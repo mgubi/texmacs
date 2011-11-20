@@ -26,32 +26,31 @@
 (define-public (dialogue-report-errors)
   (if dialogue-error
       (with error dialogue-error
-	(set! dialogue-error #f)
-	(apply throw error))))
+         (set! dialogue-error #f)
+	       (apply throw error))))
 
 (define-public-macro (dialogue . body)
   (cond
     (dialogue-break
-     `(begin ,@body))
+      `(begin ,@body))
     (dialogue-return
-     `(begin
-	(exec-delayed (lambda () (dialogue ,@body)))
-	(dialogue-return (noop))))
+      `(begin
+	       (exec-delayed (lambda () (dialogue ,@body)))
+	       (dialogue-return (noop))))
     (else
-     `(begin
-	(with-cc cont
-	  (set! dialogue-break cont)
-	  (catch #t
-		 (lambda () ,@body)
-		 (lambda err (set! dialogue-error err)))
-	  (set! dialogue-break #f))
-	(if dialogue-return (dialogue-return (noop)))
-	(dialogue-report-errors)))))
+      `(begin
+	       (with-cc cont
+	         (set! dialogue-break cont)
+	         (catch #t
+		          (lambda () ,@body)
+		          (lambda err (set! dialogue-error err)))
+	            (set! dialogue-break #f))
+         (if dialogue-return (dialogue-return (noop)))
+	       (dialogue-report-errors)))))
 
 (define-public ((dialogue-machine local-continue) result)
-  (with-cc cont
-    (set! dialogue-return cont)
-    (local-continue result))
+  (with-cc cont (set! dialogue-return cont)
+           (local-continue result))
   (set! dialogue-return #f)
   (dialogue-report-errors))
 
@@ -59,10 +58,10 @@
   `(with local-break dialogue-break
      (set! dialogue-break #f)
      (with r (with-cc ,local-continue
-	       ,@body
-	       (local-break (noop)))
-       (set! dialogue-break local-break)
-       r)))
+	              ,@body
+	              (local-break (noop)))
+           (set! dialogue-break local-break)
+           r)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simple questions
@@ -102,6 +101,30 @@
 	(delayed
 	  (choose-file (dialogue-machine local-continue) prompt type)))
       (texmacs-error "dialogue-ask" "Not in dialogue")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Simple questions without continuations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;(display* "User interaction\n")
+
+(define-public (user-ask prompt cont)
+	(tm-interactive cont
+			(if (string? prompt)
+			    (list (build-interactive-arg prompt))
+			    (list prompt))))
+
+(define-public (user-confirm? prompt default cont)
+  (let ((k (lambda (answ) (cont (yes? answ)))))
+    (if default
+      (user-ask (list prompt "question" (yes) (no)) k)
+      (user-ask (list prompt "question" (no) (yes)) k))))
+
+(define-public (user-url prompt type cont)
+  (user-delayed (lambda () (choose-file cont prompt type))))
+
+(define-public (user-delayed cont)
+  (exec-delayed cont))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Delayed execution of commands
@@ -179,13 +202,14 @@
 (define-public-macro (delayed . body)
   (if dialogue-break
       `(dialogue-user local-continue
-	 (exec-delayed
-	  (with proc ,(delayed-sub body)
-	    (lambda ()
-	      (with r (proc)
-		(if r ((dialogue-machine local-continue) (noop)))
-		r)))))
+	       (exec-delayed
+           (with proc ,(delayed-sub body)
+	           (lambda ()
+	             (with r (proc)
+		            (if r ((dialogue-machine local-continue) (noop)))
+		            r)))))
       `(exec-delayed-pause ,(delayed-sub body))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Messages and feedback on the status bar
