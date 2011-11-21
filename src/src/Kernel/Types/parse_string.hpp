@@ -16,7 +16,7 @@
 #include "list.hpp"
 
 class parse_string;
-class parse_string_rep: concrete_struct {
+class parse_string_rep: public tm_obj<parse_string_rep> {
   list<string> l;   // strings left to parse
   list<int>    p;   // positions in each string
 
@@ -32,20 +32,19 @@ public:
   string get_string (int n);
   bool test (string s);
 
-  friend class parse_string;
   friend tm_ostream& operator << (tm_ostream& out, parse_string s);
   friend bool test (parse_string s, string what);
+  friend class parse_string;
 };
 
-class parse_string {
-  CONCRETE(parse_string);
-  inline parse_string (): rep (tm_new<parse_string_rep> ()) {}
-  inline parse_string (string s): rep (tm_new<parse_string_rep> (s)) {}
-  inline char operator [] (int i) { return rep->get_char (i); }
-  inline operator bool () { return !is_nil (rep->l); }
-  inline void operator += (int i) { rep->advance (i); }
+class parse_string : public parse_string_rep::ptr {
+public:
+  inline parse_string (): parse_string_rep::ptr (tm_new<parse_string_rep> ()) {}
+  inline parse_string (string s): parse_string_rep::ptr (tm_new<parse_string_rep> (s)) {}
+  inline char operator [] (int i) { return rep()->get_char (i); }
+  inline operator bool () { return !is_nil (rep()->l); }
+  inline void operator += (int i) { rep()->advance (i); }
 };
-CONCRETE_CODE(parse_string);
 
 bool test (parse_string s, string what);
 

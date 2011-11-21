@@ -16,7 +16,7 @@
 void global_clear_history ();
 void global_confirm ();
 
-class archiver_rep: public concrete_struct {
+class archiver_rep: public tm_obj<archiver_rep> {
   patch    archive;        // undo and redo archive
   patch    current;        // current sequence of modifications
   int      depth;          // archive depth
@@ -76,10 +76,9 @@ public:
   friend void global_confirm ();
 };
 
-class archiver {
-CONCRETE (archiver);
+class archiver : public archiver_rep::ptr {
+public:
   archiver (double author, path rp);
 };
-CONCRETE_CODE (archiver);
 
 #endif // defined ARCHIVER_H

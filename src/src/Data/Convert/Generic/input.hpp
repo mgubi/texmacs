@@ -14,7 +14,7 @@
 #include "path.hpp"
 
 class texmacs_input;
-struct texmacs_input_rep: concrete_struct {
+struct texmacs_input_rep: tm_obj<texmacs_input_rep> {
   string type;                  // default value for channel below
   int    status;                // status of parser
   string buf;                   // input buffer
@@ -48,10 +48,10 @@ struct texmacs_input_rep: concrete_struct {
   void xformat_flush (bool force= false);
 };
 
-class texmacs_input {
-  CONCRETE(texmacs_input);
+class texmacs_input : public texmacs_input_rep::ptr  {
+public:
   texmacs_input (string type);
 };
-CONCRETE_CODE(texmacs_input);
+
 
 #endif // defined INPUT_H

@@ -16,7 +16,7 @@
 #include "tag_info.hpp"
 
 class drd_info;
-class drd_info_rep: concrete_struct {
+class drd_info_rep: public tm_obj<drd_info_rep> {
 public:
   string name;
   rel_hashmap<tree_label,tag_info> info;
@@ -123,13 +123,12 @@ public:
   friend tm_ostream& operator << (tm_ostream& out, drd_info drd);
 };
 
-class drd_info {
-  CONCRETE(drd_info);
+class drd_info : public drd_info_rep::ptr {
+public:
   drd_info (string name);
   drd_info (string name, drd_info base);
   operator tree ();
 };
-CONCRETE_CODE(drd_info);
 
 tree drd_env_write (tree env, string var, tree val);
 tree drd_env_merge (tree env, tree t);

@@ -18,7 +18,7 @@
  * structure for caching font pixmaps
  ******************************************************************************/
 
-struct basic_character_rep: concrete_struct {
+struct basic_character_rep : public tm_obj<basic_character_rep> {
 	int          c;
 	font_glyphs  fng;
 	int          sf;
@@ -30,14 +30,13 @@ struct basic_character_rep: concrete_struct {
 	friend class basic_character;
 };
 
-class basic_character {
-	CONCRETE(basic_character);
+class basic_character : public basic_character_rep::ptr {
+public:
 	basic_character (int c=0, font_glyphs fng= font_glyphs (),
                    int sf=1, color fg= 0, color bg= 1):
-  rep (tm_new<basic_character_rep> (c, fng, sf, fg, bg)) {};
+  basic_character_rep::ptr (tm_new<basic_character_rep> (c, fng, sf, fg, bg)) {};
 	operator tree ();
 };
-CONCRETE_CODE(basic_character);
 
 bool operator == (basic_character xc1, basic_character xc2);
 bool operator != (basic_character xc1, basic_character xc2);

@@ -35,7 +35,7 @@
 typedef int modification_type;
 class modification;
 
-class modification_rep: concrete_struct {
+class modification_rep: public tm_obj<modification_rep> {
 public:
   modification_type k;
   path p;
@@ -50,14 +50,14 @@ public:
   friend class modification;
 };
 
-class modification {
-CONCRETE(modification);
+class modification : public modification_rep::ptr {
+public:
   inline modification (modification_type k, path p):
-    rep (tm_new<modification_rep> (k, p)) {}
+    modification_rep::ptr (tm_new<modification_rep> (k, p)) {}
   inline modification (modification_type k, path p, tree t):
-    rep (tm_new<modification_rep> (k, p, t)) {}
+    modification_rep::ptr (tm_new<modification_rep> (k, p, t)) {}
 };
-CONCRETE_CODE(modification);
+//CONCRETE_CODE(modification);
 
 bool operator == (modification m1, modification m2);
 bool operator != (modification m1, modification m2);

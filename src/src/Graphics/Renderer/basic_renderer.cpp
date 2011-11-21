@@ -25,8 +25,8 @@
 ******************************************************************************/
 
 basic_character::operator tree () {
-  tree t (TUPLE,  as_string (rep->c), rep->fng->res_name);
-  t << as_string (rep->sf) << as_string (rep->fg) << as_string (rep->bg);
+  tree t (TUPLE,  as_string (rep()->c), rep()->fng->res_name);
+  t << as_string (rep()->sf) << as_string (rep()->fg) << as_string (rep()->bg);
   return t;
 }
 

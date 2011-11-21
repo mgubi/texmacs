@@ -25,19 +25,17 @@ space_rep::space_rep (SI def2) {
   min= def= max= def2;
 }
 
-space::space (SI min, SI def, SI max) {
-  rep= tm_new<space_rep> (min, def, max);
-}
+space::space (SI min, SI def, SI max) 
+ : space_rep::ptr (tm_new<space_rep> (min, def, max)){ }
 
-space::space (SI def) {
-  rep= tm_new<space_rep> (def);
-}
+space::space (SI def) 
+: space_rep::ptr (tm_new<space_rep> (def)) { }
 
 space::operator tree () {
   return tree (TUPLE,
-	       as_string (rep->min),
-	       as_string (rep->def),
-	       as_string (rep->max));
+	       as_string (rep()->min),
+	       as_string (rep()->def),
+	       as_string (rep()->max));
 }
 
 /******************************************************************************

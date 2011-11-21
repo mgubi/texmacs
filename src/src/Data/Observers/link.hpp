@@ -20,7 +20,7 @@
 ******************************************************************************/
 
 class soft_link;
-class soft_link_rep: public concrete_struct {
+class soft_link_rep: public tm_obj<soft_link_rep> {
 public:
   tree t;
 
@@ -31,20 +31,17 @@ public:
   friend class soft_link;
 };
 
-class soft_link {
-public:
-CONCRETE(soft_link);
+class soft_link : public soft_link_rep::ptr {
 public:
   inline soft_link (tree t):
-    rep (tm_new<soft_link_rep> (t)) {}
+    soft_link_rep::ptr (tm_new<soft_link_rep> (t)) {}
   inline friend bool operator == (soft_link ln1, soft_link ln2) {
-    return ln1.rep == ln2.rep; }
+    return ln1.rep() == ln2.rep(); }
   inline friend bool operator != (soft_link ln1, soft_link ln2) {
-    return ln1.rep != ln2.rep; }
+    return ln1.rep() != ln2.rep(); }
   inline friend tm_ostream& operator << (tm_ostream& out, soft_link ln) {
-    return out << "soft_link (" << ln.rep << ")"; }
+    return out << "soft_link (" << ln.rep() << ")"; }
 };
-CONCRETE_CODE(soft_link);
 
 /******************************************************************************
 * Link repositories

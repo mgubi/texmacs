@@ -180,7 +180,7 @@ struct child_info {
 };
 
 class tag_info;
-class tag_info_rep: concrete_struct {
+class tag_info_rep: public tm_obj<tag_info_rep> {
 public:
   parent_info       pi;
   array<child_info> ci;
@@ -215,8 +215,8 @@ public:
 * The main tag_info class consists of parent_info and an array of child_info
 ******************************************************************************/
 
-class tag_info {
-  CONCRETE(tag_info);
+class tag_info : public tag_info_rep::ptr {
+public:
   tag_info (parent_info pi, array<child_info> ci, tree extra);
   tag_info (int arity=0, int extra=0,
 	    int am=ARITY_NORMAL, int cm= CHILD_UNIFORM,
@@ -225,7 +225,6 @@ class tag_info {
   operator tree ();
   child_info& operator () (int child, int n);
 };
-CONCRETE_CODE(tag_info);
 
 bool operator == (tag_info ti1, tag_info ti2);
 bool operator != (tag_info ti1, tag_info ti2);

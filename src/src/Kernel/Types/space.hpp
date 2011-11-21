@@ -13,7 +13,7 @@
 #define SPACE_H
 #include "tree.hpp"
 
-class space_rep: concrete_struct {
+class space_rep: public tm_obj<space_rep> {
 public:
   SI min;
   SI def;
@@ -25,17 +25,17 @@ public:
   friend class space;
 };
 
-class space {
-  CONCRETE(space);
+class space : public space_rep::ptr {
+public:
   space (SI def=0);
   space (SI min, SI def, SI max);
   operator tree ();
   inline void operator += (space spc) {
-    rep->min += spc->min;
-    rep->def += spc->def;
-    rep->max += spc->max; }
+    rep()->min += spc->min;
+    rep()->def += spc->def;
+    rep()->max += spc->max; }
 };
-CONCRETE_CODE(space);
+
 
 bool operator == (space spc1, space spc2);
 bool operator != (space spc1, space spc2);

@@ -14,21 +14,20 @@
 #define RECTANGLES_H
 #include "list.hpp"
 
-class rectangle_rep: concrete_struct {
+class rectangle_rep: public tm_obj<rectangle_rep> {
 public:
   SI x1, y1;
   SI x2, y2;
 
   rectangle_rep (SI x1b, SI y1b, SI x2b, SI y2b);
-  friend class rectangle;
 };
 
-class rectangle {
-  CONCRETE(rectangle);
+class rectangle : public rectangle_rep::ptr {
+public:
   rectangle (SI x1b=0, SI y1b=0, SI x2b=0, SI y2b=0);
   operator tree ();
 };
-CONCRETE_CODE(rectangle);
+//CONCRETE_CODE(rectangle);
 
 tm_ostream& operator << (tm_ostream& out, rectangle r);
 rectangle copy (rectangle r);

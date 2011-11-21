@@ -27,7 +27,7 @@ destroy_tree_rep (tree_rep* rep) {
 }
 
 tree::tree (tree_label l, tree t1):
-tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (1)))
+  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (1)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
 }

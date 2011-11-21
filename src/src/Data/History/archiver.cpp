@@ -50,7 +50,7 @@ archiver_rep::~archiver_rep () {
 }
 
 archiver::archiver (double author, path rp):
-  rep (tm_new<archiver_rep> (author, rp)) {}
+  archiver_rep::ptr (tm_new<archiver_rep> (author, rp)) {}
 
 void
 archiver_rep::clear () {

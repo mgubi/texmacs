@@ -28,17 +28,17 @@ class blackbox;
 tree copy (tree t);
 
 
+// can be atomic or compound or generic
 class tree_rep: public tm_obj<tree_rep> {
 public:
   tree_label op;
   observer obs;
   inline tree_rep (tree_label op2): op (op2) {}
-//  friend class tree;
+  void destroy ();
 };
 
 
 class tree: public tree_rep::ptr {
-//  tree_rep* rep; // can be atomic or compound or generic
   inline tree (tree_rep* rep2);
 
 public:
@@ -147,6 +147,8 @@ typedef tree scheme_tree;
 
 void destroy_tree_rep (tree_rep* rep);
 inline tree::tree (tree_rep* rep2): tree_rep::ptr (rep2) { }
+inline void tree_rep::destroy () { destroy_tree_rep(this); }
+
 //inline tree::tree (const tree& x): rep (x.rep) { rep->ref_count++; }
 //inline tree::~tree () {
 //  if ((--rep->ref_count)==0) { destroy_tree_rep (rep); rep= NULL; } }

@@ -21,14 +21,14 @@
 * The url data type
 ******************************************************************************/
 
-struct url_rep: public tm_obj<url_rep> {
+struct url_rep : public tm_obj<url_rep> {
   tree t;
   inline url_rep (tree t2): t (t2) {}
 };
 
 class url : public url_rep::ptr {
 private:
-  url (tree t): url_rep::ptr  (tm_new<url_rep> (t)) {}
+  url (tree t): url_rep::ptr (tm_new<url_rep> (t)) {}
 public:
   url (const char* name);
   url (string name);
@@ -38,7 +38,6 @@ public:
   inline url operator [] (int i) { return url (rep()->t[i]); }
   friend url as_url (tree t);
 };
-//CONCRETE_CODE(url);
 
 tm_ostream& operator << (tm_ostream& out, url u);
 string as_string (url u, int type= URL_SYSTEM);

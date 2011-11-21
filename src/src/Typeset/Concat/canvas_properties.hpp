@@ -13,7 +13,7 @@
 #define CANVAS_PROPERTIES_H
 #include "env.hpp"
 
-class canvas_properties_rep: public concrete_struct {
+class canvas_properties_rep: public tm_obj<canvas_properties_rep> {
 public:
   edit_env env;
   string   type;
@@ -36,11 +36,12 @@ public:
   inline canvas_properties_rep () {}
 };
 
-class canvas_properties {
-CONCRETE(canvas_properties);
-  inline canvas_properties (): rep (tm_new<canvas_properties_rep> ()) {}
+class canvas_properties : public canvas_properties_rep::ptr {
+//CONCRETE(canvas_properties);
+public:
+  inline canvas_properties (): canvas_properties_rep::ptr (tm_new<canvas_properties_rep> ()) {}
 };
-CONCRETE_CODE(canvas_properties);
+//CONCRETE_CODE(canvas_properties);
 
 canvas_properties get_canvas_properties (edit_env env, tree t);
 void get_canvas_horizontal (canvas_properties props,

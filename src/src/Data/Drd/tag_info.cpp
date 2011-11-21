@@ -262,30 +262,34 @@ tag_info_rep::tag_info_rep (int a, int x, int am, int cm, bool frozen):
   }
 }
 
-tag_info::tag_info (parent_info pi, array<child_info> ci, tree extra) {
-  rep= tm_new<tag_info_rep> (pi, ci, extra);
+tag_info::tag_info (parent_info pi, array<child_info> ci, tree extra) 
+: tag_info_rep::ptr ( tm_new<tag_info_rep> (pi, ci, extra) ) {}
+
+
+tag_info::tag_info (int a, int x, int am, int cm, bool frozen) 
+: tag_info_rep::ptr ( tm_new<tag_info_rep> (a, x, am, cm, frozen) ) { }
+
+
+static tag_info_rep *
+make_from_tree(tree t) {
+	if ((!is_func (t, TUPLE)) || (N(t)<2) || (L(t[1]) != TUPLE)) {
+		cerr << "\nt= " << t << "\n";
+		FAILED ("bad tag_info");
+	}
+	parent_info pi (t[0]);
+	int i, n= N(t[1]);
+	array<child_info> ci (n);
+	for (i=0; i<n; i++)
+		ci[i]= child_info (t[1][i]);
+	return tm_new<tag_info_rep> (pi, ci, N(t)==3? t[2]: tree (""));
 }
 
-tag_info::tag_info (int a, int x, int am, int cm, bool frozen) {
-  rep= tm_new<tag_info_rep> (a, x, am, cm, frozen);
-}
-
-tag_info::tag_info (tree t) {
-  if ((!is_func (t, TUPLE)) || (N(t)<2) || (L(t[1]) != TUPLE)) {
-    cerr << "\nt= " << t << "\n";
-    FAILED ("bad tag_info");
-  }
-  parent_info pi (t[0]);
-  int i, n= N(t[1]);
-  array<child_info> ci (n);
-  for (i=0; i<n; i++)
-    ci[i]= child_info (t[1][i]);
-  rep= tm_new<tag_info_rep> (pi, ci, N(t)==3? t[2]: tree (""));
-}
+tag_info::tag_info (tree t) 
+: tag_info_rep::ptr (make_from_tree(t)) { }
 
 tag_info::operator tree () {
-  if (rep->extra == "") return tree (TUPLE, (tree) rep->pi, (tree) rep->ci);
-  else return tree (TUPLE, (tree) rep->pi, (tree) rep->ci, rep->extra);
+  if (rep()->extra == "") return tree (TUPLE, (tree) rep()->pi, (tree) rep()->ci);
+  else return tree (TUPLE, (tree) rep()->pi, (tree) rep()->ci, rep()->extra);
 }
 
 /******************************************************************************
@@ -450,18 +454,18 @@ tag_info_rep::get_index (int child, int n) {
 
 child_info&
 tag_info::operator () (int child, int n) {
-  int index= rep->get_index (child, n);
-  if (index < 0 || index >= N(rep->ci)) {
+  int index= rep()->get_index (child, n);
+  if (index < 0 || index >= N(rep()->ci)) {
     cout << "child       = " << child << "\n";
     cout << "out of      = " << n << "\n";
-    cout << "child_mode  = " << rep->pi.child_mode << "\n";
-    cout << "arity_mode  = " << rep->pi.arity_mode << "\n";
-    cout << "arity_base  = " << rep->pi.arity_base << "\n";
-    cout << "arity_extra = " << rep->pi.arity_extra << "\n";
-    cout << "N(ci)       = " << N(rep->ci) << "\n";
+    cout << "child_mode  = " << rep()->pi.child_mode << "\n";
+    cout << "arity_mode  = " << rep()->pi.arity_mode << "\n";
+    cout << "arity_base  = " << rep()->pi.arity_base << "\n";
+    cout << "arity_extra = " << rep()->pi.arity_extra << "\n";
+    cout << "N(ci)       = " << N(rep()->ci) << "\n";
     ASSERT (false, "index out of range");
   }
-  return rep->ci [index];
+  return rep()->ci [index];
 }
 
 /******************************************************************************

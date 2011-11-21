@@ -163,11 +163,12 @@ protected:
 	inline tm_obj (): ref_count (0) { TM_DEBUG(concrete_count++); }
   inline ~tm_obj () { TM_DEBUG(concrete_count--); }
 	inline void inc_ref () { ref_count++; } 
-	inline void dec_ref () { if (0 == --ref_count) tm_delete (static_cast<T*>(this)); } 
+	inline void dec_ref () { if (0 == --ref_count) static_cast<T*>(this)->destroy(); } 
+  inline void destroy () { tm_delete (static_cast<T*>(this)); }
 
 public:
   class ptr {
-		T *rep_;
+    T *rep_;
 	protected:	
 		inline ptr (T* p) : rep_ (p) { rep_->inc_ref(); }
     inline T* rep() const { return rep_; }

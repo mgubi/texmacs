@@ -1210,8 +1210,8 @@ recompose (array<string> a, string sep) {
 string
 trim_spaces (string s) {
   int start, end;
-  for (start=0; start<N(s) && is_space (s[start]); start++);
-  for (end=N(s); end>start && is_space (s[end]); end--);
+  for (start=0; start<N(s) && is_space (s[start]); start++) {};
+  for (end=N(s); end>start && is_space (s[end]); end--) {};
   return s (start, end);
 }
 

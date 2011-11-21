@@ -20,14 +20,15 @@
 * Constructors and basic operations
 ******************************************************************************/
 
-drd_info_rep::drd_info_rep (string name2):
-  name (name2), info (tag_info ()), env (UNINIT) {}
-drd_info_rep::drd_info_rep (string name2, drd_info base):
-  name (name2), info (tag_info (), base->info), env (UNINIT) {}
-drd_info::drd_info (string name):
-  rep (tm_new<drd_info_rep> (name)) {}
-drd_info::drd_info (string name, drd_info base):
-  rep (tm_new<drd_info_rep> (name, base)) {}
+drd_info_rep::drd_info_rep (string name2)
+  : name (name2), info (tag_info ()), env (UNINIT) {}
+drd_info_rep::drd_info_rep (string name2, drd_info base)
+  : name (name2), info (tag_info (), base->info), env (UNINIT) {}
+
+drd_info::drd_info (string name)
+  : drd_info_rep::ptr (tm_new<drd_info_rep> (name)) {}
+drd_info::drd_info (string name, drd_info base)
+  : drd_info_rep::ptr (tm_new<drd_info_rep> (name, base)) {}
 
 tree
 drd_info_rep::get_locals () {
