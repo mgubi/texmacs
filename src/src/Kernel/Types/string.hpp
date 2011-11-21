@@ -15,7 +15,7 @@
 #include "basic.hpp"
 
 class string;
-class string_rep: concrete_struct {
+class string_rep: public tm_obj<string_rep> {
   int n;
   char* a;
 
@@ -29,13 +29,14 @@ public:
   friend inline int N (string a);
 };
 
-class string {
-  CONCRETE(string);
-  inline string (): rep (tm_new<string_rep> ()) {}
-  inline string (int n): rep (tm_new<string_rep> (n)) {}
+class string: public tm_ptr<string_rep> {
+//  CONCRETE(string);
+public:
+  inline string (): tm_ptr<string_rep> (tm_new<string_rep> ()) {}
+  inline string (int n): tm_ptr<string_rep> (tm_new<string_rep> (n)) {}
   string (char c);
-  string (const char *s);
   string (const char *s, int n);
+  string (const char *s);
   inline char& operator [] (int i) { return rep->a[i]; }
   bool operator == (const char* s);
   bool operator != (const char* s);
@@ -43,7 +44,7 @@ class string {
   bool operator != (string s);
   string operator () (int start, int end);
 };
-CONCRETE_CODE(string);
+//CONCRETE_CODE(string);
 
 extern inline int N (string a) { return a->n; }
 string   copy (string a);

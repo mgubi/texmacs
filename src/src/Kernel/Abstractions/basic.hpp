@@ -153,6 +153,48 @@ struct abstract_struct {
 #define INC_COUNT_NULL(R) { if ((R)!=NULL) (R)->ref_count++; }
 #define DEC_COUNT_NULL(R) { if ((R)!=NULL && 0==--((R)->ref_count)) tm_delete (R); }
 
+
+template <class T> class tm_ptr;
+
+template <class T>
+class tm_obj {
+	int ref_count;
+protected:
+	inline tm_obj (): ref_count (0) { TM_DEBUG(concrete_count++); }
+	inline ~tm_obj () { TM_DEBUG(concrete_count--); }
+	inline void inc_ref () { ref_count++; } 
+	inline void dec_ref () { if (0 == --ref_count) tm_delete (static_cast<T*>(this)); } 
+	friend class tm_ptr<T>;
+
+};
+
+
+template <class T>
+class tm_ptr {
+protected:
+	
+	class xptr {
+		T *rep;
+	protected:	
+		inline xptr (T* p) : rep (p) { rep->inc_ref(); }
+		inline xptr() { static_cast<tm_obj<T>*>(rep)->dec_ref(); }
+	public:
+		inline xptr& operator=(xptr x) { x.rep->inc_ref(); rep->dec_ref(); rep=x.rep; return *this; }
+		inline T* operator->() { return rep; }
+	friend class tm_ptr;	
+	};
+	
+	xptr rep;
+	
+	inline tm_ptr (T* p) : rep (p) {  }
+	
+public:
+	inline tm_ptr (const tm_ptr<T>& x) : rep(x.rep) {  }
+	inline T* operator->() { return rep.operator->(); }
+};
+
+
+
 // concrete
 #define CONCRETE(PTR)               \
   PTR##_rep *rep;                   \
