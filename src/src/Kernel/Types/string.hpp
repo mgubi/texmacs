@@ -22,7 +22,7 @@ class string_rep: public tm_obj<string_rep> {
 public:
   inline string_rep (): n(0), a(NULL) {}
          string_rep (int n);
-  inline ~string_rep () { if (n!=0) tm_delete_array (a); }
+  virtual inline ~string_rep () { if (n!=0) tm_delete_array (a); }
   void resize (int n);
 
   friend class string;
