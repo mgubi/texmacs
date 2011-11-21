@@ -26,7 +26,7 @@ private:
   bool flag;
 
 public:
-  tree_pointer_rep (tree ref, bool flag2): ptr (ref.rep), flag (flag2) {}
+  tree_pointer_rep (tree ref, bool flag2): ptr (ref.rep()), flag (flag2) {}
   int get_type () { return OBSERVER_POINTER; }
   tm_ostream& print (tm_ostream& out) { return out << " pointer"; }
   void announce (tree& ref, modification mod) {
@@ -66,10 +66,10 @@ tree_pointer_rep::get_tree (tree& t) {
 
 bool
 tree_pointer_rep::set_tree (tree t) {
-  if (ptr != t.rep) {
+  if (ptr != t.rep()) {
     tree ref (ptr);
     remove_observer (ref->obs, observer (this));
-    ptr= t.rep;
+    ptr= t.rep();
     insert_observer (t->obs, observer (this));
   }
   return true;
@@ -139,7 +139,7 @@ tree_pointer_rep::notify_insert_node (tree& ref, int pos) {
   (void) ref; (void) pos;
   if (flag) {
     remove_observer (ref[pos]->obs, observer (this));
-    ptr= ref.rep;
+    ptr= ref.rep();
     insert_observer (ref->obs, observer (this));    
   }
   //cout << "position -> " << obtain_position (observer (this)) << "\n";

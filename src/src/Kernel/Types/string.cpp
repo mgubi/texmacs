@@ -48,17 +48,17 @@ string_rep::resize (register int m) {
   n= m;
 }
 
-string::string (char c) : tm_ptr<string_rep>(tm_new<string_rep> (1)) {
-  rep->a[0]=c;
+string::string (char c) : string_rep::ptr(tm_new<string_rep> (1)) {
+  rep()->a[0]=c;
 }
 
-string::string (const char* a, int n) : tm_ptr<string_rep>(tm_new<string_rep> (n)) {
+string::string (const char* a, int n) : string_rep::ptr(tm_new<string_rep> (n)) {
   register int i;
   for (i=0; i<n; i++)
-    rep->a[i]=a[i];
+    rep()->a[i]=a[i];
 }
 
-string::string (const char *s) : tm_ptr<string_rep> (string(s, strlen(s))) {}
+string::string (const char *s) : string_rep::ptr(string(s, strlen(s))) {}
 
 
 /******************************************************************************
@@ -67,8 +67,8 @@ string::string (const char *s) : tm_ptr<string_rep> (string(s, strlen(s))) {}
 
 bool
 string::operator == (const char* s) {
-  register int i, n= rep->n;
-  register char* S= rep->a;
+  register int i, n= rep()->n;
+  register char* S= rep()->a;
   for (i=0; i<n; i++) {
     if (s[i]!=S[i]) return false;
     if (s[i]=='\0') return false;
@@ -78,8 +78,8 @@ string::operator == (const char* s) {
 
 bool
 string::operator != (const char* s) {
-  register int i, n= rep->n;
-  register char* S= rep->a;
+  register int i, n= rep()->n;
+  register char* S= rep()->a;
   for (i=0; i<n; i++) {
     if (s[i]!=S[i]) return true;
     if (s[i]=='\0') return true;
@@ -90,18 +90,18 @@ string::operator != (const char* s) {
 bool
 string::operator == (string a) {
   register int i;
-  if (rep->n!=a->n) return false;
-  for (i=0; i<rep->n; i++)
-    if (rep->a[i]!=a->a[i]) return false;
+  if (rep()->n!=a->n) return false;
+  for (i=0; i<rep()->n; i++)
+    if (rep()->a[i]!=a->a[i]) return false;
   return true;
 }
 
 bool
 string::operator != (string a) {
   register int i;
-  if (rep->n!=a->n) return true;
-  for (i=0; i<rep->n; i++)
-    if (rep->a[i]!=a->a[i]) return true;
+  if (rep()->n!=a->n) return true;
+  for (i=0; i<rep()->n; i++)
+    if (rep()->a[i]!=a->a[i]) return true;
   return false;
 }
 
@@ -109,7 +109,7 @@ string
 string::operator () (int begin, int end) {
   register int i;
   string r (end-begin);
-  for (i=begin; i<end; i++) r[i-begin]=rep->a[i];
+  for (i=begin; i<end; i++) r[i-begin]=rep()->a[i];
   return r;
 }
 

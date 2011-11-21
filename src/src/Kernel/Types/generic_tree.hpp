@@ -25,7 +25,7 @@ public:
 
 inline blackbox
 as_blackbox (const tree& t) {
-  return ((generic_rep*) t.rep) -> data;
+  return ((generic_rep*) t.rep()) -> data;
 }
 
 template<typename T, typename F>

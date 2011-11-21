@@ -21,25 +21,24 @@
 * The url data type
 ******************************************************************************/
 
-struct url_rep: concrete_struct {
+struct url_rep: public tm_obj<url_rep> {
   tree t;
   inline url_rep (tree t2): t (t2) {}
 };
 
-class url {
-  CONCRETE(url);
+class url : public url_rep::ptr {
 private:
-  url (tree t): rep (tm_new<url_rep> (t)) {}
+  url (tree t): url_rep::ptr  (tm_new<url_rep> (t)) {}
 public:
   url (const char* name);
   url (string name);
   url (string dir, string name);
-  inline bool operator == (url u) { return rep->t == u->t; }
-  inline bool operator != (url u) { return rep->t != u->t; }
-  inline url operator [] (int i) { return url (rep->t[i]); }
+  inline bool operator == (url u) { return rep()->t == u->t; }
+  inline bool operator != (url u) { return rep()->t != u->t; }
+  inline url operator [] (int i) { return url (rep()->t[i]); }
   friend url as_url (tree t);
 };
-CONCRETE_CODE(url);
+//CONCRETE_CODE(url);
 
 tm_ostream& operator << (tm_ostream& out, url u);
 string as_string (url u, int type= URL_SYSTEM);

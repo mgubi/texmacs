@@ -29,22 +29,20 @@ public:
   friend inline int N (string a);
 };
 
-class string: public tm_ptr<string_rep> {
-//  CONCRETE(string);
+class string: public string_rep::ptr {
 public:
-  inline string (): tm_ptr<string_rep> (tm_new<string_rep> ()) {}
-  inline string (int n): tm_ptr<string_rep> (tm_new<string_rep> (n)) {}
+  inline string (): string_rep::ptr  (tm_new<string_rep> ()) {}
+  inline string (int n): string_rep::ptr  (tm_new<string_rep> (n)) {}
   string (char c);
   string (const char *s, int n);
   string (const char *s);
-  inline char& operator [] (int i) { return rep->a[i]; }
+  inline char& operator [] (int i) { return rep()->a[i]; }
   bool operator == (const char* s);
   bool operator != (const char* s);
   bool operator == (string s);
   bool operator != (string s);
   string operator () (int start, int end);
 };
-//CONCRETE_CODE(string);
 
 extern inline int N (string a) { return a->n; }
 string   copy (string a);

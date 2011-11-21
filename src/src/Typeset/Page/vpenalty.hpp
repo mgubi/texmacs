@@ -34,7 +34,7 @@
 #define UNBALANCED_COLUMNS    1000
 #define LONGER_LATTER_COLUMN  1000
 
-struct vpenalty_rep: concrete_struct {
+struct vpenalty_rep: public tm_obj<vpenalty_rep> {
   int pen;   // main penalty
   int exc;   // excentricity: square of shift with respect to ideal position
   inline vpenalty_rep (): pen (0), exc (0) {}
@@ -42,25 +42,24 @@ struct vpenalty_rep: concrete_struct {
   inline vpenalty_rep (int pen2, int exc2): pen (pen2), exc (exc2) {}
 };
 
-class vpenalty {
-  CONCRETE(vpenalty);
-  inline vpenalty (): rep (tm_new<vpenalty_rep> ()) {}
-  inline vpenalty (int pen): rep (tm_new<vpenalty_rep> (pen)) {}
-  inline vpenalty (int pen, int exc): rep (tm_new<vpenalty_rep> (pen, exc)) {}
+class vpenalty : public vpenalty_rep::ptr {
+public:
+  inline vpenalty (): vpenalty_rep::ptr  (tm_new<vpenalty_rep> ()) {}
+  inline vpenalty (int pen): vpenalty_rep::ptr  (tm_new<vpenalty_rep> (pen)) {}
+  inline vpenalty (int pen, int exc): vpenalty_rep::ptr  (tm_new<vpenalty_rep> (pen, exc)) {}
   inline bool operator == (vpenalty pen) {
-    return (rep->pen == pen->pen) && (rep->exc == pen->exc); }
+    return (rep()->pen == pen->pen) && (rep()->exc == pen->exc); }
   inline bool operator != (vpenalty pen) {
-    return (rep->pen != pen->pen) || (rep->exc != pen->exc); }
+    return (rep()->pen != pen->pen) || (rep()->exc != pen->exc); }
   inline bool operator < (vpenalty pen) {
     return
-      (rep->pen < pen->pen) ||
-      ((rep->pen == pen->pen) && (rep->exc < pen->exc)); }
+      (rep()->pen < pen->pen) ||
+      ((rep()->pen == pen->pen) && (rep()->exc < pen->exc)); }
   inline void operator += (vpenalty pen) {
-    rep->pen += pen->pen; rep->exc += pen->exc; }
+    rep()->pen += pen->pen; rep()->exc += pen->exc; }
   inline vpenalty operator + (vpenalty pen) {
-    return vpenalty (rep->pen + pen->pen, rep->exc + pen->exc); }
+    return vpenalty (rep()->pen + pen->pen, rep()->exc + pen->exc); }
 };
-CONCRETE_CODE(vpenalty);
 
 tm_ostream& operator << (tm_ostream& out, vpenalty pen);
 

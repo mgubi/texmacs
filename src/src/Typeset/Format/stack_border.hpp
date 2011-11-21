@@ -13,7 +13,7 @@
 #define STACK_BORDER_H
 #include "space.hpp"
 
-class stack_border_rep: public concrete_struct {
+class stack_border_rep: public tm_obj<stack_border_rep> {
 public:
   SI    height;  // default distance between successive base lines
   SI    sep;     // (~~PAR_SEP) sep-ver_sep is maximal amount of shoving
@@ -37,11 +37,10 @@ public:
     nobr_before (false), nobr_after (false) {}
 };
 
-class stack_border {
-  CONCRETE(stack_border);
-  inline stack_border (): rep (tm_new<stack_border_rep> ()) {}
+class stack_border : public stack_border_rep::ptr {
+public:
+  inline stack_border (): stack_border_rep::ptr (tm_new<stack_border_rep> ()) {}
 };
-CONCRETE_CODE(stack_border);
 
 inline tm_ostream&
 operator << (tm_ostream& out, stack_border sb) {

@@ -15,7 +15,7 @@
 
 enum tab_kind { tab_all, tab_first, tab_last };
 
-class tab_rep: concrete_struct {
+class tab_rep: public tm_obj<tab_rep> {
 public:
   int pos;
   double weight;
@@ -23,15 +23,12 @@ public:
 
   inline tab_rep () {}
   tab_rep (int pos, tree t);
-
-  friend class tab;
 };
 
-class tab {
-  CONCRETE(tab);
-  inline tab (): rep (tm_new<tab_rep> ()) {}
-  inline tab (int pos, tree t): rep (tm_new<tab_rep> (pos, t)) {}
+class tab : public tab_rep::ptr {
+public:
+  inline tab (): tab_rep::ptr (tm_new<tab_rep> ()) {}
+  inline tab (int pos, tree t): tab_rep::ptr (tm_new<tab_rep> (pos, t)) {}
 };
-CONCRETE_CODE(tab);
 
 #endif // defined TAB_H
