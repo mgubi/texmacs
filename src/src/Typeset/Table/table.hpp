@@ -20,7 +20,7 @@
 class cell;
 class table;
 
-class table_rep: public concrete_struct {
+class table_rep: public tm_obj<table_rep> {
 protected:
   hashmap<string,tree> var;   // formatting variables
 
@@ -88,14 +88,14 @@ public:
   friend class lazy_table_rep;
 };
 
-class table {
-  CONCRETE_NULL(table);
+class table : public tm_null_ptr<table_rep> {
+public:
+  inline table () {}
   inline table (edit_env env, int status= 0, int i0= 0, int j0= 0):
-    rep (tm_new<table_rep> (env, status, i0, j0)) {}
+    tm_null_ptr<table_rep> (tm_new<table_rep> (env, status, i0, j0)) {}
 };
-CONCRETE_NULL_CODE(table);
 
-class cell_rep: public concrete_struct {
+class cell_rep: public tm_obj<cell_rep> {
 protected:
   hashmap<string,tree> var;   // formatting variables
 
@@ -151,10 +151,11 @@ public:
   void finish ();
 };
 
-class cell {
-  CONCRETE_NULL(cell);
-  inline cell (edit_env env): rep (tm_new<cell_rep> (env)) {}
+class cell : public tm_null_ptr<cell_rep> {
+public:
+  inline cell () {}
+  inline cell (edit_env env): tm_null_ptr<cell_rep> (tm_new<cell_rep> (env)) {}
 };
-CONCRETE_NULL_CODE(cell);
+//CONCRETE_NULL_CODE(cell);
 
 #endif // defined TABLE_H

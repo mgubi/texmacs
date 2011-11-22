@@ -57,7 +57,6 @@ public:
   inline modification (modification_type k, path p, tree t):
     modification_rep::ptr (tm_new<modification_rep> (k, p, t)) {}
 };
-//CONCRETE_CODE(modification);
 
 bool operator == (modification m1, modification m2);
 bool operator != (modification m1, modification m2);

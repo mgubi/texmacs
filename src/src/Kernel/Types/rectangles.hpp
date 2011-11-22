@@ -27,7 +27,6 @@ public:
   rectangle (SI x1b=0, SI y1b=0, SI x2b=0, SI y2b=0);
   operator tree ();
 };
-//CONCRETE_CODE(rectangle);
 
 tm_ostream& operator << (tm_ostream& out, rectangle r);
 rectangle copy (rectangle r);

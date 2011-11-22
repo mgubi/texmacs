@@ -20,7 +20,7 @@
 #define PAGE_CONTROL_ITEM   2
 
 class page_item;
-class page_item_rep: public concrete_struct {
+class page_item_rep: public tm_obj<page_item_rep> {
 public:
   int          type;    // type of the page item
 
@@ -38,8 +38,8 @@ public:
 		 array<lazy> fl, int nr_cols, tree t);
 };
 
-class page_item {
-  CONCRETE_NULL(page_item);
+class page_item : public tm_null_ptr<page_item_rep> {
+public:
   page_item (box b, array<lazy> fl= 0, int nr_cols= 1);
   page_item (tree t, int nr_cols);
   page_item (int type, box b, space spc, int penalty,
@@ -48,7 +48,6 @@ class page_item {
   bool operator != (page_item item2);
   friend page_item copy (page_item l);
 };
-CONCRETE_NULL_CODE(page_item);
 
 tm_ostream& operator << (tm_ostream& out, page_item item);
 

@@ -37,11 +37,9 @@ public:
 };
 
 class canvas_properties : public canvas_properties_rep::ptr {
-//CONCRETE(canvas_properties);
 public:
   inline canvas_properties (): canvas_properties_rep::ptr (tm_new<canvas_properties_rep> ()) {}
 };
-//CONCRETE_CODE(canvas_properties);
 
 canvas_properties get_canvas_properties (edit_env env, tree t);
 void get_canvas_horizontal (canvas_properties props,

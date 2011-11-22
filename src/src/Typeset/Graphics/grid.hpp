@@ -15,7 +15,7 @@
 #include "curve.hpp"
 #include "renderer.hpp"
 
-class grid_curve_rep: public concrete_struct {
+class grid_curve_rep: public tm_obj<grid_curve_rep> {
 public:
   string col;
   curve c;
@@ -24,12 +24,12 @@ public:
     col(col2), c(c2) {}
 };
 
-class grid_curve {
-  CONCRETE_NULL(grid_curve);
+class grid_curve : public tm_null_ptr<grid_curve_rep> {
+public:
+  inline grid_curve () {}
   inline grid_curve (string col, curve c):
-    rep (tm_new<grid_curve_rep> (col, c)) {}
+    tm_null_ptr<grid_curve_rep> (tm_new<grid_curve_rep> (col, c)) {}
 };
-CONCRETE_NULL_CODE(grid_curve);
 
 class grid_rep: public abstract_struct {
 protected:

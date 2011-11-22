@@ -17,7 +17,7 @@
 * Information about the best line breaks
 ******************************************************************************/
 
-struct lb_info_rep: concrete_struct {
+struct lb_info_rep: public tm_obj<lb_info_rep> {
   path prev;
   int  pen;
   PEN  pen_spc;
@@ -25,15 +25,14 @@ struct lb_info_rep: concrete_struct {
   lb_info_rep (): prev (), pen (HYPH_INVALID), pen_spc ((PEN) 1000000000) {}
 };
 
-struct lb_info {
-  CONCRETE(lb_info);
-  lb_info () { rep= tm_new<lb_info_rep> (); }
+struct lb_info : public lb_info_rep::ptr {
+public:
+  lb_info () : lb_info_rep::ptr  (tm_new<lb_info_rep> ()) { }
   operator tree () {
-    return tuple ((tree) rep->prev,
-		  as_string (rep->pen),
-		  as_string ((double) rep->pen_spc)); }
+    return tuple ((tree) rep()->prev,
+		  as_string (rep()->pen),
+		  as_string ((double) rep()->pen_spc)); }
 };
-CONCRETE_CODE(lb_info);
 
 tm_ostream&
 operator << (tm_ostream& out, lb_info hi) {

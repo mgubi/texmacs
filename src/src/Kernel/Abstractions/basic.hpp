@@ -155,6 +155,34 @@ struct abstract_struct {
 
 
 template <class T>
+class tm_ptr {
+  T *rep_;
+protected:	
+  inline tm_ptr (T* p) : rep_ (p) { rep_->inc_ref(); }
+  inline T* rep() const { return rep_; }
+public:
+  inline tm_ptr (const tm_ptr<T>& x) : rep_(x.rep_) { rep_->inc_ref(); }
+  inline tm_ptr() { rep_->dec_ref(); }
+  inline tm_ptr& operator=(tm_ptr<T> x) {  x.rep_->inc_ref();  rep_->dec_ref(); rep_=x.rep_; return *this; }
+  inline T* operator->() { return rep_; }
+};
+
+template <class T>
+class tm_null_ptr {
+  T *rep_;
+protected:	
+  inline tm_null_ptr (T* p) : rep_ (p) { if (rep_) rep_->inc_ref(); }
+  inline T* rep() const { return rep_; }
+public:
+  inline tm_null_ptr () : rep_ (NULL) {  }
+  inline tm_null_ptr (const tm_null_ptr<T>& x) : rep_(x.rep_) { if (rep_)  rep_->inc_ref(); }
+  inline ~tm_null_ptr() { if (rep_)  rep_->dec_ref(); }
+  inline tm_null_ptr& operator=(tm_null_ptr<T> x) {  if (x.rep_) x.rep_->inc_ref();  if (rep_) rep_->dec_ref(); rep_=x.rep_; return *this; }
+  inline T* operator->() { return rep_; }
+  friend bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
+};
+
+template <class T>
 class tm_obj {
 	int ref_count;
   
@@ -167,17 +195,10 @@ protected:
   inline void destroy () { tm_delete (static_cast<T*>(this)); }
 
 public:
-  class ptr {
-    T *rep_;
-	protected:	
-		inline ptr (T* p) : rep_ (p) { rep_->inc_ref(); }
-    inline T* rep() const { return rep_; }
-	public:
-    inline ptr (const tm_obj<T>::ptr& x) : rep_(x.rep_) { rep_->inc_ref(); }
-		inline ~ptr() { rep_->dec_ref(); }
-		inline ptr& operator=(ptr x) {  x.rep_->inc_ref();  rep_->dec_ref(); rep_=x.rep_; return *this; }
-		inline T* operator->() { return rep_; }
-	};
+  typedef tm_ptr<T> ptr;
+  typedef tm_null_ptr<T> null_ptr;
+  friend class tm_ptr<T>;
+  friend class tm_null_ptr<T>;
 };
 
 

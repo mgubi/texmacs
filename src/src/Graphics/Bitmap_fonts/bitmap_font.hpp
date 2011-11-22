@@ -32,7 +32,7 @@ typedef metric_struct metric[1];
 * The glyph structure
 ******************************************************************************/
 
-struct glyph_rep: concrete_struct {
+struct glyph_rep: tm_obj<glyph_rep> {
   short depth;               // number of bits per pixel >= depth
   short width, height;       // width and height in pixels
   short xoff, yoff;          // offset of origin
@@ -52,11 +52,10 @@ struct glyph_rep: concrete_struct {
   void adjust_top ();
 };
 
-struct glyph {
-  CONCRETE_NULL(glyph);
+struct glyph : public tm_null_ptr<glyph_rep> {
+public:
   glyph (int w2, int h2, int xoff2, int yoff2, int depth2=1, int status2= 0);
 };
-CONCRETE_NULL_CODE(glyph);
 
 inline int
 glyph_rep::get_1 (int i, int j) {

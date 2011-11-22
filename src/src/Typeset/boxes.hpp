@@ -36,7 +36,7 @@
 * The cursor class
 ******************************************************************************/
 
-struct cursor_rep: concrete_struct {
+struct cursor_rep : tm_obj<cursor_rep> {
   SI ox, oy;    // main cursor position
   SI delta;     // infinitesimal shift to the right
   SI y1;        // under base line
@@ -45,12 +45,11 @@ struct cursor_rep: concrete_struct {
   bool valid;   // the cursor is valid
 };
 
-struct cursor {
-  CONCRETE(cursor);
+struct cursor : public cursor_rep::ptr {
+public:
   cursor (SI x=0, SI y=0, SI delta=0, SI y1=0, SI y2=0,
 	  double slope=0.0, bool valid=true);
 };
-CONCRETE_CODE(cursor);
 
 cursor copy (cursor cu);
 bool operator == (cursor cu1, cursor cu2);
@@ -61,20 +60,19 @@ tm_ostream& operator << (tm_ostream& out, cursor cu);
 * The selection class
 ******************************************************************************/
 
-struct selection_rep: concrete_struct {
+struct selection_rep : public tm_obj<selection_rep> {
   rectangles rs;
   path start;
   path end;
   bool valid;
 };
 
-struct selection {
-  CONCRETE(selection);
+struct selection : public selection_rep::ptr {
+public:
   selection (rectangles rs= rectangles(),
 	     path start= path(), path end= path (),
 	     bool valid= true);
 };
-CONCRETE_CODE(selection);
 
 bool operator == (selection sel1, selection sel2);
 bool operator != (selection sel1, selection sel2);
@@ -85,8 +83,9 @@ tm_ostream& operator << (tm_ostream& out, selection sel);
 ******************************************************************************/
 
 struct gr_selection_rep;
-struct gr_selection {
-  CONCRETE(gr_selection);
+
+struct gr_selection : public tm_ptr<gr_selection_rep> {
+public:
   gr_selection (array<path> cp= array<path> (), SI dist= 0);
 };
 
@@ -325,7 +324,7 @@ tree attach_dip (tree ref, path ip);
 * The graphical selection class (continued)
 ******************************************************************************/
 
-struct gr_selection_rep: concrete_struct {
+struct gr_selection_rep: tm_obj<gr_selection_rep> {
   string type;
   array<path> cp;
   array<point> pts;
@@ -333,6 +332,5 @@ struct gr_selection_rep: concrete_struct {
   SI dist;
   curve c;
 };
-CONCRETE_CODE(gr_selection);
 
 #endif // defined BOXES_H

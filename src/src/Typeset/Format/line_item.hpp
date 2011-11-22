@@ -39,7 +39,7 @@
 
 extern int line_item_count;
 class line_item;
-class line_item_rep: public concrete_struct {
+class line_item_rep: public tm_obj<line_item_rep> {
 public:
   int        type;      // type of the line item
   int        op_type;   // operator type for mathematical symbols
@@ -56,15 +56,14 @@ public:
   ~line_item_rep ();
 };
 
-class line_item {
-  CONCRETE_NULL(line_item);
+class line_item : public tm_null_ptr<line_item_rep> {
+public:
   line_item (int type, int ot_type, box b, int penalty);
   line_item (int type, int ot_type, box b, int penalty, language lan);
   line_item (int type, int ot_type, box b, int penalty, tree t);
   bool operator == (line_item item2);
   bool operator != (line_item item2);
 };
-CONCRETE_NULL_CODE(line_item);
 
 tm_ostream& operator << (tm_ostream& out, line_item item);
 

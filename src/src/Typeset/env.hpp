@@ -116,7 +116,7 @@
 ******************************************************************************/
 
 class edit_env;
-class edit_env_rep: public concrete_struct {
+class edit_env_rep: public tm_obj<edit_env_rep> {
 public:
   drd_info&                    drd;
 private:
@@ -455,10 +455,10 @@ public:
   friend tm_ostream& operator << (tm_ostream& out, edit_env env);
 };
 
-class edit_env {
-  CONCRETE_NULL(edit_env);
-  inline edit_env (edit_env_rep* rep2):
-    rep(rep2) { INC_COUNT_NULL (this->rep); }
+class edit_env : public tm_null_ptr<edit_env_rep> {
+//  inline edit_env (edit_env_rep* rep2):
+//    tm_null_ptr<edit_env_rep>(rep2) { INC_COUNT_NULL (this->rep); }
+public:
   edit_env (drd_info& drd,
 	    url base_file_name,
 	    hashmap<string,tree>& local_ref,
@@ -466,7 +466,6 @@ class edit_env {
 	    hashmap<string,tree>& local_aux,
 	    hashmap<string,tree>& global_aux);
 };
-CONCRETE_NULL_CODE(edit_env);
 
 tm_ostream& operator << (tm_ostream& out, edit_env env);
 tree texmacs_exec (edit_env env, tree cmd);

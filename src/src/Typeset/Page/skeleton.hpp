@@ -21,17 +21,9 @@
 ******************************************************************************/
 
 struct pagelet;
-struct insertion_rep;
-struct insertion {
-  CONCRETE(insertion);
-  inline insertion ();
-  inline insertion (tree type, path begin, path end);
-  inline insertion (tree type, array<pagelet> sk);
-  friend bool operator == (insertion ins1, insertion ins2);
-  friend bool operator != (insertion ins1, insertion ins2);
-  friend tm_ostream& operator << (tm_ostream& out, insertion ins);
-};
-struct pagelet_rep: concrete_struct {
+struct insertion;
+
+struct pagelet_rep: tm_obj<pagelet_rep> {
   array<insertion> ins;
   space            ht;
   vpenalty         pen;
@@ -40,8 +32,9 @@ struct pagelet_rep: concrete_struct {
   inline pagelet_rep (space ht2);
 };
 
-struct pagelet {
-  CONCRETE_NULL(pagelet);
+struct pagelet : public tm_null_ptr<pagelet_rep> {
+public:
+  inline pagelet () {};
   inline pagelet (space ht);
   void operator << (insertion ins);
   void operator << (space ht);
@@ -51,11 +44,8 @@ struct pagelet {
 };
 typedef array<pagelet> skeleton;
 
-/******************************************************************************
-* Code for insertions
-******************************************************************************/
 
-struct insertion_rep: concrete_struct {
+struct insertion_rep: public tm_obj<insertion_rep> {
   tree      type;     // type of insertion
   path      begin;    // begin location in array of page_items
   path      end;      // end location in array of page_items
@@ -65,52 +55,65 @@ struct insertion_rep: concrete_struct {
   double    stretch;  // between -1 and 1 for determining final height
   SI        top_cor;  // top correction
   SI        bot_cor;  // bottom correction
-
+  
   inline insertion_rep () {}
   inline insertion_rep (tree type2, path begin2, path end2):
-    type (type2), begin (begin2), end (end2) {}
+  type (type2), begin (begin2), end (end2) {}
   insertion_rep (tree type, skeleton sk);
 };
-CONCRETE_CODE(insertion);
+
+
+struct insertion : public insertion_rep::ptr {
+public:
+  inline insertion ();
+  inline insertion (tree type, path begin, path end);
+  inline insertion (tree type, array<pagelet> sk);
+  friend bool operator == (insertion ins1, insertion ins2);
+  friend bool operator != (insertion ins1, insertion ins2);
+  friend tm_ostream& operator << (tm_ostream& out, insertion ins);
+};
+
+/******************************************************************************
+* Code for insertions
+******************************************************************************/
+
 
 inline
-insertion::insertion () {
-  rep= tm_new<insertion_rep> ();
-}
+insertion::insertion () 
+  :  insertion_rep::ptr ( tm_new<insertion_rep> () ) {};
+
 
 inline
-insertion::insertion (tree type, path begin, path end) {
-  rep= tm_new<insertion_rep> (type, begin, end);
-}
+insertion::insertion (tree type, path begin, path end) 
+  :  insertion_rep::ptr (  tm_new<insertion_rep> (type, begin, end)) {};
+
 
 inline
-insertion::insertion (tree type, skeleton sk) {
-  rep= tm_new<insertion_rep> (type, sk);
-}
+insertion::insertion (tree type, skeleton sk) 
+  :  insertion_rep::ptr (  tm_new<insertion_rep> (type, sk) ) {};
+
 
 /******************************************************************************
 * Code for pagelets
 ******************************************************************************/
 
-CONCRETE_NULL_CODE(pagelet);
 
 inline pagelet_rep::pagelet_rep (space ht2): ht (ht2) {}
 
 inline
-pagelet::pagelet (space ht) {
-  rep= tm_new<pagelet_rep> (ht);
-}
+pagelet::pagelet (space ht) 
+: tm_null_ptr<pagelet_rep> (tm_new<pagelet_rep> (ht)) {}
 
 inline void
 pagelet::operator << (insertion ins) {
-  rep->ht  += ins->ht;
-  rep->pen += ins->pen;
-  rep->ins << ins;
+  rep()->ht  += ins->ht;
+  rep()->pen += ins->pen;
+  rep()->ins << ins;
 }
 
 inline void
 pagelet::operator << (space spc) {
-  rep->ht += spc;
+  rep()->ht += spc;
 }
 
 bool operator == (pagelet pg1, pagelet pg2);

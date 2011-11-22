@@ -556,12 +556,12 @@ box_rep::post_display (renderer &ren) {
 * The cursor class
 ******************************************************************************/
 
-cursor::cursor (SI x, SI y, SI delta, SI y1, SI y2, double slope, bool valid):
-  rep (tm_new<cursor_rep> ())
+cursor::cursor (SI x, SI y, SI delta, SI y1, SI y2, double slope, bool valid)
+:  tm_ptr<cursor_rep> (tm_new<cursor_rep> ())
 {
-  rep->ox= x ; rep->oy= y ; rep->delta= delta;
-  rep->y1= y1; rep->y2= y2; rep->slope= slope;
-  rep->valid= valid;
+  rep()->ox= x ; rep()->oy= y ; rep()->delta= delta;
+  rep()->y1= y1; rep()->y2= y2; rep()->slope= slope;
+  rep()->valid= valid;
 }
 
 cursor
@@ -598,12 +598,12 @@ operator << (tm_ostream& out, cursor cu) {
 ******************************************************************************/
 
 selection::selection (rectangles rs, path start, path end, bool valid):
-  rep (tm_new<selection_rep> ())
+selection_rep::ptr (tm_new<selection_rep> ())
 {
-  rep->rs   = rs;
-  rep->start= start;
-  rep->end  = end;
-  rep->valid= valid;
+  rep()->rs   = rs;
+  rep()->start= start;
+  rep()->end  = end;
+  rep()->valid= valid;
 }
 
 bool
@@ -628,10 +628,10 @@ operator << (tm_ostream& out, selection sel) {
 ******************************************************************************/
 
 gr_selection::gr_selection (array<path> cp, SI dist):
-  rep (tm_new<gr_selection_rep> ())
+gr_selection_rep::ptr (tm_new<gr_selection_rep> ())
 {
-  rep->cp  = cp;
-  rep->dist= dist;
+  rep()->cp  = cp;
+  rep()->dist= dist;
 }
 
 tm_ostream&
