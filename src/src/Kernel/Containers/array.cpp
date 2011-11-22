@@ -51,18 +51,20 @@ array_rep<T>::resize (register int m) {
 }
 
 template<class T>
-array<T>::array (T* a, int n) {
+array<T>::array (T* a, int n) 
+: tm_ptr<array_rep<T> >( tm_new<array_rep<T> > (n))
+{
   register int i;
-  rep= tm_new<array_rep<T> > (n);
   for (i=0; i<n; i++)
-    rep->a[i]=a[i];
+    this->rep()->a[i]=a[i];
 }
 
 template<class T>
-array<T>::array (T x1, T x2) {
-  rep= tm_new<array_rep<T> > (2);
-  rep->a[0]= x1;
-  rep->a[1]= x2;
+array<T>::array (T x1, T x2) 
+: tm_ptr<array_rep<T> >( tm_new<array_rep<T> > (2))
+{
+  this->rep()->a[0]= x1;
+  this->rep()->a[1]= x2;
 }
 
 /******************************************************************************

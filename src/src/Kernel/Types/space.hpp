@@ -25,7 +25,7 @@ public:
   friend class space;
 };
 
-class space : public space_rep::ptr {
+class space : public tm_ptr<space_rep> {
 public:
   space (SI def=0);
   space (SI min, SI def, SI max);

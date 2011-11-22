@@ -19,7 +19,8 @@ template<class T> int N (hashset<T> h);
 template<class T> tm_ostream& operator << (tm_ostream& out, hashset<T> h);
 template<class T> bool operator <= (hashset<T> h1, hashset<T> h2);
 
-template<class T> class hashset_rep: concrete_struct {
+template<class T> 
+class hashset_rep : public tm_obj<hashset_rep<T> > {
   int size;    // size of hashset (nr of entries)
   int n;       // nr of keys (a power of two)
   int max;     // mean number of entries per key
@@ -44,13 +45,13 @@ public:
   friend class hashset_iterator_rep<T>;
 };
 
-template<class T> class hashset {
-CONCRETE_TEMPLATE(hashset,T);
+template<class T> 
+class hashset : public tm_ptr<hashset_rep<T> > {
+public:
   inline hashset (int n=1, int max=1):
-    rep (tm_new<hashset_rep<T> > (n, max)) {}
+    tm_ptr<hashset_rep<T> > (tm_new<hashset_rep<T> > (n, max)) {}
   operator tree ();
 };
-CONCRETE_TEMPLATE_CODE(hashset,class,T);
 
 template<class T> inline int N (hashset<T> h) { return h->size; }
 template<class T> bool operator == (hashset<T> h1, hashset<T> h2);

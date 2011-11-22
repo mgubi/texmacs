@@ -215,7 +215,7 @@ public:
 * The main tag_info class consists of parent_info and an array of child_info
 ******************************************************************************/
 
-class tag_info : public tag_info_rep::ptr {
+class tag_info : public tm_ptr<tag_info_rep> {
 public:
   tag_info (parent_info pi, array<child_info> ci, tree extra);
   tag_info (int arity=0, int extra=0,

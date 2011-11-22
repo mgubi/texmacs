@@ -50,12 +50,12 @@ public:
   friend class modification;
 };
 
-class modification : public modification_rep::ptr {
+class modification : public tm_ptr<modification_rep> {
 public:
   inline modification (modification_type k, path p):
-    modification_rep::ptr (tm_new<modification_rep> (k, p)) {}
+    tm_ptr<modification_rep> (tm_new<modification_rep> (k, p)) {}
   inline modification (modification_type k, path p, tree t):
-    modification_rep::ptr (tm_new<modification_rep> (k, p, t)) {}
+    tm_ptr<modification_rep> (tm_new<modification_rep> (k, p, t)) {}
 };
 
 bool operator == (modification m1, modification m2);

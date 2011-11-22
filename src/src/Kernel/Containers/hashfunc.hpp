@@ -13,7 +13,8 @@
 #define HASHFUNC_H
 #include "hashmap.hpp"
 
-template<class T, class U> class hashfunc_rep: public concrete_struct {
+template<class T, class U> 
+class hashfunc_rep : public tm_obj<hashfunc_rep<T,U> > {
   U (*func) (T);          // the function
   hashmap<T,U> remember;  // remembered values
 public:
@@ -22,14 +23,14 @@ public:
   U apply (T x);
 };
 
-template<class T, class U> class hashfunc {
-  CONCRETE_TEMPLATE_2(hashfunc,T,U);
+template<class T, class U> 
+class hashfunc : tm_ptr<hashfunc_rep<T,U> > {
+public:
   inline hashfunc (U (*func) (T), U init):
-    rep (tm_new<hashfunc_rep<T,U> > (func, init)) {}
-  inline U operator [] (T x) { return rep->apply (x); }
+    tm_ptr<hashfunc_rep<T,U> > (tm_new<hashfunc_rep<T,U> > (func, init)) {}
+  inline U operator [] (T x) { return this->rep()->apply (x); }
   operator tree ();
 };
-CONCRETE_TEMPLATE_2_CODE(hashfunc,class,T,class,U);
 
 #include "hashfunc.cpp"
 

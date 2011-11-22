@@ -26,7 +26,7 @@ TMPL T* A (polynomial<T> a);
 ******************************************************************************/
 
 TMPL
-class polynomial_rep: concrete_struct {
+class polynomial_rep : public tm_obj<polynomial_rep<T> > {
   int n;
   T* a;
 public:
@@ -39,30 +39,29 @@ public:
 };
 
 TMPL
-class polynomial {
-CONCRETE_TEMPLATE(polynomial,T);
-  inline polynomial (T *a, int n):
-    rep (tm_new<polynomial_rep<T> > (a, n)) {}
-  inline polynomial (T c, int n) {
-    T* a= (n == 0? NULL: tm_new_array<T> (n));
-    for (int i=0; i<n; i++) a[i]= c;
-    rep= tm_new<polynomial_rep<T> > (a, n); }
-  inline polynomial () {
-    rep= tm_new<polynomial_rep<T> > ((T*) NULL, 0); }
-  inline polynomial (T c1) {
-    T* a= tm_new_array<T> (1); a[0]= c1;
-    rep= tm_new<polynomial_rep<T> > (a, 1); }
-  inline polynomial (T c1, T c2) {
-    T* a= tm_new_array<T> (2); a[0]= c1; a[1]= c2;
-    rep= tm_new<polynomial_rep<T> > (a, 2); }
-  inline polynomial (T c1, T c2, T c3) {
-    T* a= tm_new_array<T> (3); a[0]= c1; a[1]= c2; a[2]= c3;
-    rep= tm_new<polynomial_rep<T> > (a, 3); }
-  inline T operator [] (int i) { return i<rep->n? rep->a[i]: T(0); }
+class polynomial : public tm_ptr<polynomial_rep<T> > {
+public:
+  inline polynomial (T *a, int n)
+   : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > (a, n)) {}
+  inline polynomial (T c, int n)
+   : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > ((n == 0? NULL: tm_new_array<T> (n)), n))
+  { T* a= this->rep()->a;
+    for (int i=0; i<n; i++) a[i]= c; }
+  inline polynomial ()
+  : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > ((T*) NULL, 0)) {}
+  inline polynomial (T c1)
+  : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > (tm_new_array<T> (1), 1)) 
+  {  T* a= this->rep()->a; a[0]= c1; }
+  inline polynomial (T c1, T c2)
+  : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > (tm_new_array<T> (2), 2)) 
+  {  T* a= this->rep()->a; a[0]= c1; a[1]= c2; }
+  inline polynomial (T c1, T c2, T c3)
+  : tm_ptr<polynomial_rep<T> > (tm_new<polynomial_rep<T> > (tm_new_array<T> (3), 3)) 
+  {  T* a= this->rep()->a; a[0]= c1; a[1]= c2;  a[2]= c3; }
+  inline T operator [] (int i) { return i<this->rep()->n? this->rep()->a[i]: T(0); }
   T operator () (T c);
   T operator () (T c, int order);
 };
-CONCRETE_TEMPLATE_CODE(polynomial,typename,T);
 
 TMPL
 class unary_properties<polynomial<T> > {
@@ -104,9 +103,9 @@ TMPL inline int degree (polynomial<T> p) { return N(p)-1; }
 
 TMPL T
 polynomial<T>::operator () (T c) {
-  int i, n= rep->n;
+  int i, n= this->rep()->n;
   if (n == 0) return 0;
-  T* a= rep->a;
+  T* a= this->rep()->a;
   T sum= a[n-1];
   for (i=n-2; i>=0; i--)
     sum = c * sum + a[i];
@@ -115,9 +114,9 @@ polynomial<T>::operator () (T c) {
 
 TMPL T
 polynomial<T>::operator () (T c, int order) {
-  int i, n= rep->n;
+  int i, n= this->rep()->n;
   if (n <= order) return 0;
-  T* a= rep->a;
+  T* a= this->rep()->a;
   T prod= 1;
   for (i=n-order; i<n; i++) prod *= T(i);
   T sum= prod * a[n-1];

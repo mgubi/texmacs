@@ -16,7 +16,7 @@
 #include "hashset.hpp"
 #include "command.hpp"
 
-struct socket_notifier_rep: concrete_struct {
+struct socket_notifier_rep: tm_obj<socket_notifier_rep> {
   int fd; // file descriptor for the socket
   command cmd;
   
@@ -26,17 +26,17 @@ public:
   void notify () { if (!is_nil (cmd)) cmd->apply (); } 
 };
 
-class socket_notifier {
-CONCRETE_NULL(socket_notifier);
+class socket_notifier : public tm_null_ptr<socket_notifier_rep> {
+public:
+  inline socket_notifier () {}
   inline socket_notifier (int _fd, void (*_cb) (void*, void*),
 			  void *_obj, void *_info = NULL):
-    rep (tm_new<socket_notifier_rep> (_fd, command (_cb, _obj, _info))) {}
+    tm_null_ptr<socket_notifier_rep> (tm_new<socket_notifier_rep> (_fd, command (_cb, _obj, _info))) {}
   friend bool operator == (socket_notifier sn1, socket_notifier sn2) {
-    return (sn1.rep == sn2.rep); }
+    return (sn1.rep() == sn2.rep()); }
   friend int hash (socket_notifier sn) {
-    return hash (sn.rep); }
+    return hash (sn.rep()); }
 };
-CONCRETE_NULL_CODE(socket_notifier);
 
 inline tm_ostream& operator << (tm_ostream& out, socket_notifier sn) {
   if (is_nil (sn)) return out << "nil socket_notifier";

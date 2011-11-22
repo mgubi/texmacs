@@ -151,10 +151,10 @@ operator << (tm_ostream& out, hashmap<T,U> h) {
 }
 
 TMPL hashmap<T,U>::operator tree () {
-  int i=0, j=0, n=rep->n, size=rep->size;
+  int i=0, j=0, n=this->rep()->n, size=this->rep()->size;
   tree t (COLLECTION, size);
   for (; i<n; i++) {
-    list<hashentry<T,U> > l= rep->a[i];
+    list<hashentry<T,U> > l= this->rep()->a[i];
     for (; !is_nil (l); l= l->next, j++)
       t[j]= (tree) l->item;
   }

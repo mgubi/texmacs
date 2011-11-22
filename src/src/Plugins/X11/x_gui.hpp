@@ -42,7 +42,7 @@ color blend (color fg, color bg);
 * For anti aliasing of TeX fonts
 ******************************************************************************/
 
-struct x_character_rep: concrete_struct {
+struct x_character_rep: public tm_obj<x_character_rep> {
   int          c;
   font_glyphs  fng;
   int          sf;
@@ -52,13 +52,13 @@ struct x_character_rep: concrete_struct {
   friend class x_character;
 };
 
-class x_character {
-  CONCRETE(x_character);
+class x_character : public tm_ptr<x_character_rep> {
+public:
+  x_character () {}
   x_character (int c=0, font_glyphs fng= font_glyphs (),
 	       int sf=1, color fg= 0, color bg= 1);
   operator tree ();
 };
-CONCRETE_CODE(x_character);
 
 bool operator == (x_character xc1, x_character xc2);
 bool operator != (x_character xc1, x_character xc2);
@@ -68,7 +68,7 @@ int hash (x_character xc);
 * Delayed messages
 ******************************************************************************/
 
-struct message_rep: concrete_struct {
+struct message_rep : public tm_obj<message_rep> {
   widget wid;
   string s;
   time_t t;
@@ -76,11 +76,11 @@ struct message_rep: concrete_struct {
   friend class message;
 };
 
-class message {
-  CONCRETE(message);
+class message : public tm_ptr<message_rep> {
+public:
   message (widget wid, string s, time_t t);
 };
-CONCRETE_CODE(message);
+
 
 tm_ostream& operator << (tm_ostream& out, message m);
 

@@ -27,7 +27,7 @@ TMPL T* A (vector<T> a);
 ******************************************************************************/
 
 TMPL
-class vector_rep: concrete_struct {
+class vector_rep : public tm_obj<vector_rep<T> > {
   int n;
   T* a;
 public:
@@ -39,28 +39,35 @@ public:
 };
 
 TMPL
-class vector {
-CONCRETE_TEMPLATE(vector,T);
-  inline vector (T *a, int n):
-    rep (tm_new<vector_rep<T> > (a, n)) {}
-  inline vector (T c, int n) {
-    T* a= (n == 0? (T*) NULL: tm_new_array<T> (n));
+class vector : public tm_ptr<vector_rep<T> > {
+public:
+  inline vector (T *a, int n)
+   : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > (a, n)) {}
+  inline vector (T c, int n)
+  : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > ((n == 0? (T*) NULL: tm_new_array<T> (n)), n)) 
+  {
+    T* a= this->rep()->a; 
     for (int i=0; i<n; i++) a[i]= c;
-    rep= tm_new<vector_rep<T> > (a, n); }
-  inline vector () {
-    rep= tm_new<vector_rep<T> > ((T*) NULL, 0); }
-  inline vector (T c1) {
-    T* a= tm_new_array<T> (1); a[0]= c1;
-    rep= tm_new<vector_rep<T> > (a, 1); }
-  inline vector (T c1, T c2) {
-    T* a= tm_new_array<T> (2); a[0]= c1; a[1]= c2;
-    rep= tm_new<vector_rep<T> > (a, 2); }
-  inline vector (T c1, T c2, T c3) {
-    T* a= tm_new_array<T> (3); a[0]= c1; a[1]= c2; a[2]= c3;
-    rep= tm_new<vector_rep<T> > (a, 3); }
-  inline T& operator [] (int i) { return rep->a[i]; }
+  }
+  inline vector ()
+    : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > ((T*) NULL, 0)) {}
+  inline vector (T c1)
+    : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > (tm_new_array<T> (1), 1)) 
+  {
+    T* a= this->rep()->a; a[0]= c1;
+  }
+  inline vector (T c1, T c2)
+  : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > (tm_new_array<T> (2), 2)) 
+  {
+    T* a= this->rep()->a; a[0]= c1; a[1]= c2;
+  }
+  inline vector (T c1, T c2, T c3)
+  : tm_ptr<vector_rep<T> > (tm_new<vector_rep<T> > (tm_new_array<T> (3), 3)) 
+  {
+    T* a= this->rep()->a; a[0]= c1; a[1]= c2; a[2]= c3;
+  }
+  inline T& operator [] (int i) { return this->rep()->a[i]; }
 };
-CONCRETE_TEMPLATE_CODE(vector,typename,T);
 
 TMPL
 class unary_properties<vector<T> > {

@@ -263,11 +263,11 @@ tag_info_rep::tag_info_rep (int a, int x, int am, int cm, bool frozen):
 }
 
 tag_info::tag_info (parent_info pi, array<child_info> ci, tree extra) 
-: tag_info_rep::ptr ( tm_new<tag_info_rep> (pi, ci, extra) ) {}
+: tm_ptr<tag_info_rep> ( tm_new<tag_info_rep> (pi, ci, extra) ) {}
 
 
 tag_info::tag_info (int a, int x, int am, int cm, bool frozen) 
-: tag_info_rep::ptr ( tm_new<tag_info_rep> (a, x, am, cm, frozen) ) { }
+: tm_ptr<tag_info_rep> ( tm_new<tag_info_rep> (a, x, am, cm, frozen) ) { }
 
 
 static tag_info_rep *
@@ -285,7 +285,7 @@ make_from_tree(tree t) {
 }
 
 tag_info::tag_info (tree t) 
-: tag_info_rep::ptr (make_from_tree(t)) { }
+: tm_ptr<tag_info_rep> (make_from_tree(t)) { }
 
 tag_info::operator tree () {
   if (rep()->extra == "") return tree (TUPLE, (tree) rep()->pi, (tree) rep()->ci);

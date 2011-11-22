@@ -31,10 +31,10 @@ public:
   friend class soft_link;
 };
 
-class soft_link : public soft_link_rep::ptr {
+class soft_link : public tm_ptr<soft_link_rep> {
 public:
   inline soft_link (tree t):
-    soft_link_rep::ptr (tm_new<soft_link_rep> (t)) {}
+    tm_ptr<soft_link_rep> (tm_new<soft_link_rep> (t)) {}
   inline friend bool operator == (soft_link ln1, soft_link ln2) {
     return ln1.rep() == ln2.rep(); }
   inline friend bool operator != (soft_link ln1, soft_link ln2) {

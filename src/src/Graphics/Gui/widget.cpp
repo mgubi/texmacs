@@ -95,11 +95,11 @@ public:
   friend class widget_connection;
 };
 
-class widget_connection : public widget_connection_rep::ptr {
+class widget_connection : public tm_ptr<widget_connection_rep> {
 public:
   inline widget_connection (widget_rep* w1, slot s1,
 			    widget_rep* w2, slot s2):
-    widget_connection_rep::ptr (tm_new<widget_connection_rep> (w1, s1, w2, s2)) {}
+    tm_ptr<widget_connection_rep> (tm_new<widget_connection_rep> (w1, s1, w2, s2)) {}
   inline bool operator == (widget_connection con) {
     return rep()->w1 == con->w1 && rep()->s1 == con->s1 &&
            rep()->w2 == con->w2 && rep()->s2 == con->s2; }

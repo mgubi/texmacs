@@ -42,11 +42,11 @@ struct vpenalty_rep: public tm_obj<vpenalty_rep> {
   inline vpenalty_rep (int pen2, int exc2): pen (pen2), exc (exc2) {}
 };
 
-class vpenalty : public vpenalty_rep::ptr {
+class vpenalty : public tm_ptr<vpenalty_rep> {
 public:
-  inline vpenalty (): vpenalty_rep::ptr  (tm_new<vpenalty_rep> ()) {}
-  inline vpenalty (int pen): vpenalty_rep::ptr  (tm_new<vpenalty_rep> (pen)) {}
-  inline vpenalty (int pen, int exc): vpenalty_rep::ptr  (tm_new<vpenalty_rep> (pen, exc)) {}
+  inline vpenalty (): tm_ptr<vpenalty_rep>  (tm_new<vpenalty_rep> ()) {}
+  inline vpenalty (int pen): tm_ptr<vpenalty_rep>  (tm_new<vpenalty_rep> (pen)) {}
+  inline vpenalty (int pen, int exc): tm_ptr<vpenalty_rep>  (tm_new<vpenalty_rep> (pen, exc)) {}
   inline bool operator == (vpenalty pen) {
     return (rep()->pen == pen->pen) && (rep()->exc == pen->exc); }
   inline bool operator != (vpenalty pen) {

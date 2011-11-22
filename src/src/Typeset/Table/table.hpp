@@ -156,6 +156,5 @@ public:
   inline cell () {}
   inline cell (edit_env env): tm_null_ptr<cell_rep> (tm_new<cell_rep> (env)) {}
 };
-//CONCRETE_NULL_CODE(cell);
 
 #endif // defined TABLE_H

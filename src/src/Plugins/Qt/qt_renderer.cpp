@@ -25,7 +25,7 @@
 * Qt images
 ******************************************************************************/
 
-struct qt_image_rep: concrete_struct {
+struct qt_image_rep : public tm_obj<qt_image_rep> {
   QTMImage *img;
   SI xo,yo;
   int w,h;
@@ -35,20 +35,19 @@ struct qt_image_rep: concrete_struct {
   friend class qt_image;
 };
 
-class qt_image {
-CONCRETE_NULL(qt_image);
+class qt_image : public tm_null_ptr<qt_image_rep> {
+public:
   qt_image (QTMImage* img2, SI xo2, SI yo2, int w2, int h2):
-    rep (tm_new<qt_image_rep> (img2, xo2, yo2, w2, h2)) {};
-  // qt_image ();
+    tm_null_ptr<qt_image_rep> (tm_new<qt_image_rep> (img2, xo2, yo2, w2, h2)) {};
+  qt_image () {}
 };
 
-CONCRETE_NULL_CODE(qt_image);
 
 /******************************************************************************
  * Qt pixmaps
  ******************************************************************************/
 
-struct qt_pixmap_rep: concrete_struct {
+struct qt_pixmap_rep : tm_obj<qt_pixmap_rep> {
   QPixmap *img;
   SI xo,yo;
   int w,h;
@@ -58,14 +57,13 @@ struct qt_pixmap_rep: concrete_struct {
   friend class qt_pixmap;
 };
 
-class qt_pixmap {
-CONCRETE_NULL(qt_pixmap);
+class qt_pixmap : public tm_null_ptr<qt_pixmap_rep> {
+public:
   qt_pixmap (QPixmap* img2, SI xo2, SI yo2, int w2, int h2):
-    rep (tm_new<qt_pixmap_rep> (img2, xo2, yo2, w2, h2)) {};
-  // qt_pixmap ();
+    tm_null_ptr<qt_pixmap_rep> (tm_new<qt_pixmap_rep> (img2, xo2, yo2, w2, h2)) {}
+  qt_pixmap () {}
 };
 
-CONCRETE_NULL_CODE(qt_pixmap);
 
 /******************************************************************************
 * Global support variables for all qt_renderers

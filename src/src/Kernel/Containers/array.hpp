@@ -20,7 +20,8 @@ template<class T> int N (array<T> a);
 template<class T> T*  A (array<T> a);
 template<class T> array<T> copy (array<T> x);
 
-template<class T> class array_rep: concrete_struct {
+template<class T> 
+class array_rep : public tm_obj<array_rep<T> > {
   int n;
   T* a;
 
@@ -35,15 +36,15 @@ public:
   friend array<T> copy LESSGTR (array<T> a);
 };
 
-template<class T> class array {
-  CONCRETE_TEMPLATE(array,T);
-  inline array (int n=0): rep (tm_new<array_rep<T> > (n)) {}
+template<class T> 
+class array  : public tm_ptr<array_rep<T> > {
+public:
+  inline array (int n=0) : tm_ptr<array_rep<T> > (tm_new<array_rep<T> > (n)) {}
   array (T *a, int n);
   array (T x1, T x2);
-  inline T& operator [] (int i) { return rep->a[i]; }
+  inline T& operator [] (int i) { return this->rep()->a[i]; }
   operator tree (); // defined in tree.hpp
 };
-CONCRETE_TEMPLATE_CODE(array,class,T);
 
 #define TMPL template<class T>
 TMPL inline int N (array<T> a) { return a->n; }

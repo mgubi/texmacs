@@ -29,7 +29,7 @@
 * Cairo images
 ******************************************************************************/
 
-struct cairo_image_rep: concrete_struct {
+struct cairo_image_rep : public tm_obj<cairo_image_rep> {
   cairo_surface_t* img;
   SI xo,yo;
   int w,h;
@@ -39,13 +39,13 @@ struct cairo_image_rep: concrete_struct {
   ~cairo_image_rep() { tm_cairo_surface_destroy(img); }
 };
 
-class cairo_image {
-  CONCRETE_NULL(cairo_image);
+class cairo_image : public tm_null_ptr<cairo_image_rep> {
+public:
+  cairo_image () {}
   cairo_image (cairo_surface_t* img2, SI xo2, SI yo2, int w2, int h2) :
     rep (tm_new<cairo_image_rep> (img2, xo2, yo2, w2, h2)) {};
 };
 
-CONCRETE_NULL_CODE(cairo_image);
 
 /******************************************************************************
 * Global support variables for all cairo_renderers

@@ -48,7 +48,7 @@ struct texmacs_input_rep: tm_obj<texmacs_input_rep> {
   void xformat_flush (bool force= false);
 };
 
-class texmacs_input : public texmacs_input_rep::ptr  {
+class texmacs_input : public tm_ptr<texmacs_input_rep>  {
 public:
   texmacs_input (string type);
 };

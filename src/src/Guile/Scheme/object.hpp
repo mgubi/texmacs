@@ -60,7 +60,7 @@
 #endif
 
 
-class object_rep: concrete_struct {
+class object_rep : public tm_obj<object_rep> {
   SCM handle;
 public:
   object_rep (SCM obj);
@@ -69,9 +69,9 @@ public:
   friend struct object;
 };
 
-struct object {
-  CONCRETE(object);
-  inline object (SCM obj): rep (tm_new<object_rep> (obj)) {}
+struct object : public tm_ptr<object_rep> {
+public:
+  inline object (SCM obj): tm_ptr<object_rep> (tm_new<object_rep> (obj)) {}
   object ();
   object (bool b);
   object (int i);
@@ -84,7 +84,6 @@ struct object {
   object (path p);
   object (url u);
 };
-CONCRETE_CODE(object);
 
 tm_ostream& operator << (tm_ostream& out, object obj);
 bool operator == (object obj1, object obj2);

@@ -27,20 +27,20 @@ destroy_tree_rep (tree_rep* rep) {
 }
 
 tree::tree (tree_label l, tree t1):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (1)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (1)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
 }
 
 tree::tree (tree_label l, tree t1, tree t2):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (2)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (2)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
 }
 
 tree::tree (tree_label l, tree t1, tree t2, tree t3):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (3)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (3)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
@@ -48,7 +48,7 @@ tree::tree (tree_label l, tree t1, tree t2, tree t3):
 }
 
 tree::tree (tree_label l, tree t1, tree t2, tree t3, tree t4):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (4)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (4)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
@@ -57,7 +57,7 @@ tree::tree (tree_label l, tree t1, tree t2, tree t3, tree t4):
 }
 
 tree::tree (tree_label l, tree t1, tree t2, tree t3, tree t4, tree t5):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (5)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (5)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
@@ -68,7 +68,7 @@ tree::tree (tree_label l, tree t1, tree t2, tree t3, tree t4, tree t5):
 
 tree::tree (tree_label l,
 	    tree t1, tree t2, tree t3, tree t4, tree t5, tree t6):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (6)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (6)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
@@ -80,7 +80,7 @@ tree::tree (tree_label l,
 
 tree::tree (tree_label l,
 	    tree t1, tree t2, tree t3, tree t4, tree t5, tree t6, tree t7):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (7)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (7)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;
@@ -94,7 +94,7 @@ tree::tree (tree_label l,
 tree::tree (tree_label l,
 	    tree t1, tree t2, tree t3, tree t4,
 	    tree t5, tree t6, tree t7, tree t8):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (8)))
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (8)))
 {
   (static_cast<compound_rep*> (rep()))->a[0]=t1;
   (static_cast<compound_rep*> (rep()))->a[1]=t2;

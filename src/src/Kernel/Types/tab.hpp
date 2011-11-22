@@ -25,10 +25,10 @@ public:
   tab_rep (int pos, tree t);
 };
 
-class tab : public tab_rep::ptr {
+class tab : public tm_ptr<tab_rep> {
 public:
-  inline tab (): tab_rep::ptr (tm_new<tab_rep> ()) {}
-  inline tab (int pos, tree t): tab_rep::ptr (tm_new<tab_rep> (pos, t)) {}
+  inline tab (): tm_ptr<tab_rep> (tm_new<tab_rep> ()) {}
+  inline tab (int pos, tree t): tm_ptr<tab_rep> (tm_new<tab_rep> (pos, t)) {}
 };
 
 #endif // defined TAB_H

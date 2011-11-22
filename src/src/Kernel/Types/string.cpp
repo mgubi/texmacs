@@ -48,17 +48,17 @@ string_rep::resize (register int m) {
   n= m;
 }
 
-string::string (char c) : string_rep::ptr(tm_new<string_rep> (1)) {
+string::string (char c) : tm_ptr<string_rep>(tm_new<string_rep> (1)) {
   rep()->a[0]=c;
 }
 
-string::string (const char* a, int n) : string_rep::ptr(tm_new<string_rep> (n)) {
+string::string (const char* a, int n) : tm_ptr<string_rep>(tm_new<string_rep> (n)) {
   register int i;
   for (i=0; i<n; i++)
     rep()->a[i]=a[i];
 }
 
-string::string (const char *s) : string_rep::ptr(string(s, strlen(s))) {}
+string::string (const char *s) : tm_ptr<string_rep>(string(s, strlen(s))) {}
 
 
 /******************************************************************************

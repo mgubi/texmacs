@@ -123,7 +123,7 @@ public:
   friend tm_ostream& operator << (tm_ostream& out, drd_info drd);
 };
 
-class drd_info : public drd_info_rep::ptr {
+class drd_info : public tm_ptr<drd_info_rep> {
 public:
   drd_info (string name);
   drd_info (string name, drd_info base);

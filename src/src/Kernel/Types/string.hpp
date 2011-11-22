@@ -29,10 +29,10 @@ public:
   friend inline int N (string a);
 };
 
-class string: public string_rep::ptr {
+class string: public tm_ptr<string_rep> {
 public:
-  inline string (): string_rep::ptr  (tm_new<string_rep> ()) {}
-  inline string (int n): string_rep::ptr  (tm_new<string_rep> (n)) {}
+  inline string (): tm_ptr<string_rep>  (tm_new<string_rep> ()) {}
+  inline string (int n): tm_ptr<string_rep>  (tm_new<string_rep> (n)) {}
   string (char c);
   string (const char *s, int n);
   string (const char *s);

@@ -63,7 +63,7 @@ struct insertion_rep: public tm_obj<insertion_rep> {
 };
 
 
-struct insertion : public insertion_rep::ptr {
+struct insertion : public tm_ptr<insertion_rep> {
 public:
   inline insertion ();
   inline insertion (tree type, path begin, path end);
@@ -80,17 +80,17 @@ public:
 
 inline
 insertion::insertion () 
-  :  insertion_rep::ptr ( tm_new<insertion_rep> () ) {};
+  :  tm_ptr<insertion_rep> ( tm_new<insertion_rep> () ) {};
 
 
 inline
 insertion::insertion (tree type, path begin, path end) 
-  :  insertion_rep::ptr (  tm_new<insertion_rep> (type, begin, end)) {};
+  :  tm_ptr<insertion_rep> (  tm_new<insertion_rep> (type, begin, end)) {};
 
 
 inline
 insertion::insertion (tree type, skeleton sk) 
-  :  insertion_rep::ptr (  tm_new<insertion_rep> (type, sk) ) {};
+  :  tm_ptr<insertion_rep> (  tm_new<insertion_rep> (type, sk) ) {};
 
 
 /******************************************************************************

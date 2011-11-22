@@ -20,18 +20,19 @@
 
 template <class T, class U> U
 rel_hashmap<T,U>::operator [] (T x) {
-  ASSERT (rep != NULL, "invalid relative hashmap");
-  if (rep->item->contains (x) || is_nil (rep->next)) return rep->item [x];
-  return rep->next [x];
+  ASSERT (this->rep() != NULL, "invalid relative hashmap");
+  if (this->rep()->item->contains (x) || is_nil (this->rep()->next)) 
+     return this->rep()->item [x];
+  return this->rep()->next [x];
 }
 
 template <class T, class U> U&
 rel_hashmap<T,U>::operator () (T x) {
-  ASSERT (rep != NULL, "invalid relative hashmap");
-  if (rep->item->contains (x)) return rep->item (x);
-  if ((!is_nil (rep->next)) && rep->next->contains (x))
-    rep->item(x)= copy (rep->next[x]);
-  return rep->item (x);
+  ASSERT (this->rep() != NULL, "invalid relative hashmap");
+  if (this->rep()->item->contains (x)) return this->rep()->item (x);
+  if ((!is_nil (this->rep()->next)) && this->rep()->next->contains (x))
+    this->rep()->item(x)= copy (this->rep()->next[x]);
+  return this->rep()->item (x);
 }
 
 template <class T, class U> bool

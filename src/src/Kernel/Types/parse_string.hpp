@@ -37,10 +37,10 @@ public:
   friend class parse_string;
 };
 
-class parse_string : public parse_string_rep::ptr {
+class parse_string : public tm_ptr<parse_string_rep> {
 public:
-  inline parse_string (): parse_string_rep::ptr (tm_new<parse_string_rep> ()) {}
-  inline parse_string (string s): parse_string_rep::ptr (tm_new<parse_string_rep> (s)) {}
+  inline parse_string (): tm_ptr<parse_string_rep> (tm_new<parse_string_rep> ()) {}
+  inline parse_string (string s): tm_ptr<parse_string_rep> (tm_new<parse_string_rep> (s)) {}
   inline char operator [] (int i) { return rep()->get_char (i); }
   inline operator bool () { return !is_nil (rep()->l); }
   inline void operator += (int i) { rep()->advance (i); }

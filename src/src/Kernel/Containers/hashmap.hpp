@@ -37,7 +37,8 @@ template<class T, class U> struct hashentry {
   operator tree ();
 };
 
-template<class T, class U> class hashmap_rep: concrete_struct {
+template<class T, class U> 
+class hashmap_rep : public tm_obj<hashmap_rep<T,U> > {
   int size;                  // size of hashmap (nr of entries)
   int n;                     // nr of keys (a power of two)
   int max;                   // mean number of entries per key
@@ -79,21 +80,21 @@ public:
   friend bool operator != LESSGTR (hashmap<T,U> h1, hashmap<T,U> h2);
 };
 
-template<class T, class U> class hashmap {
-CONCRETE_TEMPLATE_2(hashmap,T,U);
+template<class T, class U> 
+class hashmap : public tm_ptr<hashmap_rep<T,U> >  {
+public:
   static hashmap<T,U> init;
   inline hashmap ():
-    rep (tm_new<hashmap_rep<T,U> > (type_helper<U>::init, 1, 1)) {}
+    tm_ptr<hashmap_rep<T,U> > (tm_new<hashmap_rep<T,U> > (type_helper<U>::init, 1, 1)) {}
   inline hashmap (U init, int n=1, int max=1):
-    rep (tm_new<hashmap_rep<T,U> > (init, n, max)) {}
+    tm_ptr<hashmap_rep<T,U> > (tm_new<hashmap_rep<T,U> > (init, n, max)) {}
   // only for hashmap<string,tree>
   hashmap (U init, tree t);
   // end only for hashmap<string,tree>
-  inline U  operator [] (T x) { return rep->bracket_ro (x); }
-  inline U& operator () (T x) { return rep->bracket_rw (x); }
+  inline U  operator [] (T x) { return this->rep()->bracket_ro (x); }
+  inline U& operator () (T x) { return this->rep()->bracket_rw (x); }
   operator tree ();
 };
-CONCRETE_TEMPLATE_2_CODE(hashmap,class,T,class,U);
 
 #define TMPL template<class T, class U>
 TMPL inline int N (hashmap<T,U> h) { return h->size; }

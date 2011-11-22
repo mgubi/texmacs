@@ -22,7 +22,7 @@ public:
   rectangle_rep (SI x1b, SI y1b, SI x2b, SI y2b);
 };
 
-class rectangle : public rectangle_rep::ptr {
+class rectangle : public tm_ptr<rectangle_rep> {
 public:
   rectangle (SI x1b=0, SI y1b=0, SI x2b=0, SI y2b=0);
   operator tree ();

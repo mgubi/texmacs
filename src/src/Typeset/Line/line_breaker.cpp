@@ -25,9 +25,9 @@ struct lb_info_rep: public tm_obj<lb_info_rep> {
   lb_info_rep (): prev (), pen (HYPH_INVALID), pen_spc ((PEN) 1000000000) {}
 };
 
-struct lb_info : public lb_info_rep::ptr {
+struct lb_info : public tm_ptr<lb_info_rep> {
 public:
-  lb_info () : lb_info_rep::ptr  (tm_new<lb_info_rep> ()) { }
+  lb_info () : tm_ptr<lb_info_rep>  (tm_new<lb_info_rep> ()) { }
   operator tree () {
     return tuple ((tree) rep()->prev,
 		  as_string (rep()->pen),

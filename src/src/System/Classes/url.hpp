@@ -26,9 +26,9 @@ struct url_rep : public tm_obj<url_rep> {
   inline url_rep (tree t2): t (t2) {}
 };
 
-class url : public url_rep::ptr {
+class url : public tm_ptr<url_rep> {
 private:
-  url (tree t): url_rep::ptr (tm_new<url_rep> (t)) {}
+  url (tree t): tm_ptr<url_rep> (tm_new<url_rep> (t)) {}
 public:
   url (const char* name);
   url (string name);

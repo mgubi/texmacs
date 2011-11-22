@@ -45,7 +45,7 @@ struct cursor_rep : tm_obj<cursor_rep> {
   bool valid;   // the cursor is valid
 };
 
-struct cursor : public cursor_rep::ptr {
+struct cursor : public tm_ptr<cursor_rep> {
 public:
   cursor (SI x=0, SI y=0, SI delta=0, SI y1=0, SI y2=0,
 	  double slope=0.0, bool valid=true);
@@ -67,7 +67,7 @@ struct selection_rep : public tm_obj<selection_rep> {
   bool valid;
 };
 
-struct selection : public selection_rep::ptr {
+struct selection : public tm_ptr<selection_rep> {
 public:
   selection (rectangles rs= rectangles(),
 	     path start= path(), path end= path (),

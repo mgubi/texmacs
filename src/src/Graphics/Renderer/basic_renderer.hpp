@@ -30,11 +30,11 @@ struct basic_character_rep : public tm_obj<basic_character_rep> {
 	friend class basic_character;
 };
 
-class basic_character : public basic_character_rep::ptr {
+class basic_character : public tm_ptr<basic_character_rep> {
 public:
 	basic_character (int c=0, font_glyphs fng= font_glyphs (),
                    int sf=1, color fg= 0, color bg= 1):
-  basic_character_rep::ptr (tm_new<basic_character_rep> (c, fng, sf, fg, bg)) {};
+  tm_ptr<basic_character_rep> (tm_new<basic_character_rep> (c, fng, sf, fg, bg)) {};
 	operator tree ();
 };
 

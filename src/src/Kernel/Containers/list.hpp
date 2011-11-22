@@ -17,12 +17,13 @@ class tree;
 template<class T> class list_rep;
 template<class T> class list;
 
-template<class T> bool is_nil (list<T> l);
 template<class T> bool is_atom (list<T> l);
 template<class T> bool strong_equal (list<T> l1, list<T> l2);
 
-template<class T> class list {
-  CONCRETE_NULL_TEMPLATE(list,T);
+template<class T> 
+class list  : public tm_null_ptr<list_rep<T> > {
+public:
+  list() {}
   inline list (T item);
   inline list (T item, list<T> next);
   inline list (T item1, T item2, list<T> next);
@@ -36,7 +37,8 @@ template<class T> class list {
 };
 
 extern int list_count;
-template<class T> class list_rep: concrete_struct {
+template<class T> 
+class list_rep : public tm_obj<list_rep<T> > {
 public:
   T       item;
   list<T> next;
@@ -47,15 +49,14 @@ public:
   friend class list<T>;
 };
 
-CONCRETE_NULL_TEMPLATE_CODE(list,class,T);
 #define TMPL template<class T>
-TMPL inline list<T>::list (T item): rep (tm_new<list_rep<T> > (item, list<T> ())) {}
+TMPL inline list<T>::list (T item): tm_null_ptr<list_rep<T> > (tm_new<list_rep<T> > (item, list<T> ())) {}
 TMPL inline list<T>::list (T item, list<T> next):
-  rep (tm_new<list_rep<T> > (item, next)) {}
+  tm_null_ptr<list_rep<T> > (tm_new<list_rep<T> > (item, next)) {}
 TMPL inline list<T>::list (T item1, T item2, list<T> next):
-  rep (tm_new<list_rep<T> > (item1, list<T> (item2, next))) {}
+  tm_null_ptr<list_rep<T> > (tm_new<list_rep<T> > (item1, list<T> (item2, next))) {}
 TMPL inline list<T>::list (T item1, T item2, T item3, list<T> next):
-  rep (tm_new<list_rep<T> > (item1, list<T> (item2, item3, next))) {}
+  tm_null_ptr<list_rep<T> > (tm_new<list_rep<T> > (item1, list<T> (item2, item3, next))) {}
 TMPL inline bool is_atom (list<T> l) { return (!is_nil (l)) && is_nil (l->next); }
 TMPL list<T> list<T>::init= list<T> ();
 

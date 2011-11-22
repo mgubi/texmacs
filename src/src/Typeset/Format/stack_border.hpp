@@ -37,9 +37,9 @@ public:
     nobr_before (false), nobr_after (false) {}
 };
 
-class stack_border : public stack_border_rep::ptr {
+class stack_border : public tm_ptr<stack_border_rep> {
 public:
-  inline stack_border (): stack_border_rep::ptr (tm_new<stack_border_rep> ()) {}
+  inline stack_border (): tm_ptr<stack_border_rep> (tm_new<stack_border_rep> ()) {}
 };
 
 inline tm_ostream&

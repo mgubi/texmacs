@@ -36,9 +36,9 @@ public:
   inline canvas_properties_rep () {}
 };
 
-class canvas_properties : public canvas_properties_rep::ptr {
+class canvas_properties : public tm_ptr<canvas_properties_rep> {
 public:
-  inline canvas_properties (): canvas_properties_rep::ptr (tm_new<canvas_properties_rep> ()) {}
+  inline canvas_properties (): tm_ptr<canvas_properties_rep> (tm_new<canvas_properties_rep> ()) {}
 };
 
 canvas_properties get_canvas_properties (edit_env env, tree t);

@@ -19,7 +19,7 @@
 typedef hashmap<string,int> collection;
 typedef hashmap<string,collection> transaction;
 
-class disk_table_rep: concrete_struct {
+class disk_table_rep : public tm_obj<disk_table_rep> {
 private:
   url         root;           // directory where the table is stored
   FILE*       pending_fp;     // file pointer for pending writes
@@ -41,11 +41,11 @@ public:
   friend class disk_table;
 };
 
-class disk_table {
-CONCRETE_NULL(disk_table);
+class disk_table : public tm_null_ptr<disk_table_rep> {
+public:
+  disk_table () {}
   inline disk_table (url u):
-    rep (tm_new<disk_table_rep> (u)) {}
+    tm_null_ptr<disk_table_rep> (tm_new<disk_table_rep> (u)) {}
 };
-CONCRETE_NULL_CODE(disk_table);
 
 #endif // defined DISK_TABLE_H

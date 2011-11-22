@@ -26,10 +26,10 @@ space_rep::space_rep (SI def2) {
 }
 
 space::space (SI min, SI def, SI max) 
- : space_rep::ptr (tm_new<space_rep> (min, def, max)){ }
+ : tm_ptr<space_rep> (tm_new<space_rep> (min, def, max)){ }
 
 space::space (SI def) 
-: space_rep::ptr (tm_new<space_rep> (def)) { }
+: tm_ptr<space_rep> (tm_new<space_rep> (def)) { }
 
 space::operator tree () {
   return tree (TUPLE,

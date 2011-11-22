@@ -167,6 +167,9 @@ public:
   inline T* operator->() { return rep_; }
 };
 
+template <class T> class tm_null_ptr;
+template <class T>  bool is_nil (tm_null_ptr<T> p);
+
 template <class T>
 class tm_null_ptr {
   T *rep_;
@@ -179,24 +182,42 @@ public:
   inline ~tm_null_ptr() { if (rep_)  rep_->dec_ref(); }
   inline tm_null_ptr& operator=(tm_null_ptr<T> x) {  if (x.rep_) x.rep_->inc_ref();  if (rep_) rep_->dec_ref(); rep_=x.rep_; return *this; }
   inline T* operator->() { return rep_; }
-  friend bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
+  friend bool is_nil<T> (tm_null_ptr<T> p);
 };
+
+template <class T>
+inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
+
+
+template <class T>
+class tm_abs_null_ptr : public tm_null_ptr<T> {
+public:
+  inline tm_abs_null_ptr (T* p) : tm_null_ptr<T> (p) {  }
+  inline tm_abs_null_ptr () : tm_null_ptr<T> () {  }
+//  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
+};
+
+template <class T>
+class tm_abs_ptr : public tm_ptr<T> {
+public:
+  inline tm_abs_ptr (T* p) : tm_ptr<T> (p) {  }
+  inline tm_abs_ptr () : tm_ptr<T> () {  }
+  //  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
+};
+
 
 template <class T>
 class tm_obj {
 	int ref_count;
   
-  
 protected:
 	inline tm_obj (): ref_count (0) { TM_DEBUG(concrete_count++); }
-  inline ~tm_obj () { TM_DEBUG(concrete_count--); }
+  virtual inline ~tm_obj () { TM_DEBUG(concrete_count--); }
 	inline void inc_ref () { ref_count++; } 
 	inline void dec_ref () { if (0 == --ref_count) static_cast<T*>(this)->destroy(); } 
   inline void destroy () { tm_delete (static_cast<T*>(this)); }
 
 public:
-  typedef tm_ptr<T> ptr;
-  typedef tm_null_ptr<T> null_ptr;
   friend class tm_ptr<T>;
   friend class tm_null_ptr<T>;
 };

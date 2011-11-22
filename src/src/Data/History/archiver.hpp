@@ -76,7 +76,7 @@ public:
   friend void global_confirm ();
 };
 
-class archiver : public archiver_rep::ptr {
+class archiver : public tm_ptr<archiver_rep> {
 public:
   archiver (double author, path rp);
 };

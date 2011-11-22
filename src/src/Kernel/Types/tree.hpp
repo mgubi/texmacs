@@ -34,11 +34,11 @@ public:
   tree_label op;
   observer obs;
   inline tree_rep (tree_label op2): op (op2) {}
-  void destroy ();
+  inline void destroy ();
 };
 
 
-class tree: public tree_rep::ptr {
+class tree: public tm_ptr<tree_rep> {
   inline tree (tree_rep* rep2);
 
 public:
@@ -146,7 +146,7 @@ typedef tree scheme_tree;
 #endif
 
 void destroy_tree_rep (tree_rep* rep);
-inline tree::tree (tree_rep* rep2): tree_rep::ptr (rep2) { }
+inline tree::tree (tree_rep* rep2): tm_ptr<tree_rep> (rep2) { }
 inline void tree_rep::destroy () { destroy_tree_rep(this); }
 
 //inline tree::tree (const tree& x): rep (x.rep) { rep->ref_count++; }
@@ -162,17 +162,17 @@ inline atomic_rep* tree::operator -> () {
 //  return *this; }
 
 inline tree::tree ():
-  tree_rep::ptr (tm_new<atomic_rep> (string ())) {}
+  tm_ptr<tree_rep> (tm_new<atomic_rep> (string ())) {}
 inline tree::tree (const char *s):
-  tree_rep::ptr (tm_new<atomic_rep> (s)) {}
+  tm_ptr<tree_rep> (tm_new<atomic_rep> (s)) {}
 inline tree::tree (string s):
-  tree_rep::ptr (tm_new<atomic_rep> (s)) {}
+  tm_ptr<tree_rep> (tm_new<atomic_rep> (s)) {}
 inline tree::tree (tree_label l, int n):
-  tree_rep::ptr (tm_new<compound_rep> (l, array<tree> (n))) {}
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, array<tree> (n))) {}
 inline tree::tree (tree_label l, array<tree> a):
-  tree_rep::ptr (tm_new<compound_rep> (l, a)) {}
+  tm_ptr<tree_rep> (tm_new<compound_rep> (l, a)) {}
 inline tree::tree (tree t, int n):
-  tree_rep::ptr (tm_new<compound_rep> (t.rep()->op, array<tree> (n))) {
+  tm_ptr<tree_rep> (tm_new<compound_rep> (t.rep()->op, array<tree> (n))) {
     CHECK_COMPOUND (t); }
 
 inline tree& tree::operator [] (int i) {
@@ -361,10 +361,10 @@ int    hash (tree t);
 
 template<class T>
 array<T>::operator tree () {
-  int i, n=rep->n;
+  int i, n=this->rep()->n;
   tree t (TUPLE, n);
   for (i=0; i<n; i++)
-    t[i]= as_tree(rep->a[i]);
+    t[i]= as_tree(this->rep()->a[i]);
   return t;
 }
 

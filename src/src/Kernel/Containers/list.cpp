@@ -33,9 +33,9 @@ operator << (tm_ostream& out, list<T> l) {
 
 template<class T> T&
 list<T>::operator [] (int i) {
-  ASSERT (rep != NULL, "list too short");
-  if (i==0) return rep->item;
-  return rep->next[i-1];
+  ASSERT (this->rep() != NULL, "list too short");
+  if (i==0) return this->rep()->item;
+  return this->rep()->next[i-1];
 }
 
 template<class T> list<T>::operator tree () {
@@ -105,7 +105,7 @@ suppress_last (list<T>& l) {
 
 template<class T> bool
 strong_equal (list<T> l1, list<T> l2) {
-  return l1.rep == l2.rep;
+  return l1.rep() == l2.rep();
 }
 
 template<class T> bool

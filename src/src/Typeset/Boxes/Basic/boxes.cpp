@@ -598,7 +598,7 @@ operator << (tm_ostream& out, cursor cu) {
 ******************************************************************************/
 
 selection::selection (rectangles rs, path start, path end, bool valid):
-selection_rep::ptr (tm_new<selection_rep> ())
+tm_ptr<selection_rep> (tm_new<selection_rep> ())
 {
   rep()->rs   = rs;
   rep()->start= start;
@@ -628,7 +628,7 @@ operator << (tm_ostream& out, selection sel) {
 ******************************************************************************/
 
 gr_selection::gr_selection (array<path> cp, SI dist):
-gr_selection_rep::ptr (tm_new<gr_selection_rep> ())
+tm_ptr<gr_selection_rep> (tm_new<gr_selection_rep> ())
 {
   rep()->cp  = cp;
   rep()->dist= dist;

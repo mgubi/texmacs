@@ -15,10 +15,11 @@
 
 template<class T, class U> class rel_hashmap;
 template<class T, class U> class rel_hashmap_rep;
-template<class T, class U> bool is_nil (rel_hashmap<T,U> h);
 
-template<class T, class U> class rel_hashmap {
-  CONCRETE_NULL_TEMPLATE_2(rel_hashmap,T,U);
+template<class T, class U> 
+class rel_hashmap : public tm_null_ptr<rel_hashmap_rep<T,U> > {
+public:
+  inline rel_hashmap () {}
   inline rel_hashmap (U init);
   inline rel_hashmap (hashmap<T,U> item);
   inline rel_hashmap (hashmap<T,U> item, rel_hashmap<T,U> next);
@@ -26,7 +27,8 @@ template<class T, class U> class rel_hashmap {
   U& operator () (T x);
 };
 
-template<class T, class U> class rel_hashmap_rep: concrete_struct {
+template<class T, class U> 
+class rel_hashmap_rep : public tm_obj<rel_hashmap_rep<T,U> > {
 public:
   hashmap<T,U>     item;
   rel_hashmap<T,U> next;
@@ -44,15 +46,14 @@ public:
   friend class rel_hashmap<T,U>;
 };
 
-CONCRETE_NULL_TEMPLATE_2_CODE(rel_hashmap,class,T,class,U);
 #define TMPL template<class T, class U>
 TMPL inline rel_hashmap<T,U>::rel_hashmap (U init):
-  rep (tm_new<rel_hashmap_rep<T,U> > (hashmap<T,U> (init), rel_hashmap<T,U> ())) {}
+  tm_null_ptr<rel_hashmap_rep<T,U> > (tm_new<rel_hashmap_rep<T,U> > (hashmap<T,U> (init), rel_hashmap<T,U> ())) {}
 TMPL inline rel_hashmap<T,U>::rel_hashmap (hashmap<T,U> item):
-  rep (tm_new<rel_hashmap_rep<T,U> > (item, rel_hashmap<T,U> ())) {}
+  tm_null_ptr<rel_hashmap_rep<T,U> > (tm_new<rel_hashmap_rep<T,U> > (item, rel_hashmap<T,U> ())) {}
 TMPL inline rel_hashmap<T,U>::rel_hashmap
   (hashmap<T,U> item, rel_hashmap<T,U> next):
-    rep (tm_new<rel_hashmap_rep<T,U> > (item, next)) {}
+    tm_null_ptr<rel_hashmap_rep<T,U> > (tm_new<rel_hashmap_rep<T,U> > (item, next)) {}
 
 TMPL tm_ostream& operator << (tm_ostream& out, rel_hashmap<T,U> H);
 #undef TMPL

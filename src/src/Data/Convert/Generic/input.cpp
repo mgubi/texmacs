@@ -46,7 +46,7 @@ texmacs_input_rep::texmacs_input_rep (string type2):
   docs (tree (DOCUMENT, "")) { bof (); }
 
 texmacs_input::texmacs_input (string type)
-  : texmacs_input_rep::ptr (tm_new<texmacs_input_rep> (type)) {}
+  : tm_ptr<texmacs_input_rep> (tm_new<texmacs_input_rep> (type)) {}
 
 /******************************************************************************
 * Mode and channel handling

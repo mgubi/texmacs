@@ -16,7 +16,7 @@
 #define PACKRAT_UNDEFINED ((C) (-2))
 #define PACKRAT_FAILED    ((C) (-1))
 
-class packrat_parser_rep: concrete_struct {
+class packrat_parser_rep: public tm_obj<packrat_parser_rep> {
 public:
   hashmap<C,array<C> >      grammar;
   hashmap<C,tree>           productions;
@@ -68,16 +68,16 @@ public:
   friend class packrat_parser;
 };
 
-class packrat_parser {
-  CONCRETE_NULL (packrat_parser);
+class packrat_parser : public tm_null_ptr<packrat_parser_rep> {
+public:
+  inline packrat_parser () {}
   inline packrat_parser (packrat_grammar gr, tree t, path t_pos= path ());
 };
-CONCRETE_NULL_CODE (packrat_parser);
 
 inline packrat_parser::packrat_parser
   (packrat_grammar gr, tree t, path t_pos):
-    rep (tm_new<packrat_parser_rep> (gr)) {
-      rep->set_input (t);
-      rep->set_cursor (t_pos); }
+    tm_null_ptr<packrat_parser_rep> (tm_new<packrat_parser_rep> (gr)) {
+      rep()->set_input (t);
+      rep()->set_cursor (t_pos); }
 
 #endif // PACKRAT_PARSER_H

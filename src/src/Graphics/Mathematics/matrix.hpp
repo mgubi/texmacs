@@ -28,7 +28,7 @@ TMPL T*  A  (matrix<T> m);
 ******************************************************************************/
 
 TMPL
-class matrix_rep: concrete_struct {
+class matrix_rep : public tm_obj<matrix_rep<T> > {
   int rows;
   int cols;
   T* a;
@@ -43,22 +43,22 @@ public:
 };
 
 TMPL
-class matrix {
-CONCRETE_TEMPLATE(matrix,T);
-  inline matrix (T *a, int rows, int cols):
-    rep (tm_new<matrix_rep<T> > (a, rows, cols)) {}
-  inline matrix (T c, int rows, int cols) {
-    int i, n= rows * cols;
-    T* a= (n == 0? (T*) NULL: tm_new_array<T> (n));
-    for (i=0; i<n; i++)
-      a[i]= ((i%(cols+1)) == 0? c: T(0));
-    rep= tm_new<matrix_rep<T> > (a, rows, cols); }
-  inline matrix () {
-    rep= tm_new<matrix_rep<T> > ((T*) NULL, 0, 0); }
+class matrix : public tm_ptr<matrix_rep<T> > {
+public:
+  inline matrix (T *a, int rows, int cols)
+    : tm_ptr<matrix_rep<T> > (tm_new<matrix_rep<T> > (a, rows, cols)) {}
+  inline matrix (T c, int rows, int cols) 
+    : tm_ptr<matrix_rep<T> > (tm_new<matrix_rep<T> > (((rows * cols) == 0? (T*) NULL: 
+                                                    tm_new_array<T> (rows * cols)), rows, cols))
+   {
+     int i, n= rows * cols;
+     T* a= this->rep()->a;
+     for (i=0; i<n; i++)
+       a[i]= ((i%(cols+1)) == 0? c: T(0)); }
+  inline matrix ()  : tm_ptr<matrix_rep<T> > (tm_new<matrix_rep<T> > ((T*) NULL, 0, 0)) {} 
   inline T& operator () (int i, int j) {
-    return rep->a[i*rep->cols + j]; }
+    return this->rep()->a[i*(this->rep()->cols) + j]; }
 };
-CONCRETE_TEMPLATE_CODE(matrix,typename,T);
 
 TMPL inline int NR (matrix<T> m) { return m->rows; }
 TMPL inline int NC (matrix<T> m) { return m->cols; }

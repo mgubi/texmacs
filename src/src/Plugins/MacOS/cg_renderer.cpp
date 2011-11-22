@@ -26,7 +26,7 @@
 * CG images
 ******************************************************************************/
 
-struct cg_image_rep: concrete_struct {
+struct cg_image_rep: tm_obj<cg_image_rep> {
 	CGImageRef img;
 	SI xo,yo;
 	int w,h;
@@ -36,13 +36,13 @@ struct cg_image_rep: concrete_struct {
 	friend class cg_image;
 };
 
-class cg_image {
-	CONCRETE_NULL(cg_image);
+class cg_image : tm_null_ptr<cg_image_rep> {
+public:
   cg_image (CGImageRef img2, SI xo2, SI yo2, int w2, int h2):
     rep (tm_new <cg_image_rep> (img2, xo2, yo2, w2, h2)) {}	
+  cg_image() {}
 };
 
-CONCRETE_NULL_CODE(cg_image);
 
 /******************************************************************************
  * Global support variables for all cg_renderers
