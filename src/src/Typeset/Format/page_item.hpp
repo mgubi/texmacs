@@ -40,6 +40,7 @@ public:
 
 class page_item : public tm_null_ptr<page_item_rep> {
 public:
+  page_item () {}
   page_item (box b, array<lazy> fl= 0, int nr_cols= 1);
   page_item (tree t, int nr_cols);
   page_item (int type, box b, space spc, int penalty,

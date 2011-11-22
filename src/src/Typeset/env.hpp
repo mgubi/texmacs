@@ -456,15 +456,18 @@ public:
 };
 
 class edit_env : public tm_null_ptr<edit_env_rep> {
-//  inline edit_env (edit_env_rep* rep2):
-//    tm_null_ptr<edit_env_rep>(rep2) { INC_COUNT_NULL (this->rep); }
+protected:
+  inline edit_env (edit_env_rep* rep2):
+    tm_null_ptr<edit_env_rep>(rep2) {  }
 public:
+  edit_env () {}
   edit_env (drd_info& drd,
 	    url base_file_name,
 	    hashmap<string,tree>& local_ref,
 	    hashmap<string,tree>& global_ref,
 	    hashmap<string,tree>& local_aux,
 	    hashmap<string,tree>& global_aux);
+  friend class edit_env_rep;
 };
 
 tm_ostream& operator << (tm_ostream& out, edit_env env);

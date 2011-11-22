@@ -58,6 +58,7 @@ public:
 
 class line_item : public tm_null_ptr<line_item_rep> {
 public:
+  line_item () {}
   line_item (int type, int ot_type, box b, int penalty);
   line_item (int type, int ot_type, box b, int penalty, language lan);
   line_item (int type, int ot_type, box b, int penalty, tree t);

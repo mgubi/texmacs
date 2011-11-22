@@ -54,6 +54,7 @@ struct glyph_rep: tm_obj<glyph_rep> {
 
 struct glyph : public tm_null_ptr<glyph_rep> {
 public:
+  glyph () {}
   glyph (int w2, int h2, int xoff2, int yoff2, int depth2=1, int status2= 0);
 };
 

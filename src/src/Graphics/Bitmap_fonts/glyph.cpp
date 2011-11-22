@@ -37,9 +37,8 @@ glyph_rep::~glyph_rep () {
   tm_delete_array (raster);
 }
 
-glyph::glyph (int w2, int h2, int xoff2, int yoff2, int depth2, int status2) {
-  rep= tm_new<glyph_rep> (w2, h2, xoff2, yoff2, depth2, status2);
-}
+glyph::glyph (int w2, int h2, int xoff2, int yoff2, int depth2, int status2) 
+: tm_null_ptr<glyph_rep> (tm_new<glyph_rep> (w2, h2, xoff2, yoff2, depth2, status2)) {}
 
 /******************************************************************************
 * Getting and setting pixels
