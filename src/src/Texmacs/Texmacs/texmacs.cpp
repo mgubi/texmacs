@@ -452,7 +452,7 @@ main (int argc, char** argv) {
   TeXmacs_init_paths (argc, argv);
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
-  the_et->obs= ip_observer (path ());
+  the_et.obs()= ip_observer (path ());
   cache_initialize ();
   bench_start ("initialize texmacs");
   init_texmacs ();

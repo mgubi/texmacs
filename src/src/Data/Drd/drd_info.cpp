@@ -622,6 +622,9 @@ drd_info_rep::get_child_long_name (tree t, int i) {
 
 tree
 drd_env_write (tree env, string var, tree val) {
+  if (!is_compound(env)) {
+    FAILED("compound expected");
+  }
   for (int i=0; i<=N(env); i+=2)
     if (i == N(env))
       return env * tree (ATTR, var, val);
@@ -635,6 +638,9 @@ drd_env_write (tree env, string var, tree val) {
 
 tree
 drd_env_merge (tree env, tree t) {
+  if (!is_compound(env)) {
+    FAILED("compound expected");
+  }
   int i, n= N(t);
   for (i=0; (i+1)<n; i+=2)
     if (is_atomic (t[i]))
@@ -644,10 +650,12 @@ drd_env_merge (tree env, tree t) {
 
 tree
 drd_env_read (tree env, string var, tree val) {
-  int i, n= N(env);
-  for (i=0; i<n; i+=2)
-    if (env[i] == var)
-      return env[i+1];
+  if (is_compound(env)) {
+    int i, n= N(env);
+    for (i=0; i<n; i+=2)
+      if (env[i] == var)
+        return env[i+1];
+  }
   return val;
 }
 
@@ -682,6 +690,7 @@ drd_info_rep::freeze_env (tree_label l, int nr) {
 
 tree
 drd_info_rep::get_env_child (tree t, int i, tree env) {
+  if (env == "") return "";
   if (L(t) == WITH && i == N(t)-1)
     return drd_env_merge (env, t (0, N(t)-1));
   else {
@@ -718,6 +727,7 @@ drd_info_rep::get_env_child (tree t, int i, tree env) {
 tree
 drd_info_rep::get_env_child (tree t, int i, string var, tree val) {
   tree env= get_env_child (t, i, tree (ATTR));
+  if (env == "") return "";
   return drd_env_read (env, var, val);
 }
 
