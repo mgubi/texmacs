@@ -475,6 +475,9 @@ static bool in_preprocessing (string s, tree t) {
 
 string
 cpp_language_rep::get_color (tree t, int start, int end) {
+  if (!is_atomic(t)) {
+    FAILED("atomic expected");
+  }
   static bool setup_done= false;
   if (!setup_done) {
     cpp_color_setup_constants (colored);

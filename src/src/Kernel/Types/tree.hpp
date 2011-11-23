@@ -27,6 +27,7 @@ class generic_rep;
 class blackbox;
 tree copy (tree t);
 
+class tree;
 
 // can be atomic or compound or generic
 class tree_rep: public tm_obj<tree_rep> {
@@ -35,6 +36,7 @@ public:
   observer obs;
   inline tree_rep (tree_label op2): op (op2) {}
   inline void destroy ();
+  friend class tree;
 };
 
 
@@ -66,6 +68,7 @@ public:
   inline tree& operator [] (int i);
   tree operator () (int start, int end);
 
+  inline observer& obs() { return rep()->obs; }
   friend inline int N (tree t);
   friend inline int arity (tree t);
   friend inline tree_label L (tree t);
@@ -102,6 +105,7 @@ public:
   //friend class undo_observer_rep;
   friend class tree_links_rep;
   friend class link_repository_rep;
+  friend class edit_env_rep;
   friend blackbox as_blackbox (const tree& t);
 };
 
@@ -129,6 +133,7 @@ typedef tree scheme_tree;
 * Routines for trees
 ******************************************************************************/
 
+#define debug_trees
 #ifdef debug_trees
 #define CHECK_ATOMIC(t) \
   if (((t).rep())->op != STRING) { \

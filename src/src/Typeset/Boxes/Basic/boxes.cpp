@@ -807,7 +807,7 @@ attach_dip (tree ref, path dip) {
   if (old_ip != path (DETACHED)) return ref;
   if (is_atomic (ref)) {
     tree r (ref->label);
-    r->obs= list_observer (ip_observer (dip), r->obs);
+    r.obs()= list_observer (ip_observer (dip), r.obs());
     return r;
   }
   else {
@@ -815,7 +815,7 @@ attach_dip (tree ref, path dip) {
     tree r (ref, n);
     for (i=0; i<n; i++)
       r[i]= attach_dip (ref[i], descend (dip, i));
-    r->obs= list_observer (ip_observer (dip), r->obs);
+    r.obs()= list_observer (ip_observer (dip), r.obs());
     return r;
   }
 }

@@ -69,8 +69,8 @@ edit_observer_rep::touched (tree& ref, path p) {
 void
 edit_observer_rep::reattach (tree& ref, tree t) {
   if (!strong_equal(ref,t)) {
-    remove_observer (ref->obs, observer (this));
-    insert_observer (t->obs, observer (this));
+    remove_observer (ref.obs(), observer (this));
+    insert_observer (t.obs(), observer (this));
   }
 }
 
@@ -126,7 +126,7 @@ search_type (observer o, int type) {
 
 observer
 search_observer (tree& ref, int type) {
-  return search_type (ref->obs, type);
+  return search_type (ref.obs(), type);
 }
 
 bool

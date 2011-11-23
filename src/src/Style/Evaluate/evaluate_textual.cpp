@@ -157,7 +157,7 @@ evaluate_change_case (tree t, tree nc, bool evaluate_flag, bool first) {
 	if (up && is_locase (s[i])) r->label[i]= upcase (s[i]);
 	if (lo && is_upcase (s[i])) r->label[i]= locase (s[i]);
       }
-    r->obs= list_observer (ip_observer (obtain_ip (t)), r->obs);
+    r.obs()= list_observer (ip_observer (obtain_ip (t)), r.obs());
     return r;
   }
   else if (is_concat (t)) {
@@ -165,7 +165,7 @@ evaluate_change_case (tree t, tree nc, bool evaluate_flag, bool first) {
     tree r (t, n);
     for (i=0; i<n; i++)
       r[i]= evaluate_change_case (t[i], nc, evaluate_flag, first && (i==0));
-    r->obs= list_observer (ip_observer (obtain_ip (t)), r->obs);
+    r.obs()= list_observer (ip_observer (obtain_ip (t)), r.obs());
     return r;
   }
   else {

@@ -99,9 +99,9 @@ simplify (observer& obs) {
 
 static void
 detach (tree& ref, tree closest, bool right) {
-  if (!is_nil (ref->obs)) {
-    ref->obs->notify_detach (ref, closest, right);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->notify_detach (ref, closest, right);
+    simplify (ref.obs());
   }
   if (is_compound (ref)) {
     int i, n= N(ref);
@@ -114,10 +114,10 @@ void
 raw_assign (tree& ref, tree t) {
   // cout << "Assign " << ref << " := " << t << "\n";
   modification mod= mod_assign (path (), t);
-  if (!is_nil (ref->obs)) {
-    ref->obs->announce (ref, mod);
-    ref->obs->notify_assign (ref, t);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->announce (ref, mod);
+    ref.obs()->notify_assign (ref, t);
+    simplify (ref.obs());
   }
   if (is_compound (ref)) {
     int i, n= N(ref), mid= (n+1)>>1;
@@ -125,7 +125,7 @@ raw_assign (tree& ref, tree t) {
       detach (ref[i], t, i >= mid);
   }
   ref= t;
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -134,8 +134,8 @@ void
 raw_insert (tree& ref, int pos, tree t) {
   // cout << "Insert " << ref << " += " << t << " at " << pos << "\n";
   modification mod= mod_insert (path (), pos, t);
-  if (!is_nil (ref->obs))
-    ref->obs->announce (ref, mod);
+  if (!is_nil (ref.obs()))
+    ref.obs()->announce (ref, mod);
   if (is_atomic (ref) && is_atomic (t))
     ref->label= ref->label (0, pos) *t->label* ref->label (pos, N(ref->label));
   else {
@@ -146,11 +146,11 @@ raw_insert (tree& ref, int pos, tree t) {
     for (i=0; i<nr; i++)
       ref[pos+i]= t[i];
   }
-  if (!is_nil (ref->obs)) {
-    ref->obs->notify_insert (ref, pos, is_atomic (t)? N(t->label): N(t));
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->notify_insert (ref, pos, is_atomic (t)? N(t->label): N(t));
+    simplify (ref.obs());
   }
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -160,10 +160,10 @@ raw_remove (tree& ref, int pos, int nr) {
   // cout << "Remove " << ref << " -= " << nr << " at " << pos << "\n";
   modification mod= mod_remove (path (), pos, nr);
   if (nr == 0) return;
-  if (!is_nil (ref->obs)) {
-    ref->obs->announce (ref, mod);
-    ref->obs->notify_remove (ref, pos, nr);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->announce (ref, mod);
+    ref.obs()->notify_remove (ref, pos, nr);
+    simplify (ref.obs());
   }
   if (is_compound (ref)) {
     int i, n= N(ref), end= pos+nr, mid= (pos+end+1) >> 1;
@@ -183,7 +183,7 @@ raw_remove (tree& ref, int pos, int nr) {
       ref[i]= ref[i+nr];
     AR(ref)->resize (n);
   }
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -192,8 +192,8 @@ void
 raw_split (tree& ref, int pos, int at) {
   // cout << "Split " << ref << " at " << pos << ", " << at << "\n";
   modification mod= mod_split (path (), pos, at);
-  if (!is_nil (ref->obs))
-    ref->obs->announce (ref, mod);
+  if (!is_nil (ref.obs()))
+    ref.obs()->announce (ref, mod);
   tree t= ref[pos], t1, t2;
   if (is_atomic (ref[pos])) {    
     t1= ref[pos]->label (0, at);
@@ -210,15 +210,15 @@ raw_split (tree& ref, int pos, int at) {
   ref[pos  ]= t1;
   ref[pos+1]= t2;
 
-  if (!is_nil (ref->obs)) {
-    ref->obs->notify_split (ref, pos, t);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->notify_split (ref, pos, t);
+    simplify (ref.obs());
   }
-  if (!is_nil (t->obs)) {
-    t->obs->notify_var_split (t, t1, t2);
-    simplify (t->obs);
+  if (!is_nil (t.obs())) {
+    t.obs()->notify_var_split (t, t1, t2);
+    simplify (t.obs());
   }
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -234,19 +234,19 @@ raw_join (tree& ref, int pos) {
   // end security code
 
   modification mod= mod_join (path (), pos);
-  if (!is_nil (ref->obs)) ref->obs->announce (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->announce (ref, mod);
   tree t1= ref[pos], t2= ref[pos+1], t;
   int offset= is_atomic (ref)? N(t1->label): N(t1);
   if (is_atomic (t1) && is_atomic (t2)) t= t1->label * t2->label;
   else t= t1 * t2;
-  if (!is_nil (ref->obs)) ref->obs->notify_join (ref, pos, t);
-  if (!is_nil (t1->obs)) {
-    t1->obs->notify_var_join (t1, t, 0);
-    simplify (t1->obs);
+  if (!is_nil (ref.obs())) ref.obs()->notify_join (ref, pos, t);
+  if (!is_nil (t1.obs())) {
+    t1.obs()->notify_var_join (t1, t, 0);
+    simplify (t1.obs());
   }
-  if (!is_nil (t2->obs)) {
-    t2->obs->notify_var_join (t2, t, offset);
-    simplify (t2->obs);
+  if (!is_nil (t2.obs())) {
+    t2.obs()->notify_var_join (t2, t, offset);
+    simplify (t2.obs());
   }
   ref[pos]= t;
 
@@ -254,7 +254,7 @@ raw_join (tree& ref, int pos) {
   for (i=pos+1; i<n; i++)
     ref[i]= ref[i+1];
   AR(ref)->resize (n);
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -263,13 +263,13 @@ void
 raw_assign_node (tree& ref, tree_label op) {
   // cout << "Assign node " << ref << " : " << tree (op) << "\n";
   modification mod= mod_assign_node (path (), op);
-  if (!is_nil (ref->obs)) {
-    ref->obs->announce (ref, mod);
-    ref->obs->notify_assign_node (ref, op);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->announce (ref, mod);
+    ref.obs()->notify_assign_node (ref, op);
+    simplify (ref.obs());
   }
   LR (ref)= op;
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -278,18 +278,18 @@ void
 raw_insert_node (tree& ref, int pos, tree t) {
   // cout << "Insert node " << ref << " : " << t << " at " << pos << "\n";
   modification mod= mod_insert_node (path (), pos, t);
-  if (!is_nil (ref->obs)) ref->obs->announce (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->announce (ref, mod);
   int i, n= N(t);
   tree r (t, n+1);
   for (i=0; i<pos; i++) r[i]= t[i];
   r[pos]= ref;
   for (i=pos; i<n; i++) r[i+1]= t[i];
   ref= r;
-  if (!is_nil (ref[pos]->obs)) {
-    ref[pos]->obs->notify_insert_node (ref, pos);
-    simplify (ref[pos]->obs);
+  if (!is_nil (ref[pos].obs())) {
+    ref[pos].obs()->notify_insert_node (ref, pos);
+    simplify (ref[pos].obs());
   }
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -298,16 +298,16 @@ void
 raw_remove_node (tree& ref, int pos) {
   // cout << "Remove node " << ref << " : " << pos << "\n";
   modification mod= mod_remove_node (path (), pos);
-  if (!is_nil (ref->obs)) {
-    ref->obs->announce (ref, mod);
-    ref->obs->notify_remove_node (ref, pos);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->announce (ref, mod);
+    ref.obs()->notify_remove_node (ref, pos);
+    simplify (ref.obs());
   }
   for (int i=0; i<N(ref); i++)
     if (i < pos) detach (ref[i], ref[pos], false);
     else if (i > pos) detach (ref[i], ref[pos], true);
   ref= ref[pos];
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -316,12 +316,12 @@ void
 raw_set_cursor (tree& ref, int pos, tree data) {
   // cout << "Set cursor " << ref << " : " << pos << ", " << data << "\n";
   modification mod= mod_set_cursor (path (), pos, data);
-  if (!is_nil (ref->obs)) {
-    ref->obs->announce (ref, mod);
-    ref->obs->notify_set_cursor (ref, pos, data);
-    simplify (ref->obs);
+  if (!is_nil (ref.obs())) {
+    ref.obs()->announce (ref, mod);
+    ref.obs()->notify_set_cursor (ref, pos, data);
+    simplify (ref.obs());
   }
-  if (!is_nil (ref->obs)) ref->obs->done (ref, mod);
+  if (!is_nil (ref.obs())) ref.obs()->done (ref, mod);
   // stretched_print (ref, true, 1);
   // consistency_check ();
 }
@@ -470,8 +470,8 @@ set_cursor (tree& ref, int pos, tree data) {
 void
 touch (tree& ref) {
   //cout << "Touch " << ref << "\n";
-  if (!is_nil (ref->obs))
-    ref->obs->touched (ref, path ());
+  if (!is_nil (ref.obs()))
+    ref.obs()->touched (ref, path ());
 }
 
 /******************************************************************************

@@ -41,7 +41,7 @@ tm_data_rep::load_tree (url u, string fm) {
   if ((fm == "generic") || (fm == "help")) fm= get_format (s, suf);
   tree t= generic_to_tree (s, fm * "-document");
   tree links= extract (t, "links");
-  if (N (links) != 0)
+  if (is_compound(links) && (N (links) != 0))
     (void) call ("register-link-locations", object (u), object (links));
   return t;
 }

@@ -20,7 +20,7 @@ copy_ip (tree src, tree dest) {
   path src_ip= obtain_ip (src);
   path dest_ip= obtain_ip (dest);
   if (dest_ip != src_ip) {
-    dest->obs= list_observer (ip_observer (src_ip), dest->obs);
+    dest.obs()= list_observer (ip_observer (src_ip), dest.obs());
     if (is_compound (src)) {
       int i, n= N(src);
       for (i=0; i<n; i++)

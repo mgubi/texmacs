@@ -65,13 +65,13 @@ inline path decorate_right (path ip) {
 void
 transfer_ip (tree src, tree dest) {
   ASSERT (obtain_ip (dest) == path (DETACHED), "already has an ip");
-  dest->obs= list_observer (ip_observer (obtain_ip (src)), dest->obs);
+  dest.obs()= list_observer (ip_observer (obtain_ip (src)), dest.obs());
 }
 
 void
 decorate_ip (tree ref, path ip) {
   if (obtain_ip (ref) == path (DETACHED)) {
-    ref->obs= list_observer (ip_observer (ip), ref->obs);
+    ref.obs()= list_observer (ip_observer (ip), ref.obs());
     if (is_compound (ref)) {
       int i, n= N(ref);
       for (i=0; i<n; i++)

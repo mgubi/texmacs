@@ -259,15 +259,15 @@ clean_observers (observer& o) {
 
 void
 attach_observer (tree& ref, observer o) {
-  insert_observer (ref->obs, o);
+  insert_observer (ref.obs(), o);
 }
 
 void
 detach_observer (tree& ref, observer o) {
-  remove_observer (ref->obs, o);
+  remove_observer (ref.obs(), o);
 }
 
 void
 clean_observers (tree& ref) {
-  clean_observers (ref->obs);
+  clean_observers (ref.obs());
 }
