@@ -25,7 +25,7 @@ public:
 
 inline blackbox
 as_blackbox (const tree& t) {
-  return ((generic_rep*) t.rep()) -> data;
+  return (static_cast<generic_rep*>(t.rep())) -> data;
 }
 
 template<typename T, typename F>
@@ -36,7 +36,7 @@ struct convert_helper {
 template<typename F>
 struct convert_helper<tree,F> {
   static inline tree op (const F& data) {
-    return tree ((tree_rep*) tm_new<generic_rep> (data)); }
+    return tree (static_cast<tree_rep*>(tm_new<generic_rep> (data))); }
 };
 
 template<typename T>

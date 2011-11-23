@@ -153,6 +153,43 @@ struct abstract_struct {
 #define INC_COUNT_NULL(R) { if ((R)!=NULL) (R)->ref_count++; }
 #define DEC_COUNT_NULL(R) { if ((R)!=NULL && 0==--((R)->ref_count)) tm_delete (R); }
 
+class tm_base {
+  //  a base common class for all the texmacs objects
+};
+
+template <class T>
+class tm_stats  {
+public:
+  static int alive;
+  static int created;
+  tm_stats () { alive++; created++; }
+protected:
+  ~tm_stats () { alive--; }
+};
+
+template <class T> int tm_stats<T>::alive (0);
+template <class T> int tm_stats<T>::created (0);
+
+
+template <class T> class tm_ptr; 
+template <class T> class tm_null_ptr; 
+
+template <class T>
+class tm_obj : public tm_base, public tm_stats<T> {
+	int ref_count;
+  
+protected:
+	inline tm_obj (): ref_count (0) { TM_DEBUG(concrete_count++); }
+  inline ~tm_obj () { TM_DEBUG(concrete_count--); }
+	inline void inc_ref () { ref_count++; } 
+	inline void dec_ref () { if (0 == --ref_count) static_cast<T*>(this)->destroy(); } 
+  inline void destroy () { tm_delete (static_cast<T*>(this)); }
+  
+public:
+  friend class tm_ptr<T>;
+  friend class tm_null_ptr<T>;
+};
+
 
 template <class T>
 class tm_ptr {
@@ -203,23 +240,6 @@ public:
   inline tm_abs_ptr (T* p) : tm_ptr<T> (p) {  }
   inline tm_abs_ptr () : tm_ptr<T> () {  }
   //  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
-};
-
-
-template <class T>
-class tm_obj {
-	int ref_count;
-  
-protected:
-	inline tm_obj (): ref_count (0) { TM_DEBUG(concrete_count++); }
-  virtual inline ~tm_obj () { TM_DEBUG(concrete_count--); }
-	inline void inc_ref () { ref_count++; } 
-	inline void dec_ref () { if (0 == --ref_count) static_cast<T*>(this)->destroy(); } 
-  inline void destroy () { tm_delete (static_cast<T*>(this)); }
-
-public:
-  friend class tm_ptr<T>;
-  friend class tm_null_ptr<T>;
 };
 
 
