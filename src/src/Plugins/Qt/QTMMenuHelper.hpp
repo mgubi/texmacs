@@ -96,7 +96,7 @@ public:
   ~QTMInputTextWidgetHelper();
 
   qt_input_text_widget_rep* wid () 
-    { return (qt_input_text_widget_rep*) p_wid.rep; }
+    { return concrete<qt_input_text_widget_rep*>(p_wid); }
   // useful cast
   
   void add (QLineEdit *);

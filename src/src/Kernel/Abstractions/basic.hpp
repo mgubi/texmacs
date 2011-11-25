@@ -173,6 +173,8 @@ template <class T> int tm_stats<T>::created (0);
 
 template <class T> class tm_ptr; 
 template <class T> class tm_null_ptr; 
+template <class T> class tm_abs_ptr; 
+template <class T> class tm_abs_null_ptr; 
 
 template <class T>
 class tm_obj : public tm_base, public tm_stats<T> {
@@ -186,8 +188,10 @@ protected:
   inline void destroy () { tm_delete (static_cast<T*>(this)); }
   
 public:
-  friend class tm_ptr<T>;
-  friend class tm_null_ptr<T>;
+   template <class TT> friend class tm_ptr;
+  template <class TT> friend class tm_null_ptr;
+  template <class TT> friend class tm_abs_ptr;
+  template <class TT> friend class tm_abs_null_ptr;
 };
 
 

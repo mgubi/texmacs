@@ -83,31 +83,29 @@ public:
  * Wrapper around the qt_widget_rep widget representation class. It implements
  * reference counting. Please src/Kernel/Abstractions/basic.hpp
  */
-class qt_widget {
-public:
-  ABSTRACT_NULL(qt_widget); // Automagically declared constructor, methods, etc.
 
-  inline bool operator == (qt_widget w) { return rep == w.rep; }
-  inline bool operator != (qt_widget w) { return rep != w.rep; }
+class qt_widget : public tm_abs_null_ptr<qt_widget_rep> {
+public:
+  qt_widget () : tm_abs_null_ptr<qt_widget_rep>() {} 
+  qt_widget (qt_widget_rep* p) : tm_abs_null_ptr<qt_widget_rep>(p) {} 
+  inline bool operator == (qt_widget w) { return rep() == w.rep(); }
+  inline bool operator != (qt_widget w) { return rep() != w.rep(); }
+  friend widget abstract (qt_widget w);
+  friend qt_widget concrete (widget w);
+
 };
 
-/*
- * Automagically create definitions for the stuff declared inside qt_widget with
- * the macro ABSTRACT_NULL(). See src/Kernel/Abstractions/basic.hpp
- */
-
-ABSTRACT_NULL_CODE(qt_widget);
 
 /**
  * casting form qt_widget to widget
  */
 
-inline widget abstract (qt_widget w) { return widget (w.rep); }
+inline widget abstract (qt_widget w) { return widget (w.rep()); }
 
 /**
  * casting from widget to qt_widget
  */
 
-inline qt_widget concrete (widget w) { return qt_widget ((qt_widget_rep*) w.rep); }
+inline qt_widget concrete (widget w) { return qt_widget (concrete<qt_widget_rep*>(w)); }
 
 #endif // defined QT_WIDGET_HPP

@@ -30,7 +30,7 @@ template<class T> class promise;
 * The abstract widget class
 ******************************************************************************/
 
-class widget_rep: public abstract_struct {
+class widget_rep : public tm_obj<widget_rep> {
 protected:
   list<widget_connection> in;
   list<widget_connection> out;
@@ -58,13 +58,14 @@ public:
   friend class widget;
 };
 
-class widget {
+class widget : public tm_abs_null_ptr<widget_rep> {
 public:
-ABSTRACT_NULL(widget);
-  inline bool operator == (widget w) { return rep == w.rep; }
-  inline bool operator != (widget w) { return rep != w.rep; }
+  widget () : tm_abs_null_ptr<widget_rep>() {} 
+  widget (widget_rep* p) : tm_abs_null_ptr<widget_rep>(p) {} 
+  inline bool operator == (widget w) { return rep() == w.rep(); }
+  inline bool operator != (widget w) { return rep() != w.rep(); }
+  template<class T> friend T concrete (widget w) { return static_cast<T>(w.rep()); }
 };
-ABSTRACT_NULL_CODE(widget);
 
 inline tm_ostream&
 operator << (tm_ostream& out, widget w) {

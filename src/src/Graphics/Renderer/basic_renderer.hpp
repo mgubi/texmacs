@@ -48,7 +48,7 @@ int hash (basic_character xc);
  * structure for caching images
  ******************************************************************************/
 
-struct cache_image_element_rep: concrete_struct {
+struct cache_image_element_rep : tm_obj<cache_image_element_rep> {
 	int w,h,nr;
   time_t time;
   void *ptr;
@@ -58,14 +58,13 @@ struct cache_image_element_rep: concrete_struct {
 	friend class cache_image_element;
 };
 
-class cache_image_element {
-	ABSTRACT_NULL(cache_image_element);
+class cache_image_element : public tm_abs_null_ptr<cache_image_element_rep> {
+public:
+  cache_image_element() : tm_abs_null_ptr<cache_image_element_rep>() {}
+  cache_image_element(cache_image_element_rep* p) : tm_abs_null_ptr<cache_image_element_rep>(p) {}
 	//basic_image (basic_surface_t* img2, SI xo2, SI yo2, int w2, int h2);
 	//cache_image () 
 };
-
-ABSTRACT_NULL_CODE(cache_image_element);
-
 
 /******************************************************************************
  * basic_renderer_rep

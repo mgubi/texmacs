@@ -45,7 +45,7 @@ class server_rep;
 class modification;
 extern bool enable_fastenv;
 
-class editor_rep: public simple_widget_rep {
+class editor_rep : public simple_widget_rep {
 public:
   server_rep* sv;   // the underlying texmacs server
 
@@ -529,13 +529,13 @@ public:
   friend void   tm_failure (const char* msg);
 };
 
-class editor {
-EXTEND_NULL(widget,editor);
+class editor : public tm_null_ptr<editor_rep> {
 public:
-  inline bool operator == (editor w) { return rep == w.rep; }
-  inline bool operator != (editor w) { return rep != w.rep; }
+  editor (editor_rep* p) : tm_null_ptr<editor_rep>(p) {}
+  operator widget () { return static_cast<widget_rep*>(rep()); }
+  inline bool operator == (editor w) { return rep() == w.rep(); }
+  inline bool operator != (editor w) { return rep() != w.rep(); }
 };
-EXTEND_NULL_CODE(widget,editor);
 
 editor new_editor (server_rep* sv, tm_buffer buf);
 

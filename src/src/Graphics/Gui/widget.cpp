@@ -143,14 +143,14 @@ widget_rep::~widget_rep () {
 
 void
 widget_rep::connect (slot s, widget w2, slot s2) {
-  widget_connection con (this, s, w2.rep, s2);
+  widget_connection con (this, s, concrete<widget_rep*>(w2), s2);
   insert (out, con);
   insert (w2->in, con);
 }
 
 void
 widget_rep::deconnect (slot s, widget w2, slot s2) {
-  widget_connection con (this, s, w2.rep, s2);
+  widget_connection con (this, s, concrete<widget_rep*>(w2), s2);
   remove (out, con);
   remove (w2->in, con);
 }

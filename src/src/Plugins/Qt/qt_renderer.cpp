@@ -389,7 +389,7 @@ qt_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
       (*pm)= pm->scaled(w,h);
     }
 
-    ci = tm_new<qt_cache_image_rep> (w,h, texmacs_time(), pm);
+    ci = cache_image_element(tm_new<qt_cache_image_rep> (w,h, texmacs_time(), pm));
     set_image_cache(lookup, ci);
     (ci->nr)++;
   }

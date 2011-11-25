@@ -108,7 +108,7 @@ tm_server_rep::tm_server_rep ():
 }
 
 tm_server_rep::~tm_server_rep () {}
-server::server (): rep (tm_new<tm_server_rep> ()) {}
+server::server (): tm_abs_ptr<server_rep>  (static_cast<server_rep*>(tm_new<tm_server_rep> ())) {}
 
 /******************************************************************************
 * Get and set objects associated to server

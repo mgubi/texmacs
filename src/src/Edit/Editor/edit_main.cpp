@@ -70,7 +70,7 @@ edit_main_rep::~edit_main_rep () {
 
 editor
 new_editor (server_rep* sv, tm_buffer buf) {
-  return tm_new<edit_main_rep> (sv, buf);
+  return static_cast<editor_rep*>(tm_new<edit_main_rep> (sv, buf));
 }
 
 /******************************************************************************

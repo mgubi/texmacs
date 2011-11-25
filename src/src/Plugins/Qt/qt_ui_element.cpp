@@ -572,7 +572,7 @@ qt_ui_element_rep::as_qaction () {
       QAction* a= concrete(text)->as_qaction();
       {
         typedef quartet<string, int, color, bool> T1;
-        T1 x = open_box<T1>(static_cast<qt_ui_element_rep*>(help.rep)->load);
+        T1 x = open_box<T1>(concrete<qt_ui_element_rep*>(help)->load);
         string str = x.x1;
         a->setToolTip (to_qstring (str));
       }
@@ -756,7 +756,7 @@ qt_ui_element_rep::as_qlayoutitem () {
       if (li->widget())
       {
         typedef quartet<string, int, color, bool> T1;
-        T1 x = open_box<T1>(static_cast<qt_ui_element_rep*>(help.rep)->load);
+        T1 x = open_box<T1>(concrete<qt_ui_element_rep*>(help)->load);
         string str = x.x1;
         li->widget()->setToolTip (to_qstring (str));
       }
@@ -853,7 +853,7 @@ qt_ui_element_rep::as_qwidget () {
       if (w)
       {
         typedef quartet<string, int, color, bool> T1;
-        T1 x = open_box<T1>(static_cast<qt_ui_element_rep*>(help.rep)->load);
+        T1 x = open_box<T1>(concrete<qt_ui_element_rep*>(help)->load);
         string str = x.x1;
         w->setToolTip (to_qstring (str));
       }

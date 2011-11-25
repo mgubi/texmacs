@@ -234,7 +234,7 @@ qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
   
   if (DEBUG_QT)  cout << "show_wait_indicator \"" << message << "\"\"" << arg << "\"" << LF;
 
-  qt_window_widget_rep *wid = static_cast<qt_window_widget_rep*> (w.rep);
+  qt_window_widget_rep *wid = concrete<qt_window_widget_rep*>(w);
 
   // we move the texmacs window during an operation. 
   // We need to disable updates of the window to avoid erasure of the canvas

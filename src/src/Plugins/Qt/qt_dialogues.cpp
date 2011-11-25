@@ -116,12 +116,16 @@ qt_field_widget_rep::query (slot s, int type_id) {
   }
 }
 
+class qt_field_widget_ptr;
 
-class qt_field_widget {
+class qt_field_widget : public tm_abs_ptr<qt_field_widget_rep> {
 public:
-ABSTRACT_NULL(qt_field_widget);
+  qt_field_widget() : tm_abs_ptr<qt_field_widget_rep>() {}
+  qt_field_widget(qt_field_widget_rep* p) : tm_abs_ptr<qt_field_widget_rep>(p) {}
+  friend widget abstract(qt_field_widget w) { return widget(w.rep()); }
+//ABSTRACT_NULL(qt_field_widget);
 };
-ABSTRACT_NULL_CODE(qt_field_widget);
+//ABSTRACT_NULL_CODE(qt_field_widget);
 
 qt_input_widget_rep::qt_input_widget_rep
   (command _cmd, array<string> _prompts):
@@ -131,7 +135,7 @@ qt_input_widget_rep::qt_input_widget_rep
     win_title ("")
 {
   for (int i=0; i < N(_prompts); i++) {
-    fields[i] = tm_new<qt_field_widget_rep> (this);
+    fields[i] = qt_field_widget(tm_new<qt_field_widget_rep> (this));
     fields[i]->prompt = _prompts[i];
   }
 }
@@ -214,7 +218,7 @@ qt_input_widget_rep::read (slot s, blackbox index) {
     return this;
   case SLOT_FORM_FIELD:
     check_type<int> (index, "SLOT_FORM_FIELD");
-    return (widget_rep*) (fields [open_box<int> (index)].rep);
+    return abstract (fields [open_box<int> (index)]);
   default:
     return qt_widget_rep::read (s, index);
   }

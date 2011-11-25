@@ -26,7 +26,7 @@ TMPL bool is_nil (function<F,T> f);
 ******************************************************************************/
 
 TMPL
-class function_rep: public abstract_struct {
+class function_rep : public tm_obj<function_rep<F,T> > {
 public:
   inline function_rep () {}
   inline virtual ~function_rep () {}
@@ -37,14 +37,12 @@ public:
 };
 
 TMPL
-class function {
+class function : tm_abs_null_ptr<function_rep<F,T> > {
 public:
-ABSTRACT_NULL_TEMPLATE_2(function,F,T);
   inline function (T x);
   inline T operator () (F x);
   inline ball<T> operator () (ball<F> x);
 };
-ABSTRACT_NULL_TEMPLATE_2_CODE(function,typename,F,typename,T);
 
 TMPL inline T function<F,T>::operator () (F x) {
   return rep->apply (x); }

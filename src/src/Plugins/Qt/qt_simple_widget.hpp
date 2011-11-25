@@ -18,7 +18,7 @@
 #include "qt_view_widget.hpp"
 #include "QTMWidget.hpp"
 
-class simple_widget_rep: public qt_view_widget_rep {
+class simple_widget_rep : public qt_view_widget_rep {
 public:
   simple_widget_rep ();
         
@@ -48,6 +48,6 @@ public:
   QTMWidget* tm_canvas () { return qobject_cast <QTMWidget*>(view); }
 };
 
-inline simple_widget_rep *concrete_simple_widget (widget w) { return static_cast<simple_widget_rep*>(w.rep); }
+inline simple_widget_rep *concrete_simple_widget (widget w) { return concrete<simple_widget_rep*>(w); }
 
 #endif // defined QT_SIMPLE_WIDGET_HPP

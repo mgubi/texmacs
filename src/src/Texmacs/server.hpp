@@ -23,7 +23,7 @@ typedef tm_view_rep*   tm_view;
 typedef tm_window_rep* tm_window;
 class editor;
 
-class server_rep: public abstract_struct {
+class server_rep: public tm_obj<server_rep> {
 public:
   server_rep ();
   virtual ~server_rep ();
@@ -179,11 +179,13 @@ public:
   virtual void   shell (string s) = 0;
 };
 
-class server {
-  ABSTRACT(server);
+class server : public tm_abs_ptr<server_rep> {
+public:
+//  ABSTRACT(server);
   server ();
+  server (server_rep* p) : tm_abs_ptr<server_rep>(p) {}
 };
-ABSTRACT_CODE(server);
+//ABSTRACT_CODE(server);
 
 extern bool rescue_mode;
 scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);
