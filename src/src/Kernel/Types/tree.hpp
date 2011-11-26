@@ -133,7 +133,7 @@ typedef tree scheme_tree;
 * Routines for trees
 ******************************************************************************/
 
-#define debug_trees
+//#define debug_trees
 #ifdef debug_trees
 #define CHECK_ATOMIC(t) \
   if (((t).rep())->op != STRING) { \
