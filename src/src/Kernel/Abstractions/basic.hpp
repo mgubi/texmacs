@@ -127,31 +127,9 @@ template<typename T> int type_helper<T>::id  = new_type_identifier ();
 template<typename T> T   type_helper<T>::init= T ();
 
 /******************************************************************************
-* concrete and abstract base structures
-******************************************************************************/
+ * base classes
+ ******************************************************************************/
 
-extern int concrete_count;
-struct concrete_struct {
-  int ref_count;
-  inline concrete_struct (): ref_count (1) { TM_DEBUG(concrete_count++); }
-  virtual inline ~concrete_struct () { TM_DEBUG(concrete_count--); }
-};
-
-extern int abstract_count;
-struct abstract_struct {
-  int ref_count;
-  inline abstract_struct (): ref_count (0) { TM_DEBUG(abstract_count++); }
-  virtual inline ~abstract_struct () { TM_DEBUG(abstract_count--); }
-};
-
-/******************************************************************************
-* indirect structures
-******************************************************************************/
-
-#define INC_COUNT(R)      { (R)->ref_count++; }
-#define DEC_COUNT(R)      { if(0==--((R)->ref_count)) tm_delete (R); }
-#define INC_COUNT_NULL(R) { if ((R)!=NULL) (R)->ref_count++; }
-#define DEC_COUNT_NULL(R) { if ((R)!=NULL && 0==--((R)->ref_count)) tm_delete (R); }
 
 class tm_base {
   //  a base common class for all the texmacs objects
@@ -245,7 +223,7 @@ template <class T>
 class tm_abs_ptr : public tm_ptr<T> {
 public:
   inline tm_abs_ptr (T* p) : tm_ptr<T> (p) {  }
- // inline tm_abs_ptr () : tm_ptr<T> () {  }
+  // inline tm_abs_ptr () : tm_ptr<T> () {  }
   //  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
 };
 
@@ -267,6 +245,34 @@ public:
   operator B () { return B (this->rep()); }
 };
 
+#if 0
+
+/******************************************************************************
+* concrete and abstract base structures
+******************************************************************************/
+
+extern int concrete_count;
+struct concrete_struct {
+  int ref_count;
+  inline concrete_struct (): ref_count (1) { TM_DEBUG(concrete_count++); }
+  virtual inline ~concrete_struct () { TM_DEBUG(concrete_count--); }
+};
+
+extern int abstract_count;
+struct abstract_struct {
+  int ref_count;
+  inline abstract_struct (): ref_count (0) { TM_DEBUG(abstract_count++); }
+  virtual inline ~abstract_struct () { TM_DEBUG(abstract_count--); }
+};
+
+/******************************************************************************
+* indirect structures
+******************************************************************************/
+
+#define INC_COUNT(R)      { (R)->ref_count++; }
+#define DEC_COUNT(R)      { if(0==--((R)->ref_count)) tm_delete (R); }
+#define INC_COUNT_NULL(R) { if ((R)!=NULL) (R)->ref_count++; }
+#define DEC_COUNT_NULL(R) { if ((R)!=NULL && 0==--((R)->ref_count)) tm_delete (R); }
 
 
 // concrete
@@ -460,5 +466,7 @@ public:                                    \
     INC_COUNT_NULL(this->rep); }                 \
   template<TT T> inline PTR<T>::operator BASE () { return BASE (this->rep); }
 // end extend_null
+
+#endif // if 0
 
 #endif // defined BASIC_H
