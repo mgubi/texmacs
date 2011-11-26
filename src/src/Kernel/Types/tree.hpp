@@ -44,10 +44,7 @@ class tree: public tm_ptr<tree_rep> {
   inline tree (tree_rep* rep2);
 
 public:
-//  inline tree (const tree& x);
-//  inline ~tree ();
   inline atomic_rep* operator -> ();
-//  inline tree& operator = (tree x);
 
   inline tree ();
   inline tree (string l);
@@ -154,17 +151,9 @@ void destroy_tree_rep (tree_rep* rep);
 inline tree::tree (tree_rep* rep2): tm_ptr<tree_rep> (rep2) { }
 inline void tree_rep::destroy () { destroy_tree_rep(this); }
 
-//inline tree::tree (const tree& x): rep (x.rep) { rep->ref_count++; }
-//inline tree::~tree () {
-//  if ((--rep->ref_count)==0) { destroy_tree_rep (rep); rep= NULL; } }
 inline atomic_rep* tree::operator -> () {
   CHECK_ATOMIC (*this);
   return static_cast<atomic_rep*> (rep()); }
-//inline tree& tree::operator = (tree x) {
-//  x.rep->ref_count++;
-//  if ((--rep->ref_count)==0) destroy_tree_rep (rep);
-//  rep= x.rep;
-//  return *this; }
 
 inline tree::tree ():
   tm_ptr<tree_rep> (tm_new<atomic_rep> (string ())) {}
