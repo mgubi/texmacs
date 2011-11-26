@@ -3,6 +3,7 @@
 * MODULE     : basic.hpp
 * DESCRIPTION: see basic.cpp
 * COPYRIGHT  : (C) 1999  Joris van der Hoeven
+*              (C) 2011 Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -205,13 +206,12 @@ public:
   inline ~tm_null_ptr() { if (rep_)  rep_->dec_ref(); }
   inline tm_null_ptr& operator=(tm_null_ptr<T> x) {  if (x.rep_) x.rep_->inc_ref();  if (rep_) rep_->dec_ref(); rep_=x.rep_; return *this; }
   inline T* operator->() { return rep_; }
-  friend bool is_nil<T> (tm_null_ptr<T> p);
+  friend bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
   template <class TT, class BB> friend class tm_ext_null_ptr;
 };
 
-template <class T>
-inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
-
+//template <class T>
+//inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
 
 template <class T>
 class tm_abs_null_ptr : public tm_null_ptr<T> {
@@ -223,11 +223,7 @@ template <class T>
 class tm_abs_ptr : public tm_ptr<T> {
 public:
   inline tm_abs_ptr (T* p) : tm_ptr<T> (p) {  }
-  // inline tm_abs_ptr () : tm_ptr<T> () {  }
-  //  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
 };
-
-
 
 template <class T, class B>
 class tm_ext_null_ptr : public tm_abs_null_ptr<T> {
@@ -244,229 +240,5 @@ public:
   inline tm_ext_ptr (const B& x) : tm_abs_ptr<T> (static_cast<T*>(x.rep())) {}
   operator B () { return B (this->rep()); }
 };
-
-#if 0
-
-/******************************************************************************
-* concrete and abstract base structures
-******************************************************************************/
-
-extern int concrete_count;
-struct concrete_struct {
-  int ref_count;
-  inline concrete_struct (): ref_count (1) { TM_DEBUG(concrete_count++); }
-  virtual inline ~concrete_struct () { TM_DEBUG(concrete_count--); }
-};
-
-extern int abstract_count;
-struct abstract_struct {
-  int ref_count;
-  inline abstract_struct (): ref_count (0) { TM_DEBUG(abstract_count++); }
-  virtual inline ~abstract_struct () { TM_DEBUG(abstract_count--); }
-};
-
-/******************************************************************************
-* indirect structures
-******************************************************************************/
-
-#define INC_COUNT(R)      { (R)->ref_count++; }
-#define DEC_COUNT(R)      { if(0==--((R)->ref_count)) tm_delete (R); }
-#define INC_COUNT_NULL(R) { if ((R)!=NULL) (R)->ref_count++; }
-#define DEC_COUNT_NULL(R) { if ((R)!=NULL && 0==--((R)->ref_count)) tm_delete (R); }
-
-
-// concrete
-#define CONCRETE(PTR)               \
-  PTR##_rep *rep;                   \
-public:                             \
-  inline PTR (const PTR&);          \
-  inline ~PTR ();                   \
-  inline PTR##_rep* operator -> (); \
-  inline PTR& operator = (PTR x)
-#define CONCRETE_CODE(PTR)                       \
-  inline PTR::PTR (const PTR& x):                \
-    rep(x.rep) { INC_COUNT (this->rep); }        \
-  inline PTR::~PTR () { DEC_COUNT (this->rep); } \
-  inline PTR##_rep* PTR::operator -> () {        \
-    return rep; }                                \
-  inline PTR& PTR::operator = (PTR x) {          \
-    INC_COUNT (x.rep); DEC_COUNT (this->rep);    \
-    this->rep=x.rep; return *this; }
-
-// definition for 1 parameter template classes
-#define CONCRETE_TEMPLATE(PTR,T)      \
-  PTR##_rep<T> *rep;                  \
-public:                               \
-  inline PTR (const PTR<T>&);         \
-  inline ~PTR ();                     \
-  inline PTR##_rep<T>* operator -> (); \
-  inline PTR<T>& operator = (PTR<T> x)
-#define CONCRETE_TEMPLATE_CODE(PTR,TT,T)                          \
-  template<TT T> inline PTR<T>::PTR (const PTR<T>& x):            \
-    rep(x.rep) { INC_COUNT (this->rep); }                         \
-  template<TT T> inline PTR<T>::~PTR() { DEC_COUNT (this->rep); } \
-  template<TT T> inline PTR##_rep<T>* PTR<T>::operator -> () {    \
-    return this->rep; }                                           \
-  template<TT T> inline PTR<T>& PTR<T>::operator = (PTR<T> x) {   \
-    INC_COUNT (x.rep); DEC_COUNT (this->rep);                     \
-    this->rep=x.rep; return *this; }
-
-// definition for 2 parameter template classes
-#define CONCRETE_TEMPLATE_2(PTR,T1,T2)     \
-  PTR##_rep<T1,T2> *rep;                   \
-public:                                    \
-  inline PTR (const PTR<T1,T2>&);          \
-  inline ~PTR ();                          \
-  inline PTR##_rep<T1,T2>* operator -> (); \
-  inline PTR<T1,T2>& operator = (PTR<T1,T2> x)
-#define CONCRETE_TEMPLATE_2_CODE(PTR,TT1,T1,TT2,T2)                           \
-  template<TT1 T1,TT2 T2> inline PTR<T1,T2>::PTR (const PTR<T1,T2>& x):       \
-    rep(x.rep) { INC_COUNT (this->rep); }                                     \
-  template<TT1 T1,TT2 T2> inline PTR<T1,T2>::~PTR () { DEC_COUNT(this->rep);} \
-  template<TT1 T1,TT2 T2> inline PTR##_rep<T1,T2>* PTR<T1,T2>::operator -> () \
-    { return this->rep; }                                                     \
-  template <TT1 T1,TT2 T2>                                                    \
-  inline PTR<T1,T2>& PTR<T1,T2>::operator = (PTR<T1,T2> x) {                  \
-    INC_COUNT (x.rep); DEC_COUNT (this->rep);                                 \
-    this->rep=x.rep; return *this; }
-// end concrete
-
-// abstract
-#define ABSTRACT(PTR) \
-  CONCRETE(PTR);      \
-  inline PTR (PTR##_rep*)
-#define ABSTRACT_CODE(PTR) \
-  CONCRETE_CODE(PTR) ;     \
-  inline PTR::PTR (PTR##_rep* rep2): rep(rep2) { INC_COUNT (this->rep); }
-#define ABSTRACT_TEMPLATE(PTR,T) \
-  CONCRETE_TEMPLATE(PTR,T);      \
-  inline PTR (PTR##_rep<T>*)
-#define ABSTRACT_TEMPLATE_CODE(PTR,TT,T)                  \
-  CONCRETE_TEMPLATE_CODE(PTR,TT,T);                       \
-  template<TT T> inline PTR<T>::PTR (PTR##_rep<T>* rep2): \
-    rep(rep2) { INC_COUNT (this->rep); }
-// end abstract
-
-/******************************************************************************
-* null indirect structures
-******************************************************************************/
-
-// concrete_null
-#define CONCRETE_NULL(PTR) \
-  CONCRETE(PTR);           \
-  inline PTR();            \
-  friend bool is_nil /*LESSGTR*/ (PTR x)
-#define CONCRETE_NULL_CODE(PTR)                         \
-  inline PTR::PTR (): rep(NULL) {}                      \
-  inline PTR::PTR (const PTR& x):                       \
-    rep(x.rep) { INC_COUNT_NULL (this->rep); }          \
-  inline PTR::~PTR() { DEC_COUNT_NULL (this->rep); }    \
-  inline PTR##_rep* PTR::operator -> () {               \
-    return this->rep; }                                 \
-  inline PTR& PTR::operator = (PTR x) {                 \
-    INC_COUNT_NULL (x.rep); DEC_COUNT_NULL (this->rep); \
-    this->rep=x.rep; return *this; }                    \
-  inline bool is_nil (PTR x) { return x.rep==NULL; }
-#define CONCRETE_NULL_TEMPLATE(PTR,T) \
-  CONCRETE_TEMPLATE(PTR,T);           \
-  inline PTR();                       \
-  friend bool is_nil LESSGTR (PTR<T> x)
-#define CONCRETE_NULL_TEMPLATE_CODE(PTR,TT,T)                           \
-  template<TT T> inline PTR<T>::PTR (): rep(NULL) {}                    \
-  template<TT T> inline PTR<T>::PTR (const PTR<T>& x):                  \
-    rep(x.rep) { INC_COUNT_NULL (this->rep); }                          \
-  template<TT T> inline PTR<T>::~PTR () { DEC_COUNT_NULL (this->rep); } \
-  template<TT T> inline PTR##_rep<T>* PTR<T>::operator -> () {          \
-    return this->rep; }                                                 \
-  template<TT T> inline PTR<T>& PTR<T>::operator = (PTR<T> x) {         \
-    INC_COUNT_NULL (x.rep); DEC_COUNT_NULL (this->rep);                 \
-    this->rep=x.rep; return *this; }                                    \
-  template<TT T> inline bool is_nil (PTR<T> x) { return x.rep==NULL; }
-
-#define CONCRETE_NULL_TEMPLATE_2(PTR,T1,T2) \
-  CONCRETE_TEMPLATE_2(PTR,T1,T2);           \
-  inline PTR();                             \
-  friend bool is_nil LESSGTR (PTR<T1,T2> x)
-#define CONCRETE_NULL_TEMPLATE_2_CODE(PTR,TT1,T1,TT2,T2)                  \
-  template<TT1 T1, TT2 T2> inline PTR<T1,T2>::PTR (): rep(NULL) {}        \
-  template<TT1 T1, TT2 T2> inline PTR<T1,T2>::PTR (const PTR<T1,T2>& x):  \
-    rep(x.rep) { INC_COUNT_NULL (this->rep); }                            \
-  template<TT1 T1, TT2 T2> inline PTR<T1,T2>::~PTR () {                   \
-    DEC_COUNT_NULL (this->rep); }                                         \
-  template<TT1 T1, TT2 T2> PTR##_rep<T1,T2>* PTR<T1,T2>::operator -> () { \
-    return this->rep; }                                                   \
-  template<TT1 T1, TT2 T2>                                                \
-  inline PTR<T1,T2>& PTR<T1,T2>::operator = (PTR<T1,T2> x) {              \
-    INC_COUNT_NULL (x.rep); DEC_COUNT_NULL (this->rep);                   \
-    this->rep=x.rep; return *this; }                                      \
-  template<TT1 T1, TT2 T2> inline bool is_nil (PTR<T1,T2> x) {               \
-    return x.rep==NULL; }
-// end concrete_null
-
-// abstract_null
-#define ABSTRACT_NULL(PTR) \
-  CONCRETE_NULL (PTR);     \
-  inline PTR (PTR##_rep*)
-#define ABSTRACT_NULL_CODE(PTR)      \
-  CONCRETE_NULL_CODE (PTR);          \
-  inline PTR::PTR (PTR##_rep* rep2): \
-    rep(rep2) { INC_COUNT_NULL (this->rep); }
-#define ABSTRACT_NULL_TEMPLATE(PTR,T) \
-  CONCRETE_NULL_TEMPLATE (PTR,T);     \
-  inline PTR (PTR##_rep<T>*)
-#define ABSTRACT_NULL_TEMPLATE_CODE(PTR,TT,T)              \
-  CONCRETE_NULL_TEMPLATE_CODE (PTR,TT,T);                  \
-  template<TT T> inline PTR<T>::PTR (PTR##_rep<T>* rep2):  \
-    rep(rep2) { INC_COUNT (this->rep); }
-#define ABSTRACT_NULL_TEMPLATE_2(PTR,T1,T2) \
-  CONCRETE_NULL_TEMPLATE_2 (PTR,T1,T2);     \
-  inline PTR (PTR##_rep<T1,T2>*)
-#define ABSTRACT_NULL_TEMPLATE_2_CODE(PTR,TT1,T1,TT2,T2)                    \
-  CONCRETE_NULL_TEMPLATE_2_CODE (PTR,TT1,T1,TT2,T2);                          \
-  template<TT1 T1,TT2 T2> inline PTR<T1,T2>::PTR (PTR##_rep<T1,T2>* rep2):  \
-    rep(rep2) { INC_COUNT (this->rep); }
-// end abstract_null
-
-/******************************************************************************
-* extensions
-******************************************************************************/
-
-#define EXTEND(BASE,PTR) \
-  ABSTRACT(PTR);         \
-  inline PTR(BASE&);     \
-  inline operator BASE ()
-#define EXTEND_CODE(BASE,PTR)             \
-  ABSTRACT_CODE(PTR);                     \
-  inline PTR::PTR(BASE& x):               \
-    rep(static_cast<PTR##_rep*>(x.rep)) { \
-    INC_COUNT (this->rep); }              \
-  inline PTR::operator BASE () { return BASE (this->rep); }
-// end extend
-
-// extend_null
-#define EXTEND_NULL(BASE,PTR) \
-  ABSTRACT_NULL(PTR);         \
-  inline PTR(BASE&);          \
-  inline operator BASE ()
-#define EXTEND_NULL_CODE(BASE,PTR)        \
-  ABSTRACT_NULL_CODE(PTR);                \
-  inline PTR::PTR(BASE& x):               \
-    rep(static_cast<PTR##_rep*>(x.rep)) { \
-    INC_COUNT_NULL(this->rep); }          \
-  inline PTR::operator BASE () { return BASE (this->rep); }
-
-#define EXTEND_NULL_TEMPLATE(BASE,PTR,T) \
-  ABSTRACT_NULL_TEMPLATE(PTR,T);         \
-  inline PTR<T>(BASE&);                  \
-  inline operator BASE ()
-#define EXTEND_NULL_TEMPLATE_CODE(BASE,PTR,TT,T) \
-  ABSTRACT_NULL_TEMPLATE_CODE(PTR,TT,T);         \
-  template<TT T> inline PTR<T>::PTR(BASE& x):    \
-    rep(static_cast<PTR##_rep<T>*>(x.rep)) {     \
-    INC_COUNT_NULL(this->rep); }                 \
-  template<TT T> inline PTR<T>::operator BASE () { return BASE (this->rep); }
-// end extend_null
-
-#endif // if 0
 
 #endif // defined BASIC_H

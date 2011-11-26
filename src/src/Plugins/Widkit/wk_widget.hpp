@@ -52,18 +52,21 @@ public:
 
 class wk_widget : public tm_abs_null_ptr<wk_widget_rep> {
 public:
-  wk_widget(wk_widget* p=NULL) : tm_abs_null_ptr<wk_widget_rep>(p) {}
+  wk_widget(wk_widget_rep* p=NULL) : tm_abs_null_ptr<wk_widget_rep>(p) {}
   inline wk_widget operator [] (int i) { return rep()->a[i]; }
   wk_widget operator [] (string s);
   inline operator tree () { return (tree) (*rep()); }
   inline bool operator == (wk_widget w) { return rep() == w.rep(); }
   inline bool operator != (wk_widget w) { return rep() != w.rep(); }
+
+  friend inline widget abstract (wk_widget w) {
+    return widget (w.rep()); }
+  friend inline wk_widget concrete (widget w) {
+    return wk_widget (concrete<wk_widget_rep*>(w)); }
+  
+
 };
 
-inline widget abstract (wk_widget w) {
-  return widget (w.rep); }
-inline wk_widget concrete (widget w) {
-  return wk_widget ((wk_widget_rep*) w.rep); }
 array<widget> abstract (array<wk_widget> a);
 array<wk_widget> concrete (array<widget> a);
 

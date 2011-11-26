@@ -29,7 +29,7 @@ enum gravity { north_west, north,  north_east,
 #define __EVENT_CLASS_MASK 0xffff0000
 
 extern int event_count;
-struct event_rep: public abstract_struct {
+struct event_rep : public tm_obj<event_rep> {
   int     type;  // the event type
   inline  event_rep (int type2): type (type2) { TM_DEBUG(event_count++); }
   inline  virtual ~event_rep () { TM_DEBUG(event_count--); }
@@ -40,7 +40,7 @@ class event : public tm_abs_ptr<event_rep> {
 public:
   event(event_rep* p) : tm_abs_ptr<event_rep>(p) {}
   inline operator tree () { return (tree) (*rep()); }
-  friend class event_ptr_base;
+  template<class R> friend class event_ptr;
 };
 
 inline tm_ostream& operator << (tm_ostream& out, event ev) {

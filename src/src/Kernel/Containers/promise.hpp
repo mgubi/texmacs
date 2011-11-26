@@ -29,7 +29,7 @@ public:
 };
 
 template<class T>
-class promise : tm_abs_null_ptr<promise_rep<T> > {
+class promise : public tm_abs_null_ptr<promise_rep<T> > {
 public:
   promise(promise_rep<T>* p=NULL) : tm_abs_null_ptr<promise_rep<T> >(p) {}
   inline T operator () ();

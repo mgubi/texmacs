@@ -20,7 +20,7 @@ template<class K, class V> class hashtree;
 template<class K, class V> int N (hashtree<K,V> tree);
 template<class K, class V> bool is_nil (hashtree<K,V> tree);
  
-template<class K, class V> class hashtree_rep: concrete_struct {
+template<class K, class V> class hashtree_rep : public tm_obj<hashtree_rep<K,V> > {
   hashmap<K,hashtree<K,V> > children;
 public:
   V label;
@@ -87,26 +87,21 @@ public:
 * But I didn't want to modify core TeXmacs code.
 ******************************************************************************/
   
-template<class K, class V> class hashtree {
-  //CONCRETE_TEMPLATE_2(hashtree,K,V);
-  hashtree_rep<K,V>* rep;
+template<class K, class V> class hashtree : tm_null_ptr<hashtree_rep<K,V> > {
 
   // this constructor always returns a NULL element
-  inline hashtree (bool): rep (NULL) {}
+  inline hashtree (bool): tm_null_ptr<hashtree_rep<K,V> > (NULL) {}
   
   // ensures that this hashtree has a rep
   void realize();
 
 public:
-  inline hashtree (const hashtree<K,V>&);
-  inline ~hashtree ();
-  inline hashtree<K,V>& operator= (hashtree<K,V> x);
     
   // default constructor returns a non-NULL node, which does not have a value
-  inline hashtree (): rep (tm_new<hashtree_rep<K,V> > ()) {}
+  inline hashtree (): tm_null_ptr<hashtree_rep<K,V> > (tm_new<hashtree_rep<K,V> > ()) {}
   
   // returns a non-NULL node, that has value
-  inline hashtree (V val): rep (tm_new<hashtree_rep<K,V> > (val)) {}
+  inline hashtree (V val): tm_null_ptr<hashtree_rep<K,V> > (tm_new<hashtree_rep<K,V> > (val)) {}
   
   // returns this node's value
   inline hashtree_rep<K,V>* operator-> (void);

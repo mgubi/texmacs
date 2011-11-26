@@ -60,36 +60,15 @@
 #define SCROLL_EVENT          0x00000025
 
 /*** shared implementation for event_ptr<> ***/
-template<class R> struct event_ptr;
-
-class event_ptr_base {
-  event_rep* rep;
-public:
-  event_ptr_base (const event_ptr_base &ev) :
-    rep (ev.rep) { rep->ref_count++; }
-  event_ptr_base (const event& ev) : rep (ev.rep) { rep->ref_count++; }
-  ~event_ptr_base () { if ((--rep->ref_count)==0) tm_delete (rep); }
-  operator event () { return event (rep); }
-  event_rep* operator -> () { return rep; }
-  event_ptr_base& operator = (const event_ptr_base& ev) {
-    ev.rep->ref_count++;
-    if ((--rep->ref_count)==0) tm_delete (rep);
-    rep=ev.rep;
-    return *this;
-  }
-};
+template<class R> class event_ptr;
 
 /*** event_ptr template ***/
-template<class R> struct event_ptr : private event_ptr_base {
-  inline event_ptr (const event_ptr<R>& ev) : event_ptr_base(ev) {}
-  inline event_ptr (const event& ev) : event_ptr_base(ev) {}
-  inline ~event_ptr () {}
-  inline event_ptr<R>& operator = (const event_ptr<R>& ev) {
-    return static_cast<event_ptr<R>&>(event_ptr_base::operator=(ev)); }
+template<class R> 
+class event_ptr : public tm_ptr<R> {
+public:
+  inline event_ptr (const event& ev) : tm_ptr<R>(static_cast<R*>(ev.rep())) {}
   inline operator event()  {
-    return event_ptr_base::operator event(); }
-  inline R* operator -> () {
-    return static_cast<R*>(event_ptr_base::operator->()); }
+    return event(static_cast<event_rep*>(this->rep())); }
 };
 
 #define EVENT(PTR) typedef event_ptr<PTR##_rep> PTR; 
