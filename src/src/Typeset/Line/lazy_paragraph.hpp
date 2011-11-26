@@ -86,11 +86,11 @@ public:
   format query (lazy_type request, format fm);
 };
 
-struct lazy_paragraph {
-  EXTEND_NULL(lazy,lazy_paragraph);
+struct lazy_paragraph : public tm_ext_null_ptr<lazy_paragraph_rep, lazy> {
+public:
+  lazy_paragraph(lazy_paragraph_rep*p=NULL) : tm_ext_null_ptr<lazy_paragraph_rep, lazy>(p) {}
   inline lazy_paragraph (edit_env env, path ip):
-    rep (tm_new<lazy_paragraph_rep> (env, ip)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_paragraph_rep, lazy> (tm_new<lazy_paragraph_rep> (env, ip)) { }
 };
-EXTEND_NULL_CODE(lazy,lazy_paragraph);
 
 #endif // defined LAZY_PARAGRAPH_H

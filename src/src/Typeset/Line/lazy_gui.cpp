@@ -32,13 +32,12 @@ struct lazy_canvas_rep: public lazy_rep {
   format query (lazy_type request, format fm);
 };
 
-struct lazy_canvas {
-EXTEND_NULL(lazy,lazy_canvas);
+struct lazy_canvas : public tm_ext_null_ptr<lazy_canvas_rep, lazy> {
+public:
+  lazy_canvas(lazy_canvas_rep *p=NULL) : tm_ext_null_ptr<lazy_canvas_rep, lazy>(p) { }
   inline lazy_canvas (canvas_properties props, lazy par, path ip):
-    rep (tm_new<lazy_canvas_rep> (props, par, ip)) {
-      rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_canvas_rep, lazy> (tm_new<lazy_canvas_rep> (props, par, ip)) { }
 };
-EXTEND_NULL_CODE(lazy,lazy_canvas);
 
 format
 lazy_canvas_rep::query (lazy_type request, format fm) {
@@ -160,16 +159,16 @@ struct lazy_ornament_rep: public lazy_rep {
   format query (lazy_type request, format fm);
 };
 
-struct lazy_ornament {
-EXTEND_NULL(lazy,lazy_ornament);
+struct lazy_ornament : public tm_ext_null_ptr<lazy_ornament_rep, lazy> {
+public:
+  lazy_ornament(lazy_ornament_rep *p=NULL) : tm_ext_null_ptr<lazy_ornament_rep, lazy> (p) {}
   lazy_ornament (edit_env env, lazy par, path ip,
 		 SI w, SI xpad, SI ypad,
 		 tree bg, int alpha, color sunny, color shadow):
-    rep (tm_new<lazy_ornament_rep> (env, par, ip, w, xpad, ypad,
-                                    bg, alpha, sunny, shadow)) {
-    rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_ornament_rep, lazy> (
+            tm_new<lazy_ornament_rep> (env, par, ip, w, xpad, ypad,
+                                    bg, alpha, sunny, shadow)) { }
 };
-EXTEND_NULL_CODE(lazy,lazy_ornament);
 
 format
 lazy_ornament_rep::query (lazy_type request, format fm) {

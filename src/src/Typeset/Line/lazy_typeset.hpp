@@ -23,12 +23,12 @@ struct lazy_document_rep: public lazy_rep {
   format query (lazy_type request, format fm);
 };
 
-struct lazy_document {
-  EXTEND_NULL(lazy,lazy_document);
+struct lazy_document : public tm_ext_null_ptr<lazy_document_rep, lazy> {
+public:
+  lazy_document(lazy_document_rep *p=NULL) : tm_ext_null_ptr<lazy_document_rep, lazy>(p) {}
   inline lazy_document (edit_env env, tree t, path ip):
-    rep (tm_new<lazy_document_rep> (env, t, ip)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_document_rep, lazy> (tm_new<lazy_document_rep> (env, t, ip)) {  }
 };
-EXTEND_NULL_CODE(lazy,lazy_document);
 
 struct lazy_surround_rep: public lazy_rep {
   array<line_item> a;    // left surrounding
@@ -42,14 +42,14 @@ struct lazy_surround_rep: public lazy_rep {
   format query (lazy_type request, format fm);
 };
 
-struct lazy_surround {
-  EXTEND_NULL(lazy,lazy_surround);
+struct lazy_surround : public tm_ext_null_ptr<lazy_surround_rep, lazy> {
+public:
+  lazy_surround(lazy_surround_rep *p=NULL) : tm_ext_null_ptr<lazy_surround_rep, lazy>(p) { }
   inline lazy_surround (edit_env env, tree t, path ip):
-    rep (tm_new<lazy_surround_rep> (env, t, ip)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_surround_rep, lazy> (tm_new<lazy_surround_rep> (env, t, ip)) {  }
   inline lazy_surround (array<line_item> a, array<line_item> b,
 			lazy par, path ip):
-    rep (tm_new<lazy_surround_rep> (a, b, par, ip)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_surround_rep, lazy> (tm_new<lazy_surround_rep> (a, b, par, ip)) { }
 };
-EXTEND_NULL_CODE(lazy,lazy_surround);
 
 #endif // defined LAZY_TYPESET_H

@@ -30,11 +30,12 @@ public:
   */
 };
 
-struct lazy_vstream {
-  EXTEND_NULL(lazy,lazy_vstream);
+struct lazy_vstream : public tm_ext_null_ptr<lazy_vstream_rep, lazy> {
+public:
+  lazy_vstream(lazy_vstream_rep *p=NULL) : tm_ext_null_ptr<lazy_vstream_rep, lazy>(p) {}
+  lazy_vstream(lazy& l) : tm_ext_null_ptr<lazy_vstream_rep, lazy>(l) {} 
   inline lazy_vstream (path ip, tree ch, array<page_item> l, stack_border sb):
-    rep (tm_new<lazy_vstream_rep> (ip, ch, l, sb)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_vstream_rep, lazy> (tm_new<lazy_vstream_rep> (ip, ch, l, sb)) {  }
 };
-EXTEND_NULL_CODE(lazy,lazy_vstream);
 
 #endif // defined LAZY_VSTREAM_H

@@ -540,7 +540,7 @@ qt_ui_element_rep::as_qaction () {
         QObject::connect (a, SIGNAL (triggered ()), c, SLOT (apply ()),
                           Qt::QueuedConnection);    
       } else {
-        QTMCommand* c= new QTMCommand (cmd.rep);
+        QTMCommand* c= new QTMCommand (cmd);
         c->setParent (a);
         QObject::connect (a, SIGNAL (triggered ()), c, SLOT (apply ()),
                           Qt::QueuedConnection);    

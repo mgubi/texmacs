@@ -17,7 +17,7 @@ class tree;
 template<class T> class promise_rep;
 template<class T> class promise;
 template<class T> tm_ostream& operator << (tm_ostream& out, promise<T> cmd);
-template<class T> bool is_nil (promise<T> l);
+template<class T>  bool operator == (promise<T> mw1, promise<T> mw2);
 
 template<class T>
 class promise_rep: public tm_obj<promise_rep<T> > {
@@ -34,6 +34,7 @@ public:
   promise(promise_rep<T>* p=NULL) : tm_abs_null_ptr<promise_rep<T> >(p) {}
   inline T operator () ();
   friend tm_ostream& operator << LESSGTR (tm_ostream& out, promise<T> cmd);
+  friend bool operator ==  LESSGTR (promise<T> mw1, promise<T> mw2);
 };
 
 #define TMPL template<class T>
@@ -42,7 +43,7 @@ TMPL inline tm_ostream& promise_rep<T>::print (tm_ostream& out) {
 TMPL inline T promise<T>::operator () () {
   return this->rep()->eval (); }
 TMPL inline bool operator == (promise<T> mw1, promise<T> mw2) {
-  return mw1.rep == mw2.rep; }
+  return mw1.rep() == mw2.rep(); }
 TMPL inline tm_ostream& operator << (tm_ostream& out, promise<T> cmd) {
   if (is_nil (cmd)) return out << "(null)"; else return cmd->print(out); }
 #undef TMPL

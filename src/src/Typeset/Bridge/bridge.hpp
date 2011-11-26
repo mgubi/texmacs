@@ -67,6 +67,7 @@ public:
 
 class bridge : public tm_null_ptr<bridge_rep> {
 public:
+  bridge(bridge_rep *p=NULL) :  tm_null_ptr<bridge_rep> (p) {}
   bool operator == (bridge br2);
   bool operator != (bridge br2);
   friend bridge make_bridge (typesetter ttt, tree st, path ip);

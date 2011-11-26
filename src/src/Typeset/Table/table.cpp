@@ -804,7 +804,8 @@ table_rep::var_finish () {
 * Lazy tables
 ******************************************************************************/
 
-struct lazy_table_rep: public lazy_rep {
+class lazy_table_rep : public lazy_rep {
+public:
   table T; // the table
   lazy_table_rep (table T2, path ip): lazy_rep (LAZY_TABLE, ip), T (T2) {}
   operator tree () { return "Table"; }
@@ -812,12 +813,14 @@ struct lazy_table_rep: public lazy_rep {
   format query (lazy_type request, format fm);
 };
 
-struct lazy_table {
-  EXTEND_NULL(lazy,lazy_table);
+class lazy_table : public tm_ext_null_ptr<lazy_table_rep, lazy> {
+//  EXTEND_NULL(lazy,lazy_table);
+public:
+  lazy_table(lazy_table_rep *p=NULL) : tm_ext_null_ptr<lazy_table_rep, lazy>(p) {}
   inline lazy_table (table T, path ip):
-    rep (tm_new<lazy_table_rep> (T, ip)) { rep->ref_count= 1; }
+    tm_ext_null_ptr<lazy_table_rep, lazy> (tm_new<lazy_table_rep> (T, ip)) {  }
 };
-EXTEND_NULL_CODE(lazy,lazy_table);
+//EXTEND_NULL_CODE(lazy,lazy_table);
 
 format
 lazy_table_rep::query (lazy_type request, format fm) {

@@ -175,6 +175,8 @@ template <class T> class tm_ptr;
 template <class T> class tm_null_ptr; 
 template <class T> class tm_abs_ptr; 
 template <class T> class tm_abs_null_ptr; 
+template <class TT, class B>  class tm_ext_ptr;
+template <class TT, class B>  class tm_ext_null_ptr;
 
 template <class T>
 class tm_obj : public tm_base, public tm_stats<T> {
@@ -188,10 +190,12 @@ protected:
   inline void destroy () { tm_delete (static_cast<T*>(this)); }
   
 public:
-   template <class TT> friend class tm_ptr;
+  template <class TT> friend class tm_ptr;
   template <class TT> friend class tm_null_ptr;
   template <class TT> friend class tm_abs_ptr;
   template <class TT> friend class tm_abs_null_ptr;
+  template <class TT, class B> friend class tm_ext_ptr;
+  template <class TT, class B> friend class tm_ext_null_ptr;
 };
 
 
@@ -203,7 +207,7 @@ protected:
   inline T* rep() const { return rep_; }
 public:
   inline tm_ptr (const tm_ptr<T>& x) : rep_(x.rep_) { rep_->inc_ref(); }
-  inline tm_ptr() { rep_->dec_ref(); }
+  inline ~tm_ptr() { rep_->dec_ref(); }
   inline tm_ptr& operator=(tm_ptr<T> x) {  x.rep_->inc_ref();  rep_->dec_ref(); rep_=x.rep_; return *this; }
   inline T* operator->() { return rep_; }
 };
@@ -224,6 +228,7 @@ public:
   inline tm_null_ptr& operator=(tm_null_ptr<T> x) {  if (x.rep_) x.rep_->inc_ref();  if (rep_) rep_->dec_ref(); rep_=x.rep_; return *this; }
   inline T* operator->() { return rep_; }
   friend bool is_nil<T> (tm_null_ptr<T> p);
+  template <class TT, class BB> friend class tm_ext_null_ptr;
 };
 
 template <class T>
@@ -233,19 +238,34 @@ inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
 template <class T>
 class tm_abs_null_ptr : public tm_null_ptr<T> {
 public:
-  inline tm_abs_null_ptr (T* p) : tm_null_ptr<T> (p) {  }
-  inline tm_abs_null_ptr () : tm_null_ptr<T> () {  }
-//  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
+  inline tm_abs_null_ptr (T* p=NULL) : tm_null_ptr<T> (p) {  }
 };
 
 template <class T>
 class tm_abs_ptr : public tm_ptr<T> {
 public:
   inline tm_abs_ptr (T* p) : tm_ptr<T> (p) {  }
-  inline tm_abs_ptr () : tm_ptr<T> () {  }
+ // inline tm_abs_ptr () : tm_ptr<T> () {  }
   //  inline tm_abs_null_ptr (const tm_abs_null_ptr<T>& x) : tm_null_ptr<T> (x) {}
 };
 
+
+
+template <class T, class B>
+class tm_ext_null_ptr : public tm_abs_null_ptr<T> {
+public:
+  inline tm_ext_null_ptr (T* p=NULL) : tm_abs_null_ptr<T> (p) {  }
+  inline tm_ext_null_ptr (const B& x) : tm_abs_null_ptr<T> (static_cast<T*>(x.rep())) {}
+  operator B () { return B (this->rep()); }
+};
+
+template <class T, class B>
+class tm_ext_ptr : public tm_abs_ptr<T> {
+public:
+  inline tm_ext_ptr (T* p) : tm_abs_ptr<T> (p) {  }
+  inline tm_ext_ptr (const B& x) : tm_abs_ptr<T> (static_cast<T*>(x.rep())) {}
+  operator B () { return B (this->rep()); }
+};
 
 
 
