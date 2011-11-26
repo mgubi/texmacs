@@ -45,7 +45,7 @@ class inputs_list_command_rep: public command_rep {
   int n;
 public:
   inputs_list_command_rep (wk_widget w, int i2, int n2):
-    ilw (w.rep), i (i2), n (n2) {}
+    ilw (w.rep()), i (i2), n (n2) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "Input list command (" << i << ")"; }
@@ -80,7 +80,8 @@ inputs_list_widget_rep::inputs_list_widget_rep (
   command cmd2, array<string> prompts2):
     attribute_widget_rep (1), cmd (cmd2), prompts (prompts2), ok (true)
 {
-  ref_count++;
+  widget hold = this;
+  //ref_count++;
 
   int i, n= N (prompts);
   array<wk_widget> prompts_w (n);
@@ -118,7 +119,7 @@ inputs_list_widget_rep::inputs_list_widget_rep (
 
   a[0]= vertical_list (main_w, main_n);
 
-  ref_count--;
+  //ref_count--;
 }
 
 inputs_list_widget_rep::operator tree () {

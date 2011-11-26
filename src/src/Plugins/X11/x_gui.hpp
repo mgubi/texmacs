@@ -52,7 +52,7 @@ struct x_character_rep: public tm_obj<x_character_rep> {
   friend class x_character;
 };
 
-class x_character : public tm_ptr<x_character_rep> {
+class x_character : public tm_null_ptr<x_character_rep> {
 public:
   x_character () {}
   x_character (int c=0, font_glyphs fng= font_glyphs (),

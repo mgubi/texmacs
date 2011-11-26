@@ -18,7 +18,7 @@
 ******************************************************************************/
 
 scrollbar_rep::scrollbar_rep (wk_widget ref2):
-  scroll_widget_rep (0, south_west), ref (ref2.rep),
+  scroll_widget_rep (0, south_west), ref (ref2.rep()),
   sc_min(0), sc_max(0), sc_pos(0), before(0), after(0),
   factor (0.5), gripped (false), scrolling (false), increment (0) {}
 

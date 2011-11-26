@@ -29,11 +29,11 @@ x_character_rep::x_character_rep (
     c (c2), fng (fng2), sf (sf2), fg (fg2), bg (bg2) {}
 
 x_character::x_character (int c, font_glyphs fng, int sf, color fg, color bg):
-  rep (tm_new<x_character_rep> (c, fng, sf, fg, bg)) {}
+  tm_null_ptr<x_character_rep>  (tm_new<x_character_rep> (c, fng, sf, fg, bg)) {}
 
 x_character::operator tree () {
-  tree t (TUPLE,  as_string (rep->c), rep->fng->res_name);
-  t << as_string (rep->sf) << as_string (rep->fg) << as_string (rep->bg);
+  tree t (TUPLE,  as_string (rep()->c), rep()->fng->res_name);
+  t << as_string (rep()->sf) << as_string (rep()->fg) << as_string (rep()->bg);
   return t; }
 
 bool operator == (x_character xc1, x_character xc2) {

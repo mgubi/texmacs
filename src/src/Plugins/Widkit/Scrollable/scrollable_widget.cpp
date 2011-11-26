@@ -141,8 +141,8 @@ scrollable_widget_rep::handle_position (position_event ev) { (void) ev;
 
 void
 scrollable_widget_rep::handle_set_widget (set_widget_event ev) {
-  if (ev->which == "hor-bar") { hor= ev->w.rep; return; }
-  if (ev->which == "ver-bar") { ver= ev->w.rep; return; }
+  if (ev->which == "hor-bar") { hor= ev->w.rep(); return; }
+  if (ev->which == "ver-bar") { ver= ev->w.rep(); return; }
   attribute_widget_rep::handle_set_widget (ev);
 }
 

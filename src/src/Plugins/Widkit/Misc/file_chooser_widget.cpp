@@ -47,7 +47,7 @@ class file_chooser_command_rep: public command_rep {
   wk_widget_rep* fch;
   int type;
 public:
-  file_chooser_command_rep (wk_widget w, int t): fch(w.rep), type(t) {}
+  file_chooser_command_rep (wk_widget w, int t): fch(w.rep()), type(t) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "File chooser command (" << type << ")"; }
@@ -159,7 +159,7 @@ public:
 
 file_list_widget_rep::file_list_widget_rep (
   wk_widget c, array<string> s, bool f):
-    attribute_widget_rep (0), fch (c.rep),
+    attribute_widget_rep (0), fch (c.rep()),
     dir (""), suffix (s), dir_flag (f), hilight (-1) {}
 
 file_list_widget_rep::operator tree () {
@@ -425,7 +425,8 @@ file_chooser_widget_rep::file_chooser_widget_rep (
   command cmd2, string type2):
   attribute_widget_rep (1), cmd (cmd2), type (type2)
 {
-  ref_count++;
+  widget hold = this;
+//  ref_count++;
 
   tree t= stree_to_tree (call ("format-get-suffixes*", type));
   int i, n= N(t);
@@ -576,7 +577,7 @@ file_chooser_widget_rep::file_chooser_widget_rep (
     a[0]["suffixes"]["input"] << set_string ("input", s);
   }
 
-  ref_count--;
+  //ref_count--;
 }
 
 file_chooser_widget_rep::operator tree () {

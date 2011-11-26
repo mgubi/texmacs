@@ -162,7 +162,7 @@ x_window_rep::x_window_rep (widget w2, x_gui gui2, char* n2,
   Min_w (min_w), Min_h (min_h), Def_w (def_w), Def_h (def_h),
   Max_w (max_w), Max_h (max_h),
   win_x (0), win_y (0), win_w (Def_w/PIXEL), win_h (Def_h/PIXEL),
-  kbd_focus (w.rep), has_focus (false)
+  kbd_focus (concrete<widget_rep*>(w)), has_focus (false)
 {
   //cout << "Min " << (min_w >> 8) << ", " << (min_h >> 8) << "\n";
   //cout << "Def " << (def_w >> 8) << ", " << (def_h >> 8) << "\n";
@@ -430,16 +430,16 @@ x_window_rep::repaint_invalid_regions () {
 void
 x_window_rep::set_keyboard_focus (widget wid, bool get_focus) {
   ASSERT (get_focus, "explicit loss of keyboard focus not yet implemented");
-  if (has_focus && (kbd_focus != wid.rep)) {
+  if (has_focus && (kbd_focus != concrete<widget_rep*>(wid))) {
     notify_keyboard_focus (kbd_focus, false);
     notify_keyboard_focus (wid, true);
   }
-  kbd_focus= wid.rep;
+  kbd_focus= concrete<widget_rep*>(wid);
 }
 
 bool
 x_window_rep::get_keyboard_focus (widget wid) {
-  return has_focus && kbd_focus == wid.rep;
+  return has_focus && kbd_focus == concrete<widget_rep*>(wid);
 }
 
 void
@@ -466,7 +466,7 @@ x_window_rep::set_mouse_pointer (widget wid, string name, string mask) {
 message_rep::message_rep (widget wid2, string s2, time_t t2):
   wid (wid2), s (s2), t (t2) {}
 message::message (widget wid, string s, time_t t):
-  rep (tm_new<message_rep> (wid, s, t)) {}
+  tm_ptr<message_rep> (tm_new<message_rep> (wid, s, t)) {}
 
 tm_ostream&
 operator << (tm_ostream& out, message m) {

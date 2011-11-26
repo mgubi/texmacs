@@ -58,14 +58,19 @@ public:
   inline operator tree () { return (tree) (*rep()); }
   inline bool operator == (wk_widget w) { return rep() == w.rep(); }
   inline bool operator != (wk_widget w) { return rep() != w.rep(); }
-
-  friend inline widget abstract (wk_widget w) {
+  inline friend widget abstract (wk_widget w) {
     return widget (w.rep()); }
-  friend inline wk_widget concrete (widget w) {
-    return wk_widget (concrete<wk_widget_rep*>(w)); }
+  friend wk_widget concrete (widget w);
+
   
+  //HACK: ideally we should not need to expose the bare pointer.
+  //      this is used to have weak references (i.e. to avoid pointer loops)
+  inline wk_widget_rep* rep() { return tm_abs_null_ptr<wk_widget_rep>::rep(); }
 
 };
+
+inline wk_widget concrete (widget w) {
+  return wk_widget (concrete<wk_widget_rep*>(w)); }
 
 array<widget> abstract (array<wk_widget> a);
 array<wk_widget> concrete (array<widget> a);
