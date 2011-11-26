@@ -142,12 +142,12 @@ replace_bridge (bridge& br, path p, tree oldt, tree newt, path ip) {
 
 bool
 bridge::operator == (bridge item2) {
-  return rep == item2.rep;
+  return rep() == item2.rep();
 }
 
 bool
 bridge::operator != (bridge item2) {
-  return rep != item2.rep;
+  return rep() != item2.rep();
 }
 
 tm_ostream&

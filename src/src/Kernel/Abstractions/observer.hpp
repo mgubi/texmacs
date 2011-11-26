@@ -36,7 +36,7 @@ typedef list<int> path;
 ******************************************************************************/
 
 extern int observer_count;
-class observer_rep: public abstract_struct {
+class observer_rep: public tm_obj<observer_rep> {
 public:
   inline observer_rep () { TM_DEBUG(observer_count++); }
   inline virtual ~observer_rep () { TM_DEBUG(observer_count--); }
@@ -83,17 +83,16 @@ public:
   virtual bool get_highlight (int lan, array<int>& cols);
 };
 
-class observer {
+class observer : public tm_abs_null_ptr<observer_rep> {
 public:
-  ABSTRACT_NULL(observer);
+  observer (observer_rep *p=NULL) : tm_abs_null_ptr<observer_rep>(p) {}
   inline friend bool operator == (observer o1, observer o2) {
-    return o1.rep == o2.rep; }
+    return o1.rep() == o2.rep(); }
   inline friend bool operator != (observer o1, observer o2) {
-    return o1.rep != o2.rep; }
+    return o1.rep() != o2.rep(); }
   inline friend int hash (observer o1) {
-    return hash ((pointer) o1.rep); }
+    return hash ((pointer) o1.rep()); }
 };
-ABSTRACT_NULL_CODE(observer);
 
 tm_ostream& operator << (tm_ostream& out, observer o);
 

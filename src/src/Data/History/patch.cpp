@@ -70,19 +70,19 @@ public:
 };
 
 patch::patch (modification mod, modification inv):
-  rep (tm_new<modification_patch_rep> (mod, inv)) { rep->ref_count= 1; }
+  tm_abs_null_ptr<patch_rep> (tm_new<modification_patch_rep> (mod, inv)) { }
 patch::patch (array<patch> a):
-  rep (tm_new<compound_patch_rep> (a)) { rep->ref_count= 1; }
+  tm_abs_null_ptr<patch_rep> (tm_new<compound_patch_rep> (a)) { ; }
 patch::patch (bool branch, array<patch> a):
-  rep (branch?
+  tm_abs_null_ptr<patch_rep> (branch?
        ((patch_rep*) tm_new<branch_patch_rep> (a)):
-       ((patch_rep*) tm_new<compound_patch_rep> (a))) { rep->ref_count= 1; }
+       ((patch_rep*) tm_new<compound_patch_rep> (a))) {  }
 patch::patch (patch p1, patch p2):
-  rep (tm_new<compound_patch_rep> (array<patch>(p1,p2))) { rep->ref_count= 1; }
+  tm_abs_null_ptr<patch_rep> (tm_new<compound_patch_rep> (array<patch>(p1,p2))) { }
 patch::patch (double author, bool create):
-  rep (tm_new<birth_patch_rep> (author, create)) { rep->ref_count= 1; }
+  tm_abs_null_ptr<patch_rep> (tm_new<birth_patch_rep> (author, create)) {  }
 patch::patch (double author, patch p):
-  rep (tm_new<author_patch_rep> (author, p)) { rep->ref_count= 1; }
+  tm_abs_null_ptr<patch_rep>  (tm_new<author_patch_rep> (author, p)) {  }
 
 /******************************************************************************
 * Internal subroutines

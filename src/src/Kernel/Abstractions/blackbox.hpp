@@ -13,7 +13,7 @@
 #define BLACKBOX_H
 #include "basic.hpp"
 
-class blackbox_rep: public abstract_struct {
+class blackbox_rep: public tm_obj<blackbox_rep> {
 public:
   inline blackbox_rep () {}
   inline virtual ~blackbox_rep () {}
@@ -22,11 +22,19 @@ public:
   virtual tm_ostream& display (tm_ostream& out) = 0;
 };
 
-class blackbox {
+class blackbox : public tm_abs_null_ptr<blackbox_rep> {
 public:
-ABSTRACT_NULL(blackbox);
+  blackbox(blackbox_rep *p=NULL) : tm_abs_null_ptr<blackbox_rep> (p) {}
+
+  inline friend bool operator == (blackbox bb1, blackbox bb2) {
+    if (is_nil (bb1)) return is_nil (bb2);
+    else return bb1->equal (bb2.rep()); }
+  inline friend bool operator != (blackbox bb1, blackbox bb2) {
+    if (is_nil (bb1)) return !is_nil (bb2);
+    else return !bb1->equal (bb2.rep()); }
+  
+  template<class T> friend T open_box (blackbox bb);
 };
-ABSTRACT_NULL_CODE(blackbox);
 
 template<class T>
 class whitebox_rep: public blackbox_rep {
@@ -42,12 +50,6 @@ public:
   inline tm_ostream& display (tm_ostream& out) { return out << data; }
 };
 
-inline bool operator == (blackbox bb1, blackbox bb2) {
-  if (is_nil (bb1)) return is_nil (bb2);
-  else return bb1->equal (bb2.rep); }
-inline bool operator != (blackbox bb1, blackbox bb2) {
-  if (is_nil (bb1)) return !is_nil (bb2);
-  else return !bb1->equal (bb2.rep); }
 inline tm_ostream& operator << (tm_ostream& out, blackbox bb) {
   if (is_nil (bb)) return out << "nil";
   else return bb->display (out); }
@@ -65,7 +67,7 @@ close_box (const T& data) {
 template<class T> T
 open_box (blackbox bb) {
   ASSERT (type_box (bb) == type_helper<T>::id, "type mismatch");
-  return ((whitebox_rep<T>*) bb.rep) -> data;
+  return (static_cast<whitebox_rep<T>*>(bb.rep())) -> data;
 }
 
 #endif // BLACKBOX_H

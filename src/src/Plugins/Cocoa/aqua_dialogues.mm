@@ -373,11 +373,10 @@ aqua_field_widget_rep::query (slot s, int type_id) {
 }
 
 
-class aqua_field_widget {
+class aqua_field_widget : public tm_abs_null_ptr<aqua_field_widget_rep> {
 public:
-ABSTRACT_NULL(aqua_field_widget);
+  aqua_field_widget(aqua_field_widget_rep* p=NULL) : tm_abs_null_ptr<aqua_field_widget_rep>(p) {}
 };
-ABSTRACT_NULL_CODE(aqua_field_widget);
 
 
 

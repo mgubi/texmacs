@@ -181,11 +181,9 @@ public:
 
 class server : public tm_abs_ptr<server_rep> {
 public:
-//  ABSTRACT(server);
   server ();
   server (server_rep* p) : tm_abs_ptr<server_rep>(p) {}
 };
-//ABSTRACT_CODE(server);
 
 extern bool rescue_mode;
 scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);

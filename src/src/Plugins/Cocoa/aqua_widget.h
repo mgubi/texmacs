@@ -68,13 +68,12 @@ public:
 
 };
 
-class aqua_widget {
+class aqua_widget : public tm_abs_null_ptr<aqua_widget_rep> {
 public:
-	ABSTRACT_NULL(aqua_widget);
+  aqua_widget(aqua_widget_rep *p=NULL) : tm_abs_null_ptr<aqua_widget_rep>(p) {}
   inline bool operator == (aqua_widget w) { return rep == w.rep; }
   inline bool operator != (aqua_widget w) { return rep != w.rep; }
 };
-ABSTRACT_NULL_CODE(aqua_widget);
 
 inline widget abstract (aqua_widget w) { return widget (w.rep); }
 inline aqua_widget concrete (widget w) { return aqua_widget ((aqua_widget_rep*) w.rep); }

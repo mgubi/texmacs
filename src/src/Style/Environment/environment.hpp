@@ -45,7 +45,7 @@ round_pow2 (int i) {
 ******************************************************************************/
 
 class environment;
-class environment_rep: public concrete_struct {
+class environment_rep: public tm_obj<environment_rep> {
 public:
   inline environment_rep () {}
   inline virtual ~environment_rep () {}
@@ -68,20 +68,20 @@ public:
   friend class environment;
 };
 
-class environment {
-  ABSTRACT_NULL(environment);
+class environment : public tm_abs_null_ptr<environment_rep> {
+public:
+  environment(environment_rep* p=NULL) : tm_abs_null_ptr<environment_rep>(p) {}
   inline tree operator [] (int key) {
-    return rep->read (key); }
+    return rep()->read (key); }
   inline tree operator [] (const string& key) {
-    return rep->read (key); }
+    return rep()->read (key); }
   inline friend environment_rep* as_pointer (const environment& env) {
-    return env.rep; }
+    return env.rep(); }
   inline friend int weak_hash (environment env) {
-    return hash ((void*) env.rep); }
+    return hash ((void*) env.rep()); }
   inline friend bool weak_equal (environment env1, environment env2) {
-    return env1.rep == env2.rep; }
+    return env1.rep() == env2.rep(); }
 };
-ABSTRACT_NULL_CODE(environment);
 
 void test_environments ();
 

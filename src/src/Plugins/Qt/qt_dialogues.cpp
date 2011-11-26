@@ -118,14 +118,11 @@ qt_field_widget_rep::query (slot s, int type_id) {
 
 class qt_field_widget_ptr;
 
-class qt_field_widget : public tm_abs_ptr<qt_field_widget_rep> {
+class qt_field_widget : public tm_abs_null_ptr<qt_field_widget_rep> {
 public:
-  qt_field_widget() : tm_abs_ptr<qt_field_widget_rep>() {}
-  qt_field_widget(qt_field_widget_rep* p) : tm_abs_ptr<qt_field_widget_rep>(p) {}
+  qt_field_widget(qt_field_widget_rep* p=NULL) : tm_abs_null_ptr<qt_field_widget_rep>(p) {}
   friend widget abstract(qt_field_widget w) { return widget(w.rep()); }
-//ABSTRACT_NULL(qt_field_widget);
 };
-//ABSTRACT_NULL_CODE(qt_field_widget);
 
 qt_input_widget_rep::qt_input_widget_rep
   (command _cmd, array<string> _prompts):

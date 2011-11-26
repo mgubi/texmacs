@@ -103,8 +103,9 @@ class box_rep;
 struct lazy;
 typedef array<double> point;
 
-class box {
-  ABSTRACT_NULL(box);
+class box : public tm_abs_null_ptr<box_rep> {
+public:
+  box(box_rep* p=NULL) : tm_abs_null_ptr<box_rep>(p) {}
   inline box operator [] (int i);
   box operator [] (path p);
   operator tree ();
@@ -113,7 +114,7 @@ class box {
   friend inline int N (box b);
 };
 
-class box_rep: public abstract_struct {
+class box_rep: public tm_obj<box_rep> {
 private:
   SI x0, y0;    // offset w.r.t. parent box
 
@@ -251,7 +252,6 @@ public:
   friend class  remember_box_rep;
   friend void make_eps (url dest, box b, int dpi= 600);
 };
-ABSTRACT_NULL_CODE(box);
 
 extern int box_count;
 inline box_rep::box_rep (path ip2):
@@ -273,8 +273,8 @@ inline SI box_rep::sy3 (int i) { box b= subbox(i); return b->y0+ b->y3; }
 inline SI box_rep::sx4 (int i) { box b= subbox(i); return b->x0+ b->x4; }
 inline SI box_rep::sy4 (int i) { box b= subbox(i); return b->y0+ b->y4; }
 
-inline box box::operator [] (int i) { return rep->subbox(i); }
-inline int N (box b) { return b.rep->subnr(); }
+inline box box::operator [] (int i) { return rep()->subbox(i); }
+inline int N (box b) { return b.rep()->subnr(); }
 tm_ostream& operator << (tm_ostream& out, box b);
 SI   get_delta (SI x, SI x1, SI x2);
 bool outside (SI x, SI delta, SI x1, SI x2);

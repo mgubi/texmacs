@@ -783,10 +783,10 @@ box_rep::find_tag (string name) {
   return path ();
 }
 
-bool box::operator == (box b2) { return rep==b2.rep; }
-bool box::operator != (box b2) { return rep!=b2.rep; }
+bool box::operator == (box b2) { return rep()==b2.rep(); }
+bool box::operator != (box b2) { return rep()!=b2.rep(); }
 
-box::operator tree () { return tree (*rep); }
+box::operator tree () { return tree (*rep()); }
 tm_ostream& operator << (tm_ostream& out, box b) { return out << ((tree) b); }
 
 path

@@ -24,7 +24,7 @@
 ******************************************************************************/
 
 class patch;
-class patch_rep: public abstract_struct {
+class patch_rep: public tm_obj<patch_rep> {
 public:
   inline patch_rep () {}
   inline virtual ~patch_rep () {}
@@ -42,8 +42,9 @@ public:
     return -1; }
 };
 
-class patch {
-ABSTRACT_NULL (patch);
+class patch : public tm_abs_null_ptr<patch_rep> {
+public:
+  patch(patch_rep* p=NULL) : tm_abs_null_ptr<patch_rep>(p) {}
   patch (modification mod, modification inv);
   patch (array<patch> a);
   patch (bool par, array<patch> a);
@@ -51,9 +52,8 @@ ABSTRACT_NULL (patch);
   patch (double author, bool create);
   patch (double author, patch p);
   inline patch operator [] (int i) {
-    return rep->get_child (i); }
+    return rep()->get_child (i); }
 };
-ABSTRACT_NULL_CODE (patch);
 
 inline patch patch_rep::get_child (int i) {
   FAILED ("not a composite patch"); (void) i; return patch (); }

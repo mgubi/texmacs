@@ -36,7 +36,8 @@
 * The tm_link class
 ******************************************************************************/
 
-struct tm_link_rep: abstract_struct {
+class tm_link_rep : public tm_obj<tm_link_rep> {
+public:
   bool   alive;   // link is alive
   string secret;  // empty string or secret key for encrypted connections
 
@@ -66,16 +67,15 @@ public:
   friend class tm_link;
 };
 
-class tm_link {
+class tm_link : public tm_abs_null_ptr<tm_link_rep> {
 public:
-  ABSTRACT_NULL(tm_link);
+  tm_link(tm_link_rep *p=NULL) : tm_abs_null_ptr<tm_link_rep>(p) {}
   inline bool operator == (tm_link l);
   inline bool operator != (tm_link l);
 };
 
-ABSTRACT_NULL_CODE(tm_link);
-inline bool tm_link::operator == (tm_link l) { return rep == l.rep; }
-inline bool tm_link::operator != (tm_link l) { return rep != l.rep; }
+inline bool tm_link::operator == (tm_link l) { return rep() == l.rep(); }
+inline bool tm_link::operator != (tm_link l) { return rep() != l.rep(); }
 
 tm_link make_pipe_link (string cmd);
 tm_link make_dynamic_link (string lib, string symb, string init, string ses);

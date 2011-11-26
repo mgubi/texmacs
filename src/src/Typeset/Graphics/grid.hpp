@@ -31,7 +31,7 @@ public:
     tm_null_ptr<grid_curve_rep> (tm_new<grid_curve_rep> (col, c)) {}
 };
 
-class grid_rep: public abstract_struct {
+class grid_rep : public tm_obj<grid_rep> {
 protected:
   array<SI> subd;
   array<string> col;
@@ -53,11 +53,12 @@ public:
   virtual point find_point_around (point p, double delta, frame f);
 };
 
-class grid {
-  ABSTRACT_NULL(grid);
-  operator tree () { return (tree)*rep; }
+class grid : public tm_null_ptr<grid_rep> {
+public:
+  grid () :  tm_null_ptr<grid_rep>() {}
+  grid (grid_rep* p) :  tm_null_ptr<grid_rep>(p) {}
+  operator tree () { return (tree)*rep(); }
 };
-ABSTRACT_NULL_CODE(grid);
 
 grid empty_grid();
 grid cartesian (array<SI> subd, array<string> col, point o, double step);

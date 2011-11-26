@@ -18,8 +18,9 @@
 ******************************************************************************/
 
 class std_environment_rep;
-class std_environment {
-  ABSTRACT_NULL(std_environment);
+class std_environment : tm_abs_null_ptr<std_environment_rep> {
+public:
+  std_environment(std_environment_rep *p=NULL) : tm_abs_null_ptr<std_environment_rep>(p) {}
   inline std_environment
     (bool pure, list_environment env, std_environment next,
      list_environment accel, list_environment args);
@@ -32,7 +33,7 @@ class std_environment {
     return env1.rep == env2.rep; }
 };
 
-class std_environment_rep: public environment_rep {
+class std_environment_rep : public environment_rep {
 public:
   bool             pure;   // pure environment or allow side effects?
   list_environment env;    // the local variables
@@ -67,7 +68,6 @@ inline std_environment::std_environment
   (bool pure, list_environment env, std_environment next,
    list_environment accel, list_environment args):
      rep (tm_new<std_environment_rep> (pure, env, next, accel, args)) {}
-ABSTRACT_NULL_CODE(std_environment);
 
 void
 std_environment_rep::print (const string& prefix) {

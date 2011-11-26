@@ -32,7 +32,7 @@
 #define MACRO_REMOVE      2
 
 class bridge;
-class bridge_rep: public abstract_struct {
+class bridge_rep : public tm_obj<bridge_rep> {
 public:
   typesetter           ttt;      // the underlying typesetter
   edit_env&            env;      // the environment
@@ -65,15 +65,14 @@ public:
   void typeset (int desired_status);
 };
 
-class bridge {
-  ABSTRACT_NULL(bridge);
+class bridge : public tm_null_ptr<bridge_rep> {
+public:
   bool operator == (bridge br2);
   bool operator != (bridge br2);
   friend bridge make_bridge (typesetter ttt, tree st, path ip);
   friend void replace_bridge (bridge& br, tree st, path ip);
   friend void replace_bridge (bridge& br, path p, tree ot, tree nt, path ip);
 };
-ABSTRACT_NULL_CODE(bridge);
 
 bridge make_bridge (typesetter ttt, tree t, path p);
 tm_ostream& operator << (tm_ostream& out, bridge br);

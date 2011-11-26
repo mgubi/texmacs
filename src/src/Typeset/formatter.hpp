@@ -33,8 +33,9 @@ enum lazy_type {
 ******************************************************************************/
 
 extern int format_count;
-struct format;
-struct format_rep: public abstract_struct {
+class format;
+class format_rep: public tm_obj<format_rep> {
+public:
   format_type type;
 
   inline  format_rep (format_type t): type (t) {
@@ -46,13 +47,13 @@ struct format_rep: public abstract_struct {
   virtual bool equal (format fm) = 0;
 };
 
-struct format {
-  ABSTRACT_NULL(format);            
-  inline operator tree () { return (tree) (*rep); }
-  inline bool operator == (format fm) { return rep->equal (fm); }
-  inline bool operator != (format fm) { return !rep->equal (fm); }
+class format : public tm_abs_null_ptr<format_rep> {
+public:
+  format (format_rep *p=NULL) : tm_abs_null_ptr<format_rep>(p) {}
+  inline operator tree () { return (tree) (*rep()); }
+  inline bool operator == (format fm) { return rep()->equal (fm); }
+  inline bool operator != (format fm) { return !rep()->equal (fm); }
 };
-ABSTRACT_NULL_CODE(format);
 
 format make_format_none ();
 format make_format_cell (SI width, int vpos, SI depth, SI height);
@@ -63,8 +64,9 @@ format make_format_width (SI width);
 ******************************************************************************/
 
 extern int lazy_count;
-struct lazy;
-struct lazy_rep: public abstract_struct {
+class lazy;
+class lazy_rep : public tm_obj<lazy_rep> {
+public:
   lazy_type type;  // the lazy type
   path ip;         // source location
 
@@ -83,17 +85,17 @@ struct lazy_rep: public abstract_struct {
     // before production of a lazy structure of type 'request'
 };
 
-struct lazy {
-  ABSTRACT_NULL(lazy);            
+class lazy : public tm_abs_null_ptr<lazy_rep> {
+public:
+  lazy (lazy_rep *p=NULL) : tm_abs_null_ptr<lazy_rep>(p) {}
   operator box ();
-  inline operator tree () { return (tree) (*rep); }
-  inline void operator << (lazy lz) { rep->append (lz); }
-  inline bool operator == (lazy lz) { return rep == lz.rep; }
-  inline bool operator != (lazy lz) { return rep != lz.rep; }
+  inline operator tree () { return (tree) (*rep()); }
+  inline void operator << (lazy lz) { rep()->append (lz); }
+  inline bool operator == (lazy lz) { return rep() == lz.rep(); }
+  inline bool operator != (lazy lz) { return rep() != lz.rep(); }
   inline friend tm_ostream& operator << (tm_ostream& out, lazy lz) {
     return out << ((tree) lz); }
 };
-ABSTRACT_NULL_CODE(lazy);
 lazy make_lazy (edit_env env, tree t, path ip);
 lazy make_lazy_box (box b);
 

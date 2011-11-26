@@ -24,7 +24,7 @@ command_rep::apply (object args) {
 
 void
 command::operator () (object args) {
-  rep->apply (args);
+  rep()->apply (args);
 }
 
 /******************************************************************************
@@ -43,7 +43,7 @@ std_command_rep::std_command_rep (void (*routine2) (void)):
 void std_command_rep::apply () { routine (); }
 
 command::command (void (*routine) (void)) :
-  rep (tm_new<std_command_rep> (routine)) { INC_COUNT(rep); }
+  tm_abs_null_ptr<command_rep> (tm_new<std_command_rep> (routine)) { }
 
 
 /******************************************************************************
@@ -63,6 +63,6 @@ public:
 };
 
 command::command (void (*_callback) (void*, void*), void *_obj, void *_info) :
-  rep (tm_new<generic_command_rep> (_callback, _obj, _info)) { INC_COUNT(rep); }
+  tm_abs_null_ptr<command_rep> (tm_new<generic_command_rep> (_callback, _obj, _info)) { }
 
 

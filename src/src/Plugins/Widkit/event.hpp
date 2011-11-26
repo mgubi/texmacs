@@ -36,12 +36,12 @@ struct event_rep: public abstract_struct {
   virtual operator tree () = 0;   // for displaying events (debugging)
 };
 
-struct event {
-ABSTRACT(event);            
-  inline operator tree () { return (tree) (*rep); }
+class event : public tm_abs_ptr<event_rep> {
+public:
+  event(event_rep* p) : tm_abs_ptr<event_rep>(p) {}
+  inline operator tree () { return (tree) (*rep()); }
   friend class event_ptr_base;
 };
-ABSTRACT_CODE(event);
 
 inline tm_ostream& operator << (tm_ostream& out, event ev) {
   return out << ((tree) ev); }

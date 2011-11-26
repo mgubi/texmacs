@@ -15,7 +15,7 @@
 struct object;
 
 extern int command_count;
-class command_rep: public abstract_struct {
+class command_rep: public tm_obj<command_rep> {
 public:
   inline command_rep () { TM_DEBUG(command_count++); }
   inline virtual ~command_rep () { TM_DEBUG(command_count--); }
@@ -24,22 +24,22 @@ public:
   virtual void apply (object args);
 };
 
-class command {
+class command : public tm_abs_null_ptr<command_rep> {
 public:
-  ABSTRACT_NULL(command);
+  command(command_rep *p=NULL) : tm_abs_null_ptr<command_rep>(p) {}
   command (void (*routine) (void));
   command (void (*_callback) (void*, void*), void *_obj, void *_info = NULL);
 
   inline void operator () (void);
   void operator () (object args);
   inline friend tm_ostream& operator << (tm_ostream& out, command cmd);
+  inline friend bool operator == (command cmd1, command cmd2) {
+    return cmd1.rep() == cmd2.rep(); }
+
 };
-ABSTRACT_NULL_CODE(command);
 
 inline tm_ostream& command_rep::print (tm_ostream& out) { return out << "command"; }
-inline void command::operator () (void) { rep->apply(); }
-inline bool operator == (command cmd1, command cmd2) {
-  return cmd1.rep == cmd2.rep; }
+inline void command::operator () (void) { rep()->apply(); }
 inline tm_ostream& operator << (tm_ostream& out, command cmd) {
   if (is_nil(cmd)) return out << "(null)"; else return cmd->print(out); }
 

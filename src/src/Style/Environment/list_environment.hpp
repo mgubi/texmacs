@@ -18,12 +18,14 @@
 ******************************************************************************/
 
 class list_environment_rep;
-class list_environment {
-  ABSTRACT_NULL(list_environment);
+class list_environment : public tm_abs_null_ptr<list_environment_rep> {
+public:
+  list_environment(list_environment_rep* p=NULL) : 
+    tm_abs_null_ptr<list_environment_rep>(p) {}
   inline list_environment (basic_environment env);
   inline list_environment (basic_environment env, list_environment next);
   inline friend environment as_environment (const list_environment& env) {
-    return environment ((environment_rep*) env.rep); }
+    return environment ((environment_rep*) env.rep()); }
   inline friend list_environment as_list_environment (const environment& env) {
     return list_environment ((list_environment_rep*) as_pointer (env)); }
 };
@@ -56,7 +58,6 @@ public:
   void print (const string& prefix);
 };
 
-ABSTRACT_NULL_CODE(list_environment);
 inline list_environment::list_environment
   (basic_environment env):
     rep (tm_new<list_environment_rep> (env, list_environment ())) {}

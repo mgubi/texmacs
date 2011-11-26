@@ -47,7 +47,7 @@ public:
 * Link repositories
 ******************************************************************************/
 
-class link_repository_rep: public abstract_struct {
+class link_repository_rep: public tm_obj<link_repository_rep> {
 public:
   list<string> ids;
   list<observer> loci;
@@ -58,13 +58,12 @@ public:
   void insert_link (soft_link ln);
 };
 
-class link_repository {
-ABSTRACT_NULL(link_repository);
+class link_repository : public tm_abs_null_ptr<link_repository_rep> {
 public:
+  link_repository(link_repository_rep* p=NULL) : tm_abs_null_ptr<link_repository_rep>(p) {}
   inline link_repository (bool active) :
-    rep (tm_new<link_repository_rep> ()) { (void) active; rep->ref_count++; }
+    tm_abs_null_ptr<link_repository_rep>  (tm_new<link_repository_rep> ()) { (void) active; }
 };
-ABSTRACT_NULL_CODE(link_repository);
 
 /******************************************************************************
 * Routines for navigation

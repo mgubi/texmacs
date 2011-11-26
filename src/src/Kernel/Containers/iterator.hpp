@@ -16,7 +16,7 @@
 
 extern int iterator_count;
 
-template<class T> class iterator_rep: public abstract_struct {
+template<class T> class iterator_rep: public tm_obj<iterator_rep<T> > {
 public:
   inline iterator_rep<T> () { TM_DEBUG(iterator_count++); }
   inline virtual ~iterator_rep<T> () { TM_DEBUG(iterator_count--); }
@@ -25,11 +25,12 @@ public:
   virtual int remains ();
 };
 
-template<class T> struct iterator {
-  ABSTRACT_TEMPLATE(iterator,T);
+template<class T> 
+class iterator : public tm_abs_ptr<iterator_rep<T> > {
+public:
+  iterator(iterator_rep<T> *p) : tm_abs_ptr<iterator_rep<T> >(p) {}
   operator tree ();
 };
-ABSTRACT_TEMPLATE_CODE(iterator,class,T);
 
 template<class T> tm_ostream& operator << (tm_ostream& out, iterator<T> it);
 

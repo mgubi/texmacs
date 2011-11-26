@@ -14,7 +14,7 @@
 #include "point.hpp"
 #include "matrix.hpp"
 
-class frame_rep: public abstract_struct {
+class frame_rep : public tm_obj<frame_rep> {
 public:
   bool linear;
 public:
@@ -44,17 +44,18 @@ public:
 };
 
 class curve;
-class frame {
-  ABSTRACT_NULL(frame);
-  operator tree () { return (tree) *rep; }
-  inline point operator () (point p) { return rep->direct_transform (p); }
-  inline point operator [] (point p) { return rep->inverse_transform (p); }
-  inline bool operator == (frame f) { return rep == f.rep; }
-  inline bool operator != (frame f) { return rep != f.rep; }
+class frame : public tm_null_ptr<frame_rep> {
+public:
+  frame () : tm_null_ptr<frame_rep>() {}
+  frame (frame_rep* p) : tm_null_ptr<frame_rep>(p) {}
+  operator tree () { return (tree) *rep(); }
+  inline point operator () (point p) { return rep()->direct_transform (p); }
+  inline point operator [] (point p) { return rep()->inverse_transform (p); }
+  inline bool operator == (frame f) { return rep() == f.rep(); }
+  inline bool operator != (frame f) { return rep() != f.rep(); }
   curve operator () (curve c);
   curve operator [] (curve c);
 };
-ABSTRACT_NULL_CODE(frame);
 
 // Transformations
 frame scaling (double magnify, point shift);

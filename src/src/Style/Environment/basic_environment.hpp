@@ -76,21 +76,22 @@ public:
   void print (const string& prefix);
 };
 
-class basic_environment {
-  ABSTRACT_NULL(basic_environment);
+class basic_environment : public tm_abs_null_ptr<basic_environment_rep> {
+public:
+  basic_environment(basic_environment_rep* p=NULL) 
+   : tm_abs_null_ptr<basic_environment_rep>(p) {}
   inline tree operator [] (int key) {
-    return rep->read (key); }
+    return rep()->read (key); }
   inline basic_environment (int n):
-    rep (tm_new<basic_environment_rep> (n)) {}
+    tm_abs_null_ptr<basic_environment_rep> (tm_new<basic_environment_rep> (n)) {}
   inline basic_environment (assoc_environment env):
-    rep (tm_new<basic_environment_rep> (round_pow2 (env->n))) {
+    tm_abs_null_ptr<basic_environment_rep> (tm_new<basic_environment_rep> (round_pow2 (env->n))) {
       for (int i=0; i<env->n; i++)
-	rep->raw_insert (env->a[i].key, env->a[i].val); }
+	rep()->raw_insert (env->a[i].key, env->a[i].val); }
   inline friend environment as_environment (const basic_environment& env) {
-    return environment ((environment_rep*) env.rep); }
+    return environment ((environment_rep*) env.rep()); }
   inline friend basic_environment as_basic_environment (const environment& e) {
     return basic_environment ((basic_environment_rep*) as_pointer (e)); }
 };
-ABSTRACT_NULL_CODE(basic_environment);
 
 #endif // defined BASIC_ENVIRONMENT_H

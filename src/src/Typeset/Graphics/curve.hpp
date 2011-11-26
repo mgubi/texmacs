@@ -13,7 +13,7 @@
 #define CURVE_H
 #include "point.hpp"
 
-class curve_rep: public abstract_struct {
+class curve_rep : public tm_obj<curve_rep> {
 public:
   inline curve_rep () {}
   inline virtual ~curve_rep () {}
@@ -65,13 +65,13 @@ public:
             double t1, double t2, point p, double eps, bool& found);
 };
 
-class curve {
-  ABSTRACT_NULL(curve);
-  inline point operator () (double t) { return rep->evaluate (t); }
-  inline bool operator == (curve c) { return rep == c.rep; }
-  inline bool operator != (curve c) { return rep != c.rep; }
+class curve : public tm_abs_null_ptr<curve_rep> {
+public:
+  curve (curve_rep *p=NULL) : tm_abs_null_ptr<curve_rep>(p) {}
+  inline point operator () (double t) { return rep()->evaluate (t); }
+  inline bool operator == (curve c) { return rep() == c.rep(); }
+  inline bool operator != (curve c) { return rep() != c.rep(); }
 };
-ABSTRACT_NULL_CODE(curve);
 
 curve segment (point p1, point p2);
 curve poly_segment (array<point> a, array<path> cip);

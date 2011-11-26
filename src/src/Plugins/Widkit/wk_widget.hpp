@@ -19,7 +19,7 @@
 ******************************************************************************/
 
 class wk_widget;
-class wk_widget_rep: public widget_rep {
+class wk_widget_rep : public widget_rep {
 public:
   window   win;             // underlying window
   SI       ox, oy;          // origin of widget in window
@@ -50,16 +50,15 @@ public:
   friend class wk_widget;
 };
 
-class wk_widget {
+class wk_widget : public tm_abs_null_ptr<wk_widget_rep> {
 public:
-ABSTRACT_NULL(wk_widget);
-  inline wk_widget operator [] (int i) { return rep->a[i]; }
+  wk_widget(wk_widget* p=NULL) : tm_abs_null_ptr<wk_widget_rep>(p) {}
+  inline wk_widget operator [] (int i) { return rep()->a[i]; }
   wk_widget operator [] (string s);
-  inline operator tree () { return (tree) (*rep); }
-  inline bool operator == (wk_widget w) { return rep == w.rep; }
-  inline bool operator != (wk_widget w) { return rep != w.rep; }
+  inline operator tree () { return (tree) (*rep()); }
+  inline bool operator == (wk_widget w) { return rep() == w.rep(); }
+  inline bool operator != (wk_widget w) { return rep() != w.rep(); }
 };
-ABSTRACT_NULL_CODE(wk_widget);
 
 inline widget abstract (wk_widget w) {
   return widget (w.rep); }

@@ -53,18 +53,18 @@ public:
   void print (const string& prefix);
 };
 
-class assoc_environment {
-  ABSTRACT(assoc_environment);
+class assoc_environment : public tm_abs_ptr<assoc_environment_rep> {
+public:
+  assoc_environment(assoc_environment* p) : tm_abs_ptr<assoc_environment_rep>(p) {}
   inline assoc_environment (int n):
-    rep (tm_new<assoc_environment_rep> (n)) {}
+    tm_abs_ptr<assoc_environment_rep>  (tm_new<assoc_environment_rep> (n)) {}
   inline tree operator [] (int key) {
-    return rep->read (key); }
+    return rep()->read (key); }
   inline friend environment as_environment (const assoc_environment& env) {
-    return environment ((environment_rep*) env.rep); }
+    return environment ((environment_rep*) env.rep()); }
   inline friend assoc_environment as_assoc_environment (const environment& e) {
     return assoc_environment ((assoc_environment_rep*) as_pointer (e)); }
 };
-ABSTRACT_CODE(assoc_environment);
 
 assoc_environment copy (assoc_environment env);
 int weak_hash (assoc_environment env);
