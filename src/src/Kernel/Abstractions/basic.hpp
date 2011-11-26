@@ -206,12 +206,12 @@ public:
   inline ~tm_null_ptr() { if (rep_)  rep_->dec_ref(); }
   inline tm_null_ptr& operator=(tm_null_ptr<T> x) {  if (x.rep_) x.rep_->inc_ref();  if (rep_) rep_->dec_ref(); rep_=x.rep_; return *this; }
   inline T* operator->() { return rep_; }
-  friend bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
+  friend bool is_nil <> (tm_null_ptr<T> p);
   template <class TT, class BB> friend class tm_ext_null_ptr;
 };
 
-//template <class T>
-//inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
+template <class T>
+inline bool is_nil (tm_null_ptr<T> p) { return (p.rep() == NULL); }
 
 template <class T>
 class tm_abs_null_ptr : public tm_null_ptr<T> {
