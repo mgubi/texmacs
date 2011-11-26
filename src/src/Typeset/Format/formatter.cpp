@@ -102,12 +102,6 @@ struct lazy_box_rep: public lazy_rep {
 };
 
 typedef tm_ext_null_ptr<lazy_box_rep, lazy> lazy_box;
-#if 0
-struct lazy_box {
-  EXTEND_NULL(lazy,lazy_box);
-};
-EXTEND_NULL_CODE(lazy,lazy_box);
-#endif
 
 lazy::operator box () {
   lazy lz= rep()->produce (LAZY_BOX, make_format_none ());

@@ -814,13 +814,11 @@ public:
 };
 
 class lazy_table : public tm_ext_null_ptr<lazy_table_rep, lazy> {
-//  EXTEND_NULL(lazy,lazy_table);
 public:
   lazy_table(lazy_table_rep *p=NULL) : tm_ext_null_ptr<lazy_table_rep, lazy>(p) {}
   inline lazy_table (table T, path ip):
     tm_ext_null_ptr<lazy_table_rep, lazy> (tm_new<lazy_table_rep> (T, ip)) {  }
 };
-//EXTEND_NULL_CODE(lazy,lazy_table);
 
 format
 lazy_table_rep::query (lazy_type request, format fm) {
