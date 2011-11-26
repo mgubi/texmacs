@@ -37,8 +37,8 @@ struct aqua_image_rep: tm_obj<aqua_image_rep> {
 class aqua_image : public tm_null_ptr<aqua_image_rep> {
 public:
   aqua_image (NSImage* img2, SI xo2, SI yo2, int w2, int h2):
-  rep (tm_new <aqua_image_rep> (img2, xo2, yo2, w2, h2)) {}	
-  aqua_image () {}
+  tm_null_ptr<aqua_image_rep> (tm_new <aqua_image_rep> (img2, xo2, yo2, w2, h2)) {}	
+  aqua_image () : tm_null_ptr<aqua_image_rep>() {}
 };
 
 
@@ -59,8 +59,8 @@ struct cg_image_rep: tm_obj<cg_image_rep> {
 class cg_image : public tm_null_ptr<cg_image_rep> {
 public:
 	cg_image (CGImageRef img2, SI xo2, SI yo2, int w2, int h2):
-    rep (tm_new <cg_image_rep> (img2, xo2, yo2, w2, h2)) {}	
-  cg_image () {}
+    tm_null_ptr<cg_image_rep> (tm_new <cg_image_rep> (img2, xo2, yo2, w2, h2)) {}	
+  cg_image () : tm_null_ptr<cg_image_rep>() {}
 };
 
 

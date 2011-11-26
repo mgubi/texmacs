@@ -376,6 +376,7 @@ aqua_field_widget_rep::query (slot s, int type_id) {
 class aqua_field_widget : public tm_abs_null_ptr<aqua_field_widget_rep> {
 public:
   aqua_field_widget(aqua_field_widget_rep* p=NULL) : tm_abs_null_ptr<aqua_field_widget_rep>(p) {}
+  inline friend widget abstract(aqua_field_widget w) { return widget(w.rep()); }
 };
 
 
@@ -471,7 +472,7 @@ aqua_input_widget_rep::read (slot s, blackbox index) {
     return this;
   case SLOT_FORM_FIELD:
     check_type<int> (index, "SLOT_FORM_FIELD");
-    return (widget_rep*)(fields[open_box<int>(index)].rep);
+    return abstract(fields[open_box<int>(index)]);
   default:
     return aqua_widget_rep::read(s,index);
   }
@@ -583,8 +584,8 @@ widget aqua_input_widget_rep::plain_window_widget (string s)
   
   if (code == 0) { // Ok button
     NSString *ans = [(NSComboBoxCell*)[form cellAtRow:0 column:1] stringValue];
-    ((aqua_input_text_widget_rep*)wid->int_input.rep)->text = scm_quote(from_nsstring(ans));
-    ((aqua_input_text_widget_rep*)wid->int_input.rep)->cmd();
+    concrete<aqua_input_text_widget_rep*>(abstract(wid->int_input))->text = scm_quote(from_nsstring(ans));
+    concrete<aqua_input_text_widget_rep*>(abstract(wid->int_input))->cmd();
   }
   else  { // Cancel button
   }
@@ -681,14 +682,14 @@ void aqua_tm_widget_rep::do_interactive_prompt()
   ih->wid = this;
   NSMatrix *form = ih->form;
   [form renewRows:1 columns:2];
-  NSCell *cell = [[[NSCell alloc] initTextCell:to_nsstring(((aqua_text_widget_rep*)int_prompt.rep)->str)] autorelease];
+  NSCell *cell = [[[NSCell alloc] initTextCell:to_nsstring((concrete<aqua_text_widget_rep*>(abstract(int_prompt)))->str)] autorelease];
   [form putCell:cell atRow:0 column:0];
   NSComboBoxCell *cell2 = [[[NSComboBoxCell alloc] initTextCell:@""] autorelease];
   [cell2 setEditable:YES];
   [cell2 setCompletes:YES];
   [form putCell:cell2 atRow:0 column:1];
   [form setKeyCell:cell2];
-  aqua_input_text_widget_rep *it = (aqua_input_text_widget_rep*)int_input.rep;
+  aqua_input_text_widget_rep *it = concrete<aqua_input_text_widget_rep*>(abstract(int_input));
   for(int j=0; j < N(it->def); j++)
   {
     if (j==0) [cell2 setStringValue:to_nsstring(it->def[j])];

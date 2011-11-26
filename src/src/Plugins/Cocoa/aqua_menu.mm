@@ -74,7 +74,7 @@ void aqua_menu_rep::send (slot s, blackbox val) {
       check_type<bool> (val, "SLOT_MOUSE_GRAB");
       bool flag = open_box<bool> (val);
       (void) flag;
-      [NSMenu popUpContextMenu:[item submenu] withEvent:[NSApp currentEvent] forView:( (aqua_view_widget_rep*)(the_keyboard_focus.rep))->view ];
+      [NSMenu popUpContextMenu:[item submenu] withEvent:[NSApp currentEvent] forView:( concrete<aqua_view_widget_rep*>(the_keyboard_focus))->view ];
     }	
     //			send_mouse_grab (THIS, val);
     break;
@@ -97,42 +97,52 @@ public:
 
 @interface TMMenuItem : NSMenuItem
 {
-	command_rep *cmd;
-	simple_widget_rep* wid;// an eventual box widget (see tm_button.cpp)
+	command cmd;
+	widget wid;// an eventual box widget (see tm_button.cpp)
 }
-- (void)setCommand:(command_rep *)_c;
+- init;
+- (void)setCommand:(command) _c;
 - (void)setWidget:(simple_widget_rep *)_w;
 - (void)doit;
 @end
 
 @implementation TMMenuItem
-- (void)setCommand:(command_rep *)_c 
+- init 
+{
+  self = [super init];
+  if (self) {
+    new (&cmd) command();
+  }
+  return self;
+}
+- (void)setCommand:(command)_c 
 {  
-	if (cmd) { DEC_COUNT_NULL(cmd); } cmd = _c; 
-	if (cmd) {
-		INC_COUNT_NULL(cmd);
+	cmd = _c;
+	if (!is_nil(cmd)) {
 	  [self setAction:@selector(doit)];
 	  [self setTarget:self];
 	}
 }
 - (void)setWidget:(simple_widget_rep *)_w
 {  
-	if (wid) { DEC_COUNT_NULL(wid); } wid = _w; 
-	if (wid) {
-		INC_COUNT_NULL(wid);
-	}
+  wid = widget(_w);
 }
-- (void)dealloc { [self setCommand:NULL];  [self setWidget:NULL];  [super dealloc]; }
-- (void)doit {	if (cmd) cmd->apply(); }
+- (void)dealloc 
+{ 
+  (&cmd)->~command();
+  (&wid)->~widget();
+  [super dealloc]; 
+}
+- (void)doit {	if (!is_nil(cmd)) cmd->apply(); }
 
 
 - (NSImage*) image
 {
   NSImage *img = [super image];
-  if ((!img)&&(wid))
+  if ((!img)&&(!is_nil(wid)))
   {
     SI width, height;
-    wid->handle_get_size_hint (width,height);
+    concrete<simple_widget_rep*>(wid)->handle_get_size_hint (width,height);
     NSSize s = NSMakeSize(width/PIXEL,height/PIXEL);
     
     img = [[[NSImage alloc] initWithSize:s] autorelease];
@@ -149,7 +159,7 @@ public:
     r -> encode (x1,y1);
     r -> encode (x2,y2);
     r -> set_clipping (x1,y1,x2,y2);
-    wid -> handle_repaint (x1,y1,x2,y2);
+    concrete<simple_widget_rep*>(wid) -> handle_repaint (x1,y1,x2,y2);
     r->end();
     [img unlockFocus];
     //[img setFlipped:YES];
@@ -164,26 +174,35 @@ public:
 
 @interface TMLazyMenu : NSMenu
 {
-	promise_rep<widget> *pm;
+	promise<widget> pm;
 	BOOL forced;
 }
-- (void)setPromise:(promise_rep<widget> *)p;
+- init;
+- (void)setPromise:(promise<widget>)p;
 @end
 
 @implementation TMLazyMenu
-- (void)setPromise:(promise_rep<widget> *)p 
+- init
+{
+  self = [super init];
+  if (self) {
+    new (&pm) promise<widget>();
+  }
+  return self;
+}
+- (void)setPromise:(promise<widget>)p 
 { 
-	if (pm) { DEC_COUNT_NULL(pm); }  pm = p;  INC_COUNT_NULL(pm); 
+  pm = p; 
 	forced = NO;
 	[self setDelegate:self];
 }
-- (void)dealloc { [self setPromise:NULL]; [super dealloc]; }
+- (void)dealloc { (&pm)->~promise<widget>(); [super dealloc]; }
 
 - (void)menuNeedsUpdate:(NSMenu *)menu
 {
-	if (!forced) {
+	if (!forced && !is_nil(pm)) {
 		widget w = pm->eval();
-		aqua_menu_rep *wid = (aqua_menu_rep*)(w.rep); 
+		aqua_menu_rep *wid = concrete<aqua_menu_rep*>(w); 
 		NSMenu *menu2 = [wid->item submenu];
 		unsigned count = [menu2 numberOfItems];
 		for (unsigned j=0; j<count; j++)
@@ -192,7 +211,7 @@ public:
 			[menu2 removeItem:itm];
 			[menu insertItem:itm atIndex:j];
 		}
-		DEC_COUNT_NULL(pm); pm = NULL;
+    pm = promise<widget>();
 		forced = YES;
 	}
 }
@@ -365,7 +384,7 @@ widget pulldown_button (widget w, promise<widget> pw)
   TMMenuItem* mi = concrete(w) -> as_menuitem();
    
   TMLazyMenu *lm = [[[TMLazyMenu alloc] init] autorelease];
-	[lm setPromise:pw.rep];
+	[lm setPromise:pw];
 	[mi setSubmenu: lm];
 	return tm_new <aqua_menu_rep> (mi);
 }
@@ -401,8 +420,8 @@ TMMenuItem * aqua_image_widget_rep::as_menuitem()
 
 TMMenuItem * aqua_balloon_widget_rep::as_menuitem()
 {
-  TMMenuItem *mi = ((aqua_widget_rep*)text.rep)->as_menuitem();
-  [mi setToolTip:to_nsstring(((aqua_text_widget_rep*)hint.rep)->str)];
+  TMMenuItem *mi = concrete<aqua_widget_rep*>(text)->as_menuitem();
+  [mi setToolTip:to_nsstring((concrete<aqua_text_widget_rep*>(hint))->str)];
   return mi;
 }
 
@@ -414,14 +433,14 @@ widget menu_button (widget w, command cmd, string pre, string ks, int style)
   bool ok= (style & WIDGET_STYLE_INERT) == 0;
   TMMenuItem *mi = nil;
   
-  if (typeid(*(w.rep)) == typeid(simple_widget_rep)) {
+  if (typeid(*concrete<widget_rep*>(w)) == typeid(simple_widget_rep)) {
     mi = [[[TMMenuItem alloc] init] autorelease];
-    [mi setWidget:(simple_widget_rep*)w.rep];
+    [mi setWidget:concrete<simple_widget_rep*>(w)];
   } else  {
-    mi = ((aqua_widget_rep*)w.rep)->as_menuitem();
+    mi = concrete<aqua_widget_rep*>(w)->as_menuitem();
   }
 
-  [mi setCommand: cmd.rep];
+  [mi setCommand: cmd];
   [mi setEnabled:(ok ? YES : NO)];
 	// FIXME: implement complete prefix handling and keyboard shortcuts
 	// cout << "ks: "<< ks << "\n";
@@ -465,8 +484,8 @@ widget xpm_widget (url file_name)// { return widget(); }
 
 NSMenu* to_nsmenu(widget w)
 {
-  if (typeid(*w.rep) == typeid(aqua_menu_rep)) {
-    aqua_menu_rep *ww = ((aqua_menu_rep*)w.rep);
+  if (typeid(*concrete<widget_rep*>(w)) == typeid(aqua_menu_rep)) {
+    aqua_menu_rep *ww = concrete<aqua_menu_rep*>(w);
 	NSMenu *m =[[[ww->item submenu] retain] autorelease];
 	[ww->item setSubmenu:nil];
 	return m;
@@ -476,7 +495,7 @@ NSMenu* to_nsmenu(widget w)
 
 NSMenuItem* to_nsmenuitem(widget w)
 {
-	return ((aqua_menu_rep*)w.rep)->item;
+	return concrete<aqua_menu_rep*>(w)->item;
 }
 
  TMMenuItem *simple_widget_rep::as_menuitem()

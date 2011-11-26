@@ -71,12 +71,13 @@ public:
 class aqua_widget : public tm_abs_null_ptr<aqua_widget_rep> {
 public:
   aqua_widget(aqua_widget_rep *p=NULL) : tm_abs_null_ptr<aqua_widget_rep>(p) {}
-  inline bool operator == (aqua_widget w) { return rep == w.rep; }
-  inline bool operator != (aqua_widget w) { return rep != w.rep; }
+  inline bool operator == (aqua_widget w) { return rep() == w.rep(); }
+  inline bool operator != (aqua_widget w) { return rep() != w.rep(); }
+  
+  inline friend widget abstract (aqua_widget w) { return widget (w.rep()); }
 };
 
-inline widget abstract (aqua_widget w) { return widget (w.rep); }
-inline aqua_widget concrete (widget w) { return aqua_widget ((aqua_widget_rep*) w.rep); }
+inline aqua_widget concrete (widget w) { return aqua_widget (concrete<aqua_widget_rep*>(w)); }
 
 extern widget the_keyboard_focus;
 
