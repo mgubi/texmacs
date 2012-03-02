@@ -95,6 +95,8 @@ edit_interface_rep::resume () {
   SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
   SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
   SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+  if (use_side_tools)
+    { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
   cur_sb= 2;
   tp= make_cursor_accessible (tp, true);
   notify_change (THE_FOCUS + THE_EXTENTS + THE_CURSOR);
@@ -397,6 +399,8 @@ edit_interface_rep::apply_changes () {
       SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
       SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
       SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+      if (use_side_tools)
+        { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
       set_footer ();
       if (!get_renderer (this) -> interrupted ()) drd_update ();
       cache_memorize ();
@@ -413,23 +417,27 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling automatic resizing\n";
   int sb= 1;
-  if (is_attached (this) && get_init_string (PAGE_MEDIUM) == "automatic") {
-    SI wx, wy;
-    ::get_size (get_window (this), wx, wy);
-    if (get_init_string (SCROLL_BARS) == "false") sb= 0;
-    if (get_server () -> in_full_screen_mode ()) sb= 0;
+  if (is_attached (this) &&
+      get_server() -> has_window() &&
+      get_init_string (PAGE_MEDIUM) == "automatic")
+    {
+      SI wx, wy;
+      if (cvw == NULL) ::get_size (get_window (this), wx, wy);
+      else ::get_size (widget (cvw), wx, wy);
+      if (get_init_string (SCROLL_BARS) == "false") sb= 0;
+      if (get_server () -> in_full_screen_mode ()) sb= 0;
 #ifdef QTTEXMACS
-    if (sb) wx -= 24 * PIXEL;
+      if (sb) wx -= 24 * PIXEL;
 #else
-    if (sb) wx -= 20 * PIXEL;
+      if (sb) wx -= 20 * PIXEL;
 #endif
-    if (wx != cur_wx || wy != cur_wy) {
-      cur_wx= wx; cur_wy= wy;
-      init_env (PAGE_SCREEN_WIDTH, as_string (wx*sfactor) * "tmpt");
-      init_env (PAGE_SCREEN_HEIGHT, as_string (wy*sfactor) * "tmpt");
-      notify_change (THE_ENVIRONMENT);
+      if (wx != cur_wx || wy != cur_wy) {
+	cur_wx= wx; cur_wy= wy;
+	init_env (PAGE_SCREEN_WIDTH, as_string (wx*sfactor) * "tmpt");
+	init_env (PAGE_SCREEN_HEIGHT, as_string (wy*sfactor) * "tmpt");
+	notify_change (THE_ENVIRONMENT);
+      }
     }
-  }
   if (sb != cur_sb) {
     cur_sb= sb;
     if (get_server() -> has_window()) {
@@ -673,6 +681,31 @@ void
 edit_interface_rep::after_menu_action () {
   notify_change (THE_DECORATIONS);
   end_editing ();
+  windows_delayed_refresh (1);
+}
+
+rectangle
+edit_interface_rep::get_window_extents () {
+  SI ox, oy, w, h;
+  widget me= ::get_canvas (widget (cvw));
+  ::get_position (me, ox, oy);
+  ::get_size (me, w, h);
+  SI vx1, vy1, vx2, vy2;
+  SERVER (get_visible (vx1, vy1, vx2, vy2));
+  ox -= vx1; oy -= vy2;
+  return rectangle (ox, oy - h, ox + w, oy);
+}
+
+cursor
+edit_interface_rep::search_cursor (path p) {
+  return eb->find_check_cursor (p);
+}
+
+selection
+edit_interface_rep::search_selection (path start, path end) {
+  selection sel= eb->find_check_selection (start, end);
+  rectangle r= least_upper_bound (sel->rs) / 5;
+  return sel;
 }
 
 /******************************************************************************

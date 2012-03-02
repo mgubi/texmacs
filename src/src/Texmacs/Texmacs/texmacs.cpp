@@ -21,6 +21,7 @@
 #include "server.hpp"
 #include "timer.hpp"
 #include "data_cache.hpp"
+#include "tm_window.hpp"
 #ifdef AQUATEXMACS
 void mac_fix_paths ();
 #endif
@@ -433,6 +434,7 @@ immediate_options (int argc, char** argv) {
 
 int
 main (int argc, char** argv) {
+  windows_delayed_refresh (1000000000);
   immediate_options (argc, argv);
   set_env ("LC_NUMERIC", "POSIX");
 #ifdef MACOSX_EXTENSIONS
@@ -463,7 +465,7 @@ main (int argc, char** argv) {
 //#ifdef EXPERIMENTAL
 //  test_environments ();
 //#endif
-  start_guile (argc, argv, TeXmacs_main);
+  start_scheme (argc, argv, TeXmacs_main);
   cout.close ();
   cerr.close ();
   return 0;

@@ -19,17 +19,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (setq nullary-keywords
-  '(begin cond else call/cc
+  '(begin cond else
     values define-preferences menu-dynamic conserve-focus
     case-lambda kbd-map kbd-wildcards kbd-commands kbd-symbols
     define-grammar define-regexp-grammar
-    drd-rule drd-rules assume texmacs-modes
-    delayed dialogue on-entry on-exit widget-delayed
+    drd-rule logic-rules assume texmacs-modes
+    user-delayed delayed on-entry on-exit widget-delayed
     association-tile bar concat dense-bar dense-tile document
-    header-bar sequence short-bar short-tile
-    minibar
+    header-bar sequence short-bar short-tile minibar
     wrap-selection-any wrap-selection-small
     try-modification
+    tabs padded centered aligned bottom-buttons scrollable
+    hlist vlist hsplit vsplit
     $begin $cond))
 
 (setq nullary-no-highlight
@@ -45,23 +46,23 @@
 (setq unary-keywords
   '(let let* lambda
     with-result and-let* setup-append-if
-    while for repeat when assuming mini tile
+    while for repeat when unless assuming mini tile
+    plugin-configure
+    define-preference-names
     with-focus-after
-    drd-group drd-table drd-dispatcher
-    with-cc with-aux
-    with-action with-module with-cursor with-server
-    dialogue-user widget-with
-    aspect block-input button form
-    input internal short-input
+    logic-group logic-table logic-dispatcher
+    with-aux with-action with-module with-cursor with-server
+    user-ask
+    tab form item meti
     $when $let $let* $for))
 
 (setq unary-definitions
   '(define define-public define-macro define-public-macro
     texmacs-module provide-public define-group
     tm-define tm-define-macro tm-property request-handler
-    tm-menu define-menu tm-generate
+    tm-menu define-menu tm-widget define-widget tm-generate
     tm-build tm-build-macro tm-build-widget
-    menu-bind menu-extend define-table
+    menu-bind define-table extend-table
     define-format define-language))
 
 (setq unary-no-highlight
@@ -75,7 +76,8 @@
 (setq binary-keywords
   '(with with-define with-global and-with with-innermost receive
     with-environment with-environment* converter
-    hidden-input pagelet radio-button toggle-button
+    user-confirm user-url
+    resize
     $with))
 
 (setq binary-indent
@@ -88,12 +90,11 @@
   ternary-keywords)
 
 (setq other-keywords
-  '(for if inherit
-    define-secure-symbols map-in-order link promise plugin-configure
+  '(for if inherit former
+    define-secure-symbols map-in-order link promise
     plugin-input-converters use-modules export import-from inherit-modules
     lazy-menu lazy-keyboard lazy-define lazy-initialize
     lazy-format lazy-language lazy-input-converter
-    form-cancel form-done form-next form-previous radio suggestions toggle
     $if))
 
 (setq highlight-definitions

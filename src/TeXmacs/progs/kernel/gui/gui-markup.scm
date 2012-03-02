@@ -25,6 +25,7 @@
 (define-public widget-style-inert 16)
 (define-public widget-style-button 32)
 (define-public widget-style-centered 64)
+(define-public widget-style-bold 128)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Control structures
@@ -86,6 +87,12 @@
   `(with ,var ,val
      (cons* 'list ($list ,@l))))
 
+(tm-define-macro ($execute cmd . l)
+  (:synopsis "Execute one command")
+  `(begin
+     ,cmd
+     (cons* 'list ($list ,@l))))
+
 (tm-define-macro ($for var-val . l)
   (:synopsis "For primitive for content generation")
   (when (nlist-2? var-val)
@@ -113,6 +120,10 @@
   (:synopsis "Make possibly inert (whence greyed) widgets")
   `(cons* 'when (lambda () ,pred?) ($list ,@l)))
 
+(tm-define-macro ($refresh s)
+  (:synopsis "Make a refresh widget")
+  `(list 'refresh ',s))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General layout widgets
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,6 +144,22 @@
   (:synopsis "Vertical layout of widgets")
   `(cons* 'vlist ($list ,@l)))
 
+(tm-define-macro ($aligned . l)
+  (:synopsis "Align two column table")
+  `(cons* 'aligned ($list ,@l)))
+
+(tm-define-macro ($aligned-item . l)
+  (:synopsis "Item in an aligned list")
+  `(cons* 'aligned-item ($list ,@l)))
+
+(tm-define-macro ($tabs . l)
+  (:synopsis "A tab bar")
+  `(cons* 'tabs ($list ,@l)))
+
+(tm-define-macro ($tab . l)
+  (:synopsis "One tab of a tab bar")
+  `(cons* 'tab ($list ,@l)))
+
 (tm-define-macro ($horizontal . l)
   (:synopsis "Horizontal layout of widgets")
   `(cons* 'horizontal ($list ,@l)))
@@ -144,6 +171,22 @@
 (tm-define-macro ($tile columns . l)
   (:synopsis "Tile layout of widgets")
   `(cons* 'tile ,columns ($list ,@l)))
+
+(tm-define-macro ($scrollable . l)
+  (:synopsis "Make a scrollable widget")
+  `(cons* 'scrollable ($list ,@l)))
+
+(tm-define-macro ($resize w h . l)
+  (:synopsis "Resize the widget")
+  `(cons* 'resize ',w ',h ($list ,@l)))
+
+(tm-define-macro ($hsplit l r)
+  (:synopsis "Widget which is split horizontally into two parts")
+  `(list 'hsplit ,l ,r))
+
+(tm-define-macro ($vsplit t b)
+  (:synopsis "Widget which is split vertically into two parts")
+  `(list 'vsplit ,t ,b))
 
 (tm-define $/
   (:synopsis "Horizontal separator")
@@ -215,9 +258,85 @@
   (:synopsis "Make a menu group")
   `(list 'group ,text))
 
+(tm-define-macro ($menu-text text)
+  (:synopsis "Make text")
+  `(list 'text ,text))
+
 (tm-define-macro ($input cmd type proposals width)
   (:synopsis "Make input field")
   `(list 'input (lambda (answer) ,cmd) ,type (lambda () ,proposals) ,width))
+
+(tm-define-macro ($toggle cmd on)
+  (:synopsis "Make input toggle")
+  `(list 'toggle (lambda (answer) ,cmd) (lambda () ,on)))
+
+(tm-define-macro ($enum cmd vals val width)
+  (:synopsis "Make input enumeration field")
+  `(list 'enum (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,val)
+         ,width))
+
+(tm-define-macro ($choice cmd vals val)
+  (:synopsis "Make a choice list")
+  `(list 'choice (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,val)))
+
+(tm-define-macro ($choices cmd vals mc)
+  (:synopsis "Make a multiple choice list")
+  `(list 'choices (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,mc)))
+
+(tm-define-macro ($texmacs-output doc)
+  (:synopsis "Make TeXmacs output field")
+  `(list 'texmacs-output (lambda () ,doc)))
+
+(tm-define-macro ($texmacs-input doc cmd continuous?)
+  (:synopsis "Make TeXmacs input field")
+  `(list 'texmacs-input (lambda () ,doc) (lambda (answer) ,cmd) ,continuous?))
+
+(tm-define-macro ($ink cmd)
+  (:synopsis "Make an ink widget")
+  `(list 'ink (lambda (answer) ,cmd)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Forms
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define form-name "empty")
+(tm-define form-entries (list))
+(tm-define form-last (make-ahash-table))
+
+(tm-define (form-named-set name field val)
+  (ahash-set! form-last (list name field) val))
+
+(tm-define (form-named-ref name field)
+  (ahash-ref form-last (list name field)))
+
+(tm-define-macro (form-set field val)
+  `(form-named-set form-name ,field ,val))
+
+(tm-define-macro (form-ref field)
+  `(form-named-ref form-name ,field))
+
+(tm-define-macro (form-fields)
+  `form-entries)
+
+(tm-define-macro (form-values)
+  `(map (lambda (x) (form-ref x)) (form-fields)))
+
+(tm-define-macro ($form name . l)
+  (:synopsis "Make form")
+  `($let* ((form-name ,name)
+           (form-entries (list)))
+     ,@l))
+
+(tm-define (form-proposals name field l)
+  (if (nnull? l) (form-named-set name field (car l)))
+  l)
+
+(tm-define-macro ($form-input field type proposals width)
+  (:synopsis "Make form textual input field")
+  `($execute
+     (set! form-entries (append form-entries (list ,field)))
+     ($input (form-named-set form-name ,field answer)
+             ,type (form-proposals form-name ,field ,proposals) ,width)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic text markup

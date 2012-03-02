@@ -32,6 +32,7 @@ protected:
 
 public:
   tm_window_rep (widget wid2, tree geom);
+  tm_window_rep (tree doc, command quit);
   ~tm_window_rep ();
   void set_window_name (string s);
   void set_window_url (url u);
@@ -46,10 +47,13 @@ public:
   bool get_menu_widget (int which, string menu, widget& w);
   void menu_main (string menu);
   void menu_icons (int which, string menu);
+  void side_tools (int which, string tools);
   void set_header_flag (bool flag);
   void set_icon_bar_flag (int which, bool flag);
+  void set_side_tools_flag (int which, bool flag);
   bool get_header_flag ();
   bool get_icon_bar_flag (int which);
+  bool get_side_tools_flag (int which);
 
   int  get_shrinking_factor ();
   void set_shrinking_factor (int sf);
@@ -84,10 +88,16 @@ typedef tm_buffer_rep* tm_buffer;
 typedef tm_view_rep*   tm_view;
 typedef tm_window_rep* tm_window;
 
+widget texmacs_output_widget (tree doc);
+widget texmacs_input_widget (tree doc, command cmd, bool continuous);
+
 int window_handle ();
 void window_create (int win, widget wid, string name, bool plain);
+void window_create (int win, widget wid, string name, command quit);
 void window_delete (int win);
 void window_show (int win);
 void window_hide (int win);
+void windows_delayed_refresh (int ms);
+void windows_refresh ();
 
 #endif // defined TM_WINDOW_H

@@ -20,6 +20,8 @@
 
 (menu-bind texmacs-extra-menu)
 (menu-bind texmacs-extra-icons)
+(menu-bind plugin-menu)
+(menu-bind plugin-icons)
 (tm-define (buffer-menu) (get-buffer-menu))
 (tm-define (project-buffer-menu) (get-project-buffer-menu))
 (tm-define (style-menu) (get-style-menu))
@@ -38,15 +40,19 @@
   (=> "Edit" (link edit-menu))
   (if (in-graphics?)
       (=> "Insert" (link graphics-insert-menu))
+      (link texmacs-extra-menu)
       (=> "Focus" (link graphics-focus-menu)))
   (if (not (in-graphics?))
       (=> "Insert" (link insert-menu))
+      (if (in-manual?)
+	  (=> "Manual" (link tmdoc-menu)))
       (if (or (in-source?) (with-source-tool?))
 	  (=> "Source" (link source-menu)))
       (if (with-linking-tool?)
 	  (=> "Link" (link link-menu)))
       (if (in-presentation?)
 	  (=> "Dynamic" (link dynamic-menu)))
+      (link plugin-menu)
       (link texmacs-extra-menu)
       (=> "Focus" (link focus-menu))
       (=> "Format" (link format-menu)))
@@ -82,6 +88,8 @@
       (-> "Focus" (link graphics-focus-menu)))
   (if (not (in-graphics?))
       (-> "Insert" (link insert-menu))
+      (if (in-manual?)
+	  (-> "Manual" (link tmdoc-menu)))
       (if (or (in-source?) (with-source-tool?))
 	  (-> "Source" (link source-menu)))
       (if (with-linking-tool?)
@@ -154,6 +162,24 @@
   (if (in-presentation?)
     |
     (link dynamic-icons)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The TeXmacs side tools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (upward-context-trees t)
+  (cond ((tree-is-buffer? t) (list t))
+        ((tree-atomic? t) (upward-context-trees (tree-up t)))
+        (else (cons t (upward-context-trees (tree-up t))))))
+
+(tm-widget (texmacs-side-tool t)
+  ((eval (symbol->string (tree-label t)))
+   (tree-select t)))
+
+(tm-widget (texmacs-side-tools)
+  (for (t (upward-context-trees (cursor-tree)))
+    (dynamic (texmacs-side-tool t))
+    ===))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The mode dependent icon bar

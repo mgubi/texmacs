@@ -25,7 +25,7 @@ widget the_keyboard_focus (NULL);
  ******************************************************************************/
 
 widget
-qt_widget_rep::plain_window_widget (string s) {
+qt_widget_rep::plain_window_widget (string s, command ) {
   (void) s;
   return widget ();
 }
@@ -137,16 +137,18 @@ qt_glue_widget_rep::as_qwidget() {
   return w;
 }
 
-
 /******************************************************************************
 * Global functions we export for the creation of widgets by TeXmacs
 ******************************************************************************/
 
 // Window widgets creating functions
+
+/*! Creates a decorated window.
+ * The window will have name s, contents w and perform command q upon closing.
+ */
 widget
-plain_window_widget (widget w, string s) {
-  // creates a decorated window with name s and contents w
-  return concrete(w)->plain_window_widget (s);
+plain_window_widget (widget w, string s, command q) {
+  return concrete(w)->plain_window_widget (s, q);
 }
 
 widget

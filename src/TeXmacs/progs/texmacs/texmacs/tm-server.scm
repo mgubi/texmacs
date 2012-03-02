@@ -103,7 +103,7 @@
   (string<=? (symbol->string s1) (symbol->string s2)))
 
 (define (get-function-list)
-  (list-sort (map car (ahash-table->list ovl-table)) symbol<=?))
+  (list-sort (map car (ahash-table->list tm-defined-table)) symbol<=?))
 
 (define (get-interactive-function-list)
   (let* ((funs (get-function-list))
@@ -122,8 +122,8 @@
 
 (tm-define (safely-kill-buffer)
   (if (not (buffer-unsaved?)) (kill-buffer)
-    (user-confirm? "The buffer has not been saved. Really close it?" #f  
-      (lambda (answ) (when answ (kill-buffer))))))
+      (user-confirm "The buffer has not been saved. Really close it?" #f  
+        (lambda (answ) (when answ (kill-buffer))))))
 
 (tm-define (safely-kill-window)
   (if (<= (get-nr-windows) 1)
@@ -132,5 +132,5 @@
 
 (tm-define (safely-quit-TeXmacs)
   (if (not (exists-unsaved-buffer?)) (quit-TeXmacs)
-    (user-confirm? "There are unsaved files. Really quit?" #f  
-      (lambda (answ) (when answ (quit-TeXmacs))))))
+      (user-confirm "There are unsaved files. Really quit?" #f  
+        (lambda (answ) (when answ (quit-TeXmacs))))))

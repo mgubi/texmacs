@@ -99,7 +99,7 @@ tm_data_rep::get_buffer_menu () {
       menu_append_buffer (s, bufs[i]);
       count++;
     }
-    else two_types= true;
+    else if (bufs[i]->in_menu) two_types= true;
     if (count == 10) break;
   }
   if (two_types) {
@@ -339,7 +339,8 @@ tm_data_rep::attach_view (tm_window win, tm_view vw) {
   // cout << "Attach view " << vw->buf->name << "\n";
   vw->win= win;
   widget wid= win->wid;
-  set_canvas (wid, vw->ed);
+  set_scrollable (wid, vw->ed);
+  //vw->ed->cvw= wid.rep; FIXME: uncomment this line
   ASSERT (is_attached (wid), "widget should be attached");
   vw->ed->resume ();
   win->set_window_name (vw->buf->abbr);
@@ -356,7 +357,7 @@ tm_data_rep::detach_view (tm_view vw) {
   widget wid= win->wid;
   ASSERT (is_attached (wid), "widget should be attached");
   vw->ed->suspend ();
-  set_canvas (wid, glue_widget ());
+  set_scrollable (wid, glue_widget ());
   win->set_window_name ("TeXmacs");
   win->set_window_url (url_none ());
   // cout << "View detached\n";

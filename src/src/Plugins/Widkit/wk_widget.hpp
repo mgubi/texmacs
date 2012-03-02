@@ -82,6 +82,8 @@ void wk_grab_pointer (wk_widget w);
 void wk_ungrab_pointer (wk_widget w);
 bool wk_has_pointer_grab (wk_widget w);
 
+SI decode_length (string s, wk_widget w, int style);
+
 #define WK_FAILED(msg) { wk_error (msg); FAILED ("widget_error"); }
 
 /******************************************************************************
@@ -97,12 +99,15 @@ wk_widget vertical_menu (array<wk_widget> a);
 wk_widget tile (array<wk_widget> a, int cols);
 wk_widget tile (array<wk_widget> a, int cols, array<string> name);
 wk_widget aligned_widget (array<wk_widget> lhs, array<wk_widget> rhs,
-			  SI hsep, SI vsep, SI lpad= 0, SI rpad= 0);
+			  SI hsep= 3*PIXEL, SI vsep= 3*PIXEL,
+                          SI lpad= 0, SI rpad= 0);
 wk_widget horizontal_array (array<wk_widget> a, int stretch_me= -1);
 wk_widget horizontal_array (array<wk_widget> a, array<string> s,
 			    int stretch_me= -1);
+wk_widget tabs_widget (array<wk_widget> tabs, array<wk_widget> bodies);
 wk_widget switch_widget (array<wk_widget> a, array<string> name, int init= 0);
 wk_widget optional_widget (wk_widget w, bool on= true);
+wk_widget wrapped_widget (wk_widget w, command cmd);
 wk_widget glue_wk_widget (bool hx=true, bool vx=true, SI w=0, SI h=0);
 wk_widget glue_wk_widget (tree c, bool hx=true, bool vx=true, SI w=0, SI h=0);
 wk_widget separator_wk_widget (SI pre=0, SI post=0, bool vert=false);
@@ -119,19 +124,31 @@ wk_widget pulldown_button (wk_widget w, wk_widget m, int style= 0);
 wk_widget pullright_button (wk_widget w, wk_widget m, int style= 0);
 wk_widget pulldown_button (wk_widget w, promise<wk_widget> pw);
 wk_widget pullright_button (wk_widget w, promise<wk_widget> pw);
+wk_widget toggle_wk_widget (command cmd, bool on= false, int style= 0);
 wk_widget popup_widget (wk_widget w, gravity quit=center);
 wk_widget canvas_widget (wk_widget w, gravity grav=north_west, bool rf= false);
+wk_widget user_canvas_widget (wk_widget wid, int style= 0);
+wk_widget resize_widget (wk_widget w, int style, string w1, string h1,
+                         string w2, string h2, string w3, string h3);
+wk_widget hsplit_widget (wk_widget l, wk_widget r);
+wk_widget vsplit_widget (wk_widget t, wk_widget b);
 wk_widget input_text_wk_widget (command cb,
 				int style= 0, string w= "1w", bool pf= true);
 wk_widget input_text_wk_widget (command cb, string type, array<string> def,
 				int style= 0, string w= "1w", bool pf= false);
 wk_widget inputs_list_wk_widget (command call_back, array<string> prompts);
+wk_widget enum_wk_widget (command cb, array<string> vals, string cur,
+                          int style= 0, string w= "1w");
+wk_widget choice_wk_widget (command cb, array<string> vals, string val);
+wk_widget choice_wk_widget (command cb, array<string> vals, array<string> mc);
 wk_widget file_chooser_wk_widget (command cmd, string type);
 wk_widget color_picker_wk_widget (command cmd, bool bg, array<tree> proposals);
 wk_widget balloon_widget (wk_widget w, wk_widget help);
 wk_widget wait_wk_widget (SI w, SI h, string message);
+wk_widget ink_wk_widget (command cb);
+wk_widget refresh_wk_widget (string tmwid);
 wk_widget texmacs_wk_widget (int mask, command quit);
-wk_widget plain_window_widget (wk_widget wid, string s);
+wk_widget plain_window_widget (wk_widget wid, string s, command q= command ());
 wk_widget popup_window_widget (wk_widget wid, string s);
 void      destroy_window_widget (wk_widget w);
 

@@ -12,6 +12,7 @@
 #include "gui.hpp"
 #include "message.hpp"
 #include "font.hpp"
+#include "window.hpp"
 
 /******************************************************************************
 * slot names, useful for debugging
@@ -29,6 +30,7 @@ slot_name (const slot s) {
     "SLOT_SIZE",
     "SLOT_POSITION",
     "SLOT_UPDATE",
+    "SLOT_REFRESH",
     "SLOT_KEYBOARD",
     "SLOT_KEYBOARD_FOCUS",
     "SLOT_MOUSE",
@@ -46,6 +48,7 @@ slot_name (const slot s) {
     "SLOT_SCROLLBARS_VISIBILITY",
     "SLOT_SCROLL_POSITION",
     "SLOT_CANVAS",
+    "SLOT_SCROLLABLE",
     "SLOT_CURSOR",
     
     "SLOT_HEADER_VISIBILITY",
@@ -207,5 +210,8 @@ font
 get_default_styled_font (int style) {
   bool tt  = (style & WIDGET_STYLE_MONOSPACED) != 0;
   bool mini= (style & WIDGET_STYLE_MINI) != 0;
-  return get_default_font (tt, mini);
+  bool bold= (style & WIDGET_STYLE_BOLD) != 0;
+  return get_default_font (tt, mini, bold);
 }
+
+bool use_side_tools= false;

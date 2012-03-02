@@ -13,7 +13,7 @@
 #define SERVER_H
 #include "editor.hpp"
 #include "url.hpp"
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 
 class tm_buffer_rep;
 class tm_view_rep;
@@ -27,6 +27,12 @@ class server_rep: public tm_obj<server_rep> {
 public:
   server_rep ();
   virtual ~server_rep ();
+
+  /* low level */
+  virtual tm_buffer new_buffer (url name, tree doc) = 0;
+  virtual void attach_view (tm_window win, tm_view vw) = 0;
+  virtual tm_view get_passive_view (tm_buffer buf) = 0;
+  virtual void delete_buffer (tm_buffer buf) = 0;
 
   /* Get and set objects associated to server */
   virtual server_rep* get_server () = 0;
@@ -73,11 +79,14 @@ public:
 
   virtual void show_header (bool flag) = 0;
   virtual void show_icon_bar (int which, bool flag) = 0;
+  virtual void show_side_tools (int which, bool flag) = 0;
   virtual bool visible_header () = 0;
   virtual bool visible_icon_bar (int which) = 0;
+  virtual bool visible_side_tools (int which) = 0;
   virtual void menu_widget (string menu, widget& w) = 0;
   virtual void menu_main (string menu) = 0;
   virtual void menu_icons (int which, string menu) = 0;
+  virtual void side_tools (int which, string menu) = 0;
 
   virtual void set_shrinking_factor (int sf) = 0;
   virtual int  get_shrinking_factor () = 0;

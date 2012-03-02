@@ -36,7 +36,7 @@
 
 #include "tm_link.hpp" // for number_of_servers
 
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 //#include "TeXmacs/server.hpp" // for get_server
 
 #include "qt_simple_widget.hpp"
@@ -980,14 +980,14 @@ qt_gui_rep::update () {
 
 void
 set_default_font (string name) {
-        (void) name;
+  (void) name;
   // set the name of the default font
   // this is ignored since Qt handles fonts for the widgets
 }
 
 font
-get_default_font (bool tt, bool mini) {
-  (void) tt; (void) mini;
+get_default_font (bool tt, bool mini, bool bold) {
+  (void) tt; (void) mini; (void) bold;
   // get the default font or monospaced font (if tt is true)
         
   // return a null font since this function is not called in the Qt port.
@@ -1003,8 +1003,8 @@ void
 load_system_font (string family, int size, int dpi,
                   font_metric& fnm, font_glyphs& fng)
 {
-        (void) family; (void) size; (void) dpi; (void) fnm; (void) fng;
-        if (DEBUG_QT) cout << "load_system_font(): SHOULD NOT BE CALLED\n";
+  (void) family; (void) size; (void) dpi; (void) fnm; (void) fng;
+  if (DEBUG_QT) cout << "load_system_font(): SHOULD NOT BE CALLED\n";
 }
 
 /******************************************************************************

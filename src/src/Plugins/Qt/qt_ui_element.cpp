@@ -22,12 +22,13 @@
 //#import "TMView.h"
 #include <QtGui>
 
-
+#include "QTMWindow.hpp"
 #include "QTMGuiHelper.hpp"
 #include "qt_gui.hpp"
 #include "qt_window_widget.hpp"
 #include "qt_menu.hpp"
 
+#include "Style/Evaluate/evaluate_main.hpp" // required for as_length(string)
 
 /******************************************************************************
  * Auxiliary classes
@@ -382,17 +383,17 @@ qt_plain_widget_rep::send (slot s, blackbox val) {
 
 
 widget 
-qt_ui_element_rep::plain_window_widget (string s)  {
+qt_ui_element_rep::plain_window_widget (string s, command quit)  {
   QLayoutItem *li = as_qlayoutitem();
-  QWidget *w;
+  QTMPlainWindow* w = new QTMPlainWindow();
   if (li->widget()) 
-    w = li->widget();
-  else if (li->layout()) {
-    w = new QWidget();
+    w->layout()->addItem(li);
+  else if (li->layout())
     w->setLayout(li->layout());
-  } else {
-    w = new QWidget();
-  }
+
+  QTMCommand* qcmd = new QTMCommand(quit);
+  QObject::connect(w, SIGNAL(closed()), qcmd, SLOT(apply()));
+                   
   w->setWindowTitle (to_qstring (s));
   return tm_new<qt_plain_widget_rep>(w);
 //  concrete(make_popup_widget())->plain_window_widget(s);
@@ -737,6 +738,9 @@ qt_ui_element_rep::as_qlayoutitem () {
     case menu_button:
     case text_widget:
     case xpm_widget:
+    case toggle_widget:
+    case enum_widget:
+    case choice_widget:
     {
       QWidget *w = this->as_qwidget();
       return new QWidgetItem(w);
@@ -771,6 +775,73 @@ qt_ui_element_rep::as_qlayoutitem () {
   
   return NULL;
 }
+
+/*! Ad-hoc command to be used with toggle widgets.
+ * The command associated with a qt_ui_element::toggle_widget has as a parameter the state
+ * of the QCheckBox. Since it is assumed everywhere else that commands injected into
+ * the gui's queue accept no parameters, and changes would be too big, we choose to
+ * encapsulate the original command in a new one which will execute the first with 
+ * its argument.
+ * \sa qt_ui_element, , qt_ui_element_rep::as_qwidget, qt_ui_element_rep::toggle_widget
+ */
+class qt_toggle_command_rep: public command_rep {
+  QPointer<QCheckBox> qwid;
+  command cmd; 
+
+public:
+  qt_toggle_command_rep(QCheckBox* w, command c) : qwid(w), cmd(c) { }
+  void apply () { if(qwid) cmd (list_object (object (qwid->isChecked()))); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "Toggle"; }
+};
+
+/*! Ad-hoc command to be used with enum widgets.
+ * The command associated with a qt_ui_element::enum_widget has one parameter. For the
+ * reason to be of this class, see \sa qt_toggle_command_rep .
+ * \sa qt_ui_element, , qt_ui_element_rep::as_qwidget, qt_ui_element_rep::enum_widget
+ */
+class qt_enum_command_rep: public command_rep {
+  QPointer<QComboBox> qwid;
+  command cmd; 
+  
+public:
+  qt_enum_command_rep(QComboBox* w, command c) : qwid(w), cmd(c) {}
+  void apply () { 
+    if (qwid)
+      cmd (list_object (object (from_qstring(qwid->currentText()))));
+  }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "Enum"; }
+};
+
+/*! Ad-hoc command to be used with choice widgets.
+ * The command associated with a qt_ui_element::choice_widget has one parameter. (a
+ * list of selected items).
+ * For the reason to be of this class, see \sa qt_toggle_command_rep.
+ * \sa qt_ui_element, , qt_ui_element_rep::as_qwidget, qt_ui_element_rep::choice_widget
+ */
+class qt_choice_command_rep: public command_rep {
+  QPointer<QListWidget> qwid;
+  command cmd;
+  bool multiple;  //<! Whether multiple choices are allowed in the widget.
+  
+public:
+  qt_choice_command_rep(QListWidget* w, command c, bool m) : qwid(w), cmd(c), multiple(m) {}
+  void apply () { 
+    if (qwid) {
+      QList<QListWidgetItem*> items = qwid->selectedItems();
+      array<string> selected;
+      for(int i=0; i<items.size(); ++i)
+        selected << from_qstring (items[i]->text());
+      object l= null_object ();
+      for (int i=N(selected)-1; i>=0; i--)
+        l= cons (selected[i], l);
+      cmd (list_object (l));
+    }
+  }
+  tm_ostream& print (tm_ostream& out) { return out << "Choice"; }
+};
+
 
 QWidget *
 qt_ui_element_rep::as_qwidget () {
@@ -869,6 +940,7 @@ qt_ui_element_rep::as_qwidget () {
       int style = x.x2;
       //color col = x.x3;
       //bool tsp = x.x4;
+      //str= "<font color=#f00>" * str * "</font>";
       
       // a text widget with a given color and transparency
       QLabel *w = new QLabel();
@@ -879,6 +951,7 @@ qt_ui_element_rep::as_qwidget () {
 #endif
       string t= tm_var_encode (str);
       if (t == "Help") t= "Help ";
+      //w->setTextFormat(Qt::RichText);
       w->setText(to_qstring (t));
       if (style == WIDGET_STYLE_MINI) {
         QFont f = w->font();
@@ -902,20 +975,126 @@ qt_ui_element_rep::as_qwidget () {
       return l;
     }
       break;
+
+    case toggle_widget:
+    { 
+      typedef triple<command, bool, int > T;
+      T x = open_box<T>(load);
+      command cmd = x.x1;
+      bool check  = x.x2;
+      QString style = to_qstylesheet(x.x3);
+      QCheckBox* w  = new QCheckBox (NULL);  
+      w->setCheckState(check ? Qt::Checked : Qt::Unchecked);
+      w->setStyleSheet(style);
+      command tcmd = tm_new<qt_toggle_command_rep> (w, cmd);
+      QTMCommand* c = new QTMCommand (tcmd);
+      c->setParent (w);
+      QObject::connect (w, SIGNAL (stateChanged(int)), c, SLOT (apply()), Qt::QueuedConnection);
+
+      return w;
+    }
+      break;
+    case enum_widget:
+    {
+      typedef quintuple<command, array<string>, string, int, string> T;
+      T x = open_box<T>(load);
+      command cmd        = x.x1;
+      QStringList values = to_qstringlist(x.x2);
+      QString value      = to_qstring(x.x3);
+      QString style      = to_qstylesheet(x.x4);
+      //SI width           = decode_length(x.x5);  // see below
       
+      QComboBox* w = new QComboBox(NULL);
+      w->setEditable(value.isEmpty() || values.last().isEmpty());  // weird convention?!
+      if (values.last().isEmpty())
+        values.removeLast();
+
+      // FIXME? we assume the size is given in chacters and a size of 0 (the 
+      // empty string in the arguments) mean autoadjust
+      /*
+      if(width != 0) {  
+        w->setMinimumContentsLength(width);
+        w->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+      }
+      */
+      w->addItems(values);
+      w->setStyleSheet(style);
+      
+      command ecmd = tm_new<qt_enum_command_rep> (w, cmd);
+      QTMCommand* c = new QTMCommand (ecmd);
+      c->setParent (w);
+      QObject::connect (w, SIGNAL (currentIndexChanged(int)), c, SLOT (apply()), Qt::QueuedConnection);
+      
+      return w;
+    }
+      break;
+    case choice_widget:
+    {
+      //command cmd, array<string> vals, array<string> chosen
+      typedef quartet<command, array<string>, array<string>, bool > T;
+      T x = open_box<T>(load);
+      command cmd = x.x1;
+      QStringList items  = to_qstringlist(x.x2);
+      QStringList chosen = to_qstringlist(x.x3);
+      bool multiple_sel  = x.x4;
+      
+      QListWidget* w = new QListWidget();
+      w->addItems(items);
+
+      if (multiple_sel)
+        w->setSelectionMode(QAbstractItemView::ExtendedSelection);  // Support CTRL and SHIFT multiple selections.
+      else
+        w->setSelectionMode(QAbstractItemView::SingleSelection);
+      
+      for (int i = 0; i < chosen.size(); ++i) {
+        QListWidgetItem* item = w->item(i);
+        item->setSelected(chosen.contains(item->text(), Qt::CaseSensitive));  // Qt::CaseSensitive is the default anyway
+      }
+      
+      command ecmd = tm_new<qt_choice_command_rep> (w, cmd, multiple_sel);
+      QTMCommand* qcmd = new QTMCommand (ecmd);
+      qcmd->setParent (w);
+      QObject::connect (w, SIGNAL (itemSelectionChanged()), qcmd, SLOT (apply()), Qt::QueuedConnection);
+      
+      return w;      
+    }
+      break;
     default:
       ;
   }
   
   return NULL;
 }
-
-
-
+/*
+SI
+decode_length (string width, wk_widget wid, int style) {
+  SI ex, ey;
+  if (wid->win == NULL) gui_maximal_extents (ex, ey);
+  else wid->win->get_size (ex, ey);
+  if (ends (width, "w") && is_double (width (0, N(width) - 1))) {
+    double x= as_double (width (0, N(width) - 1));
+    return (SI) (x * ex);
+  }
+  else if (ends (width, "h") && is_double (width (0, N(width) - 1))) {
+    double y= as_double (width (0, N(width) - 1));
+    return (SI) (y * ey);
+  }
+  else if (ends (width, "em") && is_double (width (0, N(width) - 2))) {
+    font fn= get_default_styled_font (style);
+    double x= as_double (width (0, N(width) - 2));
+    return (SI) ((x * fn->wquad) / SHRINK);
+  }
+  else if (ends (width, "px") && is_double (width (0, N(width) - 2))) {
+    double x= as_double (width (0, N(width) - 2));
+    return (SI) (x * PIXEL);
+  }
+  else return ex;
+}
+*/
 
 /******************************************************************************
- * Widgets for the construction of menus and dialogs
- ******************************************************************************/
+* Widgets for the construction of menus and dialogs
+******************************************************************************/
 
 // TeXmacs interface
 
@@ -923,6 +1102,17 @@ widget horizontal_menu (array<widget> arr) { return qt_ui_element_rep::create (q
 widget vertical_menu (array<widget> arr)  { return qt_ui_element_rep::create (qt_ui_element_rep::vertical_menu, arr); }
 widget horizontal_list (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::horizontal_list, arr); }
 widget vertical_list (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::vertical_list, arr); }
+widget aligned_widget (array<widget> lhs, array<widget> rhs, SI, SI, SI, SI) {
+  // FIXME: to be implemented in a clean way
+  array<widget> a;
+  for (int i=0; i<min(N(lhs),N(rhs)); i++) a << lhs[i] << rhs[i];
+  return tile_menu (a, 2); }
+widget tabs_widget (array<widget> tabs, array<widget> bodies) {
+  (void) tabs; (void) bodies;
+  FAILED ("not yet implemented"); }
+widget wrapped_widget (widget w, command cmd) {
+  (void) w; (void) cmd;
+  FAILED ("not yet implemented"); }
 widget tile_menu (array<widget> a, int cols) { return qt_ui_element_rep::create (qt_ui_element_rep::tile_menu, a, cols); }
 widget minibar_menu (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::minibar_menu, arr); }
 widget menu_separator (bool vertical) { return qt_ui_element_rep::create (qt_ui_element_rep::menu_separator, vertical); }
@@ -933,4 +1123,30 @@ widget menu_button (widget w, command cmd, string pre, string ks, int style) { r
 widget balloon_widget (widget w, widget help) { return qt_ui_element_rep::create (qt_ui_element_rep::balloon_widget, w, help); }
 widget text_widget (string s, int style, color col, bool tsp) { return qt_ui_element_rep::create (qt_ui_element_rep::text_widget, s, style, col, tsp); }
 widget xpm_widget (url file_name) { return qt_ui_element_rep::create (qt_ui_element_rep::xpm_widget, file_name); }
+widget toggle_widget (command cmd, bool on, int style) { return qt_ui_element_rep::create (qt_ui_element_rep::toggle_widget, cmd, on, style); }
+widget enum_widget (command cmd, array<string> vals, string val, int style, string width) { return qt_ui_element_rep::create (qt_ui_element_rep::enum_widget, cmd, vals, val, style, width); }
+widget choice_widget (command cmd, array<string> vals, array<string> chosen) { return qt_ui_element_rep::create(qt_ui_element_rep::choice_widget, cmd, vals, chosen, true); }
+widget choice_widget (command cmd, array<string> vals, string cur) {
+  array<string> chosen (1);
+  chosen[0]= cur;
+  return qt_ui_element_rep::create(qt_ui_element_rep::choice_widget, cmd, vals, chosen, false); }
 
+widget user_canvas_widget (widget wid, int style) {
+  (void) wid; (void) style;
+  FAILED ("not yet implemented"); }
+widget resize_widget (widget w, int style, string w1, string h1,
+                      string w2, string h2, string w3, string h3) {
+  (void) w; (void) style; (void) w1; (void) h1; (void) w2; (void) h2; (void) w3; (void) h3;
+  FAILED ("not yet implemented"); }
+widget hsplit_widget (widget l, widget r) {
+  (void) l; (void) r;
+  FAILED ("not yet implemented"); }
+widget vsplit_widget (widget t, widget b) {
+  (void) t; (void) b;
+  FAILED ("not yet implemented"); }
+widget ink_widget (command cb) {
+  (void) cb;
+  FAILED ("not yet implemented"); }
+widget refresh_widget (string tmwid) {
+  (void) tmwid;
+  FAILED ("not yet implemented"); }

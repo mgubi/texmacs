@@ -16,6 +16,7 @@
 #include "blackbox.hpp"
 #include "command.hpp"
 #include "timer.hpp"
+#define PIXEL 256
 
 class window_rep;
 typedef window_rep* window;
@@ -73,6 +74,8 @@ operator << (tm_ostream& out, widget w) {
   else return w->print (out);
 }
 
+extern bool use_side_tools;
+
 /******************************************************************************
 * Widget style parameters
 ******************************************************************************/
@@ -91,12 +94,14 @@ operator << (tm_ostream& out, widget w) {
   // indicate that a button should explicitly rendered as a button
 #define WIDGET_STYLE_CENTERED           64
   // use centered text
+#define WIDGET_STYLE_BOLD              128
+  // use bold text
 
 /******************************************************************************
 * Window widgets
 ******************************************************************************/
 
-widget plain_window_widget (widget w, string s);
+widget plain_window_widget (widget w, string s, command quit= command ());
   // creates a decorated window with name s and contents w
 widget popup_window_widget (widget w, string s);
   // creates an undecorated window with name s and contents w
@@ -172,6 +177,13 @@ widget input_text_widget (command call_back, string type, array<string> def,
   // default inputs (the first one should be displayed, if there is one)
   // an optional width may be specified for the input field
   // the width is specified in TeXmacs length format with units em, px or w
+widget enum_widget (command cb, array<string> vals, string val,
+                    int st= 0, string w= "1w");
+  // select a value from a list of possible values
+widget choice_widget (command cb, array<string> vals, string val);
+  // select a value from a long list of possible values
+widget choice_widget (command cb, array<string> vals, array<string> mc);
+  // select multiple values from a long list
 
 /******************************************************************************
 * Other widgets
@@ -188,13 +200,44 @@ widget horizontal_list (array<widget> a);
   // a horizontal list made up of the widgets in a
 widget vertical_list (array<widget> a);
   // a vertical list made up of the widgets in a
+widget aligned_widget (array<widget> lhs, array<widget> rhs,
+                       SI hsep= 3*PIXEL, SI vsep= 3*PIXEL,
+                       SI lpad= 0, SI rpad= 0);
+  // a table with two columns, the first one being right aligned and
+  // the second one being left aligned
+widget tabs_widget (array<widget> tabs, array<widget> bodies);
+  // a tab bar where one and only of the bodies can be selected
+widget wrapped_widget (widget w, command quit);
+  // copy of w, but with a separate reference counter,
+  // and with a command to be called upon destruction
+widget user_canvas_widget (widget wid, int style= 0);
+  // a widget whose contents can be scrolled
+  // if the size of the inner contents exceed the specified size
+widget resize_widget (widget w, int style, string w1, string h1,
+                      string w2, string h2, string w3, string h3);
+  // resize the widget w to be of minimal size (w1, h1),
+  // of default size (w2, h2) and of maximal size (w3, h3)
+widget hsplit_widget (widget l, widget r);
+  // two horizontally juxtaposed widgets l and r with an ajustable border
+widget vsplit_widget (widget t, widget b);
+  // two vertically juxtaposed widgets t and b with an ajustable border
 widget extend (widget w, array<widget> a);
   // extend the size of w to the maximum of the sizes of
   // the widgets in the list a
-
+widget toggle_widget (command cmd, bool on= false, int style= 0);
+  // an input toggle
 widget wait_widget (SI width, SI height, string message);
   // a widget of a specified width and height, displaying a wait message
   // this widget is only needed when using the X11 plugin
+widget ink_widget (command cb);
+  // widget for inking a sketch. The input may later be passed to
+  // an external program for handwriting recognition,
+  // using the callback routine
+widget refresh_widget (string tmwid);
+  // a widget which is automatically constructed from the a dynamic
+  // scheme widget tmwid. When receiving the send_refresh event,
+  // the contents should also be updated dynamically by reevaluating
+  // the scheme widget
 
 /******************************************************************************
 * Besides the widget constructors, any GUI implementation should also provide

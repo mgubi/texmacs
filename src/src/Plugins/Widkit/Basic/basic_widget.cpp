@@ -143,6 +143,9 @@ basic_widget_rep::handle_resize (resize_event ev) { (void) ev;
 
 void
 basic_widget_rep::handle_destroy (destroy_event ev) { (void) ev;
+  int i;
+  for (i=0; i<N(a); i++)
+    a[i] << emit_destroy ();
 }
 
 /******************************************************************************
@@ -201,6 +204,12 @@ basic_widget_rep::handle_update (update_event ev) { (void) ev;
     this << emit_reposition ();
     this << emit_invalidate_all ();
   }
+}
+
+void
+basic_widget_rep::handle_refresh (refresh_event ev) { (void) ev;
+  for (int i=0; i<N(a); i++)
+    a[i] << emit_refresh ();
 }
 
 void
@@ -348,6 +357,9 @@ basic_widget_rep::handle (event ev) {
   case UPDATE_EVENT:
     test_window_attached (ev, this);
     handle_update (ev);
+    return true;
+  case REFRESH_EVENT:
+    handle_refresh (ev);
     return true;
   case INVALIDATE_EVENT: {
     if (!attached ()) return true;

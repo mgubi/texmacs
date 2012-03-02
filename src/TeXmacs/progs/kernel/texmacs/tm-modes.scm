@@ -13,7 +13,7 @@
 
 (texmacs-module (kernel texmacs tm-modes)
   (:use
-    (kernel drd drd-rules) (kernel drd drd-query) (kernel drd drd-data)
+    (kernel logic logic-rules) (kernel logic logic-query) (kernel logic logic-data)
     (kernel texmacs tm-plugins) (kernel texmacs tm-preferences)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -34,13 +34,13 @@
 	   (test (if (null? l) #t (if (null? (cdr l)) (car l) (cons 'and l))))
 	   (defn `(define-public (,pred) ,test))
 	   (rules (map (lambda (dep) (list dep mode)) deps))
-	   (drd-cmd `(drd-rules ,@rules))
+	   (logic-cmd `(logic-rules ,@rules))
 	   (arch1 `(set-symbol-procedure! ',mode ,pred))
 	   (arch2 `(set-symbol-procedure! ',pred ,pred)))
       (if (== mode 'always%) (set! defn '(noop)))
       (if (null? deps)
 	  (list 'begin defn arch1 arch2)
-	  (list 'begin defn arch1 arch2 drd-cmd)))))
+	  (list 'begin defn arch1 arch2 logic-cmd)))))
 
 (define-public-macro (texmacs-modes . l)
   `(begin
@@ -117,7 +117,9 @@
   (in-std% (style-has? "std-dtd"))
   (in-std-text% #t in-text% in-std%)
   (in-tmdoc% (style-has? "tmdoc-style"))
+  (in-tmweb% (style-has? "tmweb-style") in-tmdoc%)
   (in-mmxdoc% (style-has? "mmxdoc-style") in-tmdoc%)
+  (in-manual% (not (help-buffer?)) in-tmdoc%)
   (in-plugin-with-converters%
    (plugin-supports-math-input-ref (get-env "prog-language")))
   (in-screens% (inside? 'screens))
@@ -165,7 +167,7 @@
 (define-public remote-control-flag? #f)
 (define-public remote-control-remap (make-ahash-table))
 
-(define (cyrillic-input-method? what)
+(define-public (cyrillic-input-method? what)
   (== (get-preference "cyrillic input method") what))
 
 (texmacs-modes

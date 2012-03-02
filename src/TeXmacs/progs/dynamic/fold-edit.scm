@@ -199,6 +199,9 @@
   (alternative-tag? (tree-label t)))
 
 (tm-define (switch-select t i)
+  (texmacs-error "switch-select" "invalid context"))
+
+(tm-define (switch-select t i)
   (:require (alternative-context? t))
   (switch-set-range t 0 :last #f)
   (switch-set t i #t))
@@ -538,3 +541,25 @@
 (tm-define (screens-switch-to which)
   (and-with t (tree-innermost 'screens)
     (switch-to t which :start)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Balloons
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (show-texmacs-balloon body balloon)
+  (with w (widget-texmacs-output balloon)
+    (with (x1 y1 x2 y2) (tree-bounding-rectangle body)
+      (show-balloon w x1 (- y1 (* 5 256))))))
+
+(tm-define (show-mouse-over-balloon)
+  (:secure #t)
+  (with-action body
+    (and-with balloon (tree-ref body :next)
+      (show-texmacs-balloon body balloon))))
+
+(tm-define (show-help-balloon)
+  (:secure #t)
+  (with-action body
+    (and-with balloon (tree-ref body :next)
+      (show-texmacs-balloon
+       body `(colored-frame "pastel yellow" ,balloon)))))

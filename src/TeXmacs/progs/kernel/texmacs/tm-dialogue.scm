@@ -15,66 +15,8 @@
   (:use (kernel texmacs tm-define)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Dialogues
+;; Questions with user interaction
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(with-module texmacs-user ;; switch modules for old versions of Guile
-  (define-public dialogue-break #f)
-  (define-public dialogue-return #f)
-  (define-public dialogue-error #f))
-
-(define-public (dialogue-report-errors)
-  (if dialogue-error
-      (with error dialogue-error
-         (set! dialogue-error #f)
-	       (apply throw error))))
-
-(define-public-macro (dialogue . body)
-  (cond
-    (dialogue-break
-      `(begin ,@body))
-    (dialogue-return
-      `(begin
-	       (exec-delayed (lambda () (dialogue ,@body)))
-	       (dialogue-return (noop))))
-    (else
-      `(begin
-	       (with-cc cont
-	         (set! dialogue-break cont)
-	         (catch #t
-		          (lambda () ,@body)
-		          (lambda err (set! dialogue-error err)))
-	            (set! dialogue-break #f))
-         (if dialogue-return (dialogue-return (noop)))
-	       (dialogue-report-errors)))))
-
-(define-public ((dialogue-machine local-continue) result)
-  (with-cc cont (set! dialogue-return cont)
-           (local-continue result))
-  (set! dialogue-return #f)
-  (dialogue-report-errors))
-
-(define-public-macro (dialogue-user local-continue . body)
-  `(with local-break dialogue-break
-     (set! dialogue-break #f)
-     (with r (with-cc ,local-continue
-	              ,@body
-	              (local-break (noop)))
-           (set! dialogue-break local-break)
-           r)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Simple questions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-public (dialogue-ask prompt)
-  (if dialogue-break
-      (dialogue-user local-continue
-	(tm-interactive (dialogue-machine local-continue)
-			(if (string? prompt)
-			    (list (build-interactive-arg prompt))
-			    (list prompt))))
-      (texmacs-error "dialogue-ask" "Not in dialogue")))
 
 (define (yes)
   (with lan (get-output-language)
@@ -90,17 +32,23 @@
 	  ((== lan "german") "nein")
 	  (else "no"))))
 
-(define-public (dialogue-confirm? prompt default)
-  (if default
-      (yes? (dialogue-ask (list prompt "question" (yes) (no))))
-      (yes? (dialogue-ask (list prompt "question" (no) (yes))))))
+(define-public (user-ask prompt cont)
+  (tm-interactive cont
+    (if (string? prompt)
+	(list (build-interactive-arg prompt))
+	(list prompt))))
 
-(define-public (dialogue-url prompt type)
-  (if dialogue-break
-      (dialogue-user local-continue
-	(delayed
-	  (choose-file (dialogue-machine local-continue) prompt type)))
-      (texmacs-error "dialogue-ask" "Not in dialogue")))
+(define-public (user-confirm prompt default cont)
+  (let ((k (lambda (answ) (cont (yes? answ)))))
+    (if default
+	(user-ask (list prompt "question" (yes) (no)) k)
+	(user-ask (list prompt "question" (no) (yes)) k))))
+
+(define-public (user-url prompt type cont)
+  (user-delayed (lambda () (choose-file cont prompt type))))
+
+(define-public (user-delayed cont)
+  (exec-delayed cont))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simple questions without continuations
@@ -200,15 +148,7 @@
 	(else (delayed-sub (cdr body)))))
 
 (define-public-macro (delayed . body)
-  (if dialogue-break
-      `(dialogue-user local-continue
-	       (exec-delayed
-           (with proc ,(delayed-sub body)
-	           (lambda ()
-	             (with r (proc)
-		            (if r ((dialogue-machine local-continue) (noop)))
-		            r)))))
-      `(exec-delayed-pause ,(delayed-sub body))))
+  `(exec-delayed-pause ,(delayed-sub body)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -371,15 +311,7 @@
   (lazy-define-force fun)
   (if (null? args) (set! args (compute-interactive-args fun)))
   (with fun-args (build-interactive-args fun args 0 #t)
-    (if dialogue-break
-	(dialogue-user local-continue
-	  (tm-interactive
-	   (lambda args*
-	     (with r* (apply fun args*)
-	       ((dialogue-machine local-continue) r*)
-	       r*))
-	   fun-args))
-	(tm-interactive fun fun-args))))
+    (tm-interactive fun fun-args)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Store learned arguments from one session to another

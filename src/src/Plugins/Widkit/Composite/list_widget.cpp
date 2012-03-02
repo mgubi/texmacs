@@ -12,7 +12,9 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "window.hpp"
 #include "Widkit/composite_widget.hpp"
+#include "Widkit/layout.hpp"
 
 void abs_round (SI& l);
 
@@ -127,6 +129,7 @@ public:
   void handle_get_size (get_size_event ev);
   void handle_position (position_event ev);
   void handle_find_child (find_child_event ev);
+  void handle_repaint (repaint_event ev);
 };
 
 vertical_list_rep::vertical_list_rep (array<wk_widget> a, bool mf):
@@ -200,14 +203,14 @@ vertical_list_rep::handle_position (position_event ev) {
   SI  cur_h=0;
   for (i=0; i<N(a); i++) {
     SI the_w= w, the_h;
-    if (i<N(a)-1) {
-      min_w= w, min_h= h/N(a);
-      a[i] << get_size (min_w, min_h, -1);
-      max_w= w, max_h= h/N(a);
-      a[i] << get_size (max_w, max_h,  1);
-      the_h= (SI) (min_h+ stretch* (max_h- min_h));
-    }
-    else the_h= h+ cur_h;
+    //if (i<N(a)-1) {
+    min_w= w, min_h= h/N(a);
+    a[i] << get_size (min_w, min_h, -1);
+    max_w= w, max_h= h/N(a);
+    a[i] << get_size (max_w, max_h,  1);
+    the_h= (SI) (min_h+ stretch* (max_h- min_h));
+    //}
+    //else the_h= h+ cur_h;
     abs_round (the_h);
     a[i] << emit_position (0, cur_h, the_w, the_h);
     cur_h-=the_h;
@@ -220,6 +223,15 @@ vertical_list_rep::handle_find_child (find_child_event ev) {
   for (i=0; i<N(a); i++)
     if ((ev->y >= a[i]->y1()-oy) && (ev->y < a[i]->y2()-oy)) return;
   i= -1;
+}
+
+void
+vertical_list_rep::handle_repaint (repaint_event ev) {
+  renderer ren= win->get_renderer ();
+  int i= N(a)-1;
+  SI bot= a[i]->y1()-oy;
+  if (bot > -h) layout_default (ren, 0, -h, w, bot);
+  basic_widget_rep::handle_repaint (ev);
 }
 
 /******************************************************************************

@@ -11,20 +11,55 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (kernel texmacs tm-define)
-  (:inherit (kernel texmacs tm-overload)))
+(texmacs-module (kernel texmacs tm-define))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Contextual overloading
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (ctx-add-condition l kind opt)
+  ;;(display* "add condition " l ", " opt "\n")
+  (append l (list opt)))
+
+(define-public (ctx-insert ctx data conds)
+  ;;(display* "insert " ctx ", " data ", " conds "\n")
+  (cons (cons conds data) (or ctx '())))
+
+(define-public (ctx-find ctx conds)
+  ;;(display* "find " ctx ", " conds "\n")
+  (cond ((or (not ctx) (null? ctx)) #f)
+        ((== (caar ctx) conds) (cdar ctx))
+        (else (ctx-find (cdr ctx) conds))))
+
+(define-public (ctx-remove ctx conds)
+  ;;(display* "remove " ctx ", " conds "\n")
+  (cond ((or (not ctx) (null? ctx)) '())
+        ((== (caar ctx) conds) (ctx-remove (cdr ctx) conds))
+        (else (cons (car ctx) (ctx-remove (cdr ctx) conds)))))
+
+(define (and-apply l args)
+  (or (null? l)
+      (and (apply (car l) (or args '()))
+           (and-apply (cdr l) args))))
+
+(define-public (ctx-resolve ctx args)
+  ;;(display* "resolve " ctx ", " args "\n")
+  (cond ((or (not ctx) (null? ctx)) #f)
+        ((and-apply (caar ctx) args) (cdar ctx))
+        (else (ctx-resolve (cdr ctx) args))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Global variables and subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-public tm-defined-table (make-ahash-table))
+(define-public tm-defined-name (make-ahash-table))
 (define-public define-option-table (make-hash-table 100))
 
-(define-public ovl-table (make-ahash-table))
-(define-public ovl-conds '())
+(define-public cur-conds '())
 
-(define ovl-props-table (make-ahash-table))
-(define ovl-props '())
+(define cur-props-table (make-ahash-table))
+(define cur-props '())
 
 (define (ca*r x) (if (pair? x) (ca*r (car x)) x))
 (define (ca*adr x) (ca*r (cadr x)))
@@ -34,48 +69,52 @@
       (lambda* (car head) `((lambda ,(cdr head) ,@body)))
       (car body)))
 
+(define (listify args)
+  (if (pair? args)
+      (cons (car args) (listify (cdr args)))
+      (list args)))
+
+(define (apply* fun head)
+  (cond ((list? head)
+         `(,(apply* fun (car head)) ,@(cdr head)))
+        ((pair? head)
+         `(apply ,(apply* fun (car head)) (cons* ,@(listify (cdr head)))))
+        (else fun)))
+
+(define (and* conds)
+  (if (list-1? conds) (car conds) `(and ,@conds)))
+
+(define (begin* conds)
+  (if (list-1? conds) (car conds) `(begin ,@conds)))
+
+(let ((old-procedure-name procedure-name))
+  (set! procedure-name
+        (lambda (fun)
+          (or (old-procedure-name fun)
+              (ahash-ref tm-defined-name fun)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloading
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (define-option-profile opt decl)
-  (if (has-look-and-feel? opt) decl '(begin)))
-
-(define (conditions-insert! kind opt)
-  (set! ovl-conds (conditions-insert ovl-conds kind opt)))
+(define (ctx-add-condition! kind opt)
+  (set! cur-conds (ctx-add-condition cur-conds kind opt)))
 
 (define (define-option-mode opt decl)
-  (conditions-insert! 0 (car opt))
+  (ctx-add-condition! 0 (car opt))
   decl)
 
 (define-public (predicate-option? x)
   (or (and (symbol? x) (string-ends? (symbol->string x) "?"))
       (and (pair? x) (== (car x) 'lambda))))
 
-(define (define-option-context opt decl)
-  (if (predicate-option? (car opt))
-      (conditions-insert! 1 (car opt))
-      (conditions-insert! 1 `(lambda (t) (match? t ',(car opt)))))
-  decl)
-
-(define (define-option-inside opt decl)
-  (define-option-context
-    `((lambda (t)
-	(and (tm-compound? t)
-	     (in? (tm-car t) ',opt))))
-    decl))
-
-(define (define-option-case opt decl)
-  (conditions-insert! 2 (list quote (list->vector opt)))
-  decl)
-
 (define (define-option-match opt decl)
-  (cond ((predicate-option? opt) (conditions-insert! 3 opt))
+  (cond ((predicate-option? opt) (ctx-add-condition! 3 opt))
 	((and (pair? opt) (null? (cdr opt))
 	      (predicate-option? (car opt))
 	      (list? (cadr decl)) (= (length (cadr decl)) 3))
-	 (conditions-insert! 3 (car opt)))
-	(else (conditions-insert! 3 `(lambda args (match? args ',opt)))))
+	 (ctx-add-condition! 3 (car opt)))
+	(else (ctx-add-condition! 3 `(lambda args (match? args ',opt)))))
   decl)
 
 (define (define-option-require opt decl)
@@ -83,12 +122,7 @@
     `(lambda ,(cdadr decl) ,(car opt))
     decl))
 
-(hash-set! define-option-table :profile define-option-profile)
 (hash-set! define-option-table :mode define-option-mode)
-(hash-set! define-option-table :context define-option-context)
-(hash-set! define-option-table :inside define-option-inside)
-(hash-set! define-option-table :case define-option-case)
-(hash-set! define-option-table :match define-option-match)
 (hash-set! define-option-table :require define-option-require)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -105,24 +139,24 @@
   "Associate a property to a function symbol under conditions"
   (let* ((key (cons var prop))
 	 (conds (filter-conds conds*)))
-    (ahash-set! ovl-props-table key
-		(ovl-insert (ahash-ref ovl-props-table key) what conds))))
+    (ahash-set! cur-props-table key
+		(ctx-insert (ahash-ref cur-props-table key) what conds))))
 
 (define-public (property var prop)
   "Retrieve a property of a function symbol"
   (if (procedure? var) (set! var (procedure-name var)))
   (let* ((key (cons var prop)))
-    (ovl-resolve (ahash-ref ovl-props-table key) #f)))
+    (ctx-resolve (ahash-ref cur-props-table key) #f)))
 
 (define (property-rewrite l)
-  `(property-set! ,@l (list ,@ovl-conds)))
+  `(property-set! ,@l (list ,@cur-conds)))
 
 (define ((define-property which) opt decl)
-  (set! ovl-props (cons `(',(ca*adr decl) ,which ',opt) ovl-props))
+  (set! cur-props (cons `(',(ca*adr decl) ,which ',opt) cur-props))
   decl)
 
 (define ((define-property* which) opt decl)
-  (set! ovl-props (cons `(',(ca*adr decl) ,which (list ,@opt)) ovl-props))
+  (set! cur-props (cons `(',(ca*adr decl) ,which (list ,@opt)) cur-props))
   decl)
 
 (define (compute-arguments decl)
@@ -136,20 +170,20 @@
   (let* ((var (ca*adr decl))
 	 (args (compute-arguments decl))
 	 (arg (list :argument (car opt))))
-    (set! ovl-props (cons `(',var :arguments ',args) ovl-props))
-    (set! ovl-props (cons `(',var ',arg ',(cdr opt)) ovl-props))
+    (set! cur-props (cons `(',var :arguments ',args) cur-props))
+    (set! cur-props (cons `(',var ',arg ',(cdr opt)) cur-props))
     decl))
 
 (define (define-option-default opt decl)
   (let* ((var (ca*adr decl))
 	 (arg (list :default (car opt))))
-    (set! ovl-props (cons `(',var ',arg (lambda () ,@(cdr opt))) ovl-props))
+    (set! cur-props (cons `(',var ',arg (lambda () ,@(cdr opt))) cur-props))
     decl))
 
 (define (define-option-proposals opt decl)
   (let* ((var (ca*adr decl))
 	 (arg (list :proposals (car opt))))
-    (set! ovl-props (cons `(',var ',arg (lambda () ,@(cdr opt))) ovl-props))
+    (set! cur-props (cons `(',var ',arg (lambda () ,@(cdr opt))) cur-props))
     decl))
 
 (hash-set! define-option-table :type (define-property :type))
@@ -163,6 +197,12 @@
 (hash-set! define-option-table :check-mark (define-property* :check-mark))
 (hash-set! define-option-table :interactive (define-property* :interactive))
 
+(define-public (procedure-sources about)
+  (or (and (procedure? about)
+           (ahash-ref tm-defined-table (procedure-name about)))
+      (and (procedure-source about)
+           (list (procedure-source about)))))
+
 (define-public (help about)
   ;; very provisional
   (cond ((property about :synopsis)
@@ -175,72 +215,86 @@
 ;; Overloaded functions with properties
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (unlambda pred?)
+  (if (func? pred? 'lambda)
+      (caddr pred?)
+      (list pred?)))
+
+(define-public (tm-add-condition var head body)
+  (if (null? cur-conds) body
+      `((if ,(and* (map unlambda cur-conds))
+            ,(begin* body)
+            ,(apply* 'former head)))))
+
+(define-public-macro (tm-define-overloaded head . body)
+  (let* ((var (ca*r head))
+         (nbody (tm-add-condition var head body))
+         (nval (lambda* head nbody)))
+    (if (ahash-ref tm-defined-table var)
+        `(let ((former ,var))
+           ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
+           ;;    (display* "Overloaded " ',var "\n"))
+           ;;(display* "Overloaded " ',var "\n")
+           ;;(display* "   " ',nval "\n")
+           (set! temp-module ,(current-module))
+           (set! temp-value ,nval)
+           (set-current-module texmacs-user)
+           (set! ,var temp-value)
+           (set-current-module temp-module)
+           (ahash-set! tm-defined-table ',var
+                       (cons ',nval (ahash-ref tm-defined-table ',var)))
+           (ahash-set! tm-defined-name ,var ',var)
+           ,@(map property-rewrite cur-props))
+        `(begin
+           (when (nnull? cur-conds)
+             (display* "warning: conditional master routine " ',var "\n")
+             (display* "   " ',nval "\n"))
+           ;;(display* "Defined " ',var "\n")
+           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
+           (set! temp-module ,(current-module))
+           (set! temp-value ,nval)
+           (set-current-module texmacs-user)
+           (define-public ,var temp-value)
+           (set-current-module temp-module)
+           (ahash-set! tm-defined-table ',var (list ',nval))
+           (ahash-set! tm-defined-name ,var ',var)
+           ,@(map property-rewrite cur-props)))))
+
 (define-public (tm-define-sub head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
       (let ((decl (tm-define-sub head (cdr body))))
+	(if (not (hash-ref define-option-table (caar body)))
+	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
 	((hash-ref define-option-table (caar body)) (cdar body) decl))
       (cons 'tm-define-overloaded (cons head body))))
 
 (define-public-macro (tm-define head . body)
-  (set! ovl-conds '())
-  (set! ovl-props '())
+  (set! cur-conds '())
+  (set! cur-props '())
   (tm-define-sub head body))
-
-(define-public-macro (tm-define-overloaded head . body)
-  (let* ((var (ca*r head))
-	 (val (lambda* head body))
-	 (default? (and (null? ovl-conds) (not (ahash-ref ovl-table var)))))
-    `(begin
-       (set! temp-module ,(current-module))
-       (set! temp-value ,val)
-       ,(if default?
-	    `(ahash-set! ovl-table ',var (cons 100 temp-value))
-	    `(ahash-set! ovl-table ',var
-			 (ovl-insert (ahash-ref ovl-table ',var) temp-value
-				     (list ,@ovl-conds))))
-       (set-current-module texmacs-user)
-       (cond ((not (procedure? temp-value))
-	      (define-public ,head temp-value))
-	     (,default?
-	      (define-public ,var temp-value))
-	     (else
-	      (define-public (,var . args)
-		(ovl-apply (ahash-ref ovl-table ',var) args))))
-       (set-current-module temp-module)
-       ,@(map property-rewrite ovl-props))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloaded macros with properties
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public (tm-define-macro-sub head body)
-  (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-define-macro-sub head (cdr body))))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-define-macro-overloaded (cons head body))))
+(define-public (tm-macroify head)
+  (if (pair? head)
+      (cons (tm-macroify (car head)) (cdr head))
+      (string->symbol (string-append (symbol->string head) "$impl"))))
 
 (define-public-macro (tm-define-macro head . body)
-  (set! ovl-conds '())
-  (set! ovl-props '())
-  (tm-define-macro-sub head body))
-
-(define-public-macro (tm-define-macro-overloaded head . body)
-  (let* ((var (ca*r head))
-	 (val (lambda* head body))
-	 (default? (and (null? ovl-conds) (not (ahash-ref ovl-table var)))))
+  (with macro-head (tm-macroify head)
+    ;;(display* (ca*r head) "\n")
+    ;;(display* "   " `(tm-define ,macro-head ,@body) "\n")
+    ;;(display* "   " `(define-public-macro ,head
+    ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
+       (tm-define ,macro-head ,@body)
        (set! temp-module ,(current-module))
-       (set! temp-value ,val)
-       ,(if default?
-	    `(ahash-set! ovl-table ',var (cons 100 temp-value))
-	    `(ahash-set! ovl-table ',var
-		       (ovl-insert (ahash-ref ovl-table ',var) temp-value
-				   (list ,@ovl-conds))))
        (set-current-module texmacs-user)
-       (define-public-macro (,var . args)
-	 (ovl-apply (ahash-ref ovl-table ',var) args))
-       (set-current-module temp-module)
-       ,@(map property-rewrite ovl-props))))
+       (define-public-macro ,head
+         ,(apply* (ca*r macro-head) head))
+       (set-current-module temp-module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -253,53 +307,13 @@
 	((hash-ref define-option-table (caar body)) (cdar body) decl))))
 
 (define-public-macro (tm-property head . body)
-  (set! ovl-conds '())
-  (set! ovl-props '())
+  (set! cur-conds '())
+  (set! cur-props '())
   (tm-property-sub head body))
 
 (define-public-macro (tm-property-overloaded head . body)
   `(begin
-     ,@(map property-rewrite ovl-props)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Retrieve definitions and redefinition of functions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-public (tm-definition-sub head body)
-  (if (and (nnull? body) (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-definition-sub head (cdr body))))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-definition-overloaded (cons head body))))
-
-(define-public-macro (tm-definition head . body)
-  (set! ovl-conds '())
-  (set! ovl-props '())
-  (tm-definition-sub head body))
-
-(define-public-macro (tm-definition-overloaded head . body)
-  (with var (ca*r head)
-    `(ovl-find (ahash-ref ovl-table ',var) (list ,@ovl-conds))))
-
-(define-public (tm-redefine-sub head body)
-  (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-redefine-sub head (cdr body))))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-redefine-overloaded (cons head body))))
-
-(define-public-macro (tm-redefine head . body)
-  (set! ovl-conds '())
-  (set! ovl-props '())
-  (tm-redefine-sub head body))
-
-(define-public-macro (tm-redefine-overloaded head . body)
-  (let* ((var (ca*r head))
-	 (val (lambda* head body)))
-    `(begin
-       (ahash-set! ovl-table ',var
-		   (ovl-insert (ahash-ref ovl-table ',var) ,val
-			       (list ,@ovl-conds)))
-       (set! ,var (lambda args (ovl-apply (ahash-ref ovl-table ',var) args)))
-       ,@(map property-rewrite ovl-props))))
+     ,@(map property-rewrite cur-props)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lazy function declations
@@ -315,17 +329,16 @@
 	 (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
   (with name-star (string->symbol (string-append (symbol->string name) "*"))
-    `(if (not (tm-definition ,@opts ,name))
-	 (tm-define (,name . args)
-	   ,@opts
-	   (let* ((m (resolve-module ',module))
-		  (p (module-ref texmacs-user '%module-public-interface))
-		  (r (module-ref p ',name #f)))
-	     (if (not r)
-		 (texmacs-error "lazy-define"
-				,(string-append "Could not retrieve "
-						(symbol->string name))))
-	     (apply r args))))))
+    `(tm-define (,name . args)
+       ,@opts
+       (let* ((m (resolve-module ',module))
+              (p (module-ref texmacs-user '%module-public-interface))
+              (r (module-ref p ',name #f)))
+         (if (not r)
+             (texmacs-error "lazy-define"
+                            ,(string-append "Could not retrieve "
+                                            (symbol->string name))))
+         (apply r args)))))
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)

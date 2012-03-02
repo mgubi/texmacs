@@ -94,9 +94,10 @@
 	   key)))
 
 (tm-define (scheme-eval t)
-  (let* ((s (texmacs->verbatim (tm->tree t)))
+  (let* ((s (texmacs->code t))
 	 (r (eval-string-with-catch s)))
-    (cond ((and (tree? r) (session-scheme-trees?)) (tree-copy r))
+    (cond ((and (tree? r) (session-scheme-trees?))
+           (tree 'text (tree-copy r)))
 	  ((session-scheme-math?)
 	   (with m (cas->stree r)
 	     (if (tm? m) (tree 'math (tm->tree m)) (var-object->string r))))
@@ -280,6 +281,18 @@
     (cond ((== lan "scheme") 2)
 	  ((not (connection-defined? lan)) 0)
 	  (else (connection-status lan ses)))))
+
+(tm-define (session-busy-message msg)
+  (let* ((lan (get-env "prog-language"))
+	 (ses (get-env "prog-session")))
+    (with l (pending-ref lan ses)
+      (for-each
+       (lambda (x)
+         (with (in out next opts) (session-decode x)
+           (when (and (tm-func? out 'document)
+                      (tm-func? (tree-ref out :last) 'script-busy))
+             (tree-assign (tree-ref out :last) `(script-busy ,msg)))))
+       l))))
 
 (tm-define (session-alive?)
   (> (session-status) 1))

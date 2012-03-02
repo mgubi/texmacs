@@ -15,7 +15,7 @@
   (:use (text std-text-kbd)))
 
 (kbd-map
-  (:mode in-tmdoc?)
+  (:mode in-manual?)
   ("S-F7" (make 'scm))
   ("C-F7" (make 'scm-arg))
   ("M-F7" (make 'scm-fragment)))

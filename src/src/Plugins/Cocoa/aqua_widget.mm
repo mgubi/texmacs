@@ -592,7 +592,7 @@ aqua_tm_widget_rep::query (slot s, int type_id) {
   case SLOT_INTERACTIVE_INPUT:
     {
       TYPE_CHECK (type_id == type_helper<string>::id);
-      return close_box<string> ( concrete<aqua_input_text_widget_rep*>(abstract(int_input))->text );
+      return close_box<string> ( ((aqua_input_text_widget_rep*) int_input.rep)->text );
       
     }
   case SLOT_INTERACTIVE_MODE:
@@ -674,10 +674,10 @@ TMMenuHelper *the_menu_helper = nil;
 void
 aqua_tm_widget_rep::write (slot s, blackbox index, widget w) {
   switch (s) {
-  case SLOT_CANVAS: 
+  case SLOT_SCROLLABLE: 
     {
-      check_type_void (index, "SLOT_CANVAS");
-      NSView *v = (concrete<aqua_view_widget_rep*>(w))->view;
+      check_type_void (index, "SLOT_SCROLLABLE");
+      NSView *v = ((aqua_view_widget_rep*) w.rep)->view;
       [sv setDocumentView: v];
       [[sv window] makeFirstResponder:v];
     }
@@ -726,7 +726,7 @@ aqua_tm_widget_rep::plain_window_widget (string s) {
   // creates a decorated window with name s and contents w
   widget w = aqua_view_widget_rep::plain_window_widget(s);
   // to manage correctly retain counts
-  aqua_window_widget_rep * wid = concrete<aqua_window_widget_rep*>(w);
+  aqua_window_widget_rep * wid = (aqua_window_widget_rep *)(w.rep);
   [[wid->get_windowcontroller() window] setToolbar:toolbar];
   return wid;
 }
@@ -814,6 +814,10 @@ aqua_window_widget_rep::send (slot s, blackbox val) {
   case SLOT_UPDATE:
     NOT_IMPLEMENTED ;
     // send_update (THIS, val);
+    break;
+  case SLOT_REFRESH:
+    NOT_IMPLEMENTED ;
+    // send_refresh (THIS, val);
     break;
     
   default:

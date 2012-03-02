@@ -12,7 +12,7 @@
 
 #include "analyze.hpp"
 #include "impl_language.hpp"
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 
 extern tree the_et;
 
@@ -464,7 +464,6 @@ static bool in_preprocessing (string s, tree t) {
   string s2= s;
   while (line_number(t2) > 0) {
     t2= line_inc(t2,-1);
-    // line_inc return tree(ERROR) upon error.
     if (!is_atomic(t2)) return false;
     s2= t2->label;
     if (!end_preprocessing(s2)) return false;
@@ -473,13 +472,8 @@ static bool in_preprocessing (string s, tree t) {
   return false;
 }
 
-
-
 string
 cpp_language_rep::get_color (tree t, int start, int end) {
-  if (!is_atomic(t)) {
-    FAILED("atomic expected");
-  }
   static bool setup_done= false;
   if (!setup_done) {
     cpp_color_setup_constants (colored);

@@ -39,26 +39,43 @@
     ---
     |
     (group :string?)
+    (text :string?)
     (glue :boolean? :boolean? :integer? :integer?)
     (color :%1 :boolean? :boolean? :integer? :integer?)
     (:menu-wide-label :%1)
     (symbol :string? :*)
+    (texmacs-output :%1)
+    (texmacs-input :%3)
     (input :%1 :string? :%1 :string?)
+    (enum :%3 :string?)
+    (choice :%3)
+    (choices :%3)
+    (toggle :%2)
     (horizontal :menu-item-list)
     (vertical :menu-item-list)
     (hlist :menu-item-list)
     (vlist :menu-item-list)
+    (aligned :menu-item-list)
+    (aligned-item :%2)
+    (tabs :menu-item-list)
+    (tab :menu-item-list)
     (minibar :menu-item-list)
     (extend :menu-item :menu-item-list)
     (style :integer? :menu-item-list)
     (-> :menu-label :menu-item-list)
     (=> :menu-label :menu-item-list)
     (tile :integer? :menu-item-list)
+    (scrollable :menu-item-list)
+    (resize :%2 :menu-item-list)
+    (hsplit :menu-item :menu-item)
+    (vsplit :menu-item :menu-item)
+    (refresh :%1)
     (if :%1 :menu-item-list)
     (when :%1 :menu-item-list)
     (mini :%1 :menu-item-list)
     (link :%1)
     (promise :%1)
+    (ink :%1)
     (:menu-item-list)))
   (:menu-item-list (:repeat :menu-item)))
 
@@ -185,11 +202,47 @@
   "Make @(group :string?) menu item."
   (widget-menu-group s style))
 
+(define (make-menu-text s style)
+  "Make @(text :string?) menu item."
+  ;;(widget-text s style (color "black") #t)
+  (widget-text s style (color "black") #f))
+
+(define (make-texmacs-output p style)
+  "Make @(texmacs-output :%1) item."
+  (with (tag t) p
+    (widget-texmacs-output (t))))
+
+(define (make-texmacs-input p style)
+  "Make @(texmacs-input :%3) item."
+  (with (tag t cmd cont?) p
+    (widget-texmacs-input (t) (object->command (menu-protect cmd)) cont?)))
+
 (define (make-menu-input p style)
   "Make @(input :%1 :string? :%1 :string?) menu item."
   (with (tag cmd type props width) p
     (widget-input (object->command (menu-protect cmd)) type (props)
 		  (logior style widget-style-mini) width)))
+
+(define (make-enum p style)
+  "Make @(enum :%3 :string?) item."
+  (with (tag cmd vals val width) p
+    (widget-enum (object->command (menu-protect cmd))
+                 (vals) (val) style width)))
+
+(define (make-choice p style)
+  "Make @(choice :%3) item."
+  (with (tag cmd vals val) p
+    (widget-choice (object->command (menu-protect cmd)) (vals) (val))))
+
+(define (make-choices p style)
+  "Make @(choices :%3) item."
+  (with (tag cmd vals mc) p
+    (widget-choices (object->command (menu-protect cmd)) (vals) (mc))))
+
+(define (make-toggle p style)
+  "Make @(toggle :%2) item."
+  (with (tag cmd on) p
+    (widget-toggle (object->command cmd) (on) style)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu entries
@@ -332,8 +385,34 @@
   (widget-hlist (make-menu-items (cdr p) style #t)))
 
 (define (make-menu-vlist p style)
-  "Make @(vertical :menu-item-list) menu item."
+  "Make @(vlist :menu-item-list) menu item."
   (widget-vlist (make-menu-items (cdr p) style #f)))
+
+(define (make-aligned p style)
+  "Make @(aligned :menu-item-list) item."
+  (widget-aligned (make-menu-items (map cadr (cdr p)) style #f)
+                  (make-menu-items (map caddr (cdr p)) style #f)))
+
+(define (make-aligned-item p style)
+  "Make @(aligned-item :2%) item."
+  (display* "Error 'make-aligned-item', " p ", " style "\n")
+  (list 'vlist))
+
+(define (tab-key x)
+  (cadr x))
+
+(define (tab-value x)
+  (list 'vlist (cddr x)))
+
+(define (make-menu-tabs p style)
+  "Make @(tabs :menu-item-list) menu item."
+  (widget-tabs (make-menu-items (map tab-key (cdr p)) style #f)
+               (make-menu-items (map tab-value (cdr p)) style #f)))
+
+(define (make-menu-tab p style)
+  "Make @(tab :menu-item-list) menu item."
+  (display* "Error 'make-menu-tab', " p ", " style "\n")
+  (list 'vlist))
 
 (define (make-menu-extend p style bar?)
   "Make @(extend :menu-item :menu-item-list) menu item."
@@ -372,6 +451,42 @@
   "Make @(tile :integer? :menu-item-list) menu item."
   (with (tag width . items) p
     (widget-tmenu (make-menu-items items style #f) width)))
+
+(define (make-scrollable p style)
+  "Make @(scrollable :menu-item-list) item."
+  (with (tag . items) p
+    (with inner (make-menu-items (list (cons 'vertical items)) style #f)
+      (widget-scrollable (car inner) style))))
+
+(define (decode-resize x)
+  (cond ((string? x) (list x x x))
+        ((list-3? x) x)
+        (else (make-menu-error "bad length in " (object->string x)))))
+
+(define (make-resize p style)
+  "Make @(resize :%2 :menu-item-list) item."
+  (with (tag w h . items) p
+    (with inner (make-menu-items (list (cons 'vertical items)) style #f)
+      (with (w1 w2 w3) (decode-resize w)
+        (with (h1 h2 h3) (decode-resize h)
+          (widget-resize (car inner) style w1 h1 w2 h2 w3 h3))))))
+
+(define (make-hsplit p style)
+  "Make @(hsplit :menu-item :menu-item) item."
+  (with (tag . items) p
+    (with l (make-menu-items items style #f)
+      (widget-hsplit (car l) (cadr l)))))
+
+(define (make-vsplit p style)
+  "Make @(vsplit :menu-item :menu-item) item."
+  (with (tag . items) p
+    (with l (make-menu-items items style #f)
+      (widget-vsplit (car l) (cadr l)))))
+
+(define (make-ink p style)
+  "Make @(ink) item."
+  (with (tag cmd) p
+    (widget-ink (object->command cmd))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menus
@@ -412,6 +527,11 @@
     ;;(make-menu-items value style bar?)
     (if (match? value ':menu-item) (make-menu-items value style bar?)
 	(make-menu-error "promise did not yield a menu: " value))))
+
+(define (make-refresh p style bar?)
+  "Make @(refresh s) widget."
+  (with (tag s) p
+    (list (widget-refresh (if (string? s) s (symbol->string s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main routines for making menu items
@@ -454,10 +574,24 @@
                                    (fourth p) (fifth p) (sixth p)))))
   (group (:string?)
 	 ,(lambda (p style bar?) (list (make-menu-group (cadr p) style))))
+  (text (:string?)
+	 ,(lambda (p style bar?) (list (make-menu-text (cadr p) style))))
   (symbol (:string? :*)
 	  ,(lambda (p style bar?) (list (make-menu-symbol p style))))
+  (texmacs-output (:%1)
+    ,(lambda (p style bar?) (list (make-texmacs-output p style))))
+  (texmacs-input (:%3)
+    ,(lambda (p style bar?) (list (make-texmacs-input p style))))
   (input (:%1 :string? :%1 :string?)
          ,(lambda (p style bar?) (list (make-menu-input p style))))
+  (enum (:%3 :string?)
+        ,(lambda (p style bar?) (list (make-enum p style))))
+  (choice (:%3)
+          ,(lambda (p style bar?) (list (make-choice p style))))
+  (choices (:%3)
+           ,(lambda (p style bar?) (list (make-choices p style))))
+  (toggle (:%2)
+	  ,(lambda (p style bar?) (list (make-toggle p style))))
   (link (:%1)
 	,(lambda (p style bar?) (make-menu-link p style bar?)))
   (horizontal (:*)
@@ -468,6 +602,14 @@
          ,(lambda (p style bar?) (list (make-menu-hlist p style))))
   (vlist (:*)
          ,(lambda (p style bar?) (list (make-menu-vlist p style))))
+  (aligned (:*)
+         ,(lambda (p style bar?) (list (make-aligned p style))))
+  (aligned-item (:%2)
+                ,(lambda (p style bar?) (list (make-aligned-item p style))))
+  (tabs (:*)
+        ,(lambda (p style bar?) (list (make-menu-tabs p style))))
+  (tab (:*)
+        ,(lambda (p style bar?) (list (make-menu-tab p style))))
   (minibar (:*)
 	    ,(lambda (p style bar?) (list (make-menu-minibar p style))))
   (extend (:%1 :*)
@@ -480,6 +622,16 @@
       ,(lambda (p style bar?) (list (make-menu-submenu p style))))
   (tile (:integer? :*)
 	,(lambda (p style bar?) (list (make-menu-tile p style))))
+  (scrollable (:*)
+	      ,(lambda (p style bar?) (list (make-scrollable p style))))
+  (resize (:%2 :*)
+      ,(lambda (p style bar?) (list (make-resize p style))))
+  (hsplit (:%2)
+          ,(lambda (p style bar?) (list (make-hsplit p style))))
+  (vsplit (:%2)
+          ,(lambda (p style bar?) (list (make-vsplit p style))))
+  (ink (:%1)
+       ,(lambda (p style bar?) (list (make-ink p style))))
   (if (:%1 :*)
       ,(lambda (p style bar?) (make-menu-if p style bar?)))
   (when (:%1 :*)
@@ -487,7 +639,9 @@
   (mini (:%1 :*)
         ,(lambda (p style bar?) (make-menu-mini p style bar?)))
   (promise (:%1)
-	   ,(lambda (p style bar?) (make-menu-promise p style bar?))))
+	   ,(lambda (p style bar?) (make-menu-promise p style bar?)))
+  (refresh (:%1)
+	   ,(lambda (p style bar?) (make-refresh p style bar?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu expansion
@@ -521,6 +675,17 @@
     ;;(menu-expand value)
     (if (match? value ':menu-item) (menu-expand value) p)))
 
+(define (menu-expand-texmacs-input p)
+  "Expand texmacs-input item @p."
+  `(texmacs-input ,(replace-procedures (cadr p))
+                  ,(replace-procedures (caddr p))
+                  ,(cadddr p)))
+
+(define (menu-expand-texmacs-output p)
+  "Expand conditional menu @p."
+  (with (tag out) p
+    `(texmacs-output ',(out))))
+
 (define (menu-expand-input p)
   "Expand input menu item @p."
   `(input ,(replace-procedures (cadr p))
@@ -528,6 +693,24 @@
 	  ,(with r ((cadddr p))
 	     (if (pair? r) (car r) (replace-procedures (cadddr p))))
 	  ,(fifth p)))
+
+(define (menu-expand-enum p)
+  "Expand enum item @p."
+  `(enum ,(replace-procedures (cadr p))
+         ,(replace-procedures (caddr p))
+         ,(replace-procedures (cadddr p))
+         ,(fifth p)))
+
+(define (menu-expand-choice p)
+  "Expand choice item @p."
+  `(,(car p) ,(replace-procedures (cadr p))
+             ,(replace-procedures (caddr p))
+             ,(replace-procedures (cadddr p))))
+
+(define (menu-expand-toggle p)
+  "Expand toggle item @p."
+  `(toggle ,(replace-procedures (cadr p))
+	   ,(replace-procedures (caddr p))))
 
 (define (menu-expand-list l)
   "Expand links and conditional menus in list of menus @l."
@@ -562,25 +745,42 @@
   (--- ,(lambda (p) `(--- ,@(menu-expand-list (cdr p)))))
   (| ,(lambda (p) `(| ,@(menu-expand-list (cdr p)))))
   (group ,replace-procedures)
+  (text ,replace-procedures)
   (glue ,replace-procedures)
   (color ,replace-procedures)
   (symbol ,replace-procedures)
+  (texmacs-input ,menu-expand-texmacs-input)
+  (texmacs-output ,menu-expand-texmacs-output)
   (input ,menu-expand-input)
+  (enum ,menu-expand-enum)
+  (choice ,menu-expand-choice)
+  (choices ,menu-expand-choice)
+  (toggle ,menu-expand-toggle)
   (link ,menu-expand-link p)
   (horizontal ,(lambda (p) `(horizontal ,@(menu-expand-list (cdr p)))))
   (vertical ,(lambda (p) `(vertical ,@(menu-expand-list (cdr p)))))
   (hlist ,(lambda (p) `(hlist ,@(menu-expand-list (cdr p)))))
   (vlist ,(lambda (p) `(vlist ,@(menu-expand-list (cdr p)))))
+  (aligned ,(lambda (p) `(aligned ,@(menu-expand-list (cdr p)))))
+  (aligned-item ,(lambda (p) `(aligned-item ,@(menu-expand-list (cdr p)))))
+  (tabs ,(lambda (p) `(tabs ,@(menu-expand-list (cdr p)))))
+  (tab ,(lambda (p) `(tab ,@(menu-expand-list (cdr p)))))
   (minibar ,(lambda (p) `(minibar ,@(menu-expand-list (cdr p)))))
   (extend ,(lambda (p) `(extend ,@(menu-expand-list (cdr p)))))
   (style ,(lambda (p) `(extend ,@(menu-expand-list (cdr p)))))
   (-> ,replace-procedures)
   (=> ,replace-procedures)
   (tile ,replace-procedures)
+  (scrollable ,(lambda (p) `(scrollable ,@(menu-expand-list (cdr p)))))
+  (resize ,(lambda (p) `(resize ,@(menu-expand-list (cdr p)))))
+  (hsplit ,(lambda (p) `(hsplit ,@(menu-expand-list (cdr p)))))
+  (vsplit ,(lambda (p) `(vsplit ,@(menu-expand-list (cdr p)))))
+  (ink ,replace-procedures)
   (if ,menu-expand-if)
   (when ,menu-expand-when)
   (mini ,menu-expand-mini)
-  (promise ,menu-expand-promise))
+  (promise ,menu-expand-promise)
+  (refresh ,replace-procedures))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -594,20 +794,30 @@
 	  (else (make-menu-bad-format p style)))))
 
 (tm-define (make-menu-widget p style)
-  (:type (-> object widget))
   (:synopsis "Transform a menu into a widget.")
   (:argument p "a scheme object which represents the menu")
   (:argument style "menu style")
   ((wrap-catch make-menu-main) p style))
 
+(tm-define (top-window menu-promise name)
+  (:interactive #t)
+  (let* ((win (window-handle))
+	 (qui (object->command (lambda () (window-delete win))))
+	 (men (menu-promise))
+	 (scm (list 'vertical men))
+	 (wid (make-menu-widget scm 0)))
+    (window-create-quit win wid name qui)
+    (window-show win)))
+
 (tm-define (dialogue-window menu-promise cmd name)
   (:interactive #t)
   (let* ((win (window-handle))
+	 (qui (object->command (lambda () (window-delete win))))
 	 (lbd (lambda x (apply cmd x) (window-delete win)))
 	 (men (menu-promise lbd))
 	 (scm (list 'vertical men))
 	 (wid (make-menu-widget scm 0)))
-    (window-create win wid name #t)
+    (window-create-quit win wid name qui)
     (window-show win)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

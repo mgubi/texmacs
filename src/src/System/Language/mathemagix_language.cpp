@@ -11,7 +11,7 @@
 
 #include "analyze.hpp"
 #include "impl_language.hpp"
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 #define COLOR_MARKUP "#500d04"
 
 static void parse_number (string s, int& pos);
@@ -151,6 +151,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("literal_integer")= c;
   t ("literal_floating")= c;
   t ("literal_string")= c;
+  t ("literal_constant")= c;
   t ("locked")= c;
   t ("loop")= c;
   t ("macro")= c;
@@ -165,6 +166,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("packed")= c;
   t ("penalty")= c;
   t ("postfix")= "postfix";
+  t ("prefer")= c;
   t ("prefix")= c;
   t ("private")= c;
   t ("protected")= c;

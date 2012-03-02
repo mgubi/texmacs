@@ -12,12 +12,15 @@
 #include "tm_window.hpp"
 #include "message.hpp"
 #include "dictionary.hpp"
+#include "merge_sort.hpp"
+#include "iterator.hpp"
 
 int geometry_w= 800, geometry_h= 600;
 int geometry_x= 0  , geometry_y= 0;
 
 widget texmacs_window_widget (widget wid, tree geom);
 widget make_menu_widget (object menu);
+void refresh_size (widget wid, bool exact);
 
 /******************************************************************************
 * Meta editor constructor and destructor
@@ -35,8 +38,18 @@ tm_window_rep::tm_window_rep (widget wid2, tree geom):
   sfactor= get_server () -> get_default_shrinking_factor ();
 }
 
+tm_window_rep::tm_window_rep (tree doc, command quit):
+  win (texmacs_widget (0, quit)),
+  wid (win), id (-1),
+  serial (tm_window_serial++),
+  menu_current (object ()), menu_cache (widget ()),
+  text_ptr (NULL)
+{
+  sfactor= get_server () -> get_default_shrinking_factor ();
+}
+
 tm_window_rep::~tm_window_rep () {
-  destroy_window_id (id);
+  if (id != -1) destroy_window_id (id);
 }
 
 /******************************************************************************
@@ -48,6 +61,7 @@ texmacs_window_widget (widget wid, tree geom) {
   int W, H;
   int w= geometry_w, h= geometry_h;
   int x= geometry_x, y= geometry_y;
+  if (use_side_tools) { w += 200; h += 100; }
   if (is_tuple (geom) && N (geom) >= 2) {
     w= as_int (geom[0]);
     h= as_int (geom[1]);
@@ -59,6 +73,90 @@ texmacs_window_widget (widget wid, tree geom) {
   set_size (win, w*PIXEL, h*PIXEL);
   set_position (win, x*PIXEL, (-y)*PIXEL);
   return win;
+}
+
+/******************************************************************************
+* Closing embedded TeXmacs widgets
+******************************************************************************/
+
+class close_embedded_command_rep: public command_rep {
+  tm_view vw;
+public:
+  close_embedded_command_rep (tm_view vw2): vw (vw2) {}
+  void apply ();
+  tm_ostream& print (tm_ostream& out) {
+    return out << "Close_Embedded widget command"; }
+};
+
+void
+close_embedded_command_rep::apply () {
+  //cout << "Destroy " << vw->buf->name << "\n";
+  get_server () -> window_focus (vw->ed->mvw->win->id);
+  //cout << "Changed focus\n";
+  tm_window win= vw->win;
+  ASSERT (N(vw->buf->vws) == 1, "invalid cloned embedded TeXmacs widget");
+  get_server () -> delete_buffer (vw->buf);
+  //cout << "Deleted buffer\n";
+  tm_delete (win);
+  //cout << "Deleted window\n";
+}
+
+command
+close_embedded_command (tm_view vw) {
+  return tm_new<close_embedded_command_rep> (vw);
+}
+
+/******************************************************************************
+* Embedded TeXmacs widgets
+******************************************************************************/
+
+string
+embedded_name () {
+  static int nr= 0;
+  nr++;
+  return "* Embedded " * as_string (nr) * " *";
+}
+
+tree
+enrich_embedded_document (tree body) {
+  tree orig= body;
+  if (is_func (body, WITH)) body= body[N(body)-1];
+  if (!is_func (body, DOCUMENT)) body= tree (DOCUMENT, body);
+  tree style= "generic";
+  hashmap<string,tree> initial (UNINIT);
+  initial (PAGE_MEDIUM)= "automatic";
+  initial (PAGE_SCREEN_LEFT)= "4px";
+  initial (PAGE_SCREEN_RIGHT)= "4px";
+  initial (PAGE_SCREEN_TOP)= "2px";
+  initial (PAGE_SCREEN_BOT)= "2px";
+  if (is_func (orig, WITH))
+    for (int i=0; i+2<N(orig); i++)
+      if (is_atomic (orig[i]))
+        initial (orig[i]->label)= orig[i+1];
+  tree doc (DOCUMENT);
+  doc << compound ("TeXmacs", TEXMACS_VERSION);
+  doc << compound ("style", tree (TUPLE, "generic"));
+  doc << compound ("body", body);
+  doc << compound ("initial", make_collection (initial));
+  return doc;
+}
+
+widget
+texmacs_input_widget (tree doc, command cmd, bool continuous) {
+  (void) cmd; (void) continuous;
+  doc= enrich_embedded_document (doc);
+  tm_view   curvw=  get_server () -> get_view ();
+  string    name = embedded_name ();
+  tm_buffer buf  = get_server () -> new_buffer (url (name), doc);
+  tm_view   vw   = get_server () -> get_passive_view (buf);
+  tm_window win  = tm_new<tm_window_rep> (doc, command ());
+  get_server () -> set_aux (name, name);
+  vw->win= win;
+  vw->buf->in_menu= false;
+  set_scrollable (win->wid, vw->ed);
+  vw->ed->cvw= win->wid.rep;
+  vw->ed->mvw= curvw;
+  return wrapped_widget (win->wid, close_embedded_command (vw));
 }
 
 /******************************************************************************
@@ -135,6 +233,15 @@ tm_window_rep::menu_icons (int which, string menu) {
 }
 
 void
+tm_window_rep::side_tools (int which, string tools) {
+  eval ("(lazy-initialize-force)");
+  widget w;
+  if (get_menu_widget (10 + which, tools, w)) {
+    if (which == 0) set_side_tools (wid, w);
+  }
+}
+
+void
 tm_window_rep::set_header_flag (bool flag) {
   set_header_visibility (wid, flag);
 }
@@ -145,6 +252,11 @@ tm_window_rep::set_icon_bar_flag (int which, bool flag) {
   else if (which == 1) set_mode_icons_visibility (wid, flag);
   else if (which == 2) set_focus_icons_visibility (wid, flag);
   else if (which == 3) set_user_icons_visibility (wid, flag);
+}
+
+void
+tm_window_rep::set_side_tools_flag (int which, bool flag) {
+  if (which == 0) set_side_tools_visibility (wid, flag);
 }
 
 bool
@@ -158,6 +270,12 @@ tm_window_rep::get_icon_bar_flag (int which) {
   else if (which == 1) return get_mode_icons_visibility (wid);
   else if (which == 2) return get_focus_icons_visibility (wid);
   else if (which == 3) return get_user_icons_visibility (wid);
+  else return false;
+}
+
+bool
+tm_window_rep::get_side_tools_flag (int which) {
+  if (which == 0) return get_side_tools_visibility (wid);
   else return false;
 }
 
@@ -279,6 +397,7 @@ tm_window_rep::interactive_return () {
 ******************************************************************************/
 
 static hashmap<int,widget> window_table (NULL);
+static time_t refresh_time= 0;
 
 int
 window_handle () {
@@ -293,6 +412,13 @@ window_create (int win, widget wid, string name, bool plain) {
     pww= plain_window_widget (wid, name);
   else
     pww= popup_window_widget (wid, name);
+  window_table (win)= pww;
+}
+
+void
+window_create (int win, widget wid, string name, command quit) {
+  widget pww;
+  pww= plain_window_widget (wid, name, quit);
   window_table (win)= pww;
 }
 
@@ -316,4 +442,23 @@ window_hide (int win) {
   ASSERT (window_table->contains (win), "window does not exist");
   widget pww= window_table [win];
   set_visibility (pww, false);
+}
+
+void
+windows_delayed_refresh (int ms) {
+  refresh_time= texmacs_time () + ms;
+}
+
+void
+windows_refresh () {
+  if (texmacs_time () < refresh_time) return;
+  iterator<int> it= iterate (window_table);
+  while (it->busy ()) {
+    int id= it->next ();
+    send_refresh (window_table[id]);
+#ifndef QTTEXMACS
+    refresh_size (window_table[id], false);
+#endif
+  }
+  windows_delayed_refresh (1000000000);
 }

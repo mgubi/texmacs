@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (generic document-menu)
-  (:use (generic document-edit)))
+  (:use (generic document-edit)
+        (generic generic-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Submenus for the Document menu and the iconbars
@@ -642,7 +643,7 @@
 (tm-menu (standard-focus-icons t)
   (:require (tree-is-buffer? t))
   (dynamic (focus-style-icons t))  
-  (glue #f #f 5 0)
+  //
   (dynamic (focus-document-icons t))  
-  (glue #f #f 5 0)   
+  //   
   (dynamic (focus-document-extra-icons t)))

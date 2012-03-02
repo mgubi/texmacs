@@ -19,16 +19,14 @@
 (define (texgraph-serialize lan t)
   (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
-    (with s (texmacs->verbatim (stree->tree u))
+    (with s (texmacs->code u)
       (string-append (escape-verbatim (string-replace s "\n" "~")) "\n"))))
 
 (define (texgraph-initialize)
   (import-from (texgraph-menus))
   (import-from (utils plugins plugin-convert))
-  (lazy-input-converter (texgraph-input) texgraph)   ;; uniquement pour le script plot-curve
-  (menu-extend texmacs-extra-menu
-	(if (or (in-texgraph?) (and (not-in-session?) (texgraph-scripts?)))
-		(=> "TeXgraph" (link texgraph-functions-menu)))))
+  (lazy-input-converter (texgraph-input) texgraph) ;; uniquement pour le script plot-curve
+  )
 
 (plugin-configure texgraph
   (:require (and (url-exists-in-path? "latex")

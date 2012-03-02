@@ -205,9 +205,9 @@
       (script-modified-eval fun :approx))))
 
 (tm-define (script-apply fun . opts)
-  (if (in? opts '(() (1)))
+  (if (and (in? opts '(() (1))) (not-in-session?))
       (script-modified-eval (lambda () (insert-function fun)))
-      (let* ((n (car opts))
+      (let* ((n (if (null? opts) 1 (car opts)))
 	     (input (script-get-input)))
 	;;(display* "Script apply " fun ", " n "\n")
 	(when input
@@ -310,6 +310,25 @@
   (alternate-toggle t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Call backs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (mathemagix-alive?)
+  (and (connection-defined? "mathemagix")
+       (> (connection-status "mathemagix" "default") 1)))
+
+(tm-define (notify-graphics-extents id x1 y1 x2 y2)
+  (when (mathemagix-alive?)
+    (with msg (string-append "notify_graphics_extents (\"" id "\", "
+                             (number->string x1) ", " (number->string y1) ", "
+                             (number->string x2) ", " (number->string y2) ")")
+      ;;(display* "sending " msg "\n")
+      (silent-feed* "mathemagix" "default" msg noop '()))))
+
+(tm-define (graphics-notify-extents id x1 y1 x2 y2)
+  (delayed (:idle 1) (notify-graphics-extents id x1 y1 x2 y2)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Converters
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -321,7 +340,7 @@
                  (xor (not forwards?)
                       (tree-is? t 1 'document))))
   (let* ((format (string-append (tree->string (tree-ref t 0)) "-snippet"))
-         (in (texmacs->verbatim (tree-ref t 1))))
+         (in (texmacs->code (tree-ref t 1))))
     (tree-select t)
     (clipboard-cut "primary")
     (insert (convert in format "texmacs-tree"))))
@@ -329,7 +348,7 @@
 (tm-define (alternate-toggle t)
   (:require (tree-is? t 'converter-input))
   (let* ((format (string-append (tree->string (tree-ref t 0)) "-snippet"))
-         (in (texmacs->verbatim (tree-ref t 1))))
+         (in (texmacs->code (tree-ref t 1))))
     (tree-set! t 2 (convert in format "texmacs-tree"))
     (tree-assign-node! t 'converter-output)
     (tree-go-to t 2 :end)))

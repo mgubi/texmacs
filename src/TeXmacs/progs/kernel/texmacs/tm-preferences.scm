@@ -82,6 +82,42 @@
 				(else what)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Nicer names for preference values
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public preference-decode-table (make-ahash-table))
+(define-public preference-encode-table (make-ahash-table))
+
+(tm-define (set-pretty-preference which pretty-val)
+  (with val (ahash-ref preference-decode-table (cons which pretty-val))
+    (set-preference which (or val pretty-val))))
+
+(tm-define (get-pretty-preference which)
+  (with val (get-preference which)
+    (with pretty-val (ahash-ref preference-encode-table (cons which val))
+      ;;(display* "Get: " which ", " val " -> " pretty-val "\n")
+      (or pretty-val val "Default"))))
+
+(tm-define (set-boolean-preference which val)
+  (set-preference which (if val "on" "off")))
+
+(tm-define (get-boolean-preference which)
+  (== (get-preference which) "on"))
+
+(define-public (set-preference-encode which x)
+   `(ahash-set! preference-encode-table
+                (cons ,which ,(car x)) ,(cadr x)))
+
+(define-public (set-preference-decode which x)
+   `(ahash-set! preference-decode-table
+                (cons ,which ,(cadr x)) ,(car x)))
+
+(define-public-macro (define-preference-names which . l)
+  `(begin
+     ,@(map (lambda (x) (set-preference-encode which x)) l)
+     ,@(map (lambda (x) (set-preference-decode which x)) l)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Look and feel
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

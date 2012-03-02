@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.12>
+<TeXmacs|1.0.7.14>
 
 <style|source>
 
@@ -42,6 +42,12 @@
 
   <assign|menu|<xmacro|x|<style-with|src-compact|none|<menu-item|<arg|x|0>><map-args|menu-extra|concat|x|1><index-write|<map-args|menu-item|tuple|x>>>>>
 
+  <assign|submenu|<xmacro|x|<style-with|src-compact|none|<menu-item|<arg|x|1>><map-args|menu-extra|concat|x|2><index-write|<map-args|menu-item|tuple|x>>>>>
+
+  <assign|subsubmenu|<xmacro|x|<style-with|src-compact|none|<menu-item|<arg|x|2>><map-args|menu-extra|concat|x|3><index-write|<map-args|menu-item|tuple|x>>>>>
+
+  <assign|subsubsubmenu|<xmacro|x|<style-with|src-compact|none|<menu-item|<arg|x|3>><map-args|menu-extra|concat|x|4><index-write|<map-args|menu-item|tuple|x>>>>>
+
   <\active*>
     <\src-comment>
       Content markup. Also used for indexing purposes. The <verbatim|markup>
@@ -68,18 +74,28 @@
 
   <assign|explain-header|<\macro|what>
     <\with|par-first|0fn|par-par-sep|0fn>
-      <surround|<vspace*|0.5fn>|<no-page-break>|<arg|what>>
+      <\surround|<vspace*|0.5fn>|<no-page-break>>
+        <arg|what>
+      </surround>
     </with>
   </macro>>
 
   <assign|explain-body|<\macro|body>
-    <surround||<right-flush><vspace|0.5fn><no-indent*>|<with|par-left|<plus|<value|par-left>|1.5fn>|<arg|body>>>
+    <\surround||<right-flush><vspace|0.5fn><no-indent*>>
+      <\with|par-left|<plus|<value|par-left>|1.5fn>>
+        <arg|body>
+      </with>
+    </surround>
   </macro>>
 
   <assign|explain|<\macro|what|body>
-    <explain-header|<arg|what>>
+    <\explain-header>
+      <arg|what>
+    </explain-header>
 
-    <explain-body|<arg|body>>
+    <\explain-body>
+      <arg|body>
+    </explain-body>
   </macro>>
 
   <assign|explain-macro-sub|<macro|x|pos|<if|<equal|<arg|pos>|0>|<indexed|<src-macro|<arg|x>>>|<src-arg|<arg|x>>>>>
@@ -146,7 +162,7 @@
   </active*>
 
   <assign|tm-fragment|<\macro|body>
-    <quotation|<framed-fragment|<arg|body>>>
+    <pseudo-code|<arg|body>>
   </macro>>
 
   <\active*>
@@ -197,9 +213,11 @@
 
   \;
 
-  <assign|cursor|<with|color|red|\|>>
+  <assign|text-cursor|<macro|<with|color|red|\|>>>
 
-  <assign|math-cursor|<with|color|magenta|\|>>
+  <assign|math-cursor|<macro|<math-ignore|<with|color|#c000ff|\|>>>>
+
+  <assign|cursor|<macro|<math-ignore|<if|<equal|<value|mode>|math>|<math-cursor>|<text-cursor>>>>>
 
   <assign|small-envbox|<macro|body|<with|color|#e8f0f0|<block|<tformat|<cwith|1|1|1|1|cell-lsep|0em>|<cwith|1|1|1|1|cell-rsep|0em>|<cwith|1|1|1|1|cell-bsep|0em>|<cwith|1|1|1|1|cell-tsep|0em>|<table|<row|<cell|<with|color|black|<arg|body>>>>>>>>>>
 

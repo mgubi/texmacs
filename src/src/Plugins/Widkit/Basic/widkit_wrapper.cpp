@@ -87,6 +87,18 @@ vertical_list (array<widget> a) {
 }
 
 widget
+aligned_widget (array<widget> lhs, array<widget> rhs,
+                SI hsep, SI vsep, SI lpad, SI rpad) {
+  return abstract (aligned_widget (concrete (lhs), concrete (rhs),
+                                   hsep, vsep, lpad, rpad));
+}
+
+widget
+tabs_widget (array<widget> tabs, array<widget> bodies) {
+  return abstract (tabs_widget (concrete (tabs), concrete (bodies)));
+}
+
+widget
 horizontal_menu (array<widget> a) {
   return abstract (horizontal_list (concrete (a)));
   //return abstract (horizontal_array (concrete (a), -1));
@@ -120,6 +132,11 @@ switch_widget (array<widget> a, array<string> name, int init) {
 widget
 optional_widget (widget w, bool on) {
   return abstract (optional_widget (concrete (w), on));
+}
+
+widget
+wrapped_widget (widget w, command cmd) {
+  return abstract (wrapped_widget (concrete (w), cmd));
 }
 
 widget
@@ -208,6 +225,11 @@ pullright_button (widget w, promise<widget> pw) {
 }
 
 widget
+toggle_widget (command cmd, bool on, int style) {
+  return abstract (toggle_wk_widget (cmd, on, style));
+}
+
+widget
 popup_widget (widget w) {
   return abstract (popup_widget (concrete (w), center));
 }
@@ -215,6 +237,27 @@ popup_widget (widget w) {
 widget
 canvas_widget (widget w) {
   return abstract (canvas_widget (concrete (w), north_west, true));
+}
+
+widget
+user_canvas_widget (widget wid, int style) {
+  return abstract (user_canvas_widget (concrete (wid), style));
+}
+
+widget
+resize_widget (widget w, int style, string w1, string h1,
+               string w2, string h2, string w3, string h3) {
+  return abstract (resize_widget (concrete (w), style, w1, h1, w2, h2, w3, h3));
+}
+
+widget
+hsplit_widget (widget l, widget r) {
+  return abstract (hsplit_widget (concrete (l), concrete (r)));
+}
+
+widget
+vsplit_widget (widget t, widget b) {
+  return abstract (vsplit_widget (concrete (t), concrete (b)));
 }
 
 widget
@@ -226,6 +269,21 @@ input_text_widget (command call_back, string type, array<string> def,
 widget
 inputs_list_widget (command call_back, array<string> prompts) {
   return abstract (inputs_list_wk_widget (call_back, prompts));
+}
+
+widget
+enum_widget (command cb, array<string> vals, string v, int style, string w) {
+  return abstract (enum_wk_widget (cb, vals, v, style, w));
+}
+
+widget
+choice_widget (command cb, array<string> vals, string v) {
+  return abstract (choice_wk_widget (cb, vals, v));
+}
+
+widget
+choice_widget (command cb, array<string> vals, array<string> mc) {
+  return abstract (choice_wk_widget (cb, vals, mc));
 }
 
 widget
@@ -254,13 +312,23 @@ wait_widget (SI w, SI h, string message) {
 }
 
 widget
+ink_widget (command cb) {
+  return abstract (ink_wk_widget (cb));
+}
+
+widget
+refresh_widget (string tmwid) {
+  return abstract (refresh_wk_widget (tmwid));
+}
+
+widget
 texmacs_widget (int mask, command quit) {
   return abstract (texmacs_wk_widget (mask, quit));
 }
 
 widget
-plain_window_widget (widget wid, string s) {
-  return abstract (plain_window_widget (concrete (wid), s));
+plain_window_widget (widget wid, string s, command quit) {
+  return abstract (plain_window_widget (concrete (wid), s, quit));
 }
 
 widget
@@ -305,12 +373,17 @@ check_type (blackbox bb, string s) {
 SI get_dx (gravity grav, SI w);
 SI get_dy (gravity grav, SI h);
 
+bool
+bad_parent (wk_widget wid) {
+  return wid->win != NULL && wid != concrete (wid->win->get_widget ()) [0];
+}
+
 void
 principal_widget_check (wk_widget wid) {
   // FIXME: Positions should really be computed relative to parent widgets.
   // Currently, we only allow geometry access of the unique child of
   // a window widget.
-  if (wid->win != NULL && wid != concrete (wid->win->get_widget ()) [0]) {
+  if (bad_parent (wid)) {
     cerr << "Widget= " << wid << "\n";
     FAILED ("invalid geometry access");
   }
@@ -323,7 +396,12 @@ set_geometry (wk_widget wid, SI x, SI y, SI w, SI h) {
     wid->win->set_size (w, h);
   }
   else {
-    principal_widget_check (wid); // FIXME: we should use parent's coordinates
+    //principal_widget_check (wid);// FIXME: we should use parent's coordinates
+    if (bad_parent (wid)) {
+      SI dx, dy;
+      wid->win->get_position (dx, dy);
+      x -= dx; y -= dy;
+    }
     wid << emit_position (x, y, w, h, north_west);
   }
 }
@@ -333,13 +411,21 @@ get_geometry (wk_widget wid, SI& x, SI& y, SI& w, SI& h) {
   if (wid->is_window_widget ()) {
     wid->win->get_position (x, y);
     wid->win->get_size (w, h);
+    //cout << "Size == " << (w>>8) << ", " << (h>>8) << "\n";
   }
   else {
-    principal_widget_check (wid); // FIXME: we should use parent's coordinates
+    //principal_widget_check (wid);// FIXME: we should use parent's coordinates
     x= wid->ox - get_dx (wid->grav, wid->w);
     y= wid->oy - get_dy (wid->grav, wid->h);
     w= wid->w;
     h= wid->h;
+
+    if (bad_parent (wid)) {
+      SI dx, dy;
+      wid->win->get_position (dx, dy);
+      x += dx; y += dy;
+    }
+    //cout << "Size " << ((tree) wid) << " := " << (w>>8) << ", " << (h>>8) << "\n";
   }
 }
 
@@ -411,6 +497,12 @@ void
 send_update (wk_widget w, blackbox val) {
   ASSERT (is_nil (val), "type mismatch");
   w << emit_update ();
+}
+
+void
+send_refresh (wk_widget w, blackbox val) {
+  ASSERT (is_nil (val), "type mismatch");
+  w << emit_refresh ();
 }
 
 void
@@ -516,6 +608,9 @@ wk_widget_rep::send (slot s, blackbox val) {
   case SLOT_UPDATE:
     send_update (THIS, val);
     break;
+  case SLOT_REFRESH:
+    send_refresh (THIS, val);
+    break;
   case SLOT_KEYBOARD:
     send_keyboard (THIS, val);
     break;
@@ -578,6 +673,9 @@ wk_widget_rep::send (slot s, blackbox val) {
     break;
   case SLOT_USER_ICONS_VISIBILITY:
     send_bool (THIS, "user icons", val);
+    break;
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+    send_bool (THIS, "side tools", val);
     break;
   case SLOT_FOOTER_VISIBILITY:
     send_bool (THIS, "footer flag", val);
@@ -679,12 +777,14 @@ query_position (wk_widget w, int type_id) {
 blackbox
 query_keyboard_focus (wk_widget w, int type_id) {
   ASSERT (type_id == type_helper<bool>::id, "type mismatch");
+  if (w->win == NULL) return close_box<bool> (false);
   return close_box<bool> (w->win->get_keyboard_focus (abstract (w)));
 }
 
 blackbox
 query_mouse_grab (wk_widget w, int type_id) {
   ASSERT (type_id == type_helper<bool>::id, "type mismatch");
+  if (w->win == NULL) return close_box<bool> (false);
   return close_box<bool> (w->win->get_mouse_grab (abstract (w)));
 }
 
@@ -727,6 +827,8 @@ wk_widget_rep::query (slot s, int type_id) {
     return query_bool (THIS, "focus icons", type_id);
   case SLOT_USER_ICONS_VISIBILITY:
     return query_bool (THIS, "user icons", type_id);
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+    return query_bool (THIS, "side tools", type_id);
   case SLOT_FOOTER_VISIBILITY:
     return query_bool (THIS, "footer flag", type_id);
   case SLOT_INTERACTIVE_MODE:
@@ -793,6 +895,9 @@ wk_widget_rep::read (slot s, blackbox index) {
   case SLOT_WINDOW:
     check_type_void (index, "SLOT_WINDOW");
     return win -> get_widget ();
+  case SLOT_CANVAS:
+    check_type_void (index, "SLOT_CANVAS");
+    return abstract (THIS ["canvas"]);
   case SLOT_FORM_FIELD:
     check_type<int> (index, "SLOT_FORM_FIELD");
     return abstract (THIS [0] ["inputs"] [2*open_box<int> (index)] ["input"]);
@@ -831,8 +936,12 @@ wk_widget_rep::write (slot s, blackbox index, widget w) {
     check_type_void (index, "SLOT_USER_ICONS");
     THIS << set_widget ("user icons bar", concrete (w));
     break;
-  case SLOT_CANVAS:
-    check_type_void (index, "SLOT_CANVAS");
+  case SLOT_SIDE_TOOLS:
+    check_type_void (index, "SLOT_SIDE_TOOLS");
+    THIS << set_widget ("side tools", concrete (w));
+    break;
+  case SLOT_SCROLLABLE:
+    check_type_void (index, "SLOT_SCROLLABLE");
     THIS << set_widget ("scrollable", concrete (w));
     break;
   case SLOT_INTERACTIVE_PROMPT:

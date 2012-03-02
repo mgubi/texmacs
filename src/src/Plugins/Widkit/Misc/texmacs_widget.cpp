@@ -163,16 +163,27 @@ make_footer (int mask) {
 }
 
 static wk_widget
+middle_widget () {
+  wk_widget w1= canvas_widget (glue_wk_widget (), north_west, true);
+  wk_widget w2= glue_wk_widget (true, true, 200*PIXEL, 0);
+  wk_widget w3= resize_widget (w2, 0, "200px", "", "200px", "", "200px", "");
+  if (!use_side_tools) return w1;
+  else return hsplit_widget (w1, w3);
+}
+
+static wk_widget
 make_texmacs_widget (int mask) {
   array<wk_widget> V (5);
   array<string> V_name (5);
   V[0]= make_header (mask);
-  V[1]= canvas_widget (glue_wk_widget (), north_west, true);
+  //V[1]= canvas_widget (glue_wk_widget (), north_west, true);
+  V[1]= middle_widget ();
   V[2]= glue_wk_widget (false, false, 0, PIXEL);
   V[3]= make_footer (mask);
   V[4]= glue_wk_widget (false, false, 0, PIXEL);
   V_name[0]= "header";
-  V_name[1]= "canvas";
+  //V_name[1]= "canvas";
+  V_name[1]= "middle";
   V_name[3]= "footer";
   return vertical_list (V, V_name);
 }
@@ -300,7 +311,11 @@ texmacs_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 texmacs_widget_rep::handle_get_widget (get_widget_event ev) {
-  a[0] << ev;
+  if (ev->which == "canvas") {
+    if (use_side_tools) a[0] ["middle"] << get_widget ("left", ev->w);
+    else a[0] << get_widget ("middle", ev->w);
+  }
+  else a[0] << ev;
 }
 
 void
@@ -315,20 +330,32 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
     set_subwidget (THIS ["header"] ["focus"] ["bar"], "icons", ev->w);
   else if (ev->which == "user icons bar")
     set_subwidget (THIS ["header"] ["user"] ["bar"], "icons", ev->w);
+  else if (use_side_tools && ev->which == "side tools") {
+    wk_widget side=
+      resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "");
+    THIS ["middle"] << set_widget ("right", side);
+    if (attached ()) {
+      side << emit_attach_window (win);
+      THIS ["middle"] << emit_reposition ();
+      THIS ["middle"] ["right"] << emit_invalidate_all ();
+    }
+  }
   else if (ev->which == "interactive prompt")
     set_subwidget (THIS ["footer"] ["interactive"], "left", ev->w);
   else if (ev->which == "interactive input")
     set_subwidget (THIS ["footer"] ["interactive"], "middle", ev->w);
   else if (ev->which == "scrollable") {
-    // FIXME: we manually take care of the keyboard focus
-    // this should be done more systematically when changing subwidgets
-    wk_widget old= THIS ["canvas"] ["scrollable"];
-    bool focus= query_keyboard_focus (abstract (old));
     THIS ["canvas"] << set_widget ("scrollable", ev->w);
-    THIS ["canvas"] << emit_attach_window (win);
-    if (focus) send_keyboard_focus (abstract (THIS ["canvas"]));
-    old << emit_attach_window (NULL);
-    THIS ["canvas"] << emit_update ();
+    if (attached ()) {
+      // FIXME: we manually take care of the keyboard focus
+      // this should be done more systematically when changing subwidgets
+      wk_widget old= THIS ["canvas"] ["scrollable"];
+      bool focus= query_keyboard_focus (abstract (old));
+      THIS ["canvas"] << emit_attach_window (win);
+      old << emit_attach_window (NULL);
+      if (focus) send_keyboard_focus (abstract (THIS ["canvas"]));
+      THIS ["canvas"] << emit_update ();
+    }
   }
   else a[0] << ev;
 }
@@ -356,6 +383,8 @@ texmacs_widget_rep::handle_set_string (set_string_event ev) {
     set_subwidget_flag (THIS ["header"] ["focus"], ev->s == "on");
   else if (ev->which == "user icons")
     set_subwidget_flag (THIS ["header"] ["user"], ev->s == "on");
+  else if (use_side_tools && ev->which == "side tools")
+    /*set_side_tools_flag (ev->s == "on")*/;
   else if (ev->which == "interactive mode")
     set_footer_mode (ev->s == "on"? 1: (footer_flag? 0: 2));
   else if (ev->which == "footer flag") set_footer_flag (ev->s == "on");
@@ -381,6 +410,9 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
   else if (ev->which == "user icons")
     ev->s= get_subwidget_flag (THIS ["header"] ["user"])?
              string ("on"): string ("off");
+  else if (use_side_tools && ev->which == "side tools")
+    //ev->s= get_side_tools_flag ()? string ("on"): string ("off");
+    ev->s= string ("on");
   else if (ev->which == "interactive mode")
     ev->s= get_footer_mode () == 1? string ("on"): string ("off");
   else if (ev->which == "footer flag")
@@ -392,13 +424,15 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
 
 void
 texmacs_widget_rep::handle_set_coord2 (set_coord2_event ev) {
-  if (ev->which == "scroll position") THIS ["canvas"] << ev;
+  if (ev->which == "extra width" && ev->c1 == 0 && ev->c2 == 0) return;
+  else if (ev->which == "scroll position") THIS ["canvas"] << ev;
   else WK_FAILED ("could not set coord2 attribute " * ev->which);
 }
 
 void
 texmacs_widget_rep::handle_get_coord2 (get_coord2_event ev) {
-  if (ev->which == "scroll position") THIS ["canvas"] << ev;
+  if (ev->which == "extra width") { ev->c1= ev->c2= 0; return; }
+  else if (ev->which == "scroll position") THIS ["canvas"] << ev;
   else WK_FAILED ("could not get coord2 attribute " * ev->which);
 }
 
@@ -445,7 +479,7 @@ texmacs_widget_rep::handle_resize (resize_event ev) {
 
 void
 texmacs_widget_rep::handle_destroy (destroy_event ev) {
-  quit ();
+  if (!is_nil (quit)) quit ();
 }
 
 /******************************************************************************
@@ -454,7 +488,10 @@ texmacs_widget_rep::handle_destroy (destroy_event ev) {
 
 bool
 texmacs_widget_rep::handle (event ev) {
-  // cout << "handle " << ((event) ev) << LF;
+  //cout << "handle " << ((event) ev) << LF;
+  //  if (ev->type == POSITION_EVENT) {
+  //  cout << "position: " << ((event) ev) << LF;
+  //}
   switch (ev->type) {
   case SET_INTEGER_EVENT:
     handle_set_integer (ev);
@@ -478,7 +515,12 @@ texmacs_widget_rep::handle (event ev) {
     handle_set_coord4 (ev);
     return true;
   default:
-    return basic_widget_rep::handle (ev);
+    {
+      //cout << "size< " << (w>>8) << ", " << (h>>8) << LF;
+      bool flag= basic_widget_rep::handle (ev);
+      //cout << "size> " << (w>>8) << ", " << (h>>8) << LF;
+      return flag;
+    }
   }
 }
 

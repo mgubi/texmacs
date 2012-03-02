@@ -12,7 +12,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (generic document-edit)
-  (:use (utils base environment) (utils library length)))
+  (:use (utils base environment)
+        (utils library length)
+        (generic generic-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Document style and packages
@@ -76,7 +78,7 @@
 (tm-define (init-interactive-env var)
   (:interactive #t)
   (interactive (lambda (s) (init-env var s))
-    (list (drd-ref env-var-description% var) "string" (get-init-env var))))
+    (list (logic-ref env-var-description% var) "string" (get-init-env var))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text and paragraph properties

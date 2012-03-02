@@ -82,10 +82,10 @@ void QTMInteractiveInputHelper::commit(int result) {
       if (cb) {
         item = cb->currentText();
       }      
-      concrete<qt_input_text_widget_rep*>(abstract(wid->int_input)) -> text=
+      ((qt_input_text_widget_rep*) wid->int_input.rep) -> text=
 //      scm_quote (from_qstring (item));
       from_qstring (item);
-      concrete<qt_input_text_widget_rep*>(abstract(wid->int_input)) -> cmd ();      
+      ((qt_input_text_widget_rep*) wid->int_input.rep) -> cmd ();      
     }
   }
   sender()->deleteLater();
@@ -184,7 +184,7 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   modeToolBar  = new QToolBar ("mode toolbar", mw);
   focusToolBar = new QToolBar ("focus toolbar", mw);
   userToolBar   = new QToolBar ("user toolbar", mw);
- 
+
   mainToolBar->setStyle (qtmstyle ());
   modeToolBar->setStyle (qtmstyle ());
   focusToolBar->setStyle (qtmstyle ());
@@ -211,7 +211,7 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
 
   mw->setUnifiedTitleAndToolBarOnMac(true);
 
-  QWidget *cw= new QWidget ();
+  QWidget *cw= new QWidget ();  // QMainWindow will take ownership later and delete it when needed.
   cw->setObjectName("central widget"); // this is important for styling toolbars.
   
   QBoxLayout *bl = new QBoxLayout(QBoxLayout::TopToBottom, cw);
@@ -648,7 +648,7 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_INTERACTIVE_INPUT:
       TYPE_CHECK (type_id == type_helper<string>::id);
     {
-      qt_input_text_widget_rep* w =concrete<qt_input_text_widget_rep*>(abstract(int_input));
+      qt_input_text_widget_rep* w =((qt_input_text_widget_rep*) int_input.rep);
       if (w->ok) {
         return close_box<string>(scm_quote(w->text));
       } else {
@@ -702,9 +702,9 @@ qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
     cout << "qt_tm_widget_rep::write " << slot_name (s) << LF;
   
   switch (s) {
-    case SLOT_CANVAS:
+    case SLOT_SCROLLABLE:
     {
-      check_type_void (index, "SLOT_CANVAS");
+      check_type_void (index, "SLOT_SCROLLABLE");
       QStackedWidget* tw= tm_centralwidget();
       QWidget *new_widget= concrete(w)->get_canvas();
       QWidget *old_widget= tw->currentWidget();
@@ -844,94 +844,11 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
   tm_scrollarea()->setVerticalScrollBarPolicy(flag ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded);
 }
 
+// creates a decorated window with name s and contents w
 widget
-qt_tm_widget_rep::plain_window_widget (string s) {
-    // creates a decorated window with name s and contents w
-  widget w= qt_view_widget_rep::plain_window_widget (s);
-    // to manage correctly retain counts
-  qt_window_widget_rep* wid= concrete<qt_window_widget_rep*>(w);
+qt_tm_widget_rep::plain_window_widget (string s, command q) {
+
+  widget w= qt_view_widget_rep::plain_window_widget (s, q);
+  qt_window_widget_rep* wid= (qt_window_widget_rep*) (w.rep);   // to manage correctly retain counts
   return wid;
 }
-
-//#if !defined(_MBD_USE_NEW_INTERACTIVE_PROMPT)
-#if 0
-void
-qt_tm_widget_rep::do_interactive_prompt () {
-  QStringList items;
- // QString label= to_qstring (tm_var_encode (((qt_text_widget_rep*) int_prompt.rep)->str));
-  qt_input_text_widget_rep* it = (qt_input_text_widget_rep*) (int_input.rep);
-  if ( N(it->def) == 0) {
-    items << "";
-  } else {
-    for (int j=0; j < N(it->def); j++) {
-      items << to_qstring(it->def[j]);
-    }
-  }
-  QDialog *d = new QDialog (tm_scrollarea()->window());
-
-  QVBoxLayout* vl = new QVBoxLayout();
-  QHBoxLayout *hl = new QHBoxLayout();
-  
- // QLabel *lab = new QLabel (label,&d);
-  QLayoutItem *lab = int_prompt->as_qlayoutitem ();
-  QComboBox *cb = new QComboBox(d);
-  cb-> setObjectName("input"); // to find it
-  cb -> setSizeAdjustPolicy (QComboBox::AdjustToMinimumContentsLength);
-  cb -> setEditText (items[0]);
-  int minlen = 0;
-  for(int j=0; j < items.count(); j++) {
-    cb -> addItem (items[j]);
-    int c = items[j].count();
-    if (c > minlen) minlen = c;
-  }
-  cb -> setMinimumContentsLength (minlen>50 ? 50 : (minlen < 2 ? 10 : minlen));
-  cb -> setEditable (true);
-    // apparently the following flag prevents Qt from substituting an history item
-    // for an input when they differ only from the point of view of case (upper/lower)
-    // eg. if the history contains aAAAAa and you type AAAAAA then the combo box
-    // will retain the string aAAAAa
-  cb->setDuplicatesEnabled(true); 
-  cb->completer()->setCaseSensitivity(Qt::CaseSensitive);
-  
-  if (QLabel *_lab = qobject_cast<QLabel*>(lab ->widget())) _lab -> setBuddy (cb);
-  hl -> addItem (lab);
-  hl -> addWidget (cb);
-  vl -> addLayout (hl);
-  
-  if (ends (it->type, "file") || it->type == "directory") {
-      // autocompletion
-    QCompleter *completer = new QCompleter(d);
-    QDirModel *dirModel = new QDirModel(d);
-    completer->setModel(dirModel);
-    cb->setCompleter(completer);
-  }
-  
-  {
-    QDialogButtonBox* buttonBox =
-    new QDialogButtonBox (QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
-                          Qt::Horizontal, d);
-    QObject::connect (buttonBox, SIGNAL (accepted()), d, SLOT (accept()));
-    QObject::connect (buttonBox, SIGNAL (rejected()), d, SLOT (reject()));
-    vl -> addWidget (buttonBox);
-  }
-  d->setLayout (vl);
-  
-  QRect wframe = view->window()->frameGeometry();
-  QPoint pos = QPoint(wframe.x()+wframe.width()/2,wframe.y()+wframe.height()/2);
-  
-  d->setWindowTitle("Interactive Prompt");
-  d->updateGeometry();
-  QSize sz = d->sizeHint();
-  QRect r; r.setSize(sz);
-  r.moveCenter(pos);
-  d->setGeometry(r);
-  QObject::connect (d, SIGNAL (finished (int)), &helper, SLOT(commit (int)));
-#if (QT_VERSION >= 0x040500)
-  d->open();
-#else
-  d->exec();
-#endif
-}
-#else
-
-#endif

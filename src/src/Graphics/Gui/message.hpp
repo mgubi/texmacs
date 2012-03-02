@@ -31,6 +31,7 @@ enum slot_id {
   SLOT_SIZE,
   SLOT_POSITION,
   SLOT_UPDATE,
+  SLOT_REFRESH,
   SLOT_KEYBOARD,
   SLOT_KEYBOARD_FOCUS,
   SLOT_MOUSE,
@@ -48,6 +49,7 @@ enum slot_id {
   SLOT_SCROLLBARS_VISIBILITY,
   SLOT_SCROLL_POSITION,
   SLOT_CANVAS,
+  SLOT_SCROLLABLE,
   SLOT_CURSOR,
 
   SLOT_HEADER_VISIBILITY,
@@ -60,6 +62,8 @@ enum slot_id {
   SLOT_FOCUS_ICONS,
   SLOT_USER_ICONS_VISIBILITY,
   SLOT_USER_ICONS,
+  SLOT_SIDE_TOOLS_VISIBILITY,
+  SLOT_SIDE_TOOLS,
   SLOT_FOOTER_VISIBILITY,
   SLOT_LEFT_FOOTER,
   SLOT_RIGHT_FOOTER,
@@ -313,6 +317,14 @@ send_update (widget w) {
 }
 
 inline void
+send_refresh (widget w) {
+  // this message is issued if the contents of one of the dynamic
+  // subwidgets (as constructed using refresh_widget) of w
+  // may have changed and needs to be recomputed
+  send (w, SLOT_REFRESH);
+}
+
+inline void
 send_keyboard (widget w, string key, time_t t= 0) {
   // send a key press event
   send<string,time_t> (w, SLOT_KEYBOARD, key, t);
@@ -447,9 +459,15 @@ get_scroll_position (widget w, SI& x, SI& y) {
 }
 
 inline void
-set_canvas (widget w, widget cv) {
+set_scrollable (widget w, widget cv) {
   // set the scrollable canvas itself
-  write (w, SLOT_CANVAS, cv);
+  write (w, SLOT_SCROLLABLE, cv);
+}
+
+inline widget
+get_canvas (widget w) {
+  // get the scrollable canvas itself
+  return read (w, SLOT_CANVAS);
 }
 
 inline void
@@ -550,6 +568,24 @@ inline void
 set_user_icons (widget w, widget bar) {
   // set user icons bar
   write (w, SLOT_USER_ICONS, bar);
+}
+
+inline void
+set_side_tools_visibility (widget w, bool visible) {
+  // set visibility of user icons bar
+  send<bool> (w, SLOT_SIDE_TOOLS_VISIBILITY, visible);
+}
+
+inline bool
+get_side_tools_visibility (widget w) {
+  // get visibility of user icons bar
+  return query<bool> (w, SLOT_SIDE_TOOLS_VISIBILITY);
+}
+
+inline void
+set_side_tools (widget w, widget bar) {
+  // set user icons bar
+  write (w, SLOT_SIDE_TOOLS, bar);
 }
 
 inline void

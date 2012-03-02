@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "rectangles.hpp"
 #include "window.hpp"
 #include "Widkit/basic_widget.hpp"
 #include "Widkit/Event/attribute_event.hpp"
@@ -277,6 +278,95 @@ canvas_widget_rep::handle (event ev) {
 }
 
 /******************************************************************************
+* Resize widgets
+******************************************************************************/
+
+class resize_widget_rep: public basic_widget_rep {
+  int style;
+  string minw, minh, defw, defh, maxw, maxh;
+public:
+  resize_widget_rep (wk_widget w, int style, string w1, string h1,
+                     string w2, string h2, string w3, string j3);
+  operator tree ();
+  void handle_get_size (get_size_event ev);
+  void handle_repaint (repaint_event ev);
+};
+
+resize_widget_rep::resize_widget_rep (wk_widget w, int style2,
+                                      string w1, string h1,
+                                      string w2, string h2,
+                                      string w3, string h3):
+  basic_widget_rep (1), style (style2), minw (w1), minh (h1),
+  defw (w2), defh (h2), maxw (w3), maxh (h3) { a[0]= w; }
+
+resize_widget_rep::operator tree () {
+  return tree (TUPLE, "resize", (tree) a[0], defw, defh);
+}
+
+void
+resize_widget_rep::handle_get_size (get_size_event ev) {
+  string ww, hh;
+  if (ev->mode == -1) { ww= minw; hh= minh; }
+  else if (ev->mode == 1) { ww= maxw; hh= maxh; }
+  else { ww= defw; hh= defh; }
+  if (ww != "") ev->w= decode_length (ww, a[0], style);
+  if (hh != "") ev->h= decode_length (hh, a[0], style);
+  abs_round (ev->w, ev->h);
+}
+
+void
+resize_widget_rep::handle_repaint (repaint_event ev) {
+  renderer ren= win->get_renderer ();
+  rectangles r1= rectangle (ev->x1, ev->y1, ev->x2, ev->y2);
+  rectangles r2= rectangle (0, -h, w, 0);
+  rectangles rs= r1 - r2;
+  for (int i=0; i<N(rs); i++)
+    layout_default (ren, rs[i]->x1, rs[i]->y1, rs[i]->x2, rs[i]->y2);
+  //layout_default (ren, ev->x1, ev->y1, ev->x2, ev->y2);
+  basic_widget_rep::handle_repaint (ev);
+}
+
+wk_widget
+resize_widget (wk_widget w, int style, string w1, string h1,
+               string w2, string h2, string w3, string h3) {
+  //cout << "min: " << w1 << ", " << h1 << "\n";
+  //cout << "def: " << w2 << ", " << h2 << "\n";
+  //cout << "max: " << w3 << ", " << h3 << "\n";
+  return tm_new<resize_widget_rep> (w, style, w1, h1, w2, h2, w3, h3);
+}
+
+/******************************************************************************
+* Wrap scroll widgets
+******************************************************************************/
+
+class wrap_scroll_widget_rep: public basic_widget_rep {
+public:
+  wrap_scroll_widget_rep (wk_widget w);
+  operator tree ();
+  void handle_repaint (repaint_event ev);
+};
+
+wrap_scroll_widget_rep::wrap_scroll_widget_rep (wk_widget w):
+  basic_widget_rep (1) { a[0]= w; }
+
+wrap_scroll_widget_rep::operator tree () {
+  return tree (TUPLE, "wrap_scroll", (tree) a[0]);
+}
+
+void
+wrap_scroll_widget_rep::handle_repaint (repaint_event ev) {
+  renderer ren= win->get_renderer ();
+  layout_default (ren, ev->x1, ev->y1, ev->x2, ev->y2);
+  a[0] << emit_position (0, 0, w, h);
+  basic_widget_rep::handle_repaint (ev);
+}
+
+wk_widget
+wrap_scroll_widget (wk_widget w) {
+  return tm_new<wrap_scroll_widget_rep> (w);
+}
+
+/******************************************************************************
 * exported routines
 ******************************************************************************/
 
@@ -288,4 +378,21 @@ set_scrollable (wk_widget w) {
 wk_widget
 canvas_widget (wk_widget w, gravity grav, bool request_focus) {
   return tm_new<canvas_widget_rep> (w, grav, request_focus);
+}
+
+wk_widget
+user_canvas_widget (wk_widget wid, int style) {
+  wk_widget cv= canvas_widget (wrap_scroll_widget (wid));
+  SI widw, widh;
+  gui_maximal_extents (widw, widh);
+  wid << get_size (widw, widh, -1);
+  abs_round (widw, widh);
+  cv << set_coord4 ("extents", 0, -widh, widw, 0);
+  return cv;
+}
+
+wk_widget
+vsplit_widget (wk_widget t, wk_widget b) {
+  (void) t; (void) b;
+  FAILED ("not yet implemented");
 }
