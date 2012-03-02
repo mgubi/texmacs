@@ -30,6 +30,18 @@
 
 #include "Style/Evaluate/evaluate_main.hpp" // required for as_length(string)
 
+
+const char *ui_type_string[]= {
+  "horizontal_menu", "vertical_menu", "horizontal_list", "vertical_list",
+  "tile_menu", "minibar_menu", "menu_separator", "menu_group", 
+  "pulldown_button", "pullright_button", "menu_button",
+  "balloon_widget", "text_widget", "xpm_widget", "toggle_widget",
+  "enum_widget", "choice_widget", "scrollable_widget",
+  "hsplit_widget", "vsplit_widget", 
+  "aligned_widget", "tabs_widget", "wrapped_widget"
+};
+
+
 /******************************************************************************
  * Auxiliary classes
  ******************************************************************************/
@@ -384,6 +396,7 @@ qt_plain_widget_rep::send (slot s, blackbox val) {
 
 widget 
 qt_ui_element_rep::plain_window_widget (string s, command quit)  {
+  //cout << "plain_window_widget " << ui_type_string[type] << LF;
   QLayoutItem *li = as_qlayoutitem();
   QTMPlainWindow* w = new QTMPlainWindow();
   if (li->widget()) 
@@ -644,6 +657,8 @@ QTMUIButton::paintEvent(QPaintEvent* event) {
 
 QLayoutItem *
 qt_ui_element_rep::as_qlayoutitem () {
+  //cout << "as_qlayoutitem " << ui_type_string[type] << LF;
+
   switch (type) {
     case horizontal_menu:
     case vertical_menu:
@@ -693,6 +708,34 @@ qt_ui_element_rep::as_qlayoutitem () {
       return l;
     }
       break;
+
+    case aligned_widget: 
+    {
+      typedef quartet<SI, SI, SI, SI> T1;
+      typedef triple<array<widget>, array<widget>, T1 > T;
+      T x = open_box<T>(load);
+      array<widget> lhs = x.x1;
+      array<widget> rhs = x.x2;
+      T1 y = x.x3;
+      SI hsep = y.x1; SI vsep = y.x2; SI lpad = y.x3; SI rpad = y.x4; 
+      
+      //  a table with two columns
+      
+      QGridLayout* l= new QGridLayout ();
+      l->setSizeConstraint (QLayout::SetFixedSize);
+      l->setHorizontalSpacing (2);
+      l->setVerticalSpacing (2);
+      l->setContentsMargins (4, 0, 4, 0);
+      for (int i=0; i < N(lhs); i++) {
+        QLayoutItem *lli = concrete(lhs[i])->as_qlayoutitem();
+        QLayoutItem *rli = concrete(rhs[i])->as_qlayoutitem();
+        l->addItem(lli, i, 0);
+        l->addItem(rli, i, 1);
+      }
+      return l;
+    }
+      break;
+      
       
     case minibar_menu: 
     {
@@ -741,6 +784,11 @@ qt_ui_element_rep::as_qlayoutitem () {
     case toggle_widget:
     case enum_widget:
     case choice_widget:
+    case scrollable_widget:
+    case hsplit_widget:
+    case vsplit_widget:
+    case tabs_widget:
+    case wrapped_widget:
     {
       QWidget *w = this->as_qwidget();
       return new QWidgetItem(w);
@@ -845,6 +893,8 @@ public:
 
 QWidget *
 qt_ui_element_rep::as_qwidget () {
+  //cout << "as_qwidget " << ui_type_string[type] << LF;
+
   switch (type) {
     case horizontal_menu:
     case vertical_menu:
@@ -852,15 +902,17 @@ qt_ui_element_rep::as_qwidget () {
     case vertical_list:
     case tile_menu: 
     case minibar_menu: 
+    case aligned_widget: 
     {
       QLayoutItem *li = this->as_qlayoutitem();
       QWidget *w = new QWidget();
       if (QLayout *l = li->layout()) {
+        // note that the QLayout is the same object as the QLayoutItem 
+        // so no need to free li
         w->setLayout(l);
       } else {
         cout << "qt_ui_element_rep::as_qwidget : invalid situation" << LF;
       }
-      delete li;
       return w;
     }
       break;
@@ -994,6 +1046,7 @@ qt_ui_element_rep::as_qwidget () {
       return w;
     }
       break;
+      
     case enum_widget:
     {
       typedef quintuple<command, array<string>, string, int, string> T;
@@ -1028,9 +1081,9 @@ qt_ui_element_rep::as_qwidget () {
       return w;
     }
       break;
+      
     case choice_widget:
     {
-      //command cmd, array<string> vals, array<string> chosen
       typedef quartet<command, array<string>, array<string>, bool > T;
       T x = open_box<T>(load);
       command cmd = x.x1;
@@ -1059,6 +1112,83 @@ qt_ui_element_rep::as_qwidget () {
       return w;      
     }
       break;
+      
+    case scrollable_widget:
+    {
+      typedef pair<widget, int> T;
+      T x = open_box<T>(load);
+      widget wid = x.x1;
+      int style  = x.x2;
+      
+      QScrollArea* scroll = new QScrollArea();
+      scroll->setBackgroundRole(QPalette::NoRole);
+      QWidget* w = concrete(wid)->as_qwidget();
+      scroll->setWidget(w);
+    
+      // FIXME????
+      // "Note that You must add the layout of widget before you call this function; 
+      //  if you add it later, the widget will not be visible - regardless of when you show() the scroll area.
+      //  In this case, you can also not show() the widget later."
+      return scroll;
+    }
+      break;
+      
+    case hsplit_widget:
+    case vsplit_widget:
+    {
+      typedef pair<widget, widget> T;
+      T x = open_box<T>(load);
+      widget w1 = x.x1;
+      widget w2 = x.x2;
+      
+      QWidget* qw1 = concrete(w1)->as_qwidget();
+      QWidget* qw2 = concrete(w2)->as_qwidget();
+      QSplitter* split = new QSplitter();
+      split->setOrientation(type == hsplit_widget ? Qt::Horizontal : Qt::Vertical);
+      split->addWidget(qw1);
+      split->addWidget(qw2);
+      
+      return split;
+    }
+      break;
+
+    case tabs_widget:
+    {
+      typedef pair<array<widget>, array<widget> > T;
+      T x = open_box<T>(load);
+      array<widget> tabs = x.x1;
+      array<widget> bodies = x.x2;
+      
+      QTabWidget* tw = new QTabWidget ();
+      
+      for (int i = 0; i < N(tabs); i++) {
+        if (is_nil (tabs[i])) break;
+        QWidget* prelabel = concrete (tabs[i]) -> as_qwidget();
+        QLabel* label = qobject_cast<QLabel*> (prelabel);
+        QWidget* body = concrete (bodies[i]) -> as_qwidget();
+        tw->addTab(body, label ? label->text() : "");
+        delete prelabel;
+      }
+      
+      return tw;
+    }
+
+    case wrapped_widget:
+    {
+      typedef pair<widget, command> T;
+      T x = open_box<T>(load);
+      widget w = x.x1;
+      command cmd = x.x2;
+      
+      QWidget* qw = concrete(w)->as_qwidget();
+      QTMCommand* c = new QTMCommand (cmd);
+      c->setParent (qw);
+      QObject::connect (qw, SIGNAL (destroyed()), c, SLOT (apply()), Qt::QueuedConnection);
+      
+      return qw;
+    }
+      break;
+      
     default:
       ;
   }
@@ -1098,21 +1228,20 @@ decode_length (string width, wk_widget wid, int style) {
 
 // TeXmacs interface
 
+
+
 widget horizontal_menu (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::horizontal_menu, arr); }
 widget vertical_menu (array<widget> arr)  { return qt_ui_element_rep::create (qt_ui_element_rep::vertical_menu, arr); }
 widget horizontal_list (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::horizontal_list, arr); }
 widget vertical_list (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::vertical_list, arr); }
-widget aligned_widget (array<widget> lhs, array<widget> rhs, SI, SI, SI, SI) {
-  // FIXME: to be implemented in a clean way
-  array<widget> a;
-  for (int i=0; i<min(N(lhs),N(rhs)); i++) a << lhs[i] << rhs[i];
-  return tile_menu (a, 2); }
-widget tabs_widget (array<widget> tabs, array<widget> bodies) {
-  (void) tabs; (void) bodies;
-  FAILED ("not yet implemented"); }
-widget wrapped_widget (widget w, command cmd) {
-  (void) w; (void) cmd;
-  FAILED ("not yet implemented"); }
+widget aligned_widget (array<widget> lhs, array<widget> rhs, SI hsep, SI vsep, SI lpad, SI rpad) { 
+  typedef quartet<SI, SI, SI, SI> T1;
+  typedef triple<array<widget>, array<widget>, T1> T;
+  return tm_new <qt_ui_element_rep> (qt_ui_element_rep::aligned_widget, 
+                                     close_box (T (lhs,rhs, T1 (hsep, vsep, lpad, rpad)))); 
+}
+widget tabs_widget (array<widget> tabs, array<widget> bodies) { return qt_ui_element_rep::create (qt_ui_element_rep::tabs_widget, tabs, bodies); }
+widget wrapped_widget (widget w, command cmd) { return qt_ui_element_rep::create (qt_ui_element_rep::wrapped_widget, w, cmd); }
 widget tile_menu (array<widget> a, int cols) { return qt_ui_element_rep::create (qt_ui_element_rep::tile_menu, a, cols); }
 widget minibar_menu (array<widget> arr) { return qt_ui_element_rep::create (qt_ui_element_rep::minibar_menu, arr); }
 widget menu_separator (bool vertical) { return qt_ui_element_rep::create (qt_ui_element_rep::menu_separator, vertical); }
@@ -1130,20 +1259,15 @@ widget choice_widget (command cmd, array<string> vals, string cur) {
   array<string> chosen (1);
   chosen[0]= cur;
   return qt_ui_element_rep::create(qt_ui_element_rep::choice_widget, cmd, vals, chosen, false); }
-
-widget user_canvas_widget (widget wid, int style) {
-  (void) wid; (void) style;
-  FAILED ("not yet implemented"); }
+widget user_canvas_widget (widget wid, int style) { return qt_ui_element_rep::create(qt_ui_element_rep::scrollable_widget, wid, style); }
 widget resize_widget (widget w, int style, string w1, string h1,
                       string w2, string h2, string w3, string h3) {
   (void) w; (void) style; (void) w1; (void) h1; (void) w2; (void) h2; (void) w3; (void) h3;
-  FAILED ("not yet implemented"); }
-widget hsplit_widget (widget l, widget r) {
-  (void) l; (void) r;
-  FAILED ("not yet implemented"); }
-widget vsplit_widget (widget t, widget b) {
-  (void) t; (void) b;
-  FAILED ("not yet implemented"); }
+  //FIXME: add a meaningul semantics
+  return w;
+}
+widget hsplit_widget (widget l, widget r) { return qt_ui_element_rep::create(qt_ui_element_rep::hsplit_widget, l, r); }
+widget vsplit_widget (widget t, widget b) { return qt_ui_element_rep::create(qt_ui_element_rep::vsplit_widget, t, b); }
 widget ink_widget (command cb) {
   (void) cb;
   FAILED ("not yet implemented"); }
