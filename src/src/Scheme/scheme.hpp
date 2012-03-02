@@ -28,8 +28,7 @@ class object_rep : public tm_obj<object_rep> {
 class scm_object_rep;
 
 struct object : public tm_ptr<object_rep> {
-  public:
-//  inline object (scm_object_rep* o) : tm_ptr<object_rep> (tm_new<object_rep> (o)) {}
+public:
 	object ();
   object (scm_object_rep* o);
 	object (void *); // left intentionally undefined to inhibith implicit conversion of pointers to bool
