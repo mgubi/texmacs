@@ -167,8 +167,10 @@ protected:
 	inline void inc_ref () { ref_count++; } 
 	inline void dec_ref () { if (0 == --ref_count) static_cast<T*>(this)->destroy(); } 
   inline void destroy () { tm_delete (static_cast<T*>(this)); }
-  
+
 public:
+  inline int get_ref_count () { return ref_count; } 
+
   template <class TT> friend class tm_ptr;
   template <class TT> friend class tm_null_ptr;
   template <class TT> friend class tm_abs_ptr;

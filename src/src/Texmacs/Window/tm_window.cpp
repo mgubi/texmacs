@@ -154,7 +154,9 @@ texmacs_input_widget (tree doc, command cmd, bool continuous) {
   vw->win= win;
   vw->buf->in_menu= false;
   set_scrollable (win->wid, vw->ed);
-  vw->ed->cvw= win->wid.rep;
+//  vw->ed->cvw= win->wid.rep;
+  vw->ed->cvw= win->wid.operator->();
+//  concrete<qt_input_text_widget_rep*>(abstract(int_input));
   vw->ed->mvw= curvw;
   return wrapped_widget (win->wid, close_embedded_command (vw));
 }

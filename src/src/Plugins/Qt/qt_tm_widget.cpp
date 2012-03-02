@@ -82,10 +82,10 @@ void QTMInteractiveInputHelper::commit(int result) {
       if (cb) {
         item = cb->currentText();
       }      
-      ((qt_input_text_widget_rep*) wid->int_input.rep) -> text=
+      concrete<qt_input_text_widget_rep*>(abstract(wid->int_input)) -> text=
 //      scm_quote (from_qstring (item));
       from_qstring (item);
-      ((qt_input_text_widget_rep*) wid->int_input.rep) -> cmd ();      
+      concrete<qt_input_text_widget_rep*>(abstract(wid->int_input)) -> cmd ();      
     }
   }
   sender()->deleteLater();
@@ -648,7 +648,8 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_INTERACTIVE_INPUT:
       TYPE_CHECK (type_id == type_helper<string>::id);
     {
-      qt_input_text_widget_rep* w =((qt_input_text_widget_rep*) int_input.rep);
+      qt_input_text_widget_rep* w = 
+         concrete<qt_input_text_widget_rep*> (abstract (int_input));
       if (w->ok) {
         return close_box<string>(scm_quote(w->text));
       } else {
@@ -849,6 +850,7 @@ widget
 qt_tm_widget_rep::plain_window_widget (string s, command q) {
 
   widget w= qt_view_widget_rep::plain_window_widget (s, q);
-  qt_window_widget_rep* wid= (qt_window_widget_rep*) (w.rep);   // to manage correctly retain counts
+  // to manage correctly retain counts
+  qt_window_widget_rep* wid= concrete<qt_window_widget_rep*>(w);
   return wid;
 }

@@ -32,9 +32,12 @@ class environment;
 
 extern int memorizer_count;
 class memorizer;
-class memorizer_rep: public abstract_struct {
+class memorizer_rep: public tm_base {  
 public:
-  inline memorizer_rep () { TM_DEBUG (memorizer_count++); }
+
+  int ref_count;  
+  
+  inline memorizer_rep (): ref_count (0) { TM_DEBUG (memorizer_count++); }
   inline virtual ~memorizer_rep () { TM_DEBUG (memorizer_count--); }
 
   virtual void print (tm_ostream& out) = 0;

@@ -29,9 +29,9 @@ class scm_object_rep;
 
 struct object : public tm_ptr<object_rep> {
   public:
-  inline object (scm_object_rep* o); //: tm_ptr<object_rep> (tm_new<object_rep> (obj)) {}
+//  inline object (scm_object_rep* o) : tm_ptr<object_rep> (tm_new<object_rep> (o)) {}
 	object ();
-//    object (scm_object_rep* o);
+  object (scm_object_rep* o);
 	object (void *); // left intentionally undefined to inhibith implicit conversion of pointers to bool
 	object (bool b); // implicit conversion to bool is dangerous!!! (all pointers match this conversion)
 	object (int i);

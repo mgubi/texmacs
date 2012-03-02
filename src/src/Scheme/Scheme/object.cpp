@@ -134,21 +134,22 @@ bool is_url (object obj) { return scm_is_url (object_to_scm(obj)); }
 /******************************************************************************
  * Basic conversions
  ******************************************************************************/
-object::object (scm_object_rep* o): rep (static_cast<object_rep*>(o)) {}
-object::object (): rep (tm_new<scm_object_rep> (scm_null ())) {}
-object::object (bool b): rep (tm_new<scm_object_rep> (bool_to_scm (b))) {}
-object::object (int i): rep (tm_new<scm_object_rep> (int_to_scm (i))) {}
-object::object (double x): rep (tm_new<scm_object_rep> (double_to_scm (x))) {}
-object::object (const char* s):
-rep (tm_new<scm_object_rep> (string_to_scm (string (s)))) {}
-object::object (string s): rep (tm_new<scm_object_rep> (string_to_scm (s))) {}
-object::object (tree t): rep (tm_new<scm_object_rep> (tree_to_scm (t))) {}
-object::object (list<string> l):
-rep (tm_new<scm_object_rep> (list_string_to_scm(l))) {}
-object::object (list<tree> l):
-rep (tm_new<scm_object_rep> (list_tree_to_scm (l))) {}
-object::object (path p): rep (tm_new<scm_object_rep> (path_to_scm (p))) {}
-object::object (url u): rep (tm_new<scm_object_rep> (url_to_scm (u))) {}
+
+object::object (scm_object_rep* o) : tm_ptr<object_rep> (static_cast<object_rep*>(o)) {}
+object::object () : tm_ptr<object_rep> (tm_new<scm_object_rep> (scm_null ())) {}
+object::object (bool b) : tm_ptr<object_rep> (tm_new<scm_object_rep> (bool_to_scm (b))) {}
+object::object (int i) : tm_ptr<object_rep> (tm_new<scm_object_rep> (int_to_scm (i))) {}
+object::object (double x) : tm_ptr<object_rep> (tm_new<scm_object_rep> (double_to_scm (x))) {}
+object::object (const char* s)
+: tm_ptr<object_rep> (tm_new<scm_object_rep> (string_to_scm (string (s)))) {}
+object::object (string s): tm_ptr<object_rep> (tm_new<scm_object_rep> (string_to_scm (s))) {}
+object::object (tree t): tm_ptr<object_rep> (tm_new<scm_object_rep> (tree_to_scm (t))) {}
+object::object (list<string> l)
+  : tm_ptr<object_rep> (tm_new<scm_object_rep> (list_string_to_scm(l))) {}
+object::object (list<tree> l)
+: tm_ptr<object_rep> (tm_new<scm_object_rep> (list_tree_to_scm (l))) {}
+object::object (path p) : tm_ptr<object_rep> (tm_new<scm_object_rep> (path_to_scm (p))) {}
+object::object (url u) : tm_ptr<object_rep> (tm_new<scm_object_rep> (url_to_scm (u))) {}
 
 bool
 as_bool (object obj) {
