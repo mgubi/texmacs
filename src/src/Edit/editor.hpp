@@ -22,7 +22,6 @@
 #endif
 #endif
 #include "server.hpp"
-#include "scheme.hpp"
 #include "drd_info.hpp"
 #ifdef EXPERIMENTAL
 #include "../Style/Environment/environment.hpp"
@@ -117,6 +116,7 @@ protected:
   virtual path tree_path (path sp, SI x, SI y, SI delta) = 0;
   virtual void apply_changes () = 0;
   virtual void animate () = 0;
+  virtual path search_format () = 0;
   virtual path search_format (int& row, int& col) = 0;
   virtual void table_bound (path fp, int& i1, int& j1, int& i2, int& j2) = 0;
   virtual tree table_get_subtable (path p, int i1, int j1, int i2, int j2) = 0;
@@ -371,6 +371,7 @@ public:
   virtual void   table_row_decoration (bool forward) = 0;
   virtual void   table_column_decoration (bool forward) = 0;
   virtual void   table_correct_block_content () = 0;
+  virtual void   table_resize_notify () = 0;
   virtual void   set_cell_mode (string mode) = 0;
   virtual string get_cell_mode () = 0;
   virtual void   cell_set_format (string var, tree val) = 0;

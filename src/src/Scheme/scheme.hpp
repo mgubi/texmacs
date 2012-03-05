@@ -25,12 +25,12 @@ class object_rep : public tm_obj<object_rep> {
 };
 
 
-class scm_object_rep;
+class tmscm_object_rep;
 
 struct object : public tm_ptr<object_rep> {
 public:
 	object ();
-  object (scm_object_rep* o);
+  object (tmscm_object_rep* o);
 	object (void *); // left intentionally undefined to inhibith implicit conversion of pointers to bool
 	object (bool b); // implicit conversion to bool is dangerous!!! (all pointers match this conversion)
 	object (int i);

@@ -133,6 +133,7 @@
 ;(display "Booting table mode\n")
 (lazy-keyboard (table table-kbd) in-table?)
 (lazy-menu (table table-menu) insert-table-menu)
+(lazy-define (table table-edit) table-resize-notify)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting graphics mode\n")
@@ -160,7 +161,7 @@
 	   plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
 (lazy-define (dynamic session-edit) scheme-eval)
 (lazy-initialize (dynamic session-menu) (in-session?))
-(lazy-keyboard (dynamic calc-edit) always?)
+(lazy-keyboard (dynamic calc-table) always?)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting documentation\n")
