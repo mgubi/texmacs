@@ -27,7 +27,7 @@ private:
 
 public:
   tree_addendum_rep (tree ref, int kind2, blackbox contents2):
-    ptr (ref.rep), kind (kind2), contents (contents2) {}
+    ptr (ref.rep()), kind (kind2), contents (contents2) {}
   int get_type () { return OBSERVER_ADDENDUM; }
   tm_ostream& print (tm_ostream& out) {
     return out << " addendum (" << kind << ", " << contents << ")"; }
@@ -68,11 +68,11 @@ tree_addendum_rep::get_tree (tree& t) {
 
 bool
 tree_addendum_rep::set_tree (tree t) {
-  if (ptr != t.rep) {
+  if (ptr != t.rep()) {
     tree ref (ptr);
-    remove_observer (ref->obs, observer (this));
-    ptr= t.rep;
-    insert_observer (t->obs, observer (this));
+    remove_observer (ref.obs(), observer (this));
+    ptr= t.rep();
+    insert_observer (t.obs(), observer (this));
   }
   return true;
 }
@@ -140,7 +140,7 @@ tree_addendum_rep::notify_insert_node (tree& ref, int pos) {
   //cout << "Notify insert node " << ref << ", " << pos << "\n";
   // NOTE: we might want to remove these lines; see tree_pointer.cpp
   remove_observer (ref[pos]->obs, observer (this));
-  ptr= ref.rep;
+  ptr= ref.rep();
   insert_observer (ref->obs, observer (this));
   //cout << "position -> " << obtain_position (observer (this)) << "\n";
 }
