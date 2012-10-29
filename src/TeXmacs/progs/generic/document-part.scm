@@ -25,7 +25,7 @@
 
 (define (expand-includes-one t r)
   (if (tree-is? t 'include)
-      (with u (url-relative r (string->url (tree->string (tree-ref t 0))))
+      (with u (url-relative r (unix->url (tree->string (tree-ref t 0))))
 	(inclusion-children (tree-load-inclusion u)))
       (list (expand-includes t r))))
 
@@ -40,7 +40,7 @@
 
 (tm-define (buffer-expand-includes)
   (with t (buffer-tree)
-    (tree-assign! t (expand-includes (buffer-tree) (get-name-buffer)))))
+    (tree-assign! t (expand-includes (buffer-tree) (buffer-master)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main internal representations for document parts:
@@ -128,7 +128,7 @@
 	   (buffer-hide-preamble)
 	   (buffer-flatten-parts)
 	   (tree-go-to (car (buffer-body-paragraphs)) :start)
-	   (update-buffer))
+	   (update-current-buffer))
 	  (else
 	   (buffer-hide-preamble)
 	   (buffer-make-parts)
@@ -137,7 +137,7 @@
 	     (if (== mode :one)
 		 (buffer-show-part first)
 		 (buffer-go-to-part first)))
-	   (update-buffer)))))
+	   (update-current-buffer)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Listing the document parts

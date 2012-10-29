@@ -122,7 +122,8 @@
 	(string-append (cond ((== x 'from) (url-concretize from))
 			     ((== x 'to) (url-concretize to))
 			     (else x))
-		       " "
+		       (cond ((and (string? x) (string-ends? x "=")) "")
+                             (else " "))
 		       (converter-shell-cmd (cdr l) from to)))))
 
 (define (converter-shell l from to-format opts)
@@ -291,15 +292,6 @@
 	(with item (list-find (cdr init) (lambda (x) (== (cadr x) var)))
 	  (if item (caddr item) (default-init var))))))
 
-(define-public-macro (with-aux u . prg)
-  `(let* ((u ,u)
-	  (t (texmacs-load-tree u "texmacs"))
-	  (name (get-name-buffer)))
-     (set-aux-buffer "* Aux *" u t)
-     (with r (begin ,@prg)
-       (switch-to-buffer name)
-       r)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adding new formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -432,3 +424,40 @@
 	  (cond ((not fm) "verbatim")
 		((ahash-ref format-must-recognize fm) "verbatim")
 		(else fm))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Utilities for file conversions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (file-format u)
+  (string-append (format-from-suffix (url-suffix u)) "-file"))
+
+(define-public (file-converter-exists? what dest)
+  (nnot (converter-search (file-format what) (file-format dest))))
+
+(define-public (file-convert what dest . options)
+  (let* ((from (file-format what))
+         (to   (file-format dest)))
+    (apply convert (cons* what from to (acons 'dest dest options)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Viewers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (define viewer-table (make-ahash-table))
+
+;; (define-public (suffix->viewer suf)
+;;   (ahash-ref viewer-table suf))
+
+;; (define-public (save-viewers)
+;;   "Save viewers from disk"
+;;   (with u "$TEXMACS_HOME_PATH/system/viewers.scm"
+;;     (save-object u (ahash-table->list viewer-table))))
+
+;; (define (retrieve-viewers)
+;;   "Retrieve viewers from disk"
+;;   (with u "$TEXMACS_HOME_PATH/system/viewers.scm"
+;;     (when (url-exists? u)
+;;       (set! viewer-table (list->ahash-table (load-object u))))))
+
+;; (retrieve-viewers)

@@ -12,29 +12,44 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (version version-menu)
-  (:use (version version-compare)))
+  (:use (version version-compare)
+        (version version-tmfs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main version menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind version-menu
-  (-> "File"
-      ;;("Merge" (noop))
-      ("Compare" (choose-file compare-file "Compare with file" ""))
-      ---
-      ("Show both versions" (version-show-all 'version-both))
-      ("Show old version" (version-show-all 'version-old))
-      ("Show new version" (version-show-all 'version-new))
-      ---
-      ("Retain current version" (version-retain-all 'current))
-      ("Retain old version" (version-retain-all 0))
-      ("Retain new version" (version-retain-all 1)))
-  ;;(-> "Subversion"
-  ;;    ("Update" (noop))
-  ;;    ("Changes" (noop))
-  ;;    ("Commit" (noop)))
+  (when (versioned? (current-buffer))
+    (when (!= (version-status (current-buffer)) "unknown")
+      ("History" (version-show-history (current-buffer)))
+      ("Update" (version-interactive-update (current-buffer))))
+    (assuming (== (version-status (current-buffer)) "unknown")
+      ("Register" (register-buffer (current-buffer))))
+    (assuming (!= (version-status (current-buffer)) "unknown")
+      (when (or (== (version-status (current-buffer)) "modified")
+                (buffer-modified? (current-buffer)))
+        ("Commit" (version-interactive-commit (current-buffer))))))
   ---
+  (-> "Compare"
+      (assuming (version-revision? (current-buffer))
+        ("With current user version"
+         (compare-with-newer* (version-head (current-buffer)))))          
+      ("With older version"
+       (choose-file compare-with-older "Compare with older version" ""))
+      ("With newer version"
+       (choose-file compare-with-newer "Compare with newer version" "")))
+  ;;(-> "File"
+  ;;    ("Show both versions" (version-show-all 'version-both))
+  ;;    ("Show old version" (version-show-all 'version-old))
+  ;;    ("Show new version" (version-show-all 'version-new))
+  ;;    ---
+  ;;    ("Retain current version" (version-retain-all 'current))
+  ;;    ("Retain old version" (version-retain-all 0))
+  ;;    ("Retain new version" (version-retain-all 1)))
+  ;;(-> "Merge" ...)
+  ;;(when (or (inside-version?) (selection-active-any?))
+  ;;  ("Reactualize" (reactualize-differences)))
   (-> "Move"
       ("First difference" (version-first-difference))
       ("Previous difference" (version-previous-difference))
@@ -49,10 +64,7 @@
 	("Current version" (version-retain 'current))
 	("Old version" (version-retain 0))
 	("New version" (version-retain 1))))
-  ---
   (-> "Grain"
       ("Detailed" (version-set-grain "detailed"))
       ("Block" (version-set-grain "block"))
-      ("Rough" (version-set-grain "rough")))
-  (when (or (inside-version?) (selection-active-any?))
-    ("Reactualize" (reactualize-differences))))
+      ("Rough" (version-set-grain "rough"))))

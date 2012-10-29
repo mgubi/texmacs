@@ -11,13 +11,14 @@
 
 #ifndef TM_WINDOW_H
 #define TM_WINDOW_H
+#include "server.hpp"
 #include "tm_buffer.hpp"
 
 class tm_window_rep {
 public:
   widget win;
   widget wid;
-  int    id;
+  url    id;
 
 public:
   hashmap<tree,tree> props;
@@ -80,16 +81,16 @@ public:
   tm_buffer buf;
   editor    ed;
   tm_window win;
-  inline tm_view_rep (tm_buffer buf2, editor ed2):
-    buf (buf2), ed (ed2), win (NULL) {}
+  int       nr;
+  tm_view_rep (tm_buffer buf2, editor ed2);
 };
 
 typedef tm_buffer_rep* tm_buffer;
 typedef tm_view_rep*   tm_view;
 typedef tm_window_rep* tm_window;
 
-widget texmacs_output_widget (tree doc);
-widget texmacs_input_widget (tree doc, command cmd, bool continuous);
+widget texmacs_output_widget (tree doc, tree style);
+widget texmacs_input_widget (tree doc, tree style, command cmd, bool continuous);
 
 int window_handle ();
 void window_create (int win, widget wid, string name, bool plain);
@@ -97,6 +98,10 @@ void window_create (int win, widget wid, string name, command quit);
 void window_delete (int win);
 void window_show (int win);
 void window_hide (int win);
+scheme_tree window_get_size (int win);
+void window_set_size (int win, int w, int h);
+scheme_tree window_get_position (int win);
+void window_set_position (int win, int x, int y);
 void windows_delayed_refresh (int ms);
 void windows_refresh ();
 

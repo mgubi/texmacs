@@ -20,6 +20,7 @@
 #include "drd_std.hpp"
 #include "message.hpp"
 #include <setjmp.h>
+
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
 #endif
@@ -33,6 +34,7 @@
 #endif
 
 #ifdef QTTEXMACS
+#include "Qt/qt_gui.hpp"
 #include "Qt/qt_utilities.hpp"
 #endif
 
@@ -42,11 +44,11 @@
 
 editor_rep::editor_rep ():
   simple_widget_rep (), cvw (NULL), mvw (NULL),
-  drd (buf->abbr, std_drd), et (the_et), rp (buf->rp) {}
+  drd (buf->buf->title, std_drd), et (the_et), rp (buf->rp) {}
 
 editor_rep::editor_rep (server_rep* sv2, tm_buffer buf2):
   simple_widget_rep (), sv (sv2), cvw (NULL), mvw (NULL), buf (buf2),
-  drd (buf->abbr, std_drd), et (the_et), rp (buf2->rp) {}
+  drd (buf->buf->title, std_drd), et (the_et), rp (buf2->rp) {}
 
 edit_main_rep::edit_main_rep (server_rep* sv, tm_buffer buf):
   editor_rep (sv, buf), props (UNKNOWN), ed_obs (edit_observer (this))
@@ -139,12 +141,12 @@ edit_main_rep::tex_buffer () {
 
 url
 edit_main_rep::get_name () {
-  return buf->name;
+  return buf->buf->name;
 }
 
 void
 edit_main_rep::focus_on_this_editor () {
-  sv->focus_on_editor (this);
+  focus_on_editor (this);
 }
 
 void
@@ -315,6 +317,16 @@ edit_main_rep::print_snippet (url name, tree t) {
   return a;
 }
 
+bool
+edit_main_rep::graphics_file_to_clipboard (url name) {
+#ifdef QTTEXMACS
+  the_gui->put_graphics_on_clipboard (name);
+  return true;
+#else 
+  return false;
+#endif
+}
+
 /******************************************************************************
 * Evaluation of expressions
 ******************************************************************************/
@@ -322,6 +334,7 @@ edit_main_rep::print_snippet (url name, tree t) {
 void
 edit_main_rep::footer_eval (string s) {
   // s= unslash (s); // FIXME: dirty fix; should not be necessary
+  s= tm_decode (s);
   string r= object_to_string (eval (s));
   set_message (verbatim (r), "evaluate expression");
 }

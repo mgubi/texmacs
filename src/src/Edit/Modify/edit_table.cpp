@@ -30,7 +30,9 @@ empty_cell () {
 bool
 is_empty_cell (tree t) {
   return
-    t == "" || t == tree (DOCUMENT, "") ||
+    t == "" ||
+    (is_func (t, DOCUMENT, 1) && is_empty_cell (t[0])) ||
+    (is_compound (t, "cell-inert", 2) && is_empty_cell (t[1])) ||
     (is_compound (t, "cell-input", 3) && is_empty_cell (t[1])) ||
     (is_compound (t, "cell-output", 3) && is_empty_cell (t[2]));
 }
@@ -811,6 +813,14 @@ edit_table_rep::table_write_subtable (
   table_get_extents (fp, nr_rows, nr_cols);
   ::table_get_extents (subt, sub_rows, sub_cols);
   if ((nr_rows < row+sub_rows) || (nr_cols < col+sub_cols)) return;
+
+  path old_tp= tp;
+  tp= fp * 0;
+  bool calc_flag= inside ("calc-table");
+  tp= old_tp;
+  if (calc_flag)
+    subt= as_tree (call ("calc-table-renumber", object (subt),
+                         object (row + 1), object (col + 1)));
 
   if (is_func (subtree (et, fp), TFORMAT) &&
       is_func (subt, TFORMAT))

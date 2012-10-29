@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.13>
+<TeXmacs|1.0.7.15>
 
 <style|<tuple|source|std>>
 
@@ -39,6 +39,8 @@
   <assign|TeX|<macro|<active*|T<rsub|<space|-0.4spc><move|<resize|<with|math-level|0|E>||||0.5fn>|0fn|-0.1fn>><space|-0.4spc>X>>>
 
   <assign|LaTeX|<macro|<active*|L<rsup|<space|-0.8spc><move|A|0fn|-0.1fn>><space|-0.2spc>T<rsub|<space|-0.4spc><move|<resize|<with|math-level|0|E>||||0.5fn>|0fn|-0.1fn>><space|-0.4spc>X>>>
+
+  <assign|LaTeXe|<macro|<active*|L<rsup|<space|-0.8spc><move|A|0fn|-0.1fn>><space|-0.2spc>T<rsub|<space|-0.4spc><move|<resize|<with|math-level|0|E>||||0.5fn>|0fn|-0.1fn>><space|-0.4spc>X<compound|math|>><space|0.2spc>2<move|<math|\<varepsilon\>>|-0.0fn|-0.15fn>>>
 
   <assign|BibTeX|<macro|<active*|<with|font-shape|small-caps|Bib>T<rsub|<space|-0.4spc><move|<resize|<with|math-level|0|E>||||0.5fn>|0fn|-0.1fn>><space|-0.4spc>X>>>
 
@@ -338,6 +340,11 @@
 
   <drd-props|underline|with-like|yes|arity|1|accessible|all>
 
+  <assign|tmfs-title|<\macro|name>
+    <surround||<vspace|1fn>|<block*|<tformat|<cwith|1|1|1|1|cell-background|pastel
+    blue>|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|1|1|1|cell-lsep|2spc>|<cwith|1|1|1|1|cell-rsep|2spc>|<cwith|1|1|1|1|cell-bsep|2spc>|<cwith|1|1|1|1|cell-tsep|2spc>|<table|<row|<cell|<large|<strong|<arg|name>>>>>>>>>
+  </macro>>
+
   <\active*>
     <\src-comment>
       Tags for HTML generation.
@@ -355,6 +362,10 @@
   <assign|html-javascript-src|<macro|source-file|<small|<colored-frame|pastel
   yellow|<with|font-family|ss|Javascript source:
   ><href|<arg|source-file>>>>>>
+
+  <assign|html-video|<macro|dest|width|height|<small|<colored-frame|pastel
+  yellow|<tabular*|<tformat|<table|<row|<cell|<small|<with|font-family|tt|<arg|dest>>>>>|<row|<cell|<arg|width>
+  <math|\<times\>> <arg|height>>>>>>>>>>
 
   <\active*>
     <\src-comment>

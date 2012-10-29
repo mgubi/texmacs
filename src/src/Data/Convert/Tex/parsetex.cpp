@@ -12,9 +12,11 @@
 #include "Tex/convert_tex.hpp"
 #include "converter.hpp"
 
-string string_arg (tree t);
 extern bool textm_class_flag;
 hashmap<string,int> textm_recursion_level (0);
+
+string string_arg (tree t);
+tree latex_symbol_to_tree (string s);
 
 /******************************************************************************
 * The latex_parser structure
@@ -45,17 +47,22 @@ hashmap<string,int> textm_recursion_level (0);
 struct latex_parser {
   int level;
   bool unicode;
+  char lf;
+  hashmap<string,bool> loaded_package;
   latex_parser (bool unicode2): level (0), unicode (unicode2) {}
   void latex_error (string s, int i, string message);
 
+  bool is_opening_option (char c);
   tree parse             (string s, int& i, string stop= "", bool ch= false);
   tree parse_backslash   (string s, int& i);
+  tree parse_linefeed    (string s, int& i);
   tree parse_symbol      (string s, int& i);
   tree parse_command     (string s, int& i, string which);
   tree parse_argument    (string s, int& i);
   tree parse_unknown     (string s, int& i, string which);
   bool can_parse_length  (string s, int i);
   tree parse_length      (string s, int& i);
+  tree parse_length      (string s, int& i, int e);
   tree parse_length_name (string s, int& i);
   tree parse_verbatim    (string s, int& i, string end);
 
@@ -101,6 +108,21 @@ is_tex_alpha (string s) {
 }
 
 tree
+latex_parser::parse_linefeed (string s, int& i) {
+  int ln=0;
+  tree r=concat ();
+  while ((i<N(s)) && is_space (s[i])) {
+    if (s[i++] == '\n') ln++;
+  }
+  if (i>N(s)) return "";
+  if (lf == 'N' && ln > 0) ln++;
+  if (lf != 'N' && ln == 1) r << " ";
+  else if (ln > 1) r << "\n";
+  if (ln > 0) lf = 'M';
+  return r;
+}
+
+tree
 latex_parser::parse (string s, int& i, string stop, bool change) {
   bool no_error= true;
   int n= N(s);
@@ -119,7 +141,9 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
 	 (stop != "denom" ||
 	  (s[i] != '$' && s[i] != '}' &&
 	   (i+2>n || s(i,i+2) != "\\]") &&
+	   (i+2>n || s(i,i+2) != "\\)") &&
 	   (i+4>n || s(i,i+4) != "\\end")))) {
+    if (lf == 'N' && s[i] != '\n') lf= 'M';
     switch (s[i]) {
     case '~':
       t << tuple ("\\nbsp");
@@ -131,16 +155,9 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
       while ((i<n) && ((s[i]==' ') || (s[i]=='\t') || (s[i]=='\r'))) i++;
       if ((i<n) && (s[i]!='\n')) t << " ";
       break;
-    case '\n': {
-      int ln=0;
-      while ((i<n) && is_space (s[i]))
-	if (s[i++]=='\n') ln++;
-      if (i<n) {
-	if (ln == 1) t << " ";
-	else t << "\n";
-      }
+    case '\n':
+      t << latex_parser::parse_linefeed (s, i);
       break;
-    }
     case '%': {
       while ((i<n) && (s[i]!='\n')) i++;
       if (i<n) i++;
@@ -164,10 +181,29 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
       else t << s (i-1, i);
       break;
     case '\\':
-      if (((i+7)<n) && !is_tex_alpha (s (i+5, i+7)) &&
-	  (s (i, i+5) == "\\over" || s (i, i+5) == "\\atop"))
+      // TODO: move this in parse_command
+      if (s (i+1, i+6) == "hskip" || s (i+1, i+6) == "vskip"){
+        string skip = s (i+1, i+6);
+        i+=7;
+        bool tmp_textm_class_flag = textm_class_flag;
+        textm_class_flag = true;
+        if (can_parse_length (s, i)) {
+          if (skip == "hskip")
+            t << tuple ("\\hspace", parse_length (s, i));
+          else
+            t << tuple ("\\vspace", parse_length (s, i));
+        }
+        textm_class_flag = tmp_textm_class_flag;
+      }
+      // end of move
+      else if (((i+7)<n && !is_tex_alpha (s (i+5, i+7)) &&
+	  (s (i, i+5) == "\\over" || s (i, i+5) == "\\atop")) ||
+	  ((i+9)<n && !is_tex_alpha (s (i+7, i+9)) && s (i, i+7) == "\\choose"))
 	{
-	  string fr_cmd= s(i,i+5);
+    int start = i;
+	  i++;
+    while (i<n && is_alpha (s[i])) i++;
+	  string fr_cmd= s(start, i);
 	  if (fr_cmd == "\\over") fr_cmd= "\\frac";
 	  if (fr_cmd == "\\atop") fr_cmd= "\\ontop";
 	  int j;
@@ -175,7 +211,6 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
 	  tree num= t (j, N(t));
 	  if (N(num) == 0) num= "";
 	  t= t (0, j);
-	  i+=5;
 	  while (i<n && (s[i] == ' ' || s[i] == '\n' || s[i] == '\t')) i++;
 	  tree den= parse (s, i, "denom");
 	  t << tree (TUPLE, fr_cmd, num, den);
@@ -211,7 +246,9 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
 	while ((i < N(s)) && (s[i] == '\'')) i++;
 	t << tuple ("\\prime", s (start, i));
       }
-      else t << s (i-1, i);
+      else {
+        t << s (i-1, i);
+      }
       break;
     case '*':
       if (command_type ["!mode"] == "math") t << tree (TUPLE, "\\ast");
@@ -258,7 +295,7 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
       while ((i<n) && is_space (s[i]))
 	if (s[i++]=='\n') ln++;
       if (ln >= 2) t << "\n";
-      else if (i<n) t << tree (TUPLE, "\\ ");
+      else if (i<n) t << " ";
       break;
     }
     case '$': {
@@ -284,12 +321,20 @@ latex_parser::parse (string s, int& i, string stop, bool change) {
       break;
     }
     default:
-      if ((s[i] == '-' || (s[i] >= '0' && s[i] <= '9')) &&
+      if (i+2<n && s[i] == '-' && s[i+1] == '-' && s[i+2] == '-') {
+        i+=3;
+        t << tree (TUPLE, "\\emdash");
+      }
+      else if ((s[i] == '-' || (s[i] >= '0' && s[i] <= '9')) &&
 	  can_parse_length (s, i))
 	t << parse_length (s, i);
       else if (unicode && ((unsigned char) s[i]) >= 128) {
 	unsigned int code= decode_from_utf8 (s, i);
-	t << tree (TUPLE, "\\#" * as_hexadecimal (code));
+        string c = utf8_to_cork(encode_as_utf8(code));
+        if (c(0,1) == "<#")
+	  t << tree (TUPLE, "\\" * c(1, N(c)-1));
+        else
+          t << c;
       }
       else if (!unicode && is_iso_alpha (s[i])) {
 	// If we encounter too much text in math mode, then return
@@ -408,6 +453,8 @@ latex_parser::parse_backslash (string s, int& i) {
   while ((i<n) && is_tex_alpha (s[i])) i++;
   if ((i<n) && (s[i]=='*') && latex_type (s (start, i+1)) != "undefined") i++;
   string r= s (start, i);
+  while ((i<n) && s[i] == ' ') i++;
+  if (s[i] == '\n') {lf= 'N'; i++;}
   if ((r == "\\begin") || (r == "\\end")) {
     while ((i<n) && is_space (s[i])) i++;
     if ((i==n) || (s[i]!='{')) {
@@ -437,7 +484,7 @@ sharp_to_arg (string s, tree args) {
 
 tree
 latex_parser::parse_symbol (string s, int& i) {
-  int start= i;
+  int start= i, end;
   if ((s[i] == '*') && (command_type ["!mode"] == "math")) {
     i++; return tree (TUPLE, "\\ast"); }
   if (s[i] == '<') { i++; return tree (TUPLE, "\\<less>"); }
@@ -445,10 +492,15 @@ latex_parser::parse_symbol (string s, int& i) {
   if (s[i] != '\\') { i++; return s(start, i); }
   i++;
   if (i == N(s)) return tree (TUPLE, "\\backslash");
-  if (!is_tex_alpha (s[i])) { i++; return s(start, i); }
-  while ((i<N(s)) && is_tex_alpha (s[i])) i++;
-  if ((i<N(s)) && (s[i]=='*')) i++;
-  return s(start,i);
+  if (!is_tex_alpha (s[i])) end= ++i;
+  else {
+    while ((i<N(s)) && is_tex_alpha (s[i])) i++;
+    if ((i<N(s)) && (s[i]=='*')) i++;
+    end= i;
+  }
+  while ((i<N(s)) && s[i] == ' ') i++;
+  if (s[i] == '\n') {lf= 'N'; i++;}
+  return s(start, end);
 }
 
 static bool
@@ -487,17 +539,41 @@ is_text_argument (string cmd, int remaining_arity) {
   return cmd == "\\label" || cmd == "\\ref";
 }
 
+void
+skip_linespaces (string s, int& i) {
+  int n=N(s);
+  skip_spaces (s, i);
+  if ((i<n) && (s[i]=='\n')) i++;
+  skip_spaces (s, i);
+}
+
+bool
+latex_parser::is_opening_option (char c) {
+  if (c == '[') return true;
+  if (loaded_package["algorithm2e"] && c == '(') return true;
+  return false;
+}
+
 tree
 latex_parser::parse_command (string s, int& i, string cmd) {
-  //cout << cmd << " [" << latex_type (cmd) << ", "
-  //<< command_type ["!mode"] << ", " << latex_arity (cmd) << "]" << LF;
+  bool delimdef = false;
+  // cout << cmd << " [" << latex_type (cmd) << ", "
+  // << command_type ["!mode"] << ", " << latex_arity (cmd) << "]" << LF;
+  if (cmd == "\\gdef" || cmd == "\\xdef" || cmd == "\\edef") cmd= "\\def";
+  if (cmd == "\\def" && s[i] == '\\') delimdef = true;
   if (cmd == "\\newcommand") cmd= "\\def";
+  if (cmd == "\\providecommand") cmd= "\\def";
   if (cmd == "\\renewcommand") cmd= "\\def";
+  if (cmd == "\\DeclareMathOperator") cmd= "\\def";
+  if (cmd == "\\DeclareMathOperator*") cmd= "\\def";
+  if (cmd == "\\RequirePackage") cmd= "\\usepackage";
   if (cmd == "\\renewenvironment") cmd= "\\newenvironment";
   if (cmd == "\\begin-split") cmd= "\\begin-eqsplit";
   if (cmd == "\\end-split") cmd= "\\end-eqsplit";
   if (cmd == "\\begin-split*") cmd= "\\begin-eqsplit*";
   if (cmd == "\\end-split*") cmd= "\\end-eqsplit*";
+  if (cmd == "\\begin-tabular*") cmd= "\\begin-tabularx";
+  if (cmd == "\\end-tabular*") cmd= "\\end-tabularx";
 
   if (latex_type (cmd) == "undefined")
     return parse_unknown (s, i, cmd);
@@ -522,76 +598,192 @@ latex_parser::parse_command (string s, int& i, string cmd) {
     return tuple (cmd, name, arg);
   }
 
+  if (cmd == "\\cmidrule") {
+    if (s[i] == '[') {
+      i++;
+      parse (s, i, ']');
+      skip_linespaces (s, ++i);
+    }
+    if (s[i] == '(') {
+      i++;
+      parse (s, i, ')');
+      skip_linespaces (s, ++i);
+    }
+    tree a= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    return tuple ("\\cline", a);
+  }
+
+  if (cmd == "\\multirow") {
+    tree a= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    if (s[i] == '[') {
+      i++;
+      parse (s, i, ']');
+      skip_linespaces (s, ++i);
+    }
+    tree b= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    if (s[i] == '[') {
+      i++;
+      parse (s, i, ']');
+      skip_linespaces (s, ++i);
+    }
+    tree c= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    return tuple (cmd, a, b, c);
+  }
+
+  if (cmd == "\\category") {
+    tree a= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    tree b= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    tree c= parse_argument (s, i);
+    skip_linespaces (s, ++i);
+    if (s[i] == '[') {
+      i++;
+      tree d= parse (s, i, ']'); i++;
+      return tree (TUPLE, cmd * "*", a, b, c, d);
+    }
+    return tuple (cmd, a, b, c);
+  }
+
   bool mbox_flag=
     ((cmd == "\\text") || (cmd == "\\mbox")) &&
     (command_type ["!mode"] == "math");
   if (mbox_flag) command_type ("!mode") = "text";
 
   int  n     = N(s);
+  string type= latex_type (cmd);
   int  arity = latex_arity (cmd);
   bool option= (arity<0);
   if (option) arity= -1-arity;
 
-  /************************ retrieve arguments *******************************/
-  tree t (TUPLE, copy (cmd)); // parsed arguments
-  tree u (TUPLE, copy (cmd)); // unparsed arguments
-  while (i<n && arity>=0 && (arity>0 || option)) {
-    int j= i;
-    while ((j<n) && is_space (s[j])) j++;
-    if (j==n) break;
-    if (option && (s[j]=='[')) {
-      j++;
-      i=j;
-      tree opt= parse (s, i, "]");
-      if (cmd != "\\newtheorem" && cmd != "\\newtheorem*")
-	t << opt;
-      u << s (j, i);
-      if ((i<n) && (s[i]==']')) i++;
-      if (cmd != "\\newtheorem" && cmd != "\\newtheorem*")
-	t[0]->label= t[0]->label * "*";
-      option= false;
+  tree t, u;
+
+  // parsing exception for delimited parameters \\def
+  if (delimdef) {
+    int start = i;
+    string name, args= "";
+    i++;
+    if (is_alpha (s[i])) {
+      while (i < N(s) && ((!textm_class_flag && is_alpha (s[i])) ||
+            (textm_class_flag && is_tex_alpha (s[i]))))
+        i++;
     }
-    else if ((arity>0) && (s[j]=='{')) {
-      bool text_arg=
-	(command_type["!mode"] == "math") && is_text_argument (cmd, arity);
-      j++;
-      i=j;
-      if (text_arg) command_type ("!mode")= "text";
-      if ((N(t)==1) && (cmd == "\\def")) {
-	while ((i<n) && (s[i]!='}')) i++;
-	t << s (j, i);
+    else
+      start = i++;
+    name = s(start, i);
+    while (i < N(s) && s[i] != '{') {
+      if (i < N(s) && s[i] == '#') {
+        while (i < N(s) && s[i] == '#') i++;
+        if (i < N(s) && is_digit (s[i])) args = s[i];
       }
-      else t << parse (s, i, "}");
-      if (text_arg) command_type ("!mode")= "math";
-      u << s (j, i);
-      if ((i<n) && (s[i]=='}')) i++;
-      arity--;
-      if (arity == 0) option= false;
+      else
+        i++;
     }
-    else if (s[j] == '}') break;
-    else if (option && (s[j]=='#') && (cmd == "\\def")) {
-      while ((j+3 <= n) && is_numeric (s[j+1]) && (s[j+2] == '#')) j+=2;
-      if (j+2<=n) {
-	t << s (j+1, j+2);
-	u << s (j+1, j+2);
-	i= j+2;
+    i++;
+    tree st= parse (s, i, "}");
+    i++;
+    if (args == "")
+      t = tree (TUPLE, "\\def", name, st);
+    else
+      t = tree (TUPLE, "\\def*", name, args, st);
+    u = t;
+  }
+  else {
+/************************ retrieve arguments *******************************/
+    t = tree(TUPLE, copy (cmd)); // parsed arguments
+    u = tree(TUPLE, copy (cmd)); // unparsed arguments
+    // Should be in a drd.
+    bool option2= (cmd == "\\def" || cmd == "\\newenvironment");
+
+    while (i<n && arity>=0 && (arity>0 || option)) {
+      int j= i;
+      while ((j<n) && is_space (s[j])) j++;
+      if (j==n) break;
+      if (s[i]=='$') break; // in most cases, this should not be an argument
+      if (option && (is_opening_option (s[j]) ||
+                    (type == "algorithm2e" && s[j] == '{'))) {
+        char ec= closing_delimiter (s[j]);
+        j++;
+        i=j;
+        tree opt= parse (s, i, ec);
+        if (cmd != "\\newtheorem" && cmd != "\\newtheorem*")
+          t << opt;
+        u << s (j, i);
+        if ((i<n) && (s[i]==ec)) i++;
+        if (cmd != "\\newtheorem" && cmd != "\\newtheorem*")
+          t[0]->label= t[0]->label * "*";
+        option= false;
+        if (!option && option2) {
+          option = true;
+          option2= false;
+          continue;
+        }
       }
-      t[0]->label= t[0]->label * "*";
-      option= false;
+      else if ((arity>0) && (s[j]=='{')) {
+        bool text_arg=
+          (command_type["!mode"] == "math") && is_text_argument (cmd, arity);
+        j++;
+        i=j;
+        if (text_arg) command_type ("!mode")= "text";
+        if ((N(t)==1) && (cmd == "\\def")) {
+          while ((i<n) && (s[i]!='}')) i++;
+          t << s (j, i);
+        }
+        else t << parse (s, i, "}");
+        if (text_arg) command_type ("!mode")= "math";
+        u << s (j, i);
+        if ((i<n) && (s[i]=='}')) i++;
+        arity--;
+        if (arity == 0) option= option2= false;
+      }
+      else if (s[j] == '}') break;
+      else if (option && (s[j]=='#') && (cmd == "\\def")) {
+        while ((j+3 <= n) && is_numeric (s[j+1]) && (s[j+2] == '#')) j+=2;
+        if (j+2<=n) {
+          t << s (j+1, j+2);
+          u << s (j+1, j+2);
+          i= j+2;
+        }
+        t[0]->label= t[0]->label * "*";
+        option= option2= false;
+      }
+      else if (s[i] == '%') {
+        while(i < N(s) && s[i] != '\n') i++;
+      }
+      else {
+        if (arity>0) {
+          i=j;
+          tree st= parse_symbol (s, i);
+          t << st;
+          u << st;
+          arity--;
+          if (arity == 0) option= option2= false;
+        }
+        else break;
+      }
     }
-    else {
-      if (arity>0) {
-	i=j;
-	tree st= parse_symbol (s, i);
-	t << st;
-	u << st;
-	arity--;
-	if (arity == 0) option= false;
-      }
-      else break;
+    if (arity>0) latex_error (s, i, "too little arguments for " * cmd);
+  }
+
+  /******************** store and process loaded packages ********************/
+  if (is_tuple (t, "\\usepackage", 1) || is_tuple (t, "\\usepackage*", 2)) {
+    array<string> p = trim_spaces (tokenize (as_string(u[N(t)-1]), ","));
+    for (int i=0; i<N(p); i++) {
+      loaded_package (p[i]) = true;
+    }
+    if (loaded_package["algorithm2e"]) {
+      command_arity ("\\Else")   = -2;
+      command_arity ("\\For")    = -3;
+      command_arity ("\\ForAll") = -3;
+      command_arity ("\\If")     = -3;
+      command_arity ("\\Return") = -1;
+      command_arity ("\\While")  = -3;
     }
   }
-  if (arity>0) latex_error (s, i, "too little arguments for " * cmd);
 
   /******************** new commands and environments ************************/
   if (is_tuple (t, "\\def", 2)) {
@@ -599,12 +791,31 @@ latex_parser::parse_command (string s, int& i, string cmd) {
     command_type  (var)= "user";
     command_arity (var)= 0;
     command_def   (var)= as_string (u[2]);
+    if (is_func (t[2], TUPLE, 1) && 
+        latex_type (as_string (t[2][0])) != "undefined") {
+      command_arity (var)= latex_arity (as_string (t[2][0]));
+    }
   }
   if (is_tuple (t, "\\def*", 3)) {
     string var= string_arg (t[1]);
     command_type  (var)= "user";
     command_arity (var)= as_int (t[2]);
     command_def   (var)= as_string (u[3]);
+  }
+  if (is_tuple (t, "\\def**", 4)) {
+    string var= string_arg (t[1]);
+    command_type  (var)= "user";
+    command_arity (var)= - as_int (t[2]);
+    command_def   (var)= as_string (u[4]);
+  }
+  if (is_tuple (t, "\\declaretheorem*", 2) || 
+      is_tuple (t, "\\declaretheorem",  1)) {
+    string var= "\\begin-" * string_arg (t[N(t)-1]);
+    command_type  (var)= "environment";
+    command_arity (var)= 0;
+    var= "\\end-" * string_arg (t[N(t)-1]);
+    command_type  (var)= "environment";
+    command_arity (var)= 0;
   }
   if (is_tuple (t, "\\newtheorem", 2) || is_tuple (t, "\\newtheorem*", 2)) {
     string var= "\\begin-" * string_arg (t[1]);
@@ -614,7 +825,23 @@ latex_parser::parse_command (string s, int& i, string cmd) {
     command_type  (var)= "environment";
     command_arity (var)= 0;
   }
-  if (is_tuple (t, "\\newdimen", 1) || is_tuple (t, "\\newlength", 1)) {
+  if (is_tuple (t, "\\SetKwData", 2) || is_tuple (t, "\\SetKwFunction", 2)) {
+    string var= "\\"*string_arg (t[1]);
+    command_type  (var)= "algorithm2e";
+    command_arity (var)= -1;
+  }
+  if (is_tuple (t, "\\SetKwInput", 2) || is_tuple (t, "\\SetKwInOut", 2)) {
+    string var= "\\"*string_arg (t[1]);
+    command_type  (var)= "algorithm2e";
+    command_arity (var)= 1;
+  }
+  if (is_tuple (t, "\\SetKw")) {
+    string var= "\\"*string_arg (t[1]);
+    command_type  (var)= "algorithm2e";
+    command_arity (var)= 0;
+  }
+  if (is_tuple (t, "\\newdimen", 1) || is_tuple (t, "\\newlength", 1)
+      || is_tuple (t, "\\newskip", 1)) {
     string var= string_arg (t[1]);
     command_type  (var)= "length";
     command_arity (var)= 0;
@@ -643,9 +870,22 @@ latex_parser::parse_command (string s, int& i, string cmd) {
     command_def   (var)= as_string (u[4]);
     if (is_math_environment (t)) command_type (var)= "math-environment";
   }
+  if (is_tuple (t, "\\newenvironment**", 5)) {
+    string var= "\\begin-" * string_arg (t[1]);
+    command_type  (var)= "user";
+    command_arity (var)= -as_int (t[2]);
+    command_def   (var)= as_string (u[4]);
+    if (is_math_environment (t)) command_type (var)= "math-environment";
+    var= "\\end-" * string_arg (t[1]);
+    command_type  (var)= "user";
+    command_arity (var)= 0;
+    command_def   (var)= as_string (u[5]);
+    if (is_math_environment (t)) command_type (var)= "math-environment";
+  }
 
   /***************** environment changes for user commands  ******************/
-  if (latex_type (cmd) == "user") {
+  if ((is_tuple (t, "\\def", 2) || is_tuple (t, "\\def*", 3))
+      && latex_type (cmd) == "user") {
     int pos= 0;
     string body= command_def[cmd];
     textm_recursion_level (cmd)++;
@@ -671,13 +911,13 @@ latex_parser::parse_argument (string s, int& i) {
     i++;
     return parse (s, i, "}");
   }
-  else parse_symbol (s, i);
+  else return parse_symbol (s, i);
 }
 
 tree
 latex_parser::parse_unknown (string s, int& i, string cmd) {
   int  n     = N(s);
-  bool option= false;
+  bool option= true;
 
   tree t (TUPLE, copy (cmd));
   while (i<n) {
@@ -720,17 +960,19 @@ latex_parser::can_parse_length (string s, int i) {
 	     read (s, i, "minus") || read (s, i, "\\@minus"))
       return stage >= 2;
     else if (is_tex_alpha (s[i])) {
-      if (read (s, i, "cm")) stage= 2;
+      if      (read (s, i, "cm")) stage= 2;
       else if (read (s, i, "mm")) stage= 2;
       else if (read (s, i, "pt")) stage= 2;
       else if (read (s, i, "in")) stage= 2;
       else if (read (s, i, "em")) stage= 2;
+      else if (read (s, i, "ex")) stage= 2;
       else if (read (s, i, "pc")) stage= 2;
       else if (read (s, i, "bp")) stage= 2;
       else if (read (s, i, "dd")) stage= 2;
       else if (read (s, i, "cc")) stage= 2;
       else if (read (s, i, "sp")) stage= 2;
       else return false;
+      return stage >= 2;
       if (i<n && is_tex_alpha (s[i])) return false;
     }
     else if (s[i] == '\\') {
@@ -747,6 +989,11 @@ latex_parser::can_parse_length (string s, int i) {
 
 tree
 latex_parser::parse_length (string s, int& i) {
+  return parse_length (s, i, 0);
+}
+
+tree
+latex_parser::parse_length (string s, int& i, int e) {
   int n= N(s);
   tree r= tree (CONCAT);
   while (i<n) {
@@ -771,22 +1018,21 @@ latex_parser::parse_length (string s, int& i) {
     else if (is_tex_alpha (s[i]) && N(r) > 0 && is_atomic (r[N(r)-1]) &&
 	     (is_numeric (r[N(r)-1]->label) ||
 	      r[N(r)-1] == "." || r[N(r)-1] == "-")) {
-      for (;i<n && is_tex_alpha (s[i]); i++)
+      for (;i<n && is_tex_alpha (s[i]); i++) {
 	r << s (i, i+1);
+        e += 1;
+      }
       continue;
     }
     else if (s[i] == '\\') {
-      i++;
-      int start= i;
+      int start= i++;
       while (i<n && is_tex_alpha (s[i])) i++;
-      string unit= s (start, i);
-      if (latex_type (unit) != "length") { i= start-1; break; }
-      // FIXME
-      if (unit == "p@")
-	r << string ("p") << string ("t");
-      else if (unit == "z@")
-	r << string ("0") << string ("p") << string ("t");
-      // FIXME
+      if (latex_type (s (start+1, i)) != "length" || e > 0) { 
+        i= start; 
+        break;
+      }
+      r << as_string (latex_symbol_to_tree (s (start, i)));
+      e += 1;
       continue;
     }
     else if (is_space (s[i]));
@@ -848,7 +1094,7 @@ static char Cork_unaccented[128]= {
   'D', 'N', 'O', 'O', 'O', 'O', 'O', ' ',
   ' ', 'U', 'U', 'U', 'U', 'Y', ' ', ' ',
   'a', 'a', 'a', 'a', 'a', 'a', ' ', 'c',
-  'e', 'e', 'e', 'e', 25 , 25 , 25 , 25 ,
+  'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i',
   'd', 'n', 'o', 'o', 'o', 'o', 'o', ' ',
   ' ', 'u', 'u', 'u', 'u', 'y', ' ', ' '
 };
@@ -903,14 +1149,13 @@ accented_to_Cork (tree t) {
     }
     else {
       char c1= v[0], c2= s[1];
-      if (v == "\\i") c1= (char) 25;
+      if (v == "\\i") c1= 'i';
       if ((N(v)==1) || (v=="\\i"))
 	for (i=0; i<127; i++)
 	  if ((Cork_unaccented[i]==c1) && (Cork_accent[i]==c2))
 	    return tree (string ((char) (i+128)));
     }
   }
-  if (r == tuple ("\\i")) return "\\i";
   return r;
 }
 
@@ -1012,118 +1257,214 @@ latex_parser::parse (string s, bool change) {
   return t;
 }
 
-static bool
-japanese_tex (string& s) {
-  if (search_forwards ("\\documentclass{jarticle}", s) != -1) {
-    s= replace (s, "\\documentclass{jarticle}", "\\documentclass{article}");
-    s= convert (s, "ISO-2022-JP", "UTF-8");
-    return true;
-  }
-  if (search_forwards ("\\documentclass{jbook}", s) != -1) {
-    s= replace (s, "\\documentclass{jbook}", "\\documentclass{book}");
-    s= convert (s, "ISO-2022-JP", "UTF-8");
-    return true;
-  }
-  return false;
-}
+/******************************************************************************
+* Internationalization
+******************************************************************************/
 
-static bool
-korean_tex (string& s) {
-  if (search_forwards ("\\usepackage{hangul}", s) != -1 ||
-      search_forwards ("\\usepackage{hfont}", s) != -1 ||
-      search_forwards ("]{hangul}", s) != -1 ||
-      search_forwards ("]{hfont}", s) != -1)
-    {
-      s= replace (s, "\\usepackage{hangul}", "");
-      s= replace (s, "\\usepackage{hfont}", "");
-      s= convert (s, "EUC-KR", "UTF-8");
-      return true;
+string
+clean_latex_comments (string s) {
+  string r = "";
+  int start = 0, stop = 0;
+  while (stop < N(s)) {
+    //cout << start << " : " << stop << "\n";
+    stop = search_forwards ("%", stop, s);
+    //cout << s[stop -1] << s[stop ] << s[stop +1];
+    if (stop == -1) {
+      r << s (start, N(s));
+      return r;
     }
-  if (search_forwards ("\\usepackage{dhucs}", s) != -1 ||
-      search_forwards ("\\usepackage{memhangul-ucs}", s) != -1 ||
-      search_forwards ("]{dhucs}", s) != -1 ||
-      search_forwards ("]{memhangul-ucs}", s) != -1)
-    {
-      s= replace (s, "\\usepackage{dhucs}", "");
-      s= replace (s, "\\usepackage{memhangul-ucs}", "");
-      return true;
+    else if (stop == 0 || s[stop -1] != '\\') {
+      r << s (start, stop) << "\n";
+      stop = search_forwards ("\n", stop, s) + 1;
+      start = stop;
+      continue;
     }
-  return false;
+    else
+      stop++;
+  }
+  if (start < N(s)) r << s (start, N(s));
+  return r;
 }
 
-static bool
-chinese_tex (string& s) {
-  if (search_forwards ("\\kaishu", s) != -1)
-    s= replace (s, "\\kaishu", "");
-  if (search_forwards ("\\begin{CJK}{GBK}{kai}", s) != -1)
-    s= replace (s, "\\begin{CJK}{GBK}{kai}", "");
-  if (search_forwards ("\\begin{CJK*}{GBK}{kai}", s) != -1)
-    s= replace (s, "\\begin{CJK*}{GBK}{kai}", "");
-  if (search_forwards ("\\end{CJK}", s) != -1)
-    s= replace (s, "\\end{CJK}", "");
-  if (search_forwards ("\\end{CJK*}", s) != -1)
-    s= replace (s, "\\end{CJK*}", "");
-  if (search_forwards ("\\CJKindent", s) != -1)
-    s= replace (s, "\\CJKindent", "");
-  if (search_forwards ("\\CJKcaption{GBk}", s) != -1)
-    s= replace (s, "\\CJKcaption{GBK}", "");
-  if (search_forwards ("\\usepackage{CJK}", s) != -1) {
-    s= replace (s, "\\usepackage{CJK}", "");
-    s= convert (s, "cp936", "UTF-8");
-    return true;
+int
+get_latex_package_idx (string s, string which) {
+  int i = 0;
+  while (search_forwards ("\\usepackage", i, s) != -1) {
+    int state = 0;
+    i = search_forwards ("\\usepackage", i, s) + 1;
+    for (int j = i ; j < N(s) ; j++) {
+      if      (test (s, j, "\n")  || test (s, j, "\\")) break;
+      else if (test (s, j, "{")   && state == 0) state = 1;
+      else if (test (s, j, "}")   && state == 1) break;
+      else if (test (s, j, which) && state == 1)
+        return search_backwards ("\\usepackage", j, s);
+    }
   }
-  if (search_forwards ("\\documentclass{cctart}", s) != -1) {
-    s= replace (s, "\\documentclass{cctart}", "\\documentclass{article}");
-    s= convert (s, "cp936", "UTF-8");
-    return true;
-  }
-  if (search_forwards ("\\documentclass[CJK]{cctart}", s) != -1) {
-    s= replace (s, "\\documentclass[CJK]{cctart}", "\\documentclass{article}");
-    s= convert (s, "cp936", "UTF-8");
-    return true;
-  }
-  return false;
+  return -1;
 }
 
-static bool
-taiwanese_tex (string& s) {
-  if (search_forwards ("\\usepackage{CJKvert,type1cm}", s) != -1)
-    s= replace (s, "\\usepackage{CJKvert,type1cm}", "");
-  if (search_forwards ("\\begin{CJK}{Bg5}{aming}", s) != -1)
-    s= replace (s, "\\begin{CJK}{Bg5}{aming}", "");
-  if (search_forwards ("\\begin{CJK}{Bg5}{kai}", s) != -1)
-    s= replace (s, "\\begin{CJK}{Bg5}{kai}", "");
-  if (search_forwards ("\\end{CJK}", s) != -1)
-    s= replace (s, "\\end{CJK}", "");
-  if (search_forwards ("\\CJKcaption{Bg5}", s) != -1)
-    s= replace (s, "\\CJKcaption{Bg5}", "");
-  if (search_forwards ("\\CJKindent", s) != -1)
-    s= replace (s, "\\CJKindent", "");
-  if (search_forwards ("\\usepackage{CJK}", s) != -1) {
-    s= replace (s, "\\usepackage{CJK}", "");
-    s= convert (s, "cp950", "UTF-8");
-    return true;
+string
+get_latex_language (string s) {
+  s = clean_latex_comments (s);
+  int start, stop;
+  stop = get_latex_package_idx (s, "babel");
+  if (stop == -1) return "";
+  stop = search_forwards  ("babel", stop, s);
+  stop = search_backwards ("]", stop, s) - 1;
+  while (!is_alpha(s[stop])) stop--;
+  for (start = stop ; stop > 0 ; start--)
+    if (test(s, start, ' ') || test(s, start, '[') || test(s, start, ','))
+      break;
+  string r = s(start+1, stop+1);
+
+  tree langs = concat(); 
+  langs << "british" << "bulgarian" << "chinese" << "czech" << "danish"
+    << "dutch" << "finnish" << "french" << "german" << "hungarian" << "italian"
+    << "japanese" << "korean" << "polish" << "portuguese" << "romanian"
+    << "russian" << "slovene" << "spanish" << "swedish" << "taiwanese"
+    << "ukrainian"; 
+
+  for (int i = 0 ; i < N(langs) ; i++)
+    if (test(r, 0 , as_string(langs[i])))
+      return as_string(langs[i]);
+  if (r == "ngermanb") return "german";
+  if (r == "magyar") return "hungarian";
+  return "";
+}
+
+string
+get_latex_encoding (string s) {
+  s = clean_latex_comments (s);
+  int start, stop;
+  
+  // Try if inputenc is called
+  stop = get_latex_package_idx (s, "inputenc");
+  if (stop != -1) {
+    stop = search_forwards  ("inputenc", stop, s);
+    stop = search_backwards ("]", stop, s);
+    start = search_backwards ("[", stop, s) + 1;
+    s = s(start, stop);
+    s = replace(s, " ", "");
+    s = replace(s, "\t", "");
+    s = replace(s, ",", "");
+    return s;
   }
-  if (search_forwards ("\\usepackage{CJK*}", s) != -1) {
-    s= replace (s, "\\usepackage{CJK*}", "");
-    s= convert (s, "cp950", "UTF-8");
-    return true;
+
+  // Try if CJK is called
+  stop = get_latex_package_idx (s, "CJK");
+  if (stop != -1) {
+    tree encs = concat();
+    encs << "Bg5" <<  "GB" << "GBK" << "JIS" << "SJIS" << "KS" << "UTF8"
+      << "EUC-TW" << "EUC-JP" << "EUC-KR";
+
+    for (int i = 0 ; i < N(encs) ; i++)
+      if (occurs ("\\begin{CJK}{"*as_string(encs[i]), s))
+        return as_string(encs[i]);
   }
-  return false;
+
+  // Try other tricky tests
+  if (occurs ("\\documentclass[CJK]{cctart}", s) ||
+      occurs ("\\documentclass{cctart}", s) || occurs ("\\kaishu", s))
+    return "GB";
+
+  if (occurs ("\\usepackage{hangul}", s) || occurs ("\\usepackage{hfont}", s) ||
+      occurs ("]{hangul}", s) || occurs ("]{hfont}", s))
+    return "KS";
+
+  if (occurs ("\\usepackage{dhucs}", s) || occurs ("]{dhucs}", s) ||
+      occurs ("\\usepackage{memhangul-ucs}", s) ||
+      occurs ("]{memhangul-ucs}", s))
+    return "UTF8";
+
+  if (occurs ("\\documentclass{jarticle}", s) || occurs ("]{jarticle}", s) ||
+      occurs ("\\documentclass{jbook}", s) || occurs ("]{jbook}", s) ||
+      occurs ("\\documentclass{jreport}", s) || occurs ("]{jreport}", s))
+    return "JIS";
+
+  // Maybe a Cork/catcode generated by TeXmacs
+  if (occurs ("TeXmacs macros", s) && occurs ("\\catcode", s))
+    return "Cork";
+
+  return "";
+}
+
+string
+latex_encoding_to_iconv (string s) {
+  // Encodings used for LaTeX import.
+  // Thanks LyX developpers. Adapted from lyx-devel/lib/encodings
+
+  if (s == "Cork")     return "Cork";
+  if (s == "utf8")     return "UTF-8";
+  if (s == "utf8x")    return "UTF-8";
+  if (s == "UTF8")     return "UTF-8";
+  // This encoding is used to typeset Armenian using the armTeX package
+  if (s == "armscii8") return "ARMSCII-8";
+  if (s == "latin1")   return "ISO-8859-1";
+  if (s == "latin2")   return "ISO-8859-2";
+  if (s == "latin3")   return "ISO-8859-3";
+  if (s == "latin4")   return "ISO-8859-4";
+  if (s == "latin5")   return "ISO-8859-9";
+  if (s == "latin9")   return "ISO-8859-15";
+  if (s == "latin10")  return "ISO-8859-16";
+  if (s == "iso88595") return "ISO-8859-5";
+  // Not standard, see http://tug.ctan.org/tex-archive/language/arabic/arabi/arabi/texmf/latex/arabi/
+  if (s == "8859-6")     return "ISO-8859-6";
+  if (s == "iso-8859-7") return "ISO-8859-7";
+  if (s == "8859-8")     return "ISO-8859-8";
+  // Not standard, see http://www.vtex.lt/tex/littex/index.html
+  if (s == "l7xenc")   return "ISO-8859-13";
+  if (s == "applemac") return "Macintosh";
+  if (s == "cp437")    return "CP437";
+  // cp437, but on position 225 is sz instead of beta
+  if (s == "cp437de") return "CP437";
+  if (s == "cp850")   return "CP850";
+  if (s == "cp852")   return "CP852";
+  if (s == "cp855")   return "CP855";
+  if (s == "cp858")   return "CP858";
+  if (s == "cp862")   return "CP862";
+  if (s == "cp865")   return "CP865";
+  if (s == "cp866")   return "CP866";
+  if (s == "cp1250")  return "CP1250";
+  if (s == "cp1251")  return "CP1251";
+  if (s == "ansinew") return "CP1252";
+  if (s == "cp1252")  return "CP1252";
+  if (s == "cp1255")  return "CP1255";
+  // Not standard, see http://tug.ctan.org/tex-archive/language/arabic/arabi/arabi/texmf/latex/arabi/
+  if (s == "cp1256")  return "CP1256";
+  if (s == "cp1257")  return "CP1257";
+  if (s == "koi8-r")  return "KOI8-R";
+  if (s == "koi8-u")  return "KOI8-U";
+  if (s == "pt154")   return "PT154";
+  if (s == "pt254")   return "PT254";
+  // For simplified chinese
+  if (s == "GB")      return "EUC-CN";
+  if (s == "GBK")     return "GBK";
+  // For japanese
+  if (s == "JIS")     return "ISO-2022-JP";
+  // For korean
+  if (s == "KS")      return "EUC-KR";
+  // For traditional chinese
+  if (s == "EUC-TW")  return "EUC-TW";
+  // For japanese
+  if (s == "EUC-JP")  return "EUC-JP";
+
+  return "";
 }
 
 tree
 parse_latex (string s, bool change) {
   s= dos_to_better (s);
-  string lan= "";
-  if (japanese_tex (s)) lan= "japanese";
-  else if (korean_tex (s)) lan= "korean";
-  else if (taiwanese_tex (s)) lan= "taiwanese";
-  else if (chinese_tex (s)) lan= "chinese";
-  bool unicode= (lan == "chinese" || lan == "japanese" ||
-		 lan == "korean" || lan == "taiwanese");
-  latex_parser ltx (unicode);
-  tree r= accented_to_Cork (ltx.parse (s, change));
+  string lan= get_latex_language (s);
+  string encoding= latex_encoding_to_iconv (get_latex_encoding (s));
+  if (encoding != "UTF-8" && encoding != "Cork" && encoding != "")
+    s= convert (s, encoding, "UTF-8");
+  else if (encoding == "")
+    s= convert (s, "ISO-8859-1", "UTF-8");
+
+  latex_parser ltx (encoding != "Cork");
+  ltx.lf= 'M';
+  tree r= ltx.parse (s, change);
+  r= accented_to_Cork (ltx.parse (s, change));
   if (lan == "") return r;
   return compound ("!language", r, lan);
 }

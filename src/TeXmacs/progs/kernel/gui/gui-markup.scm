@@ -216,6 +216,11 @@
 ;; Menu and widget elements
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (process-translate x)
+  (if (or (func? x 'concat) (func? x 'verbatim))
+      `(list ',(car x) ,@(map process-translate (cdr x)))
+      x))
+
 (tm-define-macro ($-> text . l)
   (:synopsis "Make pullright button")
   `(cons* '-> ,text ($list ,@l)))
@@ -256,11 +261,11 @@
 
 (tm-define-macro ($menu-group text)
   (:synopsis "Make a menu group")
-  `(list 'group ,text))
+  `(list 'group ,(process-translate text)))
 
 (tm-define-macro ($menu-text text)
   (:synopsis "Make text")
-  `(list 'text ,text))
+  `(list 'text ,(process-translate text)))
 
 (tm-define-macro ($input cmd type proposals width)
   (:synopsis "Make input field")
@@ -283,13 +288,14 @@
   (:synopsis "Make a multiple choice list")
   `(list 'choices (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,mc)))
 
-(tm-define-macro ($texmacs-output doc)
+(tm-define-macro ($texmacs-output doc tmstyle)
   (:synopsis "Make TeXmacs output field")
-  `(list 'texmacs-output (lambda () ,doc)))
+  `(list 'texmacs-output (lambda () ,doc) (lambda () ,tmstyle)))
 
-(tm-define-macro ($texmacs-input doc cmd continuous?)
+(tm-define-macro ($texmacs-input doc tmstyle cmd continuous?)
   (:synopsis "Make TeXmacs input field")
-  `(list 'texmacs-input (lambda () ,doc) (lambda (answer) ,cmd) ,continuous?))
+  `(list 'texmacs-input (lambda () ,doc) (lambda () ,tmstyle) 
+                        (lambda (answer) ,cmd) ,continuous?))
 
 (tm-define-macro ($ink cmd)
   (:synopsis "Make an ink widget")
@@ -331,12 +337,41 @@
   (if (nnull? l) (form-named-set name field (car l)))
   l)
 
+(tm-define (form-proposals-sel name field l selected)
+  (:synopsis "Inits the value of @field in form @name to the @selected value and returns the list @l unmodified")
+  (if (nnull? l) (form-named-set name field selected))
+  l)
+
 (tm-define-macro ($form-input field type proposals width)
-  (:synopsis "Make form textual input field")
+  (:synopsis "Make a textual input field for the current form")
   `($execute
      (set! form-entries (append form-entries (list ,field)))
      ($input (form-named-set form-name ,field answer)
              ,type (form-proposals form-name ,field ,proposals) ,width)))
+
+(tm-define-macro ($form-enum field proposals selected width)
+  (:synopsis "Make an enumeration field for the current form")
+  `($execute
+     (set! form-entries (append form-entries (list ,field)))
+     ($enum (form-named-set form-name ,field answer)
+            (form-proposals-sel form-name ,field ,proposals ,selected)
+            ,selected ,width)))
+
+(tm-define-macro ($form-choice field proposals selected) 
+  (:synopsis "Make a single choice field for the current form") 
+  `($execute 
+     (set! form-entries (append form-entries (list ,field))) 
+     ($choice (form-named-set form-name ,field answer)
+              (form-proposals-sel form-name ,field ,proposals ,selected)
+              ,selected)))
+
+(tm-define-macro ($form-choices field proposals selected) 
+  (:synopsis "Make a multiple choice field for the current form") 
+  `($execute 
+     (set! form-entries (append form-entries (list ,field))) 
+     ($choices (form-named-set form-name ,field answer)
+               (form-proposals-sel form-name ,field ,proposals ,selected)
+               ,selected)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic text markup
@@ -429,6 +464,9 @@
 (tm-define-macro ($strong . l)
   ($quote `(strong ($unquote ($inline ,@l)))))
 
+(tm-define-macro ($verbatim . l)
+  ($quote `(verbatim ($unquote ($inline ,@l)))))
+
 (tm-define-macro ($link dest . l)
   ($quote `(hlink ($unquote ($inline ,@l)) ($unquote ($textual ,dest)))))
 
@@ -436,11 +474,19 @@
 ;; Specific markup for TeXmacs documentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define-macro ($generic . l)
+  ($quote
+   `(document
+      (TeXmacs ,(texmacs-version))
+      (style (tuple "generic"))
+      (body ($unquote ($block ,@l))))))
+
 (tm-define-macro ($tmdoc . l)
   (with lan (get-output-language)
     ($quote
       `(document
-         (style "tmdoc")
+         (TeXmacs ,(texmacs-version))
+         (style (tuple "tmdoc"))
          (body ($unquote ($localize ($block ,@l))))
          (initial (collection (associate "language" ,lan)))))))
 
@@ -449,6 +495,9 @@
 
 (tm-define-macro ($tmdoc-title . l)
   ($quote `(document (tmdoc-title ($unquote ($inline ,@l))))))
+
+(tm-define-macro ($tmfs-title . l)
+  ($quote `(document (tmfs-title ($unquote ($inline ,@l))))))
 
 (tm-define-macro ($folded-documentation key . l)
   ($quote `(document (folded-documentation ($unquote ($inline ,key))

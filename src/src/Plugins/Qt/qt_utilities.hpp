@@ -18,29 +18,68 @@
 #include <QPoint>
 #include <QString>
 #include <QColor>
+#include <QFont>
 
 class QStringList;
+class QKeySequence;
 
 typedef quartet<SI,SI,SI,SI> coord4;
 typedef pair<SI,SI> coord2;
 
-QColor to_qcolor (const string& );
-string from_qcolor (const QColor& );
-QRect to_qrect (const coord4 & p);
-QPoint to_qpoint (const coord2 & p);
-QSize to_qsize (const coord2 & p);
-coord4 from_qrect (const QRect & rect);
-coord2 from_qpoint (const QPoint & pt);
-coord2 from_qsize (const QSize & s);
-QString to_qstylesheet(int style);
+/******************************************************************************
+ * Conversion of data types
+ ******************************************************************************/
 
-QStringList to_qstringlist(array<string> l);
-array<string> from_qstringlist(const QStringList& l);
-QString to_qstring (string s);
-QString utf8_to_qstring (string s);  //<! convert a string with texmacs internal encoding to a QString via Utf8 encoding
-string from_qstring (const QString & s);  //<! convert an utf8 texmacs string to a QString
-string from_qstring_utf8 (const QString & s);  //<! convert a QString to a TeXmacs utf8 string
-string qt_translate (string s); //!< convert a QString to a TeXmacs cork string
+QColor   to_qcolor (const string& );
+QColor   to_qcolor (color c);
+string from_qcolor (const QColor& );
+
+QRect    to_qrect (const coord4 & p);
+coord4 from_qrect (const QRect & rect);
+
+QPoint   to_qpoint (const coord2 & p);
+coord2 from_qpoint (const QPoint & pt);
+
+QSize    to_qsize (const coord2 & p);
+QSize    to_qsize (const SI& w, const SI& h);
+coord2 from_qsize (const QSize & s);
+
+QFont         to_qfont (int style, QFont font);
+QString to_qstylesheet (int style);
+QString to_qstylesheet (int style, color c);
+
+QSize qt_decode_length (string width, string height, 
+                        const QSize& ref, const QFontMetrics& fm);
+
+QKeySequence to_qkeysequence (string s);
+
+QStringList     to_qstringlist (array<string> l);
+array<string> from_qstringlist (const QStringList& l);
+
+///// String conversion: Assumes UTF8 encodings both in QT and TeXmacs.
+
+QString        to_qstring (string s);
+string       from_qstring (const QString & s);
+QString   utf8_to_qstring (string s);
+string  from_qstring_utf8 (const QString & s);
+
+/*! Returns a QString with the translation of the argument to the current
+ language.
+ 
+ NOTE: translations of gui items are always done in the scheme side using 
+ (translate stuff-to-translate), and this is enabled by default for most widgets
+ displaying text. We need not and must not use Qt's mechanism for translations
+ nor even this function, unless the strings to be translated are hardcoded in
+ our code (which is wrong of course). While parsing widgets, etc. nothing is to
+ be done wrt. translations.
+ */
+QString qt_translate (string s);
+
+
+/******************************************************************************
+ * File formats and their conversion. Other stuff.
+ ******************************************************************************/
+
 bool qt_supports (url u);
 void qt_image_size (url image, int& w, int& h);
 void qt_convert_image (url image, url dest, int w =0, int h =0);
@@ -52,21 +91,29 @@ string qt_get_date (string lan, string fm);
 bool qt_print (bool&, bool&, string&, url&, string&, string&, string&);
 
 /******************************************************************************
-* Type checking
-******************************************************************************/
+ * Type checking
+ ******************************************************************************/
 
 inline void
-check_type_void (blackbox bb, string s) {
+check_type_void (blackbox bb, slot s) {
   if (!is_nil (bb)) {
-    cerr << "\nslot type= " << s << "\n";
+    cerr << "\nslot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+}
+
+template<class T> inline void
+check_type_id (int type_id, slot s) {
+  if (type_id != type_helper<T>::id) {
+    cerr << "\nslot type= " << as_string(s) << LF;
     FAILED ("type mismatch");
   }
 }
 
 template<class T> void
-check_type (blackbox bb, string s) {
+check_type (blackbox bb, slot s) {
   if (type_box (bb) != type_helper<T>::id) {
-    cerr << "\nslot type= " << s << "\n";
+    cerr << "\nslot type= " << as_string(s) << LF;
     FAILED ("type mismatch");
   }
 }
@@ -78,15 +125,18 @@ check_type (blackbox bb, string s) {
 
 extern widget the_keyboard_focus;
 
+/*! the run-loop should exit when the number of windows is zero */
 extern int nr_windows; 
-  // the run-loop should exit when the number of windows is zero
 
-/**
- * some debugging infrastucture
- */
+/******************************************************************************
+ * Some debugging infrastucture
+ ******************************************************************************/
 extern tm_ostream& operator << (tm_ostream& out, QRect rect);
-#define TYPE_CHECK(b) ASSERT (b, "type mismatch")
+
+// deprecated, use check_type<T>(bb, slot) instead
+//#define TYPE_CHECK(b) ASSERT (b, "type mismatch")   
+
 #define NOT_IMPLEMENTED \
-{ if (DEBUG_QT) cout << "STILL NOT IMPLEMENTED\n"; }
+{ if (DEBUG_QT) cout << "NOT YET IMPLEMENTED\n"; }
 
 #endif  // QT_UTILITIES_HPP

@@ -46,15 +46,14 @@ edit_env_rep::rewrite (tree t) {
   case EXTERN:
     {
       int i, n= N(t);
-      if (n == 0) return tree (ERROR, "invalid extern");
+      if (n < 1) return tree (ERROR, "invalid extern");
+      string fun= tm_decode(exec_string (t[0]));
       tree r (TUPLE, n);
-      for (i=0; i<n; i++)
+      for (i=1; i<n; i++)
 	r[i]= exec (t[i]);
       object expr= null_object ();
       for (i=n-1; i>0; i--)
 	expr= cons (object (r[i]), expr);
-      if (N(t) < 1) return tree (ERROR, "invalid extern");
-      string fun= exec_string (t[0]);
       expr= cons (string_to_object (fun), expr);
       if (!secure && script_status < 2) {
 	if (!as_bool (call ("secure?", expr)))
@@ -715,7 +714,7 @@ edit_env_rep::exec_arg (tree t) {
   if (is_compound (r))
     return tree (ERROR, "bad arg");
   if (is_nil (macro_arg) || (!macro_arg->item->contains (r->label)))
-    return tree (ERROR, "argument " * r->label);
+    return tree (ERROR, "arg " * r->label);
   r= macro_arg->item [r->label];
   list<hashmap<string,tree> > old_var= macro_arg;
   list<hashmap<string,path> > old_src= macro_src;
@@ -732,7 +731,7 @@ edit_env_rep::exec_arg (tree t) {
       r= r[nr];
     }
   }
-  if (err) r= tree (ERROR, "bad arg");
+  if (err) r= tree (ERROR, "arg " * r->label);
   else r= exec (r);
   macro_arg= old_var;
   macro_src= old_src;
@@ -787,9 +786,9 @@ edit_env_rep::exec_get_arity (tree t) {
 tree
 edit_env_rep::exec_eval_args (tree t) {
   if (N(t)<1) return tree (ERROR, "bad eval-args");
+  if(is_nil(macro_arg)) return tree(ERROR, "nil argument");
   tree v= macro_arg->item [as_string (t[0])];
-  if (is_atomic (v) || is_nil (macro_arg))
-    return tree (ERROR, "eval arguments " * t[0]->label);
+  if (is_atomic (v)) return tree (ERROR, "eval arguments " * t[0]->label);
   list<hashmap<string,tree> > old_var= macro_arg;
   list<hashmap<string,path> > old_src= macro_src;
   if (!is_nil (macro_arg)) macro_arg= macro_arg->next;
@@ -914,14 +913,17 @@ tree
 edit_env_rep::exec_use_package (tree t) {
   int i, n= N(t);
   for (i=0; i<n; i++) {
+    //cout << "Package " << as_string (t[i]) << "\n";
+    url name= url_none ();
     url styp= "$TEXMACS_STYLE_PATH";
-    url name= as_string (t[i]) * string (".ts");
-    //cout << "Package " << name << "\n";
-    if (is_rooted_web (base_file_name))
-      styp= styp | head (base_file_name);
-    else styp= ::expand (head (base_file_name) * url_ancestor ()) | styp;
+    //if (is_rooted_web (base_file_name)) styp= styp | head (base_file_name);
+    //else styp= ::expand (head (base_file_name) * url_ancestor ()) | styp;
+    if (ends (as_string (t[i]), ".ts")) name= as_string (t[i]);
+    else name= styp * (as_string (t[i]) * string (".ts"));
+    name= resolve (name);
+    //cout << as_string (t[i]) << " -> " << name << "\n";
     string doc_s;
-    if (!load_string (styp * name, doc_s, false)) {
+    if (!load_string (name, doc_s, false)) {
       tree doc= texmacs_document_to_tree (doc_s);
       if (is_compound (doc))
 	exec (filter_style (extract (doc, "body")));
@@ -1299,6 +1301,7 @@ edit_env_rep::exec_number (tree t) {
   string s1= t1->label;
   string s2= t2->label;
   int nr= as_int (s1);
+  if (s2 == "arabic") return as_string (nr);
   if (s2 == "roman") return roman_nr (nr);
   if (s2 == "Roman") return Roman_nr (nr);
   if (s2 == "alpha") return alpha_nr (nr);

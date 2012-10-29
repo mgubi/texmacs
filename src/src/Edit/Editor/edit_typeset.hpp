@@ -36,12 +36,14 @@ protected:
   void                 set_init (hashmap<string,tree> init= tree ("?"));
   void                 add_init (hashmap<string,tree> init);
   void                 set_fin (hashmap<string,tree> fin);
-  void                 set_base_name (url name);
+  void                 set_master (url name);
 
 public:
   edit_typeset_rep ();
   ~edit_typeset_rep ();
   void clear_local_info ();
+  void set_data (new_data data);
+  void get_data (new_data& data);
 
   SI       as_length (string l);
   string   add_lengths (string l1, string l2);
@@ -95,8 +97,6 @@ public:
   void     typeset (SI& x1, SI& y1, SI& x2, SI& y2);
 
   friend class tm_window_rep;
-  friend class tm_data_rep;
-  friend class tm_project_rep;
   friend class tm_server_rep;
 };
 

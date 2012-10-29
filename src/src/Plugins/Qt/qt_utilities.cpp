@@ -20,6 +20,7 @@
 #include <QTextCodec>
 #include <QHash>
 #include <QStringList>
+#include <QKeySequence>
 
 #include <QPrinter>
 #include <QPrintDialog>
@@ -28,6 +29,9 @@
 #include "dictionary.hpp"
 #include "converter.hpp"
 #include "language.hpp"
+#include "scheme.hpp"
+
+#include "qt_gui.hpp"    // gui_maximal_extents()
 
 #ifdef USE_GS
 #include "Ghostscript/gs_utilities.hpp"
@@ -40,35 +44,35 @@ operator << (tm_ostream& out, QRect rect) {
   << rect.width() << "," << rect.height() << ")";
 }
 
-QRect
-to_qrect (const coord4 & p) {
-  float c= 1.0/PIXEL;
-  return QRect (p.x1*c, -p.x4*c, (p.x3-p.x1+PIXEL-1)*c, (p.x4-p.x2+PIXEL-1)*c);
-}
-
-QPoint
-to_qpoint (const coord2 & p) {
-  float c= 1.0/PIXEL;
-  return QPoint (p.x1*c, -p.x2*c);
-}
-
-QSize
-to_qsize (const coord2 & p) {
-  float c= 1.0/PIXEL;
-  return QSize (p.x1*c, p.x2*c);
-}
-
-
-// TODO
-QString
-to_qstylesheet(int style) {
-  QString sheet("* {");
+QFont
+to_qfont (int style, QFont font) {
   if (style & WIDGET_STYLE_MINI)  // use smaller text font inside widget
-    sheet += "";
+    font.setPointSize(10);
   if (style & WIDGET_STYLE_MONOSPACED)  // use monospaced font inside widget
-    sheet += "";
+    font.setFixedPitch(true);     //FIXME?
+//if (style & WIDGET_STYLE_GREY)  // use grey text font
+//    font.set += "color: #414141";
+  if (style & WIDGET_STYLE_PRESSED)   // indicate that a button is currently pressed
+    {}
+  if (style & WIDGET_STYLE_INERT)  // only render but don't associate any action to widget
+    {}
+  if (style & WIDGET_STYLE_BUTTON)  // indicate that a button should explicitly rendered as a button
+    {}
+  if (style & WIDGET_STYLE_BOLD)
+    font.setBold(true);
+  return font;
+
+}
+
+QString
+parse_tm_style (int style) {
+  QString sheet;
+  if (style & WIDGET_STYLE_MINI)  // use smaller text font inside widget
+    sheet += "font-size: 10pt;";
+  if (style & WIDGET_STYLE_MONOSPACED)  // use monospaced font inside widget
+    sheet += "font-family: \"monospace\";";
   if (style & WIDGET_STYLE_GREY)  // use grey text font
-    sheet += "";
+    sheet += "color: #414141;";
   if (style & WIDGET_STYLE_PRESSED)   // indicate that a button is currently pressed
     sheet += "";
   if (style & WIDGET_STYLE_INERT)  // only render but don't associate any action to widget
@@ -76,13 +80,130 @@ to_qstylesheet(int style) {
   if (style & WIDGET_STYLE_BUTTON)  // indicate that a button should explicitly rendered as a button
     sheet += "";
   if (style & WIDGET_STYLE_CENTERED)  // use centered text
-    sheet += "";
+    sheet += "text-align: center;";
   if (style & WIDGET_STYLE_BOLD)
-    sheet += "";
-
-  sheet += "}";
+    sheet += "font-weight: bold;";
+  if (DEBUG_QT)
+    sheet += "border:1px solid rgb(255, 0, 0);";
   return sheet;
 }
+
+/*! */
+QString
+to_qstylesheet (int style) {
+  if (DEBUG_QT) {
+    return "* {" + parse_tm_style(style) + "}" + 
+           "*:hover { background-color: rgb(255,220,220); }";
+  }
+  return "* {" + parse_tm_style(style) + "}";
+}
+
+QString
+to_qstylesheet (int style, color c) {
+  int r,g,b,a;
+  get_rgb_color(c, r, g, b, a);
+  a = a*100/255;
+  return "* {" + parse_tm_style(style)
+    + QString("color: rgba(%1, %2, %3, %4%);").arg(r).arg(g).arg(b).arg(a)
+    + "}";
+}
+
+
+/*! Try to convert a TeXmacs lenght (em, px, w, h) into a QSize.
+ 
+ This uses the widget's current size to compute relative sizes as specified
+ with "FFw", where FF is the string representation of a double.
+ A value of "1w" should not affect the widget size.
+ 
+ FIXME: does 1w mean 100% of the contents' size or 100% of the available size?
+ */
+QSize
+qt_decode_length (string width, string height, const QSize& ref, const QFontMetrics& fm) {
+  QSize size = ref;
+
+    // Width as a function of the default width
+  if (ends (width, "w") && is_double (width (0, N(width) - 1))) {
+    double x = as_double (width (0, N(width) - 1));
+    size.rwidth() *= x;
+  }
+    // Width as a function of the default height
+  else if (ends (width, "h") && is_double (width (0, N(width) - 1))) {
+    double y = as_double (width (0, N(width) - 1));
+    size.rwidth() = y * size.height();
+  }
+    // Absolute EM units
+  else if (ends (width, "em") && is_double (width (0, N(width) - 2))) {
+    double x = as_double (width (0, N(width) - 2));
+    size.setWidth(x * fm.width("M")); 
+  }
+    // Absolute pixel units 
+  else if (ends (width, "px") && is_double (width (0, N(width) - 2))) {
+    double x = as_double (width (0, N(width) - 2));
+    size.setWidth(x);
+  }
+
+    // Height as a function of the default width
+  if (ends (height, "w") && is_double (height (0, N(height) - 1))) {
+    double x = as_double (height (0, N(height) - 1));
+    size.rheight() = x * size.width();
+  }
+    // Height as a function of the default height
+  else if (ends (height, "h") && is_double (width (0, N(width) - 1))) {
+    double y = as_double (height (0, N(height) - 1));
+    size.rheight() *= y;
+  }
+  else if (ends (height, "em") && is_double (height (0, N(height) - 2))) {
+    double y = as_double (height (0, N(height) - 2));
+    size.setHeight(y * fm.width("M")); 
+  }
+  else if (ends (height, "px") && is_double (height (0, N(height) - 2))) {
+    double y = as_double (height (0, N(height) - 2));
+    size.setHeight(y);
+  }
+  return size;
+}
+
+
+// used only by to_qkeysequence
+static string
+conv_sub (string ks) {
+  string r(ks);
+#ifdef Q_WS_MAC
+  r = replace (r, "S-", "Shift+");
+  r = replace (r, "C-", "Meta+");
+  r = replace (r, "A-", "Alt+");
+  r = replace (r, "M-", "Ctrl+");
+  //r = replace (r, "K-", "");
+  r = replace (r, " ", ",");
+#else
+  r = replace (r, "S-", "Shift+");
+  r = replace (r, "C-", "Ctrl+");
+  r = replace (r, "A-", "Alt+");
+  r = replace (r, "M-", "Meta+");
+  //r = replace (r, "K-", "");
+  r = replace (r, " ", ",");
+#endif
+  if (N(r) == 1 || (N(r) > 2 && r[N(r)-2] == '+')) {
+    if (is_locase (r[N(r)-1]))
+      r= r (0, N(r)-1) * upcase_all (r (N(r)-1, N(r)));
+    else if (is_upcase (r[N(r)-1]))
+      r= r (0, N(r)-1) * "Shift+" * upcase_all (r (N(r)-1, N(r)));
+  }
+  return r;
+}
+
+QKeySequence
+to_qkeysequence (string s) {
+  int i=0, k;
+  string r;
+  for (k=0; k<=N(s); k++)
+    if (k == N(s) || s[k] == ' ') {
+      r << conv_sub (s (i, k));
+      i= k;
+    }
+  return QKeySequence(to_qstring(r));
+}
+
 
 coord4
 from_qrect (const QRect & rect) {
@@ -94,28 +215,43 @@ from_qrect (const QRect & rect) {
   return coord4 (c1, c2, c3, c4);
 }
 
-coord2
-from_qpoint (const QPoint & pt) {
-  SI c1, c2;
-  c1= pt.x() * PIXEL;
-  c2= -pt.y() * PIXEL;
-  return coord2 (c1, c2);
+
+/*! Transforms a rectangle given by its lower left and upper right corners
+ into one given by its upper left and width/height */
+QRect
+to_qrect (const coord4 & p) {
+  float c= 1.0/PIXEL;
+  return QRect (p.x1*c, -p.x4*c, (p.x3-p.x1+PIXEL-1)*c, (p.x4-p.x2+PIXEL-1)*c);
 }
 
 coord2
 from_qsize (const QSize & s) {
-  SI c1, c2;
-  c1= s.width() * PIXEL;
-  c2= s.height() * PIXEL;
-  return coord2 (c1, c2);
+  return coord2 (s.width() * PIXEL, s.height() * PIXEL);
 }
 
-QStringList
-to_qstringlist(array<string> l) {
-  QStringList ql;
-  for(int i=0; i<N(l); ++i)
-    ql << to_qstring(l[i]);
-  return ql;
+QSize
+to_qsize (const coord2 & p) {
+  float c= 1.0/PIXEL;
+  return QSize (p.x1*c, p.x2*c);
+}
+
+QSize
+to_qsize (const SI& w, const SI& h) {
+  float c= 1.0/PIXEL;
+  return QSize (w*c, h*c);
+}
+
+coord2
+from_qpoint (const QPoint & pt) {
+  return coord2 (pt.x() * PIXEL, -pt.y() * PIXEL);
+}
+
+/*! Transforms texmacs coordinates, with origin at the lower left corner, into
+ Qt coordinates, with origin at the upper left corner */
+QPoint
+to_qpoint (const coord2 & p) {
+  float c= 1.0/PIXEL;
+  return QPoint (p.x1*c, -p.x2*c);
 }
 
 array<string>
@@ -126,20 +262,17 @@ from_qstringlist(const QStringList& l) {
   return tl;
 }
 
+QStringList
+to_qstringlist(array<string> l) {
+  QStringList ql;
+  for(int i=0; i<N(l); ++i)
+    ql << to_qstring(l[i]);
+  return ql;
+}
+
 QString
 to_qstring (string s) {
-  string out_lan= get_output_language ();
-  if ((out_lan == "bulgarian") || 
-      (out_lan == "russian") ||
-      (out_lan == "ukrainian"))
-    s = t2a_to_utf8 (s);
-  else
-    s = cork_to_utf8 (s);
-      
-  char* p= as_charp (s);
-  QString nss= QString::fromUtf8 (p, N(s));
-  tm_delete_array (p);
-  return nss;
+  return utf8_to_qstring (cork_to_utf8 (s));
 }
 
 QString
@@ -161,8 +294,6 @@ string
 from_qstring (const QString &s) {
   return utf8_to_cork (from_qstring_utf8(s));
 }
-
-// <MBD> 
 
 // Although slow to build, this should provide better lookup times than
 // linearly traversing the array of colors.
@@ -196,23 +327,26 @@ to_qcolor (const string& col) {
   return QColor(100,100,100);  // FIXME? 
 }
 
-/*!
- * Returns a color encoded as a string with hexadecimal RGB values, as in #e3a1ff
- */
+/*! Returns a color encoded as a string with hexadecimal RGB values, as in #e3a1ff */
 string
 from_qcolor (const QColor& col) {
   return from_qstring(col.name());
 }
 
-// </MBD> 
+// FIXME: Unnecessary? QColor::setRgba() does this.
+QColor
+to_qcolor(color c) {
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  return QColor (r, g, b, a);
+}
 
 
-string
+QString
 qt_translate (string s) {
   string in_lan= get_input_language ();
   string out_lan= get_output_language ();
-//  return tm_var_encode (translate (s, "english", out_lan));
-  return tm_var_encode (translate (s, in_lan, out_lan));
+  return to_qstring(tm_var_encode (translate (s, in_lan, out_lan)));
 }
 
 //FIXME!?!?
@@ -228,9 +362,17 @@ qt_image_size (url image, int& w, int& h) {
   //cout <<  concretize (image) << LF;
   QImage im= QImage (utf8_to_qstring (concretize (image)));
   if (im.isNull ()) {
-    cerr << "TeXmacs] cannot read image file '" << image << "'" 
-	 << " in qt_image_size" << LF;
-    w= 35; h= 35;
+    if (as_bool (call ("file-converter-exists?", image, "x.png"))) {
+      url temp= url_temp (".png");
+      call ("file-convert", object (image), object (temp));
+      qt_image_size (temp, w, h);
+      remove (temp);
+    }
+    else {
+      cerr << "TeXmacs] cannot read image file '" << image << "'" 
+           << " in qt_image_size" << LF;
+      w= 35; h= 35;
+    }
   }
   else {
     w= im.width ();

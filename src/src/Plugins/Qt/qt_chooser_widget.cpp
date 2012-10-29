@@ -23,15 +23,15 @@
  * @param _cmd  Scheme closure to execute after the dialog is closed.
  * @param _type What kind of dialog to show. Can be one of "image", "directory",
  *              or any of the supported file formats: "texmacs", "tmml",
-                "postscript", etc. See @link perform_dialog()
+                "postscript", etc. See perform_dialog()
  */
 qt_chooser_widget_rep::qt_chooser_widget_rep (command _cmd, string _type, bool _save)
- : qt_widget_rep (), cmd (_cmd), type (_type), save (_save), 
+ : qt_widget_rep (file_chooser), cmd (_cmd), type (_type), save (_save), 
    position (coord2 (0, 0)), size (coord2 (100, 100)), file ("")
 {
   if (DEBUG_QT)
     cout << "qt_chooser_widget_rep::qt_chooser_widget_rep type=\""
-    << type << "\" save=\"" << save << "\"" << LF;
+         << type << "\" save=\"" << save << "\"" << LF;
 }
 
 qt_chooser_widget_rep::~qt_chooser_widget_rep() {}
@@ -39,37 +39,35 @@ qt_chooser_widget_rep::~qt_chooser_widget_rep() {}
 
 void
 qt_chooser_widget_rep::send (slot s, blackbox val) {
-  if (DEBUG_QT)
-    cout << "qt_chooser_widget_rep::send " << slot_name(s) << LF;
+
   switch (s) {
     case SLOT_VISIBILITY:
     {   
-      check_type<bool> (val, "SLOT_VISIBILITY");
+      check_type<bool> (val, s);
       bool flag = open_box<bool> (val);
       (void) flag;
       NOT_IMPLEMENTED
     }
       break;
     case SLOT_SIZE:
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
+      check_type<coord2>(val, s);
       size = open_box<coord2> (val);
       break;
     case SLOT_POSITION:
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
+      check_type<coord2>(val, s);
       position = open_box<coord2> (val);
       break;
     case SLOT_KEYBOARD_FOCUS:
-      TYPE_CHECK (type_box (val) == type_helper<bool>::id);
+      check_type<bool>(val, s);
       perform_dialog ();
       break;              
     case SLOT_STRING_INPUT:
-        // send_string (THIS, "input", val);
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
+      check_type<string>(val, s);
       if (DEBUG_QT) cout << "string input: " << open_box<string> (val) << LF;
       NOT_IMPLEMENTED
       break;
     case SLOT_INPUT_TYPE:
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
+      check_type<string>(val, s);
       type = open_box<string> (val);
       break;
 #if 0
@@ -80,12 +78,12 @@ qt_chooser_widget_rep::send (slot s, blackbox val) {
 #endif
     case SLOT_FILE:
         //send_string (THIS, "file", val);
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
+      check_type<string>(val, s);
       if (DEBUG_QT) cout << "file: " << open_box<string> (val) << LF;
       file = open_box<string> (val);
       break;
     case SLOT_DIRECTORY:
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
+      check_type<string>(val, s);
       directory = open_box<string> (val);
       directory = as_string (url_pwd () * url_system (directory));
       break;
@@ -93,6 +91,9 @@ qt_chooser_widget_rep::send (slot s, blackbox val) {
     default:
       qt_widget_rep::send (s, val);
   }
+  if (DEBUG_QT)
+    cout << "qt_chooser_widget_rep: sent " << slot_name (s) 
+         << "\t\tto widget\t"      << type_as_string() << LF;
 }
 
 blackbox
@@ -102,19 +103,17 @@ qt_chooser_widget_rep::query (slot s, int type_id) {
   switch (s) {
     case SLOT_POSITION:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
+      check_type_id<coord2> (type_id, s);
       return close_box<coord2> (position);
     }
     case SLOT_SIZE:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
+      check_type_id<coord2> (type_id, s);
       return close_box<coord2> (size);
     }
     case SLOT_STRING_INPUT:
     {
-      TYPE_CHECK (type_id == type_helper<string>::id);
+      check_type_id<string> (type_id, s);
       if (DEBUG_QT) cout << "String: " << file << LF;
       return close_box<string> (file);
     }
@@ -123,45 +122,25 @@ qt_chooser_widget_rep::query (slot s, int type_id) {
   }
 }
 
-void
-qt_chooser_widget_rep::notify (slot s, blackbox new_val) {
-  if (DEBUG_QT)
-    cout << "[qt_chooser_widget_rep ]";
-  switch (s) {
-    default: ;
-  }
-  qt_widget_rep::notify (s, new_val);
-}
-
 widget
 qt_chooser_widget_rep::read (slot s, blackbox index) {
   if (DEBUG_QT)
     cout << "qt_chooser_widget_rep::read " << slot_name(s) << LF;
   switch (s) {
     case SLOT_WINDOW:
-      check_type_void (index, "SLOT_WINDOW");
+      check_type_void (index, s);
       return this;
     case SLOT_FORM_FIELD:
-      check_type<int> (index, "SLOT_FORM_FIELD");
+      check_type<int> (index, s);
       return this;
     case SLOT_FILE:
-      check_type_void (index, "SLOT_FILE");
+      check_type_void (index, s);
       return this;
     case SLOT_DIRECTORY:
-      check_type_void (index, "SLOT_DIRECTORY");
+      check_type_void (index, s);
       return this;
     default:
       return qt_widget_rep::read(s,index);
-  }
-}
-
-void
-qt_chooser_widget_rep::write (slot s, blackbox index, widget w) {
-  if (DEBUG_QT)
-    cout << "[qt_chooser_widget] ";
-  switch (s) {
-    default:
-      qt_widget_rep::write(s,index,w);
   }
 }
 
@@ -186,7 +165,9 @@ qt_chooser_widget_rep::perform_dialog () {
   QStringList _files;
   QString _filter, _suffix, _caption, _directory;
   _caption = to_qstring (win_title);
-  _directory = QString::fromLocal8Bit (as_charp (directory * "/" * file));
+  char* tmp = as_charp (directory * "/" * file);
+  _directory = QString::fromLocal8Bit (tmp);
+  tm_delete_array (tmp);
   
 #if (QT_VERSION >= 0x040400)
   if (type == "directory") {
@@ -246,11 +227,11 @@ qt_chooser_widget_rep::perform_dialog () {
        params << "\"" << from_qstring(QString("%1px").arg(_pic.height())) << "\" ";
        params << "\"" << "" << "\" ";  // xps ??
        params << "\"" << "" << "\"";   // yps ??
-       file = "(list (url-system " * scm_quote (as_string (u)) * ") " * params * ")";
+       file = "(list (system->url " * scm_quote (as_string (u)) * ") " * params * ")";
        */
-      file = "(list (url-system " * scm_quote (localname) * ") \"\" \"\" \"\" \"\")";
+      file = "(list (system->url " * scm_quote (localname) * ") \"\" \"\" \"\" \"\")";
     } else {
-      file = "(url-system " * scm_quote (localname) * ")";
+      file = "(system->url " * scm_quote (localname) * ")";
     }
   }
   cmd ();
@@ -269,9 +250,11 @@ qt_chooser_widget_rep::perform_dialog () {
   QTMImageDialog *imgdialog= 0; // to avoid a dynamic_cast
   
   if (type  == "image")
-    dialog= imgdialog= new QTMImageDialog (NULL, to_qstring (win_title), to_qstring(directory * "/" * file));
+    dialog= imgdialog= new QTMImageDialog (NULL, to_qstring (win_title),
+                                           to_qstring(directory * "/" * file));
   else
-    dialog= new QTMFileDialog (NULL, to_qstring (win_title), to_qstring(directory * "/" * file));
+    dialog= new QTMFileDialog (NULL, to_qstring (win_title), 
+                               to_qstring (directory * "/" * file));
   
 #if (defined(Q_WS_MAC) && (QT_VERSION >= 0x040500))
   dialog->setOptions(QFileDialog::DontUseNativeDialog);
@@ -345,11 +328,11 @@ qt_chooser_widget_rep::perform_dialog () {
       const char* cstr= arr.constData ();
       string localname = string ((char*) cstr);
       if (type == "image")
-        file = "(list (url-system " *
+        file = "(list (system->url " *
         scm_quote (as_string (u)) *
         ") " * imgdialog->getParamsAsString () * ")";
       else
-        file = "(url-system " * scm_quote (localname) * ")";
+        file = "(system->url " * scm_quote (localname) * ")";
     }
   } else {
     file = "#f";

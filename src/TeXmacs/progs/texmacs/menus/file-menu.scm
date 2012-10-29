@@ -19,29 +19,63 @@
     (texmacs texmacs tm-print)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Dynamic menu for existing buffers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-menu (buffer-list-menu l)
+  (for (name l)
+    (let* ((abbr (buffer-get-title name))
+           (abbr* (if (== abbr "") (url->system (url-tail name)) abbr))
+           (mod? (buffer-modified? name))
+           (short-name (string-append abbr* (if mod? " *" "")))
+           (long-name (url->system name)))
+      ((balloon (eval short-name) (eval long-name))
+       (switch-to-buffer name)))))
+
+(tm-define (buffer-more-recent? b1 b2)
+  (>= (buffer-last-visited b1)
+      (buffer-last-visited b2)))
+
+(tm-define (buffer-sorted-list)
+  (with l (list-filter (buffer-list) buffer-in-menu?)
+    (list-sort l buffer-more-recent?)))
+
+(tm-define (buffer-menu-list nr)
+  (let* ((l1 (list-filter (buffer-list) buffer-in-menu?))
+         (l2 (list-sort l1 buffer-more-recent?)))
+    (sublist l2 0 (min (length l2) nr))))
+
+(tm-define (buffer-go-menu)
+  (buffer-list-menu (buffer-menu-list 15)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menu for recent files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-menu (file-list-menu l)
+  (for (name l)
+    (let* ((short-name (url->system (url-tail name)))
+	   (long-name (url->system name)))
+      ((balloon (eval short-name) (eval long-name)) (load-buffer name)))))
+
 (tm-define (recent-file-list nr)
-  (with l (map cdar (learned-interactive "recent-buffer"))
-    (sublist l 0 (min (length l) nr))))
+  (let* ((l1 (map cdar (learned-interactive "recent-buffer")))
+	 (l2 (map unix->url l1))
+         (l3 (list-filter l2 buffer-in-recent-menu?)))
+    (sublist l3 0 (min (length l3) nr))))
 
 (tm-define (recent-unloaded-file-list nr)
   (let* ((l1 (map cdar (learned-interactive "recent-buffer")))
-         (l2 (map url->string (url->list (get-all-buffers))))
-         (dl (list-difference l1 l2)))
+	 (l2 (map unix->url l1))
+         (l3 (list-filter l2 buffer-in-recent-menu?))
+         (dl (list-difference l3 (buffer-list))))
     (sublist dl 0 (min (length dl) nr))))
-
-(tm-menu (file-list-menu l)
-  (for (name l)
-    (let* ((short-name (url->string (url-tail name))))
-      ((balloon (eval short-name) (eval name)) (load-buffer name)))))
 
 (tm-define (recent-file-menu)
   (file-list-menu (recent-file-list 25)))
 
 (tm-define (recent-unloaded-file-menu)
-  (file-list-menu (recent-unloaded-file-list 10)))
+  (file-list-menu (recent-unloaded-file-list 15)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menus for formats
@@ -55,7 +89,7 @@
              (import-text `(concat "Import " ,name))
              (text (if flag? import-text name))
              (format (if (== fm "verbatim") "" fm)))
-        ((eval text) (choose-file (buffer-loader fm) load-text format))))))
+        ((eval text) (choose-file (buffer-importer fm) load-text format))))))
 
 (tm-define (import-top-menu) (import-menu #t))
 (tm-define (import-import-menu) (import-menu #f))
@@ -67,7 +101,7 @@
              (save-text (string-append "Save " (string-downcase name) " file"))
              (export-text `(concat "Export as " ,name))
              (text (if flag? export-text name)))
-        ((eval text) (choose-file (buffer-saver fm) save-text fm))))))
+        ((eval text) (choose-file (buffer-exporter fm) save-text fm))))))
 
 (tm-define (export-top-menu) (export-menu #t))
 (tm-define (export-export-menu) (export-menu #f))
@@ -84,7 +118,7 @@
 (menu-bind load-menu
   ("Load" (open-buffer))
   ("Revert" (revert-buffer))
-  ("Load in new window" (choose-file load-in-new-window "Load file" ""))
+  ("Load in new window" (choose-file load-buffer-in-new-window "Load file" ""))
   ---
   (link import-top-menu)
   (if (nnull? (recent-file-list 1))
@@ -93,14 +127,18 @@
 
 (menu-bind save-menu
   ("Save" (save-buffer))
-  ("Save as" (choose-file save-buffer "Save TeXmacs file" "texmacs"))
+  ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ---
   (link export-top-menu)
   ---
   ((eval '(concat "Export as " "Pdf"))
    (choose-file print-to-file "Save pdf file" "pdf"))
   ((eval '(concat "Export as " "PostScript"))
-   (choose-file print-to-file "Save postscript file" "postscript")))
+   (choose-file print-to-file "Save postscript file" "postscript"))
+  (when (selection-active-any?)
+    ("Export selection as image" ;; FIXME: no warning on overwrite!
+     (choose-file export-selection-as-graphics
+                  "Select export file with extension" ""))))
 
 (menu-bind print-menu
   ("Preview" (preview-buffer))
@@ -124,7 +162,6 @@
 (menu-bind file-menu
   ("New" (new-buffer))
   ("Load" (open-buffer))
-  ;("Load in new window" (choose-file "Load file" "" 'load-in-new-window))
   ("Revert" (revert-buffer))
   (-> "Recent"
       (link recent-file-menu)
@@ -133,7 +170,7 @@
         ("Clear menu" (forget-interactive "recent-buffer"))))
   ---
   ("Save" (save-buffer))
-  ("Save as" (choose-file save-buffer "Save TeXmacs file" "texmacs"))
+  ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ---
    (if (experimental-qt-gui?)
        ("Preview" (preview-buffer))
@@ -148,7 +185,12 @@
       ---
       ("Pdf" (choose-file print-to-file "Save pdf file" "pdf"))
       ("Postscript"
-       (choose-file print-to-file "Save postscript file" "postscript")))
+       (choose-file print-to-file "Save postscript file" "postscript"))
+      (when (selection-active-any?)
+        ("Export selection as image"
+         (choose-file ;; no warning on overwrite!
+          export-selection-as-graphics 
+          "Save image file" ""))))
   ---
   ("Close document" (safely-kill-buffer))
   ("Close TeXmacs" (safely-quit-TeXmacs)))
@@ -163,7 +205,7 @@
   (when (cursor-has-future?)
     ("Forward" (cursor-history-forward)))
   ---
-  (link buffer-menu)
+  (link buffer-go-menu)
   (if (nnull? (recent-unloaded-file-list 1))
       ---
       (link recent-unloaded-file-menu))

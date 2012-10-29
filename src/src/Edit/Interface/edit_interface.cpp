@@ -50,8 +50,8 @@ edit_interface_rep::edit_interface_rep ():
   message_l (""), message_r (""), last_l (""), last_r (""),
   sfactor (sv->get_default_shrinking_factor ()),
   pixel (sfactor*PIXEL), copy_always (),
-  last_x (0), last_y (0),
-  made_selection (false), table_selection (false),
+  last_x (0), last_y (0), last_t (0),
+  made_selection (false), table_selection (false), mouse_adjusting(false),
   oc (0, 0), temp_invalid_cursor (false),
   shadow (NULL), stored (NULL),
   cur_sb (2), cur_wb (2)
@@ -335,10 +335,13 @@ edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
     if (is_accessible_cursor (et, p * right_index (st)) || in_source ()) {
       bool right;
       path p1= p * 0, p2= p * 1, q1, q2;
-      if (is_script (subtree (et, p), right)) {
-	p1= start (et, p * 0);
-	p2= end   (et, p * 0);
-      }
+      if (is_script (subtree (et, p), right) ||
+          is_func (st, TEXT_AT) ||
+          is_func (st, MATH_AT))
+        {
+          p1= start (et, p * 0);
+          p2= end   (et, p * 0);
+        }
       if (is_func (st, CELL)) { q1= p1; q2= p2; }
       else selection_correct (p1, p2, q1, q2);
       selection sel= eb->find_check_selection (q1, q2);
@@ -418,7 +421,7 @@ edit_interface_rep::apply_changes () {
   // cout << "Handling automatic resizing\n";
   int sb= 1;
   if (is_attached (this) &&
-      get_server() -> has_window() &&
+      has_current_window () &&
       get_init_string (PAGE_MEDIUM) == "automatic")
     {
       SI wx, wy;
@@ -440,10 +443,8 @@ edit_interface_rep::apply_changes () {
     }
   if (sb != cur_sb) {
     cur_sb= sb;
-    if (get_server() -> has_window()) {
-      tm_window win= get_server () -> get_window ();
-      win -> set_scrollbars (sb);
-    }
+    if (has_current_window ())
+      concrete_window () -> set_scrollbars (sb);
   }
   
   // window decorations (menu bar, icon bars, footer)

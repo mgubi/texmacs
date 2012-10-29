@@ -38,14 +38,14 @@
   (:menu-item (:or
     ---
     |
-    (group :string?)
-    (text :string?)
+    (group :%1)
+    (text :%1)
     (glue :boolean? :boolean? :integer? :integer?)
     (color :%1 :boolean? :boolean? :integer? :integer?)
     (:menu-wide-label :%1)
     (symbol :string? :*)
-    (texmacs-output :%1)
-    (texmacs-input :%3)
+    (texmacs-output :%2)
+    (texmacs-input :%4)
     (input :%1 :string? :%1 :string?)
     (enum :%3 :string?)
     (choice :%3)
@@ -200,28 +200,29 @@
 
 (define (make-menu-group s style)
   "Make @(group :string?) menu item."
-  (widget-menu-group s style))
+  (widget-menu-group (translate s) style))
 
 (define (make-menu-text s style)
   "Make @(text :string?) menu item."
   ;;(widget-text s style (color "black") #t)
-  (widget-text s style (color "black") #f))
+  (widget-text (translate s) style (color "black") #f))
 
 (define (make-texmacs-output p style)
-  "Make @(texmacs-output :%1) item."
-  (with (tag t) p
-    (widget-texmacs-output (t))))
+  "Make @(texmacs-output :%2) item."
+  (with (tag t tmstyle) p
+    (widget-texmacs-output (t) (tmstyle))))
 
 (define (make-texmacs-input p style)
-  "Make @(texmacs-input :%3) item."
-  (with (tag t cmd cont?) p
-    (widget-texmacs-input (t) (object->command (menu-protect cmd)) cont?)))
+  "Make @(texmacs-input :%4) item."
+  (with (tag t tmstyle cmd cont?) p
+    (widget-texmacs-input (t) (tmstyle) (object->command (menu-protect cmd))
+                          cont?)))
 
 (define (make-menu-input p style)
   "Make @(input :%1 :string? :%1 :string?) menu item."
   (with (tag cmd type props width) p
     (widget-input (object->command (menu-protect cmd)) type (props)
-		  (logior style widget-style-mini) width)))
+		  style width)))
 
 (define (make-enum p style)
   "Make @(enum :%3 :string?) item."
@@ -572,15 +573,15 @@
          ,(lambda (p style bar?)
             (list (make-menu-color (second p) (third p)
                                    (fourth p) (fifth p) (sixth p)))))
-  (group (:string?)
+  (group (:%1)
 	 ,(lambda (p style bar?) (list (make-menu-group (cadr p) style))))
-  (text (:string?)
+  (text (:%1)
 	 ,(lambda (p style bar?) (list (make-menu-text (cadr p) style))))
   (symbol (:string? :*)
 	  ,(lambda (p style bar?) (list (make-menu-symbol p style))))
-  (texmacs-output (:%1)
+  (texmacs-output (:%2)
     ,(lambda (p style bar?) (list (make-texmacs-output p style))))
-  (texmacs-input (:%3)
+  (texmacs-input (:%4)
     ,(lambda (p style bar?) (list (make-texmacs-input p style))))
   (input (:%1 :string? :%1 :string?)
          ,(lambda (p style bar?) (list (make-menu-input p style))))
@@ -679,12 +680,13 @@
   "Expand texmacs-input item @p."
   `(texmacs-input ,(replace-procedures (cadr p))
                   ,(replace-procedures (caddr p))
-                  ,(cadddr p)))
+                  ,(replace-procedures (cadddr p))
+                  ,(car (cdddr p))))
 
 (define (menu-expand-texmacs-output p)
-  "Expand conditional menu @p."
-  (with (tag out) p
-    `(texmacs-output ',(out))))
+  "Expand output menu item @p."
+  (with (tag doc tmstyle) p
+    `(texmacs-output ',(doc) ',(tmstyle))))
 
 (define (menu-expand-input p)
   "Expand input menu item @p."
@@ -801,24 +803,24 @@
 
 (tm-define (top-window menu-promise name)
   (:interactive #t)
-  (let* ((win (window-handle))
-	 (qui (object->command (lambda () (window-delete win))))
+  (let* ((win (alt-window-handle))
+	 (qui (object->command (lambda () (alt-window-delete win))))
 	 (men (menu-promise))
 	 (scm (list 'vertical men))
 	 (wid (make-menu-widget scm 0)))
-    (window-create-quit win wid name qui)
-    (window-show win)))
+    (alt-window-create-quit win wid name qui)
+    (alt-window-show win)))
 
 (tm-define (dialogue-window menu-promise cmd name)
   (:interactive #t)
-  (let* ((win (window-handle))
-	 (qui (object->command (lambda () (window-delete win))))
-	 (lbd (lambda x (apply cmd x) (window-delete win)))
+  (let* ((win (alt-window-handle))
+	 (qui (object->command (lambda () (alt-window-delete win))))
+	 (lbd (lambda x (apply cmd x) (alt-window-delete win)))
 	 (men (menu-promise lbd))
 	 (scm (list 'vertical men))
 	 (wid (make-menu-widget scm 0)))
-    (window-create-quit win wid name qui)
-    (window-show win)))
+    (alt-window-create-quit win wid name qui)
+    (alt-window-show win)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Other top-level windows
@@ -826,12 +828,12 @@
 
 (tm-define (interactive-window wid-promise cmd name)
   (:interactive #t)
-  (let* ((win (window-handle))
-	 (lbd (lambda x (apply cmd x) (window-delete win)))
+  (let* ((win (alt-window-handle))
+	 (lbd (lambda x (apply cmd x) (alt-window-delete win)))
 	 (com (object->command (menu-protect lbd)))
 	 (wid (wid-promise com)))
-    (window-create win wid name #t)
-    (window-show win)))
+    (alt-window-create win wid name #t)
+    (alt-window-show win)))
 
 (tm-define (interactive-print done u)
   (:interactive #t)

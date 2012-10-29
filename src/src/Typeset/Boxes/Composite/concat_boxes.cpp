@@ -16,7 +16,8 @@
 ******************************************************************************/
 
 struct concat_box_rep: public composite_box_rep {
-  concat_box_rep (path ip, array<box> bs, array<SI> spc);
+  bool indent;
+  concat_box_rep (path ip, array<box> bs, array<SI> spc, bool indent);
   operator tree ();
 
   void      finalize ();
@@ -83,11 +84,28 @@ concat_box_rep::position (array<SI> spc) {
     sy(i)= 0;
     x2 += bs[i]->x2;
   }
-  composite_box_rep::position ();
+
+  bool ok= !indent;
+  x1= y1= x3= y3= MAX_SI;
+  x2= y2= x4= y4= -MAX_SI;
+  for (i=0; i<N(bs); i++)
+    if (!indent || sx2(i) > sx1(i)) {
+      ok= true;
+      x1= min (x1, sx1(i));
+      y1= min (y1, sy1(i));
+      x2= max (x2, sx2(i));
+      y2= max (y2, sy2(i));
+      x3= min (x3, sx3(i));
+      y3= min (y3, sy3(i));
+      x4= max (x4, sx4(i));
+      y4= max (y4, sy4(i));
+    }
+  if (!ok) composite_box_rep::position ();
 }
 
-concat_box_rep::concat_box_rep (path ip, array<box> bs2, array<SI> spc):
-  composite_box_rep (ip)
+concat_box_rep::concat_box_rep
+  (path ip, array<box> bs2, array<SI> spc, bool indent2):
+    composite_box_rep (ip), indent (indent2)
 {
   bs = bs2;
   position (spc);
@@ -461,6 +479,12 @@ concat_box_rep::find_selection (path lbp, path rbp) {
     }
     if (is_nil (rs)) return selection (rectangles (), lp, rp);
     rectangle r= least_upper_bound (rs);
+    if (indent) {
+      r->x1= max (r->x1, x1);
+      r->y1= max (r->y1, y1);
+      r->x2= min (r->x2, x2);
+      r->y2= min (r->y2, y2);
+    }
     return selection (r, lp, rp);
   }
 }
@@ -532,7 +556,7 @@ public:
 };
 
 phrase_box_rep::phrase_box_rep (path ip, array<box> bs, array<SI> spc):
-  concat_box_rep (ip, bs, spc), logs_ptr (NULL) {}
+  concat_box_rep (ip, bs, spc, false), logs_ptr (NULL) {}
 
 phrase_box_rep::~phrase_box_rep () {
   if (logs_ptr != NULL) {
@@ -563,8 +587,8 @@ phrase_box_rep::display (renderer ren) {
 ******************************************************************************/
 
 box
-concat_box (path ip, array<box> bs, array<SI> spc) {
-  return tm_new<concat_box_rep> (ip, bs, spc);
+concat_box (path ip, array<box> bs, array<SI> spc, bool indent) {
+  return tm_new<concat_box_rep> (ip, bs, spc, indent);
 }
 
 box

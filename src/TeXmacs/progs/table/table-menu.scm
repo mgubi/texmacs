@@ -24,6 +24,9 @@
       ("Small table" (make 'small-table))
       ("Big table" (make 'big-table))
       ---)
+  (if (and (style-has? "calc-dtd") (calc-ready?))
+      (link calc-table-menu)
+      ---)
   ("Plain tabular" (make 'tabular))
   ("Centered tabular" (make 'tabular*))
   ("Plain block" (make 'block))
@@ -166,7 +169,7 @@
   (pick-background (cell-set-background answer))
   ---
   ("Palette" (interactive-background
-              (lambda (col) (cell-set-background "color" col)) '()))
+              (lambda (col) (cell-set-background col)) '()))
   ("Other" (interactive cell-set-background)))
 
 (menu-bind cell-special-menu

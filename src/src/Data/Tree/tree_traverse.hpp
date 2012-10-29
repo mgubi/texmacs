@@ -13,6 +13,9 @@
 #define TREE_TRAVERSE_H
 #include "tree_cursor.hpp"
 
+int minimal_arity (tree_label l);
+int maximal_arity (tree_label l);
+bool correct_arity (tree_label l, int n);
 int minimal_arity (tree t);
 int maximal_arity (tree t);
 bool correct_arity (tree t, int n);
@@ -28,6 +31,7 @@ string get_long_name (tree t);
 string get_child_name (tree t, int i);
 string get_child_long_name (tree t, int i);
 string get_child_type (tree t, int i);
+tree   get_env_child (tree t, int i, string var, tree val);
 
 path next_valid (tree t, path p);
 path previous_valid (tree t, path p);

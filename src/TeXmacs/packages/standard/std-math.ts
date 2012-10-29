@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.9>
+<TeXmacs|1.0.7.16>
 
 <style|<tuple|source|std>>
 
@@ -108,7 +108,21 @@
 
   <drd-props|shrink-inline|arity|1|accessible|all|syntax|<macro|x|<arg|x>>>
 
+  <assign|math-choice|<macro|disp|level-0|level-1|level-2|<if|<equal|<value|math-display>|true>|<arg|disp>|<case|<equal|<value|math-level>|0>|<arg|level-0>|<equal|<value|math-level>|1>|<arg|level-1>|<arg|level-2>>>>>
+
   <assign|binom|<macro|x|y|<style-only*|<with|mode|math|<shrink-inline|<left|(><resize|<tabular*|<tformat|<cwith|1|-1|1|1|cell-lsep|0spc>|<cwith|1|-1|1|1|cell-rsep|0spc>|<table|<row|<cell|<inactive*|<arg|x>>>>|<row|<cell|<inactive*|<arg|y>>>>>>>||<plus|1b|2.5sep>||<minus|1t|2.5sep>><right|)>>>>>>
+
+  <assign|tbinom|<macro|x|y|<with|mode|math|<with|math-display|false|<binom|<arg|x>|<arg|y>>>>>>
+
+  <assign|dbinom|<macro|x|y|<with|mode|math|<with|math-display|true|<binom|<arg|x>|<arg|y>>>>>>
+
+  <assign|modulo|<macro|x|<space|0.2spc>mod <arg|x>>>
+
+  <assign|bmod|<macro|<space|0.2spc>mod >>
+
+  <assign|pmod|<macro|x|<around*|(|mod <arg|x>|)>>>
+
+  <assign|pod|<macro|x|<around*|(|<arg|x>|)>>>
 
   <assign|ontop|<macro|x|y|<style-only*|<with|mode|math|<shrink-inline|<resize|<tabular*|<tformat|<cwith|1|-1|1|1|cell-lsep|0spc>|<cwith|1|-1|1|1|cell-rsep|0spc>|<table|<row|<cell|<inactive*|<arg|x>>>>|<row|<cell|<inactive*|<arg|y>>>>>>>||<plus|1b|2.5sep>||<minus|1t|2.5sep>>>>>>>
 
@@ -127,6 +141,8 @@
   <assign|separating-space|<macro|len|<space|<arg|len>>>>
 
   <drd-props|separating-space|syntax|<macro|len|,>>
+
+  <assign|genfrac|<macro|left|right|sep|disp|x|y|<style-only*|<with|mode|math|<shrink-inline|<around*|<inactive*|<arg|left>>|<resize|<tabular*|<tformat|<cwith|1|-1|1|1|cell-lsep|0spc>|<cwith|1|-1|1|1|cell-rsep|0spc>|<cwith|1|1|1|-1|cell-bborder|sep>|<table|<row|<cell|<inactive*|<arg|x>>>>|<row|<cell|<inactive*|<arg|y>>>>>>>||<plus|1b|2.5sep>||<minus|1t|2.5sep>>|<inactive*|<arg|right>>>>>>>>
 
   <\active*>
     <\src-comment>

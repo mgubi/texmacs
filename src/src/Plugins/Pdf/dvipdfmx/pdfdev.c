@@ -19,7 +19,7 @@
     
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
 #if HAVE_CONFIG_H
@@ -51,6 +51,8 @@
 #include "pdflimits.h"
 
 #include "pdfdev.h"
+
+#include "tfm.h"
 
 static int verbose = 0;
 
@@ -1006,12 +1008,11 @@ void pdf_dev_pop_coord(void)
   if (num_dev_coords > 0) num_dev_coords--;
 }
 
-
-spt_t pdf_dev_string_width(int   font_id, unsigned char *str, unsigned len)
+spt_t pdf_dev_string_width(int font_id, unsigned char *str, unsigned len)
 {
   if (font_id < 0 || font_id >= num_dev_fonts) {
     ERROR("Invalid font: %d (%d)", font_id, num_dev_fonts);
-    return;
+    return -1;
   }
   
   return tfm_string_width(GET_FONT(font_id)->tfm_id, str, len);

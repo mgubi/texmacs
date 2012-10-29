@@ -70,12 +70,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (id-locations id)
-  (let* ((get-name (lambda (t) (get-name-buffer-path (tree->path t))))
-	 (l1 (id->trees id))
-	 (l2 (map get-name l1))
+  (let* ((l1 (id->trees id))
+	 (l2 (map tree->buffer l1))
 	 (l2* (id->locations id))
 	 (l3 (if (null? l2) l2* l2))
-	 (l4 (list-filter l3 (lambda (u) (not (url-none? u))))))
+	 (l4 (list-filter l3 nnot)))
     (map (cut cons id <>) l4)))
 
 (define (vertex-locations v)
@@ -98,12 +97,12 @@
 (define (encode-file-name here x)
   (let* ((id (car x))
 	 (u (url-relative here (cdr x)))
-	 (s (url->string u)))
+	 (s (url->unix u)))
     (list id (list 'id (registry-id s)))))
 
 (define (encode-file-correspondance here id)
   (with u (url-delta here (car (registry-get id)))
-    (list id (url->string u))))
+    (list id (url->unix u))))
 
 (tm-define (get-link-locations here t)
   (:synopsis "Return locations of extern loci accessible from @t at url @here")
@@ -112,7 +111,7 @@
 	(let* ((l2 (map (cut encode-file-name here <>) l1))
 	       (ids (list-remove-duplicates (map cadadr l2)))
 	       (l3 (map (cut encode-file-correspondance here <>) ids)))
-	  (tm->tree `(collection (id ,(registry-id (url->string here)))
+	  (tm->tree `(collection (id ,(registry-id (url->unix here)))
 				 ,@(map (cut cons 'target <>) l3)
 				 ,@(map (cut cons 'locator <>) l2)))))))
 
@@ -126,7 +125,7 @@
 (define (id->locations id)
   (if (func? id 'id 1) (set! id (cadr id)))
   (with name (ahash-ref id-to-name-table id)
-    (if name (map string->url name)
+    (if name (map unix->url name)
 	(with l (ahash-ref* link-locator-table id '())
 	  (append-map id->locations l)))))
 
@@ -134,8 +133,8 @@
   (cond ((null? l) #f)
 	((not (url-exists? (car l))) (resolve-id-sub id (cdr l)))
 	(else
-	 (ahash-set! already-loaded-table (car l) #t)
-	 (texmacs-load-buffer (car l) "generic" 0 #f))))
+          (ahash-set! already-loaded-table (car l) #t)
+          (load-buffer (car l)))))
 
 (tm-define (resolve-id id)
   (:synopsis "Load file which contains locus with a given @id.")
@@ -146,13 +145,13 @@
 
 (define (register-unique-id here t)
   (with (dummy id) t
-    (registry-add id (url->string here))))
+    (registry-add id (url->unix here))))
 
 (define (register-target here t)
   (with (dummy id loc) t
     (with u (url-relative here loc)
       (when (url-exists? u)
-	(registry-add id (url->string u))))))
+	(registry-add id (url->unix u))))))
 
 (define (register-locator here t)
   (with (dummy id id2) t

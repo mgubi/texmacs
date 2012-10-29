@@ -263,7 +263,7 @@
   ("emacs:prefix C-c" (safely-quit-TeXmacs))
   ("emacs:prefix C-f" (interactive load-buffer))
   ("emacs:prefix C-s" (save-buffer))
-  ("emacs:prefix C-w" (interactive save-buffer))
+  ("emacs:prefix C-w" (interactive save-buffer-as))
 
   ("search emacs s" (search-next))
   ("search emacs r" (search-previous))
@@ -340,13 +340,13 @@
 
   ;; further shortcuts for the Emacs mode
   ("F2" (open-buffer))
-  ("S-F2" (choose-file load-in-new-window "Load file" ""))
+  ("S-F2" (choose-file load-buffer-in-new-window "Load file" ""))
   ("C-F2" (revert-buffer))
   ("M-F2" (new-buffer))
   ("M-S-F2" (open-window))
   ("M-C-F2" (clone-window))
   ("F3" (save-buffer))
-  ("S-F3" (choose-file save-buffer "Save TeXmacs file" "texmacs"))
+  ("S-F3" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("F4" (preview-buffer))
   ("S-F4" (print-buffer))
   ("C-F4" (interactive print-to-file))
@@ -391,7 +391,7 @@
   ("std p" (preview-buffer))
   ("std q" (safely-quit-TeXmacs))
   ("std s" (save-buffer))
-  ("std S" (choose-file save-buffer "Save TeXmacs file" "texmacs"))
+  ("std S" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("std u" (toggle-underlined))
   ("std v" (clipboard-paste "primary"))
   ("std w" (safely-kill-buffer))
@@ -405,6 +405,9 @@
   ;;("std S-tab" (previous-tab))
   ;;("std +" (zoom-in))
   ;;("std -" (zoom-out))
+
+  ("search std f" (search-next))      ;; added for convenience
+  ("search std F" (search-previous))  ;; added for convenience
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

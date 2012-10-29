@@ -20,7 +20,7 @@
 
 (define (require-format x pattern)
   (if (not (match? x pattern))
-      (texmacs-error "gui-make" "invalid menu item ~S" x)))
+    (texmacs-error "gui-make" "invalid menu item ~S" x)))
 
 (define (gui-make-eval x)
   (require-format x '(eval :%1))
@@ -79,11 +79,11 @@
   `($colored-glue ,(second x) ,(third x) ,(fourth x) ,(fifth x) ,(sixth x)))
 
 (define (gui-make-texmacs-output x)
-  (require-format x '(texmacs-output :%1))
+  (require-format x '(texmacs-output :%2))
   `($texmacs-output ,@(cdr x)))
 
 (define (gui-make-texmacs-input x)
-  (require-format x '(texmacs-input :%3))
+  (require-format x '(texmacs-input :%4))
   `($texmacs-input ,@(cdr x)))
 
 (define (gui-make-input x)
@@ -278,6 +278,18 @@
   (require-format x '(form-input :%4))
   `($form-input ,@(cdr x)))
 
+(define (gui-make-form-enum x)
+  (require-format x '(form-enum :%4))
+  `($form-enum ,@(cdr x)))
+
+(define (gui-make-form-choice x)
+  (require-format x '(form-choice :%3))
+  `($form-choice ,@(cdr x)))
+
+(define (gui-make-form-choices x)
+  (require-format x '(form-choices :%3))
+  `($form-choices ,@(cdr x)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table with Gui primitives and dispatching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -342,7 +354,10 @@
   (promise ,gui-make-promise)
   (ink ,gui-make-ink)
   (form ,gui-make-form)
-  (form-input ,gui-make-form-input))
+  (form-input ,gui-make-form-input)
+  (form-enum ,gui-make-form-enum)
+  (form-choice ,gui-make-form-choice)
+  (form-choices ,gui-make-form-choices))
 
 (tm-define (gui-make x)
   ;;(display* "x= " x "\n")
@@ -397,7 +412,7 @@
      (lazy-define ,module ,@menus)
      (delayed
        (:idle 500)
-       (import-from ,module))))
+       (module-provide ',module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic color pickers
@@ -441,7 +456,7 @@
 
 (define (standard-pattern-list)
   (with d (url-read-directory "$TEXMACS_PATH/misc/patterns" "*.png")
-    (map (lambda (x) `(pattern ,(url->string x) "" "")) d)))
+    (map (lambda (x) `(pattern ,(url->unix x) "" "")) d)))
 
 (tm-menu (standard-pattern-menu cmd)
   (tile 8
@@ -494,3 +509,12 @@
       ("Cancel" (cmd #f)))
     (glue #f #f 3 0))
   (glue #f #f 0 3))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Deprecated functionality
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define-macro (menu-extend name . l)
+  (deprecated-function "menu-extend" "tm-menu" "former")
+  (receive (opts body) (list-break l not-define-option?)
+    `(tm-define (,name) ,@opts (menu-dynamic (former) ,@body))))

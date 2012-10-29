@@ -11,43 +11,32 @@
 
 #ifndef TM_BUFFER_H
 #define TM_BUFFER_H
-#include "server.hpp"
+#include "new_data.hpp"
+#include "Data/new_buffer.hpp"
+
+class tm_buffer_rep;
+class tm_view_rep;
+typedef tm_buffer_rep* tm_buffer;
+typedef tm_view_rep*   tm_view;
 
 extern tree the_et;
 path new_document ();
 void delete_document (path rp);
 void set_document (path rp, tree t);
-int  create_window_id ();
-void destroy_window_id (int);
+url  create_window_id ();
+void destroy_window_id (url);
 
 class tm_buffer_rep {
 public:
-  url name;               // full name
-  string abbr;            // abbreviated name
-  string fm;              // buffer format
-  url extra;              // for special buffers, like help buffer
+  new_buffer buf;         // file related information
+  new_data data;          // data associated to document
   array<tm_view> vws;     // views attached to buffer
-  bool read_only;         // buffer is read only?
-  bool secure;            // is the buffer secure?
   tm_buffer prj;          // buffer which corresponds to the project
-  bool in_menu;           // should the buffer be listed in the menus?
+  path rp;                // path to the document's root in the_et
 
-  path rp;                    // path to the document's root in the_et
-  tree project;               // a project the document belongs to
-  tree style;                 // the style of the buffer
-  hashmap<string,tree> init;  // initial values of environment variables
-  hashmap<string,tree> fin;   // final values of environment variables
-  hashmap<string,tree> ref;   // all labels with references
-  hashmap<string,tree> aux;   // auxiliary output: toc, bib, etc.
-
-  inline tm_buffer_rep (url name2):
-    name (name2), abbr (as_string (tail (name))),
-    fm ("texmacs"), extra (url_none ()), vws (0),
-    read_only (false), secure (is_secure (name2)),
-    prj (NULL), in_menu (true),
-    rp (new_document ()),
-    project (""), style ("style"),
-    init ("?"), fin ("?"), ref ("?"), aux ("?") {}
+  inline tm_buffer_rep (url name):
+    buf (name), data (),
+    vws (0), prj (NULL), rp (new_document ()) {}
 
   inline ~tm_buffer_rep () {
     delete_document (rp); }
@@ -55,5 +44,8 @@ public:
   bool needs_to_be_saved ();
   bool needs_to_be_autosaved ();
 };
+
+inline tm_buffer nil_buffer () { return (tm_buffer) NULL; }
+inline bool is_nil (tm_buffer buf) { return buf == NULL; }
 
 #endif // defined TM_BUFFER_H

@@ -117,13 +117,15 @@
   (centered
     (resize "500px" "50px"
       (texmacs-output
-        '(document (theorem (document "This is true.")))))
+        '(document (theorem (document "This is true.")))
+        '(style "generic")))
     ======
     (resize "500px" "300px"
       (texmacs-input
         '(with "bg-color" "#fcfcf8"
            (document (proof (document "Trivial."
                                       "But you may add more details."))))
+        '(style "generic")
         (noop) #f))))
 
 (tm-widget (widget7)
@@ -172,6 +174,30 @@
         (toggle (display* "Second " answer "\n") #f))))
   (bottom-buttons >> ("Ok" (cmd "Ok"))))
 
+(tm-widget (form3 cmd)
+  (resize "500px" "500px"
+    (padded
+      (form "Test"
+        (aligned
+          (item (text "Input:")
+            (form-input "fieldname1" "string" '("one") "1w"))
+          (item === ===)
+          (item (text "Enum:")
+            (form-enum "fieldname2" '("one" "two" "three") "two" "1w"))
+          (item === ===)
+          (item (text "Choice:")
+            (form-choice "fieldname3" '("one" "two" "three") "one"))
+          (item === ===)
+          (item (text "Choices:")
+            (form-choices "fieldname4" 
+                          '("one" "two" "three") 
+                          '("one" "two"))))
+        (bottom-buttons
+          ("Cancel" (cmd "cancel")) >>
+          ("Ok"
+           (display* (form-fields) " -> " (form-values) "\n")
+           (cmd "ok")))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Font selector
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -187,7 +213,8 @@
          "font" ,selector-font-family
          "font-series" ,selector-font-series
          "font-shape" ,selector-font-shape
-         "abcdefghij, ABCDEFGHIJ, 0123456789"))))
+         "abcdefghij, ABCDEFGHIJ, 0123456789"))
+     '(style "generic")))
 
 (tm-define (make-multi-with . l)
   (with t (if (selection-active-any?) (selection-tree) "")

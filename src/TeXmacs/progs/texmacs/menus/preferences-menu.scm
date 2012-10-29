@@ -81,6 +81,7 @@
 	(toggle ("Focus dependent icons" "focus dependent icons"))
 	(toggle ("User provided icons" "user provided icons"))
 	(toggle ("Status bar" "status bar"))
+  (toggle ("Side tools" "side tools"))
 	---
 	(enum ("Shrinking factor" "shrinking factor")
 	      "1" "2" "3" "4" "5" "7" "10" *))
@@ -158,10 +159,12 @@
 		     "texmacs->latex:expand-user-macros"))
 	    (toggle ("Export bibliographies as links"
 		     "texmacs->latex:indirect-bib"))
-	    (toggle ("Use catcode definitions in preamble"
-		     "texmacs->latex:use-catcodes"))
 	    (toggle ("Allow for macro definitions in preamble"
-		     "texmacs->latex:use-macros")))
+		     "texmacs->latex:use-macros"))
+	    (enum ("Encoding" "texmacs->latex:encoding")
+                  ("Strict Ascii" "ascii")
+                  ("Cork charset with TeX catcode definition in preamble" "cork")
+                  ("Utf-8 with inputenc LaTeX package" "utf-8")))
 	(-> "TeXmacs -> Verbatim"
 	    (toggle ("Wrap lines"
 		     "texmacs->verbatim:wrap"))
@@ -175,7 +178,14 @@
 	    (enum ("Encoding" "verbatim->texmacs:encoding")
 		  ("Cork" "cork")
 		  ("Iso-8859-1" "iso-8859-1")
-		  ("Utf-8" "utf-8"))))
+		  ("Utf-8" "utf-8")))
+	(-> "TeXmacs -> Image"
+	    (enum ("Format" "texmacs->graphics:format")
+		  ("Svg" "svg")
+		  ("Eps" "eps")
+		  ("Png" "png"))
+            (toggle ("Embed in svg as attr" "texmacs->graphics:attr"))
+            (toggle ("Embed in svg as tmml" "texmacs->graphics:tmml"))))
     (-> "Mathematics"
         (-> "Keyboard"
             (item ("Enforce brackets to match" (toggle-matching-brackets)))
@@ -324,7 +334,7 @@
       (enum (set-pretty-preference "look and feel" answer)
             '("Default" "Emacs" "Gnome" "KDE" "Mac OS" "Windows")
             (get-pretty-preference "look and feel")
-            "10em"))
+            "12em"))
     (item (text "User interface language:")
       (enum (set-pretty-preference "language" answer)
             '("British" "Bulgarian" "Chinese" "Czech" "Dutch" "Danish"
@@ -332,17 +342,17 @@
               "Japanese" "Korean" "Polish" "Portuguese" "Romanian" "Russian"
               "Slovene" "Spanish" "Swedish" "Taiwanese" "Ukrainian")
             (get-pretty-preference "language")
-            "10em"))
+            "12em"))
     (item (text "Interactive questions:")
       (enum (set-pretty-preference "interactive questions" answer)
             '("On the footer" "In popup windows")
             (get-pretty-preference "interactive questions")
-            "10em"))
+            "12em"))
     (item (text "Details in menus:")
       (enum (set-pretty-preference "detailed menus" answer)
             '("Simplified menus" "Detailed menus")
             (get-pretty-preference "detailed menus")
-            "10em"))))
+            "12em"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keyboard preferences
@@ -377,17 +387,17 @@
       (enum (set-pretty-preference "automatic quotes" answer)
             '("Default" "Disabled" "Dutch" "English" "French" "German" "Spanish" "Swiss")
             (get-pretty-preference "automatic quotes")
-            "10em"))
+            "15em"))
     (item (text "Automatic brackets:")
       (enum (set-pretty-preference "automatic brackets" answer)
             '("Disabled" "Enabled" "Inside mathematics")
             (get-pretty-preference "automatic brackets")
-            "10em"))
+            "15em"))
     (item (text "Cyrillic input method:")
       (enum (set-pretty-preference "cyrillic input method" answer)
             '("None" "Translit" "Jcuken" "Yawerty" "Koi8-r" "Cp1251")
             (get-pretty-preference "cyrillic input method")
-            "10em")))
+            "15em")))
   ======
   (bold (text "Remote controllers with keyboard simulation"))
   ===
@@ -395,30 +405,30 @@
     (aligned
       (item (text "Left:")
         (enum (set-preference "ir-left" answer) '("pageup" "")
-              (get-preference "ir-left") "5em"))
+              (get-preference "ir-left") "8em"))
       (item (text "Right:")
         (enum (set-preference "ir-right" answer) '("pagedown" "")
-              (get-preference "ir-right") "5em"))
+              (get-preference "ir-right") "8em"))
       (item (text "Up:")
         (enum (set-preference "ir-up" answer) '("home" "")
-              (get-preference "ir-up") "5em"))
+              (get-preference "ir-up") "8em"))
       (item (text "Down:")
         (enum (set-preference "ir-down" answer) '("end" "")
-              (get-preference "ir-down") "5em")))
+              (get-preference "ir-down") "8em")))
     ///
     (aligned
       (item (text "Center:")
         (enum (set-preference "ir-center" answer) '("return" "S-return" "")
-              (get-preference "ir-center") "5em"))
+              (get-preference "ir-center") "8em"))
       (item (text "Play:")
         (enum (set-preference "ir-play" answer) '("F5" "")
-              (get-preference "ir-play") "5em"))
+              (get-preference "ir-play") "8em"))
       (item (text "Pause:")
         (enum (set-preference "ir-pause" answer) '("escape" "")
-              (get-preference "ir-pause") "5em"))
+              (get-preference "ir-pause") "8em"))
       (item (text "Menu:")
         (enum (set-preference "ir-menu" answer) '("." "")
-              (get-preference "ir-menu") "5em")))))
+              (get-preference "ir-menu") "8em")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Conversion preferences widget
@@ -439,6 +449,11 @@
       (toggle (set-boolean-preference "texmacs->html:images" answer)
               (get-boolean-preference "texmacs->html:images")))))
 
+(define-preference-names "texmacs->latex:encoding"
+  ("Strict Ascii" "ascii")
+  ("Cork charset with catcode definitions in preamble" "cork")
+  ("Unicode with inputenc LaTeX package" "utf-8"))
+
 (tm-widget (latex-preferences-widget)
   ===
   (bold (text "TeXmacs -> LaTeX"))
@@ -456,12 +471,18 @@
     (meti (text "Export bibliographies as links")
       (toggle (set-boolean-preference "texmacs->latex:indirect-bib" answer)
               (get-boolean-preference "texmacs->latex:indirect-bib")))
-    (meti (text "Allow for catcode definitions in preamble")
-      (toggle (set-boolean-preference "texmacs->latex:use-catcodes" answer)
-              (get-boolean-preference "texmacs->latex:use-catcodes")))
     (meti (text "Allow for macro definitions in preamble")
       (toggle (set-boolean-preference "texmacs->latex:use-macros" answer)
-              (get-boolean-preference "texmacs->latex:use-macros")))))
+              (get-boolean-preference "texmacs->latex:use-macros"))))
+  ===
+  (aligned
+    (item (text "Character encoding:")
+      (enum (set-pretty-preference "texmacs->latex:encoding" answer)
+            '("ascii" "cork" "utf-8")
+            (get-pretty-preference "texmacs->latex:encoding")
+            "5em"))))
+
+;;;;;;;;;;;;;;
 
 (define-preference-names "texmacs->verbatim:encoding"
   ("cork" "Cork")
@@ -503,6 +524,31 @@
             (get-pretty-preference "verbatim->texmacs:encoding")
             "5em"))))
 
+(define-preference-names "texmacs->graphics:format"
+  ("svg" "Svg")
+  ("eps" "Eps")
+  ("png" "Png"))
+
+(tm-widget (image-preferences-widget)
+  ===
+  (bold (text "TeXmacs -> Image"))
+  ===
+  (aligned
+    (item (text "Format:")
+      (enum (set-pretty-preference "texmacs->graphics:format" answer)
+            '("Svg" "Eps" "Png")
+            (get-pretty-preference "texmacs->graphics:format")
+            "5em")))
+  (when (== (get-preference "texmacs->graphics:format") "svg")
+    ===
+    (aligned
+      (meti (text "Embed TeXmacs data in Svg as string attribute")
+        (toggle (set-boolean-preference "texmacs->graphics:attr" answer)
+                (get-boolean-preference "texmacs->graphics:attr")))
+      (meti (text "Embed TeXmacs data in Svg as tmml")
+        (toggle (set-boolean-preference "texmacs->graphics:tmml" answer)
+                (get-boolean-preference "texmacs->graphics:tmml"))))))
+
 (tm-widget (conversion-preferences-widget)
   ======
   (tabs
@@ -514,7 +560,10 @@
         (dynamic (latex-preferences-widget))))
     (tab (text "Verbatim")
       (centered
-        (dynamic (verbatim-preferences-widget))))))
+        (dynamic (verbatim-preferences-widget))))
+    (tab (text "Image")
+      (centered
+        (dynamic (image-preferences-widget))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preferences widget

@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include "timer.hpp"
 #include "Bridge/impl_typesetter.hpp"
+#include "new_style.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Environment/std_environment.hpp"
 #endif // EXPERIMENTAL
@@ -27,22 +28,33 @@ bool enable_fastenv= false;
 * Contructors, destructors and notification of modifications
 ******************************************************************************/
 
-static bool
-is_aux (url u) {
-  if (!is_atomic (u->t)) return false;
-  string s= u->t->label;
-  return starts (s, "* ") && ends (s, " *");
-}
-
 edit_typeset_rep::edit_typeset_rep ():
   the_style (TUPLE),
   cur (hashmap<string,tree> (UNINIT)),
   pre (UNINIT), init (UNINIT), fin (UNINIT),
-  env (drd, is_aux (buf->name)? buf->extra: buf->name,
-       buf->ref, (buf->prj==NULL? buf->ref: buf->prj->ref),
-       buf->aux, (buf->prj==NULL? buf->aux: buf->prj->aux)),
+  env (drd, buf->buf->master,
+       buf->data->ref, (buf->prj==NULL? buf->data->ref: buf->prj->data->ref),
+       buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux)),
   ttt (new_typesetter (env, subtree (et, rp), reverse (rp))) {}
 edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
+
+void
+edit_typeset_rep::set_data (new_data data) {
+  set_style (data->style);
+  set_init  (data->init);
+  set_fin   (data->fin);
+  notify_page_change ();
+  add_init (data->init);
+  notify_change (THE_DECORATIONS);
+  typeset_invalidate_env ();
+}
+
+void
+edit_typeset_rep::get_data (new_data& data) {
+  data->style= get_style ();
+  data->init = get_init ();
+  data->fin  = get_fin ();
+}
 
 typesetter edit_typeset_rep::get_typesetter () { return ttt; }
 tree edit_typeset_rep::get_style () { return the_style; }
@@ -65,14 +77,14 @@ edit_typeset_rep::add_init (hashmap<string,tree> H) {
 }
 
 void
-edit_typeset_rep::set_base_name (url name) {
+edit_typeset_rep::set_master (url name) {
   env->base_file_name= name;
 }
 
 void
 edit_typeset_rep::clear_local_info () {
-  buf->ref= hashmap<string,tree> ();
-  buf->aux= hashmap<string,tree> ();
+  buf->data->ref= hashmap<string,tree> ();
+  buf->data->aux= hashmap<string,tree> ();
 }
 
 /******************************************************************************
@@ -115,11 +127,12 @@ use_modules (tree t) {
 
 void
 edit_typeset_rep::typeset_style_use_cache (tree style) {
+  style= preprocess_style (style, buf->buf->master);
   //cout << "Typesetting style using cache " << style << LF;
   bool ok;
   hashmap<string,tree> H;
   tree t;
-  SERVER (style_get_cache (style, H, t, ok));
+  style_get_cache (style, H, t, ok);
   if (ok) {
     env->patch_env (H);
     ok= drd->set_locals (t);
@@ -128,11 +141,11 @@ edit_typeset_rep::typeset_style_use_cache (tree style) {
   if (!ok) {
     //cout << "Typeset without cache " << style << LF;
     if (!is_tuple (style)) FAILED ("tuple expected as style");
-    tree t (USE_PACKAGE, A (style));
-    env->exec (t);
-    env->read_env (H);
-    drd->heuristic_init (H);
-    SERVER (style_set_cache (style, H, drd->get_locals ()));
+    H= get_style_env (style);
+    drd= get_style_drd (style);
+    style_set_cache (style, H, drd->get_locals ());
+    env->patch_env (H);
+    drd->set_environment (H);
   }
   use_modules (env->read (THE_MODULES));
 }
@@ -149,7 +162,7 @@ edit_typeset_rep::typeset_preamble () {
 
 void
 edit_typeset_rep::typeset_prepare () {
-  env->read_only= buf->read_only;
+  env->read_only= buf->buf->read_only;
   env->write_default_env ();
   env->patch_env (pre);
   env->style_init_env ();
@@ -378,7 +391,7 @@ edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   env->write_env (H);
   t= env->exec (t);
   if (expand_refs)
-    t= expand_references (t, buf->ref);
+    t= expand_references (t, buf->data->ref);
   t= simplify_execed (t);
   t= simplify_correct (t);
   env->write_env (H2);
@@ -537,6 +550,8 @@ void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
   init (var)= by;
+  if (var != PAGE_SCREEN_WIDTH && var != PAGE_SCREEN_HEIGHT)
+    require_save ();
   notify_change (THE_ENVIRONMENT);
 }
 

@@ -28,6 +28,10 @@
 (tm-define (clipboard-export-preference-menu)
   (clipboard-preference-menu converters-from-special clipboard-set-export))
 
+(tm-menu (tools-selections-menu)
+  (-> "Import" (link clipboard-import-preference-menu))
+  (-> "Export" (link clipboard-export-preference-menu)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -37,12 +41,11 @@
       ("Execute system command" (interactive system))
       ("Evaluate scheme expression" (interactive footer-eval)))
   (-> "Selections"
-      (-> "Import" (link clipboard-import-preference-menu))
-      (-> "Export" (link clipboard-export-preference-menu)))
+      (link tools-selections-menu))
   (-> "Update"
-      ("Image links" (image-gc))
+      ("Styles" (style-clear-cache))
       ("Inclusions" (inclusions-gc))
-      ("Styles" (style-clear-cache)))
+      ("Linked images" (image-gc)))
   (-> "Web"
       ("Create web site" (tmweb-interactive-build))
       ("Update web site" (tmweb-interactive-update)))

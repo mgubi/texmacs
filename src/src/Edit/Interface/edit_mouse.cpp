@@ -18,6 +18,16 @@
 #include "message.hpp"
 #include "window.hpp"
 
+  // These are tm-defined in graphics-utils.scm (looks like they shouldn't)
+#define ShiftMask     256
+#define LockMask      512
+#define ControlMask  1024
+#define Mod1Mask     2048
+#define Mod2Mask     4096
+#define Mod3Mask     8192
+#define Mod4Mask    16384
+#define Mod5Mask    32768
+
 /******************************************************************************
 * Routines for the mouse
 ******************************************************************************/
@@ -45,6 +55,51 @@ edit_interface_rep::mouse_extra_click (SI x, SI y) {
 }
 
 void
+edit_interface_rep::mouse_adjust_selection (SI x, SI y, int mods) {
+  if (inside_graphics () || mods <=1) return;
+  if (eb->action ("drag", x, y, 0) != "") return;
+  go_to (x, y);
+  path sp= find_innermost_scroll (eb, tp);
+  path p1= tree_path (sp, start_x, start_y, 0);
+  path p2= tree_path (sp, end_x  , end_y  , 0);
+  path p3= tree_path (sp, x      , y      , 0);
+  
+  bool p1_p2= path_inf (p1, p2);
+  bool p1_p3= path_inf (p1, p3);
+  bool p2_p3= path_inf (p2, p3);
+  
+  if (mods & ShiftMask) { // Holding shift: enlarge in direction start_ -> end_
+    if (!p1_p2 && p1_p3) { // p2<p1<p3
+      start_x= end_x;
+      start_y= end_y;
+      end_x  = x;
+      end_y  = y;
+      p1     = p2;
+      p2     = p3;
+    } else if (!p1_p3 && p1_p2) {  // p3<p1<p2
+      start_x= end_x;
+      start_y= end_y;
+      end_x  = x;
+      end_y  = y;
+      p1     = p3;
+    } else if ((p2_p3 && !p1_p3) || (!p1_p2 && !p2_p3)) {  // p2<p3<p1, p3<p2<p1
+      end_x= x;
+      end_y= y;
+      p2   = p1;
+      p1   = p3;
+    } else if ((p1_p2 && p2_p3) || (p1_p3 && !p2_p3)) {  // p1<p2<p3, p1<p3<p2
+      end_x= x;
+      end_y= y;
+      p2   = p3;
+    }
+    selection_visible ();
+    set_selection (p1, p2);
+    notify_change (THE_SELECTION);
+    selection_set ("mouse", selection_get (), true);
+  }
+}
+
+void
 edit_interface_rep::mouse_drag (SI x, SI y) {
   if (inside_graphics ()) return;
   if (eb->action ("drag", x, y, 0) != "") return;
@@ -67,7 +122,7 @@ edit_interface_rep::mouse_drag (SI x, SI y) {
 void
 edit_interface_rep::mouse_select (SI x, SI y, int mods, bool drag) {
   if (eb->action ("select" , x, y, 0) != "") return;
-  if (!is_nil (active_ids) && (mods & 256) == 0) {
+  if (!is_nil (active_ids) && (mods & ShiftMask) == 0) {
     call ("link-follow-ids", object (active_ids), object ("click"));
     return;
   }
@@ -112,15 +167,15 @@ edit_interface_rep::mouse_adjust (SI x, SI y) {
     ::get_position (get_window (this), wx, wy);
     widget wid;
     SERVER (menu_widget ("(vertical (link texmacs-popup-menu))", wid));
-    widget popup_wid= popup_widget (wid);
+    widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
 #if defined (QTTEXMACS) || defined(AQUATEXMACS)
-    SI ox, oy;
+    SI ox, oy, sx, sy;
     get_position (this, ox, oy);
-    set_position (popup_win, wx+     x, wy+     y);
-#else
-    set_position (popup_win, wx+ ox+ x, wy+ oy+ y);
+    get_scroll_position(this, sx, sy);
+    ox -= sx; oy -= sy;
 #endif
+    set_position (popup_win, wx+ ox+ x, wy+ oy+ y);
     set_visibility (popup_win, true);
     send_keyboard_focus (this);
     send_mouse_grab (popup_wid, true);
@@ -346,7 +401,11 @@ detect_right_drag (void* handle, string type, SI x, SI y, time_t t, SI d) {
 void
 edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
   //cout << "Mouse any " << type << ", " << x << ", " << y << "; " << mods << ", " << t << "\n";
-  last_x= x; last_y= y;
+  if (t < last_t && (last_x != 0 || last_y != 0 || last_t != 0)) {
+    //cout << "Ignored " << type << ", " << x << ", " << y << "; " << mods << ", " << t << "\n";
+    return;
+  }
+  last_x= x; last_y= y; last_t= t;
   bool move_like=
     (type == "move" || type == "dragging-left" || type == "dragging-right");
   if ((!move_like) || (is_attached (this) && !check_event (MOTION_EVENT)))
@@ -369,16 +428,28 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
     if (!over_graphics (x, y))
       eval ("(graphics-reset-context 'text-cursor)");
   }
-
-  if (type == "press-left" || type == "start-drag-left") mouse_click (x, y);
+  
+  if (type == "press-left" || type == "start-drag-left") {
+    if (mods > 1) {
+      mouse_adjusting = mods;
+      mouse_adjust_selection(x, y, mods);
+    } else
+      mouse_click (x, y);
+  }
   if (type == "dragging-left") {
-    if (is_attached (this) && check_event (DRAG_EVENT)) return;
-    mouse_drag (x, y);
+    if (mouse_adjusting && mods > 1) {
+      mouse_adjusting = mods;
+      mouse_adjust_selection(x, y, mods);
+    } else if (is_attached (this) && check_event (DRAG_EVENT)) return;
+    else mouse_drag (x, y);
   }
-  if (type == "release-left" || type == "end-drag-left") {
+  if ((type == "release-left" || type == "end-drag-left")) {
+    if (!(mouse_adjusting & ShiftMask))
+      mouse_select (x, y, mods, type == "end-drag-left");
     send_mouse_grab (this, false);
-    mouse_select (x, y, mods, type == "end-drag-left");
+    mouse_adjusting &= ~mouse_adjusting;
   }
+  
   if (type == "double-left") {
     send_mouse_grab (this, false);
     if (mouse_extra_click (x, y))
@@ -411,10 +482,12 @@ call_mouse_event (string kind, SI x, SI y, SI m, time_t t) {
 
 static void
 delayed_call_mouse_event (string kind, SI x, SI y, SI m, time_t t) {
+  // NOTE: interestingly, the (:idle 1) is not necessary for the Qt port
+  // but is required for appropriate updating when using the X11 port
   string cmd=
-    "(delayed (mouse-event " * scm_quote (kind) * " " *
+    "(delayed (:idle 1) (mouse-event " * scm_quote (kind) * " " *
     as_string (x) * " " * as_string (y) * " " *
-    as_string (m) * " " * as_string (((double) t)) * "))";
+    as_string (m) * " " * as_string ((long int) t) * "))";
   eval (cmd);
 }
 
@@ -425,7 +498,7 @@ edit_interface_rep::handle_mouse (string kind, SI x, SI y, int m, time_t t) {
   x *= sfactor;
   y *= sfactor;
   //cout << kind << " (" << x << ", " << y << "; " << m << ")"
-  //<< " at " << t << "\n";
+  //     << " at " << t << "\n";
 
   string rew= kind;
   rew= detect_left_drag ((void*) this, rew, x, y, t, 5 * PIXEL * sfactor);

@@ -13,14 +13,33 @@
 
 (texmacs-module (generic document-menu)
   (:use (generic document-edit)
-        (generic generic-menu)))
+        (generic generic-menu)
+        (texmacs menus file-menu)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Project menu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (include-list base t)
+  (cond ((tree-is? t 'document)
+         (apply append (map (cut include-list base <>) (tree-children t))))
+        ((and (tree-is? t 'include) (tree-atomic? (tree-ref t 0)))
+         (list (url-relative base (tree->string (tree-ref t 0)))))
+        (else (list))))
+
+(tm-define (project-file-list)
+  (if (project-attached?)
+      (let* ((prj (project-get))
+             (t (buffer->tree prj)))
+        (include-list prj t))
+      (list)))
+
+(tm-define (project-menu)
+  (buffer-list-menu (project-file-list)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Submenus for the Document menu and the iconbars
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(menu-bind project-menu
-  (link project-buffer-menu))
 
 (menu-bind document-style-menu
   ("No style" (init-style "none"))
@@ -483,9 +502,9 @@
 	  ("Default" (init-default "par-mode"))
 	  ---
 	  ("Justified" (init-env "par-mode" "justify"))
-	  ("Left ragged" (init-env "par-mode" "left"))
+	  ("Left aligned" (init-env "par-mode" "left"))
 	  ("Centered" (init-env "par-mode" "center"))
-	  ("Right ragged" (init-env "par-mode" "right")))
+	  ("Right aligned" (init-env "par-mode" "right")))
       (-> "Hyphenation"
 	  ("Default" (init-default "par-hyphen"))
 	  ---
@@ -568,10 +587,10 @@
 	      ("Other" (init-interactive-env "page-flexibility")))))
   ---
   (-> "Update"
-      ("All" (generate-all-aux) (update-buffer))
+      ("All" (generate-all-aux) (image-gc) (inclusions-gc) (update-current-buffer))
       ---
-      ("Buffer" (update-buffer))
-      ("Bibliography" (generate-all-aux) (update-buffer))
+      ("Buffer" (update-current-buffer))
+      ("Bibliography" (generate-all-aux) (update-current-buffer))
 ;;    ("Bibliography" (generate-aux "bibliography"))
       ("Table of contents" (generate-aux "table-of-contents"))
       ("Index" (generate-aux "index"))

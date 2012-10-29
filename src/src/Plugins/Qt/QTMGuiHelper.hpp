@@ -14,8 +14,9 @@
 
 #include "qt_gui.hpp"
 #include <QObject>
-#include <QTranslator>
 
+/*!
+ */
 class QTMGuiHelper : public QObject {
   Q_OBJECT
   qt_gui_rep* gui;
@@ -36,19 +37,11 @@ public slots:
   void aboutToHideMainMenu ();
   void doPopWaitingWidgets ();
  
+  void emitTmSlotRefresh ();
+
 signals:
-  void refresh ();  
-};
-
-
-class QTMTranslator : public QTranslator {
-  
-  Q_OBJECT
-  
-public:
-  QTMTranslator(QObject * parent = NULL ) : QTranslator(parent) {};
-  virtual QString translate ( const char * context, const char * sourceText, 
-                             const char * disambiguation = 0 ) const ;  
+  void refresh ();
+  void tmSlotRefresh ();   //!< qt_widgets which need to refresh connect here.
 };
 
 #endif // QTMGUIHELPER_HPP

@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * MODULE     : qt_view_widget.cpp
- * DESCRIPTION: QT View Widget class implementation
+ * DESCRIPTION: A widget with a renderer.
  * COPYRIGHT  : (C) 2008  Massimiliano Gubinelli
  *******************************************************************************
  * This software falls under the GNU general public license version 3 or later.
@@ -9,9 +9,10 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
-#include "qt_view_widget.hpp"
 #include "qt_widget.hpp"
+#include "qt_view_widget.hpp"
 #include "qt_window_widget.hpp"
+#include "qt_simple_widget.hpp"
 #include "qt_utilities.hpp"
 #include "qt_renderer.hpp"
 
@@ -23,75 +24,84 @@
 #include "QTMStyle.hpp"
 
 
+/*!
+ Sets the view to the specified QTMWidget.
+ */
+qt_view_widget_rep::qt_view_widget_rep (types _type)
+ : qt_widget_rep(_type), current_renderer(NULL)  { }
+
+
 /******************************************************************************
- * Policy: qt_view_widget_rep owns the QWidget
+ * Handling of TeXmacs messages
  ******************************************************************************/
-
-/**
- * Constructor. Sets the view to the specified QWidget, of which it takes
- * ownership.
- */
-qt_view_widget_rep::qt_view_widget_rep (QWidget* v)
- : qt_widget_rep(), view(v), current_renderer(NULL)  {}
-
-/**
- * FIXME: I'm (MG) not sure if we should delete manually all the QWidgets we 
- * create or exclusively the top level ones (the windows)
- *   - Qt specifies that widgets with a parent are deleted by the parent.
- *   - Our policy is that qt_view_widget_rep owns the QWidget (so it is 
- *     responsible to delete it)
- *  Are these two requirements compatible ?
- */
-qt_view_widget_rep::~qt_view_widget_rep() {
-  if (view) // this is redundant: delete does nothing if view==NULL
-    delete view;
-  if (DEBUG_QT)
-    cout << "qt_view_widget_rep::~qt_view_widget_rep()\n";
-}
-
 
 void
 qt_view_widget_rep::send (slot s, blackbox val) {
-  if (DEBUG_QT)
-    cout << "qt_view_widget_rep::send " << slot_name (s) << LF;
-
   switch (s) {
     case SLOT_NAME:
     {   
-      check_type<string> (val, "SLOT_NAME");
+      check_type<string> (val, s);
       string name = open_box<string> (val);
-      view->window() -> setWindowTitle (to_qstring (tm_var_encode(name)));
+      canvas()->window()->setWindowTitle (to_qstring (name));
     }
       break;
 
     case SLOT_INVALIDATE:
     {
-      TYPE_CHECK (type_box (val) == type_helper<coord4>::id);
+      check_type<coord4>(val, s);
       coord4 p= open_box<coord4> (val);
-      if (DEBUG_QT)
-        cout << "Invalidating rect " << rectangle(p.x1,p.x2,p.x3,p.x4) << LF;
-      qt_renderer_rep* ren = (qt_renderer_rep*)get_renderer (this);
-      QTMWidget *canvas = qobject_cast <QTMWidget*>(view);
-      if (ren && canvas) {
+      qt_renderer_rep* ren = static_cast<qt_renderer_rep*>(get_renderer(this));
+      if (ren && canvas()) {
         SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;    
         ren->outer_round (x1, y1, x2, y2);
         ren->decode (x1, y1);
         ren->decode (x2, y2);
-        canvas->invalidate_rect (x1,y2,x2,y1);
+        canvas()->invalidate_rect (x1, y2, x2, y1);
       }
     }
       break;
+
     case SLOT_INVALIDATE_ALL:
     {
-      ASSERT (is_nil (val), "type mismatch");
-      if (DEBUG_QT)
-        cout << "Invalidating all"<<  LF;
-      QTMWidget *canvas = qobject_cast <QTMWidget*>(view);
-      if (canvas) canvas->invalidate_all ();
+      check_type_void (val, s);
+      canvas()->invalidate_all ();
     }
       break;
 
+    case SLOT_EXTENTS:
+    {
+      check_type<coord4>(val, s);
+      coord4 p = open_box<coord4> (val);
+      scrollarea()->setExtents (to_qrect (p));
+    }
+      break;
+    
+    case SLOT_SIZE:
+    {
+      check_type<coord2>(val, s);
+      coord2 p = open_box<coord2> (val);
+      canvas()->resize(to_qsize(p));   // FIXME?
+    }
+      break;
+
+    case SLOT_SCROLL_POSITION:
+    {
+      check_type<coord2>(val, s);
+      coord2 p = open_box<coord2> (val);
+      scrollarea()->setOrigin(to_qpoint (p));
+    }
+      break;
+      
+    case SLOT_SHRINKING_FACTOR:
+    {  
+      check_type<int>(val, s);
+      int new_sf = open_box<int> (val);
+      canvas()->tm_widget()->handle_set_shrinking_factor (new_sf);
+    }
+      break;  
+      
     case SLOT_MOUSE_GRAB:
+        // Sent after a left click to indicate the start of cursor dragging.
       NOT_IMPLEMENTED;
       //send_mouse_grab (THIS, val);
       break;
@@ -102,143 +112,120 @@ qt_view_widget_rep::send (slot s, blackbox val) {
       break;
       
     case SLOT_KEYBOARD_FOCUS:
+    {
       //send_keyboard_focus (THIS, val);
-      TYPE_CHECK (type_box (val) == type_helper<bool>::id);
+      check_type<bool>(val, s);
       if (open_box<bool> (val)) 
         the_keyboard_focus = this;
       if (DEBUG_QT)
-        cout << "Ignored!\n";
+        cout << "   Ignored!\n";
+    }
       break;
-    case SLOT_REFRESH:
-      // This message is sent to refresh special widgets. Usually we just ignore it.
+      
+    case SLOT_CURSOR:
+    {
+      check_type<coord2>(val, s);
+      coord2 p = open_box<coord2> (val);
+      canvas()->setCursorPos(to_qpoint(p));
+    }
       break;
+
     default:
-      FAILED ("unhandled slot type");
+      qt_widget_rep::send(s, val);
+      return;
   }
+
+  if (DEBUG_QT && s != SLOT_INVALIDATE)
+    cout << "qt_view_widget_rep: sent " << slot_name (s) 
+         << "\t\tto widget\t" << type_as_string() << LF;  
 }
 
-/**
- * Querying
- */
 blackbox
 qt_view_widget_rep::query (slot s, int type_id) {
-  if ((DEBUG_QT) && (s != SLOT_RENDERER))
-    cout << "qt_view_widget_rep::query " << slot_name(s) << LF;
+    // Some slots are too noisy
+  if ((DEBUG_QT) && (s != SLOT_RENDERER) && (s != SLOT_IDENTIFIER))
+    cout << "qt_view_widget_rep: queried " << slot_name(s)
+         << "\t\tto widget\t" << type_as_string() << LF;
   
   switch (s) {
     case SLOT_IDENTIFIER:
-      TYPE_CHECK (type_id == type_helper<int>::id);
-        // return close_box<int> ((int)view->window());
-        // we need only to know if the widget is attached to some gui window
-      return close_box<int> (view->window() ? 1 : 0);
-#if 0
+      if (qwid)
+        return qt_window_widget_rep::widget_from_qwidget(qwid)->query(s, type_id);
+      else
+        return close_box<int>(0);
+
     case SLOT_RENDERER:
     {
-      TYPE_CHECK (type_id == type_helper<renderer>::id);
+      check_type_id<renderer> (type_id, s);
       renderer r = get_current_renderer();
-        //FIXME: sometimes the renderer is queried outside repaint events 
-        //       (see e.g. edit_interface_rep::idle_time)
-        //       TeXmacs current policy is that we should return NULL only 
-        //       if the widget is not attached (in X11 sense)
+
       if (!r) 
         r = the_qt_renderer();
-      
-      QTMWidget *canvas = qobject_cast <QTMWidget*>(view);
-      if (r && canvas) {
-        SI ox = -canvas->backing_pos.x()*PIXEL;
-        SI oy = canvas->backing_pos.y()*PIXEL;
+
+      if (canvas()) {
+        SI ox = - canvas()->backing_pos.x()*PIXEL;  // Warning: this is NOT from_qpoint()
+        SI oy = canvas()->backing_pos.y()*PIXEL;
         r->set_origin(ox,oy);
       }
-      
+
       return close_box<renderer> (r);
     }      
-#endif
       
     case SLOT_POSITION:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      QPoint pt= view->pos();
-      if (DEBUG_QT)
-        cout << "Position (" << pt.x() << "," << pt.y() << ")\n";
+      check_type_id<coord2> (type_id, s);
+        // NOTE: mapTo() does not take into account the height of unified toolbars 
+        // on the Mac. We work around this in qt_tm_widget_rep::query(SLOT_POSITION)
+      QPoint pt = scrollarea()->surface()->mapTo(scrollarea()->window(), QPoint(0,0));
+        //cout << "pos: " << pt.x() << ", " << pt.y() << LF;
       return close_box<coord2> (from_qpoint (pt));
     }
 
     case SLOT_SIZE:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      QSize s= view->size();
-      return close_box<coord2> (from_qsize (s));
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (from_qsize (canvas()->size()));
+    }
+    
+    case SLOT_SCROLL_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (from_qpoint (canvas()->origin()));
     }
       
+    case SLOT_EXTENTS:
+    {
+      check_type_id<coord4> (type_id, s);
+      return close_box<coord4> (from_qrect (canvas()->extents()));
+    }
+      
+    case SLOT_VISIBLE_PART:
+    {
+      check_type_id<coord4> (type_id, s);
+      if (canvas()) {
+        QSize sz = canvas()->surface()->size();     // sz.setWidth(sz.width()-2);
+        QPoint pos = canvas()->backing_pos;
+        return close_box<coord4> (from_qrect(QRect(pos, sz)));
+      } else {
+        return close_box<coord4>(coord4(0,0,0,0));
+      }
+    }
+
     default:
-      FAILED ("cannot handle slot type");
-      return blackbox ();
+      return qt_widget_rep::query(s, type_id);
   }
 }
 
-/**
- * Notification of state changes
- * Overriden to provide debugging support. Can be removed.
- */
-void
-qt_view_widget_rep::notify (slot s, blackbox new_val) {
-  if (DEBUG_QT)
-    cout << "qt_view_widget_rep::notify " << slot_name(s) << LF;
-  qt_widget_rep::notify (s, new_val);
-}
-
-/**
- * Read access to subwidgets
- */
 widget
 qt_view_widget_rep::read (slot s, blackbox index) {
   if (DEBUG_QT)
-    cout << "qt_view_widget_rep::read " << slot_name(s) << LF;
+    cout << "qt_view_widget_rep::read " << slot_name(s) << "\tWidget id: " << id << LF;
   
   switch (s) {
     case SLOT_WINDOW:
-    {
-      check_type_void (index, "SLOT_WINDOW");
-      QWidget* qwin = view->window();
-      QVariant v= qwin->property ("texmacs_window_widget");
-      if (v.canConvert<void*> ())
-        return (widget_rep*) (v.value<void*> ());
-      else FAILED ("QWidget property not set");
-    }
-      break; // not reached     
+      check_type_void (index, s);
+      return qt_window_widget_rep::widget_from_qwidget(qwid);
     default:
-      FAILED ("cannot handle slot type");
-      return widget();
+      return qt_widget_rep::read (s, index);
   }
 }
-
-/**
- * Write access to subwidgets
- */
-void
-qt_view_widget_rep::write (slot s, blackbox index, widget w) {
-  (void) index; (void) w;
-  if (DEBUG_QT)
-    cout << "qt_view_widget_rep::write " << slot_name (s) << LF;
-  switch (s) {
-    default:
-      FAILED ("cannot handle slot type");
-  }
-}
-
-
-/*!
- * Sets the view's title to _title, then constructs a wrapper widget for the
- * view and returns it.
- */
-widget
-qt_view_widget_rep::plain_window_widget (string _title, command q) {
-  view->setWindowTitle (to_qstring (_title));
-  widget wid= tm_new<qt_window_widget_rep> (view, q);
-    //FIXME: is this the right thing to do?
-  return wid;
-}
-
-

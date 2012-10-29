@@ -261,8 +261,7 @@ TeXmacs_main (int argc, char** argv) {
 	  url in  ("$PWD", argv[i-1]);
 	  url out ("$PWD", argv[ i ]);
 	  my_init_cmds= my_init_cmds * " " *
-	    "(texmacs-load-buffer " * scm_quote (as_string (in)) *
-	    " \"generic\" 0 #f) " *
+	    "(load-buffer " * scm_quote (as_string (in)) * " :strict) " *
 	    "(export-buffer " * scm_quote (as_string (out)) * ")";
 	}
       }
@@ -327,35 +326,47 @@ TeXmacs_main (int argc, char** argv) {
   // (see as_double() in string.cpp)
   setlocale(LC_NUMERIC, "C");    
     
+  string where= "";
   for (i=1; i<argc; i++) {
     if (argv[i] == NULL) break;
     string s= argv[i];
     if ((N(s)>=2) && (s(0,2)=="--")) s= s (1, N(s));
     if ((s[0] != '-') && (s[0] != '+')) {
       if (DEBUG_STD) cout << "TeXmacs] Loading " << s << "...\n";
-      sv->load_buffer (url_system (s), "generic", 1);
+      url u= url_system (s);
+      if (!is_rooted (u)) u= resolve (url_pwd (), "") * u;
+      string b= scm_quote (as_string (u));
+      string cmd= "(load-buffer " * b * " " * where * ")";
+      where= " :new-window";
+      exec_delayed (scheme_cmd (cmd));
     }
-    if ((s == "-b") || (s == "-initialize-buffer") ||
-	(s == "-c") || (s == "-convert") ||
-	(s == "-fn") || (s == "-font") ||
-	(s == "-i") || (s == "-initialize") ||
-	(s == "-g") || (s == "-geometry") ||
-	(s == "-x") || (s == "-execute") ||
-	(s == "-log-file")) i++;
+    if      ((s == "-c") || (s == "-convert")) i+=2;
+    else if ((s == "-b") || (s == "-initialize-buffer") ||
+             (s == "-fn") || (s == "-font") ||
+             (s == "-i") || (s == "-initialize") ||
+             (s == "-g") || (s == "-geometry") ||
+             (s == "-x") || (s == "-execute") ||
+             (s == "-log-file")) i++;
   }
   if (install_status == 1) {
     if (DEBUG_STD) cout << "TeXmacs] Loading welcome message...\n";
-    sv->load_buffer (
-      "$TEXMACS_PATH/doc/about/welcome/first.en.tm", "help", 1);
+    url u= "tmfs://help/plain/tm/doc/about/welcome/first.en.tm";
+    string b= scm_quote (as_string (u));
+    string cmd= "(load-buffer " * b * " " * where * ")";
+    where= " :new-window";
+    exec_delayed (scheme_cmd (cmd));
   }
   else if (install_status == 2) {
     if (DEBUG_STD) cout << "TeXmacs] Loading upgrade message...\n";
-    sv->load_buffer (
-      "$TEXMACS_HOME_PATH/doc/about/changes/changes-recent.en.tm", "help", 1);
+    url u= "tmfs://help/plain/tm/doc/about/changes/changes-recent.en.tm";
+    string b= scm_quote (as_string (u));
+    string cmd= "(load-buffer " * b * " " * where * ")";
+    where= " :new-window";
+    exec_delayed (scheme_cmd (cmd));
   }
-  if (sv->no_bufs ()) {
+  if (number_buffers () == 0) {
     if (DEBUG_STD) cout << "TeXmacs] Creating 'no name' buffer...\n";
-    sv->open_window ();
+    open_window ();
   }
 
   bench_print ();

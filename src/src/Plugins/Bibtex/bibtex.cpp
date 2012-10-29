@@ -13,6 +13,7 @@
 #include "file.hpp"
 #include "sys_utils.hpp"
 #include "convert.hpp"
+#include "wencoding.hpp"
 
 #ifdef OS_WIN32
 #include <sys/misc.h>
@@ -55,12 +56,24 @@ search_bib (tree t) {
   }
 }
 
+string
+bibtex_update_encoding (string s) {
+  string r;
+  array<string> a= tokenize (s, "\\bibitem");
+  for (int i=0; i<N(a); i++) {
+    if (i != 0) r << "\\bibitem";
+    r << western_to_cork (a[i]);
+  }
+  return r;
+}
+
 tree
 bibtex_load_bbl (string bib, url bbl_file) {
   string result;
   if (load_string (bbl_file, result, false))
     return "Error: bibtex failed to create bibliography";
 
+  result= bibtex_update_encoding (result);
   int count=1;
   tree t= generic_to_tree (result, "latex-snippet");
   t= search_bib (t);
@@ -72,7 +85,8 @@ bibtex_load_bbl (string bib, url bbl_file) {
   for (int i=0; i<arity(t); i++) {
     if (is_concat (t[i]) &&
 	(is_compound (t[i][0], "bibitem") ||
-	 is_compound (t[i][0], "bibitem*")))
+	 is_compound (t[i][0], "bibitem*")||
+   is_compound (t[i][0], "bibitem-with-key")))
       {
 	tree item= t[i][0];
 	if (is_compound (item, "bibitem"))
@@ -93,15 +107,27 @@ bibtex_load_bbl (string bib, url bbl_file) {
   return compound ("bib-list", largest, u);
 }
 
+static bool
+contain_space (string s) {
+  for (int i=0; i<N(s); i++)
+    if (s[i] == ' ')
+      return true;
+  return false;
+}
+
 tree
 bibtex_run (string bib, string style, url bib_file, tree bib_t) {
+  if (contain_space (style))
+    return "Error: bibtex disallows spaces in style name";
+  string bib_name= as_string (tail (bib_file));
+  if (contain_space (as_string (bib_file)))
+    return "Error: bibtex disallows spaces in bibliography name";
   int i;
   string bib_s= "\\bibstyle{" * style * "}\n";
   for (i=0; i<arity(bib_t); i++)
     bib_s << "\\citation{" << as_string (bib_t[i]) << "}\n";
 
   string dir= concretize (head (bib_file));
-  string bib_name= as_string (tail (bib_file));
   if ((N(bib_name) >= 4) && (bib_name (N(bib_name)-4, N(bib_name)) == ".bib"))
     bib_name= bib_name (0, N(bib_name)- 4);
   bib_s << "\\bibdata{" << bib_name << "}\n";

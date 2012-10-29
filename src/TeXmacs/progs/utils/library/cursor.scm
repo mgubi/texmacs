@@ -141,10 +141,10 @@
 (define cursor-history (make-ahash-table))
 (define cursor-future (make-ahash-table))
 
-(define (history-get) (ahash-ref* cursor-history (window-get-id) '()))
-(define (history-set l) (ahash-set! cursor-history (window-get-id) l))
-(define (future-get) (ahash-ref* cursor-future (window-get-id) '()))
-(define (future-set l) (ahash-set! cursor-future (window-get-id) l))
+(define (history-get) (ahash-ref* cursor-history (window-get-serial) '()))
+(define (history-set l) (ahash-set! cursor-history (window-get-serial) l))
+(define (future-get) (ahash-ref* cursor-future (window-get-serial) '()))
+(define (future-set l) (ahash-set! cursor-future (window-get-serial) l))
 
 (define (cursor-same? l p)
   (and (nnull? l) (== (position-get (car l)) p)))
@@ -210,38 +210,25 @@
 ;; Changing buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (menu-flatten x)
-  (cond ((string? x) x)
-        ((pair? x) (apply string-append (map menu-flatten (cdr x))))
-        (else "")))
+(define (list-abbrs)
+  (map buffer-get-title (buffer-sorted-list)))
 
-(define (list-buffers)
-  (with bm (list-filter (get-buffer-menu) pair?)
-    (with fun (lambda (p) (cons (menu-flatten (car p)) (cdr p)))
-      (map fun bm))))
-
-(define (menu-name p)
-  (menu-flatten (car p)))
+(define (abbr->buffer abbr)
+  (assoc-ref (map (lambda (x) (cons (buffer-get-title x) x))
+                  (buffer-sorted-list))
+             abbr))
 
 (tm-define (go-to-buffer name)
   (:argument  name "Switch to buffer")
-  (:proposals name (map car (list-buffers)))
-  (let* ((m  (list-buffers))
-	 (l1 (assoc name m))
-	 (l2 (assoc (string-append name " *") m)))
-    (cond (l1 ((cadr l1)))
-	  (l2 ((cadr l2)))
-	  (else (set-message `(concat "Error: no buffer " ,name)
-			     "switch to buffer")))))
-
-(tm-define (with-active-buffer-sub name cmd)
-  (let ((old (get-name-buffer)))
-    (switch-to-active-buffer name)
-    (eval cmd)
-    (switch-to-active-buffer old)))
-
-(tm-define-macro (with-active-buffer buf . body)
-  `(with-active-buffer-sub ,buf `(begin ,@body)))
+  (:proposals name (list-abbrs))
+  (cond ((in? name (buffer-list))
+         (switch-to-buffer name))
+        ((abbr->buffer name)
+         (switch-to-buffer (abbr->buffer name)))
+        ((in? (unix->url name) (buffer-list))
+         (switch-to-buffer (unix->url name)))
+        (else (set-message `(concat "Error: no buffer " (verbatim ,name))
+                           "switch to buffer"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search and replace

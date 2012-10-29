@@ -9,9 +9,69 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
-
 #include "QTMGuiHelper.hpp"
 #include "qt_tm_widget.hpp"
+#include "qt_utilities.hpp"
+#include "scheme.hpp"
+#include "iterator.hpp"
+#include <QFileOpenEvent>
+
+void
+QTMGuiHelper::doUpdate () {
+    //  cout << "UPDATE " << texmacs_time () << LF;
+  gui->update();
+}
+
+void
+QTMGuiHelper::doRefresh () {
+  emit refresh();
+}
+
+bool
+QTMGuiHelper::eventFilter (QObject *obj, QEvent *event) {
+  if (event->type() == QEvent::FileOpen) {
+    QFileOpenEvent* openEvent = static_cast<QFileOpenEvent *>(event);
+    const char* s = openEvent->file().toUtf8().constData();
+      //qDebug ("File Open Event %s", s);
+    call ("load-buffer", object (url_system (s)), eval (":new-window"));
+    return true;
+  } else {
+      // standard event processing
+    return QObject::eventFilter (obj, event);
+  }
+}
+
+void
+QTMGuiHelper::doWriteSocketNotification (int socket) {
+  if (DEBUG_QT) 
+    cout << "WRITE SOCKET NOTIFICATION " << socket << " "
+    << texmacs_time () << LF;
+  iterator<socket_notifier> it = iterate (gui->write_notifiers);
+  while (it->busy ()) {
+    socket_notifier sn= it->next ();
+    if (sn->fd == socket) {
+        //sn->notify();
+      the_gui->process_socket_notification (sn);
+      the_gui->enable_notifier (sn, false);
+    }
+  }
+}
+
+void
+QTMGuiHelper::doReadSocketNotification (int socket) {
+  if (DEBUG_QT) 
+    cout << "READ SOCKET NOTIFICATION " << socket << " "
+    << texmacs_time () << LF;
+  iterator<socket_notifier> it = iterate (gui->read_notifiers);
+  while (it->busy ()) {
+    socket_notifier sn= it->next ();
+    if (sn->fd == socket) {
+        //sn->notify();
+      the_gui->process_socket_notification (sn);
+      the_gui->enable_notifier (sn, false);
+    }
+  }
+}
 
 void
 QTMGuiHelper::aboutToShowMainMenu() {
@@ -39,3 +99,7 @@ QTMGuiHelper::doPopWaitingWidgets() {
   }
 }
 
+void
+QTMGuiHelper::emitTmSlotRefresh () {
+  emit tmSlotRefresh();
+}

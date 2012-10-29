@@ -16,17 +16,29 @@
 			<key>CFBundleTypeMIMETypes</key>
 			<string>text/x-texmacs</string>
 			<key>CFBundleTypeName</key>
-			<string>TeXmacs Document</string>
+			<string>TeXmacs document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSIsAppleDefaultForType</key>
 			<true/>
 		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>ts</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>TeXmacs-document.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>TeXmacs style document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>${EXECUTABLE_NAME}</string>
 	<key>CFBundleIconFile</key>
-	<string>TeXmacs</string>
+	<string>TeXmacs.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.texmacs.${PRODUCT_NAME}</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -36,9 +48,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.7.17</string>
 	<key>CFBundleSignature</key>
 	<string>MGUB</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (prog scheme-edit)
-  (:use (prog prog-edit)
+  (:use (prog prog-edit) (prog scheme-autocomplete)
 	(utils misc tm-keywords)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -149,11 +149,56 @@
       (program-set-indent i)
       (program-go-to (program-row-number) i))))
 
+;(tm-define (kbd-variant t forwards?)
+;  (:require (in-prog-scheme?))
+;  (scheme-indent))
+
 (tm-define (kbd-variant t forwards?)
   (:require (in-prog-scheme?))
-  (scheme-indent))
+  (custom-complete (tm->tree (scheme-completions (cursor-word)))))
+
+(kbd-map
+  (:require (in-prog-scheme?))
+  ("C-i" (scheme-indent))
+  ("std c" (clipboard-copy-export "scheme" "primary"))
+  ("std v" (clipboard-paste-import "scheme" "primary"))
+  ("std x" (clipboard-cut-export "scheme" "primary")))
 
 (tm-define (insert-return)
   (:mode in-prog-scheme?)
   (insert-raw-return)
   (scheme-indent))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Preferences for syntax highlighting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (notify-scheme-pref var val)
+   (syntax-read-preferences "scheme"))
+
+(define-preferences
+  ("syntax:scheme:none" "red" notify-scheme-pref)
+  ("syntax:scheme:comment" "brown" notify-scheme-pref)
+  ("syntax:scheme:keyword" "#309090" notify-scheme-pref)
+  ("syntax:scheme:error" "dark red" notify-scheme-pref)
+  ("syntax:scheme:constant" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_identifier" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_function" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_type" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_category" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_module" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_number" "#4040c0" notify-scheme-pref)
+  ("syntax:scheme:constant_string" "dark grey" notify-scheme-pref)
+  ("syntax:scheme:variable" "#606060" notify-scheme-pref)
+  ("syntax:scheme:variable_identifier" "#204080" notify-scheme-pref)
+  ("syntax:scheme:variable_function" "#606060" notify-scheme-pref)
+  ("syntax:scheme:variable_type" "#00c000" notify-scheme-pref)
+  ("syntax:scheme:variable_category" "#00c000" notify-scheme-pref)
+  ("syntax:scheme:variable_module" "#00c000" notify-scheme-pref)
+  ("syntax:scheme:declare" "#0000c0" notify-scheme-pref)
+  ("syntax:scheme:declare_identifier" "#0000c0" notify-scheme-pref)
+  ("syntax:scheme:declare_function" "#0000c0" notify-scheme-pref)
+  ("syntax:scheme:declare_type" "#0000c0" notify-scheme-pref)
+  ("syntax:scheme:declare_category" "magenta" notify-scheme-pref)
+  ("syntax:scheme:declare_module" "#0000c0" notify-scheme-pref))
+

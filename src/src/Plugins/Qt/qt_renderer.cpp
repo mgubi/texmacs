@@ -15,6 +15,7 @@
 #include "qt_utilities.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
+#include "scheme.hpp"
 
 #include <QObject>
 #include <QWidget>
@@ -85,20 +86,17 @@ qt_renderer_rep::~qt_renderer_rep () {}
 
 void
 qt_renderer_rep::begin (void* handle) {
-  QPaintDevice *device = (QPaintDevice*)handle;
-  painter->begin (device);
+  QPaintDevice *device = static_cast<QPaintDevice*>(handle);
+  if (!painter->begin (device) && DEBUG_QT)
+    cout << "qt_renderer_rep::begin(): uninitialized QPixmap of size "
+         << ((QPixmap*)handle)->width() << " x " << ((QPixmap*)handle)->height()
+         << LF;
+    
   w = painter->device()->width();
   h = painter->device()->height();
 }
 
 void qt_renderer_rep::end () { painter->end (); }
-
-QColor
-qt_color(color c) {
-  int r, g, b, a;
-  get_rgb_color (c, r, g, b, a);
-  return QColor (r, g, b, a);
-}
 
 void 
 qt_renderer_rep::get_extents (int& w2, int& h2) {  
@@ -140,8 +138,8 @@ qt_renderer_rep::set_color (color c) {
   basic_renderer_rep::set_color(c);
   QPen p (painter->pen ());
   QBrush b (painter->brush ());
-  p.setColor (qt_color(cur_fg));
-  b.setColor (qt_color(cur_fg));
+  p.setColor (to_qcolor(cur_fg));
+  b.setColor (to_qcolor(cur_fg));
   painter->setPen (p);
   painter->setBrush (b);
 }
@@ -193,7 +191,7 @@ qt_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
   if ((x1>=x2) || (y1<=y2)) return;
-  QBrush brush (qt_color(cur_bg));
+  QBrush brush (to_qcolor(cur_bg));
   painter->setRenderHints (0);
   painter->fillRect (x1, y2, x2-x1, y1-y2, brush);       
 }
@@ -219,14 +217,13 @@ qt_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
 
-  QBrush brush (qt_color(cur_fg));
+  QBrush brush (to_qcolor(cur_fg));
   painter->setRenderHints (0);
   painter->fillRect (x1, y2, x2-x1, y1-y2, brush);       
 }
 
 void
 qt_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
-  (void) alpha; (void) delta;
   if ((x1>=x2) || (y1>=y2)) return;
   decode (x1, y1);
   decode (x2, y2);
@@ -236,11 +233,10 @@ qt_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 
 void
 qt_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
-  (void) alpha; (void) delta;
   if ((x1>=x2) || (y1>=y2)) return;
   decode (x1, y1);
   decode (x2, y2);
-  QBrush brush(qt_color(cur_fg));
+  QBrush brush(to_qcolor(cur_fg));
   QPainterPath pp;
   pp.arcMoveTo (x1, y2, x2-x1, y1-y2, alpha / 64);
   pp.arcTo (x1, y2, x2-x1, y1-y2, alpha / 64, delta / 64);
@@ -260,7 +256,7 @@ qt_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
     decode (xx, yy);
     poly[i] = QPointF (xx, yy);
   }
-  QBrush brush(qt_color(cur_fg));
+  QBrush brush(to_qcolor(cur_fg));
   QPainterPath pp;
   pp.addPolygon (poly);
   pp.closeSubpath ();
@@ -304,9 +300,9 @@ qt_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
          << as_string (cx1) << as_string (cy1)
          << as_string (cx2) << as_string (cy2) << "qt-image" ;
   cache_image_element ci = get_image_cache(lookup);
-  if (!is_nil(ci)) {
+  if (!is_nil(ci))
     pm= static_cast<QImage*> (ci->ptr);
-  } else {
+  else {
     // rendering
     bool needs_crop= false;
     if (qt_supports (u)) {
@@ -370,9 +366,22 @@ qt_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
       remove (temp);
     }
     if (pm == NULL || pm->isNull ()) {
-      cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
-      if (pm != NULL) delete pm;
-      return;
+      if (pm != NULL) {
+        delete pm;
+        pm= NULL;
+      }
+      if (as_bool (call ("file-converter-exists?", u, "x.png"))) {
+        url temp= url_temp (".png");
+        call ("file-convert", object (u), object (temp));
+        needs_crop= true;
+        pm= new QImage (to_qstring (as_string (temp)));
+        remove (temp);
+      }
+      if (pm == NULL || pm->isNull ()) {
+        if (pm != NULL) delete pm;
+        cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
+        return;
+      }
     }
 
     if(needs_crop) {
@@ -558,7 +567,7 @@ the_qt_renderer () {
  * Shadow management methods 
  ******************************************************************************/
 
-/* Shadows are auxiliary renderers which allows double buffering and caching of
+/* Shadows are auxiliary renderers which allow double buffering and caching of
  * graphics. TeXmacs has explicit double buffering from the X11 port. Maybe
  * it would be better to design a better API abstracting from the low level 
  * details but for the moment the following code and the qt_proxy_renderer_rep
@@ -570,15 +579,15 @@ the_qt_renderer () {
  *    the drawback that if our widget is under another one we won't read the 
  *    right pixels)
  * 
- * qt_proxy_renderer_rep solve the double buffering problem: when texmacs ask
+ * qt_proxy_renderer_rep solves the double buffering problem: when texmacs asks
  * a qt_renderer_rep for a shadow it is given a proxy of the original renderer
  * texmacs uses this shadow for double buffering and the proxy will simply
  * forward the drawing operations to the original surface and neglect all the
  * syncronization operations
  *
  * to solve the second problem we do not draw directly on screen in QTMWidget.
- * Instead we maintain an internal pixmap which represent the state of the pixels
- * according to texmacs. when we are asked to initialize a qt_shadow_renderer_rep
+ * Instead we maintain an internal pixmap which represents the state of the pixels
+ * according to texmacs. When we are asked to initialize a qt_shadow_renderer_rep
  * we simply read the pixels form this backing store. At the Qt level then
  * (in QTMWidget) we make sure that the state of the backing store is in sync
  * with the screen via paintEvent/repaint mechanism.

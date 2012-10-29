@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.0.7.16>
 
 <style|<tuple|source|std>>
 
@@ -39,6 +39,10 @@
   <assign|tex-even-side-margin|<macro|<if|<equal|<value|par-columns>|1>|0pt|-30pt>>>
 
   <assign|tex-text-width|<macro|<if|<equal|<value|par-columns>|1>|25.5cc|17.5cm>>>
+
+  <assign|tex-line-width|<value|tex-text-width>>
+
+  <assign|tex-column-width|<value|tex-text-width>>
 
   \;
 
@@ -142,7 +146,13 @@
 
   <assign|eqn-ver-sep|<macro|<style-with|src-compact|none|<over|<style-with|src-compact|none|<minus|<tex-above-display-skip>|<tex-below-display-skip>|<plus|<tex-above-display-short-skip>|<tex-below-display-short-skip>>>>|2>>>>
 
-  \;
+  <active*|<\src-comment>
+    TeX style lists.
+  </src-comment>>
+
+  <assign|itemize-reduce|<macro|nr|<minimum|<arg|nr>|4>>>
+
+  <assign|enumerate-reduce|<macro|nr|<minimum|<arg|nr>|4>>>
 </body>
 
 <\initial>

@@ -1,0 +1,323 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MODULE      : apidoc-funcs.scm
+;; DESCRIPTION : Routines for documentation of the scheme api
+;; COPYRIGHT   : (C) 2012 Miguel de Benito Delgado
+;;
+;; This software falls under the GNU general public license version 3 or later.
+;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; This file contains procedures needed for the display of documentation
+;; collected using module (doc apidoc-collect).
+;; As usual, procedures prefixed with a dollar sign return strees for display.
+;; Most of the time they have an unprefixed counterpart which does the work.
+;;
+;; TODO:
+;;  - use the code indexer when it's ready and ditch ad-hoc parsing made here
+;;  - fix the implementation of refresh-widget to fix the module browser
+;;  - this list
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(texmacs-module (doc apidoc-funcs)
+  (:use (convert rewrite init-rewrite) (doc apidoc-collect)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Conversions related to modules:
+
+(tm-define (string->module str)
+  (:synopsis "Returns the list representation of a module given as a string")
+  (if (== str "") '()
+      (map string->symbol (string-split str #\.))))
+
+(tm-define (module->string module)
+  (:synopsis "Formats a module in list format (some module) as some.module")
+  (cond ((list? module)
+         (string-join (map symbol->string module) "."))
+        ((symbol? module)
+         (symbol->string module))
+        (else "")))
+
+(define (module->name module)
+  "Retrieves the name of the file for @module, without extension"
+  (symbol->string (cAr module)))
+
+(define (module->path module)
+  "Returns the full path of the given module, without extension"
+  (url-concretize
+    (string-append "$TEXMACS_PATH/progs/"
+      (cond ((list? module)
+             (string-join (map symbol->string module) "/"))
+            ((symbol? module)
+             (symbol->string module))
+            (else "")))))
+
+(define (tree->symbol t)
+  (string->symbol (tree->string t)))
+
+(define (symbol->tree s)
+  (string->tree (symbol->string s)))
+
+(define (module-leq? x y)
+  (string<=? (module->string x) (module->string y)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Compute and display information related to a module
+;; TODO: write abstract interface to decouple from TeXmacs/Guile/whatever
+;; specifics.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (guile?)
+  (with sd (scheme-dialect)
+    (and (string? sd) (== "guile" (string-take sd 5)))))
+
+(tm-define (is-real-module? module)
+  (url-exists? (string->url (string-append (module->path module) ".scm"))))
+
+(define (module-source-path module full?)
+  (string-concatenate
+     (list (if full? (url-concretize "$TEXMACS_PATH/progs/") "")
+           (string-join (map symbol->string module) "/")
+            ".scm")))
+
+(define (module-doc-path module)
+  (string-append "tmfs://apidoc/type=module&what=" (module->string module)))
+
+(tm-define ($module-source-link module)
+  ($link (module-source-path module #t) (module-source-path module #f)))
+
+(tm-define ($module-doc-link module)
+  ($link (module-doc-path module) (module->string module)))
+
+(tm-define (module-dependencies module) 
+  ;TODO
+  '())
+
+(tm-define ($module-dependencies module)
+ (cons 'concat
+   (list-intersperse (map $module-doc-link (module-dependencies module))
+                     ", ")))
+
+(define (module-description m)
+  "Description TO-DO")
+
+; This list is incomplete!
+(define keywords
+  '(define-public define-public-macro provide-public tm-define 
+    tm-define-macro tm-menu menu-bind tm-widget))
+
+(define module-exported-cache (make-ahash-table))
+
+; HACK: we use read (copying what's done in init-texmacs.scm) until the 
+; code indexer is implemented
+(define (parse-form form)
+  "Set symbol properties and return the symbol."
+  (let* ((line (source-property form 'line))
+         (column (source-property form 'column))
+         (filename (source-property form 'filename))
+         (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
+    (and (symbol? sym) ; Just in case
+         (begin 
+           (set-symbol-property! sym 'line line)
+           (set-symbol-property! sym 'column column)
+           (set-symbol-property! sym 'filename filename)
+           sym))))
+
+(tm-define (module-exported module)
+  (:synopsis "List of exported symbols in @module")
+  (or (ahash-ref module-exported-cache module)
+      (and (is-real-module? module)
+        (let* ((p (open-input-file (module-source-path module #t)))
+               (defs '())
+               (add (lambda (f) (set! defs (rcons defs (parse-form f))))))
+          (letrec ((r (lambda () (with form (read p)
+                                   (or (eof-object? form) 
+                                       (begin (add form) (r)))))))
+            (r))
+          (ahash-set! module-exported-cache module defs)))))
+
+(tm-define (module-count-exported module)
+  (length (module-exported module)))
+
+(tm-define (module-count-undocumented module)
+  (with l (module-exported module)
+    (- (length l)
+       (length
+         (list-filter l
+           (lambda (x)
+             (and (symbol? x) 
+                  (persistent-has? (doc-scm-cache) (symbol->string x)))))))))
+
+(tm-define ($doc-module-exported module)
+  (with l (module-exported module)
+    (with fun (lambda (sym)
+                (if (symbol? sym)
+                  (list ($doc-explain-scm* (symbol->string sym)))
+                  '()))
+      (if (null? l)
+       '(document "No symbols exported")
+       `(document (subsection "Symbol documentation")
+                  ,@(append-map fun l))))))
+
+; WRONG! what about unloaded modules
+(define (tm-exported? sym)
+  (and (symbol? sym) (ahash-ref tm-defined-table sym)))
+
+(define (dir-with-access? path)
+  (and (access? path (logior R_OK X_OK))
+       (== 'directory (stat:type (stat path)))))
+
+(define (list-submodules module)
+  (with full (module->path module)
+    (if (not (dir-with-access? full))
+      '()
+      (let* ((dir (opendir full))
+             (entries '())
+             (add (lambda (s)
+                  (set! entries 
+                    (rcons entries (rcons module (string->symbol s)))))))
+        (do ((entry (readdir dir) (readdir dir)))
+            ((eof-object? entry))
+            (cond ((string-starts? entry ".") (noop))
+                  ((string-ends? entry ".scm") 
+                   (add (string-drop-right entry 4)))
+                  ((dir-with-access? (string-append full "/" entry))
+                   (add entry))))
+        (closedir dir)
+        entries))))
+
+(tm-define (list-submodules-recursive ml)
+  (:synopsis "Return all submodules, recursively, for module list @ml")
+  (cond ((null? ml) '())
+        ((npair? ml)
+         (if (is-real-module? ml) (list ml)
+             (list-submodules-recursive (list-submodules ml))))
+        ((null? (cdr ml))
+         (if (is-real-module? (car ml)) (list (car ml))
+             (list-submodules-recursive (list-submodules (car ml)))))
+        (else
+         (if (is-real-module? (car ml))
+             (cons (car ml) (list-submodules-recursive (cdr ml)))
+             (append (list-submodules-recursive (list-submodules (car ml)))
+                     (list-submodules-recursive (cdr ml)))))))
+
+(define ($doc-module-branch m)
+  `(branch ,(symbol->string (cAr m)) ,(module-doc-path m)))
+
+(define ($doc-module-branches lst)
+  (append-map (lambda (m) (list ($doc-module-branch m))) lst))
+
+(tm-define ($doc-module-traverse root)
+  `(traverse (document ,@($doc-module-branches (list-submodules root)))))
+
+(tm-define ($submodules->gtree m)
+  (with fun (lambda (x) (symbol->string (cAr x)))
+    `(tree ,(if (null? m) "()" (fun m)) ,@(map fun (list-submodules m)))))
+
+(tm-define ($doc-module-header m)
+  `(doc-module-header ,(module->string m) ,(module-description m)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Symbols documentation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define ($doc-symbol-properties sym)
+  (let ((line (symbol-property sym 'line))
+        (column (symbol-property sym 'column))
+        (filename (symbol-property sym 'filename)))
+    (if (and line column filename)
+      (let ((lno (number->string line))
+            (cno (number->string column)))
+        `(hlink ,(string-append (basename filename) ":" lno)
+                ,(string-append filename "?line=" lno "&column=" cno
+                                         "&select=" (symbol->string sym))))
+      (translate "[symbol properties not found]"))))
+
+(tm-define (doc-symbol-synopsis* sym)
+  (with prop (property sym :synopsis)
+    (if (list? prop) (car prop) "No synopsis available")))
+
+(tm-define ($doc-symbol-code sym)
+  `(folded-explain
+     (document (with "color" "dark green" (em "Definition...")))
+     (scm-code
+       (document
+        ,(cond ((and (tm-exported? sym) (procedure? (eval sym)))
+                (object->string (procedure-sources (eval sym))))
+               ((and (defined? sym) 
+                     (procedure? (eval sym))
+                     (procedure-source (eval sym)))
+                 => object->string)
+               (else "Symbol not found or not a procedure"))))))
+
+(tm-define ($doc-symbol-template sym message)
+  `(explain
+     (document
+       (concat (scm ,(symbol->string sym))
+               (explain-synopsis ,(doc-symbol-synopsis* sym))))
+     (document ,message ,($doc-symbol-code sym))))
+
+(tm-define-macro ($ismall . l)
+  ($quote `(small (with "font-shape" "italic" ($unquote ($inline ,@l))))))
+
+(tm-define ($doc-symbol-extra sym . docurl)
+  ($inline
+    '(htab "")
+     (if (nnull? docurl)
+       ($inline ($ismall ($link (car docurl) (translate "Open doc."))) " | ")
+       "")
+    ($ismall (translate "Go to") " " ($doc-symbol-properties sym))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Retrieval and display of documentation from the cache
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (docgrep-new-window what)
+  (let* ((query (list->query (list (cons "type" "doc") (cons "what" what))))
+         (name (string-append "tmfs://grep/" query)))
+    (buffer-load name)
+    (open-buffer-in-window name (buffer-get name) "")))
+
+(tm-define (docgrep-in-doc-secure what)
+  (:synopsis "Search in documentation. Secure routine to use in 'action tags.")
+  (:secure #t)
+  (docgrep-new-window what))
+
+(define ($explain-not-found key)
+  `(document
+    ,($doc-symbol-template (string->symbol key)
+      `(concat "Documentation unavailable. Search "
+        (action "the manual"
+                ,(string-append "(docgrep-in-doc-secure \"" key "\")"))
+         ", or go to the definition in "
+         ,($doc-symbol-properties (string->symbol key))))))
+
+(define (doc-explain-sub entries)
+  (if (or (null? entries) (not (func? (car entries) 'entry))) '()
+    (with (key lan url doc) (cdar entries)
+      (cons `(explain
+               ,(tm-ref doc 0)
+               (document 
+                 ,(tm-ref doc 1)
+                 ,($doc-symbol-code (string->symbol key))
+                 ,($doc-symbol-extra (string->symbol key) url)))
+             (doc-explain-sub (cdr entries))))))
+
+(tm-define ($doc-explain-scm* key)
+  (with docs (doc-retrieve (doc-scm-cache) key (get-output-language))
+    (if (null? docs)
+      ($explain-not-found key) 
+     `(document ,@(doc-explain-sub docs)))))
+
+(tm-define ($doc-explain-scm key)
+  (:synopsis "Return a document with the scheme documentation for @key")
+  `(document
+     ,($doc-explain-scm* key)
+     (freeze (concat (locus (id "__doc__popup__") "")))))
+
+(tm-define ($doc-explain-macro* key)
+  (with docs (doc-retrieve (doc-macro-cache) key (get-output-language))
+    (if (null? docs) ($explain-not-found key) (doc-explain-sub docs))))
+

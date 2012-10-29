@@ -10,26 +10,101 @@
  ******************************************************************************/
 
 #include "qt_window_widget.hpp"
+#include "qt_tm_widget.hpp"
 #include "qt_utilities.hpp"
+#include "qt_gui.hpp"
 #include "QTMWindow.hpp"
+#include "QTMGuiHelper.hpp"
+#include "QTMMenuHelper.hpp"
 
 #include "message.hpp"
 #include "analyze.hpp"
 
 #include <QWidget>
 #include <QVariant>
+#include <QDockWidget>
 
-qt_window_widget_rep::qt_window_widget_rep (QWidget* _wid, command q):
-widget_rep(), wid(_wid), quit(q)
+/*! Construct a qt_window_widget_rep around an already compiled widget.
+ 
+ This means that the QWidget passed as an argument already represents a fully 
+ parsed and compiled scheme widget. We use this fact to decide whether we must
+ be resizable or not, for instance.
+ */
+qt_window_widget_rep::qt_window_widget_rep (QWidget* _wid, command _quit)
+: qt_widget_rep(window_widget, _wid), quit(_quit)
 {
-  wid->setProperty ("texmacs_window_widget",
-                    QVariant::fromValue ((void*) this));
-  nr_windows++;
+  qwid->setProperty ("texmacs_window_widget",
+                     QVariant::fromValue ((void*) this));
+  
+    // Try to connect only if the QWidget has a closed() signal
+    // We need this for the QDockWidgets we use in side tools (see qt_tm_widget_rep)
+  if (qwid->metaObject() -> 
+      indexOfSignal (QMetaObject::normalizedSignature ("closed()").constData ()) != -1) {
+    QTMCommand* qtmcmd = new QTMCommand(qwid, quit);
+    QObject::connect(qwid, SIGNAL (closed()), qtmcmd, SLOT (apply()));
+  }
+
+  if (!has_resizable_children(_wid))
+    qwid->setFixedSize(qwid->sizeHint());
+  
+  win_id = ++nr_windows;
 }
 
+/*!
+ WARNING! This should be the only place were QWidgets are destroyed!
+ */
 qt_window_widget_rep::~qt_window_widget_rep ()
 {
   nr_windows--;
+
+  qwid->deleteLater();
+}
+
+widget
+qt_window_widget_rep::popup_window_widget(string s)
+{
+  qwid->setWindowTitle (to_qstring (s));
+  qwid->setWindowModality (Qt::NonModal);
+  qwid->setWindowFlags (Qt::Popup);
+  return this;
+}
+
+/*! Looks among the widget's parents for the containing texmacs window
+ */
+widget_rep* 
+qt_window_widget_rep::widget_from_qwidget(QWidget* q)
+{
+  while (q != NULL) {
+    QVariant v = q->property ("texmacs_window_widget");
+    if (v.canConvert<void*> ())
+      return static_cast<widget_rep*> (v.value<void*> ());
+    else
+      q = q->parentWidget();
+  }
+  return NULL;
+}
+
+/*! Returns true if any of the child QWidgets has different minimum and maximum
+ sizes, as set by qt_ui_element_rep::as_qwidget() for resize_widgets.
+ */
+bool
+qt_window_widget_rep::has_resizable_children(QWidget* w, bool ret) {
+    // Ignore any non QWidgets
+  if (!w) return false;
+  
+    // Hack: these must always be resizable
+  if (qobject_cast<QMainWindow*>(w) || qobject_cast<QDockWidget*>(w))
+    return true;
+
+  ret = (w->minimumSize() != QSize(0,0) && 
+         w->maximumSize() != QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX) &&
+         w->minimumSize() != w->maximumSize());
+  
+  QObjectList ch = w->children();
+  for (int i=0; i<ch.size(); ++i)
+    ret = ret || has_resizable_children(qobject_cast<QWidget*>(ch[i]), ret);
+  
+  return ret;
 }
 
 void
@@ -40,78 +115,86 @@ qt_window_widget_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_SIZE:
     {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
+      check_type<coord2>(val, s);
       coord2 p= open_box<coord2> (val);
-      if (wid) {
+      if (qwid) {
         QSize size= to_qsize (p);
-        wid->resize (size);
+        qwid->resize (size);
       }
     }
       break;
       
     case SLOT_POSITION:
     {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
+      check_type<coord2>(val, s);
       coord2 p= open_box<coord2> (val);
-      if (wid) {
+      if (qwid) {
         QPoint pt = to_qpoint (p);
-        pt.ry() += 40;
+#ifdef OS_MACOS
+        pt.ry() = (pt.y() <= 40) ? 40 : pt.y();
           // to avoid window under menu bar on MAC when moving at (0,0)
-        if (DEBUG_QT) 
-          cout << "Moving to (" << pt.x() << "," 
-          << pt.y() << ")" << LF;
-        wid->move (pt);
+          // FIXME: use the real menu bar height.
+#endif
+        qwid->move (pt);
       }
     }
       break;
       
     case SLOT_VISIBILITY:
     {
-      check_type<bool> (val, "SLOT_VISIBILITY");
+      check_type<bool> (val, s);
       bool flag = open_box<bool> (val);
-      if (wid) {
+      if (qwid) {
         if (flag) {
-          wid->show();
+          qwid->show();
           // wid->activateWindow();
           //WEIRD: in Ubuntu uncommenting the above line causes the main window 
           //to be opened in the background.
-          wid->raise();
+          qwid->raise();
         }
-        else wid->hide();
+        else qwid->hide();
       }
     }
       break;
-      
+
+    case SLOT_MOUSE_GRAB:
+    {   
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);  // true= get grab, false= release grab
+      if (flag && qwid) {
+        qwid->setWindowFlags(Qt::Window);  // ok?
+        qwid->setWindowModality(Qt::WindowModal); //ok?
+        qwid->show();
+      }
+    }   
+      break;
     case SLOT_NAME:
     {   
-      check_type<string> (val, "SLOT_NAME");
+      check_type<string> (val, s);
       string name = open_box<string> (val);
-      if (wid) wid->setWindowTitle (to_qstring (tm_var_encode(name)));
+      if (qwid) qwid->setWindowTitle (to_qstring (name));
     }
       break;
       
     case SLOT_FULL_SCREEN:
     {
-      check_type<bool> (val, "SLOT_FULL_SCREEN");
-      QTMWindow *win = qobject_cast<QTMWindow*>(wid);
-      if (win && win->tm_widget()) {
-        win->tm_widget()->set_full_screen(open_box<bool> (val));
+      check_type<bool> (val, s);
+      QTMWindow* qwin = qobject_cast<QTMWindow*>(qwid);
+      if (qwin && qwin->tmwid->ref_count != 0) {
+        qt_tm_widget_rep* wid = static_cast<qt_tm_widget_rep*>(qwin->tmwid.rep);
+        if (wid)
+          wid->set_full_screen(open_box<bool> (val));
       }
-        //win->set_full_screen (open_box<bool> (val));
+      else FAILED ("attempt to set full screen on a non qt_tm_widget");
     }
       break;
       
-    case SLOT_UPDATE:
-      NOT_IMPLEMENTED ;
-        //send_update (THIS, val);
-      break;
     case SLOT_REFRESH:
-        //NOT_IMPLEMENTED ;
-        //send_refresh (THIS, val);
+      the_gui->gui_helper->emitTmSlotRefresh();
       break;
       
     default:
-      FAILED ("cannot handle slot type");
+      qt_widget_rep::send(s, val);
   }
 }
 
@@ -121,35 +204,49 @@ qt_window_widget_rep::query (slot s, int type_id) {
     cout << "qt_window_widget_rep::query " << slot_name(s) << LF;
   switch (s) {
     case SLOT_IDENTIFIER:
-      TYPE_CHECK (type_id == type_helper<int>::id);
-        // we need only to know if the widget is attached to some gui window
-      return close_box<int> (wid? 1: 0);
-        // return close_box<int> ((int)wid);
+    {
+      check_type_id<int> (type_id, s);
+      return close_box<int> (win_id);
+    }
+
     case SLOT_POSITION:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      QPoint pt= wid->pos();
-      if (DEBUG_QT)
-        cout << "Position (" << pt.x() << "," << pt.y() << ")\n";
-      return close_box<coord2> (from_qpoint (pt));
+      check_type_id<coord2> (type_id, s);
+      QRect g;
+        // FIXME: dock widgets are embedded into qt_window_widget_reps as a temporary hack
+        // because of this the underlying widget is not always a top level window
+      if (qwid->isWindow()) g = qwid->geometry();
+      else                  g = qwid->window()->geometry();
+        //cout << "wpos: " << pt.x() << ", " << pt.y() << LF;
+      return close_box<coord2> (from_qpoint (QPoint (g.x(), g.y())));
     }
+
     case SLOT_SIZE:
     {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      QSize s= wid->size();
-      return close_box<coord2> (from_qsize (s));
+      check_type_id<coord2> (type_id, s);
+      QSize sz = qwid->size();
+      return close_box<coord2> (from_qsize (sz));
     }
+
     default:
-      FAILED ("cannot handle slot type");
-      return blackbox ();
+      return qt_widget_rep::query (s, type_id);
   }
 }
 
-/******************************************************************************
- * Notification of state changes
- ******************************************************************************/
+widget
+qt_window_widget_rep::read (slot s, blackbox index) {
+  if (DEBUG_QT)
+    cout << "qt_window_widget_rep::read " << slot_name(s) << "\tWidget id: " << id << LF;
+  
+  switch (s) {
+    case SLOT_WINDOW:  // We use this in qt_gui_rep::show_help_balloon()
+      check_type_void (index, s);
+      return this;
+
+    default:
+      return qt_widget_rep::read (s, index);
+  }
+}
 
 void
 qt_window_widget_rep::notify (slot s, blackbox new_val) {
@@ -158,27 +255,101 @@ qt_window_widget_rep::notify (slot s, blackbox new_val) {
   widget_rep::notify (s, new_val);
 }
 
-widget
-qt_window_widget_rep::read (slot s, blackbox index) {
-  (void) index;
-  if (DEBUG_QT)
-    cout << "qt_window_widget_rep::read " << slot_name(s) << LF;
-  switch (s) {
-    default:
-      FAILED ("cannot handle slot type");
-      return widget();
+
+/******************************************************************************
+ * popup widget
+ ******************************************************************************/
+
+
+qt_popup_widget_rep::qt_popup_widget_rep (widget wid, command _quit)
+: qt_widget_rep(qt_widget_rep::popup_widget, 0), quit(_quit) {
+  
+  qwid = new QTMPopupWidget(concrete(wid)->as_qwidget());
+
+  if (qwid->metaObject() ->
+      indexOfSignal (QMetaObject::normalizedSignature ("closed()").constData ()) != -1) {
+  QTMCommand* qtmcmd = new QTMCommand(qwid, quit);
+  QObject::connect(qwid, SIGNAL (closed()), qtmcmd, SLOT (apply()));
   }
+}
+
+/*!
+ WARNING! This should be the only place were QWidgets are destroyed!
+ */
+qt_popup_widget_rep::~qt_popup_widget_rep () {  
+  qwid->deleteLater();
+}
+
+widget
+qt_popup_widget_rep::popup_window_widget(string s) {
+  qwid->setWindowTitle (to_qstring (s)); // useless for Qt::Popup
+
+  return this;
 }
 
 void
-qt_window_widget_rep::write (slot s, blackbox index, widget w) {
-  (void) w; (void) index;
-  if (DEBUG_QT)
-    cout << "qt_window_widget_rep::write " << slot_name(s) << LF;
-  
+qt_popup_widget_rep::send (slot s, blackbox val) {
+
   switch (s) {
+    case SLOT_SIZE:
+    {
+      check_type<coord2>(val, s);
+      qwid->resize (to_qsize (open_box<coord2> (val)));
+    }
+      break;
+      
+    case SLOT_POSITION:
+    {
+      check_type<coord2>(val, s);
+      qwid->move (to_qpoint (open_box<coord2> (val)));
+    }
+      break;
+      
+    case SLOT_VISIBILITY:
+    {
+      check_type<bool> (val, s);
+      qwid->setVisible(open_box<bool> (val));
+    }
+      break;
+      
+      //FIXME: what's this?
+    case SLOT_MOUSE_GRAB:
+    {   
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);  // true= get grab, false= release grab
+      
+      qwid->hide();
+      if (flag) qwid->setWindowModality(Qt::WindowModal); //ok?
+      else      qwid->setWindowModality(Qt::NonModal);    //ok?
+      qwid->show();
+    }   
+      break;
+
     default:
-      FAILED ("cannot handle slot type");
+      qt_widget_rep::send(s, val);
   }
+  
+  if (DEBUG_QT)
+    cout << "qt_popup_widget_rep: sent " << slot_name (s) 
+         << "\t\tto widget\t"         << type_as_string() << LF;
 }
 
+blackbox
+qt_popup_widget_rep::query (slot s, int type_id) {
+  if (DEBUG_QT)
+    cout << "qt_popup_widget_rep::query " << slot_name(s) << LF;
+  switch (s) {
+    case SLOT_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (from_qpoint (qwid->pos()));
+    }
+    case SLOT_SIZE:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (from_qsize (qwid->size()));
+    }
+    default:
+      return qt_widget_rep::query (s, type_id);
+  }
+}

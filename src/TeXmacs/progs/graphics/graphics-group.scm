@@ -15,7 +15,8 @@
 
 (texmacs-module (graphics graphics-group)
   (:use (graphics graphics-env)
-        (graphics graphics-single)))
+        (graphics graphics-single)
+        (kernel gui kbd-handlers)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Group edit mode
@@ -379,6 +380,36 @@
   (edit_tab-key 'edit inc))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Don't act on
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (group-edit-macro-arg? mode)
+  (and (== mode 'group-edit)
+       current-path
+       (path->tree current-path)
+       (graphical-text-arg-context? (path->tree current-path))))
+
+(tm-define (edit_move mode x y)
+  (:require (group-edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_left-button mode x y)
+  (:require (group-edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_right-button mode x y)
+  (:require (group-edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_middle-button mode x y)
+  (:require (group-edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Cut & paste actions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -391,7 +422,7 @@
   (if (== (car (graphics-mode)) 'group-edit)
       (with copied-objects (list-copy (sketch-get))
         (any_unselect-all #f #f)
-        (update-buffer)
+        (update-current-buffer)
         (if (null? copied-objects)
             (stree->tree "")
             (stree->tree (cons 'graphics copied-objects))))

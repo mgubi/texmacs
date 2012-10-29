@@ -551,11 +551,20 @@ init_std_drd () {
   init (GR_LINEAR_TRANSFORM, "gr-linear-transform",
 	fixed (1, 1, BIFORM) -> returns_graphical () ->
 	graphical (0));
+  /*
   init (TEXT_AT, "text-at",
 	fixed (1, 1, BIFORM) -> returns_graphical () ->
 	accessible (0) -> point_type (1));
   init (MATH_AT, "math-at",
 	fixed (1, 1, BIFORM) -> returns_graphical () ->
+	accessible (0) -> point_type (1) ->
+        locals (0, "mode", "math"));
+  */
+  init (TEXT_AT, "text-at",
+	options (1, 1, BIFORM) -> returns_graphical () ->
+	accessible (0) -> point_type (1));
+  init (MATH_AT, "math-at",
+	options (1, 1, BIFORM) -> returns_graphical () ->
 	accessible (0) -> point_type (1) ->
         locals (0, "mode", "math"));
   init (_POINT, "point",
@@ -565,15 +574,15 @@ init_std_drd () {
   init (CLINE, "cline",
 	repeat (3, 1) -> returns_graphical () -> point_type (0));
   init (ARC, "arc",
-	repeat (3, 1) -> returns_graphical () -> point_type (0));
+	fixed (3) -> returns_graphical () -> point_type (0));
   init (CARC, "carc",
-	repeat (3, 1) -> returns_graphical () -> point_type (0));
+	fixed (3) -> returns_graphical () -> point_type (0));
   init (SPLINE, "spline",
 	repeat (2, 1) -> returns_graphical () -> point_type (0));
   init (VAR_SPLINE, "spline*",
 	repeat (2, 1) -> returns_graphical () -> point_type (0));
   init (CSPLINE, "cspline",
-	repeat (2, 1) -> returns_graphical () -> point_type (0));
+	repeat (3, 1) -> returns_graphical () -> point_type (0));
   init (FILL, "fill",
 	repeat (1, 1));                       // Not yet implemented
   init (IMAGE, "image",

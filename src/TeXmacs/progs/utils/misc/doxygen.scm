@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : doxygen.scm
 ;; DESCRIPTION : 'doxygen' support for C++
-;; COPYRIGHT   : (C) 2007  Gregoire Lecerf
+;; COPYRIGHT   : (C) 2007--2012  Gregoire Lecerf
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -33,6 +33,9 @@
 ; Time stamps are stored for tag files in order to
 ; refresh them when needed.
 (define file->stamp (make-ahash-table))
+
+; Web tag files are only loaded once
+(define web->loaded? (make-ahash-table))
 
 ;; Parsing
 
@@ -110,16 +113,16 @@
 	    (display x)
 	    (newline))))
       (set! l (cdr l)))
-    (let ((url (string-append current-dir "/" anchorfile "#" anchor)))
+    (let ((u (string-append current-dir "/" anchorfile "#" anchor)))
       (cond
 	((== kind "define")
 	 (let ((tag (string-append current-source-file ":" name arglist))) 
-	   (ahash-set! tag->url tag url)
+	   (ahash-set! tag->url tag u)
 	   (ahash-set! key->tag name
 		       (cons tag (ahash-ref* key->tag name '())))))
 	((== kind "function")
 	 (let ((tag (string-append type " " current-namespace name arglist)))
-	   (ahash-set! tag->url tag url)
+	   (ahash-set! tag->url tag u)
 	   (ahash-set! key->tag (cpp_basename name)
 		       (cons tag (ahash-ref* key->tag name '())))))
 	((or (== kind "variable")
@@ -127,7 +130,7 @@
 	     (== kind "enumeration")
 	     (== kind "enumvalue"))
 	 (let ((tag (string-append current-namespace name)))
-	   (ahash-set! tag->url tag url)
+	   (ahash-set! tag->url tag u)
 	   (ahash-set! key->tag (cpp_basename name)
 		       (cons tag (ahash-ref* key->tag name '())))))
 	((== kind "friend"))
@@ -267,7 +270,7 @@
 
 (define (load-tag-file relative_filename)
   (let ((filename (string-append
-		   (dirname (url->string (get-name-buffer)))
+		   (dirname (url->unix (current-buffer)))
 		   "/" relative_filename)))
     (if (access? filename R_OK)
 	(let ((nst (stat:mtime (stat filename)))
@@ -281,12 +284,25 @@
 		(parse-main s))))
 	(texmacs-error "Doxygen: file not found" filename))))
 
+(define (load-tag-web relative_filename)
+  (let* ((filename (url-append (url-head (current-buffer)) relative_filename))
+	 (loaded? (ahash-ref* web->loaded? filename #f)))
+    (if (not loaded?)
+	(if (url-exists? filename)
+	    (let ((s (string-load filename)))
+	      (set! current-dir (dirname relative_filename))
+	      (parse-main s)
+	      (ahash-set! web->loaded? filename #t))
+	    (texmacs-error "Doxygen: file not found" filename)))))
+
 ;; TeXmacs exports
 
 (tm-define (doxygen-load l)
   (:secure #t)
   (:synopsis "Load Doxygen tag file.")
-  (load-tag-file (tree-as-string l))
+  (if (url-rooted-web? (current-buffer))
+      (load-tag-web  (tree-as-string l))
+      (load-tag-file (tree-as-string l)))
   "")
 
 (tm-define (doxygen-ref x)

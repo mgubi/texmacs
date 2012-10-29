@@ -77,8 +77,13 @@ string convert_to_cork (string input, string from);
 string convert_from_cork (string input, string to); 
 string utf8_to_cork (string input); 
 string cork_to_utf8 (string input); 
+string cork_to_sourcecode (string input);
+string sourcecode_to_cork (string input);
+string convert_utf8_to_LaTeX (string input);
 string utf8_to_html (string input);
 string t2a_to_utf8 (string input);
+string cyrillic_subset_in_t2a_to_code_point (string input);
+string cork_to_ascii (string input);
 bool check_using_iconv (string input, string encoding);
 string convert_using_iconv (string input, string from, string to); 
 

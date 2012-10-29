@@ -14,7 +14,7 @@
 (output-copyright "build-glue-editor.scm")
 
 (build
-  "get_server()->get_editor()->"
+  "get_current_editor()->"
   "initialize_glue_editor"
 
   ;; important paths and trees
@@ -262,7 +262,7 @@
   (tex-buffer tex_buffer (void))
   (clear-local-info clear_local_info (void))
   (update-path typeset_invalidate (void path))
-  (update-buffer typeset_invalidate_all (void))
+  (update-current-buffer typeset_invalidate_all (void))
   (generate-all-aux generate_aux (void))
   (generate-aux generate_aux (void string))
   (notify-page-change notify_page_change (void))
@@ -272,6 +272,7 @@
   (print print_buffer (void))
   (print-pages print_buffer (void string string))
   (print-snippet print_snippet (array_int url content))
+  (graphics-file-to-clipboard graphics_file_to_clipboard (bool url))
   (export-postscript export_ps (void url))
   (export-pages-postscript export_ps (void url string string))
   (footer-eval footer_eval (void string))

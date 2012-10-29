@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "tm_window.hpp"
+#include "tm_data.hpp"
 #include "message.hpp"
 #include "dictionary.hpp"
 #include "merge_sort.hpp"
@@ -40,7 +41,7 @@ tm_window_rep::tm_window_rep (widget wid2, tree geom):
 
 tm_window_rep::tm_window_rep (tree doc, command quit):
   win (texmacs_widget (0, quit)),
-  wid (win), id (-1),
+  wid (win), id (url_none ()),
   serial (tm_window_serial++),
   menu_current (object ()), menu_cache (widget ()),
   text_ptr (NULL)
@@ -49,7 +50,7 @@ tm_window_rep::tm_window_rep (tree doc, command quit):
 }
 
 tm_window_rep::~tm_window_rep () {
-  if (id != -1) destroy_window_id (id);
+  if (!is_none (id)) destroy_window_id (id);
 }
 
 /******************************************************************************
@@ -61,7 +62,9 @@ texmacs_window_widget (widget wid, tree geom) {
   int W, H;
   int w= geometry_w, h= geometry_h;
   int x= geometry_x, y= geometry_y;
+#ifndef QTTEXMACS
   if (use_side_tools) { w += 200; h += 100; }
+#endif
   if (is_tuple (geom) && N (geom) >= 2) {
     w= as_int (geom[0]);
     h= as_int (geom[1]);
@@ -90,12 +93,13 @@ public:
 
 void
 close_embedded_command_rep::apply () {
-  //cout << "Destroy " << vw->buf->name << "\n";
-  get_server () -> window_focus (vw->ed->mvw->win->id);
+  //cout << "Destroy " << vw->buf->buf->name << "\n";
+  window_focus (abstract_window (vw->ed->mvw->win));
   //cout << "Changed focus\n";
   tm_window win= vw->win;
-  ASSERT (N(vw->buf->vws) == 1, "invalid cloned embedded TeXmacs widget");
-  get_server () -> delete_buffer (vw->buf);
+  ASSERT (N (buffer_to_views (vw->buf->buf->name)) == 1,
+          "invalid cloned embedded TeXmacs widget");
+  remove_buffer (vw->buf->buf->name);
   //cout << "Deleted buffer\n";
   tm_delete (win);
   //cout << "Deleted window\n";
@@ -110,19 +114,18 @@ close_embedded_command (tm_view vw) {
 * Embedded TeXmacs widgets
 ******************************************************************************/
 
-string
+url
 embedded_name () {
   static int nr= 0;
   nr++;
-  return "* Embedded " * as_string (nr) * " *";
+  return url (string ("tmfs://aux/TeXmacs-input-" * as_string (nr)));
 }
 
 tree
-enrich_embedded_document (tree body) {
+enrich_embedded_document (tree body, tree style) {
   tree orig= body;
   if (is_func (body, WITH)) body= body[N(body)-1];
   if (!is_func (body, DOCUMENT)) body= tree (DOCUMENT, body);
-  tree style= "generic";
   hashmap<string,tree> initial (UNINIT);
   initial (PAGE_MEDIUM)= "automatic";
   initial (PAGE_SCREEN_LEFT)= "4px";
@@ -135,24 +138,23 @@ enrich_embedded_document (tree body) {
         initial (orig[i]->label)= orig[i+1];
   tree doc (DOCUMENT);
   doc << compound ("TeXmacs", TEXMACS_VERSION);
-  doc << compound ("style", tree (TUPLE, "generic"));
+  doc << style; //compound ("style", style);
   doc << compound ("body", body);
   doc << compound ("initial", make_collection (initial));
   return doc;
 }
 
 widget
-texmacs_input_widget (tree doc, command cmd, bool continuous) {
+texmacs_input_widget (tree doc, tree style, command cmd, bool continuous) {
   (void) cmd; (void) continuous;
-  doc= enrich_embedded_document (doc);
-  tm_view   curvw=  get_server () -> get_view ();
-  string    name = embedded_name ();
-  tm_buffer buf  = get_server () -> new_buffer (url (name), doc);
-  tm_view   vw   = get_server () -> get_passive_view (buf);
+  doc= enrich_embedded_document (doc, style);
+  url       base = get_master_buffer (get_current_buffer ());
+  tm_view   curvw= concrete_view (get_current_view ());
+  url       name = embedded_name (); create_buffer (name, doc);
+  tm_view   vw   = concrete_view (get_passive_view (name));
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
-  get_server () -> set_aux (name, name);
+  set_master_buffer (name, base);
   vw->win= win;
-  vw->buf->in_menu= false;
   set_scrollable (win->wid, vw->ed);
 //  vw->ed->cvw= win->wid.rep;
   vw->ed->cvw= win->wid.operator->();
@@ -380,7 +382,8 @@ tm_window_rep::interactive (string name, string type, array<string> def,
   text_ptr = &s;
   call_back= cmd;
   widget tw = text_widget (translate (name), 0, black, false);
-  widget inp= input_text_widget (tm_new<ia_command_rep> (this), type, def);
+  widget inp= input_text_widget (tm_new<ia_command_rep> (this), type, def,
+                                 WIDGET_STYLE_MINI);
   set_interactive_prompt (wid, tw);
   set_interactive_input (wid, inp);
   set_interactive_mode (true);
@@ -444,6 +447,38 @@ window_hide (int win) {
   ASSERT (window_table->contains (win), "window does not exist");
   widget pww= window_table [win];
   set_visibility (pww, false);
+}
+
+scheme_tree
+window_get_size (int win) {
+  ASSERT (window_table->contains (win), "window does not exist");
+  widget pww= window_table [win];
+  int w, h;
+  get_size(pww, w, h);
+  return tuple (as_string (w/PIXEL), as_string (h/PIXEL));
+}
+
+void
+window_set_size (int win, int w, int h) {
+  ASSERT (window_table->contains (win), "window does not exist");
+  widget pww= window_table [win];
+  set_size (pww, w*PIXEL, h*PIXEL);
+}
+
+scheme_tree
+window_get_position (int win) {
+  ASSERT (window_table->contains (win), "window does not exist");
+  widget pww= window_table [win];
+  int x, y;
+  get_position(pww, x, y);
+  return tuple (as_string (x/PIXEL), as_string (y/PIXEL));
+}
+
+void
+window_set_position (int win, int x, int y) {
+  ASSERT (window_table->contains (win), "window does not exist");
+  widget pww= window_table [win];
+  set_position (pww, x*PIXEL, y*PIXEL);
 }
 
 void

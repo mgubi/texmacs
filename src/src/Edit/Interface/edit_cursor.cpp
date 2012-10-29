@@ -367,6 +367,7 @@ edit_cursor_rep::go_to_here () {
 void
 edit_cursor_rep::go_to (path p) {
   if (rp <= p) {
+    //if (tp != p) cout << "Go to " << p << "\n";
     tp= p;
     mv_status= DIRECT;
     if (!has_changed (THE_TREE+THE_ENVIRONMENT)) {
@@ -457,10 +458,10 @@ edit_cursor_rep::go_end_with (string var, string val) {
 tree
 edit_cursor_rep::get_labels () {
   tree r (TUPLE);
-  hashmap<string,tree> h= buf->ref;
+  hashmap<string,tree> h= buf->data->ref;
   if (buf->prj != NULL) {
-    h= copy (buf->prj->ref);
-    h->join (buf->ref);
+    h= copy (buf->prj->data->ref);
+    h->join (buf->data->ref);
   }
   iterator<string> it= iterate (h);
   while (it->busy ()) {
@@ -510,7 +511,7 @@ edit_cursor_rep::go_to_label (string s) {
       return;
     }
   }
-  tree val= (buf->prj==NULL? buf->ref[s]: buf->prj->ref[s]);
+  tree val= (buf->prj==NULL? buf->data->ref[s]: buf->prj->data->ref[s]);
   if (is_func (val, TUPLE, 3) && is_atomic (val[2])) {
     string extra= val[2]->label;
     if (starts (extra, "#")) {
@@ -522,10 +523,10 @@ edit_cursor_rep::go_to_label (string s) {
       exec_delayed (scheme_cmd ("(if " * show * " (delayed " * jump * "))"));
     }
     else {
-      url u= relative (buf->name, url (extra));
-      if (u != buf->name) {
+      url u= relative (buf->buf->name, url (extra));
+      if (u != buf->buf->name) {
 	string new_buf = scm_quote (as_string (u));
-	string load_buf= "(load-buffer (url-system " * new_buf * "))";
+	string load_buf= "(load-buffer (system->url " * new_buf * "))";
 	string jump_to = "(go-to-label " * scm_quote (s) * ")";
 	exec_delayed (scheme_cmd ("(begin " * load_buf * " " * jump_to * ")"));
       }

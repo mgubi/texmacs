@@ -12,48 +12,51 @@
 #ifndef QTMWIDGET_HPP
 #define QTMWIDGET_HPP
 
+#include "qt_widget.hpp"
 #include "QTMScrollView.hpp"
-#include "rectangles.hpp"
 #include <QVariant>
-#include <QTimer>
 #include <QSet>
 #include <QLabel>
 
-class simple_widget_rep;
+class qt_simple_widget_rep;
 class basic_renderer_rep;
 
+/*! The underlying QWidget for a qt_simple_widget_rep handles drawing for a 
+    texmacs canvas, as well as keypresses, international input methods, etc.
+ 
+ QTMWidget needs a valid qt_simple_widget_rep object to function properly, see
+ set_tm_widget() for more on this.
+ 
+ */
 class QTMWidget: public QTMScrollView {
   Q_OBJECT
 
+  mutable widget tmwid;
+
   rectangles invalid_regions;
-  QPixmap backingPixmap;
-  
+  QPixmap      backingPixmap;
+  QLabel*           imwidget;
+  QPoint          cursor_pos;
+
 public:
 
-  static QSet<QTMWidget*> all_widgets;
-  QPoint backing_pos;
+  static QSet<QTMWidget*> all_widgets;  // needed by qt_gui_rep::update()
+  QPoint                  backing_pos;
 
-  
-  QLabel *imwidget;
-  QPoint cursor_pos;
-  
-  QTMWidget(simple_widget_rep *_wid) ;
-  ~QTMWidget();
-
-  inline simple_widget_rep*
-  tm_widget() {
-    QVariant v= property("texmacs_widget");
-    return (simple_widget_rep *)
-      (v.canConvert<void*> ()? v.value<void*> (): NULL);
-  }
-
+  QTMWidget (QWidget* _parent=0, qt_simple_widget_rep* _tmwid=0);
+  virtual ~QTMWidget ();
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_all ();
   void repaint_invalid_regions ();
 
-  void scrollContentsBy(int dx, int dy);
-  void setCursorPos(QPoint pos) { cursor_pos = pos; };
+  void scrollContentsBy (int dx, int dy);
+  void setCursorPos (QPoint pos) { cursor_pos = pos; }
+
+  qt_simple_widget_rep* tm_widget () const;
+  void              set_tm_widget (qt_simple_widget_rep* _tmwid);
+  
+  virtual QSize	sizeHint () const;
 
 protected:
   virtual void paintEvent (QPaintEvent* event);
@@ -67,7 +70,8 @@ protected:
   virtual bool event (QEvent *event);
   virtual void resizeEvent (QResizeEvent *event);
 
-  virtual QVariant inputMethodQuery ( Qt::InputMethodQuery query ) const ;
+  virtual QVariant inputMethodQuery (Qt::InputMethodQuery query) const;
+
 private:
   basic_renderer_rep *getRenderer();
 };

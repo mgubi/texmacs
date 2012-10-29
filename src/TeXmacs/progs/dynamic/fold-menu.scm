@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (dynamic fold-menu)
-  (:use (dynamic fold-edit)))
+  (:use (dynamic fold-edit)
+        (generic generic-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menus for direct folding and switching
@@ -147,7 +148,12 @@
   (-> "Expand"
       ("Preserve tags" (dynamic-operate-on-buffer :expand))
       ("Change tags" (dynamic-operate-on-buffer :var-expand))
-      ("Make slides" (dynamic-make-slides))))
+      ("Make slides" (dynamic-make-slides)))
+  (-> "Filter"
+      ("Remove folded" (dynamic-filter-buffer :remove-folded))
+      ("Remove unfolded" (dynamic-filter-buffer :remove-unfolded))
+      ("Only keep folded" (dynamic-filter-buffer :keep-folded))
+      ("Only keep unfolded" (dynamic-filter-buffer :keep-unfolded))))
 
 (tm-define (alternate-second-name t)
   (:require (fold-context? t))

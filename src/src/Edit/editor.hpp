@@ -13,20 +13,21 @@
 #define EDITOR_H
 #include "typesetter.hpp"
 #ifdef AQUATEXMACS
-#include "Cocoa/aqua_simple_widget.h"
+#  include "Cocoa/aqua_simple_widget.h"
 #else
-#ifdef QTTEXMACS
-#include "Qt/qt_simple_widget.hpp"
-#else
-#include "Widkit/simple_wk_widget.hpp"
-#endif
+#  ifdef QTTEXMACS
+#    include "Qt/qt_simple_widget.hpp"
+#  else
+#    include "Widkit/simple_wk_widget.hpp"
+#  endif
 #endif
 #include "server.hpp"
 #include "drd_info.hpp"
 #ifdef EXPERIMENTAL
-#include "../Style/Environment/environment.hpp"
-#include "../Style/Memorizer/memorizer.hpp"
+#  include "../Style/Environment/environment.hpp"
+#  include "../Style/Memorizer/memorizer.hpp"
 #endif
+#include "new_data.hpp"
 #define TEXMACS_COPYRIGHT (string("(c) 1999-2006 by Joris van der Hoeven"))
 
 #define THE_CURSOR 1
@@ -39,10 +40,12 @@
 #define THE_LOCUS 128
 
 class tm_buffer_rep;
-typedef tm_buffer_rep* tm_buffer;
 class tm_view_rep;
 class server_rep;
+typedef tm_buffer_rep* tm_buffer;
+typedef tm_view_rep* tm_view;
 class modification;
+class editor;
 extern bool enable_fastenv;
 
 class editor_rep : public simple_widget_rep {
@@ -78,7 +81,7 @@ protected:
   virtual void                 set_init (hashmap<string,tree> H= tree ("?"))=0;
   virtual void                 add_init (hashmap<string,tree> H) = 0;
   virtual void                 set_fin (hashmap<string,tree> H) = 0;
-  virtual void                 set_base_name (url name) = 0;
+  virtual void                 set_master (url name) = 0;
 
   /* exchanging property information */
   virtual void   set_bool_property (string what, bool val) = 0;
@@ -168,6 +171,7 @@ public:
   virtual void mouse_select (SI x, SI y, int mods, bool drag) = 0;
   virtual void mouse_paste (SI x, SI y) = 0;
   virtual void mouse_adjust (SI x, SI y) = 0;
+  virtual void mouse_adjust_selection (SI x, SI y, int mods) = 0;
   virtual void mouse_scroll (SI x, SI y, bool up) = 0;
   virtual cursor get_cursor () = 0;
   virtual void set_pointer (string name) = 0;
@@ -230,6 +234,8 @@ public:
 
   /* public routines from edit_typeset */
   virtual void     clear_local_info () = 0;
+  virtual void     set_data (new_data data) = 0;
+  virtual void     get_data (new_data& data) = 0;
   virtual SI       as_length (string l) = 0;
   virtual string   add_lengths (string l1, string l2) = 0;
   virtual string   multiply_length (double x, string l) = 0;
@@ -509,6 +515,7 @@ public:
   virtual void export_ps (url ps_name,
 			  string first="1", string last="1000000") = 0;
   virtual array<int> print_snippet (url u, tree t) = 0;
+  virtual bool graphics_file_to_clipboard (url output) = 0;
   virtual void footer_eval (string s) = 0;
   virtual tree the_line () = 0;
   virtual tree the_root () = 0;
@@ -527,13 +534,16 @@ public:
   virtual void edit_test () = 0;
 
   friend class tm_window_rep;
-  friend class tm_data_rep;
   friend class tm_server_rep;
   friend class server_command_rep;
   friend void   edit_announce (editor_rep* ed, modification mod);
   friend void   edit_done (editor_rep* ed, modification mod);
   friend string get_editor_status_report ();
   friend void   tm_failure (const char* msg);
+  friend void   set_buffer_tree (url name, tree doc);
+  friend void   set_master_buffer (url name, url master);
+  friend void   set_current_view (url u);
+  friend void   focus_on_editor (editor ed);
 };
 
 class editor : public tm_null_ptr<editor_rep> {
@@ -546,11 +556,11 @@ public:
 
 editor new_editor (server_rep* sv, tm_buffer buf);
 
-#define SERVER(cmd) {                    \
-  tm_view temp_vw= sv->get_view (false); \
-  focus_on_this_editor ();               \
-  sv->cmd;                               \
-  sv->set_view (temp_vw);                \
+#define SERVER(cmd) {                 \
+  url temp= get_current_view_safe (); \
+  focus_on_this_editor ();            \
+  sv->cmd;                            \
+  set_current_view (temp);            \
 }
 
 #endif // defined EDITOR_H

@@ -35,6 +35,7 @@
 #include "convert.hpp"
 #include "formatter.hpp"
 #include "Format/format.hpp"
+#include "new_style.hpp"
 
 void use_modules (tree t);
 
@@ -46,18 +47,19 @@ get_init_environment (tree doc, drd_info& drd) {
   bool ok;
   tree t, style= extract (doc, "style");
   hashmap<string,tree> H;
-  get_server () -> style_get_cache (style, H, t, ok);
+  style_get_cache (style, H, t, ok);
   if (ok) {
     env->patch_env (H);
     ok= drd->set_locals (t);
     drd->set_environment (H);
   }
   if (!ok) {
-    ASSERT (is_tuple (style), "tuple expected as style");
-    tree t (USE_PACKAGE, A (style));
-    env->exec (t);
-    env->read_env (H);
-    drd->heuristic_init (H);
+    if (!is_tuple (style)) FAILED ("tuple expected as style");
+    H= get_style_env (style);
+    drd= get_style_drd (style);
+    style_set_cache (style, H, drd->get_locals ());
+    env->patch_env (H);
+    drd->set_environment (H);
   }
   use_modules (env->read (THE_MODULES));
   // FIXME: extract (doc, "init")
@@ -171,11 +173,11 @@ box_widget (scheme_tree p, string s, color col, bool trans, bool ink) {
   return box_widget (b, trans);
 }
 
-tree enrich_embedded_document (tree body);
+tree enrich_embedded_document (tree body, tree style);
 
 widget
-texmacs_output_widget (tree doc) {
-  doc= enrich_embedded_document (doc);
+texmacs_output_widget (tree doc, tree style) {
+  doc= enrich_embedded_document (doc, style);
   drd_info drd ("none", std_drd);
   edit_env env= get_init_environment (doc, drd);
   tree t= extract (doc, "body");
@@ -190,5 +192,6 @@ texmacs_output_widget (tree doc) {
   //SI dh1= env->get_length (PAGE_SCREEN_BOT);
   //SI dh2= env->get_length (PAGE_SCREEN_TOP);
   color col= light_grey;
+  
   return widget (tm_new<box_widget_rep> (b, col, false, 5, 0, 0));
 }

@@ -80,19 +80,19 @@
 
 (tm-define (bib-format-in-ed-booktitle x)
   (:mode bib-plain?)
-  (let* ((b (bib-field x "booktitle"))
+  (let* ((b (bib-default-field x "booktitle"))
 	 (e (bib-field x "editor")))
     (if (bib-null? b)
-	""
-	(if (bib-null? e)
-	    `(concat ,(bib-translate "in ") (with "font-shape" "italic" ,b))
-	    `(concat ,(bib-translate "in ") ,(bib-format-editor x) ", "
-		     (with "font-shape" "italic" ,b))))))
+        ""
+        (if (bib-null? e)
+            `(concat ,(bib-translate "in ") (with "font-shape" "italic" ,b))
+            `(concat ,(bib-translate "in ") ,(bib-format-editor x) ", "
+                     (with "font-shape" "italic" ,b))))))
 
 (tm-define (bib-format-bvolume x)
   (:mode bib-plain?)
   (let* ((v (bib-field x "volume"))
-	 (s (bib-field x "series")))
+	 (s (bib-default-field x "series")))
     (if (bib-null? v)
 	""
 	(let ((series (if (bib-null? s) ""
@@ -105,7 +105,7 @@
   (:mode bib-plain?)
   (let* ((v (bib-field x "volume"))
 	 (n (bib-field x "number"))
-	 (s (bib-field x "series")))
+	 (s (bib-default-field x "series")))
     (if (bib-null? v)
 	(if (bib-null? n)
 	    (if (bib-null? s) "" s)
@@ -133,7 +133,9 @@
 	 (t (bib-field x "type")))
     (if (bib-null? c)
 	(bib-format-pages x)
-	(let ((type (if (bib-null? t) ,(bib-translate "chapter") (bib-locase t)))
+	(let ((type (if (bib-null? t)
+			(bib-translate "chapter")
+			(bib-locase t)))
 	      (pages `(concat ", " ,(bib-format-pages x))))
 	  `(concat ,type " " ,c ,pages)))))
 
@@ -530,6 +532,6 @@
 		(else
 		  (author-sort-key x "author")))))
     (string-append pre "    "
-		   (bib-field x "year") "    "
+		   (if (bib-empty? x "year") "" (string-append (bib-field x "year") "    "))
 		   (bib-purify (bib-field x "title")))))
 

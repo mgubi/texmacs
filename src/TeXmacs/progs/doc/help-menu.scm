@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (doc help-menu)
-  (:use (doc help-funcs)))
+  (:use (doc help-funcs))); (doc apidoc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Help menu
@@ -59,22 +59,26 @@
 	     (load-help-article "main/math/man-math"))
 	    ("Tabular material"
 	     (load-help-article "main/table/man-table"))
-	    ("Automatically generated content"
+	    ("Automatic content generation"
 	     (load-help-article "main/links/man-links"))
-	    ("Editing tools"
-	     (load-help-article "main/editing/man-editing-tools"))
+	    ("Creating technical pictures"
+	     (load-help-article "main/graphics/man-graphics"))
 	    ("Advanced layout features"
 	     (load-help-article "main/layout/man-layout"))
+            ---
+	    ("Editing tools"
+	     (load-help-article "main/editing/man-editing-tools"))
 	    ("Laptop presentations"
 	     (load-help-article "main/beamer/man-beamer"))
-	    ("TeXmacs plug-ins"
-	     (load-help-article "devel/plugin/plugins"))
 	    ("TeXmacs as an interface"
 	     (load-help-article "main/interface/man-itf"))
+            ---
 	    ("Writing your own style files"
 	     (load-help-article "devel/style/style"))
 	    ("Customizing TeXmacs"
-	     (load-help-article "main/scheme/man-scheme"))))
+	     (load-help-article "main/scheme/man-scheme"))
+	    ("The TeXmacs plug-in system"
+	     (load-help-article "devel/plugin/plugins"))))
   (when (url-exists-in-help? "main/man-manual.en.tm")
 	(-> "Reference guide"
 	    ("Browse" (load-help-buffer "main/man-reference"))
@@ -217,10 +221,18 @@
 	     (load-help-article "devel/scheme/utils/scheme-utils"))
 	    ("Programming routines for editing documents"
 	     (load-help-article "devel/scheme/edit/scheme-edit"))
+	    ("Program interface for buffer management"
+	     (load-help-article "devel/scheme/buffer/scheme-buffer"))
 	    ("Scheme interface for the graphical mode"
 	     (load-help-article "devel/scheme/graphics/scheme-graphics"))
+            
+            ("Customizing and extending the user interface"
+             (load-help-article "devel/scheme/gui/scheme-gui"))
 	    ("Writing TeXmacs bibliography styles"
-	     (load-help-article "devel/scheme/bibliography/bibliography")))))
+	     (load-help-article "devel/scheme/bibliography/bibliography"))
+            ---
+            ("Browse modules documentation" (apidoc-all-modules)))))
+            ;("List all symbols" (apidoc-all-symbols)))))
   ---
   (-> "Search"
       ("Documentation" (interactive docgrep-in-doc))
@@ -237,8 +249,8 @@
 	    ("Developers guide" (load-help-book "devel/source/source")))
 	  ---
 	  (when (style-has? "tmdoc-style")
-	    ("Compile article" (tmdoc-expand-this 'tmdoc-title))
-	    ("Compile book" (tmdoc-expand-this 'title))))
+	    ("Compile article" (tmdoc-expand-this "article"))
+	    ("Compile book" (tmdoc-expand-this "book"))))
 ;;       (when (url-exists-in-path? "wget")
 ;; 	(-> "Online help"
 ;; 	    ("Wiki" (load-buffer "tmfs://file/+R28HzRqmu}tA69.scm"))

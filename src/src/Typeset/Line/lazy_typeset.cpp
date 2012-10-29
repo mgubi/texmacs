@@ -104,9 +104,9 @@ lazy_surround_rep::lazy_surround_rep (edit_env env, tree t, path ip):
   par= make_lazy (env, t[2], descend (ip, 2));
 }
 
-lazy_surround_rep::lazy_surround_rep (
-  array<line_item> a2, array<line_item> b2, lazy par2, path ip):
-  lazy_rep (LAZY_SURROUND, ip), a (a2), b (b2), par (par2) {}
+lazy_surround_rep::lazy_surround_rep
+  (array<line_item> a2, array<line_item> b2, lazy par2, path ip):
+    lazy_rep (LAZY_SURROUND, ip), a (a2), b (b2), par (par2) {}
 
 format
 lazy_surround_rep::query (lazy_type request, format fm) {
@@ -131,7 +131,7 @@ lazy_surround_rep::produce (lazy_type request, format fm) {
     array<line_item> after = b;
     if (fm->type == FORMAT_VSTREAM) {
       format_vstream fs= (format_vstream) fm;
-      width = fs->width ;
+      width = fs->width;
       before= join (fs->before, before);
       after = join (after, fs->after);
     }
@@ -344,7 +344,7 @@ make_lazy_argument (edit_env env, tree t, path ip) {
   path   valip= decorate_right (ip);
 
   tree r= t[0];
-  if (is_compound (r)) value= tree (ERROR, "value");
+  if (is_compound (r)) value= tree (ERROR, "bad arg");
   else {
     name = r->label;
     if ((!is_nil (env->macro_arg)) && env->macro_arg->item->contains (r->label)) {
@@ -354,7 +354,7 @@ make_lazy_argument (edit_env env, tree t, path ip) {
 	if (is_accessible (new_valip)) valip= new_valip;
       }
     }
-    else value= tree (ERROR, "value " * name);
+    else value= tree (ERROR, "arg " * name);
   }
 
   array<line_item> a= typeset_marker (env, descend (ip, 0));
@@ -368,9 +368,17 @@ make_lazy_argument (edit_env env, tree t, path ip) {
     int i, n= N(t);
     for (i=1; i<n; i++) {
       tree r= env->exec (t[i]);
-      if (!is_int (r)) break;
+      if (!is_int (r)) {
+        value= tree (ERROR, "arg " * name);
+        valip= decorate_right (ip);
+        break;
+      }
       int nr= as_int (r);
-      if ((!is_compound (value)) || (nr<0) || (nr>=N(value))) break;
+      if ((!is_compound (value)) || (nr<0) || (nr>=N(value))) {
+        value= tree (ERROR, "arg " * name);
+        valip= decorate_right (ip);
+        break;
+      }
       value= value[nr];
       valip= descend (valip, nr);
     }

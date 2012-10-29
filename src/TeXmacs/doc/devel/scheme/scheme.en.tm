@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.0.7.15>
 
 <style|tmdoc>
 
@@ -15,11 +15,18 @@
     <branch|Programming routines for editing
     documents|edit/scheme-edit.en.tm>
 
+    <branch|<TeXmacs> buffer management|buffer/scheme-buffer.en.tm>
+
     <branch|Scheme interface for the graphical
     mode|graphics/scheme-graphics.en.tm>
 
+    <branch|Customizing and extending the graphical user
+    interface|gui/scheme-gui.en.tm>
+
     <branch|Writing <TeXmacs> bibliography
     styles|bibliography/bibliography.en.tm>
+
+    <branch|Other topics (tmfs, links,...)|api/api.en.tm>
   </traverse>
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

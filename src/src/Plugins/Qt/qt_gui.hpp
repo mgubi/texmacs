@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QList>
 
+#include "qt_simple_widget.hpp"
 #include "timer.hpp"
 #include "gui.hpp"
 #include "font.hpp"
@@ -33,25 +34,36 @@
 typedef class qt_gui_rep* qt_gui;
 extern qt_gui the_gui;
 class QTMGuiHelper;
-class simple_widget_rep;
 
 class qt_gui_rep {
-public:
-  bool interrupted;
-  time_t interrupt_time;
-  QTMGuiHelper *gui_helper;
-  QTimer *updatetimer;
-  QList<QLabel*> waitDialogs;
-  QWidget *waitWindow;
 
+  friend class   QTMGuiHelper;
+  friend void needs_update ();
+
+  bool           interrupted;
+  time_t      interrupt_time;
+  QTimer*        updatetimer;
+  QList<QLabel*> waitDialogs;
+  QWidget*        waitWindow;
+  widget          _popup_wid;
+  time_t      popup_wid_time; //!< 0 means not to show _popup_wid
+  
   hashmap<string,tree>   selection_t;
   hashmap<string,string> selection_s;
+  
+  hashmap<socket_notifier,pointer>  read_notifiers;
+  hashmap<socket_notifier,pointer> write_notifiers;
+
+  QTranslator* q_translator;
+  
+public:
+  QTMGuiHelper*  gui_helper;
 
 public:
   qt_gui_rep (int &argc, char **argv);
   virtual ~qt_gui_rep ();
 
-  /********************* extents, grabbing, selections ***********************/
+  /* extents, grabbing, selections */
   void get_extents (SI& width, SI& height);
   void get_max_size (SI& width, SI& height);
   // void set_button_state (unsigned int state);
@@ -63,41 +75,36 @@ public:
   virtual bool get_selection (string key, tree& t, string& s, string format);
   virtual bool set_selection (string key, tree t, string s, string format);
   virtual void clear_selection (string key);
+  bool put_graphics_on_clipboard (url file);
 
   /* miscellaneous */
   void image_gc (string name= "*");
   void set_mouse_pointer (string name);
   void set_mouse_pointer (string curs_name, string mask_name);
   void show_wait_indicator (widget w, string message, string arg);
+  void show_help_balloon (widget wid, SI x, SI y);  
   bool check_event (int type);
 
   void update();
+  void refresh_language();
   
+  /* socket notifications */
   void add_notifier (socket_notifier);
   void remove_notifier (socket_notifier);
   void enable_notifier (socket_notifier, bool);
   
   /* queued processing */
-  void process_keypress (simple_widget_rep *wid, string key, time_t t);
-  void process_keyboard_focus (simple_widget_rep *wid, bool has_focus, time_t t);
-  void process_mouse (simple_widget_rep *wid, string kind, SI x, SI y, int mods, time_t t);
-  void process_resize (simple_widget_rep *wid, SI x, SI y);
+  void process_keypress (qt_simple_widget_rep *wid, string key, time_t t);
+  void process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus, time_t t);
+  void process_mouse (qt_simple_widget_rep *wid, string kind, SI x, SI y, int mods, time_t t);
+  void process_resize (qt_simple_widget_rep *wid, SI x, SI y);
   void process_command (command _cmd);
   void process_command (command _cmd, object _args);
   void process_socket_notification (socket_notifier sn);
   void process_delayed_commands (); 
-
   void process_queued_events (int max = -1);
-  //void process_get_size_hint (SI& w, SI& h);
-  //void process_notify_resize (SI w, SI h);
-  //void process_set_shrinking_factor (int sf);
-  //void process_clear (SI x1, SI y1, SI x2, SI y2);
-  //void process_repaint (SI x1, SI y1, SI x2, SI y2);
-  
-  
 };
 
-void force_update(); 
-// force an immediate update of the internal texmacs state
+void force_update(); //!< Force an immediate update of the internal texmacs state
 
 #endif // defined QT_GUI_HPP

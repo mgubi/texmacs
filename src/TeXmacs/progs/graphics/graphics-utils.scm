@@ -17,19 +17,6 @@
   (:use (graphics graphics-drd)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Some global definitions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define ShiftMask     256)
-(tm-define LockMask      512)
-(tm-define ControlMask  1024)
-(tm-define Mod1Mask     2048)
-(tm-define Mod2Mask     4096)
-(tm-define Mod3Mask     8192)
-(tm-define Mod4Mask    16384)
-(tm-define Mod5Mask    32768)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic scheme processing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -517,6 +504,9 @@
                     (cons (cAr p0) layer-of-last-removed-object)
                     (cAr p0))
                 #f))
+      (when (list-starts? (cursor-path) p0)
+        (with-innermost t 'graphics
+          (tree-go-to t 0 :start)))
       (tree-remove (path->tree (cDr p0)) (cAr p0) 1))))
 
 (tm-define (graphics-assign p t)

@@ -157,6 +157,14 @@
 				 sep
 				 (- n 1))))))
 
+(define-public (string-decompose s sep)
+  (with d (string-search-forwards sep 0 s)
+    (if (< d 0)
+        (list s)
+        (cons (substring s 0 d)
+              (string-decompose (substring s (+ d (string-length sep))
+                                           (string-length s)) sep)))))
+
 (define-public (string-recompose l sep)
   "Turn list @l of strings into one string using @sep as separator."
   (if (char? sep) (set! sep (list->string (list sep))))
@@ -261,7 +269,7 @@
   (position-new-path (if (null? opts) (cursor-path) (car opts))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Urls and buffers
+;; Urls
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (url->list u)
@@ -279,16 +287,54 @@
   (with d (url-expand (url-complete (url-append u (url-wildcard wc)) "r"))
     (url->list d)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Buffers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (current-buffer)
+  (with u (current-buffer-url)
+    (and (not (url-none? u)) u)))
+
+(define-public (path->buffer p)
+  (with u (path-to-buffer p)
+    (and (not (url-none? u)) u)))
+
 (define-public (buffer->tree u)
-  (with t (get-buffer-tree u)
+  (with t (buffer-get-body u)
     (and (tree-active? t) t)))
 
 (define-public (tree->buffer t)
   (and-with p (tree->path t)
-    (get-name-buffer-path p)))
+    (path->buffer p)))
 
-(define-public (buffer-list)
-  (url->list (get-all-buffers)))
+(define-public (buffer->path u)
+  (with t (buffer->tree u)
+    (and t (tree->path t))))
+
+(define-public (buffer-exists? name)
+  (in? (url->url name) (buffer-list)))
+
+(define-public (buffer-master)
+  (buffer-get-master (current-buffer)))
+
+(define-public (buffer-in-recent-menu? u)
+  (not (url-rooted-tmfs? u)))
+
+(define-public (buffer-in-menu? u)
+  (or (buffer-in-recent-menu? u)
+      (string-starts? (url->unix u) "tmfs://help/")))
+
+(define-public (window->buffer win)
+  (with u (window-to-buffer win)
+    (and (not (url-none? u)) u)))
+
+(define-public (current-view)
+  (with u (current-view-url)
+    (and (not (url-none? u)) u)))
+
+(define-public (view->window vw)
+  (with win (view->window-url vw)
+    (and (not (url-none? win)) win)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Redirections

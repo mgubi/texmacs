@@ -18,7 +18,7 @@
 static string 
 from_nsstring (NSString *s) {
   const char *cstr = [s cStringUsingEncoding:NSUTF8StringEncoding];
-  return utf8_to_cork(string((char*)cstr));
+  return string((char*)cstr); // don't convert filenames to cork!
 }
 
 
@@ -31,7 +31,8 @@ from_nsstring (NSString *s) {
 - (BOOL)application:(NSApplication *)theApplication openFile:(NSString *)filename 
 {
   (void) theApplication;
-  call ("texmacs-load-buffer", object(url_system (from_nsstring(filename))), object("generic"), object(1), object(false));
+  call ("load-buffer", object (url_system (from_nsstring (filename))),
+                       eval (":new-window"));
   return YES;
 }
 @end

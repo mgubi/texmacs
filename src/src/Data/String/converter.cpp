@@ -103,7 +103,7 @@ converter_rep::load () {
   // to handle each case individually seems unelegant, but there is simply more
   // to be done here than just loading a file.
   // cout << "TeXmacs] load converter " << from << " -> " << to << "\n";
-  if ( from=="Cork" && to=="UTF-8" ) {
+  if (from=="Cork" && to=="UTF-8" ) {
     hashtree<char,string> dic;
     hashtree_from_dictionary (dic,"corktounicode", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"cork-unicode-oneway", BIT2BIT, UTF8, false);
@@ -112,7 +112,7 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
     ht = dic;
   }
-  else if ( from=="UTF-8" && to=="Cork") {
+  else if (from=="UTF-8" && to=="Cork") {
     hashtree<char,string> dic;
     hashtree_from_dictionary (dic,"corktounicode", UTF8, BIT2BIT, true);
     hashtree_from_dictionary (dic,"unicode-cork-oneway", UTF8, BIT2BIT, false);
@@ -120,13 +120,14 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"unicode-symbol-oneway", UTF8, BIT2BIT, true);
     ht = dic;
   }
-  else if ( from=="UTF-8" && to=="HTML") {
+  else if (from=="UTF-8" && to=="HTML") {
     hashtree<char,string> dic;
     hashtree_from_dictionary (dic, "HTMLlat1"   , CHAR_ENTITY, ENTITY_NAME, true);
     hashtree_from_dictionary (dic, "HTMLspecial", CHAR_ENTITY, ENTITY_NAME, true);
     hashtree_from_dictionary (dic, "HTMLsymbol" , CHAR_ENTITY, ENTITY_NAME, true);
     ht = dic;
-  } else if ( from=="T2A" && to=="UTF-8" ) {
+  }
+  else if (from=="T2A" && to=="UTF-8" ) {
     hashtree<char,string> dic;
     hashtree_from_dictionary (dic,"corktounicode", BIT2BIT, UTF8, false);
     hashtree_from_dictionary (dic,"cork-unicode-oneway", BIT2BIT, UTF8, false);
@@ -136,6 +137,41 @@ converter_rep::load () {
     hashtree_from_dictionary (dic,"t2atounicode", BIT2BIT, UTF8, false);
     ht = dic;
   }  
+  else if (from=="T2A.CY" && to=="CODEPOINT" ) {
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"t2atounicode", BIT2BIT, CHAR_ENTITY, false);
+    hashtree_from_dictionary (dic,"t2atounicode", CHAR_ENTITY, CHAR_ENTITY, false);
+    ht = dic;
+  }
+  else if (from=="UTF-8" && to=="LaTeX" ) {
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"utf8tolatex", CHAR_ENTITY, BIT2BIT, false);
+    ht = dic;
+  }
+  else if (from=="Cork" && to=="ASCII") {
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic, "cork-escaped-to-ascii", BIT2BIT, UTF8, false);
+    ht = dic;
+  }
+  else if (from=="Cork" && to=="SourceCode" ) {
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"corktounicode", BIT2BIT, UTF8, false);
+      //hashtree_from_dictionary (dic,"cork-unicode-oneway", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"tmuniversaltounicode", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"symbol-unicode-oneway", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"symbol-unicode-math", BIT2BIT, UTF8, false);
+    hashtree_from_dictionary (dic,"cork-to-real-ascii", BIT2BIT, UTF8, false);
+    ht = dic;
+  }
+  else if (from=="SourceCode" && to=="Cork") {
+    hashtree<char,string> dic;
+    hashtree_from_dictionary (dic,"corktounicode", UTF8, BIT2BIT, true);
+    hashtree_from_dictionary (dic,"unicode-cork-oneway", UTF8, BIT2BIT, false);
+    hashtree_from_dictionary (dic,"tmuniversaltounicode", UTF8, BIT2BIT, true);
+    hashtree_from_dictionary (dic,"unicode-symbol-oneway", UTF8, BIT2BIT, true);
+    hashtree_from_dictionary (dic,"cork-to-real-ascii", UTF8, BIT2BIT, true);
+    ht = dic;
+  }
 }
 
 /******************************************************************************
@@ -145,7 +181,12 @@ converter_rep::load () {
 bool
 check_encoding (string input, string encoding) {
   if (encoding == "Cork") return true;
+#ifdef USE_ICONV
   else return check_using_iconv (input, encoding);
+#else
+  (void) input;
+  return true; // Assume everything is fine.
+#endif
 }
 
 string 
@@ -154,29 +195,89 @@ convert (string input, string from, string to) {
     return convert_from_cork (input, to);
   else if (to == "Cork")
     return convert_to_cork (input,from);
+  else if (from == "UTF-8" && to == "LaTeX")
+    return convert_utf8_to_LaTeX (input);
+#ifdef USE_ICONV
   else
     return convert_using_iconv (input, from, to);
+#else
+  return input; // can't do anything.
+#endif
 }
 
 string 
 convert_to_cork (string input, string from) {
-  string str;
-  if (from != "UTF-8")
-    str = convert_using_iconv (input, from, "UTF-8");
+  if (from == "UTF-8")
+    return utf8_to_cork (input);
+  else if (from == "SourceCode")
+    return sourcecode_to_cork (input);
+#ifdef USE_ICONV
+  string str= convert_using_iconv (input, from, "UTF-8");
   return utf8_to_cork (str);
+#else
+  return input; // can't do anything.
+#endif
 }
 
 string 
 convert_from_cork (string input, string to) {
+  if (to == "UTF-8")
+    return cork_to_utf8 (input);
+  else if (to == "SourceCode")
+    return cork_to_sourcecode (input);
+#ifdef USE_ICONV
   string str = cork_to_utf8 (input);
-  if (to != "UTF-8")
-    str = convert_using_iconv (str, "UTF-8", to);
-  return str;
+  return convert_using_iconv (str, "UTF-8", to);
+#else
+  return input; // can't do anything.
+#endif
+}
+
+string
+convert_utf8_to_LaTeX (string input) {
+  converter conv= load_converter ("UTF-8", "LaTeX");
+  int i, start, n= N(input);
+  string output, r;
+  for (i=0; i<n; ) {
+    if (((unsigned char) input[i]) < 128 && ((unsigned char) input[i]) > 31) {
+      output << input[i++];
+      continue;
+    }
+    else {
+      start = i;
+      string hex_code = '#' * as_hexadecimal (decode_from_utf8 (input, i));
+      r = apply (conv, hex_code);
+      if (r != hex_code) output << r;
+      else {
+	output << input(start, i);
+        cout << "TeXmacs] non ascii character " << hex_code << " on output: "
+          << input(start, i) << "\nLaTeX output may not compile.\n";
+      }
+    }
+  }
+  return output;
 }
 
 string
 utf8_to_cork (string input) {
   converter conv= load_converter ("UTF-8", "Cork");
+  int start, i, n= N(input);
+  string output;
+  for (i=0; i<n; ) {
+    start= i;
+    unsigned int code= decode_from_utf8 (input, i);
+    string s= input (start, i);
+    string r= apply (conv, s);
+    if (r == s && code >= 256)
+      r= "<#" * as_hexadecimal (code) * ">";
+    output << r;
+  }
+  return output;
+}
+
+string
+sourcecode_to_cork (string input) {
+  converter conv= load_converter ("SourceCode", "Cork");
   int start, i, n= N(input);
   string output;
   for (i=0; i<n; ) {
@@ -209,6 +310,61 @@ cork_to_utf8 (string input) {
 }
 
 string
+cork_to_sourcecode (string input) {
+  converter conv= load_converter ("Cork", "SourceCode");
+  int start= 0, i, n= N(input);
+  string r;
+  for (i=0; i<n; i++)
+    if (input[i] == '<' && i+1<n && input[i+1] == '#') {
+      r << apply (conv, input (start, i));
+      start= i= i+2;
+      while (i<n && input[i] != '>') i++;
+      r << encode_as_utf8 (from_hexadecimal (input (start, i)));
+      start= i+1;
+    }
+  r << apply (conv, input (start, n));
+  return r;
+}
+
+string
+utf8_to_t2a (string input) {
+  converter conv= load_converter ("UTF-8", "T2A");
+  int start, i, n= N(input);
+  string output;
+  for (i=0; i<n; ) {
+    start= i;
+    unsigned int code= decode_from_utf8 (input, i);
+    string s= input (start, i);
+    string r= apply (conv, s);
+    if (r == s && code >= 256)
+      r= "<#" * as_hexadecimal (code) * ">";
+    output << r;
+  }
+  return output;
+}
+
+string
+cyrillic_subset_in_t2a_to_code_point (string input) {
+  converter conv= load_converter ("T2A.CY", "CODEPOINT");
+  string r, tmp;
+  int i, j, n = N(input);
+
+  for (i = 0 ; i < n ; i++) {
+    if (input[i] == '<') {
+      for (j = i + 1 ; j < n && input[j] != '>' ; j++) ;
+      r << input(i, j+1);
+      i = j;
+    }
+    else {
+      tmp = apply (conv, input[i]);
+      if (tmp == input[i]) r << tmp;
+      else r << '<'*tmp*'>';
+    }
+  }
+  return r;
+}
+
+string
 t2a_to_utf8 (string input) {
   converter conv= load_converter ("T2A", "UTF-8");
   int start= 0, i, n= N(input);
@@ -230,6 +386,12 @@ utf8_to_html (string input) {
   converter conv = load_converter ("UTF-8", "HTML");
   string s = apply (conv, input);
   return utf8_to_hex_entities(s);
+}
+
+string
+cork_to_ascii (string input) {
+  converter conv = load_converter ("Cork", "ASCII");
+  return apply (conv, input);
 }
 
 #ifdef USE_ICONV
@@ -335,6 +497,7 @@ bool check_using_iconv (string input, string encoding) {
 
 string
 convert_using_iconv (string input, string from, string to) {
+  if (from == to) return input;
 #ifdef USE_ICONV
   iconv_converter conv (from, to, true);
   return apply (conv, input);
@@ -353,11 +516,13 @@ convert_using_iconv (string input, string from, string to) {
 
 void
 put_prefix_code (string key, string value, hashtree<char,string> tree) {
+  /*
   if (DEBUG_STD) {
     hashtree<char,string> ht= find_node (key,tree);
     if (ht->label != "")
       cout << "overwriting: " << ht->label << " with " << value << '\n';
   }
+  */
   find_node (key,tree)->set_label(value);
 }
 
@@ -367,6 +532,14 @@ find_node (string key, hashtree<char,string> ht) {
   for(i = 0; i < N(key); i++)
     ht = ht(key[i]);
   return ht;
+}
+
+static string
+str_unquote (string s) {
+  int start, end;
+  for (start=0; start<N(s) && s[start] != '"'; start++) ;
+  for (end=N(s)-1; end > start && s[end] != '"'; end--) ;
+  return s (start+1, end);
 }
 
 void
@@ -393,9 +566,8 @@ hashtree_from_dictionary (
         //cout << N(pairs[i]) << "\n" << as_string(pairs[i]) << "\n";
         reverse ? key_string = t[i][1]->label : key_string = t[i][0]->label;
         reverse ? val_string = t[i][0]->label : val_string = t[i][1]->label;
-        if (is_quoted (key_string)) key_string = scm_unquote (key_string);
-        if (is_quoted (val_string)) val_string = scm_unquote (val_string);
-        //cout << "key: " << key_string << " val: " << val_string << "\n";
+        if (is_quoted (key_string)) key_string = str_unquote (key_string);
+        if (is_quoted (val_string)) val_string = str_unquote (val_string);
         if (key_escape == BIT2BIT)
           key_string = convert_escapes (key_string, false);
         else if (key_escape == UTF8)
@@ -592,11 +764,18 @@ decode_from_utf8 (string s, int& i) {
     i++;
     return (unsigned int) c;
   }
+  int start= i-1;
   for (; trail > 0; trail--) {
     i++;
     if (i >= N(s)) i= N(s)-1;
     c = s[i];
-    code = (code << 6) | (c & 0x3F);
+    if ((0xC0 & c) == 0x80)
+      code = (code << 6) | (c & 0x3F);
+    else {
+      i= start+1;
+      c= s[i];
+      return c;
+    }
   }
   i++;
   return code;
@@ -621,53 +800,4 @@ utf8_to_hex_entities (string s) {
     }
   }
   return result;
-
-  /*
-  string result;
-  const int n = N(s);
-  int i;
-  for (i=0; i<n; i++) {
-    unsigned char c = s[i];
-    if ((0x80 & c) == 0) {
-      // 0x0ddddddd
-      //cout << "ASCII: " << c << '\n';
-      result << c;
-      continue;
-    }
-    unsigned int code;
-    int trail;
-    if ((0xE0 & c) == 0xC0) {
-      // 0x110ddddd 0x10dddddd
-      trail = 1;
-      code = c & 0x1F;
-    }
-    else if ((0xF0 & c) == 0xE0) {
-      // 0x1110dddd 0x10dddddd 0x10dddddd
-      trail = 2;
-      code = c & 0x0F;
-    }
-    else if ((0xF8 & c) == 0xF0) {
-      // 0x11110dddd 0x10dddddd 0x10dddddd 0x10dddddd
-      trail = 3;
-      code = c & 0x07;
-    }
-    else {
-      // failsafe
-      //cout << "failsafe: " << c << " (" << (unsigned int)(c) << ")\n";
-      result << c;
-      continue;
-    }
-    for (; trail > 0; trail--) {
-      // Garbage in, garbage out. Do not resync when input is bad.
-      i++;
-      c = s[i];
-      code = (code << 6) | (c & 0x3F);
-    }
-    string hex= as_hexadecimal (code);
-    while (N(hex) < 4) hex = "0" * hex;
-    //cout << "entity: " << hex << " (" << code << ")\n";
-    result << "&#x" << hex << ";";
-  }
-  return result;
-  */
 }

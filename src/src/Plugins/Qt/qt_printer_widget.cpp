@@ -12,7 +12,7 @@
  ******************************************************************************/
 
 #include "qt_printer_widget.hpp"
-#include "qt_utilities.hpp"      // TYPE_CHECK and NOT_IMPLEMENTED
+#include "qt_utilities.hpp"      // check_type<T>
 #include "message.hpp"           // slot definitions
 #include "qt_sys_utils.hpp"      // qt_system(string)
 #include "QTMPrintDialog.hpp"
@@ -47,14 +47,30 @@ qt_printer_widget_rep::send (slot s, blackbox val) {
     cout << "qt_printer_widget_rep::send " << slot_name(s) << LF;
   switch (s) {
     case SLOT_VISIBILITY:   // Activates the widget
-      TYPE_CHECK (type_box (val) == type_helper<bool>::id);
+      check_type<bool>(val, s);
       if (open_box<bool>(val) == true)
         showDialog();
       break;
-    default:
+    case SLOT_REFRESH:   // ignore: this widget doesn't need refreshing.
+      break;
+    default:  // unsupported slots
       qt_widget_rep::send (s, val);
+      break;
   }
 }
+
+
+
+/*! Return the widget as a top-level window to the eyes of TeXmacs. */
+widget
+qt_printer_widget_rep::plain_window_widget (string s, command q)
+{
+  (void) s;
+  commandAfterExecution = q;
+
+  return this;
+}
+
 
 
 /*!
@@ -75,8 +91,9 @@ qt_printer_widget_rep::showDialog () {
   _cmd = _settings->toSystemCommand();
   
   // Send the document to the printer
-  cout << "qt_printer_dialog_rep] Running command: " << from_qstring(_cmd) 
-       << "\n";
+  if (DEBUG_QT)
+    cout << "qt_printer_dialog_rep] Running command: " << from_qstring(_cmd) 
+         << "\n";
   qt_system(from_qstring(_cmd));  // FIXME? qt_system is synchronous (blocking!)
   
   // execute the scheme closure 

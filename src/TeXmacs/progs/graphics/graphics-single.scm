@@ -63,7 +63,7 @@
   (object-set! `(point ,x ,y) 'new))
 
 (tm-define (object_create tag x y)
-  (:require (in? tag gr-tags-curves))
+  (:require (or (in? tag gr-tags-curves) (in? tag gr-tags-user)))
   (with o (graphics-enrich `(,tag (point ,x ,y) (point ,x ,y)))
     (graphics-store-state 'start-create)
     (set! current-point-no 1)
@@ -93,7 +93,7 @@
 
 (define (object_add-point no xcur ycur x y dirn)
   (define obj (stree-radical (car (sketch-get1))))
-  (if (not (and (in? (car obj) '(arc carc)) (> (length obj) 3)))
+  (if (not (graphics-complete? obj))
       (with l (list-tail (cdr obj) no)
   	(graphics-store-state #f)
  	(if dirn
@@ -135,22 +135,24 @@
 
 (define (object_commit)
   (define obj (stree-radical (car (sketch-get1))))
-  (if (not (and (in? (car obj) '(arc carc)) (<= (length obj) 3)))
-      (with tab (make-ahash-table)
-        (for (var (graphics-all-attributes))
-          (when (nin? var '("gid"))
-            (ahash-set! tab var (ahash-ref graphical-attrs var))))
-        (graphical-fetch-props (car (sketch-get)))
-        (set! obj (graphics-enrich-bis
-                   obj (ahash-ref graphical-attrs "gid") tab))
-        (set! current-edge-sel? #f)
-        (sketch-set! `(,obj))
-        ;;(display* "Commited " (sketch-get) "\n")
-        (sketch-commit)
-        (set! leftclick-waiting #f)
-        (set! current-obj (stree-radical obj))
-        (set! current-point-no #f)
-        (graphics-forget-states)))
+  (if (not (graphics-incomplete? obj))
+      (with (xobj xp) (graphics-complete obj)
+        (set! obj xobj)
+        (with tab (make-ahash-table)
+          (for (var (graphics-all-attributes))
+            (when (nin? var '("gid"))
+              (ahash-set! tab var (ahash-ref graphical-attrs var))))
+          (graphical-fetch-props (car (sketch-get)))
+          (set! obj (graphics-enrich-bis
+                     obj (ahash-ref graphical-attrs "gid") tab))
+          (set! current-edge-sel? #f)
+          (sketch-set! `(,obj))
+          ;;(display* "Commited " (sketch-get) "\n")
+          (sketch-commit)
+          (set! leftclick-waiting #f)
+          (set! current-obj (stree-radical obj))
+          (set! current-point-no #f)
+          (graphics-forget-states))))
   (delayed
     (graphics-update-constraints)))
 
@@ -230,9 +232,7 @@
   (graphics-group-start)
   (set! current-edge-sel? #t)
   (set! leftclick-waiting #f)
-  (if (and edge
-	   (not (and (current-in? '(arc carc))
-                     (> (length current-obj) 3))))
+  (if (and edge (not (graphics-complete? current-obj)))
       (begin
 	 (object_add-point current-point-no #f #f current-x current-y #t)
 	 (graphics-decorations-update)))
@@ -274,7 +274,7 @@
          (set! leftclick-waiting #t))))
 
 (define (remove-point)
-  (if (or (current-in? gr-tags-oneshot) (null? (cdddr current-obj))
+  (if (or (graphics-minimal? current-obj)
 	  (not (current-in? gr-tags-all))
 	  (!= (logand (get-keyboard-modifiers) ShiftMask) 0))
       (begin
@@ -358,7 +358,7 @@
              (next-point)))
         ((and (current-in? (graphical-text-tag-list))
               (== (car (graphics-mode)) 'edit)
-              (graphical-text-tag? (cadr (graphics-mode))))
+              (graphical-contains-text-tag? (cadr (graphics-mode))))
          (set-texmacs-pointer 'text-arrow)
          (go-to (car (select-first (s2f current-x) (s2f current-y)))))
         (else
@@ -376,6 +376,7 @@
   (:require (== mode 'edit))
   (:state graphics-state)
   (set-texmacs-pointer 'graphics-cross)
+  (set! dragging-busy? #t)
   (set! dragging-create? (or sticky-point (not current-obj)))
   (if (or sticky-point current-obj)
       (begin
@@ -396,13 +397,15 @@
 (tm-define (edit_end-drag mode x y)
   (:require (== mode 'edit))
   (:state graphics-state)
-  (set-texmacs-pointer 'graphics-cross)
-  (if (or sticky-point current-obj)
-      (if dragging-create?
-          (edit_move mode x y)
-          (last-point)))
-  (set! dragging-create? #f)
-  (set! previous-leftclick `(point ,current-x ,current-y)))
+  (when dragging-busy?
+    (set-texmacs-pointer 'graphics-cross)
+    (if (or sticky-point current-obj)
+        (if dragging-create?
+            (edit_move mode x y)
+            (last-point)))
+    (set! dragging-busy? #f)
+    (set! dragging-create? #f)
+    (set! previous-leftclick `(point ,current-x ,current-y))))
 
 (tm-define (edit_tab-key mode inc)
   (:require (== mode 'edit))
@@ -412,3 +415,32 @@
         (select-next inc)
         (graphics-update-decorations))
       (invalidate-graphical-object)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Don't dispatch certain actions on textual arguments of graphical macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (edit-macro-arg? mode)
+  (and (== mode 'edit)
+       (graphical-text-arg-context? current-obj)))
+
+(tm-define (edit_middle-button mode x y)
+  (:require (edit-macro-arg? mode))
+  (:state graphics-state)
+  ;; FIXME: should destroy graphical macro
+  (noop))
+
+(tm-define (edit_start-drag mode x y)
+  (:require (edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_drag mode x y)
+  (:require (edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_end-drag mode x y)
+  (:require (edit-macro-arg? mode))
+  (:state graphics-state)
+  (noop))

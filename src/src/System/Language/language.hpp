@@ -111,6 +111,9 @@ void init_succession_status_table ();
 struct language_rep: rep<language> {
   string lan_name;  // name of the language
   int hl_lan;
+  static hashmap<string,int> color_encoding;
+  hashmap<int,string> color_decoding;
+  
   language_rep (string s);
   virtual text_property advance (tree t, int& pos) = 0;
   virtual array<int> get_hyphens (string s) = 0;
@@ -127,6 +130,7 @@ language prog_language (string s);
 
 string locale_to_language (string s);
 string language_to_locale (string s);
+string language_to_local_ISO_charset (string s);
 string get_locale_language ();
 #if defined(__MINGW__) || defined(__MINGW32__) || defined(OS_WIN32)
 namespace win32 {
@@ -138,5 +142,9 @@ string get_date (string lan, string fm);
 string math_symbol_group (string s, string lan= "std-math");
 array<string> math_group_members (string s, string lan= "std-math");
 string math_symbol_type (string s, string lan= "std-math");
+
+void   initialize_color_decodings (string lan_name);
+int    encode_color (string s);
+string decode_color (string lan, int c);
 
 #endif // defined LANGUAGE_H

@@ -12,6 +12,44 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define boot-start (texmacs-time))
+(define developer-mode-on #f) ; TODO: the C++ code should initialize this.
+
+(if developer-mode-on
+  (begin
+    ; FIXME: how do we update this list dynamically? 
+    (define-public keywords-which-define 
+      '(define define-macro define-public define-public-macro provide-public
+        tm-define tm-define-macro tm-menu menu-bind tm-widget))
+
+    (define-public old-read read)
+    (define-public (new-read port)
+      "A redefined reader which stores line number and file name in symbols."
+      ; FIXME: handle overloaded redefinitions
+      (let ((form (old-read port)))
+        (if (and (pair? form) (member (car form) keywords-which-define))
+          (let* ((line (source-property form 'line))
+                 (column (source-property form 'column))
+                 (filename (source-property form 'filename))
+                 (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
+            (if (and (symbol? sym) ; Just in case
+                     filename)     ; don't set props if read from stdin
+             (begin 
+                (set-symbol-property! sym 'line line)
+                (set-symbol-property! sym 'column column)
+                (set-symbol-property! sym 'filename filename)
+                ))))
+        form))
+
+    (set! read new-read)
+
+    (define-public old-primitive-load primitive-load)
+    (define-public (new-primitive-load filename)
+      ; We explicitly circumvent guile's decision to set the current-reader
+      ; to #f inside ice-9/boot-9.scm, try-module-autoload
+      (with-fluids ((current-reader read))
+        (old-primitive-load filename)))
+
+    (set! primitive-load new-primitive-load)))
 
 ;; TODO: scheme file caching using (set! primitive-load ...) and
 ;; (set! %search-load-path)
@@ -67,7 +105,7 @@
 (use-modules (bibtex bib-utils))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
-;(display "Booting main TeXmacs functionality\n")
+;;(display "Booting main TeXmacs functionality\n")
 (use-modules (texmacs texmacs tm-server) (texmacs texmacs tm-view)
 	     (texmacs texmacs tm-files) (texmacs texmacs tm-print))
 (use-modules (texmacs keyboard config-kbd))
@@ -155,13 +193,15 @@
 ;(display "Booting dynamic features\n")
 (lazy-keyboard (dynamic fold-kbd) always?)
 (lazy-keyboard (dynamic scripts-kbd) always?)
+(lazy-keyboard (dynamic calc-kbd) always?)
 (lazy-menu (dynamic fold-menu) insert-fold-menu dynamic-menu dynamic-icons)
 (lazy-menu (dynamic session-menu) insert-session-menu session-help-icons)
 (lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu
 	   plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
+(lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu)
 (lazy-define (dynamic session-edit) scheme-eval)
+(lazy-define (dynamic calc-edit) calc-ready? calc-table-renumber)
 (lazy-initialize (dynamic session-menu) (in-session?))
-(lazy-keyboard (dynamic calc-table) always?)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting documentation\n")
@@ -173,7 +213,12 @@
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src docgrep-in-texts)
 (lazy-define (doc tmweb) tmweb-convert-dir tmweb-update-dir
              tmweb-interactive-build tmweb-interactive-update)
+(lazy-define (doc apidoc) apidoc-all-modules apidoc-all-symbols)
+(lazy-tmfs-handler (doc docgrep) grep)
+(lazy-tmfs-handler (doc tmdoc) help)
+(lazy-tmfs-handler (doc apidoc) apidoc)
 (define-secure-symbols tmdoc-include)
+
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting converters\n")
@@ -184,6 +229,8 @@
 (lazy-format (convert bibtex init-bibtex) bibtex)
 (lazy-format (convert images init-images)
 	     postscript pdf xfig xmgrace svg xpm jpeg ppm gif png pnm)
+(lazy-define (convert images tmimage)
+	     export-selection-as-graphics clipboard-copy-image)
 (lazy-define (convert rewrite init-rewrite) texmacs->code texmacs->verbatim)
 (lazy-define (convert html tmhtml-expand) tmhtml-env-patch)
 (lazy-define (convert latex latex-drd) latex-arity latex-type)
@@ -193,13 +240,13 @@
 
 ;(display "Booting remote facilities\n")
 (lazy-define (remote tmfs-remote) remote-load remote-save
-	     remote-name remote-permission? remote-project-load-by-name)
+	     remote-title remote-permission? remote-project-load-by-name)
 (lazy-menu (remote remote-menu) remote-menu)
 (lazy-menu (remote chat-menu) chat-menu)
 (lazy-menu (remote tmfs-menu) remote-file-menu)
 (tmfs-handler #t 'load remote-load)
 (tmfs-handler #t 'save remote-save)
-(tmfs-handler #t 'name remote-name)
+(tmfs-handler #t 'title remote-title)
 (tmfs-handler #t 'permission? remote-permission?)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
@@ -216,6 +263,7 @@
 ;(display "Booting versioning facilities\n")
 (lazy-menu (version version-menu) version-menu)
 (lazy-keyboard (version version-kbd) with-versioning-tool?)
+(lazy-define (version version-tmfs) update-buffer commit-buffer)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting debugging facilities\n")
@@ -233,6 +281,6 @@
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "------------------------------------------------------\n")
-(delayed (:idle 10000) (delayed-auto-save))
+(delayed (:idle 10000) (autosave-delayed))
 (texmacs-banner)
 ;(display "Initialization done\n")

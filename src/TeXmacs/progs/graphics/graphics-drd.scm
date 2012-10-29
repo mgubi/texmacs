@@ -29,6 +29,9 @@
 (define-group graphical-text-tag
   text-at math-at)
 
+(define-group graphical-contains-text-tag
+  (graphical-text-tag))
+
 (define-group graphical-non-group-tag
   (graphical-curve-tag) (graphical-atomic-tag) (graphical-text-tag))
 
@@ -41,15 +44,24 @@
 (tm-define (graphical-text-context? t)
   (tm-in? t (graphical-text-tag-list)))
 
+(tm-define (graphical-text-at-context? t)
+  (and (graphical-text-context? t) (>= (tm-arity t) 2)))
+
+(tm-define (graphical-text-arg-context? t)
+  (and (graphical-text-context? t) (< (tm-arity t) 2)))
+
 (tm-define (inside-graphical-text?)
   (tree-innermost graphical-text-context?))
 
-(tm-define gr-tags-all          (graphical-tag-list))
-(tm-define gr-tags-curves       (graphical-curve-tag-list))
-(tm-define gr-tags-noncurves    (append (graphical-atomic-tag-list)
-                                        (graphical-text-tag-list)
-                                        (graphical-group-tag-list)))
-(tm-define gr-tags-oneshot      '(point arc carc text-at gr-group))
+(tm-define gr-tags-user      (list))
+(tm-define gr-tags-all       (graphical-tag-list))
+(tm-define gr-tags-curves    (graphical-curve-tag-list))
+(tm-define gr-tags-noncurves (append (graphical-atomic-tag-list)
+                                     (graphical-text-tag-list)
+                                     (graphical-group-tag-list)))
+
+(tm-define (graphical-user-tag? l)
+  (in? l gr-tags-user))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; List of graphical attributes and their properties
@@ -130,7 +142,7 @@
             "point-style")))
 
 (tm-define (graphics-attributes tag)
-  (:require (graphical-curve-tag? tag))
+  (:require (or (graphical-curve-tag? tag) (graphical-user-tag? tag)))
   (append (graphics-common-attributes)
           '("fill-color"
             "line-width" "line-join" "line-caps" "line-effects"
@@ -160,3 +172,20 @@
 
 (tm-define (graphics-mode-attribute? mode attr)
   (in? attr (graphics-mode-attributes mode)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Refined properties concerning arity and types of children
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (graphics-minimal? obj)
+  (or (tm-in? obj '(point text-at math-at))
+      (== (tm-arity obj) (tag-minimal-arity (tm-car obj)))))
+
+(tm-define (graphics-incomplete? obj)
+  (< (tm-arity obj) (tag-minimal-arity (tm-car obj))))
+
+(tm-define (graphics-complete? obj)
+  (>= (tm-arity obj) (tag-maximal-arity (tm-car obj))))
+
+(tm-define (graphics-complete obj)
+  (list obj #f))

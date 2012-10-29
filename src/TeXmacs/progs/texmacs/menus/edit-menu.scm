@@ -61,9 +61,11 @@
   (if (detailed-menus?)
       ("Clear" (clipboard-clear "primary")))
   ---
-  ("Search" (search-start #t))
+  (if (not (in-search-mode?))
+      ("Search" (search-start #t)))
+  (if (in-search-mode?)
+      ("Next match" (search-button-next)))
   ("Replace" (interactive replace-start-forward))
-
   (if (not (in-math?))
       ("Spell" (spell-start)))
   (if (in-math?)
@@ -73,6 +75,7 @@
       (when (selection-active-any?)
 	(-> "Copy to"
 	    (link clipboard-copy-export-menu)
+	    (if (qt-gui?) ("Image" (clipboard-copy-image "")))
 	    ---
 	    ("Primary" (clipboard-copy "primary"))
 	    ("Secondary" (clipboard-copy "secondary"))

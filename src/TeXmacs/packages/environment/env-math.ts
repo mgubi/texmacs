@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.9>
+<TeXmacs|1.0.7.15>
 
 <style|source>
 
@@ -130,6 +130,30 @@
     </equations-base>
   </macro>>
 
+  <assign|flalign|<\macro|body>
+    <align|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|flalign*|<\macro|body>
+    <align*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|alignedat|<\macro|ncol|body>
+    <align|<arg|body>>
+  </macro>>
+
+  <assign|aligned|<\macro|body>
+    <align|<arg|body>>
+  </macro>>
+
+  <assign|alignat|<\macro|ncol|body>
+    <align|<arg|body>>
+  </macro>>
+
+  <assign|alignat*|<\macro|ncol|body>
+    <align|<arg|body>>
+  </macro>>
+
   <assign|align|<\macro|body>
     <align*|<tformat|<arg|body>>>
   </macro>>
@@ -163,6 +187,8 @@
   <assign|eqsplit|<\macro|body>
     <eqsplit*|<tformat|<arg|body>>>
   </macro>>
+
+  <assign|subequations|<macro|<arg|body>><arg|body>>
 
   \;
 

@@ -14,45 +14,19 @@
 #include "editor.hpp"
 #include "url.hpp"
 #include "scheme.hpp"
+#include "new_data.hpp"
+#include "Data/new_buffer.hpp"
+#include "Data/new_view.hpp"
+#include "Data/new_window.hpp"
+#include "Data/new_project.hpp"
 
-class tm_buffer_rep;
-class tm_view_rep;
-class tm_window_rep;
-typedef tm_buffer_rep* tm_buffer;
-typedef tm_view_rep*   tm_view;
-typedef tm_window_rep* tm_window;
 class editor;
 
 class server_rep: public tm_obj<server_rep> {
 public:
   server_rep ();
   virtual ~server_rep ();
-
-  /* low level */
-  virtual tm_buffer new_buffer (url name, tree doc) = 0;
-  virtual void attach_view (tm_window win, tm_view vw) = 0;
-  virtual tm_view get_passive_view (tm_buffer buf) = 0;
-  virtual void delete_buffer (tm_buffer buf) = 0;
-
-  /* Get and set objects associated to server */
   virtual server_rep* get_server () = 0;
-  virtual bool        has_view () = 0;
-  virtual bool        has_window () = 0;
-  virtual tm_view     get_view (bool must_be_valid= true) = 0;
-  virtual void        set_view (tm_view vw) = 0;
-  virtual tm_buffer   get_buffer () = 0;
-  virtual editor      get_editor () = 0;
-  virtual tm_window   get_window () = 0;
-  virtual int         get_nr_windows () = 0;
-
-  virtual object get_style_menu () = 0;
-  virtual object get_add_package_menu () = 0;
-  virtual object get_remove_package_menu () = 0;
-  virtual void style_clear_cache () = 0;
-  virtual void style_set_cache (
-            tree style, hashmap<string,tree> H, tree drd) = 0;
-  virtual void style_get_cache (
-	    tree style, hashmap<string,tree>& H, tree& drd, bool& flag) = 0;
 
   /* Control global server parameters */
   virtual void   set_font_rules (scheme_tree rules) = 0;
@@ -67,7 +41,7 @@ public:
 			      command& cmd, string& sh, string& help) = 0;
 
   /* TeXmacs frames */
-  virtual int  get_window_id () = 0;
+  virtual int  get_window_serial () = 0;
   virtual void set_window_property (scheme_tree what, scheme_tree val) = 0;
   virtual void set_bool_window_property (string what, bool val) = 0;
   virtual void set_int_window_property (string what, int val) = 0;
@@ -112,67 +86,12 @@ public:
   virtual void choose_file (object fun, string title, string type) = 0;
   virtual void interactive (object fun, scheme_tree p) = 0;
 
-  /* Buffer management */
-  virtual int  nr_bufs () = 0;
-  virtual tm_buffer get_buf (int i) = 0;
-  virtual tm_buffer get_buf (path p) = 0;
-  virtual void set_name_buffer (url name) = 0;
-  virtual url  get_name_buffer () = 0;
-  virtual url  get_name_buffer (path p) = 0;
-  virtual void set_abbr_buffer (string abbr) = 0;
-  virtual string get_abbr_buffer () = 0;
-  virtual url  new_buffer () = 0;
-  virtual void switch_to_buffer (url name) = 0;
-  virtual bool switch_to_buffer (path p) = 0;
-  virtual void switch_to_active_buffer (url name) = 0;
-  virtual void revert_buffer () = 0;
-  virtual void kill_buffer () = 0;
-  virtual void new_buffer_in_new_window (url name, tree t, tree geom= "") = 0;
-  virtual url  open_window (tree geom= "") = 0;
-  virtual void clone_window () = 0;
-  virtual void kill_window () = 0;
-  virtual void kill_window_and_buffer () = 0;
-  virtual bool no_bufs () = 0;
-  virtual bool no_name () = 0;
-  virtual bool help_buffer () = 0;
-  virtual void revert_buffer (url name, tree doc) = 0;
-  virtual void set_aux (string aux, url name) = 0;
-  virtual void set_aux_buffer (string aux, url name, tree doc) = 0;
-  virtual void set_help_buffer (url name, tree doc) = 0;
-  virtual void set_buffer_tree (url name, tree doc) = 0;
-  virtual tree get_buffer_tree (url name) = 0;
-  virtual url  get_all_buffers () = 0;
-  virtual object get_buffer_menu () = 0;
-  virtual bool buffer_in_menu (url name, bool flag) = 0;
-
-  /* Projects */
-  virtual void project_attach (string prj_name= "") = 0;
-  virtual bool project_attached () = 0;
-  virtual object get_project_buffer_menu () = 0;
-
-  /* Window management */
-  virtual int  window_current () = 0;
-  virtual path windows_list () = 0;
-  virtual path buffer_to_windows (url name) = 0;
-  virtual url  window_to_buffer (int id) = 0;
-  virtual void window_set_buffer (int id, url name) = 0;
-  virtual void window_focus (int id) = 0;
-
-  /* Loading and saving files */
-  virtual tree load_tree (url name, string f) = 0;
-  virtual void load_buffer (url name, string f, int w=0, bool a=false)=0;
-  virtual void save_buffer (url name, string fm) = 0;
-  virtual void auto_save () = 0;
-  virtual bool buffer_unsaved () = 0;
-  virtual bool exists_unsaved_buffer () = 0;
-  virtual void pretend_save_buffer () = 0;
-
   /* Miscellaneous routines */
+  virtual void   style_clear_cache () = 0;
   virtual void   refresh () = 0;
   virtual void   interpose_handler () = 0;
   virtual void   wait_handler (string message, string arg) = 0;
   virtual void   set_script_status (int i) = 0;
-  virtual void   focus_on_editor (editor ed) = 0;
   virtual void   set_printing_command (string s) = 0;
   virtual void   set_printer_page_type (string s) = 0;
   virtual string get_printer_page_type () = 0;
@@ -198,5 +117,10 @@ extern bool rescue_mode;
 scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);
 server get_server ();
 void gui_set_output_language (string lan);
+inline bool in_rescue_mode () { return rescue_mode; }
+
+/* low level */
+void create_buffer (url name, tree doc);
+void new_buffer_in_this_window (url name, tree t);
 
 #endif // defined SERVER_H

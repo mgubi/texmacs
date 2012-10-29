@@ -20,6 +20,21 @@
 ******************************************************************************/
 
 int
+minimal_arity (tree_label l) {
+  return the_drd->get_minimal_arity (l);
+}
+
+int
+maximal_arity (tree_label l) {
+  return the_drd->get_maximal_arity (l);
+}
+
+bool
+correct_arity (tree_label l, int n) {
+  return the_drd->correct_arity (l, n);
+}
+
+int
 minimal_arity (tree t) {
   return the_drd->get_minimal_arity (L(t));
 }
@@ -98,6 +113,11 @@ get_child_long_name (tree t, int i) {
 string
 get_child_type (tree t, int i) {
   return drd_decode_type (the_drd->get_type_child (t, i));
+}
+
+tree
+get_env_child (tree t, int i, string var, tree val) {
+  return the_drd->get_env_child (t, i, var, val);
 }
 
 /******************************************************************************

@@ -16,7 +16,6 @@
 	(generic generic-edit)
 	(generic format-edit)
 	(generic format-geometry-edit)
-	(generic document-menu)
         (source source-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -137,8 +136,9 @@
       (glue #f #f 3 0)
       (mini #t (group (eval s))))
     (when active?
-      (input (when answer (tree-set (focus-tree) i answer)) fm
-	     (list in) w))))
+      (mini #t
+        (input (when answer (tree-set (focus-tree) i answer)) fm
+  	     (list in) w)))))
 
 (tm-menu (string-input-menu t i)
   (let* ((name (tree-child-long-name* t i))
@@ -365,3 +365,9 @@
     (dynamic (graphics-focus-icons)))
   (assuming (not (in-graphics?))
     (dynamic (standard-focus-icons (focus-tree)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Immediately load document-menu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(use-modules (generic document-menu))

@@ -96,6 +96,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("alias")= c;
   t ("and")= c;
   t ("assume")= d;
+  t ("autofold")= d;
   t ("begin")= c;
   t ("break")= c;
   t ("case")= c;
@@ -111,6 +112,8 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("debugger")= c;
   t ("destructor")= c;
   t ("direct")= c;
+  t ("disjunction")= c;
+  t ("dispatch")= c;
   t ("div")= c;
   t ("do")= c;
   t ("downto")= c;
@@ -118,6 +121,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("else")= c;
   t ("evolutive")= c;
   t ("exists")= d;
+  t ("explicit")= c;
   t ("explode")= c;
   t ("export")= d;
   t ("extend")= c;
@@ -134,6 +138,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("hidden")= c;
   t ("holds")= c;
   t ("if")= c;
+  t ("implicit")= c;
   t ("import")= c;
   t ("in")= c;
   t ("include")= c;
@@ -156,6 +161,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("loop")= c;
   t ("macro")= c;
   t ("map")= c;
+  t ("match")= c;
   t ("melt")= c;
   t ("method")= c;
   t ("mod")= c;
@@ -163,7 +169,9 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("mutable")= c;
   t ("operator")= c;
   t ("or")= c;
+  t ("outline")= d;
   t ("packed")= c;
+  t ("pattern")= c;
   t ("penalty")= c;
   t ("postfix")= "postfix";
   t ("prefer")= c;
@@ -181,6 +189,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("sequel")= c;
   t ("split")= c;
   t ("step")= c;
+  t ("structure")= e;
   t ("supports?")= c;
   t ("then")= c;
   t ("this")= c;
@@ -377,16 +386,12 @@ parse_number (string s, int& pos) {
 }
 
 static void
-parse_no_declare_type (string s, int& pos) {
-  if (pos+1<N(s) && s[pos]==':' && s[pos+1]==':') pos=pos+2;
-}
-
-static void
 parse_declare_type (string s, int& pos) {
   if (pos>=N(s)) return;
   if (s[pos]!=':') return;
   if (pos+1<N(s) && s[pos+1]=='=') return;
   pos++;
+  if (pos+1<N(s) && s[pos]==':') pos++;
   if (!test (s, pos, "<gtr>")) return;
   pos+=5;
 }
@@ -603,16 +608,6 @@ mathemagix_language_rep::get_color (tree t, int start, int end) {
 	possible_future_class= false;
 	break;
       }
-      parse_no_declare_type (s, pos); // :: 
-      if (opos<pos) {
-	type= "no_declare_type";
-	possible_type= false;
-	possible_future_type= false;
-	possible_function= false;
-	possible_future_function= false;
-	possible_future_class= false;
-	break;
-      }  
       parse_backquote (s, pos);
       if (opos<pos) {
 	backquote= true;
@@ -718,8 +713,6 @@ mathemagix_language_rep::get_color (tree t, int start, int end) {
 	if (opos<pos) break;
 	parse_parenthesized (s, pos);
 	if (opos<pos) break;
-	parse_no_declare_type (s, pos);
-	if (opos<pos) break;
 	parse_declare_type (s, pos);
 	if (opos<pos) break;
 	parse_declare_macro(s,pos);
@@ -747,8 +740,6 @@ mathemagix_language_rep::get_color (tree t, int start, int end) {
       parse_comment(s,pos);
       if (opos<pos) break;
       parse_parenthesized (s, pos);
-      if (opos<pos) break;
-      parse_no_declare_type (s, pos);
       if (opos<pos) break;
       parse_declare_type (s, pos);
       if (opos<pos) break;

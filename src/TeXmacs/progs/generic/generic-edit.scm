@@ -510,6 +510,27 @@
 (tm-define (select-all)
   (tree-select (buffer-tree)))
 
+(tm-define (go-to-line n)
+  (with-innermost t 'document
+    (tree-go-to t n 0)))
+
+(tm-define (go-to-column c)
+  (with-innermost t 'document
+    (with p (tree-cursor-path t)
+      (tree-go-to t (cADr p) c))))
+
+(tm-define (select-word w t col)
+  (:synopsis "Selects word @w in tree @t, more or less around column @col.")
+  (let* ((st (tree->string t))
+         (pos (- col (string-length w)))
+         (beg (string-contains st w (if (> pos 0) pos 0))))
+    (if beg 
+        (with p (tree->path t)
+          (go-to (rcons p beg))
+          (selection-set-start)
+          (go-to (rcons p (+ beg (string-length w))))
+          (selection-set-end)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting various kinds of content
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -530,14 +551,18 @@
       (insert-go-to `(specific ,s "") '(1 0))
       (insert-go-to `(inactive (specific ,s "")) '(0 1 0))))
 
+(define (url->delta-unix u)
+  (if (url-rooted? u) (set! u (url-delta (current-buffer) u)))
+  (url->unix u))
+
 (tm-define (make-include u)
-  (insert `(include ,(url->string u))))
+  (insert `(include ,(url->delta-unix u))))
 
 (tm-define (make-inline-image l)
-  (apply make-image (cons* (url->string (car l)) #f (cdr l))))
+  (apply make-image (cons* (url->delta-unix (car l)) #f (cdr l))))
 
 (tm-define (make-link-image l)
-  (apply make-image (cons* (url->string (car l)) #t (cdr l))))
+  (apply make-image (cons* (url->delta-unix (car l)) #t (cdr l))))
 
 (tm-define (make-graphics-over-selection)
   (if (selection-active-any?)
@@ -565,7 +590,7 @@
 
 (define (make-thumbnails-sub l)
   (define (mapper x)
-    `(image ,(url->string x) "0.22par" "" "" ""))
+    `(image ,(url->delta-unix x) "0.22par" "" "" ""))
   (let* ((l1 (map mapper l))
 	 (l2 (make-rows l1 4))
 	 (l3 (map (lambda (r) `(row ,@(map (lambda (c) `(cell ,c)) r))) l2)))
@@ -579,7 +604,7 @@
    (lambda (dir) 
      (let* ((find (url-append dir (thumbnail-suffixes)))
 	          (files (url->list (url-expand (url-complete find "r"))))
-	          (base (get-name-buffer))
+	          (base (buffer-master))
 	          (rel-files (map (lambda (x) (url-delta base x)) files)))
            (if (nnull? rel-files) (make-thumbnails-sub rel-files))))))
    
@@ -622,13 +647,13 @@
 
 (tm-define (make-sound u)
   (if (not (url-none? u))
-      (insert `(sound ,(url->string u)))))
+      (insert `(sound ,(url->delta-unix u)))))
 
 (tm-define (make-animation u)
   (interactive
       (lambda (w h len rep)
 	(if (== rep "no") (set! rep "false"))
-	(insert `(video ,(url->string u) ,w ,h ,len ,rep)))
+	(insert `(video ,(url->delta-unix u) ,w ,h ,len ,rep)))
     "Width" "Height" "Length" "Repeat?"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

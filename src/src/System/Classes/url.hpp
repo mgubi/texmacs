@@ -30,6 +30,7 @@ class url : public tm_ptr<url_rep> {
 private:
   url (tree t): tm_ptr<url_rep> (tm_new<url_rep> (t)) {}
 public:
+  url ();
   url (const char* name);
   url (string name);
   url (string dir, string name);
@@ -40,8 +41,11 @@ public:
 };
 
 tm_ostream& operator << (tm_ostream& out, url u);
-string as_string (url u, int type= URL_SYSTEM);
 inline url as_url(tree t) { return url(t); }
+string as_string (url u, int type= URL_SYSTEM);
+inline string as_system_string (url u) { return as_string (u, URL_SYSTEM); }
+inline string as_unix_string (url u) { return as_string (u, URL_UNIX); }
+inline string as_standard_string (url u) { return as_string (u,URL_STANDARD); }
 
 /******************************************************************************
 * url constructors
@@ -119,6 +123,8 @@ url    unglue (url u, int nr);     // remove nr chars from suffix
 url    unblank (url u);            // a/b/ -> a/b
 url    relative (url base, url u); // a/b, c -> a/c
 url    delta (url base, url u);    // relative (a, delta (a, b)) == b
+string get_root (url u);           // get root
+url    unroot (url u);             // remove root
 url    reroot (url u, string s);   // reroot using new protocol
 url    expand (url u);             // rewrite a/{b:c} -> a/b:a/c
 url    sort (url u);               // order items in ors

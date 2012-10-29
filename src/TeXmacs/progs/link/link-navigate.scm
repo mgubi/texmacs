@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (link link-navigate)
-  (:use (utils library cursor) (link link-edit) (link link-extern)))
+  (:use (utils library cursor) (link link-edit) (link link-extern)
+        (generic generic-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Navigation mode
@@ -310,7 +311,7 @@
 
 (define (build-navigation-page-sub style l)
   (with doc (navigation-list->document style l)
-    (set-aux-buffer "Link page" "Link page" doc)))
+    (open-auxiliary "Link page" doc)))
 
 (define (build-navigation-page l)
   (let* ((style (tree->stree (get-style-tree)))
@@ -333,25 +334,53 @@
 	(and (resolve-id id)
 	     (delayed (:idle 25) (apply go-to-id (cons id opt-from)))))))
 
-(define (decompose-url s)
-  (with i (string-index s #\#)
-    (if (not i) (list s "")
-	(list (substring s 0 i) (substring s (+ i 1) (string-length s))))))
+(define (default-query-handler qry)
+  (let* ((lstr (or (query-ref qry "line") "0"))
+         (cstr (or (query-ref qry "column") "0"))
+         (sstr (or (query-ref qry "select") ""))
+         (line (or (string->number lstr) 0))
+         (column (or (string->number cstr) 0)))
+    (go-to-line line)
+    (go-to-column column)
+    (if (!= sstr "") (select-word sstr (cursor-tree) column))))
 
-(tm-define (go-to-url name-label . opt-from)
-  (:synopsis "Jump to the url @name-label.")
+;; TEMPORARY: we have to decide whether this makes sense as one of the
+;; properties of a format as defined in define-format. We also have to
+;; decide whether to always use a default handler which won't work in some
+;; cases (most notably for texmacs files) or if we require explicit naming
+;; of the handler for each format created.
+(define (query-handler-for-format fm)
+  (cond ((== fm "generic-file") default-query-handler)
+        ((== fm "scheme-file") default-query-handler)
+        (else (display* "Unhandled format for queries: " fm "\n") #f)))
+
+(define (process-query file qry)
+  (with handler (query-handler-for-format (file-format file))
+    (if handler (handler qry) #f)))
+
+(define (process-url s)
+  (let* ((m (string-length s))
+         (h (or (string-index s #\#) m))
+         (a (or (string-index s #\?) m))
+         (i (min m h a))
+         (name (substring s 0 i))
+         (rest (substring s (min m (+ 1 i)) m)))
+    (if (< i m)  ; was there either a '?' or a '#' (with args)?
+        (if (< h a) ; was it a hash?
+            (list name (lambda () (go-to-label rest)))         ; '#'
+            (list name (lambda () (process-query name rest)))) ; '?'
+        (list name noop))))
+
+(tm-define (go-to-url u . opt-from)
+  (:synopsis "Jump to the url @u")
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
-  (with (name label) (decompose-url name-label)
-    (cond ((== name "") (go-to-label label))
-	  ((== label "")
-	   (with u (url-relative (get-name-buffer) name)
-	     (load-browse-buffer u)))
-	  (else
-	   (with u (url-relative (get-name-buffer) name)
-	     (load-browse-buffer u)
-	     (go-to-label label)))))
+  (with (name action) (process-url u)
+    (with u (url-relative (buffer-master) name)
+      (load-browse-buffer u) 
+      (action)))
   (if (nnull? opt-from) (cursor-history-add (cursor-path))))
+
 
 (define (execute-at cmd opt-location)
   (if (null? opt-location) (exec-delayed cmd)

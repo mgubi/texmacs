@@ -1,4 +1,4 @@
-<TeXmacs|1.0.6.10>
+<TeXmacs|1.0.7.15>
 
 <style|tmdoc>
 
@@ -33,7 +33,8 @@
   <\explain>
     <scm|:first>, <scm|:last><explain-synopsis|select first or last child>
   <|explain>
-    Select first or last child of the input tree.
+    Select first or last child of the input tree. <with|color|red|-This does
+    not work AFAICT>
   </explain>
 
   <\explain>
@@ -48,33 +49,29 @@
   <|explain>
     Select all compound subtrees with the specified <scm-arg|label>. Example:
 
-    <with|prog-language|scheme|prog-session|default|<\session>
-      <\input|scheme] >
+    <\session|scheme|default>
+      <\unfolded-io|Scheme] >
         (select '(document (strong "x") (math "a+b") (strong "y")) '(strong))
-      </input>
-
-      <\output>
+      <|unfolded-io>
         ((strong "x") (strong "y"))
-      </output>
-    </session>>
+      </unfolded-io>
+    </session>
   </explain>
 
   <\explain>
-    <scm|:#1>, <scm|:#2>, <scm|:#3>, ...<explain-synopsis|select descendants
+    <scm|:%1>, <scm|:%2>, <scm|:%3>, ...<explain-synopsis|select descendants
     of a given generation>
   <|explain>
-    The pattern <scm|:#n>, where <scm|n> is a number, selects all descendants
+    The pattern <scm|:%n>, where <scm|n> is a number, selects all descendants
     of the <scm|n>-th generation. Example:
 
-    <with|prog-language|scheme|prog-session|default|<\session>
-      <\input|scheme] >
-        (select '(foo (bar "x" "y") (slash (dot))) '(:#2))
-      </input>
-
-      <\output>
+    <\session|scheme|default>
+      <\unfolded-io|Scheme] >
+        (select '(foo (bar "x" "y") (slash (dot))) '(:%2))
+      <|unfolded-io>
         ("x" "y" (dot))
-      </output>
-    </session>>
+      </unfolded-io>
+    </session>
   </explain>
 
   <\explain>
@@ -89,25 +86,34 @@
     <scm|(:match <scm-arg|pattern>)><explain-synopsis|matching>
   <|explain>
     This pattern matches the input tree if and only the input tree matches
-    the specified <scm-arg|pattern> according to <scm|match?>.
-  </explain>
-
-  <\explain>
-    <scm|(:match <scm-arg|pattern>)><explain-synopsis|matching>
-  <|explain>
-    This pattern matches the input tree if and only the input tree matches
     the specified <scm-arg|pattern> according to <scm|match?>. Example:
 
-    <with|prog-language|scheme|prog-session|default|<\session>
-      <\input|scheme] >
-        (select '(foo "x" (bar)) '(:#1 (:match :string?)))
-      </input>
-
-      <\output>
+    <\session|scheme|default>
+      <\unfolded-io|Scheme] >
+        (select '(foo "x" (bar)) '(:%1 (:match :string?)))
+      <|unfolded-io>
         ("x")
-      </output>
-    </session>>
+      </unfolded-io>
+    </session>
+
+    Example with creation of a custom predicate:
+
+    <\session|scheme|default>
+      <\unfolded-io|Scheme] >
+        (select '(foo "x" (bar)) '(:* (:match :tree-atomic?)))
+      <|unfolded-io>
+        ()
+      </unfolded-io>
+
+      <\input|Scheme] >
+        \;
+      </input>
+    </session>
+
+    List of useful predicates:
   </explain>
+
+  \;
 
   <\explain>
     <scm|(:or <scm-arg|pattern-1> ... <scm-arg|pattern-n>)>
@@ -140,14 +146,14 @@
     <scm|:next><explain-synopsis|next child>
   <|explain>
     If the input tree is the <math|i>-th child of its parent, then this
-    pattern will select the <math|(i+1)>-th child.
+    pattern will select the <math|<around|(|i+1|)>>-th child.
   </explain>
 
   <\explain>
     <scm|:previous><explain-synopsis|previous child>
   <|explain>
     If the input tree is the <math|i>-th child of its parent, then this
-    pattern will select the <math|(i-1)>-th child.
+    pattern will select the <math|<around|(|i-1|)>>-th child.
   </explain>
 
   <tmdoc-copyright|2007|Joris van der Hoeven>
@@ -163,5 +169,6 @@
 <\initial>
   <\collection>
     <associate|language|english>
+    <associate|preamble|false>
   </collection>
 </initial>

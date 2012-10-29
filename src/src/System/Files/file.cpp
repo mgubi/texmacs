@@ -18,6 +18,7 @@
 #include "data_cache.hpp"
 #include "web_files.hpp"
 #include "scheme.hpp"
+#include "convert.hpp"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -32,6 +33,7 @@
 #include <sys/stat.h>
 #endif
 #include <sys/types.h>
+#include <string.h>  // strerror
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_images.h"
@@ -76,7 +78,7 @@ load_string (url u, string& s, bool fatal) {
       err= true;
       if (!occurs ("system", name))
         cerr << "TeXmacs] warning, load error for " << name << ", "
-             << sys_errlist[errno] << "\n";
+             << strerror(errno) << "\n";
     }
     int size= 0;
     if (!err) {
@@ -141,7 +143,7 @@ save_string (url u, string s, bool fatal) {
     if (fout == NULL) {
       err= true;
       cerr << "TeXmacs] warning, save error for " << name << ", "
-           << sys_errlist[errno] << "\n";
+           << strerror(errno) << "\n";
     }
     if (!err) {
       int i, n= N(s);
@@ -158,7 +160,7 @@ save_string (url u, string s, bool fatal) {
     if (!err && N(s) <= 10000)
       if (file_flag || doc_flag)
 	cache_set (cache_type, name, s);
-    (bool) is_up_to_date (url_parent (r), true);
+    declare_out_of_date (url_parent (r));
     // End caching
   }
 
@@ -185,12 +187,22 @@ get_attributes (url name, struct stat* buf,
       is_cached ("stat_cache.scm", name_s) &&
       is_up_to_date (url_parent (name)))
     {
-      string r= cache_get ("stat_cache.scm", name_s) -> label;
+      tree r= cache_get ("stat_cache.scm", name_s);
+      // cout << "Cache : " << r << LF;
       if (r == "#f") return true;
-      buf->st_mode= ((unsigned int) as_int (r));
-      return false;
+      if ((is_compound(r)) && (N(r)==2)) {
+        buf->st_mode = ((unsigned int) as_int (r[0]));
+        buf->st_mtime= ((unsigned int) as_int (r[1]));
+        return false;
+      } 
+      cerr << "TeXmacs] Inconsistent value in stat_cache.scm for key:" << name_s << LF;
+      cerr << "TeXmacs] The current value is:" << r << LF;
+      cerr << "TeXmacs] I'm resetting this key" << LF;
+      // continue and recache, the current value is inconsistent. 
     }
   // End caching
+
+  //cout << "No cache" << LF;
 
   bench_start ("stat");
   bool flag;
@@ -213,8 +225,11 @@ get_attributes (url name, struct stat* buf,
 	cache_set ("stat_cache.scm", name_s, "#f");
     }
     else {
-      if (do_cache_stat (name_s))
-	cache_set ("stat_cache.scm", name_s, as_string ((int) buf->st_mode));
+      if (do_cache_stat (name_s)) {
+        string s1= as_string ((int) buf->st_mode);
+        string s2= as_string ((int) buf->st_mtime);
+	cache_set ("stat_cache.scm", name_s, tree (TUPLE, s1, s2));
+      }
     }
   }
   // End caching
@@ -275,24 +290,25 @@ is_of_type (url name, string filter) {
   for (i=0; i<n; i++)
     preserve_links= preserve_links || (filter[i] == 'l');
   struct stat buf;
-  if (get_attributes (name, &buf, preserve_links)) return false;
+  bool err= get_attributes (name, &buf, preserve_links);
   for (i=0; i<n; i++)
     switch (filter[i]) {
       // FIXME: should check user id and group id for r, w and x
     case 'f':
-      if (!S_ISREG (buf.st_mode)) return false;
+      if (err || !S_ISREG (buf.st_mode)) return false;
       break;
     case 'd':
-      if (!S_ISDIR (buf.st_mode)) return false;
+      if (err || !S_ISDIR (buf.st_mode)) return false;
       break;
     case 'l':
 #ifdef __MINGW32__
       return false;
 #else
-      if (!S_ISLNK (buf.st_mode)) return false;
+      if (err || !S_ISLNK (buf.st_mode)) return false;
 #endif
       break;
     case 'r':
+      if (err) return false;
 #ifndef __MINGW32__
       if ((buf.st_mode & (S_IRUSR | S_IRGRP | S_IROTH)) == 0) return false;
 #else
@@ -300,6 +316,7 @@ is_of_type (url name, string filter) {
 #endif
       break;
     case 'w':
+      if (err) return false;
 #ifndef __MINGW32__
       if ((buf.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0) return false;
 #else
@@ -307,6 +324,7 @@ is_of_type (url name, string filter) {
 #endif
       break;
     case 'x':
+      if (err) return false;
 #if defined (OS_WIN32) || defined (__MINGW__) || defined (__MINGW32__)
       if (suffix(name) == "bat") break;
 #endif
@@ -326,8 +344,13 @@ bool is_symbolic_link (url name) { return is_of_type (name, "l"); }
 
 int
 last_modified (url u, bool cache_flag) {
+  if (is_rooted_web (u))
+    return - (int) (((unsigned int) (-1)) >> 1);
+  if (is_rooted_tmfs (u))
+    return - (int) (((unsigned int) (-1)) >> 1);
   struct stat u_stat;
-  if (get_attributes (u, &u_stat, true, cache_flag)) return 0;
+  if (get_attributes (u, &u_stat, true, cache_flag))
+    return - (int) (((unsigned int) (-1)) >> 1);
   return u_stat.st_mtime;
 }
 
@@ -383,6 +406,13 @@ is_scratch (url u) {
   return head (u) == url ("$TEXMACS_HOME_PATH/texts/scratch");
 }
 
+string
+file_format (url u) {
+  if (is_rooted_tmfs (u))
+    return as_string (call ("tmfs-format", object (u)));
+  else return suffix_to_format (suffix (u));
+}
+
 /******************************************************************************
 * Reading directories
 ******************************************************************************/
@@ -404,7 +434,7 @@ cache_dir_set (string dir, array<string> a) {
 
 array<string>
 read_directory (url u, bool& error_flag) {
- //  cout << "Directory " << u << LF;
+  // cout << "Directory " << u << LF;
   u= resolve (u, "dr");
   if (is_none (u)) return array<string> ();
   string name= concretize (u);

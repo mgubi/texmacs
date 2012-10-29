@@ -32,7 +32,7 @@
 (define tmhtml-images? #f)
 (define tmhtml-image-serial 0)
 (define tmhtml-image-cache (make-ahash-table))
-(define tmhtml-image-root-url (string->url "image"))
+(define tmhtml-image-root-url (unix->url "image"))
 (define tmhtml-image-root-string "image")
 
 (tm-define (tmhtml-initialize opts)
@@ -51,10 +51,10 @@
 	  (set! tmhtml-image-serial 0)
 	  (set! tmhtml-image-root-url (url-unglue current-save-target n))
 	  (set! tmhtml-image-root-string
-		(url->string (url-tail tmhtml-image-root-url))))
+		(url->unix (url-tail tmhtml-image-root-url))))
 	(begin
 	  (set! tmhtml-image-serial 0)
-	  (set! tmhtml-image-root-url (string->url "image"))
+	  (set! tmhtml-image-root-url (unix->url "image"))
 	  (set! tmhtml-image-root-string "image")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -479,8 +479,9 @@
 
 (define (tmhtml-concat l)
   (set! l (tmhtml-glue-scripts l))
+  ;;(display* "l << " l "\n")
   (set! l (tmconcat-structure-tabs l))
-  ;; FIXME: tabs which are inside a 'with' are not treated correctly
+  ;;(display* "l >> " l "\n")
   (tmhtml-post-simplify-nodes
    (let ((l (tmhtml-list l)))
      (cond ((null? l) '())
@@ -949,6 +950,7 @@
 	(else #f)))
 
 (define (tmhtml-make-cell c cellf)
+  (if (not (tm-func? c 'cell 1)) (set! c `(cell ,c)))
   (ahash-with tmhtml-env :left-margin 0
     (with make (lambda (attr) (tmhtml-make-cell-attr attr cellf))
       `(h:td ,@(html-css-attrs (map* make cellf))
@@ -1073,7 +1075,7 @@
 
 (define (tmhtml-image-name name)
   ;; FIXME: we should replace ~, environment variables, etc.
-  (with u (url-relative current-save-target (string->url name))
+  (with u (url-relative current-save-target (unix->url name))
     (if (and (or (string-ends? name ".ps")
                  (string-ends? name ".eps")
                  (string-ends? name ".pdf"))
@@ -1108,46 +1110,44 @@
 ;;; Standard markup
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmhtml-list-document list-doc)
-  ;; Convert a list-document to a list of <h:li> elements.
-  ;; WARNING: makes the xpath environment inconsistent
-  (define (item->li mark item)
-    (cond ((null? item) '(h:li))
-	  ((null? (cdr item)) `(h:li ,@(tmhtml (car item))))
-	  (else `(h:li ,@(tmhtml `(document ,@item))))))
-  (if (null? (cdr list-doc)) '((h:li))
-      (stm-list-map item->li
-		    (lambda (x) (== x '(item)))
-		    (cdr list-doc))))
+(define (transform-item-post l)
+  (if (not (tm-is? (car l) '!item))
+      `(document ,@l)
+      `(!item ,(cadar l) (document ,(caddar l) ,@(cdr l)))))
+
+(define (transform-items x)
+  (cond ((and (tm-is? x 'concat)
+              (nnull? (cdr x))
+              (tm-in? (cadr x) '(item item*)))
+         `(!item ,(cadr x) (concat ,@(cddr x))))
+        ((tm-is? x 'document)
+         (let* ((r  (map transform-items (cdr x)))
+                (p? (lambda (i) (tm-is? i '!item)))
+                (sr (list-scatter r p? #t))
+                (fr (list-filter sr nnull?)))
+           `(document ,@(map transform-item-post fr))))
+        (else x)))
 
 ;; TODO: when the first data of the list is a label, it must be used to set the
 ;; ID attribute of the resulting xhtml element. When that is done, remove the
 ;; warning comment from htmltm-handler.
 
+(define (tmhtml-post-item args)
+  (let* ((i (car args))
+         (r (tmhtml (cadr args))))
+    (if (or (tm-is? i 'item) (null? (cdr i)))
+        `((h:li ,@r))
+        `((h:dt ,@(tmhtml (cadr i)))
+          (h:dd ,@r)))))
+
 (define (tmhtml-itemize args)
-  `((h:ul ,@(tmhtml-list-document (car args)))))
+  `((h:ul ,@(tmhtml (transform-items (car args))))))
 
 (define (tmhtml-enumerate args)
-  `((h:ol ,@(tmhtml-list-document (car args)))))
-
-(define (tmhtml-desc-document desc-doc)
-  ;; WARNING: makes the xpath environment inconsistent
-  (define (item->dt-dd mark item)
-    (let ((html-item (if (null? (cdr item))
-			 (tmhtml (car item))
-			 (tmhtml `(document ,@item)))))
-      (append
-       (if mark (tmhtml mark) '())
-       (cond ((and (null? html-item) mark) '())
-	     ((null? html-item) '((h:dd)))
-	     (else `((h:dd ,@html-item)))))))
-  (if (null? (cdr desc-doc)) '((h:dd))
-      (apply append (stm-list-map item->dt-dd
-				  (lambda (x) (func? x 'item* 1))
-				  (cdr desc-doc)))))
+  `((h:ol ,@(tmhtml (transform-items (car args))))))
 
 (define (tmhtml-description args)
-  `((h:dl ,@(tmhtml-desc-document (car args)))))
+  `((h:dl ,@(tmhtml (transform-items (car args))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Verbatim
@@ -1224,6 +1224,21 @@
 (define (tmhtml-html-javascript-src l)
   (list `(h:script (@ (language "javascript")
 		      (src ,(tmhtml-force-string (car l)))))))
+
+(define (tmhtml-html-video l)
+  (let* ((dest (cork->html (force-string (car l))))
+         (mp4 (string-append dest ".mp4"))
+         (ogg (string-append dest ".ogg"))
+         (webm (string-append dest ".webm"))
+         (swf (string-append dest ".swf"))
+         (width (force-string (cadr l)))
+         (height (force-string (caddr l))))
+    (list `(h:video (@ (width ,width) (height ,height) (controls "controls"))
+             (h:source (@ (src ,mp4) (type "video/mp4")))
+             (h:source (@ (src ,ogg) (type "video/ogg")))
+             (h:source (@ (src ,webm) (type "video/webm")))
+             (h:object (@ (data ,mp4) (width ,width) (height ,height))
+               (h:embed (@ (src ,swf) (width ,width) (height ,height))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tmdoc tags
@@ -1472,6 +1487,7 @@
 	description-align description-long)
    ,tmhtml-description)
   (item* (h:dt))
+  (!item ,tmhtml-post-item)
   ;; Phrase elements
   (strong (h:strong))
   (em (h:em))
@@ -1502,6 +1518,7 @@
   (html-style ,tmhtml-html-style)
   (html-javascript ,tmhtml-html-javascript)
   (html-javascript-src ,tmhtml-html-javascript-src)
+  (html-video ,tmhtml-html-video)
   ;; tmdoc tags
   (tmdoc-title ,tmhtml-tmdoc-title)
   (tmdoc-title* ,tmhtml-tmdoc-title*)

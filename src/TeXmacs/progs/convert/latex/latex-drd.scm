@@ -27,62 +27,76 @@
   ,(string->symbol " ") ,(string->symbol ";") 
   ,(string->symbol ",") ,(string->symbol ":") 
   - / [ ] ! * ,(string->symbol "|") i j ss SS oe OE ae AE
-  AA DH L NG O S TH aa dh dj l ng o th pounds colon
-  quad qquad par smallskip medskip bigskip
-  noindent newline linebreak nobreak nolinebreak
+  AA DH L NG O S TH aa dh dj l ng o th pounds colon and lq rq
+  quad qquad enspace thinspace par smallskip medskip bigskip
+  noindent newline linebreak nobreak nolinebreak strut
   pagebreak nopagebreak newpage newdoublepage clearpage cleardoublepage
-  newblock bgroup egroup protect cr date hfill appendix limits nolimits
-  dots maketitle tableofcontents TeX LaTeX
-  begingroup endgroup
+  newblock bgroup egroup protect cr hfil hfill hfilll appendix limits nolimits
+  dots maketitle tableofcontents TeX LaTeX onecolumn twocolumn
+  begingroup endgroup printindex today bmod toprule midrule bottomrule
 
   ;; AMS commands
   qed dotsc dotsb dotsm dotsi dotso
-  lvert rvert lVert rVert
   ;; temporarily
   hline
   ;; rewritten
   notin vert Vert addots
   implies iff gets
   ;; wikipedia
-  infin rang)
+  infin rang
+
+  ;; Algorithms
+  AND BlankLine Ensure ENSURE FALSE GLOBALS NOT OR PRINT Require REQUIRE RETURN
+  State STATE TO KwTo TRUE XOR Else ENDBODY EndFor ENDFOR EndFunction EndIf
+  ENDIF ENDINPUTS EndLoop ENDLOOP ENDOUTPUTS EndProcedure ENDWHILE EndWhile
+  Loop)
 
 (logic-group latex-command-1%
-  usepackage part part* chapter chapter*
+  part part* chapter chapter*
   section section* subsection subsection* subsubsection subsubsection*
   paragraph paragraph* subparagraph subparagraph* nextbib
   footnote overline underline <sub> <sup> not left right
   big Big bigg Bigg bigl Bigl biggl Biggl
   bigm Bigm biggm Biggm bigr Bigr biggr Biggr
-  bar hat tilde widehat widetilde vec
+  bar hat tilde widehat widetilde vec bm
   grave acute check breve abovering mathring
-  dot ddot dddot ddddot
+  dot ddot dddot ddddot mod pod pmod
   label ref pageref index hspace hspace* vspace vspace*
-  mbox hbox text not substack
+  mbox hbox textnormal text not substack
   ,(string->symbol "'") ,(string->symbol "`") ,(string->symbol "\"")
-  ^ over atop ~ = u v H t c d b k r textsuperscript textsubscript
+  ^ over atop choose ~ = u v H t c d b k r textsuperscript textsubscript
   thispagestyle ensuremath
   mathord mathbin mathopen mathpunct mathop mathrel mathclose mathalpha
-  arabic displaylines cases underbrace overbrace
-  title author thanks
+  arabic alph Alph roman Roman fnsymbol displaylines cases underbrace overbrace
+  title author date thanks terms
   phantom hphantom vphantom smash
   newcounter stepcounter refstepcounter value
   citet citep citet* citep* citealt citealp citealt* citealp*
-  citetext citeauthor citeauthor* citeyear
-  epsfig url penalty centerline fbox framebox
+  citetext citeauthor citeauthor* citeyear onlinecite
+  epsfig url penalty centerline fbox framebox cline cmidrule
   enlargethispage
-  newlength newdimen)
+  newlength newdimen newskip
+  Comment COMMENT For ForAll If Input KwData KwResult KwRet lnl nllabel
+  lElse uElse Output Repeat Until UNTIL While)
 
 (logic-group latex-command-1% ;; . needs a special treatment
   ,(string->symbol "."))
 
 (logic-group latex-command-2%
-  binom choose cfrac tfrac equal href
+  binom tbinom dbinom cfrac tfrac equal href
   sideset stackrel citeauthoryear
   setcounter addtocounter setlength addtolength
-  scalebox)
+  scalebox
+  Call Function Procedure SetKw SetKwData SetKwFunction SetKwInOut)
 
 (logic-group latex-command-3%
-  ifthenelse resizebox)
+  ifthenelse resizebox @setfontsize eIf multicolumn)
+
+(logic-group latex-command-4%
+  mathchoice)
+
+(logic-group latex-command-6%
+  @startsection)
 
 (logic-rules
   ((latex-command% 'x) (latex-command-0% 'x))
@@ -92,28 +106,35 @@
   ((latex-command% 'x) (latex-command-2% 'x))
   ((latex-arity% 'x 2) (latex-command-2% 'x))
   ((latex-command% 'x) (latex-command-3% 'x))
-  ((latex-arity% 'x 3) (latex-command-3% 'x)))
+  ((latex-arity% 'x 3) (latex-command-3% 'x))
+  ((latex-command% 'x) (latex-command-4% 'x))
+  ((latex-arity% 'x 4) (latex-command-4% 'x))
+  ((latex-command% 'x) (latex-command-6% 'x))
+  ((latex-arity% 'x 6) (latex-command-6% 'x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LaTeX commands with optional arguments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-command-0*%
-  item ,(string->symbol "\\"))
+  item ,(string->symbol "\\")
+  BODY ELSE INPUTS LOOP OUTPUTS REPEAT)
 
 (logic-group latex-command-1*%
-  documentclass documentstyle sqrt bibitem cite
+  usepackage documentclass documentstyle sqrt bibitem cite caption  
   includegraphics includegraphics*
-  subjclass
+  subjclass declaretheorem footnotetext
   xleftarrow xrightarrow xleftrightarrow xminus
   xLeftarrow xRightarrow xLeftrightarrow xequal
-  xmapsto xmapsfrom)
+  xmapsto xmapsfrom
+  Begin ELSIF FORALL FOR IF WHILE tcp tcp* tcc tcc*)
 
 (logic-group latex-command-2*%
-  def newcommand renewcommand newtheorem newtheorem* frac parbox)
+  def newcommand renewcommand newtheorem newtheorem* frac parbox 
+  ElseIf uElseIf lElseIf ForEach lForEach lForAll lFor)
 
 (logic-group latex-command-3*%
-  newenvironment renewenvironment)
+  category newenvironment renewenvironment multirow)
 
 (logic-rules
   ((latex-command-0% 'x) (latex-command-0*% 'x))
@@ -137,13 +158,17 @@
   begin-picture)
 
 (logic-group latex-environment-0*%
-  begin-figure begin-table)
+  begin-figure begin-table begin-figure* begin-table*
+  begin-algorithmic begin-algorithm begin-algorithm2e)
 
 (logic-group latex-environment-1%
-  begin-tabbing begin-thebibliography)
+  begin-tabbing begin-thebibliography begin-multicols)
 
 (logic-group latex-environment-1*%
   begin-array begin-tabular)
+
+(logic-group latex-environment-2*%
+  begin-tabular* begin-tabularx)
 
 (logic-rules
   ((latex-environment% 'x) (latex-environment-0% 'x))
@@ -157,7 +182,9 @@
   ((latex-environment-0% 'x) (latex-environment-0*% 'x))
   ((latex-optional-arg% 'x) (latex-environment-0*% 'x))
   ((latex-environment-1% 'x) (latex-environment-1*% 'x))
-  ((latex-optional-arg% 'x) (latex-environment-1*% 'x)))
+  ((latex-optional-arg% 'x) (latex-environment-1*% 'x))
+  ((latex-environment-2% 'x) (latex-environment-2*% 'x))
+  ((latex-optional-arg% 'x) (latex-environment-2*% 'x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modifiers
@@ -166,15 +193,17 @@
 (logic-group latex-modifier-0%
   rm tt sf md bf it em sl sc rmfamily ttfamily sffamily
   mdseries bfseries upshape itshape slshape scshape
-  displaystyle textstyle scriptstyle scriptscriptstyle cal frak Bbb
+  displaystyle textstyle scriptstyle scriptscriptstyle cal frak Bbb boldmath
   tiny scriptsize footnotesize small normalsize
   large Large LARGE huge Huge
-  black white grey red blue yellow green orange magenta brown pink)
+  black white grey red blue yellow green orange magenta brown pink
+  centering raggedleft raggedright flushleft flushright)
 
 (logic-group latex-modifier-1%
   textrm texttt textsf textmd textbf textup textit textsl textsc emph
   mathrm mathtt mathsf mathmd mathbf mathup mathit mathsl mathnormal
-  mathcal mathfrak mathbb mathbbm mathscr operatorname boldsymbol)
+  mathcal mathfrak mathbb mathbbm mathscr operatorname boldsymbol
+  lowercase MakeLowercase uppercase MakeUppercase)
 
 (logic-rules
   ((latex-modifier% 'x) (latex-modifier-0% 'x))
@@ -231,7 +260,7 @@
   ;; Binary operations
   pm mp times div ast star circ bullet cdot
   cap cup uplus sqcap sqcup vee wedge setminus wr
-  diamond triangleleft triangleright
+  diamond triangleleft triangleright land lor lnot
   oplus ominus otimes oslash odot bigcirc amalg notin
 
   ;; Relations
@@ -256,14 +285,14 @@
   Longrightarrow Longleftarrow Longleftrightarrow 
   
   ;; Miscellaneous symbols
-  ldots cdots vdots ddots aleph
+  ldots cdots vdots ddots hdots aleph
   prime forall infty hbar emptyset
   exists nabla surd triangle
   imath jmath ell neg
   top flat natural sharp wp
   bot clubsuit diamondsuit heartsuit spadesuit
-  Re Im angle partial
-  dag ddag dagger ddagger
+  Re Im angle partial textbackslash
+  dag ddag dagger ddagger guillemotleft guillemotright
 
   ;; Delimiters
   uparrow Uparrow downarrow Downarrow
@@ -272,7 +301,7 @@
   langle rangle backslash
 
   ;; Big delimiters
-  rmoustache lmoustache rgroup lgroup
+  rmoustache lmoustache rgroup lgroup lbrace rbrace
   arrowvert Arrowvert bracevert
 
   ;; Binary operations (latexsym or amssymb required)
@@ -296,21 +325,86 @@
   ((latex-symbol% 'x) (latex-stmary-symbol% 'x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Counters
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(logic-group latex-counter%
+  badness enumi enumii enumiii enumiv equation figure inputlineno
+  mpfootnote page setlanguage table)
+
+(logic-rules
+  ((latex-arity% 'x 0) (latex-counter% 'x)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Names
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(logic-group latex-name%
+  abstractname appendixname contentname figurename indexname
+  litfigurename littablename partname refname tablename)
+
+(logic-rules
+  ((latex-arity% 'x 0) (latex-name% 'x)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lengths
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-length%
-  oddsidemargin evensidemargin textwidth
-  topmargin headheight headsep topskip textheight
-  footskip footnotesep columnsep floatsep
-  marginparwidth marginparsep parindent
-  jot mathindent
-  abovedisplayskip belowdisplayskip
-  abovedisplayshortskip belowdisplayshortskip
-  p@ z@)
+  ;; From latex.ltx
+  ;; -- lengths
+  @textfloatsheight arraycolsep arrayrulewidth columnsep columnseprule
+  columnwidth doublerulesep emergencystretch evensidemargin fboxrule
+  fboxsep footnotesep footskip headheight headsep itemindent labelsep
+  labelwidth leftmargin leftmargini leftmarginii leftmarginiii
+  leftmarginiv leftmarginv leftmarginvi linewidth listparindent
+  marginparpush marginparsep marginparwidth oddsidemargin p@ paperheight
+  paperwidth rightmargin tabbingsep tabcolsep textheight textwidth
+  topmargin unitlength z@ @bls @vpt @vipt @viipt @viiipt @ixpt @xpt @xipt
+  @xiipt @xivpt @xviipt @xxpt @xxvpt 
+  ;; -- skips
+  topsep partopsep itemsep parsep floatsep textfloatsep intextsep
+  dblfloatsep dbltextfloatsep 
+  ;; From latex classes
+  abovecaptionskip belowcaptionskip bibindent
+  ;; From fleqn
+  mathindent
+  ;; Plain TeX
+  maxdimen hfuzz vfuzz overfullrule hsize vsize maxdepth lineskiplimit
+  delimitershortfall nulldelimiterspace scriptspace mathsurround
+  predisplaysize displaywidth displayindent parindent hangindent hoffset
+  voffset baselineskip lineskip parskip abovedisplayskip
+  abovedisplayshortskip belowdisplayskip belowdisplayshortskip leftskip
+  rightskip topskip splittopskip tabskip spaceskip xspaceskip parfillskip
+  thinmuskip medmuskip thickmuskip hideskip smallskipamount medskipamount
+  bigskipamount normalbaselineskip normallineskip normallineskiplimit jot 
+  )
 
 (logic-rules
   ((latex-arity% 'x 0) (latex-length% 'x)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; To be ignored
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(logic-group latex-ignore-0%
+  allowbreak notag xspace break sloppy makeatother makeatletter relax
+  ignorespacesafterend ignorespaces balancecolumns)
+
+(logic-group latex-ignore-0*%
+	displaybreak allowdisplaybreaks)
+
+(logic-group latex-ignore-1%
+	tag hyphenation)
+
+(logic-rules
+	((latex-ignore% 'x)       (latex-ignore-0% 'x))
+	((latex-ignore% 'x)       (latex-ignore-0*% 'x))
+	((latex-ignore% 'x)       (latex-ignore-1% 'x))
+  ((latex-arity% 'x 0)      (latex-ignore-0% 'x))
+  ((latex-arity% 'x 0)      (latex-ignore-0*% 'x))
+  ((latex-arity% 'x 1)      (latex-ignore-1% 'x))
+  ((latex-optional-arg% 'x) (latex-ignore-1*% 'x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Using packages
@@ -352,8 +446,14 @@
   (nleadsto "leadsto")
   (Diamond "amssymb")
   (text "amsmath")
+  (binom "amsmath")
+  (dbinom "amsmath")
+  (tbinom "amsmath")
   (dddot "amsmath")
   (ddddot "amsmath")
+  (ontop "amsmath")
+  (mod "amsmath")
+  (pod "amsmath")
   (overset "amsmath")
   (underset "amsmath")
   (tmop "amsmath")
@@ -420,6 +520,9 @@
   (citeauthor* "natbib")
   (citeyear "natbib")
 
+  (index "makeidx")
+  (printindex "makeidx")
+
   (inparaenum "paralist"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -449,6 +552,9 @@
     (cond ((not arity) "undefined")
           ((logic-in? s latex-command%) "command")
           ((logic-in? s latex-length%) "length")
+          ((logic-in? s latex-ignore%) "ignore")
+          ((logic-in? s latex-name%) "name")
+          ((logic-in? s latex-counter%) "counter")
 	  ((logic-in? s latex-modifier%) "modifier")
 	  ((logic-in? s latex-control%) "control")
 	  ((logic-in? s latex-operator%) "operator")

@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.9>
+<TeXmacs|1.0.7.15>
 
 <style|<tuple|source|std>>
 
@@ -39,21 +39,25 @@
   </active*>
 
   <assign|framed-quoted|<\macro|body>
-    <\padded-normal|1fn|1fn>
-      <\indent-both|1.5fn|1.5fn>
-        <arg|body>
-      </indent-both>
-    </padded-normal>
+    <\padded-centered|1fn|1fn>
+      <arg|body>
+    </padded-centered>
   </macro>>
 
-  <assign|framed-program|<macro|body|<\surround|<no-indent>|>
+  <assign|framed-code|<macro|body|<\surround|<no-indent>|>
     <with|old-color|<value|color>|color|<value|frame-color>|<tabular|<tformat|<twith|table-width|1par>|<cwith|1|-1|1|-1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-tsep|1spc>|<cwith|1|-1|1|-1|cell-bsep|1spc>|<cwith|1|-1|1|-1|cell-background|<value|body-color>>|<cwith|1|-1|1|-1|cell-lborder|0.5ln>|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-tborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<table|<row|<\cell>
       <with|color|<value|old-color>|<arg|body>>
     </cell>>>>>>
   </surround>>>
 
+  <assign|framed-program|<macro|body|<\surround|<no-indent>|>
+    <with|old-color|<value|color>|color|<value|frame-color>|<tabular|<tformat|<twith|table-width|1par>|<twith|table-hmode|min>|<cwith|1|-1|1|-1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-tsep|1spc>|<cwith|1|-1|1|-1|cell-bsep|1spc>|<cwith|1|-1|1|-1|cell-background|<value|body-color>>|<cwith|1|-1|1|-1|cell-lborder|0.5ln>|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-tborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<table|<row|<\cell>
+      <with|color|<value|old-color>|<arg|body>>
+    </cell>>>>>>
+  </surround>>>
+
   <assign|framed-program*|<macro|intro|body|<\surround|<no-indent>|>
-    <with|old-color|<value|color>|color|<value|frame-color>|<tabular|<tformat|<twith|table-width|1par>|<cwith|1|-1|1|-1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-tsep|1spc>|<cwith|1|-1|1|-1|cell-bsep|1spc>|<cwith|1|1|1|-1|cell-background|<value|intro-color>>|<cwith|2|-1|1|-1|cell-background|<value|body-color>>|<cwith|1|-1|1|-1|cell-lborder|0.5ln>|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-tborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<table|<row|<\cell>
+    <with|old-color|<value|color>|color|<value|frame-color>|<tabular|<tformat|<twith|table-width|1par>|<twith|table-hmode|min>|<cwith|1|-1|1|-1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-tsep|1spc>|<cwith|1|-1|1|-1|cell-bsep|1spc>|<cwith|1|1|1|-1|cell-background|<value|intro-color>>|<cwith|2|-1|1|-1|cell-background|<value|body-color>>|<cwith|1|-1|1|-1|cell-lborder|0.5ln>|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-tborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<table|<row|<\cell>
       <with|color|<value|old-color>|<arg|intro>>
     </cell>>|<row|<\cell>
       <with|color|<value|old-color>|<arg|body>>
@@ -66,9 +70,9 @@
     </src-comment>
   </active*>
 
-  <assign|pseudo-code|<\macro|body>
+  <assign|render-code|<\macro|body>
     <\framed-quoted>
-      <\with|par-first|0fn|par-par-sep|0fn|par-mode|>
+      <\with|par-first|0fn|par-par-sep|0fn|item-hsep|<macro|1.5fn>>
         <\framed-program>
           <arg|body>
         </framed-program>
@@ -78,7 +82,7 @@
 
   <assign|render-algorithm|<\macro|name|body>
     <\framed-quoted>
-      <\with|par-first|0fn|par-par-sep|0fn>
+      <\with|par-first|0fn|par-par-sep|0fn|item-hsep|<macro|1.5fn>>
         <\framed-program*|<algorithm-name|<arg|name>>>
           <arg|body>
         </framed-program*>
@@ -88,7 +92,7 @@
 
   <assign|render-specified-algorithm|<\macro|name|intro|body>
     <\framed-quoted>
-      <\with|par-first|0fn|par-par-sep|0fn>
+      <\with|par-first|0fn|par-par-sep|0fn|item-hsep|<macro|1.5fn>>
         <\framed-program*>
           <algorithm-name|<arg|name>>
 
@@ -99,6 +103,18 @@
       </with>
     </framed-quoted>
   </macro>>
+
+  <assign|pseudo-code|<\macro|body>
+    <\framed-quoted>
+      <\with|par-first|0fn|par-par-sep|0fn|item-hsep|<macro|1.5fn>>
+        <\framed-code>
+          <arg|body>
+        </framed-code>
+      </with>
+    </framed-quoted>
+  </macro>>
+
+  \;
 </body>
 
 <\initial>

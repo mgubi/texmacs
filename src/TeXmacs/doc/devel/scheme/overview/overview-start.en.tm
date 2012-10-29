@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.0.7.16>
 
 <style|tmdoc>
 
@@ -22,7 +22,7 @@
   </verbatim>
 
   The file <verbatim|my-init-texmacs.scm> is loaded when booting <TeXmacs>
-  and <verbatim|my-init-texmacs.scm> is booted each time you open a file.
+  and <verbatim|my-init-buffer.scm> is booted each time you open a file.
 
   Usually, the file <verbatim|my-init-texmacs.scm> contains personal keyboard
   bindings and menus. For instance, when putting the following piece of code
@@ -76,20 +76,20 @@
   automatically select a certain style when starting a new document:
 
   <\scm-code>
-    (if (no-name?)
+    (if (not (buffer-has-name? (current-buffer)))
 
     \ \ \ \ (begin
 
     \ \ \ \ \ \ (init-style "article")
 
-    \ \ \ \ \ \ (pretend-save-buffer)))
+    \ \ \ \ \ \ (buffer-pretend-saved (current-buffer))))
   </scm-code>
 
-  Notice that the check <verbatim|(no-name?)> is important: when omitted, the
-  styles of existing documents would also be changed to <tmstyle|article>.
-  The command <scm|(pretend-save-buffer)> is used in order to avoid <TeXmacs>
-  to complain about unsaved documents when leaving <TeXmacs> without changing
-  the document.
+  Notice that the ``no name'' check is important: when omitted, the styles of
+  existing documents would also be changed to <tmstyle|article>. The function
+  <scm|buffer-pretend-saved> is used in order to avoid <TeXmacs> to complain
+  about unsaved documents when leaving <TeXmacs> without changing the
+  document.
 
   Another typical use of <verbatim|my-init-buffer.scm> is when you mainly
   want to use <TeXmacs> as a front-end to another system. For instance, the
@@ -97,12 +97,12 @@
   session for every newly opened document:
 
   <\scm-code>
-    (if (no-name?)
+    (if (not (buffer-has-name? (current-buffer)))
 
-    \ \ \ \ (make-session "maxima" (url-\<gtr\>string (get-name-buffer))))
+    \ \ \ \ (make-session "maxima" (url-\<gtr\>string (current-buffer))))
   </scm-code>
 
-  Using <scm|(url-\<gtr\>string (get-name-buffer))> as the second argument of
+  Using <scm|(url-\<gtr\>string (current-buffer))> as the second argument of
   <scm|make-session> ensures that a different session will be opened for
   every new buffer. If you want all buffers to share a common instance of
   <name|Maxima>, then you should use <scm|"default"> instead, for the second
@@ -232,7 +232,7 @@
 
   <paragraph*|Invoking <scheme> scrips from <TeXmacs> markup>
 
-  <label|markup-scripts><TeXmacs> provides three major tags for invoking
+  <label|markup-scripts><TeXmacs> provides two major tags for invoking
   <scheme> scripts from within the markup:
 
   <\description-long>

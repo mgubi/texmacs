@@ -24,25 +24,30 @@
 #include <QLabel>
 #include <QSocketNotifier>
 #include <QSetIterator>
+#include <QTranslator>
+#include <QLocale>
 #include "QTMGuiHelper.hpp"
 #include "QTMWidget.hpp"
 #include "QTMWindow.hpp"
 #include "qt_renderer.hpp" // for the_qt_renderer
+#include "file.hpp" // added for copy_as_graphics
+#include <QMimeData>
+#include <QByteArray>
+#include <QApplication>
+#include <QImage>
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_utilities.h"
 #endif
 
-
 #include "tm_link.hpp" // for number_of_servers
-
 #include "scheme.hpp"
-//#include "TeXmacs/server.hpp" // for get_server
-
+//#include "server.hpp" // for get_server
+#include "tm_window.hpp"
+#include "new_window.hpp"
 #include "qt_simple_widget.hpp"
 #include "qt_window_widget.hpp"
 
-extern window (*get_current_window) (void);
 
 qt_gui_rep* the_gui= NULL;
 int nr_windows = 0; // FIXME: fake variable, referenced in tm_server
@@ -64,48 +69,46 @@ bool wait_for_delayed_commands = true;
 * Constructor and geometry
 ******************************************************************************/
 
+#include <QLibraryInfo>
+
 qt_gui_rep::qt_gui_rep(int &argc, char **argv):
-  interrupted (false), waitWindow (NULL)
+  interrupted (false), waitWindow (NULL), popup_wid_time(0), q_translator(0)
 {
   (void) argc; (void) argv;
   // argc= argc2;
   // argv= argv2;
 
-  interrupted   = false;
-  time_credit = 100;
-  timeout_time= texmacs_time () + time_credit;
+  interrupted  = false;
+  time_credit  = 100;
+  timeout_time = texmacs_time () + time_credit;
 
   //waitDialog = NULL;
   
-  set_output_language (get_locale_language ());
   gui_helper = new QTMGuiHelper (this);
-  qApp -> installEventFilter (gui_helper);
-  
+  qApp->installEventFilter (gui_helper);
+
 #ifdef QT_MAC_USE_COCOA
   //HACK: this filter is needed to overcome a bug in Qt/Cocoa
   extern void mac_install_filter(); // defined in src/Plugins/MacOS/mac_app.mm
   mac_install_filter();
 #endif
-  
-  
-  
-  qApp-> installTranslator(new QTMTranslator(qApp));
-  
+
+  set_output_language (get_locale_language ());
+  refresh_language();
+
   updatetimer = new QTimer (gui_helper);
   updatetimer->setSingleShot (true);
-  QObject::connect ( updatetimer, SIGNAL(timeout()), 
-                     gui_helper, SLOT(doUpdate()));
+  QObject::connect (updatetimer, SIGNAL(timeout()),
+                    gui_helper, SLOT(doUpdate()));
 //  (void) default_font ();
 }
 
 /* important routines */
 void
 qt_gui_rep::get_extents (SI& width, SI& height) {
-  QDesktopWidget* d= QApplication::desktop();
-  int w = d->width();  // returns desktop width
-  int h = d->height(); // returns desktop height        
-  width = ((SI) w) * PIXEL;
-  height= ((SI) h) * PIXEL;
+  coord2 size = from_qsize (QApplication::desktop()->size());
+  width  = size.x1;
+  height = size.x2;
 }
 
 void
@@ -230,8 +233,6 @@ void qt_gui_rep::set_mouse_pointer (string curs_name, string mask_name)
 
 void
 qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
-  (void) w; (void) message; (void) arg;
-  
   if (DEBUG_QT)  cout << "show_wait_indicator \"" << message << "\"\"" << arg << "\"" << LF;
 
   qt_window_widget_rep *wid = concrete<qt_window_widget_rep*>(w);
@@ -244,7 +245,7 @@ qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
   //FIXME: we must center the wait widget wrt the current active window
   
   if (!waitWindow) {
-    waitWindow = new QWidget (wid->wid->window());
+    waitWindow = new QWidget (wid->qwid->window());
     waitWindow->setWindowFlags (Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     QStackedLayout *layout = new QStackedLayout();
     layout->setSizeConstraint(QLayout::SetFixedSize);
@@ -263,7 +264,7 @@ qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
     QLabel* lab = new  QLabel();
     lab->setFocusPolicy(Qt::NoFocus);
     lab->setMargin(15);
-    lab->setText (to_qstring (tm_var_encode(message)));
+    lab->setText (to_qstring (message));
     waitDialogs << lab;
   } else {
     // pop the next wait message from the list
@@ -283,7 +284,7 @@ qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
       // processEvents is needed to let Qt update windows coordinates in the case
       qApp->processEvents();
       //ENDHACK
-      QPoint pt = wid->wid->window()->geometry().center();
+      QPoint pt = wid->qwid->window()->geometry().center();
       rect.moveCenter(pt);
       waitWindow->move(rect.topLeft());
       
@@ -316,12 +317,10 @@ qt_gui_rep::event_loop () {
   app->exec();
 }
 
+
 /******************************************************************************
  * Sockets notifications
  ******************************************************************************/
-
-static hashmap<socket_notifier,pointer> read_notifiers;
-static hashmap<socket_notifier,pointer> write_notifiers;
 
 void 
 qt_gui_rep::add_notifier (socket_notifier sn)
@@ -383,7 +382,6 @@ qt_gui_rep::enable_notifier (socket_notifier sn, bool flag)
   qsn = (QSocketNotifier *)write_notifiers (sn);
   if (qsn) qsn->setEnabled (flag);
 }
-
 
 
 /******************************************************************************
@@ -488,88 +486,21 @@ void
 gui_root_extents (SI& width, SI& height) {
   // get the screen size
   the_gui->get_extents (width, height);
-  if (DEBUG_QT) 
-    cout << "gui_root_extents (" << width << "," << height << ")" << LF;
+    //if (DEBUG_QT) 
+    //cout << "gui_root_extents (" << width << "," << height << ")" << LF;
 }
 
 void
 gui_maximal_extents (SI& width, SI& height) {
   // get the maximal size of a window (can be larger than the screen size)
   the_gui->get_max_size (width, height);
-  if (DEBUG_QT) 
-    cout << "gui_maximal_extents (" << width << "," << height << ")" << LF;
+    //if (DEBUG_QT) 
+    //cout << "gui_maximal_extents (" << width << "," << height << ")" << LF;
 }
 
 void
 gui_refresh () {
-  // called upon change of output language
-  // emit a signal which force every QTMAction to change his text
-  // according to the new language
-
-  the_gui->gui_helper->doRefresh();
-}
-
-
-/******************************************************************************
- * QTMGuiHelper methods
- ******************************************************************************/
-
-void
-QTMGuiHelper::doUpdate () {
-//  cout << "UPDATE " << texmacs_time () << LF;
-  gui->update();
-}
-
-void
-QTMGuiHelper::doRefresh () {
-  emit refresh();
-}
-
-bool
-QTMGuiHelper::eventFilter (QObject *obj, QEvent *event) {
-   if (event->type() == QEvent::FileOpen) {
-     QFileOpenEvent *openEvent = static_cast<QFileOpenEvent *>(event);
-     const char *s = openEvent->file().toAscii().constData();
-     //qDebug ("File Open Event %s", s);
-     call ( "texmacs-load-buffer", object(url_system (s)), 
-            object("generic"), object(1), object(false));
-     return true;
-   } else {
-     // standard event processing
-     return QObject::eventFilter(obj, event);
-   }
-}
-
-void
-QTMGuiHelper::doWriteSocketNotification (int socket) {
-  if (DEBUG_QT) 
-    cout << "WRITE SOCKET NOTIFICATION " << socket << " "
-         << texmacs_time () << LF;
-  iterator<socket_notifier> it = iterate (write_notifiers);
-  while (it->busy ()) {
-    socket_notifier sn= it->next ();
-    if (sn->fd == socket) {
-      //sn->notify();
-      the_gui->process_socket_notification (sn);
-      the_gui->enable_notifier (sn, false);
-    }
-  }
-}
-
-void
-QTMGuiHelper::doReadSocketNotification (int socket) {
-  if (DEBUG_QT) 
-    cout << "READ SOCKET NOTIFICATION " << socket << " "
-         << texmacs_time () << LF;
-  iterator<socket_notifier> it = iterate (read_notifiers);
-  while (it->busy ()) {
-    socket_notifier sn= it->next ();
-    if (sn->fd == socket) {
-      //sn->notify();
-      the_gui->process_socket_notification (sn);
-      the_gui->enable_notifier (sn, false);
-    }
-  }
+  the_gui->refresh_language(); 
 }
 
 
@@ -614,6 +545,7 @@ public:
 
 static array<queued_event> waiting_events;
 
+void add_event(const queued_event &ev);
 
 void
 process_event (queued_event ev) {
@@ -668,7 +600,7 @@ process_event (queued_event ev) {
     case QP_COMMAND_ARGS :
     {
       typedef pair<command, object> T;
-      T x = open_box <T> (ev.x2) ;
+      T x = open_box <T> (ev.x2);
       // cout << "QP_COMMAND_ARGS" << LF;
       x.x1->apply(x.x2);
     }
@@ -680,13 +612,12 @@ process_event (queued_event ev) {
       wait_for_delayed_commands = true;
     }
       break;
+
     default:   
       FAILED("Unexpected queued event");
   }
   //cout << ">" << (qp_type_id) ev.x1 << LF;
 }
-
-
 
 queued_event 
 next_event() {
@@ -705,30 +636,30 @@ next_event() {
 
 void 
 qt_gui_rep::process_queued_events (int max) {
-  // we process a maximum of max events. There are two kind of events: those
-  // which need a pass on interpose_handler just after and the others. We count
-  // only the first kind of events. In update() we call this function with
-  // max=1 so that only one of these "sensible" events is handled. Otherwise
-  // updating of internal TeXmacs structure become very slow. This can be 
-  // considerer a limitation of the current implementation of interpose_handler
-  // Likewise this function is just an hack to get things working properly.
+    // we process a maximum of max events. There are two kind of events: those
+    // which need a pass on interpose_handler just after and the others. We count
+    // only the first kind of events. In update() we call this function with
+    // max=1 so that only one of these "sensible" events is handled. Otherwise
+    // updating of internal TeXmacs structure become very slow. This can be 
+    // considerer a limitation of the current implementation of interpose_handler
+    // Likewise this function is just an hack to get things working properly.
   
   int count = 0;
-  //cout << "(" << n << " events)"
+    //cout << "(" << n << " events)"
   while ((max < 0) || (count<max))  {
     queued_event ev = next_event();
     if (ev.x1 == QP_NULL) break;
     process_event(ev);
     switch (ev.x1) {
-        case QP_COMMAND:
-        case QP_COMMAND_ARGS:
-        case QP_SOCKET_NOTIFICATION:
-        case QP_RESIZE:
-        case QP_DELAYED_COMMANDS:
-          break;
-        default:
-          count++;
-          break;
+      case QP_COMMAND:
+      case QP_COMMAND_ARGS:
+      case QP_SOCKET_NOTIFICATION:
+      case QP_RESIZE:
+      case QP_DELAYED_COMMANDS:
+        break;
+      default:
+        count++;
+        break;
     }
   }
 }
@@ -755,38 +686,66 @@ add_event(const queued_event &ev)
 }
 
 void 
-qt_gui_rep::process_keypress (simple_widget_rep *wid, string key, time_t t) {
+qt_gui_rep::process_keypress (qt_simple_widget_rep *wid, string key, time_t t) {
   typedef triple<widget, string, time_t > T;
+  if (wid->type != qt_widget_rep::simple_widget) {
+    if (DEBUG_QT)
+      cout << "WTF! Situation] process_keypress() for non simple_widget. Widget: " 
+           << wid->type_as_string() << LF; 
+
+    return;
+  }
   add_event( queued_event ( QP_KEYPRESS, close_box<T> (T(wid, key, t)))); 
  // wid -> handle_keypress (key, t);
  // needs_update ();
 }
 
 void 
-qt_gui_rep::process_keyboard_focus ( simple_widget_rep *wid, bool has_focus, 
+qt_gui_rep::process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus, 
                                      time_t t ) {
   typedef triple<widget, bool, time_t > T;
+  if (wid->type != qt_widget_rep::simple_widget) {
+    if (DEBUG_QT)
+      cout << "WTF! Situation] process_keyboard_focus() for non simple_widget. Widget: " 
+           << wid->type_as_string() << LF; 
+
+    return;
+  }
   add_event( 
-    queued_event ( QP_KEYBOARD_FOCUS, close_box<T> (T(wid, has_focus, t)))); 
+    queued_event (QP_KEYBOARD_FOCUS, close_box<T> (T(wid, has_focus, t)))); 
   //wid -> handle_keyboard_focus (has_focus, t);
   //needs_update ();
 }
 
 void 
-qt_gui_rep::process_mouse ( simple_widget_rep *wid, string kind, SI x, SI y, 
+qt_gui_rep::process_mouse (qt_simple_widget_rep *wid, string kind, SI x, SI y, 
                             int mods, time_t t ) {
   typedef quintuple<string, SI, SI, int, time_t > T1;
   typedef pair<widget, T1> T;
+
+  if (wid->type != qt_widget_rep::simple_widget) {
+    if (DEBUG_QT)
+      cout << "WTF! Situation] process_mouse() for non simple_widget. Widget: " 
+           << wid->type_as_string() << LF; 
+    return;
+  }
   add_event ( 
-    queued_event ( QP_MOUSE, close_box<T> ( T (wid, T1 (kind, x, y, mods, t))))); 
+    queued_event (QP_MOUSE, close_box<T> ( T (wid, T1 (kind, x, y, mods, t))))); 
 //  wid -> handle_mouse (kind, x, y, mods, t);
 //  needs_update ();
 }
 
 void 
-qt_gui_rep::process_resize ( simple_widget_rep *wid, SI x, SI y ) {
+qt_gui_rep::process_resize (qt_simple_widget_rep *wid, SI x, SI y ) {
   typedef triple<widget, SI, SI > T;
-  add_event(  queued_event ( QP_RESIZE, close_box<T> (T(wid, x, y)))); 
+  if (wid->type != qt_widget_rep::simple_widget) {
+    if (DEBUG_QT)
+      cout << "WTF! Situation] process_resize() for non simple_widget. Widget: " 
+           << wid->type_as_string() << LF; 
+   
+    return;
+  }
+  add_event( queued_event ( QP_RESIZE, close_box<T> (T(wid, x, y)))); 
 //  wid -> handle_notify_resize (x, y);
 //  needs_update ();
 }
@@ -899,7 +858,11 @@ qt_gui_rep::update () {
     }
   }
   
-  
+  if (popup_wid_time > 0 && now > popup_wid_time) {
+    popup_wid_time = 0;
+    _popup_wid->send(SLOT_VISIBILITY, close_box<bool>(true));
+  }
+
   // 2.
   // manage delayed commands
   
@@ -940,11 +903,11 @@ qt_gui_rep::update () {
     QSetIterator<QTMWidget*> i(QTMWidget::all_widgets);
     while (i.hasNext()) {
       QTMWidget *w = i.next();
-      w->repaint_invalid_regions();
+      if (w->isVisible())
+        w->repaint_invalid_regions();
     }
     //cout << "AND END" << LF;
   }
-  
   
   if (N(waiting_events) > 0) needing_update = true;
   if (interrupted) needing_update = true;
@@ -972,7 +935,53 @@ qt_gui_rep::update () {
   //        The interval cannot be too small to keep CPU usage low in idle state
 } 
 
+/*! Called upon change of output language.
+ 
+ We currently emit a signal which forces every QTMAction to change his text
+ according to the new language, but the preferred Qt way seems to use
+ LanguageChange events (these are triggered upon installation of QTranslators)
+ */ 
+void
+qt_gui_rep::refresh_language() {
+  QTranslator* qtr = new QTranslator();
+  if (qtr->load("qt_" + 
+        QLocale (to_qstring (language_to_locale (get_output_language()))).name(),
+        QLibraryInfo::location(QLibraryInfo::TranslationsPath))) {
+    if (q_translator) 
+      qApp->removeTranslator(q_translator);
+    qApp->installTranslator(qtr);
+    q_translator = qtr;
+  } else {
+    delete qtr;
+  }
+  gui_helper->doRefresh();
+}
 
+
+
+/*! Display a popup help balloon (i.e. a tooltip) at window coordinates x, y 
+ 
+ We use a dedicated wrapper QWidget which handles mouse events: as soon as the 
+ mouse is moved out of we hide it.
+ Problem: the widget need not appear below the mouse pointer, thus making it
+ impossible to access links or widgets inside it.
+ Solution?? as soon as the mouse moves (out of the widget), start a timer, 
+ giving enough time to the user to move (back) into the widget, then abort the
+ close operation if he gets there.
+*/
+void
+qt_gui_rep::show_help_balloon (widget wid, SI x, SI y) {
+  if (popup_wid_time > 0) return;
+
+  _popup_wid = popup_window_widget(wid, "Balloon");
+  SI winx, winy;
+    // HACK around wrong? reporting of window widget for embedded texmacs-inputs:
+    // call get_window on the current window (concrete_window()->win is set to
+    // the texmacs-input widget whenever there is one)
+  get_position (get_window (concrete_window()->win), winx, winy);
+  set_position (_popup_wid, x+winx, y+winy);
+  popup_wid_time = texmacs_time() + 666;  // update() will eventually show the widget
+}
 
 /******************************************************************************
 * Font support
@@ -1031,6 +1040,43 @@ clear_selection (string key) {
   the_gui->clear_selection (key);
 }
 
+bool
+qt_gui_rep::put_graphics_on_clipboard (url file) {
+   string extension= suffix (file) ;
+   
+  // for bitmaps this works :
+  if ((extension == "bmp") || (extension == "png") ||
+      (extension == "jpg") || (extension == "jpeg")) {
+    QClipboard *clipboard = QApplication::clipboard();
+    char* tmp = as_charp (concretize (file));
+    clipboard->setImage (QImage (tmp));
+    tm_delete_array (tmp);
+  }
+  else {
+    // vector formats
+    // Are there applications receiving eps, pdf,... through the clipboard?
+    // I have not experimented with EMF/WMF (windows) or SVM (Ooo)
+    QString mime="image/*"; // generic image format;
+    if (extension == "eps") mime= "application/postscript";
+    if (extension == "pdf") mime= "application/pdf";
+    if (extension == "svg") mime= "image/svg+xml"; //this works with Inskcape version >= 0.47
+   
+    string filecontent;
+    load_string (as_string (file), filecontent, true);
+    
+    char* tmp = as_charp (filecontent);
+    QByteArray rawdata (tmp);
+    tm_delete_array(tmp);
+
+    QMimeData *mymimeData = new QMimeData;
+    mymimeData->setData(mime, rawdata);
+
+    QClipboard *clipboard = QApplication::clipboard();
+    clipboard->setMimeData(mymimeData);// default mode= QClipboard::Clipboard 
+  }
+  return true;
+}
+
 /******************************************************************************
 * Miscellaneous
 ******************************************************************************/
@@ -1082,7 +1128,7 @@ void
 show_help_balloon (widget balloon, SI x, SI y) {
   // Display a help balloon at position (x, y); the help balloon should
   // disappear as soon as the user presses a key or moves the mouse
-  (void) balloon; (void) x; (void) y;
+  the_gui->show_help_balloon(balloon, x, y);
 }
 
 void
@@ -1091,7 +1137,7 @@ show_wait_indicator (widget base, string message, string argument) {
   // The indicator might for instance be displayed at the center of
   // the base widget which triggered the lengthy operation;
   // the indicator should be removed if the message is empty
-  the_gui->show_wait_indicator(base,message,argument);
+  the_gui->show_wait_indicator(base, message, argument);
 }
 
 void
@@ -1099,7 +1145,7 @@ external_event (string type, time_t t) {
   // External events, such as pushing a button of a remote infrared commander
   QTMWidget *tm_focus = qobject_cast<QTMWidget*>(qApp->focusWidget());
   if (tm_focus) {
-    simple_widget_rep *wid = tm_focus->tm_widget();
+    simple_widget_rep* wid = tm_focus->tm_widget();
     if (wid) the_gui -> process_keypress (wid, type, t);
   }
 }
@@ -1109,17 +1155,4 @@ font x_font (string family, int size, int dpi)
   (void) family; (void) size; (void) dpi;
   if (DEBUG_QT) cout << "x_font(): SHOULD NOT BE CALLED\n";
   return NULL;
-}
-
-
-QString 
-QTMTranslator::translate ( const char * context, const char * sourceText, 
-                           const char * disambiguation ) const 
-{
-  (void) disambiguation;  (void) context;
-  if (DEBUG_QT) {
-    cout << "Translating: " << sourceText << LF;
-    cout << "Translation: " << qt_translate (sourceText) << LF;
-  }
-  return QString (to_qstring (qt_translate (sourceText)));
 }

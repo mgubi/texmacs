@@ -69,7 +69,7 @@ is_punctuation (register char c) {
 
 bool
 is_space (register char c) {
-  return (c == ' ') || (c == '\11') || (c == '\12') || (c == '\15');\
+  return (c == ' ') || (c == '\11') || (c == '\12') || (c == '\15');
 }
 
 /******************************************************************************
@@ -128,6 +128,14 @@ locase (char c) {
   if (is_upcase (c))
     return (char) (((int) ((unsigned char) c)) + 32);
   else return c;
+}
+
+char
+closing_delimiter (char c) {
+  if (c == '{') return '}';
+  if (c == '(') return ')';
+  if (c == '[') return ']';
+  return c;
 }
 
 string
@@ -962,6 +970,12 @@ read (string s, int& i, const char* test) {
 }
 
 bool
+read (string s, string test) {
+  int i = 0;
+  return read (s, i, test);
+}
+
+bool
 read (string s, int& i, string test) {
   int n= N(s), m= N(test), j=0, k=i;
   while (j<m) {
@@ -1194,6 +1208,7 @@ tokenize (string s, string sep) {
       start= i;
     }
     else i++;
+  a << s(start, N(s));
   return a;
 }
 
@@ -1210,9 +1225,9 @@ recompose (array<string> a, string sep) {
 string
 trim_spaces (string s) {
   int start, end;
-  for (start=0; start<N(s) && is_space (s[start]); start++) {};
-  for (end=N(s); end>start && is_space (s[end]); end--) {};
-  return s (start, end);
+  for (start=0; start<N(s) && is_space (s[start]); start++) ;
+  for (end=N(s)-1; end > start && is_space (s[end]); end--) ;
+  return s (start, end+1);
 }
 
 array<string>
@@ -1221,6 +1236,20 @@ trim_spaces (array<string> a) {
   for (int i=0; i<N(a); i++)
     b[i]= trim_spaces (a[i]);
   return b;
+}
+
+tree
+trim_spaces (tree t) {
+  if (is_atomic (t)) return trim_spaces (as_string (t));
+  else if (is_concat (t)) {
+    int start, end;
+    for (start=0; start < N(t) && t[start] == " "; start++);
+    for (end=N(t)-1; end > start && t[end] == " "; end--);
+    tree r= tree (L(t));
+    for (int i=start; i<=end; i++) r << t[i];
+    return r;
+  }
+  else return t;
 }
 
 /******************************************************************************
