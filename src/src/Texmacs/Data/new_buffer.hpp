@@ -21,7 +21,7 @@
 ******************************************************************************/
 
 class new_buffer;
-class new_buffer_rep: public concrete_struct {
+class new_buffer_rep : public tm_obj<new_buffer_rep>  {
 public:
   url name;               // full name
   url master;             // base name for linking and navigation
@@ -41,20 +41,10 @@ public:
 };
 
 class new_buffer;
-class new_buffer {
-CONCRETE(new_buffer);
-  inline new_buffer (url name): rep (tm_new<new_buffer_rep> (name)) {}
+class new_buffer : public tm_ptr<new_buffer_rep> {
+public:
+  inline new_buffer (url name) : tm_ptr<new_buffer_rep> (tm_new<new_buffer_rep> (name)) {}
 };
-//CONCRETE_CODE(new_buffer);
-
-inline new_buffer::new_buffer (const new_buffer& x):
-  rep(x.rep) { INC_COUNT (this->rep); }
-inline new_buffer::~new_buffer () { DEC_COUNT (this->rep); }
-inline new_buffer_rep* new_buffer::operator -> () {
-  return rep; }
-inline new_buffer& new_buffer::operator = (new_buffer x) {
-  INC_COUNT (x.rep); DEC_COUNT (this->rep);
-  this->rep=x.rep; return *this; }
 
 /******************************************************************************
 * Low level types and routines

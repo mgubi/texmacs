@@ -207,6 +207,8 @@ public:
   inline bool operator != (qt_widget w) { return rep() != w.rep(); }
   friend widget abstract (qt_widget w);
   friend qt_widget concrete (widget w);
+  friend tm_ostream& operator << (tm_ostream& out, qt_widget w);
+
 
 };
 

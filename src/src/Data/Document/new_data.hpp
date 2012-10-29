@@ -16,7 +16,7 @@
 #include "hashmap.hpp"
 
 class new_data;
-class new_data_rep: public concrete_struct {
+class new_data_rep : public tm_obj<new_data_rep>  {
 public:
   tree project;               // a project the document belongs to
   tree style;                 // the style of the buffer
@@ -30,11 +30,10 @@ public:
     init ("?"), fin ("?"), ref ("?"), aux ("?") {}
 };
 
-class new_data {
-CONCRETE(new_data);
-  inline new_data (): rep (tm_new<new_data_rep> ()) {}
+class new_data : public tm_ptr<new_data_rep> {
+public:
+  inline new_data () : tm_ptr<new_data_rep> (tm_new<new_data_rep> ()) {}
 };
-CONCRETE_CODE(new_data);
 
 tree attach_data (tree body, new_data data, bool no_aux= false);
 tree detach_data (tree doc, new_data& data);

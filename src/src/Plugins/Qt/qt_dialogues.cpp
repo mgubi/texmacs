@@ -119,13 +119,6 @@ qt_field_widget_rep::as_qwidget () {
   return qwid;
 }
 
-class qt_field_widget_ptr;
-
-class qt_field_widget : public tm_abs_null_ptr<qt_field_widget_rep> {
-public:
-  qt_field_widget(qt_field_widget_rep* p=NULL) : tm_abs_null_ptr<qt_field_widget_rep>(p) {}
-  friend widget abstract(qt_field_widget w) { return widget(w.rep()); }
-};
 /******************************************************************************
  * qt_inputs_list_widget_rep
  ******************************************************************************/
@@ -135,8 +128,8 @@ qt_inputs_list_widget_rep::qt_inputs_list_widget_rep (command _cmd, array<string
    size (coord2 (100, 100)), position (coord2 (0, 0)), win_title (""), style (0)
 {
   for (int i=0; i < N(_prompts); i++) {
-    fields[i] = qt_field_widget(tm_new<qt_field_widget_rep> (this));
-    fields[i]->prompt = _prompts[i];
+    fields[i] = qt_field_widget(tm_new<qt_field_widget_rep> (this, _prompts[i]));
+//    fields[i]->prompt = _prompts[i];
   }
 }
 

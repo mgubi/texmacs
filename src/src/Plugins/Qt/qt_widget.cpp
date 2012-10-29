@@ -176,7 +176,7 @@ qt_widget_rep::popup_window_widget (string s) {
 }
 
 tm_ostream& operator << (tm_ostream& out, qt_widget w) {
-  return out << "qt_widget of type: " << w.rep->type_as_string();
+  return out << "qt_widget of type: " << w.rep()->type_as_string();
 }
 
 /*! Stores messages (SLOTS) sent to this widget for later replay.
@@ -272,7 +272,7 @@ void
 destroy_window_widget (widget w) {
   if (DEBUG_QT)
     cout << "destroy_window_widget() on "
-         << static_cast<qt_widget_rep*>(w.rep)->type_as_string() << LF;
+         << concrete(w)->type_as_string() << LF;
 }
 
 

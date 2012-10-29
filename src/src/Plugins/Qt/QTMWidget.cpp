@@ -464,7 +464,7 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
 
   if (DEBUG_QT)
     cout << "keypressed\n";
-  if (tm_widget()->ref_count == 0) return;
+  if (!tm_widget()) return;
 
   {
     int key = event->key();
@@ -792,7 +792,7 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
     
     r = r * as_string(pos) * ":" * from_qstring(preedit_string);
   }
-  if (tm_widget()->ref_count != 0)
+  if (tm_widget())
     the_gui -> process_keypress (tm_widget(), r, texmacs_time());
   event->accept();
 }  
@@ -814,7 +814,7 @@ QTMWidget::inputMethodQuery ( Qt::InputMethodQuery query ) const {
 
 void
 QTMWidget::mousePressEvent (QMouseEvent* event) {
-  if (tm_widget()->ref_count == 0) return;
+  if (!(tm_widget())) return;
   QPoint point = event->pos() + origin();
   scale (point);
   unsigned int mstate= mouse_state (event, false);
@@ -832,7 +832,7 @@ QTMWidget::mousePressEvent (QMouseEvent* event) {
 
 void
 QTMWidget::mouseReleaseEvent (QMouseEvent* event) {
-  if (tm_widget()->ref_count == 0) return;
+  if (!(tm_widget())) return;
   QPoint point = event->pos() + origin();
   scale (point);
   unsigned int mstate= mouse_state (event, true);
@@ -850,7 +850,7 @@ QTMWidget::mouseReleaseEvent (QMouseEvent* event) {
 
 void
 QTMWidget::mouseMoveEvent (QMouseEvent* event) {
-  if (tm_widget()->ref_count == 0) return;
+  if (!(tm_widget())) return;
   QPoint point = event->pos() + origin();
   scale (point);
   unsigned int mstate= mouse_state (event, false);
@@ -880,7 +880,7 @@ QTMWidget::event (QEvent* event) {
 
 void
 QTMWidget::focusInEvent ( QFocusEvent * event ) {
-  if (tm_widget()->ref_count != 0) {
+  if (tm_widget()) {
     if (DEBUG_QT) cout << "FOCUSIN: " << tm_widget()->type_as_string() << LF;
     the_gui -> process_keyboard_focus (tm_widget(), true, texmacs_time());
     //tm_widget() -> handle_keyboard_focus (true, texmacs_time ());
@@ -890,7 +890,7 @@ QTMWidget::focusInEvent ( QFocusEvent * event ) {
 
 void
 QTMWidget::focusOutEvent ( QFocusEvent * event ) {
-  if (tm_widget()->ref_count != 0) {
+  if (tm_widget()) {
     if (DEBUG_QT) cout << "FOCUSOUT: " << tm_widget()->type_as_string() << LF;
     the_gui -> process_keyboard_focus (tm_widget(), false, texmacs_time());
 //    tm_widget() -> handle_keyboard_focus (false, texmacs_time ());

@@ -34,7 +34,7 @@ void QTMWindow::closeEvent (QCloseEvent* event)
 {
   if (DEBUG_QT) cout << "Close QTMWindow" << LF;
 
-  if (tmwid->ref_count != 0) {
+  if (!is_nil(tmwid)) {
     concrete(tmwid)->send (SLOT_DESTROY, NULL);
     event->ignore ();
   }

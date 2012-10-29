@@ -180,8 +180,8 @@ qt_window_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       QTMWindow* qwin = qobject_cast<QTMWindow*>(qwid);
-      if (qwin && qwin->tmwid->ref_count != 0) {
-        qt_tm_widget_rep* wid = static_cast<qt_tm_widget_rep*>(qwin->tmwid.rep);
+      if (qwin) {
+        qt_tm_widget_rep* wid = concrete<qt_tm_widget_rep*>(qwin->tmwid);
         if (wid)
           wid->set_full_screen(open_box<bool> (val));
       }

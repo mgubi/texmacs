@@ -320,7 +320,7 @@ attach_view (url win_u, url u) {
   vw->win= win;
   widget wid= win->wid;
   set_scrollable (wid, vw->ed);
-  vw->ed->cvw= wid.rep;
+  vw->ed->cvw= wid.operator->();
   ASSERT (is_attached (wid), "widget should be attached");
   vw->ed->resume ();
   win->set_window_name (vw->buf->buf->title);
