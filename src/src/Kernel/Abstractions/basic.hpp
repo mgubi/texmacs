@@ -117,6 +117,11 @@ bool os_macos ();
 bool use_macos_fonts ();
 const char* default_look_and_feel ();
 
+
+/******************************************************************************
+ * type id factory
+ ******************************************************************************/
+
 template<typename T>
 struct type_helper {
   static int id;
@@ -131,19 +136,21 @@ template<typename T> T   type_helper<T>::init= T ();
  * base classes
  ******************************************************************************/
 
+//  tm_base is the base common class for all the texmacs objects
 
 class tm_base {
-  //  a base common class for all the texmacs objects
 };
+
+// auxiliary class to gather statistics about objects
 
 template <class T>
 class tm_stats  {
 public:
   static int alive;
   static int created;
-  tm_stats () { alive++; created++; }
+  tm_stats () { TM_DEBUG(alive++); TM_DEBUG(created++); }
 protected:
-  ~tm_stats () { alive--; }
+  ~tm_stats () { TM_DEBUG(alive--); }
 };
 
 template <class T> int tm_stats<T>::alive (0);
@@ -156,6 +163,8 @@ template <class T> class tm_abs_ptr;
 template <class T> class tm_abs_null_ptr; 
 template <class TT, class B>  class tm_ext_ptr;
 template <class TT, class B>  class tm_ext_null_ptr;
+
+// trait for reference counting memory handling
 
 template <class T>
 class tm_obj : public tm_base, public tm_stats<T> {
