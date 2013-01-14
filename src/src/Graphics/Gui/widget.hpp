@@ -65,8 +65,10 @@ public:
   widget (widget_rep* p) : tm_abs_null_ptr<widget_rep>(p) {} 
   inline bool operator == (widget w) { return rep() == w.rep(); }
   inline bool operator != (widget w) { return rep() != w.rep(); }
-  template<class T> friend T concrete (widget w) { return static_cast<T>(w.rep()); }
+    template<class T> friend T concrete (widget w);
 };
+
+template<class T> T concrete (widget w) { return static_cast<T>(w.rep()); }
 
 inline tm_ostream&
 operator << (tm_ostream& out, widget w) {
