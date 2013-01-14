@@ -317,13 +317,16 @@
 	  ("Default" (init-default "font"))
 	  ---
 	  ("Concrete" (init-env "font" "concrete"))
-	  ("Cyrillic" (init-env "font" "cyrillic"))
-	  ("Pandora" (init-env "font" "pandora"))
+          (if (url-exists-in-tex? "pnr10.mf")
+              ("Pandora" (init-env "font" "pandora")))
 	  ("Roman" (init-env "font" "roman"))
+	  (if (font-exists-in-tt? "STIX-Regular")
+	      ("Stix" (init-env "font" "stix")))
 	  ---
 	  ("Bookman" (init-env "font" "bookman"))
 	  ("Courier" (init-env "font" "courier"))
 	  ("Helvetica" (init-env "font" "helvetica"))
+	  ("N.C. Schoolbook" (init-env "font" "new-century-schoolbook"))
 	  ("Palatino" (init-env "font" "palatino"))
 	  ("Times" (init-env "font" "times"))
 	  ---
@@ -332,8 +335,6 @@
 	  ("Lucida" (init-env "font" "x-lucida"))
 	  (if (font-exists-in-tt? "luxirr")
               ("Luxi" (init-env "font" "luxi")))
-	  (if (font-exists-in-tt? "STIXGeneral")
-	      ("Stix" (init-env "font" "stix")))
 	  ("Utopia" (init-env "font" "x-utopia"))
 	  (if (or (supports-chinese?)
 		  (supports-japanese?)
@@ -409,13 +410,14 @@
 	  (if (font-exists-in-tt? "LucidaGrande")
 	      ("Lucida" (init-env "math-font" "math-lucida")))
 	  ("Roman" (init-env "math-font" "roman"))
-	  (if (font-exists-in-tt? "STIXGeneral")
+	  (if (font-exists-in-tt? "STIX-Regular")
 	      ("Stix" (init-env "math-font" "math-stix"))))
       (-> "Program font"
 	  ("Default" (init-default "prog-font"))
 	  ---
 	  ("Concrete" (init-env "prog-font" "concrete"))
-	  ("Pandora" (init-env "prog-font" "pandora"))
+          (if (url-exists-in-tex? "pnr10.mf")
+              ("Pandora" (init-env "prog-font" "pandora")))
 	  ("Roman" (init-env "prog-font" "roman"))
 	  ("Times" (init-env "prog-font" "times")))
       ---
@@ -537,9 +539,7 @@
       (-> "Size"
 	  (link document-page-size-menu))
       (-> "Orientation"
-	  ("Default" (check "*" (test-default? "page-orientation"))
-	   (init-default "page-orientation")
-	   (notify-page-change))
+	  ("Default" (init-default-page-orientation))
 	  ---
 	  ("Portrait" (init-page-orientation "portrait"))
 	  ("Landscape" (init-page-orientation "landscape")))

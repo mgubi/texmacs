@@ -74,17 +74,6 @@
     (enum ("Details in menus" "detailed menus")
 	  ("Simplified menus" "simple")
 	  ("Detailed menus" "detailed"))
-    (-> "View"
-	(toggle ("Header" "header"))
-	(toggle ("Main icon bar" "main icon bar"))
-	(toggle ("Mode dependent icons" "mode dependent icons"))
-	(toggle ("Focus dependent icons" "focus dependent icons"))
-	(toggle ("User provided icons" "user provided icons"))
-	(toggle ("Status bar" "status bar"))
-  (toggle ("Side tools" "side tools"))
-	---
-	(enum ("Shrinking factor" "shrinking factor")
-	      "1" "2" "3" "4" "5" "7" "10" *))
     ---
     (enum ("Language" "language")
 	  ("British" "british")
@@ -176,6 +165,7 @@
 	    (toggle ("Wrap lines"
 		     "verbatim->texmacs:wrap"))
 	    (enum ("Encoding" "verbatim->texmacs:encoding")
+		  ("Automated detection" "auto")
 		  ("Cork" "cork")
 		  ("Iso-8859-1" "iso-8859-1")
 		  ("Utf-8" "utf-8")))
@@ -434,6 +424,8 @@
 ;; Conversion preferences widget
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Html ----------
+
 (tm-widget (html-preferences-widget)
   ===
   (bold (text "TeXmacs -> Html"))
@@ -449,10 +441,12 @@
       (toggle (set-boolean-preference "texmacs->html:images" answer)
               (get-boolean-preference "texmacs->html:images")))))
 
+;; LaTeX ----------
+
 (define-preference-names "texmacs->latex:encoding"
   ("Strict Ascii" "ascii")
   ("Cork charset with catcode definitions in preamble" "cork")
-  ("Unicode with inputenc LaTeX package" "utf-8"))
+  ("Utf-8 with inputenc LaTeX package" "utf-8"))
 
 (tm-widget (latex-preferences-widget)
   ===
@@ -482,7 +476,20 @@
             (get-pretty-preference "texmacs->latex:encoding")
             "5em"))))
 
-;;;;;;;;;;;;;;
+;; BibTeX ----------
+
+(tm-widget (bibtex-preferences-widget)
+  ===
+  (bold (text "BibTeX -> TeXmacs"))
+  ===
+  (aligned
+    (item (text "BibTeX command:")
+      (enum (set-pretty-preference "bibtex command" answer)
+            '("bibtex" "rubibtex" "")
+            (get-pretty-preference "bibtex command")
+            "15em"))))
+
+;; Verbatim ----------
 
 (define-preference-names "texmacs->verbatim:encoding"
   ("cork" "Cork")
@@ -490,6 +497,7 @@
   ("utf-8" "Utf-8"))
 
 (define-preference-names "verbatim->texmacs:encoding"
+  ("auto" "Auto")
   ("cork" "Cork")
   ("iso-8859-1" "Iso-8859-1")
   ("utf-8" "Utf-8"))
@@ -520,9 +528,11 @@
   (aligned
     (item (text "Character encoding:")
       (enum (set-pretty-preference "verbatim->texmacs:encoding" answer)
-            '("Cork" "Iso-8859-1" "Utf-8")
+            '("Auto" "Cork" "Iso-8859-1" "Utf-8")
             (get-pretty-preference "verbatim->texmacs:encoding")
             "5em"))))
+
+;; Images ----------
 
 (define-preference-names "texmacs->graphics:format"
   ("svg" "Svg")
@@ -549,6 +559,8 @@
         (toggle (set-boolean-preference "texmacs->graphics:tmml" answer)
                 (get-boolean-preference "texmacs->graphics:tmml"))))))
 
+;; All converters ----------
+
 (tm-widget (conversion-preferences-widget)
   ======
   (tabs
@@ -558,6 +570,9 @@
     (tab (text "LaTeX")
       (centered
         (dynamic (latex-preferences-widget))))
+    (tab (text "BibTeX")
+      (centered
+        (dynamic (bibtex-preferences-widget))))
     (tab (text "Verbatim")
       (centered
         (dynamic (verbatim-preferences-widget))))
@@ -566,19 +581,65 @@
         (dynamic (image-preferences-widget))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Other
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-preference-names "autosave"
+  ("5" "5 sec")
+  ("30" "30 sec")
+  ("120" "120 sec")
+  ("300" "300 sec")
+  ("0" "Disable"))
+
+(define-preference-names "security"
+  ("accept no scripts" "Accept no scripts")
+  ("prompt on scripts" "Prompt on scripts")
+  ("accept all scripts" "Accept all scripts"))
+
+(tm-define (scripts-preferences-list)
+  (lazy-plugin-force)
+  (with l (list-sort supported-scripts-list string<=?)
+    (with name (lambda (x) (ahash-ref supported-scripts-table x))
+      (set-preference-name "scripting language" "none" "None")
+      (for (x l) (set-preference-name "scripting language" x (name x)))
+      (cons "None" (map name l)))))
+
+(tm-widget (other-preferences-widget)
+  (aligned
+    (item (text "Automatically save:")
+      (enum (set-pretty-preference "autosave" answer)
+            '("5 sec" "30 sec" "120 sec" "300 sec" "Disable")
+            (get-pretty-preference "autosave")
+            "15em"))
+    (item (text "Security:")
+      (enum (set-pretty-preference "security" answer)
+            '("Accept no scripts" "Prompt on scripts" "Accept all scripts")
+            (get-pretty-preference "security")
+            "15em"))
+    (item (text "Scripting language:")
+      (enum (set-pretty-preference "scripting language" answer)
+            (scripts-preferences-list)
+            (get-pretty-preference "scripting language")
+            "15em"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preferences widget
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-widget (preferences-widget)
-  (tabs
-    (tab (text "General")
+  (icon-tabs
+    (icon-tab "tm_prefs_general.xpm" (text "General")
       (centered
         (dynamic (general-preferences-widget))))
-    (tab (text "Keyboard")
+    (icon-tab "tm_prefs_keyboard.xpm" (text "Keyboard")
       (centered
         (dynamic (keyboard-preferences-widget))))
-    (tab (text "Converters")
-      (dynamic (conversion-preferences-widget)))))
+    (icon-tab "tm_prefs_convert.xpm" (text "Convert")
+      (dynamic (conversion-preferences-widget)))
+    (icon-tab "tm_prefs_other.xpm" (text "Other")
+      (centered
+        (dynamic (other-preferences-widget))))))
 
 (tm-define (open-preferences)
+  (:interactive #t)
   (top-window preferences-widget "User preferences"))

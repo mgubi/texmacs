@@ -383,7 +383,7 @@
 
 (tm-menu (focus-title-menu)
   ("Subtitle" (make-doc-data-element 'doc-subtitle))
-  ("Author" (make-doc-data-element 'doc-author-data))
+  ("Author" (make-doc-data-element 'doc-author))
   ("Date" (make-doc-data-element 'doc-date))
   ("Today"
    (begin (make-doc-data-element 'doc-date) (make-arity 'date 0)))
@@ -396,7 +396,7 @@
   ("Running author" (make-doc-data-element 'doc-running-author))
   ("Keywords" (make-doc-data-element 'doc-keywords))
   ("M.S.C."
-   (make-doc-data-element 'doc-AMS-class)))
+   (make-doc-data-element 'doc-msc)))
 
 (tm-menu (focus-title-icons)
   (assuming (doc-data-has-hidden?)
@@ -432,10 +432,10 @@
   #f)
 
 (tm-menu (focus-author-menu)
-  ("Address" (make-author-data-element 'author-address))
+  ("Affiliation" (make-author-data-element 'author-affiliation))
   ("Email" (make-author-data-element 'author-email))
   ("Homepage" (make-author-data-element 'author-homepage))
-  ("Note" (make-author-data-element 'author-note)))
+  ("Note" (make-author-data-element 'author-misc)))
 
 (tm-menu (focus-author-icons)
   (mini #t

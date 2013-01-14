@@ -12,44 +12,48 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define boot-start (texmacs-time))
-(define developer-mode-on #f) ; TODO: the C++ code should initialize this.
+(define developer-mode?
+  (equal? (cpp-get-preference "developer tool" "off") "on"))
 
-(if developer-mode-on
-  (begin
-    ; FIXME: how do we update this list dynamically? 
-    (define-public keywords-which-define 
-      '(define define-macro define-public define-public-macro provide-public
-        tm-define tm-define-macro tm-menu menu-bind tm-widget))
+(if developer-mode?
+    (begin
+      (define-public (%new-read-hook sym) (noop)) ; for autocompletion
+      
+      ;; FIXME: how do we update this list dynamically? 
+      (define-public keywords-which-define 
+        '(define define-macro define-public define-public-macro provide-public
+                 tm-define tm-define-macro tm-menu menu-bind tm-widget))
 
-    (define-public old-read read)
-    (define-public (new-read port)
-      "A redefined reader which stores line number and file name in symbols."
-      ; FIXME: handle overloaded redefinitions
-      (let ((form (old-read port)))
-        (if (and (pair? form) (member (car form) keywords-which-define))
-          (let* ((line (source-property form 'line))
-                 (column (source-property form 'column))
-                 (filename (source-property form 'filename))
-                 (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
-            (if (and (symbol? sym) ; Just in case
-                     filename)     ; don't set props if read from stdin
-             (begin 
-                (set-symbol-property! sym 'line line)
-                (set-symbol-property! sym 'column column)
-                (set-symbol-property! sym 'filename filename)
-                ))))
-        form))
+      (define-public old-read read)
+      (define-public (new-read port)
+        "A redefined reader which stores line number and file name in symbols."
+        ;; FIXME: handle overloaded redefinitions
+        (let ((form (old-read port)))
+          (if (and (pair? form) (member (car form) keywords-which-define))
+              (let* ((line (source-property form 'line))
+                     (column (source-property form 'column))
+                     (filename (source-property form 'filename))
+                     (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
+                (if (symbol? sym) ; Just in case
+                    (begin 
+                      (%new-read-hook sym)
+                      (if filename     ; don't set props if read from stdin
+                          (begin
+                            (set-symbol-property! sym 'line line)
+                            (set-symbol-property! sym 'column column)
+                            (set-symbol-property! sym 'filename filename)))))))
+          form))
 
-    (set! read new-read)
+      (set! read new-read)
 
-    (define-public old-primitive-load primitive-load)
-    (define-public (new-primitive-load filename)
-      ; We explicitly circumvent guile's decision to set the current-reader
-      ; to #f inside ice-9/boot-9.scm, try-module-autoload
-      (with-fluids ((current-reader read))
-        (old-primitive-load filename)))
+      (define-public old-primitive-load primitive-load)
+      (define-public (new-primitive-load filename)
+        ;; We explicitly circumvent guile's decision to set the current-reader
+        ;; to #f inside ice-9/boot-9.scm, try-module-autoload
+        (with-fluids ((current-reader read))
+                     (old-primitive-load filename)))
 
-    (set! primitive-load new-primitive-load)))
+      (set! primitive-load new-primitive-load)))
 
 ;; TODO: scheme file caching using (set! primitive-load ...) and
 ;; (set! %search-load-path)
@@ -99,10 +103,13 @@
 (lazy-define (utils cas cas-out) cas->stree)
 (use-modules (utils misc markup-funcs))
 (use-modules (utils handwriting handwriting))
+(define supports-email? (url-exists-in-path? "mmail"))
+(if supports-email? (use-modules (utils email email-tmfs)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting BibTeX style modules\n")
 (use-modules (bibtex bib-utils))
+(lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;;(display "Booting main TeXmacs functionality\n")
@@ -116,7 +123,8 @@
 (lazy-menu (texmacs menus edit-menu) edit-menu)
 (lazy-menu (texmacs menus view-menu) view-menu)
 (lazy-menu (texmacs menus tools-menu) tools-menu)
-(lazy-menu (texmacs menus preferences-menu) preferences-menu page-setup-menu)
+(lazy-menu (texmacs menus preferences-menu)
+           preferences-menu page-setup-menu open-preferences)
 (use-modules (texmacs menus main-menu))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
@@ -157,6 +165,7 @@
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting programming modes\n")
+;;(lazy-keyboard (prog scheme-tools) with-developer-tool?)
 (lazy-keyboard (prog scheme-edit) in-prog-scheme?)
 (lazy-menu (prog format-prog-menu) prog-format-menu prog-format-icons)
 (lazy-menu (prog prog-menu) prog-menu prog-icons)
@@ -188,6 +197,7 @@
 ;(display "Booting formal languages\n")
 (lazy-language (language minimal) minimal)
 (lazy-language (language std-math) std-math)
+(lazy-define (language natural) tr)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting dynamic features\n")
@@ -212,6 +222,7 @@
 	     tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src docgrep-in-texts)
 (lazy-define (doc tmweb) tmweb-convert-dir tmweb-update-dir
+             tmweb-convert-dir-keep-texmacs tmweb-update-dir-keep-texmacs
              tmweb-interactive-build tmweb-interactive-update)
 (lazy-define (doc apidoc) apidoc-all-modules apidoc-all-symbols)
 (lazy-tmfs-handler (doc docgrep) grep)
@@ -266,8 +277,9 @@
 (lazy-define (version version-tmfs) update-buffer commit-buffer)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
-;(display "Booting debugging facilities\n")
+;(display "Booting debugging and developer facilities\n")
 (lazy-menu (texmacs menus debug-menu) debug-menu)
+(lazy-menu (texmacs menus developer-menu) developer-menu)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting plugins\n")
@@ -278,6 +290,7 @@
 (use-modules (fonts fonts-ec) (fonts fonts-adobe) (fonts fonts-x)
 	     (fonts fonts-math) (fonts fonts-foreign) (fonts fonts-misc)
 	     (fonts fonts-composite) (fonts fonts-truetype))
+(lazy-define (fonts font-selector) open-font-selector)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "------------------------------------------------------\n")

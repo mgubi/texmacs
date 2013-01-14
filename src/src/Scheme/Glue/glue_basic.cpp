@@ -438,9 +438,74 @@ tmg_exec_delayed_pause (tmscm arg1) {
 }
 
 tmscm
-tmg_notify_preferences_loaded () {
+tmg_notify_preferences_booted () {
   // TMSCM_DEFER_INTS;
-  notify_preferences_loaded ();
+  notify_preferences_booted ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cpp_has_preferenceP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-has-preference?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= has_user_preference (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_get_preference (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-get-preference");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-get-preference");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_user_preference (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_set_preference (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-set-preference");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-set-preference");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  set_user_preference (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cpp_reset_preference (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-reset-preference");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  reset_user_preference (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_save_preferences () {
+  // TMSCM_DEFER_INTS;
+  save_user_preferences ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -504,6 +569,19 @@ tmg_translate (tmscm arg1) {
 }
 
 tmscm
+tmg_string_translate (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-translate");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= translate_as_is (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "translate-from-to");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "translate-from-to");
@@ -548,6 +626,21 @@ tmg_tree_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_force_load_translations (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "force-load-translations");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "force-load-translations");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  force_load_dictionary (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -675,6 +768,319 @@ tmg_glyph_recognize (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
+}
+
+tmscm
+tmg_tt_dump (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tt-dump");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tt_dump (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tt_font_name (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tt-font-name");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= tt_font_name (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_database_build (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-build");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  font_database_build (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_build_local () {
+  // TMSCM_DEFER_INTS;
+  font_database_build_local ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_build_global () {
+  // TMSCM_DEFER_INTS;
+  font_database_build_global ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_insert_global (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-insert-global");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  font_database_build_global (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_load () {
+  // TMSCM_DEFER_INTS;
+  font_database_load ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_save () {
+  // TMSCM_DEFER_INTS;
+  font_database_save ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_filter () {
+  // TMSCM_DEFER_INTS;
+  font_database_filter ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_families () {
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_families ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_database_styles (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-styles");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_styles (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_database_search (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-search");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-database-search");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_search (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_family_2master (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family->master");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= family_to_master (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_master_2families (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-master->families");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= master_to_families (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_master_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-master-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= master_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_family_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= family_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_family_strict_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-strict-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= family_strict_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_subfamily_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-subfamily-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= subfamily_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_public (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-public");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-public");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= logical_font (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_private (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-private");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-private");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "logical-font-private");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "logical-font-private");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= logical_font (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_family (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-family");
+
+  array_string in1= tmscm_to_array_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_family (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_variant (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-variant");
+
+  array_string in1= tmscm_to_array_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_variant (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_series (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-series");
+
+  array_string in1= tmscm_to_array_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_series (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_shape (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-shape");
+
+  array_string in1= tmscm_to_array_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_shape (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_search (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-search");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "logical-font-search");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= search_font (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
 }
 
 tmscm
@@ -2287,6 +2693,21 @@ tmg_string_occursP (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_string_count_occurrences (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-count-occurrences");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-count-occurrences");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  int out= count_occurrences (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_string_search_forwards (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-search-forwards");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-search-forwards");
@@ -2492,6 +2913,19 @@ tmg_escape_to_ascii (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= cork_to_ascii (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_unescape_guile (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "unescape-guile");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= unescape_guile (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -5211,6 +5645,25 @@ tmg_widget_choices (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_widget_filtered_choice (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-filtered-choice");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-filtered-choice");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-filtered-choice");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "widget-filtered-choice");
+
+  command in1= tmscm_to_command (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  widget out= choice_widget (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
 tmg_widget_xpm (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "widget-xpm");
 
@@ -5335,6 +5788,23 @@ tmg_widget_tabs (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   widget out= tabs_widget (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
+tmg_widget_icon_tabs (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_ARRAY_URL (arg1, TMSCM_ARG1, "widget-icon-tabs");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-icon-tabs");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg3, TMSCM_ARG3, "widget-icon-tabs");
+
+  array_url in1= tmscm_to_array_url (arg1);
+  array_widget in2= tmscm_to_array_widget (arg2);
+  array_widget in3= tmscm_to_array_widget (arg3);
+
+  // TMSCM_DEFER_INTS;
+  widget out= icon_tabs_widget (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return widget_to_tmscm (out);
@@ -6618,15 +7088,22 @@ initialize_glue_basic () {
   tmscm_install_procedure ("object->command",  tmg_object_2command, 1, 0, 0);
   tmscm_install_procedure ("exec-delayed",  tmg_exec_delayed, 1, 0, 0);
   tmscm_install_procedure ("exec-delayed-pause",  tmg_exec_delayed_pause, 1, 0, 0);
-  tmscm_install_procedure ("notify-preferences-loaded",  tmg_notify_preferences_loaded, 0, 0, 0);
+  tmscm_install_procedure ("notify-preferences-booted",  tmg_notify_preferences_booted, 0, 0, 0);
+  tmscm_install_procedure ("cpp-has-preference?",  tmg_cpp_has_preferenceP, 1, 0, 0);
+  tmscm_install_procedure ("cpp-get-preference",  tmg_cpp_get_preference, 2, 0, 0);
+  tmscm_install_procedure ("cpp-set-preference",  tmg_cpp_set_preference, 2, 0, 0);
+  tmscm_install_procedure ("cpp-reset-preference",  tmg_cpp_reset_preference, 1, 0, 0);
+  tmscm_install_procedure ("save-preferences",  tmg_save_preferences, 0, 0, 0);
   tmscm_install_procedure ("set-input-language",  tmg_set_input_language, 1, 0, 0);
   tmscm_install_procedure ("get-input-language",  tmg_get_input_language, 0, 0, 0);
   tmscm_install_procedure ("set-output-language",  tmg_set_output_language, 1, 0, 0);
   tmscm_install_procedure ("get-output-language",  tmg_get_output_language, 0, 0, 0);
   tmscm_install_procedure ("translate",  tmg_translate, 1, 0, 0);
+  tmscm_install_procedure ("string-translate",  tmg_string_translate, 1, 0, 0);
   tmscm_install_procedure ("translate-from-to",  tmg_translate_from_to, 3, 0, 0);
   tmscm_install_procedure ("tree-translate",  tmg_tree_translate, 1, 0, 0);
   tmscm_install_procedure ("tree-translate-from-to",  tmg_tree_translate_from_to, 3, 0, 0);
+  tmscm_install_procedure ("force-load-translations",  tmg_force_load_translations, 2, 0, 0);
   tmscm_install_procedure ("color",  tmg_color, 1, 0, 0);
   tmscm_install_procedure ("new-author",  tmg_new_author, 0, 0, 0);
   tmscm_install_procedure ("set-author",  tmg_set_author, 1, 0, 0);
@@ -6638,6 +7115,31 @@ initialize_glue_basic () {
   tmscm_install_procedure ("mark-new",  tmg_mark_new, 0, 0, 0);
   tmscm_install_procedure ("glyph-register",  tmg_glyph_register, 2, 0, 0);
   tmscm_install_procedure ("glyph-recognize",  tmg_glyph_recognize, 1, 0, 0);
+  tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
+  tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);
+  tmscm_install_procedure ("font-database-build",  tmg_font_database_build, 1, 0, 0);
+  tmscm_install_procedure ("font-database-build-local",  tmg_font_database_build_local, 0, 0, 0);
+  tmscm_install_procedure ("font-database-build-global",  tmg_font_database_build_global, 0, 0, 0);
+  tmscm_install_procedure ("font-database-insert-global",  tmg_font_database_insert_global, 1, 0, 0);
+  tmscm_install_procedure ("font-database-load",  tmg_font_database_load, 0, 0, 0);
+  tmscm_install_procedure ("font-database-save",  tmg_font_database_save, 0, 0, 0);
+  tmscm_install_procedure ("font-database-filter",  tmg_font_database_filter, 0, 0, 0);
+  tmscm_install_procedure ("font-database-families",  tmg_font_database_families, 0, 0, 0);
+  tmscm_install_procedure ("font-database-styles",  tmg_font_database_styles, 1, 0, 0);
+  tmscm_install_procedure ("font-database-search",  tmg_font_database_search, 2, 0, 0);
+  tmscm_install_procedure ("font-family->master",  tmg_font_family_2master, 1, 0, 0);
+  tmscm_install_procedure ("font-master->families",  tmg_font_master_2families, 1, 0, 0);
+  tmscm_install_procedure ("font-master-features",  tmg_font_master_features, 1, 0, 0);
+  tmscm_install_procedure ("font-family-features",  tmg_font_family_features, 1, 0, 0);
+  tmscm_install_procedure ("font-family-strict-features",  tmg_font_family_strict_features, 1, 0, 0);
+  tmscm_install_procedure ("font-subfamily-features",  tmg_font_subfamily_features, 1, 0, 0);
+  tmscm_install_procedure ("logical-font-public",  tmg_logical_font_public, 2, 0, 0);
+  tmscm_install_procedure ("logical-font-private",  tmg_logical_font_private, 4, 0, 0);
+  tmscm_install_procedure ("logical-font-family",  tmg_logical_font_family, 1, 0, 0);
+  tmscm_install_procedure ("logical-font-variant",  tmg_logical_font_variant, 1, 0, 0);
+  tmscm_install_procedure ("logical-font-series",  tmg_logical_font_series, 1, 0, 0);
+  tmscm_install_procedure ("logical-font-shape",  tmg_logical_font_shape, 1, 0, 0);
+  tmscm_install_procedure ("logical-font-search",  tmg_logical_font_search, 2, 0, 0);
   tmscm_install_procedure ("image->psdoc",  tmg_image_2psdoc, 1, 0, 0);
   tmscm_install_procedure ("tree->stree",  tmg_tree_2stree, 1, 0, 0);
   tmscm_install_procedure ("stree->tree",  tmg_stree_2tree, 1, 0, 0);
@@ -6753,6 +7255,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("graphics-notify-update",  tmg_graphics_notify_update, 1, 0, 0);
   tmscm_install_procedure ("string-number?",  tmg_string_numberP, 1, 0, 0);
   tmscm_install_procedure ("string-occurs?",  tmg_string_occursP, 2, 0, 0);
+  tmscm_install_procedure ("string-count-occurrences",  tmg_string_count_occurrences, 2, 0, 0);
   tmscm_install_procedure ("string-search-forwards",  tmg_string_search_forwards, 3, 0, 0);
   tmscm_install_procedure ("string-search-backwards",  tmg_string_search_backwards, 3, 0, 0);
   tmscm_install_procedure ("string-replace",  tmg_string_replace, 3, 0, 0);
@@ -6768,6 +7271,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("escape-verbatim",  tmg_escape_verbatim, 1, 0, 0);
   tmscm_install_procedure ("escape-shell",  tmg_escape_shell, 1, 0, 0);
   tmscm_install_procedure ("escape-to-ascii",  tmg_escape_to_ascii, 1, 0, 0);
+  tmscm_install_procedure ("unescape-guile",  tmg_unescape_guile, 1, 0, 0);
   tmscm_install_procedure ("string-convert",  tmg_string_convert, 3, 0, 0);
   tmscm_install_procedure ("utf8->cork",  tmg_utf8_2cork, 1, 0, 0);
   tmscm_install_procedure ("cork->utf8",  tmg_cork_2utf8, 1, 0, 0);
@@ -6963,6 +7467,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("widget-enum",  tmg_widget_enum, 5, 0, 0);
   tmscm_install_procedure ("widget-choice",  tmg_widget_choice, 3, 0, 0);
   tmscm_install_procedure ("widget-choices",  tmg_widget_choices, 3, 0, 0);
+  tmscm_install_procedure ("widget-filtered-choice",  tmg_widget_filtered_choice, 4, 0, 0);
   tmscm_install_procedure ("widget-xpm",  tmg_widget_xpm, 1, 0, 0);
   tmscm_install_procedure ("widget-box",  tmg_widget_box, 5, 0, 0);
   tmscm_install_procedure ("widget-glue",  tmg_widget_glue, 4, 0, 0);
@@ -6971,6 +7476,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("widget-vlist",  tmg_widget_vlist, 1, 0, 0);
   tmscm_install_procedure ("widget-aligned",  tmg_widget_aligned, 2, 0, 0);
   tmscm_install_procedure ("widget-tabs",  tmg_widget_tabs, 2, 0, 0);
+  tmscm_install_procedure ("widget-icon-tabs",  tmg_widget_icon_tabs, 3, 0, 0);
   tmscm_install_procedure ("widget-scrollable",  tmg_widget_scrollable, 2, 0, 0);
   tmscm_install_procedure ("widget-resize",  tmg_widget_resize, 8, 0, 0);
   tmscm_install_procedure ("widget-hsplit",  tmg_widget_hsplit, 2, 0, 0);

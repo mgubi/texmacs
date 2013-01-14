@@ -55,12 +55,11 @@
   (with t (help-win-tree)
     (cond ((== where "scheme") (tree-set! t ($doc-explain-scm key)))
           ((== where "macros") (tree-set! t ($doc-explain-macro key)))
-          (else (tree-set! t ($para (string-append (translate "Error.")
-                                                   "help-win-display")))))))
+          (else (tree-set! t ($para (tr "Error: %1" "help-win-display")))))))
 
 (define (help-win-show)
-  (window-set-geometry
-    help-win-handle (get-preference "gui:help-window-geometry"))
+  (with geo (get-preference "gui:help-window-geometry")
+    (if (list? geo) (window-set-geometry help-win-handle geo)))
   (alt-window-show help-win-handle)
   (set-preference "gui:help-window-visible" #t))
 
@@ -104,7 +103,7 @@
                  (geo (get-preference "gui:help-window-geometry")))
             (alt-window-create-quit win wid "Documentation" qui)
             (alt-window-show win)
-            (if geo (window-set-geometry win geo))
+            (if (list? geo) (window-set-geometry win geo))
             (help-win-activate win)))))
 
 ;;;;; Preference handling for the help widget
@@ -123,22 +122,21 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; module browser widget
-;; FIXME: refresh of choice widgets is not working
-;; FIXME: the input widget is not displayed ?
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define mw-module "")
 (tm-define mw-symbol "")
+(tm-define mw-module-filter "")
+(tm-define mw-symbol-filter "")
 
 ; don't make this a variable or we'll construct it when this module loads
 (tm-define (mw-all-modules)
   (map module->string (list-submodules-recursive '(()))))
 
 (tm-define (mw-all-symbols)
-  (map symbol->string (module-exported (string->module mw-module))))
-
-(tm-widget (module-symbols-widget)
-  (scrollable (choice (set! mw-symbol answer) (mw-all-symbols) "")))
+  (map symbol->string 
+       (or (module-exported (string->module mw-module))
+           '())))
 
 (tm-widget (symbol-doc-widget)
   (resize ("200px" "400px" "9000px") ("100px" "200px" "3000px")
@@ -149,18 +147,61 @@
    ("Insert template"
     (insert ($doc-symbol-template (string->symbol mw-symbol) "")))))
 
-(tm-widget (module-widget)
+(tm-widget (module-list-widget)
   (vertical
-    (hsplit
-      (scrollable 
-        (choice (set! mw-module answer)
-                (mw-all-modules)
-                ""))
-      (refresh module-symbols-widget))
-    ===
-    (refresh symbol-doc-widget)
-    ===
-    (refresh symbol-doc-buttons)))
+   (bold (text "Module"))
+   (filtered-choice (begin (set! mw-module answer)
+                           (set! mw-symbol "")
+                           (set! mw-module-filter filter))
+                    (mw-all-modules)
+                    mw-module
+                    mw-module-filter)))
 
-(tm-define (show-module-widget) 
-  (top-window module-widget "Pick module and symbol..."))
+(tm-widget (module-symbols-widget)
+  (vertical
+    (bold (text "Symbols"))
+    (filtered-choice (begin (set! mw-symbol answer) 
+                            (set! mw-symbol-filter filter))
+                     (mw-all-symbols) 
+                     mw-symbol
+                     mw-symbol-filter)))
+
+(tm-widget (module-browser)
+  (vertical
+   (hsplit
+     ; HACK: placing the resize outermost resizes to minimal size
+     ;        (vertical size is still set to min!)
+     (resize ("200px" "300px" "4000px") ("300px" "500px" "4000px")
+       (link module-list-widget))
+       (refresh module-symbols-widget))))
+
+(tm-define (open-module-browser)
+  (set! mw-module "")
+  (set! mw-symbol "")
+  (set! mw-module-filter "")
+  (set! mw-symbol-filter "")
+  (top-window module-browser "Module browser"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; symbol browser widget
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define clw-string "")
+(tm-define clw-string-filter "")
+
+(tm-widget (symbol-browser-widget)
+  (vertical
+   (bold (text "Symbol"))
+   (resize ("200px" "350üpx" "4000px") ("300px" "600px" "4000px")
+     (filtered-choice (begin (set! clw-string answer)
+                             (set! clw-string-filter filter))
+                      (list-sort (scheme-completions-dump) string<?)
+                      clw-string
+                      clw-string-filter))
+   (explicit-buttons
+    ("See definition" (noop)))))
+
+(tm-define (open-symbol-browser)
+  (set! clw-string "")
+  (set! clw-string-filter "")
+  (top-window symbol-browser-widget "Symbol browser"))

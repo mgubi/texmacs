@@ -20,7 +20,7 @@ RESOURCE(dictionary);
 * The dictionary structure
 ******************************************************************************/
 
-class dictionary_rep: public rep<dictionary> {
+struct dictionary_rep: rep<dictionary> {
   hashmap<string,string> table;
   string from, to;
 
@@ -29,10 +29,11 @@ public:
 
   void   load (url fname);
   void   load (string fname);
-  string translate (string s);
+  string translate (string s, bool guess=true);
 };
 
 dictionary load_dictionary (string from, string to);
+void force_load_dictionary (string from, string to);
 void set_input_language (string s);
 string get_input_language ();
 void set_output_language (string s);
@@ -40,6 +41,7 @@ string get_output_language ();
 
 string translate (string s, string from, string to);
 string translate (string s);
+string translate_as_is (string s);
 string translate (const char* s);
 tree   tree_translate (tree t, string from, string to);
 tree   tree_translate (tree s);

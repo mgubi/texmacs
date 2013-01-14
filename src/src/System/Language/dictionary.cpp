@@ -14,6 +14,7 @@
 #include "convert.hpp"
 #include "converter.hpp"
 #include "drd_std.hpp"
+#include "Scheme/object.hpp"
 
 RESOURCE_CODE(dictionary);
 
@@ -41,16 +42,16 @@ dictionary_rep::load (url u) {
   int i, n= N(t);
   for (i=0; i<n; i++)
     if (is_func (t[i], TUPLE, 2) &&
-	is_atomic (t[i][0]) && is_atomic (t[i][1]))
-      {
-	string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
-	string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
-	if ( to == "chinese" ||  to == "japanese"  || 
-	     to == "korean"  ||  to == "taiwanese" ||
-	     to == "russian" ||  to == "ukrainian" ||  to == "bulgarian")
-	  r= utf8_to_cork (r);
-	table (l)= r;
-      }
+        is_atomic (t[i][0]) && is_atomic (t[i][1]))
+    {
+      string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
+      string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
+      if (to == "chinese" ||  to == "japanese"  ||
+          to == "korean"  ||  to == "taiwanese" ||
+          to == "russian" ||  to == "ukrainian" || to == "bulgarian")
+        r= utf8_to_cork (r);
+      table (l)= r;
+    }
 }
 
 void
@@ -76,14 +77,22 @@ load_dictionary (string from, string to) {
 ******************************************************************************/
 
 string
-dictionary_rep::translate (string s) {
-  // Is s in dictionary?
+dictionary_rep::translate (string s, bool guess) {
   if (s == "" || from == to) return s;
   //cout << "Translate <" << s << ">\n";
+  // Is s in dictionary?
   if (table->contains (s) && table[s] != "")
     return table[s];
-
-  // remove trailing non iso_alpha characters
+  
+  // Is lowercase version of s in dictionary?
+  string ls= locase_first (s);
+  if (table->contains (ls) && table[ls] != "")
+    return upcase_first (table[ls]);
+  
+  // Attempt to split the string and translate its parts?
+  if (!guess) return s;
+  
+  // Remove trailing non iso_alpha characters
   int i, n= N(s);
   for (i=0; i<n; i++)
     if (is_iso_alpha (s[i]))
@@ -107,12 +116,7 @@ dictionary_rep::translate (string s) {
     return s1 * s2 * s3;
   }
 
-  // Is lowercase version of s in dictionary?
-  string ls= locase_first (s);
-  if (table->contains (ls) && table[ls] != "")
-    return upcase_first (table[ls]);
-
-  // break at last non iso_alpha character which is not a space
+  // Break at last non iso_alpha character which is not a space
   for (i=n; i>0; i--)
     if (!is_iso_alpha (s[i-1]) && s[i-1] != ' ')
       break;
@@ -122,7 +126,7 @@ dictionary_rep::translate (string s) {
     return s1 * s2;
   }
 
-  // no translation available
+  // No translation available
   return s;
 }
 
@@ -153,6 +157,21 @@ translate (string s) {
 string
 translate (const char* s) {
   return translate (string (s), "english", out_lan);
+}
+
+void
+force_load_dictionary (string from, string to) {
+  string name= from * "-" * to;
+  if (dictionary::instances -> contains (name))
+    dictionary::instances -> reset (name);
+  load_dictionary (from, to);
+  eval ("(notify-preference \"language\")");
+}
+
+string
+translate_as_is (string s) {
+  dictionary dict= load_dictionary ("english", out_lan);
+  return dict->translate (s, false);
 }
 
 /******************************************************************************

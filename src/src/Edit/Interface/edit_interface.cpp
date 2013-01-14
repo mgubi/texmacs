@@ -19,6 +19,7 @@
 #include "drd_mode.hpp"
 #include "message.hpp"
 #include "tree_traverse.hpp"
+#include "boot.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Evaluate/evaluate_main.hpp"
 #endif
@@ -48,8 +49,9 @@ edit_interface_rep::edit_interface_rep ():
   sh_s (""), sh_mark (0), pre_edit_s (""), pre_edit_mark (0),
   popup_win (),
   message_l (""), message_r (""), last_l (""), last_r (""),
-  sfactor (sv->get_default_shrinking_factor ()),
-  pixel (sfactor*PIXEL), copy_always (),
+  zoomf (sv->get_default_zoom_factor ()),
+  magf (zoomf / std_shrinkf),
+  pixel (::round ((std_shrinkf * PIXEL) / zoomf)), copy_always (),
   last_x (0), last_y (0), last_t (0),
   made_selection (false), table_selection (false), mouse_adjusting(false),
   oc (0, 0), temp_invalid_cursor (false),
@@ -112,19 +114,16 @@ edit_interface_rep::get_pixel_size () {
 }
 
 void
-edit_interface_rep::set_shrinking_factor (int sf) {
-  if (sfactor != sf) {
-    sfactor= sf;
-    pixel  = sf*PIXEL;
-    init_env (SFACTOR, as_string (sf));
-    notify_change (THE_ENVIRONMENT);
-  }
+edit_interface_rep::set_zoom_factor (double zoom) {
+  zoomf = zoom;
+  magf  = zoomf / std_shrinkf;
+  pixel = (int) ::round ((std_shrinkf * PIXEL) / zoomf);
 }
 
 void
 edit_interface_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
-  send_invalidate (this, (x1-sfactor+1)/sfactor, (y1-sfactor+1)/sfactor,
-		         (x2+sfactor-1)/sfactor, (y2+sfactor-1)/sfactor);
+  send_invalidate (this, (SI) floor (x1*magf), (SI) floor (y1*magf),
+                         (SI) ceil  (x2*magf), (SI) ceil  (y2*magf));
 }
 
 void
@@ -139,28 +138,61 @@ edit_interface_rep::invalidate (rectangles rs) {
 void
 edit_interface_rep::update_visible () {
   SERVER (get_visible (vx1, vy1, vx2, vy2));
-  vx1 *= sfactor; vy1 *= sfactor; vx2 *= sfactor; vy2 *= sfactor;
+  vx1= (SI) (vx1 / magf); vy1= (SI) (vy1 / magf);
+  vx2= (SI) (vx2 / magf); vy2= (SI) (vy2 / magf);
+}
+
+SI
+edit_interface_rep::get_visible_width () {
+  update_visible ();
+  return vx2 - vx1;
+}
+
+SI
+edit_interface_rep::get_visible_height () {
+  update_visible ();
+  return vy2 - vy1;
+}
+
+SI
+edit_interface_rep::get_window_width () {
+  SI w, h;
+  widget me= ::get_canvas (widget (cvw));
+  ::get_size (me, w, h);
+  bool sb= (get_init_string (SCROLL_BARS) != "false");
+#ifdef QTTEXMACS
+#  ifdef OS_MACOS
+  if (sb) w -= 17 * PIXEL;
+#  else
+  if (sb) w -= 24 * PIXEL;
+#  endif
+#else
+  if (sb) w -= 20 * PIXEL;
+#endif
+  return w;
 }
 
 SI
 edit_interface_rep::get_window_height () {
-  update_visible ();
-  return vy2 - vy1;
+  SI w, h;
+  widget me= ::get_canvas (widget (cvw));
+  ::get_size (me, w, h);
+  return h;
 }
 
 void
 edit_interface_rep::scroll_to (SI x, SI y) {
   stored_rects= rectangles ();
   copy_always = rectangles ();
-  SERVER (scroll_to (x/sfactor, y/sfactor));
+  SERVER (scroll_to ((SI) (x * magf), ((SI) (y * magf))));
 }
 
 void
 edit_interface_rep::set_extents (SI x1, SI y1, SI x2, SI y2) {
   stored_rects= rectangles ();
   copy_always = rectangles ();
-  SERVER (set_extents ((x1-sfactor+1)/sfactor, (y1-sfactor+1)/sfactor,
-		       (x2+sfactor-1)/sfactor, (y2+sfactor-1)/sfactor));
+  SERVER (set_extents ((SI) floor (x1*magf), (SI) floor (y1*magf),
+                       (SI) ceil  (x2*magf), (SI) ceil  (y2*magf)));
 }
 
 /******************************************************************************
@@ -408,6 +440,7 @@ edit_interface_rep::apply_changes () {
       if (!get_renderer (this) -> interrupted ()) drd_update ();
       cache_memorize ();
       last_update= last_change;
+      save_user_preferences ();
     }
     return;
   }
@@ -420,6 +453,14 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling automatic resizing\n";
   int sb= 1;
+  if (is_attached (this) && has_current_window ()) {
+    tree new_zoom= as_string (zoomf);
+    tree old_zoom= get_init_value (ZOOM_FACTOR);
+    if (new_zoom != old_zoom) {
+      init_env (ZOOM_FACTOR, new_zoom);
+      notify_change (THE_ENVIRONMENT);
+    }
+  }
   if (is_attached (this) &&
       has_current_window () &&
       get_init_string (PAGE_MEDIUM) == "automatic")
@@ -436,8 +477,8 @@ edit_interface_rep::apply_changes () {
 #endif
       if (wx != cur_wx || wy != cur_wy) {
 	cur_wx= wx; cur_wy= wy;
-	init_env (PAGE_SCREEN_WIDTH, as_string (wx*sfactor) * "tmpt");
-	init_env (PAGE_SCREEN_HEIGHT, as_string (wy*sfactor) * "tmpt");
+	init_env (PAGE_SCREEN_WIDTH, as_string ((SI) (wx/magf)) * "tmpt");
+	init_env (PAGE_SCREEN_HEIGHT, as_string ((SI) (wy/magf)) * "tmpt");
 	notify_change (THE_ENVIRONMENT);
       }
     }
@@ -530,7 +571,8 @@ edit_interface_rep::apply_changes () {
     oc= copy (cu);
    
     // set hot spot in the gui
-    send_cursor (this, (cu->ox-sfactor+1)/sfactor, (cu->oy-sfactor+1)/sfactor);
+    send_cursor (this, (SI) floor (cu->ox * magf),
+                       (SI) floor (cu->oy * magf));
 
     path sp= selection_get_cursor_path ();
     bool semantic_flag= semantic_active (path_up (sp));
@@ -705,7 +747,7 @@ edit_interface_rep::search_cursor (path p) {
 selection
 edit_interface_rep::search_selection (path start, path end) {
   selection sel= eb->find_check_selection (start, end);
-  rectangle r= least_upper_bound (sel->rs) / 5;
+  rectangle r= least_upper_bound (sel->rs) / std_shrinkf;
   return sel;
 }
 
@@ -725,6 +767,6 @@ edit_interface_rep::handle_notify_resize (SI w, SI h) {
 }
 
 void
-edit_interface_rep::handle_set_shrinking_factor (int sf) {
-  set_shrinking_factor (sf);
+edit_interface_rep::handle_set_zoom_factor (double zoom) {
+  set_zoom_factor (zoom);
 }

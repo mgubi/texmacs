@@ -1,4 +1,4 @@
-<TeXmacs|1.0.4.2>
+<TeXmacs|1.0.7.17>
 
 <style|tmdoc>
 
@@ -38,9 +38,9 @@
   Titel-Informationen:>
 
   <\explain>
-    <explain-macro|doc-data-main|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-data-main|data-1|<math|\<cdots\>>|data-n>
 
-    <explain-macro|doc-data-main*|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-data-main*|data-1|<math|\<cdots\>>|data-n>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die im eigentlichen Titel
     erscheinen sollen. Die <markup|doc-data-main*> Variante wird benötigt,
@@ -48,21 +48,21 @@
   </explain>
 
   <\explain>
-    <explain-macro|doc-data-note|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-data-note|data-1|<math|\<cdots\>>|data-n>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die in der Fuÿnote erscheinen
     sollen.
   </explain>
 
   <\explain>
-    <explain-macro|doc-data-abstract|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-data-abstract|data-1|<math|\<cdots\>>|data-n>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die in der Zusammenfassung
     erscheinen sollen.
   </explain>
 
   <\explain>
-    <explain-macro|doc-data-hidden|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-data-hidden|data-1|<math|\<cdots\>>|data-n>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die möglicherweise nicht
     sichtbar sein sollen oder die keinesfalls sichtbar erscheinen sollen.
@@ -72,14 +72,14 @@
   Autor-Informationen:>
 
   <\explain>
-    <explain-macro|doc-author-main|<with|font-shape|right|<explain-macro|doc-author-data|data-1|<with|mode|math|\<cdots\>>|data-n>>>
+    <explain-macro|doc-author-main|<with|font-shape|right|<explain-macro|author-data|data-1|<math|\<cdots\>>|data-n>>>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die in der Fuÿnote erscheinen
     sollen.
   </explain>
 
   <\explain>
-    <explain-macro|doc-author-note|data-1|<with|mode|math|\<cdots\>>|data-n>
+    <explain-macro|doc-author-note|data-1|<math|\<cdots\>>|data-n>
   <|explain>
     Dieses Makro sammelt und sortiert Daten, die in der Fuÿnote erscheinen
     sollen.
@@ -89,15 +89,15 @@
   zurück mit den gesammelten Daten als Kinder. Z.B.\ 
 
   <\tm-fragment>
-    <inactive*|<style-with|src-compact|none|<doc-author-main|<author-address|Somewhere
-    in Africa>|<author-name|The big GNU>|<author-note|Very hairy indeed!>>>>
+    <inactive*|<style-with|src-compact|none|<doc-author-main|<author-affiliation|Somewhere
+    in Africa>|<author-name|The big GNU>|<author-misc|Very hairy indeed!>>>>
   </tm-fragment>
 
   gibt typischerweise
 
   <\tm-fragment>
     <with|src-special|raw|<inactive*|<\style-with|src-compact|none>
-      <author-address|Somewhere in Africa>
+      <author-affiliation|Somewhere in Africa>
 
       <author-name|The big GNU>
     </style-with>>>

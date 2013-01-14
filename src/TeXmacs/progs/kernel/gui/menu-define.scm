@@ -102,6 +102,10 @@
   (require-format x '(choices :%3))
   `($choices ,@(cdr x)))
 
+(define (gui-make-filtered-choice x)
+  (require-format x '(filtered-choice :%4))
+  `($filtered-choice ,@(cdr x)))
+
 (define (gui-make-toggle x)
   (require-format x '(toggle :%2))
   `($toggle ,@(cdr x)))
@@ -109,6 +113,10 @@
 (define (gui-make-icon x)
   (require-format x '(icon :%1))
   `($icon ,(cadr x)))
+
+(define (gui-make-tr x)
+  (require-format x '(tr :%1 :*))
+  `($tr ,(cadr x) ,(cddr x)))
 
 (define (gui-make-concat x)
   (require-format x '(concat :*))
@@ -124,7 +132,7 @@
 
 (define (gui-make-balloon x)
   (require-format x '(balloon :%2))
-  `($balloon ,(gui-make (cadr x)) ,(caddr x)))
+  `($balloon ,(gui-make (cadr x)) ,(gui-make (caddr x))))
 
 (define (gui-make-submenu x)
   (require-format x '(-> :%1 :*))
@@ -169,6 +177,14 @@
 (define (gui-make-tab x)
   (require-format x '(tab :%1 :*))
   `($tab ,@(map gui-make (cdr x))))
+
+(define (gui-make-icon-tabs x)
+  (require-format x '(icon-tabs :*))
+  `($icon-tabs ,@(map gui-make (cdr x))))
+
+(define (gui-make-icon-tab x)
+  (require-format x '(icon-tab :%2 :*))
+  `($icon-tab ,@(map gui-make (cdr x))))
 
 (define (gui-make-inert x)
   (require-format x '(inert :*))
@@ -316,8 +332,10 @@
   (enum ,gui-make-enum)
   (choice ,gui-make-choice)
   (choices ,gui-make-choices)
+  (filtered-choice ,gui-make-filtered-choice)
   (toggle ,gui-make-toggle)
   (icon ,gui-make-icon)
+  (tr ,gui-make-tr)
   (concat ,gui-make-concat)
   (verbatim ,gui-make-verbatim)
   (check ,gui-make-check)
@@ -333,6 +351,8 @@
   (meti ,gui-make-meti)
   (tabs ,gui-make-tabs)
   (tab ,gui-make-tab)
+  (icon-tabs ,gui-make-icon-tabs)
+  (icon-tab ,gui-make-icon-tab)
   (inert ,gui-make-inert)
   (explicit-buttons ,gui-make-explicit-buttons)
   (bold ,gui-make-bold)
@@ -373,11 +393,11 @@
                ((== x (string->symbol "|")) '$/)
                (else
                  (texmacs-error "gui-make" "invalid menu item ~S" x))))
-	((string? x) x)
+        ((string? x) x)
         ((and (pair? x) (ahash-ref gui-make-table (car x)))
          (apply (car (ahash-ref gui-make-table (car x))) (list x)))
-	((and (pair? x) (or (string? (car x)) (pair? (car x))))
-	 `($> ,(gui-make (car x)) ,@(cdr x)))
+        ((and (pair? x) (or (string? (car x)) (pair? (car x))))
+         `($> ,(gui-make (car x)) ,@(cdr x)))
         (else
           (texmacs-error "gui-make" "invalid menu item ~S" x))))
 

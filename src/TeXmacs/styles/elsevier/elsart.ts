@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.5>
+<TeXmacs|1.0.7.17>
 
 <style|source>
 
@@ -24,7 +24,7 @@
     </src-title>
   </active*>
 
-  <use-package|std|env-base|env-flush-math|env-theorem|env-float|header-article|section-article|title-generic|std-latex|cite-author-year>
+  <use-package|std|env-base|env-flush-math|env-theorem|env-float|header-article|section-article|title-generic|std-latex|cite-author-year|env-program>
 
   <active*|<\src-comment>
     TeX-like style parameters.
@@ -202,15 +202,15 @@
     </src-comment>
   </active*>
 
-  <assign|aligned-item|<macro|x|<style-with|src-compact|none|<vspace*|0.0fn><with|par-first|-2.5fn|<yes-indent>><resize|<arg|x>|r-2.2fn|||><hspace|0.3fn>>>>
+  <assign|aligned-item|<macro|x|<style-with|src-compact|none|<vspace*|0.0fn><with|par-first|-2.5fn|<yes-indent>><resize|<arg|x>|<minus|1r|2.2fn>|||><hspace|0.3fn>>>>
 
   <assign|render-list|<macro|body|<surround|<no-page-break*>|<right-flush><no-indent*>|<with|par-left|<plus|<value|par-left>|1.5fn>|par-sep|0.2fn|par-par-sep|0fn|<arg|body>>>>>
 
   \;
 
-  <new-list|itemize-1|<value|aligned-space-item>|<macro|x|<active*|<with|mode|math|<group|\<bullet\>>>>>>
+  <new-list|itemize-1|<value|aligned-space-item>|<macro|x|<active*|<with|mode|math|<rigid|\<bullet\>>>>>>
 
-  <new-list|itemize-2|<value|aligned-space-item>|<macro|x|<active*|<with|mode|math|<group|\<cdot\>>>>>>
+  <new-list|itemize-2|<value|aligned-space-item>|<macro|x|<active*|<with|mode|math|<rigid|\<cdot\>>>>>>
 
   <new-list|itemize-3|<value|aligned-space-item>|<macro|x|>>
 
@@ -224,8 +224,14 @@
     </src-comment>
   </active*>
 
+  <assign|render-bibliography|<\macro|name|body>
+    <principal-section*|<arg|name>><yes-indent*>
+
+    <with|par-first|0fn|par-par-sep|0fn|font-size|0.84|<arg|body>>
+  </macro>>
+
   <assign|bib-list|<\macro|largest|body>
-    <\with|par-left|1em|par-first|-1em|font-size|1>
+    <\with|par-left|1em|par-first|-1em|font-size|1|bibitem*|>
       <arg|body>
     </with>
   </macro>>
@@ -236,7 +242,7 @@
 
   <assign|by-text|<macro|<localize|>>>
 
-  <assign|doc-abstract|<macro|body|<\surround|<vspace*|2fn>|<right-flush><vspace|1fn>>
+  <assign|render-abstract|<macro|body|<\surround|<vspace*|2fn>|<right-flush><vspace|1fn>>
     <\with|par-first|10pt|par-par-sep|5pt|font-base-size|9>
       <\surround|<hrule><next-line>|<next-line><hrule><yes-indent>>
         <no-indent><with|font-series|bold|<abstract-text>><vspace|5pt><no-page-break>
@@ -251,7 +257,7 @@
   </src-comment>>
 
   <style-only|<\with|mode|math>
-    <assign|reduce|<macro|x|<resize|<arg|x>|l+0.1fn|b+0.15fn|r-0.1fn|t-0.15fn>>>
+    <assign|reduce|<macro|x|<resize|<arg|x>|<plus|1l|0.1fn>|<plus|1b|0.15fn>|<minus|1r|0.1fn>|<minus|1t|0.15fn>>>>
 
     <assign|smfrac|<macro|x|y|<with|math-display|false|<style-with|src-compact|none|<frac|<move|<reduce|<arg|x>>||-0.175fn>|<move|<reduce|<arg|y>>||0.125fn>>>>>>
 
@@ -293,7 +299,7 @@
 
     <assign|FMslash|<macro|sym|<neg|<arg|sym>>>>
 
-    <assign|FMSlash|<macro|sym|<neg|<resize|<arg|sym>|l-0.1fn|b-0.1fn|r+0.1fn|t+0.1fn|>>>>
+    <assign|FMSlash|<macro|sym|<neg|<resize|<arg|sym>|<minus|1l|0.1fn>|<minus|1b|0.1fn>|<plus|1r|0.1fn>|<plus|1t|0.1fn>>>>>
   </with>>
 
   \;

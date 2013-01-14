@@ -28,6 +28,9 @@
   (", ," "")
   ("sz" "ÿ")
   ("- - -" (make 'emdash))
+  ("- var" (make 'nbhyph))
+  ("space var" (make 'nbsp))
+  ("space var var" (make-space "1em"))
   ;;("- -" "")
   ;;("' '" "")
   ;;("` `" "")
@@ -291,3 +294,14 @@
 (kbd-map
   (:mode in-cyrillic?)
   ("modeswitch" (make-with "language" "english") (make-with "font" "roman")))
+  
+(kbd-map                       ; overwrite shortcuts inadequate for verbatim
+  (:mode in-verbatim?)
+  ("\"" "\"")
+  ("< <" "<less><less>")
+  ("> >" "<gtr><gtr>")
+  (", ," ",,")
+  ("- - -" "---")
+  ("- var" "-")
+  ("space var" "    ")         ; FIXME: arbitrarily set to 4 spaces
+  ("space var var" "    "))    ; FIXME: arbitrarily set to 4 spaces

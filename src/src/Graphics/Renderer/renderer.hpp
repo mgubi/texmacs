@@ -28,29 +28,34 @@ typedef unsigned int color;
 class renderer_rep;
 typedef renderer_rep* renderer;
 class x_drawable_rep;
+class qt_renderer_rep;
 class rectangle;
 typedef list<rectangle> rectangles;
+extern int std_shrinkf;
 
 class renderer_rep {
 public:
   SI  ox, oy;               // origin
   SI  cx1, cy1, cx2, cy2;   // visible region (clipping)
-  int sfactor;              // shrinking factor
-  int pixel;                // PIXEL*sfactor
-  int thicken;              // extra thinkening = (sfactor>>1)*PIXEL
+  bool is_screen;           // flag for renderers on screen
+  double zoomf;             // zoom factor
+  int shrinkf;              // shrinking factor
+  int pixel;                // size of a pixel on the screen
+  int thicken;              // extra thinkening when anti-aliasing characters
   renderer master;          // master renderer in case of shadow renderers
   tree pattern;             // current background pattern
   int pattern_alpha;        // current background pattern transparency
   rectangles clip_stack;    // stack with clipping regions
 
 public:
-  renderer_rep ();
+  renderer_rep (bool screen_flag);
   virtual ~renderer_rep ();
 
   /* routines for specific renderers */
   virtual bool is_printer ();
   virtual bool is_x_drawable ();
   virtual x_drawable_rep* as_x_drawable ();
+  virtual qt_renderer_rep* as_qt_renderer ();
   virtual void get_extents (int& w, int& h);
   virtual void next_page ();
   virtual bool repainted ();
@@ -59,7 +64,9 @@ public:
   /* basic routines */
   void set_origin (SI x, SI y);
   void move_origin (SI dx, SI dy);
-  void set_shrinking_factor (int sfactor);
+  void set_zoom_factor (double zoom);
+  void reset_zoom_factor ();
+  void set_shrinking_factor (int sf);
   void round (SI& x, SI& y);
   void inner_round (SI& x1, SI& y1, SI& x2, SI& y2);
   void outer_round (SI& x1, SI& y1, SI& x2, SI& y2);
@@ -116,6 +123,7 @@ public:
   virtual void draw_selection (rectangles rs);
 };
 
+double normal_zoom (double zoom);
 void abs_round (SI& l);
 void abs_round (SI& x, SI& y);
 void abs_inner_round (SI& x1, SI& y1, SI& x2, SI& y2);

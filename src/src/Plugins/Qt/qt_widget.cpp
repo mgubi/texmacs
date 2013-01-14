@@ -21,6 +21,8 @@
 #include "qt_color_picker_widget.hpp"
 #include "qt_printer_widget.hpp"
 
+#include "window.hpp"
+
 #include <QWidget>
 #include <QWidgetItem>
 #include "QTMMenuHelper.hpp"
@@ -194,7 +196,7 @@ qt_widget_rep::save_send_slot (slot s, blackbox val) {
   sent_slots[s].seq = sequencer;
   sent_slots[s].val = val;
   sent_slots[s].id  = s.sid;
-  sequencer = ++sequencer % slot_id__LAST;
+  sequencer = (sequencer + 1) % slot_id__LAST;
 }
 
 
@@ -233,7 +235,18 @@ qt_widget_rep::reapply_sent_slots () {
 */
 widget
 plain_window_widget (widget w, string s, command q) {
-  return concrete(w)->plain_window_widget (s, q);
+  widget win= concrete(w)->plain_window_widget (s, q);
+  if (s != "popup") {
+    int xx, yy, ww, hh;
+    xx = yy = ww = hh = -1;
+    get_preferred_position (s, xx, yy);
+    get_preferred_size (s, ww, hh);
+    if (xx != -1)
+      set_position (win, xx, yy);
+    if (ww != -1)
+      set_size (win, ww, hh);
+  }
+  return win;
 }
 
 /*! Creates an undecorated window with name s and contents w.
@@ -295,6 +308,9 @@ widget aligned_widget (array<widget> lhs, array<widget> rhs, SI hsep, SI vsep, S
                                      close_box (T (lhs,rhs, coord4 (hsep, vsep, lpad, rpad)))); }
 widget tabs_widget (array<widget> tabs, array<widget> bodies) {
   return qt_ui_element_rep::create (qt_widget_rep::tabs_widget, tabs, bodies); }
+widget icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs) {
+  return qt_ui_element_rep::create (qt_widget_rep::icon_tabs_widget,
+                                    us, ts, bs); }
 widget wrapped_widget (widget w, command cmd) {
   return qt_ui_element_rep::create (qt_widget_rep::wrapped_widget, w, cmd); }
 widget tile_menu (array<widget> a, int cols) { 
@@ -321,13 +337,15 @@ widget toggle_widget (command cmd, bool on, int style) {
   return qt_ui_element_rep::create (qt_widget_rep::toggle_widget, cmd, on, style); }
 widget enum_widget (command cmd, array<string> vals, string val, int style, string width) { 
   return qt_ui_element_rep::create (qt_widget_rep::enum_widget, cmd, vals, val, style, width); }
-widget choice_widget (command cmd, array<string> vals, array<string> chosen) { 
+widget choice_widget (command cmd, array<string> vals, array<string> chosen) {
   return qt_ui_element_rep::create(qt_widget_rep::choice_widget, cmd, vals, chosen, true); }
 widget choice_widget (command cmd, array<string> vals, string cur) {
   array<string> chosen (1);
   chosen[0]= cur;
   return qt_ui_element_rep::create(qt_widget_rep::choice_widget, cmd, vals, chosen, false); }
-widget user_canvas_widget (widget wid, int style) { 
+widget choice_widget (command cmd, array<string> vals, string cur, string filter) {
+  return qt_ui_element_rep::create(qt_widget_rep::filtered_choice_widget, cmd, vals, cur, filter); }
+widget user_canvas_widget (widget wid, int style) {
   return qt_ui_element_rep::create(qt_widget_rep::scrollable_widget, wid, style); }
 widget resize_widget (widget w, int style, string w1, string h1,
                       string w2, string h2, string w3, string h3) {

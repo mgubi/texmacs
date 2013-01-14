@@ -181,3 +181,15 @@ wk_widget
 tabs_widget (array<wk_widget> a, array<wk_widget> b) {
   return tm_new<tabs_widget_rep> (a, b);
 }
+
+wk_widget
+icon_tabs_widget (array<url> us, array<wk_widget> a, array<wk_widget> b) {
+  ASSERT (N(us) == N(a) && N(a) == N(b), "invalid icon bar");
+  array<wk_widget> tabs;
+  for (int i=0; i<N(us); i++) {
+    wk_widget icon= xpm_wk_widget (us[i]);
+    wk_widget vert= vertical_list (array<wk_widget> (icon, a[i]));
+    tabs << vert;
+  }
+  return tm_new<tabs_widget_rep> (tabs, b);
+}

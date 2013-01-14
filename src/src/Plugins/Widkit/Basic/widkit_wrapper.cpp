@@ -99,6 +99,11 @@ tabs_widget (array<widget> tabs, array<widget> bodies) {
 }
 
 widget
+icon_tabs_widget (array<url> us, array<widget> tabs, array<widget> bodies) {
+  return abstract (icon_tabs_widget (us, concrete (tabs), concrete (bodies)));
+}
+
+widget
 horizontal_menu (array<widget> a) {
   return abstract (horizontal_list (concrete (a)));
   //return abstract (horizontal_array (concrete (a), -1));
@@ -287,6 +292,12 @@ choice_widget (command cb, array<string> vals, array<string> mc) {
 }
 
 widget
+choice_widget (command cb, array<string> vals, string v, string f) {
+    // FIXME: not implemented
+  return abstract (choice_wk_widget (cb, vals, v));
+}
+
+widget
 file_chooser_widget (command cmd, string type, bool save) {
   return abstract (file_chooser_wk_widget (cmd, type));
 }
@@ -443,6 +454,12 @@ void
 send_int (wk_widget w, string key, blackbox val) {
   ASSERT (type_box (val) == type_helper<int>::id, "type mismatch");
   w << set_integer (key, open_box<int> (val));
+}
+
+void
+send_double (wk_widget w, string key, blackbox val) {
+  ASSERT (type_box (val) == type_helper<double>::id, "type mismatch");
+  w << set_double (key, open_box<double> (val));
 }
 
 void
@@ -646,8 +663,8 @@ wk_widget_rep::send (slot s, blackbox val) {
     // this message is currently ignored. Used only in TeXmacs/Qt
     break;
       
-  case SLOT_SHRINKING_FACTOR:
-    send_int (THIS, "shrinking factor", val);
+  case SLOT_ZOOM_FACTOR:
+    send_double (THIS, "zoom factor", val);
     break;
   case SLOT_EXTENTS:
     send_coord4 (THIS, "extents", val);

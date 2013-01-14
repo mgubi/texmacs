@@ -35,13 +35,15 @@ struct tex_font_rep: font_rep {
   tex_font_metric  tfm;
   font_glyphs      pk;
   double           unit;
+  bool             exec;             // execute ligature and kerning program?
 
   tex_font_rep (string name, int status,
 		string family, int size, int dpi, int dsize);
 
   void get_extents (string s, metric& ex);
   void get_xpositions (string s, SI* xpos);
-  void draw (renderer ren, string s, SI x, SI y);
+  void draw_fixed (renderer ren, string s, SI x, SI y);
+  font magnify (double zoom);
   SI   get_left_correction (string s);
   SI   get_right_correction (string s);
   glyph get_glyph (string s);
@@ -84,6 +86,7 @@ tex_font_rep::tex_font_rep (string name, int status2,
   extra->min   = extra->min >> 1;
   extra->max   = extra->min << 1;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
+  exec         = ! ends (family, "tt");
 
   y1           = conv (-262080);   // -0.25 quad
   y2           = y1+ display_size; //  0.75 quad
@@ -208,7 +211,7 @@ tex_font_rep::special_draw (renderer ren, string s, SI x, SI y) {
   metric ex;
   for (i=0; i<N(s); i++)
     if (s[i]=='<') break;
-  draw (ren, s (0, i), x, y);
+  draw_fixed (ren, s (0, i), x, y);
   get_extents (s (0, i), ex);
   x += ex->x2;
   for (j=i+1; j<N(s); j++)
@@ -222,13 +225,13 @@ tex_font_rep::special_draw (renderer ren, string s, SI x, SI y) {
   color c= ren->get_color ();
   if (N(rr) != 0) r= rr;
   else ren->set_color (red);
-  draw (ren, r, x, y);
+  draw_fixed (ren, r, x, y);
   ren->set_color (c);
   get_extents (r, ex);
   x += ex->x2;
   status= temp;
   
-  draw (ren, s (j, N(s)), x, y);
+  draw_fixed (ren, s (j, N(s)), x, y);
 }
 
 SI
@@ -254,79 +257,79 @@ tex_font_rep::special_get_right_correction (string s) {
 ******************************************************************************/
 
 static char CM_unaccented[128]= {
-  'A', ' ', 'C', 'C', 'D', 'E', ' ', 'G',
-  'L', 'L', ' ', 'N', 'N', ' ', 'O', 'R',
-  'R', 'S', 'S', 'S', 'T', 'T', 'U', 'U',
-  'Y', 'Z', 'Z', 'Z', ' ', 'I', 'd', ' ',
-  'a', ' ', 'c', 'c', 'd', 'e', ' ', 'g',
-  'l', 'l', ' ', 'n', 'n', ' ', 'o', 'r',
-  'r', 's', 's', 's', 't', 't', 'u', 'u',
-  'y', 'z', 'z', 'z', ' ', 60 , 62 , ' ',
-  'A', 'A', 'A', 'A', 'A', 'A', 29 , 'C',
-  'E', 'E', 'E', 'E', 'I', 'I', 'I', 'I',
-  'D', 'N', 'O', 'O', 'O', 'O', 'O', 30 ,
-  31 , 'U', 'U', 'U', 'U', 'Y', ' ', ' ',
-  'a', 'a', 'a', 'a', 'a', 'a', 26 , 'c',
-  'e', 'e', 'e', 'e', 16 , 16 , 16 , 16 ,
-  'd', 'n', 'o', 'o', 'o', 'o', 'o', 27 ,
-  28 , 'u', 'u', 'u', 'u', 'y', ' ', 25
+    'A', ' ', 'C', 'C',   'D',   'E',   ' ',   'G', 
+    'L', 'L', ' ', 'N',   'N',   ' ',   'O',   'R', 
+    'R', 'S', 'S', 'S',   'T',   'T',   'U',   'U', 
+    'Y', 'Z', 'Z', 'Z',   ' ',   'I',   'd',   ' ', 
+    'a', ' ', 'c', 'c',   'd',   'e',   ' ',   'g', 
+    'l', 'l', ' ', 'n',   'n',   ' ',   'o',   'r', 
+    'r', 's', 's', 's',   't',   't',   'u',   'u', 
+    'y', 'z', 'z', 'z',   ' ', '\74', '\76',   ' ', 
+    'A', 'A', 'A', 'A',   'A',   'A', '\35',   'C', 
+    'E', 'E', 'E', 'E',   'I',   'I',   'I',   'I', 
+    'D', 'N', 'O', 'O',   'O',   'O',   'O', '\36', 
+  '\37', 'U', 'U', 'U',   'U',   'Y',   ' ',   ' ', 
+    'a', 'a', 'a', 'a',   'a',   'a', '\32',   'c', 
+    'e', 'e', 'e', 'e', '\20', '\20', '\20', '\20', 
+    'd', 'n', 'o', 'o',   'o',   'o',   'o', '\33', 
+  '\34', 'u', 'u', 'u',   'u',   'y',   ' ', '\31'
 };
 
 static char CM_accents[128]= {
-  21 , ' ', 19 , 20 , 20 , 20 , ' ', 21 ,
-  19 , 39 , ' ', 19 , 20 , ' ', 125, 19 ,
-  20 , 19 , 20 , 24 , 20 , 24 , 125, 23 ,
-  127, 19 , 20 , 95 , ' ', 95 , 22 , ' ',
-  21 , ' ', 19 , 20 , 20 , 20 , ' ', 21 ,
-  19 , 39 , ' ', 19 , 20 , ' ', 125, 19 ,
-  20 , 19 , 20 , 24 , 20 , 24 , 125, 23 ,
-  127, 19 , 20 , 95 , ' ', ' ', ' ', ' ',
-  18 , 19 , 94 , 126, 127, 23 , ' ', 24 ,
-  18 , 19 , 94 , 127, 18 , 19 , 94 , 127,
-  22 , 126, 18 , 19 , 94 , 126, 127, ' ',
-  ' ', 18 , 19 , 94 , 127, 19 , ' ', ' ',
-  18 , 19 , 94 , 126, 127, 23 , ' ', 24 ,
-  18 , 19 , 94 , 127, 18 , 19 , 94 , 127,
-  22 , 126, 18 , 19 , 94 , 126, 127, ' ',
-  ' ', 18 , 19 , 94 , 127, 19 , ' ', ' '
+   '\25',    ' ',  '\23',  '\24',  '\24',  '\24',    ' ',  '\25', 
+   '\23',  '\47',    ' ',  '\23',  '\24',    ' ', '\175',  '\23', 
+   '\24',  '\23',  '\24',  '\30',  '\24',  '\30', '\175',  '\27', 
+  '\177',  '\23',  '\24', '\137',    ' ', '\137',  '\26',    ' ', 
+   '\25',    ' ',  '\23',  '\24',  '\24',  '\24',    ' ',  '\25', 
+   '\23',  '\47',    ' ',  '\23',  '\24',    ' ', '\175',  '\23', 
+   '\24',  '\23',  '\24',  '\30',  '\24',  '\30', '\175',  '\27', 
+  '\177',  '\23',  '\24', '\137',    ' ',    ' ',    ' ',    ' ', 
+   '\22',  '\23', '\136', '\176', '\177',  '\27',    ' ',  '\30', 
+   '\22',  '\23', '\136', '\177',  '\22',  '\23', '\136', '\177', 
+   '\26', '\176',  '\22',  '\23', '\136', '\176', '\177',    ' ', 
+     ' ',  '\22',  '\23', '\136', '\177',  '\23',    ' ',    ' ', 
+   '\22',  '\23', '\136', '\176', '\177',  '\27',    ' ',  '\30', 
+   '\22',  '\23', '\136', '\177',  '\22',  '\23', '\136', '\177', 
+   '\26', '\176',  '\22',  '\23', '\136', '\176', '\177',    ' ', 
+     ' ',  '\22',  '\23', '\136', '\177',  '\23',    ' ',    ' ' 
 };
 
 static char ADOBE_unaccented[128]= {
-  'A', 'A', 'C', 'C', 'D', 'E', 'E', 'G',
-  'L', 'L', 232, 'N', 'N', ' ', 'O', 'R',
-  'R', 'S', 'S', 'S', 'T', 'T', 'U', 'U',
-  'Y', 'Z', 'Z', 'Z', ' ', 'I', 'd', 167,
-  'a', 'a', 'c', 'c', 'd', 'e', 'e', 'g',
-  'l', 'l', 248, 'n', 'n', ' ', 'o', 'r',
-  'r', 's', 's', 's', 't', 't', 'u', 'u',
-  'y', 'z', 'z', 'z', ' ', 161, 191, 163,
-  'A', 'A', 'A', 'A', 'A', 'A', 225, 'C',
-  'E', 'E', 'E', 'E', 'I', 'I', 'I', 'I',
-  'D', 'N', 'O', 'O', 'O', 'O', 'O', 30 ,
-  233, 'U', 'U', 'U', 'U', 'Y', ' ', ' ',
-  'a', 'a', 'a', 'a', 'a', 'a', 241, 'c',
-  'e', 'e', 'e', 'e', 245, 245, 245, 245,
-  'd', 'n', 'o', 'o', 'o', 'o', 'o', 250,
-  249, 'u', 'u', 'u', 'u', 'y', ' ', 251
+     'A', 'A',    'C', 'C',    'D',    'E',    'E',    'G', 
+     'L', 'L', '\350', 'N',    'N',    ' ',    'O',    'R', 
+     'R', 'S',    'S', 'S',    'T',    'T',    'U',    'U', 
+     'Y', 'Z',    'Z', 'Z',    ' ',    'I',    'd', '\247', 
+     'a', 'a',    'c', 'c',    'd',    'e',    'e',    'g', 
+     'l', 'l', '\370', 'n',    'n',    ' ',    'o',    'r', 
+     'r', 's',    's', 's',    't',    't',    'u',    'u', 
+     'y', 'z',    'z', 'z',    ' ', '\241', '\277', '\243', 
+     'A', 'A',    'A', 'A',    'A',    'A', '\341',    'C', 
+     'E', 'E',    'E', 'E',    'I',    'I',    'I',    'I', 
+     'D', 'N',    'O', 'O',    'O',    'O',    'O',  '\36', 
+  '\351', 'U',    'U', 'U',    'U',    'Y',    ' ',    ' ', 
+     'a', 'a',    'a', 'a',    'a',    'a', '\361',    'c', 
+     'e', 'e',    'e', 'e', '\365', '\365', '\365', '\365', 
+     'd', 'n',    'o', 'o',    'o',    'o',    'o', '\372', 
+  '\371', 'u',    'u', 'u',    'u',    'y',    ' ', '\373'
 };
 
 static char ADOBE_accents[128]= {
-  198, 206, 194, 207, 207, 207, 206, 198,
-  194, 39 , ' ', 194, 207, ' ', 205, 194,
-  207, 194, 207, 203, 207, 203, 205, 202,
-  200, 194, 207, 199, ' ', 199, 197, ' ',
-  198, 206, 194, 207, 207, 207, 206, 198,
-  194, 39 , ' ', 194, 207, ' ', 205, 194,
-  207, 194, 207, 203, 207, 203, 205, 202,
-  200, 194, 207, 199, ' ', ' ', ' ', ' ',
-  193, 194, 195, 196, 200, 202, ' ', 203,
-  193, 194, 195, 200, 193, 194, 195, 200,
-  197, 196, 193, 194, 195, 196, 200, ' ',
-  ' ', 193, 194, 195, 200, 194, ' ', ' ',
-  193, 194, 195, 196, 200, 202, ' ', 203,
-  193, 194, 195, 200, 193, 194, 195, 200,
-  197, 196, 193, 194, 195, 196, 200, ' ',
-  ' ', 193, 194, 195, 200, 194, ' ', ' '
+  '\306', '\316', '\302', '\317', '\317', '\317', '\316', '\306', 
+  '\302',  '\47',    ' ', '\302', '\317',    ' ', '\315', '\302', 
+  '\317', '\302', '\317', '\313', '\317', '\313', '\315', '\312', 
+  '\310', '\302', '\317', '\307',    ' ', '\307', '\305',    ' ', 
+  '\306', '\316', '\302', '\317', '\317', '\317', '\316', '\306', 
+  '\302',  '\47',    ' ', '\302', '\317',    ' ', '\315', '\302', 
+  '\317', '\302', '\317', '\313', '\317', '\313', '\315', '\312', 
+  '\310', '\302', '\317', '\307',    ' ',    ' ',    ' ',    ' ', 
+  '\301', '\302', '\303', '\304', '\310', '\312',    ' ', '\313', 
+  '\301', '\302', '\303', '\310', '\301', '\302', '\303', '\310', 
+  '\305', '\304', '\301', '\302', '\303', '\304', '\310',    ' ', 
+     ' ', '\301', '\302', '\303', '\310', '\302',    ' ',    ' ', 
+  '\301', '\302', '\303', '\304', '\310', '\312',    ' ', '\313', 
+  '\301', '\302', '\303', '\310', '\301', '\302', '\303', '\310', 
+  '\305', '\304', '\301', '\302', '\303', '\304', '\310',    ' ', 
+     ' ', '\301', '\302', '\303', '\310', '\302',    ' ',    ' ' 
 };
 
 static char* the_unaccented;
@@ -375,7 +378,7 @@ tex_font_rep::accented_get_extents (string s, metric& ex) {
   string acc= get_accents (s);
   s= get_unaccented (s);
   get_extents (s, ex);
-
+  
   for (i=0; i<N(acc); i++)
     if (acc[i] != ' ') {
       SI xx, yy;
@@ -389,9 +392,9 @@ tex_font_rep::accented_get_extents (string s, metric& ex) {
       if (c == 24) yy=PIXEL;
       else if (c == ((char) 203)) yy= 0;
       else if (c == ((char) 206)) {
-	yy= 0;
-	if ((s[i] == 'a') || (s[i] == 'A')) xx += (ey->x2 - ey->x1) / 3;
-	else xx += (ey->x2 - ey->x1) / 5;
+        yy= 0;
+        if ((s[i] == 'a') || (s[i] == 'A')) xx += (ey->x2 - ey->x1) / 3;
+        else xx += (ey->x2 - ey->x1) / 5;
       }
       else xx += (SI) (((double) yy) * slope);
       ex->x3 = min (ex->x3, xx + ez->x3);
@@ -399,7 +402,7 @@ tex_font_rep::accented_get_extents (string s, metric& ex) {
       ex->x4 = max (ex->x4, xx + ez->x4);
       ex->y4 = max (ex->y4, yy + ez->y4);
     }
-
+  
   status= old_status;
 }
 
@@ -421,7 +424,7 @@ tex_font_rep::accented_draw (renderer ren, string s, SI x, SI y) {
   register int i;
   string acc= get_accents (s);
   s= get_unaccented (s);
-  draw (ren, s, x, y);
+  draw_fixed (ren, s, x, y);
 
   for (i=0; i<N(acc); i++)
     if (acc[i] != ' ') {
@@ -436,14 +439,14 @@ tex_font_rep::accented_draw (renderer ren, string s, SI x, SI y) {
       if (c == 24) yy=PIXEL;
       else if (c == ((char) 203)) yy= 0;
       else if (c == ((char) 206)) {
-	yy= 0;
-	if ((s[i] == 'a') || (s[i] == 'A')) xx += (ey->x2 - ey->x1) / 3;
-	else xx += (ey->x2 - ey->x1) / 5;
+        yy= 0;
+        if ((s[i] == 'a') || (s[i] == 'A')) xx += (ey->x2 - ey->x1) / 3;
+        else xx += (ey->x2 - ey->x1) / 5;
       }
       else xx += (SI) (((double) yy) * slope);
-      draw (ren, string (c), x+ xx, y+ yy);
+      draw_fixed (ren, string (c), x+ xx, y+ yy);
     }
-
+  
   status= old_status;
 }
 
@@ -467,30 +470,30 @@ void
 tex_font_rep::get_extents (string s, metric& ex) {
   register int i;
   switch (status) {
-  case TEX_ANY:
-    break;
-  case TEX_EC:
-  case TEX_LA:
-    for (i=0; i<N(s); i++)
-      if (s[i]=='<') {
-	special_get_extents (s, ex);
-	return;
+    case TEX_ANY:
+      break;
+    case TEX_EC:
+    case TEX_LA:
+      for (i=0; i<N(s); i++)
+        if (s[i]=='<') {
+          special_get_extents (s, ex);
+          return;
+        }
+      break;
+    case TEX_CM:
+    case TEX_ADOBE:
+      for (i=0; i<N(s); i++) {
+        if (s[i]=='<') {
+          special_get_extents (s, ex);
+          return;
+        }
+        if ((s[i] & 128) != 0) {
+          ACCENTS_PREPARE;
+          accented_get_extents (s, ex);
+          return;
+        }
       }
-    break;
-  case TEX_CM:
-  case TEX_ADOBE:
-    for (i=0; i<N(s); i++) {
-      if (s[i]=='<') {
-	special_get_extents (s, ex);
-	return;
-      }
-      if ((s[i] & 128) != 0) {
-	ACCENTS_PREPARE;
-	accented_get_extents (s, ex);
-	return;
-      }
-    }
-    break;
+      break;
   }
 
   int n= N(s);
@@ -498,8 +501,17 @@ tex_font_rep::get_extents (string s, metric& ex) {
   STACK_NEW_ARRAY (s_copy, int, n);
   STACK_NEW_ARRAY (buf, int, m);
   STACK_NEW_ARRAY (ker, int, m);
+
+  if (exec) {
   for (i=0; i<n; i++) s_copy[i]= ((QN) s[i]);
   tfm->execute (s_copy, n, buf, ker, m);
+  } else {
+    m = n;
+    for (i=0; i<m; ++i) {
+      buf[i]= s[i] & 255;
+      ker[i]= 0;
+    }
+  }
 
   SI x1= 0;
   SI x2= 0;
@@ -549,32 +561,32 @@ void
 tex_font_rep::get_xpositions (string s, SI* xpos) {
   register int i, n= N(s);
   if (n == 0) return;
-
+  
   switch (status) {
-  case TEX_ANY:
-    break;
-  case TEX_EC:
-  case TEX_LA:
-    for (i=0; i<n; i++)
-      if (s[i]=='<') {
-	special_get_xpositions (s, xpos);
-	return;
+    case TEX_ANY:
+      break;
+    case TEX_EC:
+    case TEX_LA:
+      for (i=0; i<n; i++)
+        if (s[i]=='<') {
+          special_get_xpositions (s, xpos);
+          return;
+        }
+      break;
+    case TEX_CM:
+    case TEX_ADOBE:
+      for (i=0; i<n; i++) {
+        if (s[i]=='<') {
+          special_get_xpositions (s, xpos);
+          return;
+        }
+        if ((s[i] & 128) != 0) {
+          ACCENTS_PREPARE;
+          accented_get_xpositions (s, xpos);
+          return;
+        }
       }
-    break;
-  case TEX_CM:
-  case TEX_ADOBE:
-    for (i=0; i<n; i++) {
-      if (s[i]=='<') {
-	special_get_xpositions (s, xpos);
-	return;
-      }
-      if ((s[i] & 128) != 0) {
-	ACCENTS_PREPARE;
-	accented_get_xpositions (s, xpos);
-	return;
-      }
-    }
-    break;
+      break;
   }
 
   STACK_NEW_ARRAY (s_copy, int, n);
@@ -584,33 +596,33 @@ tex_font_rep::get_xpositions (string s, SI* xpos) {
 }
 
 void
-tex_font_rep::draw (renderer ren, string s, SI ox, SI y) {
+tex_font_rep::draw_fixed (renderer ren, string s, SI ox, SI y) {
   register int i;
   switch (status) {
-  case TEX_ANY:
-    break;
-  case TEX_EC:
-  case TEX_LA:
-    for (i=0; i<N(s); i++)
-      if (s[i]=='<') {
-	special_draw (ren, s, ox, y);
-	return;
+    case TEX_ANY:
+      break;
+    case TEX_EC:
+    case TEX_LA:
+      for (i=0; i<N(s); i++)
+        if (s[i]=='<') {
+          special_draw (ren, s, ox, y);
+          return;
+        }
+      break;
+    case TEX_CM:
+    case TEX_ADOBE:
+      for (i=0; i<N(s); i++) {
+        if (s[i]=='<') {
+          special_draw (ren, s, ox, y);
+          return;
+        }
+        if ((s[i] & 128) != 0) {
+          ACCENTS_PREPARE;
+          accented_draw (ren, s, ox, y);
+          return;
+        }
       }
-    break;
-  case TEX_CM:
-  case TEX_ADOBE:
-    for (i=0; i<N(s); i++) {
-      if (s[i]=='<') {
-	special_draw (ren, s, ox, y);
-	return;
-      }
-      if ((s[i] & 128) != 0) {
-	ACCENTS_PREPARE;
-	accented_draw (ren, s, ox, y);
-	return;
-      }
-    }
-    break;
+      break;
   }
 
   SI  x= ox;
@@ -619,8 +631,17 @@ tex_font_rep::draw (renderer ren, string s, SI ox, SI y) {
   STACK_NEW_ARRAY (str, int, n);
   STACK_NEW_ARRAY (buf, int, m);
   STACK_NEW_ARRAY (ker, int, m);
+
+  if (exec) {
   for (i=0; i<n; i++) str[i]= ((QN) s[i]);
   tfm->execute (str, n, buf, ker, m);
+  } else {
+    m = n;
+    for (i=0; i<m; ++i) {
+      buf[i]= s[i] & 255;
+      ker[i]= 0;
+    }
+  }
 
   for (i=0; i<m; i++) {
     register int c= buf[i];
@@ -632,6 +653,24 @@ tex_font_rep::draw (renderer ren, string s, SI ox, SI y) {
   STACK_DELETE_ARRAY (str);
   STACK_DELETE_ARRAY (buf);
   STACK_DELETE_ARRAY (ker);
+}
+
+font
+tex_font_rep::magnify (double zoom) {
+  int ndpi= (int) round (dpi * zoom);
+  switch (status) {
+  case TEX_ANY:
+    return tex_font (family, size, ndpi, dsize);
+  case TEX_EC:
+    return tex_ec_font (family, size, ndpi, dsize);
+  case TEX_LA:
+    return tex_la_font (family, size, ndpi, dsize);
+  case TEX_CM:
+    return tex_cm_font (family, size, ndpi, dsize);
+  case TEX_ADOBE:
+    return tex_adobe_font (family, size, ndpi, dsize);
+  }
+  return tex_font (family, size, ndpi, dsize);
 }
 
 SI

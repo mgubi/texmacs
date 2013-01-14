@@ -571,11 +571,14 @@ Alpha_nr (int nr) {
 string
 fnsymbol_nr (int nr) {
   string sym, r;
-  int i, m= (nr-1)%3, n= ((nr-1)/3)+1;
+  int i, m= (nr-1)%6, n= ((nr-1)/6)+1;
   switch (m) {
-  case 0: sym= "<ast>"; break;
-  case 1: sym= "<dag>"; break;
-  case 2: sym= "<ddag>"; break;
+    case 0: sym= "<ast>";        break;
+    case 1: sym= "<dag>";        break;
+    case 2: sym= "<ddag>";       break;
+    case 3: sym= "<paragraph>";  break;
+    case 4: sym= "<endofline>";  break;
+    case 5: sym= "||";           break;
   }
   for (i=0; i<n; i++) r << sym;
   return r;
@@ -847,6 +850,8 @@ escape_sh (string s) {
   string r;
   for (i=0; i<n; i++)
     switch (s[i]) {
+    case '<':
+    case '>':
     case '?':
     case '&':
     case '$':
@@ -905,6 +910,27 @@ dos_to_better (string s) {
   for (i=0; i<n; i++)
     if (s[i] == '\015');
     else r << s[i];
+  return r;
+}
+
+string
+unescape_guile (string s) {
+  int i, n= N(s);
+  string r;
+  for (i=0; i<n; i++) {
+    if (s[i] == '\\') {
+      if (i+3 < n && s[i+1] == 'x'
+          && is_hex_digit (s[i+2]) && is_hex_digit (s[i+3])) {
+        string e= s(i+2, i+4);
+        r << (unsigned char) from_hexadecimal (e);
+        i+=3;
+      }
+      else
+        r << s[i];
+    }
+    else
+      r << s[i];
+  }
   return r;
 }
 

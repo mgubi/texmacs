@@ -105,5 +105,7 @@
 	  ---
 	  ("Other" (interactive clipboard-paste))))
   ---
-  (-> "Preferences"
-      (link preferences-menu)))
+  ("Preferences" (interactive open-preferences))
+  ;;(-> "Preferences"
+  ;;(link preferences-menu))
+  )

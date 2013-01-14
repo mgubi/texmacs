@@ -18,19 +18,38 @@
 
 #ifdef USE_FREETYPE
 
+#define std_dpi 600
+#define std_pixel (std_shrinkf*256)
+#define ROUND(l) ((l*dpi+(std_dpi>>1))/std_dpi)
+#define FLOOR(l) ((((l*dpi)/std_dpi)/std_pixel)*std_pixel)
+#define CEIL(l) (((((l*dpi+(std_dpi-1))/std_dpi)+std_pixel-1)/std_pixel)*std_pixel)
+
+#define LIGATURE_FF   1
+#define LIGATURE_FI   2
+#define LIGATURE_FL   4
+#define LIGATURE_FT   8
+#define LIGATURE_FFI 16
+#define LIGATURE_FFL 32
+#define LIGATURE_ST  64
+
 /******************************************************************************
 * True Type fonts
 ******************************************************************************/
 
 struct unicode_font_rep: font_rep {
+  string      family;
+  int         dpi;
   font_metric fnm;
   font_glyphs fng;
+  int         ligs;
 
   unicode_font_rep (string name, string family, int size, int dpi);
 
+  unsigned int ligature_replace (unsigned int c, string s, int& i);
   void get_extents (string s, metric& ex);
   void get_xpositions (string s, SI* xpos);
-  void draw (renderer ren, string s, SI x, SI y);
+  void draw_fixed (renderer ren, string s, SI x, SI y);
+  font magnify (double zoom);
   glyph get_glyph (string s);
   SI get_left_correction  (string s);
   SI get_right_correction  (string s);
@@ -40,15 +59,13 @@ struct unicode_font_rep: font_rep {
 * Initialization of main font parameters
 ******************************************************************************/
 
-#define conv(x) ((SI) (((double) (x))*unit))
-
 unicode_font_rep::unicode_font_rep (string name,
-  string family, int size2, int dpi):
-  font_rep (name)
+  string family2, int size2, int dpi2):
+  font_rep (name), family (family2), dpi (dpi2), ligs (0)
 {
   type= FONT_TYPE_UNICODE;
   size= size2;
-  fnm = tt_font_metric (family, size, dpi);
+  fnm = tt_font_metric (family, size, std_dpi);
   fng = tt_font_glyphs (family, size, dpi);
   if (fnm->bad_font_metric || fng->bad_font_glyphs) {
     fnm= std_font_metric (res_name, NULL, 0, -1);
@@ -106,8 +123,22 @@ unicode_font_rep::unicode_font_rep (string name,
   // get_italic space
   get_extents ("f", ex);
   SI italic_spc= (ex->x4-ex->x3)-(ex->x2-ex->x1);
-  slope= ((double) italic_spc) / ((double) display_size);
+  slope= ((double) italic_spc) / ((double) display_size) - 0.05;
   if (slope<0.15) slope= 0.0;
+
+  // available standard ligatures
+  if (fnm->exists (0xfb00)) ligs += LIGATURE_FF;
+  if (fnm->exists (0xfb01)) ligs += LIGATURE_FI;
+  if (fnm->exists (0xfb02)) ligs += LIGATURE_FL;
+  if (fnm->exists (0xfb03)) ligs += LIGATURE_FFI;
+  if (fnm->exists (0xfb04)) ligs += LIGATURE_FFL;
+  if (fnm->exists (0xfb05)) ligs += LIGATURE_FT;
+  if (fnm->exists (0xfb06)) ligs += LIGATURE_ST;
+  if (family == "Times New Roman")
+    ligs= LIGATURE_FI + LIGATURE_FL;
+  if (family == "Zapfino")
+    ligs= LIGATURE_FF + LIGATURE_FI + LIGATURE_FL + LIGATURE_FFI;
+  //cout << "ligs= " << ligs << ", " << family << ", " << size << "\n";
 }
 
 /******************************************************************************
@@ -146,6 +177,34 @@ read_unicode_char (string s, int& i) {
   }
 }
 
+unsigned int
+unicode_font_rep::ligature_replace (unsigned int uc, string s, int& i) {
+  int n= N(s);
+  if (((char) uc) == 'f') {
+    if (i<n && s[i] == 'i' && (ligs & LIGATURE_FI) != 0) {
+      i++; return 0xfb01; }
+    else if (i<n && s[i] == 'l' && (ligs & LIGATURE_FL) != 0) {
+      i++; return 0xfb02; }
+    else if (i<n && s[i] == 't' && (ligs & LIGATURE_FT) != 0) {
+      i++; return 0xfb05; }
+    else if ((i+1)<n && s[i] == 'f' && s[i+1] == 'i' &&
+             (ligs & LIGATURE_FFI) != 0) {
+      i+=2; return 0xfb03; }
+    else if ((i+1)<n && s[i] == 'f' && s[i+1] == 'l' &&
+             (ligs & LIGATURE_FFL) != 0) {
+      i+=2; return 0xfb04; }
+    else if (i<n && s[i] == 'f' && (ligs & LIGATURE_FF) != 0) {
+      i++; return 0xfb00; }
+    else return uc;
+  }
+  else if (((char) uc) == 's') {
+    if (i<n && s[i] == 't' && (ligs & LIGATURE_ST) != 0) {
+      i++; return 0xfb06; }
+    else return uc;
+  }
+  else return uc;
+}
+
 void
 unicode_font_rep::get_extents (string s, metric& ex) {
   if (N(s)==0) {
@@ -155,21 +214,37 @@ unicode_font_rep::get_extents (string s, metric& ex) {
   else {
     int i= 0, n= N(s);
     unsigned int uc= read_unicode_char (s, i);
+    if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+      uc= ligature_replace (uc, s, i);
     metric_struct* first= fnm->get (uc);
-    ex->x1= first->x1; ex->y1= first->y1;
-    ex->x2= first->x2; ex->y2= first->y2;
-    ex->x3= first->x3; ex->y3= first->y3;
-    ex->x4= first->x4; ex->y4= first->y4;
-    SI x= first->x2;
+    ex->x1= ROUND (first->x1);
+    ex->y1= ROUND (first->y1);
+    ex->x2= ROUND (first->x2);
+    ex->y2= ROUND (first->y2);
+    ex->x3= FLOOR (first->x3);
+    ex->y3= FLOOR (first->y3);
+    ex->x4= CEIL  (first->x4);
+    ex->y4= CEIL  (first->y4);
+    SI x= ROUND (first->x2);
 
     while (i<n) {
+      unsigned int pc= uc;
       uc= read_unicode_char (s, i);
+      if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+        uc= ligature_replace (uc, s, i);
+      x += ROUND (fnm->kerning (pc, uc));
       metric_struct* next= fnm->get (uc);
-      ex->x1= min (ex->x1, x+ next->x1); ex->y1= min (ex->y1, next->y1);
-      ex->x2= max (ex->x2, x+ next->x2); ex->y2= max (ex->y2, next->y2);
-      ex->x3= min (ex->x3, x+ next->x3); ex->y3= min (ex->y3, next->y3);
-      ex->x4= max (ex->x4, x+ next->x4); ex->y4= max (ex->y4, next->y4);
-      x += next->x2;
+      ex->x1= min (ex->x1, x+ ROUND (next->x1));
+      ex->y1= min (ex->y1, ROUND (next->y1));
+      ex->x2= max (ex->x2, x+ ROUND (next->x2));
+      ex->y2= max (ex->y2, ROUND (next->y2));
+      ex->x3= min (ex->x3, x+ FLOOR (next->x3));
+      ex->y3= min (ex->y3, FLOOR (next->y3));
+      ex->x4= max (ex->x4, x+ CEIL (next->x4));
+      ex->y4= max (ex->y4, CEIL (next->y4));
+      x += ROUND (next->x2);
+      //if (fnm->kerning (pc, uc) != 0)
+      //cout << "Kerning " << ((char) pc) << ((char) uc) << " " << ROUND (fnm->kerning (pc, uc)) << ", " << ROUND (next->x2) << "\n";
     }
   }
 }
@@ -180,24 +255,44 @@ unicode_font_rep::get_xpositions (string s, SI* xpos) {
   if (n == 0) return;
   
   register SI x= 0;
+  unsigned int uc= 0xffffffff;
   while (i<n) {
     int start= i;
-    metric_struct* next= fnm->get (read_unicode_char (s, i));
+    unsigned int pc= uc;
+    uc= read_unicode_char (s, i);
+    if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+      uc= ligature_replace (uc, s, i);
+    if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
+    metric_struct* next= fnm->get (uc);
     for (int j= start; j<i; j++) xpos[j]= x;
-    x += next->x2;
+    x += ROUND (next->x2);
+    //if (fnm->kerning (pc, uc) != 0)
+    //cout << "Kerning " << ((char) pc) << ((char) uc) << " " << ROUND (fnm->kerning (pc, uc)) << ", " << ROUND (next->x2) << "\n";
   }
   xpos[n]= x;
 }
 
 void
-unicode_font_rep::draw (renderer ren, string s, SI x, SI y) {
+unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   int i= 0, n= N(s);
+  unsigned int uc= 0xffffffff;
   while (i<n) {
-    unsigned int uc= read_unicode_char (s, i);
+    unsigned int pc= uc;
+    uc= read_unicode_char (s, i);
+    if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+      uc= ligature_replace (uc, s, i);
+    if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     ren->draw (uc, fng, x, y);
     metric_struct* ex= fnm->get (uc);
-    x += ex->x2;
+    x += ROUND (ex->x2);
+    //if (fnm->kerning (pc, uc) != 0)
+    //cout << "Kerning " << ((char) pc) << ((char) uc) << " " << ROUND (fnm->kerning (pc, uc)) << ", " << ROUND (ex->x2) << "\n";
   }
+}
+
+font
+unicode_font_rep::magnify (double zoom) {
+  return unicode_font (family, size, (int) round (dpi * zoom));
 }
 
 glyph

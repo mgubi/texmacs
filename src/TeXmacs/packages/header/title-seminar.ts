@@ -39,7 +39,7 @@
     <new-page><right-flush>
   </macro>>
 
-  <assign|doc-abstract|<\macro|body>
+  <assign|render-abstract|<\macro|body>
     <section*|<abstract-text>>
 
     <\wide-normal>
@@ -55,7 +55,7 @@
 
   <assign|doc-render-title|<macro|x|<surround||<vspace|0.1pag>|<style-with|src-compact|none|<doc-title-block|<with|math-font-series|bold|font-series|bold|font-size|2|color|red|<arg|x>>>>>>>
 
-  <assign|doc-author|<macro|body|<\surround|<vspace*|0.1pag>|<vspace|0.1pag>>
+  <assign|render-doc-author|<macro|body|<\surround|<vspace*|0.1pag>|<vspace|0.1pag>>
     <\with|par-par-sep|0fn>
       <doc-title-block|<arg|body>>
     </with>
@@ -71,7 +71,7 @@
 
   <assign|author-render-name|<macro|x|<surround|<vspace*|1fn>||<doc-author-block|<with|font-shape|small-caps|<large|<arg|x>>>>>>>
 
-  <assign|author-address|<\macro|x>
+  <assign|author-affiliation|<\macro|x>
     <surround|<vspace*|2fn>|<vspace|2fn>|<doc-author-block|<arg|x>>>
   </macro>>
 

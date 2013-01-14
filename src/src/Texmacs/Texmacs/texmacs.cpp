@@ -396,6 +396,32 @@ TeXmacs_main (int argc, char** argv) {
 * Main program
 ******************************************************************************/
 
+#ifdef OS_MACOS
+#include <sys/resource.h>
+#endif
+
+void
+boot_hacks () {
+#ifdef OS_MACOS
+// NOTE: under MACOS, there is a limited number of open file descriptors,
+// by default 256.  Any open file descriptor can actually count several times
+// whenever the files is stored in various chunks on disk.  Hence, the limit
+// is easily exceeded, although this situation cannot easily be debugged.
+// Our current hack is to allow for at least 4096 open file descriptors.
+  rlimit lims;
+  getrlimit (RLIMIT_NOFILE, &lims);
+  lims.rlim_cur= max (lims.rlim_cur, 4096);
+  setrlimit (RLIMIT_NOFILE, &lims);
+  //getrlimit (RLIMIT_NOFILE, &lims);
+  //printf ("cur: %i\n", lims.rlim_cur);
+  //printf ("max: %i\n", lims.rlim_max);
+#endif
+}
+
+/******************************************************************************
+* Main program
+******************************************************************************/
+
 void
 immediate_options (int argc, char** argv) {
   if (get_env ("TEXMACS_HOME_PATH") == "")
@@ -412,14 +438,20 @@ immediate_options (int argc, char** argv) {
       remove (url ("$TEXMACS_HOME_PATH/system/settings.scm"));
       remove (url ("$TEXMACS_HOME_PATH/system/setup.scm"));
       remove (url ("$TEXMACS_HOME_PATH/system/cache") * url_wildcard ("*"));
+      remove (url ("$TEXMACS_HOME_PATH/fonts/font-database.scm"));
+      remove (url ("$TEXMACS_HOME_PATH/fonts/font-features.scm"));
       remove (url ("$TEXMACS_HOME_PATH/fonts/error") * url_wildcard ("*"));
     }
     else if (s == "-delete-cache")
       remove (url ("$TEXMACS_HOME_PATH/system/cache") * url_wildcard ("*"));
     else if (s == "-delete-style-cache")
       remove (url ("$TEXMACS_HOME_PATH/system/cache") * url_wildcard ("__*"));
-    else if (s == "-delete-font-cache")
+    else if (s == "-delete-font-cache") {
       remove (url ("$TEXMACS_HOME_PATH/system/cache/font_cache.scm"));
+      remove (url ("$TEXMACS_HOME_PATH/fonts/font-database.scm"));
+      remove (url ("$TEXMACS_HOME_PATH/fonts/font-features.scm"));
+      remove (url ("$TEXMACS_HOME_PATH/fonts/error") * url_wildcard ("*"));
+    }
     else if (s == "-delete-doc-cache") {
       remove (url ("$TEXMACS_HOME_PATH/system/cache/doc_cache"));
       remove (url ("$TEXMACS_HOME_PATH/system/cache/dir_cache.scm"));
@@ -445,6 +477,7 @@ immediate_options (int argc, char** argv) {
 
 int
 main (int argc, char** argv) {
+  boot_hacks ();
   windows_delayed_refresh (1000000000);
   immediate_options (argc, argv);
   set_env ("LC_NUMERIC", "POSIX");

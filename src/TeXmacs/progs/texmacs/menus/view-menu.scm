@@ -26,6 +26,24 @@
   ("Clone window" (clone-window))
   ("Close window" (safely-kill-window))
   ---
+  ("Full screen mode"  (toggle-full-screen-edit-mode))
+  ("Presentation mode" (toggle-full-screen-mode))
+  ("Remote control" (toggle-remote-control-mode))
+  ---
+  ("Fit to screen" (fit-to-screen))
+  ("Fit to screen width" (fit-to-screen-width))
+  ;;("Fit to screen height" (fit-to-screen-height))
+  ("Zoom in" (zoom-in (sqrt (sqrt 2.0))))
+  ("Zoom out" (zoom-out (sqrt (sqrt 2.0))))
+  (-> "Zoom"
+      ("50%"  (change-zoom-factor 0.5))
+      ("71%"  (change-zoom-factor (sqrt 0.5)))
+      ("100%" (change-zoom-factor 1.0))
+      ("141%" (change-zoom-factor (sqrt 2.0)))
+      ("200%" (change-zoom-factor 2.0))
+      ---
+      ("Other" (interactive other-zoom-factor)))
+  ---
   ("Header" (toggle-visible-header))
   (when (visible-header?)
 	("Main icon bar" (toggle-visible-icon-bar 0))
@@ -33,19 +51,4 @@
 	("Focus dependent icons" (toggle-visible-icon-bar 2))
 	("User provided icons" (toggle-visible-icon-bar 3)))
   ("Side tools" (toggle-visible-side-tools 0))
-  ("Status bar" (toggle-visible-footer))
-  ---
-  ("Full screen mode"  (toggle-full-screen-edit-mode))
-  ("Presentation mode" (toggle-full-screen-mode))
-  ("Remote control" (toggle-remote-control-mode))
-  ---
-  (-> "Shrinking factor"
-      ("1" (set-shrinking-factor 1))
-      ("2" (set-shrinking-factor 2))
-      ("3" (set-shrinking-factor 3))
-      ("4" (set-shrinking-factor 4))
-      ("5" (set-shrinking-factor 5))
-      ("7" (set-shrinking-factor 7))
-      ("10" (set-shrinking-factor 10))
-      ---
-      ("Other" (interactive other-shrinking-factor))))
+  ("Status bar" (toggle-visible-footer)))

@@ -11,6 +11,7 @@
 
 #include "X11/x_window.hpp"
 #include "message.hpp"
+#include "boot.hpp"
 
 extern int nr_windows;
 
@@ -21,7 +22,7 @@ hashmap<Window,pointer> Window_to_window (NULL);
 ******************************************************************************/
 
 void
-x_window_rep::set_hints (SI min_w, SI min_h, SI max_w, SI max_h) {
+x_window_rep::set_hints (int min_w, int min_h, int max_w, int max_h) {
   XSizeHints* size_hints;
   XWMHints*   wm_hints;
   XClassHint* class_hints;
@@ -157,7 +158,8 @@ x_window_rep::initialize () {
 x_window_rep::x_window_rep (widget w2, x_gui gui2, char* n2,
 			    SI min_w, SI min_h, SI def_w, SI def_h,
 			    SI max_w, SI max_h):
-  window_rep (), w (w2), gui (gui2), name (n2),
+  window_rep (), w (w2), gui (gui2),
+  orig_name (n2 == ((char*) NULL)? string ("popup"): n2), name (n2),
   ren (tm_new<x_drawable_rep> (gui2, this)),
   Min_w (min_w), Min_h (min_h), Def_w (def_w), Def_h (def_h),
   Max_w (max_w), Max_h (max_h),
@@ -167,6 +169,7 @@ x_window_rep::x_window_rep (widget w2, x_gui gui2, char* n2,
   //cout << "Min " << (min_w >> 8) << ", " << (min_h >> 8) << "\n";
   //cout << "Def " << (def_w >> 8) << ", " << (def_h >> 8) << "\n";
   //cout << "Max " << (max_w >> 8) << ", " << (max_h >> 8) << "\n";
+
   initialize ();
   gui->created_window (win);
 }
@@ -364,18 +367,31 @@ void
 x_window_rep::move_event (int x, int y) {
   bool flag= (win_x!=x) || (win_y!=y);
   win_x= x; win_y= y;
-  if (flag) notify_position (w, win_x*PIXEL, win_y*PIXEL);
+  if (flag) {
+    XWindowAttributes attrs;
+    XGetWindowAttributes (dpy, win, &attrs);
+    int border_x= attrs.x, border_y= attrs.y;
+    notify_position (w, win_x*PIXEL, win_y*PIXEL);
+    if (border_x >= 0 && border_x <= 5 && border_y >= 0 && border_y <= 30) {
+      //cout << "Move to " << x-border_x << ", " << y-border_y << "\n";
+      notify_window_move (orig_name, (x-border_x)*PIXEL, (border_y-y)*PIXEL);
+    }
+  }
 }
 
 void
 x_window_rep::resize_event (int ww, int hh) {
   bool flag= (win_w!=ww) || (win_h!=hh);
   win_w= ww; win_h= hh;
-  if (flag) notify_size (w, win_w*PIXEL, win_h*PIXEL);
+  if (flag) {
+    notify_size (w, win_w*PIXEL, win_h*PIXEL);
+    notify_window_resize (orig_name, ww*PIXEL, hh*PIXEL);
+  }
 }
 
 void
 x_window_rep::destroy_event () {
+  notify_window_destroy (orig_name);
   send_destroy (w);
 }
 
@@ -441,6 +457,7 @@ x_window_rep::repaint_invalid_regions () {
   while (!is_nil (invalid_regions)) {
     ren->set_origin (0, 0);
     rectangle r= copy (invalid_regions->item);
+    r= thicken (r, 1, 1);
     ren->encode (r->x1, r->y1);
     ren->encode (r->x2, r->y2);
     ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
@@ -537,6 +554,9 @@ x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
   invalid_intern = ::translate (invalid_intern, dx, dy) & region;
   invalid_regions= invalid_extern | invalid_intern;
 
+  rectangles extra= thicken (region - ::translate (region, dx, dy), 1, 1);
+  invalid_regions= invalid_regions | extra;
+
   if (x1<x2 && y2<y1)
     XCopyArea (dpy, win, win, gc, x1, y2, x2-x1, y1-y2, X1, Y2);
 }
@@ -562,10 +582,8 @@ window
 popup_window (widget w, string name, SI min_w, SI min_h,
 	      SI def_w, SI def_h, SI max_w, SI max_h)
 {
-  char* _name= as_charp (name);
   window win= tm_new<x_window_rep> (w, the_gui, (char*) NULL,
 				    min_w, min_h, def_w, def_h, max_w, max_h);
-  tm_delete_array (_name);
   return win;
 }
 

@@ -14,9 +14,10 @@
 
 #include "renderer.hpp"
 #include "gui.hpp" // for black, white
+
 /******************************************************************************
- * structure for caching font pixmaps
- ******************************************************************************/
+* structure for caching font pixmaps
+******************************************************************************/
 
 struct basic_character_rep : public tm_obj<basic_character_rep> {
 	int          c;
@@ -42,20 +43,18 @@ bool operator == (basic_character xc1, basic_character xc2);
 bool operator != (basic_character xc1, basic_character xc2);
 int hash (basic_character xc);
 
-
-
 /******************************************************************************
- * structure for caching images
- ******************************************************************************/
+* structure for caching images
+******************************************************************************/
 
 struct cache_image_element_rep : tm_obj<cache_image_element_rep> {
 	int w,h,nr;
   time_t time;
   void *ptr;
-	cache_image_element_rep (int w2, int h2,  time_t time2, void *ptr2) :
-   w(w2), h(h2), nr(0), time(time2), ptr(ptr2) {};
-	virtual ~cache_image_element_rep() {};
-	friend class cache_image_element;
+  cache_image_element_rep (int w2, int h2,  time_t time2, void *ptr2) :
+    w(w2), h(h2), nr(0), time(time2), ptr(ptr2) {};
+  virtual ~cache_image_element_rep() {};
+  friend class cache_image_element;
 };
 
 class cache_image_element : public tm_abs_null_ptr<cache_image_element_rep> {
@@ -67,8 +66,8 @@ public:
 };
 
 /******************************************************************************
- * basic_renderer_rep
- ******************************************************************************/
+* basic_renderer_rep
+******************************************************************************/
 
 
 class basic_renderer_rep:   public renderer_rep {
@@ -77,8 +76,9 @@ public:
   color cur_fg, cur_bg;
 
 public:
-  basic_renderer_rep (int w2 = 0, int h2 = 0) :
-  w (w2), h (h2), cur_fg(black), cur_bg(white) {};
+  basic_renderer_rep (bool screen_flag, int w2 = 0, int h2 = 0):
+    renderer_rep (screen_flag),
+    w (w2), h (h2), cur_fg(black), cur_bg(white) {};
   virtual ~basic_renderer_rep () {};
   
   virtual void get_extents (int& w, int& h);
@@ -113,7 +113,6 @@ public:
   void set_image_cache (tree lookup, cache_image_element ci);
   void image_auto_gc ();
   void image_gc (string name);
-
 };
 
 typedef basic_renderer_rep* basic_renderer;
@@ -122,7 +121,5 @@ typedef basic_renderer_rep* basic_renderer;
 //extern int CSCALES, CFACTOR, GREYS, CTOTAL;
 
 color xpm_to_color (string s);
-
-
 
 #endif // defined BASIC_RENDERER_HPP

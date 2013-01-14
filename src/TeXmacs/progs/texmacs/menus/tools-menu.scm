@@ -11,7 +11,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (texmacs menus tools-menu))
+(texmacs-module (texmacs menus tools-menu)
+  (:use (texmacs texmacs tm-tools)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menus for formats
@@ -49,12 +50,23 @@
   (-> "Web"
       ("Create web site" (tmweb-interactive-build))
       ("Update web site" (tmweb-interactive-update)))
+  (if supports-email?
+      (-> "Email"
+          ("Open mailbox" (email-open-mailbox))
+          ("Retrieve email" (begin (email-pop) (email-open-inbox)))
+          ---
+          ("Pop server settings" (interactive email-settings))))
   (-> "Project"
       (link project-manage-menu))
+  (-> "Statistics"
+      ("Count characters" (show-character-count))
+      ("Count words" (show-word-count))
+      ("Count lines" (show-line-count)))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history)))
   ---
   ("Debugging tool" (toggle-preference "debugging tool"))
+  ("Developer tool" (toggle-preference "developer tool"))
   ("Linking tool" (toggle-preference "linking tool"))
   ("Presentation tool" (toggle-preference "presentation tool"))
   ("Source macros tool" (toggle-preference "source tool"))

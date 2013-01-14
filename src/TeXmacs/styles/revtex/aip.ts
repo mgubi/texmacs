@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.0.7.17>
 
 <style|source>
 
@@ -312,7 +312,13 @@
     </with>
   </macro>>
 
-  <assign|render-bibliography|<macro|name|<with|par-columns|1|<section*|<arg|name>>>>>
+  <assign|render-bibliography|<\macro|name|body>
+    <\with|par-columns|1>
+      <center|<section*|<arg|name>>>
+    </with>
+
+    <arg|body>
+  </macro>>
 
   <active*|<\src-comment>
     Title rendering.
@@ -326,7 +332,7 @@
 
   <assign|author-render-name|<macro|author|<doc-author-block|<with|font-family|ss|<arg|author>>>>>
 
-  <assign|author-address|<\macro|address>
+  <assign|author-affiliation|<\macro|address>
     <surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<with|font-shape|italic|<arg|address>>>>
   </macro>>
 
@@ -334,21 +340,21 @@
     <\quasi>
       <unquote*|<select|<quote-arg|data>|author-name>>
 
-      <unquote*|<select|<quote-arg|data>|author-address>>
+      <unquote*|<select|<quote-arg|data>|author-affiliation>>
     </quasi>
   </macro>>
 
   <assign|doc-author-data-note|<xmacro|data|<\quasi>
     <unquote*|<select|<quote-arg|data>|author-homepage|<pat-any>>>
 
-    <unquote*|<select|<quote-arg|data>|author-note|document|<pat-any>>>
+    <unquote*|<select|<quote-arg|data>|author-misc|document|<pat-any>>>
   </quasi>>>
 
   <assign|doc-date|<macro|body|<doc-author-block|(Dated: <arg|body>)>>>
 
   <assign|abstract-text|>
 
-  <assign|doc-abstract|<macro|body|<surround||<vspace|2fn>|<doc-author-block|<arg|body>>>>>
+  <assign|render-abstract|<macro|body|<surround||<vspace|2fn>|<doc-author-block|<arg|body>>>>>
 
   <assign|doc-authors-block|<macro|body|<doc-author-block|<arg|body>>>>
 
@@ -367,7 +373,7 @@
       <\surround|<assign|the-doc-data|<quote-arg|data>>|<with|doc-note-nr|0|<quasi|<doc-data-hidden|<unquote*|<quote-arg|data>>>>>>
         <\doc-make-title>
           <with|doc-note-nr|0|<\quasi>
-            <compound|<unquote|<if|<lesseq|<length|<select|<quote-arg|data>|doc-author-data>>|1>|<value|doc-data-main>|<value|doc-data-main*>>>|<unquote*|<quote-arg|data>>>
+            <compound|<unquote|<if|<lesseq|<length|<select|<quote-arg|data>|doc-author|author-data>>|1>|<value|doc-data-main>|<value|doc-data-main*>>>|<unquote*|<quote-arg|data>>>
           </quasi>>
         </doc-make-title>
       </surround>
@@ -388,9 +394,9 @@
     </style-with>
   </xmacro>>
 
-  <assign|doc-author|<macro|body|<arg|body>>>
+  <assign|render-doc-author|<macro|body|<arg|body>>>
 
-  <assign|doc-authors|<macro|body|<arg|body>>>
+  <assign|render-doc-authors|<macro|body|<arg|body>>>
 
   <active*|<\src-comment>
     Customization of other environments.

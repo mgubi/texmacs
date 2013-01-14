@@ -1,3 +1,4 @@
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : scheme-tools.scm
@@ -120,7 +121,7 @@
   (let  ((t (get-preference "doc:collect-timestamp"))
          (lan (get-output-language))
          (langs (get-preference "doc:collect-languages")))
-    (if (not (and t langs (member lan langs)))
+    (if (not (and (!= t "default") (list? langs) (member lan langs)))
       (doc-collect-all lan cont) (cont))))
 
 (tm-define (scheme-popup-help word)
@@ -140,18 +141,13 @@
         (let ((lno (number->string line))
               (cno (number->string column)))
           (go-to-url (string-append filename "?line=" lno "&column=" cno
-                                             "&select=" ssym))
+                                             "&select=" ssym)
+                     (cursor-path))
           (set-message filename (string-append lno ":" cno)))
-        (set-message "Symbol properties not found." ssym)))))
-
-(kbd-map
-  (:require (and developer-mode-on (in-prog-scheme?)))
-  ("A-F1" (scheme-popup-help (cursor-word)))
-  ("S-A-F1" (scheme-inbuffer-help (cursor-word)))
-  ("M-F1" (scheme-go-to-definition (cursor-word))))
+        (set-message (tr "Symbol properties not found") ssym)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Handy.. (stuff previously in apidoc-funcs.scm)
+;; Miscelaneous
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (get-current-doc-module)
@@ -170,8 +166,20 @@
   (insert ($doc-symbol-template (string->symbol ssym) "")))
 
 (kbd-map
-  (:require (in-tmdoc?))
+  (:require (and developer-mode? (in-tmdoc?)))
   ("M-A-x" (interactive ask-insert-symbol-doc)))
+
+(tm-define (run-scheme-file u)
+  (:synopsis "Load the file @u into the scheme interpreter")
+  (with run (lambda (save?)
+              (if save? (buffer-save u))
+              (load (url->string u))
+              (set-message (tr "File %1 was executed" u) ""))
+    (if (and (buffer-exists? u) (buffer-modified? u))
+        (user-confirm 
+          (tr "File %1 is currently open and modified. Save before running?" u)
+          #t run)
+        (run #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Browsing of sources with the mouse.
@@ -195,7 +203,7 @@
 ; check for events of type "press-" and "release-" in order to be compatible
 ; across platforms. (We could use :require for this too)
 (tm-define (mouse-event key x y mods time)
-  (:require (and developer-mode-on (opt-click? mods) (in-prog-scheme?)))
+  (:require (and developer-mode? (opt-click? mods) (in-prog-scheme?)))
   (with short (string-take key 4)
     (cond ((== short "pres")
            ; emulate a click to move the cursor
@@ -208,7 +216,7 @@
           (else (mouse-any key x y mods (+ time 0.0))))))
 
 (tm-define (mouse-event key x y mods time)
-  (:require (and developer-mode-on (cmd-click? mods) (in-prog-scheme?)))
+  (:require (and developer-mode? (cmd-click? mods) (in-prog-scheme?)))
   (with short (string-take key 4)
     (cond ((== short "pres")
            ; emulate a click to move the cursor
@@ -219,4 +227,3 @@
            (with cw2 (cursor-word)
              (if (== cw cw2) (scheme-go-to-definition cw))))
           (else (mouse-any key x y mods (+ time 0.0))))))
-

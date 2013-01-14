@@ -42,7 +42,8 @@ qt_view_widget_rep::send (slot s, blackbox val) {
     {   
       check_type<string> (val, s);
       string name = open_box<string> (val);
-      canvas()->window()->setWindowTitle (to_qstring (name));
+      if (canvas() && canvas()->window())
+        canvas()->window()->setWindowTitle (to_qstring (name));
     }
       break;
 
@@ -92,11 +93,11 @@ qt_view_widget_rep::send (slot s, blackbox val) {
     }
       break;
       
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     {  
-      check_type<int>(val, s);
-      int new_sf = open_box<int> (val);
-      canvas()->tm_widget()->handle_set_shrinking_factor (new_sf);
+      check_type<double> (val, s);
+      double new_zoom = open_box<double> (val);
+      canvas()->tm_widget()->handle_set_zoom_factor (new_zoom);
     }
       break;  
       
@@ -163,8 +164,9 @@ qt_view_widget_rep::query (slot s, int type_id) {
         r = the_qt_renderer();
 
       if (canvas()) {
-        SI ox = - canvas()->backing_pos.x()*PIXEL;  // Warning: this is NOT from_qpoint()
-        SI oy = canvas()->backing_pos.y()*PIXEL;
+        coord2 pt_or = from_qpoint(canvas()->backing_pos);
+        SI ox = -pt_or.x1;
+        SI oy = -pt_or.x2;
         r->set_origin(ox,oy);
       }
 

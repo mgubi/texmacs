@@ -16,7 +16,7 @@
 #include "blackbox.hpp"
 #include "command.hpp"
 #include "timer.hpp"
-#define PIXEL 256
+#include "renderer.hpp" // for PIXEL
 
 class window_rep;
 typedef window_rep* window;
@@ -184,6 +184,8 @@ widget choice_widget (command cb, array<string> vals, string val);
   // select a value from a long list of possible values
 widget choice_widget (command cb, array<string> vals, array<string> mc);
   // select multiple values from a long list
+widget choice_widget (command cb, array<string> vals, string val, string filt);
+  // select a value from a long list with scrollbars and an input to filter
 
 /******************************************************************************
 * Other widgets
@@ -207,6 +209,8 @@ widget aligned_widget (array<widget> lhs, array<widget> rhs,
   // the second one being left aligned
 widget tabs_widget (array<widget> tabs, array<widget> bodies);
   // a tab bar where one and only of the bodies can be selected
+widget icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs);
+  // a variant of tabs_widget with named icon tabs
 widget wrapped_widget (widget w, command quit);
   // copy of w, but with a separate reference counter,
   // and with a command to be called upon destruction
@@ -256,8 +260,8 @@ widget refresh_widget (string tmwid);
 //        (string kind, SI x, SI y, int mods, time_t t);
 //   a mouse event of a given kind at position (x, y) and time t
 //   mods contains the active keyboard modifiers at time t
-// void simple_widget_rep::handle_set_shrinking_factor (int sf);
-//   set the shrinking factor for painting
+// void simple_widget_rep::handle_set_zoom_factor (double zoom);
+//   set the zoom factor for painting
 // void simple_widget_rep::handle_clear (SI x1, SI y1, SI x2, SI y2);
 //   clear the widget to the background color
 //   this event may for instance occur when scrolling

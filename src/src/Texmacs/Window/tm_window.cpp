@@ -15,6 +15,7 @@
 #include "dictionary.hpp"
 #include "merge_sort.hpp"
 #include "iterator.hpp"
+#include "boot.hpp"
 
 int geometry_w= 800, geometry_h= 600;
 int geometry_x= 0  , geometry_y= 0;
@@ -22,6 +23,72 @@ int geometry_x= 0  , geometry_y= 0;
 widget texmacs_window_widget (widget wid, tree geom);
 widget make_menu_widget (object menu);
 void refresh_size (widget wid, bool exact);
+
+/******************************************************************************
+* User preference management concerning the geometry of windows
+******************************************************************************/
+
+hashmap<string,string> window_names ("");
+
+string
+unique_window_name (string name) {
+  for (int i=1; true; i++) {
+    string wname= name;
+    if (i > 1) wname= wname * ":" * as_string (i);
+    if (!window_names->contains (wname)) {
+      window_names (wname)= name;
+      return wname;
+    }
+  }
+}
+
+void
+notify_window_move (string name, SI xx, SI yy) {
+  int x=  xx / PIXEL;
+  int y= -yy / PIXEL;
+  if (name != "popup") {
+    //cout << "Move " << name << " to " << x << ", " << y << "\n";
+    set_user_preference ("abscissa " * name, as_string (x));
+    set_user_preference ("ordinate " * name, as_string (y));
+  }
+}
+
+void
+notify_window_resize (string name, SI ww, SI hh) {
+  int w= ww / PIXEL;
+  int h= hh / PIXEL;
+  if (name != "popup") {
+    //cout << "Resize " << name << " to " << ww << ", " << hh << "\n";
+    set_user_preference ("width " * name, as_string (w));
+    set_user_preference ("height " * name, as_string (h));
+  }
+}
+
+void
+notify_window_destroy (string name) {
+  window_names->reset (name);
+}
+
+void
+get_preferred_position (string name, SI& xx, SI& yy) {
+  if (has_user_preference ("abscissa " * name)) {
+    int x= as_int (get_user_preference ("abscissa " * name));
+    int y= as_int (get_user_preference ("ordinate " * name));
+    
+    xx=  x * PIXEL;
+    yy= -y * PIXEL;
+  }
+}
+
+void
+get_preferred_size (string name, SI& ww, SI& hh) {
+  if (has_user_preference ("width " * name)) {
+    int w= as_int (get_user_preference ("width " * name));
+    int h= as_int (get_user_preference ("height " * name));
+    ww= w * PIXEL;
+    hh= h * PIXEL;
+  }
+}
 
 /******************************************************************************
 * Meta editor constructor and destructor
@@ -36,7 +103,7 @@ tm_window_rep::tm_window_rep (widget wid2, tree geom):
   menu_current (object ()), menu_cache (widget ()),
   text_ptr (NULL)
 {
-  sfactor= get_server () -> get_default_shrinking_factor ();
+  zoomf= get_server () -> get_default_zoom_factor ();
 }
 
 tm_window_rep::tm_window_rep (tree doc, command quit):
@@ -46,7 +113,7 @@ tm_window_rep::tm_window_rep (tree doc, command quit):
   menu_current (object ()), menu_cache (widget ()),
   text_ptr (NULL)
 {
-  sfactor= get_server () -> get_default_shrinking_factor ();
+  zoomf= get_server () -> get_default_zoom_factor ();
 }
 
 tm_window_rep::~tm_window_rep () {
@@ -62,19 +129,28 @@ texmacs_window_widget (widget wid, tree geom) {
   int W, H;
   int w= geometry_w, h= geometry_h;
   int x= geometry_x, y= geometry_y;
+  bool custom= is_tuple (geom) && N (geom) >= 2;
 #ifndef QTTEXMACS
   if (use_side_tools) { w += 200; h += 100; }
 #endif
-  if (is_tuple (geom) && N (geom) >= 2) {
+  if (custom) {
     w= as_int (geom[0]);
     h= as_int (geom[1]);
   }
   gui_root_extents (W, H); W /= PIXEL; H /= PIXEL;
   if (x < 0) x= W + x + 1 - w;
   if (y < 0) y= H + y + 1 - h;
-  widget win= plain_window_widget (wid, "TeXmacs");
-  set_size (win, w*PIXEL, h*PIXEL);
-  set_position (win, x*PIXEL, (-y)*PIXEL);
+  string name= "TeXmacs";
+  name= unique_window_name (name);
+  widget win= plain_window_widget (wid, name);
+  SI xx= x * PIXEL, yy= -y * PIXEL;
+  SI ww= w * PIXEL, hh=  h * PIXEL;
+  if (!custom) {
+    get_preferred_position (name, xx, yy);
+    get_preferred_size (name, ww, hh);
+  }
+  set_size (win, ww, hh);
+  set_position (win, xx, yy);
   return win;
 }
 
@@ -288,14 +364,14 @@ tm_window_rep::get_side_tools_flag (int which) {
 ******************************************************************************/
 
 void
-tm_window_rep::set_shrinking_factor (int sf) {
-  sfactor= sf;
-  ::set_shrinking_factor (wid, sf);
+tm_window_rep::set_window_zoom_factor (double zoom) {
+  zoomf= zoom;
+  ::set_zoom_factor (wid, zoom);
 }
 
-int
-tm_window_rep::get_shrinking_factor () {
-  return sfactor;
+double
+tm_window_rep::get_window_zoom_factor () {
+  return zoomf;
 }
 
 void

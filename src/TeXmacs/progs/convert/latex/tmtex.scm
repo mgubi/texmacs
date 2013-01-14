@@ -1170,7 +1170,7 @@
 (tm-define (tmtex-select-data expr tag)
   (:synopsis "Get data matching @tag in @expr with nice separators")
   (let* ((data (select expr (list tag)))
-	 (sep (if (== tag 'author-address) '(!nextline) "; "))
+	 (sep (if (== tag 'author-affiliation) '(!nextline) "; "))
 	 (fun (lambda (x)
 		(cond ((func? x 'document)
 		       (list (tex-concat* (tmtex-compressed sep (cdr x)))))
@@ -1183,15 +1183,16 @@
   (if (null? l) l
       (list (list tag (tex-concat* l)))))
 
-(define (tmtex-make-author tag)
-  (let* ((name (tmtex-select-data tag 'author-name))
-	 (address (tmtex-select-data tag 'author-address))
-	 (note (tmtex-select-data tag 'author-note))
+(define (tmtex-make-author data)
+  (let* ((tag (select data '(:%2)))
+         (name (tmtex-select-data tag 'author-name))
+	 (address (tmtex-select-data tag 'author-affiliation))
+	 (misc (tmtex-select-data tag 'author-misc))
 	 (email (tmtex-select-data tag 'author-email))
 	 (homepage (tmtex-select-data tag 'author-homepage))
 	 (email* (tmtex-data-apply 'email email))
 	 (homepage* (tmtex-data-apply 'homepage homepage))
-	 (note* (tmtex-data-assemble "; " (list note email* homepage*)))
+	 (note* (tmtex-data-assemble "; " (list misc email* homepage*)))
 	 (name* (append name (tmtex-data-apply 'thanks note*))))
     (tex-concat* (tmtex-data-assemble '(!nextline)
 				      (list name* address)))))
@@ -1199,11 +1200,11 @@
 (tm-define (tmtex-doc-data s l)
   (let* ((tag (cons s l))
 	 (title (tmtex-select-data tag 'doc-title))
-	 (authors (map tmtex-make-author (select tag '(doc-author-data))))
+	 (authors (map tmtex-make-author (select tag '(doc-author))))
 	 (date (tmtex-select-data tag 'doc-date))
 	 (note (tmtex-select-data tag 'doc-note))
 	 (keywords (tmtex-select-data tag 'doc-keywords))
-	 (AMS-class (tmtex-select-data tag 'doc-AMS-class))
+	 (AMS-class (tmtex-select-data tag 'doc-msc))
 	 (keywords* (tmtex-data-apply 'keywords keywords))
 	 (AMS-class* (tmtex-data-apply 'AMSclass AMS-class))
 	 (note* (tmtex-data-assemble "; " (list note keywords* AMS-class*)))
@@ -1217,7 +1218,7 @@
   (tmtex-doc-data s l))
 
 (tm-define (tmtex-abstract s l)
-  (tmtex-std-env s l))
+  (tmtex-std-env "abstract" l))
 
 (define (tmtex-abstract-wrapper s l)
   (tmtex-abstract s l))
@@ -1422,9 +1423,9 @@
 
 (define (tmtex-bibitem* s l)
   (cond ((= (length l) 1)
-	 `(bibitem ,(tmtex (car l))))
+	 `(bibitem ,(car l)))
 	((= (length l) 2)
-	 `(bibitem (!option ,(tmtex (car l))) ,(tmtex (cadr l))))
+	 `(bibitem (!option ,(tmtex (car l))) ,(cadr l)))
 	(else "")))
 
 (define (tmtex-figure s l)
@@ -1759,9 +1760,9 @@
   (hide-part (,tmtex-hide-part -1))
   (show-part (,tmtex-show-part -1))
   (doc-data (,tmtex-doc-data-wrapper -1))
-  ((:or doc-title doc-author-data doc-date doc-note
-	doc-keywords doc-AMS-class) (,tmtex-default -1))
-  ((:or author-name author-address author-note
+  ((:or doc-title doc-author author-data doc-date doc-note
+	doc-keywords doc-msc) (,tmtex-default -1))
+  ((:or author-name author-affiliation author-misc
 	author-email author-homepage) (,tmtex-default -1))
   (abstract (,tmtex-abstract-wrapper 1))
   (appendix (,tmtex-appendix 1))

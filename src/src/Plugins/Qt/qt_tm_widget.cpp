@@ -114,6 +114,7 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
    full_screen(false)
 {
   type = texmacs_widget;
+  orig_name = "popup";
 
   main_widget = ::glue_widget (true, true, 1, 1);
   
@@ -183,14 +184,15 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   userToolBar  = new QToolBar ("user toolbar", mw);
   
   sideDock     = new QDockWidget ("Side tools", 0);
-    // Wrap the dock in a "virtual" window widget to have clicks report the right position
-  dock_window_widget = tm_new<qt_window_widget_rep>(sideDock, command());
+    // HACK: Wrap the dock in a "fake" window widget (last parameter = true) to
+    // have clicks report the right position.
+  dock_window_widget = tm_new<qt_window_widget_rep> (sideDock, command(), true);
   
   mainToolBar->setStyle (qtmstyle ());
   modeToolBar->setStyle (qtmstyle ());
   focusToolBar->setStyle (qtmstyle ());
   userToolBar->setStyle (qtmstyle ());
-  sideDock->setStyle(qtmstyle());
+  sideDock->setStyle (qtmstyle ());
   
   {
     // set proper sizes for icons
@@ -321,6 +323,7 @@ qt_tm_widget_rep::~qt_tm_widget_rep () {
 widget
 qt_tm_widget_rep::plain_window_widget (string title, command quit) {
   (void) quit;
+  orig_name = title;
   qwid->setWindowTitle (to_qstring (title));
   return this;
 }
@@ -446,7 +449,7 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
     case SLOT_INVALIDATE_ALL:
     case SLOT_EXTENTS:
     case SLOT_SCROLL_POSITION:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
@@ -593,7 +596,7 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
       return main_widget->query(s, type_id);
 
     case SLOT_HEADER_VISIBILITY:
@@ -885,7 +888,7 @@ qt_tm_embedded_widget_rep::send (slot s, blackbox val) {
     case SLOT_INVALIDATE_ALL:
     case SLOT_EXTENTS:
     case SLOT_SCROLL_POSITION:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
@@ -935,7 +938,7 @@ qt_tm_embedded_widget_rep::query (slot s, int type_id) {
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_POSITION:
     case SLOT_SIZE:
       return main_widget->query(s, type_id);

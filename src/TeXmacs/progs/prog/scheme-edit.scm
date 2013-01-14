@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (prog scheme-edit)
-  (:use (prog prog-edit) (prog scheme-autocomplete)
+  (:use (prog prog-edit)
+        (prog scheme-tools) (prog scheme-autocomplete)
 	(utils misc tm-keywords)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -155,14 +156,22 @@
 
 (tm-define (kbd-variant t forwards?)
   (:require (in-prog-scheme?))
+  (if (not scheme-completions-built?) (scheme-completions-rebuild))
   (custom-complete (tm->tree (scheme-completions (cursor-word)))))
 
 (kbd-map
   (:require (in-prog-scheme?))
   ("C-i" (scheme-indent))
+  ("C-tab" (scheme-indent))
   ("std c" (clipboard-copy-export "scheme" "primary"))
   ("std v" (clipboard-paste-import "scheme" "primary"))
   ("std x" (clipboard-cut-export "scheme" "primary")))
+
+(kbd-map
+  (:require (and developer-mode? (in-prog-scheme?)))
+  ("A-F1" (scheme-popup-help (cursor-word)))
+  ("S-A-F1" (scheme-inbuffer-help (cursor-word)))
+  ("M-F1" (scheme-go-to-definition (cursor-word))))
 
 (tm-define (insert-return)
   (:mode in-prog-scheme?)
