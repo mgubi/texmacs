@@ -1,7 +1,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : title-bis.scm
+;; MODULE      : title-markup.scm
 ;; DESCRIPTION : Translation of metadata markup for typesetting purpose
 ;; COPYRIGHT   : (C) 2012  Joris van der Hoeven
 ;;
@@ -11,18 +11,19 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (database title-markup)
-  (:use (database title-transform)))
+(texmacs-module (database title-markup))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collect notes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (insert-note note h)
+(define (insert-note note h style)
   (with n (tm->stree note)
     (when (not (ahash-ref h n))
       (let* ((nr (+ (ahash-size h) 1))
-             (sym `(number ,(number->string nr) "fnsymbol"))
+             (sym (if (zero? (string-length style))
+                      '(phantom a)
+                      `(number ,(number->string nr) ,style)))
              (id (string-append "title-note-" (number->string nr))))
         ;; TODO: use hard-id of the doc-data tree as a prefix
         ;; otherwise, links will be ambiguous in case of multiple titles
@@ -35,18 +36,17 @@
           (list (cons n val))
           (list)))))
 
-(tm-define (collect-notes t)
-  (let* ((l (append (select t '(doc-note))
-                    (select t '(doc-author author-data author-misc))))
+(tm-define (collect-notes t style tags)
+  (let* ((l (apply append (map (cut select t <>) tags)))
          (h (make-ahash-table)))
-    (for-each (cut insert-note <> h) l)
+    (for-each (cut insert-note <> h style) l)
     (append-map (cut retrieve-note <> h) l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modifying notes into footnotes and references
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (remove-notes c)
+(tm-define (remove-notes c)
   (cond ((null? c) c)
         ((tm-func? (car c) 'doc-note 1) (remove-notes (cdr c)))
         ((tm-func? (car c) 'author-misc 1) (remove-notes (cdr c)))
@@ -57,23 +57,24 @@
            (cons h t)))
         (else (cons (car c) (remove-notes (cdr c))))))
 
-(define (retain-title-notes notes)
+(tm-define (retain-title-notes notes)
   (cond ((null? notes) notes)
         ((tm-is? (caar notes) 'doc-note)
          (cons (car notes) (retain-title-notes (cdr notes))))
         (else (retain-title-notes (cdr notes)))))
 
-(define (find-note sel notes)
+(tm-define (find-note sel notes)
   (cond ((null? notes) (list))
         ((== (caar notes) sel)
          (list (car notes)))
         (else (find-note sel (cdr notes)))))
 
-(define (add-annotations c notes)
+(tm-define (add-annotations c notes)
   (if (null? notes) c
       (with (n note sym id) (cAr notes)
-        (with c2 (add-annotations c (cDr notes))
-          `(doc-note-ref ,sym ,id ,c2)))))
+        (if (eqv? (car sym) 'phantom) c
+          (with c2 (add-annotations c (cDr notes))
+            `(doc-note-ref ,sym (noteref-sep) ,id ,c2))))))
 
 (define (annotate c notes)
   (cond ((tm-func? c 'doc-title 1)
@@ -91,12 +92,13 @@
            `(author-data ,@(map ann (tm-children c)))))
         (else c)))
 
-(define (make-note l)
+(tm-define (make-note l)
   (with (n note sym id) l
     `(doc-footnote-text ,sym ,id ,(tm-ref note 0))))
 
 (tm-define (add-notes t)
-  (with notes (collect-notes t)
+  (let* ((tags '((doc-note) (doc-author author-data author-misc)))
+         (notes (collect-notes t "fnsymbol" tags)))
     (if (null? notes) t
         (let* ((c1 (tm-children t))
                (c2 (map (cut annotate <> notes) c1))
@@ -108,12 +110,12 @@
 ;; Main document data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (remove-annotations t)
+(tm-define (remove-annotations t)
   (if (tm-func? t 'doc-note-ref 3)
       (remove-annotations (tm-ref t 2))
       t))
 
-(define (title->running-title t)
+(tm-define (title->running-title t)
   `(doc-running-title ,(remove-annotations (tm-ref t 0))))
 
 (tm-define (doc-data-hidden t)
@@ -146,14 +148,9 @@
 
 (tm-define (doc-data t)
   (:secure #t)
-  ;;(display* "t1= " t "\n")
-  (set! t (single-author-list t))
-  ;;(display* "t2= " t "\n")
-  (set! t (add-notes t))
-  ;;(display* "t3= " t "\n")
-  (set! t (doc-data-sub t))
-  ;;(display* "t4= " t "\n")
-  t)
+  ;;(display* "t= " t "\n")
+  ;;(display* "r= " (add-notes t) "\n")
+  (doc-data-sub (add-notes t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Author data
@@ -164,11 +161,8 @@
   `(document
      ,@(select t '(author-name))
      ,@(select t '(author-affiliation))
-     ,@(select t '(author-affiliation-note))
      ,@(select t '(author-email))
-     ,@(select t '(author-email-note))
-     ,@(select t '(author-homepage))
-     ,@(select t '(author-homepage-note))))
+     ,@(select t '(author-homepage))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Abstract data
@@ -176,7 +170,8 @@
 
 (tm-define (abstract-data t)
   (:secure #t)
-  (let ((opts `(document ,@(select t '(doc-keywords)) ,@(select t '(doc-msc))))
+  (let ((opts `(document ,@(select t '(abstract-keywords))
+                         ,@(select t '(abstract-msc))))
         (abst (select t '(:* abstract 0))))
     (if (list>1? opts)
       `(render-abstract* (document ,@abst) ,opts)
