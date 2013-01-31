@@ -292,6 +292,8 @@ concater_rep::typeset_wide (tree t, path ip, bool above) {
       wideb= wide_check_box (decorate_middle (ip), b->x1, b->x2, w, env->col);
     else if (s == "<breve>")
       wideb= wide_breve_box (decorate_middle (ip), b->x1, b->x2, w, env->col);
+    else if (s == "<invbreve>")
+      wideb= wide_invbreve_box(decorate_middle (ip), b->x1, b->x2, w, env->col);
     else if (s == "<squnderbrace>" || s == "<squnderbrace*>")
       wideb= wide_squbr_box (decorate_middle (ip), b->x1, b->x2, w, env->col);
     else if (s == "<sqoverbrace>" || s == "<sqoverbrace*>")

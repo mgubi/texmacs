@@ -11,7 +11,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (database title-markup))
+(texmacs-module (database title-markup)
+  (:use (database title-transform)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collect notes
@@ -92,7 +93,7 @@
 
 (define (make-note l)
   (with (n note sym id) l
-    `(doc-note-text ,sym ,id ,(tm-ref note 0))))
+    `(doc-footnote-text ,sym ,id ,(tm-ref note 0))))
 
 (tm-define (add-notes t)
   (with notes (collect-notes t)
@@ -117,7 +118,7 @@
 
 (tm-define (doc-data-hidden t)
   `(concat
-     ,@(select t '(doc-note-text))
+     ,@(select t '(doc-footnote-text))
      ,@(map title->running-title (select t '(doc-title)))
      ,@(select t '(doc-running-title))
      (doc-running-author
@@ -145,9 +146,14 @@
 
 (tm-define (doc-data t)
   (:secure #t)
-  ;;(display* "t= " t "\n")
-  ;;(display* "r= " (add-notes t) "\n")
-  (doc-data-sub (add-notes t)))
+  ;;(display* "t1= " t "\n")
+  (set! t (single-author-list t))
+  ;;(display* "t2= " t "\n")
+  (set! t (add-notes t))
+  ;;(display* "t3= " t "\n")
+  (set! t (doc-data-sub t))
+  ;;(display* "t4= " t "\n")
+  t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Author data
@@ -158,8 +164,11 @@
   `(document
      ,@(select t '(author-name))
      ,@(select t '(author-affiliation))
+     ,@(select t '(author-affiliation-note))
      ,@(select t '(author-email))
-     ,@(select t '(author-homepage))))
+     ,@(select t '(author-email-note))
+     ,@(select t '(author-homepage))
+     ,@(select t '(author-homepage-note))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Abstract data

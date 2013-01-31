@@ -25,7 +25,8 @@
     :string?
     (concat :*)
     (verbatim :%1)
-    (text :tuple? :string?)))
+    (text :tuple? :string?)
+    (replace :string? :translatable?)))
   (:menu-label (:or
     :translatable?
     (color :%5)
@@ -129,6 +130,7 @@
       (set! r (string-replace r "accent:umlaut" "\""))
       (set! r (string-replace r "accent:abovedot" "."))
       (set! r (string-replace r "accent:breve" "U"))
+      (set! r (string-replace r "accent:invbreve" "A"))
       (set! r (string-replace r "accent:check" "C")))
     ;;(when (!= r "")
     ;;  (display* what " -> " r " -> " (kbd-system r menu-flag?) "\n"))
@@ -139,7 +141,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (translatable? s)
-  (or (string? s) (func? s 'concat) (func? s 'verbatim)))
+  (or (string? s) (func? s 'concat) (func? s 'verbatim) (func? s 'replace)))
 
 (define (active? style)
   (== (logand style widget-style-inert) 0))

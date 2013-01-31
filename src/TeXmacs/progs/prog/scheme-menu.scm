@@ -24,8 +24,8 @@
 
 (tm-menu (scheme-contextual-menu)
   (let* ((word (cursor-word))
-         (str1 (tr "Help with \"%1\"" word))
-         (str2 (tr "Definition of \"%1\"" word)))
+         (str1 (replace "Help with \"%1\"" word))
+         (str2 (replace "Definition of \"%1\"" word)))
     (if (!= word "")
         ((eval str1) (scheme-popup-help word)))
     (if (!= word "")
@@ -59,6 +59,6 @@
   (if (with-remote-connections?) (-> "Remote" (link remote-menu)))
   (if (with-debugging-tool?) (-> "Debug" (link debug-menu)))
   (if (nnull? (test-menu)) (-> "Test" (link test-menu)))
-  (-> "Scheme" (link scheme-session-menu))
+  (-> "Scheme" (link scheme-menu))
   ---
   (-> "Help" (link help-menu)))

@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : texmacs-client.scm
 ;; DESCRIPTION : clients of TeXmacs servers
-;; COPYRIGHT   : (C) 2007  Joris van der Hoeven
+;; COPYRIGHT   : (C) 2007, 2013  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -13,45 +13,92 @@
 
 (texmacs-module (remote texmacs-client))
 
-(define client-active? #f)
-(define client-waiting? #f)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Asynchroneous clients
+;; Declaration of call backs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (client-eval cmd)
-  ;;(display* "Client command: " cmd "\n")
-  (object->string* (eval (string->object cmd))))
+(define-public call-back-dispatch-table (make-ahash-table))
 
-(tm-define (client-add)
-  (set! client-active? #t)
+(tm-define-macro (tm-call-back proto . body)
+  (if (npair? proto) '(noop)
+      (with (fun . args) proto
+        `(begin
+           (tm-define (,fun envelope ,@args) ,@body)
+           (ahash-set! call-back-dispatch-table ',fun ,fun)))))
+
+(tm-define (client-eval envelope cmd)
+  ;; (display* "client-eval " envelope ", " cmd "\n")
+  (if (and (pair? cmd) (ahash-ref call-back-dispatch-table (car cmd)))
+      (with (name . args) cmd
+        (with fun (ahash-ref call-back-dispatch-table name)
+          (apply fun (cons envelope args))))
+      (client-error envelope "invalid command")))
+
+(define (client-return envelope ret-val)
+  (with (server msg-id) envelope
+    (client-send server `(server-remote-result ,msg-id ,ret-val))))
+
+(define (client-error envelope error-msg)
+  (with (server msg-id) envelope
+    (client-send server `(server-remote-error ,msg-id ,error-msg))))
+
+(tm-call-back (local-eval cmd)
+  (with ret (eval cmd)
+    ;; (display* "local-eval " cmd " -> " ret "\n")
+    (client-return envelope ret)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Establishing and finishing connections with servers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define client-server-active? (make-ahash-table))
+(define client-serial 0)
+
+(tm-define (active-servers)
+  (ahash-set->list client-server-active?))
+
+(tm-define (client-send server cmd)
+  (client-write server (object->string* (list client-serial cmd)))
+  (set! client-serial (+ client-serial 1)))
+
+(tm-define (client-add server)
+  (ahash-set! client-server-active? server #t)
   (with wait 1
     (delayed
-      (:while client-active?)
+      (:while (ahash-ref client-server-active? server))
       (:pause ((lambda () (inexact->exact wait))))
-      (:do (set! wait (min (* 1.001 wait) 2500)))
-      (when (not client-waiting?)
-	(with cmd (client-read)
-	  (when (!= cmd "")
-	    (with result (client-eval cmd)
-	      (client-write result)
-	      (set! wait 1))))))))
+      (:do (set! wait (min (* 1.01 wait) 2500)))
+      (with msg (client-read server)
+        (when (!= msg "")
+          (with (msg-id msg-cmd) (string->object msg)
+            (client-eval (list server msg-id) msg-cmd)
+            (set! wait 1)))))))
 
-(tm-define (client-remove)
-  (set! client-active? #f))
+(tm-define (client-remove server)
+  (ahash-remove! client-server-active? server))
 
-(tm-define (client-remote cmd cont)
-  (when (not client-waiting?)
-    (set! client-waiting? #t)
-    (client-write (object->string* cmd))
-    (with wait 1
-      (delayed
-	(:while client-waiting?)
-	(:pause ((lambda () (inexact->exact wait))))
-	(:do (set! wait (min (* 1.001 wait) 2500)))
-	(with result (client-read)
-	  (when (!= result "")
-	    (set! client-waiting? #f)
-	    (set! wait 1)
-	    (cont (string->object result))))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sending asynchroneous commands to servers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define client-continuations (make-ahash-table))
+
+(tm-define (client-remote-eval server cmd cont)
+  (ahash-set! client-continuations client-serial (list server cont))
+  (client-send server cmd))
+
+(tm-call-back (client-remote-result msg-id ret)
+  (with server (car envelope)
+    (and-with val (ahash-ref client-continuations msg-id)
+      (ahash-remove! client-continuations msg-id)
+      (with (orig-server cont) val
+        (when (== server orig-server)
+          (cont ret))))))
+
+(tm-call-back (client-remote-error msg-id err-msg)
+  (with server (car envelope)
+    (and-with val (ahash-ref client-continuations msg-id)
+      (ahash-remove! client-continuations msg-id)
+      (with (orig-server cont) val
+        (when (== server orig-server)
+          (texmacs-error "client-remote-error" "remote error ~S" err-msg))))))

@@ -52,6 +52,18 @@
 	       (select-symbol (cdr l) (+ nr 1) sym bl)))
 	(else (select-symbol (cdr l) (+ nr 1) sym bl))))
 
+(define (select-exclude-symbols l nr syms bl)
+  "Select all except symbols in a given list"
+  (cond ((null? l) l)
+	((and (tm-compound? (car l)) (nin? (tm-car (car l)) syms))
+	 (cons (cons* (list nr) (car l) bl)
+	       (select-exclude-symbols (cdr l) (+ nr 1) syms bl)))
+	(else (select-exclude-symbols (cdr l) (+ nr 1) syms bl))))
+
+(define (select-exclude x args bl)
+  "Select :exclude patterns"
+  (select-exclude-symbols (cdr (tm->list x)) 0 args bl))
+
 (define (select-range l nr begin end bl)
   "Select ranges"
   (cond ((or (null? l) (>= nr end)) '())
@@ -164,6 +176,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define select-table (make-ahash-table))
+(ahash-set! select-table :exclude select-exclude)
 (ahash-set! select-table :range select-range*)
 (ahash-set! select-table :or select-or)
 (ahash-set! select-table :and select-and)

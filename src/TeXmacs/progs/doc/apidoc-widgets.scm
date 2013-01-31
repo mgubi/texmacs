@@ -55,7 +55,8 @@
   (with t (help-win-tree)
     (cond ((== where "scheme") (tree-set! t ($doc-explain-scm key)))
           ((== where "macros") (tree-set! t ($doc-explain-macro key)))
-          (else (tree-set! t ($para (tr "Error: %1" "help-win-display")))))))
+          (else 
+            (tree-set! t ($para (replace "Error: %1" "help-win-display")))))))
 
 (define (help-win-show)
   (with geo (get-preference "gui:help-window-geometry")
@@ -92,7 +93,7 @@
 
 (tm-define (help-window where key)
   (:synopsis "Display the help window for @key in the @where documentation")
-  (if (!= key "")
+  (if (and (string? key) (!= key ""))
       (if (help-win-active?)
           (begin (help-win-display where key) (help-win-show))
           (let* ((win (alt-window-handle))
@@ -199,7 +200,8 @@
                       clw-string
                       clw-string-filter))
    (explicit-buttons
-    ("See definition" (noop)))))
+    ("See documentation" 
+     (doc-check-cache-do (lambda () (help-window "scheme" clw-string)))))))
 
 (tm-define (open-symbol-browser)
   (set! clw-string "")

@@ -10,11 +10,9 @@
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
 ;; TODO:
-;;   - !! Fix the mess with the widgets and gui-make-tr, etc. It's just wrong.
-;;   - Is tr-normalize ok? Am I doing the right thing? 
-;;   - Use xgettext to gather strings to be translated rather than the hack in
+;;   - Use a better way to gather strings to be translated than the hack in
 ;;     gui-markup.scm.
-;;   - Add plural forms and other tweaks to tr
+;;   - Add plural forms and other tweaks to replace
 ;;   - Use TeXmacs to convert files with encodings different from that used by
 ;;     Guile (in tr-parse and ...)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -22,55 +20,22 @@
 (texmacs-module (language natural))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Translation 
+;; Translation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (replace-arg str arg val)
-  (cond ((number? val) (set! val (number->string val)))
-        ((symbol? val) (set! val (symbol->string val)))
-        ((tree? val) (set! val (tree->stree val)))
-        ((url? val) (set! val (url->string val))))                   
-  (let ((i (string-contains str arg))
-        (r (string-length arg)))
-    (if (== i #f) str
-        (with left (substring str 0 i)
-          (with right (string-drop str (+ i r))
-            (if (list? val)
-                (if (string-null? right) ; what about left?
-                    (list left val)
-                    (list left val right))
-                (string-concatenate `(,left ,val ,right))))))))
+(define (reformat-arg val)
+  (cond ((number? val) (number->string val))
+        ((symbol? val) `(verbatim ,(symbol->string val)))
+        ((tree? val) (tree->stree val))
+        ((url? val) `(verbatim ,(url->string val)))
+        (else val)))
 
-(tm-define (tr-apply origstr . vals)
-  (with str (string-translate origstr)
-    (with n 0
-      (list-fold
-       (lambda (v x)
-         (set! n (+ n 1))
-         (with arg (string-append "%" (number->string n))
-           (cond ((string? x)
-                  (replace-arg x arg v))
-                 ((list? x)
-                  (append (cDr x) (replace-arg (cAr x) arg v)))
-                 (else
-                   (texmacs-error "tr-apply" "wrong replace-arg")))))
-       str vals))))
-
-(tm-define (tr origstr . vals)
+; Recall that for menu and widget creation one must use the homonymous tag
+; instead of this function
+(tm-define (replace origstr . vals)
   (:synopsis "Translate a string with arguments")
-  (with res (apply tr-apply origstr vals)
-    (cond ((string? res) `(verbatim ,res))
-          ((pair? res) `(verbatim (concat ,@res)))
-          (else
-            (texmacs-error "tr" "wrong tr-apply")))))
-
-(tm-define (tr-normalize l)
-  (:synopsis "Flatten some sublists")
-  (cond ((string? l) l)
-        ((null? l) l)
-        ((or (func? (car l) 'verbatim) (func? (car l) 'concat))
-         (append (tr-normalize (cdar l)) (tr-normalize (cdr l))))
-        (else (cons (car l) (tr-normalize (cdr l))))))
+  (tm->stree
+   (translate (stree->tree `(replace ,origstr ,@(map reformat-arg vals))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reading and writing dictionaries
@@ -124,14 +89,14 @@
          (h (tr-hash language))
          (r (tr-read p h)))
     (close-input-port p)
-    (if r (display* (tr "Read %1 items from %2" (ahash-size h) f))
-        (display* (tr "Error reading from file %1" f)))))
+    (if r (display* (replace "Read %1 items from %2" (ahash-size h) f))
+        (display* (replace "Error reading from file %1" f)))))
 
 (define (tr-all language)
   "Merge the strings from the translations file with those misssing"
   (if (== 0 (ahash-size (tr-hash language))) (tr-parse language))
   (list-sort 
-   (list-uniq
+   (list-remove-duplicates
     (append (tr-current) 
             (map car (ahash-table->list (tr-hash language)))))
    string<?))
@@ -160,9 +125,10 @@
 (tm-define (tr-rebuild language)
   (:synopsis "Rebuild translations file adding the missing ones (up to now)")
   (tr-parse language)
-  (user-confirm 
-    (tr "This will overwrite the dictionary %1 with %2 entries. Are you sure?" 
-        (tr-file language) (ahash-size (tr-hash language)))
+  (user-confirm
+    `(replace 
+       "This will overwrite the dictionary %1 with %2 entries. Are you sure?"
+      (verbatim ,(tr-file language)) ,(ahash-size (tr-hash language)))
     #f
     (lambda (answ)
       (if answ
@@ -171,8 +137,10 @@
               (lambda ()
                 (tr-write (map (lambda (str) (tr-match language str))
                                (tr-all language)))))
-            (set-message (tr "Wrote file %1" (tr-file language)) ""))
-          (set-message (tr "Rebuild cancelled") language)))))
+            (set-message `(replace "Wrote file %1"
+                                   (verbatim ,(tr-file language)))
+                         ""))
+          (set-message '(replace "Rebuild cancelled") language)))))
 
 (tm-define (tr-missing language)
   (:synopsis "Translations missing in the dictionary (up to now)")
@@ -186,6 +154,10 @@
    '()
    (tr-current)))
 
+(tm-define (tr-reload-translations)
+  (force-load-translations "english" (get-output-language))
+  (set-message "Translations loaded" (get-output-language)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu entries
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -197,6 +169,5 @@
         (group "Close translations to rebuild"))
     (if (not (buffer-exists? (tr-file (get-output-language))))
         ("Rebuild translations file" (tr-rebuild (get-output-language))))
-    ("Force reloading of translations"
-     (force-load-translations "english" (get-output-language)))))
+    ("Force reloading of translations" (tr-reload-translations))))
 

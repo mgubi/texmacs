@@ -43,8 +43,11 @@ socket_link_rep::socket_link_rep (string host2, int port2, int type2, int fd):
   io     = fd;
   outbuf = "";
   alive  = (fd != -1);
-  if (type == SOCKET_SERVER) call ("server-add", object (io));
-  else if (type == SOCKET_CLIENT) call ("client-add");
+  if (type == SOCKET_SERVER) {
+    sn = socket_notifier (io, &socket_callback, this, NULL);  
+    add_notifier (sn);
+    call ("server-add", object (io));
+  } 
 }
 
 socket_link_rep::~socket_link_rep () {
@@ -118,6 +121,7 @@ socket_link_rep::start () {
     return "Error: non working connection to '" * where * "'";
   alive = true;
   sn = socket_notifier (io, &socket_callback, this, NULL);  
+  add_notifier (sn);
   return "ok";
 #else
   return "Error: sockets not implemented";
@@ -231,10 +235,11 @@ socket_link_rep::stop () {
 #ifndef __MINGW32__
   if (!alive) return;
   if (type == SOCKET_SERVER) call ("server-remove", object (io));
-  else if (type == SOCKET_CLIENT) call ("client-remove");
+  else if (type == SOCKET_CLIENT) call ("client-remove", object (io));
   close (io);
   io= -1;
   alive= false;
+  remove_notifier (sn);
   sn = socket_notifier ();
   wait (NULL);
 #endif
@@ -248,7 +253,7 @@ void
 socket_callback (void *obj, void* info) {
 #ifndef __MINGW32__
   (void) info;
-  socket_link_rep* con= (socket_link_rep*) obj;  
+  socket_link_rep* con= (socket_link_rep*) obj;
   bool busy= true;
   bool news= false;
   while (busy) {
@@ -267,6 +272,7 @@ socket_callback (void *obj, void* info) {
       //cout << "socket_callback OUT" << LF;
       con->feed (LINK_OUT);
       busy= news= true;
+      if (!con->alive) break;
     }
   }
   if (!is_nil (con->feed_cmd) && news)

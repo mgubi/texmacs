@@ -10,7 +10,6 @@
 ;; FIXME: improvements to be made:
 ;; - Directly jump to the document if exactly one occurrence is found
 ;; - Launch a search when jumping to a matching document
-;; - Translations for generated text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
@@ -19,7 +18,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (doc docgrep))
+(texmacs-module (doc docgrep)
+  (:use (doc help-funcs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Get scores for the different files
@@ -31,8 +31,8 @@
 
 (define (get-score-list keyword-list file-list)
   (let* ((l1 (map (cut get-score-sub <> keyword-list) file-list))
-	 (l2 (list-filter l1 (lambda (x) (!= (cdr x) 0))))
-	 (l3 (list-sort l2 (lambda (x y) (>= (cdr x) (cdr y))))))
+         (l2 (list-filter l1 (lambda (x) (!= (cdr x) 0))))
+         (l3 (list-sort l2 (lambda (x y) (>= (cdr x) (cdr y))))))
     l3))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,21 +43,26 @@
 
 (define (build-search-results keyword the-result)
   ($tmdoc
-    ($tmdoc-title (tr "Search results for ``%1''" keyword))
+    ($tmdoc-title (replace "Search results for ``%1''" keyword))
     ($when (null? the-result)
-      (tr "No matches found for ``%1''." keyword))
+      (replace "No matches found for ``%1''." keyword))
     ($when (nnull? the-result)
       ($with highest-score (cdar the-result)
         ($description-aligned
           ($for (x the-result)
             ($describe-item
                 ($inline (quotient (* (cdr x) 100) highest-score) "%")
-              ($link (car x)
-                (cAr (string-tokenize-by-char (car x) #\/))))))))))
+              ($link (car x) (help-file-title (car x)))
+              '(htab "")
+              ($ismall
+                ($verbatim
+                  (string-append " ("
+                                 (cAr (string-tokenize-by-char (car x) #\/)))
+                                 ")" )))))))))
 
 (define (build-link-page keyword file-list)
   (let* ((keyword-list (string-tokenize-by-char keyword #\space))
-	 (the-result (get-score-list keyword-list file-list)))
+         (the-result (get-score-list keyword-list file-list)))
     (tm->stree (build-search-results keyword the-result))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -68,15 +73,15 @@
 
 (define (url-collect path pattern)
   (let* ((u (url-append (unix->url path) (url-any)))
-	 (v (url-expand (url-complete u "dr")))
-	 (w (url-append v (url-wildcard pattern)))
-	 (x (url-expand (url-complete w "fr"))))
+         (v (url-expand (url-complete u "dr")))
+         (w (url-append v (url-wildcard pattern)))
+         (x (url-expand (url-complete w "fr"))))
     x))
 
 (define (docgrep what path . patterns)
   (let* ((l1 (map (lambda (pat) (url-collect path pat)) patterns))
-	 (l2 (map url->unix l1))
-	 (l3 (append-map (cut string-tokenize-by-char <> path-separator) l2)))
+         (l2 (map url->unix l1))
+         (l3 (append-map (cut string-tokenize-by-char <> path-separator) l2)))
     (build-link-page what l3)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -94,12 +99,12 @@
            (docgrep what "$TEXMACS_FILE_PATH" "*.tm"))
           ((== type "doc")
            (docgrep what "$TEXMACS_DOC_PATH" (string-append "*." lan ".tm")))
- 	  (else
- 	   (docgrep what "$TEXMACS_DOC_PATH" "*.en.tm")))))
+          (else
+           (docgrep what "$TEXMACS_DOC_PATH" "*.en.tm")))))
 
 (tmfs-title-handler (grep query doc)
   (with what (query-ref query "what")
-    (tr "Help - Search results for ``%1''" what)))
+    (replace "Help - Search results for ``%1''" what)))
 
 (tm-define (docgrep-in-doc what)
   (:argument what "Search words in the documentation")

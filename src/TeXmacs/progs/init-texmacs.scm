@@ -30,18 +30,16 @@
         ;; FIXME: handle overloaded redefinitions
         (let ((form (old-read port)))
           (if (and (pair? form) (member (car form) keywords-which-define))
-              (let* ((line (source-property form 'line))
-                     (column (source-property form 'column))
-                     (filename (source-property form 'filename))
+              (let* ((l (source-property form 'line))
+                     (c (source-property form 'column))
+                     (f (source-property form 'filename))
                      (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
                 (if (symbol? sym) ; Just in case
-                    (begin 
+                    (let ((old (or (symbol-property sym 'defs) '()))
+                          (new `(,f ,l ,c)))
                       (%new-read-hook sym)
-                      (if filename     ; don't set props if read from stdin
-                          (begin
-                            (set-symbol-property! sym 'line line)
-                            (set-symbol-property! sym 'column column)
-                            (set-symbol-property! sym 'filename filename)))))))
+                      (if (not (member new old))
+                          (set-symbol-property! sym 'defs (cons new old)))))))
           form))
 
       (set! read new-read)
@@ -165,8 +163,7 @@
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting programming modes\n")
-;;(lazy-keyboard (prog scheme-tools) with-developer-tool?)
-(lazy-keyboard (prog scheme-edit) in-prog-scheme?)
+(lazy-keyboard (prog prog-kbd) in-prog?)
 (lazy-menu (prog format-prog-menu) prog-format-menu prog-format-icons)
 (lazy-menu (prog prog-menu) prog-menu prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -197,7 +194,7 @@
 ;(display "Booting formal languages\n")
 (lazy-language (language minimal) minimal)
 (lazy-language (language std-math) std-math)
-(lazy-define (language natural) tr)
+(lazy-define (language natural) replace)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 
 ;(display "Booting dynamic features\n")
@@ -225,6 +222,7 @@
              tmweb-convert-dir-keep-texmacs tmweb-update-dir-keep-texmacs
              tmweb-interactive-build tmweb-interactive-update)
 (lazy-define (doc apidoc) apidoc-all-modules apidoc-all-symbols)
+(lazy-menu (doc apidoc-menu) apidoc-menu)
 (lazy-tmfs-handler (doc docgrep) grep)
 (lazy-tmfs-handler (doc tmdoc) help)
 (lazy-tmfs-handler (doc apidoc) apidoc)

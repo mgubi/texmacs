@@ -124,7 +124,8 @@ socket_server_rep::start_client () {
       if (incoming[i]->alive)
 	update << incoming[i];
     incoming= update;
-    incoming << make_socket_link (addr, -1, SOCKET_SERVER, client);
+    tm_link new_ln= make_socket_link (addr, -1, SOCKET_SERVER, client);
+    incoming << new_ln;
   }
 #endif
 }
@@ -161,8 +162,8 @@ socket_server_rep::stop () {
   if (!alive) return;
   incoming= array<tm_link> ();
   alive= false;
-  
   remove_notifier (sn);
+  sn= socket_notifier ();
   close (server);
   wait (NULL);
 #endif

@@ -26,21 +26,15 @@
   (link translations-menu)
   ---
   (group "Documentation")
-  ("Browse modules documentation" (apidoc-all-modules))
-  ; This one isn't exactly useful: (and should be removed)
-  ;("List all symbols" (apidoc-all-symbols))
-  ("Open module browser" (open-module-browser))
-  ("Open symbol browser" (open-symbol-browser))
-  (if (in-tmdoc?)
-      ("Insert symbol documentation" (interactive ask-insert-symbol-doc)))
+  (link apidoc-menu)
   ---
   (group "Configuration")
-  ((tr "Open %1" "my-init-texmacs.scm") 
+  ((replace "Open %1" (verbatim "my-init-texmacs.scm"))
     (load-buffer 
      (url-concretize "$TEXMACS_HOME_PATH/progs/my-init-texmacs.scm")))
-  ((tr "Open %1" "my-init-buffer.scm")
+  ((replace "Open %1" (verbatim "my-init-buffer.scm"))
     (load-buffer 
      (url-concretize "$TEXMACS_HOME_PATH/progs/my-init-buffer.scm")))
-    ((tr "Open %1" "preferences.scm")
+    ((replace "Open %1" (verbatim "preferences.scm"))
     (load-buffer 
      (url-concretize "$TEXMACS_HOME_PATH/system/preferences.scm"))))

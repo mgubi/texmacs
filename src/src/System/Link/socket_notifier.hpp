@@ -23,7 +23,7 @@ struct socket_notifier_rep: tm_obj<socket_notifier_rep> {
 public:
   socket_notifier_rep (int _fd, command _cmd):
     fd (_fd), cmd (_cmd) {}
-  void notify () { if (!is_nil (cmd)) cmd->apply (); } 
+  void notify ();
 };
 
 class socket_notifier : public tm_null_ptr<socket_notifier_rep> {

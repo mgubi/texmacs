@@ -179,6 +179,12 @@ url_http (string name) {
 }
 
 static url
+url_https (string name) {
+  url u= url_get_name (name);
+  return url_root ("https") * u;
+}
+
+static url
 url_ftp (string name) {
   url u= url_get_name (name);
   return url_root ("ftp") * u;
@@ -252,6 +258,7 @@ url_general (string name, int type= URL_SYSTEM) {
   if (starts (name, "local:")) return url_local (name (6, N (name)));
   if (starts (name, "file://")) return url_file (name (7, N (name)));
   if (starts (name, "http://")) return url_http (name (7, N (name)));
+  if (starts (name, "https://")) return url_https (name (8, N (name)));
   if (starts (name, "ftp://")) return url_ftp (name (6, N (name)));
   if (starts (name, "tmfs://")) return url_tmfs (name (7, N (name)));
   if (starts (name, "//")) return url_blank (name (2, N (name)));
@@ -587,7 +594,7 @@ glue (url u, string s) {
 url
 unglue (url u, int nr) {
   if (is_atomic (u))
-    return as_url (tree (u->t->label (0, N(u->t->label) - nr)));
+    return as_url (tree (u->t->label (0, max (N(u->t->label) - nr, 0))));
   if (is_concat (u)) return u[1] * unglue (u[2], nr);
   if (is_or (u)) return unglue (u[1], nr) | unglue (u[2], nr);
   cerr << "\nu= " << u << "\n";
@@ -895,7 +902,9 @@ exists (url u) {
 bool
 exists_in_path (url u) {
 #if defined (OS_WIN32) || defined (__MINGW__) || defined (__MINGW32__)
-  return !is_none (resolve_in_path (url (as_string (u) * ".exe")));
+  return !is_none (resolve_in_path (url (as_string (u) * ".bat"))) ||\
+  	 !is_none (resolve_in_path (url (as_string (u) * ".exe"))) ||\
+	 !is_none (resolve_in_path (url (as_string (u) * ".com")));
 #else
   return !is_none (resolve_in_path (u));
 #endif
