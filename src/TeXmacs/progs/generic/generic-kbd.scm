@@ -13,16 +13,16 @@
 
 (texmacs-module (generic generic-kbd)
   (:use (texmacs keyboard prefix-kbd)
-	(utils edit variants)
-	(utils edit auto-close)
-	(utils library cursor)
-	(generic generic-edit)
-	(generic format-edit)
-	(generic format-geometry-edit)
-	(source source-edit)
-	(texmacs texmacs tm-files)
-	(texmacs texmacs tm-print)
-	(doc help-funcs)))
+        (utils edit variants)
+        (utils edit auto-close)
+        (utils library cursor)
+        (generic generic-edit)
+        (generic format-edit)
+        (generic format-geometry-edit)
+        (source source-edit)
+        (texmacs texmacs tm-files)
+        (texmacs texmacs tm-print)
+        (doc help-funcs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General shortcuts for all modes
@@ -30,7 +30,7 @@
 
 (kbd-map
   ("F1" (interactive docgrep-in-doc))
-  ("S-F1" (noop)) ;; FIXME: S-F1 should be 'What is This?'
+  ("S-F1" (interactive docgrep-in-src)) ;; FIXME: S-F1 should be 'What is This?'
   ;("M-F1" (load-help-buffer "about/welcome/welcome")) ; Conflict with devtools
 
   ("<" "<less>")
@@ -461,6 +461,7 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))
@@ -522,6 +523,7 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))
@@ -598,7 +600,7 @@
   ("macos r" (interactive replace-start-forward))
 
   ("altcmd x" (interactive footer-eval))
-  ("altcmd X" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
 
   ;("C-a" (kbd-start-line)) ; conflict with ("text a" (make 'abbr))
   ;("C-e" (kbd-end-line))   ; conflict with ("text e" (make-tmlist 'enumerate))
@@ -731,6 +733,7 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))

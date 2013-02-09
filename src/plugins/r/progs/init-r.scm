@@ -11,9 +11,17 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(texmacs-modes
+  (in-r% (== (get-env "prog-language") "r"))
+  (in-prog-r% #t in-prog% in-r%))
+
+(lazy-keyboard (r-edit) in-prog-r?)
+
 (define (r-initialize)
   (import-from (utils plugins plugin-convert))
-  (lazy-input-converter (r-input) r))
+  (lazy-input-converter (r-input) r)
+  ;;(plugin-eval "r" "default" "b=1:100\n")
+  )
 
 (define (r-serialize lan t)
   (import-from (utils plugins plugin-cmd))
@@ -26,14 +34,16 @@
   (:require (url-exists-in-path? "R"))
   (:initialize (r-initialize))
   (:serializer ,r-serialize)
-  (:launch "exec tm_r")
+  (:launch "tm_r")
   (:tab-completion #t)
   (:session "R")
   (:scripts "R"))
 
 (menu-bind r-menu
   ("update menu" (insert "t.update.menus(max.len=30)"))
-  ("R help in TeXmacs" (insert "t.start.help()")))
+  ("R help in TeXmacs" (insert "t.start.help()"))
+  ;;("R help in TeXmacs 2" (plugin-eval "r" "default" "1:100\n"))
+  )
 
 (menu-bind plugin-menu
   (:require (in-r?))
