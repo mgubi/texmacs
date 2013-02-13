@@ -185,7 +185,7 @@ basic_widget_rep::handle_alarm (alarm_event ev) {
 
 void
 basic_widget_rep::handle_clear (clear_event ev) {
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   ren->set_background (white);
   ren->clear (ev->x1, ev->y1, ev->x2, ev->y2);
 }
@@ -328,9 +328,9 @@ basic_widget_rep::handle (event ev) {
     SI ry2= min (e->y2, y2())- oy;
     if ((rx2 > rx1) && (ry2 > ry1)) {
       event ev= ::emit_clear (e->win, rx1, ry1, rx2, ry2);
-      win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
+      e->win->clip (rx1, ry1, rx2, ry2);
       handle_clear (ev);
-      win->get_renderer ()->unclip ();
+      e->win->unclip ();
     }
     return true;
   }
@@ -344,9 +344,9 @@ basic_widget_rep::handle (event ev) {
 
     if ((rx2 > rx1) && (ry2 > ry1)) {
       event ev= ::emit_repaint (e->win, rx1, ry1, rx2, ry2, e->stop);
-      win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
+      e->win->clip (rx1, ry1, rx2, ry2);
       handle_repaint (ev);
-      win->get_renderer ()->unclip ();
+      e->win->unclip ();
     }
 
     int i;
