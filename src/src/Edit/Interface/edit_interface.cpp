@@ -64,11 +64,10 @@ edit_interface_rep::edit_interface_rep ():
 }
 
 edit_interface_rep::~edit_interface_rep () {
-  if (is_attached (this)) {
-    renderer ren= get_renderer (this);
-    ren->delete_shadow (shadow);
-    ren->delete_shadow (stored);
-  }
+  tm_delete(shadow);
+  tm_delete(stored);
+  shadow = NULL;
+  stored = NULL;
 }
 
 edit_interface_rep::operator tree () {
@@ -83,11 +82,10 @@ edit_interface_rep::suspend () {
   }
   got_focus= false;
   notify_change (THE_FOCUS);
-  if (is_attached (this)) {
-    renderer ren= get_renderer (this);
-    ren->delete_shadow (shadow);
-    ren->delete_shadow (stored);
-  }
+  tm_delete(shadow);
+  tm_delete(stored);
+  shadow = NULL;
+  stored = NULL;
 }
 
 void
