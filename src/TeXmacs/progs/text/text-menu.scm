@@ -387,6 +387,7 @@
   ("Date" (make-doc-data-element 'doc-date))
   ("Today"
    (begin (make-doc-data-element 'doc-date) (make-arity 'date 0)))
+  ("Miscellanous" (make-doc-data-element 'doc-misc))
   ("Note" (make-doc-data-element 'doc-note))
   ("TeXmacs notice" (begin (make-doc-data-element 'doc-note)
                            (make 'with-TeXmacs-text))))
@@ -432,7 +433,8 @@
   ("Affiliation" (make-author-data-element 'author-affiliation))
   ("Email" (make-author-data-element 'author-email))
   ("Homepage" (make-author-data-element 'author-homepage))
-  ("Note" (make-author-data-element 'author-misc)))
+  ("Miscellanous" (make-author-data-element 'author-misc))
+  ("Note" (make-author-data-element 'author-note)))
 
 (tm-menu (focus-author-icons)
   (mini #t

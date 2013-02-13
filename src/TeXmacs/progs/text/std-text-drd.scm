@@ -77,7 +77,7 @@
   (doc-title-active-tag) (doc-title-inactive-tag))
 
 (define-group doc-title-active-tag
-  doc-title doc-subtitle doc-author doc-date)
+  doc-title doc-subtitle doc-author doc-date doc-misc doc-note)
 
 (define-group doc-title-inactive-tag
   doc-running-title doc-running-author)
@@ -86,7 +86,8 @@
   author-data)
 
 (define-group author-data-tag
-  author-name author-affiliation author-email author-homepage author-misc)
+  author-name author-affiliation author-email author-homepage author-misc
+  author-note)
 
 (define-group abstract-data-tag
   abstract abstract-msc abstract-keywords)

@@ -420,6 +420,12 @@ qt_convert_image (url image, url dest, int w, int h) {
 
 void
 qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
+  string r= qt_image_to_eps (image, w_pt, h_pt, dpi);
+  save_string (eps, r);
+}
+
+string
+qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
   static const char* d= "0123456789ABCDEF";
   QImage im (utf8_to_qstring (concretize (image)));
   string r;
@@ -427,7 +433,7 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
     cerr << "TeXmacs Cannot read image file '" << image << "'"
 	 << " in qt_image_to_eps" << LF;
   else {
-    bool alpha= false;
+    bool alpha= im.hasAlphaChannel ();
     if (dpi > 0 && w_pt > 0 && h_pt > 0) {
       int ww= w_pt * dpi / 72;
       int hh= h_pt * dpi / 72;
@@ -464,8 +470,6 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
           r << "\n";
           l= 0;
         }
-        if (!alpha && im.hasAlphaChannel () && qAlpha (p) < 0xFF)
-          alpha= true;
       }
       if (alpha) {
         v= 0;
@@ -475,6 +479,12 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
             mask << d[v];
             v= 0;
             k++;
+            // Padding of the image data mask
+            if (i + 1 == im.width () && k % 2 == 1) {
+              mask << d[0];
+              k++;
+            }
+            // Code layout
             if (k >= 78) {
               mask << "\n";
               k= 0;
@@ -509,8 +519,8 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
     }
     r << "\nimage\nshowpage\n%%Trailer\ncleartomark\ncountdictstack\n"
       << "exch sub { end } repeat\nrestore\n%%EOF\n";
-    save_string (eps, r);
   }
+  return r;
 }
 
 string 
