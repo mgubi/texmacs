@@ -287,12 +287,6 @@ basic_renderer_rep::get_extents (int& w2, int& h2) {
 	w2 = w; h2 = h;
 }
 
-bool
-basic_renderer_rep::interrupted (bool check) {
-	return check_event (check? INTERRUPT_EVENT: INTERRUPTED_EVENT);
-}
-
-
 void basic_renderer_rep::begin (void* handle) { 
   (void) handle; 
 }

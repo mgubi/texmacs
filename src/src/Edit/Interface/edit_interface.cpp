@@ -23,6 +23,7 @@
 #ifdef EXPERIMENTAL
 #include "../../Style/Evaluate/evaluate_main.hpp"
 #endif
+#include "gui.hpp" // for gui_interrupted
 
 extern void (*env_next_prog)(void);
 
@@ -443,7 +444,7 @@ edit_interface_rep::apply_changes () {
         else
           concrete_window () -> set_window_name (buf->buf->title);
       }
-      if (!get_renderer (this) -> interrupted ()) drd_update ();
+      if (!gui_interrupted ()) drd_update ();
       cache_memorize ();
       last_update= last_change;
       save_user_preferences ();

@@ -11,6 +11,7 @@
 
 #include "Interface/edit_interface.hpp"
 #include "message.hpp"
+#include "gui.hpp" // for gui_interrupted
 
 extern int nr_painted;
 extern void clear_pattern_rectangles (renderer ren, rectangles l);
@@ -214,7 +215,7 @@ edit_interface_rep::draw_with_shadow (renderer win, rectangle r) {
   ren->reset_zoom_factor ();
   win->reset_zoom_factor ();
 
-  if (ren->interrupted ()) {
+  if (gui_interrupted ()) {
     ren->set_zoom_factor (zoomf);
     l= l & rectangles (translate (r, ren->ox, ren->oy));
     simplify (l);
@@ -267,7 +268,7 @@ edit_interface_rep::draw_with_stored (renderer win, rectangle r) {
   else {
     // cout << "."; cout.flush ();
     draw_with_shadow (win, r);
-    if (!win->interrupted ()) {
+    if (!gui_interrupted ()) {
       if (inside_active_graphics ()) {
 	shadow->new_shadow (stored);
 	shadow->get_shadow (stored, sr->x1, sr->y1, sr->x2, sr->y2);

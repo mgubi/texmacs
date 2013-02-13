@@ -66,12 +66,6 @@ renderer_rep::repainted () {
   return true;
 }
 
-bool
-renderer_rep::interrupted (bool check) {
-  (void) check;
-  return false;
-}
-
 void
 renderer_rep::anchor(string label, SI x, SI y) {
   (void) label; (void) x; (void) y;

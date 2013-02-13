@@ -82,7 +82,6 @@ public:
   
   void next_page ();
   bool is_printer();
-  bool interrupted (bool check);
   
   /***** private section *****************************************************/
   
@@ -599,11 +598,6 @@ cairo_renderer_rep::xpm (url file_name, SI x, SI y) {
 bool
 cairo_renderer_rep::is_printer () {
   return true;
-}
-
-bool
-cairo_renderer_rep::interrupted (bool check) {
-  return false;
 }
 
 /******************************************************************************

@@ -462,7 +462,7 @@ x_window_rep::repaint_invalid_regions () {
     ren->encode (r->x2, r->y2);
     ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
     send_repaint (w, ren, r->x1, r->y2, r->x2, r->y1);
-    if (ren->interrupted ())
+    if (gui_interrupted ())
       new_regions= rectangles (invalid_regions->item, new_regions);
     invalid_regions= invalid_regions->next;
   }

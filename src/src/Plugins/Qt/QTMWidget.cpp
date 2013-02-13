@@ -375,7 +375,7 @@ QTMWidget::repaint_invalid_regions () {
         ren->encode (r->x2, r->y2);
         ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
         tm_widget()->handle_repaint (r->x1, r->y2, r->x2, r->y1);
-        if (ren->interrupted ()) {
+        if (gui_interrupted ()) {
           //cout << "interrupted repainting of  " << r0 << "\n";
           //ren->set_color(green);
           //ren->line(r->x1, r->y1, r->x2, r->y2);
