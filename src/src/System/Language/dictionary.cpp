@@ -14,6 +14,7 @@
 #include "convert.hpp"
 #include "converter.hpp"
 #include "drd_std.hpp"
+#include "scheme.hpp"
 
 RESOURCE_CODE(dictionary);
 
@@ -41,16 +42,16 @@ dictionary_rep::load (url u) {
   int i, n= N(t);
   for (i=0; i<n; i++)
     if (is_func (t[i], TUPLE, 2) &&
-	is_atomic (t[i][0]) && is_atomic (t[i][1]))
-      {
-	string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
-	string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
-	if ( to == "chinese" ||  to == "japanese"  || 
-	     to == "korean"  ||  to == "taiwanese" ||
-	     to == "russian" ||  to == "ukrainian" ||  to == "bulgarian")
-	  r= utf8_to_cork (r);
-	table (l)= r;
-      }
+        is_atomic (t[i][0]) && is_atomic (t[i][1]))
+    {
+      string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
+      string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
+      if (to == "chinese" ||  to == "japanese"  ||
+          to == "korean"  ||  to == "taiwanese" ||
+          to == "russian" ||  to == "ukrainian" || to == "bulgarian")
+        r= utf8_to_cork (r);
+      table (l)= r;
+    }
 }
 
 void
@@ -76,14 +77,22 @@ load_dictionary (string from, string to) {
 ******************************************************************************/
 
 string
-dictionary_rep::translate (string s) {
-  // Is s in dictionary?
+dictionary_rep::translate (string s, bool guess) {
   if (s == "" || from == to) return s;
   //cout << "Translate <" << s << ">\n";
+  // Is s in dictionary?
   if (table->contains (s) && table[s] != "")
     return table[s];
-
-  // remove trailing non iso_alpha characters
+  
+  // Is lowercase version of s in dictionary?
+  string ls= locase_first (s);
+  if (table->contains (ls) && table[ls] != "")
+    return upcase_first (table[ls]);
+  
+  // Attempt to split the string and translate its parts?
+  if (!guess) return s;
+  
+  // Remove trailing non iso_alpha characters
   int i, n= N(s);
   for (i=0; i<n; i++)
     if (is_iso_alpha (s[i]))
@@ -107,12 +116,7 @@ dictionary_rep::translate (string s) {
     return s1 * s2 * s3;
   }
 
-  // Is lowercase version of s in dictionary?
-  string ls= locase_first (s);
-  if (table->contains (ls) && table[ls] != "")
-    return upcase_first (table[ls]);
-
-  // break at last non iso_alpha character which is not a space
+  // Break at last non iso_alpha character which is not a space
   for (i=n; i>0; i--)
     if (!is_iso_alpha (s[i-1]) && s[i-1] != ' ')
       break;
@@ -122,7 +126,7 @@ dictionary_rep::translate (string s) {
     return s1 * s2;
   }
 
-  // no translation available
+  // No translation available
   return s;
 }
 
@@ -155,15 +159,70 @@ translate (const char* s) {
   return translate (string (s), "english", out_lan);
 }
 
+void
+force_load_dictionary (string from, string to) {
+  string name= from * "-" * to;
+  if (dictionary::instances -> contains (name))
+    dictionary::instances -> reset (name);
+  load_dictionary (from, to);
+  notify_preference ("language");
+}
+
+string
+translate_as_is (string s, string from, string to) {
+  dictionary dict= load_dictionary (from, to);
+  return dict->translate (s, false);
+}
+
+string
+translate_as_is (string s) {
+  return translate_as_is (s, "english", out_lan);
+}
+
 /******************************************************************************
 * Translation of trees
 ******************************************************************************/
+
+tree
+translate_replace (tree t, string from, string to, int n=1)
+{
+  if (N(t) < 2) return t[0];
+  
+  string s= t[0]->label;
+  string arg= "%" * as_string (n);
+  
+  if (is_atomic (t[1])) {
+    s= replace (s, arg, translate (t[1]->label, from, to));
+    return translate_replace (concat (s) * t(2, N(t)), from, to, n+1);
+  }
+  else {
+    int l= search_forwards (arg, s);
+    if (l < 0) return t;
+    int r= l + N(arg);
+    tree r1= tree_translate (t[1], from, to);
+    tree r2= translate_replace (tuple (s (r, N(s))) * t(2, N(t)), from, to, n+1);
+    s= s(0, l);
+    if (is_atomic (r1)) {
+      if (is_atomic (r2)) return s * r1->label * r2->label;
+      else                return concat (s * r1->label, r2);
+    }
+    return concat (s, r1, r2);
+  }
+}
 
 tree
 tree_translate (tree t, string from, string to) {
   //cout << "Translating " << t << " from " << from << " into " << to << "\n";
   if (is_atomic (t))
     return translate (t->label, from, to);
+  else if (is_compound (t, "replace")) {
+    if (!is_atomic (t[0])) {
+        //cout << "tree_translate() ERROR: first child should be a string\n";
+      return t;
+    }
+    t[0]->label= translate_as_is (t[0]->label, from, to);
+    return translate_replace (t, from, to);
+  }
   else if (is_compound (t, "verbatim", 1))
     return t[0];
   else if (is_compound (t, "localize", 1))

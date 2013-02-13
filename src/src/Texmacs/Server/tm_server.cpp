@@ -80,7 +80,7 @@ gui_set_output_language (string lan) {
 server_rep::server_rep () {}
 server_rep::~server_rep () {}
 
-tm_server_rep::tm_server_rep (): def_sfactor (5) {
+tm_server_rep::tm_server_rep (): def_zoomf (1.0) {
   the_server= tm_new<server> (this);
   initialize_scheme ();
   gui_interpose (texmacs_interpose_handler);
@@ -147,10 +147,12 @@ tm_server_rep::interpose_handler () {
   int i, j;
   for (i=0; i<N(bufs); i++) {
     tm_buffer buf= (tm_buffer) bufs[i];
+
     for (j=0; j<N(buf->vws); j++) {
       tm_view vw= (tm_view) buf->vws[j];
       if (vw->win != NULL) vw->ed->apply_changes ();
     }
+
     for (j=0; j<N(buf->vws); j++) {
       tm_view vw= (tm_view) buf->vws[j];
       if (vw->win != NULL) vw->ed->animate ();
@@ -191,13 +193,16 @@ tm_server_rep::set_printer_dpi (string dpi) {
 }
 
 void
-tm_server_rep::set_default_shrinking_factor (int sf) {
-  def_sfactor= sf;
+tm_server_rep::set_default_zoom_factor (double zoom) {
+  if (zoom >= 10.0) zoom= 10.0;
+  if (zoom <=  0.1) zoom=  0.1;
+  zoom= normal_zoom (zoom);
+  def_zoomf= zoom;
 }
 
-int
-tm_server_rep::get_default_shrinking_factor () {
-  return def_sfactor;
+double
+tm_server_rep::get_default_zoom_factor () {
+  return def_zoomf;
 }
 
 void
@@ -232,7 +237,7 @@ tm_server_rep::typeset_update_all () {
 bool
 tm_server_rep::is_yes (string s) {
   s= locase_all (s);
-  string st= translate ("yes");  
+  string st= locase_all (translate ("yes"));
   return s == st || (N(st)>0 && s == st[0]); //FIXME: fails for multibyte chars?
 }
 

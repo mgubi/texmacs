@@ -52,7 +52,10 @@ signals:
   void closed ();
   
 protected:
-  virtual void closeEvent (QCloseEvent* event);
+  virtual void  closeEvent (QCloseEvent* event);
+  virtual void   moveEvent (QMoveEvent* event);
+  virtual void resizeEvent (QResizeEvent* event);
+
 };
 
 /*! The underlying QWidget for a qt_tm_widget_rep.
@@ -65,10 +68,8 @@ class QTMWindow: public QMainWindow {
   
 public:
   
-  widget tmwid;    //<! The pointer to the qt_tm_widget_rep owning this window.
-  
-  QTMWindow (QWidget* parent, qt_tm_widget_rep* _tmwid) 
-  : QMainWindow (parent), tmwid(_tmwid) { 
+  QTMWindow (QWidget* parent)
+  : QMainWindow (parent) { 
     if (DEBUG_QT) cout << "Create QTMWindow" << LF;
   }
   virtual ~QTMWindow () {
@@ -79,7 +80,9 @@ signals:
   void closed ();
   
 protected:
-  virtual void closeEvent (QCloseEvent* event);
+  virtual void  closeEvent (QCloseEvent* event);
+  virtual void   moveEvent (QMoveEvent* event);
+  virtual void resizeEvent (QResizeEvent* event);
 };
 
 

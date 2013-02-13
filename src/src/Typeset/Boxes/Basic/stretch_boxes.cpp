@@ -40,14 +40,12 @@ wide_hat_box (path ip, SI x1, SI x2, SI penw, color col) {
 
 box
 wide_tilda_box (path ip, SI x1, SI x2, SI penw, color col) {
-  SI width, height, w, h, uw, uh, ww, hh;
+  SI width, height, w, h, uw, hh;
   get_wide_parameters (x1, x2, penw, width, height);
   h = height/2;
-  uh= h;
   hh= (SI) (0.8660254 * ((double) h));
   w = width;
   uw= (SI) (((double) w) / 4.2679492);
-  ww= (SI) (1.1339746 * ((double) h));
   array<box> bs (3);
   array<SI>  xs (3);
   array<SI>  ys (3);
@@ -101,6 +99,13 @@ wide_breve_box (path ip, SI x1, SI x2, SI penw, color col) {
   SI width, height;
   get_wide_parameters (x1, x2, penw, width, height);
   return arc_box (ip, 0, 0, width, 2*height, 180<<6, 360<<6, penw, col);
+}
+
+box
+wide_invbreve_box (path ip, SI x1, SI x2, SI penw, color col) {
+  SI width, height;
+  get_wide_parameters (x1, x2, penw, width, height);
+  return arc_box (ip, 0, -height, width, 1.1*height, 370<<6, 530<<6, penw, col);
 }
 
 box

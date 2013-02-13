@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.0.7.17>
 
 <style|source>
 
@@ -38,30 +38,20 @@
 
   <assign|doc-module-header-body|<\macro|module|desc>
     <\explain>
-      <tt|<arg|module>> <explain-synopsis|<extern|doc-module-synopsis|<arg|module>>>
+      <link-to-module-source|<arg|module>>
+      <explain-synopsis|<extern|doc-module-synopsis|<arg|module>>>
     <|explain>
-      <with|font-series|bold|Module family:><htab|><tt|<extern|doc-module-family|<arg|module>>>
-
       <with|font-series|bold|Dependencies:>
 
       <\right-aligned>
         <extern|doc-module-dependencies|<arg|module>>
       </right-aligned>
 
-      <with|font-series|bold|Source:><htab|><link-to-module-source|<arg|module>>
-
-      <with|font-series|bold|Total exported
-      symbols:><htab|><with|font-series|bold|<extern|doc-module-count-exported|<arg|module>>>
-
-      <with|font-series|bold|Undocumented
-      symbols:><htab|><with|font-series|bold|<with|color|red|<extern|doc-module-count-undocumented|<arg|module>>>>
-
-      \;
+      <with|font-series|bold|Exported: <extern|doc-module-count-exported|<arg|module>>><htab|><with|font-series|bold|Undocumented:
+      <with|color|red|<extern|doc-module-count-undocumented|<arg|module>>>>
 
       <arg|desc>
     </explain>
-
-    \;
   </macro>>
 
   <drd-props|doc-module-header-body|arity|2|accesible|all>
@@ -71,11 +61,11 @@
   <assign|doc-module-header|<\macro|module-name|module-description>
     <\with|frame-color|light grey|body-color|#f2fffc>
       <\framed-table>
-        <\with|color|black>
-          <table|<row|<\cell>
+        <table|<row|<\cell>
+          <\with|color|black>
             <doc-module-header-body|<arg|module-name>|<arg|module-description>>
-          </cell>>>
-        </with>
+          </with>
+        </cell>>>
       </framed-table>
     </with>
   </macro>>
@@ -85,7 +75,7 @@
   \;
 
   <assign|doc-module-traverse|<with|frame-color|light
-  grey|body-color|#f2fffc|<framed-table|<with|color|black|<table|<row|<cell|<traverse|<macro|root|<extern|doc-module-traverse|<arg|root>>>>>>>>>>>
+  grey|body-color|#f2fffc|<framed-table|<table|<row|<cell|<with|color|black|<traverse|<macro|root|<extern|doc-module-traverse|<arg|root>>>>>>>>>>>
 
   \;
 

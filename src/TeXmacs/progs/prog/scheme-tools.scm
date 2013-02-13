@@ -1,3 +1,4 @@
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : scheme-tools.scm
@@ -99,6 +100,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface for contextual help
+;; FIXME: the calls to doc-check-cache-do shouldn't be necessary, because
+;; cache-retrieve already does it, but we crash if we do the collecting that
+;; late.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (word-at str pos)
@@ -116,42 +120,39 @@
   (with ct (cursor-tree)
     (word-at (tree->string ct) (car (tree-cursor-path ct)))))
 
-(define (check-build-cache cont)
-  (let  ((t (get-preference "doc:collect-timestamp"))
-         (lan (get-output-language))
-         (langs (get-preference "doc:collect-languages")))
-    (if (not (and t langs (member lan langs)))
-      (doc-collect-all lan cont) (cont))))
-
 (tm-define (scheme-popup-help word)
   (:synopsis "Pops up the help window for the scheme symbol @word")
-  (check-build-cache (lambda () (help-window "scheme" word))))
+  (doc-check-cache-do (lambda () (help-window "scheme" word))))
 
 (tm-define (scheme-inbuffer-help word)
-  (load-buffer (string-append "tmfs://apidoc/type=symbol&what=" word)))
+  (:synopsis "Opens a help buffer for the scheme symbol @word")
+  (doc-check-cache-do
+   (lambda ()
+     (load-buffer (string-append "tmfs://apidoc/type=symbol&what="
+                                 (string-replace word ":" "%3A")))))) ; HACK
+
+(define (url-for-symbol s props)
+  (with (file line column) props
+    (if (and file line column)
+        (let ((lno (number->string line))
+              (cno (number->string column))
+              (ss (string-replace s ":" "%3A"))) ; HACK! see link-navigate.scm
+          (string-append file "?line=" lno "&column=" cno "&select=" ss))
+        (url-none))))
 
 ; TODO: check if a symbol is in the glue
-(tm-define (scheme-go-to-definition ssym)
-  (with sym (string->symbol ssym)
-    (let ((line (symbol-property sym 'line))
-          (column (symbol-property sym 'column))
-          (filename (symbol-property sym 'filename)))
-      (if (and line filename)
-        (let ((lno (number->string line))
-              (cno (number->string column)))
-          (go-to-url (string-append filename "?line=" lno "&column=" cno
-                                             "&select=" ssym))
-          (set-message filename (string-append lno ":" cno)))
-        (set-message "Symbol properties not found." ssym)))))
-
-(kbd-map
-  (:require (and developer-mode-on (in-prog-scheme?)))
-  ("A-F1" (scheme-popup-help (cursor-word)))
-  ("S-A-F1" (scheme-inbuffer-help (cursor-word)))
-  ("M-F1" (scheme-go-to-definition (cursor-word))))
-
+(tm-define (scheme-go-to-definition tmstr)
+  (let* ((str (tmstring->string tmstr))
+         (sym (string->symbol str))
+         (defs (or (symbol-property sym 'defs) '()))
+         (urls (map (lambda (x) (url-for-symbol tmstr x)) defs)))
+    (if (null? urls)
+        (set-message "Symbol properties not found" tmstr)
+        (go-to-url (list-fold url-or (car urls) (cdr urls))
+                   (cursor-path)))))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Handy.. (stuff previously in apidoc-funcs.scm)
+;; Miscelaneous
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (get-current-doc-module)
@@ -170,8 +171,24 @@
   (insert ($doc-symbol-template (string->symbol ssym) "")))
 
 (kbd-map
-  (:require (in-tmdoc?))
+  (:require (and developer-mode? (in-tmdoc?)))
   ("M-A-x" (interactive ask-insert-symbol-doc)))
+
+(tm-define (run-scheme-file u)
+  (:synopsis "Load the file @u into the scheme interpreter")
+  (with s (url->string u)
+    (with run (lambda (save?)          
+                (if save? (buffer-save u))
+                (load s)
+                (set-message `(replace "File %1 was executed" (verbatim ,s)) 
+                             ""))
+      (if (and (buffer-exists? u) (buffer-modified? u))
+          (user-confirm 
+             `(replace
+                "File %1 is currently open and modified. Save before running?"
+                (verbatim ,s))
+            #t run)
+          (run #f)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Browsing of sources with the mouse.
@@ -195,7 +212,7 @@
 ; check for events of type "press-" and "release-" in order to be compatible
 ; across platforms. (We could use :require for this too)
 (tm-define (mouse-event key x y mods time)
-  (:require (and developer-mode-on (opt-click? mods) (in-prog-scheme?)))
+  (:require (and developer-mode? (opt-click? mods) (in-prog-scheme?)))
   (with short (string-take key 4)
     (cond ((== short "pres")
            ; emulate a click to move the cursor
@@ -208,7 +225,7 @@
           (else (mouse-any key x y mods (+ time 0.0))))))
 
 (tm-define (mouse-event key x y mods time)
-  (:require (and developer-mode-on (cmd-click? mods) (in-prog-scheme?)))
+  (:require (and developer-mode? (cmd-click? mods) (in-prog-scheme?)))
   (with short (string-take key 4)
     (cond ((== short "pres")
            ; emulate a click to move the cursor
@@ -219,4 +236,3 @@
            (with cw2 (cursor-word)
              (if (== cw cw2) (scheme-go-to-definition cw))))
           (else (mouse-any key x y mods (+ time 0.0))))))
-

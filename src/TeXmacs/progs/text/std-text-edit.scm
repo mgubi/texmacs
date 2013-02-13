@@ -35,10 +35,10 @@
 	   (<= (tree-index t) 1)
 	   (tree-is? bt 0 'doc-data)
 	   (or (== (tree-arity bt) 1)
-	       (not (tree-is? bt 1 'abstract)))))))
+	       (not (tree-is? bt 1 'abstract-data)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Inserting document and author data
+;; Inserting document, author and abstract data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (doc-title-context? t)
@@ -46,7 +46,7 @@
       (and (tree-is? t 'date) (tree-is? t :up 'doc-date))))
 
 (tm-define (doc-author-context? t)
-  (tree-in? t (doc-author-tag-list)))
+  (tree-in? t (author-data-tag-list)))
 
 (define doc-data-inactive-tags
   (doc-title-inactive-tag-list))
@@ -57,9 +57,9 @@
 (tm-define (make-doc-data-element l)
   (with-innermost t 'doc-data
     (with pos (1+ (tree-down-index t))
-      (cond ((== l 'doc-author-data)
-	     (tree-insert! t pos `((,l (author-name ""))))
-	     (tree-go-to t pos 0 0 0))
+      (cond ((== l 'doc-author)
+	     (tree-insert! t pos `((,l (author-data (author-name "")))))
+	     (tree-go-to t pos 0 0 0 0))
 	    ((== l 'doc-note)
 	     (tree-insert! t pos `((,l (document ""))))
 	     (tree-go-to t pos 0 0 0))
@@ -71,14 +71,26 @@
 	     (tree-go-to t pos 0 0))))))
 
 (tm-define (make-author-data-element l)
-  (with-innermost t 'doc-author-data
+  (with-innermost t 'author-data
     (with pos (1+ (tree-down-index t))
-      (cond ((in? l '(author-address author-note))
+      (cond ((in? l '(author-affiliation author-note))
 	     (tree-insert! t pos `((,l (document ""))))
 	     (tree-go-to t pos 0 0 0))
 	    (else
 	     (tree-insert! t pos `((,l "")))
 	     (tree-go-to t pos 0 0))))))
+
+(tm-define (abstract-data-context? t)
+  (tree-in? t (abstract-data-tag-list)))
+
+(tm-define (make-abstract-data)
+  (insert-go-to '(abstract-data (abstract "")) '(0 0 0)))
+
+(tm-define (make-abstract-data-element l)
+  (with-innermost t 'abstract-data
+    (with pos (1+ (tree-down-index t))
+      (tree-insert! t pos `((,l "")))
+      (tree-go-to t pos 0 0))))
 
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'title))
@@ -87,11 +99,25 @@
 
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'doc-title))
-  (make-doc-data-element 'doc-author-data))
+  (make-doc-data-element 'doc-author))
 
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'author-name))
-  (make-author-data-element 'author-address))
+  (make-author-data-element 'author-affiliation))
+
+(tm-define (kbd-enter t shift?)
+  (:require (tree-is? t 'abstract-keywords))
+  (with-innermost t 'abstract-keywords
+    (with pos (1+ (tree-down-index t))
+      (tree-insert! t pos `((concat "")))
+      (tree-go-to t pos 0 0))))
+
+(tm-define (kbd-enter t shift?)
+  (:require (tree-is? t 'abstract-msc))
+  (with-innermost t 'abstract-msc
+    (with pos (1+ (tree-down-index t))
+      (tree-insert! t pos `((concat "")))
+      (tree-go-to t pos 0 0))))
 
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'doc-inactive))

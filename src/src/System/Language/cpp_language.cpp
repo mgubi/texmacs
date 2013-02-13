@@ -62,12 +62,7 @@ static void parse_alpha (string s, int& pos);
 cpp_language_rep::cpp_language_rep (string name):
   language_rep (name), colored ("")
 { 
-  eval ("(use-modules (utils misc tm-keywords))");
-  list<string> l= as_list_string (eval ("(map symbol->string highlight-any)"));
-  while (!is_nil (l)) {
-    colored (l->item)= "blue";
-    l= l->next;
-  }
+
 }
 
 text_property
@@ -115,6 +110,11 @@ cpp_color_setup_constants (hashmap<string, string> & t) {
   t ("cout")= c;
   t ("cin")= c;
   t ("cerr")= c;
+  t ("NULL")= c;
+  t ("null")= c;
+  t ("Q_OBJECT")= c;
+  t ("PIXEL")= c;
+  t ("ASSERT")= c;
 }
 
 static void
@@ -123,34 +123,44 @@ cpp_color_setup_keywords (hashmap<string, string> & t)  {
   t ("asm")= c;
   t ("auto")= c;
   t ("break")= c;
+  t ("calloc")= c;
   t ("case")= c;
   t ("catch")= c;
   t ("class")= c;
   t ("concrete")= c;
   t ("constant")= c;
+  t ("const")= c;
+  t ("const_cast")= c;
   t ("continue")= c;
   t ("default")= c;
   t ("delete")= c;
   t ("do")= c;
+  t ("dynamic_cast")= c;
+  t ("free")= c;
   t ("else")= c;
   t ("enum")= c;
   t ("extern")= c;
   t ("explicit")= c;
+  t ("export")= c;
   t ("for")= c;
   t ("friend")= c;
   t ("goto")= c;
   t ("if")= c;
   t ("inline")= c;
+  t ("malloc")= c;
   t ("mutable")= c;
   t ("new")= c;
   t ("operator")= c;
   t ("private")= c;
   t ("protected")= c;
   t ("public")= c;
+  t ("realloc")= c;
   t ("register")= c;
+  t ("reinterpret_cast")= c;
   t ("return")= c ;
   t ("sizeof")= c;
   t ("static")= c;
+  t ("static_cast")= c;
   t ("struct")= c;
   t ("switch")= c;
   t ("template")= c;
@@ -159,14 +169,54 @@ cpp_color_setup_keywords (hashmap<string, string> & t)  {
   t ("to")= c;
   t ("try")= c;
   t ("typedef")= c;
+  t ("typeid")= c;
+  t ("typename")= c;
   t ("union")= c;
+  t ("using")= c;
   t ("virtual")= c;
   t ("volatile")= c;
   t ("while")= c;
-  t ("malloc")= c;
-  t ("realloc")= c;
-  t ("calloc")= c;
-  t ("free")= c;
+}
+
+static void
+cpp_color_setup_types (hashmap<string, string> & t) {
+  string c= "#b833a1";
+  t ("bool")= c;
+  t ("char")= c;
+  t ("double")= c;
+  t ("float")= c;
+  t ("int")= c;
+  t ("long")= c;
+  t ("short")= c;
+  t ("signed")= c;
+  t ("unsigned")= c;
+  t ("void")= c;
+  t ("wchar_t")= c;
+    // Just a few common ones in TeXmacs
+  /* Update: Don't color non-basic types to avoid confusion
+  t ("time_t")= c;
+  t ("array")= c;
+  t ("blackbox")= c;
+  t ("box")= c;
+  t ("command")= c;
+  t ("event")= c;
+  t ("hashmap")= c;
+  t ("iterator")= c;
+  t ("language")= c;
+  t ("list")= c;
+  t ("path")= c;
+  t ("object")= c;
+  t ("observer")= c;
+  t ("rectangle")= c;
+  t ("scheme_tree")= c;
+  t ("selection")= c;
+  t ("SI")= c;
+  t ("string")= c;
+  t ("tmscm")= c;
+  t ("tree")= c;
+  t ("url")= c;
+  t ("widget")= c;
+   */
 }
 
 static void
@@ -272,6 +322,16 @@ parse_keyword (hashmap<string,string>& t, string s, int& pos) {
 }
 
 static void
+parse_type (hashmap<string,string>& t, string s, int& pos) {
+  int i= pos;
+  if (pos>=N(s)) return;
+  if (is_number (s[i])) return;
+  while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
+  string r= s (pos, i);
+  if (t->contains (r) && t(r) == "#b833a1") { pos=i; return; }
+}
+
+static void
 parse_constant (hashmap<string,string>& t, string s, int& pos) {
   int i=pos;
   if (pos>=N(s)) return;
@@ -344,20 +404,18 @@ static void parse_preprocessing (string s, int & pos) {
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
   string r= s (pos, i);
   if (r == "include" ||
-	r == "if" ||
-	r == "ifdef" ||
-	r == "ifndef" ||
-	r == "else" ||
-	r == "elif" ||
-	r == "endif" ||
-	r == "define" ||
-	r == "undef" ||
-	r == "pragma" ||
-	r == "error") { pos=i; return; }
-  }
-  
-  
-  
+      r == "if" ||
+      r == "ifdef" ||
+      r == "ifndef" ||
+      r == "else" ||
+      r == "elif" ||
+      r == "endif" ||
+      r == "define" ||
+      r == "undef" ||
+      r == "pragma" ||
+      r == "error") { pos=i; return; }
+}
+
 static bool begin_comment (string s, int i) {
   bool comment;
   int pos= 0;
@@ -379,12 +437,10 @@ static bool begin_comment (string s, int i) {
 }
 
 static bool end_comment (string s, int i) {
-  bool comment;
   int pos= 0; int opos;
   do {
     do {
     opos= pos;
-    comment= false;
     parse_string (s, pos);
 	if (opos < pos) break;
     parse_end_comment (s, pos);
@@ -483,33 +539,36 @@ cpp_language_rep::get_color (tree t, int start, int end) {
   if (!setup_done) {
     cpp_color_setup_constants (colored);
     cpp_color_setup_keywords (colored);
+    cpp_color_setup_types (colored);
     cpp_color_setup_otherlexeme (colored);
     setup_done= true;
   }
+
   static string none= "";
   if (start >= end) return none;
   string s= t->label;
-  if (in_comment(s,start,t)) return "brown";
+  if (in_comment (s,start,t)) return decode_color("cpp", encode_color("comment"));
   int pos= 0;
   int opos=0;
   string type;
-  if (in_preprocessing(s, t)){
-  do {
+  if (in_preprocessing(s, t)) {
     do {
-    opos= pos;
-    type=none;
-    parse_blanks (s, pos);
-    if (opos < pos) break;
-    parse_diese(s, pos);
-    if (opos < pos) {type="preprocessing"; break;}
-    parse_preprocessing (s, pos);
-    if (opos < pos) {type= "preprocessing"; break; }
-    pos++;
-  	}
-  while (false);}
-  while (pos <= start);
-  if (type == "preprocessing") return "#20a000";
-  return "#004000";
+      do {
+        opos= pos;
+        type= none;
+        parse_blanks (s, pos);
+        if (opos < pos) break;
+        parse_diese (s, pos);
+        if (opos < pos) {type= "preprocessor_directive"; break;}
+        parse_preprocessing (s, pos);
+        if (opos < pos) {type= "preprocessor_directive"; break; }
+        pos++;
+      }
+      while (false);}
+    while (pos <= start);
+    if (type == "preprocessor_directive")
+      decode_color("cpp", encode_color (type));
+    return decode_color("cpp", encode_color("preprocessor"));
   }
   pos= 0;
   do {
@@ -520,7 +579,7 @@ cpp_language_rep::get_color (tree t, int start, int end) {
       if (opos < pos) break;
       parse_string (s, pos);
       if (opos < pos) {
-	type= "string";
+	type= "constant_string";
 	break;
       }
       parse_comment_single_line (s, pos);
@@ -533,9 +592,14 @@ cpp_language_rep::get_color (tree t, int start, int end) {
 	type= "keyword";
 	break;
       }
+      parse_type (colored, s, pos);
+      if (opos < pos) {
+	type= "constant_type";
+	break;
+      }
       parse_other_lexeme (colored, s, pos);  //not left parenthesis
       if (opos < pos) {
-	type= "other_lexeme";
+	type= none;
 	break;
       }
       parse_constant (colored, s, pos);
@@ -545,12 +609,12 @@ cpp_language_rep::get_color (tree t, int start, int end) {
       }
       parse_number (s, pos);
       if (opos < pos) {
-	type= "number";
+	type= "constant_number";
 	break;
       }
       parse_identifier (colored, s, pos);
       if (opos < pos) {
-	type="identifier";
+	type= none;
 	break;
       }
       pos= opos;
@@ -559,10 +623,6 @@ cpp_language_rep::get_color (tree t, int start, int end) {
     while (false);
   }
   while (pos <= start);
-  if (type=="string") return "#a06040";
-  if (type=="comment") return "brown";
-  if (type=="keyword") return "#8020c0";
-  if (type=="constant") return "#2060c0";
-  if (type=="number") return "#2060c0";
-  return none;
+  if (type == none) return none;
+  return decode_color ("cpp", encode_color (type));
 }

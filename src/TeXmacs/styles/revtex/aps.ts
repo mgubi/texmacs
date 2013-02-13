@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.0.7.17>
 
 <style|source>
 
@@ -303,12 +303,14 @@
   <assign|bibliography-text|<macro|<rule|9cm|1pt>>>
 
   <assign|bibliography-text|<\macro>
-    <\with|par-columns|1>
-      <tabular|<tformat|<cwith|1|-1|1|-1|cell-width|1cm>|<cwith|1|-1|1|-1|cell-hmode|exact>|<cwith|1|-1|1|-1|cell-height|0.1pt>|<cwith|1|-1|1|-1|cell-vmode|exact>|<cwith|1|1|4|6|cell-bborder|0.7pt>|<cwith|1|1|3|3|cell-bborder|0.5pt>|<cwith|1|1|7|7|cell-bborder|0.5pt>|<cwith|1|1|8|8|cell-bborder|0.4pt>|<cwith|1|1|2|2|cell-bborder|0.4pt>|<cwith|1|1|1|1|cell-bborder|0.3pt>|<cwith|1|1|9|9|cell-bborder|0.3pt>|<table|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>>>>
-    </with>
+    <tabular|<tformat|<cwith|1|-1|1|-1|cell-width|0.04par>|<cwith|1|-1|1|-1|cell-hmode|exact>|<cwith|1|-1|1|-1|cell-height|0.1pt>|<cwith|1|-1|1|-1|cell-vmode|exact>|<cwith|1|1|4|6|cell-bborder|0.7pt>|<cwith|1|1|3|3|cell-bborder|0.5pt>|<cwith|1|1|7|7|cell-bborder|0.5pt>|<cwith|1|1|8|8|cell-bborder|0.4pt>|<cwith|1|1|2|2|cell-bborder|0.4pt>|<cwith|1|1|1|1|cell-bborder|0.3pt>|<cwith|1|1|9|9|cell-bborder|0.3pt>|<table|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>>>>
   </macro>>
 
-  <assign|render-bibliography|<macro|name|<with|par-columns|1|<section*|<arg|name>>>>>
+  <assign|render-bibliography|<\macro|name|body>
+    <section*|<arg|name>>
+
+    <arg|body>
+  </macro>>
 
   <active*|<\src-comment>
     Title rendering.
@@ -318,7 +320,7 @@
 
   <assign|author-render-name|<macro|author|<surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<arg|author>>>>>
 
-  <assign|author-address|<\macro|address>
+  <assign|author-affiliation|<\macro|address>
     <surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<with|font-shape|italic|<arg|address>>>>
   </macro>>
 
@@ -326,7 +328,7 @@
     <\quasi>
       <unquote*|<select|<quote-arg|data>|author-name>>
 
-      <unquote*|<select|<quote-arg|data>|author-address>>
+      <unquote*|<select|<quote-arg|data>|author-affiliation>>
     </quasi>
   </macro>>
 
@@ -341,9 +343,9 @@
 
   <assign|abstract-text|>
 
-  <assign|doc-abstract|<macro|body|<\surround|<vspace|2fn>|>
+  <assign|render-abstract|<macro|body|<\surround|<vspace|2fn>|>
     <\with|par-columns|1>
-      <\with|par-mode|right>
+      <\with|par-mode|center>
         <tabular|<tformat|<cwith|1|1|1|1|cell-width|400pt>|<cwith|1|1|1|1|cell-hmode|exact>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<\cell>
           <arg|body>
         </cell>>>>>
@@ -351,17 +353,7 @@
     </with>
   </surround>>>
 
-  <assign|doc-data|<\xmacro|data>
-    <\with|par-columns|1>
-      <\surround|<assign|the-doc-data|<quote-arg|data>>|<with|doc-note-nr|0|<quasi|<doc-data-hidden|<unquote*|<quote-arg|data>>>>>>
-        <\doc-make-title>
-          <with|doc-note-nr|0|<\quasi>
-            <compound|<unquote|<if|<lesseq|<length|<select|<quote-arg|data>|doc-author-data>>|1>|<value|doc-data-main>|<value|doc-data-main*>>>|<unquote*|<quote-arg|data>>>
-          </quasi>>
-        </doc-make-title>
-      </surround>
-    </with>
-  </xmacro>>
+  <assign|doc-data|<xmacro|args|<with|par-columns|1|<extern|doc-data|<quote-arg|args>>>>>
 
   <active*|<\src-comment>
     Customization of other environments.

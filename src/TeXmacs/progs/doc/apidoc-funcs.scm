@@ -22,14 +22,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (doc apidoc-funcs)
-  (:use (convert rewrite init-rewrite) (doc apidoc-collect)))
+  (:use (convert rewrite init-rewrite) (doc apidoc-collect) 
+        (kernel gui gui-markup)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Conversions related to modules:
 
 (tm-define (string->module str)
   (:synopsis "Returns the list representation of a module given as a string")
-  (if (== str "") '()
+  (if (or (not (string? str)) (== str "")) '()
       (map string->symbol (string-split str #\.))))
 
 (tm-define (module->string module)
@@ -110,28 +111,31 @@
 
 (define module-exported-cache (make-ahash-table))
 
-; HACK: we use read (copying what's done in init-texmacs.scm) until the 
+; HACK: we use read (copying what's done in init-texmacs.scm) until the
 ; code indexer is implemented
-(define (parse-form form)
+(define (parse-form form f)
   "Set symbol properties and return the symbol."
-  (let* ((line (source-property form 'line))
-         (column (source-property form 'column))
-         (filename (source-property form 'filename))
-         (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
-    (and (symbol? sym) ; Just in case
-         (begin 
-           (set-symbol-property! sym 'line line)
-           (set-symbol-property! sym 'column column)
-           (set-symbol-property! sym 'filename filename)
-           sym))))
+  (and (pair? form) 
+       (member (car form) keywords-which-define)
+       (let* ((l (source-property form 'line))
+              (c (source-property form 'column))
+              (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
+         (and (symbol? sym) ; Just in case
+              (with old (or (symbol-property sym 'defs) '())
+                (if (not (member `(,f ,l ,c) old))
+                    (set-symbol-property! sym 'defs (cons `(,f ,l ,c) old)))
+                sym)))))
 
 (tm-define (module-exported module)
   (:synopsis "List of exported symbols in @module")
   (or (ahash-ref module-exported-cache module)
       (and (is-real-module? module)
-        (let* ((p (open-input-file (module-source-path module #t)))
+        (let* ((fname (module-source-path module #t))
+               (p (open-input-string (string-load fname)))
                (defs '())
-               (add (lambda (f) (set! defs (rcons defs (parse-form f))))))
+               (add (lambda (f) 
+                      (with pf (parse-form f fname)
+                        (and (!= pf #f) (set! defs (rcons defs pf)))))))
           (letrec ((r (lambda () (with form (read p)
                                    (or (eof-object? form) 
                                        (begin (add form) (r)))))))
@@ -157,8 +161,8 @@
                   (list ($doc-explain-scm* (symbol->string sym)))
                   '()))
       (if (null? l)
-       '(document "No symbols exported")
-       `(document (subsection "Symbol documentation")
+       `(document ,(replace "No symbols exported"))
+       `(document (subsection ,(replace "Symbol documentation"))
                   ,@(append-map fun l))))))
 
 ; WRONG! what about unloaded modules
@@ -223,25 +227,31 @@
 ;; Symbols documentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (build-link s def)
+  (with (file line column) def
+    (if (and file line column)
+        (let ((lno (number->string line))
+              (cno (number->string column)))
+          `(hlink ,(string-append (basename file) ":" lno)
+                  ,(string-append file "?line=" lno "&column=" cno
+                                       "&select=" (symbol->string s))))
+        "")))
+  
 (tm-define ($doc-symbol-properties sym)
-  (let ((line (symbol-property sym 'line))
-        (column (symbol-property sym 'column))
-        (filename (symbol-property sym 'filename)))
-    (if (and line column filename)
-      (let ((lno (number->string line))
-            (cno (number->string column)))
-        `(hlink ,(string-append (basename filename) ":" lno)
-                ,(string-append filename "?line=" lno "&column=" cno
-                                         "&select=" (symbol->string sym))))
-      (translate "[symbol properties not found]"))))
+  (with defs (or (symbol-property sym 'defs) '((#f #f #f)))
+    `(concat 
+       ,@(list-intersperse 
+          (map (lambda (x) (build-link sym x))
+               (reverse (list-remove-duplicates defs)))
+          " | "))))
 
 (tm-define (doc-symbol-synopsis* sym)
   (with prop (property sym :synopsis)
-    (if (list? prop) (car prop) "No synopsis available")))
+    (if (list? prop) (car prop) (replace "No synopsis available"))))
 
 (tm-define ($doc-symbol-code sym)
   `(folded-explain
-     (document (with "color" "dark green" (em "Definition...")))
+     (document (with "color" "dark green" (em ,(replace "Definition..."))))
      (scm-code
        (document
         ,(cond ((and (tm-exported? sym) (procedure? (eval sym)))
@@ -250,7 +260,7 @@
                      (procedure? (eval sym))
                      (procedure-source (eval sym)))
                  => object->string)
-               (else "Symbol not found or not a procedure"))))))
+               (else (replace "Symbol not found or not a procedure")))))))
 
 (tm-define ($doc-symbol-template sym message)
   `(explain
@@ -259,16 +269,13 @@
                (explain-synopsis ,(doc-symbol-synopsis* sym))))
      (document ,message ,($doc-symbol-code sym))))
 
-(tm-define-macro ($ismall . l)
-  ($quote `(small (with "font-shape" "italic" ($unquote ($inline ,@l))))))
-
 (tm-define ($doc-symbol-extra sym . docurl)
   ($inline
     '(htab "")
      (if (nnull? docurl)
-       ($inline ($ismall ($link (car docurl) (translate "Open doc."))) " | ")
+       ($inline ($ismall ($link (car docurl) (replace "Open doc."))) " | ")
        "")
-    ($ismall (translate "Go to") " " ($doc-symbol-properties sym))))
+    ($ismall (replace "Go to") " " ($doc-symbol-properties sym))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Retrieval and display of documentation from the cache
@@ -295,7 +302,7 @@
          ,($doc-symbol-properties (string->symbol key))))))
 
 (define (doc-explain-sub entries)
-  (if (or (null? entries) (not (func? (car entries) 'entry))) '()
+  (if (or (nlist? entries) (null? entries) (not (func? (car entries) 'entry))) '()
     (with (key lan url doc) (cdar entries)
       (cons `(explain
                ,(tm-ref doc 0)

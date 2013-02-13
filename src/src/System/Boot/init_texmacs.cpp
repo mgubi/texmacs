@@ -120,6 +120,7 @@ init_user_dirs () {
   make_dir ("$TEXMACS_HOME_PATH/fonts/tfm");
   make_dir ("$TEXMACS_HOME_PATH/fonts/truetype");
   make_dir ("$TEXMACS_HOME_PATH/fonts/type1");
+  make_dir ("$TEXMACS_HOME_PATH/fonts/unpacked");
   make_dir ("$TEXMACS_HOME_PATH/fonts/virtual");
   make_dir ("$TEXMACS_HOME_PATH/langs");
   make_dir ("$TEXMACS_HOME_PATH/langs/mathematical");
@@ -249,6 +250,7 @@ init_env_vars () {
 		       plugin_path ("misc/patterns"));
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
 		       "$TEXMACS_HOME_PATH/misc/pixmaps" |
+		       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/settings") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/24x24/main") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/20x20/mode") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
@@ -402,6 +404,7 @@ init_texmacs () {
   init_std_drd ();
   init_main_paths ();
   init_user_dirs ();
+  load_user_preferences ();
   init_guile ();
   init_env_vars ();
   init_misc ();

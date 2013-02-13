@@ -14,6 +14,7 @@
 #include "font.hpp"
 #include "hashmap.hpp"
 #include "timer.hpp"
+#include "Freetype/tt_file.hpp"
 
 hashmap<string,tree> font_conversion ("rule");
 
@@ -33,6 +34,15 @@ font_rule (tree which, tree by) {
 /******************************************************************************
 * Find a font
 ******************************************************************************/
+
+string
+strip_suffix (string name) {
+  if (occurs (".", name)) {
+    int pos= search_backwards (".", name);
+    name= name (0, pos);
+  }
+  return name;
+}
 
 static bool
 matches (tree t, tree which, hashmap<string,tree>& H) {
@@ -91,6 +101,9 @@ find_font_bis (tree t) {
 
   if (is_tuple (t, "x", 3))
     return x_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
+
+  if (is_tuple (t, "qt", 3))
+    return qt_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
 
   if (is_tuple (t, "tex", 3))
     return tex_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
@@ -157,7 +170,22 @@ find_font_bis (tree t) {
     return math_font (t, fn, error_fn);
   }
 
-  if (!font_conversion->contains (t[0]->label)) return font ();
+  if (!font_conversion->contains (t[0]->label)) {
+    font_database_load ();
+    if (is_tuple (t) && N(t) == 6) {
+      string family = as_string (t[0]);
+      string variant= as_string (t[1]);
+      string series = as_string (t[2]);
+      string shape  = as_string (t[3]);
+      array<string> a= font_database_search (family, variant, series, shape);
+      //cout << t << " -> " << a << "\n";
+      for (int i=0; i<N(a); i++)
+        if (tt_font_exists (strip_suffix (a[i])))
+          return unicode_font (strip_suffix (a[i]),
+                               as_int (t[4]), as_int (t[5]));
+    }
+    return font ();
+  }
 
   tree rule= font_conversion [t[0]->label];
   int i, n= N(rule);
@@ -176,6 +204,13 @@ find_font (tree t) {
   font fn= find_font_bis (t);
   bench_cumul ("find font");
   return fn;
+}
+
+font
+find_magnified_font (tree t, double zoom) {
+  font fn= find_font (t);
+  if (is_nil (fn)) return fn;
+  return fn->magnify (zoom);
 }
 
 /******************************************************************************

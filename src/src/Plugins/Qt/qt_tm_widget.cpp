@@ -109,10 +109,11 @@ tweak_iconbar_size (QSize& sz) {
 }
 
 qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
- : qt_window_widget_rep (new QTMWindow (0, this), _quit), helper (this), 
-   full_screen(false)
+ : qt_window_widget_rep (new QTMWindow (0), _quit), helper (this), 
+   prompt (NULL), full_screen (false)
 {
   type = texmacs_widget;
+  orig_name = "popup";
 
   main_widget = ::glue_widget (true, true, 1, 1);
   
@@ -182,14 +183,15 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   userToolBar  = new QToolBar ("user toolbar", mw);
   
   sideDock     = new QDockWidget ("Side tools", 0);
-    // Wrap the dock in a "virtual" window widget to have clicks report the right position
-  dock_window_widget = tm_new<qt_window_widget_rep>(sideDock, command());
+    // HACK: Wrap the dock in a "fake" window widget (last parameter = true) to
+    // have clicks report the right position.
+  dock_window_widget = tm_new<qt_window_widget_rep> (sideDock, command(), true);
   
   mainToolBar->setStyle (qtmstyle ());
   modeToolBar->setStyle (qtmstyle ());
   focusToolBar->setStyle (qtmstyle ());
   userToolBar->setStyle (qtmstyle ());
-  sideDock->setStyle(qtmstyle());
+  sideDock->setStyle (qtmstyle ());
   
   {
     // set proper sizes for icons
@@ -320,6 +322,7 @@ qt_tm_widget_rep::~qt_tm_widget_rep () {
 widget
 qt_tm_widget_rep::plain_window_widget (string title, command quit) {
   (void) quit;
+  orig_name = title;
   qwid->setWindowTitle (to_qstring (title));
   return this;
 }
@@ -445,7 +448,7 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
     case SLOT_INVALIDATE_ALL:
     case SLOT_EXTENTS:
     case SLOT_SCROLL_POSITION:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
@@ -535,15 +538,15 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
 
       if (open_box<bool> (val) == true) {
         prompt = new QTMInteractivePrompt (int_prompt, int_input);
-        mainwindow()->statusBar()->removeWidget(leftLabel);
-        mainwindow()->statusBar()->removeWidget(rightLabel);
-        mainwindow()->statusBar()->addWidget(prompt, 1);
+        mainwindow()->statusBar()->removeWidget (leftLabel);
+        mainwindow()->statusBar()->removeWidget (rightLabel);
+        mainwindow()->statusBar()->addWidget (prompt, 1);
         prompt->start();
       } else {
         if (prompt) prompt->end();
-        mainwindow()->statusBar()->removeWidget(prompt);
-        mainwindow()->statusBar()->addWidget(leftLabel);
-        mainwindow()->statusBar()->addPermanentWidget(rightLabel);
+        mainwindow()->statusBar()->removeWidget (prompt);
+        mainwindow()->statusBar()->addWidget (leftLabel);
+        mainwindow()->statusBar()->addPermanentWidget (rightLabel);
         leftLabel->show();
         rightLabel->show();
         prompt->deleteLater();
@@ -563,8 +566,57 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
     }
       break;
 
+      /* SLOT_POSITION and SLOT_SIZE are ugly and wrong:
+       we have identified qt_tm_widget with its window, but read (SLOT_POSITION)
+       on the tm_widget must return position of the canvas relative to window
+       coordinates (for use for instance in right clicks, inside mouse_adjust()),
+       whereas, write (SLOT_POSITION) is (mostly?) used by texmacs thinking that
+       we are a window. This is because in plain_window_widget, we return the
+       qt_tm_widget_rep instead of another widget. As a consequence we have to
+       implement two behaviours: as widget and as window inside the same class
+       qt_tm_widget_rep. Therefore qt_tm_widget must handle SLOT_SIZE and 
+       SLOT_POSITION in two ways and at the same time workaround buggy reporting
+       of sizes by Qt, taking into account whether toolbars are on or not
+
+       The current "solution" is a hack until this mess is cleaned up.
+       */
+    case SLOT_POSITION:
+    {
+      check_type<coord2>(val, s);
+      coord2 p= open_box<coord2> (val);
+      QPoint pt = to_qpoint (p);
+      
+#ifdef OS_MACOS
+      if (!visibility[0]) {
+        pt.ry() -= (mainwindow()->frameGeometry().height() -
+                    mainwindow()->geometry().height());
+      }
+        // to avoid window under menu bar on MAC when moving at (0,0)
+        // FIXME: use the real menu bar height.
+      pt.ry() = (pt.y() <= 40) ? 40 : pt.y();
+
+#endif
+      mainwindow()->move (pt);
+    }
+      break;
+      
+    case SLOT_SIZE:
+    {
+      check_type<coord2>(val, s);
+      coord2 p= open_box<coord2> (val);
+      QSize sz= to_qsize (p);
+      
+#ifdef OS_MACOS
+      sz.rheight() += (mainwindow()->frameGeometry().height() -
+                       mainwindow()->geometry().height());
+      sz.rheight() += focusToolBar->height();
+#endif
+      mainwindow()->resize (sz);
+    }
+      break;
+      
     case SLOT_DESTROY:
-    {  
+    {
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit))
         quit ();
@@ -572,6 +624,13 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
     }
       break;
 
+    case SLOT_FULL_SCREEN:
+    {
+      check_type<bool> (val, s);
+      set_full_screen(open_box<bool> (val));
+    }
+      break;
+      
     default:
       qt_window_widget_rep::send (s, val);
       return;
@@ -592,7 +651,7 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
       return main_widget->query(s, type_id);
 
     case SLOT_HEADER_VISIBILITY:
@@ -627,26 +686,39 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<string> (type_id, s);
       qt_input_text_widget_rep* w = 
-        static_cast<qt_input_text_widget_rep*>(int_input.rep);
+        static_cast<qt_input_text_widget_rep*> (int_input.rep);
       if (w->ok)
-        return close_box<string>(scm_quote(w->input));
+        return close_box<string> (scm_quote (w->input));
       else
-        return close_box<string>("#f");
+        return close_box<string> ("#f");
     }
 
     case SLOT_POSITION:
     {
       check_type_id<coord2> (type_id, s);
         // Skip title and toolbars
-      QPoint pt = QPoint(mainwindow()->geometry().x(), mainwindow()->geometry().y());
-        //cout << "wpos: " << pt.x() << ", " << pt.y() << LF;
+      QPoint pt = QPoint (mainwindow()->geometry().x(),
+                          mainwindow()->geometry().y());
+      //cout << "wpos: " << pt.x() << ", " << pt.y() << LF;
+      
+        // HACK: Qt seems seems not properly report geometry if the toolbars
+        // are hidden
+#ifdef OS_MACOS
+      if (!visibility[0]) {
+        pt.ry() -= (mainwindow()->frameGeometry().height() -
+                    mainwindow()->geometry().height());
+        if (visibility[3]) pt.ry() += focusToolBar->height();
+          //adding the user toolbar shifts the position too much
+          //if (visibility[4]) pt.ry() += userToolBar->height();
+      }
+#endif
       return close_box<coord2> (from_qpoint (pt));
     }
 
     case SLOT_INTERACTIVE_MODE:
       check_type_id<bool> (type_id, s);
-      return close_box<bool> (false); // FIXME: who needs this info?
-      
+      return close_box<bool> (prompt && prompt->isActive());
+
     default:
       return qt_window_widget_rep::query (s, type_id);
   }
@@ -826,11 +898,9 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
   QWidget *win = mainwindow()->window();  
   if (win) {
     if (flag ) {
-      // remove the borders from some widgets
-      scrollarea()->setFrameShape(QFrame::NoFrame);
 #ifdef UNIFIED_TOOLBAR
       //HACK: we disable unified toolbar since otherwise
-      //  the application will crash when we return in normal mode
+      //  the application will crash when we return to normal mode
       // (bug in Qt? present at least with 4.7.1)
       mainwindow()->setUnifiedTitleAndToolBarOnMac(false);
       mainwindow()->centralWidget()->layout()->setContentsMargins(0,0,0,0);
@@ -847,12 +917,10 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
 
       visibility[0] = cache;
       update_visibility();
-      // reset the borders of some widgets
-      scrollarea()->setFrameShape(QFrame::Box);
 #ifdef UNIFIED_TOOLBAR
-      mainwindow()->centralWidget()->layout()->setContentsMargins(2,2,2,2);
+      mainwindow()->centralWidget()->layout()->setContentsMargins (0,1,0,0);
       //HACK: we reenable unified toolbar (see above HACK) 
-      //  the application will crash return in normal mode
+      //  the application will crash when we return to normal mode
       mainwindow()->setUnifiedTitleAndToolBarOnMac(true);
 #endif
     }
@@ -883,7 +951,7 @@ qt_tm_embedded_widget_rep::send (slot s, blackbox val) {
     case SLOT_INVALIDATE_ALL:
     case SLOT_EXTENTS:
     case SLOT_SCROLL_POSITION:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
@@ -933,7 +1001,7 @@ qt_tm_embedded_widget_rep::query (slot s, int type_id) {
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
-    case SLOT_SHRINKING_FACTOR:
+    case SLOT_ZOOM_FACTOR:
     case SLOT_POSITION:
     case SLOT_SIZE:
       return main_widget->query(s, type_id);

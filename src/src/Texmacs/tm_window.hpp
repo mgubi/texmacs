@@ -23,13 +23,14 @@ public:
 public:
   hashmap<tree,tree> props;
   int                serial;
-  int                sfactor;       // the shrinking factor
+  double             zoomf;       // the zoom factor
 
 protected:
   hashmap<int,object>    menu_current;
   hashmap<object,widget> menu_cache;
   string*  text_ptr;  // where the interactive string is returned
   command  call_back; // called when typing finished
+  string   cur_title; // current window title
 
 public:
   tm_window_rep (widget wid2, tree geom);
@@ -56,8 +57,8 @@ public:
   bool get_icon_bar_flag (int which);
   bool get_side_tools_flag (int which);
 
-  int  get_shrinking_factor ();
-  void set_shrinking_factor (int sf);
+  double get_window_zoom_factor ();
+  void set_window_zoom_factor (double zoom);
   void get_visible (SI& x1, SI& y1, SI& x2, SI& y2);
   void get_extents (SI& x1, SI& y1, SI& x2, SI& y2);
   void set_extents (SI x1, SI y1, SI x2, SI y2);

@@ -16,6 +16,8 @@
 #include "analyze.hpp"
 #include "iterator.hpp"
 #include "Ghostscript/ghostscript.hpp"
+
+#define IMLIB2_X11TEXMACS // for imlib2_display
 #include "Imlib2/imlib2.hpp"
 
 extern int  nr_windows;
@@ -27,7 +29,7 @@ extern hashmap<tree,string> ps_bbox;
 ******************************************************************************/
 
 x_drawable_rep::x_drawable_rep (x_gui gui2, x_window_rep* x_win2):
-  gui (gui2), x_win (x_win2), w (0), h (0)
+  renderer_rep (true), gui (gui2), x_win (x_win2), w (0), h (0)
 {
   dpy         = gui->dpy;
   gc          = gui->gc;
@@ -36,7 +38,7 @@ x_drawable_rep::x_drawable_rep (x_gui gui2, x_window_rep* x_win2):
 }
 
 x_drawable_rep::x_drawable_rep (x_gui gui2, int w2, int h2):
-  gui (gui2), x_win (NULL), w (w2), h (h2)
+  renderer_rep (true), gui (gui2), x_win (NULL), w (w2), h (h2)
 {
   dpy         = gui->dpy;
   gc          = gui->gc;
@@ -176,7 +178,7 @@ void
 x_drawable_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   x1= max (x1, cx1-ox); y1= max (y1, cy1-oy);
   x2= min (x2, cx2-ox); y2= min (y2, cy2-oy);
-  // outer_round (x1, y1, x2, y2); might still be needed somewhere
+  outer_round (x1, y1, x2, y2); // might be needed somewhere
   decode (x1, y1);
   decode (x2, y2);
   if ((x1>=x2) || (y1<=y2)) return;
@@ -200,7 +202,7 @@ x_drawable_rep::fill (SI x1, SI y1, SI x2, SI y2) {
 
   x1= max (x1, cx1-ox); y1= max (y1, cy1-oy);
   x2= min (x2, cx2-ox); y2= min (y2, cy2-oy);
-  // outer_round (x1, y1, x2, y2); might still be needed somewhere
+  // outer_round (x1, y1, x2, y2); // might be needed somewhere
   if ((x1>=x2) || (y1>=y2)) return;
 
   decode (x1, y1);
@@ -348,7 +350,7 @@ x_drawable_rep::xpm (url file_name, SI x, SI y) {
   y -= pixel; // counter balance shift in draw_clipped
   if (!gui->xpm_pixmap->contains (as_string (file_name)))
     xpm_initialize (file_name);
-  ASSERT (sfactor == 1, "shrinking factor should be 1");
+  ASSERT (pixel == PIXEL, "pixel and PIXEL should coincide");
   int w, h;
   xpm_size (file_name, w, h);
   Pixmap bm= (Pixmap) gui->xpm_bitmap [as_string (file_name)];

@@ -14,21 +14,12 @@
 
 #include "message.hpp"
 #include "promise.hpp"
-#include <QObject>
-#include <QAction>
-#include <QMenu>
-#include <QWidgetAction>
-#include <QLineEdit>
-#include <QTabWidget>
-#include <QLayout>
-#include <QLineEdit>
-#include <QComboBox>
-#include <QTranslator>
+#include "scheme.hpp"
 
 #include "qt_gui.hpp"
 #include "qt_dialogues.hpp"
-#include "qt_ui_element.hpp"  // qt_refresh_widget_rep
 
+#include <QtGui>
 
 
 /*! Handles TeXmacs commands in the QT way.
@@ -65,7 +56,7 @@ public:
   QTMCommand (QObject* parent, command _cmd): QObject(parent), cmd (_cmd) {}
 
 public slots:
-  void apply();
+  void apply ();
 };
 
 /*! HACK: remove me!
@@ -84,23 +75,23 @@ class QTMOnDestroyCommand: public QTMCommand {
   Q_OBJECT
 
 public:
-  QTMOnDestroyCommand (QObject* parent, command _cmd): QTMCommand(parent, _cmd) {}
+  QTMOnDestroyCommand (QObject* parent, command _cmd) : QTMCommand(parent, _cmd) {}
   ~QTMOnDestroyCommand () { apply (); }
+
 public slots:
   void apply() {
     if (DEBUG_QT) 
       cout << "QTMOnDestroyCommand::apply()\n";
-    // Immediately apply!!
-    if (! is_nil(cmd)) cmd ();
+    if (! is_nil(cmd)) cmd ();      // Immediately apply!!
   }
 };
 
 
 /*!
- *
  */
 class QTMLazyMenu: public QMenu {
   Q_OBJECT
+
   promise<widget> pm;
 
 public:
@@ -109,11 +100,11 @@ public:
   }
 
 public slots:
-  void force();
+  void force ();
 };
 
 
-/*! The basic action for items in TeXmacs' menubars.
+/*! The basic action for items in TeXmacs' menus.
  
  This custom action frees its menu if it does not already have an owner: this is
  part of the memory policy explained in qt_menu_rep.
@@ -129,12 +120,14 @@ class QTMAction : public QAction {
   
   QTimer* _timer;
   QPoint    _pos;
-public:
-  string str;
+  string     str;
   
-  QTMAction(QObject *parent = NULL);
+public:
+  QTMAction (QObject *parent = NULL);
   ~QTMAction();
 
+  void set_text (string s);
+  
 public slots:
   void doRefresh();
   void showToolTip();   //<! Force the display of the tooltip (starts a timer)
@@ -144,39 +137,95 @@ protected slots:
 };
 
 
+/*!
+ */
+class QTMWidgetAction : public QWidgetAction {
+  Q_OBJECT
+  
+  widget wid;
+  
+public:
+  QTMWidgetAction (widget _wid, QObject *parent = NULL);
+  
+public slots:
+  void doRefresh() { };
+  
+protected:
+  virtual QWidget* createWidget (QWidget * parent);
+  
+};
+
+/*!
+ 
+ */
+class QTMTileAction: public QWidgetAction {
+  Q_OBJECT
+
+  QVector <QAction*> actions;
+  int                   cols;
+  
+public:
+  QTMTileAction (QWidget* parent, array<widget>& arr, int _cols);
+  virtual QWidget* createWidget(QWidget* parent);
+    // virtual void activate (ActionEvent event) {
+    //   cout << "TRIG\n"; QWidgetAction::activate (event); }
+};
+
+/*!
+ */
+class QTMMinibarAction : public QWidgetAction {
+  Q_OBJECT
+
+  QVector <QAction*> actions;
+
+public:
+  QTMMinibarAction (QWidget* parent, array<widget>& arr);
+  virtual QWidget* createWidget(QWidget* parent);
+    // virtual void activate (ActionEvent event) {
+    //   cout << "TRIG\n"; QWidgetAction::activate (event); }
+};
+
+
 /*! A customized QLineEdit with special keyboard handling and styling. */
 class QTMLineEdit : public QLineEdit {
   Q_OBJECT
 
   bool completing;
-public:
-  string ww; // width of the parsed widget
+  string       ww; // width of the parsed widget
   
+public:
   QTMLineEdit (QWidget *parent, string _ww, int style=0);
   virtual QSize	sizeHint () const ;
-  
-  bool event (QEvent* ev); 
-  
+  virtual bool event (QEvent* ev);
+
+signals:
+  void focusOut ();
 protected:
-  void keyPressEvent (QKeyEvent* ev);
-  void  focusInEvent (QFocusEvent* ev);
+  virtual void keyPressEvent (QKeyEvent* ev);
+  virtual void focusInEvent (QFocusEvent* ev);
+  virtual void focusOutEvent (QFocusEvent* ev);
 };
 
-/*! A class to keep a QLineEdit object and a qt_input_text_widget_rep object in
- sync.
+
+/*! A class to keep a QTMLineEdit object and a qt_input_text_widget_rep object
+ in sync.
  
  After certain events we store state information about the QLineEdit into the 
- qt_input_text_widget_rep: when the user has finished editing (i.e. has pressed
- enter), or has left the QLineEdit for instance.
+ qt_input_text_widget_rep: 
+  - When the user has finished editing (i.e. has pressed enter) we save the text
+    from the QWidget in the texmacs widget and set a "modified" flag.
+  - When the user leaves the QWidget we restore the text from the texmacs widget
+    and in case there was a modification we execute the scheme command.
  
- Actually we use this with a QTMLineEdit.
- */
+ Additionally and depending on user configuration we may always store the text
+ when leaving or apply the command when pressing enter.
+*/
 class QTMInputTextWidgetHelper : public QObject {
   Q_OBJECT
 
-  widget p_wid; /*!< A reference to the tm widget, always a qt_input_text_widget_rep */
-  bool done;
-  QList<QLineEdit*> views;
+  widget            p_wid; //<! A reference to a qt_input_text_widget_rep
+  bool               done; //<! Has the command been executed after a modif.?
+  QList<QTMLineEdit*> views;
   
 public:
   QTMInputTextWidgetHelper (qt_input_text_widget_rep*  _wid); 
@@ -186,12 +235,12 @@ public:
     return static_cast<qt_input_text_widget_rep*>(p_wid.rep); }
   
   void add (QObject *);
+  void apply ();
 
 public slots:
   void commit ();
   void leave ();
   void remove (QObject *);
-
 };
 
 class QTMComboBox;
@@ -206,8 +255,8 @@ class QTMComboBox;
 class QTMFieldWidgetHelper : public QObject {
   Q_OBJECT
   
-  qt_field_widget wid;  
-  bool done;
+  qt_field_widget     wid;
+  bool               done;
   QList<QComboBox*> views;
 
 public:
@@ -221,31 +270,14 @@ public slots:
   void remove (QObject* obj);  
 };
 
-/*!
- */
-class QTMWidgetAction : public QWidgetAction {
-  Q_OBJECT
-
-  widget wid;
-  
-public:
-  QTMWidgetAction(widget _wid, QObject *parent = NULL);
-  ~QTMWidgetAction();
-  
-public slots:
-  virtual void doRefresh();
-  
-protected:
-  QWidget * createWidget ( QWidget * parent );
-  
-};
-
 
 /*! A QTabWidget which resizes itself to the currently displayed page. */
 class QTMTabWidget : public QTabWidget {
   Q_OBJECT
+
 public:
-  QTMTabWidget(QWidget* p=NULL);
+  QTMTabWidget(QWidget* p = NULL);
+
 public slots:
   void resizeOthers(int index);
 };
@@ -255,17 +287,19 @@ public slots:
 class QTMRefreshWidget : public QWidget {
   Q_OBJECT
   
-  string tmwid;
+  string  tmwid;
   object curobj;
-  widget cur;
+  widget    cur;
+  QWidget* qwid;
   hashmap<object,widget> cache;
   
 public:
   QTMRefreshWidget (string _tmwid);
-  
+
   bool recompute ();
-  
-  public slots:
+    //static void deleteLayout (QLayout*);
+
+public slots:
   void doRefresh ();  
 };
 
@@ -281,11 +315,70 @@ class QTMComboBox : public QComboBox {
   QSize   minSize;
 public:
   QTMComboBox (QWidget* parent);
-  
+
   void addItemsAndResize (const QStringList& texts, string ww, string h);
   bool event (QEvent* ev);
-
 };
 
+
+/*! A QListView with a sorting proxy model. */
+class QTMListView : public QListView {
+  Q_OBJECT
+
+  friend class QTMScrollArea;
+
+  QStringListModel*      stringModel;
+  QSortFilterProxyModel* filterModel;
+
+public:
+  QTMListView (const command& cmd, const QStringList& vals, const QStringList&,
+               bool multiple, bool scroll = false, bool filtered = false,
+               QWidget* parent = NULL);
+  
+  QSortFilterProxyModel* filter() const { return filterModel; }
+  bool isScrollable() const {
+    return (verticalScrollBarPolicy() != Qt::ScrollBarAlwaysOff) &&
+           (horizontalScrollBarPolicy() != Qt::ScrollBarAlwaysOff);
+  }
+
+signals:
+  void selectionChanged (const QItemSelection& c);
+
+protected slots:
+  virtual void selectionChanged (const QItemSelection& c, const QItemSelection& p);
+};
+
+
+/*! A QScrollArea which automatically scrolls to selected items in QListWidgets.
+ 
+ This is needed because of our implementation of choice_widget which disables
+ the default scrollbars in QListWidget. Instead we add an explicit QScrollArea
+ which then has to be scrolled manually, for instance when the user navigates 
+ with the cursor keys. To this end we use the slot scrollToSelection(), 
+ connected to the signal currentIndexChanged() of each QListWidget contained in
+ the QScrollArea.
+ 
+ Furthermore, we must implement showEvent() because scrolling at the time of
+ widget compilation in qt_ui_element_rep::as_qwidget() before the widget
+ is shown results in an unsufficient scroll performed (by an amount roughly the
+ size of the viewport).
+ */
+class QTMScrollArea : public QScrollArea {
+  Q_OBJECT
+  
+  QList<QTMListView*> listViews;
+  
+  typedef QList<QTMListView*>::iterator ListViewsIterator;
+
+public:
+  QTMScrollArea (QWidget* p = NULL) : QScrollArea(p) { };
+  void setWidgetAndConnect (QWidget* w);
+
+protected:
+  virtual void showEvent (QShowEvent* ev);
+
+public slots:
+  void scrollToSelection (const QItemSelection& selected);
+};
 
 #endif // QTMMENUHELPER_HPP

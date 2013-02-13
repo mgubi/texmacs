@@ -3468,13 +3468,15 @@ upgrade_cyrillic_encoding (tree t, bool cyrillic) {
   else {
     int i = 0;
     if (is_func(t, WITH)) {
-      for (i = 0 ; i < N(t) - 1 ; i++) {
-        if (!cyrillic && become_cyrillic (as_string (t[i]), as_string (t[i+1])))
+      for (i = 0 ; i < N(t) - 1 ; i+=2) {
+        if (!cyrillic
+            && become_cyrillic (as_string (t[i]), as_string (t[i+1])))
           cyrillic = true;
-        else if (cyrillic && become_other (as_string (t[i]), as_string (t[i+1])))
+        else if (cyrillic
+            && become_other (as_string (t[i]), as_string (t[i+1])))
           cyrillic = false;
       }
-      t[i] = upgrade_cyrillic_encoding (t[i], cyrillic);
+      t[N(t)-1] = upgrade_cyrillic_encoding (t[N(t)-1], cyrillic);
     }
     else {
       for (i = 0 ; i < N(t) ; i++) 
@@ -3510,6 +3512,154 @@ upgrade_cyrillic (tree t) {
     }
   }
   return upgrade_cyrillic_encoding(t, cyrillic);
+}
+
+/******************************************************************************
+* Upgrade metadata storage format
+******************************************************************************/
+
+static tree
+correct_metadata (tree t) {
+  if (is_atomic (t)) return t;
+  tree r;
+
+  if (is_compound (t, "author-misc"))
+    r= compound ("author-note");
+  else
+    r= compound (as_string (L(t)));
+
+  for (int i=0; i<N(t); i++)
+    r << correct_metadata (t[i]);
+  return r;
+}
+
+static tree
+upgrade_metadata (tree t) {
+  if (is_atomic (t)) return t;
+  tree r;
+  string l;
+  if (is_compound (t, "doc-abstract"))   l= "abstract";
+  if (is_compound (t, "author-address")) l= "author-affiliation";
+  if (is_compound (t, "doc-AMS-class"))  l= "abstract-msc";
+  if (is_compound (t, "doc-msc"))        l= "abstract-msc";
+  if (is_compound (t, "doc-keywords"))   l= "abstract-keywords";
+
+  if (is_compound (t, "doc-author-data")) {
+    tree r= compound ("author-data");
+    for (int i=0; i<N(t); i++)
+      r << upgrade_metadata (t[i]);
+    return compound ("doc-author", r);
+  }
+  
+  if (l == "") r= compound (as_string (L(t)));
+  else         r= compound (l);
+  for (int i=0; i<N(t); i++)
+    r << upgrade_metadata (t[i]);
+  return r;
+}
+
+static tree
+remove_abstract_data (tree t, array<tree> &abstract_data) {
+  // Remove all abstract-msc and abstract-keywords found in a doc-data
+  // structure, and store them in abstract_data.
+  tree r(L(t));
+  if (is_compound (t, "doc-data")) {
+    for (int i=0; i<N(t); i++) {
+      if (is_compound (t[i], "abstract-msc") ||
+          is_compound (t[i], "abstract-keywords"))
+        abstract_data << t[i];
+      else r << t[i];
+    }
+  }
+  else if (is_atomic (t))
+    return t;
+  else {
+    r= tree (t, N(t));
+    for (int i=0; i<N(t); i++)
+      r[i]= remove_abstract_data (t[i], abstract_data);
+  }
+  return r;
+}
+
+static array<tree>
+sort_abstract_data (array<tree> abstract_data) {
+  // Sort and merge abstract-msc and abstract-keywords compounds
+  bool has_doc_msc= false, has_doc_keywords= false;
+  tree doc_msc (make_tree_label ("abstract-msc"));
+  tree doc_keywords (make_tree_label ("abstract-keywords"));
+  array<tree> r;
+
+  for (int i=0; i<N(abstract_data); i++) {
+    if (is_compound (abstract_data[i], "abstract-msc")) {
+      has_doc_msc= true;
+      for (int j=0; j<N(abstract_data[i]); j++)
+        doc_msc << abstract_data[i][j];
+    }
+    if (is_compound (abstract_data[i], "abstract-keywords")) {
+      has_doc_keywords= true;
+      for (int j=0; j<N(abstract_data[i]); j++)
+        doc_keywords << abstract_data[i][j];
+    }
+  }
+  if (has_doc_msc) r << doc_msc;
+  if (has_doc_keywords) r << doc_keywords;
+
+  return r;
+}
+
+static tree
+merge_abstract_data (tree t, array<tree> abstract_data, bool &stop) {
+  // Merge abstract_data with the first abstract found.
+  tree r;
+  if (stop || is_atomic (t)) return t;
+  else if (is_compound (t, "abstract", 1)) {
+    stop= true;
+    r= tree (make_tree_label ("abstract-data"));
+    r << t;
+    for (int i=0; i<N(abstract_data); i++)
+      r << abstract_data[i];
+  }
+  else {
+    r= tree (t, N(t));
+    for (int i=0; i<N(t); i++)
+      r[i]= merge_abstract_data (t[i], abstract_data, stop);
+  }
+  return r;
+}
+
+static tree
+add_abstract_data (tree t, array<tree> abstract_data, bool &stop) {
+  // Add abstract_data after the first doc-data found.
+  if (stop || is_atomic (t)) return t;
+  tree r= tree (L(t));
+  for (int i=0; i<N(t); i++) {
+    if (is_compound (t[i], "doc-data")) {
+      stop= true;
+      r << t[i];
+      r << tree (make_tree_label ("abstract-data"));
+      for (int j=0; j<N(abstract_data); j++)
+        r[N(r)-1] << abstract_data[j];
+    }
+    else
+      r << add_abstract_data (t[i], abstract_data, stop);
+  }
+  return r;
+}
+
+static tree
+upgrade_abstract_data (tree t) {
+  // Remove all abstract-msc and abstract-keywords found in a doc-data
+  // structure, and merge them with the first abstract found.
+  array<tree> abstract_data;
+  tree r= remove_abstract_data (t, abstract_data);
+  bool stop= false;
+  if (N(abstract_data) > 0) {
+    abstract_data= sort_abstract_data (abstract_data);
+    r= merge_abstract_data (r, abstract_data, stop);
+    if (stop) return r;
+    else return add_abstract_data (r, abstract_data, stop);
+  }
+  return t;
 }
 
 /******************************************************************************
@@ -3680,6 +3830,11 @@ upgrade (tree t, string version) {
     t= upgrade_cursor (t);
   if (version_inf_eq (version, "1.0.7.15"))
     t= upgrade_cyrillic (t);
+  if (version_inf_eq (version, "1.0.7.17")) {
+    t= upgrade_metadata (t);
+    t= upgrade_abstract_data (t);
+    t= correct_metadata (t);
+  }
 
   if (is_non_style_document (t))
     t= automatic_correct (t, version);

@@ -76,7 +76,7 @@
        (sort (map car (ahash-table->list tm-defined-table)) symbols>?))
   (with sorted (sort (reverse (ahash-table->list indexed-commands)) sort-by-car)
     ($tmapidoc
-      ($tmdoc-title "All TeXmacs commands")
+      ($tmdoc-title (replace "All TeXmacs commands"))
       ($para 
         "This is an alphabetical list of TeXmacs's public interface. "
         "Because of contextual overloading, a name can be defined several "
@@ -87,28 +87,28 @@
 
 (define ($doc-symbol-buffer ssym)
   ($tmapidoc
-    ($tmdoc-title (string-append "Documentation for " ssym))
+    ($tmdoc-title (replace "Documentation for %1" ssym))
     ($doc-explain-scm* ssym)))
 
 (define ($doc-all-modules-buffer)
-  ($tmapidoc ($tmdoc-title "All TeXmacs modules")
+  ($tmapidoc ($tmdoc-title (replace "All TeXmacs modules"))
     ($doc-module-traverse '())))
 
 (define ($doc-module-buffer smod)
   (with m (string->module smod)
     (if (is-real-module? m)
         ($tmapidoc
-          ($tmdoc-title (string-append "Documentation for " smod))
+          ($tmdoc-title (replace "Documentation for %1" smod))
           `(document
             ,($doc-module-header m)
             ,($doc-module-exported m)))
         ($tmapidoc
-          ($tmdoc-title (string-append "Module family " smod))
+          ($tmdoc-title (replace "Module family %1" smod))
           ($doc-module-traverse m)))))
 
 (define ($query-not-implemented query)
  ($tmdoc 
-   ($tmdoc-title "Request unknown or not implemented")
+   ($tmdoc-title (translate "Request unknown or not implemented"))
    ($para query)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -131,12 +131,12 @@
   (let* ((type (query-ref query "type"))
          (what (query-ref query "what")))
     (cond ((== type "symbol")
-           (if (== what "") "Help - Browse all symbols"
-               (string-append "Help - Documentation for " what)))
+           (if (== what "") (replace "Help - Browse all symbols")
+               (replace "Help - Documentation for %1" what)))
           ((== type "module")
-           (if (== what "") "Help - Browse all modules"
-               (string-append "Help - Documentation for module " what)))
-          (else "Help - Unknow request"))))
+           (if (== what "") (replace "Help - Browse all modules")
+               (replace "Help - Documentation for module %1" what)))
+          (else (replace "Help - Unknow request")))))
 
 (tmfs-permission-handler (apidoc name type) #t)
 

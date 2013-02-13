@@ -312,7 +312,13 @@ bib_upcase (scheme_tree st) {
 }
 
 scheme_tree
-bib_default (scheme_tree st) {
+bib_default_preserve_case (scheme_tree st) {
+  tree t= simplify_correct (scheme_tree_to_tree (st));
+  return tree_to_scheme_tree (t); 
+}
+
+scheme_tree
+bib_default_upcase_first (scheme_tree st) {
   tree t= simplify_correct (scheme_tree_to_tree (st));
   bib_change_case (t, 0);
   return tree_to_scheme_tree (t); 
@@ -894,7 +900,8 @@ bib_parse_fields (tree& t) {
   string fields;
   int i= 0;
   int nb= bib_get_fields (t, fields);
-  array<tree> latex= bib_latex_array (latex_to_tree (parse_latex (fields)));
+  array<tree> latex= bib_latex_array (
+      latex_to_tree (parse_latex (fields, false, true)));
   if (nb == N(latex)) bib_set_fields (t, latex, i);
 }
 

@@ -12,6 +12,9 @@
 #include "font.hpp"
 #include "gui.hpp"
 #include "Freetype/tt_file.hpp"
+#include "iterator.hpp"
+#include "file.hpp"
+#include "convert.hpp"
 
 RESOURCE_CODE(font);
 
@@ -23,7 +26,9 @@ font_rep::font_rep (string s):
   rep<font> (s),
   type      (FONT_TYPE_TEX),
   spc       (0),
-  extra     (0)
+  extra     (0),
+  last_zoom (0.0),
+  zoomed_fn (NULL)
 {
 }
 
@@ -36,7 +41,9 @@ font_rep::font_rep (string s, font fn):
   slope        (fn->slope),
   spc          (fn->spc),
   extra        (fn->extra),
-  sep          (fn->sep)
+  sep          (fn->sep),
+  last_zoom    (0.0),
+  zoomed_fn    (NULL)
 {
   copy_math_pars (fn);
 }
@@ -57,6 +64,60 @@ font_rep::copy_math_pars (font fn) {
   wfn          = fn->wfn;
   wline        = fn->wline;
   wquad        = fn->wquad;
+}
+
+void
+font_rep::draw (renderer ren, string s, SI x, SI y) {
+  if (ren->zoomf == 1.0 || !ren->is_screen)
+    draw_fixed (ren, s, x, y);
+  else if (ren->zoomf != last_zoom) {
+    last_zoom= ren->zoomf;
+    zoomed_fn= magnify (ren->zoomf);
+    draw (ren, s, x, y);
+  }
+  else {
+    // FIXME: low level rendering hack
+    SI     old_ox     = ren->ox;
+    SI     old_oy     = ren->oy;
+    SI     old_cx1    = ren->cx1;
+    SI     old_cy1    = ren->cy1;
+    SI     old_cx2    = ren->cx2;
+    SI     old_cy2    = ren->cy2;
+    double old_zoomf  = ren->zoomf;
+    int    old_shrinkf= ren->shrinkf;
+    SI     old_pixel  = ren->pixel;
+    SI     old_thicken= ren->thicken;
+
+    ren->ox     = (SI) ::round (old_ox  * old_zoomf);
+    ren->oy     = (SI) ::round (old_oy  * old_zoomf);
+    //ren->cx1    = (SI) ::floor (old_cx1 * old_zoomf);
+    //ren->cx2    = (SI) ::floor (old_cx2 * old_zoomf);
+    //ren->cy1    = (SI) ::ceil  (old_cy1 * old_zoomf);
+    //ren->cy2    = (SI) ::ceil  (old_cy2 * old_zoomf);
+    ren->cx1    = (SI) ::round (old_cx1 * old_zoomf);
+    ren->cx2    = (SI) ::round (old_cx2 * old_zoomf);
+    ren->cy1    = (SI) ::round (old_cy1 * old_zoomf);
+    ren->cy2    = (SI) ::round (old_cy2 * old_zoomf);
+    ren->zoomf  = 1.0;
+    ren->shrinkf= std_shrinkf;
+    ren->pixel  = std_shrinkf * PIXEL;
+    ren->thicken= (std_shrinkf >> 1) * PIXEL;
+
+    SI xx= (SI) round (x * old_zoomf);
+    SI yy= (SI) round (y * old_zoomf);
+    zoomed_fn->draw_fixed (ren, s, xx, yy);
+
+    ren->ox     = old_ox;
+    ren->oy     = old_oy;
+    ren->cx1    = old_cx1;
+    ren->cx2    = old_cx2;
+    ren->cy1    = old_cy1;
+    ren->cy2    = old_cy2;
+    ren->zoomf  = old_zoomf;
+    ren->shrinkf= old_shrinkf;
+    ren->pixel  = old_pixel;
+    ren->thicken= old_thicken;
+  }
 }
 
 double font_rep::get_left_slope  (string s) { (void) s; return slope; }
@@ -150,7 +211,8 @@ struct error_font_rep: font_rep {
   error_font_rep (string name, font fn);
   void get_extents (string s, metric& ex);
   void get_xpositions (string s, SI* xpos);
-  void draw (renderer ren, string s, SI x, SI y);
+  void draw_fixed (renderer ren, string s, SI x, SI y);
+  font magnify (double zoom);
 };
 
 error_font_rep::error_font_rep (string name, font fnb):
@@ -167,9 +229,14 @@ error_font_rep::get_xpositions (string s, SI* xpos) {
 }
 
 void
-error_font_rep::draw (renderer ren, string s, SI x, SI y) {
+error_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   ren->set_color (red);
-  fn->draw (ren, s, x, y);
+  fn->draw_fixed (ren, s, x, y);
+}
+
+font
+error_font_rep::magnify (double zoom) {
+  return error_font (fn->magnify (zoom));
 }
 
 font
@@ -177,6 +244,30 @@ error_font (font fn) {
   string name= "error-" * fn->res_name;
   return make (font, name, tm_new<error_font_rep> (name, fn));
 }
+
+/******************************************************************************
+* System dependent fonts
+******************************************************************************/
+
+#ifndef X11TEXMACS
+
+font
+x_font (string family, int size, int dpi) {
+  (void) family; (void) size; (void) dpi;
+  return font ();
+}
+
+#endif
+
+#ifndef QTTEXMACS
+
+font
+qt_font (string family, int size, int dpi) {
+  (void) family; (void) size; (void) dpi;
+  return font ();
+}
+
+#endif
 
 /******************************************************************************
 * Miscellaneous

@@ -30,12 +30,15 @@
 #include "converter.hpp"
 #include "language.hpp"
 #include "scheme.hpp"
+#include "wencoding.hpp"
 
 #include "qt_gui.hpp"    // gui_maximal_extents()
 
 #ifdef USE_GS
 #include "Ghostscript/gs_utilities.hpp"
 #endif
+
+#define SCREEN_PIXEL (PIXEL)
 
 /*! some debugging infrastucture */
 tm_ostream&
@@ -201,17 +204,17 @@ to_qkeysequence (string s) {
       r << conv_sub (s (i, k));
       i= k;
     }
-  return QKeySequence(to_qstring(r));
+  return QKeySequence (to_qstring (r));
 }
 
 
 coord4
 from_qrect (const QRect & rect) {
   SI c1, c2, c3, c4;
-  c1= rect.x() * PIXEL;
-  c2= -(rect.y() + rect.height()) * PIXEL;       
-  c3= (rect.x() + rect.width()) * PIXEL;
-  c4= -rect.y() * PIXEL;
+  c1= rect.x() * SCREEN_PIXEL;
+  c2= -(rect.y() + rect.height()) * SCREEN_PIXEL;       
+  c3= (rect.x() + rect.width()) * SCREEN_PIXEL;
+  c4= -rect.y() * SCREEN_PIXEL;
   return coord4 (c1, c2, c3, c4);
 }
 
@@ -220,37 +223,37 @@ from_qrect (const QRect & rect) {
  into one given by its upper left and width/height */
 QRect
 to_qrect (const coord4 & p) {
-  float c= 1.0/PIXEL;
-  return QRect (p.x1*c, -p.x4*c, (p.x3-p.x1+PIXEL-1)*c, (p.x4-p.x2+PIXEL-1)*c);
+  float c= 1.0/SCREEN_PIXEL;
+  return QRect (p.x1*c, -p.x4*c, (p.x3-p.x1+SCREEN_PIXEL-1)*c, (p.x4-p.x2+SCREEN_PIXEL-1)*c);
 }
 
 coord2
 from_qsize (const QSize & s) {
-  return coord2 (s.width() * PIXEL, s.height() * PIXEL);
+  return coord2 (s.width() * SCREEN_PIXEL, s.height() * SCREEN_PIXEL);
 }
 
 QSize
 to_qsize (const coord2 & p) {
-  float c= 1.0/PIXEL;
+  float c= 1.0/SCREEN_PIXEL;
   return QSize (p.x1*c, p.x2*c);
 }
 
 QSize
 to_qsize (const SI& w, const SI& h) {
-  float c= 1.0/PIXEL;
+  float c= 1.0/SCREEN_PIXEL;
   return QSize (w*c, h*c);
 }
 
 coord2
 from_qpoint (const QPoint & pt) {
-  return coord2 (pt.x() * PIXEL, -pt.y() * PIXEL);
+  return coord2 (pt.x() * SCREEN_PIXEL, -pt.y() * SCREEN_PIXEL);
 }
 
 /*! Transforms texmacs coordinates, with origin at the lower left corner, into
  Qt coordinates, with origin at the upper left corner */
 QPoint
 to_qpoint (const coord2 & p) {
-  float c= 1.0/PIXEL;
+  float c= 1.0/SCREEN_PIXEL;
   return QPoint (p.x1*c, -p.x2*c);
 }
 
@@ -270,13 +273,35 @@ to_qstringlist(array<string> l) {
   return ql;
 }
 
+/* HACK!!! Something has to be done wrt. to internal encoding: most of the times
+ it's cork, but often it's utf8. For instance when the title is built in a tmfs
+ title handler in scheme, it is sent to us as an utf8 string. Should we convert
+ before? Another example are items in the go-menu: file names are internally
+ stored as utf8, but we assume that strings are sent to us for display in
+ widgets as cork and thus display the wrong encoding.
+ 
+ It gets tricky soon, so for the time being we use this hack.
+ */
 QString
-to_qstring (string s) {
-  return utf8_to_qstring (cork_to_utf8 (s));
+to_qstring (const string& s) {
+  if (looks_ascii (s))
+    return utf8_to_qstring (cork_to_utf8 (s));
+  else if (looks_utf8 (s))
+    return utf8_to_qstring (s);
+  else
+    return latin1_to_qstring (s);
 }
 
 QString
-utf8_to_qstring (string s) {
+latin1_to_qstring (const string& s) {
+  char* p= as_charp (s);
+  QString nss= QString::fromLatin1 (p, N(s));
+  tm_delete_array (p);
+  return nss;
+}
+
+QString
+utf8_to_qstring (const string& s) {
   char* p= as_charp (s);
   QString nss= QString::fromUtf8 (p, N(s));
   tm_delete_array (p);
@@ -292,7 +317,7 @@ from_qstring_utf8 (const QString &s) {
 
 string
 from_qstring (const QString &s) {
-  return utf8_to_cork (from_qstring_utf8(s));
+  return utf8_to_cork (from_qstring_utf8 (s));
 }
 
 // Although slow to build, this should provide better lookup times than
@@ -343,7 +368,7 @@ to_qcolor(color c) {
 
 
 QString
-qt_translate (string s) {
+qt_translate (const string& s) {
   string in_lan= get_input_language ();
   string out_lan= get_output_language ();
   return to_qstring(tm_var_encode (translate (s, in_lan, out_lan)));
@@ -395,12 +420,20 @@ qt_convert_image (url image, url dest, int w, int h) {
 
 void
 qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
+  string r= qt_image_to_eps (image, w_pt, h_pt, dpi);
+  save_string (eps, r);
+}
+
+string
+qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
   static const char* d= "0123456789ABCDEF";
   QImage im (utf8_to_qstring (concretize (image)));
+  string r;
   if (im.isNull ())
     cerr << "TeXmacs Cannot read image file '" << image << "'"
 	 << " in qt_image_to_eps" << LF;
   else {
+    bool alpha= im.hasAlphaChannel ();
     if (dpi > 0 && w_pt > 0 && h_pt > 0) {
       int ww= w_pt * dpi / 72;
       int hh= h_pt * dpi / 72;
@@ -408,41 +441,86 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
         im= im.scaled (ww, hh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
       }
     }
-    string res;
     string sw= as_string (im.width ());
     string sh= as_string (im.height ());
-    res << "%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: TeXmacs\n%%BoundingBox: ";
-    res << "0 0 " << sw << " " << sh << "\n";
-    res << "%%LanguageLevel: 2\n%%Pages: 1\n%%DocumentData: Clean7Bit\n";
-    res <<  sw << " " << sh << " scale\n";
-    res <<  sw << " " << sh << " 8 [" << sw << " 0 0 -" << sh << " 0 " << sh << "]\n";
-    res << "{currentfile 3 " << sw << " mul string readhexstring pop} bind\nfalse 3 colorimage\n";
-    int v, i= 0, j= 0, l= 0;
+    r << "%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: TeXmacs\n%%BoundingBox: 0 0 "
+      << sw << " " << sh
+      << "\n\n% Created by qt_image_to_eps ()\n\n%%BeginProlog\nsave\n"
+      << "countdictstack\nmark\nnewpath\n/showpage {} def\n/setpagedevice "
+      << "{pop} def\n%%EndProlog\n%%Page 1 1\n"
+      << "/max { 2 copy lt { exch } if pop } bind def\n"
+      << "/ImageWidth " << sw
+      << " def\n/ImageHeight " << sh << " def\nImageWidth ImageHeight max "
+      << "ImageWidth ImageHeight max scale\n\n/ImageDatas\n\tcurrentfile\n\t"
+      << "<< /Filter /ASCIIHexDecode >>\n\t/ReusableStreamDecode\n\tfilter\n";
+
+    int v, i= 0, j= 0, k= 0, l= 0;
+    string mask;
     for (j= 0; j < im.height (); j++) {
       for (i=0; i < im.width (); i++) {
         l++;
         QRgb p= im.pixel (i, j);
         v= qRed (p);
-        res << d [(v >> 4)] << d [v % 16];
+        r << d [(v >> 4)] << d [v % 16];
         v= qGreen (p);
-        res << d [(v >> 4)] << d [v % 16];
+        r << d [(v >> 4)] << d [v % 16];
         v= qBlue (p);
-        res << d [(v >> 4)] << d [v % 16];
-        if (l > 10) {
-          res << "\n";
+        r << d [(v >> 4)] << d [v % 16];
+        if (l > 12) {
+          r << "\n";
           l= 0;
         }
       }
+      if (alpha) {
+        v= 0;
+        for (i=0; i < im.width (); i++) {
+          v+= (qAlpha (im.pixel (i, j)) == 0) << (3 - i % 4);
+          if (i % 4 == 3 || i + 1 == im.width ()) {
+            mask << d[v];
+            v= 0;
+            k++;
+            // Padding of the image data mask
+            if (i + 1 == im.width () && k % 2 == 1) {
+              mask << d[0];
+              k++;
+            }
+            // Code layout
+            if (k >= 78) {
+              mask << "\n";
+              k= 0;
+            }
+          }
+        }
+      }
     }
-    res << "\n%%EOF";
-    save_string (eps, res);
-#ifdef USE_GS
-    url temp= url_temp (".eps");
-    gs_to_eps (eps, temp);
-    copy (temp, eps);
-    remove (temp);
-#endif
+    r << ">\ndef\n\n";
+
+    if (alpha) {
+      r << "/MaskDatas\n\tcurrentfile\n\t<< /Filter /ASCIIHexDecode >>\n"
+        << "\t/ReusableStreamDecode\n\tfilter\n"
+        << mask
+        << ">\ndef\n\n"
+        << "/TheMask\n<<\n\t/ImageType\t1\n\t/Width\t\tImageWidth\n\t/Height\t"
+        << "\tImageHeight\n\t/BitsPerComponent 1\n\t/Decode [ 0 1 ]\n\t"
+        << "/ImageMatrix [ ImageWidth 0 0 ImageWidth neg 0 ImageHeight ]\n\t"
+        << "/DataSource MaskDatas\n>> def\n\n";
+    }
+    r << "/TheImage\n<<\n\t/ImageType\t1\n\t/Width\t\tImageWidth\n\t/Height\t"
+      << "\tImageHeight\n\t/BitsPerComponent 8\n\t/Decode [ 0 1 0 1 0 1 ]\n\t"
+      << "/ImageMatrix [ ImageWidth 0 0 ImageWidth neg 0 ImageHeight ]\n\t"
+      << "/DataSource ImageDatas\n>> def\n\n"
+      << "/DeviceRGB setcolorspace\n";
+    if (alpha) {
+      r << "<<\n\t/ImageType 3\n\t/InterleaveType 3\n\t/DataDict TheImage\n"
+        << "\t/MaskDict TheMask\n>>";
+    }
+    else {
+      r << "\tTheImage";
+    }
+    r << "\nimage\nshowpage\n%%Trailer\ncleartomark\ncountdictstack\n"
+      << "exch sub { end } repeat\nrestore\n%%EOF\n";
   }
+  return r;
 }
 
 string 
@@ -473,13 +551,13 @@ qt_get_date (string lan, string fm) {
     }
     else fm = "d MMMM yyyy";
   }
-  QLocale loc = QLocale(to_qstring(language_to_locale(lan)));
+  QLocale loc = QLocale (to_qstring (language_to_locale(lan)));
 #if (QT_VERSION >= 0x040400)
-  QString date = loc.toString(localtime, to_qstring(fm));
+  QString date = loc.toString (localtime, to_qstring (fm));
 #else
-  QString date = localtime.toString(to_qstring(fm));
+  QString date = localtime.toString (to_qstring (fm));
 #endif
-  return from_qstring(date);
+  return from_qstring (date);
 }
 
 #ifndef _MBD_EXPERIMENTAL_PRINTER_WIDGET  // this is in qt_printer_widget

@@ -34,7 +34,7 @@
   "Zeta" "Eta" "Theta" "Iota" "Kappa" "Lambda"
   "Mu" "Nu" "Xi" "Omicron" "Pi" "Rho"
   "Sigma" "Tau" "Upsilon" "Phi" "Chi" "Psi" "Omega"
-  "grave" "acute" "check" "breve" "bar"
+  "grave" "acute" "check" "breve" "invbreve" "bar"
   "cedille"
   "AA" "AE" "DH" "L" "NG" "O" "OE" "S" "SS" "TH"
   "aa" "ae" "dh" "dj" "i" "j" "l" "ng" "o" "oe" "ss" "sz" "th"
@@ -148,7 +148,7 @@
   ("'e" "Insert é" (emulate-keyboard "acute e"))
   ("`A" "Insert À" (emulate-keyboard "grave A"))
   ("`E" "Insert È" (emulate-keyboard "grave E"))
-  ("`U" "Insert È" (emulate-keyboard "grave U"))
+  ("`U" "Insert Ù" (emulate-keyboard "grave U"))
   ("`a" "Insert à" (emulate-keyboard "grave a"))
   ("`e" "Insert è" (emulate-keyboard "grave e"))
   ("`u" "Insert ù" (emulate-keyboard "grave u"))
@@ -225,6 +225,7 @@
   ("acute" "Make acute" (make-wide "<acute>"))
   ("bar" "Make bar" (make-wide "<bar>"))
   ("breve" "Make breve" (make-wide "<breve>"))
+  ("invbreve" "Make inverted breve" (make-wide "<invbreve>"))
   ("check" "Make check" (make-wide "<check>"))
   ("grave" "Make grave" (make-wide "<grave>"))
   ("hat" "Make hat" (make-wide "^"))

@@ -35,34 +35,37 @@
 	   (string-append s "\n"))
 	  (else (string-append s ";\n")))))
 
-(define maxima-detected #f)
 (define (maxima-detect)
-  (when (not maxima-detected)
-    (set! maxima-detected (var-eval-system "maxima_detect"))
-    maxima-detected))
-
-(define (maxima-versions)
-  ;;(system "maxima_detect")
-  (with version-list (string->object (maxima-detect))
-    ;;(display* "Maxima versions -> " version-list "\n")
-    (if (list? version-list)
-	(let* ((default (car version-list))
-	       (rest (cdr version-list))
-	       (launch-default
-		(list :launch (string-append "tm_maxima " default)))
-	       (launch-rest
-		(map
-		 (lambda (version-name)
-		   (list :launch version-name
-			 (string-append "tm_maxima " version-name)))
-		 rest)))
-	  (cons launch-default launch-rest))
-	'())))
+  (if (os-mingw?)
+      (url-exists-in-path? "maxima")
+      (with version-list (string->object (var-eval-system "maxima_detect"))
+        (and (list? version-list) (nnull? version-list) version-list))))
+      
+(define (maxima-versions)  ; returns list of versions if any
+  (if (os-mingw?)
+      `((:launch
+         ,(string-append "maxima.bat -p " (getenv "TEXMACS_PATH")
+                         "\\plugins\\maxima\\lisp\\texmacs-maxima.lisp")))
+      (with version-list (maxima-detect)
+        (if version-list
+            (let* ((default (car version-list))
+                   (rest (cdr version-list))
+                   (launch-default
+                    (list :launch (string-append "tm_maxima " default)))
+                   (launch-rest
+                    (map
+                     (lambda (version-name)
+                       (list :launch version-name
+                             (string-append "tm_maxima " version-name)))
+                     rest)))
+              (cons launch-default launch-rest))
+            '()))))
 
 (plugin-configure maxima
-  (:require (nnot (maxima-detect)))
-  (:initialize (maxima-initialize))
+  (:winpath ,(url-append (url-wildcard "Maxima*") "bin"))
+  (:require (maxima-detect))
   ,@(maxima-versions)
+  (:initialize (maxima-initialize))
   (:serializer ,maxima-serialize)
   (:session "Maxima")
   (:scripts "Maxima"))

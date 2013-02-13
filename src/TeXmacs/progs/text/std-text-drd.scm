@@ -77,13 +77,20 @@
   (doc-title-active-tag) (doc-title-inactive-tag))
 
 (define-group doc-title-active-tag
-  doc-title doc-subtitle doc-author-data doc-date)
+  doc-title doc-subtitle doc-author doc-date doc-misc doc-note)
 
 (define-group doc-title-inactive-tag
-  doc-running-title doc-running-author doc-keywords doc-AMS-class)
+  doc-running-title doc-running-author)
 
 (define-group doc-author-tag
-  author-name author-address author-email author-homepage author-note)
+  author-data)
+
+(define-group author-data-tag
+  author-name author-affiliation author-email author-homepage author-misc
+  author-note)
+
+(define-group abstract-data-tag
+  abstract abstract-msc abstract-keywords)
 
 ;; Enunciations
 

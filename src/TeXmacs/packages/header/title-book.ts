@@ -41,7 +41,7 @@
     <surround||<hflush>|<new-page>>
   </macro>>
 
-  <assign|doc-abstract|<\macro|body>
+  <assign|render-abstract|<\macro|body>
     <surround|<no-indent>||<chapter*|<abstract-text>>>
 
     <surround||<hflush>|<arg|body>>
@@ -55,7 +55,7 @@
 
   <assign|doc-render-title|<macro|x|<surround||<vspace|0.1pag>|<style-with|src-compact|none|<doc-title-block|<with|math-font-series|bold|font-series|bold|<font-magnify|2|<arg|x>>>>>>>>
 
-  <assign|doc-author|<macro|body|<\surround|<vspace*|0.1pag>|<vspace|0.1pag>>
+  <assign|render-doc-author|<macro|body|<\surround|<vspace*|0.1pag>|<vspace|0.1pag>>
     <\with|par-par-sep|0fn>
       <doc-title-block|<arg|body>>
     </with>
@@ -73,7 +73,7 @@
 
   <assign|author-render-name|<macro|x|<surround|<vspace*|1fn>||<doc-author-block|<with|font-shape|small-caps|<font-magnify|1.091|<arg|x>>>>>>>
 
-  <assign|author-address|<\macro|x>
+  <assign|author-affiliation|<\macro|x>
     <surround|<vspace*|2fn>|<vspace|2fn>|<doc-author-block|<arg|x>>>
   </macro>>
 

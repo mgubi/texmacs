@@ -33,9 +33,9 @@
 
 (tm-define (gui-normalize l)
   (cond ((null? l) l)
-	((func? (car l) 'list)
-	 (append (gui-normalize (cdar l)) (gui-normalize (cdr l))))
-	(else (cons (car l) (gui-normalize (cdr l))))))
+        ((func? (car l) 'list)
+         (append (gui-normalize (cdar l)) (gui-normalize (cdr l))))
+        (else (cons (car l) (gui-normalize (cdr l))))))
 
 (tm-define-macro ($list . l)
   (:synopsis "Make widgets")
@@ -160,6 +160,14 @@
   (:synopsis "One tab of a tab bar")
   `(cons* 'tab ($list ,@l)))
 
+(tm-define-macro ($icon-tabs . l)
+  (:synopsis "An icon tab bar")
+  `(cons* 'icon-tabs ($list ,@l)))
+
+(tm-define-macro ($icon-tab . l)
+  (:synopsis "One icon tab of an icon tab bar")
+  `(cons* 'icon-tab ($list ,@l)))
+
 (tm-define-macro ($horizontal . l)
   (:synopsis "Horizontal layout of widgets")
   `(cons* 'horizontal ($list ,@l)))
@@ -216,29 +224,42 @@
 ;; Menu and widget elements
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Temporary hack:
+(tm-define all-translations (make-ahash-table))
+
 (define (process-translate x)
-  (if (or (func? x 'concat) (func? x 'verbatim))
+  (if (or (func? x 'concat) (func? x 'verbatim) (func? x 'replace))
       `(list ',(car x) ,@(map process-translate (cdr x)))
       x))
 
 (tm-define-macro ($-> text . l)
   (:synopsis "Make pullright button")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(cons* '-> ,text ($list ,@l)))
 
 (tm-define-macro ($=> text . l)
   (:synopsis "Make pulldown button")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(cons* '=> ,text ($list ,@l)))
 
 (tm-define-macro ($> text . cmds)
   (:synopsis "Make button")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(list ,text (lambda () ,@cmds)))
 
 (tm-define-macro ($check text check pred?)
   (:synopsis "Make button")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(list 'check ,text ,check (lambda () ,pred?)))
 
 (tm-define-macro ($balloon text balloon)
   (:synopsis "Make balloon")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(list 'balloon ,text ,balloon))
 
 (tm-define-macro ($concat-text . l)
@@ -248,6 +269,12 @@
 (tm-define-macro ($verbatim-text . l)
   (:synopsis "Make verbatim text")
   `(quote (verbatim ,@l)))
+
+(tm-define-macro ($replace-text str . x)
+  (:synopsis "Make text to be translated with arguments")
+  (if developer-mode?
+      (ahash-set! all-translations (car x) #t))
+  `(quote (replace ,str ,@x)))
 
 (tm-define-macro ($icon name)
   (:synopsis "Make icon")
@@ -265,6 +292,8 @@
 
 (tm-define-macro ($menu-text text)
   (:synopsis "Make text")
+  (if developer-mode?
+    (ahash-set! all-translations text #t))
   `(list 'text ,(process-translate text)))
 
 (tm-define-macro ($input cmd type proposals width)
@@ -287,6 +316,11 @@
 (tm-define-macro ($choices cmd vals mc)
   (:synopsis "Make a multiple choice list")
   `(list 'choices (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,mc)))
+
+(tm-define-macro ($filtered-choice cmd vals val filterstr)
+  (:synopsis "Make a scrollable choice list with a filter on top")
+  `(list 'filtered-choice (lambda (answer filter) ,cmd) (lambda () ,vals)
+                           (lambda () ,val) (lambda () ,filterstr)))
 
 (tm-define-macro ($texmacs-output doc tmstyle)
   (:synopsis "Make TeXmacs output field")
@@ -464,6 +498,9 @@
 (tm-define-macro ($strong . l)
   ($quote `(strong ($unquote ($inline ,@l)))))
 
+(tm-define-macro ($ismall . l)
+  ($quote `(small (with "font-shape" "italic" ($unquote ($inline ,@l))))))
+
 (tm-define-macro ($verbatim . l)
   ($quote `(verbatim ($unquote ($inline ,@l)))))
 
@@ -487,7 +524,7 @@
       `(document
          (TeXmacs ,(texmacs-version))
          (style (tuple "tmdoc"))
-         (body ($unquote ($localize ($block ,@l))))
+         (body ($unquote ($block ,@l)))
          (initial (collection (associate "language" ,lan)))))))
 
 (tm-define-macro ($localize . l)
@@ -509,7 +546,7 @@
 
 (tm-define-macro ($explain key . l)
   ($quote `(document (explain ($unquote ($inline ,key))
-			      ($unquote ($block ,@l))))))
+                              ($unquote ($block ,@l))))))
 
 (tm-define-macro ($tm-fragment . l)
   ($quote `(document (tm-fragment ($unquote ($block ,@l))))))

@@ -188,34 +188,34 @@ edit_interface_rep::draw_pre (renderer win, renderer ren, rectangle r) {
 
 void
 edit_interface_rep::draw_post (renderer win, renderer ren, rectangle r) {
-  win->set_shrinking_factor (sfactor);
-  ren->set_shrinking_factor (sfactor);
+  win->set_zoom_factor (zoomf);
+  ren->set_zoom_factor (zoomf);
   draw_context (ren, r);
   draw_env (ren);
   draw_selection (ren);
   draw_graphics (ren);
   draw_cursor (ren); // the text cursor must be drawn over the graphical object
-  ren->set_shrinking_factor (1);
-  win->set_shrinking_factor (1);
+  ren->reset_zoom_factor ();
+  win->reset_zoom_factor ();
 }
 
 void
 edit_interface_rep::draw_with_shadow (renderer win, rectangle r) {
-  rectangle sr= r / sfactor;
+  rectangle sr= r * magf;
   win->new_shadow (shadow);
   win->get_shadow (shadow, sr->x1, sr->y1, sr->x2, sr->y2);
   renderer ren= shadow;
 
   rectangles l;
-  win->set_shrinking_factor (sfactor);
-  ren->set_shrinking_factor (sfactor);
+  win->set_zoom_factor (zoomf);
+  ren->set_zoom_factor (zoomf);
   draw_pre (win, ren, r);
   draw_text (ren, l);
-  ren->set_shrinking_factor (1);
-  win->set_shrinking_factor (1);
+  ren->reset_zoom_factor ();
+  win->reset_zoom_factor ();
 
   if (ren->interrupted ()) {
-    ren->set_shrinking_factor (sfactor);
+    ren->set_zoom_factor (zoomf);
     l= l & rectangles (translate (r, ren->ox, ren->oy));
     simplify (l);
     copy_always= translate (copy_always, ren->ox, ren->oy);
@@ -223,14 +223,14 @@ edit_interface_rep::draw_with_shadow (renderer win, rectangle r) {
       l= rectangles (copy_always->item, l);
       copy_always= copy_always->next;
     }
-    ren->set_shrinking_factor (1);
+    ren->reset_zoom_factor ();
 
     draw_post (win, ren, r);
     while (!is_nil(l)) {
-      SI x1= (l->item->x1)/sfactor - ren->ox - PIXEL;
-      SI y1= (l->item->y1)/sfactor - ren->oy - PIXEL;
-      SI x2= (l->item->x2)/sfactor - ren->ox + PIXEL;
-      SI y2= (l->item->y2)/sfactor - ren->oy + PIXEL;
+      SI x1= ((SI) (l->item->x1 * magf)) - ren->ox - PIXEL;
+      SI y1= ((SI) (l->item->y1 * magf)) - ren->oy - PIXEL;
+      SI x2= ((SI) (l->item->x2 * magf)) - ren->ox + PIXEL;
+      SI y2= ((SI) (l->item->y2 * magf)) - ren->oy + PIXEL;
       ren->outer_round (x1, y1, x2, y2);
       win->put_shadow (ren, x1, y1, x2, y2);
       l= l->next;
@@ -240,7 +240,7 @@ edit_interface_rep::draw_with_shadow (renderer win, rectangle r) {
 
 void
 edit_interface_rep::draw_with_stored (renderer win, rectangle r) {
-  //cout << "Redraw " << (r/(sfactor*PIXEL)) << "\n";
+  //cout << "Redraw " << (r*magf/PIXEL) << "\n";
 
   /* Verify whether the backing store is still valid */
   if (!is_nil (stored_rects)) {
@@ -255,7 +255,7 @@ edit_interface_rep::draw_with_stored (renderer win, rectangle r) {
   }
 
   /* Either draw with backing store or regenerate */
-  rectangle sr= r / sfactor;
+  rectangle sr= r * magf;
   if (is_nil (rectangles (r) - stored_rects) && !is_nil (stored_rects)) {
     // cout << "*"; cout.flush ();
     win->new_shadow (shadow);
@@ -289,14 +289,15 @@ edit_interface_rep::draw_with_stored (renderer win, rectangle r) {
 
 void
 edit_interface_rep::handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2) {
-  x1 *= sfactor; y1 *= sfactor; x2 *= sfactor; y2 *= sfactor;
-  win->set_shrinking_factor (sfactor);
+  x1= (SI) (x1 / magf); y1= (SI) (y1 / magf);
+  x2= (SI) (x2 / magf); y2= (SI) (y2 / magf);
+  win->set_zoom_factor (zoomf);
   tree bg= get_init_value (BG_COLOR);
   win->set_background_pattern (bg);
   win->clear_pattern (max (eb->x1, x1), max (eb->y1, y1),
 		      min (eb->x2, x2), min (eb->y2, y2));
   draw_surround (win, rectangle (x1, y1, x2, y2));
-  win->set_shrinking_factor (1);
+  win->reset_zoom_factor ();
 }
 
 void
@@ -314,14 +315,14 @@ edit_interface_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
   // (x1, y1)--(x2, y2) does not correspond to the repaint region clipping.
   // Nevertheless, the code seems no longer necessary. In case it would be,
   // it should be moved somewhere inside the internal repaint routines.
-  SI extra= 3 * get_init_int (FONT_BASE_SIZE) * PIXEL / (2*sfactor);
-  SI X1= (x1-extra) * sfactor, Y1= (y1-extra) * sfactor;
-  SI X2= (x2+extra) * sfactor, Y2= (y2+extra) * sfactor;
+  SI extra= 3 * get_init_int (FONT_BASE_SIZE) * PIXEL * magf / 2;
+  SI X1= (x1-extra) / magf, Y1= (y1-extra) / magf;
+  SI X2= (x2+extra) / magf, Y2= (y2+extra) / magf;
   draw_with_stored (rectangle (X1, Y1, X2, Y2));
   */
 
   // cout << "Repainting\n";
-  draw_with_stored (win, rectangle (x1, y1, x2, y2) * sfactor);
+  draw_with_stored (win, rectangle (x1, y1, x2, y2) /magf);
   if (last_change-last_update > 0)
     last_change = texmacs_time ();
   // cout << "Repainted\n";

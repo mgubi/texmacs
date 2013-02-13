@@ -14,13 +14,16 @@
 #include "rectangles.hpp"
 #include "image_files.hpp"
 
+int std_shrinkf= 5;
+
 /******************************************************************************
 * Constructors
 ******************************************************************************/
 
-renderer_rep::renderer_rep ():
+renderer_rep::renderer_rep (bool screen_flag):
   ox (0), oy (0), cx1 (0), cy1 (0), cx2 (0), cy2 (0),
-  sfactor (1), pixel (PIXEL), thicken (0),
+  is_screen (screen_flag),
+  zoomf (std_shrinkf), shrinkf (1), pixel (PIXEL), thicken (0),
   master (NULL), pattern (UNINIT), pattern_alpha (255) {}
 
 renderer_rep::~renderer_rep () {}
@@ -46,6 +49,11 @@ renderer_rep::get_extents (int& w, int& h) {
 
 x_drawable_rep*
 renderer_rep::as_x_drawable () {
+  return NULL;
+}
+
+qt_renderer_rep*
+renderer_rep::as_qt_renderer () {
   return NULL;
 }
 
@@ -94,17 +102,49 @@ renderer_rep::move_origin (SI dx, SI dy) {
   oy += dy;
 }
 
+double
+normal_zoom (double zoom) {
+  return 320.0 / ceil (320.0 / zoom - 0.0001);
+}
+
+void
+renderer_rep::set_zoom_factor (double zoom) {
+  if (shrinkf != ((int) ::round (std_shrinkf / zoomf)))
+    cout << "Invalid zoom " << zoomf << ", " << shrinkf << LF;
+  ox = (SI) ::round (ox  * zoomf);
+  oy = (SI) ::round (oy  * zoomf);
+  //cx1= (SI) ::floor (cx1 * zoomf);
+  //cx2= (SI) ::floor (cx2 * zoomf);
+  //cy1= (SI) ::ceil  (cy1 * zoomf);
+  //cy2= (SI) ::ceil  (cy2 * zoomf);
+  cx1= (SI) ::round (cx1 * zoomf);
+  cx2= (SI) ::round (cx2 * zoomf);
+  cy1= (SI) ::round (cy1 * zoomf);
+  cy2= (SI) ::round (cy2 * zoomf);
+  zoomf  = zoom;
+  shrinkf= (int) ::round (std_shrinkf / zoomf);
+  pixel  = (SI)  ::round ((std_shrinkf * PIXEL) / zoomf);
+  thicken= (shrinkf >> 1) * PIXEL;
+  ox = (SI) ::round (ox  / zoomf);
+  oy = (SI) ::round (oy  / zoomf);
+  //cx1= (SI) ::floor (cx1 / zoomf);
+  //cx2= (SI) ::floor (cx2 / zoomf);
+  //cy1= (SI) ::ceil  (cy1 / zoomf);
+  //cy2= (SI) ::ceil  (cy2 / zoomf);
+  cx1= (SI) ::round (cx1 / zoomf);
+  cx2= (SI) ::round (cx2 / zoomf);
+  cy1= (SI) ::round (cy1 / zoomf);
+  cy2= (SI) ::round (cy2 / zoomf);
+}
+
+void
+renderer_rep::reset_zoom_factor () {
+  set_zoom_factor (std_shrinkf);
+}
+
 void
 renderer_rep::set_shrinking_factor (int sf) {
-  ox  /= sfactor; oy  /= sfactor;
-  cx1 /= sfactor; cy1 /= sfactor;
-  cx2 /= sfactor; cy2 /= sfactor;
-  sfactor= sf;
-  pixel  = sf*PIXEL;
-  thicken= (sf>>1)*PIXEL;
-  ox  *= sfactor; oy  *= sfactor;
-  cx1 *= sfactor; cy1 *= sfactor;
-  cx2 *= sfactor; cy2 *= sfactor;
+  set_zoom_factor (((double) std_shrinkf) / ((double) sf));
 }
 
 /******************************************************************************

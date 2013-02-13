@@ -10,6 +10,8 @@
 ******************************************************************************/
 
 #include "QTMWindow.hpp"
+#include "window.hpp"
+#include "qt_utilities.hpp"
 
 #include <QCloseEvent>
 
@@ -21,24 +23,64 @@ void QTMPlainWindow::closeEvent (QCloseEvent* event)
   emit closed();
 }
 
-/* We must basically do the same as QTMPlainWindow::closeEvent, but we
- choose the other way: send a SLOT_DESTROY, which for qt_tm_widgets just
- calls the command. This is not personal whim but a problem with the destruction
- which has to be investigated further.
- 
- Also:
- FIXME! For some reason, not emitting closed(), which actually is supposed to
- execute the very same command, crashes TeXmacs upon exit.
- */
+void QTMPlainWindow::moveEvent (QMoveEvent* event)
+{
+  string name= from_qstring (windowTitle ());
+    // FIXME: rather use a slot for this
+  int x= event->pos().x();
+  int y= event->pos().y();
+  if (DEBUG_QT)
+    cout << "Move QTMPlainWindow " << name << ": " << x << ", " << y << LF;
+  notify_window_move (name, x*PIXEL, -y*PIXEL);
+  QWidget::moveEvent (event);
+}
+
+void QTMPlainWindow::resizeEvent (QResizeEvent* event)
+{
+  string name= from_qstring (windowTitle ());
+    // FIXME: rather use a slot for this
+  int w= event->size().width();
+  int h= event->size().height();
+  if (DEBUG_QT)
+    cout << "Resize QTMPlainWindow " << name << ": " << w << ", " << h << LF;
+  notify_window_resize (name, w*PIXEL, h*PIXEL);
+  QWidget::resizeEvent (event);
+}
+
 void QTMWindow::closeEvent (QCloseEvent* event)
 {
-  if (DEBUG_QT) cout << "Close QTMWindow" << LF;
-
-  if (tmwid->ref_count != 0) {
-    concrete(tmwid)->send (SLOT_DESTROY, NULL);
-    event->ignore ();
-  }
+  widget tmwid = qt_window_widget_rep::widget_from_qwidget(this);
+  string name= ( !is_nil(tmwid) ? concrete(tmwid)->get_nickname () : "QTMWindow");
+  if (DEBUG_QT) cout << "Close QTMWindow " << name << LF;
+  event->ignore ();
+  notify_window_destroy (name);
   emit closed();
+}
+
+void QTMWindow::moveEvent (QMoveEvent * event)
+{
+  widget tmwid = qt_window_widget_rep::widget_from_qwidget(this);
+  string name= ( !is_nil(tmwid) ? concrete(tmwid)->get_nickname () : "QTMWindow");
+  QPoint p = event->pos();
+  // FIXME: rather use a slot for this
+  if (DEBUG_QT)
+    cout << "Move QTMWindow " << name << ": " << p.x() << ", " << p.y() << LF;
+  coord2 pt = from_qpoint(p);
+  notify_window_move (name, pt.x1, pt.x2);
+  QMainWindow::moveEvent (event);
+}
+
+void QTMWindow::resizeEvent (QResizeEvent * event)
+{
+  widget tmwid = qt_window_widget_rep::widget_from_qwidget(this);
+  string name= ( !is_nil(tmwid) ? concrete(tmwid)->get_nickname () : "QTMWindow");
+  // FIXME: rather use a slot for this
+  QSize s = event->size();
+  if (DEBUG_QT)
+      cout << "Resize QTMWindow " << name << ": " << s.width() << ", " << s.height() << LF;
+  coord2 sz = from_qsize(s);
+  notify_window_resize (name, sz.x1, sz.x2);
+  QMainWindow::resizeEvent (event);
 }
 
   ////////////////////

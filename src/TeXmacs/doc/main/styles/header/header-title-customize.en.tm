@@ -37,12 +37,12 @@
     This macro is used for rendering the <src-arg|subtitle> of the document.
   </explain>
 
-  <\explain|<explain-macro|doc-author|content>>
+  <\explain|<explain-macro|render-doc-author|content>>
     In the case when the document has a single author, then this macro is
     used for rendering the <src-arg|content> information about him or her.
   </explain>
 
-  <\explain|<explain-macro|doc-authors|content>>
+  <\explain|<explain-macro|render-doc-authors|content>>
     In the case when the document has several authors, then this macros is
     used for rendering all author-related <src-arg|content> which is part of
     the main title.
@@ -67,8 +67,8 @@
     an author.
   </explain>
 
-  <\explain|<explain-macro|author-address|address>>
-    Renders the <src-arg|address> of the author.
+  <\explain|<explain-macro|author-affiliation|affiliation>>
+    Renders the <src-arg|affiliation> of the author.
   </explain>
 
   <\explain|<explain-macro|author-email|email>>
@@ -98,7 +98,7 @@
     A macro for displaying a list of keywords.
   </explain>
 
-  <\explain|<explain-macro|doc-AMS-class|nr-1|<with|mode|math|\<cdots\>>|nr-n>>
+  <\explain|<explain-macro|doc-msc|nr-1|<with|mode|math|\<cdots\>>|nr-n>>
     A macro for displaying a list of <abbr|A.M.S.> subject classification
     numbers.
   </explain>

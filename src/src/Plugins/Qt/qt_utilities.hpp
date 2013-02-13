@@ -58,9 +58,10 @@ array<string> from_qstringlist (const QStringList& l);
 
 ///// String conversion: Assumes UTF8 encodings both in QT and TeXmacs.
 
-QString        to_qstring (string s);
+QString        to_qstring (const string& s);
 string       from_qstring (const QString & s);
-QString   utf8_to_qstring (string s);
+QString   utf8_to_qstring (const string& s);
+QString latin1_to_qstring (const string& s);
 string  from_qstring_utf8 (const QString & s);
 
 /*! Returns a QString with the translation of the argument to the current
@@ -73,7 +74,7 @@ string  from_qstring_utf8 (const QString & s);
  our code (which is wrong of course). While parsing widgets, etc. nothing is to
  be done wrt. translations.
  */
-QString qt_translate (string s);
+QString qt_translate (const string& s);
 
 
 /******************************************************************************
@@ -84,6 +85,7 @@ bool qt_supports (url u);
 void qt_image_size (url image, int& w, int& h);
 void qt_convert_image (url image, url dest, int w =0, int h =0);
 void qt_image_to_eps (url image, url eps, int w_pt =0, int h_pt =0, int dpi= 0);
+string qt_image_to_eps (url image, int w_pt =0, int h_pt =0, int dpi= 0);
 
 string qt_application_directory ();
 string qt_get_date (string lan, string fm);

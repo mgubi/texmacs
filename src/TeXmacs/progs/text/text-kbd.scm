@@ -28,6 +28,9 @@
   (", ," "")
   ("sz" "ÿ")
   ("- - -" (make 'emdash))
+  ("- var" (make 'nbhyph))
+  ("space var" (make 'nbsp))
+  ("space var var" (make-space "1em"))
   ;;("- -" "")
   ;;("' '" "")
   ;;("` `" "")
@@ -291,3 +294,24 @@
 (kbd-map
   (:mode in-cyrillic?)
   ("modeswitch" (make-with "language" "english") (make-with "font" "roman")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Overwrite shortcuts inadequate in certain contexts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(kbd-map
+  (:mode in-variants-disabled?)
+  ("- var" (begin (insert "-") (kbd-tab)))
+  ("space var" (begin (insert " ") (kbd-tab)))
+  ("space var var" (begin (insert " ") (kbd-tab) (kbd-tab))))
+
+(kbd-map
+  (:mode in-verbatim?)
+  ("\"" "\"")
+  ("< <" "<less><less>")
+  ("> >" "<gtr><gtr>")
+  (", ," ",,")
+  ("- - -" "---")
+  ("- var" (begin (insert "-") (kbd-tab)))
+  ("space var" (insert-tabstop))
+  ("space var var" (begin (insert-tabstop) (insert-tabstop))))

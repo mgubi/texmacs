@@ -18,14 +18,13 @@
 ;; Defining preference call back routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public preferences-table (make-ahash-table))
 (define-public preferences-default (make-ahash-table))
 (define-public preferences-call-back (make-ahash-table))
 
 (define (define-preference x)
   (with (which value call-back) x
     `(if (not (ahash-ref preferences-default ,which))
-	 (ahash-set! preferences-default ,which ,value))))
+         (ahash-set! preferences-default ,which ,value))))
 
 (define (define-preference-call-back x)
   (with (which value call-back) x
@@ -35,8 +34,8 @@
 
 (define-public-macro (define-preferences . l)
   (append '(begin)
-	  (map-in-order define-preference l)
-	  (map-in-order define-preference-call-back l)))
+          (map-in-order define-preference l)
+          (map-in-order define-preference-call-back l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setting and getting preferences
@@ -50,25 +49,33 @@
 (tm-define (set-preference which what)
   (:synopsis "Set preference @which to @what")
   (:check-mark "*" test-preference?)
-  (if (== what "default")
-      (reset-preference which)
-      (begin
-        (ahash-set! preferences-table which what)
-        ;;(display* "set-preference " which " := " what "\n")
-        ((get-call-back which) which (get-preference which))
-        (save-preferences))))
+  ;;(display* "set-preference " which " := " what "\n")
+  (cpp-set-preference which (if (string? what) what (object->string what)))
+  (notify-preference which)
+  (save-preferences))
 
 (tm-define (reset-preference which)
   (:synopsis "Revert preference @which to default setting")
-  (ahash-remove! preferences-table which)
-  ((get-call-back which) which (get-preference which))
+  ;;(display* "reset-preference " which "\n")
+  (cpp-reset-preference which)
+  (notify-preference which)
   (save-preferences))
+
+(define (get-call-back what)
+  (let ((r (ahash-ref preferences-call-back what)))
+    (if r r (lambda args (noop)))))
+
+(tm-define (notify-preference which)
+  (:synopsis "Notify that the preference @which was changed")
+  ;;(display* "notify-preference " which ", " (get-preference which) "\n")
+  ((get-call-back which) which (get-preference which)))
 
 (tm-define (get-preference which)
   (:synopsis "Get preference @which")
-  (if (ahash-ref preferences-table which)
-      (ahash-ref preferences-table which)
-      (ahash-ref preferences-default which)))
+  (let* ((def (or (ahash-ref preferences-default which) "default"))
+         (s? (string? def))
+         (r (cpp-get-preference which (if s? def (object->string def)))))
+    (if s? r (string->object r))))
 
 (define (preference-on? which)
   (test-preference? which "on"))
@@ -78,13 +85,13 @@
   (:check-mark "v" preference-on?)
   (with what (get-preference which)
     (set-preference which (cond ((== what "on") "off")
-				((== what "off") "on")
-				(else what)))))
+                                ((== what "off") "on")
+                                (else what)))))
 
 (tm-define (append-preference which val)
   (:synopsis "Appends @val to the list of values of preference @which")
   (with cur (get-preference which)
-    (if (not cur) (set! cur '()))
+    (if (== cur "default") (set! cur '()))
     (set-preference which (rcons cur val))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -110,6 +117,10 @@
 (tm-define (get-boolean-preference which)
   (== (get-preference which) "on"))
 
+(define-public (set-preference-name which var val)
+  (ahash-set! preference-encode-table (cons which var) val)
+  (ahash-set! preference-decode-table (cons which val) var))
+
 (define-public (set-preference-encode which x)
    `(ahash-set! preference-encode-table
                 (cons ,which ,(car x)) ,(cadr x)))
@@ -134,53 +145,15 @@
 (define (test-look-and-feel t)
   ;;(display* "Check look and feel " t "\n")
   (cond ((list? t) (list-or (map test-look-and-feel t)))
-	((symbol? t) (test-look-and-feel (symbol->string t)))
-	(else
-	  (with s (look-and-feel)
-	    (or (== t s) (and (== t "std") (!= s "emacs")))))))
+        ((symbol? t) (test-look-and-feel (symbol->string t)))
+        (else
+          (with s (look-and-feel)
+            (or (== t s) (and (== t "std") (!= s "emacs")))))))
 
 (set! has-look-and-feel? test-look-and-feel)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Applying preferences
+;; Notify that the Scheme preferences system has been started
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (get-call-back what)
-  (let ((r (ahash-ref preferences-call-back what)))
-    (if r r (lambda args (noop)))))
-
-(define-public (notify-preference var)
-  "Notify a change in preference @var"
-  ;;(display* "notify-preference " var ", " (get-preference var) "\n")
-  ((get-call-back var) var (get-preference var)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Initialize preferences and consulting preferences
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define user-preferences '())
-(define saved-preferences '())
-
-(define (preferences->list table)
-  (let* ((folder (lambda (key im tail) (cons (list key im) tail)))
-	 (unsorted (ahash-fold folder '() table))
-	 (comp? (lambda (l1 l2) (string<=? (car l1) (car l2)))))
-    (list-sort unsorted comp?)))
-
-(define (save-preferences)
-  (set! user-preferences (preferences->list preferences-table))
-  (if (!= user-preferences saved-preferences)
-      (begin
-	(save-object "$TEXMACS_HOME_PATH/system/preferences.scm"
-		     user-preferences)
-	(set! saved-preferences user-preferences))))
-
-(define (retrieve-preferences)
-  "Retrieve preferences from disk"
-  (if (url-exists? "$TEXMACS_HOME_PATH/system/preferences.scm")
-      (set! saved-preferences
-	    (load-object "$TEXMACS_HOME_PATH/system/preferences.scm")))
-  (fill-dictionary preferences-table saved-preferences))
-
-(retrieve-preferences)
-(notify-preferences-loaded)
+(notify-preferences-booted)

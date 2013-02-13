@@ -350,6 +350,20 @@ edit_typeset_rep::get_env_language () {
   else return prog_language (get_env_string (PROG_LANGUAGE));
 }
 
+SI
+edit_typeset_rep::get_page_width () {
+  (void) get_env_string (PAGE_WIDTH);
+  return (env->page_user_width + env->page_odd_margin +
+          env->page_right_margin + std_shrinkf - 1) / std_shrinkf;
+}
+
+SI
+edit_typeset_rep::get_page_height () {
+  (void) get_env_string (PAGE_HEIGHT);
+  return (env->page_user_height + env->page_top_margin +
+          env->page_bottom_margin + std_shrinkf - 1) / std_shrinkf;
+}
+
 /******************************************************************************
 * Execution without typesetting
 ******************************************************************************/
@@ -550,7 +564,9 @@ void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
   init (var)= by;
-  if (var != PAGE_SCREEN_WIDTH && var != PAGE_SCREEN_HEIGHT)
+  if (var != PAGE_SCREEN_WIDTH &&
+      var != PAGE_SCREEN_HEIGHT &&
+      var != ZOOM_FACTOR)
     require_save ();
   notify_change (THE_ENVIRONMENT);
 }

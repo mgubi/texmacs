@@ -82,9 +82,14 @@ static hashmap<string,qt_pixmap> images;
 ******************************************************************************/
 
 qt_renderer_rep::qt_renderer_rep (QPainter *_painter, int w2, int h2):
-  basic_renderer_rep(w2, h2), painter(_painter) {}
+  basic_renderer_rep (true, w2, h2), painter(_painter) {}
 
 qt_renderer_rep::~qt_renderer_rep () {}
+
+qt_renderer_rep*
+qt_renderer_rep::as_qt_renderer () {
+  return this;
+}
 
 void
 qt_renderer_rep::begin (void* handle) {
@@ -434,24 +439,22 @@ qt_renderer_rep::draw_clipped (QPixmap *im, int w, int h, SI x, SI y) {
   painter->drawPixmap (x, y, w, h, *im);
 }
 
-
-
 void
 qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // get the pixmap
-  basic_character xc (c, fng, sfactor, cur_fg, 0);
+  basic_character xc (c, fng, std_shrinkf, cur_fg, 0);
   qt_image mi = character_image [xc];
   if (is_nil(mi)) {
     int r, g, b, a;
     get_rgb (cur_fg, r, g, b, a);
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, sfactor, sfactor, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
     int i, j, w= gl->width, h= gl->height;
 #ifdef QTMPIXMAPS
     QTMImage *im = new QPixmap(w,h);
     {
-      int nr_cols= sfactor*sfactor;
+      int nr_cols= std_shrinkf*std_shrinkf;
       if (nr_cols >= 64) nr_cols= 64;
 
       im->fill (Qt::transparent);
@@ -471,7 +474,7 @@ qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     QTMImage *im= new QImage (w, h, QImage::Format_ARGB32);
     //QTMImage *im= new QImage (w, h, QImage::Format_ARGB32_Premultiplied);
     {
-      int nr_cols= sfactor*sfactor;
+      int nr_cols= std_shrinkf*std_shrinkf;
       if (nr_cols >= 64) nr_cols= 64;
 
       // the following line is disabled because
@@ -496,7 +499,18 @@ qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // draw the character
   //cout << (char)c << ": " << cx1/256 << ","  << cy1/256 << ","  
   //<< cx2/256 << ","  << cy2/256 << LF; 
-  draw_clipped (mi->img, mi->w, mi->h, x- mi->xo*sfactor, y+ mi->yo*sfactor);
+  draw_clipped (mi->img, mi->w, mi->h, x- mi->xo*std_shrinkf, y+ mi->yo*std_shrinkf);
+}
+
+void
+qt_renderer_rep::draw (const QFont& qfn, const QString& qs,
+                       SI x, SI y, double zoom) {
+  decode (x, y);
+  painter->setFont (qfn);
+  painter->translate (x, y);
+  painter->scale (zoom, zoom);
+  painter->drawText (0, 0, qs);
+  painter->resetTransform ();
 }
 
 /******************************************************************************
@@ -504,7 +518,10 @@ qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 ******************************************************************************/
 
 extern int char_clip;
-
+/*! Loads and caches pixmaps.
+ 
+ Returns a newly allocated QPixmap object or one from the cache.
+ */
 QPixmap*
 qt_renderer_rep::xpm_image (url file_name) {
   QPixmap *pxm= NULL;
@@ -538,7 +555,7 @@ void
 qt_renderer_rep::xpm (url file_name, SI x, SI y) {
   y -= pixel; // counter balance shift in draw_clipped
   QPixmap* image = xpm_image (file_name);
-  ASSERT (sfactor == 1, "shrinking factor should be 1");
+  ASSERT (pixel == PIXEL, "pixel and PIXEL should coincide");
   int w, h;
   w = image->width ();
   h = image->height ();

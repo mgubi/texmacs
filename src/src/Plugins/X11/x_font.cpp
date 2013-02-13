@@ -25,6 +25,7 @@ bool char_clip= true;
 void
 x_drawable_rep::draw_clipped (Pixmap pm, Pixmap bm, int w, int h, SI x, SI y) {
   int x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
+  // outer_round (x1, y1, x2, y2); // might be needed somewhere
   decode (x , y );
   decode (x1, y1);
   decode (x2, y2);
@@ -68,15 +69,15 @@ x_drawable_rep::draw_clipped (Pixmap pm, Pixmap bm, int w, int h, SI x, SI y) {
 void
 x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // get the pixmap
-  x_character xc (c, fng, sfactor, cur_fg, cur_bg);
+  x_character xc (c, fng, std_shrinkf, cur_fg, cur_bg);
   Pixmap pm= (Pixmap) gui->character_pixmap [xc];
   if (pm == 0) {
-    gui->prepare_color (sfactor, cur_fg, cur_bg);
-    x_character col_entry (0, font_glyphs (), sfactor, cur_fg, cur_bg);
+    gui->prepare_color (std_shrinkf, cur_fg, cur_bg);
+    x_character col_entry (0, font_glyphs (), std_shrinkf, cur_fg, cur_bg);
     color* cols= (color*) gui->color_scale [col_entry];
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, sfactor, sfactor, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
     int i, j, w= gl->width, h= gl->height;
     pm= XCreatePixmap (gui->dpy, gui->root, w, h, gui->depth);
     for (j=0; j<h; j++)
@@ -89,12 +90,12 @@ x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   }
 
   // get the bitmap
-  xc= x_character (c, fng, sfactor, 0, 0);
+  xc= x_character (c, fng, std_shrinkf, 0, 0);
   Bitmap bm= (Bitmap) gui->character_bitmap [xc];
   if (bm == NULL) {
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, sfactor, sfactor, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
     int i, j, b, on, w= gl->width, h= gl->height;
     int byte_width= ((w-1)>>3)+1;
     char* data= tm_new_array<char> (byte_width * h);
@@ -118,7 +119,7 @@ x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 
   // draw the character
   draw_clipped (pm, bm->bm, bm->width, bm->height,
-		x- bm->xoff*sfactor, y+ bm->yoff*sfactor);
+		x- bm->xoff*std_shrinkf, y+ bm->yoff*std_shrinkf);
 }
 
 #undef conv
@@ -399,7 +400,7 @@ x_font_rep::get_xpositions (string s, SI* xpos) {
 }
 
 void
-x_font_rep::draw (renderer ren, string s, SI x, SI y) {
+x_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   if (N(s)!=0) {
     int i;
     for (i=0; i<N(s); i++) {
@@ -409,6 +410,11 @@ x_font_rep::draw (renderer ren, string s, SI x, SI y) {
       x += ex->x2;
     }
   }
+}
+
+font
+x_font_rep::magnify (double zoom) {
+  return x_font (family, size, (int) round (dpi * zoom));
 }
 
 glyph

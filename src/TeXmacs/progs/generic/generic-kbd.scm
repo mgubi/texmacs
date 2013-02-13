@@ -13,16 +13,16 @@
 
 (texmacs-module (generic generic-kbd)
   (:use (texmacs keyboard prefix-kbd)
-	(utils edit variants)
-	(utils edit auto-close)
-	(utils library cursor)
-	(generic generic-edit)
-	(generic format-edit)
-	(generic format-geometry-edit)
-	(source source-edit)
-	(texmacs texmacs tm-files)
-	(texmacs texmacs tm-print)
-	(doc help-funcs)))
+        (utils edit variants)
+        (utils edit auto-close)
+        (utils library cursor)
+        (generic generic-edit)
+        (generic format-edit)
+        (generic format-geometry-edit)
+        (source source-edit)
+        (texmacs texmacs tm-files)
+        (texmacs texmacs tm-print)
+        (doc help-funcs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General shortcuts for all modes
@@ -30,8 +30,8 @@
 
 (kbd-map
   ("F1" (interactive docgrep-in-doc))
-  ("S-F1" (noop)) ;; FIXME: S-F1 should be 'What is This?'
-  ("M-F1" (load-help-buffer "about/welcome/welcome"))
+  ("S-F1" (interactive docgrep-in-src)) ;; FIXME: S-F1 should be 'What is This?'
+  ;("M-F1" (load-help-buffer "about/welcome/welcome")) ; Conflict with devtools
 
   ("<" "<less>")
   (">" "<gtr>")
@@ -48,10 +48,7 @@
   ("$ var" "$")
 
   ("-" "-")
-  ("- var" (make 'nbhyph))
   ("space" " ")
-  ("space var" (make 'nbsp))
-  ("space var var" (make-space "1em"))
   ("tab" (kbd-tab))
   ("return" (kbd-return))
   ("S-space" " ")
@@ -366,12 +363,8 @@
   ("C->" (cursor-history-forward))
   ("A-#" (numbered-toggle (focus-tree)))
   ("A-*" (alternate-toggle (focus-tree)))
-  ("A-tab" (make-htab "5mm"))
-  ("A-space" (make-space "0.2spc"))
-  ("A-S-space" (make-space "-0.2spc"))
-  ("M-space" (make-space "0.2spc"))
-  ("M-S-space" (make-space "-0.2spc"))
-  ("M-tab" (make-htab "5mm")))
+  ("A-+" (zoom-in (sqrt (sqrt 2.0))))
+  ("A--" (zoom-out (sqrt (sqrt 2.0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Standard cross-platform keybindings
@@ -398,17 +391,27 @@
   ("std x" (clipboard-cut "primary"))
   ("std z" (undo 0))
   ("std Z" (redo 0))
+  ("std +" (zoom-in (sqrt (sqrt 2.0))))
+  ("std -" (zoom-out (sqrt (sqrt 2.0))))
+  ("std 0" (fit-to-screen-width))
 
   ;; not yet implemented
   ;;("std t" (add-tab))
   ;;("std tab" (next-tab))
   ;;("std S-tab" (previous-tab))
-  ;;("std +" (zoom-in))
-  ;;("std -" (zoom-out))
 
   ("search std f" (search-next))      ;; added for convenience
-  ("search std F" (search-previous))  ;; added for convenience
-  )
+  ("search std F" (search-previous)))  ;; added for convenience
+
+(kbd-map
+  (:profile emacs)
+  (:require (and (not (in-prog?)) (not (in-verbatim?))))
+  ("A-tab" (make-htab "5mm"))
+  ("A-space" (make-space "0.2spc"))
+  ("A-S-space" (make-space "-0.2spc"))
+  ("M-space" (make-space "0.2spc"))
+  ("M-S-space" (make-space "-0.2spc"))
+  ("M-tab" (make-htab "5mm")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Gnome keymap
@@ -458,12 +461,17 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))
   ("M-A-C-end" (traverse-last))
   ("M-A-C-S-home" (kbd-select traverse-first))
-  ("M-A-C-S-end" (kbd-select traverse-last))
+  ("M-A-C-S-end" (kbd-select traverse-last)))
+
+(kbd-map
+  (:profile gnome)
+  (:require (and (not (in-prog?)) (not (in-verbatim?))))
   ("M-tab" (make-htab "5mm"))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))
@@ -515,12 +523,17 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))
   ("M-A-C-end" (traverse-last))
   ("M-A-C-S-home" (kbd-select traverse-first))
-  ("M-A-C-S-end" (kbd-select traverse-last))
+  ("M-A-C-S-end" (kbd-select traverse-last)))
+  
+(kbd-map
+  (:profile kde)
+  (:require (and (not (in-prog?)) (not (in-verbatim?))))
   ("M-tab" (make-htab "5mm"))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))
@@ -536,6 +549,7 @@
   ("macos F4" (safely-kill-buffer))
   ("macos ;" (spell-start))
   ("macos ?" (interactive docgrep-in-doc))
+  ("macos ," (interactive open-preferences))
   ("macos [" (cursor-history-backward))
   ("macos ]" (cursor-history-forward))
   ("macos left" (kbd-start-line))
@@ -547,6 +561,7 @@
   ("macos S-up" (kbd-select go-start))
   ("macos S-down" (kbd-select go-end))
 
+  ("macos N" (open-window))
   ("search macos g" (search-next))
   ("search macos G" (search-previous))
 
@@ -585,16 +600,23 @@
   ("macos r" (interactive replace-start-forward))
 
   ("altcmd x" (interactive footer-eval))
-  ("altcmd X" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
 
+  ;("C-a" (kbd-start-line)) ; conflict with ("text a" (make 'abbr))
+  ;("C-e" (kbd-end-line))   ; conflict with ("text e" (make-tmlist 'enumerate))
   ("C-g" (selection-cancel))
   ("C-k" (kill-paragraph))
+  ("C-y" (yank-paragraph))
   ("C-q" (make 'symbol))
-  ("C-tab" (make-htab "5mm"))
-  ("C-space" (make-space "0.2spc"))
-  ("C-S-space" (make-space "-0.2spc"))
   ("C-!" (make-label))
   ("C-?" (make 'reference)))
+
+(kbd-map
+  (:profile macos)
+  (:require (and (not (in-prog?)) (not (in-verbatim?))))
+  ("C-tab" (make-htab "5mm"))
+  ("C-space" (make-space "0.2spc"))
+  ("C-S-space" (make-space "-0.2spc")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Windows keymap
@@ -628,7 +650,6 @@
   ("windows A-t" (make 'trademark))
   ("windows y" (redo 0))
 
-  ("M-F1" (load-help-buffer "about/welcome/welcome"))
   ("F2" (interactive replace-start-forward))
   ("S-delete" (clipboard-cut "primary"))
   ("S-insert" (clipboard-paste "primary"))
@@ -712,12 +733,17 @@
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
+  ("altcmd X" (interactive exec-interactive-command))
   ("altcmd $" (spell-start))
 
   ("M-A-C-home" (traverse-first))
   ("M-A-C-end" (traverse-last))
   ("M-A-C-S-home" (kbd-select traverse-first))
-  ("M-A-C-S-end" (kbd-select traverse-last))
+  ("M-A-C-S-end" (kbd-select traverse-last)))
+
+(kbd-map
+  (:profile windows)
+  (:require (and (not (in-prog?)) (not (in-verbatim?))))
   ("M-tab" (make-htab "5mm"))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))

@@ -20,7 +20,8 @@ struct glyph;
 
 #define FONT_TYPE_TEX      0
 #define FONT_TYPE_UNICODE  1
-#define FONT_TYPE_OTHER    2
+#define FONT_TYPE_QT       2
+#define FONT_TYPE_OTHER    3
 
 /******************************************************************************
 * The font structure
@@ -52,13 +53,18 @@ struct font_rep: rep<font> {
   SI       wline;            // width of fraction bars and so
   SI       wquad;            // quad space (often width of widest character M)
 
+  double   last_zoom;        // last rendered zoom
+  font     zoomed_fn;        // zoomed font for last_zoom (or nil)
+
   font_rep (string name);
   font_rep (string name, font fn);
   void copy_math_pars (font fn);
 
   virtual void   get_extents (string s, metric& ex) = 0;
   virtual void   get_xpositions (string s, SI* xpos);
-  virtual void   draw (renderer ren, string s, SI x, SI y) = 0;
+  virtual void   draw_fixed (renderer ren, string s, SI x, SI y) = 0;
+  virtual font   magnify (double zoom) = 0;
+  virtual void   draw (renderer ren, string s, SI x, SI y);
 
   virtual double get_left_slope  (string s);
   virtual double get_right_slope (string s);
@@ -81,6 +87,7 @@ font tt_font (string family, int size, int dpi);
 font unicode_font (string family, int size, int dpi);
 font unicode_math_font (font up, font it, font bup, font bit, font fb);
 font x_font (string family, int size, int dpi);
+font qt_font (string family, int size, int dpi);
 font tex_font (string fam, int size, int dpi, int dsize=10);
 font tex_cm_font (string fam, int size, int dpi, int dsize=10);
 font tex_ec_font (string fam, int size, int dpi, int dsize=10);
@@ -92,12 +99,43 @@ font tex_dummy_rubber_font (font base_fn);
 
 void font_rule (tree which, tree by);
 font find_font (scheme_tree t);
+font find_magnified_font (scheme_tree t, double zf);
 font find_font (string family, string fn_class,
 		string series, string shape, int sz, int dpi);
 
-font math_font (scheme_tree t, font base_fn, font error_fn);
-font compound_font (scheme_tree def);
+font math_font (scheme_tree t, font base_fn, font error_fn, double zoom= 1.0);
+font compound_font (scheme_tree def, double zoom= 1.0);
 
 int  script (int sz, int level);
+
+// Font database
+extern hashmap<tree,tree> font_table;
+void font_database_build (url u);
+void font_database_build_local ();
+void font_database_build_global ();
+void font_database_build_global (url u);
+void font_database_load ();
+void font_database_save ();
+void font_database_filter ();
+array<string> font_database_families ();
+array<string> font_database_styles (string family);
+array<string> font_database_search (string family, string style);
+array<string> font_database_search (string fam, string var,
+                                    string series, string shape);
+
+// Font selection
+string family_to_master (string f);
+array<string> master_to_families (string f);
+array<string> master_features (string m);
+array<string> family_features (string f);
+array<string> family_strict_features (string f);
+array<string> subfamily_features (string s);
+array<string> logical_font (string family, string shape);
+array<string> logical_font (string f, string v, string ser, string sh);
+string get_family (array<string> v);
+string get_variant (array<string> v);
+string get_series (array<string> v);
+string get_shape (array<string> v);
+array<string> search_font (array<string> v, bool require_exact);
 
 #endif // defined FONT_H
