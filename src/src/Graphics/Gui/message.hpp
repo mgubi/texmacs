@@ -396,10 +396,10 @@ send_invalidate (widget w, SI x1, SI y1, SI x2, SI y2) {
 }
 
 inline void
-send_repaint (widget w, SI x1, SI y1, SI x2, SI y2) {
+send_repaint (widget w, renderer ren, SI x1, SI y1, SI x2, SI y2) {
   // request widget to repaint a region;
   // the region is specified w.r.t. the top left corner of w
-  send<SI,SI,SI,SI> (w, SLOT_REPAINT, x1, y1, x2, y2);
+  send<renderer,SI,SI,SI,SI> (w, SLOT_REPAINT, ren, x1, y1, x2, y2);
 }
 
 inline void

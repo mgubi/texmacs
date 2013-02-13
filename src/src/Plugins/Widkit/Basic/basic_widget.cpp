@@ -61,13 +61,13 @@ basic_widget_rep::emit_mouse (mouse_event ev, string type, SI x, SI y) {
 }
 
 event
-basic_widget_rep::emit_clear (SI x1, SI y1, SI x2, SI y2) {
-  return ::emit_clear (ox+ x1, oy+ y1, ox+ x2, oy+ y2);
+basic_widget_rep::emit_clear (renderer win, SI x1, SI y1, SI x2, SI y2) {
+  return ::emit_clear (win, ox+ x1, oy+ y1, ox+ x2, oy+ y2);
 }
 
 event
-basic_widget_rep::emit_repaint (SI x1, SI y1, SI x2, SI y2, bool& stop) {
-  return ::emit_repaint (ox+ x1, oy+ y1, ox+ x2, oy+ y2, stop);
+basic_widget_rep::emit_repaint (renderer win, SI x1, SI y1, SI x2, SI y2, bool& stop) {
+  return ::emit_repaint (win, ox+ x1, oy+ y1, ox+ x2, oy+ y2, stop);
 }
 
 event
@@ -327,7 +327,7 @@ basic_widget_rep::handle (event ev) {
     SI rx2= min (e->x2, x2())- ox;
     SI ry2= min (e->y2, y2())- oy;
     if ((rx2 > rx1) && (ry2 > ry1)) {
-      event ev= ::emit_clear (rx1, ry1, rx2, ry2);
+      event ev= ::emit_clear (e->win, rx1, ry1, rx2, ry2);
       win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
       handle_clear (ev);
       win->get_renderer ()->unclip ();
@@ -343,14 +343,14 @@ basic_widget_rep::handle (event ev) {
     SI ry2= min (e->y2, y2())- oy;
 
     if ((rx2 > rx1) && (ry2 > ry1)) {
-      event ev= ::emit_repaint (rx1, ry1, rx2, ry2, e->stop);
+      event ev= ::emit_repaint (e->win, rx1, ry1, rx2, ry2, e->stop);
       win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
       handle_repaint (ev);
       win->get_renderer ()->unclip ();
     }
 
     int i;
-    ev= emit_repaint (rx1, ry1, rx2, ry2, e->stop);
+    ev= emit_repaint (e->win, rx1, ry1, rx2, ry2, e->stop);
     for (i=0; i<N(a); i++) a[i] << ev;
     return true;
   }

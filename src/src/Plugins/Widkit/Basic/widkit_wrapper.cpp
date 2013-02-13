@@ -559,12 +559,12 @@ send_invalidate_all (wk_widget w, blackbox val) {
 
 void
 send_repaint (wk_widget w, blackbox val) {
-  typedef quartet<SI,SI,SI,SI> repaint;
+  typedef quintuple<renderer,SI,SI,SI,SI> repaint;
   ASSERT (type_box (val) == type_helper<repaint>::id, "type mismatch");
   repaint r= open_box<repaint> (val);
   bool stop_flag= false;
   // FIXME: we should assume local coordinates for repainting
-  w << emit_repaint (r.x1, r.x2, r.x3, r.x4, stop_flag);
+  w << emit_repaint (r.x1, r.x2, r.x3, r.x4, r.x5, stop_flag);
 }
 
 void

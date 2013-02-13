@@ -77,8 +77,8 @@ scrollable_widget_rep::scroll_event_ver (SI& y, SI& bef, SI& af) {
       win->begin_draw ();
       ren->clip (0, -h, w, 0);
       win->translate (0, -h, w, 0, 0, -dy);
-      if (dy>0) a[0] << emit_clear (0, -dy, w, 0);
-      else a[0] << emit_clear (0, -h, w, -h-dy);
+      if (dy>0) a[0] << emit_clear (ren, 0, -dy, w, 0);
+      else a[0] << emit_clear (ren, 0, -h, w, -h-dy);
       ren->unclip ();
       win->end_draw ();
     }
