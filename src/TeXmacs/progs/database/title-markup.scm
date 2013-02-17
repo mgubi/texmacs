@@ -150,14 +150,16 @@
 
 (tm-define (doc-data t)
   (:secure #t)
-  ;;(display* "t1= " t "\n")
-  ;(set! t (single-author-list t))
-  ;;(display* "t2= " t "\n")
-  (set! t (add-notes t))
-  ;;(display* "t3= " t "\n")
-  (set! t (doc-data-sub t))
-  ;;(display* "t4= " t "\n")
-  t)
+  (with opts (map tree->stree (select t '(doc-title-options :%1)))
+    ;;(display* "t1= " t "\n")
+    (when (in? "cluster-all" opts)
+      (set! t (single-author-list t)))
+    ;;(display* "t2= " t "\n")
+    (set! t (add-notes t))
+    ;;(display* "t3= " t "\n")
+    (set! t (doc-data-sub t))
+    ;;(display* "t4= " t "\n")
+    t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Author data
@@ -168,12 +170,12 @@
   `(document
      ,@(select t '(author-name))
      ,@(select t '(author-affiliation))
-     ;,@(select t '(author-affiliation-note))
+     ,@(select t '(author-affiliation-note))
      ,@(select t '(author-email))
-     ;,@(select t '(author-email-note))
+     ,@(select t '(author-email-note))
      ,@(select t '(author-homepage))
      ,@(select t '(author-misc))
-     ;,@(select t '(author-homepage-note))
+     ,@(select t '(author-homepage-note))
      ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

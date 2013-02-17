@@ -63,6 +63,8 @@
 	    ((== l 'doc-note)
 	     (tree-insert! t pos `((,l (document ""))))
 	     (tree-go-to t pos 0 0 0))
+	    ((== l 'doc-title-options)
+	     (tree-insert! t pos `((,l))))
 	    ((in? l doc-data-inactive-tags)
 	     (tree-insert! t pos `((doc-inactive (,l ""))))
 	     (tree-go-to t pos 0 0 0))
@@ -122,6 +124,35 @@
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'doc-inactive))
   (doc-data-activate-here))
+
+(tm-define (set-doc-title-options opts)
+  (with-innermost t 'doc-data
+    (with opts-trees (select t '(doc-title-options))
+      (if (null? opts)
+          (when (nnull? opts-trees)
+            (with old (car opts-trees)
+              (tree-remove (tree-up old) (tree-index old) 1)))
+          (begin
+            (when (null? opts-trees)
+              (make-doc-data-element 'doc-title-options)
+              (set! opts-trees (select t '(doc-title-options))))
+            (tree-set (car opts-trees) `(doc-title-options ,@opts)))))))
+
+(tm-define (get-doc-title-options)
+  (with-innermost t 'doc-data
+    (with opts-trees (select t '(doc-title-options :%1))
+      (map tree->stree opts-trees))))
+
+(tm-define (test-doc-title-clustering? mode)
+  (with cl (list "cluster-all" "cluster-by-affiliation")
+    (with old (get-doc-title-options)
+      (if mode (in? mode old) (null? (list-intersection cl old))))))
+
+(tm-define (set-doc-title-clustering mode)
+  (:check-mark "*" test-doc-title-clustering?)
+  (with cl (list "cluster-all" "cluster-by-affiliation")
+    (with old (list-difference (get-doc-title-options) cl)
+      (set-doc-title-options (if mode (cons mode old) old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Activation and disactivation
