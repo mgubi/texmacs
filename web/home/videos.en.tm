@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.0.7.18>
 
-<style|magix-web>
+<style|tmweb>
 
 <\body>
   <tmweb-current|Home|Videos><tmweb-title|<TeXmacs>
@@ -13,13 +13,13 @@
   <section|Introduction to <TeXmacs>>
 
   <\with|par-mode|center>
-    <html-video|http://magix.lix.polytechnique.fr/local/videos/tm-intro|1024|768>
+    <html-video|/Video/tm-intro|1024|768>
   </with>
 
   <section|Writing mathematics>
 
   <\with|par-mode|center>
-    <html-video|http://magix.lix.polytechnique.fr/local/videos/tm-maths|1024|768>
+    <html-video|/Video/tm-maths|1024|768>
   </with>
 
   <tmdoc-copyright|2012|Joris van der Hoeven>
