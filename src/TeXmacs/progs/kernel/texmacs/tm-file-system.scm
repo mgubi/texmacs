@@ -33,9 +33,10 @@
 ;; Handler system
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define tmfs-handler-table (make-ahash-table))
+(define-public tmfs-handler-table (make-ahash-table))
 
 (define (object->tmstring s) (unescape-guile (object->string s)))
+(define (tmstring->object s) (string->object s))
 
 (define-public (tmfs-handler class action handle)
   (ahash-set! tmfs-handler-table (cons class action) handle))
@@ -62,7 +63,7 @@
   (with (class name) (tmfs-decompose-name u)
     (lazy-tmfs-force class)
     (cond ((ahash-ref tmfs-handler-table (cons class 'save)) =>
-           (lambda (handler) (handler name (string->object what))))
+           (lambda (handler) (handler name (tmstring->object what))))
           (else ((ahash-ref tmfs-handler-table (cons #t 'save)) u what)))))
 
 (define-public (tmfs-title u doc)
@@ -86,7 +87,7 @@
           ((ahash-ref tmfs-handler-table (cons class 'load))
            (== type "read"))
           (else
-           ((ahash-ref tmfs-handler-table (cons #t 'permission?)) u type)))))
+            ((ahash-ref tmfs-handler-table (cons #t 'permission?)) u type)))))
 
 (define-public (tmfs-master u)
   "Get a master url @u for linking and navigation."
@@ -155,6 +156,10 @@
 (define-public (tmfs-cdr s)
   (with i (string-index s #\/)
     (and i (substring s (+ i 1) (string-length s)))))
+
+(define-public (tmfs->list s)
+  (if (not (tmfs-pair? s)) (list s)
+      (cons (tmfs-car s) (tmfs->list (tmfs-cdr s)))))
 
 (define-public (url->tmfs-string u)
   (if (url-descends? u (get-texmacs-path))
