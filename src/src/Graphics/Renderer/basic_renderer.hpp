@@ -122,7 +122,7 @@ typedef basic_renderer_rep* basic_renderer;
 
 color xpm_to_color (string s);
 
-bool
+inline bool
 gui_interrupted (bool check) {
 	return check_event (check? INTERRUPT_EVENT: INTERRUPTED_EVENT);
 }
