@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : init-axiom.scm
-;; DESCRIPTION : Initialize axiom plugin
-;; COPYRIGHT   : (C) 1999  Joris van der Hoeven
+;; MODULE      : caas-edit.scm
+;; DESCRIPTION : editing caas programs
+;; COPYRIGHT   : (C) 2008  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -11,10 +11,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(plugin-configure axiom
-  (:require (url-exists-in-path? "AXIOMsys"))
-  (:launch "tm_axiom")
-  (:session "Axiom"))
+(texmacs-module (caas-edit)
+  (:use (mmx-indent)))
 
-(when (supports-axiom?)
-  (lazy-input-converter (axiom-input) axiom))
+(tm-define (kbd-variant t forward?)
+  (:require (and (in-prog-caas?) (not (inside? 'session))))
+  (caas-indent))
+
+(tm-define (insert-return)
+  (:mode in-prog-caas?)
+  (insert-raw-return)
+  (caas-indent))

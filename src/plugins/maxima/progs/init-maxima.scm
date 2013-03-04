@@ -35,18 +35,18 @@
 	   (string-append s "\n"))
 	  (else (string-append s ";\n")))))
 
-(define (maxima-detect)
+(define (maxima-versions)
   (if (os-mingw?)
       (url-exists-in-path? "maxima")
       (with version-list (string->object (var-eval-system "maxima_detect"))
         (and (list? version-list) (nnull? version-list) version-list))))
       
-(define (maxima-versions)  ; returns list of versions if any
+(define (maxima-launchers) ;; returns list of launchers for each version
   (if (os-mingw?)
       `((:launch
          ,(string-append "maxima.bat -p \"" (getenv "TEXMACS_PATH")
                          "\\plugins\\maxima\\lisp\\texmacs-maxima.lisp\"")))
-      (with version-list (maxima-detect)
+      (with version-list (plugin-versions "maxima")
         (if version-list
             (let* ((default (car version-list))
                    (rest (cdr version-list))
@@ -62,9 +62,10 @@
             '()))))
 
 (plugin-configure maxima
-  (:winpath ,(url-append (url-wildcard "Maxima*") "bin"))
-  (:require (maxima-detect))
-  ,@(maxima-versions)
+  (:winpath "Maxima*" "bin")
+  (:require (url-exists-in-path? "maxima"))
+  (:versions (maxima-versions))
+  ,@(maxima-launchers)
   (:initialize (maxima-initialize))
   (:serializer ,maxima-serialize)
   (:session "Maxima")
@@ -74,7 +75,3 @@
   (:mode in-maxima?)
   (:mode in-math?)
   ("$" "$"))
-
-(tm-define (script-numeric-evaluation-command)
-  (:mode in-maxima?)
-  "float")

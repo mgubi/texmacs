@@ -11,10 +11,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (asymptote-initialize)
-  (import-from (asymptote-menus))
-  (import-from (utils plugins plugin-convert)))
-
 (define (asy-serialize lan t)
   (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
@@ -23,9 +19,12 @@
 
 (plugin-configure asymptote
   (:require (url-exists-in-path? "asy"))
+  (:versions (list "0.3"))
   (:launch "tm_asy2")
   (:serializer ,asy-serialize)
-  (:initialize (asymptote-initialize))
   (:session "Asymptote")
-  (:scripts "Asymptote")
-  (:version "0.3"))
+  (:scripts "Asymptote"))
+
+(when (supports-asymptote?)
+  (import-from (asymptote-menus))
+  (import-from (utils plugins plugin-convert)))

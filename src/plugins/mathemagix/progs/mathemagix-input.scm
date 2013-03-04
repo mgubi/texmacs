@@ -12,55 +12,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (mathemagix-input)
-  (:use (utils plugins plugin-convert)))
+  (:use (mmx-input)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Specific conversion routines
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (mathemagix-input-var-row r)
-  (if (nnull? r)
-      (begin
-	(display ", ")
-	(plugin-input (car r))
-	(mathemagix-input-var-row (cdr r)))))
-
-(define (mathemagix-input-row r)
-  (plugin-input (car r))
-  (mathemagix-input-var-row (cdr r)))
-
-(define (mathemagix-input-var-rows t)
-  (if (nnull? t)
-      (begin
-	(display "; ")
-	(mathemagix-input-row (car t))
-	(mathemagix-input-var-rows (cdr t)))))
-
-(define (mathemagix-input-rows t)
-  (display "matrix(")
-  (mathemagix-input-row (car t))
-  (mathemagix-input-var-rows (cdr t))
-  (display ")"))
-
-(define (mathemagix-input-descend-last args)
-  (if (null? (cdr args))
-      (plugin-input (car args))
-      (mathemagix-input-descend-last (cdr args))))
-
-(define (mathemagix-input-det args)
-  (display "det(")
-  (mathemagix-input-descend-last args)
-  (display ")"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Initialization
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(plugin-input-converters mathemagix
-  (rows mathemagix-input-rows)
-  (det mathemagix-input-det)
-  ("<in>" " in ")
-  ("<neg>" "!")
-  ("<wedge>" "/\\")
-  ("<vee>" "\\/")
-  ("<mapsto>" ":-<gtr>"))
+(mmx-converters mathemagix)

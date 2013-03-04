@@ -19,11 +19,14 @@
 ;; Useful subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (empty-document)
+(define (generic-document doc)
   `(document
      (TeXmacs ,(texmacs-version))
      (style (tuple "generic"))
-     (body (document ""))))
+     (body ,doc)))
+
+(define (empty-document)
+  (generic-document '(document "")))
 
 (define (buffer-set-stm u doc)
   (let* ((s (unescape-guile (object->string doc)))
@@ -47,45 +50,46 @@
          (sid (client-find-server-user-id server)))
     (string-append "tmfs://remote-dir/" sname "/~" sid)))
 
-(define (prepend-dir server name)
+(define (prepend-dir server name type)
   (with dir (url->string (current-buffer))
     (when (not (string-starts? dir "tmfs://remote-dir/"))
-      (set! dir (remote-home-directory)))
-    (string-append "tmfs://remote-file/"
+      (set! dir (remote-home-directory server)))
+    (string-append "tmfs://" type "/"
                    (substring dir 18 (string-length dir))
                    "/" name)))
 
-(tm-define (remote-create server fname doc)
-  ;;(display* "remote-create " server ", " fname ", " doc "\n")
+(tm-define (remote-create-file server fname doc)
+  ;;(display* "remote-create-file " server ", " fname ", " doc "\n")
   (let* ((sname (client-find-server-name server))
-         (name (substring fname 19 (string-length fname))))
-    (client-remote-eval server `(remote-file-create ,name ,doc)
+         (name (substring fname 19 (string-length fname)))
+         (tm (convert doc "texmacs-stree" "texmacs-document")))
+    (client-remote-eval server `(remote-file-create ,name ,tm)
       (lambda (msg)
         (load-buffer fname))
       (lambda (err)
         (set-message err "create remote file")))))
 
-(tm-define (remote-create-interactive server)
+(tm-define (remote-create-file-interactive server)
   (:interactive #t)
   (interactive
       (lambda (name)
-        (with fname (prepend-dir server name)
-          (remote-create server fname (empty-document))))
+        (with fname (prepend-dir server name "remote-file")
+          (remote-create-file server fname (empty-document))))
     (list "Name" "string" '())))
 
 (tmfs-permission-handler (remote-file name type)
+  ;; FIXME: asynchroneous retrieval of file permissions
   #t)
 
-;; (tmfs-format-handler (remote-file name)
-;;   (let* ((sname (tmfs-car name))
-;;          (rname (tmfs-cdr name))
-;;          (server (client-find-server sname)))
-;;     "texmacs"))
+;;(tmfs-format-handler (remote-file name)
+;;  ;; FIXME: support for other file formats
+;;  "texmacs-file")
 
 (tmfs-title-handler (remote-file name doc)
   (let* ((sname (tmfs-car name))
-         (fname (string-append "tmfs://remote-file/" name)))
-    (resource-cache-get-first fname "name" "Nameless remote file")))
+         (fname (string-append "tmfs://remote-file/" name))
+         (dname (url->string (url-tail name))))
+    (resource-cache-get-first fname "title" dname)))
 
 (tmfs-load-handler (remote-file name)
   (let* ((sname (tmfs-car name))
@@ -97,12 +101,11 @@
         (begin
           (client-remote-eval server `(remote-file-load ,name)
             (lambda (msg)
-              (with (doc props) msg
-                ;;(display* "LOAD ") (write doc) (display* "\n")
-                (resource-cache-set-all fname props)
-                (if doc
-                    (remote-file-set name doc)
-                    (set-message "created new file" "load remote file"))))
+              (with (tm props) msg
+                (with doc (convert tm "texmacs-document" "texmacs-stree")
+                  ;;(display* "LOAD ") (write doc) (display* "\n")
+                  (resource-cache-set-all fname props)
+                  (remote-file-set name doc))))
             (lambda (err)
               (set-message err "load remote file")))
           (set-message "loading..." "load remote file")
@@ -115,28 +118,63 @@
          (fname (string-append "tmfs://remote-file/" name)))
     (if (not server)
         (texmacs-error "remote-file" "invalid server")
-        (client-remote-eval server `(remote-file-save ,name ,doc)
-          (lambda (msg)
-            (with (new-doc props) msg
-              (resource-cache-set-all fname props)
-              (set-message "file saved" "save remote file")))
-          (lambda (err)
-            (set-message err "save remote file"))))))
+        (with tm (convert doc "texmacs-stree" "texmacs-document")
+          (client-remote-eval server `(remote-file-save ,name ,tm)
+            (lambda (msg)
+              (with (saved props) msg
+                (resource-cache-set-all fname props)
+                (set-message "file saved" "save remote file")))
+            (lambda (err)
+              (set-message err "save remote file")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Remote directories
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (remote-create-dir server fname)
+  ;;(display* "remote-create-dir " server ", " fname "\n")
+  (let* ((sname (client-find-server-name server))
+         (name (substring fname 18 (string-length fname))))
+    (client-remote-eval server `(remote-dir-create ,name)
+      (lambda (msg)
+        (with (entries props) msg
+          (resource-cache-set-all fname props)
+          (load-buffer fname)))
+      (lambda (err)
+        (set-message err "create remote directory")))))
+
+(tm-define (remote-create-dir-interactive server)
+  (:interactive #t)
+  (interactive
+      (lambda (name)
+        (with fname (prepend-dir server name "remote-dir")
+          (remote-create-dir server fname)))
+    (list "Name" "string" '())))
+
+(define (dir-line sname entry)
+  (with (short-name full-name dir? props) entry
+    (let* ((type (if dir? "remote-dir" "remote-file"))
+           (name (string-append "tmfs://" type "/" sname "/" full-name))
+           (hlink `(hlink ,short-name ,name)))
+      hlink)))
+
+(define (dir-page sname entries)
+  (generic-document `(document (subsection* "File list")
+                               ,@(map (cut dir-line sname <>) entries))))
+
 (tmfs-load-handler (remote-dir name)
   ;;(display* "Loading remote dir " name "\n")
   (let* ((sname (car (tmfs->list name)))
-         (server (client-find-server sname)))
+         (server (client-find-server sname))
+         (fname (string-append "tmfs://remote-dir/" name)))
     (if (not server)
         (texmacs-error "remote-file" "invalid server")
         (begin
           (client-remote-eval server `(remote-dir-load ,name)
-            (lambda (doc)
-              (remote-dir-set name doc))
+            (lambda (msg)
+              (with (entries props) msg
+                  (resource-cache-set-all fname props)
+                (remote-dir-set name (dir-page sname entries))))
             (lambda (err)
               (set-message err "remote directory")))
           (set-message "loading..." "remote directory")

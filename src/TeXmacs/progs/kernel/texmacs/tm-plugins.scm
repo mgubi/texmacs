@@ -69,6 +69,10 @@
   (with r (ahash-ref connection-handler name)
     (if r (cons 'tuple r) '(tuple))))
 
+(define-public (sorted-supported-plugins)
+  (lazy-plugin-force)
+  (list-sort (map car (ahash-table->list connection-defined)) string<=?))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Supported sessions and scripting languages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -102,30 +106,101 @@
   (not (not (ahash-ref supported-scripts-table name))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Cache plugin settings
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public reconfigure-flag? #t)
+(define plugin-loaded-setup? #f)
+(define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
+
+(define check-dir-table (make-ahash-table))
+(define-public plugin-data-table (make-ahash-table))
+
+(define (plugin-load-setup)
+  (when (not plugin-loaded-setup?)
+    (set! plugin-loaded-setup? #t)
+    (when (url-exists? plugin-cache)
+      (with cached (load-object plugin-cache)
+	(with (t1 t2) cached
+	  (set! plugin-data-table (list->ahash-table t1))
+	  (set! check-dir-table (list->ahash-table t2))
+	  (when (path-up-to-date?)
+	    (set! reconfigure-flag? #f)))))
+    ;;(display* "Reconfigure " reconfigure-flag? "\n")
+    (when reconfigure-flag?
+      (set! check-dir-table (make-ahash-table))
+      (set! plugin-data-table (make-ahash-table))
+      (init-check-dir-table))))
+
+(define (plugin-save-setup)
+  (when reconfigure-flag?
+    (save-object plugin-cache
+		 (list (ahash-table->list plugin-data-table)
+		       (ahash-table->list check-dir-table)))))
+
+(define-public (plugin-versions name)
+  (with versions (ahash-ref plugin-data-table name)
+    (cond ((not versions) (list))
+	  ((list? versions) versions)
+	  ((string? versions) (list versions))
+	  (else (list "default")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Manage directories where to search for plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define home-dir (string->url "~"))
+(define texmacs-dir (string->url "$TEXMACS_PATH"))
+
+(define (init-check-dir-table)
+  (set! check-dir-table (make-ahash-table))
+  (add-to-check-dir-table "$PATH"))
+
+(define (add-to-check-dir-table u)
+  (cond ((in? u (list (url-head u) home-dir texmacs-dir))
+         (noop))
+        ((url-or? u)
+         (add-to-check-dir-table (url-ref u 1))
+         (add-to-check-dir-table (url-ref u 2)))
+        ((url-concat? u)
+         (add-to-check-dir-table (url-head u))
+         (for (v (url->list (url-expand (url-complete u "dr"))))
+           (with s (url->system v)
+             (when (not (ahash-ref check-dir-table s))
+               (ahash-set! check-dir-table s (url-last-modified v))))))))
+
+(define (add-to-path u)
+  (add-to-check-dir-table u)
+  (with p (url-expand (url-or "$PATH" (url-complete u "dr")))
+    (setenv "PATH" (url->system p))))
+
+(define (add-windows-program-path u)
+  (add-to-path (url-append (url-or (system->url "C:\\.")
+				   (system->url "C:\\Program File*")) u)))
+
+(define (add-macos-program-path u)
+  (add-to-path (url-append (system->url "/Applications") u)))
+
+(define (path-up-to-date?)
+  (with ok? #t
+    (for (p (ahash-table->list check-dir-table))
+      (with modified? (!= (url-last-modified (system->url (car p))) (cdr p))
+        (if modified? (set! ok? #f))))
+    ok?))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Configuration of plugins
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public plugin-old-data-table (make-ahash-table))
-(define-public plugin-data-table (make-ahash-table))
-
-
-(define winunit '("C:" "D:" "E:"))
-
-(define (determine-path-for-mingw x)
-   (if (url-rooted? x)
-   (url->string x)
-   (letrec ((get-path (lambda (unit) (if(eq? unit '())
-      (url-none) (url-or (url-complete (url-append (url-append (car unit) (url-or (url-wildcard "Program File*") ".")) x)"r") (get-path (cdr unit)))))))
-      (url->string (url-expand (get-path winunit))))))
-      
-
 (define (plugin-configure-cmd name cmd)
-  (cond ((or (func? cmd :require 1) (func? cmd :version 1))
-	 (ahash-set! plugin-data-table name ((second cmd))))
+  (cond ((func? cmd :require 1)
+	 (when reconfigure-flag?
+	   (ahash-set! plugin-data-table name ((second cmd)))))
+        ((func? cmd :versions 1)
+	 (when reconfigure-flag?
+	   (ahash-set! plugin-data-table name ((second cmd)))))
         ((func? cmd :setup 1)
-	 (if (!= (ahash-ref plugin-data-table name)
-		 (ahash-ref plugin-old-data-table name))
-	     ((second cmd))))
+	 (if reconfigure-flag? ((second cmd))))
 	((func? cmd :prioritary 1)
 	 (ahash-set! plugin-data-table (list name :prioritary) (cadr cmd)))
         ((func? cmd :initialize 1)
@@ -149,10 +224,12 @@
 	((func? cmd :handler 2)
 	 (connection-insert-handler
 	  name (second cmd) (symbol->string (third cmd))))
-	((func? cmd :winpath 1)
+	((func? cmd :winpath 2)
 	 (when (os-mingw?)
-	   (with path (determine-path-for-mingw (second cmd))
-	     (setenv "PATH" (string-append (getenv "PATH") ";" path)))))
+           (add-windows-program-path (url-append (second cmd) (third cmd)))))
+	((func? cmd :macpath 2)
+	 (when (os-macos?)
+           (add-macos-program-path (url-append (second cmd) (third cmd)))))
 	((func? cmd :session 1)
 	 (supported-sessions-add name (second cmd)))
 	((func? cmd :scripts 1)
@@ -170,27 +247,28 @@
 
 (define-public (plugin-configure-cmds name cmds)
   "Helper function for plugin-configure"
-  (if (and (nnull? cmds) (ahash-ref plugin-data-table name))
-      (begin
-        (plugin-configure-cmd name (car cmds))
-	(plugin-configure-cmds name (cdr cmds)))))
+  (when (and (nnull? cmds) (ahash-ref plugin-data-table name))
+    (plugin-configure-cmd name (car cmds))
+    (plugin-configure-cmds name (cdr cmds))))
 
 (define-public (plugin-configure-sub cmd)
   "Helper function for plugin-configure"
   (if (and (list? cmd) (= (length cmd) 2)
-	   (in? (car cmd) '(:require :version :setup :initialize)))
+	   (in? (car cmd) '(:require :versions :setup :initialize)))
       (list (car cmd) (list 'unquote `(lambda () ,(cadr cmd))))
       cmd))
 
 (define-public-macro (plugin-configure name2 . options)
   "Declare and configure plug-in with name @name2 according to @options"
   (let* ((name (if (string? name2) name2 (symbol->string name2)))
+         (supports-name? (string->symbol (string-append "supports-" name "?")))
 	 (in-name (string->symbol (string-append "in-" name "%")))
 	 (name-scripts (string->symbol (string-append name "-scripts%"))))
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (ahash-set! plugin-data-table ,name #t)
+       (define (,supports-name?) (ahash-ref plugin-data-table ,name))
+       (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
        (plugin-configure-cmds ,name
 	 ,(list 'quasiquote (map plugin-configure-sub options))))))
 
@@ -199,17 +277,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define plugin-initialize-todo (make-ahash-table))
-
-(define (plugin-load-setup)
-  (if (url-exists? "$TEXMACS_HOME_PATH/system/setup.scm")
-      (set! plugin-old-data-table
-	    (list->ahash-table
-	      (load-object "$TEXMACS_HOME_PATH/system/setup.scm")))))
-
-(define (plugin-save-setup)
-  (if (!= plugin-old-data-table plugin-data-table)
-      (save-object "$TEXMACS_HOME_PATH/system/setup.scm"
-		   (ahash-table->list plugin-data-table))))
+(define plugin-initialize-done? #f)
 
 (define (plugin-all-initialized?)
   (with l (ahash-table->list plugin-initialize-todo)
@@ -217,7 +285,7 @@
 
 (define-public (plugin-initialize name*)
   "Initialize plugin with name @name*"
-  (if (== (ahash-size plugin-old-data-table) 0) (plugin-load-setup))
+  (plugin-load-setup)
   (if (ahash-ref plugin-initialize-todo name*)
       (let* ((name (symbol->string name*))
 	     (file (string-append "plugins/" name "/progs/init-" name ".scm"))
@@ -227,23 +295,21 @@
 	    (with fname (url-materialize u "r")
 	      ;;(display* "loading plugin " name* "\n")
 	      ;;(display* "loading plugin " fname "\n")
-	      (load fname)))
+	      ;;(with start (texmacs-time)
+	      ;;  (load fname)
+	      ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
+	      (load fname)
+	      ))
 	(if (plugin-all-initialized?) (plugin-save-setup)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Lazy initialization of plugins
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (lazy-plugin-initialize name)
   "Initialize the plug-in @name in a lazy way"
   (ahash-set! plugin-initialize-todo name #t)
-  (if (eval (ahash-ref plugin-old-data-table (list name :prioritary)))
+  (if (eval (ahash-ref plugin-data-table (list name :prioritary)))
       (plugin-initialize name)
       (delayed
-       (:idle 1000)
-       (plugin-initialize name))))
-
-(define plugin-initialize-done? #f)
+        (:idle 1000)
+        (plugin-initialize name))))
 
 (define-public (lazy-plugin-force)
   "Force all lazy plugin initializations to take place"

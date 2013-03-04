@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : init-axiom.scm
-;; DESCRIPTION : Initialize axiom plugin
-;; COPYRIGHT   : (C) 1999  Joris van der Hoeven
+;; MODULE      : caas-input.scm
+;; DESCRIPTION : Initialize caas plugin
+;; COPYRIGHT   : (C) 1999  Joris van der Hoeven, 2005  Andrey Grozin
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -11,10 +11,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(plugin-configure axiom
-  (:require (url-exists-in-path? "AXIOMsys"))
-  (:launch "tm_axiom")
-  (:session "Axiom"))
+(texmacs-module (caas-input)
+  (:use (mmx-input)))
 
-(when (supports-axiom?)
-  (lazy-input-converter (axiom-input) axiom))
+(mmx-converters caas)
