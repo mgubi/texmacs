@@ -74,7 +74,7 @@ qt_simple_widget_rep::handle_clear (SI x1, SI y1, SI x2, SI y2) {
 }
 
 void
-qt_simple_widget_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2) {
+qt_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
   (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
@@ -119,7 +119,7 @@ impress (qt_simple_widget_rep* wid) {
         extern bool disable_check_event;
         bool cache = disable_check_event;
         disable_check_event= true;
-        wid->handle_repaint (r->x1, r->y2, r->x2, r->y1);
+        wid->handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
         disable_check_event= cache;
       }
       ren->end();
