@@ -536,6 +536,10 @@ x_window_rep::delayed_message (widget wid, string s, time_t delay) {
 
 void
 x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
+  ren->set_origin(0,0);
+  begin_draw ();
+  ren->clip (x1, y1, x2, y2);
+
   SI X1= x1+ dx;
   SI Y2= y2+ dy;
   ren->decode (x1, y1);
@@ -559,6 +563,10 @@ x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
 
   if (x1<x2 && y2<y1)
     XCopyArea (dpy, win, win, gc, x1, y2, x2-x1, y1-y2, X1, Y2);
+  
+  
+  ren->unclip ();
+  end_draw ();
 }
 
 void
