@@ -91,17 +91,6 @@
 		9C0B4A0B10A8CC110097A335 /* undo_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478E10A8CC0F0097A335 /* undo_observer.cpp */; };
 		9C0B4A0C10A8CC110097A335 /* analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479010A8CC0F0097A335 /* analyze.cpp */; };
 		9C0B4A0D10A8CC110097A335 /* converter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479210A8CC0F0097A335 /* converter.cpp */; };
-		9C0B4A0E10A8CC110097A335 /* collection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479610A8CC0F0097A335 /* collection.cpp */; };
-		9C0B4A0F10A8CC110097A335 /* disk_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479710A8CC0F0097A335 /* disk_table.cpp */; };
-		9C0B4A1010A8CC110097A335 /* properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479910A8CC0F0097A335 /* properties.cpp */; };
-		9C0B4A1110A8CC110097A335 /* solutions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479A10A8CC0F0097A335 /* solutions.cpp */; };
-		9C0B4A1210A8CC110097A335 /* tmfs_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479C10A8CC100097A335 /* tmfs_convert.cpp */; };
-		9C0B4A1310A8CC110097A335 /* tmfs_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479D10A8CC100097A335 /* tmfs_file.cpp */; };
-		9C0B4A1410A8CC110097A335 /* tmfs_permissions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479E10A8CC100097A335 /* tmfs_permissions.cpp */; };
-		9C0B4A1510A8CC110097A335 /* tmfs_properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479F10A8CC100097A335 /* tmfs_properties.cpp */; };
-		9C0B4A1610A8CC110097A335 /* tmfs_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A010A8CC100097A335 /* tmfs_table.cpp */; };
-		9C0B4A1710A8CC110097A335 /* tmfs_versioning.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A110A8CC100097A335 /* tmfs_versioning.cpp */; };
-		9C0B4A1810A8CC110097A335 /* transaction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A210A8CC100097A335 /* transaction.cpp */; };
 		9C0B4A1910A8CC110097A335 /* tree_correct.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A410A8CC100097A335 /* tree_correct.cpp */; };
 		9C0B4A1A10A8CC110097A335 /* tree_cursor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A610A8CC100097A335 /* tree_cursor.cpp */; };
 		9C0B4A1B10A8CC110097A335 /* tree_traverse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A810A8CC100097A335 /* tree_traverse.cpp */; };
@@ -411,17 +400,6 @@
 		9CCC741A10D303D900E88D90 /* undo_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478E10A8CC0F0097A335 /* undo_observer.cpp */; };
 		9CCC741B10D303D900E88D90 /* analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479010A8CC0F0097A335 /* analyze.cpp */; };
 		9CCC741C10D303D900E88D90 /* converter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479210A8CC0F0097A335 /* converter.cpp */; };
-		9CCC741D10D303D900E88D90 /* collection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479610A8CC0F0097A335 /* collection.cpp */; };
-		9CCC741E10D303D900E88D90 /* disk_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479710A8CC0F0097A335 /* disk_table.cpp */; };
-		9CCC741F10D303D900E88D90 /* properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479910A8CC0F0097A335 /* properties.cpp */; };
-		9CCC742010D303D900E88D90 /* solutions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479A10A8CC0F0097A335 /* solutions.cpp */; };
-		9CCC742110D303D900E88D90 /* tmfs_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479C10A8CC100097A335 /* tmfs_convert.cpp */; };
-		9CCC742210D303D900E88D90 /* tmfs_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479D10A8CC100097A335 /* tmfs_file.cpp */; };
-		9CCC742310D303D900E88D90 /* tmfs_permissions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479E10A8CC100097A335 /* tmfs_permissions.cpp */; };
-		9CCC742410D303D900E88D90 /* tmfs_properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479F10A8CC100097A335 /* tmfs_properties.cpp */; };
-		9CCC742510D303D900E88D90 /* tmfs_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A010A8CC100097A335 /* tmfs_table.cpp */; };
-		9CCC742610D303D900E88D90 /* tmfs_versioning.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A110A8CC100097A335 /* tmfs_versioning.cpp */; };
-		9CCC742710D303D900E88D90 /* transaction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A210A8CC100097A335 /* transaction.cpp */; };
 		9CCC742810D303D900E88D90 /* tree_correct.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A410A8CC100097A335 /* tree_correct.cpp */; };
 		9CCC742910D303D900E88D90 /* tree_cursor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A610A8CC100097A335 /* tree_cursor.cpp */; };
 		9CCC742A10D303D900E88D90 /* tree_traverse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A810A8CC100097A335 /* tree_traverse.cpp */; };
@@ -655,17 +633,6 @@
 		9CD4E60E10B14AB300E0DD5C /* undo_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478E10A8CC0F0097A335 /* undo_observer.cpp */; };
 		9CD4E60F10B14AB300E0DD5C /* analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479010A8CC0F0097A335 /* analyze.cpp */; };
 		9CD4E61010B14AB300E0DD5C /* converter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479210A8CC0F0097A335 /* converter.cpp */; };
-		9CD4E61110B14AB300E0DD5C /* collection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479610A8CC0F0097A335 /* collection.cpp */; };
-		9CD4E61210B14AB300E0DD5C /* disk_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479710A8CC0F0097A335 /* disk_table.cpp */; };
-		9CD4E61310B14AB300E0DD5C /* properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479910A8CC0F0097A335 /* properties.cpp */; };
-		9CD4E61410B14AB300E0DD5C /* solutions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479A10A8CC0F0097A335 /* solutions.cpp */; };
-		9CD4E61510B14AB300E0DD5C /* tmfs_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479C10A8CC100097A335 /* tmfs_convert.cpp */; };
-		9CD4E61610B14AB300E0DD5C /* tmfs_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479D10A8CC100097A335 /* tmfs_file.cpp */; };
-		9CD4E61710B14AB300E0DD5C /* tmfs_permissions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479E10A8CC100097A335 /* tmfs_permissions.cpp */; };
-		9CD4E61810B14AB300E0DD5C /* tmfs_properties.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479F10A8CC100097A335 /* tmfs_properties.cpp */; };
-		9CD4E61910B14AB300E0DD5C /* tmfs_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A010A8CC100097A335 /* tmfs_table.cpp */; };
-		9CD4E61A10B14AB300E0DD5C /* tmfs_versioning.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A110A8CC100097A335 /* tmfs_versioning.cpp */; };
-		9CD4E61B10B14AB300E0DD5C /* transaction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A210A8CC100097A335 /* transaction.cpp */; };
 		9CD4E61C10B14AB300E0DD5C /* tree_correct.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A410A8CC100097A335 /* tree_correct.cpp */; };
 		9CD4E61D10B14AB300E0DD5C /* tree_cursor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A610A8CC100097A335 /* tree_cursor.cpp */; };
 		9CD4E61E10B14AB300E0DD5C /* tree_traverse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A810A8CC100097A335 /* tree_traverse.cpp */; };
@@ -1242,19 +1209,6 @@
 		9C0B479210A8CC0F0097A335 /* converter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = converter.cpp; sourceTree = "<group>"; };
 		9C0B479310A8CC0F0097A335 /* converter.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = converter.hpp; sourceTree = "<group>"; };
 		9C0B479410A8CC0F0097A335 /* merge_sort.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = merge_sort.hpp; sourceTree = "<group>"; };
-		9C0B479610A8CC0F0097A335 /* collection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = collection.cpp; sourceTree = "<group>"; };
-		9C0B479710A8CC0F0097A335 /* disk_table.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = disk_table.cpp; sourceTree = "<group>"; };
-		9C0B479810A8CC0F0097A335 /* disk_table.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = disk_table.hpp; sourceTree = "<group>"; };
-		9C0B479910A8CC0F0097A335 /* properties.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = properties.cpp; sourceTree = "<group>"; };
-		9C0B479A10A8CC0F0097A335 /* solutions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = solutions.cpp; sourceTree = "<group>"; };
-		9C0B479B10A8CC100097A335 /* tmfs.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tmfs.hpp; sourceTree = "<group>"; };
-		9C0B479C10A8CC100097A335 /* tmfs_convert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_convert.cpp; sourceTree = "<group>"; };
-		9C0B479D10A8CC100097A335 /* tmfs_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_file.cpp; sourceTree = "<group>"; };
-		9C0B479E10A8CC100097A335 /* tmfs_permissions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_permissions.cpp; sourceTree = "<group>"; };
-		9C0B479F10A8CC100097A335 /* tmfs_properties.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_properties.cpp; sourceTree = "<group>"; };
-		9C0B47A010A8CC100097A335 /* tmfs_table.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_table.cpp; sourceTree = "<group>"; };
-		9C0B47A110A8CC100097A335 /* tmfs_versioning.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tmfs_versioning.cpp; sourceTree = "<group>"; };
-		9C0B47A210A8CC100097A335 /* transaction.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = transaction.cpp; sourceTree = "<group>"; };
 		9C0B47A410A8CC100097A335 /* tree_correct.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_correct.cpp; sourceTree = "<group>"; };
 		9C0B47A510A8CC100097A335 /* tree_correct.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tree_correct.hpp; sourceTree = "<group>"; };
 		9C0B47A610A8CC100097A335 /* tree_cursor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_cursor.cpp; sourceTree = "<group>"; };
@@ -2095,7 +2049,6 @@
 				9C0B478010A8CC0F0097A335 /* History */,
 				9C0B478610A8CC0F0097A335 /* Observers */,
 				9C0B478F10A8CC0F0097A335 /* String */,
-				9C0B479510A8CC0F0097A335 /* Tmfs */,
 				9C0B47A310A8CC100097A335 /* Tree */,
 			);
 			name = Data;
@@ -2233,26 +2186,6 @@
 				9C0B479410A8CC0F0097A335 /* merge_sort.hpp */,
 			);
 			path = String;
-			sourceTree = "<group>";
-		};
-		9C0B479510A8CC0F0097A335 /* Tmfs */ = {
-			isa = PBXGroup;
-			children = (
-				9C0B479610A8CC0F0097A335 /* collection.cpp */,
-				9C0B479710A8CC0F0097A335 /* disk_table.cpp */,
-				9C0B479810A8CC0F0097A335 /* disk_table.hpp */,
-				9C0B479910A8CC0F0097A335 /* properties.cpp */,
-				9C0B479A10A8CC0F0097A335 /* solutions.cpp */,
-				9C0B479B10A8CC100097A335 /* tmfs.hpp */,
-				9C0B479C10A8CC100097A335 /* tmfs_convert.cpp */,
-				9C0B479D10A8CC100097A335 /* tmfs_file.cpp */,
-				9C0B479E10A8CC100097A335 /* tmfs_permissions.cpp */,
-				9C0B479F10A8CC100097A335 /* tmfs_properties.cpp */,
-				9C0B47A010A8CC100097A335 /* tmfs_table.cpp */,
-				9C0B47A110A8CC100097A335 /* tmfs_versioning.cpp */,
-				9C0B47A210A8CC100097A335 /* transaction.cpp */,
-			);
-			path = Tmfs;
 			sourceTree = "<group>";
 		};
 		9C0B47A310A8CC100097A335 /* Tree */ = {
@@ -3961,17 +3894,6 @@
 				9C0B4A0B10A8CC110097A335 /* undo_observer.cpp in Sources */,
 				9C0B4A0C10A8CC110097A335 /* analyze.cpp in Sources */,
 				9C0B4A0D10A8CC110097A335 /* converter.cpp in Sources */,
-				9C0B4A0E10A8CC110097A335 /* collection.cpp in Sources */,
-				9C0B4A0F10A8CC110097A335 /* disk_table.cpp in Sources */,
-				9C0B4A1010A8CC110097A335 /* properties.cpp in Sources */,
-				9C0B4A1110A8CC110097A335 /* solutions.cpp in Sources */,
-				9C0B4A1210A8CC110097A335 /* tmfs_convert.cpp in Sources */,
-				9C0B4A1310A8CC110097A335 /* tmfs_file.cpp in Sources */,
-				9C0B4A1410A8CC110097A335 /* tmfs_permissions.cpp in Sources */,
-				9C0B4A1510A8CC110097A335 /* tmfs_properties.cpp in Sources */,
-				9C0B4A1610A8CC110097A335 /* tmfs_table.cpp in Sources */,
-				9C0B4A1710A8CC110097A335 /* tmfs_versioning.cpp in Sources */,
-				9C0B4A1810A8CC110097A335 /* transaction.cpp in Sources */,
 				9C0B4A1910A8CC110097A335 /* tree_correct.cpp in Sources */,
 				9C0B4A1A10A8CC110097A335 /* tree_cursor.cpp in Sources */,
 				9C0B4A1B10A8CC110097A335 /* tree_traverse.cpp in Sources */,
@@ -4342,17 +4264,6 @@
 				9CCC741A10D303D900E88D90 /* undo_observer.cpp in Sources */,
 				9CCC741B10D303D900E88D90 /* analyze.cpp in Sources */,
 				9CCC741C10D303D900E88D90 /* converter.cpp in Sources */,
-				9CCC741D10D303D900E88D90 /* collection.cpp in Sources */,
-				9CCC741E10D303D900E88D90 /* disk_table.cpp in Sources */,
-				9CCC741F10D303D900E88D90 /* properties.cpp in Sources */,
-				9CCC742010D303D900E88D90 /* solutions.cpp in Sources */,
-				9CCC742110D303D900E88D90 /* tmfs_convert.cpp in Sources */,
-				9CCC742210D303D900E88D90 /* tmfs_file.cpp in Sources */,
-				9CCC742310D303D900E88D90 /* tmfs_permissions.cpp in Sources */,
-				9CCC742410D303D900E88D90 /* tmfs_properties.cpp in Sources */,
-				9CCC742510D303D900E88D90 /* tmfs_table.cpp in Sources */,
-				9CCC742610D303D900E88D90 /* tmfs_versioning.cpp in Sources */,
-				9CCC742710D303D900E88D90 /* transaction.cpp in Sources */,
 				9CCC742810D303D900E88D90 /* tree_correct.cpp in Sources */,
 				9CCC742910D303D900E88D90 /* tree_cursor.cpp in Sources */,
 				9CCC742A10D303D900E88D90 /* tree_traverse.cpp in Sources */,
@@ -4682,17 +4593,6 @@
 				9CD4E60E10B14AB300E0DD5C /* undo_observer.cpp in Sources */,
 				9CD4E60F10B14AB300E0DD5C /* analyze.cpp in Sources */,
 				9CD4E61010B14AB300E0DD5C /* converter.cpp in Sources */,
-				9CD4E61110B14AB300E0DD5C /* collection.cpp in Sources */,
-				9CD4E61210B14AB300E0DD5C /* disk_table.cpp in Sources */,
-				9CD4E61310B14AB300E0DD5C /* properties.cpp in Sources */,
-				9CD4E61410B14AB300E0DD5C /* solutions.cpp in Sources */,
-				9CD4E61510B14AB300E0DD5C /* tmfs_convert.cpp in Sources */,
-				9CD4E61610B14AB300E0DD5C /* tmfs_file.cpp in Sources */,
-				9CD4E61710B14AB300E0DD5C /* tmfs_permissions.cpp in Sources */,
-				9CD4E61810B14AB300E0DD5C /* tmfs_properties.cpp in Sources */,
-				9CD4E61910B14AB300E0DD5C /* tmfs_table.cpp in Sources */,
-				9CD4E61A10B14AB300E0DD5C /* tmfs_versioning.cpp in Sources */,
-				9CD4E61B10B14AB300E0DD5C /* transaction.cpp in Sources */,
 				9CD4E61C10B14AB300E0DD5C /* tree_correct.cpp in Sources */,
 				9CD4E61D10B14AB300E0DD5C /* tree_cursor.cpp in Sources */,
 				9CD4E61E10B14AB300E0DD5C /* tree_traverse.cpp in Sources */,
@@ -5105,7 +5005,8 @@
 			baseConfigurationReference = 4937B89A1521C59E00D87F22 /* MOCs.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -5120,7 +5021,8 @@
 			baseConfigurationReference = 4937B89A1521C59E00D87F22 /* MOCs.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_VERSION = "";
@@ -5159,7 +5061,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B430141A1B780035D78F /* TeXmacsX11.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
@@ -5174,7 +5077,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B430141A1B780035D78F /* TeXmacsX11.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1)";
+				ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = "ppc i386";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = "$(HOME)/Applications";
@@ -5186,15 +5090,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_VERSION = "";
-				INSTALL_PATH = "$(HOME)/Applications";
-				WRAPPER_EXTENSION = app;
-				ZERO_LINK = YES;
 			};
 			name = Debug;
 		};
@@ -5202,12 +5099,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_MODEL_TUNING = G5;
-				GCC_VERSION = "";
-				INSTALL_PATH = "$(HOME)/Applications";
-				WRAPPER_EXTENSION = app;
 			};
 			name = Release;
 		};
@@ -5215,17 +5106,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B41E141A1B780035D78F /* Base.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1)";
-				ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1 = "x86_64 i386 ppc";
 				CLANG_LINK_OBJC_RUNTIME = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				GCC_VERSION = "";
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_EFFECTIVE_CPLUSPLUS_VIOLATIONS = NO;
 				GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS = NO;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.5;
-				SDKROOT = macosx10.5;
 			};
 			name = Debug;
 		};
@@ -5233,14 +5117,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B41E141A1B780035D78F /* Base.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1)";
-				ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1 = "x86_64 i386 ppc";
 				CLANG_LINK_OBJC_RUNTIME = NO;
-				GCC_VERSION = "";
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.5;
-				SDKROOT = macosx10.5;
 			};
 			name = Release;
 		};
