@@ -224,7 +224,7 @@ QTMWidget::invalidate_all () {
 
 bool
 QTMWidget::is_invalid () {
-  return is_nil(invalid_regions);
+  return !is_nil(invalid_regions);
 }
 
 basic_renderer_rep* 
