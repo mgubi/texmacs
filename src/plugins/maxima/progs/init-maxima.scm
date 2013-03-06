@@ -11,42 +11,26 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define maxima-help #f)
-(define (maxima-initialize)
-  (import-from (utils plugins plugin-convert))
-  (import-from (utils plugins plugin-cmd))
-  (import-from (dynamic session-menu))
-  (import-from (maxima-kbd))
-  (import-from (maxima-menus))
-  (lazy-input-converter (maxima-input) maxima)
-  (plugin-approx-command-set! "maxima" "float")
-  (let ((help-list (string->object (var-eval-system "maxima_detect help"))))
-    (if help-list
-	(cond ((pair? help-list)
-	       (set! maxima-help (car help-list)))
-	      ((string? help-list)
-	       (set! maxima-help help-list))))))
-
 (define (maxima-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
   (with s (string-drop-right (verbatim-serialize lan t) 1)
     (cond ((== s "") "0;\n")
 	  ((in? (string-ref s (- (string-length s) 1)) '(#\; #\$))
 	   (string-append s "\n"))
 	  (else (string-append s ";\n")))))
 
-(define (maxima-detect)
+(define (maxima-versions)
   (if (os-mingw?)
       (url-exists-in-path? "maxima")
       (with version-list (string->object (var-eval-system "maxima_detect"))
         (and (list? version-list) (nnull? version-list) version-list))))
       
-(define (maxima-versions)  ; returns list of versions if any
+(define (maxima-launchers) ;; returns list of launchers for each version
   (if (os-mingw?)
       `((:launch
          ,(string-append "maxima.bat -p \"" (getenv "TEXMACS_PATH")
                          "\\plugins\\maxima\\lisp\\texmacs-maxima.lisp\"")))
-      (with version-list (maxima-detect)
+      (with version-list
+          (if reconfigure-flag? (maxima-versions) (plugin-versions "maxima"))
         (if version-list
             (let* ((default (car version-list))
                    (rest (cdr version-list))
@@ -62,19 +46,29 @@
             '()))))
 
 (plugin-configure maxima
-  (:winpath ,(url-append (url-wildcard "Maxima*") "bin"))
-  (:require (maxima-detect))
-  ,@(maxima-versions)
-  (:initialize (maxima-initialize))
+  (:winpath "Maxima*" "bin")
+  (:require (url-exists-in-path? "maxima"))
+  (:versions (maxima-versions))
+  ,@(maxima-launchers)
   (:serializer ,maxima-serialize)
   (:session "Maxima")
   (:scripts "Maxima"))
 
-(kbd-map
-  (:mode in-maxima?)
-  (:mode in-math?)
-  ("$" "$"))
+(when (supports-maxima?)
+  (define maxima-help #f)
+  (let ((help-list (string->object (var-eval-system "maxima_detect help"))))
+    (if help-list
+	(cond ((pair? help-list)
+	       (set! maxima-help (car help-list)))
+	      ((string? help-list)
+	       (set! maxima-help help-list)))))
 
-(tm-define (script-numeric-evaluation-command)
-  (:mode in-maxima?)
-  "float")
+  (import-from (maxima-kbd))
+  (import-from (maxima-menus))
+  (lazy-input-converter (maxima-input) maxima)
+  (plugin-approx-command-set! "maxima" "float")
+
+  (kbd-map
+    (:mode in-maxima?)
+    (:mode in-math?)
+    ("$" "$")))

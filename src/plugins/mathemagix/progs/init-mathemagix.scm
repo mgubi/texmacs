@@ -11,6 +11,20 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (mathemagix-serialize lan t)
+  (with u (pre-serialize lan t)
+    (with v (texmacs->code u)
+      (with w (string-replace v "\n" "/{CR}/")
+	(string-append (escape-verbatim w) "\n")))))
+
+(plugin-configure mathemagix
+  (:winpath "Mathemagix" "bin")
+  (:require (url-exists-in-path? "mmx-light"))
+  (:serializer ,mathemagix-serialize)
+  (:launch "mmx-light --texmacs")
+  (:session "Mathemagix")
+  (:scripts "Mathemagix"))
+
 (texmacs-modes
   (in-mathemagix% (== (get-env "prog-language") "mathemagix"))
   (in-prog-mathemagix% #t in-prog% in-mathemagix%)
@@ -19,56 +33,8 @@
 
 (lazy-keyboard (mathemagix-edit) in-prog-mathemagix?)
 
-(define (mathemagix-package-config-prefix name)
-  (let ((cmd (string-concatenate (list name "-config")))
-        (cmdp (string-concatenate (list (string-concatenate
-					 (list name "-config"))
-					" --prefix"))))
-        (if (url-exists-in-path? cmd)
-            (let ((x (eval-system cmdp)))
-              (substring x 0 (- (string-length x) 1)))
-            "")))
-
-(define mathemagix-help
-  (let* ((prefix (mathemagix-package-config-prefix "mmdoc"))
-	 (index (string-concatenate (list prefix
-		  "/share/doc/mmdoc/doc/texmacs/main/index.en.tm"))))
-    (if (url-exists-in-path? index) index
-	;;(url-append "http://www.mathemagix.org/www/main/" "index.en.html"))))
-	(url-append "http://magix.lix.polytechnique.fr/local/mmxweb/mmdoc/doc/texmacs/main/" "index.en.tm"))))
-
-(define (mathemagix-initialize)
-  (import-from (utils plugins plugin-convert))
-  (lazy-input-converter (mathemagix-input) mathemagix)
-  (import-from (dynamic session-menu))
-  (import-from (mathemagix-kbd))
+(when (supports-mathemagix?)
   (import-from (mathemagix-menus))
-  (plugin-approx-command-set! "mathemagix" "")
-  (if (mathemagix-scripts?)
-      (init-add-package "mathemagix")))
-
-(define (mathemagix-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
-  (with u (pre-serialize lan t)
-    (with v (texmacs->code u)
-      (with w (string-replace v "\n" "/{CR}/")
-	(string-append (escape-verbatim w) "\n")))))
-
-(define mathemagix-launcher
-  (if #f;;(url-exists-in-path? "mmi")
-      "mmi --texmacs"
-      "mmx-light --texmacs"))
-
-(plugin-configure mathemagix
-  (:winpath "Mathemagix\\bin")
-  (:require (or (url-exists-in-path? "mmi")
-                (url-exists-in-path? "mmx-light")))
-  (:serializer ,mathemagix-serialize)
-  (:initialize (mathemagix-initialize))
-  (:launch ,mathemagix-launcher)
-  (:session "Mathemagix")
-  (:scripts "Mathemagix"))
-
-(tm-define (script-numeric-evaluation-command)
-  (:mode in-mathemagix?)
-  "")
+  (lazy-input-converter (mathemagix-input) mathemagix)
+  (lazy-keyboard (mathemagix-kbd) in-mathemagix?)
+  (plugin-approx-command-set! "mathemagix" ""))

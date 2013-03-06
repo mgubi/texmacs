@@ -11,20 +11,18 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (eukleides-initialize)
-  ;;(import-from (eukleides-menus))
-  (import-from (utils plugins plugin-convert)))
-
 (define (eukleides-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
     (with s (texmacs->code u)
       (string-append (escape-verbatim (string-replace s "\n" "~")) "\n"))))
 
 (plugin-configure eukleides
   (:require (url-exists-in-path? "eukleides"))
-  (:initialize (eukleides-initialize))
   (:launch "tm_eukleides --texmacs")
   (:serializer ,eukleides-serialize)
   (:session "Eukleides")
   (:scripts "Eukleides"))
+
+(when (supports-eukleides?)
+  ;;(import-from (eukleides-menus))
+  (import-from (utils plugins plugin-convert)))

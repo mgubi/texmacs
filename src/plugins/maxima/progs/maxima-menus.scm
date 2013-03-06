@@ -15,6 +15,7 @@
   (:use (utils plugins plugin-cmd)
 	(doc help-funcs)
 	(dynamic scripts-edit)
+        (dynamic session-menu)
 	(convert tools tmconcat)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -65,10 +66,6 @@
       (maxima-output-simplify t)))
 
 (define maxima-apply script-apply)
-
-(tm-define (script-numeric-evaluation-command)
-  (:mode in-maxima?)
-  "float")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Maxima menu

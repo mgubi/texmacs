@@ -221,7 +221,7 @@ filter_preamble (tree t) {
 	r << u;
 	if (N(preamble) > 0)
 	  r << tuple ("\\begin-hide-preamble") << A(preamble)
-	    << tuple ("\\end-hide-preamble");
+	    << tuple ("\\end-hide-preamble") << "\n";
 	in_preamble= false;
       }
       else if (is_tuple (u, "\\documentclass") ||
@@ -254,14 +254,20 @@ filter_preamble (tree t) {
                is_tuple (u, "\\SetKwFunction", 2))
 	preamble << u << "\n" << "\n";
     }
+    else if (is_metadata_env (t[i])) {
+      string s= as_string (t[i][0]);
+      s= "\\end-" * s(7,N(s));
+      while (i<n && !is_tuple (t[i], s)) i++;
+    }
     else if (!is_metadata (u))
       doc << u;
   }
+  if (in_preamble) return t;
   metadata = collect_metadata (t, latex_classe);
+  // cout << "Parsed metadatas: " << metadata << "\n\n";
   r << A(kill_space_invaders (metadata));
   // cout << "Parsed metadatas: " << kill_space_invaders (metadata) << "\n";
   r << A(kill_space_invaders (doc));
-  if (in_preamble) return t;
   return r;
 }
 
@@ -625,7 +631,7 @@ test_alpha_on_end (tree t) {
 }
 
 string
-string_arg (tree t, bool url= false) {
+string_arg (tree t, bool url) {
   if (is_atomic (t)) return t->label;
   else if (is_concat (t)) {
     string r;
@@ -826,7 +832,7 @@ is_large_delimiter (tree t, int& type) {
     type= 1;
     return true;
   }
-  if ((s == "\\bigm") ||
+  if ((s == "\\middle") || (s == "\\bigm") ||
       ((s == "\\big") && is_mid_type (t[1]))) {
     type= 0;
     return true;
@@ -2697,6 +2703,28 @@ finalize_algorithms (tree t) {
 }
 
 static tree
+finalize_returns_bis (tree t) {
+  if (is_atomic (t)) {
+    tree r (CONCAT);
+    int j= 0;
+    string s= get_label (t);
+    while (j<N(s)) {
+      int start= j;
+      while ((j<N(s)) && (s[j]!='\n')) j++;
+      if (j>start) r << s(start,j);
+      if (j<N(s)) { r << tree (FORMAT, "new line"); j++; }
+    }
+    if (N(r)==0) return "";
+    if (N(r)==1) return r[0];
+    return r;
+  }
+  int i, n= N(t);
+  tree u (L(t));
+  for (i=0; i<n; i++) u << finalize_returns_bis (t[i]);
+  return u;
+}
+
+static tree
 finalize_document (tree t) {
   if (is_atomic (t)) t= tree (CONCAT, t);
   t= finalize_algorithms (t); 
@@ -2715,7 +2743,9 @@ finalize_document (tree t) {
     else r << t(start,i);
     if (i==(N(t)-1)) r << "";
   }
-  return finalize_sections (r);
+  r= finalize_sections (r);
+  r= finalize_returns_bis (r);
+  return r;
 }
 
 bool
@@ -3052,20 +3082,20 @@ latex_to_tree (tree t1) {
   textm_unicode   = false;
   textm_natbib    = false;
   command_type ("!em") = "false";
-  //cout << "\n\nt1= " << t1 << "\n\n";
+  // cout << "\n\nt1= " << t1 << "\n\n";
   tree t2= is_document? filter_preamble (t1): t1;
-  //cout << "\n\nt2= " << t2 << "\n\n";
+  // cout << "\n\nt2= " << t2 << "\n\n";
   tree t3= parsed_latex_to_tree (t2);
-  //cout << "\n\nt3= " << t3 << "\n\n";
+  // cout << "\n\nt3= " << t3 << "\n\n";
   tree t4= finalize_document (t3);
   // cout << "\n\nt4= " << t4 << "\n\n";
   tree t5= is_document? finalize_preamble (t4, style): t4;
   // cout << "\n\nt5= " << t5 << "\n\n";
   tree t6= handle_improper_matches (t5);
-  //cout << "\n\nt6= " << t6 << "\n\n";
+  // cout << "\n\nt6= " << t6 << "\n\n";
   if ((!is_document) && is_func (t6, DOCUMENT, 1)) t6= t6[0];
   tree t7= upgrade_tex (t6);
-  //cout << "\n\nt7= " << t7 << "\n\n";
+  // cout << "\n\nt7= " << t7 << "\n\n";
   tree t8= finalize_floats (t7);
   // cout << "\n\nt8= " << t8 << "\n\n";
   tree t9= finalize_misc (t8);

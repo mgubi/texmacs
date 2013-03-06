@@ -55,7 +55,7 @@
   part part* chapter chapter*
   section section* subsection subsection* subsubsection subsubsection*
   paragraph paragraph* subparagraph subparagraph* nextbib
-  footnote overline underline <sub> <sup> not left right
+  footnote overline underline <sub> <sup> not left middle right
   big Big bigg Bigg bigl Bigl biggl Biggl
   bigm Bigm biggm Biggm bigr Bigr biggr Biggr
   bar hat tilde widehat widetilde vec bm
@@ -68,8 +68,7 @@
   thispagestyle ensuremath
   mathord mathbin mathopen mathpunct mathop mathrel mathclose mathalpha
   arabic alph Alph roman Roman fnsymbol displaylines cases underbrace overbrace
-  title author date thanks terms
-  phantom hphantom vphantom smash
+  phantom hphantom vphantom smash date terms
   newcounter stepcounter refstepcounter value
   citet citep citet* citep* citealt citealp citealt* citealp*
   citetext citeauthor citeauthor* citeyear onlinecite
@@ -122,6 +121,7 @@
 
 (logic-group latex-command-1*%
   usepackage documentclass documentstyle sqrt bibitem cite caption  
+  title author thanks
   includegraphics includegraphics*
   subjclass declaretheorem footnotetext
   xleftarrow xrightarrow xleftrightarrow xminus

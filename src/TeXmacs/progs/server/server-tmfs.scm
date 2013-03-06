@@ -50,6 +50,8 @@
 ;; File hierarchy
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (safe-car l) (and (pair? l) (car l)))
+
 (define (search-file l . where)
   (if (null? l) where
       (let* ((q (if (null? where)
@@ -69,11 +71,22 @@
          (name (resource-get-first rid "name" "?")))
     (if dir (string-append (resource->file-name dir) "/" name) name)))
 
+(define (inheritance-reserved-attributes)
+  (append (server-reserved-attributes)
+          (list "name")))
+
+(define (inherit-property? x)
+  (nin? (car x) (inheritance-reserved-attributes)))
+
+(define (inherit-properties derived-rid base-rid)
+  (let* ((props1 (resource-get-all base-rid))
+         (props2 (list-filter props1 inherit-property?)))
+    (for (prop props2)
+      (resource-set derived-rid (car prop) (cdr prop)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Remote file manipulations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (safe-car l) (and (pair? l) (car l)))
 
 (tm-service (remote-file-create rname doc)
   ;;(display* "remote-file-create " rname ", " doc "\n")
@@ -91,11 +104,11 @@
            (server-error envelope "Error: write access required for directory"))
           (else
             (let* ((rid (resource-create (cAr l) "file" uid))
-                   (name (repository-add rid "tm"))
-                   (fname (repository-get rid))
-                   (tm (convert doc "texmacs-stree" "texmacs-document")))
+                   (name (repository-add rid (url-suffix rname)))
+                   (fname (repository-get rid)))
+              (inherit-properties rid did)
               (resource-set rid "dir" (list did))
-              (string-save tm fname)
+              (string-save doc fname)
               (with props (resource-get-all-decoded rid)
                 (server-return envelope (list doc props))))))))
 
@@ -114,16 +127,14 @@
            (server-error envelope "Error: file not found"))
           (else
             (let* ((props (resource-get-all-decoded rid))
-                   (tm (string-load fname))
-                   (doc (convert tm "texmacs-document" "texmacs-stree")))
+                   (doc (string-load fname)))
               (server-return envelope (list doc props)))))))
 
 (tm-service (remote-file-save rname doc)
   ;;(display* "remote-file-save " rname ", " doc "\n")
   (let* ((uid (server-get-user envelope))
          (rid (file-name->resource (tmfs-cdr rname)))
-         (fname (repository-get rid))
-         (tm (convert doc "texmacs-stree" "texmacs-document")))
+         (fname (repository-get rid)))
     (cond ((not uid)
            (server-error envelope "Error: not logged in"))
           ((not rid)
@@ -132,7 +143,7 @@
            (server-error envelope "Error: write access denied"))
           (else
             (with props (resource-get-all-decoded rid)
-              (string-save tm fname)
+              (string-save doc fname)
               (server-return envelope (list doc props)))))))
 
 (tm-service (remote-file-set-properties rname props)
@@ -154,22 +165,26 @@
 ;; Remote directories
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (generic-document doc)
-  `(document
-     (TeXmacs ,(texmacs-version))
-     (style (tuple "generic"))
-     (body ,doc)))
-
-(define (dir-line server rid)
-  (let* ((tail (resource-get-first rid "name" "?"))
-         (name (resource->file-name rid))
-         (full (string-append "tmfs://remote-file/" server "/" name))
-         (hlink `(hlink ,tail ,full)))
-    hlink))
-
-(define (dir-page server rids)
-  (generic-document `(document (subsection* "File list")
-                               ,@(map (cut dir-line server <>) rids))))
+(tm-service (remote-dir-create rname)
+  (display* "remote-dir-create " rname "\n")
+  (let* ((uid (server-get-user envelope))
+         (fid (file-name->resource (tmfs-cdr rname)))
+         (l (tmfs->list rname))
+         (did (safe-car (search-file (cDr (cdr l))))))
+    (cond ((not uid)
+           (server-error envelope "Error: not logged in"))
+          (fid
+           (server-error envelope "Error: directory already exists"))
+          ((not did)
+           (server-error envelope "Error: directory does not exist"))
+          ((not (resource-allow? did uid "writable"))
+           (server-error envelope "Error: write access required for directory"))
+          (else
+            (let* ((rid (resource-create (cAr l) "dir" uid)))
+              (inherit-properties rid did)
+              (resource-set rid "dir" (list did))
+              (with props (resource-get-all-decoded rid)
+                (server-return envelope (list (list) props))))))))
 
 (define (filter-read-access rids uid)
   (cond ((null? rids) rids)
@@ -177,12 +192,27 @@
          (cons (car rids) (filter-read-access (cdr rids) uid)))
         (else (filter-read-access (cdr rids) uid))))
 
+(define (rewrite-dir-entry rid)
+  (let* ((short-name (resource-get-first rid "name" "?"))
+         (full-name (resource->file-name rid))
+         (dir? (== (resource-get-first rid "type" #f) "dir"))
+         (props (resource-get-all-decoded rid)))
+    (list short-name full-name dir? props)))
+
 (tm-service (remote-dir-load rname)
   ;;(display* "remote-dir-load " rname "\n")
   (with uid (server-get-user envelope)
     (if (not uid) (server-error envelope "Error: not logged in")
         (let* ((server (car (tmfs->list rname)))
                (dirs (search-file (cdr (tmfs->list rname))))
-               (matches (append-map dir-contents dirs))
-               (filtered (filter-read-access matches uid)))
-          (server-return envelope (dir-page server filtered))))))
+               (rid (safe-car dirs)))
+          (cond ((not rid)
+                 (server-error envelope "Error: directory does not exist"))
+                ((not (resource-allow? rid uid "readable"))
+                 (server-error envelope "Error: read access required"))
+                (else
+                  (let* ((matches (dir-contents rid))
+                         (filtered (filter-read-access matches uid))
+                         (rewr (map rewrite-dir-entry filtered))
+                         (props (resource-get-all-decoded rid)))
+                    (server-return envelope (list rewr props)))))))))

@@ -129,12 +129,12 @@ TeXmacs_init_paths (int& argc, char** argv) {
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
   // * "../../Resources/share/TeXmacs/bin") << LF;
   if (exists("/bin/bash")) {
-    string shell_env =  eval_system("PATH='' /bin/bash -l -c 'echo $PATH'");
+    string shell_env = var_eval_system ("PATH='' /bin/bash -l -c 'echo $PATH'");
     set_env ("PATH", get_env("PATH") * ":" * shell_env * ":" *
-           as_string (exedir * "../Resources/share/TeXmacs/bin"));
+             as_string (exedir * "../Resources/share/TeXmacs/bin"));
   } else {
     set_env ("PATH", get_env("PATH") * ":" *
-               as_string (exedir * "../Resources/share/TeXmacs/bin"));
+             as_string (exedir * "../Resources/share/TeXmacs/bin"));
   }
   // system("set");
 #endif
@@ -275,7 +275,7 @@ TeXmacs_main (int argc, char** argv) {
       else if ((s == "-S") || (s == "-setup") ||
 	       (s == "-delete-cache") || (s == "-delete-font-cache") ||
 	       (s == "-delete-style-cache") || (s == "-delete-file-cache") ||
-	       (s == "-delete-doc-cache"));
+	       (s == "-delete-doc-cache") || (s == "-delete-plugin-cache"));
       else if (starts (s, "-psn"));
       else {
 	cout << "\n";
@@ -462,6 +462,9 @@ immediate_options (int argc, char** argv) {
       remove (url ("$TEXMACS_HOME_PATH/system/cache/file_cache"));
       remove (url ("$TEXMACS_HOME_PATH/system/cache/dir_cache.scm"));
       remove (url ("$TEXMACS_HOME_PATH/system/cache/stat_cache.scm"));
+    }
+    else if (s == "-delete-plugin-cache") {
+      remove (url ("$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm"));
     }
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
