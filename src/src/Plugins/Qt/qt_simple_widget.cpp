@@ -108,7 +108,6 @@ impress (qt_simple_widget_rep* wid) {
     {
       qt_renderer_rep *ren = the_qt_renderer();
       ren->begin (static_cast<QPaintDevice*>(&pxm));
-      wid->set_current_renderer(the_qt_renderer());
       rectangle r = rectangle (0, 0, s.width(), s.height());
       ren->set_origin(0,0);
       ren->encode (r->x1, r->y1);
@@ -123,7 +122,6 @@ impress (qt_simple_widget_rep* wid) {
         disable_check_event= cache;
       }
       ren->end();
-      wid->set_current_renderer(NULL);
     }
     return pxm;
   }
