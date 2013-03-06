@@ -17,23 +17,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (texgraph-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
     (with s (texmacs->code u)
       (string-append (escape-verbatim (string-replace s "\n" "~")) "\n"))))
 
-(define (texgraph-initialize)
-  (import-from (texgraph-menus))
-  (import-from (utils plugins plugin-convert))
-  (lazy-input-converter (texgraph-input) texgraph) ;; uniquement pour le script plot-curve
-  )
-
 (plugin-configure texgraph
+  (:macpath "TeXgraph.app" "Contents/Resources/TeXgraph")
   (:require (and (url-exists-in-path? "latex")
-		 (url-exists-in-path? "CmdTeXgraph")))
-  (:initialize (texgraph-initialize))
+		 (or (url-exists-in-path? "CmdTeXgraph")
+                     (url-exists-in-path? "CmdTeXgraph.sh"))))
   (:launch "tm_texgraph --texmacs")
   (:serializer ,texgraph-serialize)
   (:session "Texgraph")
   (:scripts "Texgraph"))
 
+(when (supports-texgraph?)
+  (import-from (texgraph-menus))
+  (lazy-input-converter (texgraph-input) texgraph) ;; uniquement pour le script plot-curve
+  )

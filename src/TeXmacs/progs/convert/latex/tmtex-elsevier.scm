@@ -50,8 +50,49 @@
   (string-append "author-" (ref-author)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Preprocessing datas
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-style-preprocess doc)
+  (:mode elsevier-style?)
+  (elsevier-create-frontmatter doc))
+
+(define (elsarticle-frontmatter? t)
+  (or (func? t 'abstract-data) (func? t 'doc-data) (func? t 'abstract)))
+
+(define (partition l pred?)
+  (if (npair? l) l
+    (letrec ((npred? (lambda (x) (not (pred? x)))))
+      (if (pred? (car l))
+        (receive (h t) (list-break l npred?)
+          (cons h (partition t pred?)))
+        (receive (h t) (list-break l pred?)
+          (cons h (partition t pred?)))))))
+
+(define (elsevier-create-frontmatter t)
+  (if (or (npair? t) (npair? (cdr t))) t
+    (with l (map elsarticle-frontmatter? (cdr t))
+      (if (in? #t l)
+        (with parts (partition (cdr t) elsarticle-frontmatter?)
+          `(,(car t) ,@(map (lambda (x)
+                              (if (elsarticle-frontmatter? (car x))
+                                `(elsevier-frontmatter (,(car t) ,@x))
+                                `(,(car t) ,@x))) parts)))
+        `(,(car t) ,@(map elsevier-create-frontmatter (cdr t)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsevier specific customizations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-elsevier-frontmatter s l)
+  (:mode elsevier-style?)
+  `((!begin "frontmatter") ,(tmtex (car l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elsarticle title macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (replace-documents t) t)
 
 (define (list-elsarticle-notes)
   (if (== note-counter 0) ""
@@ -118,6 +159,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elsart specific title macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (replace-documents t)
+  (:mode elsart-style?)
+  (if (npair? t) t
+    (with (r s) (list (car t) (map replace-documents (cdr t)))
+      (if (!= r 'document) `(,r ,@s)
+        `(concat ,@(list-intersperse s '(next-line)))))))
 
 (define (thanksref t)
   `(thanksref ,t))
@@ -200,34 +248,12 @@
         ((func? t 'author-name) (elsevier-get-name-refs (cadr t)))
         (else '())))
 
-(define (elsarticle-frontmatter? t)
-  (or (func? t 'abstract-data) (func? t 'doc-data) (func? t 'abstract)))
-
-(define (partition l pred?)
-  (if (npair? l) l
-    (letrec ((npred? (lambda (x) (not (pred? x)))))
-      (if (pred? (car l))
-        (receive (h t) (list-break l npred?)
-          (cons h (partition t pred?)))
-        (receive (h t) (list-break l pred?)
-          (cons h (partition t pred?)))))))
-
-(tm-define (elsevier-create-frontmatter t)
-  (if (or (npair? t) (npair? (cdr t))) t
-    (with l (map elsarticle-frontmatter? (cdr t))
-      (if (in? #t l)
-        (with parts (partition (cdr t) elsarticle-frontmatter?)
-          `(,(car t) ,@(map (lambda (x)
-                              (if (elsarticle-frontmatter? (car x))
-                                `(elsevier-frontmatter (,(car t) ,@x))
-                                `(,(car t) ,@x))) parts)))
-        `(,(car t) ,@(map elsevier-create-frontmatter (cdr t)))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elsevier non clustered title macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tmtex-elsevier-author t)
+  (set! t (replace-documents t))
   (if (or (npair? t) (npair? (cdr t)) (not (func? (cadr t) 'author-data))) '()
     (let* ((datas        (cdadr t))
            ;; notes and miscs needed in first position due to side effects
@@ -254,7 +280,7 @@
 
 (tm-define (tmtex-doc-data s l)
   (:mode elsevier-style?)
-
+  (set! t (replace-documents t))
   (let* ((subtitles (map tmtex-elsevier-subtitle
                          (tmtex-select-args-by-func 'doc-subtitle l)))
          (notes     (map tmtex-elsevier-note
@@ -281,6 +307,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tmtex-elsevier-clustered-author t author-notes)
+  (set! t (replace-documents t))
   (if (or (npair? t) (npair? (cdr t)) (not (func? (cadr t) 'author-data))) '()
     (let* ((datas        (cdadr t))
            (author-notes (filter nnull? author-notes))
@@ -337,7 +364,7 @@
   (:mode elsevier-style?)
   (:require (or (in? "cluster-all" (get-title-option l))
                 (in? "cluster-by-affiliation" (get-title-option l))))
-
+  (set! l (map replace-documents l))
   (let* ((sal       (add-notes (single-author-list (cons s l))))
          (subtitles  (map tmtex-elsevier-subtitle
                           (tmtex-select-args-by-func 'doc-subtitle l)))

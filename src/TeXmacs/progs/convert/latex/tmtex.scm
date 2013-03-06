@@ -52,6 +52,13 @@
 (tm-define (tmtex-style-init body)
   (noop))
 
+(tm-define (tmtex-style-preprocess doc) doc)
+
+(define (import-tmtex-styles)
+  (cond ((elsevier-style?)
+         (import-from (convert latex tmtex-elsevier)))
+         (else (noop))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization from options
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -681,10 +688,14 @@
     (list (string->symbol (string-append b s)))))
 
 (define (tmtex-mid l)
-  (let ((s (tmtex-large-decode (car l))))
-    (if (== (string-ref s 0) #\\)
-	(list (string->symbol (substring s 1 (string-length s))))
-	s)))
+  (let* ((s (tmtex-large-decode (car l)))
+	 (n (if (> (length l) 1) (string->number (cadr l)) 0))
+	 (b (cond ((= n 1) "bigm")
+		  ((= n 2) "Bigm")
+		  ((= n 3) "biggm")
+		  ((= n 4) "Biggm")
+		  (else "middle"))))
+    (list (string->symbol (string-append b s)))))
 
 (define (tmtex-right l)
   (let* ((s (tmtex-large-decode (car l)))
@@ -1221,9 +1232,6 @@
 
 (define (tmtex-doc-data-wrapper s l)
   (tmtex-doc-data s l))
-
-(tm-define (tmtex-elsevier-frontmatter s l)
-  (tmtex-std-env "frontmatter" l))
 
 (tm-define (tmtex-abstract s l)
   (tmtex-std-env "abstract" l))
@@ -1774,6 +1782,10 @@
   (shown tmtex-id)
   (!file tmtex-file)
   (!arg tmtex-tex-arg))
+      
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Expansion of all macros which are not recognized by LaTeX
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-table tmtex-tmstyle%
   ((:or hide-preamble show-preamble) (,tmtex-default -1))
@@ -1785,7 +1797,6 @@
 	abstract-keywords abstract-msc) (,tmtex-default -1))
   ((:or author-name author-affiliation author-misc author-note
 	author-email author-homepage) (,tmtex-default -1))
-  (elsevier-frontmatter (,tmtex-elsevier-frontmatter 1))
   (abstract (,tmtex-abstract-wrapper 1))
   (abstract-data (,tmtex-abstract-data-wrapper -1))
   (appendix (,tmtex-appendix 1))
@@ -1890,12 +1901,42 @@
   ((:or cite-author* cite-author*-link) (,tmtex-cite-author* 1))
   ((:or cite-year cite-year-link) (,tmtex-cite-year 1)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tags which are customized in particular style files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (style-dependent-declare x)
+  (with (tag fun) x
+    (with fun+bis (symbol-append fun '+bis)
+      `(begin
+         (when (not (defined? ',fun))
+           (tm-define (,fun s l) (tmtex-function (string->symbol s) l)))
+         (when (not (defined? ',fun+bis))
+           (tm-define (,fun+bis s l) (,fun s l)))))))
+
+(tm-define (style-dependent-transform x)
+  (with (tag fun) x
+    (with fun+bis (symbol-append fun '+bis)
+      `(,tag (,(list 'unquote fun+bis) -1)))))
+
+(define-macro (tmtex-style-dependent . l)
+  `(begin
+     ,@(map style-dependent-declare l)
+     (logic-table tmtex-tmstyle% ,@(map style-dependent-transform l))))
+
+(tmtex-style-dependent
+  (elsevier-frontmatter tmtex-elsevier-frontmatter))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Protected tags
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (logic-group tmtex-protected%
   a b c d i j k l o r t u v H L O P S
   aa ae bf cr dh dj dp em fi ge gg ht if in it le lg ll lu lq mp mu
   ne ng ni nu oe or pi pm rm rq sb sc sf sl sp ss th to tt wd wp wr xi
   AA AE DH DJ Im NG OE Pi Pr Re SS TH Xi)
-
+      
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Expansion of all macros which are not recognized by LaTeX
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1969,9 +2010,8 @@
 	(latex-set-packages '())
 	(set! tmtex-style (car style))
 	(set! tmtex-packages (cdr style))
-	(when (elsevier-style?)
-	  (import-from (convert latex tmtex-elsevier))
-	  (set! doc (elsevier-create-frontmatter doc)))
+        (import-tmtex-styles)
+        (set! doc (tmtex-style-preprocess doc))
 	(tmtex-style-init body)
 	(with result (texmacs->latex doc opts)
 	  (set! tmtex-style "generic")

@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : mmx-input.scm
-;; DESCRIPTION : Initialize input conversions for various Mathemagix dialects
-;; COPYRIGHT   : (C) 2013  Joris van der Hoeven
+;; MODULE      : sage-input.scm
+;; DESCRIPTION : Sage input converters
+;; COPYRIGHT   : (C) 1999, 2012  Joris van der Hoeven and Andrey Grozin
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -11,57 +11,53 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (mmx-input)
+(texmacs-module (sage-input)
   (:use (utils plugins plugin-convert)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specific conversion routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (mmx-input-var-row r)
+(define (sage-input-var-row r)
   (if (nnull? r)
       (begin
 	(display ", ")
 	(plugin-input (car r))
-	(mmx-input-var-row (cdr r)))))
+	(sage-input-var-row (cdr r)))))
 
-(tm-define (mmx-input-row r)
+(define (sage-input-row r)
+  (display "[")
   (plugin-input (car r))
-  (mmx-input-var-row (cdr r)))
+  (sage-input-var-row (cdr r))
+  (display "]"))
 
-(tm-define (mmx-input-var-rows t)
+(define (sage-input-var-rows t)
   (if (nnull? t)
       (begin
-	(display "; ")
-	(mmx-input-row (car t))
-	(mmx-input-var-rows (cdr t)))))
+	(display ", ")
+	(sage-input-row (car t))
+	(sage-input-var-rows (cdr t)))))
 
-(tm-define (mmx-input-rows t)
-  (display "matrix(")
-  (mmx-input-row (car t))
-  (mmx-input-var-rows (cdr t))
-  (display ")"))
+(define (sage-input-rows t)
+  (display "matrix([")
+  (sage-input-row (car t))
+  (sage-input-var-rows (cdr t))
+  (display "])"))
 
-(tm-define (mmx-input-descend-last args)
+(define (sage-input-descend-last args)
   (if (null? (cdr args))
       (plugin-input (car args))
-      (mmx-input-descend-last (cdr args))))
+      (sage-input-descend-last (cdr args))))
 
-(tm-define (mmx-input-det args)
+(define (sage-input-det args)
   (display "det(")
-  (mmx-input-descend-last args)
+  (sage-input-descend-last args)
   (display ")"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define-macro (mmx-converters mmx)
-  `(plugin-input-converters ,mmx
-     (rows mmx-input-rows)
-     (det mmx-input-det)
-     ("<in>" " in ")
-     ("<neg>" "!")
-     ("<wedge>" "/\\")
-     ("<vee>" "\\/")
-     ("<mapsto>" ":-<gtr>")))
+(plugin-input-converters sage
+  (rows sage-input-rows)
+  (det sage-input-det))

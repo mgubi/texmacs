@@ -4,10 +4,10 @@
 
 <\body>
   <active*|<\src-title>
-    <src-package|caas|1.0>
+    <src-package|mmi|1.0>
 
     <\src-purpose>
-      Markup for Caas sessions.
+      Markup for Mmi sessions.
     </src-purpose>
 
     <src-copyright|2002--2004|Joris van der Hoeven>
@@ -28,13 +28,13 @@
     </src-comment>
   </active*>
 
-  <assign|caas-prompt|<macro|nr|<with|prog-language|verbatim|Caas]<specific|html|&nbsp;>
+  <assign|mmi-prompt|<macro|nr|<with|prog-language|verbatim|Mmi]<specific|html|&nbsp;>
   >>>
 
-  <assign|caas-input|<macro|prompt|body|<style-with|src-compact|none|<generic-input|<with|color|red|<arg|prompt>>|<with|color|dark
+  <assign|mmi-input|<macro|prompt|body|<style-with|src-compact|none|<generic-input|<with|color|red|<arg|prompt>>|<with|color|dark
   brown|<arg|body>>>>>>
 
-  <assign|caas-output|<macro|body|<generic-output|<with|prog-language|verbatim|<arg|body>>>>>
+  <assign|mmi-output|<macro|body|<generic-output|<with|prog-language|verbatim|<arg|body>>>>>
 
   <\active*>
     <\src-comment>

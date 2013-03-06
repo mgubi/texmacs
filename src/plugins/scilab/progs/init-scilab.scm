@@ -11,11 +11,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define scilab-launcher
-  (if (os-mingw?) "Scilex --texmacs -texmacs" "scilab --texmacs"))
+(define (scilab-launcher)
+  (if (os-mingw?)
+      "Scilex --texmacs -texmacs"
+      "scilab --texmacs"))
 
 (plugin-configure scilab
+  (:macpath "scilab*" "Contents/MacOS/bin")
   (:winpath "scilab*" "bin")
   (:require (url-exists-in-path? (if(os-mingw?) "Scilex" "scilab")))
-  (:launch ,scilab-launcher)
+  (:launch ,(scilab-launcher))
   (:session "Scilab"))

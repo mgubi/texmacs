@@ -12,29 +12,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (mathemagix-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
     (with v (texmacs->code u)
       (with w (string-replace v "\n" "/{CR}/")
 	(string-append (escape-verbatim w) "\n")))))
 
-(define mathemagix-launcher
-  (if #f;;(url-exists-in-path? "mmi")
-      "mmi --texmacs"
-      "mmx-light --texmacs"))
-
 (plugin-configure mathemagix
   (:winpath "Mathemagix" "bin")
-  (:require (or (url-exists-in-path? "mmi")
-                (url-exists-in-path? "mmx-light")))
+  (:require (url-exists-in-path? "mmx-light"))
   (:serializer ,mathemagix-serialize)
-  (:launch ,mathemagix-launcher)
+  (:launch "mmx-light --texmacs")
   (:session "Mathemagix")
   (:scripts "Mathemagix"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Editing Mathemagix programs (even if Mathemagix is not installed)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-modes
   (in-mathemagix% (== (get-env "prog-language") "mathemagix"))
@@ -44,15 +33,8 @@
 
 (lazy-keyboard (mathemagix-edit) in-prog-mathemagix?)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Initialization if Mathemagix is supported
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (when (supports-mathemagix?)
-
-(import-from (mathemagix-menus))
-(lazy-input-converter (mathemagix-input) mathemagix)
-(lazy-keyboard (mathemagix-kbd) in-mathemagix?)
-(plugin-approx-command-set! "mathemagix" "")
-
-) ;; end when (supports-mathemagix?)
+  (import-from (mathemagix-menus))
+  (lazy-input-converter (mathemagix-input) mathemagix)
+  (lazy-keyboard (mathemagix-kbd) in-mathemagix?)
+  (plugin-approx-command-set! "mathemagix" ""))

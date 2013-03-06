@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : init-matlab.scm
-;; DESCRIPTION : Initialize Matlab plugin
-;; COPYRIGHT   : (C) 2004 Free Software Foundation
+;; MODULE      : mmi-edit.scm
+;; DESCRIPTION : editing mmi programs
+;; COPYRIGHT   : (C) 2008  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -11,10 +11,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(plugin-configure matlab
-  (:require (url-exists-in-path? "matlab"))
-  (:launch "tm_matlab")
-  (:session "Matlab"))
+(texmacs-module (mmi-edit)
+  (:use (mmx-indent)))
 
-(when (supports-matlab?)
-  (plugin-input-converters matlab))
+(tm-define (kbd-variant t forward?)
+  (:require (and (in-prog-mmi?) (not (inside? 'session))))
+  (mmi-indent))
+
+(tm-define (insert-return)
+  (:mode in-prog-mmi?)
+  (insert-raw-return)
+  (mmi-indent))

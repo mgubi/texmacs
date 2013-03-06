@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : init-matlab.scm
-;; DESCRIPTION : Initialize Matlab plugin
-;; COPYRIGHT   : (C) 2004 Free Software Foundation
+;; MODULE      : mmi-input.scm
+;; DESCRIPTION : Initialize mmi input converters
+;; COPYRIGHT   : (C) 2013  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -11,10 +11,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(plugin-configure matlab
-  (:require (url-exists-in-path? "matlab"))
-  (:launch "tm_matlab")
-  (:session "Matlab"))
+(texmacs-module (mmi-input)
+  (:use (mmx-input)))
 
-(when (supports-matlab?)
-  (plugin-input-converters matlab))
+(mmx-converters mmi)

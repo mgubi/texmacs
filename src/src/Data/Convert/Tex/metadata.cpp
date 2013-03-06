@@ -261,34 +261,63 @@ translate_author_metadata_elsevier (tree u) {
   return concat ();
 }
 
+static array<tree>
+translate_abstract_data_elsevier (tree t) {
+  array<tree> r;
+  int i=0, n=N(t);
+  tree kw  (APPLY, "\\abstract-keywords");
+  tree msc (APPLY, "\\abstract-msc");
+  tree tmp (CONCAT);
+  while (i<n && !is_tuple (t[i], "\\PACS")) {
+    while (i<n && !is_tuple (t[i], "\\sep") && !is_tuple (t[i], "\\PACS"))
+      tmp << t[i++];
+    kw << tmp;
+    tmp= concat ();
+    if (!is_tuple (t[i], "\\PACS")) i++;
+  }
+  if (is_tuple (t[i], "\\PACS")) {
+    i++;
+    while (i<n) {
+      while (i<n && !is_tuple (t[i], "\\sep")) tmp << t[i++];
+      msc << tmp;
+      tmp= concat ();
+      i++;
+    }
+  }
+  if (N(kw)>1)  r << kw;
+  if (N(msc)>1) r << msc;
+  return r;
+}
+
 static tree
 translate_metadata_elsevier (tree t) {
   int i, n=N(t);
   bool clustered= false;
-  tree u, r (APPLY, "\\doc-data");
+  tree u, r (CONCAT);
+  tree doc_data (APPLY, "\\doc-data");
   tree abstract (APPLY, "\\abstract-data");
   tree author (APPLY, "\\author-data");
   array<string> authors_stuff;
   for (i=0; i<n; i++) {
     u= t[i];
     if (is_tuple (u, "\\title", 1))
-      r << tree (APPLY, "\\doc-title", cenr (u[1]));
+      doc_data << tree (APPLY, "\\doc-title", cenr (u[1]));
     else if (is_tuple (u, "\\thankssubtitle*", 2) ||
              is_tuple (u, "\\tsubtitletext*", 2))
-      r << tree (APPLY, "\\doc-subtitle", cenr (u[2]));
+      doc_data << tree (APPLY, "\\doc-subtitle", cenr (u[2]));
     else if (is_tuple (u, "\\thanksmisc*", 2) ||
              is_tuple (u, "\\tmisctext*", 2))
-      r << tree (APPLY, "\\doc-misc", cenr (u[2]));
+      doc_data << tree (APPLY, "\\doc-misc", cenr (u[2]));
     else if (is_tuple (u, "\\thanksdate*", 2) ||
              is_tuple (u, "\\tdatetext*", 2))
-      r << tree (APPLY, "\\doc-date", cenr (u[2]));
+      doc_data << tree (APPLY, "\\doc-date", cenr (u[2]));
     else if (is_tuple (u, "\\thanks*", 2)
         && !contains (string_arg (u[1]), authors_stuff))
-      r << tree (APPLY, "\\doc-note", cenr (u[2]));
+      doc_data << tree (APPLY, "\\doc-note", cenr (u[2]));
     else if (is_tuple (u, "\\tnotetext*", 2))
-      r << tree (APPLY, "\\doc-note", cenr (u[2]));
+      doc_data << tree (APPLY, "\\doc-note", cenr (u[2]));
     else if (is_tuple (u, "\\author*", 2) || is_tuple (u, "\\author", 1)) {
-      if (N(author) > 1) r << tree (APPLY, "\\doc-author", author);
+      if (N(author) > 1) doc_data << tree (APPLY, "\\doc-author", author);
       if (is_tuple (u, "\\author*", 2)) clustered= true;
       array<string> refs= get_elsevier_author_refs (u);
       array<tree> attrs= get_elsevier_author_attributes (t, refs);
@@ -304,9 +333,27 @@ translate_metadata_elsevier (tree t) {
         author << tree (APPLY, "\\author-email", cenr (u[1]));
     else if (is_tuple (u, "\\ead*", 2) && string_arg (u[1]) == "url")
         author << tree (APPLY, "\\author-homepage", cenr (u[2]));
+    else if (is_tuple (u, "\\begin-abstract")) {
+      tree abstract_text (CONCAT);
+      i++;
+      while (i<n && !is_tuple (t[i], "\\end-abstract"))
+        abstract_text << t[i++];
+      abstract << tree (APPLY, "\\abstract", abstract_text);
+    }
+    else if (is_tuple (u, "\\begin-keyword")) {
+      tree keywords (CONCAT);
+      i++;
+      while (i<n && !is_tuple (t[i], "\\end-keyword"))
+        keywords << t[i++];
+      array<tree> abstract_data= translate_abstract_data_elsevier (keywords);
+      for (int j=0; j<N(abstract_data); j++)
+        abstract << abstract_data[j];
+    }
   }
-  if (N(author) > 1) r << tree (APPLY, "\\doc-author", author);
-  if (clustered) r << tree (APPLY, "\\doc-title-options", "cluster-all");
+  if (N(author) > 1) doc_data << tree (APPLY, "\\doc-author", author);
+  if (clustered) doc_data << tree (APPLY, "\\doc-title-options", "cluster-all");
+  if (N(doc_data) > 1) r << doc_data << "\n";
+  if (N(abstract) > 1) r << abstract << "\n";
   return r;
 }
 
@@ -321,7 +368,7 @@ collect_metadata_elsevier (tree t) {
         r = concat ();
         for (i++; i<n && !is_tuple (t[i], "\\end-frontmatter"); i++)
           r << t[i];
-        return concat (translate_metadata_elsevier (r));
+        return translate_metadata_elsevier (r);
       }
       else {
         r= collect_metadata_elsevier (t[i]);

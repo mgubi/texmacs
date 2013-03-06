@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : tm-plugins.scm
 ;; DESCRIPTION : Configuration of plugins
-;; COPYRIGHT   : (C) 1999  Joris van der Hoeven
+;; COPYRIGHT   : (C) 1999-2013  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -31,31 +31,49 @@
 ;; Connection types for plugins
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define connection-defined (make-ahash-table))
-(define connection-default (make-ahash-table))
-(define connection-variant (make-ahash-table))
+(define-public connection-defined (make-ahash-table))
+(define-public connection-default (make-ahash-table))
+(define-public connection-variant (make-ahash-table))
 (define-public connection-varlist (make-ahash-table))
-(define connection-handler (make-ahash-table))
+(define-public connection-handler (make-ahash-table))
+(define-public connection-session (make-ahash-table))
+(define-public connection-scripts (make-ahash-table))
 
 (define (connection-setup name val . opt)
   (ahash-set! connection-defined name #t)
-  (if (null? opt)
-      (ahash-set! connection-default name val)
-      (with l (ahash-ref connection-varlist name)
-	(if (not l) (set! l '("default")))
-	(ahash-set! connection-variant (list name (car opt)) val)
-	(ahash-set! connection-varlist name (rcons l (car opt))))))
+  (if (null? opt) (set! opt (list "default")))
+  (with l (or (ahash-ref connection-varlist name) (list))
+    (ahash-set! connection-variant (list name (car opt)) val)
+    (ahash-set! connection-varlist name (rcons l (car opt)))))
+
+(define-public (connection-list)
+  (list-sort (list-union (map car (ahash-table->list connection-defined))
+                         (remote-connection-list))
+             string<=?))
+
+(define-public (connection-variants name)
+  (lazy-plugin-force)
+  (append (or (ahash-ref connection-varlist name) (list))
+          (remote-connection-variants name)))
 
 (define-public (connection-defined? name)
   (lazy-plugin-force)
-  (ahash-ref connection-defined name))
+  (or (ahash-ref connection-defined name)
+      (remote-connection-defined? name)))
+
+(define-public (connection-info-sub name session)
+  (or (remote-connection-info name session)
+      (ahash-ref connection-variant (list name session))
+      (with l (connection-variants name)
+        (and (nnull? l)
+             (!= session (car l))
+             (connection-info-sub name (car l))))))
 
 (define-public (connection-info name session)
   (lazy-plugin-force)
   (with pos (string-index session #\:)
     (if pos (connection-info name (substring session 0 pos))
-	(with val (ahash-ref connection-variant (list name session))
-	  (if val val (ahash-ref connection-default name))))))
+        (connection-info-sub name session))))
 
 (define (connection-insert-handler name channel routine)
   (if (not (ahash-ref connection-handler name))
@@ -69,41 +87,215 @@
   (with r (ahash-ref connection-handler name)
     (if r (cons 'tuple r) '(tuple))))
 
-(define-public (sorted-supported-plugins)
-  (lazy-plugin-force)
-  (list-sort (map car (ahash-table->list connection-defined)) string<=?))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Supported sessions and scripting languages
+;; Plug-ins for console sessions and scripting languages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public supported-sessions-list '())
-(define-public supported-sessions-table (make-ahash-table))
-
-(define (supported-sessions-add name menu-name)
+(define (session-setup name menu-name)
   (if (symbol? name) (set! name (symbol->string name)))
-  (set! supported-sessions-list (cons name supported-sessions-list))
-  (ahash-set! supported-sessions-table name menu-name))
+  (ahash-set! connection-session name menu-name))
 
-(tm-define (supports-sessions? name)
+(define-public (session-list)
+  (with l (map car (ahash-table->list connection-session))
+    (list-sort (list-union l (remote-session-list)) string<=?)))
+
+(define (session-ref name)
+  (or (ahash-ref connection-session name)
+      (remote-session-ref name)))
+
+(define-public (session-defined? name)
+  (session-ref name))
+
+(define-public (session-name name)
+  (or (session-ref name) (upcase-first name)))
+
+(define-public (session-assoc-list)
+  (list-union (ahash-table->list connection-session)
+              (remote-session-assoc-list)))
+
+(define (scripts-setup name menu-name)
   (if (symbol? name) (set! name (symbol->string name)))
-  (not (not (ahash-ref supported-sessions-table name))))
+  (ahash-set! connection-scripts name menu-name))
 
-(tm-define (sorted-supported-sessions)
+(define-public (scripts-list)
+  (with l (map car (ahash-table->list connection-scripts))
+    (list-sort (list-union l (remote-scripts-list)) string<=?)))
+
+(define (scripts-ref name)
+  (or (ahash-ref connection-scripts name)
+      (remote-scripts-ref name)))
+
+(define-public (scripts-defined? name)
+  (scripts-ref name))
+
+(define-public (scripts-name name)
+  (or (scripts-ref name) (upcase-first name)))
+
+(define-public (scripts-assoc-list)
+  (list-union (ahash-table->list connection-scripts)
+              (remote-scripts-assoc-list)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Remote plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (launcher? x)
+  (and (func? (cdr x) 'tuple 2)
+       (== (caddr x) "pipe")))
+
+(define (launcher-entry x)
+  (rcons (car x) (cadddr x)))
+
+(define (launcher<=? l1 l2)
+  (or (string<=? (car l1) (car l2))
+      (and (== (car l1) (car l2))
+           (string<=? (cadr l1) (cadr l2)))))
+
+(define (launcher-list)
   (lazy-plugin-force)
-  (list-sort supported-sessions-list string<=?))
+  (let* ((l1 (ahash-table->list connection-variant))
+         (l2 (list-filter l1 launcher?))
+         (l3 (map launcher-entry l2))
+         (l4 (list-sort l3 launcher<=?)))
+    l4))
 
-(define-public supported-scripts-list '())
-(define-public supported-scripts-table (make-ahash-table))
+(define-public (write-local-plugin-info)
+  (lazy-plugin-force)
+  (write (list (url->system (string->url "$PATH"))
+               (launcher-list)
+               (ahash-table->list connection-session)
+               (ahash-table->list connection-scripts)))
+  (display "\n"))
 
-(define (supported-scripts-add name menu-name)
-  (if (symbol? name) (set! name (symbol->string name)))
-  (set! supported-scripts-list (cons name supported-scripts-list))
-  (ahash-set! supported-scripts-table name menu-name))
+(define-public (get-remote-plugin-info where)
+  ;; NOTE: prepare environment in ~/.bashrc
+  (let* ((tmp "$TEXMACS_HOME_PATH/system/remote-plugin-info")
+         (rcmd "texmacs -s -x \"(write-local-plugin-info)\" -q")
+         (qcmd (string-quote rcmd))
+         (lcmd (string-append "ssh " where " " qcmd " > " tmp)))
+    (system lcmd)
+    (with res (string-load tmp)
+      (system-remove tmp)
+      (string->object res))))
 
-(tm-define (supports-scripts? name)
-  (if (symbol? name) (set! name (symbol->string name)))
-  (not (not (ahash-ref supported-scripts-table name))))
+(define remote-plugins "$TEXMACS_HOME_PATH/system/remote-plugins.scm")
+(define remote-plugins-initialized? #f)
+(define remote-plugins-table (make-ahash-table))
+
+(define-public (load-remote-plugins)
+  (when (not remote-plugins-initialized?)
+    (set! remote-plugins-initialized? #t)
+    (when (url-exists? remote-plugins)
+      (with l (load-object remote-plugins)
+        (set! remote-plugins-table (list->ahash-table l))
+        (update-remote-tables)))))
+
+(define-public (save-remote-plugins)
+  (with l (ahash-table->list remote-plugins-table)
+    (save-object remote-plugins l)))
+
+(tm-define (detect-remote-plugins where)
+  (:argument where "Remote server")
+  (load-remote-plugins)
+  (ahash-set! remote-plugins-table where (get-remote-plugin-info where))
+  (update-remote-tables)
+  (save-remote-plugins))
+
+(tm-define (update-remote-plugins where)
+  (:argument where "Remote server")
+  (:proposals where (remote-connection-servers))
+  (detect-remote-plugins where))
+
+(tm-define (remove-remote-plugins where)
+  (:argument where "Remote server")
+  (:proposals where (remote-connection-servers))
+  (load-remote-plugins)
+  (ahash-remove! remote-plugins-table where)
+  (update-remote-tables)
+  (save-remote-plugins))
+
+(define-public (list-remote-plugins where)
+  (load-remote-plugins)
+  (ahash-ref remote-plugins-table where))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Retrieve data about remote plug-ins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define remote-servers-table (make-ahash-table))
+(define remote-supported-table (make-ahash-table))
+(define remote-variant-table (make-ahash-table))
+(define remote-launch-table (make-ahash-table))
+(define remote-session-table (make-ahash-table))
+(define remote-scripts-table (make-ahash-table))
+
+(define-public (update-remote-tables)
+  (set! remote-servers-table (make-ahash-table))
+  (set! remote-supported-table (make-ahash-table))
+  (set! remote-variant-table (make-ahash-table))
+  (set! remote-launch-table (make-ahash-table))
+  (set! remote-session-table (make-ahash-table))
+  (set! remote-scripts-table (make-ahash-table))
+  (for (entry (ahash-table->list remote-plugins-table))
+    (with (where path launch session scripts) entry
+      (ahash-set! remote-servers-table where #t)
+      (for (x launch)
+        (with (p v c) x
+          (ahash-set! remote-supported-table p #t)
+          (with variant (string-append where "/" v)
+            (with l (or (ahash-ref remote-variant-table p) (list))
+              (ahash-set! remote-variant-table p (rcons l variant)))
+            (let* ((env (string-append "export PATH=" path))
+                   (rem (string-quote (string-append env "; " c)))
+                   (cmd (string-append "ssh " where " " rem))
+                   (val `(tuple "pipe" ,cmd)))
+              (ahash-set! remote-launch-table (cons p variant) val)))))
+      (for (x session)
+        (ahash-set! remote-session-table (car x) (cdr x)))
+      (for (x scripts)
+        (ahash-set! remote-scripts-table (car x) (cdr x))))))
+
+(define remote-initialized-data? #f)
+(define (remote-initialize-data)
+  (when (not remote-initialized-data?)
+    (load-remote-plugins)
+    (set! remote-initialized-data? #t)))
+
+(define-public (remote-connection-servers)
+  (remote-initialize-data)
+  (sort (map car (ahash-table->list remote-servers-table)) string<=?))
+
+(define (remote-connection-list)
+  (remote-initialize-data)
+  (sort (map car (ahash-table->list remote-supported-table)) string<=?))
+
+(define (remote-connection-variants name)
+  (remote-initialize-data)
+  (or (ahash-ref remote-variant-table name) (list)))
+
+(define-public (remote-connection-defined? name)
+  (remote-initialize-data)
+  (nnot (ahash-ref remote-variant-table name)))
+
+(define (remote-connection-info name session)
+  (remote-initialize-data)
+  (ahash-ref remote-launch-table (cons name session)))
+
+(define (remote-session-list)
+  (remote-initialize-data)
+  (map car (ahash-table->list remote-session-table)))
+
+(define (remote-session-ref name)
+  (remote-initialize-data)
+  (ahash-ref remote-session-table name))
+
+(define (remote-scripts-list)
+  (remote-initialize-data)
+  (map car (ahash-table->list remote-scripts-table)))
+
+(define (remote-scripts-ref name)
+  (remote-initialize-data)
+  (ahash-ref remote-scripts-table name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Cache plugin settings
@@ -231,9 +423,9 @@
 	 (when (os-macos?)
            (add-macos-program-path (url-append (second cmd) (third cmd)))))
 	((func? cmd :session 1)
-	 (supported-sessions-add name (second cmd)))
+	 (session-setup name (second cmd)))
 	((func? cmd :scripts 1)
-	 (supported-scripts-add name (second cmd)))
+	 (scripts-setup name (second cmd)))
 	((func? cmd :filter-in 1)
 	 (noop))
 	((func? cmd :serializer 1)
@@ -267,7 +459,9 @@
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (define (,supports-name?) (ahash-ref plugin-data-table ,name))
+       (define (,supports-name?)
+         (or (ahash-ref plugin-data-table ,name)
+             (remote-connection-defined? ,name)))
        (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
        (plugin-configure-cmds ,name
 	 ,(list 'quasiquote (map plugin-configure-sub options))))))

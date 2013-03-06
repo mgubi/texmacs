@@ -12,14 +12,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (asy-serialize lan t)
-  (import-from (utils plugins plugin-cmd))
   (with u (pre-serialize lan t)
     (with s (texmacs->code u)
       (string-append (escape-verbatim (string-replace s "\n" "~")) "\n"))))
 
 (plugin-configure asymptote
   (:require (url-exists-in-path? "asy"))
-  (:versions (list "0.3"))
   (:launch "tm_asy2")
   (:serializer ,asy-serialize)
   (:session "Asymptote")
