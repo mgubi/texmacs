@@ -359,6 +359,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-table latex-texmacs-preamble%
+  (fmtext        (!append "\\newcommand{\\fmtext}[2][]{\\fntext[#1]{"
+                          (!translate "Misc:") " #2}}\n"))
+  (tdatetext     (!append "\\newcommand{\\tdatetext}[2][]{\\tnotetext[#1]{"
+                          (!translate "Date:") " #2}}\n"))
+  (tmisctext     (!append "\\newcommand{\\tmisctext}[2][]{\\tnotetext[#1]{"
+                          (!translate "Misc:") " #2}}\n"))
+  (tsubtitletext (!append "\\newcommand{\\tsubtitletext}[2][]{\\tnotetext[#1]{"
+                          (!translate "Subtitle:") " #2}}\n"))
+  (thanksdate     (!append "\\newcommand{\\thanksdate}[2][]{\\thanks[#1]{"
+                          (!translate "Date:") " #2}}\n"))
+  (thanksamisc    (!append "\\newcommand{\\thanksamisc}[2][]{\\thanks[#1]{"
+                          (!translate "Misc:") " #2}}\n"))
+  (thanksmisc     (!append "\\newcommand{\\thanksmisc}[2][]{\\thanks[#1]{"
+                          (!translate "Misc:") " #2}}\n"))
+  (thankssubtitle (!append "\\newcommand{\\thankssubtitle}[2][]{\\thanks[#1]{"
+                          (!translate "Subtitle:") " #2}}\n"))
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))

@@ -12,7 +12,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (server server-menu)
-  (:use (server server-base)))
+  (:use (server server-base)
+        (server server-resource)
+        (server server-tmfs)))
 
 (menu-bind server-menu
   ("Start server" (server-start))

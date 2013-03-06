@@ -17,7 +17,7 @@
 ;; Declaration of services
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public service-dispatch-table (make-ahash-table))
+(tm-define service-dispatch-table (make-ahash-table))
 
 (tm-define-macro (tm-service proto . body)
   (if (npair? proto) '(noop)
@@ -34,11 +34,11 @@
           (apply fun (cons envelope args))))
       (server-error envelope "invalid command")))
 
-(define (server-return envelope ret-val)
+(tm-define (server-return envelope ret-val)
   (with (client msg-id) envelope
     (server-send client `(client-remote-result ,msg-id ,ret-val))))
 
-(define (server-error envelope error-msg)
+(tm-define (server-error envelope error-msg)
   (with (client msg-id) envelope
     (server-send client `(client-remote-error ,msg-id ,error-msg))))
 
@@ -106,30 +106,32 @@
 
 (define (server-load-users)
   (when (== (ahash-size server-users) 0)
-    (with f "$TEXMACS_HOME_PATH/system/users.scm"
+    (with f "$TEXMACS_HOME_PATH/server/users.scm"
       (set! server-users
             (if (url-exists? f)
                 (list->ahash-table (load-object f))
                 (make-ahash-table))))))
 
 (define (server-save-users)
-  (with f "$TEXMACS_HOME_PATH/system/users.scm"
+  (with f "$TEXMACS_HOME_PATH/server/users.scm"
     (save-object f (ahash-table->list server-users))))
 
-(tm-define (server-set-user-info uid id passwd email admin)
+(tm-define (server-set-user-info uid id fullname passwd email admin)
   (server-load-users)
-  (ahash-set! server-users uid (list id passwd email admin))
+  (ahash-set! server-users uid (list id fullname passwd email admin))
+  (resource-set-user-info uid id fullname email)
   (server-save-users))
 
-(tm-define (server-set-user-information id passwd email admin)
+(tm-define (server-set-user-information id fullname passwd email admin)
   (:argument id "User ID")
+  (:argument fullname "Full name")
   (:argument passwd "password" "Password")
   (:argument email "Email address")
   (:argument admin "Administrive rights?")
   (:proposals admin '("no" "yes"))
   (with uid (server-find-user id)
     (if (not uid) (set! uid (create-unique-id)))
-    (server-set-user-info uid id passwd email (== admin "yes"))))
+    (server-set-user-info uid id fullname passwd email (== admin "yes"))))
 
 (tm-define (server-find-user id)
   (server-load-users)
@@ -138,15 +140,15 @@
       (and-with i (list-find-index l ok?)
 	(car (list-ref l i))))))
 
-(tm-define (server-create-user id passwd email admin)
+(tm-define (server-create-user id fullname passwd email admin)
   (or (server-find-user id)
-      (with uid (create-unique-id)
-	(server-set-user-info uid id passwd email admin))))
+      (with uid (resource-create id "user" id)
+        (server-set-user-info uid id fullname passwd email admin))))
 
-(tm-service (new-account id passwd email)
+(tm-service (new-account id fullname passwd email)
   (if (server-find-user id)
       (server-error envelope "user already exists")
-      (with ret (server-create-user id passwd email #f)
+      (with ret (server-create-user id fullname passwd email #f)
 	(server-return envelope "done"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -155,16 +157,19 @@
 
 (define server-logged-table (make-ahash-table))
 
-(tm-define (server-check-admin? envelope)
+(tm-define (server-get-user envelope)
   (with client (car envelope)
-    (and-with uid (ahash-ref server-logged-table client)
-      (with (id passwd email admin) (ahash-ref server-users uid)
-	admin))))
+    (and client (ahash-ref server-logged-table client))))
+
+(tm-define (server-check-admin? envelope)
+  (and-with uid (server-get-user envelope)
+    (with (id fullname passwd email admin) (ahash-ref server-users uid)
+      admin)))
 
 (tm-service (remote-login id passwd)
   (with uid (server-find-user id)
     (if (not uid) (server-error envelope "user not found")
-	(with (id2 passwd2 email2 admin2) (ahash-ref server-users uid)
+	(with (id2 fullname2 passwd2 email2 admin2) (ahash-ref server-users uid)
 	  (if (!= passwd2 passwd) (server-error envelope "invalid password")
 	      (with client (car envelope)
 		(ahash-set! server-logged-table client uid)

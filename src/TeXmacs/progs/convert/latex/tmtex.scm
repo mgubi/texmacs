@@ -43,8 +43,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-modes
-  (elsevier-style% (in? tmtex-style '("elsart" "jsc")))
+  (elsevier-style% (in? tmtex-style '("elsart" "jsc" "elsarticle")))
   (jsc-style% (in? tmtex-style '("jsc")) elsevier-style%)
+  (elsarticle-style% (in? tmtex-style '("elsarticle")) elsevier-style%)
+  (elsart-style% (in? tmtex-style '("elsart")) elsevier-style%)
   (natbib-package% (in? "cite-author-year" tmtex-packages)))
 
 (tm-define (tmtex-style-init body)
@@ -383,8 +385,9 @@
 	((in? x '("tmbook" "tmmanual")) "book")
 	;;((in? x '("acmconf" "amsart" "svjour")) x)
 	((in? x '("elsart" "jsc")) "elsart")
+	((in? x '("elsarticle")) "elsarticle")
 	((in? x '("acmconf" "amsart")) x)
-	((in? x '("svjour" "elsart" "jsc")) "article")
+	((in? x '("svjour")) "article")
 	((not tmtex-replace-style?) x)
 	(else #f)))
 
@@ -1213,6 +1216,9 @@
 (define (tmtex-doc-data-wrapper s l)
   (tmtex-doc-data s l))
 
+(tm-define (tmtex-elsevier-frontmatter s l)
+  (tmtex-std-env "frontmatter" l))
+
 (tm-define (tmtex-abstract s l)
   (tmtex-std-env "abstract" l))
 
@@ -1222,7 +1228,10 @@
 (define (tmtex-select-args-by-func n l)
   (filter (lambda (x) (func? x n)) l))
 
-(define (tmtex-abstract-data s l)
+(define (tmtex-abstract-data-wrapper s l)
+  (tmtex-abstract-data s l))
+
+(tm-define (tmtex-abstract-data s l)
   (let* ((msc (tmtex-select-args-by-func 'abstract-msc l))
          (keywords (tmtex-select-args-by-func 'abstract-keywords l))
          (abstract (tmtex-select-args-by-func 'abstract l)))
@@ -1766,11 +1775,13 @@
   (show-part (,tmtex-show-part -1))
   (doc-data (,tmtex-doc-data-wrapper -1))
   ((:or doc-title doc-author author-data doc-date doc-note
+        doc-misc doc-subtitle doc-title-options
 	abstract-keywords abstract-msc) (,tmtex-default -1))
-  ((:or author-name author-affiliation author-note
+  ((:or author-name author-affiliation author-misc author-note
 	author-email author-homepage) (,tmtex-default -1))
+  (elsevier-frontmatter (,tmtex-elsevier-frontmatter 1))
   (abstract (,tmtex-abstract-wrapper 1))
-  (abstract-data (,tmtex-abstract-data -1))
+  (abstract-data (,tmtex-abstract-data-wrapper -1))
   (appendix (,tmtex-appendix 1))
   ((:or theorem proposition lemma corollary proof axiom definition
 	notation conjecture remark note example exercise problem warning
@@ -1952,7 +1963,8 @@
 	(set! tmtex-style (car style))
 	(set! tmtex-packages (cdr style))
 	(when (elsevier-style?)
-	  (import-from (convert latex tmtex-elsevier)))
+	  (import-from (convert latex tmtex-elsevier))
+	  (set! doc (elsevier-create-frontmatter doc)))
 	(tmtex-style-init body)
 	(with result (texmacs->latex doc opts)
 	  (set! tmtex-style "generic")
@@ -1963,5 +1975,4 @@
 	(tmtex-initialize opts)
 	(with r (tmtex (tmpre-produce x3))
 	  (if (not tmtex-use-macros?)
-	      (set! r (latex-expand-macros r)))
-	  r))))
+	      (set! r (latex-expand-macros r))) r))))

@@ -30,7 +30,8 @@
                    (nname `(doc-note-ref ,sym (noteref-sep) ,id ,name)))
               (add-author-refs-to nname author data where (cdr l)))
             (let* ((fields (ahash-ref data where))
-                   (nr (+ (length fields) 1))
+                   (nr (+ 1 (length (ahash-ref data :notes))
+                            (length (ahash-ref data :footnotes))))
                    (num (if (== where :notes) "alpha" "Alpha"))
                    (sym* `(number ,(number->string nr) ,num))
                    (sym `(with "font-shape" "italic" ,sym*))
@@ -59,7 +60,7 @@
 (define (build-authors-refs l data)
   (if (null? l) l
       (with names (select (car l) '(author-name 0))
-        (if (null? l) (build-authors-refs (cdr l) data)
+        (if (or (null? l) (null? names)) (build-authors-refs (cdr l) data)
             (with name (build-author-refs (car names) (car l) data)
               (cons name (build-authors-refs (cdr l) data)))))))
 
