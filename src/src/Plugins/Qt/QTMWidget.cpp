@@ -361,7 +361,6 @@ QTMWidget::repaint_invalid_regions () {
         invalid_regions= rectangles (lub);
       
       basic_renderer_rep* ren = getRenderer();
-      tm_widget()->set_current_renderer(ren);
       
       SI ox = -backing_pos.x()*PIXEL;  // Warning: this is NOT from_qpoint()
       SI oy = backing_pos.y()*PIXEL;
@@ -390,7 +389,6 @@ QTMWidget::repaint_invalid_regions () {
         rects = rects->next;
       }
       
-      tm_widget()->set_current_renderer(NULL);
       ren->end();
     } // !is_nil(invalid_regions)
     
