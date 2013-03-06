@@ -58,7 +58,6 @@ public:
   virtual qt_renderer_rep* as_qt_renderer ();
   virtual void get_extents (int& w, int& h);
   virtual void next_page ();
-  virtual bool repainted ();
 
   /* basic routines */
   void set_origin (SI x, SI y);

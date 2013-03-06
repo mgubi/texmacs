@@ -93,7 +93,7 @@ public:
   void   set_mouse_pointer (widget wid, string name, string mask);
   void   delayed_message (widget wid, string s, time_t delay);
   void   invalidate (SI x1, SI y1, SI x2, SI y2);
-  bool   repainted ();
+  bool   is_invalid ();
   void   translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy);
 
   /****************************** friends ************************************/

@@ -578,8 +578,8 @@ x_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
 }
 
 bool
-x_window_rep::repainted () {
-  return is_nil (invalid_regions);
+x_window_rep::is_invalid () {
+  return ! is_nil (invalid_regions);
 }
 
 /******************************************************************************

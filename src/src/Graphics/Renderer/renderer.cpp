@@ -61,11 +61,6 @@ void
 renderer_rep::next_page () {
 }
 
-bool
-renderer_rep::repainted () {
-  return true;
-}
-
 void
 renderer_rep::anchor(string label, SI x, SI y) {
   (void) label; (void) x; (void) y;

@@ -48,6 +48,7 @@ public:
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_all ();
+  bool is_invalid ();
   void repaint_invalid_regions ();
 
   void scrollContentsBy (int dx, int dy);
@@ -57,6 +58,7 @@ public:
   void              set_tm_widget (qt_simple_widget_rep* _tmwid);
   
   virtual QSize	sizeHint () const;
+  basic_renderer_rep *getRenderer();
 
 protected:
   virtual void paintEvent (QPaintEvent* event);
@@ -72,8 +74,7 @@ protected:
 
   virtual QVariant inputMethodQuery (Qt::InputMethodQuery query) const;
 
-private:
-  basic_renderer_rep *getRenderer();
+//private:
 };
 
 #endif // QTMWIDGET_HPP

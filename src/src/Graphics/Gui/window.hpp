@@ -47,6 +47,8 @@ public:
     // Get the current position of the window on the screen
   virtual void invalidate (SI x1, SI y1, SI x2, SI y2) = 0;
     // Explicit request for redrawing a region in the window
+  virtual bool is_invalid () = 0;
+    // Query pending painting operations
   virtual void translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) = 0;
     // Fast translation of a region in the window (used for scrolling)
   virtual void set_keyboard_focus (widget wid, bool get_focus= true) = 0;

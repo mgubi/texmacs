@@ -812,10 +812,10 @@ wk_widget_rep::query (slot s, int type_id) {
     ASSERT (type_id == type_helper<int>::id,
 	    "int expected (SLOT_IDENTIFIER)");
     return close_box<int> (get_identifier (win));
-  case SLOT_RENDERER:
-    ASSERT (type_id == type_helper<renderer>::id,
-	    "renderer expected (SLOT_RENDERER)");
-    return close_box<renderer> (win->get_renderer ());
+  case SLOT_INVALID:
+      ASSERT (type_id == type_helper<bool>::id,
+              "bool expected (SLOT_INVALID_STATE)");
+      return close_box<bool> (win->is_invalid());
   case SLOT_SIZE:
     return query_size (THIS, type_id);
   case SLOT_POSITION:

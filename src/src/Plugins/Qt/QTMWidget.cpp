@@ -222,6 +222,10 @@ QTMWidget::invalidate_all () {
   invalidate_rect (0, 0, sz.width(), sz.height());
 }
 
+bool
+QTMWidget::is_invalid () {
+  return is_nil(invalid_regions);
+}
 
 basic_renderer_rep* 
 QTMWidget::getRenderer() {
