@@ -193,11 +193,6 @@ x_window_rep::get_widget () {
   return w;
 }
 
-renderer
-x_window_rep::get_renderer () {
-  return (renderer) ren;
-}
-
 void
 x_window_rep::get_extents (int& w, int& h) {
   w= win_w;

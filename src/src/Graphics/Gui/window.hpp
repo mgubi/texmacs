@@ -25,8 +25,6 @@ public:
 
   virtual widget get_widget () = 0;
     // Get the top widget associated to the window
-  virtual renderer get_renderer () = 0;
-    // Get the renderer associated to the window
   virtual void set_name (string name) = 0;
     // Set the window title
   virtual void set_visibility (bool flag) = 0;

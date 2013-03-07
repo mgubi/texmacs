@@ -58,7 +58,6 @@ public:
 		SI min_w, SI min_h, SI def_w, SI def_h, SI max_w, SI max_h);
   ~x_window_rep ();
   widget get_widget ();
-  renderer get_renderer ();
   void get_extents (int& w, int& h);
 
   void set_hints (int min_w, int min_h, int max_w, int max_h);
