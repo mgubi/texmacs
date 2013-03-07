@@ -58,7 +58,6 @@ public:
   void              set_tm_widget (qt_simple_widget_rep* _tmwid);
   
   virtual QSize	sizeHint () const;
-  basic_renderer_rep *getRenderer();
 
 protected:
   virtual void paintEvent (QPaintEvent* event);
@@ -74,7 +73,8 @@ protected:
 
   virtual QVariant inputMethodQuery (Qt::InputMethodQuery query) const;
 
-//private:
+private:
+  basic_renderer_rep *getRenderer();
 };
 
 #endif // QTMWIDGET_HPP
