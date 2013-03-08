@@ -110,6 +110,8 @@
   (logical-font-series get_series (string array_string))
   (logical-font-shape get_shape (string array_string))
   (logical-font-search search_font (array_string array_string bool))
+  (search-font-families search_font_families (array_string array_string))
+  (search-font-styles search_font_styles (array_string string array_string))
 
   ;; routines for images
   (image->psdoc image_to_psdoc (string url))
@@ -460,13 +462,14 @@
   (widget-texmacs-input texmacs_input_widget (widget content content 
                                                      command bool))
   (widget-ink ink_widget (widget command))
-  (widget-refresh refresh_widget (widget string))
+  (widget-refresh refresh_widget (widget string string))
   (object->promise-widget as_promise_widget (promise_widget object))
   (tree-bounding-rectangle get_bounding_rectangle (array_int tree))
   (show-balloon show_help_balloon (void widget int int))
   (get-style-menu get_style_menu (object))
   (get-add-package-menu get_add_package_menu (object))
   (get-remove-package-menu get_remove_package_menu (object))
+  (refresh-now windows_refresh (void string))
 
   ;; buffers
   (buffer-list get_all_buffers (array_url))
