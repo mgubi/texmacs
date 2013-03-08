@@ -24,6 +24,12 @@
 		4942BEF71679293B00A6C354 /* font_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4942BEF61679293B00A6C354 /* font_select.cpp */; };
 		4942BEF81679293B00A6C354 /* font_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4942BEF61679293B00A6C354 /* font_select.cpp */; };
 		4942BEF91679293B00A6C354 /* font_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4942BEF61679293B00A6C354 /* font_select.cpp */; };
+		495712F916E90E5900934EA3 /* metadata-acm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F716E90E5900934EA3 /* metadata-acm.cpp */; };
+		495712FA16E90E5900934EA3 /* metadata-acm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F716E90E5900934EA3 /* metadata-acm.cpp */; };
+		495712FB16E90E5900934EA3 /* metadata-acm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F716E90E5900934EA3 /* metadata-acm.cpp */; };
+		495712FC16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
+		495712FD16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
+		495712FE16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
 		49896901152B981400DB1E9E /* TeXmacs.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9C61B42A141A1B780035D78F /* TeXmacs.icns */; };
 		49D662FC128B331A0006E948 /* QTMFileDialog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49D662FA128B331A0006E948 /* QTMFileDialog.cpp */; };
 		49D662FD128B333F0006E948 /* QTMFileDialog.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 49D662FB128B331A0006E948 /* QTMFileDialog.hpp */; };
@@ -1135,8 +1141,8 @@
 		4937B89A1521C59E00D87F22 /* MOCs.xcconfig */ = {isa = PBXFileReference; comments = "This addtional .xcconfig is needed to have an empty OTHER_LDFLAGS for the target MOCs. Newer versions of the linker complain and fail when they find dylibs in the link line."; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = MOCs.xcconfig; sourceTree = "<group>"; };
 		493D309915190AEA00A19C3D /* new_buffer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = new_buffer.cpp; sourceTree = "<group>"; };
 		4942BEF61679293B00A6C354 /* font_select.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_select.cpp; sourceTree = "<group>"; };
-		4995276D161D908900940D97 /* wencoding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wencoding.cpp; sourceTree = "<group>"; };
-		4995276E161D908900940D97 /* wencoding.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = wencoding.hpp; sourceTree = "<group>"; };
+		495712F716E90E5900934EA3 /* metadata-acm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "metadata-acm.cpp"; sourceTree = "<group>"; };
+		495712F816E90E5900934EA3 /* metadata-elsevier.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "metadata-elsevier.cpp"; sourceTree = "<group>"; };
 		49D662FA128B331A0006E948 /* QTMFileDialog.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMFileDialog.cpp; sourceTree = "<group>"; };
 		49D662FB128B331A0006E948 /* QTMFileDialog.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMFileDialog.hpp; sourceTree = "<group>"; };
 		49DD8FA716DB75C100647CA2 /* sqlite3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sqlite3.cpp; sourceTree = "<group>"; };
@@ -2092,6 +2098,8 @@
 		9C0B476710A8CC0F0097A335 /* Tex */ = {
 			isa = PBXGroup;
 			children = (
+				495712F716E90E5900934EA3 /* metadata-acm.cpp */,
+				495712F816E90E5900934EA3 /* metadata-elsevier.cpp */,
 				9CD1513A15A72D0F006F2205 /* metadata.cpp */,
 				9C0B09B614FF0A3D004ABDCE /* fromcls.cpp */,
 				9C0B476810A8CC0F0097A335 /* convert_tex.hpp */,
@@ -3604,8 +3612,6 @@
 		9CFEB3FE11D79AF6005C12C4 /* BibTeX */ = {
 			isa = PBXGroup;
 			children = (
-				4995276D161D908900940D97 /* wencoding.cpp */,
-				4995276E161D908900940D97 /* wencoding.hpp */,
 				9CFEB3FF11D79AF6005C12C4 /* parsebib.cpp */,
 			);
 			path = BibTeX;
@@ -4209,6 +4215,8 @@
 				9C6632EF1676B28E000D7974 /* tt_tools.cpp in Sources */,
 				4942BEF71679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FA916DB75C100647CA2 /* sqlite3.cpp in Sources */,
+				495712F916E90E5900934EA3 /* metadata-acm.cpp in Sources */,
+				495712FC16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4556,6 +4564,8 @@
 				9C6632F11676B28E000D7974 /* tt_tools.cpp in Sources */,
 				4942BEF91679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FAB16DB75C100647CA2 /* sqlite3.cpp in Sources */,
+				495712FB16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
+				495712FE16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4931,6 +4941,8 @@
 				9C6632F01676B28E000D7974 /* tt_tools.cpp in Sources */,
 				4942BEF81679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FAA16DB75C100647CA2 /* sqlite3.cpp in Sources */,
+				495712FA16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
+				495712FD16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

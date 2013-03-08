@@ -590,22 +590,24 @@ QTMTabWidget::resizeOthers(int current) {
 
 widget make_menu_widget (object wid);
 
-QTMRefreshWidget::QTMRefreshWidget (string _tmwid)
-: QWidget (), tmwid (_tmwid), curobj (false), cur (), qwid(NULL),
+QTMRefreshWidget::QTMRefreshWidget (string _tmwid, string _kind):
+  QWidget (), tmwid (_tmwid), kind (_kind),
+  curobj (false), cur (), qwid(NULL),
   cache (widget ())
 {   
-  QObject::connect(the_gui->gui_helper, SIGNAL(tmSlotRefresh()), 
-                   this, SLOT(doRefresh()));
+  QObject::connect(the_gui->gui_helper, SIGNAL(tmSlotRefresh(string)),
+                   this, SLOT(doRefresh(string)));
   QVBoxLayout* l = new QVBoxLayout (this);
   l->setContentsMargins (0, 0, 0, 0);
   l->setMargin (0);
   setLayout (l);
   
-  doRefresh();
+  doRefresh("init");
 }
 
 bool
-QTMRefreshWidget::recompute () {
+QTMRefreshWidget::recompute (string what) {
+  if (what != "init" && kind != "any" && kind != what) return false;
   string s = "'(vertical (link " * tmwid * "))";
   eval ("(lazy-initialize-force)");
   object xwid = call ("menu-expand", eval (s));
@@ -649,8 +651,8 @@ QTMRefreshWidget::deleteLayout (QLayout* l) {
 */
 
 void
-QTMRefreshWidget::doRefresh() {
-  if (recompute()) {
+QTMRefreshWidget::doRefresh (string kind) {
+  if (recompute (kind)) {
     if (qwid) qwid->setParent (NULL);
     delete qwid;
     qwid = concrete (cur)->as_qwidget();

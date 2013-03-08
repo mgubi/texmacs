@@ -1093,6 +1093,34 @@ tmg_logical_font_search (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_search_font_families (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "search-font-families");
+
+  array_string in1= tmscm_to_array_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= search_font_families (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_search_font_styles (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "search-font-styles");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "search-font-styles");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= search_font_styles (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_image_2psdoc (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "image->psdoc");
 
@@ -5474,13 +5502,15 @@ tmg_widget_ink (tmscm arg1) {
 }
 
 tmscm
-tmg_widget_refresh (tmscm arg1) {
+tmg_widget_refresh (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "widget-refresh");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-refresh");
 
   string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
 
   // TMSCM_DEFER_INTS;
-  widget out= refresh_widget (in1);
+  widget out= refresh_widget (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return widget_to_tmscm (out);
@@ -5554,6 +5584,19 @@ tmg_get_remove_package_menu () {
   // TMSCM_ALLOW_INTS;
 
   return object_to_tmscm (out);
+}
+
+tmscm
+tmg_refresh_now (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "refresh-now");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  windows_refresh (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -6715,6 +6758,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("logical-font-series",  tmg_logical_font_series, 1, 0, 0);
   tmscm_install_procedure ("logical-font-shape",  tmg_logical_font_shape, 1, 0, 0);
   tmscm_install_procedure ("logical-font-search",  tmg_logical_font_search, 2, 0, 0);
+  tmscm_install_procedure ("search-font-families",  tmg_search_font_families, 1, 0, 0);
+  tmscm_install_procedure ("search-font-styles",  tmg_search_font_styles, 2, 0, 0);
   tmscm_install_procedure ("image->psdoc",  tmg_image_2psdoc, 1, 0, 0);
   tmscm_install_procedure ("tree->stree",  tmg_tree_2stree, 1, 0, 0);
   tmscm_install_procedure ("stree->tree",  tmg_stree_2tree, 1, 0, 0);
@@ -7024,13 +7069,14 @@ initialize_glue_basic () {
   tmscm_install_procedure ("widget-texmacs-output",  tmg_widget_texmacs_output, 2, 0, 0);
   tmscm_install_procedure ("widget-texmacs-input",  tmg_widget_texmacs_input, 4, 0, 0);
   tmscm_install_procedure ("widget-ink",  tmg_widget_ink, 1, 0, 0);
-  tmscm_install_procedure ("widget-refresh",  tmg_widget_refresh, 1, 0, 0);
+  tmscm_install_procedure ("widget-refresh",  tmg_widget_refresh, 2, 0, 0);
   tmscm_install_procedure ("object->promise-widget",  tmg_object_2promise_widget, 1, 0, 0);
   tmscm_install_procedure ("tree-bounding-rectangle",  tmg_tree_bounding_rectangle, 1, 0, 0);
   tmscm_install_procedure ("show-balloon",  tmg_show_balloon, 3, 0, 0);
   tmscm_install_procedure ("get-style-menu",  tmg_get_style_menu, 0, 0, 0);
   tmscm_install_procedure ("get-add-package-menu",  tmg_get_add_package_menu, 0, 0, 0);
   tmscm_install_procedure ("get-remove-package-menu",  tmg_get_remove_package_menu, 0, 0, 0);
+  tmscm_install_procedure ("refresh-now",  tmg_refresh_now, 1, 0, 0);
   tmscm_install_procedure ("buffer-list",  tmg_buffer_list, 0, 0, 0);
   tmscm_install_procedure ("current-buffer-url",  tmg_current_buffer_url, 0, 0, 0);
   tmscm_install_procedure ("path-to-buffer",  tmg_path_to_buffer, 1, 0, 0);
