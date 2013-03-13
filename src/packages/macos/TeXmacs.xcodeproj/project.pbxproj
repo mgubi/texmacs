@@ -172,7 +172,6 @@
 		9C0B4A6210A8CC110097A335 /* tree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484310A8CC100097A335 /* tree.cpp */; };
 		9C0B4A6310A8CC110097A335 /* tree_label.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484510A8CC100097A335 /* tree_label.cpp */; };
 		9C0B4A6510A8CC110097A335 /* bibtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484C10A8CC100097A335 /* bibtex.cpp */; };
-		9C0B4A7310A8CC110097A335 /* TMButtonsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B486D10A8CC100097A335 /* TMButtonsController.m */; };
 		9C0B4A7510A8CC110097A335 /* free_type.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487110A8CC100097A335 /* free_type.cpp */; };
 		9C0B4A7610A8CC110097A335 /* tt_face.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487310A8CC100097A335 /* tt_face.cpp */; };
 		9C0B4A7710A8CC110097A335 /* tt_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487510A8CC100097A335 /* tt_file.cpp */; };
@@ -481,7 +480,6 @@
 		9CCC746410D303D900E88D90 /* tree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484310A8CC100097A335 /* tree.cpp */; };
 		9CCC746510D303D900E88D90 /* tree_label.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484510A8CC100097A335 /* tree_label.cpp */; };
 		9CCC746610D303D900E88D90 /* bibtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484C10A8CC100097A335 /* bibtex.cpp */; };
-		9CCC746710D303D900E88D90 /* TMButtonsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B486D10A8CC100097A335 /* TMButtonsController.m */; };
 		9CCC746810D303D900E88D90 /* free_type.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487110A8CC100097A335 /* free_type.cpp */; };
 		9CCC746910D303D900E88D90 /* tt_face.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487310A8CC100097A335 /* tt_face.cpp */; };
 		9CCC746A10D303D900E88D90 /* tt_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487510A8CC100097A335 /* tt_file.cpp */; };
@@ -611,13 +609,6 @@
 		9CCC750410D303D900E88D90 /* table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49ED10A8CC110097A335 /* table.cpp */; };
 		9CCC750C10D303D900E88D90 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
 		9CCC751010D303D900E88D90 /* TeXmacs in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9C0B430010A8CB4E0097A335 /* TeXmacs */; };
-		9CCC751E10D304EB00E88D90 /* aqua_dialogues.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B485710A8CC100097A335 /* aqua_dialogues.mm */; };
-		9CCC751F10D304EB00E88D90 /* aqua_gui.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B485910A8CC100097A335 /* aqua_gui.mm */; };
-		9CCC752010D304EB00E88D90 /* aqua_menu.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B485B10A8CC100097A335 /* aqua_menu.mm */; };
-		9CCC752110D304EB00E88D90 /* aqua_renderer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B485E10A8CC100097A335 /* aqua_renderer.mm */; };
-		9CCC752210D304EB00E88D90 /* aqua_utilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B486110A8CC100097A335 /* aqua_utilities.mm */; };
-		9CCC752310D304EB00E88D90 /* aqua_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B486310A8CC100097A335 /* aqua_widget.mm */; };
-		9CCC752510D304EB00E88D90 /* TMView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B486F10A8CC100097A335 /* TMView.mm */; };
 		9CD1513B15A72D0F006F2205 /* metadata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD1513A15A72D0F006F2205 /* metadata.cpp */; };
 		9CD1513C15A72D0F006F2205 /* metadata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD1513A15A72D0F006F2205 /* metadata.cpp */; };
 		9CD1513D15A72D0F006F2205 /* metadata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD1513A15A72D0F006F2205 /* metadata.cpp */; };
@@ -1070,6 +1061,20 @@
 		9CF78E0D125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
 		9CF78E0E125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
 		9CF78E0F125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
+		9CF9FBE016F1334E00A146D1 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
+		9CF9FBE116F1334E00A146D1 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
+		9CF9FBE216F1334E00A146D1 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
+		9CF9FC0116F135A100A146D1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBE716F135A100A146D1 /* InfoPlist.strings */; };
+		9CF9FC0216F135A100A146D1 /* MainMenu.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBE916F135A100A146D1 /* MainMenu.nib */; };
+		9CF9FC0316F135A100A146D1 /* Window.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBEB16F135A100A146D1 /* Window.nib */; };
+		9CF9FC0416F135A100A146D1 /* ns_dialogues.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF016F135A100A146D1 /* ns_dialogues.mm */; };
+		9CF9FC0516F135A100A146D1 /* ns_gui.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF216F135A100A146D1 /* ns_gui.mm */; };
+		9CF9FC0616F135A100A146D1 /* ns_menu.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF416F135A100A146D1 /* ns_menu.mm */; };
+		9CF9FC0716F135A100A146D1 /* ns_renderer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF716F135A100A146D1 /* ns_renderer.mm */; };
+		9CF9FC0816F135A100A146D1 /* ns_utilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFA16F135A100A146D1 /* ns_utilities.mm */; };
+		9CF9FC0916F135A100A146D1 /* ns_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFC16F135A100A146D1 /* ns_widget.mm */; };
+		9CF9FC0A16F135A100A146D1 /* TMButtonsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFE16F135A100A146D1 /* TMButtonsController.m */; };
+		9CF9FC0B16F135A100A146D1 /* TMView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FC0016F135A100A146D1 /* TMView.mm */; };
 		9CFB849214FFCA5700757D4E /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
 		9CFEB3F711D79783005C12C4 /* bibtex_functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */; };
 		9CFEB3F811D79783005C12C4 /* bibtex_functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */; };
@@ -1939,6 +1944,29 @@
 		9CF5BC70128A13CB00F691BF /* qt_window_widget.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_window_widget.hpp; sourceTree = "<group>"; };
 		9CF5BC71128A13CB00F691BF /* QTMGuiHelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMGuiHelper.cpp; sourceTree = "<group>"; };
 		9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = highlight_observer.cpp; sourceTree = "<group>"; };
+		9CF9FBE816F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		9CF9FBEA16F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/MainMenu.nib; sourceTree = "<group>"; };
+		9CF9FBEC16F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/Window.nib; sourceTree = "<group>"; };
+		9CF9FBED16F135A100A146D1 /* mac_cocoa.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mac_cocoa.h; sourceTree = "<group>"; };
+		9CF9FBEE16F135A100A146D1 /* ns_basic_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_basic_widgets.h; sourceTree = "<group>"; };
+		9CF9FBEF16F135A100A146D1 /* ns_dialogues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_dialogues.h; sourceTree = "<group>"; };
+		9CF9FBF016F135A100A146D1 /* ns_dialogues.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_dialogues.mm; sourceTree = "<group>"; };
+		9CF9FBF116F135A100A146D1 /* ns_gui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_gui.h; sourceTree = "<group>"; };
+		9CF9FBF216F135A100A146D1 /* ns_gui.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_gui.mm; sourceTree = "<group>"; };
+		9CF9FBF316F135A100A146D1 /* ns_menu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_menu.h; sourceTree = "<group>"; };
+		9CF9FBF416F135A100A146D1 /* ns_menu.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_menu.mm; sourceTree = "<group>"; };
+		9CF9FBF516F135A100A146D1 /* ns_other_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_other_widgets.h; sourceTree = "<group>"; };
+		9CF9FBF616F135A100A146D1 /* ns_renderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_renderer.h; sourceTree = "<group>"; };
+		9CF9FBF716F135A100A146D1 /* ns_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_renderer.mm; sourceTree = "<group>"; };
+		9CF9FBF816F135A100A146D1 /* ns_simple_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_simple_widget.h; sourceTree = "<group>"; };
+		9CF9FBF916F135A100A146D1 /* ns_utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_utilities.h; sourceTree = "<group>"; };
+		9CF9FBFA16F135A100A146D1 /* ns_utilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_utilities.mm; sourceTree = "<group>"; };
+		9CF9FBFB16F135A100A146D1 /* ns_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_widget.h; sourceTree = "<group>"; };
+		9CF9FBFC16F135A100A146D1 /* ns_widget.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_widget.mm; sourceTree = "<group>"; };
+		9CF9FBFD16F135A100A146D1 /* TMButtonsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMButtonsController.h; sourceTree = "<group>"; };
+		9CF9FBFE16F135A100A146D1 /* TMButtonsController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TMButtonsController.m; sourceTree = "<group>"; };
+		9CF9FBFF16F135A100A146D1 /* TMView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMView.h; sourceTree = "<group>"; };
+		9CF9FC0016F135A100A146D1 /* TMView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TMView.mm; sourceTree = "<group>"; };
 		9CFE66E910A99E700028F6F8 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		9CFE66EA10A99E700028F6F8 /* Makefile.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.in; sourceTree = "<group>"; };
 		9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bibtex_functions.cpp; sourceTree = "<group>"; };
@@ -2489,6 +2517,7 @@
 		9C0B484710A8CC100097A335 /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
+				9CF9FBE616F135A100A146D1 /* NS */,
 				9C0B484810A8CC100097A335 /* Axel */,
 				9C0B484B10A8CC100097A335 /* Bibtex */,
 				9C0B484E10A8CC100097A335 /* Cairo */,
@@ -3629,6 +3658,36 @@
 			path = dvipdfmx;
 			sourceTree = "<group>";
 		};
+		9CF9FBE616F135A100A146D1 /* NS */ = {
+			isa = PBXGroup;
+			children = (
+				9CF9FBE716F135A100A146D1 /* InfoPlist.strings */,
+				9CF9FBE916F135A100A146D1 /* MainMenu.nib */,
+				9CF9FBEB16F135A100A146D1 /* Window.nib */,
+				9CF9FBED16F135A100A146D1 /* mac_cocoa.h */,
+				9CF9FBEE16F135A100A146D1 /* ns_basic_widgets.h */,
+				9CF9FBEF16F135A100A146D1 /* ns_dialogues.h */,
+				9CF9FBF016F135A100A146D1 /* ns_dialogues.mm */,
+				9CF9FBF116F135A100A146D1 /* ns_gui.h */,
+				9CF9FBF216F135A100A146D1 /* ns_gui.mm */,
+				9CF9FBF316F135A100A146D1 /* ns_menu.h */,
+				9CF9FBF416F135A100A146D1 /* ns_menu.mm */,
+				9CF9FBF516F135A100A146D1 /* ns_other_widgets.h */,
+				9CF9FBF616F135A100A146D1 /* ns_renderer.h */,
+				9CF9FBF716F135A100A146D1 /* ns_renderer.mm */,
+				9CF9FBF816F135A100A146D1 /* ns_simple_widget.h */,
+				9CF9FBF916F135A100A146D1 /* ns_utilities.h */,
+				9CF9FBFA16F135A100A146D1 /* ns_utilities.mm */,
+				9CF9FBFB16F135A100A146D1 /* ns_widget.h */,
+				9CF9FBFC16F135A100A146D1 /* ns_widget.mm */,
+				9CF9FBFD16F135A100A146D1 /* TMButtonsController.h */,
+				9CF9FBFE16F135A100A146D1 /* TMButtonsController.m */,
+				9CF9FBFF16F135A100A146D1 /* TMView.h */,
+				9CF9FC0016F135A100A146D1 /* TMView.mm */,
+			);
+			path = NS;
+			sourceTree = "<group>";
+		};
 		9CFEB3FE11D79AF6005C12C4 /* BibTeX */ = {
 			isa = PBXGroup;
 			children = (
@@ -3786,6 +3845,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CF9FC0116F135A100A146D1 /* InfoPlist.strings in Resources */,
+				9CF9FC0216F135A100A146D1 /* MainMenu.nib in Resources */,
+				9CF9FC0316F135A100A146D1 /* Window.nib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3983,7 +4045,6 @@
 				9C0B4A6210A8CC110097A335 /* tree.cpp in Sources */,
 				9C0B4A6310A8CC110097A335 /* tree_label.cpp in Sources */,
 				9C0B4A6510A8CC110097A335 /* bibtex.cpp in Sources */,
-				9C0B4A7310A8CC110097A335 /* TMButtonsController.m in Sources */,
 				9C0B4A7510A8CC110097A335 /* free_type.cpp in Sources */,
 				9C0B4A7610A8CC110097A335 /* tt_face.cpp in Sources */,
 				9C0B4A7710A8CC110097A335 /* tt_file.cpp in Sources */,
@@ -4359,7 +4420,6 @@
 				9CCC746410D303D900E88D90 /* tree.cpp in Sources */,
 				9CCC746510D303D900E88D90 /* tree_label.cpp in Sources */,
 				9CCC746610D303D900E88D90 /* bibtex.cpp in Sources */,
-				9CCC746710D303D900E88D90 /* TMButtonsController.m in Sources */,
 				9CCC746810D303D900E88D90 /* free_type.cpp in Sources */,
 				9CCC746910D303D900E88D90 /* tt_face.cpp in Sources */,
 				9CCC746A10D303D900E88D90 /* tt_file.cpp in Sources */,
@@ -4488,13 +4548,6 @@
 				9CCC750310D303D900E88D90 /* cell.cpp in Sources */,
 				9CCC750410D303D900E88D90 /* table.cpp in Sources */,
 				9CCC750C10D303D900E88D90 /* unix_sys_utils.cpp in Sources */,
-				9CCC751E10D304EB00E88D90 /* aqua_dialogues.mm in Sources */,
-				9CCC751F10D304EB00E88D90 /* aqua_gui.mm in Sources */,
-				9CCC752010D304EB00E88D90 /* aqua_menu.mm in Sources */,
-				9CCC752110D304EB00E88D90 /* aqua_renderer.mm in Sources */,
-				9CCC752210D304EB00E88D90 /* aqua_utilities.mm in Sources */,
-				9CCC752310D304EB00E88D90 /* aqua_widget.mm in Sources */,
-				9CCC752510D304EB00E88D90 /* TMView.mm in Sources */,
 				9C060A9E10FC6D8B00C51583 /* tm_ostream.cpp in Sources */,
 				9C6061EC112442BD00054149 /* gs_utilities.cpp in Sources */,
 				9CFEB3F811D79783005C12C4 /* bibtex_functions.cpp in Sources */,
@@ -4594,6 +4647,17 @@
 				497822CD16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
 				49FFB07B16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
 				49FDFA6716F0C677002B830A /* metadata-ams.cpp in Sources */,
+				9CF9FBE016F1334E00A146D1 /* guile_tm.cpp in Sources */,
+				9CF9FBE116F1334E00A146D1 /* glue.cpp in Sources */,
+				9CF9FBE216F1334E00A146D1 /* object.cpp in Sources */,
+				9CF9FC0416F135A100A146D1 /* ns_dialogues.mm in Sources */,
+				9CF9FC0516F135A100A146D1 /* ns_gui.mm in Sources */,
+				9CF9FC0616F135A100A146D1 /* ns_menu.mm in Sources */,
+				9CF9FC0716F135A100A146D1 /* ns_renderer.mm in Sources */,
+				9CF9FC0816F135A100A146D1 /* ns_utilities.mm in Sources */,
+				9CF9FC0916F135A100A146D1 /* ns_widget.mm in Sources */,
+				9CF9FC0A16F135A100A146D1 /* TMButtonsController.m in Sources */,
+				9CF9FC0B16F135A100A146D1 /* TMView.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5013,6 +5077,30 @@
 			name = Window.nib;
 			sourceTree = "<group>";
 		};
+		9CF9FBE716F135A100A146D1 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9CF9FBE816F135A100A146D1 /* English */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		9CF9FBE916F135A100A146D1 /* MainMenu.nib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9CF9FBEA16F135A100A146D1 /* English */,
+			);
+			name = MainMenu.nib;
+			sourceTree = "<group>";
+		};
+		9CF9FBEB16F135A100A146D1 /* Window.nib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9CF9FBEC16F135A100A146D1 /* English */,
+			);
+			name = Window.nib;
+			sourceTree = "<group>";
+		};
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
@@ -5048,14 +5136,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 4937B89A1521C59E00D87F22 /* MOCs.xcconfig */;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				COPY_PHASE_STRIP = NO;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_VERSION = "";
-				INSTALL_PATH = /usr/local/lib;
-				PRODUCT_NAME = MOCs;
 			};
 			name = Debug;
 		};
@@ -5063,13 +5143,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 4937B89A1521C59E00D87F22 /* MOCs.xcconfig */;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				COPY_PHASE_STRIP = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_VERSION = "";
-				INSTALL_PATH = /usr/local/lib;
-				PRODUCT_NAME = MOCs;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -5130,13 +5203,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				COPY_PHASE_STRIP = NO;
-				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_MODEL_TUNING = G5;
-				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_VERSION = "";
-				INSTALL_PATH = "$(HOME)/Applications";
 				WRAPPER_EXTENSION = app;
 				ZERO_LINK = YES;
 			};
@@ -5146,11 +5214,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_MODEL_TUNING = G5;
 				GCC_VERSION = "";
-				INSTALL_PATH = "$(HOME)/Applications";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;
@@ -5159,17 +5225,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B41E141A1B780035D78F /* Base.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1)";
-				ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1 = "x86_64 i386 ppc";
-				CLANG_LINK_OBJC_RUNTIME = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				GCC_VERSION = "";
-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_EFFECTIVE_CPLUSPLUS_VIOLATIONS = NO;
-				GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS = NO;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.5;
-				SDKROOT = macosx10.5;
 			};
 			name = Debug;
 		};
@@ -5177,14 +5232,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B41E141A1B780035D78F /* Base.xcconfig */;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1)";
-				ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1 = "x86_64 i386 ppc";
-				CLANG_LINK_OBJC_RUNTIME = NO;
-				GCC_VERSION = "";
-				GCC_WARN_ABOUT_RETURN_TYPE = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.5;
-				SDKROOT = macosx10.5;
 			};
 			name = Release;
 		};
