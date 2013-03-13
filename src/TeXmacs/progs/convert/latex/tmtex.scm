@@ -47,6 +47,9 @@
   (jsc-style% (in? tmtex-style '("jsc")) elsevier-style%)
   (elsarticle-style% (in? tmtex-style '("elsarticle")) elsevier-style%)
   (elsart-style% (in? tmtex-style '("elsart")) elsevier-style%)
+  (acm-style% (in? tmtex-style '("acmconf" "sig-alternate")))
+  (sig-alternate-style% (in? tmtex-style '("sig-alternate")) acm-style%)
+  (ams-style% (in? tmtex-style '("amsart")))
   (natbib-package% (in? "cite-author-year" tmtex-packages)))
 
 (tm-define (tmtex-style-init body)
@@ -57,6 +60,10 @@
 (define (import-tmtex-styles)
   (cond ((elsevier-style?)
          (import-from (convert latex tmtex-elsevier)))
+        ((acm-style?)
+         (import-from (convert latex tmtex-acm)))
+        ((ams-style?)
+         (import-from (convert latex tmtex-ams)))
          (else (noop))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -390,10 +397,11 @@
 	((== x "seminar") "slides")
 	((in? x '("tmarticle" "tmdoc" "mmxdoc")) "article")
 	((in? x '("tmbook" "tmmanual")) "book")
-	;;((in? x '("acmconf" "amsart" "svjour")) x)
 	((in? x '("elsart" "jsc")) "elsart")
 	((in? x '("elsarticle")) "elsarticle")
-	((in? x '("acmconf" "amsart")) x)
+	((in? x '("amsart")) x)
+	((in? x '("acmconf")) "acm_proc_article-sp")
+	((in? x '("sig-alternate")) x)
 	((in? x '("svjour")) "article")
 	((not tmtex-replace-style?) x)
 	(else #f)))
@@ -1173,74 +1181,147 @@
 ;; Titles of documents
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmtex-compressed sep l)
-  (cond ((null? l) l)
-	((null? (cdr l)) (list (tmtex (car l))))
-	(else (cons* (tmtex (car l))
-		     sep
-		     (tmtex-compressed sep (cdr l))))))
+(define (tmtex-doc-title t)
+  `(title ,(tmtex (cadr t))))
 
-(define (tmtex-data-assemble sep l)
-  (cond ((null? l) l)
-	((null? (cdr l)) (car l))
-	(else (with r (tmtex-data-assemble sep (cdr l))
-		(cond ((null? (car l)) r)
-		      ((null? r) (car l))
-		      (else (append (car l) (list sep) r)))))))
+(tm-define (tmtex-doc-subtitle t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmsubtitle ,(tmtex (cadr t))))
 
-(tm-define (tmtex-select-data expr tag)
-  (:synopsis "Get data matching @tag in @expr with nice separators")
-  (let* ((data (select expr (list tag)))
-	 (sep (if (== tag 'author-affiliation) '(!nextline) "; "))
-	 (fun (lambda (x)
-		(cond ((func? x 'document)
-		       (list (tex-concat* (tmtex-compressed sep (cdr x)))))
-		      (else (list (tmtex x)))))))
-    (if (null? data) '()
-	(with l (cdar data)
-	  (tmtex-data-assemble ", " (map fun l))))))
+(tm-define (tmtex-doc-note t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmnote ,(tmtex (cadr t))))
 
-(define (tmtex-data-apply tag l)
-  (if (null? l) l
-      (list (list tag (tex-concat* l)))))
+(tm-define (tmtex-doc-misc t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmmisc ,(tmtex (cadr t))))
 
-(define (tmtex-make-author data)
-  (let* ((tag (select data '(:%2)))
-         (name (tmtex-select-data tag 'author-name))
-	 (address (tmtex-select-data tag 'author-affiliation))
-	 (misc (tmtex-select-data tag 'author-note))
-	 (email (tmtex-select-data tag 'author-email))
-	 (homepage (tmtex-select-data tag 'author-homepage))
-	 (email* (tmtex-data-apply 'email email))
-	 (homepage* (tmtex-data-apply 'homepage homepage))
-	 (note* (tmtex-data-assemble "; " (list misc email* homepage*)))
-	 (name* (append name (tmtex-data-apply 'thanks note*))))
-    (tex-concat* (tmtex-data-assemble '(!nextline)
-				      (list name* address)))))
+(tm-define (tmtex-doc-date t)
+  `(date ,(tmtex (cadr t))))
 
-(tm-define (tmtex-doc-data s l)
-  (let* ((tag (cons s l))
-	 (title (tmtex-select-data tag 'doc-title))
-	 (authors (map tmtex-make-author (select tag '(doc-author))))
-	 (date (tmtex-select-data tag 'doc-date))
-	 (note (tmtex-select-data tag 'doc-note))
-	 (title* (append title (tmtex-data-apply 'thanks note)))
-	 (author* (tmtex-data-assemble " \\and " (map list authors))))
-    (tex-concat `((title ,(tex-concat title*)) "\n"
-		  (author ,(tex-concat author*)) "\n"
-		  (maketitle)))))
+(tm-define (tmtex-author-name t)
+  `(author ,(tmtex (cadr t))))
 
-(tm-define (tmtex-abstract s l)
-  (tmtex-std-env "abstract" l))
+(tm-define (tmtex-author-affiliation t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmaffiliation ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-email t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmemail ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-homepage t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmhomepage ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-note t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmnote ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-misc t)
+  (set! t (tmtex-remove-line-feeds t))
+  `(tmmisc ,(tmtex (cadr t))))
 
 (define (tmtex-select-args-by-func n l)
   (filter (lambda (x) (func? x n)) l))
 
+(tm-define (tmtex-remove-line-feeds t)
+  (if (npair? t) t
+    (with (r s) (list (car t) (map tmtex-remove-line-feeds (cdr t)))
+      (if (== r 'next-line) '(!concat (tmSep) (!linefeed)) `(,r ,@s)))))
+
+(tm-define (tmtex-replace-documents t)
+  (if (npair? t) t
+    (with (r s) (list (car t) (map tmtex-replace-documents (cdr t)))
+      (if (!= r 'document) `(,r ,@s)
+        `(concat ,@(list-intersperse s '(next-line)))))))
+
+(tm-define (tmtex-make-author names affiliations emails urls miscs notes)
+  (with names `(!concat ,@(list-intersperse (map cadr names) '(tmSep)))
+        `(author (!paragraph ,names
+                             ,@affiliations
+                             ,@emails
+                             ,@urls
+                             ,@notes
+                             ,@miscs))))
+
+(define (tmtex-doc-author t)
+  (set! t (tmtex-replace-documents t))
+  (if (or (npair? t) (npair? (cdr t)) (not (func? (cadr t) 'author-data))) '()
+    (let* ((datas        (cdadr t))
+           (miscs        (map tmtex-author-misc
+                              (tmtex-select-args-by-func 'author-misc datas)))
+           (notes        (map tmtex-author-note
+                              (tmtex-select-args-by-func 'author-note datas)))
+           (emails       (map tmtex-author-email
+                              (tmtex-select-args-by-func 'author-email datas)))
+           (urls         (map tmtex-author-homepage
+                              (tmtex-select-args-by-func
+                                'author-homepage datas)))
+           (affiliations (map tmtex-author-affiliation
+                              (tmtex-select-args-by-func
+                                'author-affiliation datas)))
+           (names        (map tmtex-author-name
+                              (tmtex-select-args-by-func
+                                'author-name datas))))
+      (tmtex-make-author names affiliations emails urls miscs notes))))
+
+(tm-define (tmtex-append-authors l)
+  (if (< (length l) 2) l
+    (with lf '(!concat (!linefeed) (and) (!linefeed))
+          `((author (!concat ,@(list-intersperse (map cadr l) lf)))))))
+
+(define (tmtex-make-title titles subtitles notes miscs)
+  (with titles `(!concat ,@(list-intersperse (map cadr titles) '(tmSep)))
+        `(title (!paragraph ,titles ,@subtitles ,@notes ,@miscs))))
+
+(tm-define (tmtex-make-doc-data titles subtitles authors dates miscs notes)
+  `(!document
+     ,(tmtex-make-title titles subtitles notes miscs)
+     ,@(tmtex-append-authors authors)
+     ,@dates
+     (maketitle)))
+
+(tm-define (tmtex-doc-data s l)
+  (set! l (map tmtex-replace-documents l))
+  (let* ((subtitles (map tmtex-doc-subtitle
+                         (tmtex-select-args-by-func 'doc-subtitle l)))
+         (notes     (map tmtex-doc-note
+                         (tmtex-select-args-by-func 'doc-note l)))
+         (miscs     (map tmtex-doc-misc
+                         (tmtex-select-args-by-func 'doc-misc l)))
+         (dates     (map tmtex-doc-date
+                         (tmtex-select-args-by-func 'doc-date l)))
+         (authors   (map tmtex-doc-author
+                         (tmtex-select-args-by-func 'doc-author l)))
+         (titles    (map tmtex-doc-title
+                         (tmtex-select-args-by-func 'doc-title l))))
+    (tmtex-make-doc-data titles subtitles authors dates miscs notes)))
+
+(tm-define (tmtex-abstract t)
+  (tmtex-std-env "abstract" (cdr t)))
+
+(tm-define (tmtex-abstract-keywords t)
+  (with args (map (lambda (x) `(!group ,x))
+                  (list-intersperse (map tmtex (cdr t)) '(tmsep)))
+    `(!concat (tmkeywords) (!concat ,@args))))
+
+(tm-define (tmtex-abstract-msc t)
+  (with args (map (lambda (x) `(!group ,x))
+                  (list-intersperse (map tmtex (cdr t)) '(tmsep)))
+    `(!concat (tmmsc) (!concat ,@args))))
+
+(tm-define  (tmtex-make-abstract-data keywords msc abstract)
+  `(!document ,@keywords ,@msc ,@abstract))
+
 (tm-define (tmtex-abstract-data s l)
-  (let* ((msc (tmtex-select-args-by-func 'abstract-msc l))
-         (keywords (tmtex-select-args-by-func 'abstract-keywords l))
-         (abstract (tmtex-select-args-by-func 'abstract l)))
-  (tex-concat `(,@abstract "\n" ,@keywords "\n" ,@msc))))
+  (let* ((msc      (map tmtex-abstract-msc
+                        (tmtex-select-args-by-func 'abstract-msc l)))
+         (keywords (map tmtex-abstract-keywords
+                        (tmtex-select-args-by-func 'abstract-keywords l)))
+         (abstract (map tmtex-abstract
+                        (tmtex-select-args-by-func 'abstract l))))
+    (tmtex-make-abstract-data keywords msc abstract)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TeXmacs style primitives
@@ -1779,11 +1860,22 @@
   ((:or hide-preamble show-preamble) (,tmtex-default -1))
   (hide-part (,tmtex-hide-part -1))
   (show-part (,tmtex-show-part -1))
-  ((:or doc-title doc-author author-data doc-date doc-note
-        doc-misc doc-subtitle doc-title-options
-	abstract-keywords abstract-msc) (,tmtex-default -1))
-  ((:or author-name author-affiliation author-misc author-note
-	author-email author-homepage) (,tmtex-default -1))
+  ((:or doc-title-options author-data) (,tmtex-default -1))
+  (doc-title (,tmtex-doc-title 1))
+  (doc-subtitle (,tmtex-doc-subtitle 1))
+  (doc-note (,tmtex-doc-note 1))
+  (doc-misc (,tmtex-doc-misc 1))
+  (doc-date (,tmtex-doc-date 1))
+  (doc-author (,tmtex-doc-author -1))
+  (author-name (,tmtex-author-name 1))
+  (author-affiliation (,tmtex-author-affiliation 1))
+  (author-misc (,tmtex-author-misc 1))
+  (author-note (,tmtex-author-note 1))
+  (author-email (,tmtex-author-email 1))
+  (author-homepage (,tmtex-author-homepage 1))
+  (abstract (,tmtex-abstract 1))
+  (abstract-keywords (,tmtex-abstract-keywords -1))
+  (abstract-msc (,tmtex-abstract-msc -1))
   (appendix (,tmtex-appendix 1))
   ((:or theorem proposition lemma corollary proof axiom definition
 	notation conjecture remark note example exercise problem warning
@@ -1911,7 +2003,6 @@
 (tmtex-style-dependent
   (doc-data                 tmtex-doc-data)
   (abstract-data            tmtex-abstract-data)
-  (abstract                 tmtex-abstract)
   ((:or equation equation*) tmtex-equation)
   (elsevier-frontmatter     tmtex-elsevier-frontmatter))
 

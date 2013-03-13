@@ -14,7 +14,65 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (fonts font-selector)
-  (:use (kernel gui menu-widget)))
+  (:use (kernel gui menu-widget)
+        (fonts font-sample)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Font samples
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (standard-selector-text)
+  `(document
+     "abcdefghijklmnopqrstuvwxyz"
+     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+     "0123456789, +-*/^=<less><gtr>"
+     "([{|}]) :;!? !@#$%&"
+     "אחימץü"
+     ,(string-append 
+       "<alpha><beta><gamma><delta><epsilon> "
+       "<leq><geq><leqslant><geqslant><prec><succ> "
+       "<rightarrow><Rightarrow><mapsto> "
+       "<times><cdot><oplus><otimes>")))
+
+(define-public sample-text (standard-selector-text))
+(define-public sample-size "200px")
+(define-public sample-kind "Standard")
+
+(tm-define (set-font-sample-range hexa-start hexa-end)
+  (:argument hexa-start "First unicode character in hexadecimal")
+  (:argument hexa-end "Last unicode character in hexadecimal")
+  (set! sample-text
+        (build-character-table (hexadecimal->integer hexa-start)
+                               (hexadecimal->integer hexa-end)))
+  (set! sample-size "500px"))
+
+(define (set-font-sample-kind kind)
+  (set! sample-kind kind)
+  (cond ((== kind "ASCII")
+         (set-font-sample-range "20" "7f"))
+        ((== kind "Latin")
+         (set-font-sample-range "80" "ff"))
+        ((== kind "Greek")
+         (set-font-sample-range "380" "3ff"))
+        ((== kind "Cyrillic")
+         (set-font-sample-range "400" "4ff"))
+        ((== kind "CJK")
+         (set-font-sample-range "4e00" "9fcc"))
+        ((== kind "Hangul")
+         (set-font-sample-range "ac00" "d7af"))
+        ((== kind "Math")
+         (set-font-sample-range "2000" "23ff"))
+        ((== kind "Math Extra")
+         (set-font-sample-range "2900" "2e7f"))
+        ((== kind "Math Letters")
+         (set-font-sample-range "1d400" "1d7ff"))
+        ((and (== kind "Selection") (selection-active-any?))
+         (set! sample-text (tree->stree (selection-tree))))
+        (else
+         (set! sample-text (standard-selector-text)))))
+
+(define (get-font-sample-kind)
+  sample-kind)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Global state of font selector
@@ -25,7 +83,9 @@
 (tm-define selector-font-size "10")
 
 (tm-define (selector-get-font)
-  (logical-font-public selector-font-family selector-font-style))
+  (logical-font-patch
+    (logical-font-public selector-font-family selector-font-style)
+    (selected-properties)))
 
 (define (selector-initialize-font)
   (let* ((fam (get-env "font"))
@@ -63,6 +123,25 @@
           (set! l (cons* "font" (logical-font-family fn) l)))
         (apply make-multi-with l)))))
 
+(define (selector-font-simulate-comment)
+  (let* ((fn  (selector-get-font))
+	 (fam (logical-font-family fn))
+         (var (logical-font-variant fn))
+         (ser (logical-font-series fn))
+         (sh  (logical-font-shape fn))
+         (lf  (logical-font-private fam var ser sh))
+         (fn2 (logical-font-search lf #f)))
+    ;;(display* "fn = " fn "\n")
+    ;;(display* "lf = " lf "\n")
+    ;;(display* "fn2= " fn2 "\n")
+    (cond ((and (== selector-font-family (car fn2))
+		(== selector-font-style (cadr fn2))) "")
+	  ((null? (selected-properties))
+	   (string-append "  (" selector-font-family " " selector-font-style
+			  " -> " (car fn2) " " (cadr fn2) ")"))
+	  (else
+	   (string-append "  (closest match: " (car fn2) " " (cadr fn2) ")")))))
+
 (define (selector-font-demo-text)
   (with fn (selector-get-font)
     ;;(display* "Font: " fn "\n")
@@ -78,7 +157,7 @@
          "font-series" ,(logical-font-series fn)
          "font-shape" ,(logical-font-shape fn)
          "font-base-size" ,selector-font-size
-         "abcdefghij, ABCDEFGHIJ, 0123456789"))))
+         ,sample-text))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Global state for font searching
@@ -91,7 +170,8 @@
 (tm-define selector-search-spacing "Any")
 (tm-define selector-search-case "Any")
 (tm-define selector-search-device "Any")
-(tm-define selector-search-purpose "Any")
+(tm-define selector-search-category "Any")
+(tm-define selector-search-glyphs "Any")
 
 (define (selector-initialize-search)
   (set! selector-search-weight "Any")
@@ -101,7 +181,21 @@
   (set! selector-search-spacing "Any")
   (set! selector-search-case "Any")
   (set! selector-search-device "Any")
-  (set! selector-search-purpose "Any"))
+  (set! selector-search-category "Any")
+  (set! selector-search-glyphs "Any"))
+
+(define (selector-search-glyphs-decoded)
+  (with s selector-search-glyphs
+    (cond ((== s "ASCII") "+Ascii")
+          ((== s "Latin") "+Latin1Basic")
+          ((== s "Greek") "+GreekBasic")
+          ((== s "Cyrillic") "+CyrillicBasic")
+          ((== s "CJK") "+CJK")
+          ((== s "Hangul") "+Hangul")
+          ((== s "Math") "+Math")
+          ((== s "Math Extra") "+MathExtra")
+          ((== s "Math Letters") "+MathLetters")
+          (else s))))
 
 (define (selected-properties)
   (with l (list selector-search-weight
@@ -111,7 +205,8 @@
                 selector-search-spacing
                 selector-search-case
                 selector-search-device
-                selector-search-purpose)
+                selector-search-category
+                (selector-search-glyphs-decoded))
     (list-filter l (cut != <> "Any"))))
 
 (tm-define-macro (selector-search-set! var val)
@@ -190,16 +285,20 @@
       ;;(item ====== ======)
       (item (text "Weight:")
         (enum (selector-search-set! selector-search-weight answer)
-              '("Any" "Light" "Medium" "Bold" "Black")
+              '("Any" "Thin" "Light" "Medium" "Bold" "Black")
               selector-search-weight "120px"))
       (item (text "Slant:")
         (enum (selector-search-set! selector-search-slant answer)
               '("Any" "Normal" "Italic" "Oblique")
               selector-search-slant "120px"))
       (item (text "Stretch:")
-        (enum (selector-search-set! selector-search-weight answer)
-              '("Any" "Condensed" "Unstretched" "Wide")
-              selector-search-weight "120px"))
+        (enum (selector-search-set! selector-search-stretch answer)
+              '("Any" "Condensed" "Unextended" "Wide")
+              selector-search-stretch "120px"))
+      (item (text "Case:")
+        (enum (selector-search-set! selector-search-case answer)
+              '("Any" "Mixed" "Small Capitals")
+              selector-search-case "120px"))
       (item ====== ======)
       (item (text "Serif:")
         (enum (selector-search-set! selector-search-serif answer)
@@ -209,15 +308,34 @@
         (enum (selector-search-set! selector-search-spacing answer)
               '("Any" "Proportional" "Monospaced")
               selector-search-spacing "120px"))
-      (item (text "Case:")
-        (enum (selector-search-set! selector-search-case answer)
-              '("Any" "Mixed" "Small Capitals")
-              selector-search-case "120px"))
       (item (text "Device:")
-        (enum (selector-search-set! selector-search-case answer)
-              '("Any" "Printed" "Typewriter" "Script" "Chalk" "Marker")
-              selector-search-case "120px")))
+        (enum (selector-search-set! selector-search-device answer)
+              '("Any" "Print" "Typewriter" "Digital"
+		"Pen" "Art Pen" "Chalk" "Marker")
+              selector-search-device "120px"))
+      (item (text "Category:")
+        (enum (selector-search-set! selector-search-category answer)
+              '("Any" "Ancient" "Calligraphic" "Comic"
+                "Decorative" "Gothic" "Handwritten"
+                "Medieval" "Retro" "Scifi" "Title")
+              selector-search-category "120px"))
+      (item ====== ======)
+      (item (text "Glyphs:")
+        (enum (selector-search-set! selector-search-glyphs answer)
+              '("Any" "ASCII" "Latin" "Greek" "Cyrillic"
+                "CJK" "Hangul" "Math" "Math Extra" "Math Letters")
+              selector-search-glyphs "120px")))
     (horizontal (glue #f #t 0 0))))
+
+(tm-widget (font-selector-demo)
+  (hlist
+    (bold (text "Sample text"))
+    (text (selector-font-simulate-comment))
+    >>>)
+  ===
+  (resize ("300px" "300px" "2000px") ("200px" "200px" "200px")
+    (scrollable
+      (link font-sample-text))))
 
 (tm-widget (font-selector quit)
   (padded
@@ -230,14 +348,17 @@
       ///
       (link font-properties-selector))
     === === ===
-    (bold (text "Sample text"))
-    ===
-    (resize ("300px" "300px" "2000px") ("100px" "100px" "100px")
-      (scrollable
-        (refresh font-sample-text auto)))
+    (refresh font-selector-demo auto)
     === ===
     (explicit-buttons
-      (hlist >>> ("Ok" (begin (selector-apply-font) (quit)))))))
+      (hlist
+        (enum (set-font-sample-kind answer)
+              '("Standard" "Selection"
+                "ASCII" "Latin" "Greek" "Cyrillic" "CJK" "Hangul"
+                "Math" "Math Extra" "Math Letters")
+              (get-font-sample-kind) "120px")
+        >>>
+        ("Ok" (begin (selector-apply-font) (quit)))))))
 
 (tm-define (open-font-selector)
   (selector-initialize-font)

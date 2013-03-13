@@ -197,8 +197,17 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     else buf= md->text().toUtf8 ();
   }
   if (!(buf.isEmpty())) s << string (buf.constData(), buf.size());
+  if (input_format == "html-snippet" && seems_buggy_html_paste (s))
+    s= correct_buggy_html_paste (s);
+  if (seems_buggy_paste (s))
+    s= correct_buggy_paste (s);
   if (input_format != "")
     s= as_string (call ("convert", s, input_format, "texmacs-snippet"));
+  if (input_format == "html-snippet") {
+    tree t= as_tree (call ("convert", s, "texmacs-snippet", "texmacs-tree"));
+    t= default_with_simplify (t);
+    s= as_string (call ("convert", t, "texmacs-tree", "texmacs-snippet"));
+  }
   t= tuple ("extern", s);
   return true;
 }
@@ -217,21 +226,24 @@ qt_gui_rep::set_selection (string key, tree t,
   else return true;
   cb->clear (mode);
 
-  char *selection= as_charp (s);
-  cb->setText (selection, mode);
+  c_string selection (s);
+  cb->setText (QString::fromAscii(selection), mode);
   QMimeData *md= new QMimeData;
 
   if (format == "verbatim" || format == "default") {
     if (format == "default") {
-      md->setData ("application/x-texmacs-clipboard", selection);
+      md->setData ("application/x-texmacs-clipboard", (char*)selection);
 
-      selection= as_charp (as_string (QCoreApplication::applicationPid ()));
-      md->setData ("application/x-texmacs-pid", selection);
+      QString pid_str;
+      pid_str.setNum(QCoreApplication::applicationPid ());
+      md->setData ("application/x-texmacs-pid", pid_str.toAscii());
 
-      selection= as_charp (sh);
-      md->setHtml (selection);
+      (void) sh;
+      //selection= c_string (sh);
+      //md->setHtml (selection);
+      //tm_delete_array(selection);
 
-      selection= as_charp (sv);
+      selection= c_string (sv);
     }
 
     if (get_preference ("texmacs->verbatim:encoding") == "utf-8")
@@ -239,14 +251,13 @@ qt_gui_rep::set_selection (string key, tree t,
     else if (get_preference ("texmacs->verbatim:encoding") == "iso-8859-1")
       md->setText (QString::fromLatin1 (selection));
     else
-      md->setText (selection);
+      md->setText (QString::fromAscii (selection));
   }
   else
-    md->setText (selection);
+    md->setText (QString::fromAscii (selection));
   cb->setMimeData (md, mode);
   // according to the docs, ownership of mimedata is transferred to clipboard
   // so no memory leak here
-  tm_delete_array (selection);
   return true;
 }
 
@@ -1101,9 +1112,8 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
   if ((extension == "bmp") || (extension == "png") ||
       (extension == "jpg") || (extension == "jpeg")) {
     QClipboard *clipboard = QApplication::clipboard();
-    char* tmp = as_charp (concretize (file));
+    c_string tmp (concretize (file));
     clipboard->setImage (QImage (tmp));
-    tm_delete_array (tmp);
   }
   else {
     // vector formats
@@ -1117,9 +1127,8 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
     string filecontent;
     load_string (as_string (file), filecontent, true);
     
-    char* tmp = as_charp (filecontent);
+    c_string tmp (filecontent);
     QByteArray rawdata (tmp);
-    tm_delete_array(tmp);
 
     QMimeData *mymimeData = new QMimeData;
     mymimeData->setData(mime, rawdata);

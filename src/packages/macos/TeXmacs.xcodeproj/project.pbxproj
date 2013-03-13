@@ -11,6 +11,9 @@
 		4906929B151B743F006645F4 /* new_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4906929A151B743F006645F4 /* new_view.cpp */; };
 		4906929C151B743F006645F4 /* new_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4906929A151B743F006645F4 /* new_view.cpp */; };
 		4906929D151B743F006645F4 /* new_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4906929A151B743F006645F4 /* new_view.cpp */; };
+		4910FA7316EB3E2F0088B175 /* post_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4910FA7216EB3E2F0088B175 /* post_convert.cpp */; };
+		4910FA7416EB3E2F0088B175 /* post_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4910FA7216EB3E2F0088B175 /* post_convert.cpp */; };
+		4910FA7516EB3E2F0088B175 /* post_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4910FA7216EB3E2F0088B175 /* post_convert.cpp */; };
 		492ED6CC150FD27D00DB0FB5 /* new_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492ED6C8150FD27D00DB0FB5 /* new_data.cpp */; };
 		492ED6CD150FD27D00DB0FB5 /* new_style.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492ED6CA150FD27D00DB0FB5 /* new_style.cpp */; };
 		492ED6CE150FD27D00DB0FB5 /* new_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492ED6C8150FD27D00DB0FB5 /* new_data.cpp */; };
@@ -30,6 +33,9 @@
 		495712FC16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
 		495712FD16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
 		495712FE16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
+		497822CB16EC86D40054F5BA /* tt_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 497822CA16EC86D40054F5BA /* tt_analyze.cpp */; };
+		497822CC16EC86D40054F5BA /* tt_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 497822CA16EC86D40054F5BA /* tt_analyze.cpp */; };
+		497822CD16EC86D40054F5BA /* tt_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 497822CA16EC86D40054F5BA /* tt_analyze.cpp */; };
 		49896901152B981400DB1E9E /* TeXmacs.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9C61B42A141A1B780035D78F /* TeXmacs.icns */; };
 		49D662FC128B331A0006E948 /* QTMFileDialog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49D662FA128B331A0006E948 /* QTMFileDialog.cpp */; };
 		49D662FD128B333F0006E948 /* QTMFileDialog.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 49D662FB128B331A0006E948 /* QTMFileDialog.hpp */; };
@@ -46,6 +52,12 @@
 		49F9FA161573BA86006C7258 /* new_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F9FA111573BA86006C7258 /* new_window.cpp */; };
 		49F9FA171573BA86006C7258 /* new_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F9FA111573BA86006C7258 /* new_window.cpp */; };
 		49F9FA181573BA86006C7258 /* new_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F9FA111573BA86006C7258 /* new_window.cpp */; };
+		49FDFA6516F0C677002B830A /* metadata-ams.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FDFA6416F0C677002B830A /* metadata-ams.cpp */; };
+		49FDFA6616F0C677002B830A /* metadata-ams.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FDFA6416F0C677002B830A /* metadata-ams.cpp */; };
+		49FDFA6716F0C677002B830A /* metadata-ams.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FDFA6416F0C677002B830A /* metadata-ams.cpp */; };
+		49FFB07916EDF83A004A2A32 /* glyph_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */; };
+		49FFB07A16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */; };
+		49FFB07B16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */; };
 		49FFF7C61635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
 		49FFF7C71635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
 		49FFF7C81635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
@@ -1130,6 +1142,7 @@
 		4906929A151B743F006645F4 /* new_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = new_view.cpp; sourceTree = "<group>"; };
 		490A039C1671601100611E4C /* qt_font.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_font.cpp; sourceTree = "<group>"; };
 		490A039D1671601100611E4C /* qt_font.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_font.hpp; sourceTree = "<group>"; };
+		4910FA7216EB3E2F0088B175 /* post_convert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = post_convert.cpp; sourceTree = "<group>"; };
 		491132F216767D3E009F1A5C /* tt_tools.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tt_tools.cpp; sourceTree = "<group>"; };
 		491132F316767D3E009F1A5C /* tt_tools.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tt_tools.hpp; sourceTree = "<group>"; };
 		492ED6C8150FD27D00DB0FB5 /* new_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = new_data.cpp; sourceTree = "<group>"; };
@@ -1143,6 +1156,7 @@
 		4942BEF61679293B00A6C354 /* font_select.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_select.cpp; sourceTree = "<group>"; };
 		495712F716E90E5900934EA3 /* metadata-acm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "metadata-acm.cpp"; sourceTree = "<group>"; };
 		495712F816E90E5900934EA3 /* metadata-elsevier.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "metadata-elsevier.cpp"; sourceTree = "<group>"; };
+		497822CA16EC86D40054F5BA /* tt_analyze.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tt_analyze.cpp; sourceTree = "<group>"; };
 		49D662FA128B331A0006E948 /* QTMFileDialog.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMFileDialog.cpp; sourceTree = "<group>"; };
 		49D662FB128B331A0006E948 /* QTMFileDialog.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMFileDialog.hpp; sourceTree = "<group>"; };
 		49DD8FA716DB75C100647CA2 /* sqlite3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sqlite3.cpp; sourceTree = "<group>"; };
@@ -1157,6 +1171,8 @@
 		49F9FA101573BA86006C7258 /* new_view.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = new_view.hpp; sourceTree = "<group>"; };
 		49F9FA111573BA86006C7258 /* new_window.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = new_window.cpp; sourceTree = "<group>"; };
 		49F9FA121573BA86006C7258 /* new_window.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = new_window.hpp; sourceTree = "<group>"; };
+		49FDFA6416F0C677002B830A /* metadata-ams.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "metadata-ams.cpp"; sourceTree = "<group>"; };
+		49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = glyph_analyze.cpp; sourceTree = "<group>"; };
 		49FFF7C41635D3690031CFDC /* wencoding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wencoding.cpp; sourceTree = "<group>"; };
 		49FFF7C51635D3690031CFDC /* wencoding.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = wencoding.hpp; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* TeXmacsQt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsQt.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2079,6 +2095,7 @@
 		9C0B476010A8CC0F0097A335 /* Generic */ = {
 			isa = PBXGroup;
 			children = (
+				4910FA7216EB3E2F0088B175 /* post_convert.cpp */,
 				9C0B476110A8CC0F0097A335 /* generic.cpp */,
 				9C0B476210A8CC0F0097A335 /* input.cpp */,
 				9C0B476310A8CC0F0097A335 /* input.hpp */,
@@ -2098,6 +2115,7 @@
 		9C0B476710A8CC0F0097A335 /* Tex */ = {
 			isa = PBXGroup;
 			children = (
+				49FDFA6416F0C677002B830A /* metadata-ams.cpp */,
 				495712F716E90E5900934EA3 /* metadata-acm.cpp */,
 				495712F816E90E5900934EA3 /* metadata-elsevier.cpp */,
 				9CD1513A15A72D0F006F2205 /* metadata.cpp */,
@@ -2318,6 +2336,7 @@
 				9C0B47D410A8CC100097A335 /* bitmap_font.cpp */,
 				9C0B47D510A8CC100097A335 /* bitmap_font.hpp */,
 				9C0B47D610A8CC100097A335 /* glyph.cpp */,
+				49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */,
 				9C0B47D710A8CC100097A335 /* glyph_ops.cpp */,
 				9C0B47D810A8CC100097A335 /* glyph_shrink.cpp */,
 			);
@@ -2558,6 +2577,7 @@
 		9C0B487010A8CC100097A335 /* Freetype */ = {
 			isa = PBXGroup;
 			children = (
+				497822CA16EC86D40054F5BA /* tt_analyze.cpp */,
 				9C6632ED1676B28E000D7974 /* tt_tools.cpp */,
 				9C6632EE1676B28E000D7974 /* tt_tools.hpp */,
 				9CEDAA351264FF88009630CC /* unicode_math_font.cpp */,
@@ -4217,6 +4237,10 @@
 				49DD8FA916DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712F916E90E5900934EA3 /* metadata-acm.cpp in Sources */,
 				495712FC16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
+				4910FA7316EB3E2F0088B175 /* post_convert.cpp in Sources */,
+				497822CB16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
+				49FFB07916EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
+				49FDFA6516F0C677002B830A /* metadata-ams.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4566,6 +4590,10 @@
 				49DD8FAB16DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712FB16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
 				495712FE16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
+				4910FA7516EB3E2F0088B175 /* post_convert.cpp in Sources */,
+				497822CD16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
+				49FFB07B16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
+				49FDFA6716F0C677002B830A /* metadata-ams.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4943,6 +4971,10 @@
 				49DD8FAA16DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712FA16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
 				495712FD16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
+				4910FA7416EB3E2F0088B175 /* post_convert.cpp in Sources */,
+				497822CC16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
+				49FFB07A16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
+				49FDFA6616F0C677002B830A /* metadata-ams.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

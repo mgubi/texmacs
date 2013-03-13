@@ -806,6 +806,19 @@ tmg_tt_font_name (tmscm arg1) {
 }
 
 tmscm
+tmg_tt_analyze (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-analyze");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= tt_analyze (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_font_database_build (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-build");
 
@@ -837,6 +850,19 @@ tmg_font_database_build_global () {
 }
 
 tmscm
+tmg_font_database_build_characteristics (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-database-build-characteristics");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  font_database_build_characteristics (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_font_database_insert_global (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-insert-global");
 
@@ -844,6 +870,15 @@ tmg_font_database_insert_global (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   font_database_build_global (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_font_database_save_local_delta () {
+  // TMSCM_DEFER_INTS;
+  font_database_save_local_delta ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -886,6 +921,15 @@ tmg_font_database_families () {
 }
 
 tmscm
+tmg_font_database_delta_families () {
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_delta_families ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_font_database_styles (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-styles");
 
@@ -908,6 +952,21 @@ tmg_font_database_search (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   array_string out= font_database_search (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_database_characteristics (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-characteristics");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-database-characteristics");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_characteristics (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -992,6 +1051,51 @@ tmg_font_style_features (tmscm arg1) {
 }
 
 tmscm
+tmg_font_guessed_features (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-guessed-features");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-guessed-features");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= guessed_features (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_family_guessed_features (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-guessed-features");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "font-family-guessed-features");
+
+  string in1= tmscm_to_string (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= guessed_features (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_characteristic_distance (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "characteristic-distance");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "characteristic-distance");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  double out= characteristic_distance (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return double_to_tmscm (out);
+}
+
+tmscm
 tmg_logical_font_public (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-public");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-public");
@@ -1001,6 +1105,21 @@ tmg_logical_font_public (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   array_string out= logical_font (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_exact (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-exact");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-exact");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= logical_font_exact (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -1115,6 +1234,21 @@ tmg_search_font_styles (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   array_string out= search_font_styles (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_logical_font_patch (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-patch");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "logical-font-patch");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= patch_font (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -6735,23 +6869,32 @@ initialize_glue_basic () {
   tmscm_install_procedure ("glyph-recognize",  tmg_glyph_recognize, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);
+  tmscm_install_procedure ("tt-analyze",  tmg_tt_analyze, 1, 0, 0);
   tmscm_install_procedure ("font-database-build",  tmg_font_database_build, 1, 0, 0);
   tmscm_install_procedure ("font-database-build-local",  tmg_font_database_build_local, 0, 0, 0);
   tmscm_install_procedure ("font-database-build-global",  tmg_font_database_build_global, 0, 0, 0);
+  tmscm_install_procedure ("font-database-build-characteristics",  tmg_font_database_build_characteristics, 1, 0, 0);
   tmscm_install_procedure ("font-database-insert-global",  tmg_font_database_insert_global, 1, 0, 0);
+  tmscm_install_procedure ("font-database-save-local-delta",  tmg_font_database_save_local_delta, 0, 0, 0);
   tmscm_install_procedure ("font-database-load",  tmg_font_database_load, 0, 0, 0);
   tmscm_install_procedure ("font-database-save",  tmg_font_database_save, 0, 0, 0);
   tmscm_install_procedure ("font-database-filter",  tmg_font_database_filter, 0, 0, 0);
   tmscm_install_procedure ("font-database-families",  tmg_font_database_families, 0, 0, 0);
+  tmscm_install_procedure ("font-database-delta-families",  tmg_font_database_delta_families, 0, 0, 0);
   tmscm_install_procedure ("font-database-styles",  tmg_font_database_styles, 1, 0, 0);
   tmscm_install_procedure ("font-database-search",  tmg_font_database_search, 2, 0, 0);
+  tmscm_install_procedure ("font-database-characteristics",  tmg_font_database_characteristics, 2, 0, 0);
   tmscm_install_procedure ("font-family->master",  tmg_font_family_2master, 1, 0, 0);
   tmscm_install_procedure ("font-master->families",  tmg_font_master_2families, 1, 0, 0);
   tmscm_install_procedure ("font-master-features",  tmg_font_master_features, 1, 0, 0);
   tmscm_install_procedure ("font-family-features",  tmg_font_family_features, 1, 0, 0);
   tmscm_install_procedure ("font-family-strict-features",  tmg_font_family_strict_features, 1, 0, 0);
   tmscm_install_procedure ("font-style-features",  tmg_font_style_features, 1, 0, 0);
+  tmscm_install_procedure ("font-guessed-features",  tmg_font_guessed_features, 2, 0, 0);
+  tmscm_install_procedure ("font-family-guessed-features",  tmg_font_family_guessed_features, 2, 0, 0);
+  tmscm_install_procedure ("characteristic-distance",  tmg_characteristic_distance, 2, 0, 0);
   tmscm_install_procedure ("logical-font-public",  tmg_logical_font_public, 2, 0, 0);
+  tmscm_install_procedure ("logical-font-exact",  tmg_logical_font_exact, 2, 0, 0);
   tmscm_install_procedure ("logical-font-private",  tmg_logical_font_private, 4, 0, 0);
   tmscm_install_procedure ("logical-font-family",  tmg_logical_font_family, 1, 0, 0);
   tmscm_install_procedure ("logical-font-variant",  tmg_logical_font_variant, 1, 0, 0);
@@ -6760,6 +6903,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("logical-font-search",  tmg_logical_font_search, 2, 0, 0);
   tmscm_install_procedure ("search-font-families",  tmg_search_font_families, 1, 0, 0);
   tmscm_install_procedure ("search-font-styles",  tmg_search_font_styles, 2, 0, 0);
+  tmscm_install_procedure ("logical-font-patch",  tmg_logical_font_patch, 2, 0, 0);
   tmscm_install_procedure ("image->psdoc",  tmg_image_2psdoc, 1, 0, 0);
   tmscm_install_procedure ("tree->stree",  tmg_tree_2stree, 1, 0, 0);
   tmscm_install_procedure ("stree->tree",  tmg_stree_2tree, 1, 0, 0);

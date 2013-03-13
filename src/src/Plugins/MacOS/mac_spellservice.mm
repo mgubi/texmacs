@@ -26,9 +26,8 @@ from_nsstring (NSString *s) {
 static NSString *
 to_nsstring_utf8 (string s) {
   s= cork_to_utf8 (s);
-  char *p = as_charp(s);
+  c_string p = c_string (s);
   NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
-  tm_delete_array (p);	
   return nss;
 }
 

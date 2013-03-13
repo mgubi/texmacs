@@ -172,7 +172,7 @@ public:
 
 
 
-@interface TMLazyMenu : NSMenu
+@interface TMLazyMenu : NSMenu <NSMenuDelegate>
 {
 	promise<widget> pm;
 	BOOL forced;
