@@ -40,7 +40,7 @@
   (Longleftarrowlim "\\mathop{\\longleftarrow}\\limits")
   (Longrightarrowlim "\\mathop{\\longrightarrow}\\limits")
   (Longleftrightarrowlim "\\mathop{\\longleftrightarrow}\\limits")
-   
+
   ;; asymptotic relations by Joris
   (nasymp "\\not\\asymp")
   (asympasymp "{\\asymp\\!\\!\\!\\!\\!\\!-}")
@@ -167,6 +167,8 @@
 	    (!recurse (TeXmacs)) " (" (!translate "see") " "
 	    (texttt "http://www.texmacs.org") ")"))
   (scheme "{\\sc Scheme}")
+  (tmsep  ", ")
+  (tmSep  "; ")
   (pari "{\\sc Pari}"))
 
 (logic-table latex-texmacs-1%
@@ -199,11 +201,14 @@
   (tmdef 1)
   (dueto (textup (textbf (!append "(" 1 ") "))))
   (op 1)
-  (email (!group (textit (!translate "Email:")) " " (texttt 1)))
-  (homepage (!group (textit (!translate "Web:")) " "(texttt 1)))
-  (keywords (!group (textbf (!translate "Keywords:")) " " 1))
-  (AMSclass (!group (textbf (!translate "A.M.S. subject classification:"))
-		    " " 1)))
+  (tmaffiliation (thanks (!append (textit (!translate "Affiliation:")) " " 1)))
+  (tmemail (thanks (!append (textit (!translate "Email:")) " " (texttt 1))))
+  (tmhomepage (thanks (!append (textit (!translate "Web:")) " " (texttt 1))))
+  (tmsubtitle (thanks (!append (textit (!translate "Subtitle:")) " " 1)))
+  (tmacmhomepage (titlenote (!append (textit (!translate "Web:")) " " 1)))
+  (tmacmmisc (titlenote (!append (textit (!translate "Misc:")) " " 1)))
+  (tmnote (thanks (!append (textit (!translate "Note:")) " " 1)))
+  (tmmisc (thanks (!append (textit (!translate "Misc:")) " " 1))))
 
 (logic-table latex-texmacs-2%
   (tmhlink (!group "\\color{blue} " 1))
@@ -359,6 +364,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-table latex-texmacs-preamble%
+  (tmkeywords (!append
+                (newcommand (tmkeywords)
+                            (!append (textbf (!translate "Keywords:")) " "))
+                "\n"))
+  (tmmsc (!append
+           (newcommand (tmmsc)
+                       (!append
+                         (textbf
+                           (!translate "A.M.S. subject classification:")) " "))
+           "\n"))
   (fmtext        (!append "\\newcommand{\\fmtext}[2][]{\\fntext[#1]{"
                           (!translate "Misc:") " #2}}\n"))
   (tdatetext     (!append "\\newcommand{\\tdatetext}[2][]{\\tnotetext[#1]{"
@@ -367,14 +382,14 @@
                           (!translate "Misc:") " #2}}\n"))
   (tsubtitletext (!append "\\newcommand{\\tsubtitletext}[2][]{\\tnotetext[#1]{"
                           (!translate "Subtitle:") " #2}}\n"))
-  (thanksdate     (!append "\\newcommand{\\thanksdate}[2][]{\\thanks[#1]{"
+  (thanksdate    (!append "\\newcommand{\\thanksdate}[2][]{\\thanks[#1]{"
                           (!translate "Date:") " #2}}\n"))
-  (thanksamisc    (!append "\\newcommand{\\thanksamisc}[2][]{\\thanks[#1]{"
+  (thanksamisc   (!append "\\newcommand{\\thanksamisc}[2][]{\\thanks[#1]{"
                           (!translate "Misc:") " #2}}\n"))
-  (thanksmisc     (!append "\\newcommand{\\thanksmisc}[2][]{\\thanks[#1]{"
+  (thanksmisc    (!append "\\newcommand{\\thanksmisc}[2][]{\\thanks[#1]{"
                           (!translate "Misc:") " #2}}\n"))
   (thankssubtitle (!append "\\newcommand{\\thankssubtitle}[2][]{\\thanks[#1]{"
-                          (!translate "Subtitle:") " #2}}\n"))
+                           (!translate "Subtitle:") " #2}}\n"))
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))

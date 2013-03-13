@@ -87,24 +87,37 @@
   ;; routines for the font database
   (tt-dump tt_dump (void url))
   (tt-font-name tt_font_name (scheme_tree url))
+  (tt-analyze tt_analyze (array_string string))
   (font-database-build font_database_build (void url))
   (font-database-build-local font_database_build_local (void))
   (font-database-build-global font_database_build_global (void))
+  (font-database-build-characteristics
+   font_database_build_characteristics (void bool))
   (font-database-insert-global font_database_build_global (void url))
+  (font-database-save-local-delta font_database_save_local_delta (void))
   (font-database-load font_database_load (void))
   (font-database-save font_database_save (void))
   (font-database-filter font_database_filter (void))
   (font-database-families font_database_families (array_string))
+  (font-database-delta-families font_database_delta_families (array_string))
   (font-database-styles font_database_styles (array_string string))
   (font-database-search font_database_search (array_string string string))
+  (font-database-characteristics
+   font_database_characteristics (array_string string string))
   (font-family->master family_to_master (string string))
   (font-master->families master_to_families (array_string string))
   (font-master-features master_features (array_string string))
   (font-family-features family_features (array_string string))
   (font-family-strict-features family_strict_features (array_string string))
   (font-style-features style_features (array_string string))
+  (font-guessed-features guessed_features (array_string string string))
+  (font-family-guessed-features guessed_features (array_string string bool))
+  (characteristic-distance
+   characteristic_distance (double array_string array_string))
   (logical-font-public logical_font (array_string string string))
-  (logical-font-private logical_font (array_string string string string string))
+  (logical-font-exact logical_font_exact (array_string string string))
+  (logical-font-private
+   logical_font (array_string string string string string))
   (logical-font-family get_family (string array_string))
   (logical-font-variant get_variant (string array_string))
   (logical-font-series get_series (string array_string))
@@ -112,6 +125,7 @@
   (logical-font-search search_font (array_string array_string bool))
   (search-font-families search_font_families (array_string array_string))
   (search-font-styles search_font_styles (array_string string array_string))
+  (logical-font-patch patch_font (array_string array_string array_string))
 
   ;; routines for images
   (image->psdoc image_to_psdoc (string url))

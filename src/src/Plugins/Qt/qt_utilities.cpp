@@ -294,17 +294,15 @@ to_qstring (const string& s) {
 
 QString
 latin1_to_qstring (const string& s) {
-  char* p= as_charp (s);
+  c_string p (s);
   QString nss= QString::fromLatin1 (p, N(s));
-  tm_delete_array (p);
   return nss;
 }
 
 QString
 utf8_to_qstring (const string& s) {
-  char* p= as_charp (s);
+  c_string p (s);
   QString nss= QString::fromUtf8 (p, N(s));
-  tm_delete_array (p);
   return nss;
 }
 

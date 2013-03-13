@@ -101,7 +101,8 @@ void font_rule (tree which, tree by);
 font find_font (scheme_tree t);
 font find_magnified_font (scheme_tree t, double zf);
 font find_font (string family, string fn_class,
-		string series, string shape, int sz, int dpi);
+		string series, string shape, int sz, int dpi,
+		bool closest= false);
 
 font math_font (scheme_tree t, font base_fn, font error_fn, double zoom= 1.0);
 font compound_font (scheme_tree def, double zoom= 1.0);
@@ -109,19 +110,22 @@ font compound_font (scheme_tree def, double zoom= 1.0);
 int  script (int sz, int level);
 
 // Font database
-extern hashmap<tree,tree> font_table;
 void font_database_build (url u);
 void font_database_build_local ();
 void font_database_build_global ();
 void font_database_build_global (url u);
+void font_database_build_characteristics (bool force);
 void font_database_load ();
 void font_database_save ();
 void font_database_filter ();
+void font_database_save_local_delta ();
 array<string> font_database_families ();
+array<string> font_database_delta_families ();
 array<string> font_database_styles (string family);
 array<string> font_database_search (string family, string style);
 array<string> font_database_search (string fam, string var,
                                     string series, string shape);
+array<string> font_database_characteristics (string family, string style);
 
 // Font selection
 string family_to_master (string f);
@@ -131,7 +135,10 @@ array<string> family_features (string f);
 array<string> family_strict_features (string f);
 array<string> style_features (string s);
 array<string> logical_font (string family, string shape);
+array<string> logical_font_exact (string family, string style);
 array<string> logical_font (string f, string v, string ser, string sh);
+array<string> guessed_features (string family, string shape);
+array<string> guessed_features (string family, bool pure_guess);
 string get_family (array<string> v);
 string get_variant (array<string> v);
 string get_series (array<string> v);
@@ -139,5 +146,6 @@ string get_shape (array<string> v);
 array<string> search_font (array<string> v, bool require_exact);
 array<string> search_font_families (array<string> v);
 array<string> search_font_styles (string s, array<string> v);
+array<string> patch_font (array<string> v, array<string> w);
 
 #endif // defined FONT_H

@@ -85,4 +85,37 @@ void  system_wait (string message, string argument= "", int level= 0);
 void  system_warning (string message, string argument= "", int level= 0);
 void  system_error (string message, string argument= "", int level= 0);
 
+/******************************************************************************
+* C-style strings with automatic memory management
+******************************************************************************/
+
+class c_string;
+class c_string_rep: concrete_struct {
+  char* value;
+  
+private:
+  inline c_string_rep (c_string_rep &): concrete_struct () {};
+    // disable copy constructor
+  inline c_string_rep& operator=(c_string_rep&) {};
+    // disable assignment
+  
+public:
+  inline c_string_rep (char* v = NULL): value (v) {}
+  inline ~c_string_rep () { if (value != NULL) tm_delete_array (value); }
+  friend class c_string;
+};
+
+class c_string {
+  CONCRETE(c_string);
+public:
+  inline c_string ():
+    rep (tm_new<c_string_rep> ()) {}
+  inline c_string (int len):
+    rep (tm_new<c_string_rep> (tm_new_array<char> (len))) {}
+  inline c_string (string s):
+    rep (tm_new<c_string_rep> (as_charp (s))) {}
+  inline operator char* () const { return rep->value; }
+};
+CONCRETE_CODE(c_string);
+
 #endif // defined STRING_H

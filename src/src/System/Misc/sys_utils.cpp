@@ -73,9 +73,8 @@ var_eval_system (string s) {
 
 string
 get_env (string var) {
-  char* _var= as_charp (var);
+  c_string _var (var);
   char* _ret= getenv (_var);
-  tm_delete_array (_var);
   if (_ret==NULL) {
     if (var == "PWD") return get_env ("HOME");
     return "";
@@ -88,11 +87,9 @@ get_env (string var) {
 void
 set_env (string var, string with) {
 #if defined(STD_SETENV) && !defined(__MINGW32__)
-  char* _var = as_charp (var);
-  char* _with= as_charp (with);
+  c_string _var  (var);
+  c_string _with (with);
   setenv (_var, _with, 1);
-  tm_delete_array(_var);
-  tm_delete_array(_with);
 #else
   char* _varw= as_charp (var * "=" * with);
   (void) putenv (_varw);
@@ -104,7 +101,7 @@ set_env (string var, string with) {
 url
 get_texmacs_path () {
   string tmpath= get_env ("TEXMACS_PATH");
-    // FIXME: Why is this?
+    //FIXME: Why is this?
   while ((N(tmpath)>0) && (tmpath [N(tmpath) - 1] == '/'))
     tmpath= tmpath (0, N(tmpath)-1);
   return tmpath;

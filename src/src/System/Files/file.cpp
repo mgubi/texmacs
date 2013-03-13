@@ -65,7 +65,7 @@ load_string (url u, string& s, bool fatal) {
     // End caching
 
     bench_start ("load file");
-    char* _name= as_charp (name);
+    c_string _name (name);
     // cout << "OPEN :" << _name << LF;
 #if defined (OS_WIN32)
     FILE* fin= _fopen (_name, "rb");
@@ -99,7 +99,6 @@ load_string (url u, string& s, bool fatal) {
       if (read < size) s->resize (read);
       fclose (fin);
     }
-    tm_delete_array (_name);
     bench_cumul ("load file");
 
     // Cache file contents
@@ -132,27 +131,27 @@ save_string (url u, string s, bool fatal) {
   bool err= !is_rooted_name (r);
   if (!err) {
     string name= concretize (r);
-    char* _name= as_charp (name);
+    {
+      c_string _name (name);
 #if defined (OS_WIN32)
-    FILE* fout= _fopen (_name, "wb");
+      FILE* fout= _fopen (_name, "wb");
 #elif defined (__MINGW__) || defined (__MINGW32__)
-    FILE* fout= fopen (_name, "wb");
+      FILE* fout= fopen (_name, "wb");
 #else
-    FILE* fout= fopen (_name, "w");
+      FILE* fout= fopen (_name, "w");
 #endif
-    if (fout == NULL) {
-      err= true;
-      cerr << "TeXmacs] warning, save error for " << name << ", "
-           << strerror(errno) << "\n";
+      if (fout == NULL) {
+        err= true;
+        cerr << "TeXmacs] warning, save error for " << name << ", "
+        << strerror(errno) << "\n";
+      }
+      if (!err) {
+        int i, n= N(s);
+        for (i=0; i<n; i++)
+          fputc (s[i], fout);
+        fclose (fout);
+      }
     }
-    if (!err) {
-      int i, n= N(s);
-      for (i=0; i<n; i++)
-	fputc (s[i], fout);
-      fclose (fout);
-    }
-    tm_delete_array (_name);
-
     // Cache file contents
     bool file_flag= do_cache_file (name);
     bool doc_flag= do_cache_doc (name);
@@ -206,7 +205,7 @@ get_attributes (url name, struct stat* buf,
 
   bench_start ("stat");
   bool flag;
-  char* temp= as_charp (name_s);
+  c_string temp (name_s);
 #ifdef OS_WIN32
   flag= _stat (temp, buf);
 #else
@@ -215,7 +214,6 @@ get_attributes (url name, struct stat* buf,
   (void) link_flag;
   // FIXME: configure should test whether lstat works
   // flag= (link_flag? lstat (temp, buf): stat (temp, buf));
-  tm_delete_array (temp);
   bench_cumul ("stat");
 
   // Cache stat results
@@ -446,9 +444,8 @@ read_directory (url u, bool& error_flag) {
   // End caching
 
   DIR* dp;
-  char* temp= as_charp (name);
+  c_string temp (name);
   dp= opendir (temp);
-  tm_delete_array (temp);
   error_flag= (dp==NULL);
   if (error_flag) return array<string> ();
 
@@ -554,12 +551,9 @@ search_score (url u, array<string> a) {
 
 void
 move (url u1, url u2) {
-  char *_u1, *_u2;
-  _u1 = as_charp (concretize (u1));
-  _u2 = as_charp (concretize (u2));
+  c_string _u1 (concretize (u1));
+  c_string _u2 (concretize (u2));
   (void) rename (_u1, _u2);
-  tm_delete_array (_u1);
-  tm_delete_array (_u2);
 }
 
 void
@@ -578,9 +572,8 @@ remove (url u) {
     remove (u[2]);
   }
   else {
-    char *_u= as_charp (concretize (u));
+    c_string _u (concretize (u));
     (void) ::remove (_u);
-    tm_delete_array (_u);
   }
 }
 
@@ -588,13 +581,14 @@ void
 mkdir (url u) {
 #if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
   if (exists (u)) return;
-  char *_u= as_charp (concretize (u));
+  {
+    c_string _u (concretize (u));
 #if defined(__MINGW__) || defined(__MINGW32__)
-  (void) ::mkdir (_u);
+    (void) ::mkdir (_u);
 #else
-  (void) ::mkdir (_u, S_IRWXU + S_IRGRP + S_IROTH);
+    (void) ::mkdir (_u, S_IRWXU + S_IRGRP + S_IROTH);
 #endif
-  tm_delete_array (_u);
+  }
 #else
 #if defined(__MINGW__) || defined(__MINGW32__)
   system ("mkdir", u);
@@ -607,9 +601,8 @@ mkdir (url u) {
 void
 change_mode (url u, int mode) {
 #if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
-  char *_u= as_charp (concretize (u));
+  c_string _u (concretize (u));
   (void) ::chmod (_u, mode);
-  tm_delete_array (_u);
 #else
   string m0= as_string ((mode >> 9) & 7);
   string m1= as_string ((mode >> 6) & 7);
@@ -622,12 +615,9 @@ change_mode (url u, int mode) {
 void
 ps2pdf (url u1, url u2) {
 #ifdef OS_WIN32
-  char *_u1, *_u2;
-  _u1 = as_charp (concretize (u1));
-  _u2 = as_charp (concretize (u2));
+  c_string _u1 (concretize (u1));
+  c_string _u2 (concretize (u2));
   XPs2Pdf (_u1, _u2);
-  tm_delete_array (_u1);
-  tm_delete_array (_u2);
 #else
 #ifdef MACOSX_EXTENSIONS
   mac_ps_to_pdf (u1, u2);
