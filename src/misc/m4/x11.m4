@@ -30,8 +30,9 @@ AC_DEFUN(LC_X_HEADERS,[
   if test $no_x
   then unset x_includes
   else x_libraries=${x_includes/include/lib}
-  fi   AX_RESTORE_FLAGS
   LC_SCATTER_FLAGS([-I$x_includes -L$x_libraries -lXext -lX11],[X11])
-  LC_SUBST(X11)
   LC_COMBINE_FLAGS([X11])
+  fi   
+  AX_RESTORE_FLAGS
+  LC_SUBST(X11)
 ])
