@@ -14,8 +14,6 @@
 #include "abs_buffer.hpp"
 #include "link.hpp"
 #include "new_data.hpp"
-#include "Data/new_buffer.hpp"
-
 
 class tm_buffer_rep;
 class tm_view_rep;
