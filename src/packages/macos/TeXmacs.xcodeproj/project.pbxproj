@@ -1817,7 +1817,7 @@
 		49FFF7C41635D3690031CFDC /* wencoding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wencoding.cpp; sourceTree = "<group>"; };
 		49FFF7C51635D3690031CFDC /* wencoding.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = wencoding.hpp; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* TeXmacsQt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsQt.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9C00B15E1D418C8C00E486B5 /* abs_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = abs_buffer.hpp; path = ../Texmacs/abs_buffer.hpp; sourceTree = "<group>"; };
+		9C00B15E1D418C8C00E486B5 /* abs_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = abs_buffer.hpp; sourceTree = "<group>"; };
 		9C00B15F1D41977200E486B5 /* build-auto-doc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = "build-auto-doc"; sourceTree = "<group>"; };
 		9C00B1601D41977200E486B5 /* make-apidoc-doc.scm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "make-apidoc-doc.scm"; sourceTree = "<group>"; };
 		9C00B1611D41977200E486B5 /* make-apidoc-module.scm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "make-apidoc-module.scm"; sourceTree = "<group>"; };
@@ -2233,7 +2233,7 @@
 		9C0B496010A8CC110097A335 /* tm_configure.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = tm_configure.in; sourceTree = "<group>"; };
 		9C0B496610A8CC110097A335 /* tm_config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tm_config.cpp; sourceTree = "<group>"; };
 		9C0B496710A8CC110097A335 /* tm_server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tm_server.cpp; sourceTree = "<group>"; };
-		9C0B496810A8CC110097A335 /* server.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = server.hpp; path = ../Texmacs/server.hpp; sourceTree = "<group>"; };
+		9C0B496810A8CC110097A335 /* server.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = server.hpp; sourceTree = "<group>"; };
 		9C0B496A10A8CC110097A335 /* texmacs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = texmacs.cpp; sourceTree = "<group>"; };
 		9C0B496B10A8CC110097A335 /* tm_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tm_buffer.hpp; sourceTree = "<group>"; };
 		9C0B496C10A8CC110097A335 /* tm_config.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tm_config.hpp; sourceTree = "<group>"; };

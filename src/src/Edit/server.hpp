@@ -113,13 +113,13 @@ ABSTRACT_CODE(server);
 
 
 // the following are needed in the editor interface
-server get_server ();
 url  get_current_view ();
 url  get_current_view_safe ();
 void set_current_view (url u);
 bool has_current_window ();
 
 // the following are needed in the scheme interface (but not in editor)
+server get_server ();
 bool in_rescue_mode ();
 void gui_set_output_language (string lan);
 void project_attach (string prj_name= "");

@@ -10,7 +10,7 @@
 #define ABS_BUFFER_HPP
 
 #include "new_data.hpp"
-#include "Data/new_buffer.hpp"
+#include "../Texmacs/Data/new_buffer.hpp"
 
 
 extern tree the_et;

@@ -11,12 +11,12 @@
 
 #ifndef TM_DATA_H
 #define TM_DATA_H
-#include "server.hpp"
+
+#include "tm_server.hpp"
 #include "tm_window.hpp"
 #include "Data/new_view.hpp"
 #include "Data/new_window.hpp"
 #include "Data/new_project.hpp"
-
 
 extern array<tm_buffer> bufs;
 

@@ -11,7 +11,7 @@
 
 #include "config.h"
 #include "tm_server.hpp"
-#include "../Data/new_window.hpp"
+#include "tm_data.hpp"
 
 #include "drd_std.hpp"
 #include "convert.hpp"
