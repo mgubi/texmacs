@@ -527,7 +527,7 @@ edit_interface_rep::update_menus () {
   set_footer ();
   {
     bool ns= need_save ();
-    get_server() -> set_window_modified (ns);
+    sv -> set_window_modified (ns);
   }
   if (!gui_interrupted ()) drd_update ();
   cache_memorize ();
@@ -572,7 +572,7 @@ edit_interface_rep::apply_changes () {
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
       else ::get_size (widget (cvw), wx, wy);
       if (get_init_string (SCROLL_BARS) == "false") sb= 0;
-      if (get_server () -> in_full_screen_mode ()) sb= 0;
+      if (sv -> in_full_screen_mode ()) sb= 0;
       if (sb) wx -= scrollbar_width();
       if (wx != cur_wx || wy != cur_wy) {
 	cur_wx= wx; cur_wy= wy;
@@ -584,8 +584,7 @@ edit_interface_rep::apply_changes () {
   if (get_init_string (PAGE_MEDIUM) == "beamer" && full_screen) sb= 0;
   if (sb != cur_sb) {
     cur_sb= sb;
-    if (has_current_window ())
-      get_server () -> set_scrollbars (sb);
+    sv -> set_scrollbars (sb);
   }
   
   // window decorations (menu bar, icon bars, footer)
@@ -598,8 +597,8 @@ edit_interface_rep::apply_changes () {
     if (wb != cur_wb) {
       cur_wb= wb;
       if (wb != 2) {
-        get_server () -> show_header (wb);
-        get_server () -> show_footer (wb);
+        sv -> show_header (wb);
+        sv -> show_footer (wb);
       }
     }
   }
