@@ -16,7 +16,6 @@
 #include "analyze.hpp"
 #include "drd_mode.hpp"
 #include "message.hpp"
-//#include "window.hpp"
 
   // These are tm-defined in graphics-utils.scm (looks like they shouldn't)
 #define ShiftMask     256

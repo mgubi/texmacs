@@ -12,6 +12,7 @@
 #ifndef TM_WINDOW_H
 #define TM_WINDOW_H
 #include "server.hpp"
+#include "editor.hpp"
 #include "tm_buffer.hpp"
 
 class tm_window_rep {
@@ -81,6 +82,8 @@ public:
   void interactive_return ();
 };
 
+typedef tm_window_rep* tm_window;
+
 class tm_view_rep {
 public:
   tm_buffer buf;
@@ -92,7 +95,6 @@ public:
 
 typedef tm_buffer_rep* tm_buffer;
 typedef tm_view_rep*   tm_view;
-typedef tm_window_rep* tm_window;
 
 widget texmacs_output_widget (tree doc, tree style);
 widget texmacs_input_widget (tree doc, tree style, url wname);

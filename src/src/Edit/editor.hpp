@@ -29,7 +29,6 @@
 #  include "../Style/Memorizer/memorizer.hpp"
 #endif
 #include "new_data.hpp"
-#define TEXMACS_COPYRIGHT (string("(c) 1999-2013 by Joris van der Hoeven and others"))
 
 #define THE_CURSOR 1
 #define THE_FOCUS 2
@@ -597,6 +596,7 @@ public:
 EXTEND_NULL_CODE(widget,editor);
 
 editor new_editor (server_rep* sv, abs_buffer buf);
+editor get_current_editor ();
 
 #define SERVER(cmd) {                 \
   url temp= get_current_view_safe (); \

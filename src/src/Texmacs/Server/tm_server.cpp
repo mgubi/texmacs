@@ -11,6 +11,8 @@
 
 #include "config.h"
 #include "tm_server.hpp"
+#include "../Data/new_window.hpp"
+
 #include "drd_std.hpp"
 #include "convert.hpp"
 #include "connect.hpp"
@@ -22,6 +24,7 @@
 #include "socket_notifier.hpp"
 #include "new_style.hpp"
 #include "Database/database.hpp"
+
 
 server* the_server= NULL;
 bool texmacs_started= false;

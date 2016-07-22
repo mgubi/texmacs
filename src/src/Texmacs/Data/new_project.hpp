@@ -14,8 +14,9 @@
 #include "tree.hpp"
 #include "url.hpp"
 
-void project_attach (string prj_name= "");
-bool project_attached ();
-url  project_get ();
+// already defined in server.hpp
+//void project_attach (string prj_name= "");
+//bool project_attached ();
+//url  project_get ();
 
 #endif // defined NEW_PROJECT_H

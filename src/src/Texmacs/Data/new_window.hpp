@@ -24,6 +24,7 @@ void window_set_buffer (url win, url name);
 void window_focus (url win);
 
 url  create_buffer ();
+void create_buffer (url name, tree doc);
 url  open_window (tree geom= "");
 void clone_window ();
 void kill_buffer (url name);

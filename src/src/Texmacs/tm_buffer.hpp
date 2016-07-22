@@ -11,9 +11,10 @@
 
 #ifndef TM_BUFFER_H
 #define TM_BUFFER_H
+#include "abs_buffer.hpp"
+#include "link.hpp"
 #include "new_data.hpp"
 #include "Data/new_buffer.hpp"
-#include "abs_buffer.hpp"
 
 
 class tm_buffer_rep;

@@ -12,6 +12,11 @@
 #ifndef TM_FRAME_H
 #define TM_FRAME_H
 #include "server.hpp"
+#include "boxes.hpp"
+
+#include "Data/new_window.hpp"
+#include "Data/new_view.hpp"
+
 
 class tm_frame_rep: virtual public server_rep {
 protected:

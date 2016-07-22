@@ -11,16 +11,9 @@
 
 #ifndef SERVER_H
 #define SERVER_H
-#include "editor.hpp"
 #include "url.hpp"
+#include "widget.hpp"
 #include "scheme.hpp"
-#include "new_data.hpp"
-#include "Data/new_buffer.hpp"
-#include "Data/new_view.hpp"
-#include "Data/new_window.hpp"
-#include "Data/new_project.hpp"
-
-class editor;
 
 class server_rep: public abstract_struct {
 public:
@@ -118,14 +111,20 @@ class server {
 };
 ABSTRACT_CODE(server);
 
-extern bool rescue_mode;
-scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);
-server get_server ();
-void gui_set_output_language (string lan);
-inline bool in_rescue_mode () { return rescue_mode; }
 
-/* low level */
-void create_buffer (url name, tree doc);
-void new_buffer_in_this_window (url name, tree t);
+// the following are needed in the editor interface
+server get_server ();
+url  get_current_view ();
+url  get_current_view_safe ();
+void set_current_view (url u);
+bool has_current_window ();
+
+// the following are needed in the scheme interface (but not in editor)
+bool in_rescue_mode ();
+void gui_set_output_language (string lan);
+void project_attach (string prj_name= "");
+bool project_attached ();
+url  project_get ();
+
 
 #endif // defined SERVER_H

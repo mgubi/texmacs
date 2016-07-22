@@ -11,6 +11,7 @@
 
 #include "tm_config.hpp"
 #include "analyze.hpp"
+#include "font.hpp"
 
 /******************************************************************************
 * Constructor and destructor

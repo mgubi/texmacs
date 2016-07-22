@@ -11,6 +11,8 @@
 
 #include "tm_window.hpp"
 #include "tm_data.hpp"
+#include "../Data/new_window.hpp"
+
 #include "message.hpp"
 #include "dictionary.hpp"
 #include "merge_sort.hpp"

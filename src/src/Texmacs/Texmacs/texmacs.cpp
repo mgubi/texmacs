@@ -22,6 +22,11 @@
 #include "timer.hpp"
 #include "data_cache.hpp"
 #include "window.hpp"
+
+#include "../Data/new_buffer.hpp"
+#include "../Data/new_window.hpp"
+
+
 #ifdef AQUATEXMACS
 void mac_fix_paths ();
 #endif
@@ -39,6 +44,8 @@ void mac_fix_paths ();
 #if defined(X11TEXMACS) && defined(MACOSX_EXTENSIONS)
 #include "MacOS/mac_app.h"
 #endif
+
+#define TEXMACS_COPYRIGHT (string("(c) 1999-2013 by Joris van der Hoeven and others"))
 
 extern bool   char_clip;
 

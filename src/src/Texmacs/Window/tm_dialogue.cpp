@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include "message.hpp"
 #include "dictionary.hpp"
+#include "../Data/new_window.hpp"
 
 /******************************************************************************
 * Dialogues
