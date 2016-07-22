@@ -47,7 +47,8 @@
   (dialogue-end dialogue_end (void))
   (cpp-choose-file choose_file (void object string string string url))
   (tm-interactive interactive (void object scheme_tree))
-  
+  (keyboard-focus-on keyboard_focus_on (void string))
+
   (style-clear-cache style_clear_cache (void))
   (set-script-status set_script_status (void int))
   (set-printing-command set_printing_command (void string))

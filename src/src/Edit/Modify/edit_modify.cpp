@@ -11,7 +11,6 @@
 
 #include "modification.hpp"
 #include "edit_modify.hpp"
-#include "tm_window.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
 #endif

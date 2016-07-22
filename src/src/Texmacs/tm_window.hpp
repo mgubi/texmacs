@@ -107,7 +107,6 @@ scheme_tree window_get_size (int win);
 void window_set_size (int win, int w, int h);
 scheme_tree window_get_position (int win);
 void window_set_position (int win, int x, int y);
-void windows_delayed_refresh (int ms);
 void windows_refresh (string kind= "auto");
 
 #endif // defined TM_WINDOW_H

@@ -11,7 +11,7 @@
 
 #include "edit_interface.hpp"
 #include "analyze.hpp"
-#include "tm_buffer.hpp"
+#include "abs_buffer.hpp"
 #include "archiver.hpp"
 
 /******************************************************************************

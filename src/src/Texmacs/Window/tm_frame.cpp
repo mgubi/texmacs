@@ -200,6 +200,25 @@ tm_frame_rep::get_window_zoom_factor () {
   return concrete_window () -> get_window_zoom_factor ();
 }
 
+void
+tm_frame_rep::set_window_modified (bool flag) {
+  if (has_current_window ()) {
+    array<url> ws= buffer_to_windows (
+                                      window_to_buffer (
+                                                        abstract_window (concrete_window ())));
+    int n= N(ws);
+    for (int i=0; i<n; i++)
+      concrete_window (ws[i])->set_modified (flag);
+  }
+}
+
+void
+tm_frame_rep::keyboard_focus_on (string field) {
+  tm_window win= concrete_window ();
+  send_keyboard_focus_on (win->wid, field);
+}
+
+
 /******************************************************************************
 * Routines concerning the widget
 ******************************************************************************/
@@ -211,6 +230,7 @@ tm_frame_rep::get_visible (SI& x1, SI& y1, SI& x2, SI& y2) {
 
 void
 tm_frame_rep::set_scrollbars (int sb) {
+  if (!has_current_window ()) return;
   concrete_window () -> set_scrollbars (sb);
 }
 

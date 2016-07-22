@@ -65,6 +65,7 @@ public:
   virtual void side_tools (int which, string menu) = 0;
   virtual void bottom_tools (int which, string menu) = 0;
 
+  virtual void set_window_modified (bool flag) = 0;
   virtual void set_window_zoom_factor (double zoom) = 0;
   virtual double get_window_zoom_factor () = 0;
   virtual void set_scrollbars (int sb) = 0;
@@ -89,6 +90,7 @@ public:
   virtual void choose_file (object fun, string title, string type,
 			    string prompt, url name) = 0;
   virtual void interactive (object fun, scheme_tree p) = 0;
+  virtual void keyboard_focus_on (string field) = 0;
 
   /* Miscellaneous routines */
   virtual void   style_clear_cache () = 0;

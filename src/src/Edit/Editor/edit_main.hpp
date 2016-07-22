@@ -43,7 +43,7 @@ private:
   observer           ed_obs;  // edit observer attached to root of tree
 
 public:
-  edit_main_rep (server_rep* sv, tm_buffer buf);
+  edit_main_rep (server_rep* sv, abs_buffer buf);
   ~edit_main_rep ();
 
   void set_property (scheme_tree what, scheme_tree val);

@@ -195,8 +195,9 @@ texmacs_window_widget (widget wid, tree geom) {
 
 class close_embedded_command_rep: public command_rep {
   tm_view vw;
+  tm_view focus_view;
 public:
-  close_embedded_command_rep (tm_view vw2): vw (vw2) {}
+  close_embedded_command_rep (tm_view vw2, tm_view focus_view2): vw (vw2), focus_view(focus_view2) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "Close_Embedded widget command"; }
@@ -206,7 +207,7 @@ void
 close_embedded_command_rep::apply () {
   //cout << "Destroy " << vw->buf->buf->name << "\n";
   ASSERT (!is_nil(vw->ed), "embedded command acting on deleted editor");
-  url foc= abstract_window (vw->ed->mvw->win);
+  url foc= abstract_window (focus_view->win);
   if (is_none (foc)) {
     array<url> a= windows_list ();
     ASSERT (N(a) != 0, "no remaining windows");
@@ -224,8 +225,8 @@ close_embedded_command_rep::apply () {
 }
 
 command
-close_embedded_command (tm_view vw) {
-  return tm_new<close_embedded_command_rep> (vw);
+close_embedded_command (tm_view vw, tm_view focus_view) {
+  return tm_new<close_embedded_command_rep> (vw, focus_view);
 }
 
 /******************************************************************************
@@ -277,8 +278,7 @@ texmacs_input_widget (tree doc, tree style, url wname) {
   vw->win= win;
   set_scrollable (win->wid, vw->ed);
   vw->ed->cvw= win->wid.rep;
-  vw->ed->mvw= curvw;
-  return wrapped_widget (win->wid, close_embedded_command (vw));
+  return wrapped_widget (win->wid, close_embedded_command (vw, curvw));
 }
 
 /******************************************************************************

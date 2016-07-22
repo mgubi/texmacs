@@ -51,6 +51,7 @@ public:
   void bottom_tools (int which, string menu);
 
   /* canvas */
+  void set_window_modified (bool flag);
   void set_window_zoom_factor (double zoom);
   double get_window_zoom_factor ();
   void set_scrollbars (int sb);
@@ -76,6 +77,7 @@ public:
   void choose_file (object fun, string title, string type,
 		    string prompt, url name);
   void interactive (object fun, scheme_tree p);
+  void keyboard_focus_on (string field);
 };
 
 widget box_widget (box b, bool trans);

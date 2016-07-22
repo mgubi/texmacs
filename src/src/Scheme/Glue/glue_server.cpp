@@ -380,6 +380,19 @@ tmg_tm_interactive (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_keyboard_focus_on (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "keyboard-focus-on");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_server()->keyboard_focus_on (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_style_clear_cache () {
   // TMSCM_DEFER_INTS;
   get_server()->style_clear_cache ();
@@ -595,6 +608,7 @@ initialize_glue_server () {
   tmscm_install_procedure ("dialogue-end",  tmg_dialogue_end, 0, 0, 0);
   tmscm_install_procedure ("cpp-choose-file",  tmg_cpp_choose_file, 5, 0, 0);
   tmscm_install_procedure ("tm-interactive",  tmg_tm_interactive, 2, 0, 0);
+  tmscm_install_procedure ("keyboard-focus-on",  tmg_keyboard_focus_on, 1, 0, 0);
   tmscm_install_procedure ("style-clear-cache",  tmg_style_clear_cache, 0, 0, 0);
   tmscm_install_procedure ("set-script-status",  tmg_set_script_status, 1, 0, 0);
   tmscm_install_procedure ("set-printing-command",  tmg_set_printing_command, 1, 0, 0);

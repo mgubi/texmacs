@@ -21,7 +21,7 @@
 #include "server.hpp"
 #include "timer.hpp"
 #include "data_cache.hpp"
-#include "tm_window.hpp"
+#include "window.hpp"
 #ifdef AQUATEXMACS
 void mac_fix_paths ();
 #endif

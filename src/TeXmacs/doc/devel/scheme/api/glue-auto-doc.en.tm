@@ -5619,6 +5619,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(keyboard-focus-on <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|keyboard_focus_on> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(style-clear-cache)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -7607,14 +7615,6 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|custom_complete> which returns
-    <scm|void>.
-  </explain>
-
-  <\explain>
-    <scm|(keyboard-focus-on <scm-arg|string>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|keyboard_focus_on> which returns
     <scm|void>.
   </explain>
 

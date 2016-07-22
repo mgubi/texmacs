@@ -15,7 +15,7 @@
 #include "tm_frame.hpp"
 #include "message.hpp"
 #ifdef AQUATEXMACS
-#include "Cocoa/aqua_simple_widget.h"
+#include "Cocoa/ns_simple_widget.h"
 #else
 #ifdef QTTEXMACS
 #include "Qt/qt_simple_widget.hpp"

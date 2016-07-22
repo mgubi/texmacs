@@ -410,6 +410,9 @@
 		49FFF7C61635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
 		49FFF7C71635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
 		49FFF7C81635D3690031CFDC /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
+		9C00B1621D41977200E486B5 /* build-auto-doc in Resources */ = {isa = PBXBuildFile; fileRef = 9C00B15F1D41977200E486B5 /* build-auto-doc */; };
+		9C00B1631D41977200E486B5 /* make-apidoc-doc.scm in Resources */ = {isa = PBXBuildFile; fileRef = 9C00B1601D41977200E486B5 /* make-apidoc-doc.scm */; };
+		9C00B1641D41977200E486B5 /* make-apidoc-module.scm in Resources */ = {isa = PBXBuildFile; fileRef = 9C00B1611D41977200E486B5 /* make-apidoc-module.scm */; };
 		9C060A9C10FC6D8B00C51583 /* tm_ostream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C060A9A10FC6D8B00C51583 /* tm_ostream.cpp */; };
 		9C060A9D10FC6D8B00C51583 /* tm_ostream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C060A9A10FC6D8B00C51583 /* tm_ostream.cpp */; };
 		9C060A9E10FC6D8B00C51583 /* tm_ostream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C060A9A10FC6D8B00C51583 /* tm_ostream.cpp */; };
@@ -1814,6 +1817,10 @@
 		49FFF7C41635D3690031CFDC /* wencoding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wencoding.cpp; sourceTree = "<group>"; };
 		49FFF7C51635D3690031CFDC /* wencoding.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = wencoding.hpp; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* TeXmacsQt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsQt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9C00B15E1D418C8C00E486B5 /* abs_buffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = abs_buffer.hpp; sourceTree = "<group>"; };
+		9C00B15F1D41977200E486B5 /* build-auto-doc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = "build-auto-doc"; sourceTree = "<group>"; };
+		9C00B1601D41977200E486B5 /* make-apidoc-doc.scm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "make-apidoc-doc.scm"; sourceTree = "<group>"; };
+		9C00B1611D41977200E486B5 /* make-apidoc-module.scm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "make-apidoc-module.scm"; sourceTree = "<group>"; };
 		9C060A9A10FC6D8B00C51583 /* tm_ostream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tm_ostream.cpp; sourceTree = "<group>"; };
 		9C060A9B10FC6D8B00C51583 /* tm_ostream.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tm_ostream.hpp; sourceTree = "<group>"; };
 		9C088F7312B1BAD000A18E04 /* qt_color_picker_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_color_picker_widget.cpp; sourceTree = "<group>"; };
@@ -4081,6 +4088,7 @@
 		9C0B496110A8CC110097A335 /* Texmacs */ = {
 			isa = PBXGroup;
 			children = (
+				9C00B15E1D418C8C00E486B5 /* abs_buffer.hpp */,
 				9C0B496210A8CC110097A335 /* Data */,
 				9C0B496510A8CC110097A335 /* Server */,
 				9C0B496810A8CC110097A335 /* server.hpp */,
@@ -4376,7 +4384,10 @@
 		9C146F9C14707EDC003E9327 /* Glue */ = {
 			isa = PBXGroup;
 			children = (
+				9C00B15F1D41977200E486B5 /* build-auto-doc */,
 				9C19A57714FD624700738BD2 /* build-glue */,
+				9C00B1601D41977200E486B5 /* make-apidoc-doc.scm */,
+				9C00B1611D41977200E486B5 /* make-apidoc-module.scm */,
 				9C19A57814FD624700738BD2 /* build-glue-basic.scm */,
 				9C19A57914FD624700738BD2 /* build-glue-editor.scm */,
 				9C19A57A14FD624700738BD2 /* build-glue-server.scm */,
@@ -4674,6 +4685,9 @@
 				9C25212B14FFC7BC00C62749 /* build-glue.scm in Resources */,
 				49896901152B981400DB1E9E /* TeXmacs.icns in Resources */,
 				491BF364178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */,
+				9C00B1641D41977200E486B5 /* make-apidoc-module.scm in Resources */,
+				9C00B1631D41977200E486B5 /* make-apidoc-doc.scm in Resources */,
+				9C00B1621D41977200E486B5 /* build-auto-doc in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

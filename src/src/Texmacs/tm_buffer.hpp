@@ -13,35 +13,30 @@
 #define TM_BUFFER_H
 #include "new_data.hpp"
 #include "Data/new_buffer.hpp"
+#include "abs_buffer.hpp"
+
 
 class tm_buffer_rep;
 class tm_view_rep;
 typedef tm_buffer_rep* tm_buffer;
 typedef tm_view_rep*   tm_view;
 
-extern tree the_et;
 path new_document ();
 void delete_document (path rp);
 void set_document (path rp, tree t);
 url  create_window_id ();
 void destroy_window_id (url);
 
-class tm_buffer_rep {
+class tm_buffer_rep : public abs_buffer_rep {
 public:
-  new_buffer buf;         // file related information
-  new_data data;          // data associated to document
   array<tm_view> vws;     // views attached to buffer
-  tm_buffer prj;          // buffer which corresponds to the project
-  path rp;                // path to the document's root in the_et
   link_repository lns;    // global links
   bool notify;            // notify modifications to scheme
 
-  inline tm_buffer_rep (url name):
-    buf (name), data (),
-    vws (0), prj (NULL), rp (new_document ()), notify (false) {}
+  inline tm_buffer_rep (url name): abs_buffer_rep (name),
+    vws (0), notify (false) {}
 
-  inline ~tm_buffer_rep () {
-    delete_document (rp); }
+  virtual ~tm_buffer_rep () { delete_document (rp); }
 
   void attach_notifier ();
   bool needs_to_be_saved ();

@@ -14,7 +14,7 @@
 #include "typesetter.hpp"
 #include "tree_select.hpp"
 #ifdef AQUATEXMACS
-#  include "Cocoa/aqua_simple_widget.h"
+#  include "Cocoa/ns_simple_widget.h"
 #else
 #  ifdef QTTEXMACS
 #    include "Qt/qt_simple_widget.hpp"
@@ -41,11 +41,9 @@
 #define THE_LOCUS 128
 #define THE_MENUS 256
 
-class tm_buffer_rep;
-class tm_view_rep;
+class abs_buffer_rep;
 class server_rep;
-typedef tm_buffer_rep* tm_buffer;
-typedef tm_view_rep* tm_view;
+typedef abs_buffer_rep* abs_buffer;
 class modification;
 class editor;
 extern bool enable_fastenv;
@@ -54,10 +52,9 @@ class editor_rep: public simple_widget_rep {
 public:
   server_rep*  sv;   // the underlying texmacs server
   widget_rep*  cvw;  // non reference counted canvas widget
-  tm_view_rep* mvw;  // master view
 
 protected:
-  tm_buffer    buf;  // the underlying buffer
+  abs_buffer    buf;  // the underlying buffer
   drd_info     drd;  // the drd for the buffer
   tree&        et;   // all TeXmacs trees
   box          eb;   // box translation of tree
@@ -136,13 +133,13 @@ protected:
 
 public:
   editor_rep ();
-  editor_rep (server_rep* sv, tm_buffer buf);
+  editor_rep (server_rep* sv, abs_buffer buf);
   inline virtual ~editor_rep () {}
 
   /* public routines from edit_interface */
   virtual void suspend () = 0;
   virtual void resume () = 0;
-  virtual void keyboard_focus_on (string field) = 0;
+  //virtual void keyboard_focus_on (string field) = 0;
   virtual int  get_pixel_size () = 0;
   virtual SI   get_visible_width () = 0;
   virtual SI   get_visible_height () = 0;
@@ -599,7 +596,7 @@ public:
 };
 EXTEND_NULL_CODE(widget,editor);
 
-editor new_editor (server_rep* sv, tm_buffer buf);
+editor new_editor (server_rep* sv, abs_buffer buf);
 
 #define SERVER(cmd) {                 \
   url temp= get_current_view_safe (); \

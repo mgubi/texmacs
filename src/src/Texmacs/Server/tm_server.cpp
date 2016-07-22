@@ -136,6 +136,8 @@ tm_server_rep::refresh () {
 
 void
 tm_server_rep::interpose_handler () {
+#ifdef AQUATEXMACS
+#else
 #ifdef QTTEXMACS
   // TeXmacs/Qt handles delayed messages and socket notification
   // in its own runloop
@@ -146,6 +148,7 @@ tm_server_rep::interpose_handler () {
 #else
   perform_select ();
   exec_pending_commands ();
+#endif
 #endif
 
   int i, j;

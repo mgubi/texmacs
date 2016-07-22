@@ -10,7 +10,7 @@
 ******************************************************************************/
 
 #include "edit_main.hpp"
-#include "tm_buffer.hpp"
+#include "abs_buffer.hpp"
 #include "file.hpp"
 #include "sys_utils.hpp"
 #include "printer.hpp"
@@ -44,16 +44,16 @@
 ******************************************************************************/
 
 editor_rep::editor_rep ():
-  simple_widget_rep (), cvw (NULL), mvw (NULL),
+  simple_widget_rep (), cvw (NULL),
   drd (std_drd), et (the_et), rp () {
   cout << "TeXmacs] warning, this virtual constructor should never be called\n";
 }
 
-editor_rep::editor_rep (server_rep* sv2, tm_buffer buf2):
-  simple_widget_rep (), sv (sv2), cvw (NULL), mvw (NULL), buf (buf2),
+editor_rep::editor_rep (server_rep* sv2, abs_buffer buf2):
+  simple_widget_rep (), sv (sv2), cvw (NULL), buf (buf2),
   drd (buf->buf->title, std_drd), et (the_et), rp (buf2->rp) {}
 
-edit_main_rep::edit_main_rep (server_rep* sv, tm_buffer buf):
+edit_main_rep::edit_main_rep (server_rep* sv, abs_buffer buf):
   editor_rep (sv, buf), props (UNKNOWN), ed_obs (edit_observer (this))
 {
 #ifdef EXPERIMENTAL
@@ -73,7 +73,7 @@ edit_main_rep::~edit_main_rep () {
 }
 
 editor
-new_editor (server_rep* sv, tm_buffer buf) {
+new_editor (server_rep* sv, abs_buffer buf) {
   return tm_new<edit_main_rep> (sv, buf);
 }
 

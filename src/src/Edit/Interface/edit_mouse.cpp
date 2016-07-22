@@ -10,13 +10,13 @@
 ******************************************************************************/
 
 #include "edit_interface.hpp"
-#include "tm_buffer.hpp"
+#include "abs_buffer.hpp"
 #include "timer.hpp"
 #include "link.hpp"
 #include "analyze.hpp"
 #include "drd_mode.hpp"
 #include "message.hpp"
-#include "window.hpp"
+//#include "window.hpp"
 
   // These are tm-defined in graphics-utils.scm (looks like they shouldn't)
 #define ShiftMask     256

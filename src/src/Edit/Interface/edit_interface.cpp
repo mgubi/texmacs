@@ -13,7 +13,8 @@
 #include "file.hpp"
 #include "convert.hpp"
 #include "server.hpp"
-#include "tm_window.hpp"
+#include "abs_buffer.hpp"
+#include "window.hpp"
 #include "Metafont/tex_files.hpp"
 #include "data_cache.hpp"
 #include "drd_mode.hpp"
@@ -107,15 +108,6 @@ edit_interface_rep::resume () {
   if (new_tp != tp) {
     notify_change (THE_CURSOR);
     tp= new_tp;
-  }
-}
-
-void
-edit_interface_rep::keyboard_focus_on (string field) {
-  array<url> a= buffer_to_windows (buf->buf->name);
-  if (N(a) >= 1) {
-    tm_window win= concrete_window (a[0]);
-    send_keyboard_focus_on (win->wid, field);
   }
 }
 
@@ -533,14 +525,9 @@ edit_interface_rep::update_menus () {
     { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
   SERVER (bottom_tools (0, "(vertical (link texmacs-bottom-tools))"));
   set_footer ();
-  if (has_current_window ()) {
-    array<url> ws= buffer_to_windows (
-                     window_to_buffer (
-                       abstract_window (concrete_window ())));
-    int n= N(ws);
+  {
     bool ns= need_save ();
-    for (int i=0; i<n; i++)
-      concrete_window (ws[i])->set_modified (ns);
+    get_server() -> set_window_modified (ns);
   }
   if (!gui_interrupted ()) drd_update ();
   cache_memorize ();
@@ -598,7 +585,7 @@ edit_interface_rep::apply_changes () {
   if (sb != cur_sb) {
     cur_sb= sb;
     if (has_current_window ())
-      concrete_window () -> set_scrollbars (sb);
+      get_server () -> set_scrollbars (sb);
   }
   
   // window decorations (menu bar, icon bars, footer)
