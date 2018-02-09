@@ -72,6 +72,11 @@
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
+            key = "DYLD_LIBRARY_PATH"
+            value = "/Users/mgubi/t/chibi-scheme"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
             key = "TEXMACS_PATH"
             value = "$(TM_BASE)/TeXmacs"
             isEnabled = "YES">

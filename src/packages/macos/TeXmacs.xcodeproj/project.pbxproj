@@ -526,7 +526,6 @@
 		9C1D126910D102B300232476 /* QTMPipeLink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1D126610D102B300232476 /* QTMPipeLink.cpp */; };
 		9C225A65128B5EB00039258C /* qt_chooser_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C225A63128B5EB00039258C /* qt_chooser_widget.cpp */; };
 		9C25212B14FFC7BC00C62749 /* build-glue.scm in Resources */ = {isa = PBXBuildFile; fileRef = 9C19A57C14FD624700738BD2 /* build-glue.scm */; };
-		9C25212D14FFC7C000C62749 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
 		9C25212E14FFC7C100C62749 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
 		9C25EAB91D2A9ED400D7F2D5 /* columns_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C25EAB61D2A9ED400D7F2D5 /* columns_breaker.cpp */; };
 		9C25EABA1D2A9ED400D7F2D5 /* new_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C25EAB71D2A9ED400D7F2D5 /* new_breaker.cpp */; };
@@ -977,6 +976,7 @@
 		9C990A5A12A92473001542C5 /* HIDRemote.m in Sources */ = {isa = PBXBuildFile; fileRef = 9CCC738E12A7D6DA006EDBDA /* HIDRemote.m */; };
 		9C99F04910AD8B0400B2113D /* QTMScrollView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C99F04610AD84DE00B2113D /* QTMScrollView.cpp */; };
 		9C99F05710AD8C6100B2113D /* QTMScrollView.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C99F04510AD84DE00B2113D /* QTMScrollView.hpp */; };
+		9CAD2534202BD90F00BA38C3 /* chibi_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CAD2533202BD90F00BA38C3 /* chibi_tm.cpp */; };
 		9CC6149010A999460055F808 /* QTMInteractiveInputHelper.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48B510A8CC100097A335 /* QTMInteractiveInputHelper.hpp */; };
 		9CC6149110A999460055F808 /* QTMMenuHelper.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48B710A8CC100097A335 /* QTMMenuHelper.hpp */; };
 		9CC6149310A999460055F808 /* QTMWidget.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48BB10A8CC100097A335 /* QTMWidget.hpp */; };
@@ -2663,6 +2663,25 @@
 		9C855ABF12BEB4EC00DCBE1D /* QTMPrinterSettings.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMPrinterSettings.hpp; sourceTree = "<group>"; };
 		9C99F04510AD84DE00B2113D /* QTMScrollView.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMScrollView.hpp; sourceTree = "<group>"; };
 		9C99F04610AD84DE00B2113D /* QTMScrollView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMScrollView.cpp; sourceTree = "<group>"; };
+		9CAD251C202BAC2F00BA38C3 /* dynload.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = dynload.c; sourceTree = "<group>"; };
+		9CAD251D202BAC2F00BA38C3 /* opdefines.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opdefines.h; sourceTree = "<group>"; };
+		9CAD251E202BAC2F00BA38C3 /* tinyscheme_tm.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = tinyscheme_tm.hpp; sourceTree = "<group>"; };
+		9CAD251F202BAC2F00BA38C3 /* makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = makefile; sourceTree = "<group>"; };
+		9CAD2520202BAC2F00BA38C3 /* CHANGES */ = {isa = PBXFileReference; lastKnownFileType = text; path = CHANGES; sourceTree = "<group>"; };
+		9CAD2521202BAC2F00BA38C3 /* scheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = scheme.h; sourceTree = "<group>"; };
+		9CAD2522202BAC2F00BA38C3 /* init-scheme-tm.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-scheme-tm.scm"; sourceTree = "<group>"; };
+		9CAD2523202BAC2F00BA38C3 /* COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = COPYING; sourceTree = "<group>"; };
+		9CAD2524202BAC2F00BA38C3 /* dynload.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dynload.h; sourceTree = "<group>"; };
+		9CAD2525202BAC2F00BA38C3 /* scheme-private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "scheme-private.h"; sourceTree = "<group>"; };
+		9CAD2526202BAC2F00BA38C3 /* init.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = init.scm; sourceTree = "<group>"; };
+		9CAD2527202BAC2F00BA38C3 /* MiniSCHEMETribute.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = MiniSCHEMETribute.txt; sourceTree = "<group>"; };
+		9CAD2528202BAC2F00BA38C3 /* scheme.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = scheme.c; sourceTree = "<group>"; };
+		9CAD2529202BAC2F00BA38C3 /* Manual.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Manual.txt; sourceTree = "<group>"; };
+		9CAD252A202BAC2F00BA38C3 /* BUILDING */ = {isa = PBXFileReference; lastKnownFileType = text; path = BUILDING; sourceTree = "<group>"; };
+		9CAD252B202BAC2F00BA38C3 /* hack.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hack.txt; sourceTree = "<group>"; };
+		9CAD252C202BAC2F00BA38C3 /* tinyscheme_tm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = tinyscheme_tm.cpp; sourceTree = "<group>"; };
+		9CAD2532202BD90F00BA38C3 /* chibi_tm.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = chibi_tm.hpp; sourceTree = "<group>"; };
+		9CAD2533202BD90F00BA38C3 /* chibi_tm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = chibi_tm.cpp; sourceTree = "<group>"; };
 		9CC6148B10A998BC0055F808 /* MOCs.o */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.objfile"; includeInIndex = 0; path = MOCs.o; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CCC738D12A7D6DA006EDBDA /* HIDRemote.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HIDRemote.h; sourceTree = "<group>"; };
 		9CCC738E12A7D6DA006EDBDA /* HIDRemote.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HIDRemote.m; sourceTree = "<group>"; };
@@ -4682,6 +4701,8 @@
 		9C146ECF14705D91003E9327 /* Scheme */ = {
 			isa = PBXGroup;
 			children = (
+				9CAD2531202BD90F00BA38C3 /* Chibi */,
+				9CAD251B202BAC2F00BA38C3 /* Tiny */,
 				9CD46B0E1474299200A7E2FC /* Guile */,
 				9CD46ABF14740C4100A7E2FC /* scheme.hpp */,
 				9CD46A9114740A3F00A7E2FC /* Scheme */,
@@ -4802,6 +4823,39 @@
 				4914651B1801C1AA000E6455 /* pdf_hummus_renderer.cpp */,
 			);
 			path = Pdf;
+			sourceTree = "<group>";
+		};
+		9CAD251B202BAC2F00BA38C3 /* Tiny */ = {
+			isa = PBXGroup;
+			children = (
+				9CAD251C202BAC2F00BA38C3 /* dynload.c */,
+				9CAD251D202BAC2F00BA38C3 /* opdefines.h */,
+				9CAD251E202BAC2F00BA38C3 /* tinyscheme_tm.hpp */,
+				9CAD251F202BAC2F00BA38C3 /* makefile */,
+				9CAD2520202BAC2F00BA38C3 /* CHANGES */,
+				9CAD2521202BAC2F00BA38C3 /* scheme.h */,
+				9CAD2522202BAC2F00BA38C3 /* init-scheme-tm.scm */,
+				9CAD2523202BAC2F00BA38C3 /* COPYING */,
+				9CAD2524202BAC2F00BA38C3 /* dynload.h */,
+				9CAD2525202BAC2F00BA38C3 /* scheme-private.h */,
+				9CAD2526202BAC2F00BA38C3 /* init.scm */,
+				9CAD2527202BAC2F00BA38C3 /* MiniSCHEMETribute.txt */,
+				9CAD2528202BAC2F00BA38C3 /* scheme.c */,
+				9CAD2529202BAC2F00BA38C3 /* Manual.txt */,
+				9CAD252A202BAC2F00BA38C3 /* BUILDING */,
+				9CAD252B202BAC2F00BA38C3 /* hack.txt */,
+				9CAD252C202BAC2F00BA38C3 /* tinyscheme_tm.cpp */,
+			);
+			path = Tiny;
+			sourceTree = "<group>";
+		};
+		9CAD2531202BD90F00BA38C3 /* Chibi */ = {
+			isa = PBXGroup;
+			children = (
+				9CAD2532202BD90F00BA38C3 /* chibi_tm.hpp */,
+				9CAD2533202BD90F00BA38C3 /* chibi_tm.cpp */,
+			);
+			path = Chibi;
 			sourceTree = "<group>";
 		};
 		9CD46A9114740A3F00A7E2FC /* Scheme */ = {
@@ -5611,6 +5665,7 @@
 				9C0B4A9310A8CC110097A335 /* qt_menu.cpp in Sources */,
 				9C0B4A9410A8CC110097A335 /* qt_renderer.cpp in Sources */,
 				9C0B4A9510A8CC110097A335 /* qt_utilities.cpp in Sources */,
+				9CAD2534202BD90F00BA38C3 /* chibi_tm.cpp in Sources */,
 				9C0B4A9610A8CC110097A335 /* qt_widget.cpp in Sources */,
 				9C0B4A9710A8CC110097A335 /* QTMMenuHelper.cpp in Sources */,
 				9C0B4A9810A8CC110097A335 /* QTMStyle.cpp in Sources */,
@@ -5775,7 +5830,6 @@
 				9C0B09AF14FF0A1C004ABDCE /* poly_line.cpp in Sources */,
 				9C0B09B014FF0A1C004ABDCE /* recognize_handwriting.cpp in Sources */,
 				9C0B09B814FF0A3D004ABDCE /* fromcls.cpp in Sources */,
-				9C25212D14FFC7C000C62749 /* guile_tm.cpp in Sources */,
 				4911B18D1CCA195A00F0AFFD /* glyph_transforms.cpp in Sources */,
 				9C25212E14FFC7C100C62749 /* object.cpp in Sources */,
 				9C52102E2028B9C600A2B5B6 /* scala_language.cpp in Sources */,
