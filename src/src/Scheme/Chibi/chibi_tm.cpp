@@ -181,8 +181,12 @@ initialize_scheme () {
     
     res = tmscm_eval_string (init_prg);
     print_result(scheme_context, sexp_context_env(scheme_context), res);
+
     initialize_glue ();
     object_stack= tmscm_lookup_string ("object-stack");
+
+    res = tmscm_eval_string ("(define *texmacs-primitives* (env-exports (current-environment)))");
+    print_result(scheme_context, env, res);
 
     res = tmscm_eval_string("(load (url-concretize \"$TEXMACS_PATH/progs/chibi/booter.scm\"))");
     print_result(scheme_context, env, res);
@@ -199,7 +203,7 @@ initialize_scheme () {
     //scheme_load_named_file(scheme_context,stdin,0);
     repl(scheme_context, env);
     
-    
+    abort();
     // /Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm
     
     //FIXME: when we finalize chibi?

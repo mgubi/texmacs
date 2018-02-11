@@ -26,7 +26,7 @@
 (let ((env (interaction-environment))
        (file (url-concretize "$TEXMACS_PATH/progs/chibi/module-loader.scm")))
   (display "Loading ") (display file) (newline)
-  (%import env #f '(*texmacs-env*) #t)
+  (%import env #f '(*texmacs-env* *texmacs-primitives*) #t)
   (load file env)
   (%import #f env '(*tm-modules* *texmacs-defs*) #t)
   (%import #f env (eval '*texmacs-module-bindings* env) #t)
@@ -36,3 +36,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-import-module (chibi keywords))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+

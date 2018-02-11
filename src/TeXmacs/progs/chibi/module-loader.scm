@@ -18,7 +18,7 @@
 (define *module-names* '())
 
 ;; list of export bindings for the base environment
-(define *tm-base-bindings*  (module-exports (find-module '(chibi))))
+(define *tm-base-bindings*  '())
 (define *tm-user-bindings*  '())
 
 ;; utility to extract all bindings from a given environment
@@ -30,7 +30,12 @@
     (let* ((base-env (make-environment))
            (mod (find-module '(chibi))))
            (%import base-env (module-env mod) #f #t)
+           (set! *tm-base-bindings* (append (module-exports (find-module '(chibi))) *tm-base-bindings*))
+           ;;(display *texmacs-primitives*) (newline)
+           (%import base-env *texmacs-env* *texmacs-primitives* #t)
+           (set! *tm-base-bindings* (append *texmacs-primitives* *tm-base-bindings*))
            base-env))
+
 
 ;; create a fresh evaluation environment for texmacs modules
 (define make-evaluation-env
@@ -150,6 +155,10 @@
       ((define-public x body ...)
           (begin (define x body ...) (tm-export `x)))))
 
+(define-macro (provide-public head . body)
+  `(define-public ,head ,@body)
+  '(noop))
+
 (define-syntax define-public-macro
    (syntax-rules ()
       ((define-public-macro x body ...)
@@ -173,10 +182,15 @@
                  (r (eval 'name *texmacs-env*)))
           (apply r args))))))
 
+(define-syntax tm-disable
+  (syntax-rules ()
+     ((tm-disable . x) (begin))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set up the standard environment
 
-(define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs texmacs-module))
+(define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs
+                                    texmacs-module tm-disable provide-public))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 
