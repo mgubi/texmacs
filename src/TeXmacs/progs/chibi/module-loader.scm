@@ -1,85 +1,4 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; some glue code between Chibi and TeXmacs
-
-(import (chibi) (scheme small))
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; an implementation of define-macro with rsc-macro-transformer
-
-;; from https://stackoverflow.com/questions/15552057/is-it-possible-to-implement-define-macro-in-mit-scheme?rq=1
-;; see also https://ds26gte.github.io/tyscheme/index-Z-H-20.html
-
-;; rsc-macro-transformer is not r7rs, imported from the (chibi) module
-
-(define-syntax define-macro
-  (syntax-rules ()
-    ((define-macro (name . args) body ...)
-     (define-syntax name
-       (rsc-macro-transformer
-         (let ((transformer (lambda args body ...)))
-           (lambda (exp env)
-              (apply transformer (cdr exp)))))))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; keywords implementation
-
-;; from https://srfi.schemers.org/srfi-88/srfi-88.html
-;; slightly modified to have keywords of the form :my-keyword
-;; (i.e. lisp-like leading colon)
-
-(define real-symbol? symbol?)
-    (define real-symbol->string symbol->string)
-    (define real-string->symbol string->symbol)
-
-(define looks-like-an-unquoted-keyword?
-  (lambda (s)
-    (let ((n (string-length s)))
-      (and (> n 1)
-           (char=? (string-ref s 0) #\:)))))
-
-(set! symbol?
-  (lambda (obj)
-    (and (real-symbol? obj)
-         (not (looks-like-an-unquoted-keyword?
-               (real-symbol->string obj))))))
-
-(define keyword?
-  (lambda (obj)
-    (and (real-symbol? obj)
-         (looks-like-an-unquoted-keyword?
-          (real-symbol->string obj)))))
-
-(set! symbol->string real-symbol->string)
-
-(define keyword->string
-  (lambda (k)
-    (let* ((s (real-symbol->string k))
-           (n (string-length s)))
-      (substring s 1 n)))) ; remove the colon
-
-(set! string->symbol
-  (lambda (s)
-    (if (looks-like-an-unquoted-keyword? s)
-        (error "sorry... the symbol would look like a keyword!")
-        (real-string->symbol s))))
-
-(define string->keyword
-  (lambda (s)
-    (let ((s-colon (string-append ":" s)))
-      (if (looks-like-an-unquoted-keyword? s-colon)
-          (real-string->symbol s-colon)
-          (error "sorry... the keyword would look like a symbol!")))))
-
-(define-macro (define-keyword ks)
-   (let ((k (string->keyword (symbol->string ks))))
-   `(define ,k ',k)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+(import (chibi) (only (scheme base) define-record-type))
 
 ;; take a snapshot of current bindings
 
@@ -132,9 +51,13 @@
                        (else (error "invalid module name" (car ls))))))
         (tm-module-name->strings (cdr ls) (cons "/" (cons str res))))))
 
+;; (url-concretize "$TEXMACS_PATH/progs/chibi/booter.scm")
 (define (tm-module-name->file name)
-  (string-concatenate
-   (reverse (cons ".scm" (cdr (tm-module-name->strings name '()))))))
+   (let* ((name (string-concatenate
+   (cons   "$TEXMACS_PATH/progs/" (reverse (cons ".scm" (cdr (tm-module-name->strings name '())))))))
+         (path (url-concretize name)))
+   (display "url-concretize ") (display path) (newline)
+   path))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; texmacs modules scaffolding
@@ -143,13 +66,12 @@
 
 ;; texmacs module record
 (define-record-type <tm-module>
-(make-tm-module name env exports file)
-tm-module?
-(name get-tm-module-name set-tm-module-name!)
-(env get-tm-module-env set-tm-module-env!)
-(exports get-tm-module-exports set-tm-module-exports!)
-(file get-tm-module-file))
-
+  (make-tm-module name env exports file)
+  tm-module?
+  (name get-tm-module-name set-tm-module-name!)
+  (env get-tm-module-env set-tm-module-env!)
+  (exports get-tm-module-exports set-tm-module-exports!)
+  (file get-tm-module-file set-tm-module-file!))
 
 ;; not used
 (define (show-tm-module file)
@@ -233,7 +155,7 @@ tm-module?
       ((define-public-macro x body ...)
           (begin (define-macro x body ...) (tm-export `x)))))
 
-(define *texmacs-env* (current-environment))
+;;(define *texmacs-env* (current-environment))
 (define *texmacs-defs* '())
 
 (define-syntax define-texmacs
@@ -260,4 +182,7 @@ tm-module?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(display "Initializing Chibi/TeXmacs interface\n")
+;(display *texmacs-module-bindings*)
+;(define (reload) (load "module-loader-4.scm"))
+;(tm-import-module (a-module))
+;(lazy-define (b-module) f)

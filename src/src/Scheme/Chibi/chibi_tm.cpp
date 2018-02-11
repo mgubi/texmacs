@@ -184,7 +184,7 @@ initialize_scheme () {
     initialize_glue ();
     object_stack= tmscm_lookup_string ("object-stack");
 
-    res = tmscm_eval_string("(load (url-concretize \"$TEXMACS_PATH/progs/texmacs-chibi.scm\"))");
+    res = tmscm_eval_string("(load (url-concretize \"$TEXMACS_PATH/progs/chibi/booter.scm\"))");
     print_result(scheme_context, env, res);
 
     
