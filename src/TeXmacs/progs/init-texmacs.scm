@@ -11,12 +11,12 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond ((os-mingw?)
-       (debug-set! stack 0))
-      ((os-macos?)
-       (debug-set! stack 2000000))
-      (else
-       (debug-set! stack 1000000)))
+;;(cond ((os-mingw?)
+;;       (debug-set! stack 0))
+;;      ((os-macos?)
+;;       (debug-set! stack 2000000))
+;;      (else
+;;       (debug-set! stack 1000000)))
 
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
@@ -27,9 +27,10 @@
 (if developer-mode?
     (debug-enable 'backtrace 'debug))
 
+
 (define (%new-read-hook sym) (noop)) ; for autocompletion
 
-(define-public macro-keywords '(define-macro define-public-macro 
+(define-public macro-keywords '(define-macro define-public-macro
                                 tm-define-macro))
 (define-public def-keywords
   `(define-public provide-public
@@ -438,7 +439,7 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting autoupdater\n")
-(when (updater-supported?) 
+(when (updater-supported?)
   (use-modules (utils misc updater))
   (delayed (:idle 2000) (updater-initialize)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
