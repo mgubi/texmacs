@@ -1,7 +1,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : cp125minus1kbd.scm
+;; MODULE      : cp1251-kbd.scm
 ;; DESCRIPTION : typing russian using the cp1251 keyboard encoding
 ;; COPYRIGHT   : (C) 1999-2001  Joris van der Hoeven and Andrey Grozin
 ;;
@@ -11,7 +11,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (text cyrillic cp125minus1kbd)
+(texmacs-module (text cyrillic cp1251-kbd)
   (:use (text text-kbd)))
 
 (kbd-map

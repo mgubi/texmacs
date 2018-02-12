@@ -175,24 +175,24 @@
 (tm-define (show-widget11)
   (show (widget11 "hop" "hola" "plok")))
 
-(define widget1minus1switch? #f)
+(define widget11-switch? #f)
 
 (tm-widget (widget11)
   (padded
     (refreshable "toggle"
-      (if (not widget1minus1switch?)
+      (if (not widget11-switch?)
           (hlist
             (text "Toggle off") // // //
             (explicit-buttons
               ("Turn on" (begin
-                           (set! widget1minus1switch? #t)
+                           (set! widget11-switch? #t)
                            (refresh-now "toggle"))))))
-      (if widget1minus1switch?
+      (if widget11-switch?
           (hlist
             (text "Toggle on") // // //
             (explicit-buttons
               ("Turn off" (begin
-                            (set! widget1minus1switch? #f)
+                            (set! widget11-switch? #f)
                             (refresh-now "toggle")))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

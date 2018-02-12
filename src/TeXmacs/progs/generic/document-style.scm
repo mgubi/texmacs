@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : document-style.scm
 ;; DESCRIPTION : management of global document style
-;; COPYRIGHT   : (C) 200minus1-2013  Joris van der Hoeven
+;; COPYRIGHT   : (C) 2001--2013  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE

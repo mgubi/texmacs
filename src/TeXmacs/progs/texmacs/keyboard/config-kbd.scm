@@ -29,7 +29,7 @@
    ((== val "koi8-r")
     (lazy-keyboard (text cyrillic koi8-kbd) in-cyrillic-koi8?))
    ((== val "cp1251")
-    (lazy-keyboard (text cyrillic cp125minus1kbd) in-cyrillic-cp1251?))))
+    (lazy-keyboard (text cyrillic cp1251-kbd) in-cyrillic-cp1251?))))
 
 (define-preferences
   ("cyrillic input method" "none" notify-cyrillic-input-method))
