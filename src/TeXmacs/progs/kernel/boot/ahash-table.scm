@@ -75,9 +75,9 @@
 )
 
 (define-public make-ahash-table (lambda () (make-hash-table equal?)))
-(define-public ahash-ref hash-table-ref)
+(define-public ahash-ref (lambda (table key) (hash-table-ref/default table key #f)))
 (define-public ahash-get-handle
-(lambda (table key) (call/cc (lambda (return) (return  (cons key (hash-table-ref table key (lambda () (return #f)))))))))
+  (lambda (table key) (call/cc (lambda (return) (return  (cons key (hash-table-ref table key (lambda () (return #f)))))))))
 (define-public (ahash-size h)
   (hash-fold (lambda (key value seed) (+ 1 seed)) 0 h))
 (define-public ahash-set! hash-table-set!)

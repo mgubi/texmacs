@@ -54,6 +54,8 @@
 
 (define-keywords or and not repeat group quote exclude range and-not match replace up down first last next previous)
 
+(define-keywords mode require type synopsis returns note argument default proposals secure check-mark interactive balloon)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-inherit-modules (kernel boot compat) (kernel boot abbrevs)
@@ -65,6 +67,25 @@
                     (kernel library patch))
 
 (tm-inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
+
+(tm-inherit-modules (kernel logic logic-rules) (kernel logic logic-query)
+                    (kernel logic logic-data))
+
+(tm-inherit-modules (kernel texmacs tm-define)
+                    (kernel texmacs tm-preferences) (kernel texmacs tm-modes)
+                    (kernel texmacs tm-plugins) (kernel texmacs tm-secure)
+                    (kernel texmacs tm-convert) (kernel texmacs tm-dialogue)
+                    (kernel texmacs tm-language) (kernel texmacs tm-file-system)
+                    (kernel texmacs tm-states))
+
+(tm-inherit-modules (kernel gui gui-markup)
+                    (kernel gui menu-define) (kernel gui menu-widget)
+                    (kernel gui kbd-define) (kernel gui kbd-handlers)
+                    (kernel gui menu-test)
+                    (kernel old-gui old-gui-widget)
+                    (kernel old-gui old-gui-factory)
+                    (kernel old-gui old-gui-form)
+                    (kernel old-gui old-gui-test))
 
 
 

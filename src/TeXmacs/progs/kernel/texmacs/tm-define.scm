@@ -55,7 +55,7 @@
 (define-public tm-defined-table (make-ahash-table))
 (define-public tm-defined-name (make-ahash-table))
 (define-public tm-defined-module (make-ahash-table))
-(define-public define-option-table (make-hash-table 100))
+(define-public define-option-table (make-ahash-table))
 
 (define-public cur-conds '())
 
@@ -88,11 +88,13 @@
 (define (begin* conds)
   (if (list-1? conds) (car conds) `(begin ,@conds)))
 
+(tm-disable
 (let ((old-procedure-name procedure-name))
   (set! procedure-name
         (lambda (fun)
           (or (old-procedure-name fun)
               (ahash-ref tm-defined-name fun)))))
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloading
@@ -123,8 +125,8 @@
     `(lambda ,(cdadr decl) ,(car opt))
     decl))
 
-(hash-set! define-option-table :mode define-option-mode)
-(hash-set! define-option-table :require define-option-require)
+(hash-table-set! define-option-table :mode define-option-mode)
+(hash-table-set! define-option-table :require define-option-require)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Properties of overloaded functions
@@ -152,13 +154,15 @@
 (define (property-rewrite l)
   `(property-set! ,@l (list ,@cur-conds)))
 
-(define ((define-property which) opt decl)
+(define (define-property which)
+ (lambda (opt decl)
   (set! cur-props (cons `(',(ca*adr decl) ,which ',opt) cur-props))
-  decl)
+  decl))
 
-(define ((define-property* which) opt decl)
+(define (define-property* which)
+ (lambda (opt decl)
   (set! cur-props (cons `(',(ca*adr decl) ,which (list ,@opt)) cur-props))
-  decl)
+  decl))
 
 (define (compute-arguments decl)
   (cond ((pair? (cadr decl)) (cdadr decl))
@@ -187,17 +191,17 @@
     (set! cur-props (cons `(',var ',arg (lambda () ,@(cdr opt))) cur-props))
     decl))
 
-(hash-set! define-option-table :type (define-property :type))
-(hash-set! define-option-table :synopsis (define-property :synopsis))
-(hash-set! define-option-table :returns (define-property :returns))
-(hash-set! define-option-table :note (define-property :note))
-(hash-set! define-option-table :argument define-option-argument)
-(hash-set! define-option-table :default define-option-default)
-(hash-set! define-option-table :proposals define-option-proposals)
-(hash-set! define-option-table :secure (define-property* :secure))
-(hash-set! define-option-table :check-mark (define-property* :check-mark))
-(hash-set! define-option-table :interactive (define-property* :interactive))
-(hash-set! define-option-table :balloon (define-property* :balloon))
+(hash-table-set! define-option-table :type (define-property :type))
+(hash-table-set! define-option-table :synopsis (define-property :synopsis))
+(hash-table-set! define-option-table :returns (define-property :returns))
+(hash-table-set! define-option-table :note (define-property :note))
+(hash-table-set! define-option-table :argument define-option-argument)
+(hash-table-set! define-option-table :default define-option-default)
+(hash-table-set! define-option-table :proposals define-option-proposals)
+(hash-table-set! define-option-table :secure (define-property* :secure))
+(hash-table-set! define-option-table :check-mark (define-property* :check-mark))
+(hash-table-set! define-option-table :interactive (define-property* :interactive))
+(hash-table-set! define-option-table :balloon (define-property* :balloon))
 
 (define-public (procedure-sources about)
   (or (and (procedure? about)
@@ -267,11 +271,12 @@
            ,@(map property-rewrite cur-props)))))
 
 (define-public (tm-define-sub head body)
+(display* "XXXX:" head body "\n")
   (if (and (pair? (car body)) (keyword? (caar body)))
       (let ((decl (tm-define-sub head (cdr body))))
-	(if (not (hash-ref define-option-table (caar body)))
+(if (not (hash-table-ref/default define-option-table (caar body) #f))
 	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))
+((hash-table-ref/default define-option-table (caar body) #f) (cdar body) decl))
       (cons 'tm-define-overloaded (cons head body))))
 
 (define-public-macro (tm-define head . body)
@@ -310,7 +315,7 @@
   (if (null? body)
       (cons 'tm-property-overloaded (cons head body))
       (let ((decl (tm-property-sub head (cdr body))))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))))
+((hash-table-ref/default define-option-table (caar body) #f) (cdar body) decl))))
 
 (define-public-macro (tm-property head . body)
   (set! cur-conds '())
@@ -330,6 +335,7 @@
 (define-public (not-define-option? item)
   (not (and (pair? item) (keyword? (car item)))))
 
+(tm-disable
 (define-public (lazy-define-one module opts name)
   (let* ((old (ahash-ref lazy-define-table name))
 	 (new (if old (cons module old) (list module))))
@@ -341,6 +347,22 @@
          (let* ((m (resolve-module ',module))
                 (p (module-ref texmacs-user '%module-public-interface))
                 (r (module-ref p ',name #f)))
+           (if (not r)
+               (texmacs-error "lazy-define"
+                              ,(string-append "Could not retrieve "
+                                              (symbol->string name))))
+           (apply r args))))))
+)
+
+(define-public (lazy-define-one module opts name)
+  (let* ((old (ahash-ref lazy-define-table name))
+	 (new (if old (cons module old) (list module))))
+    (ahash-set! lazy-define-table name new))
+  (with name-star (string->symbol (string-append (symbol->string name) "*"))
+    `(when (not (defined? ',name))
+       (tm-define (,name . args)
+         ,@opts
+         (let* ((r (lazy-provide ',module ',name)))
            (if (not r)
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "

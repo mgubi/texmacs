@@ -206,6 +206,13 @@
         ((define-texmacs x . body)
           (begin (define x . body) (add-texmacs-binding x)))))
 
+(define-syntax lazy-provide
+   (syntax-rules ()
+     ((lazy-provide mod name)
+         (let* ((m (require-tm-module 'mod))
+                (r (eval 'name (get-tm-module-env *texmacs-user-module*))))
+           r))))
+
 (define-syntax lazy-define
   (syntax-rules ()
      ((lazy-define mod name)
@@ -222,7 +229,7 @@
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs
-                                    texmacs-module tm-disable provide-public define-macro))
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 
