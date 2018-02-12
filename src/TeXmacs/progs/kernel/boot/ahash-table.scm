@@ -16,7 +16,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adaptive hash tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+(tm-disable
 (if (vector? (make-hash-table 1))
     (begin ;; old style
       (define-public (make-ahash-table)
@@ -72,6 +72,19 @@
       (define-public ahash-fold hash-fold)
       (define-public (ahash-table->list h)
 	(hash-fold acons '() h))))
+)
+
+(define-public make-ahash-table (lambda () (make-hash-table equal?)))
+(define-public ahash-ref hash-table-ref)
+(define-public ahash-get-handle
+(lambda (table key) (call/cc (lambda (return) (return  (cons key (hash-table-ref table key (lambda () (return #f)))))))))
+(define-public (ahash-size h)
+  (hash-fold (lambda (key value seed) (+ 1 seed)) 0 h))
+(define-public ahash-set! hash-table-set!)
+(define-public ahash-remove! hash-table-delete!)
+(define-public ahash-fold hash-table-fold)
+(define-public (ahash-table->list h)
+  (hash-table-fold acons '() h))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra routines on adaptive hash tables

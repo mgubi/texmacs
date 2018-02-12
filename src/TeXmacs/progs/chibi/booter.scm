@@ -1,5 +1,6 @@
 (import (chibi))
 
+
 (define *texmacs-env* (current-environment))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -28,7 +29,7 @@
   (display "Loading ") (display file) (newline)
   (%import env #f '(*texmacs-env* *texmacs-primitives*) #t)
   (load file env)
-  (%import #f env '(*tm-modules* *texmacs-defs*) #t)
+  (%import #f env '(*tm-modules*) #t)
   (%import #f env (eval '*texmacs-module-bindings* env) #t)
   (display "Done\n")
 )
@@ -38,15 +39,23 @@
 (define-texmacs (noop) (begin))
 (define-texmacs (plus1 x) (+ x 1))
 (define-texmacs (minus1 x) (- x 1))
+(define-texmacs (list-head l k) (if (> k 0) (cons (car l) (list-head (cdr l) (- k 1))) '()))
 
 (tm-import-module (chibi keywords))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-import-module (kernel boot compat))
-(tm-import-module (kernel boot abbrevs))
-(tm-import-module (kernel boot debug))
-(tm-import-module (kernel boot srfi))
+(tm-inherit-module (kernel boot compat))
+(tm-inherit-module (kernel boot abbrevs))
+(tm-inherit-module (kernel boot debug))
+(tm-inherit-module (kernel boot srfi))
+(tm-inherit-module (kernel boot ahash-table))
+(tm-inherit-module (kernel boot prologue))
+
+
+(tm-inherit-modules (kernel library base) (kernel library list)
+                    (kernel library tree) (kernel library content)
+                    (kernel library patch))
 
 
 

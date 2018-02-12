@@ -93,7 +93,7 @@
       (scm-error* 'out-of-range caller
 		  "Argument out of range: ~S" (list arg) '())))
 
-(define-public (syntax-error where message . args)
+(define-public (tm-syntax-error where message . args)
   (scm-error* 'syntax-error where message args #f))
 
 (define-public (former . l)

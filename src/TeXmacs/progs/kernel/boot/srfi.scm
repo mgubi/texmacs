@@ -45,7 +45,7 @@
         (set! growth-point clause-cell)))
 
     (if (not (list? claws))
-	(syntax-error "and-let*" "Bindings are not a list: ~A" claws))
+	(tm-syntax-error "and-let*" "Bindings are not a list: ~A" claws))
     (for-each
      (lambda (claw)
        (cond
@@ -58,13 +58,13 @@
 	 (let* ((var (car claw))
 		(var-cell (cons var '())))
 	   (if (memq var new-vars)
-	       (syntax-error "and-let*"
+	       (tm-syntax-error "and-let*"
 			     "Duplicate variable in bindings: ~A" var))
 	   (set! new-vars (cons var new-vars))
 	   (set-cdr! growth-point `((let (,claw) (and . ,var-cell))))
 	   (set! growth-point var-cell)))
 	(else
-	 (syntax-error "and-let*" "Ill-formed binding: ~A" claw))))
+	 (tm-syntax-error "and-let*" "Ill-formed binding: ~A" claw))))
      claws)
     (if (not (null? body))
 	(if (null? (cdr body))
