@@ -35,9 +35,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-texmacs (noop) (begin))
+(define-texmacs (plus1 x) (+ x 1))
+(define-texmacs (minus1 x) (- x 1))
+
 (tm-import-module (chibi keywords))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-import-module (kernel boot compat))
+(tm-import-module (kernel boot abbrevs))
+(tm-import-module (kernel boot debug))
+(tm-import-module (kernel boot srfi))
 
 
 

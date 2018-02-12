@@ -1714,7 +1714,7 @@
              (taglist (if (null? (cdr l)) '() (cadr l)))
              (taglist `(,@taglist (,tl ,n* ,(cadr streetag))))
              (l*      (list authors taglist)))
-        (add-refs l* (1+ n) tag tr tl global-counter?)))))
+        (add-refs l* (plus1 n) tag tr tl global-counter?)))))
 
 (tm-define (make-references l tag author? global-counter?)
   (let* ((tag-ref      (symbol-append tag '- 'ref))

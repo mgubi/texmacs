@@ -108,11 +108,11 @@
   ;; optimized (string-rindex name #\:)
   ;; returns position of a separator between namespace-id and LocalName
   ;; (copied from sxml-tools)
-  `(let rpt ((pos (1- ,len)))
+  `(let rpt ((pos (minus1 ,len)))
      (cond
        ((negative? pos) #f)
        ((char=? #\: (string-ref name pos)) pos)
-       (else (rpt (1- pos))))))
+       (else (rpt (minus1 pos))))))
 
 (tm-define (sxml-ncname obj)
   ;; Returns Local Part of Qualified Name (Namespaces in XML production [6])

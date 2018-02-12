@@ -71,19 +71,8 @@
 ;; TeXmacs errors and assertions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define old-format?
-  (catch 'wrong-number-of-args
-	 (lambda () (car))
-	 (lambda (type caller message opts extra)
-	   (let next ((l (string->list message)))
-	     (cond ((null? l) #f)
-		   ((char=? #\% (car l)) #t)
-		   (else (next (cdr l))))))))
 
 (define (scm-error* type caller message . opt)
-  (if old-format?
-      (begin (set! message (string-replace message "~S" "%S"))
-	     (set! message (string-replace message "~A" "%s"))))
   (apply scm-error type caller message opt))
 
 (define-public (texmacs-error where message . args)
@@ -187,8 +176,8 @@
 		  (,(if e? 'regression-test-equal 'regression-test-nequal)
 		   ,group-id ,test-desc
 		   ,result-in ,result ,expected-in ,expected)
-		  ,@(rec (1+ n) (cdr l))))) ; rest of the body
-	    (cond ((null? l) `(,(1- n))) ; evaluate to number of tests
+		  ,@(rec (plus1 n) (cdr l))))) ; rest of the body
+	    (cond ((null? l) `(,(minus1 n))) ; evaluate to number of tests
 		  ;; Improper list or unexpect atom. Nevermind.
 		  ((not (pair? l)) l)
 		  ((not (pair? (car l)))
@@ -243,7 +232,7 @@
   ;; Produce the string to be used to indent trace output.
   (let rec ((n trace-level) (s '()))
     (if (equal? 0 n) (apply string-append s)
-	(rec (1- n) (cons "| " s)))))
+	(rec (minus1 n) (cons "| " s)))))
 
 (define-public (trace-display . args)
   ;; As display but also print trace indentation.
@@ -276,15 +265,15 @@
 		`("[" ,name
 		  ,@(map (lambda (x) (string-append " " (object->string x)))
 			 args) "]"))))
-    (set! trace-level (1+ trace-level))
+    (set! trace-level (plus1 trace-level))
     (lazy-catch #t
 		(lambda ()
 		  (let ((res (apply lam args)))
-		    (set! trace-level (1- trace-level))      
+		    (set! trace-level (minus1 trace-level))
 		    (trace-display (object->string res))
 		    res))
 		(lambda err
-		  (set! trace-level (1- trace-level))
+		  (set! trace-level (minus1 trace-level))
 		  (apply throw err)))))
 
 (define-public-macro (set-trace-level! . names)

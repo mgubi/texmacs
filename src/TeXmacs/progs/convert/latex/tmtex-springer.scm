@@ -308,7 +308,7 @@
 (define (replace-affiliations l n)
   (with aff (next-affiliation l)
     (if (or (nlist? l) (not aff)) l
-      (let* ((n     (1+ n))
+      (let* ((n     (plus1 n))
              (l*    (map (lambda (x) (springer-replace-aff aff x n)) l)))
         (replace-affiliations l* n)))))
 

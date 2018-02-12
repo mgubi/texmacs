@@ -213,7 +213,7 @@
 	   (define (span->format html-name tm-name)
 	     (let ((span (shtml-decode-span attrs html-name)))
 	       (if (= 1 span) '()
-		   (list (tmformat-cell (1+ i) (1+ j) tm-name span)))))
+		   (list (tmformat-cell (plus1 i) (plus1 j) tm-name span)))))
 	   (append (span->format 'colspan "cell-col-span")
 		   (span->format 'rowspan "cell-row-span")
 		   kdr)))
@@ -252,7 +252,7 @@
 
 (define (cons-empty-cells n row)
   (do ((row row (cons "" row))
-       (n n (1- n)))
+       (n n (minus1 n)))
       ((zero? n) row)))
 
 (define (table-cells/row ncols envs table next-j row msg i j kar)
@@ -262,7 +262,7 @@
 		    table)
 	      <...>))
 	((eq? msg :cell)
-	 (cut table-cells/row ncols envs table (1+ j)
+	 (cut table-cells/row ncols envs table (plus1 j)
 	      (cons (xpath-descend
 		     (car envs) kar
 		     (lambda (new-env)

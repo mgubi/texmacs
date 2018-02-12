@@ -67,13 +67,9 @@
 (define-public (number->keyword x)
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
-(if (guile-c?)
-    (define-public (save-object file value)
-      (pretty-print value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports))
     (define-public (save-object file value)
       (write value (open-file (url-materialize file "") OPEN_WRITE))
-      (flush-all-ports)))
+      (flush-all-ports))
 
 (define-public (load-object file)
   (let ((r (read (open-file (url-materialize file "r") OPEN_READ))))
@@ -121,12 +117,12 @@
 
 (define-public (.. start end)
   (if (< start end)
-      (cons start (.. (1+ start) end))
+      (cons start (.. (plus1 start) end))
       '()))
 
 (define-public (... start end)
   (if (<= start end)
-      (cons start (... (1+ start) end))
+      (cons start (... (plus1 start) end))
       '()))
 
 (define-public-macro (for what . body)

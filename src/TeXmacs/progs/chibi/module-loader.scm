@@ -21,6 +21,10 @@
 (define *tm-base-bindings*  '())
 (define *tm-user-bindings*  '())
 
+;;(define *texmacs-env* (current-environment))
+(define *texmacs-defs* '())
+
+
 ;; utility to extract all bindings from a given environment
 (define (all-bindings env)
   (if env (append (env-exports env) (all-bindings (env-parent env))) '()))
@@ -42,6 +46,8 @@
         (lambda ()
           (let ((env (make-environment)))
              (%import env *tm-base-env* *tm-base-bindings* #t)
+             (%import env *texmacs-env* *texmacs-defs* #t)
+             (display "Current *texmacs-defs* :") (display *texmacs-defs*) (newline)
              env)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -164,9 +170,6 @@
       ((define-public-macro x body ...)
           (begin (define-macro x body ...) (tm-export `x)))))
 
-;;(define *texmacs-env* (current-environment))
-(define *texmacs-defs* '())
-
 (define-syntax define-texmacs
    (syntax-rules ()
       ((define-texmacs (x . xs) body ...)
@@ -190,7 +193,7 @@
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs
-                                    texmacs-module tm-disable provide-public))
+                                    texmacs-module tm-disable provide-public define-macro))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

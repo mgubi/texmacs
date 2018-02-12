@@ -315,7 +315,7 @@
   (:require (plot-context? t))
   (if (= (tree-down-index t) (- (tree-arity t) 1))
       (activate-plot t)
-      (tree-go-to t (1+ (tree-down-index t)) :end)))
+      (tree-go-to t (plus1 (tree-down-index t)) :end)))
 
 (tm-define (kbd-enter t forwards?)
   (:require (tree-is? t 'plot-output))

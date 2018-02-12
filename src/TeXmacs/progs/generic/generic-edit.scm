@@ -526,7 +526,7 @@
   (if (== (tree-down-index t) 0) (set! t (tree-up t)))
   (if (== (tm-car t) 'tree)
       (with pos (tree-down-index t)
-        (if forwards? (set! pos (1+ pos)))
+        (if forwards? (set! pos (plus1 pos)))
         (tree-insert! t pos '(""))
         (tree-go-to t pos 0))))
 

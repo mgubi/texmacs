@@ -880,7 +880,7 @@
          (tree-insert-node! t 0 '(traversed))
          #t)
         ((and (in? mode '(:next :var-next)) (< i l))
-         (dynamic-operate (tree-ref t (1+ i)) :first)
+         (dynamic-operate (tree-ref t (plus1 i)) :first)
          (tree-go-to t i :end)
          (switch-to t :next)
          #t)

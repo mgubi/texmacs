@@ -207,7 +207,7 @@
 (define (table-fold/row kar i0 i j rowspans footers kons kdr)
   ;; @kar is a child element of a TR element.
   (cond ((not kar)
-	 (cut table-fold/group <> i0 (1+ i) (next-rowspans rowspans) footers
+	 (cut table-fold/group <> i0 (plus1 i) (next-rowspans rowspans) footers
 	      kons (kons :out-row #f (skip-spanned-cols j rowspans) #f kdr)))
 	((cell? kar)
 	 (let ((j (skip-spanned-cols j rowspans))
@@ -234,27 +234,27 @@
   (let next ((j j) (rowspans rowspans))
     (cond ((null? rowspans) j)
 	  ((< j (first (car rowspans))) j)
-	  ((= j (first (car rowspans))) (next (1+ j) (cdr rowspans)))
+	  ((= j (first (car rowspans))) (next (plus1 j) (cdr rowspans)))
 	  (else (next j (cdr rowspans))))))
 
 (define (add-rowspan rowspans j rspan cspan)
   (let next ((rowspans rowspans) (j j) (cspan cspan))
     (cond ((zero? cspan) rowspans)
 	  ((null? rowspans)
-	   (cons (list j rspan) (next '() (1+ j) (1- cspan))))
+	   (cons (list j rspan) (next '() (plus1 j) (minus1 cspan))))
 	  ((< j (first (car rowspans)))
-	   (cons (list j rspan) (next rowspans (1+ j) (1- cspan))))
+	   (cons (list j rspan) (next rowspans (plus1 j) (minus1 cspan))))
 	  ((= j (first (car rowspans)))
 	   ;; This can only happen with some very vicious incorrect HTML.
 	   (cons (list j (max rspan (second (car rowspans))))
-		 (next (cdr rowspans) (1+ j) (1- cspan))))
+		 (next (cdr rowspans) (plus1 j) (minus1 cspan))))
 	  (else (cons (car rowspans)
-		      (next (cdr rowspans) (1+ j) (1- cspan)))))))
+		      (next (cdr rowspans) (plus1 j) (minus1 cspan)))))))
 
 (define (next-rowspans rowspans)
   (reverse! (list-fold (lambda (kar kdr)
 			 (with (col old-span) kar
-			   (let ((span (1- old-span)))
+			   (let ((span (minus1 old-span)))
 			     (if (zero? span)
 				 kdr
 				 (cons (list col span) kdr)))))

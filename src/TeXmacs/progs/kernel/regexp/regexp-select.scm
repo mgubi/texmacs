@@ -132,7 +132,7 @@
 (define (navigate-down p pat bl)
   (with q (cDr (cursor-path))
     (if (and p (list-starts? (cDr q) p))
-	(select-list (path->tree (list-head q (1+ (length p)))) pat bl)
+	(select-list (path->tree (list-head q (plus1 (length p)))) pat bl)
 	'())))
 
 (define (navigate-first p pat bl)

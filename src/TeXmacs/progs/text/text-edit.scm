@@ -68,7 +68,7 @@
 
 (tm-define (make-doc-data-element l)
   (with-innermost t 'doc-data
-    (with pos (1+ (tree-down-index t))
+    (with pos (plus1 (tree-down-index t))
       (cond ((== l 'doc-author)
 	     (tree-insert! t pos `((,l (author-data (author-name "")))))
 	     (tree-go-to t pos 0 0 0 0))
@@ -86,7 +86,7 @@
 
 (tm-define (make-author-data-element l)
   (with-innermost t 'author-data
-    (with pos (1+ (tree-down-index t))
+    (with pos (plus1 (tree-down-index t))
       (cond ((in? l '(author-affiliation author-note))
 	     (tree-insert! t pos `((,l (document ""))))
 	     (tree-go-to t pos 0 0 0))
@@ -102,7 +102,7 @@
 
 (tm-define (make-abstract-data-element l)
   (with-innermost t 'abstract-data
-    (with pos (1+ (tree-down-index t))
+    (with pos (plus1 (tree-down-index t))
       (tree-insert! t pos `((,l "")))
       (tree-go-to t pos 0 0))))
 
@@ -148,7 +148,7 @@
   (with t (tree-search-upwards
             t '(abstract-msc abstract-acm abstract-pacs
                              abstract-arxiv abstract-keywords))
-    (with pos (1+ (tree-down-index t))
+    (with pos (plus1 (tree-down-index t))
       (tree-insert! t pos `((concat "")))
       (tree-go-to t pos 0 0))))
 

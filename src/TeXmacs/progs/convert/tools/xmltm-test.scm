@@ -39,7 +39,7 @@
 	 "ê  ë  ì  í  î  ï")
 	("  Fx  ð  ñ  ò  ó  ô  õ  ö  ÷  ø  ù  "
 	 "ú  û  ü  ý  þ  ÿ")))))
-  (define (latin1-chart)
+  (define (latinminus1chart)
     ((cut string-join <> (nl))
      (map
       string-concatenate
@@ -92,16 +92,16 @@
 			(tfoot (th "d") (td "e")))))
    (test "XML, UTF-8"
 	 (string-append
-	  "<?xml version='1.0' encoding='utf-8'?>" (nl) (latin1-chart))
+	  "<?xml version='1.0' encoding='utf-8'?>" (nl) (latinminus1chart))
 	 `(*TOP* (*PI* xml "version='1.0' encoding='utf-8'")
-		 ,(string-append (nl) (latin1-chart))))
+		 ,(string-append (nl) (latinminus1chart))))
    (test "XML, latin1"
 	 (string-append
 	  "<?xml version='1.0' encoding='iso-8859-1'?>" (nl) (highbit-chart))
 	 `(*TOP* (*PI* xml "version='1.0' encoding='iso-8859-1'")
-		 ,(string-append (nl) (latin1-chart))))
-   (test "HTML, UTF-8" (latin1-chart) `(*TOP* ,(latin1-chart)))
-   (test "HTML, latin1" (highbit-chart) `(*TOP* ,(latin1-chart)))))
+		 ,(string-append (nl) (latinminus1chart))))
+   (test "HTML, UTF-8" (latinminus1chart) `(*TOP* ,(latinminus1chart)))
+   (test "HTML, latin1" (highbit-chart) `(*TOP* ,(latinminus1chart)))))
 
 ;; Namespace-aware parser wrapper
 
