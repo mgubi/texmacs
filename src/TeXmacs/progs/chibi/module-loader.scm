@@ -192,13 +192,19 @@
       ((define-public-macro x body ...)
           (begin (define-macro x body ...) (tm-export `x)))))
 
+(define-syntax add-texmacs-binding
+ (syntax-rules ()
+   ((add-texmacs-binding name)
+  (env-define! (get-tm-module-env *texmacs-user-module*) 'name name)
+  (set-tm-module-exports! *texmacs-user-module*
+  (cons 'name (get-tm-module-exports *texmacs-user-module*))))))
+
 (define-syntax define-texmacs
    (syntax-rules ()
-      ((define-texmacs (x . xs) body ...)
-          (begin (define (x . xs) body ...)
-                  (env-define! (get-tm-module-env *texmacs-user-module*) 'x x)
-                   (set-tm-module-exports! *texmacs-user-module*
-                       (cons 'x (get-tm-module-exports *texmacs-user-module*)))))))
+      ((define-texmacs (x . xs) . body )
+          (begin (define (x . xs) . body ) (add-texmacs-binding x)))
+        ((define-texmacs x . body)
+          (begin (define x . body) (add-texmacs-binding x)))))
 
 (define-syntax lazy-define
   (syntax-rules ()

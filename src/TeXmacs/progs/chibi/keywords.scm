@@ -55,4 +55,9 @@
 
 (define-public-macro (define-keyword ks)
    (let ((k (string->keyword (symbol->string ks))))
-   `(define ,k ',k)))
+   `(define-public ,k ',k)))
+
+(define-public-macro (define-keywords . kss)
+  `(begin ,@(map (lambda (ks) (let ((k (string->keyword (symbol->string ks)))) `(define-public ,k ',k))) kss)))
+
+

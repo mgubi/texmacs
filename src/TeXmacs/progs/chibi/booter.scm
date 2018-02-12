@@ -36,26 +36,35 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-texmacs (noop) (begin))
-(define-texmacs (plus1 x) (+ x 1))
-(define-texmacs (minus1 x) (- x 1))
-(define-texmacs (list-head l k) (if (> k 0) (cons (car l) (list-head (cdr l) (- k 1))) '()))
+;; compatibility layer
 
-(tm-import-module (chibi keywords))
+(define-public (noop) (begin))
+(define-public (plus1 x) (+ x 1))
+(define-public (minus1 x) (- x 1))
+(define-public (list-head l k) (if (> k 0) (cons (car l) (list-head (cdr l) (- k 1))) '()))
+
+
+(define-public gensym
+  (let ((counter 0))
+    (lambda ()
+      (set! counter (+ 1 counter))
+      (string->symbol (string-append "tm-gensym-" (number->string counter))))))
+
+(tm-inherit-module (chibi keywords))
+
+(define-keywords or and not repeat group quote exclude range and-not match replace up down first last next previous)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-inherit-module (kernel boot compat))
-(tm-inherit-module (kernel boot abbrevs))
-(tm-inherit-module (kernel boot debug))
-(tm-inherit-module (kernel boot srfi))
-(tm-inherit-module (kernel boot ahash-table))
-(tm-inherit-module (kernel boot prologue))
-
+(tm-inherit-modules (kernel boot compat) (kernel boot abbrevs)
+                    (kernel boot debug) (kernel boot srfi)
+                    (kernel boot ahash-table) (kernel boot prologue))
 
 (tm-inherit-modules (kernel library base) (kernel library list)
                     (kernel library tree) (kernel library content)
                     (kernel library patch))
+
+(tm-inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
 
 
 
