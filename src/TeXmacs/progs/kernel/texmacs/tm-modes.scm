@@ -14,7 +14,8 @@
 (texmacs-module (kernel texmacs tm-modes)
   (:use
     (kernel logic logic-rules) (kernel logic logic-query) (kernel logic logic-data)
-    (kernel texmacs tm-plugins) (kernel texmacs tm-preferences)))
+;;    (kernel texmacs tm-plugins)
+(kernel texmacs tm-preferences)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining new modes
@@ -32,7 +33,7 @@
            (deps* (map list (map texmacs-mode-pred deps)))
            (l (if (== action #t) deps* (cons action deps*)))
            (test (if (null? l) #t (if (null? (cdr l)) (car l) (cons 'and l))))
-           (defn `(define-public (,pred) ,test))
+           (defn `(define-texmacs (,pred) ,test))
            (rules (map (lambda (dep) (list dep mode)) deps))
            (logic-cmd `(logic-rules ,@rules))
            (arch1 `(set-symbol-procedure! ',mode ,pred))
@@ -44,10 +45,11 @@
 
 (define-public-macro (texmacs-modes . l)
   `(begin
-     (set! temp-module ,(current-module))
-     (set-current-module texmacs-user)
+;;(set! temp-module ,(current-module))
+;;   (set-current-module texmacs-user)
      ,@(map texmacs-mode l)
-     (set-current-module temp-module)))
+;;   (set-current-module temp-module))
+))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking modes

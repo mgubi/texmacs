@@ -14,6 +14,7 @@
 (texmacs-module (kernel texmacs tm-dialogue)
   (:use (kernel texmacs tm-define)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Questions with user interaction
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,6 +134,8 @@
   (set-message-temp left right #t)
   (recall-message-after len))
 
+(display "AAAAA\n")
+
 (define-public (texmacs-banner)
   (with tmv (string-append "GNU TeXmacs " (texmacs-version))
     (delayed
@@ -152,6 +155,7 @@
      (:pause 2500)
      (set-message "" ""))))))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interactive commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -168,6 +172,8 @@
 	((== x #f) "false")
 	((== x #t) "true")
 	(else x)))
+
+
 
 (define-public (procedure-symbol-name fun)
   (cond ((symbol? fun) fun)
@@ -192,18 +198,21 @@
   "Return learned list of interactive values for @fun"
   (set! fun (procedure-symbol-name fun))
   (or (ahash-ref interactive-arg-table fun) '()))
+(display "YYYYY\n")
 
 (define-public (forget-interactive fun)
   "Forget interactive values for @fun"
   (set! fun (procedure-symbol-name fun))
   (when (symbol? fun)
     (ahash-remove! interactive-arg-table fun)))
+(display "XXXXX\n")
 
 (define (learned-interactive-arg fun nr)
   (let* ((l (learned-interactive fun))
 	 (arg (number->string nr))
 	 (extract (lambda (assoc-l) (assoc-ref assoc-l arg))))
     (map extract l)))
+(display "XXXXX\n")
 
 (define (compute-interactive-arg-text fun which)
   (with arg (property fun (list :argument which))
@@ -280,6 +289,7 @@
   (with fun-args (build-interactive-args fun args 0 #t)
     (tm-interactive fun fun-args)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Store learned arguments from one session to another
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -320,5 +330,9 @@
 	     (decode (if old? decode-old list->ahash-table)))
 	(set! interactive-arg-table (decode l)))))
 
+(display "XXXXX\n")
+
 (on-entry (retrieve-learned))
 (on-exit (save-learned))
+
+(display "XXXXX\n")

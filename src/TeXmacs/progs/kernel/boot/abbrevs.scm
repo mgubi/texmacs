@@ -68,11 +68,11 @@
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
     (define-public (save-object file value)
-      (write value (open-file (url-materialize file "") OPEN_WRITE))
+      (write value (open-output-file (url-materialize file "")))
       (flush-all-ports))
 
 (define-public (load-object file)
-  (let ((r (read (open-file (url-materialize file "r") OPEN_READ))))
+  (let ((r (read (open-input-file (url-materialize file "r")))))
         (if (eof-object? r) '() r)))
 
 (define-public (persistent-ref dir key)

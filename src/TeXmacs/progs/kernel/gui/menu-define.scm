@@ -415,7 +415,7 @@
   (form-toggle ,gui-make-form-toggle))
 
 (tm-define (gui-make x)
-  ;;(display* "x= " x "\n")
+  (display* "x= " x "\n")
   (cond ((symbol? x)
          (cond ((== x '---) '$---)
                ((== x '===) (gui-make '(glue #f #f 0 5)))

@@ -42,7 +42,9 @@
 (define-public (plus1 x) (+ x 1))
 (define-public (minus1 x) (- x 1))
 (define-public (list-head l k) (if (> k 0) (cons (car l) (list-head (cdr l) (- k 1))) '()))
+(define-public map-in-order map)
 
+(define-public has-look-and-feel? (lambda (x) (== x "emacs")))
 
 (define-public gensym
   (let ((counter 0))
@@ -50,12 +52,25 @@
       (set! counter (+ 1 counter))
       (string->symbol (string-append "tm-gensym-" (number->string counter))))))
 
+
+
+(define-public (quit-TeXmacs-scheme) (noop))
+
+(define-public-macro (on-entry . cmd)
+  `(begin ,@cmd))
+
+(define-public-macro (on-exit . cmd)
+  `(set! quit-TeXmacs-scheme (lambda () ,@cmd (,quit-TeXmacs-scheme))))
+
+
+
 (tm-inherit-module (chibi keywords))
 
 (define-keywords or and not repeat group quote exclude range and-not match replace up down first last next previous)
 
-(define-keywords mode require type synopsis returns note argument default proposals secure check-mark interactive balloon)
-
+(define-keywords mode require type synopsis returns note argument arguments default proposals secure check-mark interactive balloon)
+(define-keywords all)
+(define-keywords pause every idle)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-inherit-modules (kernel boot compat) (kernel boot abbrevs)

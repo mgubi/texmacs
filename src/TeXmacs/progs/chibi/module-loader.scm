@@ -65,7 +65,8 @@
 (define *tm-base-bindings*  '())
 
 
-(define *tm-base-chibi-modules* '((chibi) (scheme hash-table)))
+;; (scheme list) is needed for cons*
+(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list)))
 
 ;; the base environment in which texmacs modules are evaluated
 (define *tm-base-env*
@@ -128,11 +129,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; texmacs module language
 
-(define (tm-export name)
+(define (tm-defined? name)
+  (memq (get-tm-module-exports *texmacs-user-module*) name))
+
+(define (tm-export mod name)
   ;;(display "Exporting:") (display (ca*r name)) (newline)
   ;;(display *module-exports*) (newline)
-  (let ((mod (car *tm-module-stack*)))
-    (set-tm-module-exports! mod (cons (ca*r name) (get-tm-module-exports mod)))))
+  (set-tm-module-exports! mod (cons (ca*r name) (get-tm-module-exports mod))))
 
 (define-syntax tm-import-module
   (sc-macro-transformer
@@ -181,7 +184,7 @@
 (define-syntax define-public
    (syntax-rules ()
       ((define-public x body ...)
-          (begin (define x body ...) (tm-export `x)))))
+          (begin (define x body ...) (tm-export (car *tm-module-stack*) `x)))))
 
 (define-macro (provide-public head . body)
   `(define-public ,head ,@body)
@@ -190,14 +193,15 @@
 (define-syntax define-public-macro
    (syntax-rules ()
       ((define-public-macro x body ...)
-          (begin (define-macro x body ...) (tm-export `x)))))
+          (begin (define-macro x body ...) (tm-export (car *tm-module-stack*) `x)))))
 
 (define-syntax add-texmacs-binding
  (syntax-rules ()
-   ((add-texmacs-binding name)
-  (env-define! (get-tm-module-env *texmacs-user-module*) 'name name)
-  (set-tm-module-exports! *texmacs-user-module*
-  (cons 'name (get-tm-module-exports *texmacs-user-module*))))))
+   ((add-texmacs-binding name value)
+       (env-define! (get-tm-module-env *texmacs-user-module*) 'name value)
+       (set-tm-module-exports! *texmacs-user-module*
+                (cons 'name (get-tm-module-exports *texmacs-user-module*))))
+   ((add-texmacs-binding name) (add-texmacs-binding name name))))
 
 (define-syntax define-texmacs
    (syntax-rules ()
@@ -225,11 +229,14 @@
   (syntax-rules ()
      ((tm-disable . x) (begin))))
 
+(define (current-tm-module-name)
+  (caar *tm-modules*))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set up the standard environment
 
-(define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs
-                                    texmacs-module tm-disable provide-public define-macro lazy-provide))
+(define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs  add-texmacs-binding
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined?))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

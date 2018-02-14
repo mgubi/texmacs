@@ -155,13 +155,19 @@
     (ahash-set! h (car binding) (cdr binding)))
   (for-each insert l))
 
-(define-public-macro (define-table name . l)
+'(define-public-macro (define-table name . l)
   `(begin
      (when (not (defined? ',name))
        (if (defined? 'tm-define)
            (tm-define ,name (make-ahash-table))
            (define-public ,name (make-ahash-table))))
      (define-table-decls ,name ,(list 'quasiquote l))))
+
+(define-public-macro (define-table name . l)
+   (let ((form (append '(begin) (if (tm-defined? name) '() `((define-texmacs ,name (make-ahash-table))))
+                        `((define-table-decls ,name ,(list 'quasiquote l))))))
+          (display ":: define-table :: ")(display form) (newline)
+          form))
 
 (define-public-macro (extend-table name . l)
   `(define-table-decls ,name ,(list 'quasiquote l)))
