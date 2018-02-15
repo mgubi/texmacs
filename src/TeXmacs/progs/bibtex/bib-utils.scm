@@ -67,7 +67,7 @@
 	   ,(number->string (length ts))
 	   (document ,@(format-entries 1 ts)))))))
 
-(tm-define bib-functions-table (make-hash-table 100))
+(tm-define bib-functions-table (make-hash-table equal?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public functions
@@ -107,7 +107,7 @@
     ((tm-func? x 'with) (bib-null? (tm-ref x :last)))
     ((list? x) (equal? x `()))
     ((string? x) (equal? x ""))
-    ((symbol? x) (equal? x '#{}#))
+    ((symbol? x) (equal? x '||))
     (else #f)))
 
 (tm-define (bib-simplify x)

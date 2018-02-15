@@ -522,6 +522,7 @@
 
 (define-public (plugin-initialize name*)
   "Initialize plugin with name @name*"
+   (display "Initialize ") (display name*) (newline)
   (plugin-load-setup)
   (if (ahash-ref plugin-initialize-todo name*)
       (let* ((name (symbol->string name*))
@@ -530,8 +531,8 @@
 	(ahash-set! plugin-initialize-todo name* #f)
 	(if (url-exists? u)
 	    (with fname (url-materialize u "r")
-	      ;;(display* "loading plugin " name* "\n")
-	      ;;(display* "loading plugin " fname "\n")
+	      (display* "loading plugin " name* "\n")
+          ;;(display* "loading plugin " fname "\n")
 	      ;;(with start (texmacs-time)
 	      ;;  (load fname)
 	      ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))

@@ -80,8 +80,8 @@
 
 (tm-define (bib-preprocessing t)
   (:mode bib-alpha?)
-  (set! bib-label-table (make-hash-table 100))
-  (set! bib-key-table (make-hash-table 100))
+  (set! bib-label-table (make-hash-table equal?))
+  (set! bib-key-table (make-hash-table equal?))
   (do ((entry t (cdr entry)) (n 1 (+ n 1)))
       ((null? entry))
       (if (func? (car entry) 'bib-entry)

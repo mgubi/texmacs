@@ -272,7 +272,7 @@
   (let ((filename (string-append
 		   (dirname (url->unix (current-buffer)))
 		   "/" relative_filename)))
-    (if (access? filename R_OK)
+    (if (file-is-readable? filename)
 	(let ((nst (stat:mtime (stat filename)))
 	      (ost (ahash-ref* file->stamp filename '())))
 	  (if (not (equal? nst ost))

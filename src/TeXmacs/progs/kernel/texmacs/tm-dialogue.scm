@@ -111,8 +111,14 @@
 	      (proc))))
 	(else (delayed-sub (cdr body)))))
 
+(display '(define-public-macro (delayed . body)
+`(exec-delayed-pause ,(delayed-sub body))))
 (define-public-macro (delayed . body)
-  `(exec-delayed-pause ,(delayed-sub body)))
+`(exec-delayed-pause ,(delayed-sub body)))
+(eval
+ '(define-public-macro (delayed . body)
+   `(exec-delayed-pause ,(delayed-sub body))) (get-tm-module-env *texmacs-user-module*))
+(tm-export *texmacs-user-module* 'delayed)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Messages and feedback on the status bar

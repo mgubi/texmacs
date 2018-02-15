@@ -42,7 +42,7 @@
   (with psize (getenv "PAPERSIZE")
     (if (and psize (!= psize "")) psize
         (with papersizefile (or (getenv "PAPERCONF") "/etc/papersize")
-          (and (access? papersizefile R_OK)
+          (and (file-is-readable? papersizefile)
                (with pps-port (open-input-file papersizefile)
                  (with size (read-line pps-port)
                    (close-input-port pps-port)

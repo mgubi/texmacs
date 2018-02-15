@@ -17,10 +17,10 @@
 ;; Adaptive hash tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (tm-disable
-(if (vector? (make-hash-table 1))
+(if (vector? (make-hash-table equal?))
     (begin ;; old style
       (define-public (make-ahash-table)
-	(cons (make-hash-table 1) 0))
+	(cons (make-hash-table equal?) 0))
 
       (define-public (ahash-ref h key)
 	(hash-ref (car h) key))

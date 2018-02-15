@@ -151,12 +151,12 @@ void
 initialize_scheme () {
     tmscm res;
     scheme_context = sexp_make_eval_context(NULL, NULL, NULL, 0, 0);
-    sexp_add_path(scheme_context, "/Users/mgubi/t/chibi-scheme/lib");
+    //sexp_add_path(scheme_context, "/Users/mgubi/t/chibi-scheme/lib");
 
     sexp_load_standard_env(scheme_context, NULL, SEXP_SEVEN);
+    sexp_load_standard_ports(scheme_context, NULL, stdin, stdout, stderr, 1);
 
     tmscm env = sexp_context_env(scheme_context);
-    sexp_load_standard_ports(scheme_context, env, stdin, stdout, stderr, 1);
     
     const char* init_prg =
     "(begin \n"

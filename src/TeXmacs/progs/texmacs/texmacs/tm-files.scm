@@ -13,7 +13,7 @@
 
 (texmacs-module (texmacs texmacs tm-files)
   (:use (texmacs texmacs tm-server)
-        (texmacs texmacs tm-print)
+;;    (texmacs texmacs tm-print)
         (utils library cursor)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

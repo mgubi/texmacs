@@ -415,7 +415,7 @@
   (form-toggle ,gui-make-form-toggle))
 
 (tm-define (gui-make x)
-  (display* "x= " x "\n")
+  ;;(display* "x= " x "\n")
   (cond ((symbol? x)
          (cond ((== x '---) '$---)
                ((== x '===) (gui-make '(glue #f #f 0 5)))
@@ -467,7 +467,7 @@
      (lazy-define ,module ,@menus)
      (delayed
        (:idle 500)
-       (module-provide ',module))))
+       (require-tm-module ',module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic color pickers
@@ -485,6 +485,7 @@
   '("black" "darker grey" "dark grey" "light grey"
     "pastel grey" "white"))
 
+(display "===================") (newline)
 (tm-menu (standard-color-menu cmd)
   (tile 8
     (for (col (standard-color-list))
@@ -502,6 +503,7 @@
         (explicit-buttons
           ((color "#fff0" #f #f 32 24)
            (noop)))))))
+(display "===================") (newline)
 
 (define (gui-make-pick-color x)
   `(menu-dynamic

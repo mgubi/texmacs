@@ -256,6 +256,7 @@
              (display* "   " ',nval "\n"))
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
+           ;;(display "### tm-define :") (display ',var) (newline)
            (define-texmacs ,var ,nval)
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
@@ -305,11 +306,12 @@
     ;;(display* (ca*r head) "\n")
     ;;(display* "   " `(tm-define ,macro-head ,@body) "\n")
     ;;(display* "   " `(define-public-macro ,head
-    ;;                   ,(apply* (ca*r macro-head) head)) "\n")
+    ;;                     ,(apply* (ca*r macro-head) head)) "\n")
   (let*  ((d `(define-macro ,head
                ,(apply* (ca*r macro-head) head)))
     (form `(begin
        (tm-define ,macro-head ,@body)
+       ,d
        (eval ',d (get-tm-module-env *texmacs-user-module*))
        (tm-export *texmacs-user-module* ',(ca*r head)))))
 (display form) (newline)

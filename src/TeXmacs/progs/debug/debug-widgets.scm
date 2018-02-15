@@ -182,5 +182,9 @@
 (tm-define (open-debug-console)
   (open-console "Debugging console"))
 
+(display "#####################\n")
+
 (tm-define (open-error-messages)
   (open-console "Error messages"))
+
+(display "#####################\n")

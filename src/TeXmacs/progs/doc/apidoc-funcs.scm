@@ -163,7 +163,7 @@
   (and (symbol? sym) (ahash-ref tm-defined-table sym)))
 
 (define (dir-with-access? path)
-  (and (access? path (logior R_OK X_OK))
+  (and (file-is-executable? path) (file-is-readable? path)
        (== 'directory (stat:type (stat path)))))
 
 (define (list-submodules module)

@@ -37,10 +37,8 @@
 (define (all-bindings env)
 (if env (append (env-exports env) (all-bindings (env-parent env))) '()))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; texmacs modules scaffolding
-
 
 ;; texmacs module record
 (define-record-type <tm-module>
@@ -66,7 +64,7 @@
 
 
 ;; (scheme list) is needed for cons*
-(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list)))
+(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file)))
 
 ;; the base environment in which texmacs modules are evaluated
 (define *tm-base-env*
@@ -169,8 +167,10 @@
      ((tm-inherit-modules x . xs)  (begin (tm-inherit-module x) (tm-inherit-modules . xs)))))
 
 (define (tm-start-module name)
-  ;;(display name) (newline)
-  ;;(display *module-names*) (newline)
+  (display "--------------------------------------------\n")
+  (display "Module: ")(display name) (newline)
+  (display "--------------------------------------------\n")
+;;(display *module-names*) (newline)
   (set-tm-module-name! (car *tm-module-stack*) name)
   (%import (current-environment) (get-tm-module-env *texmacs-user-module*) (get-tm-module-exports *texmacs-user-module*) #t))
 
@@ -197,10 +197,11 @@
 
 (define-syntax add-texmacs-binding
  (syntax-rules ()
-   ((add-texmacs-binding name value)
+   ((add-texmacs-binding name value) (begin
+        ;;(display "++++++++++ ADD BINDING |") (display 'name ) (display "|") (newline)
        (env-define! (get-tm-module-env *texmacs-user-module*) 'name value)
        (set-tm-module-exports! *texmacs-user-module*
-                (cons 'name (get-tm-module-exports *texmacs-user-module*))))
+                (cons 'name (get-tm-module-exports *texmacs-user-module*)))))
    ((add-texmacs-binding name) (add-texmacs-binding name name))))
 
 (define-syntax define-texmacs

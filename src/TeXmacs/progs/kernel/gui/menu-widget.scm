@@ -19,6 +19,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu grammar
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(display "1=================\n")
 
 (define-regexp-grammar
   (:translatable? (:or
@@ -40,7 +41,7 @@
     (shortcut :menu-wide-label :string?)))
   (:menu-item (:or
     ---
-    |
+    \
     (group :%1)
     (text :%1)
     (glue :boolean? :boolean? :integer? :integer?)
@@ -87,6 +88,7 @@
     (ink :%1)
     (:menu-item-list)))
   (:menu-item-list (:repeat :menu-item)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu utilities
@@ -201,6 +203,7 @@
            (widget-color (second p) (third p) (fourth p)
                          (* (fifth p) 256) (* (sixth p) 256))))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elementary menu items
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -210,7 +213,7 @@
   (widget-separator #f))
 
 (define (make-menu-vsep)
-  "Make @| menu item."
+  "Make @\ menu item."
   (widget-separator #t))
 
 (define (make-menu-glue hext? vext? minw minh)
@@ -304,6 +307,7 @@
     (if (not txt) but
         (with bal (widget-text txt style (color "black") #t)
           (widget-balloon but bal)))))
+(display "=================\n")
 
 (define (make-menu-entry-button style bar? bal? check label short action)
   (let* ((command (make-menu-command (if (active? style) (apply action '()))))
@@ -656,7 +660,7 @@
             (else
              (make-menu-items-list p style bar?)))
       (cond ((== p '---) (list (make-menu-hsep)))
-            ((== p '|) (list (make-menu-vsep)))
+            ((== p '\) (list (make-menu-vsep)))
             ((== p '()) p)
             (else (list (make-menu-bad-format p style))))))
 
@@ -874,7 +878,7 @@
 
 (define-table menu-expand-table
   (--- ,(lambda (p) `(--- ,@(menu-expand-list (cdr p)))))
-  (| ,(lambda (p) `(| ,@(menu-expand-list (cdr p)))))
+  (\ ,(lambda (p) `(\ ,@(menu-expand-list (cdr p)))))
   (group ,replace-procedures)
   (text ,replace-procedures)
   (glue ,replace-procedures)
@@ -1028,6 +1032,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reporting errors of system commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(display "=================\n")
 
 (tm-widget ((system-error-widget cmd out err) done)
   (padded
