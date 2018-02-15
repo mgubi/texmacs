@@ -29,7 +29,7 @@
 #include "Sqlite3/sqlite3.hpp"
 #include "Updater/tm_updater.hpp"
 
-tmscm 
+tmscm
 blackboxP (tmscm t) {
   bool b= tmscm_is_blackbox (t);
   return bool_to_tmscm (b);
@@ -419,23 +419,30 @@ scheme_tree_to_tmscm (scheme_tree t) {
   }
 }
 
+void print_result (sexp ctx, sexp env, sexp res);
+
 scheme_tree
 tmscm_to_scheme_tree (tmscm p) {
+  //sexp_gc_preserve1(scheme_context, p);
+  scheme_tree res = "?";
+//  print_result(scheme_context, sexp_context_env(scheme_context), p);
   if (tmscm_is_list (p)) {
     tree t (TUPLE);
     while (!tmscm_is_null (p)) {
       t << tmscm_to_scheme_tree (tmscm_car (p));
       p= tmscm_cdr (p);
     }
-    return t;
-  }
-  if (tmscm_is_symbol (p)) return tmscm_to_symbol (p);
-  if (tmscm_is_string (p)) return scm_quote (tmscm_to_string (p));
+    res= t;
+  } else if (tmscm_is_symbol (p)) res= tmscm_to_symbol (p);
+    else if (tmscm_is_string (p)) res= scm_quote (tmscm_to_string (p));
   //if (tmscm_is_string (p)) return "\"" * tmscm_to_string (p) * "\"";
-  if (tmscm_is_int (p)) return as_string ((int) tmscm_to_int (p));
-  if (tmscm_is_bool (p)) return (tmscm_to_bool (p)? string ("#t"): string ("#f"));
-  if (tmscm_is_tree (p)) return tree_to_scheme_tree (tmscm_to_tree (p));
-  return "?";
+  else if (tmscm_is_int (p)) res =  as_string ((int) tmscm_to_int (p));
+  else if (tmscm_is_bool (p)) res = (tmscm_to_bool (p)? string ("#t"): string ("#f"));
+  else if (tmscm_is_tree (p)) res = tree_to_scheme_tree (tmscm_to_tree (p));
+    
+//sexp_gc_release1(scheme_context);
+
+  return res;
 }
 
 /******************************************************************************

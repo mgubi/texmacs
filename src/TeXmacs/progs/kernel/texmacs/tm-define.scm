@@ -314,7 +314,7 @@
        ,d
        (eval ',d (get-tm-module-env *texmacs-user-module*))
        (tm-export *texmacs-user-module* ',(ca*r head)))))
-(display form) (newline)
+    ;;(display form) (newline)
    form)))
 
 

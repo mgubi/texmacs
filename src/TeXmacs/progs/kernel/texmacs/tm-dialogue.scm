@@ -111,8 +111,6 @@
 	      (proc))))
 	(else (delayed-sub (cdr body)))))
 
-(display '(define-public-macro (delayed . body)
-`(exec-delayed-pause ,(delayed-sub body))))
 (define-public-macro (delayed . body)
 `(exec-delayed-pause ,(delayed-sub body)))
 (eval
@@ -204,21 +202,18 @@
   "Return learned list of interactive values for @fun"
   (set! fun (procedure-symbol-name fun))
   (or (ahash-ref interactive-arg-table fun) '()))
-(display "YYYYY\n")
 
 (define-public (forget-interactive fun)
   "Forget interactive values for @fun"
   (set! fun (procedure-symbol-name fun))
   (when (symbol? fun)
     (ahash-remove! interactive-arg-table fun)))
-(display "XXXXX\n")
 
 (define (learned-interactive-arg fun nr)
   (let* ((l (learned-interactive fun))
 	 (arg (number->string nr))
 	 (extract (lambda (assoc-l) (assoc-ref assoc-l arg))))
     (map extract l)))
-(display "XXXXX\n")
 
 (define (compute-interactive-arg-text fun which)
   (with arg (property fun (list :argument which))
@@ -336,9 +331,6 @@
 	     (decode (if old? decode-old list->ahash-table)))
 	(set! interactive-arg-table (decode l)))))
 
-(display "XXXXX\n")
-
 (on-entry (retrieve-learned))
 (on-exit (save-learned))
 
-(display "XXXXX\n")

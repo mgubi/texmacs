@@ -12,7 +12,7 @@
 #ifndef CHIBI_TM_HPP
 #define CHIBI_TM_HPP
 
-#define SEXP_USE_DEBUG_GC 1
+//#define SEXP_USE_DEBUG_GC 1
 
 #include "string.hpp"
 #include "array.hpp"
@@ -92,7 +92,14 @@ inline bool tmscm_to_bool (tmscm obj) { return (obj != tmscm_false()); }
 inline int tmscm_to_int (tmscm obj) { return sexp_unbox_fixnum (obj); }
 inline double tmscm_to_double (tmscm obj) { return sexp_flonum_value (obj); }
 inline string tmscm_to_string (tmscm obj) { return string ( sexp_string_data (obj),  sexp_string_size (obj)); }
-inline string tmscm_to_symbol (tmscm obj) { return string (sexp_lsymbol_data (obj),  sexp_lsymbol_length (obj)); }
+inline string tmscm_to_symbol (tmscm obj) {
+    sexp_gc_var1(out);
+    sexp_gc_preserve1(scheme_context, out);
+    out = sexp_symbol_to_string_op(scheme_context, SEXP_NULL, 0, obj);
+    string res = tmscm_to_string(out);
+    sexp_gc_release1(scheme_context);
+    return res;
+}
 
 
 bool tmscm_is_blackbox (tmscm obj);

@@ -51,6 +51,21 @@
 
 (define-public (symbol-append . l) (string->symbol (apply string-append  (map symbol->string l))))
 (define-public getenv get-environment-variable)
+
+#;(define-public (object->string obj)
+      (let ((out (open-output-string)))
+         (write obj out)
+          (get-output-string out)))
+
+(define-public (texmacs-version) (%%texmacs-version%%))
+(define-public (display-to-string obj)
+  (call-with-output-string
+    (lambda (port) (display obj port))))
+(define-public (object->string obj)
+  (call-with-output-string
+    (lambda (port) (write obj port))))
+
+
 (define-public developer-mode?
     (equal? (cpp-get-preference "developer tool" "off") "on"))
 

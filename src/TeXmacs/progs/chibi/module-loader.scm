@@ -149,6 +149,11 @@
      ((tm-import-modules) (begin))
      ((tm-import-modules x . xs)  (begin (tm-import-module x) (tm-import-modules . xs)))))
 
+(define-syntax use-modules
+  (syntax-rules ()
+    ((use-modules x ...) (tm-import-modules x ...))))
+
+
 (define-syntax tm-inherit-module
   (sc-macro-transformer
     (lambda (exp env)
@@ -237,7 +242,7 @@
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs  add-texmacs-binding
-                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined?))
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined? use-modules))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

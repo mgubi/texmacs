@@ -52,12 +52,9 @@ tmscm blackbox_to_tmscm (blackbox b) {
 }
 
 
-sexp sexp_init_blackbox (sexp ctx, sexp self, sexp_sint_t n, sexp env, const char* version, const sexp_abi_identifier_t abi) {
+sexp sexp_init_blackbox (sexp ctx, sexp env) {
     sexp sexp_blackbox_type_obj;
     sexp_gc_var3(name, tmp, op);
-    if (!(sexp_version_compatible(ctx, version, sexp_version)
-          && sexp_abi_compatible(ctx, abi, SEXP_ABI_IDENTIFIER)))
-        return SEXP_ABI_ERROR;
     sexp_gc_preserve3(ctx, name, tmp, op);
     name = sexp_c_string(ctx, "texmacs-blackbox", -1);
     sexp_blackbox_type_obj = sexp_register_c_type(ctx, name, sexp_finalize_blackbox);
@@ -157,6 +154,7 @@ initialize_scheme () {
     sexp_load_standard_ports(scheme_context, NULL, stdin, stdout, stderr, 1);
 
     tmscm env = sexp_context_env(scheme_context);
+    sexp_init_blackbox(scheme_context, env);
     
     const char* init_prg =
     "(begin \n"
@@ -166,17 +164,18 @@ initialize_scheme () {
     "(debug-enable 'debug)\n"
     ";(debug-enable 'backtrace)\n"
     "\n"
-#endif
     "(define (display-to-string obj)\n"
     "  (call-with-output-string\n"
     "    (lambda (port) (display obj port))))\n"
     "(define (object->string obj)\n"
     "  (call-with-output-string\n"
     "    (lambda (port) (write obj port))))\n"
-    "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
+#endif
+//    "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
+    "(define (%%texmacs-version%%) \"" TEXMACS_VERSION "\")\n"
     "(define object-stack (cons '() '()))\n"
-    "(import (srfi 128))\n"
-    "(define (reload) (load \"/Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm\"))\n"
+    "(import (srfi 128))\n" // for default-hash
+  //  "(define (reload) (load \"/Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm\"))\n"
     ")";
     
     res = tmscm_eval_string (init_prg);
@@ -201,9 +200,9 @@ initialize_scheme () {
     //REPL
     //tmscm_eval_file (stdin);
     //scheme_load_named_file(scheme_context,stdin,0);
-    repl(scheme_context, env);
+ //   repl(scheme_context, env);
     
-    abort();
+//    abort();
     // /Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm
     
     //FIXME: when we finalize chibi?
