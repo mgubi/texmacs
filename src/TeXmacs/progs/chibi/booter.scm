@@ -78,7 +78,7 @@
     (lambda (port) (write obj port))))
 
 (define-public logand bitwise-and)
-
+(define-public logior bitwise-ior)
 (define-public module-provide require-tm-module)
 
 

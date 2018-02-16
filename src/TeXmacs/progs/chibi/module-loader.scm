@@ -21,7 +21,7 @@
       (let ((str (cond ((symbol? (car ls)) (symbol->string (car ls)))
                        ((number? (car ls)) (number->string (car ls)))
                        ((string? (car ls)) (car ls))
-                       (else (error "invalid module name" (car ls))))))
+                       (else (error "invalid tm-module name" (car ls))))))
         (tm-module-name->strings (cdr ls) (cons "/" (cons str res))))))
 
 ;; (url-concretize "$TEXMACS_PATH/progs/chibi/booter.scm")
@@ -115,7 +115,8 @@
 
 ;; require a texmacs module, loading it if it is not already present
 (define (require-tm-module name)
-   (cond
+  (display ">>>> Requiring tm-module :") (display name) (newline)
+  (cond
      ((assoc name *tm-modules*) => (lambda (p) (cdr p)))
      (else (let* ((file (tm-module-name->file name))
                   (mod (load-tm-module file)))
@@ -221,18 +222,20 @@
 
 (define-syntax lazy-provide
    (syntax-rules ()
-     ((lazy-provide mod name)
-         (let* ((m (require-tm-module 'mod))
+     ((lazy-provide mod name) (begin
+         (display "lazy-provide :") (display name) (display " in ") (display mod) (newline)
+         (let* ((m (require-tm-module mod))
                 (r (eval 'name (get-tm-module-env *texmacs-user-module*))))
-           r))))
+           r)))))
 
-(define-syntax lazy-define
+#;(define-syntax lazy-define
   (syntax-rules ()
-     ((lazy-define mod name)
+     ((lazy-define mod name) (begin
+        (display "lazy-define :") (display name) (display " in ") (display mod) (newline)
         (define-texmacs (name . args)
           (let* ((m (require-tm-module 'mod))
                  (r (eval 'name (get-tm-module-env *texmacs-user-module*))))
-          (apply r args))))))
+          (apply r args)))))))
 
 (define-syntax tm-disable
   (syntax-rules ()

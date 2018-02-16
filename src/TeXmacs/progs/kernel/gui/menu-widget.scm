@@ -319,7 +319,10 @@
                   (widget-menu-button l command check short style))
       (if bal? but (add-menu-entry-balloon but style action)))))
 
-(define-public (promise-source action)
+;; FIXME: this is a stub!!!
+(define-public (promise-source action) #f)
+
+#;(define-public (promise-source action)
   "Helper routines for menu-widget and kbd-define"
   (and (procedure? action)
        (with source (procedure-source action)

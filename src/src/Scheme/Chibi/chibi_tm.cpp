@@ -91,7 +91,8 @@ tmscm tmscm_lookup_string(const char *name)
 
 tmscm tmscm_apply (tmscm func, tmscm args)
 {
-    return sexp_apply(scheme_context, func, args);
+    tmscm res =  sexp_apply(scheme_context, func, args);
+    return res;
 }
 
 
@@ -300,19 +301,23 @@ struct arg_list { int  n; tmscm* a; };
 
 tmscm
 TeXmacs_call_scm (arg_list* args) {
+    sexp_gc_var3(tmp, l, res);
+    sexp_gc_preserve3(scheme_context, tmp, l, res);
     switch (args->n) {
         default:
         {
             int i;
-            tmscm l= tmscm_null ();
+            l= tmscm_null ();
             for (i=args->n; i>=1; i--)
                 l= tmscm_cons (args->a[i], l);
-            tmscm res = tmscm_apply (args->a[0], l);
+            tmp = args->a[0];
+            res = tmscm_apply (tmp, l);
             cout << "Scheme call with result :";
             print_result(scheme_context, sexp_context_env(scheme_context), res);
-            return res;
         }
     }
+    sexp_gc_release3(scheme_context);
+    return res;
 }
 #if 0
 static tmscm
