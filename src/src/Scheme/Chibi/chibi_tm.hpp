@@ -12,7 +12,7 @@
 #ifndef CHIBI_TM_HPP
 #define CHIBI_TM_HPP
 
-//#define SEXP_USE_DEBUG_GC 1
+#define SEXP_USE_DEBUG_GC 1
 
 #include "string.hpp"
 #include "array.hpp"

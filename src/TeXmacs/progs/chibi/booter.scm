@@ -53,6 +53,17 @@
 (define-public (symbol-append . l) (string->symbol (apply string-append  (map symbol->string l))))
 (define-public getenv get-environment-variable)
 
+;; stub
+(define-public (procedure-source name) #f)
+
+(define-public (assoc-set! alist key value)
+  (let lp ((l alist))
+    (if (pair? l)
+     (if (equal? key (caar l))
+           (begin (set-cdr! (car l) value) alist)
+           (lp (cdr l)))
+     (cons (cons key value) alist))))
+
 #;(define-public (object->string obj)
       (let ((out (open-output-string)))
          (write obj out)
