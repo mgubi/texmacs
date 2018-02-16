@@ -1,7 +1,8 @@
 (import (chibi)
-        (scheme list)
+        (scheme list) (scheme hash-table)
         (only (scheme process-context) get-environment-variable)
-        (chibi filesystem))
+        (chibi filesystem)
+         (srfi 33))
 
 
 (define *texmacs-env* (current-environment))
@@ -45,7 +46,7 @@
 (define-public (plus1 x) (+ x 1))
 (define-public (minus1 x) (- x 1))
 (define-public (list-head l k) (if (> k 0) (cons (car l) (list-head (cdr l) (- k 1))) '()))
-(define-public map-in-order map)
+;(define-public map-in-order map)
 (define-public scm-error error)
 (define-public has-look-and-feel? (lambda (x) (== x "emacs")))
 
@@ -64,6 +65,11 @@
 (define-public (object->string obj)
   (call-with-output-string
     (lambda (port) (write obj port))))
+
+(define-public logand bitwise-and)
+
+(define-public module-provide require-tm-module)
+
 
 
 (define-public developer-mode?

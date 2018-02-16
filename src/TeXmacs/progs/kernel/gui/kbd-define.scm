@@ -134,7 +134,7 @@
 
 (tm-define (kbd-find-key-binding key)
   (:synopsis "Find the command associated to the keystroke @key")
-  ;;(display* "Find binding '" key "'\n")
+  (display* "Find binding '" key "'\n")
   (lazy-keyboard-force)
   (ctx-resolve (kbd-get-map key) #f))
 

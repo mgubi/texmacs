@@ -110,7 +110,8 @@
          (uauthor `(doc-author ,adata)))
     uauthor))
 
-(define ((rewrite-by-affiliation data) group)
+(define (rewrite-by-affiliation data)
+ (lambda (group)
   (if (null? (cdr group))
       (let* ((f (car group))
              (l '(author-email author-homepage author-misc))
@@ -119,7 +120,7 @@
              (nf `(,(tm-label f) ,@nnotes))
              (rewr (rewrite-by-affiliation-bis (list nf) data)))
         `(doc-author (author-data ,@(cdadr rewr) ,@notes)))
-      (rewrite-by-affiliation-bis group data)))
+      (rewrite-by-affiliation-bis group data))))
 
 (tm-define (factor-affiliation t)
   (with authors (select t '(doc-author author-data))

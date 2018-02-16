@@ -31,6 +31,7 @@
           (else (texmacs-error "path-in" "invalid path")))))
 
 (tm-define (insert t . opt-l)
+  (display* "insert " t "\n")
   (if (null? opt-l)
       (cpp-insert t)
       (cpp-insert-go-to t (path-in t opt-l))))

@@ -59,7 +59,7 @@ operator << (tm_ostream& out, object obj) {
   if (out == cout) call ("write", obj);
   else if (out == cerr) call ("write-err", obj);
   else FAILED ("not yet implemented");
-  call ("force-output");
+  //call ("force-output");
   return out;
 }
 
@@ -76,7 +76,15 @@ operator != (object obj1, object obj2) {
 
 int
 hash (object obj) {
-  return as_int (call ("default-hash", obj, object (1234567)));
+  int ret;
+  tmscm o = object_to_tmscm(obj);
+  if (tmscm_is_blackbox(o)) {
+      return hash((pointer)tmscm_to_blackbox(o).rep);
+  } else
+    ret = as_int (call ("hash", obj, object (1234567)));
+
+    //cout << "hashing :" << obj << " result : " << ret << "\n";
+  return ret;
 }
 
 

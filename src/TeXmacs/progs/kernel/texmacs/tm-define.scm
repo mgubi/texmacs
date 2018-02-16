@@ -240,8 +240,8 @@
         `(let ((former ,var))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
-           ;;(display* "Overloaded " ',var "\n")
-           ;;(display* "   " ',nval "\n")
+           (display* "Overloaded " ',var "\n")
+           (display* "   " ',nval "\n")
            (add-texmacs-binding ,var ,nval)
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
@@ -254,9 +254,9 @@
            (when (nnull? cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
              (display* "   " ',nval "\n"))
-           ;;(display* "Defined " ',var "\n")
-           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           ;;(display "### tm-define :") (display ',var) (newline)
+           (display* "Defined " ',var " in module " (current-tm-module-name) "\n")
+           (if (nnull? cur-conds) (display* "   " ',nval "\n"))
+           (display "### tm-define :") (display ',var) (newline) (display ',nval) (newline)
            (define-texmacs ,var ,nval)
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
@@ -307,16 +307,16 @@
     ;;(display* "   " `(tm-define ,macro-head ,@body) "\n")
     ;;(display* "   " `(define-public-macro ,head
     ;;                     ,(apply* (ca*r macro-head) head)) "\n")
+   (display* "tm-define-macro " head " -> " body "\n")
   (let*  ((d `(define-macro ,head
                ,(apply* (ca*r macro-head) head)))
     (form `(begin
        (tm-define ,macro-head ,@body)
-       ,d
+       ,d ;; FIXME: this is not optimal since we duplicate the definition
        (eval ',d (get-tm-module-env *texmacs-user-module*))
        (tm-export *texmacs-user-module* ',(ca*r head)))))
     ;;(display form) (newline)
    form)))
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

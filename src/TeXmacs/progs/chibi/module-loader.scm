@@ -64,7 +64,8 @@
 
 
 ;; (scheme list) is needed for cons*
-(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file)))
+;; (srfi 33) for bitwise operations
+(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file) (srfi 33)))
 
 ;; the base environment in which texmacs modules are evaluated
 (define *tm-base-env*
@@ -153,6 +154,9 @@
   (syntax-rules ()
     ((use-modules x ...) (tm-import-modules x ...))))
 
+(define-syntax import-from
+  (syntax-rules ()
+    ((import-from x ...) (tm-import-modules x ...))))
 
 (define-syntax tm-inherit-module
   (sc-macro-transformer
@@ -175,7 +179,6 @@
   (display "--------------------------------------------\n")
   (display "Module: ")(display name) (newline)
   (display "--------------------------------------------\n")
-;;(display *module-names*) (newline)
   (set-tm-module-name! (car *tm-module-stack*) name)
   (%import (current-environment) (get-tm-module-env *texmacs-user-module*) (get-tm-module-exports *texmacs-user-module*) #t))
 
@@ -236,13 +239,13 @@
      ((tm-disable . x) (begin))))
 
 (define (current-tm-module-name)
-  (caar *tm-modules*))
+  (get-tm-module-name (car *tm-module-stack*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs  add-texmacs-binding
-                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined? use-modules))
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined? use-modules import-from))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

@@ -579,4 +579,4 @@
 ;; Immediately load document-menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use-modules (generic document-menu))
+;;(use-modules (generic document-menu))

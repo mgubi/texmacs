@@ -30,8 +30,10 @@
   (noop))
 
 (tm-define (mouse-event key x y mods time)
-  ;;(display* "mouse-event " key ", " x ", " y ", " mods ", " time "\n")
+  (display* "mouse-event " key ", " x ", " y ", " mods ", " time "\n")
   (mouse-any key x y mods (+ time 0.0)))
 
 (tm-define (kbd-insert s)
+  (display* "kbd-insert ++ " s "\n")
+  (display* "insert " insert "\n")
   (insert s))

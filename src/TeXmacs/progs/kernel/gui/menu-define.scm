@@ -467,6 +467,7 @@
      (lazy-define ,module ,@menus)
      (delayed
        (:idle 500)
+       (display "lazy-menu requiring " ',module) (newline)
        (require-tm-module ',module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

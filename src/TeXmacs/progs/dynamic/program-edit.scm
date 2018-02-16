@@ -16,7 +16,7 @@
 	(utils library cursor)
 	(utils plugins plugin-cmd)
 	(dynamic program-drd)
-	(dynamic program-menu)
+;;(dynamic program-menu)
 	(dynamic fold-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

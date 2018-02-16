@@ -213,11 +213,10 @@
 (define-public (wrap-catch proc)
   ;; Wrap a procedure in a closure which displays and passes exceptions.
   (lambda args
-    (lazy-catch #t
-		(lambda () (apply proc args))
-		(lambda err
-		  (tm-display-error "Guile error: " (list err))
-		  (apply throw err)))))
+    (with-exception-handler
+		(lambda (err)
+		  (tm-display-error "Scheme error: " (error-object-message  err)))
+        (lambda () (apply proc args)))))
 
 (define-public (wrap-catch-list expr)
   ;; Similar to wrap-catch for a scheme expression in list form.

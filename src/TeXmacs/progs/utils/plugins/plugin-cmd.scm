@@ -32,9 +32,9 @@
 
 (tm-define (generic-serialize lan t)
   (with u (pre-serialize lan t)
-    (string-append (char->string #\002) "verbatim:"
+    (string-append (char->string #\x002) "verbatim:"
 		   (escape-generic (texmacs->code u))
-		   (char->string #\005))))
+		   (char->string #\x005))))
 
 (tm-define (plugin-serialize lan t)
   (with fun (ahash-ref plugin-serializer lan)
@@ -52,7 +52,7 @@
 (define plugin-commander (make-ahash-table))
 
 (define (default-format-command s)
-  (string-append (char->string #\020) s "\n"))
+  (string-append (char->string #\x010) s "\n"))
 
 (tm-define (format-command lan s)
   (with fun (ahash-ref plugin-commander lan)

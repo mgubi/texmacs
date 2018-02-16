@@ -174,7 +174,7 @@ initialize_scheme () {
 //    "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
     "(define (%%texmacs-version%%) \"" TEXMACS_VERSION "\")\n"
     "(define object-stack (cons '() '()))\n"
-    "(import (srfi 128))\n" // for default-hash
+ //   "(import (srfi 128))\n" // for default-hash
   //  "(define (reload) (load \"/Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm\"))\n"
     ")";
     
@@ -200,7 +200,7 @@ initialize_scheme () {
     //REPL
     //tmscm_eval_file (stdin);
     //scheme_load_named_file(scheme_context,stdin,0);
- //   repl(scheme_context, env);
+    repl(scheme_context, env);
     
 //    abort();
     // /Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm
@@ -307,7 +307,10 @@ TeXmacs_call_scm (arg_list* args) {
             tmscm l= tmscm_null ();
             for (i=args->n; i>=1; i--)
                 l= tmscm_cons (args->a[i], l);
-            return tmscm_apply (args->a[0], l);
+            tmscm res = tmscm_apply (args->a[0], l);
+            cout << "Scheme call with result :";
+            print_result(scheme_context, sexp_context_env(scheme_context), res);
+            return res;
         }
     }
 }
