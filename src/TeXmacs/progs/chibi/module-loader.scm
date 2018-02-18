@@ -65,7 +65,7 @@
 
 ;; (scheme list) is needed for cons*
 ;; (srfi 33) for bitwise operations
-(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file) (srfi 33)))
+(define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file) (srfi 33) (scheme charset)))
 
 ;; the base environment in which texmacs modules are evaluated
 (define *tm-base-env*
@@ -196,8 +196,7 @@
           (begin (define x body ...) (tm-export (car *tm-module-stack*) `x)))))
 
 (define-macro (provide-public head . body)
-  `(define-public ,head ,@body)
-  '(noop))
+  `(define-public ,head ,@body))
 
 (define-syntax define-public-macro
    (syntax-rules ()

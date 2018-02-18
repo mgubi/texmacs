@@ -1,9 +1,13 @@
-(import (chibi)
+(import (except (chibi) define) (rename (chibi) (define prim-define))
         (scheme list) (scheme hash-table)
         (only (scheme process-context) get-environment-variable)
         (chibi filesystem)
-         (srfi 33))
+         (srfi 33) (scheme charset))
 
+(define-syntax define
+  (syntax-rules ()
+    ((define ((x a1 ...) a ...) body ...) (define (x a1 ...) (lambda (a ...) body ...)))
+    ((define x body ...) (prim-define x body ...))))
 
 (define *texmacs-env* (current-environment))
 
@@ -15,7 +19,7 @@
 
 ;; rsc-macro-transformer is not r7rs, imported from the (chibi) module
 
-(define-syntax define-macro
+#;(define-syntax define-macro
   (syntax-rules ()
     ((define-macro (name . args) body ...)
      (define-syntax name
@@ -23,6 +27,17 @@
          (let ((transformer (lambda args body ...)))
            (lambda (exp env)
               (apply transformer (cdr exp)))))))))
+
+(define-syntax define-macro
+  (syntax-rules ()
+    ((define-macro (name . args) body ...) (define-macro name (lambda args body ...)))
+    ((define-macro name def)
+      (define-syntax name
+       (rsc-macro-transformer
+         (let ((transformer def))
+           (lambda (exp env)
+              (apply transformer (cdr exp)))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -41,6 +56,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; compatibility layer
+
+(define boot-start (texmacs-time))
+(define-public remote-client-list (list))
 
 (define-public (noop . x) (if (pair? x) (car x) #f))
 (define-public (plus1 x) (+ x 1))
@@ -664,6 +682,16 @@
                     (kernel old-gui old-gui-factory)
                     (kernel old-gui old-gui-form)
                     (kernel old-gui old-gui-test))
+
+(display "=================================================\n")
+(display "Booting all modules\n")
+(display "=================================================\n")
+
+;; (utils cas cas-out)
+
+(tm-import-modules (utils library cpp-wrap) (utils library cursor)  (utils plugins plugin-cmd) (utils library smart-table) (utils plugins plugin-convert) (utils misc markup-funcs) (utils handwriting handwriting) (bibtex bib-utils) (bibtex bib-complete) (bibtex bib-widgets) (texmacs texmacs tm-server) (texmacs texmacs tm-view) (texmacs texmacs tm-files) (texmacs texmacs tm-print) (texmacs keyboard config-kbd) (texmacs keyboard prefix-kbd) (texmacs keyboard latex-kbd) (texmacs menus file-menu) (texmacs menus edit-menu) (texmacs menus view-menu) (texmacs menus tools-menu) (texmacs menus preferences-menu) (texmacs menus preferences-widgets) (texmacs menus main-menu) (texmacs menus view-menu) (generic generic-kbd) (generic generic-menu) (generic format-menu) (generic document-menu) (generic document-part) (generic insert-menu) (generic document-edit) (generic generic-edit) (generic generic-doc) (generic generic-widgets) (generic format-widgets) (generic document-widgets) (text text-kbd) (text text-menu) (math math-kbd) (math math-sem-edit) (math math-menu) (math math-edit) (prog prog-kbd) (prog prog-menu) (source source-kbd) (source source-menu) (source macro-edit) (source macro-widgets) (table table-kbd) (table table-menu) (table table-edit) (table table-widgets) (graphics graphics-kbd) (graphics graphics-menu) (graphics graphics-object) (graphics graphics-utils) (graphics graphics-edit) (graphics graphics-main) (graphics graphics-markup) (language natural) (dynamic fold-kbd) (dynamic scripts-kbd) (dynamic calc-kbd) (dynamic fold-menu) (dynamic session-menu) (dynamic scripts-menu) (dynamic calc-menu) (dynamic animate-menu) (dynamic fold-edit) (dynamic session-edit) (dynamic calc-edit) (doc tmdoc-kbd) (doc apidoc-kbd) (doc tmdoc-menu) (doc help-menu) (doc tmdoc) (doc docgrep) (doc tmdoc-search) (doc tmweb) (doc apidoc) (doc apidoc-menu) (doc docgrep) (doc tmdoc) (doc apidoc) (convert images tmimage) (convert rewrite init-rewrite) (convert html tmhtml-expand) (convert latex latex-drd) (convert latex tmtex) (convert latex latex-tools) (convert latex tmtex-widgets) (part part-shared) (part part-menu) (part part-tmfs) (database db-widget) (database db-menu) (database db-convert) (database bib-db) (database bib-manage) (database bib-local) (database db-menu) (database db-tmfs) (database bib-kbd) (security wallet wallet-menu) (security wallet wallet-base) (security wallet wallet-menu) (security gpg gpg-edit) (security gpg gpg-widgets) (security gpg gpg-base) (security gpg gpg-menu) (security gpg gpg-widgets) (client client-tmfs) (server server-menu) (client client-menu) (client client-tmfs) (link link-menu) (link link-kbd) (link link-edit) (link link-navigate) (link link-extern) (version version-menu) (version version-kbd) (version version-tmfs) (debug debug-menu) (texmacs menus developer-menu) (debug debug-widgets) (fonts fonts-ec) (fonts fonts-adobe) (fonts fonts-x) (fonts fonts-math) (fonts fonts-foreign) (fonts fonts-misc) (fonts fonts-composite) (fonts fonts-truetype) (fonts font-old-menu) (fonts font-new-widgets) (check check-master))
+
+(display "-------------------------------------------------\n")
 
 
 ;(display "Booting utilities\n")

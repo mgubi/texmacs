@@ -98,6 +98,9 @@
 (tm-define (kbd-get-rev key) (ahash-ref kbd-rev-table key))
 (define (kbd-remove-map! key) (ahash-remove! kbd-map-table key))
 
+;; FIXME: this is a stub!!!
+(define-public (promise-source action) #f)
+
 (define (kbd-source cmd)
   (if (procedure? cmd) (promise-source cmd) cmd))
 

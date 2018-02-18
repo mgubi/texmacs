@@ -111,11 +111,18 @@
 	      (proc))))
 	(else (delayed-sub (cdr body)))))
 
+(define-public (delayed-sub-trace body)
+  `(lambda ()
+     (display ">>> Executing delayed sub :") (display ',body) (newline)
+     (,(delayed-sub body))))
+
+(define m-delayed '(define-public-macro (delayed . body)
+                      `(exec-delayed-pause ,(delayed-sub-trace body))))
+(display ">>> Defining delayed command :") (display m-delayed) (newline)
 (define-public-macro (delayed . body)
-`(exec-delayed-pause ,(delayed-sub body)))
-(eval
- '(define-public-macro (delayed . body)
-   `(exec-delayed-pause ,(delayed-sub body))) (get-tm-module-env *texmacs-user-module*))
+`(exec-delayed-pause ,(delayed-sub-trace body)))
+;;(eval m-delayed)
+(eval m-delayed (get-tm-module-env *texmacs-user-module*))
 (tm-export *texmacs-user-module* 'delayed)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
