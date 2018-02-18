@@ -312,7 +312,8 @@
                ,(apply* (ca*r macro-head) head)))
     (form `(begin
        (tm-define ,macro-head ,@body)
-       ,d ;; FIXME: this is not optimal since we duplicate the definition
+;;,d ;; FIXME: this is not optimal since we duplicate the definition
+       (eval ',d (get-tm-module-env (current-tm-module)))
        (eval ',d (get-tm-module-env *texmacs-user-module*))
        (tm-export *texmacs-user-module* ',(ca*r head)))))
     ;;(display form) (newline)

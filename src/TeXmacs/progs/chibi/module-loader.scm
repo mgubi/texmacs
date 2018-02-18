@@ -1,10 +1,6 @@
-(import (chibi) (only (scheme base) define-record-type))
-
-;; take a snapshot of current bindings
-;;(define *tm-base-bindings*
-;;    (let p ((e (current-environment)) (l '())) (if e (p (env-parent e) (append (env-exports e) l)) l)))
-
-(import (chibi modules)
+(import (chibi)
+        (only (scheme base) define-record-type)
+        (chibi modules)
         (only (meta) module-env load-module)
         (only (chibi ast) env-define!))
 
@@ -35,7 +31,7 @@
 
 ;; utility to extract all bindings from a given environment
 (define (all-bindings env)
-(if env (append (env-exports env) (all-bindings (env-parent env))) '()))
+  (if env (append (env-exports env) (all-bindings (env-parent env))) '()))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; texmacs modules scaffolding
@@ -50,7 +46,7 @@
   (file get-tm-module-file set-tm-module-file!))
 
 ;; the main texmacs module
-(define *texmacs-user-module* (make-tm-module '(texmacs-user) (current-environment) '() ""))
+(define *texmacs-user-module* (make-tm-module '(texmacs-user) *texmacs-environment* '() ""))
 
 ;; list of all loaded modules
 (define *tm-modules* (list (cons '(texmacs-user) *texmacs-user-module*)))
@@ -58,6 +54,9 @@
 ;; stack of current modules (the top one is the texmacs-user module)
 ;; (to parse modules recursively)
 (define *tm-module-stack* (list *texmacs-user-module*))
+
+(define (current-tm-module) (car *tm-module-stack*))
+
 
 ;; list of export bindings for the base environment
 (define *tm-base-bindings*  '())
@@ -68,7 +67,7 @@
 (define *tm-base-chibi-modules* '((chibi) (scheme cxr) (scheme hash-table) (scheme list) (chibi filesystem) (scheme file) (srfi 33) (scheme charset)))
 
 ;; the base environment in which texmacs modules are evaluated
-(define *tm-base-env*
+#;(define *tm-base-env*
     (let* ((base-env (make-environment)))
            (for-each (lambda (name)
                        (let ((mod (load-module name)))
@@ -80,12 +79,15 @@
            (set! *tm-base-bindings* (append *texmacs-primitives* *tm-base-bindings*))
            base-env))
 
+(define *tm-base-env* (get-tm-module-env  *texmacs-user-module*))
+(set!  *tm-base-bindings* *initial-exports*)
 
 ;; create a fresh evaluation environment for texmacs modules
 (define make-evaluation-env
         (lambda ()
           (let ((env (make-environment)))
              (%import env *tm-base-env* *tm-base-bindings* #t)
+;;(%import env (get-tm-module-env  *texmacs-user-module*) *initial-exports* #t)
              ;;(%import env *texmacs-env* *texmacs-defs* #t)
              ;;(display "Current *texmacs-defs* :") (display *texmacs-defs*) (newline)
              env)))
@@ -138,13 +140,11 @@
   (set-tm-module-exports! mod (cons (ca*r name) (get-tm-module-exports mod))))
 
 (define-syntax tm-import-module
-  (sc-macro-transformer
-    (lambda (exp env)
-      (let* ((mod-name (cadr exp))
-             (mod (require-tm-module mod-name)))
-        ;;(display (current-environment)) (newline)
-        `(%import ,(current-environment) ,(get-tm-module-env mod)
-                  ',(get-tm-module-exports mod) #t)))))
+  (syntax-rules ()
+     ((tm-import-module mod-name) (let ((mod (require-tm-module 'mod-name)))
+                (%import (get-tm-module-env  (current-tm-module))
+                         (get-tm-module-env mod)
+                         (get-tm-module-exports mod) #t)))))
 
 (define-syntax tm-import-modules
   (syntax-rules ()
@@ -165,9 +165,9 @@
       `(let* ((mod-name ',(cadr exp))
              (mod (require-tm-module mod-name))
              (exp (get-tm-module-exports mod))
-             (cur-mod (car *tm-module-stack*)))
+             (cur-mod  (current-tm-module)))
         ;;(display (current-environment)) (newline)
-         (%import (current-environment) (get-tm-module-env mod)
+         (%import (get-tm-module-env cur-mod) (get-tm-module-env mod)
                   exp #t)
                 (set-tm-module-exports! cur-mod (append (get-tm-module-exports cur-mod) exp))))))
 
@@ -180,8 +180,8 @@
   (display "--------------------------------------------\n")
   (display "Module: ")(display name) (newline)
   (display "--------------------------------------------\n")
-  (set-tm-module-name! (car *tm-module-stack*) name)
-  (%import (current-environment) (get-tm-module-env *texmacs-user-module*) (get-tm-module-exports *texmacs-user-module*) #t))
+  (set-tm-module-name!  (current-tm-module) name)
+  (%import (get-tm-module-env  (current-tm-module)) (get-tm-module-env *texmacs-user-module*) (get-tm-module-exports *texmacs-user-module*) #t))
 
 (define-syntax texmacs-module
    (syntax-rules (:use)
@@ -193,7 +193,7 @@
 (define-syntax define-public
    (syntax-rules ()
       ((define-public x body ...)
-          (begin (define x body ...) (tm-export (car *tm-module-stack*) `x)))))
+          (begin (define x body ...) (tm-export  (current-tm-module) `x)))))
 
 (define-macro (provide-public head . body)
   `(define-public ,head ,@body))
@@ -201,7 +201,7 @@
 (define-syntax define-public-macro
    (syntax-rules ()
       ((define-public-macro x body ...)
-          (begin (define-macro x body ...) (tm-export (car *tm-module-stack*) `x)))))
+          (begin (define-macro x body ...) (tm-export  (current-tm-module) `x)))))
 
 (define-syntax add-texmacs-binding
  (syntax-rules ()
@@ -241,13 +241,13 @@
      ((tm-disable . x) (begin))))
 
 (define (current-tm-module-name)
-  (get-tm-module-name (car *tm-module-stack*)))
+  (get-tm-module-name  (current-tm-module)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs  add-texmacs-binding
-                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module* get-tm-module-env tm-export tm-defined? use-modules import-from))
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module*  get-tm-module-env tm-export tm-defined? use-modules import-from  current-tm-module require-tm-module tm-inherit-module tm-inherit-modules tm-import-module tm-import-modules))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

@@ -155,8 +155,8 @@
 
 ;; Conversion of Cork GRAVE ACCENT to LEFT SINGLE QUOTATION MARK
 
-(define cork-grave-char #\nul)
-(define cork-grave (list->string '(#\nul)))
+(define cork-grave-char #\null)
+(define cork-grave (list->string '(#\null)))
 (define cork-backquote (list->string '(#\`))) ;; that is GRAVE ACCENT in ASCII
 
 (define (cork-grave->backquote s)

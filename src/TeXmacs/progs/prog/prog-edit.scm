@@ -54,7 +54,7 @@
 (tm-define (program-character path)
   (let ((s (tree->string (path->tree (cDr path))))
         (pos (cAr path)))
-    (if (or (string-null? s) (>= pos (string-length s)) (< pos 0)) #\nul
+    (if (or (string-null? s) (>= pos (string-length s)) (< pos 0)) #\null
         (string-ref s pos))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

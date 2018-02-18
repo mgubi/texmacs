@@ -31,10 +31,10 @@
 	((string? x) (ahash-set! indent-arity-table x nr))
 	((list? x) (for-each (cut indent-set-arity <> nr) x))))
 
-(indent-set-arity nullary-indent 0)
-(indent-set-arity unary-indent   1)
-(indent-set-arity binary-indent  2)
-(indent-set-arity ternary-indent 3)
+(indent-set-arity 'nullary-indent 0)
+(indent-set-arity 'unary-indent   1)
+(indent-set-arity 'binary-indent  2)
+(indent-set-arity 'ternary-indent 3)
 
 (tm-define (indent-get-arity s)
   (:synopsis "get indentation arity of keyword @s")
