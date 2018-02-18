@@ -390,7 +390,7 @@
   ("less"          #\<)
   ("gtr"           #\>)
   ("box"           (Box))
-  ("||"            (|)) ;; |
+  ("||"            (|\||)) ;; |
   ("precdot"       (tmprecdot)))
 
 (logic-table latex-text-symbols%
