@@ -23,7 +23,7 @@
 	(cons (make-hash-table equal?) 0))
 
       (define-public (ahash-ref h key)
-	(hash-ref (car h) key))
+	(hash-table-ref (car h) key))
 
       (define-public (ahash-get-handle h key)
 	(hash-get-handle (car h) key))
@@ -33,18 +33,18 @@
 
       (define-public (ahash-slots! h new-size)
 	(let ((new-h (make-hash-table new-size)))
-	  (hash-fold (lambda (key value dummy) (hash-set! new-h key value))
+	  (hash-fold (lambda (key value dummy) (hash-table-set! new-h key value))
 		     #f (car h))
 	  (set-car! h new-h)))
 
       (define-public (ahash-set! h key value)
 	(if (hash-get-handle (car h) key)
-	    (hash-set! (car h) key value)
+	    (hash-table-set! (car h) key value)
 	    (begin
 	      (if (>= (cdr h) (vector-length (car h)))
 		  (ahash-slots! h (+ (* 2 (vector-length (car h))) 1)))
 	      (set-cdr! h (+ (cdr h) 1))
-	      (hash-set! (car h) key value))))
+	      (hash-table-set! (car h) key value))))
 
       (define-public (ahash-remove! h key)
 	(let ((removed (hash-remove! (car h) key)))

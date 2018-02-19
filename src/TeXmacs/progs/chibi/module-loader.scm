@@ -243,11 +243,15 @@
 (define (current-tm-module-name)
   (get-tm-module-name  (current-tm-module)))
 
+(define (defined? name)
+  (let lp ((e (current-environment)))
+   (if e (if (member name (env-exports e)) #t (lp (env-parent e))) #f)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set up the standard environment
 
 (define *texmacs-module-bindings* '(define-public define-public-macro define-texmacs  add-texmacs-binding
-                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module*  get-tm-module-env tm-export tm-defined? use-modules import-from  current-tm-module require-tm-module tm-inherit-module tm-inherit-modules tm-import-module tm-import-modules))
+                                    texmacs-module tm-disable provide-public define-macro lazy-provide current-tm-module-name *texmacs-user-module*  get-tm-module-env tm-export tm-defined? use-modules import-from  current-tm-module require-tm-module tm-inherit-module tm-inherit-modules tm-import-module tm-import-modules defined?))
 (%import *tm-base-env* (current-environment) *texmacs-module-bindings* #t)
 (set! *tm-base-bindings* (append *tm-base-bindings* *texmacs-module-bindings*))
 

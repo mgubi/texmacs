@@ -2,7 +2,10 @@
         (scheme list) (scheme hash-table)
         (only (scheme process-context) get-environment-variable)
         (chibi filesystem)
-         (srfi 33) (scheme charset) (scheme cxr))
+        (srfi 33) (scheme charset) (scheme cxr)
+        (only (chibi process) current-process-id)
+        (srfi 27) ;; random numbers
+)
 
 (define-syntax define
   (syntax-rules ()
@@ -75,6 +78,8 @@
 ;(define-public map-in-order map)
 (define-public scm-error error)
 (define-public has-look-and-feel? (lambda (x) (== x "emacs")))
+
+(define-public (getpid) (current-process-id))
 
 (define-public (symbol-append . l) (string->symbol (apply string-append  (map symbol->string l))))
 (define-public getenv get-environment-variable)

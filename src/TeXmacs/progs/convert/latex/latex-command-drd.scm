@@ -253,7 +253,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-control%
-  $ & % ,(string->symbol "#") _ { } <less> <gtr>)
+  $ & % ,(string->symbol "#") _ |{| |}| <less> <gtr>)
 
 (logic-group latex-operator%
   arccos arcsin arctan arg cos cosh cot coth csc deg det dim exp gcd hom
