@@ -28,8 +28,12 @@
 
 static list<tmscm > destroy_list;
 extern tmscm object_stack;
+extern tmscm scheme_context;
 
 tmscm_object_rep::tmscm_object_rep (tmscm obj) {
+  sexp_gc_var1(tmp);
+  sexp_gc_preserve1(scheme_context, tmp);
+  tmp = obj;
   while (!is_nil (destroy_list)) {
     tmscm handle= destroy_list->item;
      
@@ -40,6 +44,7 @@ tmscm_object_rep::tmscm_object_rep (tmscm obj) {
   }
   handle = tmscm_cons ( tmscm_cons (obj, tmscm_null ()), tmscm_car (object_stack) );
   tmscm_set_car (object_stack, handle);
+  sexp_gc_release1(scheme_context);
 }
 
 tmscm_object_rep::~tmscm_object_rep () {

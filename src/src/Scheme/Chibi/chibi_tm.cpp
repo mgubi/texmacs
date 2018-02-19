@@ -94,10 +94,14 @@ tmscm tmscm_lookup_string(const char *name)
 
 tmscm tmscm_apply (tmscm func, tmscm args)
 {
-    sexp_gc_var1(res);
-    sexp_gc_preserve1(scheme_context, res);
+    sexp_gc_var3(res, tmp1, tmp2);
+    sexp_gc_preserve3(scheme_context, res, tmp1, tmp2);
+    tmp1 = func;
+    tmp2 = args;
     res =  sexp_apply(scheme_context, func, args);
-    sexp_gc_release1(scheme_context);
+    //cout << "@@@@ apply result :";
+    //print_result(scheme_context, sexp_context_env(scheme_context), res);
+    sexp_gc_release3(scheme_context);
     return res;
 }
 
@@ -106,17 +110,6 @@ void tmscm_define(tmscm symbol, tmscm value)
 {
     sexp_env_define(scheme_context, sexp_context_env(scheme_context), symbol, value);
 }
-
-#if 0
-tmscm tmscm_eval_file (FILE *f)
-{
-#if 0
-    scheme_load_file(scheme_context,f);
-    return scheme_context->value;
-#endif
-}
-#endif
-
 
 tmscm object_stack;
 
@@ -152,14 +145,20 @@ static void sexp_add_path (sexp ctx, const char *str) {
 
 void
 initialize_scheme () {
-    tmscm res;
+    
+    sexp_gc_var2(res, env);
+
+    sexp_init();
+    
     scheme_context = sexp_make_eval_context(NULL, NULL, NULL, 0, 0);
     //sexp_add_path(scheme_context, "/Users/mgubi/t/chibi-scheme/lib");
+
+    sexp_gc_preserve2(scheme_context, res, env);
 
     sexp_load_standard_env(scheme_context, NULL, SEXP_SEVEN);
     sexp_load_standard_ports(scheme_context, NULL, stdin, stdout, stderr, 1);
 
-    tmscm env = sexp_context_env(scheme_context);
+    env = sexp_context_env(scheme_context);
     sexp_init_blackbox(scheme_context, env);
     
     const char* init_prg =
@@ -180,8 +179,6 @@ initialize_scheme () {
 //    "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
     "(define (%%texmacs-version%%) \"" TEXMACS_VERSION "\")\n"
     "(define object-stack (cons '() '()))\n"
- //   "(import (srfi 128))\n" // for default-hash
-  //  "(define (reload) (load \"/Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm\"))\n"
     ")";
     
     res = tmscm_eval_string (init_prg);
@@ -197,20 +194,12 @@ initialize_scheme () {
     print_result(scheme_context, env, res);
 
     
-   // res = tmscm_eval_string("(load (url-concretize \"$TEXMACS_PATH/progs/init-tinyscheme.tmscm\"))");
-   // print_result(scheme_context, env, res);
-
-    //res = tmscm_eval_string("(load (url-concretize \"$TEXMACS_PATH/progs/init-scheme-tm.tmscm\"))");
-    //print_result(scheme_context, env, res);
-
     //REPL
-    //tmscm_eval_file (stdin);
-    //scheme_load_named_file(scheme_context,stdin,0);
     repl(scheme_context, env);
     
-//    abort();
-    // /Users/mgubi/t/lab/scheme/src/TeXmacs/progs/init-texmacs.scm
-    
+    // abort();
+    sexp_gc_release2(scheme_context);
+
     //FIXME: when we finalize chibi?
     //sexp_destroy_context(ctx);
 }
@@ -251,7 +240,7 @@ eval_scheme_file (string file) {
         debug_std << "Evaluating " << file << "...\n";
     c_string _file (file);
     result= sexp_load(scheme_context, sexp_c_string(scheme_context, _file, -1), NULL);
-    print_result(scheme_context, sexp_context_env(scheme_context), result);
+    //print_result(scheme_context, sexp_context_env(scheme_context), result);
     //FILE *f = fopen(_file, "r");
   //  tmscm result= tmscm_eval_file (f);
    // fclose(f);
@@ -264,21 +253,7 @@ eval_scheme_file (string file) {
 /******************************************************************************
  * Evaluation of strings
  ******************************************************************************/
-#if 0
-static tmscm
-TeXmacs_lazy_eval_string (char *s) {
-    return tmscm_internal_lazy_catch (tmscm_BOOL_T,
-                                    (tmscm_t_catch_body) tmscm_c_eval_string, s,
-                                    (tmscm_t_catch_handler) TeXmacs_lazy_catcher, s);
-}
 
-static tmscm
-TeXmacs_eval_string (char *s) {
-    return tmscm_internal_catch (tmscm_BOOL_T,
-                               (tmscm_t_catch_body) TeXmacs_lazy_eval_string, s,
-                               (tmscm_t_catch_handler) TeXmacs_catcher, s);
-}
-#endif
 tmscm
 eval_scheme (string s) {
     // cout << "Eval] " << s << "\n";
