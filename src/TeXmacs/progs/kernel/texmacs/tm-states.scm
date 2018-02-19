@@ -131,8 +131,8 @@
 	 (slots (cadr (car theslots)))
 	 (props (cadr (cadr theslots))))
     `(begin
-	(if (not (defined? ',name))
-	    (define-public ,name #f))
+	   ,(if (not (defined? name))
+	      `(define-public ,name #f) `(begin))
 	(with cprops #f
 	  (set! cprops (map (lambda (x)
 			       (eval

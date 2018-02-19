@@ -19,8 +19,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define repo (url-concretize "$TEXMACS_HOME_PATH/server"))
-(define repo-seed-val (+ (* 4294967296 (abs (texmacs-time)))))
-(define repo-seed (seed->random-state repo-seed-val))
+;;(define repo-seed-val (+ (* 4294967296 (abs (texmacs-time)))))
+;;(define repo-seed (seed->random-state repo-seed-val))
+
+
+
 
 (define (repository-add-into dir name)
   (when (not (url-exists? dir))
@@ -30,7 +33,7 @@
         (begin
           (system-mkdir rdir)
           (string-append rdir "/" name))
-        (with sub (number->string (random 10 repo-seed))
+        (with sub (number->string (texmacs-random-integer 10))
           (repository-add-into (string-append dir "/" sub) name)))))
 
 (define (repository-add rid suffix)

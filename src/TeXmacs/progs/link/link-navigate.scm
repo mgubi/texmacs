@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (link link-navigate)
-  (:use (utils library cursor) (link link-edit) (link link-extern)
+  (:use (utils library cursor) (link link-edit)
+;;(link link-extern)
         (generic generic-edit)))
 
 ; FIXME: remove these two and find a better way

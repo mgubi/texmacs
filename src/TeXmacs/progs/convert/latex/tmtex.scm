@@ -20,7 +20,7 @@
         (doc tmdoc-markup)
 	(convert latex latex-tools)))
 
-(use-modules (ice-9 format))
+;;(use-modules (ice-9 format))
 
 (tm-define tmtex-debug-mode? #f)
 
@@ -220,7 +220,7 @@
   (det ((left|) "c" (right|) #f))
   (bmatrix ((,(string->symbol "left[")) "c" (,(string->symbol "right]")) #f))
   (stack ("" "c" "" #f))
-  (choice ((left\{) "l" (right.) #f)))
+  (choice ((|left\{|) "l" (right.) #f)))
 
 (logic-table tex-with-cmd%
   (("font-family" "rm") tmtextrm)
@@ -655,8 +655,8 @@
         ((== (car l) 'hide-preamble) "")
         ((in? (car l) '(concat document))
          (with a (list-filter (cdr l) tmtex-non-preamble-statement?)
-           (if (null? l)
-               (if (== (car l) 'concat "" '(document "")))
+           (if (null? a)
+               (if (== (car l) 'concat) "" '(document ""))
                (cons (car l) (map tmtex-filter-body a)))))
         (else (cons (car l) (map tmtex-filter-body (cdr l))))))
 
@@ -2837,17 +2837,17 @@
     (with fun+bis (symbol-append fun '+bis)
       (if (== narg 2)
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun s l) (tmtex-function (string->symbol s) l)))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l) (,fun s l))))
+           ,@(if  (defined? fun) '()
+             `((tm-define (,fun s l) (tmtex-function (string->symbol s) l))))
+           ,@(if (defined? fun+bis) '()
+             `((tm-define (,fun+bis s l) (,fun s l)))))
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun t)
-               (tmtex-function (string->symbol (car t)) (cdr t))))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l)
-               (,fun (append (list (string->symbol s)) l)))))))))
+           ,@(if (defined? ',fun) '()
+             `((tm-define (,fun t)
+               (tmtex-function (string->symbol (car t)) (cdr t)))))
+           ,@(if (defined? ',fun+bis) '()
+             `((tm-define (,fun+bis s l)
+               (,fun (append (list (string->symbol s)) l))))))))))
 
 (tm-define (style-dependent-transform x)
   (with (tag fun narg) x

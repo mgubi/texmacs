@@ -160,7 +160,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Copied from GLUG repository. Author: Daniel Skarda <0rfelyus@ucw.cz>
 
-(define-public-macro (cut slot . slots)
+;; disable since chibi has SRFI 26
+
+#;(define-public-macro (cut slot . slots)
   (let loop ((slots	(cons slot slots))
 	     (params	'())
 	     (args	'()))
@@ -181,7 +183,7 @@
             (else
              (loop rest params (cons s args))))))))
 
-(define-public-macro (cute . slots)
+#;(define-public-macro (cute . slots)
   (let ((temp
 	 (map (lambda (s) (and (not (memq s '(<> <...>))) (gensym))) slots)))
     `(let ,(delq! #f (map (lambda (t s) (and t (list t s))) temp slots))

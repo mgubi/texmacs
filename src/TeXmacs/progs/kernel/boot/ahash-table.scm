@@ -155,7 +155,8 @@
     (ahash-set! h (car binding) (cdr binding)))
   (for-each insert l))
 
-'(define-public-macro (define-table name . l)
+;;FIXME: better idiom here!!
+#;(define-public-macro (define-table name . l)
   `(begin
      (when (not (defined? ',name))
        (if (defined? 'tm-define)

@@ -1,10 +1,13 @@
 (import (except (chibi) define) (rename (chibi) (define prim-define))
         (scheme list) (scheme hash-table)
+        (only (scheme base) define-record-type)
         (only (scheme process-context) get-environment-variable)
         (chibi filesystem)
         (srfi 33) (scheme charset) (scheme cxr)
         (only (chibi process) current-process-id)
         (srfi 27) ;; random numbers
+        (srfi 26) ;; cut, cute
+        (srfi 18) ;; current-time
 )
 
 (define-syntax define
@@ -137,6 +140,11 @@
 
 (define-public-macro (on-exit . cmd)
   `(set! quit-TeXmacs-scheme (lambda () ,@cmd (,quit-TeXmacs-scheme))))
+
+
+(define-public texmacs-random-source (make-random-source))
+(random-source-randomize! texmacs-random-source)
+(define-public texmacs-random-integer (random-source-make-integers texmacs-random-source))
 
 
 
@@ -477,7 +485,7 @@ person| |pre| |preamble| |prefix| |preformatted| |preprocessor| |preprocessor_di
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 (display "Booting database facilities\n")
-(lazy-define (database db-widget) open-db-chooser)
+(lazy-define (database db-widgets) open-db-chooser)
 (lazy-define (database db-menu) db-show-toolbar)
 (lazy-define (database db-convert) db-url?)
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)

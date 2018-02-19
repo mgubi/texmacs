@@ -62,11 +62,11 @@
 ;;    (test "simple block*" `(block* ,(simple-tformat)) (expect-hline "|c|"))
 ;;    ;; These conversions are only meaningful in math mode!
 ;;    ;; (test "simple matrix" `(matrix ,(simple-tformat))
-;;    ;;	 `(!concat (#{left\(}#) ,(expect-simple "c") (#{right\)}#)))
+;;    ;;	 `(!concat (|left\(|) ,(expect-simple "c") (|right\)|)))
 ;;    ;; (test "simple det" `(det ,(simple-tformat))
 ;;    ;;	 `(!concat (left|) ,(expect-simple "c")  (right|)))
 ;;    ;; (test "simple choice" `(choice ,(simple-tformat))
-;;    ;;	 `(!concat (left\{) ,(expect-simple "c") (right.)))
+;;    ;;	 `(!concat (|left\{|) ,(expect-simple "c") (right.)))
 ;;    (test "tabular*, two cells" `(tabular* ,(tformat '() '(("a" "b"))))
 ;; 	 (tabular "cc" '(("a" "b"))))
 ;;    (test "tabular*, four cells"

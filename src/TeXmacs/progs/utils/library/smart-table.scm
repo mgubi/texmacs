@@ -51,10 +51,11 @@
 
 (tm-define-macro (smart-table t . l)
   (:synopsis "Define a smart table @t with entries @l")
+  (let ((form
   `(begin
-     ,(when (not (defined? t))
-       `(tm-define ,t (make-ahash-table)) `(begin))
-     ,@(smart-table-insert t '() l)))
+     ,@(if (defined? t) '() `((tm-define ,t (make-ahash-table))))
+     ,@(smart-table-insert t '() l))))
+     form))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Routines for smart tables

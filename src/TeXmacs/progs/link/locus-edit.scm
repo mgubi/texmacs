@@ -30,9 +30,9 @@
 ;;(define texmacs-seed (seed->random-state seed-val))
 ;;(define texmacs-serial-id (random 9342813113834066795298815 texmacs-seed))
 
-(define texmacs-random-source (make-random-source))
-(random-source-randomize! texmacs-random-source)
-(define texmacs-serial-id ((random-source-make-integers texmacs-random-source) 9342813113834066795298815))
+(define texmacs-serial-id (texmacs-random-integer 9342813113834066795298815))
+
+
 
 (define (base62 x)
   (if (== x 0) '()
