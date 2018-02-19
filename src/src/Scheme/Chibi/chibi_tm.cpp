@@ -77,9 +77,12 @@ sexp sexp_init_blackbox (sexp ctx, sexp env) {
 
 tmscm tmscm_eval_string (const char *str)
 {
+    sexp_gc_var1(res);
+    sexp_gc_preserve1(scheme_context, res);
     cout << "Eval: " << str << "\n";
-    tmscm res = sexp_eval_string(scheme_context, str, -1,  NULL);
+    res = sexp_eval_string(scheme_context, str, -1,  NULL);
     print_result(scheme_context, sexp_context_env(scheme_context), res);
+    sexp_gc_release1(scheme_context);
     return res;
 }
 
@@ -91,7 +94,10 @@ tmscm tmscm_lookup_string(const char *name)
 
 tmscm tmscm_apply (tmscm func, tmscm args)
 {
-    tmscm res =  sexp_apply(scheme_context, func, args);
+    sexp_gc_var1(res);
+    sexp_gc_preserve1(scheme_context, res);
+    res =  sexp_apply(scheme_context, func, args);
+    sexp_gc_release1(scheme_context);
     return res;
 }
 
@@ -109,10 +115,9 @@ tmscm tmscm_eval_file (FILE *f)
     return scheme_context->value;
 #endif
 }
-
-
-
 #endif
+
+
 tmscm object_stack;
 
 /******************************************************************************
@@ -234,36 +239,25 @@ TeXmacs_catcher (void *data, tmscm tag, tmscm args) {
 /******************************************************************************
  * Evaluation of files
  ******************************************************************************/
-#if 0
-static tmscm
-TeXmacs_lazy_eval_file (char *file) {
-    
-    return tmscm_internal_lazy_catch (tmscm_BOOL_T,
-                                    (tmscm_t_catch_body) tmscm_c_primitive_load, file,
-                                    (tmscm_t_catch_handler) TeXmacs_lazy_catcher, file);
-}
 
-static tmscm
-TeXmacs_eval_file (char *file) {
-    return tmscm_internal_catch (tmscm_BOOL_T,
-                               (tmscm_t_catch_body) TeXmacs_lazy_eval_file, file,
-                               (tmscm_t_catch_handler) TeXmacs_catcher, file);
-}
-#endif
 tmscm
 eval_scheme_file (string file) {
+    sexp_gc_var1(result);
+    sexp_gc_preserve1(scheme_context, result);
+
     //static int cumul= 0;
     //timer tm;
     //if (DEBUG_STD)
         debug_std << "Evaluating " << file << "...\n";
     c_string _file (file);
-    tmscm result= sexp_load(scheme_context, sexp_c_string(scheme_context, _file, -1), NULL);
+    result= sexp_load(scheme_context, sexp_c_string(scheme_context, _file, -1), NULL);
     print_result(scheme_context, sexp_context_env(scheme_context), result);
     //FILE *f = fopen(_file, "r");
   //  tmscm result= tmscm_eval_file (f);
    // fclose(f);
     //int extra= tm->watch (); cumul += extra;
     //cout << extra << "\t" << cumul << "\t" << file << "\n";
+    sexp_gc_release1(scheme_context);
     return result;
 }
 
@@ -288,8 +282,11 @@ TeXmacs_eval_string (char *s) {
 tmscm
 eval_scheme (string s) {
     // cout << "Eval] " << s << "\n";
+    sexp_gc_var1(result);
+    sexp_gc_preserve1(scheme_context, result);
     c_string _s (s);
-    tmscm result= tmscm_eval_string (_s);
+    result= tmscm_eval_string (_s);
+    sexp_gc_release1(scheme_context);
     return result;
 }
 
@@ -403,8 +400,11 @@ void tmscm_define_glue(const char *name, int args, tmscm_foreign_func f)
 
 tmscm
 string_to_tmscm (string s) {
+    sexp_gc_var1(r);
+    sexp_gc_preserve1(scheme_context, r);
     c_string _s (s);
-    tmscm r= sexp_c_string (scheme_context, _s, N(s));
+    r= sexp_c_string (scheme_context, _s, N(s));
+    sexp_gc_release1(scheme_context);
     return r;
 }
 
@@ -414,8 +414,11 @@ string_to_tmscm (string s) {
 
 tmscm
 symbol_to_tmscm (string s) {
+    sexp_gc_var1(r);
+    sexp_gc_preserve1(scheme_context, r);
     c_string _s (s);
-    tmscm r= sexp_intern (scheme_context,_s, N(s));
+    r= sexp_intern (scheme_context,_s, N(s));
+    sexp_gc_release1(scheme_context);
     return r;
 }
 

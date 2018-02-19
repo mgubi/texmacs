@@ -128,12 +128,12 @@ static tmscm proc (tmscm cxt, tmscm env, sexp_sint_t n) {
     tmscm res = PROC();
     return (res);
 }
+
 template<tmscm (*PROC)(tmscm)>
 static tmscm proc (tmscm cxt, tmscm env, sexp_sint_t n, tmscm a1) {
     tmscm res = PROC(a1);
     return (res);
 }
-
 
 template<tmscm (*PROC)(tmscm, tmscm)>
 static tmscm proc (tmscm cxt, tmscm env, sexp_sint_t n, tmscm a1, tmscm a2) {
@@ -196,10 +196,6 @@ string scheme_dialect ();
 void tmscm_define_glue(const char *name, int args, tmscm_foreign_func f);
 
 #define tmscm_install_procedure(name, func, args, p0, p1) tmscm_define_glue( name, args, (tmscm_foreign_func)proc<func> )
-
-
-
-
 
 #define SCM_ARG1
 #define SCM_ARG2

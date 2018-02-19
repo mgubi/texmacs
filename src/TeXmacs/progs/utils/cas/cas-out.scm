@@ -120,7 +120,7 @@
     cas-prefix-op-table
     (list->ahash-set '(%prime factorial ^ _ %dotaccess %sqaccess))
     (list->ahash-set '(quote quasiquote eval))
-    (list->ahash-set '(matrix det bmatrix row tuple list set comma | ||))
+    (list->ahash-set '(matrix det bmatrix row tuple list set comma |\|| |\|\||))
     (list->ahash-set '(sqrt conj choose))))
 
 (define (cas-special-op? x)
@@ -312,10 +312,10 @@
 	((list-1? l)
 	 (with x (car l)
 	   (cond ((func? x '|\||)
-		  (cons* (cas-out (cadr x)) '(mid "|")
+          (cons* (cas-out (cadr x)) '(mid "|")
 			 (cas-out-several (cddr x))))
 		 ((func? x '|\|\||)
-		  (cons* (cas-out (cadr x)) '(mid "||")
+          (cons* (cas-out (cadr x)) '(mid "||")
 			 (cas-out-several (cddr x))))
 		 (else (list (cas-out x))))))
 	(else (cons* (cas-out (car l)) "," (cas-out-several (cdr l))))))
