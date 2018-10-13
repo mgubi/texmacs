@@ -187,7 +187,7 @@ EOF
         echo "configure: could not run $QT_MOC on:" >&AS_MESSAGE_LOG_FD
         cat ax_qt_test.h >&AS_MESSAGE_LOG_FD
       else
-        ax_try_2="$CXX $QT_CXXFLAGS -c $CXXFLAGS -o moc_ax_qt_test.o moc_ax_qt_test.$ac_ext >/dev/null 2>/dev/null"
+        ax_try_2="$CXX $QT_CXXFLAGS -c $CXXFLAGS -o moc_ax_qt_test.o moc_ax_qt_test.$ac_ext"
         AC_TRY_EVAL(ax_try_2)
         if test x"$ac_status" != x0; then
           echo "$ax_err_2" >&AS_MESSAGE_LOG_FD

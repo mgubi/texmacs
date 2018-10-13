@@ -399,7 +399,7 @@ qt_simple_widget_rep::as_qaction () {
 
 void
 qt_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
   //HACK: for unknown reasons we need to enlarge the invalid rect to prevent
   //artifacts while moving the cursor (for example at the end of a formula like
   // $a+f$. These artifacts seems present only on 64 bit Macs.
@@ -444,7 +444,7 @@ qt_simple_widget_rep::get_renderer() {
   Visual *visual = (Visual*)(backingPixmap.x11Info().visual());
   surf = tm_cairo_xlib_surface_create (dpy, drawable, visual,
                                        backingPixmap.width (), backingPixmap.height ());
-#elif defined (Q_WS_MAC)
+#elif defined (Q_OS_MAC)
   surf = tm_cairo_quartz_surface_create_for_cg_context (
                                                         (CGContextRef)(this->macCGHandle()), width(), height());
 #endif

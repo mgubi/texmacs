@@ -25,7 +25,7 @@ QTMPrinterSettings* qt_printer_widget_rep::_settings = NULL;
  */
 qt_printer_widget_rep::qt_printer_widget_rep (command _cmd, url _file)
 : commandAfterExecution(_cmd) {
-#if defined(Q_WS_MAC) || defined(Q_WS_X11)
+#if defined(Q_OS_MAC) || defined(Q_WS_X11)
   if (!_settings)
     _settings = new CupsQTMPrinterSettings();
 #endif

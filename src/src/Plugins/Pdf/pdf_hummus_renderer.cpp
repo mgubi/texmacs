@@ -27,7 +27,7 @@
 #include "wencoding.hpp"
 
 #ifdef QTTEXMACS
-#include "Qt/qt_utilities.hpp"
+//#include "Qt/qt_utilities.hpp"
 #endif
 
 #include "PDFWriter/PDFWriter.h"
@@ -1798,7 +1798,7 @@ pdf_image_rep::flush_for_pattern (PDFWriter& pdfw) {
   int iw = 0, ih =0;
   
 #ifdef QTTEXMACS
-  qt_image_data (u, iw, ih, data, palette, mask);
+  //qt_image_data (u, iw, ih, data, palette, mask);
 #endif
   
   if ((iw==0)||(ih==0)) return false;

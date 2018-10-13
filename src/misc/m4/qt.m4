@@ -19,9 +19,9 @@ AC_DEFUN([LC_WITH_QT],[
 QT5_AVAILABLE="no"
 SAVE_LIBS="$LIBS"
 LIBS=""
-#     AX_HAVE_QT
+     AX_HAVE_QT
 LIBS="$SAVE_LIBS"
-if test x"$have_qt" = xyes; then 
+if test x"$have_qt" = xyes; then
   AC_MSG_RESULT([Qt5 found])
   at_cv_qt_build=ok
   QMAKE="qmake"
