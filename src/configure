@@ -19515,7 +19515,7 @@ $as_echo_n "checking whether host operating system is Darwin... " >&6; }
   case $host_os in
     darwin*)
       at_darwin=yes
-      at_qmake_args='-spec macx-g++'
+      at_qmake_args=''
       ;;
   esac
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_darwin" >&5
@@ -25244,4 +25244,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

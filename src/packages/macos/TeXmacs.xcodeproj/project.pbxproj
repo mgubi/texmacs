@@ -532,6 +532,10 @@
 		9C3D2E5A12B0D662009E33AD /* tree_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C3D2E5712B0D662009E33AD /* tree_select.cpp */; };
 		9C3D2E5B12B0D662009E33AD /* tree_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C3D2E5712B0D662009E33AD /* tree_select.cpp */; };
 		9C3DA71F12932990009617C4 /* extend_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C3DA71E12932990009617C4 /* extend_widget.cpp */; };
+		9C430D6D217357010039EC9F /* SimpleStringTokenizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 9C430D69217357000039EC9F /* SimpleStringTokenizer.h */; };
+		9C430D6E217357010039EC9F /* InputAsciiHexDecodeStream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C430D6A217357010039EC9F /* InputAsciiHexDecodeStream.cpp */; };
+		9C430D6F217357010039EC9F /* SimpleStringTokenizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C430D6B217357010039EC9F /* SimpleStringTokenizer.cpp */; };
+		9C430D70217357010039EC9F /* InputAsciiHexDecodeStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 9C430D6C217357010039EC9F /* InputAsciiHexDecodeStream.h */; };
 		9C4A740C1D22BEE900572468 /* player.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A740A1D22BEE900572468 /* player.cpp */; };
 		9C4A740D1D22BEF500572468 /* player.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A740A1D22BEE900572468 /* player.cpp */; };
 		9C4A740E1D22BEF600572468 /* player.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A740A1D22BEE900572468 /* player.cpp */; };
@@ -2565,6 +2569,10 @@
 		9C3D2E5712B0D662009E33AD /* tree_select.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_select.cpp; sourceTree = "<group>"; };
 		9C3D2E5812B0D662009E33AD /* tree_select.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tree_select.hpp; sourceTree = "<group>"; };
 		9C3DA71E12932990009617C4 /* extend_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = extend_widget.cpp; sourceTree = "<group>"; };
+		9C430D69217357000039EC9F /* SimpleStringTokenizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SimpleStringTokenizer.h; sourceTree = "<group>"; };
+		9C430D6A217357010039EC9F /* InputAsciiHexDecodeStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InputAsciiHexDecodeStream.cpp; sourceTree = "<group>"; };
+		9C430D6B217357010039EC9F /* SimpleStringTokenizer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SimpleStringTokenizer.cpp; sourceTree = "<group>"; };
+		9C430D6C217357010039EC9F /* InputAsciiHexDecodeStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputAsciiHexDecodeStream.h; sourceTree = "<group>"; };
 		9C4A740A1D22BEE900572468 /* player.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = player.cpp; sourceTree = "<group>"; };
 		9C4A740B1D22BEE900572468 /* player.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = player.hpp; sourceTree = "<group>"; };
 		9C4A740F1D22C37400572468 /* glyph_effects.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = glyph_effects.cpp; sourceTree = "<group>"; };
@@ -2825,6 +2833,10 @@
 		4914651D1801C1AA000E6455 /* PDFWriter */ = {
 			isa = PBXGroup;
 			children = (
+				9C430D6A217357010039EC9F /* InputAsciiHexDecodeStream.cpp */,
+				9C430D6C217357010039EC9F /* InputAsciiHexDecodeStream.h */,
+				9C430D6B217357010039EC9F /* SimpleStringTokenizer.cpp */,
+				9C430D69217357000039EC9F /* SimpleStringTokenizer.h */,
 				9CD074CA2028A17200512C68 /* ArrayOfInputStreamsStream.cpp */,
 				9CD074BD2028A17000512C68 /* ArrayOfInputStreamsStream.h */,
 				9CD074B82028A16F00512C68 /* DecryptionHelper.cpp */,
@@ -4855,6 +4867,7 @@
 				9C520FFB2028A88D00A2B5B6 /* aes_ni.h in Headers */,
 				9C520F762028A3A700A2B5B6 /* PDFDocEncoding.h in Headers */,
 				9C520F902028A3A700A2B5B6 /* PDFObjectParser.h in Headers */,
+				9C430D6D217357010039EC9F /* SimpleStringTokenizer.h in Headers */,
 				9C520FFD2028A88D00A2B5B6 /* aestab.h in Headers */,
 				9C520F1E2028A3A700A2B5B6 /* InfoDictionary.h in Headers */,
 				9C520EF72028A3A700A2B5B6 /* DictOperand.h in Headers */,
@@ -4986,6 +4999,7 @@
 				9C520F942028A3A700A2B5B6 /* PDFPageInput.h in Headers */,
 				9C520F7B2028A3A700A2B5B6 /* PDFEmbedParameterTypes.h in Headers */,
 				9C520EDC2028A3A700A2B5B6 /* CFFEmbeddedFontWriter.h in Headers */,
+				9C430D70217357010039EC9F /* InputAsciiHexDecodeStream.h in Headers */,
 				9C520F182028A3A700A2B5B6 /* IFontDescriptorHelper.h in Headers */,
 				9C520EA52028A3A700A2B5B6 /* DecryptionHelper.h in Headers */,
 				9C520F4D2028A3A700A2B5B6 /* MapIterator.h in Headers */,
@@ -5375,6 +5389,7 @@
 				9C520FC02028A3A700A2B5B6 /* StateWriter.cpp in Sources */,
 				9C520FBE2028A3A700A2B5B6 /* StateReader.cpp in Sources */,
 				9C520F272028A3A700A2B5B6 /* InputDCTDecodeStream.cpp in Sources */,
+				9C430D6E217357010039EC9F /* InputAsciiHexDecodeStream.cpp in Sources */,
 				9C520F652028A3A700A2B5B6 /* OutputStringBufferStream.cpp in Sources */,
 				9C520F332028A3A700A2B5B6 /* InputPredictorPNGOptimumStream.cpp in Sources */,
 				9C520F952028A3A700A2B5B6 /* PDFPageMergingHelper.cpp in Sources */,
@@ -5424,6 +5439,7 @@
 				9C520F002028A3A700A2B5B6 /* FontDescriptorWriter.cpp in Sources */,
 				9C520ED12028A3A700A2B5B6 /* Ascii7Encoding.cpp in Sources */,
 				9C520F822028A3A700A2B5B6 /* PDFIndirectObjectReference.cpp in Sources */,
+				9C430D6F217357010039EC9F /* SimpleStringTokenizer.cpp in Sources */,
 				9C520FB72028A3A700A2B5B6 /* ResourcesDictionary.cpp in Sources */,
 				9C520F022028A3A700A2B5B6 /* FreeTypeFaceWrapper.cpp in Sources */,
 				9C520EBC2028A3A700A2B5B6 /* PDFModifiedPage.cpp in Sources */,

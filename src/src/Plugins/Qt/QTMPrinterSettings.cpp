@@ -13,8 +13,8 @@
 #include "qt_utilities.hpp"
 #include "sys_utils.hpp"
 
-#include <QPrinter>
-#include <QPrinterInfo>
+#include <QtPrintSupport/QPrinter>
+#include <QtPrintSupport/QPrinterInfo>
 #include <QProcess>
 #include <QRegExp>
 
@@ -22,8 +22,8 @@
  *
  */
 QTMPrinterSettings::QTMPrinterSettings()
-: collateCopies(true), blackWhite(true), printerName(""), fileName(""), 
-  paperSize("A4"), dpi(600), firstPage(0), lastPage(0), printOddPages(true), 
+: collateCopies(true), blackWhite(true), printerName(""), fileName(""),
+  paperSize("A4"), dpi(600), firstPage(0), lastPage(0), printOddPages(true),
   printEvenPages(true), fitToPage(true), copyCount(1), duplex(false),
   pagesPerSide(1), pagesOrder(LR_TB), orientation(Portrait)
 {
@@ -42,7 +42,7 @@ void
 QTMPrinterSettings::getFromQPrinter(const QPrinter& from) {
   printerName   = from.printerName ();
   fileName      = from.outputFileName ();
-  orientation   = (from.orientation() == QPrinter::Landscape) 
+  orientation   = (from.orientation() == QPrinter::Landscape)
                   ? Landscape : Portrait;
   paperSize     = qtPaperSizeToQString(from.paperSize());
   dpi           = from.resolution ();
@@ -63,25 +63,25 @@ QTMPrinterSettings::getFromQPrinter(const QPrinter& from) {
 void
 QTMPrinterSettings::setToQPrinter(QPrinter& to) const {
   to.setResolution(dpi);
-  to.setFromTo(firstPage, lastPage);  
+  to.setFromTo(firstPage, lastPage);
   to.setOrientation((orientation == Landscape) ?
                     QPrinter::Landscape : QPrinter::Portrait);
   to.setOutputFileName(fileName);
   to.setPaperSize(qStringToQtPaperSize(paperSize));
 #if (QT_VERSION >= 0x040700)
   to.setCopyCount(copyCount);
-#endif  
+#endif
   to.setCollateCopies(collateCopies);
   to.setColorMode(blackWhite ? QPrinter::Color : QPrinter::GrayScale);
 }
 
 /*!
- * Just for internal use, converts QPrinter::PaperSize to a string 
+ * Just for internal use, converts QPrinter::PaperSize to a string
  * representation. Massimiliano's code.
  */
 QString
 QTMPrinterSettings::qtPaperSizeToQString(const QPrinter::PaperSize _size) {
-  
+
 #define PAPER(fmt)  case QPrinter::fmt : return "fmt"
   switch (_size) {
       PAPER (A0) ; PAPER (A1) ; PAPER (A2) ; PAPER (A3) ; PAPER (A4) ;
@@ -99,7 +99,7 @@ QTMPrinterSettings::qtPaperSizeToQString(const QPrinter::PaperSize _size) {
  */
 QPrinter::PaperSize
 QTMPrinterSettings::qStringToQtPaperSize(const QString& _size) {
-  
+
 #define PAPER(fmt)  if(_size == "fmt") return QPrinter::fmt
   PAPER (A0) ; PAPER (A1) ; PAPER (A2) ; PAPER (A3) ; PAPER (A4) ;
   PAPER (A5) ; PAPER (A6) ; PAPER (A7) ; PAPER (A8) ; PAPER (A9) ;
@@ -113,10 +113,10 @@ QTMPrinterSettings::qStringToQtPaperSize(const QString& _size) {
 
 /*!
  * Returns a QStringList with all the available choices reported by the
- * printer driver for the setting specified. 
+ * printer driver for the setting specified.
  *
  * @param _which Specifies which driver option to query.
- * @param _default Will hold the index number (in the returned list) of the 
+ * @param _default Will hold the index number (in the returned list) of the
  *        currently selected value, as reported by the printer driver.
  */
 QStringList
@@ -139,7 +139,7 @@ QTMPrinterSettings::getChoices(DriverChoices _which, int& _default) {
       _ret = printerOptions["Collate"].split(" ", QString::SkipEmptyParts);
       break;
   }
-  
+
   // FIXME: this is CUPS specific (marking the default option with an asterisk)
   for (int i=0; i<_ret.size(); ++i)
     if (_ret[i].trimmed().startsWith("*")) {
@@ -160,26 +160,26 @@ CupsQTMPrinterSettings::CupsQTMPrinterSettings() : QTMPrinterSettings() {
 }
 
 /*!
- * Runs the lpoptions program and returns. 
+ * Runs the lpoptions program and returns.
  */
 bool
 CupsQTMPrinterSettings::fromSystemConfig(const QString& printer) {
   if (configProgram->state() != QProcess::NotRunning)
     return false;
-  
+
   // Watch out! the order of the options is relevant!
   configProgram->start(QString("lpoptions -p \"%1\" -l").arg(printer));
-  //, 
+  //,
   //                   QStringList() << QString("-p \"%1\"").arg(printer)
   //                                 << "-l");
-  
-  
+
+
   printerName = printer;
   return true;
 }
 
 /*!
- * Parses the output of the lpoptions program once it finishes. This 
+ * Parses the output of the lpoptions program once it finishes. This
  * asynchronous calling of lpoptions is needed because it performs network
  * calls. The available configuration choices are available as QStringLists
  * via QTMQTMPrinterSettings::getChoices().
@@ -188,33 +188,33 @@ CupsQTMPrinterSettings::fromSystemConfig(const QString& printer) {
  *          found on CUPS 1.4.5 (systemv/lpoptions.c) A sample of the output
  *          follows:
  * Resolution/Printer Resolution: *3600x3600dpi 1200x600dpi
- * PageSize/Page Size: Letter Legal Executive HalfLetter 4x6 5x7 5x8 *A4 A5 A6 
+ * PageSize/Page Size: Letter Legal Executive HalfLetter 4x6 5x7 5x8 *A4 A5 A6
  * InputSlot/Paper Source: Auto Tray1 Tray2 Tray3 Tray1_Man
  * Duplex/2-Sided Printing: *None DuplexNoTumble DuplexTumble
  * Collate/Collate: True *False
  * ColorModel/Print Color as Gray: Gray *CMYK
  */
 void
-CupsQTMPrinterSettings::systemCommandFinished(int exitCode, 
+CupsQTMPrinterSettings::systemCommandFinished(int exitCode,
                                               QProcess::ExitStatus exitStatus) {
   (void) exitCode;
-  
+
   printerOptions.clear();
 
   if (exitStatus != QProcess::NormalExit) {
     emit doneReading();
     return;
   }
-    
+
   QRegExp rx("^(\\w+)/(.+):(.*)$"); // Param/Param desc: val1 val2 *default val4
   rx.setMinimal(true);              // Non-greedy matching
-  
+
   QList<QByteArray> _lines = configProgram->readAllStandardOutput().split('\n');
   foreach (QString _line, _lines) {
     if(rx.indexIn(_line) == -1)      // No matches?
       continue;
     // Store for further parsing later, see QTMPrinterSettings::getChoices()
-    printerOptions[rx.cap(1)] = rx.cap(3);   
+    printerOptions[rx.cap(1)] = rx.cap(3);
   }
   emit doneReading();
 }
@@ -232,20 +232,20 @@ CupsQTMPrinterSettings::toSystemCommand() const {
 
   if (from_qstring (printProgram) == "lp ")
     _cmd += to_qstring (get_printing_cmd ()) + " ";
-  
+
   else if (! printProgram.isEmpty())
     _cmd += printProgram;
-  
+
   if (! printerName.isEmpty())
     _cmd += QString(" -d \"%1\"").arg(printerName);
-  
+
   _cmd += QString(" -o orientation-requested=%1").arg(orientation);
-  
+
   if (duplex && (orientation==Landscape || orientation == ReverseLandscape))
     _cmd += " -o sides=two-sided-short-edge";
   else if (duplex && (orientation==Portrait || orientation == ReversePortrait))
     _cmd += " -o sides=two-sided-long-edge";
- 
+
   if (fitToPage)
     _cmd += " -o fitplot";
 
@@ -253,7 +253,7 @@ CupsQTMPrinterSettings::toSystemCommand() const {
     _cmd += QString(" -o number-up=%1").arg(pagesPerSide);
 
     // -o number-up-layout=string
-    // specifies the n-up image order in any of eight permutations from btlr 
+    // specifies the n-up image order in any of eight permutations from btlr
     // (bottom, top, left, right) to tbrl.
     _cmd += " -o number-up-layout=";
     switch (pagesOrder) {
@@ -264,7 +264,7 @@ CupsQTMPrinterSettings::toSystemCommand() const {
       default: _cmd += "lrtb"; break;
     }
   }
-  
+
   // Specifies which pages to print in the document. The list can contain a list
   // of numbers and ranges (#-#) separated by commas (e.g. 1,3-5,16).
   // The page numbers refer to the output pages and not the document's original
@@ -274,24 +274,24 @@ CupsQTMPrinterSettings::toSystemCommand() const {
     int l = (int)ceil (lastPage / pagesPerSide);     l = (l==0) ? 1 : l;
     if (firstPage > lastPage )
       _cmd += " -o outputorder=reverse";
-    
+
     _cmd += QString(" -o page-ranges=%1-%2").arg(f).arg(l);
   }
-    
+
   if (copyCount > 1) {
     _cmd += QString(" -o Collate=") + (collateCopies ? "True" : "False");
     _cmd += QString(" -n %1").arg(copyCount);
   }
-  
+
   if (! printOddPages)
     _cmd += " -o page-set=even";
   else if(! printEvenPages)
     _cmd += " -o page-set=odd";
 
-  _cmd += " -- ";  // Marks the end of options; use this to print a file whose 
+  _cmd += " -- ";  // Marks the end of options; use this to print a file whose
                    // name begins with a dash (-).
   _cmd += '"' + fileName + '"';
-  
+
   return _cmd;
 }
 
@@ -322,18 +322,18 @@ CupsQTMPrinterSettings::availablePrinters() {
 
 #endif
 
-#ifdef Q_WS_WIN 
+#ifdef Q_WS_WIN
 
 /*!
- * 
+ *
  * @todo Read the printing program from some configuration file/preference?
  */
 WinQTMPrinterSettings::WinQTMPrinterSettings() : QTMPrinterSettings() {
   // -sDEVICE=mswinpr2
   // Selects the MS Windows printer device.
-  //  
+  //
   // -dNoCancel
-  // Hides the progress dialog, which shows the percent of the document page 
+  // Hides the progress dialog, which shows the percent of the document page
   // already processed and also provides a cancel button.
   //printProgram = "gs -sDEVICE=mswinpr2";
   printProgram = "gsprint";
@@ -343,17 +343,17 @@ WinQTMPrinterSettings::WinQTMPrinterSettings() : QTMPrinterSettings() {
  * Uses Winprinfo ( @link http://unixwiz.net/tools/winprinfo.html @link ) to
  * read configuration parameters from the printer.
  */
-bool 
+bool
 WinQTMPrinterSettings::fromSystemConfig(const QString& printer) {
   if (configProgram->state() != QProcess::NotRunning)
     return false;
   /* This (untested) alternative uses (wrong) postscript to read printer options
-  configProgram->start(QString("gs"), QStringList() 
+  configProgram->start(QString("gs"), QStringList()
                        << "-sDEVICE=mswinpr2"
                        << QString("-sOutputFile=\"\\\\spool\\%1\"").arg(printer)
                        << "-c \"currentpagedevice /Duplex get ==\"");
    */
-  
+
   // See the docs for QProcess::start() for the reason behind the triple \"
   configProgram->start(QString("winprinfo --printer=\"\"\"%1\"\"\"").arg(printer));
   printerName = printer;
@@ -370,40 +370,40 @@ WinQTMPrinterSettings::fromSystemConfig(const QString& printer) {
 QString
 WinQTMPrinterSettings::toSystemCommand() const {
   QString _cmd;
-  
+
   if (! printProgram.isEmpty())
     _cmd += printProgram;
-  
-  /* 
+
+  /*
   // This (untested) code is for use with the mswinpr2 driver:
   _cmd += QString(" -sOutputFile=\"\\\\spool\\%1\" ").arg(printerName);
   _cmd += QString(" -c << /Duplex %1 /Tumble %2 >> setpagedevice").
               arg(duplex ? "true" : "false").
-              arg((orientation == Landscape || orientation == ReverseLandscape) 
+              arg((orientation == Landscape || orientation == ReverseLandscape)
                   ? "true" : "false");
-  
+
   // -f Interprets following non-switch arguments as file names to be executed
-  // using the normal run command. Since this is the default behavior, 
+  // using the normal run command. Since this is the default behavior,
   // -f is useful only for terminating the list of tokens for the -c switch.
   _cmd += QString(" -f \"%1\"").arg(fileName);
   */
-  
+
   _cmd += " -noquery";  // Don't show printer setup dialog.
 
   if (! printerName.isEmpty())
     _cmd += QString(" -printer \"%1\"").arg(printerName);
-  
+
   if (duplex)
     _cmd += QString(" -duplex_%1").
                 arg((orientation == Portrait || orientation == ReversePortrait)
                     ? "vertical" : "horizontal");
   else
     _cmd += (orientation == Portrait || orientation == ReversePortrait)
-             ? " -portrait" : " -landscape";    
-  
+             ? " -portrait" : " -landscape";
+
   if (pagesPerSide > 1)
     _cmd += QString(" -copies %1").arg(pagesPerSide);
-    
+
   // Specifies which pages to print in the document. The list can contain a list
   // of numbers and ranges (#-#) separated by commas (e.g. 1,3-5,16).
   // The page numbers refer to the output pages and not the document's original
@@ -414,17 +414,17 @@ WinQTMPrinterSettings::toSystemCommand() const {
     // FIXME: what happens if f > l?
     _cmd += QString(" -from %1 -to %2").arg(f).arg(l);
   }
-  
+
   if (copyCount > 1)
      _cmd += QString(" -copies %1").arg(pagesPerSide);
-  
+
   if (! printOddPages)
     _cmd += " -even";
   else if(! printEvenPages)
     _cmd += " -odd";
-  
+
   _cmd += '"' + fileName + '"';
-  
+
   return _cmd;
 }
 
@@ -432,17 +432,17 @@ WinQTMPrinterSettings::toSystemCommand() const {
  * Parses winprinfo output. This is really UGLY.
  */
 void
-WinQTMPrinterSettings::systemCommandFinished(int exitCode, 
+WinQTMPrinterSettings::systemCommandFinished(int exitCode,
                                            QProcess::ExitStatus exitStatus) {
   (void) exitCode;
-  
+
   printerOptions.clear();
-  
+
   if (exitStatus != QProcess::NormalExit) {
     emit doneReading();
     return;
   }
-  
+
   int resolutionsCounter = 0;
   bool readingSizes = false;
   QList<QByteArray> _lines = configProgram->readAllStandardOutput().split('\n');
@@ -463,8 +463,8 @@ WinQTMPrinterSettings::systemCommandFinished(int exitCode,
       //printerOptions["PaperSize"] = QString();
       continue;
     }
-                                                    
-    // Parse special lines after PAPER SIZES FROM THE DEVMODE :   
+
+    // Parse special lines after PAPER SIZES FROM THE DEVMODE :
     if (readingSizes) {
       QRegExp rx2("^.*mm *(\\w)+.*$");  // [ 0]   215.90  279.40 mm  Letter
       rx2.setMinimal(true);
@@ -480,9 +480,9 @@ WinQTMPrinterSettings::systemCommandFinished(int exitCode,
     QStringList capt = rx.capturedTexts();
     if (capt.size() != 3)              // We are only interested in some options.
       continue;
-    
+
     if (capt[1] == "DUPLEX" && capt[2].toInt() > 0)
-      printerOptions["Duplex"] = "Yes No"; 
+      printerOptions["Duplex"] = "Yes No";
     if (capt[1] == "COLORDEVICE" && capt[2].toInt() > 0)
       printerOptions["ColorModel"] = "Monochrome Gray Color";
     if (capt[1] == "COLLATE") {
@@ -497,7 +497,7 @@ WinQTMPrinterSettings::systemCommandFinished(int exitCode,
       //printerOptions["Resolution"] = QString();
     }
   }
-  
+
   emit doneReading();
 }
 
@@ -514,4 +514,3 @@ WinQTMPrinterSettings::availablePrinters() {
 }
 
 #endif
-
