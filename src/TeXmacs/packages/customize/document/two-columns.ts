@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.6>
 
 <style|<tuple|source|std-pattern>>
 
@@ -28,31 +28,25 @@
     </src-comment>
   </active*>
 
-  <assign|doc-make-title|<macro|body|<with|par-columns|1|<surround||<vspace|2fn>|<doc-title-block|<arg|body>>>>>>
-
-  <assign|custom-footnote-text|<macro|sym|id|body|<style-with|src-compact|none|<\float|footnote|>
-    <smaller|<\with|par-mode|justify|par-left|0cm|par-right|0cm|par-columns|1>
-      <\custom-note-text|<arg|sym>|<arg|id>>
-        <arg|body>
-      </custom-note-text>
-    </with>>
-  </float>>>>
-
-  <\active*>
-    <\src-comment>
-      Big figures.
-    </src-comment>
-  </active*>
-
-  <assign|render-big-figure-2col|<value|render-big-figure>>
-
-  <assign|render-big-figure|<\macro|type|name|fig|cap>
+  <assign|doc-make-title|<\macro|body>
     <\with|par-columns|1>
-      <render-big-figure-2col|<arg|type>|<arg|name>|<arg|fig>|<arg|cap>>
+      <\surround||<right-flush>>
+        <doc-title-block|<arg|body>>
+
+        \;
+      </surround>
     </with>
   </macro>>
 
-  \;
+  <assign|doc-make-rich-title|<\macro|notes|body>
+    <\with|par-columns|1>
+      <\surround||<with|par-columns|2|<arg|notes>>>
+        <\doc-make-title>
+          <arg|body>
+        </doc-make-title>
+      </surround>
+    </with>
+  </macro>>
 </body>
 
 <\initial>

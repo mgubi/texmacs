@@ -1,6 +1,6 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.7>
 
-<style|<tuple|tmweb|english>>
+<style|<tuple|tmweb|english|old-spacing>>
 
 <\body>
   <tmweb-current|Download|Linux><tmweb-title|Installing <TeXmacs> on
@@ -16,6 +16,10 @@
     supports <TeXmacs>, in which case you may directly install <TeXmacs>
     using the standard tools of your system.
 
+    <item>Please <hlink|check|linux-packages.en.tm> whether your distribution
+    is in the list of standard GNU/<name|Linux> distributions for which we
+    provide ready-to-install packages.
+
     <item>Otherwise, you may install a generic binary package for <TeXmacs>,
     as explained below.
   </enumerate>
@@ -30,11 +34,13 @@
   the following static binary distributions of GNU <TeXmacs>:
 
   <\enumerate>
-    <item>The <hlink|recommended <TeXmacs>
-    package|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-B.tar.gz>>
-    should work on recent GNU/<name|Linux> systems.
+    <item><hlink|<TeXmacs> package for 32 bit GNU/<name|Linux>
+    distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-B.tar.gz>>.
 
-    <item>If the above package does not work on your computer, then you may
+    <item><hlink|<TeXmacs> package for 64 bit GNU/<name|Linux>
+    distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-C.tar.gz>>.
+
+    <item>If the above packages do not work on your computer, then you may
     try our <hlink|alternate <TeXmacs> package|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-A.tar.gz>>,
     which should be suitable for older systems.
   </enumerate>

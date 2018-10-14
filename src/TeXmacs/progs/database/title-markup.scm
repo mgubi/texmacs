@@ -121,15 +121,16 @@
   `(doc-running-title ,(remove-annotations (tm-ref t 0))))
 
 (tm-define (doc-data-hidden t)
-  `(concat
-     ,@(select t '(doc-footnote-text))
-     ,@(map title->running-title (select t '(doc-title)))
-     ,@(select t '(doc-running-title))
-     (doc-running-author
-       (comma-separated
-         ,@(map remove-annotations
-                (select t '(doc-author author-data author-name 0)))))
-     ,@(select t '(doc-running-author))))
+  (with names (select t '(doc-author author-data
+                          (:or author-name author-name-affiliation) 0))
+    `(concat
+       ,@(select t '(doc-footnote-text))
+       ,@(map title->running-title (select t '(doc-title)))
+       ,@(select t '(doc-running-title))
+       (doc-running-author
+        (comma-separated
+         ,@(map remove-annotations names)))
+       ,@(select t '(doc-running-author)))))
 
 (tm-define (doc-data-main t)
   `(document
@@ -142,17 +143,32 @@
      ,@(select t '(doc-misc))
      ,@(select t '(doc-inactive))))
 
-(tm-define (doc-data-sub t)
+(tm-define (xdoc-data-sub t)
   `(surround
      ,(doc-data-hidden t) (concat)
      (document
        (doc-make-title
          ,(doc-data-main t)))))
 
-(tm-define (doc-data t)
+(tm-define (doc-data-sub t)
+  ;;(display* "--------------------------------------------------\n")
+  ;;(display* "source= " t "\n")
+  ;;(display* "--------------------------------------------------\n")
+  ;;(display* "hidden= " (doc-data-hidden t) "\n")
+  ;;(display* "--------------------------------------------------\n")
+  ;;(display* "main  = " (doc-data-main t) "\n")
+  `(doc-make-rich-title
+    ,(doc-data-hidden t)
+    (document ,(doc-data-main t))))
+
+(tm-define (doc-data t xopts)
   (:secure #t)
-  (with opts (map tree->stree (select t '(doc-title-options :%1)))
+  (let* ((opts1 (select t '(doc-title-options :%1)))
+         (opts2 (select xopts '(:%1)))
+         (opts  (map tree->stree (append opts1 opts2))))
     ;;(display* "t1= " t "\n")
+    (cond ((in? "abbreviate-authors" opts)
+           (set! t (abbreviate-authors t))))
     (cond ((in? "cluster-all" opts)
            (set! t (single-author-list t)))
           ((in? "cluster-by-affiliation" opts)
@@ -160,8 +176,11 @@
     ;;(display* "t2= " t "\n")
     (set! t (add-notes t))
     ;;(display* "t3= " t "\n")
-    (set! t (doc-data-sub t))
+    (cond ((in? "abbreviate-authors" opts)
+           (set! t (abbreviate-authors-bis t))))
     ;;(display* "t4= " t "\n")
+    (set! t (doc-data-sub t))
+    ;;(display* "t5= " t "\n")
     t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -172,6 +191,7 @@
   (:secure #t)
   `(document
      ,@(select t '(author-name))
+     ,@(select t '(author-name-affiliation))
      ,@(select t '(author-affiliation))
      ,@(select t '(author-affiliation-note))
      ,@(select t '(author-email))

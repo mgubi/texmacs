@@ -16,17 +16,103 @@
 ******************************************************************************/
 
 void
+lsub_adjust_pagella (hashmap<string,double>& t) {
+  adjust_pair (t, "T", 0.03);
+  adjust_pair (t, "U", 0.03);
+  adjust_pair (t, "V", 0.05);
+  adjust_pair (t, "Y", 0.03);
+  adjust_pair (t, "<tau>", 0.03);
+  adjust_pair (t, "<Epsilon>", 0.05);
+  adjust_pair (t, "<Tau>", 0.03);
+  adjust_pair (t, "<Psi>", 0.03);
+  adjust_pair (t, "<backepsilon>", 0.05);
+  adjust_pair (t, "<partial>", 0.05);
+  for (char c= 'A'; c <= 'Z'; c++)
+    adjust_pair (t, "<bbb-" * string (c) * ">", 0.05);
+  adjust_pair (t, "<bbb-A>", 0.02);
+  adjust_pair (t, "<bbb-T>", 0.05);
+  adjust_pair (t, "<bbb-U>", 0.03);
+  adjust_pair (t, "<bbb-V>", 0.07);
+  adjust_pair (t, "<bbb-W>", 0.07);
+  adjust_pair (t, "<bbb-Y>", 0.07);
+  adjust_pair (t, "<bbb-u>", 0.02);
+  adjust_pair (t, "<bbb-v>", 0.03);
+  adjust_pair (t, "<bbb-w>", 0.03);
+  for (char c= 'a'; c <= 'z'; c++)
+    adjust_pair (t, "<frak-" * string (c) * ">", 0.02);
+  adjust_pair (t, "<wedge>", 0.02);
+  adjust_pair (t, "<curlywedge>", 0.05);
+  adjust_integral (t, "1", -0.07);
+  adjust_integral (t, "2", -0.1);
+  adjust_contour_integral (t, "1", -0.1);
+  adjust_contour_integral (t, "2", -0.07);
+}
+
+void
+lsup_adjust_pagella (hashmap<string,double>& t) {
+  adjust_pair (t, "b", 0.02);
+  adjust_pair (t, "A", 0.02);
+  adjust_pair (t, "B", 0.02);
+  adjust_pair (t, "D", 0.02);
+  adjust_pair (t, "E", 0.02);
+  adjust_pair (t, "F", 0.02);
+  adjust_pair (t, "K", 0.02);
+  adjust_pair (t, "L", 0.02);
+  adjust_pair (t, "M", 0.02);
+  adjust_pair (t, "N", 0.02);
+  adjust_pair (t, "P", 0.02);
+  adjust_pair (t, "R", 0.02);
+  adjust_pair (t, "S", 0.02);
+  adjust_pair (t, "<beta>", 0.02);
+  adjust_pair (t, "<pi>", 0.02);
+  adjust_pair (t, "<chi>", 0.02);
+  adjust_pair (t, "<omega>", 0.02);
+  adjust_pair (t, "<Alpha>", 0.02);
+  adjust_pair (t, "<Lambda>", 0.02);
+  adjust_pair (t, "<cal-A>", 0.05);
+  adjust_pair (t, "<cal-M>", 0.05);
+  adjust_pair (t, "<cal-N>", 0.05);
+  adjust_pair (t, "<cal-P>", 0.08);
+  adjust_pair (t, "<cal-Z>", 0.05);
+  adjust_pair (t, "<bbb-A>", 0.1);
+  adjust_pair (t, "<bbb-j>", 0.02);
+  adjust_integral (t, "1", 0.15);
+  adjust_integral (t, "2", 0.15);
+  adjust_contour_integral (t, "1", 0.07);
+  adjust_contour_integral (t, "2", 0.13);
+}
+
+void
 rsub_adjust_pagella (hashmap<string,double>& t) {
-  adjust_pair (t, "!", 0.05);
-  adjust_pair (t, "/", -0.05);
-  adjust_pair (t, "7", -0.1);
-  adjust_pair (t, "D", -0.02);
+  adjust_pair (t, "A", 0.02);
+  adjust_pair (t, "I", 0.02);
+  adjust_pair (t, "K", 0.02);
+  adjust_pair (t, "M", 0.02);
   adjust_pair (t, "N", -0.02);
   adjust_pair (t, "O", -0.02);
   adjust_pair (t, "P", -0.03);
+  adjust_pair (t, "Q", 0.02);
+  adjust_pair (t, "R", 0.02);
+  adjust_pair (t, "S", 0.02);
   adjust_pair (t, "T", -0.03);
   adjust_pair (t, "V", -0.03);
   adjust_pair (t, "Y", -0.02);
+  adjust_pair (t, "d", 0.02);
+  adjust_pair (t, "g", 0.04);
+  adjust_pair (t, "h", 0.02);
+  adjust_pair (t, "i", 0.02);
+  adjust_pair (t, "l", 0.02);
+  adjust_pair (t, "m", 0.02);
+  adjust_pair (t, "n", 0.02);
+  adjust_pair (t, "q", 0.02);
+  adjust_pair (t, "u", 0.02);
+  adjust_pair (t, "v", -0.05);
+  adjust_pair (t, "w", -0.05);
+  adjust_pair (t, "x", 0.02);
+  adjust_pair (t, "y", -0.05);
+  adjust_pair (t, "!", 0.05);
+  adjust_pair (t, "/", -0.05);
+  adjust_pair (t, "7", -0.1);
   adjust_pair (t, "<Alpha>", 0.02);
   adjust_pair (t, "<Gamma>", -0.02);
   adjust_pair (t, "<Delta>", 0.02);
@@ -73,29 +159,39 @@ rsub_adjust_pagella (hashmap<string,double>& t) {
   adjust_pair (t, "<bbb-V>", -0.1);
   adjust_pair (t, "<bbb-W>", -0.1);
   adjust_pair (t, "<bbb-Y>", -0.1);
+  adjust_pair (t, "<bbb-f>", -0.02);
+  adjust_pair (t, "<bbb-j>", 0.02);
+  adjust_pair (t, "<bbb-v>", -0.05);
+  adjust_pair (t, "<bbb-w>", -0.05);
+  adjust_pair (t, "<bbb-y>", -0.05);
+  adjust_pair (t, "<partial>", -0.04);
+  adjust_integral (t, "1", -0.17);
+  adjust_integral (t, "2", -0.17);
+  adjust_contour_integral (t, "1", -0.03);
+  adjust_contour_integral (t, "2", -0.13);
 }
 
 void
 rsup_adjust_pagella (hashmap<string,double>& t) {
-  adjust_pair (t, "!", 0.05);
-  adjust_pair (t, "?", 0.05);
-  adjust_pair (t, "/", 0.05);
   for (char c= 'A'; c <= 'Z'; c++)
     adjust_pair (t, string (c), 0.03);
   for (char c= 'a'; c <= 'z'; c++)
     adjust_pair (t, string (c), 0.02);
-  adjust_pair (t, "H", -0.02);
-  adjust_pair (t, "B", 0.02);
-  adjust_pair (t, "D", 0.01);
-  adjust_pair (t, "I", 0.02);
-  adjust_pair (t, "J", 0.02);
-  adjust_pair (t, "b", 0.02);
-  adjust_pair (t, "l", 0.02);
-  adjust_pair (t, "p", 0.02);
-  adjust_pair (t, "q", 0.02);
+  adjust_pair (t, "A", -0.05);
+  adjust_pair (t, "L", -0.05);
+  adjust_pair (t, "c", 0.02);
+  adjust_pair (t, "f", 0.04);
+  adjust_pair (t, "g", 0.04);
   adjust_pair (t, "r", 0.02);
-  adjust_pair (t, "s", 0.02);
   adjust_pair (t, "t", 0.02);
+  adjust_pair (t, "v", 0.02);
+  adjust_pair (t, "w", 0.02);
+  adjust_pair (t, "x", 0.02);
+  adjust_pair (t, "y", 0.02);
+  adjust_pair (t, "z", 0.02);
+  adjust_pair (t, "!", 0.05);
+  adjust_pair (t, "?", 0.05);
+  adjust_pair (t, "/", 0.05);
   adjust_pair (t, "<Beta>", 0.03);
   adjust_pair (t, "<Gamma>", 0.03);
   adjust_pair (t, "<Delta>", 0.03);
@@ -212,7 +308,18 @@ rsup_adjust_pagella (hashmap<string,double>& t) {
   adjust_pair (t, "<bbb-M>", 0.02);
   adjust_pair (t, "<bbb-R>", -0.07);
   adjust_pair (t, "<bbb-X>", -0.03);
+  adjust_pair (t, "<bbb-a>", -0.03);
+  adjust_pair (t, "<bbb-h>", -0.03);
+  adjust_pair (t, "<bbb-j>", 0.02);
+  adjust_pair (t, "<bbb-k>", -0.05);
+  adjust_pair (t, "<bbb-m>", -0.03);
+  adjust_pair (t, "<bbb-n>", -0.03);
   adjust_pair (t, "<frak-a>", -0.03);
+  adjust_pair (t, "<partial>", -0.02);
+  adjust_integral (t, "1", -0.02);
+  adjust_integral (t, "2", -0.02);
+  adjust_contour_integral (t, "1", -0.03);
+  adjust_contour_integral (t, "2", -0.03);
 }
 
 void
@@ -245,9 +352,9 @@ above_adjust_pagella (hashmap<string,double>& t) {
   adjust_pair (t, "R", -0.04);
   adjust_pair (t, "T", -0.04);
   adjust_pair (t, "U", -0.06);
-  adjust_pair (t, "V", -0.1);
+  adjust_pair (t, "V", -0.06);
   adjust_pair (t, "W", -0.08);
-  adjust_pair (t, "Y", -0.1);
+  adjust_pair (t, "Y", -0.06);
   adjust_char (t, "<gamma>", -0.02);
   adjust_char (t, "<vartheta>", -0.06);
   adjust_char (t, "<lambda>", 0.1);
@@ -320,9 +427,29 @@ above_adjust_pagella (hashmap<string,double>& t) {
 * Interface
 ******************************************************************************/
 
+static hashmap<string,double> lsub_pagella (0.0);
+static hashmap<string,double> lsup_pagella (0.0);
 static hashmap<string,double> rsub_pagella (0.0);
 static hashmap<string,double> rsup_pagella (0.0);
 static hashmap<string,double> above_pagella (0.0);
+
+hashmap<string,double>
+lsub_pagella_table () {
+  if (N (lsub_pagella) == 0) {
+    lsub_adjust_std (lsub_pagella);
+    lsub_adjust_pagella (lsub_pagella);
+  }
+  return lsub_pagella;
+}
+
+hashmap<string,double>
+lsup_pagella_table () {
+  if (N (lsup_pagella) == 0) {
+    lsup_adjust_std (lsup_pagella);
+    lsup_adjust_pagella (lsup_pagella);
+  }
+  return lsup_pagella;
+}
 
 hashmap<string,double>
 rsub_pagella_table () {
@@ -348,4 +475,154 @@ above_pagella_table () {
     above_adjust_pagella (above_pagella);
   }
   return above_pagella;
+}
+
+/******************************************************************************
+* Table initialization
+******************************************************************************/
+
+void
+lsub_adjust_pagella_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "f", 0.03);
+  adjust_pair (t, "T", 0.03);
+  adjust_pair (t, "U", 0.03);
+  adjust_pair (t, "V", 0.05);
+  adjust_pair (t, "Y", 0.03);
+}
+
+void
+lsup_adjust_pagella_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "b", 0.02);
+  adjust_pair (t, "A", 0.02);
+  adjust_pair (t, "B", 0.02);
+  adjust_pair (t, "D", 0.02);
+  adjust_pair (t, "E", 0.02);
+  adjust_pair (t, "F", 0.02);
+  adjust_pair (t, "K", 0.02);
+  adjust_pair (t, "L", 0.02);
+  adjust_pair (t, "M", 0.02);
+  adjust_pair (t, "N", 0.02);
+  adjust_pair (t, "P", 0.02);
+  adjust_pair (t, "R", 0.02);
+  adjust_pair (t, "S", 0.02);
+}
+
+void
+rsub_adjust_pagella_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "D", -0.02);
+  adjust_pair (t, "N", -0.02);
+  adjust_pair (t, "O", -0.02);
+  adjust_pair (t, "P", -0.03);
+  adjust_pair (t, "T", -0.03);
+  adjust_pair (t, "V", -0.03);
+  adjust_pair (t, "Y", -0.02);
+}
+
+void
+rsup_adjust_pagella_italic (hashmap<string,double>& t) {
+  for (char c= 'A'; c <= 'Z'; c++)
+    adjust_pair (t, string (c), 0.03);
+  for (char c= 'a'; c <= 'z'; c++)
+    adjust_pair (t, string (c), 0.02);
+  adjust_pair (t, "H", -0.02);
+  adjust_pair (t, "B", 0.02);
+  adjust_pair (t, "D", 0.01);
+  adjust_pair (t, "I", 0.02);
+  adjust_pair (t, "J", 0.02);
+  adjust_pair (t, "b", 0.02);
+  adjust_pair (t, "l", 0.02);
+  adjust_pair (t, "p", 0.02);
+  adjust_pair (t, "q", 0.02);
+  adjust_pair (t, "r", 0.02);
+  adjust_pair (t, "s", 0.02);
+  adjust_pair (t, "t", 0.02);
+}
+
+void
+above_adjust_pagella_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "b", -0.02);
+  adjust_pair (t, "d", 0.06);
+  adjust_pair (t, "e", -0.02);
+  adjust_pair (t, "f", -0.04);
+  adjust_pair (t, "h", -0.04);
+  adjust_pair (t, "k", -0.04);
+  adjust_pair (t, "m", -0.02);
+  adjust_pair (t, "n", -0.02);
+  adjust_pair (t, "o", -0.02);
+  adjust_pair (t, "p", -0.04);
+  adjust_pair (t, "q", -0.02);
+  adjust_pair (t, "r", -0.04);
+  adjust_pair (t, "t", -0.04);
+  adjust_pair (t, "y", -0.04);
+  adjust_pair (t, "z", -0.02);
+  adjust_pair (t, "A", 0.1);
+  adjust_pair (t, "B", -0.04);
+  adjust_pair (t, "D", -0.04);
+  adjust_pair (t, "F", -0.04);
+  adjust_pair (t, "H", -0.04);
+  adjust_pair (t, "I", -0.04);
+  adjust_pair (t, "J", -0.04);
+  adjust_pair (t, "K", -0.02);
+  adjust_pair (t, "M", -0.02);
+  adjust_pair (t, "N", -0.06);
+  adjust_pair (t, "R", -0.04);
+  adjust_pair (t, "T", -0.04);
+  adjust_pair (t, "U", -0.06);
+  adjust_pair (t, "V", -0.06);
+  adjust_pair (t, "W", -0.08);
+  adjust_pair (t, "Y", -0.06);
+}
+
+/******************************************************************************
+* Interface
+******************************************************************************/
+
+static hashmap<string,double> lsub_pagella_italic (0.0);
+static hashmap<string,double> lsup_pagella_italic (0.0);
+static hashmap<string,double> rsub_pagella_italic (0.0);
+static hashmap<string,double> rsup_pagella_italic (0.0);
+static hashmap<string,double> above_pagella_italic (0.0);
+
+hashmap<string,double>
+lsub_pagella_italic_table () {
+  if (N (lsub_pagella_italic) == 0) {
+    lsub_adjust_std (lsub_pagella_italic);
+    lsub_adjust_pagella_italic (lsub_pagella_italic);
+  }
+  return lsub_pagella_italic;
+}
+
+hashmap<string,double>
+lsup_pagella_italic_table () {
+  if (N (lsup_pagella_italic) == 0) {
+    lsup_adjust_std (lsup_pagella_italic);
+    lsup_adjust_pagella_italic (lsup_pagella_italic);
+  }
+  return lsup_pagella_italic;
+}
+
+hashmap<string,double>
+rsub_pagella_italic_table () {
+  if (N (rsub_pagella_italic) == 0) {
+    rsub_adjust_std (rsub_pagella_italic);
+    rsub_adjust_pagella_italic (rsub_pagella_italic);
+  }
+  return rsub_pagella_italic;
+}
+
+hashmap<string,double>
+rsup_pagella_italic_table () {
+  if (N (rsup_pagella_italic) == 0) {
+    rsup_adjust_std (rsup_pagella_italic);
+    rsup_adjust_pagella_italic (rsup_pagella_italic);
+  }
+  return rsup_pagella_italic;
+}
+
+hashmap<string,double>
+above_pagella_italic_table () {
+  if (N (above_pagella_italic) == 0) {
+    above_adjust_pagella_italic (above_pagella_italic);
+  }
+  return above_pagella_italic;
 }

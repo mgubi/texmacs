@@ -71,6 +71,7 @@ initialize_default_env () {
   env (VISITED_COLOR)    = "global";    // the color of visited loci
   env (NO_PATTERNS)      = "false";     // disable background patterns
   env (LANGUAGE)         = "english";   // the language
+  env (SPACING_POLICY)   = "default";   // the spacing policy
   env (ATOM_DECORATIONS) = DATOMS;      // dots, underline, hyperlinks?, etc.
   env (LINE_DECORATIONS) = DLINES;      // boxed pars, nested envs, etc.
   env (PAGE_DECORATIONS) = DPAGES;      // future headers, footers, etc.
@@ -82,6 +83,7 @@ initialize_default_env () {
   env (MATH_FONT_FAMILY) = "mr";        // the font family in math mode
   env (MATH_FONT_SERIES) = "medium";    // the font series in math mode
   env (MATH_FONT_SHAPE)  = "normal";    // the font shape in math mode
+  env (MATH_FONT_SIZES)  = "default";   // various script sizes
   env (MATH_LEVEL)       = "0";         // the index level (0, 1 or 2)
   env (MATH_DISPLAY)     = "false";     // true if we are in display style
   env (MATH_CONDENSED)   = "false";     // ignore spaces between operators ?
@@ -90,7 +92,11 @@ initialize_default_env () {
   env (MATH_NESTING_LEVEL)= "0";        // nesting level inside brackets
   env (MATH_FRAC_LIMIT)  = "100par";    // maximal width of 2D fraction
   env (MATH_TABLE_LIMIT) = "100par";    // maximal width of 2D math table
-  env (MATH_FLATTEN_COLOR)= "#448";     // bracket color when 2D width excess
+  env (MATH_FLATTEN_COLOR)  = "#448";   // bracket color when 2D width excess
+  env (MATH_TOP_SWELL_START)= "1.7ex";  // start padding above this level
+  env (MATH_TOP_SWELL_END)  = "3.5ex";  // maximal padding reached here
+  env (MATH_BOT_SWELL_START)= "-0.7ex"; // start padding below this level
+  env (MATH_BOT_SWELL_END)  = "-2.5ex"; // maximal padding reached here
 
   env (PROG_LANGUAGE)    = "scheme";    // the default programming language
   env (PROG_SCRIPTS)     = "scheme";    // the scripting language
@@ -104,8 +110,11 @@ initialize_default_env () {
   env (PAR_FLEXIBILITY)  = "1000";      // threshold for switching to ragged
   env (PAR_HYPHEN)       = "professional"; // quality of hyphenation
   env (PAR_SPACING)      = "plain";     // spacing mode (for CJK)
+  env (PAR_KERNING_REDUCE) = "auto";    // reduced kerning around characters
   env (PAR_KERNING_STRETCH)= "auto";    // extra kerning around characters
   env (PAR_KERNING_MARGIN) = "false";   // use marginal kerning (protrusion)
+  env (PAR_CONTRACTION)  = "auto";      // maximal glyph contraction
+  env (PAR_EXPANSION)    = "auto";      // maximal glyph expansion
   env (PAR_WIDTH)        = "auto";      // width of paragraph
   env (PAR_LEFT)         = "0cm";       // left indentation
   env (PAR_RIGHT)        = "0cm";       // right indentation
@@ -119,6 +128,7 @@ initialize_default_env () {
   env (PAR_FNOTE_SEP)    = "0.2fn";     // min space between diff footnotes
   env (PAR_COLUMNS)      = "1";         // number of columns
   env (PAR_COLUMNS_SEP)  = "2fn";       // separation between columns
+  env (PAR_SWELL)        = "0ex";       // extra padding around large lines
 
   env (PAGE_MEDIUM)      = "papyrus";   // paper medium: paper, papyrus, auto
   env (PAGE_PRINTED)     = "false";     // printed version?
@@ -219,6 +229,7 @@ initialize_default_env () {
   env (CELL_COL_SPAN)    = "1";         // column span of cell
   env (CELL_ROW_NR)      = "1";         // row coordinate of cell
   env (CELL_COL_NR)      = "1";         // column coordinate of cell
+  env (CELL_SWELL)       = "0ex";       // extra padding around large cells
 
   env (GR_GEOMETRY)         = gr_geometry;    // geometry of graphics
   env (GR_FRAME)            = gr_frame;       // coordinate frame for graphics

@@ -276,6 +276,7 @@ ignore_dir (string dir) {
     (dir == "Latex") ||
     (dir == "Miscellaneous") ||
     (dir == "Obsolete") ||
+    (dir == "Poster") ||
     (dir == "Section") ||
     (dir == "Session") ||
     (dir == "Standard") ||
@@ -294,8 +295,9 @@ hidden_package (url u, string name, bool hidden) {
   }
   if (hidden && is_atomic (u)) {
     string l= as_string (u);
-    if (!ends (l, ".ts")) return false;
-    l= l(0, N(l)-3);
+    if (ends (l, ".ts")) l= l (0, N(l)-3);
+    else if (ends (l, ".hook")) l= l (0, N(l)-5);
+    else return false;
     return name == l;
   }
   return false;
@@ -303,6 +305,9 @@ hidden_package (url u, string name, bool hidden) {
 
 bool
 hidden_package (string name) {
+  if (name == "reduced-margins" ||
+      name == "indent-paragraphs" ||
+      name == "padded-paragraphs") return false;
   if (!hidden_packages->contains (name)) {
     url pck_u= descendance ("$TEXMACS_PACKAGE_ROOT");
     hidden_packages (name)= hidden_package (pck_u, name, false);
@@ -330,8 +335,9 @@ compute_style_menu (url u, int kind) {
   }
   if (is_atomic (u)) {
     string l  = as_string (u);
-    if (!ends (l, ".ts")) return "";
-    l= l(0, N(l)-3);
+    if (ends (l, ".ts")) l= l (0, N(l)-3);
+    else if (ends (l, ".hook")) l= l (0, N(l)-5);
+    else return "";
     string cmd ("set-main-style");
     if (kind == 1) cmd= "add-style-package";
     if (kind == 2) cmd= "remove-style-package";

@@ -52,6 +52,7 @@ string LOCUS_COLOR ("locus-color");
 string VISITED_COLOR ("visited-color");
 string NO_PATTERNS ("no-patterns");
 string LANGUAGE ("language");
+string SPACING_POLICY ("spacing-policy");
 string ATOM_DECORATIONS ("atom-decorations");
 string LINE_DECORATIONS ("line-decorations");
 string PAGE_DECORATIONS ("page-decorations");
@@ -63,6 +64,7 @@ string MATH_FONT ("math-font");
 string MATH_FONT_FAMILY ("math-font-family");
 string MATH_FONT_SERIES ("math-font-series");
 string MATH_FONT_SHAPE ("math-font-shape");
+string MATH_FONT_SIZES ("math-font-sizes");
 string MATH_LEVEL ("math-level");
 string MATH_DISPLAY ("math-display");
 string MATH_CONDENSED ("math-condensed");
@@ -72,6 +74,10 @@ string MATH_NESTING_LEVEL ("math-nesting-level");
 string MATH_FRAC_LIMIT ("math-frac-limit");
 string MATH_TABLE_LIMIT ("math-table-limit");
 string MATH_FLATTEN_COLOR ("math-flatten-color");
+string MATH_TOP_SWELL_START ("math-top-swell-start");
+string MATH_TOP_SWELL_END ("math-top-swell-end");
+string MATH_BOT_SWELL_START ("math-bot-swell-start");
+string MATH_BOT_SWELL_END ("math-bot-swell-end");
 
 string PROG_LANGUAGE ("prog-language");
 string PROG_SCRIPTS ("prog-scripts");
@@ -89,8 +95,11 @@ string PAR_MODE ("par-mode");
 string PAR_FLEXIBILITY ("par-flexibility");
 string PAR_HYPHEN ("par-hyphen");
 string PAR_SPACING ("par-spacing");
+string PAR_KERNING_REDUCE ("par-kerning-reduce");
 string PAR_KERNING_STRETCH ("par-kerning-stretch");
 string PAR_KERNING_MARGIN ("par-kerning-margin");
+string PAR_CONTRACTION ("par-contraction");
+string PAR_EXPANSION ("par-expansion");
 string PAR_WIDTH ("par-width");
 string PAR_LEFT ("par-left");
 string PAR_RIGHT ("par-right");
@@ -104,6 +113,7 @@ string PAR_PAR_SEP ("par-par-sep");
 string PAR_FNOTE_SEP ("par-fnote-sep");
 string PAR_COLUMNS ("par-columns");
 string PAR_COLUMNS_SEP ("par-columns-sep");
+string PAR_SWELL ("par-swell");
 
 /******************************************************************************
 * Environment variables for pages
@@ -220,6 +230,7 @@ string CELL_ROW_SPAN ("cell-row-span");
 string CELL_COL_SPAN ("cell-col-span");
 string CELL_ROW_NR ("cell-row-nr");
 string CELL_COL_NR ("cell-col-nr");
+string CELL_SWELL ("cell-swell");
 
 /******************************************************************************
 * Environment variables for graphics

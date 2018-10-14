@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.16>
+<TeXmacs|1.99.6>
 
 <style|source>
 
@@ -24,7 +24,7 @@
     </src-title>
   </active*>
 
-  <use-package|std|env-base|env-math|env-float|env-program|header-article|title-base|section-article|std-latex>
+  <use-package|std|env-base|env-math|env-enunciation|env-float|env-program|header-article|title-base|section-article|std-latex>
 
   <assign|env-theorem-dtd|1.0>
 
@@ -75,6 +75,8 @@
   </src-comment>>
 
   <assign|font-base-size|10>
+
+  <assign|par-sep|0.2em>
 
   <assign|par-first|15pt>
 
@@ -162,55 +164,30 @@
 
   <group-common-counter|theorem-env>
 
-  <assign|enunciation-name|<macro|name|<with|font-series|bold|<arg|name>>>>
+  <assign|enunciation-sep|<macro|<space|1spc>>>
 
-  <assign|enunciation-sep|<macro|. >>
-
-  <assign|theorem-name|<macro|name|<enunciation-name|<arg|name>>>>
-
-  <assign|theorem-sep|<macro|<enunciation-sep>>>
+  <assign|env-number|<macro|num|<arg|num>>>
 
   <assign|remark-name|<macro|name|<with|font-shape|italic|<arg|name>>>>
 
-  <assign|remark-sep|<macro|<enunciation-sep>>>
-
-  <assign|exercise-name|<macro|name|<enunciation-name|<arg|name>>>>
-
-  <assign|exercise-sep|<macro|<enunciation-sep>>>
+  <assign|smart-qed|<macro|>>
 
   \;
 
   <assign|render-enunciation|<\macro|which|body>
-    <padded-normal|1fn|1fn|<surround|<remark-name|<arg|which><theorem-sep>>||<arg|body>>>
-  </macro>>
-
-  <assign|render-remark|<\macro|which|body>
-    <padded-normal|1fn|1fn|<surround|<remark-name|<arg|which><theorem-sep>>||<arg|body>>>
-  </macro>>
-
-  <assign|render-theorem|<\macro|which|body>
-    <padded-normal|1fn|1fn|<surround|<theorem-name|<arg|which><theorem-sep>>||<with|font-shape|italic|<arg|body>>>>
+    <padded-normal|1fn|1fn|<surround|<arg|which>||<arg|body>>>
   </macro>>
 
   <assign|render-exercise|<\macro|which|body>
-    <padded-normal|1fn|1fn|<surround|<exercise-name|<arg|which><theorem-sep>>||<arg|body>>>
+    <padded-normal|1fn|1fn|<surround|<exercise-name|<arg|which><exercise-sep>>||<arg|body>>>
   </macro>>
-
-  \;
-
-  <assign|proof-text|<macro|<localize|Proof>>>
-
-  <assign|dueto|<macro|name|<with|font-shape|right|<theorem-name|(<arg|name>)
-  >>>>
 
   <assign|render-proof|<\macro|which|body>
-    <\surround||<space|0.5fn><active*|<with|mode|math|\<box\>>>>
-      <render-remark|<arg|which>|<arg|body>>
+    <\surround||<smart-qed>>
+      <\render-remark|<arg|which>>
+        <arg|body>
+      </render-remark>
     </surround>
-  </macro>>
-
-  <assign|proof|<\macro|body>
-    <render-proof|<proof-text>|<arg|body>>
   </macro>>
 
   <active*|<\src-comment>
@@ -261,6 +238,8 @@
 
   <new-remark|warning|Warning>
 
+  <new-remark|acknowledgments|Acknowledgments>
+
   <\active*>
     <\src-comment>
       Customization of other environments.
@@ -304,6 +283,16 @@
     </padded-normal>
   </macro>>
 
+  <assign|bib-list-nosvjour|<value|bib-list>>
+
+  <assign|bib-list|<\macro|largest|body>
+    <\bib-list-nosvjour|<arg|largest>>
+      <\with|par-left|<plus|<value|par-left>|10pt>>
+        <arg|body>
+      </with>
+    </bib-list-nosvjour>
+  </macro>>
+
   \;
 
   <new-list|itemize-1|<value|aligned-item>|<macro|x|<active*|<with|mode|math|<rigid|->>>>>
@@ -334,15 +323,15 @@
 
   <assign|long-compact-space-item|<macro|x|<item-long|<compact-space-item|<arg|x>>>>>
 
-  <new-list|description-compact|<value|compact-space-item>|<macro|x|<active*|<with|mode|math|<with|math-font-series|bold|<rigid|\<ast\>>>>>>>
+  <new-list|description-compact|<value|compact-space-item>|<macro|x|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
 
-  <new-list|description-aligned|<value|aligned-item>|<macro|x|<active*|<with|mode|math|<with|math-font-series|bold|<rigid|\<ast\>>>>>>>
+  <new-list|description-aligned|<value|aligned-item>|<macro|x|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
 
-  <new-list|description-dash|<value|compact-dash-item>|<macro|x|<active*|<with|mode|math|<with|math-font-series|bold|<rigid|\<ast\>>>>>>>
+  <new-list|description-dash|<value|compact-dash-item>|<macro|x|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
 
-  <new-list|description-long|<value|long-compact-space-item>|<macro|x|<active*|<with|mode|math|<with|math-font-series|bold|<rigid|\<ast\>>>>>>>
+  <new-list|description-long|<value|long-compact-space-item>|<macro|x|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
 
-  <new-list|description|<value|compact-space-item>|<macro|x|<active*|<with|mode|math|<with|math-font-series|bold|<rigid|\<ast\>>>>>>>
+  <new-list|description|<value|compact-space-item>|<macro|x|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
 
   <\active*>
     <\src-comment>

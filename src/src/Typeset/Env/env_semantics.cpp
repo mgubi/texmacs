@@ -46,16 +46,19 @@ initialize_default_var_type () {
   var_type (OPACITY)            = Env_Color;
   var_type (NO_PATTERNS)        = Env_Pattern_Mode;
   var_type (LANGUAGE)           = Env_Language;
+  var_type (SPACING_POLICY)     = Env_Spacing;
 
   var_type (MATH_LANGUAGE)      = Env_Language;
   var_type (MATH_FONT)          = Env_Font;
   var_type (MATH_FONT_FAMILY)   = Env_Font;
   var_type (MATH_FONT_SERIES)   = Env_Font;
   var_type (MATH_FONT_SHAPE)    = Env_Font;
+  var_type (MATH_FONT_SIZES)    = Env_Font_Sizes;
   var_type (MATH_LEVEL)         = Env_Index_Level;
   var_type (MATH_DISPLAY)       = Env_Display_Style;
   var_type (MATH_CONDENSED)     = Env_Math_Condensed;
   var_type (MATH_VPOS)          = Env_Vertical_Pos;
+  var_type (MATH_NESTING_LEVEL) = Env_Math_Nesting;
   var_type (MATH_FRAC_LIMIT)    = Env_Math_Width;
   var_type (MATH_TABLE_LIMIT)   = Env_Math_Width;
   var_type (MATH_FLATTEN_COLOR) = Env_Math_Width;
@@ -70,8 +73,11 @@ initialize_default_var_type () {
   var_type (PAR_FLEXIBILITY)    = Env_Paragraph;
   var_type (PAR_HYPHEN)         = Env_Paragraph;
   var_type (PAR_SPACING)        = Env_Paragraph;
+  var_type (PAR_KERNING_REDUCE) = Env_Paragraph;
   var_type (PAR_KERNING_STRETCH)= Env_Paragraph;
   var_type (PAR_KERNING_MARGIN) = Env_Paragraph;
+  var_type (PAR_CONTRACTION)    = Env_Paragraph;
+  var_type (PAR_EXPANSION)      = Env_Paragraph;
   var_type (PAR_HYPHEN)         = Env_Paragraph;
   var_type (PAR_WIDTH)          = Env_Paragraph;
   var_type (PAR_LEFT)           = Env_Paragraph;
@@ -401,6 +407,54 @@ edit_env_rep::get_ornament_parameters () {
 }
 
 /******************************************************************************
+* Various font sizes for scripts
+******************************************************************************/
+
+static array<int>
+determine_sizes (tree szt, int sz) {
+  array<int> r;
+  r << sz;
+  if (is_tuple (szt))
+    for (int i=0; i<N(szt); i++)
+      if (is_tuple (szt[i]) && N(szt[i]) >= 1)
+	if (szt[i][0] == "all" ||
+	    szt[i][0] == as_string (sz)) {
+	  for (int j=1; j<N(szt[i]); j++)
+	    if (is_atomic (szt[i][j])) {
+	      string s= szt[i][j]->label;
+	      if (is_int (s)) r << as_int (s);
+	      else if (starts (s, "*")) {
+		s= s (1, N(s));
+		double x= 1.0;
+		int d= search_forwards ("/", s);
+		if (d >= 0 && is_double (s(0, d)) && is_double (s(d+1, N(s))))
+		  x= as_double (s (0, d)) / as_double (s (d+1, N(s)));
+		else if (is_double (s)) x= as_double (s);
+		int xsz= (int) ceil ((x - 0.001) * sz);
+		r << xsz;
+	      }
+	    }
+	  //cout << szt << ", " << sz << " -> " << r << LF;
+	  return r;
+	}
+  r << script (sz, 1);
+  r << script (sz, 2);
+  //cout << szt << ", " << sz << " -> " << r << LF;
+  return r;
+}
+
+int
+edit_env_rep::get_script_size (int sz, int level) {
+  while (sz >= N(size_cache)) {
+    int xsz= N(size_cache);
+    size_cache << determine_sizes (math_font_sizes, xsz);
+  }
+  array<int>& a (size_cache[sz]);
+  if (level < N(a)) return a[level];
+  else return a[N(a) - 1];
+}
+
+/******************************************************************************
 * Updating the environment from the variables
 ******************************************************************************/
 
@@ -413,21 +467,21 @@ edit_env_rep::update_font () {
   case 1:
     fn= smart_font (get_string (FONT), get_string (FONT_FAMILY),
                     get_string (FONT_SERIES), get_string (FONT_SHAPE),
-                    script (fn_size, index_level), (int) (magn*dpi));
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   case 2:
     fn= smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
                     get_string (MATH_FONT_SERIES), get_string (MATH_FONT_SHAPE),
                     get_string (FONT), get_string (FONT_FAMILY),
                     get_string (FONT_SERIES), "mathitalic",
-                    script (fn_size, index_level), (int) (magn*dpi));
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   case 3:
     fn= smart_font (get_string (PROG_FONT), get_string (PROG_FONT_FAMILY),
                     get_string (PROG_FONT_SERIES), get_string (PROG_FONT_SHAPE),
                     get_string (FONT), get_string (FONT_FAMILY) * "-tt",
                     get_string (FONT_SERIES), get_string (FONT_SHAPE),
-                    script (fn_size, index_level), (int) (magn*dpi));
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   }
   string eff= get_string (FONT_EFFECTS);
@@ -799,7 +853,11 @@ edit_env_rep::update () {
   display_style  = get_bool (MATH_DISPLAY);
   math_condensed = get_bool (MATH_CONDENSED);
   vert_pos       = get_int (MATH_VPOS);
+  nesting_level  = get_int (MATH_NESTING_LEVEL);
   preamble       = get_bool (PREAMBLE);
+  spacing_policy = get_spacing_id (env[SPACING_POLICY]);
+  math_font_sizes= env[MATH_FONT_SIZES];
+  size_cache     = array<array<int> > ();
 
   update_mode ();
   update_info_level ();
@@ -877,6 +935,11 @@ edit_env_rep::update (string s) {
   case Env_Font_Size:
     update_font ();
     break;
+  case Env_Font_Sizes:
+    math_font_sizes= env[MATH_FONT_SIZES];
+    size_cache= array<array<int> > ();
+    update_font ();
+    break;
   case Env_Index_Level:
     index_level= get_int (MATH_LEVEL);
     update_font ();
@@ -890,6 +953,9 @@ edit_env_rep::update (string s) {
   case Env_Vertical_Pos:
     vert_pos= get_int (MATH_VPOS);
     break;
+  case Env_Math_Nesting:
+    nesting_level= get_int (MATH_NESTING_LEVEL);
+    break;
   case Env_Math_Width:
     frac_max= get_length (MATH_FRAC_LIMIT);
     table_max= get_length (MATH_TABLE_LIMIT);
@@ -900,6 +966,9 @@ edit_env_rep::update (string s) {
     break;
   case Env_Pattern_Mode:
     update_pattern_mode ();
+    break;
+  case Env_Spacing:
+    spacing_policy= get_spacing_id (env[SPACING_POLICY]);
     break;
   case Env_Paragraph:
     break;

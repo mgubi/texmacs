@@ -25,13 +25,25 @@
 static void special_initialize ();
 font_metric tfm_font_metric (tex_font_metric tfm, font_glyphs pk, double unit);
 
+hashmap<string,double> lsub_ecrm_table ();
+hashmap<string,double> lsup_ecrm_table ();
+hashmap<string,double> rsub_ecrm_table ();
+hashmap<string,double> rsup_ecrm_table ();
+hashmap<string,double> lsub_cmr_table ();
+hashmap<string,double> lsup_cmr_table ();
 hashmap<string,double> rsub_cmr_table ();
 hashmap<string,double> rsup_cmr_table ();
 hashmap<string,double> above_cmr_table ();
+hashmap<string,double> lsub_cmmi_table ();
+hashmap<string,double> lsup_cmmi_table ();
 hashmap<string,double> rsub_cmmi_table ();
 hashmap<string,double> rsup_cmmi_table ();
 hashmap<string,double> above_cmmi_table ();
+hashmap<string,double> lsub_cmsy_table ();
+hashmap<string,double> lsup_cmsy_table ();
 hashmap<string,double> above_cmsy_table ();
+hashmap<string,double> lsub_bbm_table ();
+hashmap<string,double> lsup_bbm_table ();
 hashmap<string,double> rsub_bbm_table ();
 hashmap<string,double> rsup_bbm_table ();
 hashmap<string,double> above_bbm_table ();
@@ -63,10 +75,12 @@ struct tex_font_rep: font_rep {
   font  magnify (double zoomx, double zoomy);
   SI    get_left_correction  (string s);
   SI    get_right_correction (string s);
+  SI    get_lsub_correction  (string s);
+  SI    get_lsup_correction  (string s);
   SI    get_rsub_correction  (string s);
   SI    get_rsup_correction  (string s);
   SI    get_wide_correction  (string s, int mode);
-  void  advance_glyph (string s, int& pos);
+  void  advance_glyph (string s, int& pos, bool ligf);
   glyph get_glyph (string s);
   int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
   int   get_ligature_code (string s);
@@ -108,6 +122,7 @@ tex_font_rep::tex_font_rep (string name, int status2,
   extra        = conv (tfm->spc_extra ());
   extra->min   = extra->min >> 1;
   extra->max   = extra->min << 1;
+  mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
   exec         = !ends (family, "tt");
 
@@ -141,32 +156,51 @@ tex_font_rep::tex_font_rep (string name, int status2,
 
   special_initialize ();
 
-  if (family == "cmr" || family == "cmbx") {
+  if (family == "ecrm" || family == "ecbx") {
+    lsub_correct= lsub_ecrm_table ();
+    lsup_correct= lsup_ecrm_table ();
+    rsub_correct= rsub_ecrm_table ();
+    rsup_correct= rsup_ecrm_table ();
+    above_correct= hashmap<string,double> (0.0);
+  }
+  else if (family == "cmr" || family == "cmbx") {
+    lsub_correct= lsub_cmr_table ();
+    lsup_correct= lsup_cmr_table ();
     rsub_correct= rsub_cmr_table ();
     rsup_correct= rsup_cmr_table ();
     above_correct= above_cmr_table ();
   }
   else if (family == "cmmi" || family == "cmmib") {
+    lsub_correct= lsub_cmmi_table ();
+    lsup_correct= lsup_cmmi_table ();
     rsub_correct= rsub_cmmi_table ();
     rsup_correct= rsup_cmmi_table ();
     above_correct= above_cmmi_table ();
   }
   else if (family == "cmsy" || family == "cmbsy") {
+    lsub_correct= lsub_cmsy_table ();
+    lsup_correct= lsup_cmsy_table ();
     rsub_correct= hashmap<string,double> (0.0);
     rsup_correct= hashmap<string,double> (0.0);
     above_correct= above_cmsy_table ();
   }
   else if (family == "bbm" || family == "bbmbx") {
+    lsub_correct= lsub_bbm_table ();
+    lsup_correct= lsup_bbm_table ();
     rsub_correct= rsub_bbm_table ();
     rsup_correct= rsup_bbm_table ();
     above_correct= above_bbm_table ();
   }
   else if (family == "eufm" || family == "eufb") {
+    lsub_correct= hashmap<string,double> (0.0);
+    lsup_correct= hashmap<string,double> (0.0);
     rsub_correct= hashmap<string,double> (0.0);
     rsup_correct= hashmap<string,double> (0.0);
     above_correct= above_eufm_table ();
   }
   else {
+    lsub_correct= hashmap<string,double> (0.0);
+    lsup_correct= hashmap<string,double> (0.0);
     rsub_correct= hashmap<string,double> (0.0);
     rsup_correct= hashmap<string,double> (0.0);
     above_correct= hashmap<string,double> (0.0);
@@ -829,9 +863,32 @@ tex_font_rep::get_right_correction (string s) {
 }
 
 SI
+tex_font_rep::get_lsub_correction (string s) {
+  SI r= -get_left_correction (s);
+  if (lsub_correct->contains (s)) r += (SI) (lsub_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[0]) &&
+           lsub_correct->contains (s (0, 1)))
+    r += (SI) (lsub_correct[s (0, 1)] * wfn);
+  return r;
+}
+
+SI
+tex_font_rep::get_lsup_correction (string s) {
+  SI r= 0;
+  if (lsup_correct->contains (s)) r += (SI) (lsup_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[0]) &&
+           lsup_correct->contains (s (0, 1)))
+    r += (SI) (lsup_correct[s (0, 1)] * wfn);
+  return r;
+}
+
+SI
 tex_font_rep::get_rsub_correction (string s) {
   SI r= 0;
   if (rsub_correct->contains (s)) r += (SI) (rsub_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[N(s)-1]) &&
+           rsub_correct->contains (s (N(s)-1, N(s))))
+    r += (SI) (rsub_correct[s (N(s)-1, N(s))] * wfn);
   return r;
 }
 
@@ -839,6 +896,9 @@ SI
 tex_font_rep::get_rsup_correction (string s) {
   SI r= get_right_correction (s);
   if (rsup_correct->contains (s)) r += (SI) (rsup_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[N(s)-1]) &&
+           rsup_correct->contains (s (N(s)-1, N(s))))
+    r += (SI) (rsup_correct[s (N(s)-1, N(s))] * wfn);
   return r;
 }
 
@@ -852,9 +912,9 @@ tex_font_rep::get_wide_correction (string s, int mode) {
 }
 
 void
-tex_font_rep::advance_glyph (string s, int& pos) {
+tex_font_rep::advance_glyph (string s, int& pos, bool ligf) {
   if (pos >= N(s)) return;
-  if (!exec || (status != TEX_ANY && s[pos] == '<'))
+  if (!exec || (status != TEX_ANY && s[pos] == '<') || !ligf)
     tm_char_forwards (s, pos);
   else {
     int c= -1;

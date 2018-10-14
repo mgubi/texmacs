@@ -265,25 +265,20 @@ QTMMenuButton::mouseReleaseEvent (QMouseEvent* e) {
 void
 QTMMenuButton::paintEvent (QPaintEvent* e) {
   (void) e;
-  QPainter p (this);
-    cout << ".";
-  QRect r = rect();
-
-  // initialize the options
+    // initialize the options
   QStyleOptionToolButton opt;
   initStyleOption (&opt);
 
-  QStyleOptionMenuItem mopt;
-  QTMAuxMenu m;
-  m.myInitStyleOption(&mopt);
-  mopt.rect = r;
-  mopt.state = QStyle::State_Enabled | (opt.state & QStyle::State_MouseOver
-                                        ? QStyle::State_Selected
-                                        : QStyle::State_None);
-
-  // draw the control background as a menu item
-  style()->drawControl (QStyle::CE_MenuItem, &mopt, &p, this);
-  // draw the icon with a bit of inset.
+  QPainter p (this);
+  QStyleOptionToolButton option;
+  QRect r = rect();
+  option.rect = r;
+  option.state = QStyle::State_Enabled | (opt.state & QStyle::State_MouseOver
+                                          ? QStyle::State_Selected
+                                          : QStyle::State_None);
+    // draw the control background as a menu item
+  style()->drawControl (QStyle::CE_MenuItem, &option, &p, this);
+    // draw the icon with a bit of inset.
   r.adjust (2, 2, -2, -2);
   defaultAction()->icon().paint (&p, r);
 }
@@ -292,16 +287,15 @@ QTMMenuButton::paintEvent (QPaintEvent* e) {
  * QTMMenuWidget
  ******************************************************************************/
 
+QTMMenuWidget::QTMMenuWidget (QWidget* parent) : QWidget (parent) {
+}
+
 void
 QTMMenuWidget::paintEvent(QPaintEvent* e) {
   QPainter p (this);
-  QStyleOptionMenuItem mopt;
-  QTMAuxMenu m;
-  m.myInitStyleOption (&mopt);
-  mopt.rect = rect ();
-    cout << "+";
-
-  style()->drawControl (QStyle::CE_MenuEmptyArea, &mopt, &p, this);
+  QStyleOptionMenuItem option;
+  option.rect = rect();
+  style()->drawControl (QStyle::CE_MenuEmptyArea, &option, &p, this);
   QWidget::paintEvent (e);
 }
 
@@ -343,9 +337,8 @@ QTMLazyMenu::transferActions (QList<QAction*>* from) {
     QAction* a = list.takeFirst();
     removeAction (a);
   }
-  list = *from;
-  while (!list.isEmpty()) {
-    QAction* a = list.takeFirst();
+  while (!from->isEmpty()) {
+    QAction* a = from->takeFirst();
     addAction (a);
   }
 }

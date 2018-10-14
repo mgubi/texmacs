@@ -1,4 +1,4 @@
-<TeXmacs|1.99.2>
+<TeXmacs|1.99.6>
 
 <style|<tuple|source|std-pattern>>
 
@@ -87,6 +87,8 @@
 
   <drd-props|author-affiliation|border|no>
 
+  <drd-props|author-name-affiliation|border|no>
+
   <drd-props|author-email|border|no>
 
   <drd-props|author-homepage|border|no>
@@ -123,6 +125,14 @@
 
   <assign|doc-make-title|<macro|body|<surround||<vspace|2fn>|<doc-title-block|<arg|body>>>>>
 
+  <assign|doc-make-rich-title|<\macro|notes|body>
+    <\surround||<arg|notes>>
+      <\doc-make-title>
+        <arg|body>
+      </doc-make-title>
+    </surround>
+  </macro>>
+
   <assign|doc-title|<macro|x|<\surround|<vspace*|0.5fn>|<vspace|0.5fn>>
     <doc-title-block|<font-magnify|1.682|<with|math-font-series|bold|font-series|bold|<arg|x>>>>
   </surround>>>
@@ -149,7 +159,7 @@
 
   <assign|doc-footnote-text|<macro|sym|id|body|<custom-footnote-text|<arg|sym>|<arg|id>|<arg|body>>>>
 
-  <assign|doc-data|<xmacro|args|<extern|doc-data|<quote-arg|args>>>>
+  <assign|doc-data|<xmacro|args|<extern|doc-data|<quote-arg|args>|>>>
 
   <\active*>
     <\src-comment>
@@ -172,6 +182,9 @@
   <assign|author-affiliation|<\macro|address>
     <surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<arg|address>>>
   </macro>>
+
+  <assign|author-name-affiliation|<macro|author|address|<surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<name|<arg|author>>,
+  <arg|address>>>>>
 
   <assign|author-affiliation-note|<\macro|sym|id|address>
     <author-affiliation|<\doc-note-text|<arg|sym>|<arg|id>>

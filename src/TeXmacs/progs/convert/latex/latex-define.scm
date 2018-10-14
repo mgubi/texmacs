@@ -149,12 +149,25 @@
   (Tau "\\mathrm{T}")
   (Zeta "\\mathrm{Z}")
 
+  ;; symbols from mathabx
+  ;; NOTE: we avoid using the mathabx package because it tends
+  ;; to be badly installed and incompatible with certain styles
+  (divides "\\mathrel{|}")
+  (ndivides "\\mathrel{\\nmid}")
+  (asterisk "\\mathord{*}")
+  (npreccurlyeq (!annotate "\\mathrel{\\not\\preccurlyeq}" (preccurlyeq)))
+  (dottimes "\\mathbin{\\dot{\\times}}")
+  (nequiv "\\mathrel{\\not\\equiv}")
+  (precdot "\\mathrel{\\prec\\!\\!\\cdot")
+  
   ;; other extra symbols
   (exterior "\\wedge")
   (Exists "\\exists")
   (bigintwl "\\int")
   (bigointwl "\\oint")
   (of ":")
+  (suchthat ":")
+  (barsuchthat "|")
   (point ".")
   (cdummy "\\cdot")
   (comma "{,}")
@@ -201,6 +214,12 @@
   (gflux "\\gg")
   (colons "\\,:\\,")
   (transtype "\\,:\\!!>")
+  (lebar (mathrel (Yleft)))
+  (gebar (mathrel (Yright)))
+  (leangle (mathrel (angle)))
+  (geangle (mathrel (!group (mbox (reflectbox (!math (angle)))))))
+  (leqangle (mathrel (substack (!append (angle) "\\\\" "-"))))
+  (geqangle (mathrel (!group (mbox (reflectbox (!math (substack (!append (angle) "\\\\" "-"))))))))
   (udots "{\\mathinner{\\mskip1mu\\raise1pt\\vbox{\\kern7pt\\hbox{.}}\\mskip2mu\\raise4pt\\hbox{.}\\mskip2mu\\raise7pt\\hbox{.}\\mskip1mu}}")
   (subsetsim (underset (sim) (subset)))
   (supsetsim (underset (sim) (supset)))

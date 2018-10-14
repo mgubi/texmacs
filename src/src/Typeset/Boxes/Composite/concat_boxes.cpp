@@ -22,6 +22,7 @@ struct concat_box_rep: public composite_box_rep {
   concat_box_rep (path ip, array<box> bs, array<SI> spc, bool indent);
   operator tree ();
   box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   void      finalize ();
   void      clear_incomplete (rectangles& rs, SI pixel, int i, int i1, int i2);
@@ -137,6 +138,18 @@ concat_box_rep::adjust_kerning (int mode, double factor) {
     if (sx2(i) < x2) smode= smode & (~END_OF_LINE);
     adj[i]= bs[i]->adjust_kerning (smode, factor);
     spa[i]= (SI) tm_round ((1 + 4*factor) * spc[i]);
+  }
+  return concat_box (ip, adj, spa, indent);
+}
+
+box
+concat_box_rep::expand_glyphs (int mode, double factor) {
+  int n= N(bs);
+  array<box> adj (n);
+  array<SI > spa (n);
+  for (int i=0; i<n; i++) {
+    adj[i]= bs[i]->expand_glyphs (mode, factor);
+    spa[i]= (SI) tm_round ((1 + factor) * spc[i]);
   }
   return concat_box (ip, adj, spa, indent);
 }
@@ -257,45 +270,50 @@ concat_box_rep::rsup_correction () {
 SI
 concat_box_rep::sub_lo_base (int level) {
   int i=0, n=N(bs);
-  SI  y=y1;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sub_lo_base (level));
+  if (y == y2) y= y1;
   return y;
 }
 
 SI
 concat_box_rep::sub_hi_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y= y1 + (y2-y1)/4;
+  SI  y= y1;
   for (i=0; i<n; i++)
     y= max (y, bs[i]->sub_hi_lim (level));
+  if (y == y1) y= y1 + (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_lo_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y=y2 - (y2-y1)/4;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sup_lo_lim (level));
+  if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_lo_base (int level) {
   int i=0, n=N(bs);
-  SI  y=y2 - (y2-y1)/4;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sup_lo_base (level));
+  if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_hi_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y=y2;
+  SI  y= y1;
   for (i=0; i<n; i++)
     y= max (y, bs[i]->sup_hi_lim (level));
+  if (y == y1) y= y2;
   return y;
 }
 

@@ -420,8 +420,8 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
 	  return false;
   }
   else {
-    w= (im.width ()*2834)/im.dotsPerMeterX();
-    h= (im.height()*2834)/im.dotsPerMeterY();
+    w= (int) rint ((((double) im.width ())*2834)/im.dotsPerMeterX());
+    h= (int) rint ((((double) im.height())*2834)/im.dotsPerMeterY());
     if (DEBUG_CONVERT) debug_convert <<"QT dotsPerMeter: "
         <<w<<" x "<<h<<LF;
     return true;      
@@ -619,33 +619,18 @@ qt_image_data (url image, int& w, int&h, string& data, string& palette, string& 
     << " in qt_image_data" << LF;
     return;
   }
-  bool alpha= im.hasAlphaChannel ();
-  if (alpha) im.fill( Qt::transparent );
   w=  im.width ();
   h=  im.height ();    
   data = string ((w*h)*3);
-  int v, i= 0, j= 0, k= 0, l= 0;
+  mask = string (w*h); 
+  int i= 0, j= 0, k= 0, l= 0;
   for (j= 0; j < im.height (); j++) {
     for (i=0; i < im.width (); i++) {
       QRgb p= im.pixel (i, j);
       data[l++] = qRed (p);
       data[l++] = qGreen (p);
       data[l++] = qBlue (p);
-    }
-  }
-  if (alpha) {
-    mask = string ((w*h+7)/8); 
-    v= 0;
-    for (i=0; i < im.width (); i++) {
-      v+= (qAlpha (im.pixel (i, j)) == 0) << (3 - i % 4);
-      if (i % 8 == 7 || i + 1 == im.width ()) {
-	mask[k++] = v;
-	v= 0;
-	// Padding of the image data mask
-	if (i + 1 == im.width () && k % 2 == 1) {
-	  mask[k++] = 0;
-	}
-      }
+      mask[k++] = qAlpha (p);
     }
   }
 }

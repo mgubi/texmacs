@@ -163,11 +163,17 @@
   ---
   ("Indent" (make 'indent))
   ("Jump in" (make 'jump-in))
-  ("Compact" (make 'compact))
   ---
   ("Centered" (make 'center))
   ("Left aligned" (make 'left-aligned))
   ("Right aligned" (make 'right-aligned))
+  (with s (get-env "par-par-sep")
+    (assuming (and (not (string-ends? s "fns"))
+                   (not (string-starts? s "0fn")))
+      ---
+      ("Compact" (make 'compact))
+      ("Compressed" (make 'compressed))
+      ("Amplified" (make 'amplified))))
   ---
   ("Padded" (make 'padded))
   ("Overlined" (make 'overlined))
@@ -189,7 +195,8 @@
   ("Pseudo code" (make 'render-code))
   ---
   ("Indent" (make 'indent))
-  ("Tabbed" (make 'tabbed))
+  (when (not (selection-active?))
+    ("Tabbed" (make 'wide-tabbed)))
   ---
   (-> "Inline code"
       ("C++" (make 'cpp))
@@ -218,17 +225,28 @@
 
 (menu-bind note-menu
   (when (not (or (inside? 'float) (inside? 'footnote)))
-    ("Footnote" (make 'footnote))
-    ("Marginal note" (make-marginal-note))
+    ("Footnote" (make-wrapped 'footnote))
+    (when (not (selection-active-non-small?))
+      ("Marginal note" (make-marginal-note)))
     ;;("Balloon" (make-balloon))
     ---
     ("Floating object" (make-insertion "float"))
-    ("Floating phantom" (insert '(phantom-float "float" "hf")))
-    ("Floating figure" (begin (make-insertion "float") (make 'big-figure)))
-    ("Floating table" (begin (make-insertion "float")
-                             (insert-go-to '(big-table "" "") '(0 0))
-                             (make 'tabular)))
-    ("Floating algorithm" (begin (make-insertion "float") (make 'algorithm)))))
+    (when (not (selection-active-non-small?))
+      ("Floating phantom" (insert '(phantom-float "float" "hf"))))
+    (when (not (selection-active-non-small?))
+      ("Floating figure"
+       (wrap-selection-small
+         (make-insertion "float")
+         (insert-go-to '(big-figure "" (document "")) '(0 0))))
+      ("Floating table"
+       (wrap-selection-small
+         (make-insertion "float")
+         (insert-go-to '(big-table "" (document "")) '(0 0))
+         (make 'tabular))))
+    ("Floating algorithm"
+     (wrap-selection-any
+       (make-insertion "float")
+       (make 'algorithm)))))
 
 (menu-bind position-marginal-note-menu
   (group "Horizontal position")
@@ -256,10 +274,16 @@
   ("Top" (toggle-insertion-positioning "t"))
   ("Here" (toggle-insertion-positioning "h"))
   ("Bottom" (toggle-insertion-positioning "b"))
-  ("Other pages" (toggle-insertion-positioning-not "f")))
+  ("Other pages" (toggle-insertion-positioning-not "f"))
+  (if (tree-innermost float-context? #t)
+      ---
+      ("Make non floating"
+       (turn-non-floating (tree-innermost float-context? #t)))))
 
 (tm-menu (focus-float-menu t)
-  (:require (float-context? t))
+  (:require (rich-float-context? t))
+  (if (in-multicol-style?)
+      ("Wide float" (float-toggle-wide (focus-tree))))
   (-> "Allowed positions" (link float-menu))
   (if (cursor-at-anchor?)
       ("Go to float" (go-to-float)))
@@ -272,10 +296,14 @@
 
 (tm-menu (focus-float-menu t)
   (:require (floatable-context? t))
-  ("Make floating" (turn-floating t)))
+  (if (in-multicol-style?)
+      ("Span over all columns" (floatable-toggle-wide t)))
+  ("Make floating" (turn-floating (tree-innermost floatable-context?))))
 
 (tm-menu (focus-float-menu t)
   (:require (tree-is? t 'footnote))
+  (if (in-multicol-style?)
+      ("Wide footnote" (float-toggle-wide (focus-tree))))
   (if (cursor-at-anchor?)
       ("Go to footnote" (go-to-float)))
   (if (not (cursor-at-anchor?))
@@ -315,7 +343,8 @@
   ("Name" (make 'name))
   ("Person" (make 'person))
   ("Cite" (make 'cite*))
-  ("Abbreviation" (make 'abbr))
+  (when (not (selection-active-non-small?))
+    ("Abbreviation" (make 'abbr)))
   ("Acronym" (make 'acronym))
   ---
   ("Verbatim" (make 'verbatim))
@@ -445,7 +474,8 @@
 (menu-bind text-block-menu
   (if (and (style-has? "header-title-dtd")
            (not (style-has? "header-letter-dtd"))
-           (not (style-has? "header-exam-dtd")))
+           (not (style-has? "header-exam-dtd"))
+           (not (in-poster?)))
       (-> "Title" (link title-menu)))
   (if (style-has? "header-letter-dtd")
       (-> "Header" (link letter-header-menu)))
@@ -512,15 +542,23 @@
       (=> (balloon (icon "tm_chapter.xpm") "Start a new chapter")
           (link chapter-menu)))
   (if (and (style-has? "section-base-dtd")
-           (not (style-has? "header-exam-dtd")))
+           (not (style-has? "header-exam-dtd"))
+           (not (in-poster?)))
       (=> (balloon (icon "tm_section.xpm") "Start a new section")
           (link section-menu)))
+  (if (in-poster?)
+      (=> (balloon (icon "tm_block.xpm") "Insert a section block")
+          (link poster-block-menu)))
   (if (or (style-has? "env-theorem-dtd")
           (style-has? "header-exam-dtd"))
       (=> (balloon (icon "tm_theorem.xpm") "Insert an enunciation")
           (link enunciation-menu)))
-  (if (style-has? "std-markup-dtd")
+  (if (and (style-has? "std-markup-dtd") (not (in-poster?)))
       (=> (balloon (icon "tm_prominent.xpm") "Insert a prominent piece of text")
+          (link prominent-menu)))
+  (if (and (style-has? "std-markup-dtd") (in-poster?))
+      (=> (balloon (icon "tm_var_prominent.xpm")
+                   "Insert a prominent piece of text")
           (link prominent-menu)))
   (if (style-has? "std-markup-dtd")
       (=> (balloon (icon "tm_program.xpm") "Insert a computer program")
@@ -824,7 +862,7 @@
 
 (tm-define (standard-options l)
   (:require (in? l (list-tag-list)))
-  (list "compact-list"))
+  (list "compact-list" "triangle-list"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menu for theorems and proofs
@@ -898,7 +936,11 @@
       (link position-marginal-note-menu)))
 
 (tm-menu (focus-float-icons t)
-  (:require (float-context? t))
+  (:require (rich-float-context? t))
+  (if (in-multicol-style?)
+      ((check (balloon (icon "tm_wide_float.xpm") "Make float wide") "v"
+              (float-wide? (focus-tree)))
+       (float-toggle-wide (focus-tree))))
   (=> (balloon (icon "tm_position_float.xpm")
                "Allowed positions of floating object")
       (link float-menu))
@@ -914,12 +956,20 @@
 
 (tm-menu (focus-float-icons t)
   (:require (floatable-context? t))
+  (if (in-multicol-style?)
+      ((check (balloon (icon "tm_wide_float.xpm") "Make wide") "v"
+              (floatable-wide? (focus-tree)))
+       (floatable-toggle-wide (focus-tree))))
   ((balloon (icon "tm_position_float.xpm")
             "Let the environment float")
    (turn-floating (tree-innermost floatable-context?))))
 
 (tm-menu (focus-float-icons t)
-  (:require (tree-is? t 'footnote))
+  (:require (footnote-context? t))
+  (if (in-multicol-style?)
+      ((check (balloon (icon "tm_wide_float.xpm") "Make footnote wide") "v"
+              (float-wide? (focus-tree)))
+       (float-toggle-wide (focus-tree))))
   ((balloon (icon "tm_anchor.xpm")
             "Go to anchor or footnote")
    (cursor-toggle-anchor)))

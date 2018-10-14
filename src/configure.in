@@ -23,9 +23,9 @@ TM_SUBVERSION
 
 PACKAGE="TeXmacs"
 DEBIAN_NAME="texmacs"
-DEVEL_VERSION="1.99.6"
+DEVEL_VERSION="1.99.8"
 DEVEL_RELEASE="1"         # I think we should use SVNREV here
-STABLE_VERSION="1.99.6"
+STABLE_VERSION="1.99.8"
 STABLE_RELEASE="1"
 
 DEVEL_VERSION_MAJOR="1"   #testing
@@ -92,14 +92,16 @@ m4_define([PROG_STDLIB], [AC_LANG_PROGRAM([[
 std::string t="CompileMe";
 std::cout <<t.size(); ]])])
 
-#AX_CHECK_COMPILE_FLAG([-stdlib=libstdc++],[
-#	LC_APPEND_FLAG([-stdlib=libstdc++],[CXXFLAGS])
-#	LC_APPEND_FLAG([-stdlib=libstdc++],[CFLAGS])
-#	AC_MSG_NOTICE([added libstdc++ in compile flags])])
-
-#LC_LINK_IFELSE([stdlibc++], [PROG_STDLIB],[
-#	AC_MSG_NOTICE([compiler has stdlibc++ support])
-#],[AC_MSG_ERROR([Not able to link with libstdc++])])
+if test -n "$STDC_HEADERS";then
+AX_CHECK_COMPILE_FLAG([-stdlib=libstdc++],[
+	LC_APPEND_FLAG([-stdlib=libstdc++],[CXXFLAGS])
+	LC_APPEND_FLAG([-stdlib=libstdc++],[CFLAGS])
+	AC_MSG_NOTICE([added libstdc++ in compile flags])])
+  
+LC_LINK_IFELSE([stdlibc++], [PROG_STDLIB],[
+	AC_MSG_NOTICE([compiler has stdlibc++ support])  
+],[AC_MSG_ERROR([Not able to link with libstdc++])])
+fi
 
 AC_CHECK_TYPES(FILE)
 AC_CHECK_TYPES(intptr_t)

@@ -81,6 +81,7 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
   extra        = conv (tfm->spc_extra ());
   extra->min   = extra->min >> 1;
   extra->max   = extra->min << 1;
+  mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
 
   y1           = conv (-262080);
@@ -264,12 +265,16 @@ tex_rubber_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
                   // using SI temp= x; decode (temp, y); encode (temp, y);
     if (tfm->top (c)!=0) draw_raw (ren, tfm->top (c), x, y, real_y);
     if (tfm->rep (c)!=0)
-      for (i=0; i<nr_rep; i++)
+      for (i=0; i<nr_rep; i++) {
+        if (!ren->is_screen) ren->draw (tfm->rep (c), pk, x, y + 2*PIXEL);
 	draw_raw (ren, tfm->rep (c), x, y, real_y);
+      }
     if (tfm->mid (c)!=0) draw_raw (ren, tfm->mid (c), x, y, real_y);
     if ((tfm->rep (c)!=0) && (tfm->mid (c)!=0))
-      for (i=0; i<nr_rep; i++)
+      for (i=0; i<nr_rep; i++) {
+        if (!ren->is_screen) ren->draw (tfm->rep (c), pk, x, y + 2*PIXEL);
 	draw_raw (ren, tfm->rep (c), x, y, real_y);
+      }
     if (tfm->bot (c)!=0) draw_raw (ren, tfm->bot (c), x, y, real_y);
   }
 }

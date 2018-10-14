@@ -123,6 +123,8 @@
 (lazy-define (utils library cursor) notify-cursor-moved)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
+(lazy-define (utils test test-convert) delayed-quit
+             build-manual build-ref-suite run-test-suite)
 (use-modules (utils library smart-table))
 (use-modules (utils plugins plugin-convert))
 (use-modules (utils misc markup-funcs))
@@ -191,7 +193,8 @@
 (tm-property (open-search) (:interactive #t))
 (tm-property (open-replace) (:interactive #t))
 (tm-property (open-paragraph-format) (:interactive #t))
-(tm-property (open-page-format) (:interactive #t))
+(tm-property (open-page-format) (:interactive #t)
+                                (:applicable (not (selection-active?))))
 (tm-property (open-source-tree-preferences) (:interactive #t))
 (tm-property (open-document-paragraph-format) (:interactive #t))
 (tm-property (open-document-page-format) (:interactive #t))
@@ -411,6 +414,11 @@
 (lazy-menu (texmacs menus developer-menu) developer-menu)
 (lazy-define (debug debug-widgets) notify-debug-message
              open-debug-console open-error-messages)
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting editing modes for various special styles\n")
+(lazy-menu (various poster-menu) poster-block-menu)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

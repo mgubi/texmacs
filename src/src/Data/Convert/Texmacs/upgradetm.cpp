@@ -1532,6 +1532,11 @@ is_with (tree t, string var, string val) {
 }
 
 static bool
+is_var_with (tree t, string var, string val) {
+  return is_with (t, var, val) || is_with (t, replace (var, " ", "-"), val);
+}
+
+static bool
 is_alpha (tree t) {
   if (is_compound (t)) return false;
   string s= t->label;
@@ -1581,19 +1586,29 @@ upgrade_mod_symbol (string prefix, string s) {
 static tree
 upgrade_mod_symbols (tree t) {
   if (is_atomic (t)) return t;
-  if (is_with (t, "math font series", "bold") && is_bold (t[2]))
+  if (is_func (t, WITH) && N(t) > 3 &&
+      (t[0] == "mode" || is_atomic (t[0]) && starts (t[0]->label, "math")) &&
+      is_atomic (t[2]) && starts (t[2]->label, "math")) {
+    tree u (WITH, t[0], t[1], t (2, N(t)));
+    tree r= upgrade_mod_symbols (u);
+    if (is_atomic (r)) return r;
+    if (is_with (r, "mode", "math") && is_atomic (r[2])) return r;
+  }
+  if (is_var_with (t, "math font series", "bold") && is_bold (t[2]))
     return upgrade_mod_symbol ("b-", t[2]->label);
-  else if (is_with (t, "math font", "cal") && is_upper (t[2]))
+  else if (is_var_with (t, "math font", "cal") && is_upper (t[2]))
     return upgrade_mod_symbol ("cal-", t[2]->label);
-  else if (is_with (t, "math font", "Euler") && is_alpha (t[2]))
+  else if (is_var_with (t, "math font", "Euler") && is_alpha (t[2]))
     return upgrade_mod_symbol ("frak-", t[2]->label);
-  else if (is_with (t, "math font", "Bbb*") && is_alpha (t[2]))
+  else if (is_var_with (t, "math font", "Bbb") && is_alpha (t[2]))
     return upgrade_mod_symbol ("bbb-", t[2]->label);
-  else if (is_with (t, "math font series", "bold") &&
-	   is_with (t[2], "math font", "cal") && is_upper (t[2][2]))
+  else if (is_var_with (t, "math font", "Bbb*") && is_alpha (t[2]))
+    return upgrade_mod_symbol ("bbb-", t[2]->label);
+  else if (is_var_with (t, "math font series", "bold") &&
+	   is_var_with (t[2], "math font", "cal") && is_upper (t[2][2]))
     return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
-  else if (is_with (t, "math font", "cal") &&
-	   is_with (t[2], "math font series", "bold") && is_upper (t[2][2]))
+  else if (is_var_with (t, "math font", "cal") &&
+	   is_var_with (t[2], "math font series", "bold") && is_upper (t[2][2]))
     return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
   //else if ((is_func (t, VALUE, 1) || is_func (t, EXPAND, 1) ||
   //         is_func (t, APPLY, 1)) && (is_atomic (t[0]))) {
@@ -4026,6 +4041,74 @@ upgrade_draw_over_under (tree t) {
 }
 
 /******************************************************************************
+* Upgrade qed
+******************************************************************************/
+
+tree
+upgrade_qed (tree t) {
+  if (is_atomic (t)) return t;
+  else if (t == tree (VALUE, "qed"))
+    return compound ("qed");
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_qed (t[i]);
+    return r;
+  }
+}
+
+/******************************************************************************
+* Preserve spacing of older documents
+******************************************************************************/
+
+tree
+preserve_spacing (tree t) {
+  if (!is_non_style_document (t)) return t;
+  tree style= copy (extract (t, "style"));
+  if (is_atomic (style)) style= tuple (style);
+  if (style == tree (TUPLE)) style= tuple ("generic");
+  for (int i=0; i<N(style); i++)
+    if (style[i] == "source") return t;
+    else if (style[i] == "old-spacing") return t;
+    else if (style[i] == "default-spacing") return t;
+    else if (style[i] == "wide-spacing") return t;
+    else if (style[i] == "invisible-multiply") return t;
+    else if (style[i] == "narrow-multiply") return t;
+    else if (style[i] == "regular-multiply") return t;
+  style << "old-spacing";
+  return change_doc_attr (t, "style", style);
+}
+
+/******************************************************************************
+* Rename educational styles
+******************************************************************************/
+
+tree
+upgrade_educ_styles (tree t) {
+  int i;
+  if (is_atomic (t)) return t;
+  else if (is_compound (t, "style") || is_func (t, TUPLE)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++) {
+      if (t[i] == "exam") r[i]= "old-exam";
+      else if (t[i] == "compact") r[i]= "old-compact";
+      else r[i]= upgrade_educ_styles (t[i]);
+    }
+    return r;
+  }
+  else if (is_func (t, DOCUMENT)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_educ_styles (t[i]);
+    return r;
+  }
+  else return t;
+}
+
+/******************************************************************************
 * Upgrade from previous versions
 ******************************************************************************/
 
@@ -4212,6 +4295,15 @@ upgrade (tree t, string version) {
   }
   if (version_inf_eq (version, "1.99.4"))
     t= upgrade_draw_over_under (t);
+  if (version_inf_eq (version, "1.99.6")) {
+    t= upgrade_qed (t);
+    if (is_non_style_document (t))
+      t= preserve_spacing (t);
+  }
+  if (version_inf_eq (version, "1.99.8")) {
+    if (is_non_style_document (t))
+      t= upgrade_educ_styles (t);
+  }
   
   if (is_non_style_document (t))
     t= automatic_correct (t, version);

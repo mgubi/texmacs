@@ -73,6 +73,7 @@ struct lim_box_rep: public composite_box_rep {
   operator tree () { return tree (TUPLE, "lim", bs[0]); }
   void finalize ();
   box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   path find_box_path (path p, bool& found);
   path find_tree_path (path bp);
@@ -132,6 +133,16 @@ lim_box_rep::adjust_kerning (int mode, double factor) {
   return limit_box (ip, body, sub, sup, fn, glued);
 }
 
+box
+lim_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box body= bs[0]->expand_glyphs (0, factor);
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[1]->expand_glyphs (0, factor);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->expand_glyphs (0, factor);
+  return limit_box (ip, body, sub, sup, fn, glued);
+}
+
 path
 lim_box_rep::find_box_path (path p, bool& found) {
   if (glued) {
@@ -175,6 +186,7 @@ struct dummy_script_box_rep: public composite_box_rep {
   operator tree () { return "dummy script"; }
   void finalize ();
   box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   path      find_box_path (path p, bool& found);
   path      find_tree_path (path bp);
@@ -235,6 +247,15 @@ dummy_script_box_rep::adjust_kerning (int mode, double factor) {
   return script_box (ip, sub, sup, fn);
 }
 
+box
+dummy_script_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[0]->expand_glyphs (0, factor);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->expand_glyphs (0, factor);
+  return script_box (ip, sub, sup, fn);
+}
+
 path
 dummy_script_box_rep::find_box_path (path p, bool& found) {
   //cout << "Find " << p << " in " << operator tree () << "\n";
@@ -283,6 +304,7 @@ struct side_box_rep: public composite_box_rep {
   } 
   void finalize ();
   box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   int       find_child (SI x, SI y, SI delta, bool force);
   path      find_box_path (path p, bool& found);
@@ -387,19 +409,19 @@ side_box_rep::side_box_rep (
   }
 
   if (!is_nil (l1)) {
-    SI dx= l1->right_correction () + ref->lsub_correction ();
+    SI dx= l1->rsup_correction () - ref->lsub_correction ();
     insert (l1, -l1->x2- dx, lsub);
   }
   if (!is_nil (l2)) {
-    SI dx= l2->right_correction () - ref->lsup_correction ();
+    SI dx= l2->rsub_correction () - ref->lsup_correction ();
     insert (l2, -l2->x2- dx, lsup);
   }
   if (!is_nil (r1)) {
-    SI dx= r1->left_correction () + ref->rsub_correction ();
+    SI dx= -r1->lsup_correction () + ref->rsub_correction ();
     insert (r1, ref->x2+ dx, rsub);
   }
   if (!is_nil (r2)) {
-    SI dx= r2->left_correction () + ref->rsup_correction ();
+    SI dx= -r2->lsub_correction () + ref->rsup_correction ();
     insert (r2, ref->x2+ dx, rsup);
   }
 
@@ -447,6 +469,22 @@ side_box_rep::adjust_kerning (int mode, double factor) {
     rsub= bs[1+nr_left]->adjust_kerning (mode & (~START_OF_LINE), factor/2);
   if ((type & 8) != 0)
     rsup= bs[N(bs)-1]->adjust_kerning (mode & (~START_OF_LINE), factor/2);
+  return side_box (ip, body, lsub, lsup, rsub, rsup, fn, level);
+}
+
+box
+side_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box body= bs[0]->expand_glyphs (0, factor);
+  box lsub, lsup, rsub, rsup;
+  if ((type & 1) != 0)
+    lsub= bs[1]->expand_glyphs (0, factor);
+  if ((type & 2) != 0)
+    lsup= bs[nr_left]->expand_glyphs (0, factor);
+  if ((type & 4) != 0)
+    rsub= bs[1+nr_left]->expand_glyphs (0, factor);
+  if ((type & 8) != 0)
+    rsup= bs[N(bs)-1]->expand_glyphs (0, factor);
   return side_box (ip, body, lsub, lsup, rsub, rsup, fn, level);
 }
 

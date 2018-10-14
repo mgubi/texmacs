@@ -21,30 +21,36 @@
 
 (menu-bind insert-table-menu
   (if (and (style-has? "std-dtd") (in-text?) (style-has? "env-float-dtd"))
-      ("Small table" (begin
-                       (insert-go-to '(small-table "" "") '(0 0))
-                       (make 'tabular)))
-      ("Big table"   (begin
-                       (insert-go-to '(big-table "" "") '(0 0))
-                       (make 'tabular)))
-      ---)
+      (when (not (selection-active-non-small?))
+        ("Small table"
+         (wrap-selection-small
+           (insert-go-to '(small-table "" "") '(0 0))
+           (make 'tabular)))
+        ("Big table"
+         (wrap-selection-small
+           (insert-go-to '(big-table "" (document "")) '(0 0))
+           (make 'tabular)))
+        ---))
   (if (and (style-has? "calc-dtd") (calc-ready?))
       (link calc-table-menu)
       ---)
   (if (not (in-math?))
-      ("Wide tabular" (make 'wide-tabular)))
-  ("Plain tabular" (make 'tabular))
-  ("Centered tabular" (make 'tabular*))
+      ("Wide tabular" (make-wrapped 'wide-tabular)))
+  (when (not (selection-active-non-small?))
+    ("Plain tabular" (make 'tabular))
+    ("Centered tabular" (make 'tabular*)))
   (if (not (in-math?))
-      ("Wide block" (make 'wide-block)))
-  ("Plain block" (make 'block))
-  ("Centered block" (make 'block*))
-  (if (and (style-has? "std-dtd") (in-math?))
-      ---
-      ("Matrix" (make 'matrix))
-      ("Determinant" (make 'det))
-      ("Choice" (make 'choice))
-      ("Stack" (make 'stack))))
+      ("Wide block" (make-wrapped 'wide-block)))
+  (when (not (selection-active-non-small?))
+    ("Plain block" (make 'block))
+    ("Centered block" (make 'block*)))
+  (when (not (selection-active-non-small?))
+    (if (and (style-has? "std-dtd") (in-math?))
+        ---
+        ("Matrix" (make 'matrix))
+        ("Determinant" (make 'det))
+        ("Choice" (make 'choice))
+        ("Stack" (make 'stack)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Submenus of the Table menu

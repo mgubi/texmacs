@@ -55,6 +55,7 @@ struct font_rep: rep<font> {
   double   slope;            // italic slope
   space    spc;              // usual space between words
   space    extra;            // extra space at end of words
+  space    mspc;             // space after mathematical operator, e.g. log x
   SI       sep;              // separation space between close components
 
   SI       y1;               // bottom y position
@@ -78,13 +79,20 @@ struct font_rep: rep<font> {
   font     zoomed_fn;        // zoomed font for last_zoom (or nil)
 
   // Microtypography
+  SI   global_lsub_correct;  // global left subscript correction
+  SI   global_lsup_correct;  // global left superscript correction
   SI   global_rsub_correct;  // global right subscript correction
   SI   global_rsup_correct;  // global right superscript correction
+  hashmap<string,double> lsub_correct;     // left subscript adjustments
+  hashmap<string,double> lsup_correct;     // left superscript adjustments
   hashmap<string,double> rsub_correct;     // right subscript adjustments
   hashmap<string,double> rsup_correct;     // right superscript adjustments
   hashmap<string,double> above_correct;    // wide accent above adjustments
   hashmap<string,double> below_correct;    // wide accent above adjustments
   hashmap<int,int>       protrusion_maps;  // tables for protrusion
+  array<array<space> >   narrow_spacing;   // narrow spacing table
+  array<array<space> >   normal_spacing;   // normal spacing table
+  array<array<space> >   wide_spacing;     // wide spacing table
 
   font_rep (string name);
   font_rep (string name, font fn);
@@ -123,9 +131,23 @@ struct font_rep: rep<font> {
   void var_get_xpositions (string s, SI* xpos);
   void var_draw (renderer ren, string s, SI x, SI y);
 
-  virtual void  advance_glyph (string s, int& pos);
+  virtual void  advance_glyph (string s, int& pos, bool ligf);
   virtual glyph get_glyph (string s);
   virtual int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
+
+  array<space> get_spacing_table (int mode, int id, array<array<space> >& t);
+  space        get_spacing_entry (int mode, tree t, int i);
+  space        get_spacing_entry (int mode, tree t, int i, string kind);
+  space        get_spacing_val   (int mode, tree t);
+  inline array<space> get_narrow_spacing (int id) {
+    if (id < N(narrow_spacing)) return narrow_spacing[id];
+    return get_spacing_table (-1, id, narrow_spacing); }
+  inline array<space> get_normal_spacing (int id) {
+    if (id < N(normal_spacing)) return normal_spacing[id];
+    return get_spacing_table (0, id, normal_spacing); }
+  inline array<space> get_wide_spacing (int id) {
+    if (id < N(wide_spacing)) return wide_spacing[id];
+    return get_spacing_table (1, id, wide_spacing); }
 };
 
 string default_chinese_font_name ();
@@ -190,12 +212,18 @@ int  script (int sz, int level);
 // Microtypography
 void adjust_char (hashmap<string,double>& t, string c, double delta);
 void adjust_pair (hashmap<string,double>& t, string c, double delta);
+void adjust_integral (hashmap<string,double>& t, string suf, double delta);
+void adjust_contour_integral (hashmap<string,double>& t, string s, double d);
+void lsub_adjust_std (hashmap<string,double>& t);
+void lsup_adjust_std (hashmap<string,double>& t);
 void rsub_adjust_std (hashmap<string,double>& t);
 void rsup_adjust_std (hashmap<string,double>& t);
 void above_adjust_std (hashmap<string,double>& t);
 void below_adjust_std (hashmap<string,double>& t);
 void above_adjust_frak (hashmap<string,double>& t, double force);
 void above_adjust_bbb (hashmap<string,double>& t, double force);
+int  get_spacing_id (tree spacing_desc);
+tree get_spacing_desc (int spacing_id);
 
 // Font database
 extern bool new_fonts;

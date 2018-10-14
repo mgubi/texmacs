@@ -69,6 +69,7 @@ class concater_rep {
   // mathematical markup
   void typeset_around (tree t, path ip, bool colored);
   void typeset_large (tree t, path ip, int type, int op_type, string prefix);
+  void typeset_wide_middle (tree t, path ip);
   //void typeset_left (tree t, path ip);
   //void typeset_middle (tree t, path ip);
   //void typeset_right (tree t, path ip);
@@ -171,6 +172,8 @@ class concater_rep {
   int  prec (int i);
   int  succ (int i);
   void pre_glue ();
+  box  glue_left_markers (box b, int ref, int arg);
+  box  glue_right_markers (box b, int ref, int arg, bool flag);
   void glue (box b, int ref, int arg);
   void glue (box b, int ref, int arg1, int arg2);
   void clean_and_correct ();

@@ -53,7 +53,7 @@ struct virtual_font_rep: font_rep {
   void   draw_clipped (renderer ren, scheme_tree t, SI x, SI y,
                        SI x1, SI y1, SI x2, SI y2);
   void   draw_transformed (renderer ren, scheme_tree t, SI x, SI y, frame f);
-  void   advance_glyph (string s, int& pos);
+  void   advance_glyph (string s, int& pos, bool ligf);
   int    get_char (string s, font_metric& fnm, font_glyphs& fng);
   glyph  get_glyph (string s);
   int    index_glyph (string s, font_metric& fnm, font_glyphs& fng);
@@ -70,6 +70,8 @@ struct virtual_font_rep: font_rep {
   double get_left_slope (string s);
   double get_right_slope (string s);
   SI     get_right_correction (string s);
+  SI     get_lsub_correction  (string s);
+  SI     get_lsup_correction  (string s);
   SI     get_rsub_correction  (string s);
   SI     get_rsup_correction  (string s);
   SI     get_wide_correction  (string s, int mode);
@@ -1680,7 +1682,7 @@ virtual_font_rep::draw_tree (renderer ren, scheme_tree t, SI x, SI y) {
 void
 virtual_font_rep::draw_clipped (renderer ren, scheme_tree t, SI x, SI y,
                                 SI x1, SI y1, SI x2, SI y2) {
-  ren->clip (x + x1, y + y1, x + x2, y + y2);
+  ren->clip (x + x1, y + y1 - 5*PIXEL, x + x2, y + y2 + 2*PIXEL);
   draw_tree (ren, t, x, y);
   ren->unclip ();  
 }
@@ -1883,7 +1885,7 @@ virtual_font_rep::magnify (double zoomx, double zoomy) {
 }
 
 void
-virtual_font_rep::advance_glyph (string s, int& pos) {
+virtual_font_rep::advance_glyph (string s, int& pos, bool ligf) {
   pos= N(s);
 }
 
@@ -1938,6 +1940,24 @@ virtual_font_rep::get_right_correction (string s) {
   if (is_tuple (t, "italic", 3))
     return (SI) (as_double (t[3]) * hunit);
   return font_rep::get_right_correction (s);
+}
+
+SI
+virtual_font_rep::get_lsub_correction (string s) {
+  if (extend && base_fn->supports (s))
+    return base_fn->get_lsub_correction (s);
+  SI r= -get_left_correction (s);
+  if (lsub_correct->contains (s)) r += (SI) (lsub_correct[s] * wfn);
+  return r;
+}
+
+SI
+virtual_font_rep::get_lsup_correction (string s) {
+  if (extend && base_fn->supports (s))
+    return base_fn->get_lsup_correction (s);
+  SI r= get_right_correction (s);
+  if (lsup_correct->contains (s)) r += (SI) (lsup_correct[s] * wfn);
+  return r;
 }
 
 SI

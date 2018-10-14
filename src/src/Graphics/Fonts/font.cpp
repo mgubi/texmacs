@@ -18,6 +18,8 @@
 
 RESOURCE_CODE(font);
 
+hashmap<string,double> lsub_guessed_table ();
+hashmap<string,double> lsup_guessed_table ();
 hashmap<string,double> rsub_guessed_table ();
 hashmap<string,double> rsup_guessed_table ();
 hashmap<string,double> above_guessed_table ();
@@ -32,7 +34,7 @@ get_math_type (string s) {
   s= locase_all (s);
   if (starts (s, "unicode:")) s= s (8, N(s));
   if (starts (s, "texgyre")) s= s (7, N(s));
-  if (starts (s, "stix-"))
+  if (starts (s, "stix-") || starts (s, "stixintegrals"))
     return MATH_TYPE_STIX;
   if (starts (s, "bonum-") || starts (s, "pagella-") ||
       starts (s, "schola-") ||starts (s, "termes-"))
@@ -46,16 +48,23 @@ font_rep::font_rep (string s):
   math_type (get_math_type (s)),
   spc       (0),
   extra     (0),
+  mspc      (0),
   last_zoom (0.0),
   zoomed_fn (NULL),
+  global_lsub_correct (0),
+  global_lsup_correct (0),
   global_rsub_correct (0),
   global_rsup_correct (0),
+  lsub_correct (0.0),
+  lsup_correct (0.0),
   rsub_correct (0.0),
   rsup_correct (0.0),
   above_correct (0.0),
   below_correct (0.0),
   protrusion_maps (-1)
 {
+  lsub_correct = lsub_guessed_table ();
+  lsup_correct = lsup_guessed_table ();
   rsub_correct = rsub_guessed_table ();
   rsup_correct = rsup_guessed_table ();
   above_correct= above_guessed_table ();
@@ -72,15 +81,22 @@ font_rep::font_rep (string s, font fn):
   slope        (fn->slope),
   spc          (fn->spc),
   extra        (fn->extra),
+  mspc         (fn->mspc),
   sep          (fn->sep),
   last_zoom    (0.0),
   zoomed_fn    (NULL),
+  global_lsub_correct (0),
+  global_lsup_correct (0),
   global_rsub_correct (0),
   global_rsup_correct (0),
+  lsub_correct (0.0),
+  lsup_correct (0.0),
   rsub_correct (0.0),
   rsup_correct (0.0),
   protrusion_maps (-1)
 {
+  lsub_correct = lsub_guessed_table ();
+  lsup_correct = lsup_guessed_table ();
   rsub_correct = rsub_guessed_table ();
   rsup_correct = rsup_guessed_table ();
   above_correct= above_guessed_table ();
@@ -245,7 +261,7 @@ font_rep::get_xpositions (string s, SI* xpos) {
 	i++;
 	xpos[i]= x;
       }
-    i++;
+    if (i < N(s)) i++;
     get_extents (s (0, i), ex);
     x= ex->x2;
     xpos[i]= x;
@@ -272,7 +288,7 @@ font_rep::get_xpositions (string s, SI* xpos, SI xk) {
 	i++;
 	xpos[i] += dx;
       }
-    i++;
+    if (i < N(s)) i++;
     count++;
     if (i == N(s)) dx= 2 * count * xk;
     else dx= (2*count + 1) * xk;
@@ -336,7 +352,8 @@ font_rep::var_draw (renderer ren, string s, SI x, SI y) {
 bool get_glyph_fatal= false;
 
 void
-font_rep::advance_glyph (string s, int& pos) {
+font_rep::advance_glyph (string s, int& pos, bool ligf) {
+  (void) ligf;
   tm_char_forwards (s, pos);
 }
 

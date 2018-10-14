@@ -1,15 +1,27 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.7>
 
-<style|<tuple|tmdoc|english>>
+<style|<tuple|tmdoc|english|old-spacing>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.7>
+  <section|Changes from version 1.99.1 to 1.99.8>
 
   <\itemize>
+    <item>Several bug fixes (1.99.8).
+
+    <item>Support of binary packages for various GNU/<name|Linux>
+    distributions, cosntructed using <name|Suse> <name|OpenBuild> services
+    (1.99.8).
+
     <item>Several new algorithms for micro typography: roots, mathematical
     accents, etc. (1.99.7).
+
+    <item>New style for posters (1.99.7).
+
+    <item>Support for new ACM styles (1.99.7).
+
+    <item>Various bug fixes (1.99.7).
 
     <item>New page breaker with better support for floating objects and
     footnotes (1.99.6).

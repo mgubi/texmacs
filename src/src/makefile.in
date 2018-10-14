@@ -30,6 +30,7 @@ CXXTEMPLATE = @CONFIG_CXXTEMPLATE@
 CXXOPTIMIZE = @CONFIG_CXXOPTIMIZE@ @CONFIG_CXXDIALECT@
 CXXDEBUG = @CONFIG_CXXDEBUG@ 
 CXXPROFILE = @CONFIG_CXXPROFILE@
+CFLAGS = @CFLAGS@
 CXXFLAGS = $(CXXWARNING) $(CXXTEMPLATE) $(CXXOPTIMIZE) $(CXXDEBUG) $(CXXPROFILE) @CONFIG_CXXFLAGS@ @CXXFLAGS@
 CPPFLAGS = @CPPFLAGS@ @QT_CPPFLAGS@ -D@CONFIG_GUI_DEFINE@
 CXXX11 = @X11_CXX@
@@ -60,7 +61,7 @@ LDGUI = $(LD@CONFIG_GUI@)
 AR = ar
 ARFLAGS = -r
 RM = rm -f
-CP = cp -r -f
+CP = @CONFIG_CP@
 GLUE = cd Scheme/Glue; ./build-glue
 TOUCH = touch
 MOC = @MOC@
@@ -371,6 +372,8 @@ $(texmacs_c_deps):   Objects/%.o: %.c
 ifeq "$(link)" "shared"
 ifeq "$(CONFIG_OS)" "DEC"
 link_bin = $(strip $(LD) $(LDFLAGS) -lstdc++ $(LDSHARED) $^ $(1) $(LIBS) -o $@)
+else ifeq "$(CONFIG_OS)" "FREEBSD"
+link_bin = $(strip $(LD) $(LDFLAGS) $(LDSHARED) $^ $(1) $(LIBS) -lthr -o $@)
 else
 link_bin = $(strip $(LD) $(LDFLAGS) $(LDSHARED) $^ $(1) $(LIBS) -o $@)
 endif
@@ -423,7 +426,7 @@ link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
 $(tmsrc)/bin/texmacs.bin: Objects/texmacs-$(link).bin
 	$(CP) $^ $@
 
-Objects/texmacs-$(link).bin: $(TEXMACS_objects)
+Objects/texmacs-$(link).bin: Objects/texmacs.o Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o $(TEXMACS_objects)
 	$(call link_bin,$(link_options))
 
 all: $(tmsrc)/bin/texmacs.bin

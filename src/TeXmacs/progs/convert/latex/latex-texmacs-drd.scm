@@ -45,13 +45,16 @@
   succsucc succsucceq succsuccsucc succsuccsucceq
   lleq llleq ggeq gggeq triplesim ntriplesim
 
+  ;; replacements for symbols from mathabx
+  divides ndivides asterisk npreccurlyeq dottimes nequiv precdot
+
   ;; extra literal symbols
   mathcatalan mathd mathD mathe matheuler mathlambda mathi mathpi
   Alpha Beta Epsilon Eta Iota Kappa Mu Nu Omicron Chi Rho Tau Zeta
 
   ;; other extra symbols
   exterior Exists bigintwl bigointwl
-  of asterisk point cdummy comma copyright
+  of suchthat barsuchthat asterisk point cdummy comma copyright
   bignone nobracket nospace nocomma noplus nosymbol
   nin nni notni nequiv nleadsto
   dotminus dotpm dotmp dotamalg dottimes dotoplus dototimes dotast
@@ -60,7 +63,9 @@
   triangleup tmprecdot preceqdot
   llangle rrangle join um upl upm ump
   assign plusassign minusassign timesassign overassign backassign
-  lflux gflux colons transtype udots subsetsim supsetsim
+  lflux gflux colons transtype
+  lebar gebar leangle geangle leqangle geqangle
+  udots subsetsim supsetsim
   rightmap leftmap leftrightmap)
 
 (logic-rules

@@ -16,16 +16,77 @@
 ******************************************************************************/
 
 void
+lsub_adjust_stix (hashmap<string,double>& t) {
+  adjust_pair (t, "T", 0.02);
+  adjust_pair (t, "V", 0.02);
+  adjust_pair (t, "Y", 0.02);
+  adjust_pair (t, "<chi>", 0.05);
+  adjust_pair (t, "<Upsilon>", 0.03);
+  adjust_pair (t, "<Phi>", -0.03);
+  adjust_pair (t, "<bbb-T>", 0.05);
+  adjust_pair (t, "<bbb-Y>", 0.05);
+  adjust_pair (t, "<vee>", -0.05);
+  adjust_pair (t, "<curlyvee>", -0.05);
+}
+
+void
+lsup_adjust_stix (hashmap<string,double>& t) {
+  adjust_pair (t, "<beta>", 0.02);
+  adjust_pair (t, "<rho>", 0.02);
+  adjust_pair (t, "<chi>", 0.1);
+  adjust_pair (t, "<omega>", 0.02);
+  adjust_pair (t, "<Alpha>", 0.02);
+  adjust_pair (t, "<Delta>", 0.02);
+  adjust_pair (t, "<Lambda>", 0.02);
+  adjust_pair (t, "<cal-A>", 0.02);
+  adjust_pair (t, "<cal-I>", 0.08);
+  adjust_pair (t, "<cal-J>", 0.1);
+  adjust_pair (t, "<cal-M>", 0.1);
+  adjust_pair (t, "<cal-N>", 0.1);
+  adjust_pair (t, "<cal-S>", 0.03);
+  adjust_pair (t, "<cal-X>", 0.02);
+  adjust_pair (t, "<bbb-A>", 0.05);
+  adjust_pair (t, "<bbb-j>", 0.02);
+  adjust_integral (t, "1", 0.1);
+  adjust_integral (t, "2", 0.2);
+  adjust_contour_integral (t, "1", 0.1);
+  adjust_contour_integral (t, "2", 0.2);
+}
+
+void
 rsub_adjust_stix (hashmap<string,double>& t) {
+  adjust_pair (t, "A", 0.03);
+  adjust_pair (t, "I", 0.03);
+  adjust_pair (t, "J", -0.03);
+  adjust_pair (t, "K", 0.03);
+  adjust_pair (t, "M", 0.03);
+  adjust_pair (t, "P", -0.03);
+  adjust_pair (t, "Q", 0.05);
+  adjust_pair (t, "R", 0.03);
+  adjust_pair (t, "T", -0.05);
+  adjust_pair (t, "U", -0.03);
+  adjust_pair (t, "V", -0.05);
+  adjust_pair (t, "W", -0.05);
+  adjust_pair (t, "Y", -0.05);
+  adjust_pair (t, "a", 0.03);
+  adjust_pair (t, "d", 0.03);
+  adjust_pair (t, "g", 0.03);
+  adjust_pair (t, "h", 0.03);
+  adjust_pair (t, "i", 0.03);
+  adjust_pair (t, "k", 0.03);
+  adjust_pair (t, "l", 0.03);
+  adjust_pair (t, "m", 0.03);
+  adjust_pair (t, "n", 0.03);
+  adjust_pair (t, "q", 0.03);
+  adjust_pair (t, "t", 0.03);
+  adjust_pair (t, "u", 0.03);
+  adjust_pair (t, "v", -0.05);
+  adjust_pair (t, "w", -0.05);
+  adjust_pair (t, "x", 0.03);
+  adjust_pair (t, "y", -0.05);
+  adjust_pair (t, "z", 0.03);
   adjust_pair (t, "!", 0.05);
   adjust_pair (t, "/", -0.02);
-  adjust_pair (t, "B", -0.01);
-  adjust_pair (t, "F", -0.02);
-  adjust_pair (t, "N", -0.02);
-  adjust_pair (t, "O", -0.02);
-  adjust_pair (t, "P", -0.02);
-  adjust_pair (t, "T", -0.02);
-  adjust_pair (t, "U", -0.02);
   adjust_pair (t, "<Alpha>", 0.02);
   adjust_pair (t, "<Beta>", -0.02);
   adjust_pair (t, "<Gamma>", -0.02);
@@ -103,31 +164,21 @@ rsub_adjust_stix (hashmap<string,double>& t) {
   adjust_pair (t, "<bbb-W>", 0.07);
   adjust_pair (t, "<bbb-Y>", 0.05);
   adjust_pair (t, "<bbb-Z>", -0.03);
+  adjust_pair (t, "<bbb-f>", -0.03);
+  adjust_pair (t, "<bbb-j>", 0.03);
+  adjust_pair (t, "<partial>", -0.03);
 }
   
 void
 rsup_adjust_stix (hashmap<string,double>& t) {
+  adjust_pair (t, "A", -0.03);
+  adjust_pair (t, "L", -0.05);
+  adjust_pair (t, "g", 0.02);
+  adjust_pair (t, "r", 0.02);
+  adjust_pair (t, "t", 0.02);
   adjust_pair (t, "!", 0.05);
   adjust_pair (t, "?", 0.05);
   adjust_pair (t, "/", 0.05);
-  adjust_pair (t, "B", 0.03);
-  adjust_pair (t, "D", 0.01);
-  adjust_pair (t, "P", 0.03);
-  adjust_pair (t, "Q", 0.01);
-  adjust_pair (t, "R", 0.03);
-  adjust_pair (t, "W", 0.02);
-  adjust_pair (t, "a", 0.01);
-  adjust_pair (t, "b", 0.02);
-  adjust_pair (t, "c", 0.02);
-  adjust_pair (t, "d", 0.01);
-  adjust_pair (t, "e", 0.02);
-  adjust_pair (t, "i", 0.02);
-  adjust_pair (t, "l", 0.02);
-  adjust_pair (t, "q", 0.01);
-  adjust_pair (t, "r", 0.02);
-  adjust_pair (t, "s", 0.02);
-  adjust_pair (t, "t", 0.02);
-  adjust_pair (t, "x", 0.02);
   adjust_pair (t, "<Gamma>", 0.02);
   adjust_pair (t, "<Theta>", 0.02);
   adjust_pair (t, "<Rho>", 0.02);
@@ -162,6 +213,10 @@ rsup_adjust_stix (hashmap<string,double>& t) {
   adjust_pair (t, "<bbb-L>", -0.02);
   adjust_pair (t, "<bbb-M>", 0.01);
   adjust_pair (t, "<bbb-P>", 0.02);
+  string bbs= "bceghijlmnopqstuvwyz";
+  for (int i=0; i<N(bbs); i++)
+    adjust_pair (t, "<bbb-" * bbs (i, i+1) * ">", 0.02);
+  adjust_pair (t, "<bbb-j>", 0.02);
   adjust_pair (t, "<frak-a>", -0.02);
   adjust_pair (t, "<frak-i>", -0.02);
   adjust_pair (t, "<frak-j>", 0.01);
@@ -170,6 +225,7 @@ rsup_adjust_stix (hashmap<string,double>& t) {
   adjust_pair (t, "<frak-r>", 0.01);
   adjust_pair (t, "<frak-t>", 0.01);
   adjust_pair (t, "<frak-u>", -0.01);
+  adjust_pair (t, "<partial>", 0.02);
 }
 
 void
@@ -258,9 +314,29 @@ above_adjust_stix (hashmap<string,double>& t) {
 * Interface
 ******************************************************************************/
 
+static hashmap<string,double> lsub_stix (0.0);
+static hashmap<string,double> lsup_stix (0.0);
 static hashmap<string,double> rsub_stix (0.0);
 static hashmap<string,double> rsup_stix (0.0);
 static hashmap<string,double> above_stix (0.0);
+
+hashmap<string,double>
+lsub_stix_table () {
+  if (N (lsub_stix) == 0) {
+    lsub_adjust_std (lsub_stix);
+    lsub_adjust_stix (lsub_stix);
+  }
+  return lsub_stix;
+}
+
+hashmap<string,double>
+lsup_stix_table () {
+  if (N (lsup_stix) == 0) {
+    lsup_adjust_std (lsup_stix);
+    lsup_adjust_stix (lsup_stix);
+  }
+  return lsup_stix;
+}
 
 hashmap<string,double>
 rsub_stix_table () {
@@ -285,4 +361,145 @@ above_stix_table () {
   if (N (above_stix) == 0)
     above_adjust_stix (above_stix);
   return above_stix;
+}
+
+/******************************************************************************
+* Table initialization
+******************************************************************************/
+
+void
+lsub_adjust_stix_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "p", 0.03);
+  adjust_pair (t, "U", 0.03);
+}
+
+void
+lsup_adjust_stix_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "b", 0.02);
+  adjust_pair (t, "B", 0.02);
+  adjust_pair (t, "D", 0.02);
+  adjust_pair (t, "E", 0.02);
+  adjust_pair (t, "F", 0.02);
+  adjust_pair (t, "H", 0.02);
+  adjust_pair (t, "I", 0.02);
+  adjust_pair (t, "J", 0.02);
+  adjust_pair (t, "K", 0.02);
+  adjust_pair (t, "L", 0.02);
+  adjust_pair (t, "M", 0.02);
+  adjust_pair (t, "N", 0.02);
+  adjust_pair (t, "P", 0.02);
+  adjust_pair (t, "R", 0.02);
+  adjust_pair (t, "S", 0.02);
+  adjust_pair (t, "U", 0.02);
+  adjust_pair (t, "V", 0.02);
+  adjust_pair (t, "W", 0.02);
+}
+
+void
+rsub_adjust_stix_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "B", -0.01);
+  adjust_pair (t, "F", -0.02);
+  adjust_pair (t, "N", -0.02);
+  adjust_pair (t, "O", -0.02);
+  adjust_pair (t, "P", -0.02);
+  adjust_pair (t, "T", -0.02);
+  adjust_pair (t, "U", -0.02);
+}
+  
+void
+rsup_adjust_stix_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "B", 0.03);
+  adjust_pair (t, "D", 0.01);
+  adjust_pair (t, "P", 0.03);
+  adjust_pair (t, "Q", 0.01);
+  adjust_pair (t, "R", 0.03);
+  adjust_pair (t, "W", 0.02);
+  adjust_pair (t, "a", 0.01);
+  adjust_pair (t, "b", 0.02);
+  adjust_pair (t, "c", 0.02);
+  adjust_pair (t, "d", 0.01);
+  adjust_pair (t, "e", 0.02);
+  adjust_pair (t, "i", 0.02);
+  adjust_pair (t, "l", 0.02);
+  adjust_pair (t, "q", 0.01);
+  adjust_pair (t, "r", 0.02);
+  adjust_pair (t, "s", 0.02);
+  adjust_pair (t, "t", 0.02);
+  adjust_pair (t, "x", 0.02);
+}
+
+void
+above_adjust_stix_italic (hashmap<string,double>& t) {
+  adjust_pair (t, "b", -0.02);
+  adjust_pair (t, "d", 0.06);
+  adjust_pair (t, "f", -0.04);
+  adjust_pair (t, "h", -0.02);
+  adjust_pair (t, "k", -0.02);
+  adjust_pair (t, "<ell>", 0.04);
+  adjust_pair (t, "r", -0.04);
+  adjust_pair (t, "x", -0.04);
+  adjust_pair (t, "z", -0.04);
+  adjust_pair (t, "A", 0.04);
+  adjust_pair (t, "I", -0.02);
+  adjust_pair (t, "J", 0.06);
+  adjust_pair (t, "M", -0.04);
+  adjust_pair (t, "N", -0.04);
+  adjust_pair (t, "T", -0.04);
+  adjust_pair (t, "U", -0.02);
+  adjust_pair (t, "V", -0.08);
+  adjust_pair (t, "W", -0.06);
+  adjust_pair (t, "Y", -0.08);
+}
+
+/******************************************************************************
+* Interface
+******************************************************************************/
+
+static hashmap<string,double> lsub_stix_italic (0.0);
+static hashmap<string,double> lsup_stix_italic (0.0);
+static hashmap<string,double> rsub_stix_italic (0.0);
+static hashmap<string,double> rsup_stix_italic (0.0);
+static hashmap<string,double> above_stix_italic (0.0);
+
+hashmap<string,double>
+lsub_stix_italic_table () {
+  if (N (lsub_stix_italic) == 0) {
+    lsub_adjust_std (lsub_stix_italic);
+    lsub_adjust_stix_italic (lsub_stix_italic);
+  }
+  return lsub_stix_italic;
+}
+
+hashmap<string,double>
+lsup_stix_italic_table () {
+  if (N (lsup_stix_italic) == 0) {
+    lsup_adjust_std (lsup_stix_italic);
+    lsup_adjust_stix_italic (lsup_stix_italic);
+  }
+  return lsup_stix_italic;
+}
+
+hashmap<string,double>
+rsub_stix_italic_table () {
+  if (N (rsub_stix_italic) == 0) {
+    rsub_adjust_std (rsub_stix_italic);
+    rsub_adjust_stix_italic (rsub_stix_italic);
+  }
+  return rsub_stix_italic;
+}
+
+hashmap<string,double>
+rsup_stix_italic_table () {
+  if (N (rsup_stix_italic) == 0) {
+    rsup_adjust_std (rsup_stix_italic);
+    rsup_adjust_stix_italic (rsup_stix_italic);
+  }
+  return rsup_stix_italic;
+}
+
+hashmap<string,double>
+above_stix_italic_table () {
+  if (N (above_stix_italic) == 0)
+    above_adjust_stix_italic (above_stix_italic);
+  return above_stix_italic;
 }

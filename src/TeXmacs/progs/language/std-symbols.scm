@@ -19,18 +19,18 @@
   (define Assign-symbol
     (:type infix)
     (:penalty 3)
-    (:spacing default default)
+    (:spacing wide wide)
     "<assign>" "<backassign>"
     "<plusassign>" "<minusassign>" "<astassign>" "<overassign>")
   
   (define Flux-symbol
     (:type infix)
-    (:spacing default default)
+    (:spacing wide wide)
     "<lflux>" "<gflux>")
 
   (define Models-symbol
     (:type infix)
-    (:spacing default default)
+    (:spacing default wide)
     "<models>"
     "<vdash>" "<dashv>" "<vDash>" "<Dashv>"
     "<Vdash>" "<dashV>" "<VDash>" "<DashV>"
@@ -49,7 +49,7 @@
   (define Imply-nolim-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     "<implies>" "<equivalent>" "<Leftarrow>" "<Rightarrow>" "<Leftrightarrow>"
     "<Longleftarrow>" "<Longrightarrow>" "<Longleftrightarrow>"
     "<Lleftarrow>" "<Rrightarrow>"
@@ -58,7 +58,7 @@
   (define Imply-lim-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     (:limits always)
     "<Leftarrowlim>" "<Rightarrowlim>" "<Leftrightarrowlim>"
     "<Longleftarrowlim>" "<Longrightarrowlim>" "<Longleftrightarrowlim>")
@@ -69,13 +69,13 @@
   (define Or-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     "<vee>" "<curlyvee>" "<veebar>" "<obar>" "<boxbar>")
 
   (define And-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     "<wedge>" "<curlywedge>" "<barwedge>" "<doublebarwedge>")
 
   (define Not-symbol
@@ -86,7 +86,7 @@
   (define Relation-nolim-symbol
     (:type infix)
     (:penalty 20)
-    (:spacing default default)
+    (:spacing wide wide)
 
     "=" "<ne>" "<neq>" "<longequal>" "<less>" "<gtr>" "<le>" "<leq>"
     "<prec>" "<preceq>" "<preceqq>" "<ll>" "<lleq>" "<subset>" "<subseteq>"
@@ -163,12 +163,13 @@
     "<precdot>" "<preceqdot>" "<preccurlyeqdot>"
     "<dotsucc>" "<dotsucceq>" "<dotsucccurlyeq>"
 
-    "<because>" "<between>" "<therefore>")
+    "<because>" "<between>" "<therefore>" "<lebar>" "<gebar>"
+    "<leangle>" "<geangle>" "<leqangle>" "<geqangle>")
 
   (define Relation-lim-symbol
     (:type infix)
     (:penalty 20)
-    (:spacing default default)
+    (:spacing wide wide)
     (:limits always)
     "<equallim>" "<longequallim>")
 
@@ -296,7 +297,7 @@
   (define Times-invisible-symbol
     (:type infix)
     (:penalty invalid)
-    (:spacing half half)
+    (:spacing multiply multiply)
     "*")
 
   (define Times-symbol
@@ -395,7 +396,8 @@
   (define Other-postfix-symbol
     (:type postfix)
     (:penalty panic)
-    "!" "%" "<permil>" "<postup>" "<postdown>")
+    "!" "%" "<permil>"
+    "<postup>" "<postdown>" "<postupdown>" "<postmapsup>" "<postmapsdown>")
 
   (define Prime-symbol
     (:type symbol)
@@ -429,9 +431,18 @@
     "<left-lfloor>" "<left-lceil>" "<left-rfloor>" "<left-rceil>"
     "<left-langle>" "<left-rangle>")
   
-  (define Middle-symbol
+  (define Middle-bracket-symbol
     (:type middle-bracket)
+    (:spacing middle middle)
     "|" "<||>" "<nobracket>" "<mid-|>" "<mid-||>" "<mid-.>")
+  
+  (define Middle-separator-symbol
+    (:type middle-bracket)
+    (:spacing default default)
+    "<suchthat>" "<barsuchthat>")
+
+  (define Middle-symbol
+    Middle-bracket-symbol Middle-separator-symbol)
 
   (define Close-symbol
     (:type closing-bracket)

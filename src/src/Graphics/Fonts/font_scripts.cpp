@@ -46,9 +46,91 @@ adjust_pair (hashmap<string,double>& t, string c, double delta) {
   adjust_char (t, c, delta);
 }
 
+void
+adjust_integral_sub (hashmap<string,double>& t,
+                     string c, string suf, double delta) {
+  adjust_char (t, "<big-" * c * "-" * suf * ">", delta);
+  adjust_char (t, "<big-up" * c * "-" * suf * ">", delta);
+  adjust_char (t, "<big-" * c * "lim-" * suf * ">", delta);
+  adjust_char (t, "<big-up" * c * "lim-" * suf * ">", delta);
+  if (suf == "1") {
+    adjust_char (t, "<" * c * ">", delta);
+    adjust_char (t, "<up" * c * ">", delta);
+    adjust_char (t, "<" * c * "lim>", delta);
+    adjust_char (t, "<up" * c * "lim>", delta);
+  }
+  if (suf == "2") {
+    adjust_char (t, "<big-" * c * ">", delta);
+    adjust_char (t, "<big-up" * c * ">", delta);
+    adjust_char (t, "<big-" * c * "lim>", delta);
+    adjust_char (t, "<big-up" * c * "lim>", delta);
+  }
+}
+
+void
+adjust_integral (hashmap<string,double>& t, string suf, double delta) {
+  adjust_integral_sub (t, "int", suf, delta);
+  adjust_integral_sub (t, "iint", suf, delta);
+  adjust_integral_sub (t, "iiint", suf, delta);
+  adjust_integral_sub (t, "iiiint", suf, delta);
+  adjust_integral_sub (t, "idotsint", suf, delta);
+}
+
+void
+adjust_contour_integral (hashmap<string,double>& t, string suf, double delta) {
+  adjust_integral_sub (t, "oint", suf, delta);
+  adjust_integral_sub (t, "oiint", suf, delta);
+  adjust_integral_sub (t, "oiiint", suf, delta);
+}
+
 /******************************************************************************
 * Standard corrections
 ******************************************************************************/
+
+void
+lsub_adjust_std (hashmap<string,double>& t) {
+  adjust_pair (t, "V", 0.05);
+  adjust_pair (t, "W", 0.05);
+  adjust_pair (t, "Y", 0.05);
+  adjust_pair (t, "<Upsilon>", 0.05);
+  adjust_pair (t, "<Phi>", 0.05);
+  adjust_pair (t, "<Psi>", 0.05);
+  adjust_pair (t, "<nabla>", 0.05);
+  adjust_pair (t, "<vee>", 0.1);
+  adjust_pair (t, "<curlyvee>", 0.15);
+}
+
+void
+lsup_adjust_std (hashmap<string,double>& t) {
+  adjust_pair (t, "/", 0.07);
+  adjust_pair (t, "a", 0.05);
+  adjust_pair (t, "c", 0.05);
+  adjust_pair (t, "d", 0.05);
+  adjust_pair (t, "e", 0.05);
+  adjust_pair (t, "g", 0.05);
+  adjust_pair (t, "o", 0.05);
+  adjust_pair (t, "q", 0.05);
+  adjust_pair (t, "A", 0.05);
+  adjust_pair (t, "<alpha>", 0.05);
+  adjust_pair (t, "<beta>", 0.05);
+  adjust_pair (t, "<delta>", 0.05);
+  adjust_pair (t, "<iota>", 0.05);
+  adjust_pair (t, "<lambda>", 0.05);
+  adjust_pair (t, "<omicron>", 0.05);
+  adjust_pair (t, "<rho>", 0.05);
+  adjust_pair (t, "<sigma>", 0.05);
+  adjust_pair (t, "<phi>", 0.05);
+  adjust_pair (t, "<epsilon>", 0.05);
+  adjust_pair (t, "<varpi>", 0.05);
+  adjust_pair (t, "<varsigma>", 0.05);
+  adjust_pair (t, "<varphi>", 0.05);
+  adjust_pair (t, "<varrho>", 0.05);
+  adjust_pair (t, "<Alpha>", 0.05);
+  adjust_pair (t, "<Delta>", 0.05);
+  adjust_pair (t, "<Lambda>", 0.05);
+  adjust_pair (t, "<wedge>", 0.05);
+  adjust_pair (t, "<curlywedge>", 0.1);
+}
 
 void
 rsub_adjust_std (hashmap<string,double>& t) {
@@ -64,6 +146,7 @@ rsub_adjust_std (hashmap<string,double>& t) {
   adjust_pair (t, "<Upsilon>", -0.05);
   adjust_pair (t, "<Psi>", -0.03);
   adjust_pair (t, "<gamma>", -0.02);
+  adjust_pair (t, "<nabla>", -0.1);
 }
 
 void
@@ -81,6 +164,17 @@ rsup_adjust_std (hashmap<string,double>& t) {
 /******************************************************************************
 * Guessing further adjustments
 ******************************************************************************/
+
+void
+lsub_adjust_guessed (hashmap<string,double>& t) {
+  (void) t;
+}
+
+void
+lsup_adjust_guessed (hashmap<string,double>& t) {
+  adjust_integral (t, "1", 0.1);
+  adjust_integral (t, "2", 0.1);
+}
 
 void
 rsub_adjust_guessed (hashmap<string,double>& t) {
@@ -101,6 +195,11 @@ rsub_adjust_guessed (hashmap<string,double>& t) {
   adjust_pair (t, "<bbb-V>", -0.05);
   adjust_pair (t, "<bbb-W>", -0.05);
   adjust_pair (t, "<bbb-Y>", -0.05);
+  adjust_pair (t, "<bbb-v>", -0.05);
+  adjust_pair (t, "<bbb-w>", -0.05);
+  adjust_pair (t, "<bbb-y>", -0.05);
+  adjust_integral (t, "1", -0.1);
+  adjust_integral (t, "2", -0.1);
 }
 
 void
@@ -115,8 +214,28 @@ rsup_adjust_guessed (hashmap<string,double>& t) {
 * Interface
 ******************************************************************************/
 
+static hashmap<string,double> lsub_guessed (0.0);
+static hashmap<string,double> lsup_guessed (0.0);
 static hashmap<string,double> rsub_guessed (0.0);
 static hashmap<string,double> rsup_guessed (0.0);
+
+hashmap<string,double>
+lsub_guessed_table () {
+  if (N (lsub_guessed) == 0) {
+    lsub_adjust_std (lsub_guessed);
+    lsub_adjust_guessed (lsub_guessed);
+  }
+  return lsub_guessed;
+}
+
+hashmap<string,double>
+lsup_guessed_table () {
+  if (N (lsup_guessed) == 0) {
+    lsup_adjust_std (lsup_guessed);
+    lsup_adjust_guessed (lsup_guessed);
+  }
+  return lsup_guessed;
+}
 
 hashmap<string,double>
 rsub_guessed_table () {

@@ -662,6 +662,17 @@ finalize_layout (tree t) {
 	continue;
       }
 
+      if ((is_func (v, BEGIN, 1) && (v[0] == "teaserfigure" ))  ||
+          (is_func (v, BEGIN, 2) && (v[0] == "teaserfigure*"))) {
+	r << tree (NEW_LINE) << tree (BEGIN, "bigfigure*");
+	continue;
+      }
+
+      if (is_func (v, END, 1) && (v[0] == "teaserfigure")) {
+	r << tree (END, "bigfigure*") << tree (NEW_LINE);
+	continue;
+      }
+
       if ((is_func (v, BEGIN, 1) && (v[0] == "table*" ))  ||
           (is_func (v, BEGIN, 2) && (v[0] == "table**"))) {
 	r << tree (NEW_LINE) << tree (BEGIN, "bigtable*");
@@ -1422,31 +1433,36 @@ reopen_envs (tree t, array< array<tree> > &envs) {
   int i, n= N(t), m= N(envs);
   tree r (CONCAT);
   array<tree> done;
+  int direct_level= 0;
   for (i=0; i<n; i++) {
     if (is_apply (t[i], "begingroup")) {
       array<tree> tmp;
       if (m > 0) tmp= envs[m-1];
       envs << copy (tmp);
       m= N(envs);
+      direct_level++;
     }
     else if (is_apply (t[i], "endgroup")) {
-      if (m > 0)
-        envs= range (envs, 0, m-1);
+      if (m > 0) envs= range (envs, 0, m-1);
       m= N(envs);
-      r << get_envs (envs, array<tree> ());
+      if (direct_level == 0) r << get_envs (envs, array<tree> ());
+      direct_level= max (direct_level-1, 0);
     }
     else if (is_func (t[i], SET, 2) && repeat_envs (t[i][0])) {
       r << t[i];
       done << t[i][0];
       set_envs (t[i], envs);
+      direct_level= 0;
     }
     else if (is_func (t[i], SET, 2) && t[i][0] == MODE && t[i][1] == "text") {
       r << t[i];
       r << get_envs (envs, array<tree> ());
+      direct_level= 0;
     }
     else if (is_func (t[i], RESET, 1)) {
       r << t[i];
       reset_envs (t[i], envs);
+      direct_level= 0;
     }
     else if (begin) {
       r << get_envs (envs, done);
@@ -1526,17 +1542,17 @@ finalize_floats (tree t) {
     tree capt= find_caption (t[N(t)-1]);
     return tree (make_tree_label ("big-table"), body, capt);
   }
-   else if (is_var_compound (t, "bigfigure*", 1)) {
+  else if (is_var_compound (t, "bigfigure*", 1)) {
     tree body= float_body (t[N(t)-1]);
     tree capt= find_caption (t[N(t)-1]);
     return tree (WITH, "par-columns", "1",
-        tree (make_tree_label ("big-figure"), body, capt));
+                 tree (make_tree_label ("big-figure"), body, capt));
   }
   else if (is_var_compound (t, "bigtable*", 1)) {
     tree body= float_body (t[N(t)-1]);
     tree capt= find_caption (t[N(t)-1]);
     return tree (WITH, "par-columns", "1",
-        tree (make_tree_label ("big-table"), body, capt));
+                 tree (make_tree_label ("big-table"), body, capt));
   }
   else if (is_var_compound (t, "algorithm", 1)) {
     tree body= float_body (t[N(t)-1]);
@@ -2147,7 +2163,10 @@ latex_to_tree (tree t0) {
     tree the_body   = compound ("body", t13);
     if (textm_natbib)
       the_style= compound ("style", tuple (style, "cite-author-year"));
-    the_style[0] << "std-latex";
+    if (style != "acmart" && style != "acmsmall" && style != "acmlarge" &&
+        style != "acmtog" && style != "sigconf" && style != "sigchi" &&
+        style != "sigplan")
+      the_style[0] << "std-latex";
     tree r= tree (DOCUMENT, the_version, the_style, the_body);
     if (N (initial) > 0) r << compound ("initial", initial);
     // cout << "\n\nr= " << r << "\n\n";

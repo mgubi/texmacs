@@ -18,12 +18,15 @@
 
 (define-group variant-tag
   (section-tag) (list-tag) (figure-tag)
-  (enunciation-tag) (prominent-tag) (frame-tag) (frame-titled-tag)
-  (textual-tag) (code-tag) (ornament-tag) (balloon-tag))
+  (enunciation-tag) (prominent-tag) (compression-tag)
+  (frame-tag) (frame-titled-tag)
+  (textual-tag) (code-tag) (ornament-tag) (balloon-tag)
+  (reference-tag))
 
 (define-group similar-tag
   (section-tag) (list-tag) (figure-tag)
-  (enunciation-tag) (prominent-tag) (frame-tag) (frame-titled-tag)
+  (enunciation-tag) (prominent-tag) (compression-tag)
+  (frame-tag) (frame-titled-tag)
   (textual-tag) (code-tag) (equation-tag) (ornament-tag) (balloon-tag))
 
 (define-group numbered-tag
@@ -134,6 +137,9 @@
 (define-group prominent-tag
   quote-env quotation verse)
 
+(define-group compression-tag
+  ultra-compact compact compressed amplified)
+
 (define-group frame-tag
   padded overlined underlined bothlined framed ornamented)
 
@@ -144,7 +150,8 @@
 ;; Textual markup tags
 
 (define-group textual-tag
-  (strong-tag) (name-tag) (monospaced-tag) (size-tag) (opacity-tag))
+  (strong-tag) (name-tag) (monospaced-tag) (size-tag)
+  (opacity-tag) (decorated-tag))
 
 (define-group strong-tag
   strong em dfn underline)
@@ -161,6 +168,9 @@
 
 (define-group opacity-tag
   pastel greyed light)
+
+(define-group decorated-tag
+  deleted marked stressed fill-out fill-out*)
 
 ;; Figures and tables
 

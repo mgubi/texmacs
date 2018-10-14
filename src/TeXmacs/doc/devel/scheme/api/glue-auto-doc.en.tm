@@ -843,6 +843,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(apply-effect <scm-arg|content> <scm-arg|array_url> <scm-arg|url> <scm-arg|int> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|apply_effect> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(tt-exists? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3008,6 +3016,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|recompose> which returns
     <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(string-differences <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|differences> which returns
+    <scm|array_int>.
+  </explain>
+
+  <\explain>
+    <scm|(string-distance <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|distance> which returns
+    <scm|int>.
   </explain>
 
   <\explain>
@@ -7831,6 +7855,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|invalidate_all> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-forced)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_forced> which returns
     <scm|void>.
   </explain>
 

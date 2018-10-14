@@ -160,6 +160,8 @@
   ("altcmd /" (make 'no-break))
   ("altcmd !" (make-label))
   ("altcmd ?" (make 'reference))
+  ("altcmd ? var" (make 'eqref))
+  ("altcmd ? var var" (make 'pageref))
   ("altcmd P" (make 'pageref))
 
   ("accent:hat" "^")
@@ -216,10 +218,10 @@
 
   ("table N t" (make 'tabular))
   ("table N T" (make 'tabular*))
-  ("table N w" (make 'wide-tabular))
+  ("table N w" (make-wrapped 'wide-tabular))
   ("table N b" (make 'block))
   ("table N B" (make 'block*))
-  ("table N W" (make 'wide-block)))
+  ("table N W" (make-wrapped 'wide-block)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Emacs keymap
@@ -349,7 +351,7 @@
   ("C-F2" (revert-buffer))
   ("M-F2" (new-buffer))
   ("M-S-F2" (open-window))
-  ("M-C-F2" (clone-window))
+  ;;("M-C-F2" (clone-window))
   ("F3" (save-buffer))
   ("S-F3" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("F4" (preview-buffer))
@@ -667,8 +669,8 @@
   ("windows A--" (make 'emdash))
   ("windows A-." "<ldots>")
   ("windows A-c" (make 'copyright))
-  ("windows e" (make 'footnote))
-  ("windows F" (make 'footnote))
+  ("windows e" (make-wrapped 'footnote))
+  ("windows F" (make-wrapped 'footnote))
   ("windows h" (interactive-replace))
   ("windows k" (make 'hlink))
   ("windows K" (toggle-small-caps))

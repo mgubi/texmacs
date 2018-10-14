@@ -14,6 +14,7 @@
 (texmacs-module (text text-edit)
   (:use (utils library tree)
 	(utils edit variants)
+	(utils edit selections)
 	(text text-drd)
 	(generic format-edit)))
 
@@ -64,6 +65,7 @@
   (doc-title-inactive-tag-list))
 
 (tm-define (make-doc-data)
+  (:applicable (not (selection-active-non-small?)))
   (insert-go-to '(doc-data (doc-title "")) '(0 0 0)))
 
 (tm-define (make-doc-data-element l)
@@ -298,8 +300,9 @@
       (begin 
         (make l)
         (if flag (make-return-before))))))
-       
+
 (tm-define (make-section l)
+  (:applicable (not (selection-active-non-small?)))
   (make-section-aux l #f))
 
 (tm-define (make-unnamed-section l)
@@ -333,8 +336,11 @@
       (tree-in? t (enumerate-tag-list))))
 
 (tm-define (make-tmlist l)
-  (make l)
-  (make-item))
+  (with flag? (and (selection-active-non-small?)
+                   (in? l (description-tag-list)))
+    (wrap-selection-any
+      (make l)
+      (if flag? (insert '(item* "")) (make-item)))))
 
 (tm-define (make-item)
   (if (not (make-return-after))
@@ -396,14 +402,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (make-equation)
+  (:applicable (not (selection-active-non-small?)))
   (make 'equation)
   (temp-proof-fix))
 
 (tm-define (make-equation*)
+  (:applicable (not (selection-active-non-small?)))
   (make 'equation*)
   (temp-proof-fix))
 
 (tm-define (make-eqnarray*)
+  (:applicable (not (selection-active-non-small?)))
   (make 'eqnarray*)
   (temp-proof-fix))
 
@@ -718,48 +727,118 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (float-context? t)
-  (cond ((tree-is? t 'float) #t)
+  (tree-in? t '(float wide-float)))
+
+(tm-define (footnote-context? t)
+  (tree-in? t '(footnote wide-footnote)))
+
+(tm-define (float-or-footnote-context? t)
+  (tree-in? t '(float wide-float footnote wide-footnote)))
+
+(tm-define (phantom-float-context? t)
+  (tree-is? t 'phantom-float))
+
+(tm-define (rich-float-context? t)
+  (cond ((tree-in? t '(float wide-float)) #t)
         ((tree-in? t '(big-figure big-figure*
                        big-table big-table*
                        algorithm algorithm*
                        document concat))
-         (and (tree-up t) (float-context? (tree-up t))))
+         (and (tree-up t) (rich-float-context? (tree-up t))))
         (else #f)))
-
-(tm-define (phantom-float-context? t)
-  (tree-is? t 'phantom-float))
 
 (tm-define (floatable-context? t)
   (and (tree-in? t '(big-figure big-figure*
                      big-table big-table*
                      algorithm algorithm*))
-       (not (float-context? t))
-       (tree-is? t :up 'document)))
+       (not (rich-float-context? t))
+       (or (tree-is? t :up 'document)
+           (and (tree-is? t :up 'with)
+                (tree-is? t :up :up 'document)))))
+
+(define (with-wide? w)
+  (and (tree-is? w 'with)
+       (== (tree-arity w) 3)
+       (tm-equal? (tree-ref w 0) "par-columns")
+       (tm-equal? (tree-ref w 1) "1")))
 
 (tm-define (turn-floating t)
   (when (floatable-context? t)
-    (with f `(float "float" "thb" ,t)
+    (when (tree-is? t :up 'with)
+      (set! t (tree-up t)))
+    (with f (if (with-wide? t)
+                `(wide-float "float" "thb" ,(tree-ref t 2))
+                `(float "float" "thb" ,t))
       (tree-set! t f)
       (tree-go-to t :start)
-      (remove-text #f))))
+      (remove-text #f)
+      (tree-go-to t :end))))
+
+(define (floatable-path t)
+  (if (or (tm-func? t 'document 1)
+          (tm-func? t 'with 3)
+          (tm-in? t '(big-figure big-figure*
+                      big-table big-table*
+                      algorithm algorithm*)))
+      (with last (- (tm-arity t) 1)
+        (cons last (floatable-path (tm-ref t :last))))
+      (path-end t '())))
+
+(tm-define (turn-non-floating t)
+  (when (float-context? t)
+    (with body (tree-copy (tree-ref t :last))
+      (when (tree-is? t 'wide-float)
+        (set! body (tm->tree `(with "par-columns" "1" ,body))))
+      (when (not (tree-is? body 'document))
+        (set! body (tm->tree `(document ,body))))
+      (tree-cut t)
+      (insert-return)
+      (insert-go-to body (floatable-path body)))))
+
+(tm-define (float-wide? t)
+  (and-with f (tree-search-upwards t float-or-footnote-context?)
+    (tree-in? f '(wide-float wide-footnote))))
+
+(tm-define (test-float-wide? . args)
+  (float-wide? (focus-tree)))
+(tm-define (float-toggle-wide t)
+  (:check-mark "v" test-float-wide?)
+  (and-with f (tree-search-upwards t float-or-footnote-context?)
+    (cond ((tree-is? f 'float) (tree-assign-node f 'wide-float))
+          ((tree-is? f 'wide-float) (tree-assign-node f 'float))
+          ((tree-is? f 'footnote) (tree-assign-node f 'wide-footnote))
+          ((tree-is? f 'wide-footnote) (tree-assign-node f 'footnote)))))
+
+(tm-define (floatable-wide? t)
+  (and-with w (tree-up t)
+    (with-wide? w)))
+
+(tm-define (test-floatable-wide? . args)
+  (floatable-wide? (focus-tree)))
+(tm-define (floatable-toggle-wide t)
+  (:check-mark "v" test-floatable-wide?)
+  (and-with w (tree-up t)
+    (if (with-wide? w)
+        (tree-set w (tree-ref w 2))
+        (tree-set t `(with "par-columns" "1" ,t)))))
 
 (tm-define (cursor-at-anchor?)
   (with t (cursor-tree)
-    (tree-in? t '(float footnote))))
+    (float-or-footnote-context? t)))
 
 (tm-define (go-to-anchor)
-  (cond ((inside? 'float)
-         (with-innermost t 'float
+  (cond ((or (inside? 'float) (inside? 'wide-float))
+         (with-innermost t float-context?
            (tree-go-to t :end)))
-        ((inside? 'footnote)
-         (with-innermost t 'footnote
+        ((or (inside? 'footnote) (inside? 'wide-footnote))
+         (with-innermost t footnote-context?
            (tree-go-to t :end)))))
 
 (tm-define (go-to-float)
   (with t (cursor-tree)
-    (cond ((tree-is? t 'float)
+    (cond ((float-context? t)
            (tree-go-to t 2 :start))
-          ((tree-is? t 'footnote)
+          ((footnote-context? t)
            (tree-go-to t 0 :start)))))
 
 (tm-define (cursor-toggle-anchor)

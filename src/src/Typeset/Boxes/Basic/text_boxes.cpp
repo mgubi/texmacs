@@ -49,6 +49,7 @@ struct text_box_rep: public box_rep {
   text_box_rep (path ip, int pos, string s, font fn, pencil pen, xkerning xk);
   operator tree () { return str; }
   box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   void      display (renderer ren);
   double    left_slope ();
@@ -125,6 +126,13 @@ text_box_rep::adjust_kerning (int mode, double factor) {
   if ((mode & START_OF_LINE) != 0) nxk->left  -= pad;
   if ((mode & END_OF_LINE  ) != 0) nxk->right -= pad;
   return tm_new<text_box_rep> (ip, pos, str, fn, pen, nxk);
+}
+
+box
+text_box_rep::expand_glyphs (int mode, double factor) {
+  if (N(str) == 0) return this;
+  font nfn= fn->magnify (1.0 + factor, 1.0);
+  return tm_new<text_box_rep> (ip, pos, str, nfn, pen, xk);
 }
 
 void
@@ -514,6 +522,7 @@ delimiter_box (path ip, string s, font fn, pencil pen, SI bot, SI top) {
   //cout << "  extents: " << b->x1/PIXEL << ", " << b->y1/PIXEL
   //     << "; " << b->x2/PIXEL << ", " << b->y2/PIXEL << "\n";
   box mvb= move_box (ip, b, x, y, false, true);
+  if (ends (r, "-0>")) return mvb;
   return macro_box (ip, mvb, fn);
 }
 
@@ -537,6 +546,7 @@ delimiter_box (path ip, string s, font fn, pencil pen,
   //cout << "  extents: " << b->x1/PIXEL << ", " << b->y1/PIXEL
   //     << "; " << b->x2/PIXEL << ", " << b->y2/PIXEL << "\n";
   box mvb= move_box (ip, b, x, y, false, true);
+  if (ends (r, "-0>")) return mvb;
   return macro_box (ip, mvb, fn);
 }
 

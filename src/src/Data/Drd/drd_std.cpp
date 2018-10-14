@@ -394,6 +394,9 @@ init_std_drd () {
 	fixed (1) -> returns_boolean () -> regular (0) -> name ("tuple?"));
   init (LOOK_UP, "look-up",
 	fixed (1, 1, BIFORM) -> regular (0) -> integer (1));
+  init (OCCURS_INSIDE, "occurs-inside",
+	fixed (1, 1, BIFORM) -> returns_boolean () ->
+        regular (0) -> argument (1));
   init (EQUAL, "equal",
 	fixed (2) -> returns_boolean () -> regular (0));
   init (UNEQUAL, "unequal",
@@ -938,6 +941,7 @@ init_std_drd () {
   init_var (VISITED_COLOR, TYPE_COLOR);
   init_var (NO_PATTERNS, TYPE_COLOR);
   init_var (LANGUAGE, TYPE_STRING);
+  init_var (SPACING_POLICY, TYPE_ADHOC);
   init_var (ATOM_DECORATIONS, TYPE_ADHOC);
   init_var (LINE_DECORATIONS, TYPE_ADHOC);
   init_var (PAGE_DECORATIONS, TYPE_ADHOC);
@@ -949,6 +953,7 @@ init_std_drd () {
   init_var (MATH_FONT_FAMILY, TYPE_STRING);
   init_var (MATH_FONT_SERIES, TYPE_STRING);
   init_var (MATH_FONT_SHAPE, TYPE_STRING);
+  init_var (MATH_FONT_SIZES, TYPE_ADHOC);
   init_var (MATH_LEVEL, TYPE_INTEGER);
   init_var (MATH_DISPLAY, TYPE_BOOLEAN);
   init_var (MATH_CONDENSED, TYPE_BOOLEAN);
@@ -958,6 +963,10 @@ init_std_drd () {
   init_var (MATH_FRAC_LIMIT, TYPE_LENGTH);
   init_var (MATH_TABLE_LIMIT, TYPE_LENGTH);
   init_var (MATH_FLATTEN_COLOR, TYPE_COLOR);
+  init_var (MATH_TOP_SWELL_START, TYPE_LENGTH);
+  init_var (MATH_TOP_SWELL_END, TYPE_LENGTH);
+  init_var (MATH_BOT_SWELL_START, TYPE_LENGTH);
+  init_var (MATH_BOT_SWELL_END, TYPE_LENGTH);
 
   init_var (PROG_LANGUAGE, TYPE_STRING);
   init_var (PROG_SCRIPTS, TYPE_STRING);
@@ -971,8 +980,11 @@ init_std_drd () {
   init_var (PAR_FLEXIBILITY, TYPE_NUMERIC);
   init_var (PAR_HYPHEN, TYPE_STRING);
   init_var (PAR_SPACING, TYPE_STRING);
+  init_var (PAR_KERNING_REDUCE, TYPE_NUMERIC);
   init_var (PAR_KERNING_STRETCH, TYPE_NUMERIC);
   init_var (PAR_KERNING_MARGIN, TYPE_BOOLEAN);
+  init_var (PAR_CONTRACTION, TYPE_NUMERIC);
+  init_var (PAR_EXPANSION, TYPE_NUMERIC);
   init_var (PAR_WIDTH, TYPE_LENGTH);
   init_var (PAR_LEFT, TYPE_LENGTH);
   init_var (PAR_RIGHT, TYPE_LENGTH);
@@ -986,6 +998,7 @@ init_std_drd () {
   init_var (PAR_FNOTE_SEP, TYPE_LENGTH);
   init_var (PAR_COLUMNS, TYPE_INTEGER);
   init_var (PAR_COLUMNS_SEP, TYPE_LENGTH);
+  init_var (PAR_SWELL, TYPE_LENGTH);
 
   init_var (PAGE_MEDIUM, TYPE_STRING);
   init_var (PAGE_PRINTED, TYPE_BOOLEAN);
@@ -1089,6 +1102,7 @@ init_std_drd () {
   init_var (CELL_BLOCK, TYPE_STRING);
   init_var (CELL_ROW_NR, TYPE_INTEGER);
   init_var (CELL_COL_NR, TYPE_INTEGER);
+  init_var (CELL_SWELL, TYPE_LENGTH);
 
   init_var (GR_GEOMETRY, TYPE_ADHOC);
   init_var (GR_FRAME, TYPE_ADHOC);

@@ -303,74 +303,68 @@
 (tm-define (init-default-font)
   (:check-mark "*" test-default-font?)
   (init-default "font")
-  (init-default "math-font"))
+  (init-default "math-font")
+  (init-default "font-family"))
 
-(tm-define (test-init-font? val math-val)
+(tm-define (test-init-font? val . opts)
   (== (get-init "font") val))
 
-(tm-define (init-font val math-val)
+(tm-define (init-font val . opts)
   (:check-mark "*" test-init-font?)
   (init-env "font" val)
-  (init-env "math-font" math-val))
+  (when (nnull? opts)
+    (init-env "math-font" (car opts)))
+  (init-env "font-family" "rm"))
 
 (menu-bind document-short-chinese-font-menu
   (if (font-exists-in-tt? "AppleGothic")
-      ("Apple Gothic" (init-env "font" "apple-gothic")))
+      ("Apple Gothic" (init-font "apple-gothic")))
   (if (font-exists-in-tt? "FandolSong-Regular")
-      ("FandolSong" (init-env "font" "FandolSong")))
+      ("FandolSong" (init-font "FandolSong")))
   (if (font-exists-in-tt? "fireflysung")
-      ("Fireflysung" (init-env "font" "fireflysung")))
+      ("Fireflysung" (init-font "fireflysung")))
   (if (font-exists-in-tt? "wqy-microhei")
-      ("MicroHei" (init-env "font" "wqy-microhei")))
+      ("MicroHei" (init-font "wqy-microhei")))
   (if (font-exists-in-tt? "MS Mincho")
-      ("MS Mincho" (init-env "font" "ms-mincho")))
+      ("MS Mincho" (init-font "ms-mincho")))
   (if (font-exists-in-tt? "simsun")
-      ("SimSun" (init-env "font" "simsun")))
+      ("SimSun" (init-font "simsun")))
   (if (font-exists-in-tt? "uming")
-      ("UMing" (init-env "font" "uming")))
+      ("UMing" (init-font "uming")))
   (if (font-exists-in-tt? "wqy-zenhei")
-      ("ZenHei" (init-env "font" "wqy-zenhei"))))
+      ("ZenHei" (init-font "wqy-zenhei"))))
 
 (menu-bind document-short-japanese-font-menu
   (if (font-exists-in-tt? "AppleGothic")
-      ("Apple Gothic" (init-env "font" "apple-gothic")))
+      ("Apple Gothic" (init-font "apple-gothic")))
   (if (font-exists-in-tt? "华文细黑")
-      ("HeiTi" (init-env "font" "heiti")))
+      ("HeiTi" (init-font "heiti")))
   (if (font-exists-in-tt? "ヒラギノ明朝 ProN W6")
-      ("Hiragino Kaku" (init-env "font" "kaku")))
+      ("Hiragino Kaku" (init-font "kaku")))
   (if (font-exists-in-tt? "ipam")
-      ("Ipa" (init-env "font" "ipa")))
+      ("Ipa" (init-font "ipa")))
   (if (font-exists-in-tt? "ttf-japanese-gothic")
-      ("Japanese" (init-env "font" "ttf-japanese")))
+      ("Japanese" (init-font "ttf-japanese")))
   (if (font-exists-in-tt? "sazanami-gothic")
-      ("Sazanami" (init-env "font" "sazanami")))
+      ("Sazanami" (init-font "sazanami")))
   (if (font-exists-in-tt? "ukai")
-      ("UKai" (init-env "font" "ukai"))))
+      ("UKai" (init-font "ukai"))))
 
 (menu-bind document-short-korean-font-menu
   (if (font-exists-in-tt? "AppleGothic")
-      ("Apple Gothic" (init-env "font" "apple-gothic")))
+      ("Apple Gothic" (init-font "apple-gothic")))
   (if (font-exists-in-tt? "Batang")
-      ("Batang" (init-env "font" "batang")))
+      ("Batang" (init-font "batang")))
   (if (font-exists-in-tt? "Gulim")
-      ("Gulim" (init-env "font" "gulim")))
+      ("Gulim" (init-font "gulim")))
   (if (font-exists-in-tt? "unbatang")
-      ("Unbatang" (init-env "font" "unbatang"))))
+      ("Unbatang" (init-font "unbatang"))))
 
 (menu-bind document-short-font-menu
   ("Default" (init-default-font))
   ---
-  ("Concrete" (init-font "concrete" "concrete"))
   ("Roman" (init-font "roman" "roman"))
   ("Stix" (init-font "stix" "math-stix"))
-  ;;---
-  ;;("Avant Garde" (init-env "font" "avant-garde"))
-  ;;("Bookman" (init-env "font" "bookman"))
-  ;;("Courier" (init-env "font" "courier"))
-  ;;("Helvetica" (init-env "font" "helvetica"))
-  ;;("NC Schoolbook" (init-env "font" "new-century-schoolbook"))
-  ;;("Palatino" (init-env "font" "palatino"))
-  ;;("Times" (init-env "font" "times"))
   (if (or (font-exists-in-tt? "texgyrebonum-math")
           (font-exists-in-tt? "texgyrepagella-math")
           (font-exists-in-tt? "texgyreschola-math")
@@ -391,35 +385,35 @@
           (font-exists-in-tt? "Papyrus"))
       ---
       (if (font-exists-in-tt? "AmericanTypewriter")
-          ("American Typewriter" (init-env "font" "American Typewriter")))
+          ("American Typewriter" (init-font "American Typewriter")))
       (if (font-exists-in-tt? "Baskerville")
-          ("Baskerville" (init-env "font" "Baskerville")))
+          ("Baskerville" (init-font "Baskerville")))
       (if (font-exists-in-tt? "Chalkboard")
-          ("Chalkboard" (init-env "font" "Chalkboard")))
+          ("Chalkboard" (init-font "Chalkboard")))
       (if (font-exists-in-tt? "Chalkduster")
-          ("Chalkduster" (init-env "font" "Chalkduster")))
+          ("Chalkduster" (init-font "Chalkduster")))
       (if (font-exists-in-tt? "Cochin")
-          ("Cochin" (init-env "font" "Cochin")))
+          ("Cochin" (init-font "Cochin")))
       (if (font-exists-in-tt? "Cuprum-Regular")
-          ("Cuprum" (init-env "font" "Cuprum")))
+          ("Cuprum" (init-font "Cuprum")))
       (if (font-exists-in-tt? "DejaVuSerif")
           ("Dejavu" (init-font "dejavu" "math-dejavu")))
       (if (font-exists-in-tt? "Didot")
-          ("Didot" (init-env "font" "Didot")))
+          ("Didot" (init-font "Didot")))
       (if (font-exists-in-tt? "Essays1743")
-          ("Essays1743" (init-env "font" "Essays1743")))
+          ("Essays1743" (init-font "Essays1743")))
       (if (font-exists-in-tt? "MarkerFelt")
-          ("Marker Felt" (init-env "font" "Marker Felt")))
+          ("Marker Felt" (init-font "Marker Felt")))
       (if (font-exists-in-tt? "meyne_textur")
-          ("Meyne Textur" (init-env "font" "Meyne Textur")))
+          ("Meyne Textur" (init-font "Meyne Textur")))
       (if (font-exists-in-tt? "LinBiolinum_R")
-          ("Linux Biolinum" (init-env "font" "Linux Biolinum")))
+          ("Linux Biolinum" (init-font "Linux Biolinum")))
       (if (font-exists-in-tt? "LinLibertine_R")
-          ("Linux Libertine" (init-env "font" "Linux Libertine")))
+          ("Linux Libertine" (init-font "Linux Libertine")))
       (if (font-exists-in-tt? "Optima")
-          ("Optima" (init-env "font" "Optima")))
+          ("Optima" (init-font "Optima")))
       (if (font-exists-in-tt? "Papyrus")
-          ("Papyrus" (init-env "font" "Papyrus"))))
+          ("Papyrus" (init-font "Papyrus"))))
   (if (and (supports-chinese?) (== (get-init "language") "chinese"))
       ---
       (link document-short-chinese-font-menu))
@@ -469,9 +463,7 @@
   (-> "Number of columns"
       ("Default" (init-default "par-columns"))
       ---
-      ("1" (init-env "par-columns" "1"))
-      ("2" (init-env "par-columns" "2"))
-      ("3" (init-env "par-columns" "3")))
+      (link document-columns-menu))
   (-> "Advanced"
       (-> "Space stretchability"
           ("Default" (init-default "par-flexibility"))
@@ -524,22 +516,7 @@
   ("Standard 4:3" (init-page-type "4:3"))
   ("Standard 5:4" (init-page-type "5:4")))
 
-(tm-menu (document-page-size-menu)
-  ("Default"
-   (init-default "page-type" "page-width" "page-height")
-   (notify-page-change))
-  ---
-  (if (not (style-has? "beamer-style"))
-      (group "Common formats")
-      (link document-common-page-size-menu))
-  (if (style-has? "beamer-style")
-      (group "Beamer formats")
-      (link document-beamer-page-size-menu))
-  ---
-  (group "Standard formats")
-  (if (style-has? "beamer-style")
-      (-> "Common"
-          (link document-common-page-size-menu)))
+(tm-menu (document-standard-page-formats)
   (-> "A series"
       ("A0" (init-page-type "a0"))
       ("A1" (init-page-type "a1"))
@@ -592,13 +569,43 @@
       ("Note" (init-page-type "note"))
       ("Quarto" (init-page-type "quarto"))
       ("Statement" (init-page-type "statement"))
-      ("Tabloid" (init-page-type "tabloid")))
-  (if (not (style-has? "beamer-style"))
-      (-> "Beamer"
-          (link document-beamer-page-size-menu)))
+      ("Tabloid" (init-page-type "tabloid"))))
+
+(tm-menu (document-page-size-menu)
+  ("Default" (default-page-type))
+  ---
+  (group "Common formats")
+  (link document-common-page-size-menu)
+  ---
+  (group "Standard formats")
+  (link document-standard-page-formats)
+  (-> "Beamer"
+      (link document-beamer-page-size-menu))
   ---
   ("Other" (interactive init-page-size)))
 
+(tm-menu (document-page-size-menu)
+  (:require (style-has? "beamer-style"))
+  ("Default" (default-page-type))
+  ---
+  (group "Beamer formats")
+  (link document-beamer-page-size-menu)
+  ---
+  (group "Standard formats")
+  (-> "Common"
+      (link document-common-page-size-menu))
+  (link document-standard-page-formats)
+  ---
+  ("Other" (interactive init-page-size)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Number of columns
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-menu (document-columns-menu)
+  ("One column" (init-env "par-columns" "1"))
+  ("Two columns" (init-env "par-columns" "2")))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Document -> Page menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -914,6 +921,8 @@
         ((== s "1") "One column")
         ((== s "2") "Two columns")
         ((== s "3") "Three columns")
+        ((== s "4") "Four columns")
+        ((== s "5") "Five columns")
         (else (string-append s " columns"))))
 
 (tm-menu (focus-document-menu t)
@@ -928,8 +937,7 @@
       ("Portrait" (init-page-orientation "portrait"))
       ("Landscape" (init-page-orientation "landscape")))
   (-> (eval (number-columns-text (get-init "par-columns")))
-      ("One column" (init-env "par-columns" "1"))
-      ("Two columns" (init-env "par-columns" "2")))
+      (link document-columns-menu))
   (if (and (== (get-preference "experimental encryption") "on")
 	   (!= (get-init "encryption") ""))
       (-> "Encryption" (link document-encryption-menu)))
@@ -989,18 +997,17 @@
     (=> (balloon (eval (upcase-first (get-init "page-type")))
                  "Paper size")
         (link document-page-size-menu))
-    (=> (balloon (eval (string-append (get-init "font-base-size") "pt"))
-                 "Font size")
-        (link document-font-base-size-menu))
     (=> (balloon (eval (upcase-first (font-family-main (get-init "font"))))
                  "Main document font")
         (link document-short-font-menu))
+    (=> (balloon (eval (string-append (get-init "font-base-size") "pt"))
+                 "Font size")
+        (link document-font-base-size-menu))
     (=> (balloon (icon (eval (current-page-icon))) "Page layout")
         ("Portrait" (init-page-orientation "portrait"))
         ("Landscape" (init-page-orientation "landscape"))
         ---
-        ("One column" (init-env "par-columns" "1"))
-        ("Two columns" (init-env "par-columns" "2"))
+        (link document-columns-menu)
         ---
 	(link page-rendering-menu))
     (if (and (== (get-preference "experimental encryption") "on")

@@ -354,6 +354,7 @@ x_font_rep::x_font_rep (string name, string family2, int size2, int dpi2):
   get_extents (" ", ex);
   spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (ex->x2-ex->x1)<<1);
   extra= spc;
+  mspc = spc;
   sep  = wfn/10;
 
   // get_italic space

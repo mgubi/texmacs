@@ -149,7 +149,8 @@
                      "tab"))))
 
 (tm-define (kbd-variant t forwards?)
-  (:require (and (tree-in? t '(label reference pageref)) (cursor-inside? t)))
+  (:require (and (tree-in? t '(label reference pageref eqref))
+                 (cursor-inside? t)))
   (if (complete-try?) (noop)))
 
 (tm-define (bib-cite-context? t)
@@ -269,7 +270,7 @@
   (and (tree-compound? t) (tree-label-extension? (tree-label t))))
 
 (tm-define (focus-has-preferences? t)
-  (:require (tree-in? t '(reference pageref hlink locus ornament)))
+  (:require (tree-in? t '(reference pageref eqref hlink locus ornament)))
   #t)
 
 (tm-define (focus-can-search? t)
@@ -666,12 +667,12 @@
 	"ornament-sunny-color" "ornament-shadow-color"))
 
 (tm-define (standard-parameters l)
-  (:require (in? l '("reference" "pageref" "label" "tag")))
+  (:require (in? l '("reference" "pageref" "eqref" "label" "tag")))
   (list))
 
 (tm-define (search-parameters l)
   (:require (in? (if (string? l) l (symbol->string l))
-                 '("reference" "pageref" "hlink")))
+                 '("reference" "pageref" "eqref" "hlink")))
   (standard-parameters "locus"))
 
 (tm-define (parameter-choice-list l)
@@ -734,11 +735,14 @@
 
 (tm-define (make-anim l)
   (with duration "1s"
-    (if (selection-active-any?)
-        (with selection (selection-tree)
+    (if (selection-active?)
+        (let* ((selection (selection-tree))
+	       (p (path-end selection (list))))
+	  (when (selection-active-large?)
+	    (set! selection `(par-block ,selection))
+	    (set! p (cons 0 p)))
           (clipboard-cut "graphics background")
-          (insert-go-to `(,l ,selection ,duration)
-                        (cons 0 (path-end selection (list)))))
+          (insert-go-to `(,l ,selection ,duration) (cons 0 p)))
         (insert-go-to `(,l "" ,duration) (list 0 0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -814,7 +818,7 @@
                   (list 2 0 0))))
 
 (define (any-float? t)
-  (tree-in? t '(float phantom-float)))
+  (tree-in? t '(float wide-float phantom-float)))
 
 (tm-define (insertion-positioning what flag)
   (:synopsis "Allow/disallow the position @what for innermost float.")

@@ -48,10 +48,14 @@ is_metadata (tree u) {
          is_tuple (u, "\\altaffiliation")    ||
          is_tuple (u, "\\altaffiliation*")   ||
          is_tuple (u, "\\author")            ||
+         is_tuple (u, "\\authornote")        ||
          is_tuple (u, "\\authorrunning")     ||
          is_tuple (u, "\\author*")           ||
          is_tuple (u, "\\category")          ||
          is_tuple (u, "\\category*")         ||
+         is_tuple (u, "\\ccsdesc")           ||
+         is_tuple (u, "\\ccsdesc*")          ||
+         is_tuple (u, "\\CCSXML")            ||
          is_tuple (u, "\\classification")    ||
          is_tuple (u, "\\contrib")           ||
          is_tuple (u, "\\contrib*")          ||
@@ -73,6 +77,7 @@ is_metadata (tree u) {
          is_tuple (u, "\\maketitle")         ||
          is_tuple (u, "\\noaffiliation")     ||
          is_tuple (u, "\\numberofauthors")   ||
+         is_tuple (u, "\\orcid")             ||
          is_tuple (u, "\\pacs")              ||
          is_tuple (u, "\\preprint")          ||
          is_tuple (u, "\\pagenumbering")     ||
@@ -82,8 +87,10 @@ is_metadata (tree u) {
          is_tuple (u, "\\subjclass")         ||
          is_tuple (u, "\\subjclass*")        ||
          is_tuple (u, "\\subtitle")          ||
+         is_tuple (u, "\\subtitlenote")      ||
          is_tuple (u, "\\terms")             ||
          is_tuple (u, "\\title")             ||
+         is_tuple (u, "\\titlenote")         ||
          is_tuple (u, "\\titlerunning")      ||
          is_tuple (u, "\\title*")            ||
          is_tuple (u, "\\thanks")            ||
@@ -343,6 +350,9 @@ collect_metadata (tree t, tree latex_class) {
 
   if (s == "acm_proc_article-sp" ||
       s == "sig-alternate" || s == "sig-alt-full")
+    r= collect_metadata_acm_old (t);
+  else if (s == "acmart" || s == "acmsmall" || s == "acmlarge" ||
+           s == "acmtog" || s == "sigconf" || s == "sigchi" || s == "sigplan")
     r= collect_metadata_acm (t);
   else if (s == "elsarticle" || s == "elsart" || s == "ifacconf")
     r= collect_metadata_elsevier (t);
@@ -367,10 +377,19 @@ collect_metadata (tree t, tree latex_class) {
 
 string
 get_latex_style (tree t) {
-  if (N(t) != 3 && N(t) != 2)  return "";
+  if (N(t) != 3 && N(t) != 2) return "";
   string s= trim_spaces (string_arg (t[N(t)-1]));
+  string opt= N(t)==3? trim_spaces (string_arg (t[1])): string ("");
+  array<string> opts= trim_spaces (tokenize (opt, ","));
+  if (N(t) == 3 && occurs ("acmart", s)) {
+    if (occurs ("acmsmall", opt)) return "acmsmall";
+    if (occurs ("acmlarge", opt)) return "acmlarge";
+    if (occurs ("acmtog", opt)) return "acmtog";
+    if (occurs ("sigconf", opt)) return "sigconf";
+    if (occurs ("sigchi", opt)) return "sigchi";
+    if (occurs ("sigplan", opt)) return "sigplan";
+  }
   if (N(t) == 3 && occurs ("revtex", s)) {
-    array<string> opts= trim_spaces (tokenize (string_arg (t[1]), ","));
     if (contains (string ("aip"), opts)) return "aip";
     if (contains (string ("aps"), opts)) return "aps";
   }

@@ -43,7 +43,7 @@ struct tt_font_rep: font_rep {
   void  get_xpositions (string s, SI* xpos);
   void  draw_fixed (renderer ren, string s, SI x, SI y);
   font  magnify (double zoomx, double zoomy);
-  void  advance_glyph (string s, int& pos);
+  void  advance_glyph (string s, int& pos, bool ligf);
   glyph get_glyph (string s);
   int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
 };
@@ -105,6 +105,7 @@ tt_font_rep::tt_font_rep (string name, string family2, int size2,
   get_extents (" ", ex);
   spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (3*(ex->x2-ex->x1))>>1);
   extra= spc/2;
+  mspc = spc;
   sep  = wfn/10;
 
   // get_italic space
@@ -199,7 +200,8 @@ tt_font_rep::magnify (double zoomx, double zoomy) {
 }
 
 void
-tt_font_rep::advance_glyph (string s, int& pos) {
+tt_font_rep::advance_glyph (string s, int& pos, bool ligf) {
+  (void) ligf;
   if (pos < N(s)) pos++;
 }
 

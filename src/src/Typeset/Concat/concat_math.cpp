@@ -65,6 +65,24 @@ concater_rep::typeset_large (tree t, path ip, int tp, int otp, string prefix) {
   env->fn= old_fn;
 }
 
+inline array<space>
+get_spacing (font fn, int id, bool condensed, bool display) {
+  if (condensed) return fn->get_narrow_spacing (id);
+  if (display) return fn->get_wide_spacing (id);
+  return fn->get_normal_spacing (id);
+}
+
+void
+concater_rep::typeset_wide_middle (tree t, path ip) {
+  array<space> spc_tab=
+    get_spacing (env->fn, env->spacing_policy, env->math_condensed,
+                 env->display_style && env->nesting_level == 0);
+  space spc= spc_tab[SPC_MIDDLE];
+  if (spc->max > 0) print (spc);
+  typeset_large (t, ip, MIDDLE_BRACKET_ITEM, OP_MIDDLE_BRACKET, "<mid-");
+  if (spc->max > 0) print (spc);
+}
+
 static void
 get_big_flags (string l, bool& int_flag, bool& it_flag, bool& lim_flag) {
   int n= N(l);
@@ -486,12 +504,11 @@ make_large (tree_label l, tree t) {
 
 void
 concater_rep::typeset_around (tree t, path ip, bool colored) {
+  tree old_nl=
+    env->local_begin (MATH_NESTING_LEVEL, as_string (env->nesting_level + 1));
   if (colored) {
-    int nl= env->get_int (MATH_NESTING_LEVEL);
-    tree old_col= env->local_begin (COLOR, bracket_color (nl));
-    tree old_nl = env->local_begin (MATH_NESTING_LEVEL, as_string (nl+1));
+    tree old_col= env->local_begin (COLOR, bracket_color (env->nesting_level));
     typeset_around (t, ip, false);
-    env->local_end (MATH_NESTING_LEVEL, old_nl);
     env->local_end (COLOR, old_col);
   }
   else {
@@ -539,6 +556,7 @@ concater_rep::typeset_around (tree t, path ip, bool colored) {
     }
     marker (descend (ip, 1));
   }
+  env->local_end (MATH_NESTING_LEVEL, old_nl);
 }
 
 void
