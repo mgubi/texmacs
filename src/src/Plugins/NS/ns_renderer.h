@@ -49,6 +49,6 @@ public:
 
 };
 
-ns_renderer_rep *the_aqua_renderer();
+ns_renderer_rep *the_ns_renderer();
 
 #endif // defined NS_RENDERER_H

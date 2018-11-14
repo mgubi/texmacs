@@ -279,7 +279,7 @@ void initkeymap()
 //	NSRect bounds = [self bounds];
 	
   {
-    aqua_renderer_rep* r = the_aqua_renderer();
+    aqua_renderer_rep* r = the_ns_renderer();
     int x1 = rect.origin.x;
     int y1 = rect.origin.y+rect.size.height;
     int x2 = rect.origin.x+rect.size.width;

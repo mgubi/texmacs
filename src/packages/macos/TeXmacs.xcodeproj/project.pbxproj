@@ -78,7 +78,6 @@
 		491BB5B8173118F700A755DF /* rewrite_equation_number.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B5173118F700A755DF /* rewrite_equation_number.cpp */; };
 		491BF364178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491BF365178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
-		491BF366178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491BF36E178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
 		491BF36F178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
 		491BF370178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
@@ -90,12 +89,10 @@
 		491BF376178BFF4C00C69EEF /* tm_winsparkle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36C178BFF4C00C69EEF /* tm_winsparkle.cpp */; };
 		491BF378178BFF9000C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491BF37A178BFFA600C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
-		491BF37C178BFFAF00C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491FC57C16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
 		491FC57D16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
 		491FC57E16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
 		49250531186DD64A00D32374 /* QTMTreeModel.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 49630B5A186D6A3600C9268F /* QTMTreeModel.hpp */; };
-		49250532186DD65400D32374 /* QTMTreeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49630B59186D6A3600C9268F /* QTMTreeModel.cpp */; };
 		4929A88A170207440028991F /* curve.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A87F170207440028991F /* curve.cpp */; };
 		4929A88B170207440028991F /* curve.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A87F170207440028991F /* curve.cpp */; };
 		4929A88C170207440028991F /* curve.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A87F170207440028991F /* curve.cpp */; };
@@ -951,6 +948,29 @@
 		9C6723D714FFD4EC005F1FE9 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
 		9C6723D814FFD4EE005F1FE9 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
 		9C6723D914FFD4F1005F1FE9 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
+		9C6DCD25219CD0EB00DB8E7A /* GSAutoLayoutSpace.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCCF1219CD0EB00DB8E7A /* GSAutoLayoutSpace.m */; };
+		9C6DCD26219CD0EB00DB8E7A /* GSAutoLayoutDefaults.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCCF3219CD0EB00DB8E7A /* GSAutoLayoutDefaults.m */; };
+		9C6DCD27219CD0EB00DB8E7A /* NSViewSize.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCCF7219CD0EB00DB8E7A /* NSViewSize.m */; };
+		9C6DCD28219CD0EB00DB8E7A /* README in Resources */ = {isa = PBXBuildFile; fileRef = 9C6DCCFC219CD0EB00DB8E7A /* README */; };
+		9C6DCD29219CD0EB00DB8E7A /* GSAutoLayoutHBox.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCCFE219CD0EB00DB8E7A /* GSAutoLayoutHBox.m */; };
+		9C6DCD2A219CD0EB00DB8E7A /* GSAutoLayoutVSpace.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCCFF219CD0EB00DB8E7A /* GSAutoLayoutVSpace.m */; };
+		9C6DCD2B219CD0EB00DB8E7A /* GSAutoLayoutGrid.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD00219CD0EB00DB8E7A /* GSAutoLayoutGrid.m */; };
+		9C6DCD2C219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD02219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.m */; };
+		9C6DCD2D219CD0EB00DB8E7A /* GSAutoLayoutManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD06219CD0EB00DB8E7A /* GSAutoLayoutManager.m */; };
+		9C6DCD2E219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD07219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.m */; };
+		9C6DCD2F219CD0EB00DB8E7A /* GSAutoLayoutHSpace.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD08219CD0EB00DB8E7A /* GSAutoLayoutHSpace.m */; };
+		9C6DCD30219CD0EB00DB8E7A /* GSAutoLayoutVBox.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD09219CD0EB00DB8E7A /* GSAutoLayoutVBox.m */; };
+		9C6DCD31219CD0EB00DB8E7A /* TMView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD0B219CD0EB00DB8E7A /* TMView.mm */; };
+		9C6DCD32219CD0EB00DB8E7A /* MainMenu.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9C6DCD0C219CD0EB00DB8E7A /* MainMenu.nib */; };
+		9C6DCD33219CD0EB00DB8E7A /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9C6DCD0E219CD0EB00DB8E7A /* InfoPlist.strings */; };
+		9C6DCD34219CD0EB00DB8E7A /* Window.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9C6DCD10219CD0EB00DB8E7A /* Window.nib */; };
+		9C6DCD35219CD0EB00DB8E7A /* ns_utilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */; };
+		9C6DCD36219CD0EB00DB8E7A /* ns_gui.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */; };
+		9C6DCD37219CD0EB00DB8E7A /* ns_renderer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */; };
+		9C6DCD38219CD0EB00DB8E7A /* TMButtonsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD17219CD0EB00DB8E7A /* TMButtonsController.m */; };
+		9C6DCD39219CD0EB00DB8E7A /* ns_dialogues.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */; };
+		9C6DCD3A219CD0EB00DB8E7A /* ns_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */; };
+		9C6DCD3B219CD0EB00DB8E7A /* ns_menu.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */; };
 		9C722BED10D2F7C700C41915 /* qt_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */; };
 		9C722C0F10D2F88900C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
 		9C722C1E10D2FBD300C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
@@ -1486,17 +1506,6 @@
 		9CF9FBE016F1334E00A146D1 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
 		9CF9FBE116F1334E00A146D1 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
 		9CF9FBE216F1334E00A146D1 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
-		9CF9FC0116F135A100A146D1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBE716F135A100A146D1 /* InfoPlist.strings */; };
-		9CF9FC0216F135A100A146D1 /* MainMenu.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBE916F135A100A146D1 /* MainMenu.nib */; };
-		9CF9FC0316F135A100A146D1 /* Window.nib in Resources */ = {isa = PBXBuildFile; fileRef = 9CF9FBEB16F135A100A146D1 /* Window.nib */; };
-		9CF9FC0416F135A100A146D1 /* ns_dialogues.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF016F135A100A146D1 /* ns_dialogues.mm */; };
-		9CF9FC0516F135A100A146D1 /* ns_gui.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF216F135A100A146D1 /* ns_gui.mm */; };
-		9CF9FC0616F135A100A146D1 /* ns_menu.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF416F135A100A146D1 /* ns_menu.mm */; };
-		9CF9FC0716F135A100A146D1 /* ns_renderer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBF716F135A100A146D1 /* ns_renderer.mm */; };
-		9CF9FC0816F135A100A146D1 /* ns_utilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFA16F135A100A146D1 /* ns_utilities.mm */; };
-		9CF9FC0916F135A100A146D1 /* ns_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFC16F135A100A146D1 /* ns_widget.mm */; };
-		9CF9FC0A16F135A100A146D1 /* TMButtonsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FBFE16F135A100A146D1 /* TMButtonsController.m */; };
-		9CF9FC0B16F135A100A146D1 /* TMView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9FC0016F135A100A146D1 /* TMView.mm */; };
 		9CFB849214FFCA5700757D4E /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
 		9CFEB3F711D79783005C12C4 /* bibtex_functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */; };
 		9CFEB3F811D79783005C12C4 /* bibtex_functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */; };
@@ -1564,7 +1573,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 7;
 			files = (
-				491BF37C178BFFAF00C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2640,6 +2648,56 @@
 		9C6632E11676B229000D7974 /* font_database.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_database.cpp; sourceTree = "<group>"; };
 		9C6632E71676B272000D7974 /* preferences.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = preferences.cpp; sourceTree = "<group>"; };
 		9C6632ED1676B28E000D7974 /* tt_tools.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tt_tools.cpp; sourceTree = "<group>"; };
+		9C6DCCF0219CD0EB00DB8E7A /* GSAutoLayoutHBox.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutHBox.h; sourceTree = "<group>"; };
+		9C6DCCF1219CD0EB00DB8E7A /* GSAutoLayoutSpace.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutSpace.m; sourceTree = "<group>"; };
+		9C6DCCF2219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutProportionalManager.h; sourceTree = "<group>"; };
+		9C6DCCF3219CD0EB00DB8E7A /* GSAutoLayoutDefaults.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutDefaults.m; sourceTree = "<group>"; };
+		9C6DCCF4219CD0EB00DB8E7A /* GSAutoLayoutGrid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutGrid.h; sourceTree = "<group>"; };
+		9C6DCCF5219CD0EB00DB8E7A /* GSAutoLayoutVSpace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutVSpace.h; sourceTree = "<group>"; };
+		9C6DCCF6219CD0EB00DB8E7A /* GSAutoLayoutManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutManager.h; sourceTree = "<group>"; };
+		9C6DCCF7219CD0EB00DB8E7A /* NSViewSize.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NSViewSize.m; sourceTree = "<group>"; };
+		9C6DCCF8219CD0EB00DB8E7A /* GSAutoLayoutHSpace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutHSpace.h; sourceTree = "<group>"; };
+		9C6DCCF9219CD0EB00DB8E7A /* GSAutoLayoutVBox.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutVBox.h; sourceTree = "<group>"; };
+		9C6DCCFA219CD0EB00DB8E7A /* GNUstep.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GNUstep.h; sourceTree = "<group>"; };
+		9C6DCCFB219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutStandardManager.h; sourceTree = "<group>"; };
+		9C6DCCFC219CD0EB00DB8E7A /* README */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = README; sourceTree = "<group>"; };
+		9C6DCCFD219CD0EB00DB8E7A /* GSAutoLayoutSpace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutSpace.h; sourceTree = "<group>"; };
+		9C6DCCFE219CD0EB00DB8E7A /* GSAutoLayoutHBox.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutHBox.m; sourceTree = "<group>"; };
+		9C6DCCFF219CD0EB00DB8E7A /* GSAutoLayoutVSpace.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutVSpace.m; sourceTree = "<group>"; };
+		9C6DCD00219CD0EB00DB8E7A /* GSAutoLayoutGrid.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutGrid.m; sourceTree = "<group>"; };
+		9C6DCD01219CD0EB00DB8E7A /* GSAutoLayoutDefaults.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutDefaults.h; sourceTree = "<group>"; };
+		9C6DCD02219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutProportionalManager.m; sourceTree = "<group>"; };
+		9C6DCD03219CD0EB00DB8E7A /* NSViewSize.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NSViewSize.h; sourceTree = "<group>"; };
+		9C6DCD04219CD0EB00DB8E7A /* AutoLayoutCommonInclude.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AutoLayoutCommonInclude.h; sourceTree = "<group>"; };
+		9C6DCD05219CD0EB00DB8E7A /* GSAutoLayoutBox.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutBox.h; sourceTree = "<group>"; };
+		9C6DCD06219CD0EB00DB8E7A /* GSAutoLayoutManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutManager.m; sourceTree = "<group>"; };
+		9C6DCD07219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutStandardManager.m; sourceTree = "<group>"; };
+		9C6DCD08219CD0EB00DB8E7A /* GSAutoLayoutHSpace.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutHSpace.m; sourceTree = "<group>"; };
+		9C6DCD09219CD0EB00DB8E7A /* GSAutoLayoutVBox.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GSAutoLayoutVBox.m; sourceTree = "<group>"; };
+		9C6DCD0A219CD0EB00DB8E7A /* GSAutoLayoutManagerPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GSAutoLayoutManagerPrivate.h; sourceTree = "<group>"; };
+		9C6DCD0B219CD0EB00DB8E7A /* TMView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TMView.mm; sourceTree = "<group>"; };
+		9C6DCD0D219CD0EB00DB8E7A /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/MainMenu.nib; sourceTree = "<group>"; };
+		9C6DCD0F219CD0EB00DB8E7A /* English */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		9C6DCD11219CD0EB00DB8E7A /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/Window.nib; sourceTree = "<group>"; };
+		9C6DCD12219CD0EB00DB8E7A /* mac_cocoa.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mac_cocoa.h; sourceTree = "<group>"; };
+		9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_utilities.mm; sourceTree = "<group>"; };
+		9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_gui.mm; sourceTree = "<group>"; };
+		9C6DCD15219CD0EB00DB8E7A /* ns_other_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_other_widgets.h; sourceTree = "<group>"; };
+		9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_renderer.mm; sourceTree = "<group>"; };
+		9C6DCD17219CD0EB00DB8E7A /* TMButtonsController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TMButtonsController.m; sourceTree = "<group>"; };
+		9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_dialogues.mm; sourceTree = "<group>"; };
+		9C6DCD19219CD0EB00DB8E7A /* TMView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMView.h; sourceTree = "<group>"; };
+		9C6DCD1A219CD0EB00DB8E7A /* ns_dialogues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_dialogues.h; sourceTree = "<group>"; };
+		9C6DCD1B219CD0EB00DB8E7A /* ns_renderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_renderer.h; sourceTree = "<group>"; };
+		9C6DCD1C219CD0EB00DB8E7A /* ns_simple_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_simple_widget.h; sourceTree = "<group>"; };
+		9C6DCD1D219CD0EB00DB8E7A /* ns_menu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_menu.h; sourceTree = "<group>"; };
+		9C6DCD1E219CD0EB00DB8E7A /* ns_gui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_gui.h; sourceTree = "<group>"; };
+		9C6DCD1F219CD0EB00DB8E7A /* ns_basic_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_basic_widgets.h; sourceTree = "<group>"; };
+		9C6DCD20219CD0EB00DB8E7A /* ns_utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_utilities.h; sourceTree = "<group>"; };
+		9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_widget.mm; sourceTree = "<group>"; };
+		9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_widget.h; sourceTree = "<group>"; };
+		9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_menu.mm; sourceTree = "<group>"; };
+		9C6DCD24219CD0EB00DB8E7A /* TMButtonsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMButtonsController.h; sourceTree = "<group>"; };
 		9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_sys_utils.cpp; sourceTree = "<group>"; };
 		9C722BEC10D2F7C700C41915 /* qt_sys_utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_sys_utils.hpp; sourceTree = "<group>"; };
 		9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unix_sys_utils.cpp; sourceTree = "<group>"; };
@@ -2735,29 +2793,6 @@
 		9CF5BC70128A13CB00F691BF /* qt_window_widget.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_window_widget.hpp; sourceTree = "<group>"; };
 		9CF5BC71128A13CB00F691BF /* QTMGuiHelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMGuiHelper.cpp; sourceTree = "<group>"; };
 		9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = highlight_observer.cpp; sourceTree = "<group>"; };
-		9CF9FBE816F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		9CF9FBEA16F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/MainMenu.nib; sourceTree = "<group>"; };
-		9CF9FBEC16F135A100A146D1 /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/Window.nib; sourceTree = "<group>"; };
-		9CF9FBED16F135A100A146D1 /* mac_cocoa.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mac_cocoa.h; sourceTree = "<group>"; };
-		9CF9FBEE16F135A100A146D1 /* ns_basic_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_basic_widgets.h; sourceTree = "<group>"; };
-		9CF9FBEF16F135A100A146D1 /* ns_dialogues.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_dialogues.h; sourceTree = "<group>"; };
-		9CF9FBF016F135A100A146D1 /* ns_dialogues.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_dialogues.mm; sourceTree = "<group>"; };
-		9CF9FBF116F135A100A146D1 /* ns_gui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_gui.h; sourceTree = "<group>"; };
-		9CF9FBF216F135A100A146D1 /* ns_gui.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_gui.mm; sourceTree = "<group>"; };
-		9CF9FBF316F135A100A146D1 /* ns_menu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_menu.h; sourceTree = "<group>"; };
-		9CF9FBF416F135A100A146D1 /* ns_menu.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_menu.mm; sourceTree = "<group>"; };
-		9CF9FBF516F135A100A146D1 /* ns_other_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_other_widgets.h; sourceTree = "<group>"; };
-		9CF9FBF616F135A100A146D1 /* ns_renderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_renderer.h; sourceTree = "<group>"; };
-		9CF9FBF716F135A100A146D1 /* ns_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_renderer.mm; sourceTree = "<group>"; };
-		9CF9FBF816F135A100A146D1 /* ns_simple_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_simple_widget.h; sourceTree = "<group>"; };
-		9CF9FBF916F135A100A146D1 /* ns_utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_utilities.h; sourceTree = "<group>"; };
-		9CF9FBFA16F135A100A146D1 /* ns_utilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_utilities.mm; sourceTree = "<group>"; };
-		9CF9FBFB16F135A100A146D1 /* ns_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_widget.h; sourceTree = "<group>"; };
-		9CF9FBFC16F135A100A146D1 /* ns_widget.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_widget.mm; sourceTree = "<group>"; };
-		9CF9FBFD16F135A100A146D1 /* TMButtonsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMButtonsController.h; sourceTree = "<group>"; };
-		9CF9FBFE16F135A100A146D1 /* TMButtonsController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TMButtonsController.m; sourceTree = "<group>"; };
-		9CF9FBFF16F135A100A146D1 /* TMView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMView.h; sourceTree = "<group>"; };
-		9CF9FC0016F135A100A146D1 /* TMView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TMView.mm; sourceTree = "<group>"; };
 		9CFE66E910A99E700028F6F8 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		9CFE66EA10A99E700028F6F8 /* Makefile.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.in; sourceTree = "<group>"; };
 		9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bibtex_functions.cpp; sourceTree = "<group>"; };
@@ -2833,6 +2868,7 @@
 				9C0B475B10A8CBE40097A335 /* Resources */,
 				29B97315FDCFA39411CA2CEA /* Sources */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
+				9C6DCCED219CD0B000DB8E7A /* Recovered References */,
 			);
 			name = TeXmacs;
 			sourceTree = "<group>";
@@ -3813,7 +3849,7 @@
 		9C0B484710A8CC100097A335 /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
-				9CF9FBE616F135A100A146D1 /* NS */,
+				9C6DCCEE219CD0EB00DB8E7A /* NS */,
 				9C0B484810A8CC100097A335 /* Axel */,
 				9C0B484B10A8CC100097A335 /* Bibtex */,
 				9C0B484E10A8CC100097A335 /* Cairo */,
@@ -4801,6 +4837,78 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		9C6DCCED219CD0B000DB8E7A /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
+		9C6DCCEE219CD0EB00DB8E7A /* NS */ = {
+			isa = PBXGroup;
+			children = (
+				9C6DCCEF219CD0EB00DB8E7A /* AutoLayout */,
+				9C6DCD0B219CD0EB00DB8E7A /* TMView.mm */,
+				9C6DCD0C219CD0EB00DB8E7A /* MainMenu.nib */,
+				9C6DCD0E219CD0EB00DB8E7A /* InfoPlist.strings */,
+				9C6DCD10219CD0EB00DB8E7A /* Window.nib */,
+				9C6DCD12219CD0EB00DB8E7A /* mac_cocoa.h */,
+				9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */,
+				9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */,
+				9C6DCD15219CD0EB00DB8E7A /* ns_other_widgets.h */,
+				9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */,
+				9C6DCD17219CD0EB00DB8E7A /* TMButtonsController.m */,
+				9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */,
+				9C6DCD19219CD0EB00DB8E7A /* TMView.h */,
+				9C6DCD1A219CD0EB00DB8E7A /* ns_dialogues.h */,
+				9C6DCD1B219CD0EB00DB8E7A /* ns_renderer.h */,
+				9C6DCD1C219CD0EB00DB8E7A /* ns_simple_widget.h */,
+				9C6DCD1D219CD0EB00DB8E7A /* ns_menu.h */,
+				9C6DCD1E219CD0EB00DB8E7A /* ns_gui.h */,
+				9C6DCD1F219CD0EB00DB8E7A /* ns_basic_widgets.h */,
+				9C6DCD20219CD0EB00DB8E7A /* ns_utilities.h */,
+				9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */,
+				9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */,
+				9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */,
+				9C6DCD24219CD0EB00DB8E7A /* TMButtonsController.h */,
+			);
+			path = NS;
+			sourceTree = "<group>";
+		};
+		9C6DCCEF219CD0EB00DB8E7A /* AutoLayout */ = {
+			isa = PBXGroup;
+			children = (
+				9C6DCCF0219CD0EB00DB8E7A /* GSAutoLayoutHBox.h */,
+				9C6DCCF1219CD0EB00DB8E7A /* GSAutoLayoutSpace.m */,
+				9C6DCCF2219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.h */,
+				9C6DCCF3219CD0EB00DB8E7A /* GSAutoLayoutDefaults.m */,
+				9C6DCCF4219CD0EB00DB8E7A /* GSAutoLayoutGrid.h */,
+				9C6DCCF5219CD0EB00DB8E7A /* GSAutoLayoutVSpace.h */,
+				9C6DCCF6219CD0EB00DB8E7A /* GSAutoLayoutManager.h */,
+				9C6DCCF7219CD0EB00DB8E7A /* NSViewSize.m */,
+				9C6DCCF8219CD0EB00DB8E7A /* GSAutoLayoutHSpace.h */,
+				9C6DCCF9219CD0EB00DB8E7A /* GSAutoLayoutVBox.h */,
+				9C6DCCFA219CD0EB00DB8E7A /* GNUstep.h */,
+				9C6DCCFB219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.h */,
+				9C6DCCFC219CD0EB00DB8E7A /* README */,
+				9C6DCCFD219CD0EB00DB8E7A /* GSAutoLayoutSpace.h */,
+				9C6DCCFE219CD0EB00DB8E7A /* GSAutoLayoutHBox.m */,
+				9C6DCCFF219CD0EB00DB8E7A /* GSAutoLayoutVSpace.m */,
+				9C6DCD00219CD0EB00DB8E7A /* GSAutoLayoutGrid.m */,
+				9C6DCD01219CD0EB00DB8E7A /* GSAutoLayoutDefaults.h */,
+				9C6DCD02219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.m */,
+				9C6DCD03219CD0EB00DB8E7A /* NSViewSize.h */,
+				9C6DCD04219CD0EB00DB8E7A /* AutoLayoutCommonInclude.h */,
+				9C6DCD05219CD0EB00DB8E7A /* GSAutoLayoutBox.h */,
+				9C6DCD06219CD0EB00DB8E7A /* GSAutoLayoutManager.m */,
+				9C6DCD07219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.m */,
+				9C6DCD08219CD0EB00DB8E7A /* GSAutoLayoutHSpace.m */,
+				9C6DCD09219CD0EB00DB8E7A /* GSAutoLayoutVBox.m */,
+				9C6DCD0A219CD0EB00DB8E7A /* GSAutoLayoutManagerPrivate.h */,
+			);
+			path = AutoLayout;
+			sourceTree = "<group>";
+		};
 		9C722C0C10D2F88800C41915 /* Unix */ = {
 			isa = PBXGroup;
 			children = (
@@ -5240,7 +5348,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				491BF366178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */,
+				9C6DCD32219CD0EB00DB8E7A /* MainMenu.nib in Resources */,
+				9C6DCD34219CD0EB00DB8E7A /* Window.nib in Resources */,
+				9C6DCD33219CD0EB00DB8E7A /* InfoPlist.strings in Resources */,
+				9C6DCD28219CD0EB00DB8E7A /* README in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5872,7 +5983,6 @@
 				491563F618141C2000EEBBC9 /* font_protrusion.cpp in Sources */,
 				49194C6C184E892800DC45E2 /* tree_search.cpp in Sources */,
 				49C096111B0F945300E038BA /* database.cpp in Sources */,
-				49250532186DD65400D32374 /* QTMTreeModel.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5906,9 +6016,11 @@
 				9CCC740010D303D900E88D90 /* input.cpp in Sources */,
 				9CCC740110D303D900E88D90 /* from_scheme.cpp in Sources */,
 				9CCC740210D303D900E88D90 /* to_scheme.cpp in Sources */,
+				9C6DCD2D219CD0EB00DB8E7A /* GSAutoLayoutManager.m in Sources */,
 				9CCC740310D303D900E88D90 /* fromtex.cpp in Sources */,
 				9CCC740410D303D900E88D90 /* inittex.cpp in Sources */,
 				9CCC740510D303D900E88D90 /* parsetex.cpp in Sources */,
+				9C6DCD2F219CD0EB00DB8E7A /* GSAutoLayoutHSpace.m in Sources */,
 				9CCC740610D303D900E88D90 /* fromtm.cpp in Sources */,
 				9CCC740710D303D900E88D90 /* totm.cpp in Sources */,
 				9CCC740810D303D900E88D90 /* upgradetm.cpp in Sources */,
@@ -5943,8 +6055,10 @@
 				9CCC742A10D303D900E88D90 /* tree_traverse.cpp in Sources */,
 				9CCC742B10D303D900E88D90 /* edit_main.cpp in Sources */,
 				9CCC742C10D303D900E88D90 /* edit_typeset.cpp in Sources */,
+				9C6DCD31219CD0EB00DB8E7A /* TMView.mm in Sources */,
 				9CCC742D10D303D900E88D90 /* edit_complete.cpp in Sources */,
 				9CCC742E10D303D900E88D90 /* edit_cursor.cpp in Sources */,
+				9C6DCD37219CD0EB00DB8E7A /* ns_renderer.mm in Sources */,
 				49CC0E0018D30BDB007AB053 /* latex_tools.cpp in Sources */,
 				9CCC742F10D303D900E88D90 /* edit_footer.cpp in Sources */,
 				9CCC743010D303D900E88D90 /* edit_graphics.cpp in Sources */,
@@ -5968,6 +6082,7 @@
 				9CCC744010D303D900E88D90 /* glyph.cpp in Sources */,
 				9CCC744110D303D900E88D90 /* glyph_ops.cpp in Sources */,
 				9CCC744210D303D900E88D90 /* glyph_shrink.cpp in Sources */,
+				9C6DCD2C219CD0EB00DB8E7A /* GSAutoLayoutProportionalManager.m in Sources */,
 				9CCC744310D303D900E88D90 /* charmap.cpp in Sources */,
 				9CCC744410D303D900E88D90 /* compound_font.cpp in Sources */,
 				9CCC744510D303D900E88D90 /* find_font.cpp in Sources */,
@@ -5990,6 +6105,8 @@
 				9CCC745310D303D900E88D90 /* observer.cpp in Sources */,
 				4934A46C18C5D00000BF1E6A /* conservative_totex.cpp in Sources */,
 				9CCC745410D303D900E88D90 /* array.cpp in Sources */,
+				9C6DCD2E219CD0EB00DB8E7A /* GSAutoLayoutStandardManager.m in Sources */,
+				9C6DCD27219CD0EB00DB8E7A /* NSViewSize.m in Sources */,
 				9CCC745510D303D900E88D90 /* hashfunc.cpp in Sources */,
 				9CCC745610D303D900E88D90 /* hashmap.cpp in Sources */,
 				9CCC745710D303D900E88D90 /* hashmap_extra.cpp in Sources */,
@@ -6009,7 +6126,6 @@
 				9CCC746410D303D900E88D90 /* tree.cpp in Sources */,
 				9CCC746510D303D900E88D90 /* tree_label.cpp in Sources */,
 				9CCC746610D303D900E88D90 /* bibtex.cpp in Sources */,
-				9CCC746710D303D900E88D90 /* TMButtonsController.m in Sources */,
 				9C4A740E1D22BEF600572468 /* player.cpp in Sources */,
 				9CCC746810D303D900E88D90 /* free_type.cpp in Sources */,
 				9CCC746910D303D900E88D90 /* tt_face.cpp in Sources */,
@@ -6052,6 +6168,7 @@
 				9CCC74A410D303D900E88D90 /* text_language.cpp in Sources */,
 				9CCC74A510D303D900E88D90 /* verb_language.cpp in Sources */,
 				9CCC74A610D303D900E88D90 /* connection.cpp in Sources */,
+				9C6DCD35219CD0EB00DB8E7A /* ns_utilities.mm in Sources */,
 				9CCC74A710D303D900E88D90 /* dyn_link.cpp in Sources */,
 				9CCC74A810D303D900E88D90 /* pipe_link.cpp in Sources */,
 				9CCC74A910D303D900E88D90 /* socket_link.cpp in Sources */,
@@ -6062,6 +6179,7 @@
 				9CCC74AC10D303D900E88D90 /* texmacs_client.cpp in Sources */,
 				9CCC74AD10D303D900E88D90 /* texmacs_server.cpp in Sources */,
 				9CCC74AE10D303D900E88D90 /* tm_link.cpp in Sources */,
+				9C6DCD36219CD0EB00DB8E7A /* ns_gui.mm in Sources */,
 				9CCC74AF10D303D900E88D90 /* data_cache.cpp in Sources */,
 				9CCC74B010D303D900E88D90 /* fast_alloc.cpp in Sources */,
 				49FB1B091CB30D6000B983F3 /* poor_smallcaps.cpp in Sources */,
@@ -6071,6 +6189,7 @@
 				9CCC74B610D303D900E88D90 /* texmacs.cpp in Sources */,
 				9CCC74B710D303D900E88D90 /* tm_button.cpp in Sources */,
 				4952408E1AC402A800A611AD /* indexation.cpp in Sources */,
+				9C6DCD29219CD0EB00DB8E7A /* GSAutoLayoutHBox.m in Sources */,
 				9CCC74B810D303D900E88D90 /* tm_dialogue.cpp in Sources */,
 				9CCC74B910D303D900E88D90 /* tm_frame.cpp in Sources */,
 				9CCC74BA10D303D900E88D90 /* tm_window.cpp in Sources */,
@@ -6104,10 +6223,12 @@
 				9CCC74D310D303D900E88D90 /* bridge_document.cpp in Sources */,
 				49705A641CA3F4A00081B937 /* env_animate.cpp in Sources */,
 				9CCC74D410D303D900E88D90 /* bridge_eval.cpp in Sources */,
+				9C6DCD25219CD0EB00DB8E7A /* GSAutoLayoutSpace.m in Sources */,
 				9CCC74D510D303D900E88D90 /* bridge_expand_as.cpp in Sources */,
 				9CCC74D610D303D900E88D90 /* bridge_formatting.cpp in Sources */,
 				9CCC74D710D303D900E88D90 /* bridge_gui.cpp in Sources */,
 				9CCC74D810D303D900E88D90 /* bridge_hidden.cpp in Sources */,
+				9C6DCD3A219CD0EB00DB8E7A /* ns_widget.mm in Sources */,
 				9CCC74D910D303D900E88D90 /* bridge_locus.cpp in Sources */,
 				9CCC74DA10D303D900E88D90 /* bridge_mark.cpp in Sources */,
 				4934A46F18C5D00000BF1E6A /* tracked_fromtex.cpp in Sources */,
@@ -6136,6 +6257,7 @@
 				9CCC74EE10D303D900E88D90 /* env_semantics.cpp in Sources */,
 				9CCC74EF10D303D900E88D90 /* format.cpp in Sources */,
 				494DEEE51CD0EF8F00D882BE /* glyph_unserif.cpp in Sources */,
+				9C6DCD2B219CD0EB00DB8E7A /* GSAutoLayoutGrid.m in Sources */,
 				9CCC74F010D303D900E88D90 /* formatter.cpp in Sources */,
 				9CCC74F110D303D900E88D90 /* line_item.cpp in Sources */,
 				9CCC74F210D303D900E88D90 /* page_item.cpp in Sources */,
@@ -6168,8 +6290,10 @@
 				9CF78E0F125FBF9700CA5846 /* highlight_observer.cpp in Sources */,
 				9CEDAA321264FF6C009630CC /* tree_analyze.cpp in Sources */,
 				9CD958F01D241C0500AA2C65 /* poor_extended.cpp in Sources */,
+				9C6DCD2A219CD0EB00DB8E7A /* GSAutoLayoutVSpace.m in Sources */,
 				9CEDAA381264FF88009630CC /* unicode_math_font.cpp in Sources */,
 				9CDA7260126CC926006E8028 /* tree_modify.cpp in Sources */,
+				9C6DCD39219CD0EB00DB8E7A /* ns_dialogues.mm in Sources */,
 				9C5210302028B9C600A2B5B6 /* scala_language.cpp in Sources */,
 				9C646EC012842B7A000ABCDF /* mac_utilities.mm in Sources */,
 				9CCC739012A7D6DA006EDBDA /* HIDRemote.m in Sources */,
@@ -6180,6 +6304,8 @@
 				9C61B4B1141A495C0035D78F /* stack_trace.cpp in Sources */,
 				9C0B09B114FF0A1C004ABDCE /* learn_handwriting.cpp in Sources */,
 				9C0B09B214FF0A1C004ABDCE /* poly_line.cpp in Sources */,
+				9C6DCD38219CD0EB00DB8E7A /* TMButtonsController.m in Sources */,
+				9C6DCD3B219CD0EB00DB8E7A /* ns_menu.mm in Sources */,
 				9C0B09B314FF0A1C004ABDCE /* recognize_handwriting.cpp in Sources */,
 				9C0B09B914FF0A3D004ABDCE /* fromcls.cpp in Sources */,
 				9C4FCFF9150F73100087378D /* new_document.cpp in Sources */,
@@ -6199,22 +6325,14 @@
 				4942BEF91679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FAB16DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712FB16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
+				9C6DCD30219CD0EB00DB8E7A /* GSAutoLayoutVBox.m in Sources */,
 				495712FE16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
 				4910FA7516EB3E2F0088B175 /* post_convert.cpp in Sources */,
 				497822CD16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
 				49FFB07B16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
-				49FDFA6716F0C677002B830A /* metadata-ams.cpp in Sources */,
 				9CF9FBE016F1334E00A146D1 /* guile_tm.cpp in Sources */,
 				9CF9FBE116F1334E00A146D1 /* glue.cpp in Sources */,
 				9CF9FBE216F1334E00A146D1 /* object.cpp in Sources */,
-				9CF9FC0416F135A100A146D1 /* ns_dialogues.mm in Sources */,
-				9CF9FC0516F135A100A146D1 /* ns_gui.mm in Sources */,
-				9CF9FC0616F135A100A146D1 /* ns_menu.mm in Sources */,
-				9CF9FC0716F135A100A146D1 /* ns_renderer.mm in Sources */,
-				9CF9FC0816F135A100A146D1 /* ns_utilities.mm in Sources */,
-				9CF9FC0916F135A100A146D1 /* ns_widget.mm in Sources */,
-				9CF9FC0A16F135A100A146D1 /* TMButtonsController.m in Sources */,
-				9CF9FC0B16F135A100A146D1 /* TMView.mm in Sources */,
 				492EA53F18634091007F16D8 /* fromtex_post.cpp in Sources */,
 				9C52100C2028AFE500A2B5B6 /* tm_timer.cpp in Sources */,
 				9CE5CF8A16EFDB55001A6292 /* guile_tm.cpp in Sources */,
@@ -6229,6 +6347,7 @@
 				49BEF71A16FDD566004BAE73 /* metadata-springer.cpp in Sources */,
 				9C52101A2028B7B000A2B5B6 /* adjust_schola.cpp in Sources */,
 				4929A88C170207440028991F /* curve.cpp in Sources */,
+				9C6DCD26219CD0EB00DB8E7A /* GSAutoLayoutDefaults.m in Sources */,
 				4929A88F170207440028991F /* equations.cpp in Sources */,
 				49A513F619426DD70017E373 /* true_color.cpp in Sources */,
 				4929A892170207440028991F /* frame.cpp in Sources */,
@@ -6703,26 +6822,26 @@
 			name = Window.nib;
 			sourceTree = "<group>";
 		};
-		9CF9FBE716F135A100A146D1 /* InfoPlist.strings */ = {
+		9C6DCD0C219CD0EB00DB8E7A /* MainMenu.nib */ = {
 			isa = PBXVariantGroup;
 			children = (
-				9CF9FBE816F135A100A146D1 /* English */,
-			);
-			name = InfoPlist.strings;
-			sourceTree = "<group>";
-		};
-		9CF9FBE916F135A100A146D1 /* MainMenu.nib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				9CF9FBEA16F135A100A146D1 /* English */,
+				9C6DCD0D219CD0EB00DB8E7A /* English */,
 			);
 			name = MainMenu.nib;
 			sourceTree = "<group>";
 		};
-		9CF9FBEB16F135A100A146D1 /* Window.nib */ = {
+		9C6DCD0E219CD0EB00DB8E7A /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
-				9CF9FBEC16F135A100A146D1 /* English */,
+				9C6DCD0F219CD0EB00DB8E7A /* English */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		9C6DCD10219CD0EB00DB8E7A /* Window.nib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9C6DCD11219CD0EB00DB8E7A /* English */,
 			);
 			name = Window.nib;
 			sourceTree = "<group>";

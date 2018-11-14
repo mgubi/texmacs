@@ -17,7 +17,7 @@
 #include <locale.h>
 #include "language.hpp"
 #include "message.hpp"
-#include "aqua_renderer.h" // for the_aqua_renderer
+#include "aqua_renderer.h" // for the_ns_renderer
 
 //extern hashmap<id, pointer> NSWindow_to_window;
 //extern window (*get_current_window) (void);

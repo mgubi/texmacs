@@ -551,7 +551,7 @@ aqua_renderer_rep::xpm_image(url file_name)
 
 
 aqua_renderer_rep*
-the_aqua_renderer () {
+the_ns_renderer () {
   static aqua_renderer_rep* the_renderer= NULL;
 	if (!the_renderer) the_renderer= tm_new <aqua_renderer_rep> ();
 	return the_renderer;

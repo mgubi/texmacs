@@ -566,7 +566,7 @@ void ns_renderer_rep::xpm (url file_name, SI x, SI y) {
 
 
 ns_renderer_rep*
-the_aqua_renderer () {
+the_ns_renderer () {
   static ns_renderer_rep* the_renderer= NULL;
 	if (!the_renderer) the_renderer= tm_new <ns_renderer_rep> ();
 	return the_renderer;

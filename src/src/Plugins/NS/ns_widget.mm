@@ -148,9 +148,11 @@ ns_view_widget_rep::query (slot s, int type_id) {
   case SLOT_IDENTIFIER:
     TYPE_CHECK (type_id == type_helper<int>::id);
     return close_box<int> ([view window] ? 1 : 0);
+#if 0
   case SLOT_RENDERER:
     TYPE_CHECK (type_id == type_helper<renderer>::id);
-    return close_box<renderer> ((renderer) the_aqua_renderer());
+    return close_box<renderer> ((renderer) the_ns_renderer());
+#endif
   case SLOT_POSITION:  
     {
       typedef pair<SI,SI> coord2;
@@ -950,7 +952,7 @@ simple_widget_rep::send (slot s, blackbox val) {
       coord4 p= open_box<coord4> (val);
       if (DEBUG_QT)
         cout << "Invalidating rect " << rectangle(p.x1,p.x2,p.x3,p.x4) << LF;
-      ns_renderer_rep* ren = (ns_renderer_rep*)get_renderer (this);
+      ns_renderer_rep* ren = the_ns_renderer();
       if (ren) {
         SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;    
         ren->outer_round (x1, y1, x2, y2);

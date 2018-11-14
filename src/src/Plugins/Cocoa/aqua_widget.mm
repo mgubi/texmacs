@@ -108,7 +108,7 @@ aqua_view_widget_rep::send (slot s, blackbox val) {
 //      NSRect rect = to_nsrect(p);
       if (DEBUG_AQUA)
          debug_aqua << "Invalidating rect " << rectangle(p.x1,p.x2,p.x3,p.x4) << LF;
-      aqua_renderer_rep* ren = the_aqua_renderer();
+      aqua_renderer_rep* ren = the_ns_renderer();
       ren->set_origin(0,0);
       SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;
       ren->outer_round (x1, y1, x2, y2);
@@ -185,7 +185,7 @@ aqua_view_widget_rep::query (slot s, int type_id) {
 #if 0
   case SLOT_RENDERER:
     TYPE_CHECK (type_id == type_helper<renderer>::id);
-    return close_box<renderer> ((renderer) the_aqua_renderer());
+    return close_box<renderer> ((renderer) the_ns_renderer());
 #endif
   case SLOT_POSITION:
     {

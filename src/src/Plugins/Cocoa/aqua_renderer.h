@@ -52,6 +52,6 @@ public:
   NSImage *xpm_image(url file_name);
 };
 
-aqua_renderer_rep *the_aqua_renderer();
+aqua_renderer_rep *the_ns_renderer();
 
 #endif // defined AQUA_RENDERER_H

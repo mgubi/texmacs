@@ -17,7 +17,7 @@
 #include <locale.h>
 #include "language.hpp"
 #include "message.hpp"
-#include "ns_renderer.h" // for the_aqua_renderer
+#include "ns_renderer.h" // for the_ns_renderer
 
 //extern hashmap<id, pointer> NSWindow_to_window;
 //extern window (*get_current_window) (void);
@@ -502,7 +502,7 @@ bool check_event (int type)
 void image_gc (string name) {
   // Garbage collect images of a given name (may use wildcards)
   // This routine only needs to be implemented if you use your own image cache
-  the_aqua_renderer()->image_gc(name); 
+  the_ns_renderer()->image_gc(name); 
 }
 
 void

@@ -138,7 +138,7 @@ public:
     img = [[[NSImage alloc] initWithSize:s] autorelease];
     [img lockFocus];
     
-    basic_renderer r = the_aqua_renderer();
+    basic_renderer r = the_ns_renderer();
     int x1 = 0;
     int y1 = s.height;
     int x2 = s.width;
@@ -385,11 +385,11 @@ TMMenuItem * ns_text_widget_rep::as_menuitem()
 TMMenuItem * ns_image_widget_rep::as_menuitem()
 {
 #if 0
-  CGImageRef cgi = the_aqua_renderer()->xpm_image(image);
+  CGImageRef cgi = the_ns_renderer()->xpm_image(image);
   NSImage *img = [[[NSImage alloc] init] autorelease];
   [img addRepresentation:[[NSBitmapImageRep alloc ] initWithCGImage: cgi]];
 #else
-  NSImage *img = the_aqua_renderer()->xpm_image(image);
+  NSImage *img = the_ns_renderer()->xpm_image(image);
 #endif
   //	TMMenuItem *mi = [[[TMMenuItem alloc] initWithTitle:to_nsstring(as_string(file_name)) action:NULL keyEquivalent:@""] autorelease];
   TMMenuItem *mi = [[[TMMenuItem alloc] initWithTitle:@"" action:NULL keyEquivalent:@""] autorelease];
@@ -453,7 +453,7 @@ widget xpm_widget (url file_name)// { return widget(); }
 {
   return tm_new <ns_image_widget_rep> (file_name);
 #if 0  
-	NSImage *image = the_aqua_renderer()->xpm_image(file_name);
+	NSImage *image = the_ns_renderer()->xpm_image(file_name);
 //	TMMenuItem *mi = [[[TMMenuItem alloc] initWithTitle:to_nsstring(as_string(file_name)) action:NULL keyEquivalent:@""] autorelease];
 	TMMenuItem *mi = [[[TMMenuItem alloc] initWithTitle:@"" action:NULL keyEquivalent:@""] autorelease];
 	[mi setRepresentedObject:image];
