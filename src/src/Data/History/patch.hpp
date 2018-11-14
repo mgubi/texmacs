@@ -76,6 +76,8 @@ double new_marker ();
 void set_author (double author);
 double get_author ();
 
+bool operator == (patch p1, patch p2);
+bool operator != (patch p1, patch p2);
 tm_ostream& operator << (tm_ostream& out, patch p);
 patch copy (patch p);
 patch compactify (patch p);
@@ -83,8 +85,20 @@ path cursor_hint (patch p, tree t);
 
 inline int get_type (patch p) {
   return p->get_type (); }
+inline bool is_modification (patch p) {
+  return p->get_type () == PATCH_MODIFICATION; }
+inline bool is_compound (patch p) {
+  return p->get_type () == PATCH_COMPOUND; }
+inline bool is_branch (patch p) {
+  return p->get_type () == PATCH_BRANCH; }
+inline bool is_birth (patch p) {
+  return p->get_type () == PATCH_BIRTH; }
+inline bool is_author (patch p) {
+  return p->get_type () == PATCH_AUTHOR; }
 inline int N (patch p) {
   return p->get_arity (); }
+inline patch access (patch p, int i) {
+  return p[i]; }
 inline modification get_modification (patch p) {
   return p->get_modification (); }
 inline modification get_inverse (patch p) {
@@ -101,10 +115,17 @@ void apply (patch p, tree& t);
 modification invert (modification m, tree t);
 bool commute (modification m1, modification m2);
 bool swap (modification& m1, modification& m2);
+bool can_pull (modification m1, modification m2);
+modification pull (modification m1, modification m2);
+modification co_pull (modification m1, modification m2);
 bool join (modification& m1, modification m2, tree t);
+
 patch invert (patch p, tree t);
 bool commute (patch p1, patch p2);
 bool swap (patch& p1, patch& p2);
+bool can_pull (patch p1, patch p2);
+patch pull (patch p1, patch p2);
+patch co_pull (patch p1, patch p2);
 bool join (patch& p1, patch p2, tree t);
 patch remove_set_cursor (patch p);
 bool does_modify (patch p);

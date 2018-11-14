@@ -15,12 +15,11 @@
 #include "tree.hpp"
 #include "blackbox.hpp"
 #include "command.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "renderer.hpp" // for PIXEL
 
 class window_rep;
 typedef window_rep* window;
-typedef unsigned int color;
 class url;
 class widget;
 class slot;
@@ -39,6 +38,7 @@ protected:
 public:
   widget_rep ();
   virtual ~widget_rep ();
+  inline virtual void* derived_this () {return (widget_rep*)this; }
   virtual tm_ostream& print (tm_ostream& out);
 
   virtual void send (slot s, blackbox val);
@@ -116,10 +116,11 @@ widget texmacs_widget (int mask, command quit);
   // the main TeXmacs widget and a command which is called on exit
   // the mask variable indicates whether the menu, icon bars, status bar, etc.
   // are visible or not
-widget file_chooser_widget (command cmd, string type, bool save);
+widget file_chooser_widget (command cmd, string type, string prompt);
   // file chooser widget for files of a given 'type';
   // for files of type "image", the widget includes a previsualizer for images
-  // 'save' indicates whether we intend to save the file
+  // 'prompt' contains a prompt if we intend to save the file
+  // and the empty string otherwise
 widget printer_widget (command cmd, url ps_pdf_file);
   // widget for printing a file, offering a way for selecting a page range,
   // changing the paper type and orientation, previewing, etc.;
@@ -185,6 +186,8 @@ widget choice_widget (command cb, array<string> vals, array<string> mc);
   // select multiple values from a long list
 widget choice_widget (command cb, array<string> vals, string val, string filt);
   // select a value from a long list with scrollbars and an input to filter
+widget tree_view_widget (command cmd, tree data, tree data_roles);
+  // A widget with a tree view which observes the data and updates automatically
 
 /******************************************************************************
 * Other widgets
@@ -217,9 +220,11 @@ widget user_canvas_widget (widget wid, int style= 0);
   // a widget whose contents can be scrolled
   // if the size of the inner contents exceed the specified size
 widget resize_widget (widget w, int style, string w1, string h1,
-                      string w2, string h2, string w3, string h3);
+                      string w2, string h2, string w3, string h3,
+                      string hpos, string vpos);
   // resize the widget w to be of minimal size (w1, h1),
-  // of default size (w2, h2) and of maximal size (w3, h3)
+  // of default size (w2, h2), of maximal size (w3, h3),
+  // and initial scrolling position (hpos, vpos)
 widget hsplit_widget (widget l, widget r);
   // two horizontally juxtaposed widgets l and r with an ajustable border
 widget vsplit_widget (widget t, widget b);
@@ -241,12 +246,19 @@ widget refresh_widget (string tmwid, string kind= "any");
   // scheme widget tmwid. When receiving the send_refresh event,
   // the contents should also be updated dynamically by reevaluating
   // the scheme widget (in case of matching kind)
+widget refreshable_widget (object prom, string kind= "any");
+  // a widget which is automatically constructed from the a dynamic
+  // scheme widget promise. When receiving the send_refresh event,
+  // the contents should also be updated dynamically by reevaluating
+  // the scheme widget promise (in case of matching kind)
 
 /******************************************************************************
 * Besides the widget constructors, any GUI implementation should also provide
 * a simple_widget_rep class with the following virtual methods:
 ******************************************************************************/
 
+// bool simple_widget_rep::is_editor_widget ();
+//   should return true for editor widgets only
 // void simple_widget_rep::handle_get_size_hint (SI& w, SI& h);
 //   propose a size for the widget
 // void simple_widget_rep::handle_notify_resize (SI w, SI h);
@@ -261,10 +273,12 @@ widget refresh_widget (string tmwid, string kind= "any");
 //   mods contains the active keyboard modifiers at time t
 // void simple_widget_rep::handle_set_zoom_factor (double zoom);
 //   set the zoom factor for painting
-// void simple_widget_rep::handle_clear (SI x1, SI y1, SI x2, SI y2);
+// void simple_widget_rep::handle_clear
+//        (renderer ren, SI x1, SI y1, SI x2, SI y2);
 //   clear the widget to the background color
 //   this event may for instance occur when scrolling
-// void simple_widget_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2);
+// void simple_widget_rep::handle_repaint
+//        (renderer ren, SI x1, SI y1, SI x2, SI y2);
 //   repaint the region (x1, y1, x2, y2)
 
 #endif // defined WIDGET_H

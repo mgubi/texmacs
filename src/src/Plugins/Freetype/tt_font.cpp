@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "config.h"
 #include "font.hpp"
 #include "Freetype/free_type.hpp"
 #include "Freetype/tt_file.hpp"
@@ -18,9 +19,11 @@
 
 #define std_dpi 600
 #define std_pixel (std_shrinkf*256)
-#define ROUND(l) ((l*dpi+(std_dpi>>1))/std_dpi)
-#define FLOOR(l) ((((l*dpi)/std_dpi)/std_pixel)*std_pixel)
-#define CEIL(l) (((((l*dpi+(std_dpi-1))/std_dpi)+std_pixel-1)/std_pixel)*std_pixel)
+#define ROUND(l) ((l*hdpi+(std_dpi>>1))/std_dpi)
+#define FLOOR(l) ((((l*hdpi)/std_dpi)/std_pixel)*std_pixel)
+#define CEIL(l) (((((l*hdpi+(std_dpi-1))/std_dpi)+std_pixel-1)/std_pixel)*std_pixel)
+
+font tt_font (string family, int size, int hdpi, int vdpi);
 
 /******************************************************************************
 * True Type fonts
@@ -28,35 +31,40 @@
 
 struct tt_font_rep: font_rep {
   string      family;
-  int         dpi;
+  int         hdpi;
+  int         vdpi;
   font_metric fnm;
   font_glyphs fng;
 
-  tt_font_rep (string name, string family, int size, int dpi);
+  tt_font_rep (string name, string family, int size, int hdpi, int vdpi);
 
-  void get_extents (string s, metric& ex);
-  void get_xpositions (string s, SI* xpos);
-  void draw_fixed (renderer ren, string s, SI x, SI y);
-  font magnify (double zoom);
+  bool  supports (string c);
+  void  get_extents (string s, metric& ex);
+  void  get_xpositions (string s, SI* xpos);
+  void  draw_fixed (renderer ren, string s, SI x, SI y);
+  font  magnify (double zoomx, double zoomy);
+  void  advance_glyph (string s, int& pos, bool ligf);
   glyph get_glyph (string s);
+  int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
 };
 
 /******************************************************************************
 * Initialization of main font parameters
 ******************************************************************************/
 
-tt_font_rep::tt_font_rep (string name, string family2, int size2, int dpi2):
-  font_rep (name), family (family2), dpi (dpi2)
+tt_font_rep::tt_font_rep (string name, string family2, int size2,
+                          int hdpi2, int vdpi2):
+  font_rep (name), family (family2), hdpi (hdpi2), vdpi (vdpi2)
 {
   size= size2;
-  fnm = tt_font_metric (family, size, std_dpi);
-  fng = tt_font_glyphs (family, size, dpi);
+  fnm = tt_font_metric (family, size, std_dpi, (std_dpi * vdpi) / hdpi);
+  fng = tt_font_glyphs (family, size, hdpi, vdpi);
   if (fnm->bad_font_metric || fng->bad_font_glyphs) {
     fnm= std_font_metric (res_name, NULL, 0, -1);
     fng= std_font_glyphs (res_name, NULL, 0, -1);
     if (DEBUG_AUTO)
-      cout << "TeXmacs] Font " << family << " " << size
-	   << "pt at " << dpi << " dpi could not be loaded\n";
+      debug_fonts << "Font " << family << " " << size << "pt "
+                  << "at " << hdpi << " dpi could not be loaded\n";
     
   }
 
@@ -84,7 +92,8 @@ tt_font_rep::tt_font_rep (string name, string family2, int size2, int dpi2):
   yshift       = yx/6;
 
   // compute other widths
-  wpt          = (dpi*PIXEL)/72;
+  wpt          = (hdpi*PIXEL)/72;
+  hpt          = (vdpi*PIXEL)/72;
   wfn          = (wpt*design_size) >> 8;
   wline        = wfn/20;
 
@@ -94,8 +103,9 @@ tt_font_rep::tt_font_rep (string name, string family2, int size2, int dpi2):
 
   // get space length
   get_extents (" ", ex);
-  spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (ex->x2-ex->x1)<<1);
-  extra= spc;
+  spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (3*(ex->x2-ex->x1))>>1);
+  extra= spc/2;
+  mspc = spc;
   sep  = wfn/10;
 
   // get_italic space
@@ -108,6 +118,14 @@ tt_font_rep::tt_font_rep (string name, string family2, int size2, int dpi2):
 /******************************************************************************
 * Routines for font
 ******************************************************************************/
+
+bool
+tt_font_rep::supports (string c) {
+  if (N(c) == 1) return fnm->exists ((unsigned int) c[0]);
+  if (c == "<less>") return fnm->exists ((unsigned int) '<');
+  if (c == "<gtr>") return fnm->exists ((unsigned int) '>');
+  return false;
+}
 
 void
 tt_font_rep::get_extents (string s, metric& ex) {
@@ -175,8 +193,16 @@ tt_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 }
 
 font
-tt_font_rep::magnify (double zoom) {
-  return tt_font (family, size, (int) tm_round (dpi * zoom));
+tt_font_rep::magnify (double zoomx, double zoomy) {
+  return tt_font (family, size,
+                  (int) tm_round (hdpi * zoomx),
+                  (int) tm_round (vdpi * zoomy));
+}
+
+void
+tt_font_rep::advance_glyph (string s, int& pos, bool ligf) {
+  (void) ligf;
+  if (pos < N(s)) pos++;
 }
 
 glyph
@@ -188,23 +214,40 @@ tt_font_rep::get_glyph (string s) {
   return gl;
 }
 
+int
+tt_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
+  if (N(s)!=1) return font_rep::index_glyph (s, rm, rg);
+  int c= ((QN) s[0]);
+  glyph gl= fng->get (c);
+  if (is_nil (gl)) return font_rep::index_glyph (s, rm, rg);
+  rm= fnm;
+  rg= fng;
+  return c;
+}
+
 /******************************************************************************
 * Interface
 ******************************************************************************/
 
 font
-tt_font (string family, int size, int dpi) {
-  string name= "tt:" * family * as_string (size) * "@" * as_string(dpi);
+tt_font (string family, int size, int hdpi, int vdpi) {
+  string name= "tt:" * family * as_string (size) * "@" * as_string (hdpi);
+  if (vdpi != hdpi) name << "x" << as_string (vdpi);
   return make (font, name,
-    tm_new<tt_font_rep> (name, family, size, dpi));
+               tm_new<tt_font_rep> (name, family, size, hdpi, vdpi));
+}
+
+font
+tt_font (string family, int size, int dpi) {
+  return tt_font (family, size, dpi, dpi);
 }
 
 #else
 
 font
 tt_font (string family, int size, int dpi) {
-  string name= "tt:" * family * as_string (size) * "@" * as_string(dpi);
-  cerr << "\n\nFont name= " << name << "\n";
+  string name= "tt:" * family * as_string (size) * "@" * as_string (dpi);
+  failed_error << "Font name= " << name << "\n";
   FAILED ("true type support was disabled");
   return font ();
 }

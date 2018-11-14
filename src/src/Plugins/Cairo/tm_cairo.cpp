@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "config.h"
 #include "dyn_link.hpp"
 #include "tm_cairo.hpp"
 
@@ -151,9 +152,9 @@ tm_cairo_initialize () {
     
 #undef CAIRO_LINK
 #ifdef LINKED_CAIRO
-  if (DEBUG_AUTO) cout << "TeXmacs] With linked Cairo support\n";
+  if (DEBUG_AUTO) debug_automatic << "With linked Cairo support\n";
 #else
-  if (DEBUG_AUTO) cout << "TeXmacs] Installed Cairo support\n";
+  if (DEBUG_AUTO) debug_automatic << "Installed Cairo support\n";
   debug_on (status);
 #endif
   

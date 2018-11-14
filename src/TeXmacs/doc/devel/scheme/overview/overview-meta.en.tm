@@ -83,12 +83,12 @@
   <markup|extern> and <markup|action> macros. For instance, the default
   implementation of the <markup|fold> tag allows the user to click on the
   ``<math|<op|\<circ\>>>'' before the folded text so as to unfold the tag.
-  When doing this, the scheme script <scm|(mouse-unfold)> is launched.
+  When doing this, the scheme script <scm|mouse-unfold> is launched.
   However, for this to work, the <scm|mouse-unfold> function needs to be
   secure:
 
   <\scm-code>
-    (tm-define (mouse-unfold)
+    (tm-define mouse-unfold
 
     \ \ (:secure #t)
 
@@ -100,7 +100,7 @@
   </scm-code>
 
   You can read more about the tags which depend on <scheme> scripts in
-  ``<hlink|Invoking <scheme> scrips from <TeXmacs>
+  ``<hlink|Invoking <scheme> scripts from <TeXmacs>
   markup|overview-start.en.tm#markup-scripts>''.\ 
 
   In the future, the number of options for entering meta-information is

@@ -11,6 +11,7 @@
 
 #include "convert.hpp"
 #include "converter.hpp"
+#include "language.hpp"
 #include "wencoding.hpp"
 #include "vars.hpp"
 #include "drd_std.hpp"
@@ -26,7 +27,7 @@ static string as_verbatim (tree t, bool wrap);
 static void
 print_verbatim_arg (string& buf, tree t, bool wrap) {
   string s= as_verbatim (t, wrap);
-  if (tm_string_length (s) <= 1 || is_iso_alpha (s) || is_numeric (s))
+  if (tm_string_length (s) <= 1 || is_numeric (s) || is_iso_alpha (s))
     print_verbatim (buf, t, wrap);
   else {
     buf << "(";
@@ -85,6 +86,7 @@ print_verbatim (string& buf, tree t, bool wrap) {
       break;
     case HSPACE:
     case SPACE:
+      if (is_atomic (t[0]) && starts (t[0]->label, "-")) break;
     case HTAB:
       if (N(buf)>0 && buf[N(buf)-1] != '\n') buf << " ";
       break;
@@ -238,11 +240,13 @@ var_cork_to_sourcecode (string s) {
 
 string
 tree_to_verbatim (tree t, bool wrap, string enc) {
-  if (enc == "default") enc= "utf-8";
+  if (enc == "default") enc= "auto";
   string buf= as_verbatim (t, wrap);
-  if (enc == "utf-8") buf= var_cork_to_utf8 (buf);
-  else if (enc == "iso-8859-1") buf= tm_decode (buf);
+  if (enc == "auto")
+    enc= get_locale_charset ();
+  if (enc == "iso-8859-1" || enc == "ISO-8859-1") buf= tm_decode (buf);
   else if (enc == "SourceCode") buf= var_cork_to_sourcecode (buf);
+  else if (enc != "cork" && enc != "Cork") buf= var_cork_to_utf8 (buf);
 #ifdef OS_WIN32
   return unix_to_dos (buf);
 #else
@@ -277,24 +281,25 @@ encode (string s, string enc) {
   else if (enc == "utf-8") return utf8_to_cork (s);
   else if (enc == "iso-8859-1") return tm_encode (s);
   else if (enc == "SourceCode") return sourcecode_to_cork(s);
-  else return s;
+  else return tm_encode (s);
 }
 
 tree
 verbatim_to_tree (string s, string enc) {
+  s= encode (s, enc);
   int i, j;
   for (i=0; i<N(s); i++)
     if (s[i]=='\n') {
       tree t (DOCUMENT);
       for (i=0, j=0; i<N(s); i++)
 	if (s[i]=='\n') {
-	  t << encode (un_special (s (j, i)), enc);
+	  t << un_special (s (j, i));
 	  j= i+1;
 	}
-      t << encode (un_special (s (j, i)), enc);
+      t << un_special (s (j, i));
       return t;
     }
-  return encode (un_special (s), enc);
+  return un_special (s);
 }
 
 string

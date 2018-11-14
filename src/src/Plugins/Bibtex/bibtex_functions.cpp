@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : bibtex_functions.cpp
 * DESCRIPTION: BiBTeX internal functions
-* COPYRIGHT  : (C) 2010 David MICHEL
+* COPYRIGHT  : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "bibtex_functions.hpp"
+#include "converter.hpp"
 #include "vars.hpp"
 
 /******************************************************************************
@@ -110,6 +111,11 @@ bib_is_space (string s) {
   return (N(s) == 1) && is_space (s[0]);
 }
 
+static bool
+bib_keepcase_sep (string s) {
+  return (N(s) == 1) && (is_space (s[0]) || s[0] == '[' || s[0] == ']');
+}
+
 /*
 static bool
 bib_is_iso_alpha (string s) {
@@ -126,7 +132,7 @@ static bool
 bib_is_char (string s, char c) {
   return (N(s) == 1) && (s[0] == c);
 }
-
+ 
 static string
 bib_to_latex (string s) {
   string r= "{";
@@ -139,15 +145,17 @@ bib_to_latex (string s) {
   while (pos < N(s)) {
     specialsav= special;
     string ch= bib_parse_char (s, pos, depth, special, math);
-    //    cerr << ch << " " << as_string (keepcase) << " " << as_string (depth) << "\n";
+    // convert_warning << ch << " " << as_string (keepcase) << " " << as_string (depth) << "\n";
     if (ch == "$$") r << "$";
     else if (special || math) r << ch;
-    else if (bib_is_space (ch)) {
+    else if (bib_keepcase_sep (ch)) {
+      if (bib_is_space (ch)) ch= " ";
+      if (ch == "[" || ch == "]") ch= "{" * ch * "}";
       if (keepcase == depth+1) {
-        r << "} ";
+        r << "}" << ch;
         keepcase= -1;
       }
-      else r << " ";
+      else r << ch;
     }
     else if (ch == "%") r << "\\%";
     else if (bib_is_char (ch, '{') && depth > 0 &&
@@ -161,11 +169,13 @@ bib_to_latex (string s) {
     else if (bib_is_char (ch, '}')) {
       if (keepcase <= depth || specialsav) r << ch;
     }
-    else  r << ch;
+    else r << ch;
   }
   for (int i= keepcase; i>0; i--) r << "}";
   r << "}";
-  //  cerr << r << "\n";
+  // cout << "<<< " << s << "\n";
+  // cout << ">>> " << r << "\n";
+  // convert_warning << r << "\n";
   return r;
 }
 
@@ -177,7 +187,7 @@ bool
 bib_is_bad (tree t) {
   if (is_atomic(t)) {
     string s= t->label;
-    for (int i= N(s); i >= 0; i--)
+    for (int i= N(s)-1; i >= 0; i--)
       if (!is_space (s[i])) return false;
     return true;
   }
@@ -223,33 +233,44 @@ bib_add_period (scheme_tree st) {
 * Change case of the first letter
 ******************************************************************************/
 
-char*
-bib_first_char (tree t) {
+bool
+bib_change_first (tree& t, string (*change_fun) (string)) {
   if (is_atomic (t)) {
     string s= t->label;
     int beg= 0;
     while ((beg < N(s)) && is_space (s[beg])) beg++;
-    if (beg < N(s)) return &(s[beg]);
-    else return 0;
+    if (beg >= N(s)) return false;
+    t= s (0, beg) * change_fun (s (beg, N(s)));
+    return true;
   }
   else if (is_compound (t, "verbatim"))
-    return 0;
+    return false;
+  else if (is_compound (t, "slink"))
+    return false;
   else if (is_func (t, WITH, 3) && t[0] == FONT_FAMILY && t[1] == "tt")
-    return 0;
+    return false;
+  else if (is_func (t, WITH, 3) && t[0] == MATH_FONT)
+    return false;
   else {
     int pos= 0;
     if (L(t) == WITH) pos= N(t)-1;
     else while ((pos < N(t)) && bib_is_bad (t[pos])) pos++;
-    if (pos < N(t)) return bib_first_char (t[pos]);
-    else return 0;
+    if (pos < N(t)) return bib_change_first (t[pos], change_fun);
+    else return false;
   }
+}
+
+scheme_tree
+bib_locase_first (scheme_tree st) {
+  tree t= simplify_correct (scheme_tree_to_tree (st));
+  bib_change_first (t, uni_locase_first);
+  return tree_to_scheme_tree (t); 
 }
 
 scheme_tree
 bib_upcase_first (scheme_tree st) {
   tree t= simplify_correct (scheme_tree_to_tree (st));
-  char* ch= bib_first_char (t);
-  if (ch != 0) *ch= upcase (*ch);
+  bib_change_first (t, uni_upcase_first);
   return tree_to_scheme_tree (t); 
 }
 
@@ -291,6 +312,9 @@ bib_change_case (tree& t, string (*change_case) (string)) {
   //cout << "Change case " << t << "\n";
   if (is_atomic (t) && change_case) t->label= change_case (t->label);
   else if (is_compound (t, "verbatim"));
+  else if (is_compound (t, "slink"));
+  else if (is_func (t, WITH, 3) && t[0] == FONT_FAMILY && t[1] == "tt");
+  else if (is_func (t, WITH, 3) && t[0] == MATH_FONT);
   else if (L(t) == WITH) bib_change_case (t[N(t)-1], change_case);
   else if (L(t) == as_tree_label ("keepcase")) t= t[0];
   else if (L(t) == CONCAT || L(t) == DOCUMENT)
@@ -300,14 +324,14 @@ bib_change_case (tree& t, string (*change_case) (string)) {
 scheme_tree
 bib_locase (scheme_tree st) {
   tree t= simplify_correct (scheme_tree_to_tree (st));
-  bib_change_case (t, locase_all);
+  bib_change_case (t, uni_locase_all);
   return tree_to_scheme_tree (t); 
 }
 
 scheme_tree
 bib_upcase (scheme_tree st) {
   tree t= simplify_correct (scheme_tree_to_tree (st));
-  bib_change_case (t, upcase_all);
+  bib_change_case (t, uni_upcase_all);
   return tree_to_scheme_tree (t); 
 }
 
@@ -612,7 +636,6 @@ bib_purify_tree (tree t, string& res) {
   else if (L(t) == CONCAT || L(t) == DOCUMENT) {
     for (int i= 0; i<N(t); i++) bib_purify_tree (t[i], res);
   }
-  cout << UNINDENT;
 }
 
 string
@@ -753,12 +776,21 @@ get_first_letters (tree t, tree s1, tree s2, tree& l) {
       while (beg < N(s) && is_space (s[beg])) beg++;
       if (beg < N(s)) {
         if (N(l) > 0) l << s2;
-        l << s(beg, beg+1) << s1;
+	int start= beg;
+	tm_char_forwards (s, beg);
+        l << s(start, beg) << s1;
         while (beg < N(s) && !is_space (s[beg])) {
-          beg++;
+	  tm_char_forwards (s, beg);
           if (beg < N(s) && s[beg] == '-') {
-            beg++;
-            l << "-" << s(beg, beg+1) << s1;
+	    while (beg < N(s) && s[beg] == '-') {
+	      beg++;
+	      l << "-";
+	    }
+	    if (beg < N(s)) {
+	      int start= beg;
+	      tm_char_forwards (s, beg);
+	      l << s (start, beg) << s1;
+	    }
           }
         }
       }
@@ -895,13 +927,24 @@ bib_latex_array (tree latex) {
   return res;
 }
 
+static bool
+is_hyper_link (string s) {
+  if (occurs (" ", s)) return false;
+  return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
+}
+
 void
 bib_parse_fields (tree& t) {
   string fields;
-  int i= 0;
   int nb= bib_get_fields (t, fields);
   array<tree> latex= bib_latex_array (
-      latex_to_tree (parse_latex (fields, false, true)));
+      latex_to_tree (parse_latex (cork_to_sourcecode (fields), false, false)));
+  //cout << "<<< " << t << LF;
+  //cout << ">>> " << latex << LF;
+  for (int k=0; k<N(latex); k++)
+    if (is_atomic (latex[k]) && is_hyper_link (latex[k]->label))
+      latex[k]= compound ("slink", latex[k]);
+  int i= 0;
   if (nb == N(latex)) bib_set_fields (t, latex, i);
 }
 
@@ -1041,11 +1084,16 @@ bib_select_entries (tree t, tree bib_t) {
   tree entries (DOCUMENT);
   tree bt= copy (bib_t);
   for (int i= 0; i<N(t); i++)
-    if (bib_is_entry (t[i]))
-      h(t[i][1]->label)= t[i];
+    if (bib_is_entry (t[i])) {
+      if (h->contains (t[i][1]->label))
+        bibtex_warning << "Duplicate entry '" << t[i][1]->label << "'\n";
+      else h(t[i][1]->label)= t[i];
+    }
   for (int i= 0; i < arity (bt); i++) {
     string b= as_string (bt[i]);
-    if (h->contains (b) && !r->contains (b)) {
+    if (!h->contains (b))
+      bibtex_warning << "Missing reference '" << b << "'\n";
+    else if (!r->contains (b)) {
       r->insert (b);
       entries << h[b];
       tree cr= bib_assoc (h[b], string ("crossref"));

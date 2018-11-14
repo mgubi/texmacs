@@ -59,13 +59,17 @@ path_as_string (path p) {
 string
 get_editor_status_report () {
   string r;
-  r << "Editor status:\n";
+
+  if (!is_server_started ()) {
+    r << "TeXmacs server not yet started";
+    return r;
+  }
+
   server sv= get_server ();
+  r << "Editor status:\n";
   editor ed= get_current_editor ();
   path start_p, end_p;
   ed->get_selection (start_p, end_p);
-  selection sel;
-  ed->selection_get (sel);
   r << "  Root path          : "
     << path_as_string (ed->rp) << "\n"
     << "  Current path       : "
@@ -74,10 +78,14 @@ get_editor_status_report () {
     << path_as_string (ed->the_shifted_path ()) << "\n"
     << "  Physical selection : "
     << path_as_string (start_p) << " -- "
-    << path_as_string (end_p) << "\n"
-    << "  Logical selection  : "
-    << path_as_string (sel->start) << " -- "
-    << path_as_string (sel->end) << "\n";
+    << path_as_string (end_p) << "\n";
+  if (start_p != end_p) {
+    selection sel;
+    ed->selection_get (sel);
+    r << "  Logical selection  : "
+      << path_as_string (sel->start) << " -- "
+      << path_as_string (sel->end) << "\n";
+  }
   return r;
 }
 
@@ -97,7 +105,7 @@ tree_report (string& s, tree t, path p, int indent) {
 }
 
 string
-  tree_report (tree t, path p) {
+tree_report (tree t, path p) {
   string s;
   tree_report (s, t, p, 0);
   return s;
@@ -121,11 +129,15 @@ void
 tm_failure (const char* msg) {
   if (rescue_mode) {
     fprintf (stderr, "\nTeXmacs] Fatal unrecoverable error, %s\n", msg);
+#ifdef DEBUG_ASSERT
+    return;
+#endif
     exit (1);
   }
   rescue_mode= true;
   cerr << "\nTeXmacs] Fatal error, " << msg << "\n";
 
+  //cerr << "Saving crash report...\n";
   string report= get_crash_report (msg);
   url dir ("$TEXMACS_HOME_PATH/system/crash");
   url err= url_numbered (dir, "crash_report_", "");
@@ -137,6 +149,7 @@ tm_failure (const char* msg) {
          << "TeXmacs] Dumping report below\n\n"
          << report << "\n";
 
+  //cerr << "Saving current buffer...\n";
   server sv= get_server ();
   editor ed= get_current_editor ();
   string buf= tree_report (subtree (the_et, ed->rp), ed->rp);
@@ -149,7 +162,9 @@ tm_failure (const char* msg) {
          << "TeXmacs] Dumping report below\n\n"
          << buf << "\n";
 
+  //cerr << "Autosaving...\n";
   call ("autosave-all");
+  //cerr << "Closing pipes...\n";
   close_all_pipes ();
   call ("quit-TeXmacs-scheme");
   clear_pending_commands ();

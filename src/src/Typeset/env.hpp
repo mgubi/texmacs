@@ -20,8 +20,9 @@
 #include "hashmap.hpp"
 #include "boxes.hpp"
 #include "url.hpp"
-#include "Graphics/frame.hpp"
+#include "frame.hpp"
 #include "link.hpp"
+#include "player.hpp"
 
 #define DECORATION (-1)
 
@@ -39,31 +40,40 @@
 #define Env_Info_Level         7
 #define Env_Font               8
 #define Env_Font_Size          9
-#define Env_Index_Level       10
-#define Env_Display_Style     11
-#define Env_Math_Condensed    12
-#define Env_Vertical_Pos      13
-#define Env_Color             14
-#define Env_Paragraph         15
-#define Env_Page              16
-#define Env_Page_Extents      17
-#define Env_Preamble          18
-#define Env_Geometry          19
-#define Env_Frame             20
-#define Env_Line_Width        21
-#define Env_Grid              22
-#define Env_Grid_Aspect       23
-#define Env_Src_Style         24
-#define Env_Src_Special       25
-#define Env_Src_Compact       26
-#define Env_Src_Close         27
-#define Env_Point_Style       28
-#define Env_Dash_Style        29
-#define Env_Dash_Style_Unit   30
-#define Env_Fill_Color        31
-#define Env_Line_Arrows       32
-#define Env_Text_At_Halign    33
-#define Env_Text_At_Valign    34
+#define Env_Font_Sizes        10
+#define Env_Index_Level       11
+#define Env_Display_Style     12
+#define Env_Math_Condensed    13
+#define Env_Vertical_Pos      14
+#define Env_Math_Nesting      15
+#define Env_Math_Width        16
+#define Env_Color             17
+#define Env_Pattern_Mode      18
+#define Env_Spacing           19
+#define Env_Paragraph         20
+#define Env_Page              21
+#define Env_Page_Extents      22
+#define Env_Preamble          23
+#define Env_Geometry          24
+#define Env_Frame             25
+#define Env_Line_Width        26
+#define Env_Grid              27
+#define Env_Grid_Aspect       28
+#define Env_Src_Style         29
+#define Env_Src_Special       30
+#define Env_Src_Compact       31
+#define Env_Src_Close         32
+#define Env_Src_Color         33
+#define Env_Point_Style       34
+#define Env_Point_Size        35
+#define Env_Dash_Style        36
+#define Env_Dash_Style_Unit   37
+#define Env_Fill_Color        38
+#define Env_Line_Arrows       39
+#define Env_Line_Portion      40
+#define Env_Text_At_Halign    41
+#define Env_Text_At_Valign    42
+#define Env_Doc_At_Valign     43
 
 /******************************************************************************
 * For style file editing
@@ -106,17 +116,14 @@
 #define INFO_SHORT         2
 #define INFO_DETAILED      3
 #define INFO_PAPER         4
-
-#define FILL_MODE_NOTHING  0
-#define FILL_MODE_NONE     1
-#define FILL_MODE_INSIDE   2
-#define FILL_MODE_BOTH     3
+#define INFO_SHORT_PAPER   5
 
 /******************************************************************************
 * The edit environment
 ******************************************************************************/
 
 class edit_env;
+class ornament_parameters;
 class edit_env_rep: public concrete_struct {
 public:
   drd_info&                    drd;
@@ -137,9 +144,15 @@ public:
   hashmap<string,tree>&        global_ref;
   hashmap<string,tree>&        local_aux;
   hashmap<string,tree>&        global_aux;
+  hashmap<string,tree>&        local_att;
+  hashmap<string,tree>&        global_att;
   bool                         complete;    // typeset complete document ?
   bool                         read_only;   // write-protected ?
-  link_repository              link_env;
+  hashmap<string,tree>         missing;     // missing refs
+  array<tree>                  redefined;   // redefined labels
+  hashmap<string,bool>         touched;     // touched refs
+  link_repository              link_env;    // current links
+  array<array<int> >           size_cache;  // math font size cache
 
   int          dpi;
   double       inch;
@@ -148,6 +161,7 @@ public:
   double       magn;
   double       mgfy;
   double       flexibility;
+  int          first_page;
   int          mode;
   int          mode_op;
   language     lan;
@@ -158,36 +172,59 @@ public:
   bool         display_style;
   bool         math_condensed;
   int          vert_pos;
+  SI           frac_max;
+  SI           table_max;
+  pencil       flatten_pen;
   int          alpha;
-  color        col;
-  SI           lw;
-  string       point_style;
+  pencil       pen;
+  bool         no_patterns;
   bool         preamble;
+  int          spacing_policy;
+  tree         math_font_sizes;
+  int          nesting_level;
+
   int          info_level;
+  int          src_style;
+  int          src_special;
+  int          src_compact;
+  int          src_close;
+  string       src_tag_color;
+  color        src_tag_col;
+  int          inactive_mode;
+  tree         recover_env;
+
+  double       anim_start;
+  double       anim_end;
+  double       anim_portion;
+
   SI           gw;
   SI           gh;
   string       gvalign;
   frame        fr;
   point        clip_lim1;
   point        clip_lim2;
-  int          src_style;
-  int          src_special;
-  int          src_compact;
-  int          src_close;
+  string       point_style;
+  SI           point_size;
+  SI           point_border;
   array<bool>  dash_style;
+  array<point> dash_motif;
   SI           dash_style_unit;
-  int          fill_mode;
-  color        fill_color;
+  double       dash_style_ratio;
+  brush        fill_brush;
   array<tree>  line_arrows;
+  double       line_portion;
   string       text_at_halign;
   string       text_at_valign;
- 
-  int          inactive_mode;
-  tree         recover_env;
+  string       doc_at_valign;
 
   string       page_type;
   bool         page_landscape;
   bool         page_automatic;
+  bool         page_single;
+  bool         page_floats;
+  int          page_packet;
+  int          page_offset;
+  tree         page_border;
   int          page_margin_mode;
   SI           page_width;
   SI           page_height;
@@ -262,14 +299,18 @@ private:
   tree exec_change_case (tree t, tree nc, bool exec_flag, bool first);
   tree exec_change_case (tree t);
   tree exec_find_file (tree t);
+  tree exec_find_file_upwards (tree t);
   tree exec_is_tuple (tree t);
   tree exec_lookup (tree t);
+  tree exec_arg_recursive (tree t);
+  tree exec_occurs_inside (tree t);
   tree exec_equal (tree t);
   tree exec_unequal (tree t);
   tree exec_less (tree t);
   tree exec_lesseq (tree t);
   tree exec_greater (tree t);
   tree exec_greatereq (tree t);
+  tree exec_blend (tree t);
 
   tree exec_cm_length ();
   tree exec_mm_length ();
@@ -299,6 +340,9 @@ private:
   tree exec_px_length ();
   tree exec_gw_length ();
   tree exec_gh_length ();
+  tree exec_gu_length ();
+  tree exec_ms_length ();
+  tree exec_s_length ();
   tree exec_msec_length ();
   tree exec_sec_length ();
   tree exec_min_length ();
@@ -306,12 +350,33 @@ private:
 
   tree exec_hard_id (tree t);
   tree exec_script (tree t);
+  tree exec_find_accessible (tree t);
   tree exec_set_binding (tree t);
   tree exec_get_binding (tree t);
+  tree exec_get_attachment (tree t);
 
   tree exec_pattern (tree t);
 
+  tree exec_anim_static (tree t);
+  tree exec_anim_dynamic (tree t);
+  tree exec_morph (tree t);
+  tree exec_anim_time ();
+  tree exec_anim_portion ();
+
   tree exec_point (tree t);
+
+  tree exec_eff_move (tree t);
+  tree exec_eff_bubble (tree t);
+  tree exec_eff_turbulence (tree t);
+  tree exec_eff_fractal_noise (tree t);
+  tree exec_eff_gaussian (tree t);
+  tree exec_eff_oval (tree t);
+  tree exec_eff_rectangular (tree t);
+  tree exec_eff_motion (tree t);
+  tree exec_eff_degrade (tree t);
+  tree exec_eff_distort (tree t);
+  tree exec_eff_gnaw (tree t);
+
   tree exec_box_info (tree t);
   tree exec_frame_direct (tree t);
   tree exec_frame_inverse (tree t);
@@ -339,7 +404,9 @@ public:
 		hashmap<string,tree>& local_ref,
 		hashmap<string,tree>& global_ref,
 		hashmap<string,tree>& local_aux,
-		hashmap<string,tree>& global_aux);
+		hashmap<string,tree>& global_aux,
+		hashmap<string,tree>& local_att,
+		hashmap<string,tree>& global_att);
   void   style_init_env ();
 
   /* execution of trees and setting environment variables */
@@ -350,6 +417,11 @@ public:
   tree   expand (tree t, bool search_accessible= false);
   bool   depends (tree t, string s, int level);
   tree   rewrite (tree t);
+  path   get_animation_ip (path ip);
+  tree   animate (tree t);
+  tree   checkout_animation (tree t);
+  tree   commit_animation (tree t);
+  tree   expand_morph (tree t);
 
   inline void monitored_write (string s, tree t) {
     back->write_back (s, env); env (s)= t; }
@@ -384,12 +456,18 @@ public:
   void local_end (hashmap<string,tree>& prev_back);
 
   /* updating environment variables */
+  ornament_parameters get_ornament_parameters ();
   void   update_page_pars ();
   void   get_page_pars (SI& w, SI& h, SI& ww, SI& hh,
 			SI& odd, SI& even, SI& top, SI& bottom);
+  SI     get_page_width (bool deco);
+  SI     get_pages_width (bool deco);
+  SI     get_page_height (bool deco);
   tree   decode_arrow (tree t, string l, string h);
+  int    get_script_size (int sz, int level);
   void   update_font ();
   void   update_color ();
+  void   update_pattern_mode ();
   void   update_mode ();
   void   update_info_level ();
   void   update_language ();
@@ -400,6 +478,7 @@ public:
   void   update_src_compact ();
   void   update_src_close ();
   void   update_dash_style ();
+  void   update_dash_style_unit ();
   void   update_line_arrows ();
   void   update ();
   void   update (string env_var);
@@ -467,7 +546,9 @@ class edit_env {
 	    hashmap<string,tree>& local_ref,
 	    hashmap<string,tree>& global_ref,
 	    hashmap<string,tree>& local_aux,
-	    hashmap<string,tree>& global_aux);
+	    hashmap<string,tree>& global_aux,
+	    hashmap<string,tree>& local_att,
+	    hashmap<string,tree>& global_att);
 };
 CONCRETE_NULL_CODE(edit_env);
 
@@ -482,6 +563,7 @@ double as_percentage (tree t);
 bool is_magnification (string s);
 double get_magnification (string s);
 int decode_alpha (string s);
+array<double> get_control_times (tree t);
 
 void set_graphical_value (tree var, tree val);
 bool has_graphical_value (tree var);
@@ -489,5 +571,8 @@ tree get_graphical_value (tree var);
 bool graphics_needs_update ();
 void graphics_require_update (tree var);
 void graphics_notify_update (tree var);
+
+void players_set_elapsed (tree t, double el);
+void players_set_speed (tree t, double sp);
 
 #endif // defined ENV_H

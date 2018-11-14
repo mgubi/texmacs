@@ -34,6 +34,10 @@
 ;;          Any HTML or HTML-like data.
 ;;   m  --  MathML - http://www.w3.org/1998/Math/MathML
 ;;
+;;Non-Normalized namespace prefixes are:
+;;   g  --  Gallina language.
+;;   c  --  Coq XML format (we named it CoqML).
+;;
 ;; Since the parser is designed to be used for conversion to STM data format,
 ;; no provisions are made to preserve the namespace prefixes used in the
 ;; orginial sxml tree. Namespace normalization is not reversible.
@@ -41,6 +45,8 @@
 (define xmlns-uri-xml "http://www.w3.org/XML/1998/namespace")
 (define xmlns-uri-xhtml "http://www.w3.org/1999/xhtml")
 (define xmlns-uri-mathml "http://www.w3.org/1998/Math/MathML")
+(define xmlns-uri-gallina "Gallina")
+(define xmlns-uri-coqml "CoqML")
 
 ;;; Building the namespace bindings environment
 
@@ -70,14 +76,20 @@
 
 ;;; Converting nodes
 
-(tm-define (htmltm-parse s)
-  (xmltm-parse xmlns-uri-xhtml s))
+(tm-define (coqml-parse s)
+  (xmltm-parse xmlns-uri-coqml parse-xml s))
 
-(tm-define (xmltm-parse default-ns s)
+(tm-define (gallinatm-parse s)
+  (xmltm-parse xmlns-uri-gallina parse-xml s))
+
+(tm-define (htmltm-parse s)
+  (xmltm-parse xmlns-uri-xhtml parse-html s))
+
+(tm-define (xmltm-parse default-ns parser s)
   (with-xmltm-environment
    env default-ns
    (let sub ((env env)
-	     (t (parse-html s)))
+	     (t (parser s)))
      (cond ((string? t) t)
 	   ((sxml-top-node? t) `(*TOP* ,@(map (cut sub env <>) (cdr t))))
 	   ((sxml-control-node? t) t)
@@ -111,6 +123,8 @@
        ;; FIXME: user namespace prefix list should be extensible
        (cond ((== ns-uri xmlns-uri-xhtml) "h:")
 	     ((== ns-uri xmlns-uri-mathml) "m:")
+	     ((== ns-uri xmlns-uri-gallina) "g:")
+	     ((== ns-uri xmlns-uri-coqml) "c:")
 	     ((== ns-uri xmlns-uri-xml) "x:")
 	     ((string-null? ns-uri) "")
 	     (else (string-append ns-uri ":")))
@@ -236,6 +250,16 @@
 	((char-whitespace? (first kdr)) kdr)
 	(else (cons #\space kdr))))
 
+(tm-define (htmltm-space-collapse env l)
+  ;; Collapses whitespaces in sxml node list @l. Correctly merges consecutive
+  ;; string nodes in @l.
+  (cond ((null? l) '())
+	((htmltm-preserve-space? env) (htmltm-space-preserve l))
+	(else (let ((l2 (list-fold-right htmltm-space-collapse/kons #f l)))
+		(if (string? (first l2))
+                    (cons (htmltm-collapse-spaces (car l2)) (cdr l2))
+		    l2)))))
+
 (tm-define (htmltm-space-mixed env l)
   ;; remove heading and trailing spaces, and collapses whitespaces in sxml node
   ;; list @l. Correctly merges consecutive string nodes in @l.
@@ -246,6 +270,18 @@
 		    (cons (htmltm-collapse-spaces (string-trim (car l2)))
 			  (cdr l2))
 		    l2)))))
+
+(define (htmltm-space-collapse/kons kar kdr)
+  (cond ((not kdr)			; kar is last node
+	 (list kar))
+	((string? kar)
+	 (if (string? (first kdr))
+	     (cons (string-append kar (car kdr)) (cdr kdr))
+	     (cons kar kdr)))
+	((string? (first kdr))
+	 (cons kar (cons (htmltm-collapse-spaces (car kdr)) (cdr kdr))))
+	(else
+	 (cons kar kdr))))
 
 (define (htmltm-space-mixed/kons kar kdr)
   (cond ((not kdr)			; kar is last node
@@ -314,6 +350,8 @@
   ;;           TODO: might fallback to 'mixed' if some text is present
   ;;         :mixed -- drop heading and trailing whitespaces, normalize and
   ;;           collapse internal whitespaces.
+  ;;         :collapse -- normalize and collapse whitespaces. Preserve heading
+  ;;           and trailing whitespaces.
   ;;         :pre -- drop newlines at ends and switch to preserved spaces
   ;;           mode.
   ;;   kind: either :block or :inline, how is the element rendered
@@ -351,6 +389,7 @@
   ;; descendence of various ancestors might not be consistent.
   (let ((clean (cond ((eq? model :empty) (lambda (env c) c))
 		     ((eq? model :element) htmltm-space-element)
+		     ((eq? model :collapse) htmltm-space-collapse)
 		     ((eq? model :mixed) htmltm-space-mixed)
 		     ((eq? model :pre) htmltm-space-preformatted)
 		     (else (error "Bad model: " model))))
@@ -446,7 +485,7 @@
 	(else (cons line stack))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Producing handlers for dispatch table
+;; Producing mathml handlers for dispatch table
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (mathtm-handler model method)
@@ -473,12 +512,114 @@
   (proc env a c))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Producing gallina handlers for dispatch table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define gallinatm-raw    htmltm-space-preformatted)
+(define gallinatm-terms  htmltm-space-element)
+(define gallinatm-vernac htmltm-space-element)
+(define gallinatm-toplvl htmltm-space-element)
+(define gallinatm-ltac   htmltm-space-element)
+
+(define (gallinatm-handler/inline env a c proc)
+  (proc env a c))
+
+(define (gallinatm-handler/bloc env a c proc)
+  `((document ,@(proc env a c))))
+
+(tm-define (gallinatm-handler model method)
+  ;;  model:  content model category
+  ;;          :toplvl -- text node are ignored
+  ;;          :terms  -- text node are ignored
+  ;;          :vernac -- text node are ignored
+  ;;          :ltac   -- text node are ignored
+  ;;          :raw -- drop heading and trailing whitespaces, normalize and
+  ;;            collapse internal whitespaces.
+  ;;  method: <procedure> to convert the element content to a node-list.
+  (if (not (in? model '(:raw :terms :vernac :toplvl :ltac)))
+      (error "Bad model: " model))
+  (if (not (procedure? method))
+      (error "Bad method: " method))
+  (let ((clean (cond ((eq? model :raw)    gallinatm-raw)
+                     ((eq? model :terms)  gallinatm-terms)
+                     ((eq? model :toplvl) gallinatm-toplvl)
+                     ((eq? model :vernac) gallinatm-vernac)
+                     ((eq? model :ltac)   gallinatm-ltac)))
+        (para  (cond ((eq? model :raw)    gallinatm-handler/inline)
+                     ((eq? model :terms)  gallinatm-handler/inline)
+                     ((eq? model :ltac)   gallinatm-handler/inline)
+                     ((eq? model :toplvl) gallinatm-handler/bloc)
+                     ((eq? model :vernac) gallinatm-handler/bloc))))
+    (let ((proc method))
+      (lambda (env a c)
+        (para env a (clean env c) proc)))))
+
+(tm-define (gallinatm-serial p? l)
+  (if p? (stm-serial l stm-document?)
+      (stm-serial l stm-document? htmltm-make-line htmltm-make-concat)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Producing coqml handlers for dispatch table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (char-whitespace? c)
+  (in? c '(#\space #\ht #\newline)))
+
+(tm-define (blank? s)
+  (:synopsis "does @s contain only whitespace?")
+  (list-and (map char-whitespace? (string->list s))))
+
+(define (trim-newlines s)
+  (letrec ((nl? (lambda (c) (== c #\newline)))
+           (trim-right (lambda (l)
+                         (if (and (list>0? l) (nl? (car l)))
+                           (trim-right (cdr l)) l)))
+           (trim-left  (lambda (l)
+                         (if (and (list>0? l) (nl? (cAr l)))
+                           (trim-left  (cDr l)) l))))
+  (list->string (trim-right (trim-left (string->list s))))))
+
+(define (coqml-space-cleaning env l)
+  ;; Drop blank lines. Trim newlines at begin and end of strings.
+  ;; Conserve spaces. Put text in string tags.
+  (set! l (filter (lambda (x) (or (nstring? x)
+                                  (not (blank? x)))) l))
+  (if (and (nnull? l) (null? (filter nstring? l)))
+    (list (trim-newlines (apply string-append l)))
+    (map (lambda (x) (if (string? x) `(c:string ,(trim-newlines x)) x)) l)))
+
+(define coqml-pre    coqml-space-cleaning)
+(define coqml-elem   htmltm-space-element)
+
+(tm-define (coqml-handler model method)
+  ;;  model:  content model category
+  ;;          :element -- text nodes are ignored
+  ;;          :pre -- Drop blank lines. Trim newlines at beginning and ending
+  ;;            of strings.  Conserve spaces. Put text in string tags.
+  ;;  method: <procedure> to convert the element content to a node-list.
+  (if (not (in? model '(:pre :elem)))
+      (error "Bad model: " model))
+  (if (not (procedure? method))
+      (error "Bad method: " method))
+  (let ((clean (cond ((eq? model :pre)  coqml-pre)
+                     ((eq? model :elem) coqml-elem))))
+    (let ((proc method))
+      (lambda (env a c)
+        (proc env a (clean env c))))))
+
+(tm-define (coqml-serial p? l)
+  (if p? (stm-serial l stm-document?)
+      (stm-serial l stm-document? htmltm-make-line htmltm-make-concat)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Generic XML dispatcher
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (sxml-meta-logic-ref ns-id ncname)
   (cond ((== ns-id "h") (logic-ref htmltm-methods% ncname))
 	((== ns-id "m") (logic-ref mathtm-methods% ncname))
+	((== ns-id "g") (logic-ref gallinatm-methods% ncname))
+	((== ns-id "c") (logic-ref coqml-methods% ncname))
 	(else #f)))
 
 (tm-define (sxml-dispatch x-string x-pass env t)

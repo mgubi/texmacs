@@ -14,12 +14,9 @@
 
 #include "qt_widget.hpp"
 #include "QTMScrollView.hpp"
-#include <QVariant>
-#include <QSet>
 #include <QLabel>
 
 class qt_simple_widget_rep;
-class basic_renderer_rep;
 
 /*! The underlying QWidget for a qt_simple_widget_rep handles drawing for a 
     texmacs canvas, as well as keypresses, international input methods, etc.
@@ -31,34 +28,25 @@ class basic_renderer_rep;
 class QTMWidget: public QTMScrollView {
   Q_OBJECT
 
-  mutable widget tmwid;
-
-  rectangles invalid_regions;
-  QPixmap      backingPixmap;
-  QLabel*           imwidget;
-  QPoint          cursor_pos;
-
+  qt_widget    tmwid;
+  QLabel*      imwidget;
+  QPoint       cursor_pos;
+  
 public:
 
-  static QSet<QTMWidget*> all_widgets;  // needed by qt_gui_rep::update()
-  QPoint                  backing_pos;
-
-  QTMWidget (QWidget* _parent=0, qt_simple_widget_rep* _tmwid=0);
+  QTMWidget (QWidget* _parent=0, qt_widget _tmwid=0);
   virtual ~QTMWidget ();
   
-  void invalidate_rect (int x1, int y1, int x2, int y2);
-  void invalidate_all ();
-  void repaint_invalid_regions ();
-
-  void scrollContentsBy (int dx, int dy);
-  void setCursorPos (QPoint pos) { cursor_pos = pos; }
-
-  qt_simple_widget_rep* tm_widget () const;
-  void              set_tm_widget (qt_simple_widget_rep* _tmwid);
-  
   virtual QSize	sizeHint () const;
+  virtual void scrollContentsBy (int dx, int dy);
 
+  void setCursorPos (QPoint pos) { cursor_pos = pos; }
+  qt_simple_widget_rep* tm_widget () const;
+  
 protected:
+
+  virtual bool event (QEvent *event);
+
   virtual void paintEvent (QPaintEvent* event);
   virtual void focusInEvent (QFocusEvent* event);
   virtual void focusOutEvent (QFocusEvent* event);
@@ -67,13 +55,11 @@ protected:
   virtual void mousePressEvent (QMouseEvent* event);
   virtual void mouseReleaseEvent (QMouseEvent* event);
   virtual void mouseMoveEvent (QMouseEvent* event);
-  virtual bool event (QEvent *event);
   virtual void resizeEvent (QResizeEvent *event);
-
+  virtual void resizeEventBis (QResizeEvent *e);
+  
   virtual QVariant inputMethodQuery (Qt::InputMethodQuery query) const;
 
-private:
-  basic_renderer_rep *getRenderer();
 };
 
 #endif // QTMWIDGET_HPP

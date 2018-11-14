@@ -19,8 +19,20 @@
 #include "qt_gui.hpp"
 #include "qt_dialogues.hpp"
 
-#include <QtGui>
-
+#include <QTimer>
+#include <QPoint>
+#include <QStringListModel>
+#include <QSortFilterProxyModel>
+#include <QMenu>
+#include <QAction>
+#include <QWidgetAction>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QListView>
+#include <QTreeView>
+#include <QScrollArea>
+#include <QTabWidget>
+#include <QToolButton>
 
 /*! Handles TeXmacs commands in the QT way.
 
@@ -34,8 +46,8 @@
  To use this class, one typically takes some given command "cmd" and does the
  following:
  
-    QTMCommand* qtmcmd = new QTMCommand(theQWidget, cmd);
-    QObject::connect(theQWidget, SIGNAL(somethingHappened()), qtmcmd, SLOT(apply()));
+    QTMCommand* qtmcmd = new QTMCommand (theQWidget, cmd);
+    QObject::connect(theQWidget, SIGNAL (somethingHappened()), qtmcmd, SLOT (apply()));
  
  Since the slot in this class accepts no arguments, commands which require
  access to the QWidget must be subclassed from command_rep to accept the
@@ -59,48 +71,38 @@ public slots:
   void apply ();
 };
 
-/*! HACK: remove me!
+
+/*! A QMenu which builds its entries just before show()ing.
  
- This special QTMCommand applies its underlying texmacs command immediately
- and upon destruction. This is needed to circumvent some strange behaviour
- where children QObjects are destroyed before the destroyed() signal is
- emmitted. 
+ The menu entries are given as a texmacs widget in form of a promise which is
+ evaluated each time we force(). No caching internal to this object should be
+ performed lest we break dynamic menus.
  
- In particular, only qt_ui_widget_rep needs this for the wrapped_widget because
- it wants to connect the command to the destroyed() signal and the QTMCommand
- has already been deleted, the signal is disconnected and apply() never called.
- A nasty hack in the destructor applies the command anyway...
-*/
-class QTMOnDestroyCommand: public QTMCommand {
-  Q_OBJECT
-
-public:
-  QTMOnDestroyCommand (QObject* parent, command _cmd) : QTMCommand(parent, _cmd) {}
-  ~QTMOnDestroyCommand () { apply (); }
-
-public slots:
-  void apply() {
-    if (DEBUG_QT) 
-      cout << "QTMOnDestroyCommand::apply()\n";
-    if (! is_nil(cmd)) cmd ();      // Immediately apply!!
-  }
-};
-
-
-/*!
+ If this is intended as a submenu of a QAction, we must attachTo() it: then,
+ when the action is about to be destroyed() we are notified and remove ourselves
+ 
+ If this is used as a menu for a button, then it suffices to set the parent
+ accordingly in the constructor.
  */
 class QTMLazyMenu: public QMenu {
   Q_OBJECT
-
-  promise<widget> pm;
+  
+  promise<widget> promise_widget;
+  bool show_right;
 
 public:
-  QTMLazyMenu (promise<widget> _pm) : pm (_pm) {
-      QObject::connect (this, SIGNAL (aboutToShow ()), this, SLOT (force ()));
-  }
+  QTMLazyMenu (promise<widget> _pm, QWidget* p = NULL, bool right = false);
+  void attachTo (QAction* a);
+  virtual void showEvent (QShowEvent* event);
 
 public slots:
   void force ();
+
+protected:
+  void transferActions (QList<QAction*>* src);
+
+protected slots:
+  void destroy (QObject* obj=0);
 };
 
 
@@ -145,18 +147,21 @@ class QTMWidgetAction : public QWidgetAction {
   widget wid;
   
 public:
-  QTMWidgetAction (widget _wid, QObject *parent = NULL);
+  QTMWidgetAction (widget _wid, QObject* parent=NULL);
   
 public slots:
   void doRefresh() { };
   
 protected:
-  virtual QWidget* createWidget (QWidget * parent);
-  
+  virtual QWidget* createWidget (QWidget* parent);
 };
 
-/*!
+
+/*! QTMTileAction is used to build a popup menu with a grid of buttons.
  
+ In particular this is used to build the matrix of buttons in the color palette
+ available at the toolbar. The corresponding texmacs widget using this class
+ is a tile_menu (see qt_ui_element.cpp)
  */
 class QTMTileAction: public QWidgetAction {
   Q_OBJECT
@@ -165,11 +170,10 @@ class QTMTileAction: public QWidgetAction {
   int                   cols;
   
 public:
-  QTMTileAction (QWidget* parent, array<widget>& arr, int _cols);
-  virtual QWidget* createWidget(QWidget* parent);
-    // virtual void activate (ActionEvent event) {
-    //   cout << "TRIG\n"; QWidgetAction::activate (event); }
+  QTMTileAction (array<widget>& arr, int _cols, QObject* parent=NULL);
+  virtual QWidget* createWidget (QWidget* parent);
 };
+
 
 /*!
  */
@@ -179,10 +183,38 @@ class QTMMinibarAction : public QWidgetAction {
   QVector <QAction*> actions;
 
 public:
-  QTMMinibarAction (QWidget* parent, array<widget>& arr);
-  virtual QWidget* createWidget(QWidget* parent);
-    // virtual void activate (ActionEvent event) {
-    //   cout << "TRIG\n"; QWidgetAction::activate (event); }
+  QTMMinibarAction (array<widget>& arr, QObject* parent=NULL);
+  virtual QWidget* createWidget (QWidget* parent);
+};
+
+
+/*! QTMMenuButton is a custom button appropriate for menus.
+ 
+ We need to subclass QToolButton for two reasons:
+    1) Custom appearance
+    2) If used in QWidgetAction the menu does not disappear upon triggering the
+       button. See QTBUG-10427 and TeXmacs bug #37719.
+ */
+class QTMMenuButton: public QToolButton {
+  Q_OBJECT
+
+public:
+  QTMMenuButton (QWidget* parent = NULL);
+ 
+  void mouseReleaseEvent (QMouseEvent* e);
+  void mousePressEvent (QMouseEvent* e);
+  void paintEvent (QPaintEvent* e);
+};
+
+
+/*!
+ */
+class QTMMenuWidget: public QWidget {
+  Q_OBJECT
+
+public:
+  QTMMenuWidget (QWidget* parent = NULL);
+  void paintEvent(QPaintEvent *event);
 };
 
 
@@ -191,15 +223,23 @@ class QTMLineEdit : public QLineEdit {
   Q_OBJECT
 
   bool completing;
+  string     type; // type of input field
+  string     name; // optional name of input field
+  string   serial; // optional serial number of input field
   string       ww; // width of the parsed widget
-  
+  command     cmd;
+  int    last_key;
 public:
-  QTMLineEdit (QWidget *parent, string _ww, int style=0);
+  QTMLineEdit (QWidget *parent, string _type, string _ww,
+               int style=0, command _cmd= command ());
+  void set_type (string t);
+  bool continuous ();
   virtual QSize	sizeHint () const ;
   virtual bool event (QEvent* ev);
 
 signals:
-  void focusOut ();
+  void focusOut (Qt::FocusReason reason);
+  
 protected:
   virtual void keyPressEvent (QKeyEvent* ev);
   virtual void focusInEvent (QFocusEvent* ev);
@@ -207,11 +247,11 @@ protected:
 };
 
 
-/*! A class to keep a QTMLineEdit object and a qt_input_text_widget_rep object
- in sync.
+/*! A class to keep a QTMLineEdit and a qt_input_text_widget_rep in sync.
  
  After certain events we store state information about the QLineEdit into the 
- qt_input_text_widget_rep: 
+ qt_input_text_widget_rep:
+ 
   - When the user has finished editing (i.e. has pressed enter) we save the text
     from the QWidget in the texmacs widget and set a "modified" flag.
   - When the user leaves the QWidget we restore the text from the texmacs widget
@@ -219,55 +259,49 @@ protected:
  
  Additionally and depending on user configuration we may always store the text
  when leaving or apply the command when pressing enter.
+ 
+ @note On memory management: the QTMInputTextWidgetHelper is owned by the
+       QTMLineEdit it is helping with.
 */
 class QTMInputTextWidgetHelper : public QObject {
   Q_OBJECT
-
-  widget            p_wid; //<! A reference to a qt_input_text_widget_rep
-  bool               done; //<! Has the command been executed after a modif.?
-  QList<QTMLineEdit*> views;
   
+  qt_widget   p_wid;  //!< A pointer to a qt_input_text_widget_rep
+
 public:
-  QTMInputTextWidgetHelper (qt_input_text_widget_rep*  _wid); 
-  ~QTMInputTextWidgetHelper();
-
-  qt_input_text_widget_rep* wid () { // useful cast
-    return static_cast<qt_input_text_widget_rep*>(p_wid.rep); }
+  QTMInputTextWidgetHelper (qt_widget _wid);
   
-  void add (QObject *);
-  void apply ();
+protected:
+  qt_input_text_widget_rep* wid () { // useful cast
+    return static_cast<qt_input_text_widget_rep*> (p_wid.rep); }
 
 public slots:
   void commit ();
-  void leave ();
-  void remove (QObject *);
+  void leave (Qt::FocusReason reason);
 };
 
-class QTMComboBox;
 
-/*! A class to keep a QComboBox object and a qt_field_widget_rep object in
- sync.
+/*! A class to keep a QComboBox and a qt_field_widget_rep in sync.
  
  After certain events we store state information about the QComboBox into the 
  qt_input_text_widget_rep: when the user has finished editing (i.e. has pressed
  enter), or has left the QComboBox for instance.
+ 
+ @note On memory management: the QTMFieldWidgetHelper is owned by the
+       QComboBox it is helping with.
 */
 class QTMFieldWidgetHelper : public QObject {
   Q_OBJECT
   
-  qt_field_widget     wid;
-  bool               done;
-  QList<QComboBox*> views;
-
-public:
-  QTMFieldWidgetHelper (qt_field_widget  _wid); 
-  ~QTMFieldWidgetHelper ();
+  qt_widget wid;
+  bool     done;
   
-  void add (QObject* cb);
+public:
+  QTMFieldWidgetHelper (qt_widget _wid, QComboBox* parent);
+  QTMFieldWidgetHelper (qt_widget _wid, QLineEdit* parent);
 
 public slots:
   void commit (const QString& qst);
-  void remove (QObject* obj);  
 };
 
 
@@ -276,7 +310,7 @@ class QTMTabWidget : public QTabWidget {
   Q_OBJECT
 
 public:
-  QTMTabWidget(QWidget* p = NULL);
+  QTMTabWidget (QWidget* p = NULL);
 
 public slots:
   void resizeOthers(int index);
@@ -287,15 +321,38 @@ public slots:
 class QTMRefreshWidget : public QWidget {
   Q_OBJECT
   
-  string  tmwid;
+  string strwid;
   string   kind;
   object curobj;
   widget    cur;
-  QWidget* qwid;
+  qt_widget tmwid;
+  QWidget*   qwid;
   hashmap<object,widget> cache;
   
 public:
-  QTMRefreshWidget (string _tmwid, string _kind);
+  QTMRefreshWidget (qt_widget _tmwid, string _strwid, string _kind);
+
+  bool recompute (string what);
+    //static void deleteLayout (QLayout*);
+
+public slots:
+  void doRefresh (string kind);
+};
+
+
+/*! A container widget which redraws the widgets it owns. */
+class QTMRefreshableWidget : public QWidget {
+  Q_OBJECT
+  
+  object     prom;
+  string     kind;
+  object   curobj;
+  widget      cur;
+  qt_widget tmwid;
+  QWidget*   qwid;
+  
+public:
+  QTMRefreshableWidget (qt_widget _tmwid, object _prom, string _kind);
 
   bool recompute (string what);
     //static void deleteLayout (QLayout*);
@@ -347,6 +404,36 @@ signals:
 
 protected slots:
   virtual void selectionChanged (const QItemSelection& c, const QItemSelection& p);
+};
+
+
+class QTMTreeModel;
+
+/*! A simple wrapper around a QTreeView.
+ 
+ This class keeps a pointer to the tree it's displaying, in order to keep it
+ alive. It also instantiates (if necessary) the QTMTreeModel it needs to sync 
+ with the data. This model is property of a qt_tree_observer, which will delete
+ it when the tree is.
+ */
+class QTMTreeView : public QTreeView {
+  Q_OBJECT
+
+  tree      _t;
+  command _cmd;
+  
+  QTMTreeView (const QTMTreeView&);
+  QTMTreeView& operator= (const QTMTreeView&);
+  
+public:
+  QTMTreeView (command cmd, tree data, const tree& roles, QWidget* parent=0);
+  QTMTreeModel* tmModel() const;
+  
+protected:
+  virtual void currentChanged (const QModelIndex& cur, const QModelIndex& pre);
+  
+private slots:
+  void callOnChange (const QModelIndex& index, bool mouse=true);
 };
 
 

@@ -1,13 +1,173 @@
-<TeXmacs|1.0.7.18>
+<TeXmacs|1.99.8>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english|old-spacing>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.0.7 to 1.0.7.19>
+  <section|Changes from version 1.99.1 to 1.99.9>
 
   <\itemize>
+    <item>A unified Graph plugin for Graphviz, Asymptote (1.99.9).
+
+    <item>Import improvements from the FriCAS project (1.99.9).
+
+    <item>Fixes and documentations on the Sage plugin (1.99.9).
+
+    <item>Several bug fixes (1.99.8).
+
+    <item>Support of binary packages for various GNU/<name|Linux>
+    distributions, cosntructed using <name|Suse> <name|OpenBuild> services
+    (1.99.8).
+
+    <item>Several new algorithms for micro typography: roots, mathematical
+    accents, etc. (1.99.7).
+
+    <item>New style for posters (1.99.7).
+
+    <item>Support for new ACM styles (1.99.7).
+
+    <item>Various bug fixes (1.99.7).
+
+    <item>New page breaker with better support for floating objects and
+    footnotes (1.99.6).
+
+    <item>Improved native <name|Pdf> generation based on <name|Hummus>
+    (1.99.6).
+
+    <item>Several new algorithms for micro typography: subscripts,
+    superscripts, etc. (1.99.6).
+
+    <item>Improved support for <TeX> <name|Gyre> fonts (1.99.6).
+
+    <item>Various bug fixes (1.99.6).
+
+    <item>Support for retina screens (1.99.5).
+
+    <item>Implementation of a better, still experimental, page breaking
+    algorithm (1.99.5).
+
+    <item>Various improvements for the laptop presentation mode (1.99.5).
+
+    <item>Simplified editor for graphical slides in laptop presentations
+    (1.99.5).
+
+    <item>Highly improved animations (1.99.5).
+
+    <item>An editing mode for simple animations based on morphing (1.99.5).
+
+    <item>Various graphical effects and font effects (1.99.5).
+
+    <item>Reorganizations in the configuration of <TeXmacs> (1.99.5).
+
+    <item>Improved rendering of pages, including a mode for double sided
+    rendering, and a panorama mode (1.99.5).
+
+    <item>High quality mathematical typesetting for many standard fonts
+    (1.99.5); see also the paper \PMathematical Font Art\Q presented at ICMS
+    2016.
+
+    <item>Rudimentary support for inking (1.99.5).
+
+    <item>Customizable snapping in graphics mode (1.99.5).
+
+    <item>Various enhancements and fixes for graphics mode (1.99.5).
+
+    <item>Various bug fixes (1.99.4).
+
+    <item>Various improvements for the table editor (1.99.4).
+
+    <item>Greek language support, with the help of Alkis Akritas (1.99.4).
+
+    <item>Experimental math editing mode that enforces syntactic correctness
+    (1.99.3).
+
+    <item>A series of improvements in the converter to <LaTeX> (1.99.3).
+
+    <item>Tool for examining errors in the <LaTeX> export (1.99.3).
+
+    <item>High quality support of STIX fonts (1.99.3).
+
+    <item>Various improvements concerning mathematical typesetting (1.99.3).
+
+    <item>Improved punctuation, including support for French punctuation
+    rules (1.99.3).
+
+    <item>Improved experimental client-server support (1.99.3).
+
+    <item>Encrypting/decrypting pieces of documents (1.99.3).
+
+    <item>New experimental bibliographic database management (1.99.3).
+
+    <item>New experimental database facilities (1.99.3).
+
+    <item>Added style package for literate programming (1.99.3).
+
+    <item>Consistent support for multiple bibliographies, indexes,
+    glossaries, <abbr|etc.> (1.99.3).
+
+    <item>Enabled new style fonts as the default (1.99.2).
+
+    <item>Use small amount of intercharacter stretching by default (1.99.2).
+
+    <item>Nicer search and replace system (1.99.2).
+
+    <item>Added support for the Croatian language (1.99.2).
+
+    <item>Added experimental \Pconservative\Q converters for <LaTeX>
+    (1.99.2).
+
+    <item>Various improvements for <LaTeX> converters (1.99.2).
+
+    <item>Various bug fixes (1.99.2).
+  </itemize>
+
+  <section|Changes from version 1.0.7 to 1.99.1>
+
+  <\itemize>
+    <item>Activate the native Pdf renderer by default (1.99.1).
+
+    <item>Many, many bug fixes (1.99.1).
+
+    <item>Introduction of a debugging console (1.99.1).
+
+    <item>Limited recovery from errors (1.99.1).
+
+    <item>Started implementation of search and replace widget (1.99.1).
+
+    <item>Support for marginal notes (1.99.1).
+
+    <item>Complete reorganization of document styles and package (1.0.7.21).
+
+    <item>Major improvements for upcoming native Pdf renderer (1.0.7.21).
+
+    <item>New focus preferences menu (1.0.7.21).
+
+    <item>New widgets for editing macros (1.0.7.21).
+
+    <item>Improved CJK typesetting and support for Fandol fonts (1.0.7.21).
+
+    <item>Stretchable space between letters (1.0.7.21).
+
+    <item>Implementation of protrusion for the standard <verbatim|ecrm> font
+    (1.0.7.21).
+
+    <item>Improved ornaments and typesetting adjustments (1.0.7.21).
+
+    <item>Improved presentation mode (1.0.7.20).
+
+    <item>Various improvements for <LaTeX> import and export (1.0.7.20).
+
+    <item>Rewritten <name|Scilab> plug-in (1.0.7.20).
+
+    <item>Better portability of various plug-ins (1.0.7.20).
+
+    <item>Various graphical font effects; experimental, not yet in interface
+    (1.0.7.20).
+
+    <item>Profound reorganization of the font system with experimental option
+    for testing (1.0.7.19).
+
     <item><LaTeX> import and export of metadata for various standard styles
     (1.0.7.19).
 
@@ -16,8 +176,10 @@
 
     <item>Started implementation of remote <TeXmacs> file system (1.0.7.19).
 
-    <item>Implementation of arbitrary zoom factors and ``fit to paragraph
-    width'' (1.0.7.18).
+    <item>Improved portability of plug-in detection (1.0.7.19).
+
+    <item>Implementation of arbitrary zoom factors and \Pfit to paragraph
+    width\Q (1.0.7.18).
 
     <item>New widget for user preferences (1.0.7.18).
 
@@ -581,7 +743,7 @@
 
     <item>Better handling of parameters for page size and margins (1.0.3.8).
 
-    <item>Implementation of ``mutators'', tags which may modify themselves
+    <item>Implementation of \Pmutators\Q, tags which may modify themselves
     (1.0.3.8).
 
     <item>Let computer algebra sessions make use of mutators (1.0.3.8).
@@ -1023,7 +1185,7 @@
 
     <item>Visual environment information when editing (1.0.0.5).
 
-    <item>Letter and exam styles; old letter becomes ``generic'' (1.0.0.5).
+    <item>Letter and exam styles; old letter becomes \Pgeneric\Q (1.0.0.5).
 
     <item>Implementation of overline and underline macros (1.0.0.5).
 
@@ -1279,7 +1441,7 @@
 
     <item>Some minor bug corrections (0.3.4.10).
 
-    <item>Started ``lazyfication'' of typesetter (0.3.4.10).
+    <item>Started \Plazyfication\Q of typesetter (0.3.4.10).
 
     <item>Short documentation on tables (0.3.4.9).
 
@@ -1615,7 +1777,7 @@
 
     <item>Implementation of a file chooser (0.2.5-8).
 
-    <item>Menus have been made ``sticky'' (0.2.5-8).
+    <item>Menus have been made \Psticky\Q (0.2.5-8).
 
     <item>Corrected bugs in the russian language support (0.2.5-7).
 
@@ -1685,7 +1847,7 @@
     <item>Automatic generation of bibliographies using <verbatim|bibtex>
     (0.2.4c).
 
-    <item>Auto save recovery and ``no changes need to be saved'' (0.2.4b).
+    <item>Auto save recovery and \Pno changes need to be saved\Q (0.2.4b).
 
     <item>Nicer recursive dynamic commands (0.2.4b).
 
@@ -1771,8 +1933,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

@@ -108,12 +108,20 @@ edit_interface_rep::try_shortcut (string comb) {
     tree rhs= (shorth == rew_s? tree (""): sv->kbd_system_rewrite (shorth));
     //cout << "Shortcut: " << sh_s << " -> " << rew << "\n";
     if ((search_forwards (" ", comb) >= 0 && comb != " ") ||
-	(search_forwards ("-", comb) >= 0 && comb != "-"))
+	(search_forwards ("-", comb) >= 0 && comb != "-")) {
+      tree t= rhs;
+      if (is_compound (t, "render-key", 1)) t= t[0];
+      if (is_func (t, WITH)) t= t[N(t)-1];
+      string r= as_string (t);
+      if (starts (r, "<") && !starts (r, "<#"))
+        if (cork_to_utf8 (r) != r)
+          rhs= tree (CONCAT, rhs, " (" * r(1, N(r)-1) * ")");
       call ("set-temporary-message",
 	    tree (CONCAT, "keyboard shortcut: ", rew), rhs,
 	    shorth == ""? 1: 3000);
+    }
     if ((status & 1) == 1) cmd ();
-    else if (N(shorth) > 0) insert_tree (shorth);
+    else if (N(shorth) > 0) call ("kbd-insert", shorth);
     //cout << "Mark= " << sh_mark << "\n";
     return true;    
   }
@@ -166,17 +174,19 @@ edit_interface_rep::key_press (string gkey) {
     if ((i >= 32 && i <= 127) || (i >= 128 && i <= 255) || (i == 25))
       if (!inside_active_graphics ()) {
         archive_state ();
-        insert_tree (rew);
+        call ("kbd-insert", rew);
       }
     interrupt_shortcut ();
   }
   else if (contains_unicode_char (rew)) {
     archive_state ();
-    insert_tree (key);
+    call ("kbd-insert", key);
     interrupt_shortcut ();    
-  } else if (DEBUG_KEYBOARD)
-    cout << "Keyboard] unrecognized key " << key 
-         << ". Undefined shortcut or key missing in the encoding files.\n";
+  }
+  else if (DEBUG_KEYBOARD)
+    debug_keyboard
+      << "unrecognized key " << key << ". "
+      << "Undefined shortcut or key missing in the encoding files.\n";
 }
 
 void
@@ -216,18 +226,45 @@ edit_interface_rep::kbd_shortcut (string cmd) {
 
 void
 edit_interface_rep::handle_keypress (string key, time_t t) {
-  if (DEBUG_KEYBOARD)
-    cout << "Keyboard] Pressed " << key << " at " << t << "\n";
-  //time_t t1= texmacs_time ();
-  if (is_nil (eb)) apply_changes ();
-  start_editing ();
-  string zero= "a"; zero[0]= '\0';
-  string gkey= replace (key, zero, "<#0>");
-  call ("keyboard-press", object (gkey), object ((double) t));
-  notify_change (THE_DECORATIONS);
-  end_editing ();
-  //time_t t2= texmacs_time ();
-  //if (t2 - t1 >= 10) cout << "handle_keypress took " << t2-t1 << "ms\n";
+  bool started= false;
+#ifdef USE_EXCEPTIONS
+  try {
+#endif
+    if (DEBUG_KEYBOARD) {
+      //for (int i=0; i<N(key); i++)
+      //  cout << ((int) (unsigned char) key[i]) << " ";
+      //cout << "\n";
+      debug_keyboard << "Pressed " << key << " at " << t << "\n";
+      debug_keyboard << "  Codes";
+      for (int i=0; i<N(key); i++)
+	debug_keyboard << " " << (unsigned int) (unsigned char) key[i];
+      debug_keyboard << "\n";      
+    }
+    //time_t t1= texmacs_time ();
+    if (is_nil (eb)) apply_changes ();
+    start_editing ();
+    started= true;
+    string zero= "a"; zero[0]= '\0';
+    string gkey= replace (key, zero, "<#0>");
+    if (gkey == "<#3000>") gkey= "space";
+    call ("keyboard-press", object (gkey), object ((double) t));
+    update_focus_loci ();
+    if (!is_nil (focus_ids))
+      call ("link-follow-ids", object (focus_ids), object ("focus"));
+    notify_change (THE_DECORATIONS);
+    end_editing ();
+    //time_t t2= texmacs_time ();
+    //if (t2 - t1 >= 10) cout << "handle_keypress took " << t2-t1 << "ms\n";
+#ifdef USE_EXCEPTIONS
+  }
+  catch (string msg) {
+    if (started) {
+      cancel_editing ();
+      interrupt_shortcut ();
+    }
+  }
+  handle_exceptions ();
+#endif
 }
 
 void drag_left_reset ();
@@ -236,8 +273,8 @@ void drag_right_reset ();
 void
 edit_interface_rep::handle_keyboard_focus (bool has_focus, time_t t) {
   if (DEBUG_KEYBOARD) {
-    if (has_focus) cout << "Keyboard] Got focus at " << t << "\n";
-    else cout << "Keyboard] Lost focus at " << t << "\n";
+    if (has_focus) debug_keyboard << "Got focus at " << t << "\n";
+    else debug_keyboard << "Lost focus at " << t << "\n";
   }
   if (got_focus != has_focus) {
     drag_left_reset ();

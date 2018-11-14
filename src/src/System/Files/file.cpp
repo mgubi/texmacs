@@ -13,7 +13,7 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "merge_sort.hpp"
 #include "data_cache.hpp"
 #include "web_files.hpp"
@@ -25,13 +25,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <dirent.h>
-#ifdef OS_WIN32
-#include <sys/misc.h>
-#include <sys/_stat.h>
-#include <X11/Xlib.h>
-#else
 #include <sys/stat.h>
-#endif
+#include <sys/file.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <string.h>  // strerror
 
@@ -58,7 +54,8 @@ load_string (url u, string& s, bool fatal) {
     bool doc_flag= do_cache_doc (name);
     string cache_type= doc_flag? string ("doc_cache"): string ("file_cache");
     if (doc_flag) cache_load ("doc_cache");
-    if (is_cached (cache_type, name) && is_up_to_date (url_parent (r))) {
+    bool currently_cached= is_cached (cache_type, name);
+    if (currently_cached && is_up_to_date (url_parent (r))) {
       s= cache_get (cache_type, name) -> label;
       return false;
     }
@@ -67,18 +64,24 @@ load_string (url u, string& s, bool fatal) {
     bench_start ("load file");
     c_string _name (name);
     // cout << "OPEN :" << _name << LF;
-#if defined (OS_WIN32)
-    FILE* fin= _fopen (_name, "rb");
-#elif defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
     FILE* fin= fopen (_name, "rb");
 #else
     FILE* fin= fopen (_name, "r");
+    int fd= -1;
+    if (fin != NULL) {
+      fd= fileno (fin);
+      if (flock (fd, LOCK_SH) == -1) {
+        fclose (fin);
+        fin= NULL;
+      }
+    }
 #endif
     if (fin == NULL) {
       err= true;
       if (!occurs ("system", name))
-        cerr << "TeXmacs] warning, load error for " << name << ", "
-             << strerror(errno) << "\n";
+        std_warning << "Load error for " << name << ", "
+                    << strerror(errno) << "\n";
     }
     int size= 0;
     if (!err) {
@@ -88,7 +91,11 @@ load_string (url u, string& s, bool fatal) {
 	if (size<0) err= true;
       }
       if (err) {
-        cerr << "TeXmacs] warning, seek failed for " << as_string (u) << "\n";
+        std_warning << "Seek failed for " << as_string (u) << "\n";
+#ifdef OS_MINGW
+#else
+        flock (fd, LOCK_UN);
+#endif
         fclose (fin);
       }
     }
@@ -97,18 +104,22 @@ load_string (url u, string& s, bool fatal) {
       s->resize (size);
       int read= fread (&(s[0]), 1, size, fin);
       if (read < size) s->resize (read);
+#ifdef OS_MINGW
+#else
+      flock (fd, LOCK_UN);
+#endif
       fclose (fin);
     }
     bench_cumul ("load file");
 
     // Cache file contents
-    if (!err && N(s) <= 10000)
+    if (!err && (N(s) <= 10000 || currently_cached))
       if (file_flag || doc_flag)
 	cache_set (cache_type, name, s);
     // End caching
   }
   if (err && fatal) {
-    cerr << "File name= " << as_string (u) << "\n";
+    failed_error << "File name= " << as_string (u) << "\n";
     FAILED ("file not readable");
   }
   return err;
@@ -119,7 +130,7 @@ save_string (url u, string s, bool fatal) {
   if (is_rooted_tmfs (u)) {
     bool err= save_to_server (u, s);
     if (err && fatal) {
-      cerr << "File name= " << as_string (u) << "\n";
+      failed_error << "File name= " << as_string (u) << "\n";
       FAILED ("file not writeable");
     }
     return err;
@@ -133,22 +144,35 @@ save_string (url u, string s, bool fatal) {
     string name= concretize (r);
     {
       c_string _name (name);
-#if defined (OS_WIN32)
-      FILE* fout= _fopen (_name, "wb");
-#elif defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
       FILE* fout= fopen (_name, "wb");
 #else
-      FILE* fout= fopen (_name, "w");
+      FILE* fout= fopen (_name, "r+");
+      bool rw= (fout != NULL);
+      if (!rw) fout= fopen (_name, "w");
+      int fd= -1;
+      if (fout != NULL) {
+        fd= fileno (fout);
+        if (flock (fd, LOCK_EX) == -1) {
+          fclose (fout);
+          fout= NULL;
+        }
+        else if (rw) ftruncate (fd, 0);
+      }
 #endif
       if (fout == NULL) {
         err= true;
-        cerr << "TeXmacs] warning, save error for " << name << ", "
-        << strerror(errno) << "\n";
+        std_warning << "Save error for " << name << ", "
+                    << strerror(errno) << "\n";
       }
       if (!err) {
         int i, n= N(s);
         for (i=0; i<n; i++)
           fputc (s[i], fout);
+#ifdef OS_MINGW
+#else
+        flock (fd, LOCK_UN);
+#endif
         fclose (fout);
       }
     }
@@ -164,8 +188,61 @@ save_string (url u, string s, bool fatal) {
   }
 
   if (err && fatal) {
-    cerr << "File name= " << as_string (u) << "\n";
+    failed_error << "File name= " << as_string (u) << "\n";
     FAILED ("file not writeable");
+  }
+  return err;
+}
+
+bool
+append_string (url u, string s, bool fatal) {
+  if (is_rooted_tmfs (u)) FAILED ("file not appendable");
+
+  // cout << "Save " << u << LF;
+  url r= u;
+  if (!is_rooted_name (r)) r= resolve (r, "");
+  bool err= !is_rooted_name (r);
+  if (!err) {
+    string name= concretize (r);
+    {
+      c_string _name (name);
+#ifdef OS_MINGW
+      FILE* fout= fopen (_name, "ab");
+#else
+      FILE* fout= fopen (_name, "a");
+      int fd= -1;
+      if (fout != NULL) {
+        fd= fileno (fout);
+        if (flock (fd, LOCK_EX) == -1) {
+          fclose (fout);
+          fout= NULL;
+        }
+      }
+#endif
+      if (fout == NULL) {
+        err= true;
+        std_warning << "Append error for " << name << ", "
+                    << strerror(errno) << "\n";
+      }
+      if (!err) {
+        int i, n= N(s);
+        for (i=0; i<n; i++)
+          fputc (s[i], fout);
+#ifdef OS_MINGW
+#else
+        flock (fd, LOCK_UN);
+#endif
+        fclose (fout);
+      }
+    }
+    // Cache file contents
+    declare_out_of_date (url_parent (r));
+    // End caching
+  }
+
+  if (err && fatal) {
+    failed_error << "File name= " << as_string (u) << "\n";
+    FAILED ("file not appendable");
   }
   return err;
 }
@@ -189,14 +266,16 @@ get_attributes (url name, struct stat* buf,
       tree r= cache_get ("stat_cache.scm", name_s);
       // cout << "Cache : " << r << LF;
       if (r == "#f") return true;
-      if ((is_compound(r)) && (N(r)==2)) {
+      if ((is_compound(r)) && (N(r)==3)) {
         buf->st_mode = ((unsigned int) as_int (r[0]));
         buf->st_mtime= ((unsigned int) as_int (r[1]));
+        buf->st_size = ((unsigned int) as_int (r[2]));
         return false;
       } 
-      cerr << "TeXmacs] Inconsistent value in stat_cache.scm for key:" << name_s << LF;
-      cerr << "TeXmacs] The current value is:" << r << LF;
-      cerr << "TeXmacs] I'm resetting this key" << LF;
+      std_warning << "Inconsistent value in stat_cache.scm for key "
+                  << name_s << LF;
+      std_warning << "The current value is " << r << LF;
+      std_warning << "I'm resetting this key" << LF;
       // continue and recache, the current value is inconsistent. 
     }
   // End caching
@@ -206,11 +285,7 @@ get_attributes (url name, struct stat* buf,
   bench_start ("stat");
   bool flag;
   c_string temp (name_s);
-#ifdef OS_WIN32
-  flag= _stat (temp, buf);
-#else
   flag= stat (temp, buf);
-#endif
   (void) link_flag;
   // FIXME: configure should test whether lstat works
   // flag= (link_flag? lstat (temp, buf): stat (temp, buf));
@@ -226,7 +301,8 @@ get_attributes (url name, struct stat* buf,
       if (do_cache_stat (name_s)) {
         string s1= as_string ((int) buf->st_mode);
         string s2= as_string ((int) buf->st_mtime);
-	cache_set ("stat_cache.scm", name_s, tree (TUPLE, s1, s2));
+        string s3= as_string ((int) buf->st_size);
+	cache_set ("stat_cache.scm", name_s, tree (TUPLE, s1, s2, s3));
       }
     }
   }
@@ -280,7 +356,7 @@ is_of_type (url name, string filter) {
     return true;
 
   // Normal files
-#if defined (OS_WIN32) || defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
   if ((filter == "x") && (suffix(name) != "exe") && (suffix(name) != "bat"))
     name = glue (name, ".exe");
 #endif
@@ -299,7 +375,7 @@ is_of_type (url name, string filter) {
       if (err || !S_ISDIR (buf.st_mode)) return false;
       break;
     case 'l':
-#ifdef __MINGW32__
+#ifdef OS_MINGW
       return false;
 #else
       if (err || !S_ISLNK (buf.st_mode)) return false;
@@ -307,7 +383,7 @@ is_of_type (url name, string filter) {
       break;
     case 'r':
       if (err) return false;
-#ifndef __MINGW32__
+#ifndef OS_MINGW
       if ((buf.st_mode & (S_IRUSR | S_IRGRP | S_IROTH)) == 0) return false;
 #else
       if ((buf.st_mode & 292) == 0) return false;
@@ -315,7 +391,7 @@ is_of_type (url name, string filter) {
       break;
     case 'w':
       if (err) return false;
-#ifndef __MINGW32__
+#ifndef OS_MINGW
       if ((buf.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0) return false;
 #else
       if ((buf.st_mode & 146) == 0) return false;
@@ -323,10 +399,10 @@ is_of_type (url name, string filter) {
       break;
     case 'x':
       if (err) return false;
-#if defined (OS_WIN32) || defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
       if (suffix(name) == "bat") break;
 #endif
-#ifndef __MINGW32__
+#ifndef OS_MINGW
       if ((buf.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0) return false;
 #else
       if ((buf.st_mode & 73) == 0) return false;
@@ -339,6 +415,15 @@ is_of_type (url name, string filter) {
 bool is_regular (url name) { return is_of_type (name, "f"); }
 bool is_directory (url name) { return is_of_type (name, "d"); }
 bool is_symbolic_link (url name) { return is_of_type (name, "l"); }
+
+int
+file_size (url u) {
+  if (is_rooted_web (u)) return -1;
+  if (is_rooted_tmfs (u)) return -1;
+  struct stat u_stat;
+  if (get_attributes (u, &u_stat, true)) return -1;
+  return u_stat.st_size;
+}
 
 int
 last_modified (url u, bool cache_flag) {
@@ -367,18 +452,18 @@ is_newer (url which, url than) {
 
 url
 url_temp (string suffix) {
-#ifdef __MINGW32__
-  int rnd= raw_time ();
+#ifdef OS_MINGW
+  unsigned int rnd= raw_time ();
 #else
   static bool initialized= false;
   if (!initialized) {
     srandom ((int) raw_time ());
     initialized= true;
   }
-  int rnd= random ();
+  unsigned int rnd= random ();
 #endif
   string name= "tmp_" * as_string (rnd) * suffix;
-  url u ("$TEXMACS_HOME_PATH/system/tmp", name);
+  url u= url_temp_dir () * url (name);
   if (exists (u)) return url_temp (suffix);
   return u;
 }
@@ -469,6 +554,195 @@ read_directory (url u, bool& error_flag) {
 }
 
 /******************************************************************************
+* Commands on files
+******************************************************************************/
+
+void
+move (url u1, url u2) {
+  c_string _u1 (concretize (u1));
+  c_string _u2 (concretize (u2));
+  (void) rename (_u1, _u2);
+}
+
+void
+copy (url u1, url u2) {
+  string s;
+  if (!load_string (u1, s, false))
+    (void) save_string (u2, s, false);
+}
+
+void
+remove_sub (url u) {
+  if (is_none (u));
+  else if (is_or (u)) {
+    remove_sub (u[1]);
+    remove_sub (u[2]);
+  }
+  else {
+    c_string _u (concretize (u));
+    if (::remove (_u) && DEBUG_AUTO) {
+      std_warning << "Remove failed: " << strerror (errno) << LF;
+      std_warning << "File was: " << u << LF;
+    }
+  }
+}
+
+void
+remove (url u) {
+  remove_sub (expand (complete (u)));
+}
+
+void
+append_to (url what, url to) {
+  string what_s;
+  if (load_string (what, what_s, false) ||
+      append_string (to, what_s, false))
+    std_warning << "Append failed for " << to << LF;
+}
+
+void
+rmdir (url u) {
+  remove_sub (expand (complete (u, "dr")));
+}
+
+void
+mkdir (url u) {
+#if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
+  if (!exists (u)) {
+    c_string _u (concretize (u));
+#ifdef OS_MINGW
+    (void) ::mkdir (_u);
+#else
+    (void) ::mkdir (_u, S_IRWXU + S_IRGRP + S_IROTH);
+#endif
+  }
+#else
+#ifdef OS_MINGW
+  system ("mkdir", u);
+#else
+  system ("mkdir -p", u);
+#endif
+#endif
+}
+
+void
+change_mode (url u, int mode) {
+#if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
+  c_string _u (concretize (u));
+  (void) ::chmod (_u, mode);
+#else
+  string m0= as_string ((mode >> 9) & 7);
+  string m1= as_string ((mode >> 6) & 7);
+  string m2= as_string ((mode >> 3) & 7);
+  string m3= as_string (mode & 7);
+  system ("chmod -f " * m0 * m1 * m2 * m3, u);
+#endif
+}
+
+/******************************************************************************
+* Tab-completion for file names
+******************************************************************************/
+
+#ifdef OS_WIN32
+#define URL_CONCATER  '\\'
+#else
+#define URL_CONCATER  '/'
+#endif
+
+static void
+file_completions_file (array<string>& a, url search, url u) {
+  if (is_or (u)) {
+    file_completions_file (a, search, u[1]);
+    file_completions_file (a, search, u[2]);
+  }
+  else {
+    url v= delta (search * url ("dummy"), u);
+    if (is_none (v)) return;
+    string s= as_string (v);
+    if (is_directory (u)) s= s * string (URL_CONCATER);
+    a << s;
+  }
+}
+
+static void
+file_completions_dir (array<string>& a, url search, url dir) {
+  if (is_or (search)) {
+    file_completions_dir (a, search[1], dir);
+    file_completions_dir (a, search[2], dir);
+  }
+  else if (is_or (dir)) {
+    file_completions_dir (a, search, dir[1]);
+    file_completions_dir (a, search, dir[2]);
+  }
+  else {
+    url u= search * dir * url_wildcard ("*");
+    u= complete (u, "r");
+    u= expand (u);
+    file_completions_file (a, search, u);
+  }
+}
+
+array<string>
+file_completions (url search, url dir) {
+  array<string> a;
+  file_completions_dir (a, search, dir);
+  return a;
+}
+
+/******************************************************************************
+* Grepping of strings with heavy caching
+******************************************************************************/
+
+hashmap<tree,tree>   grep_cache (url_none () -> t);
+hashmap<tree,string> grep_load_cache ("");
+hashmap<tree,tree>   grep_complete_cache (url_none () -> t);
+
+static bool
+bad_url (url u) {
+  if (is_atomic (u))
+    return u == url ("aapi") || u == url (".svn");
+  else if (is_concat (u))
+    return bad_url (u[1]) || bad_url (u[2]);
+  else return false;
+}
+
+string
+grep_load (url u) {
+  if (!grep_load_cache->contains (u->t)) {
+    //cout << "Loading " << u << "\n";
+    string s;
+    if (load_string (u, s, false)) s= "";
+    grep_load_cache (u->t)= s;
+  }
+  return grep_load_cache [u->t];
+}
+
+url
+grep_sub (string what, url u) {
+  if (is_or (u))
+    return grep_sub (what, u[1]) | grep_sub (what, u[2]);
+  else if (bad_url (u))
+    return url_none ();
+  else {
+    string contents= grep_load (u);
+    if (occurs (what, contents)) return u;
+    else return url_none ();
+  }
+}
+
+url
+grep (string what, url u) {
+  tree key= tuple (what, u->t);
+  if (!grep_cache->contains (key)) {
+    if (!grep_complete_cache->contains (u->t))
+      grep_complete_cache (u->t)= expand (complete (u)) -> t;
+    url found= grep_sub (what, as_url (grep_complete_cache [u->t]));
+    grep_cache (key)= found->t;
+  }
+  return as_url (grep_cache [key]);
+}
+
+/******************************************************************************
 * Searching text in the documentation
 ******************************************************************************/
 
@@ -531,9 +805,10 @@ compute_score (string what, string in, array<int> pos, string suf) {
 
 int
 search_score (url u, array<string> a) {
-  string in, suf= suffix (u);
-  if (load_string (u, in, false)) return 0;
+  string in = grep_load (u);
+  if (N(in) == 0) return 0;
   in= locase_all (in);
+  string suf= suffix (u);
   int i, score= 1, n= N(a);
   for (i=0; i<n; i++) {
     string what= locase_all (a[i]);
@@ -546,135 +821,104 @@ search_score (url u, array<string> a) {
 }
 
 /******************************************************************************
-* Commands on files
+* Finding recursive non hidden subdirectories of a given directory
 ******************************************************************************/
 
-void
-move (url u1, url u2) {
-  c_string _u1 (concretize (u1));
-  c_string _u2 (concretize (u2));
-  (void) rename (_u1, _u2);
-}
-
-void
-copy (url u1, url u2) {
-  string s;
-  if (!load_string (u1, s, false))
-    (void) save_string (u2, s, false);
-}
-
-void
-remove (url u) {
-  u= expand (complete (u));
-  if (is_none (u));
-  else if (is_or (u)) {
-    remove (u[1]);
-    remove (u[2]);
+static void
+search_sub_dirs (url& all, url root) {
+  if (is_none (root));
+  else if (is_or (root)) {
+    search_sub_dirs (all, root[2]);
+    search_sub_dirs (all, root[1]);
   }
-  else {
-    c_string _u (concretize (u));
-    (void) ::remove (_u);
+  else if (is_directory (root)) {
+    bool err= false;
+    array<string> a= read_directory (root, err);
+    if (!err) {
+      for (int i=N(a)-1; i>=0; i--)
+        if (N(a[i])>0 && a[i][0] != '.')
+          search_sub_dirs (all, root * a[i]);
+    }
+    all= root | all;
   }
 }
 
-void
-mkdir (url u) {
-#if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
-  if (exists (u)) return;
-  {
-    c_string _u (concretize (u));
-#if defined(__MINGW__) || defined(__MINGW32__)
-    (void) ::mkdir (_u);
-#else
-    (void) ::mkdir (_u, S_IRWXU + S_IRGRP + S_IROTH);
-#endif
-  }
-#else
-#if defined(__MINGW__) || defined(__MINGW32__)
-  system ("mkdir", u);
-#else
-  system ("mkdir -p", u);
-#endif
-#endif
+url
+search_sub_dirs (url root) {
+  url all= url_none ();
+  //cout << "Search in " << root << " -> " << expand (complete (root, "dr")) << LF;
+  search_sub_dirs (all, expand (complete (root, "dr")));
+  return all;
 }
-
-void
-change_mode (url u, int mode) {
-#if defined (HAVE_SYS_TYPES_H) && defined (HAVE_SYS_STAT_H)
-  c_string _u (concretize (u));
-  (void) ::chmod (_u, mode);
-#else
-  string m0= as_string ((mode >> 9) & 7);
-  string m1= as_string ((mode >> 6) & 7);
-  string m2= as_string ((mode >> 3) & 7);
-  string m3= as_string (mode & 7);
-  system ("chmod -f " * m0 * m1 * m2 * m3, u);
-#endif
-}
-
-void
-ps2pdf (url u1, url u2) {
-#ifdef OS_WIN32
-  c_string _u1 (concretize (u1));
-  c_string _u2 (concretize (u2));
-  XPs2Pdf (_u1, _u2);
-#else
-#ifdef MACOSX_EXTENSIONS
-  mac_ps_to_pdf (u1, u2);
-#else
-  system ("ps2pdf", u1, u2);
-#endif
-#endif
-}
-
 
 /******************************************************************************
- * Tab-completion for file names
- ******************************************************************************/
+* Searching files in a directory tree with caching
+******************************************************************************/
 
-#ifdef OS_WIN32
-#define URL_CONCATER  '\\'
-#else
-#define URL_CONCATER  '/'
-#endif
-
-static void
-file_completions_file (array<string>& a, url search, url u) {
-  if (is_or (u)) {
-    file_completions_file (a, search, u[1]);
-    file_completions_file (a, search, u[2]);
-  }
-  else {
-    url v= delta (search * url ("dummy"), u);
-    if (is_none (v)) return;
-    string s= as_string (v);
-    if (is_directory (u)) s= s * string (URL_CONCATER);
-    a << s;
-  }
-}
-
-static void
-file_completions_dir (array<string>& a, url search, url dir) {
-  if (is_or (search)) {
-    file_completions_dir (a, search[1], dir);
-    file_completions_dir (a, search[2], dir);
-  }
-  else if (is_or (dir)) {
-    file_completions_dir (a, search, dir[1]);
-    file_completions_dir (a, search, dir[2]);
-  }
-  else {
-    url u= search * dir * url_wildcard ("*");
-    u= complete (u, "r");
-    u= expand (u);
-    file_completions_file (a, search, u);
-  }
-}
+array<string> no_strings;
+hashmap<tree,int> dir_stamp (0);
+hashmap<tree,bool> dir_is_dir (false);
+hashmap<tree,array<string> > dir_contents (no_strings);
 
 array<string>
-file_completions (url search, url dir) {
-  array<string> a;
-  file_completions_dir (a, search, dir);
-  return a;
+var_read_directory (url u) {
+  array<string> d;
+  if (is_rooted (u, "default") || is_rooted (u, "file")) {
+    bool error_flag= false;
+    array<string> a= read_directory (u, error_flag);
+    for (int i=0; i<N(a); i++)
+      if (!starts (a[i], "."))
+        d << a[i];
+  }
+  return d;
 }
 
+url
+search_file_in (url u, string name) {
+  // cout << "Search in " << u << ", " << name << LF;
+  if (!dir_stamp->contains (u->t) ||
+      texmacs_time () - dir_stamp [u->t] > 10000) {
+    dir_is_dir->reset (u->t);
+    dir_contents->reset (u->t);
+  }
+  dir_stamp (u->t)= texmacs_time ();
+
+  if (!dir_is_dir->contains (u->t))
+    dir_is_dir (u->t)= is_directory (u);
+  if (!dir_is_dir [u->t]) {
+    if (as_string (tail (u)) == name) return u;
+    return url_none ();
+  }
+
+  if (!dir_contents->contains (u->t)) {
+    array<string> d= var_read_directory (u);
+    dir_contents (u->t)= d;
+  }
+
+  array<string> d= dir_contents [u->t];
+  for (int i=0; i<N(d); i++) {
+    url f= search_file_in (u * d[i], name);
+    if (!is_none (f)) return f;
+  }
+  return url_none ();
+}
+
+bool
+find_stop (url u, array<string> stops) {
+  if (head (u) == u) return false;
+  for (int i=0; i<N(stops); i++)
+    if (as_string (tail (u)) == stops[i]) return true;
+  return find_stop (head (u), stops);
+}
+
+url
+search_file_upwards (url u, string name, array<string> stops) {
+  // cout << "Search upwards " << u << ", " << name << LF;
+  url f= search_file_in (u, name);
+  if (!is_none (f)) return f;
+  if (head (u) == u) return url_none ();
+  if (!find_stop (head (u), stops)) return url_none ();
+  for (int i=0; i<N(stops); i++)
+    if (as_string (tail (u)) == stops[i]) return url_none ();
+  return search_file_upwards (head (u), name, stops);
+}

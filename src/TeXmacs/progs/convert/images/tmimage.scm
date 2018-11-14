@@ -1,4 +1,3 @@
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : tmimage.scm
@@ -26,7 +25,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-preferences
-  ("texmacs->graphics:format" "svg" noop))
+  ("texmacs->image:format" "svg" noop))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; private functions
@@ -40,93 +39,6 @@
 ;; new system function call that check that output is produced
 ;; and give minimum information if not
 
-(define no-error-yet #t)
-
-(define (system-2-check cmd urlin urlout)
-;; this fails for convert on windows XP, but why??  (system-2 cmd urlin urlout)
-;; very uggly workaround:
-(if (and (or (os-win32?) (os-mingw?)) (string=? (string-take cmd 7) "convert"))
-    (system (string-append cmd " \""(url-concretize urlin)"\" \""
-			   (url-concretize urlout) "\"" ))
-    (system-2 cmd urlin urlout))
-(if (and (not (url-exists? urlout)) no-error-yet)
-    (begin
-      (set-message (string-append cmd " failed") "Check converters")
-      (display (string-append "image conversion problem: " cmd " failed\n" ))
-      (display "check converter setup, existence in path...\n" )
-      (set! no-error-yet #f))
-))
-;; since we chain converters
-;; the first error will trigger a cascade of failures
-;; so we only report the first error in export-selection-as-graphics.
-;; We display error both in console and in status bar for console-less
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; external converters
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; In windows, passing correctly arguments to
-;; the gs tools and pdf2svg is a serious issue in some cases.
-;; In particular, in XP filenames may have spaces and/or accents
-;; (eg in french localized TEXMACS_HOME_PATH : "Données d'applications")
-;; that cause them to fail. I deliver the only workaround I could find:
-;; We provide customized versions of gs tools which
-;; work by converting pathes to old MSDOS-style ascii-only shortened version.
-;; Note that these short names may be deactived in some NT-based systems,
-;; which would break our workaround.
-;; The custom .bat gs tools go in /bin with texmacs.exe and gsw32c.exe
-;; We also need to provide pdf2svg.exe and the needed dlls.
-;; The standard install of imagemagick on windows puts it in the path
-;; so not much to do
-
-(cond ((or (os-win32?) (os-mingw?))
-       (define win-tm-path (system->url "$TEXMACS_PATH"))
-       (define ps2eps
-	 (string-append
-	  "\""
-	  (url-concretize
-	   (url-append win-tm-path
-		       (string->url "bin/tm-ps2epsi.bat"))) "\""))
-       (define ps2pdf
-	 (string-append
-	  "\""
-	  (url-concretize
-	   (url-append win-tm-path
-		       (string->url "bin/tm-ps2pdf.bat")))"\""))
-       (define pdf2svg
-	 (string-append
-	  "\""
-	  (url-concretize
-	   (url-append win-tm-path
-		       (string->url "bin/tm-pdf2svg.bat")))"\""))
-       )
-
-      (else ;; MacOS and Linux
-	(define ps2eps "ps2epsi")
-	(define ps2pdf "ps2pdf -dEPSCrop")
-	(define pdf2svg "pdf2svg")
-
-	(if (not (url-exists-in-path? "pdf2svg"))
-	    (begin
-	      (set-message "warning: pdf2svg not in path"
-			   "svg export not available")
-	      (display
-	       "Texmacs] Warning: pdf2svg not in path; svg export not available\n" )
-	      )))
-
-;;we just assume gs (including ps2epsi, ps2pdf) is available in *nix ans MacOS
-      )
-
-;; on all OSes check for "convert"
-;; also check for "conjure" because windows systems may have an homonym
-(if (not (and (url-exists-in-path? "convert") (url-exists-in-path? "conjure")))
-    (begin
-      (set-message "warning: ImageMagick not in path"
-		   "bitmap export not available")
-      (display
-       "Texmacs] Warning: ImageMagick not in path; bitmap export not available\n" )
-      ))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; commodity functions for tree manipulations
@@ -136,12 +48,28 @@
   ;; removes node (with children if any)
   (tree-remove! (tree-ref node :up) (tree-index node) 1))
 
+(define (copy-node! node parent-dest pos)
+  ;; insert an existing node (with children if any) as new child of parent-dest
+  ;; FIXME: No sanity check! parent should not be in node's subtree!
+  (tree-insert! parent-dest pos `(,node)))
+
 (define (move-node! node parent-dest pos)
   ;; moves an existing node (with children if any) and
   ;; insert it as new child of parent-dest
   ;; FIXME: No sanity check! parent should not be in node's subtree!
-  (tree-insert! parent-dest pos `(,node))
+  (copy-node! node parent-dest pos)
   (remove-node! node))
+
+(define (remove-node-raise-children! node . firstlast)
+  ;; similar to "remove tag" operation in the editor
+  (let* ((parent (tree-ref node :up))
+         (pos (+ (tree-index node) 1))
+         (lastindex (if (< (length firstlast) 2) (- (tree-arity node) 1) (cadr firstlast) ))
+         (firstindex (- (if (null? firstlast) 0 (car firstlast)) 1)))
+    (do ((i lastindex (- i 1))) ((= i firstindex))
+      (copy-node! (tree-ref node i) parent pos))
+    (remove-node! node)
+    ))
 
 (define (replace-leaftext! leaf newtext)
   ;; replace a node's content by a new string.
@@ -200,6 +128,18 @@
 (define (tm-encode tm-fragment-tree)
   (escape-to-ascii (serialize-texmacs tm-fragment-tree)))
 
+(define (remove-clip! clipg)
+  (let* ((parent (tree-ref clipg :up))
+         (pos (+ (tree-index clipg) 1))
+         (lastindex (- (tree-arity clipg) 1)))
+    (do ((i lastindex (- i 1))) ((= i 0))
+      (let* ((node (tree-ref clipg i)))
+             (move-node! node parent pos)))
+    (remove-node! clipg)
+    ))
+
+(tm-define (cr2? s) (or (equal? (tree->stree s) "\n") (equal? (tree->stree s) "\n  ")))
+
 (define (refactor-svg dest tm-fragment)
   ;; reorganize svg file and inject attributes containing tm code of
   ;; equation. dest is the url of the svg file to be edited
@@ -242,12 +182,13 @@
        ;; third: the new data we want to insert in the tree
        (latex-code (latex-encode tm-fragment))
        (tm-code (tm-encode tm-fragment))
+       (tm-style (tm-encode (get-all-inits)))
        ;; define new attributes containing latex and texmacs code:
        (extra-latex-attrib
         `((xmlns:ns0 "http://www.iki.fi/pav/software/textext/")
           (ns0:text ,latex-code) (ns0:preamble "texmacs_latex.sty")))
        (extra-tm-attrib `((xmlns:ns1 "http://www.texmacs.org/")
-                          (ns1:texmacscode ,tm-code)))
+                          (ns1:texmacscode ,tm-code) (ns1:texmacstyle ,tm-style)))
        ;; OK, the texmacs namespace maybe not correctly described at that url
        (old->new-labels (newids! idlist tm-code))
        ;; rename all ids, create an association list of old to new ids
@@ -256,6 +197,10 @@
     ;; fourth: modify tree
     (replace-hlinks! hreflist old->new-labels)
     ;; replace hlinks with new pointers
+    (map remove-node! (select svgroot '(:* (:match :cr2?))))
+    (map remove-clip! (reverse (select maingroup '(:* g @ clip-path :up :up))))
+    (map remove-node! (select defs '(:* clipPath) ))
+    ;; cleanup & simplify svg tree removing unecessary clips
     (tree-insert! maingroup-attrib 1 extra-latex-attrib)
     ;; for textext compatibility
     (tree-insert! maingroup-attrib 2 extra-tm-attrib)
@@ -292,7 +237,7 @@
     (set-message "Qt GUI only, sorry. Use \"Export selection...\"" "")
     (if (not (selection-active-any?))
       (set-message "no selection!" "")
-      (let* ((format (get-preference "texmacs->graphics:format"))
+      (let* ((format (get-preference "texmacs->image:format"))
              (tmpurl (url-temp-ext format)))
         (export-selection-as-graphics tmpurl)
 	;; first generate an image file
@@ -311,75 +256,54 @@
 
   (if (not (selection-active-any?))
       (set-message "no selection!" "")
-      (let* (;; step 1 prepare and typeset selection
-	     ;;if selection is part of math need to re-encapsulate
-	     ;; it with math to obtain proper typesetting :
-	     (tm-fragment
-	      (if (tree-multi-paragraph? (selection-tree))
-	          (selection-tree)
-	          (if (in-math?)
-		      (stree->tree `(equation* (document ,(selection-tree))))
-		      (selection-tree))))
-	     ;; also if selection spans several lines of text,
-	     ;; need to encapsulate it in a fixed-width table
-	     ;;to enforce pagewidth :
-	     (tm-fragment-enforce-pagewidth
-	      (stree->tree
-	       `(tabular
-		 (tformat (twith "table-width" "1par")
-			  (twith "table-hmode" "exact")
-			  (cwith "1" "1" "1" "1" "cell-hyphen" "t")
-			  (table (row (cell (document ,tm-fragment))))))))
-	     (temp0 (url-temp-ext "ps"))
-	     (temp1 (url-temp-ext "eps"))
-	     (dpi-pref (get-preference "printer dpi"))
-	     (suffix (url-suffix myurl)))
+      (let* (
+        ;; step 1 prepare and typeset selection
+        ;; if selection is part of math need to re-encapsulate
+        ;; it with math to obtain proper typesetting :
+        (tm-fragment
+          (if (in-math?)
+              (stree->tree `(equation* (document ,(selection-tree))))
+  	          (selection-tree)))
+        ;; also if selection spans several lines of text,
+        ;; need to encapsulate it in a fixed-width table
+        ;;to enforce pagewidth :
+        (tm-fragment-enforce-pagewidth
+          (if (tree-multi-paragraph? (selection-tree))
+              (stree->tree
+                `(tabular
+                   (tformat (twith "table-width" "1par")
+			               (twith "table-hmode" "exact")
+			               (cwith "1" "1" "1" "1" "cell-hyphen" "t")
+                     (table (row (cell (document ,tm-fragment)))))))
+              (selection-tree)))
+        (temp0 (url-temp-ext "pdf"))
+        (dpi-pref (get-preference "printer dpi"))
+        (suffix (url-suffix myurl)))
 
-	(set! no-error-yet #t)
-        (set-printer-dpi "236") ; 472 is ~ exact size
-	;;set to a fixed value so our graphics does
-	;;not depend on the printer dpi
-	;;We need to set this weird dpi value so that the size of the svg
-	;;produced is about twice that of direct pdf or ps output. Why??
-	(print-snippet temp0 tm-fragment-enforce-pagewidth)
-	;;typeset fragment to ps as starting point
-	(set-printer-dpi dpi-pref)
-	;; revert to preference dpi
-	(system-2-check ps2eps temp0 temp1)
-	;;make eps to get optimized bounding box. We could generate
-	;; directly the eps, but then the bounding box width
-	;; is a full pagewidth
-	(system-remove temp0)
-	;; step 2 generate output according to desired output format
+       (set-printer-dpi "236") ; 472 is ~ exact size
+       ;;set to a fixed value so our graphics does
+       ;;not depend on the printer dpi
+       ;;We need to set this weird dpi value so that the size of the svg
+       ;;produced is about twice that of direct pdf or ps output. Why??
+       (print-snippet temp0 tm-fragment-enforce-pagewidth #t)
+       ;;typeset fragment to ps as starting point
+       (set-printer-dpi dpi-pref)
+       ;; revert to preference dpi
+       ;; step 2 generate output according to desired output format
 
-	(cond ((== suffix "eps")
-	       (system-copy temp1 myurl))
-	      ((== suffix "pdf")
-	       (system-2-check ps2pdf temp1 myurl))
-	      ((== suffix "svg")
-	       ;; assume target is inkscape with texmacs.ink plugin
-	       ;; allowing to re-edit the original tm selection
-	       ;; (presumably an equation)
-	       (let* ((temp2 (url-temp-ext "pdf")))
-		 ;; still need pdf as intermediate format
-		 (system-2-check ps2pdf temp1 temp2)
-		 (system-2-check pdf2svg temp2 myurl)
-		 ;; chaining these 2 specific converters is crucial
-		 ;; for svg inport in inkscape:
-		 ;; fonts are properly passed as vector outlines
-		 (refactor-svg myurl tm-fragment)
-		 ;; modify svg, embedding texmacs code
-		 (system-remove temp2)
-		 ))
-	      (else
-		;; other formats : use imagemagick generic converter
-		;; this is where png, jpg, etc is generated
-		;; we ask imagemagick to insert texmacs source
-		;; in image metadata (comment)
-		(system-2-check
-		 (string-append "convert -density 300 -comment \""
-				(tm-encode tm-fragment) "\"")
-		 temp1 myurl)))
+       (cond
+        ((== suffix "pdf") (system-copy temp0 myurl))
+        ((== suffix "svg")
+         ;; assume target is inkscape
+         (file-convert temp0 myurl)
+         ;; using either pdf2svg or pdf2cairo converters is crucial
+         ;; for svg inport in inkscape:
+         ;; fonts are properly passed as vector outlines
+         ;; file converters are defined in init-images.scm
+         (refactor-svg myurl tm-fragment))
+         ;; modify svg, embedding texmacs code
+        (else
+         (file-convert temp0 myurl)))
 
-	(system-remove temp1) ;; temp eps file not needed anymore
-	)))
+       (system-remove temp0) ;; temp pdf file not needed anymore
+  )))

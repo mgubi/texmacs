@@ -118,12 +118,14 @@ tree::operator () (int begin, int end) {
 
 bool
 operator == (tree t, tree u) {
+  if (strong_equal (t, u)) return true;
   return (L(t)==L(u)) &&
     (L(t)==STRING? (t->label==u->label): (A(t)==A(u)));
 }
 
 bool
 operator != (tree t, tree u) {
+  if (strong_equal (t, u)) return false;
   return (L(t)!=L(u)) ||
     (L(t)==STRING? (t->label!=u->label): (A(t)!=A(u)));
 }
@@ -238,6 +240,19 @@ tree_as_string (tree t) {
   return "";
 }
 
+tree
+replace (tree t, tree w, tree b) {
+  if (t == w) return b;
+  else if (is_atomic (t)) return t;
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= replace (t[i], w, b);
+    return r;
+  }
+}
+
 /******************************************************************************
 * Tree predicates
 ******************************************************************************/
@@ -294,8 +309,10 @@ is_multi_paragraph (tree t) {
   case ACTIVE:
   case VAR_ACTIVE:
     return is_multi_paragraph (t[N(t)-1]);
-  case INCLUDE:
+  case VAR_INCLUDE:
     return true;
+  case WITH_PACKAGE:
+    return is_multi_paragraph (t[N(t)-1]);
   case LOCUS:
   case CANVAS:
     return is_multi_paragraph (t[N(t)-1]);
@@ -347,6 +364,12 @@ is_prime (tree t) {
 }
 
 bool
+is_left_script_prime (tree t) {
+  return is_func (t, LSUB, 1) || is_func (t, LSUP, 1) ||
+         is_func (t, LPRIME, 1);
+}
+
+bool
 is_right_script_prime (tree t) {
   return is_func (t, RSUB, 1) || is_func (t, RSUP, 1) ||
          is_func (t, RPRIME, 1);
@@ -365,7 +388,10 @@ is_mod_active_once (tree t) {
 
 bool
 is_graphical_text (tree t) {
-  return is_func (t, TEXT_AT) || is_func (t, MATH_AT);
+  return
+    is_func (t, TEXT_AT) ||
+    is_func (t, MATH_AT) ||
+    is_func (t, DOCUMENT_AT);
 }
 
 bool
@@ -377,7 +403,7 @@ is_empty (tree t) {
       if (!is_empty (t[i])) return false;
     return is_concat (t) || (n<=1);
   }
-  return false;
+  return is_compound (t, "suppressed");
 }
 
 /******************************************************************************
@@ -407,6 +433,16 @@ compound (string s, tree t1, tree t2, tree t3) {
 tree
 compound (string s, tree t1, tree t2, tree t3, tree t4) {
   return tree (make_tree_label (s), t1, t2, t3, t4);
+}
+
+tree
+compound (string s, tree t1, tree t2, tree t3, tree t4, tree t5) {
+  return tree (make_tree_label (s), t1, t2, t3, t4, t5);
+}
+
+tree
+compound (string s, tree t1, tree t2, tree t3, tree t4, tree t5, tree t6) {
+  return tree (make_tree_label (s), t1, t2, t3, t4, t5, t6);
 }
 
 tree
@@ -445,6 +481,10 @@ is_compound (tree t, string s, int n) {
 
 static void
 simplify_concat (tree& r, tree t) {
+  if (is_atomic (t)) {
+   r= concat (t);
+   return;
+  }
   int i, n= N(t);
   for (i=0; i<n; i++)
     if (is_concat (t[i])) simplify_concat (r, t[i]);
@@ -456,10 +496,27 @@ simplify_concat (tree& r, tree t) {
 
 tree
 simplify_concat (tree t) {
+  if (is_atomic (t)) return t;
   tree r (CONCAT);
   simplify_concat (r, t);
   if (N(r) == 0) return "";
   if (N(r) == 1) return r[0];
+  return r;
+}
+
+static void
+simplify_document (tree& r, tree t) {
+  int i, n= N(t);
+  for (i=0; i<n; i++)
+    if (is_document (t[i])) simplify_document (r, t[i]);
+    else r << t[i];
+}
+
+tree
+simplify_document (tree t) {
+  if (!is_document (t)) return t;
+  tree r (DOCUMENT);
+  simplify_document (r, t);
   return r;
 }
 
@@ -472,5 +529,6 @@ simplify_correct (tree t) {
   for (i=0; i<n; i++)
     r[i]= simplify_correct (t[i]);
   if (is_concat (r)) r= simplify_concat (r);
+  if (is_document (r)) r= simplify_document (r);
   return r;
 }

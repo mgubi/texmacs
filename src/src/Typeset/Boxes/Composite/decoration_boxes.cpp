@@ -21,23 +21,45 @@ bool in_presentation_mode ();
 
 struct specific_box_rep: public box_rep {
   box b;
-  bool printer_flag;
-  specific_box_rep (path ip, box b2, bool flag, font fn):
-    box_rep (ip), b (b2), printer_flag (flag) {
+  string filter;
+  specific_box_rep (path ip, box b2, string filter2, font fn):
+    box_rep (ip), b (b2), filter (filter2) {
       x1=x2=y1=0;
       y2=fn->yx;
       x3= b->x3; y3= b->y3;
       x4= b->x4; y4= b->y4;
     }
   operator tree () {
-    return tuple ("specific", (tree) b, as_string (printer_flag)); }
+    return tuple ("specific", (tree) b, filter); }
   void display (renderer ren) {
-    if (ren->is_printer () == printer_flag)
-      if (printer_flag || !in_presentation_mode ()) {
-	rectangles rs;
-	b->redraw (ren, path (), rs);
-      }
+    bool ok= false;
+    if (filter == "screen") ok= !ren->is_printer () && !in_presentation_mode ();
+    else if (filter == "printer") ok= ren->is_printer ();
+    else if (filter == "even") ok= (ren->cur_page & 1) == 0;
+    else if (filter == "odd") ok= (ren->cur_page & 1) == 1;
+    if (ok) {
+      rectangles rs;
+      b->redraw (ren, path (), rs);
+    }
   }
+};
+
+/******************************************************************************
+* TOC boxes
+******************************************************************************/
+
+struct toc_box_rep: public box_rep {
+  string kind, title;
+  toc_box_rep (path ip, string kind2, string title2, font fn):
+    box_rep (ip), kind (kind2), title (title2) {
+      x1=x2=y1=0;
+      y2=fn->yx;
+      x3=x4=y3=y4= 0;
+    }
+  operator tree () {
+    return tuple ("toc", kind, title); }
+  void display (renderer ren) {
+    ren->toc_entry (kind, title, 0, y2); }
 };
 
 /******************************************************************************
@@ -45,8 +67,9 @@ struct specific_box_rep: public box_rep {
 ******************************************************************************/
 
 struct flag_box_rep: public composite_box_rep {
-  color light, old_bg;
-  flag_box_rep (path ip, box b, SI h, SI lw, color dark, color light);
+  brush light;
+  brush old_bg;
+  flag_box_rep (path ip, box b, SI h, pencil dark, brush light);
   operator tree () { return tree (TUPLE, "flag"); }
   void pre_display (renderer &ren);
   void post_display (renderer &ren);
@@ -64,7 +87,7 @@ flag_box_rep::post_display (renderer &ren) {
 }
 
 flag_box_rep::flag_box_rep (
-  path ip, box b, SI h, SI lw, color dark, color light2):
+  path ip, box b, SI h, pencil dark, brush light2):
   composite_box_rep (ip), light (light2)
 {
   SI sep= h/5, H= b->h() + 2*sep, w= b->w() + 2*sep, W= H/4;
@@ -75,8 +98,8 @@ flag_box_rep::flag_box_rep (
   x[2]= w+W; y[2]= H/2;
   x[3]= w; y[3]= H;
   x[4]= 0; y[4]= H;
-  insert (line_box (dip, 0, 0, 0, h, lw, dark), 0, 0);
-  insert (polygon_box (dip, x, y, lw, light, dark), 0, h);
+  insert (line_box (dip, 0, 0, 0, h, dark), 0, 0);
+  insert (polygon_box (dip, x, y, light, dark), 0, h);
   insert (b, sep - b->x1, h + sep - b->y1);
   position ();
   finalize ();
@@ -87,12 +110,11 @@ flag_box_rep::flag_box_rep (
 ******************************************************************************/
 
 struct info_box_rep: public composite_box_rep {
-  info_box_rep (path ip, SI h, SI lw, color dark, color light);
+  info_box_rep (path ip, SI h, pencil dark, brush light);
   operator tree () { return tree (TUPLE, "info"); }
 };
 
-info_box_rep::info_box_rep (
-  path ip, SI h, SI lw, color dark, color light):
+info_box_rep::info_box_rep (path ip, SI h, pencil dark, brush light):
   composite_box_rep (ip)
 {
   SI d= h/5;
@@ -102,8 +124,8 @@ info_box_rep::info_box_rep (
   x[1]= d; y[1]= 0;
   x[2]= 0; y[2]= d;
   x[3]= -d; y[3]= 0;
-  insert (line_box (dip, 0, 0, 0, h-d, lw, dark), 0, 0);
-  insert (polygon_box (dip, x, y, lw, light, dark), 0, h);
+  insert (line_box (dip, 0, 0, 0, h-d, dark), 0, 0);
+  insert (polygon_box (dip, x, y, light, dark), 0, h);
   position ();
   finalize ();
 }
@@ -157,22 +179,23 @@ scrollbar_box_rep::action (tree type, SI x, SI y, SI delta) {
 ******************************************************************************/
 
 box
-specific_box (path ip, box b, bool printer_flag, font fn) {
-  return tm_new<specific_box_rep> (ip, b, printer_flag, fn);
-}
-
-box flag_box (path ip, box b, SI h, SI lw, color dark, color light) {
-  return tm_new<flag_box_rep> (ip, b, h, lw, dark, light);
+specific_box (path ip, box b, string filter, font fn) {
+  return tm_new<specific_box_rep> (ip, b, filter, fn);
 }
 
 box
-flag_box (path ip, string s, font fn, color dark, color light) {
-  box b= text_box (decorate_right (ip), 0, s, fn, dark);
-  return flag_box (ip, b, fn->wfn, fn->wline, dark, light);
+toc_box (path ip, string kind, string title, font fn) {
+  return tm_new<toc_box_rep> (ip, kind, title, fn);
 }
 
-box info_box (path ip, SI h, SI lw, color dark, color light) {
-  return tm_new<info_box_rep> (ip, h, lw, dark, light);
+box
+flag_box (path ip, box b, SI h, pencil dark, brush light) {
+  return tm_new<flag_box_rep> (ip, b, h, dark, light);
+}
+
+box
+info_box (path ip, SI h, pencil dark, brush light) {
+  return tm_new<info_box_rep> (ip, h, dark, light);
 }
 
 box

@@ -11,7 +11,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Given a page from the documentation, we parse it and all its children and
-;; store every "explain" tag into a cache in the users $HOME directory. 
+;; store every "explain" tag into a cache in the users $TEXMACS_HOMEPATH
+;; directory. 
 ;; We use this to provide documentation for scheme symbols and texmacs macros.
 ;; Multiple languages can be stored for each tag, allowing for localization
 ;; as well as a fallback language.
@@ -74,21 +75,23 @@
 (tm-define (doc-scm-cache)
   (:synopsis "Url of the cache with the collected scheme documentation.")
   (with pref (get-preference "doc:doc-scm-cache")
-    (if (and (!= pref "default") (url-exists? (string->url pref)))
-        (string->url pref)
+    (if (and (!= pref "default") (url-exists? (system->url pref)))
+        (system->url pref)
         (with new (persistent-file-name
-                   (string->url "$HOME/.TeXmacs/system/cache/") "api")
-          (set-preference "doc:doc-scm-cache" (url->string new))
+                   (unix->url "$TEXMACS_HOME_PATH/system/cache/")
+                   "api")
+          (set-preference "doc:doc-scm-cache" (url->system new))
           new))))
 
 (tm-define (doc-macro-cache)
   (:synopsis "Url of the cache with the collected macro documentation.")
   (with pref (get-preference "doc:doc-macro-cache")
-    (if (and (!= pref "default") (url-exists? (string->url pref)))
-        (string->url pref)
+    (if (and (!= pref "default") (url-exists? (system->url pref)))
+        (system->url pref)
         (with new (persistent-file-name 
-                   (string->url "$HOME/.TeXmacs/system/cache/") "api")
-          (set-preference "doc:doc-macro-cache" (url->string new))
+                   (unix->url "$TEXMACS_HOME_PATH/system/cache/")
+                   "api")
+          (set-preference "doc:doc-macro-cache" (url->system new))
           new))))
 
 (define (explain-scm? t)
@@ -116,7 +119,7 @@
   (with prev (string->object (persistent-get cache key))
     (if (eof-object? prev) (set! prev '()))
     (persistent-set cache key
-      (object->string (cons `(entry ,key ,lan ,(url->string url) ,t) prev)))))
+      (object->string (cons `(entry ,key ,lan ,(url->system url) ,t) prev)))))
 
 (define (process-explain t lan url)
   "Store an explain macro from a given URL into the cache."
@@ -168,65 +171,56 @@
   (set! _macro_ (doc-macro-cache))
   (parse-branch `(branch (dummy) ,fname) basedir))
 
-(define (delayed-collect-sub where what lan cont)
+(define (doc-collect-sub where what lan)
   (let ((path (string-append "$TEXMACS_PATH/doc/" where "/"))
         (file (string-append what "." lan ".tm"))
         (msg  (string-append  "(" what ", " lan ")")))
     (system-wait "Building index" msg)
-    (doc-collect-explains path file)
-    (user-delayed cont)))
+    (doc-collect-explains path file)))
 
-(tm-define (doc-collect-all lan cont)
+(tm-define (doc-collect-all lan)
   (:synopsis "Collect all explain tags available in the documentation.")
   (with loc (string-take (language-to-locale lan) 2)
-   (delayed-collect-sub "devel/scheme" "scheme" loc 
-    (lambda ()
-     (delayed-collect-sub "devel/plugin" "plugin" loc
-      (lambda ()
-       (delayed-collect-sub "devel/plugin" "plugins" loc
-        (lambda ()
-         (delayed-collect-sub "devel/source" "source" loc
-          (lambda ()
-           (delayed-collect-sub "devel/style" "style" loc
-            (lambda ()
-             (delayed-collect-sub "main" "man-reference" loc 
-              (lambda ()
-                (set-preference "doc:collect-timestamp" (current-time))
-                (append-preference "doc:collect-languages" lan)
-                (set-message "Finished collecting symbols documentation."
-                             (string-append "(" lan ")"))
-                (cont)))))))))))))))
+   (doc-collect-sub "devel/scheme" "scheme" loc)
+   (doc-collect-sub "devel/plugin" "plugin" loc)
+   (doc-collect-sub "devel/plugin" "plugins" loc)
+   (doc-collect-sub "devel/source" "source" loc)
+   (doc-collect-sub "devel/style" "style" loc)
+   (doc-collect-sub "main" "man-reference" loc)
+   (set-preference "doc:collect-timestamp" (current-time))
+   (append-preference "doc:collect-languages" lan)
+   (set-message "Finished collecting symbols documentation."
+                (string-append "(" lan ")"))))
 
-; FIXME: running this at doc-retrieve crashes, so we call it at each entry point
-; like showing the help window etc. though we ought not to have to.
-(tm-define (doc-check-cache-do cont)
-  (:synopsis "Call @cont after ensuring that the doc cache is built.")
+(tm-define (doc-check-cache)
+  (:synopsis "Ensure that the documentation cache is built.")
   (let  ((t (get-preference "doc:collect-timestamp"))
          (lan (get-output-language))
          (langs (get-preference "doc:collect-languages")))
     (if (not (and (!= t "default") (list? langs) (member lan langs)))
-      (doc-collect-all lan cont) (cont))))
+        (doc-collect-all lan))))
 
 (define (doc-retrieve* cache key lan)
   (let ((docs (string->object (persistent-get cache key)))
         (aux (lambda (i) (== (tm-ref i 1) lan))))
     (if (eof-object? docs) '() ; (string->object "") => #<eof>
-      (with res (list-filter docs aux)
-        (if (and (null? res) (!= lan "english")) ; second check just in case 
-          (doc-retrieve* cache key "english") 
-          res)))))
+        (with res (list-filter docs aux)
+          (if (and (null? res) (!= lan "english")) ; second check just in case 
+              (doc-retrieve* cache key "english") 
+              res)))))
   
 (tm-define (doc-retrieve cache key lan)
   (:synopsis "A list with all help items for @key in language @lan in @cache")
-  (doc-check-cache-do (lambda () (doc-retrieve* cache key lan))))
+  (doc-check-cache)
+  (doc-retrieve* cache key lan))
 
 (define (doc-delete-cache*)
-  (with s (url-root (doc-scm-cache))
-    (display* "I WOULD HAVE deleted the cache. \n")
+  (with s (url->system (doc-scm-cache))
+    (display* "I WOULD HAVE deleted the cache at " s ".\n")
     (reset-preference "doc:doc-scm-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
-  (with s (url-root (doc-macro-cache))
-    (display* "I WOULD HAVE deleted the cache. \n")
+  (with s (url->system (doc-macro-cache))
+    (display* "I WOULD HAVE deleted the cache at " s ".\n")
     (reset-preference "doc:doc-macro-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
   (reset-preference "doc:collect-timestamp")
@@ -240,6 +234,6 @@
       (lambda (go?) (if go? (doc-delete-cache*) (set-message "Cancelled" "")))
     (user-confirm 
         `(replace "All the files at %1 and %2 will be deleted. Are you sure?"
-                  (verbatim ,(url->string (doc-scm-cache))) 
-                  (verbatim ,(url->string (doc-macro-cache))))
+                  (verbatim ,(url->system (doc-scm-cache))) 
+                  (verbatim ,(url->system (doc-macro-cache))))
       #t run)))

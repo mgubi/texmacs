@@ -24,6 +24,8 @@ class printer_rep: public renderer_rep {
   bool     landscape;
   double   paper_w;
   double   paper_h;
+  int      psw;
+  int      psh;
   bool     use_alpha;
   string   prologue;
   string   body;
@@ -31,6 +33,9 @@ class printer_rep: public renderer_rep {
   int      linelen;
 
   color    fg, bg;
+  int      opacity;
+  pencil   pen;
+  brush    bgb;
   int      ncols;
   SI       lw;
   int      nwidths;
@@ -38,12 +43,14 @@ class printer_rep: public renderer_rep {
   int      nfonts;
   SI       xpos, ypos;
   bool     tex_flag;
+  tree     toc;
 
   hashmap<string,string> defs;
   hashmap<string,string> tex_chars;
   hashmap<string,string> tex_width;
   hashmap<string,string> tex_fonts;
   hashmap<string,array<int> > tex_font_chars;
+  hashmap<string,string> metadata;
 
 public:
   printer_rep (url ps_file_name, int dpi, int nr_pages,
@@ -71,29 +78,33 @@ public:
   void generate_tex_fonts ();
 
   /************************ subroutines hyperlinks ***************************/
-  void anchor(string label, SI x, SI y);
-  void href(string label, SI x1, SI y1, SI x2, SI y2);
+
+  void anchor (string label, SI x1, SI y1, SI x2, SI y2);
+  void href (string label, SI x1, SI y1, SI x2, SI y2);
+  void toc_entry (string kind, string title, SI x, SI y);
+  void generate_toc_item (tree t);
+  void generate_toc ();
+  void set_metadata (string kind, string val);
+  void generate_metadata ();
 
   /********************** routines from renderer.hpp *************************/
 
-  void  set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore= false);
-  color get_color ();
-  color get_background ();
-  void  set_color (color c);
-  void  set_background (color c);
-  void  draw (int char_code, font_glyphs fn, SI x, SI y);
-  void  set_line_style (SI w, int type=0, bool round=true);
-  void  line (SI x1, SI y1, SI x2, SI y2);
-  void  lines (array<SI> x, array<SI> y);
-  void  clear (SI x1, SI y1, SI x2, SI y2);
-  void  fill (SI x1, SI y1, SI x2, SI y2);
-  void  arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
-  void  fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
-  void  polygon (array<SI> x, array<SI> y, bool convex=true);
-  void  xpm (url file_name, SI x, SI y);
-  void  image (url u, SI w, SI h, SI x, SI y,
-	       double cx1, double cy1, double cx2, double cy2,
-               int alpha);
+  void set_transformation (frame fr);
+  void reset_transformation ();
+
+  void   set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore= false);
+  pencil get_pencil ();
+  brush  get_background ();
+  void   set_pencil (pencil p);
+  void   set_background (brush b);
+  void   draw (int char_code, font_glyphs fn, SI x, SI y);
+  void   line (SI x1, SI y1, SI x2, SI y2);
+  void   lines (array<SI> x, array<SI> y);
+  void   clear (SI x1, SI y1, SI x2, SI y2);
+  void   fill (SI x1, SI y1, SI x2, SI y2);
+  void   arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
+  void   fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
+  void   polygon (array<SI> x, array<SI> y, bool convex=true);
 
   void fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y);
   void new_shadow (renderer& ren);
@@ -101,6 +112,12 @@ public:
   void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
   void put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
   void apply_shadow (SI x1, SI y1, SI x2, SI y2);
+
+  renderer shadow (picture& pic, SI x1, SI y1, SI x2, SI y2);
+  void draw_picture (picture p, SI x, SI y, int alpha);
+  void draw_scalable (scalable im, SI x, SI y, int alpha);
+  void image (string name, string eps, SI x1, SI y1, SI x2, SI y2,
+              SI w, SI h, SI x, SI y, int alpha);
 };
 
 renderer printer (url ps_file_name, int dpi, int nr_pages= 1,

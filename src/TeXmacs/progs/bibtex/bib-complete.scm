@@ -9,19 +9,14 @@
 ;; in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; TODO:
-;;  - Maybe we should use persistent storage for the parsed files?
-;;  - This is pretty ad-hoc. We could provide a better interface and use it
-;;    for a simple bibliography browser widget, for instance.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (bibtex bib-complete)
   (:use (utils library ptrees)))
 
 (define parse-times (make-ahash-table))
 (define parse-results (make-ahash-table))
-(define bib-files (make-ahash-table))
+(define bib-files-cache (make-ahash-table))
+(define bib-styles-cache (make-ahash-table))
 
 (define (get-citekeys-list l)
   (list-fold
@@ -42,19 +37,31 @@
     (ahash-ref parse-results u)))
 
 ; FIXME: if the user changes the bibliography file we still retrieve from cache
-(tm-define (current-bib-file)
+(tm-define (current-bib-file usecache?)
   (:synopsis "Returns the (cached) name of the bibliography file")
   (with u (current-buffer-url)
-    (or (ahash-ref bib-files u)
-        (with l (select (buffer-tree) '(bibliography))
+    (or (and usecache? (ahash-ref bib-files-cache u))
+        (with l (select (buffer-tree) '(:* bibliography))
           (if (nnull? l)
-              (ahash-set! bib-files u
-               (url-append (url-head u)
-                           (tree->string (tree-ref (car l) 2))))
+              (ahash-set! bib-files-cache u
+               (url-append (url-head u) (tm->string (tree-ref (car l) 2))))
               (url-none))))))
 
-(tm-define (citekey-completions u root)
-  (:synopsis "Completions for @root in the bibtex file @u for custom-complete")
-  `(tuple ,root
-     ,@(map string->tmstring
-            (pt-words-below (pt-find (get-citekeys-pt u) (tree->string root))))))
+(tm-define (current-bib-style usecache?)
+  (:synopsis "Returns the (cached) style of the bibliography")
+  (with u (current-buffer-url)
+    (or (and usecache? (ahash-ref bib-styles-cache u))
+        (with l (select (buffer-tree) '(:* bibliography))
+          (if (nnull? l)
+              (ahash-set! bib-styles-cache u (tm->string (tree-ref (car l) 1)))
+              "tm-plain")))))
+
+(tm-define (citekey-list u s)
+  (:synopsis "Completions for @s in the bibtex file @u as a list")
+  (if (url-none? u) '()
+      (pt-words-below (pt-find (get-citekeys-pt u) s))))
+
+(tm-define (citekey-completions u t)
+  (:synopsis "Completions for @t in the bibtex file @u for custom-complete")
+  `(tuple ,t
+     ,@(map string->tmstring (citekey-list u (tree->string t)))))

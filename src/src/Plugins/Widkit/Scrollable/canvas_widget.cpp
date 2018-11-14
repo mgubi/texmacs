@@ -11,6 +11,7 @@
 
 #include "rectangles.hpp"
 #include "window.hpp"
+#include "message.hpp"
 #include "Widkit/basic_widget.hpp"
 #include "Widkit/Event/attribute_event.hpp"
 #include "Widkit/scroll_widget.hpp"
@@ -18,12 +19,15 @@
 
 SI get_dx (gravity grav, SI w);
 SI get_dy (gravity grav, SI h);
+gravity opposite (gravity grav);
+wk_widget wrap_scroll_widget (wk_widget w);
 
 /******************************************************************************
 * Canvas widgets
 ******************************************************************************/
 
 class canvas_widget_rep: public basic_widget_rep {
+  //bool padding_flag; // should small canvasses be padded?
   bool request_focus; // request focus upon clicking in canvas
   SI ex1, ey1, ex2, ey2;
   SI last_w, last_h;
@@ -53,7 +57,9 @@ public:
 ******************************************************************************/
 
 canvas_widget_rep::canvas_widget_rep (wk_widget child, gravity grav, bool rf):
-  basic_widget_rep (1), request_focus (rf), show_scroll_bars (true)
+  basic_widget_rep (1),
+  //padding_flag (false),
+  request_focus (rf), show_scroll_bars (true)
 {
   a[0] = tm_new<scrollable_widget_rep> (child, grav);
   hor  = tm_new<hor_scrollbar_widget_rep> (a[0]);
@@ -70,26 +76,30 @@ canvas_widget_rep::operator tree () {
 void
 canvas_widget_rep::set_extents (SI Ex1, SI Ey1, SI Ex2, SI Ey2) {
   abs_outer_round (Ex1, Ey1, Ex2, Ey2);
-  SI ew= Ex2- Ex1, eh= Ey2- Ey1;
+  SI ew= Ex2 - Ex1, eh= Ey2 - Ey1;
   bool old_hor_active= hor_active, old_ver_active= ver_active;
   if ((ew<=(w-2*PIXEL)) && (eh<=(h-2*PIXEL))) {
     hor_active= false; ver_active= false; }
   else { hor_active= ew > (w-20*PIXEL); ver_active= eh > (h-20*PIXEL); }
 
   gravity grav= a[0]->grav;
-  SI ww= w- (show_scroll_bars? (ver_active? 20*PIXEL: 2*PIXEL): 0);
-  SI wh= h- (show_scroll_bars? (hor_active? 20*PIXEL: 2*PIXEL): 0);
-  if (Ex2- Ex1 < ww) {
+  SI ww= w - (show_scroll_bars? (ver_active? 20*PIXEL: 2*PIXEL): 0);
+  SI wh= h - (show_scroll_bars? (hor_active? 20*PIXEL: 2*PIXEL): 0);
+  if (ew < ww) {
+    SI chw= ww;
+    //if (padding_flag) chw= ew;
     SI cxr= get_dx (grav, ww);
-    SI cxc= Ex1+ get_dx (grav, Ex2- Ex1);
-    Ex1= cxc- cxr;
-    Ex2= cxc- cxr+ ww;
+    SI cxc= Ex1 + get_dx (grav, chw);
+    Ex1= cxc - cxr;
+    Ex2= cxc - cxr + chw;
   }
-  if (Ey2- Ey1 < wh) {
-    SI cyr= get_dy (grav, wh);
-    SI cyc= Ey2+ get_dy (grav, Ey2- Ey1);
-    Ey1= cyc- cyr- wh;
-    Ey2= cyc- cyr;
+  if (eh < wh) {
+    SI chh= wh;
+    //if (padding_flag) chh= eh;
+    SI cyr= get_dy (grav, wh) + (wh - chh);
+    SI cyc= Ey2 + get_dy (grav, chh);
+    Ey1= cyc - cyr - chh;
+    Ey2= cyc - cyr;
   }
 
   bool bars_changed=
@@ -184,7 +194,7 @@ extern void indent ();
 
 void
 canvas_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   if (!show_scroll_bars);
   else if (hor_active && ver_active) {
     layout_default (ren, w- 16*PIXEL, -h, w, -h+ 16*PIXEL);
@@ -195,15 +205,13 @@ canvas_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
   else if (hor_active && (!ver_active)) {
     layout_default (ren, 0, -h+ 16*PIXEL, w, -h+ 18*PIXEL);
     layout_dark_outline (ren, 0, -h+ 15*PIXEL, w, 0);
-    ren->set_line_style (PIXEL);
-    ren->set_color (layout_light (ren));
+    ren->set_pencil (pencil (layout_light (ren), PIXEL));
     ren->line (PIXEL, -h+ 18*PIXEL, w-2*PIXEL, -h+ 18*PIXEL);
   }
   else if ((!hor_active) && ver_active) {
     layout_default (ren, w- 18*PIXEL, -h, w- 16*PIXEL, 0);
     layout_dark_outline (ren, 0, -h, w- 15*PIXEL, 0);
-    ren->set_line_style (PIXEL);
-    ren->set_color (layout_light (ren));
+    ren->set_pencil (pencil (layout_light (ren), PIXEL));
     ren->line (w- 19*PIXEL, -h+PIXEL, w- 19*PIXEL, -2*PIXEL);
   }
   else layout_dark_outline (ren, 0, -h, w, 0);
@@ -316,7 +324,7 @@ resize_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 resize_widget_rep::handle_repaint (repaint_event ev) {
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   rectangles r1= rectangle (ev->x1, ev->y1, ev->x2, ev->y2);
   rectangles r2= rectangle (0, -h, w, 0);
   rectangles rs= r1 - r2;
@@ -333,6 +341,22 @@ resize_widget (wk_widget w, int style, string w1, string h1,
   //cout << "def: " << w2 << ", " << h2 << "\n";
   //cout << "max: " << w3 << ", " << h3 << "\n";
   return tm_new<resize_widget_rep> (w, style, w1, h1, w2, h2, w3, h3);
+}
+
+wk_widget
+resize_widget (wk_widget w, int style, string w1, string h1,
+               string w2, string h2, string w3, string h3,
+               string hp, string vp) {
+  wk_widget cw= w;
+  if (vp == "bottom") {
+    cw= canvas_widget (wrap_scroll_widget (cw), south_west, false);
+    SI widw, widh;
+    w << get_size (widw, widh, -1);
+    abs_round (widw, widh);
+    cw << set_coord4 ("extents", 0, -widh, widw, 0);
+    cw << set_scroll_pos (0, -widh);
+  }
+  return resize_widget (cw, style, w1, h1, w2, h2, w3, h3);
 }
 
 /******************************************************************************
@@ -355,7 +379,7 @@ wrap_scroll_widget_rep::operator tree () {
 
 void
 wrap_scroll_widget_rep::handle_repaint (repaint_event ev) {
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   layout_default (ren, ev->x1, ev->y1, ev->x2, ev->y2);
   a[0] << emit_position (0, 0, w, h);
   basic_widget_rep::handle_repaint (ev);

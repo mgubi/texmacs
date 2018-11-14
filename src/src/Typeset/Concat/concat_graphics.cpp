@@ -15,6 +15,7 @@
 #include "hashset.hpp"
 #include "analyze.hpp"
 #include "scheme.hpp"
+#include "matrix.hpp"
 
 #define BEGIN_MAGNIFY                                           \
   tree new_mag= as_string (env->magn * env->mgfy);              \
@@ -70,6 +71,8 @@ notify_graphics_extents (tree t, point lbot, point rtop) {
 void
 concater_rep::typeset_graphics (tree t, path ip) {
 BEGIN_MAGNIFY
+  env->update_color ();
+  env->update_dash_style_unit ();
   grid gr= as_grid (env->read (GR_GRID));
   array<box> bs;
   gr->set_aspect (env->read (GR_GRID_ASPECT));
@@ -128,15 +131,77 @@ concater_rep::typeset_superpose (tree t, path ip) {
   print (superpose_box (ip, bs));
 }
 
+bool
+is_transformation (tree t) {
+  if (is_tuple (t, "rotation", 1) &&
+      is_double (t[1]))
+    return true;
+  if (is_tuple (t, "rotation", 2) &&
+      is_func (t[1], _POINT, 2) &&
+      is_double (t[1][0]) &&
+      is_double (t[1][1]) &&
+      is_double (t[2]))
+    return true;
+  if (is_tuple (t, "scaling", 2) &&
+      is_double (t[1]) &&
+      is_double (t[2]))
+    return true;
+  if (is_tuple (t, "slanting", 1) &&
+      is_double (t[1]))
+    return true;
+  if (is_tuple (t, "linear", 4) &&
+      is_double (t[1]) &&
+      is_double (t[2]) &&
+      is_double (t[3]) &&
+      is_double (t[4]))
+    return true;
+  return false;
+}
+
+frame
+get_transformation (tree t) {
+  if (is_tuple (t, "rotation", 1))
+    return rotation_2D (point (0.0, 0.0), as_double (t[1]) / 57.2957795131);
+  if (is_tuple (t, "rotation", 2))
+    return rotation_2D (as_point (t[1]), as_double (t[2]) / 57.2957795131);
+  if (is_tuple (t, "scaling", 2))
+    return scaling (point (as_double (t[1]), as_double (t[2])),
+                    point (0.0, 0.0));
+  if (is_tuple (t, "slanting", 1))
+    return slanting (point (0.0, 0.0), as_double (t[1]));
+  if (is_tuple (t, "linear", 4)) {
+    matrix<double> m (0.0, 2, 2);
+    m (0, 0) = as_double (t[1]);
+    m (0, 1) = as_double (t[2]);
+    m (1, 0) = as_double (t[3]);
+    m (1, 1) = as_double (t[4]);
+    return linear_2D (m);
+  }
+  failed_error << "t= " << t << LF;
+  FAILED ("transformation expected");
+  return frame ();
+}
+
 void
-concater_rep::typeset_gr_linear_transform (tree t, path ip) {
-  if (N(t) != 2 || !is_tuple (t[1])) { typeset_error (t, ip); }
-  frame f= affine_2D (as_matrix<double> (t[1]));
-  box   b= typeset_as_concat (env, t[0], descend (ip, 0));
-        /* The call should be performed with 'typeset_as_atomic()',
-	   but we should re-test transform() under these circumstances.
-         */
-  print (b->transform (env->fr * (f * invert (env->fr))));
+concater_rep::typeset_gr_transform (tree t, path ip) {
+  if (N(t) != 2) typeset_error (t, ip);
+  tree tr= env->exec (t[1]);
+  if (!is_transformation (tr)) typeset_error (t, ip);
+  else {
+    frame f= get_transformation (tr);
+    box   b= typeset_as_atomic (env, t[0], descend (ip, 0));
+    print (transformed_box (ip, b, f));
+  }
+}
+
+void
+concater_rep::typeset_gr_effect (tree t, path ip) {
+  if (N(t) < 2) typeset_error (t, ip);
+  array<box> bs (N(t)-1);
+  for (int i=0; i<N(t)-1; i++)
+    bs[i]= typeset_as_atomic (env, t[i], descend (ip, i));
+  tree eff= env->exec (t[N(t)-1]);
+  print (effect_box (ip, bs, eff));
 }
 
 void
@@ -163,7 +228,8 @@ BEGIN_MAGNIFY
       }
       else if (valign == "center") y -= ((b->y1 + b->y2) >> 1);
       else if (valign == "top") y -= b->y2;
-      print (text_at_box (ip, b, x, y, axis, env->fn->spc->def));
+      SI pad= env->get_length (TEXT_AT_MARGIN);
+      print (text_at_box (ip, b, x, y, axis, pad));
     }
   }
 END_MAGNIFY
@@ -174,7 +240,7 @@ concater_rep::typeset_math_at (tree t, path ip) {
 BEGIN_MAGNIFY
   if (N(t) != 2) typeset_error (t, ip);
   else {
-    // FIXME: attaching ip to compound ("math", t[0]) is a bit hacky,
+    // FIXME: attaching an ip to compound ("math", t[0]) is a bit hacky,
     // but it seems to work fine for the time being
     box    b     = typeset_as_concat (env, compound ("math", t[0]), ip);
     point  p     = env->fr (env->as_point (env->exec (t[1])));
@@ -182,7 +248,39 @@ BEGIN_MAGNIFY
     string valign= env->text_at_valign;
 
     if (N(p) == 0)
-      typeset_dynamic (tree (ERROR, "bad text-at"), ip);
+      typeset_dynamic (tree (ERROR, "bad math-at"), ip);
+    else {
+      SI x= (SI) p[0], y= (SI) p[1], axis= (b->h() >> 1);
+      if (halign == "left") x -= b->x1;
+      else if (halign == "center") x -= ((b->x1 + b->x2) >> 1);
+      else if (halign == "right") x -= b->x2;
+      if (valign == "bottom") y -= b->y1;
+      else if (valign == "axis") {
+	axis= (env->fn->yx >> 1) - b->y1;
+	y -= (env->fn->yx >> 1);
+      }
+      else if (valign == "center") y -= ((b->y1 + b->y2) >> 1);
+      else if (valign == "top") y -= b->y2;
+      print (text_at_box (ip, b, x, y, axis, env->fn->spc->def));
+    }
+  }
+END_MAGNIFY
+}
+
+void
+concater_rep::typeset_document_at (tree t, path ip) {
+BEGIN_MAGNIFY
+  if (N(t) != 2) typeset_error (t, ip);
+  else {
+    // FIXME: attaching ip to compound ("paragraph-box", t[0]) is a bit hacky,
+    // but it seems to work fine for the time being
+    box    b= typeset_as_concat (env, compound ("paragraph-box", t[0]), ip);
+    point  p= env->fr (env->as_point (env->exec (t[1])));
+    string halign= env->text_at_halign;
+    string valign= env->doc_at_valign;
+
+    if (N(p) == 0)
+      typeset_dynamic (tree (ERROR, "bad document-at"), ip);
     else {
       SI x= (SI) p[0], y= (SI) p[1], axis= (b->h() >> 1);
       if (halign == "left") x -= b->x1;
@@ -211,15 +309,16 @@ BEGIN_MAGNIFY
     for (i=0; i<n; i++)
       u[i]= env->exec (t[i]);
     point p= env->fr (env->as_point (u));
-    print (point_box (ip, p, 20*PIXEL, env->col,
-                      env->fill_mode, env->fill_color,
-                      env->point_style));
+    pencil pen= env->pen->set_width (env->point_border);
+    print (point_box (ip, p, env->point_size, pen,
+                      env->fill_brush, env->point_style));
   }
 END_MAGNIFY
 }
 
 static tree
 protect_arrow (edit_env env, tree t) {
+  (void) env;
   return tree (WITH, "arrow-begin", "none", "arrow-end", "none",
                "dash-style", "none", t);
 }
@@ -259,10 +358,9 @@ BEGIN_MAGNIFY
       cip << cip[0];
     }
     curve c= env->fr (poly_segment (a, cip));
-    print (curve_box (ip, c, env->lw, env->col,
-                      env->dash_style, env->dash_style_unit,
-                      env->fill_mode, env->fill_color,
-                      typeset_line_arrows (ip)));
+    print (curve_box (ip, c, env->line_portion, env->pen,
+                      env->dash_style, env->dash_motif, env->dash_style_unit,
+                      env->fill_brush, typeset_line_arrows (ip)));
   }
 END_MAGNIFY
 }
@@ -285,10 +383,9 @@ BEGIN_MAGNIFY
       typeset_line (t, ip, close);
     else {
       curve c= env->fr (arc (a, cip, close));
-      print (curve_box (ip, c, env->lw, env->col,
-                        env->dash_style, env->dash_style_unit,
-                        env->fill_mode, env->fill_color,
-                        typeset_line_arrows (ip)));
+      print (curve_box (ip, c, env->line_portion, env->pen,
+                        env->dash_style, env->dash_motif, env->dash_style_unit,
+                        env->fill_brush, typeset_line_arrows (ip)));
     }
   }
 END_MAGNIFY
@@ -311,10 +408,9 @@ BEGIN_MAGNIFY
       cip << cip[0];
     }
     curve c= env->fr (N(a)>=3 ? spline (a, cip, close): poly_segment (a, cip));
-    print (curve_box (ip, c, env->lw, env->col,
-                      env->dash_style, env->dash_style_unit,
-                      env->fill_mode, env->fill_color,
-                      typeset_line_arrows (ip)));
+    print (curve_box (ip, c, env->line_portion, env->pen,
+                      env->dash_style, env->dash_motif, env->dash_style_unit,
+                      env->fill_brush, typeset_line_arrows (ip)));
   }
 END_MAGNIFY
 }
@@ -328,6 +424,37 @@ concater_rep::typeset_var_spline (tree t, path ip) {
 void
 concater_rep::typeset_cspline (tree t, path ip) {
   typeset_spline (t, ip, true);
+}
+
+void
+concater_rep::typeset_bezier (tree t, path ip) {
+BEGIN_MAGNIFY
+  int i, n= N(t);
+  array<point> a(n);
+  for (i=0; i<n; i++)
+    a[i]= env->as_point (env->exec (t[i]));
+  array<path> cip(n);
+  for (i=0; i<n; i++)
+    cip[i]= descend (ip, i);
+  if (N(a) == 0 || N(a[0]) == 0) typeset_error (t, ip);
+  else {
+    if (N(a) == 1) {
+      a << copy (a[0]);
+      cip << cip[0];
+    }
+    curve c;
+    if (N(a) < 3) c= poly_segment (a, cip);
+    else {
+      bool simple= is_func (t, SMOOTH) || is_func (t, CSMOOTH);
+      bool closed= is_func (t, CBEZIER) || is_func (t, CSMOOTH);
+      c= poly_bezier (a, cip, simple, closed);
+    }
+    c= env->fr (c);
+    print (curve_box (ip, c, env->line_portion, env->pen,
+                      env->dash_style, env->dash_motif, env->dash_style_unit,
+                      env->fill_brush, typeset_line_arrows (ip)));
+  }
+END_MAGNIFY
 }
 
 void
@@ -397,6 +524,70 @@ set_graphical_values (tree t) {
   }
 }
 
+box
+typeset_gr_item (edit_env env, tree t, path ip, bool& ok) {
+  ok= false;
+  if (is_func (t, WITH)) {
+    int i, n= N(t), k= (n-1)>>1; // is k=0 allowed ?
+    if ((n&1) != 1) return empty_box (ip);
+
+    STACK_NEW_ARRAY(vars,string,k);
+    STACK_NEW_ARRAY(oldv,tree,k);
+    STACK_NEW_ARRAY(newv,tree,k);
+    for (i=0; i<k; i++) {
+      tree var_t= env->exec (t[i<<1]);
+      if (is_atomic (var_t)) {
+	string var= var_t->label;
+	vars[i]= var;
+	oldv[i]= env->read (var);
+	newv[i]= env->exec (t[(i<<1)+1]);
+        if (var == PROVISO && newv[i] == "false") {
+          STACK_DELETE_ARRAY(vars);
+          STACK_DELETE_ARRAY(oldv);
+          STACK_DELETE_ARRAY(newv);
+          return empty_box (ip);
+        }
+      }
+      else {
+	STACK_DELETE_ARRAY(vars);
+	STACK_DELETE_ARRAY(oldv);
+	STACK_DELETE_ARRAY(newv);
+	return empty_box (ip);
+      }
+    }
+
+    // for (i=0; i<k; i++) env->monitored_write_update (vars[i], newv[i]);
+    for (i=0; i<k; i++) env->write_update (vars[i], newv[i]);
+    box b= typeset_as_atomic (env, t[n-1], descend (ip, n-1));
+    for (i=k-1; i>=0; i--) env->write_update (vars[i], oldv[i]);
+    STACK_DELETE_ARRAY(vars);
+    STACK_DELETE_ARRAY(oldv);
+    STACK_DELETE_ARRAY(newv);
+    ok= true;
+    return b;
+  }
+  else if ((L(t) == ANIM_STATIC || L(t) == ANIM_DYNAMIC) &&
+	   (N(t) >= 1 && is_func (t[0], MORPH))) {
+    ok= true;
+    for (int i=0; i<N(t[0]); i++)
+      if (is_func (t[0][i], TUPLE, 2) && is_func (t[0][i][1], WITH)) {
+	tree w= t[0][i][1];
+	for (int j=0; j+1<N(w); j++) {
+	  if (w[j] == PROVISO && env->exec (w[j+1]) == "false") {
+	    ok= false;
+	    break;
+	  }
+	}
+      }
+    if (!ok) return empty_box (ip);
+    return typeset_as_atomic (env, t, ip);
+  }
+  else {
+    ok= true;
+    return typeset_as_atomic (env, t, ip);
+  }
+}
+
 void
 concater_rep::typeset_graphical (array<box>& bs, tree t, path ip) {
   int i, n= N(t);
@@ -428,6 +619,93 @@ concater_rep::typeset_graphical (array<box>& bs, tree t, path ip) {
     }
 
   for (i=0; i<n; i++)
-    if (the_drd->get_type (t[i]) != TYPE_CONSTRAINT && !is_atomic (t[i]))
-      bs << typeset_as_atomic (env, t[i], descend (ip, i));
+    if (the_drd->get_type (t[i]) != TYPE_CONSTRAINT && !is_atomic (t[i])) {
+      bool ok;
+      box b= typeset_gr_item (env, t[i], descend (ip, i), ok);
+      if (ok) bs << b;
+    }
+}
+
+/******************************************************************************
+* 3D graphics
+******************************************************************************/
+
+static point
+as_point_3d (tree t) {
+  if (is_func (t, _POINT, 3) && is_point (t)) return as_point (t);
+  else return point ();
+}
+
+static triangle
+as_triangle_3d (tree t, color& col) {
+  if (is_func (t, TRIANGLE_3D, 4)) {
+    point p1= as_point_3d (t[0]);
+    point p2= as_point_3d (t[1]);
+    point p3= as_point_3d (t[2]);
+    if (N(p1) == 0 || N(p2) == 0 || N(p3) == 0) return triangle ();
+    col= named_color (as_string (t[3]));
+    return triangle (p1, p2, p3);
+  }
+  else return triangle ();
+}
+
+static spacial
+as_spacial (tree t) {
+  if (is_func (t, TRANSFORM_3D, 2)) {
+    spacial obj= as_spacial (t[0]);
+    matrix<double> m= as_matrix<double> (t[1]);
+    return transformed (obj, m);
+  }
+  else if (is_func (t, LIGHT_3D, 2)) {
+    spacial obj= as_spacial (t[0]);
+    return enlightened (obj, t[1]);
+  }
+  else if (is_func (t, OBJECT_3D)) {
+    array<triangle> ts;
+    array<color> cs;
+    for (int i=0; i<N(t); i++) {
+      color col;
+      triangle tri= as_triangle_3d (t[i], col);
+      if (N(tri) == 0) return spacial ();
+      ts << tri;
+      cs << col;
+    }
+    return triangulated (ts, cs);
+  }
+  else if (is_func (t, TRIANGLE_3D, 4)) {
+    color col;
+    triangle tri= as_triangle_3d (t, col);
+    if (N(tri) == 0) return spacial ();
+    array<triangle> ts;
+    array<color> cs;
+    ts << tri;
+    cs << col;
+    return triangulated (ts, cs);
+  }
+  else return spacial ();
+}
+
+void
+concater_rep::typeset_graphics_3d (tree t, path ip) {
+BEGIN_MAGNIFY
+  point o = env->fr (point (0.0, 0.0));
+  point ux= env->fr (point (1.0, 0.0));
+  point uy= env->fr (point (0.0, 1.0));
+  matrix<double> vt (0.0, 4, 4);
+  vt (0, 0)= ux[0] - o[0];
+  vt (0, 1)= ux[1] - o[1];
+  vt (1, 0)= uy[0] - o[0];
+  vt (1, 1)= uy[1] - o[1];
+  vt (2, 2)= 1.0;
+  vt (3, 3)= 1.0;
+  vt (0, 3)= o[0];
+  vt (1, 3)= o[1];
+  vt= vt * as_matrix<double> (env->read (GR_TRANSFORMATION));
+  tree u= env->exec (t);
+  spacial obj= as_spacial (u);
+  if (is_nil (obj))
+    typeset_dynamic (tree (ERROR, "bad spacial object"), ip);
+  else
+    print (spacial_box (ip, transformed (obj, vt)));
+END_MAGNIFY
 }

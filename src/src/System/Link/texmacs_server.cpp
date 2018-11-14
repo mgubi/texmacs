@@ -14,6 +14,63 @@
 #include "socket_server.hpp"
 #include "scheme.hpp"
 
+#ifdef QTTEXMACS
+#include "Qt/QTMSockets.hpp"
+
+static socket_server* the_server= NULL;
+//int socket_link::id= 0;
+
+/******************************************************************************
+* Server side
+******************************************************************************/
+
+void
+server_start () {
+  if (the_server == NULL) {
+    (void) eval ("(use-modules (server server-base))");
+    (void) eval ("(use-modules (server server-tmfs))");
+    (void) eval ("(use-modules (server server-menu))");
+    (void) eval ("(use-modules (server server-live))");
+    the_server= tm_new<socket_server> (INADDR_ANY,6561);
+  }
+  if (the_server->alive ())
+    cout << "TeXmacs] Server started... \n";
+}
+
+void
+server_stop () {
+  if (the_server != NULL) {
+    tm_delete (the_server);
+    the_server= NULL;
+  }
+}
+
+bool
+server_started () {
+  return (the_server != NULL && the_server->alive ());
+}
+
+string
+server_read (int fd) {
+  string s(the_server->read(fd));
+  DBG_IOS ("in:", s);
+  return s;
+}
+
+void
+server_write (int fd, string s) {
+  DBG_IOS ("out:", s);
+  the_server->write (fd,s);
+}
+
+int
+number_of_servers () {
+  return the_server?the_server->srv_count():0;
+}
+
+
+#else
+
 static socket_server_rep* the_server= NULL;
 
 /******************************************************************************
@@ -24,6 +81,9 @@ void
 server_start () {
   if (the_server == NULL) {
     (void) eval ("(use-modules (server server-base))");
+    (void) eval ("(use-modules (server server-tmfs))");
+    (void) eval ("(use-modules (server server-menu))");
+    (void) eval ("(use-modules (server server-live))");
     the_server= tm_new<socket_server_rep> (6561);
   }
   if (!the_server->alive)
@@ -36,6 +96,11 @@ server_stop () {
     tm_delete (the_server);
     the_server= NULL;
   }
+}
+
+bool
+server_started () {
+  return the_server != NULL;
 }
 
 string
@@ -56,3 +121,4 @@ server_write (int fd, string s) {
   //cout << "Server write " << s << "\n";
   ln->write_packet (s, LINK_IN);
 }
+#endif

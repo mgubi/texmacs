@@ -13,7 +13,54 @@
 
 (texmacs-module (texmacs texmacs tm-files)
   (:use (texmacs texmacs tm-server)
-        (texmacs texmacs tm-print)))
+        (texmacs texmacs tm-print)
+        (utils library cursor)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Supplementary routines on urls, taking into account the TeXmacs file system
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define cpp-url-last-modified url-last-modified)
+(define cpp-url-newer? url-newer?)
+(define cpp-buffer-last-save buffer-last-save)
+
+(tm-define (url-last-modified u)
+  (if (url-rooted-tmfs? u)
+      (tmfs-date u)
+      (cpp-url-last-modified u)))
+
+(tm-define (url-newer? u1 u2)
+  (if (or (url-rooted-tmfs? u1) (url-rooted-tmfs? u2))
+      (and-let* ((d1 (url-last-modified u1))
+                 (d2 (url-last-modified u2)))
+        (> d1 d2))
+      (cpp-url-newer? u1 u2)))
+
+(tm-define (url-remove u)
+  (if (url-rooted-tmfs? u)
+      (tmfs-remove u)
+      (system-remove u)))
+
+(tm-define (url-autosave u suf)
+  (if (url-rooted-tmfs? u)
+      (tmfs-autosave u suf)
+      (and (or (url-scratch? u)
+               (url-test? u "fw")
+               (and (not (url-exists? u))
+                    (url-test? u "c")))
+           (url-glue u suf))))
+
+(tm-define (url-wrap u)
+  (and (url-rooted-tmfs? u)
+       (tmfs-wrap u)))
+
+(tm-define (buffer-last-save u)
+  (with base (url-wrap u)
+    (cond ((not base)
+           (cpp-buffer-last-save u))
+          ((buffer-exists? base)
+           (buffer-last-save base))
+          (else (url-last-modified base)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Miscellaneous subroutines
@@ -22,8 +69,8 @@
 (tm-define (propose-name-buffer)
   (with name (url->unix (current-buffer))
     (cond ((not (url-scratch? name)) name)
-	  ((os-win32?) "")
-	  (else (string-append (var-eval-system "pwd") "/")))))
+          ((os-win32?) "")
+          (else (string-append (var-eval-system "pwd") "/")))))
 
 (tm-property (choose-file fun text type)
   (:interactive #t))
@@ -37,12 +84,40 @@
 
 (define-public-macro (with-aux u . prg)
   `(let* ((u ,u)
-	  (t (tree-import u "texmacs"))
-	  (name (current-buffer)))
+          (t (tree-import u "texmacs"))
+          (name (current-buffer)))
      (open-auxiliary "* Aux *" t u)
      (with r (begin ,@prg)
        (switch-to-buffer name)
        r)))
+
+(define buffer-newly-created-table (make-ahash-table))
+
+(tm-define (buffer-newly-created? name)
+  (and name
+       (or (not (buffer-has-name? name))
+           (ahash-ref buffer-newly-created-table name))))
+
+(tm-define (buffer-copy buf u)
+  (:synopsis "Creates a copy of @buf in @u and return @u.")
+  (with-buffer buf
+    (let* ((styles (get-style-list))
+           (init (get-all-inits))
+           (body (tree-copy (buffer-get-body buf))))
+      (view-new u) ; needed by buffer-focus, used in with-buffer
+      (buffer-set-body u body) 
+      (with-buffer u
+        (set-style-list styles)
+        (init-env "global-title" (buffer-get-metadata buf "title"))
+        (init-env "global-author" (buffer-get-metadata buf "author"))
+        (init-env "global-subject" (buffer-get-metadata buf "subject"))
+        (for-each
+         (lambda (t)
+           (if (tree-func? t 'associate)
+               (with (var val) (list (tree-ref t 0) (tree-ref t 1))
+                 (init-env-tree (tree->string var) val))))
+         (tree-children init)))
+      u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving buffers
@@ -54,7 +129,7 @@
   (learn-interactive 'recent-buffer (list (cons "0" (url->unix name)))))
 
 (define (has-faithful-format? name)
-  (in? (url-suffix name) '("tm" "ts" "tp" "stm" "tmml" "scm")))
+  (in? (url-suffix name) '("tm" "ts" "tp" "stm" "tmml" "scm" "")))
 
 (define (save-buffer-post name opts)
   ;;(display* "save-buffer-post " name "\n")
@@ -65,7 +140,7 @@
 
 (define (save-buffer-save name opts)
   ;;(display* "save-buffer-save " name "\n")
-  (with vname `(verbatim ,(url->system name))
+  (with vname `(verbatim ,(utf8->cork (url->system name)))
     (if (buffer-save name)
         (begin
           (buffer-pretend-modified name)
@@ -116,8 +191,9 @@
           ((cannot-write? name "Save file")
            (noop))
           ((and (url-test? name "fr")
-                (> (url-last-modified name)
-                   (buffer-last-save name)))
+		(and-with mod-t (url-last-modified name)
+		  (and-with save-t (buffer-last-save name)
+		    (> mod-t save-t))))
            (user-confirm "The file has changed on disk. Really save?" #f
              (lambda (answ)
                (when answ
@@ -239,7 +315,8 @@
 
 (define (autosave-eligible? name)
   (and (not (url-rooted-web? name))
-       (not (url-rooted-tmfs? name))))
+       (or (not (url-rooted-tmfs? name))
+           (tmfs-autosave name "~"))))
 
 (define (autosave-propose name)
   (and (autosave-eligible? name)
@@ -252,29 +329,26 @@
        (== (most-recent-suffix name) "#")))
 
 (define (autosave-remove name)
-  (when (file-exists? (url-glue name "~"))
-    (system-remove (url-glue name "~")))
-  (when (file-exists? (url-glue name "#"))
-    (system-remove (url-glue name "#"))))
+  (when (url-exists? (url-glue name "~"))
+    (url-remove (url-glue name "~")))
+  (when (url-exists? (url-glue name "#"))
+    (url-remove (url-glue name "#"))))
 
 (tm-define (autosave-buffer name)
   (when (and (buffer-modified-since-autosave? name)
-             (or (url-scratch? name)
-                 (url-test? name "fw")
-                 (and (not (url-exists? name))
-                      (url-test? name "c"))))
+             (url-autosave name "~"))
     ;;(display* "Autosave " name "\n")
     ;; FIXME: incorrectly autosaves after cursor movements only
     (let* ((vname `(verbatim ,(url->system name)))
            (suffix (if (rescue-mode?) "#" "~"))
-           (aname (url-glue name suffix))
+           (aname (url-autosave name suffix))
            (fm (url-format name)))
       (if (url-scratch? name) (set! aname name))
-      (cond ((!= fm "texmacs")
+      (cond ((nin? fm (list "texmacs" "stm"))
              (when (not (rescue-mode?))
                (set-message `(concat "Warning: " ,vname " not auto-saved")
                             "Auto-save file")))
-            ((buffer-export name aname "texmacs")
+            ((buffer-export name aname fm)
              (when (not (rescue-mode?))
                (set-message `(concat "Failed to auto-save " ,vname)
                             "Auto-save file")))
@@ -293,12 +367,12 @@
 
 (tm-define (autosave-delayed)
   (let* ((pref (get-preference "autosave"))
-	 (len (if (and (string? pref) (integer? (string->number pref)))
-		  (* (string->number pref) 1000) 120000)))
+         (len (if (and (string? pref) (integer? (string->number pref)))
+                  (* (string->number pref) 1000) 120000)))
     (if (> len 0)
-	(delayed
-	  (:pause len)
-	  (autosave-now)))))
+        (delayed
+          (:pause len)
+          (autosave-now)))))
 
 (define (notify-autosave var val)
   (if (current-view) ; delayed-autosave would crash at initialization time
@@ -319,6 +393,12 @@
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
+  (when (nnull? (select (buffer-get name)
+			'(:* gpg-passphrase-encrypted-buffer)))
+    (tm-gpg-dialogue-passphrase-decrypt-buffer name))
+  (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
+    (when (!= master name)
+      (buffer-set-master name master)))
   (noop))
 
 (define (load-buffer-load name opts)
@@ -331,11 +411,14 @@
                (set-message `(concat "Could not load " ,vname) "Load file")
                (load-buffer-open name opts)))
           (else
-            (buffer-set-body name '(document ""))
-            (load-buffer-open name opts)
-            (set-message `(concat "Could not load " ,vname
-                                  ". Created new document")
-                         "Load file")))))
+            (with uname (if (string? name) (string->url name) name)
+              (buffer-set-body name '(document ""))
+              (ahash-set! buffer-newly-created-table uname #t)
+              (load-buffer-open name opts)
+              (ahash-remove! buffer-newly-created-table uname)
+              (set-message `(concat "Could not load " ,vname
+                                    ". Created new document")
+                           "Load file"))))))
 
 (define (load-buffer-check-permissions name opts)
   ;;(display* "load-buffer-check-permissions " name ", " opts "\n")
@@ -454,20 +537,49 @@
 ;; Printing buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (print-buffer)
-  (:synopsis "Print the current buffer")
-  (print))
-
 (tm-define (interactive-page-setup)
   (:synopsis "Specify the page setup")
   (:interactive #t)
   (set-message "Not yet implemented" "Printer setup"))
+
+(tm-define (direct-print-buffer)
+  (:synopsis "Print the current buffer")
+  (print))
 
 (tm-define (interactive-print-buffer)
   (:synopsis "Print the current buffer")
   (:interactive #t)
   (print-to-file "$TEXMACS_HOME_PATH/system/tmp/tmpprint.ps")
   (interactive-print '() "$TEXMACS_HOME_PATH/system/tmp/tmpprint.ps"))
+
+(tm-define (print-buffer)
+  (:synopsis "Print the current buffer")
+  (:interactive (use-print-dialog?))
+  (if (use-print-dialog?)
+      (interactive-print-buffer)
+      (direct-print-buffer)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Important files to which the buffer is linked (e.g. bibliographies)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (linked-files-inside t)
+  (cond ((tree-atomic? t) (list))
+        ((tree-is? t 'document)
+         (append-map linked-files-inside (tree-children t)))
+        ((tree-in? t '(with with-bib))
+         (linked-files-inside (tm-ref t :last)))
+        ((or (tree-func? t 'bibliography 4)
+	     (tree-func? t 'bibliography* 5))
+         (with name (tm->stree (tm-ref t 2))
+           (if (or (== name "") (nstring? name)) (list)
+               (with s (if (string-ends? name ".bib") name
+                           (string-append name ".bib"))
+                 (list (url-relative (current-buffer) s))))))
+        (else (list))))
+
+(tm-define (linked-file-list)
+  (linked-files-inside (buffer-tree)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Deprecated functionality

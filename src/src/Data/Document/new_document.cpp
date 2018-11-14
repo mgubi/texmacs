@@ -31,6 +31,8 @@ new_document () {
 
 void
 delete_document (path rp) {
+  ASSERT (subtree (the_et, rp).operator->() != NULL,
+	  "NULL subtree in delete_document");
   assign (subtree (the_et, rp), UNINIT);
   clean_observers (subtree (the_et, rp));
 }

@@ -63,10 +63,13 @@ class concater_rep {
   void typeset_repeat (tree t, path ip);
   void typeset_formatting (tree t, path ip, string var);
   void typeset_decorated_box (tree t, path ip);
+  void typeset_line_note (tree t, path ip);
+  void typeset_page_note (tree t, path ip);
 
   // mathematical markup
   void typeset_around (tree t, path ip, bool colored);
   void typeset_large (tree t, path ip, int type, int op_type, string prefix);
+  void typeset_wide_middle (tree t, path ip);
   //void typeset_left (tree t, path ip);
   //void typeset_middle (tree t, path ip);
   //void typeset_right (tree t, path ip);
@@ -77,15 +80,19 @@ class concater_rep {
   void typeset_below (tree t, path ip);
   void typeset_above (tree t, path ip);
   void typeset_script (tree t, path ip, bool right);
+  void typeset_wide_frac (tree t, path ip);
   void typeset_frac (tree t, path ip);
+  void typeset_wide_sqrt (tree t, path ip);
   void typeset_sqrt (tree t, path ip);
   void typeset_wide (tree t, path ip, bool above);
   void typeset_neg (tree t, path ip);
   void typeset_tree (tree t, path ip);
+  void typeset_wide_table (tree t, path ip);
   void typeset_table (tree t, path ip);
+  void print_semantic (box b, tree sem);
   void typeset_syntax (tree t, path ip);
 
-  // disactivated markup
+  // deactivated markup
   void typeset_blue (tree t, path ip);
   void typeset_src_open (tree t, path ip, string extra);
   void typeset_src_middle (tree t, path ip, int i);
@@ -120,13 +127,16 @@ class concater_rep {
   void typeset_locus (tree t, path ip);
   void typeset_set_binding (tree t, path ip);
   void typeset_write (tree t, path ip);
+  void typeset_toc_notify (tree t, path ip);
   void typeset_specific (tree t, path ip);
   void typeset_flag (tree t, path ip);
+  void typeset_hyphenate_as (tree t, path ip);
 
   // animations
   void typeset_anim_compose (tree t, path ip);
   void typeset_anim_repeat (tree t, path ip);
   void typeset_anim_constant (tree t, path ip);
+  void typeset_anim_accelerate (tree t, path ip);
   void typeset_anim_translate (tree t, path ip);
   void typeset_anim_progressive (tree t, path ip);
   void typeset_video (tree t, path ip);
@@ -137,9 +147,11 @@ class concater_rep {
   void typeset_graphics (tree t, path ip);
   void typeset_superpose (tree t, path ip);
   void typeset_gr_group (tree t, path ip);
-  void typeset_gr_linear_transform (tree t, path ip);
+  void typeset_gr_transform (tree t, path ip);
+  void typeset_gr_effect (tree t, path ip);
   void typeset_text_at (tree t, path ip);
   void typeset_math_at (tree t, path ip);
+  void typeset_document_at (tree t, path ip);
   void typeset_point (tree t, path ip);
   array<box> typeset_line_arrows (path ip);
   void typeset_line (tree t, path ip, bool close);
@@ -147,8 +159,10 @@ class concater_rep {
   void typeset_spline (tree t, path ip, bool close);
   void typeset_var_spline (tree t, path ip);
   void typeset_cspline (tree t, path ip);
+  void typeset_bezier (tree t, path ip);
   void typeset_fill (tree t, path ip);
   void typeset_image (tree t, path ip);
+  void typeset_graphics_3d (tree t, path ip);
 
   // markup for graphical user interface
   void typeset_canvas (tree t, path ip);
@@ -158,6 +172,8 @@ class concater_rep {
   int  prec (int i);
   int  succ (int i);
   void pre_glue ();
+  box  glue_left_markers (box b, int ref, int arg);
+  box  glue_right_markers (box b, int ref, int arg, bool flag);
   void glue (box b, int ref, int arg);
   void glue (box b, int ref, int arg1, int arg2);
   void clean_and_correct ();
@@ -177,6 +193,8 @@ public:
   friend class document_rep;
 
   friend box              typeset_as_concat (edit_env env, tree t, path ip);
+  friend box              typeset_as_concat (edit_env env, tree t, path ip,
+                                             array<line_item>& a);
   friend box              typeset_as_box (edit_env env, tree t, path ip);
   friend box              typeset_as_atomic (edit_env env, tree t, path ip);
   friend array<line_item> typeset_concat (edit_env env, tree t, path ip);

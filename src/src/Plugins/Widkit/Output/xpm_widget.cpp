@@ -55,9 +55,12 @@ xpm_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 xpm_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   if (!transparent) layout_default (ren, -(w>>1), -(h>>1), w>>1, h>>1);
-  ren->xpm (name, -(ww>>1)*PIXEL, (hh>>1)*PIXEL);
+  ASSERT (ren->pixel == PIXEL, "pixel and PIXEL should coincide");
+  picture p= load_xpm (name);
+  SI x= -(ww>>1)*PIXEL, y= (hh>>1)*PIXEL;
+  ren->draw_picture (p, x, y - (p->get_height () - 1) * PIXEL);
 }
 
 /******************************************************************************

@@ -228,10 +228,7 @@
 
 (define-public (list-filter l pred?)
   "Return the list of elements from @l which match @pred?."
-  (let rec ((l l))
-    (cond ((null? l) l)
-	  ((pred? (car l)) (cons (car l) (rec (cdr l))))
-	  (else (rec (cdr l))))))
+  (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l)))
 
 (provide-public (filter-map fun . args)
   "Composition of @map and @list-filter."
@@ -274,6 +271,25 @@
 	  (if keep?
 	      (cons* head (cons (car tail) (car r)) (cdr r))
 	      (cons head r))))))
+
+(define-public (list->assoc l)
+  "Group entries of list @l two by two and construct association list"
+  (if (or (null? l) (null? (cdr l))) (list)
+      (cons (cons (car l) (cadr l)) (list->assoc (cddr l)))))
+
+(define-public (assoc->list l)
+  "intersperse all keys and values in @l into a flat list"
+  (append-map (lambda (x) (list (car x) (cdr x))) l))
+
+(define-public (forall? pred? l)
+  (cond ((null? l) #t)
+	((not (pred? (car l))) #f)
+	(else (forall? pred? (cdr l)))))
+
+(define-public (exists? pred? l)
+  (cond ((null? l) #f)
+	((pred? (car l)) #t)
+	(else (exists? pred? (cdr l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search and replace
@@ -358,6 +374,9 @@
 ;; Set operations on lists
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-public (list-remove l x)
+  (list-filter l (lambda (y) (!= x y))))
+
 (define (list-remove-duplicates-sub t l)
   (cond ((null? l) l)
 	((ahash-ref t (car l)) (list-remove-duplicates-sub t (cdr l)))
@@ -383,8 +402,15 @@
   (with s (list->ahash-set l2)
     (list-filter l1 (lambda (x) (not (ahash-ref s x))))))
 
-(define-public (list-union l1 l2)
-  (append l1 (list-difference l2 l1)))
+(define-public (list-union . ls)
+  (let* ((cumul (list))
+         (done? (make-ahash-table)))
+    (for (l ls)
+      (for (x l)
+        (when (not (ahash-ref done? x))
+          (set! cumul (cons x cumul))
+          (ahash-set! done? x #t))))
+    (reverse cumul)))
 
 (define-public (list-permutation? l1 l2)
   (and (null? (list-difference l1 l2))
@@ -407,3 +433,34 @@
   (and (pair? x)
        (pair? (cdr x))
        (null? (cddr x))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Operations on association lists
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (assoc-remove-duplicates-sub t l)
+  (cond ((null? l) l)
+	((ahash-ref t (caar l))
+         (assoc-remove-duplicates-sub t (cdr l)))
+	(else
+	 (ahash-set! t (caar l) #t)
+	 (cons (car l) (assoc-remove-duplicates-sub t (cdr l))))))
+
+(define-public (assoc-remove-duplicates l)
+  (with t (make-ahash-table)
+    (assoc-remove-duplicates-sub t l)))
+
+(define-public (assoc-remove-duplicates* l)
+  (reverse (assoc-remove-duplicates (reverse l))))
+
+(define-public (assoc-difference l1 l2)
+  (with t (list->ahash-table l2)
+    (list-filter l1 (lambda (x) (not (ahash-ref t (car x)))))))
+
+(define-public (assoc-delta l1 l2)
+  (with t (list->ahash-table l1)
+    (list-filter l2 (lambda (x) (!= (ahash-ref t (car x)) (cdr x))))))
+
+(define-public (assoc-exclude l1 l2)
+  (with s (list->ahash-set l2)
+    (list-filter l1 (lambda (x) (not (ahash-ref s (car x)))))))

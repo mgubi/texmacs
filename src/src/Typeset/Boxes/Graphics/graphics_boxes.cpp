@@ -13,7 +13,7 @@
 #include "Boxes/graphics.hpp"
 #include "Boxes/composite.hpp"
 #include "Boxes/construct.hpp"
-#include "Graphics/math_util.hpp"
+#include "math_util.hpp"
 
 /******************************************************************************
 * Graphics boxes
@@ -190,29 +190,62 @@ graphics_group_box_rep::reindex (int i, int item, int n) {
 struct point_box_rep: public box_rep {
   point p;
   SI r;
-  color col;
-  int fill;
-  color fill_col;
+  pencil pen;
+  brush br;
   string style;
-  point_box_rep (
-    path ip, point p, SI radius, color col,
-    int fill, color fill_col, string style);
-  SI graphical_distance (SI x, SI y) { return (SI)norm (p - point (x, y)); }
+  point_box_rep (path ip, point p, SI radius, pencil pen,
+		 brush br, string style);
+  SI graphical_distance (SI x, SI y) { return (SI) norm (p - point (x, y)); }
   gr_selections graphical_select (SI x, SI y, SI dist);
   void display (renderer ren);
   operator tree () { return "point"; }
 };
 
-point_box_rep::point_box_rep (
-  path ip2, point p2, SI r2, color col2,
-  int fill2, color fill_col2, string style2):
-    box_rep (ip2), p (p2), r (r2), col (col2),
-    fill (fill2), fill_col (fill_col2), style (style2)
+point_box_rep::point_box_rep (path ip2, point p2, SI r2, pencil pen2,
+			      brush br2, string style2):
+    box_rep (ip2), p (p2), r (r2), pen (pen2),
+    br (br2), style (style2)
 {
-  x1= x3= ((SI) p[0]) - r;
-  y1= y3= ((SI) p[1]) - r;
-  x2= x4= ((SI) p[0]) + r;
-  y2= y4= ((SI) p[1]) + r;
+  SI w= pen->get_width () >> 1;
+  x1= x3= ((SI) p[0]) - r - w;
+  y1= y3= ((SI) p[1]) - r - w;
+  x2= x4= ((SI) p[0]) + r + w;
+  y2= y4= ((SI) p[1]) + r + w;
+}
+
+static array<point>
+get_contour (string style) {
+  array<point> a;
+  if (style == "square")
+    a << point (-1.0, -1.0) << point ( 1.0, -1.0)
+      << point ( 1.0,  1.0) << point (-1.0,  1.0);
+  else if (style == "diamond")
+    a << point (-1.0,  0.0) << point ( 0.0, -1.0)
+      << point ( 1.0,  0.0) << point ( 0.0,  1.0);
+  else if (style == "triangle")
+    a << point (-1.0, -1.0) << point ( 1.0, -1.0)
+      << point ( 0.0,  1.0);
+  else if (style == "star") {
+    int n= 5;
+    for (int i=0; i<2*n; i++) {
+      double b= (2.0 * 3.141592653) * (1.0 * i) / (2.0 * n);
+      double r= ((i&1) == 0? 1.0: 0.5);
+      double x= r * sin (b);
+      double y= r * cos (b);
+      a << point (x, y);
+    }
+  }
+  else if (style == "plus")
+    a << point ( 0.0,  0.0) << point ( 1.0,  0.0)
+      << point ( 0.0,  0.0) << point ( 0.0,  1.0)
+      << point ( 0.0,  0.0) << point (-1.0,  0.0)
+      << point ( 0.0,  0.0) << point ( 0.0, -1.0);
+  else if (style == "cross")
+    a << point ( 0.0,  0.0) << point ( 1.0,  1.0)
+      << point ( 0.0,  0.0) << point (-1.0,  1.0)
+      << point ( 0.0,  0.0) << point (-1.0, -1.0)
+      << point ( 0.0,  0.0) << point ( 1.0, -1.0);
+  return a;
 }
 
 gr_selections
@@ -233,44 +266,49 @@ point_box_rep::graphical_select (SI x, SI y, SI dist) {
 
 void
 point_box_rep::display (renderer ren) {
-  array<SI> x (4), y (4);
-  x[0]= ((SI) p[0]) - r;
-  y[0]= ((SI) p[1]) - r;
-  x[1]= ((SI) p[0]) - r;
-  y[1]= ((SI) p[1]) + r;
-  x[2]= ((SI) p[0]) + r;
-  y[2]= ((SI) p[1]) + r;
-  x[3]= ((SI) p[0]) + r;
-  y[3]= ((SI) p[1]) - r;
-  ren->set_line_style (PIXEL);
+  array<point> a= get_contour (style);
+  for (int i=0; i<N(a); i++)
+    a[i]= p + ((double) r) * a[i];
   if (style == "none");
-  else if (style == "square") {
-    if (fill == FILL_MODE_INSIDE || fill == FILL_MODE_BOTH) {
-      ren->set_color (fill_col);
-      ren->line (x[0], y[0], x[1], y[1]);
-      ren->line (x[1], y[1], x[2], y[2]);
-      ren->line (x[2], y[2], x[3], y[3]);
-      ren->line (x[3], y[3], x[0], y[0]);
+  else if (N(a) != 0) {
+    if (br->get_type () != brush_none) {
+      ren->set_pencil (pen);
+      ren->set_brush (br);
+      for (int i=0; i<N(a); i++) {
+	int j= (i+1) % (N(a));
+	ren->line ((SI) a[i][0], (SI) a[i][1], (SI) a[j][0], (SI) a[j][1]);
+      }
+      array<SI> x (N(a)), y (N(a));
+      for (int i=0; i<N(a); i++) {
+	x[i]= (SI) a[i][0];
+	y[i]= (SI) a[i][1];
+      }
       ren->polygon (x, y, false);
     }
-    if (fill == FILL_MODE_NONE || fill == FILL_MODE_BOTH) {
-      ren->set_color (col);
-      ren->line (x[0], y[0], x[1], y[1]);
-      ren->line (x[1], y[1], x[2], y[2]);
-      ren->line (x[2], y[2], x[3], y[3]);
-      ren->line (x[3], y[3], x[0], y[0]);
+    if (pen->get_type () != pencil_none) {
+      ren->set_pencil (pen);
+      for (int i=0; i<N(a); i++) {
+	int j= (i+1) % (N(a));
+	ren->line ((SI) a[i][0], (SI) a[i][1], (SI) a[j][0], (SI) a[j][1]);
+      }
     }
   }
   else {
-    if (style == "disk" ||
-        fill == FILL_MODE_INSIDE || fill == FILL_MODE_BOTH) {
-      ren->set_color (style == "disk" ? col : fill_col);
-      ren->arc (x[0], y[0]+ren->pixel, x[2], y[2]+ren->pixel, 0, 64*360);
-      ren->fill_arc (x[0], y[0]+ren->pixel, x[2], y[2]+ren->pixel, 0, 64*360);
+    SI w = (SI) pen->get_width ();
+    SI cx= (SI) p[0];
+    SI cy= (SI) p[1];
+    SI lx= cx - r;
+    SI by= cy - r;
+    SI rx= cx + r;
+    SI ty= cy + r;
+    if (style == "disk" || br->get_type () != brush_none) {
+      ren->set_brush (style == "disk" ? pen->get_brush () : br);
+      ren->arc (lx, by+w, rx, ty+w, 0, 64*360);
+      ren->fill_arc (lx, by+w, rx, ty+w, 0, 64*360);
     }
-    if (fill == FILL_MODE_NONE || fill == FILL_MODE_BOTH) {
-      ren->set_color (col);
-      ren->arc (x[0], y[0]+ren->pixel, x[2], y[2]+ren->pixel, 0, 64*360);
+    if (pen->get_type () != pencil_none) {
+      ren->set_pencil (pen);
+      ren->arc (lx, by+w, rx, ty+w, 0, 64*360);
     }
   }
 }
@@ -281,18 +319,17 @@ point_box_rep::display (renderer ren) {
 
 struct curve_box_rep: public box_rep {
   array<point> a;
-  SI width;
-  color col;
+  pencil pen;
   curve c;
   array<bool> style;
+  array<point> motif;
   SI style_unit;
   array<SI> styled_n;
-  int fill;
-  color fill_col;
+  brush fill_br;
   array<box> arrows;
-  curve_box_rep (path ip, curve c, SI width, color col,
-		 array<bool> style, SI style_unit,
-		 int fill, color fill_col,
+  curve_box_rep (path ip, curve c, pencil pen,
+		 array<bool> style, array<point> motif, SI style_unit,
+		 brush fill_br,
 		 array<box> arrows);
   box transform (frame fr);
   SI graphical_distance (SI x, SI y);
@@ -302,17 +339,18 @@ struct curve_box_rep: public box_rep {
   operator tree () { return "curve"; }
   SI length ();
   void apply_style ();
+  void apply_motif (array<box> arrows);
 };
 
-curve_box_rep::curve_box_rep (path ip2, curve c2, SI W, color C,
-  array<bool> style2, SI style_unit2, int fill2, color fill_col2,
-  array<box> arrows2)
-  :
-  box_rep (ip2), width (W), col (C), c (c2),
-  style (style2), style_unit (style_unit2),
-  fill (fill2), fill_col (fill_col2)
+curve_box_rep::curve_box_rep (path ip2, curve c2, pencil pen2,
+  array<bool> style2, array<point> motif2, SI style_unit2,
+  brush fill_br2, array<box> arrows2):
+    box_rep (ip2), pen (pen2), c (c2),
+    style (style2), motif (motif2), style_unit (style_unit2),
+    fill_br (fill_br2)
 {
   a= c->rectify (PIXEL);
+  apply_motif (arrows2);
   int i, n= N(a);
   x1= y1= x3= y3= MAX_SI;
   x2= y2= x4= y4= -MAX_SI;
@@ -354,14 +392,15 @@ curve_box_rep::curve_box_rep (path ip2, curve c2, SI W, color C,
       }
     }
   }
+  SI width= pen->get_width ();
   x3= x1 - (width>>1); y3= y1 - (width>>1); 
   x4= x2 + (width>>1); y4= y2 + (width>>1);
 }
 
 box
 curve_box_rep::transform (frame fr) {
-  return curve_box (ip, fr (c), width, col,
-    style, style_unit, fill, fill_col, arrows);
+  return curve_box (ip, fr (c), 1.0, pen, style, motif, style_unit,
+                    fill_br, arrows);
 }
 
 SI
@@ -375,6 +414,12 @@ curve_box_rep::graphical_distance (SI x, SI y) {
     ax.p1= a[i+1];
     gd= min (gd, (SI)seg_dist (ax, p));
   }
+  array<double> abs;
+  array<point> pts;
+  array<path> paths;
+  int np= c->get_control_points (abs, pts, paths);
+  for (i=0; i<np; i++)
+    gd= min (gd, (SI) norm (pts[i] - p));
   return gd;
 }
 
@@ -447,8 +492,8 @@ curve_box_rep::graphical_select (SI x1, SI y1, SI x2, SI y2) {
 void
 curve_box_rep::display (renderer ren) {
   int i, n;
-  if (fill == FILL_MODE_INSIDE || fill == FILL_MODE_BOTH) {
-    ren->set_color (fill_col);
+  if (fill_br->get_type () != brush_none) {
+    ren->set_brush (fill_br);
     n= N(a);
     array<SI> x (n), y (n);
     for (i=0; i<n; i++) {
@@ -457,9 +502,8 @@ curve_box_rep::display (renderer ren) {
     }
     ren->polygon (x, y, false);
   }
-  if (fill == FILL_MODE_NONE || fill == FILL_MODE_BOTH) {
-    ren->set_color (col);
-    ren->set_line_style (width, 0, false);
+  if (pen->get_type () != pencil_none) {
+    ren->set_pencil (pen->set_cap (cap_flat));
  // TODO: Add options for handling round/nonround joins & line ends
     if (N (style) == 0) {
       n= N(a);
@@ -607,6 +651,98 @@ curve_box_rep::apply_style () {
   if (style[n2-1]) styled_n[N(styled_n)-1]= nbu;
 }
 
+void
+curve_box_rep::apply_motif (array<box> arrows) {
+  int n= N(motif);
+  if (n <= 0 || fnull (style_unit,1e-6)) return;
+  SI l= length ();
+  int k= l / style_unit;
+  if (k<=0) return;
+  SI unit= l / k;
+  array<point> b;
+  b << a[0];
+  SI rem= 0;
+  for (int i=1; i<N(a); i++) {
+    double no= norm (a[i] - a[i-1]);
+    double t= 0.0;
+    while (true) {
+      SI res= (SI) ((1.0 - t) * no);
+      if (rem + res < unit - 32) {
+        // NOTE: 32 serves as safety margin
+        rem += res;
+        break;
+      }
+      t += ((double) (unit - rem)) / no;
+      if (t >= 0.999) t= 1.0;
+      point d= t * (a[i] - a[i-1]);
+      b << (a[i-1] + d);
+      rem= 0;
+    }
+  }
+  if (N(b) <= 2 && b[0] == b[N(b)-1]) return;
+  a= b;
+  b= array<point> ();
+  for (int i=0; i<N(a); i++) {
+    point cur = a[i];
+    point prev= (i == 0? a[N(a)-2]: a[i-1]);
+    point next= (i == N(a)-1? a[1]: a[i+1]);
+    if (i == 0 && a[0] != a[N(a)-1])
+      prev= cur - (next - cur);
+    if (i == N(a) - 1 && a[0] != a[N(a)-1])
+      next= cur + (cur - prev);
+    point u= (next == prev? point (0.0, 0.0):
+              unit * (next - prev) / norm (next - prev));
+    b << (cur + point (-u[1],  u[0]));
+  }
+  array<point> ta;
+  ta << a[0];
+  for (int i=0; i+1<N(a); i++) {
+    array<point> mot= motif;
+    if ((i == 0 && N(arrows) > 0 && !is_nil (arrows[0])) ||
+        (i == N(a)-2 && N(arrows) > 1 && !is_nil (arrows[1]))) {
+      mot= array<point> (0);
+      mot << point (0.0, 0.0);
+      mot << point (1.0, 0.0);
+    }
+    for (int j=0; j<N(mot); j++) {
+      double x= mot[j][0];
+      double y= mot[j][1];
+      point u= a[i] + x * (a[i+1] - a[i]);
+      point v= b[i] + x * (b[i+1] - b[i]);
+      point w= u + y * (v - u);
+      if (w != ta[N(ta)-1]) ta << w;
+    }
+  }
+  ta << a[N(a)-1];
+  a= ta;
+}
+
+/******************************************************************************
+* 3D graphics
+******************************************************************************/
+
+struct spacial_box_rep: public box_rep {
+  spacial obj;
+  spacial_box_rep (path ip, spacial obj2);
+  void display (renderer ren);
+  operator tree () { return "spacial"; }
+};
+
+spacial_box_rep::spacial_box_rep (path ip, spacial obj2):
+  box_rep (ip), obj (obj2)
+{
+  rectangle r= obj->get_extents ();
+  x1= x3= r->x1;
+  y1= y3= r->y1;
+  x2= x4= r->x2;
+  y2= y4= r->y2;
+}
+
+void
+spacial_box_rep::display (renderer ren) {
+  ren->draw_spacial (obj);
+}
+
 /******************************************************************************
 * User interface
 ******************************************************************************/
@@ -626,17 +762,21 @@ graphics_group_box (path ip, array<box> bs) {
 }
 
 box
-point_box (
-  path ip, point p, SI r, color col, int fill, color fill_col, string style) {
-  return tm_new<point_box_rep> (ip, p, r, col, fill, fill_col, style);
+point_box (path ip, point p, SI r, pencil pen, brush br, string style) {
+  return tm_new<point_box_rep> (ip, p, r, pen, br, style);
 }
 
 box
-curve_box (path ip, curve c, SI width, color col,
-  array<bool> style, SI style_unit,
-  int fill, color fill_col,
-  array<box> arrows)
+curve_box (path ip, curve c, double portion, pencil pen,
+           array<bool> style, array<point> motif, SI style_unit,
+           brush fill_br, array<box> arrows)
 {
-  return tm_new<curve_box_rep> (ip, c, width, col,
-                                style, style_unit, fill, fill_col, arrows);
+  if (portion < 1.0) c= truncate (c, max (portion, 1.0e-5), PIXEL / 10.0);
+  return tm_new<curve_box_rep> (ip, c, pen, style, motif, style_unit,
+                                fill_br, arrows);
+}
+
+box
+spacial_box (path ip, spacial obj) {
+  return tm_new<spacial_box_rep> (ip, obj);
 }

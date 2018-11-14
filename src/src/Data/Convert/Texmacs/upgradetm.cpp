@@ -402,19 +402,19 @@ upgrade_textual (tree t, path& mode_stack) {
 	string ss= t->label (start, i);
 	if (t->label[i-1] != '>') ss << '>';
 	if (starts (ss, "<left-")) {
-	  if (s != "") r << s; s= "";
+	  if (s != "") { r << s; s= ""; }
 	  r << tree (LEFT, ss (6, N(ss)-1));
 	}
 	else if (starts (ss, "<mid-")) {
-	  if (s != "") r << s; s= "";
+	  if (s != "") { r << s; s= ""; }
 	  r << tree (MID, ss (5, N(ss)-1));
 	}
 	else if (starts (ss, "<right-")) {
-	  if (s != "") r << s; s= "";
+	  if (s != "") { r << s; s= ""; }
 	  r << tree (RIGHT, ss (7, N(ss)-1));
 	}
 	else if (starts (ss, "<big-")) {
-	  if (s != "") r << s; s= "";
+	  if (s != "") { r << s; s= ""; }
 	  r << tree (BIG, ss (5, N(ss)-1));
 	}
 	else s << ss;
@@ -424,7 +424,7 @@ upgrade_textual (tree t, path& mode_stack) {
 	{
 	  int start= i++;
 	  while ((i<n) && (t->label[i] == t->label[i-1])) i++;
-	  if (s != "") r << s; s= "";
+	  if (s != "") { r << s; s= ""; }
 	  tree_label op= t->label[start] == '`'? LPRIME: RPRIME;
 	  r << tree (op, t->label (start, i));
 	}
@@ -508,10 +508,10 @@ static charp apply_expand_value_strings[]= {
   "include-document", "include-project", "globalize-variable",
   "localize-variable", "assign-variable",
   "gb", "cgb", "gbt", "cgbt", "head", "tail", "hm", "tm", "binom",
-  "ma", "mb", "md", "me", "mf", "mg", "mh", "mi", "mj", "mk",
-  "mm", "mn", "mu", "mv", "mw", "my", "mz",
-  "MA", "MB", "MD", "ME", "MF", "MG", "MH", "MI", "MJ", "MK",
-  "MM", "MN", "MU", "MV", "MW", "MY", "MZ",
+  //"ma", "mb", "md", "me", "mf", "mg", "mh", "mi", "mj", "mk",
+  //"mm", "mn", "mu", "mv", "mw", "my", "mz",
+  //"MA", "MB", "MD", "ME", "MF", "MG", "MH", "MI", "MJ", "MK",
+  //"MM", "MN", "MU", "MV", "MW", "MY", "MZ",
   ""
 };
 
@@ -786,13 +786,20 @@ upgrade_set_begin_document_once (tree doc_t) {
 	matching (doc_t[doc_1][con_1], doc_t[doc_2][con_2]))
       {
 	tree ins= document_replace (doc_t, doc_1, con_1, doc_2, con_2);
+        // cout << "ins: " << ins << "\n";
 	if (is_func (ins, EXPAND, 2)) {
-	  if ((ins[0] == "verbatim") || (ins[0] == "code"))
+          if ((ins[0] == "verbatim") || (ins[0] == "code") ||
+              (upgrade_tex_flag && is_verbatim (compound (as_string(ins[0])))))
 	    upgrade_verbatim_expand (doc, con, ins);
 	  else if (ins[0] == "abstract")
 	    upgrade_abstract_expand (doc, con, ins);
 	  else con << ins;
 	}
+        else if (is_func (ins, WITH) &&
+                 is_func (ins[N(ins)-1], DOCUMENT, 1)) {
+          ins[N(ins)-1]= ins[N(ins)-1][0];
+          con << ins;
+        }
 	else con << ins;
 	document_inc (doc, con, doc_t, doc_i, con_i);
       }
@@ -945,7 +952,7 @@ eliminate_set_begin (tree t) {
 * Upgrade surround, indentation after and final routine
 ******************************************************************************/
 
-static bool
+bool
 expand_needs_surrounding (string s) {
   return
     (s == "maketitle") || (s == "abstract") ||
@@ -999,7 +1006,7 @@ needs_transfer (tree t) {
 
 static tree
 upgrade_surround (tree t) {
-  if (is_atomic (t)) return t;
+  if (upgrade_tex_flag || is_atomic (t)) return t;
   int i, n= N(t);
   tree r (t, n);
   for (i=0; i<n; i++) {
@@ -1052,11 +1059,28 @@ upgrade_indent (tree t) {
 }
 
 static tree
+upgrade_equations (tree t) {
+  if (!upgrade_tex_flag || is_atomic (t)) return t;
+  else if (needs_transfer (t) && !is_document (t[1])) {
+    t[1]= document (upgrade_equations (t[1]));
+    return t;
+  }
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_equations (t[i]);
+    return r;
+  }
+}
+
+static tree
 upgrade_new_environments (tree t) {
   t= upgrade_set_begin (t);
   t= eliminate_set_begin (t);
   t= upgrade_surround (t);
   t= upgrade_indent (t);
+  t= upgrade_equations (t);
   return t;
 }
 
@@ -1356,6 +1380,19 @@ upgrade_split (tree t, bool eq= false) {
         return r;
       }
     }
+    else if (upgrade_tex_flag && (n == 2 || is_func (t, EXPAND, 3))) {
+      string s= as_string (L(t));
+      if (is_func (t, EXPAND, 3) && is_atomic (t[0])) s= t[0]->label;
+      if (ends (s, "*")) s= s (0, N(s)-1);
+      if (s == "alignat") {
+        tree arg= t[n-1];
+        if (is_func (arg, DOCUMENT, 1)) arg= arg[0];
+        if (!is_concat (arg)) arg= tree (CONCAT, arg);
+        r= copy (t);
+        r[n-1]= upgrade_split (arg, true);
+        return r;
+      }
+    }
     for (i=0; i<n; i++)
       r[i]= upgrade_split (t[i]);
     return r;
@@ -1370,7 +1407,7 @@ static tree
 upgrade_project (tree t) {
   if (is_atomic (t)) return t;
   else if (is_expand (t, "include-document", 1))
-    return tree (INCLUDE, t[1]);
+    return tree (VAR_INCLUDE, t[1]);
   else {
     int i, n= N(t);
     tree r (t, n);
@@ -1495,6 +1532,11 @@ is_with (tree t, string var, string val) {
 }
 
 static bool
+is_var_with (tree t, string var, string val) {
+  return is_with (t, var, val) || is_with (t, replace (var, " ", "-"), val);
+}
+
+static bool
 is_alpha (tree t) {
   if (is_compound (t)) return false;
   string s= t->label;
@@ -1544,29 +1586,39 @@ upgrade_mod_symbol (string prefix, string s) {
 static tree
 upgrade_mod_symbols (tree t) {
   if (is_atomic (t)) return t;
-  if (is_with (t, "math font series", "bold") && is_bold (t[2]))
-    return upgrade_mod_symbol ("b-", t[2]->label);
-  else if (is_with (t, "math font", "cal") && is_upper (t[2]))
-    return upgrade_mod_symbol ("cal-", t[2]->label);
-  else if (is_with (t, "math font", "Euler") && is_alpha (t[2]))
-    return upgrade_mod_symbol ("frak-", t[2]->label);
-  else if (is_with (t, "math font", "Bbb*") && is_alpha (t[2]))
-    return upgrade_mod_symbol ("bbb-", t[2]->label);
-  else if (is_with (t, "math font series", "bold") &&
-	   is_with (t[2], "math font", "cal") && is_upper (t[2][2]))
-    return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
-  else if (is_with (t, "math font", "cal") &&
-	   is_with (t[2], "math font series", "bold") && is_upper (t[2][2]))
-    return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
-  else if ((is_func (t, VALUE, 1) || is_func (t, EXPAND, 1) ||
-	    is_func (t, APPLY, 1)) && (is_atomic (t[0]))) {
-    string s= t[0]->label;
-    if ((N(s) == 2) && ((s[0]=='m') && (s[1]>='a') && s[1]<='z'))
-      return upgrade_mod_symbol ("frak-", s(1,2));
-    if ((N(s) == 2) && ((s[0]=='M') && (s[1]>='A') && s[1]<='Z'))
-      return upgrade_mod_symbol ("frak-", s(1,2));
-    return t;
+  if (is_func (t, WITH) && N(t) > 3 &&
+      (t[0] == "mode" || is_atomic (t[0]) && starts (t[0]->label, "math")) &&
+      is_atomic (t[2]) && starts (t[2]->label, "math")) {
+    tree u (WITH, t[0], t[1], t (2, N(t)));
+    tree r= upgrade_mod_symbols (u);
+    if (is_atomic (r)) return r;
+    if (is_with (r, "mode", "math") && is_atomic (r[2])) return r;
   }
+  if (is_var_with (t, "math font series", "bold") && is_bold (t[2]))
+    return upgrade_mod_symbol ("b-", t[2]->label);
+  else if (is_var_with (t, "math font", "cal") && is_upper (t[2]))
+    return upgrade_mod_symbol ("cal-", t[2]->label);
+  else if (is_var_with (t, "math font", "Euler") && is_alpha (t[2]))
+    return upgrade_mod_symbol ("frak-", t[2]->label);
+  else if (is_var_with (t, "math font", "Bbb") && is_alpha (t[2]))
+    return upgrade_mod_symbol ("bbb-", t[2]->label);
+  else if (is_var_with (t, "math font", "Bbb*") && is_alpha (t[2]))
+    return upgrade_mod_symbol ("bbb-", t[2]->label);
+  else if (is_var_with (t, "math font series", "bold") &&
+	   is_var_with (t[2], "math font", "cal") && is_upper (t[2][2]))
+    return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
+  else if (is_var_with (t, "math font", "cal") &&
+	   is_var_with (t[2], "math font series", "bold") && is_upper (t[2][2]))
+    return upgrade_mod_symbol ("b-cal-", t[2][2]->label);
+  //else if ((is_func (t, VALUE, 1) || is_func (t, EXPAND, 1) ||
+  //         is_func (t, APPLY, 1)) && (is_atomic (t[0]))) {
+  //  string s= t[0]->label;
+  //  if ((N(s) == 2) && ((s[0]=='m') && (s[1]>='a') && s[1]<='z'))
+  //    return upgrade_mod_symbol ("frak-", s(1,2));
+  //  if ((N(s) == 2) && ((s[0]=='M') && (s[1]>='A') && s[1]<='Z'))
+  //    return upgrade_mod_symbol ("frak-", s(1,2));
+  //  return t;
+  //}
   else {
     int i, n= N(t);
     tree r (t, n);
@@ -3663,6 +3715,400 @@ upgrade_abstract_data (tree t) {
 }
 
 /******************************************************************************
+* Upgrade unroll
+******************************************************************************/
+
+tree
+upgrade_unroll (tree t) {
+  if (is_atomic (t)) return t;
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++) {
+    r[i]= upgrade_unroll (t[i]);
+    if (is_compound (t, "unroll") && is_func (r[i], HIDDEN, 1))
+      r[i]= compound ("hidden*", r[i][0]);
+  }
+  return r;
+}
+
+/******************************************************************************
+* Upgrade style files
+******************************************************************************/
+
+tree
+upgrade_style (tree t, bool flag) {
+  int i;
+  if (is_atomic (t)) return t;
+  else if (is_compound (t, "style") || is_func (t, TUPLE)) {
+    int n= N(t);
+    tree r (t, 0);
+    bool doc= false;
+    for (i=0; i<n; i++)
+      if (!flag) r << upgrade_style (t[i], is_compound (t, "style"));
+      else if (t[i] == "beamer") r << "old-beamer";
+      else if (t[i] == "generic") r << "old-generic";
+      else if (t[i] == "help") r << "old-help";
+      else if (t[i] == "letter") r << "old-letter";
+      else if (t[i] == "seminar") r << "old-seminar";
+      else if (t[i] == "tmdoc-keyboard") { if (!doc) r << "doc"; doc= true; }
+      else if (t[i] == "tmdoc-markup") { if (!doc) r << "doc"; doc= true; }
+      else if (t[i] == "tmdoc-traversal") { if (!doc) r << "doc"; doc= true; }
+      else r << upgrade_style (t[i], flag);
+    return r;
+  }
+  else {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_style (t[i], flag);
+    return r;
+  }
+}
+
+/******************************************************************************
+* Upgrade document language
+******************************************************************************/
+
+tree
+upgrade_doc_language (tree t) {
+  tree style= extract (t, "style");
+  tree init = extract (t, "initial");
+  if (init == "" || N(init) == 0) return t;
+
+  string lan= "";
+  for (int i=0; i<N(init); i++)
+    if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == LANGUAGE)
+      lan= as_string (init[i][1]);
+
+  tree new_style= copy (style);
+  tree new_init = tree (COLLECTION);
+  for (int i=0; i<N(init); i++)
+    if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == LANGUAGE)
+      new_style << init[i][1];
+    else if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == FONT) {
+      if (init[i][1] == "cyrillic" &&
+          (lan == "bulgarian" || lan == "russian" || lan == "ukrainian"));
+      else if ((init[i][1] == "sys-chinese" || init[i][1] == "fireflysung") &&
+               (lan == "chinese" || lan == "taiwanese"));
+      else if ((init[i][1] == "sys-japanese" || init[i][1] == "ipa") &&
+               lan == "japanese");
+      else if ((init[i][1] == "sys-korean" || init[i][1] == "unbatang") &&
+               lan == "korean");
+      else new_init << init[i];
+    }
+    else new_init << init[i];
+
+  if (new_style != style)
+    t= change_doc_attr (t, "style", new_style);
+  if (new_init != init)
+    t= change_doc_attr (t, "initial", new_init);
+  return t;
+}
+
+/******************************************************************************
+* Rename varsession package
+******************************************************************************/
+
+tree
+upgrade_varsession (tree t) {
+  int i;
+  if (is_atomic (t)) return t;
+  else if (is_compound (t, "style") || is_func (t, TUPLE)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++) {
+      if (t[i] == "varsession") r[i]= "framed-session";
+      else r[i]= upgrade_varsession (t[i]);
+    }
+    return r;
+  }
+  else if (is_func (t, DOCUMENT)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_varsession (t[i]);
+    return r;
+  }
+  else return t;
+}
+
+/******************************************************************************
+* Upgrade subsessions
+******************************************************************************/
+
+tree
+upgrade_subsession (tree t, bool in_session= false) {
+  int i;
+  if (is_atomic (t)) return t;
+  else if (in_session && is_compound (t, "folded", 2))
+    return compound ("folded-subsession", upgrade_subsession (t[0]),
+                     upgrade_subsession (t[1], true));
+  else if (in_session && is_compound (t, "unfolded", 2))
+    return compound ("unfolded-subsession", upgrade_subsession (t[0]),
+                     upgrade_subsession (t[1], true));
+  else {
+    bool flag=
+      (is_func (t, DOCUMENT) && in_session) ||
+      is_compound (t, "session");
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_subsession (t[i], flag);
+    return r;
+  }
+}
+
+/******************************************************************************
+* Upgrade quotes
+******************************************************************************/
+
+static hashset<string> std_textual_envs;
+
+static array<string>&
+operator << (array<string>& a, const char* s) {
+  return a << string (s);
+}
+
+static bool
+is_std_textual_env (string s) {
+  if (N(std_textual_envs) == 0) {
+    array<string> a;
+    a << "part" << "chapter" << "section" << "subsection"
+      << "subsubsection" << "paragraph" << "subparagraph" << "appendix"
+      << "part*" << "chapter*" << "section*" << "subsection*"
+      << "subsubsection*" << "paragraph*" << "subparagraph*" << "appendix*"
+      << "abstract" << "theorem" << "proposition" << "lemma"
+      << "corollary" << "proof" << "axiom" << "definition"
+      << "notation" << "conjecture" << "remark" << "note"
+      << "example" << "exercise" << "warning" << "convention"
+      << "theorem*" << "proposition*" << "lemma*"
+      << "corollary*" << "proof*" << "axiom*" << "definition*"
+      << "notation*" << "conjecture*" << "remark*" << "note*"
+      << "example*" << "exercise*" << "warning*" << "convention*"
+      << "acknowledgments" << "quote" << "quotation" << "verse"
+      << "indent" << "compact" << "jump-in"
+      << "algorithm" << "body" << "render-code"
+      << "center" << "left-aligned" << "right-aligned"
+      << "small-table" << "big-table" << "small-figure" << "big-figure"
+      << "tabular" << "tabular*" << "block" << "block*" << "descriptive-table"
+      << "description" << "itemize" << "enumerate"
+      << "bibliography" << "bib-list" << "thebibliography"
+      << "bib-field" << "bib-entry" << "db-field" << "db-entry"
+      << "itemize-minus" << "enumerate-roman" << "enumerate-alpha"
+      << "strong" << "em" << "dfn" << "sample"
+      << "name" << "person" << "cite*" << "abbr" << "acronym"
+      << "really-tiny" << "tiny" << "very-small" << "small" << "flat-size"
+      << "normal-size" << "large" << "very-large" << "huge" << "really-huge"
+      << "underline" << "overline" << "pastel" << "greyed" << "light"
+      << "british" << "bulgarian" << "chinese" << "croatian"
+      << "czech" << "danish" << "dutch" << "english" << "finnish"
+      << "french" << "german" << "greek" << "hungarian" << "italian"
+      << "japanese" << "korean" << "polish" << "portuguese" << "romanian"
+      << "russian" << "slovene" << "spanish" << "swedish"
+      << "taiwanese" << "ukrainian"
+      << "switch" << "screens" << "tiny-switch"
+      << "shown" << "hidden" << "shown*" << "hidden*"
+      << "unroll" << "unroll-compressed" << "unroll-phantoms" << "unroll-greyed"
+      << "folded" << "unfolded";
+    for (int i=0; i<N(a); i++) std_textual_envs->insert (a[i]);
+  }
+  return std_textual_envs->contains (s);
+}
+
+static string
+upgrade_quotes (string s) {
+  string r;
+  int i, n= N(s);
+  for (i=0; i<n; )
+    if (s[i] == '<') {
+      int start= i;
+      tm_char_forwards (s, i);
+      r << s (start, i);
+    }
+    else if (s[i] == '-' && i+1 < n && s[i+1] == '-') { r << "\25"; i += 2; }
+    else if (s[i] == '\'' && i+1 < n && s[i+1] == '\'') { r << "\21"; i += 2; }
+    else if (s[i] == '`' && i+1 < n && s[i+1] == '`') { r << "\20"; i += 2; }
+    else { r << s[i]; i++; }
+  return r;
+}
+
+tree
+upgrade_quotes (tree t) {
+  if (is_atomic (t))
+    return upgrade_quotes (t->label);
+  else if (is_concat (t)) {
+    int i, n= N(t);
+    tree r (t, n);
+    bool adjust= false;
+    for (i=0; i<n; i++) {
+      adjust= adjust || is_compound (t[i], "emdash", 0);
+      r[i]= upgrade_quotes (t[i]);
+    }
+    if (adjust) r= simplify_correct (r);
+    return r;
+  }
+  else if (is_compound (t, "emdash", 0))
+    return "\26";
+  else if (is_compound (t, "body", 1))
+    return compound ("body", upgrade_quotes (t[0]));
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++) {
+      if (is_std_textual_env (as_string (L(t))))
+        r[i]= upgrade_quotes (t[i]);
+      else if (std_drd->get_type_child (t, i) != TYPE_REGULAR ||
+               std_drd->get_env_child (t, i, MODE, "text") != "text")
+        r[i]= t[i];
+      else r[i]= upgrade_quotes (t[i]);
+    }
+    return r;
+  }
+}
+
+/******************************************************************************
+* Upgrade ancient
+******************************************************************************/
+
+static charp equation_tags[]= {
+  "equation", "equation*", "eqnarray", "eqnarray*",
+  "leqnarray", "leqnarray*", "align", "align*",
+  "falign", "falign*", "aligned", "aligned*",
+  "multline", "multline*", "gather", "gather*",
+  "eqsplit", "eqsplit*",
+  ""
+};
+
+bool
+is_equation_env (tree t) {
+  if (is_atomic (t) || N(t) != 1) return false;
+  static hashset<tree_label> H;
+  if (N(H) == 0)
+    for (int i=0; equation_tags[i][0] != '\0'; i++)
+      H->insert (as_tree_label (equation_tags[i]));
+  return H->contains (L(t));
+}
+
+tree
+upgrade_ancient (tree t) {
+  // Miscellaneous upgradings for old documents
+  if (is_atomic (t)) return t;
+  else if (is_func (t, INACTIVE, 1) && is_func (t[0], RIGID))
+    return upgrade_ancient (t[0]);
+  else if (is_equation_env (t) && !is_func (t[0], DOCUMENT))
+    return tree (L(t), tree (DOCUMENT, upgrade_ancient (t[0])));
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_ancient (t[i]);
+    if (is_func (r, WITH)) {
+      bool font_series= false;
+      for (i=0; i+1<n; i+=2)
+        if (r[i] == FONT_SERIES) font_series= true;
+      for (i=0; i+1<n; i+=2)
+        if (r[i] == MATH_FONT_SERIES && !font_series) {
+          tree ins= tree (WITH, FONT_SERIES, copy (r[i+1]));
+          return r (0, i) * ins * r (i, N(r));
+        }
+    }
+    return r;
+  }
+}
+
+/******************************************************************************
+* Upgrade draw over/under
+******************************************************************************/
+
+tree
+upgrade_draw_over_under (tree t) {
+  if (is_atomic (t)) return t;
+  else if (is_compound (t, "draw-over", 2))
+    return compound ("draw-over",
+                     upgrade_ancient (t[0]),
+                     upgrade_ancient (t[1]), "0cm");
+  else if (is_compound (t, "draw-under", 2))
+    return compound ("draw-under",
+                     upgrade_ancient (t[0]),
+                     upgrade_ancient (t[1]), "0cm");
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_draw_over_under (t[i]);
+    return r;
+  }
+}
+
+/******************************************************************************
+* Upgrade qed
+******************************************************************************/
+
+tree
+upgrade_qed (tree t) {
+  if (is_atomic (t)) return t;
+  else if (t == tree (VALUE, "qed"))
+    return compound ("qed");
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_qed (t[i]);
+    return r;
+  }
+}
+
+/******************************************************************************
+* Preserve spacing of older documents
+******************************************************************************/
+
+tree
+preserve_spacing (tree t) {
+  if (!is_non_style_document (t)) return t;
+  tree style= copy (extract (t, "style"));
+  if (is_atomic (style)) style= tuple (style);
+  if (style == tree (TUPLE)) style= tuple ("generic");
+  for (int i=0; i<N(style); i++)
+    if (style[i] == "source") return t;
+    else if (style[i] == "old-spacing") return t;
+    else if (style[i] == "default-spacing") return t;
+    else if (style[i] == "wide-spacing") return t;
+    else if (style[i] == "invisible-multiply") return t;
+    else if (style[i] == "narrow-multiply") return t;
+    else if (style[i] == "regular-multiply") return t;
+  style << "old-spacing";
+  return change_doc_attr (t, "style", style);
+}
+
+/******************************************************************************
+* Rename educational styles
+******************************************************************************/
+
+tree
+upgrade_educ_styles (tree t) {
+  int i;
+  if (is_atomic (t)) return t;
+  else if (is_compound (t, "style") || is_func (t, TUPLE)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++) {
+      if (t[i] == "exam") r[i]= "old-exam";
+      else if (t[i] == "compact") r[i]= "old-compact";
+      else r[i]= upgrade_educ_styles (t[i]);
+    }
+    return r;
+  }
+  else if (is_func (t, DOCUMENT)) {
+    int n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= upgrade_educ_styles (t[i]);
+    return r;
+  }
+  else return t;
+}
+
+/******************************************************************************
 * Upgrade from previous versions
 ******************************************************************************/
 
@@ -3688,8 +4134,6 @@ upgrade_tex (tree t) {
   t= upgrade_style_rename (t);
   t= upgrade_item_punct (t);
   t= substitute (t, tree (VALUE, "hrule"), compound ("hrule"));
-  t= upgrade_doc_info (t);
-  t= upgrade_bibliography (t);
   t= upgrade_math (t);
   t= upgrade_resize_clipped (t);
   t= with_correct (t);
@@ -3700,6 +4144,8 @@ upgrade_tex (tree t) {
   t= upgrade_math_ops (t);
   t= clean_spaces (t);
   t= clean_header (t);
+  t= upgrade_doc_language (t);
+  t= upgrade_quotes (t);
   upgrade_tex_flag= false;
   return t;
 }
@@ -3834,7 +4280,31 @@ upgrade (tree t, string version) {
     t= upgrade_abstract_data (t);
     t= correct_metadata (t);
   }
-
+  if (version_inf_eq (version, "1.0.7.20")) {
+    t= upgrade_unroll (t);
+    t= upgrade_style (t, false);
+    t= upgrade_doc_language (t);
+  }
+  if (version_inf_eq (version, "1.0.7.21")) {
+    t= upgrade_varsession (t);
+    t= upgrade_subsession (t);
+  }
+  if (version_inf_eq (version, "1.99.2")) {
+    t= upgrade_quotes (t);
+    t= upgrade_ancient (t);
+  }
+  if (version_inf_eq (version, "1.99.4"))
+    t= upgrade_draw_over_under (t);
+  if (version_inf_eq (version, "1.99.6")) {
+    t= upgrade_qed (t);
+    if (is_non_style_document (t))
+      t= preserve_spacing (t);
+  }
+  if (version_inf_eq (version, "1.99.8")) {
+    if (is_non_style_document (t))
+      t= upgrade_educ_styles (t);
+  }
+  
   if (is_non_style_document (t))
     t= automatic_correct (t, version);
   return t;

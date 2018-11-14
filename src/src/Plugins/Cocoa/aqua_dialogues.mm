@@ -25,7 +25,7 @@
 
 #define TYPE_CHECK(b) ASSERT (b, "type mismatch")
 #define NOT_IMPLEMENTED \
-  { if (DEBUG_EVENTS) cout << "STILL NOT IMPLEMENTED\n";  }
+  { if (DEBUG_EVENTS) debug_events << "STILL NOT IMPLEMENTED\n";  }
 
 #pragma mark aqua_chooser_widget_rep
 
@@ -33,7 +33,7 @@ class aqua_chooser_widget_rep: public aqua_widget_rep {
 protected:	
   command cmd;
   string type;
-  bool   save;
+  string prompt;
   string win_title;
   string directory;
   coord2 position;
@@ -41,7 +41,7 @@ protected:
   string file;
 	
 public:
-  aqua_chooser_widget_rep (command, string, bool);
+  aqua_chooser_widget_rep (command, string, string);
   ~aqua_chooser_widget_rep ();
 	
   virtual void send (slot s, blackbox val);
@@ -56,9 +56,10 @@ public:
   void perform_dialog();
 };
 
-aqua_chooser_widget_rep::aqua_chooser_widget_rep (command _cmd, string _type, bool _save) 
+aqua_chooser_widget_rep::aqua_chooser_widget_rep (command _cmd, string
+_type, string _prompt) 
 : aqua_widget_rep(), cmd(_cmd), type(_type), 
-  save(_save), position (coord2 (0, 0)), 
+  prompt (_prompt), position (coord2 (0, 0)), 
   size (coord2 (100, 100)), file ("")
 {
 }
@@ -96,11 +97,14 @@ aqua_chooser_widget_rep::send (slot s, blackbox val) {
       perform_dialog();
     }
     break;
+  case SLOT_KEYBOARD_FOCUS_ON:
+    NOT_IMPLEMENTED 
+    break;
     
   case SLOT_STRING_INPUT:
     //		send_string (THIS, "input", val);
     NOT_IMPLEMENTED 
-      break;
+    break;
   case SLOT_INPUT_TYPE:
     TYPE_CHECK (type_box (val) == type_helper<string>::id);
     type = open_box<string> (val);        
@@ -200,12 +204,12 @@ widget aqua_chooser_widget_rep::plain_window_widget (string s)
 
 
 
-widget file_chooser_widget (command cmd, string type, bool save) 
+widget file_chooser_widget (command cmd, string type, string prompt)
 // file chooser widget for files of a given type; for files of type "image",
 // the widget includes a previsualizer and a default magnification
 // for importation can be specified
 {
-  return tm_new <aqua_chooser_widget_rep> (cmd, type, save);
+  return tm_new <aqua_chooser_widget_rep> (cmd, type, prompt);
 }
 
 

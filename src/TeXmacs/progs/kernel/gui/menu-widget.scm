@@ -40,7 +40,7 @@
     (shortcut :menu-wide-label :string?)))
   (:menu-item (:or
     ---
-    |
+    | ;; |
     (group :%1)
     (text :%1)
     (glue :boolean? :boolean? :integer? :integer?)
@@ -48,12 +48,13 @@
     (:menu-wide-label :%1)
     (symbol :string? :*)
     (texmacs-output :%2)
-    (texmacs-input :%4)
+    (texmacs-input :%3)
     (input :%1 :string? :%1 :string?)
     (enum :%3 :string?)
     (choice :%3)
     (choices :%3)
     (filtered-choice :%4)
+    (tree-view :%3)
     (toggle :%2)
     (horizontal :menu-item-list)
     (vertical :menu-item-list)
@@ -76,8 +77,10 @@
     (hsplit :menu-item :menu-item)
     (vsplit :menu-item :menu-item)
     (refresh :%1 :string?)
+    (refreshable :%1 :menu-item-list)
     (if :%1 :menu-item-list)
     (when :%1 :menu-item-list)
+    (for :%1 :%1)
     (mini :%1 :menu-item-list)
     (link :%1)
     (promise :%1)
@@ -102,18 +105,13 @@
   (object->command (lambda () (exec-delayed cmd))))
 
 (define-macro (make-menu-command cmd)
-  `(delay-command (lambda ()
-                    (menu-before-action)
-                    ,cmd
-                    (menu-after-action))))
+  `(delay-command (lambda () (protected-call (lambda () ,cmd)))))
 
 (define (menu-protect cmd)
   (lambda x
     (exec-delayed
       (lambda ()
-        (menu-before-action)
-        (apply cmd x)
-        (menu-after-action)))))
+        (protected-call (lambda () (apply cmd x)))))))
 
 (define (kbd-system shortcut menu-flag?)
   (cond ((nstring? shortcut) "")
@@ -149,6 +147,24 @@
 (define (greyed? style)
   (!= (logand style widget-style-grey) 0))
 
+(define (recursive-occurs? w t)
+  (cond ((string? t) (string-occurs? w t))
+        ((list? t) (list-or (map (cut recursive-occurs? w <>) t)))
+        (else #f)))
+
+(define (recursive-replace t w b)
+  (cond ((string? t) (string-replace t w b))
+        ((list? t) (map (cut recursive-replace <> w b) t))
+        (else t)))
+
+(define (adjust-translation s t)
+  (cond ((not (and (qt-gui?) (os-macos?))) t)
+        ((recursive-occurs? "reference" s)
+	 (recursive-replace (recursive-replace t "c" "<#441>") "e" "<#435>"))
+        ((recursive-occurs? "onfigur" s)
+	 (recursive-replace t "o" "<#43E>"))
+        (else t)))
+
 (define (make-menu-label p style . opt)
   "Make widget for menu label @p."
   ;; Possibilities for p:
@@ -166,7 +182,7 @@
   (let ((tt? (and (nnull? opt) (car opt)))
         (col (color (if (greyed? style) "dark grey" "black"))))
     (cond ((translatable? p)            ; "text"
-           (widget-text (translate p) style col #t))
+           (widget-text (adjust-translation p (translate p)) style col #t))
           ((tuple? p 'balloon 2)        ; (balloon <label> "balloon text")
            (make-menu-label (cadr p) style tt?))
           ((tuple? p 'extend)           ; (extend <label> . ws)
@@ -207,7 +223,7 @@
 
 (define (make-menu-group s style)
   "Make @(group :string?) menu item."
-  (widget-menu-group (translate s) style))
+  (widget-menu-group (adjust-translation s (translate s)) style))
 
 (define (make-menu-text s style)
   "Make @(text :string?) menu item."
@@ -220,10 +236,9 @@
     (widget-texmacs-output (t) (tmstyle))))
 
 (define (make-texmacs-input p style)
-  "Make @(texmacs-input :%4) item."
-  (with (tag t tmstyle cmd cont?) p
-    (widget-texmacs-input (t) (tmstyle) (object->command (menu-protect cmd))
-                          cont?)))
+  "Make @(texmacs-input :%3) item."
+  (with (tag t tmstyle name) p
+    (widget-texmacs-input (t) (tmstyle) (or (name) (url-none)))))
 
 (define (make-menu-input p style)
   "Make @(input :%1 :string? :%1 :string?) menu item."
@@ -253,6 +268,12 @@
     (widget-filtered-choice (object->command (menu-protect cmd)) (vals) (val)
                             (filterstr))))
 
+(define (make-tree-view p style)
+  "Make @(tree-view :%3) item."
+  (with (tag cmd data roles) p
+    (widget-tree-view (object->command (menu-protect cmd)) (data) (roles))))
+
+
 (define (make-toggle p style)
   "Make @(toggle :%2) item."
   (with (tag cmd on) p
@@ -262,13 +283,37 @@
 ;; Menu entries
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (make-menu-entry-button style bar? check label short command)
-  (let* ((l (make-menu-label label style))
+(define (synopsis-substitute synopsis source)
+  (if (string-occurs? "@" synopsis)
+      #f ;; not yet implemented
+      synopsis))
+
+(define (search-balloon-help action)
+  (and-with source (promise-source action)
+    (and (pair? source)
+         (or (and-with prop (property (car source) :balloon)
+               (with txt (apply (car prop) (cdr source))
+                 (and (string? txt) txt)))
+             (and-with prop (property (car source) :synopsis)
+               (and (pair? prop) (string? (car prop))
+                    (with txt (synopsis-substitute (car prop) source)
+                      (and (string? txt) txt))))))))
+
+(define (add-menu-entry-balloon but style action)
+  (with txt (search-balloon-help action)
+    (if (not txt) but
+        (with bal (widget-text txt style (color "black") #t)
+          (widget-balloon but bal)))))
+
+(define (make-menu-entry-button style bar? bal? check label short action)
+  (let* ((command (make-menu-command (if (active? style) (apply action '()))))
+         (l (make-menu-label label style))
          (pressed? (and bar? (!= check "")))
          (new-style (logior style (if pressed? widget-style-pressed 0))))
-    (if bar?
-        (widget-menu-button l command "" "" new-style)
-        (widget-menu-button l command check short style))))
+    (with but (if bar?
+                  (widget-menu-button l command "" "" new-style)
+                  (widget-menu-button l command check short style))
+      (if bal? but (add-menu-entry-balloon but style action)))))
 
 (define-public (promise-source action)
   "Helper routines for menu-widget and kbd-define"
@@ -317,6 +362,14 @@
         (menu-label-add-dots label)
         label)))
 
+(define (make-menu-entry-style style action)
+  (with source (promise-source action)
+    (if (not (pair? source)) style
+	(with prop (property (car source) :applicable)
+	  (if (or (not prop) (apply (car prop) (list)))
+	      style
+	      (logior style (+ widget-style-inert widget-style-grey)))))))
+
 (define (make-menu-entry-attrs label action opt-key opt-check)
   (cond ((match? label '(shortcut :%1 :string?))
          (make-menu-entry-attrs (cadr label) action (caddr label) opt-check))
@@ -329,11 +382,13 @@
       (label action opt-key opt-check)
       (make-menu-entry-attrs (car p) (cAr p) #f #f)
     (make-menu-entry-button
-     style bar?
+     (make-menu-entry-style style action)
+     bar?
+     (tuple? (car p) 'balloon 2)
      (make-menu-entry-check opt-check action)
      (make-menu-entry-dots label action)
      (make-menu-entry-shortcut label action opt-key)
-     (make-menu-command (if (active? style) (apply action '()))))))
+     action)))
 
 (define (make-menu-entry p style bar?)
   "Make @:menu-wide-item menu item."
@@ -495,18 +550,19 @@
     (with inner (make-menu-items (list (cons 'vertical items)) style #f)
       (widget-scrollable (car inner) style))))
 
-(define (decode-resize x)
-  (cond ((string? x) (list x x x))
-        ((list-3? x) x)
+(define (decode-resize x default)
+  (cond ((string? x) (list x x x default))
+        ((list-3? x) (append x (list default)))
+        ((list-4? x) x)
         (else (make-menu-error "bad length in " (object->string x)))))
 
 (define (make-resize p style)
   "Make @(resize :%2 :menu-item-list) item."
   (with (tag w h . items) p
     (with inner (make-menu-items (list (cons 'vertical items)) style #f)
-      (with (w1 w2 w3) (decode-resize w)
-        (with (h1 h2 h3) (decode-resize h)
-          (widget-resize (car inner) style w1 h1 w2 h2 w3 h3))))))
+      (with (w1 w2 w3 hpos) (decode-resize w "left")
+        (with (h1 h2 h3 vpos) (decode-resize h "top")
+          (widget-resize (car inner) style w1 h1 w2 h2 w3 h3 hpos vpos))))))
 
 (define (make-hsplit p style)
   "Make @(hsplit :menu-item :menu-item) item."
@@ -544,6 +600,13 @@
                                   (+ widget-style-inert widget-style-grey)))))
       (make-menu-items-list items new-style bar?))))
 
+(define (make-menu-for p style bar?)
+  "Make @(for :%1 :%1) menu items."
+  (with (tag gen-func vals-promise) p
+    (let* ((vals (vals-promise))
+           (items (append-map gen-func vals)))
+      (make-menu-items-list items style bar?))))
+
 (define (make-menu-mini p style bar?)
   "Make @(mini :%1 :menu-item-list) menu items."
   (with (tag pred? . items) p
@@ -569,6 +632,13 @@
   "Make @(refresh :%1 :string?) widget."
   (with (tag s kind) p
     (list (widget-refresh (if (string? s) s (symbol->string s)) kind))))
+
+(define (make-refreshable p style bar?)
+  "Make @(refreshable :%1 :menu-item-list) menu items."
+  (with (tag kind . items) p
+    (list (widget-refreshable
+            (lambda () (widget-vmenu (make-menu-items-list items style bar?)))
+            (kind)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main routines for making menu items
@@ -617,7 +687,7 @@
           ,(lambda (p style bar?) (list (make-menu-symbol p style))))
   (texmacs-output (:%2)
     ,(lambda (p style bar?) (list (make-texmacs-output p style))))
-  (texmacs-input (:%4)
+  (texmacs-input (:%3)
     ,(lambda (p style bar?) (list (make-texmacs-input p style))))
   (input (:%1 :string? :%1 :string?)
          ,(lambda (p style bar?) (list (make-menu-input p style))))
@@ -629,6 +699,8 @@
            ,(lambda (p style bar?) (list (make-choices p style))))
   (filtered-choice (:%4)
            ,(lambda (p style bar?) (list (make-filtered-choice p style))))
+  (tree-view (:%3)
+             ,(lambda (p style bar?) (list (make-tree-view p style))))
   (toggle (:%2)
           ,(lambda (p style bar?) (list (make-toggle p style))))
   (link (:%1)
@@ -679,12 +751,16 @@
       ,(lambda (p style bar?) (make-menu-if p style bar?)))
   (when (:%1 :*)
         ,(lambda (p style bar?) (make-menu-when p style bar?)))
+  (for (:%1 :%1)
+        ,(lambda (p style bar?) (make-menu-for p style bar?)))
   (mini (:%1 :*)
         ,(lambda (p style bar?) (make-menu-mini p style bar?)))
   (promise (:%1)
            ,(lambda (p style bar?) (make-menu-promise p style bar?)))
   (refresh (:%1 :string?)
-           ,(lambda (p style bar?) (make-refresh p style bar?))))
+           ,(lambda (p style bar?) (make-refresh p style bar?)))
+  (refreshable (:%1 :*)
+               ,(lambda (p style bar?) (make-refreshable p style bar?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu expansion
@@ -707,6 +783,13 @@
         (cons* 'when #t (menu-expand-list items))
         (cons* 'when #f (replace-procedures items)))))
 
+(define (menu-expand-for p)
+  "Expand menu @p generated using for loop."
+  (with (tag gen-func vals-promise) p
+    (let* ((vals (vals-promise))
+           (items (append-map gen-func vals)))
+      (menu-expand-list items))))
+
 (define (menu-expand-mini p)
   "Expand mini menu @p."
   (with (tag pred? . items) p
@@ -722,8 +805,7 @@
   "Expand texmacs-input item @p."
   `(texmacs-input ,(replace-procedures (cadr p))
                   ,(replace-procedures (caddr p))
-                  ,(replace-procedures (cadddr p))
-                  ,(car (cdddr p))))
+                  ,(replace-procedures (cadddr p))))
 
 (define (menu-expand-texmacs-output p)
   "Expand output menu item @p."
@@ -753,10 +835,18 @@
 
 (define (menu-expand-filtered-choice p)
   "Expand filtered choice item @p."
+  
   `(,(car p) ,(replace-procedures (cadr p))
              ,(caddr p)
              ,(cadddr p)
              ,(car (cddddr p))))
+
+(define (menu-expand-tree-view p)
+  "Expand tree-view item @p."
+  (display* "menu-expand-tree-view\n")
+  `(,(car p) ,(replace-procedures (cadr p))
+             ,(caddr p)
+             ,(cadddr p)))
 
 (define (menu-expand-toggle p)
   "Expand toggle item @p."
@@ -807,6 +897,7 @@
   (choice ,menu-expand-choice)
   (choices ,menu-expand-choice)
   (filtered-choice ,menu-expand-filtered-choice)
+  (tree-view ,menu-expand-tree-view)
   (toggle ,menu-expand-toggle)
   (link ,menu-expand-link p)
   (horizontal ,(lambda (p) `(horizontal ,@(menu-expand-list (cdr p)))))
@@ -832,9 +923,11 @@
   (ink ,replace-procedures)
   (if ,menu-expand-if)
   (when ,menu-expand-when)
+  (for ,menu-expand-for)
   (mini ,menu-expand-mini)
   (promise ,menu-expand-promise)
-  (refresh ,replace-procedures))
+  (refresh ,replace-procedures)
+  (refreshable ,replace-procedures))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -853,26 +946,54 @@
   (:argument style "menu style")
   ((wrap-catch make-menu-main) p style))
 
-(tm-define (top-window menu-promise name)
-  (:interactive #t)
-  (let* ((win (alt-window-handle))
-         (qui (object->command (lambda () (alt-window-delete win))))
-         (men (menu-promise))
-         (scm (list 'vertical men))
-         (wid (make-menu-widget scm 0)))
-    (alt-window-create-quit win wid name qui)
-    (alt-window-show win)))
+(define (decode-options opts)
+  (let* ((bufs (list))
+         (qcmd noop))
+    (while (and (pair? opts) (url? (car opts)))
+      (set! bufs (cons (car opts) bufs))
+      (set! opts (cdr opts)))
+    (when (pair? opts)
+      (set! qcmd (car opts))
+      (set! opts (cdr opts)))
+    (list bufs qcmd)))
 
-(tm-define (dialogue-window menu-promise cmd name)
+(define window-deleters (make-ahash-table))
+
+(define (make-window-deleter win bufs)
+  (for-each (lambda (buf)
+              (and-with old-del (ahash-ref window-deleters buf) (old-del)))
+            bufs)
+  (with del
+      (lambda ()
+        (for-each (lambda (buf) (ahash-remove! window-deleters buf)) bufs)
+        (alt-window-delete win))
+    (for-each (lambda (buf) (ahash-set! window-deleters buf del)) bufs)
+    del))
+
+(tm-define (top-window menu-promise name . opts)
   (:interactive #t)
-  (let* ((win (alt-window-handle))
-         (qui (object->command (lambda () (alt-window-delete win))))
-         (lbd (lambda x (apply cmd x) (alt-window-delete win)))
-         (men (menu-promise lbd))
-         (scm (list 'vertical men))
-         (wid (make-menu-widget scm 0)))
-    (alt-window-create-quit win wid name qui)
-    (alt-window-show win)))
+  (with (bufs qqq) (decode-options opts)
+    (let* ((win (alt-window-handle))
+           (del (make-window-deleter win bufs))
+           (qui (object->command (lambda () (qqq) (del))))
+           (men (menu-promise))
+           (scm (list 'vertical men))
+           (wid (make-menu-widget scm 0)))
+      (alt-window-create-quit win wid name qui)
+      (alt-window-show win))))
+
+(tm-define (dialogue-window menu-promise cmd name . opts)
+  (:interactive #t)
+  (with (bufs qqq) (decode-options opts)
+    (let* ((win (alt-window-handle))
+           (del (make-window-deleter win bufs))
+           (qui (object->command (lambda () (qqq) (del))))
+           (lbd (lambda x (apply cmd x) (del)))
+           (men (menu-promise lbd))
+           (scm (list 'vertical men))
+           (wid (make-menu-widget scm 0)))
+      (alt-window-create-quit win wid name qui)
+      (alt-window-show win))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Other top-level windows
@@ -913,3 +1034,47 @@
       (with p (lambda (com) (widget-color-picker com #f proposals))
         (with cmd* (lambda (t) (when t (cmd (tm->stree t))))
           (interactive-window p cmd* "Choose background")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Reporting errors of system commands
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-widget ((system-error-widget cmd out err) done)
+  (padded
+    (resize ("300px" "600px" "1200px") ("275px" "400px" "600px")
+      (centered (bold (text "Input command")))  
+      (scrollable
+	(for (x (string-decompose cmd "\n"))
+	  (hlist // (text x) >>)))
+      ===
+      (centered (bold (text "Standard Output")))
+      (scrollable
+	(for (x (string-decompose out "\n"))
+	  (hlist // (text x) >>)))
+      ===
+      (centered (bold (text "Error output")))
+      (scrollable
+	(for (x (string-decompose err "\n"))
+	  (hlist // (text x) >>)))
+      ===
+      (bottom-buttons >> ("Ok" (done))))))
+
+(tm-define (report-system-error win-name cmd out err)
+  (:synopsis "Display command @cmd with its standard outputs @out and @err")
+  (when (list? cmd) (set! cmd (string-recompose cmd " ")))
+  (set! out (utf8->cork out))
+  (set! err (utf8->cork err))
+  (dialogue-window (system-error-widget cmd out err) noop win-name)
+  #f)
+
+(tm-widget ((message-widget msg) done)
+  (padded
+    (centered (text msg))
+    ===
+    (centered
+      (explicit-buttons
+        ("Ok" (done))))))
+
+(tm-define (show-message msg title)
+  (:interactive #t)
+  (dialogue-window (message-widget msg) noop title))

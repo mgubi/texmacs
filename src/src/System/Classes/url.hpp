@@ -43,8 +43,9 @@ public:
 CONCRETE_CODE(url);
 
 tm_ostream& operator << (tm_ostream& out, url u);
-inline url as_url(tree t) { return url(t); }
+inline url as_url (tree t) { return url(t); }
 string as_string (url u, int type= URL_SYSTEM);
+inline tree as_tree (url u) { return tree (u->t); }
 inline string as_system_string (url u) { return as_string (u, URL_SYSTEM); }
 inline string as_unix_string (url u) { return as_string (u, URL_UNIX); }
 inline string as_standard_string (url u) { return as_string (u,URL_STANDARD); }
@@ -109,6 +110,7 @@ bool is_rooted (url u);
 bool is_rooted (url u, string protocol);
 bool is_rooted_web (url u);
 bool is_rooted_tmfs (url u);
+bool is_rooted_tmfs (url u, string sub_protocol);
 bool is_rooted_blank (url u);
 bool is_name (url u);
 bool is_rooted_name (url u);
@@ -120,22 +122,24 @@ bool is_ramdisc (url u);
 * operations on urls
 ******************************************************************************/
 
-url    head (url u);               // keep only the directory of the file
-url    tail (url u);               // keep only the file name without path
-string suffix (url u);             // get suffix of file
-url    glue (url u, string s);     // glue suffix to url tail
-url    unglue (url u, int nr);     // remove nr chars from suffix
-url    unblank (url u);            // a/b/ -> a/b
-url    relative (url base, url u); // a/b, c -> a/c
-url    delta (url base, url u);    // relative (a, delta (a, b)) == b
-string get_root (url u);           // get root
-url    unroot (url u);             // remove root
-url    reroot (url u, string s);   // reroot using new protocol
-url    expand (url u);             // rewrite a/{b:c} -> a/b:a/c
-url    sort (url u);               // order items in ors
-url    factor (url u);             // inverse of expand; also sorts
-bool   descends (url u, url base); // does u descend from base?
-bool   is_secure (url u);          // is u secure?
+url    head (url u);                 // keep only the directory of the file
+url    tail (url u);                 // keep only the file name without path
+string suffix (url u);               // get suffix of file
+string basename (url u, string suf); // get basename of file with given suffix
+string basename (url u);             // get basename of file
+url    glue (url u, string s);       // glue suffix to url tail
+url    unglue (url u, int nr);       // remove nr chars from suffix
+url    unblank (url u);              // a/b/ -> a/b
+url    relative (url base, url u);   // a/b, c -> a/c
+url    delta (url base, url u);      // relative (a, delta (a, b)) == b
+string get_root (url u);             // get root
+url    unroot (url u);               // remove root
+url    reroot (url u, string s);     // reroot using new protocol
+url    expand (url u);               // rewrite a/{b:c} -> a/b:a/c
+url    sort (url u);                 // order items in ors
+url    factor (url u);               // inverse of expand; also sorts
+bool   descends (url u, url base);   // does u descend from base?
+bool   is_secure (url u);            // is u secure?
 
 /******************************************************************************
 * url resolution

@@ -92,18 +92,14 @@ cg_renderer_rep::next_page () {
 }
 
 void
-cg_renderer_rep::set_color (color c) {
-  basic_renderer_rep::set_color(c);
-  cg_set_color(context,cur_fg);
-}
-
-void
-cg_renderer_rep::set_line_style (SI lw, int type, bool round) {
-  (void) type;
-	
-  CGContextSetLineCap(context, round? kCGLineCapRound : kCGLineCapSquare);
+cg_renderer_rep::set_pencil (pencil p) {
+  basic_renderer_rep::set_pencil (p);
+  cg_set_color (context, pen->c);
+  CGContextSetLineCap(context, pen->cap == cap_round?
+                               kCGLineCapRound : kCGLineCapSquare);
   CGContextSetLineJoin(context, kCGLineJoinRound);
-  CGContextSetLineWidth(context, lw <= pixel ? 1 : ((lw+thicken) / (1.0*pixel)));
+  CGContextSetLineWidth(context, pen->w <= pixel ?
+                                 1 : ((lw+thicken) / (1.0*pixel)));
 }
 
 void
@@ -141,10 +137,10 @@ cg_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
   if ((x1>=x2) || (y1<=y2)) return;
-  cg_set_color (context, cur_bg);
+  cg_set_color (context, bg_brush->get_color ());
   CGContextSetShouldAntialias(context, false);
   CGContextFillRect(context, CGRectMake(x1, y2, x2-x1, y1-y2) );
-  cg_set_color (context, cur_fg);
+  cg_set_color (context, pen->get_color ());
 }
 
 void
@@ -168,7 +164,7 @@ cg_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
 
-  // cg_set_color (context, cur_fg);
+  // cg_set_color (context, pen->get_color ());
   CGContextSetShouldAntialias (context, false);
   CGContextFillRect (context, CGRectMake(x1, y2, x2-x1, y1-y2) );
 }
@@ -204,7 +200,7 @@ cg_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
     else  CGContextAddLineToPoint(context, xx ,yy);
   }
   CGContextClosePath (context);
-  // cg_set_color (context, cur_fg);
+  // cg_set_color (context, pen->get_color ());
   CGContextSetShouldAntialias (context, true);
   if (convex)    CGContextEOFillPath (context);	
   else CGContextFillPath (context);	
@@ -214,23 +210,12 @@ cg_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
 * Image rendering
 ******************************************************************************/
 
-struct cg_cache_image_rep: cache_image_element_rep {
-  cg_cache_image_rep (int w2, int h2, time_t time2, CGImageRef ptr2) :
-    cache_image_element_rep(w2,h2,time2,ptr2) {
-      CGImageRetain((CGImageRef)ptr); }
-  virtual ~cg_cache_image_rep() { CGImageRelease((CGImageRef)ptr); }
-};
-
 void
-cg_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
-			double cx1, double cy1, double cx2, double cy2,
-                        int alpha)
-{
+cg_renderer_rep::image (url u, SI w, SI h, SI x, SI y, int alpha) {
   // Given an image of original size (W, H),
-  // we display the part (cx1 * W, xy1 * H, cx2 * W, cy2 * H)
-  // at position (x, y) in a rectangle of size (w, h)
+  // we display it at position (x, y) in a rectangle of size (w, h)
 
-  // if (DEBUG_EVENTS) cout << "cg_renderer_rep::image " << as_string(u) << LF;
+  // if (DEBUG_EVENTS) debug_events << "cg_renderer_rep::image " << as_string(u) << LF;
   (void) alpha;
 
   w= w/pixel; h= h/pixel;
@@ -240,50 +225,37 @@ cg_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
   //painter.drawRect (QRect (x, y-h, w, h));
   
   CGImageRef pm = NULL;
-  tree lookup= tuple (u->t);
-  lookup << as_string (w ) << as_string (h )
-  << as_string (cx1) << as_string (cy1)
-  << as_string (cx2) << as_string (cy2) << "cg-image" ;
-  cache_image_element ci = get_image_cache(lookup);
-  if (!is_nil(ci))
-    pm = static_cast<CGImageRef> (ci->ptr);
-  else {
-    if (suffix (u) == "png") {
-      // rendering
-      string suu = as_string (u);
-      c_string buf (suu);
-      // cout << suu << LF;
-      CFURLRef uu =  CFURLCreateFromFileSystemRepresentation(NULL, (UInt8*)buf, N(suu),  false);
-      CGImageSourceRef source =  CGImageSourceCreateWithURL ( uu, NULL );
-      pm =  CGImageSourceCreateImageAtIndex(source, 0, NULL);
-      CFRelease(source);
-      CFRelease(uu);
-    }
-    else if (suffix (u) == "ps" ||
-             suffix (u) == "eps" ||
-             suffix (u) == "pdf") {
-      url temp= url_temp (".png");
-      // system ("convert", u, temp);
-      mac_image_to_png (u, temp); 
-      string suu = as_string (temp);
-      c_string buf (suu);
-      //cout << suu << LF;
-      CFURLRef uu =  CFURLCreateFromFileSystemRepresentation(NULL, (UInt8*)buf, N(suu),  false);
-      CGImageSourceRef source =  CGImageSourceCreateWithURL ( uu, NULL );
-      pm =  CGImageSourceCreateImageAtIndex(source, 0, NULL);
-      CFRelease(source);
-      CFRelease(uu);
-      remove (temp);
-    }
+  if (suffix (u) == "png") {
+    // rendering
+    string suu = as_string (u);
+    c_string buf (suu);
+    // cout << suu << LF;
+    CFURLRef uu =  CFURLCreateFromFileSystemRepresentation(NULL, (UInt8*)buf, N(suu),  false);
+    CGImageSourceRef source =  CGImageSourceCreateWithURL ( uu, NULL );
+    pm =  CGImageSourceCreateImageAtIndex(source, 0, NULL);
+    CFRelease(source);
+    CFRelease(uu);
+  }
+  else if (suffix (u) == "ps" ||
+           suffix (u) == "eps" ||
+           suffix (u) == "pdf") {
+    url temp= url_temp (".png");
+    // system ("convert", u, temp);
+    mac_image_to_png (u, temp); 
+    string suu = as_string (temp);
+    c_string buf (suu);
+    //cout << suu << LF;
+    CFURLRef uu =  CFURLCreateFromFileSystemRepresentation(NULL, (UInt8*)buf, N(suu),  false);
+    CGImageSourceRef source =  CGImageSourceCreateWithURL ( uu, NULL );
+    pm =  CGImageSourceCreateImageAtIndex(source, 0, NULL);
+    CFRelease(source);
+    CFRelease(uu);
+    remove (temp);
+  }
 
-    if (pm == NULL ) {
-      cout << "TeXmacs] warning: cannot render " << as_string (u) << "\n";
-      return;
-    }
-    // caching
-    ci = tm_new <cg_cache_image_rep> (w,h, texmacs_time(), pm);
-    set_image_cache(lookup, ci);
-    (ci->nr)++;
+  if (pm == NULL ) {
+    cout << "TeXmacs] warning: cannot render " << as_string (u) << "\n";
+    return;
   }
   
   CGContextSetShouldAntialias(context, false);
@@ -408,7 +380,7 @@ cg_renderer_rep::native_draw (int ch, font_glyphs fn, SI x, SI y) {
     CGContextSetShouldAntialias(cgc,true);
     CGContextSetShouldSmoothFonts(cgc,true);
     // CGContextSetBlendMode(context,kCGBlendModeSourceAtop);
-    // cg_set_color (context, cur_fg);
+    // cg_set_color (context, pen->get_color ());
     CGGlyph buf[1] = {c};
     CGContextShowGlyphsAtPoint(cgc,x,y,(CGGlyph*)buf,1);
   } 
@@ -482,7 +454,7 @@ cg_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     CGRect r = CGRectMake(x1,y1,mi->w,mi->h);
     CGContextSetShouldAntialias (context, true);
     CGContextSaveGState (context);
-    //  cg_set_color (context, cur_fg);
+    //  cg_set_color (context, pen->get_color ());
     CGContextClipToMask (context, r, mi->img); 
     CGContextFillRect (context, r);
     CGContextRestoreGState (context);
@@ -509,7 +481,7 @@ xpm_init (url file_name) {
   skip_spaces (s, i);
   ok= read_int (s, i, b) && ok;
   if ((!ok) || (N(t)<(c+1)) || (c<=0)) {
-    cerr << "File name= " << file_name << "\n";
+    failed_error << "File name= " << file_name << "\n";
     FAILED ("invalid xpm");
   }
 	
@@ -539,7 +511,7 @@ xpm_init (url file_name) {
       def= locase_all (s (j, i));
     }
     
-    pmcs(name)= xpm_to_color(def);
+    pmcs(name)= xpm_color(def);
   }
   CGContextRef ic = MyCreateBitmapContext(w,h);
   CGContextSetBlendMode(ic,kCGBlendModeCopy);
@@ -561,8 +533,6 @@ xpm_init (url file_name) {
   return im;
 }
 
-extern int char_clip;
-
 CGImageRef 
 cg_renderer_rep::xpm_image (url file_name) { 
   CGImageRef pxm= NULL;
@@ -576,19 +546,6 @@ cg_renderer_rep::xpm_image (url file_name) {
   }
   else pxm= mi->img;
   return pxm;
-}
-
-void
-cg_renderer_rep::xpm (url file_name, SI x, SI y) {
-  y -= pixel; // counter balance shift in draw_clipped
-  CGImageRef image = xpm_image (file_name);
-  ASSERT (pixel == PIXEL, "pixel and PIXEL should coincide");
-  int w = CGImageGetWidth(image);
-  int h = CGImageGetHeight(image);
-  int old_clip= char_clip;
-  char_clip = true;
-  draw_clipped (image, w, h, x, y);
-  char_clip = old_clip;
 }
 
 /******************************************************************************

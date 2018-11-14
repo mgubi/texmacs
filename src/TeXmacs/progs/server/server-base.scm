@@ -11,11 +11,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(texmacs-module (server server-base))
+(texmacs-module (server server-base)
+  (:use (database db-version)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Declaration of services
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (server-database) (global-database))
 
 (tm-define service-dispatch-table (make-ahash-table))
 
@@ -23,16 +26,25 @@
   (if (npair? proto) '(noop)
       (with (fun . args) proto
         `(begin
-           (tm-define (,fun envelope ,@args) ,@body)
+           (tm-define (,fun envelope ,@args)
+             (with-database (server-database)
+               (catch #t
+                      (lambda () ,@body)
+                      (lambda err
+                        (display* "Server error: " err "\n")
+                        (server-error envelope err)))))
            (ahash-set! service-dispatch-table ',fun ,fun)))))
 
 (tm-define (server-eval envelope cmd)
   ;; (display* "server-eval " envelope ", " cmd "\n")
-  (if (and (pair? cmd) (ahash-ref service-dispatch-table (car cmd)))
-      (with (name . args) cmd
-        (with fun (ahash-ref service-dispatch-table name)
-          (apply fun (cons envelope args))))
-      (server-error envelope "invalid command")))
+  (cond ((and (pair? cmd) (ahash-ref service-dispatch-table (car cmd)))
+         (with (name . args) cmd
+           (with fun (ahash-ref service-dispatch-table name)
+             (apply fun (cons envelope args)))))
+        ((symbol? (car cmd))
+         (with s (symbol->string (car cmd))
+           (server-error envelope (string-append "invalid command '" s "'"))))
+        (else (server-error envelope "invalid command"))))
 
 (tm-define (server-return envelope ret-val)
   (with (client msg-id) envelope
@@ -49,6 +61,9 @@
 (define server-client-active? (make-ahash-table))
 (define server-serial 0)
 
+(tm-define (active-client? client)
+  (ahash-ref server-client-active? client))
+
 (tm-define (active-clients)
   (ahash-set->list server-client-active?))
 
@@ -61,7 +76,7 @@
   (with wait 1
     (delayed
       (:while (ahash-ref server-client-active? client))
-      (:pause ((lambda () (inexact->exact wait))))
+      (:pause ((lambda () (inexact->exact (round wait)))))
       (:do (set! wait (min (* 1.01 wait) 2500)))
       (with msg (server-read client)
         (when (!= msg "")
@@ -77,26 +92,39 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define server-continuations (make-ahash-table))
+(define server-error-handlers (make-ahash-table))
 
-(tm-define (server-remote-eval client cmd cont)
-  (ahash-set! server-continuations server-serial (list client cont))
-  (server-send client cmd))
+(define (std-server-error msg)
+  ;;(texmacs-error "server-remote-error" "remote error ~S" msg)
+  (display-err* "Remote error: " msg "\n"))
+
+(tm-define (server-remote-eval client cmd cont . opt-err-handler)
+  (with err-handler std-server-error
+    (if (nnull? opt-err-handler) (set! err-handler (car opt-err-handler)))
+    (ahash-set! server-continuations server-serial (list client cont))
+    (ahash-set! server-error-handlers server-serial (list client err-handler))
+    (server-send client cmd)))
+
+(tm-define (server-remote-eval* client cmd cont)
+  (server-remote-eval client cmd cont cont))
 
 (tm-service (server-remote-result msg-id ret)
   (with client (car envelope)
     (and-with val (ahash-ref server-continuations msg-id)
       (ahash-remove! server-continuations msg-id)
+      (ahash-remove! server-error-handlers msg-id)
       (with (orig-client cont) val
         (when (== client orig-client)
           (cont ret))))))
 
 (tm-service (server-remote-error msg-id err-msg)
   (with client (car envelope)
-    (and-with val (ahash-ref server-continuations msg-id)
+    (and-with val (ahash-ref server-error-handlers msg-id)
       (ahash-remove! server-continuations msg-id)
-      (with (orig-client cont) val
+      (ahash-remove! server-error-handlers msg-id)
+      (with (orig-client err-handler) val
         (when (== client orig-client)
-          (texmacs-error "server-remote-error" "remote error ~S" err-msg))))))
+          (err-handler err-msg))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Users
@@ -116,40 +144,65 @@
   (with f "$TEXMACS_HOME_PATH/server/users.scm"
     (save-object f (ahash-table->list server-users))))
 
-(tm-define (server-set-user-info uid id fullname passwd email admin)
+(define (server-find-user pseudo)
   (server-load-users)
-  (ahash-set! server-users uid (list id fullname passwd email admin))
-  (resource-set-user-info uid id fullname email)
-  (server-save-users))
+  (with l (ahash-table->list server-users)
+    (with ok? (lambda (x) (== (cadr x) pseudo))
+      (and-with i (list-find-index l ok?)
+        (car (list-ref l i))))))
 
-(tm-define (server-set-user-information id fullname passwd email admin)
-  (:argument id "User ID")
-  (:argument fullname "Full name")
+(define (server-lookup-user pseudo)
+  (with-database (server-database)
+    (with uids (db-search (list (list "type" "user")
+                                (list "pseudo" pseudo)))
+      (and (nnull? uids) (car uids)))))
+
+(define (server-set-user-info uid pseudo name passwd email admin)
+  (with-database (server-database)
+    (with-user #t
+      (when (not uid) (set! uid pseudo))
+      ;;(when (not uid) (set! uid (db-create-entry (list))))
+      (db-set-entry uid (list (list "type" "user")
+                              (list "pseudo" pseudo)
+                              (list "name" name)
+                              (list "email" email)
+                              (list "owner" uid)))
+      (server-load-users)
+      (ahash-set! server-users uid (list pseudo name passwd email admin))
+      (server-save-users)
+      (let* ((home (string-append "~" pseudo))
+             (q (list (list "name" home)
+                      (list "type" "dir"))))
+        (when (null? (db-search q))
+          (db-create-entry (rcons q (list "owner" uid))))))))
+
+(tm-define (server-set-user-information pseudo name passwd email admin)
+  (:argument pseudo "User pseudo")
+  (:argument name "Full name")
   (:argument passwd "password" "Password")
   (:argument email "Email address")
   (:argument admin "Administrive rights?")
   (:proposals admin '("no" "yes"))
-  (with uid (server-find-user id)
-    (if (not uid) (set! uid (create-unique-id)))
-    (server-set-user-info uid id fullname passwd email (== admin "yes"))))
+  (with uid (or (server-find-user pseudo)
+                (pseudo->user pseudo))
+    (server-set-user-info uid pseudo name passwd email (== admin "yes"))))
 
-(tm-define (server-find-user id)
-  (server-load-users)
-  (with l (ahash-table->list server-users)
-    (with ok? (lambda (x) (== (cadr x) id))
-      (and-with i (list-find-index l ok?)
-	(car (list-ref l i))))))
+(define (server-create-user pseudo name passwd email admin)
+  (with uid (or (server-find-user pseudo)
+                (pseudo->user pseudo))
+    (server-set-user-info uid pseudo name passwd email admin)))
 
-(tm-define (server-create-user id fullname passwd email admin)
-  (or (server-find-user id)
-      (with uid (resource-create id "user" id)
-        (server-set-user-info uid id fullname passwd email admin))))
-
-(tm-service (new-account id fullname passwd email)
-  (if (server-find-user id)
+(tm-service (new-account pseudo name passwd email agreed)
+  (if (server-find-user pseudo)
       (server-error envelope "user already exists")
-      (with ret (server-create-user id fullname passwd email #f)
+      (with ret (server-create-user pseudo name passwd email #f)
 	(server-return envelope "done"))))
+
+(tm-service (server-licence)
+  (with f "$TEXMACS_HOME_PATH/server/licence.tm"
+    (with s (and (url-exists? f) (string-load f))
+      (with doc (and s (convert s "texmacs-document" "texmacs-stree"))
+	(server-return envelope doc)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Logging in
@@ -163,14 +216,17 @@
 
 (tm-define (server-check-admin? envelope)
   (and-with uid (server-get-user envelope)
-    (with (id fullname passwd email admin) (ahash-ref server-users uid)
+    (with (pseudo name passwd email admin) (ahash-ref server-users uid)
       admin)))
 
-(tm-service (remote-login id passwd)
-  (with uid (server-find-user id)
+(tm-service (remote-login pseudo passwd)
+  (with uid (server-find-user pseudo)
     (if (not uid) (server-error envelope "user not found")
-	(with (id2 fullname2 passwd2 email2 admin2) (ahash-ref server-users uid)
-	  (if (!= passwd2 passwd) (server-error envelope "invalid password")
+	(with (pseudo2 name2 passwd2 email2 admin2) (ahash-ref server-users uid)
+	  (if (!= passwd2 passwd)
+	      (with client (car envelope)
+		(ahash-remove! server-logged-table client)
+                (server-error envelope "invalid password"))
 	      (with client (car envelope)
 		(ahash-set! server-logged-table client uid)
 		(server-return envelope "ready")))))))

@@ -314,14 +314,17 @@
   ;; path to innermost group
   (graphics-graphics-path))
 
-(tm-define (make-graphics)
+(tm-define (graphics-default-unit)
+  (if (in-poster?) "0.1par" "1cm"))
+
+(tm-define (make-graphics . init)
+  (when (null? init)
+    (set! init `("gr-mode" "point"
+                 "gr-frame" (tuple "scale" ,(graphics-default-unit)
+                                   (tuple "0.5gw" "0.5gh"))
+                 "gr-geometry" (tuple "geometry" "1par" "0.6par"))))
   (graphics-reset-context 'begin)
-  (insert-raw-go-to 
-   '(with "gr-mode" "point" 
-          "gr-frame" (tuple "scale" "1cm" (tuple "0.5gw" "0.5gh"))
-          "gr-geometry" (tuple "geometry" "1par" "0.6par")
-      (graphics ""))
-   '(6 1)))
+  (insert-raw-go-to `(with ,@init (graphics "")) `(,(length init) 1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subroutines for accessing the properties of the graphics
@@ -339,6 +342,13 @@
 (tm-define (graphics-get-property var)
   (with val (graphics-get-raw-property var)
      (tree->stree val)))
+
+(tm-define ((graphics-get-property-at p) var)
+  (with r (if (and (pair? p) (in? var (list "gr-gid" "gr-anim-id")))
+              (graphics-path-property p (string-drop var 3))
+              (graphics-get-property var))
+    ;;(display* p ", " var " ~~> " r "\n")
+    r))
 
 (tm-define (graphics-set-property var val)
   (with p (graphics-graphics-path)
@@ -490,10 +500,16 @@
 (tm-define (graphics-path-property-1 p var)
   (graphics-path-property-bis-1 p var "default"))
 
+;;(tm-define (graphics-object-root-path p)
+;;  (let* ((q (tm-upwards-path p '(with) '()))
+;;	   (path (if (and q (== (+ (length q) 1) (length p))) q p)))
+;;    path))
+
 (tm-define (graphics-object-root-path p)
-  (let* ((q (tm-upwards-path p '(with) '()))
-	 (path (if (and q (== (+ (length q) 1) (length p))) q p)))
-    path))
+  (with t (path->tree p)
+    (cond ((tree-in? t :up '(with anim-edit))
+           (graphics-object-root-path (cDr p)))
+          (else p))))
 
 (tm-define (graphics-remove p . parms)
   (when p
@@ -519,13 +535,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (box-info t cmd)
-  (tree->stree (texmacs-exec `(box-info ,t ,cmd))))
+  (tree->stree (texmacs-exec* `(box-info ,t ,cmd))))
 
 (tm-define (frame-direct p)
-  (tree->stree (texmacs-exec `(frame-direct ,p))))
+  (tree->stree (texmacs-exec* `(frame-direct ,p))))
 
 (tm-define (frame-inverse p)
-  (tree->stree (texmacs-exec `(frame-inverse ,p))))
+  (tree->stree (texmacs-exec* `(frame-inverse ,p))))
 
 (tm-define (interval-intersects i1 i2)
   (let* ((i1a (car i1))
@@ -559,21 +575,60 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (enhanced-tree? t)
-  (eq? (tree-label t) 'with))
+  (tree-in? t '(with anim-edit)))
 
 (tm-define (enhanced-tree->radical t)
-  (if (enhanced-tree? t)
-      (tree-ref t (- (tree-arity t) 1))
-      t))
+  (cond ((tree-is? t 'with)
+         (enhanced-tree->radical (tree-ref t :last)))
+        ((tree-is? t 'anim-edit)
+         (enhanced-tree->radical (tree-ref t 1)))
+        (else t)))
 
 (tm-define (radical->enhanced-tree r)
   (with t (tree-up r)
-     (if (enhanced-tree? t) t r)))
+    (if (enhanced-tree? t)
+        (radical->enhanced-tree t)
+        r)))
 
 (tm-define (stree-radical t)
-  (if (and (pair? t) (eq? (car t) 'with) (nnull? (cdr t)))
-      (cAr t)
-      t))
+  (cond ((tm-is? t 'with)
+         (stree-radical (tm-ref t :last)))
+        ((tm-is? t 'anim-edit)
+         (stree-radical (tm-ref t 1)))
+        (else t)))
+
+(tm-define (stree-radical* t anim?)
+  (cond ((and (tm-is? t 'with) (not anim?))
+         (stree-radical* (tm-ref t :last) anim?))
+        ((tm-is? t 'anim-edit)
+         (stree-radical* (tm-ref t 1) #t))
+        (else t)))
+
+(tm-define (graphics-re-enhance obj compl anim?)
+  (cond ((tm-is? compl 'anim-edit)
+         `(anim-edit ,(tm-ref compl 0)
+                     ,(graphics-re-enhance obj (tm-ref compl 1) #t)
+                     ,@(cddr (tm-children compl))))
+        ((and (tm-is? compl 'with)
+	      (or anim? (tm-is? (tm-ref compl :last) 'anim-edit)))
+         `(with ,@(cDr (tm-children compl))
+	      ,(graphics-re-enhance obj (tm-ref compl :last) anim?)))
+        (else obj)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Animations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (graphics-anim-frames t)
+  (and (tm-in? t '(anim-static anim-dynamic))
+       (tm-is? (tm-ref t 0) 'morph)
+       (with c (tm-children (tm-ref t 0))
+         (and (list-and (map (lambda (x) (tm-func? x 'tuple 2)) c))
+              (map (lambda (x) (tm-ref x 1)) c)))))
+
+(tm-define (graphics-anim-radicals t)
+  (and-with l (graphics-anim-frames t)
+    (map stree-radical l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; New style graphical attributes

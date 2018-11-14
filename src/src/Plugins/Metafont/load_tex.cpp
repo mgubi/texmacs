@@ -10,21 +10,29 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "config.h"
 #include "load_tex.hpp"
 #include "path.hpp"
 #include "boot.hpp"
 #include "Freetype/tt_file.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "data_cache.hpp"
 
 #ifdef OS_WIN32
 #include <x11/xlib.h>
 #endif
 
+/*
+ For certain LaTeX fonts, it is possible to have non integer font sizes, 
+ by multiplying the font size by 100. For instance, larm10 would be equivalent
+ to larm1000 and larm1050 would stand for a 10.5 point larm font.
+ 
+ See bug https://savannah.gnu.org/bugs/?37472
+ */
 static int
 mag (double dpi, double size, double dsize) {
-  if ((size>=100) && (dsize<100)) dsize *= 100;
-  if ((dsize>=100) && (size<100))  size *= 100;
+  if ((size>=316) && (dsize<100)) dsize *= 100;
+  if ((dsize>=316) && (size<100))  size *= 100;
   return (int) (((size * dpi) / dsize) + 0.5);
 }
 
@@ -42,12 +50,12 @@ try_tfm (string family, int size, int osize, tex_font_metric& tfm, bool make) {
     return true;
   }
   string name= family * (size==0? string (""): as_string (size)) * ".tfm";
-  if (DEBUG_STD) cout << "TeXmacs] Try tfm " << name << "\n";
+  if (DEBUG_STD) debug_fonts << "Try tfm " << name << "\n";
   url u= resolve_tex (name);
   if (is_none (u)) {
     if (exists (url ("$TEXMACS_HOME_PATH/fonts/error", name))) {
       if (DEBUG_STD)
-        cout << "TeXmacs] Error during " << name << " loading\n";
+        debug_fonts << "Error during " << name << " loading\n";
       return false;
     }
     if (make) {
@@ -70,7 +78,7 @@ try_tfm (string family, int size, int osize, tex_font_metric& tfm, bool make) {
 	       "tfm:" * family * as_string (osize), as_string (size));
   if (size == 0) {
     size= tfm->size;
-    if (DEBUG_STD) cout << "TeXmacs] Design size = " << size << "\n";
+    if (DEBUG_STD) debug_fonts << "Design size = " << size << "\n";
   }
   if (size != osize)
     tfm->header[1]= mag (tfm->header[1], osize, size);
@@ -198,7 +206,7 @@ try_pk (string family, int size, int dpi, int dsize,
   if (tt_name != "") {
     if (font_glyphs::instances -> contains (tt_name))
       pk= font_glyphs (tt_name);
-    else pk= tt_font_glyphs (tt_name, tt_size, tt_dpi);
+    else pk= tt_font_glyphs (tt_name, tt_size, tt_dpi, tt_dpi);
     return true;
   }
 #endif // USE_FREETYPE
@@ -216,12 +224,12 @@ try_pk (string family, int size, int dpi, int dsize,
   }
   string size_name (dsize==0? string (""): as_string (size));
   string name (family * size_name * "." * as_string (dpi) * "pk");
-  if (DEBUG_STD) cout << "TeXmacs] Open pk " << name << "\n";
+  if (DEBUG_STD) debug_fonts << "Open pk " << name << "\n";
   url u= resolve_tex (name);
   if (is_none (u)) {
     if (exists (url ("$TEXMACS_HOME_PATH/fonts/error", name))) {
       if (DEBUG_STD)
-        cout << "TeXmacs] Error during " << name << " loading\n";
+        debug_fonts << "Error during " << name << " loading\n";
       return false;
     }
     if (get_setting ("MAKEPK") != "false") {
@@ -237,7 +245,7 @@ try_pk (string family, int size, int dpi, int dsize,
     if (is_none (u)) {
       save_string (url ("$TEXMACS_HOME_PATH/fonts/error", name), "");
       if (DEBUG_STD)
-        cout << "TeXmacs] Error during " << name << " loading\n";
+        debug_fonts << "Error during " << name << " loading\n";
       return false;
     }
   }
@@ -269,6 +277,7 @@ load_tex_pk (string family, int size, int dpi, int dsize,
 
 static void
 rubber_status (glyph& gl, int st) {
+  if (is_nil (gl)) return;
   gl -> status |= st;
   gl -> yoff    = 0;
 }
@@ -294,8 +303,8 @@ load_tex (string family, int size, int dpi, int dsize,
 {
   bench_start ("load tex font");
   if (DEBUG_VERBOSE)
-    cout << "TeXmacs] loading " << family << size
-	 << " at " << dpi << " dpi\n";
+    debug_fonts << "Loading " << family << size
+                << " at " << dpi << " dpi\n";
   if (load_tex_tfm (family, size, dsize, tfm) &&
       load_tex_pk (family, size, dpi, dsize, tfm, pk))
     {
@@ -304,10 +313,10 @@ load_tex (string family, int size, int dpi, int dsize,
       return;
     }
   if (DEBUG_VERBOSE) {
-    cout << "TeXmacs] font " << family << size
-         << " at " << dpi << " dpi not found\n";
-    cout << "TeXmacs] loading ecrm" << size
-	 << " at " << dpi << " dpi instead\n";
+    debug_fonts << "Font " << family << size
+                << " at " << dpi << " dpi not found\n";
+    debug_fonts << "Loading ecrm" << size
+                << " at " << dpi << " dpi instead\n";
   }
   if (load_tex_tfm ("ecrm", size, 10, tfm) &&
       load_tex_pk ("ecrm", size, dpi, 10, tfm, pk))
@@ -318,7 +327,7 @@ load_tex (string family, int size, int dpi, int dsize,
 #ifdef OS_WIN32
   else {
     string name= family * as_string (size) * "@" * as_string (dpi);
-    cerr << "\n\nCould not open font " << name << "\nLoading default" << LF;
+    failed_error << "Could not open font " << name << "\nLoading default" << LF;
     cout << "Could not load font...\nLoading default" << LF;
     XNoTexWarn();
     if (load_tex_tfm ("ecrm", 10, 10, tfm) &&
@@ -330,7 +339,7 @@ load_tex (string family, int size, int dpi, int dsize,
   }
 #endif
   string name= family * as_string (size) * "@" * as_string (dpi);
-  cerr << "\n\nI could not open " << name << "\n";
+  failed_error << "Could not open " << name << "\n";
   FAILED ("Tex seems not to be installed properly");
   bench_cumul ("load tex font");
 }

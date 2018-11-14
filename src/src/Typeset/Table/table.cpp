@@ -28,7 +28,8 @@ table_rep::table_rep (edit_env env2, int status2, int i0b, int j0b):
 table_rep::~table_rep () {
   if (T != NULL) {
     int i;
-    for (i=0; i<nr_rows; i++) tm_delete_array (T[i]);
+    for (i=0; i<nr_rows; i++)
+      if (T[i] != NULL) tm_delete_array (T[i]);
     tm_delete_array (T);
   }
   if (mw != NULL) tm_delete_array (mw);
@@ -88,10 +89,14 @@ table_rep::typeset_table (tree fm, tree t, path ip) {
   nr_rows= N(t);
   nr_cols= 0;
   T= tm_new_array<cell*> (nr_rows);
+  for (i=0; i<nr_rows; i++) T[i]= NULL;
   STACK_NEW_ARRAY (subformat, tree, nr_rows);
   extract_format (fm, subformat, nr_rows);
-  for (i=0; i<nr_rows; i++)
+  for (i=0; i<nr_rows; i++) {
+    tree old= env->local_begin (CELL_ROW_NR, as_string (i));
     typeset_row (i, subformat[i], t[i], descend (ip, i));
+    env->local_end (CELL_ROW_NR, old);
+  }
   STACK_DELETE_ARRAY (subformat);
   mw= tm_new_array<SI> (nr_cols);
   lw= tm_new_array<SI> (nr_cols);
@@ -100,15 +105,20 @@ table_rep::typeset_table (tree fm, tree t, path ip) {
 
 void
 table_rep::typeset_row (int i, tree fm, tree t, path ip) {
+  //ASSERT (i==0 || nr_cols == N(t), "inconsistent number of columns");
   int j;
-  nr_cols= N(t);
+  nr_cols= (i==0? N(t): min (nr_cols, N(t)));
   T[i]= tm_new_array<cell> (nr_cols);
   STACK_NEW_ARRAY (subformat, tree, nr_cols);
   extract_format (fm, subformat, nr_cols);
   for (j=0; j<nr_cols; j++) {
     cell& C= T[i][j];
     C= cell (env);
+    if (i == 0) C->border_flags += 1;
+    if (i == nr_rows-1) C->border_flags += 2;
+    tree old= env->local_begin (CELL_COL_NR, as_string (j));
     C->typeset (subformat[j], t[j], descend (ip, j));
+    env->local_end (CELL_COL_NR, old);
     C->row_span= min (C->row_span, nr_rows- i);
     C->col_span= min (C->col_span, nr_cols- j);
     if (hyphen == "y") C->row_span= 1;
@@ -725,9 +735,11 @@ table_rep::finish_horizontal () {
 void
 table_rep::finish () {
   int i, j;
-  array<box> bs;
-  array<SI>  x;
-  array<SI>  y;
+  array<box>    bs;
+  array<SI>     x;
+  array<SI>     y;
+  array<string> ha;
+  bool ext_flag= true;
   for (i=0; i<nr_rows; i++)
     for (j=0; j<nr_cols; j++)
       if (!is_nil (T[i][j])) {
@@ -736,21 +748,29 @@ table_rep::finish () {
 	bs << C->b;
 	x  << C->x1;
 	y  << C->y1;
+        ha << C->halign;
+        if (N(ha) == 0) ext_flag= false;
+        else if (ha[0] != 'l' && ha[0] != 'c' && ha[0] != 'r') ext_flag= false;
       }
+      else ext_flag= false;
 
-  box   tb = composite_box (ip, bs, x, y, false);
+  box tb;
+  if (ext_flag) tb= table_box (ip, bs, x, y, ha, nr_cols);
+  else tb= composite_box (ip, bs, x, y, false);
+
   SI    x1= tb->x1;
   SI    y1= tb->y1;
   SI    x2= tb->x2;
   SI    y2= tb->y2;
-  color fg= env->col;
+  brush fg= env->pen->get_brush ();
+  brush bg= brush (false);
   b= cell_box (tb->ip, tb, 0, 0, x1, y1, x2, y2,
-	       lborder, rborder, bborder, tborder, fg, "", 0);
+	       lborder, rborder, bborder, tborder, fg, bg);
   SI Lsep= lsep+lborder, Rsep= rsep+rborder;
   SI Bsep= bsep+bborder, Tsep= tsep+tborder;
   if ((Lsep != 0) || (Rsep != 0) || (Bsep != 0) || (Tsep != 0))
     b= cell_box (b->ip, b, Lsep, 0, x1, y1-Bsep, x2+Lsep+Rsep, y2+Tsep,
-		 0, 0, 0, 0, fg, "", 0);
+		 0, 0, 0, 0, fg, bg);
 }
 
 array<box>
@@ -787,14 +807,15 @@ table_rep::var_finish () {
     SI    x2= tb->x2 + rborder;
     SI    y1= tb->y1 - BB;
     SI    y2= tb->y2 + TB;
-    color fg= env->col;
+    brush fg= env->pen->get_brush ();
+    brush bg= brush (false);
     b= cell_box (tb->ip, tb, 0, 0, x1, y1, x2, y2,
-		 lborder, rborder, BB, TB, fg, "", 0);
+		 lborder, rborder, BB, TB, fg, bg);
     SI Lsep= lsep+lborder, Rsep= rsep+rborder;
     SI Bsep= BS+BB, Tsep= TS+TB;
     if ((Lsep != 0) || (Rsep != 0) || (Bsep != 0) || (Tsep != 0))
       b= cell_box (b->ip, b, Lsep, 0, x1, y1-Bsep, x2+Lsep+Rsep, y2+Tsep,
-		   0, 0, 0, 0, fg, "", 0);
+		   0, 0, 0, 0, fg, bg);
     stack << b;
   }
   return stack;

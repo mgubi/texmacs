@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "drd_std.hpp"
+#include "vars.hpp"
 
 drd_info std_drd ("tm");
 drd_info the_drd= std_drd;
@@ -32,10 +33,12 @@ hashmap<string,int> STD_CODE (UNKNOWN);
 #define code(i) type (i, TYPE_CODE)
 #define url_type(i) type (i, TYPE_URL)
 #define identifier(i) type (i, TYPE_IDENTIFIER)
+#define color_type(i) type (i, TYPE_COLOR)
 #define graphical(i) type (i, TYPE_GRAPHICAL)
 #define constraint(i) type (i, TYPE_CONSTRAINT)
 #define graphical_id(i) type (i, TYPE_GRAPHICAL_ID)
 #define point_type(i) type (i, TYPE_POINT)
+#define effect(i) type (i, TYPE_EFFECT)
 #define animation(i) type (i, TYPE_ANIMATION)
 #define duration(i) type (i, TYPE_DURATION)
 
@@ -48,8 +51,11 @@ hashmap<string,int> STD_CODE (UNKNOWN);
 #define returns_url() type (TYPE_URL)
 #define returns_identifier() type (TYPE_IDENTIFIER)
 #define returns_animation() type (TYPE_ANIMATION)
+#define returns_duration() type (TYPE_DURATION)
+#define returns_color() type (TYPE_COLOR)
 #define returns_graphical() type (TYPE_GRAPHICAL)
 #define returns_constraint() type (TYPE_CONSTRAINT)
+#define returns_effect() type (TYPE_EFFECT)
 
 static tag_info
 fixed (int arity, int extra=0, int child_mode= CHILD_UNIFORM) {
@@ -80,6 +86,16 @@ init (tree_label l, string name, tag_info ti) {
   std_drd->freeze_border (l);
   // std_drd->freeze_block (l);
   // FIXME: freeze children properties
+}
+
+static void
+init_var (string var, int tp, string vname= "") {
+  tree_label l= make_tree_label (var);
+  tag_info ti= fixed (0) -> var_parameter () -> type (tp);
+  if (vname != "") ti= ti->name (vname);
+  std_drd->info (l)= ti;
+  std_drd->freeze_arity (l);
+  std_drd->freeze_border (l);
 }
 
 static bool std_drd_initialized= false;
@@ -155,6 +171,12 @@ init_std_drd () {
 	var_repeat (1, 1, BIFORM) -> accessible (1) ->
 	name ("decorate pages"));
   init (DBOX, "dbox", fixed (0) -> name ("decorated box"));
+  init (LINE_NOTE, "line-note",
+        fixed (1, 2, BIFORM) -> length (1) ->
+	name ("line note"));
+  init (PAGE_NOTE, "page-note",
+        fixed (1, 2, BIFORM) -> length (1) ->
+	name ("page note"));
 
   init (WITH_LIMITS, "with-limits", fixed (0) -> name ("with limits"));
   init (LINE_BREAK, "line-break", fixed (0) -> name ("line break"));
@@ -171,6 +193,14 @@ init_std_drd () {
   init (VAR_NO_PAGE_BREAK, "no-page-break*",
 	fixed (0) -> name ("no page break before"));
   init (NO_PAGE_BREAK, "no-page-break", fixed (0) -> name ("no page break"));
+  init (VAR_NO_BREAK_HERE, "no-break-here*",
+        fixed (0) -> name ("no page break before line"));
+  init (NO_BREAK_HERE, "no-break-here",
+        fixed (0) -> name ("no page break after line"));
+  init (NO_BREAK_START, "no-break-start",
+        fixed (0) -> name ("start no page breaks"));
+  init (NO_BREAK_END, "no-break-end",
+        fixed (0) -> name ("end no page breaks"));
   init (VAR_NEW_PAGE, "new-page*", fixed (0) -> name ("new page before"));
   init (NEW_PAGE, "new-page", fixed (0) -> name ("new page"));
   init (VAR_NEW_DPAGE, "new-dpage*",
@@ -254,17 +284,21 @@ init_std_drd () {
 	binding (0) -> accessible (1));
   init (PROVIDES, "provides",
 	fixed (1) -> returns_boolean () -> string_type (0));
-  init (VALUE, "value", fixed (1) -> variable (0));
+  init (VALUE, "value", fixed (1) -> variable (0) ->
+        locals (0, "mode", "src"));
   init (QUOTE_VALUE, "quote-value",
-	fixed (1) -> variable (0) -> name ("quoted value"));
+	fixed (1) -> variable (0) -> name ("quoted value") ->
+        locals (0, "mode", "src"));
   init (MACRO, "macro",
 	var_repeat (1, 1, BIFORM) -> argument (0) -> regular (1));
   init (DRD_PROPS, "drd-props",
 	repeat (3, 2) -> name ("drd properties"));
   init (QUOTE_ARG, "quote-arg",
-	repeat (1, 1, BIFORM) -> argument (0) -> name ("quoted argument"));
+	repeat (1, 1, BIFORM) -> argument (0) -> name ("quoted argument") ->
+        locals (0, "mode", "src"));
   init (ARG, "arg",
-	repeat (1, 1, BIFORM) -> argument (0) -> name ("argument"));
+	repeat (1, 1, BIFORM) -> argument (0) -> name ("argument") ->
+        locals (0, "mode", "src"));
   init (COMPOUND, "compound",
 	repeat (1, 1, BIFORM) -> variable (0) -> accessible (1));
   // FIXME: should be refined. The current setting is f.i. needed for "theorem"
@@ -307,7 +341,11 @@ init_std_drd () {
 	fixed (1, 1, BIFORM) -> variable (0) -> regular (1));
   init (EXTERN, "extern",
 	repeat (1, 1, BIFORM) -> code (0) -> regular (1)); // func and args
+  init (VAR_INCLUDE, "include*", fixed (1) -> url_type (0));
   init (INCLUDE, "include", fixed (1) -> url_type (0));
+  init (WITH_PACKAGE, "with-package",
+        fixed (1, 1, BIFORM) -> with_like () ->
+        string_type (0) -> regular (1) -> accessible (1));
   init (USE_PACKAGE, "use-package", repeat (1, 1) -> string_type (0));
   init (USE_MODULE, "use-module", repeat (1, 1) -> code (0));
 
@@ -350,10 +388,15 @@ init_std_drd () {
 	fixed (1, 1, BIFORM) -> accessible (0) -> string_type (1));
   init (FIND_FILE, "find-file",
 	var_repeat (1, 1) -> returns_url () -> url_type (0)); // dirs and file
+  init (FIND_FILE_UPWARDS, "find-file-upwards",
+	repeat (1, 1) -> returns_url () -> string_type (0));
   init (IS_TUPLE, "is-tuple",
 	fixed (1) -> returns_boolean () -> regular (0) -> name ("tuple?"));
   init (LOOK_UP, "look-up",
 	fixed (1, 1, BIFORM) -> regular (0) -> integer (1));
+  init (OCCURS_INSIDE, "occurs-inside",
+	fixed (1, 1, BIFORM) -> returns_boolean () ->
+        regular (0) -> argument (1));
   init (EQUAL, "equal",
 	fixed (2) -> returns_boolean () -> regular (0));
   init (UNEQUAL, "unequal",
@@ -369,6 +412,7 @@ init_std_drd () {
   init (GREATEREQ, "greatereq",
 	fixed (2) -> returns_boolean () -> regular (0) ->
 	name ("greater or equal"));
+  init (BLEND, "blend", fixed (2) -> returns_color () -> color_type (0));
 
   init (CM_LENGTH, "cm-length", fixed (0) -> returns_length ());
   init (MM_LENGTH, "mm-length", fixed (0) -> returns_length ());
@@ -396,8 +440,11 @@ init_std_drd () {
   init (PAG_LENGTH, "pag-length", fixed (0) -> returns_length ());
   init (GW_LENGTH, "gw-length", fixed (0) -> returns_length ());
   init (GH_LENGTH, "gh-length", fixed (0) -> returns_length ());
+  init (GU_LENGTH, "gu-length", fixed (0) -> returns_length ());
   init (TMPT_LENGTH, "tmpt-length", fixed (0) -> returns_length ());
   init (PX_LENGTH, "px-length", fixed (0) -> returns_length ());
+  init (MS_LENGTH, "ms-length", fixed (0) -> returns_length ());
+  init (S_LENGTH, "s-length", fixed (0) -> returns_length ());
   init (MSEC_LENGTH, "msec-length", fixed (0) -> returns_length ());
   init (SEC_LENGTH, "sec-length", fixed (0) -> returns_length ());
   init (MIN_LENGTH, "min-length", fixed (0) -> returns_length ());
@@ -459,19 +506,25 @@ init_std_drd () {
 	accessible (0) -> url_type (0) ->
 	accessible (1) -> regular (1));       // FIXME: location?
   init (SCRIPT, "script",
-	options (1, 1, BIFORM) -> returns_adhoc () ->
-	accessible (0) -> code (0) -> name (0, "script") ->
-	accessible (1) -> regular (1) -> name (0, "where"));
+	repeat (1, 1, BIFORM) -> returns_adhoc () ->
+	accessible (0) -> code (0) -> name (0, "function") ->
+	accessible (1) -> regular (1) -> name (0, "arguments"));
+  init (OBSERVER, "observer",
+	fixed (1, 1, BIFORM) -> returns_adhoc () ->
+	accessible (0) -> identifier (0) -> name (0, "identifier") ->
+	accessible (1) -> code (1) -> name (1, "call back"));
+  init (FIND_ACCESSIBLE, "find-accessible",
+	fixed (1) -> regular (0));
   init (HLINK, "hlink",
 	fixed (1, 1, BIFORM) ->
 	accessible (0) -> name (0, "text") ->
 	url_type (1) -> name (1, "destination") ->
 	name ("hyperlink"));
   init (ACTION, "action",
-	options (2, 1, DETAILED) ->
+	repeat (2, 1, DETAILED) ->
 	accessible (0) -> name (0, "text") ->
-	code (1) -> name (1, "script") ->
-	regular (2) -> name (2, "where"));
+	code (1) -> name (1, "function") ->
+	regular (2) -> name (2, "arguments"));
   init (SET_BINDING, "set-binding",
 	options (1, 2));                      // see env_exec.cpp
   init (GET_BINDING, "get-binding",
@@ -487,10 +540,17 @@ init_std_drd () {
   init (PAGEREF, "pageref",
 	fixed (1) -> name ("page reference") ->
         identifier (0) -> name (0, "id") -> long_name (0, "identifier"));
+  init (GET_ATTACHMENT, "get-attachment",
+	fixed (1) -> name ("get attachment") ->
+        identifier (0) -> name (0, "name"));
   init (WRITE, "write",
 	fixed (1, 1, BIFORM) ->
 	string_type (0) -> name (0, "channel") ->
 	regular (1) -> name (1, "content"));
+  init (TOC_NOTIFY, "toc-notify",
+	fixed (1, 1, BIFORM) ->
+	string_type (0) -> name (0, "kind") ->
+	string_type (1) -> name (1, "title"));
 
   init (TUPLE, "tuple",
 	repeat (0, 1) -> accessible (0));
@@ -507,9 +567,10 @@ init_std_drd () {
   init (BACKUP, "backup",
 	fixed (2) -> regular (0));
   init (PATTERN, "pattern",
-	options (3, 1, DETAILED) -> url_type (0));
+	options (3, 1, DETAILED) -> returns_color () ->
+        url_type (0));
   init (GRADIENT, "gradient",
-	fixed (3));                           // not yet implemented
+	fixed (3) -> returns_color ());           // not yet implemented
   init (SPECIFIC, "specific",
 	fixed (1, 1, BIFORM) ->
 	string_type (0) -> name (0, "medium") ->
@@ -517,9 +578,25 @@ init_std_drd () {
   init (FLAG, "flag",
 	options (2, 1, DETAILED) ->
 	regular (0) -> name (0, "flag text") ->
-	string_type (1) -> name (1, "color") ->
+	color_type (1) -> name (1, "color") ->
 	argument (2) -> name (2, "source"));
+  init (HYPHENATE_AS, "hyphenate-as",
+	options (1, 1, BIFORM) ->
+	string_type (0) -> name (0, "hyphenation") ->
+	accessible (1) -> regular (1) -> name (1, "content"));
 
+  init (ANIM_STATIC, "anim-static",
+	fixed (1, 3, BIFORM) -> returns_animation () ->
+        duration (1));
+  init (ANIM_DYNAMIC, "anim-dynamic",
+	fixed (1, 3, BIFORM) -> returns_animation () ->
+        duration (1));
+  init (MORPH, "morph",
+	repeat (1, 1) -> regular (0));
+  init (ANIM_TIME, "anim-time",
+	fixed (0) -> returns_duration ());
+  init (ANIM_PORTION, "anim-portion",
+	fixed (0) -> returns_numeric ());
   init (ANIM_COMPOSE, "anim-compose",
 	repeat (1, 1) -> returns_animation () ->
 	animation (0));
@@ -529,6 +606,9 @@ init_std_drd () {
   init (ANIM_CONSTANT, "anim-constant",
 	fixed (1, 1, BIFORM) -> returns_animation () ->
 	accessible (0) -> duration (1));
+  init (ANIM_ACCELERATE, "anim-accelerate",
+	fixed (1, 1, BIFORM) -> returns_animation () ->
+	accessible (0) -> string_type (1));
   init (ANIM_TRANSLATE, "anim-translate",
 	fixed (1, 3, DETAILED) -> returns_animation () ->
 	accessible (0) -> animation (0) ->
@@ -548,9 +628,13 @@ init_std_drd () {
 	repeat (1, 1) -> accessible (0));
   init (GR_GROUP, "gr-group",
 	repeat (1, 1) -> returns_graphical () -> graphical (0));
-  init (GR_LINEAR_TRANSFORM, "gr-linear-transform",
+  init (GR_TRANSFORM, "gr-transform",
 	fixed (1, 1, BIFORM) -> returns_graphical () ->
-	graphical (0));
+	accessible (0) -> graphical (0));
+  init (GR_EFFECT, "gr-effect",
+	var_repeat (1, 1, BIFORM) -> returns_graphical () ->
+	accessible (0) ->
+        effect (1));
   /*
   init (TEXT_AT, "text-at",
 	fixed (1, 1, BIFORM) -> returns_graphical () ->
@@ -567,6 +651,9 @@ init_std_drd () {
 	options (1, 1, BIFORM) -> returns_graphical () ->
 	accessible (0) -> point_type (1) ->
         locals (0, "mode", "math"));
+  init (DOCUMENT_AT, "document-at",
+	options (1, 1, BIFORM) -> returns_graphical () ->
+	accessible (0) -> regular (0) -> point_type (1));
   init (_POINT, "point",
 	repeat (1, 1) -> returns_graphical () -> point_type (0));
   init (LINE, "line",
@@ -582,6 +669,14 @@ init_std_drd () {
   init (VAR_SPLINE, "spline*",
 	repeat (2, 1) -> returns_graphical () -> point_type (0));
   init (CSPLINE, "cspline",
+	repeat (3, 1) -> returns_graphical () -> point_type (0));
+  init (BEZIER, "bezier",
+	repeat (2, 1) -> returns_graphical () -> point_type (0));
+  init (CBEZIER, "cbezier",
+	repeat (3, 1) -> returns_graphical () -> point_type (0));
+  init (SMOOTH, "smooth",
+	repeat (2, 1) -> returns_graphical () -> point_type (0));
+  init (CSMOOTH, "csmooth",
 	repeat (3, 1) -> returns_graphical () -> point_type (0));
   init (FILL, "fill",
 	repeat (1, 1));                       // Not yet implemented
@@ -614,8 +709,151 @@ init_std_drd () {
   init (ON_GRID, "on-grid",
         fixed (2) -> returns_constraint () -> graphical_id (0));
 
+  init (TRANSFORM_3D, "transform-3d",
+        fixed (1, 1, BIFORM) -> returns_graphical () ->
+        graphical (0));
+  init (OBJECT_3D, "object-3d",
+        repeat (1, 1) -> returns_graphical () ->
+        graphical (0));
+  init (TRIANGLE_3D, "triangle-3d",
+        fixed (3, 1, BIFORM) -> returns_graphical () ->
+        graphical (0) -> color_type (1));
+  init (LIGHT_3D, "light-3d",
+        fixed (1, 1, BIFORM) -> returns_graphical () ->
+        graphical (0));
+  init (LIGHT_DIFFUSE, "light-diffuse",
+        repeat (1, 1, BIFORM) ->
+        point_type (0));
+  init (LIGHT_SPECULAR, "light-specular",
+        repeat (2, 1, BIFORM) ->
+        point_type (0));
+
+  init (EFF_MOVE, "eff-move",
+        fixed (3, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        length (1) -> name (1, "dx") ->
+        length (2) -> name (2, "dy"));
+  init (EFF_MAGNIFY, "eff-magnify",
+        fixed (3, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        numeric (1) -> name (1, "magx") ->
+        numeric (2) -> name (2, "magy"));
+  init (EFF_BUBBLE, "eff-bubble",
+        fixed (3, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        length (1) -> name (1, "radius") ->
+        numeric (2) -> name (2, "amplitude"));
+  init (EFF_TURBULENCE, "eff-turbulence",
+        fixed (5, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        integer (1) -> name (1, "seed") ->
+        length (2) -> name (2, "wave width") ->
+        length (3) -> name (3, "wave height") ->
+        integer (4) -> name (4, "octaves"));
+  init (EFF_FRACTAL_NOISE, "eff-fractal-noise",
+        fixed (5, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        integer (1) -> name (1, "seed") ->
+        length (2) -> name (2, "wave width") ->
+        length (3) -> name (3, "wave height") ->
+        integer (4) -> name (4, "octaves"));
+  init (EFF_GAUSSIAN, "eff-gaussian",
+        options (1, 2, DETAILED) -> returns_effect () ->
+        length (0) -> name (0, "rx") -> long_name (0, "blur x-radius") ->
+        length (1) -> name (1, "ry") -> long_name (1, "blur y-radius") ->
+        numeric (2) -> name (2, "phi") -> long_name (2, "blur angle"));
+  init (EFF_OVAL, "eff-oval",
+        options (1, 2, DETAILED) -> returns_effect () ->
+        length (0) -> name (0, "rx") -> long_name (0, "x-radius") ->
+        length (1) -> name (1, "ry") -> long_name (1, "y-radius") ->
+        numeric (2) -> name (2, "phi") -> long_name (2, "angle"));
+  init (EFF_RECTANGULAR, "eff-rectangular",
+        options (1, 2, DETAILED) -> returns_effect () ->
+        length (0) -> name (0, "rx") -> long_name (0, "x-radius") ->
+        length (1) -> name (1, "ry") -> long_name (1, "y-radius") ->
+        numeric (2) -> name (2, "phi") -> long_name (2, "angle"));
+  init (EFF_MOTION, "eff-motion",
+        options (2, 0, DETAILED) -> returns_effect () ->
+        length (0) -> name (0, "dx") -> long_name (0, "x-shift") ->
+        length (1) -> name (1, "dy") -> long_name (1, "y-shift"));
+  init (EFF_BLUR, "eff-blur",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        effect (1) -> name (1, "pen"));
+  init (EFF_OUTLINE, "eff-outline",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        effect (1) -> name (1, "pen"));
+  init (EFF_THICKEN, "eff-thicken",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        effect (1) -> name (1, "pen"));
+  init (EFF_ERODE, "eff-erode",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        effect (1) -> name (1, "pen"));
+  init (EFF_DEGRADE, "eff-degrade",
+        fixed (5, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        length (1) -> name (1, "wx") -> long_name (1, "x-wave-length") ->
+        length (2) -> name (2, "wy") -> long_name (2, "y-wave-length") ->
+        numeric (3) -> name (3, "threshold") -> long_name (3, "threshold") ->
+        numeric (4) -> name (4, "sharpness") -> long_name (4, "sharpness"));
+  init (EFF_DISTORT, "eff-distort",
+        fixed (5, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        length (1) -> name (1, "wx") -> long_name (1, "x-wave-length") ->
+        length (2) -> name (2, "wy") -> long_name (2, "y-wave-length") ->
+        length (3) -> name (3, "rx") -> long_name (3, "x-radius") ->
+        length (4) -> name (4, "ry") -> long_name (4, "y-radius"));
+  init (EFF_GNAW, "eff-gnaw",
+        fixed (5, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        length (1) -> name (1, "wx") -> long_name (1, "x-wave-length") ->
+        length (2) -> name (2, "wy") -> long_name (2, "y-wave-length") ->
+        length (3) -> name (3, "rx") -> long_name (3, "x-radius") ->
+        length (4) -> name (4, "ry") -> long_name (4, "y-radius"));
+  init (EFF_SUPERPOSE, "eff-superpose",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_ADD, "eff-add",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_SUB, "eff-sub",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_MUL, "eff-mul",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_MIN, "eff-min",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_MAX, "eff-max",
+	repeat (1, 1) -> returns_effect () -> effect (0));
+  init (EFF_MIX, "eff-mix",
+	fixed (4, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "eff1") ->
+        numeric (1) -> name (1, "alpha1") ->
+        effect (2) -> name (2, "eff2") ->
+        numeric (3) -> name (3, "alpha2"));
+  init (EFF_NORMALIZE, "eff-normalize",
+        fixed (1) -> returns_effect () ->
+        effect (0) -> name (0, "body"));
+  init (EFF_MONOCHROME, "eff-monochrome",
+        fixed (3, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+        color_type (1) -> name (1, "color") ->
+        numeric (2) -> name (2, "opacity"));
+  init (EFF_COLOR_MATRIX, "eff-color-matrix",
+        fixed (1, 1, BIFORM) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+	numeric (1));
+  init (EFF_MAKE_TRANSPARENT, "eff-make-transparent",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+	color_type (1) -> name (1, "bg") -> name (1, "background color"));
+  init (EFF_MAKE_OPAQUE, "eff-make-opaque",
+        fixed (2, 0, DETAILED) -> returns_effect () ->
+        effect (0) -> name (0, "body") ->
+	color_type (1) -> name (1, "bg") -> name (1, "background color"));
+
   init (CANVAS, "canvas", fixed (6, 1, BIFORM) -> accessible (1));
-  init (ORNAMENT, "ornament", fixed (1) -> accessible (0));
+  init (ORNAMENT, "ornament", options (1, 1) -> accessible (0));
 
   init (FORMAT, "format",
 	repeat (1, 1));
@@ -671,4 +909,293 @@ init_std_drd () {
 	fixed (1) -> accessible (0) -> inner_border ());
   init (make_tree_label ("ignore"), "ignore",
 	fixed (1) -> regular (0) -> inner_border ());
+
+  init_var (DPI, TYPE_NUMERIC);
+  init_var (ZOOM_FACTOR, TYPE_NUMERIC);
+  init_var (PREAMBLE, TYPE_BOOLEAN);
+  init_var (SAVE_AUX, TYPE_BOOLEAN);
+  init_var (MODE, TYPE_STRING);
+  init_var (INFO_FLAG, TYPE_STRING);
+  init_var (WINDOW_BARS, TYPE_STRING);
+  init_var (SCROLL_BARS, TYPE_BOOLEAN);
+  init_var (THE_LABEL, TYPE_REGULAR);
+  init_var (THE_TAGS, TYPE_ADHOC);
+  init_var (THE_MODULES, TYPE_ADHOC);
+  init_var (WARN_MISSING, TYPE_BOOLEAN);
+  init_var (GLOBAL_TITLE, TYPE_STRING);
+  init_var (GLOBAL_AUTHOR, TYPE_STRING);
+  init_var (GLOBAL_SUBJECT, TYPE_STRING);
+
+  init_var (FONT, TYPE_STRING);
+  init_var (FONT_FAMILY, TYPE_STRING);
+  init_var (FONT_SERIES, TYPE_STRING);
+  init_var (FONT_SHAPE, TYPE_STRING);
+  init_var (FONT_SIZE, TYPE_NUMERIC);
+  init_var (FONT_BASE_SIZE, TYPE_NUMERIC);
+  init_var (FONT_EFFECTS, TYPE_STRING);
+  init_var (MAGNIFICATION, TYPE_NUMERIC);
+  init_var (COLOR, TYPE_COLOR);
+  init_var (OPACITY, TYPE_NUMERIC);
+  init_var (BG_COLOR, TYPE_COLOR);
+  init_var (LOCUS_COLOR, TYPE_COLOR);
+  init_var (VISITED_COLOR, TYPE_COLOR);
+  init_var (NO_PATTERNS, TYPE_COLOR);
+  init_var (LANGUAGE, TYPE_STRING);
+  init_var (SPACING_POLICY, TYPE_ADHOC);
+  init_var (ATOM_DECORATIONS, TYPE_ADHOC);
+  init_var (LINE_DECORATIONS, TYPE_ADHOC);
+  init_var (PAGE_DECORATIONS, TYPE_ADHOC);
+  init_var (XOFF_DECORATIONS, TYPE_LENGTH);
+  init_var (YOFF_DECORATIONS, TYPE_LENGTH);
+
+  init_var (MATH_LANGUAGE, TYPE_STRING);
+  init_var (MATH_FONT, TYPE_STRING);
+  init_var (MATH_FONT_FAMILY, TYPE_STRING);
+  init_var (MATH_FONT_SERIES, TYPE_STRING);
+  init_var (MATH_FONT_SHAPE, TYPE_STRING);
+  init_var (MATH_FONT_SIZES, TYPE_ADHOC);
+  init_var (MATH_LEVEL, TYPE_INTEGER);
+  init_var (MATH_DISPLAY, TYPE_BOOLEAN);
+  init_var (MATH_CONDENSED, TYPE_BOOLEAN);
+  init_var (MATH_VPOS, TYPE_INTEGER);
+  init_var (MATH_NESTING_MODE, TYPE_STRING);
+  init_var (MATH_NESTING_LEVEL, TYPE_INTEGER);
+  init_var (MATH_FRAC_LIMIT, TYPE_LENGTH);
+  init_var (MATH_TABLE_LIMIT, TYPE_LENGTH);
+  init_var (MATH_FLATTEN_COLOR, TYPE_COLOR);
+  init_var (MATH_TOP_SWELL_START, TYPE_LENGTH);
+  init_var (MATH_TOP_SWELL_END, TYPE_LENGTH);
+  init_var (MATH_BOT_SWELL_START, TYPE_LENGTH);
+  init_var (MATH_BOT_SWELL_END, TYPE_LENGTH);
+
+  init_var (PROG_LANGUAGE, TYPE_STRING);
+  init_var (PROG_SCRIPTS, TYPE_STRING);
+  init_var (PROG_FONT, TYPE_STRING);
+  init_var (PROG_FONT_FAMILY, TYPE_STRING);
+  init_var (PROG_FONT_SERIES, TYPE_STRING);
+  init_var (PROG_FONT_SHAPE, TYPE_STRING);
+  init_var (PROG_SESSION, TYPE_STRING);
+
+  init_var (PAR_MODE, TYPE_STRING);
+  init_var (PAR_FLEXIBILITY, TYPE_NUMERIC);
+  init_var (PAR_HYPHEN, TYPE_STRING);
+  init_var (PAR_SPACING, TYPE_STRING);
+  init_var (PAR_KERNING_REDUCE, TYPE_NUMERIC);
+  init_var (PAR_KERNING_STRETCH, TYPE_NUMERIC);
+  init_var (PAR_KERNING_MARGIN, TYPE_BOOLEAN);
+  init_var (PAR_CONTRACTION, TYPE_NUMERIC);
+  init_var (PAR_EXPANSION, TYPE_NUMERIC);
+  init_var (PAR_WIDTH, TYPE_LENGTH);
+  init_var (PAR_LEFT, TYPE_LENGTH);
+  init_var (PAR_RIGHT, TYPE_LENGTH);
+  init_var (PAR_FIRST, TYPE_LENGTH);
+  init_var (PAR_NO_FIRST, TYPE_BOOLEAN);
+  init_var (PAR_SEP, TYPE_LENGTH);
+  init_var (PAR_HOR_SEP, TYPE_LENGTH);
+  init_var (PAR_VER_SEP, TYPE_LENGTH);
+  init_var (PAR_LINE_SEP, TYPE_LENGTH);
+  init_var (PAR_PAR_SEP, TYPE_LENGTH);
+  init_var (PAR_FNOTE_SEP, TYPE_LENGTH);
+  init_var (PAR_COLUMNS, TYPE_INTEGER);
+  init_var (PAR_COLUMNS_SEP, TYPE_LENGTH);
+  init_var (PAR_SWELL, TYPE_LENGTH);
+
+  init_var (PAGE_MEDIUM, TYPE_STRING);
+  init_var (PAGE_PRINTED, TYPE_BOOLEAN);
+  init_var (PAGE_TYPE, TYPE_STRING);
+  init_var (PAGE_ORIENTATION, TYPE_STRING);
+  init_var (PAGE_WIDTH_MARGIN, TYPE_BOOLEAN);
+  init_var (PAGE_HEIGHT_MARGIN, TYPE_BOOLEAN);
+  init_var (PAGE_SCREEN_MARGIN, TYPE_BOOLEAN);
+  init_var (PAGE_SINGLE, TYPE_BOOLEAN);
+  init_var (PAGE_PACKET, TYPE_INTEGER);
+  init_var (PAGE_OFFSET, TYPE_INTEGER);
+  init_var (PAGE_BORDER, TYPE_ADHOC);
+  init_var (PAGE_BREAKING, TYPE_STRING);
+  init_var (PAGE_FLEXIBILITY, TYPE_NUMERIC);
+  init_var (PAGE_FIRST, TYPE_NUMERIC);
+  init_var (PAGE_NR, TYPE_INTEGER);
+  init_var (PAGE_THE_PAGE, TYPE_ADHOC);
+  init_var (PAGE_WIDTH, TYPE_LENGTH);
+  init_var (PAGE_HEIGHT, TYPE_LENGTH);
+  init_var (PAGE_ODD, TYPE_LENGTH);
+  init_var (PAGE_EVEN, TYPE_LENGTH);
+  init_var (PAGE_RIGHT, TYPE_LENGTH);
+  init_var (PAGE_ODD_SHIFT, TYPE_LENGTH);
+  init_var (PAGE_EVEN_SHIFT, TYPE_LENGTH);
+  init_var (PAGE_TOP, TYPE_LENGTH);
+  init_var (PAGE_BOT, TYPE_LENGTH);
+  init_var (PAGE_USER_HEIGHT, TYPE_LENGTH);
+  init_var (PAGE_SHRINK, TYPE_LENGTH);
+  init_var (PAGE_EXTEND, TYPE_LENGTH);
+  init_var (PAGE_HEAD_SEP, TYPE_LENGTH);
+  init_var (PAGE_FOOT_SEP, TYPE_LENGTH);
+  init_var (PAGE_ODD_HEADER, TYPE_REGULAR, "odd page header");
+  init_var (PAGE_ODD_FOOTER, TYPE_REGULAR, "odd page footer");
+  init_var (PAGE_EVEN_HEADER, TYPE_REGULAR, "even page header");
+  init_var (PAGE_EVEN_FOOTER, TYPE_REGULAR, "even page footer");
+  init_var (PAGE_THIS_TOP, TYPE_LENGTH);
+  init_var (PAGE_THIS_BOT, TYPE_LENGTH);
+  init_var (PAGE_THIS_HEADER, TYPE_REGULAR);
+  init_var (PAGE_THIS_FOOTER, TYPE_REGULAR);
+  init_var (PAGE_THIS_BG_COLOR, TYPE_COLOR);
+  init_var (PAGE_SCREEN_WIDTH, TYPE_LENGTH);
+  init_var (PAGE_SCREEN_HEIGHT, TYPE_LENGTH);
+  init_var (PAGE_SCREEN_LEFT, TYPE_LENGTH);
+  init_var (PAGE_SCREEN_RIGHT, TYPE_LENGTH);
+  init_var (PAGE_SCREEN_TOP, TYPE_LENGTH);
+  init_var (PAGE_SCREEN_BOT, TYPE_LENGTH);
+  init_var (PAGE_SHOW_HF, TYPE_BOOLEAN);
+  init_var (PAGE_FNOTE_SEP, TYPE_LENGTH);
+  init_var (PAGE_FNOTE_BARLEN, TYPE_LENGTH);
+  init_var (PAGE_FLOAT_SEP, TYPE_LENGTH);
+  init_var (PAGE_FLOAT_ENABLE, TYPE_BOOLEAN);
+  init_var (PAGE_MNOTE_SEP, TYPE_LENGTH);
+  init_var (PAGE_MNOTE_WIDTH, TYPE_LENGTH);
+
+  init_var (TABLE_WIDTH, TYPE_LENGTH);
+  init_var (TABLE_HEIGHT, TYPE_LENGTH);
+  init_var (TABLE_HMODE, TYPE_STRING);
+  init_var (TABLE_VMODE, TYPE_STRING);
+  init_var (TABLE_HALIGN, TYPE_STRING);
+  init_var (TABLE_VALIGN, TYPE_STRING);
+  init_var (TABLE_ROW_ORIGIN, TYPE_INTEGER);
+  init_var (TABLE_COL_ORIGIN, TYPE_INTEGER);
+  init_var (TABLE_LSEP, TYPE_LENGTH);
+  init_var (TABLE_RSEP, TYPE_LENGTH);
+  init_var (TABLE_BSEP, TYPE_LENGTH);
+  init_var (TABLE_TSEP, TYPE_LENGTH);
+  init_var (TABLE_LBORDER, TYPE_LENGTH);
+  init_var (TABLE_RBORDER, TYPE_LENGTH);
+  init_var (TABLE_BBORDER, TYPE_LENGTH);
+  init_var (TABLE_TBORDER, TYPE_LENGTH);
+  init_var (TABLE_HYPHEN, TYPE_STRING);
+  init_var (TABLE_MIN_ROWS, TYPE_INTEGER);
+  init_var (TABLE_MIN_COLS, TYPE_INTEGER);
+  init_var (TABLE_MAX_ROWS, TYPE_INTEGER);
+  init_var (TABLE_MAX_COLS, TYPE_INTEGER);
+
+  init_var (CELL_FORMAT, TYPE_ADHOC);
+  init_var (CELL_DECORATION, TYPE_ADHOC);
+  init_var (CELL_BACKGROUND, TYPE_COLOR);
+  init_var (CELL_ORIENTATION, TYPE_STRING);
+  init_var (CELL_WIDTH, TYPE_LENGTH);
+  init_var (CELL_HEIGHT, TYPE_LENGTH);
+  init_var (CELL_HPART, TYPE_NUMERIC);
+  init_var (CELL_VPART, TYPE_NUMERIC);
+  init_var (CELL_HMODE, TYPE_STRING);
+  init_var (CELL_VMODE, TYPE_STRING);
+  init_var (CELL_HALIGN, TYPE_STRING);
+  init_var (CELL_VALIGN, TYPE_STRING);
+  init_var (CELL_LSEP, TYPE_LENGTH);
+  init_var (CELL_RSEP, TYPE_LENGTH);
+  init_var (CELL_BSEP, TYPE_LENGTH);
+  init_var (CELL_TSEP, TYPE_LENGTH);
+  init_var (CELL_LBORDER, TYPE_LENGTH);
+  init_var (CELL_RBORDER, TYPE_LENGTH);
+  init_var (CELL_BBORDER, TYPE_LENGTH);
+  init_var (CELL_TBORDER, TYPE_LENGTH);
+  init_var (CELL_ROW_SPAN, TYPE_INTEGER);
+  init_var (CELL_COL_SPAN, TYPE_INTEGER);
+  init_var (CELL_VCORRECT, TYPE_STRING);
+  init_var (CELL_HYPHEN, TYPE_STRING);
+  init_var (CELL_BLOCK, TYPE_STRING);
+  init_var (CELL_ROW_NR, TYPE_INTEGER);
+  init_var (CELL_COL_NR, TYPE_INTEGER);
+  init_var (CELL_SWELL, TYPE_LENGTH);
+
+  init_var (GR_GEOMETRY, TYPE_ADHOC);
+  init_var (GR_FRAME, TYPE_ADHOC);
+  init_var (GR_MODE, TYPE_STRING);
+  init_var (GR_AUTO_CROP, TYPE_BOOLEAN);
+  init_var (GR_CROP_PADDING, TYPE_LENGTH);
+  init_var (GR_GRID, TYPE_ADHOC);
+  init_var (GR_GRID_ASPECT, TYPE_ADHOC);
+  init_var (GR_EDIT_GRID, TYPE_ADHOC);
+  init_var (GR_EDIT_GRID_ASPECT, TYPE_ADHOC);
+  init_var (GR_TRANSFORMATION, TYPE_ADHOC);
+
+  init_var (GR_GID, TYPE_INTEGER);
+  init_var (GR_ANIM_ID, TYPE_INTEGER);
+  init_var (GR_PROVISO, TYPE_BOOLEAN);
+  init_var (GR_MAGNIFY, TYPE_NUMERIC);
+  init_var (GR_OPACITY, TYPE_NUMERIC);
+  init_var (GR_COLOR, TYPE_COLOR);
+  init_var (GR_POINT_STYLE, TYPE_STRING);
+  init_var (GR_POINT_SIZE, TYPE_LENGTH);
+  init_var (GR_POINT_BORDER, TYPE_LENGTH);
+  init_var (GR_LINE_WIDTH, TYPE_LENGTH);
+  init_var (GR_LINE_JOIN, TYPE_STRING);
+  init_var (GR_LINE_CAPS, TYPE_STRING);
+  init_var (GR_LINE_EFFECTS, TYPE_ADHOC);
+  init_var (GR_LINE_PORTION, TYPE_NUMERIC);
+  init_var (GR_DASH_STYLE, TYPE_ADHOC);
+  init_var (GR_DASH_STYLE_UNIT, TYPE_LENGTH);
+  init_var (GR_ARROW_BEGIN, TYPE_ADHOC);
+  init_var (GR_ARROW_END, TYPE_ADHOC);
+  init_var (GR_ARROW_LENGTH, TYPE_LENGTH);
+  init_var (GR_ARROW_HEIGHT, TYPE_LENGTH);
+  init_var (GR_FILL_COLOR, TYPE_COLOR);
+  init_var (GR_FILL_STYLE, TYPE_STRING);
+  init_var (GR_TEXT_AT_HALIGN, TYPE_STRING);
+  init_var (GR_TEXT_AT_VALIGN, TYPE_STRING);
+  init_var (GR_TEXT_AT_MARGIN, TYPE_LENGTH);
+  init_var (GR_DOC_AT_VALIGN, TYPE_STRING);
+  init_var (GR_DOC_AT_WIDTH, TYPE_LENGTH);
+  init_var (GR_DOC_AT_HMODE, TYPE_STRING);
+  init_var (GR_DOC_AT_BORDER, TYPE_LENGTH);
+  init_var (GR_DOC_AT_PADDING, TYPE_LENGTH);
+
+  init_var (GID, TYPE_INTEGER);
+  init_var (ANIM_ID, TYPE_INTEGER);
+  init_var (PROVISO, TYPE_BOOLEAN);
+  init_var (MAGNIFY, TYPE_NUMERIC);
+  init_var (POINT_STYLE, TYPE_STRING);
+  init_var (POINT_SIZE, TYPE_LENGTH);
+  init_var (POINT_BORDER, TYPE_LENGTH);
+  init_var (LINE_WIDTH, TYPE_LENGTH);
+  init_var (LINE_JOIN, TYPE_STRING);
+  init_var (LINE_CAPS, TYPE_STRING);
+  init_var (LINE_EFFECTS, TYPE_ADHOC);
+  init_var (LINE_PORTION, TYPE_NUMERIC);
+  init_var (DASH_STYLE, TYPE_ADHOC);
+  init_var (DASH_STYLE_UNIT, TYPE_LENGTH);
+  init_var (ARROW_BEGIN, TYPE_ADHOC);
+  init_var (ARROW_END, TYPE_ADHOC);
+  init_var (ARROW_LENGTH, TYPE_LENGTH);
+  init_var (ARROW_HEIGHT, TYPE_LENGTH);
+  init_var (FILL_COLOR, TYPE_COLOR);
+  init_var (FILL_STYLE, TYPE_STRING);
+  init_var (TEXT_AT_HALIGN, TYPE_STRING);
+  init_var (TEXT_AT_VALIGN, TYPE_STRING);
+  init_var (TEXT_AT_MARGIN, TYPE_LENGTH);
+  init_var (DOC_AT_VALIGN, TYPE_STRING);
+  init_var (DOC_AT_WIDTH, TYPE_LENGTH);
+  init_var (DOC_AT_HMODE, TYPE_STRING);
+  init_var (DOC_AT_BORDER, TYPE_LENGTH);
+  init_var (DOC_AT_PADDING, TYPE_LENGTH);
+
+  init_var (SRC_STYLE, TYPE_STRING);
+  init_var (SRC_SPECIAL, TYPE_STRING);
+  init_var (SRC_COMPACT, TYPE_STRING);
+  init_var (SRC_CLOSE, TYPE_STRING);
+  init_var (SRC_TAG_COLOR, TYPE_COLOR);
+
+  init_var (CANVAS_TYPE, TYPE_STRING);
+  init_var (CANVAS_COLOR, TYPE_COLOR);
+  init_var (CANVAS_HPADDING, TYPE_LENGTH);
+  init_var (CANVAS_VPADDING, TYPE_LENGTH);
+  init_var (CANVAS_BAR_WIDTH, TYPE_LENGTH);
+  init_var (CANVAS_BAR_PADDING, TYPE_LENGTH);
+  init_var (CANVAS_BAR_COLOR, TYPE_COLOR);
+  init_var (ORNAMENT_SHAPE, TYPE_STRING);
+  init_var (ORNAMENT_TITLE_STYLE, TYPE_STRING);
+  init_var (ORNAMENT_BORDER, TYPE_LENGTH);
+  init_var (ORNAMENT_SWELL, TYPE_NUMERIC);
+  init_var (ORNAMENT_HPADDING, TYPE_LENGTH);
+  init_var (ORNAMENT_VPADDING, TYPE_LENGTH);
+  init_var (ORNAMENT_COLOR, TYPE_COLOR);
+  init_var (ORNAMENT_EXTRA_COLOR, TYPE_COLOR);
+  init_var (ORNAMENT_SUNNY_COLOR, TYPE_COLOR);
+  init_var (ORNAMENT_SHADOW_COLOR, TYPE_COLOR);
 }

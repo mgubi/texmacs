@@ -15,6 +15,10 @@
   (:use (generic generic-kbd)
 	(dynamic fold-edit)))
 
+(define (reset-buffer-players)
+  (players-set-elapsed (buffer-tree) 0.0)
+  (update-players (tree->path (buffer-tree)) #f))
+
 (kbd-map
   ("ir-up" (screens-switch-to :previous))
   ("ir-down" (screens-switch-to :next))
@@ -32,7 +36,9 @@
   ("S-F10" (dynamic-previous))
   ("S-F11" (dynamic-next))
   ("S-F12" (dynamic-last))
-  ("C-F9" (toggle-full-screen-mode)))
+  ("C-F9" (toggle-full-screen-mode))
+  ("C-F10" (toggle-panorama-mode))
+  ("C-F12" (reset-buffer-players)))
 
 (kbd-map
   (:mode in-screens?)

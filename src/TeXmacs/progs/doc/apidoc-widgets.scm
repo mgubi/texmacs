@@ -82,15 +82,13 @@
   (cond ((== where "scheme")
          (menu-dynamic
            (resize ("300px" "600px" "9999px") ("200px" "300px" "9999px")
-             (texmacs-input ($doc-explain-scm key) 
-                            '(style "tmdoc") (noop) #f))))
+             (texmacs-input ($doc-explain-scm key) '(style "tmdoc") #f))))
         ((== where "macros")
          (menu-dynamic
            (resize ("300px" "600px" "9999px") ("200px" "300px" "9999px")
-             (texmacs-input ($doc-explain-macro key)
-                            '(style "tmdoc") (noop) #f))))
+             (texmacs-input ($doc-explain-macro key) '(style "tmdoc") #f))))
         (else
-          (menu-dynamic ("ERROR: unknow documentation set" (help-win-hide))))))
+          (menu-dynamic ("ERROR: unknown documentation set" (help-win-hide))))))
 
 (tm-define (help-window where key)
   (:synopsis "Display the help window for @key in the @where documentation")
@@ -142,7 +140,7 @@
 
 (tm-widget (symbol-doc-widget)
   (resize ("200px" "400px" "9000px") ("100px" "200px" "3000px")
-    (texmacs-input ($doc-explain-scm mw-symbol) '(style "tmdoc") (noop) #f)))
+    (texmacs-input ($doc-explain-scm mw-symbol) '(style "tmdoc") #f)))
 
 (tm-widget (symbol-doc-buttons)
  (explicit-buttons >>
@@ -194,15 +192,14 @@
 (tm-widget (symbol-browser-widget)
   (vertical
    (bold (text "Symbol"))
-   (resize ("200px" "350üpx" "4000px") ("300px" "600px" "4000px")
+   (resize ("200px" "350px" "4000px") ("300px" "600px" "4000px")
      (filtered-choice (begin (set! clw-string answer)
                              (set! clw-string-filter filter))
                       (list-sort (scheme-completions-dump) string<?)
                       clw-string
                       clw-string-filter))
    (explicit-buttons
-    ("See documentation" 
-     (doc-check-cache-do (lambda () (help-window "scheme" clw-string)))))))
+    ("See documentation" (help-window "scheme" (tmstring->string clw-string))))))
 
 (tm-define (open-symbol-browser)
   (set! clw-string "")

@@ -38,7 +38,7 @@ Pdf files. Converters exist for TeX/LaTeX and Html/Mathml.
 %setup -q -n @tm_devel@
 
 %build
-./configure --disable-qt --prefix=/usr
+./configure --disable-qt --disable-pdf-renderer --prefix=/usr
 make STATIC_TEXMACS
 
 %install
@@ -91,6 +91,9 @@ cp -f $RPM_BUILD_ROOT%{_datadir}/TeXmacs/misc/images/text-texmacs.svg $RPM_BUILD
 rm -rf $RPM_BUILD_ROOT
 
 %changelog
+
+* Wed Dec 18 2013   Joris van der Hoeven <vdhoeven@texmacs.org>
+- 1.99.1 Add --disable-pdf-renderer option to ./configure
 
 * Sun Mar 10 2012   Joris van der Hoeven <vdhoeven@texmacs.org>
 - 1.0.7.14 Updated mimetype support

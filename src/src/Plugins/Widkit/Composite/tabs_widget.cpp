@@ -71,7 +71,7 @@ tabs_widget_rep::handle_get_size (get_size_event ev) {
   }
   int www= w, hhh= h - hh;
   a[l] << get_size (www, hhh, ev->mode);
-  w= max (ww, www); h= hh + hhh + 3*PIXEL;
+  w= max (ww, www + 2*PIXEL); h= hh + hhh + 4*PIXEL;
 }
 
 void
@@ -107,13 +107,13 @@ tabs_widget_rep::handle_position (position_event ev) {
     cur_w += the_w + 2*PIXEL;
     xs << cur_w;
   }
-  a[l] << emit_position (0, 0, w, last_h, south_west);
+  a[l] << emit_position (PIXEL, PIXEL, w-2*PIXEL, last_h-PIXEL, south_west);
   h1= last_h; h2= max_h;
 }
 
 void
 tabs_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   layout_default (ren, 0, 0, w, h);
   if (h1 == 0 || h2 == 0 || N(xs) == 0) return;
 
@@ -126,23 +126,27 @@ tabs_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
   SI top= h1 + h2 + 2*PIXEL;
   SI lim= xs[N(xs)-1];
 
-  ren->set_line_style (PIXEL);
-  ren->set_color (pastel);
+  ren->set_pencil (pencil (pastel, PIXEL));
   if (focus > 0)
     ren->line (0, h1, fx1, h1);
   ren->line (fx2, h1, w, h1);
-  ren->set_color (dark);
+  ren->set_pencil (pencil (dark, PIXEL));
   if (focus > 0)
     ren->line (0, h1 + PIXEL, fx1, h1 + PIXEL);
   ren->line (fx2, h1 + PIXEL, w, h1 + PIXEL);
-  ren->set_color (dark);
+  ren->set_pencil (pencil (dark, PIXEL));
   ren->line (0, top, lim - PIXEL, top);
   for (int i=0; i<l; i++) {
-    ren->set_color (pastel);
+    ren->set_pencil (pencil (pastel, PIXEL));
     ren->line (xs[i], h1+2*PIXEL, xs[i], top - PIXEL);
-    ren->set_color (dark);
+    ren->set_pencil (pencil (dark, PIXEL));
     ren->line (xs[i+1]-PIXEL, h1+2*PIXEL, xs[i+1]-PIXEL, top - PIXEL);
   }
+  ren->set_pencil (pencil (pastel, PIXEL));
+  ren->line (0, 0, 0, h1);
+  ren->set_pencil (pencil (dark, PIXEL));
+  ren->line (0, 0, w, 0);
+  ren->line (w-PIXEL, 0, w-PIXEL, h1);
 }
 
 void

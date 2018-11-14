@@ -15,7 +15,7 @@
   (:use (utils edit auto-close)
 	(generic format-edit)
 	(generic generic-edit)
-	(text std-text-edit)))
+	(text text-edit)))
 
 (kbd-symbols
   "alpha" "beta" "gamma" "delta" "epsilon"
@@ -112,7 +112,7 @@
   "lessdot" "gtrdot" "ltimes" "rtimes" "shortmid"
   "shortparallel" "smallsetminus" "thicksim" "thickapprox"
   "approxeq" "succapprox" "precapprox" "curvearrowleft"
-  "curvearrowright" "digamma" "varkappa" "" "hslash"
+  "curvearrowright" "digamma" "varkappa" "hslash"
   "hbar" "backepsilon"
   
   "mapsto" "longmapsto" "longrightarrow" "longleftarrow"
@@ -205,8 +205,8 @@
   ("tan" "Insert tan" (insert "tan"))
   ("tanh" "Insert tanh" (insert "tanh"))
 
-  ("maketitle" "Insert title"
-   (begin (make 'make-title) (make 'title)))
+  ("abstract"  "Insert abstract" (make-abstract-data))
+  ("maketitle" "Insert title"    (make-doc-data))
   ("tableofcontents" "Insert table of contents"
    (make-aux "table-of-contents" "toc"))
   ("appendix" "Insert appendix" (make-section 'appendix))
@@ -243,7 +243,11 @@
   ("prod" "Insert big product" (math-big-operator "prod"))
   ("coprod" "Insert big coproduct" (math-big-operator "amalg"))
   ("int" "Insert big integral" (math-big-operator "int"))
+  ("iint" "Insert big integrals" (math-big-operator "iint"))
+  ("iiint" "Insert big integrals" (math-big-operator "iiint"))
   ("oint" "Insert big contour integral" (math-big-operator "oint"))
+  ("oiint" "Insert big contour integrals" (math-big-operator "oiint"))
+  ("oiiint" "Insert big contour integrals" (math-big-operator "oiiint"))
   ("bigcap" "Insert big intersection" (math-big-operator "cap"))
   ("bigcup" "Insert big union" (math-big-operator "cup"))
   ("bigsqcup" "Insert big square union" (math-big-operator "sqcup"))
@@ -378,7 +382,7 @@
   ("label" "Make label" (make-label))
   ("ref" "Make reference" (make 'reference))
   ("pageref" "Make page reference" (make 'pageref))
-  ("footnote" "Insert a footnote" (make 'footnote))
+  ("footnote" "Insert a footnote" (make-wrapped 'footnote))
   ("input" "Include a document" (make 'include)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

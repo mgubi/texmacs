@@ -16,11 +16,12 @@ box format_stack (path ip, array<box> bx, array<space> ht, SI height,
 		  bool may_stretch);
 #include "Boxes/construct.hpp"
 array<page_item> sub (array<page_item> l, path p, path q);
-SI stretch_space (space spc, double stretch);
 page_item access (array<page_item> l, path p);
 skeleton break_pages (array<page_item> l, space ph, int qual,
-		      space fn_sep, space fnote_sep, space float_sep, font fn);
-box page_box (path ip, box b, tree page, SI width, SI height, SI left, SI top,
+		      space fn_sep, space fnote_sep, space float_sep,
+                      font fn, int first_page);
+box page_box (path ip, box b, tree page, int page_nr, brush bgc,
+              SI width, SI height, SI left, SI top,
 	      SI bot, box header, box footer, SI head_sep, SI foot_sep);
 
 box
@@ -47,9 +48,14 @@ pager_rep::pages_format (array<page_item> l, SI ht, SI tcor, SI bcor) {
       spc << item->spc;
     }
   }
-  ASSERT (N(bs) != 0, "zero lines in insertion");
-  box b= format_stack (ip, bs, spc, ht, true);
-  return vcorrect_box (b->ip, b, tcor, bcor);
+  if (N(bs) == 0) {
+    box b= empty_box (decorate_middle (ip), 0, -ht, 0, 0);
+    return vcorrect_box (b->ip, b, tcor, bcor);
+  }
+  else {
+    box b= format_stack (ip, bs, spc, ht, true);
+    return vcorrect_box (b->ip, b, tcor, bcor);
+  }
 }
 
 box
@@ -72,7 +78,8 @@ pager_rep::pages_format (insertion ins) {
   else {
     array<page_item> sub_l= sub (l, ins->begin, ins->end);
     SI ht= stretch_space (ins->ht, ins->stretch);
-    return pages_format (sub_l, ht, ins->top_cor, ins->bot_cor);
+    SI xh= stretch_space (ins->xh, ins->stretch);
+    return pages_format (sub_l, ht, ins->top_cor, ins->bot_cor + xh);
   }
 }
 
@@ -82,8 +89,8 @@ pager_rep::pages_format (pagelet pg) {
   //      << " stretch " << pg->stretch
   //      << " height " << stretch_space (pg->ht, pg->stretch) << LF << INDENT;
   if (N (pg->ins) == 0) {
-    if (N(pages) == 0) return empty_box (ip);
-    return empty_box (pages[N(pages)-1]->find_rip());
+    if (N(pages) == 0) return dummy_box (decorate_middle (ip));
+    return dummy_box (decorate_middle (pages [N(pages)-1] -> find_rip ()));
   }
   else if (N (pg->ins) == 1) {
     insertion ins= pg->ins[0];
@@ -141,7 +148,8 @@ pager_rep::pages_format (pagelet pg) {
       }
     }
     if (fnote_y != MAX_SI) {
-      bs << line_box (decorate(), 0, 0, fnote_bl, 0, env->fn->wline, env->col);
+      pencil pen= env->pen->set_width (env->fn->wline);
+      bs << line_box (decorate(), 0, 0, fnote_bl, 0, pen);
       bx << 0;
       by << (fnote_y + env->fn->sep);
     }
@@ -154,14 +162,18 @@ box
 pager_rep::pages_make_page (pagelet pg) {
   box sb= pages_format (pg);
   box lb= move_box (ip, sb, 0, 0);
-  SI  left= (N(pages)&1)==0? odd: even;
-  env->write (PAGE_NR, as_string (N(pages)+1+page_offset));
+  int nr= N(pages) + 1 + page_offset;
+  SI  left= (nr&1)==0? even: odd;
+  env->write (PAGE_NR, as_string (nr));
   env->write (PAGE_THE_PAGE, style[PAGE_THE_PAGE]);
   tree page_t= env->exec (compound (PAGE_THE_PAGE));
-  box header= make_header (N (pg->ins) == 0);
-  box footer= make_footer (N (pg->ins) == 0);
-  return page_box (ip, lb, page_t,
-		   width, height, left, top, top+ text_height,
+  bool empty= N (pg->ins) == 0;
+  box header= make_header (empty);
+  box footer= make_footer (empty);
+  brush bgc = make_background (empty);
+  adjust_margins (empty);
+  return page_box (ip, lb, page_t, nr, bgc, width, height,
+                   left, top + dtop, top + dtop + text_height,
 		   header, footer, head_sep, foot_sep);
 }
 
@@ -169,7 +181,8 @@ void
 pager_rep::pages_make () {
   space ht (text_height- may_shrink, text_height, text_height+ may_extend);
   skeleton sk=
-    break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep, env->fn);
+    break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep,
+                 env->fn, env->first_page);
   int i, n= N(sk);
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
@@ -179,20 +192,26 @@ void
 pager_rep::papyrus_make () {
   space ht (MAX_SI >> 1);
   skeleton sk=
-    break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep, env->fn);
+    break_pages (l, ht, quality, fn_sep, fnote_sep, float_sep,
+                 env->fn, env->first_page);
   if (N(sk) != 1) {
-    cerr << "Number of pages: " << N(sk) << "\n";
+    failed_error << "Number of pages: " << N(sk) << "\n";
     FAILED ("unexpected situation");
   }
 
   box sb= pages_format (sk[0]);
   box b = move_box (ip, sb, 0, 0);
+  brush bgc = make_background (false);
+  adjust_margins (false);
+  SI ph= b->h();
   SI left  = (odd+even) >> 1;
-  SI height= top + bot + b->h();
+  SI height= top + dtop + bot + dbot + ph;
+  if (env->get_string (PAGE_MEDIUM) == "beamer")
+    height= max (height, env->page_user_height + top + bot);
   array<box> bs   (1); bs   [0]= b;
   array<SI>  bs_x (1); bs_x [0]= left;
-  array<SI>  bs_y (1); bs_y [0]= -top;
-  box pb= page_box (ip, "?", width, height,
+  array<SI>  bs_y (1); bs_y [0]= -top - dtop;
+  box pb= page_box (ip, "?", 0, bgc, width, height,
 		    bs, bs_x, bs_y, 0, 0, 0);
   pages << pb;
 }

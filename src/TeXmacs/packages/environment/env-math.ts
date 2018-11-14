@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.99.6>
 
 <style|source>
 
@@ -64,6 +64,8 @@
 
   <assign|eq-number|<value|req-number>>
 
+  <assign|eq-lab|<macro|lab|<htab|5mm><with|mode|text|font-shape|right|(<arg|lab>)>>>
+
   <assign|no-number|<macro|>>
 
   <assign|eqref|<macro|id|(<reference|<arg|id>>)>>
@@ -101,7 +103,7 @@
   </active*>
 
   <assign|equations-base|<\macro|body>
-    <\with|mode|math|math-display|true|par-mode|center|par-sep|<eqn-row-sep>>
+    <\with|mode|math|math-display|true|par-mode|center|par-sep|<eqn-row-sep>|par-first|0em|par-swell|<value|math-swell>>
       <style-with|src-compact|none|<surround|<no-page-break*><vspace*|<eqn-long-above>>|<vspace|<eqn-long-below>><no-indent*>|<arg|body>>>
     </with>
   </macro>>
@@ -112,7 +114,9 @@
     </equations-base>
   </macro>>
 
-  <assign|eqnarray|<macro|body|<eqnarray*|<tformat|<arg|body>>>>>
+  <assign|eqnarray|<\macro|body>
+    <eqnarray*|<tformat|<arg|body>>>
+  </macro>>
 
   <assign|leqnarray*|<\macro|body>
     <\equations-base>
@@ -130,7 +134,31 @@
     </equations-base>
   </macro>>
 
-  <assign|flalign|<\macro|body>
+  <assign|align|<\macro|body>
+    <align*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|alignat*|<\macro|ncol|body>
+    <align*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|alignat|<\macro|ncol|body>
+    <align|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|aligned*|<\macro|body>
+    <align*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|aligned|<\macro|body>
+    <aligned*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|alignedat*|<\macro|ncol|body>
+    <align*|<tformat|<arg|body>>>
+  </macro>>
+
+  <assign|alignedat|<\macro|ncol|body>
     <align|<tformat|<arg|body>>>
   </macro>>
 
@@ -138,24 +166,8 @@
     <align*|<tformat|<arg|body>>>
   </macro>>
 
-  <assign|alignedat|<\macro|ncol|body>
-    <align|<arg|body>>
-  </macro>>
-
-  <assign|aligned|<\macro|body>
-    <align|<arg|body>>
-  </macro>>
-
-  <assign|alignat|<\macro|ncol|body>
-    <align|<arg|body>>
-  </macro>>
-
-  <assign|alignat*|<\macro|ncol|body>
-    <align|<arg|body>>
-  </macro>>
-
-  <assign|align|<\macro|body>
-    <align*|<tformat|<arg|body>>>
+  <assign|flalign|<\macro|body>
+    <align|<tformat|<arg|body>>>
   </macro>>
 
   <assign|multline*|<\macro|body>
@@ -188,9 +200,9 @@
     <eqsplit*|<tformat|<arg|body>>>
   </macro>>
 
-  <assign|subequations|<macro|<arg|body>><arg|body>>
-
-  \;
+  <assign|subequations|<\macro|body>
+    <arg|body>
+  </macro>>
 
   \;
 </body>

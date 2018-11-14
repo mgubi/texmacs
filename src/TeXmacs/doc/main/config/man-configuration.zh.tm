@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.7>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|chinese>>
 
 <\body>
   <tmdoc-title|\<#914D\>\<#7F6E\><TeXmacs>>
@@ -12,10 +12,14 @@
 
     <branch|\<#897F\>\<#91CC\>\<#5C14\>\<#8BED\>\<#8A00\>\<#7528\>\<#6237\>\<#987B\>\<#77E5\>|man-russian.en.tm>
 
-    <branch|\<#4E1C\>\<#65B9\>\<#8BED\>\<#8A00\>\<#7528\>\<#6237\>\<#987B\>\<#77E5\>|man-oriental.zh.tm>
+    <\branch>
+      \<#4E1C\>\<#65B9\>\<#8BED\>\<#8A00\>\<#7528\>\<#6237\>\<#987B\>\<#77E5\>
+    </branch|man-oriental.zh.tm>
+
+    <branch|\<#9AD8\>\<#7EA7\>\<#7528\>\<#6237\>\<#9996\>\<#9009\>\<#9879\>|man-advanced-preferences.en.tm>
   </traverse>
 
-  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|2016|Darcy Shen>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -25,9 +29,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|font|sys-chinese>
-    <associate|language|chinese>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

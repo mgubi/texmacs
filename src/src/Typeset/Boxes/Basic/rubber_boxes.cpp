@@ -40,6 +40,16 @@ struct empty_box_rep: public box_rep {
   void display (renderer ren) { (void) ren; }
 };
 
+struct dummy_box_rep: public box_rep {
+  dummy_box_rep (path ip, int x1b, int y1b, int x2b, int y2b): box_rep (ip) {
+    x3=x4=y3=y4=0; x1= x1b; y1=y1b; x2=x2b; y2=y2b; }
+  operator tree () { return "dummy"; }
+  void display (renderer ren) { (void) ren; }
+  path find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
+    bool dummy; found= false;
+    return box_rep::find_box_path (x, y, delta, force, dummy); }
+};
+
 struct marker_box_rep: public box_rep {
   int pos;
   box ref;
@@ -49,8 +59,10 @@ struct marker_box_rep: public box_rep {
       x3= x4= y3= y4= 0; x1= x1b; y1= y1b; x2= x2b; y2= y2b; }
   operator tree () { return "marker"; }
   void display (renderer ren) { (void) ren; }
-  path find_box_path (SI x, SI y, SI delta, bool force) {
-    (void) x; (void) y; (void) delta; (void) force; return path (0); }
+  path find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
+    (void) x; (void) y; (void) delta; (void) force;
+    found= true;
+    return path (0); }
   path find_lip () {
     return is_accessible (ip)? descend (ip, pos): ip; }
   path find_rip () {
@@ -61,6 +73,7 @@ struct marker_box_rep: public box_rep {
     found= !is_nil (p) && is_accessible (ip);
     return path (0); }
   path find_tree_path (path bp) {
+    (void) bp;
     if (is_accessible (ip)) return reverse (descend (ip, pos));
     else return reverse (descend_decode (ip, 0)); }
   cursor find_cursor (path bp) {
@@ -68,11 +81,13 @@ struct marker_box_rep: public box_rep {
   selection find_selection (path lbp, path rbp) {
     return selection (rectangles (),
 		      find_tree_path (lbp), find_tree_path (rbp)); }
-  SI sub_lo_base (int level) { return min (y1, ref->sub_lo_base (level)); }
+  SI sub_lo_base (int level) { return ref->sub_lo_base (level); }
+  //SI sub_lo_base (int level) { return min (y1, ref->sub_lo_base (level)); }
   SI sub_hi_lim (int level) { return ref->sub_hi_lim (level); }
   SI sup_lo_lim (int level) { return ref->sup_lo_lim (level); }
   SI sup_lo_base (int level) { return ref->sup_lo_base (level); }
-  SI sup_hi_lim (int level) { return max (y2, ref->sup_hi_lim (level)); }
+  SI sup_hi_lim (int level) { return ref->sup_hi_lim (level); }
+  //SI sup_hi_lim (int level) { return max (y2, ref->sup_hi_lim (level)); }
 };
 
 /*****************************************************************************/
@@ -81,10 +96,9 @@ struct marker_box_rep: public box_rep {
 
 struct bracket_box_rep: public box_rep {
   int br_type;
-  color col;
-  SI penw;
+  pencil pen;
 
-  bracket_box_rep (path ip, int br_type2, SI penw, color c, SI y1b, SI y2b);
+  bracket_box_rep (path ip, int br_type2, pencil pen, SI y1b, SI y2b);
   operator tree () { return "bracket"; }
   void display (renderer ren);
 };
@@ -115,21 +129,22 @@ bracket_width (int br_type, SI height, SI penw) {
   }
 }
 
-bracket_box_rep::bracket_box_rep (path ip, int br_type2, SI penw2, color c,
+bracket_box_rep::bracket_box_rep (path ip, int br_type2, pencil pen2,
 				  SI y1b, SI y2b): box_rep (ip) {
-  br_type= br_type2;
-  penw   = penw2;
-  col    = c;
+  br_type = br_type2;
+  pen     = pen2;
   x1 = x3 = 0;
-  x2 = x4 = bracket_width (br_type, y2b- y1b, penw);
+  x2 = x4 = bracket_width (br_type, y2b- y1b, pen->get_width ());
   y1 = y3 = y1b;
   y2 = y4 = y2b;
 }
 
 void
-draw_bracket (renderer ren, int br_type, SI x, SI y, SI w, SI h, SI lw) {
+draw_bracket (renderer ren, int br_type, SI x, SI y, SI w, SI h, pencil pen) {
+  SI lw= pen->get_width ();
   x+=lw; w-=2*lw;
   y+=lw; h-=2*lw;
+  ren->set_pencil (pen);
   switch (br_type) {
   case Lbracket:
     {
@@ -138,8 +153,8 @@ draw_bracket (renderer ren, int br_type, SI x, SI y, SI w, SI h, SI lw) {
       SI hh= (SI) (((double) h) / sqrt (2.0));
       SI ox= x+ ww;
       SI oy= y+ (h>>1);
-      ren->set_line_style (PIXEL);
-      for (i=0; i<lw; i+=PIXEL)
+      ren->set_pencil (pen->set_width (ren->pixel));
+      for (i=0; i<lw; i+=ren->pixel)
 	ren->arc (ox-ww+i, oy-hh, ox+ww-i, oy+hh, 135<<6, 90<<6);
     }
     break;
@@ -150,8 +165,8 @@ draw_bracket (renderer ren, int br_type, SI x, SI y, SI w, SI h, SI lw) {
       SI hh= (SI) (((double) h) / sqrt (2.0));
       SI ox= x+ w- ww;
       SI oy= y+ (h>>1);
-      ren->set_line_style (PIXEL);
-      for (i=0; i<lw; i+=PIXEL)
+      ren->set_pencil (pen->set_width (ren->pixel));
+      for (i=0; i<lw; i+=ren->pixel)
 	ren->arc (ox-ww+i, oy-hh, ox+ww-i, oy+hh, -(45<<6), 90<<6);
     }
     break;
@@ -205,9 +220,7 @@ draw_bracket (renderer ren, int br_type, SI x, SI y, SI w, SI h, SI lw) {
 
 void
 bracket_box_rep::display (renderer ren) {
-  ren->set_line_style (penw);
-  ren->set_color (col);
-  draw_bracket (ren, br_type, 0, y1, x2, y2-y1, penw);
+  draw_bracket (ren, br_type, 0, y1, x2, y2-y1, pen);
 }
 
 /*****************************************************************************/
@@ -220,11 +233,16 @@ empty_box (path ip, int x1, int y1, int x2, int y2) {
 }
 
 box
+dummy_box (path ip, int x1, int y1, int x2, int y2) {
+  return tm_new<dummy_box_rep> (ip, x1, y1, x2, y2);
+}
+
+box
 marker_box (path ip, int x1, int y1, int x2, int y2, box ref) {
   return tm_new<marker_box_rep> (ip, x1, y1, x2, y2, ref);
 }
 
 box
-bracket_box (path ip, int br_type, SI penw, color col, SI y1, SI y2) {
-  return tm_new<bracket_box_rep> (ip, br_type, penw, col, y1, y2);
+bracket_box (path ip, int br_type, pencil pen, SI y1, SI y2) {
+  return tm_new<bracket_box_rep> (ip, br_type, pen, y1, y2);
 }

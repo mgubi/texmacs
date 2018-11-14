@@ -136,7 +136,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (texmacs->code t . enc)
-  (if (null? enc) (set! enc (list "iso-8859-1")))
+  (if (null? enc) (set! enc (list (get-locale-charset))))
   (if (tree? t)
       (cpp-texmacs->verbatim t #f (car enc))
       (texmacs->code (tm->tree t) (car enc))))
@@ -144,13 +144,13 @@
 (tm-define (texmacs->verbatim x . opts)
   (if (list-1? opts) (set! opts (car opts)))
   (let* ((wrap? (== (assoc-ref opts "texmacs->verbatim:wrap") "on"))
-         (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "utf-8")))
+         (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "auto")))
     (cpp-texmacs->verbatim x wrap? enc)))
 
 (tm-define (texmacs->verbatim-snippet x . opts)
   (if (list-1? opts) (set! opts (car opts)))
   (let* ((wrap? (== (assoc-ref opts "texmacs->verbatim:wrap") "on"))
-         (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "utf-8")))
+         (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "auto")))
     ;; FIXME: dirty hack for "copy to verbatim" of code snippets
     (if (or (== (get-env "mode") "prog") (== (get-env "font-family") "tt"))
         (set! wrap? #f))
@@ -185,9 +185,9 @@
 (converter texmacs-tree verbatim-document
   (:function-with-options texmacs->verbatim)
   (:option "texmacs->verbatim:wrap" "off")
-  (:option "texmacs->verbatim:encoding" "utf-8"))
+  (:option "texmacs->verbatim:encoding" "auto"))
 
 (converter texmacs-tree verbatim-snippet
   (:function-with-options texmacs->verbatim-snippet)
   (:option "texmacs->verbatim:wrap" "off")
-  (:option "texmacs->verbatim:encoding" "utf-8"))
+  (:option "texmacs->verbatim:encoding" "auto"))

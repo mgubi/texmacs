@@ -149,7 +149,7 @@ public:
     r -> encode (x1,y1);
     r -> encode (x2,y2);
     r -> set_clipping (x1,y1,x2,y2);
-    wid -> handle_repaint (x1,y1,x2,y2);
+    wid -> handle_repaint (r,x1,y1,x2,y2);
     r->end();
     [img unlockFocus];
     //[img setFlipped:YES];
@@ -177,7 +177,10 @@ public:
 	forced = NO;
 	[self setDelegate:self];
 }
-- (void)dealloc { [self setPromise:NULL]; [super dealloc]; }
+- (void)dealloc {
+    if (pm) { DEC_COUNT_NULL(pm); pm = NULL; }
+    [super dealloc];
+}
 
 - (void)menuNeedsUpdate:(NSMenu *)menu
 {
@@ -469,9 +472,17 @@ NSMenu* to_nsmenu(widget w)
     aqua_menu_rep *ww = ((aqua_menu_rep*)w.rep);
 	NSMenu *m =[[[ww->item submenu] retain] autorelease];
 	[ww->item setSubmenu:nil];
+      if (!m) {
+        debug_aqua << "unexpected nil menu\n";
+        return [[NSMenu alloc] init];
+        //FIXME: something wrong going on here.
+      }
 	return m;
   }
-  else return nil;
+  else {
+      debug_aqua << "unexpected type in to_nsmenu!\n";
+   return nil;
+  }
 }
 
 NSMenuItem* to_nsmenuitem(widget w)

@@ -19,11 +19,10 @@
 	  (else (string-append s ";\n")))))
 
 (define (maxima-versions)
-  (if (os-mingw?)
-      (url-exists-in-path? "maxima")
+  (if (os-mingw?) (list)
       (with version-list (string->object (var-eval-system "maxima_detect"))
-        (and (list? version-list) (nnull? version-list) version-list))))
-      
+	 (if (list? version-list) version-list (list)))))
+
 (define (maxima-launchers) ;; returns list of launchers for each version
   (if (os-mingw?)
       `((:launch
@@ -31,7 +30,7 @@
                          "\\plugins\\maxima\\lisp\\texmacs-maxima.lisp\"")))
       (with version-list
           (if reconfigure-flag? (maxima-versions) (plugin-versions "maxima"))
-        (if version-list
+        (if (and version-list (list? version-list) (nnull? version-list))
             (let* ((default (car version-list))
                    (rest (cdr version-list))
                    (launch-default
@@ -45,8 +44,10 @@
               (cons launch-default launch-rest))
             '()))))
 
+(plugin-add-macos-path "Maxima*" "Contents/Resources/maxima/bin" #f)
+(plugin-add-windows-path "Maxima*" "bin" #f)
+
 (plugin-configure maxima
-  (:winpath "Maxima*" "bin")
   (:require (url-exists-in-path? "maxima"))
   (:versions (maxima-versions))
   ,@(maxima-launchers)

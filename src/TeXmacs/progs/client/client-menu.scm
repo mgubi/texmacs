@@ -13,28 +13,46 @@
 
 (texmacs-module (client client-menu)
   (:use (client client-base)
-        (client client-tmfs)))
+        (client client-db)
+        (client client-widgets)))
 
-;;(menu-bind account-menu
-;;  ("Nickname" (remote-interactive-set-user-property "Nickname"))
-;;  ("Full name" (remote-interactive-set-user-property "Full name"))
-;;  ("Email address" (remote-interactive-set-user-property "Email"))
-;;  ("Home page" (remote-interactive-set-user-property "Web")))
+(menu-bind start-client-menu
+  (with l (client-accounts)
+    (if (null? l)
+	("Login" (open-remote-login "" "")))
+    (if (nnull? l)
+	(for (x l)
+	  (with (server-name pseudo) x
+	    ((eval (string-append "Login as " pseudo "@" server-name))
+	     (open-remote-login server-name pseudo))))
+	("Other login" (open-remote-login "" "")))
+    ("New account" (open-remote-account-creator))))
+
+(tm-menu (remote-submenu server)
+  ("Home" (load-buffer (remote-home-directory server)))
+  ---
+  (when (remote-file-name (current-buffer))
+    ("New remote file" (remote-create-file-interactive server))
+    ("New remote directory" (remote-create-dir-interactive server))
+    (when (not (remote-home-directory? (current-buffer)))
+      ("Rename" (remote-rename-interactive server)))
+    ("Remove" (remote-remove-interactive server))
+    ("Permissions" (open-file-permissions-editor server (current-buffer))))
+  ---
+  ("Upload" (remote-interactive-upload server))
+  ("Download" (remote-interactive-download server))
+  ("Synchronize" (remote-interactive-sync server))
+  ---
+  ("Logout" (client-logout server)))
 
 (menu-bind client-menu
-  ("New account" (interactive client-new-account))
-  ("Login" (interactive client-login)))
-
-(tm-menu (remote-submenu server sname)
-  (group sname)
-  ("Logout" (client-logout server))
-  ("Home directory" (load-buffer (remote-home-directory server)))
-  ("New remote file" (remote-create-file-interactive server))
-  ("New remote directory" (remote-create-dir-interactive server))
-  (when (and (has-client-properties? (current-buffer))
-             (nnot (strip-remote-file (current-buffer))))
-    ("Properties" (open-client-properties-editor))))
-
-(menu-bind remote-menu
-  (for (server (client-active-servers))
-    (dynamic (remote-submenu server (client-find-server-name server)))))
+  (with l (client-active-servers)
+    (assuming (null? l)
+      (link start-client-menu))
+    (assuming (== (length l) 1)
+      (with server (car l)
+        (dynamic (remote-submenu server))))
+    (assuming (> (length l) 1)
+      (for (server l)
+        (-> (eval (client-find-server-name server))
+            (dynamic (remote-submenu server)))))))

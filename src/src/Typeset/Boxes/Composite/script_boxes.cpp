@@ -11,6 +11,7 @@
 
 #include "Boxes/composite.hpp"
 #include "Boxes/Composite/italic_correct.hpp"
+#include "Boxes/construct.hpp"
 
 /******************************************************************************
 * subroutine for scripts
@@ -65,22 +66,29 @@ test_script_border (path p, box sb) {
 
 struct lim_box_rep: public composite_box_rep {
   box  ref;
+  font fn;
   bool glued;
+  int  type;
   lim_box_rep (path ip, box ref, box lo, box hi, font fn, bool glued);
   operator tree () { return tree (TUPLE, "lim", bs[0]); }
   void finalize ();
+  box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   path find_box_path (path p, bool& found);
   path find_tree_path (path bp);
 };
 
-lim_box_rep::lim_box_rep (path ip, box ref2, box lo, box hi, font fn, bool gl):
-  composite_box_rep (ip), ref (ref2), glued (gl)
+lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl):
+  composite_box_rep (ip), ref (r2), fn (fn2), glued (gl)
 {
   SI sep_lo= fn->sep + fn->yshift;
   SI sep_hi= fn->sep + (fn->yshift >> 1);
   SI X, Y;
   insert (ref, 0, 0);
+  type= 0;
+  if (!is_nil (lo)) type += 1;
+  if (!is_nil (hi)) type += 2;
   if (!is_nil (lo)) {
     SI top= max (lo->y2, fn->y2 * script (fn->size, 1) / fn->size) + sep_lo;
     Y= ref->y1;
@@ -114,6 +122,25 @@ lim_box_rep::finalize () {
       finalize_right (rip, bs[i]);
     }
   }
+}
+
+box
+lim_box_rep::adjust_kerning (int mode, double factor) {
+  box body= bs[0]->adjust_kerning (mode, factor);
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[1]->adjust_kerning (mode, factor/2);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->adjust_kerning (mode, factor/2);
+  return limit_box (ip, body, sub, sup, fn, glued);
+}
+
+box
+lim_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box body= bs[0]->expand_glyphs (0, factor);
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[1]->expand_glyphs (0, factor);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->expand_glyphs (0, factor);
+  return limit_box (ip, body, sub, sup, fn, glued);
 }
 
 path
@@ -153,21 +180,29 @@ lim_box_rep::find_tree_path (path bp) {
 ******************************************************************************/
 
 struct dummy_script_box_rep: public composite_box_rep {
+  font fn;
+  int  type;
   dummy_script_box_rep (path ip, box b1, box b2, font fn);
   operator tree () { return "dummy script"; }
   void finalize ();
+  box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   path      find_box_path (path p, bool& found);
   path      find_tree_path (path bp);
 };
 
-dummy_script_box_rep::dummy_script_box_rep (path ip, box b1, box b2, font fn):
-  composite_box_rep (ip)
+dummy_script_box_rep::dummy_script_box_rep (path ip, box b1, box b2, font fn2):
+  composite_box_rep (ip), fn (fn2)
 {
   SI sep  = fn->sep;
   SI lo_y = fn->ysub_lo_base;
   SI hi_y = fn->ysup_lo_base;
   SI miny2= (fn->y2 - fn->yshift) * script (fn->size, 1) / fn->size;
+
+  type= 0;
+  if (!is_nil (b1)) type += 1;
+  if (!is_nil (b2)) type += 2;
 
   if ((!is_nil (b1)) && (!is_nil (b2))) {
     SI y= max (b1->y2, miny2);
@@ -202,6 +237,23 @@ dummy_script_box_rep::finalize () {
     finalize_left  (lip, bs[i]);
     finalize_right (rip, bs[i]);
   }
+}
+
+box
+dummy_script_box_rep::adjust_kerning (int mode, double factor) {
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[0]->adjust_kerning (mode, factor/2);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->adjust_kerning (mode, factor/2);
+  return script_box (ip, sub, sup, fn);
+}
+
+box
+dummy_script_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box sub, sup;
+  if ((type & 1) != 0) sub= bs[0]->expand_glyphs (0, factor);
+  if ((type & 2) != 0) sup= bs[N(bs)-1]->expand_glyphs (0, factor);
+  return script_box (ip, sub, sup, fn);
 }
 
 path
@@ -241,14 +293,18 @@ dummy_script_box_rep::find_tree_path (path bp) {
 struct side_box_rep: public composite_box_rep {
   short nr_left, nr_right;
   short id_left, id_right;
+  font  fn;
+  short level, type;
   side_box_rep (path ip, box r, box l1, box l2, box r1, box r2, font f, int l);
   operator tree () {
     int i, n= N(bs);
     tree t (TUPLE, "side");
     for (i=0; i<n; i++) t << ((tree) bs[i]);
     return t;
-  }
+  } 
   void finalize ();
+  box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   int       find_child (SI x, SI y, SI delta, bool force);
   path      find_box_path (path p, bool& found);
@@ -274,11 +330,12 @@ struct side_box_rep: public composite_box_rep {
     return nr_right==0? bs[0]->rsub_correction (): right_correction (); }
   SI rsup_correction () {
     return nr_right==0? bs[0]->rsup_correction (): right_correction (); }
+  void get_bracket_extents (SI& lo, SI& hi);
 };
 
 side_box_rep::side_box_rep (
-  path ip, box ref, box l1, box l2, box r1, box r2, font fn, int level):
-    composite_box_rep (ip)
+  path ip, box ref, box l1, box l2, box r1, box r2, font fn2, int level2):
+  composite_box_rep (ip), fn (fn2), level (level2)
 {
   insert (ref, 0, 0);
 
@@ -292,6 +349,12 @@ side_box_rep::side_box_rep (
   SI miny2      = (fn->y2 - fn->yshift) * script (fn->size, 1) / fn->size;
   SI lsub= sub_lo_base, lsup= sup_lo_base;
   SI rsub= sub_lo_base, rsup= sup_lo_base;
+
+  type= 0;
+  if (!is_nil (l1)) type += 1;
+  if (!is_nil (l2)) type += 2;
+  if (!is_nil (r1)) type += 4;
+  if (!is_nil (r2)) type += 8;
 
   if (is_nil (l1)) {
     if (is_nil (l2)) nr_left= 0;
@@ -346,19 +409,19 @@ side_box_rep::side_box_rep (
   }
 
   if (!is_nil (l1)) {
-    SI dx= l1->right_correction () + ref->lsub_correction ();
+    SI dx= l1->rsup_correction () - ref->lsub_correction ();
     insert (l1, -l1->x2- dx, lsub);
   }
   if (!is_nil (l2)) {
-    SI dx= l2->right_correction () - ref->lsup_correction ();
+    SI dx= l2->rsub_correction () - ref->lsup_correction ();
     insert (l2, -l2->x2- dx, lsup);
   }
   if (!is_nil (r1)) {
-    SI dx= r1->left_correction () + ref->rsub_correction ();
+    SI dx= -r1->lsup_correction () + ref->rsub_correction ();
     insert (r1, ref->x2+ dx, rsub);
   }
   if (!is_nil (r2)) {
-    SI dx= r2->left_correction () + ref->rsup_correction ();
+    SI dx= -r2->lsub_correction () + ref->rsup_correction ();
     insert (r2, ref->x2+ dx, rsup);
   }
 
@@ -391,10 +454,45 @@ side_box_rep::finalize () {
   }
 }
 
+box
+side_box_rep::adjust_kerning (int mode, double factor) {
+  int smode= mode;
+  if (nr_left  > 0) smode= smode & (~START_OF_LINE);
+  if (nr_right > 0) smode= smode & (~END_OF_LINE);
+  box body= bs[0]->adjust_kerning (smode, factor);
+  box lsub, lsup, rsub, rsup;
+  if ((type & 1) != 0)
+    lsub= bs[1]->adjust_kerning (mode & (~END_OF_LINE), factor/2);
+  if ((type & 2) != 0)
+    lsup= bs[nr_left]->adjust_kerning (mode & (~END_OF_LINE), factor/2);
+  if ((type & 4) != 0)
+    rsub= bs[1+nr_left]->adjust_kerning (mode & (~START_OF_LINE), factor/2);
+  if ((type & 8) != 0)
+    rsup= bs[N(bs)-1]->adjust_kerning (mode & (~START_OF_LINE), factor/2);
+  return side_box (ip, body, lsub, lsup, rsub, rsup, fn, level);
+}
+
+box
+side_box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode;
+  box body= bs[0]->expand_glyphs (0, factor);
+  box lsub, lsup, rsub, rsup;
+  if ((type & 1) != 0)
+    lsub= bs[1]->expand_glyphs (0, factor);
+  if ((type & 2) != 0)
+    lsup= bs[nr_left]->expand_glyphs (0, factor);
+  if ((type & 4) != 0)
+    rsub= bs[1+nr_left]->expand_glyphs (0, factor);
+  if ((type & 8) != 0)
+    rsup= bs[N(bs)-1]->expand_glyphs (0, factor);
+  return side_box (ip, body, lsub, lsup, rsub, rsup, fn, level);
+}
+
 int
 side_box_rep::find_child (SI x, SI y, SI delta, bool force) {
   if (outside (x, delta, x1, x2)) {
-    int side= box_rep::find_box_path (x, y, delta, force)->item;
+    bool found;
+    int side= box_rep::find_box_path (x, y, delta, force, found)->item;
     if (bs[0]->accessible () || force) {
       if ((side == 0) && (nr_left == 0)) return 0;
       if ((side == 1) && (nr_right == 0)) return 0;
@@ -545,6 +643,20 @@ side_box_rep::find_selection (path lbp, path rbp) {
   if ((rbp == path (3)) && (!is_atom (lbp)) && (lbp->item == 0))
     rbp= path (0, bs[0]->find_right_box_path ());
   return composite_box_rep::find_selection (lbp, rbp);
+}
+
+
+void
+side_box_rep::get_bracket_extents (SI& lo, SI& hi) {
+  int i;
+  SI ex= fn->yx;
+  SI dd= ex / 4;
+  lo= sy1 (0);
+  hi= sy2 (0);
+  for (i=1; i<N(bs); i++) {
+    lo= min (lo, sy1 (i) + dd);
+    hi= max (hi, sy2 (i) - dd);
+  }
 }
 
 /******************************************************************************

@@ -49,14 +49,14 @@
        ("Run current file" (run-scheme-file (current-buffer-url)))))
 
 ; Simpler popup menu.
-(menu-bind texmacs-popup-menu
+(menu-bind texmacs-alternative-popup-menu
   (:require (in-prog-scheme?))
   (-> "File" (link file-menu))
   (-> "Edit" (link edit-menu))
   (-> "View" (link view-menu))
   (-> "Go" (link go-menu))
   (if (detailed-menus?) (-> "Tools" (link tools-menu)))
-  (if (nnull? remote-list) (-> "Remote" (link remote-menu)))
+  (if (with-remote-tool?) (-> "Remote" (link remote-menu)))
   (if (with-debugging-tool?) (-> "Debug" (link debug-menu)))
   (if (nnull? (test-menu)) (-> "Test" (link test-menu)))
   (-> "Scheme" (link scheme-menu))

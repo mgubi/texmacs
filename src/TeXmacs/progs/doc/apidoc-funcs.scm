@@ -55,9 +55,6 @@
              (symbol->string module))
             (else "")))))
 
-(define (tree->symbol t)
-  (string->symbol (tree->string t)))
-
 (define (symbol->tree s)
   (string->tree (symbol->string s)))
 
@@ -104,11 +101,6 @@
 (define (module-description m)
   "Description TO-DO")
 
-; This list is incomplete!
-(define keywords
-  '(define-public define-public-macro provide-public tm-define 
-    tm-define-macro tm-menu menu-bind tm-widget))
-
 (define module-exported-cache (make-ahash-table))
 
 ; HACK: we use read (copying what's done in init-texmacs.scm) until the
@@ -116,7 +108,7 @@
 (define (parse-form form f)
   "Set symbol properties and return the symbol."
   (and (pair? form) 
-       (member (car form) keywords-which-define)
+       (member (car form) def-keywords) ;def-keywords defined in init-texmacs.scm
        (let* ((l (source-property form 'line))
               (c (source-property form 'column))
               (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
@@ -130,17 +122,18 @@
   (:synopsis "List of exported symbols in @module")
   (or (ahash-ref module-exported-cache module)
       (and (is-real-module? module)
-        (let* ((fname (module-source-path module #t))
-               (p (open-input-string (string-load fname)))
-               (defs '())
-               (add (lambda (f) 
-                      (with pf (parse-form f fname)
-                        (and (!= pf #f) (set! defs (rcons defs pf)))))))
-          (letrec ((r (lambda () (with form (read p)
-                                   (or (eof-object? form) 
-                                       (begin (add form) (r)))))))
-            (r))
-          (ahash-set! module-exported-cache module defs)))))
+           (let* ((fname (module-source-path module #t))
+                  (p (open-input-string (string-load fname)))
+                  (defs '())
+                  (add (lambda (f) 
+                         (with pf (parse-form f fname)
+                           (and (!= pf #f) (set! defs (rcons defs pf)))))))
+             (letrec ((r (lambda () (with form (read p)
+                                      (or (eof-object? form) 
+                                          (begin (add form) (r)))))))
+                     (r))
+             (ahash-set! module-exported-cache module defs)))
+      '()))
 
 (tm-define (module-count-exported module)
   (length (module-exported module)))
@@ -149,7 +142,7 @@
   (with l (module-exported module)
     (- (length l)
        (length
-         (list-filter l
+        (list-filter l
            (lambda (x)
              (and (symbol? x) 
                   (persistent-has? (doc-scm-cache) (symbol->string x)))))))))
@@ -158,12 +151,12 @@
   (with l (module-exported module)
     (with fun (lambda (sym)
                 (if (symbol? sym)
-                  (list ($doc-explain-scm* (symbol->string sym)))
-                  '()))
+                    (list ($doc-explain-scm* (symbol->string sym)))
+                    '()))
       (if (null? l)
-       `(document ,(replace "No symbols exported"))
-       `(document (subsection ,(replace "Symbol documentation"))
-                  ,@(append-map fun l))))))
+          `(document ,(replace "No symbols exported"))
+          `(document (subsection ,(replace "Symbol documentation"))
+                     ,@(append-map fun l))))))
 
 ; WRONG! what about unloaded modules
 (define (tm-exported? sym)
@@ -262,12 +255,13 @@
                  => object->string)
                (else (replace "Symbol not found or not a procedure")))))))
 
-(tm-define ($doc-symbol-template sym message)
-  `(explain
-     (document
-       (concat (scm ,(symbol->string sym))
-               (explain-synopsis ,(doc-symbol-synopsis* sym))))
-     (document ,message ,($doc-symbol-code sym))))
+(tm-define ($doc-symbol-template sym code? message)
+  (with contents (cons message (if code? (list ($doc-symbol-code sym)) '()))
+    `(explain
+      (document
+        (concat (scm ,(symbol->string sym))
+                (explain-synopsis ,(doc-symbol-synopsis* sym))))
+      (document ,@contents))))
 
 (tm-define ($doc-symbol-extra sym . docurl)
   ($inline
@@ -292,31 +286,34 @@
   (:secure #t)
   (docgrep-new-window what))
 
-(define ($explain-not-found key)
+(define ($explain-scheme-not-found key)
   `(document
-    ,($doc-symbol-template (string->symbol key)
+    ,($doc-symbol-template (string->symbol key) #t
       `(concat "Documentation unavailable. Search "
         (action "the manual"
                 ,(string-append "(docgrep-in-doc-secure \"" key "\")"))
          ", or go to the definition in "
          ,($doc-symbol-properties (string->symbol key))))))
 
-(define (doc-explain-sub entries)
-  (if (or (nlist? entries) (null? entries) (not (func? (car entries) 'entry))) '()
-    (with (key lan url doc) (cdar entries)
-      (cons `(explain
-               ,(tm-ref doc 0)
-               (document 
-                 ,(tm-ref doc 1)
-                 ,($doc-symbol-code (string->symbol key))
-                 ,($doc-symbol-extra (string->symbol key) url)))
-             (doc-explain-sub (cdr entries))))))
-
+(define (doc-explain-sub entries scheme?)
+  (if (or (nlist? entries) (null? entries) (not (func? (car entries) 'entry))) 
+      '()
+      (with (key lan url doc) (cdar entries)
+        (cons (if scheme?
+                  `(explain
+                    ,(tm-ref doc 0)
+                    (document 
+                      ,(tm-ref doc 1)
+                      ,($doc-symbol-code (string->symbol key))
+                      ,($doc-symbol-extra (string->symbol key) url)))
+                  `(explain ,(tm-ref doc 0) (document ,(tm-ref doc 1))))
+              (doc-explain-sub (cdr entries) scheme?)))))
+  
 (tm-define ($doc-explain-scm* key)
   (with docs (doc-retrieve (doc-scm-cache) key (get-output-language))
     (if (null? docs)
-      ($explain-not-found key) 
-     `(document ,@(doc-explain-sub docs)))))
+        ($explain-scheme-not-found key) 
+        `(document ,@(doc-explain-sub docs #t)))))
 
 (tm-define ($doc-explain-scm key)
   (:synopsis "Return a document with the scheme documentation for @key")
@@ -324,7 +321,22 @@
      ,($doc-explain-scm* key)
      (freeze (concat (locus (id "__doc__popup__") "")))))
 
+(define ($explain-macro-not-found key)
+  `(document
+    ,($doc-symbol-template (string->symbol key) #f
+      `(concat "Documentation unavailable. You may search "
+        (action "the manual"
+                ,(string-append "(docgrep-in-doc-secure \"" key "\")"))
+         "."))))
+
 (tm-define ($doc-explain-macro* key)
   (with docs (doc-retrieve (doc-macro-cache) key (get-output-language))
-    (if (null? docs) ($explain-not-found key) (doc-explain-sub docs))))
+    (if (null? docs)
+        ($explain-macro-not-found key)
+        `(document ,@(doc-explain-sub docs #f)))))
 
+(tm-define ($doc-explain-macro key)
+  (:synopsis "Return a document with the documentation for macro @key")
+  `(document
+     ,($doc-explain-macro* key)
+     (freeze (concat (locus (id "__doc__popup__") "")))))

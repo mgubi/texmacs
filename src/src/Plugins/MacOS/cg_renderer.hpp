@@ -30,8 +30,7 @@ public:
   virtual ~cg_renderer_rep ();
   
   void  draw (int char_code, font_glyphs fn, SI x, SI y);
-  void  set_color (color c);
-  void  set_line_style (SI w, int type=0, bool round=true);
+  void  set_pencil (pencil p);
   void  line (SI x1, SI y1, SI x2, SI y2);
   void  lines (array<SI> x, array<SI> y);
   void  clear (SI x1, SI y1, SI x2, SI y2);
@@ -39,14 +38,9 @@ public:
   void  arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void  fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void  polygon (array<SI> x, array<SI> y, bool convex=true);
-  void  xpm (url file_name, SI x, SI y);
-  void  image (url u, SI w, SI h, SI x, SI y,
-	       double cx1, double cy1, double cx2, double cy2,
-               int alpha);
+  void  image (url u, SI w, SI h, SI x, SI y, int alpha);
 
   void next_page ();
-
-
 
   /***** private section *****************************************************/
 
@@ -54,12 +48,9 @@ public:
   bool native_draw (int ch, font_glyphs fn, SI x, SI y);
 
   CGImageRef xpm_image(url file_name);
-
-  
   
   void begin (void* c); // c must be a CGContextRef
   void end ();
-
 };
 
 cg_renderer_rep* the_cg_renderer();

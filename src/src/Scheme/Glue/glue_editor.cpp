@@ -200,8 +200,8 @@ tmg_insideP (tmscm arg1) {
 }
 
 tmscm
-tmg_insert (tmscm arg1) {
-  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "insert");
+tmg_cpp_insert (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-insert");
 
   content in1= tmscm_to_content (arg1);
 
@@ -213,9 +213,9 @@ tmg_insert (tmscm arg1) {
 }
 
 tmscm
-tmg_insert_go_to (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "insert-go-to");
-  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "insert-go-to");
+tmg_cpp_insert_go_to (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-insert-go-to");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "cpp-insert-go-to");
 
   content in1= tmscm_to_content (arg1);
   path in2= tmscm_to_path (arg2);
@@ -287,8 +287,8 @@ tmg_remove_structure_upwards () {
 }
 
 tmscm
-tmg_make (tmscm arg1) {
-  TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "make");
+tmg_cpp_make (tmscm arg1) {
+  TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "cpp-make");
 
   tree_label in1= tmscm_to_tree_label (arg1);
 
@@ -300,9 +300,9 @@ tmg_make (tmscm arg1) {
 }
 
 tmscm
-tmg_make_arity (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "make-arity");
-  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "make-arity");
+tmg_cpp_make_arity (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "cpp-make-arity");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "cpp-make-arity");
 
   tree_label in1= tmscm_to_tree_label (arg1);
   int in2= tmscm_to_int (arg2);
@@ -380,9 +380,9 @@ tmg_remove_argument_at (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_make_with (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-with");
-  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-with");
+tmg_cpp_make_with (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-with");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-make-with");
 
   string in1= tmscm_to_string (arg1);
   string in2= tmscm_to_string (arg2);
@@ -423,7 +423,7 @@ tmg_make_style_with (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_make_hybrid () {
+tmg_cpp_make_hybrid () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_hybrid ();
   // TMSCM_ALLOW_INTS;
@@ -490,6 +490,24 @@ tmg_temp_proof_fix () {
 }
 
 tmscm
+tmg_get_full_env () {
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->get_full_env ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_get_all_inits () {
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->get_init_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_init_default_one (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-default-one");
 
@@ -546,32 +564,6 @@ tmg_init_style (tmscm arg1) {
 }
 
 tmscm
-tmg_init_add_package (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-add-package");
-
-  string in1= tmscm_to_string (arg1);
-
-  // TMSCM_DEFER_INTS;
-  get_current_editor()->init_add_package (in1);
-  // TMSCM_ALLOW_INTS;
-
-  return TMSCM_UNSPECIFIED;
-}
-
-tmscm
-tmg_init_remove_package (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-remove-package");
-
-  string in1= tmscm_to_string (arg1);
-
-  // TMSCM_DEFER_INTS;
-  get_current_editor()->init_remove_package (in1);
-  // TMSCM_ALLOW_INTS;
-
-  return TMSCM_UNSPECIFIED;
-}
-
-tmscm
 tmg_get_style_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->get_style ();
@@ -587,7 +579,7 @@ tmg_set_style_tree (tmscm arg1) {
   tree in1= tmscm_to_tree (arg1);
 
   // TMSCM_DEFER_INTS;
-  get_current_editor()->set_style (in1);
+  get_current_editor()->change_style (in1);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -700,21 +692,127 @@ tmg_init_hasP (tmscm arg1) {
 }
 
 tmscm
-tmg_get_page_width () {
+tmg_get_page_count () {
   // TMSCM_DEFER_INTS;
-  int out= get_current_editor()->get_page_width ();
+  int out= get_current_editor()->get_page_count ();
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
 }
 
 tmscm
-tmg_get_page_height () {
+tmg_get_page_width (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-page-width");
+
+  bool in1= tmscm_to_bool (arg1);
+
   // TMSCM_DEFER_INTS;
-  int out= get_current_editor()->get_page_height ();
+  int out= get_current_editor()->get_page_width (in1);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
+}
+
+tmscm
+tmg_get_pages_width (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-pages-width");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->get_pages_width (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_get_page_height (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-page-height");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->get_page_height (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_get_total_width (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-total-width");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->get_total_width (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_get_total_height (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-total-height");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->get_total_height (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_get_attachment (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-attachment");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->get_att (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_set_attachment (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-attachment");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-attachment");
+
+  string in1= tmscm_to_string (arg1);
+  content in2= tmscm_to_content (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->set_att (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_reset_attachment (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "reset-attachment");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->reset_att (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_list_attachments () {
+  // TMSCM_DEFER_INTS;
+  array_string out= get_current_editor()->list_atts ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
 }
 
 tmscm
@@ -945,7 +1043,7 @@ tmg_length_divide (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_make_rigid () {
+tmg_cpp_make_rigid () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_rigid ();
   // TMSCM_ALLOW_INTS;
@@ -954,8 +1052,8 @@ tmg_make_rigid () {
 }
 
 tmscm
-tmg_make_lprime (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-lprime");
+tmg_cpp_make_lprime (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-lprime");
 
   string in1= tmscm_to_string (arg1);
 
@@ -967,8 +1065,8 @@ tmg_make_lprime (tmscm arg1) {
 }
 
 tmscm
-tmg_make_rprime (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-rprime");
+tmg_cpp_make_rprime (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-rprime");
 
   string in1= tmscm_to_string (arg1);
 
@@ -980,7 +1078,7 @@ tmg_make_rprime (tmscm arg1) {
 }
 
 tmscm
-tmg_make_below () {
+tmg_cpp_make_below () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_below ();
   // TMSCM_ALLOW_INTS;
@@ -989,7 +1087,7 @@ tmg_make_below () {
 }
 
 tmscm
-tmg_make_above () {
+tmg_cpp_make_above () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_above ();
   // TMSCM_ALLOW_INTS;
@@ -998,9 +1096,9 @@ tmg_make_above () {
 }
 
 tmscm
-tmg_make_script (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "make-script");
-  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "make-script");
+tmg_cpp_make_script (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "cpp-make-script");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-make-script");
 
   bool in1= tmscm_to_bool (arg1);
   bool in2= tmscm_to_bool (arg2);
@@ -1013,7 +1111,7 @@ tmg_make_script (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_make_fraction () {
+tmg_cpp_make_fraction () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_fraction ();
   // TMSCM_ALLOW_INTS;
@@ -1022,7 +1120,7 @@ tmg_make_fraction () {
 }
 
 tmscm
-tmg_make_sqrt () {
+tmg_cpp_make_sqrt () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_sqrt ();
   // TMSCM_ALLOW_INTS;
@@ -1031,8 +1129,8 @@ tmg_make_sqrt () {
 }
 
 tmscm
-tmg_make_wide (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-wide");
+tmg_cpp_make_wide (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-wide");
 
   string in1= tmscm_to_string (arg1);
 
@@ -1044,8 +1142,8 @@ tmg_make_wide (tmscm arg1) {
 }
 
 tmscm
-tmg_make_wide_under (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-wide-under");
+tmg_cpp_make_wide_under (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-wide-under");
 
   string in1= tmscm_to_string (arg1);
 
@@ -1057,7 +1155,7 @@ tmg_make_wide_under (tmscm arg1) {
 }
 
 tmscm
-tmg_make_var_sqrt () {
+tmg_cpp_make_var_sqrt () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_var_sqrt ();
   // TMSCM_ALLOW_INTS;
@@ -1066,7 +1164,7 @@ tmg_make_var_sqrt () {
 }
 
 tmscm
-tmg_make_neg () {
+tmg_cpp_make_neg () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_neg ();
   // TMSCM_ALLOW_INTS;
@@ -1075,7 +1173,7 @@ tmg_make_neg () {
 }
 
 tmscm
-tmg_make_tree () {
+tmg_cpp_make_tree () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_tree ();
   // TMSCM_ALLOW_INTS;
@@ -1093,9 +1191,9 @@ tmg_make_subtable () {
 }
 
 tmscm
-tmg_table_disactivate () {
+tmg_table_deactivate () {
   // TMSCM_DEFER_INTS;
-  get_current_editor()->table_disactivate ();
+  get_current_editor()->table_deactivate ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -1181,6 +1279,15 @@ tmg_table_nr_columns () {
 }
 
 tmscm
+tmg_table_get_extents () {
+  // TMSCM_DEFER_INTS;
+  array_int out= get_current_editor()->table_get_extents ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
 tmg_table_set_extents (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "table-set-extents");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "table-set-extents");
@@ -1211,6 +1318,15 @@ tmg_table_which_column () {
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
+}
+
+tmscm
+tmg_table_which_cells () {
+  // TMSCM_DEFER_INTS;
+  array_int out= get_current_editor()->table_which_cells ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
 }
 
 tmscm
@@ -1256,6 +1372,15 @@ tmg_table_set_format (tmscm arg1, tmscm arg2) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_table_get_format_all () {
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->table_get_format ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
 }
 
 tmscm
@@ -1518,6 +1643,15 @@ tmg_mouse_any (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
 }
 
 tmscm
+tmg_get_mouse_position () {
+  // TMSCM_DEFER_INTS;
+  array_int out= get_current_editor()->get_mouse_position ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
+}
+
+tmscm
 tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-mouse-pointer");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-mouse-pointer");
@@ -1736,6 +1870,15 @@ tmg_go_to_label (tmscm arg1) {
 }
 
 tmscm
+tmg_cursor_accessibleP () {
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->cursor_is_accessible ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_cursor_show_if_hidden () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_cursor_if_hidden ();
@@ -1766,6 +1909,15 @@ tmscm
 tmg_select_from_cursor () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_from_cursor ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_select_from_cursor_if_active () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->select_from_cursor_if_active ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -1893,6 +2045,24 @@ tmg_selection_get_end () {
 }
 
 tmscm
+tmg_selection_get_start_dot () {
+  // TMSCM_DEFER_INTS;
+  path out= get_current_editor()->selection_var_get_start ();
+  // TMSCM_ALLOW_INTS;
+
+  return path_to_tmscm (out);
+}
+
+tmscm
+tmg_selection_get_end_dot () {
+  // TMSCM_DEFER_INTS;
+  path out= get_current_editor()->selection_var_get_end ();
+  // TMSCM_ALLOW_INTS;
+
+  return path_to_tmscm (out);
+}
+
+tmscm
 tmg_selection_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_get_path ();
@@ -1917,8 +2087,49 @@ tmg_selection_set (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_clipboard_copy (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-copy");
+tmg_selection_set_range_set (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_PATH (arg1, TMSCM_ARG1, "selection-set-range-set");
+
+  array_path in1= tmscm_to_array_path (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->selection_set_range_set (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_clipboard_set (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-set");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "clipboard-set");
+
+  string in1= tmscm_to_string (arg1);
+  content in2= tmscm_to_content (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->selection_set (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_clipboard_get (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-get");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->selection_get (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_clipboard_copy (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-copy");
 
   string in1= tmscm_to_string (arg1);
 
@@ -1930,8 +2141,8 @@ tmg_clipboard_copy (tmscm arg1) {
 }
 
 tmscm
-tmg_clipboard_cut (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-cut");
+tmg_cpp_clipboard_cut (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-cut");
 
   string in1= tmscm_to_string (arg1);
 
@@ -1956,8 +2167,23 @@ tmg_clipboard_cut_at (tmscm arg1) {
 }
 
 tmscm
-tmg_clipboard_paste (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-paste");
+tmg_clipboard_cut_between (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "clipboard-cut-between");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "clipboard-cut-between");
+
+  path in1= tmscm_to_path (arg1);
+  path in2= tmscm_to_path (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cut (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cpp_clipboard_paste (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-paste");
 
   string in1= tmscm_to_string (arg1);
 
@@ -2072,6 +2298,56 @@ tmg_get_focus_path () {
   // TMSCM_ALLOW_INTS;
 
   return path_to_tmscm (out);
+}
+
+tmscm
+tmg_set_alt_selection (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-alt-selection");
+  TMSCM_ASSERT_ARRAY_PATH (arg2, TMSCM_ARG2, "set-alt-selection");
+
+  string in1= tmscm_to_string (arg1);
+  array_path in2= tmscm_to_array_path (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->set_alt_selection (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_get_alt_selection (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-alt-selection");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_path out= get_current_editor()->get_alt_selection (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_path_to_tmscm (out);
+}
+
+tmscm
+tmg_cancel_alt_selection (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cancel-alt-selection");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_alt_selection (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_alt_selections () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_alt_selections ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -2219,6 +2495,42 @@ tmscm
 tmg_show_history () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_history ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_archive_state () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->archive_state ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_start_editing () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->start_editing ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_end_editing () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->end_editing ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_editing () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_editing ();
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -2440,6 +2752,19 @@ tmg_custom_complete (tmscm arg1) {
 }
 
 tmscm
+tmg_keyboard_focus_on (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "keyboard-focus-on");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->keyboard_focus_on (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_view_set_property (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "view-set-property");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "view-set-property");
@@ -2513,6 +2838,24 @@ tmg_clear_local_info () {
 }
 
 tmscm
+tmg_refresh_window () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->invalidate_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_update_forced () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->typeset_forced ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_update_path (tmscm arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-path");
 
@@ -2529,6 +2872,21 @@ tmscm
 tmg_update_current_buffer () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->typeset_invalidate_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_update_players (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-players");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "update-players");
+
+  path in1= tmscm_to_path (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->typeset_invalidate_players (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -2576,6 +2934,28 @@ tmg_notify_change (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_get_metadata (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-metadata");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= get_current_editor()->get_metadata (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_nr_pages () {
+  // TMSCM_DEFER_INTS;
+  int out= get_current_editor()->nr_pages ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -2633,15 +3013,17 @@ tmg_print_pages (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_print_snippet (tmscm arg1, tmscm arg2) {
+tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-snippet");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "print-snippet");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "print-snippet");
 
   url in1= tmscm_to_url (arg1);
   content in2= tmscm_to_content (arg2);
+  bool in3= tmscm_to_bool (arg3);
 
   // TMSCM_DEFER_INTS;
-  array_int out= get_current_editor()->print_snippet (in1, in2);
+  array_int out= get_current_editor()->print_snippet (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return array_int_to_tmscm (out);
@@ -2717,6 +3099,19 @@ tmg_texmacs_exec (tmscm arg1) {
 }
 
 tmscm
+tmg_texmacs_exec_dot (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "texmacs-exec*");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->var_texmacs_exec (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_texmacs_expand (tmscm arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "texmacs-expand");
 
@@ -2763,6 +3158,32 @@ tmg_html_expand (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->exec_html (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_animate_checkout (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-checkout");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->checkout_animation (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_animate_commit (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-commit");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->commit_animation (in1);
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
@@ -2894,36 +3315,36 @@ initialize_glue_editor () {
   tmscm_install_procedure ("position-set",  tmg_position_set, 2, 0, 0);
   tmscm_install_procedure ("position-get",  tmg_position_get, 1, 0, 0);
   tmscm_install_procedure ("inside?",  tmg_insideP, 1, 0, 0);
-  tmscm_install_procedure ("insert",  tmg_insert, 1, 0, 0);
-  tmscm_install_procedure ("insert-go-to",  tmg_insert_go_to, 2, 0, 0);
+  tmscm_install_procedure ("cpp-insert",  tmg_cpp_insert, 1, 0, 0);
+  tmscm_install_procedure ("cpp-insert-go-to",  tmg_cpp_insert_go_to, 2, 0, 0);
   tmscm_install_procedure ("insert-raw-go-to",  tmg_insert_raw_go_to, 2, 0, 0);
   tmscm_install_procedure ("insert-raw-return",  tmg_insert_raw_return, 0, 0, 0);
   tmscm_install_procedure ("remove-text",  tmg_remove_text, 1, 0, 0);
   tmscm_install_procedure ("remove-structure",  tmg_remove_structure, 1, 0, 0);
   tmscm_install_procedure ("remove-structure-upwards",  tmg_remove_structure_upwards, 0, 0, 0);
-  tmscm_install_procedure ("make",  tmg_make, 1, 0, 0);
-  tmscm_install_procedure ("make-arity",  tmg_make_arity, 2, 0, 0);
+  tmscm_install_procedure ("cpp-make",  tmg_cpp_make, 1, 0, 0);
+  tmscm_install_procedure ("cpp-make-arity",  tmg_cpp_make_arity, 2, 0, 0);
   tmscm_install_procedure ("activate",  tmg_activate, 0, 0, 0);
   tmscm_install_procedure ("insert-argument",  tmg_insert_argument, 1, 0, 0);
   tmscm_install_procedure ("remove-argument",  tmg_remove_argument, 1, 0, 0);
   tmscm_install_procedure ("insert-argument-at",  tmg_insert_argument_at, 2, 0, 0);
   tmscm_install_procedure ("remove-argument-at",  tmg_remove_argument_at, 2, 0, 0);
-  tmscm_install_procedure ("make-with",  tmg_make_with, 2, 0, 0);
+  tmscm_install_procedure ("cpp-make-with",  tmg_cpp_make_with, 2, 0, 0);
   tmscm_install_procedure ("make-mod-active",  tmg_make_mod_active, 1, 0, 0);
   tmscm_install_procedure ("make-style-with",  tmg_make_style_with, 2, 0, 0);
-  tmscm_install_procedure ("make-hybrid",  tmg_make_hybrid, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-hybrid",  tmg_cpp_make_hybrid, 0, 0, 0);
   tmscm_install_procedure ("activate-latex",  tmg_activate_latex, 0, 0, 0);
   tmscm_install_procedure ("activate-hybrid",  tmg_activate_hybrid, 1, 0, 0);
   tmscm_install_procedure ("activate-symbol",  tmg_activate_symbol, 0, 0, 0);
   tmscm_install_procedure ("make-return-before",  tmg_make_return_before, 0, 0, 0);
   tmscm_install_procedure ("make-return-after",  tmg_make_return_after, 0, 0, 0);
   tmscm_install_procedure ("temp-proof-fix",  tmg_temp_proof_fix, 0, 0, 0);
+  tmscm_install_procedure ("get-full-env",  tmg_get_full_env, 0, 0, 0);
+  tmscm_install_procedure ("get-all-inits",  tmg_get_all_inits, 0, 0, 0);
   tmscm_install_procedure ("init-default-one",  tmg_init_default_one, 1, 0, 0);
   tmscm_install_procedure ("init-env",  tmg_init_env, 2, 0, 0);
   tmscm_install_procedure ("init-env-tree",  tmg_init_env_tree, 2, 0, 0);
   tmscm_install_procedure ("init-style",  tmg_init_style, 1, 0, 0);
-  tmscm_install_procedure ("init-add-package",  tmg_init_add_package, 1, 0, 0);
-  tmscm_install_procedure ("init-remove-package",  tmg_init_remove_package, 1, 0, 0);
   tmscm_install_procedure ("get-style-tree",  tmg_get_style_tree, 0, 0, 0);
   tmscm_install_procedure ("set-style-tree",  tmg_set_style_tree, 1, 0, 0);
   tmscm_install_procedure ("get-env",  tmg_get_env, 1, 0, 0);
@@ -2934,8 +3355,16 @@ initialize_glue_editor () {
   tmscm_install_procedure ("context-has?",  tmg_context_hasP, 1, 0, 0);
   tmscm_install_procedure ("style-has?",  tmg_style_hasP, 1, 0, 0);
   tmscm_install_procedure ("init-has?",  tmg_init_hasP, 1, 0, 0);
-  tmscm_install_procedure ("get-page-width",  tmg_get_page_width, 0, 0, 0);
-  tmscm_install_procedure ("get-page-height",  tmg_get_page_height, 0, 0, 0);
+  tmscm_install_procedure ("get-page-count",  tmg_get_page_count, 0, 0, 0);
+  tmscm_install_procedure ("get-page-width",  tmg_get_page_width, 1, 0, 0);
+  tmscm_install_procedure ("get-pages-width",  tmg_get_pages_width, 1, 0, 0);
+  tmscm_install_procedure ("get-page-height",  tmg_get_page_height, 1, 0, 0);
+  tmscm_install_procedure ("get-total-width",  tmg_get_total_width, 1, 0, 0);
+  tmscm_install_procedure ("get-total-height",  tmg_get_total_height, 1, 0, 0);
+  tmscm_install_procedure ("get-attachment",  tmg_get_attachment, 1, 0, 0);
+  tmscm_install_procedure ("set-attachment",  tmg_set_attachment, 2, 0, 0);
+  tmscm_install_procedure ("reset-attachment",  tmg_reset_attachment, 1, 0, 0);
+  tmscm_install_procedure ("list-attachments",  tmg_list_attachments, 0, 0, 0);
   tmscm_install_procedure ("make-htab",  tmg_make_htab, 1, 0, 0);
   tmscm_install_procedure ("make-space",  tmg_make_space, 1, 0, 0);
   tmscm_install_procedure ("make-var-space",  tmg_make_var_space, 3, 0, 0);
@@ -2951,21 +3380,21 @@ initialize_glue_editor () {
   tmscm_install_procedure ("length-mult",  tmg_length_mult, 2, 0, 0);
   tmscm_install_procedure ("length?",  tmg_lengthP, 1, 0, 0);
   tmscm_install_procedure ("length-divide",  tmg_length_divide, 2, 0, 0);
-  tmscm_install_procedure ("make-rigid",  tmg_make_rigid, 0, 0, 0);
-  tmscm_install_procedure ("make-lprime",  tmg_make_lprime, 1, 0, 0);
-  tmscm_install_procedure ("make-rprime",  tmg_make_rprime, 1, 0, 0);
-  tmscm_install_procedure ("make-below",  tmg_make_below, 0, 0, 0);
-  tmscm_install_procedure ("make-above",  tmg_make_above, 0, 0, 0);
-  tmscm_install_procedure ("make-script",  tmg_make_script, 2, 0, 0);
-  tmscm_install_procedure ("make-fraction",  tmg_make_fraction, 0, 0, 0);
-  tmscm_install_procedure ("make-sqrt",  tmg_make_sqrt, 0, 0, 0);
-  tmscm_install_procedure ("make-wide",  tmg_make_wide, 1, 0, 0);
-  tmscm_install_procedure ("make-wide-under",  tmg_make_wide_under, 1, 0, 0);
-  tmscm_install_procedure ("make-var-sqrt",  tmg_make_var_sqrt, 0, 0, 0);
-  tmscm_install_procedure ("make-neg",  tmg_make_neg, 0, 0, 0);
-  tmscm_install_procedure ("make-tree",  tmg_make_tree, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-rigid",  tmg_cpp_make_rigid, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-lprime",  tmg_cpp_make_lprime, 1, 0, 0);
+  tmscm_install_procedure ("cpp-make-rprime",  tmg_cpp_make_rprime, 1, 0, 0);
+  tmscm_install_procedure ("cpp-make-below",  tmg_cpp_make_below, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-above",  tmg_cpp_make_above, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-script",  tmg_cpp_make_script, 2, 0, 0);
+  tmscm_install_procedure ("cpp-make-fraction",  tmg_cpp_make_fraction, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-sqrt",  tmg_cpp_make_sqrt, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-wide",  tmg_cpp_make_wide, 1, 0, 0);
+  tmscm_install_procedure ("cpp-make-wide-under",  tmg_cpp_make_wide_under, 1, 0, 0);
+  tmscm_install_procedure ("cpp-make-var-sqrt",  tmg_cpp_make_var_sqrt, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-neg",  tmg_cpp_make_neg, 0, 0, 0);
+  tmscm_install_procedure ("cpp-make-tree",  tmg_cpp_make_tree, 0, 0, 0);
   tmscm_install_procedure ("make-subtable",  tmg_make_subtable, 0, 0, 0);
-  tmscm_install_procedure ("table-disactivate",  tmg_table_disactivate, 0, 0, 0);
+  tmscm_install_procedure ("table-deactivate",  tmg_table_deactivate, 0, 0, 0);
   tmscm_install_procedure ("table-extract-format",  tmg_table_extract_format, 0, 0, 0);
   tmscm_install_procedure ("table-insert-row",  tmg_table_insert_row, 1, 0, 0);
   tmscm_install_procedure ("table-insert-column",  tmg_table_insert_column, 1, 0, 0);
@@ -2973,12 +3402,15 @@ initialize_glue_editor () {
   tmscm_install_procedure ("table-remove-column",  tmg_table_remove_column, 1, 0, 0);
   tmscm_install_procedure ("table-nr-rows",  tmg_table_nr_rows, 0, 0, 0);
   tmscm_install_procedure ("table-nr-columns",  tmg_table_nr_columns, 0, 0, 0);
+  tmscm_install_procedure ("table-get-extents",  tmg_table_get_extents, 0, 0, 0);
   tmscm_install_procedure ("table-set-extents",  tmg_table_set_extents, 2, 0, 0);
   tmscm_install_procedure ("table-which-row",  tmg_table_which_row, 0, 0, 0);
   tmscm_install_procedure ("table-which-column",  tmg_table_which_column, 0, 0, 0);
+  tmscm_install_procedure ("table-which-cells",  tmg_table_which_cells, 0, 0, 0);
   tmscm_install_procedure ("table-cell-path",  tmg_table_cell_path, 2, 0, 0);
   tmscm_install_procedure ("table-go-to",  tmg_table_go_to, 2, 0, 0);
   tmscm_install_procedure ("table-set-format",  tmg_table_set_format, 2, 0, 0);
+  tmscm_install_procedure ("table-get-format-all",  tmg_table_get_format_all, 0, 0, 0);
   tmscm_install_procedure ("table-get-format",  tmg_table_get_format, 1, 0, 0);
   tmscm_install_procedure ("table-del-format",  tmg_table_del_format, 1, 0, 0);
   tmscm_install_procedure ("table-row-decoration",  tmg_table_row_decoration, 1, 0, 0);
@@ -3000,6 +3432,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("key-press-spell",  tmg_key_press_spell, 1, 0, 0);
   tmscm_install_procedure ("key-press-complete",  tmg_key_press_complete, 1, 0, 0);
   tmscm_install_procedure ("mouse-any",  tmg_mouse_any, 5, 0, 0);
+  tmscm_install_procedure ("get-mouse-position",  tmg_get_mouse_position, 0, 0, 0);
   tmscm_install_procedure ("set-mouse-pointer",  tmg_set_mouse_pointer, 2, 0, 0);
   tmscm_install_procedure ("set-predef-mouse-pointer",  tmg_set_predef_mouse_pointer, 1, 0, 0);
   tmscm_install_procedure ("go-to-path",  tmg_go_to_path, 1, 0, 0);
@@ -3020,10 +3453,12 @@ initialize_glue_editor () {
   tmscm_install_procedure ("go-start-paragraph",  tmg_go_start_paragraph, 0, 0, 0);
   tmscm_install_procedure ("go-end-paragraph",  tmg_go_end_paragraph, 0, 0, 0);
   tmscm_install_procedure ("go-to-label",  tmg_go_to_label, 1, 0, 0);
+  tmscm_install_procedure ("cursor-accessible?",  tmg_cursor_accessibleP, 0, 0, 0);
   tmscm_install_procedure ("cursor-show-if-hidden",  tmg_cursor_show_if_hidden, 0, 0, 0);
   tmscm_install_procedure ("select-all",  tmg_select_all, 0, 0, 0);
   tmscm_install_procedure ("select-line",  tmg_select_line, 0, 0, 0);
   tmscm_install_procedure ("select-from-cursor",  tmg_select_from_cursor, 0, 0, 0);
+  tmscm_install_procedure ("select-from-cursor-if-active",  tmg_select_from_cursor_if_active, 0, 0, 0);
   tmscm_install_procedure ("select-from-keyboard",  tmg_select_from_keyboard, 1, 0, 0);
   tmscm_install_procedure ("select-from-shift-keyboard",  tmg_select_from_shift_keyboard, 0, 0, 0);
   tmscm_install_procedure ("select-enlarge",  tmg_select_enlarge, 0, 0, 0);
@@ -3037,12 +3472,18 @@ initialize_glue_editor () {
   tmscm_install_procedure ("selection-set-end",  tmg_selection_set_end, 0, 0, 0);
   tmscm_install_procedure ("selection-get-start",  tmg_selection_get_start, 0, 0, 0);
   tmscm_install_procedure ("selection-get-end",  tmg_selection_get_end, 0, 0, 0);
+  tmscm_install_procedure ("selection-get-start*",  tmg_selection_get_start_dot, 0, 0, 0);
+  tmscm_install_procedure ("selection-get-end*",  tmg_selection_get_end_dot, 0, 0, 0);
   tmscm_install_procedure ("selection-path",  tmg_selection_path, 0, 0, 0);
   tmscm_install_procedure ("selection-set",  tmg_selection_set, 2, 0, 0);
-  tmscm_install_procedure ("clipboard-copy",  tmg_clipboard_copy, 1, 0, 0);
-  tmscm_install_procedure ("clipboard-cut",  tmg_clipboard_cut, 1, 0, 0);
+  tmscm_install_procedure ("selection-set-range-set",  tmg_selection_set_range_set, 1, 0, 0);
+  tmscm_install_procedure ("clipboard-set",  tmg_clipboard_set, 2, 0, 0);
+  tmscm_install_procedure ("clipboard-get",  tmg_clipboard_get, 1, 0, 0);
+  tmscm_install_procedure ("cpp-clipboard-copy",  tmg_cpp_clipboard_copy, 1, 0, 0);
+  tmscm_install_procedure ("cpp-clipboard-cut",  tmg_cpp_clipboard_cut, 1, 0, 0);
   tmscm_install_procedure ("clipboard-cut-at",  tmg_clipboard_cut_at, 1, 0, 0);
-  tmscm_install_procedure ("clipboard-paste",  tmg_clipboard_paste, 1, 0, 0);
+  tmscm_install_procedure ("clipboard-cut-between",  tmg_clipboard_cut_between, 2, 0, 0);
+  tmscm_install_procedure ("cpp-clipboard-paste",  tmg_cpp_clipboard_paste, 1, 0, 0);
   tmscm_install_procedure ("selection-move",  tmg_selection_move, 0, 0, 0);
   tmscm_install_procedure ("clipboard-clear",  tmg_clipboard_clear, 1, 0, 0);
   tmscm_install_procedure ("selection-cancel",  tmg_selection_cancel, 0, 0, 0);
@@ -3053,6 +3494,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("set-manual-focus-path",  tmg_set_manual_focus_path, 1, 0, 0);
   tmscm_install_procedure ("get-manual-focus-path",  tmg_get_manual_focus_path, 0, 0, 0);
   tmscm_install_procedure ("get-focus-path",  tmg_get_focus_path, 0, 0, 0);
+  tmscm_install_procedure ("set-alt-selection",  tmg_set_alt_selection, 2, 0, 0);
+  tmscm_install_procedure ("get-alt-selection",  tmg_get_alt_selection, 1, 0, 0);
+  tmscm_install_procedure ("cancel-alt-selection",  tmg_cancel_alt_selection, 1, 0, 0);
+  tmscm_install_procedure ("cancel-alt-selections",  tmg_cancel_alt_selections, 0, 0, 0);
   tmscm_install_procedure ("clear-undo-history",  tmg_clear_undo_history, 0, 0, 0);
   tmscm_install_procedure ("commit-changes",  tmg_commit_changes, 0, 0, 0);
   tmscm_install_procedure ("start-slave",  tmg_start_slave, 1, 0, 0);
@@ -3067,6 +3512,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("redo-possibilities",  tmg_redo_possibilities, 0, 0, 0);
   tmscm_install_procedure ("redo",  tmg_redo, 1, 0, 0);
   tmscm_install_procedure ("show-history",  tmg_show_history, 0, 0, 0);
+  tmscm_install_procedure ("archive-state",  tmg_archive_state, 0, 0, 0);
+  tmscm_install_procedure ("start-editing",  tmg_start_editing, 0, 0, 0);
+  tmscm_install_procedure ("end-editing",  tmg_end_editing, 0, 0, 0);
+  tmscm_install_procedure ("cancel-editing",  tmg_cancel_editing, 0, 0, 0);
   tmscm_install_procedure ("in-graphics?",  tmg_in_graphicsP, 0, 0, 0);
   tmscm_install_procedure ("get-graphical-x",  tmg_get_graphical_x, 0, 0, 0);
   tmscm_install_procedure ("get-graphical-y",  tmg_get_graphical_y, 0, 0, 0);
@@ -3086,6 +3535,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("spell-replace",  tmg_spell_replace, 1, 0, 0);
   tmscm_install_procedure ("session-complete-command",  tmg_session_complete_command, 1, 0, 0);
   tmscm_install_procedure ("custom-complete",  tmg_custom_complete, 1, 0, 0);
+  tmscm_install_procedure ("keyboard-focus-on",  tmg_keyboard_focus_on, 1, 0, 0);
   tmscm_install_procedure ("view-set-property",  tmg_view_set_property, 2, 0, 0);
   tmscm_install_procedure ("view-get-property",  tmg_view_get_property, 1, 0, 0);
   tmscm_install_procedure ("get-window-width",  tmg_get_window_width, 0, 0, 0);
@@ -3093,26 +3543,34 @@ initialize_glue_editor () {
   tmscm_install_procedure ("clear-buffer",  tmg_clear_buffer, 0, 0, 0);
   tmscm_install_procedure ("tex-buffer",  tmg_tex_buffer, 0, 0, 0);
   tmscm_install_procedure ("clear-local-info",  tmg_clear_local_info, 0, 0, 0);
+  tmscm_install_procedure ("refresh-window",  tmg_refresh_window, 0, 0, 0);
+  tmscm_install_procedure ("update-forced",  tmg_update_forced, 0, 0, 0);
   tmscm_install_procedure ("update-path",  tmg_update_path, 1, 0, 0);
   tmscm_install_procedure ("update-current-buffer",  tmg_update_current_buffer, 0, 0, 0);
+  tmscm_install_procedure ("update-players",  tmg_update_players, 2, 0, 0);
   tmscm_install_procedure ("generate-all-aux",  tmg_generate_all_aux, 0, 0, 0);
   tmscm_install_procedure ("generate-aux",  tmg_generate_aux, 1, 0, 0);
   tmscm_install_procedure ("notify-page-change",  tmg_notify_page_change, 0, 0, 0);
   tmscm_install_procedure ("notify-change",  tmg_notify_change, 1, 0, 0);
+  tmscm_install_procedure ("get-metadata",  tmg_get_metadata, 1, 0, 0);
+  tmscm_install_procedure ("cpp-nr-pages",  tmg_cpp_nr_pages, 0, 0, 0);
   tmscm_install_procedure ("print-to-file",  tmg_print_to_file, 1, 0, 0);
   tmscm_install_procedure ("print-pages-to-file",  tmg_print_pages_to_file, 3, 0, 0);
   tmscm_install_procedure ("print",  tmg_print, 0, 0, 0);
   tmscm_install_procedure ("print-pages",  tmg_print_pages, 2, 0, 0);
-  tmscm_install_procedure ("print-snippet",  tmg_print_snippet, 2, 0, 0);
+  tmscm_install_procedure ("print-snippet",  tmg_print_snippet, 3, 0, 0);
   tmscm_install_procedure ("graphics-file-to-clipboard",  tmg_graphics_file_to_clipboard, 1, 0, 0);
   tmscm_install_procedure ("export-postscript",  tmg_export_postscript, 1, 0, 0);
   tmscm_install_procedure ("export-pages-postscript",  tmg_export_pages_postscript, 3, 0, 0);
   tmscm_install_procedure ("footer-eval",  tmg_footer_eval, 1, 0, 0);
   tmscm_install_procedure ("texmacs-exec",  tmg_texmacs_exec, 1, 0, 0);
+  tmscm_install_procedure ("texmacs-exec*",  tmg_texmacs_exec_dot, 1, 0, 0);
   tmscm_install_procedure ("texmacs-expand",  tmg_texmacs_expand, 1, 0, 0);
   tmscm_install_procedure ("verbatim-expand",  tmg_verbatim_expand, 1, 0, 0);
   tmscm_install_procedure ("latex-expand",  tmg_latex_expand, 1, 0, 0);
   tmscm_install_procedure ("html-expand",  tmg_html_expand, 1, 0, 0);
+  tmscm_install_procedure ("animate-checkout",  tmg_animate_checkout, 1, 0, 0);
+  tmscm_install_procedure ("animate-commit",  tmg_animate_commit, 1, 0, 0);
   tmscm_install_procedure ("idle-time",  tmg_idle_time, 0, 0, 0);
   tmscm_install_procedure ("change-time",  tmg_change_time, 0, 0, 0);
   tmscm_install_procedure ("menu-before-action",  tmg_menu_before_action, 0, 0, 0);

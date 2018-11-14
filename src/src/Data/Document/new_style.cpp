@@ -45,6 +45,9 @@ init_style_data () {
   if (sd == NULL) sd= tm_new<style_data_rep> ();
 }
 
+extern hashmap<string,tree> style_tree_cache;
+hashmap<string,bool> hidden_packages (false);
+
 /******************************************************************************
 * Modify style so as to search in all ancestor directories
 ******************************************************************************/
@@ -84,6 +87,8 @@ cache_file_name (tree t) {
 
 void
 style_invalidate_cache () {
+  style_tree_cache= hashmap<string,tree> ();
+  hidden_packages= hashmap<string,bool> (false);
   if (sd != NULL) {
     tm_delete<style_data_rep> (sd);
     sd= NULL;
@@ -153,7 +158,9 @@ compute_env_and_drd (tree style) {
   hashmap<string,tree> gref;
   hashmap<string,tree> laux;
   hashmap<string,tree> gaux;
-  edit_env env (drd, none, lref, gref, laux, gaux);
+  hashmap<string,tree> latt;
+  hashmap<string,tree> gatt;
+  edit_env env (drd, none, lref, gref, laux, gaux, latt, gatt);
   if (!busy) {
     tree t;
     bool ok;
@@ -241,7 +248,9 @@ get_document_drd (tree doc) {
     hashmap<string,tree> gref;
     hashmap<string,tree> laux;
     hashmap<string,tree> gaux;
-    edit_env env (drd, none, lref, gref, laux, gaux);
+    hashmap<string,tree> latt;
+    hashmap<string,tree> gatt;
+    edit_env env (drd, none, lref, gref, laux, gaux, latt, gatt);
     hashmap<string,tree> H;
     env->exec (tree (USE_PACKAGE, A (style)));
     env->exec (p);
@@ -254,6 +263,57 @@ get_document_drd (tree doc) {
 /******************************************************************************
 * The style and package menus
 ******************************************************************************/
+
+static bool
+ignore_dir (string dir) {
+  return
+    (dir == "Beamer") ||
+    (dir == "Compute") ||
+    (dir == "Customize") ||
+    (dir == "Environment") ||
+    (dir == "Gui") ||
+    (dir == "Header") ||
+    (dir == "Latex") ||
+    (dir == "Miscellaneous") ||
+    (dir == "Obsolete") ||
+    (dir == "Poster") ||
+    (dir == "Section") ||
+    (dir == "Session") ||
+    (dir == "Standard") ||
+    (dir == "Test");
+}
+
+static bool
+hidden_package (url u, string name, bool hidden) {
+  if (is_or (u))
+    return hidden_package (u[1], name, hidden) ||
+           hidden_package (u[2], name, hidden);
+  if (is_concat (u)) {
+    string dir= upcase_first (as_string (u[1]));
+    if (dir == "CVS" || dir == ".svn") return false;
+    return hidden_package (u[2], name, hidden || ignore_dir (dir));
+  }
+  if (hidden && is_atomic (u)) {
+    string l= as_string (u);
+    if (ends (l, ".ts")) l= l (0, N(l)-3);
+    else if (ends (l, ".hook")) l= l (0, N(l)-5);
+    else return false;
+    return name == l;
+  }
+  return false;
+}
+
+bool
+hidden_package (string name) {
+  if (name == "reduced-margins" ||
+      name == "indent-paragraphs" ||
+      name == "padded-paragraphs") return false;
+  if (!hidden_packages->contains (name)) {
+    url pck_u= descendance ("$TEXMACS_PACKAGE_ROOT");
+    hidden_packages (name)= hidden_package (pck_u, name, false);
+  }
+  return hidden_packages [name];
+}
 
 static string
 compute_style_menu (url u, int kind) {
@@ -270,17 +330,18 @@ compute_style_menu (url u, int kind) {
   if (is_concat (u)) {
     string dir= upcase_first (as_string (u[1]));
     string sub= compute_style_menu (u[2], kind);
-    if ((dir == "Test") || (dir == "Obsolete") ||
-	(dir == "CVS") || (dir == ".svn")) return "";
+    if (ignore_dir (dir) || dir == "CVS" || dir == ".svn") return "";
     return "(-> \"" * dir * "\" " * sub * ")";
   }
   if (is_atomic (u)) {
     string l  = as_string (u);
-    if (!ends (l, ".ts")) return "";
-    l= l(0, N(l)-3);
-    string cmd ("init-style");
-    if (kind == 1) cmd= "init-add-package";
-    if (kind == 2) cmd= "init-remove-package";
+    if (ends (l, ".ts")) l= l (0, N(l)-3);
+    else if (ends (l, ".hook")) l= l (0, N(l)-5);
+    else return "";
+    string cmd ("set-main-style");
+    if (kind == 1) cmd= "add-style-package";
+    if (kind == 2) cmd= "remove-style-package";
+    if (kind == 3) cmd= "toggle-style-package";
     return "((verbatim \"" * l * "\") (" * cmd * " \"" * l * "\"))";
   }
   return "";
@@ -304,5 +365,12 @@ object
 get_remove_package_menu () {
   url pck_u= descendance ("$TEXMACS_PACKAGE_ROOT");
   string pck= compute_style_menu (pck_u, 2);
+  return eval ("(menu-dynamic " * pck * ")");
+}
+
+object
+get_toggle_package_menu () {
+  url pck_u= descendance ("$TEXMACS_PACKAGE_ROOT");
+  string pck= compute_style_menu (pck_u, 3);
   return eval ("(menu-dynamic " * pck * ")");
 }

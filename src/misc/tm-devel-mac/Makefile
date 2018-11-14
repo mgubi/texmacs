@@ -34,9 +34,9 @@ TARGET_ppc     := powerpc-apple-darwin10.4.0
 HOST := $(shell sh ./config.guess)
 
 # point to your devtools here
-DEVTOOLS := /Developer_3.2.6
-MACOS_SDK := $(DEVTOOLS)/SDKs/MacOSX10.5.sdk
-BASE_FLAGS := -arch $(BUILD_ARCH) -mmacosx-version-min=10.5 -isysroot $(MACOS_SDK) -Wl,-syslibroot,$(MACOS_SDK) -Wl,-search_paths_first
+DEVTOOLS :=  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer
+MACOS_SDK := /Users/mgubi/t/SDKs/MacOSX10.6.sdk
+BASE_FLAGS := -arch $(BUILD_ARCH) -mmacosx-version-min=10.6 -isysroot $(MACOS_SDK) -Wl,-syslibroot,$(MACOS_SDK) -Wl,-search_paths_first
 BASE_CFLAGS := -I$(PREFIX)/include 
 BASE_LDFLAGS :=  -L$(PREFIX)/lib  
 

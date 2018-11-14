@@ -12,7 +12,8 @@
 #ifndef QT_FONT_H
 #define QT_FONT_H
 
-#include <QtGui>
+#include <QFont>
+#include <QFontMetrics>
 
 #include "font.hpp"
 
@@ -28,10 +29,13 @@ struct qt_font_rep: font_rep {
   QFontMetricsF qfm;
   
   qt_font_rep (string name, string family, int size, int dpi);
+  bool supports (string c);
   void get_extents (string s, metric& ex);
   void draw_fixed (renderer ren, string s, SI x, SI y);
-  font magnify (double zoom);
+  font magnify (double zoomx, double zoomy);
+  //void  advance_glyph (string s, int& pos, bool ligf);
   //glyph get_glyph (string s);
+  //int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
 };
 
 #endif // defined QT_FONT_H

@@ -78,6 +78,7 @@ root (modification mod) {
   case MOD_SET_CURSOR: return path_up (mod->p);
   default: FAILED ("invalid modification type");
   }
+  return path ();
 }
 
 int
@@ -91,6 +92,7 @@ index (modification mod) {
   case MOD_SET_CURSOR: return last_item (mod->p);
   default: FAILED ("invalid modification type");
   }
+  return 0;
 }
 
 int
@@ -101,12 +103,59 @@ argument (modification mod) {
   case MOD_INSERT_NODE: return last_item (mod->p);
   default: FAILED ("invalid modification type");
   }
+  return 0;
 }
 
 tree_label
 L (modification mod) {
   ASSERT (mod->k == MOD_ASSIGN_NODE, "assign_node modification expected");
   return L (mod->t);
+}
+
+/******************************************************************************
+* Constructor and accessors for scheme interface
+******************************************************************************/
+
+modification
+make_modification (string s, path p, tree t) {
+  modification_type k= MOD_ASSIGN;
+  if (s == "assign") k= MOD_ASSIGN;
+  else if (s == "insert") k= MOD_INSERT;
+  else if (s == "remove") k= MOD_REMOVE;
+  else if (s == "split") k= MOD_SPLIT;
+  else if (s == "join") k= MOD_JOIN;
+  else if (s == "assign-node") k= MOD_ASSIGN_NODE;
+  else if (s == "insert-node") k= MOD_INSERT_NODE;
+  else if (s == "remove-node") k= MOD_REMOVE_NODE;
+  else if (s == "set-cursor") k= MOD_SET_CURSOR;
+  return modification (k, p, t);
+}
+
+string
+get_type (modification mod) {
+  switch (mod->k) {
+  case MOD_ASSIGN: return "assign";
+  case MOD_INSERT: return "insert";
+  case MOD_REMOVE: return "remove";
+  case MOD_SPLIT: return "split";
+  case MOD_JOIN: return "join";
+  case MOD_ASSIGN_NODE: return "assign-node";
+  case MOD_INSERT_NODE: return "insert-node";
+  case MOD_REMOVE_NODE: return "remove-node";
+  case MOD_SET_CURSOR: return "set-cursor";
+  default: FAILED ("invalid modification type");
+  }
+  return "none";
+}
+
+path
+get_path (modification mod) {
+  return mod->p;
+}
+
+tree
+get_tree (modification mod) {
+  return mod->t;
 }
 
 /******************************************************************************
@@ -249,7 +298,7 @@ clean_remove (tree t, path p, int nr) {
   if (is_nil (p->next) && is_atomic (t)) {
     string s= t->label;
     if (N(s) < p->item+nr)
-      FAILED("clean_remove(): Invalid remove from atomic tree.");
+      FAILED ("clean_remove: Invalid remove from atomic tree");
     return s (0, p->item) * s (p->item+nr, N(s));
   }
   else if (is_nil (p->next)) {
@@ -261,7 +310,7 @@ clean_remove (tree t, path p, int nr) {
   }
   else {
     int i, j= p->item, n= N(t);
-    if (j >= n) FAILED("clean_remove(): Invalid path."); //return t;  // FIXME? check whether this is the right return value.
+    if (j >= n) FAILED ("clean_remove: Invalid path"); //return t;  // FIXME? check whether this is the right return value.
     tree r (t, n);
     for (i=0; i<j; i++) r[i]= t[i];
     r[j]= clean_remove (t[j], p->next, nr);

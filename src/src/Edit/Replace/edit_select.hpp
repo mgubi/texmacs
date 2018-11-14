@@ -20,13 +20,14 @@
 
 class edit_select_rep: virtual public editor_rep {
 protected:
-  path   start_p, end_p;
-  bool   selecting, shift_selecting;
-  path   mid_p;
-  string selection_import;
-  string selection_export;
-  path   focus_p;
-  bool   focus_hold;
+  range_set cur_sel;
+  bool      selecting, shift_selecting;
+  path      mid_p;
+  string    selection_import;
+  string    selection_export;
+  path      focus_p;
+  bool      focus_hold;
+  hashmap<string,range_set> alt_sels;
 
 protected:
   void get_selection (path& start, path& end);
@@ -63,18 +64,24 @@ public:
   tree selection_raw_get (string key);
   void selection_correct (path i1, path i2, path& o1, path& o2);
   path selection_get_subtable (int& row1, int& col1, int& row2, int& col2);
+  selection compute_selection (path p1, path p2);
+  selection compute_selection (range_set sel);
   void selection_get (selection& sel);
   void selection_get (path& start, path& end);
   path selection_get_start ();
   path selection_get_end ();
+  path selection_var_get_start ();
+  path selection_var_get_end ();
   path selection_get_path ();
   path selection_get_cursor_path ();
   tree selection_get_env_value (string var);
+  tree selection_get (string key);
   void selection_set (string key, tree t, bool persistant= false);
   void selection_set (tree t);
   void selection_set_start (path p= path());
   void selection_set_end (path p= path());
   void selection_set_paths (path start, path end);
+  void selection_set_range_set (range_set sel);
   void selection_copy (string key= "primary");
   void selection_paste (string key= "primary");
   void selection_clear (string key= "primary");
@@ -95,6 +102,11 @@ public:
   void manual_focus_release ();
   path focus_search (path p, bool skip_flag, bool up_flag);
   path focus_get (bool skip_flag);
+
+  void set_alt_selection (string s, range_set sel);
+  range_set get_alt_selection (string s);
+  void cancel_alt_selection (string s);
+  void cancel_alt_selections ();
 };
 
 #endif // defined EDIT_SELECT_H

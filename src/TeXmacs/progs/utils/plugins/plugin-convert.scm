@@ -45,7 +45,7 @@
             (cond ((!= im #f) (im args))
                   (else (noop)))))))
 
-(define (plugin-input-arg t)
+(tm-define (plugin-input-arg t)
   (if (and (string? t)
 	   (= (length (string->tmtokens t 0 (string-length t))) 1))
       (plugin-input t)
@@ -304,6 +304,7 @@
   (block* plugin-input-descend-last)
   (matrix plugin-input-descend-last)
   (det plugin-input-det)
+  (bmatrix plugin-input-descend-last)
   (tformat plugin-input-descend-last)
   (table plugin-input-table)
   (rows plugin-input-rows)

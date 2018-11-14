@@ -143,6 +143,9 @@
   (:require (alternate-standard-second? t))
   #t)
 
+(tm-define (pure-alternate-context? t)
+  (alternate-context? t))
+
 (tm-define alternate-table (make-ahash-table))
 
 (tm-define-macro (define-alternate first second)
@@ -195,20 +198,20 @@
   (:synopsis "Unold at the current focus position")
   (alternate-unfold (focus-tree)))
 
-(tm-define (mouse-fold)
+(tm-define (mouse-fold t)
   (:type (-> void))
   (:synopsis "Fold using the mouse")
   (:secure #t)
-  (with-action t
+  (when (tree->path t)
     (tree-go-to t :start)
     (when (tree-up t)
       (alternate-fold (tree-up t)))))
 
-(tm-define (mouse-unfold)
+(tm-define (mouse-unfold t)
   (:type (-> void))
   (:synopsis "Unfold using the mouse")
   (:secure #t)
-  (with-action t
+  (when (tree->path t)
     (tree-go-to t :start)
     (when (tree-up t)
       (alternate-unfold (tree-up t)))))
@@ -219,10 +222,14 @@
 
 (define-group variant-tag)
 
+(tm-define (focus-tree-modified t)
+  (noop))
+
 (tm-define (variant-set t by)
   (with-focus-after t
     (with i (tree-down-index t)
       (tree-assign-node! t by)
+      (focus-tree-modified t)
       (when (and i (not (tree-accessible-child? t i)))
         (with ac (tree-accessible-children t)
           (when (nnull? ac)
@@ -285,11 +292,14 @@
 ;; Folding-unfolding variants of tags with hidden arguments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (hidden-context? t)
+  (tree-in? t (hidden-tag-list)))
+
 (tm-define (tree-show-hidden t)
   (noop))
 
 (tm-define (tree-show-hidden t)
-  (:require (tree-is? t 'hidden))
+  (:require (hidden-context? t))
   (tree-assign-node! t 'shown))
 
 (tm-define (cursor-show-hidden)
@@ -297,3 +307,32 @@
     (while (and t (!= t (cursor-tree)))
       (tree-show-hidden t)
       (set! t (tree-ref t :down)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Standard groups
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-group variant-tag
+  (argument-tag) (value-tag) (quote-tag)
+  (binary-operation-tag) (binary-compare-tag))
+
+(define-group hidden-tag
+  hidden hidden*)
+
+(define-group argument-tag
+  arg quote-arg)
+
+(define-group value-tag
+  value quote-value)
+
+(define-group quote-tag
+  quote quasi quasiquote)
+
+(define-group binary-operation-tag
+  plus minus times over minimum maximum or and)
+
+(define-group binary-compare-tag
+  equal unequal less lesseq greater greatereq)
+
+(define-group reference-tag
+  reference eqref pageref)

@@ -29,15 +29,15 @@ struct aqua_image_rep: concrete_struct {
 	SI xo,yo;
 	int w,h;
 	aqua_image_rep (NSImage* img2, SI xo2, SI yo2, int w2, int h2) :
-  img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { [img retain]; };
+      img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { [img retain]; };
 	~aqua_image_rep()  {  [img release]; };
 	friend class aqua_image;
 };
 
 class aqua_image {
-	CONCRETE_NULL(aqua_image);
+  CONCRETE_NULL(aqua_image);
   aqua_image (NSImage* img2, SI xo2, SI yo2, int w2, int h2):
-  rep (tm_new <aqua_image_rep> (img2, xo2, yo2, w2, h2)) {}	
+    rep (tm_new <aqua_image_rep> (img2, xo2, yo2, w2, h2)) {}
 };
 
 CONCRETE_NULL_CODE(aqua_image);
@@ -51,7 +51,7 @@ struct cg_image_rep: concrete_struct {
 	SI xo,yo;
 	int w,h;
 	cg_image_rep (CGImageRef img2, SI xo2, SI yo2, int w2, int h2) :
-    img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { CGImageRetain(img); };
+      img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { CGImageRetain(img); };
 	~cg_image_rep()  {  CGImageRelease(img); };
 	friend class cg_image;
 };
@@ -59,35 +59,26 @@ struct cg_image_rep: concrete_struct {
 class cg_image {
 	CONCRETE_NULL(cg_image);
 	cg_image (CGImageRef img2, SI xo2, SI yo2, int w2, int h2):
-    rep (tm_new <cg_image_rep> (img2, xo2, yo2, w2, h2)) {}	
+      rep (tm_new <cg_image_rep> (img2, xo2, yo2, w2, h2)) {}
 };
 
 CONCRETE_NULL_CODE(cg_image);
-
 
 /******************************************************************************
  * Global support variables for all aqua_renderers
  ******************************************************************************/
 
-
-static hashmap<basic_character,cg_image> character_image;  // bitmaps of all characters
+// bitmaps of all characters
+static hashmap<basic_character,cg_image> character_image;
+// image cache
 static hashmap<string,aqua_image> images; 
-
-
 
 /******************************************************************************
  * aqua_renderer
  ******************************************************************************/
 
-void 
-aqua_set_color (color col) {
-  int r, g, b, a;
-  get_rgb_color (col, r, g, b, a);
-  [[NSColor colorWithDeviceRed: r/255.0 green:g/255.0 blue:b/255.0 alpha:a/255.0] set];
-}
-
 aqua_renderer_rep::aqua_renderer_rep (int w2, int h2) :
-  basic_renderer_rep (true, w2, h2), context(NULL)
+  basic_renderer_rep (true, w2, h2), context(nil), view(nil)
 {
 }
 
@@ -105,40 +96,65 @@ aqua_renderer_rep::begin (void * c) {
 void 
 aqua_renderer_rep::end () { 
 //  CGContextEndPage(context);
-  [context release];
+  [context release];    
 //  CGContextRelease(context); 
-  context = NULL;  
+  context = NULL;
+  view = nil;
 }
 
 void
-aqua_renderer_rep::set_color (color c) {
-  basic_renderer_rep::set_color(c);
-  aqua_set_color(cur_fg);
+aqua_set_color (color col) {
+    int r, g, b, a;
+    get_rgb_color (col, r, g, b, a);
+    [[NSColor colorWithDeviceRed: r/255.0 green:g/255.0 blue:b/255.0 alpha:a/255.0] set];
 }
 
 
 void
-aqua_renderer_rep::set_line_style (SI lw, int type, bool round) { (void) type;
-  if (lw <= pixel)
-  {
+aqua_renderer_rep::set_pencil (pencil p) {
+  basic_renderer_rep::set_pencil (p);
+  aqua_set_color (pen->get_color ());
+  double pw= (((double) pen->get_width ()) / ((double) pixel));
+#if 0
+  if (pw <= pixel) {
     [NSBezierPath setDefaultLineWidth:1.0];
   }
-  else
-  {
-    [NSBezierPath setDefaultLineWidth:(lw+thicken)/(1.0*pixel)];
+  else {
+    [NSBezierPath setDefaultLineWidth: (pen->w+thicken)/(1.0*pixel)];
   }
-  [NSBezierPath setDefaultLineCapStyle:(round ? NSRoundLineCapStyle : NSButtLineCapStyle)];
+#else
+  [NSBezierPath setDefaultLineWidth: pw];
+#endif
+    if (pen->get_type () == pencil_brush) {
+        brush br= pen->get_brush ();
+#if 0
+        //FIXME: brushes
+        QImage* pm= get_pattern_image (br, pixel);
+        int pattern_alpha= br->get_alpha ();
+        painter->setOpacity (qreal (pattern_alpha) / qreal (255));
+        if (pm != NULL) {
+            b= QBrush (*pm);
+            double pox, poy;
+            decode (0, 0, pox, poy);
+            QTransform tr;
+            tr.translate (pox, poy);
+            b.setTransform (tr);
+            p= QPen (b, pw);
+        }
+#endif
+    }
+  [NSBezierPath setDefaultLineCapStyle: ((pen->get_cap () == cap_round) ? NSRoundLineCapStyle : NSButtLineCapStyle)];
   [NSBezierPath setDefaultLineJoinStyle: NSRoundLineJoinStyle];
 }
 
 void
 aqua_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
-  decode (x1, y1);
-  decode (x2, y2);
+    double rx1, ry1, rx2, ry2;
+    decode (x1, y1, rx1, ry1);
+    decode (x2, y2, rx2, ry2);
  // y1--; y2--; // top-left origin to bottom-left origin conversion
-  [NSBezierPath strokeLineFromPoint:NSMakePoint(x1,y1) toPoint:NSMakePoint(x2,y2)];
+  [NSBezierPath strokeLineFromPoint:NSMakePoint(rx1,ry1) toPoint:NSMakePoint(rx2,ry2)];
 }
-
 
 void
 aqua_renderer_rep::lines (array<SI> x, array<SI> y) {
@@ -146,16 +162,13 @@ aqua_renderer_rep::lines (array<SI> x, array<SI> y) {
   if ((N(y) != n) || (n<1)) return;
   STACK_NEW_ARRAY (pnt, NSPoint, n);
   for (i=0; i<n; i++) {
-    SI xx= x[i], yy= y[i];
-    decode (xx, yy);
-    pnt[i].x= xx;
-    pnt[i].y= yy;
+    double xx, yy;
+    decode (x[i], y[i], xx, yy);
+    pnt[i] = NSMakePoint (xx,yy);
     if (i>0) [NSBezierPath strokeLineFromPoint:pnt[i-1] toPoint:pnt[i]]; // FIX: hack
   }
- // XDrawLines (dpy, win, gc, pnt, n, CoordModeOrigin);
   STACK_DELETE_ARRAY (pnt);
 }
-
 
 void
 aqua_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
@@ -165,10 +178,10 @@ aqua_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
 	  if ((x1>=x2) || (y1<=y2)) return;
-	NSRect rect = NSMakeRect(x1,y2,x2-x1,y1-y2);
-  aqua_set_color (cur_bg);
+	NSRect rect = NSMakeRect (x1, y2, x2-x1, y1-y2);
+  aqua_set_color (bg_brush->get_color ());
   [NSBezierPath fillRect:rect];
-  aqua_set_color (cur_fg);
+  aqua_set_color (pen->get_color ());
 }
 
 void
@@ -197,16 +210,18 @@ aqua_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
 void
 aqua_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   if ((x1>=x2) || (y1>=y2)) return;
-  decode (x1, y1);
-  decode (x2, y2);
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
   //FIXME: XDrawArc (dpy, win, gc, x1, y2, x2-x1, y1-y2, alpha, delta);
 }
 
 void
 aqua_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   if ((x1>=x2) || (y1>=y2)) return;
-  decode (x1, y1);
-  decode (x2, y2);
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
   //FIXME: XFillArc (dpy, win, gc, x1, y2, x2-x1, y1-y2, alpha, delta);
 }
 
@@ -216,8 +231,8 @@ aqua_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   if ((N(y) != n) || (n<1)) return;
   STACK_NEW_ARRAY (pnt, NSPoint, n);
   for (i=0; i<n; i++) {
-    SI xx= x[i], yy= y[i];
-    decode (xx, yy);
+    double xx,yy;
+    decode (x[i], y[i], xx, yy);
     pnt[i] = NSMakePoint(xx,yy);
   }
   
@@ -228,26 +243,37 @@ aqua_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   STACK_DELETE_ARRAY (pnt);
 }
 
+void
+aqua_renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
+    array<SI> x (3), y (3);
+    x[0]= x1; y[0]= y1;
+    x[1]= x2; y[1]= y2;
+    x[2]= x3; y[2]= y3;
+    NSPoint pnt[3];
+    int i, n= N(x);
+    if ((N(y) != n) || (n<1)) return;
+    for (i=0; i<n; i++) {
+        double xx,yy;
+        decode (x[i], y[i], xx, yy);
+        pnt[i] = NSMakePoint(xx,yy);
+    }
+    NSBezierPath *path = [NSBezierPath bezierPath];
+    [path  appendBezierPathWithPoints:pnt count:n];
+    [path setWindingRule: NSEvenOddWindingRule];
+    [path fill];
+}
+
+
 /******************************************************************************
  * Image rendering
  ******************************************************************************/
-struct aqua_cache_image_rep: cache_image_element_rep {
-	aqua_cache_image_rep (int w2, int h2, time_t time2, NSImage *ptr2) :
-  cache_image_element_rep(w2,h2,time2,ptr2) {  [(NSImage*)ptr retain]; };
-	virtual ~aqua_cache_image_rep() {   [(NSImage*)ptr release]; };
-};
-
 
 void
-aqua_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
-                          double cx1, double cy1, double cx2, double cy2,
-                          int alpha)
-{
+aqua_renderer_rep::image (url u, SI w, SI h, SI x, SI y, int alpha) {
   // Given an image of original size (W, H),
-  // we display the part (cx1 * W, xy1 * H, cx2 * W, cy2 * H)
-  // at position (x, y) in a rectangle of size (w, h)
+  // we display it at position (x, y) in a rectangle of size (w, h)
   
-  // if (DEBUG_EVENTS) cout << "cg_renderer_rep::image " << as_string(u) << LF;
+  // if (DEBUG_EVENTS) debug_events << "cg_renderer_rep::image " << as_string(u) << LF;
   (void) alpha; // FIXME
   
   w= w/pixel; h= h/pixel;
@@ -257,46 +283,33 @@ aqua_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
   //painter.drawRect (QRect (x, y-h, w, h));
   
   NSImage *pm = NULL;
-  tree lookup= tuple (u->t);
-  lookup << as_string (w ) << as_string (h )
-  << as_string (cx1) << as_string (cy1)
-  << as_string (cx2) << as_string (cy2) << "cg-image" ;
-  cache_image_element ci = get_image_cache(lookup);
-  if (!is_nil(ci)) {
-    pm = static_cast<NSImage*> (ci->ptr);
-  } else {
-	  if (suffix (u) == "png") {
-      // rendering
-      string suu = as_string (u);
-      // cout << suu << LF;
-      pm = [[NSImage alloc] initWithContentsOfFile:to_nsstring(suu)];
-	  } else if (suffix (u) == "ps" ||
-               suffix (u) == "eps" ||
-               suffix (u) == "pdf") {
-      url temp= url_temp (".png");
-      mac_image_to_png (u, temp, w, h);
-//      system ("convert", u, temp);
-      string suu = as_string (temp);
-      pm = [[NSImage alloc] initWithContentsOfFile:to_nsstring(suu)];
-      remove (temp);
-    }
-    
-    if (pm == NULL ) {
-      cout << "TeXmacs] warning: cannot render " << as_string (u) << "\n";
-      return;
-    }
-    // caching
-    ci = tm_new <aqua_cache_image_rep> (w,h, texmacs_time(), pm);
-    set_image_cache(lookup, ci);
-    (ci->nr)++;
+  if (suffix (u) == "png") {
+    // rendering
+    string suu = as_string (u);
+    // debug_events << suu << LF;
+    pm = [[NSImage alloc] initWithContentsOfFile:to_nsstring(suu)];
   }
-  
+  else if (suffix (u) == "ps" ||
+           suffix (u) == "eps" ||
+           suffix (u) == "pdf") {
+    url temp= url_temp (".png");
+    mac_image_to_png (u, temp, w, h);
+//  system ("convert", u, temp);
+    string suu = as_string (temp);
+    pm = [[NSImage alloc] initWithContentsOfFile:to_nsstring(suu)];
+    remove (temp);
+  }
+    
+  if (pm == NULL ) {
+    debug_events << "TeXmacs] warning: cannot render " << as_string (u) << "\n";
+    return;
+  }
+ 
   NSSize isz = [pm size];
   [pm setFlipped:YES];
 //  [pm drawAtPoint:NSMakePoint(x,y) fromRect:NSMakeRect(0,0,w,h) operation:NSCompositeSourceAtop fraction:1.0];
   [pm drawInRect:NSMakeRect(x,y-h,w,h) fromRect:NSMakeRect(0,0,isz.width,isz.height) operation:NSCompositeSourceAtop fraction:1.0];
 }
-
 
 void
 aqua_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
@@ -304,8 +317,6 @@ aqua_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
   y--; // top-left origin to bottom-left origin conversion
   [im drawAtPoint:NSMakePoint(x,y) fromRect:NSMakeRect(0,0,w,h) operation:NSCompositeSourceAtop fraction:1.0];
 }  
-
-
 
 static CGContextRef 
 MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
@@ -376,7 +387,7 @@ aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 		CGRect r = CGRectMake(x1,y1,mi->w,mi->h);
 		CGContextSetShouldAntialias (cgc, true);
 		CGContextSaveGState (cgc);
-		//  cg_set_color (context, cur_fg);
+		//  cg_set_color (context, pen->get_color ());
 		CGContextClipToMask (cgc, r, mi->img); 
 		CGContextFillRect (cgc, r);
 		CGContextRestoreGState (cgc);
@@ -388,7 +399,7 @@ void aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   basic_character xc (c, fng, std_shrinkf, 0, 0);
   cg_image mi = character_image [xc];
   if (is_nil(mi)) {
-    // cout << "CACHING:" << c << "\n" ;
+    // debug_events << "CACHING:" << c << "\n" ;
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
     glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
@@ -424,7 +435,7 @@ void aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     CGRect r = CGRectMake(x1,y1,mi->w,mi->h);
     CGContextSetShouldAntialias (cgc, true);
     CGContextSaveGState (cgc);
-    //  aqua_set_color (context, cur_fg);
+    //  aqua_set_color (context, pen->get_color ());
     CGContextClipToMask (cgc, r, (CGImage*)(mi->img)); 
     CGContextFillRect (cgc, r);
     CGContextRestoreGState (cgc);
@@ -457,7 +468,7 @@ NSImage* xpm_init(url file_name)
   skip_spaces (s, i);
   ok= read_int (s, i, b) && ok;
   if ((!ok) || (N(t)<(c+1)) || (c<=0)) {
-    cerr << "File name= " << file_name << "\n";
+    failed_error << "File name= " << file_name << "\n";
     FAILED ("invalid xpm");
   }
   
@@ -487,7 +498,7 @@ NSImage* xpm_init(url file_name)
       def= locase_all (s (j, i));
     }
 
-		pmcs(name)= xpm_to_color(def);
+		pmcs(name)= xpm_color(def);
   }
   NSImage *im = [[NSImage alloc] initWithSize:NSMakeSize(w,h)];
 	[im setFlipped:YES];
@@ -515,9 +526,6 @@ NSImage* xpm_init(url file_name)
   return im;
 }
 
-
-extern int char_clip;
-
 NSImage *
 aqua_renderer_rep::xpm_image(url file_name)
 { 
@@ -537,29 +545,6 @@ aqua_renderer_rep::xpm_image(url file_name)
 	return image;
 }
 
-void aqua_renderer_rep::xpm (url file_name, SI x, SI y) {
-  y -= pixel; // counter balance shift in draw_clipped
-  
- // c_string chstr (as_string (file_name));
-//  NSString *name = [NSString stringWithCString:chstr];
-//  name = [[name stringByDeletingPathExtension] stringByAppendingPathExtension:@"png"];
-  ///name = [name stringByDeletingPathExtension];
-  NSImage *image = xpm_image(file_name);
-  
-  ASSERT (pixel == PIXEL, "pixel and PIXEL should coincide");
-  int w, h;
-  NSSize imgSize = [image size];
-  w = imgSize.width; h = imgSize.height;
-
-//  [(NSImageRep*)[[image representations] objectAtIndex:0]  drawAtPoint:NSMakePoint(x,y)];
-  
-  int old_clip= char_clip;
-  char_clip= true;
-  draw_clipped (image, w, h, x, y);
-  char_clip=old_clip;
-}
-
-
 /******************************************************************************
  * main cocoa renderer
  ******************************************************************************/
@@ -572,3 +557,310 @@ the_aqua_renderer () {
 	return the_renderer;
 }
 
+
+
+/******************************************************************************
+ * Shadow management methods
+ ******************************************************************************/
+
+/* Shadows are auxiliary renderers which allow double buffering and caching of
+ * graphics. TeXmacs has explicit double buffering from the X11 port. Maybe
+ * it would be better to design a better API abstracting from the low level
+ * details but for the moment the following code and the aqua_proxy_renderer_rep
+ * is designed to avoid double buffering : when texmacs asks
+ * a aqua_renderer_rep for a shadow it is given a proxy of the original renderer
+ * texmacs uses this shadow for double buffering and the proxy will simply
+ * forward the drawing operations to the original surface and neglect all the
+ * syncronization operations
+ *
+ * to solve the second problem we do not draw directly on screen in QTMWidget.
+ * Instead we maintain an internal pixmap which represents the state of the pixels
+ * according to texmacs. When we are asked to initialize a aqua_shadow_renderer_rep
+ * we simply read the pixels form this backing store. At the Qt level then
+ * (in QTMWidget) we make sure that the state of the backing store is in sync
+ * with the screen via paintEvent/repaint mechanism.
+ *
+ */
+
+class aqua_shadow_renderer_rep: public aqua_renderer_rep {
+public:
+    NSBitmapImageRep *px;
+    aqua_renderer_rep *master;
+    
+public:
+    aqua_shadow_renderer_rep (int _w, int _h);
+    ~aqua_shadow_renderer_rep ();
+    
+    void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
+};
+
+class aqua_proxy_renderer_rep: public aqua_renderer_rep {
+public:
+    aqua_renderer_rep *base;
+    
+public:
+    aqua_proxy_renderer_rep (aqua_renderer_rep *_base)
+    : aqua_renderer_rep(w, h), base(_base) { }
+    ~aqua_proxy_renderer_rep () { };
+    
+    void new_shadow (renderer& ren);
+    void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
+};
+
+
+void
+aqua_renderer_rep::new_shadow (renderer& ren) {
+    SI mw, mh, sw, sh;
+    get_extents (mw, mh);
+    if (ren != NULL) {
+        ren->get_extents (sw, sh);
+        if (sw != mw || sh != mh) {
+            delete_shadow (ren);
+            ren= NULL;
+        } else
+            static_cast<aqua_shadow_renderer_rep*>(ren)->end();
+        // cout << "Old: " << sw << ", " << sh << "\n";
+    }
+
+    if (ren == NULL)  ren= (renderer) tm_new<aqua_proxy_renderer_rep> (this);
+  
+    if (ren) static_cast<aqua_renderer_rep*>(ren)->begin(context);
+
+    // cout << "Create " << mw << ", " << mh << "\n";
+}
+
+void
+aqua_renderer_rep::delete_shadow (renderer& ren)  {
+    if (ren != NULL) {
+        tm_delete (ren);
+        ren= NULL;
+    }
+}
+
+void
+aqua_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+    // FIXME: we should use the routine fetch later
+    ASSERT (ren != NULL, "invalid renderer");
+    if (ren->is_printer ()) return;
+    aqua_renderer_rep* shadow= static_cast<aqua_renderer_rep*>(ren);
+    outer_round (x1, y1, x2, y2);
+    x1= max (x1, cx1- ox);
+    y1= max (y1, cy1- oy);
+    x2= min (x2, cx2- ox);
+    y2= min (y2, cy2- oy);
+    shadow->ox= ox;
+    shadow->oy= oy;
+    shadow->master= this;
+    shadow->cx1= x1+ ox;
+    shadow->cy1= y1+ oy;
+    shadow->cx2= x2+ ox;
+    shadow->cy2= y2+ oy;
+    
+    decode (x1, y1);
+    decode (x2, y2);
+    if (x1<x2 && y2<y1) {
+        NSRect rect = NSMakeRect(x1, y2, x2-x1, y1-y2);
+        //    shadow->painter->setCompositionMode(QPainter::CompositionMode_Source);
+        NSGraphicsContext *old_context = [[NSGraphicsContext currentContext] retain];
+        [NSGraphicsContext setCurrentContext:context];
+        NSBezierPath* clipPath = [NSBezierPath bezierPath];
+        [clipPath appendBezierPathWithRect: rect];
+        [clipPath setClip];
+        [NSGraphicsContext setCurrentContext:old_context]; [old_context release];
+        //    shadow->painter->drawPixmap (rect, px, rect);
+        //    cout << "aqua_shadow_renderer_rep::get_shadow "
+        //         << rectangle(x1,y2,x2,y1) << LF;
+        //  XCopyArea (dpy, win, shadow->win, gc, x1, y2, x2-x1, y1-y2, x1, y2);
+    } else {
+//        shadow->painter->setClipRect(QRect());
+    }
+}
+
+void
+aqua_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+    // FIXME: we should use the routine fetch later
+    ASSERT (ren != NULL, "invalid renderer");
+    if (ren->is_printer ()) return;
+    if (context == static_cast<aqua_renderer_rep*>(ren)->context) return;
+    aqua_shadow_renderer_rep* shadow= static_cast<aqua_shadow_renderer_rep*>(ren);
+    outer_round (x1, y1, x2, y2);
+    x1= max (x1, cx1- ox);
+    y1= max (y1, cy1- oy);
+    x2= min (x2, cx2- ox);
+    y2= min (y2, cy2- oy);
+    decode (x1, y1);
+    decode (x2, y2);
+    if (x1<x2 && y2<y1) {
+        NSRect rect = NSMakeRect(x1, y2, x2-x1, y1-y2);
+        //    cout << "aqua_shadow_renderer_rep::put_shadow "
+        //         << rectangle(x1,y2,x2,y1) << LF;
+        //    painter->setCompositionMode(QPainter::CompositionMode_Source);
+        NSGraphicsContext *old_context = [[NSGraphicsContext currentContext] retain];
+        [NSGraphicsContext setCurrentContext:context];
+        [shadow->px drawInRect: rect];
+        [NSGraphicsContext setCurrentContext:old_context]; [old_context release];
+//        painter->drawPixmap (rect, shadow->px, rect);
+        //  XCopyArea (dpy, shadow->win, win, gc, x1, y2, x2-x1, y1-y2, x1, y2);
+    }
+}
+
+
+void
+aqua_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2)  {
+    if (master == NULL) return;
+    if (context == static_cast<aqua_renderer_rep*>(master)->context) return;
+    outer_round (x1, y1, x2, y2);
+    decode (x1, y1);
+    decode (x2, y2);
+    static_cast<aqua_renderer_rep*>(master)->encode (x1, y1);
+    static_cast<aqua_renderer_rep*>(master)->encode (x2, y2);
+    master->put_shadow (this, x1, y1, x2, y2);
+}
+
+
+/******************************************************************************
+ * proxy qt renderer
+ ******************************************************************************/
+
+void
+aqua_proxy_renderer_rep::new_shadow (renderer& ren) {
+    SI mw, mh, sw, sh;
+    get_extents (mw, mh);
+    if (ren != NULL) {
+        ren->get_extents (sw, sh);
+        if (sw != mw || sh != mh) {
+            delete_shadow (ren);
+            ren= NULL;
+        }
+        else
+            static_cast<aqua_renderer_rep*>(ren)->end();
+        // cout << "Old: " << sw << ", " << sh << "\n";
+    }
+    if (ren == NULL) {
+//        NSBitmapImageRep *img = [[NSBitmapImageRep alloc] init];
+//        ren= (renderer) tm_new<aqua_shadow_renderer_rep> (QPixmap (mw, mh));
+        ren= (renderer) tm_new<aqua_shadow_renderer_rep> (mw, mh);
+    }
+    
+    // cout << "Create " << mw << ", " << mh << "\n";
+    static_cast<aqua_renderer_rep*>(ren)->begin(context);
+}
+
+void
+aqua_proxy_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+    // FIXME: we should use the routine fetch later
+    ASSERT (ren != NULL, "invalid renderer");
+    if (ren->is_printer ()) return;
+    aqua_renderer_rep* shadow= static_cast<aqua_renderer_rep*>(ren);
+    outer_round (x1, y1, x2, y2);
+    x1= max (x1, cx1- ox);
+    y1= max (y1, cy1- oy);
+    x2= min (x2, cx2- ox);
+    y2= min (y2, cy2- oy);
+    shadow->ox= ox;
+    shadow->oy= oy;
+    shadow->cx1= x1+ ox;
+    shadow->cy1= y1+ oy;
+    shadow->cx2= x2+ ox;
+    shadow->cy2= y2+ oy;
+    shadow->master= this;
+    decode (x1, y1);
+    decode (x2, y2);
+    
+    NSGraphicsContext *old_context = [[NSGraphicsContext currentContext] retain];
+    [NSGraphicsContext setCurrentContext:shadow->context];
+    if (x1<x2 && y2<y1) {
+        NSRect rect = NSMakeRect(x1, y2, x2-x1, y1-y2);
+
+        
+        NSBezierPath* clipPath = [NSBezierPath bezierPath];
+        [clipPath appendBezierPathWithRect: rect];
+        [clipPath setClip];
+
+        
+//        shadow->painter->setClipRect(rect);
+        
+        //    shadow->painter->setCompositionMode(QPainter::CompositionMode_Source);
+        NSBitmapImageRep *img = [view bitmapImageRepForCachingDisplayInRect:rect];
+//        QPixmap *_pixmap = static_cast<QPixmap*>(painter->device());
+        if (img) {
+            [img drawInRect:rect];
+//            shadow->painter->drawPixmap (rect, *_pixmap, rect);
+        }
+        //    cout << "aqua_shadow_renderer_rep::get_shadow "
+        //         << rectangle(x1,y2,x2,y1) << LF;
+        //  XCopyArea (dpy, win, shadow->win, gc, x1, y2, x2-x1, y1-y2, x1, y2);
+
+    } else {
+        //shadow->painter->setClipRect(QRect());
+    }
+    [NSGraphicsContext setCurrentContext:old_context]; [old_context release];
+    
+}
+
+
+/******************************************************************************
+ * shadow qt renderer
+ ******************************************************************************/
+
+aqua_shadow_renderer_rep::aqua_shadow_renderer_rep (int _w, int _h)
+// : aqua_renderer_rep (_px.width(),_px.height()), px(_px)
+: aqua_renderer_rep (_w, _h), px(nil)
+{
+    px = [[NSBitmapImageRep alloc] init];
+    [px setSize: NSMakeSize(w,h)];
+    context = [[NSGraphicsContext graphicsContextWithBitmapImageRep: px] retain];
+    //cout << px.width() << "," << px.height() << " " << LF;
+    // painter->begin(&px);
+}
+
+aqua_shadow_renderer_rep::~aqua_shadow_renderer_rep ()
+{
+  [px release];
+  [context release];
+  context  = nil;
+}
+
+void
+aqua_shadow_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+    // FIXME: we should use the routine fetch later
+    ASSERT (ren != NULL, "invalid renderer");
+    if (ren->is_printer ()) return;
+    aqua_shadow_renderer_rep* shadow= static_cast<aqua_shadow_renderer_rep*>(ren);
+    outer_round (x1, y1, x2, y2);
+    x1= max (x1, cx1- ox);
+    y1= max (y1, cy1- oy);
+    x2= min (x2, cx2- ox);
+    y2= min (y2, cy2- oy);
+    shadow->ox= ox;
+    shadow->oy= oy;
+    shadow->cx1= x1+ ox;
+    shadow->cy1= y1+ oy;
+    shadow->cx2= x2+ ox;
+    shadow->cy2= y2+ oy;
+    shadow->master= this;
+    decode (x1, y1);
+    decode (x2, y2);
+    NSGraphicsContext *old_context = [[NSGraphicsContext currentContext] retain];
+    [NSGraphicsContext setCurrentContext:shadow->context];
+    if (x1<x2 && y2<y1) {
+        NSRect rect = NSMakeRect(x1, y2, x2-x1, y1-y2);
+        
+        NSBezierPath* clipPath = [NSBezierPath bezierPath];
+        [clipPath appendBezierPathWithRect: rect];
+        [clipPath setClip];
+
+//        shadow->painter->setClipRect(rect);
+        [px drawInRect:rect];
+        
+        //    shadow->painter->setCompositionMode(QPainter::CompositionMode_Source);   
+//        shadow->painter->drawPixmap (rect, px, rect);
+        //    cout << "aqua_shadow_renderer_rep::get_shadow " 
+        //         << rectangle(x1,y2,x2,y1) << LF;
+        //  XCopyArea (dpy, win, shadow->win, gc, x1, y2, x2-x1, y1-y2, x1, y2);
+    } else {
+  //      shadow->painter->setClipRect(QRect());
+    }
+    [NSGraphicsContext setCurrentContext:old_context]; [old_context release];
+
+}

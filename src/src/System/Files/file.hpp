@@ -17,16 +17,19 @@
 
 bool load_string (url file_name, string& s, bool fatal);
 bool save_string (url file_name, string s, bool fatal=false);
+bool append_string (url u, string s, bool fatal= false);
 
 bool is_of_type (url name, string filter);
 bool is_regular (url name);
 bool is_directory (url name);
 bool is_symbolic_link (url name);
 bool is_newer (url which, url than);
+int  file_size (url u);
 int  last_modified (url u, bool cache_flag= true);
+url  url_temp_dir ();
 url  url_temp (string suffix= "");
 url  url_numbered (url dir, string prefix, string postfix, int i=1);
-url  url_scratch (string prefix= "no_name_", string postfix= ".tm", int i=1);
+url  url_scratch (string prefix="no_name_", string postfix=".tm", int i=1);
 bool is_scratch (url u);
 string file_format (url u);
 
@@ -52,12 +55,19 @@ inline string eval_system (string which, url u1, url u2) {
 void move (url from, url to);
 void copy (url from, url to);
 void remove (url what);
+void append_to (url what, url to);
 void mkdir (url dir);
+void rmdir (url what);
 void change_mode (url u, int mode);
 void ps2pdf (url u1, url u2);
 
 int search_score (url u, array<string> a);
 
+url search_sub_dirs (url root);
 array<string> file_completions (url search, url dir);
+
+url grep (string what, url u);
+url search_file_in (url u, string name);
+url search_file_upwards (url u, string name, array<string> stops);
 
 #endif // defined FILE_H

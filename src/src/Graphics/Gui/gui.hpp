@@ -20,11 +20,11 @@
 #define GUI_H
 #include "tree.hpp"
 #include "bitmap_font.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
+#include "colors.hpp"
 
 struct font;
 class widget;
-typedef unsigned int color;
 
 /******************************************************************************
 * Main routines
@@ -44,24 +44,6 @@ void gui_maximal_extents (SI& width, SI& height);
   // get the maximal size of a window (can be larger than the screen size)
 void gui_refresh ();
   // update and redraw all windows (e.g. on change of output language)
-
-/******************************************************************************
-* Colors
-******************************************************************************/
-
-extern color black, white, red, green, blue;
-extern color yellow, magenta, orange, brown, pink;
-extern color light_grey, grey, dark_grey;
-
-color  rgb_color (int r, int g, int b, int a= 255);
-  // get a color by its RGB and alpha components
-  // ranging from 0 to 255 included
-void   get_rgb_color (color col, int& r, int& g, int& b, int& a);
-  // get the RGB components of a color
-color  named_color (string s, int a= 255);
-  // get a color by its name
-string get_named_color (color c);
-  // get a standard name for the color if it exists
 
 /******************************************************************************
 * Font support
@@ -120,6 +102,8 @@ bool check_event (int type);
 void image_gc (string name= "*");
   // Garbage collect images of a given name (may use wildcards)
   // This routine only needs to be implemented if you use your own image cache
+array<SI> get_widget_size (widget w);
+  // Get size of a widget w
 void show_help_balloon (widget balloon, SI x, SI y);
   // Display a help balloon at position (x, y); the help balloon should
   // disappear as soon as the user presses a key or moves the mouse
@@ -130,5 +114,11 @@ void show_wait_indicator (widget base, string message, string argument);
   // the indicator should be removed if the message is empty
 void external_event (string type, time_t t);
   // External events, such as pushing a button of a remote infrared commander
+bool gui_interrupted (bool check = false);
+  // Probe whether external events are waiting to be handled
+  // Useful to stop lengthy repainting operations
+
+extern bool use_unified_toolbar;
+  // MacOS toolbar style option
 
 #endif // defined GUI_H

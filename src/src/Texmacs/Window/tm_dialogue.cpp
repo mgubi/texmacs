@@ -24,15 +24,21 @@
 class dialogue_command_rep: public command_rep {
   server_rep* sv;
   object      fun;
+  scheme_tree p;
   int         nr_args;
 
 public:
   dialogue_command_rep (server_rep* sv2, object fun2, int nr_args2):
     sv (sv2), fun (fun2), nr_args (nr_args2) {}
+  dialogue_command_rep (server_rep* sv2, object fun2, scheme_tree p2):
+    sv (sv2), fun (fun2), p (p2), nr_args (N(p2)) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "Dialogue"; }
 };
+
+static string
+get_type (scheme_tree p, int i);
 
 void
 dialogue_command_rep::apply () {
@@ -47,8 +53,11 @@ dialogue_command_rep::apply () {
       return;
     }
     object arg= string_to_object (s_arg);
-    learn= cons (cons (object (as_string (i)), arg), learn);
     cmd= cons (arg, cmd);
+    if (!is_empty (p) && get_type (p, i) == "password")
+      learn= cons (cons (object (as_string (i)), object ("")), learn);
+    else
+      learn= cons (cons (object (as_string (i)), arg), learn);
     //call ("learn-interactive-arg", fun, object (i), arg);
   }
   call ("learn-interactive", fun, learn);
@@ -58,8 +67,13 @@ dialogue_command_rep::apply () {
 }
 
 command
-dialogue_command (server_rep* sv, object fun, int nr_args) {
-  return tm_new<dialogue_command_rep> (sv, fun, nr_args);
+dialogue_command (server_rep* sv, object fun, scheme_tree p) {
+  return tm_new<dialogue_command_rep> (sv, fun, p);
+}
+
+command
+dialogue_command (server_rep* sv, object fun, int n) {
+  return tm_new<dialogue_command_rep> (sv, fun, n);
 }
 
 void
@@ -102,19 +116,20 @@ tm_frame_rep::dialogue_end () {
   }
 }
 
+/*
 static int
 gcd (int i, int j) {
   if (i<j)  return gcd (j, i);
   if (j==0) return i;
   return gcd (j, i%j);
 }
+*/
 
 void
-tm_frame_rep::choose_file (object fun, string title, string type) {
-  url      name= get_master_buffer (get_current_buffer ());
+tm_frame_rep::choose_file (object fun, string title, string type,
+			   string prompt, url name) {
   command  cb  = dialogue_command (get_server(), fun, 1);
-  bool     save= starts (title, "Save") || starts (title, "Export");
-  widget   wid = file_chooser_widget (cb, type, save);
+  widget   wid = file_chooser_widget (cb, type, prompt);
   if (!is_scratch (name)) {
     set_directory (wid, as_string (head (name)));
     if ((type != "image") && (type != "")) {
@@ -197,7 +212,10 @@ interactive_command_rep::apply () {
     array<object> params (N(p));
     for (i=N(p)-1; i>=0; i--) {
       params[i]= string_to_object (s[i]);
-      learn= cons (cons (object (as_string (i)), params[i]), learn);
+      if (get_type (p, i) == "password")
+	learn= cons (cons (object (as_string (i)), object ("")), learn);
+      else
+	learn= cons (cons (object (as_string (i)), params[i]), learn);
     }
     call ("learn-interactive", fun, learn);
     string ret= object_to_string (call (fun, params));
@@ -222,12 +240,14 @@ tm_frame_rep::interactive (object fun, scheme_tree p) {
     if (ret != "" && ret != "<unspecified>" && ret != "#<unspecified>")
       set_message (verbatim (ret), "interactive command");
   }
-  else if (get_preference ("interactive questions") == "popup") {
+  else if (get_preference ("interactive questions") == "popup" ||
+	   (is_aux_buffer (get_current_buffer_safe ()) &&
+            !is_rooted_tmfs (get_current_buffer_safe (), "part"))) {
     int i, n= N(p);
     array<string> prompts (n);
     for (i=0; i<n; i++)
       prompts[i]= get_prompt (p, i);
-    command cb= dialogue_command (get_server(), fun, n);
+    command cb= dialogue_command (get_server(), fun, p);
     widget wid= inputs_list_widget (cb, prompts);
     for (i=0; i<n; i++) {
       widget input_wid= get_form_field (wid, i);
@@ -251,3 +271,4 @@ tm_frame_rep::interactive (object fun, scheme_tree p) {
     }
   }
 }
+

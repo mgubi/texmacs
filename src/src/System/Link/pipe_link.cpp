@@ -11,17 +11,17 @@
 
 #include "basic.hpp"
 
-#if !(defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__) || defined (QTPIPES)))
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
 
 #include "tm_link.hpp"
 #include "socket_notifier.hpp"
 #include "sys_utils.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include <stdio.h>
 #include <string.h>
-#ifdef __MINGW32__
+#ifdef OS_MINGW
 //#define PATTERN WIN_PATTERN
 //#include <winsock.h>
 //#undef PATTERN
@@ -30,7 +30,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #endif
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__FreeBSD__)
 #include <malloc.h>
 #endif
 
@@ -101,7 +101,7 @@ make_pipe_link (string cmd) {
 
 void
 close_all_pipes () {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   iterator<pointer> it= iterate (pipe_link_set);
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
@@ -129,7 +129,7 @@ process_all_pipes () {
 * Routines for pipe_links
 ******************************************************************************/
 
-#ifndef __MINGW32__
+#ifndef OS_MINGW
 void
 execute_shell (string s) {
   c_string _s (s);
@@ -144,9 +144,9 @@ execute_shell (string s) {
 
 string
 pipe_link_rep::start () {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   if (alive) return "busy";
-  if (DEBUG_AUTO) cout << "TeXmacs] Launching '" << cmd << "'\n";
+  if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
 
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
@@ -204,7 +204,7 @@ pipe_link_rep::start () {
 #endif
 }
 
-#ifndef __MINGW32__
+#ifndef OS_MINGW
 static string
 debug_io_string (string s) {
   int i, n= N(s);
@@ -213,6 +213,7 @@ debug_io_string (string s) {
     unsigned char c= (unsigned char) s[i];
     if (c == DATA_BEGIN) r << "[BEGIN]";
     else if (c == DATA_END) r << "[END]";
+    else if (c == DATA_ABORT) r << "[ABORT]";
     else if (c == DATA_COMMAND) r << "[COMMAND]";
     else if (c == DATA_ESCAPE) r << "[ESCAPE]";
     else r << s[i];
@@ -223,9 +224,9 @@ debug_io_string (string s) {
 
 void
 pipe_link_rep::write (string s, int channel) {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   if ((!alive) || (channel != LINK_IN)) return;
-  if (DEBUG_IO) cout << "[INPUT]" << debug_io_string (s);
+  if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string (s);
   c_string _s (s);
   int err= ::write (in, _s, N(s));
   (void) err;
@@ -234,14 +235,14 @@ pipe_link_rep::write (string s, int channel) {
 
 void
 pipe_link_rep::feed (int channel) {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   if ((!alive) || ((channel != LINK_OUT) && (channel != LINK_ERR))) return;
   int r;
   char tempout[1024];
   if (channel == LINK_OUT) r = ::read (out, tempout, 1024);
   else r = ::read (err, tempout, 1024);
   if (r == -1) {
-    cerr << "TeXmacs] read failed for#'" << cmd << "'\n";
+    io_error << "Read failed for '" << cmd << "'\n";
     wait (NULL);
   }
   else if (r == 0) {
@@ -255,7 +256,7 @@ pipe_link_rep::feed (int channel) {
     remove_notifier (snerr);      
   }
   else {
-    if (DEBUG_IO) cout << debug_io_string (string (tempout, r));
+    if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
     if (channel == LINK_OUT) outbuf << string (tempout, r);
     else errbuf << string (tempout, r);
   }
@@ -306,7 +307,7 @@ pipe_link_rep::listen (int msecs) {
 
 void
 pipe_link_rep::interrupt () {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   if (!alive) return;
   killpg (pid, SIGINT);
 #endif
@@ -314,7 +315,7 @@ pipe_link_rep::interrupt () {
 
 void
 pipe_link_rep::stop () {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   if (!alive) return;
   if (-1 != killpg(pid,SIGTERM)) {
     sleep(2);
@@ -335,7 +336,7 @@ pipe_link_rep::stop () {
 ******************************************************************************/
 
 void pipe_callback (void *obj, void *info) {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   (void) info;
   pipe_link_rep* con= (pipe_link_rep*) obj;  
   bool busy= true;
@@ -374,4 +375,4 @@ void pipe_callback (void *obj, void *info) {
 #endif
 }
 
-#endif // !(defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__)))
+#endif // !(defined (QTTEXMACS) && defined (OS_MINGW))

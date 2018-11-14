@@ -74,8 +74,11 @@ packrat_parser_rep::serialize (tree t, path p) {
       if (pos == start+1)
 	current_string << s[start];
       else {
+        // FIXME: where did we use this kind of syntactical substitutions?
+        tree r (UNINIT);
 	string ss= s (start, pos);
-        tree r= the_drd->get_syntax (ss);
+        if (N(ss) != 1 && existing_tree_label (ss))
+          r= the_drd->get_syntax (as_tree_label (ss));
         //if (r != UNINIT) cout << "Rewrite " << ss << " -> " << r << "\n";
         if (r == UNINIT) current_string << ss;
         else serialize (r, path (-1));
@@ -137,12 +140,20 @@ packrat_parser_rep::serialize (tree t, path p) {
     case PAGE_BREAK:
     case VAR_NO_PAGE_BREAK:
     case NO_PAGE_BREAK:
+    case VAR_NO_BREAK_HERE:
+    case NO_BREAK_HERE:
+    case NO_BREAK_START:
+    case NO_BREAK_END:
     case VAR_NEW_PAGE:
     case NEW_PAGE:
     case VAR_NEW_DPAGE:
     case NEW_DPAGE:
       break;
 
+    case WIDE:
+    case NEG:
+      serialize (t[0], p * 0);
+      break;
     case SYNTAX:
       serialize (t[1], path (-1));
       break;
@@ -175,6 +186,8 @@ packrat_parser_rep::serialize (tree t, path p) {
     case LINK:
     case URL:
     case SCRIPT:
+    case OBSERVER:
+    case FIND_ACCESSIBLE:
       break;
     case HLINK:
     case ACTION:
@@ -185,13 +198,18 @@ packrat_parser_rep::serialize (tree t, path p) {
     case LABEL:
     case REFERENCE:
     case PAGEREF:
+    case GET_ATTACHMENT:
     case WRITE:
+    case TOC_NOTIFY:
       break;
 
     case SPECIFIC:
       serialize (t[1], p * 1);
       break;
     case FLAG:
+      break;
+    case HYPHENATE_AS:
+      serialize (t[1], p * 1);
       break;
 
     default:

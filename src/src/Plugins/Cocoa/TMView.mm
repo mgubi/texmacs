@@ -168,9 +168,6 @@ void initkeymap()
     processingCompose = NO;
     workingText = nil;
     delayed_rects = [[NSMutableArray arrayWithCapacity:100] retain];
-    
-    
-    
   }
   return self;
 }
@@ -237,7 +234,7 @@ void initkeymap()
 
 - (void) focusIn
 {
-  if (DEBUG_EVENTS) cout << "FOCUSIN" << LF;
+  if (DEBUG_EVENTS) debug_events << "FOCUSIN" << LF;
   if (wid) {
     wid -> handle_keyboard_focus (true, texmacs_time ());
   }
@@ -245,7 +242,7 @@ void initkeymap()
 
 - (void) focusOut
 {
-  if (DEBUG_EVENTS)   cout << "FOCUSOUT" << LF;
+  if (DEBUG_EVENTS)   debug_events << "FOCUSOUT" << LF;
   if (wid) {
     wid -> handle_keyboard_focus (false, texmacs_time ());
   }
@@ -263,8 +260,6 @@ void initkeymap()
   [arr release];
 }
 
-
-
 - (void)drawRect:(NSRect)rect 
 {
   if (aqua_update_flag) {
@@ -280,37 +275,37 @@ void initkeymap()
 		[NSBezierPath strokeRect:NSInsetRect(bounds,1,1)];
 		//    return;
 	}
-//	cout << "DRAWING : " << rect.origin.x << ","<< rect.origin.x << ","<< rect.size.width<< "," << rect.size.height <<  "\n";
+//	debug_events << "DRAWING : " << rect.origin.x << ","<< rect.origin.x << ","<< rect.size.width<< "," << rect.size.height <<  "\n";
 //	NSRect bounds = [self bounds];
 	
   {
-		basic_renderer r = the_aqua_renderer();
+    aqua_renderer_rep* r = the_aqua_renderer();
     int x1 = rect.origin.x;
     int y1 = rect.origin.y+rect.size.height;
     int x2 = rect.origin.x+rect.size.width;
     int y2 = rect.origin.y;
     
-    r -> begin([NSGraphicsContext currentContext]);
-  //  r -> set_origin(0,0);
+    r -> begin ([NSGraphicsContext currentContext]);
+    r -> view = self;
+    r -> set_origin (0,0);
     r -> encode (x1,y1);
     r -> encode (x2,y2);
- //   cout << "DRAWING RECT " << x1 << "," << y1 << "," << x2 << "," << y2 << LF;
-    r -> set_clipping (x1,y1,x2,y2);
-    wid->handle_repaint (x1,y1,x2,y2);
-		r->end();
-    if (r->interrupted())
+ //    debug_events << "DRAWING RECT " << x1 << "," << y1 << "," << x2 << "," << y2 << LF;
+    r -> set_clipping (x1, y1, x2, y2);
+    wid->handle_repaint (r, x1, y1, x2, y2);
+    r -> end ();
+    if (gui_interrupted ())
       aqua_update_flag= true;
-	}
-//	cout << "END DRAWING" << "\n";
+  }
+//	debug_events << "END DRAWING" << "\n";
  
   if (aqua_update_flag) {
     if (DEBUG_EVENTS)
-      cout << "Postponed redrawing\n"; 
+      debug_events << "Postponed redrawing\n"; 
     [self performSelector:@selector(delayedUpdate) withObject: nil afterDelay: 10];
   }
   
 }
-
 
 #if 0
 - (void)keyDown:(NSEvent *)theEvent
@@ -354,7 +349,7 @@ void initkeymap()
 	  // if (mods & NSHelpKeyMask) s= "H-" * s;
           // if (mods & NSFunctionKeyMask) s= "F-" * s;
         }
-        cout << "key press: " << s << LF;
+        debug_events << "key press: " << s << LF;
         wid -> handle_keypress (s, texmacs_time());    
       }
     }
@@ -382,9 +377,9 @@ void initkeymap()
   static bool fInit = false;
   if (!fInit) {
     if (DEBUG_EVENTS)
-      cout << "Initializing keymap\n";
-    initkeymap();
-    fInit= true;
+      debug_events << "Initializing keymap\n";
+    initkeymap ();
+    fInit = true;
   }
   
   {
@@ -409,7 +404,7 @@ void initkeymap()
         if (nskeymap->contains(key)) {
           r = nskeymap[key];
           r = ((mods & NSShiftKeyMask)? "S-" * modstr: modstr) * r;          
-          cout << "function key press: " << r << LF;
+          debug_events << "function key press: " << r << LF;
           [self deleteWorkingText];
           wid -> handle_keypress (r, texmacs_time());    
           return;
@@ -421,7 +416,7 @@ void initkeymap()
           r= utf8_to_cork (rr);          
           
           string s ( modstr * r);
-          cout << "modified  key press: " << s << LF;
+          debug_events << "modified  key press: " << s << LF;
           [self deleteWorkingText];
           wid -> handle_keypress (s, texmacs_time());    
           the_gui->update (); // FIXME: remove this line when
@@ -467,8 +462,6 @@ mouse_decode (unsigned int mstate) {
   return "unknown";
 }
 
-
-
 - (void)mouseDown:(NSEvent *)theEvent
 {
   if (wid) {
@@ -478,7 +471,7 @@ mouse_decode (unsigned int mstate) {
     string s= "press-" * mouse_decode (mstate);
     wid -> handle_mouse (s, point.x , point.y , mstate, texmacs_time ());
     if (DEBUG_EVENTS)
-      cout << "mouse event: " << s << " at "
+      debug_events << "mouse event: " << s << " at "
       << point.x << ", " << point.y  << LF;
   }
 }
@@ -492,7 +485,7 @@ mouse_decode (unsigned int mstate) {
     string s= "release-" * mouse_decode (mstate);
     wid -> handle_mouse (s, point.x , point.y , mstate, texmacs_time ());
     if (DEBUG_EVENTS)
-      cout << "mouse event: " << s << " at "
+      debug_events << "mouse event: " << s << " at "
       << point.x  << ", " << point.y  << LF;
   }
 }
@@ -506,7 +499,7 @@ mouse_decode (unsigned int mstate) {
     string s= "move";
     wid -> handle_mouse (s, point.x , point.y , mstate, texmacs_time ());
     if (DEBUG_EVENTS)
-      cout << "mouse event: " << s << " at "
+      debug_events << "mouse event: " << s << " at "
       << point.x  << ", " << point.y  << LF;
   }  
 }
@@ -520,7 +513,7 @@ mouse_decode (unsigned int mstate) {
     string s= "move";
     wid -> handle_mouse (s, point.x , point.y , mstate, texmacs_time ());
     if (DEBUG_EVENTS)
-      cout << "mouse event: " << s << " at "
+      debug_events << "mouse event: " << s << " at "
       << point.x  << ", " << point.y  << LF;
   }  
 }
@@ -540,10 +533,9 @@ mouse_decode (unsigned int mstate) {
   [super resizeWithOldSuperviewSize:oldBoundsSize];
   if (wid)  {
     NSSize size = [self bounds].size;
-		scaleSize(size);
-		wid-> handle_notify_resize (size.width, size.height);
+    scaleSize (size);
+    wid-> handle_notify_resize (size.width, size.height);
   }
-	
 }
 
 - (BOOL)acceptsFirstResponder
@@ -553,17 +545,13 @@ mouse_decode (unsigned int mstate) {
 
 - (void) deleteWorkingText
 { 
-  if (workingText == nil)
-    return;
+  if (workingText == nil) return;
   [workingText release];
   workingText = nil;
   processingCompose = NO;
-  
-  
 }
 
 #pragma mark NSTextInput protocol implementation
-
 
 - (void) insertText:(id)aString
 // instead of keyDown: aString can be NSString or NSAttributedString
@@ -579,7 +567,7 @@ mouse_decode (unsigned int mstate) {
     [[str substringWithRange:NSMakeRange(i, 1)] getCString:buf maxLength:256 encoding:NSUTF8StringEncoding];
     string rr (buf, strlen(buf));
     string s= utf8_to_cork (rr);          
-    cout << "key press: " << s << LF;
+    debug_events << "key press: " << s << LF;
     wid -> handle_keypress (s, texmacs_time());        
   }
 }
@@ -608,11 +596,13 @@ mouse_decode (unsigned int mstate) {
 {
   [self deleteWorkingText];  
 }
+
 - (BOOL) hasMarkedText
 {
   return workingText != nil;
   
 }
+
 - (NSInteger) conversationIdentifier
 {
   return (NSInteger)self;

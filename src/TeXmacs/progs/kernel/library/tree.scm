@@ -32,6 +32,18 @@
 (define-public (tree->list t)
   (cons (tree-label t) (tree-children t)))
 
+(define-public (tree->symbol t)
+  (string->symbol (tree->string t)))
+
+(define-public (tree-number? t)
+  (and (tree-atomic? t) (string->number (tree->string t))))
+
+(define-public (tree-integer? t)
+  (and (tree-atomic? t) (integer? (string->number (tree->string t)))))
+
+(define-public (tree->number t)
+  (if (tree-atomic? t) (string->number (tree->string t)) 0))
+
 (define-public (tree-explode t)
   (if (atomic-tree? t)
       (tree->string t)
@@ -150,7 +162,10 @@
   (let* ((c (cursor-path))
          (p (cDr c))
          (q (tree->path t)))
-    (and (> (length p) (length q))
+    (and (list? q)
+         (if (tree-atomic? (cursor-tree))
+             (>= (length p) (length q))
+             (> (length p) (length q)))
          (== (sublist p 0 (length q)) q)
          (sublist c (length q) (length c)))))
 
@@ -161,23 +176,15 @@
 (define-public (table-cell-tree row col)
   (path->tree (table-cell-path row col)))
 
-(define the-action-path '(-1))
-
-(define-public (action-set-path p)
-  (set! the-action-path p))
+(define the-action-tree #f)
 
 (define-public (exec-delayed-at cmd t)
-  (let* ((ip (tree-ip t))
-	 (old-path the-action-path)
-	 (new-path (if (or (null? ip) (>= (car ip) 0)) (reverse ip) '(-1))))
-    (action-set-path new-path)
-    (exec-delayed (lambda () (cmd) (action-set-path old-path)))))
-
-(define-public (action-path)
-  (and (!= the-action-path '(-1)) the-action-path))
+  (with old-t the-action-tree
+    (set! the-action-tree t)
+    (exec-delayed (lambda () (cmd) (set! the-action-tree old-t)))))
 
 (define-public (action-tree)
-  (and (!= the-action-path '(-1)) (path->tree the-action-path)))
+  the-action-tree)
 
 (define-public-macro (with-action t . body)
   `(and-with ,t (action-tree)

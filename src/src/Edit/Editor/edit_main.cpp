@@ -20,13 +20,10 @@
 #include "drd_std.hpp"
 #include "message.hpp"
 #include <setjmp.h>
+#include "image_files.hpp"
 
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
-#endif
-
-#ifdef PDF_RENDERER
-#include "Pdf/pdf_renderer.hpp"
 #endif
 
 #ifdef USE_GS
@@ -44,7 +41,9 @@
 
 editor_rep::editor_rep ():
   simple_widget_rep (), cvw (NULL), mvw (NULL),
-  drd (buf->buf->title, std_drd), et (the_et), rp (buf->rp) {}
+  drd (std_drd), et (the_et), rp () {
+  cout << "TeXmacs] warning, this virtual constructor should never be called\n";
+}
 
 editor_rep::editor_rep (server_rep* sv2, tm_buffer buf2):
   simple_widget_rep (), sv (sv2), cvw (NULL), mvw (NULL), buf (buf2),
@@ -154,37 +153,89 @@ edit_main_rep::notify_page_change () {
   if (is_attached (this)) send_invalidate_all (this);
 }
 
+string
+edit_main_rep::get_metadata (string kind) {
+  string var= "global-" * kind;
+  string val= get_init_string (var);
+  if (val != "") return val;
+  val= search_metadata (subtree (et, rp), kind);
+  if (val != "") return val;
+  if (kind == "title") return as_string (tail (get_name ()));
+#ifndef OS_MINGW
+  if (kind == "author" &&
+      !is_none (resolve_in_path ("finger")) &&
+      !is_none (resolve_in_path ("sed"))) {
+    string val= var_eval_system ("finger `whoami` | sed -e '/Name/!d' -e 's/.*Name: //'");
+    if (N(val) > 1) return utf8_to_cork (val);
+  }
+#endif
+  return "";
+}
+
 /******************************************************************************
 * Printing
 ******************************************************************************/
 
 string printing_dpi ("600");
-string printing_cmd ("lpr");
 string printing_on ("a4");
 
-void
-edit_main_rep::print (url name, bool conform, int first, int last) {
-  bool pdf= (suffix (name) == "pdf");
-  url orig= resolve (name, "");
-
-#ifndef PDF_RENDERER
-#ifdef USE_GS
-  if (pdf) name= url_temp (".ps");
-#endif
+bool
+use_pdf () {
+#ifdef PDF_RENDERER
+  return get_preference ("native pdf", "on") == "on";
 #else
-  (void) pdf;  // avoid annoying warning
+  return false;
+#endif
+}
+
+bool
+use_ps () {
+#ifdef PDF_RENDERER
+  return get_preference ("native postscript", "on") == "on";
+#else
+  return true;
+#endif
+}
+
+int
+edit_main_rep::nr_pages () {
+  string medium = env->get_string (PAGE_MEDIUM);
+  if (medium == "paper") return N (eb[0]);
+  typeset_prepare ();
+  env->write (PAGE_MEDIUM, "paper");
+  box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  env->write (PAGE_MEDIUM, medium);
+  return N (the_box[0]);
+}
+
+void
+edit_main_rep::print_doc (url name, bool conform, int first, int last) {
+  bool ps  = (suffix (name) == "ps");
+  bool pdf = (suffix (name) == "pdf");
+  url  orig= resolve (name, "");
+
+#ifdef USE_GS
+  if (!use_pdf () && pdf)
+    name= url_temp (".ps");
+  if (!use_ps () && ps)
+    name= url_temp (".pdf");
 #endif
   
   string medium = env->get_string (PAGE_MEDIUM);
   if (conform && (medium != "paper")) conform= false;
-  // FIXME: better command for conform printing
+    // FIXME: better command for conform printing
 
+  typeset_preamble ();
+    // FIXME: when printing several files via aux buffers,
+    // it seems that the style can be corrupted.  Why?
+  
   // Set environment variables for printing
 
   typeset_prepare ();
   env->write (DPI, printing_dpi);
   env->write (PAGE_SHOW_HF, "true");
   env->write (PAGE_SCREEN_MARGIN, "false");
+  env->write (PAGE_BORDER, "none");
   if (!conform) {
     env->write (PAGE_MEDIUM, "paper");
     env->write (PAGE_PRINTED, "true");
@@ -216,52 +267,63 @@ edit_main_rep::print (url name, bool conform, int first, int last) {
   }
 
   // Print pages
-
-  int i;
+  renderer ren= printer (name, dpi, pages, page_type, landsc, w/cm, h/cm);
   
-#ifdef PDF_RENDERER
-  renderer ren = (pdf ? 
-    pdf_renderer (name, dpi, pages, page_type, landsc, w/cm, h/cm) :
-    printer (name, dpi, pages, page_type, landsc, w/cm, h/cm) );
-#else
-  renderer ren = printer (name, dpi, pages, page_type, landsc, w/cm, h/cm);
-#endif
-  
-  for (i=start; i<end; i++) {
-    tree bg= env->read (BG_COLOR);
-    ren->set_background_pattern (bg);
-    if (bg != "white")
-      ren->clear_pattern (0, (SI) -h, (SI) w, 0);
+  if (ren->is_started ()) {
+    int i;
+    ren->set_metadata ("title", get_metadata ("title"));
+    ren->set_metadata ("author", get_metadata ("author"));
+    ren->set_metadata ("subject", get_metadata ("subject"));
+    for (i=start; i<end; i++) {
+      tree bg= env->read (BG_COLOR);
+      ren->set_background (bg);
+      if (bg != "white" && bg != "#ffffff")
+        ren->clear_pattern (0, (SI) -h, (SI) w, 0);
 
-    rectangles rs;
-    the_box[0]->sx(i)= 0;
-    the_box[0]->sy(i)= 0;
-    the_box[0][i]->redraw (ren, path (0), rs);
-    if (i<end-1) ren->next_page ();
+      rectangles rs;
+      the_box[0]->sx(i)= 0;
+      the_box[0]->sy(i)= 0;
+      the_box[0][i]->redraw (ren, path (0), rs);
+      if (i<end-1) ren->next_page ();
+    }
   }
   tm_delete (ren);
 
-#ifndef PDF_RENDERER
 #ifdef USE_GS
-  if (pdf) {
-    gs_to_pdf (name, orig);
+  if (!use_pdf () && pdf) {
+    gs_to_pdf (name, orig, landsc, h/cm, w/cm);
     ::remove (name);
   }
-#endif
+  if (!use_ps () && ps) {
+    gs_to_ps (name, orig, landsc, h/cm, w/cm);
+    ::remove (name);
+  }
+  if (ps || pdf)
+    if (get_preference ("texmacs->pdf:check", "off") == "on") {
+      //system_wait ("Checking exported file for correctness", "please wait");
+      // FIXME: the wait message often causes a crash, currently
+      gs_check (orig);
+    }
 #endif
 }
 
 void
 edit_main_rep::print_to_file (url name, string first, string last) {
-  print (name, false, as_int (first), as_int (last));
+  print_doc (name, false, as_int (first), as_int (last));
+  set_message ("Done printing", "print to file");
 }
-
 
 void
 edit_main_rep::print_buffer (string first, string last) {
-  url target= url_temp (".ps"); 
-  print (target, false, as_int (first), as_int (last));
-  system (printing_cmd, target);  // Send the document to the printer
+  url target;
+#ifdef OS_MINGW
+  target= use_pdf ()? url_temp (".pdf"): url_temp (".ps");
+#else
+  target= url_temp (".ps");
+#endif
+  print_doc (target, false, as_int (first), as_int (last));
+  system (get_printing_cmd (), target);  // Send the document to the printer
+  set_message ("Done printing", "print buffer");
   ::remove (target);
 }
 
@@ -277,7 +339,7 @@ edit_main_rep::print_buffer (string first, string last) {
   string paper_type;
   if (qt_print (to_file, landscape, printer, name, first, last, paper_type)) {
       if (!to_file) name = url_temp (".ps");
-      print (name, false, as_int (first), as_int (last));
+      print_doc (name, false, as_int (first), as_int (last));
       if (!to_file) {
         string cmd = printing_cmd * " -P" * printer;
         system (cmd, name);  
@@ -289,26 +351,44 @@ edit_main_rep::print_buffer (string first, string last) {
 
 void
 edit_main_rep::export_ps (url name, string first, string last) {
-  print (name, true, as_int (first), as_int (last));
+  print_doc (name, true, as_int (first), as_int (last));
 }
 
 array<int>
-edit_main_rep::print_snippet (url name, tree t) {
-  bool ps= suffix (name) == "ps" || suffix (name) == "eps";
+edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
+  tree buft= subtree (et, rp);
+  if (conserve_preamble)
+    if (is_document (buft) && is_compound (buft[0], "hide-preamble"))
+      t= tree (SURROUND, buft[0], "", t);
+
+  string s= suffix (name);
+  bool ps= (s == "ps" || s == "eps");
+  if (use_pdf ()) ps= (ps || s == "pdf");
   typeset_prepare ();
   int dpi= as_int (printing_dpi);
   //if (!ps) t= tree (WITH, MAGNIFICATION, "2", PAGE_WIDTH, "40cm", t);
-  if (!ps) t= tree (WITH, MAGNIFICATION, "1.6", PAGE_WIDTH, "40cm", t);
+  //if (!ps) t= tree (WITH, MAGNIFICATION, "1.6", PAGE_WIDTH, "40cm", t);
+  double mag= ( 1.0 * dpi) / 600;
+  double wid= (25.0 * dpi) / 600;
+  if (!ps) {
+    mag *= 1.6;
+    wid *= 1.6;
+  }
+  t= tree (WITH, MAGNIFICATION, as_string (mag),
+           PAGE_WIDTH, as_string (wid) * "cm", t);
   box b= typeset_as_box (env, t, path ());
   if (b->x4 - b->x3 >= 5*PIXEL && b->y4 - b->y3 >= 5*PIXEL) {
     if (ps) make_eps (name, b, dpi);
     else {
-      url temp= url_temp (".eps");
+      url temp= url_temp (use_pdf ()? ".pdf": ".eps");
       make_eps (temp, b, dpi);
       ::remove (name);
-      system ("convert", temp, name);
-      if (!exists (name))
-        cout << "TeXmacs] warning, failed to create image " << name << "\n";
+      if (!call_scm_converter (temp, name)) {
+        call_imagemagick_convert (temp, name);
+        if (!exists (name))
+          convert_error << "could not convert snippet " << temp
+                        << " into :" << name << "\n";
+      }
       ::remove (temp);
     }
   }
@@ -398,15 +478,17 @@ edit_main_rep::show_path () {
 void
 edit_main_rep::show_cursor () {
   cout << "Principal cursor: "
-       << cu->ox << ", " << cu->oy << " [" << cu->delta << "]\n";
+       << cu->ox << ", " << cu->oy << " [" << cu->delta << "], "
+       << cu->y1 << " : " << cu->y2 << ", " << cu->slope << "\n";
   cout << "Ghost cursor    : "
-       << mv->ox << ", " << mv->oy << " [" << mv->delta << "]\n";
+       << mv->ox << ", " << mv->oy << " [" << mv->delta << "], "
+       << mv->y1 << " : " << mv->y2 << ", " << mv->slope << "\n";
 }
 
 void
 edit_main_rep::show_selection () {
   selection sel; selection_get (sel);
-  cout << "physical  selection: " << start_p << " --- " << end_p << "\n";
+  cout << "physical  selection: " << cur_sel << "\n";
   cout << "logical   selection: " << sel->start << " --- " << sel->end << "\n";
 }
 

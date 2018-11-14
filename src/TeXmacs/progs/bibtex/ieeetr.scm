@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : ieeetr.scm
 ;; DESCRIPTION : ieeetr style for BibTeX files
-;; COPYRIGHT   : (C) 2010  David MICHEL
+;; COPYRIGHT   : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -16,14 +16,36 @@
 
 (bib-define-style "ieeetr" "plain")
 
+(tm-define (bib-sorted-entries l)
+  (:mode bib-ieeetr?)
+  l)
+
+(tm-define (new-list-rec s x)
+  (:mode bib-ieeetr?)
+  (cond ((bib-null? x) "")
+        ((bib-null? (car x)) (new-list-rec s (cdr x)))
+        ((null? (cdr x)) (car x))
+        ((and (func? (car x) 'concat) (== (cAr (car x)) "''") (== s ", "))
+         `(concat ,@(cdr (cDr (car x))) ",'' " ,(new-list-rec s (cdr x))))
+        (else `(concat ,(car x) ,s ,(new-list-rec s (cdr x))))))
+
 (tm-define (bib-format-name x)
   (:mode bib-ieeetr?)
   (let* ((f (if (bib-null? (list-ref x 1)) ""
 		`(concat ,(bib-abbreviate (list-ref x 1) "." `(nbsp)) (nbsp))))
-	 (vv (if (bib-null? (list-ref x 2)) "" `(concat ,(list-ref x 2) (nbsp))))
-	 (ll (if (bib-null? (list-ref x 3)) "" (bib-purify (list-ref x 3))))
-	 (jj (if (bib-null? (list-ref x 4)) "" `(concat ", " ,(list-ref x 4)))))
+	 (vv (if (bib-null? (list-ref x 2)) ""
+                 `(concat ,(list-ref x 2) (nbsp))))
+	 (ll (if (bib-null? (list-ref x 3)) ""
+                 (bib-purify (list-ref x 3))))
+	 (jj (if (bib-null? (list-ref x 4)) ""
+                 `(concat ", " ,(list-ref x 4)))))
     `(concat ,f ,vv ,ll ,jj)))
+
+(tm-define (bib-last-name-sep a)
+  (:mode bib-ieeetr?)
+  (if (<= (length a) 3)
+      (bib-translate " and ")
+      (bib-translate ", and ")))
 
 (tm-define (bib-format-editor x)
   (:mode bib-ieeetr?)
@@ -58,8 +80,7 @@
 	      `(concat "no." ,sep ,n ,series)))
 	"")))
 
-(tm-define (bib-format-edition x)
-  (:mode bib-ieeetr?)
+(define (bib-format-edition x)
   (with e (bib-field x "edition")
     (if (bib-null? e) ""
 	`(concat ,e " ed."))))
@@ -74,8 +95,7 @@
 	    `(concat ,(bib-translate "in ") (with "font-shape" "italic" ,b)
 		     " (" ,(bib-format-editor x) ")")))))
 
-(tm-define (bib-format-address-publisher x)
-  (:mode bib-ieeetr?)
+(define (bib-format-address-publisher x)
   (let* ((a (bib-field x "address"))
 	 (p (bib-field x "publisher")))
     (if (bib-null? a) p
@@ -88,34 +108,39 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2) `(concat "p. " ,(list-ref p 1)))
-      (else `(concat "p. " ,(list-ref p 1) "--" ,(list-ref p 2))))))
+      ((== (length p) 2) `(concat "p." (nbsp) ,(list-ref p 1)))
+      (else
+       `(concat "pp." (nbsp)
+                ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
 
 (tm-define (bib-format-article n x)
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
-     ,(bib-new-block
-       (bib-new-sentence
-	`(,(bib-format-author x)
-	  (concat "``" ,(bib-format-field-Locase x "title") "''")
-	  ,@(if (bib-empty? x "crossref")
-		`(,(bib-emphasize (bib-format-field x "journal"))
-		  ,(if (bib-empty? x "volume") ""
-		       `(concat "vol. " ,(bib-field x "volume")))
-		  ,(bib-format-pages x)
-		  ,(bib-format-date x))
-		`((concat ,(bib-translate "in ")
-			  (cite ,(bib-field x "crossref")))
-		  ,(bib-format-pages x))))))
-     ,(bib-new-block (bib-format-field x "note"))))
+     ,(bib-label (list-ref x 2))
+     ,(bib-new-list-spc
+       `(,(bib-new-block
+           (bib-new-sentence
+            `(,(bib-format-author x)
+              (concat "``" ,(bib-format-field-Locase x "title") "''")
+              ,@(if (bib-empty? x "crossref")
+                    `(,(bib-emphasize (bib-format-field x "journal"))
+                      ,(if (bib-empty? x "volume") ""
+                           `(concat "vol." (nbsp) ,(bib-field x "volume")))
+                      ,(if (bib-empty? x "number") ""
+                           `(concat "no." (nbsp) ,(bib-field x "number")))
+                      ,(bib-format-pages x)
+                      ,(bib-format-date x))
+                    `((concat ,(bib-translate "in ")
+                              (cite ,(bib-field x "crossref")))
+                      ,(bib-format-pages x))))))
+         ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-book n x)
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -139,7 +164,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -156,7 +181,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -180,7 +205,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -203,7 +228,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -227,7 +252,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -249,7 +274,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -267,7 +292,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-case-preserved-block
 	   (bib-new-case-preserved-sentence
@@ -281,7 +306,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -299,7 +324,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -319,7 +344,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -335,7 +360,7 @@
   (:mode bib-ieeetr?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (bib-new-sentence
@@ -345,4 +370,3 @@
 	   (bib-new-sentence
 	    `(,(bib-format-field x "note")
 	      ,(bib-format-date x))))))))
-

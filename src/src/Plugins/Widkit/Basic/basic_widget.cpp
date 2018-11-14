@@ -61,13 +61,13 @@ basic_widget_rep::emit_mouse (mouse_event ev, string type, SI x, SI y) {
 }
 
 event
-basic_widget_rep::emit_clear (SI x1, SI y1, SI x2, SI y2) {
-  return ::emit_clear (ox+ x1, oy+ y1, ox+ x2, oy+ y2);
+basic_widget_rep::emit_clear (renderer win, SI x1, SI y1, SI x2, SI y2) {
+  return ::emit_clear (win, ox+ x1, oy+ y1, ox+ x2, oy+ y2);
 }
 
 event
-basic_widget_rep::emit_repaint (SI x1, SI y1, SI x2, SI y2, bool& stop) {
-  return ::emit_repaint (ox+ x1, oy+ y1, ox+ x2, oy+ y2, stop);
+basic_widget_rep::emit_repaint (renderer win, SI x1, SI y1, SI x2, SI y2, bool& stop) {
+  return ::emit_repaint (win, ox+ x1, oy+ y1, ox+ x2, oy+ y2, stop);
 }
 
 event
@@ -159,6 +159,14 @@ void
 basic_widget_rep::handle_keyboard_focus (keyboard_focus_event ev) {(void) ev;}
 
 void
+basic_widget_rep::handle_keyboard_focus_on (keyboard_focus_on_event ev) {
+  int i;
+  for (i=0; i<N(a); i++)
+    if (!ev->done)
+      a[i] << emit_keyboard_focus_on (ev->field, ev->done);
+}
+
+void
 basic_widget_rep::handle_mouse (mouse_event ev) {
   string type= ev->type;
   SI     x= ev->x, y= ev->y;
@@ -185,7 +193,7 @@ basic_widget_rep::handle_alarm (alarm_event ev) {
 
 void
 basic_widget_rep::handle_clear (clear_event ev) {
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   ren->set_background (white);
   ren->clear (ev->x1, ev->y1, ev->x2, ev->y2);
 }
@@ -214,7 +222,7 @@ basic_widget_rep::handle_refresh (refresh_event ev) { (void) ev;
 
 void
 basic_widget_rep::handle_invalidate (invalidate_event ev) {
-  if (ev->all_flag) win->invalidate (x1()-ox, y1()-oy, x2()-ox, y2()-oy);
+  if (ev->all_flag) win->invalidate (x1(), y1(), x2(), y2());
   else win->invalidate (ev->x1, ev->y1, ev->x2, ev->y2);
 }
 
@@ -251,18 +259,17 @@ test_round (wk_widget w, string var, SI num) {
 static void
 test_window_attached (event ev, wk_widget w) {
   if (!w->attached ()) {
-    cerr << "\n" << HRULE << "\n";
-    cerr << ev << " was sent to\n" << w;
-    cerr << HRULE << "\n";
+    failed_error << HRULE << "\n";
+    failed_error << ev << " was sent to\n" << w;
+    failed_error << HRULE << "\n";
     FAILED ("widget was not yet attached to window");
   }
 }
 
 bool
 basic_widget_rep::handle (event ev) {
-  if (DEBUG_EVENTS) cout << "TeXmacs] " << ev << "\n";
+  if (DEBUG_EVENTS) debug_events << ev << "\n";
   // " ---> " << wk_widget (this) << "\n";
-  if (attached ()) win->get_renderer ()->set_origin (ox, oy);
   switch (ev->type) {
   case GET_SIZE_EVENT:
     handle_get_size (ev);
@@ -307,6 +314,10 @@ basic_widget_rep::handle (event ev) {
     test_window_attached (ev, this);
     handle_keyboard_focus (ev);
     return true;
+  case KEYBOARD_FOCUS_ON_EVENT:
+    test_window_attached (ev, this);
+    handle_keyboard_focus_on (ev);
+    return true;
   case MOUSE_EVENT: {
     test_window_attached (ev, this);
     mouse_event e (ev);
@@ -327,10 +338,12 @@ basic_widget_rep::handle (event ev) {
     SI rx2= min (e->x2, x2())- ox;
     SI ry2= min (e->y2, y2())- oy;
     if ((rx2 > rx1) && (ry2 > ry1)) {
-      event ev= ::emit_clear (rx1, ry1, rx2, ry2);
-      win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
+      event ev= ::emit_clear (e->win, rx1, ry1, rx2, ry2);
+      e->win->set_origin (ox, oy);
+      e->win->clip (rx1, ry1, rx2, ry2);
       handle_clear (ev);
-      win->get_renderer ()->unclip ();
+      e->win->unclip ();
+      e->win->set_origin (0, 0);
     }
     return true;
   }
@@ -341,16 +354,17 @@ basic_widget_rep::handle (event ev) {
     SI ry1= max (e->y1, y1())- oy;
     SI rx2= min (e->x2, x2())- ox;
     SI ry2= min (e->y2, y2())- oy;
-
     if ((rx2 > rx1) && (ry2 > ry1)) {
-      event ev= ::emit_repaint (rx1, ry1, rx2, ry2, e->stop);
-      win->get_renderer ()->clip (rx1, ry1, rx2, ry2);
+      event ev= ::emit_repaint (e->win, rx1, ry1, rx2, ry2, e->stop);
+      e->win->set_origin (ox, oy);
+      e->win->clip (rx1, ry1, rx2, ry2);
       handle_repaint (ev);
-      win->get_renderer ()->unclip ();
+      e->win->unclip ();
+      e->win->set_origin (0, 0);
     }
 
     int i;
-    ev= emit_repaint (rx1, ry1, rx2, ry2, e->stop);
+    ev= emit_repaint (e->win, rx1, ry1, rx2, ry2, e->stop);
     for (i=0; i<N(a); i++) a[i] << ev;
     return true;
   }
@@ -366,7 +380,7 @@ basic_widget_rep::handle (event ev) {
     test_window_attached (ev, this);
     invalidate_event e (ev);
     if (!e->all_flag)
-      ev= ::emit_invalidate (e->x1- ox, e->y1- oy, e->x2- ox, e->y2- oy);
+      ev= ::emit_invalidate (e->x1, e->y1, e->x2, e->y2);
     handle_invalidate (ev);
     return true;
   }

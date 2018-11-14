@@ -9,82 +9,88 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
-#include <QtGui>
+#include <QToolBar>
+#include <QToolButton>
+#include <QDialog>
+#include <QComboBox>
+#include <QStatusBar>
+#include <QDockWidget>
+#include <QMainWindow>
+#include <QMenuBar>
+#include <QLayoutItem>
 
+#include "config.h"
 #include "analyze.hpp"
+#include "scheme.hpp"
 
 #include "qt_tm_widget.hpp"
 #include "qt_utilities.hpp"
 #include "qt_renderer.hpp"
 #include "qt_gui.hpp"
+#include "qt_picture.hpp"
 
 #include "qt_dialogues.hpp"
 #include "qt_simple_widget.hpp"
 #include "qt_window_widget.hpp"
+#include "qt_menu.hpp"
 #include "QTMWindow.hpp"
 #include "QTMStyle.hpp"      // qtstyle()
 #include "QTMGuiHelper.hpp"  // needed to connect()
 #include "QTMInteractivePrompt.hpp"
 #include "QTMInteractiveInputHelper.hpp"
 
-
-#ifdef Q_WS_MAC
-#define UNIFIED_TOOLBAR
-// enable the unified toolbar style on the mac. To work properly this requires
-// a modification of the widget hierarchy of the main window.
-#endif
-
-int menu_count = 0;
+int menu_count = 0;  // zero if no menu is currently being displayed
 list<qt_tm_widget_rep*> waiting_widgets;
 
-void
-replaceActions (QWidget* dest, QWidget* src) {
-    //NOTE: the parent hierarchy of the actions is not modified while installing
-    //      the menu in the GUI (see qt_menu.hpp for this memory management 
-    //      policy)
-  dest->setUpdatesEnabled(false);
+static void
+replaceActions (QWidget* dest,  QList<QAction*>* src) {
+  //NOTE: the parent hierarchy of the actions is not modified while installing
+  //      the menu in the GUI (see qt_menu.hpp for this memory management
+  //      policy)
+  if (src == NULL || dest == NULL)
+    FAILED ("replaceActions expects valid objects");
+  dest->setUpdatesEnabled (false);
   QList<QAction *> list = dest->actions();
-  while (!list.isEmpty()) {
-    QAction* a= list.takeFirst();
+  for (int i = 0; i < list.count(); i++) {
+    QAction* a = list[i];
     dest->removeAction (a);
   }
-  list = src->actions();
-  while (!list.isEmpty()) {
-    QAction* a= list.takeFirst();
-    dest->addAction (a);
+  for (int i = 0; i < src->count(); i++) {
+    QAction* a = (*src)[i];
+    dest->addAction(a);
   }
-  dest->setUpdatesEnabled(true);
+  dest->setUpdatesEnabled (true);
 }
 
-void
-replaceButtons(QToolBar* dest, QWidget* src) {
-  dest->setUpdatesEnabled(false);
+static void
+replaceButtons (QToolBar* dest, QList<QAction*>* src) {
+  if (src == NULL || dest == NULL)
+    FAILED ("replaceButtons expects valid objects");
+  dest->setUpdatesEnabled (false);
   bool visible = dest->isVisible();
   if (visible) dest->hide(); //TRICK: to avoid flicker of the dest widget
   replaceActions (dest, src);
-  QList<QObject*> list= dest->children();
-  for (int i=0; i<list.count(); i++) {
-    QToolButton* button= qobject_cast<QToolButton*> (list[i]);
+  QList<QObject*> list = dest->children();
+  for (int i = 0; i < list.count(); ++i) {
+    QToolButton* button = qobject_cast<QToolButton*> (list[i]);
     if (button) {
       button->setPopupMode (QToolButton::InstantPopup);
-      button->setStyle( qtmstyle() );
+      button->setStyle (qtmstyle());
     }
   }
   if (visible) dest->show(); //TRICK: see above
-  dest->setUpdatesEnabled(true);
+  dest->setUpdatesEnabled (true);
 }
 
-void QTMInteractiveInputHelper::commit(int result) {
-  if (wid) {
-    if (result == QDialog::Accepted) {
-      QString item = "#f";
-      QComboBox *cb = sender()->findChild<QComboBox*>("input");
-      if (cb) {
-        item = cb->currentText();
-      }      
-      static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->input = from_qstring (item);
-      static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->cmd ();      
-    }
+void
+QTMInteractiveInputHelper::commit (int result) {
+  if (wid && result == QDialog::Accepted) {
+    QString  item = "#f";
+    QComboBox* cb = sender()->findChild<QComboBox*> ("input");
+    if (cb)  item = cb->currentText();
+    static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->input =
+      from_qstring (item);
+    static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->cmd ();
   }
   sender()->deleteLater();
 }
@@ -94,43 +100,33 @@ void QTMInteractiveInputHelper::commit(int result) {
 * qt_tm_widget_rep
 ******************************************************************************/
 
-static void
-tweak_iconbar_size (QSize& sz) {
-  if (sz.height () >= 24) {
-    sz.setWidth (sz.width () + 2);
-    sz.setHeight (sz.height () + 6);
-  }
-  else if (sz.height () >= 20) {
-    sz.setHeight (sz.height () + 2);
-  }
-  else if (sz.height () >= 16) {
-    sz.setHeight (sz.height () + 2);
-  }
-}
-
 qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
- : qt_window_widget_rep (new QTMWindow (0), _quit), helper (this), 
+ : qt_window_widget_rep (new QTMWindow (0), "popup", _quit), helper (this),
    prompt (NULL), full_screen (false)
 {
   type = texmacs_widget;
-  orig_name = "popup";
 
-  main_widget = ::glue_widget (true, true, 1, 1);
+  main_widget = concrete (::glue_widget (true, true, 1, 1));
   
   // decode mask
-  visibility[0] = (mask & 1)  == 1;  // header
-  visibility[1] = (mask & 2)  == 2;  // main
-  visibility[2] = (mask & 4)  == 4;  // mode
-  visibility[3] = (mask & 8)  == 8;  // focus
-  visibility[4] = (mask & 16) == 16; // user
-  visibility[5] = (mask & 32) == 32; // footer
-  visibility[6] = (mask & 64) == 64; // side tools #0
-  
+  visibility[0] = (mask & 1)   == 1;   // header
+  visibility[1] = (mask & 2)   == 2;   // main
+  visibility[2] = (mask & 4)   == 4;   // mode
+  visibility[3] = (mask & 8)   == 8;   // focus
+  visibility[4] = (mask & 16)  == 16;  // user
+  visibility[5] = (mask & 32)  == 32;  // footer
+  visibility[6] = (mask & 64)  == 64;  // side tools #0
+  visibility[7] = (mask & 128) == 128; // bottom tools
+
   // general setup for main window
   
   QMainWindow* mw= mainwindow ();
   mw->setStyle (qtmstyle ());
   mw->menuBar()->setStyle (qtmstyle ());
+
+#if (defined(MACOS_QT_MENU))
+  mw->menuBar()->setNativeMenuBar(false);
+#endif
   
   // there is a bug in the early implementation of toolbars in Qt 4.6
   // which has been fixed in 4.6.2 (at least)
@@ -150,12 +146,6 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   rightLabel= new QLabel (qt_translate ("Booting"), mw);
   leftLabel->setFrameStyle (QFrame::NoFrame);
   rightLabel->setFrameStyle (QFrame::NoFrame);
-  {
-    QFont f = leftLabel->font();
-    f.setPixelSize(12);
-    leftLabel->setFont(f);
-    rightLabel->setFont(f);
-  }
   bar->addWidget (leftLabel, 1);
   bar->addPermanentWidget (rightLabel);
   bar->setStyle (qtmstyle ());
@@ -172,41 +162,50 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   //    also at minimumSize, didn't notice it first time and spend lot of time
   //    trying to figure this out :)
   
-  bar->setMinimumWidth(2);
+  bar->setMinimumWidth (2);
+  if (retina_scale > 1.0) {
+    int min_h= (int) floor (20 * retina_scale);
+    bar->setMinimumHeight (min_h);
+  }
   mw->setStatusBar (bar);
  
   // toolbars
   
-  mainToolBar  = new QToolBar ("main toolbar", mw);
-  modeToolBar  = new QToolBar ("mode toolbar", mw);
-  focusToolBar = new QToolBar ("focus toolbar", mw);
-  userToolBar  = new QToolBar ("user toolbar", mw);
+  mainToolBar   = new QToolBar ("main toolbar", mw);
+  modeToolBar   = new QToolBar ("mode toolbar", mw);
+  focusToolBar  = new QToolBar ("focus toolbar", mw);
+  userToolBar   = new QToolBar ("user toolbar", mw);
   
-  sideDock     = new QDockWidget ("Side tools", 0);
+  bottomTools   = new QDockWidget ("bottom tools", mw);
+  sideTools     = new QDockWidget ("side tools", 0);
     // HACK: Wrap the dock in a "fake" window widget (last parameter = true) to
     // have clicks report the right position.
-  dock_window_widget = tm_new<qt_window_widget_rep> (sideDock, command(), true);
+  static int cnt=0;
+  string dock_name = "dock:" * as_string(cnt++);
+  dock_window_widget = tm_new<qt_window_widget_rep> (sideTools, dock_name,
+                                                     command(), true);
   
   mainToolBar->setStyle (qtmstyle ());
   modeToolBar->setStyle (qtmstyle ());
   focusToolBar->setStyle (qtmstyle ());
   userToolBar->setStyle (qtmstyle ());
-  sideDock->setStyle (qtmstyle ());
+  sideTools->setStyle (qtmstyle ());
+  bottomTools->setStyle (qtmstyle ());
   
   {
     // set proper sizes for icons
-    QPixmap *pxm = the_qt_renderer()->xpm_image ("tm_new.xpm");
-    QSize sz = (pxm ? pxm->size() : QSize(24,24));
+    QImage *pxm = xpm_image ("tm_new.xpm");
+    QSize sz = (pxm ? pxm->size() : QSize (24, 24));
     tweak_iconbar_size (sz);
     mainToolBar->setIconSize (sz);
-    pxm = the_qt_renderer()->xpm_image ("tm_section.xpm");
-    sz = (pxm ? pxm->size() : QSize(20,20));
+    pxm = xpm_image ("tm_section.xpm");
+    sz = (pxm ? pxm->size() : QSize (20, 20));
     tweak_iconbar_size (sz);
-    modeToolBar->setIconSize(sz);
-    pxm = the_qt_renderer()->xpm_image ("tm_add.xpm");
-    sz = (pxm ? pxm->size() : QSize(16,16));
+    modeToolBar->setIconSize (sz);
+    pxm = xpm_image ("tm_add.xpm");
+    sz = (pxm ? pxm->size() : QSize (16, 16));
     tweak_iconbar_size (sz);
-    focusToolBar->setIconSize(sz);
+    focusToolBar->setIconSize (sz);
   }  
   
   QWidget *cw= new QWidget();
@@ -214,61 +213,73 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   
     // The main layout
   
-  QVBoxLayout *bl = new QVBoxLayout(cw);
-  bl->setContentsMargins(0,1,0,0);
-  bl->setSpacing(0);
-  cw->setLayout(bl);
-  QWidget* q = concrete(main_widget)->as_qwidget(); // force creation of QWidget
-  q->setParent(qwid); // q->layout()->removeWidget(q) will reset the parent to this
-  bl->addWidget(q);
+  QVBoxLayout *bl = new QVBoxLayout (cw);
+  bl->setContentsMargins (0, 1, 0, 0);
+  bl->setSpacing (0);
+  cw->setLayout (bl);
+  QWidget* q = main_widget->as_qwidget(); // force creation of QWidget
+  q->setParent (qwid); // q->layout()->removeWidget(q) will reset the parent to this
+  bl->addWidget (q);
   
-  mw->setCentralWidget(cw);
-  
+  mw->setCentralWidget (cw);
+
 #ifdef UNIFIED_TOOLBAR
 
-  mw->setUnifiedTitleAndToolBarOnMac(true);
+  if (use_unified_toolbar) {
+    mw->setUnifiedTitleAndToolBarOnMac(true);
     
-  //WARNING: dumbToolBar is the toolbar installed on the top area of the
-  //main widget which is  then unified in the title bar. 
-  //to overcome some limitations of the unified toolbar implementation we
-  //install the real toolbars as widgets in this toolbar.
+    //WARNING: dumbToolBar is the toolbar installed on the top area of the
+    //main widget which is  then unified in the title bar. 
+    //to overcome some limitations of the unified toolbar implementation we
+    //install the real toolbars as widgets in this toolbar.
   
-  dumbToolBar = mw->addToolBar("dumb toolbar");
-  dumbToolBar->setMinimumHeight(30);
+    dumbToolBar = mw->addToolBar("dumb toolbar");
+    dumbToolBar->setMinimumHeight(30);
 
-  //these are the actions related to the various toolbars to be installed in
-  //the dumb toolbar.
+    //these are the actions related to the various toolbars to be installed in
+    //the dumb toolbar.
   
-  mainToolBarAction = dumbToolBar->addWidget(mainToolBar);
-  modeToolBarAction = NULL;
+    mainToolBarAction = dumbToolBar->addWidget(mainToolBar);
+    modeToolBarAction = NULL;
 
   
-  // A ruler
-  rulerWidget = new QWidget(cw);
-  rulerWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-  rulerWidget->setMinimumHeight(1);
-  rulerWidget->setBackgroundRole(QPalette::Mid);
-  // FIXME: how to use 112 (active) and 146 (passive)
-  rulerWidget->setVisible(false);
-  rulerWidget->setAutoFillBackground(true);
-  // rulerWidget = new QLabel("pippo", cw);
+    // A ruler
+    rulerWidget = new QWidget(cw);
+    rulerWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    rulerWidget->setMinimumHeight(1);
+    rulerWidget->setBackgroundRole(QPalette::Mid);
+    // FIXME: how to use 112 (active) and 146 (passive)
+    rulerWidget->setVisible(false);
+    rulerWidget->setAutoFillBackground(true);
+    // rulerWidget = new QLabel("pippo", cw);
   
     // A second ruler (this one always visible) to separate from the canvas.
-  QWidget* r2 = new QWidget(mw);
-  r2->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
-  r2->setMinimumHeight(1);
-  r2->setBackgroundRole(QPalette::Mid);
-  r2->setVisible(true);
-  r2->setAutoFillBackground(true);
+    QWidget* r2 = new QWidget(mw);
+    r2->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    r2->setMinimumHeight(1);
+    r2->setBackgroundRole(QPalette::Mid);
+    r2->setVisible(true);
+    r2->setAutoFillBackground(true);
 
-  bl->insertWidget(0, modeToolBar);
-  bl->insertWidget(1, rulerWidget);
-  bl->insertWidget(2, focusToolBar);
-  bl->insertWidget(3, userToolBar);
-  bl->insertWidget(4, r2);
-  
+    bl->insertWidget(0, modeToolBar);
+    bl->insertWidget(1, rulerWidget);
+    bl->insertWidget(2, focusToolBar);
+    bl->insertWidget(3, userToolBar);
+    bl->insertWidget(5, r2);
+
     //mw->setContentsMargins (-2, -2, -2, -2);  // Why this?
-  bar->setContentsMargins (0, 1, 0, 1);
+    bar->setContentsMargins (0, 1, 0, 1);
+  }
+  else {
+    mw->addToolBar (mainToolBar);
+    mw->addToolBarBreak ();
+    mw->addToolBar (modeToolBar);
+    mw->addToolBarBreak ();
+    mw->addToolBar (focusToolBar);
+    mw->addToolBarBreak ();
+    mw->addToolBar (userToolBar);
+    mw->addToolBarBreak ();
+  }
 
 #else
   mw->addToolBar (mainToolBar);
@@ -278,14 +289,23 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   mw->addToolBar (focusToolBar);
   mw->addToolBarBreak ();
   mw->addToolBar (userToolBar);
- // mw->addToolBarBreak ();
+  mw->addToolBarBreak ();
 #endif
 
-  sideDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-  sideDock->setFeatures(QDockWidget::DockWidgetMovable |
-                        QDockWidget::DockWidgetFloatable);
-  sideDock->setFloating(false);
-  mw->addDockWidget(Qt::RightDockWidgetArea, sideDock);
+  sideTools->setAllowedAreas (Qt::AllDockWidgetAreas);
+  sideTools->setFeatures (QDockWidget::DockWidgetMovable |
+                         QDockWidget::DockWidgetFloatable);
+  sideTools->setFloating (false);
+  mw->addDockWidget (Qt::RightDockWidgetArea, sideTools);
+
+  bottomTools->setAllowedAreas (Qt::BottomDockWidgetArea);
+  bottomTools->setFeatures (QDockWidget::NoDockWidgetFeatures);
+  bottomTools->setFloating (false);
+  bottomTools->setTitleBarWidget (new QWidget()); // Disables title bar
+  bottomTools->setMinimumHeight (10);             // Avoids warning
+  bottomTools->setContentsMargins (3, 6, 3, -2);  // Hacks hacks hacks... :(
+  mw->addDockWidget (Qt::BottomDockWidgetArea, bottomTools);
+
   
     // FIXME? add DockWidgetClosable and connect the close signal
     // to the scheme code
@@ -302,7 +322,8 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   modeToolBar->setVisible (false);
   focusToolBar->setVisible (false);
   userToolBar->setVisible (false);
-  sideDock->setVisible (false);
+  sideTools->setVisible (false);
+  bottomTools->setVisible (false);
   mainwindow()->statusBar()->setVisible (true);
 #ifndef Q_WS_MAC
   mainwindow()->menuBar()->setVisible (false);
@@ -310,20 +331,37 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
 }
 
 qt_tm_widget_rep::~qt_tm_widget_rep () {
-  if (DEBUG_QT)
-    cout << "qt_tm_widget_rep::~qt_tm_widget_rep of widget" << type_as_string() << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep::~qt_tm_widget_rep of widget "
+                  << type_as_string() << LF;
   
     // clear any residual waiting menu installation
   waiting_widgets = remove(waiting_widgets, this);
 }
 
-/*! FIXME: should we overwrite the previous quit command?
+void
+qt_tm_widget_rep::tweak_iconbar_size (QSize& sz) {
+  if (sz.height () >= 24) {
+    sz.setWidth (sz.width () + 2);
+    sz.setHeight (sz.height () + 6);
+  }
+  else if (sz.height () >= 20) {
+    sz.setHeight (sz.height () + 2);
+  }
+  else if (sz.height () >= 16) {
+    sz.setHeight (sz.height () + 2);
+  }
+  //sz.setHeight ((int) floor (sz.height () * retina_scale + 0.5));
+}
+
+
+/*! Return ourselves as a window widget.
+ \param name A unique identifier for the window (e.g. "TeXmacs:3")
  */
 widget
-qt_tm_widget_rep::plain_window_widget (string title, command quit) {
-  (void) quit;
-  orig_name = title;
-  qwid->setWindowTitle (to_qstring (title));
+qt_tm_widget_rep::plain_window_widget (string name, command _quit) {
+  (void) _quit; // The widget already has a command. Don't overwrite. 
+  orig_name = name;
   return this;
 }
 
@@ -335,7 +373,8 @@ qt_tm_widget_rep::update_visibility () {
   bool old_modeVisibility = modeToolBar->isVisible();
   bool old_focusVisibility = focusToolBar->isVisible();
   bool old_userVisibility = userToolBar->isVisible();
-  bool old_sideVisibility = sideDock->isVisible();
+  bool old_sideVisibility = sideTools->isVisible();
+  bool old_bottomVisibility = bottomTools->isVisible();
   bool old_statusVisibility = mainwindow()->statusBar()->isVisible();
 
   bool new_mainVisibility = visibility[1] && visibility[0];
@@ -344,6 +383,7 @@ qt_tm_widget_rep::update_visibility () {
   bool new_userVisibility = visibility[4] && visibility[0];
   bool new_statusVisibility = visibility[5];
   bool new_sideVisibility = visibility[6];
+  bool new_bottomVisibility = visibility[7];
   
   if ( XOR(old_mainVisibility,  new_mainVisibility) )
     mainToolBar->setVisible (new_mainVisibility);
@@ -354,7 +394,9 @@ qt_tm_widget_rep::update_visibility () {
   if ( XOR(old_userVisibility,  new_userVisibility) )
     userToolBar->setVisible (new_userVisibility);
   if ( XOR(old_sideVisibility,  new_sideVisibility) )
-    sideDock->setVisible (new_sideVisibility);
+    sideTools->setVisible (new_sideVisibility);
+  if ( XOR(old_bottomVisibility,  new_bottomVisibility) )
+    bottomTools->setVisible (new_bottomVisibility);
   if ( XOR(old_statusVisibility,  new_statusVisibility) )
     mainwindow()->statusBar()->setVisible (new_statusVisibility);
 
@@ -370,8 +412,9 @@ qt_tm_widget_rep::update_visibility () {
 #ifdef UNIFIED_TOOLBAR
 
   // do modifications only if needed to reduce flicker
-  if ( XOR(old_mainVisibility,  new_mainVisibility) ||
-      XOR(old_modeVisibility,  new_modeVisibility) )
+  if (use_unified_toolbar &&
+      (XOR(old_mainVisibility,  new_mainVisibility) ||
+       XOR(old_modeVisibility,  new_modeVisibility) ))
   {
     // ensure that the topmost visible toolbar is always unified on Mac
     // (actually only for main and mode toolbars, unifying focus is not
@@ -418,6 +461,13 @@ qt_tm_widget_rep::update_visibility () {
   }
 #endif // UNIFIED_TOOLBAR
 #undef XOR
+  {
+    QFont f = leftLabel->font();
+    int fs = as_int (get_preference ("gui:mini-fontsize", QTM_MINI_FONTSIZE));
+    f.setPointSize (qt_zoom (fs > 0 ? fs : QTM_MINI_FONTSIZE));
+    leftLabel->setFont(f);
+    rightLabel->setFont(f);
+  }
 }
 
 widget
@@ -427,16 +477,16 @@ qt_tm_widget_rep::read(slot s, blackbox index) {
   switch (s) {
     case SLOT_CANVAS:
       check_type_void (index, s);
-      ret = main_widget;
+      ret = abstract (main_widget);
       break;
       
     default:
       return qt_window_widget_rep::read(s, index);
   }
   
-  if (DEBUG_QT)
-    cout << "qt_tm_widget_rep::read " << slot_name (s) << "\t\tfor widget\t" 
-         << type_as_string() << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep::read " << slot_name (s)
+                  << "\t\tfor widget\t" << type_as_string() << LF;
   
   return ret;
 }
@@ -452,7 +502,14 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
-      
+    case SLOT_KEYBOARD_FOCUS:
+    {
+      check_type<bool> (val, s);
+      bool focus = open_box<bool> (val);
+      if (focus && canvas() && !canvas()->hasFocus())
+        canvas()->setFocus (Qt::OtherFocusReason);
+    }
+      break;
     case SLOT_HEADER_VISIBILITY:
     {
       check_type<bool>(val, s);
@@ -460,7 +517,6 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       update_visibility();
     }
       break;
-
     case SLOT_MAIN_ICONS_VISIBILITY:
     {
       check_type<bool>(val, s);
@@ -468,7 +524,6 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       update_visibility();
     }
       break;
-
     case SLOT_MODE_ICONS_VISIBILITY:
     {
       check_type<bool>(val, s);
@@ -476,7 +531,6 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       update_visibility();
     }
       break;
-
     case SLOT_FOCUS_ICONS_VISIBILITY:
     {
       check_type<bool>(val, s);
@@ -484,7 +538,6 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       update_visibility();
     }
       break;
-
     case SLOT_USER_ICONS_VISIBILITY:
     {
       check_type<bool>(val, s);
@@ -500,11 +553,17 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       update_visibility();
     }
       break;
-
     case SLOT_SIDE_TOOLS_VISIBILITY:
     {
       check_type<bool>(val, s);
       visibility[6] = open_box<bool> (val);
+      update_visibility();
+    }
+      break;
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    {
+      check_type<bool>(val, s);
+      visibility[7] = open_box<bool> (val);
       update_visibility();
     }
       break;
@@ -517,7 +576,6 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       leftLabel->update ();
     }
       break;
-
     case SLOT_RIGHT_FOOTER:
     {
       check_type<string>(val, s);
@@ -526,12 +584,10 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       rightLabel->update ();
     }
       break;
-
     case SLOT_SCROLLBARS_VISIBILITY:
         // ignore this: qt handles scrollbars independently
         //                send_int (THIS, "scrollbars", val);
       break;
-
     case SLOT_INTERACTIVE_MODE:
     {
       check_type<bool>(val, s);
@@ -554,98 +610,59 @@ qt_tm_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
-      
     case SLOT_FILE:
     {
       check_type<string>(val, s);
       string file = open_box<string> (val);
-      if (DEBUG_QT) cout << "File: " << file << LF;
+      if (DEBUG_QT_WIDGETS) debug_widgets << "\tFile: " << file << LF;
 #if (QT_VERSION >= 0x040400)
-      mainwindow()->setWindowFilePath(utf8_to_qstring(file));
+      mainwindow()->setWindowFilePath (utf8_to_qstring (file));
 #endif
     }
       break;
-
-      /* SLOT_POSITION and SLOT_SIZE are ugly and wrong:
-       we have identified qt_tm_widget with its window, but read (SLOT_POSITION)
-       on the tm_widget must return position of the canvas relative to window
-       coordinates (for use for instance in right clicks, inside mouse_adjust()),
-       whereas, write (SLOT_POSITION) is (mostly?) used by texmacs thinking that
-       we are a window. This is because in plain_window_widget, we return the
-       qt_tm_widget_rep instead of another widget. As a consequence we have to
-       implement two behaviours: as widget and as window inside the same class
-       qt_tm_widget_rep. Therefore qt_tm_widget must handle SLOT_SIZE and 
-       SLOT_POSITION in two ways and at the same time workaround buggy reporting
-       of sizes by Qt, taking into account whether toolbars are on or not
-
-       The current "solution" is a hack until this mess is cleaned up.
-       */
     case SLOT_POSITION:
     {
       check_type<coord2>(val, s);
       coord2 p= open_box<coord2> (val);
-      QPoint pt = to_qpoint (p);
-      
-#ifdef OS_MACOS
-      if (!visibility[0]) {
-        pt.ry() -= (mainwindow()->frameGeometry().height() -
-                    mainwindow()->geometry().height());
-      }
-        // to avoid window under menu bar on MAC when moving at (0,0)
-        // FIXME: use the real menu bar height.
-      pt.ry() = (pt.y() <= 40) ? 40 : pt.y();
-
-#endif
-      mainwindow()->move (pt);
+      mainwindow()->move (to_qpoint (p));
     }
       break;
-      
     case SLOT_SIZE:
     {
       check_type<coord2>(val, s);
       coord2 p= open_box<coord2> (val);
-      QSize sz= to_qsize (p);
-      
-#ifdef OS_MACOS
-      sz.rheight() += (mainwindow()->frameGeometry().height() -
-                       mainwindow()->geometry().height());
-      sz.rheight() += focusToolBar->height();
-#endif
-      mainwindow()->resize (sz);
+      mainwindow()->resize (to_qsize (p));
     }
       break;
-      
     case SLOT_DESTROY:
     {
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit))
         quit ();
-      needs_update ();
+      the_gui->need_update ();
     }
       break;
-
     case SLOT_FULL_SCREEN:
     {
       check_type<bool> (val, s);
       set_full_screen(open_box<bool> (val));
     }
       break;
-      
     default:
       qt_window_widget_rep::send (s, val);
       return;
   }
   
-  if (DEBUG_QT)
-    cout << "qt_tm_widget_rep: sent " << slot_name (s) 
-         << "\t\tto widget\t"      << type_as_string() << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep: sent " << slot_name (s) 
+                  << "\t\tto widget\t"      << type_as_string() << LF;
 }
 
 blackbox
 qt_tm_widget_rep::query (slot s, int type_id) {
-  if ((DEBUG_QT) && (s != SLOT_RENDERER))
-    cout << "qt_tm_widget_rep: queried " << slot_name(s)
-         << "\t\tto widget\t" << type_as_string() << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep: queried " << slot_name(s)
+                  << "\t\tto widget\t" << type_as_string() << LF;
   
   switch (s) {
     case SLOT_SCROLL_POSITION:
@@ -681,6 +698,9 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_SIDE_TOOLS_VISIBILITY:
       check_type_id<bool> (type_id, s);
       return close_box<bool> (visibility[6]);
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (visibility[7]);
       
     case SLOT_INTERACTIVE_INPUT:
     {
@@ -696,23 +716,13 @@ qt_tm_widget_rep::query (slot s, int type_id) {
     case SLOT_POSITION:
     {
       check_type_id<coord2> (type_id, s);
-        // Skip title and toolbars
-      QPoint pt = QPoint (mainwindow()->geometry().x(),
-                          mainwindow()->geometry().y());
-      //cout << "wpos: " << pt.x() << ", " << pt.y() << LF;
+      return close_box<coord2> (from_qpoint (mainwindow()->pos()));
+    }
       
-        // HACK: Qt seems seems not properly report geometry if the toolbars
-        // are hidden
-#ifdef OS_MACOS
-      if (!visibility[0]) {
-        pt.ry() -= (mainwindow()->frameGeometry().height() -
-                    mainwindow()->geometry().height());
-        if (visibility[3]) pt.ry() += focusToolBar->height();
-          //adding the user toolbar shifts the position too much
-          //if (visibility[4]) pt.ry() += userToolBar->height();
-      }
-#endif
-      return close_box<coord2> (from_qpoint (pt));
+    case SLOT_SIZE:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (from_qsize (mainwindow()->size()));
     }
 
     case SLOT_INTERACTIVE_MODE:
@@ -726,152 +736,144 @@ qt_tm_widget_rep::query (slot s, int type_id) {
 
 void
 qt_tm_widget_rep::install_main_menu () {
+  if (main_menu_widget == waiting_main_menu_widget) return;
   main_menu_widget = waiting_main_menu_widget;
-  QMenu* m= concrete (main_menu_widget)->get_qmenu();
-  if (m) {
-      // REMARK: We do not want the menubar shared across windows as suggested  
-      // in http://doc.qt.nokia.com/4.7/qmainwindow.html#menuBar
-      // e.g. :
-      //
-      //     QMenuBar *dest = new QMenuBar(0);
-      //     mainwindow()->setMenuBar(dest);
-      //
-      // as the default behavior on MacOS. The main reason is that in TeXmacs
-      // different windows can have different main menus so that it is indeed
-      // appropriate to change the main menu as the window focus changes. 
-      // So we kindly ask to each window to give us its own menu and we install
-      // there our actions.
-      // So we do:
-    
-    QMenuBar *dest = mainwindow()->menuBar();
-    
-      // and everything is fine.
-      // Also please note that we have to do the replacement and not simply 
-      // install the menu returned by get_qmenu() since the main menu there 
-      // could contain some default items appropriate for the given OS (like the
-      // service menu on MacOS) which are not present in our menu widget.
-    
-    QWidget *src = m;
-    replaceActions(dest,src);
-    QList<QAction*> list = dest->actions();
-    for (int i= 0; i < list.count(); i++) {
-      QAction* a= list[i];
-      if (a->menu()) {
-        QObject::connect(a->menu(), SIGNAL(aboutToShow()),
-                         the_gui->gui_helper, SLOT(aboutToShowMainMenu()));
-        QObject::connect(a->menu(), SIGNAL(aboutToHide()),
-                         the_gui->gui_helper, SLOT(aboutToHideMainMenu()));
-      }
+  QList<QAction*>* src = main_menu_widget->get_qactionlist();
+  if (!src) return;
+  QMenuBar* dest = mainwindow()->menuBar();
+  dest->clear();
+  for (int i = 0; i < src->count(); i++) {
+    QAction* a = (*src)[i];
+    if (a->menu()) {
+      //TRICK: Mac native QMenuBar accepts only menus which are already populated
+      // this will cause a problem for us, since menus are lazy and populated only after triggering
+      // this is the reason we add a dummy action before inserting the menu
+      a->menu()->addAction("native menubar trick");
+      dest->addAction(a->menu()->menuAction());
+      QObject::connect (a->menu(),         SIGNAL (aboutToShow()),
+                        the_gui->gui_helper, SLOT (aboutToShowMainMenu()));
+      QObject::connect (a->menu(),         SIGNAL (aboutToHide()),
+                        the_gui->gui_helper, SLOT (aboutToHideMainMenu()));
     }
   }
 }
 
 void
 qt_tm_widget_rep::write (slot s, blackbox index, widget w) {
-  if (DEBUG_QT)
-    cout << "qt_tm_widget_rep::write " << slot_name (s) << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep::write " << slot_name (s) << LF;
   
   switch (s) {
         // Widget w is usually a qt_simple_widget_rep, with a QTMWidget as
-        // underlying widget. We must discard the current main_widget and 
+        // underlying widget. We must discard the current main_widget and
         // display the new. But while switching buffers the widget w is a
         // glue_widget, so we may not just use canvas() everywhere.
     case SLOT_SCROLLABLE:
     {
       check_type_void (index, s);
       
+      QWidget* q = main_widget->qwid;
+      q->hide();
       QLayout* l = centralwidget()->layout();
-      
-        //// Reparent the current main_widget's QWidget to the window
-      QWidget* q = concrete(main_widget)->qwid;
       l->removeWidget(q);
-      q->setParent(qwid);
-      q->deleteLater();                 // careful with pending QEvents...
-      concrete(main_widget)->qwid = 0;  // Unnecessary in principle.
       
       q = concrete(w)->as_qwidget();   // force creation of the new QWidget
-      q->setParent(qwid);  // l->removeWidget(q) will reset ownership to this
       l->addWidget(q);
-
-      main_widget = w; // canvas() now returns the new QTMWidget (or 0)
-
-      if (canvas()) {
-        canvas()->show();
-        canvas()->setFocusPolicy(Qt::StrongFocus);
-        canvas()->setFocus();
-          // Fix horizontal size to draw vertical margins around.
-        scrollarea()->surface()->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-      }
+      /* " When you use a layout, you do not need to pass a parent when
+       constructing the child widgets. The layout will automatically reparent
+       the widgets (using QWidget::setParent()) so that they are children of 
+       the widget on which the layout is installed " */
+      main_widget = concrete (w);
+        // canvas() now returns the new QTMWidget (or 0)
+      
+      if (scrollarea())   // Fix size to draw margins around.
+        scrollarea()->surface()->setSizePolicy (QSizePolicy::Fixed,
+                                                QSizePolicy::Fixed);
+      send_keyboard_focus (abstract (main_widget));
     }
       break;
       
     case SLOT_MAIN_MENU:
       check_type_void (index, s);
     {
-      waiting_main_menu_widget = w;
-      if (menu_count <=0) {
+      waiting_main_menu_widget = concrete (w);
+      if (menu_count <= 0)
         install_main_menu();
-      } else { 
-          // menu interaction ongoing.
-          // postpone menu installation when the menu interaction is done
-        if (DEBUG_QT)
-          cout << "Main menu is busy: postponing menu installation" << LF;
-        if (!contains(waiting_widgets,this))
-          waiting_widgets << this;
-      }
+      else if (!contains (waiting_widgets, this))
+          // menu interaction ongoing, postpone new menu installation until done
+        waiting_widgets << this;
     }
       break;
       
     case SLOT_MAIN_ICONS:
       check_type_void (index, s);
     {
-        //cout << "widget :" << (void*)w.rep << LF;
-      main_icons_widget = w;
-      QMenu* m= concrete (w)->get_qmenu();
-      replaceButtons (mainToolBar, m);
-      update_visibility();
+      main_icons_widget = concrete (w);
+      QList<QAction*>* list = main_icons_widget->get_qactionlist();
+      if (list) {
+        replaceButtons (mainToolBar, list);
+        update_visibility();
+      }
     }
       break;
       
     case SLOT_MODE_ICONS:
       check_type_void (index, s);
-    {   
-      mode_icons_widget = w;
-      QMenu* m= concrete (w)->get_qmenu();
-      replaceButtons (modeToolBar, m);
-      update_visibility();
+    {
+      mode_icons_widget = concrete (w);
+      QList<QAction*>* list = mode_icons_widget->get_qactionlist();
+      if (list) {
+        replaceButtons (modeToolBar, list);
+        update_visibility();
+      }
     }
       break;
       
     case SLOT_FOCUS_ICONS:
       check_type_void (index, s);
-    {   
-      focus_icons_widget = w;
-      QMenu* m= concrete (w)->get_qmenu();
-      replaceButtons (focusToolBar, m);
-      update_visibility();
+    {
+      focus_icons_widget = concrete (w);
+      QList<QAction*>* list = focus_icons_widget->get_qactionlist();
+      if (list) {
+        replaceButtons (focusToolBar, list);
+        update_visibility();
+      }
     }
       break;
       
     case SLOT_USER_ICONS:
       check_type_void (index, s);
     {   
-      user_icons_widget = w;
-      QMenu* m= concrete (w)->get_qmenu();
-      replaceButtons (userToolBar, m);
-      update_visibility();
+      user_icons_widget = concrete (w);
+      QList<QAction*>* list = user_icons_widget->get_qactionlist();
+      if (list) {
+        replaceButtons (userToolBar, list);
+        update_visibility();
+      }
     }
       break;
       
     case SLOT_SIDE_TOOLS:
       check_type_void (index, s);
     {
-      side_tools_widget = w;
-      QWidget* new_qwidget = concrete (w)->as_qwidget();
-      QWidget* old_qwidget = sideDock->widget();
-      old_qwidget->deleteLater();
-      old_qwidget = 0;  // HACK, FIXME
-      sideDock->setWidget (new_qwidget); 
+      side_tools_widget = concrete (w);
+      QWidget* new_qwidget = side_tools_widget->as_qwidget();
+      QWidget* old_qwidget = sideTools->widget();
+      if (old_qwidget) old_qwidget->deleteLater();
+      sideTools->setWidget (new_qwidget);
+      update_visibility();
+      new_qwidget->show();
+    }
+      break;
+
+    case SLOT_BOTTOM_TOOLS:
+      check_type_void (index, s);
+    {   
+      bottom_tools_widget = concrete (w);
+      QWidget* new_qwidget = bottom_tools_widget->as_qwidget();
+      QWidget* old_qwidget = bottomTools->widget();
+      if (old_qwidget) old_qwidget->deleteLater();
+      bottomTools->setWidget (new_qwidget);
       update_visibility();
       new_qwidget->show();
     }
@@ -899,11 +901,13 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
   if (win) {
     if (flag ) {
 #ifdef UNIFIED_TOOLBAR
-      //HACK: we disable unified toolbar since otherwise
-      //  the application will crash when we return to normal mode
-      // (bug in Qt? present at least with 4.7.1)
-      mainwindow()->setUnifiedTitleAndToolBarOnMac(false);
-      mainwindow()->centralWidget()->layout()->setContentsMargins(0,0,0,0);
+      if (use_unified_toolbar) {
+        //HACK: we disable unified toolbar since otherwise
+        //  the application will crash when we return to normal mode
+        // (bug in Qt? present at least with 4.7.1)
+        mainwindow()->setUnifiedTitleAndToolBarOnMac(false);
+        mainwindow()->centralWidget()->layout()->setContentsMargins(0,0,0,0);
+      }
 #endif
 //      mainwindow()->window()->setContentsMargins(0,0,0,0);
       //win->showFullScreen();
@@ -918,10 +922,12 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
       visibility[0] = cache;
       update_visibility();
 #ifdef UNIFIED_TOOLBAR
-      mainwindow()->centralWidget()->layout()->setContentsMargins (0,1,0,0);
-      //HACK: we reenable unified toolbar (see above HACK) 
-      //  the application will crash when we return to normal mode
-      mainwindow()->setUnifiedTitleAndToolBarOnMac(true);
+      if (use_unified_toolbar) {
+        mainwindow()->centralWidget()->layout()->setContentsMargins (0,1,0,0);
+        //HACK: we reenable unified toolbar (see above HACK) 
+        //  the application will crash when we return to normal mode
+        mainwindow()->setUnifiedTitleAndToolBarOnMac(true);
+      }
 #endif
     }
   }
@@ -936,11 +942,8 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
  ******************************************************************************/
 
 qt_tm_embedded_widget_rep::qt_tm_embedded_widget_rep (command _quit) 
- : qt_widget_rep(embedded_tm_widget), quit(_quit) {
-
+ : qt_widget_rep (embedded_tm_widget), quit (_quit) {
   main_widget = ::glue_widget (true, true, 1, 1);
-    // force creation of QWidget and reparent main_widget's QWidget to it.
-  qwid = as_qwidget();
 }
 
 void
@@ -964,19 +967,20 @@ qt_tm_embedded_widget_rep::send (slot s, blackbox val) {
     case SLOT_USER_ICONS_VISIBILITY:
     case SLOT_FOOTER_VISIBILITY:
     case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
     case SLOT_LEFT_FOOTER:
     case SLOT_RIGHT_FOOTER:
     case SLOT_SCROLLBARS_VISIBILITY:
     case SLOT_INTERACTIVE_MODE:
     case SLOT_FILE:
       break;
-
+ 
     case SLOT_DESTROY:
-    {  
+    {
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit))
         quit ();
-      needs_update ();
+      the_gui->need_update ();
     }
       break;
       
@@ -984,19 +988,25 @@ qt_tm_embedded_widget_rep::send (slot s, blackbox val) {
       qt_widget_rep::send (s, val);
       return;
   }
-  if (DEBUG_QT)
-    cout << "qt_tm_embedded_widget_rep: sent " << slot_name (s) 
-         << "\t\tto widget\t" << type_as_string() << LF;  
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_embedded_widget_rep: sent " << slot_name (s) 
+                  << "\t\tto widget\t" << type_as_string() << LF;  
 }
 
 blackbox
 qt_tm_embedded_widget_rep::query (slot s, int type_id) {
-  if (DEBUG_QT)
-    cout << "qt_tm_embedded_widget_rep::query " << slot_name (s) << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_embedded_widget_rep::query " << slot_name (s) << LF;
   
   switch (s) {
     case SLOT_IDENTIFIER:
-      return qt_window_widget_rep::widget_from_qwidget(qwid)->query(s, type_id);
+    {
+      if (qwid) {
+        widget_rep* wid = qt_window_widget_rep::widget_from_qwidget(qwid);
+        if (wid) return wid->query (s, type_id);
+      }
+      return close_box<int>(0);
+    }
 
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
@@ -1004,8 +1014,10 @@ qt_tm_embedded_widget_rep::query (slot s, int type_id) {
     case SLOT_ZOOM_FACTOR:
     case SLOT_POSITION:
     case SLOT_SIZE:
-      return main_widget->query(s, type_id);
-      
+      if (!is_nil (main_widget))
+        return main_widget->query (s, type_id);
+      else
+        return qt_widget_rep::query (s, type_id);
         /// FIXME: decide what to do with these for embedded widgets
     case SLOT_HEADER_VISIBILITY:
     case SLOT_MAIN_ICONS_VISIBILITY:
@@ -1014,6 +1026,7 @@ qt_tm_embedded_widget_rep::query (slot s, int type_id) {
     case SLOT_USER_ICONS_VISIBILITY:
     case SLOT_FOOTER_VISIBILITY:
     case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
       check_type_id<bool> (type_id, s);
       return close_box<bool> (false);
 
@@ -1023,7 +1036,7 @@ qt_tm_embedded_widget_rep::query (slot s, int type_id) {
 }
 
 widget
-qt_tm_embedded_widget_rep::read(slot s, blackbox index) {
+qt_tm_embedded_widget_rep::read (slot s, blackbox index) {
   widget ret;
   
   switch (s) {
@@ -1035,17 +1048,17 @@ qt_tm_embedded_widget_rep::read(slot s, blackbox index) {
       return qt_widget_rep::read(s, index);
   }
   
-  if (DEBUG_QT)
-    cout << "qt_tm_widget_rep::read " << slot_name (s) 
-         << "\t\tfor widget\t" << type_as_string() << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_widget_rep::read " << slot_name (s) 
+                  << "\t\tfor widget\t" << type_as_string() << LF;
   
   return ret;
 }
 
 void
 qt_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
-  if (DEBUG_QT)
-    cout << "qt_tm_embedded_widget_rep::write " << slot_name (s) << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_tm_embedded_widget_rep::write " << slot_name (s) << LF;
 
   switch (s) {
       // Widget w is a qt_simple_widget_rep, with a QTMWidget as underlying
@@ -1054,22 +1067,9 @@ qt_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_SCROLLABLE:
     {
       check_type_void (index, s);
-      
-      QLayout* l = qwid->layout();
-      QWidget* q = concrete(main_widget)->qwid;
-      l->removeWidget(q);
-      q->deleteLater();
-      concrete(main_widget)->qwid = 0;
-      q = concrete(w)->as_qwidget();
-      q->setParent(qwid);
-      l->addWidget(q);
       main_widget = w;
-        //qwid->show();
-      qwid->setFocusPolicy (Qt::StrongFocus);
-      qwid->setFocus ();       
     }
       break;
-
         /// FIXME: decide what to do with these for embedded widgets
     case SLOT_MAIN_MENU:
     case SLOT_MAIN_ICONS:
@@ -1077,6 +1077,7 @@ qt_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_FOCUS_ICONS:
     case SLOT_USER_ICONS:
     case SLOT_SIDE_TOOLS:
+    case SLOT_BOTTOM_TOOLS:
     case SLOT_INTERACTIVE_INPUT:
     case SLOT_INTERACTIVE_PROMPT:
     default:
@@ -1088,9 +1089,9 @@ QWidget*
 qt_tm_embedded_widget_rep::as_qwidget() {
   qwid = new QWidget();
   QVBoxLayout* l = new QVBoxLayout();
-  l->setContentsMargins(0,0,0,0);
-  qwid->setLayout(l);
-  l->addWidget(concrete(main_widget)->as_qwidget());
+  l->setContentsMargins (0,0,0,0);
+  qwid->setLayout (l);
+  l->addWidget (concrete(main_widget)->as_qwidget());
   return qwid;
 }
 

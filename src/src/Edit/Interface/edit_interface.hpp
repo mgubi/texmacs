@@ -12,7 +12,7 @@
 #ifndef EDIT_INTERFACE_H
 #define EDIT_INTERFACE_H
 #include "editor.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "widget.hpp"
 
 #define INPUT_NORMAL      0
@@ -28,8 +28,7 @@ protected:
   int           env_change;    // which things have been changed ?
   time_t        last_change;   // time of last processed change
   time_t        last_update;   // time of last update of menu, icons and footer
-  bool          do_animate;    // are we in an animation ?
-  time_t        next_animate;  // time for next animation
+  double        anim_next;     // time for next animation
   bool          full_screen;   // full screen mode ?
   bool          got_focus;     // do we have keyboard focus ?
   string        sh_s;          // current string for shortcuts
@@ -52,10 +51,11 @@ protected:
   time_t        last_t;
   SI            start_x, start_y;
   SI            end_x, end_y;
-  bool          made_selection;
   bool          table_selection;
   int           mouse_adjusting;  // mask with active key modifiers upon click
   rectangles    selection_rects;
+  array<rectangles> alt_selection_rects;
+  rectangle     last_visible;
   rectangles    env_rects;
   rectangles    foc_rects;
   rectangles    sem_rects;
@@ -71,7 +71,8 @@ protected:
   renderer      stored;
   rectangles    locus_new_rects;
   rectangles    locus_rects;
-  list<string>  active_ids;
+  list<string>  mouse_ids;
+  list<string>  focus_ids;
   int           cur_sb, cur_wb;
   SI            cur_wx, cur_wy;
 
@@ -81,6 +82,7 @@ public:
   operator tree ();
   void suspend ();
   void resume ();
+  void keyboard_focus_on (string field);
   void get_size (SI& wx, SI& wy);
 
   /* routines for dealing with shrinked coordinates */
@@ -92,28 +94,32 @@ public:
   void set_zoom_factor (double zoom);
   void invalidate (SI x1, SI y1, SI x2, SI y2);
   void invalidate (rectangles rs);
+  void invalidate_all ();
   void update_visible ();
   void scroll_to (SI x, SI y1);
   void set_extents (SI x1, SI y1, SI x2, SI y2);
 
   /* repainting the window */
+  void draw_background (renderer ren, SI x1, SI y1, SI x2, SI y2);
   void draw_text (renderer ren, rectangles& l);
   void draw_surround (renderer ren, rectangle r);
   void draw_context (renderer ren, rectangle r);
   void draw_env (renderer ren);
   void draw_cursor (renderer ren);
-  void draw_selection (renderer ren);
+  void draw_selection (renderer ren, rectangle r);
   void draw_graphics (renderer ren);
-  void draw_pre (renderer ren, rectangle r);
-  void draw_post (renderer ren, rectangle r);
-  void draw_with_shadow (rectangle r);
-  void draw_with_stored (rectangle r);
+  void draw_pre (renderer win, renderer ren, rectangle r);
+  void draw_post (renderer win, renderer ren, rectangle r);
+  void draw_with_shadow (renderer win, rectangle r);
+  void draw_with_stored (renderer win, rectangle r);
 
   /* handle changes */
   void notify_change (int changed);
   bool has_changed (int question);
   int  idle_time (int event_type= ANY_EVENT);
   int  change_time ();
+  void update_menus ();
+  int  find_alt_selection_index (range_set alt_sel, SI y, int b, int e);
   void apply_changes ();
   void animate ();
 
@@ -124,6 +130,7 @@ public:
   void full_screen_mode (bool flag);
   void before_menu_action ();
   void after_menu_action ();
+  void cancel_menu_action ();
   cursor search_cursor (path p);
   selection search_selection (path start, path end);
   rectangle get_window_extents ();
@@ -157,13 +164,15 @@ public:
   void mouse_drag (SI x, SI y);
   void mouse_select (SI x, SI y, int mods, bool drag);
   void mouse_paste (SI x, SI y);
-  void mouse_adjust (SI x, SI y);
+  void mouse_adjust (SI x, SI y, int mods);
   void mouse_adjust_selection (SI x, SI y, int mods);
   void mouse_scroll (SI x, SI y, bool up);
   cursor get_cursor ();
+  array<SI> get_mouse_position ();
   void set_pointer (string name);
   void set_pointer (string curs_name, string mask_name);
-  void update_active_loci ();
+  void update_mouse_loci ();
+  void update_focus_loci ();
 
   /* the footer */
   tree compute_text_footer (tree st);
@@ -181,14 +190,15 @@ public:
   void recall_message ();
 
   /* event handlers */
+  bool is_editor_widget ();
   void handle_get_size_hint (SI& w, SI& h);
   void handle_notify_resize (SI w, SI h);
   void handle_keypress (string key, time_t t);
   void handle_keyboard_focus (bool has_focus, time_t t);
   void handle_mouse (string kind, SI x, SI y, int mods, time_t t);
   void handle_set_zoom_factor (double zoomf);
-  void handle_clear (SI x1, SI y1, SI x2, SI y2);
-  void handle_repaint (SI x1, SI y1, SI x2, SI y2);
+  void handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2);
+  void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
 
   friend class interactive_command_rep;
   friend class tm_window_rep;

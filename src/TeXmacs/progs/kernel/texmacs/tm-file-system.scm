@@ -39,6 +39,7 @@
 (define (tmstring->object s) (string->object s))
 
 (define-public (tmfs-handler class action handle)
+  ;;(display* "Define " class " :: " action "\n")
   (ahash-set! tmfs-handler-table (cons class action) handle))
 
 (define-public (tmfs-decompose-name name)
@@ -56,7 +57,11 @@
            (lambda (handler)
              (with r (handler name)
                (if (string? r) r (object->tmstring r)))))
-          (else ((ahash-ref tmfs-handler-table (cons #t 'load)) u)))))
+          ((ahash-ref tmfs-handler-table (cons #t 'load)) =>
+           (lambda (handler)
+             (with r (handler name)
+               (if (string? r) r (object->tmstring r)))))
+          (else ""))))
 
 (define-public (tmfs-save u what)
   "Save string @what to url @u on TeXmacs file system."
@@ -65,6 +70,41 @@
     (cond ((ahash-ref tmfs-handler-table (cons class 'save)) =>
            (lambda (handler) (handler name (tmstring->object what))))
           (else ((ahash-ref tmfs-handler-table (cons #t 'save)) u what)))))
+
+(define-public (tmfs-autosave u suf)
+  "Autosave name for url @u with suffix @suf on TeXmacs file system, or @#f."
+  (with (class name) (tmfs-decompose-name u)
+    (lazy-tmfs-force class)
+    (cond ((ahash-ref tmfs-handler-table (cons class 'autosave)) =>
+           (lambda (handler) (handler name suf)))
+          (else ((ahash-ref tmfs-handler-table (cons #t 'autosave)) u suf)))))
+
+(define-public (tmfs-can-autosave? u)
+  (not (not (tmfs-autosave u "~"))))
+
+(define-public (tmfs-remove u)
+  "Remove url @u from TeXmacs file system and return @#t on success."
+  (with (class name) (tmfs-decompose-name u)
+    (lazy-tmfs-force class)
+    (cond ((ahash-ref tmfs-handler-table (cons class 'remove)) =>
+           (lambda (handler) (handler name)))
+          (else ((ahash-ref tmfs-handler-table (cons #t 'remove)) u)))))
+
+(define-public (tmfs-wrap u)
+  "Underlying wrapped url for url @u on TeXmacs file system, or @#f."
+  (with (class name) (tmfs-decompose-name u)
+    (lazy-tmfs-force class)
+    (cond ((ahash-ref tmfs-handler-table (cons class 'wrap)) =>
+           (lambda (handler) (handler name)))
+          (else ((ahash-ref tmfs-handler-table (cons #t 'wrap)) u)))))
+
+(define-public (tmfs-date u)
+  "Get last modification date for url @u on TeXmacs file system, or @#f."
+  (with (class name) (tmfs-decompose-name u)
+    (lazy-tmfs-force class)
+    (cond ((ahash-ref tmfs-handler-table (cons class 'date)) =>
+           (lambda (handler) (handler name)))
+          (else ((ahash-ref tmfs-handler-table (cons #t 'date)) u)))))
 
 (define-public (tmfs-title u doc)
   "Get a nice title for url @u on TeXmacs file system."
@@ -80,10 +120,14 @@
   "Check whether we have the permission of a given @type for the url @u."
   (with (class name) (tmfs-decompose-name u)
     (lazy-tmfs-force class)
-    (cond ((string-ends? (url->unix u) "~") #f)
-          ((string-ends? (url->unix u) "#") #f)
+    (cond ((and (string-ends? (url->unix u) "~")
+                (not (tmfs-autosave (url-unglue u 1) "~"))) #f)
+          ((and (string-ends? (url->unix u) "#")
+                (not (tmfs-autosave (url-unglue u 1) "#"))) #f)
           ((ahash-ref tmfs-handler-table (cons class 'permission?)) =>
            (lambda (handler) (handler name type)))
+          ((tmfs-wrap u)
+           ((ahash-ref tmfs-handler-table (cons #t 'permission?)) u type))
           ((ahash-ref tmfs-handler-table (cons class 'load))
            (== type "read"))
           (else
@@ -161,14 +205,30 @@
   (if (not (tmfs-pair? s)) (list s)
       (cons (tmfs-car s) (tmfs->list (tmfs-cdr s)))))
 
+(define-public (list->tmfs l)
+  (apply string-append (list-intersperse l "/")))
+
+(define-public (strip-colon s)
+  (if (and (>= (string-length s) 3)
+           (string-alpha? (substring s 0 1))
+           (== (substring s 1 3) ":/"))
+      (string-append (substring s 0 1)
+                     (substring s 2 (string-length s)))
+      s))
+
 (define-public (url->tmfs-string u)
-  (if (url-descends? u (get-texmacs-path))
+  (if (and (url-descends? u (get-texmacs-path))
+           (!= (url->url u) (get-texmacs-path)))
       (with base (url-append (get-texmacs-path) "x")
         (string-append "tm/" (url->unix (url-delta base u))))
       (let* ((protocol (url-root u))
              (file (url->unix (url-unroot u))))
-        (cond ((== protocol "") (string-append "here" file))
-              ((== protocol "default") (string-append "file/" file))
+        (cond ((== protocol "")
+               (string-append "here/" file))
+              ((== protocol "default")
+               (if (os-mingw?)
+                   (string-append "file/" (strip-colon file))
+                   (string-append "file/" file)))
               (else (string-append protocol "/" file))))))
 
 (define-public (tmfs-string->url s)
@@ -178,8 +238,11 @@
              (file (unix->url (tmfs-cdr s))))
         (cond ((== protocol "tm") (url-append (get-texmacs-path) file))
               ((== protocol "here") file)
-              ((== protocol "file") (url-append (root->url "default") file))
-              ((in? protocol '("http" "ftp"))
+              ((== protocol "file")
+               (if (os-mingw?)
+                   (string->url (string-append "/" (tmfs-cdr s)))
+                   (url-append (root->url "default") file)))
+              ((in? protocol '("http" "https" "ftp" "tmfs"))
                (url-append (root->url protocol) file))
               (else (url-append (root->url "default") s))))))
 
@@ -196,6 +259,26 @@
   (with (type what doc) head
     `(tmfs-handler ,(symbol->string type) 'save
                    (lambda (,what ,doc) ,@body))))
+
+(define-public-macro (tmfs-autosave-handler head . body)
+  (with (type what suf) head
+    `(tmfs-handler ,(symbol->string type) 'autosave
+                   (lambda (,what ,suf) ,@body))))
+
+(define-public-macro (tmfs-remove-handler head . body)
+  (with (type what) head
+    `(tmfs-handler ,(symbol->string type) 'remove
+                   (lambda (,what) ,@body))))
+
+(define-public-macro (tmfs-wrap-handler head . body)
+  (with (type what) head
+    `(tmfs-handler ,(symbol->string type) 'wrap
+                   (lambda (,what) ,@body))))
+
+(define-public-macro (tmfs-date-handler head . body)
+  (with (type what) head
+    `(tmfs-handler ,(symbol->string type) 'date
+                   (lambda (,what) ,@body))))
 
 (define-public-macro (tmfs-title-handler head . body)
   (with (type what doc) head
@@ -226,6 +309,56 @@
      (TeXmacs ,(texmacs-version))
      (style (tuple "generic"))
      (body (document ,what))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Default handlers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tmfs-handler #t 'load
+  (lambda (name)
+    `(document
+       (TeXmacs ,(texmacs-version))
+       (style (tuple "generic"))
+       (body (document "Invalid tmfs document.")))))
+
+(tmfs-handler #t 'save
+  (lambda (name doc) (noop)))
+
+(tmfs-handler #t 'autosave
+  (lambda (name suf)
+    (and-with u (tmfs-wrap name)
+      (and (url-autosave u suf)
+           (url-glue name suf)))))
+
+(tmfs-handler #t 'remove
+  (lambda (name)
+    (and-with u (tmfs-wrap name)
+      (url-remove u))))
+
+(tmfs-handler #t 'wrap
+  (lambda (name) #f))
+
+(tmfs-handler #t 'date
+  (lambda (name)
+    (and-with u (tmfs-wrap name)
+      (url-last-modified u))))
+
+(tmfs-handler #t 'title
+  (lambda (name doc) name))
+
+(tmfs-handler #t 'permission?
+  (lambda (name kind)
+    (with u (tmfs-wrap name)
+      (cond ((not u) (== kind "read"))
+            ((== kind "read") (url-test? u "r"))
+            ((== kind "write") (url-test? u "w"))
+            (else #f)))))
+
+(tmfs-handler #t 'master
+  (lambda (name) name))
+
+(tmfs-handler #t 'format
+  (lambda (name) "stm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Auxiliary buffers

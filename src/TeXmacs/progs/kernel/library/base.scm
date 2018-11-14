@@ -94,6 +94,11 @@
   "Return the first @n chars of @s."
   (substring s 0 n))
 
+(provide-public (string-take-right s n)
+  "Return the first @n chars of @s."
+  (let ((l (string-length s)))
+    (substring s (- l n) l)))
+
 (provide-public (string-trim s)		; srfi-13 (subset)
   "Remove whitespace at start of @s."
   (list->string (list-drop-while (string->list s) char-whitespace?)))
@@ -287,6 +292,23 @@
   (with d (url-expand (url-complete (url-append u (url-wildcard wc)) "r"))
     (url->list d)))
 
+(define-public (url-remove u)
+  (system-remove u))
+
+(define-public (url-autosave u suf)
+  (and (not (url-rooted-web? name))
+       (not (url-rooted-tmfs? name))
+       (url-glue u suf)))
+
+(define-public (url-wrap u)
+  #f)
+
+(define-public (url->delta-unix u)
+  (with base (buffer-get-master (current-buffer))
+    (when (and (url-rooted? u) (not (url-none? base)))
+      (set! u (url-delta base u))))
+  (url->unix u))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -318,7 +340,8 @@
   (buffer-get-master (current-buffer)))
 
 (define-public (buffer-in-recent-menu? u)
-  (not (url-rooted-tmfs? u)))
+  (or (not (url-rooted-tmfs? u))
+      (string-starts? (url->unix u) "tmfs://part/")))
 
 (define-public (buffer-in-menu? u)
   (or (buffer-in-recent-menu? u)

@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.16>
+<TeXmacs|1.99.6>
 
 <style|<tuple|source|std>>
 
@@ -20,13 +20,7 @@
     </src-license>
   </src-title>>
 
-  <assign|par-hyphen|professional>
-
-  <active*|<\src-comment>
-    TeX-like lengths.
-  </src-comment>>
-
-  <assign|tex-len|<macro|default|increase|decrease|<style-with|src-compact|none|<tmlen|<minus|<arg|default>|<arg|decrease>>|<arg|default>|<plus|<arg|default>|<arg|increase>>>>>>
+  <use-package|std-latex-base>
 
   <active*|<\src-comment>
     Default values of TeX page layout parameters.
@@ -145,14 +139,6 @@
   <assign|eqn-row-sep|<macro|<plus|<value|par-sep>|<tex-jot>>>>
 
   <assign|eqn-ver-sep|<macro|<style-with|src-compact|none|<over|<style-with|src-compact|none|<minus|<tex-above-display-skip>|<tex-below-display-skip>|<plus|<tex-above-display-short-skip>|<tex-below-display-short-skip>>>>|2>>>>
-
-  <active*|<\src-comment>
-    TeX style lists.
-  </src-comment>>
-
-  <assign|itemize-reduce|<macro|nr|<minimum|<arg|nr>|4>>>
-
-  <assign|enumerate-reduce|<macro|nr|<minimum|<arg|nr>|4>>>
 </body>
 
 <\initial>

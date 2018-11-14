@@ -16,6 +16,7 @@
 #include "file.hpp"
 #include "image_files.hpp"
 #include "scheme.hpp"
+#include "frame.hpp"
 
 #include <QObject>
 #include <QWidget>
@@ -77,27 +78,38 @@ static hashmap<basic_character,qt_image> character_image;
 // image cache
 static hashmap<string,qt_pixmap> images;
 
+/*
+** hash contents must be removed because 
+** the underlying objects are destroyed during 
+** Qt exit function
+*/
+void del_obj_qt_renderer(void)  {
+  character_image= hashmap<basic_character,qt_image> ();  
+  images= hashmap<string,qt_pixmap>() ;
+}
+
 /******************************************************************************
 * qt_renderer
 ******************************************************************************/
 
 qt_renderer_rep::qt_renderer_rep (QPainter *_painter, int w2, int h2):
-  basic_renderer_rep (true, w2, h2), painter(_painter) {}
+  basic_renderer_rep (true, w2, h2), painter(_painter) {
+    reset_zoom_factor(); }
 
 qt_renderer_rep::~qt_renderer_rep () {}
 
-qt_renderer_rep*
-qt_renderer_rep::as_qt_renderer () {
-  return this;
+void*
+qt_renderer_rep::get_handle () {
+  return (void*) this;
 }
 
 void
 qt_renderer_rep::begin (void* handle) {
   QPaintDevice *device = static_cast<QPaintDevice*>(handle);
   if (!painter->begin (device) && DEBUG_QT)
-    cout << "qt_renderer_rep::begin(): uninitialized QPixmap of size "
-         << ((QPixmap*)handle)->width() << " x " << ((QPixmap*)handle)->height()
-         << LF;
+    debug_qt << "qt_renderer_rep::begin(): uninitialized QPixmap of size "
+             << ((QPixmap*)handle)->width() << " x "
+             << ((QPixmap*)handle)->height() << LF;
     
   w = painter->device()->width();
   h = painter->device()->height();
@@ -114,9 +126,47 @@ qt_renderer_rep::get_extents (int& w2, int& h2) {
   }
 }
 
+void
+qt_renderer_rep::set_zoom_factor (double zoom) {
+  renderer_rep::set_zoom_factor (retina_factor * zoom);
+  retina_pixel= pixel * retina_factor;
+}
+
 /******************************************************************************
- * Clipping
- ******************************************************************************/
+* Transformations
+******************************************************************************/
+
+void
+qt_renderer_rep::set_transformation (frame fr) {
+  ASSERT (fr->linear, "only linear transformations have been implemented");
+
+  SI cx1, cy1, cx2, cy2;
+  get_clipping (cx1, cy1, cx2, cy2);
+  rectangle oclip (cx1, cy1, cx2, cy2);
+
+  frame cv= scaling (point (pixel, -pixel), point (-ox, -oy));
+  frame tr= invert (cv) * fr * cv;
+  point o = tr (point (0.0, 0.0));
+  point ux= tr (point (1.0, 0.0)) - o;
+  point uy= tr (point (0.0, 1.0)) - o;
+  //cout << "Set transformation " << o << ", " << ux << ", " << uy << "\n";
+  QTransform qtr (ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
+  painter->save ();
+  painter->setTransform (qtr, true);
+
+  rectangle nclip= fr [oclip];
+  clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
+}
+
+void
+qt_renderer_rep::reset_transformation () {
+  unclip ();
+  painter->restore ();
+}
+
+/******************************************************************************
+* Clipping
+******************************************************************************/
 
 void
 qt_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore)
@@ -134,59 +184,126 @@ qt_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore)
   }
 }
 
-
-
 /******************************************************************************
 * Drawing 
 ******************************************************************************/
+bool is_percentage (tree t, string s= "%");
+double as_percentage (tree t);
+
+static QImage*
+get_pattern_image (brush br, SI pixel) {
+  url u;
+  SI w, h;
+  get_pattern_data (u, w, h, br, pixel);
+  QImage* pm= get_image (u, w, h);
+  return pm;
+}
 
 void
-qt_renderer_rep::set_color (color c) {
-  basic_renderer_rep::set_color(c);
+qt_renderer_rep::set_pencil (pencil np) {
+  painter->setOpacity (qreal (1.0));
+  basic_renderer_rep::set_pencil (np);
   QPen p (painter->pen ());
   QBrush b (painter->brush ());
-  p.setColor (to_qcolor(cur_fg));
-  b.setColor (to_qcolor(cur_fg));
+  QColor qc= to_qcolor (pen->get_color ());
+  p.setColor (qc);
+  b.setColor (qc);
+  //SI pw= 0;
+  //if (pen->get_width () > pixel)
+  //pw= (pen->get_width () + thicken) / (1.0*pixel);
+  //p.setWidth (pw);
+  qreal pw= (qreal) (((double) pen->get_width ()) / ((double) pixel));
+  p.setWidthF (pw);
+  if (np->get_type () == pencil_brush) {
+    brush br= np->get_brush ();
+    QImage* pm= get_pattern_image (br, pixel);
+    int pattern_alpha= br->get_alpha ();
+    painter->setOpacity (qreal (pattern_alpha) / qreal (255));
+    if (pm != NULL) {
+      b= QBrush (*pm);
+      double pox, poy;
+      decode (0, 0, pox, poy);
+      QTransform tr;
+      tr.translate (pox, poy);
+      b.setTransform (tr);
+      p= QPen (b, pw);
+    }
+  }
+  p.setCapStyle (pen->get_cap () == cap_round? Qt::RoundCap: Qt::SquareCap);
+  p.setJoinStyle (Qt::RoundJoin);
   painter->setPen (p);
   painter->setBrush (b);
 }
 
 void
-qt_renderer_rep::set_line_style (SI lw, int type, bool round) {
-  (void) type;
-  QPen p (painter->pen ());
-  if (lw <= pixel) p.setWidth (0);
-  else p.setWidth ((lw+thicken) / (1.0*pixel));
-  p.setCapStyle (round? Qt::RoundCap: Qt::SquareCap);
-  p.setJoinStyle (Qt::RoundJoin);
-  painter->setPen (p);
+qt_renderer_rep::set_brush (brush br) {
+  basic_renderer_rep::set_brush (br);
+  if (br->get_type () == brush_none) {
+    painter->setPen (QPen (Qt::NoPen));
+    painter->setBrush (QBrush (Qt::NoBrush));
+  }
+  else {
+    QPen p (painter->pen ());
+    QBrush b (painter->brush ());
+    QColor col= to_qcolor (pen->get_color ());
+    p.setColor (col);
+    b.setColor (col);
+    painter->setPen (p);
+    painter->setBrush (b);
+  }
+  if (br->get_type () == brush_pattern) {
+    QImage* pm= get_pattern_image (br, pixel);
+    int pattern_alpha= br->get_alpha ();
+    painter->setOpacity (qreal (pattern_alpha) / qreal (255));
+    if (pm != NULL) {
+      QBrush b (*pm);
+      double pox, poy;
+      decode (0, 0, pox, poy);
+      QTransform tr;
+      tr.translate (pox, poy);
+      //tr.rotate (45.0);
+      b.setTransform (tr);
+      painter->setBrush (b);
+    }
+  }
 }
 
 void
 qt_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
-  decode (x1, y1);
-  decode (x2, y2);
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
   // y1--; y2--; // top-left origin to bottom-left origin conversion
   painter->setRenderHints (QPainter::Antialiasing);
-  painter->drawLine (x1, y1, x2, y2);
+  painter->drawLine (QPointF (rx1, ry1), QPointF (rx2, ry2));
 }
 
 void
 qt_renderer_rep::lines (array<SI> x, array<SI> y) {
   int i, n= N(x);
-  if ((N(y) != n) || (n<1)) return;
-  STACK_NEW_ARRAY (pnt, QPoint, n);
-  for (i=0; i<n; i++) {
-    SI xx= x[i], yy= y[i];
-    decode (xx, yy);
-    pnt[i].rx()= xx;
-    pnt[i].ry()= yy;
-    if (i>0) {
-      painter->setRenderHints (QPainter::Antialiasing);
-      painter->drawLine (pnt[i-1], pnt[i]); // FIX: hack
-    }
+  if ((N(y) != n) || (n<2)) return;
+  STACK_NEW_ARRAY (pnt, QPointF, n);
+  for (i=0; i<n; i++)
+#ifdef __arm__
+// for compiling in Raspbian
+  {
+    double px = double (pnt[i].rx());//explicit conversion needed for ARM where qreal==float!=double
+    double py = double (pnt[i].ry());    
+    decode (x[i], y[i], px, py);
+    pnt[i].rx()=qreal(px); pnt[i].ry()=qreal(py);
   }
-  // XDrawLines (dpy, win, gc, pnt, n, CoordModeOrigin);
+#else
+    decode (x[i], y[i], pnt[i].rx(), pnt[i].ry());
+#endif
+
+  QPen p= painter->pen();
+  p.setCapStyle (pen->get_cap () == cap_round? Qt::RoundCap: Qt::SquareCap);
+  if (x[N(x)-1] == x[0] && y[N(y)-1] == y[0]) p.setCapStyle (Qt::RoundCap);
+  p.setJoinStyle (Qt::RoundJoin);
+  painter->setPen (p);
+
+  painter->setRenderHints (QPainter::Antialiasing);
+  painter->drawPolyline (pnt, n);
   STACK_DELETE_ARRAY (pnt);
 }
 
@@ -198,9 +315,9 @@ qt_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
   if ((x1>=x2) || (y1<=y2)) return;
-  QBrush brush (to_qcolor(cur_bg));
+  QBrush br (to_qcolor (bg_brush->get_color ()));
   painter->setRenderHints (0);
-  painter->fillRect (x1, y2, x2-x1, y1-y2, brush);       
+  painter->fillRect (x1, y2, x2-x1, y1-y2, br);       
 }
 
 void
@@ -224,37 +341,69 @@ qt_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   decode (x1, y1);
   decode (x2, y2);
 
-  QBrush brush (to_qcolor(cur_fg));
+  QBrush br (to_qcolor (pen->get_color ()));
   painter->setRenderHints (0);
-  painter->fillRect (x1, y2, x2-x1, y1-y2, brush);       
+  painter->fillRect (x1, y2, x2-x1, y1-y2, br);       
 }
 
 void
 qt_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   if ((x1>=x2) || (y1>=y2)) return;
-  decode (x1, y1);
-  decode (x2, y2);
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
   painter->setRenderHints (QPainter::Antialiasing);
-  painter->drawArc (x1, y2, x2-x1, y1-y2, alpha / 4, delta / 4);
+  painter->drawArc (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 4, delta / 4);
 }
 
 void
 qt_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   if ((x1>=x2) || (y1>=y2)) return;
-  decode (x1, y1);
-  decode (x2, y2);
-  QBrush brush(to_qcolor(cur_fg));
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
+  QBrush br= painter->brush ();
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+    br= QBrush (to_qcolor (pen->get_color ()));
   QPainterPath pp;
-  pp.arcMoveTo (x1, y2, x2-x1, y1-y2, alpha / 64);
-  pp.arcTo (x1, y2, x2-x1, y1-y2, alpha / 64, delta / 64);
+  pp.arcMoveTo (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 64);
+  pp.arcTo (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 64, delta / 64);
   pp.closeSubpath ();
   pp.setFillRule (Qt::WindingFill);
   painter->setRenderHints (QPainter::Antialiasing);
-  painter->fillPath (pp, brush);
+  painter->fillPath (pp, br);
 }
 
 void
 qt_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  int i, n= N(x);
+  if ((N(y) != n) || (n<1)) return;
+  QPolygonF poly (n);
+  for (i=0; i<n; i++) {
+    double qx, qy;
+    decode (x[i], y[i], qx, qy);
+    poly[i] = QPointF (qx, qy);
+  }
+  QBrush br= painter->brush ();
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+    // FIXME: is this really necessary?
+    // The brush should have been set at the moment of set_pencil or set_brush
+    br= QBrush (to_qcolor (pen->get_color ()));
+  QPainterPath pp;
+  pp.addPolygon (poly);
+  pp.closeSubpath ();
+  pp.setFillRule (convex? Qt::OddEvenFill: Qt::WindingFill);
+  painter->setRenderHints (QPainter::Antialiasing);
+  painter->fillPath (pp, br);
+}
+
+void
+qt_renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
+  array<SI> x (3), y (3);
+  x[0]= x1; y[0]= y1;
+  x[1]= x2; y[1]= y2;
+  x[2]= x3; y[2]= y3;
+
   int i, n= N(x);
   if ((N(y) != n) || (n<1)) return;
   QPolygonF poly(n);
@@ -262,160 +411,26 @@ qt_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
     SI xx= x[i], yy= y[i];
     decode (xx, yy);
     poly[i] = QPointF (xx, yy);
+    //double qx, qy;
+    //decode (x[i], y[i], qx, qy);
+    //poly[i] = QPointF (qx, qy);
   }
-  QBrush brush(to_qcolor(cur_fg));
+  QBrush br= painter->brush ();
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+    // FIXME: is this really necessary?
+    // The brush should have been set at the moment of set_pencil or set_brush
+    br= QBrush (to_qcolor (pen->get_color ()));
   QPainterPath pp;
   pp.addPolygon (poly);
   pp.closeSubpath ();
-  pp.setFillRule (convex? Qt::OddEvenFill: Qt::WindingFill);
-  painter->setRenderHints (QPainter::Antialiasing);
-  painter->fillPath (pp, brush);
+  pp.setFillRule (Qt::OddEvenFill);
+  painter->setRenderHints (QPainter::Antialiasing, false);
+  painter->fillPath (pp, br);
 }
-
 
 /******************************************************************************
 * Image rendering
 ******************************************************************************/
-
-struct qt_cache_image_rep: cache_image_element_rep {
-  qt_cache_image_rep (int w2, int h2, time_t time2, QImage *ptr2):
-    cache_image_element_rep (w2, h2, time2, ptr2) {}
-  virtual ~qt_cache_image_rep () {
-    delete static_cast<QImage*> (ptr); }
-};
-
-void
-qt_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
-                        double cx1, double cy1, double cx2, double cy2,
-                        int alpha)
-{
-  // Given an image of original size (W, H),
-  // we display the part (cx1 * W, xy1 * H, cx2 * W, cy2 * H)
-  // at position (x, y) in a rectangle of size (w, h)
-  if(cx2<=cx1 || cy2<=cy1) return;
-
-  w= w/pixel; h= h/pixel;
-  decode (x, y);
-
-  // safety check
-  url ru = resolve(u);
-  u = is_none (ru) ? "$TEXMACS_PATH/misc/pixmaps/unknown.ps" : ru;
-  
-  QImage *pm = NULL;
-  tree lookup= tuple (u->t);
-  lookup << as_string (w ) << as_string (h )
-         << as_string (cx1) << as_string (cy1)
-         << as_string (cx2) << as_string (cy2) << "qt-image" ;
-  cache_image_element ci = get_image_cache(lookup);
-  if (!is_nil(ci))
-    pm= static_cast<QImage*> (ci->ptr);
-  else {
-    // rendering
-    bool needs_crop= false;
-    if (qt_supports (u)) {
-      pm= new QImage (utf8_to_qstring (concretize (u)));
-      needs_crop= true;
-    }
-    else if (suffix (u) == "ps" ||
-             suffix (u) == "eps" ||
-             suffix (u) == "pdf") {
-      url temp= url_temp (".png");
-      image_to_png (u, temp, w, h);
-      needs_crop= true;
-/*
-      string idstr= eval_system ("identify",u);
-      int i=0;
-      int a=0,b=0;
-      while(i<N(idstr)) {
-        b=0;
-        if(idstr[i]==' ') {
-          i++;
-          a=i;
-          while(i<N(idstr) && idstr[i]>'0' && idstr[i]<'9')
-            i++;
-          if(i>=N(idstr))
-            break;
-          if(idstr[i] != 'x')
-            continue;
-          i++;
-          b=i;
-          while(i<N(idstr) && idstr[i]>'0' && idstr[i]<'9')
-            i++;
-          if(i<N(idstr) && idstr[i]==' ')
-            break;
-        }
-        i++;
-      }
-      int iw,ih;
-      if(b>0) {
-        iw=as_int(idstr(a,b-1));
-        ih=as_int(idstr(b,i));
-      } else {
-        int bbx1,bby1,bbx2,bby2;
-        ps_bounding_box(u,bbx1,bby1,bbx2,bby2);
-        iw=bbx2-bbx1;
-        ih=bby2-bby1;
-      }
-
-//      float resx = 72*w/((bbx2-bbx1)*(cx2-cx1));
-//      float resy = 72*h/((bby2-bby1)*(cy2-cy1));
-      float resx = 144*w/(iw*(cx2-cx1));
-      float resy = 144*h/(ih*(cy2-cy1));
-
-      url temp= url_temp (".png");
-      system ("convert -density " * as_string(resx) * "x" * as_string(resy)
-             * " -scale 50% -crop " * as_string(w) * "x" * as_string(h)
-             * "+" * as_string (cx1*w/(cx2-cx1))
-             * "+" * as_string ((1-cy2)*h/(cy2-cy1))
-             * "! -background white -flatten", u, temp);
-*/
-      pm= new QImage (to_qstring (as_string (temp)));
-      remove (temp);
-    }
-    if (pm == NULL || pm->isNull ()) {
-      if (pm != NULL) {
-        delete pm;
-        pm= NULL;
-      }
-      if (as_bool (call ("file-converter-exists?", u, "x.png"))) {
-        url temp= url_temp (".png");
-        call ("file-convert", object (u), object (temp));
-        needs_crop= true;
-        pm= new QImage (to_qstring (as_string (temp)));
-        remove (temp);
-      }
-      if (pm == NULL || pm->isNull ()) {
-        if (pm != NULL) delete pm;
-        cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
-        return;
-      }
-    }
-
-    if(needs_crop) {
-      int iw= pm->width ();
-      int ih= pm->height ();
-      int x1= as_int (cx1 * iw);
-      int y1= as_int (cy1 * ih);
-      int x2= as_int (cx2 * iw);
-      int y2= as_int (cy2 * ih);
-      int ww= x2 - x1;
-      int hh= y2 - y1;
-
-      (*pm)= pm->copy(QRect (x1, hh-y2, ww, hh));
-      (*pm)= pm->scaled(w,h);
-    }
-
-    ci = tm_new<qt_cache_image_rep> (w,h, texmacs_time(), pm);
-    set_image_cache(lookup, ci);
-    (ci->nr)++;
-  }
-
-  qreal old_opacity= painter->opacity ();
-  painter->setOpacity (qreal (alpha) / qreal (255));
-  painter->drawImage (x, y-h, *pm);
-  painter->setOpacity (old_opacity);
-};
-
 
 void
 qt_renderer_rep::draw_clipped (QImage *im, int w, int h, SI x, SI y) {
@@ -440,13 +455,64 @@ qt_renderer_rep::draw_clipped (QPixmap *im, int w, int h, SI x, SI y) {
 }
 
 void
+qt_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
+  // draw with background pattern
+  SI xo, yo;
+  glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
+  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+  int w= gl->width, h= gl->height;
+  QImage *im= new QImage (w, h, QImage::Format_ARGB32);
+  im->fill (Qt::transparent);
+
+  {
+    brush br= pen->get_brush ();
+    QImage* pm= get_pattern_image (br, brushpx==-1? pixel: brushpx);
+    int pattern_alpha= br->get_alpha ();
+    QPainter glim (im);
+    glim.setOpacity (qreal (pattern_alpha) / qreal (255));
+    if (pm != NULL) {
+      SI tx= x- xo*std_shrinkf, ty= y+ yo*std_shrinkf;
+      decode (tx, ty); ty--;
+      QBrush qbr (*pm);
+      QTransform qtf= painter->transform ();
+      qbr.setTransform (qtf.translate (-tx, -ty));
+      glim.setBrush (qbr);
+    }
+    glim.setPen (Qt::NoPen);
+    glim.drawRect (0, 0, w, h);
+
+    int nr_cols= std_shrinkf*std_shrinkf;
+    if (nr_cols >= 64) nr_cols= 64;
+    for (int j=0; j<h; j++)
+      for (int i=0; i<w; i++) {
+        color patcol= im->pixel (i, j);
+        int r, g, b, a;
+        get_rgb (patcol, r, g, b, a);
+        if (get_reverse_colors ()) reverse (r, g, b);
+        int col = gl->get_x (i, j);
+        im->setPixel (i, j, qRgba (r, g, b, (a*col)/nr_cols));
+      }
+  }
+
+  draw_clipped (im, w, h, x- xo*std_shrinkf, y+ yo*std_shrinkf);
+  delete im;
+}
+
+void
 qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
+  if (pen->get_type () == pencil_brush) {
+    draw_bis (c, fng, x, y);
+    return;
+  }
+
   // get the pixmap
-  basic_character xc (c, fng, std_shrinkf, cur_fg, 0);
+  color fgc= pen->get_color ();
+  basic_character xc (c, fng, std_shrinkf, fgc, 0);
   qt_image mi = character_image [xc];
   if (is_nil(mi)) {
     int r, g, b, a;
-    get_rgb (cur_fg, r, g, b, a);
+    get_rgb (fgc, r, g, b, a);
+    if (get_reverse_colors ()) reverse (r, g, b);
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
     glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
@@ -460,13 +526,13 @@ qt_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       im->fill (Qt::transparent);
       QPainter pp(im);
       QPen pen(painter->pen());
-      QBrush brush(pen.color());
+      QBrush br(pen.color());
       pp.setPen(Qt::NoPen);
       for (j=0; j<h; j++)
         for (i=0; i<w; i++) {
           int col = gl->get_x (i, j);
-          brush.setColor (QColor (r, g, b, (a*col)/nr_cols));
-          pp.fillRect (i, j, 1, 1, brush);
+          br.setColor (QColor (r, g, b, (a*col)/nr_cols));
+          pp.fillRect (i, j, 1, 1, br);
         }
       pp.end();
     }
@@ -511,57 +577,6 @@ qt_renderer_rep::draw (const QFont& qfn, const QString& qs,
   painter->scale (zoom, zoom);
   painter->drawText (0, 0, qs);
   painter->resetTransform ();
-}
-
-/******************************************************************************
-* Setting up and displaying xpm pixmaps
-******************************************************************************/
-
-extern int char_clip;
-/*! Loads and caches pixmaps.
- 
- Returns a newly allocated QPixmap object or one from the cache.
- */
-QPixmap*
-qt_renderer_rep::xpm_image (url file_name) {
-  QPixmap *pxm= NULL;
-  qt_pixmap mi= images [as_string (file_name)];
-  if (is_nil (mi)) {
-    string sss;
-    if (suffix (file_name) == "xpm") {
-      url png_equiv= glue (unglue (file_name, 3), "png");
-      load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
-    }
-    if (sss == "")
-      load_string ("$TEXMACS_PIXMAP_PATH" * file_name, sss, false);
-    if (sss == "")
-      load_string ("$TEXMACS_PATH/misc/pixmaps/TeXmacs.xpm", sss, true);
-    c_string buf (sss);
-    pxm= new QPixmap();
-    pxm->loadFromData ((uchar*)(char*)buf, N(sss));
-    //out << sss;
-    //cout << "pxm: " << file_name << "(" << pxm->size().width()
-    //     << "," <<  pxm->size().height() << ")\n";
-    qt_pixmap mi2 (pxm, 0, 0, pxm->width(), pxm->height());
-    mi= mi2;
-    images (as_string (file_name))= mi2;
-  }
-  else pxm=  mi->img ;
-  return pxm;
-}
-
-void
-qt_renderer_rep::xpm (url file_name, SI x, SI y) {
-  y -= pixel; // counter balance shift in draw_clipped
-  QPixmap* image = xpm_image (file_name);
-  ASSERT (pixel == PIXEL, "pixel and PIXEL should coincide");
-  int w, h;
-  w = image->width ();
-  h = image->height ();
-  int old_clip= char_clip;
-  char_clip= true;
-  draw_clipped (image, w, h, x, y);
-  char_clip=old_clip;
 }
 
 /******************************************************************************
@@ -638,7 +653,6 @@ qt_renderer_rep::delete_shadow (renderer& ren)  {
   }
 }
 
-
 void 
 qt_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   // FIXME: we should use the routine fetch later
@@ -712,8 +726,8 @@ qt_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2)  {
 
 
 /******************************************************************************
- * proxy qt renderer
- ******************************************************************************/
+* proxy qt renderer
+******************************************************************************/
 
 void 
 qt_proxy_renderer_rep::new_shadow (renderer& ren) {
@@ -829,5 +843,3 @@ qt_shadow_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
     shadow->painter->setClipRect(QRect());
   }
 }
-
-

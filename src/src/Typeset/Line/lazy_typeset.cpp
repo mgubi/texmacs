@@ -301,7 +301,12 @@ make_lazy_rewrite (edit_env env, tree t, path ip) {
 
 lazy
 make_lazy_eval (edit_env env, tree t, path ip) {
-  tree r= env->exec (is_func (t, EVAL, 1)? t[0]: tree (QUASIQUOTE, t[0]));
+  tree r;
+  if (is_func (t, EVAL, 1))
+    r= env->exec (t[0]);
+  else if (is_func (t, QUASI, 1))
+    r= env->exec (tree (QUASIQUOTE, t[0]));
+  else r= env->exec (t);
   array<line_item> a= typeset_marker (env, descend (ip, 0));
   array<line_item> b= typeset_marker (env, descend (ip, 1));
   lazy par= make_lazy (env, attach_right (r, ip));
@@ -358,7 +363,7 @@ make_lazy_argument (edit_env env, tree t, path ip) {
 	if (is_accessible (new_valip)) valip= new_valip;
       }
     }
-    else value= tree (ERROR, "arg " * name);
+    else value= compound ("src-unknown", name);
   }
 
   array<line_item> a= typeset_marker (env, descend (ip, 0));
@@ -456,7 +461,7 @@ make_lazy_locus (edit_env env, tree t, path ip) {
   list<string> ids;
   string col;
   if (!build_locus (env, t, ids, col))
-    system_warning ("Ignored unaccessible loci");
+    typeset_warning << "Ignored unaccessible loci\n";
   int last= N(t)-1;
   tree old_col= env->read (COLOR);
   env->write_update (COLOR, col);
@@ -527,8 +532,8 @@ make_lazy (edit_env env, tree t, path ip) {
   case COMPOUND:
     return make_lazy_compound (env, t, ip);
   case EXTERN:
-    return make_lazy_rewrite (env, t, ip);
-  case INCLUDE:
+  case VAR_INCLUDE:
+  case WITH_PACKAGE:
     return make_lazy_rewrite (env, t, ip);
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
@@ -546,6 +551,9 @@ make_lazy (edit_env env, tree t, path ip) {
   case HLINK:
   case ACTION:
     return make_lazy_compound (env, t, ip);
+  case ANIM_STATIC:
+  case ANIM_DYNAMIC:
+    return make_lazy_eval (env, t, ip);
   case CANVAS:
     return make_lazy_canvas (env, t, ip);
   case ORNAMENT:

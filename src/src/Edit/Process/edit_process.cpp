@@ -15,6 +15,7 @@
 #include "merge_sort.hpp"
 #include "Bibtex/bibtex.hpp"
 #include "Bibtex/bibtex_functions.hpp"
+#include "Sqlite3/sqlite3.hpp"
 #include "file.hpp"
 #include "convert.hpp"
 #include "scheme.hpp"
@@ -27,14 +28,46 @@ edit_process_rep::edit_process_rep () {}
 edit_process_rep::~edit_process_rep () {}
 
 /******************************************************************************
+* Removing labels
+******************************************************************************/
+
+// Labels in TOC, index or glossaries (list-of-anything) leads to redefinition
+// and impede typesetting. This generates errors reported via intrusive popups.
+// So we remove them.
+
+static tree
+remove_labels (tree t) {
+  if (is_atomic (t)) return t;
+  if (is_func (t, LABEL)) return "";
+  int i, n= N(t);
+  tree r (L(t));
+  for (i=0; i<n; i++) {
+    tree u= remove_labels (t[i]);
+    if (!is_concat (t) || u != "") r << u;
+  }
+  if (is_func (r, CONCAT, 0)) return "";
+  if (is_func (r, CONCAT, 1)) return r[0];
+  return r;
+}
+
+/******************************************************************************
 * Automatically generate a bibliography
 ******************************************************************************/
 
+void
+copy_bst_file (url base, string style) {
+  string bst= style * ".bst";
+  url u1= url ("$TEXMACS_HOME_PATH/system/bib", bst);
+  url u2= relative (base, bst);
+  if (!exists (u1) && exists (u2)) copy (u2, u1);
+}
+
 url
-find_bib_file (url base, string fname, string suffix= ".bib") {
+find_bib_file (url base, string fname,
+               string suffix= ".bib", bool rooted= false) {
   if (!ends (fname, suffix)) fname= fname * suffix;
   url bibf (fname);
-  if (exists (bibf))
+  if (exists (bibf) && (!rooted || is_rooted (bibf)))
     return bibf;
   if (exists (relative (base, bibf)))
     return relative (base, bibf);
@@ -43,46 +76,72 @@ find_bib_file (url base, string fname, string suffix= ".bib") {
   return url_none ();
 }
 
+bool
+supports_db () {
+  return get_preference ("database tool") == "on";
+}
+
 void
 edit_process_rep::generate_bibliography (
   string bib, string style, string fname)
 {
+  system_wait ("Generating bibliography, ", "please wait");
   if (DEBUG_AUTO)
-    cout << "TeXmacs] Generating bibliography"
-	 << " [" << bib << ", " << style << ", " << fname << "]\n";
+    debug_automatic << "Generating bibliography"
+                    << " [" << bib << ", " << style << ", " << fname << "]\n";
   tree bib_t= buf->data->aux[bib];
   if (buf->prj != NULL) bib_t= buf->prj->data->aux[bib];
   tree t;
+  copy_bst_file (buf->buf->name, style);
   url bib_file= find_bib_file (buf->buf->name, fname);
+  //cout << fname << " -> " << concretize (bib_file) << "\n";
   if (is_none (bib_file)) {
     url bbl_file= find_bib_file (buf->buf->name, fname, ".bbl");
     if (is_none (bbl_file)) {
-      set_message ("Could not find bibliography file", "compile bibliography");
-      return;
+      if (supports_db ()) {
+        t= as_tree (call (string ("bib-compile"), bib, style, bib_t));
+        call (string ("bib-attach"), bib, bib_t);
+      }
+      else {
+	std_error << "Could not load BibTeX file " << fname;
+        set_message ("Could not find bibliography file",
+                     "compile bibliography");
+        return;
+      }
     }
-    t= bibtex_load_bbl (bib, bbl_file);
+    else t= bibtex_load_bbl (bib, bbl_file);
   }
-  //cout << fname << " -> " << concretize (bib_file) << "\n";
   else {
     if (!bibtex_present () && !starts (style, "tm-")) {
-      if (style == "alpha") style= "tm-alpha";
+      if (style == "abbrv") style= "tm-abbrv";
       else if (style == "acm") style= "tm-acm";
+      else if (style == "alpha") style= "tm-alpha";
+      else if (style == "elsart-num") style= "tm-elsart-num";
       else if (style == "ieeetr") style= "tm-ieeetr";
       else if (style == "siam") style= "tm-siam";
+      else if (style == "unsrt") style= "tm-unsrt";
       else style= "tm-plain";
     }
-    if (starts (style, "tm-")) {
+    if (supports_db () && !is_rooted (bib_file))
+      bib_file= find_bib_file (buf->buf->name, fname, ".bib", true);
+    if (supports_db ()) {
+      //(void) call (string ("bib-import-bibtex"), bib_file);
+      t= as_tree (call (string ("bib-compile"), bib, style, bib_t, bib_file));
+    }
+    else if (starts (style, "tm-")) {
       string sbib;
-      load_string (bib_file, sbib, false);
+      if (load_string (bib_file, sbib, false))
+	std_error << "Could not load BibTeX file " << fname;
       tree te= bib_entries (parse_bib (sbib), bib_t);
       object ot= tree_to_stree (te);
       eval ("(use-modules (bibtex " * style (3, N(style)) * "))");
-      t= stree_to_tree (call (string ("bibstyle"), style (3, N(style)), ot));
+      t= stree_to_tree (call (string ("bib-process"),
+                              bib, style (3, N(style)), ot));
     }
-    else {
-      string dir= concretize (head (buf->buf->name));
+    else
       t= bibtex_run (bib, style, bib_file, bib_t);
-    }
+    if (supports_db ())
+      (void) call (string ("bib-attach"), bib, bib_t, bib_file);
   }
   if (is_atomic (t) && starts (t->label, "Error:"))
     set_message (t->label, "compile bibliography");
@@ -96,10 +155,10 @@ edit_process_rep::generate_bibliography (
 void
 edit_process_rep::generate_table_of_contents (string toc) {
   if (DEBUG_AUTO)
-    cout << "TeXmacs] Generating table of contents [" << toc << "]\n";
+    debug_automatic << "Generating table of contents [" << toc << "]\n";
   tree toc_t= buf->data->aux[toc];
   if (buf->prj != NULL) toc_t= copy (buf->prj->data->aux[toc]);
-  if (N(toc_t)>0) insert_tree (toc_t);
+  if (N(toc_t)>0) insert_tree (remove_labels (toc_t));
 }
 
 /******************************************************************************
@@ -246,8 +305,9 @@ make_entry (tree& D, tree t) {
 
 void
 edit_process_rep::generate_index (string idx) {
+  system_wait ("Generating index, ", "please wait");
   if (DEBUG_AUTO)
-    cout << "TeXmacs] Generating index [" << idx << "]\n";
+    debug_automatic << "Generating index [" << idx << "]\n";
   tree I= copy (buf->data->aux[idx]);
   if (buf->prj != NULL) I= copy (buf->prj->data->aux[idx]);
   if (N(I)>0) {
@@ -277,7 +337,7 @@ edit_process_rep::generate_index (string idx) {
     tree D (DOCUMENT);
     for (i=0; i<n; i++)
       make_entry (D, h (entry[i]));
-    insert_tree (D);
+    insert_tree (remove_labels (D));
   }
 }
 
@@ -287,8 +347,9 @@ edit_process_rep::generate_index (string idx) {
 
 void
 edit_process_rep::generate_glossary (string gly) {
+  system_wait ("Generating glossary, ", "please wait");
   if (DEBUG_AUTO)
-    cout << "TeXmacs] Generating glossary [" << gly << "]\n";
+    debug_automatic << "Generating glossary [" << gly << "]\n";
   tree G= copy (buf->data->aux[gly]);
   if (buf->prj != NULL) G= copy (buf->prj->data->aux[gly]);
   if (N(G)>0) {
@@ -297,11 +358,15 @@ edit_process_rep::generate_glossary (string gly) {
     for (i=0; i<n; i++)
       if (is_func (G[i], TUPLE, 1)) D << G[i][0];
       else if (is_func (G[i], TUPLE, 3) && (G[i][0] == "normal")) {
-	tree L= compound ("glossary-1", G[i][1], G[i][2]);
+        tree content= G[i][1];
+        if (is_document (content) && N(content) == 1) content= content[0];;
+	tree L= compound ("glossary-1", content, G[i][2]);
 	D << L;
       }
       else if (is_func (G[i], TUPLE, 4) && (G[i][0] == "normal")) {
-	tree L= compound ("glossary-2", G[i][1], G[i][2], G[i][3]);
+        tree content= G[i][1];
+        if (is_document (content) && N(content) == 1) content= content[0];;
+	tree L= compound ("glossary-2", content, G[i][2], G[i][3]);
 	D << L;
       }
       else if (is_func (G[i], TUPLE, 3) && (G[i][0] == "dup")) {
@@ -309,7 +374,7 @@ edit_process_rep::generate_glossary (string gly) {
 	for (j=0; j<N(D); j++)
 	  if ((is_compound (D[j], "glossary-1") ||
 	       is_compound (D[j], "glossary-2")) &&
-	      (D[j][1] == G[i][1]))
+	      (D[j][0] == G[i][1]))
 	    {
 	      tree C= D[j][N(D[j])-1];
 	      if (!is_concat (C)) C= tree (CONCAT, C);
@@ -318,7 +383,7 @@ edit_process_rep::generate_glossary (string gly) {
 	      D[j][N(D[j])-1]= C;
 	    }
       }
-    insert_tree (D);
+    insert_tree (remove_labels (D));
   }
 }
 
@@ -397,6 +462,7 @@ void
 edit_process_rep::generate_aux (string which) {
   // path saved_path= tp;
   generate_aux_recursively (which, subtree (et, rp), rp);
+  init_update ();
   // if (which == "") go_to (saved_path);
   // ... may be problematic if cursor was inside regenerated content
 }

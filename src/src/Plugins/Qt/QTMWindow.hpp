@@ -42,10 +42,10 @@ public:
 
   QTMPlainWindow (QWidget* parent) 
   : QWidget (parent) { 
-    if (DEBUG_QT) cout << "Create QTMPlainWindow" << LF;
+    if (DEBUG_QT) debug_qt << "Creating QTMPlainWindow" << LF;
   }
   virtual ~QTMPlainWindow () {
-    if (DEBUG_QT) cout << "Delete QTMPlainWindow" << LF;
+    if (DEBUG_QT) debug_qt << "Deleting QTMPlainWindow" << LF;
   }
   
 signals:
@@ -70,10 +70,10 @@ public:
   
   QTMWindow (QWidget* parent)
   : QMainWindow (parent) { 
-    if (DEBUG_QT) cout << "Create QTMWindow" << LF;
+    if (DEBUG_QT) debug_qt << "Creating QTMWindow" << LF;
   }
   virtual ~QTMWindow () {
-    if (DEBUG_QT) cout << "Delete QTMWindow" << LF;
+    if (DEBUG_QT) debug_qt << "Deleting QTMWindow" << LF;
   }
   
 signals:
@@ -101,6 +101,7 @@ signals:
   void closed();
   
 protected:
+  virtual void closeEvent (QCloseEvent* event);
   virtual void mouseMoveEvent (QMouseEvent* event);
   virtual void keyPressEvent  (QKeyEvent* event);
 };

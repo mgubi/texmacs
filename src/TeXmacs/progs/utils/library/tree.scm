@@ -64,19 +64,19 @@
 			    (string->list (tm->string t2))))
 	(else 0)))
 
-(define (tree-focus ref l)
+(define (tree-focus-index ref l)
   (cond ((null? l) #f)
 	((tree-inside? (car l) ref) 0)
-	((and (list? (car l)) (tree-focus ref (car l))) 0)
+	((and (list? (car l)) (tree-focus-index ref (car l))) 0)
 	(else
-	 (with r (tree-focus ref (cdr l))
+	 (with r (tree-focus-index ref (cdr l))
 	   (if r (+ r 1) #f)))))
 
-(define (tree-get-focus ref t l)
+(define (tree-get-focus-index ref t l)
   (if (or (== t ref) (not (tree-inside? t ref)))
-      (tree-focus ref l)
-      (with r (tree-focus t l)
-	(if r r (tree-get-focus ref (tree-up t) l)))))
+      (tree-focus-index ref l)
+      (with r (tree-focus-index t l)
+	(if r r (tree-get-focus-index ref (tree-up t) l)))))
 
 (tm-define (tree-set-diff ref t)
   (:type (-> tree content void))
@@ -114,7 +114,7 @@
 	   (if (== (tm-car ref) (tm-car t)) ref
 	       (tree-assign-node! ref (tm-car t))))
 	  (else
-	   (with pos (tree-focus ref (tm-cdr t))
+	   (with pos (tree-focus-index ref (tm-cdr t))
 	     (if (or (not pos) (tree-is-buffer? ref))
                  (tree-assign! ref t)
 		 (let* ((tl (tm->list t))
@@ -218,28 +218,23 @@
 ;; Upward searching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (tree-search-upwards t pred?)
-  (:synopsis "Find ancestor of @t which matches @pred?")
-  (cond ((pred? t) t)
+(tm-define (tree-search-upwards t what)
+  (:synopsis "Find ancestor of @t which matches @what")
+  (cond ((list? what)
+         (tree-search-upwards t (lambda (x) (in? (tree-label x) what))))
+        ((symbol? what)
+         (tree-search-upwards t (lambda (x) (== (tree-label x) what))))
+        ((and (procedure? what) (what t)) t)         
         ((or (tree-is-buffer? t) (not (tree-up t))) #f)
-        (else (tree-search-upwards (tree-up t) pred?))))
-
-(define (tree-innermost-sub p pred?)
-  (with t (path->tree p)
-    (cond ((pred? t) t)
-	  ((or (null? p) (== p (buffer-path))) #f)
-	  (else (tree-innermost-sub (cDr p) pred?)))))
+        (else (tree-search-upwards (tree-up t) what))))
 
 (tm-define (tree-innermost x . opt-flag)
   (:type (-> symbol tree)
 	 (-> (list symbol) tree)
 	 (-> (-> bool) tree))
   (:synopsis "Search upwards from the cursor position.")
-  (let* ((p ((if (null? opt-flag) cDDr cDr) (cursor-path)))
-	 (pred? (cond ((procedure? x) x)
-		      ((list? x) (lambda (t) (in? (tree-label t) x)))
-		      (else (lambda (t) (== (tree-label t) x))))))
-    (tree-search-upwards (path->tree p) pred?)))
+  (with p ((if (null? opt-flag) cDDr cDr) (cursor-path))
+    (tree-search-upwards (path->tree p) x)))
 
 (tm-define (inside-which l)
   (:type (-> (list symbol) symbol))
@@ -359,13 +354,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define-macro (try-modification . body)
-  `(let* ((mark-nr (mark-new))
-	  (mark-cursor (cursor-path)))
+  `(with mark-nr (mark-new)
      (mark-start mark-nr)
+     (archive-state)
      (with mark-ok (begin ,@body)
        (if mark-ok
 	   (mark-end mark-nr)
-	   (begin
-	     (mark-cancel mark-nr)
-	     (go-to-path mark-cursor)))
+           (mark-cancel mark-nr))
        mark-ok)))

@@ -1,9 +1,9 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.2>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|chinese>>
 
 <\body>
-  <tmdoc-title|\<#521B\>\<#5EFA\>\<#4F60\>\<#81EA\>\<#5DF1\>\<#7684\>\<#952E\>\<#76D8\>\<#5FEB\>\<#6377\>\<#952E\>>
+  <tmdoc-title|\<#5B9A\>\<#5236\>\<#5FEB\>\<#6377\>\<#952E\>>
 
   \<#4E0B\>\<#9762\>\<#8FD9\>\<#884C\>\<#4EE3\>\<#7801\>\<#7528\>\<#6765\>\<#6307\>\<#5B9A\>\<#952E\>\<#76D8\>\<#5E03\>\<#5C40\>
 
@@ -28,9 +28,9 @@
     (<em|key-combination> <scm-arg|result> <scm-arg|help-message>)
   </scm-code>
 
-  \<#7B2C\>\<#4E00\>\<#884C\>\<#4E2D\>\<#FF0C\><scm-arg|action_i>\<#662F\>\<#548C\><scm-arg|key-combination>\<#76F8\>\<#5173\>\<#7684\>Scheme\<#4EE3\>\<#7801\>\<#3002\>\<#7B2C\>\<#4E8C\>\<#884C\>\<#548C\>\<#7B2C\>\<#4E09\>\<#884C\>\<#4E2D\>\<#7684\><scm-arg|result>\<#662F\>
-  <scm-arg|key-combination>\<#7ED3\>\<#675F\>\<#4E4B\>\<#540E\>\<#63D2\>\<#5165\>\<#7684\>\<#5B57\>\<#7B26\>\<#4E32\>\<#3002\>\<#7B2C\>\<#4E09\>\<#884C\>\<#4E2D\>\<#FF0C\><scm-arg|key-combination>\<#7ED3\>\<#675F\>\<#4E4B\>\<#540E\>\<#FF0C\>\<#5C06\>\<#4F1A\>\<#663E\>\<#793A\>
-  <scm-arg|help-message>\<#3002\>
+  \<#7B2C\>\<#4E00\>\<#884C\>\<#4E2D\>\<#FF0C\><scm-arg|action_i>\<#662F\>\<#548C\><scm-arg|key-combination>\<#76F8\>\<#5173\>\<#7684\>Scheme\<#4EE3\>\<#7801\>\<#3002\>\<#7B2C\>\<#4E8C\>\<#884C\>\<#548C\>\<#7B2C\>\<#4E09\>\<#884C\>\<#4E2D\>\<#7684\>
+  <scm-arg|result>\<#662F\><scm-arg|key-combination>\<#7ED3\>\<#675F\>\<#4E4B\>\<#540E\>\<#63D2\>\<#5165\>\<#7684\>\<#5B57\>\<#7B26\>\<#4E32\>\<#3002\>\<#7B2C\>\<#4E09\>\<#884C\>\<#4E2D\>\<#FF0C\><scm-arg|key-combination>
+  \<#7ED3\>\<#675F\>\<#4E4B\>\<#540E\>\<#FF0C\>\<#5C06\>\<#4F1A\>\<#663E\>\<#793A\><scm-arg|help-message>\<#3002\>
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
@@ -42,9 +42,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|font|fireflysung>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

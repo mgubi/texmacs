@@ -37,6 +37,7 @@ public:
   tm_window_rep (tree doc, command quit);
   ~tm_window_rep ();
   void set_window_name (string s);
+  void set_modified (bool flag);
   void set_window_url (url u);
   void map ();
   void unmap ();
@@ -50,12 +51,15 @@ public:
   void menu_main (string menu);
   void menu_icons (int which, string menu);
   void side_tools (int which, string tools);
+  void bottom_tools (int which, string tools);
   void set_header_flag (bool flag);
   void set_icon_bar_flag (int which, bool flag);
   void set_side_tools_flag (int which, bool flag);
+  void set_bottom_tools_flag (int which, bool flag);
   bool get_header_flag ();
   bool get_icon_bar_flag (int which);
   bool get_side_tools_flag (int which);
+  bool get_bottom_tools_flag (int which);
 
   double get_window_zoom_factor ();
   void set_window_zoom_factor (double zoom);
@@ -91,7 +95,7 @@ typedef tm_view_rep*   tm_view;
 typedef tm_window_rep* tm_window;
 
 widget texmacs_output_widget (tree doc, tree style);
-widget texmacs_input_widget (tree doc, tree style, command cmd, bool continuous);
+widget texmacs_input_widget (tree doc, tree style, url wname);
 
 int window_handle ();
 void window_create (int win, widget wid, string name, bool plain);

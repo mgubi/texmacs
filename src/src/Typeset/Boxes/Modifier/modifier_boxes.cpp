@@ -12,6 +12,7 @@
 
 #include "Boxes/modifier.hpp"
 #include "Boxes/composite.hpp"
+#include "Boxes/construct.hpp"
 
 /******************************************************************************
 * Modifier boxes
@@ -91,14 +92,19 @@ SI modifier_box_rep::sup_lo_base (int level) {
   return b->sup_lo_base (level); }
 SI modifier_box_rep::sup_hi_lim  (int level) {
   return b->sup_hi_lim (level); }
+SI modifier_box_rep::wide_correction (int mode) {
+  return b->wide_correction (mode); }
+void modifier_box_rep::get_bracket_extents (SI& lo, SI& hi) {
+  b->get_bracket_extents (lo, hi); }
 
 /******************************************************************************
 * New routines concerning the cursor
 ******************************************************************************/
 
 path
-modifier_box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
-  return path (0, b->find_box_path (x, y, delta, force));
+modifier_box_rep::find_box_path (SI x, SI y, SI delta,
+                                 bool force, bool& found) {
+  return path (0, b->find_box_path (x, y, delta, force, found));
 }
 
 path
@@ -155,13 +161,12 @@ modifier_box_rep::graphical_select (SI x1, SI y1, SI x2, SI y2) {
 * Animations
 ******************************************************************************/
 
-int modifier_box_rep::anim_length () { return b->anim_length (); }
-bool modifier_box_rep::anim_started () { return b->anim_started (); }
-bool modifier_box_rep::anim_finished () { return b->anim_finished (); }
-void modifier_box_rep::anim_finish_now () { b->anim_finish_now (); }
-void modifier_box_rep::anim_start_at (time_t at) { b->anim_start_at (at); }
-void modifier_box_rep::anim_get_invalid (bool& f, time_t& at, rectangles& rs) {
-  b->anim_get_invalid (f, at, rs); }
+player modifier_box_rep::anim_player () { return b->anim_player (); }
+double modifier_box_rep::anim_delay () { return b->anim_delay (); }
+double modifier_box_rep::anim_duration () { return b->anim_duration (); }
+void   modifier_box_rep::anim_position (double t) { b->anim_position (t); }
+double modifier_box_rep::anim_next () { return b->anim_next (); }
+rectangles modifier_box_rep::anim_invalid () { return b->anim_invalid (); }
 
 /******************************************************************************
 * Symbol boxes
@@ -172,11 +177,23 @@ class symbol_box_rep: public modifier_box_rep {
 public:
   symbol_box_rep (path ip, box b, int n);
   operator tree () { return tree (TUPLE, "symbol", subbox(0)); }
-  path find_box_path (SI x, SI y, SI delta, bool force);
+  box    adjust_kerning (int mode, double factor);
+  box    expand_glyphs (int mode, double factor);
+  path   find_box_path (SI x, SI y, SI delta, bool force, bool& found);
 };
 
 symbol_box_rep::symbol_box_rep (path ip, box b2, int n2):
   modifier_box_rep (ip, b2), n (n2) {}
+
+box
+symbol_box_rep::adjust_kerning (int mode, double factor) {
+  return symbol_box (ip, b->adjust_kerning (mode, factor), n);
+}
+
+box
+symbol_box_rep::expand_glyphs (int mode, double factor) {
+  return symbol_box (ip, b->expand_glyphs (mode, factor), n);
+}
 
 static box
 subbox (box b, path p) {
@@ -185,8 +202,8 @@ subbox (box b, path p) {
 }
 
 path
-symbol_box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
-  path p= modifier_box_rep::find_box_path (x, y, delta, force);
+symbol_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
+  path p= modifier_box_rep::find_box_path (x, y, delta, force, found);
   box leaf= ::subbox (box (this), path_up (p));
   if (is_accessible (leaf->ip) || force) {
     if (last_item (p) <= (n>>1)) return path_up (p) * 0;
@@ -204,23 +221,36 @@ class shorter_box_rep: public modifier_box_rep {
 public:
   shorter_box_rep (path ip, box b, int len);
   operator tree () { return tuple ("shorter", subbox(0)); }
-  path   find_box_path (SI x, SI y, SI delta, bool force);
+  box    adjust_kerning (int mode, double factor);
+  box    expand_glyphs (int mode, double factor);
+  path   find_box_path (SI x, SI y, SI delta, bool force, bool& found);
   path   find_rip ();
   path   find_right_box_path ();
+  int    get_type ();
   int    get_leaf_left_pos ();
   int    get_leaf_right_pos ();
   string get_leaf_string ();
   font   get_leaf_font ();
-  color  get_leaf_color ();
+  pencil get_leaf_pencil ();
   SI     get_leaf_offset (string search);
 };
 
 shorter_box_rep::shorter_box_rep (path ip, box b2, int len2):
   modifier_box_rep (ip, b2), pos (b->get_leaf_left_pos ()), len (len2) {}
 
+box
+shorter_box_rep::adjust_kerning (int mode, double factor) {
+  return shorter_box (ip, b->adjust_kerning (mode, factor), len);
+}
+
+box
+shorter_box_rep::expand_glyphs (int mode, double factor) {
+  return shorter_box (ip, b->expand_glyphs (mode, factor), len);
+}
+
 path
-shorter_box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
-  path p= modifier_box_rep::find_box_path (x, y, delta, force);
+shorter_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
+  path p= modifier_box_rep::find_box_path (x, y, delta, force, found);
   box leaf= ::subbox (box (this), path_up (p));
   if ((is_accessible (leaf->ip) || force) && (last_item (p) > len))
     return path_up (p) * len;
@@ -239,6 +269,11 @@ path
 shorter_box_rep::find_right_box_path () {
   path bp= b->find_right_box_path ();
   return path (0, path_up (bp) * min (last_item (bp), len));
+}
+
+int
+shorter_box_rep::get_type () {
+  return SHORTER_BOX;
 }
 
 int
@@ -261,9 +296,9 @@ shorter_box_rep::get_leaf_font () {
   return b->get_leaf_font ();
 }
 
-color
-shorter_box_rep::get_leaf_color () {
-  return b->get_leaf_color ();
+pencil
+shorter_box_rep::get_leaf_pencil () {
+  return b->get_leaf_pencil ();
 }
 
 SI
@@ -279,12 +314,24 @@ class frozen_box_rep: public modifier_box_rep {
 public:
   frozen_box_rep (path ip, box b);
   operator tree () { return tree (TUPLE, "frozen", subbox(0)); }
+  box  adjust_kerning (int mode, double factor);
+  box  expand_glyphs (int mode, double factor);
   path find_lip ();
   path find_rip ();
 };
 
 frozen_box_rep::frozen_box_rep (path ip, box b2):
   modifier_box_rep (ip, b2) {}
+
+box
+frozen_box_rep::adjust_kerning (int mode, double factor) {
+  return frozen_box (ip, b->adjust_kerning (mode, factor));
+}
+
+box
+frozen_box_rep::expand_glyphs (int mode, double factor) {
+  return frozen_box (ip, b->expand_glyphs (mode, factor));
+}
 
 path
 frozen_box_rep::find_lip () {
@@ -302,20 +349,24 @@ frozen_box_rep::find_rip () {
 
 struct macro_box_rep: public composite_box_rep {
   font big_fn; // big character font if non nil
-  macro_box_rep (path ip, box b, font big_fn);
+  int  btype;
+  macro_box_rep (path ip, box b, font big_fn, int btype);
   operator tree () { return tree (TUPLE, "macro", (tree) bs[0]); }
+  box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   int       find_child (SI x, SI y, SI delta, bool force);
-  path      find_box_path (SI x, SI y, SI delta, bool force);
+  path      find_box_path (SI x, SI y, SI delta, bool force, bool& found);
   path      find_lip ();
   path      find_rip ();
   path      find_box_path (path p, bool& found);
   path      find_tree_path (path bp);
   cursor    find_cursor (path bp);
   selection find_selection (path lbp, path rbp);
+  int       get_type ();
   string    get_leaf_string ();
   font      get_leaf_font ();
-  color     get_leaf_color ();
+  pencil    get_leaf_pencil ();
   SI        get_leaf_offset (string search);
 
   double left_slope () { return bs[0]->left_slope(); }
@@ -341,15 +392,20 @@ struct macro_box_rep: public composite_box_rep {
     SI syx= big_fn->yx * script (big_fn->size, 1) / big_fn->size;
     if ((y2-y1) <= 3*big_fn->yx) syx -= (l<0? 0: big_fn->yshift);
     return y2- syx; }
+  SI wide_correction (int mode) { return bs[0]->wide_correction (mode); }
 };
 
-macro_box_rep::macro_box_rep (path ip, box b, font fn):
-  composite_box_rep (ip), big_fn (fn) {
+macro_box_rep::macro_box_rep (path ip, box b, font fn, int bt):
+  composite_box_rep (ip), big_fn (fn), btype (bt) {
     insert (b, 0, 0); position (); finalize (); }
+box macro_box_rep::adjust_kerning (int mode, double factor) {
+  return macro_box (ip, bs[0]->adjust_kerning (mode, factor), big_fn); }
+box macro_box_rep::expand_glyphs (int mode, double factor) {
+  return macro_box (ip, bs[0]->expand_glyphs (mode, factor), big_fn); }
 int macro_box_rep::find_child (SI x, SI y, SI delta, bool force) {
   (void) x; (void) y; (void) delta; (void) force; return -1; }
-path macro_box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
-  return box_rep::find_box_path (x, y, delta, force); }
+path macro_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& f) {
+  return box_rep::find_box_path (x, y, delta, force, f); }
 path macro_box_rep::find_lip () {
   return box_rep::find_lip (); }
 path macro_box_rep::find_rip () {
@@ -362,12 +418,14 @@ cursor macro_box_rep::find_cursor (path bp) {
   return box_rep::find_cursor (bp); }
 selection macro_box_rep::find_selection (path lbp, path rbp) {
   return box_rep::find_selection (lbp, rbp); }
+int macro_box_rep::get_type () {
+  return btype; }
 string macro_box_rep::get_leaf_string () {
   return bs[0]->get_leaf_string (); }
 font macro_box_rep::get_leaf_font () {
   return bs[0]->get_leaf_font (); }
-color macro_box_rep::get_leaf_color () {
-  return bs[0]->get_leaf_color (); }
+pencil macro_box_rep::get_leaf_pencil () {
+  return bs[0]->get_leaf_pencil (); }
 SI macro_box_rep::get_leaf_offset (string search) {
   return bs[0]->get_leaf_offset (search); }
 
@@ -391,6 +449,6 @@ frozen_box (path ip, box b) {
 }
 
 box
-macro_box (path ip, box b, font big_fn) {
-  return tm_new<macro_box_rep> (ip, b, big_fn);
+macro_box (path ip, box b, font big_fn, int btype) {
+  return tm_new<macro_box_rep> (ip, b, big_fn, btype);
 }

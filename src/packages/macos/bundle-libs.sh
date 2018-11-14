@@ -1,102 +1,125 @@
-#!/bin/bash 
+#!/bin/bash -O extglob -O nocasematch -O nocaseglob -O nullglob
+#
+# denis RAUX  CNRS/LIX 2015
+#
+# Copies frameworks and lib into the application bundle and rewrites the loading
+# information in the .dylib files.
+#
+# Qt plugins list are copied as specified within configure --enable-QtPlugins
+# This script relies on the variables environment variables  QT_PLUGINS_PATH 
+# and QT_PLUGINS_LIST
+#
+# NOTE that all paths are relative to BASEDIR=TeXmacs.app/Contents/MacOS
+# Some assumptions to keep in mind :
+# - this script does not manage space in pathnames
+# - Framework is identified by name.framework in the pathname
+# - Qt expects plugins in Whatever.app/Contents/plugins
+# - id setting is silently ignored for non dll file
+#
 
-EXECUTABLE=${1}
-BUNDLE_RESOURCES=${1%/*}/../Resources
-BUNDLE_FRAMEWORKS=${1%/*}/../Frameworks
-BUNDLE_PLUGINS=${1%/*}/../Plugins
-
-if [ x${QT_FRAMEWORKS_PATH}x == xx ]; then
-  QT_FRAMEWORKS_PATH=/Library/Frameworks
-fi
-
-if [ x${QT_PLUGINS_PATH}x == xx ]; then
- if [exists $QT_FRAMEWORKS_PATH/plugins]; then 
-  QT_PLUGINS_PATH=$QT_FRAMEWORKS_PATH/plugins;
- else 
-  QT_PLUGINS_PATH=/Developer/Applications/Qt/plugins
- fi
-fi
-
-echo Qt Frameworks path [$QT_FRAMEWORKS_PATH]
-
-function bundle_install_lib {
-  echo Bundling [$2] in [${BUNDLE_RESOURCES}/lib/$3] for [$1]
-  if [ ! -f ${BUNDLE_RESOURCES}/lib/${3} ]; then
-    cp ${2} ${BUNDLE_RESOURCES}/lib
-  fi
-  install_name_tool -id @executable_path/../Resources/lib/${3} ${BUNDLE_RESOURCES}/lib/${3}
-  bundle_all_libs ${BUNDLE_RESOURCES}/lib/${3}
-  install_name_tool -change ${2} @executable_path/../Resources/lib/${3} ${1}
+function set_rpath
+{ # $1 = returned value
+  local args rpath value cmdout file=$1  retval=$2
+  cmdout="$(otool -lX $file)" || return 42
+  while read rpath value
+  do
+    [[ $rpath == path ]] && args+=" -delete_rpath $value"
+  done <<< "$cmdout"
+  eval $retval+=$args
 }
+  
+function bundle_all_libs
+{
+# $1   executable  or library path (relative to Contents directory)
+  local libdest="Resources/lib"
 
-function bundle_all_libs {
-  echo Bundling all for ${1}
-  for lib in $( otool -L ${1}  | grep -o '/\(opt\|sw\|Users\|usr/local\)/.*/lib[^/]*dylib' ) ; do 
-	bundle_install_lib ${1} ${lib} $(basename ${lib})  
-  done
+  echo "Bundling all libraries for [$1]"
+  bundle_all_libs_sub "$1"
 }
+  
+function bundle_all_libs_sub
+{
+# $file is library to process with path relative to Contents directory
 
-
-
-function bundle_install_plugin {
-  RELPATH=@executable_path/../Plugins/${2#${BUNDLE_PLUGINS}}
-  echo Bundling plugin [$2] for [$1] relpath [${RELPATH}]
-  install_name_tool -id ${RELPATH} ${2}
-  install_name_tool -change ${3} ${RELPATH} ${1}
-  bundle_all_libs ${2}
-  bundle_qt_frameworks ${2}
-}
-
-function bundle_qt_plugins {
-  echo Bundling Qt plugins for ${1}
-  cp -R ${QT_PLUGINS_PATH} ${BUNDLE_PLUGINS}
-  for lib in $( find ${BUNDLE_PLUGINS} -name \*.dylib -print ) ; do 
-	  bundle_install_plugin ${1} ${lib} $(basename ${lib})  
-  done
-}
-
-
-
-function bundle_framework {
- if [ ! ${4##*/} == ${1##*/} ]; then
-  echo Bundling Framework [${2}] to [${3}/Versions/${4}] for [${1}]
-  if [ ! -e ${BUNDLE_FRAMEWORKS}/${3} ]; then
-    mkdir ${BUNDLE_FRAMEWORKS}/${3}
-    mkdir ${BUNDLE_FRAMEWORKS}/${3}/Versions
-    mkdir ${BUNDLE_FRAMEWORKS}/${3}/Versions/4
-    ln -s 4 ${BUNDLE_FRAMEWORKS}/${3}/Versions/Current
-    ln -s 4 ${BUNDLE_FRAMEWORKS}/${3}/Versions/4.0
-#    lipo -thin $ARCH ${2}/Versions/${4} -output ${BUNDLE_FRAMEWORKS}/${3}/Versions/${4}
-    cp ${2}/Versions/${4} ${BUNDLE_FRAMEWORKS}/${3}/Versions/${4}
-    if [ -e  ${2}/Versions/4/Resources ]; then
-      cp -R ${2}/Versions/4/Resources ${BUNDLE_FRAMEWORKS}/${3}/Versions/4
-      ln -s Versions/4/Resources ${BUNDLE_FRAMEWORKS}/${3}/Resources
-    fi
-    bundle_qt_frameworks ${BUNDLE_FRAMEWORKS}/${3}/Versions/${4}
-  fi
-  install_name_tool -id @executable_path/../Frameworks/${3}/Versions/${4} ${BUNDLE_FRAMEWORKS}/${3}/Versions/${4}
-  install_name_tool -change ${5} @executable_path/../Frameworks/${3}/Versions/${4} ${1} 
- fi
-}
-
-function bundle_qt_frameworks {
-  if [ ! -e ${BUNDLE_FRAMEWORKS} ]; then
-    mkdir ${BUNDLE_FRAMEWORKS}
-  fi
-  for f in $( otool -L ${1}  | grep -o '\(.*Qt.*\.framework/Versions/[^: ]*\) ' ) ; do 
-    fname=${f%%/Versions/*}
-    if [ ! -e ${fname} ]; then
-      if [ -e ${QT_FRAMEWORKS_PATH}/${fname} ]; then
-        fname=${QT_FRAMEWORKS_PATH}/${fname}
+  local lib change cmdout libname file="$1" rpath="$2" d
+  [[ $(otool -DX "$file") == @executable_path/../$file ]] && return 0
+  echo "Process $file"
+    chmod +w "$file"  # Needed e.g. with homebrew (libraries are 622)
+  install_name_tool -id "@executable_path/../$file" "$file" || return 31
+  cmdout="$(otool -LX "$file")" || return 41
+  # Add local Libs and Force bundling of (system) libltdl (changed in OSX 10.8)
+  while read -r lib version
+  do
+    case $lib in
+    @executable_path/../$file) ;;
+    *:) ;;
+    /System*) ;;
+    /+(opt/local|sw|Users|usr/local)/*/lib*.dylib|/usr/lib/libltdl.*.dylib)
+    local blib="$(basename $lib)"
+    [ -f "$libdest/$blib" ] || cp "$lib" "$libdest" && chmod u+w "$libdest/$blib" || return 11
+    bundle_all_libs_sub "$libdest/$blib" || return $?
+    change="$change -change $lib  @executable_path/../Resources/lib/$blib"
+    ;; 
+    *.framework/*)
+    local fwloc="${lib%%.framework/*}.framework"; 
+    if [[ ! "$fwloc" =~ ^/.* ]]; then 
+      if [[ -f /Library/Frameworks/$lib ]]
+      then fwloc="/Library/Frameworks/$fwloc"
+      else  
+        if [[ -f "$QT_FRAMEWORKS_PATH/$lib" ]]
+        then fwloc="$QT_FRAMEWORKS_PATH/$fwloc"
+        else return 32
+        fi
       fi
-    fi 
-    if [ -e ${fname} ]; then
-  	  bundle_framework  ${1} ${fname} ${fname##*/} ${f#*Versions/} ${f}
     fi
-  done
+
+    local fwname="${fwloc##*/}"
+    local blib=$(basename $lib)
+    local fwbase="Frameworks/$fwname"
+    [ -d "$fwbase" ] || mkdir "$fwbase" || return 12
+    for d in Resources Contents
+    do [ -d "$fwloc/$d" -a ! -d "$fwbase/$d" ] && { cp -RL "$fwloc/$d" "$fwbase" || return 13; }
+    done
+    [ -f "$fwbase/$blib" ] || cp "$fwloc/${lib#*.framework}" "$fwbase" || return 14
+    bundle_all_libs_sub "$fwbase/$blib" || return $?
+    change="$change -change $lib  @executable_path/../$fwbase/$blib"
+    ;;
+    esac
+  done <<< "$cmdout"
+  set_rpath "$file" change || return $?
+  [ "$rpath" ] && change+=" -add_rpath $rpath"
+  [ -z "$change" ] && return 0
+  install_name_tool $change "$file" || return 33
+  return 0
 }
 
 
-bundle_all_libs ${EXECUTABLE}
-bundle_qt_frameworks ${EXECUTABLE}
-bundle_qt_plugins ${EXECUTABLE}
+function bundle_qt_plugins
+{ 
+# $2 Qt plugin path $1 subdir list
+# Plugins is the directory where we store them
+  [ -z $1 ] && return 0
+  local oplug dplug
+  if [[ $1 =~ , ]]
+  then 
+    oplug="$(eval echo $2/{$1})"
+    dplug="$(eval echo Plugins/{$1}/*dylib)"
+  else
+    oplug="$2/$1"
+    dplug="Plugins/$1/*dylib"
+  fi
+  for d in $oplug
+  do test -d $d && mkdir Plugins/$(basename $d) && \
+    test -n "$(echo $d/*dylib)" && cp $d/*dylib Plugins/$(basename $d)/
+  done
+  for p in $dplug
+  do bundle_all_libs $p || return $?
+  done
+}
+
+###############################################################################
+
+cd "$(dirname $1)/.." || exit 10
+bundle_all_libs "MacOS/$(basename $1)"  || exit $?
+[ -z "$QT_PLUGINS_LIST" ] && exit 0
+bundle_qt_plugins "$QT_PLUGINS_LIST" "$QT_PLUGINS_PATH"

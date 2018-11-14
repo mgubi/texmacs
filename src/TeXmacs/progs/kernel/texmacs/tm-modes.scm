@@ -96,6 +96,9 @@
 (define-public (supports-korean?)
   (!= (default-korean-font) "roman"))
 
+(define-public (supports-db?)
+  (== (get-preference "database tool") "on"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mode related
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -108,25 +111,36 @@
   (in-math% (and (== (get-env "mode") "math") (not (in-graphics?))))
   (in-prog% (and (== (get-env "mode") "prog") (not (in-graphics?))))
   (in-math-not-hybrid% (not (inside? 'hybrid)) in-math%)
+  (in-math-or-hybrid% (or (in-math?) (inside? 'hybrid)))
+  (in-sem-math% (== (get-preference "semantic correctness") "on") in-math%)
   (in-table% (and (inside? 'table) (not (in-graphics?))))
-  (in-session% (and (inside? 'session) (not (in-graphics?))))
-  (in-session% (inside? 'session))
+  (in-session% (and (or (inside? 'session) (inside? 'program))
+                    (not (in-graphics?))))
   (not-in-session% (not (inside? 'session)))
   (in-math-in-session% #t in-math% in-session%)
   (in-math-not-in-session% #t in-math% not-in-session%)
+  (in-multicol-style% (!= (get-init "par-columns") "1"))
   (in-std% (style-has? "std-dtd"))
   (in-std-text% #t in-text% in-std%)
   (in-tmdoc% (style-has? "tmdoc-style"))
   (in-tmweb% (style-has? "tmweb-style") in-tmdoc%)
   (in-mmxdoc% (style-has? "mmxdoc-style") in-tmdoc%)
   (in-manual% (not (url-rooted-tmfs? (current-buffer))) in-tmdoc%)
+  (in-database% (style-has? "database-style"))
+  (in-bib% (style-has? "database-bib-style") in-database%)
   (in-plugin-with-converters%
    (plugin-supports-math-input-ref (get-env "prog-language")))
   (in-screens% (inside? 'screens))
+  (in-beamer% (style-has? "beamer-style"))
+  (in-poster% (style-has? "poster-style"))
   (with-any-selection% (selection-active-any?))
   (with-active-selection% (selection-active-normal?))
+  (in-cpp% (== (get-env "prog-language") "cpp"))
+  (in-prog-cpp% #t in-prog% in-cpp%)
   (in-scheme% (== (get-env "prog-language") "scheme"))
   (in-prog-scheme% #t in-prog% in-scheme%)
+  (in-python% (== (get-env "prog-language") "python"))
+  (in-prog-python% #t in-prog% in-python%)
   (in-verbatim% (or (inside? 'verbatim) (inside? 'verbatim-code) 
                     (inside? 'code)) in-text%)
   (in-variants-disabled% 
@@ -136,20 +150,39 @@
 ;; Language related
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-public supported-languages
+  '("british" "bulgarian" "chinese" "croatian" "czech"
+    "danish" "dutch" "english" "esperanto" "finnish" "french" "german" "greek"
+    "hungarian" "italian" "japanese" "korean" "polish"
+    "portuguese" "romanian" "russian" "slovene" "spanish"
+    "swedish" "taiwanese" "ukrainian"))
+
+(define-public (supported-language? lan)
+  (and (in? lan supported-languages)
+       (cond ((== lan "chinese") (supports-chinese?))
+             ((== lan "japanese") (supports-japanese?))
+             ((== lan "korean") (supports-korean?))
+             ((== lan "taiwanese") (supports-chinese?))
+             (else #t))))
+
 (texmacs-modes
   (in-cyrillic% (in? (get-env "language")
                      '("bulgarian" "russian" "ukrainian")) in-text%)
   (in-oriental% (in? (get-env "language")
                      '("chinese" "japanese" "korean" "taiwanese")) in-text%)
+  (in-british% (== (get-env "language") "british") in-text%)
   (in-bulgarian% (== (get-env "language") "bulgarian") in-cyrillic%)
   (in-chinese% (== (get-env "language") "chinese") in-oriental%)
+  (in-croatian% (== (get-env "language") "croatian") in-text%)
   (in-czech% (== (get-env "language") "czech") in-text%)
   (in-danish% (== (get-env "language") "danish") in-text%)
   (in-dutch% (== (get-env "language") "dutch") in-text%)
   (in-english% (== (get-env "language") "english") in-text%)
+  (in-esperanto% (== (get-env "language") "esperanto") in-text%)
   (in-finnish% (== (get-env "language") "finnish") in-text%)
   (in-french% (== (get-env "language") "french") in-text%)
   (in-german% (== (get-env "language") "german") in-text%)
+  (in-greek% (== (get-env "language") "greek") in-text%)
   (in-hungarian% (== (get-env "language") "hungarian") in-text%)
   (in-italian% (== (get-env "language") "italian") in-text%)
   (in-japanese% (== (get-env "language") "japanese") in-oriental%)
@@ -183,15 +216,17 @@
   (like-std% (has-look-and-feel? "std"))
   (simple-menus% (== (get-preference "detailed menus") "simple"))
   (detailed-menus% (== (get-preference "detailed menus") "detailed"))
+  (with-database-tool% (== (get-preference "database tool") "on"))
   (with-debugging-tool% (== (get-preference "debugging tool") "on"))
   (with-developer-tool% (== (get-preference "developer tool") "on"))
   (with-linking-tool% (== (get-preference "linking tool") "on"))
   (with-presentation-tool% (== (get-preference "presentation tool") "on"))
+  (with-remote-tool% (== (get-preference "remote tool") "on"))
   (with-source-tool% (== (get-preference "source tool") "on"))
   (with-versioning-tool% (== (get-preference "versioning tool") "on"))
   (in-presentation% (or (style-has? "beamer-style")
                         (== (get-preference "presentation tool") "on")
-                        (inside? 'screens)))
+                        (inside? 'screens)) in-beamer%)
   (search-mode% (== (get-input-mode) 1))
   (replace-mode% (== (get-input-mode) 2))
   (spell-mode% (== (get-input-mode) 3))

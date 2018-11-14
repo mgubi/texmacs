@@ -42,15 +42,41 @@ unique_window_name (string name) {
   }
 }
 
+static bool
+move_accept (int old_x, int old_y, int x, int y) {
+  if (old_x == x && old_y == y) return false;
+  return true;
+}
+
 void
 notify_window_move (string name, SI xx, SI yy) {
   int x=  xx / PIXEL;
   int y= -yy / PIXEL;
   if (name != "popup") {
     //cout << "Move " << name << " to " << x << ", " << y << "\n";
-    set_user_preference ("abscissa " * name, as_string (x));
-    set_user_preference ("ordinate " * name, as_string (y));
+    string old_x= get_user_preference ("abscissa " * name, "");
+    string old_y= get_user_preference ("ordinate " * name, "");
+    //cout << "Move " << name << ": " << old_x << ", " << old_y
+    //<< " --> " << x << ", " << y << "\n";
+    if (old_x == "" || old_y == "" ||
+        move_accept (as_int (old_x), as_int (old_y), x, y)) {
+      set_user_preference ("abscissa " * name, as_string (x));
+      set_user_preference ("ordinate " * name, as_string (y));
+    }
   }
+}
+
+static bool
+resize_accept (int old_w, int old_h, int w, int h) {
+  if (old_w == w && old_h == h) return false;
+#ifdef QTTEXMACS
+  if (old_w == w && old_h == h + 41) return false;
+  if (old_w == w && old_h == h + 24) return false;
+  if (old_w == w && old_h == h + 22) return false;
+  if (old_w == w && old_h == h + 16) return false;
+  if (old_w == w && old_h == h - 40) return false;
+#endif
+  return true;
 }
 
 void
@@ -59,8 +85,15 @@ notify_window_resize (string name, SI ww, SI hh) {
   int h= hh / PIXEL;
   if (name != "popup") {
     //cout << "Resize " << name << " to " << ww << ", " << hh << "\n";
-    set_user_preference ("width " * name, as_string (w));
-    set_user_preference ("height " * name, as_string (h));
+    string old_w= get_user_preference ("width " * name, "");
+    string old_h= get_user_preference ("height " * name, "");
+    //cout << "Resize " << name << ": " << old_w << ", " << old_h
+    //<< " --> " << w << ", " << h << "\n";
+    if (old_w == "" || old_h == "" ||
+        resize_accept (as_int (old_w), as_int (old_h), w, h)) {
+      set_user_preference ("width " * name, as_string (w));
+      set_user_preference ("height " * name, as_string (h));
+    }
   }
 }
 
@@ -87,6 +120,7 @@ get_preferred_size (string name, SI& ww, SI& hh) {
     int h= as_int (get_user_preference ("height " * name));
     ww= w * PIXEL;
     hh= h * PIXEL;
+    //cout << "Size " << name << ": " << w << ", " << h << "\n";
   }
 }
 
@@ -113,6 +147,7 @@ tm_window_rep::tm_window_rep (tree doc, command quit):
   menu_current (object ()), menu_cache (widget ()),
   text_ptr (NULL)
 {
+  (void) doc;
   zoomf= get_server () -> get_default_zoom_factor ();
 }
 
@@ -170,7 +205,14 @@ public:
 void
 close_embedded_command_rep::apply () {
   //cout << "Destroy " << vw->buf->buf->name << "\n";
-  window_focus (abstract_window (vw->ed->mvw->win));
+  ASSERT (!is_nil(vw->ed), "embedded command acting on deleted editor");
+  url foc= abstract_window (vw->ed->mvw->win);
+  if (is_none (foc)) {
+    array<url> a= windows_list ();
+    ASSERT (N(a) != 0, "no remaining windows");
+    foc= a[0];
+  }
+  window_focus (foc);
   //cout << "Changed focus\n";
   tm_window win= vw->win;
   ASSERT (N (buffer_to_views (vw->buf->buf->name)) == 1,
@@ -191,8 +233,9 @@ close_embedded_command (tm_view vw) {
 ******************************************************************************/
 
 url
-embedded_name () {
+embedded_name (url name) {
   static int nr= 0;
+  if (!is_none (name)) return name;
   nr++;
   return url (string ("tmfs://aux/TeXmacs-input-" * as_string (nr)));
 }
@@ -209,9 +252,12 @@ enrich_embedded_document (tree body, tree style) {
   initial (PAGE_SCREEN_TOP)= "2px";
   initial (PAGE_SCREEN_BOT)= "2px";
   if (is_func (orig, WITH))
-    for (int i=0; i+2<N(orig); i++)
+    for (int i=0; i+2<N(orig); i+=2)
       if (is_atomic (orig[i]))
         initial (orig[i]->label)= orig[i+1];
+  initial (DPI)= "720";
+  initial (ZOOM_FACTOR)= "1.2";
+  initial ("no-zoom")= "true";
   tree doc (DOCUMENT);
   doc << compound ("TeXmacs", TEXMACS_VERSION);
   doc << style; //compound ("style", style);
@@ -221,12 +267,13 @@ enrich_embedded_document (tree body, tree style) {
 }
 
 widget
-texmacs_input_widget (tree doc, tree style, command cmd, bool continuous) {
-  (void) cmd; (void) continuous;
+texmacs_input_widget (tree doc, tree style, url wname) {
   doc= enrich_embedded_document (doc, style);
   url       base = get_master_buffer (get_current_buffer ());
   tm_view   curvw= concrete_view (get_current_view ());
-  url       name = embedded_name (); create_buffer (name, doc);
+  url       name = embedded_name (wname);
+  if (contains (name, get_all_buffers ())) set_buffer_tree (name, doc);
+  else create_buffer (name, doc);
   tm_view   vw   = concrete_view (get_passive_view (name));
   tm_window win  = tm_new<tm_window_rep> (doc, command ());
   set_master_buffer (name, base);
@@ -247,6 +294,11 @@ tm_window_rep::set_window_name (string s) {
     cur_title= s;
     set_name (wid, s);
   }
+}
+
+void
+tm_window_rep::set_modified (bool flag) {
+  ::set_modified (wid, flag);
 }
 
 void
@@ -273,6 +325,8 @@ tm_window_rep::refresh () {
 * Menus
 ******************************************************************************/
 
+bool menu_caching= true;
+
 bool
 tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   object xmenu= call ("menu-expand", eval ("'" * menu));
@@ -289,7 +343,7 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   //cout << "Compute " << menu << "\n";
   object umenu= eval ("'" * menu);
   w= make_menu_widget (umenu);
-  menu_cache (xmenu)= w;
+  if (menu_caching) menu_cache (xmenu)= w;
   return true;
 }
 
@@ -323,6 +377,15 @@ tm_window_rep::side_tools (int which, string tools) {
 }
 
 void
+tm_window_rep::bottom_tools (int which, string tools) {
+  eval ("(lazy-initialize-force)");
+  widget w;
+  if (get_menu_widget (20 + which, tools, w)) {
+    if (which == 0) set_bottom_tools (wid, w);
+  }
+}
+
+void
 tm_window_rep::set_header_flag (bool flag) {
   set_header_visibility (wid, flag);
 }
@@ -338,6 +401,11 @@ tm_window_rep::set_icon_bar_flag (int which, bool flag) {
 void
 tm_window_rep::set_side_tools_flag (int which, bool flag) {
   if (which == 0) set_side_tools_visibility (wid, flag);
+}
+
+void
+tm_window_rep::set_bottom_tools_flag (int which, bool flag) {
+  if (which == 0) set_bottom_tools_visibility (wid, flag);
 }
 
 bool
@@ -357,6 +425,12 @@ tm_window_rep::get_icon_bar_flag (int which) {
 bool
 tm_window_rep::get_side_tools_flag (int which) {
   if (which == 0) return get_side_tools_visibility (wid);
+  else return false;
+}
+
+bool
+tm_window_rep::get_bottom_tools_flag (int which) {
+  if (which == 0) return get_bottom_tools_visibility (wid);
   else return false;
 }
 
@@ -504,12 +578,34 @@ window_create (int win, widget wid, string name, command quit) {
   window_table (win)= pww;
 }
 
+/*
+FIXME: this old implementation does not work in the presence
+of texmacs_input widgets.  The current hack remedies this situation
+by explicitly signalling the widget destruction slot before
+the actual destruction of the widget.  This is still not sufficient
+in the case of Qt though and also might cause the desruction slot
+to be signalled twice.
+
 void
 window_delete (int win) {
   ASSERT (window_table->contains (win), "window does not exist");
   widget pww= window_table [win];
   window_table->reset (win);
   destroy_window_widget (pww);
+}
+*/
+
+void
+window_delete (int win) {
+  static hashmap<int,bool> busy (false);
+  if (busy->contains (win)) return;
+  busy (win)= true;
+  ASSERT (window_table->contains (win), "window does not exist");
+  widget pww= window_table [win];
+  window_table->reset (win);
+  send_destroy (pww);
+  destroy_window_widget (pww);
+  busy (win)= false;
 }
 
 void

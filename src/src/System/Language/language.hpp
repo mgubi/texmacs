@@ -24,28 +24,45 @@ RESOURCE(language);
 * The text property class
 ******************************************************************************/
 
-#define TP_NORMAL     0
-#define TP_HYPH       1
-#define TP_SPACE      2
-#define TP_DSPACE     3
-#define TP_BLANK      4
-#define TP_PERIOD     5
-#define TP_OPERATOR   6
-#define TP_SHORTOP    7
-#define TP_OTHER      8
+#define TP_NORMAL             0
+#define TP_HYPH               1
+#define TP_THIN_SPACE         2
+#define TP_SPACE              3
+#define TP_DSPACE             4
+#define TP_NB_THIN_SPACE      5
+#define TP_NB_SPACE           6
+#define TP_NB_DSPACE          7
+#define TP_PERIOD             8
+#define TP_CJK_NORMAL         9
+#define TP_CJK_NO_BREAK      10
+#define TP_CJK_PERIOD        11
+#define TP_CJK_WIDE_PERIOD   12
+#define TP_OPERATOR          13
+#define TP_SHORTOP           14
+#define TP_OTHER             15
 
-#define SPC_NONE      0
-#define SPC_SPACE     1
-#define SPC_DSPACE    2
-#define SPC_PERIOD    3
-#define SPC_TINY      4
-#define SPC_HALF      5
-#define SPC_OPERATOR  6
-#define SPC_BIGOP     7
+#define SPC_NONE              0
+#define SPC_THIN_SPACE        1
+#define SPC_SPACE             2
+#define SPC_DSPACE            3
+#define SPC_PERIOD            4
+#define SPC_TINY              5
+#define SPC_CJK_NORMAL        6
+#define SPC_CJK_PERIOD        7
+#define SPC_CJK_WIDE_PERIOD   8
+#define SPC_HALF              9
+#define SPC_OPERATOR         10
+#define SPC_WIDEOP           11
+#define SPC_BIGOP            12
+#define SPC_SHORT_APPLY      13
+#define SPC_APPLY            14
+#define SPC_MULTIPLY         15
+#define SPC_MIDDLE           16
+#define SPC_END_MARKER       17
 
-#define HYPH_STD      10000
-#define HYPH_PANIC    1000000
-#define HYPH_INVALID  100000000
+#define HYPH_STD       10000
+#define HYPH_PANIC     1000000
+#define HYPH_INVALID   100000000
 
 #define OP_UNKNOWN            0
 #define OP_TEXT               1
@@ -127,17 +144,20 @@ struct language_rep: rep<language> {
 language text_language (string s);
 language math_language (string s);
 language prog_language (string s);
+language ad_hoc_language (language base, tree hyphs);
 
 string locale_to_language (string s);
 string language_to_locale (string s);
 string language_to_local_ISO_charset (string s);
 string get_locale_language ();
-#if defined(__MINGW__) || defined(__MINGW32__) || defined(OS_WIN32)
+string get_locale_charset ();
+#ifdef OS_MINGW
 namespace win32 {
   string get_date (string lan, string fm);
 }
 #endif
 string get_date (string lan, string fm);
+string pretty_time (int t);
 
 string math_symbol_group (string s, string lan= "std-math");
 array<string> math_group_members (string s, string lan= "std-math");

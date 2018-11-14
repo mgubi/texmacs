@@ -1,13 +1,13 @@
 
 /******************************************************************************
- * MODULE     : object.cpp
- * DESCRIPTION: Implementation of scheme objects
- * COPYRIGHT  : (C) 1999-2011 Joris van der Hoeven and Massimiliano Gubinelli
- *******************************************************************************
- * This software falls under the GNU general public license version 3 or later.
- * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
- * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
- ******************************************************************************/
+* MODULE     : object.cpp
+* DESCRIPTION: Implementation of scheme objects
+* COPYRIGHT  : (C) 1999-2011 Joris van der Hoeven and Massimiliano Gubinelli
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
 
 #include "object.hpp"
 #include "glue.hpp"
@@ -18,18 +18,20 @@
 #include "promise.hpp"
 #include "widget.hpp"
 #include "boot.hpp"
-
+#include "editor.hpp"
+#include "modification.hpp"
+#include "patch.hpp"
 
 /******************************************************************************
- * The object representation class
- ******************************************************************************/
+* The object representation class
+******************************************************************************/
 
 static list<tmscm > destroy_list;
-extern tmscm  object_stack;
+extern tmscm object_stack;
 
-tmscm_object_rep::tmscm_object_rep (tmscm  obj) {
+tmscm_object_rep::tmscm_object_rep (tmscm obj) {
   while (!is_nil (destroy_list)) {
-    tmscm  handle= destroy_list->item;
+    tmscm handle= destroy_list->item;
     
     tmscm_set_car (handle, tmscm_null ());
     while (tmscm_is_pair (tmscm_cdr (handle)) && tmscm_is_null (tmscm_cadr (handle)))
@@ -48,8 +50,8 @@ tmscm_object_rep::~tmscm_object_rep () {
 
 
 /******************************************************************************
- * Routines on objects
- ******************************************************************************/
+* Routines on objects
+******************************************************************************/
 
 tm_ostream&
 operator << (tm_ostream& out, object obj) {
@@ -63,7 +65,7 @@ operator << (tm_ostream& out, object obj) {
 
 bool
 operator == (object obj1, object obj2) {
-  tmscm  o1= object_to_tmscm (obj1), o2= object_to_tmscm (obj2);
+  tmscm o1= object_to_tmscm (obj1), o2= object_to_tmscm (obj2);
   return tmscm_is_equal (o1, o2);
 }
 
@@ -79,8 +81,8 @@ hash (object obj) {
 
 
 /******************************************************************************
- * Utilities
- ******************************************************************************/
+* Utilities
+******************************************************************************/
 
 object null_object () {
   return tmscm_to_object (tmscm_null ()); }
@@ -93,7 +95,7 @@ object list_object (object obj1, object obj2) {
 object list_object (object obj1, object obj2, object obj3) {
   return cons (obj1, cons (obj2, cons (obj3, null_object ()))); }
 object symbol_object (string s) {
-  return tmscm_to_object ( symbol_to_tmscm  (s) ); }
+  return tmscm_to_object ( symbol_to_tmscm (s) ); }
 object car (object obj) {
   return tmscm_to_object (tmscm_car (object_to_tmscm (obj))); }
 object cdr (object obj) {
@@ -113,8 +115,8 @@ object cadddr (object obj) {
 
 
 /******************************************************************************
- * Predicates
- ******************************************************************************/
+* Predicates
+******************************************************************************/
 
 bool is_null (object obj) { return tmscm_is_null (object_to_tmscm (obj)); }
 bool is_list (object obj) { return tmscm_is_list (object_to_tmscm (obj)); }
@@ -126,91 +128,103 @@ bool is_symbol (object obj) { return tmscm_is_symbol (object_to_tmscm (obj)); }
 bool is_tree (object obj) { return tmscm_is_tree (object_to_tmscm (obj)); }
 bool is_path (object obj) { return tmscm_is_path (object_to_tmscm (obj)); }
 bool is_url (object obj) { return tmscm_is_url (object_to_tmscm (obj)); }
+bool is_widget (object obj) { return tmscm_is_widget (object_to_tmscm (obj)); }
+bool is_patch (object obj) { return tmscm_is_patch (object_to_tmscm (obj)); }
+bool is_modification (object obj) {
+  return tmscm_is_modification (object_to_tmscm (obj)); }
 
 /******************************************************************************
- * Basic conversions
- ******************************************************************************/
+* Basic conversions
+******************************************************************************/
+
 object::object (tmscm_object_rep* o): rep (static_cast<object_rep*>(o)) {}
 object::object (): rep (tm_new<tmscm_object_rep> (tmscm_null ())) {}
-object::object (bool b): rep (tm_new<tmscm_object_rep> (bool_to_tmscm  (b))) {}
-object::object (int i): rep (tm_new<tmscm_object_rep> (int_to_tmscm  (i))) {}
-object::object (double x): rep (tm_new<tmscm_object_rep> (double_to_tmscm  (x))) {}
+object::object (bool b): rep (tm_new<tmscm_object_rep> (bool_to_tmscm (b))) {}
+object::object (int i): rep (tm_new<tmscm_object_rep> (int_to_tmscm (i))) {}
+object::object (double x):
+  rep (tm_new<tmscm_object_rep> (double_to_tmscm (x))) {}
 object::object (const char* s):
-rep (tm_new<tmscm_object_rep> (string_to_tmscm  (string (s)))) {}
-object::object (string s): rep (tm_new<tmscm_object_rep> (string_to_tmscm  (s))) {}
-object::object (tree t): rep (tm_new<tmscm_object_rep> (tree_to_tmscm  (t))) {}
+  rep (tm_new<tmscm_object_rep> (string_to_tmscm (string (s)))) {}
+object::object (string s):
+  rep (tm_new<tmscm_object_rep> (string_to_tmscm (s))) {}
+object::object (tree t):
+  rep (tm_new<tmscm_object_rep> (tree_to_tmscm (t))) {}
 object::object (list<string> l):
-rep (tm_new<tmscm_object_rep> (list_string_to_tmscm (l))) {}
+  rep (tm_new<tmscm_object_rep> (list_string_to_tmscm (l))) {}
 object::object (list<tree> l):
-rep (tm_new<tmscm_object_rep> (list_tree_to_tmscm  (l))) {}
-object::object (path p): rep (tm_new<tmscm_object_rep> (path_to_tmscm  (p))) {}
-object::object (url u): rep (tm_new<tmscm_object_rep> (url_to_tmscm  (u))) {}
+  rep (tm_new<tmscm_object_rep> (list_tree_to_tmscm (l))) {}
+object::object (path p): rep (tm_new<tmscm_object_rep> (path_to_tmscm (p))) {}
+object::object (url u): rep (tm_new<tmscm_object_rep> (url_to_tmscm (u))) {}
+object::object (patch m):
+  rep (tm_new<tmscm_object_rep> (patch_to_tmscm (m))) {}
+object::object (modification m):
+  rep (tm_new<tmscm_object_rep> (modification_to_tmscm (m))) {}
 
 bool
 as_bool (object obj) {
-  tmscm  b= object_to_tmscm (obj);
+  tmscm b= object_to_tmscm (obj);
   if (!tmscm_is_bool (b)) return false;
   return tmscm_to_bool (b);
 }
 
 int
 as_int (object obj) {
-  tmscm  i= object_to_tmscm (obj);
+  tmscm i= object_to_tmscm (obj);
   if (!tmscm_is_int (i)) return 0;
   return tmscm_to_int (i);
 }
 
 double
 as_double (object obj) {
-  tmscm  x= object_to_tmscm (obj);
+  tmscm x= object_to_tmscm (obj);
   if (!tmscm_is_double (x)) return 0.0;
   return tmscm_to_double (x);
 }
 
 string
 as_string (object obj) {
-  tmscm  s= object_to_tmscm (obj);
+  tmscm s= object_to_tmscm (obj);
   if (!tmscm_is_string (s)) return "";
   return tmscm_to_string (s);
 }
 
 string
 as_symbol (object obj) {
-  tmscm  s= object_to_tmscm (obj);
+  tmscm s= object_to_tmscm (obj);
   if (!tmscm_is_symbol (s)) return "";
   return tmscm_to_symbol (s);
 }
 
 tree
 as_tree (object obj) {
-  tmscm  t= object_to_tmscm (obj);
+  tmscm t= object_to_tmscm (obj);
   if (!tmscm_is_tree (t)) return tree ();
   return tmscm_to_tree (t);
 }
 
 scheme_tree
 as_tmscm_tree (object obj) {
-  tmscm  t= object_to_tmscm (obj);
+  tmscm t= object_to_tmscm (obj);
   return tmscm_to_scheme_tree (t);
 }
 
 list<string>
 as_list_string (object obj) {
-  tmscm  l= object_to_tmscm (obj);
+  tmscm l= object_to_tmscm (obj);
   if (!tmscm_is_list_string (l)) return list<string> ();
   return tmscm_to_list_string (l);
 }
 
 list<tree>
 as_list_tree (object obj) {
-  tmscm  l= object_to_tmscm (obj);
+  tmscm l= object_to_tmscm (obj);
   if (!tmscm_is_list_tree (l)) return list<tree> ();
   return tmscm_to_list_tree (l);
 }
 
 path
 as_path (object obj) {
-  tmscm  t= object_to_tmscm (obj);
+  tmscm t= object_to_tmscm (obj);
   if (!tmscm_is_path (t)) return path ();
   return tmscm_to_path (t);
 }
@@ -228,14 +242,30 @@ as_array_object (object obj) {
 
 url
 as_url (object obj) {
-  tmscm  t= object_to_tmscm (obj);
+  tmscm t= object_to_tmscm (obj);
   if (!tmscm_is_url (t)) return url ("");
   return tmscm_to_url (t);
 }
 
+modification
+as_modification (object obj) {
+  tmscm m= object_to_tmscm (obj);
+  if (!tmscm_is_modification (m))
+    return mod_assign (path (), "");
+  return tmscm_to_modification (m);
+}
+
+patch
+as_patch (object obj) {
+  tmscm p= object_to_tmscm (obj);
+  if (!tmscm_is_patch (p))
+    return patch (array<patch> ());
+  return tmscm_to_patch (p);
+}
+
 widget
 as_widget (object obj) {
-  tmscm  w= object_to_tmscm (obj);
+  tmscm w= object_to_tmscm (obj);
   if (!tmscm_is_widget (w)) return widget ();
   return tmscm_to_widget (w);
 }
@@ -285,8 +315,8 @@ scheme_cmd (object cmd) {
 }
 
 /******************************************************************************
- * Conversions to functional objects
- ******************************************************************************/
+* Conversions to functional objects
+******************************************************************************/
 
 static inline array<tmscm >
 array_lookup (array<object> a) {
@@ -301,7 +331,7 @@ class object_command_rep: public command_rep {
   object obj;
 public:
   object_command_rep (object obj2): obj (obj2) {}
-  void apply () { (void) call_scheme (object_to_tmscm  (obj)); }
+  void apply () { (void) call_scheme (object_to_tmscm (obj)); }
   void apply (object args) {
     (void) call_scheme (object_to_tmscm (obj),
                         array_lookup (as_array_object (args))); }
@@ -319,7 +349,7 @@ public:
   object_promise_widget_rep (object obj2): obj (obj2) {}
   tm_ostream& print (tm_ostream& out) { return out << obj; }
   widget eval () {
-    tmscm  result= call_scheme (object_to_tmscm  (obj));
+    tmscm result= call_scheme (object_to_tmscm (obj));
     if (tmscm_is_widget (result)) return tmscm_to_widget (result);
     else {
       FAILED ("widget expected");
@@ -334,8 +364,8 @@ as_promise_widget (object obj) {
 }
 
 /******************************************************************************
- * Evaluation and function calls
- ******************************************************************************/
+* Evaluation and function calls
+******************************************************************************/
 
 object eval (const char* expr) {
   return tmscm_to_object (eval_scheme (expr)); }
@@ -397,8 +427,8 @@ object call (object fun, array<object> a) {
   return tmscm_to_object (call_scheme (object_to_tmscm (fun), array_lookup(a))); }
 
 /******************************************************************************
- * User preferences
- ******************************************************************************/
+* User preferences
+******************************************************************************/
 
 static bool preferences_ok= false;
 
@@ -429,8 +459,8 @@ get_preference (string var, string def) {
 }
 
 /******************************************************************************
- * Delayed evaluation
- ******************************************************************************/
+* Delayed evaluation
+******************************************************************************/
 
 #ifndef QTTEXMACS
 static array<object> delayed_queue;
@@ -478,3 +508,24 @@ clear_pending_commands () {
   start_queue  = array<time_t> (0);
 }
 #endif // QTTEXMACS
+
+/******************************************************************************
+* Protected evaluation
+******************************************************************************/
+
+void
+protected_call (object cmd) {
+#ifdef USE_EXCEPTIONS
+  try {
+#endif
+    get_current_editor()->before_menu_action ();
+    call (cmd);
+    get_current_editor()->after_menu_action ();
+#ifdef USE_EXCEPTIONS
+  }
+  catch (string s) {
+    get_current_editor()->cancel_menu_action ();
+  }
+  handle_exceptions ();
+#endif
+}

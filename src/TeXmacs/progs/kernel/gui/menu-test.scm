@@ -125,8 +125,7 @@
         '(with "bg-color" "#fcfcf8"
            (document (proof (document "Trivial."
                                       "But you may add more details."))))
-        '(style "generic")
-        (noop) #f))))
+        '(style "generic") #f))))
 
 (tm-widget (widget7)
   (padded
@@ -146,6 +145,55 @@
              "string" '() "1w")
       ===
       (refresh widget8-sub auto))))
+
+(tm-widget (widget9)
+  (padded
+    (with flag? #f
+      (refreshable "test"
+        (if (not flag?) (text "Flag is off"))
+        (if flag? (text "Flag is on")))
+      ===
+      (hlist
+        (toggle (begin (set! flag? answer) (refresh-now "test")) flag?)
+        ///
+        (text "Toggle here")))))
+
+(tm-widget (widget10)
+  (resize ("150px" "400px" "9000px") ("300px" "600px" "9000px")
+    (vertical
+      (bold (text "Testing tree-view"))
+      ===
+      (tree-view noop (buffer-tree) (stree->tree '(dummy))))))
+
+(tm-widget ((widget11 . l))
+  (padded
+    (aligned
+      (for (x l)
+	(item (toggle (display* x ": " answer "\n") #f)
+	  (text x))))))
+
+(tm-define (show-widget11)
+  (show (widget11 "hop" "hola" "plok")))
+
+(define widget11-switch? #f)
+
+(tm-widget (widget11)
+  (padded
+    (refreshable "toggle"
+      (if (not widget11-switch?)
+          (hlist
+            (text "Toggle off") // // //
+            (explicit-buttons
+              ("Turn on" (begin
+                           (set! widget11-switch? #t)
+                           (refresh-now "toggle"))))))
+      (if widget11-switch?
+          (hlist
+            (text "Toggle on") // // //
+            (explicit-buttons
+              ("Turn off" (begin
+                            (set! widget11-switch? #f)
+                            (refresh-now "toggle")))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some test forms
@@ -191,7 +239,13 @@
           (item (text "Choices:")
             (form-choices "fieldname4" 
                           '("one" "two" "three") 
-                          '("one" "two"))))
+                          '("one" "two")))
+          (item === ===)
+          (item (text "Password:")
+            (form-input "fieldname5" "password" '() "1w"))
+          (item === ===)
+          (item (text "Toggle:")
+            (form-toggle "fieldname6" #f)))
         (bottom-buttons
           ("Cancel" (cmd "cancel")) >>
           ("Ok"

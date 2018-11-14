@@ -17,6 +17,10 @@
 #include "merge_sort.hpp"
 #include "drd_std.hpp"
 #include "language.hpp"
+#include <unistd.h>
+#ifdef OS_MINGW
+#include <time.h>
+#endif
 
 tree texmacs_settings = tuple ();
 int  install_status   = 0;
@@ -81,30 +85,95 @@ plugin_list () {
 
 static void
 init_main_paths () {
-#ifdef __MINGW32__
+#ifdef OS_MINGW
   if (is_none (get_env_path ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "/TeXmacs"))) {
 #else
   if (is_none (get_env_path ("TEXMACS_HOME_PATH", "~/.TeXmacs"))) {
 #endif
-    cerr << "\nTeXmacs]\n";
-    cerr << "TeXmacs] Installation problem: please send a bug report.\n";
-    cerr << "TeXmacs] 'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs'.\n";
-    cerr << "TeXmacs] You may try to set this environment variable manually\n";
-    cerr << "TeXmacs]\n";
+    boot_error << "\n";
+    boot_error << "Installation problem: please send a bug report.\n";
+    boot_error << "'TEXMACS_HOME_PATH' could not be set to '~/.TeXmacs'.\n";
+    boot_error << "You may try to set this environment variable manually\n";
+    boot_error << "\n";
     FAILED ("installation problem");
     exit (1);
   }
 }
 
 /******************************************************************************
-* Make user directories
+* Directory for temporary files
 ******************************************************************************/
+
+static string main_tmp_dir= "$TEXMACS_HOME_PATH/system/tmp";
 
 static void
 make_dir (url which) {
-  if (!is_directory (which))
+  if (is_none(which))
+    return ;
+  if (!is_directory (which)) {
+    make_dir (head (which));
     mkdir (which);
+  }
 }
+
+static url
+url_temp_dir_sub () {
+#ifdef OS_MINGW
+  static url tmp_dir=
+    url_system (main_tmp_dir) * url_system (as_string (time (NULL)));
+#else
+  static url tmp_dir=
+    url_system (main_tmp_dir) * url_system (as_string ((int) getpid ()));
+#endif
+  return (tmp_dir);
+}
+
+url
+url_temp_dir () {
+  static url u;
+  if (u == url_none()) {
+    u= url_temp_dir_sub ();
+    make_dir (u);
+  }
+  return u;
+}
+
+bool
+process_running (int pid) {
+  string cmd= "ps -p " * as_string (pid);
+  string ret= eval_system (cmd);
+  return occurs ("texmacs", ret) && occurs (as_string (pid), ret);
+}
+
+static void
+clean_temp_dirs () {
+  bool err= false;
+  array<string> a= read_directory (main_tmp_dir, err);
+#ifndef OS_MINGW
+  for (int i=0; i<N(a); i++)
+    if (is_int (a[i]))
+      if (!process_running (as_int (a[i])))
+        if (a[i] != as_string ((int) getpid ()))
+          system ("rm -rf", url (main_tmp_dir) * url (a[i]));
+#else
+  /* delete the directories after 7 days */
+  time_t ts = as_int (basename (url_temp_dir_sub ())) - (3600 * 24 * 7 );
+  for (int i=0; i<N(a); i++)     
+    if (is_int (a[i])) {
+      time_t td= as_int (a[i]);
+      if (td < ts) {
+        url cur = url (main_tmp_dir) * url (a[i]);
+        array<string> f= read_directory (cur, err);
+        for (int j=0; j<N(f); j++) remove (cur * url (f[j]));
+	rmdir (as_charp (as_string (cur)));
+      }
+    }
+#endif
+}
+
+/******************************************************************************
+* Make user directories
+******************************************************************************/
 
 static void
 init_user_dirs () {
@@ -140,11 +209,15 @@ init_user_dirs () {
   make_dir ("$TEXMACS_HOME_PATH/system");
   make_dir ("$TEXMACS_HOME_PATH/system/bib");
   make_dir ("$TEXMACS_HOME_PATH/system/cache");
+  make_dir ("$TEXMACS_HOME_PATH/system/database");
+  make_dir ("$TEXMACS_HOME_PATH/system/database/bib");
   make_dir ("$TEXMACS_HOME_PATH/system/tmp");
   make_dir ("$TEXMACS_HOME_PATH/texts");
+  make_dir ("$TEXMACS_HOME_PATH/users");
   change_mode ("$TEXMACS_HOME_PATH/server", 7 << 6);
   change_mode ("$TEXMACS_HOME_PATH/system", 7 << 6);
-  remove (url ("$TEXMACS_HOME_PATH/system/tmp") * url_wildcard ("*"));
+  change_mode ("$TEXMACS_HOME_PATH/users", 7 << 6);
+  clean_temp_dirs ();
 }
 
 /******************************************************************************
@@ -155,16 +228,16 @@ static void
 init_guile () {
   url guile_path= "$TEXMACS_PATH/progs:$GUILE_LOAD_PATH";
   if (!exists (guile_path * "init-texmacs.scm")) {
-    cerr << "\nTeXmacs]\n";
-    cerr << "TeXmacs] Installation problem: please send a bug report.\n";
-    cerr << "TeXmacs] The initialization file init-texmacs.scm"
-	 << " could not be found.\n";
-    cerr << "TeXmacs] Please check the values of the environment variables\n";
-    cerr << "TeXmacs] TEXMACS_PATH and GUILE_LOAD_PATH."
-	 << " init-texmacs.scm should\n";
-    cerr << "TeXmacs] be readable and in the directory $TEXMACS_PATH/progs\n";
-    cerr << "TeXmacs] or in the directory $GUILE_LOAD_PATH\n";
-    cerr << "TeXmacs]\n";
+    boot_error << "\n";
+    boot_error << "Installation problem: please send a bug report.\n";
+    boot_error << "The initialization file init-texmacs.scm"
+               << " could not be found.\n";
+    boot_error << "Please check the values of the environment variables\n";
+    boot_error << "TEXMACS_PATH and GUILE_LOAD_PATH."
+               << " init-texmacs.scm should\n";
+    boot_error << "be readable and in the directory $TEXMACS_PATH/progs\n";
+    boot_error << "or in the directory $GUILE_LOAD_PATH\n";
+    boot_error << "\n";
     FAILED ("guile could not be found");
   }
 
@@ -194,7 +267,7 @@ init_guile () {
     guile_path= guile_path | guile_dir;
     set_env_path ("GUILE_LOAD_PATH", guile_path);
     if (!exists ("$GUILE_LOAD_PATH/ice-9/boot-9.scm")) {
-      cerr << "\nGUILE_LOAD_PATH=" << guile_path << "\n";
+      failed_error << "\nGUILE_LOAD_PATH=" << guile_path << "\n";
       FAILED ("guile seems not to be installed on your system");
     }
   }
@@ -228,14 +301,14 @@ init_env_vars () {
   url all_root= style_root | package_root;
   url style_path=
     get_env_path ("TEXMACS_STYLE_PATH",
-		  expand (complete (all_root * url_wildcard (), "dr")));
+                  search_sub_dirs (all_root));
   url text_root=
     get_env_path ("TEXMACS_TEXT_ROOT",
 		  "$TEXMACS_HOME_PATH/texts:$TEXMACS_PATH/texts" |
 		  plugin_path ("texts"));
   url text_path=
     get_env_path ("TEXMACS_TEXT_PATH",
-		  expand (complete (text_root * url_wildcard (), "dr")));
+                  search_sub_dirs (text_root));
 
   // Get other data paths
   (void) get_env_path ("TEXMACS_FILE_PATH",text_path | style_path);
@@ -253,6 +326,7 @@ init_env_vars () {
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
 		       "$TEXMACS_HOME_PATH/misc/pixmaps" |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/settings") |
+		       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/table") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/24x24/main") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/20x20/mode") |
 		       url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
@@ -276,7 +350,7 @@ init_env_vars () {
 static void
 init_misc () {
   // Test whether 'which' works
-#if defined(__MINGW__) || defined(__MINGW32__) || defined (OS_WIN32)
+#ifdef OS_MINGW
   use_which = false;
 #else
   use_which = (var_eval_system ("which texmacs 2> /dev/null") != "");
@@ -295,27 +369,24 @@ init_misc () {
 
 static void
 setup_inkscape_extension () {
-#if defined(__MINGW__) || defined(__MINGW32__) || defined (OS_WIN32)
-  url ink_ext = url( get_env ("APPDATA") * "/inkscape/extensions/");
+debug_boot << "attempt install of inkscape extension \n ";
+#ifdef OS_MINGW
+  url ink_ext = url ("$APPDATA/inkscape/extensions");
 #else
   url ink_ext = "~/.config/inkscape/extensions/";
 #endif 
-  if (exists_in_path ("inkscape") && exists (ink_ext)) {
-    // this detection is used in scheme.
-    // Does it really work for windows?
-    // Shouldn't we rather detect inkscape.exe?
-
+  if ( exists (ink_ext)) {
     url f1 = url (ink_ext * "texmacs.inx");
     url f2 = url (ink_ext * "texmacs_reedit.py");
     url f3 = url (ink_ext * "texmacs_latex.sty");
-    url plug_source = url ("$TEXMACS_PATH/misc/inkscape_plugin/");
-    cerr << "TeXmacs] installing or updating inkscape plugin\n";
+    url plug_source = url ("$TEXMACS_PATH/misc/inkscape_extension/");
+    debug_boot << "installing or updating inkscape extension\n";
     copy (url (plug_source * "texmacs.inx"), f1);
     copy (url (plug_source * "texmacs_reedit.py"), f2);
     copy (url (plug_source * "texmacs_latex.sty"), f3);
     if (!(exists (f1) && exists (f2))) {
-      cerr << "TeXmacs] automatic install of inkscape plugin failed\n; ";
-      cerr << "TeXmacs] see documentation for manual install\n";
+      debug_boot << "automatic install of inkscape extension failed\n; ";
+      debug_boot << "see documentation for manual install\n";
     }
   }
 }
@@ -370,8 +441,8 @@ set_setting (string var, string val) {
 void
 setup_texmacs () {
   url settings_file= "$TEXMACS_HOME_PATH/system/settings.scm";
-  cerr << "Welcome to TeXmacs " TEXMACS_VERSION "\n";
-  cerr << HRULE;
+  debug_boot << "Welcome to TeXmacs " TEXMACS_VERSION "\n";
+  debug_boot << HRULE;
 
   set_setting ("VERSION", TEXMACS_VERSION);
   setup_tex ();
@@ -381,19 +452,19 @@ setup_texmacs () {
   //cout << "settings_t= " << texmacs_settings << "\n";
   //cout << "settings_s= " << s << "\n";
   if (save_string (settings_file, s) || load_string (settings_file, s, false)) {
-    cerr << HRULE;
-    cerr << "I could not save or reload the file\n\n";
-    cerr << "\t" << settings_file << "\n\n";
-    cerr << "Please give me full access control over this file and\n";
-    cerr << "rerun 'TeXmacs'.\n";
-    cerr << HRULE;
+    failed_error << HRULE;
+    failed_error << "I could not save or reload the file\n\n";
+    failed_error << "\t" << settings_file << "\n\n";
+    failed_error << "Please give me full access control over this file and\n";
+    failed_error << "rerun 'TeXmacs'.\n";
+    failed_error << HRULE;
     FAILED ("unable to write settings");
   }
   
-  cerr << HRULE;
-  cerr << "Installation completed successfully !\n";
-  cerr << "I will now start up the editor\n";
-  cerr << HRULE;
+  debug_boot << HRULE;
+  debug_boot << "Installation completed successfully !\n";
+  debug_boot << "I will now start up the editor\n";
+  debug_boot << HRULE;
 }
 
 /******************************************************************************
@@ -402,14 +473,23 @@ setup_texmacs () {
 
 void
 init_texmacs () {
+  //cout << "Initialize -- Succession status table\n";
   init_succession_status_table ();
+  //cout << "Initialize -- Succession standard DRD\n";
   init_std_drd ();
+  //cout << "Initialize -- Main paths\n";
   init_main_paths ();
+  //cout << "Initialize -- User dirs\n";
   init_user_dirs ();
+  //cout << "Initialize -- User preferences\n";
   load_user_preferences ();
+  //cout << "Initialize -- Guile\n";
   init_guile ();
+  //cout << "Initialize -- Environment variables\n";
   init_env_vars ();
+  //cout << "Initialize -- Miscellaneous\n";
   init_misc ();
+  //cout << "Initialize -- Deprecated\n";
   init_deprecated ();
 }
 

@@ -1,4 +1,3 @@
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : init-python.scm
@@ -12,6 +11,12 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(use-modules (dynamic session-edit) (dynamic program-edit))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Plugin configuration
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;Basically, the serializer makes the input preserve the newlines
 ;;and adds the string character "\n<EOF>\n" by the end.
 ;;I guess it could send "\x04" instead to signal a real EOF,
@@ -21,7 +26,7 @@
 
 (define (python-serialize lan t)
   (with u (pre-serialize lan t)
-    (with s (texmacs->verbatim (stree->tree u))
+    (with s (texmacs->code (stree->tree u))
       (string-append  s  "\n<EOF>\n"))))
 
 (define (python-launcher)
@@ -36,4 +41,11 @@
   (:launch ,(python-launcher))
   (:tab-completion #t)
   (:serializer ,python-serialize)
-  (:session "Python"))
+  (:session "Python")
+  (:scripts "Python"))
+
+;(set-session-multiline-input "python" "default" #t)
+;(set-program-multiline-input "python" "default" #t)
+
+(when (supports-python?)
+  (import-from (python-widgets) (python-menus)))

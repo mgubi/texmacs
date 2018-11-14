@@ -97,7 +97,7 @@
       ($when (not (numbered-numbered? t))
         "For most style files, the " ($markup lab)
         " environment is unnumbered. "
-        "The environment admits an numbered variant " ($markup lab*) ". ")
+        "The environment admits a numbered variant " ($markup lab*) ". ")
       "You may toggle the numbering using the keyboard shortcut "
       ($shortcut (numbered-toggle (focus-tree))) ", the menu entry "
       ($menu "Focus" "Numbered") ", or by pressing the "
@@ -140,6 +140,68 @@
     (focus-doc-variants t))
   ($when (focus-has-toggles? t)
     (focus-doc-toggles t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Stylistic preferences for tag
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-generate (focus-doc-style-option opt)
+  ($with opt-doc (tmdoc-search-style opt)
+    ($when opt-doc opt-doc)
+    ($when (not opt-doc)
+      ($explain ($inline `(tmpackage ,opt)
+                         `(explain-synopsis ,(style-get-menu-name opt)))
+        ($with brief-doc (style-get-documentation opt)
+          ($when brief-doc brief-doc ".")
+          ($when (not brief-doc) "Undocumented style package."))))))
+
+(tm-generate (focus-doc-parameter par)
+  ($with par-doc (tmdoc-search-parameter par)
+    ($when par-doc par-doc)
+    ($when (not par-doc)
+      ($explain `(src-var ,par)
+        "A parameter of type " (tree-label-type (string->symbol par)) "."))))
+
+(tm-generate (focus-doc-preferences t)
+  ($let* ((lab (tree-label t))
+          (opts (search-tag-options t))
+          (pars (list-filter (search-tag-parameters t)
+                             parameter-show-in-menu?)))
+    ($block
+      ($para
+        "The rendering of the " ($markup lab)
+        " tag can be customized by editing the macro which defines it. "
+        "This can be done by clicking on " ($menu "Edit macro")
+        " button in the " ($menu "Focus" "Preferences") " menu "
+        "(or in the equivalent " ($tmdoc-icon "tm_focus_prefs.xpm")
+        " icon menu on the focus toolbar). "
+        "You may also directly edit the macro in the style file or package "
+        "where it was defined, using " ($menu "Edit source") ".")
+    
+      ($when (nnull? (append opts pars))
+        ($para
+          "Still using the " ($menu "Focus" "Preferences") " menu, "
+          "you may also specify "
+          ($when (and (nnull? opts) (null? pars))
+            "style options")
+          ($when (and (null? opts) (nnull? pars))
+            "style parameters")
+          ($when (and (nnull? opts) (nnull? pars))
+            "style options and parameters")
+          " which apply to the " ($markup lab) " tag. "
+          "These settings are global, so they will apply to all other "
+          ($markup lab) " tags in your document, and generally also to "
+          "other similar tags."))
+
+      ($when (nnull? opts)
+        ($folded ($strong "Style options")
+          ($for (opt opts)
+            (focus-doc-style-option opt))))
+
+      ($when (nnull? pars)
+        ($folded ($strong "Style parameters")
+          ($for (par pars)
+            (focus-doc-parameter par)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Document structured editing operations
@@ -264,12 +326,12 @@
       "In order to edit the hidden arguments, you should use "
       ($menu "Focus" "Show hidden") " or push the "
       ($tmdoc-icon "tm_show_hidden.xpm") " icon on the focus toolbar. "
-      "Disactivated tags can be reactivated by pressing "
+      "Deactivated tags can be reactivated by pressing "
       ($shortcut (kbd-return)) ".")
     ($para
       "Non internal hidden arguments which contain string values "
       "can also be edited directly in the text fields on the focus toolbar; "
-      "no need to disactivate the " ($markup lab) " tag in this case.")))
+      "no need to deactivate the " ($markup lab) " tag in this case.")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Change the geometry
@@ -289,12 +351,19 @@
     ($when #t
       ($unfolded-documentation "Usage"
 	(focus-doc-usage t)))
+    ($with tagdoc (tmdoc-search-tag (tree-label t))
+      ($when tagdoc
+	($unfolded-documentation "Description"
+	  tagdoc)))
     ($when (tree-label-extension? (tree-label t))
       ($unfolded-documentation "Current definition"
         (focus-doc-source t)))
     ($when (or (focus-has-variants? t) (focus-has-toggles? t))
       ($unfolded-documentation "Structured variants"
         (focus-doc-toggles-variants t)))
+    ($when (focus-has-preferences? t)
+      ($unfolded-documentation "Style preferences"
+        (focus-doc-preferences t)))
     ($when (focus-can-move? t)
       ($unfolded-documentation "Structured navigation"
         (focus-doc-move t)))

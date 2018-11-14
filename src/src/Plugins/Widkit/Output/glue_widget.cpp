@@ -65,23 +65,22 @@ glue_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 glue_widget_rep::handle_repaint (repaint_event ev) {
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   if (col == "")
     layout_default (ren, ev->x1, ev->y1, ev->x2, ev->y2);
   else {
     if (is_atomic (col)) {
       color c= named_color (col->label);
       ren->set_background (c);
-      ren->set_color (c);
+      ren->set_pencil (c);
       ren->fill (ev->x1, ev->y1, ev->x2, ev->y2);
     }
     else {
       ren->set_shrinking_factor (5);
-      int old_a;
-      tree old_bg= ren->get_background_pattern (old_a);
-      ren->set_background_pattern (col);
+      brush old_b= ren->get_background ();
+      ren->set_background (col);
       ren->clear_pattern (5*ev->x1, 5*ev->y1, 5*ev->x2, 5*ev->y2);
-      ren->set_background_pattern (old_bg, old_a);
+      ren->set_background (old_b);
       ren->set_shrinking_factor (1);
     }
   }

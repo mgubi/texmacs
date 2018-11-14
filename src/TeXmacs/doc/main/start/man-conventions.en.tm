@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.10>
+<TeXmacs|1.99.5>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Conventions for this manual>
@@ -29,30 +29,66 @@
   simultaneously pressing the three keys <prefix|M->, <prefix|S-> and
   <key|x>.
 
+  The actual keyboard modifier keys depend on your system as indicated in the
+  following table
+
+  <\big-table>
+    \;
+
+    <descriptive-table|<tformat|<cwith|1|-1|3|3|cell-lborder|1ln>|<cwith|1|-1|1|-1|cell-row-span|1>|<cwith|1|-1|1|-1|cell-col-span|1>|<cwith|1|-1|1|-1|cell-bsep|3spc>|<cwith|1|-1|1|-1|cell-tsep|3sep>|<cwith|1|1|1|-1|cell-bsep|1spc>|<cwith|2|-1|1|-1|cell-bsep|2sep>|<cwith|1|-1|1|-1|cell-halign|c>|<cwith|1|-1|1|-1|cell-valign|c>|<cwith|1|-1|1|-1|cell-hyphen|n>|<table|<row|<cell|>|<cell|<key*|C->>|<cell|<key*|A->>|<cell|<key*|M->>>|<row|<\cell>
+      <name|Windows> or <name|Linux>/<name|Unix>
+
+      \ with <name|Windows> keyboard
+    </cell>|<cell|<math|<block*|<tformat|<cwith|1|1|1|1|cell-tsep|2sep>|<cwith|1|1|1|1|cell-bsep|1pt>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|<small|<with|font-family|ss|Ctrl>>>>>>>>>|<cell|left
+    <block*|<tformat|<cwith|1|1|1|1|cell-tsep|2sep>|<cwith|1|1|1|1|cell-bsep|1pt>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|<small|<with|font-family|ss|Alt>>>>>>>
+    (<math|\<dag\>>)>|<cell|<math|<block*|<tformat|<cwith|1|1|1|1|cell-valign|B>|<cwith|1|1|1|1|cell-bsep|1sep>|<cwith|1|1|1|1|cell-tsep|1sep>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|<shift|<draw-over|<phantom|ihj>|<with|gr-frame|<tuple|scale|1cm|<tuple|0.5gw|0.380011gh>>|gr-mode|<tuple|group-edit|move>|gr-fill-color|black|gr-color|white|gr-snap|<tuple|control
+    point|grid point|grid curve point|curve-grid intersection|curve-curve
+    intersection|text border point|text border>|<graphics|<with|fill-color|black|<cline|<point|-0.190551|-0.0360167>|<point|0.149110332054505|-0.126306389734092>|<point|0.151690038364863|0.212495039026326>|<point|-0.190550998809366|0.148862283370816>>>|<with|color|white|fill-color|black|<with|color|white|fill-color|black|<line|<point|-0.193989980156105|0.049973520664109>|<point|0.145671135070777|0.0525532105172642>>>>|<with|color|white|fill-color|black|<line|<point|-0.0529667|0.176379>|<point|-0.0521067601534595|-0.072132557216563>>>>>|0cm>||2ln>>>>>>><math|>
+    (<math|\<dag\>>)>>|<row|<cell|<name|Apple>>|<cell|<block*|<tformat|<cwith|1|1|1|1|cell-tsep|2sep>|<cwith|1|1|1|1|cell-bsep|1pt>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|<with|font-family|ss|<small|\<place of interest
+    sign\> Command>>>>>>>>|<cell|<block*|<tformat|<cwith|1|1|1|1|cell-tsep|2sep>|<cwith|1|1|1|1|cell-bsep|1pt>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|\<option key\><small|<with|font-family|ss|
+    Option>>>>>>> (<math|\<dag\>>)>|<cell|<block*|<tformat|<cwith|1|1|1|1|cell-tsep|2sep>|<cwith|1|1|1|1|cell-bsep|1pt>|<cwith|1|1|1|1|cell-background|pastel
+    grey>|<table|<row|<cell|<small|<with|font-family|ss|Ctrl>>>>>>>>>|<row|<cell|fallback
+    combination>|<cell|<key*|escape escape escape>>|<cell|<key*|escape
+    escape>>|<cell|<key*|escape>>>>>>
+  <|big-table>
+    Actual modifier keys on common platforms.
+
+    <tabular|<tformat|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-width|10cm>|<cwith|1|1|1|1|cell-hmode|min>|<table|<row|<\cell>
+      <math|\<dag\>> Some modifier key combinations are preempted by the
+      operating system. The behavior may be different for the right and left
+      modifier key.
+    </cell>>>>>
+  </big-table>
+
   <paragraph*|Keyboard shortcuts>
 
-  More complex keyboard shortcuts are obtain by pressing several keys or
-  ``modified keys'' in succession. For instance, the shortcut <key|- \<gtr\>>
+  Keyboard shortcuts are obtained by pressing several keys or \Pmodified
+  keys\Q in succession. For instance, the shortcut <key|- \<gtr\>>
   corresponds on first pressing the <key|-> key and then the key
   <key|\<gtr\>>. Inside mathematical formulas, this shortcut inserts the
   arrow <math|<op|\<rightarrow\>>>. Similarly, the shortcut <key*|C-x C-f>
   consists of first pressing the keys <prefix|C-> and <key|x> together, and
   next pressing the keys <prefix|C-> and <key|f> again together. In the
-  <name|Emacs> ``look and feel'', this shortcut enables you to open a new
+  <name|Emacs> \Plook and feel\Q, this shortcut enables you to open a new
   file.
 
   Some common keyboard prefixes are detailed in the section on <hlink|general
   keyboard rules|../text/keyboard/man-general-rules.en.tm>. In cases when
   <TeXmacs> keyboard shortcuts are superseded by shortcuts from the operating
-  system, we notice that <hlink|equivalents for the keyboard
+  system, <hlink|equivalents for the keyboard
   modifiers|../config/man-config-keyboard.en.tm#kbd-escape-table> can be
   obtained using the <key*|escape> key. For instance, <key*|escape> is
   equivalent to <key|escape> and <key*|escape escape> is equivalent to
   <key|escape escape>.
 
   Notice that the <TeXmacs> menus and keyboard behavior are <em|contextual>,
-  <abbr|i.e.> they depend on the current mode (i.e. text mode or ``math
-  mode''), the current language and the position of the cursor inside your
+  <abbr|i.e.> they depend on the current mode (i.e. text mode or \Pmath
+  mode\Q), the current language and the position of the cursor inside your
   document. For instance, inside math mode, you have special keyboard
   shortcuts which are handy for typing mathematical formulas, but which are
   useless in text mode.
@@ -90,6 +126,6 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|preamble|false>
   </collection>
 </initial>

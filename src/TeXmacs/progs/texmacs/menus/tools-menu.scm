@@ -29,24 +29,25 @@
 (tm-define (clipboard-export-preference-menu)
   (clipboard-preference-menu converters-from-special clipboard-set-export))
 
-(tm-menu (tools-selections-menu)
-  (-> "Import" (link clipboard-import-preference-menu))
-  (-> "Export" (link clipboard-export-preference-menu)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind tools-menu
-  (-> "Execute"
-      ("Execute system command" (interactive system))
-      ("Evaluate scheme expression" (interactive footer-eval)))
-  (-> "Selections"
-      (link tools-selections-menu))
+  (-> "Macros"
+      (link source-macros-menu))
   (-> "Update"
-      ("Styles" (style-clear-cache))
       ("Inclusions" (inclusions-gc))
-      ("Linked images" (image-gc)))
+      ("Plugins" (reinit-plugin-cache))
+      ("Styles" (style-clear-cache)))
+  (if (url-exists-in-path? "pdflatex")
+      (-> "LaTeX"
+          (link tmtex-menu)))
+  (-> "Fonts"
+      ("Look for more fonts"
+       (system-wait "Full search for more fonts on your system"
+                    "(can be long)")
+       (font-database-build-local)))
   (-> "Web"
       ("Create web site" (tmweb-interactive-build))
       ("Update web site" (tmweb-interactive-update)))
@@ -63,20 +64,19 @@
       ("Count words" (show-word-count))
       ("Count lines" (show-line-count)))
   (-> "Miscellaneous"
-      ("Clear undo history" (clear-undo-history)))
+      ("Clear undo history" (clear-undo-history))
+      ("Save auxiliary data" (toggle-save-aux))
+      ---
+      (-> "Import selections as"
+          (link clipboard-import-preference-menu))
+      (-> "Export selections as"
+          (link clipboard-export-preference-menu)))
   ---
-  (-> "Server"
-      (link server-menu))
-  (-> "Client"
-      (link client-menu))
-  (-> "Remote plug-ins"
-      ("Add remote ssh connection" (interactive detect-remote-plugins))
-      ("Update remote ssh connection" (interactive update-remote-plugins))
-      ("Remove remote ssh connection" (interactive remove-remote-plugins)))
-  ---
+  ("Database tool" (toggle-preference "database tool"))
   ("Debugging tool" (toggle-preference "debugging tool"))
   ("Developer tool" (toggle-preference "developer tool"))
   ("Linking tool" (toggle-preference "linking tool"))
   ("Presentation tool" (toggle-preference "presentation tool"))
+  ("Remote tool" (toggle-preference "remote tool"))
   ("Source macros tool" (toggle-preference "source tool"))
   ("Versioning tool" (toggle-preference "versioning tool")))

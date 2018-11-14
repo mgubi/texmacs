@@ -16,6 +16,7 @@
         (utils edit variants)
         (utils edit auto-close)
         (utils library cursor)
+        (generic document-edit)
         (generic generic-edit)
         (generic format-edit)
         (generic format-geometry-edit)
@@ -44,16 +45,20 @@
   ("\\" (if (or (inside? 'hybrid) (in-prog?)) (insert "\\") (make-hybrid)))
   ("\\ var" "\\")
   ("\\ var var" "<setminus>")
-  ("$" (if (or (inside? 'hybrid) (inside? 'session)) (insert "$") (make 'math)))
+  ("$" (make 'math))
   ("$ var" "$")
 
   ("-" "-")
-  ("space" " ")
+  ("space" (kbd-space))
   ("tab" (kbd-tab))
   ("return" (kbd-return))
-  ("S-space" " ")
+  ("S-space" (kbd-shift-space))
   ("S-tab" (kbd-shift-tab))
   ("S-return" (kbd-shift-return))
+  ("C-return" (kbd-control-return))
+  ("C-S-return" (kbd-shift-control-return))
+  ("A-return" (kbd-alternate-return))
+  ("A-S-return" (kbd-shift-alternate-return))
 
   ("delete" (kbd-delete))
   ("backspace" (kbd-backspace))
@@ -78,14 +83,14 @@
 
   ("structured:cmd delete" (remove-structure-upwards))
   ("structured:cmd backspace" (remove-structure-upwards))
-  ("structured:cmd left" (traverse-left))
-  ("structured:cmd right" (traverse-right))
-  ("structured:cmd up" (traverse-up))
-  ("structured:cmd down" (traverse-down))
-  ("structured:cmd home" (traverse-first))
-  ("structured:cmd end" (traverse-last))
-  ("structured:cmd pageup" (traverse-previous))
-  ("structured:cmd pagedown" (traverse-next))
+  ("structured:cmd left" (kbd-select-if-active traverse-left))
+  ("structured:cmd right" (kbd-select-if-active traverse-right))
+  ("structured:cmd up" (kbd-select-if-active traverse-up))
+  ("structured:cmd down" (kbd-select-if-active traverse-down))
+  ("structured:cmd home" (kbd-select-if-active traverse-first))
+  ("structured:cmd end" (kbd-select-if-active traverse-last))
+  ("structured:cmd pageup" (kbd-select-if-active traverse-previous))
+  ("structured:cmd pagedown" (kbd-select-if-active traverse-next))
   ("structured:cmd section" (traverse-previous-section-title))
   ("structured:cmd S-left" (kbd-select traverse-left))
   ("structured:cmd S-right" (kbd-select traverse-right))
@@ -155,6 +160,8 @@
   ("altcmd /" (make 'no-break))
   ("altcmd !" (make-label))
   ("altcmd ?" (make 'reference))
+  ("altcmd ? var" (make 'eqref))
+  ("altcmd ? var var" (make 'pageref))
   ("altcmd P" (make 'pageref))
 
   ("accent:hat" "^")
@@ -172,7 +179,6 @@
   ("symbol %" "%")
   ("symbol _" "_")
   ("symbol ^" "^")
-  ("symbol \"" "\"")
   ("symbol (" "(")
   ("symbol )" ")")
   ("symbol [" "[")
@@ -187,9 +193,9 @@
   ("cut" (noop) (clipboard-cut "primary"))
   ("paste" (noop) (clipboard-paste "primary"))
   ("copy" (noop) (clipboard-copy "primary"))
-  ("find" (noop) (search-start #t))
-  ("search find" (search-next))
-  ("search again" (search-next))
+  ("find" (noop) (interactive-search))
+  ("search find" (search-next-match #t))
+  ("search again" (search-next-match #t))
 
   ("copyto 1" (noop) (clipboard-copy "primary"))
   ("copyto 2" (clipboard-copy "secondary"))
@@ -212,8 +218,10 @@
 
   ("table N t" (make 'tabular))
   ("table N T" (make 'tabular*))
+  ("table N w" (make-wrapped 'wide-tabular))
   ("table N b" (make 'block))
-  ("table N B" (make 'block*)))
+  ("table N B" (make 'block*))
+  ("table N W" (make-wrapped 'wide-block)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Emacs keymap
@@ -225,18 +233,20 @@
   ;; standard Emacs shortcuts
   ("emacs a" (kbd-start-line))
   ("emacs b" (kbd-left))
-  ("emacs d" (remove-text #t))
+  ;;("emacs d" (remove-text #t))
+  ("emacs d" (kbd-delete))
   ("emacs e" (kbd-end-line))
   ("emacs f" (kbd-right))
   ("emacs g" (selection-cancel))
   ("emacs j" (insert-return))
   ("emacs k" (kill-paragraph))
+  ("emacs l" (refresh-window))
   ("emacs m" (insert-return))
   ("emacs n" (kbd-down))
   ("emacs p" (kbd-up))
   ("emacs q" (make 'symbol))
-  ("emacs r" (search-start #f))
-  ("emacs s" (search-start #t))
+  ("emacs r" (interactive-search))
+  ("emacs s" (interactive-search))
   ("emacs v" (kbd-page-down))
   ("emacs w" (clipboard-cut "primary"))
   ("emacs y" (clipboard-paste "primary"))
@@ -251,7 +261,7 @@
   ("emacs:meta <" (go-start))
   ("emacs:meta >" (go-end))
   ("emacs:meta $" (spell-start))
-  ("emacs:meta %" (interactive replace-start-forward))
+  ("emacs:meta %" (interactive-replace))
 
   ("emacs:prefix tab" (make 'indent))
   ("emacs:prefix b" (interactive go-to-buffer))
@@ -262,8 +272,8 @@
   ("emacs:prefix C-s" (save-buffer))
   ("emacs:prefix C-w" (interactive save-buffer-as))
 
-  ("search emacs s" (search-next))
-  ("search emacs r" (search-previous))
+  ("search emacs s" (search-next-match #t))
+  ("search emacs r" (search-next-match #f))
 
   ;; not implemented
   ;;("emacs h ..." (help ...))
@@ -341,7 +351,7 @@
   ("C-F2" (revert-buffer))
   ("M-F2" (new-buffer))
   ("M-S-F2" (open-window))
-  ("M-C-F2" (clone-window))
+  ;;("M-C-F2" (clone-window))
   ("F3" (save-buffer))
   ("S-F3" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("F4" (preview-buffer))
@@ -350,7 +360,7 @@
   ("M-F4" (interactive print-pages))
   ("M-S-F4" (interactive print-pages-to-file))
 
-  ("emacs =" (interactive replace-start-forward))
+  ("emacs =" (interactive-replace))
   ("emacs:meta g" (clipboard-clear "primary"))
   ("emacs:meta [" (undo 0))
   ("emacs:meta ]" (redo 0))
@@ -361,10 +371,14 @@
 
   ("C-<" (cursor-history-backward))
   ("C->" (cursor-history-forward))
-  ("A-#" (numbered-toggle (focus-tree)))
-  ("A-*" (alternate-toggle (focus-tree)))
-  ("A-+" (zoom-in (sqrt (sqrt 2.0))))
-  ("A--" (zoom-out (sqrt (sqrt 2.0)))))
+  ("C-!" (cursor-history-add (cursor-path)))
+  ("C-#" (numbered-toggle (focus-tree)))
+  ("C-*" (alternate-toggle (focus-tree)))
+  ("C-+" (zoom-in (sqrt (sqrt 2.0))))
+  ("C--" (zoom-out (sqrt (sqrt 2.0))))
+  ("C-8" (fit-all-to-screen))
+  ("C-9" (fit-to-screen))
+  ("C-0" (fit-to-screen-width)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Standard cross-platform keybindings
@@ -377,17 +391,20 @@
   ("std a" (select-all))
   ("std b" (toggle-bold))
   ("std c" (clipboard-copy "primary"))
-  ("std f" (search-start #t))
+  ("std f" (interactive-search))
   ("std i" (toggle-italic))
   ("std n" (new-buffer))
+  ("std N" (open-window))
   ("std o" (open-buffer))
   ("std p" (preview-buffer))
   ("std q" (safely-quit-TeXmacs))
+  ("std R" (update-document "all"))
   ("std s" (save-buffer))
   ("std S" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("std u" (toggle-underlined))
   ("std v" (clipboard-paste "primary"))
   ("std w" (safely-kill-buffer))
+  ("std W" (safely-kill-window))
   ("std x" (clipboard-cut "primary"))
   ("std z" (undo 0))
   ("std Z" (redo 0))
@@ -400,18 +417,20 @@
   ;;("std tab" (next-tab))
   ;;("std S-tab" (previous-tab))
 
-  ("search std f" (search-next))      ;; added for convenience
-  ("search std F" (search-previous)))  ;; added for convenience
+  ("search std f" (search-next-match #t))   ;; added for convenience
+  ("search std F" (search-next-match #f)))  ;; added for convenience
 
 (kbd-map
   (:profile emacs)
   (:require (and (not (in-prog?)) (not (in-verbatim?))))
-  ("A-tab" (make-htab "5mm"))
+  ("A-tab" (kbd-alternate-tab))
+  ("A-S-tab" (kbd-shift-alternate-tab))
   ("A-space" (make-space "0.2spc"))
   ("A-S-space" (make-space "-0.2spc"))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc"))
-  ("M-tab" (make-htab "5mm")))
+  ("M-tab" (kbd-alternate-tab))
+  ("M-S-tab" (kbd-shift-alternate-tab)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Gnome keymap
@@ -422,7 +441,7 @@
 
   ;; standard Gnome shortcuts
   ("gnome d" (remove-text #t))
-  ("gnome h" (interactive replace-start-forward))
+  ("gnome h" (interactive-replace))
   ("gnome k" (kill-paragraph))
   ("gnome left" (traverse-left))
   ("gnome right" (traverse-right))
@@ -440,13 +459,16 @@
   ("C-insert" (clipboard-copy "primary"))
   ("S-insert" (clipboard-paste "primary"))
   ("S-delete" (clipboard-cut "primary"))
+  ("gnome c" (clipboard-copy "primary"))
+  ("gnome v" (clipboard-paste "primary"))
+  ("gnome x" (clipboard-cut "primary"))
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
 
-  ("search F3" (search-next))
-  ("search S-F3" (search-previous))
-  ("search gnome g" (search-next))
-  ("search gnome G" (search-previous))
+  ("search F3" (search-next-match #t))
+  ("search S-F3" (search-next-match #f))
+  ("search gnome g" (search-next-match #t))
+  ("search gnome G" (search-next-match #f))
 
   ;; not yet implemented
   ;;("gnome delete" (delete-end-word))
@@ -456,7 +478,8 @@
 
   ;; further shortcuts for Gnome look and feel
   ("gnome g" (selection-cancel))
-  ("gnome F" (search-start #f))
+  ("gnome l" (refresh-window))
+  ("gnome F" (interactive-search))
 
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
@@ -472,7 +495,8 @@
 (kbd-map
   (:profile gnome)
   (:require (and (not (in-prog?)) (not (in-verbatim?))))
-  ("M-tab" (make-htab "5mm"))
+  ("M-tab" (kbd-alternate-tab))
+  ("M-S-tab" (kbd-shift-alternate-tab))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))
 
@@ -486,7 +510,7 @@
   ;; standard KDE shortcuts
   ("kde d" (remove-text #t))
   ("kde k" (kill-paragraph))
-  ("kde r" (interactive replace-start-forward))
+  ("kde r" (interactive-replace))
   ("kde left" (traverse-left))
   ("kde right" (traverse-right))
   ("kde home" (go-start))
@@ -506,8 +530,8 @@
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
 
-  ("search F3" (search-next))
-  ("search S-F3" (search-previous))
+  ("search F3" (search-next-match #t))
+  ("search S-F3" (search-next-match #f))
 
   ;; not yet implemented
   ;;("kde N" (add-tab))
@@ -518,7 +542,8 @@
 
   ;; further shortcuts for KDE look and feel
   ("kde g" (selection-cancel))
-  ("kde F" (search-start #f))
+  ("kde l" (refresh-window))
+  ("kde F" (interactive-search))
 
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
@@ -534,7 +559,8 @@
 (kbd-map
   (:profile kde)
   (:require (and (not (in-prog?)) (not (in-verbatim?))))
-  ("M-tab" (make-htab "5mm"))
+  ("M-tab" (kbd-alternate-tab))
+  ("M-S-tab" (kbd-shift-alternate-tab))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))
 
@@ -546,7 +572,6 @@
   (:profile macos)
 
   ;; standard Mac OS keyboard shortcuts
-  ("macos F4" (safely-kill-buffer))
   ("macos ;" (spell-start))
   ("macos ?" (interactive docgrep-in-doc))
   ("macos ," (interactive open-preferences))
@@ -561,9 +586,8 @@
   ("macos S-up" (kbd-select go-start))
   ("macos S-down" (kbd-select go-end))
 
-  ("macos N" (open-window))
-  ("search macos g" (search-next))
-  ("search macos G" (search-previous))
+  ("search macos g" (search-next-match #t))
+  ("search macos G" (search-next-match #f))
 
   ;; not yet supported
   ;;("macos :" (display-spelling-window))
@@ -591,14 +615,16 @@
   ;;("macos C-v" (paste-style))
   ;;("macos C-V" (paste-match-style))
   ;;("macos A-v" (paste-formatting))
-  ;;("macos W" (safely-kill-buffer-windows))
   ;;("macos A-w" (safely-kill-all-windows))
   ;;("macos C-x" (cut-style))       ;; TeXmacs addition
   ;;("macos A-x" (cut-formatting))  ;; TeXmacs addition
 
   ;; further shortcuts for MacOS look and feel
-  ("macos r" (interactive replace-start-forward))
+  ("macos r" (interactive-replace))
+  ("macos F" (toggle-full-screen-mode))
+  ("macos C-f" (toggle-full-screen-edit-mode))
 
+  ("macos A-u" (toggle-preamble))
   ("altcmd x" (interactive footer-eval))
   ("altcmd X" (interactive exec-interactive-command))
 
@@ -606,6 +632,7 @@
   ;("C-e" (kbd-end-line))   ; conflict with ("text e" (make-tmlist 'enumerate))
   ("C-g" (selection-cancel))
   ("C-k" (kill-paragraph))
+  ("C-l" (refresh-window))
   ("C-y" (yank-paragraph))
   ("C-q" (make 'symbol))
   ("C-!" (make-label))
@@ -614,7 +641,8 @@
 (kbd-map
   (:profile macos)
   (:require (and (not (in-prog?)) (not (in-verbatim?))))
-  ("C-tab" (make-htab "5mm"))
+  ("C-tab" (kbd-alternate-tab))
+  ("C-S-tab" (kbd-shift-alternate-tab))
   ("C-space" (make-space "0.2spc"))
   ("C-S-space" (make-space "-0.2spc")))
 
@@ -641,16 +669,16 @@
   ("windows A--" (make 'emdash))
   ("windows A-." "<ldots>")
   ("windows A-c" (make 'copyright))
-  ("windows e" (make 'footnote))
-  ("windows F" (make 'footnote))
-  ("windows h" (interactive replace-start-forward))
+  ("windows e" (make-wrapped 'footnote))
+  ("windows F" (make-wrapped 'footnote))
+  ("windows h" (interactive-replace))
   ("windows k" (make 'hlink))
   ("windows K" (toggle-small-caps))
   ("windows A-r" (make 'registered))
   ("windows A-t" (make 'trademark))
   ("windows y" (redo 0))
 
-  ("F2" (interactive replace-start-forward))
+  ("F2" (interactive-replace))
   ("S-delete" (clipboard-cut "primary"))
   ("S-insert" (clipboard-paste "primary"))
   ("C-insert" (clipboard-copy "primary"))
@@ -658,10 +686,10 @@
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
 
-  ("search windows g" (search-next))
-  ("search windows G" (search-previous))
-  ("search F3" (search-next))
-  ("search S-F3" (search-previous))
+  ("search windows g" (search-next-match #t))
+  ("search windows G" (search-next-match #f))
+  ("search F3" (search-next-match #t))
+  ("search S-F3" (search-next-match #f))
 
   ;; not yet implemented
   ;;("F4" (go-to-different-folder))
@@ -729,6 +757,7 @@
 
   ;; further shortcuts for Windows look and feel
   ("windows g" (selection-cancel))
+  ("windows l" (refresh-window))
 
   ("altcmd g" (clipboard-clear "primary"))
   ("altcmd q" (make 'symbol))
@@ -744,6 +773,7 @@
 (kbd-map
   (:profile windows)
   (:require (and (not (in-prog?)) (not (in-verbatim?))))
-  ("M-tab" (make-htab "5mm"))
+  ("M-tab" (kbd-alternate-tab))
+  ("M-S-tab" (kbd-shift-alternate-tab))
   ("M-space" (make-space "0.2spc"))
   ("M-S-space" (make-space "-0.2spc")))

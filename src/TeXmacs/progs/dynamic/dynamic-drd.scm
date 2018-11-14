@@ -34,6 +34,9 @@
      (define-group unfolded-tag ,unfolded)
      (define-alternate ,folded ,unfolded)))
 
+(define-toggle picture-mixed source-mixed)
+(define-toggle folded-subsession unfolded-subsession)
+
 (define-fold folded unfolded)
 (define-fold folded-plain unfolded-plain)
 (define-fold folded-std unfolded-std)
@@ -69,6 +72,9 @@
 
 ;; switches
 
+(define-group variant-tag (unroll-tag))
+(define-group similar-tag (unroll-tag))
+
 (define-group switch-tag
   (alternative-tag) (unroll-tag) (expanded-tag))
 
@@ -82,15 +88,71 @@
   switch screens)
 
 (define-group unroll-tag
-  unroll)
+  unroll unroll-compressed unroll-phantoms unroll-greyed)
 
 (define-group expanded-tag
   expanded slides)
 
-;; ornaments
+;; overlays
 
-(define-group ornament-tag
-  manila-paper rough-paper ridged-paper pine granite metal)
+(define-group variant-tag
+  (std-overlays-tag)
+  (nullary-overlay-tag) (unary-overlay-tag) (binary-overlay-tag))
 
-(define-group variant-tag (ornament-tag))
-(define-group similar-tag (ornament-tag))
+(define-group similar-tag
+  (std-overlays-tag)
+  (nullary-overlay-tag) (unary-overlay-tag) (binary-overlay-tag))
+
+(define-group overlays-tag
+  (std-overlays-tag) gr-overlays)
+
+(define-group std-overlays-tag
+  overlays overlays-compressed overlays-phantoms overlays-greyed)
+
+(define-group overlay-tag
+  (nullary-overlay-tag) (unary-overlay-tag) (binary-overlay-tag))
+
+(define-group nullary-overlay-tag
+  show-always show-from show-until show-this show-other)
+
+(define-group unary-overlay-tag
+  overlay-from overlay-until overlay-this overlay-other)
+
+(define-group binary-overlay-tag
+  alternate-from alternate-until alternate-this alternate-other)
+
+;; hidden content
+
+(define-group variant-tag (hidden-tag))
+(define-group similar-tag (hidden-tag))
+
+(define-group hidden-tag
+  hidden-deleted hidden-invisible hidden-greyed)
+
+;; animation tags
+
+(define-group variant-tag
+  (appear-tag) (disappear-tag) (smooth-tag) (anim-emphasize-tag))
+
+(define-group similar-tag
+  (appear-tag) (disappear-tag) (smooth-tag) (anim-emphasize-tag))
+
+(define-group anim-tag
+  (appear-tag) (disappear-tag) (smooth-tag) (anim-emphasize-tag))
+
+(define-group appear-tag
+  translate-in progressive-in fade-in zoom-in)
+
+(define-group disappear-tag
+  translate-out progressive-out fade-out zoom-out)
+
+(define-group smooth-tag
+  translate-smooth progressive-smooth fade-smooth zoom-smooth)
+
+(define-group anim-emphasize-tag
+  shadowed-smooth emboss-smooth outlined-emboss-smooth)
+
+(define-group animation-tag
+  anim-constant anim-compose anim-repeat
+  anim-translate anim-progressive
+  (anim-tag))

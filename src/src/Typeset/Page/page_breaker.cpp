@@ -12,6 +12,7 @@
 #include "Line/lazy_vstream.hpp"
 #include "vpenalty.hpp"
 #include "skeleton.hpp"
+#include "boot.hpp"
 
 #include "merge_sort.hpp"
 void sort (pagelet& pg);
@@ -42,6 +43,7 @@ struct page_breaker_rep {
   space fnote_sep;
   space float_sep;
   font  fn;
+  int   first_page;
   bool  last_page_flag;
 
   int                 nr_flows;   // number of flows;
@@ -86,8 +88,8 @@ struct page_breaker_rep {
   array<pagelet>      best_pgs;   // & pagelets
 
   page_breaker_rep (array<page_item> l, space ph, int quality,
-			 space fn_sep, space fnote_sep,
-			 space float_sep, font fn);
+                    space fn_sep, space fnote_sep, space float_sep,
+                    font fn, int fp);
 
   void init_flows (int start, int end);
   void init_flows (array<page_item> l, int start, int end, path p, path flb);
@@ -142,10 +144,12 @@ struct page_breaker_rep {
 
 page_breaker_rep::page_breaker_rep (
   array<page_item> l2, space ph, int quality2,
-  space fn_sep2, space fnote_sep2, space float_sep2, font fn2):
+  space fn_sep2, space fnote_sep2, space float_sep2,
+  font fn2, int fp2):
     l (l2), papyrus_mode (ph == (MAX_SI >> 1)), height (ph),
     fn_sep (fn_sep2), fnote_sep (fnote_sep2), float_sep (float_sep2),
-    fn (fn2), flow_id (-1), brk_nr (-1), quality (quality2)
+    fn (fn2), first_page (fp2),
+    flow_id (-1), brk_nr (-1), quality (quality2)
 {}
 
 /******************************************************************************
@@ -218,11 +222,11 @@ sub (array<page_item> l, path p, path q) {
   }
   else {
     if ((N(p) <= 2) || (N(q) <= 2)) {
-      cerr << "\nThe paths were " << p << " and " << q << "\n";
+      failed_error << "The paths were " << p << " and " << q << "\n";
       FAILED ("paths to short");
     }
     if ((p->item != q->item) || (p->next->item != q->next->item)) {
-      cerr << "\nThe paths were " << p << " and " << q << "\n";
+      failed_error << "The paths were " << p << " and " << q << "\n";
       FAILED ("paths don't match");
     }
     page_item item= l[p->item];
@@ -902,13 +906,6 @@ page_breaker_rep::make_pagelet (int start, int end, path flb, int nr_cols) {
   return pg;
 }
 
-SI
-stretch_space (space spc, double stretch) {
-  if (stretch > 0.0) return (SI) (spc->def + stretch * (spc->max - spc->def));
-  if (stretch < 0.0) return (SI) (spc->def + stretch * (spc->def - spc->min));
-  return spc->def;
-}
-
 vpenalty
 page_breaker_rep::format_insertion (insertion& ins, double stretch) {
   // cout << "Stretch " << ins << ": " << stretch << LF;
@@ -1230,7 +1227,7 @@ page_breaker_rep::fast_break_page (int i1, int& first_end) {
     SI top_cor= flow_cor[0][i1]->max;
     SI bot_cor= flow_cor[0][i2-1]->min;
     spc += space (top_cor + flow_cor[0][i2-1]->def + bot_cor);
-
+    
     int bpen= access (l, flow[0][i2-1])->penalty;
     if (i2 >= n) bpen= 0;
     if (bpen < HYPH_INVALID) {
@@ -1246,7 +1243,7 @@ page_breaker_rep::fast_break_page (int i1, int& first_end) {
 	    ((double) max (spc->def, 1))/((double) max (height->def, 1));
 	  if (factor < 0.0 ) factor= 0.0;
 	  if (factor > 0.99) factor= 0.99;
-	  pen= vpenalty ((int) ((1.0 - factor) * TOO_SHORT_PENALTY));
+	  pen += vpenalty ((int) ((1.0 - factor) * TOO_SHORT_PENALTY));
 	}
       }
       else if (spc->min > height->def) {
@@ -1256,7 +1253,7 @@ page_breaker_rep::fast_break_page (int i1, int& first_end) {
 	    ((double) max (spc->def, 1))/((double) max (height->def, 1));
 	  if (factor < 1.0  ) factor= 1.0;
 	  if (factor > 100.0) factor= 100.0;
-	  pen= vpenalty ((int) (factor * TOO_LONG_PENALTY));
+	  pen += vpenalty ((int) (factor * TOO_LONG_PENALTY));
 	}
       }
       if (pen < best_pens[i2]) {
@@ -1471,18 +1468,22 @@ page_breaker_rep::make_skeleton () {
   skeleton sk;
   int i, j, n= N(l);
   bool dpage_flag= false;
+  int page_offset= first_page - 1;
   for (i=0, j=0; j<n; j++) {
-    if ((!papyrus_mode) && (l[j]->type == PAGE_CONTROL_ITEM))
+    if ((!papyrus_mode) && (l[j]->type == PAGE_CONTROL_ITEM)) {
       if ((l[j]->t == PAGE_BREAK) ||
 	  (l[j]->t == NEW_PAGE) || (l[j]->t == NEW_DPAGE))
 	{
-	  if (dpage_flag && ((N(sk)&1) == 1))
+	  if (dpage_flag && ((N(sk) + page_offset) & 1) == 1)
 	    sk << pagelet (space (0));
 	  dpage_flag= (l[j]->t == NEW_DPAGE);
 	  last_page_flag= (l[j]->t != PAGE_BREAK);
 	  if (i<j) assemble_skeleton (sk, i, j);
 	  i=j+1;
 	}
+      else if (is_tuple (l[j]->t, "env_page") && l[j]->t[1] == PAGE_NR)
+        page_offset= as_int (l[j]->t[2]->label) - N(sk) - 1;
+    }
   }
   if (i<j) {
     if (dpage_flag && ((N(sk)&1) == 1))
@@ -1497,14 +1498,25 @@ page_breaker_rep::make_skeleton () {
 * The exported page breaking routine
 ******************************************************************************/
 
+skeleton new_break_pages (array<page_item> l, space ph, int qual,
+                          space fn_sep, space fnote_sep, space float_sep,
+                          font fn, int first_page);
+
 skeleton
 break_pages (array<page_item> l, space ph, int qual,
-	     space fn_sep, space fnote_sep, space float_sep, font fn)
+	     space fn_sep, space fnote_sep, space float_sep,
+             font fn, int first_page)
 {
-  page_breaker_rep* H=
-    tm_new<page_breaker_rep> (l, ph, qual, fn_sep, fnote_sep, float_sep, fn);
-  // cout << HRULE << LF;
-  skeleton sk= H->make_skeleton ();
-  tm_delete (H);
-  return sk;
+  if (get_user_preference ("new style page breaking") == "on")
+    return new_break_pages (l, ph, qual, fn_sep, fnote_sep, float_sep,
+                            fn, first_page);
+  else {
+    page_breaker_rep* H=
+      tm_new<page_breaker_rep> (l, ph, qual, fn_sep, fnote_sep, float_sep,
+                                fn, first_page);
+    // cout << HRULE << LF;
+    skeleton sk= H->make_skeleton ();
+    tm_delete (H);
+    return sk;
+  }
 }

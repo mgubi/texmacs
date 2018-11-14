@@ -48,7 +48,7 @@ edit_interface_rep::set_left_footer () {
     s << " " << lan;
   else s << " " << mode;
   if ((mode == "text") || (mode == "src")) {
-    s << " " << get_env_string (FONT);
+    s << " " << main_family (get_env_string (FONT));
     append_left_footer (s, FONT_FAMILY);
     s << " " << as_string ((int) ((base_sz+0.5)*sz));
     append_left_footer (s, FONT_SERIES);
@@ -113,6 +113,9 @@ edit_interface_rep::compute_text_footer (tree st) {
   if (r == "") r= "start";
   if (r == " ") r= "space";
   if (r == "space" && get_env_string (MODE) == "math") r= "apply";
+  if (starts (r, "<") && !starts (r, "<#"))
+    if (cork_to_utf8 (r) != r)
+      r= r * " (" * r(1, N(r)-1) * ")";
   return r;
 }
 
@@ -214,6 +217,7 @@ edit_interface_rep::compute_operation_footer (tree st) {
       if (is_atomic (st[0])) r= as_string (st[0]);
       else r= "compound";
       break;
+    case VAR_INCLUDE:
     case INCLUDE:
       r= concat ("include ", as_string (st[0])); break;
     case INACTIVE:
@@ -226,10 +230,16 @@ edit_interface_rep::compute_operation_footer (tree st) {
       r= concat ("reference: ", as_string (st[0])); break;
     case PAGEREF:
       r= concat ("page reference: ", as_string (st[0])); break;
+    case GET_ATTACHMENT:
+      r= concat ("get attachment: ", as_string (st[0])); break;
     case WRITE:
       r= concat ("write to ", as_string (st[0])); break;
+    case TOC_NOTIFY:
+      r= concat ("toc notify: ", as_string (st[1])); break;
     case SPECIFIC:
       r= concat ("specific ", as_string (st[0])); break;
+    case HYPHENATE_AS:
+      r= concat ("hyphenate as ", as_string (st[0])); break;
     case IMAGE:
       r= concat ("image"); break;
     default: ;
@@ -330,10 +340,15 @@ edit_interface_rep::compute_compound_footer (tree t, path p) {
     else
       return concat (up, "compound ");
   case HLINK:
-    if (N(st) >= 2)
-      return concat (up, "hyperlink(" * as_string (st[1]) * ") ");
-    else
+    if (N(st) >= 2) {
+      if (l == 0) {
+        return concat (up, "hyperlink(text) ");
+      } else {
+        return concat (up, "hyperlink(destination) ");
+      }
+    } else {
       return concat (up, "hyperlink ");
+    }
   case TUPLE:
     return concat (up, "tuple(" * as_string (l+1) * ") ");
   case ATTR:
@@ -344,8 +359,10 @@ edit_interface_rep::compute_compound_footer (tree t, path p) {
   case SPECIFIC:
     return concat (up, "texmacs ");
   case ANIM_CONSTANT:
-    if (l == 0)
-      return concat (up, "anim-constant ");
+    if (l == 0) return concat (up, "anim-constant ");
+    else return up;
+  case ANIM_ACCELERATE:
+    if (l == 0 && N(st) == 2) return concat (up, as_string (st[1]) * " ");
     else return up;
   case ANIM_TRANSLATE:
     if (l == 0)

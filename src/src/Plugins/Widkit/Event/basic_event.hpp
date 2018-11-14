@@ -14,6 +14,7 @@
 #include "Widkit/event.hpp"
 #include "Widkit/wk_widget.hpp"
 #include "Widkit/Event/event_codes.hpp"
+#include "renderer.hpp"
 
 /******************************************************************************
 * Attribute events
@@ -97,6 +98,13 @@ struct keyboard_focus_event_rep: public event_rep {
 };
 EVENT(keyboard_focus_event);
 
+struct keyboard_focus_on_event_rep: public event_rep {
+  string field; bool& done;
+  keyboard_focus_on_event_rep (string field, bool& done);
+  operator tree ();
+};
+EVENT(keyboard_focus_on_event);
+
 struct mouse_event_rep: public event_rep {
   string type; SI x, y; int mods; time_t t;
   mouse_event_rep (string type, SI x, SI y, int mods, time_t t);
@@ -117,15 +125,17 @@ EVENT(alarm_event);
 ******************************************************************************/
 
 struct clear_event_rep: public event_rep {
+  renderer win;
   SI x1, y1, x2, y2;
-  clear_event_rep (SI x1, SI y1, SI x2, SI y2);
+  clear_event_rep (renderer win, SI x1, SI y1, SI x2, SI y2);
   operator tree ();
 };
 EVENT(clear_event);
 
 struct repaint_event_rep: public event_rep {
+  renderer win;
   SI x1, y1, x2, y2; bool& stop;
-  repaint_event_rep (SI x1, SI y1, SI x2, SI y2, bool& stop);
+  repaint_event_rep (renderer win, SI x1, SI y1, SI x2, SI y2, bool& stop);
   operator tree ();
 };
 EVENT(repaint_event);

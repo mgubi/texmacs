@@ -9,14 +9,20 @@
  ******************************************************************************/
 
 #define TEXMACS_R_VERSION "0.15"
-
+#include "config.h"
 #include <stdio.h>
 #include <sys/select.h>
+#ifdef __FreeBSD__
+#include <libutil.h>
+#else
 #if HAVE_PTY_H
 #include <pty.h>
+#else
+#include <util.h>
 #endif
 
 #include <utmp.h>
+#endif
 #include <unistd.h>
 #include <termios.h>
 #include <stdlib.h>
@@ -115,7 +121,7 @@ if( !is.element(\"TeXmacs\", installed.packages()[,1]) || \n\
 	system(paste(\"R CMD build \",Sys.getenv(\"TEXMACS_PATH\"),\"/plugins/r/r/TeXmacs\",sep=\"\") );\n\
 	pack=list.files(pattern=\"TeXmacs.*gz\"); \n\
     install.packages(pack,repos=NULL,type=\"source\");	\n\
-	library(TeXmacs) }\n\n" ;
+	library(TeXmacs) }\n" ;
 
 // Add one more DATA_BEGIN, i.e. open bracket.
 #define B_DATA_BEGIN( TXB )					\
@@ -900,6 +906,8 @@ DEBUG_LOG( "TEXMACS_SEND=%s",TEXMACS_SEND_E) ;
     for( i=0,n=0; i<m; i++)
       if( TEXMACS_R[i] == ' ' ) 
 	n++ ;
+	
+unsetenv( "DYLD_LIBRARY_PATH") ;
 	
     exec_argv = (char **) malloc( (n+2)*sizeof( char * ) ) ;
 	

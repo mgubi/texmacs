@@ -22,6 +22,7 @@
 #include "file.hpp"
 #include "sys_utils.hpp"
 #include "qt_utilities.hpp"
+#include "qt_gui.hpp"
 #include "analyze.hpp"
 #include "dictionary.hpp"
 #include "image_files.hpp"
@@ -112,41 +113,42 @@ QTMImagePreview::QTMImagePreview (QWidget* parent)
   setImage (0);
 }
 
-void
-QTMImagePreview::setImage (const QString& file) {
+void 
+QTMImagePreview::setImage (const QString& file) { 	  //generate thumbnail
+BEGIN_SLOT
   QImage img;
   wid->setText ("");
   hei->setText ("");
   xps->setText ("");
   yps->setText ("");
 
-  if (file.endsWith (".ps") ||
-      file.endsWith (".eps") ||
-      file.endsWith (".pdf")) {
+  string localname = from_qstring_os8bits(file);
+  url image_url= url_system (localname);
+  if (DEBUG_CONVERT) debug_convert<<"image preview :["<<image_url<<"]"<<LF;
+  if (!(as_string(image_url)=="") && !is_directory(image_url) && exists(image_url) ){
     url temp= url_temp (".png");
-    url image_url= url_system (scm_unquote (from_qstring_utf8 (file)));
     int w_pt, h_pt;
     double w, h;
     image_size (image_url, w_pt, h_pt);
-    if (w_pt > h_pt) {
-      w= 98;
-      h= h_pt*98/w_pt;
-      if ((int)h < h) h= (int)h+1; else h= (int)h;
-    }
-    else {
-      w= w_pt*98/h_pt;
-      if ((int)w < w) w= (int)w+1; else w= (int)w;
-      h= 98;
-    }
-    image_to_png (image_url, temp, w, h);
-    img.load (utf8_to_qstring (as_string (temp)));
-    remove (temp);
-  }
-  else {
-    img.load (file);
-    if (!img.isNull()) {
-      wid->setText (QString::number (img.width ()) + "px");
-      hei->setText (QString::number (img.height ()) + "px");
+    if (w_pt*h_pt !=0) { //necessary if gs returns h=v=0 (for instance 0-size pdf)
+      wid->setText (QString::number (w_pt) + "pt");
+      hei->setText (QString::number (h_pt) + "pt");
+      if (w_pt > h_pt) {
+        w= 98;
+        h= h_pt*98/w_pt;
+        if ((int)h < h) h= (int)h+1;
+        else h= (int)h;
+      } 
+	  else {
+        w= w_pt*98/h_pt;
+        if ((int)w < w) w= (int)w+1;
+        else w= (int)w;
+        h= 98;
+	  }
+	  //generate thumbnail :
+	  image_to_png (image_url, temp, w, h);
+	  img.load (os8bits_to_qstring (as_string (temp)));
+	  remove (temp);
     }
   }
 
@@ -167,6 +169,7 @@ QTMImagePreview::setImage (const QString& file) {
   }
   else
     image->setPixmap (QPixmap::fromImage (img.scaled (98, 98, Qt::KeepAspectRatio, Qt::FastTransformation)));
+END_SLOT
 }
 
 QTMImageDialog::QTMImageDialog (QWidget* parent, const QString& caption, const QString& directory, const QString& filter)

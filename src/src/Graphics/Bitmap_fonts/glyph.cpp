@@ -18,6 +18,7 @@
 glyph_rep::glyph_rep (int w2, int h2, int xoff2, int yoff2,
 		      int depth2, int status2)
 {
+  index   = 0;
   depth   = depth2;
   width   = w2;
   height  = h2;
@@ -45,8 +46,8 @@ glyph::glyph (int w2, int h2, int xoff2, int yoff2, int depth2, int status2) {
 
 int
 glyph_rep::get_x (int i, int j) {
-  if ((i<0) || (i>=width))  return 0;
-  if ((j<0) || (j>=height)) return 0;
+  if (i<0 ||  (i-width)>=0) return 0;
+  if (j<0 || (j-height)>=0) return 0;
   if (depth==1) {
     int bit= j*width+i;
     return (raster[bit>>3] >> (bit&7)) & 1;
@@ -101,8 +102,9 @@ glyph_rep::adjust_top () {
 tm_ostream&
 operator << (tm_ostream& out, glyph gl) {
   int i, j;
-  out << "Size  : (" << gl->width << ", " << gl->height << ")\n";
-  out << "Offset: (" << gl->xoff << ", " << gl->yoff << ")\n";
+  out << "Size   : (" << gl->width << ", " << gl->height << ")\n";
+  out << "Offset : (" << gl->xoff << ", " << gl->yoff << ")\n";
+  out << "Advance: " << gl->lwidth << "\n";
   for (i=0; i<gl->width+2; i++) out << "-";
   out << "\n";
   for (j=0; j<gl->height; j++) {

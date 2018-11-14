@@ -30,7 +30,13 @@
     "halfexecutive" "ledger" "legal" "letter" "Monarch"
     "csheet" "dsheet" "flsa" "flse" "folio"
     "lecture note" "note" "quarto" "statement" "tabloid"
+    "16:9" "8:5" "3:2" "4:3" "5:4"
     "user"))
+
+(define standard-sizes
+  '("a0" "a1" "a2" "a3" "a4" "a5" "a6"
+    "b3" "b4" "b5" "b6"
+    "ledger" "legal" "letter" "folio"))
 
 (define (get-default-paper-size-bis)
   (with psize (getenv "PAPERSIZE")
@@ -44,6 +50,9 @@
 
 (tm-define (correct-paper-size s)
   (if (and (string? s) (in? s supported-sizes)) s "a4"))
+
+(tm-define (standard-paper-size s)
+  (if (and (string? s) (in? s standard-sizes)) s "user"))
 
 (tm-define (get-default-paper-size)
   (correct-paper-size (get-default-paper-size-bis)))
@@ -67,10 +76,31 @@
   (set-printer-dpi val))
 
 (define-preferences
+  ("native pdf" "on" noop)
+  ("native postscript" "on" noop)
+  ("texmacs->pdf:expand slides" "off" noop)
+  ("texmacs->pdf:check" "off" noop)
   ("preview command" "default" notify-preview-command)
-  ("printing command" "lpr" notify-printing-command)
+  ("printing command" (get-default-printing-command) notify-printing-command)
   ("paper type" (get-default-paper-size) notify-paper-type)
   ("printer dpi" "600" notify-printer-dpi))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Printing wrapper for slides
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (wrapped-print-to-file fname)
+  (if (screens-buffer?)
+      (let* ((cur (current-buffer))
+             (buf (buffer-new)))
+        (buffer-copy cur buf)
+        (buffer-set-master buf cur)
+        (switch-to-buffer buf)
+        (dynamic-make-slides)
+        (print-to-file fname)
+        (switch-to-buffer cur)
+        (buffer-close buf))
+      (print-to-file fname)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Printing commands
@@ -96,28 +126,36 @@
   (:argument first "First page")
   (:argument last "Last page"))
 
+(tm-define (preview-file u)
+  (with s (url->system u)
+    (cond ((!= preview-command "default")
+           (shell (string-append preview-command " " s " &")))
+          ((or (os-mingw?) (os-win32?))
+           (shell (string-append "cmd /c start " s)))
+          ((os-macos?)
+           (shell (string-append "open " s)))
+          ((url-exists-in-path? "xdg-open")
+           (shell (string-append "xdg-open " s)))
+          ((url-exists-in-path? "ggv")
+           (shell (string-append "ggv " s " &")))
+          ((url-exists-in-path? "ghostview")
+           (shell (string-append "ghostview " s " &")))
+          ((url-exists-in-path? "gv")
+           (shell (string-append "gv " s " &")))
+          (else (set-message
+                 "Error: ghostview does not seem to be installed on your system"
+                 "preview")))))
+
 (tm-define (preview-buffer)
-  (print-to-file "$TEXMACS_HOME_PATH/system/tmp/preview.ps")
-  (cond ((!= preview-command "default")
-	 (shell (string-append preview-command
-			       " $TEXMACS_HOME_PATH/system/tmp/preview.ps &")))
-	((or (os-mingw?) (os-win32?))
-	 (shell (string-append "gsview32 \""
-			       (getenv "TEXMACS_HOME_PATH")
-			       "\\system\\tmp\\preview.ps\"")))
-	((os-macos?)
-         (shell "open $TEXMACS_HOME_PATH/system/tmp/preview.ps"))
-        ((url-exists-in-path? "xdg-open")
-	 (shell "xdg-open $TEXMACS_HOME_PATH/system/tmp/preview.ps"))
-        ((url-exists-in-path? "ggv")
-	 (shell "ggv $TEXMACS_HOME_PATH/system/tmp/preview.ps &"))
-	((url-exists-in-path? "ghostview")
-	 (shell "ghostview $TEXMACS_HOME_PATH/system/tmp/preview.ps &"))
-	((url-exists-in-path? "gv")
-	 (shell "gv $TEXMACS_HOME_PATH/system/tmp/preview.ps &"))
-	(else (set-message
-	       "Error: ghostview does not seem to be installed on your system"
-	       "preview"))))
+  (with file (cond ((os-mingw?)
+                    (let* ((p (getenv "TEXMACS_HOME_PATH"))
+                           (f (string-append p "\\system\\tmp\\preview.pdf")))
+                      (system->url f)))
+                   ((or (os-macos?) (get-boolean-preference "native pdf"))
+                    "$TEXMACS_HOME_PATH/system/tmp/preview.pdf")
+                   (else "$TEXMACS_HOME_PATH/system/tmp/preview.ps"))
+    (print-to-file file)
+    (preview-file file)))
 
 (tm-define (choose-file-and-print-page-selection start end)
   (:argument start "First page")

@@ -14,43 +14,47 @@
 (texmacs-module (convert latex tmtex-elsevier)
   (:use (convert latex tmtex)))
 
+(tm-define (tmtex-transform-style x)
+  (:mode elsevier-style?)
+  (cond ((== x "elsart") "elsart")
+	((== x "elsarticle") "elsarticle")
+	((== x "ifac") "ifacconf")
+	((== x "jsc") `("amsthm" "elsart"))
+        (else x)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization of elsevier style
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define note-counter 0)
 (define author-counter 0)
-(define elsevier-thanks '())
-(define elsevier-abstract #f)
+(define clustered? #f)
 
-(tm-define (init-elsevier body)
-  (:synopsis "Initialize Elsevier style")
+(define (init-elsevier body)
+  (set! clustered? #f)
   (set! note-counter 0)
-  (set! author-counter 0)
-  (set! elsevier-thanks '())
-  (with l (select body '(:* abstract))
-    (set! elsevier-abstract (and (nnull? l) (list-2? (car l)) (cadar l)))))
+  (set! author-counter 0))
 
 (tm-define (tmtex-style-init body)
   (:mode elsevier-style?)
   (init-elsevier body))
 
-(define (ref-note)
-  (number->string note-counter))
+(tm-define (tmtex-style-init body)
+  (:mode ifac-style?)
+  (init-elsevier body)
+  ;;(set! tmtex-packages (cons "natbib" tmtex-packages))
+  ;;(latex-set-packages '("natbib"))
+  )
 
-(define (refstep-note)
-  (set! note-counter (+ note-counter 1))
-  (string-append "note-" (ref-note)))
-
-(define (ref-author)
-  (number->string author-counter))
-
-(define (refstep-author)
-  (set! author-counter (+ author-counter 1))
-  (string-append "author-" (ref-author)))
+(tm-define (tmtex-style-init body)
+  (:mode jsc-style?)
+  (init-elsevier body)
+  (set! tmtex-packages (cons "natbib" tmtex-packages))
+  (latex-set-packages '("amsthm" "yjsco" ;;"natbib"
+                        )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Preprocessing datas
+;; Preprocessing data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmtex-style-preprocess doc)
@@ -89,331 +93,294 @@
   `((!begin "frontmatter") ,(tmtex (car l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Elsarticle title macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (tmtex-tmtex-replace-documents t)
-  (:mode elsevier-style?)
-  t)
-
-(define (list-elsarticle-notes)
-  (if (== note-counter 0) ""
-    (let* ((notes (map number->string (.. 1 (1+ note-counter))))
-           (notes (map (cut string-append "note-" <>) notes))
-           (notes (apply string-append (list-intersperse notes ","))))
-    `(tnoteref ,notes))))
-
-(tm-define (tmtex-elsevier-title t)
-  `(title ,(tmtex `(!concat ,(cadr t) ,(list-elsarticle-notes)))))
-
-(tm-define (tmtex-elsevier-note t)
-  `(tnotetext (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-date t)
-  `(tdatetext (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-subtitle t)
-  `(tsubtitletext (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-misc t)
-  `(tmisctext (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-misc t)
-  `(fmtext (!option ,(refstep-author)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-misc* t)
-  `(,(third t) (fmtext (!option ,(third t)) ,(tmtex (fourth t)))))
-
-(tm-define (tmtex-elsevier-auth-note t)
-  `(fntext (!option ,(refstep-author)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-note* t)
-  (if (string-starts? (third t) "authref-")
-    `(,(third t) (fntext (!option ,(third t)) ,(tmtex (fourth t)))) '()))
-
-(define (tmtex-elsevier-affiliation t)
-  `(address ,(tmtex (cadr t))))
-
-(define (tmtex-elsevier-affiliation* t)
-  `(,(third t) (address (!option ,(third t)) ,(tmtex (fourth t)))))
-
-(define (tmtex-elsevier-email t)
-  `(ead ,(tmtex (cadr t))))
-
-(define (tmtex-elsevier-email* t)
-  `(,(third t) (ead ,(tmtex (fourth t)))))
-
-(define (tmtex-elsevier-homepage t)
-  `(ead (!option "url") ,(tmtex (cadr t))))
-
-(define (tmtex-elsevier-homepage* t)
-  `(,(third t) (ead (!option "url") ,(tmtex (fourth t)))))
-
-(tm-define (tmtex-elsevier-name t affref fnref)
-  (set! affref (list-intersperse affref ","))
-  (if (nnull? fnref)
-    (with fnref (tex-concat* (list-intersperse fnref ","))
-      (set! t `(!concat ,t (fnref ,fnref)))))
-  (if (null? affref)
-    `(author ,t)
-    `(author (!option ,(tex-concat* affref)) ,t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Elsart specific title macros
+;; Elsarticle specific title macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmtex-replace-documents t)
-  (:mode elsart-style?)
+  (:mode elsevier-style?) t)
+
+(tm-define (springer-note-ref l r)
+  (if (list? r)
+    (set! r (tex-concat* (list-intersperse r ",")))
+    (set! r (string-append l r)))
+  `(tnoteref ,r))
+
+(tm-define (tmtex-doc-title t)
+  (:mode elsevier-style?)
+  `(title ,(tmtex (cadr t))))
+
+(tm-define (tmtex-doc-subtitle-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "sub-" (car l)))
+
+(tm-define (tmtex-doc-subtitle-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "sub-" (car l))
+    `(tsubtitletext (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-note-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "note-" (car l)))
+
+(tm-define (tmtex-doc-note-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "note-" (car l))
+    `(tnotetext (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-date-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "date-" (car l)))
+
+(tm-define (tmtex-doc-date-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "date-" (car l))
+    `(tdatetext (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-misc-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "misc-" (car l)))
+
+(tm-define (tmtex-doc-misc-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "misc-" (car l))
+    `(tmisctext (!option ,label) ,(tmtex (cadr l)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsevier specific authors macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (springer-author-note-ref l r)
+  (if (list? r)
+    (set! r (tex-concat* (list-intersperse r ",")))
+    (set! r (string-append l r)))
+  `(fnref ,r))
+
+(tm-define (tmtex-author-note-ref s l)
+  (:mode elsevier-style?)
+  (springer-author-note-ref "author-note-" (car l)))
+
+(tm-define (tmtex-author-note-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "author-note-" (car l))
+    `(fntext (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-author-misc-ref s l)
+  (:mode elsevier-style?)
+  (springer-author-note-ref "author-misc-" (car l)))
+
+(tm-define (tmtex-author-misc-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "author-misc-" (car l))
+    `(fmtext (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-author-affiliation t)
+  (:mode elsevier-style?)
+  `(address ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-affiliation-ref s l)
+  (:mode elsevier-style?)
+  (springer-author-note-ref "affiliation-" (car l)))
+
+(tm-define (tmtex-author-affiliation-label s l)
+  (:mode elsevier-style?)
+  (with label (string-append "affiliation-" (car l))
+    `(address (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-author-email t)
+  (:mode elsevier-style?)
+  `(ead ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-email-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "author-email-" (car l)))
+
+(tm-define (tmtex-author-email-label s l)
+  (:mode elsevier-style?)
+  `(ead ,(tmtex (cadr l))))
+
+(tm-define (tmtex-author-homepage t)
+  (:mode elsevier-style?)
+  `(ead (!option "url") ,(tmtex (cadr t))))
+
+(tm-define (tmtex-author-homepage-ref s l)
+  (:mode elsevier-style?)
+  (springer-note-ref "author-url-" (car l)))
+
+(tm-define (tmtex-author-homepage-label s l)
+  (:mode elsevier-style?)
+  `(ead (!option "url") ,(tmtex (cadr l))))
+
+(tm-define (tmtex-author-name t)
+  (:mode elsevier-style?)
+  `(author ,(tmtex (cadr t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsart and IFAC specific title macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-replace-documents t)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
   (if (npair? t) t
     (with (r s) (list (car t) (map tmtex-replace-documents (cdr t)))
       (if (!= r 'document) `(,r ,@s)
         `(concat ,@(list-intersperse s '(next-line)))))))
 
-(define (thanksref t)
-  `(thanksref ,t))
-
-(define (list-elsart-notes)
-  (if (== note-counter 0) ""
-    (let* ((notes (map number->string (.. 1 (1+ note-counter))))
-           (notes (map (lambda (x) (string-append "note-" x)) notes))
-           (notes (map thanksref notes)))
-    (tex-concat* notes))))
-
-(tm-define (tmtex-elsevier-title t)
-  (:mode elsart-style?)
-  `(title ,(tmtex `(!concat ,(cadr t) ,(list-elsart-notes)))))
-
-(tm-define (tmtex-elsevier-note t)
-  (:mode elsart-style?)
-  `(thanks (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-date t)
-  (:mode elsart-style?)
-  `(thanksdate (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-subtitle t)
-  (:mode elsart-style?)
-  `(thankssubtitle (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-misc t)
-  (:mode elsart-style?)
-  `(thanksmisc (!option ,(refstep-note)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-misc t)
-  (:mode elsart-style?)
-  `(thanksamisc (!option ,(refstep-author)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-misc* t)
-  (:mode elsart-style?)
-  `(,(third t) (thanksamisc (!option ,(third t)) ,(tmtex (fourth t)))))
-
-(tm-define (tmtex-elsevier-auth-note t)
-  (:mode elsart-style?)
-  `(thanks (!option ,(refstep-author)) ,(tmtex (cadr t))))
-
-(tm-define (tmtex-elsevier-auth-note* t)
-  (:mode elsart-style?)
-  (if (string-starts? (third t) "authref-")
-    `(,(third t) (thanks (!option ,(third t)) ,(tmtex (fourth t)))) '()))
-
-(tm-define (tmtex-elsevier-name t affref fnref)
-  (:mode elsart-style?)
-  (set! affref (list-intersperse affref ","))
-  (if (nnull? fnref)
-    (with fnref (map thanksref fnref)
-      (set! t `(!concat ,t ,@fnref))))
-  (if (null? affref)
-    `(author ,t)
-    `(author (!option ,(tex-concat* affref)) ,t)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Elsevier miscellanous macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (tmtex-select-args-by-func n l)
-  (filter (lambda (x) (func? x n)) l))
-
-(define (elsevier-split-authors t)
-  (if (and (pair? t) (pair? (cdr t)) (func? (cadr t) 'concat))
-    (with l (filter (lambda (x) (!= ", " x)) (cdadr t))
-           (if (null? (filter (lambda (x) (not (func? x 'doc-note-ref))) l))
-             l `(,t))) `(,t)))
-
-(define (elsevier-get-names t)
-  (cond ((func? t 'doc-note-ref) (elsevier-get-names (cAr t)))
-        ((func? t 'author-name) (cadr t))
-        (else t)))
-
-(define (elsevier-get-name-refs t)
-  (cond ((func? t 'doc-note-ref) (append `(,(cADr t))
-                                         (elsevier-get-name-refs (cAr t))))
-        ((func? t 'author-name) (elsevier-get-name-refs (cadr t)))
-        (else '())))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Elsevier non clustered title macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (tmtex-elsevier-author t)
-  (set! t (tmtex-replace-documents t))
-  (if (or (npair? t) (npair? (cdr t)) (not (func? (cadr t) 'author-data))) '()
-    (let* ((datas        (cdadr t))
-           ;; notes and miscs needed in first position due to side effects
-           (miscs        (map tmtex-elsevier-auth-misc
-                              (tmtex-select-args-by-func 'author-misc datas)))
-           (notes        (map tmtex-elsevier-auth-note
-                              (tmtex-select-args-by-func 'author-note datas)))
-           (emails       (map tmtex-elsevier-email
-                              (tmtex-select-args-by-func 'author-email datas)))
-           (urls         (map tmtex-elsevier-homepage
-                              (tmtex-select-args-by-func
-                                'author-homepage datas)))
-           (affiliations (map tmtex-elsevier-affiliation
-                              (tmtex-select-args-by-func
-                                'author-affiliation datas)))
-           (fnbeg        (1+ (- author-counter (length notes) (length miscs))))
-           (fnend        (1+ author-counter))
-           (fnref        (map number->string (.. fnbeg fnend)))
-           (fnref        (map (lambda (x) (string-append "author-" x)) fnref))
-           (names        (map (lambda (x)
-                                (tmtex-elsevier-name  (cadr x) '() fnref))
-                              (tmtex-select-args-by-func 'author-name datas))))
-      `(!paragraph ,@names ,@affiliations ,@emails ,@urls ,@miscs ,@notes))))
-
-(tm-define (tmtex-doc-data s l)
+(tm-define (springer-note-ref l r)
   (:mode elsevier-style?)
-  (set! l (map tmtex-replace-documents l))
-  (let* ((subtitles (map tmtex-elsevier-subtitle
-                         (tmtex-select-args-by-func 'doc-subtitle l)))
-         (notes     (map tmtex-elsevier-note
-                         (tmtex-select-args-by-func 'doc-note l)))
-         (miscs     (map tmtex-elsevier-misc
-                         (tmtex-select-args-by-func 'doc-misc l)))
-         (dates     (map tmtex-elsevier-date
-                         (tmtex-select-args-by-func 'doc-date l)))
-         (authors   (map tmtex-elsevier-author
-                         (tmtex-select-args-by-func 'doc-author l)))
-         ;; titles needed in last position due to side effects
-         (titles    (map tmtex-elsevier-title
-                         (tmtex-select-args-by-func 'doc-title l))))
-    `(!document
-        ,@titles
-        ,@subtitles
-        ,@notes
-        ,@miscs
-        ,@dates
-        ,@authors)))
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (if (list? r)
+    `(!concat ,@(map (lambda (x) `(thanksref ,x)) r))
+    `(thanksref ,(string-append l r))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Elsevier clustered title macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (tmtex-elsevier-clustered-author t author-notes)
-  (set! t (tmtex-replace-documents t))
-  (if (or (npair? t) (npair? (cdr t)) (not (func? (cadr t) 'author-data))) '()
-    (let* ((datas        (cdadr t))
-           (author-notes (filter nnull? author-notes))
-           (author-names (apply append
-                                (map elsevier-split-authors
-                                     (tmtex-select-args-by-func
-                                       'author-name datas))))
-           (names        (map tmtex (map elsevier-get-names author-names)))
-           (names-refs   (map elsevier-get-name-refs author-names))
-           (miscs        (map tmtex-elsevier-auth-misc*
-                              (tmtex-select-args-by-func
-                                'author-misc-note datas)))
-           (emails       (map tmtex-elsevier-email*
-                              (tmtex-select-args-by-func
-                                'author-email-note datas)))
-           (urls         (map tmtex-elsevier-homepage*
-                              (tmtex-select-args-by-func
-                                'author-homepage-note datas)))
-           (affiliations (map tmtex-elsevier-affiliation*
-                              (tmtex-select-args-by-func
-                                'author-affiliation-note datas)))
-           (author-stuff (map
-                           (lambda (auth)
-                             (let* ((auref (list-ref names-refs author-counter))
-                                    (afref (filter (lambda (x) (in? x auref))
-                                                   (map car affiliations)))
-                                    (fnref (filter (lambda (x) (in? x auref))
-                                                   (map car (append
-                                                              miscs
-                                                              author-notes))))
-                                    (dummy (refstep-author)))
-                               `(!paragraph
-                                  ,(tmtex-elsevier-name auth afref fnref)
-                                  ,@(map cadr
-                                         (filter (lambda (email)
-                                                   (in? (car email) auref))
-                                                 emails))
-                                  ,@(map cadr
-                                         (filter (lambda (url)
-                                                   (in? (car url) auref))
-                                                 urls))))) names))
-           (affiliations (map cadr affiliations))
-           (miscs (map cadr miscs))
-           (author-notes (map cadr author-notes)))
-      `((!paragraph ,@author-stuff)
-        (!paragraph ,@affiliations)
-        (!paragraph ,@miscs)
-        (!paragraph ,@author-notes)))))
-
-(define (get-title-option l)
-  (apply append (map cdr (tmtex-select-args-by-func 'doc-title-options l))))
-
-(tm-define (tmtex-doc-data s l)
+(tm-define (tmtex-doc-subtitle-label s l)
   (:mode elsevier-style?)
-  (:require (or (in? "cluster-all" (get-title-option l))
-                (in? "cluster-by-affiliation" (get-title-option l))))
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "sub-" (car l))
+    `(thankssubtitle (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-note-label s l)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "note-" (car l))
+    `(thanks (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-date-label s l)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "date-" (car l))
+    `(thanksdate (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-doc-misc-label s l)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "misc-" (car l))
+    `(thanksmisc (!option ,label) ,(tmtex (cadr l)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsart specific authors macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (springer-author-note-ref l r)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (springer-note-ref l r))
+
+(tm-define (tmtex-author-note-label s l)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "author-note-" (car l))
+    `(thanks (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-author-misc-label s l)
+  (:mode elsevier-style?)
+  (:require (or (elsart-style?) (jsc-style?) (ifac-style?)))
+  (with label (string-append "author-misc-" (car l))
+    `(thanksamisc (!option ,label) ,(tmtex (cadr l)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; IFAC specific authors macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-author-email-label s l)
+  (:mode ifac-style?)
+  (with label (string-append "author-email-" (car l))
+    `(thanksemail (!option ,label) ,(tmtex (cadr l)))))
+
+(tm-define (tmtex-author-homepage-label s l)
+  (:mode ifac-style?)
+  (with label (string-append "author-url-" (car l))
+    `(thankshomepage (!option ,label) ,(tmtex (cadr l)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsevier title and author preprocessing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-prepare-doc-data l)
+  (:mode elsevier-style?)
+  (set! clustered?
+    (or
+      (contains-stree? l '(doc-title-options "cluster-by-affiliation"))
+      (contains-stree? l '(doc-title-options "cluster-all"))))
   (set! l (map tmtex-replace-documents l))
-  (let* ((sal       (add-notes (single-author-list (cons s l))))
-         (subtitles  (map tmtex-elsevier-subtitle
-                          (tmtex-select-args-by-func 'doc-subtitle l)))
-         (notes      (map tmtex-elsevier-note
-                          (tmtex-select-args-by-func 'doc-note l)))
-         (miscs      (map tmtex-elsevier-misc
-                          (tmtex-select-args-by-func 'doc-misc l)))
-         (dates      (map tmtex-elsevier-date
-                          (tmtex-select-args-by-func 'doc-date l)))
-         (auth-notes (map tmtex-elsevier-auth-note*
-                          (tmtex-select-args-by-func 'doc-footnote-text
-                                                     (cdr sal))))
-         (auth-stuff (apply append
-                            (map (lambda (x)
-                                   (tmtex-elsevier-clustered-author x auth-notes))
-                                 (tmtex-select-args-by-func 'doc-author
-                                                            (cdr sal)))))
-         ;; titles needed in last position due to side effects
-         (titles     (map tmtex-elsevier-title
-                          (tmtex-select-args-by-func 'doc-title l))))
-    `(!document
-        ,@titles
-        ,@subtitles
-        ,@notes
-        ,@miscs
-        ,@dates
-        ,@auth-stuff)))
+  (set! l (make-references l 'doc-subtitle #f #f))
+  (set! l (make-references l 'doc-note #f #f))
+  (set! l (make-references l 'doc-misc #f #f))
+  (set! l (make-references l 'doc-date #f #f))
+  (set! l (make-references l 'author-note #t #f))
+  (set! l (make-references l 'author-misc #t #f))
+  (if (ifac-style?)
+    (begin
+      (set! l (make-references l 'author-email #t #f))
+      (set! l (make-references l 'author-homepage #t #f))))
+  (if clustered?
+    (set! l (make-references l 'author-affiliation #t #f)))
+  l)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Elsevier title and author presentation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-make-doc-data titles subtitles authors dates miscs notes
+                                subtitles-l dates-l miscs-l notes-l tr ar)
+  (:mode elsevier-style?)
+  (let* ((authors (filter nnull? authors))
+         (authors (if (null? authors) '()
+                    `((!paragraph ,@authors))))
+         (titles (tmtex-concat-Sep (map cadr titles)))
+         (notes  `(,@subtitles ,@dates ,@miscs ,@notes))
+         (notes  (if (null? notes) '()
+                   `(,(springer-note-ref "" (map cadr notes)))))
+         (result `(,@titles ,@notes))
+         (result (if (null? result) '() `((title (!concat ,@result)))))
+         (result `(,@result ,@subtitles-l ,@notes-l
+                   ,@miscs-l ,@dates-l ,@authors)))
+    (if (null? result) "" `(!document ,@result))))
+
+(tm-define (tmtex-make-author names affs emails urls miscs notes
+                              affs* emails* urls* miscs* notes*)
+  (:mode elsevier-style?)
+  (let* ((names  (tmtex-concat-Sep (map cadr names)))
+         (notes* (if (ifac-style?)
+                   `(,@emails* ,@urls* ,@miscs* ,@notes*)
+                   `(,@miscs* ,@notes*)))
+         (notes* (if (null? notes*) '()
+                   `(,(springer-author-note-ref "" (map cadr notes*)))))
+         (affs*  (if (null? affs*) '()
+                   `((!option
+                       (!concat ,@(list-intersperse (map cadr affs*) ","))))))
+         (result `(,@names ,@notes*))
+         (result (if (null? result) '()
+                   `((author ,@affs* (!concat ,@result)))))
+         (result `(,@result ,@affs ,@emails ,@urls ,@miscs ,@notes)))
+    (if (null? result) '() `(!paragraph ,@result))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elsevier abstract macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (tmtex-abstract-data s l)
+(tm-define (tmtex-abstract-keywords t)
   (:mode elsevier-style?)
-  (let* ((msc (tmtex-select-args-by-func 'abstract-msc l))
-         (msc (apply append (map cdr (map tmtex msc))))
-         (msc (list-intersperse msc '(!concat " " (sep) " ")))
-         (msc (if (nnull? msc) `((!concat (PACS) " " ,@msc)) '()))
-         (keywords (tmtex-select-args-by-func 'abstract-keywords l))
-         (keywords (apply append (map cdr (map tmtex keywords))))
-         (keywords (list-intersperse keywords '(!concat " " (sep) " ")))
-         (keywords (if (nnull? keywords) `((!concat ,@keywords)) '()))
-         (keywords (if (or (nnull? msc) (nnull? keywords))
-                       `(((!begin "keyword")
-                          (!document ,@keywords ,@msc))) '()))
-         (abstract (map tmtex (tmtex-select-args-by-func 'abstract l))))
-    `(!document ,@abstract ,@keywords)))
+  (with args (list-intersperse (map tmtex (cdr t)) '(!concat (sep) " "))
+    `((!begin "keyword") (!concat ,@args))))
+
+(tm-define (tmtex-abstract-msc t)
+  (:mode elsevier-style?)
+  (with args (list-intersperse (map tmtex (cdr t)) '(!concat (sep) " "))
+    `(!concat (MSC) " " (!concat ,@args))))
+
+(tm-define (tmtex-abstract-pacs t)
+  (:mode elsevier-style?)
+  (with args (list-intersperse (map tmtex (cdr t)) '(!concat (sep) " "))
+    `(!concat (PACS) " " (!concat ,@args))))
+
+(tm-define  (tmtex-make-abstract-data keywords acm arxiv msc pacs abstract)
+  (:mode elsevier-style?)
+  (if (or (nnull? msc) (nnull? pacs) (nnull? acm) (nnull? arxiv))
+    (set! keywords
+      `(((!begin "keyword") (!document ,@(map cadr keywords)
+                                       ,@pacs ,@msc ,@acm ,@arxiv)))))
+  `(!document ,@abstract ,@keywords))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Elsevier style is quite ugly.
@@ -431,11 +398,9 @@
 	)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Customizations for JSC
+;; Elsevier specific macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (tmtex-style-init body)
-  (:mode jsc-style?)
-  (init-elsevier body)
-  (set! tmtex-packages (cons "natbib" tmtex-packages))
-  (latex-set-packages '("amsthm" "yjsco" "natbib")))
+(smart-table latex-texmacs-macro
+  (:mode elsevier-style?)
+  (qed #f))

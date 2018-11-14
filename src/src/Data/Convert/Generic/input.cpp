@@ -16,6 +16,8 @@
 #include "Generic/input.hpp"
 #include "scheme.hpp"
 #include "vars.hpp"
+#include "image_files.hpp"
+#include "file.hpp"
 
 #define STATUS_NORMAL 0
 #define STATUS_ESCAPE 1
@@ -30,6 +32,7 @@
 #define MODE_CHANNEL  6
 #define MODE_COMMAND  7
 #define MODE_XFORMAT  8
+#define MODE_FILE     9
 
 /******************************************************************************
 * Universal data input
@@ -43,6 +46,7 @@ texmacs_input_rep::texmacs_input_rep (string type2):
   mode (get_mode (format)),
   channel (type),
   stack (""),
+  ignore_verb (false),
   docs (tree (DOCUMENT, "")) { bof (); }
 
 texmacs_input::texmacs_input (string type):
@@ -62,6 +66,7 @@ texmacs_input_rep::get_mode (string s) {
   if (s == "math")  return MODE_MATH;
   if (s == "channel")  return MODE_CHANNEL;
   if (s == "command")  return MODE_COMMAND;
+  if (s == "file") return MODE_FILE;
   if (as_bool (call ("format?", s))) return MODE_XFORMAT;
   return MODE_VERBATIM;
 }
@@ -112,10 +117,15 @@ texmacs_input_rep::put (char c) { // returns true when expecting input
       flush (true);
       status= STATUS_BEGIN;
     }
+    else if (c == DATA_ABORT && format == "verbatim" && buf == "") {
+      // Aborting sessions allows completion with a naive read-eval loop
+      ignore_verb= true;
+    }
     else if (c == DATA_END) {
       flush (true);
       end ();
       block_done= (stack == "");
+      ignore_verb= (ignore_verb && stack != "");
     }
     else buf << c;
     break;
@@ -214,6 +224,9 @@ texmacs_input_rep::flush (bool force) {
   case MODE_XFORMAT:
     xformat_flush (force);
     break;
+  case MODE_FILE:
+    file_flush (force);
+    break;
   default:
     FAILED ("invalid mode");
     break;
@@ -223,7 +236,10 @@ texmacs_input_rep::flush (bool force) {
 void
 texmacs_input_rep::verbatim_flush (bool force) {
   if (force || ends (buf, "\n")) {
-    write (verbatim_to_tree (buf, false, "utf-8"));
+    if (!ignore_verb)
+      write (verbatim_to_tree (buf, false, "auto"));
+    else if (DEBUG_IO)
+      debug_io << "ignore verbatim (aborted input)" << LF;
     buf= "";
   }
 }
@@ -255,18 +271,19 @@ texmacs_input_rep::html_flush (bool force) {
 void
 texmacs_input_rep::ps_flush (bool force) {
   if (force) {
-    string w= "";
+    string pref= get_preference ("plugins:embedded postscript width");
+    string w= (pref == "default") ? "0.7par" : pref;
     string h= "";
     string b= copy (buf);
     while (true)
       if (starts (b, "width=") || starts (b, "height=")) {
-	int i=0;
-	for (i=0; i<N(b); i++)
-	  if (b[i] == '\n') break;
-	if (i == N(b)) break;
-	if (b[0] == 'w') w= b (6, i);
-	else h= b (7, i);
-	b= b (i+1, N(b));
+        int i=0;
+        for (i=0; i<N(b); i++)
+          if (b[i] == '\n') break;
+        if (i == N(b)) break;
+        if (b[0] == 'w') w= b (6, i);
+        else h= b (7, i);
+        b= b (i+1, N(b));
       }
       else break;
     tree t (IMAGE, tuple (tree (RAW_DATA, b), "ps"));
@@ -309,6 +326,31 @@ void
 texmacs_input_rep::xformat_flush (bool force) {
   if (force) {
     write (generic_to_tree (buf, format * "-snippet"));
+    buf= "";
+  }
+}
+
+void
+texmacs_input_rep::file_flush (bool force) {
+  if (force) {
+    url file= url (buf);
+    if (! exists (file)) {
+      string err_msg = "[" * as_string(file) * "] does not exist";
+      write (verbatim_to_tree (err_msg, false, "auto"));
+    } else {
+      string type = suffix (file);
+      if (type == "png") {
+        string s;
+        load_string (file, s, false);
+        tree t (IMAGE);
+        t << tuple (tree (RAW_DATA, s), type);
+        t << tree("") << tree("") << tree("") << tree("");
+        write (t);
+      } else {
+        string err_msg = "Do not support file type with suffix: [" * type * "]";
+        write (verbatim_to_tree (err_msg, false, "auto"));
+      }
+    }
     buf= "";
   }
 }

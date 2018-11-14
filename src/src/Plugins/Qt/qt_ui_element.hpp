@@ -21,14 +21,18 @@
 #include "qt_widget.hpp"
 #include "QTMMenuHelper.hpp"
 
-#include <QtGui>
+#include <QPointer>
+#include <QWidgetItem>
+
+class QMenu;
+class QAction;
 
 
 /*! Construction of UI elements / widgets.
 
  Most of the items in the UI are constructed by this class, although in fact,
- the actual QWidgets and layout items aren't instantiated until one of
- as_qwidget(), as_qaction(), get_qmenu() or as_qlayoutmenu() is called.
+ the actual QWidgets and layout items aren't instantiated ("compiled") until
+ one of as_qwidget(), as_qaction(), get_qmenu() or as_qlayoutmenu() is called.
  
  A UI element is first created using the factory methods create(), these store
  the parameters for the widget until they are needed upon creation. as_*()
@@ -39,17 +43,18 @@
  See the documentation of qt_widget_rep for the rationale behind the four
  methods as_qaction(), get_qmenu(), as_qlayoutmenu(), as_qwidget()
  
- NOTE: although it might seem wasteful to instantiate the QObjects "on demand",
- caching makes no sense given the current infrastructure, because TeXmacs always
- discards the scheme-created widgets as soon as they exist.
+ NOTE: although we store the QWidgets in qt_widget_rep::qwid after creating 
+ them, this caching achieves nothing for the current infrastructure, because
+ TeXmacs always discards widgets which are not menus or toolbars.
 */
 class qt_ui_element_rep: public qt_widget_rep {
   
     // NOTE: automatic deletion of the blackbox upon destruction will trigger
     // deletion of all the nested widgets within.
-  blackbox         load;  
-  QAction* cachedAction;
-  
+  blackbox                  load;
+  QPointer<QAction> cachedAction;
+  QList<QAction*>* cachedActionList;
+    
 public:  
   qt_ui_element_rep (types _type, blackbox _load);
   virtual ~qt_ui_element_rep(); 
@@ -58,57 +63,55 @@ public:
   
   virtual QAction*         as_qaction ();
   virtual QWidget*         as_qwidget ();
-  virtual QLayoutItem* as_qlayoutitem ();
-  virtual QMenu*            get_qmenu ();
-  
+  virtual QLayoutItem*     as_qlayoutitem ();
+  virtual QList<QAction*>* get_qactionlist();
+
   operator tree ();
 
-  template<class X1> static widget create (types _type, X1 x1) {
+  template<class X1> static qt_widget create (types _type, X1 x1) {
     return tm_new <qt_ui_element_rep> (_type, close_box<X1>(x1));
   }
   
   template <class X1, class X2> 
-  static widget create (types _type, X1 x1, X2 x2) {
+  static qt_widget create (types _type, X1 x1, X2 x2) {
     typedef pair<X1,X2> T;
     return tm_new <qt_ui_element_rep> (_type, close_box<T> (T (x1,x2)));
   }
   
   template <class X1, class X2, class X3> 
-  static widget create (types _type, X1 x1, X2 x2, X3 x3) {
+  static qt_widget create (types _type, X1 x1, X2 x2, X3 x3) {
     typedef triple<X1,X2,X3> T;
     return tm_new <qt_ui_element_rep> (_type, close_box<T> (T (x1,x2,x3)));
   }
   
   template <class X1, class X2, class X3, class X4> 
-  static widget create (types _type, X1 x1, X2 x2, X3 x3, X4 x4) {
+  static qt_widget create (types _type, X1 x1, X2 x2, X3 x3, X4 x4) {
     typedef quartet<X1,X2,X3,X4> T;
     return tm_new <qt_ui_element_rep> (_type, close_box<T> (T (x1,x2,x3,x4)));
   }
   
   template <class X1, class X2, class X3, class X4, class X5> 
-  static widget create (types _type, X1 x1, X2 x2, X3 x3, X4 x4, X5 x5) {
+  static qt_widget create (types _type, X1 x1, X2 x2, X3 x3, X4 x4, X5 x5) {
     typedef quintuple<X1,X2,X3,X4,X5> T;
     return tm_new <qt_ui_element_rep> (_type, close_box<T> (T (x1,x2,x3,x4,x5)));
   }
   
+protected:
+  static blackbox get_payload (qt_widget qtw, types check_type = none);
 };
 
 
-/*! A rectangular separator widget with a colored background.
- */
+/*! A rectangular separator widget with a colored background. */
 class qt_glue_widget_rep: public qt_widget_rep {
 public:
-  
   tree col;
   bool hx, vx;
   SI w,h;
   
-  
   qt_glue_widget_rep (tree _col, bool _hx, bool _vx, SI _w, SI _h)
-  : col(_col), hx(_hx), vx(_vx), w(_w), h(_h) 
-  {}
+    : col (_col), hx (_hx), vx (_vx), w (_w), h (_h) { }
   
-  qt_glue_widget_rep () {};
+  qt_glue_widget_rep () { }
   
   QPixmap render ();
   
@@ -116,50 +119,31 @@ public:
   virtual QWidget* as_qwidget ();
 };
 
-
-/*!
- We use this class to properly initialize style options for our QWidgets
- which have to blend into QMenus
-    see #QTBUG-1993.
-    see #QTBUG-7707.
- */
-class QTMAuxMenu: public QMenu {
+/*! A wrapper widget executing a quit command upon SLOT_DESTROY. */
+class qt_wrapped_widget_rep : public qt_widget_rep {
+  widget tmwid;
+  command quit;
 public:
-  QTMAuxMenu (): QMenu() {}
-  
-  void myInitStyleOption (QStyleOptionMenuItem *option) const {
-    QAction action (NULL);
-    initStyleOption(option,&action);
+  qt_wrapped_widget_rep (widget _tmwid, command _quit)
+    : tmwid (_tmwid), quit (_quit) {
+    add_child (tmwid);
   }
-};
+  QWidget* as_qwidget () { return concrete(tmwid)->as_qwidget(); }
+  void send (slot s, blackbox val) {
+    switch (s) {
+      case SLOT_DESTROY:
+        if (! is_nil (quit)) quit ();
+        quit = command();
+        break;
+      default:
+        return;
+    }
+    qt_widget_rep::send (s, val);
+    if (DEBUG_QT_WIDGETS)
+      cout << "qt_wrapped_widget_rep: sent " << slot_name (s)
+           << "\t\tto widget\t" << type_as_string() << LF;
+  }
 
-
-/*! QTMMenuButton is a custom button appropriate for menus
- 
- We need to subclass QToolButton for two reasons
- 1) custom appearence
- 2) if used in QWidgetAction the menu does not disappear upon triggering the
- button. See QTBUG-10427.
- */
-class QTMMenuButton: public QToolButton {
-  QStyleOptionMenuItem option;
-  
-public:
-  QTMMenuButton (QWidget* parent = NULL);
-  void mouseReleaseEvent (QMouseEvent *event);
-  void mousePressEvent (QMouseEvent *event);
-  void paintEvent (QPaintEvent *event);
-};
-
-
-/*!
- */
-class QTMMenuWidget: public QWidget {
-  QStyleOptionMenuItem option;
-  
-public:
-  QTMMenuWidget (QWidget* parent = NULL);
-  void paintEvent(QPaintEvent *event);
 };
 
 /*! Ad-hoc command to be used with choice widgets.

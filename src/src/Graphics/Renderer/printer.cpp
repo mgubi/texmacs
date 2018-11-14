@@ -19,6 +19,13 @@
 #include "merge_sort.hpp"
 #include "scheme.hpp"
 #include "image_files.hpp"
+#include "link.hpp"
+#include "frame.hpp"
+#include "converter.hpp"
+
+#ifdef PDF_RENDERER
+#include "Pdf/pdf_hummus_renderer.hpp"
+#endif
 
 string PS_CLIP_PUSH ("gsave");
 string PS_CLIP_POP ("grestore");
@@ -46,11 +53,11 @@ printer_rep::printer_rep (
     nr_pages (nr_pages2), page_type (page_type2),
     landscape (landscape2), paper_w (paper_w2), paper_h (paper_h2),
     use_alpha (get_preference ("experimental alpha") == "on"),
-    linelen (0), fg ((color) (-1)), bg ((color) (-1)), ncols (0),
-    lw (-1), nwidths (0), cfn (""), nfonts (0),
-    xpos (0), ypos (0), tex_flag (false),
+    linelen (0), fg ((color) (-1)), bg ((color) (-1)), opacity (255),
+    ncols (0), lw (-1), nwidths (0), cfn (""), nfonts (0),
+    xpos (0), ypos (0), tex_flag (false), toc (TUPLE),
     defs ("?"), tex_chars ("?"), tex_width ("?"),
-    tex_fonts ("?"), tex_font_chars (array<int>(0))    
+    tex_fonts ("?"), tex_font_chars (array<int>(0)), metadata ("")
 {
   string tex_pro, special_pro, color_pro, texps_pro;
   load_string ("$TEXMACS_PATH/misc/convert/tex.pro", tex_pro, true);
@@ -68,15 +75,19 @@ printer_rep::printer_rep (
 	     << "%%PageOrder: Ascend\n";
   if (page_type != "user")
     prologue << "%%DocumentPaperSizes: " << page_type << "\n";
+  if (landscape) {
+    psw= (int) (28.36*paper_h+ 0.5);
+    psh= (int) (28.36*paper_w+ 0.5);
+  }
+  else {
+    psw= (int) (28.36*paper_w+ 0.5);
+    psh= (int) (28.36*paper_h+ 0.5);
+  }
+  prologue << "%%BoundingBox: 0 0 "
+           << as_string (psw) << " "
+           << as_string (psh) << "\n";
   if (landscape)
-    prologue << "%%BoundingBox: 0 0 "
-	     << as_string ((int) (28.36*paper_h+ 0.5)) << " "
-	     << as_string ((int) (28.36*paper_w+ 0.5)) << "\n"
-	     << "%%Orientation: Landscape\n";
-  else
-    prologue << "%%BoundingBox: 0 0 "
-	     << as_string ((int) (28.36*paper_w+ 0.5)) << " "
-	     << as_string ((int) (28.36*paper_h+ 0.5)) << "\n";
+    prologue << "%%Orientation: Landscape\n";
   prologue   << "%%EndComments\n\n"
 	     << tex_pro << "\n"
 	     << special_pro << "\n"
@@ -114,6 +125,8 @@ printer_rep::printer_rep (
 
 printer_rep::~printer_rep () {
   next_page ();
+  generate_toc ();
+  generate_metadata ();
   body << "\n%%Trailer\n"
        << "end\n"
        << "userdict /end-hook known{end-hook} if\n"
@@ -128,11 +141,17 @@ printer_rep::~printer_rep () {
 	   << "%%BeginSetup\n"
 	   << "%%Feature: *Resolution " << as_string (dpi) << "dpi\n"
 	   << "TeXDict begin\n";
-  if (page_type != "user") {
-    prologue << "%%BeginPaperSize: " << page_type << "\n";
+  prologue << "%%BeginPaperSize: " << page_type << "\n";
+  if (page_type != "user")
     prologue << page_type << "\n";
-    prologue << "%%EndPaperSize\n";
+  else {
+    prologue << "/setpagedevice where\n";
+    prologue << "{ pop << /PageSize ["
+             << as_string (psw) << " " << as_string (psh)
+             << "] >> setpagedevice }\n";
+    prologue << "if\n";
   }
+  prologue << "%%EndPaperSize\n";
   if (landscape)
     prologue << "@landscape\n";
   prologue << "%%EndSetup\n";
@@ -217,11 +236,9 @@ printer_rep::print (string s) {
 
 void
 printer_rep::print (SI x, SI y) {
-  x += ox; y += oy;
-  if (x>=0) x= x/PIXEL; else x= (x-PIXEL+1)/PIXEL;
-  if (y>=0) y= y/PIXEL; else y= (y-PIXEL+1)/PIXEL;
+  decode (x, y);
   print (as_string (x-dpi));
-  print (as_string (-y-dpi));
+  print (as_string (y-dpi));
 }
 
 void
@@ -458,9 +475,6 @@ static string pfb_to_pfa (url file) {
 
 #undef HEX_PER_LINE
 
-
-
-
 void
 printer_rep::generate_tex_fonts () {
   hashset<string> done;
@@ -479,9 +493,8 @@ printer_rep::generate_tex_fonts () {
       int pos2= search_backwards (":", fn_name);
       root= fn_name (0, pos2);
       url u= tt_font_find (root);
-      if (suffix (u) == "pfb") {
+      if (suffix (u) == "pfb")
         ttf = pfb_to_pfa (u);
-      }
     }
 #endif
 
@@ -548,6 +561,49 @@ printer_rep::generate_tex_fonts () {
 }
 
 /******************************************************************************
+* Transformed rendering
+******************************************************************************/
+
+void
+printer_rep::set_transformation (frame fr) {
+  ASSERT (fr->linear, "only linear transformations have been implemented");
+
+  SI cx1, cy1, cx2, cy2;
+  get_clipping (cx1, cy1, cx2, cy2);
+  rectangle oclip (cx1, cy1, cx2, cy2);
+
+  frame cv= scaling (point (pixel, -pixel),
+                     point (-ox+dpi*pixel, -oy-dpi*pixel));
+  frame tr= invert (cv) * fr * cv;
+  point o = tr (point (0.0, 0.0));
+  point ux= tr (point (1.0, 0.0)) - o;
+  point uy= tr (point (0.0, 1.0)) - o;
+  //cout << "Set transformation " << o << ", " << ux << ", " << uy << "\n";
+  double tx= o[0];
+  double ty= o[1];
+  print ("gsave");
+  print ("[");
+  print (as_string (ux[0]));
+  print (as_string (ux[1]));
+  print (as_string (uy[0]));
+  print (as_string (uy[1]));
+  print (as_string (tx));
+  print (as_string (ty));
+  print ("]");
+  print ("concat");
+
+  rectangle nclip= fr [oclip];
+  renderer_rep::clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
+}
+
+void
+printer_rep::reset_transformation () {
+  //cout << "Reset transformation\n";
+  renderer_rep::unclip ();
+  print ("grestore");
+}
+
+/******************************************************************************
 * Clipping
 ******************************************************************************/
 
@@ -571,31 +627,55 @@ printer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
 * graphical routines
 ******************************************************************************/
 
-color
-printer_rep::get_color () {
-  return fg;
+pencil
+printer_rep::get_pencil () {
+  return pen;
 }
 
-color
+brush
 printer_rep::get_background () {
-  return bg;
+  return bgb;
 }
 
 void
-printer_rep::set_color (color c) {
-  if (fg==c) return;
-  fg= c;
-  select_color (c);
+printer_rep::set_pencil (pencil pen2) {
+  pen= pen2;
+  color c= pen->get_color ();
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  opacity= a;
+  if (a != 255) {
+    int r2, g2, b2, a2;
+    get_rgb_color (bg, r2, g2, b2, a2);
+    r= (r * a + r2 * (255 - a)) / 255;
+    g= (g * a + g2 * (255 - a)) / 255;
+    b= (b * a + b2 * (255 - a)) / 255;
+    c= rgb_color (r, g, b, 255);
+  }
+  if (c != fg) {
+    fg= c;
+    select_color (fg);
+  }
+  //if (pen->w != lw) {
+  // FIXME: apparently, the line width can be overidden by some of
+  // the graphical constructs (example file: newimpl.tm, in which
+  // the second dag was not printed using the right width)
+  lw= pen->get_width ();
+  select_line_width (lw);
+  //}
 }
 
 void
-printer_rep::set_background (color c) {
-  if (bg==c) return;
-  bg= c;
+printer_rep::set_background (brush b) {
+  //if (bgb==b) return;
+  bgb= b;
+  bg= b->get_color ();
 }
 
 void
 printer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
+  //cout << "Draw " << ch << " at " << (x/PIXEL) << ", " << (y/PIXEL) << "\n";
+  if (opacity == 0) return;
   glyph gl= fn->get(ch);
   if (is_nil (gl)) return;
   string name= fn->res_name;
@@ -613,19 +693,8 @@ printer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
 }
 
 void
-printer_rep::set_line_style (SI w, int type, bool round) {
-  (void) type;
-  (void) round;
-  // if (lw == w) return;
-  // FIXME: apparently, the line width can be overidden by some of
-  // the graphical constructs (example file: newimpl.tm, in which
-  // the second dag was not printed using the right width)
-  lw= w;
-  select_line_width (w);
-}
-
-void
 printer_rep::line (SI x1, SI y1, SI x2, SI y2) {
+  if (opacity == 0) return;
   print (x1, y1);
   print (x2, y2);
   print (PS_LINE);
@@ -633,6 +702,7 @@ printer_rep::line (SI x1, SI y1, SI x2, SI y2) {
 
 void
 printer_rep::lines (array<SI> x, array<SI> y) {
+  if (opacity == 0) return;
   int i, n= N(x);
   if ((N(y) != n) || (n<1)) return;
   print (x[0], y[0]);
@@ -655,6 +725,7 @@ printer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
 
 void
 printer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
+  if (opacity == 0) return;
   if ((x1<x2) && (y1<y2)) {
     print (x1, y1);
     print (x2, y2);
@@ -664,6 +735,7 @@ printer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
 
 void
 printer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
+  if (opacity == 0) return;
   print ((x1+x2)/2, (y1+y2)/2);
   print (as_string ((x2-x1)/(2*PIXEL)));
   print (as_string ((y1-y2)/(2*PIXEL)));
@@ -674,6 +746,7 @@ printer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 
 void
 printer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
+  if (opacity == 0) return;
   print ((x1+x2)/2, (y1+y2)/2);
   print (as_string ((x2-x1)/(2*PIXEL)));
   print (as_string ((y1-y2)/(2*PIXEL)));
@@ -684,6 +757,7 @@ printer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 
 void
 printer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  if (opacity == 0) return;
   (void) convex;
   int i, n= N(x);
   if ((N(y) != n) || (n<1)) return;
@@ -694,12 +768,6 @@ printer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
     print (PS_POL_NEXT);
   }
   print (PS_POL_END);
-}
-
-void
-printer_rep::xpm (url file_name, SI x, SI y) {
-  (void) file_name; (void) x; (void) y;
-  FAILED ("not yet implemented");
 }
 
 /*
@@ -722,16 +790,10 @@ incorporate_postscript (string s) {
 
 void
 printer_rep::image (
-  url u, SI w, SI h, SI x, SI y,
-  double cx1, double cy1, double cx2, double cy2, int alpha)
+  string name, string eps, SI x1, SI y1, SI x2, SI y2,
+  SI w, SI h, SI x, SI y, int alpha)
 {
-  (void) alpha; // FIXME
-  int bx1, by1, bx2, by2;
-  ps_bounding_box (u, bx1, by1, bx2, by2);
-  int x1= bx1 + (int) (cx1 * (bx2 - bx1) + 0.5);
-  int y1= by1 + (int) (cy1 * (by2 - by1) + 0.5);
-  int x2= bx1 + (int) (cx2 * (bx2 - bx1) + 0.5);
-  int y2= by1 + (int) (cy2 * (by2 - by1) + 0.5);
+  if (opacity == 0 || alpha == 0) return;
 
   double sc_x= (72.0/dpi) * ((double) (w/PIXEL)) / ((double) (x2-x1));
   double sc_y= (72.0/dpi) * ((double) (h/PIXEL)) / ((double) (y2-y1));
@@ -774,10 +836,8 @@ printer_rep::image (
   /* @beginspecial 0 @llx 0 @lly 613.291260 @urx 613.291260 @ury 6110 @rwi
      @clip @setspecial */
   
-  string ps_image= ps_load (u);
-  string imtext= is_ramdisc (u)? "inline image": as_string (u);
-  body << "%%BeginDocument: " << imtext  << "\n";
-  body << ps_image; // incorporate_postscript (ps_image);
+  body << "%%BeginDocument: " << name  << "\n";
+  body << eps; // incorporate_postscript (eps);
   body << "%%EndDocument";
   cr ();
 
@@ -838,21 +898,71 @@ printer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2) {
   (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
+renderer
+printer_rep::shadow (picture& pic, SI x1, SI y1, SI x2, SI y2) {
+  double old_zoomf= this->zoomf;
+  set_zoom_factor (1.0);
+  renderer ren= renderer_rep::shadow (pic, x1, y1, x2, y2);
+  set_zoom_factor (old_zoomf);
+  return ren;
+}
+
 void
-printer_rep::anchor (string label, SI x, SI y) {
+printer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
+  (void) alpha; // FIXME
+  int w= p->get_width (), h= p->get_height ();
+  int ox= p->get_origin_x (), oy= p->get_origin_y ();
+  int pixel= 5*PIXEL;
+  string name= "picture";
+  string eps= picture_as_eps (p, 600);
+  int x1= 0;
+  int y1= 0;
+  int x2= w;
+  int y2= h;
+  x -= (int) (1.2 * (ox * pixel)); // FIXME: why the magic 1.2?
+  y -= (int) (1.2 * (oy * pixel));
+  image (name, eps, x1, y1, x2, y2, w * pixel, h * pixel, x, y, 255);
+  save_string ("~/Temp/hummus_aux.eps", eps);
+}
+
+void
+printer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
+  if (im->get_type () != scalable_image)
+    renderer_rep::draw_scalable (im, x, y, alpha);
+  else {
+    url u= im->get_name ();
+    rectangle r= im->get_logical_extents ();
+    SI w= r->x2, h= r->y2;
+    string ps_image= ps_load (u);
+    string imtext= is_ramdisc (u)? "inline image": as_string (u);
+    int x1, y1, x2, y2;
+    if (suffix(u)=="eps") ps_bounding_box (u, x1, y1, x2, y2); //get cached value
+    //if original image is not eps at this point it was already converted through a temp file
+    // and it is the bbox of the temp file was cached...
+    // do not call ps_bounding_box otherwise the image will get converted AGAIN
+    // extract bbox from ps code that was generated
+    else ps_read_bbox (ps_image, x1, y1, x2, y2); 
+    image (imtext, ps_image, x1, y1, x2, y2, w, h, x, y, alpha);
+  }
+}
+
+void
+printer_rep::anchor (string label, SI x1, SI y1, SI x2, SI y2) {
+  (void) x2; (void) y2;
   string s = "(";
   s = s << prepare_text (label) << ") cvn";
   if (linelen>0) cr ();
   print ("[ /Dest");
   print (s);
   print ("/View [/XYZ");
-  print (x, y);
+  print (x1, y1);
   print ("null] /DEST pdfmark");
   cr ();
 }
 
 void
 printer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
+  bool preserve= (get_locus_rendering ("locus-on-paper") == "preserve");
   if (linelen>0) cr ();
   print ("[");
   if (starts (label, "#")) {
@@ -860,28 +970,132 @@ printer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
     print ("(" * prepare_text (label) * ") cvn");
   }
   else {
-    print ("/Action");
-    print ("<< /Subtype /URI /URI (" * prepare_text (label) * ") >>");
+    print ("/A");
+    print ("<< /S /URI /URI (" * prepare_text (label) * ") >>");
   }
   print ("/Rect [");
   print (x1 - 5*PIXEL, y1 - 10*PIXEL);
   print (x2 + 5*PIXEL, y2 + 10*PIXEL);
   print ("]");
-  print ("/Border [16 16 1 [3 10]] /Color [0.75 0.5 1.0]");
+  if (preserve)
+    print ("/Border [16 16 1 [3 10]] /Color [0.75 0.5 1.0]");
+  else
+    print ("/Border [16 16 0 [3 10]] /Color [0.75 0.5 1.0]");
   print ("/Subtype /Link");
   print ("/ANN pdfmark");
   cr ();
+}
+
+void
+printer_rep::toc_entry (string kind, string title, SI x, SI y) {
+  decode (x, y);
+  string ls= "1";
+  if (kind == "toc-strong-1") ls= "1";
+  if (kind == "toc-strong-2") ls= "2";
+  if (kind == "toc-1") ls= "3";
+  if (kind == "toc-2") ls= "4";
+  if (kind == "toc-3") ls= "5";
+  if (kind == "toc-4") ls= "6";
+  if (kind == "toc-5") ls= "7";
+  string ps= as_string (cur_page);
+  string xs= as_string (x-dpi);
+  string ys= as_string (y-dpi);
+  toc << tuple (title, ls, ps, xs, ys);
+}
+
+void
+structure_toc (tree t, int& i, tree& out, string level) {
+  //cout << "Structure " << t[i] << " at " << level << "\n";
+  if (i >= N(t)) return;
+  string nlevel= t[i][1]->label;
+  if (nlevel <= level) return;
+  tree next= tuple (t[i]);
+  i++;
+  while (i < N(t)) {
+    string slevel= t[i][1]->label;
+    if (slevel <= nlevel) break;
+    structure_toc (t, i, next, nlevel);
+  }
+  out << next;
+}
+
+static string
+to_hex_string (string s) {
+  return "<FEFF" * utf8_to_hex_string (cork_to_utf8 (s)) * ">";  
+}
+
+void
+printer_rep::generate_toc_item (tree t) {
+  string title= t[0][0]->label;
+  string level= t[0][1]->label;
+  string page = t[0][2]->label;
+  string x    = t[0][3]->label;
+  string y    = t[0][4]->label;
+  string htit = to_hex_string (title);
+  print ("[");
+  if (N(t) > 1) {
+    print ("/Count");
+    print (as_string (1 - N(t)));
+  }
+  print ("/Page");
+  print (page);
+  print ("/View [ /XYZ");
+  print (x);
+  print (y);
+  print ("0");
+  print ("]");
+  print ("/Title " * htit);
+  print ("/OUT pdfmark");
+  cr ();
+  for (int i=1; i<N(t); i++)
+    generate_toc_item (t[i]);
+}
+
+void
+printer_rep::generate_toc () {
+  tree rew (TUPLE);
+  int i=0;
+  while (i < N(toc))
+    structure_toc (toc, i, rew, "0");
+  for (i=0; i<N(rew); i++)
+    generate_toc_item (rew[i]);
+}
+
+void
+printer_rep::set_metadata (string kind, string val) {
+  metadata (kind)= val;
+}
+
+void
+printer_rep::generate_metadata () {
+  if (N(metadata) == 0) return;
+  print ("[");
+  if (metadata->contains ("title"))
+    print ("/Title " * to_hex_string (metadata ["title"]));
+  if (metadata->contains ("author"))
+    print ("/Author " * to_hex_string (metadata ["author"]));
+  if (metadata->contains ("subject"))
+    print ("/Subject " * to_hex_string (metadata ["subject"]));
+  print ("/DOCINFO pdfmark");
 }
 
 /******************************************************************************
 * user interface
 ******************************************************************************/
 
+bool use_pdf ();
+bool use_ps ();
+
 renderer
 printer (url ps_file_name, int dpi, int nr_pages,
-	 string page_type, bool landscape, double paper_w, double paper_h)
-{
-  page_type= as_string (call ("correct-paper-size", object (page_type)));
+	 string page_type, bool landscape, double paper_w, double paper_h) {
+#ifdef PDF_RENDERER
+  if (use_pdf () && (suffix (ps_file_name) == "pdf" || !use_ps ()))
+    return pdf_hummus_renderer (ps_file_name, dpi, nr_pages,
+                                page_type, landscape, paper_w, paper_h);
+#endif
+  //cout << "Postscript print to " << ps_file_name << " at " << dpi << " dpi\n";
+  page_type= as_string (call ("standard-paper-size", object (page_type)));
   return tm_new<printer_rep> (ps_file_name, dpi, nr_pages,
                               page_type, landscape, paper_w, paper_h);
 }

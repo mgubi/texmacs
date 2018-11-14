@@ -54,13 +54,16 @@ public:
   virtual void show_header (bool flag) = 0;
   virtual void show_icon_bar (int which, bool flag) = 0;
   virtual void show_side_tools (int which, bool flag) = 0;
+  virtual void show_bottom_tools (int which, bool flag) = 0;
   virtual bool visible_header () = 0;
   virtual bool visible_icon_bar (int which) = 0;
   virtual bool visible_side_tools (int which) = 0;
+  virtual bool visible_bottom_tools (int which) = 0;
   virtual void menu_widget (string menu, widget& w) = 0;
   virtual void menu_main (string menu) = 0;
   virtual void menu_icons (int which, string menu) = 0;
   virtual void side_tools (int which, string menu) = 0;
+  virtual void bottom_tools (int which, string menu) = 0;
 
   virtual void set_window_zoom_factor (double zoom) = 0;
   virtual double get_window_zoom_factor () = 0;
@@ -83,7 +86,8 @@ public:
   virtual void dialogue_start (string name, widget wid) = 0;
   virtual void dialogue_inquire (int i, string& arg) = 0;
   virtual void dialogue_end () = 0;
-  virtual void choose_file (object fun, string title, string type) = 0;
+  virtual void choose_file (object fun, string title, string type,
+			    string prompt, url name) = 0;
   virtual void interactive (object fun, scheme_tree p) = 0;
 
   /* Miscellaneous routines */
@@ -98,7 +102,6 @@ public:
   virtual void   set_printer_dpi (string dpi) = 0;
   virtual void   set_default_zoom_factor (double zoom) = 0;
   virtual double get_default_zoom_factor () = 0;
-  virtual void   image_gc (string which= "*") = 0;
   virtual void   inclusions_gc (string which= "*") = 0;
   virtual void   typeset_update (path p) = 0;
   virtual void   typeset_update_all () = 0;

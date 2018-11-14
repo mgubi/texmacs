@@ -12,6 +12,7 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 #include "typesetter.hpp"
+#include "tree_select.hpp"
 #ifdef AQUATEXMACS
 #  include "NS/ns_simple_widget.h"
 #else
@@ -38,6 +39,7 @@
 #define THE_DECORATIONS 32
 #define THE_EXTENTS 64
 #define THE_LOCUS 128
+#define THE_MENUS 256
 
 class tm_buffer_rep;
 class tm_view_rep;
@@ -77,10 +79,11 @@ protected:
   virtual typesetter           get_typesetter () = 0;
   virtual hashmap<string,tree> get_init () = 0;
   virtual hashmap<string,tree> get_fin () = 0;
+  virtual hashmap<string,tree> get_att () = 0;
   virtual void                 set_init (hashmap<string,tree> H= tree ("?"))=0;
   virtual void                 add_init (hashmap<string,tree> H) = 0;
   virtual void                 set_fin (hashmap<string,tree> H) = 0;
-  virtual void                 set_master (url name) = 0;
+  virtual void                 set_att (hashmap<string,tree> H) = 0;
 
   /* exchanging property information */
   virtual void   set_bool_property (string what, bool val) = 0;
@@ -120,11 +123,16 @@ protected:
   virtual void animate () = 0;
   virtual path search_format () = 0;
   virtual path search_format (int& row, int& col) = 0;
+  virtual void table_get_extents (path fp, int& nr_rows, int& nr_cols) = 0;
   virtual void table_bound (path fp, int& i1, int& j1, int& i2, int& j2) = 0;
   virtual tree table_get_subtable (path p, int i1, int j1, int i2, int j2) = 0;
   virtual void table_write_subtable (path fp, int row, int col, tree subt) = 0;
   virtual void table_del_format (path fp, int I1, int J1,
 				 int I2, int J2, string var) = 0;
+  virtual void table_insert (path fp, int row, int col,
+                             int nr_rows, int nr_cols) = 0;
+  virtual void table_remove (path fp, int row, int col,
+                             int nr_rows, int nr_cols) = 0;
 
 public:
   editor_rep ();
@@ -134,6 +142,7 @@ public:
   /* public routines from edit_interface */
   virtual void suspend () = 0;
   virtual void resume () = 0;
+  virtual void keyboard_focus_on (string field) = 0;
   virtual int  get_pixel_size () = 0;
   virtual SI   get_visible_width () = 0;
   virtual SI   get_visible_height () = 0;
@@ -141,6 +150,7 @@ public:
   virtual SI   get_window_height () = 0;
   virtual void invalidate (SI x1, SI y1, SI x2, SI y2) = 0;
   virtual void invalidate (rectangles rs) = 0;
+  virtual void invalidate_all () = 0;
   virtual void notify_change (int changed) = 0;
   virtual bool has_changed (int question) = 0;
   virtual int  idle_time (int event_type= ANY_EVENT) = 0;
@@ -148,6 +158,7 @@ public:
   virtual void full_screen_mode (bool flag) = 0;
   virtual void before_menu_action () = 0;
   virtual void after_menu_action () = 0;
+  virtual void cancel_menu_action () = 0;
   virtual rectangle get_window_extents () = 0;
   virtual cursor search_cursor (path p) = 0;
   virtual selection search_selection (path start, path end) = 0;
@@ -173,10 +184,11 @@ public:
   virtual void mouse_drag (SI x, SI y) = 0;
   virtual void mouse_select (SI x, SI y, int mods, bool drag) = 0;
   virtual void mouse_paste (SI x, SI y) = 0;
-  virtual void mouse_adjust (SI x, SI y) = 0;
+  virtual void mouse_adjust (SI x, SI y, int mods) = 0;
   virtual void mouse_adjust_selection (SI x, SI y, int mods) = 0;
   virtual void mouse_scroll (SI x, SI y, bool up) = 0;
   virtual cursor get_cursor () = 0;
+  virtual array<SI> get_mouse_position () = 0;
   virtual void set_pointer (string name) = 0;
   virtual void set_pointer (string curs_name, string mask_name) = 0;
   virtual void set_message (tree l, tree r= "", bool temp= false) = 0;
@@ -184,6 +196,7 @@ public:
 
   /* public routines from edit_cursor */
   virtual path make_cursor_accessible (path p, bool forwards) = 0;
+  virtual bool cursor_is_accessible () = 0;
   virtual void show_cursor_if_hidden () = 0;
   virtual void go_to (SI x, SI y, bool absolute= true) = 0;
   virtual void go_left_physical () = 0;
@@ -244,10 +257,12 @@ public:
   virtual string   multiply_length (double x, string l) = 0;
   virtual bool     is_length (string s) = 0;
   virtual double   divide_lengths (string l1, string l2) = 0;
+  virtual void     init_update () = 0;
   virtual void     drd_update () = 0;
 #ifdef EXPERIMENTAL
   virtual void     environment_update () = 0;
 #endif
+  virtual tree     get_full_env () = 0;
   virtual bool     defined_at_cursor (string var_name) = 0;
   virtual bool     defined_at_init (string var_name) = 0;
   virtual bool     defined_in_init (string var_name) = 0;
@@ -261,8 +276,12 @@ public:
   virtual double   get_env_double (string var_name) = 0;
   virtual double   get_init_double (string var_name) = 0;
   virtual language get_env_language () = 0;
-  virtual SI       get_page_width () = 0;
-  virtual SI       get_page_height () = 0;
+  virtual int      get_page_count () = 0;
+  virtual SI       get_page_width (bool deco) = 0;
+  virtual SI       get_pages_width (bool deco) = 0;
+  virtual SI       get_page_height (bool deco) = 0;
+  virtual SI       get_total_width (bool deco) = 0;
+  virtual SI       get_total_height (bool deco) = 0;
   virtual tree     exec_texmacs (tree t, path p) = 0;
   virtual tree     exec_texmacs (tree t) = 0;
   virtual tree     exec_verbatim (tree t, path p) = 0;
@@ -272,16 +291,25 @@ public:
   virtual tree     exec_latex (tree t, path p) = 0;
   virtual tree     exec_latex (tree t) = 0;
   virtual tree     texmacs_exec (tree t) = 0;
+  virtual tree     var_texmacs_exec (tree t) = 0;
+  virtual tree     checkout_animation (tree t) = 0;
+  virtual tree     commit_animation (tree t) = 0;
   virtual tree     get_style () = 0;
   virtual void     set_style (tree t) = 0;
   virtual void     init_style () = 0;
   virtual void     init_style (string style) = 0;
-  virtual void     init_add_package (string package) = 0;
-  virtual void     init_remove_package (string package) = 0;
+  virtual void     change_style (tree style) = 0;
+  virtual tree     get_init_all () = 0;
   virtual void     init_env (string var, tree by) = 0;
   virtual void     init_default (string var) = 0;
+  virtual tree     get_att (string key) = 0;
+  virtual void     set_att (string key, tree im) = 0;
+  virtual void     reset_att (string key) = 0;
+  virtual array<string> list_atts () = 0;
+  virtual void     typeset_forced () = 0;
   virtual void     typeset_invalidate (path p) = 0;
   virtual void     typeset_invalidate_all () = 0;
+  virtual void     typeset_invalidate_players (path p, bool reattach) = 0;
 
   /* public routines from edit_modify */
   virtual void notify_assign (path p, tree u) = 0;
@@ -299,6 +327,7 @@ public:
   virtual void archive_state () = 0;
   virtual void start_editing () = 0;
   virtual void end_editing () = 0;
+  virtual void cancel_editing () = 0;
   virtual void start_slave (double a) = 0;
   virtual void mark_start (double a) = 0;
   virtual bool mark_cancel (double a) = 0;
@@ -362,7 +391,7 @@ public:
   /* public routines from edit_table */
   virtual void   make_table (int nr_rows=1, int nr_cols=1) = 0;
   virtual void   make_subtable (int nr_rows=1, int nr_cols=1) = 0;
-  virtual void   table_disactivate () = 0;
+  virtual void   table_deactivate () = 0;
   virtual void   table_extract_format () = 0;
   virtual void   table_insert_row (bool forward) = 0;
   virtual void   table_insert_column (bool forward) = 0;
@@ -370,12 +399,15 @@ public:
   virtual void   table_remove_column (bool forward, bool flag= false) = 0;
   virtual int    table_nr_rows () = 0;
   virtual int    table_nr_columns () = 0;
+  virtual array<int> table_get_extents () = 0;
   virtual void   table_set_extents (int rows, int cols) = 0;
   virtual int    table_which_row () = 0;
   virtual int    table_which_column () = 0;
+  virtual array<int> table_which_cells () = 0;
   virtual path   table_search_cell (int row, int col) = 0;
   virtual void   table_go_to (int row, int col) = 0;
   virtual void   table_set_format (string var, tree val) = 0;
+  virtual tree   table_get_format () = 0;
   virtual string table_get_format (string var) = 0;
   virtual void   table_del_format (string var= "") = 0;
   virtual void   table_format_center () = 0;
@@ -449,18 +481,24 @@ public:
   virtual tree selection_raw_get (string key) = 0;
   virtual void selection_correct (path i1, path i2, path& o1, path& o2) = 0;
   virtual path selection_get_subtable (int& i1, int& j1, int& i2, int& j2) = 0;
+  virtual selection compute_selection (path p1, path p2) = 0;
+  virtual selection compute_selection (range_set sel) = 0;
   virtual void selection_get (selection& sel) = 0;
   virtual void selection_get (path& start, path& end) = 0;
   virtual path selection_get_start () = 0;
   virtual path selection_get_end () = 0;
+  virtual path selection_var_get_start () = 0;
+  virtual path selection_var_get_end () = 0;
   virtual path selection_get_path () = 0;
   virtual path selection_get_cursor_path () = 0;
   virtual tree selection_get_env_value (string var) = 0;
+  virtual tree selection_get (string key) = 0;
   virtual void selection_set (string key, tree t, bool persistant= false) = 0;
   virtual void selection_set (tree t) = 0;
   virtual void selection_set_start (path p= path()) = 0;
   virtual void selection_set_end (path p= path()) = 0;
   virtual void selection_set_paths (path start, path end) = 0;
+  virtual void selection_set_range_set (range_set sel) = 0;
   virtual void selection_copy (string key= "primary") = 0;
   virtual void selection_paste (string key= "primary") = 0;
   virtual void selection_clear (string key= "primary") = 0;
@@ -480,6 +518,11 @@ public:
   virtual void manual_focus_set (path p, bool force= true) = 0;
   virtual void manual_focus_release () = 0;
   virtual path focus_get (bool skip_flag= true) = 0;
+
+  virtual void set_alt_selection (string s, range_set sel) = 0;
+  virtual range_set get_alt_selection (string s) = 0;
+  virtual void cancel_alt_selection (string s) = 0;
+  virtual void cancel_alt_selections () = 0;
 
   /* public routines from edit_replace */
   virtual bool inside (string what) = 0;
@@ -513,13 +556,15 @@ public:
   virtual url  get_name () = 0;
   virtual void focus_on_this_editor () = 0;
   virtual void notify_page_change () = 0;
-  virtual void print (url ps_name, bool to_file, int first, int last) = 0;
+  virtual string get_metadata (string kind) = 0;
+  virtual int  nr_pages () = 0;
+  virtual void print_doc (url ps_name, bool to_file, int first, int last) = 0;
   virtual void print_to_file (url ps_name,
 			      string first="1", string last="1000000") = 0;
   virtual void print_buffer (string first="1", string last="1000000") = 0;
   virtual void export_ps (url ps_name,
 			  string first="1", string last="1000000") = 0;
-  virtual array<int> print_snippet (url u, tree t) = 0;
+  virtual array<int> print_snippet (url u, tree t, bool conserve_preamble) = 0;
   virtual bool graphics_file_to_clipboard (url output) = 0;
   virtual void footer_eval (string s) = 0;
   virtual tree the_line () = 0;
@@ -546,7 +591,6 @@ public:
   friend string get_editor_status_report ();
   friend void   tm_failure (const char* msg);
   friend void   set_buffer_tree (url name, tree doc);
-  friend void   set_master_buffer (url name, url master);
   friend void   set_current_view (url u);
   friend void   focus_on_editor (editor ed);
 };

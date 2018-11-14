@@ -49,12 +49,12 @@ toggle_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 toggle_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   layout_default (ren, 0, 0, w, h);
   layout_pastel_lower (ren, 0, dy, sz, dy + sz);
   if (on) {
     color dark= layout_dark (ren);
-    ren->set_color (dark);
+    ren->set_pencil (pencil (dark, PIXEL));
     ren->line (3*PIXEL, dy + 3*PIXEL, sz - 4*PIXEL, dy + sz - 4*PIXEL);
     ren->line (3*PIXEL, dy + sz - 4*PIXEL, sz - 4*PIXEL, dy + 3*PIXEL);
   }

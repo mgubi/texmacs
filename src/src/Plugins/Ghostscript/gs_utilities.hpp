@@ -17,11 +17,21 @@
 
 #include "url.hpp"
 
+string gs_prefix ();
+string eps_device ();
 bool gs_supports (url image);
 void gs_image_size (url image, int& w_pt, int& h_pt);
-void gs_to_png (url image, url png, int w_px, int h_px);
+bool gs_PDFimage_size (url image, int& w_pt, int& h_pt);
+bool gs_to_png (url image, url png, int w_px, int h_px);
 void gs_to_eps (url image, url eps);
-void gs_to_pdf (url doc, url pdf);
+void gs_to_pdf (url image, url pdf, int w_pt, int h_pt); //notice reversed dimensions order !
+void gs_to_pdf (url doc, url pdf, bool landsc, double paper_h, double paper_w);
+bool gs_PDF_EmbedAllFonts (url image, url pdf);
+void gs_to_ps (url doc, url ps, bool landsc, double paper_h, double paper_w);
+bool gs_check (url doc);
+string pdf_version (url image);
+string pdf_version ();
+string default_pdf_version ();
 void tm_gs (url image);
 
 #endif // USE_GS

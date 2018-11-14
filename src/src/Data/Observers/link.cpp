@@ -13,15 +13,12 @@
 #include "link.hpp"
 #include "iterator.hpp"
 #include "vars.hpp"
+#include "boot.hpp"
 
 hashmap<string,list<observer> > id_resolve;
 hashmap<observer,list<string> > pointer_resolve;
 hashmap<tree,list<soft_link> > vertex_occurrences;
 hashmap<string,int> type_count (0);
-
-static string current_locus_on_paper= "preserve";
-static string current_locus_color= "#404080";
-static string current_visited_color= "#702070";
 
 static hashset<string> visited_table;
 
@@ -119,6 +116,15 @@ link_repository_rep::insert_locus (string id, tree t) {
 }
 
 void
+link_repository_rep::insert_locus (string id, tree t, string cb) {
+  observer obs= scheme_observer (t, cb);
+  register_pointer (id, obs);
+  attach_observer (t, obs);
+  ids= list<string> (id, ids);
+  loci= list<observer> (obs, loci);
+}
+
+void
 link_repository_rep::insert_link (soft_link ln) {
   register_link (ln);
   links= list<soft_link> (ln, links);
@@ -180,16 +186,17 @@ all_link_types () {
 
 void
 set_locus_rendering (string var, string val) {
-  if (var == "locus-on-paper") current_locus_on_paper= val;
-  if (var == LOCUS_COLOR) current_locus_color= val;
-  if (var == VISITED_COLOR) current_visited_color= val;
+  set_user_preference (var, val);
 }
 
 string
 get_locus_rendering (string var) {
-  if (var == "locus-on-paper") return current_locus_on_paper;
-  if (var == LOCUS_COLOR) return current_locus_color;
-  if (var == VISITED_COLOR) return current_visited_color;
+  if (var == "locus-on-paper")
+    return get_user_preference (var, "change");
+  if (var == LOCUS_COLOR)
+    return get_user_preference (var, "#404080");
+  if (var == VISITED_COLOR)
+    return get_user_preference (var, "#702070");
   return "";
 }
 
@@ -217,7 +224,7 @@ get_reference (tree& t) {
 list<tree>
 not_done (list<tree> l) {
   if (is_nil (l)) return l;
-  else if (versioning_busy || busy_tree (get_reference (l->item)))
+  else if (busy_modifying || busy_tree (get_reference (l->item)))
     return not_done (l->next);
   return list<tree> (l->item, not_done (l->next));
 }

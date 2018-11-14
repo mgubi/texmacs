@@ -15,7 +15,8 @@
   (:use (utils library tree)
 	(utils library cursor)
 	(utils edit auto-close)
-	(math math-drd)))
+	(math math-drd)
+        (generic format-geometry-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some drd properties, which should go into table-drd.scm later on
@@ -25,17 +26,61 @@
 (define-group similar-tag (math-table-tag))
 
 (define-group math-table-tag
-  matrix det)
+  matrix det bmatrix)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Invisible operators
+;; Spaces
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (insert-invisible s)
-  (:synopsis "insert an invisible mathematical symbol")
-  (cond ((in? (before-cursor) '(" " "*")) (noop))
-	((in? (after-cursor) '(" " "*")) (noop))
-	(else (insert s))))
+(tm-define (allow-space-after? b)
+  (and b (not (tm-func? b 'big))
+       (or (not (tm-atomic? b))
+           (let* ((s (tm->string b))
+                  (last (and (!= s "") (tmstring-reverse-ref s 0)))
+                  (type (and last (math-symbol-type last))))
+	     (nin? type (list "prefix" "infix" "separator"
+			      "opening-bracket" "middle-bracket"))))))
+
+(tm-define (skip-decorations-leftwards t)
+  (if (and (tree? t)
+           (tree-in? t '(rsub rsup rprime suppressed))
+           (tree-ref t :previous))
+      (skip-decorations-leftwards (tree-ref t :previous))
+      t))
+
+(tm-define (kbd-space-bar t shift?)
+  (:require (and (tree-is-buffer? t) (in-math?)))
+  (let* ((b (skip-decorations-leftwards (before-cursor)))
+	 (p (get-preference "math spacebar")))
+    (cond ((== p "allow spurious spaces")
+	   (insert " "))
+	  ((and (== b " ") (== p "no spurious spaces"))
+	   (noop))
+	  ((== b " ")
+	   (remove-text #f)
+	   (make-space "1em"))
+	  ((and (tree? b) (tree-func? b 'space 1))
+	   (if (and (tree-atomic? (tree-ref b 0))
+		    (string-ends? (tree->string (tree-ref b 0)) "em"))
+	       (make-space "1em")
+	       (geometry-horizontal b #t)))
+	  ((not (allow-space-after? b))
+	   (noop))
+	  (else
+	   (insert " ")))))
+
+(tm-define (kbd-insert s)
+  (:require (in-math?))
+  (when (== (before-cursor) " ")
+    (let* ((p (get-preference "math spacebar"))
+	   (type (if (string? s) (math-symbol-type s) "symbol")))
+      (when (in? type (list "postfix" "infix" "separator"
+			    "middle-bracket" "closing-bracket"))
+	(remove-text #f))))
+  (former s))
+
+(tm-define (math-insert t)
+  (insert t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special customizations inside equation environments
@@ -247,12 +292,21 @@
   '("~" "^" "<bar>" "<vect>" "<check>" "<breve>" "<invbreve>"))
 
 (define wide-list-2
-  '("<acute>" "<grave>" "<dot>" "<ddot>" "<abovering>"))
+  '("<acute>" "<grave>" "<dot>" "<ddot>" "<dddot>" "<ddddot>" "<abovering>"))
 
 (define wide-list-3
   '("<wide-overbrace>" "<wide-underbrace*>"
-    "<wide-sqoverbrace>" "<wide-squnderbrace*>"
-    "<wide-varrightarrow>" "<wide-varleftarrow>" "<wide-bar>"))
+    "<wide-poverbrace>" "<wide-punderbrace*>"
+    "<wide-sqoverbrace>" "<wide-squnderbrace*>"))
+
+(define wide-list-4
+  '("<wide-underbrace>" "<wide-overbrace*>"
+    "<wide-punderbrace>" "<wide-poverbrace*>"
+    "<wide-squnderbrace>" "<wide-sqoverbrace*>"))
+
+(define wide-list-5
+  '("<wide-varrightarrow>" "<wide-varleftarrow>"
+    "<wide-varleftrightarrow>" "<wide-bar>"))
 
 (tm-define (variant-circulate t forward?)
   (:require (tree-in? t '(wide wide*)))
@@ -266,7 +320,13 @@
           (tree-set t 1 (list-ref wide-list-2 j))))
       (and-with i (list-find-index wide-list-3 (lambda (x) (== x s)))
         (with j (modulo (+ i (if forward? 1 -1)) (length wide-list-3))
-          (tree-set t 1 (list-ref wide-list-3 j)))))))
+          (tree-set t 1 (list-ref wide-list-3 j))))
+      (and-with i (list-find-index wide-list-4 (lambda (x) (== x s)))
+        (with j (modulo (+ i (if forward? 1 -1)) (length wide-list-4))
+          (tree-set t 1 (list-ref wide-list-4 j))))
+      (and-with i (list-find-index wide-list-5 (lambda (x) (== x s)))
+        (with j (modulo (+ i (if forward? 1 -1)) (length wide-list-5))
+          (tree-set t 1 (list-ref wide-list-5 j)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Wide arrows
@@ -286,32 +346,37 @@
 ;; Modifying the shape of brackets
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define brackets
-  '(("(" ")")
-    ("[" "]")
-    ("{" "}")
-    ("<langle>" "<rangle>")
-    ("|" "|")
-    ("<||>" "<||>")
-    ("<lfloor>" "<rfloor>")
-    ("<lceil>" "<rceil>")
-    ("<llbracket>" "<rrbracket>")))
+(define lbrackets
+  '("(" "[" "{" "<langle>" "|" "<||>" "<lfloor>" "<lceil>" "<llbracket>"))
+
+(define mbrackets
+  '("|" "<||>" "/" "\\"))
+
+(define rbrackets
+  '(")" "]" "}" "<rangle>" "|" "<||>" "<rfloor>" "<rceil>" "<rrbracket>"))
+
+(define (bracket-circulate t forward? brackets)
+  (cond ((and (tree-in? t '(around around*))
+              (== (tree-arity t) 3))
+         (bracket-circulate (tree-ref t 0) forward? lbrackets)
+         (bracket-circulate (tree-ref t 2) forward? rbrackets))
+        ((and (tree-is? t 'left) (> (tree-arity t) 1))
+         (bracket-circulate (tree-ref t 0) forward? lbrackets))
+        ((and (tree-is? t 'mid) (> (tree-arity t) 1))
+         (bracket-circulate (tree-ref t 0) forward? mbrackets))
+        ((and (tree-is? t 'right) (> (tree-arity t) 1))
+         (bracket-circulate (tree-ref t 0) forward? rbrackets))
+        ((and (tree-atomic? t)
+              (in? (tree->string t) brackets))
+         (let* ((s (tree->string t))
+                (i (list-find-index brackets (lambda (x) (== x s))))
+                (j (modulo (+ i (if forward? 1 -1)) (length brackets)))
+                (r (list-ref brackets j)))
+           (tree-assign t r)))))
 
 (tm-define (variant-circulate t forward?)
-  (:require (tree-in? t '(around around*)))
-  (when (and (== (tree-arity t) 3)
-             (tree-atomic? (tree-ref t 0))
-             (tree-atomic? (tree-ref t 2)))
-    (let* ((l (tree->string (tree-ref t 0)))
-           (r (tree->string (tree-ref t 2)))
-           (p (list l r)))
-      (when (in? p brackets)
-        (let* ((i (list-find-index brackets (lambda (x) (== x p))))
-               (j (modulo (+ i (if forward? 1 -1)) (length brackets)))
-               (nl (car (list-ref brackets j)))
-               (nr (cadr (list-ref brackets j))))
-          (tree-assign (tree-ref t 0) nl)
-          (tree-assign (tree-ref t 2) nr))))))
+  (:require (tree-in? t '(left mid right around around*)))
+  (bracket-circulate t forward? mbrackets))
 
 (define bigops
   '("<int>" "<intlim>" "<oint>" "<ointlim>"
@@ -332,6 +397,48 @@
                (j (modulo (+ i (if forward? 1 -1)) (length bigops)))
                (ns (list-ref bigops j)))
           (tree-assign (tree-ref t 0) ns))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Modifying the dimension of brackets
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (bracket-size-increase t by)
+  (cond ((and (tree-in? t '(left mid right))
+              (>= (tree-arity t) 2))
+         (bracket-size-increase (tree-ref t 1) by))
+        ((and (tree-in? t '(around around*))
+              (== (tree-arity t) 3))
+         (when (tree-atomic? (tree-ref t 0))
+           (tree-set t 0 `(left ,(tree-ref t 0) "0")))
+         (when (tree-atomic? (tree-ref t 2))
+           (tree-set t 2 `(right ,(tree-ref t 2) "0")))
+         (bracket-size-increase (tree-ref t 0) by)
+         (bracket-size-increase (tree-ref t 2) by)
+         (when (tm-equal? (tree-ref t 0 1) "0")
+           (tree-set t 0 (tree-ref t 0 0)))
+         (when (tm-equal? (tree-ref t 2 1) "0")
+           (tree-set t 2 (tree-ref t 2 0))))
+        ((tree-integer? t)
+         (let* ((old (tree->number t))
+                (new (+ old by)))
+           (tree-set t (number->string new))))
+        ((tm-length? t)
+         (length-increase t by))))
+
+(tm-define (geometry-vertical t down?)
+  (:require (tree-in? t '(left mid right around around*)))
+  (with inc (if down? -1 1)
+    (bracket-size-increase t inc)))
+
+(define (bracket-size-reset t)
+  (when (and (tree-in? t '(left mid right)) (>= (tree-arity t) 1))
+    (tree-set t (tree-ref t 0))))
+
+(tm-define (geometry-default t)
+  (:require (tree-in? t '(around around*)))
+  (when (== (tree-arity t) 3)
+    (bracket-size-reset (tree-ref t 0))
+    (bracket-size-reset (tree-ref t 2))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Not necessarily matching brackets
@@ -400,11 +507,11 @@
 (define (deleted? t i)
   (== (tm->stree (tree-ref t i)) "<nobracket>"))
 
-(define (make-small s)
-  (cond ((nstring? s) "<nobracket>")
-	((== s ".") "<nobracket>")
-	((<= (string-length s) 1) s)
-	(else (string-append "<" s ">"))))
+;;(define (make-small s)
+;;  (cond ((nstring? s) "<nobracket>")
+;;	  ((== s ".") "<nobracket>")
+;;	  ((<= (string-length s) 1) s)
+;;	  (else (string-append "<" s ">"))))
 
 (define (find-adjacent-around del?)
   (let* ((ret #f)
@@ -435,11 +542,6 @@
 	      (set! ret t))))))
     ret))
 
-(define (at-end? t)
-  (with p (cursor-path)
-    (or (== p (tree->path t 1 :end))
-        (== p (tree->path t :end)))))
-
 (tm-define (math-bracket-open lb rb large?)
   (when (== large? 'default)
     (set! large? (!= (get-preference "use large brackets") "off")))
@@ -456,7 +558,7 @@
                (u (find-adjacent-around #f)))
           (cond ((and t (deleted? t 2)
                       (or (not (deleted? t 0))
-                          (at-end? t)))
+                          (tree-at-end? t)))
                  (tree-set t 2 lb)
                  (tree-go-to t :end))
                 ((and t (deleted? t 0))
@@ -497,7 +599,7 @@
 	   (u (find-adjacent-around #f)))
       (cond ((and t (deleted? t 0)
                   (or (not (deleted? t 2))
-                      (not (at-end? t))))
+                      (not (tree-at-end? t))))
 	     (tree-set t 0 rb)
 	     (tree-go-to t 1 :start))
 	    ((and t (deleted? t 2))

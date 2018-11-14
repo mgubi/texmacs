@@ -25,9 +25,25 @@
 (tm-define (style-menu) (get-style-menu))
 (tm-define (add-package-menu) (get-add-package-menu))
 (tm-define (remove-package-menu) (get-remove-package-menu))
+(tm-define (toggle-package-menu) (get-toggle-package-menu))
 (menu-bind bookmarks-menu)
 (menu-bind test-menu)
 (menu-bind help-icons (if (in-session?) (link session-help-icons)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The Remote menu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(menu-bind remote-menu
+  (if (and (null? remote-client-list) (not (server-started?)))
+      (link start-client-menu)
+      ;;---
+      ;;(link start-server-menu)
+      )
+  (if (and (null? remote-client-list) (server-started?))
+      (link server-menu))
+  (if (nnull? remote-client-list)
+      (link client-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The TeXmacs main menu
@@ -50,6 +66,8 @@
           (=> "Link" (link link-menu)))
       (if (in-presentation?)
           (=> "Dynamic" (link dynamic-menu)))
+      (if (style-has? "icourse-dtd")
+          (=> "Icourse" (link calc-icourse-menu)))
       (link plugin-menu)
       (link texmacs-extra-menu)
       (=> "Focus" (link focus-menu))
@@ -64,7 +82,9 @@
   (=> "View" (link view-menu))
   (=> "Go" (link go-menu))
   (if (detailed-menus?) (=> "Tools" (link tools-menu)))
-  (if (nnull? remote-list)
+  (if (with-database-tool?)
+      (=> "Data" (link db-menu)))
+  (if (with-remote-tool?)
       (=> "Remote" (link remote-menu)))
   (if (with-debugging-tool?)
       (=> "Debug" (link debug-menu)))
@@ -75,12 +95,13 @@
   (=> "Help" (link help-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The TeXmacs popup menu
+;; The TeXmacs popup menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind texmacs-popup-menu
-  (link focus-menu)
-  ---
+  (link focus-menu))
+
+(menu-bind texmacs-alternative-popup-menu
   (-> "File" (link file-menu))
   (-> "Edit" (link edit-menu))
   (if (in-graphics?)
@@ -96,6 +117,9 @@
           (-> "Link" (link link-menu)))
       (if (in-presentation?)
           (-> "Dynamic" (link dynamic-menu)))
+      (if (style-has? "icourse-dtd")
+          (-> "Icourse" (link calc-icourse-menu)))
+      (-> "Focus" (link focus-menu))
       (-> "Format" (link format-menu)))
   (-> "Document" (link document-menu))
   (if (== (get-init-tree "sectional-short-style") (tree 'macro "false"))
@@ -105,7 +129,8 @@
   (-> "View" (link view-menu))
   (-> "Go" (link go-menu))
   (if (detailed-menus?) (-> "Tools" (link tools-menu)))
-  (if (nnull? remote-list) (-> "Remote" (link remote-menu)))
+  (if (with-database-tool?) (-> "Data" (link db-menu)))
+  (if (with-remote-tool?) (-> "Remote" (link remote-menu)))
   (if (with-debugging-tool?) (-> "Debug" (link debug-menu)))
   (if (nnull? (test-menu)) (-> "Test" (link test-menu)))
   ---
@@ -120,12 +145,15 @@
       (link new-file-menu))
   (=> (balloon (icon "tm_open.xpm") "Load a file") (link load-menu))
   (=> (balloon (icon "tm_save.xpm") "Save this buffer") (link save-menu))
-  (if (experimental-qt-gui?)
-      ((balloon (icon "tm_print.xpm") "Print") (interactive-print-buffer)))
-  (if (not (experimental-qt-gui?))
-      (=> (balloon (icon "tm_print.xpm") "Print") (link print-menu)))
-  ((balloon (icon "tm_preferences.xpm") "Change the TeXmacs preferences")
-   (open-preferences))
+  ((balloon (icon "tm_build.xpm") "Update this buffer")
+   (update-document "all"))
+  (=> (balloon (icon "tm_print.xpm") "Print") (link print-menu-inline))
+  (if (use-menus?)
+      (=> (balloon (icon "tm_preferences.xpm") "Change the TeXmacs preferences")
+          (link preferences-menu)))
+  (if (use-popups?)
+      ((balloon (icon "tm_preferences.xpm") "Change the TeXmacs preferences")
+       (open-preferences)))
   (if (detailed-menus?)
       ;;(=> (balloon (icon "tm_style.xpm") "Select a document style")
       ;;(link document-style-menu))
@@ -133,20 +161,17 @@
       ;;(link global-language-menu))
       )
   (=> (balloon (icon "tm_cancel.xpm") "Close") (link close-menu))
-  |
+  /
   ((balloon (icon "tm_cut.xpm") "Cut text")
    (clipboard-cut "primary"))
   ((balloon (icon "tm_copy.xpm") "Copy text")
    (clipboard-copy "primary"))
   ((balloon (icon "tm_paste.xpm") "Paste text")
    (clipboard-paste "primary"))
-  (if (not (in-search-mode?))
-      ((balloon (icon "tm_find.xpm") "Find text") (search-start #t)))
-  (if (in-search-mode?)
-      ((balloon (icon "tm_find_next.xpm") "Find next match")
-       (search-button-next)))
+  ((balloon (icon "tm_find.xpm") "Find text")
+   (interactive-search))
   ((balloon (icon "tm_replace.xpm") "Query replace")
-   (interactive replace-start-forward))
+   (interactive-replace))
   (if (not (in-math?))
       ((balloon (icon "tm_spell.xpm") "Check text for spelling errors")
        (spell-start)))
@@ -155,7 +180,7 @@
           (link math-correct-menu)))
   ((balloon (icon "tm_undo.xpm") "Undo last changes") (undo 0))
   ((balloon (icon "tm_redo.xpm") "Redo undone changes") (redo 0))
-  |
+  /
   ((balloon (icon "tm_back.xpm") "Browse back")
    (cursor-history-backward))
   ((balloon (icon "tm_reload.xpm") "Reload")
@@ -163,7 +188,7 @@
   ((balloon (icon "tm_forward.xpm") "Browse forward")
    (cursor-history-forward))
   (if (in-presentation?)
-    |
+    /
     (link dynamic-icons)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -176,13 +201,31 @@
         (else (cons t (upward-context-trees (tree-up t))))))
 
 (tm-widget (texmacs-side-tool t)
-  ((eval (symbol->string (tree-label t)))
-   (tree-select t)))
+  (horizontal
+    (mini #t
+      ((eval (symbol->string (tree-label t)))
+       (tree-select t)))
+    >>>))
 
 (tm-widget (texmacs-side-tools)
   (for (t (upward-context-trees (cursor-tree)))
     (dynamic (texmacs-side-tool t))
-    ===))
+    ===)
+  (glue #t #t 100 0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The TeXmacs bottom tools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-widget (texmacs-bottom-tools)
+  (if (qt-gui?)
+      (link texmacs-bottom-toolbars))
+  (if (not (qt-gui?))
+      (glue #f #f 0 2)
+      (horizontal
+        (link texmacs-bottom-toolbars))
+      (glue #f #f 0 1)
+      ---))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The mode dependent icon bar

@@ -21,9 +21,11 @@ class edit_typeset_rep: virtual public editor_rep {
 protected:
   tree the_style;                         // document style
   hashmap<path,hashmap<string,tree> > cur; // environment at different paths
-  hashmap<string,tree> pre;               // environment after styles
+  hashmap<string,tree> stydef;            // environment after styles
+  hashmap<string,tree> pre;               // environment after styles and init
   hashmap<string,tree> init;              // environment changes w.r.t. style
-  hashmap<string,tree> fin ;              // environment changes w.r.t. doc
+  hashmap<string,tree> fin;               // environment changes w.r.t. doc
+  hashmap<string,tree> grefs;             // global references
   edit_env env;                           // the environment for typesetting
   typesetter ttt;                         // the (not) yet typesetted document
 
@@ -33,10 +35,11 @@ protected:
   void                 set_style (tree t);
   hashmap<string,tree> get_init ();
   hashmap<string,tree> get_fin ();
+  hashmap<string,tree> get_att ();
   void                 set_init (hashmap<string,tree> init= tree ("?"));
   void                 add_init (hashmap<string,tree> init);
   void                 set_fin (hashmap<string,tree> fin);
-  void                 set_master (url name);
+  void                 set_att (hashmap<string,tree> att);
 
 public:
   edit_typeset_rep ();
@@ -51,10 +54,12 @@ public:
   bool     is_length (string s);
   double   divide_lengths (string l1, string l2);
 
+  void     init_update ();
   void     drd_update ();
 #ifdef EXPERIMENTAL
   void     environment_update ();
 #endif
+  tree     get_full_env ();
   bool     defined_at_cursor (string var_name);
   bool     defined_at_init (string var_name);
   bool     defined_in_init (string var_name);
@@ -68,8 +73,12 @@ public:
   double   get_env_double (string var_name);
   double   get_init_double (string var_name);
   language get_env_language ();
-  SI       get_page_width ();
-  SI       get_page_height ();
+  int      get_page_count ();
+  SI       get_page_width (bool deco);
+  SI       get_pages_width (bool deco);
+  SI       get_page_height (bool deco);
+  SI       get_total_width (bool deco);
+  SI       get_total_height (bool deco);
 
   tree     exec (tree t, hashmap<string,tree> env, bool expand_refs= true);
   tree     exec_texmacs (tree t, path p);
@@ -81,13 +90,21 @@ public:
   tree     exec_latex (tree t, path p);
   tree     exec_latex (tree t);
   tree     texmacs_exec (tree t);
+  tree     var_texmacs_exec (tree t);
 
+  tree     checkout_animation (tree t);
+  tree     commit_animation (tree t);
+
+  void     change_style (tree style);
+  tree     get_init_all ();
   void     init_env (string var, tree by);
   void     init_default (string var);
   void     init_style ();
   void     init_style (string style);
-  void     init_add_package (string package);
-  void     init_remove_package (string package);
+  tree     get_att (string key);
+  void     set_att (string key, tree im);
+  void     reset_att (string key);
+  array<string> list_atts ();
 
   void     typeset_style_use_cache (tree style);
   void     typeset_preamble ();
@@ -96,7 +113,10 @@ public:
   void     typeset_exec_until (path p);
   void     typeset_invalidate (path p);
   void     typeset_invalidate_all ();
+  void     typeset_invalidate_players (path p, bool reattach);
+  void     typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2);
   void     typeset (SI& x1, SI& y1, SI& x2, SI& y2);
+  void     typeset_forced ();
 
   friend class tm_window_rep;
   friend class tm_server_rep;

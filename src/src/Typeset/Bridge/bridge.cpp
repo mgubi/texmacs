@@ -84,6 +84,11 @@ make_bridge (typesetter ttt, tree st, path ip) {
     return bridge_compound (ttt, st, ip);
   case ARG:
     return bridge_argument (ttt, st, ip);
+  case MAP_ARGS:
+    // FIXME: we might want to merge bridge_rewrite and bridge_eval
+    // 'map_args' should really be implemented using bridge_rewrite,
+    // but bridge_eval leads to better locality of updates for 'screens'
+    return bridge_eval (ttt, st, ip);
   case MARK:
     return bridge_mark (ttt, st, ip);
   case EXPAND_AS:
@@ -92,9 +97,11 @@ make_bridge (typesetter ttt, tree st, path ip) {
   case QUASI:
     return bridge_eval (ttt, st, ip);
   case EXTERN:
+  case VAR_INCLUDE:
+  case WITH_PACKAGE:
     return bridge_rewrite (ttt, st, ip);
   case INCLUDE:
-    return bridge_rewrite (ttt, st, ip);
+    return bridge_compound (ttt, st, ip);
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
   case ACTIVE:
@@ -111,6 +118,9 @@ make_bridge (typesetter ttt, tree st, path ip) {
   case HLINK:
   case ACTION:
     return bridge_compound (ttt, st, ip);
+  case ANIM_STATIC:
+  case ANIM_DYNAMIC:
+    return bridge_eval (ttt, st, ip);
   case CANVAS:
     return bridge_canvas (ttt, st, ip);
   case ORNAMENT:
@@ -330,6 +340,7 @@ bridge_rep::typeset (int desired_status) {
       int first=-1, last=-1;
       array<box> bs;
       array<SI>  spc;
+      array<page_item> special_l;
       for (i=0; i<n; i++)
 	if (l[i]->type != PAGE_CONTROL_ITEM) {
 	  if (first == -1 && l[i]->type == PAGE_LINE_ITEM) first= N(bs);
@@ -337,11 +348,17 @@ bridge_rep::typeset (int desired_status) {
 	  spc << l[i]->spc->def;
 	  last= i;
 	}
+        else if (is_tuple (l[i]->t, "env_page") &&
+                 (l[i]->t[1] == PAGE_THIS_TOP ||
+                  l[i]->t[1] == PAGE_THIS_BOT ||
+                  l[i]->t[1] == PAGE_THIS_BG_COLOR))
+          special_l << l[i];
       box lb= stack_box (path (ip), bs, spc);
       if (first != -1) lb= move_box (path (ip), lb, 0, bs[first]->y2);
       array<page_item> new_l (1);
       new_l[0]= page_item (lb);
       new_l[0]->spc= l[last]->spc;
+      new_l << special_l;
       ttt->insert_stack (new_l, sb);
     }
   }

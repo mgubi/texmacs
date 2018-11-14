@@ -13,12 +13,14 @@
 #include "dyn_link.hpp"
 #include "hashmap.hpp"
 #include "analyze.hpp"
+#include "config.h"
 
 #ifdef USE_SQLITE3
 
 #include <sqlite3.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 /******************************************************************************
 * Routines used from Sqlite3
@@ -77,9 +79,9 @@ tm_sqlite3_initialize () {
   debug_on (status);
 
 #ifdef LINKED_SQLITE3
-  if (DEBUG_AUTO) cout << "TeXmacs] With linked Sqlite3 support\n";
+  if (DEBUG_AUTO) debug_automatic << "With linked Sqlite3 support\n";
 #else
-  if (DEBUG_AUTO) cout << "TeXmacs] Installed Sqlite3 support\n";
+  if (DEBUG_AUTO) debug_automatic << "Installed Sqlite3 support\n";
 #endif
 
   sqlite3_error= false;
@@ -98,10 +100,26 @@ sqlite3_present () {
 
 hashmap<tree,pointer> sqlite3_connections (NULL);
 
+string
+sql_escape (string s) {
+  //return cork_to_utf8 (s);
+  return s;
+}
+
+string
+sql_unescape (string s) {
+  //return utf_8_to_cork (s);
+  return s;
+}
+
 tree
 sql_exec (url db_name, string cmd) {
   if (!sqlite3_initialized)
     tm_sqlite3_initialize ();
+  if (sqlite3_error) {
+    cout << "TeXmacs] ERROR: SQLite support not properly configured.\n";
+    return tree (TUPLE);
+  }
   string name= concretize (db_name);
   if (!sqlite3_connections->contains (name)) {
     c_string _name (name);
@@ -117,12 +135,21 @@ sql_exec (url db_name, string cmd) {
   }
   tree ret (TUPLE);
   sqlite3* db= (sqlite3*) sqlite3_connections [name];
-  c_string _cmd (cork_to_utf8 (cmd));
+  c_string _cmd (sql_escape (cmd));
   char** tab;
   int rows, cols;
   char* err;
   //cout << "Executing " << _cmd << "\n";
   int status= SQLITE3_get_table (db, _cmd, &tab, &rows, &cols, &err);
+
+  int attempt= 0;
+  while (status != SQLITE_OK &&
+         string (err) == string ("database is locked") &&
+         attempt < 100) {
+    usleep (100000);
+    attempt++;
+    status= SQLITE3_get_table (db, _cmd, &tab, &rows, &cols, &err);
+  }
 
   if (status != SQLITE_OK) {
     // TODO: improve error handling
@@ -132,10 +159,14 @@ sql_exec (url db_name, string cmd) {
 
   for (int r=0; r<=rows; r++) {
     tree row (TUPLE);
+    //cout << "  Row " << r << LF;
     for (int c=0; c<cols; c++) {
       int i= r*cols + c;
       if (tab[i] == NULL) row << tree (TUPLE);
-      else row << tree (scm_quote (utf8_to_cork (string (tab[i]))));
+      else {
+        row << tree (scm_quote (sql_unescape (tab[i])));
+        //cout << "    Column " << c << ": " << tab[i] << LF;
+      }
     }
     ret << row;
   }
@@ -157,3 +188,19 @@ tree sql_exec (url db_name, string cmd) {
   (void) db_name; (void) cmd; return tree (TUPLE); }
 
 #endif // USE_SQLITE3
+
+/******************************************************************************
+* Other routines
+******************************************************************************/
+
+string
+sql_quote (string s) {
+  int i, n= N(s);
+  string r;
+  r << "'";
+  for (i=0; i<n; i++)
+    if (s[i] != '\'') r << s[i];
+    else r << "''";
+  r << "'";
+  return r;
+}

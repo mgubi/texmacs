@@ -11,10 +11,13 @@
 
 #include "boxes.hpp"
 #include "formatter.hpp"
-#include "Graphics/point.hpp"
+#include "point.hpp"
 #include "printer.hpp"
 #include "file.hpp"
 #include "merge_sort.hpp"
+#include "player.hpp"
+
+extern tree the_et;
 
 /******************************************************************************
 * Default settings for virtual routines
@@ -37,6 +40,8 @@ SI box_rep::sub_hi_lim  (int level) { (void) level; return y1 + ((y2-y1)/3); }
 SI box_rep::sup_lo_lim  (int level) { (void) level; return (y1 + y2) >> 1; }
 SI box_rep::sup_lo_base (int level) { (void) level; return y2 - ((y2-y1)/3); }
 SI box_rep::sup_hi_lim  (int level) { (void) level; return y2; }
+SI box_rep::wide_correction (int mode) { (void) mode; return 0; }
+void box_rep::get_bracket_extents (SI& lo, SI& hi) { lo= y1; hi= y2; }
 
 /******************************************************************************
 * Positioning routines
@@ -82,14 +87,40 @@ box_rep::contains_rectangle (SI X1, SI Y1, SI X2, SI Y2) {
   return x1<=X1 && y1<=Y1 && x2>=X2 && y2>=Y2;
 }
 
+box
+box_rep::adjust_kerning (int mode, double factor) {
+  (void) mode; (void) factor;
+  return this;
+}
+
+box
+box_rep::expand_glyphs (int mode, double factor) {
+  (void) mode; (void) factor;
+  return this;
+}
+
+void
+box_rep::get_cell_extents (SI& l, SI& r) {
+  (void) l; (void) r;
+  FAILED ("cell box expected");
+}
+
+box
+box_rep::adjust_cell_geometry (SI dx, SI dl, SI dr) {
+  (void) dx; (void) dl; (void) dr;
+  FAILED ("cell box expected");
+  return this;
+}
+
 /******************************************************************************
 * Cursor routines
 ******************************************************************************/
 
 path
-box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
+box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
   (void) y;
   (void) force;
+  found= true;
   SI m= (x1+x2)>>1;
   return path (((x<m) || ((x==m) && (delta<0)))? 0: 1);
 }
@@ -153,7 +184,8 @@ box_rep::find_selection (path lbp, path rbp) {
 
 path
 box_rep::find_tree_path (SI x, SI y, SI delta) {
-  path bp= find_box_path (x, y, delta, false);
+  bool found;
+  path bp= find_box_path (x, y, delta, false, found);
   //cout << "Find " << x << ", " << y << "; " << delta;
   //cout << " -> " << bp << "\n";
   return find_tree_path (bp);
@@ -223,7 +255,10 @@ find_innermost_scroll (box b, path p) {
 
 path
 find_scrolled_box_path (box b, path sp, SI x, SI y, SI delta) {
-  if (is_nil (sp)) return b->find_box_path (x, y, delta, false);
+  if (is_nil (sp)) {
+    bool found;
+    return b->find_box_path (x, y, delta, false, found);
+  }
   else {
     int m= sp->item;
     SI xx= x - b->sx (m), yy= y - b->sy (m);
@@ -231,6 +266,18 @@ find_scrolled_box_path (box b, path sp, SI x, SI y, SI delta) {
     return path (m, find_scrolled_box_path (b[m], sp->next, xx, yy, dd));
   }
 }
+
+/*
+void
+debug (box b, path bp) {
+  tree t= (tree) b;
+  if (is_tuple (t) && N(t) > 0) cout << t[0];
+  else cout << t;
+  cout << ", " << bp << "\n";
+  if (!is_nil (bp))
+    debug (b[bp->item], bp->next);
+}
+*/
 
 path
 find_scrolled_tree_path (box b, path sp, SI x, SI y, SI delta) {
@@ -306,7 +353,7 @@ box_rep::find_frame (path bp, bool last) {
 
 grid
 box_rep::find_grid (path bp) {
-  box   b= this;
+  box  b= this;
   grid g= get_grid ();
   while (!is_nil (bp)) {
     b  = b->subbox (bp->item);
@@ -395,56 +442,63 @@ box_rep::get_info (tree in) {
 
 int
 box_rep::get_leaf_left_pos () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
   return 0;
 }
 
 int
 box_rep::get_leaf_right_pos () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
   return 0;
 }
 
 string
 box_rep::get_leaf_string () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
   return "";
 }
 
 font
 box_rep::get_leaf_font () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
   return font ();
 }
 
-color
-box_rep::get_leaf_color () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+pencil
+box_rep::get_leaf_pencil () {
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
-  return 0;
+  return pencil (false);
 }
 
 language
 box_rep::get_leaf_language () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("this box is not textual");
   return language ();
 }
 
 tree
 box_rep::get_leaf_tree () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("no tree attached to this box");
   return "";
 }
 
+box
+box_rep::get_leaf_box () {
+  failed_error << "The box is " << box (this) << "\n";
+  FAILED ("no box attached to this box");
+  return box ();
+}
+
 lazy
 box_rep::get_leaf_lazy () {
-  cerr << "\nTeXmacs] the box is " << box (this) << "\n";
+  failed_error << "The box is " << box (this) << "\n";
   FAILED ("no lazy attached to this box");
   return lazy ();
 }
@@ -462,10 +516,12 @@ box_rep::get_leaf_offset (string search) {
 int nr_painted= 0;
 
 void
-clear_pattern_rectangles (renderer ren, rectangles l) {
+clear_pattern_rectangles (renderer ren, rectangle m, rectangles l) {
   while (!is_nil (l)) {
     rectangle r (l->item);
-    ren->clear_pattern (r->x1- ren->ox, r->y1- ren->oy,
+    ren->clear_pattern (m->x1- ren->ox, m->y1- ren->oy,
+			m->x2- ren->ox, m->y2- ren->oy,
+                        r->x1- ren->ox, r->y1- ren->oy,
 			r->x2- ren->ox, r->y2- ren->oy);
     l= l->next;
   }
@@ -487,9 +543,9 @@ box_rep::reindex (int i, int item, int n) {
 
 void
 box_rep::redraw (renderer ren, path p, rectangles& l) {
-  if (((nr_painted&15) == 15) && ren->interrupted (true)) return;
+  if ((nr_painted&15) == 15 && ren->is_screen && gui_interrupted (true)) return;
   ren->move_origin (x0, y0);
-  SI delta= ren->pixel; // adjust visibility to compensate truncation
+  SI delta= ren->retina_pixel; // adjust visibility to compensate truncation
   if (ren->is_visible (x3- delta, y3- delta, x4+ delta, y4+ delta)) {
     rectangles ll;
     l= rectangles();
@@ -513,14 +569,15 @@ box_rep::redraw (renderer ren, path p, rectangles& l) {
       }
     }
     
-    if (((nr_painted&15) == 15) && ren->interrupted ()) {
+    if ((nr_painted&15) == 15 && ren->is_screen && gui_interrupted ()) {
       l= translate (l, -ren->ox, -ren->oy);
-      clear_incomplete (l, ren->pixel, item, i1, i2);
+      clear_incomplete (l, ren->retina_pixel, item, i1, i2);
       l= translate (l, ren->ox, ren->oy);
     }
     else {
       l= rectangle (x3+ ren->ox, y3+ ren->oy, x4+ ren->ox, y4+ ren->oy);
       display (ren);
+      if (!ren->is_screen) display_links (ren);
       if (nr_painted < 15) ren->apply_shadow (x1, y1, x2, y2);
       nr_painted++;
     }
@@ -550,6 +607,33 @@ box_rep::pre_display (renderer &ren) {
 void
 box_rep::post_display (renderer &ren) {
   (void) ren;
+}
+
+void
+box_rep::display_background (renderer ren) {
+  (void) ren;
+}
+
+void
+box_rep::redraw_background (renderer ren) {
+  ren->move_origin (x0, y0);
+  display_background (ren);
+  int i, n=subnr ();
+  for (i=0; i<n; i++)
+    subbox (i)->redraw_background (ren);
+  ren->move_origin (-x0, -y0);
+}
+
+void
+box_rep::clear (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+  SI old_x1, old_y1, old_x2, old_y2;
+  ren->get_clipping (old_x1, old_y1, old_x2, old_y2);
+  if (max (old_x1, x1) < min (old_x2, x2) &&
+      max (old_y1, y1) < min (old_y2, y2)) {
+    ren->extra_clipping (x1, y1, x2, y2);
+    redraw_background (ren);
+    ren->set_clipping (old_x1, old_y1, old_x2, old_y2, true);
+  }
 }
 
 /******************************************************************************
@@ -660,92 +744,62 @@ as_tree (gr_selections sels) {
   return (tree) res;
 }
 
-
 /******************************************************************************
 * Animations
 ******************************************************************************/
 
-int
-box_rep::anim_length () {
-  int i, n= subnr (), len=0;
+player box_rep::anim_player () { return player (); }
+
+double
+box_rep::anim_delay () {
+  int i, n= subnr ();
+  double r= 0.0;
   for (i=0; i<n; i++) {
-    int slen= subbox (i)->anim_length ();
-    if (slen == -1) return -1;
-    if (slen > len) len= slen;
+    double sr= subbox (i)->anim_delay ();
+    r= max (r, sr);
   }
-  return len;
+  return r;
 }
 
-bool
-box_rep::anim_started () {
+double
+box_rep::anim_duration () {
   int i, n= subnr ();
-  for (i=0; i<n; i++)
-    if (!subbox (i)->anim_started ()) return false;
-  return true;
-}
-
-bool
-box_rep::anim_finished () {
-  int i, n= subnr ();
-  for (i=0; i<n; i++)
-    if (!subbox (i)->anim_finished ()) return false;
-  return true;
-}
-
-void
-box_rep::anim_start_at (time_t at) {
-  int i, n= subnr ();
-  for (i=0; i<n; i++)
-    subbox (i)->anim_start_at (at);
-}
-
-void
-box_rep::anim_finish_now () {
-  int i, n= subnr ();
-  for (i=0; i<n; i++)
-    subbox (i)->anim_finish_now ();
-}
-
-time_t
-box_rep::anim_next_update () {
-  FAILED ("invalid situation");
-  return texmacs_time ();
-}
-
-void
-box_rep::anim_check_invalid (bool& flag, time_t& at, rectangles& rs) {
-  time_t now= texmacs_time ();
-  time_t finish_at= anim_next_update ();
-  if (finish_at - now < 0) finish_at= now;
-  if (flag && at - now < 0) at= now;
-  if (!flag || finish_at - (at - 3) < 0) {
-    flag= true;
-    at  = finish_at;
-    rs  = rectangle (x1, y1, x2, y2);
+  double r= 0.0;
+  for (i=0; i<n; i++) {
+    double sr= subbox (i)->anim_duration ();
+    r= max (r, sr);
   }
-  else if (finish_at - (at + 3) <= 0) {
-    rs << rectangle (x1, y1, x2, y2);
-    if (finish_at - at < 0)
-      at= finish_at;
-  }
+  return r;
 }
 
 void
-box_rep::anim_get_invalid (bool& flag, time_t& at, rectangles& rs) {
+box_rep::anim_position (double t) {
+  int i, n= subnr ();
+  for (i=0; i<n; i++)
+    subbox (i)->anim_position (t);
+}
+
+double
+box_rep::anim_next () {
+  double r= 1.0e12;
   int i, n= subnr ();
   for (i=0; i<n; i++) {
-    bool   flag2= false;
-    time_t at2= at;
-    rectangles rs2;
-    subbox (i)->anim_get_invalid (flag2, at2, rs2);
-    if (flag2) {
-      rs2= translate (rs2, sx (i), sy (i));
-      if (at2 - (at-3) < 0) rs= rs2;
-      else rs << rs2;
-      flag= true;
-      if (at2 - at < 0) at= at2;
-    }
+    double sr= subbox (i)->anim_next ();
+    r= min (r, sr);
   }
+  return r;
+}
+
+rectangles
+box_rep::anim_invalid () {
+  rectangles rs;
+  int i, n= subnr ();
+  for (i=0; i<n; i++) {
+    rectangles rs2= subbox (i)->anim_invalid ();
+    rs2= translate (rs2, sx (i), sy (i));
+    rs << rs2;
+  }
+  return rs;
 }
 
 /******************************************************************************
@@ -766,6 +820,31 @@ box_rep::loci (SI x, SI y, SI delta, list<string>& ids, rectangles& rs) {
 }
 
 void
+box_rep::display_links (renderer ren) {
+  if (!is_nil (ip) && ip->item >= 0) {
+    path p= reverse (ip);
+    // FIXME: we might also look for links in the parents
+    // FIXME: we might want to sort out overlapping and adjacent links
+    if (has_subtree (the_et, p)) {
+      tree t= subtree (the_et, p);
+      list<string> ids= get_ids (t);
+      for (int i=0; i<N(ids); i++) {
+        list<tree> lns= get_links (compound ("id", ids[i]));
+        for (int j=0; j<N(lns); j++)
+          if (is_compound (lns[j], "link", 4) &&
+              lns[j][0] == "hyperlink" &&
+              is_compound (lns[j][3], "url", 1) &&
+              is_atomic (lns[j][3][0])) {
+            string dest= lns[j][3][0]->label;
+            ren->href (dest, x1, y1, x2, y2);
+            //cout << "Found link to " << dest << "\n";
+         }
+      }
+    }
+  }
+}
+
+void
 box_rep::position_at (SI x, SI y, rectangles& change_log) {
   int i, n= subnr ();
   x += x0; y += y0;
@@ -775,6 +854,17 @@ box_rep::position_at (SI x, SI y, rectangles& change_log) {
 void
 box_rep::collect_page_numbers (hashmap<string,tree>& h, tree page) {
   (void) h; (void) page;
+}
+
+void
+box_rep::collect_page_colors (array<brush>& bs, array<rectangle>& rs) {
+  int i, n= subnr ();
+  for (i=0; i<n; i++) {
+    array<rectangle> rs2;
+    subbox (i)->collect_page_colors (bs, rs2);
+    for (int j=0; j<N(rs2); j++)
+      rs << translate (rs2[j], sx (i), sy (i));
+  }
 }
 
 path
@@ -821,11 +911,13 @@ attach_dip (tree ref, path dip) {
 }
 
 /******************************************************************************
-* Convert to postscript
+* Convert to postscript or pdf 
 ******************************************************************************/
 
 void
 make_eps (url name, box b, int dpi) {
+  //cout << "Make eps " << name << ", " << dpi << ", " << ((tree) b) << "\n";
+  //cout << "  Extents " << b->w() / PIXEL << ", " << b->h() / PIXEL << "\n";
   double inch= ((double) dpi * PIXEL);
   double cm  = inch / 2.54;
   SI w= b->x4 - b->x3;
@@ -833,8 +925,8 @@ make_eps (url name, box b, int dpi) {
   b->x0= -b->x3;
   b->y0= -b->y4;
   renderer ren= printer (name, dpi, 1, "user", false, w/cm, h/cm);
-  ren->set_color (black);
   ren->set_background (white);
+  ren->set_pencil (black);
   rectangles rs;
   b->redraw (ren, path (0), rs);
   tm_delete (ren);

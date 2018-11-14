@@ -18,7 +18,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (set-font-rules
-  `(((math $ecrm $cmr $cmmi $cmsy $msam $msbm $stmary $wasy $line
+  `(;; Main math font
+    ((math $ecrm $cmr $cmmi $cmsy $msam $msbm $stmary $wasy $line
 	   $cal $frak $bbb $upgreek $bold1 $bold2 $boldcal $cmex $s $d)
      (math
       (math (tex $cmr $s $d)
@@ -37,9 +38,9 @@
 	    (tex $bold1 $s $d)
 	    (tex $bold2 $s $d)
 	    (tex $boldcal $s $d)
-	    (virtual long $s $d)
-	    (virtual negate $s $d)
-	    (virtual misc $s $d))
+	    (virtual tradi-long $s $d)
+	    (virtual tradi-negate $s $d)
+	    (virtual tradi-misc $s $d))
       (rubber (tex-rubber rubber-cmex $cmex $s $d)
 	      (tex-rubber rubber-stmary $stmary $s $d)
 	      (tex-rubber rubber-wasy $wasy $s $d)
@@ -51,8 +52,8 @@
      (math $ecrm $cmr $cmmi cmsy msam msbm stmary wasy line
 	   cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
     ((bold-math-std $ecrm $cmr $cmmi $s $d)
-     (math $ecrm $cmr $cmmi cmbsy msam msbm stmaryb wasyb linew
-	   cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
+     (math $ecrm $cmr $cmmi cmbsy msam msbm stmary wasyb linew
+	   cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
     ((math-conc $ecrm $cmr $cmmi $s $d)
      (math $ecrm $cmr $cmmi xccsy xccam xccbm stmary wasy line
 	   cmsy eufm bbm grmn cmbx cmmib cmbsy xccex $s $d))
@@ -60,6 +61,7 @@
      (math $ecrm $cmr $cmmi cmbrsy cmbram cmbrbm stmary wasy line
 	   cmbrsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
 
+    ;; Upright math font
     ((var-math $ecrm $cmr $cmmi $cmsy $msam $msbm $stmary $wasy $line
 	       $cal $frak $bbb $upgreek $bold1 $bold2 $boldcal $cmex $s $d)
      (math
@@ -79,9 +81,9 @@
 		(tex $bold1 $s $d)
 		(tex $bold2 $s $d)
 		(tex $boldcal $s $d)
-		(virtual long $s $d)
-		(virtual negate $s $d)
-		(virtual misc $s $d))
+		(virtual tradi-long $s $d)
+		(virtual tradi-negate $s $d)
+		(virtual tradi-misc $s $d))
       (rubber (tex-rubber rubber-cmex $cmex $s $d)
 	      (tex-rubber rubber-stmary $stmary $s $d)
 	      (tex-rubber rubber-wasy $wasy $s $d)
@@ -89,18 +91,75 @@
       (ec $ecrm $s $d)
       (ec ecrm $s $d)))
 
+    ;; Math font with modified italic math letters
+    ((alt-math $ecrm $ecti $cmr $cmmi $cmsy $msam $msbm $stmary $wasy $line
+               $cal $frak $bbb $upgreek $bold1 $bold2 $boldcal $cmex $s $d)
+     (math
+      (alt-math (tex $cmr $s $d)
+                (tex $cmmi $s $d)
+                (tex $ecti $s $d)
+                (tex $cmsy $s $d)
+                (tex $msam $s $d)
+                (tex $msbm $s $d)
+                (tex $stmary $s $d)
+                (tex $wasy $s $d)
+                (tex $line $s $d)
+                (tex $cmex $s $d)
+                (tex $cal $s $d)
+                (tex $frak $s $d)
+                (tex $bbb $s $d)
+                (tex $upgreek $s $d)
+                (tex $bold1 $s $d)
+                (tex $bold2 $s $d)
+                (tex $boldcal $s $d)
+                (virtual tradi-long $s $d)
+                (virtual tradi-negate $s $d)
+                (virtual tradi-misc $s $d))
+      (rubber (tex-rubber rubber-cmex $cmex $s $d)
+	      (tex-rubber rubber-stmary $stmary $s $d)
+	      (tex-rubber rubber-wasy $wasy $s $d)
+	      (tex-dummy-rubber (tex-rubber rubber-cmex $cmex $s $d)))
+      (ec $ecrm $s $d)
+      (ec ecrm $s $d)))
+
+    ((math-std $ecrm $cmr $cmmi $s $d)
+     (math $ecrm $cmr $cmmi cmsy msam msbm stmary wasy line
+	   cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
+    ((bold-math-std $ecrm $cmr $cmmi $s $d)
+     (math $ecrm $cmr $cmmi cmbsy msam msbm stmary wasyb linew
+	   cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
+    ((math-conc $ecrm $cmr $cmmi $s $d)
+     (math $ecrm $cmr $cmmi xccsy xccam xccbm stmary wasy line
+	   cmsy eufm bbm grmn cmbx cmmib cmbsy xccex $s $d))
+    ((math-bright $ecrm $cmr $cmmi $s $d)
+     (math $ecrm $cmr $cmmi cmbrsy cmbram cmbrbm stmary wasy line
+	   cmbrsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
+
     ((math-var $ecrm $cmr $cmmi $s $d)
      (var-math $ecrm $cmr $cmmi cmsy msam msbm stmary wasy line
 	       cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
     ((bold-math-var $ecrm $cmr $cmmi $s $d)
      (var-math $ecrm $cmr $cmmi cmbsy msam msbm stmary wasyb linew
-	       cmsy eufm bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
+	       cmsy eufm bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
     ((math-conc-var $ecrm $cmr $cmmi $s $d)
      (var-math $ecrm $cmr $cmmi xccsy xccam xccbm stmary wasy line
 	       cmsy eufm bbm grmn cmbx cmmib cmbsy xccex $s $d))
     ((math-bright-var $ecrm $cmr $cmmi $s $d)
      (var-math $ecrm $cmr $cmmi cmbrsy cmbram cmbrbm stmary wasy line
 	       cmbrsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
+
+    ((math-alt $ecrm $ecti $cmr $cmmi $s $d)
+     (alt-math $ecrm $ecti $cmr $cmmi cmsy msam msbm stmary wasy line
+               cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
+    ((bold-math-alt $ecrm $ecti $cmr $cmmi $s $d)
+     (alt-math $ecrm $ecti $cmr $cmmi cmbsy msam msbm stmary wasyb linew
+               cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
+    ((math-conc-alt $ecrm $ecti $cmr $cmmi $s $d)
+     (alt-math $ecrm $ecti $cmr $cmmi xccsy xccam xccbm stmary wasy line
+               cmsy eufm bbm grmn cmbx cmmib cmbsy xccex $s $d))
+    ((math-bright-alt $ecrm $ecti $cmr $cmmi $s $d)
+     (alt-math $ecrm $ecti $cmr $cmmi cmbrsy cmbram cmbrbm stmary wasy line
+               cmbrsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
 
     ((roman mr medium right $s $d) (math-var ecrm cmr cmmi $s $d))
     ((roman mr bold right $s $d) (bold-math-var ecbx cmbx cmmib $s $d))
@@ -110,9 +169,9 @@
     ((roman mr medium $a $s $d) (math-std ecrm cmr cmmi $s $d))
     ((roman mr bold $a $s $d) (bold-math-std ecbx cmbx cmmib $s $d))
     ((roman ms light $a $s $d) (math-bright cmbr cmbr cmbrmi $s $d))
-    ((roman ms medium $a $s $d) (math-std ecss cmss cmssi $s $d))
-    ((roman ms bold $a $s $d) (math-std ecsx cmssbx cmmib $s $d))
-    ((roman mt medium $a $s $d) (math-std ectt cmtt cmitt $s $d))
+    ((roman ms medium $a $s $d) (math-alt ecss ecsi cmss cmmi $s $d))
+    ((roman ms bold $a $s $d) (math-alt ecsx ecso cmssbx cmmib $s $d))
+    ((roman mt medium $a $s $d) (math-alt ectt ecst cmtt cmitt $s $d))
 
     ((roman trm medium $a $s $d) (math-var ecrm cmr cmmi $s $d))
     ((roman trm bold $a $s $d) (bold-math-var ecbx cmbx cmmib $s $d))
@@ -124,17 +183,17 @@
     ((roman it $a $b $s $d) (math-var ecti cmti cmmi $s $d))
     ((roman sl $a $b $s $d) (math-var ecsl cmsl cmmi $s $d))
 
-    ((concrete mr medium right $s $d) (math-conc eorm ccr xccmi $s $d))
-    ((concrete mr bold right $s $d) (bold-math-std ecbx cmbx cmmib $s $d))
-    ((concrete ms light right $s $d) (math-bright cmbr cmbr cmbrmi $s $d))
-    ((concrete ms medium right $s $d) (math-std ecss cmss cmssi $s $d))
-    ((concrete ms bold right $s $d) (math-std ecsx cmssbx cmmib $s $d))
-    ((concrete mt medium right $s $d) (math-std ectt cmtt cmitt $s $d))
-    ((concrete mr medium $a $s $d) (math-conc-var eorm ccr xcmmi $s $d))
-    ((concrete mr bold $a $s $d) (math-conc-var ecbx cmbx cmmib $s $d))
-    ((concrete ms medium $a $s $d) (math-var ecss cmss cmmi $s $d))
-    ((concrete ms bold $a $s $d) (math-var ecsx cmssbx cmmib $s $d))
-    ((concrete mt medium $a $s $d) (math-var ectt cmtt cmmi $s $d))
+    ((concrete mr medium right $s $d) (math-conc-var eorm ccr xcmmi $s $d))
+    ((concrete mr bold right $s $d) (math-conc-var ecbx cmbx cmmib $s $d))
+    ((concrete ms medium right $s $d) (math-alt ecss ecsi cmss cmmi $s $d))
+    ((concrete ms bold right $s $d) (math-alt ecsx ecso cmssbx cmmib $s $d))
+    ((concrete mt medium right $s $d) (math-alt ectt ecst cmtt cmmi $s $d))
+    ((concrete mr medium $a $s $d) (math-conc eorm ccr xccmi $s $d))
+    ((concrete mr bold $a $s $d) (bold-math-std ecbx cmbx cmmib $s $d))
+    ((concrete ms light $a $s $d) (math-bright cmbr cmbr cmbrmi $s $d))
+    ((concrete ms medium $a $s $d) (math-std ecss cmss cmssi $s $d))
+    ((concrete ms bold $a $s $d) (math-std ecsx cmssbx cmmib $s $d))
+    ((concrete mt medium $a $s $d) (math-std ectt cmtt cmitt $s $d))
 
     ((concrete trm medium $a $s $d) (math-conc-var eorm ccr xcmmi $s $d))
     ((concrete trm bold $a $s $d) (math-conc-var ecbx cmbx cmmib $s $d))
@@ -171,9 +230,9 @@
 		    (tex $bold1 $s $d)
 		    (tex $bold2 $s $d)
 		    (tex $boldcal $s $d)
-		    (virtual long $s $d)
-		    (virtual negate $s $d)
-		    (virtual misc $s $d))
+		    (virtual tradi-long $s $d)
+		    (virtual tradi-negate $s $d)
+		    (virtual tradi-misc $s $d))
       (rubber (tex-rubber rubber-cmex $cmex $s $d)
 	      (tex-rubber rubber-stmary $stmary $s $d)
 	      (tex-rubber rubber-wasy $wasy $s $d)
@@ -185,14 +244,14 @@
      (capital-math $name ecrm cmr cmmi cmsy msam msbm stmary wasy line
 		   cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
     ((bold-math-capital $name $s $d)
-     (capital-math $name ecbx cmbx cmmib cmbsy msam msbm stmaryb wasyb linew
-		   cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
+     (capital-math $name ecbx cmbx cmmib cmbsy msam msbm stmary wasyb linew
+		   cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
 
-    ((cal mr medium normal $s $d) (math-capital cmsy $s $d))
-    ((cal mr bold normal $s $d) (bold-math-capital cmbsy $s $d))
-    ((cal* mr medium normal $s $d) (math-capital rsfs $s $d))
-    ((cal** mr medium normal $s $d) (math-capital euxm $s $d))
-    ((Bbb mr medium normal $s $d) (math-capital msbm $s $d))))
+    ((cal mr medium $a $s $d) (math-capital cmsy $s $d))
+    ((cal mr bold $a $s $d) (bold-math-capital cmbsy $s $d))
+    ((cal* mr medium $a $s $d) (math-capital rsfs $s $d))
+    ((cal** mr medium $a $s $d) (math-capital euxm $s $d))
+    ((Bbb mr medium $a $s $d) (math-capital msbm $s $d))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mathematical fonts with special alpha-numerical letters
@@ -220,9 +279,9 @@
 		     (tex $bold1 $s $d)
 		     (tex $bold2 $s $d)
 		     (tex $boldcal $s $d)
-		     (virtual long $s $d)
-		     (virtual negate $s $d)
-		     (virtual misc $s $d))
+		     (virtual tradi-long $s $d)
+		     (virtual tradi-negate $s $d)
+		     (virtual tradi-misc $s $d))
       (rubber (tex-rubber rubber-cmex $cmex $s $d)
 	      (tex-rubber rubber-stmary $stmary $s $d)
 	      (tex-rubber rubber-wasy $wasy $s $d)
@@ -234,29 +293,29 @@
      (alphanum-math $name ecrm cmr cmmi cmsy msam msbm stmary wasy line
 		    cmsy eufm bbm grmn cmbx cmmib cmbsy cmex $s $d))
     ((bold-math-alphanum $name $s $d)
-     (alphanum-math $name ecbx cmbx cmmib cmbsy msam msbm stmaryb wasyb linew
-		    cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmex $s $d))
+     (alphanum-math $name ecbx cmbx cmmib cmbsy msam msbm stmary wasyb linew
+		    cmbsy eufb bbmbx grxn cmbx cmmib cmbsy cmexb $s $d))
 
-    ((Duerer mr medium normal $s $d) (math-alphanum cdr $s $d))
     ((Duerer mr medium slanted $s $d) (math-alphanum cdsl $s $d))
     ((Duerer mr medium italic $s $d) (math-alphanum cdi $s $d))
-    ((Duerer mr bold normal $s $d) (math-alphanum cdb $s $d))
-    ((Duerer ms medium normal $s $d) (math-alphanum cdss $s $d))
-    ((Duerer mt medium normal $s $d) (math-alphanum cdtt $s $d))
-    ((Euler mr medium normal $s $d) (math-alphanum eufm $s $d))
-    ((Euler mr bold normal $s $d) (math-alphanum eufb $s $d))
-    ((Bbb* mr medium normal $s $d) (math-alphanum bbm $s $d))
+    ((Duerer mr medium $a $s $d) (math-alphanum cdr $s $d))
+    ((Duerer mr bold $a $s $d) (math-alphanum cdb $s $d))
+    ((Duerer ms medium $a $s $d) (math-alphanum cdss $s $d))
+    ((Duerer mt medium $a $s $d) (math-alphanum cdtt $s $d))
+    ((Euler mr medium $a $s $d) (math-alphanum eufm $s $d))
+    ((Euler mr bold $a $s $d) (math-alphanum eufb $s $d))
     ((Bbb* mr medium slanted $s $d) (math-alphanum bbmsl $s $d))
-    ((Bbb* mr bold normal $s $d) (math-alphanum bbmbx $s $d))
+    ((Bbb* mr medium $a $s $d) (math-alphanum bbm $s $d))
     ((Bbb* mr bold slanted $s $d) (math-alphanum bbmbxsl $s $d))
-    ((Bbb* ms medium normal $s $d) (math-alphanum bbmss $s $d))
+    ((Bbb* mr bold $a $s $d) (math-alphanum bbmbx $s $d))
     ((Bbb* ms medium italic $s $d) (math-alphanum bbmssi $s $d))
-    ((Bbb* ms bold normal $s $d) (math-alphanum bbmssbx $s $d))
-    ((Bbb* mt medium normal $s $d) (math-alphanum bbmsltt $s $d))
-    ((Bbb** mr medium normal $s $d) (math-alphanum bbold $s $d))
-    ((Bbb*** mr medium normal $s $d) (math-alphanum ocmr $s $d))
-    ((Bbb**** mr medium normal $s $d) (math-alphanum dsrom $s $d))
-    ((Bbb**** ms medium normal $s $d) (math-alphanum dsss $s $d))))
+    ((Bbb* ms medium $a $s $d) (math-alphanum bbmss $s $d))
+    ((Bbb* ms bold $a $s $d) (math-alphanum bbmssbx $s $d))
+    ((Bbb* mt medium $a $s $d) (math-alphanum bbmsltt $s $d))
+    ((Bbb** mr medium $a $s $d) (math-alphanum bbold $s $d))
+    ((Bbb*** mr medium $a $s $d) (math-alphanum ocmr $s $d))
+    ((Bbb**** mr medium $a $s $d) (math-alphanum dsrom $s $d))
+    ((Bbb**** ms medium $a $s $d) (math-alphanum dsss $s $d))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Support for the Euler New Roman fonts
@@ -283,9 +342,9 @@
 		(tex $bold1 $s $d)
 		(tex $bold2 $s $d)
 		(tex $boldcal $s $d)
-		(virtual long $s $d)
-		(virtual negate $s $d)
-		(virtual misc $s $d))
+		(virtual tradi-long $s $d)
+		(virtual tradi-negate $s $d)
+		(virtual tradi-misc $s $d))
       (rubber (tex-rubber rubber-cmex $cmex $s $d)
 	      (tex-rubber rubber-stmary $stmary $s $d)
 	      (tex-rubber rubber-wasy $wasy $s $d)
@@ -297,11 +356,11 @@
      (enr-math $name ecrm cmr cmmi cmsy msam msbm stmary wasy line
 	       cmsy eufm bbm grmn eurb eurb cmbsy cmex $s $d))
     ((bold-math-enr $name $s $d)
-     (enr-math $name ecbx cmbx cmmib cmbsy msam msbm stmaryb wasyb linew
-	       cmbsy eufb bbmbx grxn eurb eurb cmbsy cmex $s $d))
+     (enr-math $name ecbx cmbx cmmib cmbsy msam msbm stmary wasyb linew
+	       cmbsy eufb bbmbx grxn eurb eurb cmbsy cmexb $s $d))
 
-    ((ENR mr medium normal $s $d) (math-enr eurm $s $d))
-    ((ENR mr bold normal $s $d) (math-enr eurb $s $d))))
+    ((ENR mr medium $a $s $d) (math-enr eurm $s $d))
+    ((ENR mr bold $a $s $d) (math-enr eurb $s $d))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Stix fonts
@@ -316,13 +375,71 @@
      (unicode $bit $s $d)
      (roman $t $a $b $s $d)))
 
-   ((math-pagella $t $a $b $s $d)
+   ;;((math-bonum $t bold right $s $d)
+   ;; (unicode-math texgyrebonum-bold texgyrebonum-bold
+   ;;		  texgyrebonum-bold texgyrebonum-bold
+   ;;		  $t $a $b $s $d))
+   ((math-bonum $t $a right $s $d)
+    (unicode-math texgyrebonum-math texgyrebonum-math
+		  texgyrebonum-bold texgyrebonum-bold
+		  $t $a $b $s $d))
+   ;;((math-bonum $t bold $b $s $d)
+   ;; (unicode-math texgyrebonum-bold texgyrebonum-bolditalic
+   ;;		  texgyrebonum-bold texgyrebonum-bolditalic
+   ;;		  $t $a $b $s $d))
+   ((math-bonum $t $a $b $s $d)
+    (unicode-math texgyrebonum-math texgyrebonum-italic
+		  texgyrebonum-bold texgyrebonum-bolditalic
+		  $t $a $b $s $d))
+
+   ;;((math-pagella $t bold right $s $d)
+   ;; (unicode-math texgyrepagella-bold texgyrepagella-bold
+   ;;		  texgyrepagella-bold texgyrepagella-bold
+   ;;		  $t $a $b $s $d))
+   ((math-pagella $t $a right $s $d)
     (unicode-math texgyrepagella-math texgyrepagella-math
+		  texgyrepagella-bold texgyrepagella-bold
+		  $t $a $b $s $d))
+   ;;((math-pagella $t bold $b $s $d)
+   ;; (unicode-math texgyrepagella-bold texgyrepagella-bolditalic
+   ;;		  texgyrepagella-bold texgyrepagella-bolditalic
+   ;;		  $t $a $b $s $d))
+   ((math-pagella $t $a $b $s $d)
+    (unicode-math texgyrepagella-math texgyrepagella-italic
 		  texgyrepagella-bold texgyrepagella-bolditalic
 		  $t $a $b $s $d))
 
-   ((math-termes $t $a $b $s $d)
+   ;;((math-schola $t bold right $s $d)
+   ;; (unicode-math texgyreschola-bold texgyreschola-bold
+   ;;		  texgyreschola-bold texgyreschola-bold
+   ;;		  $t $a $b $s $d))
+   ((math-schola $t $a right $s $d)
+    (unicode-math texgyreschola-math texgyreschola-math
+		  texgyreschola-bold texgyreschola-bold
+		  $t $a $b $s $d))
+   ;;((math-schola $t bold $b $s $d)
+   ;; (unicode-math texgyreschola-bold texgyreschola-bolditalic
+   ;;		  texgyreschola-bold texgyreschola-bolditalic
+   ;;		  $t $a $b $s $d))
+   ((math-schola $t $a $b $s $d)
+    (unicode-math texgyreschola-math texgyreschola-italic
+		  texgyreschola-bold texgyreschola-bolditalic
+		  $t $a $b $s $d))
+
+   ;;((math-termes $t bold right $s $d)
+   ;; (unicode-math texgyretermes-bold texgyretermes-bold
+   ;;		  texgyretermes-bold texgyretermes-bold
+   ;;		  $t $a $b $s $d))
+   ((math-termes $t $a right $s $d)
     (unicode-math texgyretermes-math texgyretermes-math
+		  texgyretermes-bold texgyretermes-bold
+		  $t $a $b $s $d))
+   ;;((math-termes $t bold $b $s $d)
+   ;; (unicode-math texgyretermes-bold texgyretermes-bolditalic
+   ;;		  texgyretermes-bold texgyretermes-bolditalic
+   ;;		  $t $a $b $s $d))
+   ((math-termes $t $a $b $s $d)
+    (unicode-math texgyretermes-math texgyretermes-italic
 		  texgyretermes-bold texgyretermes-bolditalic
 		  $t $a $b $s $d))
 

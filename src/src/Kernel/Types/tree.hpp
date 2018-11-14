@@ -84,7 +84,7 @@ public:
   friend tree& operator << (tree& t, array<tree> a);
   friend tm_ostream& operator << (tm_ostream& out, tree t);
   friend tree operator * (tree t1, tree t2);
-  friend void print_tree (tree t, int tab=0);
+  friend void print_tree (tree t, int tab);
   friend list<tree> as_trees (list<pointer> l);
   friend class tree_pointer_rep;
   friend class tree_position_rep;
@@ -93,6 +93,9 @@ public:
   friend class undo_observer_rep;
   friend class tree_links_rep;
   friend class link_repository_rep;
+#ifdef QTTEXMACS
+  friend class QTMTreeModel;  // hack: wouldn't need it with a widget_observer
+#endif
   friend blackbox as_blackbox (const tree& t);
 };
 
@@ -120,7 +123,11 @@ public:
 
 // generic_rep in generic_tree.hpp
 
-template<> struct type_helper<tree> { static int id; static tree init; };
+template<> struct type_helper<tree> {
+  static int  id;
+  static tree init;
+  static inline tree init_val () { return tree (); }
+};
 
 typedef tree scheme_tree;
 
@@ -131,12 +138,12 @@ typedef tree scheme_tree;
 #ifdef debug_trees
 #define CHECK_ATOMIC(t) \
   if (((t).rep)->op != STRING) { \
-    cerr << "\nThe tree : " << (t) << "\n"; \
+    failed_error << "The tree : " << (t) << "\n"; \
     FAILED ("atomic tree expected"); \
   }
 #define CHECK_COMPOUND(t) \
   if (((t).rep)->op == STRING) { \
-    cerr << "\nThe tree : " << (t) << "\n"; \
+    failed_error << "The tree : " << (t) << "\n"; \
     FAILED ("compound tree expected"); \
   }
 #else
@@ -231,6 +238,9 @@ inline bool as_bool (tree t) {
 inline int as_int (tree t) {
   if (is_atomic (t)) return as_int (t->label);
   else return 0; }
+inline long int as_long_int (tree t) {
+  if (is_atomic (t)) return as_long_int (t->label);
+  else return 0; }
 inline double as_double (tree t) {
   if (is_atomic (t)) return as_double (t->label);
   else return 0.0; }
@@ -238,10 +248,12 @@ inline string as_string (tree t) {
   if (is_atomic (t)) return t->label;
   else return ""; }
 string tree_as_string (tree t);
-template<class T> inline tree as_tree(T x) { return (tree) x; }
-template<> inline tree as_tree(int x) { return as_string (x); }
-template<> inline tree as_tree(double x) { return as_string (x); }
-template<> inline tree as_tree(pointer x) { (void) x; return "pointer"; }
+tree replace (tree t, tree w, tree b);
+template<class T> inline tree as_tree (T x) { return (tree) x; }
+template<> inline tree as_tree (int x) { return as_string (x); }
+template<> inline tree as_tree (long int x) { return as_string (x); }
+template<> inline tree as_tree (double x) { return as_string (x); }
+template<> inline tree as_tree (pointer x) { (void) x; return "pointer"; }
 inline tree bool_as_tree (bool f) {
   return (f? tree ("true"): tree ("false")); }
 
@@ -260,6 +272,7 @@ bool is_around (tree t);
 bool is_script (tree t);
 bool is_script (tree t, bool& right);
 bool is_prime (tree t);
+bool is_left_script_prime (tree t);
 bool is_right_script_prime (tree t);
 bool is_mod_active (tree t);
 bool is_mod_active_once (tree t);
@@ -273,6 +286,7 @@ is_applicable (tree t) {
 }
 
 tree simplify_concat (tree t);
+tree simplify_document (tree t);
 tree simplify_correct (tree t);
 
 /******************************************************************************
@@ -284,6 +298,8 @@ tree compound (string s, tree t1);
 tree compound (string s, tree t1, tree t2);
 tree compound (string s, tree t1, tree t2, tree t3);
 tree compound (string s, tree t1, tree t2, tree t3, tree t4);
+tree compound (string s, tree t1, tree t2, tree t3, tree t4, tree t5);
+tree compound (string s, tree t1, tree t2, tree t3, tree t4, tree t5, tree t6);
 tree compound (string s, array<tree> a);
 bool is_extension (tree t);
 bool is_extension (tree t, int n);
@@ -304,6 +320,8 @@ inline tree tuple (tree t1, tree t2, tree t3) {
   return tree (TUPLE, t1, t2, t3); }
 inline tree tuple (tree t1, tree t2, tree t3, tree t4) {
   return tree (TUPLE, t1, t2, t3, t4); }
+inline tree tuple (tree t1, tree t2, tree t3, tree t4, tree t5) {
+  return tree (TUPLE, t1, t2, t3, t4, t5); }
 
 inline bool is_tuple (tree t) {
   return (L(t) == TUPLE); }
@@ -364,5 +382,14 @@ array<T>::operator tree () {
     t[i]= as_tree(rep->a[i]);
   return t;
 }
+
+class formatted {
+public:
+  tree rep;
+  inline formatted (tree t): rep (t) {}
+  inline formatted (const formatted& f): rep (f.rep) {}
+};
+
+void print_tree (tree t, int tab=0);
 
 #endif // defined TREE_H

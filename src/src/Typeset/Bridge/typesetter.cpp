@@ -133,6 +133,7 @@ typesetter_rep::determine_page_references (box b) {
     else if (is_func (old, TUPLE, 3))
       env->local_ref (var)= tuple (old[0], val, old[2]);
     else env->local_ref (var)= tuple (old, val);
+    env->touched (var)= true;
   }
 }
 
@@ -157,15 +158,19 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  if (env->complete) env->local_aux= hashmap<string,tree> (UNINIT);
+  if (env->complete) {
+    env->local_aux= hashmap<string,tree> (UNINIT);
+    env->missing  = hashmap<string,tree> (UNINIT);
+    env->redefined= array<tree> ();
+    env->touched  = hashmap<string,bool> (false);
+  }
   br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
-  box b= ppp->make_pages ();
-  if (env->complete && paper) determine_page_references (b);
+  box rb= ppp->make_pages ();
+  if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
-  env->complete= false;
-
-  return b;
+  // env->complete= false;  // moved to edit_typeset_rep::typeset
+  return rb;
 }
 
 box
@@ -177,6 +182,13 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   change_log= requires_update (change_log);
   rectangle r (0, 0, 0, 0);
   if (!is_nil (change_log)) r= least_upper_bound (change_log);
+  array<brush> new_bgs;
+  array<rectangle> rs;
+  b->collect_page_colors (new_bgs, rs);
+  for (int i=0; i<min(N(old_bgs), N(new_bgs)); i++)
+    if (new_bgs[i] != old_bgs[i])
+      r= least_upper_bound (r, rs[i]);
+  old_bgs= new_bgs;
   x1b= r->x1; y1b= r->y1; x2b= r->x2; y2b= r->y2;
   change_log= rectangles ();
   return b;

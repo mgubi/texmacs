@@ -179,7 +179,8 @@ shrink (glyph gl, int xfactor, int yfactor,
   int i, j, x, y;
   int index, indey, entry;
   int ww=(X2-X1)*xfactor, hh=(Y2-Y1)*yfactor;
-  STACK_NEW_ARRAY (bitmap, int, ww*hh);
+  int* bitmap= tm_new_array<int> (ww*hh);
+  //STACK_NEW_ARRAY (bitmap, int, ww*hh);
   for (i=0; i<ww*hh; i++) bitmap[i]=0;
   for (y=0, index= ww*frac_y+ frac_x; y<gl->height; y++, index-=ww)
     for (x=0; x<gl->width; x++)
@@ -194,6 +195,7 @@ shrink (glyph gl, int xfactor, int yfactor,
   int new_depth= gl->depth+ log2i (nr);
   if (new_depth > 8) new_depth= 8;
   glyph CB (X2-X1, Y2-Y1, -X1, Y2-1, new_depth, gl->status);
+  CB->index = gl->index;
   for (Y=Y1; Y<Y2; Y++)
     for (X=X1; X<X2; X++) {
       sum=0;
@@ -206,7 +208,8 @@ shrink (glyph gl, int xfactor, int yfactor,
     }
   xo= off_x;
   yo= off_y;
-  STACK_DELETE_ARRAY (bitmap);
+  tm_delete_array (bitmap);
+  //STACK_DELETE_ARRAY (bitmap);
 
   // cout << CB << "\n";
   return CB;
@@ -214,11 +217,14 @@ shrink (glyph gl, int xfactor, int yfactor,
 
 glyph
 shrink (glyph gl, int xfactor, int yfactor, SI& xo, SI& yo) {
-  if ((gl->width==0) || (gl->height==0))
-    FAILED ("zero size character");
+  if ((gl->width==0) || (gl->height==0)) {
+    int nr= xfactor*yfactor;
+    int new_depth= gl->depth+ log2i (nr);
+    return glyph (0, 0, 0, 0, new_depth);
+  }
 
-  int tx= xfactor/3;
-  int ty= yfactor/3;
+  int tx= ((xfactor/3) * (retina_factor+1)) / 2;
+  int ty= ((yfactor/3) * (retina_factor+1)) / 2;
   int dx=0, dy=0;
   if ((gl->status==0) && (xfactor>1)) dx= get_hor_shift (gl, xfactor, tx);
   // if ((gl->status==0) && (yfactor>1)) dy= get_ver_shift (gl, yfactor, ty);

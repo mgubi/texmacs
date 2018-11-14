@@ -58,6 +58,12 @@
   (:synopsis "When primitive for content generation")
   `(cons* 'list (if ,pred? ($list ,@l) '())))
 
+(tm-define-macro ($for* var-vals . l)
+  (:synopsis "For primitive for content generation")
+  `(list 'for
+         (lambda (,(car var-vals)) ($list ,@l))
+         (lambda () ,(cadr var-vals))))
+
 (tm-define (cond$sub l)
   (cond ((null? l)
          (list `(else '())))
@@ -123,6 +129,10 @@
 (tm-define-macro ($refresh s kind)
   (:synopsis "Make a refresh widget")
   `(list 'refresh ',s ,kind))
+
+(tm-define-macro ($refreshable kind . l)
+  (:synopsis "Make a refreshable widget")
+  `(cons* 'refreshable (lambda () ,kind) ($list ,@l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; General layout widgets
@@ -322,14 +332,19 @@
   `(list 'filtered-choice (lambda (answer filter) ,cmd) (lambda () ,vals)
                            (lambda () ,val) (lambda () ,filterstr)))
 
+(tm-define-macro ($tree-view cmd data roles)
+  (:synopsis "Make a tree view of the data")
+  `(list 'tree-view (lambda x (apply ,cmd (reverse x)))
+                    (lambda () ,data) (lambda () ,roles)))
+
 (tm-define-macro ($texmacs-output doc tmstyle)
   (:synopsis "Make TeXmacs output field")
   `(list 'texmacs-output (lambda () ,doc) (lambda () ,tmstyle)))
 
-(tm-define-macro ($texmacs-input doc tmstyle cmd continuous?)
+(tm-define-macro ($texmacs-input doc tmstyle name)
   (:synopsis "Make TeXmacs input field")
-  `(list 'texmacs-input (lambda () ,doc) (lambda () ,tmstyle) 
-                        (lambda (answer) ,cmd) ,continuous?))
+  `(list 'texmacs-input (lambda () ,doc) (lambda () ,tmstyle)
+                        (lambda () ,name)))
 
 (tm-define-macro ($ink cmd)
   (:synopsis "Make an ink widget")
@@ -341,9 +356,14 @@
 
 (tm-define form-name "empty")
 (tm-define form-entries (list))
+(tm-define form-text-entries (list))
 (tm-define form-last (make-ahash-table))
 
 (tm-define (form-named-set name field val)
+  (if (and (pair? val) (pair? (cdr val)) (cadr val)) (set! val (car val)))
+  (ahash-set! form-last (list name field) val))
+
+(tm-define (form-named-set-multiple name field val)
   (ahash-set! form-last (list name field) val))
 
 (tm-define (form-named-ref name field)
@@ -364,7 +384,8 @@
 (tm-define-macro ($form name . l)
   (:synopsis "Make form")
   `($let* ((form-name ,name)
-           (form-entries (list)))
+           (form-entries (list))
+           (form-text-entries (list)))
      ,@l))
 
 (tm-define (form-proposals name field l)
@@ -379,9 +400,13 @@
 (tm-define-macro ($form-input field type proposals width)
   (:synopsis "Make a textual input field for the current form")
   `($execute
-     (set! form-entries (append form-entries (list ,field)))
+     (begin
+       (set! form-entries (append form-entries (list ,field)))
+       (set! form-text-entries (append form-text-entries (list ,field))))
      ($input (form-named-set form-name ,field answer)
-             ,type (form-proposals form-name ,field ,proposals) ,width)))
+             (with nr (number->string (length form-text-entries))
+               (string-append ,field "#form-" form-name "-" nr ":" ,type))
+	     (form-proposals form-name ,field ,proposals) ,width)))
 
 (tm-define-macro ($form-enum field proposals selected width)
   (:synopsis "Make an enumeration field for the current form")
@@ -393,7 +418,7 @@
 
 (tm-define-macro ($form-choice field proposals selected) 
   (:synopsis "Make a single choice field for the current form") 
-  `($execute 
+  `($execute
      (set! form-entries (append form-entries (list ,field))) 
      ($choice (form-named-set form-name ,field answer)
               (form-proposals-sel form-name ,field ,proposals ,selected)
@@ -401,11 +426,19 @@
 
 (tm-define-macro ($form-choices field proposals selected) 
   (:synopsis "Make a multiple choice field for the current form") 
-  `($execute 
+  `($execute
      (set! form-entries (append form-entries (list ,field))) 
-     ($choices (form-named-set form-name ,field answer)
-               (form-proposals-sel form-name ,field ,proposals ,selected)
+     ($choices (form-named-set-multiple form-name ,field answer)
+               (begin
+                 (form-named-set-multiple form-name ,field ,selected)
+                 ,proposals)
                ,selected)))
+
+(tm-define-macro ($form-toggle field on?)
+  (:synopsis "Make a toggle field for the current form") 
+  `($execute
+     (set! form-entries (append form-entries (list ,field))) 
+     ($toggle (form-named-set form-name ,field answer) ,on?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic text markup
@@ -523,9 +556,8 @@
     ($quote
       `(document
          (TeXmacs ,(texmacs-version))
-         (style (tuple "tmdoc"))
-         (body ($unquote ($block ,@l)))
-         (initial (collection (associate "language" ,lan)))))))
+         (style (tuple "tmdoc" ,lan))
+         (body ($unquote ($block ,@l)))))))
 
 (tm-define-macro ($localize . l)
   `(tree-translate ($inline ,@l)))
@@ -535,6 +567,14 @@
 
 (tm-define-macro ($tmfs-title . l)
   ($quote `(document (tmfs-title ($unquote ($inline ,@l))))))
+
+(tm-define-macro ($folded key . l)
+  ($quote `(document (folded ($unquote ($inline ,key))
+                             ($unquote ($block ,@l))))))
+
+(tm-define-macro ($unfolded key . l)
+  ($quote `(document (unfolded ($unquote ($inline ,key))
+                               ($unquote ($block ,@l))))))
 
 (tm-define-macro ($folded-documentation key . l)
   ($quote `(document (folded-documentation ($unquote ($inline ,key))

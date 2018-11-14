@@ -29,11 +29,13 @@ attach_data (tree body, new_data data, bool no_aux) {
     hashmap<string,tree> init= copy (data->init);
     init->reset (PAGE_SCREEN_WIDTH);
     init->reset (PAGE_SCREEN_HEIGHT);
-    init->reset (ZOOM_FACTOR);
+    if (!init->contains ("no-zoom")) init->reset (ZOOM_FACTOR);
     doc << compound ("initial", make_collection (init));
   }
   if (N (data->fin) != 0)
     doc << compound ("final", make_collection (data->fin));
+  if (N (data->att) != 0)
+    doc << compound ("attachments", make_collection (data->att));
   if (!no_aux) {
     if (N (data->ref) != 0)
       doc << compound ("references", make_collection (data->ref));
@@ -56,6 +58,7 @@ detach_data (tree doc, new_data& data) {
   data->fin    = hashmap<string,tree> (UNINIT, extract (doc, "final"));
   data->ref    = hashmap<string,tree> (UNINIT, extract (doc, "references"));
   data->aux    = hashmap<string,tree> (UNINIT, extract (doc, "auxiliary"));
+  data->att    = hashmap<string,tree> (UNINIT, extract (doc, "attachments"));
   //tree links= extract (doc, "links");
   //if (N (links) != 0)
   //  (void) call ("register-link-locations", object (u), object (links));

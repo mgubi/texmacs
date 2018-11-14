@@ -11,48 +11,65 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(cond ((os-mingw?)
+       (debug-set! stack 0))
+      ((os-macos?)
+       (debug-set! stack 2000000))
+      (else
+       (debug-set! stack 1000000)))
+
 (define boot-start (texmacs-time))
-(define remote-list (list))
+(define remote-client-list (list))
 
 (define developer-mode?
   (equal? (cpp-get-preference "developer tool" "off") "on"))
 
 (if developer-mode?
+    (debug-enable 'backtrace 'debug))
+
+(define (%new-read-hook sym) (noop)) ; for autocompletion
+
+(define-public macro-keywords '(define-macro define-public-macro 
+                                tm-define-macro))
+(define-public def-keywords
+  `(define-public provide-public
+    tm-define tm-menu menu-bind tm-widget ,@macro-keywords))
+
+(define old-read read)
+(define (new-read port)
+  "A redefined reader which stores line number and file name in symbols."
+  ;; FIXME: handle overloaded definitions
+  (let ((form (old-read port)))
+    (if (and (pair? form) (member (car form) def-keywords))
+        (let* ((l (source-property form 'line))
+               (c (source-property form 'column))
+               (f (source-property form 'filename))
+               (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
+          (if (symbol? sym) ; Just in case
+              (let ((old (or (symbol-property sym 'defs) '()))
+                    (new `(,f ,l ,c)))
+                (%new-read-hook sym)
+                (if (and (member (car form) macro-keywords)
+                         (not (member sym def-keywords)))
+                    (set! def-keywords (cons sym def-keywords)))
+                (if (not (member new old))
+                    (set-symbol-property! sym 'defs (cons new old)))))))
+    form))
+
+(define old-primitive-load primitive-load)
+(define (new-primitive-load filename)
+  ;; We explicitly circumvent guile's decision to set the current-reader
+  ;; to #f inside ice-9/boot-9.scm, try-module-autoload
+  (with-fluids ((current-reader read))
+               (old-primitive-load filename)))
+
+(if developer-mode?
     (begin
-      (define-public (%new-read-hook sym) (noop)) ; for autocompletion
-      
-      ;; FIXME: how do we update this list dynamically? 
-      (define-public keywords-which-define 
-        '(define define-macro define-public define-public-macro provide-public
-                 tm-define tm-define-macro tm-menu menu-bind tm-widget))
-
-      (define-public old-read read)
-      (define-public (new-read port)
-        "A redefined reader which stores line number and file name in symbols."
-        ;; FIXME: handle overloaded redefinitions
-        (let ((form (old-read port)))
-          (if (and (pair? form) (member (car form) keywords-which-define))
-              (let* ((l (source-property form 'line))
-                     (c (source-property form 'column))
-                     (f (source-property form 'filename))
-                     (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
-                (if (symbol? sym) ; Just in case
-                    (let ((old (or (symbol-property sym 'defs) '()))
-                          (new `(,f ,l ,c)))
-                      (%new-read-hook sym)
-                      (if (not (member new old))
-                          (set-symbol-property! sym 'defs (cons new old)))))))
-          form))
-
+      (module-export! (current-module)
+                      '(%new-read-hook old-read new-read def-keywords))
       (set! read new-read)
-
-      (define-public old-primitive-load primitive-load)
-      (define-public (new-primitive-load filename)
-        ;; We explicitly circumvent guile's decision to set the current-reader
-        ;; to #f inside ice-9/boot-9.scm, try-module-autoload
-        (with-fluids ((current-reader read))
-                     (old-primitive-load filename)))
-
+      (module-export! (current-module)
+                      '(old-primitive-load new-primitive-load))
       (set! primitive-load new-primitive-load)))
 
 ;; TODO: scheme file caching using (set! primitive-load ...) and
@@ -79,7 +96,8 @@
                  (kernel boot debug) (kernel boot srfi)
                  (kernel boot ahash-table) (kernel boot prologue))
 (inherit-modules (kernel library base) (kernel library list)
-                 (kernel library tree) (kernel library content))
+                 (kernel library tree) (kernel library content)
+                 (kernel library patch))
 (inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
 (inherit-modules (kernel logic logic-rules) (kernel logic logic-query)
                  (kernel logic logic-data))
@@ -98,37 +116,50 @@
                  (kernel old-gui old-gui-form)
                  (kernel old-gui old-gui-test))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting utilities\n")
+(use-modules (utils library cpp-wrap))
+(lazy-define (utils library cursor) notify-cursor-moved)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
+(lazy-define (utils test test-convert) delayed-quit
+             build-manual build-ref-suite run-test-suite)
+(use-modules (utils library smart-table))
 (use-modules (utils plugins plugin-convert))
 (use-modules (utils misc markup-funcs))
 (use-modules (utils handwriting handwriting))
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting BibTeX style modules\n")
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
+(lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
-;;(display "Booting main TeXmacs functionality\n")
+;(display "Booting main TeXmacs functionality\n")
 (use-modules (texmacs texmacs tm-server) (texmacs texmacs tm-view)
              (texmacs texmacs tm-files) (texmacs texmacs tm-print))
 (use-modules (texmacs keyboard config-kbd))
 (lazy-keyboard (texmacs keyboard prefix-kbd) always?)
 (lazy-keyboard (texmacs keyboard latex-kbd) always?)
 (lazy-menu (texmacs menus file-menu) file-menu go-menu
-           new-file-menu load-menu save-menu print-menu close-menu)
+           new-file-menu load-menu save-menu
+           print-menu print-menu-inline close-menu)
 (lazy-menu (texmacs menus edit-menu) edit-menu)
-(lazy-menu (texmacs menus view-menu) view-menu)
+(lazy-menu (texmacs menus view-menu) view-menu texmacs-bottom-toolbars)
 (lazy-menu (texmacs menus tools-menu) tools-menu)
-(lazy-menu (texmacs menus preferences-menu)
-           preferences-menu page-setup-menu open-preferences)
+(lazy-menu (texmacs menus preferences-menu) preferences-menu page-setup-menu)
+(lazy-menu (texmacs menus preferences-widgets) open-preferences)
 (use-modules (texmacs menus main-menu))
+(lazy-define (texmacs menus view-menu) set-bottom-bar test-bottom-bar?)
+(tm-define (notify-set-attachment name key val) (noop))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting generic mode\n")
 (lazy-keyboard (generic generic-kbd) always?)
@@ -136,92 +167,151 @@
 (lazy-menu (generic format-menu) format-menu
            font-size-menu color-menu horizontal-space-menu
            transform-menu specific-menu
+           text-font-effects-menu text-effects-menu
            vertical-space-menu indentation-menu line-break-menu
            page-header-menu page-footer-menu page-numbering-menu
-           page-break-menu page-insertion-menu
-           insert-page-insertion-menu position-float-menu)
+           page-break-menu)
 (lazy-menu (generic document-menu) document-menu
            project-menu document-style-menu global-language-menu)
-(lazy-menu (generic document-part) document-part-menu project-manage-menu)
-(lazy-menu (generic insert-menu) insert-menu texmacs-insert-icons
-           insert-link-menu insert-image-menu insert-animation-menu)
+(lazy-menu (generic document-part)
+           preamble-menu document-part-menu project-manage-menu)
+(lazy-menu (generic insert-menu) insert-menu texmacs-insert-menu
+           texmacs-insert-icons insert-link-menu insert-image-menu)
+(lazy-define (generic document-edit) update-document
+             get-init-page-rendering init-page-rendering)
+(lazy-define (generic generic-edit) notify-activated notify-disactivated)
 (lazy-define (generic generic-doc) focus-help)
+(lazy-define (generic generic-widgets) search-toolbar replace-toolbar
+             open-search toolbar-search-start interactive-search
+             open-replace toolbar-replace-start interactive-replace
+             search-next-match)
+(lazy-define (generic format-widgets) open-paragraph-format open-page-format
+             open-pattern-selector)
+(lazy-define (generic document-widgets) open-source-tree-preferences
+             open-document-paragraph-format open-document-page-format
+             open-document-metadata open-document-colors)
+(tm-property (open-search) (:interactive #t))
+(tm-property (open-replace) (:interactive #t))
+(tm-property (open-paragraph-format) (:interactive #t))
+(tm-property (open-page-format) (:interactive #t)
+                                (:applicable (not (selection-active?))))
+(tm-property (open-source-tree-preferences) (:interactive #t))
+(tm-property (open-document-paragraph-format) (:interactive #t))
+(tm-property (open-document-page-format) (:interactive #t))
+(tm-property (open-document-metadata) (:interactive #t))
+(tm-property (open-document-colors) (:interactive #t))
+(tm-property (open-pattern-selector cmd w) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting text mode\n")
 (lazy-keyboard (text text-kbd) in-text?)
-(lazy-keyboard (text format-text-kbd) in-text?)
-(lazy-keyboard (text std-text-kbd) in-std-text?)
-(lazy-menu (text format-text-menu) text-format-menu text-format-icons)
-(lazy-menu (text text-menu) text-menu text-icons)
+(lazy-menu (text text-menu) text-format-menu text-format-icons
+	   text-menu text-block-menu text-inline-menu
+           text-icons text-block-icons text-inline-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting math mode\n")
 (lazy-keyboard (math math-kbd) in-math?)
-(lazy-menu (math format-math-menu) math-format-menu math-format-icons)
-(lazy-menu (math math-menu) math-menu math-icons insert-math-menu
+(lazy-keyboard (math math-sem-edit) in-sem-math?)
+(lazy-menu (math math-menu) math-format-menu math-format-icons
+	   math-menu math-insert-menu
+           math-icons math-insert-icons
            math-correct-menu semantic-math-preferences-menu
-           context-preferences-menu)
+           context-preferences-menu insert-math-menu)
 (lazy-initialize (math math-menu) (in-math?))
 (lazy-define (math math-edit) brackets-refresh)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting programming modes\n")
 (lazy-keyboard (prog prog-kbd) in-prog?)
-(lazy-menu (prog format-prog-menu) prog-format-menu prog-format-icons)
-(lazy-menu (prog prog-menu) prog-menu prog-icons)
+(lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
+	   prog-menu prog-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting source mode\n")
 (lazy-keyboard (source source-kbd) always?)
-(lazy-menu (source source-menu) source-menu source-icons
+(lazy-menu (source source-menu) source-macros-menu source-menu source-icons
            source-transformational-menu source-executable-menu)
+(lazy-define (source macro-edit) has-macro-source? edit-macro-source)
+(lazy-define (source macro-widgets) editable-macro? open-macros-editor
+	     open-macro-editor create-table-macro)
+(tm-property (open-macro-editor l) (:interactive #t))
+(tm-property (create-table-macro l) (:interactive #t))
+(tm-property (open-macros-editor) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting table mode\n")
 (lazy-keyboard (table table-kbd) in-table?)
 (lazy-menu (table table-menu) insert-table-menu)
 (lazy-define (table table-edit) table-resize-notify)
+(lazy-define (table table-widgets) open-cell-properties open-table-properties)
+(tm-property (open-cell-properties) (:interactive #t))
+(tm-property (open-table-properties) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting graphics mode\n")
 (lazy-keyboard (graphics graphics-kbd) in-active-graphics?)
 (lazy-menu (graphics graphics-menu) graphics-menu graphics-icons)
+(lazy-define (graphics graphics-object)
+             graphics-reset-state graphics-decorations-update)
+(lazy-define (graphics graphics-utils) make-graphics)
 (lazy-define (graphics graphics-edit)
              graphics-busy?
              graphics-reset-context graphics-undo-enabled
              graphics-release-left graphics-release-middle
              graphics-release-right graphics-start-drag-left
              graphics-dragging-left graphics-end-drag-left)
+(lazy-define (graphics graphics-main) graphics-update-proviso
+             graphics-get-proviso graphics-set-proviso)
+(lazy-define (graphics graphics-markup) arrow-with-text arrow-with-text*)
+(define-secure-symbols arrow-with-text arrow-with-text*)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
-;(display "Booting formal languages\n")
+;(display "Booting formal and natural languages\n")
 (lazy-language (language minimal) minimal)
 (lazy-language (language std-math) std-math)
 (lazy-define (language natural) replace)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting dynamic features\n")
 (lazy-keyboard (dynamic fold-kbd) always?)
 (lazy-keyboard (dynamic scripts-kbd) always?)
 (lazy-keyboard (dynamic calc-kbd) always?)
-(lazy-menu (dynamic fold-menu) insert-fold-menu dynamic-menu dynamic-icons)
+(lazy-menu (dynamic fold-menu) insert-fold-menu dynamic-menu dynamic-icons
+           graphics-overlays-menu graphics-screens-menu
+           graphics-focus-overlays-menu graphics-focus-overlays-icons)
 (lazy-menu (dynamic session-menu) insert-session-menu session-help-icons)
 (lazy-menu (dynamic scripts-menu) scripts-eval-menu scripts-plot-menu
            plugin-eval-menu plugin-eval-toggle-menu plugin-plot-menu)
-(lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu)
+(lazy-menu (dynamic calc-menu) calc-table-menu calc-insert-menu
+           calc-icourse-menu)
+(lazy-menu (dynamic animate-menu) insert-animation-menu animate-toolbar)
+(lazy-define (dynamic fold-edit)
+             screens-switch-to dynamic-make-slides overlays-context?)
 (lazy-define (dynamic session-edit) scheme-eval)
 (lazy-define (dynamic calc-edit) calc-ready? calc-table-renumber)
 (lazy-initialize (dynamic session-menu) (in-session?))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting documentation\n")
 (lazy-keyboard (doc tmdoc-kbd) in-manual?)
+(lazy-keyboard (doc apidoc-kbd) developer-mode?)
 (lazy-menu (doc tmdoc-menu) tmdoc-menu tmdoc-icons)
 (lazy-menu (doc help-menu) help-menu)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src docgrep-in-texts)
+(lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
+             tmdoc-search-parameter tmdoc-search-scheme)
 (lazy-define (doc tmweb) tmweb-convert-dir tmweb-update-dir
              tmweb-convert-dir-keep-texmacs tmweb-update-dir-keep-texmacs
              tmweb-interactive-build tmweb-interactive-update)
@@ -231,8 +321,8 @@
 (lazy-tmfs-handler (doc tmdoc) help)
 (lazy-tmfs-handler (doc apidoc) apidoc)
 (define-secure-symbols tmdoc-include)
-
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting converters\n")
 (lazy-format (convert rewrite init-rewrite) texmacs scheme cpp verbatim)
@@ -247,16 +337,59 @@
 (lazy-define (convert rewrite init-rewrite) texmacs->code texmacs->verbatim)
 (lazy-define (convert html tmhtml-expand) tmhtml-env-patch)
 (lazy-define (convert latex latex-drd) latex-arity latex-type)
-(lazy-define (convert latex textm) textm-finalize)
 (lazy-define (convert latex tmtex) tmtex-env-patch)
+(lazy-define (convert latex latex-tools) latex-set-virtual-packages
+             latex-has-style? latex-has-package?
+             latex-has-texmacs-style? latex-has-texmacs-package?)
+(lazy-menu (convert latex tmtex-widgets) tmtex-menu)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting partial document facilities\n")
+(lazy-define (part part-shared) buffer-initialize buffer-notify)
+(lazy-menu (part part-menu) document-master-menu)
+(lazy-tmfs-handler (part part-tmfs) part)
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting database facilities\n")
+(lazy-define (database db-widget) open-db-chooser)
+(lazy-define (database db-menu) db-show-toolbar)
+(lazy-define (database db-convert) db-url?)
+(lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
+(lazy-define (database bib-manage)
+             bib-import-bibtex bib-compile bib-attach open-bib-chooser)
+(lazy-define (database bib-local) open-biblio)
+(lazy-menu (database db-menu) db-menu db-toolbar)
+(lazy-tmfs-handler (database db-tmfs) db)
+(lazy-keyboard (database bib-kbd) in-bib?)
+(tm-property (open-biblio) (:interactive #t))
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting security tools\n")
+(lazy-define (security wallet wallet-menu) with-wallet)
+(lazy-define (security wallet wallet-base)
+	     supports-wallet? wallet-initialized?
+	     wallet-on? wallet-off?)
+(lazy-menu (security wallet wallet-menu) wallet-preferences-widget)
+(lazy-define (security gpg gpg-edit) tree-export-encrypted
+	     tm-gpg-dialogue-passphrase-decrypt-buffer)
+(lazy-define (security gpg gpg-widgets) open-gpg-key-manager)
+(lazy-define (security gpg gpg-base) supports-gpg?)
+(lazy-menu (security gpg gpg-menu) gpg-menu document-encryption-menu)
+(lazy-menu (security gpg gpg-widgets) gpg-preferences-widget)
+
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting remote facilities\n")
-(lazy-define (server server-resource) resource-create resource-set-user-info)
-(lazy-menu (server server-menu) server-menu)
-(lazy-menu (client client-menu) client-menu remote-menu)
+(lazy-define (client client-tmfs) remote-home-directory)
+(lazy-menu (server server-menu) start-server-menu server-menu)
+(lazy-menu (client client-menu) start-client-menu client-menu)
 (lazy-tmfs-handler (client client-tmfs) remote-file)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting linking facilities\n")
 (lazy-menu (link link-menu) link-menu)
@@ -267,28 +400,57 @@
 (lazy-define (link link-extern) get-constellation
              get-link-locations register-link-locations)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting versioning facilities\n")
 (lazy-menu (version version-menu) version-menu)
 (lazy-keyboard (version version-kbd) with-versioning-tool?)
 (lazy-define (version version-tmfs) update-buffer commit-buffer)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting debugging and developer facilities\n")
-(lazy-menu (texmacs menus debug-menu) debug-menu)
+(lazy-menu (debug debug-menu) debug-menu)
 (lazy-menu (texmacs menus developer-menu) developer-menu)
+(lazy-define (debug debug-widgets) notify-debug-message
+             open-debug-console open-error-messages)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting editing modes for various special styles\n")
+(lazy-menu (various poster-menu) poster-block-menu)
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting plugins\n")
 (for-each lazy-plugin-initialize (plugin-list))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting fonts\n")
 (use-modules (fonts fonts-ec) (fonts fonts-adobe) (fonts fonts-x)
              (fonts fonts-math) (fonts fonts-foreign) (fonts fonts-misc)
              (fonts fonts-composite) (fonts fonts-truetype))
-(lazy-define (fonts font-selector) open-font-selector)
+(lazy-define (fonts font-old-menu)
+	     text-font-menu math-font-menu prog-font-menu)
+(lazy-define (fonts font-new-widgets)
+             open-font-selector open-document-font-selector)
+(tm-property (open-font-selector) (:interactive #t))
+(tm-property (open-document-font-selector) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting regression testing\n")
+(lazy-define (check check-master) check-all run-checks)
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
+;(display "Booting autoupdater\n")
+(when (updater-supported?) 
+  (use-modules (utils misc updater))
+  (delayed (:idle 2000) (updater-initialize)))
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "------------------------------------------------------\n")
 (delayed (:idle 10000) (autosave-delayed))

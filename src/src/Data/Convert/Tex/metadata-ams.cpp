@@ -8,37 +8,9 @@
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
+
 #include "convert.hpp"
-
-static array<tree>
-get_ams_subjclass (tree t) {
-  tree tmp (CONCAT);
-  array<tree> r;
-  for (int i=0; i<=N(t); i++) {
-    if (i < N(t) && t[i] != "," && !is_tuple (t[i], "\\tmSep"))
-      tmp << t[i];
-    else {
-      r << tmp;
-      tmp= concat();
-    }
-  }
-  return r;
-}
-
-static array<tree>
-get_ams_keywords (tree t) {
-  tree tmp (CONCAT);
-  array<tree> r;
-  for (int i=0; i<=N(t); i++) {
-    if (i < N(t) && t[i] != "," && !is_tuple (t[i], "\\tmsep"))
-      tmp << t[i];
-    else {
-      r << tmp;
-      tmp= concat();
-    }
-  }
-  return r;
-}
+#include "metadata.hpp"
 
 tree
 collect_metadata_ams (tree t) {
@@ -48,7 +20,6 @@ collect_metadata_ams (tree t) {
   tree doc_data (APPLY, "\\doc-data");
   tree abstract_data (APPLY, "\\abstract-data");
   tree author_data (APPLY, "\\author-data");
-  array<string> authors_stuff;
   for (i=0; i<n; i++) {
     u= t[i];
     if (is_tuple (u, "\\title", 1) || is_tuple (u, "\\title*", 2)) {
@@ -94,27 +65,35 @@ collect_metadata_ams (tree t) {
     }
     // abstract datas
     else if (is_tuple (u, "\\keywords", 1)) {
-      array<tree> tmp= get_ams_keywords (u[1]);
+      array<tree> tmp= tokenize_concat (u[N(u)-1], A(concat (",", ";",
+              tree (TUPLE, "\\tmsep"), tree (TUPLE, "\\tmSep"))));
       if (N(tmp) > 0) {
         tree kw= tree (APPLY, "\\abstract-keywords");
-        for (int j=0; j<N(tmp); j++) kw << tmp[j];
+        kw << tmp;
         abstract_data << kw;
       }
     }
     else if (is_tuple (u, "\\subjclass", 1)   ||
              is_tuple (u, "\\subjclass*", 2)) {
-      array<tree> tmp= get_ams_subjclass (u[N(u)-1]);
+      array<tree> tmp= tokenize_concat (u[N(u)-1], A(concat (",", ";",
+              tree (TUPLE, "\\tmsep"), tree (TUPLE, "\\tmSep"))));
       if (N(tmp) > 0) {
         tree msc= tree (APPLY, "\\abstract-msc");
-        for (int j=0; j<N(tmp); j++) msc << tmp[j];
+        msc << tmp;
         abstract_data << msc;
       }
     }
     else if (is_tuple (u, "\\begin-abstract")) {
       tree abstract_text (CONCAT);
       i++;
-      while (i<n && !is_tuple (t[i], "\\end-abstract"))
-        abstract_text << t[i++];
+      while (i<n && !is_tuple (t[i], "\\end-abstract")) {
+        if (is_tuple (t[i], "\\tmacm") || is_tuple (t[i], "\\tmpacs") ||
+            is_tuple (t[i], "\\tmarxiv"))
+          abstract_data << collect_abstract_data (t[i]);
+        else
+          abstract_text << t[i];
+        i++;
+      }
       abstract_data << tree (APPLY, "\\abstract", abstract_text);
     }
   }

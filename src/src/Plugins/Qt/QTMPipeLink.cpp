@@ -11,6 +11,7 @@
 
 #include "tm_link.hpp"
 #include "qt_utilities.hpp"
+#include "qt_gui.hpp"
 #include "QTMPipeLink.hpp"
 #include <QByteArray>
 
@@ -22,6 +23,7 @@ debug_io_string (QByteArray s) {
     unsigned char c= (unsigned char) s[i];
     if (c == DATA_BEGIN) r << "[BEGIN]";
     else if (c == DATA_END) r << "[END]";
+    else if (c == DATA_ABORT) r << "[ABORT]";
     else if (c == DATA_COMMAND) r << "[COMMAND]";
     else if (c == DATA_ESCAPE) r << "[ESCAPE]";
     else r << s[i];
@@ -31,19 +33,21 @@ debug_io_string (QByteArray s) {
 
 void
 QTMPipeLink::readErrOut () {
+BEGIN_SLOT
   feedBuf (QProcess::StandardError);
   feedBuf (QProcess::StandardOutput);
+END_SLOT
 }
 
 QTMPipeLink::QTMPipeLink (string cmd2) : cmd (cmd2), outbuf (""), errbuf ("") {}
 
 QTMPipeLink::~QTMPipeLink () {
-  killProcess ();
+  killProcess (1000);
 }
 
 bool
 QTMPipeLink::launchCmd () {
-  if (state () != QProcess::NotRunning) killProcess ();
+  if (state () != QProcess::NotRunning) killProcess (1000);
   //FIXME: is UTF8 the right encoding here?
   QProcess::start(utf8_to_qstring(cmd));
   bool r= waitForStarted ();
@@ -57,7 +61,7 @@ QTMPipeLink::launchCmd () {
 int
 QTMPipeLink::writeStdin (string s) {
   c_string _s (s);
-  if (DEBUG_IO) cout << "[INPUT]" << debug_io_string ((char*)_s);
+  if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string ((char*)_s);
   int err= QIODevice::write (_s, N(s));
   return err;
 }
@@ -69,7 +73,7 @@ QTMPipeLink::feedBuf (ProcessChannel channel) {
   if (channel == QProcess::StandardOutput) outbuf << tempout.constData ();
   else errbuf << tempout.constData ();
   if (DEBUG_IO)
-    cout << "[OUTPUT " << channel << "]" << debug_io_string (tempout.constData ()) << "\n";
+    debug_io << "[OUTPUT " << channel << "]" << debug_io_string (tempout.constData ()) << "\n";
 }
 
 bool
@@ -79,14 +83,15 @@ QTMPipeLink::listenChannel (ProcessChannel channel, int msecs) {
 }
 
 void
-QTMPipeLink::killProcess () {
+QTMPipeLink::killProcess (int msecs) {
   disconnect (SIGNAL(readyReadStandardOutput ()), this, SLOT(readErrOut ()));
   disconnect (SIGNAL(readyReadStandardError ()), this, SLOT(readErrOut ()));
-#if defined(__MINGW__) || defined(__MINGW32__)
+#ifdef OS_MINGW
+  (void) msecs;
   close ();
 #else
   terminate ();
-  if (! waitForFinished ()) kill ();
+  if (! waitForFinished (msecs)) kill ();
 #endif
 }
 

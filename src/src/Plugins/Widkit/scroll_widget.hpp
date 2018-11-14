@@ -35,7 +35,6 @@ class scrollable_widget_rep: public scroll_widget_rep {
   SI             ex2, ey2;    // extents of scrolled window hi-right
   wk_widget_rep* hor;         // the horizontal scroll bar
   wk_widget_rep* ver;         // the vertical scroll bar
-  gravity        backup;      // for a dirty bugfix
 
   void scroll_to (SI scx, SI scy);
   void set_extents (SI ex1, SI ey1, SI ex2, SI ey2);
@@ -46,15 +45,17 @@ public:
   scrollable_widget_rep (wk_widget child, gravity grav);
   operator tree ();
 
-  void handle_get_size   (get_size_event ev);
-  void handle_position   (position_event ev);
-  void handle_set_widget (set_widget_event ev);
-  void handle_get_coord1 (get_coord1_event ev);
-  void handle_get_coord2 (get_coord2_event ev);
-  void handle_get_coord4 (get_coord4_event ev);
-  void handle_set_coord2 (set_coord2_event ev);
-  void handle_set_coord4 (set_coord4_event ev);
-  void handle_scroll     (scroll_event ev);
+  void handle_get_size    (get_size_event ev);
+  void handle_position    (position_event ev);
+  void handle_set_widget  (set_widget_event ev);
+  void handle_set_integer (set_integer_event ev);
+  void handle_get_coord1  (get_coord1_event ev);
+  void handle_get_coord2  (get_coord2_event ev);
+  void handle_get_coord4  (get_coord4_event ev);
+  void handle_set_coord2  (set_coord2_event ev);
+  void handle_set_coord4  (set_coord4_event ev);
+  void handle_scroll      (scroll_event ev);
+  void handle_repaint     (repaint_event ev);
 };
 
 /******************************************************************************

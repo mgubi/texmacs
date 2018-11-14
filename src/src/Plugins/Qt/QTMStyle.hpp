@@ -14,8 +14,18 @@
 
 #include <QStyle>
 
+int qt_zoom (int sz);
+
+#ifdef Q_WS_MAC
+#define QTM_MINI_FONTSIZE 12 // also see uses of preference "gui:mini-fontsize"
+                             // toolbar creation and config should be in scheme
+#else
+#define QTM_MINI_FONTSIZE 9
+#endif
+
 #ifdef Q_WS_MAC
 #define UNIFIED_TOOLBAR
+extern bool use_unified_toolbar;
   // enable the unified toolbar style on the mac. To work properly this requires
   // a modification of the widget hierarchy of the main window.
 #endif
@@ -24,13 +34,13 @@
   // frame around widgets in the status bar
 
 class QTMProxyStyle: public QStyle {
+  Q_OBJECT
   
 protected:
   QStyle* base;
   
 public:
   explicit QTMProxyStyle (QStyle* _base = NULL);
-  ~QTMProxyStyle ();
   
   QStyle *baseStyle() const;
   
@@ -38,6 +48,14 @@ public:
   const QStyle * proxy () const { return this; }
 #endif  
   
+#if (QT_VERSION >= 0x050000)
+  int layoutSpacing(QSizePolicy::ControlType control1,
+                    QSizePolicy::ControlType control2,
+                    Qt::Orientation orientation,
+                    const QStyleOption *option = 0,
+                    const QWidget *widget = 0) const;
+#endif
+
   void drawComplexControl (ComplexControl control, const QStyleOptionComplex* option, QPainter* painter, const QWidget* widget = 0) const;
   void drawControl (ControlElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget = 0)  const;
   void drawItemPixmap (QPainter* painter, const QRect& rect, int alignment, const QPixmap& pixmap) const;
@@ -63,11 +81,10 @@ public:
 };
 
 class QTMStyle: public QTMProxyStyle {
-  
+  Q_OBJECT
   
 public:
-  inline QTMStyle (QStyle* _style = NULL): QTMProxyStyle (_style) {}
-  inline ~QTMStyle () {}
+  QTMStyle (QStyle* _style = NULL): QTMProxyStyle (_style) { }
   
   void drawComplexControl (ComplexControl control, const QStyleOptionComplex* option, QPainter* painter, const QWidget* widget = 0) const;
   void drawPrimitive (PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const;

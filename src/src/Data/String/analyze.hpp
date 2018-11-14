@@ -60,6 +60,8 @@ string tm_to_xml_name (string s);
 string xml_name_to_tm (string s);
 string xml_unspace (string s, bool first, bool last);
 bool   contains_unicode_char (string s);
+tree   convert_OTS1_symbols_to_universal_encoding (tree t);
+string convert_tabs_to_spaces (string s, int w);
 
 string roman_nr (int nr);
 string Roman_nr (int nr);
@@ -84,7 +86,10 @@ string tm_forward_access (string s, int i);
 string tm_backward_access (string s, int i);
 int    tm_string_length (string s);
 array<string> tm_tokenize (string s);
+array<string> tm_string_split (string s);
 string tm_recompose (array<string> a);
+int    tm_search_forwards (string s, int pos, string in);
+int    tm_search_backwards (string s, int pos, string in);
 
 string scm_quote (string s);
 string scm_unquote (string s);
@@ -110,6 +115,7 @@ bool read_line (string s, int& i, string& result);
 bool read_int (string s, int& i, int& result);
 bool read_double (string s, int& i, double& result);
 void skip_spaces (string s, int& i);
+void skip_whitespace (string s, int& i);
 void skip_line (string s, int& i);
 void skip_symbol (string s, int& i);
 
@@ -122,21 +128,35 @@ void parse (string s, int& pos, SI*& a, int len);
 
 int    search_forwards (string what, string in);
 int    search_forwards (string what, int pos, string in);
+int    search_forwards (array<string> what_list, int pos, string in);
 int    search_backwards (string what, string in);
 int    search_backwards (string what, int pos, string in);
 int    count_occurrences (string what, string in);
 int    count_occurrences (string what, string in);
 bool   occurs (string what, string in);
+int    overlapping (string s1, string s2);
 string replace (string s, string what, string by);
 bool   match_wildcard (string s, string w);
 array<string> tokenize (string s, string sep);
 string recompose (array<string> a, string sep);
+string trim_spaces_left (string s);
+tree   trim_spaces_left (tree t);
+array<string> trim_spaces_left (array<string> a);
+string trim_spaces_right (string s);
+tree   trim_spaces_right (tree t);
+array<string> trim_spaces_right (array<string> a);
 string trim_spaces (string s);
 tree   trim_spaces (tree t);
 array<string> trim_spaces (array<string> a);
 
+path find_left_bracket (path p, const string& lbr, const string& rbr);
+path find_right_bracket (path p, const string& lbr, const string& rbr);
+
 array<string> as_completions (hashset<string> h);
 array<string> close_completions (array<string> a);
 array<string> strip_completions (array<string> a, string prefix);
+
+array<int> differences (string s1, string s2);
+int distance (string s1, string s2);
 
 #endif // defined ANALYZE_H

@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : plain.scm
 ;; DESCRIPTION : plain style for BibTeX files
-;; COPYRIGHT   : (C) 2010  David MICHEL
+;; COPYRIGHT   : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -31,12 +31,37 @@
 
 (tm-define (bib-preprocessing t) (:mode bib-plain?) `())
 
+(define (bib-non-breaking x)
+  (cond ((tm-func? x 'concat)
+         (with l (map bib-non-breaking (tm-children x))
+           (apply tmconcat l)))
+        ((string? x)
+         (let* ((l (string-tokenize-by-char x #\space))
+                (r (list-intersperse l '(nbsp))))
+           (apply tmconcat r)))
+        (else x)))
+
+(tm-define (bib-name-ends? x s)
+  (cond ((tm-func? x 'concat) (bib-name-ends? (cAr x) s))
+        ((string? x) (string-ends? x s))
+        (else #f)))
+
+(tm-define (bib-format-first-name x)
+  (if (bib-null? (list-ref x 1)) ""
+      (with f (bib-non-breaking (list-ref x 1))
+        (if (bib-name-ends? f ".")
+            (tmconcat f '(nbsp))
+            (tmconcat f " ")))))
+
 (tm-define (bib-format-name x)
-  (:mode bib-plain?)
-  (let* ((ff (if (bib-null? (list-ref x 1)) "" `(concat ,(list-ref x 1) (nbsp))))
-	 (vv (if (bib-null? (list-ref x 2)) "" `(concat ,(list-ref x 2) (nbsp))))
-	 (ll (if (bib-null? (list-ref x 3)) "" (bib-purify (list-ref x 3))))
-	 (jj (if (bib-null? (list-ref x 4)) "" `(concat ", " ,(list-ref x 4)))))
+  ;; (:mode bib-plain?)
+  (let* ((ff (bib-format-first-name x))
+	 (vv (if (bib-null? (list-ref x 2)) ""
+                 `(concat ,(list-ref x 2) (nbsp))))
+	 (ll (if (bib-null? (list-ref x 3)) ""
+                 (bib-purify (list-ref x 3))))
+	 (jj (if (bib-null? (list-ref x 4)) ""
+                 `(concat ", " ,(list-ref x 4)))))
     `(concat ,ff ,vv ,ll ,jj)))
 
 (define (bib-format-names-rec n lim a)
@@ -46,8 +71,14 @@
 	       ,(bib-format-name (list-ref a n))
 	       ,(bib-format-names-rec (+ n 1) lim a))))
 
+(tm-define (bib-last-name-sep a)
+  ;; (:mode bib-plain?)
+  (if (<= (length a) 3)
+      (bib-translate " and ")
+      (bib-translate ", and ")))
+
 (tm-define (bib-format-names a)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (if (or (bib-null? a) (nlist? a))
       ""
       (let* ((n (length a)))
@@ -58,19 +89,19 @@
 		   (e (if (or (== (list-ref (list-ref a (- n 1)) 3) "others")
                               (== (list-ref (list-ref a (- n 1)) 4) "others"))
 			  `(concat " et" (nbsp) "al")
-			  `(concat ,(bib-translate " and ")
+			  `(concat ,(bib-last-name-sep a)
 				   ,(bib-format-name (list-ref a (- n 1)))))))
 	      `(concat ,b ,m ,e))))))
 
 (tm-define (bib-format-author x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (with a (bib-field x "author")
     (if (bib-null? a)
 	""
 	(bib-format-names a))))
 
 (tm-define (bib-format-editor x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (with a (bib-field x "editor")
     (if (or (bib-null? a) (nlist? a))
 	""
@@ -79,7 +110,7 @@
 	    `(concat ,(bib-format-names a) ,(bib-translate ", editors"))))))
 
 (tm-define (bib-format-in-ed-booktitle x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((b (bib-default-field x "booktitle"))
 	 (e (bib-field x "editor")))
     (if (bib-null? b)
@@ -90,7 +121,7 @@
                      (with "font-shape" "italic" ,b))))))
 
 (tm-define (bib-format-bvolume x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((v (bib-field x "volume"))
 	 (s (bib-default-field x "series")))
     (if (bib-null? v)
@@ -102,7 +133,7 @@
 	  `(concat ,(bib-translate "volume") ,sep ,v ,series)))))
 
 (tm-define (bib-format-number-series x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((v (bib-field x "volume"))
 	 (n (bib-field x "number"))
 	 (s (bib-default-field x "series")))
@@ -116,7 +147,7 @@
 	"")))
 
 (tm-define (bib-format-pages x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (with p (bib-field x "pages")
     (cond
       ((or (bib-null? p) (nlist? p)) "")
@@ -125,10 +156,10 @@
        `(concat ,(bib-translate "page ") ,(list-ref p 1)))
       (else
 	`(concat ,(bib-translate "pages ")
-		 ,(list-ref p 1) "--" ,(list-ref p 2))))))
+		 ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
 
 (tm-define (bib-format-chapter-pages x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((c (bib-field x "chapter"))
 	 (t (bib-field x "type")))
     (if (bib-null? c)
@@ -140,7 +171,7 @@
 	  `(concat ,type " " ,c ,pages)))))
 
 (tm-define (bib-format-vol-num-pages x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((v (bib-field x "volume"))
 	 (n (bib-field x "number"))
 	 (p (bib-field x "pages"))
@@ -152,11 +183,14 @@
 		    ((equal? 1 (length p)) "")
 		    ((equal? 2 (length p)) `(concat ":" ,(list-ref p 1)))
 		    (else
-		      `(concat ":" ,(list-ref p 1) "--" ,(list-ref p 2)))))))
-    `(concat ,vol ,num ,pag)))
+		      `(concat ":" ,(list-ref p 1)
+                               ,bib-range-symbol ,(list-ref p 2)))))))
+    (if (and (== vol "") (== num ""))
+        (bib-format-pages x)
+        `(concat ,vol ,num ,pag))))
 
 (tm-define (bib-format-date x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((y (bib-field x "year"))
 	 (m (bib-field x "month")))
     (if (bib-null? y)
@@ -164,7 +198,7 @@
 	(if (bib-null? m) y `(concat ,m " " ,y)))))
 
 (tm-define (bib-format-tr-number x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((t (bib-field x "type"))
 	 (n (bib-field x "number"))
 	 (type (if (bib-null? t) (bib-translate "Technical Report") t))
@@ -174,14 +208,14 @@
         `(concat ,type ,sep ,number))))
 
 (tm-define (bib-format-bibitem n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(bibitem* ,(number->string n)))
 
 (tm-define (bib-format-article n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -198,10 +232,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-book n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (if (bib-empty? x "author")
@@ -231,10 +265,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-booklet n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -246,10 +280,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-inbook n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (if (bib-empty? x "author") (bib-format-editor x)
 			 (bib-format-author x)))
@@ -276,10 +310,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-incollection n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -302,10 +336,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-inproceedings n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
     ,(bib-format-bibitem n x)
-    (label ,(string-append "bib-" (list-ref x 2)))
+    ,(bib-label (list-ref x 2))
     ,(bib-new-list-spc
       `(,(bib-new-block (bib-format-author x))
 	,(bib-new-block (bib-format-field-Locase x "title"))
@@ -336,10 +370,10 @@
 	,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-manual n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (if (bib-empty? x "author")
@@ -360,10 +394,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-mastersthesis n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -378,10 +412,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-misc n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -392,10 +426,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-phdthesis n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-emphasize (bib-format-field x "title")))
@@ -410,10 +444,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-proceedings n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block
 	   (if (bib-empty? x "editor")
@@ -442,10 +476,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-techreport n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -458,10 +492,10 @@
 	 ,(bib-new-block (bib-format-field x "note"))))))
 
 (tm-define (bib-format-unpublished n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   `(concat
      ,(bib-format-bibitem n x)
-     (label ,(string-append "bib-" (list-ref x 2)))
+     ,(bib-label (list-ref x 2))
      ,(bib-new-list-spc
        `(,(bib-new-block (bib-format-author x))
 	 ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -471,7 +505,7 @@
 	      ,(bib-format-date x))))))))
 
 (tm-define (bib-format-entry n x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (if (and (list? x) (func? x 'bib-entry)
 	   (= (length x) 4) (func? (list-ref x 3) 'document))
       (with doctype (list-ref x 1)
@@ -512,8 +546,10 @@
   (if (bib-empty? x "author")
       (if (bib-empty? x "editor")
 	  (list-ref x 2)
-	  (author-sort-format (bib-cdr (bib-field x "editor"))))
-      (author-sort-format (bib-cdr (bib-field x "author")))))
+	  (string-upcase (author-sort-format
+                          (bib-cdr (bib-field x "editor")))))
+      (string-upcase (author-sort-format
+                      (bib-cdr (bib-field x "author"))))))
 
 (define (author-sort-key x ae)
   (if (bib-empty? x ae)
@@ -522,7 +558,7 @@
       (string-upcase (author-sort-format (bib-cdr (bib-field x ae))))))
 
 (tm-define (bib-sort-key x)
-  (:mode bib-plain?)
+  ;; (:mode bib-plain?)
   (let* ((doctype (list-ref x 1))
 	 (pre (cond
 		((or (equal? doctype "inbook") (equal? doctype "book"))

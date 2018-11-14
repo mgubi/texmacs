@@ -170,8 +170,10 @@ evaluate_impl (tree t) {
     return evaluate_for_each (t);
   case EXTERN:
     return evaluate_rewrite (t);
-  case INCLUDE:
+  case VAR_INCLUDE:
     return evaluate_include (t);
+  case WITH_PACKAGE:
+    return evaluate_rewrite (t);
   case USE_PACKAGE:
     return evaluate_use_package (t);
   case USE_MODULE:
@@ -242,6 +244,8 @@ evaluate_impl (tree t) {
     return evaluate_greater (t);
   case GREATEREQ:
     return evaluate_greatereq (t);
+  case BLEND:
+    return evaluate_blend (t);
 
   /* Length units */
   case CM_LENGTH:
@@ -296,6 +300,8 @@ evaluate_impl (tree t) {
     return evaluate_gw_length ();
   case GH_LENGTH:
     return evaluate_gh_length ();
+  case GU_LENGTH:
+    return evaluate_gu_length ();
   case TMPT_LENGTH:
     return evaluate_tmpt_length ();
   case PX_LENGTH:

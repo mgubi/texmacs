@@ -37,8 +37,9 @@
       (cons (cons (car l) (cadr l)) (list->assoc-list (cddr l)))))
 
 (define (link-flatten-sub t)
-  (cond ((tm-func? t 'script 2)
-	 (list 'script (tree->stree (tree-ref t 0)) (tree-ref t 1)))
+  (cond ((tm-func? t 'script)
+	 (cons* 'script (tree->stree (tree-ref t 0))
+		(cdr (tree-children t))))
 	((tm-func? t 'attr)
 	 (list->assoc-list (cdr (tree->stree t))))
 	(else (tree->stree t))))
@@ -153,7 +154,7 @@
 (define (link-remove-participant nr)
   (with p (ahash-ref link-participants nr)
     (ahash-remove! link-participants nr)
-    (when (oberver? p)
+    (when (observer? p)
       (tree-pointer-detach p))))
 
 (define (link-clean nr)

@@ -19,30 +19,67 @@
 	(dynamic fold-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Style package rules for sessions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (style-category p)
+  (:require (in? p (list "framed-session" "ring-session" "large-formulas")))
+  :session-theme)
+
+(tm-define (style-category-precedes? x y)
+  (:require (and (== x :session-theme)
+                 (in? y (map symbol->string (plugin-list)))))
+  #t)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Switches
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define session-math-input #f)
+(define session-math-input (make-ahash-table))
+
+(define (session-key)
+  (let* ((lan (get-env "prog-language"))
+	 (ses (get-env "prog-session")))
+    (cons lan ses)))
 
 (tm-define (session-math-input?)
-  session-math-input)
+  (ahash-ref session-math-input (session-key)))
 
 (tm-define (toggle-session-math-input)
   (:synopsis "Toggle mathematical input in sessions.")
   (:check-mark "v" session-math-input?)
-  (set! session-math-input (not session-math-input))
+  (ahash-set! session-math-input (session-key) (not (session-math-input?)))
   (with-innermost t field-context?
     (field-update-math t)))
 
-(define session-multiline-input #f)
+(define session-multiline-input (make-ahash-table))
 
 (tm-define (session-multiline-input?)
-  session-multiline-input)
+  (ahash-ref session-multiline-input (session-key)))
+
+(tm-define (set-session-multiline-input lan ses set?)
+  (ahash-set! session-multiline-input (cons lan ses) set?))
 
 (tm-define (toggle-session-multiline-input)
   (:synopsis "Toggle multi-line input in sessions.")
   (:check-mark "v" session-multiline-input?)
-  (set! session-multiline-input (not session-multiline-input)))
+  (ahash-set! session-multiline-input (session-key)
+              (not (session-multiline-input?))))
+
+(define session-output-timings (make-ahash-table))
+
+(tm-define (session-output-timings?)
+  (ahash-ref session-output-timings (session-key)))
+
+(tm-define (toggle-session-output-timings)
+  (:synopsis "Toggle output of evaluation timings.")
+  (:check-mark "v" session-output-timings?)
+  (ahash-set! session-output-timings (session-key)
+              (not (session-output-timings?))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Specific switches for Scheme sessions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define session-scheme-trees #t)
 
@@ -63,16 +100,6 @@
   (:synopsis "Toggle pretty math output in scheme sessions.")
   (:check-mark "v" session-scheme-math?)
   (set! session-scheme-math (not session-scheme-math)))
-
-(define session-output-timings #f)
-
-(tm-define (session-output-timings?)
-  session-output-timings)
-
-(tm-define (toggle-session-output-timings)
-  (:synopsis "Toggle output of evaluation timings.")
-  (:check-mark "v" session-output-timings?)
-  (set! session-output-timings (not session-output-timings)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Scheme sessions
@@ -101,7 +128,7 @@
   (and (tree? t) (tree-is? t 'errput)))
 
 (tm-define (scheme-eval t)
-  (let* ((s (texmacs->code t))
+  (let* ((s (texmacs->code t "iso-8859-1"))
 	 (r (eval-string-with-catch s)))
     (cond ((and (tree? r) (error-tree? r) (session-scheme-trees?))
            (tree-copy r))
@@ -235,7 +262,7 @@
   (or (and (tm-func? t 'document)
 	   (tm-func? (tree-ref t :up) 'session))
       (and (tm-func? t 'document)
-	   (tm-func? (tree-ref t :up) 'unfolded)
+	   (tm-func? (tree-ref t :up) 'unfolded-subsession)
 	   (== (tree-index t) 1))))
 
 (tm-define field-tags
@@ -270,6 +297,35 @@
 (tm-define (field-input-context? t)
   (and (field-context? t)
        (== (tree-down-index t) 1)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Style parameters
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (field-parameters kind)
+  (let* ((var (string-append (get-env "prog-language") "-" kind))
+         (gen (string-append "generic-" kind)))
+    (search-parameters (if (style-has? var) var gen))))
+
+(tm-define (standard-parameters l)
+  (:require (== l "session"))
+  (field-parameters "session"))
+
+(tm-define (standard-parameters l)
+  (:require (== l "input"))
+  (field-parameters "input"))
+
+(tm-define (standard-parameters l)
+  (:require (== l "output"))
+  (field-parameters "output"))
+
+(tm-define (standard-parameters l)
+  (:require (== l "errput"))
+  (field-parameters "errput"))
+
+(tm-define (standard-parameters l)
+  (:require (== l "textput"))
+  (field-parameters "textput"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subroutines
@@ -309,6 +365,16 @@
 (tm-define (session-supports-completions?)
   (and (session-alive?)
        (plugin-supports-completions? (get-env "prog-language"))))
+
+(tm-define (session-supports-input-done?)
+  (and (session-alive?)
+       (plugin-supports-input-done? (get-env "prog-language"))))
+
+(define (field-next* t forward?)
+  (and-with u (tree-ref t (if forward? :next :previous))
+    (cond ((field-context? u) u)
+          ((tree-in? u '(folded-subsession unfolded-subsession)) #f)
+          (else (field-next u forward?)))))
 
 (define (field-next t forward?)
   (and-with u (tree-ref t (if forward? :next :previous))
@@ -366,7 +432,7 @@
   (for (u (tree-children t))
     (when (field-context? u)
       (fun u))
-    (when (and (tm-func? u 'unfolded)
+    (when (and (tm-func? u 'unfolded-subsession)
 	       (tm-func? (tree-ref u 1) 'document))
       (session-forall-sub fun (tree-ref u 1)))))
 
@@ -389,8 +455,14 @@
       (with u (tree-ref t :previous 0)
 	(if (url-exists? (url-unix "$TEXMACS_STYLE_PATH"
 				   (string-append lan ".ts")))
-	    (init-add-package lan))
+	    (add-style-package lan))
 	(session-feed lan ses :start u t '())))))
+
+(define (input-options t)
+  (with opts '()
+    (when (session-output-timings?) (set! opts (cons :timings opts)))
+    (when (field-math-context? t) (set! opts (cons :math-input opts)))
+    opts))
 
 (define (field-process-input t)
   (when (session-ready? #t)
@@ -404,18 +476,34 @@
 	   (p (plugin-prompt lan ses))
 	   (in (tree->stree (tree-ref t 1)))
 	   (out (tree-ref t 2))
-	   (opts '()))
-      (when (session-output-timings?) (set! opts (cons :timings opts)))
-      (when (field-math-context? t) (set! opts (cons :math-input opts)))
-      (with u (or (field-next t #t) (field-create t p #t))
+	   (opts (input-options t)))
+      (with u (or (field-next* t #t) (field-create t p #t))
 	(session-feed lan ses in out u opts)
 	(tree-go-to u 1 :end)))))
 
+(define (kbd-enter-sub t done?)
+  (if (in? done? (list #f "#f"))
+      (insert-return)
+      (delayed
+        (:idle 1)
+        (session-evaluate))))
+
 (tm-define (kbd-enter t shift?)
   (:require (field-input-context? t))
-  (if (xor (session-multiline-input?) shift?)
-      (insert-return)
-      (session-evaluate)))
+  (cond ((xor (session-multiline-input?) shift?)
+         (insert-return))
+        ((session-supports-input-done?)
+         (let* ((lan (get-env "prog-language"))
+                (ses (get-env "prog-session"))
+                (opts (input-options t))
+                (st (tree->stree (tree-ref t 1)))
+                (pre (plugin-preprocess lan ses st opts))
+                (in (plugin-serialize lan pre))
+                (rew (if (string-ends? in "\n") (string-drop-right in 1) in))
+                (cmd (string-append "(input-done? " (string-quote rew) ")"))
+                (ret (lambda (done?) (kbd-enter-sub t done?))))
+           (plugin-command lan ses cmd ret '())))
+        (else (session-evaluate))))
 
 (tm-define (session-evaluate)
   (with-innermost t field-input-context?
@@ -613,7 +701,7 @@
                   (tree-remove (tree-ref t :up) (tree-index t) 1)
                   (tree-go-to u 1 :start))
               (field-remove-extreme t #t)))
-        (with u (field-next t #f)
+        (with u (field-next* t #f)
           (if u (tree-remove (tree-ref u :up) (tree-index u) 1)
               (field-remove-banner t))))))
 
@@ -648,7 +736,7 @@
 
 (tm-define (field-insert-fold t*)
   (and-with t (tree-search-upwards t* field-input-context?)
-    (tree-set! t `(unfolded (document "") (document ,t)))
+    (tree-set! t `(unfolded-subsession (document "") (document ,t)))
     (tree-go-to t 0 :end)))
 
 (tm-define (session-split)

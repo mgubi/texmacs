@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : elsart-num.scm
 ;; DESCRIPTION : elsart-num style for BibTeX files
-;; COPYRIGHT   : (C) 2010  David MICHEL
+;; COPYRIGHT   : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -16,15 +16,25 @@
 
 (bib-define-style "elsart-num" "plain")
 
+(tm-define (bib-sorted-entries l)
+  (:mode bib-elsart-num?)
+  l)
+
 (tm-define (bib-format-name x)
   (:mode bib-elsart-num?)
-  (let* ((f (if (bib-null? (list-ref x 1))
-		""
-		`(concat ,(bib-abbreviate (list-ref x 1) "." `(nbsp)))))
-	 (vv (if (bib-null? (list-ref x 2)) "" `(concat ,(list-ref x 2) (nbsp))))
-	 (ll (if (bib-null? (list-ref x 3)) "" (bib-purify (list-ref x 3))))
-	 (jj (if (bib-null? (list-ref x 4)) "" `(concat ", " ,(list-ref x 4)))))
+  (let* ((f (if (bib-null? (list-ref x 1)) ""
+		`(concat ,(bib-abbreviate (list-ref x 1) "." `(nbsp)) (nbsp))))
+	 (vv (if (bib-null? (list-ref x 2)) ""
+                 `(concat ,(list-ref x 2) (nbsp))))
+	 (ll (if (bib-null? (list-ref x 3)) ""
+                 (bib-purify (list-ref x 3))))
+	 (jj (if (bib-null? (list-ref x 4)) ""
+                 `(concat ", " ,(list-ref x 4)))))
     `(concat ,f ,vv ,ll ,jj)))
+
+(tm-define (bib-last-name-sep a)
+  (:mode bib-elsart-num?)
+  ", ")
 
 (tm-define (bib-format-editor x)
   (:mode bib-elsart-num?)
@@ -35,13 +45,11 @@
 	    `(concat ,(bib-format-names a) ,(bib-translate " (Ed.)"))
 	    `(concat ,(bib-format-names a) ,(bib-translate " (Eds.)"))))))
 
-(tm-define (bib-format-edition x)
-  (:mode bib-elsart-num?)
+(define (bib-format-edition x)
   (let* ((e (bib-field x "edition")))
     (if (bib-null? e) "" `(concat ,e " Edition"))))
 
-(tm-define (bib-format-volume-or-number x)
-  (:mode bib-elsart-num?)
+(define (bib-format-volume-or-number x)
   (let* ((v (bib-field x "volume"))
 	 (n (bib-field x "number"))
 	 (s (bib-field x "series")))
@@ -65,28 +73,35 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2) `(concat ,(bib-translate "pp. ") ,(list-ref p 1)))
-      (else `(concat ,(bib-translate "pp. ")
-                     ,(list-ref p 1) "--" ,(list-ref p 2))))))
+      ((== (length p) 2)
+       `(concat ,(bib-translate "p.") (nbsp) ,(list-ref p 1)))
+      (else `(concat ,(bib-translate "pp.") (nbsp)
+                     ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
 
 (tm-define (bib-format-vol-num-pages x)
   (:mode bib-elsart-num?)
   (let* ((j (bib-field x "journal"))
 	 (v (bib-field x "volume"))
-	 (n `(concat "(" ,(bib-field x "number") ")"))
+	 (n (bib-field x "number"))
 	 (y `(concat "(" ,(bib-field x "year") ")"))
 	 (p (let* ((pp (bib-field x "pages")))
 	      (cond
                ((or (bib-null? pp) (nlist? pp)) "")
 	       ((equal? 1 (length pp)) "")
 	       ((equal? 2 (length pp)) (list-ref pp 1))
-	       (else `(concat ,(list-ref pp 1) "--" ,(list-ref pp 2)))))))
-    (bib-new-list " " `(,j ,v ,n ,y ,p))))
+	       (else `(concat ,(list-ref pp 1) ,bib-range-symbol
+                              ,(list-ref pp 2)))))))
+    (when (not (bib-null? n))
+      (set! v `(concat ,v (nbsp) "(" ,n ")")))
+    (bib-new-list " " `(,j ,v ,y ,p))))
+
+(define (bib-format-note x)
+  (bib-format-field-locase-first x "note"))
 
 (tm-define (bib-format-article n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(bib-format-author x)
@@ -96,12 +111,12 @@
 		      `((concat ,(bib-translate "in ")
 				(cite ,(bib-field x "crossref")))
 			,(bib-format-pages x)))
-		,(bib-format-field x "note"))))))
+		,(bib-format-note x))))))
 
 (tm-define (bib-format-book n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(if (bib-empty? x "author")
@@ -117,12 +132,12 @@
 				(cite ,(bib-field x "crossref")))
 			,(bib-format-edition x )))
 		,(bib-format-field x "year")
-		,(bib-format-field x "note"))))))
+		,(bib-format-note x))))))
 
 (tm-define (bib-format-booklet n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-case-preserved-sentence
 	      `(,(bib-format-author x)
@@ -131,13 +146,13 @@
 		,(bib-format-field x "address")
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
 
 (tm-define (bib-format-inbook n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(if (bib-empty? x "author")
@@ -155,12 +170,12 @@
 				(cite ,(bib-field x "crossref")))
 			,(bib-format-field x "edition")
 			,(bib-format-field x "year")))
-		,(bib-format-field x "note"))))))
+		,(bib-format-note x))))))
 
 (tm-define (bib-format-incollection n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(bib-format-author x)
@@ -177,7 +192,7 @@
 		      `((concat ,(bib-translate "in ")
 				(cite ,(bib-field x "crossref")))))
 		,(bib-format-chapter-pages x)
-		,(bib-format-field x "note"))))))
+		,(bib-format-note x))))))
 
 (tm-define (bib-format-inproceedings n x)
   (:mode bib-elsart-num?)
@@ -186,7 +201,7 @@
 (tm-define (bib-format-manual n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,@(if (bib-empty? x "author")
@@ -201,13 +216,13 @@
 		,(bib-format-edition x)
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
 
 (tm-define (bib-format-mastersthesis n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(bib-format-author x)
@@ -219,13 +234,13 @@
 		,(bib-format-field x "address")
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
 
 (tm-define (bib-format-misc n x)
   (:mode bib-plain?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(bib-format-author x)
@@ -233,7 +248,7 @@
 		,(bib-format-field-preserve-case x "howpublished")
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
 
 (tm-define (bib-format-phdthesis n x)
@@ -243,7 +258,7 @@
 (tm-define (bib-format-proceedings n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(if (bib-empty? x "editor")
@@ -257,12 +272,12 @@
 		,(bib-format-field x "publisher")
 		,(bib-format-field x "address")
 		,(bib-format-field x "year")
-		,(bib-format-field x "note"))))))
+		,(bib-format-note x))))))
 
 (tm-define (bib-format-techreport n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-block
 	     (bib-new-sentence
 	      `(,(bib-format-author x)
@@ -272,13 +287,13 @@
 		,(bib-format-field x "address")
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
 
 (tm-define (bib-format-unpublished n x)
   (:mode bib-elsart-num?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   :promptrepl
            ,(bib-new-block
 	     (bib-new-sentence
@@ -286,6 +301,5 @@
 		,(bib-format-field-Locase x "title")
 		(concat ,(if (bib-empty? x "note")
 			     ""
-			     `(concat ,(bib-format-field x "note") " "))
+			     `(concat ,(bib-format-note x) " "))
 			"(" ,(bib-format-date x) ")"))))))
-

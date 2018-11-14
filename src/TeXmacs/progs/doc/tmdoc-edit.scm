@@ -1,9 +1,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : std-text-edit.scm
-;; DESCRIPTION : editing routines for text mode
-;; COPYRIGHT   : (C) 2001  Joris van der Hoeven
+;; MODULE      : tmdoc-edit.scm
+;; DESCRIPTION : editing routines for TeXmacs documentation
+;; COPYRIGHT   : (C) 2012  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -14,7 +14,7 @@
 (texmacs-module (doc tmdoc-edit)
   (:use (utils library tree)
 	(utils edit variants)
-	(text std-text-edit)
+	(text text-edit)
 	(doc tmdoc-drd)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -64,11 +64,7 @@
       (with n (tree-arity buf)
         (tree-insert! buf n '((tmdoc-license "")))
         (tree-go-to buf n 0 0)
-        (insert "Permission is granted to copy, distribute and/or modify this
-document under the terms of the GNU Free Documentation License, Version 1.1 or
-any later version published by the Free Software Foundation; with no Invariant
-Sections, with no Front-Cover Texts, and with no Back-Cover Texts. A copy of
-the license is included in the section entitled \"GNU Free Documentation License\".")))))
+        (insert "Permission is granted to copy, distribute and/or modify this document under the terms of the GNU Free Documentation License, Version 1.1 or any later version published by the Free Software Foundation; with no Invariant Sections, with no Front-Cover Texts, and with no Back-Cover Texts. A copy of the license is included in the section entitled \"GNU Free Documentation License\".")))))
 
 (tm-define (tmdoc-insert-copyright-and-license)
   (tmdoc-insert-gnu-fdl)

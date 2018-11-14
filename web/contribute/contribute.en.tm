@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.99.6>
 
-<style|tmweb>
+<style|<tuple|tmweb|english|old-spacing>>
 
 <\body>
   <tmweb-current|Contribute|Contributing><tmweb-title|Contributing to
@@ -45,8 +45,8 @@
   we want to go. Of course your own ideas are welcome! <TeXmacs> is developed
   using <hlink|SVN|../download/svn.en.tm>, but we prefer contributions in the
   form of <hlink|patches|../contact/patches.en.tm>. There exists a fairly
-  up-to-date Git <hlink|mirror|https://gitorious.org/texmacs/texmacs> hosted
-  at Gitorious.
+  up-to-date Git <hlink|mirror|https://github.com/texmacs/texmacs> hosted at
+  Github.
 
   <section|The <TeXmacs> team and prioritary tasks><label|prioritary-tasks>
 
@@ -60,11 +60,11 @@
 
   Each prioritary task is well specified and led by a single member of the
   team. Anyone who would like to contribute to such a task should first
-  contact this person. Some tasks do not yet have a<nbsp>leader and you
-  should contact <hlink|<name|Joris van der Hoeven>|team-joris.en.tm> if you
-  want to accept the responsability to lead<nbsp>it. You may also propose new
-  tasks, if you can give a clear description of the <em|rationale>, of what
-  precisely has to be done, and how things will be organized.
+  contact this person. Some tasks do not yet have a leader and you should
+  contact <hlink|<name|Joris van der Hoeven>|team-joris.en.tm> if you want to
+  accept the responsibility to lead it. You may also propose new tasks, if
+  you can give a clear description of the <em|rationale>, of what precisely
+  has to be done, and how things will be organized.
 
   It is the responsability of the task leader to organize all necessary
   developments and social aspects around the task. For instance, one usually
@@ -154,8 +154,5 @@
   <tmweb-license>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

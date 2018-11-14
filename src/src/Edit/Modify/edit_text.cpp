@@ -29,7 +29,7 @@ void
 edit_text_rep::correct_concat (path p, int done) {
   tree t (subtree (et, p));
   if (L(t) != CONCAT) {
-    cerr << "\nThe tree was <" << t << ">\n";
+    failed_error << "The tree was '" << t << "'\n";
     FAILED ("concat expected");
   }
 
@@ -96,7 +96,8 @@ edit_text_rep::pure_line (path p) {
   return
     is_document (st) ||
     ((is_func (st, WITH) || is_func (st, LOCUS) ||
-      is_func (st, CANVAS) || is_func (st, ORNAMENT)) &&
+      is_func (st, CANVAS) || is_func (st, ORNAMENT) ||
+      is_func (st, WITH_PACKAGE)) &&
      (last_item (p) == (N(st)-1)) && pure_line (p)) ||
     (is_extension (st) && (last_item (p) >= 0) && pure_line (p));
 }
@@ -114,7 +115,7 @@ edit_text_rep::accepts_return (path p) {
     (is_func (st, XMACRO, 2) && (last_item (p) == 1)) ||
     ((is_func (st, WITH) || is_mod_active (st) ||
       is_func (st, STYLE_WITH) || is_func (st, VAR_STYLE_WITH) ||
-      is_func (st, LOCUS) ||
+      is_func (st, LOCUS) || is_func (st, WITH_PACKAGE) ||
       is_func (st, CANVAS) || is_func (st, ORNAMENT)) &&
      (last_item (p) == (N(st)-1)) && pure_line (p)) ||
     (is_extension (st) && (last_item (p) >= 0) && pure_line (p));
@@ -203,6 +204,10 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
       is_atomic (subtree (et, path_up (tp))))
     insert (tp, t);
   else if (is_document (t)) {
+    if (subtree (et, path_up (tp)) == "" &&
+        accepts_return (path_up (tp)) &&
+        !is_func (subtree (et, path_up (tp, 2)), DOCUMENT))
+      insert_node (path_up (tp) * 0, DOCUMENT);
     if (insert_return ()) return;
     path p= search_parent_upwards (DOCUMENT);
     bool empty= (subtree (et, p) == "");
@@ -214,6 +219,10 @@ edit_text_rep::insert_tree (tree t, path p_in_t) {
     if (!empty) remove_return (path_add (p, N(t)-2));
   }
   else if (is_multi_paragraph (t)) {
+    if (subtree (et, path_up (tp)) == "" &&
+        accepts_return (path_up (tp)) &&
+        !is_func (subtree (et, path_up (tp, 2)), DOCUMENT))
+      insert_node (path_up (tp) * 0, DOCUMENT);
     if (make_return_after ()) return;
     path p= search_parent_upwards (DOCUMENT);
     if (subtree (et, p) == "") remove (p, 1);

@@ -10,17 +10,24 @@
 
 #include "url.hpp"
 #include "mac_utilities.h"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "gui.hpp"
-
+#include "analyze.hpp"
+#include "hashset.hpp"
+#include "iterator.hpp"
+#pragma push_macro("FAILED")  // CoreFoundation will rewrite our macro FAILED
 #define extend CARBON_extends // avoid name collision
 #include "Cocoa/mac_cocoa.h"
 #include <Carbon/Carbon.h>
+#include <crt_externs.h>
 #include "HIDRemote.h"
 #undef extend
+#pragma pop_macro("FAILED")   // Restore our definition
 
 #ifdef QTTEXMACS
-#include <QtGui>
+#include <QApplication>
+#include <QKeyEvent>
+#include <QString>
 #include "Qt/QTMWidget.hpp"
 #include "Qt/qt_gui.hpp"
 #endif
@@ -37,6 +44,7 @@ mac_alternate_startup () {
 }
 
 
+#ifdef AQUATEXMACS
 void 
 mac_fix_paths () {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
@@ -60,6 +68,7 @@ mac_fix_paths () {
   system("printenv");
   [pool release];  
 }
+#endif
 
 
 
@@ -197,8 +206,6 @@ mac_cancel_menu_tracking () {
 	}
 }
 
-extern string utf8_to_cork (string input);
-
 static string 
 from_nsstring (NSString *s) {
   const char *cstr = [s cStringUsingEncoding:NSUTF8StringEncoding];
@@ -211,6 +218,7 @@ from_nsstring (NSString *s) {
          isPressed:(BOOL)isPressed
 fromHardwareWithAttributes:(NSMutableDictionary *)attributes
 {
+  (void) theHidRemote; (void) attributes;
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init]; 
   mac_remote_button (from_nsstring([self buttonNameForButtonCode:buttonCode]), isPressed);
   [pool release];
@@ -432,3 +440,36 @@ mac_screen_scale_factor() {
 
 // end scale factor detection
 
+#if defined (MAC_OS_X_VERSION_10_10)
+/* A bug in OSX Yosemite inserts duplicate entries in the environment. This
+ affects child processes: in particular, the PATH is not properly inherited
+ unless we remove the duplicates and most plugins fail to start (since they are
+ indirectly invoked through tm_* scripts.
+ 
+ This code is adapted from Joe Cheng's https://github.com/jcheng5/envmunge
+ */
+void
+mac_fix_yosemite_bug() {
+  hashset<string> entries;
+  hashset<string> duplicates;
+  
+    // Find duplicate entries in the environment
+  for (char** entry = *_NSGetEnviron(); *entry; ++entry) {
+    array<string> pair = tokenize (string (*entry), "=");
+    if (N(pair) < 2) continue;
+    string key = pair[0];
+    if (entries->contains(key)) duplicates->insert(key);
+    else                        entries->insert(key);
+  }
+    // Remove duplicate entries
+  iterator<string> it = iterate (duplicates);
+  while (it->busy()) {
+    c_string name (it->next());
+    const char* val = getenv (name); // remember value (first one on the list?)
+    if (val != NULL) {
+      unsetenv (name);       // removes all instances of name
+      setenv (name, val, 0); // restore name=val
+    }
+  }
+}
+#endif   // defined (MAC_OS_X_VERSION_10_10)

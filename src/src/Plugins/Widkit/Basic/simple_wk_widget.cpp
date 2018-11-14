@@ -23,6 +23,11 @@ simple_widget_rep::simple_widget_rep ():
 * Empty handlers for redefinition later on
 ******************************************************************************/
 
+bool
+simple_widget_rep::is_editor_widget () {
+  return false;
+}
+
 void
 simple_widget_rep::handle_get_size_hint (SI& w, SI& h) {
   gui_root_extents (w, h);  
@@ -54,12 +59,12 @@ simple_widget_rep::handle_set_zoom_factor (double zoom) {
 }
 
 void
-simple_widget_rep::handle_clear (SI x1, SI y1, SI x2, SI y2) {
+simple_widget_rep::handle_clear (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
 void
-simple_widget_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2) {
+simple_widget_rep::handle_repaint (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
@@ -110,12 +115,12 @@ simple_widget_rep::handle_set_double (set_double_event ev) {
 
 void
 simple_widget_rep::handle_clear (clear_event ev) {
-  handle_clear (ev->x1, ev->y1, ev->x2, ev->y2);
+  handle_clear (ev->win, ev->x1, ev->y1, ev->x2, ev->y2);
 }
 
 void
 simple_widget_rep::handle_repaint (repaint_event ev) {
-  handle_repaint (ev->x1, ev->y1, ev->x2, ev->y2);
+  handle_repaint (ev->win, ev->x1, ev->y1, ev->x2, ev->y2);
 }
 
 void

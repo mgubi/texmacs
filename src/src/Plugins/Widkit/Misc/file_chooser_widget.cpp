@@ -21,6 +21,8 @@
 #include "analyze.hpp"
 #include "scheme.hpp"
 #include "dictionary.hpp"
+#include "converter.hpp"
+#include "language.hpp"
 
 #ifdef OS_WIN32
 #include <X11/Xlib.h>
@@ -209,7 +211,7 @@ file_list_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 file_list_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   int i; 
   metric ex;
   ren->set_background (white);
@@ -219,8 +221,8 @@ file_list_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
   SI y= 0;
   for (i=0; i<N(names); i++)
     if (lids[i]) {
-      ren->set_color (black);
-      if (hilight == i) ren->set_color (red);
+      ren->set_pencil (black);
+      if (hilight == i) ren->set_pencil (red);
       fn->var_get_extents (names[i], ex);
       fn ->draw (ren, names[i], 9*PIXEL, y-fn->y2-6*PIXEL);
       y += fn->y1- fn->y2- 12*PIXEL;
@@ -320,7 +322,7 @@ image_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 image_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
+  renderer ren= ev->win;
   ren->set_background (white);
   ren->clear (0, 0, w, h);
   layout_dark_outline (ren, 0, 0, w, h);
@@ -335,8 +337,9 @@ image_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
       else ww= (hh * iw) / ih;
     }
 
-    ren->image (url_system (file_name),
-		ww, hh, PIXEL, PIXEL, 0.0, 0.0, 1.0, 1.0);
+    SI px= ren->pixel;
+    scalable im= load_scalable_image (url_system (file_name), ww, hh, px);
+    ren->draw_scalable (im, PIXEL, PIXEL);
   }
 }
 
@@ -674,7 +677,7 @@ file_chooser_widget_rep::handle_get_string (get_string_event ev) {
       a[0]["file"]["input"] << get_string ("input", name);
       if (name == "#f") { ev->s= "#f"; return; }
       url u= url_system (scm_unquote (dir)) * url_system (scm_unquote (name));
-      ev->s= "(system->url " * scm_quote (as_string (u)) * ")";
+      ev->s= "(system->url " * scm_quote (convert(as_string (u), get_locale_charset () ,"Cork")) * ")";
     }
     if (type == "image") {
       string hsize, vsize, xpos, ypos;

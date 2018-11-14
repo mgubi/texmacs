@@ -12,11 +12,12 @@
 #ifndef EDIT_GRAPHICS_H
 #define EDIT_GRAPHICS_H
 #include "editor.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 
 class edit_graphics_rep: virtual public editor_rep {
 private:
   box go_box;           // The graphical object typesetted as a box
+  double p_x, p_y;      // Last unadjusted (x, y) position
   double gr_x, gr_y;    // Last (x, y) position of the mouse
   gr_selections gs;     // Last graphical_select (x, y)
   grid gr0;             // Last grid

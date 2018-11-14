@@ -9,13 +9,14 @@
 #you need to set DEVTOOLS to the root of the development tools (usually /Developer)
 
 ARCH=i386
-PREFIX=`(cd ..; pwd)`/usr
-DEVTOOLS=/Developer_3.2.6
+PREFIX=/Users/mgubi/t/e/i386-darwin10.4/usr
+DEVTOOLS=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer
 
 
 PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig/
 
-SDK=$DEVTOOLS/SDKs/MacOSX10.5.sdk 
+SDK=/Users/mgubi/t/SDKs/MacOSX10.6.sdk 
+#SDK=$DEVTOOLS/SDKs/MacOSX10.9.sdk 
 
 #---------------------------------------------------------------------------------------------------
 # setup target architecure
@@ -60,18 +61,21 @@ TARGET_ARCH=TARGET_${ARCH}
 #printenv
 
 
-PATH=$DEVTOOLS/usr/bin:$PREFIX/bin:$PATH \
-PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig/ \
+export PATH=$DEVTOOLS/usr/bin:$PREFIX/bin:$PATH
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig/
   ./configure \
   --host=${!TARGET_ARCH} \
   --enable-macosx-extensions\
-  --enable-qt\
+  --enable-qt --enable-QtPlugins=imageformats \
   CC="gcc -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK  -I$SDK/usr/include/c++/4.2.1/i686-apple-darwin10" \
   CXX="g++ -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK -I$SDK/usr/include/c++/4.2.1/i686-apple-darwin10" \
+  OBJC="clang -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK  -I$SDK/usr/include/c++/4.2.1/i686-apple-darwin10" \
+  OBJCXX="clang++ -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK -I$SDK/usr/include/c++/4.2.1/i686-apple-darwin10" \
   CPP="gcc -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK -E" \
   CPPCXX="g++ -arch $ARCH  -mmacosx-version-min=10.5 -isysroot $SDK -E" \
   CPPFLAGS="-I$PREFIX/include" CFLAGS="-I$PREFIX/include" CXXFLAGS="-I$PREFIX/include" \
   LDFLAGS="-Wl,-search_paths_first -Wl,-syslibroot $SDK -L$PREFIX/lib" \
+  GUILE_BIN=guile \
   GUILE_CFLAGS="`pkg-config --static --cflags guile-1.8`" \
   GUILE_LDFLAGS="`pkg-config --static --libs guile-1.8`" \
   GUILE_DATA_PATH="`pkg-config --variable=datadir guile-1.8`" \

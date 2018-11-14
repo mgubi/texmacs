@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.8>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english|old-spacing>>
 
 <\body>
   <tmdoc-title|To do list for improving the current implementation>
@@ -37,7 +37,11 @@
     <item*|Memory leaks>
 
     Perform extensive (automated) checks for memory leaks using
-    <name|Valgrind> and implement a<nbsp>marking algorithm.
+    <name|Valgrind> and implement a marking algorithm.
+
+    <item*|Unit Test>
+
+    More and more unit tests should be written under the GTest framework.
   </description>
 
   <subsection|Improving the speed>
@@ -51,7 +55,7 @@
 
     <item*|Coding style>
 
-    Systematically use ``const ref'' style parameter passing should both
+    Systematically use \Pconst ref\Q style parameter passing should both
     decrease the size of the binary and accelerate the global efficiency.
 
     <item*|Better caching mechanism>
@@ -89,7 +93,7 @@
   <\description>
     <item*|Unicode>
 
-    Systematically use Unicode.
+    Systematically use <name|Unicode>.
 
     <item*|Agglomerated fonts>
 
@@ -109,8 +113,8 @@
 
     <item*|Rubber characters>
 
-    <label|rubber-chars>Implement large brackets and wide delimiters for STIX
-    fonts.
+    <label|rubber-chars>Implement large brackets and wide delimiters for
+    <name|STIX> fonts.
 
     Provide standard implementations using vector graphics, which do not
     depend on fonts, with many parameters for customizing width, shape, etc.
@@ -135,6 +139,11 @@
     <item*|Documentation>
 
     Better documentation on how to use the <scheme> extensions.
+
+    <item*|Programming aids>
+
+    Implement a proper parser and autocompletion mechanism. Add standard
+    <abbr|IDE> code browsing tools and visual aids.
   </description>
 
   <subsection|Coding style>
@@ -169,19 +178,19 @@
     <item*|Eequivalent for <TeX> <verbatim|\\topsep>>
 
     In <TeXmacs>, the <verbatim|\\topsep> always equals 0.75em. It should be
-    possible to modify this. For symmetry, we might also introduce a ``bottom
-    sep''.
+    possible to modify this. For symmetry, we might also introduce a \Pbottom
+    sep\Q.
 
     <item*|Resizing macro expansions>
 
     When attempting to resize a macro application to become smaller than the
-    ``<verbatim|x>'', the invisible markers may have undesirable
+    \P<verbatim|x>\Q, the invisible markers may have undesirable
     side-effects.
 
     <item*|Font parameters>
 
-    Separate environment variables for ``typewriter'', ``sans serif'',
-    ``small caps'', ``slant'', etc.
+    Separate environment variables for \Ptypewriter\Q, \Psans serif\Q,
+    \Psmall caps\Q, \Pslant\Q, etc.
 
     Find rendering font as a function of selected font and language?
 
@@ -195,12 +204,12 @@
     Boxes should not have origins; its children should have positions
     instead.
 
-    <item*|Temporarily inccorect markup>
+    <item*|Temporarily incorrect markup>
 
     Example: when pressing <shortcut|(remove-structure-upwards)> inside a
     <markup|surround> tag, we first remove the two first children of the
     surround tag (so that it obtains arity 1) and next remove the tag itself.
-    The temporarily inccorect <markup|surround> tag of arity 1 may cause
+    The temporarily incorrect <markup|surround> tag of arity 1 may cause
     <verbatim|bridge_surround> to crash. Temporary fix: add extra nodes in
     the bridge. Better fix: implement an elementary modification
     <verbatim|assign_label>, which allows to change the surround tag into
@@ -459,7 +468,7 @@
       <\with|par-par-sep|0fn>
         <item>Explanatory messages on the status bar.
 
-        <item>Better ``mouse button layout'': do as much as possible with
+        <item>Better \Pmouse button layout\Q: do as much as possible with
         left mouse button only and reserve right button for contextual menu.
 
         <item>Fine-grained resizing using keyboard (also allow modification
@@ -590,7 +599,7 @@
     <\itemize>
       <\with|par-par-sep|0fn>
         <item>Automatic correction of formulas <math|\<rightarrow\>> editing
-        mode based on ``slots''.
+        mode based on \Pslots\Q.
 
         <item>Explicit prefix-postfix, prefix-infix and symbol-prefix
         operator types for operators such as <math|!>, <math|-> <abbr|resp.>
@@ -652,7 +661,7 @@
 
   <section|Universal spreadsheet>
 
-  <name|Rationale:> We started to incorporate a ``universal spreadsheet''
+  <name|Rationale:> We started to incorporate a \Puniversal spreadsheet\Q
   facility into <TeXmacs>. The idea is that all dependencies between the
   cells in the sheet are analyzed by <TeXmacs>, but all actual computations
   are delegated to an extern system of your choice, like one of the currently
@@ -690,9 +699,9 @@
       least when the input is a string).
 
       <item>Possibilitity to apply operations to subtable selections. For
-      instance, when selecting part of a column and applying ``sum'', the sum
+      instance, when selecting part of a column and applying \Psum\Q, the sum
       of the column should be computed at the bottom of the selection.
-      Similarly, applying a unary operation such as ``sin'' might apply the
+      Similarly, applying a unary operation such as \Psin\Q might apply the
       operation to each cell in the selection and put the result right next
       to it.
     </itemize>
@@ -824,7 +833,7 @@
 
     <\itemize>
       <\with|par-par-sep|0fn>
-        <item>Different purposes of TeXmacs.
+        <item>Different purposes of <TeXmacs>.
 
         <item>Writing a simple text.
 
@@ -842,7 +851,7 @@
       <\with|par-par-sep|0fn>
         <item>Why are structured documents useful?
 
-        <item>How to enter structure into TeXmacs, redundancy of the
+        <item>How to enter structure into <TeXmacs>, redundancy of the
         interface.
 
         <item>Understanding the visual indications, cursor movement.
@@ -898,8 +907,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

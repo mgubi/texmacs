@@ -9,23 +9,27 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
-#include "QTMStyle.hpp"
-#include <QApplication>
-#include <QStyleOptionMenuItem>
 #include "tm_ostream.hpp"
+#include "renderer.hpp"
+
+#include "QTMStyle.hpp"
+#include "QTMApplication.hpp"
+
+#include <QStyleOptionMenuItem>
 #include <qdrawutil.h>
 #include <QPainter>
 #include <QMainWindow>
 
+int
+qt_zoom (int sz) {
+  return (int) (retina_scale * ((double) sz));
+}
+
 QStyle*
 qtmstyle () {
-  static QStyle* qtmstyle= NULL;
-  if (!qtmstyle) {
-    qtmstyle = new QTMStyle ();
-  }
-  if (!qtmstyle) {
-    qtmstyle = qApp->style ();
-  }
+  static QStyle* qtmstyle = NULL;
+  if (!qtmstyle)
+    qtmstyle = new QTMStyle (qApp->style());
   return qtmstyle;
 }
 
@@ -33,17 +37,22 @@ qtmstyle () {
  * QTMProxyStyle (does not own *style)
  ******************************************************************************/
 
-QTMProxyStyle::QTMProxyStyle (QStyle* _base):
-QStyle (), base (_base) {}
-
-QTMProxyStyle::~QTMProxyStyle() {
-  // delete style;
-}
+QTMProxyStyle::QTMProxyStyle (QStyle* _base) : QStyle (), base (_base) { }
 
 inline  QStyle *QTMProxyStyle::baseStyle() const {
   return ( base ? base : qApp->style() );
 }
 
+#if (QT_VERSION >= 0x050000)
+int
+QTMProxyStyle::layoutSpacing (QSizePolicy::ControlType control1,
+                              QSizePolicy::ControlType control2,
+                              Qt::Orientation orientation,
+                              const QStyleOption *option,
+                              const QWidget *widget) const {
+  return baseStyle()->layoutSpacing(control1, control2, orientation, option, widget);
+}
+#endif
 
 void
 QTMProxyStyle::drawComplexControl (ComplexControl control, const QStyleOptionComplex* option, QPainter* painter, const QWidget* widget) const {
@@ -417,7 +426,8 @@ QTMStyle::drawControl (ControlElement element, const QStyleOption* option, QPain
 
     case CE_ToolBar: {
 #ifdef UNIFIED_TOOLBAR
-      if ((widget) &&  (widget->windowTitle() == "mode toolbar"))  {
+      if (use_unified_toolbar &&
+          (widget) && (widget->windowTitle() == "mode toolbar")) {
 
           // For unified tool bars, draw nothing.
           if (QMainWindow * mainWindow = qobject_cast<QMainWindow *>(widget->window())) {

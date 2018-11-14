@@ -17,7 +17,7 @@
 * Routines intern to the array<T> class
 ******************************************************************************/
 
-static inline int
+inline int
 round_length (int n, size_t s) {
   (void) s;
   if (n<6) return n;
@@ -63,6 +63,33 @@ array<T>::array (T x1, T x2) {
   rep= tm_new<array_rep<T> > (2);
   rep->a[0]= x1;
   rep->a[1]= x2;
+}
+
+template<class T>
+array<T>::array (T x1, T x2, T x3) {
+  rep= tm_new<array_rep<T> > (3);
+  rep->a[0]= x1;
+  rep->a[1]= x2;
+  rep->a[2]= x3;
+}
+
+template<class T>
+array<T>::array (T x1, T x2, T x3, T x4) {
+  rep= tm_new<array_rep<T> > (4);
+  rep->a[0]= x1;
+  rep->a[1]= x2;
+  rep->a[2]= x3;
+  rep->a[3]= x4;
+}
+
+template<class T>
+array<T>::array (T x1, T x2, T x3, T x4, T x5) {
+  rep= tm_new<array_rep<T> > (5);
+  rep->a[0]= x1;
+  rep->a[1]= x2;
+  rep->a[2]= x3;
+  rep->a[3]= x4;
+  rep->a[4]= x5;
 }
 
 /******************************************************************************
@@ -165,6 +192,22 @@ hash (array<T> a) {
   for (i=0; i<n; i++)
     h= hash(a[i]) ^ ((h<<7) + (h>>25));
   return h;
+}
+
+template<class T> array<T>
+operator * (array<T> a, T c) {
+  register int i, n= N(a);
+  array<T> r (n);
+  for (i=0; i<n; i++) r[i]= a[i] * c;
+  return r;
+}
+
+template<class T> array<T>
+operator / (array<T> a, T c) {
+  register int i, n= N(a);
+  array<T> r (n);
+  for (i=0; i<n; i++) r[i]= a[i] / c;
+  return r;
 }
 
 #endif // defined ARRAY_CC

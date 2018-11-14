@@ -11,7 +11,7 @@
 
 #include "load_tex.hpp"
 #include "analyze.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 
 RESOURCE_CODE(tex_font_metric);
 
@@ -205,9 +205,9 @@ tex_font_metric_rep::execute (int* s, int n, int* buf, int* ker, int& m) {
     /***************** end ligature-kerning program ******************/
 
     if ((bp>=m-2) || (sp>=m-2)) {
-      cerr << "\nString is ";
-      for (i=0; i<n; i++) cerr << (char) s[i];
-      cerr << "\n";
+      failed_error << "\nString is ";
+      for (i=0; i<n; i++) failed_error << (char) s[i];
+      failed_error << "\n";
       FAILED ("string too complex for ligature kerning");
     }
   }
@@ -235,7 +235,9 @@ tex_font_metric_rep::execute (int* s, int n, int* buf, int* ker, int& m) {
   }
 
 void
-tex_font_metric_rep::get_xpositions (int* s, int n, double unit, SI* xpos) {
+tex_font_metric_rep::get_xpositions (int* s, int n, double unit,
+                                     SI* xpos, bool ligf) {
+  (void) ligf;
   SI  x    = 0;
   SI  x_bis= 0;
   int pos  = 1;
@@ -262,6 +264,7 @@ tex_font_metric_rep::get_xpositions (int* s, int n, double unit, SI* xpos) {
 	if (byte0 (instr) >= 128) { ADVANCE (0); break; }
 	if (byte1 (instr) != next_char) { pc += byte0 (instr)+1; continue; }
 	if (byte2 (instr) < 128) {
+          if (!ligf) { ADVANCE (0); break; }
 	  int code= byte2 (instr);
 	  int a   = code>>2;
 	  int b   = (code>>1)&1;
@@ -280,9 +283,9 @@ tex_font_metric_rep::get_xpositions (int* s, int n, double unit, SI* xpos) {
     /***************** end ligature-kerning program ******************/
 
     if ((bp>=m-2) || (sp>=m-2)) {
-      cerr << "\nString is ";
-      for (i=0; i<n; i++) cerr << (char) s[i];
-      cerr << "\n";
+      failed_error << "\nString is ";
+      for (i=0; i<n; i++) failed_error << (char) s[i];
+      failed_error << "\n";
       FAILED ("string too complex for ligature kerning");
     }
   }
@@ -418,6 +421,29 @@ load_tfm (url file_name, string family, int size) {
   }
 
   tfm->size= (tfm->header[1] + (1<<19)) >> 20;
+
+  // Fixes for fonts by Dobkin which should be replaced by TeX Gyre fonts
+  if (starts (family, "avant-garde-ti") || starts (family, "avant-garde-bi"))
+    tfm->param[0]= (int) (0.185339 * ((double) (1<<20)));
+  if (starts (family, "bookman-ti") || starts (family, "bookman-bi"))
+    tfm->param[0]= (int) (0.176327 * ((double) (1<<20)));
+  if (starts (family, "courier-ti") || starts (family, "courier-bi"))
+    tfm->param[0]= (int) (0.212557 * ((double) (1<<20)));
+  if (starts (family, "helvetica-ti") || starts (family, "helvetica-bi"))
+    tfm->param[0]= (int) (0.212557 * ((double) (1<<20)));
+  if (starts (family, "nc-schoolbook-ti") || starts (family, "nc-schoolbook-bi"))
+    tfm->param[0]= (int) (0.286745 * ((double) (1<<20)));
+  if (starts (family, "palatino-ti") || starts (family, "palatino-bi"))
+    tfm->param[0]= (int) (0.176327 * ((double) (1<<20)));
+  if (starts (family, "palatino-sl") || starts (family, "palatino-bl"))
+    tfm->param[0]= (int) (0.167 * ((double) (1<<20)));
+  if (starts (family, "times-ti"))
+    tfm->param[0]= (int) (0.277325 * ((double) (1<<20)));
+  if (starts (family, "times-bi"))
+    tfm->param[0]= (int) (0.267949 * ((double) (1<<20)));    
+  if (starts (family, "times-sl") || starts (family, "times-bl"))
+    tfm->param[0]= (int) (0.167 * ((double) (1<<20)));
+  // End fixes
 
   bench_cumul ("decode tfm");
   return tfm;

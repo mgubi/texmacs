@@ -42,7 +42,9 @@ public:
 public:
   qt_renderer_rep (QPainter *_painter, int w = 0, int h = 0);
   ~qt_renderer_rep ();
-  qt_renderer_rep* as_qt_renderer ();
+  void* get_handle ();
+
+  void set_zoom_factor (double zoom);
 
   void begin (void* handle);
   void end ();
@@ -50,12 +52,16 @@ public:
   //void set_extent (int _w, int _h) { w = _w; h = _h; }
   void get_extents (int& w, int& h);
 
+  void set_transformation (frame fr);
+  void reset_transformation ();
+
   void set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore = false);
 
+  void  draw_bis (int char_code, font_glyphs fn, SI x, SI y);
   void  draw (int char_code, font_glyphs fn, SI x, SI y);
   void  draw (const QFont& qfn, const QString& s, SI x, SI y, double zoom);
-  void  set_color (color c);
-  void  set_line_style (SI w, int type=0, bool round=true);
+  void  set_pencil (pencil p);
+  void  set_brush (brush b);
   void  line (SI x1, SI y1, SI x2, SI y2);
   void  lines (array<SI> x, array<SI> y);
   void  clear (SI x1, SI y1, SI x2, SI y2);
@@ -63,29 +69,25 @@ public:
   void  arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void  fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void  polygon (array<SI> x, array<SI> y, bool convex=true);
-  void  xpm (url file_name, SI x, SI y);
-  void  image (url u, SI w, SI h, SI x, SI y,
-               double cx1, double cy1, double cx2, double cy2,
-               int alpha);
+  void  draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3);
 
   void draw_clipped (QImage * im, int w, int h, SI x, SI y);
   void draw_clipped (QPixmap * im, int w, int h, SI x, SI y);
-  
   
   void new_shadow (renderer& ren);
   void delete_shadow (renderer& ren);
   void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
   void put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
-  
+
   void apply_shadow (SI x1, SI y1, SI x2, SI y2);
 
-  /***** private section *****************************************************/
-
-  QPixmap *xpm_image(url file_name);
+  void draw_picture (picture pict, SI x, SI y, int alpha);
 };
 
+qt_renderer_rep* the_qt_renderer();
+QImage* get_image (url u, int w, int h);
 
-class qt_shadow_renderer_rep:  public qt_renderer_rep {
+class qt_shadow_renderer_rep: public qt_renderer_rep {
 public:
   QPixmap px;   
   qt_renderer_rep *master;
@@ -97,8 +99,7 @@ public:
   void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
 };
 
-
-class qt_proxy_renderer_rep:  public qt_renderer_rep {
+class qt_proxy_renderer_rep: public qt_renderer_rep {
 public:
   qt_renderer_rep *base;
   
@@ -110,7 +111,5 @@ public:
   void new_shadow (renderer& ren);
   void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
 };
-
-qt_renderer_rep* the_qt_renderer();
 
 #endif // defined QT_RENDERER_HPP

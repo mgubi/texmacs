@@ -65,6 +65,10 @@ public:
   void freeze_with_like (tree_label tag);
   bool is_with_like (tree t);
 
+  void set_var_type (tree_label tag, int vt);
+  int  get_var_type (tree_label tag);
+  void freeze_var_type (tree_label tag);
+
   void set_attribute (tree_label tag, string which, tree val);
   tree get_attribute (tree_label tag, string which);
   void set_name (tree_label tag, string val);
@@ -87,6 +91,7 @@ public:
   bool all_accessible (tree_label tag);
   bool none_accessible (tree_label tag);
   bool is_accessible_child (tree t, int child);
+  bool is_accessible_path (tree t, path p);
 
   void set_writability (tree_label tag, int nr, int writability);
   int  get_writability (tree_label tag, int nr);
@@ -113,10 +118,12 @@ public:
 
   /* Heuristic initialization */
   void set_environment (hashmap<string,tree> env);
-  tree arg_access (tree t, tree arg, tree env, int& type);
+  tree arg_access (tree t, tree arg, tree env, int& type, bool& found);
   bool heuristic_with_like (tree t, tree arg);
   bool heuristic_init_macro (string var, tree macro);
   bool heuristic_init_xmacro (string var, tree xmacro);
+  bool heuristic_init_parameter (string var, string val);
+  bool heuristic_init_parameter (string var, tree val);
   void heuristic_init (hashmap<string,tree> env);
 
   friend class drd_info;

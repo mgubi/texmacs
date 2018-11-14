@@ -20,6 +20,7 @@
 (define-public == equal?)
 (define-public (!= x y) (not (equal? x y)))
 
+(define-public (nsymbol? x) (not (symbol? x)))
 (define-public (nstring? x) (not (string? x)))
 (define-public (nnull? x) (not (null? x)))
 (define-public (npair? x) (not (pair? x)))
@@ -42,6 +43,7 @@
 
 (define-public (in? x l) (not (not (member x l))))
 (define-public (nin? x l) (not (member x l)))
+(define-public (cons-new x l) (if (in? x l) l (cons x l)))
 
 (define-public (always? . l) #t)
 (define-public (never? . l) #f)
@@ -54,6 +56,7 @@
 
 (provide-public (identity x) x)
 (provide-public (ignore . l) (noop))
+(provide-public (negate pred?) (lambda x (not (apply pred? x))))
 
 (define-public (keyword->string x)
   (symbol->string (keyword->symbol x)))
@@ -104,8 +107,8 @@
     `(let ((,old ,var))
        (set! ,var ,val)
        (let ((,new (begin ,@body)))
-	 (set! ,var ,old)
-	 ,new))))
+         (set! ,var ,old)
+         ,new))))
 
 (define-public-macro (and-with var val . body)
   `(with ,var ,val
@@ -113,7 +116,7 @@
 
 (define-public-macro (with-result result . body)
   `(let* ((return ,result)
-	  (dummy (begin ,@body)))
+          (dummy (begin ,@body)))
      return))
 
 (define-public (.. start end)
@@ -121,32 +124,37 @@
       (cons start (.. (1+ start) end))
       '()))
 
+(define-public (... start end)
+  (if (<= start end)
+      (cons start (... (1+ start) end))
+      '()))
+
 (define-public-macro (for what . body)
   (let ((n (length what)))
     (cond ((== n 2)
-	   ;; range over values of a list
-	   `(for-each (lambda (,(car what)) ,@body)
-		      ,(cadr what)))
-	  ((== n 3)
-	   ;; range over values from start to end with step 1
-	   `(do ((,(car what) ,(cadr what) (+ ,(car what) 1)))
-		((>= ,(car what) ,(caddr what)) (noop))
-	      ,@body))
-	  ((== n 4)
-	   ;; range over values from start to end with step
-	   `(if (> ,(cadddr what) 0)
-		(do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
-		    ((>= ,(car what) ,(caddr what)) (noop))
-		  ,@body)
-		(do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
-		    ((<= ,(car what) ,(caddr what)) (noop))
-		  ,@body)))
-	  ((== n 5)
-	   ;; range over values from start to end with step and comparison
-	   `(do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
-		((not (,(car (cddddr what)) ,(car what) ,(caddr what))) (noop))
-	      ,@body))
-	  (else '(noop)))))
+           ;; range over values of a list
+           `(for-each (lambda (,(car what)) ,@body)
+                      ,(cadr what)))
+          ((== n 3)
+           ;; range over values from start to end with step 1
+           `(do ((,(car what) ,(cadr what) (+ ,(car what) 1)))
+                ((>= ,(car what) ,(caddr what)) (noop))
+              ,@body))
+          ((== n 4)
+           ;; range over values from start to end with step
+           `(if (> ,(cadddr what) 0)
+                (do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
+                    ((>= ,(car what) ,(caddr what)) (noop))
+                  ,@body)
+                (do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
+                    ((<= ,(car what) ,(caddr what)) (noop))
+                  ,@body)))
+          ((== n 5)
+           ;; range over values from start to end with step and comparison
+           `(do ((,(car what) ,(cadr what) (+ ,(car what) ,(cadddr what))))
+                ((not (,(car (cddddr what)) ,(car what) ,(caddr what))) (noop))
+              ,@body))
+          (else '(noop)))))
 
 (define-public-macro (repeat n . body)
   (let ((x (gensym)))
@@ -159,11 +167,34 @@
 ;; Small rewritings on top of C++ interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-public selection-active? selection-active-any?)
+
+(define-public (selection-active-non-small?)
+  (and (selection-active?)
+       (not (selection-active-small?))))
+
+(define-public (selection-active-large?)
+  (and (selection-active?)
+       (not (selection-active-small?))
+       (not (selection-active-table?))))
+
 (define-public (go-to p)
   (let* ((r (buffer-path))
-	 (lp (length p))
-	 (lr (length r)))
+         (lp (length p))
+         (lr (length r)))
     (and (or (and (<= lr lp) (== (sublist p 0 lr) r))
              (and-with buf (path->buffer p)
                (switch-to-buffer buf) #t))
-	 (go-to-path p))))
+         (go-to-path p))))
+
+(define-public (choose-file fun title type . opts)
+  (when (null? opts)
+    (with prompt (cond ((string-starts? title "Save") "Save as:")
+		       ((string-starts? title "Export") "Export as:")
+		       ((== title "Select database") "Selected database:")
+		       (else ""))
+      (set! opts (list prompt))))
+  (when (null? (cdr opts))
+    (with u (buffer-get-master (current-buffer))
+      (set! opts (list (car opts) u))))
+  (cpp-choose-file fun title type (car opts) (cadr opts)))

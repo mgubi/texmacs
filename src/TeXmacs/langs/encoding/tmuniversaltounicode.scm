@@ -143,7 +143,8 @@
 ("<varspace>"        "#A0") ; no break space
 ;("<flip-!>"          "#A1") ; see symbol-unicode-math.scm
 ("<cent>"            "#A2")
-("<sterling>"        "#A3") ; pound sign
+("<sterling>"        "#A3") ; pound sign (for retrocompatibility)
+("#BF"               "#A3") ; pound sign (TODO: move this to upgradetm.cpp)
 ("<currency>"        "#A4")
 ("<yen>"             "#A5")
 ("<brokenvert>"      "#A6")
@@ -151,7 +152,9 @@
 ;("<ddot>"            "#A8") ; see symbol-unicode-math.scm
 ("<copyright>"       "#A9")
 ("<ordfeminine>"     "#AA")
-("<guillemotleft>"   "#AB") ; left pointing double angle quotation mark
+("<guillemotleft>"   "#AB") ; (for retrocompatibility)
+("#13"               "#AB") ; left pointing double angle quotation mark
+                            ; (TODO: move this to upgradetm.cpp)
 ("<neg>"             "#AC")
 ("<hyphen>"          "#AD")
 ("<circledR>"        "#AE") ; for MathML compatility. Maybe U+24C7 more correct.
@@ -167,8 +170,10 @@
 ;("<cedille>"         "#B8") ; see symbol-unicode-math.scm
 ("<onesuperior>"     "#B9") ; superscript one
 ("<masculine>"       "#BA") ; masculine ordinal indicator
-("<guillemotright>"  "#BB") ; right pointing double angle quotation mark
 ("<onequarter>"      "#BC") ; vulgar fraction one quarter
+("<guillemotright>"  "#BB") ; (for retrocompatibility)
+("#14"               "#BB") ; right pointing double angle quotation mark
+                            ; (TODO: move this to upgradetm.cpp)
 ("<onehalf>"         "#BD") ; vulgar fraction one half
 ("<threequarters>"   "#BE") ; vulgar fraction three quarters
 ;("<flip-?>"          "#BF") ; see symbol-unicode-math.scm
@@ -214,7 +219,7 @@
 ("<bullet>"	"#2022")
 
 ;; General punctuation
-("<ldots>"	"#2026")
+("..."	        "#2026")
 ;("<permil>"	"#2030") ; see symbol-unicode-math.scm
 ("<prime>"	"#2032")
 ("<backprime>"	"#2035")
@@ -449,11 +454,11 @@
 ("<cap>"		"#2229")
 ("<cup>"		"#222A")
 ("<big-int>"		"#222B")
-; double integral	"#222E"
-; triple integral	"#222D"
+("<big-iint>"		"#222C")
+("<big-iiint>"		"#222D")
 ("<big-oint>"		"#222E")
-; surface integral	"#222F"
-; volume integral	"#2230"
+("<big-oiint>"		"#222F")
+("<big-oiiint>"		"#2230")
 ; clockwise integral	"#2231"
 ; clockwise contour integral "#2232"
 ; anticlockwise contour integral "#2233"
@@ -667,6 +672,7 @@
 ("<ntriangleright>"	"#22EB")
 ("<ntrianglelefteq>"	"#22EC")
 ("<ntrianglerighteq>"	"#22ED")
+("<ldots>"		"#2026")
 ("<vdots>"		"#22EE")
 ("<cdots>"		"#22EF")
 ("<udots>"		"#22F0")
@@ -713,8 +719,9 @@
 ("<recorder>"		"#2315")
 ; position indicator	"#2316"
 ; viewdata square	"#2317"
-; place of interest sign "#2318"
+("<place of interest sign>"		"#2318");; Apple command key 
 ; turned not sign	"#2319"
+("<option key>"		"#2325")
 
 ;; GUI icons
 ; watch			"#231A"
@@ -814,14 +821,14 @@
 
 ;;; Enclosed Alphanumerics			2460--24FF
 
-("<circledS>"		"#24C8")
+("<circledS>"		                "#24C8")
 
 
 ;;; Geometric Shapes				25A0--25FF
 
 ;; Geometric Shapes
-("<blacksquare>"				"#25A0")
-("<Square>"					"#25A1")
+("<blacksquare>"			"#25A0")
+("<Square>"				"#25A1")
 ; white square with rounded corners		"#25A2"
 ; white square containing black small square	"#25A3"
 ; square with horizontal fill			"#25A4"
@@ -993,6 +1000,7 @@
 
 ("<checkmark>"		"#2713")
 ("<maltese>"		"#2720")
+; black diamond minus white x	"#2756"
 
 
 ;;; Supplemental Arrows-B
@@ -1535,39 +1543,74 @@
 ("<b-Omega>"	"#1D6C0")
 
 ;; Bold Greek lowercase symbols
-("<b-alpha>"	  "#1D6C2")
-("<b-beta>"	  "#1D6C3")
-("<b-gamma>"	  "#1D6C4")
-("<b-delta>"	  "#1D6C5")
-("<b-varepsilon>" "#1D6C6")
-("<b-zeta>"	  "#1D6C7")
-("<b-eta>"	  "#1D6C8")
-("<b-theta>"	  "#1D6C9")
-("<b-iota>"	  "#1D6CA")
-("<b-kappa>"	  "#1D6CB")
-("<b-lambda>"	  "#1D6CC")
-("<b-mu>"	  "#1D6CD")
-("<b-nu>"	  "#1D6CE")
-("<b-xi>"	  "#1D6CF")
-("<b-omicron>"	  "#1D6D0")
-("<b-pi>"	  "#1D6D1")
-("<b-rho>"	  "#1D6D2")
-("<b-varsigma>"	  "#1D6D3")
-("<b-sigma>"	  "#1D6D4")
-("<b-tau>"	  "#1D6D5")
-("<b-upsilon>"	  "#1D6D6")
-("<b-varphi>"	  "#1D6D7")
-("<b-chi>"	  "#1D6D8")
-("<b-psi>"	  "#1D6D9")
-("<b-omega>"	  "#1D6DA")
+("<b-up-alpha>"	     "#1D6C2")
+("<b-up-beta>"	     "#1D6C3")
+("<b-up-gamma>"	     "#1D6C4")
+("<b-up-delta>"	     "#1D6C5")
+("<b-up-varepsilon>" "#1D6C6")
+("<b-up-zeta>"	     "#1D6C7")
+("<b-up-eta>"	     "#1D6C8")
+("<b-up-theta>"	     "#1D6C9")
+("<b-up-iota>"	     "#1D6CA")
+("<b-up-kappa>"	     "#1D6CB")
+("<b-up-lambda>"     "#1D6CC")
+("<b-up-mu>"	     "#1D6CD")
+("<b-up-nu>"	     "#1D6CE")
+("<b-up-xi>"	     "#1D6CF")
+("<b-up-omicron>"    "#1D6D0")
+("<b-up-pi>"	     "#1D6D1")
+("<b-up-rho>"	     "#1D6D2")
+("<b-up-varsigma>"   "#1D6D3")
+("<b-up-sigma>"	     "#1D6D4")
+("<b-up-tau>"	     "#1D6D5")
+("<b-up-upsilon>"    "#1D6D6")
+("<b-up-varphi>"     "#1D6D7")
+("<b-up-chi>"	     "#1D6D8")
+("<b-up-psi>"	     "#1D6D9")
+("<b-up-omega>"	     "#1D6DA")
 
 ;; Additional bold Greek symbols
-("<b-epsilon>"  "#1D6DC")
-("<b-vartheta>"	"#1D6DD")
-("<b-varkappa>"	"#1D6DE")
-("<b-phi>"	"#1D6DF")
-("<b-varrho>"	"#1D6E0")
-("<b-varpi>"	"#1D6E1")
+("<b-up-epsilon>"  "#1D6DC")
+("<b-up-vartheta>" "#1D6DD")
+("<b-up-varkappa>" "#1D6DE")
+("<b-up-phi>"	   "#1D6DF")
+("<b-up-varrho>"   "#1D6E0")
+("<b-up-varpi>"	   "#1D6E1")
+
+;; Bold Italic Greek lowercase symbols
+("<b-alpha>"	  "#1D736")
+("<b-beta>"	  "#1D737")
+("<b-gamma>"	  "#1D738")
+("<b-delta>"	  "#1D739")
+("<b-varepsilon>" "#1D73A")
+("<b-zeta>"	  "#1D73B")
+("<b-eta>"	  "#1D73C")
+("<b-theta>"	  "#1D73D")
+("<b-iota>"	  "#1D73E")
+("<b-kappa>"	  "#1D73F")
+("<b-lambda>"	  "#1D740")
+("<b-mu>"	  "#1D741")
+("<b-nu>"	  "#1D742")
+("<b-xi>"	  "#1D743")
+("<b-omicron>"	  "#1D744")
+("<b-pi>"	  "#1D745")
+("<b-rho>"	  "#1D746")
+("<b-varsigma>"	  "#1D747")
+("<b-sigma>"	  "#1D748")
+("<b-tau>"	  "#1D749")
+("<b-upsilon>"	  "#1D74A")
+("<b-varphi>"	  "#1D74B")
+("<b-chi>"	  "#1D74C")
+("<b-psi>"	  "#1D74D")
+("<b-omega>"	  "#1D74E")
+
+;; Additional Bold Italic Greek symbols
+("<b-epsilon>"  "#1D750")
+("<b-vartheta>"	"#1D751")
+("<b-varkappa>"	"#1D752")
+("<b-phi>"	"#1D753")
+("<b-varrho>"	"#1D754")
+("<b-varpi>"	"#1D755")
 
 ;; Bold digits
 ("<b-0>"	"#1D7CE")

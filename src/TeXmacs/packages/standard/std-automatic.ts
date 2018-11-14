@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.99.6>
 
 <style|<tuple|source|std>>
 
@@ -44,16 +44,18 @@
     </src-comment>
   </active*>
 
+  <assign|bib-prefix|bib>
+
+  <assign|with-bib|<macro|bib|body|<with|bib-prefix|<arg|bib>|<arg|body>>>>
+
   <assign|render-cite|<macro|body|[<arg|body>]>>
 
   <assign|render-cite-detail|<macro|body|detail|<render-cite|<arg|body>,
   <arg|detail>>>>
 
-  <assign|cite-bib|bib>
-
   <assign|cite-sep|<macro|, >>
 
-  <assign|cite-arg|<macro|key|<write|<value|cite-bib>|<arg|key>><reference|<merge|<value|cite-bib>|-|<arg|key>>>>>
+  <assign|cite-arg|<macro|key|<write|<value|bib-prefix>|<arg|key>><reference|<merge|<value|bib-prefix>|-|<arg|key>>>>>
 
   <assign|cite-arg-extra|<macro|key|<cite-sep><cite-arg|<arg|key>>>>
 
@@ -63,20 +65,32 @@
 
   <assign|cite-raw|<xmacro|keys|<cite-arg|<arg|keys|0>><map-args|cite-arg-extra|concat|keys|1>>>
 
-  <assign|nocite-arg|<macro|key|<write|<value|cite-bib>|<arg|key>>>>
+  <assign|nocite-arg|<macro|key|<write|<value|bib-prefix>|<arg|key>>>>
 
   <assign|nocite|<xmacro|keys|<style-with|src-compact|none|<flag|<localize|bibliography>|dark
   green|keys><map-args|nocite-arg|concat|keys>>>>
 
-  \;
+  <drd-props|cite|arity|<tuple|repeat|1|1>|accessible|none|identifier|all>
+
+  <drd-props|nocite|arity|<tuple|repeat|1|1>|accessible|none|identifier|all>
+
+  <drd-props|cite-detail|arity|2|unaccessible|0|identifier|0>
+
+  <\active*>
+    <\src-comment>
+      Bibliographies.
+    </src-comment>
+  </active*>
+
+  <assign|bibitem-width|3em>
 
   <assign|transform-bibitem|<macro|body|<strong|[<arg|body>] \ >>>
 
-  <assign|render-bibitem|<macro|text|<style-with|src-compact|none|<vspace*|<item-vsep>><with|par-first|<minus|<item-hsep>>|<yes-indent>><resize|<arg|text>|||<maximum|1r|<item-hsep>>|>>>>
+  <assign|render-bibitem|<macro|text|<style-with|src-compact|none|<with|par-first|<minus|1tmpt|<value|bibitem-width>>|<yes-indent>><resize|<arg|text>|||<maximum|1r|<value|bibitem-width>>|>>>>
 
-  <assign|bibitem|<macro|text|<style-with|src-compact|none|<bibitem*|<arg|text>><label|<merge|<value|cite-bib>|-|<arg|text>>>>>>
+  <assign|bibitem|<macro|text|<style-with|src-compact|none|<bibitem*|<arg|text>><label|<merge|<value|bib-prefix>|-|<arg|text>>>>>>
 
-  <assign|bibitem-with-key|<macro|text|key|<style-with|src-compact|none|<bibitem*|<arg|text>><label|<merge|<value|cite-bib>|-|<arg|key>>>>>>
+  <assign|bibitem-with-key|<macro|text|key|<style-with|src-compact|none|<bibitem*|<arg|text>><label|<merge|<value|bib-prefix>|-|<arg|key>>>>>>
 
   <assign|bibitem*|<macro|text|<style-with|src-compact|none|<render-bibitem|<transform-bibitem|<arg|text>>><set-binding|<arg|text>>>>>
 
@@ -89,7 +103,7 @@
   <assign|bibitem-hsep|<macro|<value|bibitem-width>>>
 
   <assign|bib-list|<\macro|largest|body>
-    <\with|bibitem-width|<box-info|<transform-bibitem|<arg|largest>>|w.>|item-hsep|<value|bibitem-hsep>|bibitem-nr|0|par-flexibility|2.0>
+    <\with|bibitem-width|<minimum|<box-info|<transform-bibitem|<arg|largest>>.|w.>|3em>|item-hsep|<value|bibitem-hsep>|bibitem-nr|0|par-flexibility|2.0>
       <\description>
         <arg|body>
       </description>
@@ -102,8 +116,12 @@
     </src-comment>
   </active*>
 
+  <assign|toc-prefix|toc>
+
+  <assign|with-toc|<macro|toc|body|<with|toc-prefix|<arg|toc>|<arg|body>>>>
+
   <assign|toc-entry|<macro|type|what|<quasi|<style-with|src-compact|none|<flag|<localize|table
-  of contents>|dark green|what><auto-label><write|toc|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<the-auto>>>>>>>>
+  of contents>|dark green|what><auto-label><write|<value|toc-prefix>|<compound|<unquote|<arg|type>>|<arg|what>|<pageref|<the-auto>>>><toc-notify|<arg|type>|<arg|what>>>>>>
 
   <assign|toc-main-1|<macro|what|<toc-entry|toc-strong-1|<arg|what>>>>
 
@@ -130,11 +148,11 @@
 
   <assign|toc-1|<macro|left|right|<arg|left><toc-dots><no-break><arg|right>>>
 
-  <assign|toc-2|<macro|left|right|<with|par-left|1.5fn|<arg|left><toc-dots><no-break><arg|right>>>>
+  <assign|toc-2|<macro|left|right|<with|par-left|1tab|<arg|left><toc-dots><no-break><arg|right>>>>
 
-  <assign|toc-3|<macro|left|right|<with|par-left|3fn|<arg|left><toc-dots><no-break><arg|right>>>>
+  <assign|toc-3|<macro|left|right|<with|par-left|2tab|<arg|left><toc-dots><no-break><arg|right>>>>
 
-  <assign|toc-4|<macro|left|right|<with|par-left|6fn|<arg|left><toc-dots><no-break><arg|right><vspace|0.15fn>>>>
+  <assign|toc-4|<macro|left|right|<with|par-left|4tab|<arg|left><toc-dots><no-break><arg|right><vspace|0.15fn>>>>
 
   <assign|toc-5|<macro|left|right|<arg|left><toc-dots><no-break><arg|right><vspace|0.15fn>>>
 
@@ -144,10 +162,16 @@
     </src-comment>
   </active*>
 
-  <assign|index-line|<macro|key|entry|<style-with|src-compact|none|<flag|<localize|index>|dark
-  green|key><write|idx|<tuple|<arg|key>||<arg|entry>>>>>>
+  <assign|index-enabled|true>
 
-  <assign|index-write|<macro|entry|<style-with|src-compact|none|<auto-label><write|idx|<tuple|<arg|entry>|<pageref|<the-auto>>>>>>>
+  <assign|index-prefix|idx>
+
+  <assign|with-index|<macro|idx|body|<with|index-prefix|<arg|idx>|<arg|body>>>>
+
+  <assign|index-line|<macro|key|entry|<style-with|src-compact|none|<flag|<localize|index>|dark
+  green|key><write|<value|index-prefix>|<tuple|<arg|key>||<arg|entry>>>>>>
+
+  <assign|index-write|<macro|entry|<style-with|src-compact|none|<if|<value|index-enabled>|<auto-label><write|<value|index-prefix>|<tuple|<arg|entry>|<pageref|<the-auto>>>>>>>>
 
   <assign|index|<macro|key|<style-with|src-compact|none|<flag|<localize|index>|dark
   green|key><index-write|<tuple|<arg|key>>>>>>
@@ -162,7 +186,7 @@
   green|key><index-write|<tuple|<arg|key>|<arg|secondary>|<arg|tertiary>|<arg|quaternary>>>>>>
 
   <assign|index-complex|<macro|key|how|range|entry|<style-with|src-compact|none|<flag|<localize|index>|dark
-  green|key><auto-label><write|idx|<tuple|<arg|key>|<arg|how>|<arg|range>|<arg|entry>|<pageref|<the-auto>>>>>>>
+  green|key><auto-label><write|<value|index-prefix>|<tuple|<arg|key>|<arg|how>|<arg|range>|<arg|entry>|<pageref|<the-auto>>>>>>>
 
   \;
 
@@ -173,21 +197,21 @@
 
   <assign|index-1*|<macro|left|<arg|left><no-page-break>>>
 
-  <assign|index-2|<macro|left|right|<with|par-left|1.5fn|<arg|left><index-dots><arg|right>>>>
+  <assign|index-2|<macro|left|right|<with|par-left|1tab|<arg|left><index-dots><arg|right>>>>
 
-  <assign|index-2*|<macro|left|<with|par-left|1.5fn|<arg|left><no-page-break>>>>
+  <assign|index-2*|<macro|left|<with|par-left|1tab|<arg|left><no-page-break>>>>
 
-  <assign|index-3|<macro|left|right|<with|par-left|3fn|<arg|left><index-dots><arg|right>>>>
+  <assign|index-3|<macro|left|right|<with|par-left|2tab|<arg|left><index-dots><arg|right>>>>
 
-  <assign|index-3*|<macro|left|<with|par-left|3fn|<arg|left><no-page-break>>>>
+  <assign|index-3*|<macro|left|<with|par-left|2tab|<arg|left><no-page-break>>>>
 
-  <assign|index-4|<macro|left|right|<with|par-left|4.5fn|<arg|left><index-dots><arg|right>>>>
+  <assign|index-4|<macro|left|right|<with|par-left|3tab|<arg|left><index-dots><arg|right>>>>
 
-  <assign|index-4*|<macro|left|<with|par-left|4.5fn|<arg|left><no-page-break>>>>
+  <assign|index-4*|<macro|left|<with|par-left|3tab|<arg|left><no-page-break>>>>
 
-  <assign|index-5|<macro|left|right|<with|par-left|6fn|<arg|left><index-dots><arg|right>>>>
+  <assign|index-5|<macro|left|right|<with|par-left|4tab|<arg|left><index-dots><arg|right>>>>
 
-  <assign|index-5*|<macro|left|<with|par-left|6fn|<arg|left><no-page-break>>>>
+  <assign|index-5*|<macro|left|<with|par-left|4tab|<arg|left><no-page-break>>>>
 
   <\active*>
     <\src-comment>
@@ -195,17 +219,21 @@
     </src-comment>
   </active*>
 
+  <assign|glossary-prefix|gly>
+
+  <assign|with-glossary|<macro|gly|body|<with|glossary-prefix|<arg|gly>|<arg|body>>>>
+
   <assign|glossary-line|<macro|entry|<style-with|src-compact|none|<flag|<localize|glossary>|dark
-  green|entry><write|gly|<tuple|<arg|entry>>>>>>
+  green|entry><write|<value|glossary-prefix>|<tuple|<arg|entry>>>>>>
 
   <assign|glossary|<macro|entry|<style-with|src-compact|none|<flag|<localize|glossary>|dark
-  green|entry><auto-label><write|gly|<tuple|normal|<arg|entry>|<pageref|<the-auto>>>>>>>
+  green|entry><auto-label><write|<value|glossary-prefix>|<tuple|normal|<arg|entry>|<pageref|<the-auto>>>>>>>
 
   <assign|glossary-explain|<macro|entry|explain|<style-with|src-compact|none|<flag|<localize|glossary>|dark
-  green|entry><auto-label><write|gly|<tuple|normal|<arg|entry>|<arg|explain>|<pageref|<the-auto>>>>>>>
+  green|entry><auto-label><write|<value|glossary-prefix>|<tuple|normal|<arg|entry>|<arg|explain>|<pageref|<the-auto>>>>>>>
 
   <assign|glossary-dup|<macro|entry|<style-with|src-compact|none|<flag|<localize|glossary>|dark
-  green|entry><auto-label><write|gly|<tuple|dup|<arg|entry>|<pageref|<the-auto>>>>>>>
+  green|entry><auto-label><write|<value|glossary-prefix>|<tuple|dup|<arg|entry>|<pageref|<the-auto>>>>>>>
 
   \;
 
@@ -217,7 +245,19 @@
   <assign|glossary-2|<macro|entry|explain|right|<margin-first-other|0fn|10fn|<style-with|src-compact|none|<resize|<arg|entry>
   |||<maximum|1r|10fn>|><arg|explain><glossary-dots><no-break><arg|right>>>>>
 
-  \;
+  <\active*>
+    <\src-comment>
+      Shared documents.
+    </src-comment>
+  </active*>
+
+  <assign|part-info|<macro|name|<style-with|src-compact|none|<label|<merge|part:|<arg|name>>><write|parts|<tuple|<arg|name>|chapter-nr|<value|chapter-nr>|section-nr|<value|section-nr><value|>|subsection-nr|<value|subsection-nr>>>>>>
+
+  <assign|shared|<macro|unique-id|mirror-id|body|<with|old-color|<value|locus-color>|locus-color|preserve|<locus|<id|<arg|mirror-id>>|<observer|<arg|unique-id>|mirror-notify>|<surround|<hidden|<part-info|<arg|unique-id>><extern|mirror-initialize|<quote-arg|xbody>>>|<right-flush>|<with|locus-color|<value|old-color>|<arg|body>>>>>>>
+
+  <assign|include|<macro|name|<\surround|<part-info|<arg|name>>|>
+    <include*|<arg|name>>
+  </surround>>>
 </body>
 
 <\initial>

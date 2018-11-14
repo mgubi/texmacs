@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.99.6>
 
 <style|source>
 
@@ -29,7 +29,7 @@
 
     <assign|L|\<cal-L\>>
 
-    <assign|o|<with|magnification|0.7|\<cal-O\>>>
+    <assign|o|<with|magnification|<times|0.7|<value|magnification>>|\<cal-O\>>>
 
     <assign|O|\<cal-O\>>
 
@@ -62,6 +62,12 @@
     <drd-props|\<uparrow\>|syntax|\<postup\>>
 
     <drd-props|\<downarrow\>|syntax|\<postdown\>>
+
+    <drd-props|\<updownarrow\>|syntax|\<postupdown\>>
+
+    <drd-props|\<mapsup\>|syntax|\<postmapsup\>>
+
+    <drd-props|\<mapsdown\>|syntax|\<postmapsdown\>>
 
     \;
 
@@ -116,6 +122,8 @@
     <assign|rsY|<with|math-font|cal*|Y>>
 
     <assign|rsZ|<with|math-font|cal*|Z>>
+
+    <assign|rso|<very-small|<with|math-font|cal*|O>>>
 
     \;
 
@@ -197,7 +205,7 @@
 
     \;
 
-    <assign|bpartial|<with|math-font-series|bold|\<partial\>>>
+    <assign|bpartial|<with|font-series|bold|math-font-series|bold|\<partial\>>>
 
     <assign|xor|<space|0.6spc>\<triangledown\><space|0.6spc>>
 
@@ -270,12 +278,12 @@
   <assign|recall|<macro|key|<block|<tformat|<cwith|1|1|1|1|cell-background|pastel
   red>|<table|<row|<cell|<arg|key>>>>>>>>
 
-  <assign|fold|<macro|x|y|<surround||<right-flush><action|<active*|<with|color|blue|<with|mode|math|<rigid|\<Rightarrow\>>>>>|(mouse-unfold)|<arg|x>>|<arg|x>>>>
+  <assign|fold|<macro|x|y|<surround||<right-flush><action|<active*|<with|color|blue|<with|mode|math|<rigid|\<Rightarrow\>>>>>|mouse-unfold|<arg|x>>|<arg|x>>>>
 
   <assign|unfold|<\macro|x|y>
     <arg|x>
 
-    <surround||<right-flush><action|<active*|<with|color|blue|<with|mode|math|<rigid|\<Leftarrow\>>>>>|(mouse-fold)|<arg|x>>|<arg|y>>
+    <surround||<right-flush><action|<active*|<with|color|blue|<with|mode|math|<rigid|\<Leftarrow\>>>>>|mouse-fold|<arg|x>>|<arg|y>>
   </macro>>
 
   <assign|solution|<\macro|body>
@@ -289,12 +297,20 @@
   blue|<arg|old>><active*|<with|color|brown|<with|mode|math|\<rightarrow\>>>><with|color|dark
   blue|<arg|new>><active*|<with|color|brown|]>>>>
 
+  <assign|smart-qed|<macro|<htab|0.5fn|0><qed>>>
+
   \;
 
   <assign|joris-title|<macro|title|<block*|<tformat|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|1|1|1|cell-lsep|2spc>|<cwith|1|1|1|1|cell-rsep|2spc>|<cwith|1|1|1|1|cell-bsep|2spc>|<cwith|1|1|1|1|cell-tsep|2spc>|<cwith|2|2|1|1|cell-lsep|1spc>|<cwith|2|2|1|1|cell-rsep|1spc>|<cwith|2|2|1|1|cell-bsep|1spc>|<cwith|2|2|1|1|cell-tsep|1spc>|<cwith|1|1|1|1|cell-background|#d0f0ff>|<cwith|2|2|1|1|cell-background|#e8f8ff>|<cwith|1|1|1|1|cell-lborder|1ln>|<cwith|1|1|1|1|cell-rborder|1ln>|<cwith|1|1|1|1|cell-bborder|1ln>|<cwith|1|1|1|1|cell-tborder|1ln>|<cwith|2|2|1|1|cell-lborder|1ln>|<cwith|2|2|1|1|cell-rborder|1ln>|<cwith|2|2|1|1|cell-bborder|1ln>|<cwith|2|2|1|1|cell-tborder|1ln>|<cwith|1|1|1|1|cell-block|no>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<cell|<with|par-mode|center|<very-large|<strong|<name|<arg|title>>>><hidden-title|<arg|title>>>>>|<row|<cell|<small|<strong|[
   <hlink|Homepage|../main/joris.tm> \| <hlink|Publications|../main/publs.tm>
-  \| <hlink|<TeXmacs>|http://www.texmacs.org> \|
-  <hlink|Mathemagix|http://www.mathemagix.org> ]>>>>>>>>>
+  \| <hlink|Talks|../main/talks.tm> \| <hlink|<TeXmacs>|http://www.texmacs.org>
+  \| <hlink|Mathemagix|http://www.mathemagix.org> ]>>>>>>>>>
+
+  <assign|joris-title*|<macro|title|<block*|<tformat|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|1|1|1|cell-lsep|2spc>|<cwith|1|1|1|1|cell-rsep|2spc>|<cwith|1|1|1|1|cell-bsep|2spc>|<cwith|1|1|1|1|cell-tsep|2spc>|<cwith|2|2|1|1|cell-lsep|1spc>|<cwith|2|2|1|1|cell-rsep|1spc>|<cwith|2|2|1|1|cell-bsep|1spc>|<cwith|2|2|1|1|cell-tsep|1spc>|<cwith|1|1|1|1|cell-background|#d0f0ff>|<cwith|2|2|1|1|cell-background|#e8f8ff>|<cwith|1|1|1|1|cell-lborder|1ln>|<cwith|1|1|1|1|cell-rborder|1ln>|<cwith|1|1|1|1|cell-bborder|1ln>|<cwith|1|1|1|1|cell-tborder|1ln>|<cwith|2|2|1|1|cell-lborder|1ln>|<cwith|2|2|1|1|cell-rborder|1ln>|<cwith|2|2|1|1|cell-bborder|1ln>|<cwith|2|2|1|1|cell-tborder|1ln>|<cwith|1|1|1|1|cell-block|no>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<cell|<with|par-mode|center|<very-large|<strong|<name|<arg|title>>>><hidden-title|<arg|title>>>>>|<row|<cell|<small|<strong|[
+  <hlink|Homepage|../../main/joris.tm> \|
+  <hlink|Publications|../../main/publs.tm> \|
+  <hlink|Talks|../../main/talks.tm> \| <hlink|<TeXmacs>|http://www.texmacs.org>
+  \| <hlink|Mathemagix|http://www.mathemagix.org> ]>>>>>>>>>
 
   <assign|joris-versions*|<macro|name|<hlink|Pdf|<merge|<arg|name>|.pdf>>,
   <hlink|Bib<TeX>|<merge|<arg|name>|.bib>>>>

@@ -22,6 +22,7 @@ struct texmacs_input_rep: concrete_struct {
   int    mode;                  // corresponding input mode
   string channel;               // current output channel
   tree   stack;                 // stack for nested blocks
+  bool   ignore_verb;           // hack to enable completion with some plugins
   hashmap<string,tree> docs;    // output for each channel
 
   texmacs_input_rep (string type);
@@ -46,6 +47,7 @@ struct texmacs_input_rep: concrete_struct {
   void channel_flush (bool force= false);
   void command_flush (bool force= false);
   void xformat_flush (bool force= false);
+  void file_flush (bool force= false);
 };
 
 class texmacs_input {

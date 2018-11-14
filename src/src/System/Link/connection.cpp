@@ -112,7 +112,7 @@ connection_rep::read (int channel) {
     for (i=0; i<n; i++)
       if (tm_in->put (s[i])) {
 	status= WAITING_FOR_INPUT;
-	if (DEBUG_IO) cout << LF << HRULE;
+	if (DEBUG_IO) debug_io << LF << HRULE;
       }
   }
   else if (channel == LINK_ERR) {
@@ -232,16 +232,18 @@ connection_start (string name, string session, bool again) {
   connection con= connection (name * "-" * session);
   if (is_nil (con)) {
     if (DEBUG_VERBOSE)
-      cout << "TeXmacs] Starting session '" << session << "'\n";
+      debug_io << "Starting session '" << session << "'\n";
     tree t= connection_info (name, session);
     if (is_tuple (t, "pipe", 1)) {
       tm_link ln= make_pipe_link (t[1]->label);
       con= tm_new<connection_rep> (name, session, ln);
     }
+#ifndef QTTEXMACS
     else if (is_tuple (t, "socket", 2)) {
       tm_link ln= make_socket_link (t[1]->label, as_int (t[2]->label));
       con= tm_new<connection_rep> (name, session, ln);
     }
+#endif
     else if (is_tuple (t, "dynlink", 3)) {
       tm_link ln=
 	make_dynamic_link (t[1]->label, t[2]->label, t[3]->label, session);
@@ -333,7 +335,9 @@ connection_retrieve (string name, string session) {
   tree doc (DOCUMENT);
   while (true) {
     con->forced_eval= true;
+#ifndef QTTEXMACS
     perform_select ();
+#endif
     con->forced_eval= false;
     tree next= connection_read (name, session);
     if (next == "");

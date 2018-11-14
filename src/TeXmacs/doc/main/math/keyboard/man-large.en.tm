@@ -10,7 +10,7 @@
   the matching closing bracket ``<math|>)''. You may disable this feature
   using <menu|Edit|Preferences|Keyboard|Automatic brackets|Disable>.
   Attention (see also below): brackets in old documents will be automatically
-  be upgraded to matching brackets.
+  upgraded to matching brackets.
 
   Sometimes, you do not want the closing bracket, or you may want to replace
   it by another closing bracket. No problem: if your cursor is just before
@@ -54,7 +54,7 @@
 
   Sometimes you may want large delimiters of a particular size, instead of
   self-adjusting ones. This can be achieved by resizing the expression in
-  between the brackets using <menu|Format|Transform|Resize object>.
+  between the brackets using the items in <menu|Format|Adjust>.
 
   Notice that it is possible to insert a pair of invisible brackets using
   <shortcut|(math-bracket-open "." "." #t)>. This is for instance useful in

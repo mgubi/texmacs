@@ -23,8 +23,11 @@
 #ifdef EXPERIMENTAL
 #include "../../Style/Evaluate/evaluate_main.hpp"
 #endif
+#include "gui.hpp" // for gui_interrupted
 
 extern void (*env_next_prog)(void);
+extern void set_snap_mode (tree t);
+extern void set_snap_distance (SI d);
 
 /*static*/ string
 MODE_LANGUAGE (string mode) {
@@ -32,8 +35,7 @@ MODE_LANGUAGE (string mode) {
   else if (mode == "math") return MATH_LANGUAGE;
   else if (mode == "prog") return PROG_LANGUAGE;
   else if (mode == "src") return LANGUAGE;
-  cerr << "Mode = " << mode << "\n";
-  FAILED ("invalid mode");
+  std_error << "Invalid mode " << mode << ", assuming text mode instead\n";
   return LANGUAGE;
 }
 
@@ -41,19 +43,27 @@ MODE_LANGUAGE (string mode) {
 * Main edit_interface routines
 ******************************************************************************/
 
+static double
+get_zoom (editor_rep* ed, tm_buffer buf) {
+  if (!is_nil (buf) && buf->data->init->contains ("no-zoom"))
+    return as_double (buf->data->init [ZOOM_FACTOR]);
+  else return ed->sv->get_default_zoom_factor ();
+}
+
 edit_interface_rep::edit_interface_rep ():
+  editor_rep (), // NOTE: ignored by the compiler, but suppresses warning
   env_change (0),
   last_change (texmacs_time()), last_update (last_change-1),
-  do_animate (false), next_animate (last_change-1),
+  anim_next (1.0e12),
   full_screen (false), got_focus (false),
   sh_s (""), sh_mark (0), pre_edit_s (""), pre_edit_mark (0),
   popup_win (),
   message_l (""), message_r (""), last_l (""), last_r (""),
-  zoomf (sv->get_default_zoom_factor ()),
+  zoomf (get_zoom (this, buf)),
   magf (zoomf / std_shrinkf),
   pixel ((SI) tm_round ((std_shrinkf * PIXEL) / zoomf)), copy_always (),
   last_x (0), last_y (0), last_t (0),
-  made_selection (false), table_selection (false), mouse_adjusting(false),
+  table_selection (false), mouse_adjusting (false),
   oc (0, 0), temp_invalid_cursor (false),
   shadow (NULL), stored (NULL),
   cur_sb (2), cur_wb (2)
@@ -63,11 +73,10 @@ edit_interface_rep::edit_interface_rep ():
 }
 
 edit_interface_rep::~edit_interface_rep () {
-  if (is_attached (this)) {
-    renderer ren= get_renderer (this);
-    ren->delete_shadow (shadow);
-    ren->delete_shadow (stored);
-  }
+  if (shadow != NULL) tm_delete (shadow);
+  if (stored != NULL) tm_delete (stored);
+  shadow = NULL;
+  stored = NULL;
 }
 
 edit_interface_rep::operator tree () {
@@ -82,11 +91,10 @@ edit_interface_rep::suspend () {
   }
   got_focus= false;
   notify_change (THE_FOCUS);
-  if (is_attached (this)) {
-    renderer ren= get_renderer (this);
-    ren->delete_shadow (shadow);
-    ren->delete_shadow (stored);
-  }
+  if (shadow != NULL) tm_delete (shadow);
+  if (stored != NULL) tm_delete (stored);
+  shadow = NULL;
+  stored = NULL;
 }
 
 void
@@ -99,9 +107,28 @@ edit_interface_rep::resume () {
   SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
   if (use_side_tools)
     { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
+  SERVER (bottom_tools (0, "(vertical (link texmacs-bottom-tools))"));
   cur_sb= 2;
-  tp= make_cursor_accessible (tp, true);
-  notify_change (THE_FOCUS + THE_EXTENTS + THE_CURSOR);
+  notify_change (THE_FOCUS + THE_EXTENTS);
+  path new_tp= make_cursor_accessible (tp, true);
+  if (new_tp != tp) {
+    notify_change (THE_CURSOR);
+    tp= new_tp;
+  }
+#ifdef QTTEXMACS
+  // FIXME: dirty hack in order to correct a bug introduced
+  // after a bugfix by Massimiliano during summer 2016
+  eval ("(delayed (:idle 1) (refresh-window))");
+#endif
+}
+
+void
+edit_interface_rep::keyboard_focus_on (string field) {
+  array<url> a= buffer_to_windows (buf->buf->name);
+  if (N(a) >= 1) {
+    tm_window win= concrete_window (a[0]);
+    send_keyboard_focus_on (win->wid, field);
+  }
 }
 
 /******************************************************************************
@@ -136,6 +163,11 @@ edit_interface_rep::invalidate (rectangles rs) {
 }
 
 void
+edit_interface_rep::invalidate_all () {
+  send_invalidate_all (this);
+}
+
+void
 edit_interface_rep::update_visible () {
   SERVER (get_visible (vx1, vy1, vx2, vy2));
   vx1= (SI) (vx1 / magf); vy1= (SI) (vy1 / magf);
@@ -154,21 +186,31 @@ edit_interface_rep::get_visible_height () {
   return vy2 - vy1;
 }
 
+#ifdef QTTEXMACS
+#include <QApplication>
+#include <QStyle>
+static SI
+scrollbar_width () {
+  return (qApp->style()->pixelMetric (QStyle::PM_ScrollBarExtent) + 2) * PIXEL;
+}
+#else
+static SI
+scrollbar_width () {
+  return 20 * PIXEL;
+}
+#endif
+
 SI
 edit_interface_rep::get_window_width () {
   SI w, h;
   widget me= ::get_canvas (widget (cvw));
   ::get_size (me, w, h);
   bool sb= (get_init_string (SCROLL_BARS) != "false");
-#ifdef QTTEXMACS
-#  ifdef OS_MACOS
-  if (sb) w -= 17 * PIXEL;
-#  else
-  if (sb) w -= 24 * PIXEL;
-#  endif
-#else
-  if (sb) w -= 20 * PIXEL;
-#endif
+  if (full_screen) {
+    string medium= get_init_string (PAGE_MEDIUM);
+    if (medium == "automatic" || medium == "beamer") sb= false;
+  }
+  if (sb) w -= scrollbar_width ();
   return w;
 }
 
@@ -199,6 +241,8 @@ edit_interface_rep::set_extents (SI x1, SI y1, SI x2, SI y2) {
 * Scroll so as to make the cursor and the selection visible
 ******************************************************************************/
 
+static SI absval (SI x) { return max (x, -x); }
+
 void
 edit_interface_rep::cursor_visible () {
   path sp= find_innermost_scroll (eb, tp);
@@ -206,14 +250,68 @@ edit_interface_rep::cursor_visible () {
   if (is_nil (sp)) {
     update_visible ();
     cu->y1 -= 2*pixel; cu->y2 += 2*pixel;
-    if ((cu->ox+ ((SI) (cu->y1 * cu->slope)) <  vx1) ||
-	(cu->ox+ ((SI) (cu->y2 * cu->slope)) >= vx2) ||
-	(cu->oy+ cu->y1 <  vy1) ||
-	(cu->oy+ cu->y2 >= vy2))
-      {
-	scroll_to (cu->ox- ((vx2-vx1)>>1), cu->oy+ ((vy2-vy1)>>1));
-	send_invalidate_all (this);
+    bool must_update=
+      (cu->ox+ ((SI) (cu->y1 * cu->slope)) <  vx1) ||
+      (cu->ox+ ((SI) (cu->y2 * cu->slope)) >= vx2) ||
+      (cu->oy+ cu->y1 <  vy1) ||
+      (cu->oy+ cu->y2 >= vy2);
+
+    box pages= eb[0];
+    if (N(pages) > 1) {
+      SI vw= vx2 - vx1, vh= vy2 - vy1;
+      for (int i=0; i<N(pages); i++) {
+        SI scx, scy;
+        SERVER (scroll_where (scx, scy));
+        scx= (SI) (scx / magf);
+        scy= (SI) (scy / magf);
+        SI x1= eb->sy(0)+ pages->sx1 (i);
+        SI x2= eb->sy(0)+ pages->sx2 (i);
+        SI y1= eb->sy(0)+ pages->sy1 (i);
+        SI y2= eb->sy(0)+ pages->sy2 (i);
+        SI pw= x2 - x1, ph= y2 - y1;
+        if (cu->ox >= x1 && x2 > cu->ox &&
+            cu->oy >= y1 && y2 > cu->oy &&
+            5*vw > 3*pw && 5*vh > 3*ph) {
+          if (!must_update) {
+            SI d= 5*pixel;
+            if (pw >= vw) {
+              if (vx1 > x1 + d && absval (x2 - vx2) > d) must_update= true;
+              if (x2 > vx2 + d && absval (x1 - vx1) > d) must_update= true;
+            }
+            else if (vx1 > x1 + d || x2 > vx2 + d) must_update= true;
+            if (ph >= vh) {
+              if (vy1 > y1 + d && absval (y2 - vy2) > d) must_update= true;
+              if (y2 > vy2 + d && absval (y1 - vy1) > d) must_update= true;
+            }
+            else if (vy1 > y1 + d || y2 > vy2 + d) must_update= true;
+          }
+          if (must_update) {
+            //cout << "Cursor on page " << i << LF;
+            //cout << "Visual " << vx1/PIXEL << ", " << vy1/PIXEL
+            //     << "; " << vx2/PIXEL << ", " << vy2/PIXEL << LF;
+            //cout << "Page " << x1/PIXEL << ", " << y1/PIXEL
+            //     << "; " << x2/PIXEL << ", " << y2/PIXEL << LF;
+            SI mx= (x1 + x2) >> 1, my= (y1 + y2) >> 1;
+            if (pw >= vw) {
+              if (cu->ox > mx) mx= x2 - ((vx2 - vx1) >> 1);
+              else             mx= x1 + ((vx2 - vx1) >> 1);
+            }
+            if (ph >= vh) {
+              if (cu->oy > my) my= y2 - ((vy2 - vy1) >> 1);
+              else             my= y1 + ((vy2 - vy1) >> 1);
+            }
+            scroll_to (mx, my);
+            send_invalidate_all (this);
+            return;
+          }
+        }
       }
+    }
+
+    if (must_update) {
+      scroll_to (cu->ox, cu->oy);
+      send_invalidate_all (this);
+    }
   }
   else {
     SI x, y, sx, sy;
@@ -270,14 +368,23 @@ edit_interface_rep::selection_visible () {
   if ((vx2 - vx1 <= 80*pixel) || (vy2 - vy1 <= 80*pixel)) return;
 
   SI extra= (cur_sb == 1? 20 * pixel: 0);
+  /*
   bool scroll_x= (end_x < vx1 + extra) || (end_x >= vx2 - extra);
   bool scroll_y= (end_y < vy1 + extra) || (end_y >= vy2 - extra);
-  SI new_x= vx1;
-  if (scroll_x) new_x= end_x - ((vx2-vx1)>>1);
-  SI new_y= vy2;
-  if (scroll_y) new_y= end_y + ((vy2-vy1)>>1);
-
   if (scroll_x || scroll_y) {
+    SI new_x = (scroll_x)? end_x : (vx1+vx2)/2;
+    SI new_y = (scroll_y)? end_y : (vy1+vy2)/2;
+  */
+  // trying a "proportional" scroll 
+  SI mx = max (-end_x + vx1 + extra, max (end_x - vx2 + extra, 0));
+  SI my = max (-end_y + vy1 + extra, max (end_y - vy2 + extra, 0));
+
+  if ((mx>0) || (my>0)) {
+    SI vxc = (vx1+vx2)/2, dx = end_x - vxc;
+    SI vyc = (vy1+vy2)/2, dy = end_y - vyc;
+    SI new_x = vxc+ ((extra)? (mx*dx)/extra: dx);
+    SI new_y = vyc+ ((extra)? (my*dy)/extra: dy);
+    //end change
     scroll_to (new_x, new_y);
     send_invalidate_all (this);
     SI old_vx1= vx1, old_vy1= vy1;
@@ -297,7 +404,9 @@ is_graphical (tree t) {
     is_func (t, _POINT) ||
     is_func (t, LINE) || is_func (t, CLINE) ||
     is_func (t, ARC) || is_func (t, CARC) ||
-    is_func (t, SPLINE) || is_func (t, CSPLINE);
+    is_func (t, SPLINE) || is_func (t, CSPLINE) ||
+    is_func (t, BEZIER) || is_func (t, CBEZIER) ||
+    is_func (t, SMOOTH) || is_func (t, CSMOOTH);
 }
 
 static void
@@ -321,6 +430,7 @@ correct_adjacent (rectangles& rs1, rectangles& rs2) {
 void
 edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
   if (p == rp) return;
+  tree pt= subtree (et, path_up (p));
   tree st= subtree (et, p);
   if ((is_func (st, TABLE) || is_func (st, SUBTABLE)) &&
       recurse && get_preference ("show table cells") == "on") {
@@ -356,6 +466,11 @@ edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
            is_graphical (st) ||
            (is_func (st, WITH) && is_graphical (st[N(st)-1])) ||
            (is_func (st, WITH) && is_graphical_text (st[N(st)-1])) ||
+           (is_func (pt, GRAPHICS) &&
+            (is_compound (st, "anim-edit") ||
+             is_compound (st, "anim-static") ||
+             is_compound (st, "anim-dynamic"))) ||
+           is_compound (st, "shared", 3) ||
            (is_compound (st, "math", 1) &&
             is_compound (subtree (et, path_up (p)), "input")))
     compute_env_rects (path_up (p), rs, recurse);
@@ -407,9 +522,9 @@ edit_interface_rep::has_changed (int question) {
 int
 edit_interface_rep::idle_time (int event_type) {
   if (env_change == 0 &&
-      get_renderer (this) -> repainted () &&
-      (!check_event (event_type)) &&
-      got_focus)
+      got_focus &&
+      (!query_invalid (this)) &&
+      (!check_event (event_type)))
     return texmacs_time () - last_change;
   else return 0;
 }
@@ -420,42 +535,70 @@ edit_interface_rep::change_time () {
 }
 
 void
+edit_interface_rep::update_menus () {
+  SERVER (menu_main ("(horizontal (link texmacs-menu))"));
+  SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
+  SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
+  SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
+  SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+  if (use_side_tools)
+    { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
+  SERVER (bottom_tools (0, "(vertical (link texmacs-bottom-tools))"));
+  set_footer ();
+  if (has_current_window ()) {
+    array<url> ws= buffer_to_windows (
+                     window_to_buffer (
+                       abstract_window (concrete_window ())));
+    int n= N(ws);
+    bool ns= need_save ();
+    for (int i=0; i<n; i++)
+      concrete_window (ws[i])->set_modified (ns);
+  }
+  if (!gui_interrupted ()) drd_update ();
+  cache_memorize ();
+  last_update= last_change;
+  save_user_preferences ();
+}
+
+int
+edit_interface_rep::find_alt_selection_index
+  (range_set alt_sel, SI y, int b, int e) {
+  if (e - b <= 2) return b;
+  int half= ((b + e) >> 2) << 1;
+  int h= half;
+  SI sy;
+  while (h < e) {
+    range_set sub_sel= simple_range (alt_sel[h], alt_sel[h+1]);
+    selection sel= compute_selection (sub_sel);
+    if (is_nil (sel->rs)) { h += 2; continue; }
+    sy= (sel->rs->item->y1 + sel->rs->item->y2) >> 1;
+    break;
+  }
+  if (h >= e || y > sy)
+    return find_alt_selection_index (alt_sel, y, b, half);
+  else
+    return find_alt_selection_index (alt_sel, y, h, e);
+}
+
+void
 edit_interface_rep::apply_changes () {
   //cout << "Apply changes\n";
   //cout << "et= " << et << "\n";
   //cout << "tp= " << tp << "\n";
   //cout << HRULE << "\n";
+
+  update_visible ();
+  rectangle new_visible= rectangle (vx1, vy1, vx2, vy2);  
+
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
         idle_time (INTERRUPTED_EVENT) >= 1000/6)
-    {
-      SERVER (menu_main ("(horizontal (link texmacs-menu))"));
-      SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
-      SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
-      SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
-      SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
-      if (use_side_tools)
-        { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
-      set_footer ();
-      if (has_current_window ()) {
-        if (need_save())
-          concrete_window () -> set_window_name (buf->buf->title * " *");
-        else
-          concrete_window () -> set_window_name (buf->buf->title);
-      }
-      if (!get_renderer (this) -> interrupted ()) drd_update ();
-      cache_memorize ();
-      last_update= last_change;
-      save_user_preferences ();
-    }
-    return;
+      update_menus ();
+    if (new_visible == last_visible) return;
   }
-  
+
   // cout << "Applying changes " << env_change << " to " << get_name() << "\n";
   // time_t t1= texmacs_time ();
-  
-  // cout << "Always\n";
-  update_visible ();
   
   // cout << "Handling automatic resizing\n";
   int sb= 1;
@@ -476,11 +619,7 @@ edit_interface_rep::apply_changes () {
       else ::get_size (widget (cvw), wx, wy);
       if (get_init_string (SCROLL_BARS) == "false") sb= 0;
       if (get_server () -> in_full_screen_mode ()) sb= 0;
-#ifdef QTTEXMACS
-      if (sb) wx -= 24 * PIXEL;
-#else
-      if (sb) wx -= 20 * PIXEL;
-#endif
+      if (sb) wx -= scrollbar_width();
       if (wx != cur_wx || wy != cur_wy) {
 	cur_wx= wx; cur_wy= wy;
 	init_env (PAGE_SCREEN_WIDTH, as_string ((SI) (wx/magf)) * "tmpt");
@@ -488,6 +627,7 @@ edit_interface_rep::apply_changes () {
 	notify_change (THE_ENVIRONMENT);
       }
     }
+  if (get_init_string (PAGE_MEDIUM) == "beamer" && full_screen) sb= 0;
   if (sb != cur_sb) {
     cur_sb= sb;
     if (has_current_window ())
@@ -512,13 +652,21 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling selection\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_SELECTION)) {
-    if (made_selection) {
+    if (!is_nil (selection_rects)) {
       invalidate (selection_rects);
       if (!selection_active_any ()) {
-        made_selection= false;
         set_selection (tp, tp);
         selection_rects= rectangles ();
       }
+    }
+    if (N (alt_selection_rects) != 0) {
+      rectangles visible (rectangle (vx1, vy1, vx2, vy2));
+      for (int i=0; i<N(alt_selection_rects); i++)
+        invalidate (alt_selection_rects[i] & visible);
+      range_set alt_sel= append (get_alt_selection ("alternate"),
+                                 get_alt_selection ("brackets"));
+      if (is_empty (alt_sel))
+        alt_selection_rects= array<rectangles> ();
     }
   }
   
@@ -550,8 +698,50 @@ edit_interface_rep::apply_changes () {
 #endif
   
   // cout << "Handling extents\n";
-  if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS))
-    set_extents (eb->x1, eb->y1, eb->x2, eb->y2);
+  if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
+    string medium= get_init_string (PAGE_MEDIUM);
+    SI ex1= (SI) (((double) eb->x1) * magf);
+    SI ey1= (SI) (((double) eb->y1) * magf);
+    SI ex2= (SI) (((double) eb->x2) * magf);
+    SI ey2= (SI) (((double) eb->y2) * magf);
+    abs_round (ex1, ey1);
+    abs_round (ex2, ey2);
+    SI w, h;
+    widget me= ::get_canvas (widget (cvw));
+    ::get_size (me, w, h);
+#ifdef X11TEXMACS
+    w -= 2*PIXEL;
+    h -= 2*PIXEL;
+#endif
+    if (cur_sb && ey2 - ey1 > h) w -= scrollbar_width ();
+    if (cur_sb && ex2 - ex1 > w) h -= scrollbar_width ();
+    if (ex2 - ex1 <= w + 2*PIXEL) {
+      if (medium == "automatic" ||
+          (medium == "beamer" && full_screen))
+        ex2= ex1 + w;
+      else {
+#ifdef X11TEXMACS
+        ex1= (ex1 + ex2 - w) / 2;
+        abs_round (ex1);
+        ex2= ex1 + w;
+#endif
+      }
+    }
+    if (ey2 - ey1 <= h + 2*PIXEL) {
+      if (medium == "papyrus" || medium == "automatic" ||
+          (medium == "beamer" && full_screen))
+        ey1= ey2 - h;
+      else {
+#ifdef X11TEXMACS
+        ey1= (ey1 + ey2 - h) / 2;
+        abs_round (ey1);
+        ey2= ey1 + h;
+#endif
+      }
+    }
+    SERVER (set_extents (ex1, ey1, ex2, ey2));
+    //set_extents (eb->x1, eb->y1, eb->x2, eb->y2);
+  }
   
   // cout << "Cursor\n";
   temp_invalid_cursor= false;
@@ -639,8 +829,7 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling selection\n";
   if (env_change & THE_SELECTION) {
-    made_selection= selection_active_any ();
-    if (made_selection) {
+    if (selection_active_any ()) {
       table_selection= selection_active_table ();
       selection sel; selection_get (sel);
       rectangles rs= thicken (sel->rs, pixel, 3*pixel);
@@ -651,10 +840,37 @@ edit_interface_rep::apply_changes () {
       invalidate (selection_rects);
     }
   }
+
+  // cout << "Handling alternative selection\n";
+  if ((env_change & THE_SELECTION) || new_visible != last_visible) {
+    range_set alt_sel= append (get_alt_selection ("alternate"),
+                               get_alt_selection ("brackets"));
+    if (!is_empty (alt_sel)) {
+      alt_selection_rects= array<rectangles> (); int b= 0, e= N(alt_sel);
+      if (e - b >= 200) {
+        b= max (find_alt_selection_index (alt_sel, vy2, b, e) - 100, b);
+        e= min (find_alt_selection_index (alt_sel, vy1, b, e) + 100, e);
+      }
+      for (int i=b; i+1<e; i+=2) {
+        range_set sub_sel= simple_range (alt_sel[i], alt_sel[i+1]);
+        selection sel= compute_selection (sub_sel);
+        rectangles rs= thicken (sel->rs, pixel, 3*pixel);
+#ifndef QTTEXMACS
+        rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
+#endif
+        if (N(rs) != 0) alt_selection_rects << rs;
+      }
+      rectangles visible (new_visible);
+      for (int i=0; i<N(alt_selection_rects); i++)
+        invalidate (alt_selection_rects[i] & visible);
+    }
+  }
   
   // cout << "Handling locus highlighting\n";
-  if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS))
-    update_active_loci ();
+  if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
+    update_mouse_loci ();
+    update_focus_loci ();
+  }
   if (env_change & THE_LOCUS) {
     if (locus_new_rects != locus_rects) {
       invalidate (locus_rects);
@@ -676,17 +892,30 @@ edit_interface_rep::apply_changes () {
         invalidate (gx1, gy1, gx2, gy2);
     }
   }
+
+  // cout << "Graphics snapping\n";
+  if (inside_active_graphics ()) {
+    tree t= as_tree (call ("graphics-get-snap-mode"));
+    set_snap_mode (t);
+    string val= as_string (call ("graphics-get-snap-distance"));
+    set_snap_distance (as_length (val));
+  }
   
   // cout << "Handling environment changes\n";
   if (env_change & THE_ENVIRONMENT)
     send_invalidate_all (this);
-  
+
+  // cout << "Handling menus\n";
+  if (env_change & THE_MENUS)
+    update_menus ();
+
   // cout << "Applied changes\n";
   // time_t t2= texmacs_time ();
   // if (t2 - t1 >= 10) cout << "apply_changes took " << t2-t1 << "ms\n";
   env_change  = 0;
   last_change = texmacs_time ();
   last_update = last_change-1;
+  last_visible= new_visible;
   manual_focus_release ();
 }
 
@@ -696,16 +925,10 @@ edit_interface_rep::apply_changes () {
 
 void
 edit_interface_rep::animate () {
-  // cout << do_animate << ", " << next_animate << "\n";
-  if (do_animate && texmacs_time () - next_animate >= 0) {
-    bool flag= false;
-    time_t at= 0;
-    rectangles rs;
-    eb->anim_get_invalid (flag, at, rs);
-    if (flag && texmacs_time () - at >= 0)
-      invalidate (rs);
-    do_animate  = flag;
-    next_animate= at;
+  if (((double) texmacs_time ()) >= anim_next) {
+    rectangles rs= eb->anim_invalid ();
+    invalidate (rs);
+    stored_rects= rectangles ();
   }
 }
 
@@ -730,6 +953,13 @@ void
 edit_interface_rep::after_menu_action () {
   notify_change (THE_DECORATIONS);
   end_editing ();
+  windows_delayed_refresh (1);
+}
+
+void
+edit_interface_rep::cancel_menu_action () {
+  notify_change (THE_DECORATIONS);
+  cancel_editing ();
   windows_delayed_refresh (1);
 }
 
@@ -760,6 +990,11 @@ edit_interface_rep::search_selection (path start, path end) {
 /******************************************************************************
 * event handlers
 ******************************************************************************/
+
+bool
+edit_interface_rep::is_editor_widget () {
+  return true;
+}
 
 void
 edit_interface_rep::handle_get_size_hint (SI& w, SI& h) {

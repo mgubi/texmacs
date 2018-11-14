@@ -73,6 +73,7 @@ invert (modification m, tree t) {
   default:
     FAILED ("unexpected situation");
   }
+  return m;
 }
 
 /******************************************************************************
@@ -149,6 +150,10 @@ swap_basic (modification& m1, modification& m2) {
 
 bool
 swap (modification& m1, modification& m2) {
+  // Assuming that m1;m2 (the patch m1 followed by m2) is well-defined,
+  // determine modifications m1* and m2* such that m2*;m1* is equivalent
+  // to m1;m2.  If such modifications exist, then set m1 := m2* and
+  // m2 := m1* and return true.  Otherwise, return false
   path rp1= root (m1);
   path rp2= root (m2);
   if (is_nil (rp1))
@@ -303,13 +308,42 @@ swap (modification& m1, modification& m2) {
   }
   else return swap_basic (m1, m2);
   FAILED ("unexpected situation");
+  return false;
 }
 
 bool
 commute (modification m1, modification m2) {
+  // Assuming that m1;m2 (the patch m1 followed by m2) is well-defined,
+  // determine whether there exist modifications m1* and m2* such that
+  // m2*;m1* is equivalent to m1;m2
   modification s1= m1;
   modification s2= m2;
   return swap (s1, s2);
+}
+
+bool
+can_pull (modification m1, modification m2) {
+  return commute (m2, m1);
+}
+
+modification
+pull (modification m1, modification m2) {
+  // Assuming that m2;m1 (the patch m2 followed by m1) is well-defined,
+  // return the modification m1* such that m1;m2 is equivalent to m2*;m1*
+  // for a suitable modification m1* (assuming that m1* and m2* exist).
+  modification s1= m2;
+  modification s2= m1;
+  ASSERT (swap (s1, s2), "modification cannot be pulled");
+  return s1;
+}
+
+modification
+co_pull (modification m1, modification m2) {
+  // Same as pull, but return m2* instead of m1*
+  modification s1= m2;
+  modification s2= m1;
+  ASSERT (swap (s1, s2), "modification cannot be pulled");
+  return s2;
 }
 
 /******************************************************************************
@@ -408,37 +442,39 @@ test_commute () {
       modification m2= test_modification (j);
       modification t1= m1;
       modification t2= m2;
-      cout << "m1  = " << m1 << "\n";
-      cout << "m2  = " << m2 << "\n";
+      debug_std << "m1  = " << m1 << "\n";
+      debug_std << "m2  = " << m2 << "\n";
       bool r= swap (m1, m2);
       modification u1= m1;
       modification u2= m2;
-      if (!r) cout << "  Modifications do not commute\n\n";
+      if (!r) debug_std << "  Modifications do not commute\n\n";
       else {
-	cout << "m1' = " << m1 << "\n";
-	cout << "m2' = " << m2 << "\n";
+	debug_std << "m1' = " << m1 << "\n";
+	debug_std << "m2' = " << m2 << "\n";
 	if (clean_apply (clean_apply (tt, t1), t2) !=
 	    clean_apply (clean_apply (tt, m1), m2)) {
-	  cout << "t1  = " << clean_apply (clean_apply (tt, t1), t2) << "\n";
-	  cout << "t2  = " << clean_apply (clean_apply (tt, m1), m2) << "\n";
+	  failed_error << "t1  = "
+                       << clean_apply (clean_apply (tt, t1), t2) << "\n";
+	  failed_error << "t2  = "
+                       << clean_apply (clean_apply (tt, m1), m2) << "\n";
 	  FAILED ("inconsistency");
 	}
 	r= swap (m1, m2);
-	if (!r) cout << "r   = " << r << "\n";
+	if (!r) debug_std << "r   = " << r << "\n";
 	else if (m1 != t1 || m2 != t2) {
-	  cout << "m1''= " << m1 << "\n";
-	  cout << "m2''= " << m2 << "\n";
+	  debug_std << "m1''= " << m1 << "\n";
+	  debug_std << "m2''= " << m2 << "\n";
 	  r= swap (m1, m2);
-	  if (!r) cout << "r   = " << r << "\n";
+	  if (!r) debug_std << "r   = " << r << "\n";
 	  else if (m1 != u1 || m2 != u2) {
-	    cout << "m1* = " << m1 << "\n";
-	    cout << "m2* = " << m2 << "\n";
+	    debug_std << "m1* = " << m1 << "\n";
+	    debug_std << "m2* = " << m2 << "\n";
 	    r= false;
 	  }
 	}
-	if (r) cout << "  Consistency check succeeded\n\n";
+	if (r) debug_std << "  Consistency check succeeded\n\n";
 	else {
-	  cout << "  Consistency check failed\n\n";
+	  failed_error << "  Consistency check failed\n\n";
 	  FAILED ("inconsistency");
 	}
       }
@@ -455,11 +491,11 @@ test_invert () {
     tree t3= clean_apply (t2, m2);
     modification m3= invert (m2, t2);
     if (m1 != m3 || t1 != t3) {
-      cout << "t1= " << t1 << "\n";
-      cout << "m1= " << m1 << "\n";
-      cout << "t2= " << t2 << "\n";
-      cout << "m2= " << m2 << "\n";
-      cout << "t3= " << t3 << "\n";
+      failed_error << "t1= " << t1 << "\n";
+      failed_error << "m1= " << m1 << "\n";
+      failed_error << "t2= " << t2 << "\n";
+      failed_error << "m2= " << m2 << "\n";
+      failed_error << "t3= " << t3 << "\n";
       FAILED ("inconsistency");
     }
  }

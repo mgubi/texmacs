@@ -11,11 +11,12 @@
 
 #ifndef X_GUI_H
 #define X_GUI_H
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "gui.hpp"
 #include "widget.hpp"
 #include "array.hpp"
 #include "hashmap.hpp"
+#include "colors.hpp"
 
 class x_gui_rep;
 class x_drawable_rep;
@@ -34,9 +35,7 @@ extern x_gui the_gui;
 #include <X11/keysym.h>
 #include <X11/Sunkeysym.h>
 
-extern bool true_color;
-#define CONVERT(c) (true_color? (c & 0xffffff): gui->cmap [c & 0xffffff])
-color blend (color fg, color bg);
+#define CONVERT(c) (true_colors? (c & 0xffffff): gui->cmap [c & 0xffffff])
 
 /******************************************************************************
 * For anti aliasing of TeX fonts
@@ -120,8 +119,6 @@ public:
   hashmap<x_character,pointer> color_scale;       // for anti-aliasing
   hashmap<x_character,pointer> character_bitmap;  // bitmaps of all characters
   hashmap<x_character,pointer> character_pixmap;  // pixmaps of all characters
-  hashmap<string,int>          xpm_bitmap;        // bitmaps of all xpms
-  hashmap<string,int>          xpm_pixmap;        // pixmaps of all xpms
   hashmap<int,string>          lower_key;
   hashmap<int,string>          upper_key;
 
@@ -143,7 +140,6 @@ public:
   /****************************** Keyboard ***********************************/
   void initialize_input_method ();
   void insert_keysym (array<int>& a, int i, int j);
-  void get_xmodmap ();
   void map (int key, string s);
   void Map (int key, string s);
   void initialize_keyboard_pointer ();
@@ -180,8 +176,6 @@ public:
   void   show_help_balloon (widget wid, SI x, SI y);
   void   map_balloon ();
   void   unmap_balloon ();
-  void   image_auto_gc ();
-  void   image_gc (string name);
   void   set_mouse_pointer (widget w, string name);
   void   set_mouse_pointer (widget w, string curs_name, string mask_name);
   void   show_wait_indicator (widget w, string message, string arg);

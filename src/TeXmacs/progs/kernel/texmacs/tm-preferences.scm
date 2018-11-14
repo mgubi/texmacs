@@ -50,16 +50,19 @@
   (:synopsis "Set preference @which to @what")
   (:check-mark "*" test-preference?)
   ;;(display* "set-preference " which " := " what "\n")
-  (cpp-set-preference which (if (string? what) what (object->string what)))
-  (notify-preference which)
-  (save-preferences))
+  (with val (if (string? what) what (object->string what))
+    (when (!= (get-preference which) val)
+      (cpp-set-preference which val)
+      (notify-preference which)
+      (save-preferences))))
 
 (tm-define (reset-preference which)
   (:synopsis "Revert preference @which to default setting")
   ;;(display* "reset-preference " which "\n")
-  (cpp-reset-preference which)
-  (notify-preference which)
-  (save-preferences))
+  (when (cpp-has-preference? which)
+    (cpp-reset-preference which)
+    (notify-preference which)
+    (save-preferences)))
 
 (define (get-call-back what)
   (let ((r (ahash-ref preferences-call-back what)))
@@ -77,7 +80,7 @@
          (r (cpp-get-preference which (if s? def (object->string def)))))
     (if s? r (string->object r))))
 
-(define (preference-on? which)
+(tm-define (preference-on? which)
   (test-preference? which "on"))
 
 (tm-define (toggle-preference which)
@@ -149,6 +152,15 @@
         (else
           (with s (look-and-feel)
             (or (== t s) (and (== t "std") (!= s "emacs")))))))
+
+(define-public (use-popups?)
+  (== (get-preference "complex actions") "popups"))
+
+(define-public (use-menus?)
+  (== (get-preference "complex actions") "menus"))
+
+(define-public (use-print-dialog?)
+  (and (qt-gui?) (== (get-preference "gui:print dialogue") "on")))
 
 (set! has-look-and-feel? test-look-and-feel)
 

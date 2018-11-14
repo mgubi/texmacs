@@ -67,6 +67,16 @@ hashset_rep<T>::remove (T x) {
   }
 }
 
+template<class T> hashset<T>
+copy (hashset<T> h) {
+  int i, n= h->n;
+  hashset<T> h2 (n, h->max);
+  h2->size= h->size;
+  for (i=0; i<n; i++)
+    h2->a[i]= copy (h->a[i]);
+  return h2;
+}
+
 template<class T> bool
 operator <= (hashset<T> h1, hashset<T> h2) {
   int i=0, j=0, n=h1->n;
@@ -114,6 +124,12 @@ hashset<T>::operator tree () {
       t[j]= as_tree(l->item);
   }
   return t;
+}
+
+template<class T> hashset<T>&
+operator << (hashset<T>& h, T x) {
+  h->insert (x);
+  return h;
 }
 
 #endif // defined HASHSET_CC

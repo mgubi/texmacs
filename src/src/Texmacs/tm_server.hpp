@@ -11,11 +11,13 @@
 
 #ifndef TM_SERVER_H
 #define TM_SERVER_H
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "tm_config.hpp"
 #include "tm_buffer.hpp"
 #include "tm_frame.hpp"
 #include "tm_data.hpp"
+
+bool is_server_started ();
 
 class tm_server_rep:
   public tm_config_rep,
@@ -41,7 +43,6 @@ public:
   void   set_printer_dpi (string dpi);
   void   set_default_zoom_factor (double zoom);
   double get_default_zoom_factor ();
-  void   image_gc (string which);
   void   inclusions_gc (string which);
   void   typeset_update (path p);
   void   typeset_update_all ();

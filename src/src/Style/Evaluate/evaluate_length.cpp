@@ -146,27 +146,34 @@ std_fn () {
   switch (std_mode ()) {
   case 0:
   case 1:
-    return find_font (as_string (std_env [FONT]),
-		      as_string (std_env [FONT_FAMILY]),
-		      as_string (std_env [FONT_SERIES]),
-		      as_string (std_env [FONT_SHAPE]),
-		      script (fs, std_math_level ()),
-		      (int) (std_magnification () * std_dpi ()),
-		      true);
+    return smart_font (as_string (std_env [FONT]),
+                       as_string (std_env [FONT_FAMILY]),
+                       as_string (std_env [FONT_SERIES]),
+                       as_string (std_env [FONT_SHAPE]),
+                       script (fs, std_math_level ()),
+                       (int) (std_magnification () * std_dpi ()));
   case 2:
-    return find_font (as_string (std_env [MATH_FONT]),
-		      as_string (std_env [MATH_FONT_FAMILY]),
-		      as_string (std_env [MATH_FONT_SERIES]),
-		      as_string (std_env [MATH_FONT_SHAPE]),
-		      script (fs, std_math_level ()),
-		      (int) (std_magnification () * std_dpi ()));
+    return smart_font (as_string (std_env [MATH_FONT]),
+                       as_string (std_env [MATH_FONT_FAMILY]),
+                       as_string (std_env [MATH_FONT_SERIES]),
+                       as_string (std_env [MATH_FONT_SHAPE]),
+                       as_string (std_env [FONT]),
+                       as_string (std_env [FONT_FAMILY]),
+                       as_string (std_env [FONT_SERIES]),
+                       "mathitalic",
+                       script (fs, std_math_level ()),
+                       (int) (std_magnification () * std_dpi ()));
   case 3:
-    return find_font (as_string (std_env [PROG_FONT]),
-		      as_string (std_env [PROG_FONT_FAMILY]),
-		      as_string (std_env [PROG_FONT_SERIES]),
-		      as_string (std_env [PROG_FONT_SHAPE]),
-		      script (fs, std_math_level ()),
-		      (int) (std_magnification () * std_dpi ()));
+    return smart_font (as_string (std_env [PROG_FONT]),
+                       as_string (std_env [PROG_FONT_FAMILY]),
+                       as_string (std_env [PROG_FONT_SERIES]),
+                       as_string (std_env [PROG_FONT_SHAPE]),
+                       as_string (std_env [FONT]),
+                       as_string (std_env [FONT_FAMILY]) * "-tt",
+                       as_string (std_env [FONT_SERIES]),
+                       as_string (std_env [FONT_SHAPE]),
+                       script (fs, std_math_level ()),
+                       (int) (std_magnification () * std_dpi ()));
   default:
     return get_default_font ();
   }
@@ -325,6 +332,15 @@ tree
 evaluate_gh_length () {
   //return tree (TMLEN, as_string (gh));
   return tree (TMLEN, as_string (6 * std_inch() / 2.54)); // 6cm
+}
+
+tree
+evaluate_gu_length () {
+  // FIXME: not yet implemented
+  return evaluate_cm_length ();
+  //point p0= fr (point (0.0, 0.0));
+  //point p1= fr (point (1.0, 0.0));
+  //return tree (TMLEN, as_string (norm (p1 - p0)));
 }
 
 tree evaluate_msec_length () { return tree (TMLEN, "1"); }

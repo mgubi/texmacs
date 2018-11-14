@@ -19,21 +19,28 @@
   (define Assign-symbol
     (:type infix)
     (:penalty 3)
-    (:spacing default default)
-    "<assign>" "<plusassign>" "<minusassign>" "<astassign>" "<overassign>")
+    (:spacing wide wide)
+    "<assign>" "<backassign>"
+    "<plusassign>" "<minusassign>" "<astassign>" "<overassign>")
   
   (define Flux-symbol
     (:type infix)
-    (:spacing default default)
+    (:spacing wide wide)
     "<lflux>" "<gflux>")
 
   (define Models-symbol
     (:type infix)
-    (:spacing default default)
-    "<models>" "<vdash>" "<dashv>" "<vDash>" "<Vdash>" "<Vvdash>" "<VDash>"
-    "<longvdash>" "<longdashv>" "<longvDash>"
-    "<longVdash>" "<longVvdash>" "<longVDash>"
-    "<nvdash>" "<ndashv>" "<nvDash>" "<nVdash>" "<nVvdash>" "<nVDash>")
+    (:spacing default wide)
+    "<models>"
+    "<vdash>" "<dashv>" "<vDash>" "<Dashv>"
+    "<Vdash>" "<dashV>" "<VDash>" "<DashV>"
+    "<Vvdash>" "<dashVv>" "<VvDash>" "<DashVv>"
+    "<longvdash>" "<longdashv>" "<longvDash>" "<longDashv>"
+    "<longVdash>" "<longdashV>" "<longVDash>" "<longDashV>"
+    "<longVvdash>" "<longdashVv>" "<longVvDash>" "<longDashVv>"
+    "<nvdash>" "<ndashv>" "<nvDash>" "<nDashv>"
+    "<nVdash>" "<ndashV>" "<nVDash>" "<nDashV>"
+    "<nVvdash>" "<ndashVv>" "<nVvDash>" "<nDashVv>")
 
   (define Quantifier-symbol
     (:type prefix)
@@ -42,7 +49,7 @@
   (define Imply-nolim-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     "<implies>" "<equivalent>" "<Leftarrow>" "<Rightarrow>" "<Leftrightarrow>"
     "<Longleftarrow>" "<Longrightarrow>" "<Longleftrightarrow>"
     "<Lleftarrow>" "<Rrightarrow>"
@@ -51,7 +58,7 @@
   (define Imply-lim-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
+    (:spacing wide wide)
     (:limits always)
     "<Leftarrowlim>" "<Rightarrowlim>" "<Leftrightarrowlim>"
     "<Longleftarrowlim>" "<Longrightarrowlim>" "<Longleftrightarrowlim>")
@@ -62,14 +69,14 @@
   (define Or-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
-    "<vee>" "<curlyvee>")
+    (:spacing wide wide)
+    "<vee>" "<curlyvee>" "<veebar>" "<obar>" "<boxbar>")
 
   (define And-symbol
     (:type infix)
     (:penalty 10)
-    (:spacing default default)
-    "<wedge>" "<curlywedge>")
+    (:spacing wide wide)
+    "<wedge>" "<curlywedge>" "<barwedge>" "<doublebarwedge>")
 
   (define Not-symbol
     (:type prefix)
@@ -79,62 +86,90 @@
   (define Relation-nolim-symbol
     (:type infix)
     (:penalty 20)
-    (:spacing default default)
+    (:spacing wide wide)
 
     "=" "<ne>" "<neq>" "<longequal>" "<less>" "<gtr>" "<le>" "<leq>"
-    "<prec>" "<preceq>" "<ll>" "<lleq>" "<subset>" "<subseteq>"
-    "<sqsubset>" "<sqsubseteq>" "<in>" "<ni>" "<of>"
-    "<ge>" "<geq>" "<succ>" "<succeq>"
-    "<gg>" "<ggeq>" "<supset>" "<supseteq>" "<sqsupset>" "<sqsupseteq>"
+    "<prec>" "<preceq>" "<preceqq>" "<ll>" "<lleq>" "<subset>" "<subseteq>"
+    "<sqsubset>" "<sqsubseteq>" "<sqsubseteqq>" "<in>" "<ni>" "<of>"
+    "<ge>" "<geq>" "<succ>" "<succeq>" "<succeqq>"
+    "<gg>" "<ggeq>" "<supset>" "<supseteq>"
+    "<sqsupset>" "<sqsupseteq>" "<sqsupseteqq>"
     "<equiv>" "<nequiv>" "<sim>" "<simeq>" "<asymp>" "<approx>" "<cong>"
+    "<triplesim>" "<ntriplesim>"
     "<subsetsim>" "<supsetsim>" "<doteq>" "<propto>" "<varpropto>"
     "<perp>" "<bowtie>" "<Join>" "<smile>" "<frown>" "<signchange>"
     "<parallel>" "<shortparallel>" "<nparallel>" "<nshortparallel>"
     "<shortmid>" "<nshortmid>" "<nmid>" "<divides>" "<ndivides>"
 
-    "<approxeq>" "<backsim>" "<backsimeq>" "<Bumpeq>" "<bumpeq>" "<circeq>"
+    "<approxeq>" "<backsim>" "<backsimeq>"
+    "<Bumpeq>" "<bumpeq>" "<circeq>" "<triangleq>"
     "<curlyeqprec>" "<curlyeqsucc>" "<Doteq>" "<doteqdot>" "<eqcirc>"
     "<eqslantgtr>" "<eqslantless>" "<fallingdotseq>" "<geqq>" "<geqslant>"
-    "<ggg>" "<gggtr>" "<gnapprox>" "<gneq>" "<gneqq>" "<gnsim>" "<gtrapprox>"
-    "<gtrdot>" "<gtreqdot>" "<gtreqless>" "<gtreqqless>" "<gtrless>"
+    "<ggg>" "<gggtr>" "<ngtrapprox>" "<gnapprox>" "<gneq>" "<gneqq>"
+    "<ngtrsim>" "<gnsim>" "<gtrapprox>"
+    "<gtrdot>" "<gtreqdot>" "<dotgtr>" "<dotgeq>" "<dotgeqslant>"
+    "<gtreqless>" "<gtreqqless>" "<gtrless>"
     "<gtrsim>" "<gvertneqq>" "<leqq>" "<leqslant>" "<lessapprox>"
-    "<lessdot>" "<lesseqdot>" "<lesseqgtr>" "<lesseqqgtr>" "<lessgtr>"
-    "<lesssim>" "<lll>" "<llless>" "<lnapprox>" "<lneq>" "<lneqq>"
-    "<lnsim>" "<lvertneqq>" "<napprox>" "<ngeq>" "<ngeqq>" "<ngeqslant>"
-    "<ngtr>" "<nleq>" "<nleqq>" "<nleqslant>" "<nless>" "<nprec>" "<npreceq>"
-    "<nsim>" "<nsimeq>""<ncong>" "<nasymp>" "<nsubset>" "<nsupset>"
-    "<nsqsubset>" "<nsqsupset>" "<nsqsubseteq>" "<nsqsupseteq>"
-    "<nsubseteq>" "<nsucc>" "<nsucceq>"
+    "<lessdot>" "<lesseqdot>" "<leqdot>" "<leqslantdot>"
+    "<lesseqgtr>" "<lesseqqgtr>" "<lessgtr>"
+    "<lesssim>" "<lll>" "<llless>" "<nlessapprox>" "<lnapprox>"
+    "<lneq>" "<lneqq>" "<nlesssim>" "<lnsim>"
+    "<lvertneqq>" "<napprox>" "<ngeq>" "<ngeqq>" "<ngeqslant>"
+    "<ngtr>" "<nleq>" "<nleqq>" "<nleqslant>" "<nless>"
+    "<nprec>" "<npreceq>" "<precneq>" "<npreceqq>"
+    "<nsim>" "<nsimeq>""<ncong>" "<napproxeq>"
+    "<nasymp>" "<nsubset>" "<nsupset>" "<nsqsubset>" "<nsqsupset>"
+    "<nsqsubseteq>" "<sqsubsetneq>" "<varsqsubsetneq>"
+    "<nsqsupseteq>" "<sqsupsetneq>" "<varsqsupsetneq>"
+    "<nsqsubseteqq>" "<sqsubsetneqq>" "<varsqsubsetneqq>"
+    "<nsqsupseteqq>" "<sqsupsetneqq>" "<varsqsupsetneqq>"
+    "<nsubseteq>" "<nsucc>" "<nsucceq>" "<succneq>" "<nsucceqq>"
     "<nsupseteq>" "<nsupseteqq>" "<precapprox>" "<preccurlyeq>"
-    "<npreccurlyeq>" "<precnapprox>" "<precneqq>"
-    "<precsim>" "<precnsim>" "<risingdoteq>" "<Subset>"
-    "<subseteqq>" "<subsetneq>" "<subsetneqq>" "<succapprox>"
-    "<succcurlyeq>" "<nsucccurlyeq>" "<succnapprox>" "<succneqq>"
-    "<succsim>" "<succnsim>" "<Supset>" "<supseteqq>"
-    "<supsetneq>" "<supsetneqq>"
+    "<npreccurlyeq>" "<nprecapprox>" "<precnapprox>"
+    "<precneqq>" "<precvertneqq>"
+    "<precsim>" "<nprecsim>" "<precnsim>" "<risingdoteq>" "<Subset>"
+    "<subseteqq>" "<subsetneq>"
+    "<nsubseteqq>" "<subsetneqq>" "<succapprox>"
+    "<succcurlyeq>" "<nsucccurlyeq>" "<nsuccapprox>" "<succnapprox>"
+    "<succneqq>" "<succvertneqq>"
+    "<succsim>" "<nsuccsim>" "<succnsim>" "<Supset>" "<supseteqq>"
+    "<nsupsetneqq>" "<supsetneq>" "<supsetneqq>"
     "<thickapprox>" "<thicksim>" "<varsubsetneq>" "<varsubsetneqq>"
     "<varsupsetneq>" "<varsupsetneqq>" "<llleq>" "<gggeq>"
     "<subsetplus>" "<supsetplus>"
+    "<nll>" "<nlleq>" "<nlll>" "<nllleq>"
+    "<ngg>" "<nggeq>" "<nggg>" "<ngggeq>"
 
     "<vartriangleleft>" "<vartriangleright>"
     "<triangleleft>" "<triangleright>"
-    "<trianglelefteq>" "<trianglerighteq>" "<trianglelefteqslant>"
-    "<trianglerighteqslant>" "<blacktriangleleft>" "<blacktriangleright>"
+    "<trianglelefteq>" "<trianglerighteq>"
+    "<trianglelefteqslant>" "<trianglerighteqslant>"
+    "<blacktriangleleft>" "<blacktriangleright>"
+    "<blacktrianglelefteq>" "<blacktrianglerighteq>"
+    "<blacktrianglelefteqslant>" "<blacktrianglerighteqslant>"
     "<ntriangleleft>" "<ntriangleright>"
     "<ntrianglelefteq>" "<ntrianglerighteq>"
     "<ntrianglelefteqslant>" "<ntrianglerighteqslant>"
+    "<nblacktriangleleft>" "<nblacktriangleright>"
+    "<nblacktrianglelefteq>" "<nblacktrianglerighteq>"
+    "<nblacktrianglelefteqslant>" "<nblacktrianglerighteqslant>"
 
     "<precprec>" "<precpreceq>" "<precprecprec>" "<precprecpreceq>"
     "<succsucc>" "<succsucceq>" "<succsuccsucc>" "<succsuccsucceq>"
     "<nprecprec>" "<nprecpreceq>" "<nprecprecprec>" "<nprecprecpreceq>"
     "<nsuccsucc>" "<nsuccsucceq>" "<nsuccsuccsucc>" "<nsuccsuccsucceq>"
     "<asympasymp>" "<nasympasymp>" "<simsim>" "<nsimsim>" "<nin>" "<nni>"
-    "<notin>" "<notni>" "<precdot>" "<preceqdot>" "<dotsucc>" "<dotsucceq>")
+    "<notin>" "<notni>"
+    "<precdot>" "<preceqdot>" "<preccurlyeqdot>"
+    "<dotsucc>" "<dotsucceq>" "<dotsucccurlyeq>"
+
+    "<because>" "<between>" "<therefore>" "<lebar>" "<gebar>"
+    "<leangle>" "<geangle>" "<leqangle>" "<geqangle>")
 
   (define Relation-lim-symbol
     (:type infix)
     (:penalty 20)
-    (:spacing default default)
+    (:spacing wide wide)
     (:limits always)
     "<equallim>" "<longequallim>")
 
@@ -153,7 +188,8 @@
     "<longmapsto>" "<longmapsfrom>"
     "<longhookleftarrow>" "<longhookrightarrow>" "<leftharpoonup>"
     "<leftharpoondown>" "<rightleftharpoons>" "<rightharpoonup>"
-    "<rightharpoondown>" "<leadsto>" "<nleadsto>"
+    "<rightharpoondown>" "<longleftharpoonup>" "<longleftharpoondown>"
+    "<longrightharpoonup>" "<longrightharpoondown>" "<leadsto>" "<nleadsto>"
     "<nearrow>" "<searrow>" "<swarrow>" "<nwarrow>"
     "<longtwoheadleftarrow>" "<longtwoheadrightarrow>"
     "<leftprec>" "<leftpreceq>" "<succright>" "<succeqright>"
@@ -161,15 +197,21 @@
     "<circlearrowleft>" "<circlearrowdown>"
     "<curvearrowleft>" "<curvearrowright>"
     "<downdownarrows>" "<downharpoonleft>" "<downharpoonright>"
+    "<longdownharpoonleft>" "<longdownharpoonright>"
     "<leftarrowtail>" "<leftleftarrows>" "<leftrightarrows>"
+    "<longleftleftarrows>" "<longleftrightarrows>"
     "<leftrightharpoons>" "<rightleftharpoons>"
-    "<looparrowleft>" "<looparrowright>" "<Lsh>" "<multimap>"
+    "<longleftrightharpoons>" "<longrightleftharpoons>"
+    "<looparrowleft>" "<looparrowright>" "<Lsh>"
+    "<multimap>" "<mapmulti>" "<longmultimap>" "<longmapmulti>"
     "<nleftarrow>" "<nleftrightarrow>" "<nrightarrow>" "<restriction>"
     "<rightarrowtail>" "<rightleftarrows>" "<rightrightarrows>"
+    "<longrightleftarrows>" "<longrightrightarrows>"
     "<leftsquigarrow>" "<rightsquigarrow>" "<leftrightsquigarrow>"
     "<Rsh>" "<twoheadleftarrow>" "<twoheadrightarrow>"
-    "<upharpoonleft>" "<upharpoonright>" "<upuparrows>"
-    "<leftrightmap>" "<pointer>")
+    "<upharpoonleft>" "<upharpoonright>"
+    "<longupharpoonleft>" "<longupharpoonright>"
+    "<upuparrows>" "<leftrightmap>" "<pointer>")
   
   (define Arrow-lim-symbol
     (:type infix)
@@ -200,7 +242,7 @@
     (:type infix)
     (:penalty 30)
     (:spacing default default)
-    "<setminus>" "<smallsetminus>")
+    "<setminus>" "<smallsetminus>" "<bslash>")
 
   (define Plus-visible-symbol
     (:type infix)
@@ -228,7 +270,9 @@
     (:type infix)
     (:penalty 30)
     (:spacing default default)
-    "-" "<pm>" "<mp>" "<minus>" "<ominus>" "<boxminus>" "<longminus>")
+    "-" "<pm>" "<mp>" "<minus>" "<longminus>"
+    "<dotminus>" "<dotpm>" "<dotmp>"
+    "<ominus>" "<boxminus>" "<circleddash>")
 
   (define Minus-prefix-symbol
     (:type prefix)
@@ -240,14 +284,20 @@
     (:type infix)
     (:penalty 40)
     (:spacing default default)
-    "<cdot>" "<times>" "<otimes>" "<circ>" "<odot>" "<boxdot>" "<boxtimes>"
-    "<dottimes>" "<dototimes>" "<ltimes>" "<rtimes>" "<atimes>" "<btimes>"
-    "<exterior>" "<join>" "<ast>" "<star>" "<oast>" "<asterisk>")
+    "<cdot>" "<times>" "<otimes>" "<product>"
+    "<circ>" "<bullet>" "<odot>" "<boxdot>" "<boxtimes>" "<boxcircle>"
+    "<dottimes>" "<dototimes>"
+    "<ltimes>" "<rtimes>" "<btimes>" "<ttimes>"
+    "<exterior>" "<join>"
+    "<ast>" "<star>" "<oast>" "<boxast>" "<dotast>"
+    "<circledast>" "<circledcirc>" "<varocircle>" "<boxbox>"
+    "<leftthreetimes>" "<rightthreetimes>"
+    "<lefttimesthree>" "<righttimesthree>")
 
   (define Times-invisible-symbol
     (:type infix)
     (:penalty invalid)
-    (:spacing half half)
+    (:spacing multiply multiply)
     "*")
 
   (define Times-symbol
@@ -257,11 +307,13 @@
     (:type infix)
     (:penalty 40)
     (:spacing default default)
-    "<div>" "<oover>")
+    "<over>" "<div>" "<oover>" "<divideontimes>"
+    "<oslash>" "<boxslash>" "<dslash>")
 
   (define Over-condensed-symbol
     (:type infix)
     (:penalty 40)
+    (:spacing half half)
     "/")
 
   (define Over-symbol
@@ -287,13 +339,19 @@
     "wedge" "curlywedge")
 
   (define Big-union-symbol
-    "cup" "sqcup" "amalg" "uplus" "box")
+    "cup" "sqcup" "amalg" "uplus" "pluscup" "box")
 
   (define Big-intersection-symbol
     "cap" "sqcap")
 
   (define Big-sum-symbol
-    "int" "oint" "intlim" "ointlim" "sum" "oplus" "triangledown")
+    "sum" "oplus" "triangledown"
+    ;; NOTE: declaration order is important, because of packrat parsing
+    "intlim" "iintlim" "iiintlim" "iiiintlim" "idotsintlim"
+    "ointlim" "oiintlim" "oiiintlim"
+    "int" "iint" "iiint" "iiiint" "idotsint" "oint" "oiint" "oiiint"
+    "upintlim" "upiintlim" "upiiintlim" "upointlim" "upoiintlim" "upoiiintlim"
+    "upint" "upiint" "upiiint" "upoint" "upoiint" "upoiiint")
 
   (define Big-product-symbol
     "prod" "otimes" "odot" "triangleup")
@@ -308,14 +366,18 @@
     (:type prefix)
     (:penalty panic)
     (:spacing none big)
-    "<big-int>" "<big-oint>")
+    "<big-int>" "<big-iint>" "<big-iiint>" "<big-iiiint>" "<big-idotsint>"
+    "<big-oint>" "<big-oiint>" "<big-oiiint>")
 
   (define Big-lim-symbol
     (:type prefix)
     (:penalty panic)
     (:spacing none big)
     (:limits display)
-    "<big-sum>" "<big-prod>" "<big-amalg>" "<big-intlim>" "<big-ointlim>"
+    "<big-sum>" "<big-prod>" "<big-amalg>"
+    "<big-intlim>" "<big-iintlim>" "<big-iiintlim>"
+    "<big-iiiintlim>" "<big-idotsintlim>"
+    "<big-ointlim>" "<big-oiintlim>" "<big-oiiintlim>"
     "<big-cap>" "<big-cup>" "<big-sqcap>" "<big-sqcup>"
     "<big-vee>" "<big-wedge>" "<big-curlyvee>" "<big-curlywedge>"
     "<big-odot>" "<big-otimes>" "<big-oplus>" "<big-uplus>"
@@ -334,12 +396,13 @@
   (define Other-postfix-symbol
     (:type postfix)
     (:penalty panic)
-    "!" "%" "<permil>" "<postup>" "<postdown>")
+    "!" "%" "<permil>"
+    "<postup>" "<postdown>" "<postupdown>" "<postmapsup>" "<postmapsdown>")
 
   (define Prime-symbol
     (:type symbol)
     (:penalty panic)
-    "'" "`" "<dag>" "<ddag>" "<ast>")
+    "'" "`" "<dag>" "<ddag>" "<asterisk>" "<star>" "<kreuz>")
 
   (define Ponctuation-visible-symbol
     (:type separator)
@@ -368,9 +431,18 @@
     "<left-lfloor>" "<left-lceil>" "<left-rfloor>" "<left-rceil>"
     "<left-langle>" "<left-rangle>")
   
-  (define Middle-symbol
+  (define Middle-bracket-symbol
     (:type middle-bracket)
+    (:spacing middle middle)
     "|" "<||>" "<nobracket>" "<mid-|>" "<mid-||>" "<mid-.>")
+  
+  (define Middle-separator-symbol
+    (:type middle-bracket)
+    (:spacing default default)
+    "<suchthat>" "<barsuchthat>")
+
+  (define Middle-symbol
+    Middle-bracket-symbol Middle-separator-symbol)
 
   (define Close-symbol
     (:type closing-bracket)
@@ -387,7 +459,8 @@
   (define Suspension-nolim-symbol
     (:type symbol)
     (:penalty invalid invalid)
-    "<ldots>" "<cdots>" "<udots>" "<vdots>" "<ddots>" "<mdots>" "<colons>")
+    "<ldots>" "<cdots>" "<hdots>" "<vdots>"
+    "<ddots>" "<udots>" "<mdots>" "<colons>")
   
   (define Suspension-lim-symbol
     (:type symbol)
@@ -401,11 +474,13 @@
   (define Letter-symbol
     (:type symbol)
 
-    "<mathe>" "<mathi>" "<mathpi>"
+    "<mathe>" "<mathi>" "<mathlambda>" "<mathpi>"
     "<matheuler>" "<mathcatalan>" "<mathGamma>"
     "<aleph>" "<beth>" "<gimel>" "<daleth>"
-    "<hbar>" "<hslash>" "<imath>" "<jmath>"
-    "<ell>" "<b-ell>" "<wp>" "<digamma>"
+    "<hbar>" "<hslash>" "<wp>" "<digamma>"
+    "<imath>" "<b-imath>" "<jmath>" "<b-jmath>" "<ell>" "<b-ell>"
+    "<cal-imath>" "<b-cal-imath>" "<cal-jmath>" "<b-cal-jmath>"
+    "<frak-imath>" "<frak-jmath>" "<bbb-imath>" "<bbb-jmath>"
 
     "<alpha>" "<beta>" "<gamma>" "<delta>" "<epsilon>"
     "<varepsilon>" "<zeta>" "<eta>" "<theta>" "<vartheta>"
@@ -435,6 +510,14 @@
     "<b-Pi>" "<b-Rho>" "<b-Sigma>" "<b-Tau>" "<b-Upsilon>"
     "<b-Phi>" "<b-Psi>" "<b-Chi>" "<b-Omega>"
     "<b-Backepsilon>" "<b-Mho>"
+
+    "<up-alpha>" "<up-beta>" "<up-gamma>" "<up-delta>" "<up-epsilon>"
+    "<up-varepsilon>" "<up-zeta>" "<up-eta>" "<up-theta>" "<up-vartheta>"
+    "<up-iota>" "<up-kappa>" "<up-varkappa>" "<up-lambda>" "<up-mu>"
+    "<up-nu>" "<up-xi>" "<up-omicron>" "<up-pi>" "<up-varpi>" "<up-rho>"
+    "<up-varrho>" "<up-sigma>" "<up-varsigma>" "<up-tau>" "<up-upsilon>"
+    "<up-phi>" "<up-varphi>" "<up-psi>" "<up-chi>" "<up-omega>"
+    "<up-backepsilon>" "<up-mho>"
 
     "<b-a>" "<b-b>" "<b-c>" "<b-d>" "<b-e>" "<b-f>" "<b-g>"
     "<b-h>" "<b-i>" "<b-j>" "<b-k>" "<b-l>" "<b-m>" "<b-n>"
@@ -515,45 +598,46 @@
 
     "<uparrow>" "<Uparrow>" "<downarrow>" "<Downarrow>"
     "<updownarrow>" "<Updownarrow>" "<mapsup>" "<mapsdown>"
-    "<hookuparrow>" "<hookdownarrow>" "<longuparrow>" "<Longuparrow>"
+    "<hookuparrow>" "<hookdownarrow>"
+    "<upsquigarrow>" "<downsquigarrow>" "<updownsquigarrow>"
+    "<upminus>" "<downminus>" "<upequal>" "<downequal>"
+    "<longuparrow>" "<Longuparrow>"
     "<longdownarrow>" "<Longdownarrow>" "<longupdownarrow>" "<Longupdownarrow>"
     "<longmapsup>" "<longmapsdown>" "<longhookuparrow>" "<longhookdownarrow>"
+    "<longupequal>" "<longdownequal>" "<longupminus>" "<longdownminus>"
 
     "<prime>" "<emptyset>"
     "<surd>" "<top>" "<bot>" "<angle>"
     "<flat>" "<natural>" "<sharp>" "<backslash>"
-    "<infty>" "<infty>" "<Box>" "<Diamont>"
+    "<infty>" "<infty>" "<Box>" "<Diamont>" "<oempty>" "<boxempty>"
     "<triangle>" "<clubsuit>" "<diamondsuit>" "<heartsuit>"
-    "<spadesuit>" "<diamond>" "<box>" "<bullet>"
+    "<spadesuit>" "<diamond>" "<box>" "<smallbox>" "<bullet>"
     "<eigthnote>" "<quarternote>" "<halfnote>" "<fullnote>" "<twonotes>"
     "<sun>" "<leftmoon>" "<rightmoon>" "<earth>" "<male>" "<female>"
     "<kreuz>" "<recorder>" "<phone>" "<checked>" "<bell>"
 
-    "<backprime>" "<barwedge>" "<because>"
-    "<between>" "<bigstar>" "<blacklozenge>"
+    "<backprime>" "<bigstar>" "<blacklozenge>"
     "<blacksquare>" "<blacktriangle>" "<blacktriangledown>"
-    "<centerdot>" "<checkmark>" "<circledast>" "<circledcirc>"
-    "<circleddash>" "<divideontimes>" "<doublebarwedge>"
-    "<intercal>" "<leftthreetimes>" "<llcorner>"
+    "<centerdot>" "<checkmark>"
+    "<intercal>" "<llcorner>"
     "<lozenge>" "<lrcorner>" "<maltese>" "<measuredangle>"
-    "<pitchfork>" "<rightthreetimes>"
-    "<smallfrown>" "<smallsmile>" "<sphericalangle>"
-    "<square>" "<therefore>" "<thorn>" "<triangledown>"
-    "<triangleq>" "<ulcorner>" "<urcorner>" "<varkappa>"
-    "<varnothing>" "<vartriangle>" "<veebar>" "<yen>")
+    "<pitchfork>" "<smallfrown>" "<smallsmile>" "<sphericalangle>"
+    "<square>" "<thorn>" "<triangledown>"
+    "<ulcorner>" "<urcorner>" "<varkappa>"
+    "<varnothing>" "<vartriangle>" "<yen>")
 
   (define Spacing-visible-symbol
-    (:type symbol)
-    (:spacing default none)
+    (:type infix)
+    (:spacing half none)
     " ")
 
   (define Spacing-wide-symbol
-    (:type symbol)
+    (:type infix)
     (:spacing big none)
     "<space>")
 
   (define Spacing-invisible-symbol
-    (:type symbol)
+    (:type infix)
     (:penalty invalid)
     (:spacing none none)
     "<nospace>")
@@ -567,15 +651,24 @@
     (:spacing none none)
     "<mathd>" "<mathD>" "<mathLaplace>" "<partial>" "<nabla>"
     "<Re>" "<Im>" "<complement>"
-    "<sum>" "<prod>" "<int>" "<oint>")
+    "<sum>" "<prod>"
+    "<int>" "<iint>" "<iiint>" "<iiiint>" "<idotsint>"
+    "<oint>" "<oiint>" "<oiiint>"
+    "<intlim>" "<iintlim>" "<iiintlim>" "<iiiintlim>" "<idotsintlim>"
+    "<ointlim>" "<oiintlim>" "<oiiintlim>")
 
-  (define Unary-operator-textual-symbol
-    (:type unary)
-    (:penalty invalid)
-    (:spacing none default)
-    "arccos" "arcsin" "arctan" "cos" "cosh" "cot" "coth" "csc"
-    "deg" "det" "dim" "exp" "gcd" "hom" "ker" "Pr"
-    "lg" "ln" "log" "sec" "sin" "sinh" "tan" "tanh")
+  ;; FIXME: spacing behind $\sin$ is currently incorrect,
+  ;; because the transition OP_UNARY -> OP_TEXT is not detected
+  ;; in concater_rep::typeset_math_string.  The unary operators
+  ;; can be uncommented as soon as this problem will be corrected.
+  ;;
+  ;;(define Unary-operator-textual-symbol
+  ;;  (:type unary)
+  ;;  (:penalty invalid)
+  ;;  (:spacing none default)
+  ;;  "arccos" "arcsin" "arctan" "cos" "cosh" "cot" "coth" "csc"
+  ;;  "deg" "det" "dim" "exp" "hom" "ker" "lg" "ln" "log"
+  ;;  "Pr" "sec" "sin" "sinh" "tan" "tanh")
 
   (define Unary-operator-symbol
     Unary-operator-glyph-symbol
@@ -592,7 +685,8 @@
     (:penalty invalid)
     (:spacing none default)
     (:limits display)
-    "inf" "lim" "liminf" "limsup" "max" "min" "sup")
+    "gcd" "gcrd" "inf" "lclm" "lcm" "lim"
+    "liminf" "limsup" "max" "min" "statlim" "sup")
 
   (define Prefix-symbol
     Not-symbol

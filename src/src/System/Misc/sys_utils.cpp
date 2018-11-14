@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : sys_utils.cpp
 * DESCRIPTION: file handling
-* COPYRIGHT  : (C) 1999  Joris van der Hoeven
+* COPYRIGHT  : (C) 1999-2016  Joris van der Hoeven, Denis Raux
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -12,14 +12,13 @@
 #include "sys_utils.hpp"
 #include "file.hpp"
 #include "tree.hpp"
-#ifdef OS_WIN32
-#  include <sys/misc.h>
-#endif
+#include "parse_string.hpp"
 
-#if defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__))
-#  include "Qt/qt_sys_utils.hpp"
+#ifdef OS_MINGW
+#include "Qt/qt_sys_utils.hpp"
+#include "Windows/mingw_sys_utils.hpp"
 #else
-#  include "Unix/unix_sys_utils.hpp"
+#include "Unix/unix_sys_utils.hpp"
 #endif
 
 int script_status = 1;
@@ -28,27 +27,37 @@ int script_status = 1;
 * System functions
 ******************************************************************************/
 
-static int
+int
+system (string s, string& result, string& error) {
+#if defined (OS_MINGW)
+  int r= qt_system (s, result, error);
+#else
+  int r= unix_system (s, result, error);
+#endif
+  return r;
+}
+
+int
 system (string s, string& result) {
-#if defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__))
+#if defined (OS_MINGW)
   int r= qt_system (s, result);
 #else
   int r= unix_system (s, result);
-#endif  
+#endif
   return r;
 }
 
 int
 system (string s) {
-  if (DEBUG_STD) cerr << "TeXmacs] System: " << s << "\n";
+  if (DEBUG_STD) debug_shell << s << "\n";
   if (DEBUG_VERBOSE) {
     string result;
     int r= system (s, result);
-    cerr << result;
+    debug_shell << result;
     return r;
   }
   else {
-#if defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__))
+#if defined (OS_MINGW)
     // if (starts (s, "convert ")) return 1;
     return qt_system (s);
 #else
@@ -67,7 +76,7 @@ eval_system (string s) {
 string
 var_eval_system (string s) {
   string r= eval_system (s);
-  while ((N(r)>0) && (r[N(r)-1]=='\n')) r= r (0,N(r)-1);
+  while ((N(r)>0) && (r[N(r)-1]=='\n' || r[N(r)-1]=='\r')) r= r (0,N(r)-1);
   return r;
 }
 
@@ -86,7 +95,7 @@ get_env (string var) {
 
 void
 set_env (string var, string with) {
-#if defined(STD_SETENV) && !defined(__MINGW32__)
+#if defined(STD_SETENV) && !defined(OS_MINGW)
   c_string _var  (var);
   c_string _with (with);
   setenv (_var, _with, 1);
@@ -104,7 +113,7 @@ get_texmacs_path () {
     //FIXME: Why is this?
   while ((N(tmpath)>0) && (tmpath [N(tmpath) - 1] == '/'))
     tmpath= tmpath (0, N(tmpath)-1);
-  return tmpath;
+  return url_system (tmpath);
 }
 
 url
@@ -113,4 +122,63 @@ get_texmacs_home_path () {
   if (path == "")
     path= url_system ("$HOME/.TeXmacs");
   return path;
+}
+
+array<string>
+evaluate_system (array<string> arg,
+		 array<int> fd_in, array<string> in,
+		 array<int> fd_out) {
+  array<string> out (N(fd_out));
+  array<string*> ptr (N(fd_out));
+  for (int i= 0; i < N(fd_out); i++) ptr[i]= &(out[i]);
+#ifdef OS_MINGW
+  int ret= mingw_system (arg, fd_in, in, fd_out, ptr);
+#else
+  int ret= unix_system (arg, fd_in, in, fd_out, ptr);
+#endif
+  return append (as_string (ret), out);
+}
+
+
+string 
+get_printing_default () {
+#if defined (OS_MINGW)
+  url embedded ("$TEXMACS_PATH/bin/SumatraPDF.exe");
+  if (exists (embedded))
+    return sys_concretize (embedded) * " -print-dialog -exit-when-done";
+  else return "";
+#else
+  return "lp";
+#endif
+}
+
+class PrintCap {
+private:
+  string prt_cmd;
+  bool blank;
+public:	
+  PrintCap (): blank (true) {};
+  friend string get_printing_cmd ();
+  friend void set_printing_cmd (string);
+} print_cap;
+
+string
+get_printing_cmd () {
+  if (print_cap.blank) {
+    print_cap.prt_cmd= get_printing_default ();
+    print_cap.blank= false;
+  }
+  return print_cap.prt_cmd;
+}
+
+void
+set_printing_cmd (string cmd) {
+  print_cap.prt_cmd= cmd;
+  print_cap.blank= false;
+}
+
+bool
+has_printing_cmd () {
+  static bool has= get_printing_cmd () != "";
+  return has;
 }

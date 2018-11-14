@@ -224,6 +224,8 @@
 
   (define Middle
     (:operator associative)
+    ;;(Middle Post)
+    ;;(Pre Middle)
     Middle-symbol
     (:<mid :args :>))
 
@@ -279,6 +281,10 @@
     (Main Separator)
     (Main ".")
     (Main "\n")
+    Relaxed-expressions)
+
+  (define Strict
+    (Strict "\n")
     Relaxed-expressions)
 
   (define Relaxed-expressions
@@ -357,8 +363,9 @@
 
   (define Quantified
     (Quantifier-prefixes Ponctuation-infix Quantified)
-    (Quantifier-fenced Quantified)
     (Quantifier-fenced Space-infix Quantified)
+    (Quantifier-fenced Quantified)
+    Quantifier-fenced
     Implication)
 
   (define Implication
@@ -486,7 +493,11 @@
     (+ (or (- "a" "z") (- "A" "Z"))))
 
   (define Number
-    ((+ (- "0" "9")) (or ("." (+ (- "0" "9"))) ""))))
+    ((+ (- "0" "9")) (or "." "<comma>") (+ (- "0" "9")))
+    ((+ (- "0" "9")) (or "." "<comma>"))
+    ((or "." "<comma>") (+ (- "0" "9")))
+    (+ (- "0" "9"))
+    (or "." "<comma>")))
 
 (define-language std-math
   (:synopsis "default semantics for mathematical formulas")

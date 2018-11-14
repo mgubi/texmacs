@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "window.hpp"
 #include "promise.hpp"
 #include "Widkit/Button/button_widget.hpp"
@@ -89,9 +89,9 @@ popup_button_rep::consistent (string s) {
 		((!require_map) && (popup == NULL));
   else flag= (!require_map) && (popup != NULL);
   if (flag) {
-    cerr << "status     = " << status << "\n";
-    cerr << "require map= " << require_map << "\n";
-    cerr << "popup      = " << (popup != NULL) << "\n";
+    failed_error << "status     = " << status << "\n";
+    failed_error << "require map= " << require_map << "\n";
+    failed_error << "popup      = " << (popup != NULL) << "\n";
     WK_FAILED ("inconsistency in " * s);
   }
 }
@@ -223,7 +223,7 @@ popup_button_rep::handle_mouse (mouse_event ev) {
       }
     }
 
-    // stick or disactivate
+    // stick or deactivate
     else {
       if (inside /* && false */) {
 	status= true;
@@ -275,23 +275,6 @@ popup_button_rep::handle (event ev) {
   default:
     return basic_widget_rep::handle (ev);
   }
-}
-
-gravity
-opposite (gravity grav) {
-  switch (grav) {
-  case north_west: return south_east;
-  case north     : return south;
-  case north_east: return south_west;
-  case west      : return east;
-  case center    : return center;
-  case east      : return west;
-  case south_west: return north_east;
-  case south     : return north;
-  case south_east: return north_west;
-  }
-  FAILED ("unknown gravity");
-  return center; // Because of bug in certain versions of g++
 }
 
 /******************************************************************************

@@ -18,38 +18,11 @@ inline double square (double x) { return x*x; }
 ******************************************************************************/
 
 double
-min (point p) {
-  ASSERT (N(p) > 0, "non zero length expected");
-  double r= p[0];
-  for (int i=1; i<N(p); i++)
-    r= min (r, p[i]);
-  return r;
-}
-
-double
-max (point p) {
-  ASSERT (N(p) > 0, "non zero length expected");
-  double r= p[0];
-  for (int i=1; i<N(p); i++)
-    r= max (r, p[i]);
-  return r;
-}
-
-double
 l2_norm (point p) {
   double s= 0.0;
   for (int i=0; i<N(p); i++)
     s += square (p[i]);
   return sqrt (s);
-}
-
-double
-inner (point p, point q) {
-  ASSERT (N(p) == N(q), "unequal lengths");
-  double s= 0.0;
-  for (int i=0; i<N(p); i++)
-    s += p[i] * q[i];
-  return s;
 }
 
 double
@@ -100,13 +73,6 @@ sup (point p, point q) {
   return r;
 }
 
-point
-abs (point p) {
-  point r (N(p));
-  for (int i=0; i<N(p); i++)
-    r[i]= (p[i] > 0? p[i]: -p[i]);
-  return r;
-}
 
 /******************************************************************************
 * Poly lines

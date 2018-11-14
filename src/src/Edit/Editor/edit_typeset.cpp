@@ -9,14 +9,17 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include <climits>
 #include "edit_typeset.hpp"
 #include "tm_buffer.hpp"
 #include "convert.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "Bridge/impl_typesetter.hpp"
 #include "new_style.hpp"
+#include "iterator.hpp"
+#include "merge_sort.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Environment/std_environment.hpp"
 #endif // EXPERIMENTAL
@@ -29,13 +32,18 @@ bool enable_fastenv= false;
 ******************************************************************************/
 
 edit_typeset_rep::edit_typeset_rep ():
+  editor_rep (), // NOTE: ignored by the compiler, but suppresses warning
   the_style (TUPLE),
   cur (hashmap<string,tree> (UNINIT)),
-  pre (UNINIT), init (UNINIT), fin (UNINIT),
+  stydef (UNINIT), pre (UNINIT), init (UNINIT), fin (UNINIT), grefs (UNINIT),
   env (drd, buf->buf->master,
-       buf->data->ref, (buf->prj==NULL? buf->data->ref: buf->prj->data->ref),
-       buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux)),
-  ttt (new_typesetter (env, subtree (et, rp), reverse (rp))) {}
+       buf->data->ref, (buf->prj==NULL? grefs: buf->prj->data->ref),
+       buf->data->aux, (buf->prj==NULL? buf->data->aux: buf->prj->data->aux),
+       buf->data->att, (buf->prj==NULL? buf->data->att: buf->prj->data->att)),
+  ttt (new_typesetter (env, subtree (et, rp), reverse (rp))) {
+    init_update ();
+}
+
 edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
 
 void
@@ -43,10 +51,17 @@ edit_typeset_rep::set_data (new_data data) {
   set_style (data->style);
   set_init  (data->init);
   set_fin   (data->fin);
+  set_att   (data->att);
   notify_page_change ();
   add_init (data->init);
   notify_change (THE_DECORATIONS);
   typeset_invalidate_env ();
+  iterator<string> it = iterate (data->att);
+  while (it->busy()) {
+    string key= it->next ();
+    (void) call (string ("notify-set-attachment"),
+                 buf->buf->name, key, data->att [key]);
+  }
 }
 
 void
@@ -54,6 +69,7 @@ edit_typeset_rep::get_data (new_data& data) {
   data->style= get_style ();
   data->init = get_init ();
   data->fin  = get_fin ();
+  data->att  = get_att ();
 }
 
 typesetter edit_typeset_rep::get_typesetter () { return ttt; }
@@ -61,7 +77,35 @@ tree edit_typeset_rep::get_style () { return the_style; }
 void edit_typeset_rep::set_style (tree t) { the_style= copy (t); }
 hashmap<string,tree> edit_typeset_rep::get_init () { return init; }
 hashmap<string,tree> edit_typeset_rep::get_fin () { return fin; }
+hashmap<string,tree> edit_typeset_rep::get_att () { return buf->data->att; }
 void edit_typeset_rep::set_fin (hashmap<string,tree> H) { fin= H; }
+void edit_typeset_rep::set_att (hashmap<string,tree> H) { buf->data->att= H; }
+
+tree
+edit_typeset_rep::get_att (string key) {
+  return buf->data->att[key];
+}
+
+void
+edit_typeset_rep::set_att (string key, tree im) {
+  buf->data->att (key)= im;
+}
+
+void
+edit_typeset_rep::reset_att (string key) {
+  buf->data->att->reset (key);
+}
+
+array<string>
+edit_typeset_rep::list_atts () {
+  tree a= (tree) buf->data->att;
+  array<string> v;
+  int i, n= N(a);
+  for (i=0; i<n; i++)
+    v << a[i][0]->label;
+  merge_sort (v);
+  return v;
+}
 
 void
 edit_typeset_rep::set_init (hashmap<string,tree> H) {
@@ -74,11 +118,6 @@ edit_typeset_rep::add_init (hashmap<string,tree> H) {
   init->join (H);
   ::notify_assign (ttt, path(), subtree (et, rp));
   notify_change (THE_ENVIRONMENT);
-}
-
-void
-edit_typeset_rep::set_master (url name) {
-  env->base_file_name= name;
 }
 
 void
@@ -154,6 +193,8 @@ void
 edit_typeset_rep::typeset_preamble () {
   env->write_default_env ();
   typeset_style_use_cache (the_style);
+  env->update ();
+  env->read_env (stydef);
   env->patch_env (init);
   env->update ();
   env->read_env (pre);
@@ -162,11 +203,43 @@ edit_typeset_rep::typeset_preamble () {
 
 void
 edit_typeset_rep::typeset_prepare () {
+  env->base_file_name= buf->buf->master;
   env->read_only= buf->buf->read_only;
   env->write_default_env ();
   env->patch_env (pre);
   env->style_init_env ();
   env->update ();
+}
+
+void
+edit_typeset_rep::init_update () {
+  if (buf->prj != NULL) {
+    string id= as_string (delta (buf->prj->buf->name, buf->buf->name));
+    string lab= "part:" * id;
+    hashmap<string,tree> aux= env->global_aux;
+    hashmap<string,tree> ref= env->global_ref;
+    if (aux->contains ("parts")) {
+      tree parts= aux ["parts"];
+      if (is_func (parts, DOCUMENT))
+        for (int i=0; i<N(parts); i++)
+          if (is_tuple (parts[i]) && N(parts[i]) >= 1)
+            if (parts[i][0] == id)
+              for (int j=1; j+1 < N(parts[i]); j+=2)
+                if (is_atomic (parts[i][j])) {
+                  buf->data->init (parts[i][j]->label)= copy (parts[i][j+1]);
+                  init (parts[i][j]->label)= copy (parts[i][j+1]);
+                }      
+    }
+    if (ref->contains (lab)) {
+      tree val= ref [lab];
+      if (is_tuple (val) && N(val) >= 2 && val[1] != tree (UNINIT)) {
+        buf->data->init (PAGE_FIRST)= copy (val[1]);
+        init (PAGE_FIRST)= copy (val[1]);
+      }
+    }
+  }
+  else if (buf->data->init ["part-flag"] == "true")
+    grefs= copy (buf->data->ref);
 }
 
 void
@@ -209,13 +282,51 @@ restricted_exec (edit_env env, tree t, int end) {
     env->exec (t[0]);
 }
 
+static tree
+filter_format (tree fm, int i, int n) {
+  array<tree> r;
+  for (int k=0; k<N(fm); k++)
+    if (is_func (fm[k], CWITH) && N(fm[k]) >= 4 &&
+        is_int (fm[k][0]) && is_int (fm[k][1])) {
+      int j1= as_int (fm[k][0]->label);
+      int j2= as_int (fm[k][1]->label);
+      if (j1 > 0) j1--; else j1 += n;
+      if (j2 > 0) j2--; else j2 += n;
+      if (i >= j1 && i <= j2) r << fm[k] (2, N(fm[k]));
+    }
+  return tree (TFORMAT, r);
+}
+
+static void
+table_descend (tree& t, path& p, tree& fm) {
+  while (!is_nil (p)) {
+    if (L(t) == TFORMAT && p->item == N(t) - 1) {
+      array<tree> r;
+      for (int k=0; k<N(t)-1; k++)
+        if (is_func (t[k], CWITH, 6) &&
+            is_atomic (t[k][4]) &&
+            !starts (t[k][4]->label, "cell-"))
+          r << t[k];
+      fm= tree (TFORMAT, r);
+      t= t[N(t)-1];
+      p= p->next;
+    }
+    else if ((L(t) == TABLE || L(t) == ROW) &&
+             p->item >= 0 && p->item < N(t)) {
+      fm= filter_format (fm, p->item, N(t));
+      t= t[p->item];
+      p= p->next;
+    }
+    else break;
+  }
+}
+
 void
 edit_typeset_rep::typeset_exec_until (path p) {
   //time_t t1= texmacs_time ();
   if (has_changed (THE_TREE + THE_ENVIRONMENT))
     if (p != correct_cursor (et, rp * 0)) {
-      if (DEBUG_STD)
-	cout << "TeXmacs] Warning: resynchronizing for path " << p << "\n";
+      if (DEBUG_STD) std_warning << "resynchronizing for path " << p << "\n";
       // apply_changes ();
     }
   if (p == tp && inside_graphics (true) && p != closest_inside (et, p)) {
@@ -224,13 +335,14 @@ edit_typeset_rep::typeset_exec_until (path p) {
     p = tp;
   }
 
+  //cout << "Exec until " << p << LF;
   if (N(cur[p])!=0) return;
   if (N(cur)>=25) // avoids out of memory in weird cases
     typeset_invalidate_env ();
   typeset_prepare ();
   if (enable_fastenv) {
     if (!(rp < p)) {
-      cerr << "TeXmacs] erroneous path " << p << "\n";
+      failed_error << "Erroneous path " << p << "\n";
       FAILED ("invalid typesetting path");
     }
     tree t= subtree (et, rp);
@@ -238,17 +350,27 @@ edit_typeset_rep::typeset_exec_until (path p) {
     while (!is_nil (q)) {
       int i= q->item;
       restricted_exec (env, t, i);
-      tree w= drd->get_env_child (t, i, tree (ATTR));
-      if (w == "") break;
-      //cout << "t= " << t << "\n";
-      //cout << "i= " << i << "\n";
-      //cout << "w= " << w << "\n";
-      for (int j=0; j<N(w); j+=2) {
-	//cout << w[j] << " := " << env->exec (w[j+1]) << "\n";
-	env->write (w[j]->label, env->exec (w[j+1]));
+      if (L(t) == TFORMAT && i == N(t) - 1) {
+        tree fm= tree (TFORMAT);
+        table_descend (t, q, fm);
+        if (!is_nil (q))
+          for (int k=0; k<N(fm); k++)
+            if (is_func (fm[k], CWITH, 2))
+              env->write (fm[k][0]->label, fm[k][1]);
       }
-      t= t[i];
-      q= q->next;
+      else {
+        tree w= drd->get_env_child (t, i, tree (ATTR));
+        if (w == "") break;
+        //cout << "t= " << t << "\n";
+        //cout << "i= " << i << "\n";
+        //cout << "w= " << w << "\n";
+        for (int j=0; j<N(w); j+=2) {
+          //cout << w[j] << " := " << env->exec (w[j+1]) << "\n";
+          env->write (w[j]->label, env->exec (w[j+1]));
+        }
+        t= t[i];
+        q= q->next;
+      }
     }
     if (env->read (PREAMBLE) == "true")
       env->write (MODE, "src");
@@ -257,6 +379,12 @@ edit_typeset_rep::typeset_exec_until (path p) {
   env->read_env (cur (p));
   //time_t t2= texmacs_time ();
   //if (t2 - t1 >= 10) cout << "typeset_exec_until took " << t2-t1 << "ms\n";
+}
+
+tree
+edit_typeset_rep::get_full_env () {
+  typeset_exec_until (tp);
+  return (tree) cur[tp];
 }
 
 bool
@@ -303,10 +431,12 @@ tree
 edit_typeset_rep::get_init_value (string var) {
   if (init->contains (var)) {
     tree t= init [var];
+    if (var == BG_COLOR && is_func (t, PATTERN)) t= env->exec (t);
     return is_func (t, BACKUP, 2)? t[0]: t;
   }
   if (N(pre)==0) typeset_preamble ();
   tree t= pre [var];
+  if (var == BG_COLOR && is_func (t, PATTERN)) t= env->exec (t);
   return is_func (t, BACKUP, 2)? t[0]: t;
 }
 
@@ -350,18 +480,52 @@ edit_typeset_rep::get_env_language () {
   else return prog_language (get_env_string (PROG_LANGUAGE));
 }
 
-SI
-edit_typeset_rep::get_page_width () {
-  (void) get_env_string (PAGE_WIDTH);
-  return (env->page_user_width + env->page_odd_margin +
-          env->page_right_margin + std_shrinkf - 1) / std_shrinkf;
+int
+edit_typeset_rep::get_page_count () {
+  return N (eb[0]);
 }
 
 SI
-edit_typeset_rep::get_page_height () {
+edit_typeset_rep::get_page_width (bool deco) {
+  (void) get_env_string (PAGE_WIDTH);
+  return (env->get_page_width (deco) + std_shrinkf - 1) / std_shrinkf;
+}
+
+SI
+edit_typeset_rep::get_pages_width (bool deco) {
+  (void) get_env_string (PAGE_WIDTH);
+  return (env->get_pages_width (deco) + std_shrinkf - 1) / std_shrinkf;
+}
+
+SI
+edit_typeset_rep::get_page_height (bool deco) {
   (void) get_env_string (PAGE_HEIGHT);
-  return (env->page_user_height + env->page_top_margin +
-          env->page_bottom_margin + std_shrinkf - 1) / std_shrinkf;
+  return (env->get_page_height (deco) + std_shrinkf - 1) / std_shrinkf;
+}
+
+SI
+edit_typeset_rep::get_total_width (bool deco) {
+  SI w= eb->w();
+  if (!deco) {
+    SI w1= env->get_pages_width (false);
+    SI w2= env->get_pages_width (true);
+    w -= (w2 - w1);
+  }
+  return (w + std_shrinkf - 1) / std_shrinkf;
+}
+
+SI
+edit_typeset_rep::get_total_height (bool deco) {
+  SI h= eb->h();
+  if (!deco) {
+    SI h1= env->get_page_height (false);
+    SI h2= env->get_page_height (true);
+    int nr= get_page_count ();
+    int nx= env->page_packet;
+    int ny= ((nr + env->page_offset) + nx - 1) / nx;
+    h -= ny * (h2 - h1);
+  }
+  return (h + std_shrinkf - 1) / std_shrinkf;
 }
 
 /******************************************************************************
@@ -425,6 +589,7 @@ edit_typeset_rep::exec_texmacs (tree t) {
 
 tree
 edit_typeset_rep::exec_verbatim (tree t, path p) {
+  t= convert_OTS1_symbols_to_universal_encoding (t);
   typeset_exec_until (p);
   hashmap<string,tree> H= copy (cur[p]);
   H ("TeXmacs")= tree (MACRO, "TeXmacs");
@@ -440,6 +605,7 @@ edit_typeset_rep::exec_verbatim (tree t) {
 
 tree
 edit_typeset_rep::exec_html (tree t, path p) {
+  t= convert_OTS1_symbols_to_universal_encoding (t);
   if (p == (rp * 0)) typeset_preamble ();
   typeset_exec_until (p);
   hashmap<string,tree> H= copy (cur[p]);
@@ -489,22 +655,35 @@ value_to_compound (tree t, hashmap<string,tree> h) {
 
 tree
 edit_typeset_rep::exec_latex (tree t, path p) {
-  string pref= "texmacs->latex:expand-macros";
-  if (as_string (call ("get-preference", pref)) != "on") return t;
+  t= convert_OTS1_symbols_to_universal_encoding (t);
+  bool expand_unknown_macros= "on" == as_string (
+      call ("get-preference", "texmacs->latex:expand-macros"));
+  bool expand_user_macro= "on" == as_string (
+      call ("get-preference", "texmacs->latex:expand-user-macros"));
+  if (!expand_unknown_macros && !expand_user_macro)
+    return t;
   if (p == (rp * 0)) typeset_preamble ();
   typeset_exec_until (p);
   hashmap<string,tree> H= copy (cur[p]);
-  tree patch= as_tree (call ("stree->tree", call ("tmtex-env-patch", t)));
+  object l= null_object ();
+  iterator<string> it= iterate (H);
+  while (it->busy ()) l= cons (object (it->next ()), l);
+  tree patch= as_tree (call ("stree->tree", call ("tmtex-env-patch", t, l)));
   hashmap<string,tree> P (UNINIT, patch);
   H->join (P);
-  if (is_document (t) && is_compound (t[0], "hide-preamble")) {
+
+  if (!expand_user_macro &&
+      is_document (t) && is_compound (t[0], "hide-preamble")) {
     tree r= copy (t);
     r[0]= "";
     r= exec (value_to_compound (r, P), H, false);
     r[0]= exec (t[0], H, false);
     return r;
   }
-  else return exec (value_to_compound (t, P), H, false);
+  else {
+    tree r= exec (value_to_compound (t, P), H, false);
+    return r;
+  }
 }
 
 tree
@@ -517,9 +696,55 @@ edit_typeset_rep::texmacs_exec (tree t) {
   return ::texmacs_exec (env, t);
 }
 
+tree
+edit_typeset_rep::var_texmacs_exec (tree t) {
+  typeset_exec_until (tp);
+  env->write_env (cur[tp]);
+  env->update_frame ();
+  return texmacs_exec (t);
+}
+
+/******************************************************************************
+* Wrappers for editing animations
+******************************************************************************/
+
+tree
+edit_typeset_rep::checkout_animation (tree t) {
+  path p= search_upwards (ANIM_STATIC);
+  if (is_nil (p)) p= search_upwards (ANIM_DYNAMIC);
+  if (is_nil (p)) p= search_upwards ("anim-edit");
+  if (!is_nil (p)) {
+    typeset_exec_until (p);
+    env->write_env (cur[p]);
+  }
+  return env->checkout_animation (t);
+}
+
+tree
+edit_typeset_rep::commit_animation (tree t) {
+  path p= search_upwards ("anim-edit");
+  if (is_nil (p)) p= search_upwards (ANIM_STATIC);
+  if (is_nil (p)) p= search_upwards (ANIM_DYNAMIC);
+  if (!is_nil (p)) {
+    typeset_exec_until (p);
+    env->write_env (cur[p]);
+  }
+  return env->commit_animation (t);
+}
+
 /******************************************************************************
 * Initialization
 ******************************************************************************/
+
+void
+edit_typeset_rep::change_style (tree t) {
+  bool changed= (the_style != t);
+  the_style= copy (t);
+  if (changed) {
+    require_save ();
+    notify_change (THE_ENVIRONMENT);
+  }
+}
 
 void
 edit_typeset_rep::init_style () {
@@ -535,29 +760,9 @@ edit_typeset_rep::init_style (string name) {
   notify_change (THE_ENVIRONMENT);
 }
 
-void
-edit_typeset_rep::init_add_package (string name) {
-  int i, n= N(the_style);
-  for (i=0; i<n; i++)
-    if (the_style[i] == name)
-      return;
-
-  the_style << tree (name);
-  require_save ();
-  notify_change (THE_ENVIRONMENT);
-}
-
-void
-edit_typeset_rep::init_remove_package (string name) {
-  int i, n= N(the_style);
-  tree new_style= tree (TUPLE);
-  for (i=0; i<n; i++)
-    if (the_style[i] == name) {
-      require_save ();
-      notify_change (THE_ENVIRONMENT);
-    }
-    else new_style << the_style[i];
-  the_style= new_style;
+tree
+edit_typeset_rep::get_init_all () {
+  return (tree) init;
 }
 
 void
@@ -575,6 +780,8 @@ void
 edit_typeset_rep::init_default (string var) {
   if (!init->contains (var)) return;
   init->reset (var);
+  if (stydef->contains (var)) pre(var)= stydef[var];
+  else pre->reset (var);
   notify_change (THE_ENVIRONMENT);
 }
 
@@ -583,16 +790,93 @@ edit_typeset_rep::init_default (string var) {
 ******************************************************************************/
 
 void
-edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
+edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
   eb= empty_box (reverse (rp));
   // saves memory, also necessary for change_log update
   bench_start ("typeset");
-  eb= ::typeset (ttt, x1, y1, x2, y2);
+#ifdef USE_EXCEPTIONS
+  try {
+#endif
+    eb= ::typeset (ttt, x1, y1, x2, y2);
+#ifdef USE_EXCEPTIONS
+  }
+  catch (string msg) {
+    the_exception= msg;
+    std_error << "Typesetting failure, resetting to empty document\n";
+    assign (rp, tree (DOCUMENT, ""));
+    ::notify_assign (ttt, path(), subtree (et, rp));
+    eb= ::typeset (ttt, x1, y1, x2, y2);    
+  }
+  handle_exceptions ();
+#endif
   bench_end ("typeset");
   //time_t t2= texmacs_time ();
   //if (t2 - t1 >= 10) cout << "typeset took " << t2-t1 << "ms\n";
+  picture_cache_clean ();
+}
+
+static void
+report_missing (hashmap<string,tree> missing) {
+  array<string> a;
+  for (iterator<string> it= iterate (missing); it->busy(); a << it->next ()) {}
+  merge_sort (a);
+  for (int i=0; i<N(a); i++)
+    if (!starts (a[i], "bib-"))
+      typeset_warning << "Undefined reference " << a[i] << LF;
+}
+
+static void
+report_redefined (array<tree> redefined) {
+  for (int i=0; i<N(redefined); i++) {
+    tree t= redefined[i];
+    if (t[1]->label == "")
+      typeset_warning << "Redefined " << t[0]->label << LF;
+    else
+      typeset_warning << "Redefined " << t[0]->label
+                      << " as " << t[1]->label << LF;
+  }
+}
+
+static void
+clean_unused (hashmap<string,tree>& refs, hashmap<string,bool> used) {
+  array<string> a;
+  for (iterator<string> it= iterate (refs); it->busy(); ) {
+    string key= it->next ();
+    if (!used->contains (key)) a << key;
+  }
+  for (int i=0; i<N(a); i++)
+    refs->reset (a[i]);
+}
+
+void
+edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
+  int missing_nr= INT_MAX;
+  int redefined_nr= INT_MAX;
+  while (true) {
+    typeset_sub (x1, y1, x2, y2);
+    if (!env->complete) break;
+    env->complete= false;
+    clean_unused (env->local_ref, env->touched);
+    if (N(env->missing) == 0 && N(env->redefined) == 0) break;
+    if ((N(env->missing) == missing_nr && N(env->redefined) == redefined_nr) ||
+        (N(env->missing) > missing_nr || N(env->redefined) > redefined_nr)) {
+      report_missing (env->missing);
+      report_redefined (env->redefined);
+      break;
+    }
+    missing_nr= N(env->missing);
+    redefined_nr= N(env->redefined);
+    ::notify_assign (ttt, path(), ttt->br->st);
+  }
+}
+
+void
+edit_typeset_rep::typeset_forced () {
+  //cout << "Typeset forced\n";
+  SI x1, y1, x2, y2;
+  typeset (x1, y1, x2, y2);
 }
 
 void
@@ -610,4 +894,22 @@ edit_typeset_rep::typeset_invalidate_all () {
   notify_change (THE_ENVIRONMENT);
   typeset_preamble ();
   ::notify_assign (ttt, path(), subtree (et, rp));
+}
+
+void
+edit_typeset_rep::typeset_invalidate_players (path p, bool reattach) {
+  if (rp <= p) {
+    tree t= subtree (et, p);
+    blackbox bb;
+    bool ok= t->obs->get_contents (ADDENDUM_PLAYER, bb);
+    if (ok) {
+      if (reattach) tree_addendum_delete (t, ADDENDUM_PLAYER);
+      typeset_invalidate (p);
+    }
+    if (is_compound (t)) {
+      int i, n= N(t);
+      for (i=0; i<n; i++)
+        typeset_invalidate_players (p * i, reattach);
+    }
+  }
 }

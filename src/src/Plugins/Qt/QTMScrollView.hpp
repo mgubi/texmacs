@@ -33,6 +33,7 @@ class QPaintEvent;
 class QTMScrollView : public QAbstractScrollArea {
   Q_OBJECT
 
+  bool   editor_flag;   // Set to true for editor widgets
   QRect    p_extents;   // The size of the virtual area where things are drawn.
   QPoint    p_origin;   // The offset into that area
   QWidget* p_surface;   // Actual drawing area, centered (or not) in the scrollarea
@@ -60,35 +61,14 @@ protected:
   void updateScrollBars();
   void scrollContentsBy (int dx, int dy);
   
+  virtual void resizeEventBis (QResizeEvent *e);
   virtual bool viewportEvent (QEvent *e);
   virtual bool surfaceEvent (QEvent *e);
   virtual bool event (QEvent *e);
 
   friend class QTMSurface;
+  friend class qt_simple_widget_rep;
 };
 
 
-/*! Provide automatic centering of the working area inside the viewport.
- 
- The only purpose of this widget is to provide this centering. To support this
- we "un-wired" the event redirection built-in in QAbstractScrollArea (from the
- viewport widget to the QAbstractScrollArea) and re-wired event redirection 
- from the surface to the QTMScrollView (see event())
- 
- All relevant events like resize, I/O events and the like which are sent to the
- surface are resent QTMScrollView::surfaceEvent() for handling. This allows to 
- concentrate all the logic in only one object.
- */
-class QTMSurface : public QWidget {
-  Q_OBJECT
-
-  QTMScrollView* sv;
-public:
-  QTMSurface(QWidget* p, QTMScrollView* _sv) : QWidget (p), sv (_sv) { }
-  
-protected:
-  virtual bool event(QEvent *event) {
-    return sv->surfaceEvent(event) ? true : QWidget::event(event);
-  }  
-};
 #endif // QTMSCROLLVIEW_HPP

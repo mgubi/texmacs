@@ -11,7 +11,7 @@
 
 #include "edit_interface.hpp"
 #include "tm_buffer.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "link.hpp"
 #include "analyze.hpp"
 #include "drd_mode.hpp"
@@ -28,6 +28,8 @@
 #define Mod4Mask    16384
 #define Mod5Mask    32768
 
+void disable_double_clicks ();
+
 /******************************************************************************
 * Routines for the mouse
 ******************************************************************************/
@@ -35,8 +37,8 @@
 void
 edit_interface_rep::mouse_click (SI x, SI y) {
   if (eb->action ("click", x, y, 0) != "") return;
-  start_x   = x;
-  start_y   = y;
+  start_x= x;
+  start_y= y;
   send_mouse_grab (this, true);
 }
 
@@ -59,6 +61,8 @@ edit_interface_rep::mouse_adjust_selection (SI x, SI y, int mods) {
   if (inside_graphics () || mods <=1) return;
   if (eb->action ("drag", x, y, 0) != "") return;
   go_to (x, y);
+  end_x= x;
+  end_y= y;
   path sp= find_innermost_scroll (eb, tp);
   path p1= tree_path (sp, start_x, start_y, 0);
   path p2= tree_path (sp, end_x  , end_y  , 0);
@@ -122,8 +126,9 @@ edit_interface_rep::mouse_drag (SI x, SI y) {
 void
 edit_interface_rep::mouse_select (SI x, SI y, int mods, bool drag) {
   if (eb->action ("select" , x, y, 0) != "") return;
-  if (!is_nil (active_ids) && (mods & ShiftMask) == 0) {
-    call ("link-follow-ids", object (active_ids), object ("click"));
+  if (!is_nil (mouse_ids) && (mods & ShiftMask) == 0 && !drag) {
+    call ("link-follow-ids", object (mouse_ids), object ("click"));
+    disable_double_clicks ();
     return;
   }
   tree g;
@@ -158,7 +163,7 @@ edit_interface_rep::mouse_paste (SI x, SI y) { (void) x; (void) y;
 }
 
 void
-edit_interface_rep::mouse_adjust (SI x, SI y) {
+edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
   if (eb->action ("adjust", x, y, 0) != "") return;
   x= (SI) (x * magf);
   y= (SI) (y * magf);
@@ -167,7 +172,10 @@ edit_interface_rep::mouse_adjust (SI x, SI y) {
     SI wx, wy;
     ::get_position (get_window (this), wx, wy);
     widget wid;
-    SERVER (menu_widget ("(vertical (link texmacs-popup-menu))", wid));
+    string menu= "texmacs-popup-menu";
+    if ((mods & (ShiftMask + ControlMask)) != 0)
+      menu= "texmacs-alternative-popup-menu";
+    SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
     widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
 #if defined (QTTEXMACS) || defined(AQUATEXMACS)
@@ -238,6 +246,16 @@ edit_interface_rep::get_cursor () {
   return copy (the_cursor ());
 }
 
+array<SI>
+edit_interface_rep::get_mouse_position () {
+  rectangle wr= get_window_extents ();
+  SI sz= get_pixel_size ();
+  double sf= ((double) sz) / 256.0;
+  SI mx= ((SI) (last_x / sf)) + wr->x1;
+  SI my= ((SI) (last_y / sf)) + wr->y2;
+  return array<SI> (mx, my);
+}
+
 void
 edit_interface_rep::set_pointer (string name) {
   send_mouse_pointer (this, name);
@@ -255,7 +273,13 @@ edit_interface_rep::set_pointer (
 ******************************************************************************/
 
 void
-edit_interface_rep::update_active_loci () {
+edit_interface_rep::update_mouse_loci () {
+  if (is_nil (eb)) {
+    locus_new_rects= rectangles ();
+    mouse_ids= list<string> ();
+    return;
+  }
+
   int old_mode= set_access_mode (DRD_ACCESS_SOURCE);
   path cp= path_up (tree_path (path (), last_x, last_y, 0));
   set_access_mode (old_mode);
@@ -270,7 +294,7 @@ edit_interface_rep::update_active_loci () {
   }
 
   locus_new_rects= rectangles ();
-  active_ids= list<string> ();
+  mouse_ids= list<string> ();
   if (!is_nil (ids1 * ids2) && !has_changed (THE_FOCUS)) {
     list<tree> l= as_list_tree (call ("link-active-upwards", object (mt)));
     while (!is_nil (l)) {
@@ -285,9 +309,24 @@ edit_interface_rep::update_active_loci () {
     if (is_nil (ids1)) rs1= rectangles ();
     // FIXME: we should keep track which id corresponds to which rectangle
     locus_new_rects= rs1 * rs2;
-    active_ids= ids1 * ids2;
+    mouse_ids= ids1 * ids2;
   }
   if (locus_new_rects != locus_rects) notify_change (THE_LOCUS);
+}
+
+void
+edit_interface_rep::update_focus_loci () {
+  path p= path_up (tp);
+  list<string> ids;
+  while (rp <= p) {
+    ids << get_ids (subtree (et, p));
+    p= path_up (p);
+  }
+  focus_ids= list<string> ();
+  if (!is_nil (ids) && !has_changed (THE_FOCUS)) {
+    ids= as_list_string (call ("link-active-ids", object (ids)));
+    focus_ids= ids;
+  }
 }
 
 /******************************************************************************
@@ -300,6 +339,7 @@ static bool   left_dragging= false;
 static SI     left_x= 0;
 static SI     left_y= 0;
 static time_t left_last= 0;
+static int    double_click_delay= 500;
 
 void
 drag_left_reset () {
@@ -309,10 +349,18 @@ drag_left_reset () {
   left_y       = 0;
 }
 
+void
+disable_double_clicks () {
+  left_last -= (double_click_delay + 1);
+}
+
 static string
-detect_left_drag (void* handle, string type, SI x, SI y, time_t t, SI d) {
+detect_left_drag (void* handle, string type, SI x, SI y, time_t t,
+                  int m, SI d) {
   if (left_handle != handle) drag_left_reset ();
   left_handle= handle;
+  if (left_dragging && type == "move" && (m&1) == 0)
+    type= "release-left";
   if (type == "press-left") {
     left_dragging= true;
     left_started = true;
@@ -333,7 +381,7 @@ detect_left_drag (void* handle, string type, SI x, SI y, time_t t, SI d) {
       drag_left_reset ();
       return "end-drag-left";
     }
-    if ((t >= left_last) && ((t - left_last) <= 500)) {
+    if ((t >= left_last) && ((t - left_last) <= double_click_delay)) {
       left_last= t;
       return "double-left";
     }
@@ -363,9 +411,12 @@ drag_right_reset () {
 }
 
 static string
-detect_right_drag (void* handle, string type, SI x, SI y, time_t t, SI d) {
+detect_right_drag (void* handle, string type, SI x, SI y, time_t t,
+                   int m, SI d) {
   if (right_handle != handle) drag_right_reset ();
   right_handle= handle;
+  if (right_dragging && type == "move" && (m&4) == 0)
+    type= "release-right";
   if (type == "press-right") {
     right_dragging= true;
     right_started = true;
@@ -410,9 +461,9 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
   bool move_like=
     (type == "move" || type == "dragging-left" || type == "dragging-right");
   if ((!move_like) || (is_attached (this) && !check_event (MOTION_EVENT)))
-    update_active_loci ();
-  if (type == "move")
-    call ("link-follow-ids", object (active_ids), object ("mouse-over"));
+    update_mouse_loci ();
+  if (!is_nil (mouse_ids) && type == "move")
+    call ("link-follow-ids", object (mouse_ids), object ("mouse-over"));
 
   if (type == "leave")
     set_pointer ("XC_top_left_arrow");
@@ -424,7 +475,9 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
     popup_win= widget ();
   }
 
-  if (inside_graphics (false)) {
+  //if (inside_graphics (false)) {
+  //if (inside_graphics ()) {
+  if (inside_graphics (type != "release-left")) {
     if (mouse_graphics (type, x, y, mods, t)) return;
     if (!over_graphics (x, y))
       eval ("(graphics-reset-context 'text-cursor)");
@@ -457,7 +510,7 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
       drag_left_reset ();
   }
   if (type == "press-middle") mouse_paste (x, y);
-  if (type == "press-right") mouse_adjust (x, y);
+  if (type == "press-right") mouse_adjust (x, y, mods);
   if (type == "press-up") mouse_scroll (x, y, true);
   if (type == "press-down") mouse_scroll (x, y, false);
 
@@ -494,28 +547,39 @@ delayed_call_mouse_event (string kind, SI x, SI y, SI m, time_t t) {
 
 void
 edit_interface_rep::handle_mouse (string kind, SI x, SI y, int m, time_t t) {
-  if (is_nil (eb)) apply_changes ();
-  start_editing ();
-  x= ((SI) (x / magf));
-  y= ((SI) (y / magf));
-  //cout << kind << " (" << x << ", " << y << "; " << m << ")"
-  //     << " at " << t << "\n";
+  bool started= false;
+#ifdef USE_EXCEPTIONS
+  try {
+#endif
+    if (is_nil (eb)) apply_changes ();
+    start_editing ();
+    started= true;
+    x= ((SI) (x / magf));
+    y= ((SI) (y / magf));
+    //cout << kind << " (" << x << ", " << y << "; " << m << ")"
+    //     << " at " << t << "\n";
 
-  string rew= kind;
-  SI dist= (SI) (5 * PIXEL / magf);
-  rew= detect_left_drag ((void*) this, rew, x, y, t, dist);
-  if (rew == "start-drag-left") {
-    call_mouse_event (rew, left_x, left_y, m, t);
-    delayed_call_mouse_event ("dragging-left", x, y, m, t);
-  }
-  else {
-    rew= detect_right_drag ((void*) this, rew, x, y, t, dist);
-    if (rew == "start-drag-right") {
-      call_mouse_event (rew, right_x, right_y, m, t);
-      delayed_call_mouse_event ("dragging-right", x, y, m, t);
+    string rew= kind;
+    SI dist= (SI) (5 * PIXEL / magf);
+    rew= detect_left_drag ((void*) this, rew, x, y, t, m, dist);
+    if (rew == "start-drag-left") {
+      call_mouse_event (rew, left_x, left_y, m, t);
+      delayed_call_mouse_event ("dragging-left", x, y, m, t);
     }
-    else call_mouse_event (rew, x, y, m, t);
+    else {
+      rew= detect_right_drag ((void*) this, rew, x, y, t, m, dist);
+      if (rew == "start-drag-right") {
+        call_mouse_event (rew, right_x, right_y, m, t);
+        delayed_call_mouse_event ("dragging-right", x, y, m, t);
+      }
+      else call_mouse_event (rew, x, y, m, t);
+    }
+    end_editing ();
+#ifdef USE_EXCEPTIONS
   }
-
-  end_editing ();
+  catch (string msg) {
+    if (started) cancel_editing ();
+  }
+  handle_exceptions ();
+#endif
 }

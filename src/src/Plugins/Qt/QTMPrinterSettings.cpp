@@ -10,8 +10,8 @@
  ******************************************************************************/
 
 #include "QTMPrinterSettings.hpp"
-#include "tm_ostream.hpp"
 #include "qt_utilities.hpp"
+#include "sys_utils.hpp"
 
 #include <QPrinter>
 #include <QPrinterInfo>
@@ -229,8 +229,11 @@ CupsQTMPrinterSettings::systemCommandFinished(int exitCode,
 QString
 CupsQTMPrinterSettings::toSystemCommand() const {
   QString _cmd;
+
+  if (from_qstring (printProgram) == "lp ")
+    _cmd += to_qstring (get_printing_cmd ()) + " ";
   
-  if (! printProgram.isEmpty())
+  else if (! printProgram.isEmpty())
     _cmd += printProgram;
   
   if (! printerName.isEmpty())
@@ -306,13 +309,12 @@ CupsQTMPrinterSettings::availablePrinters() {
   stat.start("lpstat -a");
   if(! stat.waitForFinished(2000)) // 2 sec.
     return _ret;
-  QRegExp rx("^(\\w+) +.*$");
+  QRegExp rx("^(\\S+) +.*$");
   rx.setMinimal(true);
   QList<QByteArray> _lines = stat.readAllStandardOutput().split('\n');
   foreach (QString _line, _lines) {
     if(rx.indexIn(_line) == -1)      // No matches?
       continue;
-    
     _ret << QPair<QString,QString>(rx.cap(1),rx.cap(1));
   }
   return _ret;
@@ -483,12 +485,13 @@ WinQTMPrinterSettings::systemCommandFinished(int exitCode,
       printerOptions["Duplex"] = "Yes No"; 
     if (capt[1] == "COLORDEVICE" && capt[2].toInt() > 0)
       printerOptions["ColorModel"] = "Monochrome Gray Color";
-    if (capt[1] == "COLLATE")
-      if (capt[2].toInt() > 0)
+    if (capt[1] == "COLLATE") {
+      if (capt[2].toInt() > 0) {
         printerOptions["Collate"] = "No *Yes";
-      else
+      } else {
         printerOptions["Collate"] = "*No Yes";
-    
+      }
+    }
     if (capt[1] == "ENUMRESOLUTIONS") {
       resolutionsCounter = capt[2].toInt();   // The next iterations are special
       //printerOptions["Resolution"] = QString();

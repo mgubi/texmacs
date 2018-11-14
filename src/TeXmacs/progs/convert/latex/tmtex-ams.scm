@@ -14,6 +14,13 @@
 (texmacs-module (convert latex tmtex-ams)
   (:use (convert latex tmtex)))
 
+(tm-define (tmtex-transform-style x)
+  (:mode ams-style?) x)
+
+(tm-define tmtex-provided-packages
+  (:mode ams-style?)
+  '("amsmath"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; AMS data preprocessing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,27 +50,32 @@
 ;;; AMS metadata presentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (tmtex-make-author names affiliations emails urls miscs notes)
+(tm-define (tmtex-make-author names affiliations emails urls miscs notes
+                              affs-l emails-l urls-l miscs-l notes-l)
   (:mode ams-style?)
-  (with names (map (lambda (x) `(author ,x))
-                   (list-intersperse (map cadr names) '(tmSep)))
-        `(!paragraph ,@names
-                     ,@affiliations
-                     ,@emails
-                     ,@urls
-                     ,@notes
-                     ,@miscs)))
+  (let* ((names (map (lambda (x) `(author ,x))
+                     (list-intersperse (map cadr names) '(tmSep))))
+         (result `(,@names ,@affiliations ,@emails ,@urls ,@notes ,@miscs)))
+    (if (null? result) '() `(!paragraph ,@result))))
 
-(tm-define (tmtex-make-doc-data titles subtitles authors dates miscs notes)
+(tm-define (tmtex-make-doc-data titles subtitles authors dates miscs notes
+                                subtits-l dates-l miscs-l notes-l tr ar)
   (:mode ams-style?)
-  `(!document
-     (!paragraph ,@titles ,@subtitles ,@notes ,@miscs)
-     ,@authors
-     ,@dates))
+  (let* ((title-opt (if (null? tr) '() `((!option ,@(tmtex-concat-Sep tr)))))
+         (titles    (tmtex-concat-Sep (map cadr titles)))
+         (titles    (if (null? titles) '() `((title ,@title-opt ,@titles))))
+         (title-data `(,@titles ,@subtitles ,@notes ,@miscs))
+         (title-data (if (null? title-data) '() `((!paragraph ,@title-data)))))
+    (if (and (null? title-data) (null? authors) (null? dates)) '()
+      `(!document ,@title-data ,@authors ,@dates))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; AMS specific titlemarkup
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tmtex-doc-running-title t)
+  (:mode ams-style?)
+  (tmtex (cadr t)))
 
 (tm-define (tmtex-doc-subtitle t)
   (:mode ams-style?)
@@ -111,16 +123,24 @@
 ;;; AMS specific abstract markup
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define  (tmtex-make-abstract-data keywords msc abstract)
+(define (move-in-abstract what in)
+  (if (null? in)
+    (if (null? what) '() `(((!begin "abstract") (document ,@what))))
+    `(((!begin "abstract") (!document ,@(map cadr in) ,@what)))))
+
+(tm-define  (tmtex-make-abstract-data keywords acm arxiv msc pacs abstract)
   (:mode ams-style?)
-  `(!document ,@abstract ,@msc ,@keywords))
+  (with class `(,@acm ,@arxiv ,@pacs)
+    (set! abstract (move-in-abstract class abstract)))
+  (with result `(,@abstract ,@msc ,@keywords)
+    (if (null? result) "" `(!document ,@result))))
 
 (tm-define (tmtex-abstract-keywords t)
   (:mode ams-style?)
-  (with args (list-intersperse (map tmtex (cdr t)) '(!group (tmsep)))
-    `(keywords (!concat ,@args))))
+  (with args (tmtex-concat-sep (map tmtex (cdr t)))
+    `(keywords ,@args)))
 
 (tm-define (tmtex-abstract-msc t)
   (:mode ams-style?)
-  (with args (list-intersperse (map tmtex (cdr t)) '(!group (tmSep)))
-    `(subjclass (!concat ,@args))))
+  (with args (tmtex-concat-Sep (map tmtex (cdr t)))
+    `(subjclass ,@args)))

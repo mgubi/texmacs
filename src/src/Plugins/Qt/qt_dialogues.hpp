@@ -23,28 +23,31 @@ class qt_tm_widget_rep;
  */
 class qt_input_text_widget_rep: public qt_widget_rep {
 protected:
-  command cmd;
-  string type;
+  command             cmd;
+  string             type;
   array<string> proposals;
-  string input;
-  int style;
-  string width;
-  
-  bool ok;  
-  QTMInputTextWidgetHelper* helper;
+  string            input;
+  int               style;
+  string            width;
+  bool                 ok;
+
+  bool         done;  //!< Has the command been executed after a modification?
+
 public:
-  qt_input_text_widget_rep (command _cmd, string _type, array<string> _proposals, 
+  qt_input_text_widget_rep (command _cmd, string _type, array<string> _proposals,
                             int _style, string _width);
-  
+
   virtual QAction*  as_qaction ();
   virtual QWidget*  as_qwidget ();
+  
+  void commit(bool ok);
   
   friend class QTMInputTextWidgetHelper;
   friend class QTMInteractiveInputHelper;
   friend class qt_tm_widget_rep;
 };
 
-class qt_field_widget;
+class qt_field_widget_rep;
 
 /*! A dialog with a list of inputs and ok and cancel buttons.
  
@@ -61,38 +64,37 @@ class qt_field_widget;
 class qt_inputs_list_widget_rep: public qt_widget_rep {
 protected:
   command cmd;
-  array<qt_field_widget> fields;
   coord2 size, position;
   string win_title;
   int style;
 
 public:
   qt_inputs_list_widget_rep (command, array<string>);
-  
+
   virtual void      send (slot s, blackbox val);
   virtual blackbox query (slot s, int type_id);
   virtual widget    read (slot s, blackbox index);
   
   virtual widget plain_window_widget (string s, command q);
-
+  
+protected:
   void perform_dialog();
+  qt_field_widget_rep* field (int i);
 };
-
 
 /*! Each of the fields in a qt_inputs_list_widget_rep.
  
  Each field is composed of a prompt (a label) and an input (a QTMComboBox).
  */
 class qt_field_widget_rep: public qt_widget_rep {
-  string prompt;
-  string input;
-  string type;
+  string           prompt;
+  string            input;
+  string             type;
   array<string> proposals;
-  
   qt_inputs_list_widget_rep* parent;
-  QTMFieldWidgetHelper*            helper;
+
 public:
-  qt_field_widget_rep(qt_inputs_list_widget_rep* _parent, string _prompt);
+  qt_field_widget_rep (qt_inputs_list_widget_rep* _parent, string _prompt);
 
   virtual void      send (slot s, blackbox val);
   virtual blackbox query (slot s, int type_id);
@@ -103,10 +105,4 @@ public:
   friend class QTMFieldWidgetHelper;
 };
 
-class qt_field_widget {
-public:
-  ABSTRACT_NULL(qt_field_widget);
-};
-
-ABSTRACT_NULL_CODE(qt_field_widget);
 #endif // defined QT_DIALOGUES_HPP

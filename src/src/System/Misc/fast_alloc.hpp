@@ -11,6 +11,8 @@
 
 #ifndef FAST_ALLOC_H
 #define FAST_ALLOC_H
+
+#include "config.h"
 #include "tm_configure.hpp"
 #include <stdlib.h>
 
@@ -22,13 +24,18 @@
 * Globals
 ******************************************************************************/
 
-extern char   alloc_table[MAX_FAST];
+extern void*   alloc_table[MAX_FAST]; // Static declaration initializes with NULL's
 extern char*  alloc_mem;
+#ifdef DEBUG_ON
+extern char*  alloc_mem_top;
+extern char*  alloc_mem_bottom;
+#endif
+bool break_stub(void* ptr);
 extern size_t alloc_remains;
 extern int    allocated;
 extern int    large_uses;
 
-#define alloc_ptr(i) (*((void **) (alloc_table+i)))
+#define alloc_ptr(i) alloc_table[i]
 #define ind(ptr) (*((void **) ptr))
 
 /******************************************************************************
@@ -44,6 +51,7 @@ extern void  fast_delete (register void* ptr);
 
 extern int   mem_used ();
 extern void  mem_info ();
+void* alloc_check(const char *msg,void *ptr,size_t* sp);
 
 /******************************************************************************
 * Fast new and delete
@@ -57,6 +65,9 @@ inline void* operator new[] (register size_t s, void* loc) { return loc; }
 #else
 #include <new>
 #endif
+
+class widget_rep;
+void tm_delete (widget_rep* ptr);
 
 template<typename C> inline C*
 tm_new () {
@@ -220,6 +231,15 @@ tm_new (const A1& a1, const A2& a2, const A3& a3,
 
 template<typename C, typename A1, typename A2, typename A3,
 	 typename A4, typename A5, typename A6,
+         typename A7, typename A8> inline C*
+tm_new (A1& a1, const A2& a2, A3& a3, A4& a4, A5& a5, A6& a6, A7& a7, A8& a8) {
+  void* ptr= fast_new (sizeof (C));
+  (void) new (ptr) C (a1, a2, a3, a4, a5, a6, a7, a8);
+  return (C*) ptr;
+}
+
+template<typename C, typename A1, typename A2, typename A3,
+	 typename A4, typename A5, typename A6,
 	 typename A7, typename A8, typename A9> inline C*
 tm_new (const A1& a1, const A2& a2, const A3& a3,
 	const A4& a4, const A5& a5, const A6& a6,
@@ -316,12 +336,69 @@ tm_new (const A1& a1, const A2& a2, const A3& a3,
   return (C*) ptr;
 }
 
+template<typename C, typename A1, typename A2, typename A3,
+	 typename A4, typename A5, typename A6,
+	 typename A7, typename A8, typename A9,
+	 typename A10, typename A11, typename A12,
+	 typename A13, typename A14, typename A15,
+	 typename A16, typename A17> inline C*
+tm_new (const A1& a1, const A2& a2, const A3& a3,
+	const A4& a4, const A5& a5, const A6& a6,
+	const A7& a7, const A8& a8, const A9& a9,
+	const A10& a10, const A11& a11, const A12& a12,
+	const A13& a13, const A14& a14, const A15& a15,
+	const A16& a16, const A17& a17) {
+  void* ptr= fast_new (sizeof (C));
+  (void) new (ptr) C (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+		      a11, a12, a13, a14, a15, a16, a17);
+  return (C*) ptr;
+}
+
 template<typename C> inline void
 tm_delete (C* ptr) {
   ptr -> ~C ();
   fast_delete ((void*) ptr);
 }
 
+#ifdef DEBUG_ON
+template<typename C>  C*
+tm_new_array (int n) {
+  void* ptr= fast_alloc (n * sizeof (C) + (4 * WORD_LENGTH));
+  *((int*) ptr)= n;
+  ptr= (void*) (((char*) ptr) + WORD_LENGTH);
+  *((int*) ptr)= n;
+  ptr= (void*) (((char*) ptr) + WORD_LENGTH);
+  *((int*) ptr)= ~n;
+  ptr= (void*) (((char*) ptr) + WORD_LENGTH);
+  C* ctr= (C*) ptr;
+  for (int i=0; i<n; i++, ctr++)
+    (void) new ((void*) ctr) C ();
+  *((int*)ctr)=0x55AA;
+  return (C*) ptr;
+}
+
+template<typename C>  void
+tm_delete_array (C* Ptr) {
+  void* ptr= (void*) Ptr;
+  ptr= (void*) (((char*) ptr) - WORD_LENGTH);
+  int comp= *((int*) ptr);
+  ptr= (void*) (((char*) ptr) - WORD_LENGTH);
+  int n1= *((int*) ptr);
+  ptr= (void*) (((char*) ptr) - WORD_LENGTH);
+  int n= *((int*) ptr);
+  if((n1 + comp) != -1 || (n + comp) != -1) {
+    printf("tm_delete_array size mismatch: %d:%d vs %d:%d\n",n,n+comp,n1,n1+comp);
+  }
+  
+  C* ctr= Ptr+n;
+  if(*((int*)ctr)!=0x55AA) {
+     printf("tm_delete_array buffer overflow\n");
+  }
+  ctr--;
+  for (int i=0; i<n; i++, ctr--) ctr -> ~C();
+  fast_free (ptr, n * sizeof (C) + (4 * WORD_LENGTH));
+}
+#else
 template<typename C> inline C*
 tm_new_array (int n) {
   void* ptr= fast_alloc (n * sizeof (C) + WORD_LENGTH);
@@ -342,6 +419,8 @@ tm_delete_array (C* Ptr) {
   for (int i=0; i<n; i++, ctr--) ctr -> ~C();
   fast_free (ptr, n * sizeof (C) + WORD_LENGTH);
 }
+#endif
+
 
 #endif // (!defined(NO_FAST_ALLOC)) && (!defined(X11TEXMACS))
 
@@ -487,6 +566,13 @@ tm_new (const A1& a1, const A2& a2, const A3& a3,
 
 template<typename C, typename A1, typename A2, typename A3,
 	 typename A4, typename A5, typename A6,
+	 typename A7, typename A8> inline C*
+tm_new (A1& a1, const A2& a2, A3& a3, A4& a4, A5& a5, A6& a6, A7& a7, A8& a8) {
+  return new C (a1, a2, a3, a4, a5, a6, a7, a8);
+}
+
+template<typename C, typename A1, typename A2, typename A3,
+	 typename A4, typename A5, typename A6,
 	 typename A7, typename A8, typename A9> inline C*
 tm_new (const A1& a1, const A2& a2, const A3& a3,
 	const A4& a4, const A5& a5, const A6& a6,
@@ -565,6 +651,22 @@ tm_new (const A1& a1, const A2& a2, const A3& a3,
 	const A13& a13, const A14& a14, const A15& a15) {
   return new C (a1, a2, a3, a4, a5, a6, a7, a8, a9,
                 a10, a11, a12, a13, a14, a15);
+}
+
+template<typename C, typename A1, typename A2, typename A3,
+	 typename A4, typename A5, typename A6,
+	 typename A7, typename A8, typename A9,
+	 typename A10, typename A11, typename A12,
+	 typename A13, typename A14, typename A15,
+         typename A16, typename A17> inline C*
+tm_new (const A1& a1, const A2& a2, const A3& a3,
+	const A4& a4, const A5& a5, const A6& a6,
+	const A7& a7, const A8& a8, const A9& a9,
+	const A10& a10, const A11& a11, const A12& a12,
+	const A13& a13, const A14& a14, const A15& a15,
+        const A16& a16, const A17& a17) {
+  return new C (a1, a2, a3, a4, a5, a6, a7, a8, a9,
+                a10, a11, a12, a13, a14, a15, a16, a17);
 }
 
 template<typename C> inline void

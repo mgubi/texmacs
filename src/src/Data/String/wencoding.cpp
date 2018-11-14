@@ -86,6 +86,30 @@ looks_iso_8859 (string s) {
   return true;
 }
 
+bool
+looks_universal (string s) {
+  // Looks if s can be from TeXmacs's universal charset
+  int i=0, n=N(s);
+  bool glyph= false;
+  for (; i<n; i++) {
+    if (i+2 < n && s[i] == '<') {
+      bool unicode= s[++i] == '#';
+      if (unicode) i++;
+      while (i<n && s[i] != '>') {
+        if (unicode && !is_digit (s[i]))
+          return false;
+        if (!unicode && !(is_alpha (s[i]) || s[i] == '-'))
+          return false;
+        i++;
+      }
+      if (i<n && s[i] == '>') glyph= true;
+      else return false;
+    }
+    else if (s[i] == '>') return false;
+  }
+  return glyph;
+}
+
 string
 guess_wencoding (string s) {
   if (looks_ascii (s))         return "ASCII";
@@ -104,6 +128,19 @@ western_to_cork (string s) {
     charset= language_to_local_ISO_charset (get_locale_language ());
     if (charset != "")
       return convert (s, charset, "Cork");
+  }
+  if (looks_universal (s)) return s;
+  return tm_encode (s);
+}
+string
+western_to_utf8 (string s) {
+  string charset= guess_wencoding (s);
+  if (charset == "UTF-8-BOM") return s(3, N(s));
+  if (charset == "UTF-8")     return s;
+  if (charset == "ISO-8859") {
+    charset= language_to_local_ISO_charset (get_locale_language ());
+    if (charset != "")
+      return convert (s, charset, "UTF-8");
   }
   return s;
 }

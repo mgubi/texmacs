@@ -189,6 +189,35 @@ get_author () {
 * Common routines
 ******************************************************************************/
 
+bool
+operator == (patch p1, patch p2) {
+  if (get_type (p1) != get_type (p2)) return false;
+  switch (get_type (p1)) {
+  case PATCH_MODIFICATION:
+    return get_modification (p1) == get_modification (p2) &&
+           get_inverse (p1) == get_inverse (p2);
+  case PATCH_COMPOUND:
+  case PATCH_BRANCH:
+    if (N(p1) != N(p2)) return false;
+    for (int i=0; i<N(p1); i++)
+      if (p1[i] != p2[i]) return false;
+    return true;
+  case PATCH_BIRTH:
+    return get_birth (p1) == get_birth (p2) &&
+           get_author (p1) == get_author (p2);
+  case PATCH_AUTHOR:
+    return get_author (p1) == get_author (p2) && p1[0] == p2[0];
+  default:
+    FAILED ("unsupported patch type");
+  }
+  return false;
+}
+
+bool
+operator != (patch p1, patch p2) {
+  return !(p1 == p2);
+}
+
 tm_ostream&
 operator << (tm_ostream& out, patch p) {
   switch (get_type (p)) {
@@ -468,14 +497,46 @@ swap (patch& p1, patch& p2, double a1, double a2) {
 
 bool
 swap (patch& p1, patch& p2) {
+  // Assuming that p1;p2 (the patch p1 followed by p2) is well-defined,
+  // determine patches p1* and p2* such that p2*;p1* is equivalent
+  // to p1;p2.  If such patches exist, then set p1 := p2* and
+  // p2 := p1* and return true.  Otherwise, return false
   return swap (p1, p2, 0, 0);
 }
 
 bool
 commute (patch p1, patch p2) {
+  // Assuming that p1;p2 (the patch p1 followed by p2) is well-defined,
+  // determine whether there exist patches p1* and p2* such that
+  // p2*;p1* is equivalent to p1;p2
   patch s1= p1;
   patch s2= p2;
   return swap (s1, s2);
+}
+
+bool
+can_pull (patch p1, patch p2) {
+  return commute (p2, p1);
+}
+
+patch
+pull (patch p1, patch p2) {
+  // Assuming that p2;p1 (the patch p2 followed by p1) is well-defined,
+  // return the patch p1* such that p1;p2 is equivalent to p2*;p1*
+  // for a suitable patch p1* (assuming that p1* and p2* exist).
+  patch s1= p2;
+  patch s2= p1;
+  ASSERT (swap (s1, s2), "patch cannot be pulled");
+  return s1;
+}
+
+patch
+co_pull (patch p1, patch p2) {
+  // Same as pull, but return p2* instead of p1*
+  patch s1= p2;
+  patch s2= p1;
+  ASSERT (swap (s1, s2), "patch cannot be pulled");
+  return s2;
 }
 
 /******************************************************************************

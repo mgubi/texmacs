@@ -63,7 +63,7 @@ edit_dynamic_rep::is_multi_paragraph_macro (tree t) {
     for (i=1; i<n; i++)
       if (is_multi_paragraph_macro (t[i]))
 	return true;
-    tree f= get_env_value (t[0]->label);
+    tree f= get_env_value (as_string (L(t)));
     return is_multi_paragraph_macro (f);
   }
   return false;
@@ -115,6 +115,12 @@ edit_dynamic_rep::make_compound (tree_label l, int n= -1) {
     if (selection_active_small () ||
 	(block_macro && selection_active_normal ()))
       sel= selection_get_cut ();
+    else if (is_with_like (t) && selection_active_normal ()) {
+      sel= selection_get_cut ();
+      t[n-1]= sel;
+      insert_tree (t, p);
+      return;
+    }
     if ((block_macro && (!table_macro)) ||
 	(l == make_tree_label ("footnote")))
       {
@@ -152,12 +158,14 @@ edit_dynamic_rep::activate () {
     tree u (make_tree_label (st[0]->label));
     u << A (st (1, N(st)));
     assign (p, u);
+    call ("notify-activated", object (subtree (et, p)));
     go_to (end (et, p));
     correct (path_up (p));
   }
   else {
     bool acc= (p < path_up (tp) && drd->is_accessible_child (st, tp[N(p)]));
     remove_node (p * 0);
+    call ("notify-activated", object (subtree (et, p)));
     if (!acc) go_to (end (et, p));
     correct (path_up (p));
   }
@@ -179,6 +187,7 @@ edit_dynamic_rep::go_to_argument (path p, bool start_flag) {
 	(!inactive) && (!in_source ()))
       {
 	insert_node (path_up (p) * 0, INACTIVE);
+        call ("notify-disactivated", object (subtree (et, path_up (p) * 0)));
 	p= path_up (p) * path (0, i);
       }
     if (start_flag) go_to_start (p);
@@ -547,6 +556,7 @@ edit_dynamic_rep::activate_hybrid (bool with_args_hint) {
   // activate macro argument
   string name= st[0]->label;
   path mp= search_upwards (MACRO);
+  if (is_nil (mp)) mp= search_upwards ("edit-macro");
   if (!is_nil (mp)) {
     tree mt= subtree (et, mp);
     int i, n= N(mt)-1;

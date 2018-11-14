@@ -37,6 +37,7 @@ define $(PKG)_BUILD_ARCH
         NM='$(DEVTOOLS)/usr/bin/nm -p' \
         --prefix='$(PREFIX)' \
         --disable-shared \
+        --without-x \
 	    CC='gcc $(BASE_FLAGS)' CXX='g++ $(BASE_FLAGS)' \
         CPP='gcc -E $(BASE_FLAGS)' CXXCPP='g++ -E $(BASE_FLAGS)' \
         CFLAGS='$(BASE_CFLAGS)' LDFLAGS='$(BASE_LDFLAGS)' \

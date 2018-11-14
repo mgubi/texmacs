@@ -23,53 +23,47 @@
 
 class x_window_rep;
 class x_drawable_rep: public renderer_rep {
+protected:
+
   x_gui          gui;
   Display*       dpy;
   Drawable       win;
   x_window_rep*  x_win;
+  int            drawable_type;
   int            w, h;
   GC             gc;
-  color          cur_fg, cur_bg;
+  pencil         pen;
+  brush          bg_brush;
 
 public:
 
   x_drawable_rep (x_gui gui, x_window_rep* x_win);
   x_drawable_rep (x_gui gui, int w, int h);
+  x_drawable_rep (x_gui gui, Pixmap pm, int w, int h);
   ~x_drawable_rep ();
+  void* get_handle ();
 
-  bool is_x_drawable ();
-  x_drawable_rep* as_x_drawable ();
   void get_extents (int& w, int& h);
-  bool interrupted (bool check= false);
-
-  void encode (SI& x, SI& y);  // X coordinates -> mathematical coordinates
-  void decode (SI& x, SI& y);  // mathematical coordinates -> X coordinates
 
   /**************** subroutines for drawing text and xpms ********************/
 
   void draw_clipped (Pixmap pm, Pixmap bm, int w, int h, SI x, SI y);
   void draw (int char_code, font_glyphs fn, SI x, SI y);
-  void xpm_initialize (url file_name);
 
   /********************** routines from renderer.hpp *************************/
 
-  void  set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore= false);
-  color get_color ();
-  color get_background ();
-  void  set_color (color c);
-  void  set_background (color c);
-  void  set_line_style (SI w, int type=0, bool round=true);
-  void  line (SI x1, SI y1, SI x2, SI y2);
-  void  lines (array<SI> x, array<SI> y);
-  void  clear (SI x1, SI y1, SI x2, SI y2);
-  void  fill (SI x1, SI y1, SI x2, SI y2);
-  void  arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
-  void  fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
-  void  polygon (array<SI> x, array<SI> y, bool convex=true);
-  void  xpm (url file_name, SI x, SI y);
-  void  image (url u, SI w, SI h, SI x, SI y,
-	       double cx1, double cy1, double cx2, double cy2,
-               int alpha);
+  void   set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore= false);
+  pencil get_pencil ();
+  brush  get_background ();
+  void   set_pencil (pencil p);
+  void   set_background (brush b);
+  void   line (SI x1, SI y1, SI x2, SI y2);
+  void   lines (array<SI> x, array<SI> y);
+  void   clear (SI x1, SI y1, SI x2, SI y2);
+  void   fill (SI x1, SI y1, SI x2, SI y2);
+  void   arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
+  void   fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
+  void   polygon (array<SI> x, array<SI> y, bool convex=true);
 
   void fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y);
   void new_shadow (renderer& ren);
@@ -78,11 +72,14 @@ public:
   void put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
   void apply_shadow (SI x1, SI y1, SI x2, SI y2);
 
+  void draw_picture (picture pict, SI x, SI y, int alpha);
+
   /****************************** friends ************************************/
 
   friend class x_gui_rep;
   friend class x_window_rep;
   friend Bool my_selnotify_predicate (Display* dpy, XEvent* ev, XPointer arg);
+  friend x_gui get_gui (renderer ren);
 };
 
 #endif // defined X_DRAWABLE_H

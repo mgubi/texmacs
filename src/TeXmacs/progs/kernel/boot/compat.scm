@@ -27,10 +27,6 @@
       (set-current-output-port cout-port)
       (set-current-error-port cout-port)))
 
-(if (os-mingw?)
-  (debug-set! stack 0)
-  (debug-set! stack 1000000))
-
 ;;; make eval from guile>=1.6.0 backwards compatible
 (catch 'wrong-number-of-args
        (lambda () (eval 1))
@@ -44,3 +40,8 @@
 ;;; for old-style initialization files
 (define-public (exec-file . args)
   (noop))
+
+;;; certain Guile versions do not define 'filter'
+(if (not (defined? 'filter))
+    (define-public (filter pred? l)
+      (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))

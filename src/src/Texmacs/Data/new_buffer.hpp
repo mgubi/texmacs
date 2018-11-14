@@ -14,7 +14,7 @@
 #include "tree.hpp"
 #include "hashmap.hpp"
 #include "url.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 
 /******************************************************************************
 * The buffer class
@@ -95,6 +95,7 @@ bool buffer_modified_since_autosave (url name);
 void pretend_buffer_modified (url name);
 void pretend_buffer_saved (url name);
 void pretend_buffer_autosaved (url name);
+void attach_buffer_notifier (url name);
 bool buffer_has_name (url name);
 bool buffer_import (url name, url src, string fm);
 bool buffer_load (url name);
@@ -103,5 +104,7 @@ bool buffer_save (url name);
 tree import_loaded_tree (string s, url u, string fm);
 tree import_tree (url u, string fm);
 bool export_tree (tree doc, url u, string fm);
+tree load_style_tree (string package);
+tree with_package_definitions (string package, tree body);
 
 #endif // NEW_BUFFER_H

@@ -46,17 +46,17 @@
   (require-format x '(:%1 :%2 :*))
   `(,(car x) ,(cadr x) ,(caddr x) (menu-dynamic ,@(cdddr x))))
 
-(define (gui-make-for x)
-  (require-format x '(for (:%1 :%1) :*))
-  (with fun `(lambda (,(caadr x)) (menu-dynamic ,@(cddr x)))
-    `($dynamic (append-map ,fun ,(cadadr x)))))
-
 (define (gui-make-cond x)
   (require-format x '(cond :*))
   (with fun (lambda (x)
               (with (pred? . body) x
                 (list pred? (cons* 'menu-dynamic body))))
     `(cond ,@(map fun (cdr x)))))
+
+(define (gui-make-loop x)
+  (require-format x '(loop (:%1 :%1) :*))
+  (with fun `(lambda (,(caadr x)) (menu-dynamic ,@(cddr x)))
+    `($dynamic (append-map ,fun ,(cadadr x)))))
 
 (define (gui-make-refresh x)
   (require-format x '(refresh :%1 :*))
@@ -66,6 +66,10 @@
     (when (not (symbol? (car opts)))
       (texmacs-error "gui-make-refresh" "invalid menu item ~S" x))
     `($refresh ,(cadr x) ,(symbol->string (car opts)))))
+
+(define (gui-make-refreshable x)
+  (require-format x '(refreshable :%1 :*))
+  `($refreshable ,(cadr x) ,@(map gui-make (cddr x))))
 
 (define (gui-make-group x)
   (require-format x '(group :%1))
@@ -88,7 +92,7 @@
   `($texmacs-output ,@(cdr x)))
 
 (define (gui-make-texmacs-input x)
-  (require-format x '(texmacs-input :%4))
+  (require-format x '(texmacs-input :%3))
   `($texmacs-input ,@(cdr x)))
 
 (define (gui-make-input x)
@@ -110,6 +114,10 @@
 (define (gui-make-filtered-choice x)
   (require-format x '(filtered-choice :%4))
   `($filtered-choice ,@(cdr x)))
+
+(define (gui-make-tree-view x)
+  (require-format x '(tree-view :%3))
+  `($tree-view ,@(cdr x)))
 
 (define (gui-make-toggle x)
   (require-format x '(toggle :%2))
@@ -203,6 +211,14 @@
   (require-format x '(bold :*))
   `($widget-style ,widget-style-bold ,@(map gui-make (cdr x))))
 
+(define (gui-make-grey x)
+  (require-format x '(grey :*))
+  `($widget-style ,widget-style-grey ,@(map gui-make (cdr x))))
+
+(define (gui-make-monospaced x)
+  (require-format x '(mono :*))
+  `($widget-style ,widget-style-monospaced ,@(map gui-make (cdr x))))
+
 (define (gui-make-tile x)
   (require-format x '(tile :integer? :*))
   `($tile ,(cadr x) ,@(map gui-make (cddr x))))
@@ -275,6 +291,10 @@
   (require-format x '(when :%1 :*))
   `($assuming ,(cadr x) ,@(map gui-make (cddr x))))
 
+(define (gui-make-for x)
+  (require-format x '(for (:%1 :%1) :*))
+  `($for* ,(cadr x) ,@(map gui-make (cddr x))))
+
 (define (gui-make-mini x)
   (require-format x '(mini :%1 :*))
   `($mini ,(cadr x) ,@(map gui-make (cddr x))))
@@ -311,6 +331,10 @@
   (require-format x '(form-choices :%3))
   `($form-choices ,@(cdr x)))
 
+(define (gui-make-form-toggle x)
+  (require-format x '(form-toggle :%2))
+  `($form-toggle ,@(cdr x)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table with Gui primitives and dispatching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -324,9 +348,10 @@
   (let* ,gui-make-let)
   (with ,gui-make-with)
   (receive ,gui-make-with)
-  (for ,gui-make-for)
   (cond ,gui-make-cond)
+  (loop ,gui-make-loop)
   (refresh ,gui-make-refresh)
+  (refreshable ,gui-make-refreshable)
   (group ,gui-make-group)
   (text ,gui-make-text)
   (glue ,gui-make-glue)
@@ -337,6 +362,7 @@
   (enum ,gui-make-enum)
   (choice ,gui-make-choice)
   (choices ,gui-make-choices)
+  (tree-view ,gui-make-tree-view)
   (filtered-choice ,gui-make-filtered-choice)
   (toggle ,gui-make-toggle)
   (icon ,gui-make-icon)
@@ -361,6 +387,8 @@
   (inert ,gui-make-inert)
   (explicit-buttons ,gui-make-explicit-buttons)
   (bold ,gui-make-bold)
+  (grey ,gui-make-grey)
+  (mono ,gui-make-monospaced)
   (tile ,gui-make-tile)
   (scrollable ,gui-make-scrollable)
   (resize ,gui-make-resize)
@@ -374,6 +402,7 @@
   (assuming ,gui-make-assuming)
   (if ,gui-make-if)
   (when ,gui-make-when)
+  (for ,gui-make-for)
   (mini ,gui-make-mini)
   (symbol ,gui-make-symbol)
   (promise ,gui-make-promise)
@@ -382,7 +411,8 @@
   (form-input ,gui-make-form-input)
   (form-enum ,gui-make-form-enum)
   (form-choice ,gui-make-form-choice)
-  (form-choices ,gui-make-form-choices))
+  (form-choices ,gui-make-form-choices)
+  (form-toggle ,gui-make-form-toggle))
 
 (tm-define (gui-make x)
   ;;(display* "x= " x "\n")
@@ -466,7 +496,12 @@
     (for (col (standard-grey-list))
       (explicit-buttons
         ((color col #f #f 32 24)
-         (cmd col))))))
+         (cmd col))))
+    (for (i (.. 0 2))
+      (when #f
+        (explicit-buttons
+          ((color "#fff0" #f #f 32 24)
+           (noop)))))))
 
 (define (gui-make-pick-color x)
   `(menu-dynamic
@@ -479,25 +514,72 @@
 ;; Basic pattern picker
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (standard-pattern-list)
-  (with d (url-read-directory "$TEXMACS_PATH/misc/patterns" "*.png")
-    (map (lambda (x) `(pattern ,(url->unix x) "" "")) d)))
+(define-public (tm-pattern name w h)
+  (cond ((url-exists? (url-append "$TEXMACS_PATTERN_PATH" (url-tail name)))
+         `(pattern ,(url->unix (url-tail name)) ,w ,h))
+        ((string-starts? (url->unix (url->delta-unix name)) "../")
+         (when (url? name) (set! name (url->system name)))
+         `(pattern ,name ,w ,h))         
+        (else
+         `(pattern ,(url->unix (url->delta-unix name)) ,w ,h))))
 
-(tm-menu (standard-pattern-menu cmd)
+(define (standard-pattern-list dir scale)
+  (let* ((l1 (url-read-directory dir "*.png"))
+         (l2 (url-read-directory dir "*.jpg"))
+         (l3 (url-read-directory dir "*.gif"))
+         (l (append l1 l2 l3))
+         (d (map (cut url-delta (string-append dir "/x") <>) l))
+         (f (map (lambda (x) (string-append dir "/" (url->unix x))) d)))
+    (map (lambda (x) (tm-pattern x scale "")) f)))
+
+(tm-menu (standard-pattern-menu cmd dir scale)
   (tile 8
-    (for (col (standard-pattern-list))
-      (explicit-buttons
-        ((color col #f #f 32 24)
-         (cmd col))))))
+    (for (col (standard-pattern-list dir scale))
+      (with col2 (tm-pattern (cadr col) "100%" "100@")
+        (explicit-buttons
+          ((color col2 #f #f 32 32)
+           (cmd col)))))))
+
+(tm-menu (big-pattern-menu cmd dir scale)
+  (tile 6
+    (for (col (standard-pattern-list dir scale))
+      (with col2 (tm-pattern (cadr col) "100%" "100@")
+        (explicit-buttons
+          ((color col2 #f #f 90 90)
+           (cmd col)))))))
+
+(define-public (clipart-list)
+  (list-filter
+   (list (list "Dot hatches" "$TEXMACS_PATH/misc/patterns/dots-hatches")
+         (list "Line hatches" "$TEXMACS_PATH/misc/patterns/lines-default")
+         (list "Artistic hatches" "$TEXMACS_PATH/misc/patterns/lines-artistic")
+         (list "Hatch" "/opt/local/share/openclipart/special/patterns")
+         (list "Personal" "~/patterns")
+         (list "Simple" "~/simple-tiles"))
+   (lambda (p) (url-exists? (cadr p)))))
+
+(tm-menu (clipart-pattern-menu cmd scale)
+  (for (p (clipart-list))
+    (-> (eval (car p))
+        (dynamic (big-pattern-menu cmd (cadr p) scale)))))
 
 (define (gui-make-pick-background x)
   `(menu-dynamic
-     (dynamic (standard-color-menu (lambda (answer) ,@(cdr x))))
+     (dynamic (standard-color-menu (lambda (answer) ,@(cddr x))))
      (glue #f #f 0 5)
-     (dynamic (standard-pattern-menu (lambda (answer) ,@(cdr x))))))
+     (dynamic (standard-pattern-menu (lambda (answer) ,@(cddr x))
+                                     "$TEXMACS_PATH/misc/patterns"
+                                     ,(cadr x)))
+     (assuming (nnull? (clipart-list))
+       ---
+       (dynamic (clipart-pattern-menu (lambda (answer) ,@(cddr x))
+                                      ,(cadr x))))))
 
 (extend-table gui-make-table
   (pick-background ,gui-make-pick-background))
+
+(tm-define (allow-pattern-colors?)
+  (qt-gui?))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra RGB color picker

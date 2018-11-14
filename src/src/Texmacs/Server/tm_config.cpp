@@ -154,9 +154,9 @@ tm_config_rep::get_keycomb (
   string& which, int& status, command& cmd, string& shorth, string& help)
 {
   string orig= which;
-  if (DEBUG_KEYBOARD) cout << "        ] " << which;
+  if (DEBUG_KEYBOARD) debug_keyboard << which;
   variant_simplification (which);
-  if (DEBUG_KEYBOARD) cout << " -> " << which;
+  if (DEBUG_KEYBOARD) debug_keyboard << " -> " << which;
   string rew= apply_wildcards (which, post_kbd_wildcards);
   bool no_var= false;
   if (rew * var_suffix == orig) {
@@ -167,7 +167,7 @@ tm_config_rep::get_keycomb (
     no_var= true;
     rew= unvar_suffix (1, N(unvar_suffix));
   }
-  if (DEBUG_KEYBOARD) cout << " -> " << rew << LF;
+  if (DEBUG_KEYBOARD) debug_keyboard << " -> " << rew << LF;
   object obj= find_key_binding (rew);
   //cout << rew << " => " << obj << LF;
   //if (obj == object (false) || (orig != which && !is_string (car (obj)))) {
@@ -234,6 +234,7 @@ system_kbd_initialize (hashmap<string,tree>& h) {
     h ("end")= "<#2198>";
     h ("pageup")= "<#21DE>";
     h ("pagedown")= "<#21DF>";
+    h ("section")= "\237";
     h ("<less>")= "<#3C>";
     h ("<gtr>")= "<#3E>";
   }
@@ -260,6 +261,7 @@ system_kbd_initialize (hashmap<string,tree>& h) {
     h ("end")= localize ("End");
     h ("pageup")= localize ("PageUp");
     h ("pagedown")= localize ("PageDown");
+    h ("section")= "\237";
   }
   else {
     h ("S-")= "S-";
@@ -284,6 +286,7 @@ system_kbd_initialize (hashmap<string,tree>& h) {
     h ("end")= localize ("end");
     h ("pageup")= localize ("pageup");
     h ("pagedown")= localize ("pagedown");
+    h ("section")= "\237";
   }
 }
 

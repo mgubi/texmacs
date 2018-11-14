@@ -12,6 +12,8 @@
 #include "env.hpp"
 #include "page_type.hpp"
 #include "typesetter.hpp"
+#include "Boxes/construct.hpp"
+#include "analyze.hpp"
 
 /******************************************************************************
 * Retrieving the page size
@@ -24,109 +26,134 @@ initialize_default_var_type () {
   if (N(default_var_type) != 0) return;
   hashmap<string,int>& var_type= default_var_type;
 
-  var_type (DPI)               = Env_Fixed;
-  var_type (ZOOM_FACTOR)       = Env_Zoom;
-  var_type (PREAMBLE)          = Env_Preamble;
-  var_type (SAVE_AUX)          = Env_Fixed;
-  var_type (MODE)              = Env_Mode;
-  var_type (INFO_FLAG)         = Env_Info_Level;
+  var_type (DPI)                = Env_Fixed;
+  var_type (ZOOM_FACTOR)        = Env_Zoom;
+  var_type (PREAMBLE)           = Env_Preamble;
+  var_type (SAVE_AUX)           = Env_Fixed;
+  var_type (MODE)               = Env_Mode;
+  var_type (INFO_FLAG)          = Env_Info_Level;
 
-  var_type (FONT)              = Env_Font;
-  var_type (FONT_FAMILY)       = Env_Font;
-  var_type (FONT_SERIES)       = Env_Font;
-  var_type (FONT_SHAPE)        = Env_Font;
-  var_type (FONT_SIZE)         = Env_Font_Size;
-  var_type (FONT_BASE_SIZE)    = Env_Font_Size;
-  var_type (MAGNIFICATION)     = Env_Magnification;
-  var_type (MAGNIFY)           = Env_Magnify;
-  var_type (COLOR)             = Env_Color;
-  var_type (OPACITY)           = Env_Color;
-  var_type (LANGUAGE)          = Env_Language;
+  var_type (FONT)               = Env_Font;
+  var_type (FONT_FAMILY)        = Env_Font;
+  var_type (FONT_SERIES)        = Env_Font;
+  var_type (FONT_SHAPE)         = Env_Font;
+  var_type (FONT_SIZE)          = Env_Font_Size;
+  var_type (FONT_BASE_SIZE)     = Env_Font_Size;
+  var_type (FONT_EFFECTS)       = Env_Font;
+  var_type (MAGNIFICATION)      = Env_Magnification;
+  var_type (MAGNIFY)            = Env_Magnify;
+  var_type (COLOR)              = Env_Color;
+  var_type (OPACITY)            = Env_Color;
+  var_type (NO_PATTERNS)        = Env_Pattern_Mode;
+  var_type (LANGUAGE)           = Env_Language;
+  var_type (SPACING_POLICY)     = Env_Spacing;
 
-  var_type (MATH_LANGUAGE)     = Env_Language;
-  var_type (MATH_FONT)         = Env_Font;
-  var_type (MATH_FONT_FAMILY)  = Env_Font;
-  var_type (MATH_FONT_SERIES)  = Env_Font;
-  var_type (MATH_FONT_SHAPE)   = Env_Font;
-  var_type (MATH_LEVEL)        = Env_Index_Level;
-  var_type (MATH_DISPLAY)      = Env_Display_Style;
-  var_type (MATH_CONDENSED)    = Env_Math_Condensed;
-  var_type (MATH_VPOS)         = Env_Vertical_Pos;
+  var_type (MATH_LANGUAGE)      = Env_Language;
+  var_type (MATH_FONT)          = Env_Font;
+  var_type (MATH_FONT_FAMILY)   = Env_Font;
+  var_type (MATH_FONT_SERIES)   = Env_Font;
+  var_type (MATH_FONT_SHAPE)    = Env_Font;
+  var_type (MATH_FONT_SIZES)    = Env_Font_Sizes;
+  var_type (MATH_LEVEL)         = Env_Index_Level;
+  var_type (MATH_DISPLAY)       = Env_Display_Style;
+  var_type (MATH_CONDENSED)     = Env_Math_Condensed;
+  var_type (MATH_VPOS)          = Env_Vertical_Pos;
+  var_type (MATH_NESTING_LEVEL) = Env_Math_Nesting;
+  var_type (MATH_FRAC_LIMIT)    = Env_Math_Width;
+  var_type (MATH_TABLE_LIMIT)   = Env_Math_Width;
+  var_type (MATH_FLATTEN_COLOR) = Env_Math_Width;
 
-  var_type (PROG_LANGUAGE)     = Env_Language;
-  var_type (PROG_FONT)         = Env_Font;
-  var_type (PROG_FONT_FAMILY)  = Env_Font;
-  var_type (PROG_FONT_SERIES)  = Env_Font;
-  var_type (PROG_FONT_SHAPE)   = Env_Font;
+  var_type (PROG_LANGUAGE)      = Env_Language;
+  var_type (PROG_FONT)          = Env_Font;
+  var_type (PROG_FONT_FAMILY)   = Env_Font;
+  var_type (PROG_FONT_SERIES)   = Env_Font;
+  var_type (PROG_FONT_SHAPE)    = Env_Font;
 
-  var_type (PAR_MODE)          = Env_Paragraph;
-  var_type (PAR_HYPHEN)        = Env_Paragraph;
-  var_type (PAR_WIDTH)         = Env_Paragraph;
-  var_type (PAR_LEFT)          = Env_Paragraph;
-  var_type (PAR_RIGHT)         = Env_Paragraph;
-  var_type (PAR_FIRST)         = Env_Paragraph;
-  var_type (PAR_NO_FIRST)      = Env_Paragraph;
-  var_type (PAR_SEP)           = Env_Paragraph;
-  var_type (PAR_HOR_SEP)       = Env_Paragraph;
-  var_type (PAR_VER_SEP)       = Env_Paragraph;
-  var_type (PAR_LINE_SEP)      = Env_Paragraph;
-  var_type (PAR_PAR_SEP)       = Env_Paragraph;
+  var_type (PAR_MODE)           = Env_Paragraph;
+  var_type (PAR_FLEXIBILITY)    = Env_Paragraph;
+  var_type (PAR_HYPHEN)         = Env_Paragraph;
+  var_type (PAR_SPACING)        = Env_Paragraph;
+  var_type (PAR_KERNING_REDUCE) = Env_Paragraph;
+  var_type (PAR_KERNING_STRETCH)= Env_Paragraph;
+  var_type (PAR_KERNING_MARGIN) = Env_Paragraph;
+  var_type (PAR_CONTRACTION)    = Env_Paragraph;
+  var_type (PAR_EXPANSION)      = Env_Paragraph;
+  var_type (PAR_HYPHEN)         = Env_Paragraph;
+  var_type (PAR_WIDTH)          = Env_Paragraph;
+  var_type (PAR_LEFT)           = Env_Paragraph;
+  var_type (PAR_RIGHT)          = Env_Paragraph;
+  var_type (PAR_FIRST)          = Env_Paragraph;
+  var_type (PAR_NO_FIRST)       = Env_Paragraph;
+  var_type (PAR_SEP)            = Env_Paragraph;
+  var_type (PAR_HOR_SEP)        = Env_Paragraph;
+  var_type (PAR_VER_SEP)        = Env_Paragraph;
+  var_type (PAR_LINE_SEP)       = Env_Paragraph;
+  var_type (PAR_PAR_SEP)        = Env_Paragraph;
 
-  var_type (PAGE_TYPE)         = Env_Fixed;
-  var_type (PAGE_BREAKING)     = Env_Fixed;
-  var_type (PAGE_FLEXIBILITY)  = Env_Fixed;
-  var_type (PAGE_WIDTH)        = Env_Page_Extents;
-  var_type (PAGE_HEIGHT)       = Env_Page_Extents;
-  var_type (PAGE_WIDTH_MARGIN) = Env_Page;
-  var_type (PAGE_SCREEN_MARGIN)= Env_Page;
-  var_type (PAGE_NR)           = Env_Page;
-  var_type (PAGE_THE_PAGE)     = Env_Page;
-  var_type (PAGE_ODD)          = Env_Page;
-  var_type (PAGE_EVEN)         = Env_Page;
-  var_type (PAGE_RIGHT)        = Env_Page;
-  var_type (PAGE_TOP)          = Env_Page;
-  var_type (PAGE_BOT)          = Env_Page;
-  var_type (PAGE_USER_HEIGHT)  = Env_Page;
-  var_type (PAGE_ODD_SHIFT)    = Env_Page;
-  var_type (PAGE_EVEN_SHIFT)   = Env_Page;
-  var_type (PAGE_SHRINK)       = Env_Page;
-  var_type (PAGE_EXTEND)       = Env_Page;
-  var_type (PAGE_HEAD_SEP)     = Env_Page;
-  var_type (PAGE_FOOT_SEP)     = Env_Page;
-  var_type (PAGE_ODD_HEADER)   = Env_Page;
-  var_type (PAGE_ODD_FOOTER)   = Env_Page;
-  var_type (PAGE_EVEN_HEADER)  = Env_Page;
-  var_type (PAGE_EVEN_FOOTER)  = Env_Page;
-  var_type (PAGE_THIS_HEADER)  = Env_Page;
-  var_type (PAGE_THIS_FOOTER)  = Env_Page;
-  var_type (PAGE_FNOTE_SEP)    = Env_Page;
-  var_type (PAGE_FNOTE_BARLEN) = Env_Page;
-  var_type (PAGE_FLOAT_SEP)    = Env_Page;
-  var_type (PAGE_MNOTE_SEP)    = Env_Page;
-  var_type (PAGE_MNOTE_WIDTH)  = Env_Page;
+  var_type (PAGE_TYPE)          = Env_Fixed;
+  var_type (PAGE_BREAKING)      = Env_Fixed;
+  var_type (PAGE_FLEXIBILITY)   = Env_Fixed;
+  var_type (PAGE_FIRST)         = Env_Fixed;
+  var_type (PAGE_WIDTH)         = Env_Page_Extents;
+  var_type (PAGE_HEIGHT)        = Env_Page_Extents;
+  var_type (PAGE_WIDTH_MARGIN)  = Env_Page;
+  var_type (PAGE_SCREEN_MARGIN) = Env_Page;
+  var_type (PAGE_NR)            = Env_Page;
+  var_type (PAGE_THE_PAGE)      = Env_Page;
+  var_type (PAGE_ODD)           = Env_Page;
+  var_type (PAGE_EVEN)          = Env_Page;
+  var_type (PAGE_RIGHT)         = Env_Page;
+  var_type (PAGE_TOP)           = Env_Page;
+  var_type (PAGE_BOT)           = Env_Page;
+  var_type (PAGE_USER_HEIGHT)   = Env_Page;
+  var_type (PAGE_ODD_SHIFT)     = Env_Page;
+  var_type (PAGE_EVEN_SHIFT)    = Env_Page;
+  var_type (PAGE_SHRINK)        = Env_Page;
+  var_type (PAGE_EXTEND)        = Env_Page;
+  var_type (PAGE_HEAD_SEP)      = Env_Page;
+  var_type (PAGE_FOOT_SEP)      = Env_Page;
+  var_type (PAGE_ODD_HEADER)    = Env_Page;
+  var_type (PAGE_ODD_FOOTER)    = Env_Page;
+  var_type (PAGE_EVEN_HEADER)   = Env_Page;
+  var_type (PAGE_EVEN_FOOTER)   = Env_Page;
+  var_type (PAGE_THIS_TOP)      = Env_Page;
+  var_type (PAGE_THIS_BOT)      = Env_Page;
+  var_type (PAGE_THIS_HEADER)   = Env_Page;
+  var_type (PAGE_THIS_FOOTER)   = Env_Page;
+  var_type (PAGE_THIS_BG_COLOR) = Env_Page;
+  var_type (PAGE_FNOTE_SEP)     = Env_Page;
+  var_type (PAGE_FNOTE_BARLEN)  = Env_Page;
+  var_type (PAGE_FLOAT_SEP)     = Env_Page;
+  var_type (PAGE_MNOTE_SEP)     = Env_Page;
+  var_type (PAGE_MNOTE_WIDTH)   = Env_Page;
 
-  var_type (POINT_STYLE)       = Env_Point_Style;
-  var_type (LINE_WIDTH)        = Env_Line_Width;
-  var_type (DASH_STYLE)        = Env_Dash_Style;
-  var_type (DASH_STYLE_UNIT)   = Env_Dash_Style_Unit;
-  var_type (FILL_COLOR)        = Env_Fill_Color;
-  var_type (ARROW_BEGIN)       = Env_Line_Arrows;
-  var_type (ARROW_END)         = Env_Line_Arrows;
-  var_type (ARROW_LENGTH)      = Env_Line_Arrows;
-  var_type (ARROW_HEIGHT)      = Env_Line_Arrows;
-  var_type (TEXT_AT_HALIGN)    = Env_Text_At_Halign;
-  var_type (TEXT_AT_VALIGN)    = Env_Text_At_Valign;
-  var_type (GR_FRAME)          = Env_Frame;
-  var_type (GR_GEOMETRY)       = Env_Geometry;
-  var_type (GR_GRID)           = Env_Grid;
-  var_type (GR_GRID_ASPECT)    = Env_Grid_Aspect;
-  var_type (GR_EDIT_GRID)        = Env_Grid;
-  var_type (GR_EDIT_GRID_ASPECT) = Env_Grid_Aspect;
+  var_type (POINT_STYLE)        = Env_Point_Style;
+  var_type (POINT_SIZE)         = Env_Point_Size;
+  var_type (POINT_BORDER)       = Env_Point_Size;
+  var_type (LINE_WIDTH)         = Env_Line_Width;
+  var_type (DASH_STYLE)         = Env_Dash_Style;
+  var_type (DASH_STYLE_UNIT)    = Env_Dash_Style_Unit;
+  var_type (FILL_COLOR)         = Env_Fill_Color;
+  var_type (ARROW_BEGIN)        = Env_Line_Arrows;
+  var_type (ARROW_END)          = Env_Line_Arrows;
+  var_type (ARROW_LENGTH)       = Env_Line_Arrows;
+  var_type (ARROW_HEIGHT)       = Env_Line_Arrows;
+  var_type (LINE_PORTION)       = Env_Line_Portion;
+  var_type (TEXT_AT_HALIGN)     = Env_Text_At_Halign;
+  var_type (TEXT_AT_VALIGN)     = Env_Text_At_Valign;
+  var_type (DOC_AT_VALIGN)      = Env_Doc_At_Valign;
+  var_type (GR_FRAME)           = Env_Frame;
+  var_type (GR_GEOMETRY)        = Env_Geometry;
+  var_type (GR_GRID)            = Env_Grid;
+  var_type (GR_GRID_ASPECT)     = Env_Grid_Aspect;
+  var_type (GR_EDIT_GRID)       = Env_Grid;
+  var_type (GR_EDIT_GRID_ASPECT)= Env_Grid_Aspect;
 
-  var_type (SRC_STYLE)         = Env_Src_Style;
-  var_type (SRC_SPECIAL)       = Env_Src_Special;
-  var_type (SRC_COMPACT)       = Env_Src_Compact;
-  var_type (SRC_CLOSE)         = Env_Src_Close;
+  var_type (SRC_STYLE)          = Env_Src_Style;
+  var_type (SRC_SPECIAL)        = Env_Src_Special;
+  var_type (SRC_COMPACT)        = Env_Src_Compact;
+  var_type (SRC_CLOSE)          = Env_Src_Close;
+  var_type (SRC_TAG_COLOR)      = Env_Src_Color;
 }
 
 /******************************************************************************
@@ -147,6 +174,10 @@ edit_env_rep::update_page_pars () {
   string height_flag= get_string (PAGE_HEIGHT_MARGIN);
   bool   screen_flag= get_bool   (PAGE_SCREEN_MARGIN);
 
+  page_floats       = (get_string (PAGE_FLOAT_ENABLE) == "true");
+  if (get_string (PAGE_FLOAT_ENABLE) == get_string (PAGE_MEDIUM))
+    page_floats= true;
+
   if (page_automatic) {
     page_width        = get_length (PAGE_SCREEN_WIDTH);
     page_height       = get_length (PAGE_SCREEN_HEIGHT);
@@ -159,8 +190,8 @@ edit_env_rep::update_page_pars () {
     page_user_height  = page_height - page_top_margin - page_bottom_margin;
   }
   else {
-    page_width        = get_page_par (PAGE_WIDTH);
-    page_height       = get_page_par (PAGE_HEIGHT);
+    page_width  = get_page_par (PAGE_WIDTH);
+    page_height = get_page_par (PAGE_HEIGHT);
 
     if (width_flag == "false") {
       page_odd_margin   = get_page_par (PAGE_ODD);
@@ -199,6 +230,15 @@ edit_env_rep::update_page_pars () {
       page_bottom_margin= page_height - page_top_margin - page_user_height;
     }
 
+    if (page_type == "user") {
+      if (get_string (PAGE_EVEN) == "auto" &&
+          get_string (PAGE_ODD ) != "auto")
+        page_even_margin= page_odd_margin;
+      if (get_string (PAGE_ODD ) == "auto" &&
+          get_string (PAGE_EVEN) != "auto")
+        page_odd_margin= page_even_margin;
+    }
+
     if (screen_flag) {
       page_odd_margin   = get_length (PAGE_SCREEN_LEFT);
       page_right_margin = get_length (PAGE_SCREEN_RIGHT);
@@ -209,6 +249,11 @@ edit_env_rep::update_page_pars () {
       page_height= page_user_height + page_top_margin + page_bottom_margin;
     }
   }
+
+  page_single= get_bool (PAGE_SINGLE);
+  page_packet= get_int (PAGE_PACKET);
+  page_offset= get_int (PAGE_OFFSET);
+  page_border= read (PAGE_BORDER);
 }
 
 void
@@ -243,67 +288,257 @@ edit_env_rep::get_page_pars (SI& w, SI& h, SI& width, SI& height,
   */
 }
 
+SI
+edit_env_rep::get_page_width (bool deco) {
+  SI w= page_user_width + page_odd_margin + page_right_margin;
+  if (get_string (PAGE_MEDIUM) == "paper" &&
+      get_string (PAGE_BORDER) != "none" &&
+      deco) w += 20 * pixel;
+  return w;
+}
+
+SI
+edit_env_rep::get_pages_width (bool deco) {
+  SI w= page_user_width + page_odd_margin + page_right_margin;
+  if (get_string (PAGE_MEDIUM) == "paper" &&
+      get_string (PAGE_BORDER) != "attached" &&
+      get_string (PAGE_BORDER) != "none" &&
+      deco) w += 20 * pixel;
+  w= w * page_packet;
+  if (get_string (PAGE_MEDIUM) == "paper" &&
+      get_string (PAGE_BORDER) == "attached" &&
+      deco) w += 20 * pixel;
+  return w;
+}
+
+SI
+edit_env_rep::get_page_height (bool deco) {
+  SI h= page_user_height + page_top_margin + page_bottom_margin;
+  if (get_string (PAGE_MEDIUM) == "paper" &&
+      get_string (PAGE_BORDER) != "none" &&
+      deco) h += 20 * pixel;
+  return h;
+}
+
+/******************************************************************************
+* Retrieving ornament parameters
+******************************************************************************/
+
+static tree
+tuplify (tree t) {
+  array<string> a= tokenize (t->label, ",");
+  tree r (TUPLE, N(a));
+  for (int i=0; i<N(a); i++)
+    r[i]= a[i];
+  return r;
+}
+
+ornament_parameters
+edit_env_rep::get_ornament_parameters () {
+  tree  shape = read (ORNAMENT_SHAPE);
+  tree  tst   = read (ORNAMENT_TITLE_STYLE);
+  tree  bg    = read (ORNAMENT_COLOR);
+  tree  xc    = read (ORNAMENT_EXTRA_COLOR);
+  tree  sunny = read (ORNAMENT_SUNNY_COLOR);
+  tree  shadow= read (ORNAMENT_SHADOW_COLOR);
+  int   a     = alpha;
+  tree  w     = read (ORNAMENT_BORDER);
+  tree  ext   = read (ORNAMENT_SWELL);
+  tree  xpad  = read (ORNAMENT_HPADDING);
+  tree  ypad  = read (ORNAMENT_VPADDING);
+
+  array<brush> border;
+  if (is_func (sunny, TUPLE)) {
+    for (int i=0; i<N(sunny); i++)
+      border << brush (sunny[i], a);
+  }
+  else {
+    border << brush (sunny, a);
+    border << brush (shadow, a);
+  }
+  if (N(border) == 1) border << border[0];
+  if (N(border) == 2) border << border[1] << border[0];
+
+  SI lw, bw, rw, tw;
+  if (is_atomic (w) && occurs (",", w->label))
+    w= tuplify (w);
+  if (is_func (w, TUPLE, 4)) {
+    lw= ((as_length (w[0]) >> 1) << 1);
+    bw= ((as_length (w[1]) >> 1) << 1);
+    rw= ((as_length (w[2]) >> 1) << 1);
+    tw= ((as_length (w[3]) >> 1) << 1);
+  }
+  else lw= bw= rw= tw= ((as_length (w) >> 1) << 1);
+
+  double lx, bx, rx, tx;
+  if (is_atomic (ext) && occurs (",", ext->label))
+    ext= tuplify (ext);
+  if (is_func (ext, TUPLE, 4)) {
+    lx= as_double (ext[0]);
+    bx= as_double (ext[1]);
+    rx= as_double (ext[2]);
+    tx= as_double (ext[3]);
+  }
+  else lx= bx= rx= tx= as_double (ext);
+
+  SI lpad, rpad;
+  if (is_atomic (xpad) && occurs (",", xpad->label))
+    xpad= tuplify (xpad);
+  if (is_func (xpad, TUPLE, 2)) {
+    lpad= as_length (xpad[0]);
+    rpad= as_length (xpad[1]);
+  }
+  else lpad= rpad= as_length (xpad);
+
+  SI bpad, tpad;
+  if (is_atomic (ypad) && occurs (",", ypad->label))
+    ypad= tuplify (ypad);
+  if (is_func (ypad, TUPLE, 2)) {
+    bpad= as_length (ypad[0]);
+    tpad= as_length (ypad[1]);
+  }
+  else bpad= tpad= as_length (ypad);
+
+  return ornament_parameters (shape, tst,
+                              lw, bw, rw, tw,
+			      lx, bx, rx, tx,
+			      lpad, bpad, rpad, tpad,
+                              brush (bg, a), brush (xc, a), border);
+}
+
+/******************************************************************************
+* Various font sizes for scripts
+******************************************************************************/
+
+static array<int>
+determine_sizes (tree szt, int sz) {
+  array<int> r;
+  r << sz;
+  if (is_tuple (szt))
+    for (int i=0; i<N(szt); i++)
+      if (is_tuple (szt[i]) && N(szt[i]) >= 1)
+	if (szt[i][0] == "all" ||
+	    szt[i][0] == as_string (sz)) {
+	  for (int j=1; j<N(szt[i]); j++)
+	    if (is_atomic (szt[i][j])) {
+	      string s= szt[i][j]->label;
+	      if (is_int (s)) r << as_int (s);
+	      else if (starts (s, "*")) {
+		s= s (1, N(s));
+		double x= 1.0;
+		int d= search_forwards ("/", s);
+		if (d >= 0 && is_double (s(0, d)) && is_double (s(d+1, N(s))))
+		  x= as_double (s (0, d)) / as_double (s (d+1, N(s)));
+		else if (is_double (s)) x= as_double (s);
+		int xsz= (int) ceil ((x - 0.001) * sz);
+		r << xsz;
+	      }
+	    }
+	  //cout << szt << ", " << sz << " -> " << r << LF;
+	  return r;
+	}
+  r << script (sz, 1);
+  r << script (sz, 2);
+  //cout << szt << ", " << sz << " -> " << r << LF;
+  return r;
+}
+
+int
+edit_env_rep::get_script_size (int sz, int level) {
+  while (sz >= N(size_cache)) {
+    int xsz= N(size_cache);
+    size_cache << determine_sizes (math_font_sizes, xsz);
+  }
+  array<int>& a (size_cache[sz]);
+  if (level < N(a)) return a[level];
+  else return a[N(a) - 1];
+}
+
 /******************************************************************************
 * Updating the environment from the variables
 ******************************************************************************/
 
 void
 edit_env_rep::update_font () {
-  fn_size= (int) ((((double) get_int (FONT_BASE_SIZE))+0.5)*
-		  get_double (FONT_SIZE));
+  fn_size= (int) (((double) get_int (FONT_BASE_SIZE)) *
+		  get_double (FONT_SIZE) + 0.5);
   switch (mode) {
   case 0:
   case 1:
-    fn= find_font (get_string (FONT), get_string (FONT_FAMILY),
-		   get_string (FONT_SERIES), get_string (FONT_SHAPE),
-		   script (fn_size, index_level), (int) (magn*dpi), true);
+    fn= smart_font (get_string (FONT), get_string (FONT_FAMILY),
+                    get_string (FONT_SERIES), get_string (FONT_SHAPE),
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   case 2:
-    fn= find_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
-		   get_string (MATH_FONT_SERIES), get_string (MATH_FONT_SHAPE),
-		   script (fn_size, index_level), (int) (magn*dpi));
+    fn= smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
+                    get_string (MATH_FONT_SERIES), get_string (MATH_FONT_SHAPE),
+                    get_string (FONT), get_string (FONT_FAMILY),
+                    get_string (FONT_SERIES), "mathitalic",
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   case 3:
-    fn= find_font (get_string (PROG_FONT), get_string (PROG_FONT_FAMILY),
-		   get_string (PROG_FONT_SERIES), get_string (PROG_FONT_SHAPE),
-		   script (fn_size, index_level), (int) (magn*dpi));
+    fn= smart_font (get_string (PROG_FONT), get_string (PROG_FONT_FAMILY),
+                    get_string (PROG_FONT_SERIES), get_string (PROG_FONT_SHAPE),
+                    get_string (FONT), get_string (FONT_FAMILY) * "-tt",
+                    get_string (FONT_SERIES), get_string (FONT_SHAPE),
+                    get_script_size (fn_size, index_level), (int) (magn*dpi));
     break;
   }
+  string eff= get_string (FONT_EFFECTS);
+  if (N(eff) != 0) fn= apply_effects (fn, eff);
 }
 
 int
 decode_alpha (string s) {
   if (N(s) == 0) return 255;
   else if (s[N(s)-1] == '%') {
-      // mg: be careful to avoid rounding problems for the conversion from double to int : (int)(2.55*100.0)=254
-      double p = as_double (s (0, N(s)-1));
-      if (p<0.0) p = 0.0;
-      if (p>100.0) p = 100.0;
-      return ((int) (255.0 * p))/100;
+    // mg: be careful to avoid rounding problems for the conversion from double to int : (int)(2.55*100.0)=254
+    double p = as_double (s (0, N(s)-1));
+    if (p<0.0) p = 0.0;
+    if (p>100.0) p = 100.0;
+    return ((int) (255.0 * p))/100;
   }
   else {
-      double p = as_double (s);
-      if (p<0.0) p = 0.0;
-      if (p>1.0) p = 1.0;
-      return ((int) (255.0 * p))/100;
+    double p = as_double (s);
+    if (p<0.0) p = 0.0;
+    if (p>1.0) p = 1.0;
+    return ((int) (255.0 * p));
   }
 }
 
 void
 edit_env_rep::update_color () {
   alpha= decode_alpha (get_string (OPACITY));
-  string c = get_string (COLOR);
-  string fc= get_string (FILL_COLOR);
-  if (c == "none") {
-    if (fc == "none") fill_mode= FILL_MODE_NOTHING;
-    else fill_mode= FILL_MODE_INSIDE;
-  }
+  tree pc= env [COLOR];
+  tree fc= env [FILL_COLOR];
+  if (pc == "none") pen= pencil (false);
   else {
-    if (fc == "none") fill_mode= FILL_MODE_NONE;
-    else fill_mode= FILL_MODE_BOTH;
+    if (L(pc) == PATTERN) pc= exec (pc);
+    pen= pencil (pc, alpha, get_length (LINE_WIDTH));
   }
-  col= named_color (c, alpha);
-  fill_color= named_color (fc, alpha);
+  if (fc == "none") fill_brush= brush (false);
+  else {
+    if (L(fc) == PATTERN) fc= exec (fc);
+    fill_brush= brush (fc, alpha);
+  }
+}
+
+void
+edit_env_rep::update_pattern_mode () {
+  no_patterns= (get_string (NO_PATTERNS) == "true");
+  if (no_patterns) {
+    tree c= env[COLOR];
+    if (is_func (c, PATTERN, 4)) env (COLOR)= exec (c);
+    c= env[BG_COLOR];
+    if (is_func (c, PATTERN, 4)) env (BG_COLOR)= exec (c);
+    c= env[FILL_COLOR];
+    if (is_func (c, PATTERN, 4)) env (FILL_COLOR)= exec (c);
+    c= env[ORNAMENT_COLOR];
+    if (is_func (c, PATTERN, 4)) env (ORNAMENT_COLOR)= exec (c);
+    c= env[ORNAMENT_EXTRA_COLOR];
+    if (is_func (c, PATTERN, 4)) env (ORNAMENT_EXTRA_COLOR)= exec (c);
+    update_color ();
+  }
 }
 
 void
@@ -325,6 +560,7 @@ edit_env_rep::update_info_level () {
   else if (s == "short") info_level= INFO_SHORT;
   else if (s == "detailed") info_level= INFO_DETAILED;
   else if (s == "paper") info_level= INFO_PAPER;
+  else if (s == "short-paper") info_level= INFO_SHORT_PAPER;
   else info_level= INFO_MINIMAL;
 }
 
@@ -352,8 +588,10 @@ edit_env_rep::update_geometry () {
   gh= as_length ("0.6par");
   gvalign= as_string ("center");
   if (is_tuple (t, "geometry", 2) || is_tuple (t, "geometry", 3)) {
-    if (is_length (as_string (t[1]))) gw= as_length (t[1]);
-    if (is_length (as_string (t[2]))) gh= as_length (t[2]);
+    if (is_length (as_string (t[1])) || is_anylen (t[1]))
+      gw= as_length (t[1]);
+    if (is_length (as_string (t[2])) || is_anylen (t[2]))
+      gh= as_length (t[2]);
     if (is_tuple (t, "geometry", 3))
       gvalign= as_string (t[3]);
   }
@@ -439,6 +677,7 @@ void
 edit_env_rep::update_dash_style () {
   tree t= env [DASH_STYLE];
   dash_style= array<bool> (0);
+  dash_motif= array<point> (0);
   if (is_string (t)) {
     string s= as_string (t);
     if (N(s) > 0 && (s[0] == '0' || s[0] == '1')) {
@@ -447,7 +686,60 @@ edit_env_rep::update_dash_style () {
       for (i=0; i<n; i++)
         dash_style[i]= (s[i] != '0');
     }
+    else if (N(s) > 0) {
+      if (s == "zigzag")
+        dash_motif << point (0.25, 0.5) << point (0.75, -0.5);
+      else if (s == "wave")
+        for (int k=1; k<=11; k++)
+          dash_motif << point (k / 12.0, sin (3.141592*k / 6.0) / 2.0);
+      else if (s == "pulse")
+        dash_motif << point (0.0, 0.5) << point (0.5, 0.5)
+                   << point (0.5, -0.5) << point (1.0, -0.5);
+      else if (s == "loops")
+        for (int k=1; k<=11; k++) {
+          double c= (1.0 - cos (3.141592*k / 6.0)) / 2.0;
+          double s= sin (3.141592*k / 6.0) / 2.0;
+          dash_motif << point (k / 12.0 + c, s);
+        }
+      else if (s == "meander") {
+        double u= 1.0 / 12.0;
+        dash_motif << point (-0.5*u, 0.0)
+                   << point (5*u, 0.0) << point (5*u, 5*u)
+                   << point (u, 5*u) << point (u, 2*u)
+                   << point (3*u, 2*u) << point (3*u, 3*u)
+                   << point (2*u, 3*u) << point (2*u, 4*u)
+                   << point (4*u, 4*u) << point (4*u, u)
+                   << point (0.0, u) << point (0.0, 6*u)
+                   << point (5.5*u, 6*u)
+                   << point (11*u, 6*u) << point (11*u, u)
+                   << point (7*u, u) << point (7*u, 4*u)
+                   << point (9*u, 4*u) << point (9*u, 3*u)
+                   << point (8*u, 3*u) << point (8*u, 2*u)
+                   << point (10*u, 2*u) << point (10*u, 5*u)
+                   << point (6*u, 5*u) << point (6*u, 0.0);
+        for (int i=0; i<N(dash_motif); i++)
+          dash_motif[i][0] += 0.5*u;
+      }
+      for (int i=0; i<N(dash_motif); i++)
+        dash_motif[i][1] *= dash_style_ratio;
+    }
   }
+}
+
+void
+edit_env_rep::update_dash_style_unit () {
+  tree t= read (DASH_STYLE_UNIT);
+  if (is_tuple (t) && N(t) == 2) {
+    SI hunit= as_length (t[0]);
+    SI vunit= as_length (t[1]);
+    dash_style_unit = hunit;
+    dash_style_ratio= ((double) vunit) / max (((double) hunit), 1.0);
+  }
+  else {
+    dash_style_unit= as_length (t);
+    dash_style_ratio= 1.0;
+  }
+  if (N(dash_motif) != 0) update_dash_style ();
 }
 
 void
@@ -546,6 +838,10 @@ edit_env_rep::update_line_arrows () {
   string h= get_string (ARROW_HEIGHT);
   line_arrows[0]= decode_arrow (env [ARROW_BEGIN], l, h);
   line_arrows[1]= decode_arrow (env [ARROW_END], l, h);
+  if (line_arrows[0] != "")
+    line_arrows[0]= tree (WITH, LINE_PORTION, "1", line_arrows[0]);
+  if (line_arrows[1] != "")
+    line_arrows[1]= tree (WITH, LINE_PORTION, "1", line_arrows[1]);
 }
 
 void
@@ -557,9 +853,12 @@ edit_env_rep::update () {
   display_style  = get_bool (MATH_DISPLAY);
   math_condensed = get_bool (MATH_CONDENSED);
   vert_pos       = get_int (MATH_VPOS);
+  nesting_level  = get_int (MATH_NESTING_LEVEL);
   preamble       = get_bool (PREAMBLE);
+  spacing_policy = get_spacing_id (env[SPACING_POLICY]);
+  math_font_sizes= env[MATH_FONT_SIZES];
+  size_cache     = array<array<int> > ();
 
-  update_color ();
   update_mode ();
   update_info_level ();
   update_language ();
@@ -567,18 +866,29 @@ edit_env_rep::update () {
 
   update_geometry ();
   update_frame ();
-  point_style= get_string (POINT_STYLE);
-  lw= get_length (LINE_WIDTH);
+  point_style = get_string (POINT_STYLE);
+  point_size  = get_length (POINT_SIZE);
+  point_border= get_length (POINT_BORDER);
+  update_color ();
+  update_pattern_mode ();
   update_dash_style ();
-  dash_style_unit= get_length (DASH_STYLE_UNIT);
+  update_dash_style_unit ();
   update_line_arrows ();
+  line_portion= get_double (LINE_PORTION);
   text_at_halign= get_string (TEXT_AT_HALIGN);
   text_at_valign= get_string (TEXT_AT_VALIGN);
+  doc_at_valign= get_string (DOC_AT_VALIGN);
 
   update_src_style ();
   update_src_special ();
   update_src_compact ();
   update_src_close ();
+  src_tag_color= get_string (SRC_TAG_COLOR);
+  src_tag_col= named_color (src_tag_color);
+
+  frac_max   = get_length (MATH_FRAC_LIMIT);
+  table_max  = get_length (MATH_TABLE_LIMIT);
+  flatten_pen= pencil (env[MATH_FLATTEN_COLOR], alpha, get_length (LINE_WIDTH));
 }
 
 /******************************************************************************
@@ -599,10 +909,14 @@ edit_env_rep::update (string s) {
   case Env_Magnification:
     magn= get_double (MAGNIFICATION);
     update_font ();
-    lw= get_length (LINE_WIDTH);
+    update_color ();
+    update_dash_style_unit ();
     break;
   case Env_Magnify:
     mgfy= get_double (MAGNIFY);
+    update_font ();
+    update_color ();
+    update_dash_style_unit ();
     break;
   case Env_Language:
     update_language ();
@@ -612,10 +926,18 @@ edit_env_rep::update (string s) {
     update_language ();
     update_font ();
     break;
+  case Env_Info_Level:
+    update_info_level ();
+    break;
   case Env_Font:
     update_font ();
     break;
   case Env_Font_Size:
+    update_font ();
+    break;
+  case Env_Font_Sizes:
+    math_font_sizes= env[MATH_FONT_SIZES];
+    size_cache= array<array<int> > ();
     update_font ();
     break;
   case Env_Index_Level:
@@ -631,8 +953,22 @@ edit_env_rep::update (string s) {
   case Env_Vertical_Pos:
     vert_pos= get_int (MATH_VPOS);
     break;
+  case Env_Math_Nesting:
+    nesting_level= get_int (MATH_NESTING_LEVEL);
+    break;
+  case Env_Math_Width:
+    frac_max= get_length (MATH_FRAC_LIMIT);
+    table_max= get_length (MATH_TABLE_LIMIT);
+    flatten_pen= pencil (env[MATH_FLATTEN_COLOR], alpha, get_length (LINE_WIDTH));
+    break;
   case Env_Color:
     update_color ();
+    break;
+  case Env_Pattern_Mode:
+    update_pattern_mode ();
+    break;
+  case Env_Spacing:
+    spacing_policy= get_spacing_id (env[SPACING_POLICY]);
     break;
   case Env_Paragraph:
     break;
@@ -653,14 +989,18 @@ edit_env_rep::update (string s) {
   case Env_Point_Style:
     point_style= get_string (POINT_STYLE);
     break;
+  case Env_Point_Size:
+    point_size= get_length (POINT_SIZE);
+    point_border= get_length (POINT_BORDER);
+    break;
   case Env_Line_Width:
-    lw= get_length (LINE_WIDTH);
+    update_color ();
     break;
   case Env_Dash_Style:
     update_dash_style();
     break;
   case Env_Dash_Style_Unit:
-    dash_style_unit= get_length (DASH_STYLE_UNIT);
+    update_dash_style_unit ();
     break;
   case Env_Fill_Color:
     update_color ();
@@ -668,11 +1008,17 @@ edit_env_rep::update (string s) {
   case Env_Line_Arrows:
     update_line_arrows();
     break;
+  case Env_Line_Portion:
+    line_portion= get_double (LINE_PORTION);
+    break;
   case Env_Text_At_Halign:
     text_at_halign= get_string (TEXT_AT_HALIGN);
     break;
   case Env_Text_At_Valign:
     text_at_valign= get_string (TEXT_AT_VALIGN);
+    break;
+  case Env_Doc_At_Valign:
+    doc_at_valign= get_string (DOC_AT_VALIGN);
     break;
   case Env_Src_Style:
     update_src_style ();
@@ -685,6 +1031,10 @@ edit_env_rep::update (string s) {
     break;
   case Env_Src_Close:
     update_src_close ();
+    break;
+  case Env_Src_Color:
+    src_tag_color= get_string (SRC_TAG_COLOR);
+    src_tag_col= named_color (src_tag_color);
     break;
   }
 }

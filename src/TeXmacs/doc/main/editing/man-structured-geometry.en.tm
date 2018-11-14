@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.7>
+<TeXmacs|1.99.5>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Positioning and resizing objects>
@@ -41,13 +41,14 @@
     alignment) to the defaults.
 
     <item*|<shortcut|(geometry-circulate #t)>, <shortcut|(geometry-circulate
-    #f)>>Circulate among available length units for specifying the geometry.
+    #f)>>Circulate among the available length units for specifying the
+    geometry.
 
     <item*|<shortcut|(geometry-slower)>, <shortcut|(geometry-faster)>>Decrease
     or increase the step size when positioning or resizing.
   </description>
 
-  Particular tags to which the shortcuts apply are the following
+  Particular tags to which the shortcuts apply are the following:
 
   <\description>
     <item*|Spaces>Both horizontal and vertical spaces from the
@@ -55,8 +56,8 @@
     tag for the shortcuts to apply.
 
     <item*|Box modifiers>The tags <markup|move>, <markup|shift>,
-    <markup|resize> and <markup|clipped><compound|markup|> from the
-    <menu|Format|Transform> menu.
+    <markup|resize>, <markup|extend>, <markup|clipped>, <markup|smashed>,
+    <markup|swell> from the <menu|Format|Adjust> menu.
 
     <item*|Animations>The durations of animations can be modified using
     <shortcut|(geometry-left)> and <shortcut|(geometry-right)>.
@@ -74,8 +75,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

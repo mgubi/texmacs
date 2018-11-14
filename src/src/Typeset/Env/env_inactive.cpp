@@ -29,7 +29,7 @@ is_long_arg (tree t, int i) {
   int n= N(t);
   switch (L(t)) {
   case DOCUMENT:
-  case INCLUDE:
+  case VAR_INCLUDE:
   case TFORMAT:
   case TABLE:
     return true;
@@ -111,6 +111,7 @@ is_long (tree t) {
 
 static tree
 highlight (tree t, tree orig, int kind) {
+  (void) orig;
   switch (kind) {
   case TYPE_INVALID:
     return compound ("src-unknown", t);
@@ -142,6 +143,8 @@ highlight (tree t, tree orig, int kind) {
     return compound ("src-tt", t);
   case TYPE_URL:
     return compound ("src-tt", t);
+  case TYPE_COLOR:
+    return compound ("src-textual", t);
   case TYPE_GRAPHICAL:
     return compound ("src-regular", t);
   case TYPE_POINT:
@@ -416,9 +419,9 @@ edit_env_rep::rewrite_inactive (tree t, tree var, bool block, bool flush) {
   if (is_atomic (t)) {
     if (src_style == STYLE_SCHEME)
       return tree (CONCAT,
-		   tree (WITH, COLOR, "blue", "``"),
+		   tree (WITH, COLOR, src_tag_color, "``"),
 		   var,
-		   tree (WITH, COLOR, "blue", "''"));
+		   tree (WITH, COLOR, src_tag_color, "''"));
     return var;
   }
   switch (L(t)) {

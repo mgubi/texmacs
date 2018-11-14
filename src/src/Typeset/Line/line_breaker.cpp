@@ -41,7 +41,7 @@ operator << (tm_ostream& out, lb_info hi) {
 	     << hi->pen << ", " << hi->pen_spc << " ]";
 }
 
-// FIXME: explicit instanciation for broken g++
+// FIXME: explicit instantiation for broken g++
 #include "hashmap.hpp"
 template lb_info& hashmap_rep<list<int>, lb_info>::bracket_rw(list<int>);
 
@@ -54,13 +54,14 @@ struct line_breaker_rep {
   int start;
   int end;
   SI  line_width;
+  SI  large_width;
   SI  first_spc;
   SI  last_spc;
   int pass;
   hashmap<path,lb_info> best;
 
   line_breaker_rep (array<line_item> a, int start, int end,
-		    SI line_width, SI first_spc, SI last_spc);
+		    SI line_width, SI large_width, SI first_spc, SI last_spc);
 
   void empty_line_fix (line_item& first, path& pos, int& cur_nr);
   path next_ragged_break (path pos);
@@ -76,9 +77,10 @@ struct line_breaker_rep {
 
 line_breaker_rep::line_breaker_rep (
   array<line_item> a2, int start2, int end2,
-  SI line_width2, SI first_spc2, SI last_spc2):
+  SI line_width2, SI large_width2, SI first_spc2, SI last_spc2):
     a (a2), start (start2), end (end2),
-    line_width (line_width2), first_spc (first_spc2), last_spc (last_spc2),
+    line_width (line_width2), large_width (large_width2),
+    first_spc (first_spc2), last_spc (last_spc2),
     best (lb_info ()) {}
 
 /******************************************************************************
@@ -117,16 +119,16 @@ hyphenate (line_item item, int pos, line_item& item1, line_item& item2) {
   box b= item->b;
   string s  = b->get_leaf_string ();
   font   fn = b->get_leaf_font ();
-  color  col= b->get_leaf_color ();
+  pencil pen= b->get_leaf_pencil ();
 
   string s1, s2;
   array<int> hp= item->lan->get_hyphens (s);
   item->lan->hyphenate (s, pos, s1, s2);
   item1= line_item (STRING_ITEM, OP_SKIP,
-		    shorter_box (ip, text_box (ip, x1, s1, fn, col), pos+ 1),
+		    shorter_box (ip, text_box (ip, x1, s1, fn, pen), pos+ 1),
 		    hp[pos], item->lan);
   item2= line_item (STRING_ITEM, item->op_type,
-                    text_box (ip, x2, s2, fn, col),
+                    text_box (ip, x2, s2, fn, pen),
 		    item->penalty, item->lan);
   item2->spc= item->spc;
   // cout << s << " ---> " << s1 << " " << s2 << "\n";
@@ -286,7 +288,7 @@ line_breaker_rep::propose_break (path new_pos, path old_pos,
 		 cur->pen_spc + (cur->pen == HYPH_INVALID?
                                  ((PEN) 0): square ((PEN) (d / PIXEL))));
   }
-  
+
   if (pass==2) {
     if (spc->max < line_width)
       test_better (new_pos, old_pos, HYPH_INVALID,
@@ -294,14 +296,20 @@ line_breaker_rep::propose_break (path new_pos, path old_pos,
 		   square ((PEN) ((line_width - spc->max)/PIXEL)) +
 		   (new_pos->item==old_pos->item?
 		    square ((PEN) (line_width / PIXEL)): ((PEN) 0)));
-    if (spc->min > line_width)
+    else if (spc->min > large_width)
       test_better (new_pos, old_pos, HYPH_INVALID,
 		   (cur->pen == HYPH_INVALID? cur->pen_spc: ((PEN) 0)) +
 		   square ((PEN) ((spc->min - line_width) / PIXEL)) +
 		   square ((PEN) (4*line_width / PIXEL)));
+    else if (spc->min > line_width)
+      test_better (new_pos, old_pos, HYPH_INVALID,
+		   (cur->pen == HYPH_INVALID? cur->pen_spc: ((PEN) 0)) +
+		   square ((PEN) ((spc->min - line_width) / PIXEL)) +
+		   (new_pos->item==old_pos->item?
+                    square ((PEN) (line_width / PIXEL)): ((PEN) 0)));
   }
-  
-  return spc->min > line_width;
+
+  return spc->min > large_width;
 }
 
 /******************************************************************************
@@ -449,12 +457,14 @@ line_breaker_rep::compute_breaks () {
 
 array<path>
 line_breaks (array<line_item> a, int start, int end,
-	     SI line_width, SI first_spc, SI last_spc, bool ragged)
+	     SI line_width, SI large_width,
+             SI first_spc, SI last_spc, bool ragged)
 {
   int tol= 5;         // extra tolerance of 5tmpt avoid rounding errors when
   line_width += tol;  // the widths of the boxes sum up to precisely 1par
   line_breaker_rep* H=
-    tm_new<line_breaker_rep> (a, start, end, line_width, first_spc, last_spc);
+    tm_new<line_breaker_rep> (a, start, end, line_width, large_width,
+                              first_spc, last_spc);
   array<path> ap= ragged? H->compute_ragged_breaks (): H->compute_breaks ();
   tm_delete (H);
   return ap;

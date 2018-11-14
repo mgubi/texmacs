@@ -42,7 +42,7 @@
 			 ,(cAr l))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Rewriting document titles as a function of several style parameters
+;; Select
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (rewrite-select pat)
@@ -64,3 +64,40 @@
   (:secure #t)
   (with (op body2 . pat) (tree->list args)
     (list 'quote (cons 'tuple (select body (map rewrite-select pat))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Language suffix
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (ext-language-suffix)
+  (:secure #t)
+  (with s (language-to-locale (get-output-language))
+    (if (>= (string-length s) 2) (substring s 0 2) "en")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Listings
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ext-listing-row body row)
+  `(row (cell (with "color" "dark grey" "prog-language" "verbatim"
+                    ,(number->string (+ row 1))))
+        (cell (document ,(tm-ref body row)))))
+
+(tm-define (ext-listing body)
+  (:secure #t)
+  (if (tm-func? body 'document)
+      `(tformat
+         (twith "table-width" "1par")
+         (twith "table-hmode" "exact")
+         (twith "table-hyphen" "y")
+         (cwith "1" "-1" "1" "1" "cell-halign" "r")
+         (cwith "1" "-1" "1" "1" "cell-lsep" "0em")
+         (cwith "1" "-1" "2" "2" "cell-halign" "l")
+         (cwith "1" "-1" "2" "2" "cell-rsep" "0em")
+         (cwith "1" "-1" "2" "2" "cell-hpart" "1")
+         (cwith "1" "-1" "2" "2" "cell-hyphen" "t")
+         (cwith "1" "-1" "1" "-1" "cell-background"
+                (if (equal (mod (value "cell-row-nr") "2") "0") "#f4f4ff" ""))
+         (table ,@(map (lambda (row) (ext-listing-row body row))
+                       (.. 0 (tm-arity body)))))
+      body))

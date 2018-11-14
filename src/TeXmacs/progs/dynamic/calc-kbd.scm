@@ -25,3 +25,13 @@
   ("\\ \\" (make-calc-inert))
   ("\\ !" (make-calc-input))
   ("\\ ?" (make 'calc-ref)))
+
+(kbd-map
+  (:require (and (calc-ready?) (style-has? "icourse-dtd")))
+  ("\\ <" (make-calc-generate))
+  ("\\ >" (make-calc-answer))
+  ("\\ ]" (make-calc-check))
+  ("C-return" (calc-regenerate))
+  ("C-*" (calc-regenerate))
+  ("C-!" (calc-solutions #f))
+  ("C-?" (calc-solutions #t)))

@@ -19,13 +19,14 @@
 pager_rep::pager_rep (path ip2, edit_env env2, array<page_item> l2):
   ip (ip2), env (env2), style (UNINIT), l (l2)
 {
-  style (PAGE_THE_PAGE)   = tree (MACRO, compound ("page-nr"));
-  style (PAGE_ODD_HEADER) = env->read (PAGE_ODD_HEADER);
-  style (PAGE_ODD_FOOTER) = env->read (PAGE_ODD_FOOTER);
-  style (PAGE_EVEN_HEADER)= env->read (PAGE_EVEN_HEADER);
-  style (PAGE_EVEN_FOOTER)= env->read (PAGE_EVEN_FOOTER);
-  style (PAGE_THIS_HEADER)= "";
-  style (PAGE_THIS_FOOTER)= "";
+  style (PAGE_THE_PAGE)     = tree (MACRO, compound ("page-nr"));
+  style (PAGE_ODD_HEADER)   = env->read (PAGE_ODD_HEADER);
+  style (PAGE_ODD_FOOTER)   = env->read (PAGE_ODD_FOOTER);
+  style (PAGE_EVEN_HEADER)  = env->read (PAGE_EVEN_HEADER);
+  style (PAGE_EVEN_FOOTER)  = env->read (PAGE_EVEN_FOOTER);
+  style (PAGE_THIS_HEADER)  = "";
+  style (PAGE_THIS_FOOTER)  = "";
+  style (PAGE_THIS_BG_COLOR)= "";
 
   int nr_cols= env->get_int (PAR_COLUMNS);
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
@@ -46,7 +47,7 @@ pager_rep::pager_rep (path ip2, edit_env env2, array<page_item> l2):
   show_hf   = env->get_bool (PAGE_SHOW_HF) && paper;
   if (nr_cols > 1) text_width = (text_width+col_sep+1) * nr_cols - col_sep;
 
-  page_offset= 0;
+  page_offset= env->first_page - 1;
   cur_top= 0;
 }
 
@@ -126,7 +127,7 @@ format_stack (path ip, array<page_item> l, SI height, bool may_stretch) {
 }
 
 box
-page_box (path ip, box b, tree page,
+page_box (path ip, box b, tree page, int page_nr, brush bgc,
 	  SI width, SI height, SI left, SI top, SI bot,
 	  box header, box footer, SI head_sep, SI foot_sep)
 {
@@ -140,7 +141,7 @@ page_box (path ip, box b, tree page,
   array<SI>  decs_x (2); decs_x [0]= left  ; decs_x [1]= left;
   array<SI>  decs_y (2); decs_y [0]= h_y   ; decs_y [1]= f_y;
 
-  return page_box (ip, page, width, height,
+  return page_box (ip, page, page_nr, bgc, width, height,
 		   bs, bs_x, bs_y,
 		   decs, decs_x, decs_y);
 }
@@ -177,8 +178,9 @@ void
 pager_rep::end_page (bool flag) {
   box sb  = format_stack (ip, lines_bx, lines_ht, text_height, !flag);
   box lb  = move_box (ip, sb, 0, 0);
-  SI  left= (N(pages)&1)==0? odd: even;
-  box pb  = page_box (ip, lb, as_string (N(pages)+1+page_offset),
+  SI  nr  = N(pages)+1+page_offset;
+  SI  left= (nr&1)==0? even: odd;
+  box pb  = page_box (ip, lb, as_string (nr), nr, brush (none),
 		      width, height, left, top, top+ text_height,
 		      make_header(), make_footer(), head_sep, foot_sep);
 
@@ -217,6 +219,27 @@ pager_rep::make_footer (bool empty_flag) {
   return b;
 }
 
+brush
+pager_rep::make_background (bool empty_flag) {
+  if (empty_flag) return brush (false);
+  tree bgc= style [PAGE_THIS_BG_COLOR];
+  style (PAGE_THIS_BG_COLOR) = "";
+  if (bgc == "") return brush (false);
+  return brush (bgc);
+}
+
+void
+pager_rep::adjust_margins (bool empty_flag) {
+  dtop= dbot= 0;
+  if (empty_flag) return;
+  tree topt= style [PAGE_THIS_TOP];
+  tree bott= style [PAGE_THIS_BOT];
+  if (topt != UNINIT) dtop= env->as_length (topt) - top;
+  if (bott != UNINIT) dbot= env->as_length (bott) - bot;
+  style->reset (PAGE_THIS_TOP);
+  style->reset (PAGE_THIS_BOT);
+}
+
 /******************************************************************************
 * Typesetting all pages
 ******************************************************************************/
@@ -225,12 +248,66 @@ box
 pager_rep::make_pages () {
   if (paper) pages_make ();
   else papyrus_make ();
-  int i, nr_pages= N(pages);
-  array<SI>  x  (nr_pages);
-  array<SI>  y  (nr_pages);
-  for (i=0; i<nr_pages; i++) {
-    x[i]= 0;
-    y[i]= (i==0? 0: y[i-1]- pages[i-1]->h());
+
+  int nr_pages= N(pages);
+  int nx= max (1, min (env->page_packet, nr_pages));
+  int d = env->page_offset % nx;
+  int ny= ((nr_pages + nx - 1 + d) / nx);
+
+  SI pixel= env->pixel;
+  array<box> pg= pages;
+  if (env->get_string (PAGE_MEDIUM) == "paper" &&
+      env->get_string (PAGE_BORDER) != "none")
+    for (int i=0; i<nx; i++)
+      for (int j=0; j<ny; j++) {
+        int p= j*nx + i - d;
+        if (p >= 0 && p < nr_pages) {
+          SI l= 10*pixel, r= 10*pixel;
+          SI b= 10*pixel, t= 10*pixel;
+          if (env->get_string (PAGE_BORDER) == "attached") {
+#ifdef QTTEXMACS
+            if (i > 0) l= pixel/2;
+#else
+            if (i > 0) l= pixel;
+#endif
+            if (i < nx-1) r= 0;
+          }
+          pg[p]= page_border_box (pages[p]->ip, pages[p], l, r, b, t, pixel);
+        }
+      }
+
+  array<SI> xx (nx);
+  xx[0]= 0;
+  for (int i=1; i<nx; i++) {
+    xx[i]= xx[i-1];
+    for (int j=0; j<ny; j++) {
+      int p= j*nx + i - d;
+      if (p >= 0 && p < nr_pages)
+        xx[i]= max (xx[i-1] + pg[p]->w(), xx[i]);
+    }
   }
-  return move_box (ip, scatter_box (ip, pages, x, y), 0, 0);
+
+  array<SI> yy (ny);
+  yy[0]= 0;
+  for (int j=1; j<ny; j++) {
+    yy[j]= yy[j-1];
+    for (int i=0; i<nx; i++) {
+      int p= j*nx + i - d;
+      if (p >= 0 && p < nr_pages)
+        yy[j]= min (yy[j-1] - pg[p]->h(), yy[j]);
+    }
+  }
+
+  array<SI> x (nr_pages);
+  array<SI> y (nr_pages);
+  for (int i=0; i<nx; i++)
+    for (int j=0; j<ny; j++) {
+      int p= j*nx + i - d;
+      if (p >= 0 && p < nr_pages) {
+        x[p]= xx[i];
+        y[p]= yy[j];
+      }
+    }
+
+  return move_box (ip, scatter_box (ip, pg, x, y, nr_pages > 1), 0, 0);
 }

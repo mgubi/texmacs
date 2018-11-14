@@ -30,8 +30,7 @@ empty_cell () {
 bool
 is_empty_cell (tree t) {
   return
-    t == "" ||
-    (is_func (t, DOCUMENT, 1) && is_empty_cell (t[0])) ||
+    is_empty (t) ||
     (is_compound (t, "cell-inert", 2) && is_empty_cell (t[1])) ||
     (is_compound (t, "cell-input", 3) && is_empty_cell (t[1])) ||
     (is_compound (t, "cell-output", 3) && is_empty_cell (t[2]));
@@ -810,9 +809,14 @@ edit_table_rep::table_write_subtable (
   path fp, int row, int col, tree subt)
 {
   int nr_rows, nr_cols, sub_rows, sub_cols;
+  int min_rows, min_cols, max_rows, max_cols;
   table_get_extents (fp, nr_rows, nr_cols);
   ::table_get_extents (subt, sub_rows, sub_cols);
-  if ((nr_rows < row+sub_rows) || (nr_cols < col+sub_cols)) return;
+  table_get_limits (fp, min_rows, min_cols, max_rows, max_cols);
+  if ((max_rows < row + sub_rows) || (max_cols < col + sub_cols)) return;
+  if ((nr_rows < row + sub_rows) || (nr_cols < col + sub_cols))
+    table_set_extents (fp, max (nr_rows, row + sub_rows),
+                           max (nr_cols, col + sub_cols));
 
   path old_tp= tp;
   tp= fp * 0;
@@ -1032,6 +1036,7 @@ edit_table_rep::make_table (int nr_rows, int nr_cols) {
   int i1, j1, i2, j2;
   path fp= search_format ();
   if (is_nil (fp)) return;
+  typeset_invalidate_env (); // FIXME: dirty hack for getting correct limits
   table_get_limits (fp, i1, j1, i2, j2);
   if ((nr_rows<i1) || (nr_cols<j1)) {
     T= empty_table (max (nr_rows, i1), max (nr_cols, j1));
@@ -1041,7 +1046,8 @@ edit_table_rep::make_table (int nr_rows, int nr_cols) {
   }
 
   string hyphen= as_string (table_get_format (fp, TABLE_HYPHEN));
-  if (hyphen == "y") {
+  string block = as_string (table_get_format (fp, TABLE_BLOCK));
+  if (hyphen == "y" || block == "yes") {
     path q= fp;
     if (is_extension (subtree (et, path_up (q)), 1)) q= path_up (q);
     tree st= subtree (et, path_up (q));
@@ -1112,7 +1118,7 @@ edit_table_rep::destroy_table () {
 }
 
 void
-edit_table_rep::table_disactivate () {
+edit_table_rep::table_deactivate () {
   path fp= search_format ();
   if (is_nil (fp)) return;
   tree st= subtree (et, fp);
@@ -1232,6 +1238,17 @@ edit_table_rep::table_nr_columns () {
   return nr_cols;
 }
 
+array<int>
+edit_table_rep::table_get_extents () {
+  array<int> r;
+  int nr_rows, nr_cols;
+  path fp= search_format ();
+  if (is_nil (fp)) return r;
+  table_get_extents (fp, nr_rows, nr_cols);
+  r << nr_rows << nr_cols;
+  return r;
+}
+  
 void
 edit_table_rep::table_set_extents (int rows, int cols) {
   path fp= search_format ();
@@ -1257,6 +1274,25 @@ edit_table_rep::table_which_column () {
   path fp= search_format (row, col);
   if (is_nil (fp)) return 0;
   return col+1;
+}
+
+array<int>
+edit_table_rep::table_which_cells () {
+  array<int> r;
+  if (selection_active_table (false)) {
+    int row1, col1, row2, col2;
+    path fp= selection_get_subtable (row1, col1, row2, col2);
+    if (is_nil (fp)) return r;
+    r << row1+1 << row2+1 << col1+1 << col2+1;
+  }
+  else {
+    int row, col;
+    path fp= search_format (row, col);
+    if (is_nil (fp)) return array<int> ();
+    row++; col++;
+    r << row << row << col << col;
+  }
+  return r;
 }
 
 path
@@ -1297,6 +1333,13 @@ edit_table_rep::table_set_format (string var, tree val) {
     if (is_nil (fp)) return;
     table_set_format (fp, var, val);
   }
+}
+
+tree
+edit_table_rep::table_get_format () {
+  path fp= search_format ();
+  if (is_nil (fp)) return "";
+  return table_get_format (fp);
 }
 
 string

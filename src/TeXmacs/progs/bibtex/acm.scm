@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : acm.scm
 ;; DESCRIPTION : acm style for BibTeX files
-;; COPYRIGHT   : (C) 2010  David MICHEL
+;; COPYRIGHT   : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -18,12 +18,14 @@
 
 (tm-define (bib-format-name x)
   (:mode bib-acm?)
-  (let* ((f (if (bib-null? (list-ref x 1))
-		""
+  (let* ((f (if (bib-null? (list-ref x 1)) ""
 		`(concat ", " ,(bib-abbreviate (list-ref x 1) "." `(nbsp)))))
-	 (vv (if (bib-null? (list-ref x 2)) "" `(concat ,(list-ref x 2) (nbsp))))
-	 (ll (if (bib-null? (list-ref x 3)) "" (bib-purify (list-ref x 3))))
-	 (jj (if (bib-null? (list-ref x 4)) "" `(concat ", " ,(list-ref x 4)))))
+	 (vv (if (bib-null? (list-ref x 2)) ""
+                 `(concat ,(list-ref x 2) (nbsp))))
+	 (ll (if (bib-null? (list-ref x 3)) ""
+                 (bib-purify (list-ref x 3))))
+	 (jj (if (bib-null? (list-ref x 4)) ""
+                 `(concat ", " ,(list-ref x 4)))))
     `(with "font-shape" "small-caps" (concat ,vv ,ll ,jj ,f))))
 
 (tm-define (bib-format-editor x)
@@ -54,8 +56,7 @@
 	  ,(bib-translate "in ")
 	  (with "font-shape" "italic" ,b) ,cl))))
 
-(tm-define (bib-format-volume-or-number x)
-  (:mode bib-acm?)
+(define (bib-format-volume-or-number x)
   (let* ((v (bib-field x "volume"))
 	 (n (bib-field x "number"))
 	 (s (bib-field x "series")))
@@ -80,9 +81,8 @@
     (cond
       ((or (bib-null? p) (nlist? p)) "")
       ((== (length p) 1) "")
-      ((== (length p) 2) `(concat ,(bib-translate "p. ") ,(list-ref p 1)))
-      (else `(concat ,(bib-translate "p. ")
-                     ,(list-ref p 1) "--" ,(list-ref p 2))))))
+      ((== (length p) 2) (list-ref p 1))
+      (else `(concat ,(list-ref p 1) ,bib-range-symbol ,(list-ref p 2))))))
 
 (tm-define (bib-format-chapter-pages x)
   (:mode bib-acm?)
@@ -106,8 +106,7 @@
     (if (bib-null? n) type
         `(concat ,type ,sep ,number))))
 
-(tm-define (bib-format-edition x)
-  (:mode bib-acm?)
+(define (bib-format-edition x)
   (let* ((e (bib-field x "edition")))
     (if (bib-null? e) "" `(concat ,e " ed."))))
 
@@ -115,23 +114,37 @@
   (:mode bib-acm?)
   `(bibitem* ,(number->string n)))
 
+(define (bib-format-journal-volume-date x)
+  (bib-new-sentence
+   `((concat ,(bib-emphasize
+               `(concat ,(bib-format-field x "journal")
+                        ,(if (bib-null? (bib-field x "volume")) "" " ")
+                        ,(bib-format-field x "volume")))
+             " (" ,(bib-format-date x) ")")
+     ,(bib-format-pages x))))
+
+(define (bib-format-journal-volume-number-date x)
+  (bib-new-sentence
+   `(,(bib-emphasize
+       `(concat ,(bib-format-field x "journal")
+                ,(if (bib-null? (bib-field x "volume")) "" " ")
+                ,(bib-format-field x "volume")))
+     (concat ,(bib-format-field x "number")
+             " (" ,(bib-format-date x) ")")
+     ,(bib-format-pages x))))
+
 (tm-define (bib-format-article n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (bib-format-author x))
 	       ,(bib-new-block (bib-format-field-Locase x "title"))
 	       ,(bib-new-block
 		 (if (bib-empty? x "crossref")
-		     (bib-new-sentence
-		      `(,(bib-emphasize `(concat ,(bib-format-field x "journal")
-					     " "
-					     ,(bib-format-field x "volume")))
-			(concat ,(bib-format-field x "number")
-				" ("
-				,(bib-format-date x) ")") 
-			,(bib-format-pages x)))
+                     (if (bib-null? (bib-field x "number"))
+                         (bib-format-journal-volume-date x)
+                         (bib-format-journal-volume-number-date x))
 		     (bib-new-sentence
 		      `((concat ,(bib-translate "in ")
 				(cite ,(bib-field x "crossref")))
@@ -141,7 +154,7 @@
 (tm-define (bib-format-book n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (if (bib-empty? x "author")
 			       (bib-format-editor x)
@@ -168,7 +181,7 @@
 (tm-define (bib-format-inbook n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (if (bib-empty? x "author")
 			       (bib-format-editor x)
@@ -195,7 +208,7 @@
 (tm-define (bib-format-incollection n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (bib-format-author x))
 	       ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -222,7 +235,7 @@
 (tm-define (bib-format-inproceedings n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (bib-format-author x))
 	       ,(bib-new-block (bib-format-field-Locase x "title"))
@@ -245,7 +258,7 @@
 (tm-define (bib-format-manual n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block (bib-format-author x))
 	       ,(bib-new-block
@@ -260,7 +273,7 @@
 (tm-define (bib-format-proceedings n x)
   (:mode bib-acm?)
   `(concat ,(bib-format-bibitem n x)
-	   (label ,(string-append "bib-" (list-ref x 2)))
+	   ,(bib-label (list-ref x 2))
 	   ,(bib-new-list-spc
 	     `(,(bib-new-block
 		 (if (bib-empty? x "editor")

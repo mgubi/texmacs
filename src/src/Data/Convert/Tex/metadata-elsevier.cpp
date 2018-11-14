@@ -8,7 +8,9 @@
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
+
 #include "convert.hpp"
+#include "metadata.hpp"
 
 static bool
 is_elsevier_note_ref (tree t) {
@@ -78,6 +80,10 @@ translate_author_metadata_elsevier (tree u) {
     return tree (APPLY, "\\author-note", cenr (u[2]));
   if (is_tuple (u, "\\thanksamisc*", 2) || is_tuple (u, "\\fmtext*", 2))
     return tree (APPLY, "\\author-misc", cenr (u[2]));
+  if (is_tuple (u, "\\thanksemail*", 2))
+    return tree (APPLY, "\\author-email", cenr (u[2]));
+  if (is_tuple (u, "\\thankshomepage*", 2))
+    return tree (APPLY, "\\author-homepage", cenr (u[2]));
   return concat ();
 }
 
@@ -85,27 +91,32 @@ static array<tree>
 translate_abstract_data_elsevier (tree t) {
   array<tree> r;
   int i=0, n=N(t);
-  tree kw  (APPLY, "\\abstract-keywords");
-  tree msc (APPLY, "\\abstract-msc");
-  tree tmp (CONCAT);
-  while (i<n && !is_tuple (t[i], "\\PACS")) {
-    while (i<n && !is_tuple (t[i], "\\sep") && !is_tuple (t[i], "\\PACS"))
-      tmp << t[i++];
-    kw << tmp;
-    tmp= concat ();
-    if (!is_tuple (t[i], "\\PACS")) i++;
-  }
-  if (is_tuple (t[i], "\\PACS")) {
-    i++;
-    while (i<n) {
-      while (i<n && !is_tuple (t[i], "\\sep")) tmp << t[i++];
-      msc << tmp;
-      tmp= concat ();
-      i++;
+  tree comp (APPLY, "\\abstract-keywords");
+  tree word (CONCAT);
+  for (i=0; i<n; i++) {
+    if (is_tuple (t[i], "\\PACS")) {
+      comp << word;
+      if (N(comp) > 1) r << comp;
+      word= concat ();
+      comp= tree (APPLY, "\\abstract-pacs");
     }
+    else if (is_tuple (t[i], "\\MSC")) {
+      comp << word;
+      if (N(comp) > 1) r << comp;
+      word= concat ();
+      comp= tree (APPLY, "\\abstract-msc");
+    }
+    else if (is_tuple (t[i], "\\tmacm") || is_tuple (t[i], "\\tmarxiv"))
+          r << collect_abstract_data (t[i]);
+    else if (is_tuple (t[i], "\\sep")) {
+      comp << word;
+      word= concat ();
+    }
+    else
+      word << t[i];
   }
-  if (N(kw)>1)  r << kw;
-  if (N(msc)>1) r << msc;
+  if (N(word) > 1) comp << word;
+  if (N(comp) > 1) r << comp;
   return r;
 }
 

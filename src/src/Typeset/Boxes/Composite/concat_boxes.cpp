@@ -10,15 +10,19 @@
 ******************************************************************************/
 
 #include "Boxes/composite.hpp"
+#include "Boxes/construct.hpp"
 
 /******************************************************************************
 * The concat_box representation
 ******************************************************************************/
 
 struct concat_box_rep: public composite_box_rep {
+  array<SI> spc;
   bool indent;
   concat_box_rep (path ip, array<box> bs, array<SI> spc, bool indent);
   operator tree ();
+  box adjust_kerning (int mode, double factor);
+  box expand_glyphs (int mode, double factor);
 
   void      finalize ();
   void      clear_incomplete (rectangles& rs, SI pixel, int i, int i1, int i2);
@@ -42,11 +46,13 @@ struct concat_box_rep: public composite_box_rep {
   SI        sup_lo_lim  (int level);
   SI        sup_lo_base (int level);
   SI        sup_hi_lim  (int level);
+  SI        wide_correction (int mode);
+  void      get_bracket_extents (SI& lo, SI& hi);
 
   int       find_any_child (SI x, SI y, SI delta, SI& delta_out);
   int       find_accessible_child (SI x, SI y, SI delta, SI& delta_out);
   int       find_child (SI x, SI y, SI delta, bool force);
-  path      find_box_path (SI x, SI y, SI delta, bool force);
+  path      find_box_path (SI x, SI y, SI delta, bool force, bool& found);
   path      find_tree_path (path bp);
   cursor    find_cursor (path bp);
   selection find_selection (path lbp, path rbp);
@@ -104,8 +110,8 @@ concat_box_rep::position (array<SI> spc) {
 }
 
 concat_box_rep::concat_box_rep
-  (path ip, array<box> bs2, array<SI> spc, bool indent2):
-    composite_box_rep (ip), indent (indent2)
+  (path ip, array<box> bs2, array<SI> spc2, bool indent2):
+    composite_box_rep (ip), spc (spc2), indent (indent2)
 {
   bs = bs2;
   position (spc);
@@ -118,6 +124,34 @@ concat_box_rep::finalize () {
   ip= decorate_middle (ip);
   composite_box_rep::finalize ();
   ip= old_ip;
+}
+
+
+box
+concat_box_rep::adjust_kerning (int mode, double factor) {
+  int n= N(bs);
+  array<box> adj (n);
+  array<SI > spa (n);
+  for (int i=0; i<n; i++) {
+    int smode= mode;
+    if (sx1(i) > x1) smode= smode & (~START_OF_LINE);
+    if (sx2(i) < x2) smode= smode & (~END_OF_LINE);
+    adj[i]= bs[i]->adjust_kerning (smode, factor);
+    spa[i]= (SI) tm_round ((1 + 4*factor) * spc[i]);
+  }
+  return concat_box (ip, adj, spa, indent);
+}
+
+box
+concat_box_rep::expand_glyphs (int mode, double factor) {
+  int n= N(bs);
+  array<box> adj (n);
+  array<SI > spa (n);
+  for (int i=0; i<n; i++) {
+    adj[i]= bs[i]->expand_glyphs (mode, factor);
+    spa[i]= (SI) tm_round ((1 + factor) * spc[i]);
+  }
+  return concat_box (ip, adj, spa, indent);
 }
 
 bool
@@ -236,46 +270,79 @@ concat_box_rep::rsup_correction () {
 SI
 concat_box_rep::sub_lo_base (int level) {
   int i=0, n=N(bs);
-  SI  y=y1;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sub_lo_base (level));
+  if (y == y2) y= y1;
   return y;
 }
 
 SI
 concat_box_rep::sub_hi_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y= y1 + (y2-y1)/4;
+  SI  y= y1;
   for (i=0; i<n; i++)
     y= max (y, bs[i]->sub_hi_lim (level));
+  if (y == y1) y= y1 + (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_lo_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y=y2 - (y2-y1)/4;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sup_lo_lim (level));
+  if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_lo_base (int level) {
   int i=0, n=N(bs);
-  SI  y=y2 - (y2-y1)/4;
+  SI  y= y2;
   for (i=0; i<n; i++)
     y= min (y, bs[i]->sup_lo_base (level));
+  if (y == y2) y= y2 - (y2-y1)/4;
   return y;
 }
 
 SI
 concat_box_rep::sup_hi_lim  (int level) {
   int i=0, n=N(bs);
-  SI  y=y2;
+  SI  y= y1;
   for (i=0; i<n; i++)
     y= max (y, bs[i]->sup_hi_lim (level));
+  if (y == y1) y= y2;
   return y;
+}
+
+SI
+concat_box_rep::wide_correction (int mode) {
+  SI current= 0;
+  bool done= false;
+  int i, n= N(bs);
+  for (i=0; i<n; i++)
+    if (bs[i]->w() != 0) {
+      if (done) return 0;
+      current= bs[i]->wide_correction (mode);
+      done= true;
+    }
+  if (!done && mode == 0) return 1;
+  return current;
+}
+
+void
+concat_box_rep::get_bracket_extents (SI& lo, SI& hi) {
+  int i, n= N(bs);
+  if (n == 0) box_rep::get_bracket_extents (lo, hi);
+  else bs[0]->get_bracket_extents (lo, hi);
+  for (i=1; i<N(bs); i++) {
+    SI lo2, hi2;
+    bs[i]->get_bracket_extents (lo2, hi2);
+    lo= min (lo, lo2);
+    hi= max (hi, hi2);
+  }
 }
 
 /******************************************************************************
@@ -377,16 +444,20 @@ concat_box_rep::find_child (SI x, SI y, SI delta, bool force) {
 }
 
 path
-concat_box_rep::find_box_path (SI x, SI y, SI delta, bool force) {
+concat_box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found) {
   int delta_out, m;
   if (force) m= find_any_child (x, y, delta, delta_out);
   else m= find_accessible_child (x, y, delta, delta_out);
-  if (m==-1) return box_rep::find_box_path (x, y, delta, force);
-  else {
-    SI xx= x- sx(m), yy= y- sy(m);
-    SI dd= delta_out + get_delta (xx, bs[m]->x1, bs[m]->x2);
-    return path (m, bs[m]->find_box_path (xx, yy, dd, force));
-  }
+  int i, n= subnr();
+  if (m != -1)
+    for (i=0; i<=n; i++) {
+      int c= (m+i) % n;
+      SI xx= x- sx(c), yy= y- sy(c);
+      SI dd= delta_out + get_delta (xx, bs[c]->x1, bs[c]->x2);
+      path r= path (c, bs[c]->find_box_path (xx, yy, dd, force, found));
+      if (found || i == n) return r;
+    }
+  return box_rep::find_box_path (x, y, delta, force, found);
 }
 
 path

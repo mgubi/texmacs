@@ -23,45 +23,45 @@ CONFIG_OS= @CONFIG_OS@
 
 CC = @CC@
 CXX = @CXX@
+OBJC = @OBJC@
+OBJCXX = @OBJCXX@
 CXXWARNING = @CONFIG_CXXWARNING@
 CXXTEMPLATE = @CONFIG_CXXTEMPLATE@
 CXXOPTIMIZE = @CONFIG_CXXOPTIMIZE@ @CONFIG_CXXDIALECT@
 CXXDEBUG = @CONFIG_CXXDEBUG@ 
-CXXFLAGS = $(CXXWARNING) $(CXXTEMPLATE) $(CXXOPTIMIZE) $(CXXDEBUG) @CONFIG_CXXFLAGS@ @CXXFLAGS@
+CXXPROFILE = @CONFIG_CXXPROFILE@
+CFLAGS = @CFLAGS@
+CXXFLAGS = $(CXXWARNING) $(CXXTEMPLATE) $(CXXOPTIMIZE) $(CXXDEBUG) $(CXXPROFILE) @CONFIG_CXXFLAGS@ @CXXFLAGS@
 CPPFLAGS = @CPPFLAGS@ @QT_CPPFLAGS@ -D@CONFIG_GUI_DEFINE@
-CXXX11 = @X11_CFLAGS@
+CXXX11 = @X11_CXX@
 CXXCOCOA = @COCOA_CFLAGS@
 CXXQT = @QT_CXXFLAGS@
 CXXGUI = $(CXX@CONFIG_GUI@)
-CXXAXEL = @AXEL_CFLAGS@
-CXXCAIRO = @CAIRO_CFLAGS@
-CXXIMLIB2 = @IMLIB2_CFLAGS@
-CXXSQLITE3 = @SQLITE3_CFLAGS@
+CXXAXEL = @AXEL_CXX@
+CXXCAIRO = @CAIRO_CXX@
+CXXIMLIB2 = @IMLIB2_CXX@
+CXXSQLITE3 = @SQLITE3_CXX@
 CXXFREETYPE = @FREETYPE_CFLAGS@
-CXXICONV = @ICONV_CFLAGS@
+CXXICONV = @ICONV_CXX@
 CXXGUILE = @GUILE_CFLAGS@
+CXXSPARKLE = @SPARKLE_CXX@
+CXXPDF = @PDF_CFLAGS@
+
 LD = @CXX@
-LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@
-LDRT = @CONFIG_LDRT@
+LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE)
+LIBS = @LIBS@
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
-LDDL = @CONFIG_BDL@
-LDX11 = @X11_LDFLAGS@
+LDX11 =
 LDCOCOA = @COCOA_LDFLAGS@
 LDQT = @QT_LIBS@
 LDGUI = $(LD@CONFIG_GUI@)
-LDAXEL = @AXEL_LDFLAGS@
-LDCAIRO = @CAIRO_LDFLAGS@
-LDIMLIB2 = @IMLIB2_LDFLAGS@
-LDSQLITE3 = @SQLITE3_LDFLAGS@
-LDFREETYPE = @FREETYPE_LDFLAGS@
-LDICONV = @ICONV_LDFLAGS@
-LDGUILE = @GUILE_LDFLAGS@
+
 AR = ar
 ARFLAGS = -r
 RM = rm -f
-CP = cp -r -f
+CP = @CONFIG_CP@
 GLUE = cd Scheme/Glue; ./build-glue
 TOUCH = touch
 MOC = @MOC@
@@ -100,11 +100,11 @@ system_src   := $(call findsrc,System)
 data_src     := $(call findsrc,Data)
 graphics_src := $(call findsrc,Graphics)
 plugins_src  := $(call findsrc_in,Plugins,Bibtex Cairo Imlib2 Sqlite3 \
-                                          Ispell Metafont Openssl @CONFIG_PDF@)
-plugins_c_src:= $(call findc_in,Plugins,@CONFIG_PDF@)
+                                          Ispell Metafont Openssl Updater \
+                                          LaTeX_Preview Database)
 x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
-cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
+cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
 qt_src       := $(call findsrc_in,Plugins,@CONFIG_QT@)
 gs_src       := $(call findsrc_in,Plugins,@CONFIG_GS@)
@@ -112,7 +112,9 @@ style_src    := $(call findsrc_in,Style,@CONFIG_EXPERIMENTAL@)
 typeset_src  := $(call findsrc,Typeset)
 edit_src     := $(call findsrc,Edit)
 texmacs_src  := $(call findsrc,Texmacs)
-scheme_src    := $(call findsrc_in,Scheme,Scheme Guile)
+scheme_src   := $(call findsrc_in,Scheme,Scheme Guile)
+pdf_src      := $(call findsrc_in,Plugins,@CONFIG_PDF@)
+pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
 
 # Each makefile will have its own Deps directory. Okay that is a bit
@@ -123,7 +125,7 @@ freetype_src := $(call findsrc_in,Plugins,Freetype)
 # compiles.
 
 make_cpp_deps = $(patsubst %.cpp,Deps/%.d,$(notdir $(1)))
-make_c_deps = $(patsubst %.c,Deps/%.d,$(notdir $(1)))
+make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 make_m_deps = $(patsubst %.m,Deps/%.d,$(notdir $(1)))
 make_mm_deps = $(patsubst %.mm,Deps/%.d,$(notdir $(1)))
 
@@ -131,12 +133,13 @@ texmacs_cpp_deps := $(call make_cpp_deps,$(system_src) $(kernel_src) $(data_src)
  $(edit_src) $(scheme_src) $(graphics_src)\
  $(plugins_src) $(x11_src) $(texmacs_src)\
  $(typeset_src) $(style_src) $(qt_src) $(gs_src) $(os_src)\
- $(freetype_src))
+ $(pdf_src) $(freetype_src))
 texmacs_m_deps += $(call make_m_deps,$(cocoa_m_src))
 texmacs_mm_deps += $(call make_mm_deps,$(cocoa_mm_src))
-texmacs_c_deps += $(call make_c_deps,$(plugins_c_src))
+texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
+texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
 
-deps += $(texmacs_cpp_deps) $(texmacs_c_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
+deps += $(texmacs_cpp_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
 
 ###############################################################################
 # Include files
@@ -150,8 +153,8 @@ system_incl   := $(call incl_flags,System System/Boot System/Classes \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree \
   Scheme \
   Graphics/Bitmap_fonts Graphics/Fonts Graphics/Gui Graphics/Mathematics \
-  Graphics/Renderer Graphics/Handwriting \
-  Plugins)
+  Graphics/Renderer Graphics/Handwriting Graphics/Types Graphics/Pictures \
+  Graphics/Spacial Graphics/Colors Plugins)
 kernel_incl   := $(system_incl)
 data_incl     := $(system_incl)
 graphics_incl := $(system_incl)
@@ -170,6 +173,8 @@ scheme_incl    := $(typeset_incl) $(call incl_flags,Plugins Texmacs)
 edit_incl     := $(scheme_incl) \
   $(call incl_flags,Edit/Editor Edit/Interface Edit/Modify)
 texmacs_incl  := $(scheme_incl)
+pdf_incl      := $(system_incl) \
+  $(call incl_flags,Plugins/Pdf/LibAesgm)
 freetype_incl := $(system_incl)
 
 ###############################################################################
@@ -185,15 +190,32 @@ else
 qt_moc := QTMStyle.hpp QTMGuiHelper.hpp QTMInteractiveInputHelper.hpp \
   QTMMenuHelper.hpp QTMWidget.hpp  QTMWindow.hpp QTMScrollView.hpp \
   QTMPipeLink.hpp QTMInteractivePrompt.hpp QTMFileDialog.hpp \
-  QTMPrintDialog.hpp QTMPrinterSettings.hpp
+  QTMPrintDialog.hpp QTMPrinterSettings.hpp QTMApplication.hpp \
+  QTMTreeModel.hpp QTMSockets.hpp
 endif
 
 qt_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qt_moc))
 qt_moc_paths = $(patsubst %,./Plugins/Qt/%,$(qt_moc_src))
 
-
 $(qt_moc_paths): ./Plugins/Qt/moc_%.cpp: ./Plugins/Qt/%.hpp
 	$(MOC) $(MOCFLAGS) $< -o $@
+
+###############################################################################
+# Windows resource file
+###############################################################################
+
+WINDRES = windres.exe
+WINDRESFLAGS = -O coff
+
+Objects/winresource.rc.o:
+	$(WINDRES) $(WINDRESFLAGS) ../packages/windows/resource.rc \
+	-o Objects/winresource.rc.o
+
+ifeq "@CONFIG_OS_COMPAT@" "Windows"
+uses_windowsres = Objects/winresource.rc.o
+else
+uses_windowsres =
+endif
 
 ###############################################################################
 # Dependencies
@@ -205,7 +227,8 @@ deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree Graphics \
   Plugins Style/Environment Style/Evaluate Style/Memorizer \
   Typeset Edit Texmacs Scheme Graphics/Bitmap_fonts Graphics/Fonts \
-  Graphics/Gui Graphics/Mathematics Graphics/Renderer Graphics/Handwriting)
+  Graphics/Gui Graphics/Mathematics Graphics/Renderer Graphics/Pictures \
+  Graphics/Handwriting Graphics/Types Graphics/Spacial)
 
 deps_flags = $(deps_incl) \
  $(CPPFLAGS) $(CXXAXEL) $(CXXCAIRO) $(CXXIMLIB2) $(CXXSQLITE3) $(CXXFREETYPE) \
@@ -260,10 +283,10 @@ moc_obj	     := $(call makeobj,$(qt_moc_src))
 qt_obj 	     := $(filter-out $(moc_obj), $(call makeobj,$(qt_src)))
 gs_obj       := $(call makeobj,$(gs_src))
 plugins_obj  := $(call makeobj,$(plugins_src))
-plugins_c_obj:= $(call makeobj_c,$(plugins_c_src))
 texmacs_obj  := $(call makeobj,$(texmacs_src))
 typeset_obj  := $(call makeobj,$(typeset_src))
 style_obj    := $(call makeobj,$(style_src))
+pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
 
 # To enforce some degree of modularity, each object file must be
@@ -278,28 +301,34 @@ freetype_obj := $(call makeobj,$(freetype_src))
 cxx_flags    = $(strip $(CXX) $(1) -c $< -o $@)
 cxx_incl     = $(call cxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS)) 
+objcxx_flags = $(strip $(OBJCXX) $(1) -c $< -o $@)
+objcxx_incl  = $(call objcxx_flags,$(1) \
+ $(CPPFLAGS) $(CXXFLAGS))
 cc_flags    = $(strip $(CC) $(1) -c $< -o $@)
 cc_incl     = $(call cc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS)) 
+objc_flags = $(strip $(OBJC) $(1) -c $< -o $@)
+objc_incl  = $(call objc_flags,$(1) \
+  $(CPPFLAGS) $(CXXFLAGS))
 
 $(system_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include)
+	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include $(CXXGUI))
 $(kernel_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(kernel_incl))
 $(data_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(data_incl) -I$(tmsrc)/include $(CXXGUILE))
 $(edit_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(edit_incl))
+	$(call cxx_incl,$(edit_incl) $(CXXGUI))
 $(scheme_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(scheme_incl) $(CXXGUILE))
+	$(call cxx_incl,$(scheme_incl) $(CXXGUILE) $(CXXGUI))
 $(graphics_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(graphics_incl))
 $(plugins_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(plugins_incl) $(CXXAXEL) $(CXXCAIRO) $(CXXIMLIB2) $(CXXSQLITE3) $(CXXICONV)  $(CXXX11))
+	$(call cxx_incl,$(plugins_incl) $(CXXAXEL) $(CXXCAIRO) $(CXXIMLIB2) $(CXXSQLITE3) $(CXXICONV) $(CXXSPARKLE) $(CXXX11))
 $(plugins_c_obj): Objects/%.o: %.c
 	$(call cc_incl,$(plugins_incl))
 $(x11_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(x11_incl) $(CXXX11))
+	$(call cxx_incl,$(x11_incl) $(CXXX11) $(CXXGUILE))
 $(os_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(os_incl))
 $(qt_obj): Objects/%.o: %.cpp
@@ -309,17 +338,21 @@ $(moc_obj): Objects/%.o: ./Plugins/Qt/%.cpp
 $(gs_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gs_incl)  $(CXXX11))
 $(cocoa_m_obj): Objects/%.o: %.m
-	$(call cxx_incl,$(cocoa_incl) $(CXXCOCOA))
+	$(call objc_incl,$(cocoa_incl) $(CXXCOCOA))
 $(cocoa_mm_obj): Objects/%.o: %.mm
-	$(call cxx_incl,$(cocoa_incl) $(CXXCOCOA))
+	$(call objcxx_incl,$(cocoa_incl) $(CXXCOCOA) $(CXXSPARKLE) $(CXXGUI))
 $(texmacs_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(texmacs_incl))
+	$(call cxx_incl,$(texmacs_incl) $(CXXGUI))
 $(typeset_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(typeset_incl))
 $(style_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(style_incl))
+$(pdf_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(pdf_incl) $(CXXFREETYPE) $(CXXPDF) $(CXXGUI))
 $(freetype_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
+$(texmacs_c_deps):   Objects/%.o: %.c
+	$(call cc_flags, $(CFLAGS))
 
 ###############################################################################
 # Make editor
@@ -338,16 +371,18 @@ $(freetype_obj): Objects/%.o: %.cpp
 
 ifeq "$(link)" "shared"
 ifeq "$(CONFIG_OS)" "DEC"
-link_bin = $(strip $(LD) $(LDFLAGS) -lstdc++ $(LDSHARED) $^ $(1) -o $@)
+link_bin = $(strip $(LD) $(LDFLAGS) -lstdc++ $(LDSHARED) $^ $(1) $(LIBS) -o $@)
+else ifeq "$(CONFIG_OS)" "FREEBSD"
+link_bin = $(strip $(LD) $(LDFLAGS) $(LDSHARED) $^ $(1) $(LIBS) -lthr -o $@)
 else
-link_bin = $(strip $(LD) $(LDFLAGS) $(LDSHARED) $^ $(1) -o $@)
+link_bin = $(strip $(LD) $(LDFLAGS) $(LDSHARED) $^ $(1) $(LIBS) -o $@)
 endif
 endif
 ifeq "$(link)" "static"
 ifeq "$(CONFIG_OS)" "DEC"
-link_bin = $(strip $(LD) $(LDFLAGS) $^ $(LDSTATIC) $(1) -lstdc++ -o $@)
+link_bin = $(strip $(LD) $(LDFLAGS) $^ $(LDSTATIC) $(1) $(LIBS) -lstdc++ -o $@)
 else
-link_bin = $(strip $(LD) $(LDFLAGS) $^ $(LDSTATIC) $(1) -o $@)
+link_bin = $(strip $(LD) $(LDFLAGS) $^ -Wl,-Bstatic $(1) $(LDSTATIC) $(LIBS) -static-libgcc -o $@)
 endif
 endif
 
@@ -374,20 +409,24 @@ uses_style    := $(style_obj)
 uses_edit     := $(edit_obj)
 uses_scheme   := $(scheme_obj)
 uses_texmacs  := $(texmacs_obj)
+uses_pdf      := $(pdf_obj)
 uses_freetype := $(freetype_obj)
+#"uses_windowsres" is defined above
 
 # Compilation rules
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
- plugins x11 os qt gs cocoa style typeset edit scheme texmacs freetype))
+ plugins x11 os qt gs cocoa style typeset edit scheme texmacs pdf\
+ freetype windowsres)) $(texmacs_c_deps)
 
-link_options:=-L$(tmsrc)/lib $(LDRT) -lm $(LDPATH) $(LDGUI) $(LDGUILE) \
-  $(LDAXEL) $(LDCAIRO) $(LDIMLIB2) $(LDSQLITE3) $(LDFREETYPE) $(LDICONV) $(LDDL)
+link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
+   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) \
+   $(LDSPARKLE)
 
 $(tmsrc)/bin/texmacs.bin: Objects/texmacs-$(link).bin
 	$(CP) $^ $@
 
-Objects/texmacs-$(link).bin: $(TEXMACS_objects)
+Objects/texmacs-$(link).bin: Objects/texmacs.o Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o $(TEXMACS_objects)
 	$(call link_bin,$(link_options))
 
 all: $(tmsrc)/bin/texmacs.bin

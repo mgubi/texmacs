@@ -20,5 +20,30 @@
 
 (menu-bind calc-insert-menu
   ("Input field" (make-calc-inert))
-  ("Executable input field" (make-calc-input))
+  ("Evaluable field" (make-calc-input))
   ("Field reference" (make 'calc-ref)))
+
+(menu-bind calc-icourse-menu
+  (when (calc-ready?)
+    (link calc-insert-menu)
+    ---
+    ("Generated field" (make-calc-generate))
+    ("Answer field" (make-calc-answer))
+    ("Checkable field" (make-calc-check))
+    (when (selection-active-any?)
+      ("Conceal" (make 'concealed)))
+    ---
+    ("Regenerate" (calc-regenerate))
+    ("Clean slate" (calc-solutions #f))
+    ("Solutions" (calc-solutions #t))))
+
+(tm-define (calc-labeled-context? t)
+  (tree-in? t (calc-labeled-tag-list)))
+
+(tm-define (pure-alternate-context? t)
+  (:require (calc-labeled-context? t))
+  #f)
+
+(tm-define (hidden-child? t i)
+  (:require (calc-labeled-context? t))
+  (== i 0))

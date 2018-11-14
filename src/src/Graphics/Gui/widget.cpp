@@ -27,12 +27,14 @@ slot_name (const slot s) {
     "SLOT_VISIBILITY",
     "SLOT_FULL_SCREEN",
     "SLOT_NAME",
+    "SLOT_MODIFIED",
     "SLOT_SIZE",
     "SLOT_POSITION",
     "SLOT_UPDATE",
     "SLOT_REFRESH",
     "SLOT_KEYBOARD",
     "SLOT_KEYBOARD_FOCUS",
+    "SLOT_KEYBOARD_FOCUS_ON",
     "SLOT_MOUSE",
     "SLOT_MOUSE_GRAB",
     "SLOT_MOUSE_POINTER",
@@ -63,6 +65,8 @@ slot_name (const slot s) {
     "SLOT_USER_ICONS",
     "SLOT_SIDE_TOOLS_VISIBILITY",
     "SLOT_SIDE_TOOLS",
+    "SLOT_BOTTOM_TOOLS_VISIBILITY",
+    "SLOT_BOTTOM_TOOLS",
     "SLOT_FOOTER_VISIBILITY",
     "SLOT_LEFT_FOOTER",
     "SLOT_RIGHT_FOOTER",
@@ -220,4 +224,27 @@ get_default_styled_font (int style) {
   return get_default_font (tt, mini, bold);
 }
 
+#ifdef QTTEXMACS
 bool use_side_tools= false;
+#else
+bool use_side_tools= false;
+#endif
+
+array<SI>
+get_widget_size (widget w) {
+  // FIXME: this does not work yet (nor under Qt, nor under X11)
+  SI width, height;
+  get_size (w, width, height);
+  return array<SI> (width, height);
+}
+
+bool use_unified_toolbar= true;
+
+
+void
+tm_delete (widget_rep* ptr) {
+  void *mem= ptr->derived_this ();
+  ptr -> ~widget_rep ();
+  fast_delete (mem);
+}
+

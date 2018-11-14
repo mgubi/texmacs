@@ -13,6 +13,7 @@
 #include "file.hpp"
 #include "convert.hpp"
 #include "converter.hpp"
+#include "universal.hpp"
 #include "drd_std.hpp"
 #include "scheme.hpp"
 
@@ -48,7 +49,8 @@ dictionary_rep::load (url u) {
       string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
       if (to == "chinese" ||  to == "japanese"  ||
           to == "korean"  ||  to == "taiwanese" ||
-          to == "russian" ||  to == "ukrainian" || to == "bulgarian")
+          to == "russian" ||  to == "ukrainian" || to == "bulgarian" ||
+          to == "german" || to == "greek")
         r= utf8_to_cork (r);
       table (l)= r;
     }
@@ -57,7 +59,7 @@ dictionary_rep::load (url u) {
 void
 dictionary_rep::load (string fname) {
   fname= fname * ".scm";
-  if (DEBUG_VERBOSE) cout << "TeXmacs] Loading " << fname << "\n";
+  if (DEBUG_CONVERT) debug_convert << "Loading " << fname << "\n";
   url u= url ("$TEXMACS_DIC_PATH") * url_wildcard ("*" * fname);
   load (expand (complete (u)));
 }
@@ -87,7 +89,7 @@ dictionary_rep::translate (string s, bool guess) {
   // Is lowercase version of s in dictionary?
   string ls= locase_first (s);
   if (table->contains (ls) && table[ls] != "")
-    return upcase_first (table[ls]);
+    return uni_upcase_first (table[ls]);
   
   // Attempt to split the string and translate its parts?
   if (!guess) return s;

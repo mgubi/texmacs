@@ -9,13 +9,40 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "message.hpp"
+
 #include "QTMScrollView.hpp"
+#include "QTMApplication.hpp"
 
 #include <QScrollBar>
 #include <QPainter>
 #include <QBoxLayout>
-
 #include <QPaintEvent>
+#include <QStyle>
+
+
+/*! Provide automatic centering of the working area inside the viewport.
+ 
+ The only purpose of this widget is to provide this centering. To support this
+ we "un-wired" the event redirection built-in in QAbstractScrollArea (from the
+ viewport widget to the QAbstractScrollArea) and re-wired event redirection
+ from the surface to the QTMScrollView (see event())
+ 
+ All relevant events like resize, I/O events and the like which are sent to the
+ surface are resent QTMScrollView::surfaceEvent() for handling. This allows to
+ concentrate all the logic in only one object.
+ */
+class QTMSurface : public QWidget {
+    
+    QTMScrollView* sv;
+public:
+    QTMSurface(QWidget* p, QTMScrollView* _sv) : QWidget (p), sv (_sv) { }
+    
+protected:
+    virtual bool event(QEvent *event) {
+        return sv->surfaceEvent(event) ? true : QWidget::event(event);
+    }  
+};
 
 /*! Constructor.
  
@@ -29,14 +56,16 @@
  Don't try to disable double buffering even if we do our own: the flag 
  Qt::WA_PaintOnScreen is only supported on X11 and anyway makes things slower
  */
-QTMScrollView::QTMScrollView (QWidget *_parent)
-: QAbstractScrollArea (_parent), p_extents(QRect(0,0,0,0))  {
-  
+QTMScrollView::QTMScrollView (QWidget *_parent):
+  QAbstractScrollArea (_parent),
+  editor_flag (false),
+  p_extents (QRect(0,0,0,0))
+{
   QWidget *_viewport = QAbstractScrollArea::viewport();
   _viewport->setBackgroundRole(QPalette::Mid);
   _viewport->setAutoFillBackground(true);
   setFrameShape(QFrame::NoFrame);
-  
+
   p_surface = new QTMSurface (_viewport, this);
   p_surface->setAttribute(Qt::WA_NoSystemBackground);
   p_surface->setAttribute(Qt::WA_StaticContents); 
@@ -47,7 +76,7 @@ QTMScrollView::QTMScrollView (QWidget *_parent)
   p_surface->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   
   QHBoxLayout *layout = new QHBoxLayout();
-  layout->addWidget(p_surface); //, 0, Qt::AlignHCenter);
+  layout->addWidget(p_surface, 0, Qt::AlignHCenter | Qt::AlignVCenter);
   layout->setContentsMargins(0,0,0,0);
   _viewport->setLayout(layout);
 }
@@ -62,10 +91,13 @@ QTMScrollView::setOrigin ( QPoint newOrigin ) {
 
 void 
 QTMScrollView::setExtents ( QRect newExtents ) {
+  //QWidget *_viewport = QAbstractScrollArea::viewport();
+  //cout << "Inside  " << _viewport->width() << ", " << _viewport->height() << "\n";
+  //cout << "Extents " << newExtents.width() << ", " << newExtents.height() << "\n";
+  if (newExtents.width()  < 0) newExtents.setWidth (0);
+  if (newExtents.height() < 0) newExtents.setHeight(0);
   if (p_extents != newExtents) {
     p_extents = newExtents;
-    if (p_extents.width() < 0) p_extents.setWidth(0);
-    if (p_extents.height() < 0) p_extents.setHeight(0);
     updateScrollBars();
   }
 }
@@ -108,32 +140,41 @@ QTMScrollView::ensureVisible ( int cx, int cy, int mx, int my ) {
 void 
 QTMScrollView::updateScrollBars (void) {
   QWidget *_viewport = QAbstractScrollArea::viewport();
-  int w = _viewport->width()  ; // -2
-  int h = _viewport->height() ; // -2
-  
   QScrollBar *_hScrollBar = QAbstractScrollArea::horizontalScrollBar();
-  int cw = (p_extents.width() > w ? p_extents.width() - w : 0);
+  QScrollBar *_vScrollBar = QAbstractScrollArea::verticalScrollBar();
+
+  int xw = p_extents.width();
+  int xh = p_extents.height();
+  int w  = _viewport->width() ; // -2
+  int h  = _viewport->height(); // -2
+  int sbw= qApp->style()->pixelMetric (QStyle::PM_ScrollBarExtent);
+  if (_hScrollBar->maximum() > _hScrollBar->minimum()) h += sbw;
+  if (_vScrollBar->maximum() > _vScrollBar->minimum()) w += sbw;
+  if (xw > w) h -= sbw;
+  if (xh > h) w -= sbw;
+  if (!editor_flag) {
+    if (xw < w) xw= w;
+    if (xh < h) xh= h;
+  }
+
+  int cw = (xw > w ? xw - w : 0);
   if (_hScrollBar->sliderPosition() > cw)
     _hScrollBar->setSliderPosition(cw);
   _hScrollBar->setRange(0, cw);
   _hScrollBar->setSingleStep((w >> 4) + 1);
   _hScrollBar->setPageStep(w);
   
-  QRect r = (p_extents.width() > w) ? QRect(0,0,w,h) 
-  : QRect ((w-p_extents.width())/2,0,p_extents.width(),h);
-    //  surface()->setGeometry(r);
-  surface()->setMinimumWidth(r.width());
-  
-  QScrollBar *_vScrollBar = QAbstractScrollArea::verticalScrollBar();
-  int ch = (p_extents.height() > h ? p_extents.height() - h : 0);
+  int ch = (xh > h ? xh - h : 0);
   if (_vScrollBar->sliderPosition() > ch)
     _vScrollBar->setSliderPosition(ch);
   _vScrollBar->setRange(0, ch);
   _vScrollBar->setSingleStep((h >> 4) + 1);
   _vScrollBar->setPageStep(h);
   
+  surface()->setMinimumWidth (w < xw? w: xw);
+  surface()->setMinimumHeight(h < xh? h: xh);
   
-    // we may need a relayout if the surface width is changed
+  // we may need a relayout if the surface width is changed
   updateGeometry();
 }
 
@@ -223,13 +264,20 @@ QTMScrollView::event (QEvent *event) {
     case QEvent::Resize:
     {
       bool res = QAbstractScrollArea::event(event);
+      QResizeEvent *re = static_cast<QResizeEvent*> (event);
       updateScrollBars();
+      resizeEventBis (re);
       return res;
     }
     default:
       break;
   }
   return QAbstractScrollArea::event(event);
+}
+
+void
+QTMScrollView::resizeEventBis (QResizeEvent *event) {
+  (void) event;
 }
 
 /*

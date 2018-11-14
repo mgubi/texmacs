@@ -138,8 +138,6 @@ aqua_gui_rep::clear_selection (string key) {
  * Miscellaneous
  ******************************************************************************/
 
-void aqua_gui_rep::image_gc (string name) { (void) name; }
-// FIXME: remove this unused function
 void aqua_gui_rep::set_mouse_pointer (string name) { (void) name; }
 // FIXME: implement this function
 void aqua_gui_rep::set_mouse_pointer (string curs_name, string mask_name)  { (void) curs_name; (void) mask_name; } ;
@@ -434,7 +432,7 @@ get_default_font (bool tt, bool mini, bool bold) {
   // get the default font or monospaced font (if tt is true)
 	
   // return a null font since this function is not called in the Qt port.
-  if (DEBUG_EVENTS) cout << "get_default_font(): SHOULD NOT BE CALLED\n";
+  if (DEBUG_EVENTS) debug_events << "get_default_font(): SHOULD NOT BE CALLED\n";
   return NULL;
   //return tex_font (this, "ecrm", 10, 300, 0);
 }
@@ -447,7 +445,7 @@ load_system_font (string family, int size, int dpi,
                   font_metric& fnm, font_glyphs& fng)
 {
 	(void) family; (void) size; (void) dpi; (void) fnm; (void) fng;
-	if (DEBUG_EVENTS) cout << "load_system_font(): SHOULD NOT BE CALLED\n";
+	if (DEBUG_EVENTS) debug_events << "load_system_font(): SHOULD NOT BE CALLED\n";
 }
 
 /******************************************************************************
@@ -498,12 +496,6 @@ bool check_event (int type)
   // Check whether an event of one of the above types has occurred;
   // we check for keyboard events while repainting windows
 { return the_gui->check_event(type); }
-
-void image_gc (string name) {
-  // Garbage collect images of a given name (may use wildcards)
-  // This routine only needs to be implemented if you use your own image cache
-  the_aqua_renderer()->image_gc(name); 
-}
 
 void
 show_help_balloon (widget balloon, SI x, SI y) { 

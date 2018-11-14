@@ -39,10 +39,8 @@
 
 void use_modules (tree t);
 
-edit_env
-get_init_environment (tree doc, drd_info& drd) {
-  hashmap<string,tree> h1 (UNINIT), h2 (UNINIT), h3 (UNINIT), h4 (UNINIT);
-  edit_env env (drd, "none", h1, h2, h3, h4);
+void
+initialize_environment (edit_env& env, tree doc, drd_info& drd) {
   env->write_default_env ();
   bool ok;
   tree t, style= extract (doc, "style");
@@ -62,16 +60,24 @@ get_init_environment (tree doc, drd_info& drd) {
     drd->set_environment (H);
   }
   use_modules (env->read (THE_MODULES));
-  // FIXME: extract (doc, "init")
+  tree init= extract (doc, "initial");
+  for (int i=0; i<N(init); i++)
+    if (is_func (init[i], ASSOCIATE, 2) && is_atomic (init[i][0]))
+      env->write (init[i][0]->label, init[i][1]);
+  // env->write (DPI, "720");
+  // env->write (ZOOM_FACTOR, "1.2");
   // env->write (PAGE_TYPE, "a5");
   env->update ();
-  return env;
 }
 
 tree
 tree_extents (tree doc) {
   drd_info drd ("none", std_drd);
-  edit_env env= get_init_environment (doc, drd);
+  hashmap<string,tree> h1 (UNINIT), h2 (UNINIT);
+  hashmap<string,tree> h3 (UNINIT), h4 (UNINIT);
+  hashmap<string,tree> h5 (UNINIT), h6 (UNINIT);
+  edit_env env (drd, "none", h1, h2, h3, h4, h5, h6);
+  initialize_environment (env, doc, drd);
   tree t= extract (doc, "body");
   lazy lz= make_lazy (env, t, path ());
   format vf= make_query_vstream_width (array<line_item>(), array<line_item>());
@@ -96,18 +102,18 @@ class box_widget_rep: public simple_widget_rep {
   bool   transparent;
   double zoomf;
   double magf;
-  int    dw, dh;
+  SI     dw, dh;
 
 public:
-  box_widget_rep (box b, color bg, bool trans, double zoom, int dw, int dh);
+  box_widget_rep (box b, color bg, bool trans, double zoom, SI dw, SI dh);
   operator tree ();
 
   void handle_get_size_hint (SI& w, SI& h);
-  void handle_repaint (SI x1, SI y1, SI x2, SI y2);
+  void handle_repaint (renderer ren, SI x1, SI y1, SI x2, SI y2);
 };
 
 box_widget_rep::box_widget_rep
-  (box b2, color bg2, bool trans2, double zoom, int dw2, int dh2):
+  (box b2, color bg2, bool trans2, double zoom, SI dw2, SI dh2):
     simple_widget_rep (), b (b2),
     bg (bg2), transparent (trans2),
     zoomf (zoom), magf (zoom / std_shrinkf),
@@ -127,13 +133,12 @@ box_widget_rep::handle_get_size_hint (SI& w, SI& h) {
 }
 
 void
-box_widget_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2) {
+box_widget_rep::handle_repaint (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   SI w, h;
   handle_get_size_hint (w, h);
-  renderer ren= get_renderer (this);
   if (!transparent) {
     ren->set_background (bg);
-    ren->set_color (bg);
+    ren->set_pencil (bg);
     ren->fill (x1, y1, x2, y2);
   }
   ren->set_zoom_factor (zoomf);
@@ -177,11 +182,23 @@ box_widget (scheme_tree p, string s, color col, bool trans, bool ink) {
 
 tree enrich_embedded_document (tree body, tree style);
 
+static bool
+is_transparent (tree init) {
+  for (int i=0; i<N(init); i++)
+    if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == BG_COLOR)
+      return false;
+  return true;
+}
+
 widget
 texmacs_output_widget (tree doc, tree style) {
   doc= enrich_embedded_document (doc, style);
   drd_info drd ("none", std_drd);
-  edit_env env= get_init_environment (doc, drd);
+  hashmap<string,tree> h1 (UNINIT), h2 (UNINIT);
+  hashmap<string,tree> h3 (UNINIT), h4 (UNINIT);
+  hashmap<string,tree> h5 (UNINIT), h6 (UNINIT);
+  edit_env env (drd, "none", h1, h2, h3, h4, h5, h6);
+  initialize_environment (env, doc, drd);
   tree t= extract (doc, "body");
   lazy lz= make_lazy (env, t, path ());
   format vf= make_query_vstream_width (array<line_item>(), array<line_item>());
@@ -193,7 +210,13 @@ texmacs_output_widget (tree doc, tree style) {
   //SI dw2= env->get_length (PAGE_SCREEN_RIGHT);
   //SI dh1= env->get_length (PAGE_SCREEN_BOT);
   //SI dh2= env->get_length (PAGE_SCREEN_TOP);
-  color col= light_grey;
-  
-  return widget (tm_new<box_widget_rep> (b, col, false, 1.0, 0, 0));
+  color col= env->get_color (BG_COLOR);
+  if (env->get_string (BG_COLOR) == "white" &&
+      is_transparent (extract (doc, "body")))
+#ifdef QTTEXMACS
+    col= rgb_color (236, 236, 236);
+#else
+    col= light_grey;
+#endif
+  return widget (tm_new<box_widget_rep> (b, col, false, 1.2, 0, 0));
 }

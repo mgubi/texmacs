@@ -366,7 +366,8 @@ raw_apply (tree& t, modification mod) {
 * Wrappers which take into account mirroring
 ******************************************************************************/
 
-bool versioning_busy= false;
+bool busy_modifying= false;
+bool busy_versioning= false;
 static bool is_busy= false;
 static list<path> busy_paths;
 static list<modification> upcoming;
@@ -388,14 +389,14 @@ busy_tree (tree& ref) {
 void
 apply (tree& ref, modification mod) {
   if (!is_applicable (ref, mod)) {
-    cout << "mod= " << mod << "\n";
-    cout << "ref= " << ref << "\n";
-    ASSERT (is_applicable (ref, mod), "invalid modification");
+    failed_error << "mod= " << mod << "\n";
+    failed_error << "ref= " << ref << "\n";
+    FAILED ("invalid modification");
   }
   path ip= obtain_ip (ref);
   path rp= reverse (ip);
   path p = rp * root (mod);
-  if (versioning_busy) raw_apply (ref, mod);
+  if (busy_modifying) raw_apply (ref, mod);
   else if (is_busy) {
     if (ip_attached (ip) && !busy_path (p)) {
       //cout << "Postpone " << (reverse (ip) * mod) << "\n";

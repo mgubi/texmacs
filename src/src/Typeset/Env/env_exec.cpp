@@ -20,6 +20,7 @@
 #include "dictionary.hpp"
 
 extern int script_status;
+extern tree with_package_definitions (string package, tree body);
 
 /******************************************************************************
 * Subroutines
@@ -85,20 +86,30 @@ edit_env_rep::rewrite (tree t) {
       if (N(t)>=5) end  = as_int (exec (t[4]));
       int i, n= max (0, end-start);
       tree r (make_tree_label (t[1]->label), n);
-      for (i=0; i<n; i++)
-	r[i]= tree (make_tree_label (t[0]->label),
-		    tree (ARG, copy (t[2]), as_string (start+i)),
-		    as_string (start+i));
-
+      if (t[0]->label == "identity")
+	for (i=0; i<n; i++)
+	  r[i]= tree (ARG, copy (t[2]), as_string (start+i));
+      else
+	for (i=0; i<n; i++)
+	  r[i]= tree (make_tree_label (t[0]->label),
+		      tree (ARG, copy (t[2]), as_string (start+i)),
+		      as_string (start+i));
       macro_arg= old_var;
       macro_src= old_src;
       return r;
     }
-  case INCLUDE:
+  case VAR_INCLUDE:
     {
       if (N(t) == 0) return tree (ERROR, "invalid include");
-      url file_name= url_system (exec_string (t[0]));
+      url file_name= url_unix (exec_string (t[0]));
+      //cout << "file_name= " << as_tree (file_name) << LF;
       return load_inclusion (relative (base_file_name, file_name));
+    }
+  case WITH_PACKAGE:
+    {
+      if (N(t) != 2) return tree (ERROR, "invalid with-package");
+      string file_name= exec_string (t[0]);
+      return with_package_definitions (file_name, t[1]);
     }
   case REWRITE_INACTIVE:
     {
@@ -257,7 +268,9 @@ edit_env_rep::exec (tree t) {
     return exec_for_each (t);
   case EXTERN:
     return exec_rewrite (t);
-  case INCLUDE:
+  case VAR_INCLUDE:
+    return exec_rewrite (t);
+  case WITH_PACKAGE:
     return exec_rewrite (t);
   case USE_PACKAGE:
     return exec_use_package (t);
@@ -315,10 +328,14 @@ edit_env_rep::exec (tree t) {
     return exec_change_case (t);
   case FIND_FILE:
     return exec_find_file (t);
+  case FIND_FILE_UPWARDS:
+    return exec_find_file_upwards (t);
   case IS_TUPLE:
     return exec_is_tuple (t);
   case LOOK_UP:
     return exec_lookup (t);
+  case OCCURS_INSIDE:
+    return exec_occurs_inside (t);
   case EQUAL:
     return exec_equal (t);
   case UNEQUAL:
@@ -331,6 +348,8 @@ edit_env_rep::exec (tree t) {
     return exec_greater (t);
   case GREATEREQ:
     return exec_greatereq (t);
+  case BLEND:
+    return exec_blend (t);
 
   case CM_LENGTH:
     return exec_cm_length ();
@@ -384,10 +403,16 @@ edit_env_rep::exec (tree t) {
     return exec_gw_length ();
   case GH_LENGTH:
     return exec_gh_length ();
+  case GU_LENGTH:
+    return exec_gu_length ();
   case TMPT_LENGTH:
     return exec_tmpt_length ();
   case PX_LENGTH:
     return exec_px_length ();
+  case MS_LENGTH:
+    return exec_ms_length ();
+  case S_LENGTH:
+    return exec_s_length ();
   case MSEC_LENGTH:
     return exec_msec_length ();
   case SEC_LENGTH:
@@ -416,6 +441,8 @@ edit_env_rep::exec (tree t) {
     return exec_hard_id (t);
   case SCRIPT:
     return exec_script (t);
+  case FIND_ACCESSIBLE:
+    return exec_find_accessible (t);
   case HLINK:
   case ACTION:
     return exec_compound (t);
@@ -423,12 +450,49 @@ edit_env_rep::exec (tree t) {
     return exec_set_binding (t);
   case GET_BINDING:
     return exec_get_binding (t);
+  case GET_ATTACHMENT:
+    return exec_get_attachment (t);
 
   case PATTERN:
     return exec_pattern (t);
 
+  case ANIM_STATIC:
+    return exec_anim_static (t);
+  case ANIM_DYNAMIC:
+    return exec_anim_dynamic (t);
+  case MORPH:
+    return exec_morph (t);
+  case ANIM_TIME:
+    return exec_anim_time ();
+  case ANIM_PORTION:
+    return exec_anim_portion ();
+
   case _POINT:
     return exec_point (t);
+
+  case EFF_MOVE:
+    return exec_eff_move (t);
+  case EFF_BUBBLE:
+    return exec_eff_bubble (t);
+  case EFF_TURBULENCE:
+    return exec_eff_turbulence (t);
+  case EFF_FRACTAL_NOISE:
+    return exec_eff_fractal_noise (t);
+  case EFF_GAUSSIAN:
+    return exec_eff_gaussian (t);
+  case EFF_OVAL:
+    return exec_eff_oval (t);
+  case EFF_RECTANGULAR:
+    return exec_eff_rectangular (t);
+  case EFF_MOTION:
+    return exec_eff_motion (t);
+  case EFF_DEGRADE:
+    return exec_eff_degrade (t);
+  case EFF_DISTORT:
+    return exec_eff_distort (t);
+  case EFF_GNAW:
+    return exec_eff_gnaw (t);
+
   case BOX_INFO:
     return exec_box_info (t);
   case FRAME_DIRECT:
@@ -484,7 +548,10 @@ edit_env_rep::exec_assign (tree t) {
   tree r= exec (t[0]);
   if (is_compound (r)) return tree (ERROR, "bad assign");
   assign (r->label, copy (t[1]));
-  return tree (ASSIGN, r, tree (QUOTE, read (r->label)));
+  tree v= read (r->label);
+  if (is_atomic (v) || is_func (v, MACRO));
+  else v= tree (QUOTE, v);
+  return tree (ASSIGN, r, v);
 }
 
 tree
@@ -586,6 +653,9 @@ edit_env_rep::exec_drd_props (tree t) {
 	if (is_tuple (val, "repeat", 2))
 	  drd->set_arity (l, as_int (val [1]), as_int (val [2]),
 			  ARITY_REPEAT, CHILD_BIFORM);
+	else if (is_tuple (val, "repeat*", 2))
+	  drd->set_arity (l, as_int (val [1]), as_int (val [2]),
+			  ARITY_VAR_REPEAT, CHILD_BIFORM);
 	else if (is_tuple (val, "options", 2))
 	  drd->set_arity (l, as_int (val [1]), as_int (val [2]),
 			  ARITY_OPTIONS, CHILD_BIFORM);
@@ -641,8 +711,8 @@ edit_env_rep::exec_drd_props (tree t) {
 	  }
 	}
       else if (prop == "normal-writability" ||
-	  prop == "disable-writability" ||
-	  prop == "enable-writability")
+               prop == "disable-writability" ||
+               prop == "enable-writability")
 	{
 	  int prop_code= WRITABILITY_NORMAL;
 	  if (prop == "disable-writability") prop_code= WRITABILITY_DISABLE;
@@ -662,6 +732,20 @@ edit_env_rep::exec_drd_props (tree t) {
 	}
       else if (prop == "returns" && drd_encode_type (as_string (val)) >= 0) {
 	drd->set_type (l, drd_encode_type (as_string (val)));
+	drd->freeze_type (l);
+      }
+      else if (prop == "parameter" &&
+               drd_encode_type (as_string (val)) >= 0) {
+        drd->set_var_type (l, VAR_PARAMETER);
+	drd->set_type (l, drd_encode_type (as_string (val)));
+	drd->freeze_var_type (l);
+	drd->freeze_type (l);
+      }
+      else if (prop == "macro-parameter" &&
+               drd_encode_type (as_string (val)) >= 0) {
+        drd->set_var_type (l, VAR_MACRO_PARAMETER);
+	drd->set_type (l, drd_encode_type (as_string (val)));
+	drd->freeze_var_type (l);
 	drd->freeze_type (l);
       }
       else if (drd_encode_type (prop) >= 0) {
@@ -916,8 +1000,9 @@ edit_env_rep::exec_use_package (tree t) {
     //cout << "Package " << as_string (t[i]) << "\n";
     url name= url_none ();
     url styp= "$TEXMACS_STYLE_PATH";
-    //if (is_rooted_web (base_file_name)) styp= styp | head (base_file_name);
-    //else styp= ::expand (head (base_file_name) * url_ancestor ()) | styp;
+    if (is_rooted (base_file_name, "default"))
+      styp= styp | ::expand (head (base_file_name) * url_ancestor ());
+    else styp= styp | head (base_file_name);
     if (ends (as_string (t[i]), ".ts")) name= as_string (t[i]);
     else name= styp * (as_string (t[i]) * string (".ts"));
     name= resolve (name);
@@ -946,19 +1031,17 @@ edit_env_rep::exec_use_module (tree t) {
 
 tree
 edit_env_rep::exec_or (tree t) {
-  if (N(t)<2) return tree (ERROR, "bad or");
+  if (N(t) < 2) return tree (ERROR, "bad or");
   for (int i=0; i<N(t); i++) {
     tree ti= exec (t[i]);
-    if (is_compound (ti)) return tree (ERROR, "bad or");
-    if (! is_bool (ti->label)) return tree (ERROR, "bad or");
-    if (as_bool (ti->label)) return as_string_bool (true);
+    if (ti != "false") return ti;
   }
   return as_string_bool (false);
 }
 
 tree
 edit_env_rep::exec_xor (tree t) {
-  if (N(t)!=2) return tree (ERROR, "bad xor");
+  if (N(t) != 2) return tree (ERROR, "bad xor");
   tree t1= exec (t[0]);
   tree t2= exec (t[1]);
   if (is_compound (t1) || is_compound (t2)) return tree (ERROR, "bad xor");
@@ -969,23 +1052,20 @@ edit_env_rep::exec_xor (tree t) {
 
 tree
 edit_env_rep::exec_and (tree t) {
-  if (N(t)<2) return tree (ERROR, "bad and");
-  for (int i=0; i<N(t); i++) {
+  if (N(t) < 2) return tree (ERROR, "bad and");
+  for (int i=0; i<N(t)-1; i++) {
     tree ti= exec (t[i]);
-    if (is_compound (ti)) return tree (ERROR, "bad and");
-    if (! is_bool (ti->label)) return tree (ERROR, "bad and");
-    if (! as_bool (ti->label)) return as_string_bool (false);
+    if (ti == "false") return ti;
   }
-  return as_string_bool (true);
+  return exec (t[N(t)-1]);
 }
 
 tree
 edit_env_rep::exec_not (tree t) {
-  if (N(t)!=1) return tree (ERROR, "bad not");
-  tree tt= exec(t[0]);
-  if (is_compound (tt)) return tree (ERROR, "bad not");
-  if (! is_bool (tt->label)) return tree (ERROR, "bad not");
-  return as_string_bool (! as_bool (tt->label));
+  if (N(t) != 1) return tree (ERROR, "bad not");
+  tree tt= exec (t[0]);
+  if (tt == "false") return "true";
+  else return "false";
 }
 
 tree
@@ -1335,8 +1415,7 @@ edit_env_rep::exec_translate (tree t) {
   tree t1= exec (t[0]);
   tree t2= exec (t[1]);
   tree t3= exec (t[2]);
-  if (is_compound (t1) || is_compound (t2) || is_compound (t3))
-    return tree (ERROR, "bad translate");
+  if (is_compound (t1) || is_compound (t2) || is_compound (t3)) return t1;
   return translate (t1->label, t2->label, t3->label);
 }
 
@@ -1394,13 +1473,41 @@ edit_env_rep::exec_find_file (tree t) {
   for (i=0; i<(n-1); i++) {
     url u= resolve (url (r[i]->label, r[n-1]->label));
     if (!is_none (u)) {
+      url d= delta (base_file_name, u);
+      if (!is_rooted (d) && !(is_concat (d) && is_parent (d[1])))
+        return as_string (d);
       if (is_rooted (u, "default")) u= reroot (u, "file");
       return as_string (u);
     }
   }
   url u= resolve (base_file_name * url_parent () * r[n-1]->label);
   if (!is_none (u)) {
+    url d= delta (base_file_name, u);
+    if (!is_rooted (d) && !(is_concat (d) && is_parent (d[1])))
+      return as_string (d);
     if (is_rooted (u, "default")) u= reroot (u, "file");
+    return as_string (u);
+  }
+  return "false";
+}
+
+tree
+edit_env_rep::exec_find_file_upwards (tree t) {
+  if (N(t) < 1) return tree (ERROR, "bad find file upwards");
+  tree name= exec (t[0]);
+  array<string> roots;
+  for (int i=1; i<N(t); i++) {
+    tree root= exec (t[i]);
+    if (!is_atomic (name) || !is_atomic (root))
+      return tree (ERROR, "bad find file upwards");
+    roots << root->label;
+  }
+  url u= search_file_upwards (base_file_name, name->label, roots);
+  if (!is_none (u)) {
+    url d= delta (base_file_name, u);
+    if (!is_rooted (d))
+      return as_string (d);
+    //if (is_rooted (u, "default")) u= reroot (u, "file");
     return as_string (u);
   }
   return "false";
@@ -1421,6 +1528,43 @@ edit_env_rep::exec_lookup (tree t) {
   int i= as_int (t2);
   if (i<0 || i>=N(t1)) return tree (ERROR, "index out of range in look up");
   return t1[i];
+}
+
+static bool
+occurs_inside (tree w, tree t) {
+  if (t == w) return true;
+  if (is_atomic (t)) return false;
+  for (int i=0; i<N(t); i++)
+    if (occurs_inside (w, t[i])) return true;
+  return false;
+}
+
+tree
+edit_env_rep::exec_arg_recursive (tree t) {
+  if (N(t)<1) return tree (ERROR, "bad arg");
+  tree r= t[0];
+  if (is_compound (r))
+    return tree (ERROR, "bad arg");
+  if (is_nil (macro_arg) || (!macro_arg->item->contains (r->label)))
+    return tree (ERROR, "arg " * r->label);
+  r= macro_arg->item [r->label];
+  list<hashmap<string,tree> > old_var= macro_arg;
+  list<hashmap<string,path> > old_src= macro_src;
+  if (!is_nil (macro_arg)) macro_arg= macro_arg->next;
+  if (!is_nil (macro_src)) macro_src= macro_src->next;
+  if (is_func (r, ARG, 1)) r= exec_arg_recursive (r);
+  macro_arg= old_var;
+  macro_src= old_src;
+  return r;
+}
+
+tree
+edit_env_rep::exec_occurs_inside (tree t) {
+  if (N(t)!=2) return tree (ERROR, "bad look up");
+  tree t1= exec (t[0]);
+  tree t2= exec_arg_recursive (tree (ARG, t[1]));
+  if (occurs_inside (t1, t2)) return "true";
+  else return "false";
 }
 
 tree
@@ -1510,6 +1654,23 @@ edit_env_rep::exec_greatereq (tree t) {
 }
 
 tree
+edit_env_rep::exec_blend (tree t) {
+  if (N(t)!=2) return tree (ERROR, "bad blend");
+  tree t1= exec (t[0]);
+  tree t2= exec (t[1]);
+  if (is_compound (t1) || is_compound (t2))
+    return tree (ERROR, "bad blend");
+  string s1= t1->label;
+  string s2= t2->label;
+  if (is_color_name (s1) && (is_color_name (s2))) {
+    color c1= named_color (s1);
+    color c2= named_color (s2);
+    return get_hex_color (blend_colors (c1, c2));
+  }
+  return tree (ERROR, "bad blend");
+}
+
+tree
 edit_env_rep::exec_hard_id (tree t) {
   pointer ptr= (pointer) this;
   if (N(t) == 0)
@@ -1531,9 +1692,19 @@ edit_env_rep::exec_hard_id (tree t) {
 
 tree
 edit_env_rep::exec_script (tree t) {
-  if (N(t) != 1 && N(t) != 2) return tree (ERROR, "bad script");
-  if (N(t) == 1) return tree (SCRIPT, exec (t[0]));
-  else return tree (SCRIPT, exec (t[0]), expand (t[1], true));
+  int i, n= N(t);
+  if (n < 1) return tree (ERROR, "bad script");
+  tree r (t, n);
+  r[0]= exec (t[0]);
+  for (i=1; i<n; i++)
+    r[i]= exec (t[i]);
+  return r;
+}
+
+tree
+edit_env_rep::exec_find_accessible (tree t) {
+  if (N(t) < 1) return tree (ERROR, "bad find-accessible");
+  return expand (t[0], true);
 }
 
 tree
@@ -1587,12 +1758,14 @@ edit_env_rep::exec_set_binding (tree t) {
 	extra << "#" << part (1, N(part));
       local_ref (key) << extra;
     }
+    touched (key)= true;
     if (complete && is_tuple (old_value) && N(old_value) >= 1) {
       string old_s= tree_as_string (old_value[0]);
       string new_s= tree_as_string (value);
       if (new_s != old_s && !starts (key, "auto-")) {
-	if (new_s == "") system_warning ("Redefined", key);
-	else system_warning ("Redefined " * key * " as", new_s);
+        redefined << tree (TUPLE, key, new_s);
+	//if (new_s == "") typeset_warning << "Redefined " << key << LF;
+	//else typeset_warning << "Redefined " << key << " as " << new_s << LF;
       }
     }
   }
@@ -1609,15 +1782,27 @@ edit_env_rep::exec_get_binding (tree t) {
   if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
   else if (type == 1) value= tree (UNINIT);
   if (complete && value == tree (UNINIT))
-    system_warning ("Undefined reference", key);
+    if (get_bool (WARN_MISSING)) {
+      missing (key)= tree (GET_BINDING, key);
+      //typeset_warning << "Undefined reference " << key << LF;
+    }
   //cout << t << ": " << key << " -> " << value << "\n";
+  return value;
+}
+
+tree
+edit_env_rep::exec_get_attachment (tree t) {
+  if (N(t) != 1) return tree (ERROR, "bad get attachment");
+  string key= exec_string (t[0]);
+  tree value= local_att->contains (key)? local_att [key]: global_att [key];
   return value;
 }
 
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (ERROR, "bad pattern");
-  url im= exec_string (t[0]);
+  if (no_patterns && N(t) == 4) return exec (t[3]);
+  url im= url_system (exec_string (t[0]));
   url image= resolve (relative (base_file_name, im));
   if (is_none (image))
     image= resolve (url ("$TEXMACS_PATTERN_PATH") * im);
@@ -1655,8 +1840,8 @@ edit_env_rep::exec_pattern (tree t) {
     w= as_string (imw);
     h= as_string (imh);
   }
-  else if ((!is_int (w) && !is_percentage (w)) ||
-	   (!is_int (h) && !is_percentage (h)))
+  else if ((!is_int (w) && !is_percentage (w) && !is_percentage (w, "@")) ||
+	   (!is_int (h) && !is_percentage (h) && !is_percentage (h, "@")))
     return "white";
   tree r (PATTERN, as_string (image), w, h);
   if (N(t) == 4) r << exec (t[3]);
@@ -1671,6 +1856,117 @@ edit_env_rep::exec_point (tree t) {
     u[i]= exec (t[i]);
   if (n==0 || is_double (u[0])) return u;
   return as_tree (as_point (u));
+}
+
+tree
+edit_env_rep::exec_eff_move (tree t) {
+  if (N(t) < 3) return tree (ERROR, "bad eff-move");
+  tree body= exec (t[0]);
+  tree dx  = as_tree (as_length (exec (t[1])));
+  tree dy  = as_tree (as_length (exec (t[2])));
+  return tree (EFF_MOVE, body, dx, dy);
+}
+
+tree
+edit_env_rep::exec_eff_bubble (tree t) {
+  if (N(t) < 3) return tree (ERROR, "bad eff-bubble");
+  tree body= exec (t[0]);
+  tree r   = as_tree (as_length (exec (t[1])));
+  tree a   = exec (t[2]);
+  return tree (EFF_BUBBLE, body, r, a);
+}
+
+tree
+edit_env_rep::exec_eff_turbulence (tree t) {
+  if (N(t) != 5) return tree (ERROR, "bad eff-turbulence");
+  tree body= exec (t[0]);
+  tree s   = exec (t[1]);
+  tree w   = as_tree (as_length (exec (t[2])));
+  tree h   = as_tree (as_length (exec (t[3])));
+  tree o   = exec (t[4]);
+  return tree (EFF_TURBULENCE, body, s, w, h, o);
+}
+
+tree
+edit_env_rep::exec_eff_fractal_noise (tree t) {
+  if (N(t) != 5) return tree (ERROR, "bad eff-fractal-noise");
+  tree body= exec (t[0]);
+  tree s   = exec (t[1]);
+  tree w   = as_tree (as_length (exec (t[2])));
+  tree h   = as_tree (as_length (exec (t[3])));
+  tree o   = exec (t[4]);
+  return tree (EFF_FRACTAL_NOISE, body, s, w, h, o);
+}
+
+tree
+edit_env_rep::exec_eff_gaussian (tree t) {
+  if (N(t) < 1) return tree (ERROR, "bad eff-gaussian");
+  tree rx= as_tree (as_length (exec (t[0])));
+  if (N(t) == 1) return tree (EFF_GAUSSIAN, as_tree (rx));
+  if (N(t) < 3) return tree (ERROR, "bad eff-gaussian");
+  tree ry= as_tree (as_length (exec (t[1])));
+  return tree (EFF_GAUSSIAN, rx, ry, exec (t[2]));
+}
+
+tree
+edit_env_rep::exec_eff_oval (tree t) {
+  if (N(t) < 1) return tree (ERROR, "bad eff-oval");
+  tree rx= as_tree (as_length (exec (t[0])));
+  if (N(t) == 1) return tree (EFF_OVAL, as_tree (rx));
+  if (N(t) < 3) return tree (ERROR, "bad eff-oval");
+  tree ry= as_tree (as_length (exec (t[1])));
+  return tree (EFF_OVAL, rx, ry, exec (t[2]));
+}
+
+tree
+edit_env_rep::exec_eff_rectangular (tree t) {
+  if (N(t) < 1) return tree (ERROR, "bad eff-rectangular");
+  tree rx= as_tree (as_length (exec (t[0])));
+  if (N(t) == 1) return tree (EFF_RECTANGULAR, as_tree (rx));
+  if (N(t) < 3) return tree (ERROR, "bad eff-rectangular");
+  tree ry= as_tree (as_length (exec (t[1])));
+  return tree (EFF_RECTANGULAR, rx, ry, exec (t[2]));
+}
+
+tree
+edit_env_rep::exec_eff_motion (tree t) {
+  if (N(t) < 2) return tree (ERROR, "bad eff-motion");
+  tree dx= as_tree (as_length (exec (t[0])));
+  tree dy= as_tree (as_length (exec (t[1])));
+  return tree (EFF_MOTION, dx, dy);
+}
+
+tree
+edit_env_rep::exec_eff_degrade (tree t) {
+  if (N(t) < 4) return tree (ERROR, "bad eff-degrade");
+  tree b = exec (t[0]);
+  tree wx= as_tree (as_length (exec (t[1])));
+  tree wy= as_tree (as_length (exec (t[2])));
+  tree th= as_tree (as_double (exec (t[3])));
+  tree sh= as_tree (as_double (exec (t[4])));
+  return tree (EFF_DEGRADE, b, wx, wy, th, sh);
+}
+
+tree
+edit_env_rep::exec_eff_distort (tree t) {
+  if (N(t) < 5) return tree (ERROR, "bad eff-distort");
+  tree b = exec (t[0]);
+  tree wx= as_tree (as_length (exec (t[1])));
+  tree wy= as_tree (as_length (exec (t[2])));
+  tree rx= as_tree (as_length (exec (t[3])));
+  tree ry= as_tree (as_length (exec (t[4])));
+  return tree (EFF_DISTORT, b, wx, wy, rx, ry);
+}
+
+tree
+edit_env_rep::exec_eff_gnaw (tree t) {
+  if (N(t) < 5) return tree (ERROR, "bad eff-gnaw");
+  tree b = exec (t[0]);
+  tree wx= as_tree (as_length (exec (t[1])));
+  tree wy= as_tree (as_length (exec (t[2])));
+  tree rx= as_tree (as_length (exec (t[3])));
+  tree ry= as_tree (as_length (exec (t[4])));
+  return tree (EFF_GNAW, b, wx, wy, rx, ry);
 }
 
 tree
@@ -1948,7 +2244,8 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
     (void) exec (t);
     return false;
   case EXTERN:
-  case INCLUDE:
+  case VAR_INCLUDE:
+  case WITH_PACKAGE:
     return exec_until_rewrite (t, p, var, level);
   case USE_PACKAGE:
   case USE_MODULE:
@@ -1969,14 +2266,17 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case _DATE:
   case TRANSLATE:
   case FIND_FILE:
+  case FIND_FILE_UPWARDS:
   case IS_TUPLE:
   case LOOK_UP:
+  case OCCURS_INSIDE:
   case EQUAL:
   case UNEQUAL:
   case LESS:
   case LESSEQ:
   case GREATER:
   case GREATEREQ:
+  case BLEND:
     (void) exec (t);
     return false;
   case STYLE_WITH:
@@ -2305,7 +2605,7 @@ edit_env_rep::depends (tree t, string s, int level) {
 	   is_func (t, EVAL_ARGS))
     {
       // FIXME: this does not handle more complex dependencies,
-      // like those encountered after rewritings (INCLUDE, EXTERN, etc.)
+      // like those encountered after rewritings (VAR_INCLUDE, EXTERN, etc.)
       tree v= (L(t) == MAP_ARGS? t[2]: t[0]);
       if (is_compound (v)) return false;
       if (!macro_arg->item->contains (v->label)) return false;

@@ -13,7 +13,8 @@
 
 (texmacs-module (generic format-geometry-edit)
   (:use (utils edit selections)
-	(generic generic-edit)))
+        (generic embedded-edit)
+        (generic format-drd)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Customizable step changes for length modifications
@@ -34,7 +35,7 @@
   ("sec increase" "1" noop)
   ("min increase" "0.1" noop)
   ("% increase" "5" noop)
-  ("default unit" "spc" noop))
+  ("default unit" "ex" noop))
 
 (define step-table (make-ahash-table))
 (define step-list
@@ -44,7 +45,8 @@
 (define (get-step unit)
   (when (not (ahash-ref step-table unit))
     (with pref (get-preference (string-append unit " increase"))
-      (with step (if pref (string->number pref) 0.1)
+      (if pref (set! pref (string->number pref)))
+      (with step (or pref 0.1)
 	(ahash-set! step-table unit step))))
   (ahash-ref step-table unit))
 
@@ -81,10 +83,44 @@
 		 "Change default unit")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Extra conversion routines for lengths
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tm-rich-length? t)
+  (cond ((tm-atomic? t) #t)
+	((and (tm-is? t 'minus) (not (tm-atomic? (tm-ref t :last)))) #f)
+	((tm-in? t '(plus minus))
+	 (list-and (map tm-rich-length? (tm-children t))))
+	(else #f)))
+
+(tm-define (tm->rich-length t)
+  (cond ((tm-atomic? t) (tm->string t))
+	((tm-is? t 'plus)
+	 (with s (string-recompose (map tm->rich-length (tm-children t)) "+")
+	   (string-replace s "+-" "-")))
+	((tm-func? t 'minus 1)
+	 (with s (string-append "-" (tm->rich-length (tm-ref t 0)))
+	   (if (string-starts? s "--")
+	       (substring s 2 (string-length s))
+	       s)))
+	((tm-is? t 'minus)
+	 (with r `(plus ,@(cDr (tm-children t)) (minus ,(cAr (tm-children t))))
+	   (tm->rich-length r)))
+	(else "")))
+
+(tm-define (rich-length->tm s)
+  (with r (string-replace s "-" "+-")
+    (with l (string-decompose r "+")
+      (when (and (nnull? l) (== (car l) ""))
+        (set! l (cdr l)))
+      (if (<= (length l) 1) s
+	  `(plus ,@l)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful subroutines for length manipulations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (length-increase t by)
+(tm-define (length-increase t by)
   (cond ((tree-in? t '(plus minimum maximum))
 	 (length-increase (tree-ref t :last) by))
 	((tree-in? t '(minus))
@@ -110,7 +146,7 @@
 	 (tm-length? t2)
 	 (== (tm-length-unit t1) (tm-length-unit t2)))))
 
-(define (replace-empty t i by)
+(tm-define (replace-empty t i by)
   (when (tree-empty? (tree-ref t i))
     (tree-assign (tree-ref t i) by)))
 
@@ -122,7 +158,9 @@
   (tree-is? t 'space))
 
 (tm-define (var-space-context? t)
-  (or (tree-is? t 'space) (tree-func? t 'separating-space 1)))
+  (or (tree-is? t 'space)
+      (tree-func? t 'separating-space 1)
+      (tree-func? t 'application-space 1)))
 
 (define (space-make-ternary t)
   (cond ((== (tm-arity t) 1) (tree-insert t 1 '("0ex" "1ex")))
@@ -212,23 +250,51 @@
       (rubber-space-increase t inc))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Vertical adjustments
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (vadjust-context? t)
+  (tree-in? t (reduce-by-tag-list)))
+
+(tm-define (geometry-speed t inc?)
+  (:require (vadjust-context? t))
+  (with inc (if inc? 1 -1)
+    (length-increase-step (tree-ref t 1) inc)))
+
+(tm-define (geometry-vertical t down?)
+  (:require (vadjust-context? t))
+  (with inc (if down? 1 -1)
+    (length-increase (tree-ref t 1) inc)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Move and shift
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (move-context? t)
-  (tree-in? t '(move shift)))
+  (tree-in? t (move-tag-list)))
+
+(define (set-adjust-message s c)
+  (let* ((l (kbd-find-inv-system-binding '(geometry-left)))
+	 (r (kbd-find-inv-system-binding '(geometry-right))))
+    (if (and l r)
+	(set-message (string-append s " using " l ", " r ", etc. or "
+				    "via the fields in the focus bar") c)
+	(set-message (string-append s " using the keyboard or "
+				    "via the fields in the focus bar") c))))
 
 (tm-define (make-move hor ver)
   (:argument hor "Horizontal")
   (:argument ver "Vertical")
   (wrap-selection-small
-    (insert-go-to `(move "" ,hor ,ver) '(0 0))))
+    (insert-go-to `(move "" ,hor ,ver) '(0 0))
+    (set-adjust-message "Adjust position" "move")))
 
 (tm-define (make-shift hor ver)
   (:argument hor "Horizontal")
   (:argument ver "Vertical")
   (wrap-selection-small
-    (insert-go-to `(shift "" ,hor ,ver) '(0 0))))
+    (insert-go-to `(shift "" ,hor ,ver) '(0 0))
+    (set-adjust-message "Adjust position" "shift")))
 
 (tm-define (geometry-speed t inc?)
   (:require (move-context? t))
@@ -261,7 +327,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (resize-context? t)
-  (tree-in? t '(resize clipped)))
+  (tree-in? t (resize-tag-list)))
 
 (tm-define (make-resize l b r t)
   (:argument l "Left")
@@ -269,7 +335,17 @@
   (:argument r "Right")
   (:argument t "Top")
   (wrap-selection-small
-    (insert-go-to `(resize "" ,l ,b ,r ,t) '(0 0))))
+    (insert-go-to `(resize "" ,l ,b ,r ,t) '(0 0))
+    (set-adjust-message "Adjust extents" "resize")))
+
+(tm-define (make-extend l b r t)
+  (:argument l "Left")
+  (:argument b "Bottom")
+  (:argument r "Right")
+  (:argument t "Top")
+  (wrap-selection-small
+    (insert-go-to `(extend "" ,l ,b ,r ,t) '(0 0))
+    (set-adjust-message "Adjust extension" "extend")))
 
 (tm-define (make-clipped l b r t)
   (:argument l "Left")
@@ -277,7 +353,14 @@
   (:argument r "Right")
   (:argument t "Top")
   (wrap-selection-small
-    (insert-go-to `(clipped "" ,l ,b ,r ,t) '(0 0))))
+    (insert-go-to `(clipped "" ,l ,b ,r ,t) '(0 0))
+    (set-adjust-message "Adjust clipping" "clipped")))
+
+(tm-define (make-reduce-by by)
+  (:argument by "Reduce by")
+  (wrap-selection-small
+    (insert-go-to `(reduce-by "" ,by) '(0 0))
+    (set-adjust-message "Reduce vertical size" "reduce-by")))
 
 (define (replace-empty-horizontal t)
   (replace-empty t 1 `(plus "1l" ,(get-zero-unit)))
@@ -341,9 +424,6 @@
 ;; Images
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (image-context? t)
-  (tm-func? t 'image 5))
-
 (tm-define (geometry-speed t inc?)
   (:require (image-context? t))
   (with inc (if inc? 1 -1)
@@ -370,69 +450,3 @@
     (with-focus-after t
       (replace-empty t 4 "0h")
       (length-increase (tree-ref t 4) inc))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Animations
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (anim-context? t)
-  (tree-in? t '(anim-constant anim-translate anum-progressive)))
-
-(tm-define (make-anim-constant duration)
-  (:argument duration "Duration")
-  (insert-go-to `(anim-constant "" ,duration) '(0 0)))
-
-(define (make-anim-translate duration start)
-  (insert-go-to `(anim-translate "" ,duration ,start "") '(0 0)))
-
-(tm-define (make-anim-translate-right duration)
-  (:argument duration "Duration")
-  (make-anim-translate duration '(tuple "-1.0" "0.0")))
-
-(tm-define (make-anim-translate-left duration)
-  (:argument duration "Duration")
-  (make-anim-translate duration '(tuple "1.0" "0.0")))
-
-(tm-define (make-anim-translate-up duration)
-  (:argument duration "Duration")
-  (make-anim-translate duration '(tuple "0.0" "-1.0")))
-
-(tm-define (make-anim-translate-down duration)
-  (:argument duration "Duration")
-  (make-anim-translate duration '(tuple "0.0" "1.0")))
-
-(define (make-anim-progressive duration start)
-  (insert-go-to `(anim-progressive "" ,duration ,start "") '(0 0)))
-
-(tm-define (make-anim-progressive-right duration)
-  (:argument duration "Duration")
-  (make-anim-progressive duration '(tuple "0.0" "0.0" "0.0" "1.0")))
-
-(tm-define (make-anim-progressive-left duration)
-  (:argument duration "Duration")
-  (make-anim-progressive duration '(tuple "1.0" "0.0" "1.0" "1.0")))
-
-(tm-define (make-anim-progressive-up duration)
-  (:argument duration "Duration")
-  (make-anim-progressive duration '(tuple "0.0" "0.0" "1.0" "0.0")))
-
-(tm-define (make-anim-progressive-down duration)
-  (:argument duration "Duration")
-  (make-anim-progressive duration '(tuple "0.0" "1.0" "1.0" "1.0")))
-
-(tm-define (make-anim-progressive-center duration)
-  (:argument duration "Duration")
-  (make-anim-progressive duration '(tuple "0.5" "0.5" "0.5" "0.5")))
-
-(tm-define (geometry-speed t inc?)
-  (:require (anim-context? t))
-  (with inc (if inc? 1 -1)
-    (with-focus-after t
-      (length-increase-step (tree-ref t 1) inc))))
-
-(tm-define (geometry-horizontal t forward?)
-  (:require (anim-context? t))
-  (with inc (if forward? 1 -1)
-    (with-focus-after t
-      (replace-empty t 1 "1sec")
-      (length-increase (tree-ref t 1) inc))))

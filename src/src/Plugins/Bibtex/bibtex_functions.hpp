@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "analyze.hpp"
+#include "universal.hpp"
 #include "convert.hpp"
 #include "hashmap.hpp"
 #include "hashset.hpp"
@@ -30,6 +30,7 @@ scheme_tree bib_field (scheme_tree st, string field);
 list<string> bib_field_pages (scheme_tree st);
 void   bib_parse_fields (tree& t);
 scheme_tree bib_add_period (scheme_tree st);
+scheme_tree bib_locase_first (scheme_tree st);
 scheme_tree bib_upcase_first (scheme_tree st);
 
 hashmap<string,string> bib_strings_dict (tree t);

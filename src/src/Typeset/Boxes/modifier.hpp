@@ -30,7 +30,8 @@ public:
   void      collect_page_numbers (hashmap<string,tree>& h, tree page);
   path      find_tag (string name);
 
-  virtual path            find_box_path (SI x, SI y, SI delta, bool force);
+  virtual path            find_box_path (SI x, SI y, SI delta,
+                                         bool force, bool & found);
   virtual path            find_lip ();
   virtual path            find_rip ();
   virtual path            find_left_box_path ();
@@ -55,13 +56,15 @@ public:
   SI        sup_lo_lim  (int level);
   SI        sup_lo_base (int level);
   SI        sup_hi_lim  (int level);
+  SI        wide_correction (int mode);
+  void      get_bracket_extents (SI& lo, SI& hi);
 
-  virtual int   anim_length ();
-  virtual bool  anim_started ();
-  virtual bool  anim_finished ();
-  virtual void  anim_start_at (time_t at);
-  virtual void  anim_finish_now ();
-  virtual void  anim_get_invalid (bool& flag, time_t& at, rectangles& rs);
+  virtual player     anim_player ();
+  virtual double     anim_delay ();
+  virtual double     anim_duration ();
+  virtual void       anim_position (double delay);
+  virtual double     anim_next ();
+  virtual rectangles anim_invalid ();
 };
 
 #endif // defined MODIFIER_H

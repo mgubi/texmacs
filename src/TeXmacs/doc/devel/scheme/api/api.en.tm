@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.99.4>
 
 <style|tmdoc>
 
@@ -10,16 +10,20 @@
   reading the manual as a book. However it often happens that some <scheme>
   module or procedure needs documenting but doesn't fit into any of the
   available sections of the manual. The purpose of this section is precisely
-  to assemble all those pieces of information. Currently (sept. 2012) there
+  to assemble all those pieces of information. Currently (jan. 2016) there
   are very sketchy pages for:
 
   <\traverse>
     <branch|<tt|tmfs>: the <TeXmacs> file system.|tmfs/tmfs.en.tm>
 
-    <branch|The linking system.|link.en.tm>
+    <branch|The URL system.|url.en.tm>
+
+    <branch|Notification and download of updates.|automatic-updates.en.tm>
+
+    <branch|All glue symbols.|glue-auto-doc.en.tm>
   </traverse>
 
-  <tmdoc-copyright|2012|the <TeXmacs> team>
+  <tmdoc-copyright|2016|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify
   this\ndocument under the terms of the GNU Free Documentation License,
@@ -28,3 +32,9 @@
   with no Back-Cover Texts. A copy of\nthe license is included in the section
   entitled "GNU Free Documentation License".>
 </body>
+
+<\initial>
+  <\collection>
+    <associate|preamble|false>
+  </collection>
+</initial>

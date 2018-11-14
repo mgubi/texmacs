@@ -15,6 +15,7 @@
 #include "hashmap.hpp"
 typedef tree scheme_tree;
 class url;
+class object;
 
 /*** Miscellaneous ***/
 bool   is_snippet (tree doc);
@@ -27,6 +28,12 @@ string format_to_suffix (string format);
 string get_format (string s, string suffix);
 tree   generic_to_tree (string s, string format);
 string tree_to_generic (tree doc, string format);
+array<string> compute_keys (string s, string fm);
+array<string> compute_keys (tree t, string fm);
+array<string> compute_keys (url u);
+scheme_tree compute_index (string s, string fm);
+scheme_tree compute_index (tree t, string fm);
+scheme_tree compute_index (url u);
 
 /*** Texmacs ***/
 tree   texmacs_to_tree (string s);
@@ -35,10 +42,14 @@ string tree_to_texmacs (tree t);
 tree   extract (tree doc, string attr);
 tree   extract_document (tree doc);
 tree   change_doc_attr (tree doc, string attr, tree val);
+tree   remove_doc_attr (tree doc, string attr);
 hashmap<string,int> get_codes (string version);
 tree   string_to_tree (string s, string version);
 tree   upgrade (tree t, string version);
 tree   substitute (tree t, tree which, tree by);
+tree   nonumber_to_eqnumber (tree t);
+tree   eqnumber_to_nonumber (tree t);
+string search_metadata (tree doc, string kind);
 
 /*** Scheme ***/
 string scheme_tree_to_string (scheme_tree t);
@@ -58,19 +69,28 @@ tree   verbatim_to_tree (string s, bool wrap= false, string enc= "default");
 tree   verbatim_document_to_tree (string s, bool w= false, string e= "default");
 
 /*** Latex ***/
-tree   parse_latex (string s, bool change= false, bool using_cork= false);
-tree   parse_latex_document (string s, bool change= false);
+tree   parse_latex (string s, bool change= false, bool as_pic= false);
+tree   parse_latex_document (string s, bool change= false, bool as_pic= false);
 tree   latex_to_tree (tree t);
-tree   latex_document_to_tree (string s);
+tree   latex_document_to_tree (string s, bool as_pic= false);
 tree   latex_class_document_to_tree (string s);
 string latex_verbarg_to_string (tree t);
-tree   collect_metadata_acm (tree t);
-tree   collect_metadata_ams (tree t);
-tree   collect_metadata_elsevier (tree t);
-tree   collect_metadata (tree t, tree latex_classe);
-bool   is_metadata (tree u);
-bool   is_metadata_env (tree u);
-string string_arg (tree t, bool url= false);
+string get_latex_style (tree t);
+string string_arg (tree t, bool u= false);
+array<tree> tokenize_concat (tree t, array<tree> a, bool keep= false);
+bool   is_verbatim (tree t);
+int    latex_search_forwards (string s, int pos, string in);
+int    latex_search_forwards (string s, string in);
+tree   tracked_latex_to_texmacs (string s, bool as_pic);
+string conservative_texmacs_to_latex (tree doc, object opts);
+string tracked_texmacs_to_latex (tree doc, object opts);
+tree   conservative_latex_to_texmacs (string s, bool as_pic);
+int    get_line_number (string s, int pos);
+int    get_column_number (string s, int pos);
+tree   try_latex_export (tree doc, object opts, url src, url dest);
+int    number_latex_errors (url log);
+tree   get_latex_errors (url log);
+int    number_latex_pages (url log);
 
 /*** Xml / Html / Mathml ***/
 tree   parse_xml (string s);
@@ -80,6 +100,8 @@ tree   upgrade_mathml (tree t);
 
 /*** BibTeX ***/
 tree   parse_bib (string s);
+tree   conservative_bib_import (string olds, tree oldt, string news);
+string conservative_bib_export (tree oldt, string olds, tree newt);
 
 /*** Post corrections ***/
 bool   seems_buggy_html_paste (string s);
@@ -87,5 +109,9 @@ string correct_buggy_html_paste (string s);
 bool   seems_buggy_paste (string s);
 string correct_buggy_paste (string s);
 tree   default_with_simplify (tree t);
+
+/*** Coq ***/
+tree vernac_to_tree (string s);
+tree vernac_document_to_tree (string s);
 
 #endif // defined CONVERT_H

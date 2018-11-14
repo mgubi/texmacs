@@ -56,6 +56,7 @@ qt_font_rep::qt_font_rep (string name, string family2, int size2, int dpi2):
 
   // compute other widths
   wpt          = (dpi*PIXEL)/72;
+  hpt          = (dpi*PIXEL)/72;
   wfn          = (wpt*design_size) >> 8;
   wline        = wfn/20;
 
@@ -67,6 +68,7 @@ qt_font_rep::qt_font_rep (string name, string family2, int size2, int dpi2):
   get_extents (" ", ex);
   spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (ex->x2-ex->x1)<<1);
   extra= spc;
+  mspc = spc;
   sep  = wfn/10;
 
   // get_italic space
@@ -74,6 +76,12 @@ qt_font_rep::qt_font_rep (string name, string family2, int size2, int dpi2):
   SI italic_spc= (ex->x4-ex->x3)-(ex->x2-ex->x1);
   slope= ((double) italic_spc) / ((double) display_size);
   if (slope<0.15) slope= 0.0;
+}
+
+bool
+qt_font_rep::supports (string c) {
+  QString qs= utf8_to_qstring (cork_to_utf8 (c));
+  return qs.length () == 1 && qfm.inFont (qs[0]);
 }
 
 void
@@ -96,13 +104,15 @@ qt_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   if (N(s)!=0) {
     QString qs= utf8_to_qstring (cork_to_utf8 (s));
     double zoom= dpi / (std_shrinkf * 72.0);
-    ren -> as_qt_renderer () -> draw (qfn, qs, x, y, zoom);
+    qt_renderer_rep* qren= (qt_renderer_rep*) ren->get_handle ();
+    qren -> draw (qfn, qs, x, y, zoom);
   }
 }
 
 font
-qt_font_rep::magnify (double zoom) {
-  return qt_font (family, size, (int) round (dpi * zoom));
+qt_font_rep::magnify (double zoomx, double zoomy) {
+  if (zoomx != zoomy) return poor_magnify (zoomx, zoomy);
+  return qt_font (family, size, (int) round (dpi * zoomx));
 }
 
 /******************************************************************************

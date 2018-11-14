@@ -16,7 +16,8 @@
 (texmacs-module (graphics graphics-edit)
   (:use (graphics graphics-env)
         (graphics graphics-single)
-        (graphics graphics-group)))
+        (graphics graphics-group)
+        (graphics graphics-animate)))
 
 
 ;; TODO:
@@ -170,13 +171,14 @@
   ;;(display* "Graphics] Finish\n")
   (with mode (graphics-mode)
     (cond ((== (car mode) 'edit)
-	  (with submode (cadr mode)
+           (with submode (cadr mode)
 	     (cond ((== submode 'point) (noop))
 		   ((in? submode gr-tags-curves) (noop))
 		   ((in? submode gr-tags-user) (noop))
 		   ((graphical-text-tag? submode) (noop))
 		   (else (display* "Uncaptured finish (edit)\n")))))
 	 ((== (car mode) 'group-edit) (noop))
+	 ((== (car mode) 'hand-edit) (noop))
 	 (else (display* "Uncaptured finish\n")))))
 
 (tm-define (graphics-busy?)

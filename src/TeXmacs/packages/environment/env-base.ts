@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.9>
+<TeXmacs|1.99.6>
 
 <style|source>
 
@@ -62,8 +62,10 @@
     </src-comment>
   </active*>
 
+  <assign|env-number|<macro|num|<with|font-shape|right|<arg|num>>>>
+
   <assign|new-env|<macro|env|name|grp|render|<quasi|<style-with|src-compact|none|<add-to-counter-group|<unquote|<arg|env>>|<unquote|<arg|grp>>><assign|<unquote|<merge|<arg|env>|-text>>|<macro|<localize|<unquote|<arg|name>>>>><assign|<unquote|<merge|<arg|env>|-numbered>>|<macro|text|num|<arg|text>
-  <with|font-shape|right|<arg|num>>>><assign|<unquote|<merge|<arg|env>|-unnumbered>>|<macro|text|<arg|text>>><assign|<unquote|<arg|env>>|<\macro|body>
+  <env-number|<arg|num>>>><assign|<unquote|<merge|<arg|env>|-unnumbered>>|<macro|text|<arg|text>>><assign|<unquote|<arg|env>>|<\macro|body>
     <surround|<compound|<unquote|<merge|next-|<arg|env>>>>||<style-with|src-compact|none|<compound|<unquote|<arg|render>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|env>|-numbered>>|<compound|<unquote|<merge|<arg|env>|-text>>>|<compound|<unquote|<merge|the-|<arg|env>>>>>>|<arg|body>>>>
   </macro>><assign|<unquote|<merge|<arg|env>|*>>|<\macro|body>
     <style-with|src-compact|none|<compound|<unquote|<arg|render>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|env>|-unnumbered>>|<compound|<unquote|<merge|<arg|env>|-text>>>>>|<arg|body>>>
@@ -128,9 +130,9 @@
   </active*>
 
   <assign|new-figure|<macro|env|name|<quasi|<style-with|src-compact|none|<add-to-counter-group|<unquote|<arg|env>>|figure-env><assign|<unquote|<merge|<arg|env>|-text>>|<macro|<localize|<unquote|<arg|name>>>>><assign|<unquote|<merge|small-|<arg|env>>>|<macro|body|caption|<style-with|src-compact|none|<compound|<unquote|<merge|next-|<arg|env>>>><style-with|src-compact|none|<render-small-figure|<unquote|<arg|env>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|env>|-text>>>
-  <compound|<unquote|<merge|the-|<arg|env>>>>>|<arg|body>|<arg|caption>>>>>><assign|<unquote|<merge|small-|<arg|env>|*>>|<macro|body|caption|<style-with|src-compact|none|<render-small-figure|<unquote|<arg|env>>|<compound|<unquote|<merge|<arg|env>|-text>>>|<arg|body>|<arg|caption>>>>><assign|<unquote|<merge|big-|<arg|env>>>|<\macro|body|caption>
+  <compound|<unquote|<merge|the-|<arg|env>>>>>|<arg|body>|<surround|<set-binding|<compound|<unquote|<merge|the-|<arg|env>>>>>||<arg|caption>>>>>>><assign|<unquote|<merge|small-|<arg|env>|*>>|<macro|body|caption|<style-with|src-compact|none|<render-small-figure|<unquote|<arg|env>>|<compound|<unquote|<merge|<arg|env>|-text>>>|<arg|body>|<arg|caption>>>>><assign|<unquote|<merge|big-|<arg|env>>>|<\macro|body|caption>
     <surround|<compound|<unquote|<merge|next-|<arg|env>>>>||<style-with|src-compact|none|<render-big-figure|<unquote|<arg|env>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|env>|-text>>>
-    <compound|<unquote|<merge|the-|<arg|env>>>>>|<arg|body>|<arg|caption>>>>
+    <compound|<unquote|<merge|the-|<arg|env>>>>>|<arg|body>|<surround|<set-binding|<compound|<unquote|<merge|the-|<arg|env>>>>>||<arg|caption>>>>>
   </macro>><assign|<unquote|<merge|big-|<arg|env>|*>>|<\macro|body|caption>
     <style-with|src-compact|none|<render-big-figure|<unquote|<arg|env>>|<compound|<unquote|<merge|<arg|env>|-text>>>|<arg|body>|<arg|caption>>>
   </macro>>>>>>

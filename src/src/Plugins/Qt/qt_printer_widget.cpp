@@ -43,8 +43,8 @@ qt_printer_widget_rep::qt_printer_widget_rep (command _cmd, url _file)
  */ 
 void
 qt_printer_widget_rep::send (slot s, blackbox val) {
-  if (DEBUG_QT)
-    cout << "qt_printer_widget_rep::send " << slot_name(s) << LF;
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "qt_printer_widget_rep::send " << slot_name(s) << LF;
   switch (s) {
     case SLOT_VISIBILITY:   // Activates the widget
       check_type<bool>(val, s);
@@ -91,13 +91,13 @@ qt_printer_widget_rep::showDialog () {
   _cmd = _settings->toSystemCommand();
   
   // Send the document to the printer
-  if (DEBUG_QT)
-    cout << "qt_printer_dialog_rep] Running command: " << from_qstring(_cmd) 
-         << "\n";
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "Running print command: " << from_qstring(_cmd) << "\n";
   qt_system(from_qstring(_cmd));  // FIXME? qt_system is synchronous (blocking!)
   
   // execute the scheme closure 
-  commandAfterExecution ();
+  if (!is_nil (commandAfterExecution))
+    commandAfterExecution ();
 }
 
 

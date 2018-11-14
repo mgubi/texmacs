@@ -21,13 +21,13 @@ lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
 
 void
 concater_rep::typeset_substring (string s, path ip, int pos) {
-  box b= text_box (ip, pos, s, env->fn, env->col);
+  box b= text_box (ip, pos, s, env->fn, env->pen);
   a << line_item (STRING_ITEM, OP_TEXT, b, HYPH_INVALID, env->lan);
 }
 
 void
 concater_rep::typeset_math_substring (string s, path ip, int pos, int otype) {
-  box b= text_box (ip, pos, s, env->fn, env->col);
+  box b= text_box (ip, pos, s, env->fn, env->pen);
   a << line_item (STRING_ITEM, otype, b, HYPH_INVALID, env->lan);
 }
 
@@ -35,7 +35,7 @@ void
 concater_rep::typeset_colored_substring
   (string s, path ip, int pos, string col)
 {
-  color c= (col == ""? env->col: named_color (col));
+  color c= (col == ""? env->pen->get_color (): named_color (col));
   if (env->alpha != 255) {
     int r, g, b, a;
     get_rgb_color (c, r, g, b, a);
@@ -46,61 +46,13 @@ concater_rep::typeset_colored_substring
 }
 
 #define PRINT_SPACE(spc_type) \
-  switch (spc_type) { \
-  case SPC_NONE: \
-    break; \
-  case SPC_SPACE: \
-    print (spc); \
-    break; \
-  case SPC_DSPACE: \
-    print (space (spc->min << 1, spc->def << 1, spc->max << 1)); \
-    break; \
-  case SPC_PERIOD: \
-    print (spc+ extra); \
-    break; \
-  case SPC_TINY: \
-    print (space (spc->min>>2, spc->def>>2, spc->max>>2)); \
-    break; \
-  case SPC_HALF: \
-    print (space (spc->min>>1, spc->def>>2, spc->max>>1)); \
-    break; \
-  case SPC_OPERATOR: \
-    print (space (spc->min>>1, spc->def>>1, spc->max)); \
-    break; \
-  case SPC_BIGOP: \
-    break; \
-  }
-
-#define PRINT_CONDENSED_SPACE(spc_type) \
-  switch (spc_type) { \
-  case SPC_NONE: \
-    break; \
-  case SPC_SPACE: \
-    print (spc); \
-    break; \
-  case SPC_PERIOD: \
-    print (spc+ extra); \
-    break; \
-  case SPC_TINY: \
-    print (space (spc->min>>4, spc->def>>4, spc->max>>4)); \
-    break; \
-  case SPC_HALF: \
-    print (space (spc->min>>3, spc->def>>4, spc->max>>3)); \
-    break; \
-  case SPC_OPERATOR: \
-    print (space (spc->min>>3, spc->def>>3, spc->max>>2)); \
-    break; \
-  case SPC_BIGOP: \
-    print (space (spc->min>>2, spc->def>>2, spc->max>>2)); \
-    break; \
-  }
+  if (spc_type != SPC_NONE) print (spc_tab[spc_type]);
 
 void
 concater_rep::typeset_text_string (tree t, path ip, int pos, int end) {
+  array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
-  space  spc= env->fn->spc;
-  space  extra= env->fn->extra;
 
   do {
     start= pos;
@@ -124,13 +76,20 @@ concater_rep::typeset_text_string (tree t, path ip, int pos, int end) {
   } while (pos<end);
 }
 
+inline array<space>
+get_spacing (font fn, int id, bool condensed, bool display) {
+  if (condensed) return fn->get_narrow_spacing (id);
+  if (display) return fn->get_wide_spacing (id);
+  return fn->get_normal_spacing (id);
+}
+
 void
 concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
+  array<space> spc_tab=
+    get_spacing (env->fn, env->spacing_policy, env->math_condensed,
+                 env->display_style && env->nesting_level == 0);
   string s= t->label;
   int    start;
-  space  spc= env->fn->spc;
-  space  extra= env->fn->extra;
-  bool   condensed= env->math_condensed;
 
   do {
     start= pos;
@@ -158,14 +117,11 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
     }
     else { // strings
       penalty_max (tp->pen_before);
-      if (spc_ok) {
-        if (condensed) PRINT_CONDENSED_SPACE (tp->spc_before)
-        else PRINT_SPACE (tp->spc_before)
-      }
+      if (spc_ok) { PRINT_SPACE (tp->spc_before); }
       if (pos > start && s[start] == '*' && env->info_level >= INFO_SHORT) {
         color c = rgb_color (160, 160, 255);
         box   tb= text_box (decorate (ip), 0, "<cdot>", env->fn, c);
-        box   sb= specific_box (decorate (ip), tb, false, env->fn);
+        box   sb= specific_box (decorate (ip), tb, "screen", env->fn);
         box   mb= move_box (decorate (ip), sb, -tb->w()>>1, 0);
         box   rb= resize_box (decorate (ip), mb, 0, tb->y1, 0, tb->y2);
         a << line_item (STD_ITEM, OP_SKIP, rb, HYPH_INVALID);
@@ -173,20 +129,16 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
       typeset_math_substring (s (start, pos), ip, start, tp->op_type);
       penalty_min (tp->pen_after);
       if (tp->limits != LIMITS_NONE) with_limits (tp->limits);
-      if (spc_ok) {
-        if (condensed) PRINT_CONDENSED_SPACE (tp->spc_after)
-        else PRINT_SPACE (tp->spc_after)
-      }
+      if (spc_ok) { PRINT_SPACE (tp->spc_after); }
     }
   } while (pos<end);
 }
 
 void
 concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
+  array<space> spc_tab= env->fn->get_normal_spacing (env->spacing_policy);
   string s= t->label;
   int    start;
-  space  spc= env->fn->spc;
-  space  extra= env->fn->extra;
 
   do {
     start= pos;
@@ -251,16 +203,13 @@ concater_rep::typeset_rigid (tree t, path ip) {
 }
 
 void
-concater_rep::typeset_syntax (tree t, path ip) {
-  if (N(t) != 2) { typeset_error (t, ip); return; }
-  box b= typeset_as_concat (env, t[0], descend (ip, 0));
-  b= move_box (ip, b, 0, 0, true);
-  if (is_atomic (t[1]) && tm_string_length (t[1]->label) == 1) {
-    space  spc= env->fn->spc;
-    space  extra= env->fn->extra;
-    bool   condensed= env->math_condensed;
+concater_rep::print_semantic (box b, tree sem) {
+  if (is_atomic (sem) && tm_string_length (sem->label) == 1) {
+    array<space> spc_tab=
+      get_spacing (env->fn, env->spacing_policy, env->math_condensed,
+                   env->display_style && env->nesting_level == 0);
     int    pos= 0;
-    string s= t[1]->label;
+    string s= sem->label;
     text_property tp= env->lan->advance (s, pos);
     int k= N(a);
     while (k > 0 && a[k-1]->op_type == OP_SKIP) k--;
@@ -269,19 +218,22 @@ concater_rep::typeset_syntax (tree t, path ip) {
     if ((succ_status & 1) != 0 && k > 0) a[k-1]->spc= space (0);
     bool spc_ok= (succ_status <= 1);
     penalty_max (tp->pen_before);
-    if (spc_ok) {
-      if (condensed) PRINT_CONDENSED_SPACE (tp->spc_before)
-      else PRINT_SPACE (tp->spc_before)
-    }
+    if (spc_ok) { PRINT_SPACE (tp->spc_before); }
     print (STD_ITEM, tp->op_type, b);
     penalty_min (tp->pen_after);
     if (tp->limits != LIMITS_NONE) with_limits (tp->limits);
-    if (spc_ok) {
-      if (condensed) PRINT_CONDENSED_SPACE (tp->spc_after)
-      else PRINT_SPACE (tp->spc_after)
-    }
+    if (spc_ok) { PRINT_SPACE (tp->spc_after); }
   }
-  else print (b);
+  else print (b);  
+}
+
+void
+concater_rep::typeset_syntax (tree t, path ip) {
+  if (N(t) != 2) { typeset_error (t, ip); return; }
+  box b= typeset_as_concat (env, t[0], descend (ip, 0));
+  b= move_box (ip, b, 0, 0, true);
+  tree sem= env->exec (t[1]);
+  print_semantic (b, sem);
 }
 
 /******************************************************************************
@@ -373,6 +325,7 @@ concater_rep::typeset_float (tree t, path ip) {
   if (N(t) != 3) { typeset_error (t, ip); return; }
   tree t1= env->exec (t[0]);
   tree t2= env->exec (t[1]);
+  if (!env->page_floats) t2= "h";
   tree ch= tuple (t1, t2);
   lazy lz= make_lazy_vstream (env, t[2], descend (ip, 2), ch);
   marker (descend (ip, 0));
@@ -444,4 +397,34 @@ concater_rep::typeset_decorated_box (tree t, path ip) {
     print (env->decorated_boxes [n-1]);
     env->decorated_boxes [n-1]= box ();
   }
+}
+
+/******************************************************************************
+* Marginal notes and page notes
+******************************************************************************/
+
+void
+concater_rep::typeset_line_note (tree t, path ip) {
+  box  b= typeset_as_concat (env, t[0], decorate (ip));
+  box  c= control_box (decorate_middle (ip), b, env->fn);
+  SI   x= env->as_length (env->exec (t[1]));
+  SI   y= env->as_length (env->exec (t[2]));
+  tree p= tuple (as_string (x), as_string (y));
+  marker (descend (ip, 0));
+  a << line_item (NOTE_LINE_ITEM, OP_SKIP, c, HYPH_INVALID, p);
+  flag ("line note", ip, brown);
+  marker (descend (ip, 1));
+}
+
+void
+concater_rep::typeset_page_note (tree t, path ip) {
+  box  b= typeset_as_concat (env, t[0], decorate (ip));
+  box  c= control_box (decorate_middle (ip), b, env->fn);
+  SI   x= env->as_length (env->exec (t[1]));
+  SI   y= env->as_length (env->exec (t[2]));
+  tree p= tuple (as_string (x), as_string (y));
+  marker (descend (ip, 0));
+  a << line_item (NOTE_PAGE_ITEM, OP_SKIP, c, HYPH_INVALID, p);
+  flag ("page note", ip, brown);
+  marker (descend (ip, 1));
 }

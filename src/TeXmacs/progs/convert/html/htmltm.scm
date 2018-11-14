@@ -374,6 +374,15 @@
       (htmltm-pass env a c)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Special rules for improving Scilab documentation rendering
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (htmltm-scilab-pre env a c)
+  (if (== (shtml-attr-non-null a 'class) "scilabcode")
+      (list `(scilab-code ,(htmltm-args-serial env c)))
+      (list `(code ,(htmltm-args-serial env c)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main translation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -424,36 +433,36 @@
   ;; Grouping
   (div  (handler :mixed :block  htmltm-pass))
   ;; TODO: convert 'align' attributes in div, p and headings
-  (span (handler :mixed :inline htmltm-wikipedia-span))
+  (span (handler :collapse :inline htmltm-wikipedia-span))
 
   ;; Headings
-  (h1 (handler :mixed :block "chapter"))
-  (h2 (handler :mixed :block "section"))
-  (h3 (handler :mixed :block "subsection"))
-  (h4 (handler :mixed :block "subsubsection"))
-  (h5 (handler :mixed :block "paragraph"))
-  (h6 (handler :mixed :block "subparagraph"))
+  (h1 (handler :mixed :block "chapter*"))
+  (h2 (handler :mixed :block "section*"))
+  (h3 (handler :mixed :block "subsection*"))
+  (h4 (handler :mixed :block "subsubsection*"))
+  (h5 (handler :mixed :block "paragraph*"))
+  (h6 (handler :mixed :block "subparagraph*"))
 
   ;; Address and text direction
   (address (handler :mixed :block htmltm-pass))
-  (bdo (handler :mixed :inline htmltm-pass))
+  (bdo (handler :collapse :inline htmltm-pass))
 
   ;;; Structured text
   ;; Phrase elements
-  (em      (handler :mixed :inline "em"))
-  (strong  (handler :mixed :inline "strong"))
-  (cite    (handler :mixed :inline "cite*"))
-  (dfn     (handler :mixed :inline "dfn"))
-  (code    (handler :mixed :inline "code*"))
-  (samp    (handler :mixed :inline "samp"))
-  (kbd     (handler :mixed :inline "kbd"))
-  (var     (handler :mixed :inline "var"))
-  (abbr    (handler :mixed :inline "abbr"))
-  (acronym (handler :mixed :inline "acronym"))
+  (em      (handler :collapse :inline "em"))
+  (strong  (handler :collapse :inline "strong"))
+  (cite    (handler :collapse :inline "cite*"))
+  (dfn     (handler :collapse :inline "dfn"))
+  (code    (handler :collapse :inline "code*"))
+  (samp    (handler :collapse :inline "samp"))
+  (kbd     (handler :collapse :inline "kbd"))
+  (var     (handler :collapse :inline "var"))
+  (abbr    (handler :collapse :inline "abbr"))
+  (acronym (handler :collapse :inline "acronym"))
 
   ;; Quotations
   ;; NOTE: there should be a texmacs macro for Q
-  (q (handler :mixed :inline htmltm-quote))
+  (q (handler :collapse :inline htmltm-quote))
   (blockquote (handler :mixed :block "quotation"))
 
   ;; Subscripts and superscripts
@@ -463,10 +472,10 @@
   ;; Lines and paragraphs
   (p (handler :mixed :block htmltm-pass))
   (br (handler :empty :inline htmltm-br))
-  (pre (handler :pre :block "code"))
+  (pre (handler :pre :block htmltm-scilab-pre))
 
   ;; Document changes
-  ((:or ins del) (handler :mixed :inline htmltm-pass))
+  ((:or ins del) (handler :collapse :inline htmltm-pass))
 
   ;;; Lists
   (dl (handler :element :block "description"))
@@ -503,17 +512,17 @@
   (center (handler :mixed :block '(with "par-mode" "center")))
 
   ;; Font style
-  (tt  (handler :mixed :inline '(with "font-family" "tt")))
+  (tt  (handler :collapse :inline '(with "font-family" "tt")))
   ; NOTE: the tt macro is now deprecated
-  (i   (handler :mixed :inline '(with "font-shape" "italic")))
-  (b   (handler :mixed :inline '(with "font-series" "bold")))
-  (big (handler :mixed :inline '(with "font-size" "1.2")))
-  (small (handler :mixed :inline '(with "font-size" "0.83")))
-  ((:or s strike) (handler :mixed :inline htmltm-pass))
-  (u (handler :mixed :inline "underline"))
+  (i   (handler :collapse :inline '(with "font-shape" "italic")))
+  (b   (handler :collapse :inline '(with "font-series" "bold")))
+  (big (handler :collapse :inline '(with "font-size" "1.2")))
+  (small (handler :collapse :inline '(with "font-size" "0.83")))
+  ((:or s strike) (handler :collapse :inline htmltm-pass))
+  (u (handler :collapse :inline "underline"))
 
   ;; Font modifiers (deprecated)
-  (font (handler :mixed :inline htmltm-font))
+  (font (handler :collapse :inline htmltm-font))
   (basefont htmltm-drop)
 
   ;; Rules
@@ -542,6 +551,54 @@
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Routines for replacement in stree
+;; NOTA: made to be generic. To be moved and reused elsewhere.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (replace-symbol-in-stree st from to)
+  (cond ((== st from) to)
+        ((list? st) (map (lambda (x) (replace-symbol-in-stree x from to)) st))
+        (else st)))
+
+(define (replace-stree-in-stree st from to)
+  (cond ((== st from) to)
+        ((list? st) (map (lambda (x) (replace-stree-in-stree x from to)) st))
+        (else st)))
+
+(define (replace-string-in-stree st from to)
+  (cond ((string? st) (string-replace st from to))
+        ((list? st) (map (lambda (x) (replace-string-in-stree x from to)) st))
+        (else st)))
+
+(define (replace-str-by-st-in-stree st from to)
+  (cond ((and (string? st) (string-contains? st from))
+         (let* ((st (string-decompose st from))
+                (st (list-intersperse st to)))
+           `(concat ,@st)))
+        ((list? st) (map (lambda (x)
+                           (replace-str-by-st-in-stree x from to)) st))
+        (else st)))
+
+(define (replace-in-stree st from to)
+  (cond
+    ((and (symbol? from) (symbol? to)) (replace-symbol-in-stree st from to))
+    ((and (string? from) (string? to)) (replace-string-in-stree st from to))
+    ((and (string? from) (list? to)) (replace-str-by-st-in-stree st from to))
+    ((list? from) (replace-stree-in-stree st from to))
+    (else
+      st))) ; unexpected entry
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Post processing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (html-postproc st)
+  (let* ((st (replace-in-stree st "<varspace>" '(nbsp)))
+         (st (replace-in-stree st "\" " "'' "))
+         (st (replace-in-stree st " \"" " ``")))
+    st))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -556,7 +613,7 @@
   (:synopsis "Convert a parsed HTML stree @t into a TeXmacs stree.")
   (let* ((snippet? (not (func? html '!file 1)))
 	 (body (if snippet? html (cadr html)))
-	 (tm (htmltm-as-serial (sxhtml-correct-table body))))
+	 (tm (html-postproc (htmltm-as-serial (sxhtml-correct-table body)))))
     (if snippet? tm
 	(let* ((aux (stm-unary-document tm))
 	       (doc (tree->stree (tree-simplify (stree->tree aux))))

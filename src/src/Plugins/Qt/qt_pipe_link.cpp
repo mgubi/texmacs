@@ -11,17 +11,17 @@
 
 #include "basic.hpp"
 
-#if defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__) || defined (QTPIPES))
+#if defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES))
 
 #include "tm_link.hpp"
 #include "QTMPipeLink.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 
 #include <sys/types.h>
 #include <signal.h>
-#if defined(__MINGW__) || defined(__MINGW32__)
+#ifdef OS_MINGW
 #else
 #  include <sys/wait.h>
 #endif
@@ -68,9 +68,11 @@ qt_pipe_link_rep::~qt_pipe_link_rep () {
 string
 qt_pipe_link_rep::start () {
   if (alive) return "busy";
-  if (DEBUG_AUTO) cerr << "TeXmacs] Launching '" << PipeLink.cmd << "'\n";
+  if (DEBUG_AUTO)
+    debug_shell << "Launching '" << PipeLink.cmd << "'\n";
   if (! PipeLink.launchCmd ()) {
-    if (DEBUG_AUTO) cerr << "TeXmacs] Error: cannot start '" << PipeLink.cmd << "'\n";
+    if (DEBUG_AUTO)
+      debug_shell << "TeXmacs] Error: cannot start '" << PipeLink.cmd << "'\n";
     return "Error: cannot start application";
   }
   alive= true;
@@ -81,8 +83,8 @@ void
 qt_pipe_link_rep::write (string s, int channel) {
   if ((!alive) || (channel != LINK_IN)) return;
   if (-1 == PipeLink.writeStdin (s)) {
-    cerr << "TeXmacs] Error: cannot write to '" << PipeLink.cmd << "'\n";
-    PipeLink.killProcess ();
+    io_error << "Error: cannot write to '" << PipeLink.cmd << "'\n";
+    stop();
   }
 }
 
@@ -129,15 +131,18 @@ qt_pipe_link_rep::listen (int msecs) {
 
 bool
 qt_pipe_link_rep::is_readable (int channel) {
-  if ((!alive) || ((channel != LINK_OUT) && (channel != LINK_ERR))) return false;
-  if (channel == LINK_OUT) PipeLink.listenChannel (QProcess::StandardOutput, 0);
-  else PipeLink.listenChannel (QProcess::StandardError, 0);
+  if ((!alive) || ((channel != LINK_OUT) && (channel != LINK_ERR)))
+    return false;
+  if (channel == LINK_OUT)
+    return PipeLink.listenChannel (QProcess::StandardOutput, 0);
+  else
+    return PipeLink.listenChannel (QProcess::StandardError, 0);
 }
 
 void
 qt_pipe_link_rep::interrupt () {
   if (!alive) return;
-#if defined(__MINGW__) || defined(__MINGW32__)
+#ifdef OS_MINGW
   // Not implemented
 #else
   ::killpg(PipeLink.pid (), SIGINT);
@@ -146,7 +151,7 @@ qt_pipe_link_rep::interrupt () {
 
 void
 qt_pipe_link_rep::stop () {
-  PipeLink.killProcess ();
+  PipeLink.killProcess (0);
   alive= false;
 }
 
@@ -181,4 +186,4 @@ process_all_pipes () {
   }
 }
 
-#endif // defined (QTTEXMACS) && (defined (__MINGW__) || defined (__MINGW32__))
+#endif // defined (QTTEXMACS) && defined (OS_MINGW)

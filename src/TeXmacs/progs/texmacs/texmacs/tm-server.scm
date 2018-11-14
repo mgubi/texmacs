@@ -19,21 +19,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (get-default-interactive-questions)
-  (if (or (like-gnome?) (like-macos?) (like-windows?)) "popups" "footer"))
+  (if (or (like-gnome?) (like-macos?) (like-windows?)) "popup" "footer"))
 
 (define (get-default-show-table-cells)
   (if (qt-gui?) "on" "off"))
 
 (define (notify-look-and-feel var val)
-  (with b (or (== val "macos") (== val "gnome"))
-    (set-preference "gui:line-input:autocommit" b))
   (set-message "Restart in order to let the new look and feel take effect"
                "configure look and feel"))
 
 (define (notify-language var val)
   (set-output-language val)
   (if (and (current-view) (== (buffer-tree) (stree->tree '(document ""))))
-      (init-language val))
+      (set-document-language val))
   (cond ((or (== val "bulgarian") (== val "russian") (== val "ukrainian"))
          (notify-preference "cyrillic input method"))))
 
@@ -48,6 +46,9 @@
         ((== val "prompt on scripts") (set-script-status 1))
         ((== val "accept all scripts") (set-script-status 2))))
 
+(define (notify-latex-command var val)
+  (set-latex-command val))
+
 (define (notify-bibtex-command var val)
   (set-bibtex-command val))
 
@@ -56,13 +57,20 @@
   ;; but the fix below does not work
   (if (current-view) (notify-change 1)))
 
+(define (notify-new-fonts var val)
+  (set-new-fonts (== val "on")))
+
 (define (notify-fast-environments var val)
   (set-fast-environments (== val "on")))
+
+(define (notify-new-page-breaking var val)
+  (noop))
 
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
   ("look and feel" "default" notify-look-and-feel)
   ("detailed menus" "detailed" noop)
+  ("complex actions" "popups" noop)
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("fast environments" "on" notify-fast-environments)
@@ -72,6 +80,7 @@
   ("show only semantic focus" "on" (lambda args (noop)))
   ("semantic editing" "off" (lambda args (noop)))
   ("semantic selections" "on" (lambda args (noop)))
+  ("semantic correctness" "off" (lambda args (noop)))
   ("remove superfluous invisible" "off" (lambda args (noop)))
   ("insert missing invisible" "off" (lambda args (noop)))
   ("zealous invisible correct" "off" (lambda args (noop)))
@@ -81,15 +90,21 @@
   ("manual zealous invisible correct" "off" (lambda args (noop)))
   ("manual homoglyph correct" "on" (lambda args (noop)))
   ("security" "prompt on scripts" notify-security)
+  ("latex command" "pdflatex" notify-latex-command)
   ("bibtex command" "bibtex" notify-bibtex-command)
   ("scripting language" "none" notify-scripting-language)
+  ("database tool" "off" notify-tool)
   ("debugging tool" "off" notify-tool)
   ("developer tool" "off" notify-tool)
   ("linking tool" "off" notify-tool)
   ("presentation tool" "off" notify-tool)
+  ("remote tool" "off" notify-tool)
   ("source tool" "off" notify-tool)
   ("versioning tool" "off" notify-tool)
-  ("experimental alpha" "off" notify-tool))
+  ("experimental alpha" "on" notify-tool)
+  ("new style fonts" "on" notify-new-fonts)
+  ("bitmap effects" "on" notify-tool)
+  ("new style page breaking" "off" notify-new-page-breaking))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Properties of some built-in routines
@@ -132,12 +147,14 @@
         (lambda (answ)
           (when answ (buffer-close (current-buffer)))))))
 
-(tm-define (safely-kill-window)
-  (if (<= (windows-number) 1)
-      (safely-quit-TeXmacs)
-      (kill-window)))
+(tm-define (safely-kill-window . opt-name)
+  (with name (if (null? opt-name) (current-window) (car opt-name))
+    (if (<= (windows-number) 1)
+        (safely-quit-TeXmacs)
+        (kill-window name))))
 
 (tm-define (safely-quit-TeXmacs)
   (if (not (buffers-modified?)) (quit-TeXmacs)
       (user-confirm "There are unsaved files. Really quit?" #f  
         (lambda (answ) (when answ (quit-TeXmacs))))))
+

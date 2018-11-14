@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : bib-utils.scm
 ;; DESCRIPTION : helper functions for BibTeX styles
-;; COPYRIGHT   : (C) 2010  David MICHEL
+;; COPYRIGHT   : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -17,8 +17,12 @@
 ;; Private administrative functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define bib-current-prefix "bib")
 (tm-define bib-style "plain")
 (tm-define bib-default-style "plain")
+
+(tm-define (bib-label what)
+  `(label ,(string-append bib-current-prefix "-" what)))
 
 (tm-define (bib-preprocessing t)
   (noop))
@@ -43,13 +47,17 @@
       (cons (cadar t) (bib-without-sort-key (cdr t)))))
 
 (define (bib-compare x y)
-  (string<? (car x) (car y)))
+  (tmstring-before? (car x) (car y)))
 
-(define (bib-sorted-entries t)
-  (bib-without-sort-key (stable-sort (bib-with-sort-key t) bib-compare)))
+(tm-define (bib-sorted-entries l)
+  ;; redefine when (e.g.) sorting should be disabled
+  (with is-entry? (lambda (x) (func? x 'bib-entry))
+    (with l1 (list-filter l is-entry?)
+      (with l2 (stable-sort (bib-with-sort-key l1) bib-compare)
+        (bib-without-sort-key l2)))))
 
-
-(tm-define (bibstyle style t)
+(tm-define (bib-process prefix style t)
+  (set! bib-current-prefix prefix)
   (set! bib-style style)
   (bib-preprocessing (cdr t))
   (if (and (list? t) (func? t 'document))
@@ -64,6 +72,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (bib-standard-styles)
+  (list "tm-plain" "tm-abbrv" "tm-abstract" "tm-acm" "tm-alpha" "tm-elsart-num"
+        "tm-ieeetr" "tm-siam" "tm-unsrt"))
 
 (tm-define-macro (bib-define-style s d)
   (if (equal? s d)
@@ -92,6 +104,7 @@
 
 (tm-define (bib-null? x)
   (cond
+    ((tm-func? x 'with) (bib-null? (tm-ref x :last)))
     ((list? x) (equal? x `()))
     ((string? x) (equal? x ""))
     ((symbol? x) (equal? x '#{}#))
@@ -113,12 +126,14 @@
       (if (bib-null? (car x)) (elim-empty (cdr x))
 	  `(,(car x) ,@(elim-empty (cdr x))))))
 
-(define (new-list-rec s x)
-  (if (bib-null? x) ""
-      (if (bib-null? (car x))
-	  (new-list-rec s (cdr x))
-	  `(concat ,(car x) ,@(if (nnull? (cdr x))
-				  `(,s ,(new-list-rec s (cdr x))) `())))))
+(tm-define (new-list-rec s x)
+  ;; redefined in ieeetr.scm
+  (cond ((bib-null? x) "")
+        ((bib-null? (car x)) (new-list-rec s (cdr x)))
+        ((null? (cdr x)) `(concat ,(car x)))
+        ((and (tm-func? (car x) 'concat) (== (cAr (car x)) `(newblock)))
+         `(concat ,(cDr (car x)) ,s (newblock) ,(new-list-rec s (cdr x))))
+        (else `(concat ,(car x) ,s ,(new-list-rec s (cdr x))))))
 
 (tm-define (bib-new-list-spc x)
   (new-list-rec " " (elim-empty x)))
@@ -144,6 +159,10 @@
   (with e (bib-field x s)
     (if (bib-null? e) "" (bib-default-preserve-case e))))
 
+(tm-define (bib-format-field-locase-first x s)
+  (with e (bib-field x s)
+    (if (bib-null? e) "" (bib-locase-first e))))
+
 (tm-define (bib-format-field-Locase x s)
   (with e (bib-field x s)
     (if (bib-null? e) "" (bib-upcase-first (bib-locase e)))))
@@ -152,6 +171,8 @@
   `(with "font-shape" "italic" ,x))
 
 (tm-define (bib-translate s) `(localize ,s))
+
+(tm-define bib-range-symbol "")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sample function

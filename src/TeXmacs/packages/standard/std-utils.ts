@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.6>
 
 <style|<tuple|source|std>>
 
@@ -37,9 +37,51 @@
 
   <assign|wide-centered|<macro|body|<surround|<no-indent><htab|0fn|last>|<htab|0fn|first>|<arg|body>>>>
 
+  <\active*>
+    <\src-comment>
+      Helper macros for vertically padded environments
+    </src-comment>
+  </active*>
+
+  <assign|padding-above|0.5fn>
+
+  <assign|padding-below|0.5fn>
+
+  <assign|large-padding-above|1fn>
+
+  <assign|large-padding-below|1fn>
+
   <assign|padded-normal|<macro|before|after|body|<surround|<vspace*|<arg|before>><no-indent>|<htab|0fn|first><vspace|<arg|after>>|<arg|body>>>>
 
   <assign|padded-centered|<macro|before|after|body|<surround|<vspace*|<arg|before>><no-indent><htab|0fn|last>|<htab|0fn|first><vspace|<arg|after>>|<arg|body>>>>
+
+  <assign|padded-normal-titled|<\macro|before|after|body|title>
+    <\surround|<vspace*|<arg|before>><no-indent>|>
+      <arg|title>
+    </surround>
+
+    <\surround|<no-indent>|<htab|0fn|first><vspace|<arg|after>>>
+      <arg|body>
+    </surround>
+  </macro>>
+
+  <assign|padded|<\macro|body>
+    <\padded-normal|<value|padding-above>|<value|padding-below>>
+      <arg|body>
+    </padded-normal>
+  </macro>>
+
+  <assign|padded*|<\macro|body>
+    <\padded-normal|<value|large-padding-above>|<value|large-padding-below>>
+      <arg|body>
+    </padded-normal>
+  </macro>>
+
+  <assign|padded-titled|<\macro|body|title>
+    <\padded-normal-titled|<value|padding-above>|<value|padding-below>>
+      <arg|body>
+    </padded-normal-titled|<arg|title>>
+  </macro>>
 
   <\active*>
     <\src-comment>
@@ -48,19 +90,73 @@
     </src-comment>
   </active*>
 
+  <assign|overlined-width|1ln>
+
+  <assign|overlined-sep|1sep>
+
+  <assign|underlined-width|1ln>
+
+  <assign|underlined-sep|1sep>
+
   <assign|wide-bothlined|<macro|top-border|bot-border|top-sep|bot-sep|body|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|1|1|1|cell-width|1par>|<cwith|1|1|1|1|cell-lsep|0pt>|<cwith|1|1|1|1|cell-rsep|0pt>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-tborder|<arg|top-border>>|<cwith|1|1|1|1|cell-bborder|<arg|bot-border>>|<cwith|1|1|1|1|cell-tsep|<arg|top-sep>>|<cwith|1|1|1|1|cell-bsep|<arg|bot-sep>>|<table|<row|<cell|<arg|body>>>>>>>>>
 
-  <assign|wide-std-bothlined|<macro|body|<wide-bothlined|1ln|1ln|1sep|1sep|<arg|body>>>>
+  <assign|wide-bothlined-titled|<macro|top-border|bot-border|top-sep|bot-sep|body|title|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|2|1|1|cell-width|1par>|<cwith|1|2|1|1|cell-lsep|0pt>|<cwith|1|2|1|1|cell-rsep|0pt>|<cwith|2|2|1|1|cell-hyphen|t>|<cwith|1|2|1|1|cell-tborder|<arg|top-border>>|<cwith|2|2|1|1|cell-bborder|<arg|bot-border>>|<cwith|1|2|1|1|cell-tsep|<arg|top-sep>>|<cwith|1|1|1|1|cell-bsep|<arg|top-sep>>|<cwith|2|2|1|1|cell-bsep|<arg|bot-sep>>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<\cell>
+    <arg|title>
+  </cell>>|<row|<\cell>
+    <arg|body>
+  </cell>>>>>>>>
+
+  <assign|wide-bothlined-titled*|<macro|top-border|bot-border|top-sep|bot-sep|body|title|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|2|1|1|cell-width|1par>|<cwith|1|2|1|1|cell-lsep|0pt>|<cwith|1|2|1|1|cell-rsep|0pt>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-tborder|<arg|top-border>>|<cwith|1|2|1|1|cell-bborder|<arg|bot-border>>|<cwith|1|1|1|1|cell-tsep|<arg|top-sep>>|<cwith|2|2|1|1|cell-tsep|<arg|bot-sep>>|<cwith|1|2|1|1|cell-bsep|<arg|bot-sep>>|<cwith|2|2|1|1|cell-hyphen|t>|<table|<row|<\cell>
+    <arg|body>
+  </cell>>|<row|<\cell>
+    <arg|title>
+  </cell>>>>>>>>
+
+  <assign|wide-std-bothlined|<macro|body|<wide-bothlined|<value|overlined-width>|<value|underlined-width>|<value|overlined-sep>|<value|underlined-sep>|<arg|body>>>>
+
+  <assign|wide-std-bothlined-titled|<macro|body|title|<wide-bothlined-titled|<value|overlined-width>|<value|underlined-width>|<value|overlined-sep>|<value|underlined-sep>|<arg|body>|<arg|title>>>>
 
   <assign|padded-bothlined|<macro|before|after|top-border|bot-border|top-sep|bot-sep|body|<surround|<vspace*|<arg|before>>|<vspace|<arg|after>>|<wide-bothlined|<arg|top-border>|<arg|bot-border>|<arg|top-sep>|<arg|bot-sep>|<arg|body>>>>>
 
   <assign|padded-std-bothlined|<\macro|before|after|body>
-    <padded-bothlined|<arg|before>|<arg|after>|1ln|1ln|1sep|1sep|<arg|body>>
+    <padded-bothlined|<arg|before>|<arg|after>|<value|overlined-width>|<value|underlined-width>|<value|overlined-sep>|<value|underlined-sep>|<arg|body>>
   </macro>>
+
+  <assign|wide-overlined|<macro|tborder|tsep|body|<wide-bothlined|<arg|tborder>|0pt|<arg|tsep>|0pt|<arg|body>>>>
+
+  <assign|wide-std-overlined|<macro|body|<wide-overlined|<value|overlined-width>|<value|overlined-sep>|<arg|body>>>>
+
+  <assign|wide-std-overlined-titled|<macro|body|title|<wide-bothlined-titled|<value|overlined-width>|0pt|<value|overlined-sep>|0pt|<arg|body>|<arg|title>>>>
 
   <assign|wide-underlined|<macro|bborder|bsep|body|<wide-bothlined|0pt|<arg|bborder>|0pt|<arg|bsep>|<arg|body>>>>
 
-  <assign|wide-std-underlined|<macro|body|<wide-underlined|1ln|1sep|<arg|body>>>>
+  <assign|wide-std-underlined|<macro|body|<wide-underlined|<value|underlined-width>|<value|underlined-sep>|<arg|body>>>>
+
+  <assign|wide-std-underlined-titled|<macro|body|title|<wide-bothlined-titled*|0pt|<value|underlined-width>|0pt|<value|underlined-sep>|<arg|body>|<arg|title>>>>
+
+  <assign|overlined|<\macro|body>
+    <padded|<wide-std-overlined|<arg|body>>>
+  </macro>>
+
+  <assign|underlined|<\macro|body>
+    <padded|<wide-std-underlined|<arg|body>>>
+  </macro>>
+
+  <assign|bothlined|<\macro|body>
+    <padded|<wide-std-bothlined|<arg|body>>>
+  </macro>>
+
+  <assign|overlined-titled|<\macro|body|title>
+    <padded|<wide-std-overlined-titled|<arg|body>|<arg|title>>>
+  </macro>>
+
+  <assign|underlined-titled|<\macro|body|title>
+    <padded|<wide-std-underlined-titled|<arg|body>|<arg|title>>>
+  </macro>>
+
+  <assign|bothlined-titled|<\macro|body|title>
+    <padded|<wide-std-bothlined-titled|<arg|body>|<arg|title>>>
+  </macro>>
 
   <\active*>
     <\src-comment>
@@ -69,15 +165,75 @@
     </src-comment>
   </active*>
 
-  <assign|wide-framed-color|>
+  <assign|framed-color|>
 
-  <assign|wide-framed|<macro|border-width|hsep|vsep|body|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|1|1|1|cell-width|1par>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-lborder|<arg|border-width>>|<cwith|1|1|1|1|cell-rborder|<arg|border-width>>|<cwith|1|1|1|1|cell-tborder|<arg|border-width>>|<cwith|1|1|1|1|cell-bborder|<arg|border-width>>|<cwith|1|1|1|1|cell-lsep|<arg|hsep>>|<cwith|1|1|1|1|cell-rsep|<arg|hsep>>|<cwith|1|1|1|1|cell-tsep|<arg|vsep>>|<cwith|1|1|1|1|cell-bsep|<arg|vsep>>|<cwith|1|1|1|1|cell-background|<value|wide-framed-color>>|<table|<row|<cell|<arg|body>>>>>>>>>
+  <assign|framed-width|1ln>
 
-  <assign|wide-std-framed|<macro|body|<wide-framed|1ln|1spc|1sep|<arg|body>>>>
+  <assign|framed-hsep|1spc>
 
-  <assign|wide-framed-colored|<macro|border-color|body-color|border-width|hsep|vsep|body|<with|old-color|<value|color>|color|<arg|border-color>|wide-framed-color|<arg|body-color>|<wide-framed|<arg|border-width>|<arg|hsep>|<arg|vsep>|<with|color|<value|old-color>|<style-with|src-compact|none|<arg|body>>>>>>>
+  <assign|framed-vsep|1sep>
 
-  <assign|wide-std-framed-colored|<macro|border-color|body-color|body|<wide-framed-colored|<arg|border-color>|<arg|body-color>|1ln|1spc|1sep|<style-with|src-compact|none|<arg|body>>>>>
+  <assign|wide-framed|<macro|border-width|hsep|vsep|body|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|1|1|1|cell-width|1par>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-lborder|<arg|border-width>>|<cwith|1|1|1|1|cell-rborder|<arg|border-width>>|<cwith|1|1|1|1|cell-tborder|<arg|border-width>>|<cwith|1|1|1|1|cell-bborder|<arg|border-width>>|<cwith|1|1|1|1|cell-lsep|<arg|hsep>>|<cwith|1|1|1|1|cell-rsep|<arg|hsep>>|<cwith|1|1|1|1|cell-tsep|<arg|vsep>>|<cwith|1|1|1|1|cell-bsep|<arg|vsep>>|<cwith|1|1|1|1|cell-background|<value|framed-color>>|<table|<row|<cell|<arg|body>>>>>>>>>
+
+  <assign|wide-framed-titled|<macro|border-width|hsep|vsep|body|title|<surround|<no-indent>||<tabular|<tformat|<twith|table-width|1par>|<cwith|1|2|1|1|cell-width|1par>|<cwith|2|2|1|1|cell-hyphen|t>|<cwith|1|2|1|1|cell-lborder|<arg|border-width>>|<cwith|1|2|1|1|cell-rborder|<arg|border-width>>|<cwith|1|2|1|1|cell-tborder|<arg|border-width>>|<cwith|1|2|1|1|cell-bborder|<arg|border-width>>|<cwith|1|2|1|1|cell-lsep|<arg|hsep>>|<cwith|1|2|1|1|cell-rsep|<arg|hsep>>|<cwith|1|2|1|1|cell-tsep|<arg|vsep>>|<cwith|1|2|1|1|cell-bsep|<arg|vsep>>|<cwith|1|2|1|1|cell-background|<value|framed-color>>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<\cell>
+    <arg|title>
+  </cell>>|<row|<\cell>
+    <arg|body>
+  </cell>>>>>>>>
+
+  <assign|wide-std-framed|<macro|body|<wide-framed|<value|framed-width>|<value|framed-hsep>|<value|framed-vsep>|<arg|body>>>>
+
+  <assign|wide-std-framed-titled|<macro|body|title|<wide-framed-titled|<value|framed-width>|<value|framed-hsep>|<value|framed-vsep>|<arg|body>|<arg|title>>>>
+
+  <assign|wide-framed-colored|<macro|border-color|body-color|border-width|hsep|vsep|body|<with|old-color|<value|color>|color|<arg|border-color>|framed-color|<arg|body-color>|<wide-framed|<arg|border-width>|<arg|hsep>|<arg|vsep>|<with|color|<value|old-color>|<style-with|src-compact|none|<arg|body>>>>>>>
+
+  <assign|wide-std-framed-colored|<macro|border-color|body-color|body|<wide-framed-colored|<arg|border-color>|<arg|body-color>|<value|framed-width>|<value|framed-hsep>|<value|framed-vsep>|<style-with|src-compact|none|<arg|body>>>>>
+
+  <assign|framed|<\macro|body>
+    <padded|<wide-std-framed|<arg|body>>>
+  </macro>>
+
+  <assign|framed-titled|<\macro|body|title>
+    <padded|<compound|wide-std-framed-titled|<arg|body>|<arg|title>>>
+  </macro>>
+
+  <\active*>
+    <\src-comment>
+      Ornamented environments.
+    </src-comment>
+  </active*>
+
+  <assign|ornamented|<\macro|body>
+    <padded|<\ornament>
+      <\surround||<right-flush>>
+        <arg|body>
+      </surround>
+    </ornament>>
+  </macro>>
+
+  <assign|ornamented-titled|<\macro|body|title>
+    <padded|<\ornament>
+      <\surround||<right-flush>>
+        <arg|body>
+      </surround>
+    <|ornament>
+      <arg|title>
+    </ornament>>
+  </macro>>
+
+  <drd-props|ornamented-titled|arity|2|accessible|all>
+
+  <assign|ornament-indent|<\macro|left|right|bottom|top|body>
+    <\with|old-shape|<value|ornament-shape>|old-color|<value|ornament-color>|old-hpadding|<value|ornament-hpadding>|old-vpadding|<value|ornament-vpadding>|old-border|<value|ornament-border>|ornament-shape|classic|ornament-color|#fff0|ornament-hpadding|<tuple|<arg|left>|<arg|right>>|ornament-vpadding|<tuple|<arg|bottom>|<arg|top>>|ornament-border|0ln>
+      <\ornament>
+        <\surround||<right-flush>>
+          <\with|ornament-shape|<value|old-shape>|ornament-color|<value|old-color>|ornament-hpadding|<value|old-hpadding>|ornament-vpadding|<value|old-vpadding>|ornament-border|<value|old-border>>
+            <arg|body>
+          </with>
+        </surround>
+      </ornament>
+    </with>
+  </macro>>
 
   <\active*>
     <\src-comment>
@@ -107,9 +263,23 @@
 
   <\active*>
     <\src-comment>
+      Mini paragraphs.
+    </src-comment>
+  </active*>
+
+  <assign|mini-paragraph|<\macro|width|body>
+    <tabular|<tformat|<cwith|1|1|1|1|cell-lsep|0spc>|<cwith|1|1|1|1|cell-rsep|0spc>|<cwith|1|1|1|1|cell-bsep|0spc>|<cwith|1|1|1|1|cell-tsep|0spc>|<cwith|1|1|1|1|cell-vcorrect|n>|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-width|<arg|width>>|<cwith|1|1|1|1|cell-hmode|exact>|<table|<row|<\cell>
+      <arg|body>
+    </cell>>>>>
+  </macro>>
+
+  <\active*>
+    <\src-comment>
       Header information.
     </src-comment>
   </active*>
+
+  <assign|page-number|<macro|<quote|<page-the-page>>>>
 
   <assign|set-this-page-header|<macro|header|<style-with|src-compact|none|<flag|<localize|this
   page header>|brown|header><assign|page-this-header|<arg|header>>>>>
@@ -141,7 +311,7 @@
 
   <assign|blanc-page|<macro|<style-with|src-compact|none|<assign|page-this-header|><assign|page-this-footer|>>>>
 
-  <assign|simple-page|<macro|<style-with|src-compact|none|<assign|page-this-header|><assign|page-this-footer|<htab|5mm><quote|<page-the-page>><htab|5mm>>>>>
+  <assign|simple-page|<macro|<style-with|src-compact|none|<assign|page-this-header|><assign|page-this-footer|<no-indent><htab|5mm><page-number><htab|5mm>>>>>
 
   <\active*>
     <\src-comment>
@@ -150,6 +320,8 @@
   </active*>
 
   <assign|localize|<macro|text|<translate|<arg|text>|english|<value|language>>>>
+
+  <assign|language-suffix|<macro|<extern|ext-language-suffix>>>
 
   <assign|map|<macro|fun|args|<extern|ext-map|<arg|fun>|<arg|args>>>>
 
@@ -167,9 +339,6 @@
 
   <assign|hidden-title|<macro|title|>>
 
-  <assign|wiki-link|<macro|body|name|<style-with|src-compact|none|<action|<arg|body>|<merge|(remote-project-load-by-name
-  "|<arg|name>|")>>>>>
-
   <assign|inline-block|<macro|body|<tabular|<tformat|<cwith|1|1|1|1|cell-lsep|0fn>|<twith|table-width|1par>|<cwith|1|1|1|1|cell-rsep|0fn>|<cwith|1|1|1|1|cell-hyphen|t>|<table|<row|<\cell>
     <arg|body>
   </cell>>>>>>>
@@ -178,6 +347,5 @@
 <\initial>
   <\collection>
     <associate|preamble|true>
-    <associate|zoom-factor|1.35021>
   </collection>
 </initial>

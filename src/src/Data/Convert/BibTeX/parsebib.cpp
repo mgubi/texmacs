@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : parsebib.cpp
 * DESCRIPTION: conversion of bibtex strings into logical bibtex trees
-* COPYRIGHT  : (C) 2010  David MICHEL
+* COPYRIGHT  : (C) 2010, 2015  David MICHEL, Joris van der Hoeven
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -33,21 +33,22 @@ bib_ok (string s, int pos) {
 void
 bib_error () {
   if (bib_current_tag == "")
-    cerr << "TeXmacs] BibTeX parse error encountered\n";
+    convert_error << "BibTeX parse error encountered\n";
   else
-    cerr << "TeXmacs] BibTeX parse error in " << bib_current_tag << "\n";
+    convert_error << "BibTeX parse error in " << bib_current_tag << "\n";
 }
 
-void
+int
 bib_char (string s, int& pos, char c) {
-  if (!bib_ok (s, pos)) return;
+  if (!bib_ok (s, pos)) return -1;
   if (s[pos] == c) pos++;
   else {
     bib_error ();
-    if (c) cerr << "       ] Invalid char: \'" << s[pos]
-		<< "\', expected \'" << c << "\'\n";
-    pos= -1;
+    if (c) convert_error << "Invalid char: \'" << s[pos]
+                         << "\', expected \'" << c << "\'\n";
+    return -1;
   }
+  return 0;
 }
 
 bool
@@ -57,10 +58,9 @@ bib_open (string s, int& pos, char& cend) {
   case '(': cend= ')'; return false;
   default:
     bib_error ();
-    cerr << "       ] Expected '{' or '(' instead of '" << s[pos] << "'\n";
+    convert_error << "Expected '{' or '(' instead of '" << s[pos] << "'\n";
     while (pos < N(s) && s[pos] != '{' && s[pos] != '(') pos++;
     if (pos < N(s)) return bib_open (s, pos, cend);
-    pos= -1;
     return true;
   }
 }
@@ -83,7 +83,8 @@ void
 bib_within (string s, int& pos, char cbegin, char cend, string& content) {
   if (!bib_ok (s, pos)) return;
   int depth= 0;
-  bib_char (s, pos, cbegin);
+  if (bib_char (s, pos, cbegin))
+    return;
   while (bib_ok (s, pos) && (s[pos] != cend || depth > 0)) {
     if (cbegin != cend) {
       if (s[pos] == cbegin) depth++;
@@ -173,6 +174,28 @@ bib_arg (string s, int& pos, string ce, tree& arg) {
   }
 }
 
+tree
+normalize_newlines (tree t) {
+  if (is_atomic (t)) {
+    string s= t->label, r;
+    for (int i=0; i<N(s); )
+      if (s[i] == '\n') {
+        r << " ";
+        i++;
+        while (i<N(s) && s[i] == ' ') i++;
+      }
+      else r << s[i++];
+    return r;
+  }
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= normalize_newlines (t[i]);
+    return r;
+  }
+}
+
 void
 bib_fields (string s, int& pos, string ce, string tag, tree& fields) {
   if (!bib_ok (s, pos)) return;
@@ -192,11 +215,13 @@ bib_fields (string s, int& pos, string ce, string tag, tree& fields) {
       return;
     }
     bib_blank (s, pos);
-    bib_char (s, pos, '=');
+    if (bib_char (s, pos, '='))
+      return;
     bib_blank (s, pos);
     bib_arg (s, pos, ce, arg);
     if (tag == "bib-field") param= locase_all (param);
     arg= simplify_correct (arg);
+    arg= normalize_newlines (arg);
     fields << compound (tag, param, arg);
     bib_blank (s, pos);
     string cend= ce;
@@ -353,9 +378,16 @@ bib_list (string s, int& pos, tree& t) {
             /* dirty hack to get comments between entries */
             int start= pos;
             while (pos+1 < N(s) && s[pos+1] != '@') pos++;
-            if (bibtex_non_empty_comment (s(start, pos+1)))
-              tentry << compound ("bib-comment",
-                  tree (DOCUMENT, western_to_cork (s(start, pos+1))));
+            if (bibtex_non_empty_comment (s(start, pos+1))) {
+              string ss= western_to_cork (s(start, pos+1));
+              array<string> lines= tokenize (ss, "\n");
+              tree doc (DOCUMENT);
+              for (int l=0; l<N(lines); l++)
+                if (trim_spaces (lines[l]) != "")
+                  doc << tree (lines[l]);
+              if (N(doc) != 0)
+                tentry << compound ("bib-comment", doc);
+            }
             /* end */
             if (comment) {
               if (N(te) == 1) tentry << compound ("bib-comment", te[0]);
@@ -368,9 +400,9 @@ bib_list (string s, int& pos, tree& t) {
       }
     }
   }
-//  cerr << "ENTRIES: " << tentry << "\n";
-//  cerr << "PREAMBLE: " << tpreamble << "\n";
-//  cerr << "STRING: " << tstring << "\n";
+//  convert_error << "ENTRIES: " << tentry << "\n";
+//  convert_error << "PREAMBLE: " << tpreamble << "\n";
+//  convert_error << "STRING: " << tstring << "\n";
 //  if (N(tpreamble) != 0) t << compound ("bib-preamble", tpreamble);
 //  if (N(tstring) != 0) t << compound ("bib-string", tstring);
 //  t << A(tentry);
@@ -388,9 +420,8 @@ parse_bib (string s) {
   bib_list (s, pos, r);
   if (N(s) == 0 || N(r) == 0) return tree ();
   if (pos < 0) {
-    cerr << "TeXmacs] Error: failed to load BibTeX file.\n";
+    convert_error << "Failed to load BibTeX file.\n";
     return tree ();
   }
   return r;
 }
-

@@ -10,12 +10,12 @@
 ******************************************************************************/
 
 #include "env.hpp"
-#include "Graphics/grid.hpp"
-#include "Graphics/point.hpp"
-#include "Graphics/frame.hpp"
+#include "grid.hpp"
+#include "point.hpp"
+#include "frame.hpp"
 #include "Boxes/graphics.hpp"
 #include "Boxes/composite.hpp"
-#include "Graphics/math_util.hpp"
+#include "math_util.hpp"
 
 /******************************************************************************
 * Grid boxes
@@ -75,9 +75,10 @@ grid_box_rep::display (renderer ren) {
 
     for (i=0; i<N(grads); i++) {
       curve c= f (grads[i]->c);
-      bs << curve_box (
-	      decorate (ip), c, ren->pixel, named_color (grads[i]->col),
-	      array<bool> (0), 0, FILL_MODE_NONE, white, array<box> (0));
+      bs << curve_box (decorate (ip), c, 1.0,
+		       pencil (named_color (grads[i]->col), ren->pixel),
+		       array<bool> (0), array<point> (0), 0,
+                       brush (false), array<box> (0));
     }
     first_time= false;
     ren_pixel= ren->pixel;

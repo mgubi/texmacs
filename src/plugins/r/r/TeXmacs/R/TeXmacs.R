@@ -25,7 +25,7 @@
 	assign( "t.help.quest.old", get("?"),envir=as.environment("package:TeXmacs"))
 	assign("?",t.display.html.help, ,envir=as.environment("package:TeXmacs"))
 
-	assign("TeXmacsR.version","0.15",envir=as.environment("package:TeXmacs") )
+	assign("TeXmacsR.version","0.16",envir=as.environment("package:TeXmacs") )
 	motd=paste("TeXmacs to R interface version ",TeXmacsR.version,"\n\
 	Run start.view() to use graphics without x11()\
 	Use t.help.start() to view R documentation pages separately. Otherwise they are displayed in the buffer.\
@@ -35,9 +35,11 @@
 
     packageStartupMessage("TeXmacs to R interface version ",TeXmacsR.version,"\n") 
 
-	if( as.numeric( version$minor ) >= 11 ) {
+	if( as.numeric( version$minor )*0.0001 + as.numeric(
+version$major ) >= 2.0011 ) {
 	  assign( "t.gethelpfile", utils:::.getHelpFile, envir=as.environment("package:TeXmacs"))
-	} else if( as.numeric( version$minor ) >= 10 ) {
+	} else if( as.numeric( version$minor )*0.0001 + as.numeric(
+version$major ) >= 2.0010 ) {
 	  assign( "t.gethelpfile" , 
 	    function (file) {
 	      path <- dirname(file)
@@ -584,7 +586,8 @@ t.browseURL = structure( function(# Ask TeXmacs to open a url
   
 
 t.help = function( ... ) {
-  if( as.numeric( version$minor ) >= 11 ) {
+  if( as.numeric( version$minor )*0.0001 + as.numeric(
+version$major ) >= 2.0011 ) {
     h = help(...,help_type="html")  
   } else {
     h = help(...,htmlhelp=T)

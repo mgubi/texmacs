@@ -34,6 +34,7 @@ class string {
   inline string (): rep (tm_new<string_rep> ()) {}
   inline string (int n): rep (tm_new<string_rep> (n)) {}
   string (char c);
+  string (char c, int n);
   string (const char *s);
   string (const char *s, int n);
   inline char& operator [] (int i) { return rep->a[i]; }
@@ -53,37 +54,35 @@ string&  operator << (string& a, string b);
 string   operator * (const char* a, string b);
 string   operator * (string a, string b);
 string   operator * (string a, const char* b);
+bool     operator < (string a, string b);
 bool     operator <= (string a, string b);
 int      hash (string s);
 
-bool   as_bool   (string s);
-int    as_int    (string s);
-double as_double (string s);
-char*  as_charp  (string s);
-string as_string_bool (bool f);
-string as_string (int i);
-string as_string (unsigned int i);
-string as_string (long int i);
-string as_string (long long int i);
-string as_string (unsigned long int i);
-string as_string (double x);
-string as_string (const char* s);
-bool   is_bool   (string s);
-bool   is_int    (string s);
-bool   is_double (string s);
-bool   is_charp  (string s);
+string   to_lower  (string s);
+string   to_upper  (string s);
+bool     as_bool   (string s);
+int      as_int    (string s);
+long int as_long_int (string s);
+double   as_double (string s);
+char*    as_charp  (string s);
+string   as_string_bool (bool f);
+string   as_string (int i);
+string   as_string (unsigned int i);
+string   as_string (long int i);
+string   as_string (long long int i);
+string   as_string (unsigned long int i);
+string   as_string (double x);
+string   as_string (const char* s);
+bool     is_bool   (string s);
+bool     is_int    (string s);
+bool     is_double (string s);
+bool     is_charp  (string s);
 
-bool   is_quoted (string s);
-bool   is_id     (string s);
+bool  is_quoted (string s);
+bool  is_id     (string s);
 
-void  set_info_handler (void (*) (string, string, int));
 void  set_wait_handler (void (*) (string, string, int));
-void  set_warning_handler (void (*) (string, string, int));
-void  set_error_handler (void (*) (string, string, int));
-void  system_info (string message, string argument= "", int level= 0);
 void  system_wait (string message, string argument= "", int level= 0);
-void  system_warning (string message, string argument= "", int level= 0);
-void  system_error (string message, string argument= "", int level= 0);
 
 /******************************************************************************
 * C-style strings with automatic memory management
@@ -94,9 +93,9 @@ class c_string_rep: concrete_struct {
   char* value;
   
 private:
-  inline c_string_rep (c_string_rep &): concrete_struct () {};
+  inline c_string_rep (c_string_rep &): concrete_struct () {}
     // disable copy constructor
-  inline c_string_rep& operator=(c_string_rep&) {};
+  inline c_string_rep& operator=(c_string_rep&) { return *this; }
     // disable assignment
   
 public:

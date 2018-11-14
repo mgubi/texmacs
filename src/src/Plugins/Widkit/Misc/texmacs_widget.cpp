@@ -123,6 +123,15 @@ make_header (int mask) {
 }
 
 static wk_widget
+make_bottom (int mask) {
+  array<wk_widget> H (1);
+  array<string> H_name (1);
+  H[0]= glue_wk_widget (true, false, 0, 2*PIXEL);
+  H_name[0]= "tools";
+  return optional_widget (vertical_list (H, H_name), (mask & 128) == 128);
+}
+
+static wk_widget
 make_footer (int mask) {
   array<wk_widget> F (3);
   array<string> F_name (3);
@@ -165,27 +174,30 @@ make_footer (int mask) {
 
 static wk_widget
 middle_widget () {
-  wk_widget w1= canvas_widget (glue_wk_widget (), north_west, true);
+  wk_widget w1= canvas_widget (glue_wk_widget (), center, true);
   wk_widget w2= glue_wk_widget (true, true, 200*PIXEL, 0);
-  wk_widget w3= resize_widget (w2, 0, "200px", "", "200px", "", "200px", "");
+  wk_widget w3= resize_widget (w2, 0, "200px", "", "200px", "", "200px", "",
+                               "left", "top");
   if (!use_side_tools) return w1;
   else return hsplit_widget (w1, w3);
 }
 
 static wk_widget
 make_texmacs_widget (int mask) {
-  array<wk_widget> V (5);
-  array<string> V_name (5);
+  array<wk_widget> V (6);
+  array<string> V_name (6);
   V[0]= make_header (mask);
   //V[1]= canvas_widget (glue_wk_widget (), north_west, true);
   V[1]= middle_widget ();
-  V[2]= glue_wk_widget (false, false, 0, PIXEL);
-  V[3]= make_footer (mask);
-  V[4]= glue_wk_widget (false, false, 0, PIXEL);
+  V[2]= make_bottom (mask);
+  V[3]= glue_wk_widget (false, false, 0, PIXEL);
+  V[4]= make_footer (mask);
+  V[5]= glue_wk_widget (false, false, 0, PIXEL);
   V_name[0]= "header";
   //V_name[1]= "canvas";
   V_name[1]= "middle";
-  V_name[3]= "footer";
+  V_name[2]= "bottom";
+  V_name[4]= "footer";
   return vertical_list (V, V_name);
 }
 
@@ -333,12 +345,22 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
     set_subwidget (THIS ["header"] ["user"] ["bar"], "icons", ev->w);
   else if (use_side_tools && ev->which == "side tools") {
     wk_widget side=
-      resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "");
+      resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
+                     "left", "top");
     THIS ["middle"] << set_widget ("right", side);
     if (attached ()) {
       side << emit_attach_window (win);
       THIS ["middle"] << emit_reposition ();
       THIS ["middle"] ["right"] << emit_invalidate_all ();
+    }
+  }
+  else if (ev->which == "bottom tools") {
+    wk_widget bottom= ev->w;
+    THIS ["bottom"] << set_widget ("tools", bottom);
+    if (attached ()) {
+      bottom << emit_attach_window (win);
+      THIS << emit_reposition ();
+      THIS ["bottom"] << emit_invalidate_all ();
     }
   }
   else if (ev->which == "interactive prompt")
@@ -391,6 +413,10 @@ texmacs_widget_rep::handle_set_string (set_string_event ev) {
     set_subwidget_flag (THIS ["header"] ["user"], ev->s == "on");
   else if (ev->which == "side tools")
     /*set_side_tools_flag (ev->s == "on")*/;
+  else if (ev->which == "bottom tools") {
+    if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
+    set_subwidget_flag (THIS ["bottom"], ev->s == "on");
+  }
   else if (ev->which == "interactive mode")
     set_footer_mode (ev->s == "on"? 1: (footer_flag? 0: 2));
   else if (ev->which == "footer flag") set_footer_flag (ev->s == "on");
@@ -419,6 +445,9 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
   else if (ev->which == "side tools")
     //ev->s= get_side_tools_flag ()? string ("on"): string ("off");
     ev->s= string (use_side_tools? "on": "off");
+  else if (ev->which == "bottom tools")
+    ev->s= get_subwidget_flag (THIS ["bottom"])?
+             string ("on"): string ("off");
   else if (ev->which == "interactive mode")
     ev->s= get_footer_mode () == 1? string ("on"): string ("off");
   else if (ev->which == "footer flag")

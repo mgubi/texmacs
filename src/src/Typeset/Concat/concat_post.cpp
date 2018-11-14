@@ -12,6 +12,7 @@
 ******************************************************************************/
 
 #include "concater.hpp"
+#include "analyze.hpp"
 SI italic_correction (box, box);
 
 /******************************************************************************
@@ -20,13 +21,15 @@ SI italic_correction (box, box);
 
 int
 concater_rep::prec (int i) {
-  do i--; while ((i>=0) && (a[i]->type==OBSOLETE_ITEM));
+  do i--; while ((i>=0) && (a[i]->type==OBSOLETE_ITEM ||
+                            a[i]->type==MARKER_ITEM));
   return i;
 }
 
 int
 concater_rep::succ (int i) {
-  do i++; while ((i<N(a)) && (a[i]->type==OBSOLETE_ITEM));
+  do i++; while ((i<N(a)) && (a[i]->type==OBSOLETE_ITEM ||
+                              a[i]->type==MARKER_ITEM));
   return i;
 }
 
@@ -36,10 +39,12 @@ concater_rep::succ (int i) {
 
 void
 concater_rep::pre_glue () {
-  int i;
-  for (i=0; i<N(a)-1; i++) {
+  int i=0;
+  while (true) {
+    int j= succ(i);
+    if (j >= N(a)) break;
     line_item item1= a[i];
-    line_item item2= a[i+1];
+    line_item item2= a[j];
     int t1= item1->type;
     int t2= item2->type;
     if (((t1 == RSUB_ITEM) && (t2 == RSUP_ITEM)) ||
@@ -58,9 +63,61 @@ concater_rep::pre_glue () {
 
 	a[i]= line_item (type, OP_SKIP, b, pen);
 	a[i]->spc = spc;
-	a[i+1]= line_item (OBSOLETE_ITEM, OP_SKIP, item2->b, pen);
+        for (int k=i+1; k<j; k++)
+          if (a[k]->type == MARKER_ITEM)
+            a[k]= line_item (OBSOLETE_ITEM, OP_SKIP, a[k]->b, a[k]->penalty);
+	a[j]= line_item (OBSOLETE_ITEM, OP_SKIP, item2->b, pen);
       }
+    i++;
   }
+}
+
+box
+concater_rep::glue_left_markers (box b, int ref, int arg) {
+  int i= arg+1;
+  while (i < ref && a[i]->type == OBSOLETE_ITEM) i++;
+  if (i >= ref) return b;
+  array<box> bs;
+  array<SI>  spc;
+  while (i < ref) {
+    if (a[i]->type == MARKER_ITEM) {
+      bs  << a[i]->b;
+      spc << 0;
+      a[i]->type= OBSOLETE_ITEM;
+    }
+    i++;
+  }
+  bs  << b;
+  spc << 0;
+  return concat_box (b->ip, bs, spc);
+}
+
+box
+concater_rep::glue_right_markers (box b, int ref, int arg, bool flag) {
+  int i= ref+1;
+  while (i < arg && a[i]->type == OBSOLETE_ITEM) i++;
+  if (i >= arg) return b;
+  array<box> bs;
+  array<SI>  spc;
+  if (flag) {
+    for (int j=0; j<N(b); j++) {
+      bs  << b[j];
+      spc << 0;
+    }
+  }
+  else {
+    bs  << b;
+    spc << 0;
+  }
+  while (i < arg) {
+    if (a[i]->type == MARKER_ITEM) {
+      bs  << a[i]->b;
+      spc << 0;
+      a[i]->type= OBSOLETE_ITEM;
+    }
+    i++;
+  }
+  return concat_box (b->ip, bs, spc);
 }
 
 void
@@ -142,21 +199,28 @@ concater_rep::handle_scripts (int start, int end) {
     }
 
     box b;
-    if ((l==-1) && (r==N(a))) { i++; continue; }
-    if ((l!=-1) && (r==N(a))) {
-      b= left_script_box (sip, a[i]->b, lb1, lb2, env->fn, env->vert_pos);
-      glue (b, i, l);
+    if (l==-1) {
+      if (r==N(a)) { i++; continue; }
+      else {
+        box mb= glue_right_markers (a[i]->b, i, r, false);
+        if (a[i]->limits)
+          b= limit_box (sip, mb, rb1, rb2, env->fn, true);
+        else
+          b= right_script_box (sip, mb, rb1, rb2, env->fn, env->vert_pos);
+        glue (b, i, r);
+      }
     }
-    if ((l==-1) && (r!=N(a))) {
-      if (a[i]->limits)
-	b= limit_box (sip, a[i]->b, rb1, rb2, env->fn, true);
-      else
-	b= right_script_box (sip, a[i]->b, rb1, rb2, env->fn, env->vert_pos);
-      glue (b, i, r);
-    }
-    if ((l!=-1) && (r!=N(a))) {
-      b= side_box (sip, a[i]->b, lb1, lb2, rb1, rb2, env->fn, env->vert_pos);
-      glue (b, i, l, r);
+    else {
+      box mb= glue_left_markers (a[i]->b, i, l);
+      if (r==N(a)) {
+        b= left_script_box (sip, mb, lb1, lb2, env->fn, env->vert_pos);
+        glue (b, i, l);
+      }
+      else {
+        mb= glue_right_markers (mb, i, r, true);
+        b = side_box (sip, mb, lb1, lb2, rb1, rb2, env->fn, env->vert_pos);
+        glue (b, i, l, r);
+      }
     }
   }
 }
@@ -168,8 +232,14 @@ concater_rep::clean_and_correct () {
   for (i=0; i<N(a); i++)
     if (a[i]->type!=OBSOLETE_ITEM) {
       if (a[i]->b->w () != 0) {
-	if (prev != -1)
-	  a[prev]->spc += space (::italic_correction (a[prev]->b, a[i]->b));
+	if (prev != -1) {
+          SI cor= ::italic_correction (a[prev]->b, a[i]->b);
+          if (cor != 0) {
+            if (a[prev]->b->right_correction () != 0)
+              a[prev]->spc += space (cor);
+            else a[i-1]->spc += space (cor);
+          }
+        }
 	prev= i;
       }
       new_a << a[i];
@@ -186,47 +256,72 @@ concater_rep::handle_matching (int start, int end) {
   //cout << "matching " << start << " -- " << end << "\n";
   //cout << a << "\n\n";
   int i;
-  SI y1= min (a[start]->b->y1, a[end]->b->y2);
-  SI y2= max (a[start]->b->y1, a[end]->b->y2);
+  SI y1=  MAX_SI;
+  SI y2= -MAX_SI;
+  bool uninit= true;
   a[start]->penalty++;
   a[end]->penalty++;
-  // cout << "Start: " << (y2-y1) << "\n";
   for (i=start+1; i<end; i++) {
     if (a[i]->type == OBSOLETE_ITEM) continue;
     // cout << "  " << a[i] << ": " << (a[i]->b->y2- a[i]->b->y1) << "\n";
     // y1= min (y1, a[i]->b->sub_base());
     // y2= max (y2, a[i]->b->sup_base());
-    y1= min (y1, a[i]->b->y1);
-    y2= max (y2, a[i]->b->y2);
+    SI lo, hi;
+    a[i]->b->get_bracket_extents (lo, hi);
+    y1= min (y1, lo);
+    y2= max (y2, hi);
     a[i]->penalty++;
+    uninit= false;
   }
+  if (uninit) {
+    y1= min (a[start]->b->y1, a[end]->b->y2);
+    y2= max (a[start]->b->y1, a[end]->b->y2);
+  }
+
   for (i=start; i<=end; i++) {
     int tp= a[i]->type;
     if (tp == LEFT_BRACKET_ITEM ||
 	tp == MIDDLE_BRACKET_ITEM ||
 	tp == RIGHT_BRACKET_ITEM)
       {
+        string ls= a[i]->b->get_leaf_string ();
+        pencil lp= a[i]->b->get_leaf_pencil ();
+	font   fn= a[i]->b->get_leaf_font ();
+
+        // find the middle of the bracket, around where to center
+	SI mid= (a[i]->b->y1 + a[i]->b->y2) >> 1;
+        bool custom=
+          N(ls) > 2 && ls[N(ls)-2] <= '9' && ls[N(ls)-2] >= '0' &&
+          !ends (ls, "-0>");
+        if (custom) {
+          int pos= N(ls)-1;
+          while (pos > 0 && ls[pos] != '-') pos--;
+          if (pos > 0 && ls[pos-1] == '-') pos--;
+          string ss= ls (0, pos) * ">";
+          box auxb= text_box (a[i]->b->ip, 0, ss, fn, lp);
+          mid= (auxb->y1 + auxb->y2) >> 1;
+        }
+
 	// make symmetric and prevent from too large delimiters if possible
-	font fn = a[i]->b->get_leaf_font ();
 	SI Y1   = y1 + (fn->sep >> 1);
 	SI Y2   = y2 - (fn->sep >> 1);
 	SI tol  = fn->sep << 1;
-	SI mid  = (a[i]->b->y1 + a[i]->b->y2) >> 1;
 	SI drift= ((Y1 + Y2) >> 1) - mid; // fn->yfrac;
 	if (drift < 0) Y2 += min (-drift, tol) << 1;
 	else Y1 -= min (drift, tol) << 1;
 
-        // further adjustments when the enclosed expression is not very heigh
+        // further adjustments when the enclosed expression is not very high
+        // and for empty brackets
         SI h= y2 - y1 - fn->sep;
         SI d= 5 * fn->yx - h;
         if (d > 0) { Y1 += d/12; Y2 -= d/12; }
+        if (N(ls) >= 8 && (ls[6] == '.' || ls[7] == '.'))
+          if (starts (ls, "<left-.") || starts (ls, "<right-.")) {
+            Y1 += d/6; Y2 -= d/12; }
 
         // replace item by large or small delimiter
-        string ls= a[i]->b->get_leaf_string ();
-        color lc= a[i]->b->get_leaf_color ();
-        font lf= a[i]->b->get_leaf_font ();
-        if (Y1 < fn->y1 || Y2 > fn->y2)
-          a[i]->b= delimiter_box (a[i]->b->ip, ls, fn, lc, Y1, Y2);
+        if (Y1 < fn->y1 || Y2 > fn->y2 || custom || use_poor_rubber (fn))
+          a[i]->b= delimiter_box (a[i]->b->ip, ls, fn, lp, Y1, Y2, mid, y1, y2);
         else {
           string s= "<nobracket>";
           int j;
@@ -235,7 +330,7 @@ concater_rep::handle_matching (int start, int end) {
           if (j<N(ls) && ls[N(ls)-1] == '>') s= ls (j+1, N(ls)-1);
           if (N(s) > 1 && s[0] != '<') s= "<" * s * ">";
           else if (N(s) == 0 || s == ".") s= "<nobracket>";
-          a[i]->b= text_box (a[i]->b->ip, 0, s, lf, lc);
+          a[i]->b= text_box (a[i]->b->ip, 0, s, fn, lp);
           tp= STD_ITEM;
         }
         a[i]->type= STD_ITEM;
@@ -245,7 +340,8 @@ concater_rep::handle_matching (int start, int end) {
 	if (a[j]->type == MARKER_ITEM) {
 	  SI Y1= a[i]->b->y1;
 	  SI Y2= a[i]->b->y2;
-	  a[j]->b   = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[j]->b);
+	  //a[j]->b = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[j]->b);
+	  a[j]->b   = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[i]->b);
 	  a[j]->type= STD_ITEM;
 	}
 	else if (a[j]->type != CONTROL_ITEM) break;
@@ -255,7 +351,8 @@ concater_rep::handle_matching (int start, int end) {
 	if (a[j]->type == MARKER_ITEM) {
 	  SI Y1= a[i]->b->y1;
 	  SI Y2= a[i]->b->y2;
-	  a[j]->b   = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[j]->b);
+	  //a[j]->b = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[j]->b);
+	  a[j]->b   = marker_box (a[j]->b->find_lip (), 0, Y1, 0, Y2, a[i]->b);
 	  a[j]->type= STD_ITEM;
 	}
 	else if (a[j]->type != CONTROL_ITEM) break;

@@ -8,7 +8,7 @@
 ;;
 ;; Inspired from utf8enc.dfu
 
-("#A"  "\n")
+("#7C" "{\\textbar}")
 ("#A1" "{\\textexclamdown}")
 ("#A2" "{\\textcent}")
 ("#A3" "{\\textsterling}")
@@ -29,9 +29,9 @@
 ("#B3" "{\\textthreesuperior}")
 ("#B4" "{\\textasciiacute}")
 ("#B5" "{\\textmu}") ; micro sign
-("#B6" "{\\textparagraph}")
+("#B6" "{\\P}")
 ("#B7" "{\\textperiodcentered}")
-("#B8" "{\\c\ }")
+("#B8" "\\c{}")
 ("#B9" "{\\textonesuperior}")
 ("#BA" "{\\textordmasculine}")
 ("#BB" "{\\guillemotright}")
@@ -173,6 +173,7 @@
 ("#2D8" "{\\textasciibreve}")
 ("#2DD" "{\\textacutedbl}")
 ("#311" "{\\textroundcap}")
+("#3BC" "{\\textmu}")
 ("#400" "{\\`\CYRE}")
 ("#401" "{\\CYRYO}")
 ("#402" "{\\CYRDJE}")
@@ -395,11 +396,7 @@
 ("#2013" "{\\textendash}")
 ("#2014" "{\\textemdash}")
 ("#2016" "{\\textbardbl}")
-("#2018" "{\\textquoteleft}")
-("#2019" "{\\textquoteright}")
 ("#201A" "{\\quotesinglbase}")
-("#201C" "{\\textquotedblleft}")
-("#201D" "{\\textquotedblright}")
 ("#201E" "{\\quotedblbase}")
 ("#2020" "{\\textdagger}")
 ("#2021" "{\\textdaggerdbl}")

@@ -68,9 +68,10 @@ struct tex_font_metric_rep: rep<tex_font_metric> {
   SI      parameter (int i);
 
   void    execute (SI* s, int n, SI* buf, SI* ker, int& m);
-  void    get_xpositions (int* s, int n, double unit, SI* xpos);
+  void    get_xpositions (int* s, int n, double unit, SI* xpos, bool ligf);
 };
 
+font_metric tfm_font_metric (tex_font_metric tfm);
 tex_font_metric load_tfm (url file_name, string family, int size);
 
 #endif // defined LOAD_TFM_H

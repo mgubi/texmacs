@@ -13,7 +13,7 @@
 #include "tree.hpp"
 #include "font.hpp"
 #include "hashmap.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "Freetype/tt_file.hpp"
 
 hashmap<string,tree> font_conversion ("rule");
@@ -77,7 +77,7 @@ find_font_bis (tree t) {
   if ((arity (t)==0) || is_compound (t[0])) return font ();
 
   if (is_tuple (t, "compound"))
-    return compound_font (t (1, N(t)));
+    return compound_font (t (1, N(t)), 1.0, 1.0);
 
   if (is_tuple (t, "truetype", 3))
     return tt_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
@@ -133,6 +133,14 @@ find_font_bis (tree t) {
   if (is_tuple (t, "la", 4))
     return tex_la_font (as_string (t[1]), as_int (t[2]) * 100,
 			as_int (t[3]), as_int (t[4]) * 100);
+  
+  if (is_tuple (t, "gr", 3))
+    return tex_gr_font (as_string (t[1]), as_int (t[2]) * 100,
+			as_int (t[3]), 1000);
+
+  if (is_tuple (t, "gr", 4))
+    return tex_gr_font (as_string (t[1]), as_int (t[2]) * 100,
+			as_int (t[3]), as_int (t[4]) * 100);
 
   if (is_tuple (t, "adobe", 3))
     return tex_adobe_font (as_string (t[1]), as_int (t[2]),
@@ -167,7 +175,7 @@ find_font_bis (tree t) {
     if (is_nil (fn)) return fn;
     font error_fn= error_font (find_font (t[4]));
     if (is_nil (error_fn)) error_fn= error_font (fn);
-    return math_font (t, fn, error_fn);
+    return math_font (t, fn, error_fn, 1.0, 1.0);
   }
 
   if (!font_conversion->contains (t[0]->label)) {
@@ -207,45 +215,10 @@ find_font (tree t) {
 }
 
 font
-find_magnified_font (tree t, double zoom) {
+find_magnified_font (tree t, double zoomx, double zoomy) {
   font fn= find_font (t);
   if (is_nil (fn)) return fn;
-  return fn->magnify (zoom);
-}
-
-/******************************************************************************
-* Find closest existing font
-******************************************************************************/
-
-static bool
-find_closest (string& family, string& fn_class,
-              string& series, string& shape) {
-  static hashmap<tree,tree> closest_cache (UNINIT);
-  tree key= tuple (family, fn_class, series, shape);
-  if (closest_cache->contains (key)) {
-    tree t  = closest_cache[key];
-    family  = t[0]->label;
-    fn_class= t[1]->label;
-    series  = t[2]->label;
-    shape   = t[3]->label;
-    return t != key;
-  }
-  else {
-    //cout << "< " << family << ", " << fn_class
-    //     << ", " << series << ", " << shape << "\n";
-    array<string> lfn= logical_font (family, fn_class, series, shape);
-    array<string> pfn= search_font (lfn, false);
-    array<string> nfn= logical_font (pfn[0], pfn[1]);
-    family= get_family (nfn);
-    fn_class= get_variant (nfn);
-    series= get_series (nfn);
-    shape= get_shape (nfn);
-    //cout << "> " << family << ", " << fn_class
-    //     << ", " << series << ", " << shape << "\n";
-    tree t= tuple (family, fn_class, series, shape);
-    closest_cache (key)= t;
-    return t != key;
-  }
+  return fn->magnify (zoomx, zoomy);
 }
 
 /******************************************************************************
@@ -253,24 +226,69 @@ find_closest (string& family, string& fn_class,
 ******************************************************************************/
 
 font
-find_font (string family, string fn_class,
-	   string series, string shape, int sz, int dpi, bool closest)
+find_font (string family, string variant,
+	   string series, string shape, int sz, int dpi)
 {
   string s=
-    family * "-" * fn_class * "-" *
+    family * "-" * variant * "-" *
     series * "-" * shape * "-" *
     as_string (sz) * "-" * as_string (dpi);
   if (font::instances->contains (s)) return font (s);
 
-  if (closest && find_closest (family, fn_class, series, shape)) {
-    font fn= find_font (family, fn_class, series, shape, sz, dpi, false);
-    font::instances (s)= (pointer) fn.rep;
-    return fn;
+  if (ends (shape, "-poorit")) {
+    string shape2= shape (0, N(shape) - 7);
+    font fn= find_font (family, variant, series, shape2, sz, dpi);
+    if (!is_nil (fn)) {
+      font nafn= fn->magnify (5.0/6.0, 1.0);
+      font itfn= poor_italic_font (nafn, 0.25001);
+      // NOTE: precise value 0.25001 also used in 'concat_math'
+      font::instances (s)= (pointer) itfn.rep;
+      return itfn;
+    }
+  }
+  else if (ends (shape, "-poorsc")) {
+    string shape2= shape (0, N(shape) - 7);
+    font fn= find_font (family, variant, series, shape2, sz, dpi);
+    if (!is_nil (fn)) {
+      font scfn= poor_smallcaps_font (fn);
+      font::instances (s)= (pointer) scfn.rep;
+      return scfn;
+    }
+  }
+  else if (ends (series, "-poorbf")) {
+    string series2= series (0, N(series) - 7);
+    font fn= find_font (family, variant, series2, shape, sz, dpi);
+    if (!is_nil (fn)) {
+      font bffn= poor_bold_font (fn);
+      font::instances (s)= (pointer) bffn.rep;
+      return bffn;
+    }
+  }
+  else if (ends (variant, "-poorbbb")) {
+    string variant2= variant (0, N(variant) - 8);
+    font fn= find_font (family, variant2, series, shape, sz, dpi);
+    if (!is_nil (fn)) {
+      font bbbfn= poor_bbb_font (fn);
+      font::instances (s)= (pointer) bbbfn.rep;
+      return bbbfn;
+    }
+  }
+
+  string family2= family;
+  if (family == "sys-chinese") family2= default_chinese_font_name ();
+  if (family == "sys-japanese") family2= default_japanese_font_name ();
+  if (family == "sys-korean") family2= default_korean_font_name ();
+  if (family2 != family) {
+    font fn= find_font (family2, variant, series, shape, sz, dpi);
+    if (!is_nil (fn)) {
+      font::instances (s)= (pointer) fn.rep;
+      return fn;
+    }
   }
 
   tree t1 (TUPLE, 6);
   t1[0]= family;
-  t1[1]= fn_class;
+  t1[1]= variant;
   t1[2]= series; t1[3]= shape;
   t1[4]= as_string (sz); t1[5]= as_string (dpi);
   font fn= find_font (t1);
@@ -281,7 +299,7 @@ find_font (string family, string fn_class,
 
   tree t2 (TUPLE, 5);
   t2[0]= family;
-  t2[1]= fn_class; t2[2]= series;
+  t2[1]= variant; t2[2]= series;
   t2[3]= as_string (sz); t2[4]= as_string (dpi);
   fn= find_font (t2);
   if (!is_nil (fn)) {
@@ -291,7 +309,7 @@ find_font (string family, string fn_class,
 
   tree t3 (TUPLE, 4);
   t3[0]= family;
-  t3[1]= fn_class; t3[2]= as_string (sz); t3[3]= as_string (dpi);
+  t3[1]= variant; t3[2]= as_string (sz); t3[3]= as_string (dpi);
   fn= find_font (t3);
   if (!is_nil (fn)) {
     font::instances (s)= (pointer) fn.rep;

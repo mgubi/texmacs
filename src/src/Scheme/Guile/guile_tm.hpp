@@ -11,13 +11,13 @@
 
 #ifndef GUILE_TM_H
 #define GUILE_TM_H
-#include "tm_configure.hpp"
 
+#include "tm_configure.hpp"
 #include "blackbox.hpp"
 #include "array.hpp"
 
 
-#ifdef __MINGW32__
+#ifdef OS_MINGW
 // we redefine some symbols to avoid name clashes with Windows headers (included by Guile)
 #define PATTERN WIN_PATTERN
 #define STRING WIN_STRING
@@ -34,15 +34,23 @@
 #define MY_MENU_EVENT MENU_EVENT
 #undef MENU_EVENT
 #endif
-#endif // __MINGW32__
+#endif // OS_MINGW
 
 #if defined(GUILE_D) || defined(GUILE_C) 
+#ifdef GUILE_HEADER_18
+#include <libguile18.h>
+#else
 #include <libguile.h>
+#endif
+#else
+#ifdef GUILE_HEADER_16
+#include <guile16/gh.h>
 #else
 #include <guile/gh.h>
 #endif
+#endif
 
-#ifdef __MINGW32__
+#ifdef OS_MINGW
 // put things back
 #undef STRING
 #undef ERROR
@@ -63,7 +71,7 @@
 #define OUT MY_OUT
 #undef MY_OUT
 #endif
-#endif // __MINGW32__
+#endif // OS_MINGW
 
 #ifdef GUILE_D
 
@@ -107,7 +115,7 @@
 #else
 #ifdef GUILE_B
 
-#define SCM_NULL scm_list_n (SCM_UNDEFINED)
+#define SCM_NULL gh_list (SCM_UNDEFINED)
 #define scm_is_list(x) SCM_NFALSEP(scm_list_p(x))
 #define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,r)
 #define scm_lookup_string(name) scm_variable_ref(scm_c_lookup(name))
@@ -182,6 +190,8 @@ typedef SCM (*scm_t_catch_handler) (void *data, SCM tag, SCM throw_args);
 
 #define SCM_ARG8 8
 #define SCM_ARG9 9
+#define SCM_ARG10 10
+#define SCM_ARG11 11
 
 #ifdef DOTS_OK
 typedef SCM (*FN)(...);
@@ -192,7 +202,8 @@ typedef SCM (*FN)();
 #if defined(GUILE_A) || defined(GUILE_B)
 int scm_to_bool (SCM obj);
 int scm_to_int (SCM obj);
-double scm_to_double (SCM i);
+long scm_to_long (SCM obj);
+double scm_to_double (SCM obj);
 #endif
 
 
@@ -236,12 +247,14 @@ inline tmscm tmscm_cadddr (tmscm obj) { return SCM_CADDDR (obj); }
 
 SCM bool_to_scm (bool b);
 SCM int_to_scm (int i);
+SCM long_to_scm (long l);
 SCM double_to_scm (double i);
 
 
 
 inline tmscm bool_to_tmscm (bool b) { return bool_to_scm (b); }
-inline tmscm int_to_tmscm (int i) {   return int_to_scm (i); }
+inline tmscm int_to_tmscm (int i) { return int_to_scm (i); }
+inline tmscm long_to_tmscm (long l) { return long_to_scm (l); }
 inline tmscm double_to_tmscm (double i) { return double_to_scm (i); }
 tmscm string_to_tmscm (string s);
 tmscm symbol_to_tmscm (string s);
@@ -279,6 +292,8 @@ tmscm call_scheme (tmscm fun, array<tmscm> a);
 #define TMSCM_ARG6 SCM_ARG6
 #define TMSCM_ARG7 SCM_ARG7
 #define TMSCM_ARG8 SCM_ARG8
+#define TMSCM_ARG9 SCM_ARG9
+#define TMSCM_ARG10 SCM_ARG10
 
 #define TMSCM_UNSPECIFIED SCM_UNSPECIFIED
 

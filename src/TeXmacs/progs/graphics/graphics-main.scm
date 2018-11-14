@@ -26,6 +26,59 @@
 ;; Global properties of graphics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (inside-draw-over?)
+  (inside? 'draw-over))
+
+(tm-define (graphics-toggle-over-under)
+  (:check-mark "*" inside-draw-over?)
+  (with-innermost t graphical-over-under-context?
+    (cond ((tree-is? t 'draw-over)
+           (tree-assign-node! t 'draw-under)
+           (tree-go-to t 0 :end))
+          ((tree-is? t 'draw-under)
+           (tree-assign-node! t 'draw-over)
+           (if (tree-is? (tree-ref t 1) 'with)
+               (tree-go-to t 1 (- (tree-arity (tree-ref t 1)) 1) :end)
+               (tree-go-to t 1 :end))))))
+
+(tm-define (graphics-enter-into t)
+  (set! t (tree-ref t 1))
+  (while (tree-is? t 'with)
+    (set! t (tm-ref t :last)))
+  (when (tree-is? t 'graphics)
+    (tree-go-to t :last :end)))
+
+(tm-define (graphics-enter)
+  (with t (cursor-tree)
+    (when (tree-is? t 'draw-under)
+      (tree-assign-node! t 'draw-over))
+    (if (tree-is? t 'draw-over)
+        (graphics-enter-into t)
+        (with-innermost u 'draw-under
+          (tree-assign-node! u 'draw-over)
+          (graphics-enter-into u)))))
+
+(tm-define (graphics-exit-right)
+  (cond ((inside-graphical-over-under?)
+         (with-innermost t graphical-over-under-context?
+           (tree-go-to t :end)))
+        ((inside? 'graphics)
+         (with-innermost t 'graphics
+           (while (and (tree-up t) (tree-func? (tree-up t) 'with))
+             (set! t (tree-up t)))
+           (tree-go-to t :end)))
+        ((tree-is? (cursor-tree) 'graphics)
+         (with t (cursor-tree)
+           (while (and (tree-up t) (tree-func? (tree-up t) 'with))
+             (set! t (tree-up t)))
+           (tree-go-to t :end)))))
+
+(tm-define (graphics-set-overlap w)
+  (:argument w "Width of overlapping border")
+  (when (inside-graphical-over-under?)
+    (with-innermost t graphical-over-under-context?
+      (tree-set t 2 w))))
+
 (tm-define (graphics-geometry)
   (with geo (tree->stree (get-env-tree "gr-geometry"))
     (if (match? geo '(tuple "geometry" :%2))
@@ -72,7 +125,8 @@
   (with frame (tree->stree (get-env-tree "gr-frame"))
     (if (match? frame '(tuple "scale" :%2))
 	frame
-	'(tuple "scale" "1cm" (tuple "0.5par" "0cm")))))
+        `(tuple "scale" ,(graphics-default-unit)
+                (tuple "0.5par" "0cm")))))
 
 (define (graphics-unit-has-value? val)
   (let* ((fr (graphics-cartesian-frame))
@@ -201,6 +255,99 @@
                ((== a "center") "top")
                ((== a "bottom") "center")
                (else "default"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Commutative diagrams
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (graphics-set-notebook-grid)
+  (graphics-set-visual-grid 'cartesian)
+  (graphics-set-unit "1cm")
+  (graphics-set-grid-aspect 'detailed 2 #t)
+  (graphics-set-grid-color 'subunits "#e0e0ff")
+  (delayed
+    (:idle 1)
+    (graphics-set-grid-color 'units "#e0e0ff")
+    (delayed
+      (:idle 1)
+      (graphics-set-grid-color 'axes "#e0e0ff"))))
+
+(tm-define (make-cd)
+  (make-graphics)
+  (delayed
+    (:idle 1)
+    (graphics-set-extents "8.1cm" "3.1cm")
+    (graphics-set-text-at-halign "center")
+    (graphics-set-arrow-end "<gtr>")
+    (graphics-set-mode '(edit math-at))
+    (graphics-set-notebook-grid)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 3D transformations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (stree->number x)
+  (string->number x))
+
+(define (stree->vector v)
+  (map stree->number (cdr v)))
+
+(define (stree->matrix m)
+  (map stree->vector (cdr m)))
+
+(define (number->stree x)
+  (number->string x))
+
+(define (vector->stree v)
+  (cons 'tuple (map number->stree v)))
+
+(define (matrix->stree m)
+  (cons 'tuple (map vector->stree m)))
+
+(tm-define (graphics-transformation)
+  (stree->matrix (tree->stree (get-env-tree "gr-transformation"))))
+
+(tm-define (graphics-set-transformation m)
+  (graphics-set-property "gr-transformation" (matrix->stree m)))
+
+(tm-define (xz-rotation a)
+  (list (list (cos a) 0.0 (sin a) 0.0)
+        (list 0.0 1.0 0.0 0.0)
+        (list (- (sin a)) 0.0 (cos a) 0.0)
+        (list 0.0 0.0 0.0 1.0)))
+
+(define (yz-rotation a)
+  (list (list 1.0 0.0 0.0 0.0)
+        (list 0.0 (cos a) (sin a) 0.0)
+        (list 0.0 (- (sin a)) (cos a) 0.0)
+        (list 0.0 0.0 0.0 1.0)))
+
+(define (matrix-columns m)
+  (if (null? m) 0 (length (car m))))
+
+(define (matrix-column m i)
+  (map (cut list-ref <> i) m))
+
+(define (matrix-transpose m)
+  (map (cut matrix-column m <>) (.. 0 (matrix-columns m))))
+
+(define (vector-vector-inner v w)
+  (if (or (null? v) (null? w)) 0.0
+      (+ (* (car v) (car w)) (vector-vector-inner (cdr v) (cdr w)))))
+
+(define (vector-matrix-inner v m)
+  (map (cut vector-vector-inner v <>) m))
+
+(tm-define (matrix-multiply m1 m2)
+  (map (cut vector-matrix-inner <> (matrix-transpose m2)) m1))
+
+(tm-define (graphics-rotate-xz a)
+  (with m (graphics-transformation)
+    (graphics-set-transformation (matrix-multiply (xz-rotation a) m))))
+
+(tm-define (graphics-rotate-yz a)
+  (with m (graphics-transformation)
+    (graphics-set-transformation (matrix-multiply (yz-rotation a) m))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Grids
@@ -664,6 +811,41 @@
   (func? mode 'group-edit 1))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Provisos for graphical objects
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (graphics-get-proviso)
+  (graphics-get-property "gr-proviso"))
+
+(define (graphics-test-proviso? val)
+  (with old (graphics-get-property "gr-proviso")
+    (or (and (func? val 'quasiquote 1)
+             (graphics-test-proviso? (cadr val)))
+        (and (pair? val) (pair? old)
+             (== (car val) (car old)))
+        (== val old))))
+
+(tm-define (graphics-set-proviso val)
+  (:argument val "Proviso")
+  (:check-mark "*" graphics-test-proviso?)
+  (graphics-set-property "gr-proviso" val))
+
+(define (update-proviso-sub l val)
+  (when (and (nnull? l) (nnull? (cdr l)))
+    (when (and (tm-equal? (car l) "gr-proviso")
+               (tree-compound? (cadr l))
+               (== (tree-arity (cadr l)) 1)
+               (tree-atomic? (tree-ref (cadr l) 0)))
+      (tree-set (tree-ref (cadr l) 0) val))
+    (update-proviso-sub (cddr l) val)))
+
+(tm-define (graphics-update-proviso t val)
+  (when (tree-compound? t)
+    (when (tree-is? t 'with)
+      (update-proviso-sub (cDr (tree-children t)) val))
+    (for-each (cut graphics-update-proviso <> val) (tree-children t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Attributes for graphical objects
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -688,6 +870,16 @@
   (:check-mark "*" (graphics-test-property? "gr-point-style"))
   (graphics-set-property "gr-point-style" val))
 
+(tm-define (graphics-set-point-size val)
+  (:argument val "Point size")
+  (:check-mark "*" (graphics-test-property? "gr-point-size"))
+  (graphics-set-property "gr-point-size" val))
+
+(tm-define (graphics-set-point-border val)
+  (:argument val "Point border")
+  (:check-mark "*" (graphics-test-property? "gr-point-border"))
+  (graphics-set-property "gr-point-border" val))
+
 (tm-define (graphics-set-line-width val)
   (:argument val "Line width")
   (:check-mark "*" (graphics-test-property? "gr-line-width"))
@@ -702,6 +894,16 @@
   (:argument val "Dash style unit")
   (:check-mark "*" (graphics-test-property? "gr-dash-style-unit"))
   (graphics-set-property "gr-dash-style-unit" val))
+
+(tm-define (graphics-set-dash-style-unit* hu vu)
+  (:argument hu "Horizontal dash style unit")
+  (:argument vu "Vertical dash style unit")
+  (graphics-set-property "gr-dash-style-unit" `(tuple ,hu ,vu)))
+
+(tm-define (graphics-set-line-portion val)
+  (:argument val "Line portion")
+  (:check-mark "*" (graphics-test-property? "gr-line-portion"))
+  (graphics-set-property "gr-line-portion" val))
 
 (tm-define (graphics-set-fill-color val)
   (:argument val "Fill color")
@@ -727,3 +929,207 @@
   (:argument val "Text-at vertical alignment")
   (:check-mark "*" (graphics-test-property? "gr-text-at-valign"))
   (graphics-set-property "gr-text-at-valign" val))
+
+(tm-define (graphics-set-doc-at-valign val)
+  (:argument val "Document-at vertical alignment")
+  (:check-mark "*" (graphics-test-property? "gr-doc-at-valign"))
+  (graphics-set-property "gr-doc-at-valign" val))
+
+(define (graphics-check-width? val)
+  (if (== val "1par") (set! val "default"))
+  (and (== (graphics-get-property "gr-doc-at-width") val)
+       (== (graphics-get-property "gr-doc-at-hmode") "exact")))
+(tm-define (graphics-set-doc-at-width val)
+  (:argument val "Document-at width")
+  (:check-mark "*" graphics-check-width?)
+  (graphics-set-property "gr-doc-at-width" val)
+  (graphics-set-property "gr-doc-at-hmode" "exact")
+  (graphics-set-property "gr-doc-at-ppsep" ""))
+
+(define (graphics-check-compact?)
+  (== (graphics-get-property "gr-doc-at-hmode") "default"))
+(tm-define (graphics-set-doc-at-compact)
+  (:check-mark "*" graphics-check-compact?)
+  (graphics-set-property "gr-doc-at-width" "default")
+  (graphics-set-property "gr-doc-at-hmode" "default")
+  (graphics-set-property "gr-doc-at-ppsep" "default"))
+
+(define (graphics-toggled-property? var)
+  (lambda ()
+    (!= (graphics-get-property var) "default")))
+
+(tm-define (graphics-toggle-doc-at-border)
+  (:check-mark "*" (graphics-toggled-property? "gr-doc-at-border"))
+  (if (== (graphics-get-property "gr-doc-at-border") "default")
+      (begin
+        (graphics-set-property "gr-doc-at-border" "1ln")
+        (graphics-set-property "gr-doc-at-padding" "1spc"))
+      (begin
+        (graphics-set-property "gr-doc-at-border" "default")
+        (graphics-set-property "gr-doc-at-padding" "default"))))
+
+(tm-define (graphics-toggle-doc-at-padded)
+  (:check-mark "*" (graphics-toggled-property? "gr-doc-at-padding"))
+  (if (== (graphics-get-property "gr-doc-at-padding") "default")
+      (graphics-set-property "gr-doc-at-padding" "1spc")
+      (graphics-set-property "gr-doc-at-padding" "default")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Snapping
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (get-snap)
+  (with val (graphics-get-property "gr-snap")
+    (if (tm-func? val 'tuple) (tm-children val) (list "all"))))
+
+(define (set-snap l)
+  (graphics-set-property "gr-snap" `(tuple ,@l)))
+
+(define graphics-snap-types
+  (list "control point"
+        "grid point" "grid curve point" "curve-grid intersection"
+        "curve point" "curve-curve intersection"
+         "text border point" "text border"))
+
+(tm-define (graphics-get-snap-mode)
+  (tm->tree (if (== (car (graphics-mode)) 'hand-edit)
+		`(tuple)
+		`(tuple ,@(get-snap)))))
+
+(tm-define (graphics-get-snap-distance)
+  (with val (graphics-get-property "gr-snap-distance")
+    (if (string? val) val "10px")))
+
+(tm-define (graphics-get-snap type)
+  (or (in? type (get-snap))
+      (in? "all" (get-snap))))
+
+(tm-define (graphics-test-snap? type)
+  (if (== type "none")
+      (null? (get-snap))
+      (graphics-get-snap type)))
+
+(tm-define (graphics-set-snap type)
+  (:check-mark "*" graphics-test-snap?)
+  (cond ((== type "none")
+         (set-snap (list)))
+        ((== type "all")
+         (set-snap (list "all")))
+        ((nin? type (get-snap))
+         (set-snap (cons type (get-snap))))))
+
+(tm-define (graphics-reset-snap type)
+  (when (in? "all" (get-snap))
+    (set-snap graphics-snap-types))
+  (when (in? type (get-snap))
+    (set-snap (list-remove (get-snap) type))))
+
+(tm-define (graphics-toggle-snap type)
+  (:check-mark "*" graphics-test-snap?)
+  (if (graphics-get-snap type)
+      (graphics-reset-snap type)
+      (graphics-set-snap type)))
+
+(tm-define (graphics-set-snap-distance val)
+  (:argument val "Snap distance")
+  (:check-mark "*" (graphics-test-property? "gr-snap-distance"))
+  (graphics-set-property "gr-snap-distance" val))
+
+(tm-define (graphics-set-snap-text-padding val)
+  (:argument val "Text padding for snapping")
+  (:check-mark "*" (graphics-test-property? "gr-text-at-margin"))
+  (graphics-set-property "gr-text-at-margin" val))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Special routines for text-at boxes and its variants
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (object-get-property-bis t var)
+  (tree->stree (get-env-tree var)))
+
+(define (with-set t var val i)
+  (cond ((>= i (- (tree-arity t) 1))
+         (when (!= val "default")
+           (tree-insert! t i (list var val))))
+        ((tm-equal? (tree-ref t i) var)
+         (if (!= val "default")
+             (tree-assign (tree-ref t (+ i 1)) val)
+             (tree-remove t i 2)))
+        (else (with-set t var val (+ i 2)))))
+
+(define (object-set-property-bis t var val)
+  (cond ((tree-is? t :up 'with)
+         (with-set (tree-up t) var val 0))
+        ((!= val "default")
+         (tree-set! t `(with ,var ,val ,t)))))
+
+(define (object-test-property? var)
+  (lambda (val)
+    (if (== val "default") (set! val (tree->stree (get-init-tree var))))
+    (== (object-get-property var) val)))
+
+(tm-define (object-get-property var)
+  (tree->stree (get-env-tree var)))
+
+(tm-define (object-set-property var val)
+  (and-with t (tree-innermost graphical-context?)
+    (object-set-property-bis t var val)))
+
+(tm-define (object-set-fill-color val)
+  (:argument val "Fill color")
+  (:check-mark "*" (object-test-property? "fill-color"))
+  (object-set-property "fill-color" val))
+
+(tm-define (object-set-text-at-halign val)
+  (:argument val "Horizontal alignment")
+  (:check-mark "*" (object-test-property? "text-at-halign"))
+  (object-set-property "text-at-halign" val))
+
+(tm-define (object-set-text-at-valign val)
+  (:argument val "Vertical alignment")
+  (:check-mark "*" (object-test-property? "text-at-valign"))
+  (object-set-property "text-at-valign" val))
+
+(tm-define (object-set-doc-at-valign val)
+  (:argument val "Vertical alignment")
+  (:check-mark "*" (object-test-property? "doc-at-valign"))
+  (object-set-property "doc-at-valign" val))
+
+(define (object-check-width? val)
+  (and (== (object-get-property "doc-at-width") val)
+       (== (object-get-property "doc-at-hmode") "exact")))
+(tm-define (object-set-doc-at-width val)
+  (:argument val "Document-at width")
+  (:check-mark "*" object-check-width?)
+  (if (== val "1par") (set! val "default"))
+  (object-set-property "doc-at-width" val)
+  (object-set-property "doc-at-hmode" "exact")
+  (object-set-property "doc-at-ppsep" ""))
+
+(define (object-check-compact?)
+  (== (object-get-property "doc-at-hmode") "min"))
+(tm-define (object-set-doc-at-compact)
+  (:check-mark "*" object-check-compact?)
+  (object-set-property "doc-at-width" "default")
+  (object-set-property "doc-at-hmode" "default")
+  (object-set-property "doc-at-ppsep" "default"))
+
+(define (object-toggled-property? var)
+  (lambda ()
+    (!= (object-get-property var) (get-init var))))
+
+(tm-define (object-toggle-doc-at-border)
+  (:check-mark "*" (object-toggled-property? "doc-at-border"))
+  (if (== (object-get-property "doc-at-border") "0ln")
+      (begin
+        (object-set-property "doc-at-border" "1ln")
+        (object-set-property "doc-at-padding" "1spc"))
+      (begin
+        (object-set-property "doc-at-border" "default")
+        (object-set-property "doc-at-padding" "default"))))
+
+(tm-define (object-toggle-doc-at-padded)
+  (:check-mark "*" (object-toggled-property? "doc-at-padding"))
+  (if (== (object-get-property "doc-at-padding") "0spc")
+      (object-set-property "doc-at-padding" "1spc")
+      (object-set-property "doc-at-padding" "default")))

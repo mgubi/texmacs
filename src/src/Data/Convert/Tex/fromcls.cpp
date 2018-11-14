@@ -148,12 +148,12 @@ filter_setfontsize (tree doc) {
           if (is_func (doc[i][1], MACRO, 1)) 
             if (is_func (doc[i][1][0], WITH) && N(doc[i][1][0]) > 4) {
               tree t = tree (WITH);
-              for (int j=0 ; j< 4 ; j++) 
-                t << doc[i][1][0][j];
+              for (int k=0; k<4 ; k++)
+                t << doc[i][1][0][k];
               t << tree (ARG, "x");
               r << tree (ASSIGN, doc[i][0], tree (MACRO, "x", t));
             }
-    return r;
+  return r;
 }
 
 array<tree>
@@ -352,7 +352,7 @@ tree
 latex_class_document_to_tree (string s) {
   bool old= textm_class_flag;
   textm_class_flag= true;  
-  tree t= latex_document_to_tree (s);
+  tree t= latex_document_to_tree (s, false);
   tree r= latex_class_filter (t);
   textm_class_flag= old;
   return r;

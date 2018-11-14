@@ -24,21 +24,23 @@
 enum slot_id {
   SLOT_IDENTIFIER,
   SLOT_WINDOW,
-  SLOT_RENDERER,
   SLOT_VISIBILITY,
   SLOT_FULL_SCREEN,
   SLOT_NAME,
+  SLOT_MODIFIED,
   SLOT_SIZE,
   SLOT_POSITION,
   SLOT_UPDATE,
   SLOT_REFRESH,
   SLOT_KEYBOARD,
   SLOT_KEYBOARD_FOCUS,
+  SLOT_KEYBOARD_FOCUS_ON,
   SLOT_MOUSE,
   SLOT_MOUSE_GRAB,
   SLOT_MOUSE_POINTER,
   SLOT_INVALIDATE,
   SLOT_INVALIDATE_ALL,
+  SLOT_INVALID,
   SLOT_REPAINT,
   SLOT_DELAYED_MESSAGE,
   SLOT_DESTROY,
@@ -64,6 +66,8 @@ enum slot_id {
   SLOT_USER_ICONS,
   SLOT_SIDE_TOOLS_VISIBILITY,
   SLOT_SIDE_TOOLS,
+  SLOT_BOTTOM_TOOLS_VISIBILITY,
+  SLOT_BOTTOM_TOOLS,
   SLOT_FOOTER_VISIBILITY,
   SLOT_LEFT_FOOTER,
   SLOT_RIGHT_FOOTER,
@@ -248,12 +252,6 @@ get_window (widget w) {
   return read (w, SLOT_WINDOW);
 }
 
-inline renderer
-get_renderer (widget w) {
-  // get renderer associated to widget (or NULL if the widget is not attached)
-  return query<renderer> (w, SLOT_RENDERER);
-}
-
 inline void
 set_visibility (widget w, bool flag) {
   // map or unmap a window widget
@@ -270,6 +268,12 @@ inline void
 set_name (widget w, string s) {
   // set the name of a widget (usually a window)
   send<string> (w, SLOT_NAME, s);
+}
+
+inline void
+set_modified (widget w, bool flag) {
+  // set the modified flag for a widget (usually a window)
+  send<bool> (w, SLOT_MODIFIED, flag);
 }
 
 inline void
@@ -351,6 +355,12 @@ query_keyboard_focus (widget w) {
 }
 
 inline void
+send_keyboard_focus_on (widget w, string field) {
+  // request the keyboard focus for field inside a widget
+  send<string> (w, SLOT_KEYBOARD_FOCUS_ON, field);
+}
+
+inline void
 send_mouse (widget w, string kind, SI x, SI y, int mods, time_t t) {
   // send a mouse event of a given kind at position (x, y) and time t
   // mods corresponds to active buttons and keyboard modifiers at time t
@@ -395,11 +405,18 @@ send_invalidate (widget w, SI x1, SI y1, SI x2, SI y2) {
   send<SI,SI,SI,SI> (w, SLOT_INVALIDATE, x1, y1, x2, y2);
 }
 
+inline bool
+query_invalid (widget w) {
+  // does this widget has invalid regions
+  return query<bool> (w, SLOT_INVALID);
+}
+
+
 inline void
-send_repaint (widget w, SI x1, SI y1, SI x2, SI y2) {
+send_repaint (widget w, renderer ren, SI x1, SI y1, SI x2, SI y2) {
   // request widget to repaint a region;
   // the region is specified w.r.t. the top left corner of w
-  send<SI,SI,SI,SI> (w, SLOT_REPAINT, x1, y1, x2, y2);
+  send<renderer,SI,SI,SI,SI> (w, SLOT_REPAINT, ren, x1, y1, x2, y2);
 }
 
 inline void
@@ -574,20 +591,38 @@ set_user_icons (widget w, widget bar) {
 
 inline void
 set_side_tools_visibility (widget w, bool visible) {
-  // set visibility of user icons bar
+  // set visibility of side tools
   send<bool> (w, SLOT_SIDE_TOOLS_VISIBILITY, visible);
 }
 
 inline bool
 get_side_tools_visibility (widget w) {
-  // get visibility of user icons bar
+  // get visibility of side tools
   return query<bool> (w, SLOT_SIDE_TOOLS_VISIBILITY);
 }
 
 inline void
 set_side_tools (widget w, widget bar) {
-  // set user icons bar
+  // set side tools
   write (w, SLOT_SIDE_TOOLS, bar);
+}
+
+inline void
+set_bottom_tools_visibility (widget w, bool visible) {
+  // set visibility of bottom tools
+  send<bool> (w, SLOT_BOTTOM_TOOLS_VISIBILITY, visible);
+}
+
+inline bool
+get_bottom_tools_visibility (widget w) {
+  // get visibility of bottom tools
+  return query<bool> (w, SLOT_BOTTOM_TOOLS_VISIBILITY);
+}
+
+inline void
+set_bottom_tools (widget w, widget bar) {
+  // set bottom tools
+  write (w, SLOT_BOTTOM_TOOLS, bar);
 }
 
 inline void
@@ -680,7 +715,7 @@ add_input_proposal (widget w, string s) {
 
 inline void
 set_file (widget w, string s) {
-  // set current file of file chooser widget
+  // set current file of file chooser widget or texmacs window
   send<string> (w, SLOT_FILE, s);
 }
 

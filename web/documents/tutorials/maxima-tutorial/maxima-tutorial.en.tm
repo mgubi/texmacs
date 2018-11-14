@@ -9,7 +9,7 @@
   System (CAS) maxima from <TeXmacs>. It should be valid for <TeXmacs>-1.0.5
   and maxima-5.9.2.
 
-  Let's start <TeXmacs>. We shall use the package <tmpackage|varsession>:
+  Let's start <TeXmacs>. We shall use the package <tmpackage|framed-session>:
 
   <postscript|c0.png|*5/8|*5/8||||>
 
@@ -106,7 +106,7 @@
   Note a subtle point: the integral sign (or the sum or product sign) is
   considered as a kind of an ``opening bracket'', and there is the
   corresponding ``closing bracket'', which is invisible, but it shows where
-  your integral ends. You can see it in the <menu|Document|View|Edit source
+  your integral ends. You can see it in the <menu|Document|Source|Edit source
   tree> mode as <explain-macro|big\|.>. With out setting of
   <menu|Edit|Preferences|Keyboard|Automatically close brackets>, it is
   automatically produced after the integral sign when you input it; if you

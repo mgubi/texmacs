@@ -87,9 +87,9 @@
 	((string-starts? s "<b-") `(h:b (h:var ,(tmhtml-sub-token s 3))))
 	((string-starts? s "<")
 	 (with encoded (cork->utf8 s)
-	   (utf8->html (if (== s encoded)
-			   (old-tm->xml-cdata s)
-			   encoded))))
+           (if (== s encoded)
+             (utf8->html (old-tm->xml-cdata s))
+             `(h:var ,(utf8->html encoded)))))
 	(else s)))
 
 (define (tmhtml-string s)
@@ -108,7 +108,7 @@
 (define cork-rdquo (char->string (integer->char 17)))
 
 (define (make-ligatures s)
-  ;; Make texmacs ligatures in Cork encoding  
+  ;; Make texmacs ligatures in Cork encoding
   (string-replace
    (string-replace
     (string-replace s "--" cork-endash) "``" cork-ldquo) "''" cork-rdquo))
@@ -129,6 +129,7 @@
 		    (tmhtml-find-title (cdr doc)))))))
 
 (define (tmhtml-css-header)
+  ;; TODO: return only used CSS properties
   (let ((html
 	 (string-append
 	  "body { text-align: justify } "
@@ -147,6 +148,16 @@
 	  ".compact-block p { margin-top: 0px; margin-bottom: 0px } "
 	  ".left-tab { text-align: left } "
 	  ".center-tab { text-align: center } "
+          ".balloon-anchor { border-bottom: 1px dotted #000000; outline:none;"
+          "                  cursor: help; position: relative; }"
+          ".balloon-anchor [hidden] { margin-left: -999em; position: absolute;"
+                                    " display: none; }"
+          ".balloon-anchor:hover [hidden] { position: absolute; left: 1em;"
+                                 " top: 2em; z-index: 99; margin-left: 0;"
+                                 " width: 500px; display: inline-block; }"
+          ".balloon-body { }"
+	  ".ornament  { border-width: 1px; border-style: solid; border-color: "
+                      " black; display: inline-block; padding: 0.2em; } "
 	  ".right-tab { float: right; position: relative; top: -1em } "))
 	(mathml "math { font-family: cmr, times, verdana } "))
     (if tmhtml-mathml? (string-append html mathml) html)))
@@ -196,7 +207,8 @@
 	       (script `(h:script (@ (language "javascript")) ,code)))
 	  (set! xhead (append xhead (list script)))))
     (if (or (in? "tmdoc" styles) (in? "tmweb" styles)
-            (in? "mmxdoc" styles) (in? "magix-web" styles))
+            (in? "mmxdoc" styles) (in? "magix-web" styles)
+            (in? "max-web" styles))
 	(set! body (tmhtml-tmdoc-post body)))
     `(h:html
       (h:head
@@ -215,9 +227,13 @@
       (xmlns:m "http://www.w3.org/1998/Math/MathML")
       (xmlns:x "http://www.texmacs.org/2002/extensions")))
   (define doctype-list
-    (let ((html "-//W3C//DTD XHTML 1.1 plus MathML 2.0//EN")
-	  (mathml "http://www.w3.org/TR/MathML2/dtd/xhtml-math11-f.dtd"))
-      (if tmhtml-mathml? (list html mathml) (list html))))
+    (let ((html       "-//W3C//DTD XHTML 1.1//EN")
+          (mathml     "-//W3C//DTD XHTML 1.1 plus MathML 2.0//EN")
+	  (html-drd   "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd")
+	  (mathml-drd (string-append
+                        "http://www.w3.org/2002/04/xhtml-math-svg/"
+                        "xhtml-math-svg.dtd")))
+      (if tmhtml-mathml? (list mathml mathml-drd) (list html html-drd))))
   `(*TOP* (*PI* xml "version=\"1.0\" encoding=\"UTF-8\"")
 	  (*DOCTYPE* html PUBLIC ,@doctype-list)
 	  ,((cut sxml-set-attrs <> xmlns-attrs)
@@ -631,12 +647,20 @@
   `("not(" ,@(tmhtml (car l)) ")"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Shape conversions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tmshape->htmllength x)
+  (if (== (tmhtml-force-string x) "rounded") "15px" "0px"))
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Color conversions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tmcolor->htmlcolor x)
   (with s (tmhtml-force-string x)
     (cond ((== s "light grey") "#d0d0d0")
+	  ((== s "pastel grey") "#dfdfdf")
 	  ((== s "dark grey") "#707070")
 	  ((== s "dark red") "#800000")
 	  ((== s "dark green") "#008000")
@@ -687,7 +711,8 @@
 			       (= x (exact->inexact (inexact->exact x))))
 			  (inexact->exact x) x))))
 
-(define (tmlength->htmllength len css?)
+(define (tmlength->htmllength len . css?)
+  (if (list>0? css?) (set! css? (car css?)) (set! css? #t))
   (and-let* ((len-str (tmhtml-force-string len))
 	     (tmlen (string->tmlength len-str))
 	     (dummy2? (not (tmlength-null? tmlen)))
@@ -708,7 +733,7 @@
 	   (string-append (number->htmlstring val) "px"))
 	  (css? len)
 	  (else (number->htmlstring (* cmpx val incm))))))
- 
+
 (define (tmlength->px len)
   (and-let* ((tmlen (string->tmlength len))
 	     (dummy? (not (tmlength-null? tmlen)))
@@ -774,6 +799,8 @@
 (define (tmhtml-with-one var val arg)
   (cond ((logic-ref tmhtml-with-cmd% (list var val)) =>
 	 (lambda (w) (list (append w (tmhtml arg)))))
+	((logic-ref tmhtml-with-cmd% (list var)) =>
+	 (lambda (x) (ahash-with tmhtml-env x val (tmhtml arg))))
 	((logic-ref tmhtml-with-cmd% var) =>
 	 (lambda (h) (h val arg)))
 	(else (tmhtml arg))))
@@ -785,6 +812,9 @@
 	 (string-append (tmhtml-force-string (cadr x)) "tmpt"))
 	((func? x 'tmlen 3)
 	 (string-append (tmhtml-force-string (caddr x)) "tmpt"))
+	((func? x 'tuple)
+         (apply string-append (list-intersperse
+                                (map tmhtml-force-string (cdr x)) ";")))
 	;;(else (force-string x))))
 	(else (texmacs->code x "utf-8"))))
 
@@ -864,7 +894,9 @@
   ;; in order to disable this suffix change
   (let* ((sdir (string-rindex s #\/))
 	 (sep (string-rindex s #\#)))
-    (cond ((or (string-starts? s "http:") (string-starts? s "ftp:")) s)
+    (cond ((or (string-starts? s "http:")
+               (string-starts? s "https:")
+               (string-starts? s "ftp:")) s)
           ((and sep (or (not sdir) (< sdir sep)))
 	   (string-append (tmhtml-suffix (substring s 0 sep))
 			  (string-drop s sep)))
@@ -1052,16 +1084,18 @@
 (define (tmhtml-png y)
   (let* ((mag (ahash-ref tmhtml-env :mag))
 	 (x (if (or (nstring? mag) (== mag "1")) y
-		`(with "font-size" ,mag ,y)))
+		`(with "magnification" ,mag ,y)))
 	 (l1 (tmhtml-collect-labels y))
 	 (l2 (if (null? l1) l1 (list (car l1)))))
     (with cached (ahash-ref tmhtml-image-cache x)
       (if (not cached)
 	  (receive (name-url name-string) (tmhtml-image-names "png")
 	    ;;(display* x " -> " name-url ", " name-string "\n")
-	    (let* ((extents (print-snippet name-url x))
-		   ;;(pixels (inexact->exact (/ (second extents) 2100)))
-		   (pixels (inexact->exact (/ (second extents) 2000)))
+	    (let* ((extents (print-snippet name-url x #t))
+                   (dpi (string->number (get-preference "printer dpi")))
+                   (den (/ (* dpi 2200.0) 600.0))
+                   ;;(den (/ (* dpi 2000.0) 600.0))
+		   (pixels (inexact->exact (/ (second extents) den)))
 		   (valign (number->htmlstring pixels))
 		   (style (string-append "vertical-align: " valign "px")))
 	      ;;(display* x " -> " extents "\n")
@@ -1105,6 +1139,60 @@
             `((h:img (@ (src ,s)
                         ,@(if w `((width ,w)) '())
                         ,@(if h `((height ,h)) '()))))))))
+
+(define (tmhtml-ornament-get-env-style)
+  (let* ((l0 (hash-map->list list tmhtml-env))
+         (l1 (filter (lambda (x)
+                       (and (list>0? (car x))
+                            (cadr x)
+                            (string-prefix? "#:ornament-"
+                                            (object->string (caar x))))) l0))
+         (l2   (map car l1))
+         (args (map cadr l1))
+         (funs (map cAr l2))
+         (stys (map (lambda (x) (cdr (cDr x))) l2)))
+    (apply
+      string-append
+      (list-intersperse
+        (map (lambda (f arg sty)
+               (with args (string-tokenize-by-char arg #\;)
+                 (apply
+                   string-append
+                   (list-intersperse
+                     (cond ((== (length args) (length sty))
+                            (map (lambda (x y)
+                                   (string-append x ":" (f y))) sty args))
+                           ((>= 1 (length sty))
+                            (map (lambda (y)
+                                   (string-append (car sty) ":" (f y))) args))
+                           (else '()))
+                     ";"))))
+             funs args stys) ";"))))
+
+(define (contains-surround? l)
+  (cond ((nlist? l) #f)
+        ((func? l 'surround 3) #t)
+        (else (with r #f
+                (for-each (lambda (x)
+                            (set! r (or r (contains-surround? x)))) l)
+                r))))
+
+(define (tmhtml-ornament l)
+  (let* ((body (tmhtml (car l)))
+         (styl (tmhtml-ornament-get-env-style))
+         (styl (if (contains-surround? l)
+                 (string-append styl ";display:block;") styl))
+         (args (if (== styl "") '() `((style ,styl))))
+         (tag  (if (stm-block-structure? (car l)) 'h:div 'h:span)))
+    `((,tag (@ (class "ornament") ,@args) ,@body))))
+
+(define (tmhtml-balloon l)
+  (let* ((anch (tmhtml (car  l)))
+         (body (tmhtml (cadr l)))
+         (tag1 (if (stm-block-structure? (car  l)) 'h:div 'h:span))
+         (tag2 (if (stm-block-structure? (cadr l)) 'h:div 'h:span)))
+    `((,tag1 (@ (class "balloon-anchor")) ,@anch
+             (,tag2 (@ (class "balloon-body") (hidden "hidden")) ,@body)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Standard markup
@@ -1290,6 +1378,7 @@
   (list `(h:div (@ (class "tmdoc-license")) ,@(tmhtml (car l)))))
 
 (define (tmhtml-key l)
+  ;; `((h:u (h:tt ,@(tmhtml (tm->stree (tmdoc-key (car l))))))))
   `((h:u (h:tt ,@(tmhtml (car l))))))
 
 (define (tmhtml-tmdoc-bar? y)
@@ -1379,6 +1468,7 @@
   (dlines tmhtml-datoms)
   (dpages tmhtml-datoms)
   (dbox tmhtml-datoms)
+  (locus tmhtml-datoms)
 
   (with-limits tmhtml-noop)
   (line-break tmhtml-noop)
@@ -1394,6 +1484,10 @@
   (page-break tmhtml-noop)
   (no-page-break* tmhtml-noop)
   (no-page-break tmhtml-noop)
+  (no-break-here* tmhtml-noop)
+  (no-break-here tmhtml-noop)
+  (no-break-start tmhtml-noop)
+  (no-break-end tmhtml-noop)
   (new-page* tmhtml-noop)
   (new-page tmhtml-noop)
   (new-dpage* tmhtml-noop)
@@ -1433,7 +1527,7 @@
   (mark tmhtml-mark)
   (eval tmhtml-noop)
   ((:or if if* case while for-each extern include use-package) tmhtml-noop)
-  
+
   ((:or or xor and not plus minus times over div mod merge length range
 	number date translate is-tuple look-up equal unequal less lesseq
 	greater greatereq if case while extern authorize)
@@ -1462,6 +1556,8 @@
   (graphics tmhtml-graphics)
   ((:or point line arc bezier) tmhtml-noop)
   (image tmhtml-image)
+  (ornament tmhtml-ornament)
+  ((:or mouse-over-balloon mouse-over-balloon*) tmhtml-balloon)
 
   (!file tmhtml-file))
 
@@ -1500,6 +1596,7 @@
   (acronym (h:acronym))
   (verbatim ,tmhtml-verbatim)
   (code ,tmhtml-verbatim)
+  (nbsp ,(lambda x '("&nbsp;")))
   ;; Presentation
   (tt (h:tt))
   (hrule (h:hr))
@@ -1513,6 +1610,7 @@
   (equation* ,tmhtml-equation*)
   (equation-lab ,tmhtml-equation-lab)
   (equations-base ,tmhtml-equation*)
+  (wide-float tmhtml-float)
   ;; tags for customized html generation
   (html-div ,tmhtml-html-div)
   (html-style ,tmhtml-html-style)
@@ -1540,6 +1638,27 @@
   ("par-right" ,tmhtml-with-par-right)
   ("par-first" ,tmhtml-with-par-first)
   ("par-par-sep" ,tmhtml-with-par-par-sep)
+  (("ornament-hpadding")      (:ornament-hpadding
+                                "padding-left" "padding-right"
+                                ,tmlength->htmllength))
+  (("ornament-vpadding")      (:ornament-vpadding
+                                "padding-top"  "padding-bottom"
+                                ,tmlength->htmllength))
+  (("ornament-border")        (:ornament-border
+                                "border-width"     ,tmlength->htmllength))
+  (("ornament-shape")         (:ornament-shape
+                                "border-radius"    ,tmshape->htmllength))
+  (("ornament-color")         (:ornament-color
+                                "background-color" ,tmcolor->htmlcolor))
+  (("ornament-shadow-color")  (:ornament-shadow-color
+                                "border-bottom-color" "border-right-color"
+                                ,tmcolor->htmlcolor))
+  (("ornament-sunny-color")   (:ornament-sunny-color
+                                "border-left-color" "border-top-color"
+                                ,tmcolor->htmlcolor))
+  ;;(("ornament-extra-color")   :ornament-extra-color ""  ,tmcolor->htmlcolor))
+  ;;(("ornament-swell")        :ornament-swell "" ,identity))
+  ;;(("ornament-title-style")   :ornament-title-style "" ,identity))
   (("font-family" "tt") (h:tt))
   (("font-family" "ss") (h:class (@ (style "font-family: sans-serif"))))
   (("font-series" "bold") (h:b))
@@ -1576,8 +1695,9 @@
       (let* ((body (tmfile-extract x 'body))
 	     (style* (tmfile-extract x 'style))
 	     (style (if (list? style*) style* (list style*)))
-	     (lan (tmfile-init x "language"))
-	     (doc (list '!file body style lan (url->string (get-texmacs-path)))))
+	     (lan (tmfile-language x))
+	     (doc (list '!file body style lan
+                        (url->string (get-texmacs-path)))))
 	(texmacs->html doc opts))
       (begin
 	(tmhtml-initialize opts)

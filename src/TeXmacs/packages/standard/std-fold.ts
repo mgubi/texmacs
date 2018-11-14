@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.99.4>
 
 <style|<tuple|source|std>>
 
@@ -19,6 +19,24 @@
       which the software. If not, see <hlink|http://www.gnu.org/licenses/gpl-3.0.html|http://www.gnu.org/licenses/gpl-3.0.html>.
     </src-license>
   </src-title>>
+
+  <\active*>
+    <\src-comment>
+      Customizable and shown content.
+    </src-comment>
+  </active*>
+
+  <assign|hidden*|<macro|body|<hidden|<arg|body>>>>
+
+  <assign|shown*|<macro|body|<arg|body>>>
+
+  <drd-props|hidden*|arity|1|hidden|all|unaccessible|all|border|no>
+
+  <assign|hidden-deleted|<macro|body|<with|hidden*|<macro|x|<hidden|<arg|x>>>|<arg|body>>>>
+
+  <assign|hidden-invisible|<macro|body|<with|hidden*|<macro|x|<with|opacity|0|<arg|x>>>|<arg|body>>>>
+
+  <assign|hidden-greyed|<macro|body|<with|hidden*|<macro|x|<with|opacity|0.1|<arg|x>>>|<arg|body>>>>
 
   <\active*>
     <\src-comment>
@@ -56,16 +74,20 @@
     </surround>
   </macro>>
 
-  <assign|render-folded-documentation|<\macro|button|body>
-    <\surround||<right-flush><vspace|0.5fn>>
-      <arg|body> <arg|button>
+  <assign|render-folded-documentation|<\macro|button|body1|body2>
+    <\surround||<right-flush><arg|button><vspace|0.5fn>>
+      <arg|body1>
     </surround>
+
+    <hidden|<arg|body2>>
   </macro>>
 
-  <assign|render-unfolded-documentation|<\macro|button|body>
+  <assign|render-unfolded-documentation|<\macro|button|body1|body2>
     <\surround||<right-flush><arg|button><vspace|0.5fn>>
-      <arg|body>
+      <arg|body1>
     </surround>
+
+    <arg|body2>
   </macro>>
 
   <assign|render-folded-grouped|<\macro|button|body>
@@ -102,7 +124,7 @@
   </macro>>
 
   <assign|folded-std|<\macro|x|y>
-    <\render-folded-std|<action|<resize|<active*|<with|mode|math|<op|\<circ\>>>>|||<maximum|1r|1.5fn>|>|(mouse-unfold)|<arg|x>>>
+    <\render-folded-std|<action|<resize|<active*|<with|mode|math|<op|\<circ\>>>>|||<maximum|1r|1.5fn>|>|mouse-unfold|<arg|x>>>
       <arg|x>
 
       <hidden|<arg|y>>
@@ -110,7 +132,7 @@
   </macro>>
 
   <assign|unfolded-std|<\macro|x|y>
-    <\render-folded-std|<action|<resize|<active*|<with|mode|math|\<bullet\>>>|||<maximum|1r|1.5fn>|>|(mouse-fold)|<arg|x>>>
+    <\render-folded-std|<action|<resize|<active*|<with|mode|math|\<bullet\>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|x>>>
       <arg|x>
 
       <arg|y>
@@ -118,7 +140,7 @@
   </macro>>
 
   <assign|folded-env|<\macro|x|y>
-    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|(mouse-unfold)|<arg|x>>>
+    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|mouse-unfold|<arg|x>>>
       <arg|x>
 
       <hidden|<arg|y>>
@@ -126,7 +148,7 @@
   </macro>>
 
   <assign|unfolded-env|<\macro|x|y>
-    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|(mouse-fold)|<arg|x>>>
+    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|x>>>
       <arg|x>
 
       <arg|y>
@@ -134,33 +156,43 @@
   </macro>>
 
   <assign|folded-explain|<\macro|x|y>
-    <\render-folded-explain|<with|color*|<value|color>|<action|<with|color|<value|color*>|<arg|x>>|(mouse-unfold)|<arg|x>>>>
+    <\render-folded-explain|<with|color*|<value|color>|<action|<with|color|<value|color*>|<arg|x>>|mouse-unfold|<arg|x>>>>
       <hidden|<arg|y>>
     </render-folded-explain>
   </macro>>
 
   <assign|unfolded-explain|<\macro|x|y>
-    <\render-folded-explain|<with|color*|<value|color>|<action|<with|color|<value|color*>|<arg|x>>|(mouse-fold)|<arg|x>>>>
+    <\render-folded-explain|<with|color*|<value|color>|<action|<with|color|<value|color*>|<arg|x>>|mouse-fold|<arg|x>>>>
       <arg|y>
     </render-folded-explain>
   </macro>>
 
   <assign|folded-documentation|<\macro|x|y>
-    <\render-folded-documentation|<action|<with|color|#336666|<strong|<large|<math|<op|\<ldots\>>>>>>|(mouse-unfold)|<arg|x>>>
-      <strong|<large|<arg|x>>><hidden|<arg|y>>
+    <\render-folded-documentation|<action|<with|color|#336666|<strong|<large|<math|<op|\<Downarrow\>>>>>>|mouse-unfold|<arg|x>>>
+      <strong|<large|<arg|x>>>
+    <|render-folded-documentation>
+      <hidden|<arg|y>>
     </render-folded-documentation>
   </macro>>
 
   <assign|unfolded-documentation|<\macro|x|y>
-    <\render-unfolded-documentation|<action|<with|color|#336666|<strong|<math|<op|\<Leftarrow\>>>>>|(mouse-fold)|<arg|x>>>
+    <\render-unfolded-documentation|<action|<with|color|#336666|<strong|<math|<op|\<Uparrow\>>>>>|mouse-fold|<arg|x>>>
       <strong|<large|<arg|x>>>
+    </render-unfolded-documentation|<arg|y>>
+  </macro>>
 
-      <arg|y>
-    </render-unfolded-documentation>
+  <assign|picture-mixed|<\macro|x|y>
+    <action|<arg|x>|mouse-unfold|<arg|x>><hidden|<arg|y>>
+  </macro>>
+
+  <assign|source-mixed|<\macro|x|y>
+    <\render-folded-std|<action|<resize|<active*|<with|mode|math|||||\<blacktriangleleft\>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<verbatim|<arg|y>>>>
+      <verbatim|<arg|y>><hidden|<arg|x>>
+    </render-folded-std>
   </macro>>
 
   <assign|folded-grouped|<\macro|x|y>
-    <\render-folded-grouped|<action| |(mouse-unfold)|<arg|x>>>
+    <\render-folded-grouped|<action| |mouse-unfold|<arg|x>>>
       <arg|x>
 
       <hidden|<arg|y>>
@@ -168,7 +200,7 @@
   </macro>>
 
   <assign|unfolded-grouped|<\macro|x|y>
-    <\render-folded-grouped|<action| |(mouse-fold)|<arg|x>>>
+    <\render-folded-grouped|<action| |mouse-fold|<arg|x>>>
       <arg|x>
 
       <arg|y>
@@ -178,6 +210,10 @@
   <assign|folded|<value|folded-std>>
 
   <assign|unfolded|<value|unfolded-std>>
+
+  <assign|folded-subsession|<value|folded-std>>
+
+  <assign|unfolded-subsession|<value|unfolded-std>>
 
   \;
 
@@ -191,9 +227,13 @@
 
   <drd-props|folded-documentation|arity|2|accessible|0|hidden|1>
 
+  <drd-props|picture-mixed|arity|2|accessible|0|hidden|1>
+
   <drd-props|folded-grouped|arity|2|accessible|0|hidden|1>
 
   <drd-props|folded|arity|2|accessible|0|hidden|1>
+
+  <drd-props|folded-subsession|arity|2|accessible|0|hidden|1>
 
   <\active*>
     <\src-comment>
@@ -214,49 +254,49 @@
   </macro>>
 
   <assign|summarized-std|<\macro|x|y>
-    <\render-folded-std|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|(mouse-unfold)|<arg|x>>>
+    <\render-folded-std|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|mouse-unfold|<arg|x>>>
       <arg|x>
     </render-folded-std>
   </macro>>
 
   <assign|detailed-std|<\macro|x|y>
-    <\render-folded-std|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|(mouse-fold)|<arg|x>>>
+    <\render-folded-std|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|x>>>
       <arg|y>
     </render-folded-std>
   </macro>>
 
   <assign|summarized-env|<\macro|x|y>
-    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|(mouse-unfold)|<arg|x>>>
+    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|<op|\<circ\>>>>>|||<maximum|1r|1.5fn>|>|mouse-unfold|<arg|x>>>
       <arg|x>
     </render-folded-env>
   </macro>>
 
   <assign|detailed-env|<\macro|x|y>
-    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|(mouse-fold)|<arg|x>>>
+    <\render-folded-env|<action|<resize|<specific|screen|<active*|<with|mode|math|\<bullet\>>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|x>>>
       <arg|y>
     </render-folded-env>
   </macro>>
 
   <assign|summarized-grouped|<\macro|x|y>
-    <\render-folded-grouped|<action| |(mouse-unfold)|<arg|x>>>
+    <\render-folded-grouped|<action| |mouse-unfold|<arg|x>>>
       <arg|x>
     </render-folded-grouped>
   </macro>>
 
   <assign|detailed-grouped|<\macro|x|y>
-    <\render-folded-grouped|<action| |(mouse-fold)|<arg|x>>>
+    <\render-folded-grouped|<action| |mouse-fold|<arg|x>>>
       <arg|y>
     </render-folded-grouped>
   </macro>>
 
   <assign|summarized-documentation|<\macro|x|y>
-    <\render-folded-documentation|<action|<with|color|#336666|<strong|<large|<math|<op|\<ldots\>>>>>>|(mouse-unfold)|<arg|x>>>
+    <\render-folded-documentation|<action|<with|color|#336666|<strong|<large|<math|<op|\<ldots\>>>>>>|mouse-unfold|<arg|x>>>
       <strong|<large|<arg|x>>>
     </render-folded-documentation>
   </macro>>
 
   <assign|detailed-documentation|<\macro|x|y>
-    <\render-unfolded-documentation|<action|<with|color|#336666|<strong|<math|<op|\<Leftarrow\>>>>>|(mouse-fold)|<arg|x>>>
+    <\render-unfolded-documentation|<action|<with|color|#336666|<strong|<math|<op|\<Leftarrow\>>>>>|mouse-fold|<arg|x>>>
       <arg|y>
     </render-unfolded-documentation>
   </macro>>
@@ -265,11 +305,11 @@
 
   <assign|detailed-raw|<macro|x|y|<arg|y>>>
 
-  <assign|unfold-summarized|<macro|x|<action|<arg|x>|(mouse-unfold)|<arg|x>>>>
+  <assign|unfold-summarized|<macro|x|<action|<arg|x>|mouse-unfold|<arg|x>>>>
 
-  <assign|fold-detailed|<macro|x|<action|<arg|x>|(mouse-fold)|<arg|x>>>>
+  <assign|fold-detailed|<macro|x|<action|<arg|x>|mouse-fold|<arg|x>>>>
 
-  <assign|summarized-tiny|<macro|x|y|<action|<arg|x>|(mouse-unfold)|<arg|x>>>>
+  <assign|summarized-tiny|<macro|x|y|<action|<arg|x>|mouse-unfold|<arg|x>>>>
 
   <assign|detailed-tiny|<macro|x|y|<arg|y>>>
 
@@ -305,20 +345,78 @@
 
   <\active*>
     <\src-comment>
+      Tags for unrolls.
+    </src-comment>
+  </active*>
+
+  <assign|unroll|<\xmacro|switch-args>
+    <\surround||<right-flush>>
+      <\quasi>
+        <unquote*|<quote-arg|switch-args>>
+      </quasi>
+    </surround>
+  </xmacro>>
+
+  <assign|unroll-phantoms|<\xmacro|switch-args>
+    <\surround||<right-flush>>
+      <\hidden-invisible>
+        <\quasi>
+          <unquote*|<quote-arg|switch-args>>
+        </quasi>
+      </hidden-invisible>
+    </surround>
+  </xmacro>>
+
+  <assign|unroll-compressed|<\xmacro|switch-args>
+    <\surround||<right-flush>>
+      <\hidden-deleted>
+        <\quasi>
+          <unquote*|<quote-arg|switch-args>>
+        </quasi>
+      </hidden-deleted>
+    </surround>
+  </xmacro>>
+
+  <assign|unroll-greyed|<\xmacro|switch-args>
+    <\surround||<right-flush>>
+      <\hidden-greyed>
+        <\quasi>
+          <unquote*|<quote-arg|switch-args>>
+        </quasi>
+      </hidden-greyed>
+    </surround>
+  </xmacro>>
+
+  \;
+
+  <drd-props|unroll|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <drd-props|unroll-phantoms|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <drd-props|unroll-compressed|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <drd-props|unroll-greyed|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <\active*>
+    <\src-comment>
       Tags for switches.
     </src-comment>
   </active*>
 
-  <assign|document-block|<\xmacro|switch-args>
+  <assign|deprecated-document-block|<\xmacro|switch-args>
     <surround||<right-flush>|<\quasi>
       <unquote*|<quote-arg|switch-args>>
     </quasi>>
   </xmacro>>
 
+  <assign|document-block|<\xmacro|switch-args>
+    <surround||<right-flush>|<map-args|identity|document|switch-args>>
+  </xmacro>>
+
   <assign|tiny-block|<xmacro|switch-args|<map-args|identity|concat|switch-args>>>
 
   <assign|slide|<\macro|body>
-    <\surround||<right-flush><new-page>>
+    <\surround||<new-page>>
       <arg|body>
     </surround>
   </macro>>
@@ -329,6 +427,10 @@
     </quasi>>
   </xmacro>>
 
+  <assign|slideshow|<\macro|body>
+    <arg|body>
+  </macro>>
+
   \;
 
   <assign|switch|<value|document-block>>
@@ -336,8 +438,6 @@
   <assign|screens|<value|document-block>>
 
   <assign|tiny-switch|<value|tiny-block>>
-
-  <assign|unroll|<value|document-block>>
 
   <assign|expanded|<value|document-block>>
 
@@ -351,11 +451,13 @@
 
   <drd-props|tiny-switch|arity|<tuple|repeat|1|1>|accessible|all>
 
-  <drd-props|unroll|arity|<tuple|repeat|1|1>|accessible|all>
-
   <drd-props|expanded|arity|<tuple|repeat|1|1>|accessible|all>
 
   <drd-props|slides|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <drd-props|slide|arity|1|accessible|all|border|no>
+
+  <drd-props|slideshow|arity|1|accessible|all|border|no>
 
   \;
 
@@ -367,15 +469,119 @@
 
   <\active*>
     <\src-comment>
+      Overlays.
+    </src-comment>
+  </active*>
+
+  <assign|overlays|<macro|current|total|body|<with|overlay-nr|<arg|current>|<\surround||<right-flush>>
+    <arg|body>
+  </surround>>>>
+
+  <assign|overlays-phantoms|<\macro|current|total|body>
+    <\overlays|<arg|current>|<arg|total>>
+      <\hidden-invisible>
+        <arg|body>
+      </hidden-invisible>
+    </overlays>
+  </macro>>
+
+  <assign|overlays-compressed|<\macro|current|total|body>
+    <\overlays|<arg|current>|<arg|total>>
+      <\hidden-deleted>
+        <arg|body>
+      </hidden-deleted>
+    </overlays>
+  </macro>>
+
+  <assign|overlays-greyed|<\macro|current|total|body>
+    <\overlays|<arg|current>|<arg|total>>
+      <\hidden-greyed>
+        <arg|body>
+      </hidden-greyed>
+    </overlays>
+  </macro>>
+
+  <assign|overlays-range|<macro|start|end|body|<with|overlay-nr|<arg|start>|<arg|body>>>>
+
+  \;
+
+  <assign|show-always|<macro|here|true>>
+
+  <assign|show-from|<macro|start|<greatereq|<value|overlay-nr>|<arg|start>>>>
+
+  <assign|show-until|<macro|end|<lesseq|<value|overlay-nr>|<arg|end>>>>
+
+  <assign|show-this|<macro|here|<equal|<value|overlay-nr>|<arg|here>>>>
+
+  <assign|show-other|<macro|avoid|<unequal|<value|overlay-nr>|<arg|avoid>>>>
+
+  \;
+
+  <assign|overlay-cond|<macro|cond|body|<compound|<if|<arg|cond>|shown*|hidden*>|<arg|body>>>>
+
+  <assign|overlay-from|<macro|start|body|<overlay-cond|<greatereq|<value|overlay-nr>|<arg|start>>|<arg|body>>>>
+
+  <assign|overlay-until|<macro|end|body|<overlay-cond|<lesseq|<value|overlay-nr>|<arg|end>>|<arg|body>>>>
+
+  <assign|overlay-this|<macro|here|body|<overlay-cond|<equal|<value|overlay-nr>|<arg|here>>|<arg|body>>>>
+
+  <assign|overlay-other|<macro|avoid|body|<overlay-cond|<unequal|<value|overlay-nr>|<arg|avoid>>|<arg|body>>>>
+
+  \;
+
+  <assign|alternate-cond|<macro|cond|b1|b2|<style-with|src-compact|none|<superpose|<compound|<if|<arg|cond>|hidden*|shown*>|<arg|b1>>|<compound|<if|<arg|cond>|shown*|hidden*>|<arg|b2>>>>>>
+
+  <assign|alternate-from|<macro|start|b1|b2|<alternate-cond|<greatereq|<value|overlay-nr>|<arg|start>>|<arg|b1>|<arg|b2>>>>
+
+  <assign|alternate-until|<macro|end|b1|b2|<alternate-cond|<lesseq|<value|overlay-nr>|<arg|end>>|<arg|b1>|<arg|b2>>>>
+
+  <assign|alternate-this|<macro|here|b1|b2|<alternate-cond|<equal|<value|overlay-nr>|<arg|here>>|<arg|b1>|<arg|b2>>>>
+
+  <assign|alternate-other|<macro|avoid|b1|b2|<alternate-cond|<unequal|<value|overlay-nr>|<arg|avoid>>|<arg|b1>|<arg|b2>>>>
+
+  \;
+
+  <assign|alter-colors|<macro|body|hidden-color|shown-color|<style-with|src-compact|none|<with|hidden*|<quasi|<macro|x|<with|color|<unquote|<arg|hidden-color>>|<arg|x>>>>|shown*|<quasi|<macro|x|<with|color|<unquote|<arg|shown-color>>|<arg|x>>>>|<arg|body>>>>>
+
+  <drd-props|alter-colors|arity|3|color|1|color|2>
+
+  <\active*>
+    <\src-comment>
+      Special macros for graphical slideshows.
+    </src-comment>
+  </active*>
+
+  <assign|gpag-length|<macro|1pag>>
+
+  <assign|gpar-length|<macro|1par>>
+
+  <assign|gr-screen|<macro|body|<arg|body><assign|gpag-length|<macro|1pag>>>>
+
+  <assign|gr-overlays|<macro|current|total|body|<with|overlay-nr|<arg|current>|<\surround||<right-flush>>
+    <arg|body>
+  </surround>>>>
+
+  <drd-props|gr-screen|arity|1|accessible|all|border|outer>
+
+  <drd-props|gr-overlays|arity|3|accessible|2|hidden|0|hidden|1|border|outer>
+
+  <\active*>
+    <\src-comment>
       Help balloons.
     </src-comment>
   </active*>
 
-  <assign|mouse-over|<macro|body|destination|where|<style-with|src-compact|none|<locus|<id|<hard-id|<arg|body>>>|<link|mouse-over|<id|<hard-id|<arg|body>>>|<script|<arg|destination>|<arg|where>>>|<arg|body>>>>>
+  <assign|on-event|<xmacro|args|<style-with|src-compact|none|<locus|<id|<hard-id|<arg|args|1>>>|<link|<arg|args|0>|<id|<hard-id|<arg|args|1>>>|<map-args|identity|script|args|2>>|<arg|args|1>>>>>
 
-  <assign|move-over-balloon|<macro|x|y|<mouse-over|<arg|x>|(show-move-over-balloon)|<arg|x>>>>
+  <assign|mouse-over-balloon|<macro|x|y|halign|valign|<on-event|mouse-over|<arg|x>|display-balloon|<arg|x>|<arg|y>|<arg|halign>|<arg|valign>|<box-info|<arg|y>|wh>>>>
 
-  <assign|help-balloon|<macro|x|y|<mouse-over|<arg|x>|(show-help-balloon)|<arg|x>>>>
+  <assign|mouse-over-balloon*|<macro|x|y|halign|valign|<on-event|mouse-over|<arg|x>|display-balloon*|<arg|x>|<arg|y>|<arg|halign>|<arg|valign>|<box-info|<arg|y>|wh>>>>
+
+  <assign|focus-balloon|<macro|x|y|halign|valign|<on-event|focus|<arg|x>|display-balloon|<arg|x>|<arg|y>|<arg|halign>|<arg|valign>|<box-info|<arg|y>|wh>>>>
+
+  <assign|help-balloon-color|pastel yellow>
+
+  <assign|help-balloon|<macro|x|y|halign|valign|<mouse-over-balloon*|<arg|x>|<colored-frame|<value|help-balloon-color>|<arg|y>>|<arg|halign>|<arg|valign>>>>
 
   <\active*>
     <\src-comment>
@@ -399,6 +605,12 @@
     <hidden|<set-part|<arg|id>|<if|<sectional-short-style>|<arg|active>|<arg|inactive>>>>
   </macro>>
 
+  <assign|hide-para|<\macro|body>
+    <hidden|<arg|body>>
+  </macro>>
+
+  <assign|blank-line|<macro|>>
+
   <drd-props|show-preamble|border|no>
 
   <drd-props|hide-preamble|border|no>
@@ -407,15 +619,21 @@
 
   <drd-props|hide-part|border|no|arity|3|hidden|1>
 
+  <drd-props|hide-para|border|no>
+
   <\active*>
     <\src-comment>
       Different versions of parts of documents.
     </src-comment>
   </active*>
 
-  <assign|render-old|<macro|old|<with|color|dark red|<arg|old>>>>
+  <assign|old-version-color|dark red>
 
-  <assign|render-new|<macro|new|<with|color|dark green|<arg|new>>>>
+  <assign|new-version-color|dark green>
+
+  <assign|render-old|<macro|old|<with|color|<value|old-version-color>|<arg|old>>>>
+
+  <assign|render-new|<macro|new|<with|color|<value|new-version-color>|<arg|new>>>>
 
   <assign|version-old|<macro|old|new|<render-old|<arg|old>>>>
 

@@ -16,8 +16,6 @@
 	(dynamic scripts-edit)))
 
 (kbd-map
-  ("C-return" (script-eval))
-  ("A-return" (script-approx))
   ("script *" (make 'script-eval))
   ("script !" (make-script-input))
   ("script =" (toggle-keep-input))

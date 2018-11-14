@@ -12,6 +12,7 @@
 #include "X11/x_window.hpp"
 #include "message.hpp"
 #include "boot.hpp"
+#include "x_picture.hpp"
 
 extern int nr_windows;
 
@@ -38,9 +39,7 @@ x_window_rep::set_hints (int min_w, int min_h, int max_w, int max_h) {
 	  "out of memory (X server)");
 
   // time_t start_1= texmacs_time ();
-  if (!gui->xpm_pixmap->contains ("TeXmacs.xpm"))
-    ren->xpm_initialize ("TeXmacs.xpm");
-  Pixmap pm= (Pixmap) gui->xpm_pixmap ["TeXmacs.xpm"];
+  Pixmap pm= retrieve_pixmap (load_xpm ("TeXmacs.xpm"));
   // cout << "Getting pixmap required " << (texmacs_time ()-start_1) << " ms\n";
 
   // time_t start_2= texmacs_time ();
@@ -118,7 +117,10 @@ x_window_rep::initialize () {
   //     << def_w << ", " << def_h << " --- "
   //     << max_w << ", " << max_h << "\n";
   if (name == NULL) name= const_cast<char*> ("popup");
-  if (the_name == "") the_name= name;
+  if (the_name == "") {
+    the_name= name;
+    mod_name= name;
+  }
   set_hints (min_w, min_h, max_w, max_h);
 
   unsigned long ic_mask= 0;
@@ -155,12 +157,20 @@ x_window_rep::initialize () {
   notify_size (w, Def_w, Def_h);
 }
 
+static x_drawable_rep*
+new_drawable (x_gui gui, x_window win) {
+  // FIXME: for gcc 3.*, use this in order to avoid ambiguity
+  // for tm_new with two arguments
+  return new x_drawable_rep (gui, win);
+  //return tm_new<x_drawable_rep> (gui, win);
+}
+
 x_window_rep::x_window_rep (widget w2, x_gui gui2, char* n2,
 			    SI min_w, SI min_h, SI def_w, SI def_h,
 			    SI max_w, SI max_h):
   window_rep (), w (w2), gui (gui2),
   orig_name (n2 == ((char*) NULL)? string ("popup"): n2), name (n2),
-  ren (tm_new<x_drawable_rep> (gui2, this)),
+  ren (new_drawable (gui2, this)),
   Min_w (min_w), Min_h (min_h), Def_w (def_w), Def_h (def_h),
   Max_w (max_w), Max_h (max_h),
   win_x (0), win_y (0), win_w (Def_w/PIXEL), win_h (Def_h/PIXEL),
@@ -193,11 +203,6 @@ x_window_rep::get_widget () {
   return w;
 }
 
-renderer
-x_window_rep::get_renderer () {
-  return (renderer) ren;
-}
-
 void
 x_window_rep::get_extents (int& w, int& h) {
   w= win_w;
@@ -208,7 +213,7 @@ Window
 get_Window (widget w) {
   int id= get_identifier (w);
   if (id == 0) {
-    cerr << "\nwidget = " << w << "\n";
+    failed_error << "widget = " << w << "\n";
     FAILED ("widget is not attached to a window");
   }
   return (Window) id;
@@ -246,8 +251,7 @@ x_window_rep::get_position (SI& x, SI& y) {
 #else
   int xx, yy;
   Window ww;
-  bool b;
-  b=  XTranslateCoordinates (dpy, win, gui->root, 0, 0, &xx, &yy, &ww);
+  XTranslateCoordinates (dpy, win, gui->root, 0, 0, &xx, &yy, &ww);
   x=  xx*PIXEL;
   y= -yy*PIXEL;
 #endif
@@ -303,15 +307,29 @@ x_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 
 void
 x_window_rep::set_name (string name) {
-  c_string s (name);
-  XStoreName (dpy, win, s);
-  XSetIconName (dpy, win, s);
-  the_name= name;
+  if (the_name != name) {
+    c_string s (name);
+    XStoreName (dpy, win, s);
+    XSetIconName (dpy, win, s);
+    the_name= name;
+    mod_name= name;
+  }
 }
 
 string
 x_window_rep::get_name () {
   return the_name;
+}
+
+void
+x_window_rep::set_modified (bool flag) {
+  string name= (flag? (the_name * " *"): the_name);
+  if (mod_name != name) {
+    c_string s (name);
+    XStoreName (dpy, win, s);
+    XSetIconName (dpy, win, s);
+    mod_name= name;
+  }
 }
 
 void
@@ -461,8 +479,8 @@ x_window_rep::repaint_invalid_regions () {
     ren->encode (r->x1, r->y1);
     ren->encode (r->x2, r->y2);
     ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-    send_repaint (w, r->x1, r->y2, r->x2, r->y1);
-    if (ren->interrupted ())
+    send_repaint (w, ren, r->x1, r->y2, r->x2, r->y1);
+    if (gui_interrupted ())
       new_regions= rectangles (invalid_regions->item, new_regions);
     invalid_regions= invalid_regions->next;
   }
@@ -536,6 +554,10 @@ x_window_rep::delayed_message (widget wid, string s, time_t delay) {
 
 void
 x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
+  ren->set_origin(0,0);
+  begin_draw ();
+  ren->clip (x1, y1, x2, y2);
+
   SI X1= x1+ dx;
   SI Y2= y2+ dy;
   ren->decode (x1, y1);
@@ -559,6 +581,10 @@ x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
 
   if (x1<x2 && y2<y1)
     XCopyArea (dpy, win, win, gc, x1, y2, x2-x1, y1-y2, X1, Y2);
+  
+  
+  ren->unclip ();
+  end_draw ();
 }
 
 void
@@ -570,8 +596,8 @@ x_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
 }
 
 bool
-x_window_rep::repainted () {
-  return is_nil (invalid_regions);
+x_window_rep::is_invalid () {
+  return ! is_nil (invalid_regions);
 }
 
 /******************************************************************************

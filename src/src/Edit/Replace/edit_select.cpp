@@ -22,7 +22,7 @@
 
 string
 selection_encode (string lan, string s) {
-  if ((lan == "czech") || (lan == "hungarian") ||
+  if ((lan == "croatian") || (lan == "czech") || (lan == "hungarian") ||
       (lan == "polish") || (lan == "slovene"))
     return cork_to_il2 (s);
   else if (lan == "spanish")
@@ -34,7 +34,7 @@ selection_encode (string lan, string s) {
 
 string
 selection_decode (string lan, string s) {
-  if ((lan == "czech") || (lan == "hungarian") ||
+  if ((lan == "croatian") || (lan == "czech") || (lan == "hungarian") ||
       (lan == "polish") || (lan == "slovene"))
     return il2_to_cork (s);
   else if (lan == "spanish")
@@ -49,6 +49,7 @@ selection_decode (string lan, string s) {
 ******************************************************************************/
 
 edit_select_rep::edit_select_rep ():
+  cur_sel (no_ranges ()),
   selecting (false), shift_selecting (false), mid_p (),
   selection_import ("default"), selection_export ("default"),
   focus_p (), focus_hold (false) {}
@@ -106,6 +107,7 @@ edit_select_rep::semantic_select (path p, path& q1, path& q2, int mode) {
   path cp= (p <= tp? tp / p: path ());
   tree st= subtree (et, p);
   bool ret= packrat_select (lan, "Main", st, cp, p1, p2, mode);
+  p1= correct_right_most_inside (p1, st);
   if (ret) {
     q1= p * p1;
     q2= p * p2;
@@ -120,11 +122,10 @@ edit_select_rep::semantic_select (path p, path& q1, path& q2, int mode) {
 void
 edit_select_rep::select (path p1, path p2) {
   //cout << "Select " << p1 << " -- " << p2 << "\n";
-  if (start_p == p1 && end_p == p2) return;
+  if (cur_sel == simple_range (p1, p2)) return;
   if (!(rp <= p1 && rp <= p2)) return;
-  if (start_p == end_p && p1 == p2) {
-    start_p= copy (p1);
-    end_p  = copy (p2);
+  if (is_empty (cur_sel) && p1 == p2) {
+    cur_sel= simple_range (p1, p2);
     return;
   }
   if (p1 != p2) {
@@ -133,14 +134,10 @@ edit_select_rep::select (path p1, path p2) {
     if (!is_func (st, TABLE) && !is_func (st, ROW))
       (void) semantic_select (cp, p1, p2, 0);
   }
-  if (path_less (p1, p2)) {
-    start_p= copy (p1);
-    end_p  = copy (p2);
-  }
-  else {
-    start_p= copy (p2);
-    end_p  = copy (p1);
-  }
+  if (path_less (p1, p2))
+    cur_sel= simple_range (p1, p2);
+  else
+    cur_sel= simple_range (p2, p1);
   notify_change (THE_SELECTION);
 }
 
@@ -159,10 +156,10 @@ edit_select_rep::select_line () {
   select (search_parent_upwards (DOCUMENT));
 }
 
-void edit_select_rep::get_selection (path& start, path& end) {
-  start= copy (start_p); end= copy (end_p); }
-void edit_select_rep::set_selection (path start, path end) {
-  select (start, end); }
+void edit_select_rep::get_selection (path& p1, path& p2) {
+  p1= start (cur_sel); p2= end (cur_sel); }
+void edit_select_rep::set_selection (path p1, path p2) {
+  select (p1, p2); }
 
 /******************************************************************************
 * For interface with cursor movement
@@ -187,16 +184,15 @@ edit_select_rep::select_from_keyboard (bool flag) {
   selecting= flag;
   shift_selecting= false;
   if (flag) {
-    start_p= copy (tp);
+    cur_sel= simple_range (tp, tp);
     mid_p  = copy (tp);
-    end_p  = copy (tp);
   }
   else mid_p= rp;
 }
 
 void
 edit_select_rep::select_from_shift_keyboard () {
-  if (!shift_selecting || end_p == start_p) mid_p= copy (tp);
+  if (!shift_selecting || is_empty (cur_sel)) mid_p= copy (tp);
   selecting= true;
   shift_selecting= true;
 }
@@ -215,14 +211,14 @@ breaking_force (char c) {
 
 void
 edit_select_rep::select_enlarge_text () {
-  path p= common (start_p, end_p);
-  if (start_p == end_p) p= path_up (p);
+  path p= common (cur_sel);
+  if (is_empty (cur_sel) && !is_nil (p)) p= path_up (p);
   tree st= subtree (et, p);
   ASSERT (is_atomic (st), "non textual tree");
   string s= st->label;
   string mode= get_env_string (MODE);
-  int i1= last_item (start_p), j1= i1;
-  int i2= last_item (end_p), j2= i2;
+  int i1= last_item (start (cur_sel)), j1= i1;
+  int i2= last_item (end   (cur_sel)), j2= i2;
   path q= path_up (p);
 
   if (mode == "text" || mode == "src") {
@@ -272,12 +268,12 @@ incomplete_script_selection (tree t, path lp, path rp) {
 void
 edit_select_rep::select_enlarge () {
   path sp, sq;
-  if (start_p == end_p) {
-    sp= path_up (start_p);
+  if (is_empty (cur_sel) && !is_nil (start (cur_sel))) {
+    sp= path_up (start (cur_sel));
     sq= sp;
   }
   else {
-    sp= common (start_p, end_p);
+    sp= common (cur_sel);
     if (!(rp < sp)) {
       selection_cancel ();
       set_message ("", "");
@@ -285,8 +281,9 @@ edit_select_rep::select_enlarge () {
     }
     sq= path_up (sp);
   }
-  path pp= sp, p1= start_p, p2= end_p;
-  if (start_p == pp * 0 && end_p == pp * right_index (subtree (et, pp)))
+  path pp= sp, p1= start (cur_sel), p2= end (cur_sel);
+  if (start (cur_sel) == pp * 0 &&
+      end   (cur_sel) == pp * right_index (subtree (et, pp)))
     if (!is_nil (pp)) pp= path_up (pp);
   if (is_func (subtree (et, pp), TFORMAT)) pp= path_up (pp);
   if (semantic_select (pp, p1, p2, 1))
@@ -296,13 +293,13 @@ edit_select_rep::select_enlarge () {
     else select (sq * 0, sq * 1);
   }
 
-  path p = common (start_p, end_p);
+  path p = common (cur_sel);
   tree st= subtree (et, p);
   if (drd->var_without_border (L(st)) ||
       is_func (st, TFORMAT) ||
       is_func (st, DOCUMENT, 1) ||
       is_script (st) ||
-      incomplete_script_selection (st, start_p / p, end_p / p))
+      incomplete_script_selection (st, start (cur_sel) / p, end (cur_sel) / p))
     select_enlarge ();
   else {
     tree s;
@@ -334,8 +331,8 @@ stop_enlarge_environmental (tree t) {
 void
 edit_select_rep::select_enlarge_environmental () {
   select_enlarge ();
-  if (end_p == start_p) return;
-  path p= common (start_p, end_p);
+  if (is_empty (cur_sel)) return;
+  path p= common (cur_sel);
   tree st= subtree (et, p);
   if (stop_enlarge_environmental (st)) return;
   select_enlarge_environmental ();
@@ -347,8 +344,7 @@ edit_select_rep::select_enlarge_environmental () {
 
 bool
 edit_select_rep::selection_active_any () {
-  return end_p != start_p;
-  // return made_selection;
+  return !is_empty (cur_sel);
 }
 
 bool
@@ -359,13 +355,7 @@ edit_select_rep::selection_active_normal () {
 bool
 edit_select_rep::selection_active_table (bool strict) {
   if (!selection_active_any ()) return false;
-  path p= common (start_p, end_p);
-  if ((p == start_p) || (p == end_p)) p= path_up (p);
-  tree t= subtree (et, p);
-  return
-    is_func (t, TFORMAT) || is_func (t, TABLE) ||
-    is_func (t, ROW) || is_func (t, CELL) ||
-    (!strict && N(t) == 1 && is_func (t[0], TFORMAT));
+  return is_table_selection (et, start (cur_sel), end (cur_sel), strict);
 }
 
 bool
@@ -380,59 +370,7 @@ edit_select_rep::selection_active_small () {
 
 bool
 edit_select_rep::selection_active_enlarging () {
-  return (selecting || (end_p != start_p)) && (mid_p == tp);
-}
-
-/******************************************************************************
-* Subroutines for table selections
-******************************************************************************/
-
-static path
-table_search_format (tree t, path p) {
-  tree st= subtree (t, p);
-  if (is_func (st, TFORMAT) && is_func (st[N(st)-1], TABLE)) return p;
-  while ((!is_nil (p)) && (!is_func (subtree (t, p), TABLE))) p= path_up (p);
-  if ((!is_nil (p)) && (is_func (subtree (t, path_up (p)), TFORMAT)))
-    p= path_up (p);
-  return p;
-}
-
-static void
-table_search_coordinates (tree t, path p, int& row, int& col) {
-  row= col= 0;
-  while (true) {
-    if (is_nil (p)) p= path (1);
-    if (p == path (0)) p= path (0, 0);
-    if (p == path (1)) p= path (N(t)-1, 1);
-    if (is_func (t, TFORMAT));
-    else if (is_func (t, TABLE)) row= p->item;
-    else if (is_func (t, ROW)) col= p->item;
-    else return;
-    t= t [p->item];
-    p= p->next;
-  }
-}
-
-static path
-table_search_cell (tree t, int row, int col) {
-  path p;
-  while (is_func (t, TFORMAT)) {
-    p= p * (N(t)-1);
-    t= t [N(t)-1];
-  }
-  p= p * row;
-  t= t [row];
-  while (is_func (t, TFORMAT)) {
-    p= p * (N(t)-1);
-    t= t [N(t)-1];
-  }
-  p= p * col;
-  t= t [col];
-  while (is_func (t, TFORMAT)) {
-    p= p * (N(t)-1);
-    t= t [N(t)-1];
-  }
-  return p;
+  return (selecting || !is_empty (cur_sel)) && (mid_p == tp);
 }
 
 /******************************************************************************
@@ -454,90 +392,108 @@ path
 edit_select_rep::selection_get_subtable (
   int& row1, int& col1, int& row2, int& col2)
 {
-  if (selection_active_table ()) {
-    path fp= ::table_search_format (et, common (start_p, end_p));
-    if (is_nil (fp)) return fp;
-    tree st= subtree (et, fp);
-    table_search_coordinates (st, tail (start_p, N(fp)), row1, col1);
-    table_search_coordinates (st, tail (end_p, N(fp)), row2, col2);
-    if (row1>row2) { int tmp= row1; row1= row2; row2= tmp; }
-    if (col1>col2) { int tmp= col1; col1= col2; col2= tmp; }
-    table_bound (fp, row1, col1, row2, col2);
-    return fp;
-  }
-  else if (selection_active_table (false)) {
-    path fp= ::table_search_format (et, common (start_p, end_p) * 0);
-    if (is_nil (fp)) return fp;
-    path p= fp;
-    tree st;
-    while (true) {
-      st= subtree (et, p);
-      if (is_func (st, TABLE) && N(st) > 0 && is_func (st[0], ROW)) break;
-      if (!is_func (st, TFORMAT)) return path ();
-      p= p * (N(st) - 1);
-    }
-    row1= 0; col1= 0;
-    row2= N(st)-1; col2= N(st[0])-1;
-    return fp;
-  }
-  else return path ();
+  path fp= find_subtable_selection (et, start (cur_sel), end (cur_sel),
+                                    row1, col1, row2, col2);
+  table_bound (fp, row1, col1, row2, col2);
+  return fp;
 }
 
-void
-edit_select_rep::selection_get (selection& sel) {
-  if (selection_active_table ()) {
+selection
+edit_select_rep::compute_selection (path p1, path p2) {
+  if (is_table_selection (et, p1, p2, true)) {
     int row1, col1, row2, col2;
-    path fp= selection_get_subtable (row1, col1, row2, col2);
+    path fp= find_subtable_selection (et, p1, p2, row1, col1, row2, col2);
     tree st= subtree (et, fp);
+    table_bound (fp, row1, col1, row2, col2);
 
     int i, j;
     rectangle r (0, 0, 0, 0);
     for (i=row1; i<=row2; i++)
       for (j=col1; j<=col2; j++) {
 	path cp= fp * ::table_search_cell (st, i, j);
-	sel= eb->find_check_selection (cp * 0, cp * 1);
+	selection sel= eb->find_check_selection (cp * 0, cp * 1);
 	if (sel->valid) {
 	  rectangles rs= sel->rs;
 	  if (r != rectangle (0, 0, 0, 0)) rs= rectangles (r, rs);
 	  r= least_upper_bound (rs);
 	}
       }
-    sel= selection (rectangles (r), fp * 0, fp * 1);
+    return selection (rectangles (r), fp * 0, fp * 1);
   }
   else {
     path p_start, p_end;
-    //cout << "Find " << start_p << " -- " << end_p << "\n";
-    selection_correct (start_p, end_p, p_start, p_end);
+    //cout << "Find " << p1 << " -- " << p2 << "\n";
+    selection_correct (p1, p2, p_start, p_end);
     //cout << "Find " << p_start << " -- " << p_end << "\n";
-    sel= eb->find_check_selection (p_start, p_end);
+    selection sel= eb->find_check_selection (p_start, p_end);
     //cout << "sel= " << sel << "\n";
+    return sel;
   }
 }
 
+selection
+edit_select_rep::compute_selection (range_set sel) {
+  if (is_empty (sel)) return selection ();
+  int old_mode= set_access_mode (DRD_ACCESS_SOURCE);
+  // FIXME: instead of changing the access mode,
+  // we should already start with setting the correct DRD.
+  // For instance, when searching text using a popup window,
+  // the DRD is incorrect.  Consequently, matching text inside
+  // certain macros can become inaccessible, after which
+  // the entire macro is erroneously highlighted.
+  // Similar remark for the main routine for computing selections
+  rectangles rs;
+  for (int i=0; i+1<N(sel); i+=2) {
+    selection ssel= compute_selection (sel[i], sel[i+1]);
+    if (ssel->valid) rs << ssel->rs;
+  }
+  set_access_mode (old_mode);
+  return selection (rs, start (sel), end (sel));
+}
+
 void
-edit_select_rep::selection_get (path& start, path& end) {
+edit_select_rep::selection_get (selection& sel) {
+  sel= compute_selection (cur_sel);
+}
+
+void
+edit_select_rep::selection_get (path& p1, path& p2) {
   if (selection_active_table ()) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
-    start= fp * 0;
-    end= fp * 1;
+    p1= fp * 0;
+    p2= fp * 1;
   }
-  else selection_correct (start_p, end_p, start, end);
+  else selection_correct (start (cur_sel), end (cur_sel), p1, p2);
   /*
   selection sel; selection_get (sel);
-  start= sel->start;
-  end  = sel->end;
+  p1= sel->start;
+  p2= sel->end;
   */
 }
 
 path
 edit_select_rep::selection_get_start () {
-  return start_p;
+  return start (cur_sel);
 }
 
 path
 edit_select_rep::selection_get_end () {
-  return end_p;
+  return end (cur_sel);
+}
+
+path
+edit_select_rep::selection_var_get_start () {
+  path p1, p2;
+  selection_get (p1, p2);
+  return p1;
+}
+
+path
+edit_select_rep::selection_var_get_end () {
+  path p1, p2;
+  selection_get (p1, p2);
+  return p2;
 }
 
 tree
@@ -549,11 +505,11 @@ edit_select_rep::selection_get () {
     return table_get_subtable (fp, row1, col1, row2, col2);
   }
   else {
-    path start, end;
+    path p1, p2;
     // cout << "Selecting...\n";
-    selection_get (start, end);
-    // cout << "Between paths: " << start << " and " << end << "\n";
-    tree t= selection_compute (et, start, end);
+    selection_get (p1, p2);
+    // cout << "Between paths: " << p1 << " and " << p2 << "\n";
+    tree t= selection_compute (et, p1, p2);
     // cout << "Selection : " << t << "\n";
     return simplify_correct (t);
   }
@@ -561,11 +517,11 @@ edit_select_rep::selection_get () {
 
 path
 edit_select_rep::selection_get_path () {
-  path start, end;
-  selection_get (start, end);
-  if (end == start && end_p != start_p)
-    return path_up (start);
-  return common (start, end);
+  path p1, p2;
+  selection_get (p1, p2);
+  if (p2 == p1 && !is_empty (cur_sel))
+    return path_up (p1);
+  return common (p1, p2);
 }
 
 path
@@ -599,26 +555,31 @@ edit_select_rep::selection_raw_get (string key) {
 void
 edit_select_rep::selection_set_start (path p) {
   if (!selection_active_any ()) {
-    if (rp < start_p) select (start_p, start_p);
+    if (rp < start (cur_sel)) select (start (cur_sel), start (cur_sel));
     else select (tp, tp);
   }
   if (is_nil (p)) selection_set_start (tp);
-  else if (path_less_eq (end_p, p)) select (p, p);
-  else if (rp < p) select (p, end_p);
+  else if (path_less_eq (end (cur_sel), p)) select (p, p);
+  else if (rp < p) select (p, end (cur_sel));
 }
 
 void
 edit_select_rep::selection_set_end (path p) {
   if (is_nil (p)) selection_set_end (tp);
-  else if (path_less_eq (p, start_p)) select (p, p);
-  else if (rp < p) select (start_p, p);
+  else if (path_less_eq (p, start (cur_sel))) select (p, p);
+  else if (rp < p) select (start (cur_sel), p);
 }
 
 void
-edit_select_rep::selection_set_paths (path start, path end) {
-  if (is_nil (start) || is_nil (end)) selection_set_paths (tp, tp);
-  else if (path_less_eq (end, start)) select (start, start);
-  else if (rp < start && rp < end) select (start, end);
+edit_select_rep::selection_set_paths (path p1, path p2) {
+  if (is_nil (p1) || is_nil (p2)) selection_set_paths (tp, tp);
+  else if (path_less_eq (p2, p1)) select (p1, p1);
+  else if (rp < p1 && rp < p2) select (p1, p2);
+}
+
+void
+edit_select_rep::selection_set_range_set (range_set sel) {
+  selection_set_paths (start (sel), end (sel));
 }
 
 void
@@ -678,6 +639,13 @@ edit_select_rep::selection_copy (string key) {
   }
 }
 
+tree
+edit_select_rep::selection_get (string key) {
+  tree t; string s;
+  (void) ::get_selection (key, t, s, selection_import);
+  return t;
+}
+
 void
 edit_select_rep::selection_paste (string key) {
   tree t; string s;
@@ -690,14 +658,23 @@ edit_select_rep::selection_paste (string key) {
   if (is_tuple (t, "extern", 1)) {
     string mode= get_env_string (MODE);
     string lan = get_env_string (MODE_LANGUAGE (mode));
+    string s   = selection_decode (lan, as_string (t[1]));
+    if (mode == "prog")
+      if (selection_import == "latex" || selection_import == "html")
+        selection_import= "verbatim";
+    if (mode == "math")
+      if (selection_import == "latex") {
+        while (starts (s, " ")) s= s(1, N(s));
+        while (ends (s, " ")) s= s(0, N(s)-1);
+        if (!starts (s, "$") && !ends (s, "$"))
+          s= "$" * s * "$";
+      }
     string fm;
-    if ((selection_import == "latex") && (mode == "prog")) mode= "verbatim";
-    if ((selection_import == "latex") && (mode == "math")) mode= "latex-math";
-    if ((selection_import == "html") && (mode == "prog")) mode= "verbatim";
     if (selection_import == "default") fm= "texmacs-snippet";
     else fm= selection_import * "-snippet";
-    tree doc= generic_to_tree (selection_decode(lan, as_string(t[1])), fm);
+    tree doc= generic_to_tree (s, fm);
     if (is_func (doc, DOCUMENT, 1)) doc= doc[0]; // temporary fix
+    if (mode == "math" && is_compound (doc, "math", 1)) doc= doc[0];
     insert_tree (doc);
   }
   if (is_tuple (t, "texmacs", 3)) {
@@ -743,8 +720,8 @@ edit_select_rep::selection_clear (string key) {
 void
 edit_select_rep::selection_cancel () {
   selecting= shift_selecting= false;
-  if (end_p == start_p) return;
-  select (start_p, start_p);
+  if (is_empty (cur_sel)) return;
+  select (start (cur_sel), start (cur_sel));
 }
 
 void
@@ -812,11 +789,12 @@ edit_select_rep::raw_cut (path p1, path p2) {
   if (is_func (t, TFORMAT) || is_func (t, TABLE) || is_func (t, ROW)) {
     path fp= ::table_search_format (et, p);
     tree st= subtree (et, fp);
-    int row1, col1, row2, col2;
+    int row1, col1, row2, col2, nr_rows, nr_cols;
     table_search_coordinates (st, tail (p1, N(fp)), row1, col1);
     table_search_coordinates (st, tail (p2, N(fp)), row2, col2);
     if (row1>row2) { int tmp= row1; row1= row2; row2= tmp; }
     if (col1>col2) { int tmp= col1; col1= col2; col2= tmp; }
+    table_get_extents (fp, nr_rows, nr_cols);
 
     int i, j;
     for (i=row1; i<=row2; i++)
@@ -832,6 +810,10 @@ edit_select_rep::raw_cut (path p1, path p2) {
       table_del_format (fp, row1+1, col1+1, row2+1, col2+1, "");
 
     if (fp == search_format ()) {
+      if (col1 == 0 && col2 == nr_cols-1 && row2 > row1)
+        table_remove (fp, row1 + 1, col1, row2 - row1, 0);      
+      else if (row1 == 0 && row2 == nr_rows-1 && col2 > col1)
+        table_remove (fp, row1, col1 + 1, 0, col2 - col1);      
       table_correct_block_content ();
       table_resize_notify ();
     }
@@ -852,10 +834,10 @@ edit_select_rep::raw_cut (path p1, path p2) {
   }
 
   if ((N(p1) != (N(p)+1)) || (N(p2) != (N(p)+1))) {
-    cerr << "t = " << t << "\n";
-    cerr << "p = " << p << "\n";
-    cerr << "p1= " << p1 << "\n";
-    cerr << "p2= " << p2 << "\n";
+    failed_error << "t = " << t << "\n";
+    failed_error << "p = " << p << "\n";
+    failed_error << "p1= " << p1 << "\n";
+    failed_error << "p2= " << p2 << "\n";
     FAILED ("invalid cut");
   }
 
@@ -866,10 +848,10 @@ edit_select_rep::raw_cut (path p1, path p2) {
   }
   else {
     if ((last_item (p1) != 0) || (last_item (p2) != 1)) {
-      cerr << "t = " << t << "\n";
-      cerr << "p = " << p << "\n";
-      cerr << "p1= " << p1 << "\n";
-      cerr << "p2= " << p2 << "\n";
+      failed_error << "t = " << t << "\n";
+      failed_error << "p = " << p << "\n";
+      failed_error << "p1= " << p1 << "\n";
+      failed_error << "p2= " << p2 << "\n";
       FAILED ("invalid object cut");
     }
     assign (p, "");
@@ -887,7 +869,7 @@ edit_select_rep::selection_cut (string key) {
   else if (selection_active_any ()) {
     path p1, p2;
     if (selection_active_table ()) {
-      p1= start_p; p2= end_p;
+      p1= start (cur_sel); p2= end (cur_sel);
       if(key != "none") {
         tree sel= selection_get ();
         selection_set (key, sel);
@@ -961,6 +943,9 @@ edit_select_rep::focus_search (path p, bool skip_flag, bool up_flag) {
       is_func (st, CELL) ||
       is_compound (st, "shown") ||
       is_func (st, HIDDEN) ||
+      is_compound (st, "shared") ||
+      is_compound (st, "slide") ||
+      is_compound (st, "with-screen-color") ||
       up_flag)
     return focus_search (path_up (p), skip_flag, false);
   return p;
@@ -973,6 +958,52 @@ edit_select_rep::focus_get (bool skip_flag) {
     return focus_search (focus_p, skip_flag, false);
   if (selection_active_any ())
     return focus_search (selection_get_path (), skip_flag, false);
-  else
+  else {
+    tree st= subtree (et, path_up (tp));
+    if (is_compound (st, "draw-over")) skip_flag= false;
+    if (is_compound (st, "draw-under")) skip_flag= false;
+    if (is_compound (st, "float")) skip_flag= false;
+    if (is_compound (st, "wide-float")) skip_flag= false;
+    if (is_compound (st, "footnote")) skip_flag= false;
+    if (is_compound (st, "wide-footnote")) skip_flag= false;
     return focus_search (path_up (tp), skip_flag, true);
+  }
+}
+
+/******************************************************************************
+* Alternative selections
+******************************************************************************/
+
+void
+edit_select_rep::set_alt_selection (string name, range_set sel) {
+  if (alt_sels[name] != sel) {
+    alt_sels (name)= sel;
+    notify_change (THE_SELECTION);
+  }
+}
+
+range_set
+edit_select_rep::get_alt_selection (string name) {
+  return alt_sels[name];
+}
+
+range_set
+current_alt_selection (string name) {
+  return get_current_editor()->get_alt_selection (name);
+}
+
+void
+edit_select_rep::cancel_alt_selection (string name) {
+  if (alt_sels->contains (name)) {
+    alt_sels->reset (name);
+    notify_change (THE_SELECTION);
+  }
+}
+
+void
+edit_select_rep::cancel_alt_selections () {
+  if (N(alt_sels) > 0) {
+    alt_sels= hashmap<string,range_set> ();
+    notify_change (THE_SELECTION);
+  }
 }

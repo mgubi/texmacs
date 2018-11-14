@@ -106,6 +106,9 @@
 ("<Bbbk>"		"#1D55C") ; variant of <bb-k>
 ("<triangle>"	        "#25B3") ; variant of <bigtriangleup>
 ("<nshortmid>"		"#2224") ; variant of <nmid>
+("<of>"		        ":")     ; variant of : for "of type"
+("<suchthat>"		":")     ; variant of : for { a in ZZ : a > 5 }
+("<varsuchthat>"	"|")     ; variant of | for { a in ZZ | a > 5 }
 
 ;;; Big delimiters
 
@@ -169,24 +172,84 @@
 ;; primitives or other special constructs. If they are explicitely
 ;; present, they are exported as a regular-sized character.
 
+
 ("<prod>"		"#220F")
 ("<sum>"		"#2211")
 ("<int>"		"#222B")
+("<iint>"		"#222C")
+("<iiint>"		"#222D")
+("<iiiint>"		"#2A0C")
+("<oint>"		"#222E")
+("<oiint>"		"#222F")
+("<oiiint>"		"#2230")
+("<big-box>"  	        "#25FD")
+("<big-square>"         "#25FD")
+("<pluscup>"	        "#2A04")
 ("<big-prod-1>"		"#220F")
 ("<big-amalg-1>"        "#2210")
 ("<big-sum-1>"		"#2211")
 ("<big-int-1>"		"#222B")
+("<big-iint-1>"		"#222C")
+("<big-iiint-1>"	"#222D")
+("<big-iiiint-1>"	"#2A0C")
 ("<big-oint-1>"		"#222E")
+("<big-oiint-1>"	"#222F")
+("<big-oiiint-1>"	"#2230")
 ("<big-wedge-1>"        "#22C0")
 ("<big-vee-1>"		"#22C1")
 ("<big-cap-1>"		"#22C2")
 ("<big-cup-1>"		"#22C3")
+("<big-box-1>"	        "#25FD")
+("<big-square-1>"       "#25FD")
 ("<big-odot-1>"		"#2A00")
 ("<big-oplus-1>"	"#2A01")
 ("<big-otimes-1>"	"#2A02")
 ("<big-pluscup-1>"	"#2A04")
 ("<big-sqcap-1>"   	"#2A05")
 ("<big-sqcup-1>"  	"#2A06")
+
+("<upint>"		"#222B")
+("<upiint>"		"#222C")
+("<upiiint>"		"#222D")
+("<upiiiint>"		"#2A0C")
+("<upoint>"		"#222E")
+("<upoiint>"		"#222F")
+("<upoiiint>"		"#2230")
+("<big-upint-1>"	"#222B")
+("<big-upiint-1>"	"#222C")
+("<big-upiiint-1>"	"#222D")
+("<big-upiiiint-1>"	"#2A0C")
+("<big-upoint-1>"	"#222E")
+("<big-upoiint-1>"	"#222F")
+("<big-upoiiint-1>"	"#2230")
+("<intlim>"		"#222B")
+("<iintlim>"		"#222C")
+("<iiintlim>"		"#222D")
+("<iiiintlim>"		"#2A0C")
+("<ointlim>"		"#222E")
+("<oiintlim>"		"#222F")
+("<oiiintlim>"		"#2230")
+("<big-intlim-1>"	"#222B")
+("<big-iintlim-1>"	"#222C")
+("<big-iiintlim-1>"	"#222D")
+("<big-iiiintlim-1>"	"#2A0C")
+("<big-ointlim-1>"	"#222E")
+("<big-oiintlim-1>"	"#222F")
+("<big-oiiintlim-1>"	"#2230")
+("<upintlim>"		"#222B")
+("<upiintlim>"		"#222C")
+("<upiiintlim>"		"#222D")
+("<upiiiintlim>"	"#2A0C")
+("<upointlim>"		"#222E")
+("<upoiintlim>"		"#222F")
+("<upoiiintlim>"	"#2230")
+("<big-upintlim-1>"	"#222B")
+("<big-upiintlim-1>"	"#222C")
+("<big-upiiintlim-1>"	"#222D")
+("<big-upiiiint-1>"	"#2A0C")
+("<big-upointlim-1>"	"#222E")
+("<big-upoiintlim-1>"	"#222F")
+("<big-upoiiintlim-1>"	"#2230")
 
 ;;; Limit symbols
 
@@ -210,26 +273,6 @@
 ("<Rightarrowlim>"		"#21D2")
 ("<equallim>"			"=")
 ("<longequallim>"		"#FF1D")
-
-;;; Long arrows
-
-;; These arrows have no long variant in unicode. They are exported as regular
-;; arrows.
-
-;; No long "two headed" arrow
-("<longtwoheadleftarrow>"	"#219E")
-("<longtwoheadrightarrow>"	"#21A0")
-
-;; No "long upwards arrow" or "long downwards arrow"
-("<longuparrow>"		"#2191")
-("<longdownarrow>"		"#2193")
-("<longupdownarrow>"		"#2195")
-("<Longuparrow>"		"#21D1")
-("<Longdownarrow>"		"#21D3")
-("<Longupdownarrow>"		"#21D5")
-("<longhookrightarrow>"		"#21AA")
-;("<longmapsup>"		"")
-;("<longmapsdown>"		"")
 
 ;;; Unary operator variants
 

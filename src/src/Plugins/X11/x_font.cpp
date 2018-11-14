@@ -69,11 +69,13 @@ x_drawable_rep::draw_clipped (Pixmap pm, Pixmap bm, int w, int h, SI x, SI y) {
 void
 x_drawable_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // get the pixmap
-  x_character xc (c, fng, std_shrinkf, cur_fg, cur_bg);
+  color fgc= pen->get_color ();
+  color bgc= bg_brush->get_color ();
+  x_character xc (c, fng, std_shrinkf, fgc, bgc);
   Pixmap pm= (Pixmap) gui->character_pixmap [xc];
   if (pm == 0) {
-    gui->prepare_color (std_shrinkf, cur_fg, cur_bg);
-    x_character col_entry (0, font_glyphs (), std_shrinkf, cur_fg, cur_bg);
+    gui->prepare_color (std_shrinkf, fgc, bgc);
+    x_character col_entry (0, font_glyphs (), std_shrinkf, fgc, bgc);
     color* cols= (color*) gui->color_scale [col_entry];
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
@@ -171,6 +173,8 @@ x_gui_rep::default_font_sub (bool tt, bool mini, bool bold) {
     }
     if (out_lan == "chinese" || out_lan == "taiwanese")
       return unicode_font ("fireflysung", sz, dpi);
+    if (out_lan == "greek")
+      return unicode_font ("Stix", sz, dpi);
     //if (out_lan == "japanese")
     //return unicode_font ("ipagui", sz, dpi);
     //if (out_lan == "korean")
@@ -271,13 +275,13 @@ x_gui_rep::load_system_font (string family, int size, int dpi,
   name << "-*-" * sz1 * "-" * sz2 * "-*-*-*-*-*-*";
   if (size == 0) name= family;
 
-  if (DEBUG_VERBOSE) cout << "TeXmacs] Loading ps font " << name << "\n";
+  if (DEBUG_VERBOSE) debug_fonts << "Loading X font " << name << "\n";
   XFontStruct *xfs = NULL;
   c_string temp (name);
   xfs = XLoadQueryFont (dpy, temp);
   if (xfs == NULL) {
-    if (DEBUG_VERBOSE) cout << "TeXmacs] Font " << name << " not found\n";
-    if (DEBUG_VERBOSE) cout << "TeXmacs] Using default font instead\n";
+    if (DEBUG_VERBOSE) debug_fonts << "Font " << name << " not found\n";
+    if (DEBUG_VERBOSE) debug_fonts << "Using default font instead\n";
     xfs = XLoadQueryFont (dpy, "*");
     ASSERT (xfs != NULL, "could not load default X font");
   }
@@ -338,6 +342,7 @@ x_font_rep::x_font_rep (string name, string family2, int size2, int dpi2):
 
   // compute other widths
   wpt          = (dpi*PIXEL)/72;
+  hpt          = (dpi*PIXEL)/72;
   wfn          = (wpt*design_size) >> 8;
   wline        = wfn/20;
 
@@ -349,6 +354,7 @@ x_font_rep::x_font_rep (string name, string family2, int size2, int dpi2):
   get_extents (" ", ex);
   spc  = space ((3*(ex->x2-ex->x1))>>2, ex->x2-ex->x1, (ex->x2-ex->x1)<<1);
   extra= spc;
+  mspc = spc;
   sep  = wfn/10;
 
   // get_italic space
@@ -356,6 +362,16 @@ x_font_rep::x_font_rep (string name, string family2, int size2, int dpi2):
   SI italic_spc= (ex->x4-ex->x3)-(ex->x2-ex->x1);
   slope= ((double) italic_spc) / ((double) display_size);
   if (slope<0.15) slope= 0.0;
+}
+
+
+bool
+x_font_rep::supports (string c) {
+  glyph gl;
+  if (c == "<less>") gl= fng->get ('<');
+  else if (c == "<gtr>") gl= fng->get ('>');
+  else if (N(c) == 1) gl= fng->get (c[0]);
+  return !is_nil (gl);
 }
 
 void
@@ -413,8 +429,9 @@ x_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 }
 
 font
-x_font_rep::magnify (double zoom) {
-  return x_font (family, size, (int) tm_round (dpi * zoom));
+x_font_rep::magnify (double zoomx, double zoomy) {
+  if (zoomx != zoomy) return poor_magnify (zoomx, zoomy);
+  return x_font (family, size, (int) tm_round (dpi * zoomx));
 }
 
 glyph
@@ -424,6 +441,17 @@ x_font_rep::get_glyph (string s) {
   glyph gl= fng->get (c);
   if (is_nil (gl)) return font_rep::get_glyph (s);
   return gl;
+}
+
+int
+x_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
+  if (N(s)!=1) return font_rep::index_glyph (s, rm, rg);
+  int c= ((QN) s[0]);
+  glyph gl= fng->get (c);
+  if (is_nil (gl)) return font_rep::index_glyph (s, rm, rg);
+  rm= fnm;
+  rg= fng;
+  return c;
 }
 
 /******************************************************************************

@@ -16,7 +16,8 @@
 (texmacs-module (graphics graphics-group)
   (:use (graphics graphics-env)
         (graphics graphics-single)
-        (kernel gui kbd-handlers)))
+        (kernel gui kbd-handlers)
+        (dynamic animate-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Group edit mode
@@ -166,20 +167,145 @@
 (tm-define (graphics-assign-props p obj)
   (let* ((l1 (graphics-all-attributes))
          (l2 (map gr-prefix l1))
-         (l3 (map graphics-get-property l2))
+         (l3 (map (graphics-get-property-at p) l2))
          (l4 (map cons l1 l3))
          (tab (list->ahash-table l4)))
     (graphics-remove p 'memoize-layer)
     (graphics-group-enrich-insert-table (stree-radical obj) tab #f)))
 
-(tm-define (graphics-copy-props p)
-  (let* ((t (path->tree p))
-         (attrs (graphical-relevant-attributes t))
-         (vars (list-difference attrs '("gid")))
-         (get-prop (lambda (var) (graphics-path-property p var)))
-         (gr-vars (map gr-prefix vars))
-         (vals (map get-prop vars)))
-    (for-each graphics-set-property gr-vars vals)))
+(tm-define (graphics-get-props p)
+  (and-with t (path->tree p)
+    (let* ((attrs (graphical-relevant-attributes t))
+           (vars (list-difference attrs '("gid" "anim-id")))
+           (get-prop (lambda (var) (graphics-path-property p var)))
+           (gr-vars (map gr-prefix vars))
+           (vals (map get-prop vars)))
+      (for-each graphics-set-property gr-vars vals))))
+
+(tm-define (graphics-get-props-at-mouse)
+  (and-with p current-path
+    (graphics-get-props p)))
+
+(define (with-list vars vals)
+  (cond ((or (null? vars) (null? vals)) (list))
+        ((== (car vals) "default") (with-list (cdr vars) (cdr vals)))
+        (else (cons* (car vars) (car vals)
+                     (with-list (cdr vars) (cdr vals))))))
+
+(define (graphics-tree-apply-props t vars vals)
+  (with l (with-list vars vals)
+    (and-with w (tree-up t)
+      (if (tree-is? w 'with)
+          (if (null? l)
+              (tree-set! w (tm-ref w :last))
+              (tree-set! w `(with ,@l ,(tm-ref w :last))))
+          (if (null? l)
+              (noop)
+              (tree-set! t `(with ,@l ,t)))))))
+
+(tm-define (graphics-apply-props p)
+  (and-with t (path->tree p)
+    (let* ((attrs (graphical-relevant-attributes t))
+           (vars (list-difference attrs '("gid" "anim-id")))
+           (gr-vars (map gr-prefix vars))
+           (vals (map graphics-get-property gr-vars)))
+      (graphics-tree-apply-props t vars vals))))
+
+(tm-define (graphics-apply-props-at-mouse)
+  (and-with p current-path
+    (graphics-apply-props p)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Edit properties
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (has-attribute? t var)
+  (cond ((not (tree? t)) #f)
+        ((tree-is? t 'anim-edit) (has-attribute? (tm-ref t 1) var))
+        ((tree-in? t '(anim-static anim-dynamic))
+         (with c (or (graphics-anim-frames t) (list))
+           (list-or (map (cut has-attribute? <> var) c))))
+        ((tree-is? t 'with) (has-attribute? (tm-ref t :last) var))
+        ((tree-atomic? t) #f)
+        (else (graphics-attribute? (tree-label t) var))))
+
+(tm-define (graphics-mode-attribute? mode var)
+  (:require (== (graphics-mode) '(group-edit edit-props)))
+  (with v (if (string-starts? var "gr-") (string-drop var 3) var)
+    (with l (map (cut has-attribute? <> v) (sketch-get))
+      (list-or l))))
+
+(define (property-get t var i)
+  (cond ((not (tree? t)) "default")
+        ((tree-is? t 'anim-edit) (property-get (tm-ref t 1) var 0))
+        ((tree-in? t '(anim-static anim-dynamic))
+         (with c (or (graphics-anim-frames t) (list))
+           (properties-and (map (cut property-get <> var 0) c))))
+        ((not (tree-is? t 'with)) "default")
+        ((>= i (- (tree-arity t) 1)) "default")
+        ((tm-equal? (tree-ref t i) var) (tree->stree (tree-ref t (+ i 1))))
+        (else (property-get t var (+ i 2)))))
+
+(define (property-and p1 p2)
+  (if (== p1 p2) p1 "mixed"))
+
+(tm-define (properties-and l)
+  (cond ((null? l) "default")
+        ((null? (cdr l)) (car l))
+        (else (property-and (car l) (properties-and (cdr l))))))
+
+(tm-define (graphics-get-property var)
+  (:require (and (== (graphics-mode) '(group-edit edit-props))
+                 (graphics-selection-active?)))
+  (with v (if (string-starts? var "gr-") (string-drop var 3) var)
+    (if (graphics-mode-attribute? (graphics-mode) v)
+        (with l (map (cut property-get <> v 0) (sketch-get))
+          (properties-and l))
+        (former var))))
+
+(define (property-remove t var i)
+  (cond ((>= i (- (tree-arity t) 1)) t)
+        ((tm-equal? (tree-ref t i) var)
+         (if (== (tree-arity t) 3)
+             (tree-remove-node! t 2)
+             (tree-remove! t i 2))
+         t)
+        (else (property-remove t var (+ i 2)))))
+
+(define (property-set-sub t var val i)
+  (cond ((>= i (- (tree-arity t) 1))
+         (tree-insert! t i (list var val))
+         t)
+        ((tm-equal? (tree-ref t i) var)
+         (tree-set (tree-ref t (+ i 1)) val)
+         t)
+        (else (property-set-sub t var val (+ i 2)))))
+
+(define (property-set t var val)
+  (cond ((not (tree? t)) t)
+        ((tree-is? t 'anim-edit)
+         (property-set (tree-ref t 1) var val))
+        ((tree-in? t '(anim-static anim-dynamic))
+         (with c (or (graphics-anim-frames t) (list))
+           (for-each (cut property-set <> var val) c)
+           t))
+        ((tree-is? t 'with)
+         (if (== val "default")
+             (property-remove t var 0)
+             (property-set-sub t var val 0)))
+        ((== val "default") t)
+        (else
+          (tree-set! t `(with ,var ,val ,t))
+          t)))
+
+(tm-define (graphics-set-property var val)
+  (:require (and (== (graphics-mode) '(group-edit edit-props))
+                 (graphics-selection-active?)))
+  (with v (if (string-starts? var "gr-") (string-drop var 3) var)
+    (if (graphics-mode-attribute? (graphics-mode) v)
+        (with r (map (cut property-set <> v val) (sketch-get))
+          (sketch-set! r))
+        (former var val))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Remove
@@ -201,57 +327,59 @@
 (tm-define (start-operation opn p obj)
   (:require (graphical-non-group-tag? (car obj)))
   (set! current-path #f)
-  (if sticky-point
-      ;;Perform operation
-      (begin
-        (sketch-commit)
-        (graphics-decorations-update)
-        (if (== (state-ref graphics-first-state 'graphics-action)
-                'start-operation)
-            (remove-undo-mark))
-        (set! graphics-undo-enabled #t)
-        (graphics-forget-states))
-      ;;Start operation
-      (cond
-        ((and (not multiselecting) (eq? (cadr (graphics-mode)) 'group-ungroup))
-         (if (and p (not sticky-point) (null? (sketch-get))
-                  (== (tree-label (path->tree p)) 'gr-group))
-             (sketch-set! `(,(path->tree p))))
-         (if (and (not sticky-point)
-                  (== (length (sketch-get)) 1)
-                  (== (tree-label (car (sketch-get))) 'gr-group))
-             (ungroup-current-object)
-             (group-selected-objects)))
-        ((and (not multiselecting) (== (cadr (graphics-mode)) 'props))
-         (if (null? (sketch-get))
-             (if p
-                 (begin
-                   (set! obj (stree-at p))
-                   (set! current-path (graphics-assign-props p obj))
-                   (set! current-obj obj)
-                   (graphics-decorations-update)))
-             (with l '()
-               (for (o (sketch-get))
-                 (with p (graphics-assign-props
-                          (tree->path o)
-                          (tree->stree o))
-                   (set! l (cons (path->tree p) l))))
-               (sketch-set! (reverse l))
-               (graphics-decorations-update)))
-         (graphics-group-start))
-        ((and (not multiselecting) (or p (nnull? (sketch-get))))
-         (if (null? (sketch-get))
-             (any_toggle-select #f #f p obj))
-         (if (store-important-points)
+  (if (not sticky-point)
+      (set! preselected (nnull? (sketch-get))))
+  (cond
+    ;;Perform operation
+    (sticky-point
+     (sketch-commit)
+     (graphics-decorations-update)
+     (if (== (state-ref graphics-first-state 'graphics-action)
+             'start-operation)
+         (remove-undo-mark))
+     (set! graphics-undo-enabled #t)
+     (graphics-forget-states)
+     (if (not preselected) (unselect-all p obj))
+     (set! preselected #f))
+    ;;Start operation
+    ((and (not multiselecting) (eq? (cadr (graphics-mode)) 'group-ungroup))
+     (if (and p (not sticky-point) (null? (sketch-get))
+              (== (tree-label (path->tree p)) 'gr-group))
+         (sketch-set! `(,(path->tree p))))
+     (if (and (not sticky-point)
+              (== (length (sketch-get)) 1)
+              (== (tree-label (car (sketch-get))) 'gr-group))
+         (ungroup-current-object)
+         (group-selected-objects)))
+    ((and (not multiselecting) (== (cadr (graphics-mode)) 'props))
+     (if (null? (sketch-get))
+         (if p
              (begin
-               (graphics-store-state 'start-operation)
-               (sketch-checkout)
-               (sketch-transform tree->stree)
-               (set! group-first-go (copy-tree (sketch-get)))
-               (set! graphics-undo-enabled #f)
-               (graphics-store-state #f)
-               (set! group-old-x (s2f current-x))
-               (set! group-old-y (s2f current-y))))))))
+               (set! obj (stree-at p))
+               (set! current-path (graphics-assign-props p obj))
+               (set! current-obj obj)
+               (graphics-decorations-update)))
+         (with l '()
+           (for (o (sketch-get))
+             (with p (graphics-assign-props
+                      (tree->path o)
+                      (tree->stree o))
+               (set! l (cons (path->tree p) l))))
+           (sketch-set! (reverse l))
+           (graphics-decorations-update)))
+     (graphics-group-start))
+    ((and (not multiselecting) (or p (nnull? (sketch-get))))
+     (if (null? (sketch-get))
+         (any_toggle-select #f #f p obj))
+     (store-important-points) ;; ignore return value?
+     (graphics-store-state 'start-operation)
+     (sketch-checkout)
+     (sketch-transform tree->stree)
+     (set! group-first-go (copy-tree (sketch-get)))
+     (set! graphics-undo-enabled #f)
+     (graphics-store-state #f)
+     (set! group-old-x (s2f current-x))
+     (set! group-old-y (s2f current-y)))))
 
 (define (any_toggle-select x y p obj)
   (if (not sticky-point)
@@ -294,6 +422,9 @@
 
 (tm-define (toggle-select x y p obj)
   (:require (graphical-non-group-tag? (car obj)))
+  (when (list? p)
+    (and-with t (path->tree p)
+      (tree-go-to t :end)))
   (any_toggle-select x y p obj))
 
 (define (any_unselect-all p obj)
@@ -301,7 +432,7 @@
          (sketch-reset)
          (graphics-decorations-update))
         ((and p (not multiselecting) (== (cadr (graphics-mode)) 'props))
-         (graphics-copy-props p))))
+         (graphics-get-props p))))
 
 (tm-define (unselect-all p obj)
   (texmacs-error "unselect-all" "invalid context"))
@@ -317,34 +448,43 @@
 (tm-define (edit_move mode x y)
   (:require (eq? mode 'group-edit))
   (:state graphics-state)
-  (if sticky-point
-      (begin
-        (set! x (s2f x))
-        (set! y (s2f y))
-        (with mode (graphics-mode)
-          (cond ((== (cadr mode) 'move)
-                 (sketch-transform
-                  (group-translate (- x group-old-x)
-                                   (- y group-old-y))))
-                ((== (cadr mode) 'zoom)
-                 (sketch-set! group-first-go)
-                 (sketch-transform (group-zoom x y)))
-                ((== (cadr mode) 'rotate)
-                 (sketch-set! group-first-go)
-                 (sketch-transform (group-rotate x y)))))
-        (set! group-old-x x)
-        (set! group-old-y y))
-      (if multiselecting
-	  (begin
-            (graphical-object!
-             (append
-              (create-graphical-props 'default #f)
-              `((with color red
-                  (cline (point ,selecting-x0 ,selecting-y0)
-                         (point ,x ,selecting-y0)
-                         (point ,x ,y)
-                         (point ,selecting-x0 ,y)))))))
-	  (graphics-decorations-update))))
+  (cond (sticky-point
+         (set! x (s2f x))
+         (set! y (s2f y))
+         (with mode (graphics-mode)
+           (cond ((== (cadr mode) 'move)
+                  (sketch-transform
+                   (group-translate (- x group-old-x)
+                                    (- y group-old-y))))
+                 ((== (cadr mode) 'zoom)
+                  (sketch-set! group-first-go)
+                  (sketch-transform (group-zoom x y)))
+                 ((== (cadr mode) 'rotate)
+                  (sketch-set! group-first-go)
+                  (sketch-transform (group-rotate x y)))))
+         (set! group-old-x x)
+         (set! group-old-y y))
+        (multiselecting
+         (graphical-object!
+          (append
+           (create-graphical-props 'default #f)
+           `((with color red
+               (cline (point ,selecting-x0 ,selecting-y0)
+                      (point ,x ,selecting-y0)
+                      (point ,x ,y)
+                      (point ,selecting-x0 ,y)))))))
+        (else
+          (cond (current-path
+                 (set-message (string-append "Left click: operate; "
+                                             "Right click: select/unselect")
+                              "Group of objects"))
+                ((nnull? (sketch-get))
+                 (set-message "Left click: operate"
+                              "Group of objects"))
+                (else
+                  (set-message "Move over object on which to operate"
+                               "Edit groups of objects")))
+          (graphics-decorations-update))))
 
 (tm-define (edit_move mode x y)
   (:require (and (== mode 'edit) (current-in? '(gr-group))))
@@ -360,17 +500,29 @@
   (:state graphics-state)
   (start-operation 'move current-path current-obj))
 
+(tm-define (edit_left-button mode x y)
+  (:require (in? (graphics-mode) '((group-edit edit-props)
+                                   (group-edit animate))))
+  (:state graphics-state)
+  (if (and (not current-path) (graphics-selection-active?))
+      (unselect-all current-path current-obj)
+      (begin
+        (unselect-all current-path current-obj)
+        (toggle-select x y current-path current-obj))))
+
 (tm-define (edit_right-button mode x y)
   (:require (eq? mode 'group-edit))
   (:state graphics-state)
-  (toggle-select x y current-path current-obj))
+  (if (and (not current-path) (graphics-selection-active?))
+      (unselect-all current-path current-obj)
+      (toggle-select x y current-path current-obj)))
 
 (tm-define (edit_middle-button mode x y)
   (:require (eq? mode 'group-edit))
   (:state graphics-state)
   (if (!= (logand (get-keyboard-modifiers) ShiftMask) 0)
       (if (null? (sketch-get))
-	  (middle-button)
+	  (graphics-delete)
 	  (remove-selected-objects))
       (unselect-all current-path current-obj)))
 

@@ -17,7 +17,8 @@
 * Cells
 ******************************************************************************/
 
-cell_rep::cell_rep (edit_env env2): var (""), env (env2) {}
+cell_rep::cell_rep (edit_env env2):
+  var (""), env (env2), border_flags (0) {}
 
 void
 cell_rep::typeset (tree fm, tree t, path iq) {
@@ -28,6 +29,7 @@ cell_rep::typeset (tree fm, tree t, path iq) {
     t = t[0];
   }
 
+  cell_local_begin (fm);
   if (is_func (t, SUBTABLE, 1)) {
     lsep= rsep= bsep= tsep= 0;
     T= table (env, 2);
@@ -41,8 +43,9 @@ cell_rep::typeset (tree fm, tree t, path iq) {
 	SI y2= b->y2;
 	if ((vcorrect == "a") || (vcorrect == "b")) y1= min (y1, env->fn->y1);
 	if ((vcorrect == "a") || (vcorrect == "t")) y2= max (y2, env->fn->y2);
-	b= resize_box (iq, b, b->x1, y1, b->x2, y2);
+	b= vresize_box (iq, b, y1, y2);
       }
+      if (swell > 0) swell_padding ();
     }
     else {
       b= empty_box (iq);
@@ -53,11 +56,13 @@ cell_rep::typeset (tree fm, tree t, path iq) {
       tree old3= env->local_begin (PAR_RIGHT, "0tmpt");
       tree old4= env->local_begin (PAR_MODE, "justify");
       tree old5= env->local_begin (PAR_NO_FIRST, "true");
-      tree old6= env->local_begin (PAR_WIDTH, len);
+      //tree old6= env->local_begin (PAR_COLUMNS, "1");
+      tree old7= env->local_begin (PAR_WIDTH, len);
 
       lz= make_lazy (env, t, iq);
       
-      env->local_end (PAR_WIDTH, old6);
+      env->local_end (PAR_WIDTH, old7);
+      //env->local_end (PAR_COLUMNS, old6);
       env->local_end (PAR_NO_FIRST, old5);
       env->local_end (PAR_MODE, old4);
       env->local_end (PAR_RIGHT, old3);
@@ -65,6 +70,7 @@ cell_rep::typeset (tree fm, tree t, path iq) {
       env->local_end (PAGE_MEDIUM, old1);
     }
   }
+  cell_local_end (fm);
 
   if (decoration != "") {
     int i, j, or_row= -1, or_col= -1;
@@ -86,6 +92,36 @@ cell_rep::typeset (tree fm, tree t, path iq) {
     if (or_row != -1) {
       D= table (env, 1, or_row, or_col);
       D->typeset (attach_deco (decoration, iq));
+    }
+  }
+}
+
+void
+cell_rep::cell_local_begin (tree fm) {
+  int i, l= N(fm);
+  for (i=0; i<l; i++) {
+    tree with= fm[i];
+    if (is_func (with, CWITH, 2) &&
+        is_atomic (with[0]) &&
+        !starts (with[0]->label, "cell-")) {
+      tree old= env->local_begin (with[0]->label, with[1]);
+      string v= with[0]->label * "-" * as_string (i);
+      var (v)= old;
+    }
+  }
+}
+
+void
+cell_rep::cell_local_end (tree fm) {
+  int i, l= N(fm);
+  for (i=l-1; i>=0; i--) {
+    tree with= fm[i];
+    if (is_func (with, CWITH, 2) &&
+        is_atomic (with[0]) &&
+        !starts (with[0]->label, "cell-")) {
+      string v= with[0]->label * "-" * as_string (i);
+      tree old= var [v];
+      env->local_end (with[0]->label, old);
     }
   }
 }
@@ -200,6 +236,9 @@ cell_rep::format_cell (tree fm) {
   if (var->contains (CELL_COL_SPAN))
     col_span= as_int (env->exec (var[CELL_COL_SPAN]));
   else col_span= 1;
+  if (var->contains (CELL_SWELL))
+    swell= env->as_length (env->exec (var[CELL_SWELL])) >> 1;
+  else swell= 0;
 }
 
 void
@@ -343,12 +382,35 @@ cell_rep::position_vertically (SI offset, SI mh, SI bh, SI th) {
 ******************************************************************************/
 
 void
+cell_rep::swell_padding () {
+  if (row_span > 1) return;
+  SI swt= env->get_length (MATH_TOP_SWELL_START);
+  SI swb= env->get_length (MATH_BOT_SWELL_START);
+  if (b->y2 > swt && (border_flags & 1) == 0) {
+    SI swT= env->get_length (MATH_TOP_SWELL_END);
+    double exceed= b->y2 - swt;
+    double unit  = max (swT - swt, 1);
+    double ratio = min (exceed / unit, 1.0);
+    tsep += (SI) (ratio * swell);
+  }
+  if (b->y1 < swb && (border_flags & 2) == 0) {
+    SI swB= env->get_length (MATH_BOT_SWELL_END);
+    double exceed= swb - b->y1;
+    double unit  = max (swb - swB, 1);
+    double ratio = min (exceed / unit, 1.0);
+    bsep += (SI) (ratio * swell);
+  }
+  swell= 0;
+}
+
+void
 cell_rep::finish_horizontal () {
   SI  w= width- lsep- lborder- rsep- rborder;
   int v= hyphen == "t"? 1: (hyphen == "c"? 0: -1);
   SI  d= ((vcorrect == "b") || (vcorrect == "a"))? -env->fn->y1: 0;
   SI  h= ((vcorrect == "t") || (vcorrect == "a"))?  env->fn->y2: 0;
   b= (box) lz->produce (LAZY_BOX, make_format_cell (w, v, d, h));
+  if (swell > 0) swell_padding ();
 }
 
 void
@@ -358,9 +420,7 @@ cell_rep::finish () {
     b= T->b;
   }
 
-  color fc= env->col;
-
   b= cell_box (ip, b, xoff, yoff, 0, 0, x2-x1, y2-y1,
 	       lborder, rborder, bborder, tborder,
-               fc, bg, env->alpha);
+               env->pen->get_brush (), brush (bg, env->alpha));
 }

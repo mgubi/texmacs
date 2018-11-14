@@ -3,7 +3,7 @@
 #
 # MODULE      : configure.in
 # DESCRIPTION : TeXmacs configuration file for autoconf
-# COPYRIGHT   : (C) 2000  Joris van der Hoeven
+# COPYRIGHT   : (C) 2000-2017  Joris van der Hoeven, Denis Raux
 #
 # This software falls under the GNU general public license version 3 or later.
 # It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -15,12 +15,23 @@ AC_INIT
 AC_CONFIG_HEADERS([src/System/config.h:src/System/config.in])
 AC_CANONICAL_HOST
 
+#--------------------------------------------------------------------
+# Export version and package name 
+#--------------------------------------------------------------------
+
+TM_SUBVERSION
+
 PACKAGE="TeXmacs"
 DEBIAN_NAME="texmacs"
-DEVEL_VERSION="1.0.7.18"
-DEVEL_RELEASE="1"
-STABLE_VERSION="1.0.7.18"
+DEVEL_VERSION="1.99.8"
+DEVEL_RELEASE="1"         # I think we should use SVNREV here
+STABLE_VERSION="1.99.8"
 STABLE_RELEASE="1"
+
+DEVEL_VERSION_MAJOR="1"   #testing
+DEVEL_VERSION_MINOR="8"
+AC_SUBST(DEVEL_VERSION_MINOR)
+AC_SUBST(DEVEL_VERSION_MAJOR)
 
 AC_SUBST(PACKAGE)
 AC_SUBST(DEVEL_VERSION)
@@ -32,8 +43,15 @@ AC_SUBST(STABLE_RELEASE)
 # Checks for C++ compiler
 #--------------------------------------------------------------------
 
-AC_PROG_CC
-AC_PROG_CXX
+# define CFLAGS else it would assigned at -g -O2 later by autoconf
+# but keep previous value if any
+CFLAGS=${CFLAGS:=""}
+CXXFLAGS=${CXXFLAGS:=""}
+
+AC_PROG_CC([clang gcc])
+AC_PROG_CXX([clang++ g++])
+AC_PROG_OBJC([clang gcc])
+AC_PROG_OBJCXX([clang++ g++])
 AC_LANG_CPLUSPLUS
 AH_TEMPLATE([OLD_GNU_COMPILER],[Use g++ strictly prior to g++ 3.0])
 AC_MSG_CHECKING(whether GNU C++ compiler is default)
@@ -48,7 +66,7 @@ case "$GXX" in
     AC_MSG_RESULT($GXX_VERSION)
     case "$GXX_VERSION" in
       0* | 1* | 2*)
-        echo "old style GNU compiler"
+        AC_MSG_NOTICE(old style GNU compiler)
         AC_DEFINE([OLD_GNU_COMPILER],[])
       ;;
     esac
@@ -63,1242 +81,95 @@ esac
 AC_CPLUSPLUS_STACK
 
 #--------------------------------------------------------------------
-# Checks for Guile
-#--------------------------------------------------------------------
-
-if test -z "$GUILE_CFLAGS" -a -z "$GUILE_LDFLAGS"; then
-  GUILE_FLAGS
-fi
-AC_MSG_CHECKING(version of guile)
-if test -z "$GUILE_VERSION" ; then
-  GUILE_VERSION=`guile --version | grep 'Guile \([[0-9]]\)' | sed 's/Guile \([[0-9]]*\)/\1/'`
-fi
-AC_MSG_RESULT($GUILE_VERSION)
-AC_MSG_CHECKING(guile data path)
-if test -z "$GUILE_DATA_PATH" ; then
-  GUILE_DATA_PATH=`guile-config info pkgdatadir`
-fi
-AC_MSG_RESULT($GUILE_DATA_PATH)
-
-case "$GUILE_VERSION" in
-  1.0* | 1.1* | 1.2* | 1.3* | 1.4* | 1.5*)
-    CONFIG_GUILE_SERIAL="A"
-  ;;
-  1.6* | 1.7*)
-    CONFIG_GUILE_SERIAL="B"
-  ;;
-  2.*)
-    CONFIG_GUILE_SERIAL="D"
-  ;;
-  *)
-    CONFIG_GUILE_SERIAL="C"
-  ;;
-esac
-AC_SUBST(CONFIG_GUILE_SERIAL)
-AC_SUBST(GUILE_DATA_PATH)
-
-#--------------------------------------------------------------------
 # Checks for standard functionality
 #--------------------------------------------------------------------
 
-CPP_X_HEADERS
+# Standard C++ library
+m4_define([PROG_STDLIB], [AC_LANG_PROGRAM([[
+@%:@include <string>
+@%:@include <iostream>
+]],[[
+std::string t="CompileMe";
+std::cout <<t.size(); ]])])
+
+if test -n "$STDC_HEADERS";then
+AX_CHECK_COMPILE_FLAG([-stdlib=libstdc++],[
+	LC_APPEND_FLAG([-stdlib=libstdc++],[CXXFLAGS])
+	LC_APPEND_FLAG([-stdlib=libstdc++],[CFLAGS])
+	AC_MSG_NOTICE([added libstdc++ in compile flags])])
+  
+LC_LINK_IFELSE([stdlibc++], [PROG_STDLIB],[
+	AC_MSG_NOTICE([compiler has stdlibc++ support])  
+],[AC_MSG_ERROR([Not able to link with libstdc++])])
+fi
+
 AC_CHECK_TYPES(FILE)
 AC_CHECK_TYPES(intptr_t)
 AC_CHECK_TYPES(time_t)
-AC_PATH_X
-AC_PATH_XTRA
 AC_CHECK_HEADERS(pty.h util.h)
 AC_CHECK_FUNCS(gettimeofday)
 
-#--------------------------------------------------------------------
-# Checks for dl library
-#--------------------------------------------------------------------
-
-AC_CHECK_FUNC(dlopen)
-if test "$ac_cv_func_dl" = "yes"; then
-  AC_DEFINE(DYNAMIC_LINKING, 1, [Dynamic linking works])
-else
-  AC_CHECK_LIB(dl,dlopen)
-  if test "$ac_cv_lib_dl_dlopen" = "yes"; then
-    AC_CHECK_FUNCS(dlopen)
-    CONFIG_BDL="-ldl"
-    AC_DEFINE(DYNAMIC_LINKING, 1, [Dynamic linking works])
-  else
-    AC_CHECK_LIB(dld,dld_link)
-    if test "$ac_cv_lib_dld_dld_link" = "yes"; then
-      CONFIG_BDL="-ldl"
-      AC_DEFINE(DYNAMIC_LINKING, 1, [Dynamic linking works])
-    else
-      AC_CHECK_FUNCS(shl_load)
-      if test "$ac_cv_func_shl_load" = "yes"; then
-        CONFIG_BDL="-ldl"
-        AC_DEFINE(DYNAMIC_LINKING, 1, [Dynamic linking works])
-      else
-        AC_CHECK_FUNCS(dlopen)
-        if test "$ac_cv_func_dlopen" = "yes"; then
-          AC_DEFINE(DYNAMIC_LINKING, 1, [Dynamic linking works])
-        fi
-      fi
-    fi
-  fi
-fi
-AC_SUBST(CONFIG_BDL)
+TM_REPO
+TM_PLATFORM
+TM_STATIC
 
 #--------------------------------------------------------------------
-# Checks for iconv library
+# External libraries, functions and binaries
 #--------------------------------------------------------------------
 
-AC_ARG_WITH(iconv,
-changequote(<<, >>)dnl
-<<  --with-iconv[=DIR]        where to find iconv [system]>>dnl
-changequote([, ])dnl
-)
-
-# Check for iconv
-# Modified from GNOME's libxml2 configure.in
-AC_LANG_SAVE
-AC_LANG_C  # compile C to avoid the 'const char**' problem
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test "$with_iconv" = "no" ; then
-    AC_MSG_RESULT([disabling iconv support])
-else
-    if test -n "$ICONV_CFLAGS" -a -n "$ICONV_LDFLAGS"; then
-       CPPFLAGS="$ICONV_CFLAGS" # for AC_TRY_LINK
-       LDFLAGS="$ICONV_LDFLAGS"
-    fi
-    if test "$with_iconv" != "yes" -a "$with_iconv" != "" ; then
-       CPPFLAGS="-I$with_iconv/include" # for AC_TRY_LINK
-       LDFLAGS="-L$with_iconv/lib"
-       ICONV_CFLAGS="-I$with_iconv/include"
-       ICONV_LDFLAGS="-L$with_iconv/lib"
-    fi
-
-    AC_CHECK_HEADER(iconv.h,
-    AC_MSG_CHECKING(for iconv)
-    AC_TRY_LINK(
-[
-#include <stdlib.h>
-#include <iconv.h>
-],[
-    iconv_t cd = iconv_open ("","");
-    iconv (cd, NULL, NULL, NULL, NULL);
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_ICONV, 1, [Use iconv library])
-],[
-    AC_MSG_RESULT(no)
-    AC_MSG_CHECKING(for iconv in -liconv)
-#    LDFLAGS="${ICONV_LDFLAGS}"    # for AC_TRY_LINK
-    LIBS="-liconv"                # for AC_TRY_LINK
-    AC_TRY_LINK(
-[
-#include <stdlib.h>
-#include <iconv.h>
-],[
-      iconv_t cd = iconv_open ("","");
-      iconv (cd, NULL, NULL, NULL, NULL);
-],[
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(USE_ICONV, 1, [Use iconv library])
-      ICONV_LDFLAGS="${ICONV_LDFLAGS/-liconv} -liconv"
-],[
-      AC_MSG_RESULT(no)
-      AC_MSG_WARN([absence of iconv may crash HTML import])
-  ])]))
-fi
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-AC_LANG_RESTORE  # restore C++ language
-AC_SUBST(ICONV_CFLAGS)
-AC_SUBST(ICONV_LDFLAGS)
+LC_GUILE
+LC_DLOPEN
+LC_ICONV
+LC_FREETYPE
+LC_CAIRO
+LC_IMLIB2
+LC_AXEL
+LC_GS
+LC_SQL
+LC_SPARKLE
 
 #--------------------------------------------------------------------
-# Checks for freetype library
+# Further TeXmacs settings
 #--------------------------------------------------------------------
 
-AC_ARG_WITH(freetype,
-changequote(<<, >>)dnl
-<<  --with-freetype[=ARG]     with freetype support [ARG=linked]>>dnl
-changequote([, ])dnl
-)
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test -z "$FREETYPE_CFLAGS"; then
-  FREETYPE_CFLAGS=`freetype-config --cflags`
-fi
-CPPFLAGS="$CPPFLAGS $FREETYPE_CFLAGS"
-if test -z "$FREETYPE_LDFLAGS"; then
-  FREETYPE_LDFLAGS=`freetype-config --libs`
-fi
-LIBS="$LDFLAGS $FREETYPE_LDFLAGS"
-AC_CHECK_HEADER(ft2build.h,
-AC_MSG_CHECKING(for freetype)
-AC_TRY_LINK(
-[
-#include <ft2build.h>
-#include FT_FREETYPE_H 
-],[
-    FT_Library ft_library;
-    (void) FT_Init_FreeType (&ft_library);
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_FREETYPE, 1, [Use freetype library])
-    FREETYPE_CFLAGS="$CPPFLAGS"
-    if test "$with_freetype" = "linked" -o "$with_freetype" = "" ; then
-      FREETYPE_LDFLAGS="$LIBS"
-      AC_DEFINE(LINKED_FREETYPE, 1, [Link freetype library with TeXmacs])
-    fi
-],[
-    AC_MSG_RESULT(no)
-    AC_MSG_ERROR([cannot find freetype library])
-]))
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-AC_SUBST(FREETYPE_CFLAGS)
-AC_SUBST(FREETYPE_LDFLAGS)
+TM_FASTALLOC
+TM_MACOS
+TM_WINDOWS
+TM_GUI
+LC_HUMMUS
+TM_DEBUG
+TM_OPTIMIZE
+TM_INSTALL
 
 #--------------------------------------------------------------------
-# Checks for Cairo library
+# final adjustement for Texmacs compile and run
 #--------------------------------------------------------------------
 
-AC_ARG_WITH(cairo,
-changequote(<<, >>)dnl
-<<  --with-cairo[=ARG]        with cairo support [ARG=no]>>dnl
-changequote([, ])dnl
-)
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test "$with_cairo" = "no" -o "$with_cairo" = "" ; then
-    AC_MSG_RESULT([disabling cairo support])
-else
-    CPPFLAGS=`pkg-config --cflags cairo`
-    LIBS=`pkg-config --libs cairo`
-    AC_CHECK_HEADER(cairo.h,
-    AC_MSG_CHECKING(for cairo)
-    AC_TRY_LINK(
-[
-#include <cairo.h>
-],[
-    cairo_surface_t *surface;
-    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, 120, 120);
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_CAIRO, 1, [Use cairo library])
-    CAIRO_CFLAGS="$CPPFLAGS"
-    if test "$with_cairo" = "linked" ; then
-      CAIRO_LDFLAGS="$LIBS"
-      AC_DEFINE(LINKED_CAIRO, 1, [Link cairo library with TeXmacs])
-    fi
-],[
-    AC_MSG_RESULT(no)]))
-fi
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-AC_SUBST(CAIRO_CFLAGS)
-AC_SUBST(CAIRO_LDFLAGS)
-
-#--------------------------------------------------------------------
-# Checks for Imlib2 library
-#--------------------------------------------------------------------
-
-AC_ARG_WITH(imlib2,
-changequote(<<, >>)dnl
-<<  --with-imlib2[=ARG]       with imlib2 support [ARG=no]>>dnl
-changequote([, ])dnl
-)
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test "$with_imlib2" = "no" -o "$with_imlib2" = "" ; then
-    AC_MSG_RESULT([disabling imlib2 support])
-else
-    CPPFLAGS=`imlib2-config --cflags`
-    LIBS=`imlib2-config --libs`
-    AC_CHECK_HEADER(Imlib2.h,
-    AC_MSG_CHECKING(for imlib2)
-    AC_TRY_LINK(
-[
-#include <X11/Xlib.h>
-#include <Imlib2.h>
-#include <stdio.h>
-#include <string.h>
-],[
-    Imlib_Image image= imlib_load_image("");
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_IMLIB2, 1, [Use imlib2 library])
-    IMLIB2_CFLAGS="$CPPFLAGS"
-    if test "$with_imlib2" = "linked" ; then
-      IMLIB2_LDFLAGS="$LIBS"
-      AC_DEFINE(LINKED_IMLIB2, 1, [Link imlib2 library with TeXmacs])
-    fi
-],[
-    AC_MSG_RESULT(no)]))
-fi
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-AC_SUBST(IMLIB2_CFLAGS)
-AC_SUBST(IMLIB2_LDFLAGS)
-
-#--------------------------------------------------------------------
-# Checks for Axel library
-#--------------------------------------------------------------------
-
-AC_ARG_WITH(axel,
-changequote(<<, >>)dnl
-<<  --with-axel[=ARG]         with axel support [ARG=no]>>dnl
-changequote([, ])dnl
-)
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test "$with_axel" = "no" -o "$with_axel" = "" ; then
-    AC_MSG_RESULT([disabling axel support])
-else
-    CPPFLAGS=`axel-config --cflags`
-    LIBS=`axel-config --libs`
-    AC_CHECK_HEADER(QGui/Viewer.h,
-    AC_MSG_CHECKING(for axel)
-    AC_TRY_LINK(
-[
-#include <QGui/Viewer.h>
-],[
-    Viewer viewer(0);
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_AXEL, 1, [Use axel library])
-    AXEL_CFLAGS="$CPPFLAGS"
-    if test "$with_axel" = "linked" ; then
-      AXEL_LDFLAGS="$LIBS"
-      AC_DEFINE(LINKED_AXEL, 1, [Link axel library with TeXmacs])
-    fi
-],[
-    AC_MSG_RESULT(no)]))
-fi
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-AC_SUBST(AXEL_CFLAGS)
-AC_SUBST(AXEL_LDFLAGS)
-
-#--------------------------------------------------------------------
-# Checks for ghostscript library
-#--------------------------------------------------------------------
-
-AC_ARG_WITH(gs,
-changequote(<<, >>)dnl
-<<  --with-gs[=ARG]           with ghostscript support [ARG=yes]>>dnl
-changequote([, ])dnl
-)
-
-if test "$with_gs" = "no" ; then
-    AC_MSG_RESULT([disabling ghostscript support])
-else
-case "${host}" in
-  *mingw*)
-    GS_EXE="gswin32c.exe"
-    GS_DLL="gsdll32.dll"
-    AC_CHECK_PROG([HAS_GS_EXE], [${GS_EXE}], [yes], [no])
-    AC_CHECK_PROG([HAS_GS_LIB], [${GS_DLL}], [yes], [no])
-  ;;
-  *)
-    AC_CHECK_PROG([HAS_GS_EXE], [gs], [yes], [no])
-    HAS_GS_LIB="yes"
-  ;;
-esac
-if test "x${HAS_GS_EXE}" = "xyes" -a "x${HAS_GS_LIB}" = "xyes"; then
-  AC_DEFINE([USE_GS], [1], [Use ghostscript])
-  CONFIG_GS="Ghostscript"
-  AC_SUBST([CONFIG_GS])
-  AC_SUBST([GS_EXE])
-  AC_SUBST([GS_DLL])
-else
-  AC_MSG_RESULT([disabling ghostscript support])
-fi
-fi
-
-#--------------------------------------------------------------------
-# Checks for sqlite3 library
-#--------------------------------------------------------------------
-
-AC_ARG_WITH(sqlite3,
-changequote(<<, >>)dnl
-<<  --with-sqlite3[=ARG]      with sqlite3 support [ARG=no]>>dnl
-changequote([, ])dnl
-)
-
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-if test "$with_sqlite3" = "no" -o "$with_sqlite3" = "" ; then
-    AC_MSG_RESULT([disabling sqlite3 support])
-else
-    CPPFLAGS=`pkg-config --cflags sqlite3`
-    LIBS=`pkg-config --libs sqlite3`
-    AC_CHECK_HEADER(sqlite3.h,
-    AC_MSG_CHECKING(for sqlite3)
-    AC_TRY_LINK(
-[
-#include <sqlite3.h>
-],[
-    int res= sqlite3_threadsafe ();
-],[
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_SQLITE3, 1, [Use sqlite3 library])
-    SQLITE3_CFLAGS="$CPPFLAGS"
-    if test "$with_sqlite3" = "linked" ; then
-      SQLITE3_LDFLAGS="$LIBS"
-      AC_DEFINE(LINKED_SQLITE3, 1, [Link sqlite3 library with TeXmacs])
-    fi
-],[
-    AC_MSG_RESULT(no)]))
-fi
-
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-AC_SUBST(SQLITE3_CFLAGS)
-AC_SUBST(SQLITE3_LDFLAGS)
-
-#--------------------------------------------------------------------
-# Fixes for erroneous behaviour of gcc/g++ and guile on some systems
-#--------------------------------------------------------------------
-
-AC_MSG_CHECKING(whether ... arguments behave correctly)
-if test -z "$GUILE_CFLAGS"; then
-  CXXFLAGS="`guile-config compile`"
-else
-  CXXFLAGS="$GUILE_CFLAGS"
-fi
-AC_TRY_COMPILE([
-  #include <guile/gh.h>
-  #include <libguile.h>
-  typedef SCM (*FN)(...);
-  static SCM identity (SCM x) { return x; }
-  void declare () { gh_new_procedure ("identity", (FN) identity, 1, 0, 0); }
-],[
-],[
-  AC_DEFINE(DOTS_OK, 1, [Defined if ...-style argument passing works])
-  AC_MSG_RESULT(yes)
-],[
-  AC_MSG_RESULT(no)
-])
-CXXFLAGS=""
-
-AC_MSG_CHECKING(the size_t of guile strings)
-if test -z "$GUILE_CFLAGS"; then
-  CXXFLAGS="`guile-config compile`"
-else
-  CXXFLAGS="$GUILE_CFLAGS"
-fi
-AC_TRY_COMPILE([
-  #include <guile/gh.h>
-  #include <libguile.h>
-  void print_string (SCM s) {
-    int len_r;
-    char* r= gh_scm2newstr (s, &len_r); }
-],[
-],[
-  AC_DEFINE(guile_str_size_t, int, [Guile string size type])
-  AC_MSG_RESULT(int)
-],[
-  AC_DEFINE(guile_str_size_t, size_t, [Guile string size type])
-  AC_MSG_RESULT(size_t)
-])
-CXXFLAGS=""
-
-AC_MSG_CHECKING([if statically linking with guile works])
-SAVE_CPPFLAGS="$CPPFLAGS"
-SAVE_LDFLAGS="$LDFLAGS"
-SAVE_LIBS="$LIBS"
-CPPFLAGS="$GUILE_CFLAGS"
-LDFLAGS="-static"
-LIBS="$GUILE_LDFLAGS"
-TEXMACS_LINK_GUILE([tm_link_guile_static="yes"],
-		   [tm_link_guile_static="no"])
-AC_MSG_RESULT(["$tm_link_guile_static"])
-if test "$tm_link_guile_static" = "no" ; then
-   AC_MSG_CHECKING([if it works with -lltdl])
-   LIBS="$GUILE_LDFLAGS -lltdl"
-   TEXMACS_LINK_GUILE([tm_link_guile_static_ltdl="yes"],
-		      [tm_link_guile_static_ltdl="no"])
-   AC_MSG_RESULT(["$tm_link_guile_static_ltdl"])
-   if test "$tm_link_guile_static_ltdl" = "yes" ; then
-      GUILE_LDFLAGS="$GUILE_LDFLAGS -lltdl"
-   else
-      AC_MSG_CHECKING([if it works with -lltdl -ldl])
-      LIBS="$GUILE_LDFLAGS -lltdl -ldl"
-      TEXMACS_LINK_GUILE([tm_link_guile_static_ltdl_ldl="yes"],
-			 [tm_link_guile_static_ltdl_ldl="no"])
-      AC_MSG_RESULT(["$tm_link_guile_static_ltdl_ldl"])
-      if test "$tm_link_guile_static_ltdl_ldl" = "yes" ; then
-	 GUILE_LDFLAGS="$GUILE_LDFLAGS -lltdl -ldl"
-      else
-         AC_MSG_WARN([unable to link statically with guile])
-      fi
-   fi
-fi
-CPPFLAGS="$SAVE_CPPFLAGS"
-LDFLAGS="$SAVE_LDFLAGS"
-LIBS="$SAVE_LIBS"
-
-#--------------------------------------------------------------------
-# Handle different systems case by case
-#--------------------------------------------------------------------
-
-CONFIG_OS="GNU_LINUX"
-CONFIG_OS_SUFFIX="${host}"
-CONFIG_OS_COMPAT="Unix"
-CONFIG_MACOS=""
-CONFIG_CXXFLAGS=""
-CONFIG_CXXTEMPLATE=""
-CONFIG_STD_SETENV="#define STD_SETENV"
-CONFIG_SO="so"
-CONFIG_LIB_PATH="LD_LIBRARY_PATH"
-CONFIG_CHMOD="chmod -f"
-CONFIG_CXXOPTIMIZE="-O2"
-CONFIG_BSTATIC="-Wl,-Bstatic"
-CONFIG_BSHARED="-Wl,-Bdynamic"
-CONFIG_BFLAGS=""
-CONFIG_BPATH="-Wl,-rpath,"
-CONFIG_LDRT=""
-CONFIG_WORD_LENGTH="4"
-CONFIG_WORD_LENGTH_INC="3"
-CONFIG_WORD_MASK="0xfffffffc"
-CONFIG_MAX_FAST="260 // WORD_LENGTH more than power of 2"
-CONFIG_HOST_OS="$host_os"
-CONFIG_HOST_VENDOR="$host_vendor"
-CONFIG_HOST_CPU="$host_cpu"
-CONFIG_USER="$USER"
-CONFIG_DATE="`date`"
-# tweak for XCode project
-CONFIG_ARCHS='$(NATIVE_ARCH)'
-
-X11_CFLAGS="$X_CFLAGS"
-X11_LDFLAGS="$X_LIBS -lXext -lX11"
-
-AC_CHECK_SIZEOF(void *)
-AC_MSG_CHECKING(if we are on a 64-bits computer)
-if test "$ac_cv_sizeof_void_p" = "8"; then
-  AC_MSG_RESULT([yes])
-  CONFIG_WORD_LENGTH="8"
-  CONFIG_WORD_LENGTH_INC="7"
-  CONFIG_WORD_MASK="0xfffffffffffffff8"
-  CONFIG_MAX_FAST="264 // WORD_LENGTH more than power of 2"
-else
-  AC_MSG_RESULT([no])
-fi
-
-case "${host}" in
-  i*86-*-linux* | x86_64-*-linux*)
-    AC_MSG_RESULT(final adjustments for an Intel or AMD GNU/Linux host)
-    CONFIG_OS_SUFFIX="i386-pc-linux-gnu"
-    CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
-  ;;
-  i*86-*-freebsd* | x86_64-*-freebsd*)
-    AC_MSG_RESULT(final adjustments for an Intel or AMD GNU/BSD host)
-    CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
-  ;;
-  i*86-*-solaris*)
-    AC_MSG_RESULT(final adjustments for an Intel or AMS Solaris host)
-    CONFIG_CXXOPTIMIZE="-O3"
-    CONFIG_BPATH="-Wl,-R,"
-    X11_LDFLAGS="$X_LIBS -lXext -lX11 -lsocket"
-  ;;
-  *mingw*)
-    AC_MSG_RESULT([final adjustments for mingw host])
-    CONFIG_OS=MINGW
-    CONFIG_OS_COMPAT="Windows"
-    CPPFLAGS="$CPPFLAGS -I/usr/local/include -I."
-    CONFIG_LDRT="-L/mingw/lib -lmingw32 -lmingwex"
-    GUILE_LDFLAGS="-lmingwex $GUILE_LDFLAGS -lintl" #added mingwex to mask the internal guile readdir function
-  ;;
-  *-*-cygwin)
-    AC_MSG_RESULT(final adjustments for cygwin host)
-    CONFIG_OS="CYGWIN"
-    CONFIG_BFLAGS="-Wl,-stack,8388608"
-#    CXX="export CYGWIN=check_case:strict; $CXX"
-#    AC_SUBST(CXX)
-  ;;
-  *apple*darwin*)
-    echo "$ac_t""final adjustments for a MacOS host" 1>&6
-    CONFIG_OS="MACOS"
-    CONFIG_CXXFLAGS="-I${prefix}/include"
-    CONFIG_BSHARED=""
-    CONFIG_BFLAGS="-framework Cocoa -framework IOKit"
-    CONFIG_BPATH=""
-    CONFIG_SO="dylib"
-    CONFIG_LIB_PATH="DYLD_LIBRARY_PATH"
-  ;;
-  *darwin*)
-    echo "$ac_t""final adjustments for a generic Darwin host" 1>&6
-    CONFIG_CXXFLAGS="-I${prefix}/include"
-    CONFIG_BSHARED=""
-    CONFIG_BPATH=""
-    CONFIG_SO="dylib"
-    CONFIG_LIB_PATH="DYLD_LIBRARY_PATH"
-  ;;
-  powerpc-*-linux*)
-    AC_MSG_RESULT(final adjustments for a PowerPC/GNU-linux host)
-    CONFIG_OS="POWERPC_GNU_LINUX"
-    CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
-  ;;
-  *sun*)
-    AC_MSG_RESULT(final adjustments for a SUN/solaris host)
-    CONFIG_OS="SUN"
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED=""
-    CONFIG_BPATH="-Wl,-R,"
-    X11_LDFLAGS="$X_LIBS -lXext -lX11 -lsocket"
-    CONFIG_WORD_LENGTH="8"
-    CONFIG_WORD_LENGTH_INC="7"
-    CONFIG_WORD_MASK="0xfffffff8"
-    CONFIG_MAX_FAST="264 // WORD_LENGTH more than power of 2"
-    CONFIG_STD_SETENV=""
-  ;;
-  sparc*-*-linux*)
-    AC_MSG_RESULT(final adjustments for a Sparc host running GNU/Linux)
-    CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
-    CONFIG_WORD_LENGTH="8"
-    CONFIG_WORD_LENGTH_INC="7"
-    CONFIG_WORD_MASK="0xfffffff8"
-    CONFIG_MAX_FAST="264 // WORD_LENGTH more than power of 2"
-    CONFIG_STD_SETENV=""
-  ;;
-  *dec*)
-    AC_MSG_RESULT(final adjustments for a DEC/alpha host)
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED="-shared"
-    CONFIG_STD_SETENV=""
-  ;;
-  *alpha*-*-linux*)
-    AC_MSG_RESULT(final adjustments for an Alpha GNU/Linux host)
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED="-shared"
-  ;;
-  s390-*-linux*)
-    AC_MSG_RESULT(final adjustments for an IBM S/390 GNU/Linux host)
-    CONFIG_STD_SETENV=""
-  ;;
-  ia64-*-linux*)
-    AC_MSG_RESULT(final adjustments for an Itanium GNU/Linux host)
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED="-shared"
-  ;;
-  hppa*-*-linux*)
-    AC_MSG_RESULT(final adjustments for an HP PA_RISC GNU/Linux host)
-    CONFIG_CXXFLAGS="$CONFIG_CXXFLAGS -fPIC"
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED="-shared"
-  ;;
-  *sgi-irix*)
-    echo "$ac_t""final adjustments for a SGI/Irix host" 1>&6
-    CONFIG_OS="IRIX"
-    CONFIG_CXXFLAGS=""
-    X_LIBS=-L/usr/lib32
-    CONFIG_BSTATIC=""
-    CONFIG_BSHARED=""
-    CONFIG_BPATH=""
-    X11_LDFLAGS="$X_LIBS -lX11"
-    CONFIG_WORD_MASK="0xfffffff8"
-    CONFIG_STD_SETENV=""
-    CONFIG_CHMOD="chmod"
-    CONFIG_LIB_PATH="LD_LIBRARYN32_PATH"
-  ;;
-  m68k-*-linux* | mips-*-linux* | mipsel-*-linux* | arm*-*-linux*)
-    AC_MSG_RESULT(final adjustments for a supported GNU/Linux host)
-  ;;
-  *-linux*)
-    AC_MSG_RESULT(final adjustments for a generic GNU/Linux host)
-  ;;
-  *)
-    AC_MSG_RESULT(final adjustments for a generic host)
-  ;;
-esac
-
-case "${host}" in
-  *apple*darwin10*)
-    echo "$ac_t""Xcode 3.2 project tweak (only MacOSX 10.6)" 1>&6
-    CONFIG_ARCHS='$(NATIVE_ARCH_ACTUAL)'
-  ;;
-esac
-
-#--------------------------------------------------------------------
-# Temporary fix for link problem
-#--------------------------------------------------------------------
-
-case "$GXX_VERSION" in
-     3.* | 4.*)
-	 CONFIG_BSTATIC="-static"
-	 CONFIG_BSHARED="-dynamic"
-     ;;
-esac
-
-#--------------------------------------------------------------------
-# Memory allocation options
-#--------------------------------------------------------------------
-
-AC_ARG_ENABLE(fastalloc,
-[  --disable-fastalloc     omit fast allocator for small objects],
-    [], [enable_fastalloc="yes"])
-case "$enable_fastalloc" in
-    yes)
-        ;;
-    no)
-	AC_MSG_RESULT([disabling fast allocator for small objects])
-        AC_DEFINE(NO_FAST_ALLOC, 1, [Disable fast memory allocator])
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-fastalloc=$enable_fastalloc])
-	;;
-esac
-
-#--------------------------------------------------------------------
-# Experimental options
-#--------------------------------------------------------------------
-
-AC_ARG_ENABLE(experimental,
-[  --enable-experimental   support new style rewriting code],
-    [], [enable_experimental="no"])
-case "$enable_experimental" in
-    yes)
-	AC_MSG_RESULT([enabling experimental style rewriting code])
-        AC_DEFINE(EXPERIMENTAL, 1, [Enable experimental style rewriting code])
-        CONFIG_EXPERIMENTAL="Memorizer Environment Evaluate"
-        ;;
-    no)
-	AC_MSG_RESULT([disabling experimental style rewriting code])
-        CONFIG_EXPERIMENTAL=""
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-experimental=$enable_experimental])
-	;;
-esac
-AC_SUBST(CONFIG_EXPERIMENTAL)
-
-#--------------------------------------------------------------------
-# MacOS X extensions (spellchecker, image loading)
-#--------------------------------------------------------------------
-
-if test x"$CONFIG_OS" = xMACOS; then
-
-AC_ARG_ENABLE(macosx-extensions,
-[  --disable-macosx-extensions  don't use Mac specific services (spellchecker, image handling, ...)],
-    [], [enable_macosx_extensions="yes"])
-case "$enable_macosx_extensions" in
-    yes)
-	AC_MSG_RESULT([enabling Mac OSX extensions])
-        AC_DEFINE(MACOSX_EXTENSIONS, 1, [Enabling Mac OSX extensions])
-        CONFIG_MACOS="MacOS"
-#        CONFIG_BFLAGS="$CONFIG_BFLAGS -framework IOKit"
-        ;;
-    no)
-	AC_MSG_RESULT([disabling Mac OSX extensions])
-        CONFIG_MACOS=""
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-macosx-extensions=$enable_macosx_extensions])
-	;;
-esac
-AC_SUBST(CONFIG_MACOS)
-
-fi
-
-#--------------------------------------------------------------------
-# MacOS X distribution version (guarantees backward compatibility)
-#--------------------------------------------------------------------
-
-AC_ARG_ENABLE(macosx-distr,
-changequote(<<, >>)dnl
-<<  --enable-macosx-distr[=ARCH]   build for MacOSX >= 10.4 and arch [ARCH]>>,
-changequote([, ])dnl
-[], [enable_macosx_distr="no"])
-
-if test "$enable_macosx_distr" != "no" ; then    
-  MACOSX_DEPLOYMENT_TARGET="MACOSX_DEPLOYMENT_TARGET=10.4"
-  CONFIG_CXXFLAGS="$CONFIG_CXXFLAGS -mmacosx-version-min=10.4 -DMACOSX_DEPLOYMENT_TARGET=10.4"
-  CONFIG_BFLAGS="$CONFIG_BFLAGS -mmacosx-version-min=10.4 -DMACOSX_DEPLOYMENT_TARGET=10.4"
-  if test "$enable_macosx_distr" != "yes" -a "$enable_macosx_distr" != "" ; then
-    CONFIG_ARCHS="$enable_macosx_distr" 
-  	AC_MSG_RESULT([enabling Mac OSX distribution for architecture $enable_macosx_distr])
-  else
-	  AC_MSG_RESULT([enabling Mac OSX distribution])
-  fi
-else
-	AC_MSG_RESULT([disabling Mac OSX distribution])
-fi
-
-AC_SUBST(MACOSX_DEPLOYMENT_TARGET)
-
-AC_SUBST(QT_FRAMEWORKS_PATH)
-AC_SUBST(QT_PLUGINS_PATH)
-
-#--------------------------------------------------------------------
-# Experimental PDF renderer
-#--------------------------------------------------------------------
-
-AC_ARG_ENABLE(pdf-renderer,
-[  --enable-pdf-renderer   use experimental PDF renderer for pdf export],
-    [], [enable_pdf_renderer="no"])
-case "$enable_pdf_renderer" in
-    yes)
-	AC_MSG_RESULT([enabling experimental PDF renderer])
-        AC_DEFINE(PDF_RENDERER, 1, [Enabling experimental PDF renderer])
-        CONFIG_PDF="Pdf Pdf/dvipdfmx"
-        ;;
-    no)
-	AC_MSG_RESULT([disabling experimental PDF renderer])
-        CONFIG_PDF=""
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-pdf-renderer=$enable_pdf_renderer])
-	;;
-esac
-AC_SUBST(CONFIG_PDF)
-
-#--------------------------------------------------------------------
-# Windows console
-#--------------------------------------------------------------------
-
-if test x"$CONFIG_OS" = xMINGW; then
-
-AC_ARG_ENABLE(console,
-[  --enable-console        enable windows console], [], [])
-case "$enable_console" in
-    yes)
-	AC_MSG_RESULT([enabling Windows console])
-        ;;
-    *)
-	AC_MSG_RESULT([disabling Windows console])
-	CONFIG_LDRT="$CONFIG_LDRT -mwindows"
-	;;
-esac
-
-fi
-
-#--------------------------------------------------------------------
-# Gui selection
-#--------------------------------------------------------------------
-
-CONFIG_X11=""
-CONFIG_COCOA=""
-CONFIG_GUI="X11"
-
-AC_ARG_ENABLE(qt,
-[  --disable-qt            replace Qt by X11 interface],
-    [], [enable_qt="yes"])
-
-case "$enable_qt" in
-    yes)
-        HACKED_AT_WITH_QT
-	if test x"$at_cv_qt_build" = xko; then 
-	   AC_MSG_ERROR([cannot find Qt!])
-	else
-	   AC_MSG_RESULT([enabling Qt port])
-           CONFIG_GUI="QT"
-           if test x"$CONFIG_OS" = xMACOS; then
-              # on Mac we rely on some ObjC code contained in 
-              # src/Plugins/MacOS    
-              CONFIG_MACOS="MacOS"
-           fi
-        fi
-        ;;
-    no)
-	AC_MSG_RESULT([enabling X11 port])
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-qt=$enable_qt])
-	;;
-esac
-
-AC_ARG_ENABLE(qtpipes,
-[  --enable-qtpipes        replace UNIX pipes by Qt pipes],
-    [], [enable_qtpipes="no"])
-
-case "$enable_qtpipes" in
-    yes)
-        if test x"$CONFIG_GUI" = xQT; then
-           AC_DEFINE(QTPIPES, 1, [Enabling Qt pipes])
-           AC_MSG_RESULT([enabling Qt pipes])
-        else
-           AC_MSG_ERROR([QT not enabled!])
-        fi
-        ;;
-    no)
-        if test x"$CONFIG_GUI" = xQT; then
-           AC_MSG_RESULT([disabling Qt pipes])
-        fi
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-qtpipes=$enable_qt])
-	;;
-esac
-
-AC_ARG_ENABLE(cocoa,
-[  --enable-cocoa          replace X11 by Cocoa interface],
-    [], [enable_cocoa="no"])
-case "$enable_cocoa" in
-    yes)
-	AC_MSG_RESULT([enabling experimental Cocoa port])
-	COCOA_CFLAGS=""
-	COCOA_LDFLAGS="-framework Cocoa"
-        CONFIG_GUI="COCOA"
-        ;;
-    no)
-	AC_MSG_RESULT([disabling experimental Cocoa port])
-	;;
-    *)
-	AC_MSG_ERROR([bad option --enable-cocoa=$enable_cocoa])
-	;;
-esac
-
-case "$CONFIG_GUI" in
-    X11)
-	CONFIG_X11="X11 Widkit"
-        if test "x${CONFIG_GS}" != "xGhostscript"; then
-          CONFIG_X11="$CONFIG_X11 Ghostscript"
-        fi
-        CONFIG_GUI_DEFINE="X11TEXMACS"
-#        AC_DEFINE(X11TEXMACS, 1, [Use standard X11 port])
-	;;
-    COCOA)
-        CONFIG_COCOA="Cocoa"
-        CONFIG_GUI_DEFINE="AQUATEXMACS"
-#        AC_DEFINE(AQUATEXMACS, 1, [Enable experimental Cocoa port])
-	;;
-    QT)
-        CONFIG_QT="Qt"
-        CONFIG_GUI_DEFINE="QTTEXMACS"
-#        AC_DEFINE(QTTEXMACS, 1, [Enable experimental Qt port])
-	;;
-esac
-
-AC_SUBST(CPPFLAGS)
-AC_SUBST(LDFLAGS)
-AC_SUBST(X11_CFLAGS)
-AC_SUBST(X11_LDFLAGS)
-AC_SUBST(COCOA_CFLAGS)
-AC_SUBST(COCOA_LDFLAGS)
-
-AC_SUBST(CONFIG_X11)
-AC_SUBST(CONFIG_COCOA)
-AC_SUBST(CONFIG_QT)
-AC_SUBST(CONFIG_GUI)
-AC_SUBST(CONFIG_GUI_DEFINE)
-
-#--------------------------------------------------------------------
-# Debugging options
-#--------------------------------------------------------------------
-
-STD_DEBUG_FLAGS="-fno-rtti -fno-exceptions"
-if test "$enable_cocoa" = "yes"; then
-    STD_DEBUG_FLAGS="-fno-exceptions"
-fi
-
-AC_MSG_CHECKING(if compiler supports $STD_DEBUG_FLAGS)
-CXXFLAGS="$STD_DEBUG_FLAGS"
-AC_TRY_COMPILE([
-  int some_variable = 0;
-],[
-],[
-    CONFIG_CXXDIALECT="$STD_DEBUG_FLAGS"
-    AC_MSG_RESULT(yes)
-],[
-    CONFIG_CXXDIALECT=""
-    AC_MSG_RESULT(no)
-])
-CXXFLAGS=""
-AC_SUBST(CONFIG_CXXDIALECT)
-
-AC_ARG_ENABLE(debug,
-changequote(<<, >>)dnl
-<<  --enable-debug[=ARG]      install a debugging enable executable [-ggdb]>>,
-changequote([, ])dnl
-[], [enable_debug="no"])
-
-if test "$enable_debug" = "yes"; then
-    if test "$GXX" = "yes"; then
-        enable_debug="-ggdb"
-    else
-        enable_debug="-g3"
-    fi
-fi
-
-if test "$enable_debug" = "no"; then
-    AC_MSG_RESULT([disabling debugging])
-    CONFIG_STRIP="strip"
-    CONFIG_CXXDEBUG=""
-    optimize_default="yes"
-else
-    AC_MSG_RESULT([enabling debugging, $enable_debug])
-    CONFIG_STRIP="true"
-    CONFIG_CXXDEBUG="$enable_debug"
-    optimize_default="no"
-fi
-
-AC_ARG_ENABLE(assert,
-changequote(<<, >>)dnl
-<<  --enable-assert         exit on failed assertions in code>>,
-changequote([, ])dnl
-[], [enable_assert="yes"])
-
-if test "$enable_assert" = "no"; then
-    AC_MSG_RESULT([disabling assertion checking])
-else
-    AC_MSG_RESULT([enabling assertion checking])
-    AC_DEFINE(DEBUG_ASSERT, 1, [check assertions in code])
-fi
-
-#--------------------------------------------------------------------
-# Warning options
-#--------------------------------------------------------------------
-
-case "$GXX_VERSION" in
-  none)
-    CONFIG_CXXWARNING="";
-  ;;
-  *)
-    CONFIG_CXXWARNING="-Wall -Wno-return-type"
-  ;;
-esac
-
-AC_ARG_ENABLE(warnings,
-[  --enable-warnings       print warning messages during compilation],
-    [], [enable_warnings="yes"])
-case "$enable_warnings" in
-    yes)
-	AC_MSG_RESULT([enabling warning flags $CONFIG_CXXWARNING]) ;;
-    no)
-        CONFIG_CXXWARNING=""
-	AC_MSG_RESULT([disabling warning flags]) ;;
-    *)
-        CONFIG_CXXWARNING="$enable_warnings"
-	AC_MSG_RESULT([enabling warning flags $CONFIG_CXXWARNING]) ;;
-esac
-
-#--------------------------------------------------------------------
-# Optimization options
-#--------------------------------------------------------------------
-
-if test "$optimize_default" = "yes"; then
-  case "$GXX_VERSION" in
-    3.3.3 | 3.3.4 | 4.*)
-      ;;
-    2.96 | 3.0 | 3.0.* | 3.1 | 3.1.* | 3.2 | 3.2.* | 3.3 | 3.3.*)
-      case "${host}" in
-	i*86-*-linux-gnu* | i*86-*-freebsd*)
-	  AC_MSG_WARN([using g++ 3.*, optimize without inline by default])
-	  optimize_default="no-inline"
-	;;
-	*)
-	  AC_MSG_WARN([using g++ 3.*, optimize without inline by default])
-	  optimize_default="no-inline"
-	;;
-      esac
-    ;;
-  esac
-fi
-
-AC_ARG_ENABLE(optimize,
-changequote(<<, >>)dnl
-<<  --enable-optimize[=ARG]   compile with optimizations [guessed]>>,
-changequote([, ])dnl
-[], [enable_optimize="$optimize_default"])
-
-case "$enable_optimize" in
-    yes)
-	# keep optimization options
-  	AC_MSG_RESULT([enabling optimizations, $CONFIG_CXXOPTIMIZE]) ;;
-    no-inline)
-	optimize_no_inline="-fno-default-inline -fno-inline"
-	CONFIG_CXXOPTIMIZE="$CONFIG_CXXOPTIMIZE $optimize_no_inline"
-  	AC_MSG_RESULT([enabling optimizations, $CONFIG_CXXOPTIMIZE]) ;;
-    no)
-	CONFIG_CXXOPTIMIZE=""
-	AC_MSG_RESULT([disabling optimizations]) ;;
-    *)
-	CONFIG_CXXOPTIMIZE="$enable_optimize"
-	AC_MSG_RESULT([customizing optimizations, $enable_optimize]) ;;
-esac
-
-#--------------------------------------------------------------------
-# Substitute TeXmacs specific configuration parameters
-#--------------------------------------------------------------------
-
-AC_SUBST(CONFIG_OS)
-AC_SUBST(CONFIG_OS_SUFFIX)
-AC_SUBST(CONFIG_OS_COMPAT)
-AC_SUBST(CONFIG_CXXWARNING)
-AC_SUBST(CONFIG_CXXTEMPLATE)
-AC_SUBST(CONFIG_CXXOPTIMIZE)
-AC_SUBST(CONFIG_CXXDEBUG)
-AC_SUBST(CONFIG_BFLAGS)
-AC_SUBST(CONFIG_BSTATIC)
-AC_SUBST(CONFIG_BSHARED)
-AC_SUBST(CONFIG_BPATH)
-AC_SUBST(CONFIG_WORD_LENGTH)
-AC_SUBST(CONFIG_WORD_LENGTH_INC)
-AC_SUBST(CONFIG_WORD_MASK)
-AC_SUBST(CONFIG_MAX_FAST)
-AC_SUBST(CONFIG_CXXFLAGS)
-AC_SUBST(CONFIG_STD_SETENV)
-AC_SUBST(CONFIG_SO)
-AC_SUBST(CONFIG_LIB_PATH)
-AC_SUBST(CONFIG_STRIP)
-AC_SUBST(CONFIG_CHMOD)
-AC_SUBST(CONFIG_LDRT)
-AC_SUBST(CONFIG_HOST_OS)
-AC_SUBST(CONFIG_HOST_VENDOR)
-AC_SUBST(CONFIG_HOST_CPU)
-AC_SUBST(CONFIG_USER)
-AC_SUBST(CONFIG_DATE)
-AC_SUBST(CONFIG_ARCHS)
-
-#--------------------------------------------------------------------
-# Default paths for installation
-#--------------------------------------------------------------------
-
-if test "$prefix" = ""; then
-  prefix=/usr/local
-fi
-if test "$prefix" = "NONE"; then
-  prefix=/usr/local
-fi
-if test "$exec_prefix" = ""; then
-  exec_prefix='${prefix}'
-fi
-if test "$exec_prefix" = "NONE"; then
-  exec_prefix='${prefix}'
-fi
-if test "$exec_prefix" = '${prefix}'; then
-  exec_prefix='${prefix}'
-fi
-if test "$includedir" = ""; then
-  includedir='${prefix}/include'
-fi
-if test "$includedir" = "NONE"; then
-  includedir='${prefix}/include'
-fi
-if test "$includedir" = '${prefix}/include'; then
-  includedir='${prefix}/include'
-fi
-if test "$libdir" = ""; then
-  libdir='${exec_prefix}/lib'
-fi
-if test "$libdir" = "NONE"; then
-  libdir='${exec_prefix}/lib'
-fi
-if test "$libdir" = '${exec_prefix}/lib'; then
-  libdir='${exec_prefix}/lib'
-fi
-if test "$bindir" = ""; then
-  bindir='${exec_prefix}/bin'
-fi
-if test "$bindir" = "NONE"; then
-  bindir=${exec_prefix}/bin
-fi
-if test "$bindir" = '${exec_prefix}/bin'; then
-  bindir='${exec_prefix}/bin'
-fi
-if test "$datarootdir" = ""; then
-  datarootdir='${prefix}/share'
-fi
-if test "$datarootdir" = "NONE"; then
-  datarootdir='${prefix}/share'
-fi
-if test "$datarootdir" = '${prefix}/share'; then
-  datarootdir='${prefix}/share'
-fi
-if test "$datadir" = ""; then
-  datadir='${prefix}/share'
-fi
-if test "$datadir" = "NONE"; then
-  datadir='${prefix}/share'
-fi
-if test "$datadir" = '${prefix}/share'; then
-  datadir='${prefix}/share'
-fi
-if test "$mandir" = ""; then
-  mandir='${datarootdir}/man'
-fi
-if test "$mandir" = "NONE"; then
-  mandir='${datarootdir}/man'
-fi
-if test "$mandir" = '${datarootdir}/man'; then
-  mandir='${datarootdir}/man'
-fi
-if test "$libexecdir" = ""; then
-  libexecdir='${exec_prefix}/libexec'
-fi
-if test "$libexecdir" = "NONE"; then
-  libexecdir='${exec_prefix}/libexec'
-fi
-if test "$libexecdir" = '${exec_prefix}/libexec'; then
-  libexecdir='${exec_prefix}/libexec'
-fi
-
-curdir="`pwd`"
-tmorig=${curdir}
-tmdir=${PACKAGE}
-tmsrc=${curdir}/${tmdir}
-tmbin=${libexecdir}/${tmdir}
-tmdata=${datadir}/${tmdir}
-AC_SUBST(tmorig)
-AC_SUBST(tmdir)
-AC_SUBST(tmsrc)
-AC_SUBST(tmbin)
-AC_SUBST(tmdata)
-
-if test "$DEVEL_RELEASE" = "1"; then
-  tm_devel=${PACKAGE}-${DEVEL_VERSION}
-else
-  tm_devel=${PACKAGE}-${DEVEL_VERSION}-R${DEVEL_RELEASE}
-fi
-tm_devel_release=${PACKAGE}-${DEVEL_VERSION}-${DEVEL_RELEASE}
-tm_underscore_devel=${PACKAGE}_${DEVEL_VERSION}
-tm_debian_name_devel=${DEBIAN_NAME}_${DEVEL_VERSION}
-
-AC_SUBST(tm_devel)
-AC_SUBST(tm_devel_release)
-AC_SUBST(tm_underscore_devel)
-AC_SUBST(tm_debian_name_devel)
-
-if test "$STABLE_RELEASE" = "1"; then
-  tm_stable=${PACKAGE}-${STABLE_VERSION}
-else
-  tm_stable=${PACKAGE}-${STABLE_VERSION}-R${STABLE_RELEASE}
-fi
-tm_stable_release=${PACKAGE}-${STABLE_VERSION}-${STABLE_RELEASE}
-tm_underscore_stable=${PACKAGE}_${STABLE_VERSION}
-
-AC_SUBST(tm_stable)
-AC_SUBST(tm_stable_release)
-AC_SUBST(tm_underscore_stable)
+CPPFLAGS="$CPPFLAGS -include config.h"
 
 #--------------------------------------------------------------------
 # Done
 #--------------------------------------------------------------------
-AC_OUTPUT(Makefile:Makefile.in src/makefile:src/makefile.in src/System/tm_configure.hpp:src/System/tm_configure.in misc/admin/admin.makefile:misc/admin/admin.makefile.in misc/doxygen/Doxyfile:misc/doxygen/Doxyfile.in misc/man/texmacs.1:misc/man/texmacs.1.in packages/redhat/TeXmacs.spec:packages/redhat/TeXmacs.spec.in misc/scripts/fig2ps:misc/scripts/fig2ps.in misc/scripts/texmacs:misc/scripts/texmacs.in TeXmacs/examples/plugins/dynlink/Makefile:TeXmacs/examples/plugins/dynlink/Makefile.in packages/macos/Base.xcconfig:packages/macos/Base.xcconfig.in packages/macos/Info-Xcode.plist:packages/macos/Info-Xcode.plist.in packages/fedora/TeXmacs.spec:packages/fedora/TeXmacs.spec.in packages/mandriva/TeXmacs.spec:packages/mandriva/TeXmacs.spec.in packages/centos/TeXmacs.spec:packages/centos/TeXmacs.spec.in packages/windows/TeXmacs.iss:packages/windows/TeXmacs.iss.in packages/debian/changelog:packages/debian/changelog.in packages/debian/control:packages/debian/control.in)
+
+AC_OUTPUT([
+Makefile
+src/makefile
+misc/admin/admin.makefile
+misc/doxygen/Doxyfile:misc/doxygen/Doxyfile.in
+misc/man/texmacs.1:misc/man/texmacs.1.in 
+packages/redhat/TeXmacs.spec:packages/redhat/TeXmacs.spec.in 
+misc/scripts/fig2ps:misc/scripts/fig2ps.in 
+misc/scripts/texmacs:misc/scripts/texmacs.in 
+TeXmacs/examples/plugins/dynlink/Makefile:TeXmacs/examples/plugins/dynlink/Makefile.in 
+packages/macos/Base.xcconfig:packages/macos/Base.xcconfig.in 
+packages/macos/Info-Xcode.plist:packages/macos/Info-Xcode.plist.in 
+packages/macos/Info.plist:packages/macos/Info.plist.in 
+packages/fedora/TeXmacs.spec:packages/fedora/TeXmacs.spec.in 
+packages/mandriva/TeXmacs.spec:packages/mandriva/TeXmacs.spec.in 
+packages/centos/TeXmacs.spec:packages/centos/TeXmacs.spec.in 
+packages/windows/TeXmacs.iss:packages/windows/TeXmacs.iss.in 
+packages/windows/resource.rc:packages/windows/resource.rc.in 
+packages/debian/changelog:packages/debian/changelog.in 
+packages/debian/control:packages/debian/control.in
+src/System/tm_configure.hpp:src/System/tm_configure.in 
+])

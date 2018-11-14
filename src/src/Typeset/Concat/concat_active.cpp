@@ -16,6 +16,8 @@
 #include "analyze.hpp"
 #include "scheme.hpp"
 #include "packrat.hpp"
+#include "convert.hpp"
+#include "converter.hpp"
 
 /******************************************************************************
 * Typesetting executable markup
@@ -106,7 +108,7 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
 	ids= list<string> (id, ids);
 	visited= visited || has_been_visited ("id:" * id);
       }
-      if (is_compound (arg, "link") && N(arg) >= 2) {
+      else if (is_compound (arg, "link") && N(arg) >= 2) {
 	if (is_func (arg[1], ATTR)) arg= copy (arg);
 	else arg= arg (0, 1) * tree (LINK, tree (ATTR)) * arg (1, N(arg));
 	arg[1] << tree ("secure")
@@ -123,6 +125,17 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
 	  }
 	}
       }
+      else if (is_compound (arg, "observer", 2)) {
+	string id= as_string (arg[0]);
+	string cb= cork_to_utf8 (as_string (arg[1]));
+	if (accessible) {
+          if (env->secure ||
+              as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
+            env->link_env->insert_locus (id, body, cb);
+        }
+	ids= list<string> (id, ids);
+	visited= visited || has_been_visited ("id:" * id);
+      }
     }
   }
 
@@ -131,6 +144,7 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
   string var= (visited? VISITED_COLOR: LOCUS_COLOR);
   string current_col= env->get_string (COLOR);
   string locus_col= env->get_string (var);
+  if (on_paper) visited= false;
   if (locus_col == "preserve") col= current_col;
   else if (on_paper && preserve) col= current_col;
   else if (locus_col == "global") col= get_locus_rendering (var);
@@ -182,24 +196,60 @@ concater_rep::typeset_set_binding (tree t, path ip) {
 	tree body= env->expand (tree (ARG, t[2]), true);
 	sip= obtain_ip (body);
       }
-      box b= tag_box (sip, empty_box (sip, 0, 0, 0, env->fn->yx), keys);
+      path dip= decorate_middle (sip);
+      box b= tag_box (dip, sip, empty_box (dip, 0, 0, 0, env->fn->yx), keys);
       a << line_item (CONTROL_ITEM, OP_SKIP, b, HYPH_INVALID, "label");
     }
   }
   else typeset_dynamic (keys, ip);
 }
 
+static tree
+remove_labels (tree t) {
+  if (is_atomic (t)) return copy (t);
+  else if (is_func (t, LABEL)) return "";
+  else if (is_func (t, CONCAT)) {
+    tree r (CONCAT);
+    for (int i=0; i<N(t); i++)
+      if (!is_func (t, LABEL))
+        r << remove_labels (t[i]);
+    if (N(r) == 0) return "";
+    else if (N(r) == 1) return r[0];
+    else return r;
+  }
+  else {
+    tree r (t, N(t));
+    for (int i=0; i<N(t); i++)
+      r[i]= remove_labels (t[i]);
+    return r;
+  }
+}
+
 void
 concater_rep::typeset_write (tree t, path ip) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   string s= env->exec_string (t[0]);
-  tree   r= copy (env->exec (t[1]));
+  tree   r= remove_labels (env->exec (t[1]));
   if (env->complete) {
     if (!env->local_aux->contains (s))
       env->local_aux (s)= tree (DOCUMENT);
     env->local_aux (s) << r;
   } 
   control ("write", ip);
+}
+
+void
+concater_rep::typeset_toc_notify (tree t, path ip) {
+  if (N(t) != 2) { typeset_error (t, ip); return; }
+  string kind = tree_to_verbatim (env->exec (t[0]), false, "cork");
+  string title= tree_to_verbatim (env->exec (t[1]), false, "cork");
+  title= replace (title, "T_EX_MACS", "TeXmacs");
+  title= replace (title, "L^AT_EX", "LaTeX");
+  title= replace (title, "T_EX", "TeX");
+  box  b = toc_box (decorate_middle (ip), kind, title, env->fn);
+  marker (descend (ip, 0));
+  print (b);
+  marker (descend (ip, 1));  
 }
 
 /******************************************************************************
@@ -216,10 +266,10 @@ concater_rep::typeset_specific (tree t, path ip) {
     marker (descend (ip, 1));
     //typeset_dynamic (t[1], descend (ip, 1));
   }
-  else if ((which == "screen") || (which == "printer")) {
-    bool pr= (which != "screen");
+  else if (which == "screen" || which == "printer" ||
+           which == "even" || which == "odd") {
     box  sb= typeset_as_concat (env, attach_middle (t[1], ip));
-    box  b = specific_box (decorate_middle (ip), sb, pr, env->fn);
+    box  b = specific_box (decorate_middle (ip), sb, which, env->fn);
     marker (descend (ip, 0));
     print (b);
     marker (descend (ip, 1));
@@ -244,6 +294,20 @@ concater_rep::typeset_flag (tree t, path ip) {
   }
 }
 
+void
+concater_rep::typeset_hyphenate_as (tree t, path ip) {
+  if (N(t) != 1 && N(t) != 2) { typeset_error (t, ip); return; }
+  tree pat= env->exec (t[0]);
+  if (N(t) == 1 && !is_atomic (pat)) { typeset_error (t, ip); return; }
+  language old_lan= env->lan;
+  env->lan= ad_hoc_language (env->lan, pat);
+  marker (descend (ip, 0));
+  if (N(t) == 1) typeset (replace (pat->label, "-", ""), decorate_middle (ip));
+  else typeset (t[1], descend (ip, 1));
+  marker (descend (ip, 1));
+  env->lan= old_lan;
+}
+
 /******************************************************************************
 * Typesetting images
 ******************************************************************************/
@@ -262,8 +326,12 @@ concater_rep::typeset_image (tree t, path ip) {
   if (is_atomic (image_tree)) {
     if (N (image_tree->label) == 0)
       error_image (tree (WITH, "color", "red", "no image"));
-    url im= image_tree->label;
+    url im= cork_to_os8bits (image_tree->label);
     image= resolve (relative (env->base_file_name, im));
+    if (is_none (image) && suffix (im) == "")
+      image= resolve (relative (env->base_file_name, ::glue (im, ".eps")));
+    if (is_none (image) && suffix (im) == "")
+      image= resolve (relative (env->base_file_name, ::glue (im, ".pdf")));
     if (is_none (image)) image= "$TEXMACS_PATH/misc/pixmaps/unknown.ps";
   }
   else if (is_func (image_tree, TUPLE, 2) &&
@@ -304,7 +372,7 @@ concater_rep::typeset_image (tree t, path ip) {
   env->local_end ("h-length", old_h);
   
   // print the box
-  box imb= image_box (ip, image, imw, imh, env->alpha);
+  box imb= image_box (ip, image, imw, imh, env->alpha, env->pixel);
   print (move_box (ip, imb, imx, imy, true));
 }
 

@@ -124,7 +124,8 @@ wk_widget popup_widget (wk_widget w, gravity quit=center);
 wk_widget canvas_widget (wk_widget w, gravity grav=north_west, bool rf= false);
 wk_widget user_canvas_widget (wk_widget wid, int style= 0);
 wk_widget resize_widget (wk_widget w, int style, string w1, string h1,
-                         string w2, string h2, string w3, string h3);
+                         string w2, string h2, string w3, string h3,
+                         string hpos, string vpos);
 wk_widget hsplit_widget (wk_widget l, wk_widget r);
 wk_widget vsplit_widget (wk_widget t, wk_widget b);
 wk_widget input_text_wk_widget (command cb,
@@ -142,6 +143,7 @@ wk_widget balloon_widget (wk_widget w, wk_widget help);
 wk_widget wait_wk_widget (SI w, SI h, string message);
 wk_widget ink_wk_widget (command cb);
 wk_widget refresh_wk_widget (string tmwid, string kind);
+wk_widget refreshable_wk_widget (object promise, string kind);
 wk_widget texmacs_wk_widget (int mask, command quit);
 wk_widget plain_window_widget (wk_widget wid, string s, command q= command ());
 wk_widget popup_window_widget (wk_widget wid, string s);

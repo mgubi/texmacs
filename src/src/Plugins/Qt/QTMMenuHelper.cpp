@@ -9,16 +9,23 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "QTMMenuHelper.hpp"
-#include "QTMGuiHelper.hpp"
-#include "QTMStyle.hpp"
+#include "analyze.hpp"
+
 #include "qt_gui.hpp"
 #include "qt_utilities.hpp"
 #include "qt_window_widget.hpp"
-#include "qt_ui_element.hpp"  // qt_choice_command_rep
-#include "analyze.hpp"
+#include "qt_ui_element.hpp"    // qt_choice_command_rep
+#include "qt_picture.hpp"       // xpm_image
+#include "qt_tm_widget.hpp"     // tweak_iconbar_size
+#include "QTMMenuHelper.hpp"
+#include "QTMGuiHelper.hpp"
+#include "QTMStyle.hpp"
+#include "QTMApplication.hpp"
+#include "QTMTreeModel.hpp"
 
-#include <QtGui>
+#include <QToolTip>
+#include <QCompleter>
+#include <QKeyEvent>
 
 /******************************************************************************
  * QTMCommand
@@ -27,30 +34,41 @@
 /*! Queues the object's command into the main queue. */
 void 
 QTMCommand::apply()  {
-  if (DEBUG_QT)
-    cout << "QTMCommand::apply() (delayed): " << cmd << "\n";
-  if (!is_nil(cmd)) { the_gui->process_command(cmd); }
+BEGIN_SLOT
+  if (!is_nil (cmd)) {
+    the_gui->process_command (cmd);
+    if (DEBUG_QT) {
+      debug_qt << "QTMCommand::apply() (delayed)\n";
+      /* FIXME: this sometimes crashes:
+         cmd->print(debug_qt);
+         debug_qt << "\n";
+      */
+    }
+  }
+END_SLOT
 }
-
 
 /******************************************************************************
  * QTMAction
  ******************************************************************************/
 
-QTMAction::QTMAction(QObject *parent) : QAction(parent) { 
-  QObject::connect(the_gui->gui_helper, SIGNAL(refresh()), this, SLOT(doRefresh()));
-  _timer = new QTimer(this);
-  QObject::connect(_timer, SIGNAL(timeout()), this, SLOT(doShowToolTip()));
+QTMAction::QTMAction (QObject *parent) : QAction (parent) {
+  QObject::connect (the_gui->gui_helper, SIGNAL (refresh()),
+                    this,                  SLOT (doRefresh()));
+  _timer = new QTimer (this);
+  QObject::connect (_timer, SIGNAL (timeout()),
+                    this,     SLOT (doShowToolTip()));
 }
 
 QTMAction::~QTMAction() { 
-  if (menu() && !(menu()->parent())) delete menu(); 
+  if (menu() && !menu()->parent()) delete menu();
 }
 
 void
 QTMAction::set_text (string s) {
   if (N(s)) {
-    if (s == "Help" || s == "Edit")
+      // FIXME: this will only work if the system language is English!
+    if (s == "Help" || s == "Edit" || s == "Preferences...")
       s = s * " ";
     str = s;
     setText (to_qstring (s));
@@ -59,14 +77,17 @@ QTMAction::set_text (string s) {
 
 void 
 QTMAction::doRefresh() {
+BEGIN_SLOT
   set_text (str);
+END_SLOT
 }
 
 void
-QTMAction::showToolTip()
-{
-  _timer->start(500);   // Restarts the timer if already running
+QTMAction::showToolTip() {
+BEGIN_SLOT
+  _timer->start (500);   // Restarts the timer if already running
   _pos = QCursor::pos();
+END_SLOT
 }
 
 /*
@@ -81,16 +102,18 @@ QTMAction::showToolTip()
  stops, the distance is bigger than the given constant and no tooltip is
  displayed.
  */
+
 void
 QTMAction::doShowToolTip() {
+BEGIN_SLOT
   static int step = QApplication::font().pointSize();
   _timer->stop();
-  if((QCursor::pos() - _pos).manhattanLength() < step)  // Hideous HACK
-    QToolTip::showText(QCursor::pos(), toolTip());
+  if ((QCursor::pos() - _pos).manhattanLength() < step)  // Hideous HACK
+    QToolTip::showText (QCursor::pos(), toolTip());
   else
     QToolTip::hideText();
+END_SLOT
 }
-
 
 /******************************************************************************
  * QTMWidgetAction
@@ -99,13 +122,14 @@ QTMAction::doShowToolTip() {
 
 QTMWidgetAction::QTMWidgetAction (widget _wid, QObject *parent)
 : QWidgetAction (parent), wid (_wid) {
-  QObject::connect (the_gui->gui_helper, SIGNAL(refresh()), this, SLOT(doRefresh()));
+  QObject::connect (the_gui->gui_helper, SIGNAL (refresh()),
+                    this,                  SLOT (doRefresh()));
 }
 
 QWidget *
 QTMWidgetAction::createWidget (QWidget * parent) {
-  QWidget* qw = concrete(wid)->as_qwidget();
-  qw->setParent(parent);
+  QWidget* qw = concrete (wid)->as_qwidget();
+  qw->setParent (parent);
   return qw;
 }
 
@@ -114,45 +138,37 @@ QTMWidgetAction::createWidget (QWidget * parent) {
  * QTMTileAction
  ******************************************************************************/
 
-QTMTileAction::QTMTileAction (QWidget* parent, array<widget>& arr, int _cols)
-: QWidgetAction (parent), cols (_cols)
-{
-  actions.reserve(N(arr));
-  for(int i = 0; i < N(arr); i++) {
-    if (is_nil(arr[i])) break;
-    QAction *act = concrete(arr[i])->as_qaction();
-    act->setParent(this);
-    actions.append(act);
+QTMTileAction::QTMTileAction (array<widget>& arr, int _cols, QObject* parent)
+: QWidgetAction (parent), cols (_cols) {
+  actions.reserve (N (arr));
+  for (int i = 0; i < N (arr); i++) {
+    if (is_nil (arr[i])) break;
+    QAction* act = concrete (arr[i])->as_qaction();
+    act->setParent (this);
+    actions.append (act);
   };
 }
 
-/*!
- FIXME: QTMTileAction::createWidget is called twice:
- the first time when the action is added to the menu,
- the second when from the menu it is transferred to the toolbar.
- This is weird since the first widget does not ever use
- the widget so it results in a waste of time.
- */
 QWidget*
-QTMTileAction::createWidget(QWidget* parent)
+QTMTileAction::createWidget (QWidget* parent)
 {
-  if (DEBUG_QT)
-    cout << "QTMTileAction::createWidget\n";
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "QTMTileAction::createWidget\n";
   QWidget* wid= new QTMMenuWidget (parent);
   QGridLayout* l= new QGridLayout (wid);
-    // wid->setAutoFillBackground(true);
-    // wid->setBackgroundRole(QPalette::Base);
+    // wid->setAutoFillBackground (true);
+    // wid->setBackgroundRole (QPalette::Base);
   wid->setLayout (l);
   l->setSizeConstraint (QLayout::SetFixedSize);
   l->setHorizontalSpacing (2);
   l->setVerticalSpacing (2);
   l->setContentsMargins (4, 0, 4, 0);
-  int row= 0, col= 0;
-  for (int i=0; i < actions.count(); i++) {
-    QAction* sa= actions[i];
+  int row = 0, col = 0;
+  for (int    i = 0; i < actions.count(); i++) {
+    QAction* sa = actions[i];
     QToolButton* tb= new QTMMenuButton (wid);
     tb->setDefaultAction (sa);
-    QObject::connect(tb, SIGNAL(released()), this, SLOT(trigger()));
+    QObject::connect (tb, SIGNAL (released()), this, SLOT (trigger()));
       //  tb->setStyle (qtmstyle ());
     l->addWidget (tb, row, col);
     col++;
@@ -166,217 +182,253 @@ QTMTileAction::createWidget(QWidget* parent)
  * QTMMinibarAction
  ******************************************************************************/
 
-QTMMinibarAction::QTMMinibarAction (QWidget* parent, array<widget>& arr)
+QTMMinibarAction::QTMMinibarAction (array<widget>& arr, QObject* parent)
 : QWidgetAction (parent)
 {
-  actions.reserve(N(arr));
-  for(int i = 0; i < N(arr); i++) {
-    if (is_nil(arr[i])) break;
-    QAction *act = concrete(arr[i])->as_qaction();
-    act->setParent(this);
-    actions.append(act);
+  actions.reserve (N (arr));
+  for (int i = 0; i < N (arr); i++) {
+    if (is_nil (arr[i])) break;
+    QAction* act = concrete (arr[i])->as_qaction();
+    act->setParent (this);
+    actions.append (act);
   };
 }
 
-/*!
- FIXME: QTMMinibarAction::createWidget is called twice:
- the first time when the action is added to the menu, the second when from the
- menu it is transferred to the toolbar. This is weird since the first widget
- does not ever use the widget so it results in a waste of time.
- */
 QWidget*
-QTMMinibarAction::createWidget(QWidget* parent) {
-  if (DEBUG_QT) cout << "QTMMinibarAction::createWidget\n";
+QTMMinibarAction::createWidget (QWidget* parent) {
+  static QImage* pxm = xpm_image ("tm_add.xpm"); // See qt_tm_widget.cpp 
+  QSize sz = pxm ? pxm->size() : QSize (16, 16);
+  qt_tm_widget_rep::tweak_iconbar_size (sz);
+  
+  if (DEBUG_QT_WIDGETS) debug_widgets << "QTMMinibarAction::createWidget\n";
   QWidget* wid= new QWidget (parent);
   QBoxLayout* l= new QBoxLayout (QBoxLayout::LeftToRight, wid);
   wid->setLayout (l);
     //  l->setSizeConstraint (QLayout::SetFixedSize);
   l->setContentsMargins (0, 0, 0, 0);
-  l->setSpacing(0);
+  l->setSpacing (0);
   for (int i=0; i < actions.count(); i++) {
     QAction* sa= actions[i];
-    if (QWidgetAction * wa = qobject_cast<QWidgetAction*>(sa)) {
-      QWidget *w = wa->requestWidget(wid);
+    if (QWidgetAction * wa = qobject_cast<QWidgetAction*> (sa)) {
+      QWidget *w = wa->requestWidget (wid);
       l->addWidget(w);
-    } else if ((sa->text().isNull())&&(sa->icon().isNull())) {
+    } else if (sa->text().isNull() && sa->icon().isNull()) {
       l->addSpacing(8);
     } else {
-      QToolButton *tb = new QToolButton(wid);
+      QToolButton *tb = new QToolButton (wid);
       
         //HACK: texmacs does not use the checked state of the action
         // if the action is checkable then it means that it should be checked
-      sa->setChecked(sa->isCheckable());
+      sa->setChecked (sa->isCheckable());
       
-      tb->setDefaultAction(sa);
-      tb->setAutoRaise(true);
+      tb->setDefaultAction (sa);
+      tb->setAutoRaise (true);
       tb->setPopupMode (QToolButton::InstantPopup);
-      tb->setStyle(qtmstyle());
-        //  tb->setIconSize(QSize(12,12));
+      tb->setStyle (qtmstyle());
+      tb->setIconSize (sz);
       QFont f = tb->font();
-      f.setPixelSize(10);
+      int fs = as_int (get_preference ("gui:mini-fontsize", QTM_MINI_FONTSIZE));
+      f.setPointSize (qt_zoom (fs > 0 ? fs : QTM_MINI_FONTSIZE));
       tb->setFont(f);
-      l->addWidget(tb);
+      l->addWidget (tb);
     }
   }
   return wid;
 }
 
+/******************************************************************************
+ * QTMMenuButton
+ ******************************************************************************/
+
+QTMMenuButton::QTMMenuButton (QWidget* parent) : QToolButton (parent) {
+  setAttribute (Qt::WA_Hover);
+}
+
+void
+QTMMenuButton::mousePressEvent (QMouseEvent* e) {
+    // this one triggers the action and toggles the button
+  QToolButton::mousePressEvent (e);
+    // this one forwards the event to the parent
+    // (which eventually is the menu)
+  QWidget::mousePressEvent (e);
+}
+
+void
+QTMMenuButton::mouseReleaseEvent (QMouseEvent* e) {
+    // this one triggers the action and untoggles the button
+  QToolButton::mouseReleaseEvent (e);
+    // this one forwards the event to the parent
+    // (which eventually is the menu which then closes itself)
+  QWidget::mouseReleaseEvent (e);
+}
+
+void
+QTMMenuButton::paintEvent (QPaintEvent* e) {
+  (void) e;
+  
+    // initialize the options
+  QStyleOptionToolButton opt;
+  initStyleOption (&opt);
+
+  QPainter p (this);
+  QStyleOptionToolButton option;
+  QRect r = rect();
+  option.rect = r;
+  option.state = QStyle::State_Enabled | (opt.state & QStyle::State_MouseOver
+                                          ? QStyle::State_Selected
+                                          : QStyle::State_None);
+    // draw the control background as a menu item
+  style()->drawControl (QStyle::CE_MenuItem, &option, &p, this);
+    // draw the icon with a bit of inset.
+  r.adjust (2, 2, -2, -2);
+  defaultAction()->icon().paint (&p, r);
+}
+
+/******************************************************************************
+ * QTMMenuWidget
+ ******************************************************************************/
+
+QTMMenuWidget::QTMMenuWidget (QWidget* parent) : QWidget (parent) {
+}
+
+void
+QTMMenuWidget::paintEvent(QPaintEvent* e) {
+  QPainter p (this);
+  QStyleOptionMenuItem option;
+  option.rect = rect();
+  style()->drawControl (QStyle::CE_MenuEmptyArea, &option, &p, this);
+  QWidget::paintEvent (e);
+}
 
 /******************************************************************************
  * QTMLazyMenu
  ******************************************************************************/
 
+QTMLazyMenu::QTMLazyMenu (promise<widget> _pm, QWidget* p, bool right)
+: QMenu (p), promise_widget (_pm), show_right (right) {
+  QObject::connect (this, SIGNAL (aboutToShow ()), this, SLOT (force ()));
+}
+
 void
-rerootActions (QWidget* dest, QWidget* src) {
-  if (src == NULL || dest == NULL) return;
-  QList<QAction *> list = dest->actions();
-  while (!list.isEmpty()) {
-    QAction* a= list.takeFirst();
-    dest->removeAction (a);
-    //    delete a;
-    a->deleteLater();
+QTMLazyMenu::showEvent (QShowEvent* e)
+{
+  if (show_right && parentWidget()) {
+    QPoint p = pos();
+    p.rx() += parentWidget()->width();
+    p.ry() -= parentWidget()->height();
+    move (p);
   }
-  list = src->actions();
+  QMenu::showEvent (e);
+}
+
+/*! Sets the QTMLazyMenu as the menu for the QAction and makes its destruction
+ depend on that of the latter. */
+void
+QTMLazyMenu::attachTo (QAction* a) {
+  QObject::connect (a,  SIGNAL (destroyed (QObject*)),
+                    this, SLOT (destroy (QObject*)));
+  a->setMenu (this);
+}
+
+void
+QTMLazyMenu::transferActions (QList<QAction*>* from) {
+  if (from == NULL) return;
+  QList<QAction*> list = actions();
   while (!list.isEmpty()) {
-    QAction* a= list.takeFirst();
-    dest->addAction (a);
-    a->setParent (dest);
+    QAction* a = list.takeFirst();
+    removeAction (a);
+  }
+  while (!from->isEmpty()) {
+    QAction* a = from->takeFirst();
+    addAction (a);
   }
 }
 
 void
 QTMLazyMenu::force () {
-  if (DEBUG_QT) cout << "Force lazy menu" << LF;
-  widget w = pm ();
-  QMenu* menu2 = concrete(w)->get_qmenu();
-  rerootActions (this, menu2);
-    //menu2->deleteLater();  // OK? Conflicting policies in qt_menu and qt_ui_element
+BEGIN_SLOT
+  QList<QAction*>* list = concrete (promise_widget())->get_qactionlist();
+  transferActions (list);
+END_SLOT
 }
 
+void
+QTMLazyMenu::destroy (QObject* obj) {
+BEGIN_SLOT
+  (void) obj;
+  deleteLater();
+END_SLOT
+}
 
 /******************************************************************************
  * QTMInputTextWidgetHelper
  ******************************************************************************/
 
-QTMInputTextWidgetHelper::QTMInputTextWidgetHelper (qt_input_text_widget_rep* _wid) 
-: QObject(NULL), p_wid(abstract(_wid)), done(false) { }
-
-/*! Destructor.
- Removes reference to the helper in the texmacs widget. If needed the texmacs
- widget is automatically deleted.
- */
-QTMInputTextWidgetHelper::~QTMInputTextWidgetHelper() {
-  wid()->helper = NULL;
-}
-
-void
-QTMInputTextWidgetHelper::apply () {
-  if (done) return;
-  done = true;
-  the_gui->process_command (wid()->cmd, wid()->ok
-                            ? list_object (object (wid()->input))
-                            : list_object (object (false)));
+QTMInputTextWidgetHelper::QTMInputTextWidgetHelper (qt_widget _wid)
+: QObject (), p_wid (_wid) {
+  QTMLineEdit* le = qobject_cast<QTMLineEdit*>(wid()->qwid);
+  setParent(le);
+  ASSERT (le != NULL, "QTMInputTextWidgetHelper: expecting valid QTMLineEdit");
+  QObject::connect (le, SIGNAL (returnPressed ()), this, SLOT (commit ()));
+  QObject::connect (le, SIGNAL (focusOut (Qt::FocusReason)),
+                    this, SLOT (leave (Qt::FocusReason)));
 }
 
 /*! Executed when the enter key is pressed. */
 void
 QTMInputTextWidgetHelper::commit () {
-  QTMLineEdit* le = qobject_cast <QTMLineEdit*> (sender());
-  if (!le) return;
-
-  done         = false;
-  wid()->ok    = true;
-  wid()->input = from_qstring (le->text());
-
-    // HACK: restore focus to the main editor widget
-  widget_rep* win = qt_window_widget_rep::widget_from_qwidget (le);
-  if (win && concrete(win)->type == qt_widget_rep::texmacs_widget)
-    concrete(get_canvas(win))->qwid->setFocus();
-
-  if (win) apply();    // This is 0 inside a dialog => no command
+BEGIN_SLOT
+  if (sender() != wid()->qwid) return;
+  wid()->commit(true);
+END_SLOT
 }
 
 /*! Executed after commit of the input field (enter) and when losing focus */
 void
-QTMInputTextWidgetHelper::leave () {
-  QTMLineEdit* le = qobject_cast <QTMLineEdit*> (sender());
-  if (!le) return;
-
-  if (get_preference ("gui:line-input:autocommit") == "#t") {
-    done         = false;
-    wid()->ok    = true;
-    wid()->input = from_qstring (le->text());
-  } else {
-    le->setText (to_qstring (wid()->input));
-  }
-
-  widget_rep* win = qt_window_widget_rep::widget_from_qwidget(le);
-  if (win) apply();    // This is 0 inside a dialog => no command
+QTMInputTextWidgetHelper::leave (Qt::FocusReason reason) {
+BEGIN_SLOT
+  if (sender() != wid()->qwid) return;
+  wid()->commit((reason != Qt::OtherFocusReason &&
+                 get_preference ("gui:line-input:autocommit") == "#t"));
+END_SLOT
 }
-
-void
-QTMInputTextWidgetHelper::remove (QObject* obj) {
-  views.removeAll (qobject_cast<QTMLineEdit*> (obj));
-  if (views.count () == 0)
-    deleteLater();
-}
-
-void
-QTMInputTextWidgetHelper::add (QObject* obj) {
-  QTMLineEdit* le = qobject_cast<QTMLineEdit*> (obj);
-  if (le && !views.contains (le)) {
-    QObject::connect (le, SIGNAL (destroyed (QObject*)), this, SLOT (remove (QObject*)));
-    QObject::connect (le, SIGNAL (returnPressed ()),     this, SLOT (commit ()));
-    QObject::connect (le, SIGNAL (focusOut ()),          this, SLOT (leave ()));
-    views << le;
-  }
-}
-
 
 /******************************************************************************
  * QTMFieldWidgetHelper
  ******************************************************************************/
 
-QTMFieldWidgetHelper::QTMFieldWidgetHelper (qt_field_widget _wid) 
-  : QObject(NULL), wid(_wid), done(false) { }
-
-/*! Destructor.
- Removes reference to the helper in the texmacs widget. Deletion of the texmacs
- widget is automagic.
- */
-QTMFieldWidgetHelper::~QTMFieldWidgetHelper() {
-  wid->helper = NULL;
+QTMFieldWidgetHelper::QTMFieldWidgetHelper (qt_widget _wid, QComboBox* cb)
+: QObject (cb), wid (_wid), done (false) {
+  ASSERT (cb != NULL, "QTMFieldWidgetHelper: expecting valid QComboBox");
+  QObject::connect (cb, SIGNAL (editTextChanged (const QString&)),
+                    this, SLOT (commit (const QString&)));
+}
+QTMFieldWidgetHelper::QTMFieldWidgetHelper (qt_widget _wid, QLineEdit* cb)
+: QObject (cb), wid (_wid), done (false) {
+  ASSERT (cb != NULL, "QTMFieldWidgetHelper: expecting valid QLineEdit");
+  QObject::connect (cb, SIGNAL (textChanged (const QString&)),
+                    this, SLOT (commit (const QString&)));
 }
 
 void
 QTMFieldWidgetHelper::commit (const QString& qst) {
-  wid->input = scm_quote (from_qstring (qst));
+BEGIN_SLOT
+  static_cast<qt_field_widget_rep*> (wid.rep)->input =
+      scm_quote (from_qstring (qst));
+END_SLOT
 }
-
-void
-QTMFieldWidgetHelper::remove (QObject* obj) {
-  views.removeAll (qobject_cast<QTMComboBox*> (obj));
-  if (views.count () == 0)
-    deleteLater();
-}
-
-void
-QTMFieldWidgetHelper::add (QObject* obj) {
-  QComboBox* cb = qobject_cast<QComboBox*> (obj);
-  if (obj && !views.contains (cb)) {
-    QObject::connect (cb, SIGNAL (destroyed (QObject*)), this, SLOT (remove (QObject*)));
-    QObject::connect (cb, SIGNAL (editTextChanged (const QString&)), this, SLOT (commit (const QString&)));
-    views << cb;
-  }
-}
-
 
 /******************************************************************************
  * QTMLineEdit
  ******************************************************************************/
 
-QTMLineEdit::QTMLineEdit (QWidget* parent, string _ww, int style)
-: QLineEdit (parent), completing (false), ww (_ww) {
+QTMLineEdit::QTMLineEdit (QWidget* parent, string _type, string _ww,
+                          int style, command _cmd)
+  : QLineEdit (parent), completing (false),
+    type ("default"), name ("default"), serial ("default"),
+    ww (_ww), cmd (_cmd), last_key (0) {
+  set_type (_type);
+  if (type == "password") setEchoMode(QLineEdit::Password);
   if (style & WIDGET_STYLE_MINI) {
     setStyle (qtmstyle());
       // FIXME: we should remove this and let the scheme code decide.
@@ -387,9 +439,32 @@ QTMLineEdit::QTMLineEdit (QWidget* parent, string _ww, int style)
   }
   
     // just to be sure we don't capture the wrong keys in keyPressEvent
-  setCompleter(0);
+  setCompleter (0);
 
-  setStyleSheet (to_qstylesheet (style)); 
+  qt_apply_tm_style (this, style);
+}
+
+void
+QTMLineEdit::set_type (string t) {
+  int i= search_forwards (":", 0, t);
+  if (i >= 0) {
+    type= t (i+1, N(t));
+    name= t (0, i);
+    int j= search_forwards ("#", 0, name);
+    if (j >= 0) {
+      serial= name (j+1, N(name));
+      name  = name (0, j);
+    }
+  }
+  else type= t;
+}
+
+bool
+QTMLineEdit::continuous () {
+  return
+    starts (type, "search") ||
+    starts (type, "replace-") ||
+    starts (serial, "form-");
 }
 
 /*
@@ -399,92 +474,174 @@ QTMLineEdit::QTMLineEdit (QWidget* parent, string _ww, int style)
 bool
 QTMLineEdit::event (QEvent* ev) {
   if (ev->type() == QEvent::KeyPress)  // Handle ALL keys
-    keyPressEvent(static_cast<QKeyEvent*> (ev));
+    keyPressEvent (static_cast<QKeyEvent*> (ev));
   else
     return QWidget::event (ev);
-
   return true;
 }
+
+extern hashmap<int,string> qtkeymap;
 
 /*
  FIXME: This is a hideous mess...
  */
 void 
-QTMLineEdit::keyPressEvent(QKeyEvent* ev)
+QTMLineEdit::keyPressEvent (QKeyEvent* ev)
 {
   QCompleter* c = completer();
-
-  int key = (ev->key() == Qt::Key_Tab && ev->modifiers() & Qt::ShiftModifier)
+  
+  last_key = (ev->key() == Qt::Key_Tab && ev->modifiers() & Qt::ShiftModifier)
             ? Qt::Key_Backtab
             : ev->key();
-  
-  if (c) {
+
+  if (continuous ()) {
+    if ((last_key != Qt::Key_Tab || type == "replace-what") &&
+        (last_key != Qt::Key_Backtab || type == "replace-by") &&
+        last_key != Qt::Key_Down &&
+        last_key != Qt::Key_Up &&        
+        last_key != Qt::Key_Enter &&
+        last_key != Qt::Key_Return &&
+        last_key != Qt::Key_Escape &&
+        (ev->modifiers() & Qt::ControlModifier) == 0 &&
+        (ev->modifiers() & Qt::MetaModifier) == 0)
+      QLineEdit::keyPressEvent (ev);
+    string key= "none";
+    string s  = from_qstring (text());
+    if (last_key >= 32 && last_key <= 126) {
+      key= string ((char) last_key);
+      if (key[0] >= 'A' && key[0] <= 'Z')
+        if ((ev->modifiers() & Qt::ShiftModifier) == 0)
+          key[0]= (int) (key[0] + ((int) 'a') - ((int) 'A'));
+    }
+    if (qtkeymap->contains (last_key)) key= qtkeymap[last_key];
+    if ((ev->modifiers() & Qt::ShiftModifier) && N(key) > 1) key= "S-" * key;
+#ifdef Q_WS_MAC
+    if (ev->modifiers() & Qt::ControlModifier) key= "C-" * key;
+    if (ev->modifiers() & Qt::AltModifier) key= "none";
+    if (ev->modifiers() & Qt::MetaModifier) key= "M-" * key;
+#else
+    if (ev->modifiers() & Qt::ControlModifier) key= "M-" * key;
+    if (ev->modifiers() & Qt::AltModifier) key= "A-" * key;
+    if (ev->modifiers() & Qt::MetaModifier) key= "C-" * key;
+#endif
+    cmd (list_object (list_object (object (s), object (key))));
+    return;
+  }
+  else if (c) {
     int row = 0;
-    switch (key) {
+    switch (last_key) {
       case Qt::Key_Down:
         completing = true;
+        setCursorPosition (0);
         c->complete();
       case Qt::Key_Tab:
       {
+//        cout << "Completing= " << completing << LF;
+//        cout << "hasSelectedText= " << hasSelectedText() << LF;
+//        cout << "CursorPosition= " << cursorPosition() << LF;
+//        cout << "SelectionStart= " << selectionStart() << LF;
+        
         if (completing) {
+//          cout << "CompletionCount= " << c->completionCount() << LF;
           if (c->completionCount() > 1) {
-            if(! c->setCurrentRow (c->currentRow() + 1))
+            if (! c->setCurrentRow (c->currentRow() + 1))
               c->setCurrentRow (0);    // cycle
           } else {
-            setCursorPosition (text().length());
             completing = false;
+            setCursorPosition (text().length());
+            c->setCompletionPrefix ("");
               //c->popup()->hide();
           }
-        } else {
           if (hasSelectedText())
-            c->setCompletionPrefix (text().left (selectionStart()));
+            setCursorPosition (selectionStart());
+          if (c->currentCompletion() != "") {
+            int pos = cursorPosition();
+            setText (c->currentCompletion ());
+            setSelection (pos, text().length());
+          } else {
+            completing = false;
+            setSelection (0, text(). length());
+            c->setCompletionPrefix ("");
+          }
+        } else {
+          QString prefix;
+          if (hasSelectedText())
+            prefix = text().left (selectionStart());
           else
-            c->setCompletionPrefix (text().left (cursorPosition()));
-
-            // If there are no completions, send the key up for tab navigation
+            prefix = text().left (cursorPosition());
+          c->setCompletionPrefix (prefix);
+//          cout << "prefix= " << from_qstring (prefix) << LF;
+//          cout << "CompletionCount= " << c->completionCount() << LF;
+          
+            // If there are no completions, go to the end of the line or
+            // send the key up for tab navigation
           if (c->completionCount() == 0 ||
               (c->completionCount() == 1 && c->currentCompletion() == text())) {
-            QLineEdit::keyPressEvent (ev);
+            if (c->popup() && c->popup()->isVisible()) {
+              setCursorPosition (text().length());
+              c->popup()->hide();
+            } else if (cursorPosition() == text().length()) {
+              QLineEdit::keyPressEvent (ev);
+            } else {
+              setCursorPosition (text().length());
+            }
             return;
           }
-          
+
           completing = true;
+            // hack: advance one completion (needed after tab navigation)
+          if (c->currentCompletion() == text()) {
+            clear();
+            if (! c->setCurrentRow (c->currentRow() + 1))
+              c->setCurrentRow (0);    // cycle
+          }
           c->complete();
         }
-        if (hasSelectedText())
-          setCursorPosition (selectionStart());
-        if (c->currentCompletion() != "") {
-          int pos = cursorPosition();
-          setText (c->currentCompletion ());
-          setSelection (pos, text().length() - 1);
-        } else {
-          completing = false;
-          setSelection (0, text(). length() - 1);
-        }
-
         ev->accept();
       }
         return;
           // This is different on purpose: when "back-completing" suggested text
           // we want to display the previous entry to the one suggested
       case Qt::Key_Up:
+        completing = true;
+        setCursorPosition (0);
+        c->complete();
       case Qt::Key_Backtab:
       {
-        completing = true;
-        c->complete();
-        row = c->currentRow();
-        if(! c->setCurrentRow (row - 1))
-          c->setCurrentRow (c->completionCount() - 1);    // cycle
-        if (c->currentCompletion() != "") {
-          int pos;
+        if (!completing) {
           if (hasSelectedText())
-            pos = selectionStart();
+            c->setCompletionPrefix (text().left (selectionStart()));
           else
-            pos = cursorPosition();
-          setText (c->currentCompletion ());
-          setSelection (pos, text().length() - 1);
+            c->setCompletionPrefix (text().left (cursorPosition()));
+            // If there are no completions, go to the end of the line or
+            // send the key up for tab navigation
+          if (c->completionCount() == 0 ||
+              (c->completionCount() == 1 && c->currentCompletion() == text())) {
+            if (c->popup() && c->popup()->isVisible()) {
+              setCursorPosition (text().length());
+              c->popup()->hide();
+            } else if (cursorPosition() == text().length()) {
+              QLineEdit::keyPressEvent (ev);
+            } else {
+              setCursorPosition (text().length());
+            }
+            return;
+          }
+          completing = true;
+          c->complete();
         } else {
-            // TODO: blink somehow
+          row = c->currentRow();
+          if (! c->setCurrentRow (row - 1))
+            c->setCurrentRow (c->completionCount() - 1);    // cycle
+          if (c->currentCompletion() != "") {
+            int pos;
+            if (hasSelectedText())
+              pos = selectionStart();
+            else
+              pos = cursorPosition();
+            setText (c->currentCompletion ());
+            setSelection (pos, text().length());
+          }
         }
         ev->accept();
       }
@@ -495,27 +652,33 @@ QTMLineEdit::keyPressEvent(QKeyEvent* ev)
           setCursorPosition (text().length());
           c->popup()->hide();
         } else if (completing) {
+          completing = false;
           setText (c->currentCompletion());
           setCursorPosition (text().length());
+          c->setCompletionPrefix ("");
         } else {
-          emit returnPressed();
+          completing = false;
+          c->setCompletionPrefix ("");
+          QLineEdit::keyPressEvent (ev);
+          return;
         }
-        completing = false;
         ev->accept();
         return;
       case Qt::Key_Escape:
-        if (completing) {
+        if (completing && c->completionMode() == QCompleter::PopupCompletion) {
           if (c->popup()) c->popup()->hide();
           completing = false;
         } else {
           emit editingFinished();
           ev->accept();
           if (parentWidget())        // HACK to return focus to the main editor widget
-            parentWidget()->setFocus();
+            parentWidget()->setFocus ();
         }
+        c->setCompletionPrefix ("");
         return;
       default:
         completing = false;
+        c->setCompletionPrefix ("");
         QLineEdit::keyPressEvent (ev);
         return;
     }
@@ -526,7 +689,7 @@ QTMLineEdit::keyPressEvent(QKeyEvent* ev)
 
 QSize
 QTMLineEdit::sizeHint () const {
-  return qt_decode_length(ww, "", QLineEdit::sizeHint(), fontMetrics());
+  return qt_decode_length (ww, "", QLineEdit::sizeHint(), fontMetrics());
 }
 
 void 
@@ -540,18 +703,21 @@ QTMLineEdit::focusInEvent (QFocusEvent* ev)
 void
 QTMLineEdit::focusOutEvent (QFocusEvent* ev)
 {
-  emit focusOut();
+  if (!continuous ()) {
+    Qt::FocusReason reason =
+      (last_key != Qt::Key_Escape) ? ev->reason() : Qt::OtherFocusReason;
+    emit focusOut (reason);
+  }
   QLineEdit::focusOutEvent (ev);
 }
-
 
 
 /******************************************************************************
  * QTMTabWidget
  ******************************************************************************/
 
-QTMTabWidget::QTMTabWidget(QWidget *p) : QTabWidget(p) {
-  QObject::connect(this, SIGNAL(currentChanged(int)), this, SLOT(resizeOthers(int)));
+QTMTabWidget::QTMTabWidget (QWidget *p) : QTabWidget(p) {
+  QObject::connect (this, SIGNAL (currentChanged (int)), this, SLOT (resizeOthers (int)));
 }
 
 /*! Resizes the widget to the size of the tab given by the index.
@@ -562,12 +728,13 @@ QTMTabWidget::QTMTabWidget(QWidget *p) : QTabWidget(p) {
  case we must update the fixed size to reflect the change of tab.
  */
 void
-QTMTabWidget::resizeOthers(int current) {
-  for(int i = 0; i < count(); ++i) {
+QTMTabWidget::resizeOthers (int current) {
+BEGIN_SLOT
+  for (int i = 0; i < count(); ++i) {
     if (i != current)
-      widget(i)->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+      widget(i)->setSizePolicy (QSizePolicy::Ignored, QSizePolicy::Ignored);
     else
-      widget(i)->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+      widget(i)->setSizePolicy (QSizePolicy::Minimum, QSizePolicy::Minimum);
   }
   
     // FIXME? this could loop indefinitely if parents are cyclic.
@@ -576,39 +743,39 @@ QTMTabWidget::resizeOthers(int current) {
     p->adjustSize();
     p = p->parentWidget();
   }
+  p->adjustSize();
 
-  if (window()->minimumSize()!=QSize(0,0) && 
-      window()->maximumSize() != QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
-    window()->setFixedSize(window()->sizeHint());
+  if (window()->minimumSize()!=QSize (0,0) && 
+      window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
+    window()->setFixedSize (window()->sizeHint());
+END_SLOT
 }
-
-
 
 /******************************************************************************
  * QTMRefreshWidget
  ******************************************************************************/
 
 widget make_menu_widget (object wid);
+extern bool menu_caching;
 
-QTMRefreshWidget::QTMRefreshWidget (string _tmwid, string _kind):
-  QWidget (), tmwid (_tmwid), kind (_kind),
-  curobj (false), cur (), qwid(NULL),
-  cache (widget ())
+QTMRefreshWidget::QTMRefreshWidget (qt_widget _tmwid, string _strwid, string _kind)
+: QWidget (), strwid (_strwid), kind (_kind),
+  curobj (false), cur (), tmwid (_tmwid), qwid (NULL), cache (widget ())
 {   
-  QObject::connect(the_gui->gui_helper, SIGNAL(tmSlotRefresh(string)),
-                   this, SLOT(doRefresh(string)));
+  QObject::connect (the_gui->gui_helper, SIGNAL (tmSlotRefresh (string)),
+                   this, SLOT (doRefresh (string)));
   QVBoxLayout* l = new QVBoxLayout (this);
   l->setContentsMargins (0, 0, 0, 0);
   l->setMargin (0);
   setLayout (l);
   
-  doRefresh("init");
+  doRefresh ("init");
 }
 
 bool
 QTMRefreshWidget::recompute (string what) {
   if (what != "init" && kind != "any" && kind != what) return false;
-  string s = "'(vertical (link " * tmwid * "))";
+  string s = "'(vertical (link " * strwid * "))";
   eval ("(lazy-initialize-force)");
   object xwid = call ("menu-expand", eval (s));
   
@@ -621,7 +788,8 @@ QTMRefreshWidget::recompute (string what) {
     curobj = xwid;
     object uwid = eval (s);
     cur = make_menu_widget (uwid);
-    cache (xwid) = cur;
+    tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
+    if (menu_caching) cache (xwid) = cur;
     return true;
   }
 }
@@ -652,6 +820,7 @@ QTMRefreshWidget::deleteLayout (QLayout* l) {
 
 void
 QTMRefreshWidget::doRefresh (string kind) {
+BEGIN_SLOT
   if (recompute (kind)) {
     if (qwid) qwid->setParent (NULL);
     delete qwid;
@@ -669,6 +838,86 @@ QTMRefreshWidget::doRefresh (string kind) {
         window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
       window()->setFixedSize (window()->sizeHint());  
   }
+END_SLOT
+}
+
+
+/******************************************************************************
+ * QTMRefreshableWidget
+ ******************************************************************************/
+
+QTMRefreshableWidget::QTMRefreshableWidget (qt_widget _tmwid, object _prom, string _kind)
+: QWidget (), prom (_prom), kind (_kind),
+  curobj (false), cur (), tmwid (_tmwid), qwid (NULL)
+{   
+  QObject::connect (the_gui->gui_helper, SIGNAL (tmSlotRefresh (string)),
+                   this, SLOT (doRefresh (string)));
+  QVBoxLayout* l = new QVBoxLayout (this);
+  l->setContentsMargins (0, 0, 0, 0);
+  l->setMargin (0);
+  setLayout (l);
+  
+  doRefresh ("init");
+}
+
+bool
+QTMRefreshableWidget::recompute (string what) {
+  if (what != "init" && kind != "any" && kind != what) return false;
+  eval ("(lazy-initialize-force)");
+  object xwid = call (prom);
+  if (curobj == xwid) return false;
+  if (!is_widget (xwid)) return false;
+  curobj= xwid;
+  cur= as_widget (xwid);
+  tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
+  return true;
+}
+
+/*
+void
+QTMRefreshableWidget::deleteLayout (QLayout* l) {
+  if (!l)
+    return;
+
+  QLayoutItem* item;
+  while ((item = l->takeAt(0)) != 0) {
+    if (item->widget()) {
+        //qDebug() << "Deleting widget: " << item->widget();
+      l->removeWidget (item->widget());
+      item->widget()->setParent (NULL);
+      delete item->widget();
+    }	else if (item->layout()) {
+        //qDebug() << "Deleting layout: " << item->layout();
+      item->layout()->setParent (NULL);
+      deleteLayout (item->layout());
+    }
+  }
+
+  delete l;
+}
+*/
+
+void
+QTMRefreshableWidget::doRefresh (string kind) {
+BEGIN_SLOT
+  if (recompute (kind)) {
+    if (qwid) qwid->setParent (NULL);
+    delete qwid;
+    qwid = concrete (cur)->as_qwidget();
+    qwid->setParent (this);
+
+    delete layout()->takeAt(0);
+    layout()->addWidget (qwid);
+    update();
+    
+      // Tell the window to fix its size to the new one if we had it fixed to
+      // begin with (this is indicated by minimum and maximum sizes set to 
+      // values other than the default)
+    if (window()->minimumSize() != QSize (0,0) &&
+        window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
+      window()->setFixedSize (window()->sizeHint());  
+  }
+END_SLOT
 }
 
 
@@ -679,17 +928,17 @@ QTMRefreshWidget::doRefresh (string kind) {
 QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
     ///// Obtain the minimum vertical size
   QComboBox cb;
-  cb.setSizeAdjustPolicy(AdjustToContents);
-  cb.addItem("");
+  cb.setSizeAdjustPolicy (AdjustToContents);
+  cb.addItem ("");
   minSize = cb.sizeHint();  // we'll just keep the height
   
     ///// Add width of the arrow button
   QStyleOptionComboBox opt;
-  opt.initFrom(&cb);
+  opt.initFrom (&cb);
   opt.activeSubControls = QStyle::SC_ComboBoxArrow;
   QRect r = style()->subControlRect (QStyle::CC_ComboBox, &opt,
                                      QStyle::SC_ComboBoxArrow, &cb);
-  minSize.setWidth(r.width());
+  minSize.setWidth (r.width());
 }
 
 /*! Add items and fix the ComboBox size using texmacs length units.
@@ -702,14 +951,14 @@ QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
  */
 void
 QTMComboBox::addItemsAndResize (const QStringList& texts, string ww, string hh) {
-  QComboBox::addItems(texts);
+  QComboBox::addItems (texts);
   
     ///// Calculate the minimal contents size:
   calcSize = QApplication::globalStrut ();
   const QFontMetrics& fm = fontMetrics ();
   
   for (int i = 0; i < count(); ++i) {
-    QRect br = fm.boundingRect(itemText(i));
+    QRect br = fm.boundingRect (itemText(i));
     calcSize.setWidth (qMax (calcSize.width(), br.width()));
     calcSize.setHeight (qMax (calcSize.height(), br.height()));
   }
@@ -719,7 +968,7 @@ QTMComboBox::addItemsAndResize (const QStringList& texts, string ww, string hh) 
   calcSize.setHeight (qMax (calcSize.height(), minSize.height()));
   calcSize.rwidth() += minSize.width();
   
-  setFixedSize(calcSize);
+  setFixedSize (calcSize);
 }
 
 /*
@@ -733,7 +982,7 @@ QTMComboBox::event (QEvent* ev) {
     if (k->key() == Qt::Key_Up || k->key() == Qt::Key_Down)
       showPopup();
     else if (k->key() != Qt::Key_Escape) // HACK: QTMLineEdit won't need this
-      lineEdit()->event(ev);             // but we do.
+      lineEdit()->event (ev);             // but we do.
     else
       return false;
   } else
@@ -754,8 +1003,7 @@ QTMComboBox::event (QEvent* ev) {
  It also scrolls the viewport to the position of selected items in QListWidgets.
  */
 void
-QTMScrollArea::setWidgetAndConnect (QWidget* w)
-{
+QTMScrollArea::setWidgetAndConnect (QWidget* w) {
   setWidget (w);
  
   listViews = w->findChildren<QTMListView*>();
@@ -768,8 +1016,8 @@ QTMScrollArea::setWidgetAndConnect (QWidget* w)
 
 /*! Scrolls the area to a given index in a QTMListView. */
 void
-QTMScrollArea::scrollToSelection (const QItemSelection& sel)
-{
+QTMScrollArea::scrollToSelection (const QItemSelection& sel) {
+BEGIN_SLOT
   if (sel.isEmpty())
     return;
 
@@ -783,6 +1031,7 @@ QTMScrollArea::scrollToSelection (const QItemSelection& sel)
     if (! viewport()->geometry().contains (x, y))
       ensureVisible (x, y, r.width(), r.height());
   }
+END_SLOT
 }
 
 /*! Work around a problem with scrolling before the widget is shown.
@@ -791,15 +1040,13 @@ QTMScrollArea::scrollToSelection (const QItemSelection& sel)
  insufficient amount. See the comments to QTMScrollArea.
  */
 void
-QTMScrollArea::showEvent (QShowEvent* ev)
-{
+QTMScrollArea::showEvent (QShowEvent* ev) {
   for (ListViewsIterator it = listViews.begin(); it != listViews.end(); ++it) {
     QItemSelection sel = (*it)->selectionModel()->selection();
     (*it)->selectionChanged (sel, sel);
   }
   QScrollArea::showEvent (ev);
 }
-
 
 /******************************************************************************
  * QTMListView
@@ -826,12 +1073,18 @@ QTMListView::QTMListView (const command& cmd,
   setSelectionMode (multiple ? ExtendedSelection : SingleSelection);
   setEditTriggers (NoEditTriggers);
 
+    // NOTE: using selectionModel()->select(item, QItemSelection::SelectCurrent)
+    // doesn't update the selection but overwrites it, so we explicitly define
+    // our QItemSelection and use merge()
+  QItemSelection sel;
   for (int i = 0; i < model()->rowCount(); ++i) {
     QModelIndex item = model()->index (i, 0);
-    if (selections.contains (model()->data(item, Qt::DisplayRole).toString(), Qt::CaseSensitive))
-      selectionModel()->select (item, QItemSelectionModel::SelectCurrent);
+    if (selections.contains (model()->data (item, Qt::DisplayRole).toString(),
+                             Qt::CaseSensitive))
+      sel.merge (QItemSelection(item, item), QItemSelectionModel::Select);
   }
-
+  selectionModel()->select (sel, QItemSelectionModel::Select);
+  
   if (!scroll) {
     setMinimumWidth (sizeHintForColumn(0));
     setMinimumHeight (sizeHintForRow(0) * model()->rowCount());
@@ -858,6 +1111,57 @@ QTMListView::QTMListView (const command& cmd,
  */
 void
 QTMListView::selectionChanged (const QItemSelection& c, const QItemSelection& p) {
+BEGIN_SLOT
   QListView::selectionChanged (c, p);
   emit selectionChanged (c);
+END_SLOT
 }
+
+/******************************************************************************
+ * QTMTreeView
+ ******************************************************************************/
+
+QTMTreeView::QTMTreeView (command cmd, tree data, const tree& roles, QWidget* p)
+: QTreeView (p), _t (data), _cmd (cmd) {
+  setModel (QTMTreeModel::instance (_t, roles));
+  setUniformRowHeights (true);  // assuming we display only text.
+  setHeaderHidden (true);       // for now...
+  QObject::connect (this, SIGNAL (pressed (const QModelIndex&)),
+                    this,   SLOT (callOnChange (const QModelIndex&)));
+}
+
+void
+QTMTreeView::currentChanged (const QModelIndex& curr, const QModelIndex& prev) {
+  (void) prev;
+  if (selectedIndexes().contains(curr))
+    callOnChange (curr, false);
+}
+
+void
+QTMTreeView::callOnChange (const QModelIndex& index, bool mouse) {
+BEGIN_SLOT
+  object arguments = mouse ? list_object ((int)QApplication::mouseButtons())
+                           : list_object (-1);
+    
+    // docs state the index is valid, no need to check
+  QVariant d = tmModel()->data (index, QTMTreeModel::CommandRole);
+    // If there's no CommandRole, we return the subtree by default
+  if (!d.isValid() || !d.canConvert (QVariant::String))
+    arguments = cons (tmModel()->item_from_index (index), arguments);
+  else
+    arguments = cons (from_qstring (d.toString()), arguments);
+  int cnt = QTMTreeModel::TMUserRole;
+  d = tmModel()->data (index, cnt);
+  while (d.isValid() && d.canConvert (QVariant::String)) {
+    arguments = cons (from_qstring (d.toString()), arguments);
+    d = tmModel()->data (index, ++cnt);
+  }
+  _cmd (arguments);
+END_SLOT
+}
+
+inline QTMTreeModel*
+QTMTreeView::tmModel() const {
+  return static_cast<QTMTreeModel*> (model());
+}
+

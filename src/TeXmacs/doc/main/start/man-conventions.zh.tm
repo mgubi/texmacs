@@ -1,18 +1,18 @@
-<TeXmacs|1.0.7.17>
+<TeXmacs|1.99.2>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|chinese>>
 
 <\body>
   <tmdoc-title|\<#672C\>\<#6587\>\<#6863\>\<#60EF\>\<#4F8B\>>
 
   <paragraph*|\<#83DC\>\<#5355\>\<#9879\>>
 
-  \<#5728\><TeXmacs>\<#6587\>\<#6863\>\<#4E2D\>\<#FF0C\>\<#83DC\>\<#5355\>\<#662F\>\<#8FD9\>\<#6837\>\<#7684\>\<#FF1A\><menu|Document>\<#FF0C\><menu|File|Load>
-  \<#6216\>\<#8005\> <menu|Format|Font shape|Italic>\<#FF0C\>\<#4E00\>\<#822C\>\<#4F1A\>\<#548C\>\<#6B63\>\<#6587\>\<#7A7A\>\<#5F00\>\<#4E00\>\<#4E2A\>\<#7A7A\>\<#683C\>\<#FF0C\>\<#5F53\>\<#7136\>\<#FF0C\>\<#8FD9\>\<#662F\>\<#4E34\>\<#65F6\>\<#7684\>\<#89E3\>\<#51B3\>\<#65B9\>\<#6848\>\<#FF0C\>\<#5F53\><TeXmacs>\<#5BF9\>\<#4E2D\>\<#6587\>\<#652F\>\<#6301\>\<#66F4\>\<#597D\>\<#65F6\>\<#FF0C\>\<#6211\>\<#4EEC\>\<#4F1A\>\<#91C7\>\<#7528\>\<#7279\>\<#6B8A\>\<#7684\>\<#5B57\>\<#4F53\>\<#6765\>\<#548C\>\<#6B63\>\<#6587\>\<#533A\>\<#5206\>\<#3002\>
+  \<#5728\><TeXmacs>\<#6587\>\<#6863\>\<#4E2D\>\<#FF0C\>\<#83DC\>\<#5355\>\<#9879\>\<#4EE5\>\<#52A0\>\<#7C97\>\<#7684\>\<#5B57\>\<#4F53\>\<#548C\>\<#7BAD\>\<#5934\>\<#8868\>\<#793A\>\<#FF1A\><menu|Document>\<#FF0C\><menu|File|Load>\<#6216\>\<#8005\><menu|Format|Font
+  shape|Italic>\<#3002\>
 
   <paragraph*|\<#7EC4\>\<#5408\>\<#952E\>>
 
-  <TeXmacs> \<#4F7F\>\<#7528\>\<#4E0B\>\<#5217\>\<#7EC4\>\<#5408\>\<#952E\>\<#FF1A\>
+  <TeXmacs>\<#4F7F\>\<#7528\>\<#4E0B\>\<#5217\>\<#7EC4\>\<#5408\>\<#952E\>\<#FF1A\>
 
   <\description>
     <item*|<prefix|S->>Shift \<#7EC4\>\<#5408\>\<#952E\>
@@ -49,7 +49,7 @@
   \<#7EC4\>\<#5408\>\<#952E\>>|<cell|<key*|home>>|<cell|Home>>|<row|<cell|<key*|return>>|<cell|\<#6362\>\<#884C\>>|<cell|<key*|end>>|<cell|End>>|<row|<cell|<key*|delete>>|<cell|\<#5220\>\<#9664\>>|<cell|<key*|pageup>>|<cell|Page
   up>>|<row|<cell|<key*|backspace>>|<cell|\<#9000\>\<#683C\>>|<cell|<key*|pagedown>>|<cell|Page
   down>>|<row|<cell|<key*|escape>>|<cell|Escape>|<cell|<key*|space>>|<cell|\<#7A7A\>\<#683C\>>>|<row|<cell|<key*|tab>>|<cell|Tab>|<cell|>|<cell|>>>>>>
-    Special keys.
+    \<#7279\>\<#6B8A\>\<#952E\>\<#3002\>
   </big-table>
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
@@ -62,9 +62,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|font|sys-chinese>
-    <associate|language|chinese>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

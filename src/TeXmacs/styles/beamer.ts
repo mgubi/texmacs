@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.8>
+<TeXmacs|1.0.7.20>
 
 <style|source>
 
@@ -24,7 +24,7 @@
     </src-title>
   </active*>
 
-  <use-package|generic|compact-list|presentation|ridged-paper>
+  <use-package|generic|section-beamer|compact-list|presentation|bluish|title-bar>
 
   \;
 </body>

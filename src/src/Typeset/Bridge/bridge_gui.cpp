@@ -20,7 +20,6 @@
 
 class bridge_ornamented_rep: public bridge_rep {
 protected:
-  int    last;
   bridge body;
   tree   with;
 
@@ -49,9 +48,8 @@ bridge_ornamented_rep::bridge_ornamented_rep (
 
 void
 bridge_ornamented_rep::initialize () {
-  last= N(st)-1;
-  if (is_nil(body)) body= make_bridge (ttt, st[last], descend (ip, last));
-  else replace_bridge (body, st[last], descend (ip, last));
+  if (is_nil(body)) body= make_bridge (ttt, st[0], descend (ip, 0));
+  else replace_bridge (body, st[0], descend (ip, 0));
 }
 
 /******************************************************************************
@@ -67,8 +65,8 @@ bridge_ornamented_rep::notify_assign (path p, tree u) {
   }
   else {
     bool mp_flag= is_multi_paragraph (st);
-    if (p->item == last) {
-      if (is_atom (p)) body= make_bridge (ttt, u, descend (ip, last));
+    if (p->item == 0) {
+      if (is_atom (p)) body= make_bridge (ttt, u, descend (ip, 0));
       else body->notify_assign (p->next, u);
       st= substitute (st, p->item, body->st);
     }
@@ -85,11 +83,11 @@ void
 bridge_ornamented_rep::notify_insert (path p, tree u) {
   // cout << "Insert " << p << ", " << u << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
-  if (is_atom (p) || (p->item != last)) bridge_rep::notify_insert (p, u);
+  if (is_atom (p) || (p->item != 0)) bridge_rep::notify_insert (p, u);
   else {
     bool mp_flag= is_multi_paragraph (st);
     body->notify_insert (p->next, u);
-    st= substitute (st, last, body->st);
+    st= substitute (st, 0, body->st);
     if (mp_flag != is_multi_paragraph (st)) initialize ();
   }
   status= CORRUPTED;
@@ -99,11 +97,11 @@ void
 bridge_ornamented_rep::notify_remove (path p, int nr) {
   // cout << "Remove " << p << ", " << nr << " in " << st << "\n";
   ASSERT (!is_nil (p), "nil path");
-  if (is_atom (p) || (p->item != last)) bridge_rep::notify_remove (p, nr);
+  if (is_atom (p) || (p->item != 0)) bridge_rep::notify_remove (p, nr);
   else {
     bool mp_flag= is_multi_paragraph (st);
     body->notify_remove (p->next, nr);
-    st= substitute (st, last, body->st);
+    st= substitute (st, 0, body->st);
     if (mp_flag != is_multi_paragraph (st)) initialize ();
   }
   status= CORRUPTED;
@@ -116,7 +114,7 @@ bridge_ornamented_rep::notify_macro (
   //cout << "Notify macro " << type << ", " << var << ", " << l
   //     << ", " << p << ", " << u << " in " << st << "\n";
   bool flag= body->notify_macro (type, var, l, p, u);
-  flag= flag || env->depends (st (0, last), var, l);
+  flag= flag || env->depends (st, var, l);
   if (flag) status= CORRUPTED;
   return flag;
 }
@@ -246,7 +244,7 @@ bridge_canvas_rep::my_typeset (int desired_status) {
 }
 
 /******************************************************************************
-* Hightlighting
+* Highlighting
 ******************************************************************************/
 
 class bridge_ornament_rep: public bridge_ornamented_rep {
@@ -263,19 +261,15 @@ bridge_ornament (typesetter ttt, tree st, path ip) {
 
 void
 bridge_ornament_rep::my_typeset (int desired_status) {
-  SI    w     = env->get_length (ORNAMENT_BORDER);
-  SI    xpad  = env->get_length (ORNAMENT_HPADDING);
-  SI    ypad  = env->get_length (ORNAMENT_VPADDING);
-  tree  bg    = env->read       (ORNAMENT_COLOR);
-  int   a     = env->alpha;
-  color sunny = env->get_color  (ORNAMENT_SUNNY_COLOR);
-  color shadow= env->get_color  (ORNAMENT_SHADOW_COLOR);
-  SI    l     = env->get_length (PAR_LEFT ) + w + xpad;
-  SI    r     = env->get_length (PAR_RIGHT) + w + xpad;
-  with        = tuple (PAR_LEFT , tree (TMLEN, as_string (l))) *
-                tuple (PAR_RIGHT, tree (TMLEN, as_string (r)));
-  box   b     = typeset_ornament (desired_status);
-  box   hb    = highlight_box (ip, b, w, xpad, ypad, bg, a, sunny, shadow);
-  box   mb    = move_box (decorate (ip), hb, -l, 0);
+  ornament_parameters ps= env->get_ornament_parameters ();
+  SI   l = env->get_length (PAR_LEFT ) + ps->lpad;
+  SI   r = env->get_length (PAR_RIGHT) + ps->rpad;
+  with   = tuple (PAR_LEFT , tree (TMLEN, as_string (l))) *
+           tuple (PAR_RIGHT, tree (TMLEN, as_string (r)));
+  box  b = typeset_ornament (desired_status);
+  box  xb;
+  if (N(st) == 2) xb= typeset_as_concat (env, st[1], descend (ip, 1));
+  box  hb= highlight_box (ip, b, xb, ps);
+  box  mb= move_box (decorate (ip), hb, -l, 0);
   insert_ornament (remember_box (decorate (ip), mb));
 }

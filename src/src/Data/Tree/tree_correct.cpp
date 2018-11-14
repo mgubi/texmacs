@@ -34,6 +34,145 @@ drd_correct (drd_info drd, tree t) {
 }
 
 /******************************************************************************
+* Add missing explicit document tags when necessary
+******************************************************************************/
+
+static bool
+is_block_pseudo_code (tree t) {
+  if (!is_compound (t) || N(t) == 0) return false;
+  string s= as_string (L(t));
+  if (!starts (s, "algo-")) return false;
+  return
+    s == "algo-procedure" ||
+    s == "algo-function" ||
+    s == "algo-for" ||
+    s == "algo-forall" ||
+    s == "algo-foreach" ||
+    s == "algo-while" ||
+    s == "algo-repeat" ||
+    s == "algo-loop" ||
+    s == "algo-body" ||
+    s == "algo-begin" ||
+    s == "algo-inputs" ||
+    s == "algo-outputs" ||
+    s == "algo-if" ||
+    s == "algo-else-if" ||
+    s == "algo-else";
+}
+
+tree
+correct_missing_block (tree t) {
+  if (is_atomic (t)) return t;
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++)
+    r[i]= correct_missing_block (t[i]);
+  t= r;
+  if (is_block_pseudo_code (t))
+    if (!is_document (t[N(t)-1]))
+      t[N(t)-1]= tree (DOCUMENT, t[N(t)-1]);
+  return t;
+}
+
+/******************************************************************************
+* Correct incorrectly concatenated block content
+******************************************************************************/
+
+static tree
+to_concat (tree t) {
+  if (t == "") return tree (CONCAT);
+  else if (is_concat (t)) return t;
+  else return tree (CONCAT, t);
+}
+
+static tree
+from_concat (tree t) {
+  if (N(t) == 0) return "";
+  else if (N(t) == 1) return t[0];
+  else return t;
+}
+
+static bool
+is_migratable (tree t) {
+  return
+    t == " " || is_compound (t, "mlx", 2) ||
+    is_func (t, VAR_VSPACE) || is_func (t, VSPACE) ||
+    (is_compound (t) && L(t) >= VAR_PAGE_BREAK && L(t) <= NEW_DPAGE);
+}
+
+bool expand_needs_surrounding (string s); // defined in upgrade.cpp
+
+static bool
+is_basic_environment (tree t) {
+  return // TODO: to be completed using DRD properties
+    (is_compound (t) && N(t) == 1 &&
+     expand_needs_surrounding (as_string (L(t)))) ||
+    is_compound (t, "equation", 1) || is_compound (t, "equation*", 1);
+}
+
+static tree
+migrate_surround (tree bef, tree aft, tree body) {
+  if (is_document (body) && N(body) > 0) {
+    if (N(body) == 1)
+      return tree (DOCUMENT, migrate_surround (bef, aft, body[0]));
+    tree first (DOCUMENT, migrate_surround (bef, "", body[0]));
+    tree last  (DOCUMENT, migrate_surround ("", aft, body[N(body)-1]));
+    return first * body (1, N(body)-1) * last;
+  }
+  else
+    return from_concat (to_concat (bef) * to_concat (body) * to_concat (aft));
+}
+
+static tree
+make_surround (tree bef, tree aft, tree t) {
+  if (bef == "" && aft == "") return t;
+  else if (N(t) == 1 && is_basic_environment (t))
+    return tree (L(t), migrate_surround (bef, aft, t[0]));
+  return tree (SURROUND, bef, aft, t);
+}
+
+tree
+correct_concat_block (tree t) {
+  if (is_atomic (t)) return t;
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++)
+    r[i]= correct_concat_block (t[i]);
+  t= r;
+  if (is_concat (t)) {
+    tree doc (DOCUMENT);
+    int start= 0;
+    for (i=0; i<n; )
+      if (is_multi_paragraph (t[i])) {
+        int bef_i= i;
+        while (bef_i > start && is_migratable (t[bef_i-1])) bef_i--;
+        int aft_i= i+1;
+        while (aft_i < n && is_migratable (t[aft_i])) aft_i++;
+        if (start < bef_i) doc << from_concat (t (start, bef_i));
+        tree bef= from_concat (t (bef_i, i));
+        tree aft= from_concat (t (i+1, aft_i));
+        doc << make_surround (bef, aft, t[i]);
+        i= aft_i;
+        start= i;
+      }
+      else i++;
+    if (start < n) doc << from_concat (t (start, n));
+    if (N(doc) == 1) return doc[0];
+    else return doc;
+  }
+  else if (is_document (t)) {
+    tree doc (DOCUMENT);
+    for (i=0; i<n; i++)
+      if (is_document (t[i])) doc << A(t[i]);
+      else doc << t[i];
+    return doc;
+  }
+  else if (N(t) == 1 && is_basic_environment (t) && !is_document (t[0]))
+    return tree (L(t), tree (DOCUMENT, t[0]));
+  else return t;
+}
+
+/******************************************************************************
 * Correct WITHs or WITH-like macros
 ******************************************************************************/
 
@@ -890,6 +1029,8 @@ latex_correct (tree t) {
   //if (enabled_preference ("insert missing invisible"))
   t= missing_invisible_correct (t, 1);
   t= downgrade_big (t);
+  t= correct_missing_block (t);
+  t= correct_concat_block (t);
   return t;
 }
 

@@ -13,7 +13,81 @@
 
 (texmacs-module (dynamic session-menu)
   (:use (dynamic session-edit)
+        (dynamic program-edit)
         (generic generic-menu)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Remote plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-widget (select-remote-plugin-widget quit)
+  (let* ((where "")
+         (set-where
+          (lambda (new-where)
+            (when new-where
+              (set! where new-where)
+              (refresh-now "supported-plugins")
+              (refresh-now "enter-server"))))
+         (key-press
+          (lambda (what)
+            (when what
+              (set! where (car what))
+              (when (== (cadr what) "return")
+                (set-where where)))))
+         (encode
+          (lambda (triple)
+            (with (p v cmd) triple
+              (with s (upcase-first p)
+                (if (== v "default") s
+                    (string-append s " (" v ")"))))))
+         (decode
+          (lambda (name)
+            (and-with l (list-remote-plugins where)
+              (with t (list-find (cadr l) (lambda (u) (== (encode u) name)))
+                (list (car t) (string-append where "/" (cadr t)))))))
+         (plugin-list
+          (lambda ()
+            (with l (list-remote-plugins where)
+              (if (not l) (list)
+                  (map encode (cadr l)))))))
+    (padded
+      (hlist
+        (resize "300px" "400px"
+          (vlist
+            (bold (text "Remote servers"))
+            ===
+            (refreshable "remote-servers"
+              (choice (set-where answer) (remote-connection-servers) where))))
+        // // //
+        (resize "300px" "400px"
+          (vlist
+            (bold (text "Supported plug-ins"))
+            ===
+            (refreshable "supported-plugins"
+              (scrollable
+                (choice (quit (decode answer)) (plugin-list) ""))))))
+      === ===
+      (hlist
+        (text "Server:") //
+        (refreshable "enter-server"
+          (input (key-press answer) "search-server" (list where) "1w"))
+        // // //
+        (explicit-buttons
+          ("Add"
+           (detect-remote-plugins where)
+           (refresh-now "remote-servers")
+           (refresh-now "supported-plugins")) //
+           ("Update"
+            (update-remote-plugins where)
+            (refresh-now "supported-plugins")) //
+            ("Remove"
+             (remove-remote-plugins where)
+             (refresh-now "remote-servers")
+             (refresh-now "supported-plugins")))))))
+
+(tm-define (open-remote-plugin-selector name call-back)
+  (:interactive #t)
+  (dialogue-window select-remote-plugin-widget call-back name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting sessions
@@ -22,13 +96,14 @@
 (tm-menu (supported-sessions-menu)
   (for (name (session-list))
     (let* ((menu-name (session-name name))
-           (l (connection-variants name)))
-      (assuming (== l (list "default"))
-        ((eval menu-name) (make-session name "default")))
-      (assuming (!= l (list "default"))
-        (-> (eval menu-name)
-            (for (variant l)
-              ((eval variant) (make-session name variant))))))))
+           (l (local-connection-variants name)))
+      (assuming (nnull? l)
+        (assuming (== l (list "default"))
+          ((eval menu-name) (make-session name "default")))
+        (assuming (!= l (list "default"))
+          (-> (eval menu-name)
+              (for (variant l)
+                ((eval variant) (make-session name variant)))))))))
 
 (menu-bind insert-session-menu
   (when (and (style-has? "std-dtd") (in-text?))
@@ -36,6 +111,9 @@
     ---
     (link supported-sessions-menu)
     ---
+    ("Remote" (open-remote-plugin-selector
+               "Start remote session"
+               (lambda (x) (apply make-session x))))
     ("Other" (interactive make-session))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -59,6 +137,8 @@
   ("Fold all fields" (session-fold-all))
   ("Unfold all fields" (session-unfold-all))
   ---
+  ("Evaluate fields in order" (toggle-session-program))
+  ---
   ("Create subsession" (field-insert-fold (focus-tree)))
   ("Split session" (session-split)))
 
@@ -76,12 +156,19 @@
   (with lan (get-env "prog-language")
     (or (session-name lan) "Scheme")))
 
+(tm-define (standard-options l)
+  (:require (in? l field-tags))
+  (list "framed-session" "ring-session" "large-formulas"))
+
 (tm-menu (focus-tag-menu t)
   (:require (field-context? t))
   (inert ((eval (focus-session-language)) (noop) (noop)))
   (when (alternate-context? t)
     ((check "Unfolded" "v" (alternate-second? (focus-tree)))
      (alternate-toggle (focus-tree))))
+  (assuming (focus-has-preferences? t)
+    (-> "Preferences"
+        (dynamic (focus-preferences-menu t))))
   ("Describe" (set-message "Not yet implemented" "")))
 
 (tm-menu (focus-move-menu t)
@@ -137,6 +224,9 @@
   (:require (field-context? t))
   (dynamic (focus-toggle-icons t))
   (mini #t (inert ((eval (focus-session-language)) (noop))))
+  (assuming (focus-has-preferences? t)
+    (=> (balloon (icon "tm_focus_prefs.xpm") "Preferences for tag")
+	(dynamic (focus-preferences-menu t))))
   ((balloon (icon "tm_focus_help.xpm") "Describe tag")
    (focus-help)))
 

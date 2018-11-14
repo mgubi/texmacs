@@ -14,12 +14,8 @@
 (texmacs-module (convert latex init-latex))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; LaTeX
+;; LaTeX format
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; FIXME: the intermediate latex-stree data format is different
-;; for conversions to and from TeXmacs. After rewriting
-;; the input filter, both formats should be identical.
 
 (define (latex-recognizes-at? s pos)
   (set! pos (format-skip-spaces s pos))
@@ -45,36 +41,82 @@
   (:name "LaTeX class")
   (:suffix "ltx" "sty" "cls"))
 
+(define-preferences
+  ("texmacs->latex:transparent-tracking" "on" noop))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TeXmacs->LaTeX
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (lazy-define (convert latex texout) serialize-latex)
 (lazy-define (convert latex tmtex) texmacs->latex)
-(lazy-define (convert latex tmtex-elsevier) init-elsevier)
-
-(converter latex-document latex-tree
-  (:function parse-latex-document))
-
-(converter latex-document texmacs-tree
-  (:function latex-document->texmacs))
-
-(converter latex-class-document texmacs-tree
-  (:function latex-class-document->texmacs))
-
-(converter latex-stree latex-document
-  (:function serialize-latex))
-
-(converter latex-snippet latex-tree
-  (:function parse-latex))
-
-(converter latex-stree latex-snippet
-  (:function serialize-latex))
-
-(converter latex-tree texmacs-tree
-  (:function latex->texmacs))
 
 (converter texmacs-stree latex-stree
   (:function-with-options texmacs->latex)
+  (:option "texmacs->latex:source-tracking" "off")
+  (:option "texmacs->latex:conservative" "on")
+  (:option "texmacs->latex:transparent-source-tracking" "on")
+  (:option "texmacs->latex:attach-tracking-info" "on")
   (:option "texmacs->latex:replace-style" "on")
   (:option "texmacs->latex:expand-macros" "on")
   (:option "texmacs->latex:expand-user-macros" "off")
   (:option "texmacs->latex:indirect-bib" "off")
   (:option "texmacs->latex:use-macros" "on")
   (:option "texmacs->latex:encoding" "ascii"))
+
+(converter latex-stree latex-document
+  (:function serialize-latex))
+
+(converter latex-stree latex-snippet
+  (:function serialize-latex))
+
+(tm-define (texmacs->latex-document x opts)
+  (serialize-latex (texmacs->latex (tm->stree x) opts)))
+
+(converter texmacs-stree latex-document
+  (:function-with-options conservative-texmacs->latex)
+  ;;(:function-with-options tracked-texmacs->latex)
+  (:option "texmacs->latex:source-tracking" "off")
+  (:option "texmacs->latex:conservative" "on")
+  (:option "texmacs->latex:transparent-source-tracking" "on")
+  (:option "texmacs->latex:attach-tracking-info" "on")
+  (:option "texmacs->latex:replace-style" "on")
+  (:option "texmacs->latex:expand-macros" "on")
+  (:option "texmacs->latex:expand-user-macros" "off")
+  (:option "texmacs->latex:indirect-bib" "off")
+  (:option "texmacs->latex:use-macros" "on")
+  (:option "texmacs->latex:encoding" "ascii"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; LaTeX -> TeXmacs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (latex-document->texmacs x . opts)
+  (if (list-1? opts) (set! opts (car opts)))
+  (with as-pic (== (get-preference "latex->texmacs:fallback-on-pictures") "on")
+    (conservative-latex->texmacs x as-pic)))
+
+(converter latex-document latex-tree
+  (:function parse-latex-document))
+
+(converter latex-snippet latex-tree
+  (:function parse-latex))
+
+(converter latex-document texmacs-tree
+  (:function-with-options latex-document->texmacs)
+  (:option "latex->texmacs:fallback-on-pictures" "on")
+  (:option "latex->texmacs:source-tracking" "off")
+  (:option "latex->texmacs:conservative" "off")
+  (:option "latex->texmacs:transparent-source-tracking" "off"))
+
+(converter latex-class-document texmacs-tree
+  (:function latex-class-document->texmacs))
+
+(converter latex-tree texmacs-tree
+  (:function latex->texmacs))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(lazy-define (convert latex test-tmtex) test-tmtex)

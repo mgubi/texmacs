@@ -33,9 +33,22 @@
 ;; Main expansions routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmdoc-relative cur name)
+  ;;(display* "tmdoc-relative " cur ", " name "\n")
+  (with rel (url-relative cur name)
+    (if (url-regular? rel) rel
+        (let* ((nname (string-append name "." (ext-language-suffix) ".tm"))
+               (nfile (url-search-upwards (url-head cur) nname
+                                          (list "doc" "web" "texmacs"))))
+          (if (not (url-none? nfile)) nfile
+              (let* ((ename (string-append name ".en.tm"))
+                     (efile (url-search-upwards (url-head cur) ename
+                                                (list "doc" "web" "texmacs"))))
+                (if (not (url-none? efile)) efile rel)))))))
+
 (define (tmdoc-branch x root cur level done)
   (let* ((name (caddr x))
-	 (rel-name (url-relative cur name)))
+	 (rel-name (tmdoc-relative cur name)))
     (tmdoc-expand root rel-name level done)))
 
 (define (tmdoc-substitute-sub l root cur)
@@ -49,7 +62,21 @@
                 (u2 (url-delta root u1)))
            ;;(display* root ", " cur ", " (caddr x) " -> " u2 "\n")
            (list (car x) (cadr x) (url->unix u2))))
-	((list? x) (cons (car x) (tmdoc-substitute-sub (cdr x) root cur)))
+        ((tm-func? x 'if-ref*)
+         (cons 'if-ref (tmdoc-substitute-sub (cdr x) root cur)))
+        ((tm-func? x 'if-nref*)
+         (cons 'if-nref (tmdoc-substitute-sub (cdr x) root cur)))
+        ((tm-func? x 'tmdoc-link*)
+         (cons 'tmdoc-link (tmdoc-substitute-sub (cdr x) root cur)))
+        ((and (tm-in? x '(bibliography bibliography*))
+              (tm-atomic? (tm-ref x 2)))
+         (let* ((name (tm->string (tm-ref x 2)))
+                (rel (if (== name "") "" (url-relative cur name))))
+           `(,(tm-label x) ,(tm-ref x 0) ,(tm-ref x 1)
+             ,(url->string rel) ,@(cdddr (cDr (tm-children x)))
+             ,(tmdoc-substitute (cAr x) root cur))))
+	((list? x)
+         (cons (car x) (tmdoc-substitute-sub (cdr x) root cur)))
 	(else x)))
 
 (define (tmdoc-rewrite-one x root cur the-level done)
@@ -57,6 +84,11 @@
 	 (level (if omit? (car the-level) the-level)))
     (cond ((or (func? x 'tmdoc-title) (func? x 'tmdoc-title*))
 	   (if omit? '(document) (cons level (cdr x))))
+          ((and (func? x 'concat)
+                (or (func? (tm-ref x 0) 'tmdoc-title)
+                    (func? (tm-ref x 0) 'tmdoc-title*)))
+           `(concat ,@(map (cut tmdoc-rewrite-one <> root cur the-level done)
+                           (tm-children x))))
 	  ((func? x 'tmdoc-license)
 	   '(document))
 	  ((func? x 'traverse)
@@ -99,18 +131,9 @@
 ;; Further subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmdoc-search-env-var t which)
-  (cond ((nlist? t) #f)
-	((null? t) #f)
-	((match? t '(associate "language" :%1)) (caddr t))
-	(else (let ((val (tmdoc-search-env-var (car t) which)))
-		(if val val (tmdoc-search-env-var (cdr t) which))))))
-
 (define (tmdoc-language file-name)
-  (let* ((t (tree-import file-name "texmacs"))
-	 (init (assoc 'initial (cdr (tree->stree t))))
-	 (lan (and init (tmdoc-search-env-var (cadr init) "language"))))
-    (if lan lan "english")))
+  (with t (tree-import file-name "texmacs")
+    (tmfile-language t)))
 
 (define (tmdoc-add-aux doc)
   (let* ((l0 (cdr doc))
@@ -143,7 +166,9 @@
            `(document
               (TeXmacs ,(texmacs-version))
               (style "tmdoc")
-              (body (document "Broken link."))))
+              (body (document
+                      "Broken link."
+                      (concat "File " (tt ,root) " does not exist")))))
           ((== (url-suffix root) "html")
            (with doc (tm->stree (tree-import root "html"))
              `(document
@@ -159,19 +184,17 @@
              (tm->stree
               `(document
                  (TeXmacs ,(texmacs-version))
-                 (style "tmmanual")
+                 (style (tuple "tmmanual" ,lan))
                  (body ,(tmdoc-add-aux body))
-                 (initial (collection (associate "language" ,lan)
-                                      (associate "page-medium" "paper")))))))
+                 (initial (collection (associate "page-medium" "paper")))))))
           (else
            (let* ((body (tmdoc-expand root root 'tmdoc-title))
                   (lan (tmdoc-language root)))
              (tm->stree
               `(document
                  (TeXmacs ,(texmacs-version))
-                 (style "tmdoc")
-                 (body ,body)
-                 (initial (collection (associate "language" ,lan))))))))))
+                 (style (tuple "tmdoc" ,lan))
+                 (body ,body))))))))
 
 (define (tmdoc-find-title-list l)
   (and (nnull? l)
@@ -194,8 +217,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmdoc-expand-help root type)
-  (load-buffer (string-append "tmfs://help/" type "/"
-                              (url->tmfs-string root))))
+  (with name (url->tmfs-string root)
+    (when (string-starts? name "tmfs/help/")
+      (set! name (string-drop name 10))
+      (set! name (tmfs-cdr name)))
+    (load-buffer (string-append "tmfs://help/" type "/" name))))
 
 (tm-define (delayed-update nr cont)
   (system-wait "Generating automatic content" nr)
@@ -203,7 +229,7 @@
   (update-current-buffer)
   (user-delayed cont))
 
-(tm-define (tmdoc-expand-help-manual root)
+(tm-define (tmdoc-expand-help-manual* root next)
   (system-wait "Generating manual" "(can be long)")
   (tmdoc-expand-help root "book")
   (user-delayed
@@ -215,13 +241,17 @@
               (delayed-update "(pass 3/3)"
                 (lambda ()
                   (buffer-pretend-saved (current-buffer))
-                  (system-wait "Finishing manual" "(soon ready)"))))))))))
+                  (next))))))))))
 
-(tm-define (tmdoc-expand-this type)
+(tm-define (tmdoc-expand-help-manual root)
+  (tmdoc-expand-help-manual*
+   root (lambda () (system-wait "Finishing manual" "(soon ready)"))))
+
+(tm-define (tmdoc-expand-this* type next)
   (system-wait (string-append "Generating " type) "(can be long)")
   (with mmx? (style-has? "mmxdoc-style")
     (tmdoc-expand-help (current-buffer) type)
-    (if mmx? (init-style "mmxmanual"))
+    (if mmx? (set-main-style "mmxmanual"))
     (user-delayed
       (lambda ()
         (delayed-update "(pass 1/3)"
@@ -231,7 +261,11 @@
                 (delayed-update "(pass 3/3)"
                   (lambda ()
                     (buffer-pretend-saved (current-buffer))
-                    (system-wait "Finishing" "(soon ready)")))))))))))
+                    (next)))))))))))
+
+(tm-define (tmdoc-expand-this type)
+  (tmdoc-expand-this*
+   type (lambda () (system-wait "Finishing manual" "(soon ready)"))))
 
 (define (tmdoc-remove-hyper-links l)
   (cond ((npair? l) l)

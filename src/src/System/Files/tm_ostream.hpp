@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : tm_ostream.hpp
 * DESCRIPTION: Output stream class
-* COPYRIGHT  : (C) 2009  David MICHEL
+* COPYRIGHT  : (C) 2009-2013  David MICHEL, Joris van der Hoeven
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -15,39 +15,52 @@
 //#include "url.hpp"
 #include <cstdio>
 class string;
+class tm_ostream;
+class formatted;
+class tree;
 
-class tm_ostream {
-  FILE *file;
-  string *buf;
-  bool is_w;
-  bool is_mine;
-  bool is_buf;
-
-  static tm_ostream private_cout;
-  static tm_ostream private_cerr;
-
-  tm_ostream (const tm_ostream&);
-  tm_ostream& operator= (const tm_ostream&);
+class tm_ostream_rep {
+  int ref_count;
 
 public:
+  tm_ostream_rep ();
+  virtual ~tm_ostream_rep ();
+
+  virtual bool is_writable () const;
+  virtual void write (const char*);
+  virtual void write (tree);
+  virtual void flush ();
+  virtual void clear ();
+
+  friend class tm_ostream;
+};
+
+class tm_ostream {
+public:
+  tm_ostream_rep *rep;
+
+public:
+  static tm_ostream private_cout;
+  static tm_ostream private_cerr;
   static tm_ostream& cout;
   static tm_ostream& cerr;
 
+public:
   tm_ostream ();
   tm_ostream (char*);
   tm_ostream (FILE*);
+  tm_ostream (const tm_ostream&);
+  tm_ostream (tm_ostream_rep*);
   ~tm_ostream ();
+  tm_ostream_rep* operator -> ();
+  tm_ostream& operator = (tm_ostream x);
+  bool operator == (tm_ostream&);
 
-  bool open ();
-//  bool open (url);
-  bool open (char*);
-  bool open (FILE*);
-  bool is_writable () const;
-  bool is_buffered () const;
+  void clear ();
   void flush ();
-  void close ();
   void buffer ();
   string unbuffer ();
+  void redirect (tm_ostream x);
 
   tm_ostream& operator << (bool);
   tm_ostream& operator << (char);
@@ -63,11 +76,48 @@ public:
   tm_ostream& operator << (double);
   tm_ostream& operator << (long double);
   tm_ostream& operator << (const char*);
-
-  bool operator == (tm_ostream&);
+  tm_ostream& operator << (formatted);
 };
 
 extern tm_ostream& cout;
 extern tm_ostream& cerr;
+
+extern tm_ostream std_error;
+extern tm_ostream failed_error;
+extern tm_ostream boot_error;
+extern tm_ostream widkit_error;
+extern tm_ostream qt_error;
+extern tm_ostream font_error;
+extern tm_ostream convert_error;
+extern tm_ostream io_error;
+extern tm_ostream bibtex_error;
+
+extern tm_ostream std_warning;
+extern tm_ostream convert_warning;
+extern tm_ostream typeset_warning;
+extern tm_ostream io_warning;
+extern tm_ostream widkit_warning;
+extern tm_ostream bibtex_warning;
+
+extern tm_ostream debug_std;
+extern tm_ostream debug_qt;
+extern tm_ostream debug_aqua;
+extern tm_ostream debug_widgets;
+extern tm_ostream debug_fonts;
+extern tm_ostream debug_convert;
+extern tm_ostream debug_typeset;
+extern tm_ostream debug_edit;
+extern tm_ostream debug_packrat;
+extern tm_ostream debug_history;
+extern tm_ostream debug_keyboard;
+extern tm_ostream debug_automatic;
+extern tm_ostream debug_boot;
+extern tm_ostream debug_events;
+extern tm_ostream debug_shell;
+extern tm_ostream debug_io;
+extern tm_ostream debug_spell;
+extern tm_ostream debug_updater;
+
+extern tm_ostream std_bench;
 
 #endif // defined OUT_STREAM_HPP

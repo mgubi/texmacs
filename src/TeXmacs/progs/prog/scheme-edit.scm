@@ -14,7 +14,7 @@
 (texmacs-module (prog scheme-edit)
   (:use (prog prog-edit)
         (prog scheme-tools) (prog scheme-autocomplete)
-	(utils misc tm-keywords)))
+        (utils misc tm-keywords)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Treatment of special characters
@@ -22,36 +22,36 @@
 
 (define (previous-special s col)
   (cond ((< col 0) col)
-	((in? (string-ref s col) '(#\( #\) #\space #\")) col)
-	(else (previous-special s (- col 1)))))
+        ((in? (string-ref s col) '(#\( #\) #\space #\")) col)
+(else (previous-special s (- col 1)))))
 
 (define (next-special s col)
   (cond ((>= col (string-length s)) col)
-	((in? (string-ref s col) '(#\( #\) #\space #\")) col)
-	(else (next-special s (+ col 1)))))
+        ((in? (string-ref s col) '(#\( #\) #\space #\")) col)
+(else (next-special s (+ col 1)))))
 
 (define (next-word doc row col)
   (and-with par (program-row row)
     (and (>= col 0)
-	 (<= col (string-length par))
-	 (substring par col (next-special par col)))))
+         (<= col (string-length par))
+         (substring par col (next-special par col)))))
 
 (define (quoted-backwards s col)
   (cond ((< col 0) col)
-	((== (string-ref s col) #\") (- col 1))
-	(else (quoted-backwards s (- col 1)))))
+        ((== (string-ref s col) #\") (- col 1))
+(else (quoted-backwards s (- col 1)))))
 
 (define (quoted-forwards s col)
   (cond ((>= col (string-length s)) col)
-	((== (string-ref s col) #\") (+ col 1))
-	(else (quoted-forwards s (+ col 1)))))
+        ((== (string-ref s col) #\") (+ col 1))
+(else (quoted-forwards s (+ col 1)))))
 
 (define (string-uncommented s col)
   (cond ((>= col (string-length s)) col)
-	((== (string-ref s col) #\;) col)
-	((== (string-ref s col) #\")
-	 (string-uncommented s (quoted-forwards s (+ col 1))))
-	(else (string-uncommented s (+ col 1)))))
+        ((== (string-ref s col) #\;) col)
+             ((== (string-ref s col) #\")
+         (string-uncommented s (quoted-forwards s (+ col 1))))
+        (else (string-uncommented s (+ col 1)))))
 
 (define (string-uncommented-length s)
   (string-uncommented s 0))
@@ -66,36 +66,36 @@
        (< row (tree-arity doc))
        (tree-atomic? (tree-ref doc row))
        (with par (tree->string (tree-ref doc row))
-	 (cond ((>= col (string-length par))
-		(with len (string-uncommented-length par)
-		  (previous-argument doc row (- len 1) level)))
-	       ((< col 0)
-		(previous-argument doc (- row 1) 1000000000 level))
-	       ((== (string-ref par col) #\()
-		(cond ((== level 0) #f)
-		      ((== level 1) (cons row col))
-		      (else (previous-argument
-			     doc row (- col 1) (- level 1)))))
-	       ((== (string-ref par col) #\))
-		(previous-argument doc row (- col 1) (+ level 1)))
-	       ((== (string-ref par col) #\space)
-		(previous-argument doc row (- col 1) level))
-	       ((== (string-ref par col) #\")
-		(with ncol (quoted-backwards par (- col 1))
-		  (if (== level 0) (cons row (+ ncol 1))
-		      (previous-argument doc row ncol level))))
-	       (else (with ncol (previous-special par (- col 1))
-		       (if (== level 0) (cons row (+ ncol 1))
-			   (previous-argument doc row ncol level))))))))
+         (cond ((>= col (string-length par))
+                (with len (string-uncommented-length par)
+                  (previous-argument doc row (- len 1) level)))
+               ((< col 0)
+                (previous-argument doc (- row 1) 1000000000 level))
+               ((== (string-ref par col) #\()
+                    (cond ((== level 0) #f)
+                          ((== level 1) (cons row col))
+                          (else (previous-argument
+                                 doc row (- col 1) (- level 1)))))
+                ((== (string-ref par col) #\))
+                (previous-argument doc row (- col 1) (+ level 1)))
+               ((== (string-ref par col) #\space)
+                (previous-argument doc row (- col 1) level))
+               ((== (string-ref par col) #\")
+         (with ncol (quoted-backwards par (- col 1))
+           (if (== level 0) (cons row (+ ncol 1))
+               (previous-argument doc row ncol level))))
+       (else (with ncol (previous-special par (- col 1))
+               (if (== level 0) (cons row (+ ncol 1))
+                   (previous-argument doc row ncol level))))))))
 
 (define (previous-arguments doc row col bound)
   (with arg (previous-argument doc row col 0)
     (cond ((not arg) '())
-	  ((<= bound 0) '((-1 -1)))
-	  (else (let* ((nrow (car arg))
-		       (ncol (- (cdr arg) 1))
-		       (nbound (if (== nrow row) bound (- bound 1))))
-		  (cons arg (previous-arguments doc nrow ncol nbound)))))))
+          ((<= bound 0) '((-1 -1)))
+          (else (let* ((nrow (car arg))
+                       (ncol (- (cdr arg) 1))
+                       (nbound (if (== nrow row) bound (- bound 1))))
+                  (cons arg (previous-arguments doc nrow ncol nbound)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic indentation
@@ -104,96 +104,87 @@
 (define (reference-type doc l)
   (if (null? l) ""
       (with arg (cAr l)
-	(or (next-word doc (car arg) (cdr arg)) ""))))
+        (or (next-word doc (car arg) (cdr arg)) ""))))
 
 (define (reference-argument l)
   (cond ((null? l) #f)
-	((null? (cdr l)) (car l))
-	((null? (cddr l)) (car l))
-	(else (let* ((a1 (car l))
-		     (a2 (cadr l)))
-		(if (< (car a2) (car a1)) a1
-		    (reference-argument (cdr l)))))))	
+        ((null? (cdr l)) (car l))
+        ((null? (cddr l)) (car l))
+        (else (let* ((a1 (car l))
+                     (a2 (cadr l)))
+                (if (< (car a2) (car a1)) a1
+                    (reference-argument (cdr l)))))))   
 
 (define (tm-count l inc)
   ;; helper routine for correct indentation of <less> and <gtr>
   (cond ((null? l) 0)
-	((== (car l) #\<) (tm-count (cdr l) 0))
-	((== (car l) #\>) (+ (tm-count (cdr l) 1) 1))
-	(else (+ (tm-count (cdr l) inc) inc))))
+        ((== (car l) #\<) (tm-count (cdr l) 0))
+        ((== (car l) #\>) (+ (tm-count (cdr l) 1) 1))
+        (else (+ (tm-count (cdr l) inc) inc))))
 
 (define (get-offset doc a)
   ;; helper routine for correct indentation of <less> and <gtr>
   (with s (tree->string (tree-ref doc (car a)))
     (tm-count (string->list (substring s 0 (cdr a))) 1)))
 
-(define (compute-indentation doc row col)
+(tm-define (program-compute-indentation doc row col)
+  (:require in-prog-scheme?)
   (let* ((l (previous-arguments doc row col 10))
-	 (t (reference-type doc l))
-	 (i (indent-get-arity t))
-	 (n (length l))
-	 (a (reference-argument l)))
+         (t (reference-type doc l))
+         (i (indent-get-arity t))
+         (n (length l))
+         (a (reference-argument l)))
     (cond ((not a) 0)
-	  ((not i) (get-offset doc a))
-	  ((<= n i) (+ (get-offset doc (cAr l)) 3))
-	  ((== n (+ i 1)) (+ (get-offset doc (cAr l)) 1))
-	  (else (get-offset doc a)))))
+          ((not i) (get-offset doc a))
+          ((<= n i) (+ (get-offset doc (cAr l)) 3))
+          ((== n (+ i 1)) (+ (get-offset doc (cAr l)) 1))
+          (else (get-offset doc a)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; User interface for automatic indentation
+;; User interface for autocompletion
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (scheme-indent)
-  (:synopsis "indent current line of a scheme program")
-  (and-with doc (program-tree)
-    (with i (compute-indentation doc (program-row-number) -1)
-      (program-set-indent i)
-      (program-go-to (program-row-number) i))))
-
-;(tm-define (kbd-variant t forwards?)
-;  (:require (in-prog-scheme?))
-;  (scheme-indent))
 
 (tm-define (kbd-variant t forwards?)
-  (:require (in-prog-scheme?))
+  (:mode in-prog-scheme?)
   (if (not scheme-completions-built?) (scheme-completions-rebuild))
   (custom-complete (tm->tree (scheme-completions (cursor-word)))))
 
-(tm-define (insert-return)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Automatic insertion, highlighting and selection of brackets and quotes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (scheme-bracket-open lbr rbr)
+  (bracket-open lbr rbr "\\"))
+
+(tm-define (scheme-bracket-close lbr rbr)
+  (bracket-close lbr rbr "\\"))
+
+; TODO: select strings first
+(tm-define (kbd-select-enlarge)
+  (:require prog-select-brackets?)
   (:mode in-prog-scheme?)
-  (insert-raw-return)
-  (scheme-indent))
+  (program-select-enlarge "(" ")"))
+
+(tm-define (notify-cursor-moved status)
+  (:require prog-highlight-brackets?)
+  (:mode in-prog-scheme?)
+  (select-brackets-after-movement "([{" ")]}" "\\"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preferences for syntax highlighting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (notify-scheme-pref var val)
-   (syntax-read-preferences "scheme"))
+(define (notify-scheme-syntax var val)
+  (syntax-read-preferences "scheme"))
 
 (define-preferences
-  ("syntax:scheme:none" "red" notify-scheme-pref)
-  ("syntax:scheme:comment" "brown" notify-scheme-pref)
-  ("syntax:scheme:keyword" "#309090" notify-scheme-pref)
-  ("syntax:scheme:error" "dark red" notify-scheme-pref)
-  ("syntax:scheme:constant" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_identifier" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_function" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_type" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_category" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_module" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_number" "#4040c0" notify-scheme-pref)
-  ("syntax:scheme:constant_string" "dark grey" notify-scheme-pref)
-  ("syntax:scheme:variable" "#606060" notify-scheme-pref)
-  ("syntax:scheme:variable_identifier" "#204080" notify-scheme-pref)
-  ("syntax:scheme:variable_function" "#606060" notify-scheme-pref)
-  ("syntax:scheme:variable_type" "#00c000" notify-scheme-pref)
-  ("syntax:scheme:variable_category" "#00c000" notify-scheme-pref)
-  ("syntax:scheme:variable_module" "#00c000" notify-scheme-pref)
-  ("syntax:scheme:declare" "#0000c0" notify-scheme-pref)
-  ("syntax:scheme:declare_identifier" "#0000c0" notify-scheme-pref)
-  ("syntax:scheme:declare_function" "#0000c0" notify-scheme-pref)
-  ("syntax:scheme:declare_type" "#0000c0" notify-scheme-pref)
-  ("syntax:scheme:declare_category" "magenta" notify-scheme-pref)
-  ("syntax:scheme:declare_module" "#0000c0" notify-scheme-pref))
+  ("syntax:scheme:none" "red" notify-scheme-syntax)
+  ("syntax:scheme:comment" "brown" notify-scheme-syntax)
+  ("syntax:scheme:keyword" "#309090" notify-scheme-syntax)
+  ("syntax:scheme:error" "dark red" notify-scheme-syntax)
+  ("syntax:scheme:constant_number" "#4040c0" notify-scheme-syntax)
+  ("syntax:scheme:constant_string" "dark grey" notify-scheme-syntax)
+  ("syntax:scheme:constant_char" "#333333" notify-scheme-syntax)
+  ("syntax:scheme:variable_identifier" "#204080" notify-scheme-syntax)
+  ("syntax:scheme:declare_category" "#d030d0" notify-scheme-syntax))
 

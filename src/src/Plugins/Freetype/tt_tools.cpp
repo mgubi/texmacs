@@ -308,6 +308,16 @@ tt_dump (url u) {
 * Get the font family and available shapes
 ******************************************************************************/
 
+void
+move_to_shape (string& fam, string& shape, string what, string by) {
+  int pos= search_forwards (" " * what, 0, fam);
+  if (pos < 0) return;
+  fam  = fam (0, pos) * fam (pos + N(what) + 1, N(fam));
+  if (N(by) == 0) return;
+  if (shape == "Regular") shape= by;
+  else shape= by * " " * shape;
+}
+
 scheme_tree
 tt_font_name (url u) {
   string tt;
@@ -318,11 +328,42 @@ tt_font_name (url u) {
     string nt = tt_table (tt, i, "name");
     string fam= name_record_family (nt);
     string sh = name_record_shape (nt);
+
     // Some basic normalization of family name
+    move_to_shape (fam, sh, "Narrow", "Narrow");
+    move_to_shape (fam, sh, "Condensed", "Condensed");
+    move_to_shape (fam, sh, "Extended", "Extended");
+    move_to_shape (fam, sh, "Wide", "Wide");
+    move_to_shape (fam, sh, "Caption", "Caption");
+    move_to_shape (fam, sh, "Semilight", "SemiLight");
+    move_to_shape (fam, sh, "SemiLight", "SemiLight");
+    move_to_shape (fam, sh, "Semi Light", "SemiLight");
+    move_to_shape (fam, sh, "Ultralight", "Thin");
+    move_to_shape (fam, sh, "UltraLight", "Thin");
+    move_to_shape (fam, sh, "Ultra Light", "Thin");
+    move_to_shape (fam, sh, "Light", "Light");
+    move_to_shape (fam, sh, "Medium", "");
+    move_to_shape (fam, sh, "Semibold", "SemiBold");
+    move_to_shape (fam, sh, "SemiBold", "SemiBold");
+    move_to_shape (fam, sh, "Semi Bold", "SemiBold");
+    move_to_shape (fam, sh, "Demibold", "DemiBold");
+    move_to_shape (fam, sh, "DemiBold", "DemiBold");
+    move_to_shape (fam, sh, "Demi Bold", "DemiBold");
+    move_to_shape (fam, sh, "Bold", "Bold");
+    move_to_shape (fam, sh, "Extrabold", "ExtraBold");
+    move_to_shape (fam, sh, "ExtraBold", "ExtraBold");
+    move_to_shape (fam, sh, "Extra Bold", "ExtraBold");
+    move_to_shape (fam, sh, "Heavy", "Heavy");
+    move_to_shape (fam, sh, "Black", "Black");
+    move_to_shape (fam, sh, "Italic", "Italic");
+    move_to_shape (fam, sh, "Oblique", "Oblique");
+
     while (fam != "" && !is_alpha (fam[0])) fam= fam (1, N(fam));
     if (upcase_all (fam) == fam) fam= locase_all (fam);
     fam= upcase_first (fam);
+    if (starts (fam, "STIX")) fam= "Stix" * fam (4, N(fam));
     // End normalization of family name
+    
     r << tuple (fam, sh);
   }
   return r;

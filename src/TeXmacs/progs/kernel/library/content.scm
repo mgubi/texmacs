@@ -14,6 +14,15 @@
 (texmacs-module (kernel library content))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Predicate for scheme trees
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (stree? x)
+  (or (string? x)
+      (and (pair? x) (symbol? (car x))
+           (list? (cdr x)) (forall? stree? (cdr x)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Routines for general content
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -87,6 +96,41 @@
       (and (compound-tree? x) (in? (tree-label x) l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Searching for certain subtrees
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (tm-find t pred?)
+  "Find first subtree which matches predicate."
+  (cond ((pred? t) t)
+        ((tm-atomic? t) #f)
+        (else (list-find (tm-children t) (cut tm-find <> pred?)))))
+
+(define-public (tm-search t pred?)
+  "Search list of subtrees which match a predicate."
+  (cond ((pred? t) (list t))
+        ((tm-atomic? t) (list))
+        (else (append-map (cut tm-search <> pred?) (tm-children t)))))
+
+(define-public (tm-find-tag t tag)
+  (tm-find t (cut tm-is? <> tag)))
+
+(define-public (tm-search-tag t tag)
+  (tm-search t (cut tm-is? <> tag)))
+
+(define (tm-replace-sub t what? by)
+  (cond ((what? t) (by t))
+        ((tm-atomic? t) t)
+        (else `(,(tm-car t)
+                ,@(map (cut tm-replace-sub <> what? by) (tm-cdr t))))))
+
+(define-public (tm-replace t what by)
+  (cond ((not (procedure? what))
+         (tm-replace t (lambda (x) (tm-equal? x what)) by))
+        ((not (procedure? by))
+         (tm-replace t what (lambda (x) by)))
+        (else (tm-replace-sub t what by))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TeXmacs lengths
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -120,3 +164,48 @@
       (and (tree-atomic? s) (tm-length-unit (tree->string s)))
       (and-with pos (tm-length-unit-search s 0)
 	(substring s pos (string-length s)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Collections
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (associate->binding t)
+  (and (tm-func? t 'associate 2)
+       (cons (cadr t) (caddr t))))
+
+(define-public (collection->assoc col)
+  (and (tm-func? col 'collection)
+       (with c (tm-children (tm->stree col))
+         (list-filter (map associate->binding c) identity))))
+
+(define-public (collection-ref col key)
+  (and-with l (collection->assoc col)
+    (assoc-ref l key)))
+
+(define-public (collection-set col key val)
+  (and-with l (collection->assoc col)
+    (set! l (assoc-set! l key val))
+    (assoc->collection l)))
+
+(define-public (binding->associate b)
+  `(associate ,(car b) ,(cdr b)))
+
+(define-public (assoc->collection l)
+  `(collection ,@(map binding->associate l)))
+
+(define-public (collection-append c1 c2)
+  (let* ((a1 (collection->assoc c1))
+         (a2 (collection->assoc c2))
+         (a  (and a1 a2 (assoc-remove-duplicates* (append a1 a2)))))
+    (and a1 a2 (assoc->collection a))))
+
+(define-public (collection-delta c1 c2)
+  (let* ((a1 (collection->assoc c1))
+         (a2 (collection->assoc c2))
+         (a  (and a1 a2 (assoc-delta a1 a2))))
+    (and a1 a2 (assoc->collection a))))
+
+(define-public (collection-exclude c l)
+  (let* ((a (collection->assoc c))
+         (b (and a (assoc-exclude a l))))
+    (and a (assoc->collection b))))

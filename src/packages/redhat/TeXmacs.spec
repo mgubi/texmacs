@@ -1,16 +1,16 @@
 Summary: A structured wysiwyg scientific text editor
 Name: TeXmacs
-Version: 1.0.7.18
+Version: 1.99.8
 Release: 1%{?dist}
 Url: http://www.texmacs.org
-Source0: TeXmacs-1.0.7.18.tar.gz
+Source0: TeXmacs-1.99.8.tar.gz
 License: GNU GPL 3.0
 Packager: Joris van der Hoeven <vdhoeven@texmacs.org>
 Distribution: GNU/Linux
 Vendor: Jo the ripper software
 Group: Applications/Editors
 Buildrequires: guile-devel
-BuildRoot: %{_tmppath}/TeXmacs-1.0.7.18-root
+BuildRoot: %{_tmppath}/TeXmacs-1.99.8-root
 
 %description
 
@@ -35,10 +35,10 @@ saved in TeXmacs, Xml or Scheme format and printed as Postscript or
 Pdf files. Converters exist for TeX/LaTeX and Html/Mathml.
 
 %prep
-%setup -q -n TeXmacs-1.0.7.18
+%setup -q -n TeXmacs-1.99.8
 
 %build
-./configure --disable-qt --prefix=/usr
+./configure --disable-qt --disable-pdf-renderer --prefix=/usr
 make STATIC_TEXMACS
 
 %install
@@ -91,6 +91,9 @@ cp -f $RPM_BUILD_ROOT%{_datadir}/TeXmacs/misc/images/text-texmacs.svg $RPM_BUILD
 rm -rf $RPM_BUILD_ROOT
 
 %changelog
+
+* Wed Dec 18 2013   Joris van der Hoeven <vdhoeven@texmacs.org>
+- 1.99.1 Add --disable-pdf-renderer option to ./configure
 
 * Sun Mar 10 2012   Joris van der Hoeven <vdhoeven@texmacs.org>
 - 1.0.7.14 Updated mimetype support

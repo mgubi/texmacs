@@ -29,7 +29,10 @@ is_inside (tree t, path p) {
     for (i=0; i<k; tm_char_forwards (s, i)) {}
     return i == k;
   }
-  else if (is_atom (p)) return p->item == 0 || p->item == 1;
+  else if (is_atom (p))
+    return p->item == 0 || p->item == 1;
+  else if (is_func (t, RAW_DATA, 1))
+    return p == path (0, 0);
   else return p->item >= 0 && p->item < N(t) &&
 	      is_inside (t[p->item], p->next);
 }
@@ -47,6 +50,8 @@ closest_inside (tree t, path p) {
   }
   else if (is_atom (p) || p->item < 0 || p->item >= N(t))
     return path (max (0, min (1, p->item)));
+  else if (is_func (t, RAW_DATA, 1))
+    return path (0, 0);
   else return path (p->item, closest_inside (t[p->item], p->next));
 }
 
@@ -79,6 +84,33 @@ next_without_border (tree t, path p) {
   return false;
 }
 
+static int
+lowest_accessible_child (tree t) {
+  for (int i=0; i<N(t); i++)
+    if (the_drd->is_accessible_child (t, i))
+      return i;
+  return 0;
+}
+
+static int
+highest_accessible_child (tree t) {
+  for (int i=N(t)-1; i>=0; i--)
+    if (the_drd->is_accessible_child (t, i))
+      return i;
+  return N(t) - 1;
+}
+
+static bool
+graphics_in_path (tree t, path p) {
+  // FIXME: when in the cursor is inside graphics,
+  // it cannot be at the start/end.  There should be
+  // a more robust way to ensure this.
+  if (is_nil (p) || is_atom (p)) return false;
+  if (is_atomic (t) || p->item < 0 || p->item >= N(t)) return false;
+  if (is_func (t, GRAPHICS)) return true;
+  return graphics_in_path (t[p->item], p->next);
+}
+
 bool
 is_accessible_cursor (tree t, path p) {
   if (is_atomic (t) || is_atom (p)) {
@@ -91,8 +123,11 @@ is_accessible_cursor (tree t, path p) {
   }
   else if (0 > p->item || p->item >= N(t)) return false;
   else if (the_drd->is_parent_enforcing (t) &&
-	   ((p->item == 0 && p->next == start (t[0])) ||
-	    (p->item == N(t)-1 && p->next == end (t[p->item]))))
+           !graphics_in_path (t, p) &&
+	   ((p->item == lowest_accessible_child (t) &&
+             p->next == start (t[p->item])) ||
+	    (p->item == highest_accessible_child (t) &&
+             p->next == end (t[p->item]))))
     return false;
   else switch (L(t)) {
     case CONCAT:
@@ -153,10 +188,13 @@ closest_accessible (tree t, path p) {
 	if (!is_nil (r)) {
 	  r= path (j, r);
 	  if (!is_concat (t) || !next_without_border (t, r)) {
-	    if (the_drd->is_parent_enforcing (t)) {
-	      if (r->item == 0 && r->next == start (t[0]))
+	    if (the_drd->is_parent_enforcing (t) &&
+                !graphics_in_path (t, p)) {
+	      if (r->item == lowest_accessible_child (t) &&
+                  !is_accessible_cursor (t, p))
 		return path (0);
-	      if (r->item == N(t)-1 && r->next == end (t[r->item]))
+	      if (r->item == highest_accessible_child (t) &&
+                  !is_accessible_cursor (t, p))
 		return path (1);	    
 	    }
 	    return r;
@@ -216,7 +254,7 @@ bool
 valid_cursor (tree t, path p, bool start_flag) {
   if ((!is_nil (p)) && (!is_atom (p)) &&
       ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] testing valid cursor " << p << " in " << t << "\n";
+    failed_error << "Testing valid cursor " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -226,10 +264,13 @@ valid_cursor (tree t, path p, bool start_flag) {
     if (start_flag) return (p->item!=0);
     return true;
   }
-  if (the_drd->is_parent_enforcing (t))
-    if ((p->item == 0 && p->next == start (t[0])) ||
-	(p->item == N(t)-1 && p->next == end (t[p->item])))
-      return false;
+  if (the_drd->is_parent_enforcing (t) &&
+      !graphics_in_path (t, p) &&
+      ((p->item == lowest_accessible_child (t) &&
+        p->next == start (t[p->item])) ||
+       (p->item == highest_accessible_child (t) &&
+        p->next == end (t[p->item]))))
+    return false;
   if (is_concat (t)) {
     if (next_without_border (t, p)) return false;
     return valid_cursor (t[p->item], p->next, start_flag || (p->item!=0));
@@ -253,7 +294,7 @@ static path
 pre_correct (tree t, path p) {
   //cout << "Precorrect " << p << " in " << t << "\n";
   if ((!is_nil (p)) && (!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] precorrecting " << p << " in " << t << "\n";
+    failed_error << "Precorrecting " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -295,9 +336,14 @@ pre_correct (tree t, path p) {
       return path (1, 0, pre_correct (t[1][0], path (i)));
     }
   path r (p->item, pre_correct (t[p->item], p->next));
-  if (the_drd->is_parent_enforcing (t)) {
-    if (r->item == 0 && r->next == start (t[0])) return path (0);
-    if (r->item == N(t)-1 && r->next == end (t[r->item])) return path (1);
+  if (the_drd->is_parent_enforcing (t) &&
+      !graphics_in_path (t, p)) {
+    if (r->item == lowest_accessible_child (t) &&
+        !valid_cursor (t, p, false))
+      return path (0);
+    if (r->item == highest_accessible_child (t) &&
+        !valid_cursor (t, p, false))
+      return path (1);	    
   }
   return r;
 }
@@ -306,7 +352,7 @@ static bool
 left_most (tree t, path p) {
   if (is_nil (p)) FAILED ("invalid nil path");
   if ((!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] left most " << p << " in " << t << "\n";
+    failed_error << "Left most " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -321,7 +367,7 @@ left_correct (tree t, path p) {
   //cout << "Left correct " << p << " in " << t << "\n";
   if (is_nil (p)) FAILED ("invalid nil path");
   if ((!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] left correcting " << p << " in " << t << "\n";
+    failed_error << "Left correcting " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -337,7 +383,7 @@ static bool
 right_most (tree t, path p) {
   if (is_nil (p)) FAILED ("invalid nil path");
   if ((!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] right most " << p << " in " << t << "\n";
+    failed_error << "Right most " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -351,7 +397,7 @@ static path
 right_correct (tree t, path p) {
   if (is_nil (p)) FAILED ("invalid nil path");
   if ((!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    cerr << "TeXmacs] right correcting " << p << " in " << t << "\n";
+    failed_error << "Right correcting " << p << " in " << t << "\n";
     FAILED ("bad path");
   }
 
@@ -363,6 +409,13 @@ right_correct (tree t, path p) {
   return path (i, right_correct (t[i], p->next));
 }
 
+static path
+keep_positive (path p) {
+  if (is_nil (p)) return p;
+  if (p->item < 0) return path ();
+  return path (p->item, keep_positive (p->next));
+}
+
 /******************************************************************************
 * Exported routines for cursor paths in trees
 ******************************************************************************/
@@ -370,6 +423,7 @@ right_correct (tree t, path p) {
 path
 correct_cursor (tree t, path p, bool forwards) {
   //cout << "Correct cursor " << p << " in " << t << "\n";
+  p= keep_positive (p);
   path pp= pre_correct (t, p);
   if (forwards) return right_correct (t, pp);
   else return left_correct (t, pp);

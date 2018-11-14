@@ -21,7 +21,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic operations
 ;;
-;; NOTE: Imperative functions, which inconditionnaly perform a given
+;; NOTE: Imperative functions, which unconditionally perform a given
 ;;   operation on the sketch.
 ;;
 ;;   These functions depend on, and can change the current edit state (i.e.,
@@ -72,7 +72,11 @@
 
 (tm-define (object_create tag x y)
   (:require (graphical-text-tag? tag))
-  (object-set! `(,tag "" (point ,x ,y)) 'new))
+  (with long? (graphical-long-text-tag? tag)
+    (object-set! `(,tag ,(if long? `(document "") "") (point ,x ,y)) 'new)
+    (and-with d (path->tree (cDr (cursor-path)))
+      (when (tree-func? d 'document)
+        (tree-go-to d 0 :start)))))
 
 (define (set-point-sub obj no x y)
   ;;(display* "set-point-sub " obj ", " no ", " x ", " y "\n")
@@ -134,27 +138,31 @@
   (sketch-set! (map tree->stree (sketch-get))))
 
 (define (object_commit)
-  (define obj (stree-radical (car (sketch-get1))))
-  (if (not (graphics-incomplete? obj))
-      (with (xobj xp) (graphics-complete obj)
-        (set! obj xobj)
-        (with tab (make-ahash-table)
-          (for (var (graphics-all-attributes))
-            (when (nin? var '("gid"))
-              (ahash-set! tab var (ahash-ref graphical-attrs var))))
-          (graphical-fetch-props (car (sketch-get)))
-          (set! obj (graphics-enrich-bis
-                     obj (ahash-ref graphical-attrs "gid") tab))
-          (set! current-edge-sel? #f)
-          (sketch-set! `(,obj))
-          ;;(display* "Commited " (sketch-get) "\n")
-          (sketch-commit)
-          (set! leftclick-waiting #f)
-          (set! current-obj (stree-radical obj))
-          (set! current-point-no #f)
-          (graphics-forget-states))))
-  (delayed
-    (graphics-update-constraints)))
+  (let* ((compl (car (sketch-get1)))
+         (obj (stree-radical compl)))
+    (if (not (graphics-incomplete? obj))
+        (with (xobj xp) (graphics-complete obj)
+          (set! obj xobj)
+          (with tab (make-ahash-table)
+            (for (var (graphics-all-attributes))
+              (when (nin? var '("gid"))
+                (ahash-set! tab var (ahash-ref graphical-attrs var))))
+            (graphical-fetch-props (car (sketch-get)))
+            (for (var (list "anim-id"))
+              (ahash-set! tab var (ahash-ref graphical-attrs var)))
+            (set! obj (graphics-enrich-bis
+                       obj (ahash-ref graphical-attrs "gid") tab))
+            (set! obj (graphics-re-enhance obj compl #f))
+            (set! current-edge-sel? #f)
+            (sketch-set! `(,obj))
+            ;;(display* "Commited " (sketch-get) "\n")
+            (sketch-commit)
+            (set! leftclick-waiting #f)
+            (set! current-obj (stree-radical obj))
+            (set! current-point-no #f)
+            (graphics-forget-states))))
+    (delayed
+      (graphics-update-constraints))))
 
 (tm-define (current-in? l)
   (and (pair? current-obj) (in? (car current-obj) l)))
@@ -204,7 +212,12 @@
         moveclick-tolerance)))
 
 (define (move-over)
-  (set-message "Left click: new object; Drag: edit object; Middle click: remove" "")
+  (set-message (string-append "Left click: new object; "
+                              "Drag: edit object; "
+                              "Right click: remove; "
+                              "Return: apply properties; "
+                              "S-Return: fetch properties")
+               "Mouse over object")
   (graphics-decorations-update)
   (if current-path
       (with p2 (tm-upwards-path current-path
@@ -249,8 +262,10 @@
          (== (logand (get-keyboard-modifiers) ShiftMask) 0)))
       (begin
         (if leftclick-waiting
-            (set-message "Left click: finish; Middle click: undo" "")
-            (set-message "Left click: add point; Middle click: undo" ""))
+            (set-message "Left click: finish; Right click: undo"
+                         "Inserting control points")
+            (set-message "Left click: add point; Right click: undo"
+                         "Inserting control points"))
         (object_set-point current-point-no current-x current-y)))
   (graphics-decorations-update))
 
@@ -260,7 +275,8 @@
 
 (define (next-point)
   (cond ((not (hardly-moved?))
-         (set-message "Left click: finish; Middle click: undo" "")
+         (set-message "Left click: finish; Right click: undo"
+                      "Inserting control points")
          (set! leftclick-waiting #t))
         (leftclick-waiting
          (last-point))
@@ -268,7 +284,8 @@
          (undo 0)
          (set! leftclick-waiting #f))
         (else
-         (set-message "Left click: finish; Middle click: undo" "")
+          (set-message "Left click: finish; Right click: undo"
+                       "Inserting control points")
          (graphics-back-state #f)
          (graphics-move current-x current-y)
          (set! leftclick-waiting #t))))
@@ -286,7 +303,7 @@
         (graphics-decorations-update))))
 
 ;; Middle button
-(tm-define (middle-button)
+(tm-define (graphics-delete)
   (if sticky-point
       (begin
         (graphics-back-state #f)
@@ -345,8 +362,14 @@
             (move-point)
             (move-over)))
       (begin
-        (set-message "Left click: new object" "")
+        (set-message "Left click: new object" "Graphics")
         (graphics-decorations-reset))))
+
+(define (pointer-inside-graphical-text?)
+  (and-with l (select-first (s2f current-x) (s2f current-y))
+    (and-with p (and (nnull? l) (car l))
+      (and-with t (path->tree (cDr p))
+	(not (tree-in? t '(text-at math-at document-at)))))))
 
 (tm-define (edit_left-button mode x y)
   (:require (== mode 'edit))
@@ -358,11 +381,13 @@
              (next-point)))
         ((and (current-in? (graphical-text-tag-list))
               (== (car (graphics-mode)) 'edit)
-              (graphical-contains-text-tag? (cadr (graphics-mode))))
+              (graphical-contains-text-tag? (cadr (graphics-mode)))
+              (not (graphical-contains-curve-tag? (cadr (graphics-mode))))
+	      (pointer-inside-graphical-text?))
          (set-texmacs-pointer 'text-arrow)
          (go-to (car (select-first (s2f current-x) (s2f current-y)))))
         (else
-         (edit-insert x y)))
+	 (edit-insert x y)))
   (set! previous-leftclick `(point ,current-x ,current-y)))
 
 (tm-define (edit_middle-button mode x y)
@@ -370,7 +395,14 @@
   (:state graphics-state)
   (set-texmacs-pointer 'graphics-cross)
   (when current-obj
-    (middle-button)))
+    (graphics-delete)))
+
+(tm-define (edit_right-button mode x y)
+  (:require (== mode 'edit))
+  (:state graphics-state)
+  (set-texmacs-pointer 'graphics-cross)
+  (when current-obj
+    (graphics-delete)))
 
 (tm-define (edit_start-drag mode x y)
   (:require (== mode 'edit))
@@ -392,7 +424,7 @@
   (:require (== mode 'edit))
   (:state graphics-state)
   (edit_move mode x y)
-  (set-message "Release left button: finish editing" ""))
+  (set-message "Release left button: finish editing" "Dragging"))
 
 (tm-define (edit_end-drag mode x y)
   (:require (== mode 'edit))
@@ -415,6 +447,46 @@
         (select-next inc)
         (graphics-update-decorations))
       (invalidate-graphical-object)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hand drawn objects
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (edit_move mode x y)
+  (:require (== mode 'hand-edit))
+  (:state graphics-state)
+  (noop))
+
+(tm-define (edit_left-button mode x y)
+  (:require (== mode 'hand-edit))
+  (:state graphics-state)
+  (set-texmacs-pointer 'graphics-cross)
+  (edit-clean-up)
+  (object-set! `(with "point style" "disk"
+		      "point-size" ,(graphics-get-property "line-width")
+		  (point ,x ,y)) 'new))
+
+(tm-define (edit_start-drag mode x y)
+  (:require (== mode 'hand-edit))
+  (:state graphics-state)
+  (set-texmacs-pointer 'graphics-cross)
+  (edit-clean-up)
+  (object_create (cadr (graphics-mode)) x y))
+  
+(tm-define (edit_drag mode x y)
+  (:require (== mode 'hand-edit))
+  (:state graphics-state)
+  (let* ((obj (car (sketch-get1)))
+         (rad (stree-radical obj)))
+    (set-cdr! rad (append (cdr rad) (list `(point ,x ,y))))
+    (object-set! obj))
+  (graphics-decorations-update))
+
+(tm-define (edit_end-drag mode x y)
+  (:require (== mode 'hand-edit))
+  (:state graphics-state)
+  (object_commit)
+  (graphics-decorations-reset))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Don't dispatch certain actions on textual arguments of graphical macros

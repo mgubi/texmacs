@@ -9,23 +9,29 @@
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
+#ifndef QTTEXMACS
 
 #include "socket_link.hpp"
 #include "sys_utils.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "scheme.hpp"
 #include <stdio.h>
 #include <string.h>
-#ifndef __MINGW32__
 #include <unistd.h>
 #include <fcntl.h>
+#ifndef OS_MINGW
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#else
+namespace wsoc {
+#include <sys/types.h>
+#include <winsock2.h>
+}
 #endif
 #include <errno.h>
 
@@ -47,7 +53,7 @@ socket_link_rep::socket_link_rep (string host2, int port2, int type2, int fd):
     sn = socket_notifier (io, &socket_callback, this, NULL);  
     add_notifier (sn);
     call ("server-add", object (io));
-  } 
+  }
 }
 
 socket_link_rep::~socket_link_rep () {
@@ -55,9 +61,14 @@ socket_link_rep::~socket_link_rep () {
   socket_link_set->remove ((pointer) this);
 }
 
+socket_link_rep*
+make_weak_socket_link (string host, int port, int type, int fd) {
+  return tm_new<socket_link_rep> (host, port, type, fd);
+}
+
 tm_link
 make_socket_link (string host, int port, int type, int fd) {
-  return tm_new<socket_link_rep> (host, port, type, fd);
+  return make_weak_socket_link (host, port, type, fd);
 }
 
 tm_link
@@ -72,7 +83,7 @@ find_socket_link (int fd) {
 
 void
 close_all_sockets () {
-#ifndef __MINGW32__
+#ifndef OS_MINGW
   iterator<pointer> it= iterate (socket_link_set);
   while (it->busy()) {
     socket_link_rep* con= (socket_link_rep*) it->next();
@@ -90,13 +101,26 @@ close_all_sockets () {
 
 string
 socket_link_rep::start () {
-#ifndef __MINGW32__
-  if (alive) return "busy";
+#ifdef OS_MINGW
+  using namespace wsoc;
+  {
+    WSAData data;
+    int ret;
+    ret=wsoc::WSAStartup(MAKEWORD(2,0), &data);
+    if(ret) {
+      char buf[32];
+      string str="Error: WSAStartup failed code:";
+      str << itoa(ret,buf,10);
+      return(str);
+    }
+  }
+#endif  
+    if (alive) return "busy";
   if (DEBUG_AUTO)
-    cout << "TeXmacs] Connecting to '" << host << ":" << port << "'\n";
+    debug_io << "Connecting to '" << host << ":" << port << "'\n";
   
   // getting host
-  
+/*  
   c_string _host (host);
   struct hostent *hp = gethostbyname (_host);
   if (hp == NULL) return "Error: no connection for '" * host * "'";
@@ -105,7 +129,7 @@ socket_link_rep::start () {
   io= socket (AF_INET, SOCK_STREAM, 0);
   if (io < 0) return "Error: socket could not be created";
 
-  // connecting to socket
+   // connecting to socket
   struct sockaddr_in insock;
   string where= host * ":" * as_string (port);
   memset ((char*) &insock, 0, sizeof (insock));
@@ -115,17 +139,62 @@ socket_link_rep::start () {
   if (connect (io, (struct sockaddr*) &insock, sizeof (insock)) < 0)
     return "Error: refused connection to '" * where * "'";
 
+*/
+// the above original code used deprecated function gethostbyname.
+// this was signaled in the tracker (#34182, #46726)
+// Below the functionality is implemented using getaddrinfo,
+// (closely following the client example given in man pages)
+// same thing done also in QTMSockets.cpp
+  c_string _host (host);
+  c_string _port (as_string (port));
+  string where= host * ":" * as_string (port);
+  struct addrinfo hints;
+  struct addrinfo *result, *rp;
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6, AF_INET for v4 only*/
+  hints.ai_socktype = SOCK_STREAM; /* stream socket */
+  hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+  hints.ai_protocol = 0;          /* Any protocol */
+  hints.ai_canonname = NULL;
+  hints.ai_addr = NULL;
+  hints.ai_next = NULL;
+
+  int x =  getaddrinfo(_host, _port, &hints, &result);
+  if (x != 0) return "Error: no address found for '" * host * "'";
+  // getaddrinfo may return several addresses
+  // trying them until we can connect
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+               io = socket(rp->ai_family, rp->ai_socktype,
+                            rp->ai_protocol);
+               if (io == -1)
+                   continue;
+
+               if (connect(io, rp->ai_addr, rp->ai_addrlen) != -1)
+                   break;                  /* Success */
+
+               close(io);
+  }
+
+  if (rp == NULL) {               /* No address succeeded */
+               return "Error: could not connect to '" * where * "'";
+  }
+
+  freeaddrinfo(result);           /* No longer needed */
+
   // testing whether it works
+#ifdef OS_MINGW
+  unsigned long flags = -1;
+  if (ioctlsocket (io, FIONBIO, &flags) == SOCKET_ERROR)
+    return "non working connection to '" * where * "'";
+#else
   int flags = O_NONBLOCK;
   if (fcntl (io, F_SETFL, flags) < 0)
     return "Error: non working connection to '" * where * "'";
+#endif
   alive = true;
   sn = socket_notifier (io, &socket_callback, this, NULL);  
   add_notifier (sn);
   return "ok";
-#else
-  return "Error: sockets not implemented";
-#endif
 }
 
 static string
@@ -145,7 +214,9 @@ debug_io_string (string s) {
 
 static int
 send_all (int s, char *buf, int *len) {
-#ifndef __MINGW32__
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
   int total= 0;          // how many bytes we've sent
   int bytes_left= *len;  // how many we have left to send
   int n= 0;
@@ -159,39 +230,41 @@ send_all (int s, char *buf, int *len) {
 
   *len= total;
   return n==-1? -1: 0;
-#else
-  return 0;
-#endif
 } 
 
 
 void
 socket_link_rep::write (string s, int channel) {
   if ((!alive) || (channel != LINK_IN)) return;
-  if (DEBUG_IO) cout << "---> " << debug_io_string (s) << "\n";
+  if (DEBUG_IO) debug_io << "---> " << debug_io_string (s) << "\n";
   int len= N(s);
   if (send_all (io, &(s[0]), &len) == -1) {
-    cerr << "TeXmacs] write to '" << host << ":" << port << "' failed\n";
+    io_error << "Write to '" << host << ":" << port << "' failed\n";
     stop ();
   }
 }
 
 void
 socket_link_rep::feed (int channel) {
-#ifndef __MINGW32__
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
   if ((!alive) || (channel != LINK_OUT)) return;
   char tempout[1024];
   int r= recv (io, tempout, 1024, 0);
   if (r <= 0) {
-    if (r == 0) cout << "TeXmacs] '" << host << ":" << port << "' hung up\n";
-    else cerr << "TeXmacs] read failed from '" << host << ":" << port << "'\n";
+    if (r == 0) debug_io << host << ":" << port << "' hung up\n";
+    else io_warning << "TeXmacs] read failed from '" << host
+                    << ":" << port << "'\n";
     stop ();
   }
   else if (r != 0) {
-    if (DEBUG_IO) cout << debug_io_string (string (tempout, r));
+    if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
     outbuf << string (tempout, r);
-  }
+#ifdef QT_CPU_FIX
+    tm_wake_up ();
 #endif
+  }
 }
 
 string&
@@ -213,7 +286,9 @@ socket_link_rep::read (int channel) {
 
 void
 socket_link_rep::listen (int msecs) {
-#ifndef __MINGW32__
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
   if (!alive) return;
   fd_set rfds;
   FD_ZERO (&rfds);
@@ -223,7 +298,6 @@ socket_link_rep::listen (int msecs) {
   tv.tv_usec = 1000 * (msecs % 1000);
   int nr= select (io+1, &rfds, NULL, NULL, &tv);
   if (nr != 0 && FD_ISSET (io, &rfds)) feed (LINK_OUT);
-#endif
 }
 
 void
@@ -232,7 +306,9 @@ socket_link_rep::interrupt () {
 
 void
 socket_link_rep::stop () {
-#ifndef __MINGW32__
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
   if (!alive) return;
   if (type == SOCKET_SERVER) call ("server-remove", object (io));
   else if (type == SOCKET_CLIENT) call ("client-remove", object (io));
@@ -241,8 +317,14 @@ socket_link_rep::stop () {
   alive= false;
   remove_notifier (sn);
   sn = socket_notifier ();
+#ifdef OS_MINGW
+  closesocket (io);
+  WSACleanup();
+#else
+  //  close (io);  //fix it?
   wait (NULL);
 #endif
+  
 }
 
 /******************************************************************************
@@ -251,12 +333,14 @@ socket_link_rep::stop () {
 
 void
 socket_callback (void *obj, void* info) {
-#ifndef __MINGW32__
+#ifdef OS_MINGW
+  using namespace wsoc;
+#endif
   (void) info;
   socket_link_rep* con= (socket_link_rep*) obj;
   if (!con->alive) {
     //cout << "con= " << con << ", " << con->alive << ", " << con->io << "\n";
-    system_warning ("invalid callback invocation of deleted socket link");
+    io_warning << "invalid callback invocation of deleted socket link\n";
     return;
   }
   bool busy= true;
@@ -282,5 +366,5 @@ socket_callback (void *obj, void* info) {
   }
   if (!is_nil (con->feed_cmd) && news)
     con->feed_cmd->apply ();
-#endif
 }
+#endif

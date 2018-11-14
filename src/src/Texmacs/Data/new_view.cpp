@@ -19,6 +19,10 @@
 #include "new_document.hpp"
 #include "drd_std.hpp"
 
+#ifdef OS_MINGW
+#define WINPATHS
+#endif
+
 /******************************************************************************
 * Associating URLs to views
 ******************************************************************************/
@@ -46,8 +50,18 @@ static url
 decode_url (string s) {
   int i= search_forwards ("/", 0, s);
   if (i < 0) return url_none ();
+#ifdef WINPATHS
+  int j= 0;
+  if (s (0, i) == "here") j= i+1;
+  if (s (0, i) == "default") j= i;
+  if (j != 0) {
+    if (s[j+1] == ':') return url (s (j, N(s)));
+    else return url_root ("default") * url (s (j, N(s)));
+  }
+#else
   if (s (0, i) == "here") return url (s (i+1, N(s)));
   if (s (0, i) == "default") return url (s (i, N(s)));
+#endif
   return url_root (s (0, i)) * url (s (i+1, N(s)));
 }
 
@@ -72,10 +86,10 @@ concrete_view (url u) {
   url name= decode_url (s (i+1, N(s)));
   //cout << s (i+1, N(s)) << " -> " << name << "\n";
   tm_buffer buf= concrete_buffer (name);
-  if (is_nil (buf)) return NULL;
-  for (i=0; i<N(buf->vws); i++)
-    if (buf->vws[i]->nr == nr)
-      return buf->vws[i];
+  if (!is_nil (buf))
+    for (i=0; i<N(buf->vws); i++)
+      if (buf->vws[i]->nr == nr)
+        return buf->vws[i];
   return NULL;
 }
 
@@ -113,9 +127,20 @@ get_current_view_safe () {
   return abstract_view (the_view);
 }
 
+void notify_delete_view (url u);
+
 editor
 get_current_editor () {
-  tm_view vw= concrete_view (get_current_view ());
+  url u= get_current_view();
+  tm_view vw= concrete_view (u);
+  if (vw == NULL) { // HACK: shouldn't happen!
+    FAILED ("Current view is NULL");
+    notify_delete_view (u);
+    array<url> history = get_all_views();
+    if (history == NULL || N(history) == 0)
+      FAILED("View history is empty")
+    return view_to_editor (history[N(history)-1]);
+  }
   return vw->ed;
 }
 
@@ -146,8 +171,11 @@ view_to_window (url u) {
 editor
 view_to_editor (url u) {
   tm_view vw= concrete_view (u);
-  if (vw == NULL) cout << "TeXmacs] view is " << u << "\n";
-  ASSERT (vw != NULL, "view admits no editor");
+  if (vw == NULL) {
+    notify_delete_view (u); // HACK: returns to valid (?) state.
+    failed_error << "View is " << u << "\n";
+    FAILED ("View admits no editor");
+  }
   return vw->ed;
 }
 
@@ -288,9 +316,7 @@ delete_view (url u) {
       buf->vws= a;
     }
   notify_delete_view (u);
-  // tm_delete (vw);
-  // FIXME: causes very annoying segfault;
-  // recently introduced during reorganization
+  tm_delete (vw);
 }
 
 void
@@ -402,8 +428,24 @@ focus_on_editor (editor ed) {
     }
   */
 
-  cout << "Warning: editor no longer exists, "
-       << "may indicate synchronization error\n";
-  //cout << "Warning: name of buffer: " << ed->buf->buf->name << "\n";
+  std_warning << "Warning: editor no longer exists, "
+              << "may indicate synchronization error\n";
+  //failed_error << "Name of buffer: " << ed->buf->buf->name << "\n";
   //FAILED ("invalid situation");
+}
+
+bool
+focus_on_buffer (url name) {
+  // Focus on the most recent view on a buffer, preferably active in a window
+  // Return false if no view exists for the buffer
+  if (the_view != NULL && the_view->buf->buf->name == name) return true;
+  url r= get_recent_view (name, true, false, true, false);
+  if (is_none (r)) r= get_recent_view (name, true, false, false, false);
+  if (is_none (r)) {
+    array<url> vws= buffer_to_views (name);
+    if (N(vws) > 0) r= vws[0];
+  }
+  if (is_none (r)) return false;
+  set_current_view (r);
+  return true;
 }

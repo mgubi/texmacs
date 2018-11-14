@@ -191,6 +191,7 @@ detect_absolute (array<tree> a, array<int> tp_in, bool insist) {
 
 static array<int>
 detect_probable (array<tree> a, array<int> tp_in) {
+  (void) a;
   array<int> tp= upgrade_probable (tp_in);
   int last_open= -1;
   for (int i=0; i<N(tp); i++)
@@ -523,7 +524,12 @@ upgrade_big (tree t) {
 
 static tree
 downgrade_bracket (tree t, bool large) {
-  if (!is_atomic (t)) return t;
+  if (!is_atomic (t)) {
+    if (large && N(t) > 0)
+      if (is_func (t, LEFT) || is_func (t, MID) || is_func (t, RIGHT))
+	return t[0];
+    return t;
+  }
   string s= t->label;
   if (large) {
     if (t == "<nobracket>") return tree (".");

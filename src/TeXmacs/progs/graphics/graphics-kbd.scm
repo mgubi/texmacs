@@ -13,9 +13,10 @@
 
 (texmacs-module (graphics graphics-kbd)
   (:use (generic generic-kbd)
+        (utils library cursor)
         (graphics graphics-env)
-	(graphics graphics-main)
-	(graphics graphics-edit)))
+        (graphics graphics-main)
+        (graphics graphics-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Various contexts
@@ -23,6 +24,9 @@
 
 (define (in-active-graphics?)
   (and (in-graphics?) (== (get-env "preamble") "false")))
+
+(define (in-beamer-graphics?)
+  (and (in-active-graphics?) (in-screens?)))
 
 (define (graphics-context? t)
   (tree-is? t 'graphics))
@@ -90,6 +94,7 @@
   (:mode in-active-graphics?)
   ("+" (graphics-zoom-in))
   ("-" (graphics-zoom-out))
+  ("0" (graphics-set-zoom 0.5))
   ("1" (graphics-set-zoom 1.0))
   ("2" (graphics-set-zoom 2.0))
   ("3" (graphics-set-zoom 3.0))
@@ -111,6 +116,8 @@
   ("end" (graphics-zmove 'background))
   ("pageup" (graphics-zmove 'closer))
   ("pagedown" (graphics-zmove 'farther))
+  ("return" (graphics-apply-props-at-mouse))
+  ("S-return" (graphics-get-props-at-mouse))
   ("A-left" (graphics-decrease-hsize))
   ("A-right" (graphics-increase-hsize))
   ("A-down" (graphics-increase-vsize))
@@ -122,12 +129,26 @@
   ("backspace" (graphics-kbd-remove #f))
   ("delete" (graphics-kbd-remove #t))
   ("C-g" (graphics-toggle-grid #f))
-  ("C-G" (graphics-toggle-grid #t)))
+  ("C-G" (graphics-toggle-grid #t))
+  ("C-left" (graphics-rotate-xz -0.1))
+  ("C-right" (graphics-rotate-xz 0.1))
+  ("C-up" (graphics-rotate-yz 0.1))
+  ("C-down" (graphics-rotate-yz -0.1))
+  ("C-home" (graphics-zmove 'foreground))
+  ("C-end" (graphics-zmove 'background))
+  ("C-pageup" (graphics-zmove 'closer))
+  ("C-pagedown" (graphics-zmove 'farther)))
+
+(kbd-map
+  (:mode in-beamer-graphics?)
+  ("pageup" (screens-switch-to :previous))
+  ("pagedown" (screens-switch-to :next)))
 
 (define graphics-keys
-  '("+" "-" "1" "2" "3" "4" "5" "6" "7" "8" "9"
+  '("+" "-" "1" "2" "3" "4" "5" "6" "7" "8" "9" "0"
     "left" "right" "down" "up" "home" "end" "pageup" "pagedown"
-    "backspace" "delete" "tab"))
+    "return" "backspace" "delete" "tab"
+    "F1" "F2" "F3" "F4" "F9" "F10" "F11" "F12"))
 
 (tm-define (keyboard-press key time)
   (:mode in-active-graphics?)
@@ -193,7 +214,9 @@
 
 (tm-define (geometry-vertical t down?)
   (:require (graphical-text-context? t))
-  (let* ((old (graphical-get-attribute t "text-at-valign"))
+  (display* t ", " (graphics-valign-var t) "\n")
+  (let* ((valign-var (graphics-valign-var t))
+         (old (graphical-get-attribute t valign-var))
          (new (if down?
                   (cond ((== old "bottom") "base")
                         ((== old "base") "axis")
@@ -203,7 +226,7 @@
                         ((== old "center") "axis")
                         ((== old "axis") "base")
                         (else "bottom")))))
-    (graphical-set-attribute t "text-at-valign" new)))
+    (graphical-set-attribute t valign-var new)))
 
 (tm-define (geometry-extremal t forwards?)
   (:require (graphical-text-context? t))
@@ -212,28 +235,13 @@
 
 (tm-define (geometry-incremental t down?)
   (:require (graphical-text-context? t))
-  (graphical-set-attribute t "text-at-valign"
+  (graphical-set-attribute t (graphics-valign-var t)
                            (if down? "top" "bottom")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Draw over / draw under
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (inside-draw-over/under?)
-  (or (inside? 'draw-over) (inside? 'draw-under)))
-
-(tm-define (graphics-toggle-draw-over/under)
-  (with-innermost t (lambda (x) (tree-in? x '(draw-over draw-under)))
-    (if (tree-is? t 'draw-over)
-	(begin
-	  (tree-assign-node! t 'draw-under)
-	  (tree-go-to t 0 :end))
-	(begin
-	  (tree-assign-node! t 'draw-over)
-	  (if (tree-is? (tree-ref t 1) 'with)
-	      (tree-go-to t 1 (- (tree-arity (tree-ref t 1)) 1) :end)
-	      (tree-go-to t 1 :end))))))
-
 (kbd-map
-  (:mode inside-draw-over/under?)
-  ("C-*" (graphics-toggle-draw-over/under)))
+  (:mode inside-graphical-over-under?)
+  ("C-*" (graphics-toggle-over-under)))

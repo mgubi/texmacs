@@ -101,7 +101,7 @@ static hashmap<string,string> html_entity ("");
 
 void load_html_entities (hashmap<string, string> table, string fname) {
   string s;
-  if (DEBUG_VERBOSE) cout << "TeXmacs] Loading " << fname << "\n";
+  if (DEBUG_CONVERT) debug_convert << "Loading " << fname << "\n";
   if (load_string (url ("$TEXMACS_PATH/langs/encoding", fname), s, false)) return;
   tree t= block_to_scheme_tree (s);
   if (!is_tuple (t)) return;
@@ -632,7 +632,7 @@ xml_html_parser::build (tree& r) {
       if (build_must_close (name)) return;
       tree sub= copy (a[i]); sub[0]= "tag";
       i++;
-      if (html_empty_tag_table->contains (name))
+      if (html && html_empty_tag_table->contains (name))
 	r << sub;
       else {
 	stack= tuple (name, stack);

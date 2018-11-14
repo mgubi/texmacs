@@ -39,7 +39,7 @@ mathemagix_language_rep::advance (tree t, int& pos) {
   if (c >= '0' && c <= '9') {
     parse_number (s, pos); return &tp_normal_rep; }
   if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-      (c == '_') || (c == '$')) {
+      (c == '_') || (c == '$') || (c == '%')) {
     parse_alpha (s, pos); return &tp_normal_rep; }
   tm_char_forwards (s, pos);
   return &tp_normal_rep;
@@ -119,6 +119,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("downto")= c;
   t ("downgrade")= c;
   t ("else")= c;
+  t ("enumeration")= c;
   t ("evolutive")= c;
   t ("exists")= d;
   t ("explicit")= c;
@@ -190,6 +191,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("sequel")= c;
   t ("split")= c;
   t ("step")= c;
+  t ("stereotype")= e;
   t ("structure")= e;
   t ("supports?")= c;
   t ("then")= c;
@@ -197,6 +199,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("to")= c;
   t ("try")= c;
   t ("type")= c;
+  t ("union")= e;
   t ("unpacked")= c;
   t ("until")= c;
   t ("upgrade")= c;
@@ -205,6 +208,7 @@ mathemagix_color_setup_keywords (hashmap<string, string> & t)  {
   t ("virtual")= c;
   t ("while")= c;
   t ("with")= c;
+  t ("writable")= c;
   t ("xor")= c;
 }
 
@@ -240,7 +244,7 @@ belongs_to_identifier (char c) {
   return ((c<='9' && c>='0') ||
          (c<='Z' && c>='A') ||
 	 (c<='z' && c>='a') ||
-          c=='_' || c=='$'  || c=='?');
+          c=='_' || c=='$' || c=='%' || c=='?');
 }
 
 static inline bool
@@ -368,10 +372,24 @@ parse_other_lexeme (hashmap<string,string>& t, string s, int& pos) {
   }
 }
 
+static bool
+is_hex_char (char c) {
+  return (c >= '0' && c <= '9') ||
+         (c >= 'A' && c <= 'F') ||
+         (c >= 'a' && c <= 'f');
+}
+
 static void
 parse_number (string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return;
+  if (i+3 <= N(s) && s[i] == '0' &&
+      (s[i+1] == 'x' || s[i+1] == 'X') && is_hex_char (s[i+2])) {
+    i += 2;
+    while (i<N(s) && is_hex_char (s[i])) i++;
+    pos= i;
+    return;
+  }
   if (s[i] == '.') return;
   while (i<N(s) && 
 	 (is_number (s[i]) ||

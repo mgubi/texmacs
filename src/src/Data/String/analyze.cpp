@@ -202,20 +202,20 @@ ispanish_to_spanish (string s) {
   for (i=0; i<n; i++)
     if ((s[i] == '\'') && ((i+1)<n)) {
       switch (s[i+1]) {
-      case 'A': r << 'Á'; break;
-      case 'E': r << 'É'; break;
-      case 'I': r << 'Í'; break;
-      case 'N': r << 'Ñ'; break;
-      case 'O': r << 'Ó'; break;
-      case 'U': r << 'Ú'; break;
-      case 'Y': r << 'Ý'; break;
-      case 'a': r << 'á'; break;
-      case 'e': r << 'é'; break;
-      case 'i': r << 'í'; break;
-      case 'n': r << 'ñ'; break;
-      case 'o': r << 'ó'; break;
-      case 'u': r << 'ú'; break;
-      case 'y': r << 'ý'; break;
+      case 'A': r << '\301'; break;
+      case 'E': r << '\311'; break;
+      case 'I': r << '\315'; break;
+      case 'N': r << '\321'; break;
+      case 'O': r << '\323'; break;
+      case 'U': r << '\332'; break;
+      case 'Y': r << '\335'; break;
+      case 'a': r << '\341'; break;
+      case 'e': r << '\351'; break;
+      case 'i': r << '\355'; break;
+      case 'n': r << '\361'; break;
+      case 'o': r << '\363'; break;
+      case 'u': r << '\372'; break;
+      case 'y': r << '\375'; break;
       default : r << '\'' << s[i+1];
       }
       i++;
@@ -230,20 +230,20 @@ spanish_to_ispanish (string s) {
   string r;
   for (i=0; i<n; i++)
     switch (s[i]) {
-    case 'Á': r << "'A"; break;
-    case 'É': r << "'E"; break;
-    case 'Í': r << "'I"; break;
-    case 'Ñ': r << "'N"; break;
-    case 'Ó': r << "'O"; break;
-    case 'Ú': r << "'U"; break;
-    case 'Ý': r << "'Y"; break;
-    case 'á': r << "'a"; break;
-    case 'é': r << "'e"; break;
-    case 'í': r << "'i"; break;
-    case 'ñ': r << "'n"; break;
-    case 'ó': r << "'o"; break;
-    case 'ú': r << "'u"; break;
-    case 'ý': r << "'y"; break;
+    case '\301': r << "'A"; break;
+    case '\311': r << "'E"; break;
+    case '\315': r << "'I"; break;
+    case '\321': r << "'N"; break;
+    case '\323': r << "'O"; break;
+    case '\332': r << "'U"; break;
+    case '\335': r << "'Y"; break;
+    case '\341': r << "'a"; break;
+    case '\351': r << "'e"; break;
+    case '\355': r << "'i"; break;
+    case '\361': r << "'n"; break;
+    case '\363': r << "'o"; break;
+    case '\372': r << "'u"; break;
+    case '\375': r << "'y"; break;
     default : r << s[i];
     }
   return r;
@@ -254,7 +254,7 @@ igerman_to_german (string s) {
   int i, n= N(s);
   string r;
   for (i=0; i<n; i++)
-    if (s[i] == 'ß') r << 'ÿ';
+    if (s[i] == '\337') r << '\377';
     else r << s[i];
   return r;
 }
@@ -264,7 +264,7 @@ german_to_igerman (string s) {
   int i, n= N(s);
   string r;
   for (i=0; i<n; i++)
-    if (s[i] == 'ÿ') r << 'ß';
+    if (s[i] == '\377') r << '\337';
     else r << s[i];
   return r;
 }
@@ -274,9 +274,9 @@ german_to_igerman (string s) {
 ******************************************************************************/
 
 static string il2_to_cork_string=
-  "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ Š ‰‘Ÿ’“”™š› ¡ª©±²³´¹º»ÁÂ€Äˆ‚ÇƒÉ†Ë…ÍÎ„Ð‹ŒÓÔŽÖ.—Ú–ÜÝ•ÿ¯áâ ä¨¢ç£é¦ë¥íî¤ž«¬óô®ö/°·ú¶üýµ ";
+  "\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237 \201\212 \211\221\237\222\223\224\231\232\233 \241\252\251\261\262\263\264\271\272\273\217\301\302\200\304\210\202\307\203\311\206\313\205\315\316\204\320\213\214\323\324\216\326.\220\227\332\226\334\335\225\377\257\341\342\240\344\250\242\347\243\351\246\353\245\355\356\244\236\253\254\363\364\256\366/\260\267\372\266\374\375\265 ";
 static string cork_to_il2_string=
-  "Ã¡ÆÈÏÌÊGÅ¥£ÑÒ ÕÀØ¦©ª«ÞÛÙY¬®¯IIð§ã±æèïìêgåµ³ñò õàø¶¹º»þûùy¼¾¿i!?LAÁÂAÄAAÇEÉEËIÍÎIÐNOÓÔOÖOOUÚUÜÝ Saáâaäaaçeéeëiíîiðnoóôoöoouúuüý ß";
+  "\303\241\306\310\317\314\312G\305\245\243\321\322 \325\300\330\246\251\252\253\336\333\331Y\254\256\257II\360\247\343\261\346\350\357\354\352g\345\265\263\361\362 \365\340\370\266\271\272\273\376\373\371y\274\276\277i!?LA\301\302A\304AA\307E\311E\313I\315\316I\320NO\323\324O\326OOU\332U\334\335 Sa\341\342a\344aa\347e\351e\353i\355\356i\360no\363\364o\366oou\372u\374\375 \337";
 
 static char
 il2_to_cork (char c) {
@@ -315,27 +315,27 @@ cork_to_il2 (string s) {
 ******************************************************************************/
 
 static string koi8_to_iso_string=
-  "áâ÷çäåöúéêëìíîïðòóôõæèãþûýÿùøüàñÁÂ×ÇÄÅÖÚÉÊËÌÍÎÏÐÒÓÔÕÆÈÃÞÛÝßÙØÜÀÑ";
+  "\341\342\367\347\344\345\366\372\351\352\353\354\355\356\357\360\362\363\364\365\346\350\343\376\373\375\377\371\370\374\340\361\301\302\327\307\304\305\326\332\311\312\313\314\315\316\317\320\322\323\324\325\306\310\303\336\333\335\337\331\330\334\300\321";
 static string iso_to_koi8_string=
-  "þàáöäåôãõèéêëìíîïÿðñòóæâüûçøýù÷úÞÀÁÖÄÅÔÃÕÈÉÊËÌÍÎÏßÐÑÒÓÆÂÜÛÇØÝÙ×Ú";
+  "\376\340\341\366\344\345\364\343\365\350\351\352\353\354\355\356\357\377\360\361\362\363\346\342\374\373\347\370\375\371\367\372\336\300\301\326\304\305\324\303\325\310\311\312\313\314\315\316\317\337\320\321\322\323\306\302\334\333\307\330\335\331\327\332";
 
 static char
 koi8_to_iso (char c, bool ukrainian) {
   int i= (int) ((unsigned char) c);
-  if (i==156) return '³';
-  if (i==188) return '£';
+  if (i==156) return '\263';
+  if (i==188) return '\243';
   if (ukrainian)
   {
      switch(c)
      {
-         case 'I':return '¶';
-         case 'ˆ':return '·';
-         case '™':return '´';
-         case '€':return '½';
-         case 'i':return '¦';
-         case '¨':return '§';
-         case '¹':return '¤';
-         case ' ':return '­';
+         case 'I':return '\266';
+         case '\210':return '\267';
+         case '\231':return '\264';
+         case '\200':return '\275';
+         case 'i':return '\246';
+         case '\250':return '\247';
+         case '\271':return '\244';
+         case '\240':return '\255';
      }
   }
   if (i<192) return c;
@@ -345,20 +345,20 @@ koi8_to_iso (char c, bool ukrainian) {
 static char
 iso_to_koi8 (char c, bool ukrainian) {
   int i= (int) ((unsigned char) c);
-  if (c=='³') return (char) 156;
-  if (c=='£') return (char) 188;
+  if (c=='\263') return (char) 156;
+  if (c=='\243') return (char) 188;
   if (ukrainian)
   {
      switch(c)
      {
-         case '¶':return 'I';
-         case '·':return 'ˆ';
-         case '´':return '™';
-         case '½':return '€';
-         case '¦':return 'i';
-         case '§':return '¨';
-         case '¤':return '¹';
-         case '­':return ' ';
+         case '\266':return 'I';
+         case '\267':return '\210';
+         case '\264':return '\231';
+         case '\275':return '\200';
+         case '\246':return 'i';
+         case '\247':return '\250';
+         case '\244':return '\271';
+         case '\255':return '\240';
      }
   }
   if (i<192) return c;
@@ -398,6 +398,45 @@ iso_to_koi8uk (string s) {
   string r (n);
   for (i=0; i<n; i++)
     r[i]= iso_to_koi8 (s[i], true);
+  return r;
+}
+
+/******************************************************************************
+* Convert TS1 defined symbols to universal encoding
+******************************************************************************/
+
+tree
+convert_OTS1_symbols_to_universal_encoding (tree t) {
+  if (is_atomic (t)) return t;
+  if (N(t) == 0) {
+    static tree symbols (CONCAT);
+    if (N(symbols) == 0)
+      symbols << "cent" << "copyright" << "currency" << "yen" << "twosuperior"
+        << "threesuperior" << "onesuperior" << "mu" << "onequarter"
+        << "onehalf" << "threequarters" << "trademark";
+    tree l= tree (as_string (L(t)));
+    if (contains (l, A(symbols)))
+      return "<" * as_string (L(t)) * ">";
+    else if (l == "degreesign")
+      return "<degree>";
+    else if (l == "copyleft")
+      return "<copyright>"; // Copyleft is nor defined in TeXmacs universal
+                            // encoding, neither in utf8, neither buildable
+                            // with TeXmacs primitive construction.
+    else if (l == "registered")
+      return "<circledR>";
+    else if (l == "paragraphsign")
+      return "<paragraph>";
+    else if (l == "euro")
+      return "<#20AC>";
+    else
+      return t;
+
+  }
+  int i, n= N(t);
+  tree r (t, n);
+  for (i=0; i<n; i++)
+    r[i]= convert_OTS1_symbols_to_universal_encoding (t[i]);
   return r;
 }
 
@@ -469,7 +508,7 @@ tm_to_xml_cdata (string s) {
       string ss= s (start, i+1);
       string rr= cork_to_utf8 (ss);
       string qq= utf8_to_cork (rr);
-      if (rr != ss && qq == ss) r << rr;
+      if (rr != ss && qq == ss && ss != "<less>" && ss != "<gtr>") r << rr;
       else {
 	if (r != "") a << object (r);
 	a << cons (symbol_object ("tm-sym"),
@@ -539,7 +578,7 @@ static string hundreds[10]= {
 
 string
 roman_nr (int nr) {
-  if (nr<0) return "-" * roman_nr (nr);
+  if (nr<0) return "-" * roman_nr (-nr);
   if (nr==0) return "o";
   if (nr>1000) return "m" * roman_nr (nr-1000);
   if (nr==1000) return "m";
@@ -557,7 +596,7 @@ Roman_nr (int nr) {
 
 string
 alpha_nr (int nr) {
-  if (nr<0) return "-" * alpha_nr (nr);
+  if (nr<0) return "-" * alpha_nr (-nr);
   if (nr==0) return "0";
   if (nr<=26) return string ((char) (((int) 'a')+ nr-1));
   return alpha_nr ((nr-1)/26) * alpha_nr (((nr-1)%26)+1);
@@ -570,10 +609,11 @@ Alpha_nr (int nr) {
 
 string
 fnsymbol_nr (int nr) {
+  if (nr<0) nr= -nr;
   string sym, r;
   int i, m= (nr-1)%6, n= ((nr-1)/6)+1;
   switch (m) {
-    case 0: sym= "<ast>";        break;
+    case 0: sym= "<asterisk>";   break;
     case 1: sym= "<dag>";        break;
     case 2: sym= "<ddag>";       break;
     case 3: sym= "<paragraph>";  break;
@@ -787,6 +827,83 @@ tm_recompose (array<string> a) {
   return r;
 }
 
+int
+tm_search_forwards (string s, int pos, string in) {
+  int k= N(s), n= N(in);
+  if (k == 0) return pos;
+  char c= s[0];
+  while (pos+k <= n) {
+    if (in[pos] == c && test (in, pos, s)) return pos;
+    tm_char_forwards (in, pos);
+  }
+  return -1;
+}
+
+int
+tm_search_backwards (string s, int pos, string in) {
+  while (pos >= 0) {
+    if (test (in, pos, s)) return pos;
+    tm_char_backwards (in, pos);
+  }
+  return -1;
+}
+
+static array<string>
+tm_string_split_between_words (string s) {
+  int i= 0, j= -1, n= N(s);
+  char status= 'o';
+  array<string> r;
+  while (i < n && j < n/2) {
+    char c= s[i];
+    if      (is_numeric (c)   && status == 'c');
+    else if (is_iso_alpha (c) && status == 'a');
+    else {
+      if      (is_numeric   (c)) status= 'c';
+      else if (is_iso_alpha (c)) status= 'a';
+      else status= 'x';
+      j= i;
+    }
+    tm_char_forwards (s, i);
+  }
+  if (j > 0 && j < n)
+    r << s(0, j) << s(j, n);
+  else
+    r << s;
+  return r;
+}
+
+static array<string>
+tm_string_split_at_spaces (string s) {
+  int i= 0, j= 0, n= N(s);
+  array<string> r;
+  while (i>=0 && j < n/2) {
+    i= tm_search_forwards (" ", i, s);
+    if (i == -1) break;
+    j= i++;
+  }
+  if (j < 1 || j >= n)
+    r << s;
+  else if (j == n-1)
+    r << s(0, j) << s(j, n);
+  else
+    r << s(0, j) << s(j, j+1) << s(j+1, n);
+  return r;
+}
+
+array<string>
+tm_string_split (string s) {
+  array<string> r;
+  r= tm_string_split_at_spaces (s);
+  if (N(r) > 1) return r;
+  r= tm_string_split_between_words (s);
+  if (N(r) > 1) return r;
+  /* else split anywhere */
+  int i= 0, n= N(s);
+  while (i < n/2)
+    tm_char_forwards (s, i);
+  return array<string> (s(0, i), s(i, n));
+}
+
 /******************************************************************************
 * Quoting
 ******************************************************************************/
@@ -816,7 +933,8 @@ scm_unquote (string s) {
     int i, n= N(s);
     string r;
     for (i=1; i<n-1; i++)
-      if (s[i] == '\\' && (s[i+1] == '\"' || s[i+1] == '\\')) r << s[++i];
+      if (s[i] == '\\' && (s[i+1] == '\\' || (s[i+1] == '\"' && i+2!=n)))
+        r << s[++i];
       else r << s[i];
     return r;
   }
@@ -828,7 +946,7 @@ raw_quote (string s) {
   // Mark the label of a STRING tree as representing a string and not a symbol.
   return "\"" * s * "\"";
 }
- 
+
 string
 raw_unquote (string s) {
   // Get the string value of a STRING tree label representing a string.
@@ -843,13 +961,15 @@ raw_unquote (string s) {
 
 string
 escape_sh (string s) {
-#if defined (__MINGW__) || defined (__MINGW32__) || defined (OS_WIN32)
+#ifdef OS_MINGW
   return raw_quote (s);
 #else
   int i, n= N(s);
   string r;
   for (i=0; i<n; i++)
     switch (s[i]) {
+    case '(':
+    case ')':
     case '<':
     case '>':
     case '?':
@@ -860,6 +980,9 @@ escape_sh (string s) {
     case '\\':
     case ' ':
       r << '\\' << s[i];
+      break;
+    case '\n':
+      r << "\\n";
       break;
     default:
       r << s[i];
@@ -1073,6 +1196,12 @@ skip_spaces (string s, int& i) {
 }
 
 void
+skip_whitespace (string s, int& i) {
+  int n=N(s);
+  while ((i<n) && ((s[i]==' ') || (s[i]=='\t') || (s[i]=='\n'))) i++;
+}
+
+void
 skip_line (string s, int& i) {
   int n=N(s);
   while ((i<n) && (s[i]!='\n')) i++;
@@ -1089,6 +1218,26 @@ skip_symbol (string s, int& i) {
     }
     else i++;
   }
+}
+
+string
+convert_tabs_to_spaces (string s, int tw) {
+  int i= 0, ts= 0, n= N(s);
+  string r= "";
+  while (i<n) {
+    if (s[i] == '\t') {
+      r << string (' ', tw - ((i - ts) % tw));
+      ts= i+1;
+    }
+    else if (s[i] == '\n') {
+      ts= i+1;
+      r << s[i];
+    }
+    else
+      r << s[i];
+    i++;
+  }
+  return r;
 }
 
 /******************************************************************************
@@ -1140,6 +1289,17 @@ parse (string s, int& pos, SI*& a, int len) {
 ******************************************************************************/
 
 int
+search_forwards (array<string> a, int pos, string in) {
+  int n= N(in), na= N(a);
+  while (pos <= n) {
+    for (int i=0; i<na; i++)
+      if (N(a[i])>0 && in[pos] == a[i][0] && test (in, pos, a[i])) return pos;
+    pos++;
+  }
+  return -1;
+}
+
+int
 search_forwards (string s, int pos, string in) {
   int k= N(s), n= N(in);
   if (k == 0) return pos;
@@ -1178,7 +1338,7 @@ search_backwards (string s, string in) {
 int
 count_occurrences (string s, string in) {
   int count= 0;
-  int i=0, next, n= N(s);
+  int i=0, next, n= N(in);
   while (i<n) {
     next= search_forwards (s, i, in);
     if (next == -1) break;
@@ -1186,6 +1346,18 @@ count_occurrences (string s, string in) {
     i= next+1;
   }
   return count;
+}
+
+int
+overlapping (string s1, string s2) {
+  // return the longuest string being suffix of s1 and prefix of s2
+  int i= min (N(s1), N(s2)), n= N(s1);
+  while (i>0) {
+    if (s1(n-i, n) == s2(0, i))
+      return i;
+    i--;
+  }
+  return 0;
 }
 
 string
@@ -1249,11 +1421,22 @@ recompose (array<string> a, string sep) {
 }
 
 string
-trim_spaces (string s) {
-  int start, end;
+trim_spaces_left (string s) {
+  int start;
   for (start=0; start<N(s) && is_space (s[start]); start++) ;
-  for (end=N(s)-1; end > start && is_space (s[end]); end--) ;
-  return s (start, end+1);
+  return s (start, N(s));
+}
+
+string
+trim_spaces_right (string s) {
+  int end;
+  for (end=N(s)-1; end >= 0 && is_space (s[end]); end--) ;
+  return s (0, end+1);
+}
+
+string
+trim_spaces (string s) {
+  return trim_spaces_left (trim_spaces_right (s));
 }
 
 array<string>
@@ -1265,17 +1448,129 @@ trim_spaces (array<string> a) {
 }
 
 tree
-trim_spaces (tree t) {
-  if (is_atomic (t)) return trim_spaces (as_string (t));
+trim_spaces_right (tree t) {
+  if (is_atomic (t)) return trim_spaces_right (as_string (t));
   else if (is_concat (t)) {
-    int start, end;
-    for (start=0; start < N(t) && t[start] == " "; start++);
-    for (end=N(t)-1; end > start && t[end] == " "; end--);
+    tree l;
+    int end;
+    for (end= N(t)-1; end >= 0; end--) {
+      l= trim_spaces_right (t[end]);
+      if (l != "") break;
+    }
     tree r= tree (L(t));
-    for (int i=start; i<=end; i++) r << t[i];
-    return r;
+    for (int i=0; i<end; i++) r << t[i];
+    if (end >= 0) r << l;
+    if (N(r) == 0) return "";
+    else if (N(r) == 1) return r[0];
+    else return r;
   }
   else return t;
+}
+
+tree
+trim_spaces_left (tree t) {
+  if (is_atomic (t)) return trim_spaces_left (as_string (t));
+  else if (is_concat (t)) {
+    tree l;
+    int start;
+    for (start= 0; start < N(t); start++) {
+      l= trim_spaces_left (t[start]);
+      if (l != "") break;
+    }
+    tree r= tree (L(t));
+    if (start < N(t)) r << l;
+    for (int i=start+1; i<N(t); i++) r << t[i];
+    if (N(r) == 0) return "";
+    else if (N(r) == 1) return r[0];
+    else return r;
+  }
+  else return t;
+}
+
+tree
+trim_spaces (tree t) {
+  return trim_spaces_left (trim_spaces_right (t));
+}
+
+/******************************************************************************
+ * Program bracket matching
+ ******************************************************************************/
+
+extern tree the_et;
+enum dir_t { BACKWARD = -1, FORWARD = 1 }; // don't change the values
+
+  // FIXME: UGLY and won't handle some things
+static bool
+find_bracket_valid (tree t, int pos) {
+  if (pos < 0 || pos >= N(t))
+    return false;
+  if (L(t) == STRING || L(t) == DOCUMENT)
+    return true;
+  if (L(t) == CONCAT)
+    return L(t[pos]) == STRING || L(t[pos]) == CONCAT || L(t[pos]) == WITH;
+  if (L(t) == WITH)
+    return pos == N(t)-1 &&
+           (L(t[pos]) == STRING || L(t[pos]) == CONCAT || L(t[pos]) == WITH ||
+            L(t[pos]) == DOCUMENT);
+  else
+    return false;
+}
+
+static path
+find_bracket_sub (tree t, dir_t dir, const string& lbr, const string& rbr,
+                  int cnt, int pos) {
+  if (pos >= 0 && pos < N(t)) {
+    if (is_atomic (t)) {
+      void (*next) (string, int&) = (dir == FORWARD) ? tm_char_forwards
+                                                      : tm_char_backwards;
+      while (true) {
+        if (test (t->label, pos, lbr))
+          --cnt;
+        else if (test (t->label, pos, rbr))
+          ++cnt;
+        if (cnt == 0)
+          return reverse (path (min (N(t), pos), obtain_ip (t)));
+        int prev = pos;
+        next (t->label, pos);
+        if (prev == pos)
+          break;
+      }
+    } else if (find_bracket_valid (t, pos)) { // traverse child: t[pos]
+      int npos = (dir == FORWARD) ? 0 : N(t[pos])-1;
+      return find_bracket_sub (t[pos], dir, lbr, rbr, cnt, npos);
+    } else {  // traverse siblings
+      int npos = pos + (int)dir;
+      if (npos >= 0 && npos < N(t))
+        return find_bracket_sub (t, dir, lbr, rbr, cnt, npos);
+    }
+  }
+  path ip = obtain_ip (t);
+  if (is_nil (ip) || last_item (ip) < 0) return path();
+  const tree& pt = subtree (the_et, reverse (ip->next));
+  int npos = ip->item + (int)dir;
+  return find_bracket_sub (pt, dir, lbr, rbr, cnt, npos);
+}
+
+path
+find_left_bracket (path p, const string& lbr, const string& rbr) {
+  if (N(lbr) == 0 || N(rbr) == 0 || is_nil (p)) return path();
+  const tree& pt = subtree (the_et, path_up (p));
+  int pos = reverse(p)->item;
+  string s = as_string (pt);
+  if (pos < 0 || pos > N(s)) return path();
+  int cnt = test (s, pos, rbr) ? 0 : 1;
+  return find_bracket_sub (pt, BACKWARD, lbr, rbr, cnt, pos);
+}
+
+path
+find_right_bracket (path p, const string& lbr, const string& rbr) {
+  if (N(lbr) == 0 || N(rbr) == 0 || is_nil (p)) return path();
+  const tree& pt = subtree (the_et, path_up (p));
+  int pos = reverse(p)->item;
+  string s = as_string (pt);
+  if (pos < 0 || pos > N(s)) return path();
+  int cnt = test (s, pos, lbr) ? 0 : -1;
+  return find_bracket_sub (pt, FORWARD, lbr, rbr, cnt, pos);
 }
 
 /******************************************************************************
@@ -1341,4 +1636,92 @@ strip_completions (array<string> a, string prefix) {
     if (starts (a[i], prefix))
       b << a[i] (N(prefix), N(a[i]));
   return b;
+}
+
+/******************************************************************************
+* Differences between two strings
+******************************************************************************/
+
+static int
+find_longest (string s1, string s2, int& c1, int& c2) {
+  int n1= N(s1), n2= N(s2), bc= 0, bl= 0, br= 0;
+  for (c2=0; c2<n2; c2++)
+    if (s1[c1] == s2[c2]) {
+      int l=0, r=0;
+      while (c1+r<n1 && c2+r<n2 && s1[c1+r] == s2[c2+r]) r++;
+      while (l<c1 && l<c2 && s1[c1-l-1] == s2[c2-l-1]) l++;
+      if (l+r > bl+br) {
+        bc= c2;
+        bl= l;
+        br= r;
+      }
+    }
+  if (bl + br > 0) {
+    c1= c1 - bl;
+    c2= bc - bl;
+  }
+  return bl + br;
+}
+
+static void
+find_common (string s1, string s2, int& c1, int& c2) {
+  int best_len= 0;
+  c1= c2= 0;
+  int n1= N(s1), n2= N(s2);
+  if (n1 == 0 || n2 == 0) return;
+  int t= min (min (n1, n2), 6);
+  for (int k=1; k<t; k++) {
+    int a1= (k*n1)/t, a2= (k*n2)/t;
+    int len= find_longest (s1, s2, a1, a2);
+    if (len > best_len) { best_len= len; c1= a1; c2= a2; }
+  }
+}
+
+array<int>
+differences (string s1, string s2) {
+  int n1= N(s1), n2= N(s2);
+  int i1= 0, i2= 0, j1= n1, j2= n2;
+  while (i1<j1 && i2<j2 && s1[i1] == s2[i2]) { i1++; i2++; }
+  while (i1<j1 && i2<j2 && s1[j1-1] == s2[j2-1]) { j1--; j2--; }
+  if (i1 == i2 && j1 == j2) return array<int> ();
+  if (i1 > 0 || i2 > 0 || j1 < n1 || j2 < n2) {
+    array<int> r= differences (s1 (i1, j1), s2 (i2, j2));
+    for (int k=0; k<N(r); k+=4) {
+      r[k  ] += i1;
+      r[k+1] += i1;
+      r[k+2] += i2;
+      r[k+3] += i2;
+    }
+    return r;
+  }
+  else {
+    int c1, c2;
+    find_common (s1, s2, c1, c2);
+    if (c1 == 0 && c2 == 0) {
+      array<int> r;
+      r << i1 << j1 << i2 << j2;
+      return r;
+    }
+    else {
+      array<int> r1= differences (s1 (0 , c1), s2 (0 , c2));
+      array<int> r2= differences (s1 (c1, n1), s2 (c2, n2));
+      for (int k=0; k<N(r2); k+=4) {
+        r2[k  ] += c1;
+        r2[k+1] += c1;
+        r2[k+2] += c2;
+        r2[k+3] += c2;
+      }
+      r1 << r2;
+      return r1;
+    }
+  }
+}
+
+int
+distance (string s1, string s2) {
+  int d= 0;
+  array<int> r= differences (s1, s2);
+  for (int k=0; k<N(r); k+=4)
+    d += max (r[k+1] - r[k], r[k+3] - r[k+2]);
+  return d;
 }

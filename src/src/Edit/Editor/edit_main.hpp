@@ -45,6 +45,7 @@ private:
 public:
   edit_main_rep (server_rep* sv, tm_buffer buf);
   ~edit_main_rep ();
+  virtual inline void* derived_this () {return (edit_main_rep*)this; }
 
   void set_property (scheme_tree what, scheme_tree val);
   void set_bool_property (string what, bool val);
@@ -63,13 +64,14 @@ public:
   void focus_on_this_editor ();
   void notify_page_change ();
 
-  void print (url ps_name, bool to_file, int first, int last);
+  string get_metadata (string kind);
+  int  nr_pages ();
+  void print_doc (url ps_name, bool to_file, int first, int last);
   void print_to_file (url ps_name, string first="1", string last="1000000");
   void print_buffer (string first="1", string last="1000000");
   void export_ps (url ps_name, string first="1", string last="1000000");
-  array<int> print_snippet (url u, tree t);
+  array<int> print_snippet (url u, tree t, bool conserve_preamble);
   bool graphics_file_to_clipboard (url output);
-
   void footer_eval (string s);
   tree the_line ();
   tree the_root ();

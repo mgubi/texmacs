@@ -17,18 +17,20 @@
 ******************************************************************************/
 
 stacker_rep::stacker_rep ():
-  l (0), unit_flag (false), unit_start (0) {}
+  l (0), unit_flag (false), unit_start (0),
+  no_break_flag (false), no_break_begin (-1) {}
 
 void
 stacker_rep::set_env_vars (
-  SI height2, SI sep2, SI hor_sep2, SI ver_sep2, SI bot2, SI top2)
+  SI h2, SI sep2, SI hor_sep2, SI ver_sep2, SI bot2, SI top2, array<SI> sw2)
 {
-  sb->height_before = sb->height = height2;
+  sb->height_before = sb->height = h2;
   sb->sep_before    = sb->sep    = sep2;
   sb->hor_sep_before= sb->hor_sep= hor_sep2;
   sb->ver_sep_before= sb->ver_sep= ver_sep2;
   sb->bot           = bot2;
   sb->top           = top2;
+  swell= sw2;
 }
 
 /******************************************************************************
@@ -42,12 +44,12 @@ get_pos (array<SI> a, SI which) {
   int step, test;
   step= test= N(a)>>1;
   while (a[test] != which) {
-    step= step >> 1;
-    if (step==0) {
-      if (which < a[test]) return test-1;
-      else return test+1;
+    if (step==1) {
+      if (which < a[test]) return max (0, test-1);
+      else return min (N(a)-1, test+1);
     }
     else {
+      step = (step + 1) >> 1;
       if (which < a[test]) test= max (0, test- step);
       else test= min (N(a)-1, test+ step);
     }
@@ -91,22 +93,24 @@ shove_in (box b1, box b2, SI hor_sep, SI top, SI bot) {
     vpos2[i]= top;
   }
 
-  for (i=0; i<N(b1); i++) {
-    SI  y    = b1->sy1(i);
-    int start= get_pos (hpos, b1->sx1(i)- hor_sep);
-    int end  = get_pos (hpos, b1->sx2(i)+ hor_sep);
-    if (end>n) end= n;
-    for (j=start; j<end; j++)
-      vpos1[j]= min (vpos1[j], y);
-  }
-  for (i=0; i<N(b2); i++) {
-    SI  y    = b2->sy2(i);
-    int start= get_pos (hpos, b2->sx1(i)- hor_sep);
-    int end  = get_pos (hpos, b2->sx2(i)+ hor_sep);
-    if (end>n) end= n;
-    for (j=start; j<end; j++)
-      vpos2[j]= max (vpos2[j], y);
-  }
+  for (i=0; i<N(b1); i++)
+    if (b1[i]->w() > 0) {
+      SI  y    = b1->sy1(i);
+      int start= get_pos (hpos, b1->sx1(i)- hor_sep);
+      int end  = get_pos (hpos, b1->sx2(i)+ hor_sep);
+      if (end>n) end= n;
+      for (j=start; j<end; j++)
+	vpos1[j]= min (vpos1[j], y);
+    }
+  for (i=0; i<N(b2); i++)
+    if (b2[i]->w() > 0) {
+      SI  y    = b2->sy2(i);
+      int start= get_pos (hpos, b2->sx1(i)- hor_sep);
+      int end  = get_pos (hpos, b2->sx2(i)+ hor_sep);
+      if (end>n) end= n;
+      for (j=start; j<end; j++)
+	vpos2[j]= max (vpos2[j], y);
+    }
 
   SI m= vpos2[0]-vpos1[0];
   for (i=1; i<n; i++)
@@ -122,7 +126,8 @@ shove_in (box b1, box b2, SI hor_sep, SI top, SI bot) {
 // and the maxima of the individual values are taken on each line.
 
 static void
-shove (page_item& item1, page_item& item2, stack_border sb, stack_border sb2) {
+shove (page_item& item1, page_item& item2,
+       stack_border sb, stack_border sb2, array<SI> swell) {
   SI  height = max (sb->height , sb2->height_before );
   SI  sep    = max (sb->sep    , sb2->sep_before    );
   SI  hor_sep= max (sb->hor_sep, sb2->hor_sep_before);
@@ -134,6 +139,30 @@ shove (page_item& item1, page_item& item2, stack_border sb, stack_border sb2) {
   // cout << "Shove: " << sb->height << ", " << sb2->height_before
   // << "; " << b1->y1 << ", " << b2->y2
   // << "; " << top << ", " << bot << LF;
+
+  if (N(swell)>0) {
+    //cout << HRULE;
+    //cout << "Top: " << b1->y1/PIXEL
+    //     << ", " << swell[3]/PIXEL
+    //     << ", " << swell[4]/PIXEL << LF;
+    //cout << "Bot: " << b2->y2/PIXEL
+    //     << ", " << swell[1]/PIXEL
+    //     << ", " << swell[2]/PIXEL << LF;
+    SI d1=0, d2=0;
+    if (b1->y1 < swell[3]) {
+      double exceed= swell[3] - b1->y1;
+      double unit  = max (swell[3] - swell[4], 1);
+      double ratio = min (exceed / unit, 1.0);
+      d1= (SI) (ratio * swell[0]);
+    }
+    if (b2->y2 > swell[1]) {
+      double exceed= b1->y2 - swell[1];
+      double unit  = max (swell[2] - swell[1], 1);
+      double ratio = min (exceed / unit, 1.0);
+      d2= (SI) (ratio * swell[0]);
+    }
+    ver_sep += max (d1, d2);
+  }
 
   while (true) {
     int type= b1->get_type ();
@@ -192,7 +221,7 @@ stacker_rep::print (box b, array<lazy> fl, int nr_cols) {
   l << page_item (b, fl, nr_cols);
   if ((!unit_flag) && (i>=0)) {
     l[i]= copy (l[i]);
-    shove (l[i], l[N(l)-1], sb, sb);
+    shove (l[i], l[N(l)-1], sb, sb, swell);
   }
   unit_flag= false;
 }
@@ -219,6 +248,7 @@ void
 merge_stack (array<page_item>& l, stack_border& sb,
 	     array<page_item> l2, stack_border sb2)
 {
+  array<SI> swell;
   int i= N(l)-1, j=0;
   while ((i >= 0) && (l[i]->type != PAGE_LINE_ITEM)) i--;
   while ((j < N(l2)) && (l2[j]->type != PAGE_LINE_ITEM)) j++;
@@ -244,7 +274,7 @@ merge_stack (array<page_item>& l, stack_border& sb,
     else {
       // normal case
       l[i]= copy (l[i]);
-      shove (l[i], l2[j], sb, sb2);
+      shove (l[i], l2[j], sb, sb2, swell);
       l[i]->spc= l[i]->spc + max (sb->vspc_after, sb2->vspc_before);
       if (sb->nobr_after || sb2->nobr_before) l[i]->penalty= HYPH_INVALID;
     }
@@ -323,15 +353,43 @@ stacker_rep::no_page_break_after () {
 }
 
 void
+stacker_rep::no_break_before () {
+  penalty (HYPH_INVALID);
+}
+
+void
+stacker_rep::no_break_after () {
+  no_break_flag= true;
+}
+
+void
+stacker_rep::no_break_start () {
+  no_break_begin= N(l);
+}
+
+void
+stacker_rep::no_break_end () {
+  if (no_break_begin >= 0)
+    for (int i=no_break_begin; i<N(l); i++)
+      if (l[i]->type != PAGE_CONTROL_ITEM)
+        l[i]->penalty= HYPH_INVALID;
+  no_break_begin= -1;
+}
+
+void
 stacker_rep::penalty (int pen) {
   int i= N(l)-1;
   while ((i>=0) && (l[i]->type == PAGE_CONTROL_ITEM)) i--;
-  if (i<0) return;
-  l[i]->penalty = pen;  
+  if (i >= 0) l[i]->penalty = pen;
+  else if (pen >= HYPH_INVALID) unit_sb->nobr_before= true;
 }
 
 void
 stacker_rep::flush () {
+  if (no_break_flag) {
+    penalty (HYPH_INVALID);
+    no_break_flag= false;
+  }
   l << unit_ctrl;
   unit_ctrl= array<page_item> (0);
 }
@@ -351,7 +409,8 @@ typeset_as_stack (edit_env env, tree t, path ip) {
   SI height    = env->as_length (string ("1fn"))+ sep;
   SI bot       = 0;
   SI top       = env->fn->yx;
-  sss->set_env_vars (height, sep, hor_sep, ver_sep, bot, top);
+  array<SI> swell;
+  sss->set_env_vars (height, sep, hor_sep, ver_sep, bot, top, swell);
   for (i=0; i<n; i++)
     sss->print (typeset_as_concat (env, t[i], descend (ip, i)));
 

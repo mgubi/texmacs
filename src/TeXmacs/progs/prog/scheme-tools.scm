@@ -28,17 +28,6 @@
            (char-set-adjoin char-set:whitespace #\( #\) #\" #\'))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Rudimentary editing aids
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (scheme-auto-parenthesis)
-  (insert "()") (emulate-keyboard "left"))
-
-(kbd-map
-  (:require (in-prog-scheme?))
-  ("(" (scheme-auto-parenthesis)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Importing and exporting of sessions (incomplete, ugly and fragile)
 ;; TODO:
 ;;  - convert text into comments and viceversa
@@ -46,9 +35,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (list-split lst what)
-  (:synopsis 
+  (:synopsis
    "Return a list of lists splitting @lst by items equal? to @what")
-  (letrec 
+  (letrec
     ((loop (lambda (lst what acc)
       (cond ((null? lst) (list acc))
             ((equal? what (car lst)) (cons acc (loop (cdr lst) what '())))
@@ -56,14 +45,19 @@
               (loop (cdr lst) what (append acc (list (car lst)))))))))
     (loop lst what '())))
 
+(define (prep-math t props)
+  (cond ((atomic-tree? t) t)
+        ((tree-in? t '(math equation equation*))
+         (string->tree (texmacs->latex-document t props)))
+        ((> (tree-arity t) 0) (tree-map-children (cut prep-math <> props) t))
+        (else t)))
+
 (define (sessions->verbatim t)
   (with tx (select t '(:* (:or input unfolded-io folded-io) 1))
-    (string-join 
-      (map-in-order 
-        (lambda (x) 
-          (texmacs->verbatim x 
-            (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-        tx) "\n\n")))
+    (with props (acons "texmacs->verbatim:encoding" "SourceCode" '())
+      (string-join
+       (map-in-order (lambda (x) (texmacs->verbatim x props))
+                     (map-in-order (cut prep-math <> props) tx)) "\n\n"))))
 
 (tm-define (export-sessions url)
   (string-save (sessions->verbatim (buffer-tree)) url))
@@ -100,9 +94,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface for contextual help
-;; FIXME: the calls to doc-check-cache-do shouldn't be necessary, because
-;; cache-retrieve already does it, but we crash if we do the collecting that
-;; late.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (word-at str pos)
@@ -122,14 +113,12 @@
 
 (tm-define (scheme-popup-help word)
   (:synopsis "Pops up the help window for the scheme symbol @word")
-  (doc-check-cache-do (lambda () (help-window "scheme" word))))
+  (help-window "scheme" word))
 
 (tm-define (scheme-inbuffer-help word)
   (:synopsis "Opens a help buffer for the scheme symbol @word")
-  (doc-check-cache-do
-   (lambda ()
-     (load-buffer (string-append "tmfs://apidoc/type=symbol&what="
-                                 (string-replace word ":" "%3A")))))) ; HACK
+  (load-buffer (string-append "tmfs://apidoc/type=symbol&what="
+                              (string-replace word ":" "%3A")))); HACK
 
 (define (url-for-symbol s props)
   (with (file line column) props
@@ -168,7 +157,7 @@
   (:argument ssym "Symbol")
   (:proposals ssym (exp-modules))
   ;(:check-mark "*" (symbol-documented?)) ; right?
-  (insert ($doc-symbol-template (string->symbol ssym) "")))
+  (insert ($doc-symbol-template (string->symbol ssym) #t "")))
 
 (kbd-map
   (:require (and developer-mode? (in-tmdoc?)))

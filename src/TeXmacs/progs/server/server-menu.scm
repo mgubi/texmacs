@@ -13,9 +13,15 @@
 
 (texmacs-module (server server-menu)
   (:use (server server-base)
-        (server server-resource)
-        (server server-tmfs)))
+        (server server-db)
+        (server server-tmfs)
+        (server server-sync)))
+
+(menu-bind start-server-menu
+  ("Start server" (server-start)))
 
 (menu-bind server-menu
-  ("Start server" (server-start))
+  ("Stop server" (server-stop))
+  ("Open licence agreement"
+   (load-buffer "$TEXMACS_HOME_PATH/server/licence.tm"))
   ("Set user information" (interactive server-set-user-information)))

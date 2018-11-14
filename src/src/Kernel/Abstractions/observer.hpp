@@ -32,6 +32,9 @@ typedef list<int> path;
 #define OBSERVER_EDIT       6
 #define OBSERVER_UNDO       7
 #define OBSERVER_HIGHLIGHT  8
+#define OBSERVER_WIDGET     9
+
+#define ADDENDUM_PLAYER     1
 
 /******************************************************************************
 * The observer class
@@ -107,6 +110,7 @@ extern observer nil_observer;
 observer ip_observer (path ip);
 observer list_observer (observer o1, observer o2);
 observer tree_pointer (tree t, bool flag= false);
+observer scheme_observer (tree t, string cb);
 observer tree_position (tree t, int index);
 observer edit_observer (editor_rep* ed);
 observer undo_observer (archiver_rep* arch);
@@ -116,7 +120,8 @@ observer highlight_observer (int lan, array<int> cols);
 * Modification routines for trees and other observer-related facilities
 ******************************************************************************/
 
-extern bool versioning_busy;
+extern bool busy_modifying;
+extern bool busy_versioning;
 bool busy_tree (tree& ref);
 
 void assign      (tree& ref, tree t);
@@ -158,8 +163,9 @@ void tree_pointer_delete (observer o);
 
 path obtain_position (observer o);
 
-observer tree_addendum_new (tree t, int kind, blackbox bb);
-void tree_addendum_new (observer o);
+observer tree_addendum_new (tree t, int kind, blackbox bb, bool keep= true);
+void tree_addendum_delete (observer o);
+void tree_addendum_delete (tree t, int type);
 
 observer search_observer (tree& ref, int type);
 bool admits_edit_observer (tree t);

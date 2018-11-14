@@ -61,11 +61,8 @@
   (if (detailed-menus?)
       ("Clear" (clipboard-clear "primary")))
   ---
-  (if (not (in-search-mode?))
-      ("Search" (search-start #t)))
-  (if (in-search-mode?)
-      ("Next match" (search-button-next)))
-  ("Replace" (interactive replace-start-forward))
+  ("Search" (interactive-search))
+  ("Replace" (interactive-replace))
   (if (not (in-math?))
       ("Spell" (spell-start)))
   (if (in-math?)
@@ -80,8 +77,6 @@
 	    ("Primary" (clipboard-copy "primary"))
 	    ("Secondary" (clipboard-copy "secondary"))
 	    ("Ternary" (clipboard-copy "ternary"))
-	    ("Search" (clipboard-copy "search"))
-	    ("Replace" (clipboard-copy "replace"))
 	    ---
 	    ("Other" (interactive clipboard-copy)))
 	(-> "Cut to"
@@ -90,8 +85,6 @@
 	    ("Primary" (clipboard-cut "primary"))
 	    ("Secondary" (clipboard-cut "secondary"))
 	    ("Ternary" (clipboard-cut "ternary"))
-	    ("Search" (clipboard-cut "search"))
-	    ("Replace" (clipboard-cut "replace"))
 	    ---
 	    ("Other" (interactive clipboard-cut))))
       (-> "Paste from"
@@ -100,12 +93,11 @@
 	  ("Primary" (clipboard-paste "primary"))
 	  ("Secondary" (clipboard-paste "secondary"))
 	  ("Ternary" (clipboard-paste "ternary"))
-	  ("Search" (clipboard-paste "search"))
-	  ("Replace" (clipboard-paste "replace"))
 	  ---
 	  ("Other" (interactive clipboard-paste))))
   ---
-  ("Preferences" (interactive open-preferences))
-  ;;(-> "Preferences"
-  ;;(link preferences-menu))
-  )
+  (if (use-menus?)
+      (-> "Preferences"
+          (link preferences-menu)))
+  (if (use-popups?)
+      ("Preferences" (interactive open-preferences))))

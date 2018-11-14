@@ -77,13 +77,18 @@ string convert_to_cork (string input, string from);
 string convert_from_cork (string input, string to); 
 string utf8_to_cork (string input); 
 string cork_to_utf8 (string input); 
+string strict_cork_to_utf8 (string input); 
 string cork_to_sourcecode (string input);
 string sourcecode_to_cork (string input);
 string convert_utf8_to_LaTeX (string input);
+string convert_LaTeX_to_utf8 (string input);
 string utf8_to_html (string input);
+string utf8_to_t2a (string input);
 string t2a_to_utf8 (string input);
 string cyrillic_subset_in_t2a_to_code_point (string input);
+string code_point_to_cyrillic_subset_in_t2a (string input);
 string cork_to_ascii (string input);
+string cork_to_os8bits (string s);
 bool check_using_iconv (string input, string encoding);
 string convert_using_iconv (string input, string from, string to); 
 
@@ -118,5 +123,6 @@ string convert_escapes (string in, bool utf8);
 string convert_char_entities (string s);
 string convert_char_entity (string s, int& start, bool& success);
 string utf8_to_hex_entities (string s);
+string utf8_to_hex_string (string s);
 
 #endif // CONVERTER_H

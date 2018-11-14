@@ -61,7 +61,7 @@ math_language_rep::set_type (string cl, string s) {
   else if (s == "middle-bracket") ot= OP_MIDDLE_BRACKET;
   else if (s == "closing-bracket") ot= OP_CLOSING_BRACKET;
   else {
-    cerr << "Attempt to associate type " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate type " << s << " to " << cl << "\n";
     FAILED ("invalid type");
   }
 }
@@ -72,7 +72,8 @@ math_language_rep::set_left_penalty (string cl, string s) {
   else if (s == "panic")   tpr_class(cl).pen_before= HYPH_PANIC;
   else if (s == "invalid") tpr_class(cl).pen_before= HYPH_INVALID;
   else {
-    cerr << "Attempt to associate left penalty " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate left penalty " << s
+                 << " to " << cl << "\n";
     FAILED ("invalid penalty");
   }
 }
@@ -83,31 +84,40 @@ math_language_rep::set_right_penalty (string cl, string s) {
   else if (s == "panic")   tpr_class(cl).pen_after= HYPH_PANIC;
   else if (s == "invalid") tpr_class(cl).pen_after= HYPH_INVALID;
   else {
-    cerr << "Attempt to associate right penalty " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate right penalty " << s
+                 << " to " << cl << "\n";
     FAILED ("invalid penalty");
   }
 }
 
 void
 math_language_rep::set_left_spacing (string cl, string s) {
-  if      (s == "none")    tpr_class(cl).spc_before= SPC_NONE;
-  else if (s == "half")    tpr_class(cl).spc_before= SPC_HALF;
-  else if (s == "default") tpr_class(cl).spc_before= SPC_OPERATOR;
-  else if (s == "big")     tpr_class(cl).spc_before= SPC_BIGOP;
+  if      (s == "none")     tpr_class(cl).spc_before= SPC_NONE;
+  else if (s == "half")     tpr_class(cl).spc_before= SPC_HALF;
+  else if (s == "default")  tpr_class(cl).spc_before= SPC_OPERATOR;
+  else if (s == "wide")     tpr_class(cl).spc_before= SPC_WIDEOP;
+  else if (s == "big")      tpr_class(cl).spc_before= SPC_BIGOP;
+  else if (s == "multiply") tpr_class(cl).spc_before= SPC_MULTIPLY;
+  else if (s == "middle")   tpr_class(cl).spc_before= SPC_MIDDLE;
   else {
-    cerr << "Attempt to associate left spacing " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate left spacing " << s
+                 << " to " << cl << "\n";
     FAILED ("invalid spacing");
   }
 }
 
 void
 math_language_rep::set_right_spacing (string cl, string s) {
-  if      (s == "none")    tpr_class(cl).spc_after= SPC_NONE;
-  else if (s == "half")    tpr_class(cl).spc_after= SPC_HALF;
-  else if (s == "default") tpr_class(cl).spc_after= SPC_OPERATOR;
-  else if (s == "big")     tpr_class(cl).spc_after= SPC_BIGOP;
+  if      (s == "none")     tpr_class(cl).spc_after= SPC_NONE;
+  else if (s == "half")     tpr_class(cl).spc_after= SPC_HALF;
+  else if (s == "default")  tpr_class(cl).spc_after= SPC_OPERATOR;
+  else if (s == "wide")     tpr_class(cl).spc_after= SPC_WIDEOP;
+  else if (s == "big")      tpr_class(cl).spc_after= SPC_BIGOP;
+  else if (s == "multiply") tpr_class(cl).spc_after= SPC_MULTIPLY;
+  else if (s == "middle")   tpr_class(cl).spc_after= SPC_MIDDLE;
   else {
-    cerr << "Attempt to associate right spacing " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate right spacing " << s
+                 << " to " << cl << "\n";
     FAILED ("invalid spacing");
   }
 }
@@ -118,7 +128,8 @@ math_language_rep::set_limits (string cl, string s) {
   else if (s == "display") tpr_class(cl).limits= LIMITS_DISPLAY;
   else if (s == "always")  tpr_class(cl).limits= LIMITS_ALWAYS;
   else {
-    cerr << "Attempt to associate limits " << s << " to " << cl << "\n";
+    failed_error << "Attempt to associate limits " << s
+                 << " to " << cl << "\n";
     FAILED ("invalid limits");
   }
 }
@@ -209,8 +220,8 @@ math_language_rep::advance (tree t, int& pos) {
     bool op_flag2=
       (pos==N(s)) ||
       (((pos+2)<N(s)) && is_alpha (s[pos]) && is_alpha (s[pos+1]));
-    if (op_flag1 || op_flag2) return &tp_operator_rep;
-    else return &tp_shortop_rep;
+    if (op_flag1 || op_flag2) return &tp_apply_rep;
+    else return &tp_short_apply_rep;
   }
   return &tpr_member(r);
 

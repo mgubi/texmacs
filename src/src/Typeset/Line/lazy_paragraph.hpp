@@ -33,6 +33,7 @@ protected:
   array<SI>     items_sp;    // the final spaces between boxes in lines
   array<space>  spcs;        // the spacing between the boxes of items
   array<lazy>   fl;          // floating insertions
+  array<line_item> notes;    // line notes
   array<tab>    tabs;        // tabulations
   array<tree>   decs;        // decorations of the boxes on lines
   SI            cur_r;       // the current right offset of the last line unit
@@ -42,6 +43,11 @@ protected:
   string        mode;        // justified, left, center or right
   double        flexibility; // threshold for switching to ragged mode
   string        hyphen;      // hyphenation quality
+  double        kreduce;     // maximal kerning reduction
+  double        kstretch;    // maximal kerning stretching
+  int           protrusion;  // marginal kerning mode
+  double        contraction; // maximal glyph contraction
+  double        expansion;   // maximal glyph expansion
   SI            width;       // the width of the parbox
   SI            first;       // indentation of first line (added to left)
   SI            left;        // left indentation of paragraph lines
@@ -56,10 +62,19 @@ protected:
   SI            top;         // previous line will not descend lower than this
   SI            tab_sep;     // separation between columns in tabular
   int           nr_cols;     // number of columns
+  array<SI>     swell;       // swell properties for lines with large height
 
   void line_print (line_item item);
   void line_print (line_item item, path start, path end);
   void line_print (path start, path end);
+
+  void find_first_last_text (int& first, int& last);
+  void protrude (bool lf, bool rf);
+  array<box> adjusted (double factor, int first, int last);
+  void increase_kerning (SI dw, SI the_width);
+  void decrease_kerning (SI dw, SI the_width);
+  void expand_glyphs (SI dw, SI the_width);
+  void contract_glyphs (SI dw, SI the_width);
 
   void handle_decoration (int& i, int& j, SI& xoff, box& b, SI& b_sp);
   void handle_decorations (int& i, int& j, SI& xoff,

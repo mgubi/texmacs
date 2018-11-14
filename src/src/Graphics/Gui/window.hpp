@@ -25,10 +25,10 @@ public:
 
   virtual widget get_widget () = 0;
     // Get the top widget associated to the window
-  virtual renderer get_renderer () = 0;
-    // Get the renderer associated to the window
   virtual void set_name (string name) = 0;
     // Set the window title
+  virtual void set_modified (bool flag) = 0;
+    // Set the modified flag to decorate the title bar / window title
   virtual void set_visibility (bool flag) = 0;
     // Map or unmap the window
   virtual void set_full_screen (bool flag) = 0;
@@ -47,6 +47,8 @@ public:
     // Get the current position of the window on the screen
   virtual void invalidate (SI x1, SI y1, SI x2, SI y2) = 0;
     // Explicit request for redrawing a region in the window
+  virtual bool is_invalid () = 0;
+    // Query pending painting operations
   virtual void translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) = 0;
     // Fast translation of a region in the window (used for scrolling)
   virtual void set_keyboard_focus (widget wid, bool get_focus= true) = 0;

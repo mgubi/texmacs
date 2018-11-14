@@ -15,12 +15,14 @@
 #include "Format/format.hpp"
 #include "Line/lazy_vstream.hpp"
 #include "Boxes/construct.hpp"
+#include "analyze.hpp"
 
 array<line_item> typeset_concat (edit_env env, tree t, path ip);
 void hyphenate (line_item item, int pos, line_item& item1, line_item& item2);
 array<path>
 line_breaks (array<line_item> a, int start, int end,
-	     SI line_width, SI first_spc, SI last_spc, bool ragged);
+	     SI line_width, SI large_width,
+             SI first_spc, SI last_spc, bool ragged);
 
 /******************************************************************************
 * Constructor
@@ -54,8 +56,67 @@ lazy_paragraph_rep::lazy_paragraph_rep (edit_env env2, path ip):
   line_sep   = env->get_vspace (PAR_LINE_SEP);
   par_sep    = env->get_vspace (PAR_PAR_SEP);
   nr_cols    = env->get_int (PAR_COLUMNS);
+  swell      = array<SI> ();
 
-  tree dec   = env->read (ATOM_DECORATIONS);
+  SI sw= env->get_length (PAR_SWELL);
+  if (sw > 0)
+    swell << sw
+          << env->get_length (MATH_TOP_SWELL_START)
+          << env->get_length (MATH_TOP_SWELL_END)
+          << env->get_length (MATH_BOT_SWELL_START)
+          << env->get_length (MATH_BOT_SWELL_END);
+
+  string kr= as_string (env->read (PAR_KERNING_REDUCE));
+  if (kr == "auto") kreduce= 0.4 / 40.0;
+  else if (is_double (kr)) kreduce= as_double (kr);
+  else kreduce= 0.0;
+
+  string ks= as_string (env->read (PAR_KERNING_STRETCH));
+  if (ks == "auto") {
+    double cpl= min (max (((double) width) / max (env->fn->wfn, 1), 10.0), 40.0);
+    kstretch= 1.0 / cpl;
+  }
+  else if (ks == "tolerant") {
+    double cpl= min (max (((double) width) / max (env->fn->wfn, 1), 10.0), 40.0);
+    kstretch= 2.5 / cpl;
+  }
+  else if (is_double (ks)) kstretch= as_double (ks);
+  else kstretch= 0.0;
+
+  string ps= as_string (env->read (PAR_KERNING_MARGIN));
+  if (ps == "true") protrusion= WESTERN_PROTRUSION;
+  else protrusion= 0;
+
+  string cf= as_string (env->read (PAR_CONTRACTION));
+  if (cf == "auto") contraction= 1.0 / 40.0;
+  else if (is_double (cf)) contraction= as_double (cf);
+  else contraction= 0.0;
+
+  string ef= as_string (env->read (PAR_EXPANSION));
+  if (ef == "auto") {
+    double cpl= min (max (((double) width) / max (env->fn->wfn, 1), 10.0), 40.0);
+    expansion= 0.7 / cpl;
+  }
+  else if (ef == "tolerant") {
+    double cpl= min (max (((double) width) / max (env->fn->wfn, 1), 10.0), 40.0);
+    expansion= 1.75 / cpl;
+  }
+  else if (is_double (ef)) expansion= as_double (ef);
+  else expansion= 0.0;
+
+  //expansion= contraction= kstretch= kreduce= 0.0; // FIXME
+  //expansion= contraction= kreduce= 0.0; // FIXME
+  //contraction= kreduce= 0.0; // FIXME
+  //expansion= contraction= 0.0; // FIXME
+
+  string sm= as_string (env->read (PAR_SPACING));
+  if (sm == "plain");
+  else if (sm == "quanjiao") protrusion += QUANJIAO;
+  else if (sm == "banjiao") protrusion += BANJIAO;
+  else if (sm == "hangmobanjiao") protrusion += HANGMOBANJIAO;
+  else if (sm == "kaiming") protrusion += KAIMING;
+
+  tree dec= env->read (ATOM_DECORATIONS);
   if (N(dec) > 0) decs << tuple ("0", dec);
 }
 
@@ -74,6 +135,7 @@ lazy_paragraph_rep::operator tree () {
 void
 lazy_paragraph_rep::line_print (line_item item) {
   // cout << "Printing: " << item << "\n";
+  // cout << "Printing: " << item << ", " << item->penalty << "\n";
   if (item->type == CONTROL_ITEM) {
     if (is_func (item->t, HTAB))
       tabs << tab (N(items), item->t);
@@ -89,6 +151,14 @@ lazy_paragraph_rep::line_print (line_item item) {
       sss->no_page_break_before ();
     else if (item->t == NO_PAGE_BREAK)
       sss->no_page_break_after ();
+    else if (item->t == VAR_NO_BREAK_HERE)
+      sss->no_break_before ();
+    else if (item->t == NO_BREAK_HERE)
+      sss->no_break_after ();
+    else if (item->t == NO_BREAK_START)
+      sss->no_break_start ();
+    else if (item->t == NO_BREAK_END)
+      sss->no_break_end ();
     else if (is_tuple (item->t, "env_page") ||
 	     (item->t == PAGE_BREAK) ||
 	     (item->t == NEW_PAGE) ||
@@ -103,6 +173,10 @@ lazy_paragraph_rep::line_print (line_item item) {
   }
   else if (item->type == FLOAT_ITEM) {
     fl << item->b->get_leaf_lazy ();
+    // REPLACE item by item without lazy attachment !
+  }
+  else if (item->type == NOTE_LINE_ITEM) {
+    notes << item;
     // REPLACE item by item without lazy attachment !
   }
 
@@ -141,6 +215,169 @@ lazy_paragraph_rep::line_print (path start, path end) {
 }
 
 /******************************************************************************
+* Adjustments for current line unit
+******************************************************************************/
+
+void
+lazy_paragraph_rep::find_first_last_text (int& first, int& last) {
+  int i;
+  first= last= -1;
+  for (i=cur_start; i<N(items); i++)
+    if (items[i]->w () != 0 || spcs[i] != space (0)) {
+      first= i;
+      break;
+    }
+  for (i=N(items)-1; i>=cur_start; i--)
+    if (items[i]->w () != 0 || (i > cur_start && spcs[i-1] != space (0))) {
+      last= i;
+      break;
+    }
+}
+
+void
+lazy_paragraph_rep::protrude (bool lf, bool rf) {
+  int first, last;
+  find_first_last_text (first, last);
+  for (int i=cur_start; i<N(items); i++) {
+    int mode= 0;
+    if (lf && i == first) mode += START_OF_LINE;
+    if (rf && i == last ) mode += END_OF_LINE;
+    if (mode != 0 || (protrusion & CJK_PROTRUSION_MASK) != 0)
+      mode += protrusion;
+    if (mode != 0) {
+      box pro= items[i]->adjust_kerning (mode, 0.0);
+      cur_w += pro->w() - items[i]->w();
+      items[i]= pro;
+    }
+  }
+}
+
+array<box>
+lazy_paragraph_rep::adjusted (double factor, int first, int last) {
+  array<box> bs;
+  for (int i=cur_start; i<N(items); i++) {
+    int mode= 0;
+    if (i == first) mode += START_OF_LINE;
+    if (i == last ) mode += END_OF_LINE;
+    bs << items[i]->adjust_kerning (mode, factor);
+  }
+  return bs;
+}
+
+static SI
+total_width (array<box> bs) {
+  SI r= 0;
+  for (int i=0; i<N(bs); i++)
+    r += bs[i]->w ();
+  return r;
+}
+
+void
+lazy_paragraph_rep::increase_kerning (SI dw, SI the_width) {
+  // attempt to add dw space by increasing the kerning of the current line unit
+  if (the_width <= 0) return;
+  SI tot_spc= 0;
+  for (int i=cur_start; i<N(items)-1; i++)
+    tot_spc += spcs[i]->max;
+  dw= (((long int) dw) * (the_width - tot_spc)) / the_width;
+
+  int first, last;
+  find_first_last_text (first, last);
+  SI ref_w= total_width (range (items, cur_start, N(items)));
+  SI obj_w= ref_w + dw;
+  SI def_w= total_width (adjusted (0.0, first, last));
+  SI max_w= total_width (adjusted (kstretch, first, last));
+  if (obj_w >= def_w && max_w > def_w) {
+    double ratio= ((double) (obj_w - def_w)) / ((double) (max_w - def_w));
+    ratio= min (ratio, 1.0);
+    array<box> bs= adjusted (kstretch * ratio, first, last);
+    for (int i=0; i<N(bs); i++) {
+      cur_w += bs[i]->w() - items[cur_start + i]->w();
+      items[cur_start + i]= bs[i];
+    }
+  }
+}
+
+void
+lazy_paragraph_rep::decrease_kerning (SI dw, SI the_width) {
+  // try to subtract dw space by reducing the kerning of the current line unit
+  if (the_width <= 0) return;
+  SI tot_spc= 0;
+  for (int i=cur_start; i<N(items)-1; i++)
+    tot_spc += spcs[i]->min;
+  dw= (((long int) dw) * (the_width - tot_spc)) / the_width;
+
+  int first, last;
+  find_first_last_text (first, last);
+  SI ref_w= total_width (range (items, cur_start, N(items)));
+  SI obj_w= ref_w - dw;
+  SI def_w= total_width (adjusted (0.0, first, last));
+  SI min_w= total_width (adjusted (-kreduce, first, last));
+  if (obj_w <= def_w && min_w < def_w) {
+    double ratio= ((double) (def_w - obj_w)) / ((double) (def_w - min_w));
+    ratio= min (ratio, 1.0);
+    array<box> bs= adjusted (-kreduce * ratio, first, last);
+    for (int i=0; i<N(bs); i++) {
+      cur_w += bs[i]->w() - items[cur_start + i]->w();
+      items[cur_start + i]= bs[i];
+    }
+  }
+}
+
+void
+lazy_paragraph_rep::expand_glyphs (SI dw, SI the_width) {
+  // attempt to add dw space by expanding the glyphs of the current line unit
+  if (expansion <= 0.0 || the_width <= 0) return;
+  SI tot_spc= 0;
+  for (int i=cur_start; i<N(items)-1; i++)
+    tot_spc += spcs[i]->max;
+  dw= (((long int) dw) * (the_width - tot_spc)) / the_width;
+  SI xdw= (SI) (dw * (expansion / (kstretch + expansion)));
+  SI mdw= (SI) (expansion * the_width);
+  int stages= 8;
+  int stage = min (((3 * stages + 1) * xdw) / (3 * mdw), stages);
+  if (stage <= 0) return;
+  double expansion_factor= (expansion * stage) / stages;
+  array<box> bs;
+  for (int i=cur_start; i<N(items); i++) {
+    box b= items[i]->expand_glyphs (0, expansion_factor);
+    cur_w += b->w() - items[i]->w();
+    items[cur_start + i]= b;
+  }
+}
+
+void
+lazy_paragraph_rep::contract_glyphs (SI dw, SI the_width) {
+  // try to subtract dw space by glyph contraction for the current line unit
+  if (contraction <= 0.0 || the_width <= 0) return;
+
+  // NOTE: adjust dw in presence of ligatures
+  int first, last;
+  find_first_last_text (first, last);
+  SI ref_w= total_width (range (items, cur_start, N(items)));
+  SI def_w= total_width (adjusted (0.0, first, last));
+  dw += (def_w - ref_w);
+  // END NOTE
+
+  SI tot_spc= 0;
+  for (int i=cur_start; i<N(items)-1; i++)
+    tot_spc += spcs[i]->min;
+  dw= (((long int) dw) * (the_width - tot_spc)) / the_width;
+  SI xdw= (SI) (dw * (contraction / (kreduce + contraction)));
+  SI mdw= (SI) (contraction * the_width);
+  int stages= 8;
+  int stage = min (((3 * stages + 2) * xdw) / (3 * mdw), stages);
+  if (stage <= 0) return;
+  double contraction_factor= (contraction * stage) / stages;
+  array<box> bs;
+  for (int i=cur_start; i<N(items); i++) {
+    box b= items[i]->expand_glyphs (0, -contraction_factor);
+    cur_w += b->w() - items[i]->w();
+    items[cur_start + i]= b;
+  }
+}
+
+/******************************************************************************
 * Typesetting a line
 ******************************************************************************/
 
@@ -151,6 +388,9 @@ lazy_paragraph_rep::make_unit (string mode, SI the_width, bool break_flag) {
   // format tabs
   //cout << "      " << N(tabs) << "] " << (cur_w->def/PIXEL)
   //     << " < " << (the_width/PIXEL) << "? (" << break_flag << ")\n";
+  //cout << mode << ", " << break_flag << ", " << N(tabs)
+  //     << ", " << cur_w->def << " -- " << cur_w->max
+  //     << ", " << the_width << "\n";
   if (break_flag && (N(tabs)>0) && (cur_w->def<the_width)) {
     double tot_weight= 0.0;
     int pos_first= -1, pos_last=-1;
@@ -181,30 +421,76 @@ lazy_paragraph_rep::make_unit (string mode, SI the_width, bool break_flag) {
     return;
   }
 
+  // protrusion
+  if (cur_w->def > the_width) break_flag= false;
+  bool protrude_left = (mode == "justify" || mode == "left");
+  bool protrude_right= (mode == "justify" || mode == "right");
+  if (mode == "justify" && cur_w->def < the_width && break_flag)
+    protrude_right= false;
+  if (protrusion != 0)
+    protrude (protrude_left, protrude_right);
+
   // stretching case
-  if (mode == "justify") {
-    if ((cur_w->def < the_width) &&
-	(cur_w->max > cur_w->def) &&
-	(!break_flag)) {
-      double f=
-	((double) (the_width - cur_w->def)) /
-	((double) (cur_w->max - cur_w->def));
-      if (f <= flexibility) {
-        for (i=cur_start; i<N(items)-1; i++)
-          items_sp <<
-            (spcs[i]->def+ ((SI) (f*((double) spcs[i]->max- spcs[i]->def))));
-        return;
+  if (mode == "justify" &&
+      cur_w->def < the_width &&
+      !break_flag) {
+    double f= 2 * flexibility + 1.0;
+    if (cur_w->max > cur_w->def)
+      f= ((double) (the_width - cur_w->def)) /
+         ((double) (cur_w->max - cur_w->def));
+    if (f > 1.0 && (kstretch + expansion) > 0.0) {
+      space backup_cur_w= cur_w;
+      double backup_f= f;
+      array<box> backup= range (items, cur_start, N(items));
+      expand_glyphs (the_width - cur_w->max, the_width);
+      if (the_width > cur_w->max)
+        increase_kerning (the_width - cur_w->max, the_width);
+      if (cur_w->max > cur_w->def)
+        f= ((double) (the_width - cur_w->def)) /
+           ((double) (cur_w->max - cur_w->def));
+      else if (cur_w->max >= the_width - PIXEL)
+        f= 1.0;
+      if (f < 0 || f > flexibility) {
+        cur_w= backup_cur_w;
+        f= backup_f;
+        for (i=0; i<N(backup); i++)
+          items[cur_start + i]= backup[i];
       }
+    }
+    if (f >= 0 && f <= flexibility) {
+      for (i=cur_start; i<N(items)-1; i++)
+        items_sp <<
+          (spcs[i]->def+ ((SI) (f*((double) spcs[i]->max- spcs[i]->def))));
+      return;
     }
   }
   
   // shrinking case
-  if ((cur_w->def > the_width) &&
-      (cur_w->def > cur_w->min)) {
+  if (cur_w->def > the_width &&
+      cur_w->def > cur_w->min) {
     double f=
       ((double) (cur_w->def - the_width)) /
       ((double) (cur_w->def - cur_w->min));
-    if (f>1.0) f=1.0;
+    if (f > 1.0 && (kreduce + contraction) > 0.0) {
+      space backup_cur_w= cur_w;
+      double backup_f= f;
+      array<box> backup= range (items, cur_start, N(items));
+      contract_glyphs (cur_w->min - the_width, the_width);
+      if (cur_w->min > the_width)
+        decrease_kerning (cur_w->min - the_width, the_width);
+      if (cur_w->def > cur_w->min)
+        f= ((double) (cur_w->def - the_width)) /
+           ((double) (cur_w->def - cur_w->min));
+      else if (cur_w->min <= the_width + PIXEL)
+        f= 1.0;
+      if (f < 0) {
+        cur_w= backup_cur_w;
+        f= backup_f;
+        for (i=0; i<N(backup); i++)
+          items[cur_start + i]= backup[i];
+      }
+    }
+    if (f > 1.0) f= 1.0;
     for (i=cur_start; i<N(items)-1; i++)
       items_sp <<
 	(spcs[i]->def- ((SI) (f*((double) spcs[i]->def- spcs[i]->min))));
@@ -318,6 +604,7 @@ lazy_paragraph_rep::line_start () {
   items_sp= array<SI> ();
   spcs    = array<space> ();
   fl      = array<lazy> ();
+  notes   = array<line_item> ();
 
   cur_r    = 0;
   cur_start= 0;
@@ -349,6 +636,17 @@ lazy_paragraph_rep::line_end (space spc, int penalty) {
   if (N(items) == 0) return;
   if (N(decs) != 0) handle_decorations ();
   // cout << items << ", " << spc << ", " << penalty << LF;
+  if (N(notes) != 0) {
+    for (int i=0; i<N(notes); i++) {
+      box note= notes[i]->b->get_leaf_box ();
+      SI  x   = as_int (notes[i]->t[0]);
+      SI  y   = as_int (notes[i]->t[1]);
+      box sb  = move_box (note->ip, note, x, y);
+      box nb  = resize_box (note->ip, sb, 0, 0, 0, 0);
+      items= ::append (nb, items);
+      items_sp= ::append (0, items_sp);
+    }
+  }
   box b= phrase_box (sss->ip, items, items_sp);
   sss->print (b, fl, nr_cols);
   sss->print (spc);
@@ -372,7 +670,12 @@ lazy_paragraph_rep::line_units (
 
   int i;
   bool ragged= (hyphen == "normal");
-  array<path> hyphs= line_breaks (a, start, end, the_right-the_left,
+  SI line_width= the_right - the_left;
+  SI large_width= (SI) (line_width / (1.0 - 0.5 * (kreduce + contraction)));
+  // FIXME: the factor 0.5 is somewhat arbitrary and should be taken small
+  // enough so as to compensate for content that cannot be contracted
+  // on the line such as whitespace, images, and other miscellaneous objects.
+  array<path> hyphs= line_breaks (a, start, end, line_width, large_width,
 				  the_first, the_last, ragged);
   for (i=0; i<N(hyphs)-1; i++) {
     if (i>0) line_start ();
@@ -441,7 +744,7 @@ lazy_paragraph_rep::format_paragraph () {
     if (no_first) env->monitored_write_update (PAR_NO_FIRST, "true");
     if (mode == "center") first= 0;
     else first= env->as_length (style [PAR_FIRST]);
-    sss->set_env_vars (height, sep, hor_sep, ver_sep, bot, top);
+    sss->set_env_vars (height, sep, hor_sep, ver_sep, bot, top, swell);
 
     // typeset paragraph unit
     format_paragraph_unit (start, i);

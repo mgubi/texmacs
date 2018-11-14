@@ -13,6 +13,8 @@
 #include "translator.hpp"
 #include "Metafont/load_tex.hpp"
 
+font_metric tfm_font_metric (tex_font_metric tfm, font_glyphs pk, double unit);
+
 /******************************************************************************
 * TeX rubber fonts
 ******************************************************************************/
@@ -29,12 +31,15 @@ struct tex_rubber_font_rep: font_rep {
 
   tex_rubber_font_rep (string name, string trl_name,
 		       string family, int size, int dpi, int dsize);
-  void get_extents (int c, metric& ex);
-  void get_partial_extents (int c, metric& ex);
-  void get_extents (string s, metric& ex);
-  void draw (renderer ren, int c, SI x, SI& y, SI& real_y);
-  void draw_fixed (renderer ren, string s, SI x, SI y);
-  font magnify (double zoom);
+  bool  supports (string c);
+  void  get_raw_extents (int c, metric& ex);
+  void  get_partial_extents (int c, metric& ex);
+  void  get_extents (string s, metric& ex);
+  void  draw_raw (renderer ren, int c, SI x, SI& y, SI& real_y);
+  void  draw_fixed (renderer ren, string s, SI x, SI y);
+  font  magnify (double zoomx, double zoomy);
+  glyph get_glyph (string s);
+  int   index_glyph (string s, font_metric& fnm, font_glyphs& fng);
 
   double get_left_slope (string s);
   double get_right_slope (string s);
@@ -44,9 +49,10 @@ struct tex_rubber_font_rep: font_rep {
 struct tex_dummy_rubber_font_rep: font_rep {
   font base_fn;
   tex_dummy_rubber_font_rep (string name, font base_fn);
+  bool supports (string c);
   void get_extents (string s, metric& ex);
   void draw_fixed (renderer ren, string s, SI x, SI y);
-  font magnify (double zoom);
+  font magnify (double zoomx, double zoomy);
 };
 
 /******************************************************************************
@@ -75,6 +81,7 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
   extra        = conv (tfm->spc_extra ());
   extra->min   = extra->min >> 1;
   extra->max   = extra->min << 1;
+  mspc         = spc;
   sep          = ((((dpi*PIXEL)/72)*design_size) >> 8) / 10;
 
   y1           = conv (-262080);
@@ -89,6 +96,7 @@ tex_rubber_font_rep::tex_rubber_font_rep (string name,
   yshift       = yx/6;
 
   wpt          = (dpi*PIXEL)/72;
+  hpt          = (dpi*PIXEL)/72;
   wfn          = (wpt*design_size) >> 8;
   wline        = wfn/20;
   wquad        = conv (tfm->spc_quad ());
@@ -106,8 +114,19 @@ tex_rubber_font (string trl_name,
 * Drawing rubber boxes and computing extents
 ******************************************************************************/
 
+bool
+tex_rubber_font_rep::supports (string c) {
+  if (!ends (c, ">")) return false;
+  return
+    starts (c, "<large-") ||
+    starts (c, "<left-") ||
+    starts (c, "<mid-") ||
+    starts (c, "<right-") ||
+    starts (c, "<big-");
+}
+
 void
-tex_rubber_font_rep::get_extents (int c, metric& ex) {
+tex_rubber_font_rep::get_raw_extents (int c, metric& ex) {
   glyph gl= pk->get (c);
   if (is_nil (gl))
     ex->x1= ex->y1= ex->x2= ex->y2= ex->x3= ex->y3= ex->x4= ex->y4= 0;
@@ -129,7 +148,7 @@ tex_rubber_font_rep::get_extents (int c, metric& ex) {
 void
 tex_rubber_font_rep::get_partial_extents (int c, metric& ex) {
   metric ey;
-  get_extents (c, ey);
+  get_raw_extents (c, ey);
   ex->x1= min (ex->x1, ey->x1); ex->y1 -= (ey->y2-ey->y1);
   ex->x2= max (ex->x2, ey->x2);
   ex->x3= min (ex->x3, ey->x3); ex->y3= min (ex->y3, ex->y1+ (ey->y3-ey->y1));
@@ -144,9 +163,10 @@ tex_rubber_font_rep::get_extents (string s, metric& ex) {
   // determining base character and serial number
   int i;
   for (i=N(s)-1; i>0; i--) if (s[i]=='-') break;
+  if (i>0 && s[i-1]=='-') i--;
   string r= s (0, i) * ">";
   QN pre_c= ext->dict[r];
-  int n= as_int (s (i+1, N(s)-1));
+  int n= max (as_int (s (i+1, N(s)-1)), 0);
   if ((pre_c<tfm->bc) || (pre_c>tfm->ec)) {
     ex->x1= ex->y1= ex->x2= ex->y2= ex->x3= ex->y3= ex->x4= ex->y4= 0;
     return;
@@ -154,9 +174,13 @@ tex_rubber_font_rep::get_extents (string s, metric& ex) {
 
   // get extents
   QN c= tfm->nth_in_list (pre_c, n);
-  if (tfm->tag (c) != 3) get_extents (c, ex);
+  if (tfm->tag (c) != 3) get_raw_extents (c, ex);
   else {
-    int i, nr_rep= n- tfm->list_len (pre_c);
+    int i, nr_rep= n - tfm->list_len (pre_c);
+    if (tfm->top (c) == 0 && tfm->mid (c) == 0 && tfm->bot (c) == 0)
+      nr_rep += tfm->list_len (pre_c) + 1;
+    else if (tfm->top (c) == 0 || tfm->bot (c) == 0)
+      nr_rep += max (tfm->list_len (pre_c) - 2, 0);
 
     ex->x1= ex->x3= ex->y3= PLUS_INFINITY;
     ex->x2= ex->x4= ex->y4= MINUS_INFINITY;
@@ -203,7 +227,7 @@ tex_rubber_font_rep::get_extents (string s, metric& ex) {
 }
 
 void
-tex_rubber_font_rep::draw (renderer ren, int c, SI x, SI& y, SI& real_y) {
+tex_rubber_font_rep::draw_raw (renderer ren, int c, SI x, SI& y, SI& real_y) {
   ren->draw (c, pk, x, y);
   SI delta  = conv (tfm->h (c)+ tfm->d (c));
   SI pixel  = ren->pixel;
@@ -220,9 +244,10 @@ tex_rubber_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   // determining base character and serial number
   int i;
   for (i=N(s)-1; i>0; i--) if (s[i]=='-') break;
+  if (i>0 && s[i-1]=='-') i--;
   string r= s (0, i) * ">";
   QN pre_c= ext->dict[r];
-  int n= as_int (s (i+1, N(s)-1));
+  int n= max (as_int (s (i+1, N(s)-1)), 0);
 
   // draw the character
   if ((pre_c<tfm->bc) || (pre_c>tfm->ec)) return;
@@ -230,27 +255,69 @@ tex_rubber_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 
   if (tfm->tag (c) != 3) ren->draw (c, pk, x, y);
   else {
-    int i;
-    int nr_rep= n- tfm->list_len (pre_c);
+    int i, nr_rep= n - tfm->list_len (pre_c);
+    if (tfm->top (c) == 0 && tfm->mid (c) == 0 && tfm->bot (c) == 0)
+      nr_rep += tfm->list_len (pre_c) + 1;
+    else if (tfm->top (c) == 0 || tfm->bot (c) == 0)
+      nr_rep += max (tfm->list_len (pre_c) - 2, 0);
 
     SI real_y= y; // may be necessary to round y
                   // using SI temp= x; decode (temp, y); encode (temp, y);
-    if (tfm->top (c)!=0) draw (ren, tfm->top (c), x, y, real_y);
+    if (tfm->top (c)!=0) draw_raw (ren, tfm->top (c), x, y, real_y);
     if (tfm->rep (c)!=0)
-      for (i=0; i<nr_rep; i++)
-	draw (ren, tfm->rep (c), x, y, real_y);
-    if (tfm->mid (c)!=0) draw (ren, tfm->mid (c), x, y, real_y);
+      for (i=0; i<nr_rep; i++) {
+        if (!ren->is_screen) ren->draw (tfm->rep (c), pk, x, y + 2*PIXEL);
+	draw_raw (ren, tfm->rep (c), x, y, real_y);
+      }
+    if (tfm->mid (c)!=0) draw_raw (ren, tfm->mid (c), x, y, real_y);
     if ((tfm->rep (c)!=0) && (tfm->mid (c)!=0))
-      for (i=0; i<nr_rep; i++)
-	draw (ren, tfm->rep (c), x, y, real_y);
-    if (tfm->bot (c)!=0) draw (ren, tfm->bot (c), x, y, real_y);
+      for (i=0; i<nr_rep; i++) {
+        if (!ren->is_screen) ren->draw (tfm->rep (c), pk, x, y + 2*PIXEL);
+	draw_raw (ren, tfm->rep (c), x, y, real_y);
+      }
+    if (tfm->bot (c)!=0) draw_raw (ren, tfm->bot (c), x, y, real_y);
   }
 }
 
 font
-tex_rubber_font_rep::magnify (double zoom) {
-  int ndpi= (int) tm_round (dpi * zoom);
+tex_rubber_font_rep::magnify (double zoomx, double zoomy) {
+  if (zoomx != zoomy) return poor_magnify (zoomx, zoomy);
+  int ndpi= (int) tm_round (dpi * zoomx);
   return tex_rubber_font (trl, family, size, ndpi, dsize);
+}
+
+glyph
+tex_rubber_font_rep::get_glyph (string s) {
+  int i;
+  for (i=N(s)-1; i>0; i--) if (s[i]=='-') break;
+  if (i>0 && s[i-1]=='-') i--;
+  string r= s (0, i) * ">";
+  QN pre_c= ext->dict[r];
+  int n= max (as_int (s (i+1, N(s)-1)), 0);
+  if ((pre_c<tfm->bc) || (pre_c>tfm->ec)) return font_rep::get_glyph (s);
+  QN c = tfm->nth_in_list (pre_c, n);
+  if (tfm->tag (c) == 3) return font_rep::get_glyph (s);
+  glyph gl= pk->get (c);
+  if (is_nil (gl)) return font_rep::get_glyph (s);
+  return gl;
+}
+
+int
+tex_rubber_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
+  int i;
+  for (i=N(s)-1; i>0; i--) if (s[i]=='-') break;
+  if (i>0 && s[i-1]=='-') i--;
+  string r= s (0, i) * ">";
+  QN pre_c= ext->dict[r];
+  int n= max (as_int (s (i+1, N(s)-1)), 0);
+  if ((pre_c<tfm->bc) || (pre_c>tfm->ec)) return -1;
+  QN c = tfm->nth_in_list (pre_c, n);
+  if (tfm->tag (c) == 3) return -1;
+  glyph gl= pk->get (c);
+  if (is_nil (gl)) return -1;
+  rm= tfm_font_metric (tfm, pk, unit);
+  rg= pk;
+  return c;
 }
 
 /******************************************************************************
@@ -259,15 +326,19 @@ tex_rubber_font_rep::magnify (double zoom) {
 
 double
 tex_rubber_font_rep::get_left_slope (string s) {
-  if ((N(s)>=5) && (s(0,5)=="<big-") && (get_right_correction(s)!=0))
-    return 0.25;
+  if (N(s) >= 5 && s(0,5) == "<big-") {
+    if (N(s) >= 7 && s(5,7) == "up") return 0.125;
+    else if (get_right_correction (s) != 0) return 0.25;
+  }
   return slope;
 }
 
 double
 tex_rubber_font_rep::get_right_slope (string s) {
-  if ((N(s)>=5) && (s(0,5)=="<big-") && (get_right_correction(s)!=0))
-    return 0.25;
+  if (N(s) >= 5 && s(0,5) == "<big-") {
+    if (N(s) >= 7 && s(5,7) == "up") return 0.125;
+    else if (get_right_correction (s) != 0) return 0.25;
+  }
   return slope;
 }
 
@@ -276,10 +347,13 @@ tex_rubber_font_rep::get_right_correction (string s) {
   if ((N(s)>=5) && (s(0,5)=="<big-")) {
     int i;
     for (i=N(s)-1; i>0; i--) if (s[i]=='-') break;
+    if (i>0 && s[i-1]=='-') i--;
     string r= s (0, i) * ">";
     QN  pre_c= ext->dict[r];
-    int n    = as_int (s (i+1, N(s)-1));
+    int n    = max (as_int (s (i+1, N(s)-1)), 0);
     QN  c    = tfm->nth_in_list (pre_c, n);
+    if (N(s) >= 7 && s(5,7) == "up" && s(N(s)-3,N(s)) == "-1>")
+      return conv (tfm->i (c)) / 4;
     return conv (tfm->i (c));
   }
   return 0;
@@ -293,6 +367,17 @@ tex_rubber_font_rep::get_right_correction (string s) {
 
 tex_dummy_rubber_font_rep::tex_dummy_rubber_font_rep (string name, font fn):
   font_rep (name), base_fn (fn) {}
+
+bool
+tex_dummy_rubber_font_rep::supports (string c) {
+  if (!ends (c, ">")) return false;
+  return
+    starts (c, "<large-") ||
+    starts (c, "<left-") ||
+    starts (c, "<mid-") ||
+    starts (c, "<right-") ||
+    starts (c, "<big-");
+}
 
 void
 tex_dummy_rubber_font_rep::get_extents (string s, metric& ex) {
@@ -312,8 +397,8 @@ tex_dummy_rubber_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 }
 
 font
-tex_dummy_rubber_font_rep::magnify (double zoom) {
-  return tex_dummy_rubber_font (base_fn->magnify (zoom));
+tex_dummy_rubber_font_rep::magnify (double zoomx, double zoomy) {
+  return tex_dummy_rubber_font (base_fn->magnify (zoomx, zoomy));
 }
 
 font

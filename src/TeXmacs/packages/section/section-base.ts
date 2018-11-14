@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|1.99.5>
 
 <style|source>
 
@@ -20,9 +20,17 @@
     </src-license>
   </src-title>>
 
+  <\active*>
+    <\src-comment>
+      Environment parameters.
+    </src-comment>
+  </active*>
+
   <assign|sectional-sep|<macro|<space|2spc>>>
 
   <assign|sectional-short-style|<macro|true>>
+
+  <drd-props|sectional-sep|macro-parameter|regular>
 
   <\active*>
     <\src-comment>
@@ -65,11 +73,11 @@
 
   <assign|sectional-centered-italic|<macro|name|<sectional-centered|<with|font-shape|italic|<arg|name>>>>>
 
-  <assign|sectional-short-bold|<macro|name|<style-with|src-compact|none|<sectional-short|<with|math-font-series|bold|font-series|bold|<arg|name>>>>>>
+  <assign|sectional-short-bold|<macro|name|<style-with|src-compact|none|<sectional-short|<strong|<arg|name>>>>>>
 
-  <assign|sectional-normal-bold|<macro|name|<style-with|src-compact|none|<sectional-normal|<with|math-font-series|bold|font-series|bold|<arg|name>>>>>>
+  <assign|sectional-normal-bold|<macro|name|<style-with|src-compact|none|<sectional-normal|<strong|<arg|name>>>>>>
 
-  <assign|sectional-centered-bold|<macro|name|<style-with|src-compact|none|<sectional-centered|<with|math-font-series|bold|font-series|bold|<arg|name>>>>>>
+  <assign|sectional-centered-bold|<macro|name|<style-with|src-compact|none|<sectional-centered|<strong|<arg|name>>>>>>
 
   <\active*>
     <\src-comment>
@@ -120,7 +128,7 @@
     </src-comment>
   </active*>
 
-  <assign|new-section|<macro|x|<quasi|<style-with|src-compact|none|<new-counter|<unquote|<arg|x>>><assign|<unquote|<merge|<arg|x>|-text>>|<style-with|src-compact|none|<macro|<change-case|<localize|<unquote|<arg|x>>>|Upcase>>>><assign|<unquote|<arg|x>>|<macro|title|<style-with|src-compact|none|<assign|<unquote|<merge|<arg|x>|-numbered>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-display-numbers>>>>><assign|<unquote|<merge|<arg|x>|-prefix>>|<style-with|src-compact|none|<macro|<compound|<unquote|<merge|the-|<arg|x>>>>.>>><compound|<unquote|<merge|next-|<arg|x>>>><compound|<unquote|<merge|<arg|x>|-clean>>><compound|<unquote|<merge|<arg|x>|-header>>|<arg|title>><compound|<unquote|<merge|<arg|x>|-toc>>|<arg|title>><style-with|src-compact|none|<if|<value|<unquote|<merge|<arg|x>|-numbered>>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-numbered-title>>|<arg|title>>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<arg|title>>>>>>>><assign|<unquote|<merge|<arg|x>|*>>|<macro|title|<style-with|src-compact|none|<assign|<unquote|<merge|<arg|x>|-numbered>>|false><assign|<unquote|<merge|<arg|x>|-prefix>>|<macro|>><compound|<unquote|<merge|<arg|x>|-clean>>><compound|<unquote|<merge|<arg|x>|-header>>|<arg|title>><compound|<unquote|<merge|<arg|x>|-toc>>|<arg|title>><style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<arg|title>>>>>><assign|<unquote|<merge|<arg|x>|-numbered>>|false><assign|<unquote|<merge|<arg|x>|-prefix>>|<macro|>><assign|<unquote|<merge|<arg|x>|-display-numbers>>|true><assign|<unquote|<merge|<arg|x>|-sep>>|<macro|<sectional-sep>>><assign|<unquote|<merge|<arg|x>|-title>>|<macro|title|<style-with|src-compact|none|<strong|<arg|title>><compound|<unquote|<merge|<arg|x>|-sep>>>>>><assign|<unquote|<merge|<arg|x>|-numbered-title>>|<macro|title|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<style-with|src-compact|none|<compound|<unquote|<merge|the-|<arg|x>>>><compound|<unquote|<merge|<arg|x>|-sep>>><arg|title>>>>>><assign|<unquote|<merge|<arg|x>|-clean>>|<macro|>><assign|<unquote|<merge|<arg|x>|-header>>|<macro|title|>><assign|<unquote|<merge|<arg|x>|-toc>>|<macro|title|>>>>>>
+  <assign|new-section|<macro|x|<quasi|<style-with|src-compact|none|<new-counter|<unquote|<arg|x>>><assign|<unquote|<merge|<arg|x>|-text>>|<style-with|src-compact|none|<macro|<change-case|<localize|<unquote|<arg|x>>>|Upcase>>>><assign|<unquote|<arg|x>>|<macro|title|<style-with|src-compact|none|<assign|<unquote|<merge|<arg|x>|-numbered>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-display-numbers>>>>><assign|<unquote|<merge|<arg|x>|-prefix>>|<style-with|src-compact|none|<macro|<compound|<unquote|<merge|the-|<arg|x>>>>.>>><compound|<unquote|<merge|next-|<arg|x>>>><compound|<unquote|<merge|<arg|x>|-clean>>><compound|<unquote|<merge|<arg|x>|-header>>|<arg|title>><compound|<unquote|<merge|<arg|x>|-toc>>|<arg|title>><style-with|src-compact|none|<if|<value|<unquote|<merge|<arg|x>|-numbered>>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-numbered-title>>|<arg|title>>>|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<arg|title>>>>>>>><assign|<unquote|<merge|<arg|x>|*>>|<macro|title|<style-with|src-compact|none|<assign|<unquote|<merge|<arg|x>|-numbered>>|false><assign|<unquote|<merge|<arg|x>|-prefix>>|<macro|>><compound|<unquote|<merge|<arg|x>|-clean>>><compound|<unquote|<merge|<arg|x>|-header>>|<arg|title>><compound|<unquote|<merge|<arg|x>|-toc>>|<arg|title>><style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<arg|title>>>>>><assign|<unquote|<merge|<arg|x>|-numbered>>|false><assign|<unquote|<merge|<arg|x>|-prefix>>|<macro|>><assign|<unquote|<merge|<arg|x>|-display-numbers>>|true><drd-props|<unquote|<merge|<arg|x>|-display-numbers>>|macro-parameter|boolean><assign|<unquote|<merge|<arg|x>|-sep>>|<macro|<sectional-sep>>><drd-props|<unquote|<merge|<arg|x>|-sep>>|macro-parameter|regular><assign|<unquote|<merge|<arg|x>|-title>>|<macro|title|<style-with|src-compact|none|<strong|<arg|title>><compound|<unquote|<merge|<arg|x>|-sep>>>>>><assign|<unquote|<merge|<arg|x>|-numbered-title>>|<macro|title|<style-with|src-compact|none|<compound|<unquote|<merge|<arg|x>|-title>>|<style-with|src-compact|none|<compound|<unquote|<merge|the-|<arg|x>>>><compound|<unquote|<merge|<arg|x>|-sep>>><arg|title>>>>>><assign|<unquote|<merge|<arg|x>|-clean>>|<macro|>><assign|<unquote|<merge|<arg|x>|-header>>|<macro|title|>><assign|<unquote|<merge|<arg|x>|-toc>>|<macro|title|>>>>>>
 
   <\active*>
     <\src-comment>
@@ -285,6 +293,10 @@
   <assign|bibliography*|<\macro|aux|style|file-name|name|body>
     <render-bibliography|<localize|<arg|name>>|<arg|body>>
   </macro>>
+
+  <drd-props|bibliography|arity|4|identifier|0|string|1|url|2>
+
+  <drd-props|bibliography*|arity|5|identifier|0|string|1|url|2>
 
   <assign|thebibliography|<\macro|largest|body>
     <render-bibliography|<bibliography-text>|<bib-list|<arg|largest>|<arg|body>>>

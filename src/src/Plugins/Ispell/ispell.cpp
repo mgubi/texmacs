@@ -42,37 +42,85 @@ RESOURCE_CODE(ispeller);
 
 ispeller_rep::ispeller_rep (string lan2): rep<ispeller> (lan2), lan (lan2) {}
 
+#ifdef OS_MINGW
+bool find_win_spell(string &cmd , string &name) {
+    url u;
+    u= url_system ("$PROGRAMFILES\\Aspell\\bin\\aspell.exe");
+    if (exists (u)) {
+          cmd= escape_sh (as_string (u));
+          name= "aspell";
+          return true;
+        }
+    u= url_system ("$PROGRAMFILES(x86)\\Aspell\\bin\\aspell.exe");
+    if (exists (u)) {
+          cmd= escape_sh (as_string (u));
+          name= "aspell";
+          return true;
+        }
+    u= url_system ("$PROGRAMFILES\\Hunspell\\bin\\hunspell.exe");
+    if (exists (u)){
+          cmd= escape_sh (as_string (u));
+          name= "hunspell";
+          return true;
+        }
+    u= url_system ("$PROGRAMFILES(x86)\\Hunspell\\bin\\hunspell.exe");
+    if (exists (u)) {
+          cmd= escape_sh (as_string (u));
+          name= "hunspell";
+          return true;
+        }
+    return false;
+}
+#endif
+
 string
 ispeller_rep::start () {
   if (is_nil (ln)) {
-    string cmd;
+    string cmd,lang_opt,enc_opt,name;
 #ifdef OS_WIN32
     string prg= "\"$TEXMACS_PATH/bin/aspell/aspell.exe\"";
     cmd= prg * " --data-dir=.%//data --dict-dir=.%//dict -a";
 #else
-    if (exists_in_path ("aspell")) cmd= "aspell";
-    else
-#if defined (__MINGW__) || defined (__MINGW32__)
-      if (exists (url_system ("C:\\Program Files\\Aspell\\bin\\aspell.exe")))
-        cmd= "\"C:\\Program Files\\Aspell\\bin\\aspell.exe\"";
-      else
+    if (exists_in_path ("aspell")) {
+      cmd= "aspell";
+      name = cmd;
+    }
+    else 
+      if (exists_in_path ("hunspell")) {
+        cmd= "hunspell";
+        name = cmd;
+      }
+      else 
+#ifdef OS_MINGW
+      if (!find_win_spell(cmd , name))
 #endif
-        return "Error: Aspell is not installed";
-    cmd << " -a --encoding=utf-8 ";
+        return "Error: Cannot find spellchecker (neither Aspell nor Hunspell) ";
+    
+    if (DEBUG_IO) debug_spell << "using "<< name <<"\n";
+    if (name == "hunspell") {
+      lang_opt= "-d ";
+      enc_opt= "-i ";
+    }
+    else {
+        lang_opt= "-l ";
+        enc_opt= "--encoding=";
+    }
+
+    cmd << " -a "<< enc_opt << "utf-8 ";
     if (language_to_locale (lan) != "")
-      cmd << "-l " << language_to_locale (lan);
+      cmd << lang_opt << language_to_locale (lan);
 #endif
     ln= make_pipe_link (cmd);
   }
   if (ln->alive) return "ok";
   string message= ln->start ();
-  if (DEBUG_IO) cout << "Aspell] Received " << message << "\n";
+  if (DEBUG_IO) debug_spell << "Received " << message << "\n";
   if (starts (message, "Error: ")) {
     if (ln->alive) ln->stop ();
     return message;
   }
   message= retrieve ();
-  if (DEBUG_IO) cout << "Aspell] Received " << message << "\n";
+  if (DEBUG_IO) debug_spell << "Received " << message << "\n";
 #ifdef OS_WIN32
   if (search_forwards (message, 0, "@(#)")) return "ok";
 #else
@@ -85,7 +133,7 @@ ispeller_rep::start () {
 string
 ispeller_rep::retrieve () {
   string ret;
-#if defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
   while ((ret != "\r\n") && (!ends (ret, "\r\n\r\n")) &&
 	 ((!ends (ret, "\r\n")) || (!starts (ret, "@(#)"))))
 #else
@@ -96,7 +144,7 @@ ispeller_rep::retrieve () {
       ln->listen (10000);
       string mess = ln->read (LINK_ERR);
       string extra= ln->read (LINK_OUT);
-      if (mess  != "") cerr << "TeXmacs] aspell error: " << mess << "\n";
+      if (mess  != "") io_error << "Aspell error: " << mess << "\n";
       if (extra == "") {
 	ln->stop ();
 	return "Error: aspell does not respond";
@@ -117,11 +165,13 @@ ispeller_rep::send (string cmd) {
 
 string
 ispell_encode (string lan, string s) {
+  (void) lan;
   return cork_to_utf8 (s);
 }
 
 string
 ispell_decode (string lan, string s) {
+  (void) lan;
   return utf8_to_cork (s);
 }
 
@@ -131,7 +181,7 @@ ispell_decode (string lan, string s) {
 
 static tree
 parse_ispell (string s) {
-#if defined (__MINGW__) || defined (__MINGW32__)
+#ifdef OS_MINGW
   while (ends (s, "\r\n")) s= s (0, N(s)-2);
 #else
   while (ends (s, "\n")) s= s (0, N(s)-1);
@@ -180,7 +230,7 @@ ispell_eval (string lan, string s) {
 
 string
 ispell_start (string lan) {
-  if (DEBUG_IO) cout << "Aspell] Start " << lan << "\n";
+  if (DEBUG_IO) debug_spell << "Start " << lan << "\n";
   ispeller sc= ispeller (lan);
   if (is_nil (sc)) sc= tm_new<ispeller_rep> (lan);
   return sc->start ();
@@ -188,7 +238,7 @@ ispell_start (string lan) {
 
 tree
 ispell_check (string lan, string s) {
-  if (DEBUG_IO) cout << "Aspell] Check " << s << "\n";
+  if (DEBUG_IO) debug_spell << "Check " << s << "\n";
   ispeller sc= ispeller (lan);
   if (is_nil (sc) || (!sc->ln->alive)) {
     string message= ispell_start (lan);
@@ -201,18 +251,18 @@ ispell_check (string lan, string s) {
 
 void
 ispell_accept (string lan, string s) {
-  if (DEBUG_IO) cout << "Aspell] Accept " << s << "\n";
+  if (DEBUG_IO) debug_spell << "Accept " << s << "\n";
   ispell_send (lan, "@" * s);
 }
 
 void
 ispell_insert (string lan, string s) {
-  if (DEBUG_IO) cout << "Aspell] Insert " << s << "\n";
+  if (DEBUG_IO) debug_spell << "Insert " << s << "\n";
   ispell_send (lan, "*" * s);
 }
 
 void
 ispell_done (string lan) {
-  if (DEBUG_IO) cout << "Aspell] End " << lan << "\n";
+  if (DEBUG_IO) debug_spell << "End " << lan << "\n";
   ispell_send (lan, "#");
 }

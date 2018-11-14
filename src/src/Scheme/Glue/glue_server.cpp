@@ -182,6 +182,21 @@ tmg_show_side_tools (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_show_bottom_tools (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "show-bottom-tools");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "show-bottom-tools");
+
+  int in1= tmscm_to_int (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  get_server()->show_bottom_tools (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_show_footer (tmscm arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "show-footer");
 
@@ -224,6 +239,19 @@ tmg_visible_side_toolsP (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   bool out= get_server()->visible_side_tools (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_visible_bottom_toolsP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "visible-bottom-tools?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_server()->visible_bottom_tools (in1);
   // TMSCM_ALLOW_INTS;
 
   return bool_to_tmscm (out);
@@ -316,17 +344,21 @@ tmg_dialogue_end () {
 }
 
 tmscm
-tmg_choose_file (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "choose-file");
-  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "choose-file");
-  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "choose-file");
+tmg_cpp_choose_file (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+  TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "cpp-choose-file");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-choose-file");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-choose-file");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "cpp-choose-file");
+  TMSCM_ASSERT_URL (arg5, TMSCM_ARG5, "cpp-choose-file");
 
   object in1= tmscm_to_object (arg1);
   string in2= tmscm_to_string (arg2);
   string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+  url in5= tmscm_to_url (arg5);
 
   // TMSCM_DEFER_INTS;
-  get_server()->choose_file (in1, in2, in3);
+  get_server()->choose_file (in1, in2, in3, in4, in5);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -440,15 +472,6 @@ tmg_get_default_zoom_factor () {
 }
 
 tmscm
-tmg_image_gc () {
-  // TMSCM_DEFER_INTS;
-  get_server()->image_gc ();
-  // TMSCM_ALLOW_INTS;
-
-  return TMSCM_UNSPECIFIED;
-}
-
-tmscm
 tmg_inclusions_gc () {
   // TMSCM_DEFER_INTS;
   get_server()->inclusions_gc ();
@@ -556,10 +579,12 @@ initialize_glue_server () {
   tmscm_install_procedure ("show-header",  tmg_show_header, 1, 0, 0);
   tmscm_install_procedure ("show-icon-bar",  tmg_show_icon_bar, 2, 0, 0);
   tmscm_install_procedure ("show-side-tools",  tmg_show_side_tools, 2, 0, 0);
+  tmscm_install_procedure ("show-bottom-tools",  tmg_show_bottom_tools, 2, 0, 0);
   tmscm_install_procedure ("show-footer",  tmg_show_footer, 1, 0, 0);
   tmscm_install_procedure ("visible-header?",  tmg_visible_headerP, 0, 0, 0);
   tmscm_install_procedure ("visible-icon-bar?",  tmg_visible_icon_barP, 1, 0, 0);
   tmscm_install_procedure ("visible-side-tools?",  tmg_visible_side_toolsP, 1, 0, 0);
+  tmscm_install_procedure ("visible-bottom-tools?",  tmg_visible_bottom_toolsP, 1, 0, 0);
   tmscm_install_procedure ("visible-footer?",  tmg_visible_footerP, 0, 0, 0);
   tmscm_install_procedure ("full-screen-mode",  tmg_full_screen_mode, 2, 0, 0);
   tmscm_install_procedure ("full-screen?",  tmg_full_screenP, 0, 0, 0);
@@ -568,7 +593,7 @@ initialize_glue_server () {
   tmscm_install_procedure ("get-window-zoom-factor",  tmg_get_window_zoom_factor, 0, 0, 0);
   tmscm_install_procedure ("shell",  tmg_shell, 1, 0, 0);
   tmscm_install_procedure ("dialogue-end",  tmg_dialogue_end, 0, 0, 0);
-  tmscm_install_procedure ("choose-file",  tmg_choose_file, 3, 0, 0);
+  tmscm_install_procedure ("cpp-choose-file",  tmg_cpp_choose_file, 5, 0, 0);
   tmscm_install_procedure ("tm-interactive",  tmg_tm_interactive, 2, 0, 0);
   tmscm_install_procedure ("style-clear-cache",  tmg_style_clear_cache, 0, 0, 0);
   tmscm_install_procedure ("set-script-status",  tmg_set_script_status, 1, 0, 0);
@@ -578,7 +603,6 @@ initialize_glue_server () {
   tmscm_install_procedure ("set-printer-dpi",  tmg_set_printer_dpi, 1, 0, 0);
   tmscm_install_procedure ("set-default-zoom-factor",  tmg_set_default_zoom_factor, 1, 0, 0);
   tmscm_install_procedure ("get-default-zoom-factor",  tmg_get_default_zoom_factor, 0, 0, 0);
-  tmscm_install_procedure ("image-gc",  tmg_image_gc, 0, 0, 0);
   tmscm_install_procedure ("inclusions-gc",  tmg_inclusions_gc, 0, 0, 0);
   tmscm_install_procedure ("update-all-path",  tmg_update_all_path, 1, 0, 0);
   tmscm_install_procedure ("update-all-buffers",  tmg_update_all_buffers, 0, 0, 0);

@@ -16,7 +16,7 @@
     (utils library cursor)
     (texmacs texmacs tm-server)
     (texmacs texmacs tm-files)
-    (texmacs texmacs tm-print)))
+    (texmacs menus print-widgets)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menu for existing buffers
@@ -29,7 +29,8 @@
            (mod? (buffer-modified? name))
            (short-name `(verbatim ,(string-append abbr* (if mod? " *" ""))))
            (long-name `(verbatim ,(url->system name))))
-      ((balloon (eval short-name) (eval long-name))
+      ((check (balloon (eval short-name) (eval long-name)) "v"
+              (== (current-buffer) name))
        (switch-to-buffer name)))))
 
 (tm-define (buffer-more-recent? b1 b2)
@@ -46,16 +47,25 @@
     (sublist l2 0 (min (length l2) nr))))
 
 (tm-define (buffer-go-menu)
-  (buffer-list-menu (buffer-menu-list 15)))
+  (with l (list-difference (buffer-menu-list 15) (linked-file-list))
+    (buffer-list-menu l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menu for recent files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (short-menu-name u)
+  (if (not (url-rooted-tmfs? u))
+      (url->system (url-tail u))
+      (tmfs-title u `(document ""))))
+
+(define (long-menu-name u)
+  (url->system u))
+
 (tm-menu (file-list-menu l)
   (for (name l)
-    (let* ((short-name `(verbatim ,(url->system (url-tail name))))
-           (long-name `(verbatim ,(url->system name))))
+    (let* ((short-name `(verbatim ,(short-menu-name name)))
+           (long-name `(verbatim ,(long-menu-name name))))
       ((balloon (eval short-name) (eval long-name))
        (load-buffer name)))))
 
@@ -76,7 +86,11 @@
   (file-list-menu (recent-file-list 25)))
 
 (tm-define (recent-unloaded-file-menu)
-  (file-list-menu (recent-unloaded-file-list 15)))
+  (with l (list-difference (recent-unloaded-file-list 15) (linked-file-list))
+    (file-list-menu l)))
+
+(tm-define (linked-file-menu)
+  (file-list-menu (list-remove-duplicates (linked-file-list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dynamic menus for formats
@@ -114,7 +128,8 @@
 (menu-bind new-file-menu
   ("New document" (new-buffer))
   ("Open new window" (open-window))
-  ("Clone window" (clone-window)))
+  ;;("Clone window" (clone-window))
+  )
 
 (menu-bind load-menu
   ("Load" (open-buffer))
@@ -133,23 +148,50 @@
   (link export-top-menu)
   ---
   ((eval '(concat "Export as " "Pdf"))
-   (choose-file print-to-file "Save pdf file" "pdf"))
+   (choose-file wrapped-print-to-file "Save pdf file" "pdf"))
   ((eval '(concat "Export as " "PostScript"))
-   (choose-file print-to-file "Save postscript file" "postscript"))
+   (choose-file wrapped-print-to-file "Save postscript file" "postscript"))
   (when (selection-active-any?)
     ("Export selection as image" ;; FIXME: no warning on overwrite!
      (choose-file export-selection-as-graphics
                   "Select export file with extension" ""))))
 
-(menu-bind print-menu
-  ("Preview" (preview-buffer))
-  ---
-  ("Print all" (print-buffer))
-  ("Print page selection" (interactive print-pages))
-  ("Print all to file"
+(menu-bind print-menu-sub
+  (if (has-printing-cmd?)
+      ("Print buffer" (print-buffer))
+      ("Print page selection" (interactive print-pages)))
+  ("Print buffer to file"
    (choose-file print-to-file "Print all to file" "postscript"))
   ("Print page selection to file"
    (interactive choose-file-and-print-page-selection)))
+
+(menu-bind print-menu
+  ("Preview" (preview-buffer))
+  (if (use-print-dialog?)
+      (if (has-printing-cmd?) ("Print" (print-buffer)))
+      ("Print to file"
+       (choose-file print-to-file "Print all to file" "postscript")))
+  (if (not (use-print-dialog?))
+      (-> "Print" (link print-menu-sub)))
+  (if (use-menus?)
+      (-> "Page setup" (link page-setup-menu)))
+  (if (use-popups?)
+      ("Page setup" (open-page-setup))))
+
+(menu-bind print-menu-inline
+  ("Preview" (preview-buffer))
+  (if (use-print-dialog?)
+      (if (has-printing-cmd?) ("Print" (print-buffer)))
+      ("Print to file"
+       (choose-file print-to-file "Print all to file" "postscript")))
+  (if (not (use-print-dialog?))
+      ---
+      (link print-menu-sub)
+      ---)
+  (if (use-menus?)
+      (-> "Page setup" (link page-setup-menu)))
+  (if (use-popups?)
+      ("Page setup" (open-page-setup))))
 
 (menu-bind close-menu
   ("Close document" (safely-kill-buffer))
@@ -173,20 +215,16 @@
   ("Save" (save-buffer))
   ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ---
-   (if (experimental-qt-gui?)
-       ("Preview" (preview-buffer))
-       ("Print" (interactive-print-buffer)))
-  (if (not (experimental-qt-gui?))
-      (-> "Print" (link print-menu)))
-  (-> "Page setup" (link page-setup-menu))
+  (link print-menu)
+  ---
   (-> "Import"
       (link import-import-menu))
   (-> "Export"
       (link export-export-menu)
       ---
-      ("Pdf" (choose-file print-to-file "Save pdf file" "pdf"))
+      ("Pdf" (choose-file wrapped-print-to-file "Save pdf file" "pdf"))
       ("Postscript"
-       (choose-file print-to-file "Save postscript file" "postscript"))
+       (choose-file wrapped-print-to-file "Save postscript file" "postscript"))
       (when (selection-active-any?)
         ("Export selection as image"
          (choose-file ;; no warning on overwrite!
@@ -205,8 +243,12 @@
     ("Back" (cursor-history-backward)))
   (when (cursor-has-future?)
     ("Forward" (cursor-history-forward)))
+  ("Save position" (cursor-history-add (cursor-path)))
   ---
   (link buffer-go-menu)
+  (if (nnull? (linked-file-list))
+      ---
+      (link linked-file-menu))
   (if (nnull? (recent-unloaded-file-list 1))
       ---
       (link recent-unloaded-file-menu))

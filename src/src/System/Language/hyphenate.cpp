@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef int SI;
 #define MAX_SEARCH 10
 #define MAX_BUFFER_SIZE 256
 
@@ -62,7 +61,8 @@ load_hyphen_tables (string file_name,
   string s;
   file_name= string ("hyphen.") * file_name;
   load_string (url ("$TEXMACS_PATH/langs/natural/hyphen", file_name), s, true);
-  if (DEBUG_VERBOSE) cout << "TeXmacs] Loading " << file_name << "\n";
+  if (DEBUG_VERBOSE)
+    debug_automatic << "TeXmacs] Loading " << file_name << "\n";
 
   if (toCork) s= utf8_to_cork (s);
 
@@ -72,7 +72,7 @@ load_hyphen_tables (string file_name,
   int i=0, n= N(s);
   while (i<n) {
     string buffer;
-    while ((i<n) && (s[i]!=' ') && (s[i]!='\t') && (s[i]!='\n')) {
+    while ((i<n) && (s[i]!=' ') && (s[i]!='\t') && (s[i]!='\n') && (s[i]!='\r')) {
       if (s[i] != '%') buffer << s[i++];
       else while ((i<n) && (s[i]!='\n')) i++;
     }
@@ -81,7 +81,7 @@ load_hyphen_tables (string file_name,
       pattern_flag=false;
       hyphenation_flag=false;
     }
-    if (pattern_flag && i != 0) {
+    if (pattern_flag && i != 0 && N(buffer) != 0) {
       string norm= hyphen_normalize (buffer);
       patterns (unpattern (norm))= norm;
       //cout << unpattern (norm) << " ==> " << norm << "\n";
@@ -96,18 +96,6 @@ load_hyphen_tables (string file_name,
   }
 }
 
-static string
-lower_case (string s) {
-  int i;
-  string r (N(s));
-  for (i=0; i<N(s); i++) {
-    if ((s[i]>='A') && (s[i]<='Z'))
-      r[i]= (char) (((int) s[i])+ ((int) 'a')- ((int) 'A'));
-    else r[i]=s[i];
-  }
-  return r;
-}
-
 array<int>
 get_hyphens (string s,
              hashmap<string,string> patterns,
@@ -117,24 +105,28 @@ get_hyphens (string s,
 
 void
 goto_next_char (string s, int &i, bool utf8) {
-  if (i<N(s) && !utf8) {
-    i++;
-    return;
+  if (utf8) decode_from_utf8 (s, i);
+  else if (i < N(s)) {
+    if (s[i] == '<') {
+      i++;
+      while (i < N(s) && s[i] != '>') i++;
+      if (i < N(s)) i++;
+    }
+    else i++;
   }
-  if (utf8)
-    decode_from_utf8 (s, i);
-  return;
 }
 
 int
 str_length (string s, bool utf8) {
-  if (!utf8) return N(s);
-  int i=0, r=0;
-  while (i<N(s)) {
-    decode_from_utf8 (s, i);
-    r++;
+  if (utf8) {
+    int i=0, r=0;
+    while (i < N(s)) {
+      decode_from_utf8 (s, i);
+      r++;
+    }
+    return r;
   }
-  return r;
+  else return N(s);
 }
 
 array<int>
@@ -164,7 +156,7 @@ get_hyphens (string s,
     return penalty;
   }
   else {
-    s= "." * lower_case (s) * ".";
+    s= "." * to_lower (s) * ".";
     // cout << s << "\n";
     int i, j, k, l, m, len;
     array<int> T (str_length (s, utf8)+1);
@@ -200,19 +192,23 @@ void
 std_hyphenate (string s, int after, string& left, string& right, int penalty) {
   std_hyphenate (s, after, left, right, penalty, false);
 }
+
 void
 std_hyphenate (string s, int after, string& left, string& right, int penalty,
                bool utf8) {
+  //cout << "Hyphen " << s << ", " << after << "\n";
   if (!utf8) {
     left = s (0, after+1);
     right= s (after+1, N(s));
   }
   else {
     int i= 0, l= 0;
-    while (i < N(s) && l < after+1) {
-      if (s[i] == '<')
+    while (i < N(s) && l <= after) {
+      if (s[i] == '<') {
         while (i < N(s) && s[i] != '>') i++;
-      i++;
+        if (i < N(s)) i++;
+      }
+      else i++;
       l++;
     }
     left = s (0, i);
@@ -221,4 +217,5 @@ std_hyphenate (string s, int after, string& left, string& right, int penalty,
   }
   if (penalty >= HYPH_INVALID) left << string ("\\");
   else left << string ("-");
+  //cout << "Yields " << left << ", " << right << "\n";
 }

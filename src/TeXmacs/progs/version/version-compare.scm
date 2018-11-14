@@ -182,6 +182,18 @@
 	((null? l2) (list-diff (normalize `(,tag ,@l1)) '(version-suppressed)))
 	((== (car l1) (car l2))
 	 (cons (car l1) (compare-versions-list tag (cdr l1) (cdr l2))))
+        ((or (tm-func? (car l1) 'hide-preamble 1)
+             (tm-func? (car l2) 'hide-preamble 1))
+         (cond ((not (tm-is? (car l1) 'hide-preamble))
+                (compare-versions-list
+                 tag (cons `(hide-preamble (document "")) l1) l2))
+               ((not (tm-is? (car l2) 'hide-preamble))
+                (compare-versions-list
+                 tag l1 (cons `(hide-preamble (document "")) l2)))
+               (else
+                 (cons `(hide-preamble
+                         ,(compare-versions (cadar l1) (cadar l2)))
+                       (compare-versions-list tag (cdr l1) (cdr l2))))))
 	(else
 	  (receive (i1 i2 n) (var-longest-common l1 l2)
 	    ;;(display* "  common " (sublist l1 i1 (+ i1 n)) "\n")
@@ -235,6 +247,8 @@
 	       ((and (in? (car t1) '(table tformat))
                      (not (similar-tables? t1 t2)))
 		(diff t1 t2))
+               ((in? (car t1) '(shared mirror))
+                (rcons (cDr t2) (compare-versions (cAr t1) (cAr t2))))
 	       (else
 		 (let* ((tt1 (tm->tree t1))
 			(tt2 (tm->tree t2)))
@@ -278,9 +292,17 @@
     (version-first-difference)))
 
 (tm-define (compare-with-newer* new)
-  (with old (current-buffer)
+  (with t1 (buffer-tree)
     (switch-to-buffer new)
-    (compare-with-older old)))
+    (let* ((t2 (buffer-tree))
+           (u1 (tree->stree t1))
+           (u2 (tree->stree t2))
+           (x1 (if (tm-is? u1 'with) (cAr u1) u1))
+           (mv (compare-versions x1 u2))
+           (rt (stree->tree mv)))
+      ;;(display* "rt= " rt "\n")
+      (tree-set (buffer-tree) rt)
+      (version-first-difference))))
 
 (define (version-get t which)
   (cond ((string? t) t)

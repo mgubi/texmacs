@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "timer.hpp"
+#include "tm_timer.hpp"
 #include "dictionary.hpp"
 #include "X11/x_gui.hpp"
 #include "X11/x_drawable.hpp"
@@ -17,6 +17,7 @@
 #include "image_files.hpp"
 #include <X11/cursorfont.h>
 #include "message.hpp"
+#include "x_picture.hpp"
 
 extern hashmap<Window,pointer> Window_to_window;
 
@@ -454,12 +455,8 @@ void
 x_gui_rep::set_mouse_pointer (widget w, string name, string mask_name) {
   static hashmap<string,tree> xpm_cache ("");
   if (mask_name=="") mask_name= name;
-  x_drawable_rep* dra= tm_new<x_drawable_rep> (this, 1, 1);
-  dra->xpm_initialize (name);
-  if (mask_name!=name) dra->xpm_initialize (mask_name);
-  tm_delete (dra);
-  Pixmap curs= (Pixmap) xpm_bitmap [name];
-  Pixmap mask= (Pixmap) xpm_bitmap [mask_name];
+  Pixmap curs= retrieve_bitmap (load_xpm (name));
+  Pixmap mask= retrieve_bitmap (load_xpm (mask_name));
 
   if (!xpm_cache->contains (name))
     xpm_cache (name)= xpm_load (name);
@@ -488,7 +485,6 @@ x_gui_rep::set_mouse_pointer (widget w, string name, string mask_name) {
   if (XAllocColor (dpy, cols, &exact2)) bg= &exact2;
   else if (XAllocColor (dpy, cols, &closest2)) bg= &closest2;
   else FAILED ("unable to allocate bgcolor");
-
 
   SI x= hotspot[0], y= hotspot[1];
   Cursor cursor=XCreatePixmapCursor (dpy, curs, mask, fg, bg, x, y);
@@ -632,3 +628,10 @@ bool
 check_event (int type) {
   return the_gui->check_event (type);
 }
+
+bool
+gui_interrupted (bool check) {
+  return check_event (check? INTERRUPT_EVENT: INTERRUPTED_EVENT);
+}
+
+

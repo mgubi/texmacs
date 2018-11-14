@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.18>
+<TeXmacs|1.99.7>
 
-<style|tmweb>
+<style|<tuple|tmweb|english|old-spacing>>
 
 <\body>
   <tmweb-current|Download|Linux><tmweb-title|Installing <TeXmacs> on
@@ -16,8 +16,9 @@
     supports <TeXmacs>, in which case you may directly install <TeXmacs>
     using the standard tools of your system.
 
-    <item>If your system admits an RPM-compatible package manager, then you
-    may try to install our <hlink|generic RPM package|rpm.en.tm>.
+    <item>Please <hlink|check|linux-packages.en.tm> whether your distribution
+    is in the list of standard GNU/<name|Linux> distributions for which we
+    provide ready-to-install packages.
 
     <item>Otherwise, you may install a generic binary package for <TeXmacs>,
     as explained below.
@@ -29,10 +30,23 @@
 
   <section|Download the package>
 
-  Download the <hlink|most-recent|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-x11-i386-pc-linux-gnu.tar.gz>>
-  or <hlink|last stable|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<merge|<TeXmacs-version-release|stable>|-x11-i386-pc-linux-gnu.tar.gz>>>
-  static binary distribution of GNU <TeXmacs> for standard Intel or AMD based
-  PC's under GNU/<name|Linux>.
+  Depending on the version of your GNU/<name|Linux> system, download one of
+  the following static binary distributions of GNU <TeXmacs>:
+
+  <\enumerate>
+    <item><hlink|<TeXmacs> package for 32 bit GNU/<name|Linux>
+    distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-B.tar.gz>>.
+
+    <item><hlink|<TeXmacs> package for 64 bit GNU/<name|Linux>
+    distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-C.tar.gz>>.
+
+    <item>If the above packages do not work on your computer, then you may
+    try our <hlink|alternate <TeXmacs> package|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-A.tar.gz>>,
+    which should be suitable for older systems.
+  </enumerate>
+
+  Notice that we only provide static binary packages for Intel or AMD based
+  PC's.
 
   <section|Unpack the package>
 
@@ -89,13 +103,10 @@
   <hlink|contact|../contact/contact.en.tm> us, but you might need to be more
   patient.
 
-  <tmdoc-copyright|1999--2011|Joris van der Hoeven>
+  <tmdoc-copyright|1999--2017|Joris van der Hoeven>
 
   <tmweb-license>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

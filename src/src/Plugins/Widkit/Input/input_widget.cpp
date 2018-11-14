@@ -16,6 +16,7 @@
 #include "Widkit/attribute_widget.hpp"
 #include "Widkit/layout.hpp"
 #include "scheme.hpp"
+#include "message.hpp"
 
 #ifdef OS_WIN32
 #define URL_CONCATER  '\\'
@@ -32,6 +33,8 @@ class input_widget_rep: public attribute_widget_rep {
   string  draw_s;      // the string being displayed
   SI      text_h;      // text height
   string  type;        // expected type of string
+  string  name;        // optional name of the input field
+  string  serial;      // optional serial number of the input field
   array<string> def;   // default possible input values
   command call_back;   // routine called on <return> or <escape>
   int     style;       // style of widget
@@ -56,15 +59,20 @@ public:
   void update_draw_s ();
   void commit ();
   void cancel ();
+  void set_type (string type);
+  bool continuous ();
 
   void handle_get_size (get_size_event ev);
   void handle_repaint (repaint_event ev);
   void handle_keypress (keypress_event ev);
   void handle_mouse (mouse_event ev);
   void handle_keyboard_focus (keyboard_focus_event ev);
+  void handle_keyboard_focus_on (keyboard_focus_on_event ev);
 
   void handle_set_string (set_string_event ev);
   void handle_get_string (get_string_event ev);
+  void handle_get_coord2 (get_coord2_event ev);
+  void handle_set_coord2 (set_coord2_event ev);
 };
 
 /******************************************************************************
@@ -75,7 +83,8 @@ public:
 
 input_widget_rep::input_widget_rep (command cb2, int st2, string w2, bool p2):
   attribute_widget_rep (south_west),
-  s (""), draw_s (""), type ("default"), def (),
+  s (""), draw_s (""),
+  type ("default"), name ("default"), serial ("default"), def (),
   call_back (cb2), style (st2),
   greyed ((style & WIDGET_STYLE_INERT) != 0),
   width (w2), persistent (p2),
@@ -106,6 +115,7 @@ input_widget_rep::update_draw_s () {
 
 void
 input_widget_rep::commit () {
+  if (continuous ()) return;
   ok= true;
   done= true;
   call_back (list_object (object (s)));
@@ -116,6 +126,29 @@ input_widget_rep::cancel () {
   ok= false;
   done= true;
   call_back (list_object (object (false)));
+}
+
+void
+input_widget_rep::set_type (string t) {
+  int i= search_forwards (":", 0, t);
+  if (i >= 0) {
+    type= t (i+1, N(t));
+    name= t (0, i);
+    int j= search_forwards ("#", 0, name);
+    if (j >= 0) {
+      serial= name (j+1, N(name));
+      name  = name (0, j);
+    }
+  }
+  else type= t;
+}
+
+bool
+input_widget_rep::continuous () {
+  return
+    starts (type, "search") ||
+    starts (type, "replace-") ||
+    starts (serial, "form-");
 }
 
 void
@@ -141,8 +174,8 @@ input_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 input_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
-  renderer ren= win->get_renderer ();
-  update_draw_s (); 
+  renderer ren= ev->win;
+  update_draw_s ();
   SI ecart= max (0, (h - (2*dh / SHRINK) - text_h) >> 1);
 
   metric ex;
@@ -177,14 +210,14 @@ input_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
     layout_lower (ren, 0, 0, w, h);
   }
 
-  ren->set_color (black);
-  if (greyed) ren->set_color (dark_grey);
   ren->set_shrinking_factor (SHRINK);
+  SI pixel= SHRINK*PIXEL;
+  ren->set_pencil (pencil (black, pixel));
+  if (greyed) ren->set_pencil (pencil (dark_grey, pixel));
   ecart *= SHRINK;
   fn->var_draw (ren, draw_s, dw - left, dh - bottom + ecart);
   if (got_focus) {
-    SI pixel= SHRINK*PIXEL;
-    ren->set_color (red);
+    ren->set_pencil (pencil (red, pixel));
     ren->line (current + dw, dh + ecart,
 	       current + dw, height - pixel - dh - ecart);
     ren->line (current + dw - pixel, dh + ecart,
@@ -206,7 +239,8 @@ input_widget_rep::handle_keypress (keypress_event ev) {
   if (key == ">") key= "<gtr>";
 
   /* tab-completion */
-  if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
+  if (continuous ());
+  else if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
     int d = (key == "tab"? 1: N(tabs)-1);
     tab_nr= (tab_nr + d) % N(tabs);
     s     = s (0, tab_pos) * tabs[tab_nr];
@@ -250,7 +284,19 @@ input_widget_rep::handle_keypress (keypress_event ev) {
   }
 
   /* other actions */
-  if (key == "return") commit ();
+  if (continuous () &&
+      (key == "return" ||
+       key == "S-return" ||
+       key == "home" ||
+       key == "end" ||
+       key == "up" ||
+       key == "down" ||
+       key == "pageup" ||
+       key == "pagedown" ||
+       key == "tab" ||
+       key == "S-tab" ||
+       key == "escape"));
+  else if (key == "return") commit ();
   else if ((key == "escape") || (key == "C-c") ||
 	   (key == "C-g")) cancel ();
   else if ((key == "left") || (key == "C-b")) {
@@ -304,6 +350,8 @@ input_widget_rep::handle_keypress (keypress_event ev) {
     pos += N(key);
   }
   this << emit_invalidate_all ();
+  if (continuous ())
+    call_back (list_object (list_object (object (s), object (key))));
 }
 
 void
@@ -350,11 +398,21 @@ input_widget_rep::handle_mouse (mouse_event ev) {
 
 void
 input_widget_rep::handle_keyboard_focus (keyboard_focus_event ev) {
-  if (got_focus && !ev->flag && !done && !persistent)
+  if (got_focus && !ev->flag && !done && !persistent) {
+    //if (type == "string") commit (); else cancel ();
     cancel ();
+  }
   got_focus= ev->flag;
   if (attached ())
     this << emit_invalidate_all ();
+}
+
+void
+input_widget_rep::handle_keyboard_focus_on (keyboard_focus_on_event ev) {
+  if (ev->field == serial || ev->field == name || ev->field == type) {
+    ev->done= true;
+    send_keyboard_focus (abstract (this));
+  }
 }
 
 void
@@ -365,7 +423,7 @@ input_widget_rep::handle_set_string (set_string_event ev) {
     ok= (ev->s != "#f");
     if (attached ()) this << emit_invalidate_all ();
   }
-  else if (ev->which == "type") type= copy (ev->s);
+  else if (ev->which == "type") set_type (copy (ev->s));
   else if (ev->which == "default") def << copy (ev->s);
   else attribute_widget_rep::handle_set_string (ev);
 }
@@ -377,6 +435,17 @@ input_widget_rep::handle_get_string (get_string_event ev) {
     else ev->s= "#f";
   }
   else attribute_widget_rep::handle_get_string (ev);
+}
+
+void
+input_widget_rep::handle_get_coord2 (get_coord2_event ev) {
+  if (ev->which != "extra width") attribute_widget_rep::handle_get_coord2 (ev);
+  else { ev->c1= 0; ev->c2= 0; }
+}
+
+void
+input_widget_rep::handle_set_coord2 (set_coord2_event ev) {
+  if (ev->which != "extra width") attribute_widget_rep::handle_set_coord2 (ev);
 }
 
 /******************************************************************************

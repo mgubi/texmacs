@@ -85,7 +85,7 @@ public:
   void finish ();
   array<box> var_finish ();
 
-  friend class lazy_table_rep;
+  friend struct lazy_table_rep;
 };
 
 class table {
@@ -135,18 +135,23 @@ public:
   string   hyphen;            // horizontal hyphenation
   int      row_span;          // row span
   int      col_span;          // column span
+  SI       swell;             // amount of swell for cells of large height
+  int      border_flags;      // 1: top row, 2: bottom row
   table    D;                 // potential decoration
   table    T;                 // potential subtable
 
   cell_rep (edit_env env);
 
   void typeset (tree fm, tree t, path ip);
+  void cell_local_begin (tree fm);
+  void cell_local_end (tree fm);
   void format_cell (tree fm);
   void format_item (tree with);
   void compute_width (SI& mw, SI& lw, SI& rw, bool large);
   void compute_height (SI& mh, SI& bh, SI& th);
   void position_horizontally (SI offset, SI mw, SI lw, SI rw);
   void position_vertically (SI offset, SI mh, SI bh, SI th);
+  void swell_padding ();
   void finish_horizontal ();
   void finish ();
 };

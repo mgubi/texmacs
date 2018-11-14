@@ -15,6 +15,7 @@
 #include "message.hpp"
 #include "window.hpp"
 #include "dictionary.hpp"
+#include "Scheme/object.hpp"
 
 #define THIS wk_widget (this)
 
@@ -250,9 +251,10 @@ user_canvas_widget (widget wid, int style) {
 }
 
 widget
-resize_widget (widget w, int style, string w1, string h1,
-               string w2, string h2, string w3, string h3) {
-  return abstract (resize_widget (concrete (w), style, w1, h1, w2, h2, w3, h3));
+resize_widget (widget w, int style, string w1, string h1, string w2, string h2,
+               string w3, string h3, string hpos, string vpos) {
+  return abstract (resize_widget (concrete (w), style,
+                                  w1, h1, w2, h2, w3, h3, hpos, vpos));
 }
 
 widget
@@ -298,7 +300,14 @@ choice_widget (command cb, array<string> vals, string v, string f) {
 }
 
 widget
-file_chooser_widget (command cmd, string type, bool save) {
+tree_view_widget (command cmd, tree data, tree data_roles) {
+    // FIXME: not implemented
+  return text_widget ("Not implemented", WIDGET_STYLE_BOLD, black);
+}
+
+widget
+file_chooser_widget (command cmd, string type, string prompt) {
+  (void) prompt;
   return abstract (file_chooser_wk_widget (cmd, type));
 }
 
@@ -333,6 +342,11 @@ refresh_widget (string tmwid, string kind) {
 }
 
 widget
+refreshable_widget (object prom, string kind) {
+  return abstract (refreshable_wk_widget (prom, kind));
+}
+
+widget
 texmacs_widget (int mask, command quit) {
   return abstract (texmacs_wk_widget (mask, quit));
 }
@@ -359,7 +373,7 @@ destroy_window_widget (widget w) {
 void
 check_type_void (blackbox bb, string s) {
   if (!is_nil (bb)) {
-    cerr << "\nslot type= " << s << "\n";
+    failed_error << "slot type= " << s << "\n";
     FAILED ("type mismatch");
   }
 }
@@ -367,7 +381,7 @@ check_type_void (blackbox bb, string s) {
 template<class T> void
 check_type (blackbox bb, string s) {
   if (type_box (bb) != type_helper<T>::id) {
-    cerr << "\nslot type= " << s << "\n";
+    failed_error << "slot type= " << s << "\n";
     FAILED ("type mismatch");
   }
 }
@@ -395,7 +409,7 @@ principal_widget_check (wk_widget wid) {
   // Currently, we only allow geometry access of the unique child of
   // a window widget.
   if (bad_parent (wid)) {
-    cerr << "Widget= " << wid << "\n";
+    failed_error << "Widget= " << wid << "\n";
     FAILED ("invalid geometry access");
   }
 }
@@ -537,6 +551,14 @@ send_keyboard_focus (wk_widget w, blackbox val) {
 }
 
 void
+send_keyboard_focus_on (wk_widget w, blackbox val) {
+  ASSERT (type_box (val) == type_helper<string>::id, "type mismatch");
+  bool done= false;
+  //w->win->set_keyboard_focus (abstract (w), true);
+  w << emit_keyboard_focus_on (open_box<string> (val), done);
+}
+
+void
 send_mouse (wk_widget w, blackbox val) {
   typedef quintuple<string,SI,SI,int,time_t> mouse;
   ASSERT (type_box (val) == type_helper<mouse>::id, "type mismatch");
@@ -576,12 +598,12 @@ send_invalidate_all (wk_widget w, blackbox val) {
 
 void
 send_repaint (wk_widget w, blackbox val) {
-  typedef quartet<SI,SI,SI,SI> repaint;
+  typedef quintuple<renderer,SI,SI,SI,SI> repaint;
   ASSERT (type_box (val) == type_helper<repaint>::id, "type mismatch");
   repaint r= open_box<repaint> (val);
   bool stop_flag= false;
   // FIXME: we should assume local coordinates for repainting
-  w << emit_repaint (r.x1, r.x2, r.x3, r.x4, stop_flag);
+  w << emit_repaint (r.x1, r.x2, r.x3, r.x4, r.x5, stop_flag);
 }
 
 void
@@ -616,6 +638,10 @@ wk_widget_rep::send (slot s, blackbox val) {
   case SLOT_NAME:
     send_string (THIS, "window name", val);
     break;
+  case SLOT_MODIFIED:
+    check_type<bool> (val, "SLOT_MODIFIED");
+    win->set_modified (open_box<bool> (val));
+    break;
   case SLOT_SIZE:
     send_size (THIS, val);
     break;
@@ -633,6 +659,9 @@ wk_widget_rep::send (slot s, blackbox val) {
     break;
   case SLOT_KEYBOARD_FOCUS:
     send_keyboard_focus (THIS, val);
+    break;
+  case SLOT_KEYBOARD_FOCUS_ON:
+    send_keyboard_focus_on (THIS, val);
     break;
   case SLOT_MOUSE:
     send_mouse (THIS, val);
@@ -693,6 +722,9 @@ wk_widget_rep::send (slot s, blackbox val) {
     break;
   case SLOT_SIDE_TOOLS_VISIBILITY:
     send_bool (THIS, "side tools", val);
+    break;
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    send_bool (THIS, "bottom tools", val);
     break;
   case SLOT_FOOTER_VISIBILITY:
     send_bool (THIS, "footer flag", val);
@@ -812,10 +844,10 @@ wk_widget_rep::query (slot s, int type_id) {
     ASSERT (type_id == type_helper<int>::id,
 	    "int expected (SLOT_IDENTIFIER)");
     return close_box<int> (get_identifier (win));
-  case SLOT_RENDERER:
-    ASSERT (type_id == type_helper<renderer>::id,
-	    "renderer expected (SLOT_RENDERER)");
-    return close_box<renderer> (win->get_renderer ());
+  case SLOT_INVALID:
+      ASSERT (type_id == type_helper<bool>::id,
+              "bool expected (SLOT_INVALID_STATE)");
+      return close_box<bool> (win->is_invalid());
   case SLOT_SIZE:
     return query_size (THIS, type_id);
   case SLOT_POSITION:
@@ -846,6 +878,8 @@ wk_widget_rep::query (slot s, int type_id) {
     return query_bool (THIS, "user icons", type_id);
   case SLOT_SIDE_TOOLS_VISIBILITY:
     return query_bool (THIS, "side tools", type_id);
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    return query_bool (THIS, "bottom tools", type_id);
   case SLOT_FOOTER_VISIBILITY:
     return query_bool (THIS, "footer flag", type_id);
   case SLOT_INTERACTIVE_MODE:
@@ -956,6 +990,10 @@ wk_widget_rep::write (slot s, blackbox index, widget w) {
   case SLOT_SIDE_TOOLS:
     check_type_void (index, "SLOT_SIDE_TOOLS");
     THIS << set_widget ("side tools", concrete (w));
+    break;
+  case SLOT_BOTTOM_TOOLS:
+    check_type_void (index, "SLOT_BOTTOM_TOOLS");
+    THIS << set_widget ("bottom tools", concrete (w));
     break;
   case SLOT_SCROLLABLE:
     check_type_void (index, "SLOT_SCROLLABLE");

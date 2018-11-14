@@ -1,12 +1,14 @@
-<TeXmacs|1.0.6>
+<TeXmacs|1.99.3>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Internationalization of <TeXmacs>>
 
   <\description>
     <item*|Chinese>Chu-Ching Huang and Zou-Hu.
+
+    <item*|Croatian>Luka Marohni¢.
 
     <item*|Czech>David Rezac.
 
@@ -20,6 +22,8 @@
 
     <item*|German>Dietmar Jung, Hans Dembinski, Jan Ulrich Hasecke, Christoph
     Strobel, Joris van der Hoeven, Thomas Langen, Ralf Treinen.
+
+    <item*|Greek>Alkis Akritas.
 
     <item*|Hungarian>András Kadinger.
 
@@ -60,9 +64,3 @@
   Texts. A copy of the license is included in the section entitled "GNU Free
   Documentation License".>
 </body>
-
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>

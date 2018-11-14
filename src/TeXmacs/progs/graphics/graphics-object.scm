@@ -143,9 +143,10 @@
     (dv prop res)))
 
 (tm-define (create-graphical-props mode ps0)
+  ;;(display* "create-graphical-props " mode ", " ps0 "\n")
   (let ((tab (make-ahash-table))
         (l (graphics-all-attributes)))
-    (set! l (list-difference l '("gid")))
+    (set! l (list-difference l '("gid" "anim-id")))
     (cond
       ((== mode 'active)
        (for (var l)
@@ -171,7 +172,7 @@
 
 ;; Graphical contours
 ;;NOTE: This subsection is OK.
-(define (create-graphical-embedding-box o ha0 va0 halign valign mag)
+(define (create-graphical-embedding-box o ha0 va0 halign valign w hm pp mag)
   (define (create-text-at-handle o)
     (cond ((func? o 'with)
            (create-text-at-handle (cAr o)))
@@ -182,7 +183,10 @@
   (let* ((o1 (with res (if (or (graphical-text-at-context? o)
                                (== (car o) 'gr-group))
                            `(with "text-at-halign" ,ha0
-                                  "text-at-valign" ,va0 ,o)
+                                  ,(graphics-valign-var o) ,va0
+                                  "doc-at-width" ,w
+                                  "doc-at-hmode" ,hm
+                                  "doc-at-ppsep" ,pp ,o)
 			   o)
                `(with "magnify" ,(if (== mag "default") "1" mag) ,res)))
 	 (info0 (cdr (box-info o1 "lbLB")))
@@ -212,10 +216,10 @@
 (tm-define (on-graphical-embedding-box? x y o eps)
   (set! eps (length-decode eps))
   (let* ((ha (get-graphical-prop 'basic "text-at-halign"))
-	 (va (get-graphical-prop 'basic "text-at-valign"))
+	 (va (get-graphical-prop 'basic (graphics-valign-var o)))
 	 (o1 (if (graphical-text-at-context? o)
                  `(with "text-at-halign" ,ha
-                        "text-at-valign" ,va ,o)
+                        ,(graphics-valign-var o) ,va ,o)
 		 o))
 	 (info0 (cdr (box-info o1 "lbLB")))
 	 (info1 (cdr (box-info o1 "rtRT")))
@@ -236,61 +240,82 @@
              (in-interval? y t (+ t eps) > <=)))))
 
 (define draw-nonsticky-curp #t)
-(define (create-graphical-contour o edge no) ;; Point mode
+(define (create-graphical-contour* o edge no) ;; Point mode
   (define (curp lp)
     (if draw-nonsticky-curp lp '()))
+  ;;(display* "Contour for " o "\n")
   (cond ((== (car o) 'point)
          (cons o '()))
         ((graphical-text-at-context? o)
          (let* ((ha (get-graphical-prop 'basic "text-at-halign"))
-	        (va (get-graphical-prop 'basic "text-at-valign"))
+	        (va (get-graphical-prop 'basic (graphics-valign-var o)))
+                (w  (get-graphical-prop 'basic "doc-at-width"))
+                (hm (get-graphical-prop 'basic "doc-at-hmode"))
+                (pp (get-graphical-prop 'basic "doc-at-ppsep"))
 	        (mag (get-graphical-prop 'basic "magnify")))
-           (create-graphical-embedding-box o ha va ha va mag)))
+           (create-graphical-embedding-box o ha va ha va w hm pp mag)))
         ((== (car o) 'gr-group)
          (let* ((ha (get-graphical-prop 'basic "text-at-halign"))
 	        (va (get-graphical-prop 'basic "text-at-valign"))
 	        (mag (get-graphical-prop 'basic "magnify")))
            (create-graphical-embedding-box
-            o ha va "center" "center" mag)))
-        (else (if (integer? no)
-		  (let* ((l (list-tail (cdr o) no))
-		         (ll (length l)))
-                    (append
-                     (with h (list-head (cdr o) no)
-                       (if (and edge
-                                (in? (car o)
-                                     '(cline cspline carc))
-                                (== (+ no 1) (length (cdr o))))
-                           (cons `(with "point-style"
-                                      ,(if sticky-point
-                                           "square" "disk")
-                                    ,(car h)) (cdr h))
-                           h))
-                     (cons
-                      (list 'with "point-style" "disk"
-                            (cons 'concat
-                                  (if (< ll 2)
-                                      (if sticky-point
-                                          '()
-                                          (if edge
-                                              (list-head l 1)
-                                              (curp (list-head l 1))))
-                                      (if edge
-                                          (with l2 (list-head l 2)
-                                            (if sticky-point
-                                                `(,(cons* 'with
-					         "point-style"
-					         "square"
-					        `((concat .
-                                                          ,(cdr l2)))))
-                                                l2))
-                                          (cons
-                                           `(with "point-style"
-                                                "square"
-                                              ,(list-ref l 1))
-					   (curp (list-head l 1))))))) '())
-                     (if (> ll 2) (list-tail l 2) '())))
-		  (cdr o)))))
+            o ha va "center" "center" "1par" "min" "0fn" mag)))
+	((in? (car o) '(anim-edit))
+	 (create-graphical-contour* (caddr o) 0 #f))
+	((in? (car o) '(anim-static anim-dynamic))
+         (let* ((a (or (graphics-anim-frames o) (list (cadr o))))
+                (c (map (lambda (x) (create-graphical-contour* x 0 #f)) a)))
+           (map (lambda (x) `(concat ,@x)) c)))
+	((== (car o) 'with)
+	 (create-graphical-contour* (cAr o) 0 #f))
+        ((integer? no)
+         (let* ((l (list-tail (cdr o) no))
+                (ll (length l)))
+           (append
+            (with h (list-head (cdr o) no)
+              (if (and edge
+                       (in? (car o) (graphical-closed-curve-tag-list))
+                       (== (+ no 1) (length (cdr o))))
+                  (cons `(with "point-style"
+                             ,(if sticky-point "square" "disk")
+                           ,(car h)) (cdr h))
+                  h))
+            (cons
+             (list 'with "point-style" "disk"
+                   (cons 'concat
+                         (if (< ll 2)
+                             (if sticky-point '()
+                                 (if edge
+                                     (list-head l 1)
+                                     (curp (list-head l 1))))
+                             (if edge
+                                 (with l2 (list-head l 2)
+                                   (if sticky-point
+                                       `(with "point-style" "square"
+                                          (concat ,@(cdr l2)))
+                                       l2))
+                                 (cons
+                                  `(with "point-style" "square"
+                                     ,(list-ref l 1))
+                                  (curp (list-head l 1))))))) '())
+            (if (> ll 2) (list-tail l 2) '()))))
+        (else (cdr o))))
+
+(define (compress l)
+  (cond ((or (null? l) (null? (cdr l))) l)
+        ((null? (cddr l)) (cdr l))
+        (else (cons (car l) (compress (cddr l))))))
+
+(define (compress* l)
+  (if (<= (length l) 50) l
+      (compress* (compress l))))
+
+(define (create-graphical-contour o edge no)
+  (if (> (length o) 50)
+      (let* ((o2 (cons (car o) (compress (cdr o))))
+             (no2 (if (integer? no) (quotient no 2) no)))
+        (create-graphical-contour o2 edge no2))
+      (create-graphical-contour* o edge no)))
 
 ;; Graphical contours (group mode)
 ;;NOTE: This subsection is OK
@@ -300,7 +325,7 @@
   `((with "color" ,color
       "point-style" "square"
       "fill-color" ,fill-color
-      (concat . ,op))))
+      (concat ,@op))))
 
 (define (create-graphical-contours l ptr pts) ;; Group mode
   ;; This routine draws the contours of each one
@@ -318,6 +343,7 @@
     (add-selections-colors op col fcol))
   (define res '())
   (define curscol #f)
+  ;;(display* "create-graphical-contours " l ", " ptr ", " pts "\n")
   (for (o l)
     (if (tree? o)
         (with path (reverse (tree-ip o))
@@ -326,6 +352,8 @@
   (if (and (== pts 'points) ptr)
       (begin
         (set! l (cons (path->tree ptr) l))))
+  (set! l (append-map (lambda (x)
+                        (or (graphics-anim-radicals x) (list x))) l))
   (for (o l)
     (if (not (and (tree? o) (< (cAr (tree-ip o)) 0)))
         (let* ((props #f)
@@ -339,7 +367,9 @@
                                                         'default path)
                                                     (if (== pts 'object)
                                                         #f "square")))
-                (if (== path ptr)
+                (if (or (== path ptr)
+                        (and (list? path) (list? ptr)
+                             (list-starts? path ptr)))
                     (begin
                       (set! on-aobj #t)
                       (set! curscol default-color-go-points)))
@@ -358,12 +388,16 @@
                  (if (not curscol)
                      (set! curscol default-color-selected-points))
                  (set! t
-                       (let* ((ha (get-graphical-prop path0 "text-at-halign"))
-                              (va (get-graphical-prop path0 "text-at-valign"))
+                       (let* ((valign-var (graphics-valign-var o))
+                              (ha (get-graphical-prop path0 "text-at-halign"))
+                              (va (get-graphical-prop path0 valign-var))
+                              (w  (get-graphical-prop path0 "doc-at-width"))
+                              (hm (get-graphical-prop path0 "doc-at-hmode"))
+                              (pp (get-graphical-prop path0 "doc-at-ppsep"))
                               (mag (get-graphical-prop path0 "magnify"))
 			      (gc (asc curscol #f
                                        (create-graphical-embedding-box
-                                        o ha va ha va mag))))
+                                        o ha va ha va w hm pp mag))))
                          (if (== pts 'object-and-points)
                              (cons o gc)
                              (if (== pts 'object)
@@ -380,7 +414,8 @@
                                               (mag (get-graphical-prop
                                                     path0 "magnify")))
                                          (create-graphical-embedding-box
-                                          o ha va "center" "center" mag)))
+                                          o ha va "center" "center"
+                                          "1par" "min" "0fn" mag)))
                            (if (== pts 'object-and-points)
                                (cons o gc)
                                (if (== pts 'object)
@@ -390,11 +425,11 @@
                   (set! t (if (== pts 'object-and-points)
                               (cons o
                                     (asc curscol default-color-selected-points
-                                         (cdr o)))
+                                         (compress* (cdr o))))
                               (if (== pts 'object)
                                   `(,o)
                                   (asc curscol default-color-selected-points
-                                       (cdr o)))))))
+                                       (compress* (cdr o))))))))
           (set! res (append res
                             (if props
                                 `(,(append props `(,(cons* 'concat t))))
@@ -434,6 +469,8 @@
         ;;(display* "-------\n")
         ;;(display* "o= " o ", mode= " mode ", pts= " pts ", op= " op "\n")
         ;;(display* "no= " no ", props= " props "\n")
+        (when (== (car (graphics-mode)) 'hand-edit)
+          (set! op (list `(concat))))
         (graphical-object!
          (if (or (== no 'group)
                  (and (!= no 'no-group)
@@ -489,7 +526,7 @@
                   (graphical-fetch-props 
                    (if (== (car current-obj) 'with)
                        current-obj `(with ,current-obj)))
-                  (set! current-obj (stree-radical current-obj))))
+                  (set! current-obj (stree-radical* current-obj #f))))
             (create-graphical-object
              current-obj
              mode

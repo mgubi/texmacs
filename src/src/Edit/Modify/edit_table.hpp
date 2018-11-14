@@ -87,7 +87,7 @@ public:
   void   make_table (int nr_rows, int nr_cols);
   void   make_subtable (int nr_rows, int nr_cols);
   void   destroy_table ();
-  void   table_disactivate ();
+  void   table_deactivate ();
   void   table_extract_format ();
   void   table_insert_row (bool forward);
   void   table_insert_column (bool forward);
@@ -95,12 +95,15 @@ public:
   void   table_remove_column (bool forward, bool flag= false);
   int    table_nr_rows ();
   int    table_nr_columns ();
+  array<int> table_get_extents ();
   void   table_set_extents (int rows, int cols);
   int    table_which_row ();
   int    table_which_column ();
+  array<int> table_which_cells ();
   path   table_search_cell (int row, int col);
   void   table_go_to (int row, int col);
   void   table_set_format (string var, tree val);
+  tree   table_get_format ();
   string table_get_format (string var);
   void   table_del_format (string var);
   void   table_format_center ();

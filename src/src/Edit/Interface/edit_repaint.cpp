@@ -11,41 +11,63 @@
 
 #include "Interface/edit_interface.hpp"
 #include "message.hpp"
+#include "gui.hpp" // for gui_interrupted
 
 extern int nr_painted;
-extern void clear_pattern_rectangles (renderer ren, rectangles l);
+extern void clear_pattern_rectangles (renderer ren, rectangle m, rectangles l);
+extern bool animated_flag;
 
 /******************************************************************************
 * repainting the window
 ******************************************************************************/
 
 void
+edit_interface_rep::draw_background (renderer ren,
+                                     SI x1, SI y1, SI x2, SI y2) {
+  tree bg= get_init_value (BG_COLOR);
+  ren->set_background (bg);
+  if (get_init_value (PAGE_MEDIUM) == "paper")
+    eb->clear (ren, x1, y1, x2, y2);
+  else {
+    rectangle m (eb->x1, eb->y1, eb->x2, eb->y2);
+    rectangle r (x1, y1, x2, y2);
+    rectangle tm= translate (m, ren->ox, ren->oy);
+    rectangle tr= translate (r, ren->ox, ren->oy);
+    clear_pattern_rectangles (ren, tm, tr);
+  }
+}
+
+void
 edit_interface_rep::draw_text (renderer ren, rectangles& l) {
   nr_painted=0;
   bool tp_found= false;
   tree bg= get_init_value (BG_COLOR);
-  ren->set_background_pattern (bg);
-  refresh_needed= do_animate;
-  refresh_next  = next_animate;
+  ren->set_background (bg);
+  animated_flag= (texmacs_time () >= anim_next);
+  if (animated_flag) anim_next= 1.0e12;
   eb->redraw (ren, eb->find_box_path (tp, tp_found), l);
-  do_animate  = refresh_needed;
-  next_animate= refresh_next;
+  if (animated_flag) {
+    double t= max (((double) texmacs_time ()) + 25.0, eb->anim_next ());
+    anim_next= min (anim_next, t);
+  }
 }
 
 void
 edit_interface_rep::draw_env (renderer ren) {
   if (!full_screen) {
     if (!is_nil (env_rects)) {
-      ren->set_color (rgb_color (0, 85, 85, 24));
+      ren->set_pencil (pencil (rgb_color (0, 85, 85, 24), ren->pixel));
       ren->draw_rectangles (env_rects);
     }
     if (!is_nil (foc_rects)) {
-      ren->set_color (rgb_color (0, 255, 255));
+      ren->set_pencil (pencil (rgb_color (0, 255, 255), ren->pixel));
       ren->draw_rectangles (foc_rects);
     }
     if (!is_nil (sem_rects)) {
-      if (sem_correct) ren->set_color (rgb_color (112, 208, 112));
-      else ren->set_color (rgb_color (208, 144, 80));
+      if (sem_correct)
+        ren->set_pencil (pencil (rgb_color (112, 208, 112), ren->pixel));
+      else
+        ren->set_pencil (pencil (rgb_color (208, 144, 80), ren->pixel));
       ren->draw_rectangles (sem_rects);
     }
   }
@@ -53,15 +75,19 @@ edit_interface_rep::draw_env (renderer ren) {
 
 void
 edit_interface_rep::draw_cursor (renderer ren) {
-  if (!temp_invalid_cursor && (got_focus || full_screen)) {
+  if (get_preference ("draw cursor") == "on" &&
+      !temp_invalid_cursor && (got_focus || full_screen)) {
     cursor cu= get_cursor();
     if (!inside_active_graphics ()) {
       cu->y1 -= 2*pixel; cu->y2 += 2*pixel;
       SI x1= cu->ox + ((SI) (cu->y1 * cu->slope)), y1= cu->oy + cu->y1;
       SI x2= cu->ox + ((SI) (cu->y2 * cu->slope)), y2= cu->oy + cu->y2;
-      ren->set_line_style (pixel);
       string mode= get_env_string (MODE);
       string family, series;
+      color cuc= red;
+      if (!cu->valid) cuc= green;
+      else if (mode == "math") cuc= rgb_color (192, 0, 255);
+      ren->set_pencil (pencil (cuc, pixel));
       if ((mode == "text") || (mode == "src")) {
 	family= get_env_string (FONT_FAMILY);
 	series= get_env_string (FONT_SERIES);
@@ -74,12 +100,6 @@ edit_interface_rep::draw_cursor (renderer ren) {
 	family= get_env_string (PROG_FONT_FAMILY);
 	series= get_env_string (PROG_FONT_SERIES);
       }
-      if (cu->valid) {
-	if (mode == "math")
-	  ren->set_color (rgb_color (192, 0, 255));
-	else ren->set_color (red);
-      }
-      else ren->set_color (green);
       SI lserif= (series=="bold"? 2*pixel: pixel), rserif= pixel;
       if (family == "ss") lserif= rserif= 0;
       ren->line (x1-lserif, y1, x1+rserif, y1);
@@ -93,41 +113,45 @@ edit_interface_rep::draw_cursor (renderer ren) {
 }
 
 void
-edit_interface_rep::draw_surround (renderer ren, rectangle r) {
-  ren->set_background (light_grey);
+edit_interface_rep::draw_surround (renderer ren, rectangle r) { 	 
+  ren->set_background (tm_background);
   string medium= get_init_string (PAGE_MEDIUM);
-  if ((medium == "papyrus") || (medium == "paper"))
-    ren->clear (max (eb->x2, r->x1), r->y1,
-                r->x2, min (eb->y2+ 2*pixel, r->y2));
-  else if (medium == "paper")
-    ren->clear (r->x1, r->y1, r->x2, min (eb->y1, r->y2));
+  if (medium == "automatic") return;
+  if (medium == "beamer" && full_screen) return;
+  ren->clear (r->x1, r->y1, max (r->x1, eb->x1), r->y2);
+  ren->clear (min (r->x2, eb->x2), r->y1, r->x2, r->y2);
+  if (medium == "papyrus") return;
+  ren->clear (r->x1, r->y1, r->x2, max (r->y1, eb->y1));
+  ren->clear (r->x1, min (r->y2, eb->y2), r->x2, r->y2);
 }
 
 void
 edit_interface_rep::draw_context (renderer ren, rectangle r) {
-  int i;
-  ren->set_color (light_grey);
-  ren->set_line_style (pixel);
-  for (i=1; i<N(eb[0]); i++) {
-    SI y= eb->sy(0)+ eb[0]->sy2(i);
-    if ((y >= r->y1) && (y < r->y2))
-      ren->line (r->x1, y, r->x2, y);
-  }
   draw_surround (ren, r);
 }
 
 void
-edit_interface_rep::draw_selection (renderer ren) {
+edit_interface_rep::draw_selection (renderer ren, rectangle r) {
+  rectangles visible (thicken (r, 2 * ren->pixel, 2 * ren->pixel));
   if (!is_nil (locus_rects)) {
-    ren->set_color (rgb_color (32, 160, 96));
+    ren->set_pencil (pencil (rgb_color (32, 160, 96), ren->pixel));
     ren->draw_rectangles (locus_rects);
   }
-  if (made_selection && !is_nil (selection_rects)) {
-    ren->set_color (table_selection? rgb_color (192, 0, 255): red);
+  for (int i=0; i<N(alt_selection_rects); i++) {
+    ren->set_pencil (pencil (rgb_color (240, 192, 0), ren->pixel));
 #ifdef QTTEXMACS
-    ren->draw_selection (selection_rects);
+    ren->draw_selection (alt_selection_rects[i] & visible);
 #else
-    ren->draw_rectangles (selection_rects);
+    ren->draw_rectangles (alt_selection_rects[i] & visible);
+#endif
+  }
+  if (!is_nil (selection_rects)) {
+    color col= (table_selection? rgb_color (192, 0, 255): red);
+    ren->set_pencil (pencil (col, ren->pixel));
+#ifdef QTTEXMACS
+    ren->draw_selection (selection_rects & visible);
+#else
+    ren->draw_rectangles (selection_rects & visible);
 #endif
   }
 }
@@ -142,15 +166,13 @@ edit_interface_rep::draw_graphics (renderer ren) {
       string tm_curs= as_string (eval ("graphics-texmacs-pointer"));
       if (tm_curs != "none") {
 	if (tm_curs == "graphics-cross") {
-	  ren->set_line_style (pixel);
-	  ren->set_color (red);
+	  ren->set_pencil (pencil (red, pixel));
 	  ren->line (cu->ox, cu->oy-5*pixel, cu->ox, cu->oy+5*pixel);
 	  ren->line (cu->ox-5*pixel, cu->oy, cu->ox+5*pixel, cu->oy);
         }
 	else if (tm_curs == "graphics-cross-arrows") {
 	  static int s= 6*pixel, a= 2*pixel;
-	  ren->set_line_style (pixel);
-	  ren->set_color (red);
+	  ren->set_pencil (pencil (red, pixel));
 	  ren->line (cu->ox, cu->oy-s, cu->ox, cu->oy+s);
 	  ren->line (cu->ox-s, cu->oy, cu->ox+s, cu->oy);
 	  ren->line (cu->ox, cu->oy-s,cu->ox-a, cu->oy-s+a);
@@ -169,15 +191,12 @@ edit_interface_rep::draw_graphics (renderer ren) {
 }
 
 void
-edit_interface_rep::draw_pre (renderer ren, rectangle r) {
+edit_interface_rep::draw_pre (renderer win, renderer ren, rectangle r) {
   // draw surroundings
-  tree bg= get_init_value (BG_COLOR);
-  ren->set_background_pattern (bg);
-  clear_pattern_rectangles (ren, rectangles (translate (r, ren->ox, ren->oy)));
+  draw_background (ren, r->x1, r->y1, r->x2, r->y2);
   draw_surround (ren, r);
 
   // predraw cursor
-  renderer win= get_renderer (this);
   draw_cursor (ren);
   rectangles l= copy_always;
   while (!is_nil (l)) {
@@ -188,13 +207,12 @@ edit_interface_rep::draw_pre (renderer ren, rectangle r) {
 }
 
 void
-edit_interface_rep::draw_post (renderer ren, rectangle r) {
-  renderer win= get_renderer (this);
+edit_interface_rep::draw_post (renderer win, renderer ren, rectangle r) {
   win->set_zoom_factor (zoomf);
   ren->set_zoom_factor (zoomf);
   draw_context (ren, r);
   draw_env (ren);
-  draw_selection (ren);
+  draw_selection (ren, r);
   draw_graphics (ren);
   draw_cursor (ren); // the text cursor must be drawn over the graphical object
   ren->reset_zoom_factor ();
@@ -202,8 +220,7 @@ edit_interface_rep::draw_post (renderer ren, rectangle r) {
 }
 
 void
-edit_interface_rep::draw_with_shadow (rectangle r) {
-  renderer win= get_renderer (this);
+edit_interface_rep::draw_with_shadow (renderer win, rectangle r) {
   rectangle sr= r * magf;
   win->new_shadow (shadow);
   win->get_shadow (shadow, sr->x1, sr->y1, sr->x2, sr->y2);
@@ -212,12 +229,12 @@ edit_interface_rep::draw_with_shadow (rectangle r) {
   rectangles l;
   win->set_zoom_factor (zoomf);
   ren->set_zoom_factor (zoomf);
-  draw_pre (ren, r);
+  draw_pre (win, ren, r);
   draw_text (ren, l);
   ren->reset_zoom_factor ();
   win->reset_zoom_factor ();
 
-  if (ren->interrupted ()) {
+  if (gui_interrupted ()) {
     ren->set_zoom_factor (zoomf);
     l= l & rectangles (translate (r, ren->ox, ren->oy));
     simplify (l);
@@ -228,7 +245,7 @@ edit_interface_rep::draw_with_shadow (rectangle r) {
     }
     ren->reset_zoom_factor ();
 
-    draw_post (ren, r);
+    draw_post (win, ren, r);
     while (!is_nil(l)) {
       SI x1= ((SI) (l->item->x1 * magf)) - ren->ox - PIXEL;
       SI y1= ((SI) (l->item->y1 * magf)) - ren->oy - PIXEL;
@@ -242,14 +259,13 @@ edit_interface_rep::draw_with_shadow (rectangle r) {
 }
 
 void
-edit_interface_rep::draw_with_stored (rectangle r) {
-  renderer win= get_renderer (this);
+edit_interface_rep::draw_with_stored (renderer win, rectangle r) {
   //cout << "Redraw " << (r*magf/PIXEL) << "\n";
 
   /* Verify whether the backing store is still valid */
   if (!is_nil (stored_rects)) {
     SI w1, h1, w2, h2;
-    win   -> get_extents (w1, h1);
+    win    -> get_extents (w1, h1);
     stored -> get_extents (w2, h2);
     if (stored->ox != win->ox || stored->oy != win->oy ||
 	w1 != w2 || h1 != h2) {
@@ -265,13 +281,13 @@ edit_interface_rep::draw_with_stored (rectangle r) {
     win->new_shadow (shadow);
     win->get_shadow (shadow, sr->x1, sr->y1, sr->x2, sr->y2);
     shadow->put_shadow (stored, sr->x1, sr->y1, sr->x2, sr->y2);
-    draw_post (shadow, r);
+    draw_post (win, shadow, r);
     win->put_shadow (shadow, sr->x1, sr->y1, sr->x2, sr->y2);
   }
   else {
     // cout << "."; cout.flush ();
-    draw_with_shadow (r);
-    if (!win->interrupted ()) {
+    draw_with_shadow (win, r);
+    if (!gui_interrupted ()) {
       if (inside_active_graphics ()) {
 	shadow->new_shadow (stored);
 	shadow->get_shadow (stored, sr->x1, sr->y1, sr->x2, sr->y2);
@@ -280,10 +296,10 @@ edit_interface_rep::draw_with_stored (rectangle r) {
 	//cout << "Stored: " << stored_rects << "\n";
 	//cout << "M"; cout.flush ();
       }
-      draw_post (shadow, r);
+      draw_post (win, shadow, r);
       win->put_shadow (shadow, sr->x1, sr->y1, sr->x2, sr->y2);
     }
-    else draw_post (win, r);
+    else draw_post (win, win, r);
   }
 }
 
@@ -292,25 +308,22 @@ edit_interface_rep::draw_with_stored (rectangle r) {
 ******************************************************************************/
 
 void
-edit_interface_rep::handle_clear (SI x1, SI y1, SI x2, SI y2) {
-  renderer win= get_renderer (this);
+edit_interface_rep::handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2) {
   x1= (SI) (x1 / magf); y1= (SI) (y1 / magf);
   x2= (SI) (x2 / magf); y2= (SI) (y2 / magf);
   win->set_zoom_factor (zoomf);
-  tree bg= get_init_value (BG_COLOR);
-  win->set_background_pattern (bg);
-  win->clear_pattern (max (eb->x1, x1), max (eb->y1, y1),
-		      min (eb->x2, x2), min (eb->y2, y2));
+  draw_background (win, max (eb->x1, x1), max (eb->y1, y1),
+                        min (eb->x2, x2), min (eb->y2, y2));
   draw_surround (win, rectangle (x1, y1, x2, y2));
   win->reset_zoom_factor ();
 }
 
 void
-edit_interface_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2) {
+edit_interface_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
   if (is_nil (eb)) apply_changes ();
   if (env_change != 0) {
-    system_warning ("Invalid situation (" * as_string (env_change) * ")",
-		    "(edit_interface_rep::handle_repaint)");
+    std_warning << "Invalid situation (" << env_change << ")"
+                << " in edit_interface_rep::handle_repaint\n";
     return;
   }
 
@@ -327,7 +340,7 @@ edit_interface_rep::handle_repaint (SI x1, SI y1, SI x2, SI y2) {
   */
 
   // cout << "Repainting\n";
-  draw_with_stored (rectangle (x1, y1, x2, y2) / magf);
+  draw_with_stored (win, rectangle (x1, y1, x2, y2) /magf);
   if (last_change-last_update > 0)
     last_change = texmacs_time ();
   // cout << "Repainted\n";

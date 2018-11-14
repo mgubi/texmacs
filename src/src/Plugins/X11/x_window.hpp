@@ -27,6 +27,7 @@ public:
   string           orig_name;
   char*            name;
   string           the_name;
+  string           mod_name;
   x_drawable_rep*  ren;
 
   Display*      dpy;
@@ -58,7 +59,6 @@ public:
 		SI min_w, SI min_h, SI def_w, SI def_h, SI max_w, SI max_h);
   ~x_window_rep ();
   widget get_widget ();
-  renderer get_renderer ();
   void get_extents (int& w, int& h);
 
   void set_hints (int min_w, int min_h, int max_w, int max_h);
@@ -78,6 +78,7 @@ public:
 
   void   set_name (string name);
   string get_name ();
+  void   set_modified (bool flag);
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
   void   set_size (SI w, SI h);
@@ -93,7 +94,7 @@ public:
   void   set_mouse_pointer (widget wid, string name, string mask);
   void   delayed_message (widget wid, string s, time_t delay);
   void   invalidate (SI x1, SI y1, SI x2, SI y2);
-  bool   repainted ();
+  bool   is_invalid ();
   void   translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy);
 
   /****************************** friends ************************************/

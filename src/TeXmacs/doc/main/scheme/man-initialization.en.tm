@@ -1,11 +1,11 @@
-<TeXmacs|1.0.1.13>
+<TeXmacs|1.99.2>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
-  <expand|tmdoc-title|Writing your own initialization files>
+  <tmdoc-title|Writing your own initialization files>
 
-  When starting up, <apply|TeXmacs> executes the file
+  When starting up, <TeXmacs> executes the file
 
   <\verbatim>
     \ \ \ \ $TEXMACS_PATH/progs/init-texmacs.scm
@@ -18,7 +18,8 @@
   </verbatim>
 
   if it exists. By default, the path <verbatim|$TEXMACS_HOME_PATH> equals
-  <verbatim|.TeXmacs>. Similarly, each time you create a new buffer, the file
+  <verbatim|.TeXmacs>. Similarly, each time you create a new buffer (either
+  by creating a new file or opening an already existing one), the file
 
   <\verbatim>
     \ \ \ \ $TEXMACS_PATH/progs/init-buffer.scm
@@ -32,30 +33,37 @@
 
   if it exists.
 
-  <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <\example>
+    Suppose you want to add a style package <verbatim|CustomStyle.ts> of your
+    own to every new document you create. You can add the following lines to
+    <verbatim|$TEXMACS_HOME_PATH/progs/my-init-buffer.scm>:
 
-  <expand|tmdoc-license|Permission is granted to copy, distribute and/or
-  modify this document under the terms of the GNU Free Documentation License,
-  Version 1.1 or any later version published by the Free Software Foundation;
-  with no Invariant Sections, with no Front-Cover Texts, and with no
-  Back-Cover Texts. A copy of the license is included in the section entitled
-  "GNU Free Documentation License".>
+    <\scm-code>
+      (when (buffer-newly-created? (current-buffer))
+
+      \ \ (set-style-list (append (get-style-list) '("CustomStyle")))
+
+      \ \ (buffer-pretend-saved (current-buffer)))
+    </scm-code>
+
+    First we check whether the <scm|current-buffer> has been newly created in
+    order not to apply the style to existing files when we open them. Then we
+    add the new package (instead of changing it with <scm|init-style>) using
+    <scm|set-style-list> and finally we call <scm|buffer-pretend-saved> to
+    prevent <TeXmacs> from thinking the buffer has been modified by the
+    change of style, or it would always prompt asking for confirmation before
+    closing an empty buffer.
+  </example>
+
+  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|paragraph width|150mm>
-    <associate|odd page margin|30mm>
-    <associate|shrinking factor|4>
-    <associate|page right margin|30mm>
-    <associate|page top margin|30mm>
-    <associate|reduction page right margin|25mm>
-    <associate|page type|a4>
-    <associate|reduction page bottom margin|15mm>
-    <associate|even page margin|30mm>
-    <associate|reduction page left margin|25mm>
-    <associate|page bottom margin|30mm>
-    <associate|reduction page top margin|15mm>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

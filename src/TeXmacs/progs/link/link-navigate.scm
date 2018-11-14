@@ -360,7 +360,7 @@
     (open-auxiliary "Link page" doc)))
 
 (tm-define (build-navigation-page l)
-  (let* ((style (tree->stree (get-style-tree)))
+  (let* ((style `(tuple ,@(get-style-list)))
          (fun (lambda () (build-navigation-page-sub style l))))
     (resolve-navigation-list l fun)))
 
@@ -372,10 +372,10 @@
 
 (define (url->item u)
   (with (base qry) (process-url u)
-    (let* ((file (url->string u))
+    (let* ((file (url->system u))
            (help? (and (== "texmacs-file" (file-format u)) 
                        (url-exists-in-help? file)))
-           (text (if help? (help-file-title u) (basename (url->string base)))))
+           (text (if help? (help-file-title u) (basename (url->system base)))))
       ($link file text))))
 
 (define (url-list->document l)
@@ -402,13 +402,13 @@
 (define (default-root-disambiguator u)
  (with l (list-filter (url->list u) default-filter-url)
     (cond ((null? l) 
-           (set-message `(verbatim ,(url->string u)) "Not found"))
+           (set-message `(verbatim ,(url->system u)) "Not found"))
           ((== 1 (length l)) (load-browse-buffer (car l)))
           (else (build-disambiguation-page l)))))
 
 (define (process-url u)
   "Split a simple (not or'ed!!) url in base and query"
-  (let* ((s (url->string u))
+  (let* ((s (url->system u))
          (m (string-length s))
          (h (or (string-index s #\#) m))
          (a (or (string-index s #\?) m))
@@ -416,7 +416,7 @@
          (base (substring s 0 i))
          (qry (substring s (min m (+ 1 i)) m)))
     (if (< i m)  ; was there either a '?' or a '#' (with args)?
-        (list (string->url (string-drop-right s (+ 1 (string-length qry))))
+        (list (system->url (string-drop-right s (+ 1 (string-length qry))))
               (unescape-link-args qry))
         (list u ""))))
 
@@ -461,7 +461,7 @@
   (if (url-or? (url-expand u))
       (default-root-disambiguator (url-expand u))
       (with (base qry) (process-url u)
-        (if (!= "" (url->string base))
+        (if (!= "" (url->system base))
             (load-browse-buffer base)))))
 
 (define (tmfs-root-handler u)
@@ -476,6 +476,8 @@
            (list default-root-handler default-post-handler))
           ((== root "tmfs") 
            (list tmfs-root-handler (lambda (x) (noop))))
+          ((== root "file") ;; TODO: to be refined
+           (list http-root-handler http-post-handler))
           ((or (== root "http") (== root "https"))
            (list http-root-handler http-post-handler))
           (else (display* "Unhandled url root: " root "\n")
@@ -501,7 +503,7 @@
   (:synopsis "Jump to the url @u")
   (:argument opt-from "Optional path for the cursor history")
   (if (nnull? opt-from) (cursor-history-add (car opt-from)))
-  (if (string? u) (set! u (string->url u)))
+  (if (string? u) (set! u (system->url u)))
   (with (action post) (url-handlers u) 
     (action u) (post u))
   (if (nnull? opt-from) (cursor-history-add (cursor-path))))
@@ -510,7 +512,9 @@
   (if (null? opt-location) (exec-delayed cmd)
       (exec-delayed-at cmd (car opt-location))))
 
-(tm-define (execute-script s secure-origin? . opt-location)
+(tm-define (old-execute-script s secure-origin? opt-location)
+  ;; NOTE: this code is deprecated; we should remove the old support
+  ;; when we will be sure that nobody uses it anymore.
   (let* ((secure-s (string-append "(secure? '" s ")"))
          (ok? (or secure-origin? (eval (string->object secure-s))))
          (cmd-s (string-append "(lambda () " s ")"))
@@ -523,9 +527,30 @@
                (when answ (execute-at cmd opt-location)))))
           (else (set-message "Unsecure script refused" "Evaluate script")))))
 
+(tm-define (new-execute-script s secure-origin? args)
+  (let* ((sym-fun (eval (string->object (string-append "'" s))))
+	 (sym-cmd (cons sym-fun (map (lambda (x) (list 'quote x)) args)))
+         (ok? (or secure-origin? (secure? sym-cmd)))
+	 (cmd (eval (list 'lambda (list) sym-cmd))))
+    (cond ((or ok? (== (get-preference "security") "accept all scripts"))
+           (exec-delayed cmd))
+          ((== (get-preference "security") "prompt on scripts")
+           (user-confirm `(concat "Execute " ,s "?") #f
+             (lambda (answ)
+               (when answ (exec-delayed cmd)))))
+          (else (set-message "Unsecure script refused" "Evaluate script")))))
+
+(tm-define (execute-script s secure-origin? . opt-location)
+  (if (and (string-starts? s "(") (string-ends? s ")")
+	   (not (string-starts? s "(lambda ")))
+      (old-execute-script s secure-origin? opt-location)
+      (new-execute-script s secure-origin? opt-location)))
+
 (define (go-to-vertex v attrs)
-  (cond ((func? v 'id 1) (go-to-id (cadr v) (cursor-path)))
-        ((func? v 'url 1) (go-to-url (escape-link-args (cadr v)) (cursor-path)))
+  (cond ((func? v 'id 1)
+	 (go-to-id (cadr v) (cursor-path)))
+        ((func? v 'url 1)
+	 (go-to-url (escape-link-args (cadr v)) (cursor-path)))
         ((func? v 'script)
          (with ok? (== (assoc-ref attrs "secure") "true")
            (apply execute-script (cons* (cadr v) ok? (cddr v)))))
