@@ -16,7 +16,7 @@
 
 class ns_picture_rep: public picture_rep {
 public:
-  NSImage *pict;
+  NSBitmapImageRep *pict;
   int w, h;
   int ox, oy;
 
@@ -25,7 +25,8 @@ protected:
   void internal_set_pixel (int x, int y, color c);
 
 public:
-  ns_picture_rep (NSImage *im, int ox2, int oy2);
+  ns_picture_rep (NSBitmapImageRep *im, int ox2, int oy2);
+  ~ns_picture_rep ();
   picture_kind get_type ();
   void* get_handle ();
   int get_width ();
@@ -35,8 +36,8 @@ public:
   void set_origin (int ox2, int oy2);
 };
 
-picture ns_picture (NSImage *im, int ox, int oy);
-NSImage* xpm_image (url file_name);
+picture ns_picture (NSBitmapImageRep *im, int ox, int oy);
+NSBitmapImageRep* xpm_image (url file_name);
 
 class ns_image_renderer_rep: public ns_renderer_rep {
 public:

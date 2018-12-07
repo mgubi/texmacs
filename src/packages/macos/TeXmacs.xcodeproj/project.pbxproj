@@ -971,6 +971,7 @@
 		9C6DCD39219CD0EB00DB8E7A /* ns_dialogues.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */; };
 		9C6DCD3A219CD0EB00DB8E7A /* ns_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */; };
 		9C6DCD3B219CD0EB00DB8E7A /* ns_menu.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */; };
+		9C6DCD3E21A2271100DB8E7A /* ns_picture.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C6DCD3D21A2271100DB8E7A /* ns_picture.mm */; };
 		9C722BED10D2F7C700C41915 /* qt_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */; };
 		9C722C0F10D2F88900C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
 		9C722C1E10D2FBD300C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
@@ -2683,7 +2684,7 @@
 		9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_utilities.mm; sourceTree = "<group>"; };
 		9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_gui.mm; sourceTree = "<group>"; };
 		9C6DCD15219CD0EB00DB8E7A /* ns_other_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_other_widgets.h; sourceTree = "<group>"; };
-		9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_renderer.mm; sourceTree = "<group>"; };
+		9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_renderer.mm; sourceTree = "<group>"; tabWidth = 2; };
 		9C6DCD17219CD0EB00DB8E7A /* TMButtonsController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TMButtonsController.m; sourceTree = "<group>"; };
 		9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_dialogues.mm; sourceTree = "<group>"; };
 		9C6DCD19219CD0EB00DB8E7A /* TMView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMView.h; sourceTree = "<group>"; };
@@ -2698,6 +2699,8 @@
 		9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_widget.h; sourceTree = "<group>"; };
 		9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_menu.mm; sourceTree = "<group>"; };
 		9C6DCD24219CD0EB00DB8E7A /* TMButtonsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TMButtonsController.h; sourceTree = "<group>"; };
+		9C6DCD3C21A2271100DB8E7A /* ns_picture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_picture.h; sourceTree = "<group>"; };
+		9C6DCD3D21A2271100DB8E7A /* ns_picture.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_picture.mm; sourceTree = "<group>"; };
 		9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_sys_utils.cpp; sourceTree = "<group>"; };
 		9C722BEC10D2F7C700C41915 /* qt_sys_utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_sys_utils.hpp; sourceTree = "<group>"; };
 		9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unix_sys_utils.cpp; sourceTree = "<group>"; };
@@ -4847,6 +4850,8 @@
 		9C6DCCEE219CD0EB00DB8E7A /* NS */ = {
 			isa = PBXGroup;
 			children = (
+				9C6DCD3C21A2271100DB8E7A /* ns_picture.h */,
+				9C6DCD3D21A2271100DB8E7A /* ns_picture.mm */,
 				9C6DCCEF219CD0EB00DB8E7A /* AutoLayout */,
 				9C6DCD0B219CD0EB00DB8E7A /* TMView.mm */,
 				9C6DCD0C219CD0EB00DB8E7A /* MainMenu.nib */,
@@ -6141,6 +6146,7 @@
 				9CCC747210D303D900E88D90 /* load_pk.cpp in Sources */,
 				9CCC747310D303D900E88D90 /* load_tex.cpp in Sources */,
 				9CCC747410D303D900E88D90 /* load_tfm.cpp in Sources */,
+				9C6DCD3E21A2271100DB8E7A /* ns_picture.mm in Sources */,
 				49C096191B0F945300E038BA /* db_index.cpp in Sources */,
 				9CCC747510D303D900E88D90 /* tex_files.cpp in Sources */,
 				9C5210172028B7B000A2B5B6 /* adjust_termes.cpp in Sources */,

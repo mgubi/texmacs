@@ -26,8 +26,10 @@
 * Abstract Qt pictures
 ******************************************************************************/
 
-ns_picture_rep::ns_picture_rep (NSImage *im, int ox2, int oy2):
-  pict (im), w ([im size].width), h ([im size].height), ox (ox2), oy (oy2) {}
+ns_picture_rep::ns_picture_rep (NSBitmapImageRep *im, int ox2, int oy2) :
+  pict (im), w ([im size].width), h ([im size].height), ox (ox2), oy (oy2) { [pict retain]; }
+
+ns_picture_rep::~ns_picture_rep () { [pict release]; }
 
 picture_kind ns_picture_rep::get_type () { return picture_native; }
 void* ns_picture_rep::get_handle () { return (void*) this; }
@@ -40,26 +42,27 @@ void ns_picture_rep::set_origin (int ox2, int oy2) { ox= ox2; oy= oy2; }
 
 color
 ns_picture_rep::internal_get_pixel (int x, int y) {
-    [pict ]
-  return (color) pict.pixel (x, h - 1 - y);
+  NSUInteger col;
+  [pict getPixel:&col atX:x y:h - 1 - y];
+  return (color) col;
 }
 
 void
 ns_picture_rep::internal_set_pixel (int x, int y, color c) {
-  pict.setPixel (x, h - 1 - y, c);
+  NSUInteger col = c;
+  [pict setPixel:&col atX:x y:h - 1 - y];
 }
 
 picture
-ns_picture (const QImage& im, int ox, int oy) {
-  return (picture) tm_new<ns_picture_rep,QImage,int,int> (im, ox, oy);
+ns_picture (NSBitmapImageRep* im, int ox, int oy) {
+  return (picture) tm_new<ns_picture_rep,NSBitmapImageRep*,int,int> (im, ox, oy);
 }
 
 picture
 as_ns_picture (picture pic) {
   if (pic->get_type () == picture_native) return pic;
-  picture ret= ns_picture (QImage (pic->get_width (), pic->get_height (),
-                                   QImage::Format_ARGB32),
-                           pic->get_origin_x (), pic->get_origin_y ());
+  picture ret = native_picture(pic->get_width (), pic->get_height (),
+                               pic->get_origin_x (), pic->get_origin_y ());
   ret->copy_from (pic);
   return ret;
 }
@@ -69,36 +72,54 @@ as_native_picture (picture pict) {
   return as_ns_picture (pict);
 }
 
-QImage*
+NSBitmapImageRep*
 xpm_image (url file_name) {
   picture p= load_xpm (file_name);
   ns_picture_rep* rep= (ns_picture_rep*) p->get_handle ();
-  return &(rep->pict);
+  return rep->pict;
 }
 
 picture
 native_picture (int w, int h, int ox, int oy) {
-  return ns_picture (QImage (w, h, QImage::Format_ARGB32), ox, oy);
+  NSInteger pixelsWide = w;
+  NSInteger pixelsHigh = h;
+  // FIXME: maybe the following is not correct, I'm not sure about handling of alpha
+  // (premultipiled in this configuration)
+  NSBitmapImageRep* im =
+    [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
+                                            pixelsWide: pixelsWide
+                                            pixelsHigh: pixelsHigh
+                                         bitsPerSample: 8
+                                       samplesPerPixel: 4
+                                              hasAlpha: YES
+                                              isPlanar: NO
+                                        colorSpaceName: NSDeviceRGBColorSpace
+                                           bytesPerRow: 4 * pixelsWide
+                                          bitsPerPixel: 32];
+  picture ret =  ns_picture (im, ox, oy);
+  [im release];
+  return ret;
 }
 
 void
-qt_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
+ns_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_ns_picture (p);
   ns_picture_rep* pict= (ns_picture_rep*) p->get_handle ();
   int x0= pict->ox, y0= pict->h - 1 - pict->oy;
   decode (x, y);
-  qreal old_opacity= painter->opacity ();
-  painter->setOpacity (qreal (alpha) / qreal (255));
-  painter->drawImage (x - x0, y - y0, pict->pict);
-  painter->setOpacity (old_opacity);
+  [pict->pict drawInRect: NSMakeRect(x - x0,  y - y0, pict->w, pict->h)
+                fromRect: NSZeroRect
+               operation: NSCompositingOperationSourceAtop
+                fraction: (alpha/255.0)
+          respectFlipped: YES hints: NULL];
 }
 
 /******************************************************************************
 * Rendering on images
 ******************************************************************************/
 
-qt_image_renderer_rep::qt_image_renderer_rep (picture p, double zoom):
-  qt_renderer_rep (new QPainter ()), pict (p)
+ns_image_renderer_rep::ns_image_renderer_rep (picture p, double zoom) :
+  ns_renderer_rep (), pict (p)
 {
   zoomf  = zoom;
   shrinkf= (int) tm_round (std_shrinkf / zoomf);
@@ -118,34 +139,31 @@ qt_image_renderer_rep::qt_image_renderer_rep (picture p, double zoom):
   cy2= ph * pixel;
 
   ns_picture_rep* handle= (ns_picture_rep*) pict->get_handle ();
-  QImage& im (handle->pict);
-#if (QT_VERSION >= 0x040800)
-  im.fill (QColor (0, 0, 0, 0));
-#else
-  im.fill ((uint) 0);
-#endif
-  painter->begin (&im);
+  NSBitmapImageRep* im = handle->pict;
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:im]];
+
+  [[NSColor colorWithWhite:0.0 alpha:1.0] drawSwatchInRect: NSMakeRect(0, 0, pw, ph)];
+  //painter->begin (&im);
 }
 
-qt_image_renderer_rep::~qt_image_renderer_rep () {
-  painter->end();
-  delete painter;
-  painter = NULL;
+ns_image_renderer_rep::~ns_image_renderer_rep () {
+  [NSGraphicsContext restoreGraphicsState];
 }
 
 void
-qt_image_renderer_rep::set_zoom_factor (double zoom) {
+ns_image_renderer_rep::set_zoom_factor (double zoom) {
   renderer_rep::set_zoom_factor (zoom);
 }
 
 void*
-qt_image_renderer_rep::get_data_handle () {
+ns_image_renderer_rep::get_data_handle () {
   return (void*) this;
 }
 
 renderer
 picture_renderer (picture p, double zoomf) {
-  return (renderer) tm_new<qt_image_renderer_rep> (p, zoomf);
+  return (renderer) tm_new<ns_image_renderer_rep> (p, zoomf);
 }
 
 /******************************************************************************
