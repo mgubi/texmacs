@@ -141,8 +141,8 @@ ns_image_renderer_rep::ns_image_renderer_rep (picture p, double zoom) :
   ns_picture_rep* handle= (ns_picture_rep*) pict->get_handle ();
   NSBitmapImageRep* im = handle->pict;
   [NSGraphicsContext saveGraphicsState];
-  [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:im]];
-
+  [NSGraphicsContext
+   setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:im]];
   [[NSColor colorWithWhite:0.0 alpha:1.0] drawSwatchInRect: NSMakeRect(0, 0, pw, ph)];
   //painter->begin (&im);
 }
@@ -170,32 +170,38 @@ picture_renderer (picture p, double zoomf) {
 * Loading pictures
 ******************************************************************************/
 
-QImage*
+NSImage*
 get_image (url u, int w, int h) {
-  QImage *pm = NULL;
-  if (qt_supports (u))
-    pm= new QImage (os8bits_to_qstring (concretize (u)));
-  else {
+  NSString *fname = to_nsstring (concretize (u));
+  NSImage *pm = [[NSImage alloc] initWithContentsOfFile: fname];
+    
+  if (!pm) {
     url temp= url_temp (".png");
     image_to_png (u, temp, w, h);
-    pm= new QImage (os8bits_to_qstring (as_string (temp)));
+    fname = to_nsstring (concretize (temp));
+    pm = [[NSImage alloc] initWithContentsOfFile: fname];
     remove (temp);
   }
-  if (pm == NULL || pm->isNull ()) {
-      if (pm != NULL) delete pm;
+  if (pm == nil) {
       cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
-      return NULL;
+      return nil;
   }
-  if (pm->width () != w || pm->height () != h)
-    (*pm)= pm->scaled (w, h);
   return pm;
 }
 
 picture
 load_picture (url u, int w, int h) {
-  QImage* im= get_image (u, w, h);
-  if (im == NULL) return error_picture (w, h);
-  return ns_picture (*im, 0, 0);
+  NSImage* im= get_image (u, w, h);
+  if (im == nil) return error_picture (w, h);
+  picture p = native_picture(w, h, 0, 0);
+  ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
+  NSBitmapImageRep* rep = handle->pict;
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext
+   setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:rep]];
+  [im drawInRect:NSMakeRect (0, 0, w, h)];
+  [NSGraphicsContext restoreGraphicsState];
+  return p;
 }
 
 picture
@@ -214,9 +220,22 @@ qt_load_xpm (url file_name) {
   if (sss == "")
     load_string ("$TEXMACS_PATH/misc/pixmaps/TeXmacs.xpm", sss, true);
   c_string buf (sss);
-  QImage pm;
-  pm.loadFromData ((uchar*) (char*) buf, N(sss));
-  return ns_picture (pm, 0, 0);
+  NSImage *im = [[NSImage alloc]
+                 initWithData:[NSData dataWithBytes:(char*) buf length:N(sss)]];
+  if (im) {
+    NSSize sz = [im size];
+    picture p = native_picture(sz.width, sz.height, 0, 0);
+    ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
+    NSBitmapImageRep* rep = handle->pict;
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext
+     setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:rep]];
+    [im drawInRect:NSMakeRect (0, 0, sz.width, sz.height)];
+    [NSGraphicsContext restoreGraphicsState];
+    return p;
+  }
+  else
+    return error_picture (10, 10);
 }
 
 /******************************************************************************
@@ -224,7 +243,7 @@ qt_load_xpm (url file_name) {
 ******************************************************************************/
 
 void
-qt_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
+ns_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
   array<picture> a;
   for (int i=0; i<N(src); i++)
     a << load_picture (src[i], w, h);
@@ -232,5 +251,20 @@ qt_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
   picture t= e->apply (a, PIXEL);
   picture q= as_ns_picture (t);
   ns_picture_rep* pict= (ns_picture_rep*) q->get_handle ();
-  pict->pict.save (os8bits_to_qstring (concretize (dest)));
+  
+  NSBitmapImageFileType format = 0;
+  {
+    string suf = suffix (dest);
+    if (suf == "png") format = NSBitmapImageFileTypePNG;
+    else if (suf == "gif") format = NSBitmapImageFileTypeGIF;
+    else if (suf == "bmp") format = NSBitmapImageFileTypeBMP;
+    else if (suf == "jpg") format = NSBitmapImageFileTypeJPEG;
+    else if ((suf == "tif") || (suf == "tiff")) format = NSBitmapImageFileTypeTIFF;
+  }
+  if (format) {
+    NSData *png_data = [pict->pict representationUsingType: format properties: [NSDictionary dictionary]];
+    [png_data writeToFile: to_nsstring_utf8 ( concretize (dest))
+              atomically: NO];
+  } else
+    cout << "TeXmacs] warning: cannot save " << concretize (dest) << "\n";
 }

@@ -417,8 +417,8 @@ ns_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   }
   
   NSBezierPath *path = [NSBezierPath bezierPath];
-  [path appendBezierPathWithPoints:pnt count:n];
-  [path setWindingRule:(convex? NSEvenOddWindingRule : NSNonZeroWindingRule)];
+  [path appendBezierPathWithPoints: pnt count: n];
+  [path setWindingRule: (convex? NSEvenOddWindingRule : NSNonZeroWindingRule)];
   [path fill];
   STACK_DELETE_ARRAY (pnt);
   [path release];
@@ -430,7 +430,7 @@ ns_renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
   x[0]= x1; y[0]= y1;
   x[1]= x2; y[1]= y2;
   x[2]= x3; y[2]= y3;
-  polygon(x, y, true);
+  polygon (x, y, true);
 }
 
 /******************************************************************************
@@ -505,6 +505,7 @@ ns_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
 #endif
 
 
+#if 0 // not used
 void
 ns_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
   (void) w; (void) h;
@@ -515,6 +516,30 @@ ns_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
   y--; // top-left origin to bottom-left origin conversion
   [im drawAtPoint:NSMakePoint (x,y) fromRect:NSMakeRect (0,0,w,h) operation:NSCompositingOperationSourceAtop fraction:1.0];
 }  
+#endif
+
+void
+ns_renderer_rep::draw_clipped (CGImageRef im, int w, int h, SI x, SI y) {
+  (void) w; (void) h;
+  int x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
+  decode (x , y );
+  decode (x1, y1);
+  decode (x2, y2);
+  y--; // top-left origin to bottom-left origin conversion
+  CGContextRef cgc = [[NSGraphicsContext currentContext] CGContext];
+  CGRect r = CGRectMake (x,y,w,h);
+//  CGContextSetShouldAntialias (cgc, true);
+//  CGContextSaveGState (cgc);
+  CGContextDrawImage(cgc, r, im);
+//  CGContextRestoreGState (cgc);
+}
+
+
+
+
+
+
+
 
 static CGContextRef 
 MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
@@ -660,6 +685,7 @@ void ns_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 }
 #endif
 
+#if 0 // old code
 /******************************************************************************
 * Setting up and displaying xpm pixmaps
 ******************************************************************************/
@@ -781,7 +807,7 @@ void ns_renderer_rep::xpm (url file_name, SI x, SI y) {
   draw_clipped (image, w, h, x, y);
   char_clip=old_clip;
 }
-
+#endif
 
 /******************************************************************************
  * main cocoa renderer
