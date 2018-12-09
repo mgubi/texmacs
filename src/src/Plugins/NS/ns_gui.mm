@@ -36,28 +36,56 @@ int timeout_time;
  ******************************************************************************/
 
 
-ns_gui_rep::ns_gui_rep(int& argc, char** argv): 
-  interrupted(false), selection(NULL)
+ns_gui_rep::ns_gui_rep (int& argc, char** argv)
+  : interrupted (false), selection (NULL)
 {
   (void) argc; (void) argv;
-//  argc               = argc2;
-//  argv               = argv2;
-  interrupted        = false;
-  interrupt_time     = texmacs_time ();
+
+  interrupted  = false;
+  time_credit  = 100;
+  timeout_time = texmacs_time () + time_credit;
   
   set_output_language (get_locale_language ());
-  // out_lan= get_locale_language ();
-//  (void) default_font ();
+  refresh_language();
+  
+  updatetimer = new QTimer (gui_helper);
+  updatetimer->setSingleShot (true);
+  QObject::connect (updatetimer, SIGNAL (timeout()),
+                    gui_helper, SLOT (doUpdate()));
+  
+  if (!retina_manual) {
+    retina_manual= true;
+    double mac_hidpi = mac_screen_scale_factor();
+    if (DEBUG_STD)
+      debug_boot << "Mac Screen scaleFfactor: " << mac_hidpi <<  "\n";
+    
+    if (mac_hidpi == 2) {
+      if (DEBUG_STD) debug_boot << "Setting up HiDPI mode\n";
+      retina_factor= 2;
+      if (!retina_iman) {
+        retina_iman  = true;
+        retina_icons = 2;
+        // retina_icons = 1;
+        // retina_icons = 2;  // FIXME: why is this not better?
+      }
+      retina_scale = 1.4;
+    }
+  }
+  if (has_user_preference ("retina-factor"))
+    retina_factor= get_user_preference ("retina-factor") == "on"? 2: 1;
+  if (has_user_preference ("retina-icons"))
+    retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
+  if (has_user_preference ("retina-scale"))
+    retina_scale= as_double (get_user_preference ("retina-scale"));
 }
 
 
 /* important routines */
 void
 ns_gui_rep::get_extents (SI& width, SI& height) {
-  NSRect bounds = [[NSScreen mainScreen] visibleFrame];
-  
-  width = ((SI) bounds.size.width)  * PIXEL;
-  height= ((SI) bounds.size.height) * PIXEL;
+  coord2 size = from_nssize ([[NSScreen mainScreen] visibleFrame].size);
+  width  = size.x1;
+  height = size.x2;
 }
 
 void
@@ -65,6 +93,23 @@ ns_gui_rep::get_max_size (SI& width, SI& height) {
   width = 8000 * PIXEL;
   height= 6000 * PIXEL;
 }
+
+qt_gui_rep::~qt_gui_rep()  {
+  // FIXME: update this
+#id 0
+  delete gui_helper;
+  
+  while (waitDialogs.count()) {
+    waitDialogs.last()->deleteLater();
+    waitDialogs.removeLast();
+  }
+  if (waitWindow) delete waitWindow;
+  
+  // delete updatetimer; we do not need this given that gui_helper is the
+  // parent of updatetimer
+#endif
+}
+
 
 /******************************************************************************
  * interclient communication
@@ -138,8 +183,6 @@ ns_gui_rep::clear_selection (string key) {
  * Miscellaneous
  ******************************************************************************/
 
-void ns_gui_rep::image_gc (string name) { (void) name; }
-// FIXME: remove this unused function
 void ns_gui_rep::set_mouse_pointer (string name) { (void) name; }
 // FIXME: implement this function
 void ns_gui_rep::set_mouse_pointer (string curs_name, string mask_name)  { (void) curs_name; (void) mask_name; } ;

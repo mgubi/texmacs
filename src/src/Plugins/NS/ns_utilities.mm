@@ -14,52 +14,54 @@
 #include "converter.hpp"
 #include "analyze.hpp"
 
+#define SCREEN_PIXEL (PIXEL)
+
+coord4 from_nsrect (NSRect rect)
+{
+  SI c1, c2, c3, c4;
+  c1 = rect.origin.x*SCREEN_PIXEL;
+  c2 = rect.origin.y*SCREEN_PIXEL;
+  c3 = (rect.origin.x+rect.size.width+SCREEN_PIXEL-1)*SCREEN_PIXEL;
+  c4 = (rect.origin.y+rect.size.height+SCREEN_PIXEL-1)*SCREEN_PIXEL;
+  return coord4 (c1, c2, c3, c4);
+}
+
 NSRect to_nsrect(coord4 p)
 {
-	float c = 1.0/PIXEL;
-	return NSMakeRect(p.x1*c, -p.x4*c, (p.x3-p.x1)*c, (p.x4-p.x2)*c);
+	float c = 1.0/SCREEN_PIXEL;
+	return NSMakeRect (p.x1*c, -p.x4*c,
+                     (p.x3-p.x1+SCREEN_PIXEL-1)*c, (p.x4-p.x2+SCREEN_PIXEL-1)*c);
 }
 
-NSPoint to_nspoint(coord2 p)
+NSPoint to_nspoint (coord2 p)
 {
-	float c = 1.0/PIXEL;
-	return NSMakePoint(p.x1*c,-p.x2*c);
+	float c = 1.0/SCREEN_PIXEL;
+	return NSMakePoint (p.x1*c,-p.x2*c);
 }
 
-NSSize to_nssize(coord2 p)
+NSSize to_nssize (coord2 p)
 {
-	float c = 1.0/PIXEL;
-	return NSMakeSize(p.x1*c,p.x2*c);
+	float c = 1.0/SCREEN_PIXEL;
+	return NSMakeSize (p.x1*c,p.x2*c);
 }
 
-coord4 from_nsrect(NSRect rect)
-{
-	SI c1, c2, c3, c4;
-	
-	c1 = rect.origin.x*PIXEL;
-	c2 = rect.origin.y*PIXEL;
-	c3 = (rect.origin.x+rect.size.width)*PIXEL;
-	c4 = (rect.origin.y+rect.size.height)*PIXEL;	
-	return coord4 (c1, c2, c3, c4);
-}
-
-coord2 from_nspoint(NSPoint pt)
+coord2 from_nspoint (NSPoint pt)
 {
 	SI c1, c2;
-	c1 = pt.x*PIXEL;
-	c2 = -pt.y*PIXEL;
+	c1 = pt.x*SCREEN_PIXEL;
+	c2 = -pt.y*SCREEN_PIXEL;
 	return coord2 (c1,c2)	;
 }
 
-coord2 from_nssize(NSSize s)
+coord2 from_nssize (NSSize s)
 {
 	SI c1, c2;
-	c1 = s.width*PIXEL;
-	c2 = s.height*PIXEL;
+	c1 = s.width*SCREEN_PIXEL;
+	c2 = s.height*SCREEN_PIXEL;
 	return coord2 (c1,c2)	;
 }
 
-NSString *to_nsstring(string s)
+NSString *to_nsstring (string s)
 {
 	c_string p = c_string (s);
 	NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
