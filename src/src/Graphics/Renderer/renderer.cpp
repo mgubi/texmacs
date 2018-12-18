@@ -510,6 +510,7 @@ delete_renderer (renderer ren) {
 
 #ifndef QTTEXMACS
 #ifndef X11TEXMACS
+#ifndef AQUATEXMACS
 
 picture
 native_picture (int w, int h, int ox, int oy) {
@@ -538,5 +539,6 @@ as_native_picture (picture pict) {
   return pict;
 }
 
+#endif
 #endif
 #endif

@@ -14,7 +14,7 @@
 
 #include "mac_cocoa.h"
 
-#include "ns_simple_widget.hpp"
+#include "ns_simple_widget.h"
 #include "tm_timer.hpp"
 #include "gui.hpp"
 #include "font.hpp"
@@ -122,6 +122,7 @@ class ns_gui_rep {
   
   hashmap<string,tree>   selection_t;
   hashmap<string,string> selection_s;
+  char *selection;
   
 //  QTranslator* q_translator;
   

@@ -76,8 +76,6 @@
 		491BB5B6173118F700A755DF /* rewrite_equation_number.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B5173118F700A755DF /* rewrite_equation_number.cpp */; };
 		491BB5B7173118F700A755DF /* rewrite_equation_number.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B5173118F700A755DF /* rewrite_equation_number.cpp */; };
 		491BB5B8173118F700A755DF /* rewrite_equation_number.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B5173118F700A755DF /* rewrite_equation_number.cpp */; };
-		491BF364178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
-		491BF365178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491BF36E178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
 		491BF36F178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
 		491BF370178BFF4C00C69EEF /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
@@ -87,8 +85,6 @@
 		491BF374178BFF4C00C69EEF /* tm_winsparkle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36C178BFF4C00C69EEF /* tm_winsparkle.cpp */; };
 		491BF375178BFF4C00C69EEF /* tm_winsparkle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36C178BFF4C00C69EEF /* tm_winsparkle.cpp */; };
 		491BF376178BFF4C00C69EEF /* tm_winsparkle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36C178BFF4C00C69EEF /* tm_winsparkle.cpp */; };
-		491BF378178BFF9000C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
-		491BF37A178BFFA600C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */ = {isa = PBXBuildFile; fileRef = 491BF363178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem */; };
 		491FC57C16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
 		491FC57D16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
 		491FC57E16F900140038929C /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
@@ -1504,6 +1500,12 @@
 		9CF78E0D125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
 		9CF78E0E125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
 		9CF78E0F125FBF9700CA5846 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
+		9CF9D00521C8061800524D1A /* ns_simple_widget.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9D00421C8061700524D1A /* ns_simple_widget.mm */; };
+		9CF9D00721C8156100524D1A /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9D00621C8156100524D1A /* font_spacing.cpp */; };
+		9CF9D00821C8156100524D1A /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9D00621C8156100524D1A /* font_spacing.cpp */; };
+		9CF9D00921C8156100524D1A /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9D00621C8156100524D1A /* font_spacing.cpp */; };
+		9CF9D00A21C8200000524D1A /* QTMTreeModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49630B59186D6A3600C9268F /* QTMTreeModel.cpp */; };
+		9CF9D00D21C854E000524D1A /* ns_ui_element.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9CF9D00C21C854E000524D1A /* ns_ui_element.mm */; };
 		9CF9FBE016F1334E00A146D1 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
 		9CF9FBE116F1334E00A146D1 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
 		9CF9FBE216F1334E00A146D1 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
@@ -1554,7 +1556,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 7;
 			files = (
-				491BF378178BFF9000C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1564,7 +1565,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 7;
 			files = (
-				491BF37A178BFFA600C69EEF /* texmacs_updates_dsa_pub.pem in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2693,7 +2693,6 @@
 		9C6DCD1C219CD0EB00DB8E7A /* ns_simple_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_simple_widget.h; sourceTree = "<group>"; };
 		9C6DCD1D219CD0EB00DB8E7A /* ns_menu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_menu.h; sourceTree = "<group>"; };
 		9C6DCD1E219CD0EB00DB8E7A /* ns_gui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_gui.h; sourceTree = "<group>"; };
-		9C6DCD1F219CD0EB00DB8E7A /* ns_basic_widgets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_basic_widgets.h; sourceTree = "<group>"; };
 		9C6DCD20219CD0EB00DB8E7A /* ns_utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_utilities.h; sourceTree = "<group>"; };
 		9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_widget.mm; sourceTree = "<group>"; };
 		9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ns_widget.h; sourceTree = "<group>"; };
@@ -2796,6 +2795,10 @@
 		9CF5BC70128A13CB00F691BF /* qt_window_widget.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_window_widget.hpp; sourceTree = "<group>"; };
 		9CF5BC71128A13CB00F691BF /* QTMGuiHelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMGuiHelper.cpp; sourceTree = "<group>"; };
 		9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = highlight_observer.cpp; sourceTree = "<group>"; };
+		9CF9D00421C8061700524D1A /* ns_simple_widget.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_simple_widget.mm; sourceTree = "<group>"; };
+		9CF9D00621C8156100524D1A /* font_spacing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_spacing.cpp; sourceTree = "<group>"; };
+		9CF9D00B21C853DB00524D1A /* ns_ui_element.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ns_ui_element.h; sourceTree = "<group>"; };
+		9CF9D00C21C854E000524D1A /* ns_ui_element.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ns_ui_element.mm; sourceTree = "<group>"; };
 		9CFE66E910A99E700028F6F8 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		9CFE66EA10A99E700028F6F8 /* Makefile.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.in; sourceTree = "<group>"; };
 		9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bibtex_functions.cpp; sourceTree = "<group>"; };
@@ -2873,8 +2876,10 @@
 				19C28FACFE9D520D11CA2CBB /* Products */,
 				9C6DCCED219CD0B000DB8E7A /* Recovered References */,
 			);
+			indentWidth = 2;
 			name = TeXmacs;
 			sourceTree = "<group>";
+			tabWidth = 2;
 		};
 		29B97315FDCFA39411CA2CEA /* Sources */ = {
 			isa = PBXGroup;
@@ -3688,6 +3693,7 @@
 		9C0B47D910A8CC100097A335 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
+				9CF9D00621C8156100524D1A /* font_spacing.cpp */,
 				9C5210252028B86900A2B5B6 /* font_scripts.cpp */,
 				9C5210262028B86900A2B5B6 /* font_wide.cpp */,
 				9C4A74171D22C3A000572468 /* poor_distorted.cpp */,
@@ -4850,30 +4856,32 @@
 		9C6DCCEE219CD0EB00DB8E7A /* NS */ = {
 			isa = PBXGroup;
 			children = (
+				9C6DCD12219CD0EB00DB8E7A /* mac_cocoa.h */,
+				9C6DCD20219CD0EB00DB8E7A /* ns_utilities.h */,
+				9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */,
+				9C6DCD1B219CD0EB00DB8E7A /* ns_renderer.h */,
+				9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */,
 				9C6DCD3C21A2271100DB8E7A /* ns_picture.h */,
 				9C6DCD3D21A2271100DB8E7A /* ns_picture.mm */,
-				9C6DCCEF219CD0EB00DB8E7A /* AutoLayout */,
+				9C6DCD1E219CD0EB00DB8E7A /* ns_gui.h */,
+				9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */,
+				9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */,
+				9C6DCD15219CD0EB00DB8E7A /* ns_other_widgets.h */,
+				9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */,
+				9CF9D00B21C853DB00524D1A /* ns_ui_element.h */,
+				9CF9D00C21C854E000524D1A /* ns_ui_element.mm */,
+				9C6DCD1C219CD0EB00DB8E7A /* ns_simple_widget.h */,
+				9CF9D00421C8061700524D1A /* ns_simple_widget.mm */,
+				9C6DCD19219CD0EB00DB8E7A /* TMView.h */,
 				9C6DCD0B219CD0EB00DB8E7A /* TMView.mm */,
+				9C6DCCEF219CD0EB00DB8E7A /* AutoLayout */,
 				9C6DCD0C219CD0EB00DB8E7A /* MainMenu.nib */,
 				9C6DCD0E219CD0EB00DB8E7A /* InfoPlist.strings */,
 				9C6DCD10219CD0EB00DB8E7A /* Window.nib */,
-				9C6DCD12219CD0EB00DB8E7A /* mac_cocoa.h */,
-				9C6DCD13219CD0EB00DB8E7A /* ns_utilities.mm */,
-				9C6DCD14219CD0EB00DB8E7A /* ns_gui.mm */,
-				9C6DCD15219CD0EB00DB8E7A /* ns_other_widgets.h */,
-				9C6DCD16219CD0EB00DB8E7A /* ns_renderer.mm */,
 				9C6DCD17219CD0EB00DB8E7A /* TMButtonsController.m */,
 				9C6DCD18219CD0EB00DB8E7A /* ns_dialogues.mm */,
-				9C6DCD19219CD0EB00DB8E7A /* TMView.h */,
 				9C6DCD1A219CD0EB00DB8E7A /* ns_dialogues.h */,
-				9C6DCD1B219CD0EB00DB8E7A /* ns_renderer.h */,
-				9C6DCD1C219CD0EB00DB8E7A /* ns_simple_widget.h */,
 				9C6DCD1D219CD0EB00DB8E7A /* ns_menu.h */,
-				9C6DCD1E219CD0EB00DB8E7A /* ns_gui.h */,
-				9C6DCD1F219CD0EB00DB8E7A /* ns_basic_widgets.h */,
-				9C6DCD20219CD0EB00DB8E7A /* ns_utilities.h */,
-				9C6DCD21219CD0EB00DB8E7A /* ns_widget.mm */,
-				9C6DCD22219CD0EB00DB8E7A /* ns_widget.h */,
 				9C6DCD23219CD0EB00DB8E7A /* ns_menu.mm */,
 				9C6DCD24219CD0EB00DB8E7A /* TMButtonsController.h */,
 			);
@@ -5345,7 +5353,6 @@
 			files = (
 				9C25212B14FFC7BC00C62749 /* build-glue.scm in Resources */,
 				49896901152B981400DB1E9E /* TeXmacs.icns in Resources */,
-				491BF364178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5364,7 +5371,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				491BF365178BFF3100C69EEF /* texmacs_updates_dsa_pub.pem in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5850,6 +5856,7 @@
 				9C5210272028B86900A2B5B6 /* font_scripts.cpp in Sources */,
 				9C25EABA1D2A9ED400D7F2D5 /* new_breaker.cpp in Sources */,
 				9C0B4B2A10A8CC110097A335 /* concat_post.cpp in Sources */,
+				9CF9D00A21C8200000524D1A /* QTMTreeModel.cpp in Sources */,
 				9C0B4B2B10A8CC110097A335 /* concat_text.cpp in Sources */,
 				9C0B4B2C10A8CC110097A335 /* concater.cpp in Sources */,
 				9C0B4B2D10A8CC110097A335 /* env.cpp in Sources */,
@@ -5958,6 +5965,7 @@
 				49BEF71816FDD566004BAE73 /* metadata-springer.cpp in Sources */,
 				4929A88A170207440028991F /* curve.cpp in Sources */,
 				4929A88D170207440028991F /* equations.cpp in Sources */,
+				9CF9D00721C8156100524D1A /* font_spacing.cpp in Sources */,
 				4929A890170207440028991F /* frame.cpp in Sources */,
 				4929A893170207440028991F /* grid.cpp in Sources */,
 				4929A896170207440028991F /* point.cpp in Sources */,
@@ -6099,6 +6107,7 @@
 				9CCC744910D303D900E88D90 /* virtual_font.cpp in Sources */,
 				9CCC744A10D303D900E88D90 /* widget.cpp in Sources */,
 				9CCC744B10D303D900E88D90 /* math_tree.cpp in Sources */,
+				9CF9D00D21C854E000524D1A /* ns_ui_element.mm in Sources */,
 				9CCC744C10D303D900E88D90 /* test_math.cpp in Sources */,
 				9CCC744D10D303D900E88D90 /* basic_renderer.cpp in Sources */,
 				9CCC744E10D303D900E88D90 /* page_type.cpp in Sources */,
@@ -6157,6 +6166,7 @@
 				9CCC749510D303D900E88D90 /* init_texmacs.cpp in Sources */,
 				9C52102C2028B86900A2B5B6 /* font_wide.cpp in Sources */,
 				9CCC749610D303D900E88D90 /* init_upgrade.cpp in Sources */,
+				9CF9D00921C8156100524D1A /* font_spacing.cpp in Sources */,
 				9CCC749810D303D900E88D90 /* url.cpp in Sources */,
 				9CCC749910D303D900E88D90 /* file.cpp in Sources */,
 				9CCC749A10D303D900E88D90 /* image_files.cpp in Sources */,
@@ -6293,6 +6303,7 @@
 				9C74D965123BF892008959D1 /* packrat_grammar.cpp in Sources */,
 				9C74D966123BF892008959D1 /* packrat_parser.cpp in Sources */,
 				9CE18E85125E685D00641CFC /* tree_brackets.cpp in Sources */,
+				9CF9D00521C8061800524D1A /* ns_simple_widget.mm in Sources */,
 				9CF78E0F125FBF9700CA5846 /* highlight_observer.cpp in Sources */,
 				9CEDAA321264FF6C009630CC /* tree_analyze.cpp in Sources */,
 				9CD958F01D241C0500AA2C65 /* poor_extended.cpp in Sources */,
@@ -6434,6 +6445,7 @@
 				9CD4E61E10B14AB300E0DD5C /* tree_traverse.cpp in Sources */,
 				9CD4E61F10B14AB300E0DD5C /* edit_main.cpp in Sources */,
 				9CD4E62010B14AB300E0DD5C /* edit_typeset.cpp in Sources */,
+				9CF9D00821C8156100524D1A /* font_spacing.cpp in Sources */,
 				49FB1B081CB30D6000B983F3 /* poor_smallcaps.cpp in Sources */,
 				9CD4E62110B14AB300E0DD5C /* edit_complete.cpp in Sources */,
 				9CD4E62210B14AB300E0DD5C /* edit_cursor.cpp in Sources */,
@@ -6980,12 +6992,14 @@
 		C01FCF4F08A954540054247B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_OPTIMIZATION_LEVEL = 0;
 			};
 			name = Debug;
 		};
 		C01FCF5008A954540054247B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_OPTIMIZATION_LEVEL = 0;
 			};
 			name = Release;
 		};

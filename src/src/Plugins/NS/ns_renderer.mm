@@ -52,8 +52,8 @@ struct cg_image_rep: concrete_struct {
 	SI xo,yo;
 	int w,h;
 	cg_image_rep (CGImageRef img2, SI xo2, SI yo2, int w2, int h2) :
-    img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { CGImageRetain(img); };
-	~cg_image_rep()  {  CGImageRelease(img); };
+    img (img2), xo (xo2), yo (yo2), w (w2), h (h2) { CGImageRetain (img); };
+	~cg_image_rep()  {  CGImageRelease (img); };
 	friend class cg_image;
 };
 
@@ -80,7 +80,7 @@ static hashmap<string,ns_image> images;
  ******************************************************************************/
 
 ns_renderer_rep::ns_renderer_rep (int w2, int h2) :
-  basic_renderer_rep (true, w2, h2), context(NULL)
+  basic_renderer_rep (true, w2, h2), context (NULL)
 {
   reset_zoom_factor();
 }
@@ -91,7 +91,9 @@ ns_renderer_rep::~ns_renderer_rep () {
 
 void 
 ns_renderer_rep::begin (void * c) { 
-  context = (NSGraphicsContext*)c; 
+  context = (NSGraphicsContext*)c;
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext setCurrentContext: context];
   [context retain];
 //  CGContextBeginPage(context, NULL);
 }
@@ -99,6 +101,7 @@ ns_renderer_rep::begin (void * c) {
 void 
 ns_renderer_rep::end () { 
 //  CGContextEndPage(context);
+  [NSGraphicsContext restoreGraphicsState];
   [context release];
 //  CGContextRelease(context); 
   context = NULL;  
@@ -109,14 +112,6 @@ ns_renderer_rep::set_zoom_factor (double zoom) {
     renderer_rep::set_zoom_factor (retina_factor * zoom);
     retina_pixel= pixel * retina_factor;
 }
-
-#if 0
-void
-ns_renderer_rep::set_color (color c) {
-  basic_renderer_rep::set_color(c);
-  ns_set_color(cur_fg);
-}
-#endif
 
 /******************************************************************************
  * Transformations
@@ -276,7 +271,7 @@ ns_renderer_rep::set_pencil (pencil np) {
       set_pattern (ctx, pm, pattern_alpha, pox, poy, false);
     }
   }
-  [NSBezierPath setDefaultLineCapStyle:(pen->get_cap () == cap_round? NSRoundLineCapStyle : NSButtLineCapStyle)];
+  [NSBezierPath setDefaultLineCapStyle: (pen->get_cap () == cap_round? NSRoundLineCapStyle : NSButtLineCapStyle)];
   [NSBezierPath setDefaultLineJoinStyle: NSRoundLineJoinStyle];
 }
 
@@ -420,6 +415,7 @@ ns_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   [path appendBezierPathWithPoints: pnt count: n];
   [path setWindingRule: (convex? NSEvenOddWindingRule : NSNonZeroWindingRule)];
   [path fill];
+  
   STACK_DELETE_ARRAY (pnt);
   [path release];
 }
@@ -530,15 +526,9 @@ ns_renderer_rep::draw_clipped (CGImageRef im, int w, int h, SI x, SI y) {
   CGRect r = CGRectMake (x,y,w,h);
 //  CGContextSetShouldAntialias (cgc, true);
 //  CGContextSaveGState (cgc);
-  CGContextDrawImage(cgc, r, im);
+  CGContextDrawImage (cgc, r, im);
 //  CGContextRestoreGState (cgc);
 }
-
-
-
-
-
-
 
 
 static CGContextRef 

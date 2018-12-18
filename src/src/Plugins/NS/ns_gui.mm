@@ -2,22 +2,28 @@
 /******************************************************************************
 * MODULE     : ns_gui.mm
 * DESCRIPTION: Cocoa display class
-* COPYRIGHT  : (C) 2006 Massimiliano Gubinelli
+* COPYRIGHT  : (C) 2018 Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include <locale.h>
 
 #include "iterator.hpp"
 #include "dictionary.hpp"
-#include "ns_gui.h"
 #include "analyze.hpp"
-#include <locale.h>
 #include "language.hpp"
 #include "message.hpp"
+#include "scheme.hpp"
+#include "boot.hpp"
+
+#include "ns_gui.h"
+#include "ns_utilities.h"
 #include "ns_renderer.h" // for the_ns_renderer
+#include "MacOS/mac_utilities.h"
+
 
 //extern hashmap<id, pointer> NSWindow_to_window;
 //extern window (*get_current_window) (void);
@@ -37,7 +43,9 @@ int timeout_time;
 
 
 ns_gui_rep::ns_gui_rep (int& argc, char** argv)
-  : interrupted (false), selection (NULL)
+ : interrupted (false), popup_wid_time (0), time_credit (100),
+   do_check_events (false), updating (false), needing_update (false),
+   selection (NULL)
 {
   (void) argc; (void) argv;
 
@@ -48,16 +56,16 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
   set_output_language (get_locale_language ());
   refresh_language();
   
-  updatetimer = new QTimer (gui_helper);
-  updatetimer->setSingleShot (true);
-  QObject::connect (updatetimer, SIGNAL (timeout()),
-                    gui_helper, SLOT (doUpdate()));
+  //updatetimer = new QTimer (gui_helper);
+  //updatetimer->setSingleShot (true);
+  //QObject::connect (updatetimer, SIGNAL (timeout()),
+  //                  gui_helper, SLOT (doUpdate()));
   
   if (!retina_manual) {
     retina_manual= true;
     double mac_hidpi = mac_screen_scale_factor();
     if (DEBUG_STD)
-      debug_boot << "Mac Screen scaleFfactor: " << mac_hidpi <<  "\n";
+      debug_boot << "Mac Screen scale factor: " << mac_hidpi <<  "\n";
     
     if (mac_hidpi == 2) {
       if (DEBUG_STD) debug_boot << "Setting up HiDPI mode\n";
@@ -94,9 +102,9 @@ ns_gui_rep::get_max_size (SI& width, SI& height) {
   height= 6000 * PIXEL;
 }
 
-qt_gui_rep::~qt_gui_rep()  {
+ns_gui_rep::~ns_gui_rep()  {
   // FIXME: update this
-#id 0
+#if 0
   delete gui_helper;
   
   while (waitDialogs.count()) {
@@ -116,9 +124,11 @@ qt_gui_rep::~qt_gui_rep()  {
  ******************************************************************************/
 
 bool
-ns_gui_rep::get_selection (string key, tree& t, string& s) {
-  t= "none";
+ns_gui_rep::get_selection (string key, tree& t, string& s, string format) {
+  // FIXME: sync with Qt version
+  
   s= "";
+  t= "none";
   if (selection_t->contains (key)) {
     t= copy (selection_t [key]);
     s= copy (selection_s [key]);
@@ -127,8 +137,8 @@ ns_gui_rep::get_selection (string key, tree& t, string& s) {
   if (key != "primary") return false;
   
 	NSPasteboard *pb = [NSPasteboard generalPasteboard];
-	NSArray *types = [NSArray arrayWithObject:NSStringPboardType];
-	NSString *bestType = [pb availableTypeFromArray:types];
+	NSArray *types = [NSArray arrayWithObject: NSStringPboardType];
+	NSString *bestType = [pb availableTypeFromArray: types];
 
 	if (bestType != nil) {
 		NSString* data = [pb stringForType:bestType];
@@ -145,7 +155,10 @@ ns_gui_rep::get_selection (string key, tree& t, string& s) {
 }
 
 bool
-ns_gui_rep::set_selection (string key, tree t, string s) {
+ns_gui_rep::set_selection (string key, tree t,
+                           string s, string sv, string sh, string format) {
+  // FIXME: sync with Qt version
+
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
   if (key == "primary") {
@@ -160,15 +173,15 @@ ns_gui_rep::set_selection (string key, tree t, string s) {
 	NSArray *types = [NSArray arrayWithObjects:
 		NSStringPboardType, nil];
 	[pb declareTypes:types owner:nil];
-	[pb setString:[NSString stringWithCString:selection] forType:NSStringPboardType];
-	
-	
+	[pb setString: [NSString stringWithCString: selection]
+        forType: NSStringPboardType];
   }
   return true;
 }
 
 void
 ns_gui_rep::clear_selection (string key) {
+  // FIXME: sync with Qt version
   selection_t->reset (key);
   selection_s->reset (key);
   if ((key == "primary") && (selection != NULL)) {
@@ -193,11 +206,11 @@ void ns_gui_rep::set_mouse_pointer (string curs_name, string mask_name)  { (void
 
 static bool check_mask(int mask)
 {
-  NSEvent * event = [NSApp nextEventMatchingMask:mask
-                             untilDate:nil
-                                inMode:NSDefaultRunLoopMode 
-                               dequeue:NO];
- // if (event != nil) NSLog(@"%@",event);
+  NSEvent * event = [NSApp nextEventMatchingMask: mask
+                                       untilDate: nil
+                                          inMode: NSDefaultRunLoopMode
+                                         dequeue: NO];
+  // if (event != nil) NSLog(@"%@",event);
   return (event != nil);
   
 }
@@ -211,29 +224,29 @@ ns_gui_rep::check_event (int type) {
       else  {
         time_t now= texmacs_time ();
         if (now - interrupt_time < 0) return false;
-//        else interrupt_time= now + (100 / (XPending (dpy) + 1));
+        //        else interrupt_time= now + (100 / (XPending (dpy) + 1));
         else interrupt_time= now + 100;
-        interrupted= check_mask(NSKeyDownMask |
-                               // NSKeyUpMask |
-                                NSLeftMouseDownMask |
-                                NSLeftMouseUpMask |
-                                NSRightMouseDownMask |
-                                NSRightMouseUpMask );
+        interrupted= check_mask (NSKeyDownMask |
+                                 // NSKeyUpMask |
+                                 NSLeftMouseDownMask |
+                                 NSLeftMouseUpMask |
+                                 NSRightMouseDownMask |
+                                 NSRightMouseUpMask );
         return interrupted;
       }
-      case INTERRUPTED_EVENT:
-        return interrupted;
-      case ANY_EVENT:
-        return check_mask(NSAnyEventMask);
-      case MOTION_EVENT:
-        return check_mask(NSMouseMovedMask);
-      case DRAG_EVENT:
-        return check_mask(NSLeftMouseDraggedMask|NSRightMouseDraggedMask);
-      case MENU_EVENT:
-        return check_mask(NSLeftMouseDownMask |
-                          NSLeftMouseUpMask |
-                          NSRightMouseDownMask |
-                          NSRightMouseUpMask );
+    case INTERRUPTED_EVENT:
+      return interrupted;
+    case ANY_EVENT:
+      return check_mask (NSAnyEventMask);
+    case MOTION_EVENT:
+      return check_mask (NSMouseMovedMask);
+    case DRAG_EVENT:
+      return check_mask (NSLeftMouseDraggedMask|NSRightMouseDraggedMask);
+    case MENU_EVENT:
+      return check_mask (NSLeftMouseDownMask |
+                         NSLeftMouseUpMask |
+                         NSRightMouseDownMask |
+                         NSRightMouseUpMask );
   }
   return interrupted;
 }
@@ -246,11 +259,12 @@ ns_gui_rep::check_event (int type) {
 
 void
 ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
+  // FIXME: implement show_wait_indicator
 }
 
 
 void (*the_interpose_handler) (void) = NULL;
-//void set_interpose_handler (void (*r) (void)) { the_interpose_handler= r; }
+
 void gui_interpose (void (*r) (void)) { the_interpose_handler= r; }
 
 void update()
@@ -266,8 +280,6 @@ void ns_gui_rep::update ()
 }
 
 
-
-
 @interface TMHelper : NSObject
 {
 }
@@ -277,7 +289,7 @@ void ns_gui_rep::update ()
 {
   if (self = [super init])
   {
-		[NSApp setDelegate:self];
+		[NSApp setDelegate: self];
   }
   return self;
 }
@@ -342,58 +354,51 @@ void ns_gui_rep::update ()
 
 //@class FScriptMenuItem;
 
-void ns_gui_rep::event_loop ()
+void
+ns_gui_rep::event_loop ()
 #if 0
 {
-//	TMInterposer* i = [[TMInterposer alloc ] init];
-	//[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
-//	update();
-	[[[TMHelper alloc] init] autorelease];
-	[NSApp run];
-//	[i release];
+  //	TMInterposer* i = [[TMInterposer alloc ] init];
+  //[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
+  //	update();
+  [[[TMHelper alloc] init] autorelease];
+  [NSApp run];
+  //	[i release];
 }
 #else
 {
-//	[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
-	[NSApp finishLaunching];
-	{
-	NSEvent *event = nil;
+  //	[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
+  [NSApp finishLaunching];
+  {
+    NSEvent *event = nil;
     time_credit= 1000000;
-
-  while (1) {
-    timeout_time= texmacs_time () + time_credit;
-
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-			NSDate *dateSlow = [NSDate dateWithTimeIntervalSinceNow:0.5];
-		event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate: dateSlow //[NSDate distantFuture] 
-																 inMode:NSDefaultRunLoopMode dequeue:YES];		
-		while (event)
-		{
-			[NSApp sendEvent:event];
-		//	update();
-			//NSDate *dateFast = [NSDate dateWithTimeIntervalSinceNow:0.001];
-			event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:[NSDate distantPast] // dateFast 
-																	 inMode:NSDefaultRunLoopMode dequeue:YES];
-		}
-		interrupted = false;
-    if (!event)  {
-       update();
-      time_credit= min (1000000, 2 * time_credit);
-      ns_update_flag= false;
+    
+    while (1) {
+      timeout_time= texmacs_time () + time_credit;
+      
+      NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+      NSDate *dateSlow = [NSDate dateWithTimeIntervalSinceNow:0.5];
+      event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate: dateSlow //[NSDate distantFuture]
+                                   inMode:NSDefaultRunLoopMode dequeue:YES];
+      while (event)
+      {
+        [NSApp sendEvent:event];
+        //	update();
+        //NSDate *dateFast = [NSDate dateWithTimeIntervalSinceNow:0.001];
+        event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:[NSDate distantPast] // dateFast
+                                     inMode:NSDefaultRunLoopMode dequeue:YES];
+      }
+      interrupted = false;
+      if (!event)  {
+        update();
+        time_credit= min (1000000, 2 * time_credit);
+        ns_update_flag= false;
+      }
+      [pool release];
     }
-    [pool release];
-  }  
-	}
+  }
 }
 #endif
-
-
-
-
-ns_gui_rep::~ns_gui_rep() 
-{ 
-} 
-
 
 
 /* interface ******************************************************************/
@@ -405,12 +410,11 @@ static NSAutoreleasePool *pool = nil;
 //static NSApplication *app = nil;
 
 
-
 /******************************************************************************
 * Main routines
 ******************************************************************************/
 
-void gui_open (int& argc2, char** argv2)
+void gui_open (int& argc, char** argv)
   // start the gui
 {
   if (!NSApp) {
@@ -423,7 +427,7 @@ void gui_open (int& argc2, char** argv2)
     pool = [[NSAutoreleasePool alloc] init];
   } else [pool retain];
   
-  the_gui = tm_new <ns_gui_rep> (argc2, argv2);
+  the_gui = tm_new <ns_gui_rep> (argc, argv);
 }
 
 void gui_start_loop ()
@@ -438,8 +442,9 @@ void gui_close ()
   ASSERT (the_gui != NULL, "gui not yet open");
   [pool release];
   tm_delete (the_gui);
-  the_gui=NULL;
+  the_gui = NULL;
 }
+
 void
 gui_root_extents (SI& width, SI& height) {   
 	// get the screen size
@@ -497,21 +502,20 @@ load_system_font (string family, int size, int dpi,
 * Clipboard support
 ******************************************************************************/
 
-  // Copy a selection 't' with string equivalent 's' to the clipboard 'cb'
-  // Returns true on success
+// Copy a selection 't' with string equivalent 's' to the clipboard 'cb'
+// and possibly the variants 'sv' and 'sh' for verbatim and html
+// Returns true on success
 bool
 set_selection (string key, tree t,
                string s, string sv, string sh, string format) {
-  (void) format;
-  return the_gui->set_selection (key, t, s);
+  return the_gui->set_selection (key, t, s, sv, sh, format);
 }
 
   // Retrieve the selection 't' with string equivalent 's' from clipboard 'cb'
   // Returns true on success; sets t to (extern s) for external selections
 bool
 get_selection (string key, tree& t, string& s, string format) { 
-  (void) format;
-  return the_gui->get_selection (key, t, s);
+  return the_gui->get_selection (key, t, s, format);
 }
 
   // Clear the selection on clipboard 'cb'
@@ -529,7 +533,7 @@ int char_clip=0;
 void 
 beep () {
   // Issue a beep
-  NSBeep();
+  NSBeep ();
 }
 
 void 
@@ -549,7 +553,8 @@ void image_gc (string name) {
 }
 
 void
-show_help_balloon (widget balloon, SI x, SI y) { 
+show_help_balloon (widget balloon, SI x, SI y) {
+  // FIXME: implement
   // Display a help balloon at position (x, y); the help balloon should
   // disappear as soon as the user presses a key or moves the mouse
   (void) balloon; (void) x; (void) y;
@@ -575,3 +580,127 @@ external_event (string type, time_t t) {
   }
 #endif
 }
+
+
+/******************************************************************************
+ * Delayed commands
+ ******************************************************************************/
+
+command_queue::command_queue() : lapse (0), wait (true) { }
+command_queue::~command_queue() { clear_pending(); /* implicit */ }
+
+void
+command_queue::exec (object cmd) {
+  q << cmd;
+  start_times << (((time_t) texmacs_time ()) - 1000000000);
+  lapse = texmacs_time();
+  the_gui->need_update();
+  wait= true;
+}
+
+void
+command_queue::exec_pause (object cmd) {
+  q << cmd;
+  start_times << ((time_t) texmacs_time ());
+  lapse = texmacs_time();
+  the_gui->need_update();
+  wait= true;
+}
+
+void
+command_queue::exec_pending () {
+  array<object> a = q;
+  array<time_t> b = start_times;
+  q = array<object> (0);
+  start_times = array<time_t> (0);
+  int i, n = N(a);
+  for (i = 0; i<n; i++) {
+    time_t now =  texmacs_time ();
+    if ((now - b[i]) >= 0) {
+      object obj = call (a[i]);
+      if (is_int (obj) && (now - b[i] < 1000000000)) {
+        time_t pause = as_int (obj);
+        //cout << "pause = " << obj << "\n";
+        q << a[i];
+        start_times << (now + pause);
+      }
+    }
+    else {
+      q << a[i];
+      start_times << b[i];
+    }
+  }
+  if (N(q) > 0) {
+    wait = true;  // wait_for_delayed_commands
+    lapse = start_times[0];
+    int n = N(start_times);
+    for (i = 1; i<n; i++) {
+      if (lapse > start_times[i]) lapse = start_times[i];
+    }
+  } else
+    wait = false;
+}
+
+void
+command_queue::clear_pending () {
+  q = array<object> (0);
+  start_times = array<time_t> (0);
+  wait = false;
+}
+
+bool
+command_queue::must_wait (time_t now) const {
+  return wait && (lapse <= now);
+}
+
+
+/******************************************************************************
+ * Delayed commands interface
+ ******************************************************************************/
+
+void exec_delayed (object cmd) {
+  the_gui->delayed_commands.exec (cmd);
+}
+void exec_delayed_pause (object cmd) {
+  the_gui->delayed_commands.exec_pause (cmd);
+}
+void clear_pending_commands () {
+  the_gui->delayed_commands.clear_pending ();
+}
+
+
+/******************************************************************************
+ * Queued events
+ ******************************************************************************/
+
+event_queue::event_queue() : n(0) { }
+
+void
+event_queue::append (const queued_event& ev) {
+  q << ev;
+  ++n;
+}
+
+queued_event
+event_queue::next () {
+  if (is_nil(q))
+    return queued_event();
+  queued_event ev = q->item;
+  q = q->next;
+  --n;
+  return ev;
+}
+
+bool
+event_queue::is_empty() const {
+  ASSERT (!(n!=0 && is_nil(q)), "WTF?");
+  return n == 0;
+}
+
+int
+event_queue::size() const {
+  return n;
+}
+
+
+

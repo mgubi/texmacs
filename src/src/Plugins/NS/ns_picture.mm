@@ -138,17 +138,14 @@ ns_image_renderer_rep::ns_image_renderer_rep (picture p, double zoom) :
   cx2= pw * pixel;
   cy2= ph * pixel;
 
-  ns_picture_rep* handle= (ns_picture_rep*) pict->get_handle ();
+  ns_picture_rep* handle = (ns_picture_rep*) pict->get_handle ();
   NSBitmapImageRep* im = handle->pict;
-  [NSGraphicsContext saveGraphicsState];
-  [NSGraphicsContext
-   setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:im]];
+  begin ([NSGraphicsContext graphicsContextWithBitmapImageRep: im]);
   [[NSColor colorWithWhite:0.0 alpha:1.0] drawSwatchInRect: NSMakeRect(0, 0, pw, ph)];
-  //painter->begin (&im);
 }
 
 ns_image_renderer_rep::~ns_image_renderer_rep () {
-  [NSGraphicsContext restoreGraphicsState];
+//  [NSGraphicsContext restoreGraphicsState];
 }
 
 void
@@ -191,14 +188,14 @@ get_image (url u, int w, int h) {
 
 picture
 load_picture (url u, int w, int h) {
-  NSImage* im= get_image (u, w, h);
+  NSImage* im = get_image (u, w, h);
   if (im == nil) return error_picture (w, h);
-  picture p = native_picture(w, h, 0, 0);
+  picture p = native_picture (w, h, 0, 0);
   ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
   NSBitmapImageRep* rep = handle->pict;
   [NSGraphicsContext saveGraphicsState];
   [NSGraphicsContext
-   setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:rep]];
+   setCurrentContext: [NSGraphicsContext graphicsContextWithBitmapImageRep: rep]];
   [im drawInRect:NSMakeRect (0, 0, w, h)];
   [NSGraphicsContext restoreGraphicsState];
   return p;

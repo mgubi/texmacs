@@ -9,6 +9,9 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#ifndef NS_UTILITIES_H
+#define NS_UTILITIES_H
+
 #include "mac_cocoa.h"
 #include "message.hpp"
 
@@ -32,17 +35,25 @@ string ns_translate (string s);
 #pragma mark type checking
 
 inline void
-check_type_void (blackbox bb, string s) {
+check_type_void (blackbox bb, slot s) {
   if (!is_nil (bb)) {
-    cerr << "\nslot type= " << s << "\n";
+    failed_error << "slot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+}
+
+template<class T> inline void
+check_type_id (int type_id, slot s) {
+  if (type_id != type_helper<T>::id) {
+    failed_error << "slot type= " << as_string(s) << LF;
     FAILED ("type mismatch");
   }
 }
 
 template<class T> void
-check_type (blackbox bb, string s) {
+check_type (blackbox bb, slot s) {
   if (type_box (bb) != type_helper<T>::id) {
-    cerr << "\nslot type= " << s << "\n";
+    failed_error << "slot type= " << as_string(s) << LF;
     FAILED ("type mismatch");
   }
 }
@@ -52,4 +63,25 @@ check_type (blackbox bb, string s) {
   check_type<pair<T1,T2> > (bb, s);
 }
 
+
+/*! the run-loop should exit when the number of windows is zero */
+extern int nr_windows;
+
+/******************************************************************************
+ * Some debugging infrastucture
+ ******************************************************************************/
+extern tm_ostream& operator << (tm_ostream& out, NSRect rect);
+extern tm_ostream& operator << (tm_ostream& out, NSSize size);
+
+tm_ostream& operator << (tm_ostream& out, coord4 c);
+tm_ostream& operator << (tm_ostream& out, coord2 c);
+
+// deprecated, use check_type<T>(bb, slot) instead
+//#define TYPE_CHECK(b) ASSERT (b, "type mismatch")
+
+#define NOT_IMPLEMENTED(x) \
+{ if (DEBUG_QT) debug_qt << x << " not implemented yet.\n"; }
+
+
+#endif // NS_UTILITIES_H
 

@@ -88,3 +88,17 @@ ns_translate (string s) {
   string out_lan= get_output_language ();
   return tm_var_encode (translate (s, "english", out_lan));
 }
+
+
+tm_ostream&
+operator << (tm_ostream& out, NSRect rect) {
+  return out << "(" << rect.origin.x << "," << rect.origin.y << ","
+  << rect.size.width << "," << rect.size.height << ")";
+}
+
+tm_ostream&
+operator << (tm_ostream& out, NSSize size) {
+  return out << "("  << size.width << "," << size.height << ")";
+}
+
+

@@ -18,14 +18,11 @@
 #include "message.hpp"
 #include "ns_utilities.h"
 #include "ns_other_widgets.h"
-#include "ns_basic_widgets.h"
 
 #include "url.hpp"
 #include "analyze.hpp"
 
 #define TYPE_CHECK(b) ASSERT (b, "type mismatch")
-#define NOT_IMPLEMENTED \
-  { if (DEBUG_EVENTS) cout << "STILL NOT IMPLEMENTED\n";  }
 
 #pragma mark ns_chooser_widget_rep
 
