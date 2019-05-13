@@ -207,6 +207,9 @@ concater_rep::typeset (tree t, path ip) {
   case RIGID:
     typeset_rigid (t, ip);
     break;
+  case HGROUP:
+    typeset_hgroup (t, ip);
+    break;
   case HIDDEN:
     //(void) env->exec (t);
     if (N(t) != 1) typeset_error (t, ip);
@@ -258,7 +261,10 @@ concater_rep::typeset (tree t, path ip) {
     typeset_clipped (t, ip);
     break;
   case REPEAT:
-    typeset_repeat (t, ip);
+    typeset_repeat (t, ip, false);
+    break;
+  case VAR_REPEAT:
+    typeset_repeat (t, ip, true);
     break;
   case _FLOAT:
     typeset_float (t, ip);
@@ -426,17 +432,23 @@ concater_rep::typeset (tree t, path ip) {
   case ASSIGN:
     typeset_assign (t, ip);
     break;
+  case PROVIDE:
+    typeset_provide (t, ip);
+    break;
   case WITH:
     typeset_with (t, ip);
     break;
   case PROVIDES:
     typeset_executable (t, ip);
     break;
+  case VALUE:
+    typeset_value (t, ip);
+    break;
   case QUOTE_VALUE:
     typeset_inactive (t, ip);
     break;
-  case VALUE:
-    typeset_value (t, ip);
+  case OR_VALUE:
+    typeset_or_value (t, ip);
     break;
   case MACRO:
     typeset_inactive (t, ip);
@@ -645,6 +657,8 @@ concater_rep::typeset (tree t, path ip) {
     break;
   case GET_BINDING:
     typeset_executable (t, ip);
+    break;
+  case HIDDEN_BINDING:
     break;
   case LABEL:
   case REFERENCE:

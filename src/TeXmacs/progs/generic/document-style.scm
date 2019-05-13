@@ -95,6 +95,9 @@
   (with l (get-style-list)
     (and (nnull? l) (== (car l) style))))
 
+(tm-define (notify-new-style style)
+  (noop))
+
 (tm-define (set-main-style style)
   (:argument style "Main document style")
   (:default  style "generic")
@@ -102,12 +105,18 @@
   (:balloon style-get-documentation)
   (let* ((old (get-style-list))
          (new (if (null? old) (list style) (cons style (cdr old)))))
-    (set-style-list new)))
+    (set-style-list new))
+  (delayed
+    (:idle 1)
+    (notify-new-style style)))
 
 (tm-define (has-style-package? pack)
   (or (in? pack (get-style-list))
       (and (list-find (get-style-list) (cut style-includes? <> pack))
            (not (list-find (get-style-list) (cut style-overrides? <> pack))))))
+
+(tm-define (not-has-style-package? pack)
+  (not (has-style-package? pack)))
 
 (tm-define (add-style-package pack)
   (:argument pack "Add package")
@@ -120,6 +129,11 @@
   (:proposals pack (with l (get-style-list) (if (null? l) l (cdr l))))
   (:balloon style-get-documentation)
   (set-style-list (list-difference (get-style-list) (list pack))))
+
+(tm-define (remove-style-package* pack)
+  (:argument pack "Remove package")
+  (:check-mark "v" not-has-style-package?)
+  (remove-style-package pack))
 
 (tm-define (toggle-style-package pack)
   (:argument pack "Toggle package")

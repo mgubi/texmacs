@@ -532,8 +532,12 @@ static bool
 matching (tree open, tree close) {
   if (is_func (open, SET, 2))
     return is_func (close, RESET, 1) && (open[0] == close[0]);
-  if (is_func (open, BEGIN))
-    return is_func (close, END, 1) && (open[0] == close[0]);
+  if (is_func (open, BEGIN)) {
+    if (is_func (close, END, 1))
+      return open[0] == close[0];
+    if (is_func (close, END, 2))
+      return open[0] == "algo-repeat" && open[0] == close[0];
+  }
   return false;
 }
 
@@ -551,10 +555,11 @@ with_replace (tree var, tree val, tree body) {
 }
 
 static tree
-expand_replace (tree begin, tree body) {
-  int i, k= N(begin);
-  tree expand (EXPAND, k+1);
+expand_replace (tree begin, tree end, tree body) {
+  int i, j, k= N(begin), l= N(end);
+  tree expand (EXPAND, k + l);
   for (i=0; i<k; i++) expand[i]= begin[i];
+  for (j=1; j<l; i++, j++) expand[i]= end[j];
   expand[i]= body;
   return expand;
 }
@@ -569,6 +574,8 @@ concat_search (tree t, int& i, tree open= "") {
     if (set_reset && is_func (t[i], RESET, 1)) return;
     if (begin_end && is_func (t[i], BEGIN)) return;
     if (begin_end && is_func (t[i], END, 1)) return;
+    if (begin_end && is_func (t[i], END, 2) &&
+        t[i][0] == "algo-repeat") return;
     i++;
   }
 }
@@ -582,7 +589,7 @@ concat_replace (tree t, int i1, int i2) {
   else if (N(v)==1) v= v[0];
   if (is_func (t[i1], SET))
     return with_replace (t[i1][0], t[i1][1], v);
-  else return expand_replace (t[i1], v);
+  else return expand_replace (t[i1], t[i2], v);
 }
 
 static tree
@@ -618,6 +625,8 @@ document_search (tree t, int& i, int& j, tree open= "") {
       if (set_reset && is_func (t[i][j], RESET, 1)) return;
       if (begin_end && is_func (t[i][j], BEGIN)) return;
       if (begin_end && is_func (t[i][j], END, 1)) return;
+      if (begin_end && is_func (t[i][j], END, 2) &&
+          t[i][j][0] == "algo-repeat") return;
       j++;
     }
     i++;
@@ -674,7 +683,10 @@ document_replace (tree doc_t, int doc_1, int con_1, int doc_2, int con_2) {
     return with_replace (doc_t[doc_1][con_1][0],
 			 doc_t[doc_1][con_1][1],
 			 doc_b);
-  else return expand_replace (doc_t[doc_1][con_1], doc_b);
+  else
+    return expand_replace (doc_t[doc_1][con_1],
+                           doc_t[doc_2][con_2],
+                           doc_b);
 }
 
 /******************************************************************************
@@ -1587,7 +1599,8 @@ static tree
 upgrade_mod_symbols (tree t) {
   if (is_atomic (t)) return t;
   if (is_func (t, WITH) && N(t) > 3 &&
-      (t[0] == "mode" || is_atomic (t[0]) && starts (t[0]->label, "math")) &&
+      (t[0] == "mode" ||
+       (is_atomic (t[0]) && starts (t[0]->label, "math"))) &&
       is_atomic (t[2]) && starts (t[2]->label, "math")) {
     tree u (WITH, t[0], t[1], t (2, N(t)));
     tree r= upgrade_mod_symbols (u);
@@ -4081,20 +4094,19 @@ preserve_spacing (tree t) {
 }
 
 /******************************************************************************
-* Rename educational styles
+* Rename styles
 ******************************************************************************/
 
 tree
-upgrade_educ_styles (tree t) {
+rename_style (tree t, string old_name, string new_name) {
   int i;
   if (is_atomic (t)) return t;
   else if (is_compound (t, "style") || is_func (t, TUPLE)) {
     int n= N(t);
     tree r (t, n);
     for (i=0; i<n; i++) {
-      if (t[i] == "exam") r[i]= "old-exam";
-      else if (t[i] == "compact") r[i]= "old-compact";
-      else r[i]= upgrade_educ_styles (t[i]);
+      if (t[i] == old_name) r[i]= new_name;
+      else r[i]= rename_style (t[i], old_name, new_name);
     }
     return r;
   }
@@ -4102,7 +4114,7 @@ upgrade_educ_styles (tree t) {
     int n= N(t);
     tree r (t, n);
     for (i=0; i<n; i++)
-      r[i]= upgrade_educ_styles (t[i]);
+      r[i]= rename_style (t[i], old_name, new_name);
     return r;
   }
   else return t;
@@ -4146,6 +4158,7 @@ upgrade_tex (tree t) {
   t= clean_header (t);
   t= upgrade_doc_language (t);
   t= upgrade_quotes (t);
+  t= upgrade_ancient (t);
   upgrade_tex_flag= false;
   return t;
 }
@@ -4301,8 +4314,17 @@ upgrade (tree t, string version) {
       t= preserve_spacing (t);
   }
   if (version_inf_eq (version, "1.99.8")) {
-    if (is_non_style_document (t))
-      t= upgrade_educ_styles (t);
+    if (is_non_style_document (t)) {
+      t= rename_style (t, "exam", "old-exam");
+      t= rename_style (t, "compact", "old-compact");
+      t= rename_style (t, "beamer", "old2-beamer");
+    }
+  }
+  if (version_inf_eq (version, "1.99.9")) {
+    t= rename_primitive (t, "solution", "solution*");
+    t= rename_primitive (t, "answer", "answer*");
+    t= rename_primitive (t, "html-div", "html-div-class");
+    t= rename_primitive (t, "html-style", "html-div-style");
   }
   
   if (is_non_style_document (t))

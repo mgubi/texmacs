@@ -68,8 +68,10 @@ void
 QTMAction::set_text (string s) {
   if (N(s)) {
       // FIXME: this will only work if the system language is English!
-    if (s == "Help" || s == "Edit" || s == "Preferences...")
+    if (s == "Help" || s == "Edit" || s == "View" ||
+        s == "Preferences...")
       s = s * " ";
+    s= replace (s, "&", "&&");
     str = s;
     setText (to_qstring (s));
   }
@@ -472,6 +474,7 @@ QTMLineEdit::continuous () {
   return
     starts (type, "search") ||
     starts (type, "replace-") ||
+    starts (type, "spell") ||
     starts (serial, "form-");
 }
 
@@ -489,6 +492,7 @@ QTMLineEdit::event (QEvent* ev) {
 }
 
 extern hashmap<int,string> qtkeymap;
+void initkeymap ();
 
 /*
  FIXME: This is a hideous mess...
@@ -503,6 +507,7 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
             : ev->key();
 
   if (continuous ()) {
+    initkeymap ();
     if ((last_key != Qt::Key_Tab || type == "replace-what") &&
         (last_key != Qt::Key_Backtab || type == "replace-by") &&
         last_key != Qt::Key_Down &&
@@ -510,6 +515,8 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
         last_key != Qt::Key_Enter &&
         last_key != Qt::Key_Return &&
         last_key != Qt::Key_Escape &&
+        (!starts (type, "spell") || last_key < 49 || last_key >= 58) &&
+        (!starts (type, "spell") || last_key != 43) &&
         (ev->modifiers() & Qt::ControlModifier) == 0 &&
         (ev->modifiers() & Qt::MetaModifier) == 0)
       QLineEdit::keyPressEvent (ev);

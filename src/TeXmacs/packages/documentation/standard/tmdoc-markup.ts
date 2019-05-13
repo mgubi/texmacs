@@ -1,4 +1,4 @@
-<TeXmacs|1.99.5>
+<TeXmacs|1.99.8>
 
 <style|<tuple|source|english>>
 
@@ -31,11 +31,11 @@
 
   <assign|markup|<macro|body|<src-macro|<arg|body>>>>
 
-  <assign|tmstyle|<macro|body|<indexed|<with|font-family|tt|color|brown|<arg|body>>>>>
+  <assign|tmstyle|<macro|body|<indexed|<with|font-family|tt|language|verbatim|color|brown|<arg|body>>>>>
 
-  <assign|tmpackage|<macro|body|<indexed|<with|font-family|tt|color|brown|<arg|body>>>>>
+  <assign|tmpackage|<macro|body|<indexed|<with|font-family|tt|language|verbatim|color|brown|<arg|body>>>>>
 
-  <assign|tmdtd|<macro|body|<indexed|<with|font-family|tt|color|dark
+  <assign|tmdtd|<macro|body|<indexed|<with|font-family|tt|language|verbatim|color|dark
   magenta|<arg|body>>>>>
 
   <\active*>
@@ -139,10 +139,6 @@
   <new-theorem|question|Question>
 
   <assign|answer|<macro|body|<quotation|<surround|<theorem-name|<localize|Answer><theorem-sep>>||<arg|body>>>>>
-
-  <assign|todo|<macro|body|<block|<tformat|<cwith|1|1|1|1|cell-background|pastel
-  red>|<cwith|1|1|1|1|cell-lborder|0.5ln>|<cwith|1|1|1|1|cell-rborder|0.5ln>|<cwith|1|1|1|1|cell-bborder|0.5ln>|<cwith|1|1|1|1|cell-tborder|0.5ln>|<table|<row|<cell|To
-  do: <arg|body>>>>>>>>
 
   <assign|fake-sections|<\macro|body>
     <\with|sectional-short-style|<macro|true>|chapter-nr|0|section-nr|0|subsection-nr|0|subsubsection-nr|0|chapter-prefix||section-prefix||subsection-prefix||subsubsection-prefix||chapter-toc|<macro|body|>|section-toc|<macro|body|>|subsection-toc|<macro|body|>|subsubsection-toc|<macro|body|>>

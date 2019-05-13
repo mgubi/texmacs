@@ -48,15 +48,16 @@
   infin rang
   ;; bibtex
   bysame
-
   ;; for (e.g.) includegraphics
   width height
+  ;; miscellaneous
+  null unskip
 
   ;; Algorithms
-  AND BlankLine Ensure ENSURE FALSE GLOBALS NOT OR PRINT Require REQUIRE RETURN
-  State STATE TO KwTo TRUE XOR Else ENDBODY EndFor ENDFOR EndFunction EndIf
-  ENDIF ENDINPUTS EndLoop ENDLOOP ENDOUTPUTS EndProcedure ENDWHILE EndWhile
-  Loop)
+  AND BlankLine Ensure ENSURE FALSE GLOBALS NOT OR PRINT Require REQUIRE
+  Repeat RETURN State STATE TO KwTo TRUE XOR Else ENDBODY EndFor ENDFOR
+  EndFunction EndIf ENDIF ENDINPUTS EndLoop ENDLOOP ENDOUTPUTS
+  EndProcedure ENDWHILE EndWhile Loop)
 
 (logic-group latex-command-1%
   part* chapter* section* subsection* subsubsection* paragraph* subparagraph*
@@ -77,24 +78,24 @@
   phantom hphantom vphantom smash date terms
   newcounter stepcounter refstepcounter value
   citealt citealt* citealp*
-  citetext citeauthor citeauthor* citeyear onlinecite
+  citetext citeauthor citeauthor* citeyear onlinecite citeN
   epsfig url penalty centerline fbox framebox cline cmidrule
   enlargethispage
   newlength newdimen newskip
   Comment COMMENT For ForAll If Input KwData KwResult KwRet lnl nllabel
-  lElse uElse Output Repeat Until UNTIL While
-  etalchar MR listpart)
+  lElse uElse Output Until UNTIL While
+  etalchar MR listpart custombinding cref Cref)
 
 (logic-group latex-command-1% ;; . needs a special treatment
   ,(string->symbol "."))
 
 (logic-group latex-command-2%
   binom tbinom dbinom cfrac tfrac equal href
-  sideset stackrel citeauthoryear
+  sideset stackrel
   setcounter addtocounter setlength addtolength
   colorbox scalebox texorpdfstring raisebox foreignlanguage
   Call Function Procedure SetKw SetKwData SetKwFunction SetKwInOut
-  ifthispageodd)
+  ifthispageodd adjustbox)
 
 (logic-group latex-command-3%
   ifthenelse resizebox fcolorbox @setfontsize eIf multicolumn)
@@ -125,7 +126,8 @@
 
 (logic-group latex-command-0*%
   item ,(string->symbol "\\")
-  BODY ELSE INPUTS LOOP OUTPUTS REPEAT)
+  BODY ELSE INPUTS LOOP OUTPUTS REPEAT
+  hdashline)
 
 (logic-group latex-command-1*%
   usepackage documentclass documentstyle sqrt bibitem cite caption  
@@ -206,7 +208,21 @@
   begin-axiom begin-definition begin-notation begin-conjecture begin-remark
   begin-note begin-example begin-exercise begin-problem begin-warning
   begin-convention begin-quote-begin-env begin-quotation begin-verse
-  begin-solution begin-question begin-answer begin-acknowledgments)
+  begin-solution begin-question begin-answer begin-acknowledgments
+
+  begin-theorem* begin-proposition* begin-lemma* begin-corollary*
+  begin-axiom* begin-definition* begin-notation* begin-conjecture*
+  begin-remark* begin-note* begin-example* begin-warning*
+  begin-convention* begin-exercise* begin-problem*
+  begin-solution* begin-question* begin-answer*
+
+  ;; guessed
+  begin-th begin-thm begin-prop begin-lem begin-cor begin-corr
+  begin-dem begin-preuve begin-IEEEproof
+  begin-ax begin-def begin-dfn begin-defn
+  begin-not begin-ex begin-exa begin-rem begin-war begin-conv
+  begin-exe begin-exc begin-exo begin-prop begin-sol begin-ans
+  begin-acks)
 
 (logic-rules
   ((latex-environment-0*% 'x) (latex-enunciation% 'x)))

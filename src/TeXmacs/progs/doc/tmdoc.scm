@@ -155,7 +155,7 @@
        (let* ((file (or (tmfs-cdr name) ""))
               (root (tmfs-string->url file)))
          (if (or (== file "") (not (url-exists? root)))
-             (in? (url-suffix root) (list "html" "tm"))
+             (in? (url-suffix root) (list "html" "tm" "tmml"))
              #t))))
 
 (tmfs-load-handler (help name)
@@ -174,6 +174,8 @@
              `(document
                 (TeXmacs ,(texmacs-version))
                 ,@(cdr doc))))
+          ((== (url-suffix root) "tmml")
+           (tm->stree (tree-import root "tmml")))
           ((!= (url-suffix root) "tm")
            (string-load root))
           ((== type "normal")
@@ -221,7 +223,7 @@
     (when (string-starts? name "tmfs/help/")
       (set! name (string-drop name 10))
       (set! name (tmfs-cdr name)))
-    (load-buffer (string-append "tmfs://help/" type "/" name))))
+    (load-document (string-append "tmfs://help/" type "/" name))))
 
 (tm-define (delayed-update nr cont)
   (system-wait "Generating automatic content" nr)

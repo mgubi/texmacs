@@ -34,6 +34,7 @@
 (define tmhtml-image-cache (make-ahash-table))
 (define tmhtml-image-root-url (unix->url "image"))
 (define tmhtml-image-root-string "image")
+(define tmhtml-site-version #f)
 
 (tm-define (tmhtml-initialize opts)
   (set! tmhtml-env (make-ahash-table))
@@ -148,16 +149,16 @@
 	  ".compact-block p { margin-top: 0px; margin-bottom: 0px } "
 	  ".left-tab { text-align: left } "
 	  ".center-tab { text-align: center } "
-          ".balloon-anchor { border-bottom: 1px dotted #000000; outline:none;"
-          "                  cursor: help; position: relative; }"
+          ".balloon-anchor { border-bottom: 1px dotted #000000; outline: none;"
+          " cursor: help; position: relative; } "
           ".balloon-anchor [hidden] { margin-left: -999em; position: absolute;"
-                                    " display: none; }"
-          ".balloon-anchor:hover [hidden] { position: absolute; left: 1em;"
-                                 " top: 2em; z-index: 99; margin-left: 0;"
-                                 " width: 500px; display: inline-block; }"
-          ".balloon-body { }"
-	  ".ornament  { border-width: 1px; border-style: solid; border-color: "
-                      " black; display: inline-block; padding: 0.2em; } "
+	  " display: none; } "
+          ".balloon-anchor: hover [hidden] { position: absolute; left: 1em;"
+	  " top: 2em; z-index: 99; margin-left: 0;"
+	  " width: 500px; display: inline-block; } "
+          ".balloon-body { } "
+	  ".ornament { border-width: 1px; border-style: solid;"
+	  " border-color: black; display: inline-block; padding: 0.2em; } "
 	  ".right-tab { float: right; position: relative; top: -1em } "))
 	(mathml "math { font-family: cmr, times, verdana } "))
     (if tmhtml-mathml? (string-append html mathml) html)))
@@ -184,6 +185,8 @@
 	 (css `(h:style (@ (type "text/css")) ,(tmhtml-css-header)))
 	 (xhead '())
 	 (body (tmhtml doc)))
+    (set! tmhtml-site-version
+          (with-extract doc "html-site-version"))
     (set! title
 	  (cond ((with-extract doc "html-title")
 		 (with-extract doc "html-title"))
@@ -757,11 +760,14 @@
 (define (tmhtml-with-font-size val arg)
   (ahash-with tmhtml-env :mag val
     (let* ((x (* (string->number val) 100))
+           (c (string-append "font-size: " (number->string x) "%"))
 	   (s (cond ((< x 1) "-4") ((< x 55) "-4") ((< x 65) "-3")
 		    ((< x 75) "-2") ((< x 95) "-1") ((< x 115) "0")
 		    ((< x 135) "+1") ((< x 155) "+2") ((< x 185) "+3")
 		    ((< x 225) "+4") ((< x 500) "+5") (else "+5"))))
-      (if s `((h:font (@ (size ,s)) ,@(tmhtml arg))) (tmhtml arg)))))
+      (cond (tmhtml-css? `((h:font (@ (style ,c)) ,@(tmhtml arg))))
+            (s `((h:font (@ (size ,s)) ,@(tmhtml arg))))
+            (else (tmhtml arg))))))
 
 (define (tmhtml-with-block style arg)
   (with r (tmhtml (blockify arg))
@@ -1048,10 +1054,9 @@
 
 (define (tmhtml-make-table t tablef colf rowf cellf)
   (let* ((attrs (map* tmhtml-make-table-attr tablef))
-	 (em (- (* (tmtable-rows t) 0.55)))
-	 (va (string-append "vertical-align: " (number->htmlstring em) "em")))
+         (va "vertical-align: middle"))
     (if (not (list-find attrs (cut == <> "width: 100%")))
-	(set! attrs (cons* "display: inline" va attrs)))
+	(set! attrs (cons* "display: inline-table" va attrs)))
     `(h:table ,@(html-css-attrs attrs)
 	      ,@(tmhtml-make-column-group colf)
 	      (h:tbody ,@(tmhtml-make-rows (cdr t) rowf cellf)))))
@@ -1083,8 +1088,8 @@
 
 (define (tmhtml-png y)
   (let* ((mag (ahash-ref tmhtml-env :mag))
-	 (x (if (or (nstring? mag) (== mag "1")) y
-		`(with "magnification" ,mag ,y)))
+	 (x (if (or tmhtml-css? (nstring? mag) (== mag "1")) y
+                `(with "magnification" ,mag ,y)))
 	 (l1 (tmhtml-collect-labels y))
 	 (l2 (if (null? l1) l1 (list (car l1)))))
     (with cached (ahash-ref tmhtml-image-cache x)
@@ -1094,13 +1099,18 @@
 	    (let* ((extents (print-snippet name-url x #t))
                    (dpi (string->number (get-preference "printer dpi")))
                    (den (/ (* dpi 2200.0) 600.0))
-                   ;;(den (/ (* dpi 2000.0) 600.0))
-		   (pixels (inexact->exact (/ (second extents) den)))
-		   (valign (number->htmlstring pixels))
-		   (style (string-append "vertical-align: " valign "px")))
+		   (y1 (inexact->exact (/ (second extents) den)))
+		   (y2 (inexact->exact (/ (fourth extents) den)))
+		   (valign (number->htmlstring (/ y1 15)))
+		   (height (number->htmlstring (/ (- y2 y1) 15)))
+		   (style (string-append "vertical-align: " valign "em; "
+                                         "height: " height "em"))
+                   (attrs (if tmhtml-css?
+                              `((src ,name-string) (style ,style) ,@l2)
+                              `((src ,name-string) ,@l2)))
+                   (img `((h:img (@ ,@attrs)))))
 	      ;;(display* x " -> " extents "\n")
-	      (set! cached
-		    `((h:img (@ (src ,name-string) (style ,style) ,@l2))))
+	      (set! cached img)
 	      (ahash-set! tmhtml-image-cache x cached)))
 	  cached))))
 
@@ -1297,12 +1307,49 @@
 ;; Tags for customized html generation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmhtml-html-div l)
-  (list `(h:div (@ (class ,(tmhtml-force-string (car l))))
-		,@(tmhtml (cadr l)))))
+(define (tmhtml-append-attribute-sub l var val)
+  (cond ((null? l) (list (list var val)))
+	((and (list-2? (car l)) (== (caar l) var) (string? (cadar l)))
+	 (cons (list var (string-append (cadar l) " " val)) (cdr l)))
+	(else (cons (car l) (tmhtml-append-attribute-sub (cdr l) var val)))))
+
+(define (tmhtml-append-attribute t var val)
+  (cond ((and (pair? t) (pair? (cdr t)) (list? t)
+              (pair? (cadr t)) (== (caadr t) '@) (list? (cadr t)))
+         (with l (tmhtml-append-attribute-sub (cdadr t) var val)
+           `(,(car t) (@ ,@l) ,@(cddr t))))
+        ((and (pair? t) (list? t))
+         `(,(car t) (@ (,var ,val)) ,@(cdr t)))
+        ((== var 'class) `(font (@ (,var ,val)) ,t))
+        (else `(class (@ (,var ,val)) ,t))))
+
+(define (tmhtml-html-tag l)
+  (let* ((s (tmhtml-force-string (car l)))
+         (r (tmhtml (cadr l))))
+    (list `(,(string->symbol s) ,@r))))
+
+(define (tmhtml-html-attr l)
+  (let* ((a (tmhtml-force-string (car l)))
+         (v (tmhtml-force-string (cadr l)))
+         (r (tmhtml (caddr l))))
+    (map (cut tmhtml-append-attribute <> a v) r)))
 
 (define (tmhtml-html-style l)
+  (let* ((s (tmhtml-force-string (car l)))
+         (r (tmhtml (cadr l))))
+    (map (cut tmhtml-append-attribute <> 'style s) r)))
+
+(define (tmhtml-html-class l)
+  (let* ((s (tmhtml-force-string (car l)))
+         (r (tmhtml (cadr l))))
+    (map (cut tmhtml-append-attribute <> 'class s) r)))
+
+(define (tmhtml-html-div-style l)
   (list `(h:div (@ (style ,(tmhtml-force-string (car l))))
+		,@(tmhtml (cadr l)))))
+
+(define (tmhtml-html-div-class l)
+  (list `(h:div (@ (class ,(tmhtml-force-string (car l))))
 		,@(tmhtml (cadr l)))))
 
 (define (tmhtml-html-javascript l)
@@ -1419,6 +1466,8 @@
 
 (define (tmhtml-implicit-compound l)
   (or (tmhtml-dispatch 'tmhtml-stdmarkup% l)
+      (and (!= tmhtml-site-version "2")
+           (tmhtml-dispatch 'tmhtml-tmdocmarkup% l))
       '()))
 
 (tm-define (tmhtml-root x)
@@ -1612,23 +1661,29 @@
   (equations-base ,tmhtml-equation*)
   (wide-float tmhtml-float)
   ;; tags for customized html generation
-  (html-div ,tmhtml-html-div)
+  (html-tag ,tmhtml-html-tag)
+  (html-attr ,tmhtml-html-attr)
+  (html-div-style ,tmhtml-html-div-style)
+  (html-div-class ,tmhtml-html-div-class)
   (html-style ,tmhtml-html-style)
+  (html-class ,tmhtml-html-class)
   (html-javascript ,tmhtml-html-javascript)
   (html-javascript-src ,tmhtml-html-javascript-src)
   (html-video ,tmhtml-html-video)
   ;; tmdoc tags
+  (hyper-link ,tmhtml-hyperlink))
+
+(logic-table tmhtml-tmdocmarkup%
+  ;; deprecated direct exports of tmdoc tags
   (tmdoc-title ,tmhtml-tmdoc-title)
   (tmdoc-title* ,tmhtml-tmdoc-title*)
   (tmdoc-title** ,tmhtml-tmdoc-title**)
   (tmdoc-flag ,tmhtml-tmdoc-flag)
   (tmdoc-copyright ,tmhtml-tmdoc-copyright)
-  (tmdoc-license ,tmhtml-tmdoc-license)
-  (key ,tmhtml-key)
-  (hyper-link ,tmhtml-hyperlink))
+  (tmdoc-license ,tmhtml-tmdoc-license))
 
-;;    (name (h:name)) ; not in HTML4
-;;    (person (h:person)))) ; not in HTML4
+;; (name (h:name)) ; not in HTML4
+;; (person (h:person)))) ; not in HTML4
 
 (logic-table tmhtml-with-cmd%
   ("mode" ,tmhtml-with-mode)

@@ -1,57 +1,41 @@
 #!/usr/bin/env python
 ###############################################################################
-##
-## MODULE      : tm_python.scm
-## DESCRIPTION : Initialize python plugin
-## COPYRIGHT   : (C) 2004  Ero Carrera, ero@dkbza.org
-##               (C) 2012  Adrian Soto
-##               (C) 2014  Miguel de Benito Delgado, mdbenito@texmacs.org
-##
-## This software falls under the GNU general public license version 3 or later.
-## It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
-## in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+#
+# MODULE      : tm_python
+# DESCRIPTION : Initialize python plugin
+# COPYRIGHT   : (C) 2004  Ero Carrera, ero@dkbza.org
+#               (C) 2012  Adrian Soto
+#               (C) 2014  Miguel de Benito Delgado, mdbenito@texmacs.org
+#
+# This software falls under the GNU general public license version 3 or later.
+# It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+# in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 
 import os
+import sys
+sys.path.append(os.environ.get("TEXMACS_PATH") + "/plugins/")
+
 import traceback
 import keyword
-import re
 import string
-import sys
-import csv   # Used to parse scheme forms
 from inspect   import ismodule, getsource, getsourcefile
-from types     import CodeType
-from io        import open
-from io        import StringIO
+from tmpy.protocol import *
+from tmpy.postscript import ps_out
 
-#import logging as log
-#log.basicConfig(filename='/tmp/tm_python.log',level=log.DEBUG)
+# import logging as log
+# log.basicConfig(filename='/tmp/tm_python.log',level=log.DEBUG)
 
-DATA_BEGIN   = chr(2)
-DATA_END     = chr(5)
-DATA_ESCAPE  = chr(27)
-DATA_COMMAND = chr(16)
-
-py_ver       = sys.version_info[0];
-__version__  = '1.14'
-__author__   = 'Ero Carrera, Adrian Soto, Miguel de Benito Delgado'
+py_ver = sys.version_info[0];
+__version__ = '1.14'
+__author__ = 'Ero Carrera, Adrian Soto, Miguel de Benito Delgado'
 
 my_globals   = {}
 
-if py_ver == 3: _input = input
-else:           _input = raw_input
+if py_ver == 3:
+    _input = input
+else:
+    _input = raw_input
 
-
-def texmacs_escape(data):
-    return data.replace (DATA_BEGIN,DATA_ESCAPE +
-                         DATA_BEGIN).replace (DATA_END, DATA_ESCAPE + DATA_END)
-
-def texmacs_out(out_str):
-    """Feed data back to TeXmacs.
-    
-    Output results back to TeXmacs, with the DATA_BEGIN,
-    DATA_END control characters."""
-
-    print(DATA_BEGIN + out_str + DATA_END)
 
 def compose_output(data):
     """Do some parsing on the output according to its type.
@@ -74,69 +58,6 @@ def compose_output(data):
         data = ''
     return 'verbatim:%s' % str(data).strip()
 
-class PSOutDummy:
-    """ Dummy class for use with ps_out.
-
-    We return an instance of this class to avoid output after 
-    evaluation in the TeXmacs plugin of ps_out."""
-    
-    def __str__(self):
-        """Return an empty string for compose_output()"""
-        return ''
-    def __repr__(self):
-        return 'PSOutDummy'
-
-def ps_out(out):
-    """Outputs PostScript within TeXmacs.
-
-    According the the type of the argument the following
-    scenarios can take place:    
-
-    If the argument is an instance of matplotlib.pyplot.Figure
-    then its method savefig() will be used to produce an EPS
-    figure. Note that you need to be using a backend which
-    supports this format.
-
-    If the argument is a string and has more than one line, it
-    will be processed as raw Postscript data.
-    
-    If the argument is a string with no line breaks, it is assumed
-    to contain the filename of a Postscript file which will be
-    read (if the file  has no extension, the defaults .eps and .ps
-    will be tried in this order).
-    
-    If the argument is a file or any other object which provides
-    a 'read'  method, data will be obtained by calling such
-    method.
-    
-    Implemented from suggestion by Alvaro Tejero Cantero.
-    Implementation partially based on information provided
-    by Mark Arrasmith.
-    """
-    if 'savefig' in dir(out):
-        str_out = StringIO()
-        out.savefig(str_out, format='eps')
-        data = str_out.getvalue()
-        str_out.close()
-    elif isinstance(out, str):
-        if out.find('\n') > 0:
-            data = out
-        else:
-            ext_list = ['', '.eps', '.ps']
-        for ext in ext_list:
-            if os.path.exists(out+ext): 
-                fd = open(out+ext, 'rb')
-                data = fd.read()
-                fd.close()
-                break
-            else:
-                raise IOError('File "%s%s" not found.' %
-                              (out, str(ext_lis)))
-    elif 'read' in dir(out):
-        data = out.read()
-
-    texmacs_out('ps:' + texmacs_escape(data))
-    return PSOutDummy();
     
 def do_module_hierarchy(mod, attr):
     """Explore an object's hierarchy.
@@ -194,15 +115,17 @@ def find_completion_candidates(cmpl_str, my_globals):
               haystack = do_module_hierarchy(type(mod_name), r_str)
             
     if py_ver == 3:
-       return offset, [x for x in haystack if x.find(cmpl_str[dot+1:])  ==  0]
+        return offset, [x for x in haystack if x.find(cmpl_str[dot+1:])  ==  0]
     else:
-       return offset, filter(lambda x:x.find(cmpl_str[dot+1:])  ==  0, haystack)
+        return offset, filter(lambda x:x.find(cmpl_str[dot+1:])  ==  0, haystack)
+
 
 def name_char(c):
     """Check whether a character is a valid identifier/keyword."""
     return c not in '+-*/%<>&|^~=!,:()[]{} \n\t'
 
-def complete (s, pos, my_globals):
+
+def complete(s, pos, my_globals):
     """Process autocomplete command. """
     
     try:
@@ -237,10 +160,12 @@ def complete (s, pos, my_globals):
         res += '"%s" ' % c[pos:]
     return 'scheme:(tuple "' + s + '" ' + res + ')'
 
+
 def from_scm_string(s):
     if len(s) > 2 and s[0] == '"' and s[-1] == '"':
         return s[1:-1]
     return s
+
 
 def parse_complete_command(s):
     """HACK"""
@@ -248,6 +173,7 @@ def parse_complete_command(s):
     t2 = t1[1].rsplit(' ', 1)
     # Don't use strip('"') in case there are several double quotes
     return [t1[0], from_scm_string(t2[0]), int(t2[1])]
+
 
 class CaptureStdout:
     """Capture output to os.sys.stdout.
@@ -264,11 +190,14 @@ class CaptureStdout:
         class Capture:
             def __init__(self):
                 self.text = ''
+
             def write(self, str):
                 self.text += str
+
             def flush(self):
-                os.sys.stdout.flush() # Needed?
+                os.sys.stdout.flush()   # Needed?
                 self.text = ''
+
             def getOutput(self):
                 return self.text
 
@@ -285,11 +214,13 @@ class CaptureStdout:
             try:
                 eval (compile (code, 'tm_python', 'exec'), env)
             except Exception as e:
-                traceback.print_exc (file = os.sys.stdout, limit = 0)
+                traceback.print_exc(file = os.sys.stdout, limit = 0)
             return capt.getOutput()
+
 
 def as_scm_string (text):
     return '"%s"' % text.replace('\\', '\\\\').replace('"', '\\"')
+
 
 def compile_help (text):
     cmd = 'help(%s)' % text
@@ -316,7 +247,7 @@ def compile_help (text):
     return dict (map (lambda k_v: (k_v[0], as_scm_string (k_v[1])), out.iteritems()))
 
 ###############################################################################
-## Session start
+# Session start
 ###############################################################################
 
 # We insert into the session's namespace the 'ps_out' method.
@@ -341,29 +272,29 @@ if py_ver == 3:
 else:
     sys.stdout = os.fdopen (sys.stdout.fileno(), 'w', 0)
 
-texmacs_out ("verbatim:Python " + sys.version + 
-             "\nPython plugin for TeXmacs.\n" +
-             "Please see the documentation in Help -> Plugins -> Python")
-texmacs_out ("prompt#>>> ");    
+texmacs_out("verbatim:Python " + sys.version +
+            "\nPython plugin for TeXmacs.\n" +
+            "Please see the documentation in Help -> Plugins -> Python")
+texmacs_out("prompt#>>> ")
 
 
 # Main session loop.
-while 1:
+while True:
     line = _input()
     if not line:
         continue
     if line[0] == DATA_COMMAND:
         sf = parse_complete_command (line[1:])
         if sf[0] == 'complete':
-            texmacs_out (complete (sf[1], sf[2], my_globals))
+            texmacs_out(complete (sf[1], sf[2], my_globals))
         continue
     elif line.endswith('?') and not line.strip().startswith('#'):
-        if len (line) > 1:
+        if len(line) > 1:
             out = compile_help (line[:-1])
-            texmacs_out ('command:(tmpy-open-help %s %s %s)' %
+            texmacs_out('command:(tmpy-open-help %s %s %s)' %
                          (out["help"], out["src"], out["file"]))
         else:
-            texmacs_out ('verbatim:Type a name before the "?" to see the help')
+            texmacs_out('verbatim:Type a name before the "?" to see the help')
         continue
     else:
         lines = [line]
@@ -372,10 +303,10 @@ while 1:
             if line == '': 
                 continue
             lines.append(line)
-        text='\n'.join(lines[:-1])
+        text = '\n'.join(lines[:-1])
         try: # Is it an expression?
-            result = eval (text, my_globals)
+            result = eval(text, my_globals)
         except:
-            result = CaptureStdout.capture (text, my_globals)
-        texmacs_out (compose_output (result))
+            result = CaptureStdout.capture(text, my_globals)
+        texmacs_out(compose_output(result))
 

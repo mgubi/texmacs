@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.9>
 
 <style|<tuple|source|std>>
 
@@ -277,11 +277,15 @@
     </surround>
   </macro>>
 
-  <assign|indivisible|<\macro|body>
+  <assign|vgroup|<\macro|body>
     <\surround|<no-break-start>|<no-break-end><right-flush>>
-      <arg|body>
+      <\with|par-min-penalty|100000000>
+        <arg|body>
+      </with>
     </surround>
   </macro>>
+
+  <assign|indivisible|<value|vgroup>>
 
   \;
 
@@ -373,6 +377,8 @@
 
   <assign|extend|<macro|body|left|bottom|right|top|<style-with|src-compact|none|<resize|<arg|body>|<if|<equal|<arg|left>|>|1l|<minimum|1l|<arg|left>>>|<if|<equal|<arg|bottom>|>|1b|<minimum|1b|<arg|bottom>>>|<if|<equal|<arg|right>|>|1r|<maximum|1r|<arg|right>>>|<if|<equal|<arg|top>|>|1t|<maximum|1t|<arg|top>>>>>>>
 
+  <drd-props|extend|arity|5|accessible|0|length|1|length|2|length|3|length|4>
+
   <assign|extend-right|<macro|body|right|<resize|<arg|body>|||<maximum|1r|<arg|right>>|>>>
 
   <assign|swell|<macro|body|<resize|<arg|body>||<minimum|1b|1fnbot>||<maximum|1t|1fntop>>>>
@@ -422,7 +428,7 @@
 
   <assign|stressed-distance|0.2fn>
 
-  <assign|stressed|<macro|body|<quasi|<style-with|src-compact|none|<datoms|<macro|x|<with|color|<value|stressed-color>|<repeat|<with|color|<unquote|<value|color>>|<arg|x>>|<move|<resize|-|<plus|0.6667l|0.3333r>||<plus|0.3333l|0.6667r>|>||<minus|-0.5ex|<value|stressed-distance>>>>>>|<arg|body>>>>>>
+  <assign|stressed|<macro|body|<quasi|<style-with|src-compact|none|<datoms|<macro|x|<with|color|<value|stressed-color>|<repeat*|<with|color|<unquote|<value|color>>|<arg|x>>|<move|<resize|-|<plus|0.6667l|0.3333r>||<plus|0.3333l|0.6667r>|>||<minus|-0.5ex|<value|stressed-distance>>>>>>|<arg|body>>>>>>
 
   <drd-props|stressed|with-like|yes|arity|1|accessible|all>
 
@@ -520,9 +526,17 @@
     </src-comment>
   </active*>
 
-  <assign|html-div|<macro|name|body|<arg|body>>>
+  <assign|html-tag|<macro|name|body|<arg|body>>>
+
+  <assign|html-attr|<macro|attr|val|body|<arg|body>>>
+
+  <assign|html-div-style|<macro|name|body|<arg|body>>>
+
+  <assign|html-div-class|<macro|name|body|<arg|body>>>
 
   <assign|html-style|<macro|style|body|<arg|body>>>
+
+  <assign|html-class|<macro|style|body|<arg|body>>>
 
   <assign|html-javascript|<macro|script|<small|<colored-frame|pastel
   yellow|<with|font-family|ss|Javascript:
@@ -611,6 +625,10 @@
   <assign|text-spc|<macro|<hspace|<value|text-dots-sep>>>>
 
   <assign|text-dots|<macro|<text-spc>.<text-spc>.<text-spc>.<text-spc>>>
+
+  <assign|indent-par-first|1.5fn>
+
+  <assign|padded-par-par-sep|0.6666fn>
 </body>
 
 <\initial>

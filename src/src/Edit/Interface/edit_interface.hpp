@@ -33,6 +33,7 @@ protected:
   bool          got_focus;     // do we have keyboard focus ?
   string        sh_s;          // current string for shortcuts
   double        sh_mark;       // 0 or mark for undoing shortcut
+  bool          pre_edit_skip; // temporarily disabled pre-edit mechanism
   string        pre_edit_s;    // pre-edit string
   double        pre_edit_mark; // 0 or mark for undoing pre-edit
   widget        popup_win;     // the current popup window
@@ -75,6 +76,7 @@ protected:
   list<string>  focus_ids;
   int           cur_sb, cur_wb;
   SI            cur_wx, cur_wy;
+  rectangles    keys_rects;
 
 public:
   edit_interface_rep ();
@@ -108,6 +110,7 @@ public:
   void draw_cursor (renderer ren);
   void draw_selection (renderer ren, rectangle r);
   void draw_graphics (renderer ren);
+  void draw_keys (renderer ren);
   void draw_pre (renderer win, renderer ren, rectangle r);
   void draw_post (renderer win, renderer ren, rectangle r);
   void draw_with_shadow (renderer win, rectangle r);

@@ -31,6 +31,7 @@ bool none_accessible (tree t);
 bool exists_accessible_inside (tree t);
 tree get_env_child (tree t, int i, tree env);
 tree get_env_descendant (tree t, path p, tree env);
+tree get_env_descendant (tree t, path p, string var, tree val);
 
 string get_name (tree t);
 string get_long_name (tree t);
@@ -54,7 +55,9 @@ path previous_tag_same_argument (tree t, path p, scheme_tree labs);
 path next_argument (tree t, path p);
 path previous_argument (tree t, path p);
 
-bool inside_same (tree t, path p, path q, tree_label which, bool more);
+bool inside_same (tree t, path p, path q, tree_label which);
+bool inside_same_or_more (tree t, path p, path q, tree_label which);
+bool inside_contiguous_document (tree t, path op, path oq);
 
 array<tree> search_sections (tree t);
 path previous_section (tree t, path p);

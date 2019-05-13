@@ -56,7 +56,8 @@ edit_interface_rep::edit_interface_rep ():
   last_change (texmacs_time()), last_update (last_change-1),
   anim_next (1.0e12),
   full_screen (false), got_focus (false),
-  sh_s (""), sh_mark (0), pre_edit_s (""), pre_edit_mark (0),
+  sh_s (""), sh_mark (0),
+  pre_edit_skip (false), pre_edit_s (""), pre_edit_mark (0),
   popup_win (),
   message_l (""), message_r (""), last_l (""), last_r (""),
   zoomf (get_zoom (this, buf)),
@@ -590,6 +591,29 @@ edit_interface_rep::apply_changes () {
   update_visible ();
   rectangle new_visible= rectangle (vx1, vy1, vx2, vy2);  
 
+  if (kbd_show_keys && N(kbd_last_times) > 0) {
+    if (got_focus) {
+      time_t last= kbd_last_times[N(kbd_last_times)-1];
+      if (last + kbd_hide_delay < texmacs_time ()) {
+        kbd_last_keys = array<string> ();
+        kbd_last_times= array<time_t> ();
+      }
+      bool change= (env_change != 0);
+      if (kbd_shown_keys != kbd_last_keys) {
+        kbd_shown_keys= copy (kbd_last_keys);
+        change= true;
+      }
+      rectangles rs (rectangle (vx1, vy1, vx2, vy1 + 100 * pixel));
+      if (rs != keys_rects) { invalidate (keys_rects); change= true; }
+      keys_rects= rs;
+      if (change) invalidate (keys_rects);
+    }
+    else {
+      if (!is_nil (keys_rects)) invalidate (keys_rects);
+      keys_rects= rectangles ();
+    }
+  }
+  
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
         idle_time (INTERRUPTED_EVENT) >= 1000/6)
@@ -633,7 +657,8 @@ edit_interface_rep::apply_changes () {
     if (has_current_window ())
       concrete_window () -> set_scrollbars (sb);
   }
-  
+  init_env ("full-screen-mode", string (full_screen? "true": "false"));
+
   // window decorations (menu bar, icon bars, footer)
   int wb= 2;
   if (is_attached (this)) {
@@ -716,8 +741,7 @@ edit_interface_rep::apply_changes () {
     if (cur_sb && ey2 - ey1 > h) w -= scrollbar_width ();
     if (cur_sb && ex2 - ex1 > w) h -= scrollbar_width ();
     if (ex2 - ex1 <= w + 2*PIXEL) {
-      if (medium == "automatic" ||
-          (medium == "beamer" && full_screen))
+      if (medium == "automatic")
         ex2= ex1 + w;
       else {
 #ifdef X11TEXMACS
@@ -728,8 +752,7 @@ edit_interface_rep::apply_changes () {
       }
     }
     if (ey2 - ey1 <= h + 2*PIXEL) {
-      if (medium == "papyrus" || medium == "automatic" ||
-          (medium == "beamer" && full_screen))
+      if (medium == "papyrus" || medium == "automatic")
         ey1= ey2 - h;
       else {
 #ifdef X11TEXMACS

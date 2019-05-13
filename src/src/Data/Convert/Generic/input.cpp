@@ -16,6 +16,8 @@
 #include "Generic/input.hpp"
 #include "scheme.hpp"
 #include "vars.hpp"
+#include "image_files.hpp"
+#include "file.hpp"
 
 #define STATUS_NORMAL 0
 #define STATUS_ESCAPE 1
@@ -30,6 +32,7 @@
 #define MODE_CHANNEL  6
 #define MODE_COMMAND  7
 #define MODE_XFORMAT  8
+#define MODE_FILE     9
 
 /******************************************************************************
 * Universal data input
@@ -63,6 +66,7 @@ texmacs_input_rep::get_mode (string s) {
   if (s == "math")  return MODE_MATH;
   if (s == "channel")  return MODE_CHANNEL;
   if (s == "command")  return MODE_COMMAND;
+  if (s == "file") return MODE_FILE;
   if (as_bool (call ("format?", s))) return MODE_XFORMAT;
   return MODE_VERBATIM;
 }
@@ -220,6 +224,9 @@ texmacs_input_rep::flush (bool force) {
   case MODE_XFORMAT:
     xformat_flush (force);
     break;
+  case MODE_FILE:
+    file_flush (force);
+    break;
   default:
     FAILED ("invalid mode");
     break;
@@ -319,6 +326,61 @@ void
 texmacs_input_rep::xformat_flush (bool force) {
   if (force) {
     write (generic_to_tree (buf, format * "-snippet"));
+    buf= "";
+  }
+}
+
+void
+texmacs_input_rep::image_flush(string content, string type, int width, int height) {
+  tree t (IMAGE);
+  t << tuple (tree (RAW_DATA, content), type);
+  if (width != 0) t << tree (as_string (width) * "px");
+  else t << tree ("");
+  if (height != 0) t << tree (as_string (height) * "px");
+  else t << tree ("");
+  t << tree ("") << tree ("");
+  write (t);
+}
+
+void
+texmacs_input_rep::file_flush (bool force) {
+  if (force) {
+    array<string> path_toks= tokenize (buf, "?");
+    string path_file = path_toks[0];
+    string path_extra= (N(path_toks) >= 2? path_toks[1]: string (""));
+    array<string> param_toks= tokenize (path_extra, "&");
+    int i= 0;
+    int width= 0;
+    int height= 0;
+    while (i < N(param_toks)) {
+      string param = param_toks[i];
+      if (starts (param, "width="))
+        width= as_int (replace (param, "width=", ""));
+      if (starts (param, "height="))
+        height= as_int (replace (param, "height=", ""));
+      i++;
+    }
+
+    url file= url (path_file);
+    if (! exists (file)) {
+      string err_msg = "[" * as_string(file) * "] does not exist";
+      write (verbatim_to_tree (err_msg, false, "auto"));
+    }
+    else {
+      string type = suffix (file);
+      string content;
+      load_string (file, content, false);
+      if (type == "png") {
+        image_flush (content, "png", width, height);
+      }
+      else if (type == "eps") {
+        image_flush (content, "ps", width, height);
+      } 
+      else {
+        string err_msg = "Do not support file type with suffix: [" * type * "]";
+        write (verbatim_to_tree (err_msg, false, "auto"));
+      }
+    }
     buf= "";
   }
 }

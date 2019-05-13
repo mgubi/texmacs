@@ -128,13 +128,13 @@ box sqrt_box (path ip, box b1, box b2, box sqrtb, font fn, pencil pen);
 box neg_box (path ip, box b, font fn, pencil pen);
 box tree_box (path ip, array<box> bs, font fn, pencil pen);
 box wide_box (path ip, box ref, string s, font fn, pencil p, bool wf, bool af);
-box repeat_box (path ip, box ref, box repeat, SI xoff=0);
+box repeat_box (path ip, box ref, box repeat, SI xoff=0, bool under= false);
 box limit_box (path ip, box ref, box lo, box hi, font fn, bool glued);
 box script_box (path ip, box b1, box b2, font fn);
 box left_script_box (path ip, box ref, box b1, box b2, font fn, int level);
 box right_script_box (path ip, box ref, box b1, box b2, font fn, int level);
 box side_box (path ip, box ref, box l1, box l2, box r1, box r2, font f, int l);
-box specific_box (path ip, box b, string filter, font fn);
+box specific_box (path ip, box b, string filter, font fn, bool keep_sz= false);
 box toc_box (path ip, string kind, string title, font fn);
 box flag_box (path ip, box b, SI h, pencil dark, brush light);
 box info_box (path ip, SI h, pencil dark, brush light);
@@ -157,7 +157,7 @@ box vcorrect_box (path ip, box b, SI top_cor, SI bot_cor);
 box page_box (path ip, tree page, int page_nr, brush bgc, SI w, SI h,
 	      array<box> bs  , array<SI> bs_x  , array<SI> bs_y,
 	      array<box> decs, array<SI> decs_x, array<SI> decs_y);
-box page_border_box (path ip, box pb, SI l, SI r, SI b, SI t, SI pixel);
+box page_border_box (path ip, box pb, color tmb, SI l, SI r, SI b, SI t, SI pix);
 box locus_box (path ip, box b, list<string> ids, SI pixel);
 box locus_box (path ip, box b, list<string> ids, SI pixel, string ref, string anchor);
 box macro_box (path ip, box b, font big_fn= font (), int btype= STD_BOX);

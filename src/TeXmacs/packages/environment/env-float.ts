@@ -1,4 +1,4 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.8>
 
 <style|source>
 
@@ -113,7 +113,9 @@
   </active*>
 
   <assign|render-footnote*|<macro|sym|nr|body|<style-with|src-compact|none|<\float|footnote|>
-    <smaller|<with|par-mode|justify|par-left|0cm|par-right|0cm|font-shape|right|dummy|<value|page-fnote-sep>|dummy|<value|page-fnote-barlen>|<style-with|src-compact|none|<surround|<locus|<id|<hard-id|<arg|body>>>|<link|hyperlink|<id|<hard-id|<arg|body>>>|<url|<merge|#footnr-|<arg|nr>>>>|<arg|sym>><footnote-sep>|<set-binding|<merge|footnote-|<arg|nr>>|<value|the-label>|body><right-flush>|<style-with|src-compact|none|<arg|body>>>>>>
+    <\style-with|src-compact|none>
+      <smaller|<with|par-mode|justify|par-left|0cm|par-right|0cm|font-shape|right|dummy|<value|page-fnote-sep>|dummy|<value|page-fnote-barlen>|<style-with|src-compact|none|<surround|<locus|<id|<hard-id|<arg|body>>>|<link|hyperlink|<id|<hard-id|<arg|body>>>|<url|<merge|#footnr-|<arg|nr>>>>|<arg|sym>><footnote-sep>|<set-binding|<merge|footnote-|<arg|nr>>|<value|the-label>|body><right-flush>|<style-with|src-compact|none|<arg|body>>>>>>
+    </style-with>
   </float>>>>
 
   <assign|render-footnote|<macro|nr|body|<render-footnote*|<arg|nr>|<arg|nr>|<arg|body>>>>
@@ -147,6 +149,26 @@
   </float>>>>
 
   <assign|custom-note-ref|<macro|sym|sep|id|body|<style-with|src-compact|none|<with|locus-color|preserve|visited-color|preserve|<locus|<id|<merge|source-|<arg|id>>>|<arg|body>>><rsup|<locus|<id|<merge|source-abbr-|<arg|id>>>|<link|footnote-text|<id|<merge|source-abbr-|<arg|id>>>|<id|<merge|dest-|<arg|id>>>>|<arg|sep><arg|sym>>>>>>
+
+  <\active*>
+    <\src-comment>
+      Second kind of customized footnotes.
+    </src-comment>
+  </active*>
+
+  <assign|render-footnote**|<\macro|nr|lab|body>
+    <\style-with|src-compact|none>
+      <smaller|<with|par-mode|justify|par-left|0cm|par-right|0cm|font-shape|right|dummy|<value|page-fnote-sep>|dummy|<value|page-fnote-barlen>|<style-with|src-compact|none|<surround|<locus|<id|<hard-id|<arg|body>>>|<link|hyperlink|<id|<hard-id|<arg|body>>>|<url|<merge|#footnr-|<arg|nr>>>>|<arg|nr>><footnote-sep>|<set-binding|<merge|footnote-|<arg|nr>>|<arg|lab>|body><right-flush>|<style-with|src-compact|none|<arg|body>>>>>>
+    </style-with>
+  </macro>>
+
+  <assign|footnote-text|<macro|body|var|<flag|Footnote|brown><next-footnote><assign|<merge|fnote-|<arg|var>>|<the-footnote><render-footnote|<the-footnote>|<arg|body>>>>>
+
+  <assign|footnote-new|<macro|var|<flag|Footnote|brown><next-footnote><assign|<merge|fnote-|<arg|var>>|<the-footnote>><assign|<merge|fnlab-|<arg|var>>|<value|the-label>>>>
+
+  <assign|footnote-show|<macro|body|var|<render-footnote**|<value|<merge|fnote-|<arg|var>>>|<value|<merge|fnlab-|<arg|var>>>|<arg|body>>>>
+
+  <assign|footnote-reference|<macro|var|<space|0spc><label|<merge|footnr-|<value|<merge|fnote-|<arg|var>>>>><rsup|<with|font-shape|right|<reference|<merge|footnote-|<value|<merge|fnote-|<arg|var>>>>>>>>>
 
   <\active*>
     <\src-comment>

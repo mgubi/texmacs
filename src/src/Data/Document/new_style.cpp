@@ -57,6 +57,7 @@ preprocess_style (tree st, url name) {
   if (is_rooted_tmfs (name)) return st;
   if (is_atomic (st)) st= tree (TUPLE, st);
   if (!is_tuple (st)) return st;
+  if (is_rooted_web (name)) return st;
   tree r (TUPLE, N(st));
   for (int i=0; i<N(st); i++) {
     r[i]= st[i];
@@ -305,9 +306,7 @@ hidden_package (url u, string name, bool hidden) {
 
 bool
 hidden_package (string name) {
-  if (name == "reduced-margins" ||
-      name == "indent-paragraphs" ||
-      name == "padded-paragraphs") return false;
+  if (name == "std-latex") return false;
   if (!hidden_packages->contains (name)) {
     url pck_u= descendance ("$TEXMACS_PACKAGE_ROOT");
     hidden_packages (name)= hidden_package (pck_u, name, false);

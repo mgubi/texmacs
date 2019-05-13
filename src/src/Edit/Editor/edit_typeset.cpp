@@ -364,10 +364,13 @@ edit_typeset_rep::typeset_exec_until (path p) {
         //cout << "t= " << t << "\n";
         //cout << "i= " << i << "\n";
         //cout << "w= " << w << "\n";
+        tree ww (w, N(w));
         for (int j=0; j<N(w); j+=2) {
           //cout << w[j] << " := " << env->exec (w[j+1]) << "\n";
-          env->write (w[j]->label, env->exec (w[j+1]));
+          ww[j+1]= env->exec (w[j+1]);
         }
+        for (int j=0; j<N(w); j+=2)
+          env->write (w[j]->label, ww[j+1]);
         t= t[i];
         q= q->next;
       }
@@ -562,6 +565,19 @@ expand_references (tree t, hashmap<string,tree> h) {
   return r;  
 }
 
+static void
+prefix_specific (hashmap<string,tree>& H, string prefix) {
+  hashmap<string,tree> R;
+  iterator<string> it = iterate (H);
+  while (it->busy()) {
+    string key= it->next ();
+    string var= prefix * key;
+    if (H->contains (var)) R(key)= H[var];
+    else R(key)= H[key];
+  }
+  H= R;
+}
+
 tree
 edit_typeset_rep::exec (tree t, hashmap<string,tree> H, bool expand_refs) {
   hashmap<string,tree> H2;
@@ -612,6 +628,7 @@ edit_typeset_rep::exec_html (tree t, path p) {
   tree patch= as_tree (eval ("(stree->tree (tmhtml-env-patch))"));
   hashmap<string,tree> P (UNINIT, patch);
   H->join (P);
+  prefix_specific (H, "tmhtml-");
   tree w (WITH);
   if (H->contains ("html-title"))
     w << string ("html-title") << H["html-title"];
@@ -621,6 +638,8 @@ edit_typeset_rep::exec_html (tree t, path p) {
     w << string ("html-head-javascript") << H["html-head-javascript"];
   if (H->contains ("html-head-javascript-src"))
     w << string ("html-head-javascript-src") << H["html-head-javascript-src"];
+  if (H->contains ("html-site-version"))
+    w << string ("html-site-version") << H["html-site-version"];
   if (N(w) == 0) return exec (t, H);
   else {
     w << t;
@@ -671,6 +690,7 @@ edit_typeset_rep::exec_latex (tree t, path p) {
   tree patch= as_tree (call ("stree->tree", call ("tmtex-env-patch", t, l)));
   hashmap<string,tree> P (UNINIT, patch);
   H->join (P);
+  prefix_specific (H, "tmlatex-");
 
   if (!expand_user_macro &&
       is_document (t) && is_compound (t[0], "hide-preamble")) {
@@ -769,6 +789,7 @@ void
 edit_typeset_rep::init_env (string var, tree by) {
   if (init (var) == by) return;
   init (var)= by;
+  if (var == "full-screen-mode") return;
   if (var != PAGE_SCREEN_WIDTH &&
       var != PAGE_SCREEN_HEIGHT &&
       var != ZOOM_FACTOR)

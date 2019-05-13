@@ -34,6 +34,9 @@ cursor& edit_cursor_rep::the_ghost_cursor () { return mv; }
 
 static bool searching_forwards;
 
+//#define old_cursor_accessible
+
+#ifdef old_cursor_accessible
 path
 edit_cursor_rep::make_cursor_accessible (path p, bool forwards) {
   //time_t t1= texmacs_time ();
@@ -61,6 +64,52 @@ edit_cursor_rep::make_cursor_accessible (path p, bool forwards) {
   //if (t2-t1 >= 1) cout << "made_cursor_accessible took " << t2-t1 << "ms\n";
   return p;
 }
+#else
+path
+edit_cursor_rep::make_cursor_accessible (path p, bool forwards) {
+  //time_t t1= texmacs_time ();
+  path start_p= p;
+  bool inverse= false;
+  int old_mode= get_access_mode ();
+  if (get_init_string (MODE) == "src")
+    set_access_mode (DRD_ACCESS_SOURCE);
+  while (!is_accessible_cursor (et, p) && !in_source ()) {
+    ASSERT (rp <= p, "path outside document");
+    tree st = subtree (et, rp);
+    path sp = p / rp;    
+    path pp = sp;
+    int  dir= (forwards ^ inverse)? 1: -1;
+    path cp = closest_accessible_inside (st, sp, dir);
+    if (cp != sp) {
+      /*
+      if (( forwards && path_less (cp, sp)) ||
+          (!forwards && path_less (sp, cp)))
+        cout << "Warning: " << sp << LF
+             << "  ->   : " << cp << LF
+             << "Tree   : " << subtree (st, path_up (sp)) << LF
+             << "  ->   : " << subtree (st, path_up (cp)) << LF;
+      */
+      sp= cp;
+    }
+    else {
+      if (dir > 0) sp= next_valid (st, cp);
+      else sp= previous_valid (st, cp);
+    }
+    if ((dir > 0 && !path_less (pp, sp)) ||
+        (dir < 0 && !path_less (sp, pp))) {
+      if (inverse) {
+        p= rp * closest_accessible_inside (st, sp, forwards? 1: -1); break; }
+      else {
+        p= start_p; inverse= true; }
+    }
+    else p= rp * sp;
+  }
+  set_access_mode (old_mode);
+  //time_t t2= texmacs_time ();
+  //if (t2-t1 >= 1) cout << "made_cursor_accessible took " << t2-t1 << "ms\n";
+  return p;
+}
+#endif
 
 path
 edit_cursor_rep::tree_path (path sp, SI x, SI y, SI delta) {
@@ -77,8 +126,17 @@ edit_cursor_rep::cursor_move_sub (SI& x0, SI& y0, SI& d0, SI dx, SI dy) {
   int i,d;
   path ref_p= tree_path (sp, x0, y0, d0);
   if (ref_p != tp) {
+#ifdef old_cursor_accessible
     tp= ref_p;
     return true;
+#else
+    if (!searching_forwards && path_less (tp, ref_p));
+    else if (searching_forwards && path_less (ref_p, tp));
+    else {
+      tp= ref_p;
+      return true;
+    }
+#endif
   }
   
   // cout << "ref_p = " << ref_p << "\n";
@@ -260,7 +318,7 @@ edit_cursor_rep::go_left () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   path old_tp= copy (tp);
   go_left_physical ();
-  if (tp != old_tp && inside_same (et, old_tp, tp, DOCUMENT, false)) return;
+  if (tp != old_tp && inside_contiguous_document (et, old_tp, tp)) return;
   path p= previous_valid (et, old_tp);
   if (rp < p) go_to (p);
   select_from_cursor_if_active ();
@@ -271,7 +329,7 @@ edit_cursor_rep::go_right () {
   if (has_changed (THE_TREE+THE_ENVIRONMENT)) return;
   path old_tp= copy (tp);
   go_right_physical ();
-  if (tp != old_tp && inside_same (et, old_tp, tp, DOCUMENT, false)) return;
+  if (tp != old_tp && inside_contiguous_document (et, old_tp, tp)) return;
   path p= next_valid (et, old_tp);
   if (rp < p) go_to (p);
   select_from_cursor_if_active ();
@@ -286,7 +344,7 @@ edit_cursor_rep::go_start_line () {
     cursor old_mv= copy (mv);
     path   old_tp= copy (tp);
     go_left_physical ();
-    if (tp == old_tp || !inside_same (et, tp, orig_tp, DOCUMENT, true)) {
+    if (tp == old_tp || !inside_same_or_more (et, tp, orig_tp, DOCUMENT)) {
       notify_cursor_moved (HORIZONTAL);
       cu= old_cu;
       mv= old_mv;
@@ -306,7 +364,7 @@ edit_cursor_rep::go_end_line () {
     cursor old_mv= copy (mv);
     path   old_tp= copy (tp);
     go_right_physical ();
-    if (tp == old_tp || !inside_same (et, tp, orig_tp, DOCUMENT, true)) {
+    if (tp == old_tp || !inside_same_or_more (et, tp, orig_tp, DOCUMENT)) {
       notify_cursor_moved (HORIZONTAL);
       cu= old_cu;
       mv= old_mv;
@@ -509,9 +567,9 @@ edit_cursor_rep::show_cursor_if_hidden () {
 
 void
 edit_cursor_rep::go_to_label (string s) {
-  path p= search_label (et, s);
+  path p= search_label (subtree (et, rp), s);
   if (!is_nil (p)) {
-    go_to (p);
+    go_to (rp * p);
     show_cursor_if_hidden ();
     return;
   }

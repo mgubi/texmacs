@@ -666,7 +666,7 @@
             (else
              (make-menu-items-list p style bar?)))
       (cond ((== p '---) (list (make-menu-hsep)))
-            ((== p '|) (list (make-menu-vsep)))
+            ((== p '|) (list (make-menu-vsep))) ;; '|
             ((== p '()) p)
             (else (list (make-menu-bad-format p style))))))
 
@@ -881,6 +881,15 @@
         ((match? (car p) ':menu-wide-label)
          (replace-procedures p))
         (else (menu-expand-list p))))
+
+(tm-define (cache-menu? r)
+  (:type (-> object bool))
+  (:synopsis "Cache expanded menu @r.")
+  (cond ((symbol? r) (!= r 'input))
+        ((pair? r)
+         (and (cache-menu? (car r))
+              (cache-menu? (cdr r))))
+        (else #t)))
 
 (define-table menu-expand-table
   (--- ,(lambda (p) `(--- ,@(menu-expand-list (cdr p)))))

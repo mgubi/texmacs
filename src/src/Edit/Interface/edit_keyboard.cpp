@@ -15,6 +15,20 @@
 #include "archiver.hpp"
 
 /******************************************************************************
+* Showing the keystrokes while typing
+******************************************************************************/
+
+bool          kbd_show_keys= false;
+array<string> kbd_shown_keys;
+array<string> kbd_last_keys;
+array<time_t> kbd_last_times;
+int           kbd_erase_delay= 1500;
+int           kbd_hide_delay = 3000;
+
+bool get_show_kbd () { return kbd_show_keys; }
+void set_show_kbd (bool flag) { kbd_show_keys= flag; }
+
+/******************************************************************************
 * Basic subroutines for keyboard handling
 ******************************************************************************/
 
@@ -139,10 +153,8 @@ edit_interface_rep::key_press (string gkey) {
     pre_edit_s= "";
     pre_edit_mark= 0;
   }
-  if (starts (key, "pre-edit:") ) {
-    interrupt_shortcut ();
+  if (starts (key, "pre-edit:")) {
     string s= key (9, N(key));
-    if (s == "") return;
     int i, n= N(s), pos= N(s);
     for (i=0; i<n; i++)
       if (s[i] == ':' && is_int (s (0, i))) {
@@ -153,12 +165,33 @@ edit_interface_rep::key_press (string gkey) {
           tm_char_forwards (s, pos);
         break;
       }
-    pre_edit_s= s;
-    pre_edit_mark= new_marker ();
-    mark_start (pre_edit_mark);
-    archive_state ();
-    insert_tree (compound ("pre-edit", s), path (0, pos));
-    return;
+    if (as_bool (call ("disable-pre-edit?", cork_to_utf8 (s)))) {
+      pre_edit_skip= false;
+      if (s == "") return;
+      pre_edit_skip= true;
+      key= s;
+      if (key == zero) key= "`";
+    }
+    else if (pre_edit_skip) {
+      if (s == "") pre_edit_skip= false;
+      return;
+    }
+    else {
+      if (s == "") return;
+      interrupt_shortcut ();
+      pre_edit_s= s;
+      pre_edit_mark= new_marker ();
+      mark_start (pre_edit_mark);
+      archive_state ();
+      insert_tree (compound ("pre-edit", s), path (0, pos));
+      return;
+    }
+  }
+  else if (pre_edit_skip) {
+    string u= cork_to_utf8 (key);
+    string r= as_string (call ("downgrade-pre-edit", u));
+    if (r == "") return;
+    else key= r;
   }
   
   string new_sh= N(sh_s)==0? key: sh_s * " " * key;
@@ -230,6 +263,17 @@ edit_interface_rep::handle_keypress (string key, time_t t) {
 #ifdef USE_EXCEPTIONS
   try {
 #endif
+    if (kbd_show_keys) {
+      if (N(kbd_last_times) > 0 &&
+          kbd_last_times[N(kbd_last_times)-1] + kbd_erase_delay < t) {
+        kbd_last_keys = array<string> ();
+        kbd_last_times= array<time_t> ();
+      }
+      if (!starts (key, "pre-edit:")) {
+        kbd_last_keys  << key;
+        kbd_last_times << t;
+      }
+    }
     if (DEBUG_KEYBOARD) {
       //for (int i=0; i<N(key); i++)
       //  cout << ((int) (unsigned char) key[i]) << " ";

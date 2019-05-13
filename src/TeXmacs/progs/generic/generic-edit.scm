@@ -273,6 +273,9 @@
   (:require (tree-in? t '(reference pageref eqref hlink locus ornament)))
   #t)
 
+(tm-define (focus-has-theme? t)
+  #f)
+
 (tm-define (focus-can-search? t)
   #f)
 
@@ -411,9 +414,10 @@
 (tm-define (structured-horizontal t forwards?)
   (:require (structured-horizontal? t))
   (with-focus-after t
-    (with move (if forwards? path-next-argument path-previous-argument)
-      (with p (move (root-tree) (tree->path (tree-down t)))
-        (if (nnull? p) (go-to p))))))
+    (when (tree-down t)
+      (with move (if forwards? path-next-argument path-previous-argument)
+        (with p (move (root-tree) (tree->path (tree-down t)))
+          (if (nnull? p) (go-to p)))))))
 
 (tm-define (structured-vertical t downwards?)
   (and-with p (tree-outer t)

@@ -306,16 +306,6 @@
   (init-default "math-font")
   (init-default "font-family"))
 
-(tm-define (test-init-font? val . opts)
-  (== (get-init "font") val))
-
-(tm-define (init-font val . opts)
-  (:check-mark "*" test-init-font?)
-  (init-env "font" val)
-  (when (nnull? opts)
-    (init-env "math-font" (car opts)))
-  (init-env "font-family" "rm"))
-
 (menu-bind document-short-chinese-font-menu
   (if (font-exists-in-tt? "AppleGothic")
       ("Apple Gothic" (init-font "apple-gothic")))
@@ -617,6 +607,12 @@
   ("Beamer" (init-page-rendering "beamer"))
   ("Book" (init-page-rendering "book"))
   ("Panorama" (init-page-rendering "panorama")))
+
+(menu-bind page-layout-menu
+  ("Margins as on paper" (toggle-page-screen-margin))
+  ("Reduced margins" (toggle-reduced-margins))
+  ("Indent paragraphs" (toggle-indent-paragraphs))
+  ("No page numbers" (toggle-no-page-numbers)))
 
 (menu-bind document-page-menu
   (-> "Type"
@@ -938,6 +934,8 @@
       ("Landscape" (init-page-orientation "landscape")))
   (-> (eval (number-columns-text (get-init "par-columns")))
       (link document-columns-menu))
+  (-> "Layout"
+      (link page-layout-menu))
   (if (and (== (get-preference "experimental encryption") "on")
 	   (!= (get-init "encryption") ""))
       (-> "Encryption" (link document-encryption-menu)))
@@ -1009,7 +1007,9 @@
         ---
         (link document-columns-menu)
         ---
-	(link page-rendering-menu))
+	(link page-rendering-menu)
+        ---
+        (link page-layout-menu))
     (if (and (== (get-preference "experimental encryption") "on")
 	     (!= (get-init "encryption") ""))
 	(=> (balloon (icon "tm_lock_open.xpm") "Encryption")

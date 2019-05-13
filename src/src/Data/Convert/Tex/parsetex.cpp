@@ -202,6 +202,13 @@ latex_parser::parse (string s, int& i, string stop, int change) {
 	   (i+2>n || s(i,i+2) != "\\)") &&
 	   (i+4>n || s(i,i+4) != "\\end"))) &&
 	 (stop != "\\egroup" || i+7>n || s(i,i+7) != "\\egroup")) {
+    if (N(stop) != 0 && stop[0] == '$' && test (s, i, "\\begin{")) {
+      // Emergency break from math mode on certain text environments
+      int j= i+7, start= j;
+      while (j < n && s[j] != '}') j++;
+      string cmd= "\\begin-" * s(start, j);
+      if (latex_type (cmd) == "enunciation") break;
+    }
     if (lf == 'N' && s[i] != '\n') lf= 'M';
     switch (s[i]) {
     case '~':
@@ -893,7 +900,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
   }
 
   bool mbox_flag=
-    ((cmd == "\\text") || (cmd == "\\mbox")) &&
+    (starts (cmd, "\\text") || cmd == "\\mbox") &&
     (command_type ["!mode"] == "math");
   if (mbox_flag) command_type ("!mode") = "text";
 
@@ -1008,6 +1015,12 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
           tree st= parse_symbol (s, i);
           if (cmd == "\\def" && arity == 2 && is_tuple (st) && N(st) == 1)
             st= st[0];
+          else if (is_tuple (st) && N(st) == 1 && is_atomic (st[0]) &&
+                   latex_type  (st[0]->label) == "modifier" &&
+                   latex_arity (st[0]->label) != 0) {
+            string sub_cmd= st[0]->label;
+            st= parse_command (s, i, sub_cmd, change);
+          }
           t << st;
           u << st;
           arity--;
@@ -1599,10 +1612,15 @@ accented_to_Cork (tree t) {
     else {
       char c1= v[0], c2= s[1];
       if (v == "\\i") c1= 'i';
-      if ((N(v)==1) || (v=="\\i"))
+      if ((N(v)==1) || (v=="\\i")) {
 	for (i=0; i<127; i++)
 	  if ((Cork_unaccented[i]==c1) && (Cork_accent[i]==c2))
 	    return tree (string ((char) (i+128)));
+        if (c1 == 'A' && c2 == 'c') return "<#104>";
+        if (c1 == 'a' && c2 == 'c') return "<#105>";
+        if (c1 == 'E' && c2 == 'c') return "<#118>";
+        if (c1 == 'e' && c2 == 'c') return "<#119>";
+      }
     }
   }
   return r;
@@ -1786,8 +1804,9 @@ get_latex_language (string s) {
         << "slovene" << "spanish" << "swedish" << "taiwanese" << "ukrainian";
 
   for (int i = 0 ; i < N(langs) ; i++)
-    if (test(r, 0 , as_string(langs[i])))
-      return as_string(langs[i]);
+    if (test (r, 0, as_string (langs[i])))
+      return as_string (langs[i]);
+  if (r == "francais") return "french";
   if (r == "ngermanb") return "german";
   if (r == "magyar") return "hungarian";
   return "";

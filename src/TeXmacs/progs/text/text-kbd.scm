@@ -17,6 +17,17 @@
 	(text text-edit)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hacks to work around the problem that MacOS reserves Alt-based shortcuts
+;; for its own personal use
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(when (os-macos?)
+  (kbd-map
+    (:mode in-std-text?)
+    ("\x0f" (make-equation*)) ;; Alt-$
+    ("ddagger" (make-eqnarray*)))) ;; Alt-&
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special symbols in text mode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -64,6 +75,16 @@
   ("_ _ var" (make 'underline))
   ("/ /" "//")
   ("/ / var" (make 'deleted))
+
+  ;; Markdown Style Shortcuts
+  ("# # var" (make 'section))
+  ("# # # var" (make 'subsection))
+  ("# # # # var" (make 'subsubsection))
+  ("` ` ` var" (make 'verbatim-code))
+  ("* * var" (make-with "font-series" "bold"))
+  ("* var" (make-with "font-shape" "italic"))
+  ("+ var" (make-tmlist 'itemize))
+  ("1 . var" (make-tmlist 'enumerate))
 
   ("space var" (make 'nbsp))
   ("space var var" (make-space "1em"))
@@ -339,6 +360,13 @@
   ("n var" "<#0144>")
   ("n var var" "<#0148>")
   ("n var var var" "<#01F9>")
+  (". var" "<#3002>")
+  (": var" "<#FF1A>")
+  ("; var" "<#FF1B>")
+  (", var" "<#FF0C>")
+  ("( var" "<#FF08>")
+  (") var" "<#FF09>")
+  ("? var" "<#FF1F>")
   ("< var" "<#300A>")
   ("> var" "<#300B>")
   ("' var" "<#2018>")

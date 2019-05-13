@@ -15,7 +15,7 @@
 #include "scheme.hpp"
 
 /******************************************************************************
-* Tests for caracters
+* Tests for characters
 ******************************************************************************/
 
 bool
@@ -440,121 +440,6 @@ convert_OTS1_symbols_to_universal_encoding (tree t) {
   return r;
 }
 
-/******************************************************************************
-* Convert between TeXmacs and XML strings
-******************************************************************************/
-
-static bool
-is_xml_name (char c) {
-  return
-    is_alpha (c) || is_numeric (c) ||
-    (c == '.') || (c == '-') || (c == ':');
-}
-
-string
-tm_to_xml_name (string s) {
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; i++)
-    if (is_xml_name (s[i])) r << s[i];
-    else r << "_" << as_string ((int) ((unsigned char) s[i])) << "_";
-  return r;
-}
-
-string
-xml_name_to_tm (string s) {
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; i++)
-    if (s[i] != '_') r << s[i];
-    else {
-      int start= ++i;
-      while ((i<n) && (s[i]!='_')) i++;
-      r << (char) ((unsigned char) as_int (s (start, i)));
-    }
-  return r;
-}
-
-string
-old_tm_to_xml_cdata (string s) {
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; i++)
-    if (s[i] == '&') r << "&amp;";
-    else if (s[i] == '>') r << "&gt;";
-    else if (s[i] != '<') r << s[i];
-    else {
-      int start= ++i;
-      while ((i<n) && (s[i]!='>')) i++;
-      r << "&" << tm_to_xml_name (s (start, i)) << ";";
-    }
-  return r;
-}
-
-object
-tm_to_xml_cdata (string s) {
-  array<object> a;
-  a << symbol_object ("!concat");
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; i++)
-    if (s[i] == '&') r << "&amp;";
-    else if (s[i] == '>') r << "&gt;";
-    else if (s[i] == '\\') r << "\\";
-    else if (s[i] != '<') r << cork_to_utf8 (s (i, i+1));
-    else {
-      int start= i++;
-      while ((i<n) && (s[i]!='>')) i++;
-      string ss= s (start, i+1);
-      string rr= cork_to_utf8 (ss);
-      string qq= utf8_to_cork (rr);
-      if (rr != ss && qq == ss && ss != "<less>" && ss != "<gtr>") r << rr;
-      else {
-	if (r != "") a << object (r);
-	a << cons (symbol_object ("tm-sym"),
-		   cons (ss (1, N(ss)-1),
-			 null_object ()));
-	r= "";
-      }
-    }
-  if (r != "") a << object (r);
-  if (N(a) == 1) return object ("");
-  else if (N(a) == 2) return a[1];
-  else return call ("list", a);
-}
-
-string
-old_xml_cdata_to_tm (string s) {
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; i++)
-    if (s[i] == '<') r << "<less>";
-    else if (s[i] == '>') r << "<gtr>";
-    else if (s[i] != '&') r << s[i];
-    else {
-      int start= ++i;
-      while ((i<n) && (s[i]!=';')) i++;
-      string x= "<" * xml_name_to_tm (s (start, i)) * ">";
-      if (x == "<amp>") r << "&";
-      else r << x;
-    }
-  return r;
-}
-
-string
-xml_unspace (string s, bool first, bool last) {
-  string r;
-  int i= 0, n= N(s);
-  if (first) while ((i<n) && is_space (s[i])) i++;
-  while (i<n)
-    if (!is_space (s[i])) r << s[i++];
-    else {
-      while ((i<n) && is_space (s[i])) i++;
-      if ((i<n) || (!last)) r << ' ';
-    }
-  return r;
-}
-
 bool
 contains_unicode_char (string s) {
   int i= 0, n= N(s);
@@ -691,10 +576,12 @@ tm_decode (string s) {
     if (s[i]=='<') {
       register int j;
       for (j=i+1; j<N(s); j++)
-	if (s[j]=='>') break;
+        if (s[j]=='>') break;
       if (j<N(s)) j++;
       if (s(i,j) == "<less>") r << "<";
       else if (s(i,j) == "<gtr>") r << ">";
+      else if (i+7==j && s[i+1]=='#' && s[j-1]=='>')
+        r << s(i, j);
       i=j-1;
       if (s[i]!='>') return r;
     }
@@ -710,8 +597,8 @@ tm_var_encode (string s) {
   for (i=0; i<n; i++) {
     if (s[i]=='<') {
       if (i+1 < n && s[i+1] == '#') {
-	while (i<n && s[i] != '>') r << s[i++];
-	if (i<n) r << s[i];
+        while (i<n && s[i] != '>') r << s[i++];
+        if (i<n) r << s[i];
       }
       else r << "<less>";
     }
@@ -730,10 +617,10 @@ tm_correct (string s) {
       register bool flag= true;
       register int j, k;
       for (j=i+1; j<N(s); j++)
-	if (s[j]=='>') break;
+        if (s[j]=='>') break;
       if (j==N(s)) return r;
       for (k=i+1; k<j; k++)
-	if (s[k]=='<') flag= false;
+        if (s[k]=='<') flag= false;
       if (flag) r << s(i,j+1);
       i=j;
     }
@@ -1189,6 +1076,13 @@ read_double (string s, int& i, double& result) {
   return true;
 }
 
+bool
+is_whitespace (string s) {
+  for (int i=0; i<N(s); i++)
+    if (s[i] != ' ' && s[i] != '\t' && s[i] != '\n') return false;
+  return true;
+}
+
 void
 skip_spaces (string s, int& i) {
   int n=N(s);
@@ -1236,6 +1130,27 @@ convert_tabs_to_spaces (string s, int tw) {
     else
       r << s[i];
     i++;
+  }
+  return r;
+}
+
+string
+downgrade_math_letters (string s) {
+  string r= "";
+  for (int i=0; i<N(s); ) {
+    int start= i;
+    tm_char_forwards (s, i);
+    if (i == start + 1) r << s[start];
+    else {
+      string ss= s (start, i);
+      if (starts (ss, "<b-")) ss= "<" * ss (3, N(ss));
+      if (starts (ss, "<up-")) ss= "<" * ss (4, N(ss));
+      if (starts (ss, "<cal-")) ss= "<" * ss (5, N(ss));
+      if (starts (ss, "<bbb-")) ss= "<" * ss (5, N(ss));
+      if (starts (ss, "<frak-")) ss= "<" * ss (6, N(ss));
+      if (N(ss) == 3) ss= ss (1, 2);
+      r << ss;
+    }
   }
   return r;
 }

@@ -518,6 +518,11 @@
 		9C1359F912BAB07700680742 /* qt_simple_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49DEECC01289A694002ACC66 /* qt_simple_widget.cpp */; };
 		9C1D126810D102B300232476 /* qt_pipe_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1D126510D102B300232476 /* qt_pipe_link.cpp */; };
 		9C1D126910D102B300232476 /* QTMPipeLink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1D126610D102B300232476 /* QTMPipeLink.cpp */; };
+		9C21A02221C116660035B5B3 /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02121C116660035B5B3 /* font_spacing.cpp */; };
+		9C21A02321C116660035B5B3 /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02121C116660035B5B3 /* font_spacing.cpp */; };
+		9C21A02421C116660035B5B3 /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02121C116660035B5B3 /* font_spacing.cpp */; };
+		9C21A02621C116820035B5B3 /* InputAsciiHexDecodeStream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02521C116820035B5B3 /* InputAsciiHexDecodeStream.cpp */; };
+		9C21A02821C116C60035B5B3 /* SimpleStringTokenizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02721C116C60035B5B3 /* SimpleStringTokenizer.cpp */; };
 		9C225A65128B5EB00039258C /* qt_chooser_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C225A63128B5EB00039258C /* qt_chooser_widget.cpp */; };
 		9C25212B14FFC7BC00C62749 /* build-glue.scm in Resources */ = {isa = PBXBuildFile; fileRef = 9C19A57C14FD624700738BD2 /* build-glue.scm */; };
 		9C25212D14FFC7C000C62749 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
@@ -2561,6 +2566,9 @@
 		9C1D126510D102B300232476 /* qt_pipe_link.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_pipe_link.cpp; sourceTree = "<group>"; };
 		9C1D126610D102B300232476 /* QTMPipeLink.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMPipeLink.cpp; sourceTree = "<group>"; };
 		9C1D126710D102B300232476 /* QTMPipeLink.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMPipeLink.hpp; sourceTree = "<group>"; };
+		9C21A02121C116660035B5B3 /* font_spacing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_spacing.cpp; sourceTree = "<group>"; };
+		9C21A02521C116820035B5B3 /* InputAsciiHexDecodeStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InputAsciiHexDecodeStream.cpp; sourceTree = "<group>"; };
+		9C21A02721C116C60035B5B3 /* SimpleStringTokenizer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SimpleStringTokenizer.cpp; sourceTree = "<group>"; };
 		9C225A63128B5EB00039258C /* qt_chooser_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_chooser_widget.cpp; sourceTree = "<group>"; };
 		9C225A64128B5EB00039258C /* qt_chooser_widget.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_chooser_widget.hpp; sourceTree = "<group>"; };
 		9C25EAB61D2A9ED400D7F2D5 /* columns_breaker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = columns_breaker.cpp; sourceTree = "<group>"; };
@@ -2807,8 +2815,10 @@
 				29B97315FDCFA39411CA2CEA /* Sources */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
 			);
+			indentWidth = 2;
 			name = TeXmacs;
 			sourceTree = "<group>";
+			tabWidth = 2;
 		};
 		29B97315FDCFA39411CA2CEA /* Sources */ = {
 			isa = PBXGroup;

@@ -1,4 +1,4 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.9>
 
 <style|source>
 
@@ -260,6 +260,13 @@
 
   \;
 
+  <assign|big-imbr|<macro|ind|str|<math-ordinary|<rigid|-<space|-0.5spc><around*|<left|\<langle\>|1>||<right|.>><rsub|<shift|<arg|ind>||-0.2em>>><space|0.6spc><arg|str>>>>
+
+  <assign|Big-imbr|<macro|ind|str|<math-ordinary|<below|<rigid|<shift|<with|magnification|<times|1.297|<value|magnification>>|-<space|-0.5spc><around*|<left|\<langle\>|1>||<right|.>>>||-0.1em>>|<shift|<arg|ind>||-0.1em>>
+  <arg|str>>>>
+
+  \;
+
   <assign|bi-index|<macro|key|secondary|<style-with|src-compact|none|<flag|<localize|index>|dark
   green|key><subindex|<arg|key>|<arg|secondary>><subindex|<arg|secondary>|<arg|key>>>>>
 
@@ -286,7 +293,7 @@
     <surround||<right-flush><action|<active*|<with|color|blue|<with|mode|math|<rigid|\<Leftarrow\>>>>>|mouse-fold|<arg|x>>|<arg|y>>
   </macro>>
 
-  <assign|solution|<\macro|body>
+  <assign|solution*|<\macro|body>
     <render-exercise|<localize|Solution>|<arg|body>>
   </macro>>
 

@@ -203,6 +203,18 @@ concater_rep::typeset_rigid (tree t, path ip) {
 }
 
 void
+concater_rep::typeset_hgroup (tree t, path ip) {
+  if (N(t) != 1 && N(t) != 2) { typeset_error (t, ip); return; }
+  marker (descend (ip, 0));
+  int start= N(a);
+  typeset (t[0], descend (ip, 0));
+  int end= N(a);
+  marker (descend (ip, 1));
+  for (int i=start; i+1<end; i++)
+    a[i]->penalty= HYPH_INVALID;
+}
+
+void
 concater_rep::print_semantic (box b, tree sem) {
   if (is_atomic (sem) && tm_string_length (sem->label) == 1) {
     array<space> spc_tab=
@@ -340,12 +352,12 @@ concater_rep::typeset_float (tree t, path ip) {
 ******************************************************************************/
 
 void
-concater_rep::typeset_repeat (tree t, path ip) {
+concater_rep::typeset_repeat (tree t, path ip, bool under) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   box b1  = typeset_as_concat (env, t[0], descend (ip, 0));
   box b2  = typeset_as_concat (env, t[1], descend (ip, 1));
   SI  xoff= env->get_length (XOFF_DECORATIONS);
-  print (repeat_box (ip, b1, b2, xoff));
+  print (repeat_box (ip, b1, b2, xoff, under));
 }
 
 /******************************************************************************

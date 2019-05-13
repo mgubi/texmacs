@@ -53,6 +53,7 @@ class concater_rep {
   void typeset_surround (tree t, path ip);
   void typeset_concat (tree t, path ip);
   void typeset_rigid (tree t, path ip);
+  void typeset_hgroup (tree t, path ip);
   void typeset_hspace (tree t, path ip);
   void typeset_space (tree t, path ip);
   void typeset_move (tree t, path ip);
@@ -60,7 +61,7 @@ class concater_rep {
   void typeset_resize (tree t, path ip);
   void typeset_clipped (tree t, path ip);
   void typeset_float (tree t, path ip);
-  void typeset_repeat (tree t, path ip);
+  void typeset_repeat (tree t, path ip, bool under);
   void typeset_formatting (tree t, path ip, string var);
   void typeset_decorated_box (tree t, path ip);
   void typeset_line_note (tree t, path ip);
@@ -104,6 +105,7 @@ class concater_rep {
 
   // active macro mechanisms
   void typeset_assign (tree t, path ip);
+  void typeset_provide (tree t, path ip);
   void typeset_with (tree t, path ip);
   void typeset_compound (tree t, path ip);
   void typeset_auto (tree t, path ip, tree macro);
@@ -111,6 +113,7 @@ class concater_rep {
   void typeset_drd_props (tree t, path ip);
   void typeset_eval (tree t, path ip);
   void typeset_value (tree t, path ip);
+  void typeset_or_value (tree t, path ip);
   void typeset_argument (tree t, path ip);
   void typeset_eval_args (tree t, path ip);
   void typeset_mark (tree t, path ip);

@@ -167,10 +167,7 @@ conv_sub (const string& ks) {
     while (tmp < n && (tmp = search_forwards ("+", tmp, a[i])) != -1)
       pos = tmp++;
     if (pos != -1 && n > pos+1) {
-      if (a[i][pos+1] == '&')
-         // FIXME: this isn't enough to see the ampersand in the menus... (?)
-        a[i] = a[i](0, pos+1) * "&&";
-      else if (is_locase (a[i][pos+1]))
+      if (is_locase (a[i][pos+1]))
         a[i] = a[i](0, pos) * upcase_all (a[i] (pos, n));
       else if (is_upcase (a[i][pos+1])) {
         // HACK: don't prepend Shift for function keys F1, F2...
@@ -317,30 +314,6 @@ from_qstring_utf8 (const QString &s) {
   return string ((char*) cstr);
 }
 
-// os8bits == UTF-8 on linux/Mac OS but ==locale codepage on windows
-// Qt offers no way to explicitly know what is the encoding used!
-// note that older Unix/linuxes did not use UTF-8
-QString
-os8bits_to_qstring (const string& s) {
-  c_string p (s);
-  QString nss= QString::fromLocal8Bit (p, N(s));
-  return nss;
-}
-
-string
-from_qstring_os8bits (const QString &s) {
-  QByteArray arr= s.toLocal8Bit ();
-  const char* cstr= arr.constData ();
-  return string ((char*) cstr);
-}
-
-string
-cork_to_os8bits (const string s){
-  // Note: this function is declared in converter.hpp
-  // (and implemented in converter.cpp for X11)
-  // In Qt version we stick to Qt routines for consistency
-  return from_qstring_os8bits(utf8_to_qstring (cork_to_utf8 (s)));
-}
 
 // This should provide better lookup times
 static QHash<QString, QColor> _NamedColors;
@@ -411,7 +384,7 @@ qt_supports (url u) {
 bool
 qt_image_size (url image, int& w, int& h) {// w, h in points
   if (DEBUG_CONVERT) debug_convert << "qt_image_size :" <<LF;
-  QImage im= QImage (os8bits_to_qstring (concretize (image)));
+  QImage im= QImage (utf8_to_qstring (concretize (image)));
   if (im.isNull ()) {
       convert_error << "Cannot read image file '" << image << "'"
       << " in qt_image_size" << LF;
@@ -430,14 +403,14 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
 void
 qt_convert_image (url image, url dest, int w, int h) {// w, h in pixels
   if (DEBUG_CONVERT) debug_convert << "qt_convert_image " << image << " -> "<<dest<<LF;
-  QImage im (os8bits_to_qstring (concretize (image)));
+  QImage im (utf8_to_qstring (concretize (image)));
   if (im.isNull ())
     convert_error << "Cannot read image file '" << image << "'"
     << " in qt_convert_image" << LF;
   else {
     if (w > 0 && h > 0)
       im= im.scaled (w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    im.scaled (w, h).save (os8bits_to_qstring (concretize (dest)));
+    im.scaled (w, h).save (utf8_to_qstring (concretize (dest)));
   }
 }
 
@@ -462,8 +435,8 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
   printer.setFullPage(true);
   if (!dpi) dpi=96;
   printer.setResolution(dpi);
-  printer.setOutputFileName(os8bits_to_qstring (concretize (outfile)));
-  QImage im (os8bits_to_qstring (concretize (image)));
+  printer.setOutputFileName(utf8_to_qstring (concretize (outfile)));
+  QImage im (utf8_to_qstring (concretize (image)));
   if (im.isNull ()) {
     convert_error << "Cannot read image file '" << image << "'"
     << " in qt_image_to_pdf" << LF;
@@ -715,6 +688,9 @@ qt_translate (const string& s) {
 string
 qt_application_directory () {
   return string (QCoreApplication::applicationDirPath().toLatin1().constData());
+  // This is used to set $TEXMACS_PATH
+  // in Windows TeXmacs cannot run if this path contains unicode characters
+  // apparently because Guile uses standard narrow char api to load its modules => patch Guile?.  
   // return from_qstring (QCoreApplication::applicationDirPath ());
 }
 
@@ -732,11 +708,9 @@ qt_get_date (string lan, string fm) {
       string y = as_string(localtime.date().year());
       string m = as_string(localtime.date().month());
       string d = as_string(localtime.date().day());
-      if (lan == "japanese")
-        return y * "<#5e74>" * m * "<#6708>" * d * "<#65e5>";
       if (lan == "korean")
         return y * "<#b144> " * m * "<#c6d4> " * d * "<#c77c>";
-      return y * "," * m * "," * d;
+      return y * "<#5e74>" * m * "<#6708>" * d * "<#65e5>";
     }
     else fm = "d MMMM yyyy";
   }
