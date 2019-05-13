@@ -32,7 +32,7 @@
  ******************************************************************************/
 
 /*! Queues the object's command into the main queue. */
-void 
+void
 QTMCommand::apply()  {
 BEGIN_SLOT
   if (!is_nil (cmd)) {
@@ -60,7 +60,7 @@ QTMAction::QTMAction (QObject *parent) : QAction (parent) {
                     this,     SLOT (doShowToolTip()));
 }
 
-QTMAction::~QTMAction() { 
+QTMAction::~QTMAction() {
   if (menu() && !menu()->parent()) delete menu();
 }
 
@@ -75,7 +75,7 @@ QTMAction::set_text (string s) {
   }
 }
 
-void 
+void
 QTMAction::doRefresh() {
 BEGIN_SLOT
   set_text (str);
@@ -97,7 +97,7 @@ END_SLOT
  cursor is this particular one, so in order to avoid displaying outdated
  toolTips (because the user moved fast over items) we compute distances.
  This is obviously wrong, and will behave weirdly under certain resolutions,
- for given menu item sizes, etc. Also, one typically moves for a while 
+ for given menu item sizes, etc. Also, one typically moves for a while
  horizontally over the first item in an extensible menu, so once the user
  stops, the distance is bigger than the given constant and no tooltip is
  displayed.
@@ -149,6 +149,7 @@ QTMTileAction::QTMTileAction (array<widget>& arr, int _cols, QObject* parent)
   };
 }
 
+
 QWidget*
 QTMTileAction::createWidget (QWidget* parent)
 {
@@ -196,10 +197,10 @@ QTMMinibarAction::QTMMinibarAction (array<widget>& arr, QObject* parent)
 
 QWidget*
 QTMMinibarAction::createWidget (QWidget* parent) {
-  static QImage* pxm = xpm_image ("tm_add.xpm"); // See qt_tm_widget.cpp 
+  static QImage* pxm = xpm_image ("tm_add.xpm"); // See qt_tm_widget.cpp
   QSize sz = pxm ? pxm->size() : QSize (16, 16);
   qt_tm_widget_rep::tweak_iconbar_size (sz);
-  
+
   if (DEBUG_QT_WIDGETS) debug_widgets << "QTMMinibarAction::createWidget\n";
   QWidget* wid= new QWidget (parent);
   QBoxLayout* l= new QBoxLayout (QBoxLayout::LeftToRight, wid);
@@ -304,7 +305,7 @@ QTMMenuWidget::paintEvent(QPaintEvent* e) {
  ******************************************************************************/
 
 QTMLazyMenu::QTMLazyMenu (promise<widget> _pm, QWidget* p, bool right)
-: QMenu (p), promise_widget (_pm), show_right (right) {
+: QMenu (p), promise_widget (_pm), show_right (right), forced (false) {
   QObject::connect (this, SIGNAL (aboutToShow ()), this, SLOT (force ()));
 }
 
@@ -340,12 +341,20 @@ QTMLazyMenu::transferActions (QList<QAction*>* from) {
   while (!from->isEmpty()) {
     QAction* a = from->takeFirst();
     addAction (a);
+      QTMLazyMenu* m = qobject_cast<QTMLazyMenu *>(a->menu());
+      if (m) {
+          QList<QAction*>* list = concrete (m->promise_widget())->get_qactionlist();
+          m->transferActions (list);
+//          m->force();
+          m->forced = true;
+      }
   }
 }
 
 void
 QTMLazyMenu::force () {
 BEGIN_SLOT
+  if (forced) return;
   QList<QAction*>* list = concrete (promise_widget())->get_qactionlist();
   transferActions (list);
 END_SLOT
@@ -436,7 +445,7 @@ QTMLineEdit::QTMLineEdit (QWidget* parent, string _type, string _ww,
     pal.setColor (QPalette::WindowText, Qt::black);
     setPalette (pal);
   }
-  
+
     // just to be sure we don't capture the wrong keys in keyPressEvent
   setCompleter (0);
 
@@ -484,11 +493,11 @@ extern hashmap<int,string> qtkeymap;
 /*
  FIXME: This is a hideous mess...
  */
-void 
+void
 QTMLineEdit::keyPressEvent (QKeyEvent* ev)
 {
   QCompleter* c = completer();
-  
+
   last_key = (ev->key() == Qt::Key_Tab && ev->modifiers() & Qt::ShiftModifier)
             ? Qt::Key_Backtab
             : ev->key();
@@ -497,7 +506,7 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
     if ((last_key != Qt::Key_Tab || type == "replace-what") &&
         (last_key != Qt::Key_Backtab || type == "replace-by") &&
         last_key != Qt::Key_Down &&
-        last_key != Qt::Key_Up &&        
+        last_key != Qt::Key_Up &&
         last_key != Qt::Key_Enter &&
         last_key != Qt::Key_Return &&
         last_key != Qt::Key_Escape &&
@@ -539,7 +548,7 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
 //        cout << "hasSelectedText= " << hasSelectedText() << LF;
 //        cout << "CursorPosition= " << cursorPosition() << LF;
 //        cout << "SelectionStart= " << selectionStart() << LF;
-        
+
         if (completing) {
 //          cout << "CompletionCount= " << c->completionCount() << LF;
           if (c->completionCount() > 1) {
@@ -571,7 +580,7 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
           c->setCompletionPrefix (prefix);
 //          cout << "prefix= " << from_qstring (prefix) << LF;
 //          cout << "CompletionCount= " << c->completionCount() << LF;
-          
+
             // If there are no completions, go to the end of the line or
             // send the key up for tab navigation
           if (c->completionCount() == 0 ||
@@ -691,7 +700,7 @@ QTMLineEdit::sizeHint () const {
   return qt_decode_length (ww, "", QLineEdit::sizeHint(), fontMetrics());
 }
 
-void 
+void
 QTMLineEdit::focusInEvent (QFocusEvent* ev)
 {
   setCursorPosition (text().size());
@@ -720,10 +729,10 @@ QTMTabWidget::QTMTabWidget (QWidget *p) : QTabWidget(p) {
 }
 
 /*! Resizes the widget to the size of the tab given by the index.
- 
+
  In particular, we must tell all parent widgets to adjustSize() as well as
  possibly resize the window: qt_window_widget_rep's constructor sets a fixed
- size for windows which do not contain variable size resize_widgets. In this 
+ size for windows which do not contain variable size resize_widgets. In this
  case we must update the fixed size to reflect the change of tab.
  */
 void
@@ -735,7 +744,7 @@ BEGIN_SLOT
     else
       widget(i)->setSizePolicy (QSizePolicy::Minimum, QSizePolicy::Minimum);
   }
-  
+
     // FIXME? this could loop indefinitely if parents are cyclic.
   QWidget* p = this;
   while (p != window()) {
@@ -744,7 +753,7 @@ BEGIN_SLOT
   }
   p->adjustSize();
 
-  if (window()->minimumSize()!=QSize (0,0) && 
+  if (window()->minimumSize()!=QSize (0,0) &&
       window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
     window()->setFixedSize (window()->sizeHint());
 END_SLOT
@@ -760,14 +769,14 @@ extern bool menu_caching;
 QTMRefreshWidget::QTMRefreshWidget (qt_widget _tmwid, string _strwid, string _kind)
 : QWidget (), strwid (_strwid), kind (_kind),
   curobj (false), cur (), tmwid (_tmwid), qwid (NULL), cache (widget ())
-{   
+{
   QObject::connect (the_gui->gui_helper, SIGNAL (tmSlotRefresh (string)),
                    this, SLOT (doRefresh (string)));
   QVBoxLayout* l = new QVBoxLayout (this);
   l->setContentsMargins (0, 0, 0, 0);
   l->setMargin (0);
   setLayout (l);
-  
+
   doRefresh ("init");
 }
 
@@ -777,7 +786,7 @@ QTMRefreshWidget::recompute (string what) {
   string s = "'(vertical (link " * strwid * "))";
   eval ("(lazy-initialize-force)");
   object xwid = call ("menu-expand", eval (s));
-  
+
   if (cache->contains (xwid)) {
     if (curobj == xwid) return false;
     curobj = xwid;
@@ -829,13 +838,13 @@ BEGIN_SLOT
     delete layout()->takeAt(0);
     layout()->addWidget (qwid);
     update();
-    
+
       // Tell the window to fix its size to the new one if we had it fixed to
-      // begin with (this is indicated by minimum and maximum sizes set to 
+      // begin with (this is indicated by minimum and maximum sizes set to
       // values other than the default)
     if (window()->minimumSize() != QSize (0,0) &&
         window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
-      window()->setFixedSize (window()->sizeHint());  
+      window()->setFixedSize (window()->sizeHint());
   }
 END_SLOT
 }
@@ -848,14 +857,14 @@ END_SLOT
 QTMRefreshableWidget::QTMRefreshableWidget (qt_widget _tmwid, object _prom, string _kind)
 : QWidget (), prom (_prom), kind (_kind),
   curobj (false), cur (), tmwid (_tmwid), qwid (NULL)
-{   
+{
   QObject::connect (the_gui->gui_helper, SIGNAL (tmSlotRefresh (string)),
                    this, SLOT (doRefresh (string)));
   QVBoxLayout* l = new QVBoxLayout (this);
   l->setContentsMargins (0, 0, 0, 0);
   l->setMargin (0);
   setLayout (l);
-  
+
   doRefresh ("init");
 }
 
@@ -908,13 +917,13 @@ BEGIN_SLOT
     delete layout()->takeAt(0);
     layout()->addWidget (qwid);
     update();
-    
+
       // Tell the window to fix its size to the new one if we had it fixed to
-      // begin with (this is indicated by minimum and maximum sizes set to 
+      // begin with (this is indicated by minimum and maximum sizes set to
       // values other than the default)
     if (window()->minimumSize() != QSize (0,0) &&
         window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
-      window()->setFixedSize (window()->sizeHint());  
+      window()->setFixedSize (window()->sizeHint());
   }
 END_SLOT
 }
@@ -930,7 +939,7 @@ QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
   cb.setSizeAdjustPolicy (AdjustToContents);
   cb.addItem ("");
   minSize = cb.sizeHint();  // we'll just keep the height
-  
+
     ///// Add width of the arrow button
   QStyleOptionComboBox opt;
   opt.initFrom (&cb);
@@ -941,32 +950,32 @@ QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
 }
 
 /*! Add items and fix the ComboBox size using texmacs length units.
- 
+
  Relative sizes are set based on the minimum bounding box in which any item of
- the list fits. Absolute sizes are set independently of the size of items in 
+ the list fits. Absolute sizes are set independently of the size of items in
  the list.
- 
+
  The QComboBox' minimum height is the original minimumSizeHint().
  */
 void
 QTMComboBox::addItemsAndResize (const QStringList& texts, string ww, string hh) {
   QComboBox::addItems (texts);
-  
+
     ///// Calculate the minimal contents size:
   calcSize = QApplication::globalStrut ();
   const QFontMetrics& fm = fontMetrics ();
-  
+
   for (int i = 0; i < count(); ++i) {
     QRect br = fm.boundingRect (itemText(i));
     calcSize.setWidth (qMax (calcSize.width(), br.width()));
     calcSize.setHeight (qMax (calcSize.height(), br.height()));
   }
   calcSize = qt_decode_length (ww, hh, calcSize, fm);
-  
+
     ///// Add minimum constraints and fix size
   calcSize.setHeight (qMax (calcSize.height(), minSize.height()));
   calcSize.rwidth() += minSize.width();
-  
+
   setFixedSize (calcSize);
 }
 
@@ -996,7 +1005,7 @@ QTMComboBox::event (QEvent* ev) {
  ******************************************************************************/
 
 /*! Sets the widget for the scrollarea and looks for QListViews.
- 
+
  This is needed to correctly update the scrollbars when the user navigates with
  the keys through items in a QListView contained in the QTMScrollArea.
  It also scrolls the viewport to the position of selected items in QListWidgets.
@@ -1004,7 +1013,7 @@ QTMComboBox::event (QEvent* ev) {
 void
 QTMScrollArea::setWidgetAndConnect (QWidget* w) {
   setWidget (w);
- 
+
   listViews = w->findChildren<QTMListView*>();
   for (ListViewsIterator it = listViews.begin(); it != listViews.end(); ++it) {
     if (! (*it)->isScrollable())
@@ -1026,7 +1035,7 @@ BEGIN_SLOT
     QRect g = lw->geometry();
     int   x = r.x() + g.x();
     int   y = r.y() + g.y();
-    
+
     if (! viewport()->geometry().contains (x, y))
       ensureVisible (x, y, r.width(), r.height());
   }
@@ -1034,7 +1043,7 @@ END_SLOT
 }
 
 /*! Work around a problem with scrolling before the widget is shown.
- 
+
  Calling ensureVisible() before the widget is shown scrolls the viewport by an
  insufficient amount. See the comments to QTMScrollArea.
  */
@@ -1059,16 +1068,16 @@ QTMListView::QTMListView (const command& cmd,
                           bool filtered,
                           QWidget* parent)
 : QListView (parent) {
-  
+
   stringModel = new QStringListModel (strings, this);
   filterModel = new QSortFilterProxyModel (this);
-  
+
   filterModel->setSourceModel (stringModel);
     //filterModel->setDynamicSortFilter (true);
   filterModel->setFilterCaseSensitivity (Qt::CaseSensitive);
-  
+
   setModel (filterModel);
-  
+
   setSelectionMode (multiple ? ExtendedSelection : SingleSelection);
   setEditTriggers (NoEditTriggers);
 
@@ -1083,7 +1092,7 @@ QTMListView::QTMListView (const command& cmd,
       sel.merge (QItemSelection(item, item), QItemSelectionModel::Select);
   }
   selectionModel()->select (sel, QItemSelectionModel::Select);
-  
+
   if (!scroll) {
     setMinimumWidth (sizeHintForColumn(0));
     setMinimumHeight (sizeHintForRow(0) * model()->rowCount());
@@ -1104,7 +1113,7 @@ QTMListView::QTMListView (const command& cmd,
 }
 
 /*! Reimplemented from QListView.
- 
+
  We simply emit another signal, mainly to notify QTMScrollArea that we have a new
  selection for those cases were we don't have our own scrollbars.
  */
@@ -1141,7 +1150,7 @@ QTMTreeView::callOnChange (const QModelIndex& index, bool mouse) {
 BEGIN_SLOT
   object arguments = mouse ? list_object ((int)QApplication::mouseButtons())
                            : list_object (-1);
-    
+
     // docs state the index is valid, no need to check
   QVariant d = tmModel()->data (index, QTMTreeModel::CommandRole);
     // If there's no CommandRole, we return the subtree by default
@@ -1163,4 +1172,3 @@ inline QTMTreeModel*
 QTMTreeView::tmModel() const {
   return static_cast<QTMTreeModel*> (model());
 }
-

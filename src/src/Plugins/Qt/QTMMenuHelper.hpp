@@ -45,10 +45,10 @@
 
  To use this class, one typically takes some given command "cmd" and does the
  following:
- 
+
     QTMCommand* qtmcmd = new QTMCommand (theQWidget, cmd);
     QObject::connect(theQWidget, SIGNAL (somethingHappened()), qtmcmd, SLOT (apply()));
- 
+
  Since the slot in this class accepts no arguments, commands which require
  access to the QWidget must be subclassed from command_rep to accept the
  particular QWidget as a parameter. Then their invocation (which apply() will
@@ -73,22 +73,25 @@ public slots:
 
 
 /*! A QMenu which builds its entries just before show()ing.
- 
+
  The menu entries are given as a texmacs widget in form of a promise which is
  evaluated each time we force(). No caching internal to this object should be
  performed lest we break dynamic menus.
- 
+
  If this is intended as a submenu of a QAction, we must attachTo() it: then,
  when the action is about to be destroyed() we are notified and remove ourselves
- 
+
  If this is used as a menu for a button, then it suffices to set the parent
  accordingly in the constructor.
  */
 class QTMLazyMenu: public QMenu {
   Q_OBJECT
-  
+
   promise<widget> promise_widget;
   bool show_right;
+    
+protected:
+  bool forced;
 
 public:
   QTMLazyMenu (promise<widget> _pm, QWidget* p = NULL, bool right = false);
@@ -107,7 +110,7 @@ protected slots:
 
 
 /*! The basic action for items in TeXmacs' menus.
- 
+
  This custom action frees its menu if it does not already have an owner: this is
  part of the memory policy explained in qt_menu_rep.
 
@@ -119,17 +122,17 @@ protected slots:
  */
 class QTMAction : public QAction {
   Q_OBJECT
-  
+
   QTimer* _timer;
   QPoint    _pos;
   string     str;
-  
+
 public:
   QTMAction (QObject *parent = NULL);
   ~QTMAction();
 
   void set_text (string s);
-  
+
 public slots:
   void doRefresh();
   void showToolTip();   //<! Force the display of the tooltip (starts a timer)
@@ -143,22 +146,22 @@ protected slots:
  */
 class QTMWidgetAction : public QWidgetAction {
   Q_OBJECT
-  
+
   widget wid;
-  
+
 public:
   QTMWidgetAction (widget _wid, QObject* parent=NULL);
-  
+
 public slots:
   void doRefresh() { };
-  
+
 protected:
   virtual QWidget* createWidget (QWidget* parent);
 };
 
 
 /*! QTMTileAction is used to build a popup menu with a grid of buttons.
- 
+
  In particular this is used to build the matrix of buttons in the color palette
  available at the toolbar. The corresponding texmacs widget using this class
  is a tile_menu (see qt_ui_element.cpp)
@@ -168,10 +171,11 @@ class QTMTileAction: public QWidgetAction {
 
   QVector <QAction*> actions;
   int                   cols;
-  
+
 public:
   QTMTileAction (array<widget>& arr, int _cols, QObject* parent=NULL);
   virtual QWidget* createWidget (QWidget* parent);
+  QWidget* myWidget () { return createWidget (NULL); } 
 };
 
 
@@ -189,7 +193,7 @@ public:
 
 
 /*! QTMMenuButton is a custom button appropriate for menus.
- 
+
  We need to subclass QToolButton for two reasons:
     1) Custom appearance
     2) If used in QWidgetAction the menu does not disappear upon triggering the
@@ -200,7 +204,7 @@ class QTMMenuButton: public QToolButton {
 
 public:
   QTMMenuButton (QWidget* parent = NULL);
- 
+
   void mouseReleaseEvent (QMouseEvent* e);
   void mousePressEvent (QMouseEvent* e);
   void paintEvent (QPaintEvent* e);
@@ -240,7 +244,7 @@ public:
 
 signals:
   void focusOut (Qt::FocusReason reason);
-  
+
 protected:
   virtual void keyPressEvent (QKeyEvent* ev);
   virtual void focusInEvent (QFocusEvent* ev);
@@ -249,29 +253,29 @@ protected:
 
 
 /*! A class to keep a QTMLineEdit and a qt_input_text_widget_rep in sync.
- 
- After certain events we store state information about the QLineEdit into the 
+
+ After certain events we store state information about the QLineEdit into the
  qt_input_text_widget_rep:
- 
+
   - When the user has finished editing (i.e. has pressed enter) we save the text
     from the QWidget in the texmacs widget and set a "modified" flag.
   - When the user leaves the QWidget we restore the text from the texmacs widget
     and in case there was a modification we execute the scheme command.
- 
+
  Additionally and depending on user configuration we may always store the text
  when leaving or apply the command when pressing enter.
- 
+
  @note On memory management: the QTMInputTextWidgetHelper is owned by the
        QTMLineEdit it is helping with.
 */
 class QTMInputTextWidgetHelper : public QObject {
   Q_OBJECT
-  
+
   qt_widget   p_wid;  //!< A pointer to a qt_input_text_widget_rep
 
 public:
   QTMInputTextWidgetHelper (qt_widget _wid);
-  
+
 protected:
   qt_input_text_widget_rep* wid () { // useful cast
     return static_cast<qt_input_text_widget_rep*> (p_wid.rep); }
@@ -283,20 +287,20 @@ public slots:
 
 
 /*! A class to keep a QComboBox and a qt_field_widget_rep in sync.
- 
- After certain events we store state information about the QComboBox into the 
+
+ After certain events we store state information about the QComboBox into the
  qt_input_text_widget_rep: when the user has finished editing (i.e. has pressed
  enter), or has left the QComboBox for instance.
- 
+
  @note On memory management: the QTMFieldWidgetHelper is owned by the
        QComboBox it is helping with.
 */
 class QTMFieldWidgetHelper : public QObject {
   Q_OBJECT
-  
+
   qt_widget wid;
   bool     done;
-  
+
 public:
   QTMFieldWidgetHelper (qt_widget _wid, QComboBox* parent);
   QTMFieldWidgetHelper (qt_widget _wid, QLineEdit* parent);
@@ -321,7 +325,7 @@ public slots:
 /*! A container widget which redraws the widgets it owns. */
 class QTMRefreshWidget : public QWidget {
   Q_OBJECT
-  
+
   string strwid;
   string   kind;
   object curobj;
@@ -329,7 +333,7 @@ class QTMRefreshWidget : public QWidget {
   qt_widget tmwid;
   QWidget*   qwid;
   hashmap<object,widget> cache;
-  
+
 public:
   QTMRefreshWidget (qt_widget _tmwid, string _strwid, string _kind);
 
@@ -344,14 +348,14 @@ public slots:
 /*! A container widget which redraws the widgets it owns. */
 class QTMRefreshableWidget : public QWidget {
   Q_OBJECT
-  
+
   object     prom;
   string     kind;
   object   curobj;
   widget      cur;
   qt_widget tmwid;
   QWidget*   qwid;
-  
+
 public:
   QTMRefreshableWidget (qt_widget _tmwid, object _prom, string _kind);
 
@@ -364,12 +368,12 @@ public slots:
 
 
 /*! A mutilated QComboBox which fixes its size using texmacs lengths.
- 
+
  To use just create the QWidget and call addItemsAndResize().
  */
 class QTMComboBox : public QComboBox {
   Q_OBJECT
-  
+
   QSize  calcSize;
   QSize   minSize;
 public:
@@ -393,7 +397,7 @@ public:
   QTMListView (const command& cmd, const QStringList& vals, const QStringList&,
                bool multiple, bool scroll = false, bool filtered = false,
                QWidget* parent = NULL);
-  
+
   QSortFilterProxyModel* filter() const { return filterModel; }
   bool isScrollable() const {
     return (verticalScrollBarPolicy() != Qt::ScrollBarAlwaysOff) &&
@@ -411,9 +415,9 @@ protected slots:
 class QTMTreeModel;
 
 /*! A simple wrapper around a QTreeView.
- 
+
  This class keeps a pointer to the tree it's displaying, in order to keep it
- alive. It also instantiates (if necessary) the QTMTreeModel it needs to sync 
+ alive. It also instantiates (if necessary) the QTMTreeModel it needs to sync
  with the data. This model is property of a qt_tree_observer, which will delete
  it when the tree is.
  */
@@ -422,31 +426,31 @@ class QTMTreeView : public QTreeView {
 
   tree      _t;
   command _cmd;
-  
+
   QTMTreeView (const QTMTreeView&);
   QTMTreeView& operator= (const QTMTreeView&);
-  
+
 public:
   QTMTreeView (command cmd, tree data, const tree& roles, QWidget* parent=0);
   QTMTreeModel* tmModel() const;
-  
+
 protected:
   virtual void currentChanged (const QModelIndex& cur, const QModelIndex& pre);
-  
+
 private slots:
   void callOnChange (const QModelIndex& index, bool mouse=true);
 };
 
 
 /*! A QScrollArea which automatically scrolls to selected items in QListWidgets.
- 
+
  This is needed because of our implementation of choice_widget which disables
  the default scrollbars in QListWidget. Instead we add an explicit QScrollArea
- which then has to be scrolled manually, for instance when the user navigates 
- with the cursor keys. To this end we use the slot scrollToSelection(), 
+ which then has to be scrolled manually, for instance when the user navigates
+ with the cursor keys. To this end we use the slot scrollToSelection(),
  connected to the signal currentIndexChanged() of each QListWidget contained in
  the QScrollArea.
- 
+
  Furthermore, we must implement showEvent() because scrolling at the time of
  widget compilation in qt_ui_element_rep::as_qwidget() before the widget
  is shown results in an unsufficient scroll performed (by an amount roughly the
@@ -454,9 +458,9 @@ private slots:
  */
 class QTMScrollArea : public QScrollArea {
   Q_OBJECT
-  
+
   QList<QTMListView*> listViews;
-  
+
   typedef QList<QTMListView*>::iterator ListViewsIterator;
 
 public:
