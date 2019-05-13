@@ -142,7 +142,7 @@ protected:
 
 #endif  // defined(Q_OS_MAC) || defined (Q_WS_X11)
 
-#ifdef Q_WS_WIN
+#ifdef Q_OS_WIN
 
 /*!
  * A WinQTMPrinterSettings object sets the the default print command to be either
@@ -171,6 +171,6 @@ protected:
   void systemCommandFinished(int exitCode, QProcess::ExitStatus exitStatus);
 };
 
-#endif // Q_WS_WIN
+#endif // Q_OS_WIN
 
 #endif  // QTMPRINTERSETTINGS_HPP

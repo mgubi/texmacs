@@ -29,7 +29,7 @@ qt_printer_widget_rep::qt_printer_widget_rep (command _cmd, url _file)
   if (!_settings)
     _settings = new CupsQTMPrinterSettings();
 #endif
-#ifdef Q_WS_WIN
+#ifdef Q_OS_WIN
   if (!_settings)
     _settings = new WinQTMPrinterSettings();
 #endif
