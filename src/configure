@@ -19515,7 +19515,7 @@ $as_echo_n "checking whether host operating system is Darwin... " >&6; }
   case $host_os in
     darwin*)
       at_darwin=yes
-      at_qmake_args=''
+      at_qmake_args='-spec macx-clang'
       ;;
   esac
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_darwin" >&5
