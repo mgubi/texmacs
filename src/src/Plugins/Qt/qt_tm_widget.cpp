@@ -193,17 +193,23 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   bottomTools->setStyle (qtmstyle ());
   
   {
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+
     // set proper sizes for icons
     QImage *pxm = xpm_image ("tm_new.xpm");
     QSize sz = (pxm ? pxm->size() : QSize (24, 24));
+    sz *= 1.0/pxm->devicePixelRatio();
     tweak_iconbar_size (sz);
     mainToolBar->setIconSize (sz);
     pxm = xpm_image ("tm_section.xpm");
     sz = (pxm ? pxm->size() : QSize (20, 20));
+    sz *= 1.0/pxm->devicePixelRatio();
     tweak_iconbar_size (sz);
     modeToolBar->setIconSize (sz);
     pxm = xpm_image ("tm_add.xpm");
     sz = (pxm ? pxm->size() : QSize (16, 16));
+    sz *= 1.0/pxm->devicePixelRatio();
     tweak_iconbar_size (sz);
     focusToolBar->setIconSize (sz);
   }  
