@@ -308,7 +308,7 @@ QTMMenuWidget::paintEvent(QPaintEvent* e) {
  ******************************************************************************/
 
 QTMLazyMenu::QTMLazyMenu (promise<widget> _pm, QWidget* p, bool right)
-: QMenu (p), promise_widget (_pm), show_right (right), forced (false) {
+: QMenu (p), promise_widget (_pm), show_right (right) {
   QObject::connect (this, SIGNAL (aboutToShow ()), this, SLOT (force ()));
 }
 
@@ -344,20 +344,12 @@ QTMLazyMenu::transferActions (QList<QAction*>* from) {
   while (!from->isEmpty()) {
     QAction* a = from->takeFirst();
     addAction (a);
-      QTMLazyMenu* m = qobject_cast<QTMLazyMenu *>(a->menu());
-      if (m) {
-          QList<QAction*>* list = concrete (m->promise_widget())->get_qactionlist();
-          m->transferActions (list);
-//          m->force();
-          m->forced = true;
-      }
   }
 }
 
 void
 QTMLazyMenu::force () {
 BEGIN_SLOT
-  if (forced) return;
   QList<QAction*>* list = concrete (promise_widget())->get_qactionlist();
   transferActions (list);
 END_SLOT
