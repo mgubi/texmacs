@@ -925,6 +925,15 @@
 		9C52102E2028B9C600A2B5B6 /* scala_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52102D2028B9C600A2B5B6 /* scala_language.cpp */; };
 		9C52102F2028B9C600A2B5B6 /* scala_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52102D2028B9C600A2B5B6 /* scala_language.cpp */; };
 		9C5210302028B9C600A2B5B6 /* scala_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52102D2028B9C600A2B5B6 /* scala_language.cpp */; };
+		9C5B2D6F22918A9400B8F725 /* xml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D6E22918A9400B8F725 /* xml.cpp */; };
+		9C5B2D7022918A9400B8F725 /* xml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D6E22918A9400B8F725 /* xml.cpp */; };
+		9C5B2D7122918A9400B8F725 /* xml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D6E22918A9400B8F725 /* xml.cpp */; };
+		9C5B2D7322918AC500B8F725 /* metadata_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7222918AC500B8F725 /* metadata_post.cpp */; };
+		9C5B2D7422918AC500B8F725 /* metadata_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7222918AC500B8F725 /* metadata_post.cpp */; };
+		9C5B2D7522918AC500B8F725 /* metadata_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7222918AC500B8F725 /* metadata_post.cpp */; };
+		9C5B2D7722918B1000B8F725 /* tree_spell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7622918B0F00B8F725 /* tree_spell.cpp */; };
+		9C5B2D7822918B1000B8F725 /* tree_spell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7622918B0F00B8F725 /* tree_spell.cpp */; };
+		9C5B2D7922918B1000B8F725 /* tree_spell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5B2D7622918B0F00B8F725 /* tree_spell.cpp */; };
 		9C6061EA112442BD00054149 /* gs_utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6061E8112442BC00054149 /* gs_utilities.cpp */; };
 		9C6061EB112442BD00054149 /* gs_utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6061E8112442BC00054149 /* gs_utilities.cpp */; };
 		9C6061EC112442BD00054149 /* gs_utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6061E8112442BC00054149 /* gs_utilities.cpp */; };
@@ -2605,6 +2614,9 @@
 		9C5210262028B86900A2B5B6 /* font_wide.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_wide.cpp; sourceTree = "<group>"; };
 		9C52102D2028B9C600A2B5B6 /* scala_language.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = scala_language.cpp; sourceTree = "<group>"; };
 		9C5A817C181DC97900B9C03D /* PDFWriter.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = PDFWriter.xcconfig; sourceTree = "<group>"; };
+		9C5B2D6E22918A9400B8F725 /* xml.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xml.cpp; sourceTree = "<group>"; };
+		9C5B2D7222918AC500B8F725 /* metadata_post.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = metadata_post.cpp; sourceTree = "<group>"; };
+		9C5B2D7622918B0F00B8F725 /* tree_spell.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_spell.cpp; sourceTree = "<group>"; };
 		9C5DBAD810A8DDD7008B7623 /* makefile.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = makefile.in; path = src/makefile.in; sourceTree = "<group>"; };
 		9C5DBADB10A8DF32008B7623 /* configure.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = configure.in; sourceTree = "<group>"; };
 		9C6061E8112442BC00054149 /* gs_utilities.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = gs_utilities.cpp; sourceTree = "<group>"; };
@@ -3362,6 +3374,7 @@
 		9C0B476710A8CC0F0097A335 /* Tex */ = {
 			isa = PBXGroup;
 			children = (
+				9C5B2D7222918AC500B8F725 /* metadata_post.cpp */,
 				4934A46318C5D00000BF1E6A /* conservative_fromtex.cpp */,
 				4934A46418C5D00000BF1E6A /* conservative_totex.cpp */,
 				9C0B476810A8CC0F0097A335 /* convert_tex.hpp */,
@@ -3408,6 +3421,7 @@
 		9C0B477210A8CC0F0097A335 /* Xml */ = {
 			isa = PBXGroup;
 			children = (
+				9C5B2D6E22918A9400B8F725 /* xml.cpp */,
 				9C0B477310A8CC0F0097A335 /* fromxml.cpp */,
 				9C0B477410A8CC0F0097A335 /* parsexml.cpp */,
 			);
@@ -3483,6 +3497,7 @@
 		9C0B47A310A8CC100097A335 /* Tree */ = {
 			isa = PBXGroup;
 			children = (
+				9C5B2D7622918B0F00B8F725 /* tree_spell.cpp */,
 				9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */,
 				9CEDAA2F1264FF6C009630CC /* tree_analyze.hpp */,
 				9CE18E81125E685D00641CFC /* tree_brackets.cpp */,
@@ -5511,6 +5526,7 @@
 				9C0B4A1910A8CC110097A335 /* tree_correct.cpp in Sources */,
 				4911B1861CCA191400F0AFFD /* poor_stretched.cpp in Sources */,
 				495DB2D618CCB02300FE485A /* fakedlopen.c in Sources */,
+				9C5B2D7322918AC500B8F725 /* metadata_post.cpp in Sources */,
 				9C0B4A1A10A8CC110097A335 /* tree_cursor.cpp in Sources */,
 				9C0B4A1B10A8CC110097A335 /* tree_traverse.cpp in Sources */,
 				9C0B4A1C10A8CC110097A335 /* edit_main.cpp in Sources */,
@@ -5713,6 +5729,7 @@
 				9C0B4B3010A8CC110097A335 /* env_inactive.cpp in Sources */,
 				9C0B4B3110A8CC110097A335 /* env_length.cpp in Sources */,
 				9C0B4B3210A8CC110097A335 /* env_semantics.cpp in Sources */,
+				9C5B2D7722918B1000B8F725 /* tree_spell.cpp in Sources */,
 				4973E9A118BC945F001F74F0 /* r_language.cpp in Sources */,
 				9C0B4B3310A8CC110097A335 /* format.cpp in Sources */,
 				49FB1B041CB30D6000B983F3 /* poor_rubber.cpp in Sources */,
@@ -5720,6 +5737,7 @@
 				9C0B4B3510A8CC110097A335 /* line_item.cpp in Sources */,
 				9C0B4B3610A8CC110097A335 /* page_item.cpp in Sources */,
 				9C0B4B3C10A8CC110097A335 /* lazy_gui.cpp in Sources */,
+				9C5B2D6F22918A9400B8F725 /* xml.cpp in Sources */,
 				9C0B4B3D10A8CC110097A335 /* lazy_paragraph.cpp in Sources */,
 				9C0B4B3E10A8CC110097A335 /* lazy_typeset.cpp in Sources */,
 				9C0B4B3F10A8CC110097A335 /* lazy_vstream.cpp in Sources */,
@@ -6000,6 +6018,7 @@
 				49C096191B0F945300E038BA /* db_index.cpp in Sources */,
 				9CCC747510D303D900E88D90 /* tex_files.cpp in Sources */,
 				9C5210172028B7B000A2B5B6 /* adjust_termes.cpp in Sources */,
+				9C5B2D7122918A9400B8F725 /* xml.cpp in Sources */,
 				9CCC747610D303D900E88D90 /* tex_font.cpp in Sources */,
 				9CCC747710D303D900E88D90 /* tex_init.cpp in Sources */,
 				9CCC747810D303D900E88D90 /* tex_rubber_font.cpp in Sources */,
@@ -6071,6 +6090,7 @@
 				9CCC74CE10D303D900E88D90 /* bridge_argument.cpp in Sources */,
 				9CCC74CF10D303D900E88D90 /* bridge_auto.cpp in Sources */,
 				9CCC74D010D303D900E88D90 /* bridge_compound.cpp in Sources */,
+				9C5B2D7922918B1000B8F725 /* tree_spell.cpp in Sources */,
 				9CCC74D110D303D900E88D90 /* bridge_default.cpp in Sources */,
 				9CCC74D210D303D900E88D90 /* bridge_docrange.cpp in Sources */,
 				9CCC74D310D303D900E88D90 /* bridge_document.cpp in Sources */,
@@ -6143,6 +6163,7 @@
 				9CFEB3F811D79783005C12C4 /* bibtex_functions.cpp in Sources */,
 				9CFEB40111D79AF6005C12C4 /* parsebib.cpp in Sources */,
 				9C74D965123BF892008959D1 /* packrat_grammar.cpp in Sources */,
+				9C5B2D7522918AC500B8F725 /* metadata_post.cpp in Sources */,
 				9C74D966123BF892008959D1 /* packrat_parser.cpp in Sources */,
 				9CE18E85125E685D00641CFC /* tree_brackets.cpp in Sources */,
 				9CF78E0F125FBF9700CA5846 /* highlight_observer.cpp in Sources */,
@@ -6461,6 +6482,7 @@
 				9CD4E6DD10B14AB300E0DD5C /* concater.cpp in Sources */,
 				9CD4E6DE10B14AB300E0DD5C /* env.cpp in Sources */,
 				9CD4E6DF10B14AB300E0DD5C /* env_default.cpp in Sources */,
+				9C5B2D7422918AC500B8F725 /* metadata_post.cpp in Sources */,
 				9C5210162028B7B000A2B5B6 /* adjust_termes.cpp in Sources */,
 				9CD4E6E010B14AB300E0DD5C /* env_exec.cpp in Sources */,
 				493EAE311958CAE500F01CED /* python_language.cpp in Sources */,
@@ -6590,10 +6612,12 @@
 				495712FA16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
 				495712FD16E90E5900934EA3 /* metadata-elsevier.cpp in Sources */,
 				4910FA7416EB3E2F0088B175 /* post_convert.cpp in Sources */,
+				9C5B2D7022918A9400B8F725 /* xml.cpp in Sources */,
 				497822CC16EC86D40054F5BA /* tt_analyze.cpp in Sources */,
 				49FFB07A16EDF83A004A2A32 /* glyph_analyze.cpp in Sources */,
 				49FDFA6616F0C677002B830A /* metadata-ams.cpp in Sources */,
 				4964705216F72CB500D95FC4 /* font_guess.cpp in Sources */,
+				9C5B2D7822918B1000B8F725 /* tree_spell.cpp in Sources */,
 				4964705516F72CB500D95FC4 /* smart_font.cpp in Sources */,
 				490A9D2716F8A5EC00EC29D5 /* metadata-revtex.cpp in Sources */,
 				491FC57D16F900140038929C /* font_translate.cpp in Sources */,
