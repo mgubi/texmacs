@@ -65,9 +65,9 @@
 (define (ca*r x) (if (pair? x) (ca*r (car x)) x))
 (define (ca*adr x) (ca*r (cadr x)))
 
-(define (lambda* head body)
+(define (make-lambda head body)
   (if (pair? head)
-      (lambda* (car head) `((lambda ,(cdr head) ,@body)))
+      (make-lambda (car head) `((lambda ,(cdr head) ,@body)))
       (car body)))
 
 (define (listify args)
@@ -238,9 +238,10 @@
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
-         (nval (lambda* head nbody)))
+         (nval (make-lambda head nbody)))
     (if (ahash-ref tm-defined-table var)
-        `(let ((former ,var))
+        `(begin
+           (let ((former ,var))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
            ;;(display* "Overloaded " ',var "\n")
@@ -253,26 +254,27 @@
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
            (ahash-set! tm-defined-name ,var ',var)
-	   (ahash-set! tm-defined-module ',var
-		       (cons (module-name temp-module)
-			     (ahash-ref tm-defined-module ',var)))
-           ,@(map property-rewrite cur-props))
+	         (ahash-set! tm-defined-module ',var
+   		       (cons (module-name temp-module)
+	  		     (ahash-ref tm-defined-module ',var)))
+           ,@(map property-rewrite cur-props)))
         `(begin
            (when (nnull? cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
              (display* "   " ',nval "\n"))
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           (set! temp-module ,(current-module))
+           ;;(display* "   " ',head "|||" ',nbody "\n")
+           (eval-when (expand load eval) (set! temp-module ,(current-module))
            (set! temp-value
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)))
-           (set-current-module texmacs-user)
+           (set-current-module texmacs-user))
            (define-public ,var temp-value)
-           (set-current-module temp-module)
+           (eval-when (expand load eval) (set-current-module temp-module))
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
-	   (ahash-set! tm-defined-module ',var
+      	   (ahash-set! tm-defined-module ',var
                        (list (module-name temp-module)))
            ,@(map property-rewrite cur-props)))))
 
@@ -306,11 +308,12 @@
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
        (tm-define ,macro-head ,@body)
+       (eval-when (expand load eval)
        (set! temp-module ,(current-module))
-       (set-current-module texmacs-user)
+       (set-current-module texmacs-user))
        (define-public-macro ,head
          ,(apply* (ca*r macro-head) head))
-       (set-current-module temp-module))))
+       (eval-when (expand load eval) (set-current-module temp-module)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -344,18 +347,19 @@
   (let* ((old (ahash-ref lazy-define-table name))
 	 (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-  (with name-star (string->symbol (string-append (symbol->string name) "*"))
-    `(when (not (defined? ',name))
-       (tm-define (,name . args)
+  (with name-star (string->symbol (string-append (symbol->string name) "*")) (if (not (defined? name))
+    `(tm-define (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))
-                (p (module-ref texmacs-user '%module-public-interface))
+                (p (module-public-interface texmacs-user))
                 (r (module-ref p ',name #f)))
            (if (not r)
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
-           (apply r args))))))
+          (display* "lazy:" ',name "\n")
+          (apply r args)))
+         (begin (display* "ALREADY DEFINED:" name "\n") `(begin)))))
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)

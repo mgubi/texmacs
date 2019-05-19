@@ -70,7 +70,7 @@
 
 (define (environment-bind! env binding)	; must stay private
   ;; Restore a binding previously saved with environment-binding.
-  (if (second binding)      
+  (if (second binding)
       (environment-set!* env (first binding) (car (second binding)))
       (environment-remove! env (first binding))))
 
@@ -88,12 +88,12 @@
 
 (tm-define-macro (with-environment env bindings . body)
   (if (nlist? bindings)
-      (syntax-error "with-environment" "Bindings are not a list: ~A" bindings))
+      (tm-syntax-error "with-environment" "Bindings are not a list: ~A" bindings))
   `(with-environment* ,env
        (list ,@(map-in-order
 		(lambda (b)
 		  (if (not (list-length=2? b))
-		      (syntax-error "with-environment"
+		      (tm-syntax-error "with-environment"
 				    "Ill-formed binding: ~A" b))
 		  `(list (quote ,(first b)) ,(second b)))
 		bindings))

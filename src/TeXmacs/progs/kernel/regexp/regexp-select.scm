@@ -261,19 +261,28 @@
 (define-public (tm-select x pattern)
   "Select all subtrees of @x which match a given path pattern @pattern"
   (with sols (select-list x pattern '())
-    ;; (display* "sols= " sols "\n")
+     (display* ">>> sols= " sols "\n")
     (map cadr sols)))
 
-(if (os-mingw?) ;; mingw guile does not define select
-    (with-module texmacs-user
-      (define-public (select . args) (apply tm-select args)))
-    (with-module texmacs-user
-      (begin (define-public guile-select select)
-	     (define-public (select . args)
-	       (import-from (kernel regexp regexp-select))
-	       (if (= (length args) 2)
-		   (apply tm-select args)
-		   (apply guile-select args))))))
+; (if (os-mingw?) ;; mingw guile does not define select
+;     (with-module texmacs-user
+;       (define-public (select . args) (apply tm-select args)))
+;     (with-module texmacs-user
+;       (begin (define-public guile-select select)
+; 	     (define-public (select . args)
+; 	       (import-from (kernel regexp regexp-select))
+; 	       (if (= (length args) 2)
+; 		   (apply tm-select args)
+; 		   (apply guile-select args))))))
+
+(define-public (select . args) (apply tm-select args))
+(export! select)
+
+;(define guile-select (module-ref (resolve-module '(guile)) 'select))
+;(define-public (select . args)
+; (if (= (length args) 2)
+;   (apply tm-select args)
+;   (apply guile-select args)))
 
 (define-public (tm-ref t . l)
   (and (tm? t)

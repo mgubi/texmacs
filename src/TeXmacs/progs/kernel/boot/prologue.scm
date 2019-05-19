@@ -29,17 +29,24 @@
 	 )
     (url-materialize u "r")))
 
-(define-public (module-load module*)
+(define-public (module-load module)
+  (display* ">>> module-load" module "\n")
+  (resolve-module module))
+
+(define-public (xx-module-load module*)
   (if (list? module*)
       (let* ((module (list->module module*))
 	     (loaded (ahash-ref module-loaded-table module)))
 	(ahash-set! module-loaded-table module #t)
-	;;(if (not loaded) (display* "TeXmacs] Loading module " module* "\n"))
-	(if (not loaded) (load-module module)))))
+	(if (not loaded) (display* "TeXmacs] Loading module " module* "\n"))
+	(if (not loaded) (resolve-module module*)))))
 
 ;; FIXME: why does this not work?
 ;(define-public (module-load name)
-;  (module-use! (current-module) (resolve-module name)))
+;  (let ((m (resolve-module name)))
+;    (unless (eq? (current-module) m)
+;         (begin (display* "TeXmacs] Loading module " name "\n")
+;        (module-use! (current-module) m)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Work around broken 'symbol-property'

@@ -42,7 +42,10 @@
 
 (define-public (delayed-sub body)
   (cond ((or (npair? body) (nlist? (car body)) (not (keyword? (caar body))))
-	 `(lambda () ,@body #t))
+     `(lambda ()
+         (display* "RUN DELAYED:" ',body "\n")
+         ,@body
+         (display "END DELAYED\n") #t))
 	((== (caar body) :pause)
 	 `(let* ((start (texmacs-time))
 		 (proc ,(delayed-sub (cdr body))))

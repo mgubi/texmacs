@@ -85,9 +85,9 @@ TeXmacs_catcher (void *data, SCM tag, SCM args) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_eval_file (char *file) {
-  return scm_internal_lazy_catch (SCM_BOOL_T,
+  return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) scm_c_primitive_load, file,
-                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, file);
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, file, 0);
 }
 #endif
 
@@ -98,7 +98,7 @@ TeXmacs_eval_file (char *file) {
                              (scm_t_catch_body) TeXmacs_lazy_eval_file, file,
                              (scm_t_catch_handler) TeXmacs_catcher, file);
 #else
-  return 	scm_c_primitive_load (file);										 
+  return 	scm_c_primitive_load (file);
 #endif
 }
 
@@ -121,9 +121,9 @@ eval_scheme_file (string file) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_eval_string (char *s) {
-  return scm_internal_lazy_catch (SCM_BOOL_T,
+  return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) scm_c_eval_string, s,
-                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, s);
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, s, 0);
 }
 #endif
 
@@ -180,9 +180,9 @@ TeXmacs_call (arg_list* args) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_call_scm (arg_list* args) {
-  return scm_internal_lazy_catch (SCM_BOOL_T,
+  return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) TeXmacs_call, (void*) args,
-                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, (void*) args);
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, (void*) args, 0);
 }
 #endif
 
@@ -309,25 +309,14 @@ scm_to_bool (SCM flag) {
 
 SCM
 int_to_scm (int i) {
-  return scm_long2scm ((long) i);
+  return scm_from_int (i);
 }
 
 SCM
 long_to_scm (long l) {
-  return scm_long2scm (l);
+  return scm_from_long (l);
 }
 
-#if (defined(GUILE_A) || defined(GUILE_B))
-int
-scm_to_int (SCM i) {
-  return (int) scm_scm2long (i);
-}
-
-long
-scm_to_long (SCM l) {
-  return scm_scm2long (l);
-}
-#endif
 
 /******************************************************************************
  * Floating point numbers
@@ -443,7 +432,7 @@ mark_blackbox (SCM blackbox_smob) {
   return SCM_BOOL_F;
 }
 
-static scm_sizet
+static size_t
 free_blackbox (SCM blackbox_smob) {
   blackbox *ptr = (blackbox *) SCM_CDR (blackbox_smob);
 #ifdef DEBUG_ON
@@ -533,13 +522,17 @@ tmscm object_stack;
 void
 initialize_scheme () {
   const char* init_prg =
+  "(display (current-module)) (display \"\\n\")\n"
+  "(set-current-module the-root-module)\n"
+  "(display (current-module)) (display \"\\n\")\n"
   "(read-set! keywords 'prefix)\n"
   "(read-enable 'positions)\n"
-  "(debug-enable 'debug)\n"
+//  "(debug-enable 'debug)\n"
 #ifdef DEBUG_ON
   "(debug-enable 'backtrace)\n"
 #endif
   "\n"
+  "(debug-set! width 300)\n"
   "(define (display-to-string obj)\n"
   "  (call-with-output-string\n"
   "    (lambda (port) (display obj port))))\n"
@@ -549,16 +542,18 @@ initialize_scheme () {
   "\n"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
   "(define object-stack '(()))";
-  
+
   scm_c_eval_string (init_prg);
+  scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
   initialize_smobs ();
   initialize_glue ();
   object_stack= scm_lookup_string ("object-stack");
-  
-    // uncomment to have a guile repl available at startup	
+
+  scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
+
+    // uncomment to have a guile repl available at startup
     //	gh_repl(guile_argc, guile_argv);
     //scm_shell (guile_argc, guile_argv);
-  
-  
-}
 
+
+}

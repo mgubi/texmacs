@@ -646,11 +646,12 @@
 
 (define (make-menu-items-list l style bar?)
   "Make menu items for each element in @l and append results."
+  (display "make-menu-items-list\n")
   (append-map (lambda (p) (make-menu-items p style bar?)) l))
 
 (define (make-menu-items p style bar?)
   "Make menu items @p. The items are on a bar if @bar? and of a given @style."
-  ;;(display* "Make items " p ", " style "\n")
+  (display* "Make items " p ", " style "\n")
   (if (pair? p)
       (cond ((match? p '(input :%1 :string? :%1 :string?))
              (list (make-menu-input p style)))
@@ -865,7 +866,7 @@
 (tm-define (menu-expand p)
   (:type (-> object object))
   (:synopsis "Expand links and conditional menus in menu @p.")
-  ;;(display* "Expand " p "\n")
+  (display* "Expand " p "\n")
   (cond ((npair? p) (replace-procedures p))
         ((string? (car p)) p)
         ((symbol? (car p))
@@ -936,6 +937,7 @@
 (define (make-menu-main p style)
   "Transform the menu @p into a widget."
   (with l (make-menu-items p style #f)
+    (display* ">>>" l "\n")
     (cond ((null? l) (make-menu-empty))
           ((and (list? l) (null? (cdr l))) (car l))
           (else (make-menu-bad-format p style)))))
