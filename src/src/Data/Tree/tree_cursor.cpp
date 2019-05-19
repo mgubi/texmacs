@@ -166,36 +166,55 @@ is_accessible_cursor (tree t, path p) {
 }
 
 path
-closest_accessible (tree t, path p) {
+closest_accessible (tree t, path p, int dir) {
   // Given a path p inside t, the path may be unaccessible
   // This routine returns the closest path to p inside t which is accessible
+  // dir in {-1, 0, 1} specifies the search direction
   // The routine returns nil if there exists no accessible path inside t
   if (is_atomic (t)) return p;
+  else if (is_nil (p)) return closest_accessible (t, path (0), dir);
   else if (is_atom (p) && !the_drd->is_child_enforcing (t)) return p;
   else {
     int i, k= p->item, n= N(t);
-    if (p == 1) k= max (0, n-1);
+    if (p == path (1)) k= max (0, n-1);
     for (i=0; i<n; i++) {
-      int j= ((i&1) == 0? (k+(i>>1) % n): (k+n-((i+1)>>1) % n));
+      int j;
+      if (dir == 0)
+        j= ((i&1) == 0? (k+(i>>1) % n): (k+n-((i+1)>>1) % n));
+      else if (dir == 1) {
+        j= k+i;
+        if (j >= n) {
+          if (the_drd->is_child_enforcing (t)) break;
+          return path (1);
+        }
+      }
+      else {
+        j= k-i;
+        if (j < 0) {
+          if (the_drd->is_child_enforcing (t)) break;
+          return path (0);
+        }
+      }
       if (the_drd->is_accessible_child (t, j)) {
 	// FIXME: certain tags modify source accessability props
 	// FIXME: cells with non-trivial span may lead to unaccessability
 	// FIXME: very dynamic markup should be treated after typesetting
 	if (is_atom (p) && is_atomic (t[j]))
 	  return path (j, p->item * (j < k? N (t[j]->label): 0));
-	path sp= (is_atom (p)? (j < k? path (1): path (0)): p->next);
-	path r= closest_accessible (t[j], sp);
+        int  ind = right_index (t[j]);
+	path sp  = (j == k? p->next: (j < k? path (ind): path (0)));
+        int  sdir= (j == k? dir: (j < k? -1: 1));
+        path prop= (p == path (0)? p: path (ind));
+        path sp2 = (is_nil (sp)? prop: sp);
+	path r   = closest_accessible (t[j], sp2, sdir);
 	if (!is_nil (r)) {
 	  r= path (j, r);
 	  if (!is_concat (t) || !next_without_border (t, r)) {
 	    if (the_drd->is_parent_enforcing (t) &&
-                !graphics_in_path (t, p)) {
-	      if (r->item == lowest_accessible_child (t) &&
-                  !is_accessible_cursor (t, p))
-		return path (0);
-	      if (r->item == highest_accessible_child (t) &&
-                  !is_accessible_cursor (t, p))
-		return path (1);	    
+                !graphics_in_path (t, p) &&
+                !is_accessible_cursor (t, p)) {
+	      if (r->item == lowest_accessible_child (t)) return path (0);
+	      if (r->item == highest_accessible_child (t)) return path (1);
 	    }
 	    return r;
 	  }
@@ -204,6 +223,14 @@ closest_accessible (tree t, path p) {
     }
     return path ();
   }
+}
+
+path
+closest_accessible_inside (tree t, path p, int dir) {
+  path q= closest_accessible (t, p, dir);
+  if (!is_nil (q)) return q;
+  if (dir <= 0) return path (0);
+  else return path (right_index (t));
 }
 
 /******************************************************************************
@@ -294,8 +321,14 @@ static path
 pre_correct (tree t, path p) {
   //cout << "Precorrect " << p << " in " << t << "\n";
   if ((!is_nil (p)) && (!is_atom (p)) && ((p->item < 0) || (p->item >= arity (t)))) {
-    failed_error << "Precorrecting " << p << " in " << t << "\n";
-    FAILED ("bad path");
+    if (is_func (t, GRAPHICS)) {
+      std_warning << "Precorrecting " << p << " in " << t << "\n";
+      p= path (1);
+    }
+    else {
+      failed_error << "Precorrecting " << p << " in " << t << "\n";
+      FAILED ("bad path");
+    }
   }
 
   if (is_nil (p)) return pre_correct (t, path(0));
@@ -422,7 +455,7 @@ keep_positive (path p) {
 
 path
 correct_cursor (tree t, path p, bool forwards) {
-  //cout << "Correct cursor " << p << " in " << t << "\n";
+  //cout << "Correct cursor " << p << " in " << t << ", " << forwards << "\n";
   p= keep_positive (p);
   path pp= pre_correct (t, p);
   if (forwards) return right_correct (t, pp);

@@ -74,7 +74,9 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   bool      landscape;
   double    paper_w;
   double    paper_h;
-  
+
+  ObjectIDType initial_GState_id; // GSstate with default values
+
   int       page_num;
   bool      inText;
   int       alpha;
@@ -210,7 +212,8 @@ class pdf_hummus_renderer_rep : public renderer_rep {
                                            PDFHummus::DocumentContext* inDocumentContext);
   
   
-  void recurse (ObjectsContext& objectsContext, list<outline_data>& it, ObjectIDType parentId,
+  void recurse (ObjectsContext& objectsContext, int parent_ls,
+		list<outline_data>& it, ObjectIDType parentId,
                 ObjectIDType& firstId, ObjectIDType& lastId, int &count);
 
   
@@ -313,13 +316,7 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
   if (version == "1.7") ePDFVersion= ePDFVersion17;
   LogConfiguration log= LogConfiguration::DefaultLogConfiguration();
   PDFCreationSettings settings (true, true); //, EncryptionOptions("user", 4, "owner"));
-#if (defined (__MINGW__) || defined (__MINGW32__))
-    // WIN is using 8bit encodings, but pdfwriter expects UTF8
-    // if path or file contains non-ascii characters we need an extra conversion step. 
-    status = pdfWriter.StartPDF(as_charp(western_to_utf8(concretize (pdf_file_name))), ePDFVersion, log, settings);
-#else
     status = pdfWriter.StartPDF(as_charp(concretize (pdf_file_name)), ePDFVersion, log, settings);
-#endif  
 	if (status != PDFHummus::eSuccess) {
 		convert_error << "failed to start PDF\n";
 		started=false;
@@ -327,8 +324,36 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
 		started=true;
 		pdfWriter.GetDocumentContext().AddDocumentContextExtender (new DestinationsWriter(this));
 
-		// start real work
+		// create a graphic state with default values
+		initial_GState_id= pdfWriter.GetObjectsContext()
+		  .GetInDirectObjectsRegistry().AllocateNewObjectID();
+		ObjectsContext& objectsContext = pdfWriter.GetObjectsContext();
+		objectsContext.StartNewIndirectObject(initial_GState_id);
+		std::stringstream buf;
+		buf << "<< /Type /ExtGState\r\n";
+		buf << "/LW 1.0\r\n";
+      		buf << "/LC 0\r\n";
+      		buf << "/LJ 0\r\n";
+      		buf << "/ML 10.0\r\n";
+      		buf << "/D [[] 0]\r\n";
+      		buf << "/RI /RelativeColorimetric\r\n";
+      		buf << "/OP false\r\n";
+      		buf << "/op false\r\n";
+		buf << "/FL 1.0\r\n";
+		buf << "/SA false\r\n";
+		buf << "/BM /Normal\r\n";
+		buf << "/SMask /None\r\n";
+		buf << "/CA 1.0\r\n";
+		buf << "/ca 1.0\r\n";
+		buf << "/AIS false\r\n";
+		buf << "/TK true\r\n";
+		buf << ">>\r\n";
+		objectsContext.StartFreeContext()
+		  ->Write((const IOBasicTypes::Byte* )(buf.str().c_str()),buf.str().size());
+		objectsContext.EndFreeContext();
+		objectsContext.EndIndirectObject();
 
+		// start real work
 		begin_page();
 	}
 }
@@ -1203,13 +1228,7 @@ pdf_hummus_renderer_rep::make_pdf_font (string fontname)
     PDFUsedFont* font;
     {
       //debug_convert << "GetFontForFile "  << u  << LF;
-#if (defined (__MINGW__) || defined (__MINGW32__))
-    // WIN is using 8bit encodings, but pdfwriter expects UTF8
-    // if path or file contains non-ascii characters we need an extra conversion step. 
-      c_string _u (western_to_utf8(concretize (u)));
-#else
       c_string _u (concretize (u));
-#endif  
       font = pdfWriter.GetFontForFile((char*)_u);
       //tm_delete_array(_rname);
     }
@@ -1568,11 +1587,7 @@ pdf_image_rep::flush (PDFWriter& pdfw)
   EStatusCode status = PDFHummus::eFailure;
   DocumentContext& dc = pdfw.GetDocumentContext();
 
-#if (defined (__MINGW__) || defined (__MINGW32__))  
-  char* _temp= as_charp(western_to_utf8(concretize(temp)));
-#else
   char* _temp= as_charp(concretize(temp));
-#endif
   PDFDocumentCopyingContext *copyingContext = pdfw.CreatePDFCopyingContext(_temp);
   if(copyingContext) {
     PDFPageInput pageInput(copyingContext->GetSourceDocumentParser(),
@@ -1602,11 +1617,7 @@ void
 hummus_pdf_image_size (url image, int& w, int& h) {
   InputFile pdfFile;
   PDFParser* parser= new PDFParser();
-#if (defined (__MINGW__) || defined (__MINGW32__))
-  pdfFile.OpenFile(as_charp(western_to_utf8(concretize(image))));
-#else
   pdfFile.OpenFile(as_charp(concretize(image)));
-#endif
   EStatusCode status = parser->StartPDFParsing(pdfFile.GetInputStream());
   if (status != PDFHummus::eFailure) {
     PDFPageInput pageInput(parser, parser->ParsePage(0));
@@ -1627,7 +1638,13 @@ pdf_image_info (url image, int& w, int& h, PDFRectangle& cropBox, double (&tMat)
   int rot= (pageInput.GetRotate())%360;
   if (rot < 0) rot +=360;
   cropBox=pageInput.GetCropBox();
-  //PDFRectangle mediaBox=pageInput.GetMediaBox();
+  PDFRectangle mediaBox=pageInput.GetMediaBox();
+  if (!(cropBox.LowerLeftX >= mediaBox.LowerLeftX &&
+	cropBox.LowerLeftY >= mediaBox.LowerLeftY &&
+	cropBox.UpperRightX <= mediaBox.UpperRightX &&
+	cropBox.UpperRightY <= mediaBox.UpperRightY))
+    convert_warning << "pdf_image_info, " << image << ": "
+                    << "cropbox not included in mediabox\n";
   w= cropBox.UpperRightX-cropBox.LowerLeftX;
   h= cropBox.UpperRightY-cropBox.LowerLeftY;
   if (DEBUG_CONVERT) {
@@ -1868,11 +1885,7 @@ pdf_image_rep::flush_for_pattern (PDFWriter& pdfw) {
 
 bool
 pdf_image_rep::flush_jpg (PDFWriter& pdfw, url image) {
-#if (defined (__MINGW__) || defined (__MINGW32__))
-  c_string f (western_to_utf8 (concretize (image)));
-#else
   c_string f (concretize (image));
-#endif  
   DocumentContext& documentContext= pdfw.GetDocumentContext();
   PDFImageXObject* imageXObject= documentContext.CreateImageXObjectFromJPGFile ((char*) f);
   if ((void*) imageXObject == NULL) { 
@@ -1937,6 +1950,9 @@ pdf_hummus_renderer_rep::image (
   end_text();
   
   contentContext->q();
+  std::string initial_GState_name = page->GetResourcesDictionary()
+    .AddExtGStateMapping(initial_GState_id);
+  contentContext->gs(initial_GState_name);
   double ratio= ((double)h)/(pixel*(double)im->h);
   contentContext->cm(((double)w)/(pixel*(double)im->w), 0, 0,
 		     ((double)h)/(pixel*(double)im->h),
@@ -2167,8 +2183,9 @@ pdf_hummus_renderer_rep::toc_entry (string kind, string title, SI x, SI y) {
   outlines << outline_data(escape_string (title), page_num, to_x(x), to_y(y+20*pixel), ls);
 }
 
-void pdf_hummus_renderer_rep::recurse (ObjectsContext& objectsContext, list<outline_data>& it, ObjectIDType parentId,
-              ObjectIDType& firstId, ObjectIDType& lastId, int &count)
+void pdf_hummus_renderer_rep::recurse (ObjectsContext& objectsContext, int parent_ls,
+				       list<outline_data>& it, ObjectIDType parentId,
+				       ObjectIDType& firstId, ObjectIDType& lastId, int &count)
 {
   // weave the tangle of forward/backward references
   // are recurse over substructures
@@ -2189,11 +2206,11 @@ void pdf_hummus_renderer_rep::recurse (ObjectsContext& objectsContext, list<outl
     
     if (!is_nil(it) && ((it->item).x5 > oitem.x5)) {
       // go down in level
-      recurse(objectsContext, it, curId, subFirstId, subLastId, subCount);
+      recurse(objectsContext, oitem.x5, it, curId, subFirstId, subLastId, subCount);
     }
     
     // continue at this level or above
-    if (!is_nil(it) && ((it->item).x5 == oitem.x5)) {
+    if (!is_nil(it) && ((it->item).x5 <= oitem.x5) && ((it->item).x5 > parent_ls)) {
       nextId = objectsContext.GetInDirectObjectsRegistry().AllocateNewObjectID();
     } else {
       // finished this level, go up.
@@ -2235,7 +2252,7 @@ pdf_hummus_renderer_rep::flush_outlines()
   list<outline_data> it = outlines;
   
   outlineId = objectsContext.GetInDirectObjectsRegistry().AllocateNewObjectID();
-  recurse(objectsContext, it, outlineId, firstId, lastId, count);
+  recurse(objectsContext, 0, it, outlineId, firstId, lastId, count);
   {
     // create top-level outline dictionary
     string dict;

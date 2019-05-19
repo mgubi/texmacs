@@ -152,9 +152,9 @@
       ---)
   ("Exercise" (make 'exercise))
   ("Problem" (make 'problem))
-  ("Solution" (make 'solution))
   ("Question" (make 'question))
-  ("Answer" (make 'answer)))
+  ("Solution" (make 'solution*))
+  ("Answer" (make 'answer*)))
 
 (menu-bind prominent-menu
   ("Quote" (make 'quote-env))
@@ -164,9 +164,9 @@
   ("Indent" (make 'indent))
   ("Jump in" (make 'jump-in))
   ---
-  ("Centered" (make 'center))
-  ("Left aligned" (make 'left-aligned))
-  ("Right aligned" (make 'right-aligned))
+  ("Centered" (make 'padded-center))
+  ("Left aligned" (make 'padded-left-aligned))
+  ("Right aligned" (make 'padded-right-aligned))
   (with s (get-env "par-par-sep")
     (assuming (and (not (string-ends? s "fns"))
                    (not (string-starts? s "0fn")))
@@ -447,6 +447,11 @@
   ("Long" (make-tmlist 'description-long))
   ("Paragraphs" (make-tmlist 'description-paragraphs)))
 
+(menu-bind lists-menu
+  (-> "Itemize" (link itemize-menu))
+  (-> "Enumerate" (link enumerate-menu))
+  (-> "Description" (link description-menu)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatically generated content
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -499,9 +504,9 @@
       (-> "Automatic" (link automatic-menu)))
   (if (style-has? "std-list-dtd")
       ---
-      (-> "Itemize" (link itemize-menu))
-      (-> "Enumerate" (link enumerate-menu))
-      (-> "Description" (link description-menu))))
+      (link lists-menu)))
+
+(menu-bind text-extra-menu)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text menus for inserting inline content
@@ -522,6 +527,7 @@
 
 (menu-bind text-menu
   (link text-block-menu)
+  (link text-extra-menu)
   ---
   (link text-inline-menu)
   ---
@@ -577,6 +583,8 @@
       (=> (balloon (icon "tm_index.xpm")
                    "Insert automatically generated content")
           (link automatic-menu))))
+
+(menu-bind text-extra-icons)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Icons for modifying text properties
@@ -638,14 +646,15 @@
   ;;("Goedenmiddag" (display* "Hi there\n"))
   ;;(mini #t (input (display* answer "\n") "string" '("Hello" "Bonjour") "0.5w"))
   (link text-block-icons)
+  (link text-extra-icons)
   (if (style-has? "std-markup-dtd")
       /)
   (link text-inline-icons)
   (if (in-manual?) (link tmdoc-icons))
   (link texmacs-insert-icons)
   (if (and (in-presentation?) (not (visible-icon-bar? 0)))
-    /
-    (link dynamic-icons)))
+      /
+      (link dynamic-icons)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menus for entering title information

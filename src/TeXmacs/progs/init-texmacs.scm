@@ -156,6 +156,7 @@
 (lazy-menu (texmacs menus preferences-menu) preferences-menu page-setup-menu)
 (lazy-menu (texmacs menus preferences-widgets) open-preferences)
 (use-modules (texmacs menus main-menu))
+(lazy-define (texmacs menus file-menu) recent-file-list recent-directory-list)
 (lazy-define (texmacs menus view-menu) set-bottom-bar test-bottom-bar?)
 (tm-define (notify-set-attachment name key val) (noop))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -181,10 +182,12 @@
              get-init-page-rendering init-page-rendering)
 (lazy-define (generic generic-edit) notify-activated notify-disactivated)
 (lazy-define (generic generic-doc) focus-help)
-(lazy-define (generic generic-widgets) search-toolbar replace-toolbar
+(lazy-define (generic search-widgets) search-toolbar replace-toolbar
              open-search toolbar-search-start interactive-search
              open-replace toolbar-replace-start interactive-replace
              search-next-match)
+(lazy-define (generic spell-widgets) spell-toolbar
+             open-spell toolbar-spell-start interactive-spell)
 (lazy-define (generic format-widgets) open-paragraph-format open-page-format
              open-pattern-selector)
 (lazy-define (generic document-widgets) open-source-tree-preferences
@@ -281,6 +284,12 @@
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
+;(display "Booting educational features\n")
+(lazy-keyboard (education edu-kbd) in-edu-text?)
+(lazy-menu (education edu-menu) edu-insert-menu)
+;(display* "time: " (- (texmacs-time) boot-start) "\n")
+;(display* "memory: " (texmacs-memory) " bytes\n")
+
 ;(display "Booting dynamic features\n")
 (lazy-keyboard (dynamic fold-kbd) always?)
 (lazy-keyboard (dynamic scripts-kbd) always?)
@@ -309,7 +318,8 @@
 (lazy-menu (doc help-menu) help-menu)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual
              tmdoc-expand-this tmdoc-include)
-(lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src docgrep-in-texts)
+(lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src
+             docgrep-in-texts docgrep-in-recent)
 (lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
              tmdoc-search-parameter tmdoc-search-scheme)
 (lazy-define (doc tmweb) tmweb-convert-dir tmweb-update-dir
@@ -434,7 +444,8 @@
 (lazy-define (fonts font-old-menu)
 	     text-font-menu math-font-menu prog-font-menu)
 (lazy-define (fonts font-new-widgets)
-             open-font-selector open-document-font-selector)
+             open-font-selector open-document-font-selector
+             open-document-other-font-selector)
 (tm-property (open-font-selector) (:interactive #t))
 (tm-property (open-document-font-selector) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")

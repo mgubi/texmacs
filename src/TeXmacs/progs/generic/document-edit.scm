@@ -103,7 +103,9 @@
 
 (tm-define (init-font val . opts)
   (:check-mark "*" test-init-font?)
-  (cond ((or (== val "TeXmacs Computer Modern") (== val "roman"))
+  (cond ((== val "TeXmacs Computer Modern")
+         (init-font "roman" "roman"))
+        ((and (== val "roman") (!= opts (list "roman")))
          (init-font "roman" "roman"))
         ((string-starts? val "Stix")
          (init-font "stix" "math-stix"))
@@ -360,6 +362,52 @@
   (:check-mark "v" not-page-screen-margin?)
   (init-env "page-screen-margin"
             (if (not-page-screen-margin?) "true" "false")))
+
+(define (reduced-margins?)
+  (test-init? "page-odd" "1cm"))
+
+(tm-define (toggle-reduced-margins)
+  (:synopsis "Toggle mode for using reduced margins to save paper.")
+  (:check-mark "v" reduced-margins?)
+  (cond ((has-style-package? "reduced-margins")
+         (remove-style-package "reduced-margins"))
+        ((has-style-package? "normal-margins")
+         (remove-style-package "normal-margins"))
+        ((reduced-margins?)
+         (add-style-package "normal-margins"))
+        (else
+         (add-style-package "reduced-margins"))))
+
+(define (indent-paragraphs?)
+  (nin? (get-init-env "par-first")
+        (list "0fn" "0em" "0tab" "0cm" "0mm" "0in")))
+
+(tm-define (toggle-indent-paragraphs)
+  (:synopsis "Toggle mode for using a first indentation for each paragraph")
+  (:check-mark "v" indent-paragraphs?)
+  (cond ((has-style-package? "indent-paragraphs")
+         (remove-style-package "indent-paragraphs"))
+        ((has-style-package? "padded-paragraphs")
+         (remove-style-package "padded-paragraphs"))
+        ((indent-paragraphs?)
+         (add-style-package "padded-paragraphs"))
+        (else
+         (add-style-package "indent-paragraphs"))))
+
+(define (no-page-numbers?)
+  (test-init? "no-page-numbers" "true"))
+
+(tm-define (toggle-no-page-numbers)
+  (:synopsis "Toggle mode for using standard page numbering")
+  (:check-mark "v" no-page-numbers?)
+  (cond ((has-style-package? "page-numbers")
+         (remove-style-package "page-numbers"))
+        ((has-style-package? "no-page-numbers")
+         (remove-style-package "no-page-numbers"))
+        ((no-page-numbers?)
+         (add-style-package "page-numbers"))
+        (else
+         (add-style-package "no-page-numbers"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Document updates

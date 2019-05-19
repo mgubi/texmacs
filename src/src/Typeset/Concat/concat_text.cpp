@@ -64,7 +64,7 @@ concater_rep::typeset_text_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_before);
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
-	typeset_substring ("", ip, pos);
+        typeset_substring ("", ip, pos);
     }
     else { // strings
       penalty_max (tp->pen_before);
@@ -150,7 +150,7 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_before);
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
-	typeset_substring ("", ip, pos);
+        typeset_substring ("", ip, pos);
     }
     else { // strings
       penalty_max (tp->pen_before);
@@ -200,6 +200,18 @@ concater_rep::typeset_rigid (tree t, path ip) {
   if (N(t) != 1) { typeset_error (t, ip); return; }
   box b= typeset_as_concat (env, t[0], descend (ip, 0));
   print (move_box (ip, b, 0, 0, true));
+}
+
+void
+concater_rep::typeset_hgroup (tree t, path ip) {
+  if (N(t) != 1 && N(t) != 2) { typeset_error (t, ip); return; }
+  marker (descend (ip, 0));
+  int start= N(a);
+  typeset (t[0], descend (ip, 0));
+  int end= N(a);
+  marker (descend (ip, 1));
+  for (int i=start; i+1<end; i++)
+    a[i]->penalty= HYPH_INVALID;
 }
 
 void
@@ -340,12 +352,12 @@ concater_rep::typeset_float (tree t, path ip) {
 ******************************************************************************/
 
 void
-concater_rep::typeset_repeat (tree t, path ip) {
+concater_rep::typeset_repeat (tree t, path ip, bool under) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   box b1  = typeset_as_concat (env, t[0], descend (ip, 0));
   box b2  = typeset_as_concat (env, t[1], descend (ip, 1));
   SI  xoff= env->get_length (XOFF_DECORATIONS);
-  print (repeat_box (ip, b1, b2, xoff));
+  print (repeat_box (ip, b1, b2, xoff, under));
 }
 
 /******************************************************************************

@@ -135,7 +135,9 @@ concater_rep::typeset_bigop (tree t, path ip) {
       }
       else print (env->display_style? spc: (spc / 2));
     }
-    // temporarary: use parameters from operator-big class in std-math.syx
+    // FIXME: we should use parameters from operator-big class in std-math.syx
+    // FIXME: in concat_post, we add some more space behind big operators
+    //        with scripts; this should be understood better and formalized
   }
   else typeset_error (t, ip);
 }
@@ -158,7 +160,7 @@ concater_rep::typeset_lprime (tree t, path ip) {
     bool flag= (env->fn->type == FONT_TYPE_UNICODE);
     if (flag)
       for (int i=0; i<N(s); i++)
-	flag= flag && (s[i] == '\'' || s[i] == '`');
+        flag= flag && (s[i] == '\'' || s[i] == '`');
     if (env->fn->type == FONT_TYPE_TEX ||
         env->fn->math_type != MATH_TYPE_NORMAL)
       s= replace_primes (s);

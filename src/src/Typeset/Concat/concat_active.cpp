@@ -98,43 +98,43 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
     for (i=0; i<last; i++) {
       tree arg= env->exec (t[i]);
       if (is_compound (arg, "id", 1)) {
-	string id= as_string (arg[0]);
-	if (accessible) env->link_env->insert_locus (id, body);
-	else if (N (obtain_ip (body)) > 1) {
-	  extern tree get_subtree (path p);
-	  path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
-	  env->link_env->insert_locus ("&" * id, get_subtree (p));
-	}
-	ids= list<string> (id, ids);
-	visited= visited || has_been_visited ("id:" * id);
+        string id= as_string (arg[0]);
+        if (accessible) env->link_env->insert_locus (id, body);
+        else if (N (obtain_ip (body)) > 1) {
+          extern tree get_subtree (path p);
+          path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
+          env->link_env->insert_locus ("&" * id, get_subtree (p));
+        }
+        ids= list<string> (id, ids);
+        visited= visited || has_been_visited ("id:" * id);
       }
       else if (is_compound (arg, "link") && N(arg) >= 2) {
-	if (is_func (arg[1], ATTR)) arg= copy (arg);
-	else arg= arg (0, 1) * tree (LINK, tree (ATTR)) * arg (1, N(arg));
-	arg[1] << tree ("secure")
-	       << (env->secure? tree ("true"): tree ("false"));
-	env->link_env->insert_link (arg);
-	for (j=2; j<N(arg); j++) {
-	  if (is_compound (arg[j], "id", 1) && is_atomic (arg[j][0])) {
-	    visited= visited || has_been_visited ("id:" * arg[j][0]->label);
-	    anchor = arg[j][0]->label;
-	  }
-	  if (is_compound (arg[j], "url", 1) && is_atomic (arg[j][0])) {
-	    visited= visited || has_been_visited ("url:" * arg[j][0]->label);
-	    ref = arg[j][0]->label;
-	  }
-	}
+        if (is_func (arg[1], ATTR)) arg= copy (arg);
+        else arg= arg (0, 1) * tree (LINK, tree (ATTR)) * arg (1, N(arg));
+        arg[1] << tree ("secure")
+               << (env->secure? tree ("true"): tree ("false"));
+        env->link_env->insert_link (arg);
+        for (j=2; j<N(arg); j++) {
+          if (is_compound (arg[j], "id", 1) && is_atomic (arg[j][0])) {
+            visited= visited || has_been_visited ("id:" * arg[j][0]->label);
+            anchor = arg[j][0]->label;
+          }
+          if (is_compound (arg[j], "url", 1) && is_atomic (arg[j][0])) {
+            visited= visited || has_been_visited ("url:" * arg[j][0]->label);
+            ref = arg[j][0]->label;
+          }
+        }
       }
       else if (is_compound (arg, "observer", 2)) {
-	string id= as_string (arg[0]);
-	string cb= cork_to_utf8 (as_string (arg[1]));
-	if (accessible) {
+        string id= as_string (arg[0]);
+        string cb= cork_to_utf8 (as_string (arg[1]));
+        if (accessible) {
           if (env->secure ||
               as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
             env->link_env->insert_locus (id, body, cb);
         }
-	ids= list<string> (id, ids);
-	visited= visited || has_been_visited ("id:" * id);
+        ids= list<string> (id, ids);
+        visited= visited || has_been_visited ("id:" * id);
       }
     }
   }
@@ -187,7 +187,7 @@ concater_rep::typeset_locus (tree t, path ip) {
 void
 concater_rep::typeset_set_binding (tree t, path ip) {
   tree keys= env->exec (t);
-  if (L(keys) == HIDDEN) {
+  if (L(keys) == HIDDEN_BINDING || L(keys) == HIDDEN) {
     keys= keys[0];
     flag ("set binding", ip, blue);
     if (N(keys) > 0) {
@@ -260,6 +260,8 @@ void
 concater_rep::typeset_specific (tree t, path ip) {
   if (N(t) != 2) { typeset_error (t, ip); return; }
   string which= env->exec_string (t[0]);
+  bool keep_size= ends (which, "*");
+  if (keep_size) which= which (0, N(which)-1);
   if (which == "texmacs" || which == "image") {
     marker (descend (ip, 0));
     typeset (t[1], descend (ip, 1));
@@ -269,7 +271,7 @@ concater_rep::typeset_specific (tree t, path ip) {
   else if (which == "screen" || which == "printer" ||
            which == "even" || which == "odd") {
     box  sb= typeset_as_concat (env, attach_middle (t[1], ip));
-    box  b = specific_box (decorate_middle (ip), sb, which, env->fn);
+    box  b = specific_box (decorate_middle (ip), sb, which, env->fn, keep_size);
     marker (descend (ip, 0));
     print (b);
     marker (descend (ip, 1));
@@ -326,7 +328,7 @@ concater_rep::typeset_image (tree t, path ip) {
   if (is_atomic (image_tree)) {
     if (N (image_tree->label) == 0)
       error_image (tree (WITH, "color", "red", "no image"));
-    url im= cork_to_os8bits (image_tree->label);
+    url im= cork_to_utf8( image_tree->label);
     image= resolve (relative (env->base_file_name, im));
     if (is_none (image) && suffix (im) == "")
       image= resolve (relative (env->base_file_name, ::glue (im, ".eps")));
@@ -358,6 +360,7 @@ concater_rep::typeset_image (tree t, path ip) {
     imw= (SI) ((iw * ((double) imh)) / ih);
   if (t[1] != "" && t[2] == "" && iw != 0)
     imh= (SI) ((ih * ((double) imw)) / iw);
+  if (imw <= 0 || imh <= 0) { imw= w / 4; imh= h / 4; }
   if (imw <= 0 || imh <= 0)
     error_image (tree (WITH, "color", "red", "null box"));
   env->local_end ("w-length", old_w);

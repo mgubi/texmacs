@@ -1,4 +1,4 @@
-<TeXmacs|1.99.4>
+<TeXmacs|1.99.9>
 
 <style|<tuple|source|std>>
 
@@ -75,7 +75,7 @@
   </macro>>
 
   <assign|render-folded-documentation|<\macro|button|body1|body2>
-    <\surround||<right-flush><arg|button><vspace|0.5fn>>
+    <\surround|<vspace*|1fn>|<right-flush><arg|button><vspace|0.25fn>>
       <arg|body1>
     </surround>
 
@@ -83,7 +83,7 @@
   </macro>>
 
   <assign|render-unfolded-documentation|<\macro|button|body1|body2>
-    <\surround||<right-flush><arg|button><vspace|0.5fn>>
+    <\surround|<vspace*|1fn>|<right-flush><arg|button><vspace|0.25fn>>
       <arg|body1>
     </surround>
 
@@ -135,6 +135,24 @@
     <\render-folded-std|<action|<resize|<active*|<with|mode|math|\<bullet\>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|x>>>
       <arg|x>
 
+      <arg|y>
+    </render-folded-std>
+  </macro>>
+
+  <assign|folded-reverse|<\macro|x|y>
+    <hidden|<arg|x>>
+
+    <\render-folded-std|<action|<resize|<active*|<with|mode|math|<op|\<circ\>>>>|||<maximum|1r|1.5fn>|>|mouse-unfold|<arg|y>>>
+      <arg|y>
+    </render-folded-std>
+  </macro>>
+
+  <assign|unfolded-reverse|<\macro|x|y>
+    <\render-folded-std|<resize||||1.5fn|>>
+      <arg|x>
+    </render-folded-std>
+
+    <\render-folded-std|<action|<resize|<active*|<with|mode|math|\<bullet\>>>|||<maximum|1r|1.5fn>|>|mouse-fold|<arg|y>>>
       <arg|y>
     </render-folded-std>
   </macro>>
@@ -220,6 +238,8 @@
   <drd-props|folded-plain|arity|2|accessible|0|hidden|1>
 
   <drd-props|folded-std|arity|2|accessible|0|hidden|1>
+
+  <drd-props|folded-reverse|arity|2|hidden|0|accessible|1>
 
   <drd-props|folded-env|arity|2|accessible|0|hidden|1>
 

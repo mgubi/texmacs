@@ -135,20 +135,31 @@ get_locase_tab () {
   static hashmap<string,string> t ("");
   return t;
 }
+
 static hashmap<string,string>&
 get_upcase_tab () {
   static hashmap<string,string> t ("");
   return t;
 }
 
+static hashmap<string,bool>&
+get_letter_tab () {
+  static hashmap<string,bool> t (false);
+  return t;
+}
+
 hashmap<string,string> locase_tab = get_locase_tab ();
 hashmap<string,string> upcase_tab = get_upcase_tab ();
+hashmap<string,bool  > letter_tab = get_letter_tab ();
 
 static void
 add_greek (string sym) {
   locase_tab ("<" * upcase_first (sym) * ">")= "<" * sym * ">";
   upcase_tab ("<" * sym * ">")= "<" * upcase_first (sym) * ">";
   upcase_tab ("<var" * sym * ">")= "<" * upcase_first (sym) * ">";
+  letter_tab ("<" * upcase_first (sym) * ">")= true;
+  letter_tab ("<" * sym * ">")= true;
+  letter_tab ("<var" * sym * ">")= true;
 }
 
 static void
@@ -275,6 +286,23 @@ uni_locase_all (string s) {
 }
 
 string
+uni_Locase_all (string s) {
+  string r;
+  int i=0, n=N(s);
+  if (i<n) {
+    int start= i;
+    tm_char_forwards (s, i);
+    r << s (start, i);
+  }
+  while (i<n) {
+    int start= i;
+    tm_char_forwards (s, i);
+    r << uni_locase_char (s (start, i));
+  }
+  return r;
+}
+
+string
 uni_upcase_all (string s) {
   string r;
   int i=0, n=N(s);
@@ -307,6 +335,19 @@ fill (array<int> a, int start, int kind) {
     }
 }
 
+static void
+fill_bis (array<int> a, int start, int kind) {
+  for (int i=0; i<N(a); i++)
+    if (a[i] != -1) {
+      int code= start + i;
+      string c; c << ((unsigned char) code);
+      string v= utf8_to_cork (encode_as_utf8 (a[i]));
+      if (kind == 0) accented_list << c;
+      if (kind == 0) unaccent_table (c)= v;
+      else get_accent_table (c)= v;
+    }
+}
+
 array<string>
 get_accented_list () {
   (void) uni_unaccent_char ("a");
@@ -317,6 +358,16 @@ string
 uni_unaccent_char (string s) {
   if (N(unaccent_table) != 0) return unaccent_table[s];
   array<int> a;
+  a << 0x41 << 0x41 << 0x43 << 0x43 << 0x44 << 0x45 << 0x45 << 0x47
+    << 0x4C << 0x4C <<   -1 << 0x4E << 0x4E <<   -1 << 0x4F << 0x52
+    << 0x52 << 0x53 << 0x53 << 0x53 << 0x54 << 0x54 << 0x55 << 0x55
+    << 0x59 << 0x5A << 0x5A << 0x5A <<   -1 << 0x49 << 0x64 <<   -1
+    << 0x61 << 0x61 << 0x63 << 0x63 << 0x64 << 0x65 << 0x65 << 0x67
+    << 0x6C << 0x6C <<   -1 << 0x6E << 0x6E <<   -1 << 0x6F << 0x72
+    << 0x72 << 0x73 << 0x73 << 0x73 << 0x74 << 0x74 << 0x75 << 0x75
+    << 0x79 << 0x7A << 0x7A << 0x7A <<   -1 <<   -1 <<   -1 <<   -1;
+  fill_bis (a, 0x80, 0);
+  a= array<int> ();
   a << 0x41 << 0x41 << 0x41 << 0x41 << 0x41 << 0x41 <<   -1 << 0x43
     << 0x45 << 0x45 << 0x45 << 0x45 << 0x49 << 0x49 << 0x49 << 0x49
     << 0x44 << 0x4E << 0x4F << 0x4F << 0x4F << 0x4F << 0x4F <<   -1
@@ -358,6 +409,32 @@ uni_unaccent_all (string s) {
     else r << c;
   }
   return r;
+}
+
+/******************************************************************************
+* Separate letters from punctuation
+******************************************************************************/
+
+bool
+uni_is_letter (string s) {
+  if (N(s) == 1) {
+    unsigned char c= s[0];
+    return
+      (c >= 'A' && c <= 'Z') ||
+      (c >= 'a' && c <= 'z') ||
+      (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
+  }
+  else if (starts (s, "<#") && ends (s, ">")) {
+    int code= from_hexadecimal (s (2, N(s) - 1));
+    return
+      (code >= 0x3AC && code <= 0x3CE) ||
+      (code >= 0x400 && code <= 0x481) ||
+      (code >= 0x48A && code <= 0x4FF);
+  }
+  else {
+    init_case_tables ();
+    return letter_tab->contains (s);
+  }
 }
 
 /******************************************************************************

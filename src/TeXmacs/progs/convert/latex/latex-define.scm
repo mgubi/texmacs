@@ -161,6 +161,7 @@
   (precdot "\\mathrel{\\prec\\!\\!\\cdot")
   
   ;; other extra symbols
+  (oempty "\\circ")
   (exterior "\\wedge")
   (Exists "\\exists")
   (bigintwl "\\int")
@@ -384,6 +385,8 @@
   (ontop (genfrac "" "" "0pt" "" 1 2))
   (subindex (index (!append 1 "!" 2)))
   (renderfootnote (footnotetext (!append (tmrsup 1) " " 2)))
+  (tmlinenumber (!append (custombinding 1)
+                         (tmlinenote (footnotesize 1) 2 "0cm")))
 
   ;; Ternary macros
   (tmsession (!group (!append (tt) 3)))
@@ -401,6 +404,12 @@
    (trivlist (!append (item (!option (!append (color "rgb:black,10;red,9;green,4;yellow,2") 1)))
 		      (mbox "") (!group (!append (color "blue!50!black") 2))
 		      (item (!option "")) (mbox "") 3)))
+  (tmlinenote
+   (!append (tmdummy)
+            (marginpar (adjustbox
+                        (!append "right=0cm, lap=" 2
+                                 "-\\textwidth-\\marginparsep, raise=" 3)
+                        1))))
   (subsubindex (index (!append 1 "!" 2 "!" 3)))
   (tmref 1)
   (glossaryentry (!append (item (!option (!append 1 (hfill)))) 2 (dotfill) 3))
@@ -572,6 +581,13 @@
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))
+  (custombinding
+   (!append
+    "\\newcounter{tmcounter}\n"
+    "\\newcommand{\\custombinding}[1]{%\n"
+    "  \\setcounter{tmcounter}{#1}%\n"
+    "  \\addtocounter{tmcounter}{-1}%\n"
+    "  \\refstepcounter{tmcounter}}\n"))
   (tmfloat
    (!append
     (!ignore (ifthenelse) (captionof) (widthof))
@@ -632,9 +648,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-macro (latex-texmacs-thmenv prim name before after)
-  `(smart-table latex-texmacs-env-preamble
-     (,prim (!append ,@before (newtheorem ,prim (!translate ,name))
-		     ,@after "\n"))))
+  (let* ((prim* (string-append prim "*"))
+         (nonum (string-append "nn" prim))
+         (thenonum (string-append "\\the" nonum)))
+    `(smart-table latex-texmacs-env-preamble
+       (,prim  (!append ,@before
+                        (newtheorem ,prim (!translate ,name))
+                        ,@after "\n"))
+       (,prim* (!append (newcounter ,nonum) "\n"
+                        "\\def" ,thenonum "{\\unskip}\n"
+                        ,@before
+                        (newtheorem ,prim* (!option ,nonum) (!translate ,name))
+                        ,@after "\n")))))
 
 (define-macro (latex-texmacs-theorem prim name)
   `(latex-texmacs-thmenv ,prim ,name () ()))

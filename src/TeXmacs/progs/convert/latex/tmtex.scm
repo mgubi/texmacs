@@ -247,7 +247,9 @@
   (det ((left|) "c" (right|) #f))
   (bmatrix ((,(string->symbol "left[")) "c" (,(string->symbol "right]")) #f))
   (stack ("" "c" "" #f))
-  (choice ((left\{) "l" (right.) #f)))
+  (choice ((left\{) "l" (right.) #f))
+  (tabbed ("" "l" "" #f))
+  (tabbed* ("" "l" "" #f)))
 
 (logic-table tex-with-cmd%
   (("font-family" "rm") tmtextrm)
@@ -700,7 +702,8 @@
 (define (tmtex-file l)
   (let* ((doc (car l))
          (styles (cadr l))
-         (init (or (cadddr l) '(collection)))
+         (init* (cadddr l))
+         (init (or (and (!= init* "#f") init*) '(collection)))
          (init-bis (if (list>1? init)
                      (map (lambda (x) (cons (cadr x) (caddr x))) (cdr init))
                      '()))
@@ -761,6 +764,11 @@
 (define (tmtex-error l)
   (display* "TeXmacs] error in conversion: " l "\n")
   (if tmtex-debug-mode? "(error)" ""))
+
+(define (tmtex-line-note l)
+  `(tmlinenote ,(tmtex (car l))
+               ,(tmtex-decode-length (cadr l))
+               ,(tmtex-decode-length (caddr l))))
 
 (define (tmtex-marginal-left-note l)
   `(marginpar (!option ,(tmtex (cAr l))) ,(tmtex '())))
@@ -865,6 +873,7 @@
   ;; FIXME: should be completed
   (with s (force-string len)
     (cond ((string-ends? s "fn")   (string-replace s "fn"   "em"))
+	  ((string-ends? s "tab")  (string-replace s "tab"  "em"))
 	  ((string-ends? s "spc")  (string-replace s "spc"  "em"))
 	  ((string-ends? s "sep")  (string-replace s "sep"  "ex"))
 	  ((string-ends? s "par")  (string-replace s "par"  "\\columnwidth"))
@@ -981,6 +990,7 @@
   (cond ((nstring? s) "<nobracket>")
 	((== s ".") "<nobracket>")
 	((<= (string-length s) 1) s)
+        ((and (string-starts? s "<") (string-ends? s ">")) s)
 	(else (string-append "<" s ">"))))
 
 (define (make-small-bracket x)
@@ -1385,13 +1395,14 @@
 	  (cond ((== unit "fn") (string-append val-string "em"))
 		(else len))))))
 
-(define (tmtex-make-parmod x y z arg)
+(define (tmtex-make-parmod x y z arg flag?)
   (set! x (tmlength->texlength x))
   (set! y (tmlength->texlength y))
   (set! z (tmlength->texlength z))
   (if (and (tmlength-zero? (string->tmlength x))
 	   (tmlength-zero? (string->tmlength y))
-	   (tmlength-zero? (string->tmlength z)))
+	   (tmlength-zero? (string->tmlength z))
+           flag?)
       arg
       (list (list '!begin "tmparmod" x y z) arg)))
 
@@ -1453,9 +1464,9 @@
 	(cond ((and w (tm-func? arg w 1)) arg)
               (w (list w arg))
 	      (a (list '!group (tex-concat (list (list a) " " arg))))
-	      ((== "par-left" var)    (tmtex-make-parmod val "0pt" "0pt" arg))
-	      ((== "par-right" var)   (tmtex-make-parmod "0pt" val "0pt" arg))
-	      ((== "par-first" var)   (tmtex-make-parmod "0pt" "0pt" val arg))
+	      ((== "par-left" var)  (tmtex-make-parmod val "0pt" "0pt" arg #t))
+	      ((== "par-right" var) (tmtex-make-parmod "0pt" val "0pt" arg #t))
+	      ((== "par-first" var) (tmtex-make-parmod "0pt" "0pt" val arg #f))
 	      ((== "par-par-sep" var) (tmtex-make-parsep val arg))
               ((== var "language")    (tmtex-make-lang   val arg))
 	      ((== var "color")       (tmtex-make-color  val arg))
@@ -1558,6 +1569,11 @@
 
 (define (tmtex-quote l)
   (tmtex (car l)))
+
+(define (tmtex-hidden-binding l)
+  (if (and (== (length l) 2) (string->number (force-string (cAr l))))
+      (list 'custombinding (force-string (cAr l)))
+      ""))
 
 (define (tmtex-label l)
   (list 'label (force-string (car l))))
@@ -2121,6 +2137,15 @@
 (define (tmtex-key* s l)
   (tmtex (tm->stree (tmdoc-key* (car l)))))
 
+(define (tmtex-padded-center s l)
+  (list (list '!begin "center") (tmtex (car l))))
+
+(define (tmtex-padded-left-aligned s l)
+  (list (list '!begin "flushleft") (tmtex (car l))))
+
+(define (tmtex-padded-right-aligned s l)
+  (list (list '!begin "flushright") (tmtex (car l))))
+
 (define (tmtex-indent s l)
   (list (list '!begin "tmindent") (tmtex (car l))))
 
@@ -2251,7 +2276,7 @@
   (tmtex (car l)))
 
 (define (tmtex-theindex s l)
-    (list 'printindex))
+  (list 'printindex))
 
 (define (tmtex-toc s l)
   (tex-apply 'tableofcontents))
@@ -2272,13 +2297,22 @@
 		     (s2 (tmtex-bib-max (cdr l))))
 		(if (< (string-length s1) (string-length s2)) s2 s1)))))
 
-(define (tmtex-bib s l)
+(tm-define (tmtex-biblio s l titled?)
   (if tmtex-indirect-bib?
       (tex-concat (list (list 'bibliographystyle (force-string (cadr l)))
 			(list 'bibliography (force-string (caddr l)))))
       (let* ((doc (tmtex-bib-sub (cadddr l)))
-	     (max (tmtex-bib-max doc)))
-	(tmtex (list 'thebibliography max doc)))))
+	     (max (tmtex-bib-max doc))
+             (tls tmtex-languages)
+             (lan (or (and (pair? tls) (car tls)) "english"))
+             (txt (translate-from-to "References" "english" lan))
+             (bib (tmtex (list 'thebibliography max doc))))
+        (if titled?
+            `(!document (section* ,(tmtex txt)) ,bib)
+            bib))))
+
+(tm-define (tmtex-bib t)
+  (tmtex-biblio (car t) (cdr t) #f))
 
 (define (tmtex-thebibliography s l)
   (list (list '!begin s (car l)) (tmtex (cadr l))))
@@ -2421,6 +2455,9 @@
 (define (tmtex-modifier s l)
   (tex-apply (string->symbol (string-append "tm" s)) (tmtex (car l))))
 
+(define (tmtex-render-line-number s l)
+  (list 'tmlinenumber (tmtex (car l)) (tmtex-decode-length (tmtex (cadr l)))))
+
 (define (tmtex-menu-one x)
   (tmtex (list 'samp x)))
 
@@ -2501,6 +2538,9 @@
 (define (tmtex-cite-year s l)
   (tex-apply 'citeyear (tmtex (car l))))
 
+(define (tmtex-natbib-triple s l)
+  `(protect (citeauthoryear ,@(map tmtex l))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Glossaries
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2575,9 +2615,9 @@
   (map-in-order tmtex l))
 
 (tm-define (tmtex x)
-    (cond ((string? x) (tmtex-string x))
-          ((list>0? x) (tmtex-apply (car x) (cdr x)))
-          (else "")))
+  (cond ((string? x) (tmtex-string x))
+        ((list>0? x) (tmtex-apply (car x) (cdr x)))
+        (else "")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dispatching
@@ -2590,6 +2630,8 @@
   (surround tmtex-surround)
   (concat tmtex-concat)
   (rigid tmtex-rigid)
+  (hgroup tmtex-rigid)
+  (vgroup tmtex-id)
   (hidden tmtex-noop)
   (hspace tmtex-hspace)
   (vspace* tmtex-noop)
@@ -2602,10 +2644,10 @@
   (clipped tmtex-first)
   (repeat tmtex-noop)
   (float tmtex-float)
-  ((:or datoms dlines dpages dbox) tmtex-noop)
+  (datoms tmtex-second)
+  ((:or dlines dpages dbox) tmtex-noop)
+  (line-note tmtex-line-note)
 
-  (number tmtex-number)
-  (change-case tmtex-change-case)
   (with-limits tmtex-noop)
   (line-break tmtex-line-break)
   (new-line tmtex-new-line)
@@ -2658,7 +2700,7 @@
   ((:or twith cwith tmarker) tmtex-noop)
   (table tmtex-table)
   ((:or row cell subtable) tmtex-noop)
-
+  
   (assign tmtex-assign)
   (with tmtex-with-wrapped)
   (provides tmtex-noop)
@@ -2681,6 +2723,8 @@
 	is-tuple look-up
 	equal unequal less lesseq greater greatereq) tmtex-noop)
 
+  (number tmtex-number)
+  (change-case tmtex-change-case)
   (date tmtex-date)
 
   ((:or cm-length mm-length in-length pt-length
@@ -2697,6 +2741,9 @@
 	symbol latex hybrid) tmtex-noop)
 
   ((:or tuple attr tmlen collection associate backup) tmtex-noop)
+  (set-binding tmtex-noop)
+  (get-binding tmtex-noop)
+  (hidden-binding tmtex-hidden-binding)
   (label tmtex-label)
   (reference tmtex-reference)
   (pageref tmtex-pageref)
@@ -2751,14 +2798,20 @@
   (appendix (,tmtex-appendix 1))
   (appendix* (,tmtex-appendix* 1))
   ((:or theorem proposition lemma corollary proof axiom definition
-	notation conjecture remark note example exercise problem warning
-	convention quote-env quotation verse solution question answer
-	acknowledgments)
+	notation conjecture remark note example convention warning
+        exercise problem question solution answer
+        quote-env quotation verse acknowledgments
+        theorem* proposition* lemma* corollary* axiom* definition*
+	notation* conjecture* remark* note* example* convention* warning*
+        exercise* problem* question* solution* answer*)
    (,tmtex-enunciation 1))
   (new-theorem (,tmtex-new-theorem 2))
   (verbatim (,tmtex-verbatim 1))
-  (center (,tmtex-std-env 1))
+  (padded-center (,tmtex-padded-center 1))
+  (padded-left-aligned (,tmtex-padded-left-aligned 1))
+  (padded-right-aligned (,tmtex-padded-right-aligned 1))
   (indent (,tmtex-indent 1))
+  (algorithm-indent (,tmtex-indent 1))
   ((:or footnote wide-footnote) (,tmtex-footnote 1))
   (footnotemark (,tmtex-default 0))
   (footnotemark* (,tmtex-footnotemark 1))
@@ -2859,7 +2912,6 @@
   (glossary-2 (,tmtex-glossary-entry 3))
   (the-glossary (,tmtex-the-glossary 2))
   ((:or table-of-contents) (,tmtex-toc 2))
-  (bibliography (,tmtex-bib 4))
   (thebibliography (,tmtex-thebibliography 2))
   (bib-list (,tmtex-style-second 2))
   (bibitem* (,tmtex-bibitem* -1))
@@ -2879,6 +2931,7 @@
   (tt (,tmtex-text-tt 1))
   ((:or strong em name samp abbr dfn kbd var acronym person)
    (,tmtex-modifier 1))
+  (render-line-number (,tmtex-render-line-number 2))
   (menu (,tmtex-menu -1))
   (with-TeXmacs-text (,(tmtex-rename 'withTeXmacstext) 0))
   (made-by-TeXmacs (,(tmtex-rename 'madebyTeXmacs) 0))
@@ -2894,7 +2947,8 @@
   (render-cite (,tmtex-render-cite 1))
   ((:or cite-author cite-author-link) (,tmtex-cite-author 1))
   ((:or cite-author* cite-author*-link) (,tmtex-cite-author* 1))
-  ((:or cite-year cite-year-link) (,tmtex-cite-year 1)))
+  ((:or cite-year cite-year-link) (,tmtex-cite-year 1))
+  (natbib-triple (,tmtex-natbib-triple 3)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tags which are customized in particular style files
@@ -2975,6 +3029,7 @@
   (author-misc-label        tmtex-author-misc-label 2)
   ;; misc
   ((:or equation equation*) tmtex-equation 2)
+  (bibliography             tmtex-bib 4)
   (elsevier-frontmatter     tmtex-elsevier-frontmatter 2)
   (conferenceinfo           tmtex-acm-conferenceinfo 2)
   (CopyrightYear            tmtex-acm-copyright-year 2)
@@ -3041,7 +3096,26 @@
 (define tmtex-always-expand
   ;; FIXME: find a cleaner way to handle these environments
   (list "render-theorem" "render-remark" "render-exercise" "render-proof"
-        "specified-algorithm"))
+        "algorithm" "algorithm*" "named-algorithm"
+        "specified-algorithm" "specified-algorithm*"
+        "named-specified-algorithm" "numbered"
+
+        "short-item" "short-question"
+        "question-arabic" "question-alpha" "question-Alpha"
+        "question-roman" "question-Roman" "question-item"
+        "answer-arabic" "answer-alpha" "answer-Alpha"
+        "answer-roman" "answer-Roman" "answer-item"
+
+        "gap" "gap-dots" "gap-underlined" "gap-box"
+        "gap-wide" "gap-dots-wide" "gap-underlined-wide" "gap-box-wide"
+        "gap-long" "gap-dots-long" "gap-underlined-long" "gap-box-long"
+
+        "with-button-box" "with-button-box*"
+        "with-button-circle" "with-button-circle*"
+        "with-button-arabic" "with-button-alpha" "with-button-Alpha"
+        "with-button-roman" "with-button-Roman"
+        "mc-field" "mc-wide-field" "show-reply" "hide-reply"
+        "mc" "mc-monospaced" "mc-horizontal" "mc-vertical"))
 
 (tm-define (tmtex-env-patch t l0)
   (let* ((st (tree->stree t))
@@ -3050,7 +3124,7 @@
 	 (l2 (logic-first-list 'tmtex-tmstyle%))
 	 (l3 (map as-string (logic-apply-list '(latex-tag%))))
 	 (l4 (map as-string (logic-apply-list '(latex-symbol%))))
-	 (l5 (list-difference l3 l4))
+	 (l5 (list-difference l3 (list-union l4 tmtex-always-expand)))
 	 (l6 (map as-string (collect-user-defs st)))
 	 (l7 (if (preference-on? "texmacs->latex:expand-user-macros") '() l6))
          (l8 (list-difference (collect-user-macros st)

@@ -8,16 +8,24 @@
   <section|Changes from version 1.99.1 to 1.99.9>
 
   <\itemize>
+    <item>Many bug fixes (1.99.9).
+
+    <item>Similar spell checking widgets as for search and replace (1.99.9).
+
+    <item>Improved educational styles (1.99.9).
+
+    <item>Multiple choice lists (1.99.9).
+
     <item>A unified Graph plugin for Graphviz, Asymptote (1.99.9).
 
     <item>Import improvements from the FriCAS project (1.99.9).
 
-    <item>Fixes and documentations on the Sage plugin (1.99.9).
+    <item>Fixes and documentation for the Sage plugin (1.99.9).
 
     <item>Several bug fixes (1.99.8).
 
     <item>Support of binary packages for various GNU/<name|Linux>
-    distributions, cosntructed using <name|Suse> <name|OpenBuild> services
+    distributions, constructed using <name|Suse> <name|OpenBuild> services
     (1.99.8).
 
     <item>Several new algorithms for micro typography: roots, mathematical

@@ -34,6 +34,7 @@ tree latex_command_to_tree (tree t);
 bool is_var_compound (tree t, string s);
 bool is_var_compound (tree t, string s, int n);
 string latex_to_texmacs_languages (string s);
+string textm_normalize_length (string len);
 
 /******************************************************************************
 * Final modifications to the converted tree
@@ -85,8 +86,8 @@ parse_matrix_params (tree t, string tr, string br, string hoff) {
 	string halign= copy (CELL_HALIGN);
 	string how   = s (i, i+1);
 	tformat << tree (CWITH, tr, br, col_s, col_s, halign, how);
-  if (col_flag && col == 1)
-    tformat << tree (CWITH, tr, br, col_s, col_s, CELL_LBORDER, "0ln");
+        if (col_flag && col == 1)
+          tformat << tree (CWITH, tr, br, col_s, col_s, CELL_LBORDER, "0ln");
 	col_flag= true;
 	col++;
 	break;
@@ -99,22 +100,22 @@ parse_matrix_params (tree t, string tr, string br, string hoff) {
 	string col_s = as_string (col);
 	string halign= copy (CELL_HYPHEN);
 	char how_c   = s[i];
-  string how = (how_c == 'm')? 'c' :
-              ((how_c == 'b')? 'b' : 't');
+        string how = (how_c == 'm')? 'c' :
+          ((how_c == 'b')? 'b' : 't');
 	tformat << tree (CWITH, tr, br, col_s, col_s, halign, how);
-  if (how_c != 'X') {
-    int start= ++i;
-    while (i<n && (s[i] != ' ') && (s[i] != '|')
-        && (s[i] != '<') && (s[i] != '*')) i++;
-    string width= s(start, i);
-    tformat << tree (CWITH, tr, br, col_s, col_s, CELL_HMODE, "exact");
-    tformat << tree (CWITH, tr, br, col_s, col_s, CELL_WIDTH, width);
-  }
-  else {
-    tformat << tree (CWITH, tr, br, col_s, col_s, CELL_HALIGN, "l");
-  }
-  if (col_flag && col == 1)
-    tformat << tree (CWITH, tr, br, col_s, col_s, CELL_LBORDER, "0ln");
+        if (how_c != 'X') {
+          int start= ++i;
+          while (i<n && (s[i] != ' ') && (s[i] != '|')
+                 && (s[i] != '<') && (s[i] != '*')) i++;
+          string width= s(start, i);
+          tformat << tree (CWITH, tr, br, col_s, col_s, CELL_HMODE, "exact");
+          tformat << tree (CWITH, tr, br, col_s, col_s, CELL_WIDTH, width);
+        }
+        else {
+          tformat << tree (CWITH, tr, br, col_s, col_s, CELL_HALIGN, "l");
+        }
+        if (col_flag && col == 1)
+          tformat << tree (CWITH, tr, br, col_s, col_s, CELL_LBORDER, "0ln");
 	col_flag= true;
 	col++;
 	break;
@@ -129,11 +130,22 @@ parse_matrix_params (tree t, string tr, string br, string hoff) {
 	col_flag= false;
 	string col_s= col==1? as_string (col): as_string (col-1);
 	string hbor = col==1? copy (CELL_LBORDER): copy (CELL_RBORDER);
-  int howmany=1;
-  while (i+1 < n && s[i+1] == '|') { howmany++; i++; }
+        int howmany=1;
+        while (i+1 < n && s[i+1] == '|') { howmany++; i++; }
 	string how  = as_string (howmany) * "ln";
 	tformat << tree (CWITH, tr, br, col_s, col_s, hbor, how);
 	break;
+      }
+    case ';':
+      {
+        // TODO: for the moment, we ignore dashed lines        
+        break;
+      }
+    case '{':
+      {
+        for (int j=i; j<n; j++)
+          if (s[j] == '}') { i= j; }
+        break;
       }
     case '@':
       // FIXME: emergency exit; parameters of @ no longer between {}
@@ -245,8 +257,10 @@ parse_pmatrix (tree& r, tree t, int& i, string lb, string rb, string fm) {
       while (i+1<N(t) && t[i+1] == " ") i++;
       continue;
     }
-    else if (is_func (v, BEGIN) && (v[0] == "array" || v[0] == "tabular" ||
-          v[0] == "tabular*" || v[0] == "tabularx" || v[0] == "tabularx*")) {
+    else if (is_func (v, BEGIN) &&
+             (v[0] == "array" || v[0] == "array*" ||
+              v[0] == "tabular" || v[0] == "tabular*" ||
+              v[0] == "tabularx" || v[0] == "tabularx*")) {
       parse_pmatrix (E, t, i, "", "", "tabular*");
       if (i<N(t)) continue;
       break;
@@ -287,8 +301,11 @@ parse_pmatrix (tree& r, tree t, int& i, string lb, string rb, string fm) {
       break;
     }
     else if (v == tree (END, "array")) break;
+    else if (v == tree (END, "array*")) break;
     else if (v == tree (END, "tabular")) break;
+    else if (v == tree (END, "tabular*")) break;
     else if (v == tree (END, "tabularx")) break;
+    else if (v == tree (END, "tabularx*")) break;
     else if (v == tree (END, "cases")) break;
     else if (v == tree (END, "stack")) break;
     else if (v == tree (END, "matrix")) break;
@@ -389,7 +406,7 @@ finalize_pmatrix (tree t) {
     tree r (CONCAT);
     for (i=0; i<n; i++)
       if (is_func (u[i], BEGIN)) {
-	if (u[i][0] == "array")
+	if (u[i][0] == "array" || u[i][0] == "array*")
 	  parse_pmatrix (r, u, i, "", "", "tabular*");
 	else if (u[i][0] == "tabular"  || u[i][0] == "tabular*" ||
 	         u[i][0] == "tabularx" || u[i][0] == "tabularx*")
@@ -618,6 +635,17 @@ finalize_layout (tree t) {
 
       if (is_func (v, END, 1) && (v[0] == "tmparsep")) {
 	r << tree (RESET, "par-par-sep");
+	continue;
+      }
+
+      if (is_func (v, BEGIN, 3) && v[0] == "tmparmod") {
+        // TODO: deal with par-left and par-right as well
+        r << tree (SET, "par-first", v[3]);
+	continue;
+      }
+
+      if (is_func (v, END) && (v[0] == "tmparmod")) {
+	r << tree (RESET, "par-first");
 	continue;
       }
 
@@ -1420,13 +1448,13 @@ reset_envs (tree e, array< array<tree> > &envs) {
 
 static tree
 reopen_envs (tree t, array< array<tree> > &envs) {
-  if (is_atomic (t)) {
+  //if (is_atomic (t)) {
+  if (!is_concat (t)) {
     tree r (CONCAT);
     r << get_envs (envs, array<tree> ());
-    if (r != concat ()) {
-      r << t;
-      return r;
-    }
+    if (r == concat ()) return t;
+    r << t;
+    return r;
   }
   if (!is_concat (t)) return t;
   bool begin= true;
@@ -1608,6 +1636,8 @@ finalize_misc (tree t) {
         finalize_misc (t[N(t)-2]), finalize_misc (t[N(t)-1]));
   }
   else if (is_compound (t, "minipage", 3)) {
+    if (is_atomic (t[1]))
+      t[1]= textm_normalize_length (t[1]->label);
     if (is_document (t[2]) && N(t[2]) == 1)
       t[2]= t[2][0];
     return t;
@@ -1686,6 +1716,8 @@ modernize_newlines (tree t, bool skip) {
   tree r= tree (L(t));
   for (int i=0; i<N(t); i++)
     r << modernize_newlines (t[i], skip);
+  if (is_func (r, ASSIGN, 2) && is_func (r[1], DOCUMENT, 1))
+    r= tree (ASSIGN, r[0], r[1][0]);
   if (is_concat (r)) {
     if (contains_newline (r)) {
       array<tree> tmp=
@@ -2042,6 +2074,82 @@ remove_geometry (tree t) {
   return r;
 }
 
+/************************** Clean vertical spacing ***************************/
+
+static bool
+auto_vspace (tree t) {
+  if (is_atomic (t) || L(t) < START_EXTENSIONS) return false;
+  string s= as_string (L(t));
+  if (starts (s, "equation") ||
+      starts (s, "eqnarray") ||
+      starts (s, "itemize") ||
+      starts (s, "enumerate") ||
+      starts (s, "description") ||
+      starts (s, "solution")) return true;
+  return latex_type ("\\begin-" * s) == "enunciation";
+}
+
+static bool
+is_vspace (tree t, bool eat) {
+  if (is_func (t, LINE_BREAK, 0) ||
+      is_func (t, NEW_LINE, 0) ||
+      is_func (t, NEXT_LINE, 0))
+    return true;
+  if (!eat) return false;
+  if (!is_func (t, VSPACE, 1) &&
+      !is_func (t, VAR_VSPACE, 1))
+    return false;
+  return
+    t[0] == "0.25fn" || t[0] == "0.5fn" || t[0] == "1fn" ||
+    t[0] == "0.25em" || t[0] == "0.5em" || t[0] == "1em";
+}
+
+static tree
+clean_space_right (tree c) {
+  if (N(c) == 0) return "";
+  if (is_atomic (c[N(c)-1]))
+    c[N(c)-1]= trim_spaces_right (c[N(c)-1]->label);
+  if (c[N(c)-1] == "")
+    c= c (0, N(c)-1);
+  if (N(c) == 0) return "";
+  else if (N(c) == 1) return c[0];
+  else return c;
+}
+
+static tree
+clean_vspace (tree t) {
+  if (is_atomic (t)) return t;
+  else if (is_func (t, DOCUMENT)) {
+    int i, n= N(t);
+    tree r (DOCUMENT);
+    for (i=0; i<n; i++) {
+      tree cur= clean_vspace (t[i]);
+      if (is_concat (cur) && N(cur) > 1 &&
+	  is_func (cur[0], VSPACE))
+	cur[0]= tree (VAR_VSPACE, A(cur[0]));
+      else if (is_concat (cur) && N(cur) > 2 &&
+	       is_func (cur[0], NO_INDENT) &&
+	       is_func (cur[1], VSPACE))
+	cur[1]= tree (VAR_VSPACE, A(cur[1]));
+      bool eat= (i == n-1 || auto_vspace (t[i+1]));
+      if (is_atomic (cur)) r << cur;
+      else if (is_vspace (cur, true));
+      else if (is_concat (cur) && is_vspace (cur[N(cur)-1], eat)) {
+        tree c= cur (0, N(cur) - 1);
+        r << clean_space_right (c);
+      }
+      else r << cur;
+    }
+    return r;
+  }
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++) r[i]= clean_vspace (t[i]);
+    return r;
+  }
+}
+
 /****************************** Finalize textm *******************************/
 
 tree
@@ -2057,12 +2165,23 @@ finalize_textm (tree t) {
   t= concat_document_correct (t);
   t= remove_labels_from_sections (t);
   t= concat_sections_and_labels (t);
+  t= clean_vspace (t);
   return simplify_correct (t);
 }
 
 /******************************************************************************
 * Page geometry
 ******************************************************************************/
+
+static array<tree>
+filter_init (tree t) {
+  array<tree> r;
+  if (!is_func (t, CONCAT)) return r;
+  for (int i=0; i<N(t); i++)
+    if (is_tuple (t[i], "\\env-init", 2))
+      r << compound ("associate", t[i][1], t[i][2]);
+  return r;
+}
 
 static array<tree>
 filter_geometry (tree t) {
@@ -2080,6 +2199,65 @@ filter_geometry (tree t) {
       r << filter_geometry (t[i]);
   }
   return r;
+}
+
+/******************************************************************************
+* Guess frequent missing macros
+******************************************************************************/
+
+static void
+collect (hashmap<tree_label,bool>& def,
+         hashmap<tree_label,bool>& use,
+         tree t) {
+  if (is_atomic (t)) return;
+  if (L(t) >= START_EXTENSIONS) use (L(t))= true;
+  if (is_func (t, ASSIGN, 2) && is_atomic (t[0]))
+    def (make_tree_label (t[0]->label))= true;
+  for (int i=0; i<N(t); i++)
+    collect (def, use, t[i]);
+}
+
+static void
+add_missing (tree& doc, string name, tree val,
+             hashmap<tree_label,bool> def,
+             hashmap<tree_label,bool> use) {
+  tree_label l= make_tree_label (name);
+  if (use->contains (l) && !def->contains (l))
+    doc << tree (ASSIGN, name, val);
+}
+
+static tree
+guess_missing (tree t) {
+  hashmap<tree_label,bool> def, use;
+  collect (def, use, t);
+  tree d (DOCUMENT);
+  add_missing (d, "C", tree (MACRO, "<bbb-C>"), def, use);
+  add_missing (d, "F", tree (MACRO, "<bbb-F>"), def, use);
+  add_missing (d, "N", tree (MACRO, "<bbb-N>"), def, use);
+  add_missing (d, "Q", tree (MACRO, "<bbb-Q>"), def, use);
+  add_missing (d, "R", tree (MACRO, "<bbb-R>"), def, use);
+  add_missing (d, "Z", tree (MACRO, "<bbb-Z>"), def, use);
+  add_missing (d, "CC", tree (MACRO, "<bbb-C>"), def, use);
+  add_missing (d, "FF", tree (MACRO, "<bbb-F>"), def, use);
+  add_missing (d, "NN", tree (MACRO, "<bbb-N>"), def, use);
+  add_missing (d, "QQ", tree (MACRO, "<bbb-Q>"), def, use);
+  add_missing (d, "RR", tree (MACRO, "<bbb-R>"), def, use);
+  add_missing (d, "ZZ", tree (MACRO, "<bbb-Z>"), def, use);
+  if (N(d) == 0) return t;
+  if (is_func (t, DOCUMENT) && N(t) >= 1) {
+    if (is_compound (t[0], "hide-preamble", 1) &&
+        is_func (t[0][0], DOCUMENT)) {
+      tree r= copy (t);
+      r[0][0] << A(d);
+      return r;
+    }
+    else {
+      tree r= tree (DOCUMENT, compound ("hide-preamble", d));
+      r << A(t);
+      return r;
+    }
+  }
+  return t;
 }
 
 /******************************************************************************
@@ -2123,7 +2301,10 @@ latex_to_tree (tree t0) {
   // cout << "\n\nt9= " << t9 << "\n\n";
 
   tree initial (COLLECTION), mods (WITH);
-  if (is_document) initial << filter_geometry (t9);
+  if (is_document) {
+    initial << filter_init (t2);
+    initial << filter_geometry (t9);
+  }
 
   tree t10= finalize_textm (t9);
   // cout << "\n\nt10= " << t10 << "\n\n";
@@ -2156,11 +2337,15 @@ latex_to_tree (tree t0) {
   // cout << "\n\nt12= " << t12 << "\n\n";
   tree t13= latex_correct (t12);
   // cout << "\n\nt13= " << t13 << "\n\n";
-
+  tree t14= guess_missing (t13);
+  // cout << "\n\nt14= " << t14 << "\n\n";
+  tree t15= postprocess_metadata (t14);
+  // cout << "\n\nt15= " << t15 << "\n\n";
+  
   if (is_document) {
     tree the_version= compound ("TeXmacs", TEXMACS_VERSION);
     tree the_style  = compound ("style", tuple (style));
-    tree the_body   = compound ("body", t13);
+    tree the_body   = compound ("body", t15);
     if (textm_natbib)
       the_style= compound ("style", tuple (style, "cite-author-year"));
     if (style != "acmart" && style != "acmsmall" && style != "acmlarge" &&
@@ -2172,7 +2357,7 @@ latex_to_tree (tree t0) {
     // cout << "\n\nr= " << r << "\n\n";
     return r;
   }
-  else return t13;
+  else return t15;
 }
 
 tree

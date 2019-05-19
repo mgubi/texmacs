@@ -25,6 +25,7 @@
 #else
 #  include <sys/wait.h>
 #endif
+#include <errno.h>
 
 hashset<pointer> pipe_link_set;
 
@@ -141,7 +142,6 @@ qt_pipe_link_rep::is_readable (int channel) {
 
 void
 qt_pipe_link_rep::interrupt () {
-  extern int errno;
   if (!alive) return;
 #ifdef OS_MINGW
   // Not implemented

@@ -53,7 +53,7 @@
   Alpha Beta Epsilon Eta Iota Kappa Mu Nu Omicron Chi Rho Tau Zeta
 
   ;; other extra symbols
-  exterior Exists bigintwl bigointwl
+  oempty exterior Exists bigintwl bigointwl
   of suchthat barsuchthat asterisk point cdummy comma copyright
   bignone nobracket nospace nocomma noplus nosymbol
   nin nni notni nequiv nleadsto
@@ -110,11 +110,11 @@
   tmfoldedplain tmunfoldedplain tmfoldedenv tmunfoldedenv
   tmfoldedstd tmunfoldedstd tmfolded tmunfolded
   tminput tminputmath tmhlink tmaction ontop subindex
-  renderfootnote)
+  renderfootnote tmlinenumber)
 
 (logic-group latex-texmacs-3%
   tmsession tmfoldedio tmunfoldedio tmfoldediomath tmunfoldediomath
-  subsubindex tmref glossaryentry)
+  tmlinenote subsubindex tmref glossaryentry natbib-triple)
 
 (logic-group latex-texmacs-4%
   tmscriptinput tmscriptoutput tmconverterinput tmconverteroutput
@@ -241,14 +241,26 @@
   "axiom" "definition" "notation" "conjecture"
   "remark" "note" "example" "convention"
   "warning" "acknowledgments" "answer" "question"
-  "exercise" "problem" "solution")
+  "exercise" "problem" "solution"
+
+  "theorem*" "proposition*" "lemma*" "corollary*"
+  "axiom*" "definition*" "notation*" "conjecture*"
+  "remark*" "note*" "example*" "convention*"
+  "warning*" "acknowledgments*" "answer*" "question*"
+  "exercise*" "problem*" "solution*")
 
 (logic-group latex-texmacs-theorem%
   begin-theorem begin-proposition begin-lemma begin-corollary
   begin-axiom begin-definition begin-notation begin-conjecture
   begin-remark begin-note begin-example begin-convention
   begin-warning begin-acknowledgments begin-answer begin-question
-  begin-exercise begin-problem begin-solution)
+  begin-exercise begin-problem begin-solution
+
+  begin-theorem* begin-proposition* begin-lemma* begin-corollary*
+  begin-axiom* begin-definition* begin-notation* begin-conjecture*
+  begin-remark* begin-note* begin-example* begin-convention*
+  begin-warning* begin-acknowledgments* begin-answer* begin-question*
+  begin-exercise* begin-problem* begin-solution*)
 
 (logic-rules
   ((latex-texmacs-arity% 'x 0) (latex-texmacs-theorem% 'x))

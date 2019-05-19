@@ -24,6 +24,7 @@
 
 (tm-define toolbar-search-active? #f)
 (tm-define toolbar-replace-active? #f)
+(tm-define toolbar-spell-active? #f)
 (tm-define toolbar-db-active? #f)
 (tm-define toolbar-animate-active? #f)
 
@@ -33,13 +34,19 @@
   (if (and toolbar-replace-active?
            (not toolbar-search-active?))
       (link replace-toolbar))
-  (if (and toolbar-db-active?
+  (if (and toolbar-spell-active?
            (not toolbar-search-active?)
            (not toolbar-replace-active?))
+      (link spell-toolbar))
+  (if (and toolbar-db-active?
+           (not toolbar-search-active?)
+           (not toolbar-replace-active?)
+           (not toolbar-spell-active?))
       (link db-toolbar))
   (if (and toolbar-animate-active?
            (not toolbar-search-active?)
            (not toolbar-replace-active?)
+           (not toolbar-spell-active?)
            (not toolbar-db-active?))
       (link animate-toolbar)))
 
@@ -49,26 +56,35 @@
         ((== which "replace")
          (and toolbar-replace-active?
               (not toolbar-search-active?)))
+        ((== which "spell")
+         (and toolbar-spell-active?
+              (not toolbar-search-active?)
+              (not toolbar-replace-active?)))
         ((== which "database")
          (and toolbar-db-active?
               (not toolbar-search-active?)
-              (not toolbar-replace-active?)))
+              (not toolbar-replace-active?)
+              (not toolbar-spell-active?)))
         ((== which "animate")
          (and toolbar-animate-active?
               (not toolbar-search-active?)
               (not toolbar-replace-active?)
+              (not toolbar-spell-active?)
               (not toolbar-db-active?)))
         (else #f)))
 
 (tm-define (set-bottom-bar which val)
   (set! toolbar-search-active? #f)
   (set! toolbar-replace-active? #f)
+  (set! toolbar-spell-active? #f)
   (set! toolbar-db-active? #f)
   (set! toolbar-animate-active? #f)
   (cond ((== which "search")
          (set! toolbar-search-active? val))
         ((== which "replace")
          (set! toolbar-replace-active? val))
+        ((== which "spell")
+         (set! toolbar-spell-active? val))
         ((== which "database")
          (set! toolbar-db-active? val))
         ((== which "animate")
@@ -84,10 +100,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind view-menu
-  ("Open new window" (open-window))
-  ;;("Clone window" (clone-window))
-  ("Close window" (safely-kill-window))
-  ---
+  (if (not (window-per-buffer?))
+      ("New window" (new-document*))
+      ("Open in new window" (open-document*))
+      ;;("Clone window" (clone-window))
+      ("Close window" (close-document*))
+      ---)
   ("Full screen mode"  (toggle-full-screen-edit-mode))
   ("Presentation mode" (toggle-full-screen-mode))
   ("Show panorama" (toggle-panorama-mode))

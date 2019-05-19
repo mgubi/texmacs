@@ -193,6 +193,8 @@ edit_env_rep::exec (tree t) {
     return exec_table (t);
   case ASSIGN:
     return exec_assign (t);
+  case PROVIDE:
+    return exec_provide (t);
   case WITH:
     return exec_with (t);
   case PROVIDES:
@@ -201,6 +203,8 @@ edit_env_rep::exec (tree t) {
     return exec_value (t);
   case QUOTE_VALUE:
     return exec_quote_value (t);
+  case OR_VALUE:
+    return exec_or_value (t);
   case MACRO:
     return copy (t);
   case DRD_PROPS:
@@ -555,6 +559,19 @@ edit_env_rep::exec_assign (tree t) {
 }
 
 tree
+edit_env_rep::exec_provide (tree t) {
+  if (N(t)!=2) return tree (ERROR, "bad provide");
+  tree r= exec (t[0]);
+  if (is_compound (r)) return tree (ERROR, "bad provide");
+  if (provides (t->label)) return "";
+  assign (r->label, copy (t[1]));
+  tree v= read (r->label);
+  if (is_atomic (v) || is_func (v, MACRO));
+  else v= tree (QUOTE, v);
+  return tree (ASSIGN, r, v);
+}
+
+tree
 edit_env_rep::exec_with (tree t) {
   int i, n= N(t), k= (n-1)>>1; // is k=0 allowed ?
   if ((n&1) != 1) return tree (ERROR, "bad with");
@@ -789,6 +806,19 @@ edit_env_rep::exec_quote_value (tree t) {
   tree r= exec (t[0]);
   if (is_compound (r)) return tree (ERROR, "bad quote-value");
   return read (r->label);
+}
+
+tree
+edit_env_rep::exec_or_value (tree t) {
+  for (int i=0; i<N(t); i++) {
+    tree r= exec (t[i]);
+    if (is_compound (r)) return tree (ERROR, "bad value");
+    string name= r->label;
+    if (provides (name))
+      if (i == N(t)-1 || L(read (name)) != UNINIT)
+        return exec (read (r->label));
+  }
+  return "";
 }
 
 tree
@@ -1421,7 +1451,14 @@ edit_env_rep::exec_translate (tree t) {
 
 tree
 edit_env_rep::exec_change_case (tree t, tree nc, bool exec_flag, bool first) {
-  if (is_atomic (t)) {
+  if (is_atomic (t) && nc == "first") {
+    string s= t->label;
+    if (s == "") return s;
+    int pos= 0;
+    tm_char_forwards (s, pos);
+    return s (0, pos);
+  }
+  else if (is_atomic (t)) {
     string s= t->label;
     tree   r= copy (s);
     int i, n= N(s);
@@ -1769,7 +1806,7 @@ edit_env_rep::exec_set_binding (tree t) {
       }
     }
   }
-  return tree (HIDDEN, keys);
+  return tree (HIDDEN_BINDING, keys, value);
 }
 
 tree
@@ -2177,6 +2214,7 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case TABLE:
     return exec_until_table (t, p, var, level);
   case ASSIGN:
+  case PROVIDE:
     (void) exec (t);
     return false;
   case WITH:
@@ -2198,6 +2236,9 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
     (void) exec (t);
     return false;
   case QUOTE_VALUE:
+    (void) exec (t);
+    return false;
+  case OR_VALUE:
     (void) exec (t);
     return false;
   case MACRO:

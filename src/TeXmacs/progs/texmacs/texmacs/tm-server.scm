@@ -141,20 +141,52 @@
   (list-or (map buffer-modified? (buffer-list))))
 
 (tm-define (safely-kill-buffer)
-  (if (not (buffer-modified? (current-buffer)))
-      (buffer-close (current-buffer))
-      (user-confirm "The buffer has not been saved. Really close it?" #f  
-        (lambda (answ)
-          (when answ (buffer-close (current-buffer)))))))
+  (cond ((buffer-embedded? (current-buffer))
+         (alt-windows-delete (alt-window-search (current-buffer))))
+        ((buffer-modified? (current-buffer))
+         (user-confirm "The buffer has not been saved. Really close it?" #f  
+           (lambda (answ)
+             (when answ (buffer-close (current-buffer))))))
+        (else (buffer-close (current-buffer)))))
+
+(define (do-kill-window)
+  (with buf (current-buffer)
+    (kill-window (current-window))
+    (delayed (:idle 100) (buffer-close buf))))
 
 (tm-define (safely-kill-window . opt-name)
-  (with name (if (null? opt-name) (current-window) (car opt-name))
-    (if (<= (windows-number) 1)
-        (safely-quit-TeXmacs)
-        (kill-window name))))
+  (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
+         (alt-windows-delete (alt-window-search (current-buffer))))
+        ((<= (windows-number) 1)
+         (safely-quit-TeXmacs))
+        ((nnull? opt-name)
+         (kill-window (car opt-name)))
+        ((buffer-modified? (current-buffer))
+         (user-confirm "The buffer has not been saved. Really close it?" #f  
+           (lambda (answ)
+             (when answ (do-kill-window)))))
+        (else (do-kill-window))))
 
 (tm-define (safely-quit-TeXmacs)
   (if (not (buffers-modified?)) (quit-TeXmacs)
       (user-confirm "There are unsaved files. Really quit?" #f  
         (lambda (answ) (when answ (quit-TeXmacs))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; System dependent conventions for buffer management
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (window-per-buffer?)
+  (like-macos?))
+
+(tm-define (new-document)
+  (if (window-per-buffer?) (open-window) (new-buffer)))
+
+(tm-define (new-document*)
+  (if (window-per-buffer?) (new-buffer) (open-window)))
+
+(tm-define (close-document)
+  (if (window-per-buffer?) (safely-kill-window) (safely-kill-buffer)))
+
+(tm-define (close-document*)
+  (if (window-per-buffer?) (safely-kill-buffer) (safely-kill-window)))

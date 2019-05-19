@@ -119,6 +119,7 @@ init_std_drd () {
   init (SURROUND, "surround", fixed (3) -> accessible (0));
   init (CONCAT, "concat", repeat (1, 1) -> inner_border () -> accessible (0));
   init (RIGID, "rigid", fixed (1) -> accessible (0));
+  init (HGROUP, "hgroup", options (1, 1) -> accessible (0));
   init (HIDDEN, "hidden", fixed (1) -> inner_border () -> hidden (0));
   init (FREEZE, "freeze",
 	fixed (1) -> inner_border () -> regular (0));
@@ -159,6 +160,7 @@ init_std_drd () {
         length (3) -> name (3, "right") ->
         length (4) -> name (4, "top"));
   init (REPEAT, "repeat", fixed (1, 1, BIFORM) -> accessible (0));
+  init (VAR_REPEAT, "repeat*", fixed (1, 1, BIFORM) -> accessible (0));
   init (_FLOAT, "float", fixed (2, 1, BIFORM) -> accessible (1));
   init (DATOMS, "datoms",
 	var_repeat (1, 1, BIFORM) -> accessible (1) ->
@@ -279,6 +281,8 @@ init_std_drd () {
 
   init (ASSIGN, "assign",
 	fixed (1, 1, BIFORM) -> variable (0) -> regular (1));
+  init (PROVIDE, "provide",
+	fixed (1, 1, BIFORM) -> variable (0) -> regular (1));
   init (WITH, "with",
 	var_repeat (2, 1, BIFORM) -> with_like () ->
 	binding (0) -> accessible (1));
@@ -289,6 +293,7 @@ init_std_drd () {
   init (QUOTE_VALUE, "quote-value",
 	fixed (1) -> variable (0) -> name ("quoted value") ->
         locals (0, "mode", "src"));
+  init (OR_VALUE, "or-value", repeat (1, 1) -> variable (0));
   init (MACRO, "macro",
 	var_repeat (1, 1, BIFORM) -> argument (0) -> regular (1));
   init (DRD_PROPS, "drd-props",
@@ -531,6 +536,8 @@ init_std_drd () {
 	options (1, 1, BIFORM) ->
 	identifier (0) -> name (0, "key") ->
 	integer (1) -> name (0, "kind"));
+  init (HIDDEN_BINDING, "hidden-binding",
+	fixed (2));
   init (LABEL, "label",
 	fixed (1) ->
         identifier (0) -> name (0, "id") -> long_name (0, "identifier"));
@@ -930,7 +937,7 @@ init_std_drd () {
   init_var (FONT_FAMILY, TYPE_STRING);
   init_var (FONT_SERIES, TYPE_STRING);
   init_var (FONT_SHAPE, TYPE_STRING);
-  init_var (FONT_SIZE, TYPE_NUMERIC);
+  init_var (FONT_SIZE, TYPE_FONT_SIZE);
   init_var (FONT_BASE_SIZE, TYPE_NUMERIC);
   init_var (FONT_EFFECTS, TYPE_STRING);
   init_var (MAGNIFICATION, TYPE_NUMERIC);
@@ -979,6 +986,7 @@ init_std_drd () {
   init_var (PAR_MODE, TYPE_STRING);
   init_var (PAR_FLEXIBILITY, TYPE_NUMERIC);
   init_var (PAR_HYPHEN, TYPE_STRING);
+  init_var (PAR_MIN_PENALTY, TYPE_NUMERIC);
   init_var (PAR_SPACING, TYPE_STRING);
   init_var (PAR_KERNING_REDUCE, TYPE_NUMERIC);
   init_var (PAR_KERNING_STRETCH, TYPE_NUMERIC);

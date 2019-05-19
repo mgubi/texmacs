@@ -20,6 +20,10 @@
     </src-license>
   </src-title>>
 
+  <use-package|no-page-numbers>
+
+  \;
+
   <assign|page-screen-margin|false>
 
   <assign|page-width-margin|false>
@@ -33,16 +37,6 @@
   <assign|page-top|1cm>
 
   <assign|page-bot|1cm>
-
-  \;
-
-  <assign|page-show-hf|true>
-
-  <assign|page-head-sep|2mm>
-
-  <assign|page-foot-sep|2mm>
-
-  <set-footer|>
 </body>
 
 <\initial>

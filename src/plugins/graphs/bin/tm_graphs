@@ -13,48 +13,37 @@
 ## in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 
 import os
+import sys
+sys.path.append(os.environ.get("TEXMACS_PATH") + "/plugins/")
+
 import traceback
-import keyword
 import re
 import string
-import sys
 import csv   # Used to parse scheme forms
 from inspect   import ismodule, getsource, getsourcefile
 from types     import CodeType
 from io        import open
 from io        import StringIO
-from subprocess import Popen, PIPE, STDOUT
+from tmpy.protocol  import *
+from tmpy.graph     import Graph
+from tmpy.asymptote import Asymptote
+from tmpy.graphviz  import Graphviz
+from tmpy.mermaid   import Mermaid
+from tmpy.plantuml  import PlantUML
+import argparse
 
 #import logging as log
 #log.basicConfig(filename='/tmp/tm_python.log',level=log.DEBUG)
 
-DATA_BEGIN   = chr(2)
-DATA_END     = chr(5)
-DATA_ESCAPE  = chr(27)
-DATA_COMMAND = chr(16)
-
 py_ver       = sys.version_info[0];
 __version__  = '1.0'
 __author__   = 'Darcy Shen'
-__metaclass__ = type
 
 my_globals   = {}
 
 if py_ver == 3: _input = input
 else:           _input = raw_input
 
-
-def texmacs_escape(data):
-    return data.replace (DATA_BEGIN,DATA_ESCAPE +
-                         DATA_BEGIN).replace (DATA_END, DATA_ESCAPE + DATA_END)
-
-def texmacs_out(out_str):
-    """Feed data back to TeXmacs.
-    
-    Output results back to TeXmacs, with the DATA_BEGIN,
-    DATA_END control characters."""
-
-    print(DATA_BEGIN + out_str + DATA_END)
 
 def compose_output(data):
     """Do some parsing on the output according to its type.
@@ -76,181 +65,6 @@ def compose_output(data):
     if data is None:
         data = ''
     return 'verbatim:%s' % str(data).strip()
-
-class PSOutDummy:
-    """ Dummy class for use with ps_out.
-
-    We return an instance of this class to avoid output after 
-    evaluation in the TeXmacs plugin of ps_out."""
-    
-    def __str__(self):
-        """Return an empty string for compose_output()"""
-        return ''
-    def __repr__(self):
-        return 'PSOutDummy'
-
-def ps_out(out):
-    """Outputs PostScript within TeXmacs.
-
-    According the the type of the argument the following
-    scenarios can take place:    
-
-    If the argument is an instance of matplotlib.pyplot.Figure
-    then its method savefig() will be used to produce an EPS
-    figure. Note that you need to be using a backend which
-    supports this format.
-
-    If the argument is a string and has more than one line, it
-    will be processed as raw Postscript data.
-    
-    If the argument is a string with no line breaks, it is assumed
-    to contain the filename of a Postscript file which will be
-    read (if the file  has no extension, the defaults .eps and .ps
-    will be tried in this order).
-    
-    If the argument is a file or any other object which provides
-    a 'read'  method, data will be obtained by calling such
-    method.
-    
-    Implemented from suggestion by Alvaro Tejero Cantero.
-    Implementation partially based on information provided
-    by Mark Arrasmith.
-    """
-    if 'savefig' in dir(out):
-        str_out = StringIO()
-        out.savefig(str_out, format='eps')
-        data = str_out.getvalue()
-        str_out.close()
-    elif isinstance(out, str):
-        if out.find('\n') > 0:
-            data = out
-        else:
-            ext_list = ['', '.eps', '.ps']
-        for ext in ext_list:
-            if os.path.exists(out+ext): 
-                fd = open(out+ext, 'rb')
-                data = fd.read()
-                fd.close()
-                break
-            else:
-                raise IOError('File "%s%s" not found.' %
-                              (out, str(ext_lis)))
-    elif 'read' in dir(out):
-        data = out.read()
-
-    texmacs_out('ps:' + texmacs_escape(data))
-    return PSOutDummy();
-    
-def do_module_hierarchy(mod, attr):
-    """Explore an object's hierarchy.
-    
-    Go through the object hierarchy looking for
-    attributes/methods to provide as autocompletion options.
-    """
-    dot = attr.find('.')
-    if dot>0:
-       if hasattr(mod, attr[:dot]):
-          next = getattr(mod, attr[:dot])
-          return do_module_hierarchy(next, attr[dot+1:])
-    if isinstance(mod, dict):
-       return dir(mod)
-    else:
-       return dir(mod)
- 
-
-def find_completion_candidates(cmpl_str, my_globals):
-    """Harvest candidates to provide as autocompletion options."""
-    
-    if py_ver == 3:
-        haystack = list(my_globals.keys()) + \
-                   dir(my_globals['__builtins__']) + keyword.kwlist
-    else:
-        haystack = my_globals.keys() + \
-                   dir(my_globals['__builtins__']) + keyword.kwlist
-
-    dot = cmpl_str.rfind('.')
-    offset = None
-    if dot >= 0:
-        offset = len(cmpl_str[dot+1:])
-        first_dot = cmpl_str[:dot].find('.')
-        if first_dot < 0:
-            mod_name = cmpl_str[:dot]
-            r_str = cmpl_str[dot+1:]
-        else:
-            mod_name = cmpl_str[:first_dot]
-            r_str = cmpl_str[first_dot+1:]
-        if mod_name in keyword.kwlist:
-            return None, []
-        if py_ver == 3:    
-          if mod_name in os.sys.modules:
-              haystack = do_module_hierarchy(os.sys.modules[mod_name], r_str)
-          elif mod_name in list(my_globals.keys()):
-              haystack = do_module_hierarchy(my_globals[mod_name], r_str)
-          else:
-              haystack = do_module_hierarchy(type(mod_name), r_str)
-        else:
-          if os.sys.modules.has_key(mod_name):
-              haystack = do_module_hierarchy(os.sys.modules[mod_name], r_str)
-          elif mod_name in my_globals.keys():
-              haystack = do_module_hierarchy(my_globals[mod_name], r_str)
-          else:
-              haystack = do_module_hierarchy(type(mod_name), r_str)
-            
-    if py_ver == 3:
-       return offset, [x for x in haystack if x.find(cmpl_str[dot+1:])  ==  0]
-    else:
-       return offset, filter(lambda x:x.find(cmpl_str[dot+1:])  ==  0, haystack)
-
-def name_char(c):
-    """Check whether a character is a valid identifier/keyword."""
-    return c not in '+-*/%<>&|^~=!,:()[]{} \n\t'
-
-def complete (s, pos, my_globals):
-    """Process autocomplete command. """
-    
-    try:
-        s = s[:pos]
-        if not s:
-            return 'scheme:(tuple "" "")'
-    except Exception as e:
-        return 'scheme:(tuple "" "")'
-    # We get the string after the last space character.
-    # No completion is done for strings containing spaces.
-    i = len(s) - 1
-    while i > 0:
-        if not name_char(s[i]):
-            i += 1
-            break
-        i -= 1
-    s = s[i:]
-    pos = len(s)
-    # no string after last space? return empty completion
-    if not s:
-        return 'scheme:(tuple "" "")'
-        
-    # Find completion candidates and form a suitable answer to Texmacs
-    offset, cand = find_completion_candidates (s, my_globals)
-    if not cand:
-        res = '""'
-    else:
-        res = ''
-    for c in cand:
-        if offset is not None:
-            pos = offset
-        res += '"%s" ' % c[pos:]
-    return 'scheme:(tuple "' + s + '" ' + res + ')'
-
-def from_scm_string(s):
-    if len(s) > 2 and s[0] == '"' and s[-1] == '"':
-        return s[1:-1]
-    return s
-
-def parse_complete_command(s):
-    """HACK"""
-    t1 = s.strip().strip('()').split(' ', 1)
-    t2 = t1[1].rsplit(' ', 1)
-    # Don't use strip('"') in case there are several double quotes
-    return [t1[0], from_scm_string(t2[0]), int(t2[1])]
 
 class CaptureStdout:
     """Capture output to os.sys.stdout.
@@ -318,75 +132,9 @@ def compile_help (text):
 
     return dict (map (lambda k_v: (k_v[0], as_scm_string (k_v[1])), out.iteritems()))
 
-class Graph:
-    name = ""
-    message = ""
-
-    def greet(self):
-        for x in self.message.split("\n"):
-            if len(x) == 0:
-                pass
-            else:
-                texmacs_out("verbatim:" + x + DATA_BEGIN + "prompt#" + self.name + "] " + DATA_END)
-        os.sys.stdout.flush()
-
-    def available(self):
-        return len(self.message) > 0
-
-    def evaluate(self, code):
-        pass
-
-    def get_png_path(self):
-        png = os.getenv("HOME") + "/.TeXmacs/system/tmp/" + self.name + ".png"
-        if os.path.isfile(png):
-            os.remove(png)
-        return png
-
-class Graphviz(Graph):
-    def __init__(self, name):
-        super(Graphviz, self).__init__()
-        self.name = name
-        p = Popen([self.name, "-V"], stderr=PIPE)
-        ret, err = p.communicate()
-        # WARN: The Version Info is in stderr
-        if (p.returncode == 0):
-            self.message = str(err)
-
-    def evaluate(self, code):
-        png = self.get_png_path()
-        f = open(png, 'wb')
-        p = Popen([self.name, "-Tpng", "-Gsize=1,1","-Gdpi=400"], stdout=f, stdin=PIPE, stderr=PIPE)
-        out, err = p.communicate(input=code)
-        if (p.returncode == 0):
-          texmacs_out ("file:" + png)
-        else:
-          texmacs_out ("verbatim:" + err)
-
-class Asymptote(Graph):
-    def __init__(self, name):
-        super(Asymptote, self).__init__()
-        self.name = name
-        p = Popen([self.name, "-version"], stderr=PIPE)
-        ret, err = p.communicate()
-        # WARN: The Version Info is in stderr
-        if (p.returncode == 0):
-            self.message = str(err)
-
-    def evaluate(self, code):
-        png = self.get_png_path()
-        p = Popen([self.name, "-fpng", "-o", png], stdin=PIPE, stderr=PIPE)
-        out, err = p.communicate(input=code)
-        if (p.returncode == 0):
-          texmacs_out ("file:" + png)
-        else:
-          texmacs_out ("verbatim:" + err)
-
 ###############################################################################
 ## Session start
 ###############################################################################
-
-# We insert into the session's namespace the 'ps_out' method.
-my_globals['ps_out'] = ps_out
 
 # As well as some documentation.
 my_globals['__doc__'] = """A Python plugin for TeXmacs.
@@ -407,40 +155,57 @@ if py_ver == 3:
 else:
     sys.stdout = os.fdopen (sys.stdout.fileno(), 'w', 0)
 
-texmacs_out ("verbatim:Generate Graph with your favorite tools in GNU TeXmacs")
-texmacs_out ("verbatim:Created by Darcy Shen, Implemented in Python, dot by default")
-texmacs_out ("verbatim:It is quit easy, join us: https://github.com/texmacs/plugins")
-texmacs_out ("prompt#dot] ")
-
 grapvizs = map(lambda x: Graphviz(x), ["dot", "neato", "twopi", "circo", "fdp", "sfdp", "patchwork", "osage"])
-others = [Asymptote("asy")]
+others = [Asymptote("asy"), PlantUML(), Mermaid()]
 graphs = filter(lambda x: x.available(), grapvizs + others)
 graph_names = map(lambda x: x.name, graphs)
 
 if len(graphs) == 0:
-    texmacs_out ("verbatim:Sorry, please check your installation of Graphviz or TeX(TikZ, ...)")
+    flush_verbatim ("\nSorry, please check your installation of Graphviz/Asymptote")
+    flush_prompt ("dead] ")
     exit(0)
 
 current = graphs[0]
-current.greet()
+
+flush_verbatim ("Generate Graph with your favorite tools in GNU TeXmacs\n")
+flush_verbatim ("Created by Darcy Shen, Implemented in Python, " + current.name +  " by default\n")
+flush_verbatim ("It is quit easy, join us: https://github.com/texmacs/plugins\n")
+flush_prompt (current.name + "] ")
+
+def unigraph(text):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-width', type=int, default=0)
+    parser.add_argument('-height', type=int, default=0)
+
+    magic_lines = text.split("\n")
+    magic_line = magic_lines[0]
+    code = '\n'.join(magic_lines[1:])
+    command = magic_line.split(" ")[0].strip("%")
+    args = parser.parse_args(magic_line.split(" ")[1:])
+    if command in graph_names:
+        graph = graphs[graph_names.index(command)]
+        graph.set_height(args.height)
+        graph.set_width(args.width)
+        graph.evaluate(code)
+    else:
+        flush_verbatim ("No such Graph generator: " + command)
+
 
 # Main session loop.
-while 1:
+while True:
     line = _input()
     if not line:
         continue
     if line[0] == DATA_COMMAND:
-        sf = parse_complete_command (line[1:])
-        if sf[0] == 'complete':
-            texmacs_out (complete (sf[1], sf[2], my_globals))
+        # TODO: Handle completions
         continue
     elif line.endswith('?') and not line.strip().startswith('#'):
         if len (line) > 1:
             out = compile_help (line[:-1])
-            texmacs_out ('command:(tmpy-open-help %s %s %s)' %
+            flush_command ('(tmpy-open-help %s %s %s)' %
                          (out["help"], out["src"], out["file"]))
         else:
-            texmacs_out ('verbatim:Type a name before the "?" to see the help')
+            flush_verbatim ('Type a name before the "?" to see the help')
         continue
     else:
         lines = [line]
@@ -449,10 +214,13 @@ while 1:
             if line == '': 
                 continue
             lines.append(line)
+
         text='\n'.join(lines[:-1])
 
-        if text == "help":
-            texmacs_out("verbatim:[help, " + ", ".join(str(x) for x in graph_names) + "]")
+        if text.startswith("%"):
+            unigraph(text)
+        elif text == "help":
+            flush_verbatim ("[help, " + ", ".join(str(x) for x in graph_names) + "]\n")
             current.greet()
         elif text in graph_names:
             current = graphs[graph_names.index(text)]

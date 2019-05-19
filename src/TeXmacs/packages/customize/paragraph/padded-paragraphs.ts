@@ -22,7 +22,7 @@
 
   <assign|par-first|0tab>
 
-  <assign|par-par-sep|0.6666fn>
+  <assign|par-par-sep|<value|padded-par-par-sep>>
 </body>
 
 <\initial>

@@ -321,6 +321,7 @@ is_multi_paragraph (tree t) {
       static hashset<tree_label> inline_set; // FIXME: use drd
       if (N(inline_set) == 0) {
 	inline_set->insert (make_tree_label ("footnote"));
+	inline_set->insert (make_tree_label ("footnote-anchor"));
 	inline_set->insert (make_tree_label ("script-input"));
 	inline_set->insert (make_tree_label ("converter-input"));
       }
@@ -404,6 +405,19 @@ is_empty (tree t) {
     return is_concat (t) || (n<=1);
   }
   return is_compound (t, "suppressed");
+}
+
+bool
+is_multi_line (tree t) {
+  if (is_atomic (t)) return false;
+  else if (is_func (t, DOCUMENT)) return true;
+  else if (is_func (t, CONCAT) || is_func (t, TABLE)) return false;
+  else {
+    int i, n= N(t);
+    for (i=0; i<n; i++)
+      if (is_multi_line (t[i])) return true;
+    return false;
+  }
 }
 
 /******************************************************************************

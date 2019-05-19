@@ -40,6 +40,10 @@ deadmap (int code, string name) {
 
 void
 initkeymap () {
+  static bool fInit= false;
+  if (fInit) return;
+  fInit= true;
+  if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "Initializing keymap\n";
   map (Qt::Key_Space     , "space");
   map (Qt::Key_Return    , "return");
   map (Qt::Key_Tab       , "tab");
@@ -235,12 +239,7 @@ QTMWidget::paintEvent (QPaintEvent* event) {
 void
 QTMWidget::keyPressEvent (QKeyEvent* event) {
   if (is_nil (tmwid)) return;
-  static bool fInit = false;
-  if (!fInit) {
-    if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "Initializing keymap\n";
-    initkeymap();
-    fInit= true;
-  }
+  initkeymap();
 
   if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "keypressed\n";
   {
@@ -573,8 +572,10 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
 QVariant 
 QTMWidget::inputMethodQuery (Qt::InputMethodQuery query) const {
   switch (query) {
-    case Qt::ImMicroFocus :
-      return QVariant (QRect (cursor_pos - tm_widget()->backing_pos, QSize (5,5)));
+    case Qt::ImMicroFocus : {
+      const QPoint &topleft= cursor_pos - tm_widget()->backing_pos + surface()->geometry().topLeft();
+      return QVariant (QRect (topleft, QSize (5, 5)));
+    }
     default:
       return QWidget::inputMethodQuery (query);
   }

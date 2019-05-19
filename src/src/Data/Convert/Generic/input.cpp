@@ -331,22 +331,52 @@ texmacs_input_rep::xformat_flush (bool force) {
 }
 
 void
+texmacs_input_rep::image_flush(string content, string type, int width, int height) {
+  tree t (IMAGE);
+  t << tuple (tree (RAW_DATA, content), type);
+  if (width != 0) t << tree (as_string (width) * "px");
+  else t << tree ("");
+  if (height != 0) t << tree (as_string (height) * "px");
+  else t << tree ("");
+  t << tree ("") << tree ("");
+  write (t);
+}
+
+void
 texmacs_input_rep::file_flush (bool force) {
   if (force) {
-    url file= url (buf);
+    array<string> path_toks= tokenize (buf, "?");
+    string path_file = path_toks[0];
+    string path_extra= (N(path_toks) >= 2? path_toks[1]: string (""));
+    array<string> param_toks= tokenize (path_extra, "&");
+    int i= 0;
+    int width= 0;
+    int height= 0;
+    while (i < N(param_toks)) {
+      string param = param_toks[i];
+      if (starts (param, "width="))
+        width= as_int (replace (param, "width=", ""));
+      if (starts (param, "height="))
+        height= as_int (replace (param, "height=", ""));
+      i++;
+    }
+
+    url file= url (path_file);
     if (! exists (file)) {
       string err_msg = "[" * as_string(file) * "] does not exist";
       write (verbatim_to_tree (err_msg, false, "auto"));
-    } else {
+    }
+    else {
       string type = suffix (file);
+      string content;
+      load_string (file, content, false);
       if (type == "png") {
-        string s;
-        load_string (file, s, false);
-        tree t (IMAGE);
-        t << tuple (tree (RAW_DATA, s), type);
-        t << tree("") << tree("") << tree("") << tree("");
-        write (t);
-      } else {
+        image_flush (content, "png", width, height);
+      }
+      else if (type == "eps") {
+        image_flush (content, "ps", width, height);
+      } 
+      else {
         string err_msg = "Do not support file type with suffix: [" * type * "]";
         write (verbatim_to_tree (err_msg, false, "auto"));
       }

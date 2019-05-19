@@ -443,6 +443,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(get-show-kbd)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_show_kbd> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(set-show-kbd <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_show_kbd> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(set-latex-command <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1563,6 +1579,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-child-env* <scm-arg|content> <scm-arg|int> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_env_child> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(tree-child-env <scm-arg|content> <scm-arg|int> <scm-arg|string> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1571,7 +1595,15 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(tree-descendant-env <scm-arg|content> <scm-arg|path> <scm-arg|content>)>
+    <scm|(tree-descendant-env* <scm-arg|content> <scm-arg|path> <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_env_descendant> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-descendant-env <scm-arg|content> <scm-arg|path> <scm-arg|string> <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|get_env_descendant> which returns
@@ -1611,6 +1643,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-multi-line? <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_multi_line> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tree-is-buffer? <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1639,6 +1679,30 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|search> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-spell <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-spell-at <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell> which returns
+    <scm|array_path>.
+  </explain>
+
+  <\explain>
+    <scm|(tree-spell-selection <scm-arg|string> <scm-arg|content> <scm-arg|path> <scm-arg|path> <scm-arg|path> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell> which returns
     <scm|array_path>.
   </explain>
 
@@ -2843,6 +2907,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(string-trim-spaces-left <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|trim_spaces_left> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(string-trim-spaces-right <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|trim_spaces_right> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(string-trim-spaces <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|trim_spaces> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(downgrade-math-letters <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|downgrade_math_letters> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(string-convert <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3179,11 +3275,91 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tmstring-letter? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|uni_is_letter> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tmstring-before? <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|uni_before> which returns
     <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(multi-spell-start)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_start> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(multi-spell-done)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_done> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(single-spell-start <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_start> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(single-spell-done <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_done> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(spell-check <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_check> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(spell-check? <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|check_word> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(spell-accept <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_accept> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(spell-var-accept <scm-arg|string> <scm-arg|string> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_accept> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(spell-insert <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|spell_insert> which returns
+    <scm|void>.
   </explain>
 
   <\explain>
@@ -5035,6 +5211,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-embedded? <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|is_embedded_buffer> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(buffer-import <scm-arg|url> <scm-arg|url> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5432,6 +5616,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|window_set_position> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(alt-window-search <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_search> which returns
+    <scm|path>.
   </explain>
 
   <\explain>
@@ -8103,6 +8295,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|after_menu_action> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(update-menus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|update_menus> which returns
     <scm|void>.
   </explain>
 
