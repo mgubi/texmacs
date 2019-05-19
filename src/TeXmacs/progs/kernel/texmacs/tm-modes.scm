@@ -43,9 +43,10 @@
           (list 'begin defn arch1 arch2 logic-cmd)))))
 
 (define-public-macro (texmacs-modes . l)
-  `(begin (eval-when (expand load eval)
-     (set! temp-module ,(current-module))
-     (set-current-module texmacs-user))
+  `(begin
+     (eval-when (expand load eval)
+       (set! temp-module ,(current-module))
+       (set-current-module texmacs-user))
      ,@(map texmacs-mode l)
      (eval-when (expand load eval) (set-current-module temp-module))))
 

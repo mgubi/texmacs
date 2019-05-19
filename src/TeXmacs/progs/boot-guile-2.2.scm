@@ -90,20 +90,28 @@
 
 (define-macro (with-module module . body)
   `(begin
-     (set! temp-module (current-module))
-     (set-current-module ,module)
+     (eval-when (expand load eval)
+       (set! temp-module (current-module))
+       (set-current-module ,module))
      ,@body
-     (set-current-module temp-module)))
+     (eval-when (expand load eval) (set-current-module temp-module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Module handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;(define-macro (import-from . modules)
+;   (define (import-from-body module)
+;     `(module-use! (current-module) (resolve-module ',module)))
+;   `(begin
+;     ,@(map import-from-body modules)))
+
 (define-macro (import-from . modules)
    (define (import-from-body module)
-     `(module-use! (current-module) (resolve-module ',module)))
+     `(module-provide ',module))
    `(begin
      ,@(map import-from-body modules)))
+
 
 (define (module-exported-symbols m)
   (module-map (lambda (sym var) sym) (module-public-interface (resolve-module m))))

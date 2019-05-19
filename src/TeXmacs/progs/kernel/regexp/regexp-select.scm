@@ -261,7 +261,7 @@
 (define-public (tm-select x pattern)
   "Select all subtrees of @x which match a given path pattern @pattern"
   (with sols (select-list x pattern '())
-     (display* ">>> sols= " sols "\n")
+   ;(display* ">>> sols= " sols "\n")
     (map cadr sols)))
 
 ; (if (os-mingw?) ;; mingw guile does not define select

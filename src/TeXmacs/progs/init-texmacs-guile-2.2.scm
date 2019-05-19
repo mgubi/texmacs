@@ -1,4 +1,4 @@
-(debug-set! stack 2000000)
+(debug-set! stack 20000000)
 (debug-set! width 200)
 
 (define boot-start (texmacs-time))

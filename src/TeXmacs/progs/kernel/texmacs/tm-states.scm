@@ -32,8 +32,8 @@
   (for (e l)
      (eval
         `(begin
-	   (if (not (defined? ',(car e)))
-	       (define-public ,(car e) #f))
+	    ,@(if (not (defined? (car e)))
+	       `((define-public ,(car e) #f)) '())
 	   (set! ,(car e)
 		 ,(with val (cadr e)
 		     (if (and (pair? val) (eq? (car val) 'quote))
@@ -41,7 +41,7 @@
 			`(quote ,(eval val)))))))))
 
 (define (proplist-load l funcs b)
- ;(display* "load[props]=" l "\n")
+;(display* "load[props]=" l "\n")
   (for (e l)
      (if (not (defined? `,(car e)))
 	 (eval `(define-public ,(car e) #f))))
