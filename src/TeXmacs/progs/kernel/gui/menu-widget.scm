@@ -315,16 +315,19 @@
                   (widget-menu-button l command check short style))
       (if bal? but (add-menu-entry-balloon but style action)))))
 
-(define-public (promise-source action)
-  "Helper routines for menu-widget and kbd-define"
-  (and
-       #f ; HACK: disable this procedure since procedure-source is not working on Guile 2!!
-       (procedure? action)
-       (with source (procedure-source action)
-         (and (== (car source) 'lambda)
-              (== (cadr source) '())
-              (null? (cdddr source))
-              (caddr source)))))
+(cond-expand
+  (guile-2.2
+    ; HACK: disable this procedure since procedure-source is not working on Guile 2!!
+    (define-public (promise-source action) #f))
+  (else
+    (define-public (promise-source action)
+      "Helper routines for menu-widget and kbd-define"
+      (and (procedure? action)
+           (with source (procedure-source action)
+             (and (== (car source) 'lambda)
+                  (== (cadr source) '())
+                  (null? (cdddr source))
+                  (caddr source)))))))
 
 (define (make-menu-entry-shortcut label action opt-key)
   (cond (opt-key (kbd-system opt-key #t))
