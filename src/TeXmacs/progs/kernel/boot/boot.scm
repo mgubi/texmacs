@@ -16,11 +16,14 @@
 (define temp-module (current-module))
 (define temp-value #f)
 
-(define (guile-a?) (equal? (scheme-dialect) "guile-a"))
-(define (guile-b?) (equal? (scheme-dialect) "guile-b"))
-(define (guile-c?) (equal? (scheme-dialect) "guile-c"))
-(define (guile-b-c?) (or (guile-b?) (guile-c?)))
-(if (guile-c?) (use-modules (ice-9 rdelim) (ice-9 pretty-print)))
+(cond-expand (guile-2.2)
+  (else
+    (define (guile-a?) (equal? (scheme-dialect) "guile-a"))
+    (define (guile-b?) (equal? (scheme-dialect) "guile-b"))
+    (define (guile-c?) (equal? (scheme-dialect) "guile-c"))
+    (define (guile-b-c?) (or (guile-b?) (guile-c?)))
+    (if (guile-c?) (use-modules (ice-9 rdelim) (ice-9 pretty-print)))))
+
 (define has-look-and-feel? (lambda (x) (== x "emacs")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -52,21 +55,28 @@
       `(define-public ,head ,@body)
       '(noop)))
 
-(if (guile-a?)
-    (define-macro (define-public-macro head . body)
-      `(define-public ,(car head)
-	 ;; FIXME: why can't we use procedure->macro
-	 ;; for a non-memoizing variant?
-	 (procedure->memoizing-macro
-	  (lambda (cmd env)
-	    (apply (lambda ,(cdr head) ,@body) (cdr cmd)))))))
-
-(if (not (guile-a?))
+(cond-expand
+  (guile-2.2
     (define-macro (define-public-macro head . body)
       `(begin
-	 (define-macro ,(car head)
-	   (lambda ,(cdr head) ,@body))
-	 (export ,(car head)))))
+         (define-macro ,(car head)
+           (lambda ,(cdr head) ,@body))
+         (export-syntax ,(car head)))))
+  (else
+    (if (guile-a?)
+       (define-macro (define-public-macro head . body)
+         `(define-public ,(car head)
+	     ;; FIXME: why can't we use procedure->macro
+	     ;; for a non-memoizing variant?
+	     (procedure->memoizing-macro
+	       (lambda (cmd env)
+	         (apply (lambda ,(cdr head) ,@body) (cdr cmd)))))))
+    (if (not (guile-a?))
+       (define-macro (define-public-macro head . body)
+         `(begin
+	        (define-macro ,(car head)
+	          (lambda ,(cdr head) ,@body))
+	        (export ,(car head)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; On-entry and on-exit macros
@@ -95,52 +105,98 @@
 ;; Module handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (guile-a?)
-    (begin
-      (define import-from use-modules)
-      (define re-export export)))
 
-(if (guile-b-c?)
-    (begin
-      (define-macro (import-from . modules)
-	`(process-use-modules
-	  (list ,@(map (lambda (m)
-			 `(list ,@(compile-interface-spec m)))
-		       modules))))
+(cond-expand
+  (guile-2.2
+    (define-macro (import-from . modules) `(use-modules ,@ modules )))
+  (else (if (guile-a?)
+      (begin
+        (define import-from use-modules)
+        (define re-export export)))
+    (if (guile-b-c?)
+      (begin
+        (define-macro (import-from . modules)
+	  `(process-use-modules
+	    (list ,@(map (lambda (m)
+	  		 `(list ,@(compile-interface-spec m)))
+	  	       modules))))
       ;; FIXME: why does this not work?
       ;; (define-macro (import-from . modules)
       ;;   (define (import-from-body module)
       ;;     `(module-use! (current-module) (resolve-module ',module)))
       ;;   `(begin
       ;;     ,@(map import-from-body modules)))
-      ))
+      ))))
 
-(define-macro (inherit-modules . which-list)
-  (define (module-exports which)
-    (let* ((m (resolve-module which))
-	   (m-public (module-ref m '%module-public-interface)))
-      (module-map (lambda (sym var) sym) m-public)))
-  (let ((l (apply append (map module-exports which-list))))
-    `(begin
-       (use-modules ,@which-list)
-       (re-export ,@l))))
+(define (module-exported-symbols m)
+  (module-map (lambda (sym var) sym) (module-public-interface (resolve-module m))))
 
-(define-macro (texmacs-module name . options)
-  (define (transform action)
-    (cond ((not (pair? action)) (noop))
-	  ((equal? (car action) :use) (cons 'use-modules (cdr action)))
-	  ((equal? (car action) :inherit) (cons 'inherit-modules (cdr action)))
-	  ((equal? (car action) :export)
-	   (display "Warning] The option :export is no longer supported\n")
-	   (display "       ] Please use tm-define instead\n"))
-	  (else '(noop))))
-  (let ((l (map-in-order transform options)))
-    (if (guile-b-c?)
-	(set! l (cons `(module-use! (current-module) ,texmacs-user) l)))
-    ;;(display "loading ") (display name) (display "\n")
-    `(begin
-       (define-module ,name)
-       ,@l)))
+(cond-expand
+  (guile-2.2
+    (define-macro (inherit-module which)
+      (define (module-exports which)
+        (let* ((m (resolve-module which))
+	       (m-public (module-public-interface m)))
+          (module-map (lambda (sym var) sym) m-public)))
+      `(begin
+         (use-modules ,which)
+         (re-export ,@ (module-exports which))))
+
+     (define-macro (inherit-modules . which-list)
+        `(begin ,@(append (map (lambda (w) `(inherit-module ,w)) which-list)))))
+  (else
+    (define-macro (inherit-modules . which-list)
+      (define (module-exports which)
+        (let* ((m (resolve-module which))
+           (m-public (module-ref m '%module-public-interface)))
+          (module-map (lambda (sym var) sym) m-public)))
+      (let ((l (apply append (map module-exports which-list))))
+        `(begin
+           (use-modules ,@which-list)
+           (re-export ,@l))))))
+
+(cond-expand
+    (guile-2.2
+        (eval-when (expand load eval)
+          (set-current-module the-root-module)
+          (define texmacs-user (module-ref (resolve-module '(guile-user)) 'texmacs-user)))
+        (define-macro (texmacs-module name . options)
+          (define (transform action)
+            (cond ((not (pair? action)) (noop))
+              ((equal? (car action) :use) (cons 'use-modules (cdr action)))
+              ((equal? (car action) :inherit) (cons 'inherit-modules (cdr action)))
+              ((equal? (car action) :export)
+               (display "Warning] The option :export is no longer supported\n")
+               (display "       ] Please use tm-define instead\n"))
+              (else '(noop))))
+          (let ((l (map-in-order transform options)))
+            (set! l (cons `(module-use! (current-module) texmacs-user) l))
+        ;;(display "Loading ") (display name) (display "\n")
+            `(begin
+               (eval-when (expand) (display "IN MODULE:") (display ',name) (display "\n"))
+               (define-module ,name)
+               ,@l
+        (eval-when (expand) (display "END MODULE HEADER:") (display ',name) (display "\n")))))
+        (export-syntax texmacs-module)
+        (eval-when (expand load eval)
+           (set-current-module texmacs-user)))
+   (else
+        (define-macro (texmacs-module name . options)
+          (define (transform action)
+            (cond ((not (pair? action)) (noop))
+              ((equal? (car action) :use) (cons 'use-modules (cdr action)))
+              ((equal? (car action) :inherit) (cons 'inherit-modules (cdr action)))
+              ((equal? (car action) :export)
+               (display "Warning] The option :export is no longer supported\n")
+               (display "       ] Please use tm-define instead\n"))
+              (else '(noop))))
+          (let ((l (map-in-order transform options)))
+            (if (guile-b-c?)
+            (set! l (cons `(module-use! (current-module) ,texmacs-user) l)))
+            ;;(display "loading ") (display name) (display "\n")
+            `(begin
+               (define-module ,name)
+               ,@l)))))
 
 (define-public (module-available? module-name)
   (catch #t

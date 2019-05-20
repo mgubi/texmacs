@@ -12,6 +12,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (cond-expand
+  (guile-2.2
+    (use-modules (ice-9 curried-definitions)))
+  (else))
+
+(cond-expand
   (guile-2.2)
   (else
     (cond ((os-mingw?)
@@ -98,15 +103,9 @@
     (define-macro (eval-when a . b) `(begin ,@b))))
 
 
-(cond-expand
-  (guile-2.2
-    (if (os-mingw?)
-      (load "boot-guile-2.2.scm")
-      (load (url-concretize "$TEXMACS_PATH/progs/boot-guile-2.2.scm"))))
- (else
-   (if (os-mingw?)
+(if (os-mingw?)
     (load "kernel/boot/boot.scm")
-    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))))
+    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
 
 (inherit-modules (kernel boot compat) (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
