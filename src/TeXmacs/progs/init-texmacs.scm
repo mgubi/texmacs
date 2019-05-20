@@ -17,7 +17,8 @@
   (else))
 
 (cond-expand
-  (guile-2.2)
+  (guile-2.2
+    (debug-set! stack 2000000))
   (else
     (cond ((os-mingw?)
        (debug-set! stack 0))
