@@ -35,3 +35,6 @@ packages/macos/Info-Xcode.plist
 packages/mandriva/TeXmacs.spec
 src/System/config.h
 misc/doxygen/Doxyfile
+TeXmacs/plugins
+plugins/*/bin
+packages/macos/TeXmacs.xcodeproj/xcuserdata
