@@ -44,7 +44,7 @@ AC_DEFUN([LM_GUILE_SIZE],[AC_LANG_PROGRAM([
 
 void print_string (SCM s) {
   int len_r;
-  char* r= gh_scm2newstr (s, &len_r); 
+  char* r= gh_scm2newstr (s, &len_r);
 }
 ])])
 
@@ -70,7 +70,7 @@ AC_DEFUN([LC_WITH_GUILE],[
   LC_WITH_GUILE_tmp1="$LC_WITH_GUILE_tmp1 $($GUILE_CONFIG compile)" && dnl
   LC_WITH_GUILE_tmp1="$LC_WITH_GUILE_tmp1 -I$($GUILE_CONFIG info includedir)" && dnl
   LC_WITH_GUILE_tmp1="$LC_WITH_GUILE_tmp1 -I$($GUILE_CONFIG info pkgincludedir)" && dnl
-  # get th version with guile-config or guile. keep the same naming with guile version 
+  # get th version with guile-config or guile. keep the same naming with guile version
   # ie: guile18-config -> guile18
   { GUILE_VERSION=$($GUILE_CONFIG info guileversion) || dnl
    GUILE_VERSION=$(${GUILE_CONFIG%%-*} -c '(display (version))'); } && dnl
@@ -86,7 +86,7 @@ AC_DEFUN([LC_WITH_GUILE],[
   LC_GET_ARG_VALUE(GUILE_CPPFLAGS, [-I], [LC_WITH_GUILE_tmp2])
   LC_GET_ARG_VALUE(GUILE_LIBS, [-l], [GUILE_LIB])
   LC_APPEND_FLAG([-I$LC_WITH_GUILE_tmp2/$GUILE_LIB], [GUILE_CPPFLAGS])
-	
+
   AC_DEFUN([GUILE_LIB_NAME], [lib$GUILE_LIB])
   unset LC_WITH_GUILE_tmp1 LC_WITH_GUILE_tmp2
 ])
@@ -114,10 +114,10 @@ AC_DEFUN([LC_GUILE],[
       1.6 | 1.7) AC_DEFINE(GUILE_B,[1],[Guile version]) ;;
       1.8 | 1.9) AC_DEFINE(GUILE_C,[1],[Guile version]) ;;
       2.*) AC_DEFINE(GUILE_D,[1],[Guile version])
-        if test "$enableval" != "no"; then
+        if test "$enableval" != "yes"; then
           AC_MSG_ERROR([TeXmacs is incompatible with Guile 2.
     If you know what you are doing, run configure with --enable-guile2])
-        fi 
+        fi
         ;;
       0) AC_MSG_ERROR([Cannot determine Guile version.]) ;;
       *) AC_MSG_ERROR([Guile version unmanaged.]) ;;
@@ -131,7 +131,7 @@ AC_DEFUN([LC_GUILE],[
     AC_MSG_ERROR([ cannot work without Guile])
   fi
 
-  AX_SAVE_FLAGS	
+  AX_SAVE_FLAGS
   LC_SET_FLAGS([GUILE])
 
   unset g_success
@@ -161,7 +161,7 @@ AC_DEFUN([LC_GUILE],[
   ])
   # AC_CHECK_LIB might have completed LIBS we need to complete GUILE_LIBS
   GUILE_LIBS+=${$0_extralibs:+ ${$0_extralibs}}
-  if [[ ! $g_success ]];then 
+  if [[ ! $g_success ]];then
     AC_MSG_ERROR([It seems that guile-config does not provide the right parameters.
     Consult the config.log for error details and check your guile installation])
     unset g_success

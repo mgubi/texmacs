@@ -7856,6 +7856,7 @@ else
   unset enableval
 fi
 
+$as_echo "$as_me: enableval |$enableval|" >&6;
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: Guile version $GUILE_VERSION" >&5
 $as_echo "$as_me: Guile version $GUILE_VERSION" >&6;}
@@ -7873,7 +7874,7 @@ $as_echo "#define GUILE_C 1" >>confdefs.h
       2.*)
 $as_echo "#define GUILE_D 1" >>confdefs.h
 
-        if test "$enableval" != "no"; then
+        if test "$enableval" != "yes"; then
           as_fn_error $? "TeXmacs is incompatible with Guile 2.
     If you know what you are doing, run configure with --enable-guile2" "$LINENO" 5
         fi
@@ -8112,7 +8113,7 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
   unset ${!LC_MERGE_FLAGS_*}
 
 
-
+$as_echo "$as_me: lib$GUILE_LIB" >&2;
 
   unset g_success
   ac_fn_cxx_check_header_mongrel "$LINENO" "gh.h" "ac_cv_header_gh_h" "$ac_includes_default"
@@ -19536,7 +19537,7 @@ $as_echo_n "checking whether host operating system is Darwin... " >&6; }
   case $host_os in
     darwin*)
       at_darwin=yes
-      at_qmake_args='-spec macx-g++'
+#      at_qmake_args='-spec macx-g++'
       ;;
   esac
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_darwin" >&5
@@ -25253,4 +25254,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

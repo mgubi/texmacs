@@ -27,9 +27,9 @@
 #include "Ghostscript/gs_utilities.hpp" // for gs_prefix
 #include "wencoding.hpp"
 
-#ifdef QTTEXMACS
-#include "Qt/qt_utilities.hpp"
-#endif
+//#ifdef QTTEXMACS
+//#include "Qt/qt_utilities.hpp"
+//#endif
 
 #include "PDFWriter/PDFWriter.h"
 #include "PDFWriter/PDFPage.h"
@@ -1814,11 +1814,13 @@ bool
 pdf_image_rep::flush_for_pattern (PDFWriter& pdfw) {
   string data, smask, palette;
   int iw = 0, ih =0;
+#if 0
 #ifdef QTTEXMACS
   qt_image_data (u, iw, ih, data, palette, smask);
 #else
   convert_error << "pdf_image_rep::flush_for_pattern: cannot export pattern "
 		<< u << "  to PDF" << LF;
+#endif
 #endif
   if ((iw==0)||(ih==0)) return false;
   
