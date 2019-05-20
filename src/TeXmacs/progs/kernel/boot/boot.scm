@@ -106,6 +106,14 @@
 ;; Module handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; the definition
+; (define-macro (import-from . modules)
+;    `(eval-when (expand load eval) (process-use-modules
+;        (list ,@(map (lambda (m) `(list (quote ,m))) modules)))))
+; is equivalent in Guile 2.2 to
+;    (define-macro (import-from . modules) `(use-modules ,@ modules )))
+; but works also in Guile 1.8
+
 
 (cond-expand
   (guile-2.2
