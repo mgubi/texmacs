@@ -70,7 +70,7 @@
 
 (define (environment-bind! env binding)	; must stay private
   ;; Restore a binding previously saved with environment-binding.
-  (if (second binding)
+  (if (second binding)      
       (environment-set!* env (first binding) (car (second binding)))
       (environment-remove! env (first binding))))
 
