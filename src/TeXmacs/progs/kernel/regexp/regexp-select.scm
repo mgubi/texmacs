@@ -266,8 +266,8 @@
 
 (cond-expand
   (guile-2.2
-    (define-public (select . args) (apply tm-select args))
-    (export! select))
+    (with-module texmacs-user
+      (define-public (select . args) (apply (@ (kernel regexp regexp-select) tm-select) args))))
   (else (if (os-mingw?) ;; mingw guile does not define select
     (with-module texmacs-user
       (define-public (select . args) (apply tm-select args)))

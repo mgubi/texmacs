@@ -96,10 +96,11 @@
 
 (define-macro (with-module module . body)
   `(begin
-     (set! temp-module (current-module))
-     (set-current-module ,module)
+     (eval-when (expand load eval)
+       (set! temp-module (current-module))
+       (set-current-module ,module))
      ,@body
-     (set-current-module temp-module)))
+     (eval-when (expand load eval) (set-current-module temp-module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Module handling
@@ -133,17 +134,10 @@
 
 (cond-expand
   (guile-2.2
-    (define-macro (inherit-module which)
-      (define (module-exports which)
-        (let* ((m (resolve-module which))
-	       (m-public (module-public-interface m)))
-          (module-map (lambda (sym var) sym) m-public)))
-      `(begin
-         (use-modules ,which)
-         (re-export ,@ (module-exports which))))
-
-     (define-macro (inherit-modules . which-list)
-        `(begin ,@(append (map (lambda (w) `(inherit-module ,w)) which-list)))))
+   (define-macro (inherit-modules . which-list)
+    (let* ((l (apply append (map module-exported-symbols which-list)))
+           (s `(eval-when (expand load eval) (use-modules ,@which-list) (re-export ,@l))))
+          (display s) (display "\n") s)))
   (else
     (define-macro (inherit-modules . which-list)
       (define (module-exports which)
