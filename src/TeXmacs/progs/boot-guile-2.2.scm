@@ -100,18 +100,7 @@
 ;; Module handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;(define-macro (import-from . modules)
-;   (define (import-from-body module)
-;     `(module-use! (current-module) (resolve-module ',module)))
-;   `(begin
-;     ,@(map import-from-body modules)))
-
-(define-macro (import-from . modules)
-   (define (import-from-body module)
-     `(module-provide ',module))
-   `(begin
-     ,@(map import-from-body modules)))
-
+(define-macro (import-from . modules) `(use-modules ,@ modules ))
 
 (define (module-exported-symbols m)
   (module-map (lambda (sym var) sym) (module-public-interface (resolve-module m))))
