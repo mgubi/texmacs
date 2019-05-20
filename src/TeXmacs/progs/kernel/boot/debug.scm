@@ -221,13 +221,14 @@
 ;;; Debugging
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use-modules (system repl error-handling))
+;(use-modules (system repl error-handling))
 
 (define-public (wrap-catch proc)
   ;; Wrap a procedure in a closure which displays and passes exceptions.
   (lambda args
     (with-throw-handler #t
-		(lambda () (call-with-error-handling  (lambda () (apply proc args))))
+;		(lambda () (call-with-error-handling  (lambda () (apply proc args))))
+        (lambda () (apply proc args))
 		(lambda err
 		  (tm-display-error "Guile error: " (list err))
           ;;(cpp-error)

@@ -11,12 +11,15 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond ((os-mingw?)
+(cond-expand
+  (guile-2.2)
+  (else
+    (cond ((os-mingw?)
        (debug-set! stack 0))
       ((os-macos?)
        (debug-set! stack 2000000))
       (else
-       (debug-set! stack 1000000)))
+       (debug-set! stack 1000000)))))
 
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
@@ -89,9 +92,22 @@
 ;; (set! primitive-load new-primitive-load)
 
 ;(display "Booting TeXmacs kernel functionality\n")
-(if (os-mingw?)
+
+(cond-expand (guile-2.2)
+  (else
+    (define-macro (eval-when a . b) `(begin ,@b))))
+
+
+(cond-expand
+  (guile-2.2
+    (if (os-mingw?)
+      (load "boot-guile-2.2.scm")
+      (load (url-concretize "$TEXMACS_PATH/progs/boot-guile-2.2.scm"))))
+ (else
+   (if (os-mingw?)
     (load "kernel/boot/boot.scm")
-    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
+    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))))
+
 (inherit-modules (kernel boot compat) (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
                  (kernel boot ahash-table) (kernel boot prologue))
