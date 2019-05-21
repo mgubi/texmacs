@@ -22,19 +22,15 @@
 ; note that this macro introduces a binding which can clash with others!!!
 
 (define-macro (tm-cond-expand cond . code)
-  `(begin (define-macro (init) (if ,cond '(begin ,@code) '(begin))) (init)))
+  `(begin (define-macro (tm-cond-expand-init-TEMP) (if ,cond '(begin ,@code) '(begin))) (tm-cond-expand-init-TEMP)))
 (export-syntax tm-cond-expand)
 
-(cond-expand
-  (guile-2.2
-    (debug-set! stack 2000000))
-  (else
-    (cond ((os-mingw?)
+(cond ((os-mingw?)
        (debug-set! stack 0))
       ((os-macos?)
        (debug-set! stack 2000000))
       (else
-       (debug-set! stack 1000000)))))
+       (debug-set! stack 1000000)))
 
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
