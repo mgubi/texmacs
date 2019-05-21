@@ -454,6 +454,11 @@ tmscm_is_blackbox (tmscm t) {
 tmscm
 blackbox_to_tmscm (blackbox b) {
   SCM blackbox_smob;
+#if (defined(GUILE_D))
+  // we run finalizers on the main thread periodically since our memory allocation scheme
+  // is not thread safe.
+  scm_run_finalizers ();
+#endif
   SET_SMOB (blackbox_smob, (void*) (tm_new<blackbox> (b)), (SCM) blackbox_tag);
   return blackbox_smob;
 }
@@ -558,6 +563,12 @@ tmscm object_stack;
 
 void
 initialize_scheme () {
+  
+#if (defined(GUILE_D))
+  // we do not want finalizers to be called in concurrent threads...
+  scm_set_automatic_finalization_enabled (0);
+#endif
+  
   const char* init_prg =
 //  "(display (current-module)) (display \"\\n\")\n"
 //  "(set-current-module the-root-module)\n"

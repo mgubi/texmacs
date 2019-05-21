@@ -39,7 +39,9 @@
   (equal? (cpp-get-preference "developer tool" "off") "on"))
 
 (if developer-mode?
-    (debug-enable 'backtrace 'debug))
+   (if (equal? (scheme-dialect) "guile-d")
+     (debug-enable 'backtrace)
+     (debug-enable 'backtrace 'debug)))
 
 (define (%new-read-hook sym) (noop)) ; for autocompletion
 
