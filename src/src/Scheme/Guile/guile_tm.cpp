@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : guile_tm.cpp
 * DESCRIPTION: Interface to Guile
-* COPYRIGHT  : (C) 1999-2011  Joris van der Hoeven and Massimiliano Gubinelli
+* COPYRIGHT  : (C) 1999-2019  Joris van der Hoeven and Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -85,9 +85,15 @@ TeXmacs_catcher (void *data, SCM tag, SCM args) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_eval_file (char *file) {
+#if (defined(GUILE_D))
   return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) scm_c_primitive_load, file,
                                   (scm_t_catch_handler) TeXmacs_lazy_catcher, file, 0);
+#else
+  return scm_internal_lazy_catch (SCM_BOOL_T,
+                                  (scm_t_catch_body) scm_c_primitive_load, file,
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, file);
+#endif
 }
 #endif
 
@@ -121,9 +127,15 @@ eval_scheme_file (string file) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_eval_string (char *s) {
+#if (defined(GUILE_D))
   return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) scm_c_eval_string, s,
                                   (scm_t_catch_handler) TeXmacs_lazy_catcher, s, 0);
+#else
+  return scm_internal_lazy_catch (SCM_BOOL_T,
+                                  (scm_t_catch_body) scm_c_eval_string, s,
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, s);
+#endif
 }
 #endif
 
@@ -180,9 +192,15 @@ TeXmacs_call (arg_list* args) {
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_call_scm (arg_list* args) {
+#if (defined(GUILE_D))
   return scm_c_with_throw_handler (SCM_BOOL_T,
                                   (scm_t_catch_body) TeXmacs_call, (void*) args,
                                   (scm_t_catch_handler) TeXmacs_lazy_catcher, (void*) args, 0);
+#else
+  return scm_internal_lazy_catch (SCM_BOOL_T,
+                                  (scm_t_catch_body) TeXmacs_call, (void*) args,
+                                  (scm_t_catch_handler) TeXmacs_lazy_catcher, (void*) args);
+#endif
 }
 #endif
 
@@ -309,14 +327,33 @@ scm_to_bool (SCM flag) {
 
 SCM
 int_to_scm (int i) {
+#if (defined(GUILE_D))
   return scm_from_int (i);
+#else
+  return scm_long2scm ((long) i);
+#endif
 }
 
 SCM
 long_to_scm (long l) {
+#if (defined(GUILE_D))
   return scm_from_long (l);
+#else
+  return scm_long2scm (l);
+#endif
 }
 
+#if (defined(GUILE_A) || defined(GUILE_B))
+int
+scm_to_int (SCM i) {
+  return (int) scm_scm2long (i);
+}
+
+long
+scm_to_long (SCM l) {
+  return scm_scm2long (l);
+}
+#endif
 
 /******************************************************************************
  * Floating point numbers
@@ -432,7 +469,7 @@ mark_blackbox (SCM blackbox_smob) {
   return SCM_BOOL_F;
 }
 
-static size_t
+static scm_sizet
 free_blackbox (SCM blackbox_smob) {
   blackbox *ptr = (blackbox *) SCM_CDR (blackbox_smob);
 #ifdef DEBUG_ON
@@ -522,17 +559,18 @@ tmscm object_stack;
 void
 initialize_scheme () {
   const char* init_prg =
-  "(display (current-module)) (display \"\\n\")\n"
-  "(set-current-module the-root-module)\n"
-  "(display (current-module)) (display \"\\n\")\n"
+//  "(display (current-module)) (display \"\\n\")\n"
+//  "(set-current-module the-root-module)\n"
+//  "(display (current-module)) (display \"\\n\")\n"
   "(read-set! keywords 'prefix)\n"
   "(read-enable 'positions)\n"
-//  "(debug-enable 'debug)\n"
+#if (!defined(GUILE_D))
+  "(debug-enable 'debug)\n"
+#endif
 #ifdef DEBUG_ON
   "(debug-enable 'backtrace)\n"
 #endif
   "\n"
-  "(debug-set! width 300)\n"
   "(define (display-to-string obj)\n"
   "  (call-with-output-string\n"
   "    (lambda (port) (display obj port))))\n"
@@ -542,18 +580,19 @@ initialize_scheme () {
   "\n"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
   "(define object-stack '(()))";
-
+  
   scm_c_eval_string (init_prg);
-  scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
+ // scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
   initialize_smobs ();
   initialize_glue ();
   object_stack= scm_lookup_string ("object-stack");
 
-  scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
+  //scm_c_eval_string ("(display (current-module)) (display \"\\n\")");
 
     // uncomment to have a guile repl available at startup
     //	gh_repl(guile_argc, guile_argv);
     //scm_shell (guile_argc, guile_argv);
-
-
+  
+  
 }
+

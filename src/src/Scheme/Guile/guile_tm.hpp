@@ -91,6 +91,7 @@
 #define scm_scm2str scm_to_locale_stringn
 #define scm_symbol2scm scm_from_locale_symbol
 #define scm_scm2symbol(x,y) scm_to_locale_stringn(scm_symbol_to_string(x),y)
+#define scm_sizet size_t //FIXME: deprecated, maybe change in our code
 
 #else
 #ifdef GUILE_C
