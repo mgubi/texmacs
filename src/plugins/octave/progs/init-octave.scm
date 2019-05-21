@@ -19,5 +19,5 @@
   (:launch ,octave-launcher)
   (:session "Octave"))
 
-(when (supports-octave?)
+(tm-cond-expand (supports-octave?)
   (plugin-input-converters octave))

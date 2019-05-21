@@ -55,7 +55,7 @@
   (:session "Maxima")
   (:scripts "Maxima"))
 
-(when (supports-maxima?)
+(tm-cond-expand (supports-maxima?)
   (define maxima-help #f)
   (let ((help-list (string->object (var-eval-system "maxima_detect help"))))
     (if help-list

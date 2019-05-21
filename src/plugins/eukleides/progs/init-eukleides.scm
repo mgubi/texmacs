@@ -23,6 +23,6 @@
   (:session "Eukleides")
   (:scripts "Eukleides"))
 
-(when (supports-eukleides?)
+(tm-cond-expand (supports-eukleides?)
   ;;(import-from (eukleides-menus))
   (import-from (utils plugins plugin-convert)))

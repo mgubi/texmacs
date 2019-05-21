@@ -16,6 +16,15 @@
     (use-modules (ice-9 curried-definitions)))
   (else))
 
+; conditional expansion of code via macros
+; Guile 2.2 does not allow to have top-level definitions inside conditional statements
+; we go around this at macroexpansion
+; note that this macro introduces a binding which can clash with others!!!
+
+(define-macro (tm-cond-expand cond . code)
+  `(begin (define-macro (init) (if ,cond '(begin ,@code) '(begin))) (init)))
+(export-syntax tm-cond-expand)
+
 (cond-expand
   (guile-2.2
     (debug-set! stack 2000000))
