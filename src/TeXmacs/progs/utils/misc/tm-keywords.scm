@@ -22,7 +22,12 @@
 	 (cons (cons 'tm-define (cdar l)) (kw-transform (cdr l))))
 	(else (kw-transform (cdr l)))))
 
-(eval (cons 'begin (kw-transform kwo)))
+
+(define-macro (kw-macro) (cons 'begin (kw-transform kwo)))
+(kw-macro)
+
+; we prefer to use the macro expander, since this is compatible with Guile 2.2
+; (eval-when (expand load eval) (eval (cons 'begin (kw-transform kwo))))
 
 (define indent-arity-table (make-ahash-table))
 
