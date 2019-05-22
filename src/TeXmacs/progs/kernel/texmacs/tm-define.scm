@@ -265,11 +265,11 @@
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
            ;;(display* "   " ',head "|||" ',nbody "\n")
-           (eval-when (expand load eval) (set! temp-module ,(current-module))
+           (eval-when (expand load eval) (set! temp-module ,(current-module)))
            (set! temp-value
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)))
-           (set-current-module texmacs-user))
+           (eval-when (expand load eval) (set-current-module texmacs-user))
            (define-public ,var temp-value)
            (eval-when (expand load eval) (set-current-module temp-module))
            (ahash-set! tm-defined-table ',var (list ',nval))

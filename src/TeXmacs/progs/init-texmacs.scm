@@ -11,6 +11,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; we import some modules which are standard in versions of Guile before 2.2
+
 (cond-expand
   (guile-2.2
     (use-modules (ice-9 curried-definitions)))
@@ -24,6 +26,15 @@
 (define-macro (tm-cond-expand cond . code)
   `(begin (define-macro (tm-cond-expand-init-TEMP) (if ,cond '(begin ,@code) '(begin))) (tm-cond-expand-init-TEMP)))
 (export-syntax tm-cond-expand)
+
+; Guile 2.2 has separate expand and evaluation phases so we have several eval-when in the code
+; which can be ignored in previous Guile versions.
+
+(cond-expand (guile-2.2)
+  (else
+    (define-macro (eval-when a . b) `(begin ,@b))))
+
+; continue with initialization
 
 (cond ((os-mingw?)
        (debug-set! stack 0))
@@ -106,14 +117,14 @@
 
 ;(display "Booting TeXmacs kernel functionality\n")
 
-(cond-expand (guile-2.2)
-  (else
-    (define-macro (eval-when a . b) `(begin ,@b))))
-
+; this boots the main TeXmacs module system facilities
 
 (if (os-mingw?)
     (load "kernel/boot/boot.scm")
     (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
+
+; now we collect basic functionalities by re-exporting all the public symbols
+; as part of the current module
 
 (inherit-modules (kernel boot compat) (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
