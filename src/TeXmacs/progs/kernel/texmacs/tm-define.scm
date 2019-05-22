@@ -246,16 +246,14 @@
            ;;    (display* "Overloaded " ',var "\n"))
            ;;(display* "Overloaded " ',var "\n")
            ;;(display* "   " ',nval "\n")
-           (set! temp-module ,(current-module))
-           (set! temp-value ,nval)
-           (set-current-module texmacs-user)
-           (set! ,var temp-value)
-           (set-current-module temp-module)
+           (set! (@@ (guile-user) temp-value) ,nval)
+           (with-module texmacs-user
+             (set! ,var (@@ (guile-user) temp-value)))
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
            (ahash-set! tm-defined-name ,var ',var)
 	         (ahash-set! tm-defined-module ',var
-   		       (cons (module-name temp-module)
+   		       (cons (module-name ,(current-module))
 	  		     (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props)))
         `(begin
@@ -265,17 +263,15 @@
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
            ;;(display* "   " ',head "|||" ',nbody "\n")
-           (eval-when (expand load eval) (set! temp-module ,(current-module)))
-           (set! temp-value
+           (set! (@@ (guile-user) temp-value)
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)))
-           (eval-when (expand load eval) (set-current-module texmacs-user))
-           (define-public ,var temp-value)
-           (eval-when (expand load eval) (set-current-module temp-module))
+           (with-module texmacs-user
+             (define-public ,var (@@ (guile-user) temp-value)))
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
       	   (ahash-set! tm-defined-module ',var
-                       (list (module-name temp-module)))
+                       (list (module-name ,(current-module))))
            ,@(map property-rewrite cur-props)))))
 
 (define-public (tm-define-sub head body)
@@ -308,12 +304,9 @@
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
        (tm-define ,macro-head ,@body)
-       (eval-when (expand load eval)
-       (set! temp-module ,(current-module))
-       (set-current-module texmacs-user))
-       (define-public-macro ,head
-         ,(apply* (ca*r macro-head) head))
-       (eval-when (expand load eval) (set-current-module temp-module)))))
+       (with-module texmacs-user
+         (define-public-macro ,head
+            ,(apply* (ca*r macro-head) head))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols

@@ -99,10 +99,10 @@
 (define-macro (with-module module . body)
   `(begin
      (eval-when (expand load eval)
-       (set! temp-module (current-module))
+       (set! (@@ (guile-user) temp-module) (current-module))
        (set-current-module ,module))
      ,@body
-     (eval-when (expand load eval) (set-current-module temp-module))))
+     (eval-when (expand load eval) (set-current-module (@@ (guile-user) temp-module)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Module handling
@@ -142,13 +142,13 @@
 (define (module-exported-symbols m)
   (module-map (lambda (sym var) sym) (module-public-interface (resolve-module m))))
 
-(define-macro (inherit-modules . which-list) `(use-modules ,@which-list))
+(define-macro (inherit-modules . which-list)
+`(begin (use-modules ,@which-list)
+    ,@(map (lambda (m) ``(export ,@(module-exported-symbols ',m))) which-list)))
 
 (cond-expand
     (guile-2.2
-        (eval-when (expand load eval)
-          (set-current-module the-root-module))
-;          (define texmacs-user (module-ref (resolve-module '(guile-user)) 'texmacs-user)))
+      (with-module the-root-module
         (define-macro (texmacs-module name . options)
           (define (transform action)
             (cond ((not (pair? action)) (noop))
@@ -159,16 +159,14 @@
                (display "       ] Please use tm-define instead\n"))
               (else '(noop))))
           (let ((l (map-in-order transform options)))
-            (set! l (cons `(module-use! (current-module) (@@ (guile-user) texmacs-user)) l))
+            (set! l (cons `(module-use! (current-module) ,(@@ (guile-user) texmacs-user)) l))
         ;;(display "Loading ") (display name) (display "\n")
             `(begin
                (eval-when (expand) (display "IN MODULE:") (display ',name) (display "\n"))
                (define-module ,name)
                ,@l
-        (eval-when (expand) (display "END MODULE HEADER:") (display ',name) (display "\n")))))
-        (export-syntax texmacs-module)
-        (eval-when (expand load eval)
-           (set-current-module (@@ (guile-user) texmacs-user))))
+               (eval-when (expand) (display "END MODULE HEADER:") (display ',name) (display "\n")))))
+        (export-syntax texmacs-module)))
    (else
         (define-macro (texmacs-module name . options)
           (define (transform action)
