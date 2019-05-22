@@ -2673,6 +2673,357 @@
 		9C855ABF12BEB4EC00DCBE1D /* QTMPrinterSettings.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMPrinterSettings.hpp; sourceTree = "<group>"; };
 		9C99F04510AD84DE00B2113D /* QTMScrollView.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMScrollView.hpp; sourceTree = "<group>"; };
 		9C99F04610AD84DE00B2113D /* QTMScrollView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMScrollView.cpp; sourceTree = "<group>"; };
+		9CA3F46F2294541B0090A0FD /* tm_asy */ = {isa = PBXFileReference; lastKnownFileType = text.script.perl; path = tm_asy; sourceTree = "<group>"; };
+		9CA3F4712294541B0090A0FD /* asymptote-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "asymptote-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4722294541B0090A0FD /* asymptote-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "asymptote-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4732294541B0090A0FD /* asymptote.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = asymptote.en.tm; sourceTree = "<group>"; };
+		9CA3F4752294541B0090A0FD /* init-asymptote.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-asymptote.scm"; sourceTree = "<group>"; };
+		9CA3F4762294541B0090A0FD /* asymptote-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "asymptote-menus.scm"; sourceTree = "<group>"; };
+		9CA3F4792294541B0090A0FD /* tmlib.lisp */ = {isa = PBXFileReference; lastKnownFileType = text; path = tmlib.lisp; sourceTree = "<group>"; };
+		9CA3F47B2294541B0090A0FD /* tm_lisp */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_lisp; sourceTree = "<group>"; };
+		9CA3F47D2294541B0090A0FD /* cmucl-init.lisp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "cmucl-init.lisp"; sourceTree = "<group>"; };
+		9CA3F47F2294541B0090A0FD /* clisp.ps */ = {isa = PBXFileReference; lastKnownFileType = text; path = clisp.ps; sourceTree = "<group>"; };
+		9CA3F4802294541B0090A0FD /* clisp-init.lisp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "clisp-init.lisp"; sourceTree = "<group>"; };
+		9CA3F4822294541B0090A0FD /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = "<group>"; };
+		9CA3F4832294541B0090A0FD /* lisp.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = lisp.en.tm; sourceTree = "<group>"; };
+		9CA3F4852294541B0090A0FD /* scl-init.lisp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "scl-init.lisp"; sourceTree = "<group>"; };
+		9CA3F4872294541B0090A0FD /* init-lisp.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-lisp.scm"; sourceTree = "<group>"; };
+		9CA3F4892294541B0090A0FD /* graphviz.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = graphviz.py; sourceTree = "<group>"; };
+		9CA3F48A2294541B0090A0FD /* completion.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = completion.py; sourceTree = "<group>"; };
+		9CA3F48B2294541B0090A0FD /* plantuml.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = plantuml.py; sourceTree = "<group>"; };
+		9CA3F48C2294541B0090A0FD /* mermaid.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = mermaid.py; sourceTree = "<group>"; };
+		9CA3F48D2294541B0090A0FD /* protocol.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = protocol.py; sourceTree = "<group>"; };
+		9CA3F48E2294541B0090A0FD /* graph.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = graph.py; sourceTree = "<group>"; };
+		9CA3F48F2294541B0090A0FD /* __init__.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = __init__.py; sourceTree = "<group>"; };
+		9CA3F4902294541B0090A0FD /* asymptote.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = asymptote.py; sourceTree = "<group>"; };
+		9CA3F4912294541B0090A0FD /* postscript.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = postscript.py; sourceTree = "<group>"; };
+		9CA3F4922294541B0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F4952294541B0090A0FD /* gtybalt-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gtybalt-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4962294541B0090A0FD /* gtybalt.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = gtybalt.en.tm; sourceTree = "<group>"; };
+		9CA3F4982294541B0090A0FD /* init-gtybalt.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-gtybalt.scm"; sourceTree = "<group>"; };
+		9CA3F49B2294541B0090A0FD /* tm_gnuplot */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_gnuplot; sourceTree = "<group>"; };
+		9CA3F49D2294541B0090A0FD /* gnuplot.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = gnuplot.en.tm; sourceTree = "<group>"; };
+		9CA3F49E2294541B0090A0FD /* gnuplot-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F49F2294541B0090A0FD /* gnuplot-plots.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-plots.en.tm"; sourceTree = "<group>"; };
+		9CA3F4A02294541B0090A0FD /* gnuplot-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F4A12294541B0090A0FD /* gnuplot-script.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-script.en.tm"; sourceTree = "<group>"; };
+		9CA3F4A22294541B0090A0FD /* gnuplot-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4A42294541B0090A0FD /* init-gnuplot.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-gnuplot.scm"; sourceTree = "<group>"; };
+		9CA3F4A52294541B0090A0FD /* gnuplot-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "gnuplot-input.scm"; sourceTree = "<group>"; };
+		9CA3F4A82294541B0090A0FD /* tm_python.bat */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm_python.bat; sourceTree = "<group>"; };
+		9CA3F4A92294541B0090A0FD /* tm_python */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm_python; sourceTree = "<group>"; };
+		9CA3F4AB2294541B0090A0FD /* python-instructions.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-instructions.en.tm"; sourceTree = "<group>"; };
+		9CA3F4AC2294541B0090A0FD /* python-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4AD2294541B0090A0FD /* python.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = python.en.tm; sourceTree = "<group>"; };
+		9CA3F4AE2294541B0090A0FD /* python-limitations.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-limitations.en.tm"; sourceTree = "<group>"; };
+		9CA3F4AF2294541B0090A0FD /* python-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4B12294541B0090A0FD /* python-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-menus.scm"; sourceTree = "<group>"; };
+		9CA3F4B22294541B0090A0FD /* init-python.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-python.scm"; sourceTree = "<group>"; };
+		9CA3F4B32294541B0090A0FD /* python-widgets.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "python-widgets.scm"; sourceTree = "<group>"; };
+		9CA3F4B72294541B0090A0FD /* mathemagix.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = mathemagix.ts; sourceTree = "<group>"; };
+		9CA3F4B92294541B0090A0FD /* mathemagix-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4BA2294541B0090A0FD /* mathemagix.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = mathemagix.en.tm; sourceTree = "<group>"; };
+		9CA3F4BB2294541B0090A0FD /* mathemagix-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4BD2294541B0090A0FD /* init-mathemagix.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-mathemagix.scm"; sourceTree = "<group>"; };
+		9CA3F4BE2294541B0090A0FD /* mmx-indent.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mmx-indent.scm"; sourceTree = "<group>"; };
+		9CA3F4BF2294541B0090A0FD /* mathemagix-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-edit.scm"; sourceTree = "<group>"; };
+		9CA3F4C02294541B0090A0FD /* mathemagix-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-input.scm"; sourceTree = "<group>"; };
+		9CA3F4C12294541B0090A0FD /* mmx-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mmx-input.scm"; sourceTree = "<group>"; };
+		9CA3F4C22294541B0090A0FD /* mathemagix-kbd.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-kbd.scm"; sourceTree = "<group>"; };
+		9CA3F4C32294541B0090A0FD /* mathemagix-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mathemagix-menus.scm"; sourceTree = "<group>"; };
+		9CA3F4C62294541B0090A0FD /* reducerc */ = {isa = PBXFileReference; lastKnownFileType = text; path = reducerc; sourceTree = "<group>"; };
+		9CA3F4C82294541B0090A0FD /* tm_reduce */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_reduce; sourceTree = "<group>"; };
+		9CA3F4CA2294541B0090A0FD /* reduce-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "reduce-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4CB2294541B0090A0FD /* reduce.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = reduce.en.tm; sourceTree = "<group>"; };
+		9CA3F4CC2294541B0090A0FD /* reduce-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "reduce-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4CE2294541B0090A0FD /* reduce-kbd.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "reduce-kbd.scm"; sourceTree = "<group>"; };
+		9CA3F4CF2294541B0090A0FD /* init-reduce.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-reduce.scm"; sourceTree = "<group>"; };
+		9CA3F4D02294541B0090A0FD /* reduce-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "reduce-input.scm"; sourceTree = "<group>"; };
+		9CA3F4D12294541B0090A0FD /* reduce-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "reduce-menus.scm"; sourceTree = "<group>"; };
+		9CA3F4D32294541B0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F4D52294541B0090A0FD /* tm_shell */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tm_shell; sourceTree = "<group>"; };
+		9CA3F4D62294541B0090A0FD /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		9CA3F4D82294541B0090A0FD /* shell.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = shell.en.tm; sourceTree = "<group>"; };
+		9CA3F4DA2294541B0090A0FD /* init-shell.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-shell.scm"; sourceTree = "<group>"; };
+		9CA3F4DC2294541B0090A0FD /* tm_shell.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = tm_shell.cpp; sourceTree = "<group>"; };
+		9CA3F4DF2294541B0090A0FD /* qcl-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "qcl-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4E02294541B0090A0FD /* qcl-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "qcl-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F4E12294541B0090A0FD /* qcl-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "qcl-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4E22294541B0090A0FD /* qcl.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = qcl.en.tm; sourceTree = "<group>"; };
+		9CA3F4E42294541B0090A0FD /* qcl-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "qcl-input.scm"; sourceTree = "<group>"; };
+		9CA3F4E52294541B0090A0FD /* init-qcl.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-qcl.scm"; sourceTree = "<group>"; };
+		9CA3F4E82294541B0090A0FD /* yacas-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "yacas-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F4E92294541B0090A0FD /* yacas.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = yacas.en.tm; sourceTree = "<group>"; };
+		9CA3F4EA2294541B0090A0FD /* yacas-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "yacas-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F4EB2294541B0090A0FD /* yacas-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "yacas-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F4ED2294541B0090A0FD /* init-yacas.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-yacas.scm"; sourceTree = "<group>"; };
+		9CA3F4F02294541B0090A0FD /* mycas.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = mycas.en.tm; sourceTree = "<group>"; };
+		9CA3F4F22294541B0090A0FD /* init-mycas.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-mycas.scm"; sourceTree = "<group>"; };
+		9CA3F4F42294541B0090A0FD /* mycas.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = mycas.cpp; sourceTree = "<group>"; };
+		9CA3F4F62294541B0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F4F82294541B0090A0FD /* tm_maple */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_maple; sourceTree = "<group>"; };
+		9CA3F4F92294541B0090A0FD /* tm_maple_5 */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tm_maple_5; sourceTree = "<group>"; };
+		9CA3F4FA2294541B0090A0FD /* Makefile.9 */ = {isa = PBXFileReference; lastKnownFileType = text; path = Makefile.9; sourceTree = "<group>"; };
+		9CA3F4FB2294541B0090A0FD /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		9CA3F4FD2294541B0090A0FD /* init-maple.mpl */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-maple.mpl"; sourceTree = "<group>"; };
+		9CA3F4FF2294541B0090A0FD /* tm_maple_9.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tm_maple_9.c; sourceTree = "<group>"; };
+		9CA3F5022294541B0090A0FD /* maple.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = maple.ts; sourceTree = "<group>"; };
+		9CA3F5042294541B0090A0FD /* maple.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = maple.en.tm; sourceTree = "<group>"; };
+		9CA3F5062294541B0090A0FD /* maple-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maple-input.scm"; sourceTree = "<group>"; };
+		9CA3F5072294541B0090A0FD /* init-maple.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-maple.scm"; sourceTree = "<group>"; };
+		9CA3F5092294541B0090A0FD /* tm_maple_5.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = tm_maple_5.cpp; sourceTree = "<group>"; };
+		9CA3F50B2294541B0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F50D2294541B0090A0FD /* tm_r */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tm_r; sourceTree = "<group>"; };
+		9CA3F50E2294541B0090A0FD /* r_install */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = r_install; sourceTree = "<group>"; };
+		9CA3F50F2294541B0090A0FD /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		9CA3F5132294541B0090A0FD /* T.plotmath.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.plotmath.R; sourceTree = "<group>"; };
+		9CA3F5142294541B0090A0FD /* T.image.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.image.R; sourceTree = "<group>"; };
+		9CA3F5152294541B0090A0FD /* T.Japanese.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.Japanese.R; sourceTree = "<group>"; };
+		9CA3F5162294541B0090A0FD /* 00Index */ = {isa = PBXFileReference; lastKnownFileType = text; path = 00Index; sourceTree = "<group>"; };
+		9CA3F5172294541B0090A0FD /* T.persp.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.persp.R; sourceTree = "<group>"; };
+		9CA3F5182294541B0090A0FD /* T.Hershey.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.Hershey.R; sourceTree = "<group>"; };
+		9CA3F5192294541B0090A0FD /* T.lm.glm.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.lm.glm.R; sourceTree = "<group>"; };
+		9CA3F51A2294541B0090A0FD /* T.graphics.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.graphics.R; sourceTree = "<group>"; };
+		9CA3F51B2294541B0090A0FD /* T.recursion.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.recursion.R; sourceTree = "<group>"; };
+		9CA3F51C2294541B0090A0FD /* T.nlm.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = T.nlm.R; sourceTree = "<group>"; };
+		9CA3F51E2294541B0090A0FD /* TeXmacs-package.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = "TeXmacs-package.Rd"; sourceTree = "<group>"; };
+		9CA3F51F2294541B0090A0FD /* print.texmacs.matrix.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = print.texmacs.matrix.Rd; sourceTree = "<group>"; };
+		9CA3F5202294541B0090A0FD /* t.tab.comp.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.tab.comp.Rd; sourceTree = "<group>"; };
+		9CA3F5212294541B0090A0FD /* t.issue.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.issue.Rd; sourceTree = "<group>"; };
+		9CA3F5222294541B0090A0FD /* t.display.html.help.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.display.html.help.Rd; sourceTree = "<group>"; };
+		9CA3F5232294541B0090A0FD /* t.highlight.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.highlight.Rd; sourceTree = "<group>"; };
+		9CA3F5242294541B0090A0FD /* end.view.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = end.view.Rd; sourceTree = "<group>"; };
+		9CA3F5252294541B0090A0FD /* t.edit.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.edit.Rd; sourceTree = "<group>"; };
+		9CA3F5262294541B0090A0FD /* formatter_texmacs.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = formatter_texmacs.Rd; sourceTree = "<group>"; };
+		9CA3F5272294541B0090A0FD /* translator_texmacs.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = translator_texmacs.Rd; sourceTree = "<group>"; };
+		9CA3F5282294541B0090A0FD /* t.nice.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.nice.Rd; sourceTree = "<group>"; };
+		9CA3F5292294541B0090A0FD /* print.texmacs.data.frame.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = print.texmacs.data.frame.Rd; sourceTree = "<group>"; };
+		9CA3F52A2294541B0090A0FD /* t.update.menus.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.update.menus.Rd; sourceTree = "<group>"; };
+		9CA3F52B2294541B0090A0FD /* tm.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm.Rd; sourceTree = "<group>"; };
+		9CA3F52C2294541B0090A0FD /* t.matchAvailableTopics.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.matchAvailableTopics.Rd; sourceTree = "<group>"; };
+		9CA3F52D2294541B0090A0FD /* t.make.menu.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.make.menu.Rd; sourceTree = "<group>"; };
+		9CA3F52E2294541B0090A0FD /* t.browseURL.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.browseURL.Rd; sourceTree = "<group>"; };
+		9CA3F52F2294541B0090A0FD /* t.start.html.help.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.start.html.help.Rd; sourceTree = "<group>"; };
+		9CA3F5302294541B0090A0FD /* t.cat.in2out.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.cat.in2out.Rd; sourceTree = "<group>"; };
+		9CA3F5312294541B0090A0FD /* DATA_BEGIN.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = DATA_BEGIN.Rd; sourceTree = "<group>"; };
+		9CA3F5322294541B0090A0FD /* v.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = v.Rd; sourceTree = "<group>"; };
+		9CA3F5332294541B0090A0FD /* start.view.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = start.view.Rd; sourceTree = "<group>"; };
+		9CA3F5342294541B0090A0FD /* DATA_END.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = DATA_END.Rd; sourceTree = "<group>"; };
+		9CA3F5352294541B0090A0FD /* t.start.inline.help.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.start.inline.help.Rd; sourceTree = "<group>"; };
+		9CA3F5362294541B0090A0FD /* t.help.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.help.Rd; sourceTree = "<group>"; };
+		9CA3F5372294541B0090A0FD /* t.send.menu.Rd */ = {isa = PBXFileReference; lastKnownFileType = text; path = t.send.menu.Rd; sourceTree = "<group>"; };
+		9CA3F5392294541B0090A0FD /* TeXmacs.R */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; path = TeXmacs.R; sourceTree = "<group>"; };
+		9CA3F53A2294541B0090A0FD /* DESCRIPTION */ = {isa = PBXFileReference; lastKnownFileType = text; path = DESCRIPTION; sourceTree = "<group>"; };
+		9CA3F53C2294541B0090A0FD /* r.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = r.en.tm; sourceTree = "<group>"; };
+		9CA3F53D2294541B0090A0FD /* r-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "r-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F53E2294541B0090A0FD /* r-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "r-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F53F2294541B0090A0FD /* r-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "r-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F5412294541B0090A0FD /* r-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "r-edit.scm"; sourceTree = "<group>"; };
+		9CA3F5422294541B0090A0FD /* r-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "r-input.scm"; sourceTree = "<group>"; };
+		9CA3F5432294541B0090A0FD /* init-r.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-r.scm"; sourceTree = "<group>"; };
+		9CA3F5452294541B0090A0FD /* tm_r.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tm_r.c; sourceTree = "<group>"; };
+		9CA3F5482294541B0090A0FD /* tm_texgraph */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_texgraph; sourceTree = "<group>"; };
+		9CA3F5492294541B0090A0FD /* texgraph_macros_texmacs.mac */ = {isa = PBXFileReference; lastKnownFileType = text; path = texgraph_macros_texmacs.mac; sourceTree = "<group>"; };
+		9CA3F54C2294541B0090A0FD /* texgraph-scripts.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-scripts.ts"; sourceTree = "<group>"; };
+		9CA3F54E2294541B0090A0FD /* texgraph.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = texgraph.en.tm; sourceTree = "<group>"; };
+		9CA3F54F2294541B0090A0FD /* texgraph-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5502294541B0090A0FD /* ReadMe.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ReadMe.txt; sourceTree = "<group>"; };
+		9CA3F5512294541B0090A0FD /* LisezMoi.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LisezMoi.txt; sourceTree = "<group>"; };
+		9CA3F5532294541B0090A0FD /* texgraph-scripts-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-scripts-edit.scm"; sourceTree = "<group>"; };
+		9CA3F5542294541B0090A0FD /* texgraph-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-input.scm"; sourceTree = "<group>"; };
+		9CA3F5552294541B0090A0FD /* texgraph-figures-menu.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-figures-menu.scm"; sourceTree = "<group>"; };
+		9CA3F5562294541B0090A0FD /* texgraph-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-menus.scm"; sourceTree = "<group>"; };
+		9CA3F5572294541B0090A0FD /* texgraph-scripts-menu.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-scripts-menu.scm"; sourceTree = "<group>"; };
+		9CA3F5582294541B0090A0FD /* init-texgraph.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-texgraph.scm"; sourceTree = "<group>"; };
+		9CA3F5592294541B0090A0FD /* texgraph-3d-menu.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-3d-menu.scm"; sourceTree = "<group>"; };
+		9CA3F55A2294541B0090A0FD /* texgraph-2d-menu.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texgraph-2d-menu.scm"; sourceTree = "<group>"; };
+		9CA3F55D2294541B0090A0FD /* tm_mathematica.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tm_mathematica.c; sourceTree = "<group>"; };
+		9CA3F55F2294541B0090A0FD /* realpath */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = realpath; sourceTree = "<group>"; };
+		9CA3F5602294541B0090A0FD /* tm_mathematica */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_mathematica; sourceTree = "<group>"; };
+		9CA3F5612294541B0090A0FD /* realpath.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = realpath.py; sourceTree = "<group>"; };
+		9CA3F5622294541B0090A0FD /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		9CA3F5642294541B0090A0FD /* post */ = {isa = PBXFileReference; lastKnownFileType = text; path = post; sourceTree = "<group>"; };
+		9CA3F5652294541B0090A0FD /* pre */ = {isa = PBXFileReference; lastKnownFileType = text; path = pre; sourceTree = "<group>"; };
+		9CA3F5662294541B0090A0FD /* Makefile.lazy */ = {isa = PBXFileReference; lastKnownFileType = text; path = Makefile.lazy; sourceTree = "<group>"; };
+		9CA3F5692294541B0090A0FD /* mathematica.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = mathematica.ts; sourceTree = "<group>"; };
+		9CA3F56B2294541B0090A0FD /* mathematica.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = mathematica.en.tm; sourceTree = "<group>"; };
+		9CA3F56D2294541B0090A0FD /* init-mathematica.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-mathematica.scm"; sourceTree = "<group>"; };
+		9CA3F56F2294541B0090A0FD /* realpath.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = realpath.c; sourceTree = "<group>"; };
+		9CA3F5732294541B0090A0FD /* giac.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = giac.ts; sourceTree = "<group>"; };
+		9CA3F5752294541B0090A0FD /* giac-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "giac-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5762294541B0090A0FD /* giac.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = giac.en.tm; sourceTree = "<group>"; };
+		9CA3F5782294541B0090A0FD /* giac-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "giac-input.scm"; sourceTree = "<group>"; };
+		9CA3F5792294541B0090A0FD /* giac-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "giac-menus.scm"; sourceTree = "<group>"; };
+		9CA3F57A2294541B0090A0FD /* init-giac.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-giac.scm"; sourceTree = "<group>"; };
+		9CA3F57D2294541B0090A0FD /* tm_eukleides.old */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_eukleides.old; sourceTree = "<group>"; };
+		9CA3F57E2294541B0090A0FD /* tm_eukleides */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_eukleides; sourceTree = "<group>"; };
+		9CA3F5802294541B0090A0FD /* eukleides.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = eukleides.en.tm; sourceTree = "<group>"; };
+		9CA3F5812294541B0090A0FD /* eukleides-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "eukleides-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F5822294541B0090A0FD /* eukleides-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "eukleides-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5842294541B0090A0FD /* eukleides-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "eukleides-menus.scm"; sourceTree = "<group>"; };
+		9CA3F5852294541B0090A0FD /* eukleides-figures-menu.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "eukleides-figures-menu.scm"; sourceTree = "<group>"; };
+		9CA3F5862294541B0090A0FD /* init-eukleides.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-eukleides.scm"; sourceTree = "<group>"; };
+		9CA3F5882294541B0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F58A2294541B0090A0FD /* tm_axiom */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tm_axiom; sourceTree = "<group>"; };
+		9CA3F58B2294541B0090A0FD /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		9CA3F58E2294541B0090A0FD /* axiom.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = axiom.ts; sourceTree = "<group>"; };
+		9CA3F5902294541B0090A0FD /* axiom-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "axiom-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5912294541B0090A0FD /* axiom.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = axiom.en.tm; sourceTree = "<group>"; };
+		9CA3F5932294541B0090A0FD /* init-axiom.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-axiom.scm"; sourceTree = "<group>"; };
+		9CA3F5942294541B0090A0FD /* axiom-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "axiom-input.scm"; sourceTree = "<group>"; };
+		9CA3F5962294541B0090A0FD /* tm_axiom.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tm_axiom.c; sourceTree = "<group>"; };
+		9CA3F59A2294541C0090A0FD /* caas.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = caas.ts; sourceTree = "<group>"; };
+		9CA3F59C2294541C0090A0FD /* caas-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "caas-input.scm"; sourceTree = "<group>"; };
+		9CA3F59D2294541C0090A0FD /* caas-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "caas-edit.scm"; sourceTree = "<group>"; };
+		9CA3F59E2294541C0090A0FD /* init-caas.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-caas.scm"; sourceTree = "<group>"; };
+		9CA3F59F2294541C0090A0FD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		9CA3F5A22294541C0090A0FD /* fricas-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fricas-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F5A32294541C0090A0FD /* fricas-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fricas-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5A52294541C0090A0FD /* fricas-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fricas-menus.scm"; sourceTree = "<group>"; };
+		9CA3F5A62294541C0090A0FD /* fricas-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fricas-input.scm"; sourceTree = "<group>"; };
+		9CA3F5A72294541C0090A0FD /* init-fricas.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-fricas.scm"; sourceTree = "<group>"; };
+		9CA3F5A82294541C0090A0FD /* fricas-kbd.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "fricas-kbd.scm"; sourceTree = "<group>"; };
+		9CA3F5AB2294541C0090A0FD /* tm_lush */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_lush; sourceTree = "<group>"; };
+		9CA3F5AD2294541C0090A0FD /* tmlush.lsh */ = {isa = PBXFileReference; lastKnownFileType = text; path = tmlush.lsh; sourceTree = "<group>"; };
+		9CA3F5AF2294541C0090A0FD /* lush.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = lush.en.tm; sourceTree = "<group>"; };
+		9CA3F5B12294541C0090A0FD /* init-lush.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-lush.scm"; sourceTree = "<group>"; };
+		9CA3F5B42294541C0090A0FD /* tm_octave */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_octave; sourceTree = "<group>"; };
+		9CA3F5B52294541C0090A0FD /* tm_octave.bat */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm_octave.bat; sourceTree = "<group>"; };
+		9CA3F5B72294541C0090A0FD /* .octaverc */ = {isa = PBXFileReference; lastKnownFileType = text; path = .octaverc; sourceTree = "<group>"; };
+		9CA3F5B92294541C0090A0FD /* contour.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = contour.m; sourceTree = "<group>"; };
+		9CA3F5BA2294541C0090A0FD /* __plt2mm__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __plt2mm__.m; sourceTree = "<group>"; };
+		9CA3F5BB2294541C0090A0FD /* __plt2vv__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __plt2vv__.m; sourceTree = "<group>"; };
+		9CA3F5BC2294541C0090A0FD /* __plt2vm__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __plt2vm__.m; sourceTree = "<group>"; };
+		9CA3F5BD2294541C0090A0FD /* __errplot__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __errplot__.m; sourceTree = "<group>"; };
+		9CA3F5BE2294541C0090A0FD /* __plt2mv__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __plt2mv__.m; sourceTree = "<group>"; };
+		9CA3F5BF2294541C0090A0FD /* __plt2ss__.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = __plt2ss__.m; sourceTree = "<group>"; };
+		9CA3F5C02294541C0090A0FD /* mesh.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = mesh.m; sourceTree = "<group>"; };
+		9CA3F5C22294541C0090A0FD /* obj2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = obj2scm.m; sourceTree = "<group>"; };
+		9CA3F5C32294541C0090A0FD /* tmrepl.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tmrepl.m; sourceTree = "<group>"; };
+		9CA3F5C42294541C0090A0FD /* str2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = str2scm.m; sourceTree = "<group>"; };
+		9CA3F5C52294541C0090A0FD /* struct2tree.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2tree.m; sourceTree = "<group>"; };
+		9CA3F5C62294541C0090A0FD /* tmdisp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tmdisp.m; sourceTree = "<group>"; };
+		9CA3F5C72294541C0090A0FD /* mat2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = mat2scm.m; sourceTree = "<group>"; };
+		9CA3F5C82294541C0090A0FD /* struct2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2scm.m; sourceTree = "<group>"; };
+		9CA3F5C92294541C0090A0FD /* tmlasterr.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tmlasterr.m; sourceTree = "<group>"; };
+		9CA3F5CA2294541C0090A0FD /* list2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = list2scm.m; sourceTree = "<group>"; };
+		9CA3F5CB2294541C0090A0FD /* isnewans.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = isnewans.m; sourceTree = "<group>"; };
+		9CA3F5CC2294541C0090A0FD /* struct2bullet.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2bullet.m; sourceTree = "<group>"; };
+		9CA3F5CD2294541C0090A0FD /* num2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = num2scm.m; sourceTree = "<group>"; };
+		9CA3F5CE2294541C0090A0FD /* scheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = scheme.m; sourceTree = "<group>"; };
+		9CA3F5CF2294541C0090A0FD /* tm-start.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "tm-start.m"; sourceTree = "<group>"; };
+		9CA3F5D12294541C0090A0FD /* polyout.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = polyout.m; sourceTree = "<group>"; };
+		9CA3F5D32294541C0090A0FD /* octave-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "octave-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F5D42294541C0090A0FD /* octave-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "octave-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F5D52294541C0090A0FD /* octave.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = octave.en.tm; sourceTree = "<group>"; };
+		9CA3F5D62294541C0090A0FD /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = "<group>"; };
+		9CA3F5D72294541C0090A0FD /* octave-details.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "octave-details.en.tm"; sourceTree = "<group>"; };
+		9CA3F5D82294541C0090A0FD /* octave-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "octave-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5DA2294541C0090A0FD /* init-octave.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-octave.scm"; sourceTree = "<group>"; };
+		9CA3F5DE2294541C0090A0FD /* mmi.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = mmi.ts; sourceTree = "<group>"; };
+		9CA3F5E02294541C0090A0FD /* mmi-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mmi-input.scm"; sourceTree = "<group>"; };
+		9CA3F5E12294541C0090A0FD /* init-mmi.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-mmi.scm"; sourceTree = "<group>"; };
+		9CA3F5E22294541C0090A0FD /* mmi-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mmi-edit.scm"; sourceTree = "<group>"; };
+		9CA3F5E62294541C0090A0FD /* macaulay2.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = macaulay2.ts; sourceTree = "<group>"; };
+		9CA3F5E82294541C0090A0FD /* macaulay2-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "macaulay2-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F5E92294541C0090A0FD /* macaulay2-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "macaulay2-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F5EA2294541C0090A0FD /* macaulay2-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "macaulay2-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F5EB2294541C0090A0FD /* macaulay2.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = macaulay2.en.tm; sourceTree = "<group>"; };
+		9CA3F5ED2294541C0090A0FD /* m2-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "m2-input.scm"; sourceTree = "<group>"; };
+		9CA3F5EE2294541C0090A0FD /* init-macaulay2.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-macaulay2.scm"; sourceTree = "<group>"; };
+		9CA3F5F12294541C0090A0FD /* tm_matlab */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_matlab; sourceTree = "<group>"; };
+		9CA3F5F32294541C0090A0FD /* obj2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = obj2scm.m; sourceTree = "<group>"; };
+		9CA3F5F42294541C0090A0FD /* tmrepl.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tmrepl.m; sourceTree = "<group>"; };
+		9CA3F5F52294541C0090A0FD /* str2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = str2scm.m; sourceTree = "<group>"; };
+		9CA3F5F62294541C0090A0FD /* struct2tree.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2tree.m; sourceTree = "<group>"; };
+		9CA3F5F72294541C0090A0FD /* typeinfo.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = typeinfo.m; sourceTree = "<group>"; };
+		9CA3F5F82294541C0090A0FD /* tmdisp.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = tmdisp.m; sourceTree = "<group>"; };
+		9CA3F5F92294541C0090A0FD /* mat2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = mat2scm.m; sourceTree = "<group>"; };
+		9CA3F5FA2294541C0090A0FD /* struct2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2scm.m; sourceTree = "<group>"; };
+		9CA3F5FB2294541C0090A0FD /* isnewans.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = isnewans.m; sourceTree = "<group>"; };
+		9CA3F5FC2294541C0090A0FD /* struct2bullet.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = struct2bullet.m; sourceTree = "<group>"; };
+		9CA3F5FD2294541C0090A0FD /* num2scm.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = num2scm.m; sourceTree = "<group>"; };
+		9CA3F5FE2294541C0090A0FD /* scheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = scheme.m; sourceTree = "<group>"; };
+		9CA3F6002294541C0090A0FD /* matlab.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = matlab.en.tm; sourceTree = "<group>"; };
+		9CA3F6022294541C0090A0FD /* init-matlab.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-matlab.scm"; sourceTree = "<group>"; };
+		9CA3F6052294541C0090A0FD /* tm_mupad */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm_mupad; sourceTree = "<group>"; };
+		9CA3F6062294541C0090A0FD /* tm_mupad_help */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_mupad_help; sourceTree = "<group>"; };
+		9CA3F6092294541C0090A0FD /* mupad.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = mupad.ts; sourceTree = "<group>"; };
+		9CA3F60B2294541C0090A0FD /* mupad.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = mupad.en.tm; sourceTree = "<group>"; };
+		9CA3F60D2294541C0090A0FD /* init-mupad.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-mupad.scm"; sourceTree = "<group>"; };
+		9CA3F60E2294541C0090A0FD /* mupad-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mupad-input.scm"; sourceTree = "<group>"; };
+		9CA3F60F2294541C0090A0FD /* mupad-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "mupad-menus.scm"; sourceTree = "<group>"; };
+		9CA3F6122294541C0090A0FD /* cocoa5.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = cocoa5.en.tm; sourceTree = "<group>"; };
+		9CA3F6132294541C0090A0FD /* cocoa5-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "cocoa5-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F6152294541C0090A0FD /* init-cocoa5.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-cocoa5.scm"; sourceTree = "<group>"; };
+		9CA3F6182294541C0090A0FD /* cadabra-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "cadabra-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6192294541C0090A0FD /* cadabra.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = cadabra.en.tm; sourceTree = "<group>"; };
+		9CA3F61B2294541C0090A0FD /* init-cadabra.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-cadabra.scm"; sourceTree = "<group>"; };
+		9CA3F61E2294541C0090A0FD /* tm_graphs */ = {isa = PBXFileReference; lastKnownFileType = text; path = tm_graphs; sourceTree = "<group>"; };
+		9CA3F6202294541C0090A0FD /* graphs.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = graphs.en.tm; sourceTree = "<group>"; };
+		9CA3F6222294541C0090A0FD /* init-graphs.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-graphs.scm"; sourceTree = "<group>"; };
+		9CA3F6252294541C0090A0FD /* tm_feynmf */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_feynmf; sourceTree = "<group>"; };
+		9CA3F6262294541C0090A0FD /* bbox_add.pl */ = {isa = PBXFileReference; lastKnownFileType = text.script.perl; path = bbox_add.pl; sourceTree = "<group>"; };
+		9CA3F6282294541C0090A0FD /* feynmf-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "feynmf-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6292294541C0090A0FD /* feynmf-todo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "feynmf-todo.en.tm"; sourceTree = "<group>"; };
+		9CA3F62A2294541C0090A0FD /* feynmf-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "feynmf-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F62B2294541C0090A0FD /* feynmf.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = feynmf.en.tm; sourceTree = "<group>"; };
+		9CA3F62D2294541C0090A0FD /* init-feynmf.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-feynmf.scm"; sourceTree = "<group>"; };
+		9CA3F62F2294541C0090A0FD /* feynmf-styles */ = {isa = PBXFileReference; lastKnownFileType = text; path = "feynmf-styles"; sourceTree = "<group>"; };
+		9CA3F6332294541C0090A0FD /* pari.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = pari.ts; sourceTree = "<group>"; };
+		9CA3F6352294541C0090A0FD /* pari-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pari-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6362294541C0090A0FD /* pari.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = pari.en.tm; sourceTree = "<group>"; };
+		9CA3F6382294541C0090A0FD /* init-pari.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-pari.scm"; sourceTree = "<group>"; };
+		9CA3F6392294541C0090A0FD /* pari-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pari-menus.scm"; sourceTree = "<group>"; };
+		9CA3F63C2294541C0090A0FD /* tm_dratex */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_dratex; sourceTree = "<group>"; };
+		9CA3F63E2294541C0090A0FD /* AlDraTex.sty */ = {isa = PBXFileReference; lastKnownFileType = text; path = AlDraTex.sty; sourceTree = "<group>"; };
+		9CA3F63F2294541C0090A0FD /* DraTex.sty */ = {isa = PBXFileReference; lastKnownFileType = text; path = DraTex.sty; sourceTree = "<group>"; };
+		9CA3F6412294541C0090A0FD /* dratex-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "dratex-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F6422294541C0090A0FD /* dratex.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = dratex.en.tm; sourceTree = "<group>"; };
+		9CA3F6442294541C0090A0FD /* init-dratex.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-dratex.scm"; sourceTree = "<group>"; };
+		9CA3F6472294541C0090A0FD /* tm_xypic */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_xypic; sourceTree = "<group>"; };
+		9CA3F6492294541C0090A0FD /* xypic.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = xypic.en.tm; sourceTree = "<group>"; };
+		9CA3F64B2294541C0090A0FD /* init-xypic.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-xypic.scm"; sourceTree = "<group>"; };
+		9CA3F64D2294541C0090A0FD /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		9CA3F6502294541C0090A0FD /* coq.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = coq.ts; sourceTree = "<group>"; };
+		9CA3F6522294541C0090A0FD /* coq-kbd.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "coq-kbd.scm"; sourceTree = "<group>"; };
+		9CA3F6532294541C0090A0FD /* init-coq.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-coq.scm"; sourceTree = "<group>"; };
+		9CA3F6542294541C0090A0FD /* coq-edit.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "coq-edit.scm"; sourceTree = "<group>"; };
+		9CA3F6562294541C0090A0FD /* pico_xml.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = pico_xml.c; sourceTree = "<group>"; };
+		9CA3F6572294541C0090A0FD /* tm_coq.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = tm_coq.c; sourceTree = "<group>"; };
+		9CA3F6582294541C0090A0FD /* pico_xml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pico_xml.h; sourceTree = "<group>"; };
+		9CA3F65B2294541C0090A0FD /* scilab-demo.sce */ = {isa = PBXFileReference; lastKnownFileType = text; path = "scilab-demo.sce"; sourceTree = "<group>"; };
+		9CA3F65C2294541C0090A0FD /* rm_from_insert_menu.sci */ = {isa = PBXFileReference; lastKnownFileType = text; path = rm_from_insert_menu.sci; sourceTree = "<group>"; };
+		9CA3F65D2294541C0090A0FD /* populates_demo_menu.sci */ = {isa = PBXFileReference; lastKnownFileType = text; path = populates_demo_menu.sci; sourceTree = "<group>"; };
+		9CA3F65E2294541C0090A0FD /* init-scilab.sce */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-scilab.sce"; sourceTree = "<group>"; };
+		9CA3F65F2294541C0090A0FD /* add_to_insert_menu.sci */ = {isa = PBXFileReference; lastKnownFileType = text; path = add_to_insert_menu.sci; sourceTree = "<group>"; };
+		9CA3F6602294541C0090A0FD /* plotout.sci */ = {isa = PBXFileReference; lastKnownFileType = text; path = plotout.sci; sourceTree = "<group>"; };
+		9CA3F6612294541C0090A0FD /* tmstree.sci */ = {isa = PBXFileReference; lastKnownFileType = text; path = tmstree.sci; sourceTree = "<group>"; };
+		9CA3F6642294541C0090A0FD /* scilab.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = scilab.ts; sourceTree = "<group>"; };
+		9CA3F6662294541C0090A0FD /* scilab-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "scilab-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F6672294541C0090A0FD /* scilab-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "scilab-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6682294541C0090A0FD /* scilab.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = scilab.en.tm; sourceTree = "<group>"; };
+		9CA3F66A2294541C0090A0FD /* scilab-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "scilab-menus.scm"; sourceTree = "<group>"; };
+		9CA3F66B2294541C0090A0FD /* init-scilab.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-scilab.scm"; sourceTree = "<group>"; };
+		9CA3F66E2294541C0090A0FD /* texmacs-maxima.lisp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "texmacs-maxima.lisp"; sourceTree = "<group>"; };
+		9CA3F6702294541C0090A0FD /* tm_maxima */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_maxima; sourceTree = "<group>"; };
+		9CA3F6712294541C0090A0FD /* maxima_detect */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = maxima_detect; sourceTree = "<group>"; };
+		9CA3F6742294541C0090A0FD /* maxima.ts */ = {isa = PBXFileReference; lastKnownFileType = text; path = maxima.ts; sourceTree = "<group>"; };
+		9CA3F6762294541C0090A0FD /* maxima-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6772294541C0090A0FD /* maxima.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = maxima.en.tm; sourceTree = "<group>"; };
+		9CA3F6782294541C0090A0FD /* maxima-demo.it.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-demo.it.tm"; sourceTree = "<group>"; };
+		9CA3F6792294541C0090A0FD /* maxima-demo.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-demo.en.tm"; sourceTree = "<group>"; };
+		9CA3F67B2294541C0090A0FD /* maxima-kbd.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-kbd.scm"; sourceTree = "<group>"; };
+		9CA3F67C2294541C0090A0FD /* init-maxima.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-maxima.scm"; sourceTree = "<group>"; };
+		9CA3F67D2294541C0090A0FD /* maxima-menus.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-menus.scm"; sourceTree = "<group>"; };
+		9CA3F67E2294541C0090A0FD /* maxima-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "maxima-input.scm"; sourceTree = "<group>"; };
+		9CA3F6812294541C0090A0FD /* tm_sage */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = tm_sage; sourceTree = "<group>"; };
+		9CA3F6822294541C0090A0FD /* bridge.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = bridge.py; sourceTree = "<group>"; };
+		9CA3F6842294541C0090A0FD /* sage.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = sage.en.tm; sourceTree = "<group>"; };
+		9CA3F6852294541C0090A0FD /* sage-abstract.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "sage-abstract.en.tm"; sourceTree = "<group>"; };
+		9CA3F6862294541C0090A0FD /* sage-tour.en.tm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "sage-tour.en.tm"; sourceTree = "<group>"; };
+		9CA3F6882294541C0090A0FD /* init-sage.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "init-sage.scm"; sourceTree = "<group>"; };
+		9CA3F6892294541C0090A0FD /* sage-input.scm */ = {isa = PBXFileReference; lastKnownFileType = text; path = "sage-input.scm"; sourceTree = "<group>"; };
 		9CC6148B10A998BC0055F808 /* MOCs.o */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.objfile"; includeInIndex = 0; path = MOCs.o; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CCC738D12A7D6DA006EDBDA /* HIDRemote.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HIDRemote.h; sourceTree = "<group>"; };
 		9CCC738E12A7D6DA006EDBDA /* HIDRemote.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HIDRemote.m; sourceTree = "<group>"; };
@@ -3308,6 +3659,7 @@
 		9C0B475B10A8CBE40097A335 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				9CA3F46C2294541B0090A0FD /* plugins */,
 				9C61B41D141A1B780035D78F /* macos */,
 				9C7AC3371105DE4A00A7D07F /* scripts */,
 				9CFE66E910A99E700028F6F8 /* Makefile */,
@@ -4819,6 +5171,1884 @@
 				4914651B1801C1AA000E6455 /* pdf_hummus_renderer.cpp */,
 			);
 			path = Pdf;
+			sourceTree = "<group>";
+		};
+		9CA3F46C2294541B0090A0FD /* plugins */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F46D2294541B0090A0FD /* asymptote */,
+				9CA3F4772294541B0090A0FD /* lisp */,
+				9CA3F4882294541B0090A0FD /* tmpy */,
+				9CA3F4922294541B0090A0FD /* CMakeLists.txt */,
+				9CA3F4932294541B0090A0FD /* gtybalt */,
+				9CA3F4992294541B0090A0FD /* gnuplot */,
+				9CA3F4A62294541B0090A0FD /* python */,
+				9CA3F4B42294541B0090A0FD /* mathemagix */,
+				9CA3F4C42294541B0090A0FD /* reduce */,
+				9CA3F4D22294541B0090A0FD /* shell */,
+				9CA3F4DD2294541B0090A0FD /* qcl */,
+				9CA3F4E62294541B0090A0FD /* yacas */,
+				9CA3F4EE2294541B0090A0FD /* mycas */,
+				9CA3F4F52294541B0090A0FD /* maple */,
+				9CA3F50A2294541B0090A0FD /* r */,
+				9CA3F5462294541B0090A0FD /* texgraph */,
+				9CA3F55B2294541B0090A0FD /* mathematica */,
+				9CA3F5702294541B0090A0FD /* giac */,
+				9CA3F57B2294541B0090A0FD /* eukleides */,
+				9CA3F5872294541B0090A0FD /* axiom */,
+				9CA3F5972294541B0090A0FD /* caas */,
+				9CA3F59F2294541C0090A0FD /* README.md */,
+				9CA3F5A02294541C0090A0FD /* fricas */,
+				9CA3F5A92294541C0090A0FD /* lush */,
+				9CA3F5B22294541C0090A0FD /* octave */,
+				9CA3F5DB2294541C0090A0FD /* mmi */,
+				9CA3F5E32294541C0090A0FD /* macaulay2 */,
+				9CA3F5EF2294541C0090A0FD /* matlab */,
+				9CA3F6032294541C0090A0FD /* mupad */,
+				9CA3F6102294541C0090A0FD /* cocoa5 */,
+				9CA3F6162294541C0090A0FD /* cadabra */,
+				9CA3F61C2294541C0090A0FD /* graphs */,
+				9CA3F6232294541C0090A0FD /* feynmf */,
+				9CA3F6302294541C0090A0FD /* pari */,
+				9CA3F63A2294541C0090A0FD /* dratex */,
+				9CA3F6452294541C0090A0FD /* xypic */,
+				9CA3F64C2294541C0090A0FD /* coq */,
+				9CA3F6592294541C0090A0FD /* scilab */,
+				9CA3F66C2294541C0090A0FD /* maxima */,
+				9CA3F67F2294541C0090A0FD /* sage */,
+			);
+			path = plugins;
+			sourceTree = "<group>";
+		};
+		9CA3F46D2294541B0090A0FD /* asymptote */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F46E2294541B0090A0FD /* bin */,
+				9CA3F4702294541B0090A0FD /* doc */,
+				9CA3F4742294541B0090A0FD /* progs */,
+			);
+			path = asymptote;
+			sourceTree = "<group>";
+		};
+		9CA3F46E2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F46F2294541B0090A0FD /* tm_asy */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F4702294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4712294541B0090A0FD /* asymptote-demo.en.tm */,
+				9CA3F4722294541B0090A0FD /* asymptote-abstract.en.tm */,
+				9CA3F4732294541B0090A0FD /* asymptote.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4742294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4752294541B0090A0FD /* init-asymptote.scm */,
+				9CA3F4762294541B0090A0FD /* asymptote-menus.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4772294541B0090A0FD /* lisp */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4782294541B0090A0FD /* lisp */,
+				9CA3F47A2294541B0090A0FD /* bin */,
+				9CA3F47C2294541B0090A0FD /* cmucl */,
+				9CA3F47E2294541B0090A0FD /* clisp */,
+				9CA3F4812294541B0090A0FD /* doc */,
+				9CA3F4842294541B0090A0FD /* scl */,
+				9CA3F4862294541B0090A0FD /* progs */,
+			);
+			path = lisp;
+			sourceTree = "<group>";
+		};
+		9CA3F4782294541B0090A0FD /* lisp */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4792294541B0090A0FD /* tmlib.lisp */,
+			);
+			path = lisp;
+			sourceTree = "<group>";
+		};
+		9CA3F47A2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F47B2294541B0090A0FD /* tm_lisp */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F47C2294541B0090A0FD /* cmucl */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F47D2294541B0090A0FD /* cmucl-init.lisp */,
+			);
+			path = cmucl;
+			sourceTree = "<group>";
+		};
+		9CA3F47E2294541B0090A0FD /* clisp */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F47F2294541B0090A0FD /* clisp.ps */,
+				9CA3F4802294541B0090A0FD /* clisp-init.lisp */,
+			);
+			path = clisp;
+			sourceTree = "<group>";
+		};
+		9CA3F4812294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4822294541B0090A0FD /* README */,
+				9CA3F4832294541B0090A0FD /* lisp.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4842294541B0090A0FD /* scl */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4852294541B0090A0FD /* scl-init.lisp */,
+			);
+			path = scl;
+			sourceTree = "<group>";
+		};
+		9CA3F4862294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4872294541B0090A0FD /* init-lisp.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4882294541B0090A0FD /* tmpy */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4892294541B0090A0FD /* graphviz.py */,
+				9CA3F48A2294541B0090A0FD /* completion.py */,
+				9CA3F48B2294541B0090A0FD /* plantuml.py */,
+				9CA3F48C2294541B0090A0FD /* mermaid.py */,
+				9CA3F48D2294541B0090A0FD /* protocol.py */,
+				9CA3F48E2294541B0090A0FD /* graph.py */,
+				9CA3F48F2294541B0090A0FD /* __init__.py */,
+				9CA3F4902294541B0090A0FD /* asymptote.py */,
+				9CA3F4912294541B0090A0FD /* postscript.py */,
+			);
+			path = tmpy;
+			sourceTree = "<group>";
+		};
+		9CA3F4932294541B0090A0FD /* gtybalt */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4942294541B0090A0FD /* doc */,
+				9CA3F4972294541B0090A0FD /* progs */,
+			);
+			path = gtybalt;
+			sourceTree = "<group>";
+		};
+		9CA3F4942294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4952294541B0090A0FD /* gtybalt-abstract.en.tm */,
+				9CA3F4962294541B0090A0FD /* gtybalt.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4972294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4982294541B0090A0FD /* init-gtybalt.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4992294541B0090A0FD /* gnuplot */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F49A2294541B0090A0FD /* bin */,
+				9CA3F49C2294541B0090A0FD /* doc */,
+				9CA3F4A32294541B0090A0FD /* progs */,
+			);
+			path = gnuplot;
+			sourceTree = "<group>";
+		};
+		9CA3F49A2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F49B2294541B0090A0FD /* tm_gnuplot */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F49C2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F49D2294541B0090A0FD /* gnuplot.en.tm */,
+				9CA3F49E2294541B0090A0FD /* gnuplot-abstract.en.tm */,
+				9CA3F49F2294541B0090A0FD /* gnuplot-plots.en.tm */,
+				9CA3F4A02294541B0090A0FD /* gnuplot-demo.it.tm */,
+				9CA3F4A12294541B0090A0FD /* gnuplot-script.en.tm */,
+				9CA3F4A22294541B0090A0FD /* gnuplot-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4A32294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4A42294541B0090A0FD /* init-gnuplot.scm */,
+				9CA3F4A52294541B0090A0FD /* gnuplot-input.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4A62294541B0090A0FD /* python */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4A72294541B0090A0FD /* bin */,
+				9CA3F4AA2294541B0090A0FD /* doc */,
+				9CA3F4B02294541B0090A0FD /* progs */,
+			);
+			path = python;
+			sourceTree = "<group>";
+		};
+		9CA3F4A72294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4A82294541B0090A0FD /* tm_python.bat */,
+				9CA3F4A92294541B0090A0FD /* tm_python */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F4AA2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4AB2294541B0090A0FD /* python-instructions.en.tm */,
+				9CA3F4AC2294541B0090A0FD /* python-demo.en.tm */,
+				9CA3F4AD2294541B0090A0FD /* python.en.tm */,
+				9CA3F4AE2294541B0090A0FD /* python-limitations.en.tm */,
+				9CA3F4AF2294541B0090A0FD /* python-abstract.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4B02294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4B12294541B0090A0FD /* python-menus.scm */,
+				9CA3F4B22294541B0090A0FD /* init-python.scm */,
+				9CA3F4B32294541B0090A0FD /* python-widgets.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4B42294541B0090A0FD /* mathemagix */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4B52294541B0090A0FD /* packages */,
+				9CA3F4B82294541B0090A0FD /* doc */,
+				9CA3F4BC2294541B0090A0FD /* progs */,
+			);
+			path = mathemagix;
+			sourceTree = "<group>";
+		};
+		9CA3F4B52294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4B62294541B0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F4B62294541B0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4B72294541B0090A0FD /* mathemagix.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F4B82294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4B92294541B0090A0FD /* mathemagix-abstract.en.tm */,
+				9CA3F4BA2294541B0090A0FD /* mathemagix.en.tm */,
+				9CA3F4BB2294541B0090A0FD /* mathemagix-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4BC2294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4BD2294541B0090A0FD /* init-mathemagix.scm */,
+				9CA3F4BE2294541B0090A0FD /* mmx-indent.scm */,
+				9CA3F4BF2294541B0090A0FD /* mathemagix-edit.scm */,
+				9CA3F4C02294541B0090A0FD /* mathemagix-input.scm */,
+				9CA3F4C12294541B0090A0FD /* mmx-input.scm */,
+				9CA3F4C22294541B0090A0FD /* mathemagix-kbd.scm */,
+				9CA3F4C32294541B0090A0FD /* mathemagix-menus.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4C42294541B0090A0FD /* reduce */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4C52294541B0090A0FD /* install */,
+				9CA3F4C72294541B0090A0FD /* bin */,
+				9CA3F4C92294541B0090A0FD /* doc */,
+				9CA3F4CD2294541B0090A0FD /* progs */,
+			);
+			path = reduce;
+			sourceTree = "<group>";
+		};
+		9CA3F4C52294541B0090A0FD /* install */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4C62294541B0090A0FD /* reducerc */,
+			);
+			path = install;
+			sourceTree = "<group>";
+		};
+		9CA3F4C72294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4C82294541B0090A0FD /* tm_reduce */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F4C92294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4CA2294541B0090A0FD /* reduce-abstract.en.tm */,
+				9CA3F4CB2294541B0090A0FD /* reduce.en.tm */,
+				9CA3F4CC2294541B0090A0FD /* reduce-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4CD2294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4CE2294541B0090A0FD /* reduce-kbd.scm */,
+				9CA3F4CF2294541B0090A0FD /* init-reduce.scm */,
+				9CA3F4D02294541B0090A0FD /* reduce-input.scm */,
+				9CA3F4D12294541B0090A0FD /* reduce-menus.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4D22294541B0090A0FD /* shell */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4D32294541B0090A0FD /* CMakeLists.txt */,
+				9CA3F4D42294541B0090A0FD /* bin */,
+				9CA3F4D62294541B0090A0FD /* Makefile */,
+				9CA3F4D72294541B0090A0FD /* doc */,
+				9CA3F4D92294541B0090A0FD /* progs */,
+				9CA3F4DB2294541B0090A0FD /* src */,
+			);
+			path = shell;
+			sourceTree = "<group>";
+		};
+		9CA3F4D42294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4D52294541B0090A0FD /* tm_shell */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F4D72294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4D82294541B0090A0FD /* shell.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4D92294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4DA2294541B0090A0FD /* init-shell.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4DB2294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4DC2294541B0090A0FD /* tm_shell.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F4DD2294541B0090A0FD /* qcl */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4DE2294541B0090A0FD /* doc */,
+				9CA3F4E32294541B0090A0FD /* progs */,
+			);
+			path = qcl;
+			sourceTree = "<group>";
+		};
+		9CA3F4DE2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4DF2294541B0090A0FD /* qcl-demo.en.tm */,
+				9CA3F4E02294541B0090A0FD /* qcl-demo.it.tm */,
+				9CA3F4E12294541B0090A0FD /* qcl-abstract.en.tm */,
+				9CA3F4E22294541B0090A0FD /* qcl.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4E32294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4E42294541B0090A0FD /* qcl-input.scm */,
+				9CA3F4E52294541B0090A0FD /* init-qcl.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4E62294541B0090A0FD /* yacas */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4E72294541B0090A0FD /* doc */,
+				9CA3F4EC2294541B0090A0FD /* progs */,
+			);
+			path = yacas;
+			sourceTree = "<group>";
+		};
+		9CA3F4E72294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4E82294541B0090A0FD /* yacas-abstract.en.tm */,
+				9CA3F4E92294541B0090A0FD /* yacas.en.tm */,
+				9CA3F4EA2294541B0090A0FD /* yacas-demo.it.tm */,
+				9CA3F4EB2294541B0090A0FD /* yacas-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4EC2294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4ED2294541B0090A0FD /* init-yacas.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4EE2294541B0090A0FD /* mycas */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4EF2294541B0090A0FD /* doc */,
+				9CA3F4F12294541B0090A0FD /* progs */,
+				9CA3F4F32294541B0090A0FD /* src */,
+			);
+			path = mycas;
+			sourceTree = "<group>";
+		};
+		9CA3F4EF2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4F02294541B0090A0FD /* mycas.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F4F12294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4F22294541B0090A0FD /* init-mycas.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F4F32294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4F42294541B0090A0FD /* mycas.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F4F52294541B0090A0FD /* maple */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4F62294541B0090A0FD /* CMakeLists.txt */,
+				9CA3F4F72294541B0090A0FD /* bin */,
+				9CA3F4FA2294541B0090A0FD /* Makefile.9 */,
+				9CA3F4FB2294541B0090A0FD /* Makefile */,
+				9CA3F4FC2294541B0090A0FD /* maple */,
+				9CA3F4FE2294541B0090A0FD /* src.9 */,
+				9CA3F5002294541B0090A0FD /* packages */,
+				9CA3F5032294541B0090A0FD /* doc */,
+				9CA3F5052294541B0090A0FD /* progs */,
+				9CA3F5082294541B0090A0FD /* src */,
+			);
+			path = maple;
+			sourceTree = "<group>";
+		};
+		9CA3F4F72294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4F82294541B0090A0FD /* tm_maple */,
+				9CA3F4F92294541B0090A0FD /* tm_maple_5 */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F4FC2294541B0090A0FD /* maple */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4FD2294541B0090A0FD /* init-maple.mpl */,
+			);
+			path = maple;
+			sourceTree = "<group>";
+		};
+		9CA3F4FE2294541B0090A0FD /* src.9 */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F4FF2294541B0090A0FD /* tm_maple_9.c */,
+			);
+			path = src.9;
+			sourceTree = "<group>";
+		};
+		9CA3F5002294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5012294541B0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5012294541B0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5022294541B0090A0FD /* maple.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F5032294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5042294541B0090A0FD /* maple.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5052294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5062294541B0090A0FD /* maple-input.scm */,
+				9CA3F5072294541B0090A0FD /* init-maple.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5082294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5092294541B0090A0FD /* tm_maple_5.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F50A2294541B0090A0FD /* r */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F50B2294541B0090A0FD /* CMakeLists.txt */,
+				9CA3F50C2294541B0090A0FD /* bin */,
+				9CA3F50F2294541B0090A0FD /* Makefile */,
+				9CA3F5102294541B0090A0FD /* r */,
+				9CA3F53B2294541B0090A0FD /* doc */,
+				9CA3F5402294541B0090A0FD /* progs */,
+				9CA3F5442294541B0090A0FD /* src */,
+			);
+			path = r;
+			sourceTree = "<group>";
+		};
+		9CA3F50C2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F50D2294541B0090A0FD /* tm_r */,
+				9CA3F50E2294541B0090A0FD /* r_install */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F5102294541B0090A0FD /* r */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5112294541B0090A0FD /* TeXmacs */,
+			);
+			path = r;
+			sourceTree = "<group>";
+		};
+		9CA3F5112294541B0090A0FD /* TeXmacs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5122294541B0090A0FD /* demo */,
+				9CA3F51D2294541B0090A0FD /* man */,
+				9CA3F5382294541B0090A0FD /* R */,
+				9CA3F53A2294541B0090A0FD /* DESCRIPTION */,
+			);
+			path = TeXmacs;
+			sourceTree = "<group>";
+		};
+		9CA3F5122294541B0090A0FD /* demo */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5132294541B0090A0FD /* T.plotmath.R */,
+				9CA3F5142294541B0090A0FD /* T.image.R */,
+				9CA3F5152294541B0090A0FD /* T.Japanese.R */,
+				9CA3F5162294541B0090A0FD /* 00Index */,
+				9CA3F5172294541B0090A0FD /* T.persp.R */,
+				9CA3F5182294541B0090A0FD /* T.Hershey.R */,
+				9CA3F5192294541B0090A0FD /* T.lm.glm.R */,
+				9CA3F51A2294541B0090A0FD /* T.graphics.R */,
+				9CA3F51B2294541B0090A0FD /* T.recursion.R */,
+				9CA3F51C2294541B0090A0FD /* T.nlm.R */,
+			);
+			path = demo;
+			sourceTree = "<group>";
+		};
+		9CA3F51D2294541B0090A0FD /* man */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F51E2294541B0090A0FD /* TeXmacs-package.Rd */,
+				9CA3F51F2294541B0090A0FD /* print.texmacs.matrix.Rd */,
+				9CA3F5202294541B0090A0FD /* t.tab.comp.Rd */,
+				9CA3F5212294541B0090A0FD /* t.issue.Rd */,
+				9CA3F5222294541B0090A0FD /* t.display.html.help.Rd */,
+				9CA3F5232294541B0090A0FD /* t.highlight.Rd */,
+				9CA3F5242294541B0090A0FD /* end.view.Rd */,
+				9CA3F5252294541B0090A0FD /* t.edit.Rd */,
+				9CA3F5262294541B0090A0FD /* formatter_texmacs.Rd */,
+				9CA3F5272294541B0090A0FD /* translator_texmacs.Rd */,
+				9CA3F5282294541B0090A0FD /* t.nice.Rd */,
+				9CA3F5292294541B0090A0FD /* print.texmacs.data.frame.Rd */,
+				9CA3F52A2294541B0090A0FD /* t.update.menus.Rd */,
+				9CA3F52B2294541B0090A0FD /* tm.Rd */,
+				9CA3F52C2294541B0090A0FD /* t.matchAvailableTopics.Rd */,
+				9CA3F52D2294541B0090A0FD /* t.make.menu.Rd */,
+				9CA3F52E2294541B0090A0FD /* t.browseURL.Rd */,
+				9CA3F52F2294541B0090A0FD /* t.start.html.help.Rd */,
+				9CA3F5302294541B0090A0FD /* t.cat.in2out.Rd */,
+				9CA3F5312294541B0090A0FD /* DATA_BEGIN.Rd */,
+				9CA3F5322294541B0090A0FD /* v.Rd */,
+				9CA3F5332294541B0090A0FD /* start.view.Rd */,
+				9CA3F5342294541B0090A0FD /* DATA_END.Rd */,
+				9CA3F5352294541B0090A0FD /* t.start.inline.help.Rd */,
+				9CA3F5362294541B0090A0FD /* t.help.Rd */,
+				9CA3F5372294541B0090A0FD /* t.send.menu.Rd */,
+			);
+			path = man;
+			sourceTree = "<group>";
+		};
+		9CA3F5382294541B0090A0FD /* R */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5392294541B0090A0FD /* TeXmacs.R */,
+			);
+			path = R;
+			sourceTree = "<group>";
+		};
+		9CA3F53B2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F53C2294541B0090A0FD /* r.en.tm */,
+				9CA3F53D2294541B0090A0FD /* r-abstract.en.tm */,
+				9CA3F53E2294541B0090A0FD /* r-demo.it.tm */,
+				9CA3F53F2294541B0090A0FD /* r-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5402294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5412294541B0090A0FD /* r-edit.scm */,
+				9CA3F5422294541B0090A0FD /* r-input.scm */,
+				9CA3F5432294541B0090A0FD /* init-r.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5442294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5452294541B0090A0FD /* tm_r.c */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F5462294541B0090A0FD /* texgraph */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5472294541B0090A0FD /* bin */,
+				9CA3F5492294541B0090A0FD /* texgraph_macros_texmacs.mac */,
+				9CA3F54A2294541B0090A0FD /* packages */,
+				9CA3F54D2294541B0090A0FD /* doc */,
+				9CA3F5502294541B0090A0FD /* ReadMe.txt */,
+				9CA3F5512294541B0090A0FD /* LisezMoi.txt */,
+				9CA3F5522294541B0090A0FD /* progs */,
+			);
+			path = texgraph;
+			sourceTree = "<group>";
+		};
+		9CA3F5472294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5482294541B0090A0FD /* tm_texgraph */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F54A2294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F54B2294541B0090A0FD /* compute */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F54B2294541B0090A0FD /* compute */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F54C2294541B0090A0FD /* texgraph-scripts.ts */,
+			);
+			path = compute;
+			sourceTree = "<group>";
+		};
+		9CA3F54D2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F54E2294541B0090A0FD /* texgraph.en.tm */,
+				9CA3F54F2294541B0090A0FD /* texgraph-abstract.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5522294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5532294541B0090A0FD /* texgraph-scripts-edit.scm */,
+				9CA3F5542294541B0090A0FD /* texgraph-input.scm */,
+				9CA3F5552294541B0090A0FD /* texgraph-figures-menu.scm */,
+				9CA3F5562294541B0090A0FD /* texgraph-menus.scm */,
+				9CA3F5572294541B0090A0FD /* texgraph-scripts-menu.scm */,
+				9CA3F5582294541B0090A0FD /* init-texgraph.scm */,
+				9CA3F5592294541B0090A0FD /* texgraph-3d-menu.scm */,
+				9CA3F55A2294541B0090A0FD /* texgraph-2d-menu.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F55B2294541B0090A0FD /* mathematica */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F55C2294541B0090A0FD /* src.lazy */,
+				9CA3F55E2294541B0090A0FD /* bin */,
+				9CA3F5622294541B0090A0FD /* Makefile */,
+				9CA3F5632294541B0090A0FD /* ps */,
+				9CA3F5662294541B0090A0FD /* Makefile.lazy */,
+				9CA3F5672294541B0090A0FD /* packages */,
+				9CA3F56A2294541B0090A0FD /* doc */,
+				9CA3F56C2294541B0090A0FD /* progs */,
+				9CA3F56E2294541B0090A0FD /* src */,
+			);
+			path = mathematica;
+			sourceTree = "<group>";
+		};
+		9CA3F55C2294541B0090A0FD /* src.lazy */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F55D2294541B0090A0FD /* tm_mathematica.c */,
+			);
+			path = src.lazy;
+			sourceTree = "<group>";
+		};
+		9CA3F55E2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F55F2294541B0090A0FD /* realpath */,
+				9CA3F5602294541B0090A0FD /* tm_mathematica */,
+				9CA3F5612294541B0090A0FD /* realpath.py */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F5632294541B0090A0FD /* ps */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5642294541B0090A0FD /* post */,
+				9CA3F5652294541B0090A0FD /* pre */,
+			);
+			path = ps;
+			sourceTree = "<group>";
+		};
+		9CA3F5672294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5682294541B0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5682294541B0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5692294541B0090A0FD /* mathematica.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F56A2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F56B2294541B0090A0FD /* mathematica.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F56C2294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F56D2294541B0090A0FD /* init-mathematica.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F56E2294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F56F2294541B0090A0FD /* realpath.c */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F5702294541B0090A0FD /* giac */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5712294541B0090A0FD /* packages */,
+				9CA3F5742294541B0090A0FD /* doc */,
+				9CA3F5772294541B0090A0FD /* progs */,
+			);
+			path = giac;
+			sourceTree = "<group>";
+		};
+		9CA3F5712294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5722294541B0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5722294541B0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5732294541B0090A0FD /* giac.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F5742294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5752294541B0090A0FD /* giac-abstract.en.tm */,
+				9CA3F5762294541B0090A0FD /* giac.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5772294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5782294541B0090A0FD /* giac-input.scm */,
+				9CA3F5792294541B0090A0FD /* giac-menus.scm */,
+				9CA3F57A2294541B0090A0FD /* init-giac.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F57B2294541B0090A0FD /* eukleides */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F57C2294541B0090A0FD /* bin */,
+				9CA3F57F2294541B0090A0FD /* doc */,
+				9CA3F5832294541B0090A0FD /* progs */,
+			);
+			path = eukleides;
+			sourceTree = "<group>";
+		};
+		9CA3F57C2294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F57D2294541B0090A0FD /* tm_eukleides.old */,
+				9CA3F57E2294541B0090A0FD /* tm_eukleides */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F57F2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5802294541B0090A0FD /* eukleides.en.tm */,
+				9CA3F5812294541B0090A0FD /* eukleides-demo.en.tm */,
+				9CA3F5822294541B0090A0FD /* eukleides-abstract.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5832294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5842294541B0090A0FD /* eukleides-menus.scm */,
+				9CA3F5852294541B0090A0FD /* eukleides-figures-menu.scm */,
+				9CA3F5862294541B0090A0FD /* init-eukleides.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5872294541B0090A0FD /* axiom */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5882294541B0090A0FD /* CMakeLists.txt */,
+				9CA3F5892294541B0090A0FD /* bin */,
+				9CA3F58B2294541B0090A0FD /* Makefile */,
+				9CA3F58C2294541B0090A0FD /* packages */,
+				9CA3F58F2294541B0090A0FD /* doc */,
+				9CA3F5922294541B0090A0FD /* progs */,
+				9CA3F5952294541B0090A0FD /* src */,
+			);
+			path = axiom;
+			sourceTree = "<group>";
+		};
+		9CA3F5892294541B0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F58A2294541B0090A0FD /* tm_axiom */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F58C2294541B0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F58D2294541B0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F58D2294541B0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F58E2294541B0090A0FD /* axiom.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F58F2294541B0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5902294541B0090A0FD /* axiom-abstract.en.tm */,
+				9CA3F5912294541B0090A0FD /* axiom.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5922294541B0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5932294541B0090A0FD /* init-axiom.scm */,
+				9CA3F5942294541B0090A0FD /* axiom-input.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5952294541B0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5962294541B0090A0FD /* tm_axiom.c */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F5972294541B0090A0FD /* caas */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5982294541C0090A0FD /* packages */,
+				9CA3F59B2294541C0090A0FD /* progs */,
+			);
+			path = caas;
+			sourceTree = "<group>";
+		};
+		9CA3F5982294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5992294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5992294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F59A2294541C0090A0FD /* caas.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F59B2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F59C2294541C0090A0FD /* caas-input.scm */,
+				9CA3F59D2294541C0090A0FD /* caas-edit.scm */,
+				9CA3F59E2294541C0090A0FD /* init-caas.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5A02294541C0090A0FD /* fricas */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5A12294541C0090A0FD /* doc */,
+				9CA3F5A42294541C0090A0FD /* progs */,
+			);
+			path = fricas;
+			sourceTree = "<group>";
+		};
+		9CA3F5A12294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5A22294541C0090A0FD /* fricas-demo.en.tm */,
+				9CA3F5A32294541C0090A0FD /* fricas-abstract.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5A42294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5A52294541C0090A0FD /* fricas-menus.scm */,
+				9CA3F5A62294541C0090A0FD /* fricas-input.scm */,
+				9CA3F5A72294541C0090A0FD /* init-fricas.scm */,
+				9CA3F5A82294541C0090A0FD /* fricas-kbd.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5A92294541C0090A0FD /* lush */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5AA2294541C0090A0FD /* bin */,
+				9CA3F5AC2294541C0090A0FD /* lush */,
+				9CA3F5AE2294541C0090A0FD /* doc */,
+				9CA3F5B02294541C0090A0FD /* progs */,
+			);
+			path = lush;
+			sourceTree = "<group>";
+		};
+		9CA3F5AA2294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5AB2294541C0090A0FD /* tm_lush */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F5AC2294541C0090A0FD /* lush */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5AD2294541C0090A0FD /* tmlush.lsh */,
+			);
+			path = lush;
+			sourceTree = "<group>";
+		};
+		9CA3F5AE2294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5AF2294541C0090A0FD /* lush.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5B02294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5B12294541C0090A0FD /* init-lush.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5B22294541C0090A0FD /* octave */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5B32294541C0090A0FD /* bin */,
+				9CA3F5B62294541C0090A0FD /* octave */,
+				9CA3F5D22294541C0090A0FD /* doc */,
+				9CA3F5D92294541C0090A0FD /* progs */,
+			);
+			path = octave;
+			sourceTree = "<group>";
+		};
+		9CA3F5B32294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5B42294541C0090A0FD /* tm_octave */,
+				9CA3F5B52294541C0090A0FD /* tm_octave.bat */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F5B62294541C0090A0FD /* octave */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5B72294541C0090A0FD /* .octaverc */,
+				9CA3F5B82294541C0090A0FD /* plot */,
+				9CA3F5C12294541C0090A0FD /* tm */,
+				9CA3F5CF2294541C0090A0FD /* tm-start.m */,
+				9CA3F5D02294541C0090A0FD /* polynomial */,
+			);
+			path = octave;
+			sourceTree = "<group>";
+		};
+		9CA3F5B82294541C0090A0FD /* plot */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5B92294541C0090A0FD /* contour.m */,
+				9CA3F5BA2294541C0090A0FD /* __plt2mm__.m */,
+				9CA3F5BB2294541C0090A0FD /* __plt2vv__.m */,
+				9CA3F5BC2294541C0090A0FD /* __plt2vm__.m */,
+				9CA3F5BD2294541C0090A0FD /* __errplot__.m */,
+				9CA3F5BE2294541C0090A0FD /* __plt2mv__.m */,
+				9CA3F5BF2294541C0090A0FD /* __plt2ss__.m */,
+				9CA3F5C02294541C0090A0FD /* mesh.m */,
+			);
+			path = plot;
+			sourceTree = "<group>";
+		};
+		9CA3F5C12294541C0090A0FD /* tm */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5C22294541C0090A0FD /* obj2scm.m */,
+				9CA3F5C32294541C0090A0FD /* tmrepl.m */,
+				9CA3F5C42294541C0090A0FD /* str2scm.m */,
+				9CA3F5C52294541C0090A0FD /* struct2tree.m */,
+				9CA3F5C62294541C0090A0FD /* tmdisp.m */,
+				9CA3F5C72294541C0090A0FD /* mat2scm.m */,
+				9CA3F5C82294541C0090A0FD /* struct2scm.m */,
+				9CA3F5C92294541C0090A0FD /* tmlasterr.m */,
+				9CA3F5CA2294541C0090A0FD /* list2scm.m */,
+				9CA3F5CB2294541C0090A0FD /* isnewans.m */,
+				9CA3F5CC2294541C0090A0FD /* struct2bullet.m */,
+				9CA3F5CD2294541C0090A0FD /* num2scm.m */,
+				9CA3F5CE2294541C0090A0FD /* scheme.m */,
+			);
+			path = tm;
+			sourceTree = "<group>";
+		};
+		9CA3F5D02294541C0090A0FD /* polynomial */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5D12294541C0090A0FD /* polyout.m */,
+			);
+			path = polynomial;
+			sourceTree = "<group>";
+		};
+		9CA3F5D22294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5D32294541C0090A0FD /* octave-demo.it.tm */,
+				9CA3F5D42294541C0090A0FD /* octave-demo.en.tm */,
+				9CA3F5D52294541C0090A0FD /* octave.en.tm */,
+				9CA3F5D62294541C0090A0FD /* README */,
+				9CA3F5D72294541C0090A0FD /* octave-details.en.tm */,
+				9CA3F5D82294541C0090A0FD /* octave-abstract.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5D92294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5DA2294541C0090A0FD /* init-octave.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5DB2294541C0090A0FD /* mmi */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5DC2294541C0090A0FD /* packages */,
+				9CA3F5DF2294541C0090A0FD /* progs */,
+			);
+			path = mmi;
+			sourceTree = "<group>";
+		};
+		9CA3F5DC2294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5DD2294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5DD2294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5DE2294541C0090A0FD /* mmi.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F5DF2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5E02294541C0090A0FD /* mmi-input.scm */,
+				9CA3F5E12294541C0090A0FD /* init-mmi.scm */,
+				9CA3F5E22294541C0090A0FD /* mmi-edit.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5E32294541C0090A0FD /* macaulay2 */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5E42294541C0090A0FD /* packages */,
+				9CA3F5E72294541C0090A0FD /* doc */,
+				9CA3F5EC2294541C0090A0FD /* progs */,
+			);
+			path = macaulay2;
+			sourceTree = "<group>";
+		};
+		9CA3F5E42294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5E52294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F5E52294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5E62294541C0090A0FD /* macaulay2.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F5E72294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5E82294541C0090A0FD /* macaulay2-demo.en.tm */,
+				9CA3F5E92294541C0090A0FD /* macaulay2-demo.it.tm */,
+				9CA3F5EA2294541C0090A0FD /* macaulay2-abstract.en.tm */,
+				9CA3F5EB2294541C0090A0FD /* macaulay2.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F5EC2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5ED2294541C0090A0FD /* m2-input.scm */,
+				9CA3F5EE2294541C0090A0FD /* init-macaulay2.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F5EF2294541C0090A0FD /* matlab */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5F02294541C0090A0FD /* bin */,
+				9CA3F5F22294541C0090A0FD /* code */,
+				9CA3F5FF2294541C0090A0FD /* doc */,
+				9CA3F6012294541C0090A0FD /* progs */,
+			);
+			path = matlab;
+			sourceTree = "<group>";
+		};
+		9CA3F5F02294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5F12294541C0090A0FD /* tm_matlab */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F5F22294541C0090A0FD /* code */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F5F32294541C0090A0FD /* obj2scm.m */,
+				9CA3F5F42294541C0090A0FD /* tmrepl.m */,
+				9CA3F5F52294541C0090A0FD /* str2scm.m */,
+				9CA3F5F62294541C0090A0FD /* struct2tree.m */,
+				9CA3F5F72294541C0090A0FD /* typeinfo.m */,
+				9CA3F5F82294541C0090A0FD /* tmdisp.m */,
+				9CA3F5F92294541C0090A0FD /* mat2scm.m */,
+				9CA3F5FA2294541C0090A0FD /* struct2scm.m */,
+				9CA3F5FB2294541C0090A0FD /* isnewans.m */,
+				9CA3F5FC2294541C0090A0FD /* struct2bullet.m */,
+				9CA3F5FD2294541C0090A0FD /* num2scm.m */,
+				9CA3F5FE2294541C0090A0FD /* scheme.m */,
+			);
+			path = code;
+			sourceTree = "<group>";
+		};
+		9CA3F5FF2294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6002294541C0090A0FD /* matlab.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6012294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6022294541C0090A0FD /* init-matlab.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6032294541C0090A0FD /* mupad */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6042294541C0090A0FD /* bin */,
+				9CA3F6072294541C0090A0FD /* packages */,
+				9CA3F60A2294541C0090A0FD /* doc */,
+				9CA3F60C2294541C0090A0FD /* progs */,
+			);
+			path = mupad;
+			sourceTree = "<group>";
+		};
+		9CA3F6042294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6052294541C0090A0FD /* tm_mupad */,
+				9CA3F6062294541C0090A0FD /* tm_mupad_help */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6072294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6082294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F6082294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6092294541C0090A0FD /* mupad.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F60A2294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F60B2294541C0090A0FD /* mupad.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F60C2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F60D2294541C0090A0FD /* init-mupad.scm */,
+				9CA3F60E2294541C0090A0FD /* mupad-input.scm */,
+				9CA3F60F2294541C0090A0FD /* mupad-menus.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6102294541C0090A0FD /* cocoa5 */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6112294541C0090A0FD /* doc */,
+				9CA3F6142294541C0090A0FD /* progs */,
+			);
+			path = cocoa5;
+			sourceTree = "<group>";
+		};
+		9CA3F6112294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6122294541C0090A0FD /* cocoa5.en.tm */,
+				9CA3F6132294541C0090A0FD /* cocoa5-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6142294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6152294541C0090A0FD /* init-cocoa5.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6162294541C0090A0FD /* cadabra */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6172294541C0090A0FD /* doc */,
+				9CA3F61A2294541C0090A0FD /* progs */,
+			);
+			path = cadabra;
+			sourceTree = "<group>";
+		};
+		9CA3F6172294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6182294541C0090A0FD /* cadabra-abstract.en.tm */,
+				9CA3F6192294541C0090A0FD /* cadabra.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F61A2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F61B2294541C0090A0FD /* init-cadabra.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F61C2294541C0090A0FD /* graphs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F61D2294541C0090A0FD /* bin */,
+				9CA3F61F2294541C0090A0FD /* doc */,
+				9CA3F6212294541C0090A0FD /* progs */,
+			);
+			path = graphs;
+			sourceTree = "<group>";
+		};
+		9CA3F61D2294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F61E2294541C0090A0FD /* tm_graphs */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F61F2294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6202294541C0090A0FD /* graphs.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6212294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6222294541C0090A0FD /* init-graphs.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6232294541C0090A0FD /* feynmf */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6242294541C0090A0FD /* bin */,
+				9CA3F6272294541C0090A0FD /* doc */,
+				9CA3F62C2294541C0090A0FD /* progs */,
+				9CA3F62E2294541C0090A0FD /* share */,
+			);
+			path = feynmf;
+			sourceTree = "<group>";
+		};
+		9CA3F6242294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6252294541C0090A0FD /* tm_feynmf */,
+				9CA3F6262294541C0090A0FD /* bbox_add.pl */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6272294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6282294541C0090A0FD /* feynmf-abstract.en.tm */,
+				9CA3F6292294541C0090A0FD /* feynmf-todo.en.tm */,
+				9CA3F62A2294541C0090A0FD /* feynmf-demo.en.tm */,
+				9CA3F62B2294541C0090A0FD /* feynmf.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F62C2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F62D2294541C0090A0FD /* init-feynmf.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F62E2294541C0090A0FD /* share */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F62F2294541C0090A0FD /* feynmf-styles */,
+			);
+			path = share;
+			sourceTree = "<group>";
+		};
+		9CA3F6302294541C0090A0FD /* pari */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6312294541C0090A0FD /* packages */,
+				9CA3F6342294541C0090A0FD /* doc */,
+				9CA3F6372294541C0090A0FD /* progs */,
+			);
+			path = pari;
+			sourceTree = "<group>";
+		};
+		9CA3F6312294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6322294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F6322294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6332294541C0090A0FD /* pari.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F6342294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6352294541C0090A0FD /* pari-abstract.en.tm */,
+				9CA3F6362294541C0090A0FD /* pari.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6372294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6382294541C0090A0FD /* init-pari.scm */,
+				9CA3F6392294541C0090A0FD /* pari-menus.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F63A2294541C0090A0FD /* dratex */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F63B2294541C0090A0FD /* bin */,
+				9CA3F63D2294541C0090A0FD /* latex */,
+				9CA3F6402294541C0090A0FD /* doc */,
+				9CA3F6432294541C0090A0FD /* progs */,
+			);
+			path = dratex;
+			sourceTree = "<group>";
+		};
+		9CA3F63B2294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F63C2294541C0090A0FD /* tm_dratex */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F63D2294541C0090A0FD /* latex */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F63E2294541C0090A0FD /* AlDraTex.sty */,
+				9CA3F63F2294541C0090A0FD /* DraTex.sty */,
+			);
+			path = latex;
+			sourceTree = "<group>";
+		};
+		9CA3F6402294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6412294541C0090A0FD /* dratex-demo.en.tm */,
+				9CA3F6422294541C0090A0FD /* dratex.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6432294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6442294541C0090A0FD /* init-dratex.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6452294541C0090A0FD /* xypic */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6462294541C0090A0FD /* bin */,
+				9CA3F6482294541C0090A0FD /* doc */,
+				9CA3F64A2294541C0090A0FD /* progs */,
+			);
+			path = xypic;
+			sourceTree = "<group>";
+		};
+		9CA3F6462294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6472294541C0090A0FD /* tm_xypic */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6482294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6492294541C0090A0FD /* xypic.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F64A2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F64B2294541C0090A0FD /* init-xypic.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F64C2294541C0090A0FD /* coq */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F64D2294541C0090A0FD /* CMakeLists.txt */,
+				9CA3F64E2294541C0090A0FD /* packages */,
+				9CA3F6512294541C0090A0FD /* progs */,
+				9CA3F6552294541C0090A0FD /* src */,
+			);
+			path = coq;
+			sourceTree = "<group>";
+		};
+		9CA3F64E2294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F64F2294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F64F2294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6502294541C0090A0FD /* coq.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F6512294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6522294541C0090A0FD /* coq-kbd.scm */,
+				9CA3F6532294541C0090A0FD /* init-coq.scm */,
+				9CA3F6542294541C0090A0FD /* coq-edit.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F6552294541C0090A0FD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6562294541C0090A0FD /* pico_xml.c */,
+				9CA3F6572294541C0090A0FD /* tm_coq.c */,
+				9CA3F6582294541C0090A0FD /* pico_xml.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		9CA3F6592294541C0090A0FD /* scilab */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F65A2294541C0090A0FD /* bin */,
+				9CA3F6622294541C0090A0FD /* packages */,
+				9CA3F6652294541C0090A0FD /* doc */,
+				9CA3F6692294541C0090A0FD /* progs */,
+			);
+			path = scilab;
+			sourceTree = "<group>";
+		};
+		9CA3F65A2294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F65B2294541C0090A0FD /* scilab-demo.sce */,
+				9CA3F65C2294541C0090A0FD /* rm_from_insert_menu.sci */,
+				9CA3F65D2294541C0090A0FD /* populates_demo_menu.sci */,
+				9CA3F65E2294541C0090A0FD /* init-scilab.sce */,
+				9CA3F65F2294541C0090A0FD /* add_to_insert_menu.sci */,
+				9CA3F6602294541C0090A0FD /* plotout.sci */,
+				9CA3F6612294541C0090A0FD /* tmstree.sci */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6622294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6632294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F6632294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6642294541C0090A0FD /* scilab.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F6652294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6662294541C0090A0FD /* scilab-demo.en.tm */,
+				9CA3F6672294541C0090A0FD /* scilab-abstract.en.tm */,
+				9CA3F6682294541C0090A0FD /* scilab.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6692294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F66A2294541C0090A0FD /* scilab-menus.scm */,
+				9CA3F66B2294541C0090A0FD /* init-scilab.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F66C2294541C0090A0FD /* maxima */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F66D2294541C0090A0FD /* lisp */,
+				9CA3F66F2294541C0090A0FD /* bin */,
+				9CA3F6722294541C0090A0FD /* packages */,
+				9CA3F6752294541C0090A0FD /* doc */,
+				9CA3F67A2294541C0090A0FD /* progs */,
+			);
+			path = maxima;
+			sourceTree = "<group>";
+		};
+		9CA3F66D2294541C0090A0FD /* lisp */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F66E2294541C0090A0FD /* texmacs-maxima.lisp */,
+			);
+			path = lisp;
+			sourceTree = "<group>";
+		};
+		9CA3F66F2294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6702294541C0090A0FD /* tm_maxima */,
+				9CA3F6712294541C0090A0FD /* maxima_detect */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6722294541C0090A0FD /* packages */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6732294541C0090A0FD /* session */,
+			);
+			path = packages;
+			sourceTree = "<group>";
+		};
+		9CA3F6732294541C0090A0FD /* session */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6742294541C0090A0FD /* maxima.ts */,
+			);
+			path = session;
+			sourceTree = "<group>";
+		};
+		9CA3F6752294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6762294541C0090A0FD /* maxima-abstract.en.tm */,
+				9CA3F6772294541C0090A0FD /* maxima.en.tm */,
+				9CA3F6782294541C0090A0FD /* maxima-demo.it.tm */,
+				9CA3F6792294541C0090A0FD /* maxima-demo.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F67A2294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F67B2294541C0090A0FD /* maxima-kbd.scm */,
+				9CA3F67C2294541C0090A0FD /* init-maxima.scm */,
+				9CA3F67D2294541C0090A0FD /* maxima-menus.scm */,
+				9CA3F67E2294541C0090A0FD /* maxima-input.scm */,
+			);
+			path = progs;
+			sourceTree = "<group>";
+		};
+		9CA3F67F2294541C0090A0FD /* sage */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6802294541C0090A0FD /* bin */,
+				9CA3F6832294541C0090A0FD /* doc */,
+				9CA3F6872294541C0090A0FD /* progs */,
+			);
+			path = sage;
+			sourceTree = "<group>";
+		};
+		9CA3F6802294541C0090A0FD /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6812294541C0090A0FD /* tm_sage */,
+				9CA3F6822294541C0090A0FD /* bridge.py */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		9CA3F6832294541C0090A0FD /* doc */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6842294541C0090A0FD /* sage.en.tm */,
+				9CA3F6852294541C0090A0FD /* sage-abstract.en.tm */,
+				9CA3F6862294541C0090A0FD /* sage-tour.en.tm */,
+			);
+			path = doc;
+			sourceTree = "<group>";
+		};
+		9CA3F6872294541C0090A0FD /* progs */ = {
+			isa = PBXGroup;
+			children = (
+				9CA3F6882294541C0090A0FD /* init-sage.scm */,
+				9CA3F6892294541C0090A0FD /* sage-input.scm */,
+			);
+			path = progs;
 			sourceTree = "<group>";
 		};
 		9CD46A9114740A3F00A7E2FC /* Scheme */ = {
