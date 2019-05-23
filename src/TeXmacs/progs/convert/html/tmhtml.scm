@@ -85,6 +85,8 @@
 	((string-starts? s "<frak-")
 	 `(h:u ,(tmhtml-sub-token s 6)))
 	((string-starts? s "<bbb-") `(h:u (h:b ,(tmhtml-sub-token s 5))))
+	((string-starts? s "<up-") (tmhtml-sub-token s 4))
+	((string-starts? s "<b-up-") `(h:b ,(tmhtml-sub-token s 6)))
 	((string-starts? s "<b-") `(h:b (h:var ,(tmhtml-sub-token s 3))))
 	((string-starts? s "<")
 	 (with encoded (cork->utf8 s)
@@ -1099,10 +1101,10 @@
 	    (let* ((extents (print-snippet name-url x #t))
                    (dpi (string->number (get-preference "printer dpi")))
                    (den (/ (* dpi 2200.0) 600.0))
-		   (y1 (inexact->exact (/ (second extents) den)))
-		   (y2 (inexact->exact (/ (fourth extents) den)))
-		   (valign (number->htmlstring (/ y1 15)))
-		   (height (number->htmlstring (/ (- y2 y1) 15)))
+		   (y1 (/ (second extents) den))
+		   (y2 (/ (fourth extents) den))
+		   (valign (number->htmlstring (/ y1 15.0)))
+		   (height (number->htmlstring (/ (- y2 y1) 15.0)))
 		   (style (string-append "vertical-align: " valign "em; "
                                          "height: " height "em"))
                    (attrs (if tmhtml-css?
@@ -1493,7 +1495,8 @@
   (cond ((and tmhtml-mathml? (ahash-ref tmhtml-env :math))
 	 `((m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
 		   ,(texmacs->mathml x tmhtml-env))))
-	((and tmhtml-images? (ahash-ref tmhtml-env :math))
+	((and tmhtml-images? (ahash-ref tmhtml-env :math)
+              (!= tmhtml-image-root-string "image"))
 	 (tmhtml-png `(with "mode" "math" ,x)))
 	((string? x)
 	 (if (string-null? x) '() (tmhtml-text x))) ; non-verbatim string nodes
