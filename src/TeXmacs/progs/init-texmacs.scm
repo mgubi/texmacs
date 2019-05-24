@@ -76,9 +76,12 @@
               (let ((old (or (symbol-property sym 'defs) '()))
                     (new `(,f ,l ,c)))
                 (%new-read-hook sym)
-                (if (and (member (car form) macro-keywords)
-                         (not (member sym def-keywords)))
-                    (set! def-keywords (cons sym def-keywords)))
+; (max) I do not understand the logic of the code below
+; since there are macros which do not introduce new definitions
+; so I will disable it for the moment.
+;               (if (and (member (car form) macro-keywords)
+;                        (not (member sym def-keywords)))
+;                   (set! def-keywords (cons sym def-keywords)))
                 (if (not (member new old))
                     (set-symbol-property! sym 'defs (cons new old)))))))
     form))

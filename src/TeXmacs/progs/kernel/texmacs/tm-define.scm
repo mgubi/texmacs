@@ -365,4 +365,4 @@
   (let* ((im (ahash-ref lazy-define-table name))
 	 (modules (if im im '())))
     (ahash-remove! lazy-define-table name)
-    (for-each module-provide modules)))
+    (for-each module-load modules)))

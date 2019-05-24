@@ -192,5 +192,8 @@
     (lambda () (resolve-interface module-name) #t)
     (lambda (key . args) #f)))
 
-(define-public (module-provide m)
-  (if (not (module-available? m)) (module-load m)))
+(define-public (module-load module)
+  ;(display* ">>> module-load" module "\n")
+  (resolve-module module)
+  ;(display "---\n")
+  )

@@ -88,7 +88,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Copied from guile-1.6.0. Author: Martin Grabmueller
 
-(define-public-macro (xxx-case-lambda . clauses)
+(cond-expand (guile-2.2)
+ (else
+(define-public-macro (case-lambda . clauses)
 
   ;; Return the length of the list @var{l}, but allow dotted list.
   (define (alength l)
@@ -153,6 +155,7 @@
 	      (let ((,length-name (length ,args-name)))
 		(cond ,@(gen-clauses clauses length-name args-name))))))
       proc)))
+)) ; cond-exp
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SECTION : curry which is not curry (SRFI-26)

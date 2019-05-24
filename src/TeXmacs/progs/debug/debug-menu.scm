@@ -46,9 +46,6 @@
 ;; Memory
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(menu-bind provoke-error-menu
-  (xxx))
-
 (menu-bind debug-menu
   (-> "Guile"
       ("Backtrace errors" (debug-toggle-backtrace-errors)))
@@ -101,3 +98,14 @@
   ("flatten" (debug-toggle "flatten"))
   ("correct" (debug-toggle "correct"))
   ("convert" (debug-toggle "convert")))
+
+
+;; HACK! (max, 5.2019)
+;; the form below poses problems in Guile-2.2
+;; the expander complains about the invalid menu item and it seems that
+;; this blocks the expander. As a result, any form appearing after is ignored
+;; when parsing this module. For this reason this form has to appear at the end
+;; of the module.
+
+(menu-bind provoke-error-menu
+  (xxx))

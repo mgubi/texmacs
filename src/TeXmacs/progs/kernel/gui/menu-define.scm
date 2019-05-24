@@ -467,7 +467,7 @@
      (lazy-define ,module ,@menus)
      (delayed
        (:idle 500)
-       (module-provide ',module))))
+       (module-load ',module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic color pickers
