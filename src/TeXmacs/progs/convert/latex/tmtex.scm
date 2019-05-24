@@ -2960,17 +2960,13 @@
     (with fun+bis (symbol-append fun '+bis)
       (if (== narg 2)
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun s l) (tmtex-function (string->symbol s) l)))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l) (,fun s l))))
+             (tm-define-once (,fun s l) (tmtex-function (string->symbol s) l))
+             (tm-define-once (,fun+bis s l) (,fun s l)))
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun t)
-               (tmtex-function (string->symbol (car t)) (cdr t))))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l)
-               (,fun (append (list (string->symbol s)) l)))))))))
+             (tm-define-once (,fun t)
+               (tmtex-function (string->symbol (car t)) (cdr t)))
+             (tm-define-once (,fun+bis s l)
+               (,fun (append (list (string->symbol s)) l))))))))
 
 (tm-define (style-dependent-transform x)
   (with (tag fun narg) x

@@ -81,8 +81,15 @@
       `(define-public ,head ,@body)
       '(noop)))
 
+(cond-expand
+  (guile-2.2)
+  (else
+    (define-public-macro (define-once head . body)
+      (let ((h (if (pair? head) (car head) head)))
+        `(when (not (defined? ',h)) (define ,head ,@body))))))
+
 (define-public-macro (define-public-once head . body)
-   `(begin (define-once ,head ,@body) (export ,(car head))))
+  `(begin (define-once ,head ,@body) (export ,(if (pair? head) (car head) head))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
