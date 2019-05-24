@@ -53,7 +53,7 @@
   (:synopsis "Define a smart table @t with entries @l")
   `(begin
      ,@(if (not (defined? t))
-       `(tm-define ,t (make-ahash-table)) '())
+       `((tm-define ,t (make-ahash-table))) '())
      ,@(smart-table-insert t '() l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
