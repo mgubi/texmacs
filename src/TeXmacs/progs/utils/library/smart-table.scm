@@ -52,8 +52,8 @@
 (tm-define-macro (smart-table t . l)
   (:synopsis "Define a smart table @t with entries @l")
   `(begin
-     (when (not (defined? ',t))
-       (tm-define ,t (make-ahash-table)))
+     ,@(if (not (defined? t))
+       `(tm-define ,t (make-ahash-table)) '())
      ,@(smart-table-insert t '() l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
