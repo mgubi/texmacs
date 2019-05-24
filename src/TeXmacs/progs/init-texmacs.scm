@@ -32,7 +32,7 @@
 
 (cond-expand (guile-2.2)
   (else
-    (define-macro (eval-when a . b) `(begin ,@b))))
+    (define-macro (eval-when a . b) `(begin ,@b)) (export-syntax eval-when)))
 
 ; continue with initialization
 

@@ -338,10 +338,11 @@
 
 (define-public (lazy-define-one module opts name)
   (let* ((old (ahash-ref lazy-define-table name))
-	 (new (if old (cons module old) (list module))))
+	     (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-  (with name-star (string->symbol (string-append (symbol->string name) "*")) (if (not (defined? name))
-    `(tm-define (,name . args)
+  (with name-star (string->symbol (string-append (symbol->string name) "*"))
+    (if (not (module-ref (module-public-interface texmacs-user) name #f))
+    `(with-module texmacs-user (define-public (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))
                 (p (module-public-interface texmacs-user))
@@ -351,7 +352,7 @@
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
           (display* "lazy:" ',name "\n")
-          (apply r args)))
+          (apply r args))))
          (begin (display* "ALREADY DEFINED:" name "\n") `(begin)))))
 
 (define-public-macro (lazy-define module . names)

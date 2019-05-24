@@ -159,13 +159,14 @@
                (display "       ] Please use tm-define instead\n"))
               (else '(noop))))
           (let ((l (map-in-order transform options)))
-            (set! l (cons `(module-use! (current-module) ,(@@ (guile-user) texmacs-user)) l))
         ;;(display "Loading ") (display name) (display "\n")
             `(begin
                (eval-when (expand) (display "IN MODULE:") (display ',name) (display "\n"))
                (define-module ,name)
+               (eval-when (expand load eval) (module-use! (current-module) (@@ (guile-user) texmacs-user)))
                ,@l
-               (eval-when (expand) (display "END MODULE HEADER:") (display ',name) (display "\n")))))
+               (eval-when (expand) (display "END MODULE HEADER:") (display ',name) (display "\n"))
+              )))
         (export-syntax texmacs-module)))
    (else
         (define-macro (texmacs-module name . options)
@@ -178,11 +179,12 @@
                (display "       ] Please use tm-define instead\n"))
               (else '(noop))))
           (let ((l (map-in-order transform options)))
-            (if (guile-b-c?)
-            (set! l (cons `(module-use! (current-module) ,texmacs-user) l)))
+;    (if (guile-b-c?)
+;(set! l (cons `(module-use! (current-module) ,texmacs-user) l)))
             ;;(display "loading ") (display name) (display "\n")
             `(begin
                (define-module ,name)
+               (module-use! (current-module) (@@ (guile-user) texmacs-user))
                ,@l)))))
 
 (define-public (module-available? module-name)
