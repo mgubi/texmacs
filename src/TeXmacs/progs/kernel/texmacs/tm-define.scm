@@ -235,16 +235,17 @@
             ,(begin* body)
             ,(apply* 'former head)))))
 
-(define-public-macro (tm-define-overloaded head . body)
+(define-public-macro (tm-define-overloaded once? head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (make-lambda head nbody)))
     (if (ahash-ref tm-defined-table var)
+        (if once? `(begin)
         `(begin
            (let ((former ,var))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
-           ;;(display* "Overloaded " ',var "\n")
+           ;; (display* "Overloaded " ',var "\n")
            ;;(display* "   " ',nval "\n")
            (set! (@@ (guile-user) temp-value) ,nval)
            (with-module texmacs-user
@@ -255,7 +256,7 @@
 	         (ahash-set! tm-defined-module ',var
    		       (cons (module-name ,(current-module))
 	  		     (ahash-ref tm-defined-module ',var)))
-           ,@(map property-rewrite cur-props)))
+           ,@(map property-rewrite cur-props))))
         `(begin
            (when (nnull? cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
@@ -274,56 +275,36 @@
                        (list (module-name ,(current-module))))
            ,@(map property-rewrite cur-props)))))
 
-(define-public (tm-define-sub head body)
+
+(define-public (tm-define-sub symb head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-define-sub head (cdr body))))
+      (let ((decl (tm-define-sub symb head (cdr body))))
 	(if (not (hash-ref define-option-table (caar body)))
 	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
 	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-define-overloaded (cons head body))))
+       `(,symb ,head ,@body)))
+
+;; HACK (mg): the way tm-define-sub works does not allow to pass direclty the once? argument
+;; to tm-define-overloaded, otherwise in particular compute-arguments, would have
+;; to be rewritten. Therefore we let tm-define-sub parse the arguments and then
+;; we dispatch and call tm-define-overloaded with the right arguments.
+
+(define-public-macro (tm-define-overloaded-once head . body)
+  `(tm-define-overloaded #t ,head ,@body))
+
+(define-public-macro (tm-define-overloaded-multiple head . body)
+ `(tm-define-overloaded #f ,head ,@body))
+
 
 (define-public-macro (tm-define head . body)
   (set! cur-conds '())
   (set! cur-props '())
-  (tm-define-sub head body))
-
-(define-public-macro (tm-define-once-overloaded head . body)
-  (let* ((var (ca*r head))
-         (nbody (tm-add-condition var head body))
-         (nval (make-lambda head nbody)))
-    (if (ahash-ref tm-defined-table var)
-        `(begin)
-        `(begin
-           (when (nnull? cur-conds)
-             (display* "warning: conditional master routine " ',var "\n")
-             (display* "   " ',nval "\n"))
-           ;;(display* "Defined " ',var "\n")
-           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           ;;(display* "   " ',head "|||" ',nbody "\n")
-           (set! (@@ (guile-user) temp-value)
-                 (if (null? cur-conds) ,nval
-                     ,(list 'let '((former (lambda args (noop)))) nval)))
-           (with-module texmacs-user
-             (define-public ,var (@@ (guile-user) temp-value)))
-           (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name ,var ',var)
-      	   (ahash-set! tm-defined-module ',var
-                       (list (module-name ,(current-module))))
-           ,@(map property-rewrite cur-props)))))
-
-
-(define-public (tm-define-once-sub head body)
-  (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-define-once-sub head (cdr body))))
-	(if (not (hash-ref define-option-table (caar body)))
-	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
-	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-define-once-overloaded (cons head body))))
+  (tm-define-sub 'tm-define-overloaded-multiple head body))
 
 (define-public-macro (tm-define-once head . body)
   (set! cur-conds '())
   (set! cur-props '())
-  (tm-define-once-sub head body))
+  (tm-define-sub 'tm-define-overloaded-once head body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloaded macros with properties
