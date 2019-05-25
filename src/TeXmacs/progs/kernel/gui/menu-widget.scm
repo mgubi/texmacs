@@ -317,8 +317,13 @@
 
 (cond-expand
   (guile-2.2
-    ; HACK: disable this procedure since procedure-source is not working on Guile 2!!
-    (define-public (promise-source action) #f))
+    (define-public (promise-source action)
+      "Helper routines for menu-widget and kbd-define"
+      (and (thunk? action)
+           (with cmds (procedure-property action 'tm-commands)
+             (and (pair? cmds) (pair? (car cmds))
+                  (null? (cdr (car cmds)))
+                  (car cmds))))))
   (else
     (define-public (promise-source action)
       "Helper routines for menu-widget and kbd-define"

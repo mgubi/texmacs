@@ -209,3 +209,23 @@
   (resolve-module module)
   ;(display "---\n")
   )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Some compatibility utilities
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; tagged-thunk marks certain thunks in order to recover the code
+;; for retrieving the correct shortcuts
+;; in Guile 2.2 the procedure procedure-source does not work
+;; see promise-source in kernel/gui/menu-widget.scm
+
+(cond-expand
+  (guile-2.2
+    (define-public-macro (tagged-thunk . cmds)
+      `(let ((p (lambda () ,@cmds)))
+         (set-procedure-property! p 'tm-commands ',cmds)
+         p)))
+  (else
+    (define-public-macro (tagged-thunk . cmds)
+     `(lambda () ,@cmds))))
