@@ -215,17 +215,24 @@
 ;; Some compatibility utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; tagged-thunk marks certain thunks in order to recover the code
+;; tagged-lambda marks certain closures in order to recover the code
 ;; for retrieving the correct shortcuts
 ;; in Guile 2.2 the procedure procedure-source does not work
-;; see promise-source in kernel/gui/menu-widget.scm
+;; so we bake our in-house solution tm-procedure-source
+;; see e.g. promise-source in kernel/gui/menu-widget.scm
 
 (cond-expand
   (guile-2.2
-    (define-public-macro (tagged-thunk . cmds)
-      `(let ((p (lambda () ,@cmds)))
-         (set-procedure-property! p 'tm-commands ',cmds)
-         p)))
+    (define-public-macro (tagged-lambda head . body)
+      `(let ((p (lambda ,head ,@body)) (s '(lambda ,head ,@body)))
+         (set-procedure-property! p 'tm-source s)
+         p))
+
+    (define-public (tm-procedure-source action)
+      (and (procedure? action) (procedure-property action 'tm-source))))
   (else
-    (define-public-macro (tagged-thunk . cmds)
-     `(lambda () ,@cmds))))
+    (define-public-macro (tagged-lambda head . body)
+     `(lambda ,head ,@body))
+    (define-public (tm-procedure-source action)
+      (procedure-source action))))
+

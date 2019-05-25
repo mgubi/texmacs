@@ -228,7 +228,7 @@
     (if (string? action)
 	(with help (if (null? opt) "" (car opt))
 	  `(kbd-binding (list ,@conds) ,key ,action ,help))
-	`(kbd-binding (list ,@conds) ,key (tagged-thunk ,action ,@opt) ""))))
+	`(kbd-binding (list ,@conds) ,key (tagged-lambda () ,action ,@opt) ""))))
 
 (define (kbd-map-body conds l)
   (cond ((null? l) '())

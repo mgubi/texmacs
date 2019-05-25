@@ -315,24 +315,14 @@
                   (widget-menu-button l command check short style))
       (if bal? but (add-menu-entry-balloon but style action)))))
 
-(cond-expand
-  (guile-2.2
-    (define-public (promise-source action)
-      "Helper routines for menu-widget and kbd-define"
-      (and (thunk? action)
-           (with cmds (procedure-property action 'tm-commands)
-             (and (pair? cmds) (pair? (car cmds))
-                  (null? (cdr (car cmds)))
-                  (car cmds))))))
-  (else
-    (define-public (promise-source action)
-      "Helper routines for menu-widget and kbd-define"
-      (and (procedure? action)
-           (with source (procedure-source action)
-             (and (== (car source) 'lambda)
-                  (== (cadr source) '())
-                  (null? (cdddr source))
-                  (caddr source)))))))
+(define-public (promise-source action)
+  "Helper routines for menu-widget and kbd-define"
+  (and (procedure? action)
+       (with source (tm-procedure-source action)
+         (and (== (car source) 'lambda)
+              (== (cadr source) '())
+              (null? (cdddr source))
+              (caddr source)))))
 
 (define (make-menu-entry-shortcut label action opt-key)
   (cond (opt-key (kbd-system opt-key #t))
