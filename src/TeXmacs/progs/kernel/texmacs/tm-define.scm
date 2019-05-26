@@ -247,15 +247,13 @@
            ;;    (display* "Overloaded " ',var "\n"))
            ;; (display* "Overloaded " ',var "\n")
            ;;(display* "   " ',nval "\n")
-           (set! (@@ (guile-user) temp-value) ,nval)
-           (with-module texmacs-user
-             (set! ,var (@@ (guile-user) temp-value)))
+           (module-set! texmacs-user ',var ,nval)
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
            (ahash-set! tm-defined-name ,var ',var)
 	         (ahash-set! tm-defined-module ',var
-   		       (cons (module-name ,(current-module))
-	  		     (ahash-ref tm-defined-module ',var)))
+             (cons (module-name (current-module))
+                   (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props))))
         `(begin
            (when (nnull? cur-conds)
@@ -264,15 +262,14 @@
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
            ;;(display* "   " ',head "|||" ',nbody "\n")
-           (set! (@@ (guile-user) temp-value)
+           (module-define! texmacs-user ',var
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)))
-           (with-module texmacs-user
-             (define-public ,var (@@ (guile-user) temp-value)))
+           (module-export! texmacs-user '(,var))
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
       	   (ahash-set! tm-defined-module ',var
-                       (list (module-name ,(current-module))))
+                       (list (module-name (current-module))))
            ,@(map property-rewrite cur-props)))))
 
 
@@ -357,20 +354,18 @@
 
 (define-public (lazy-define-one module opts name)
   (let* ((old (ahash-ref lazy-define-table name))
-	     (new (if old (cons module old) (list module))))
+	       (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-  (with name-star (string->symbol (string-append (symbol->string name) "*"))
     `(tm-define-once (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))
-                (p (module-public-interface texmacs-user))
-                (r (module-ref p ',name #f)))
+                (r (module-ref texmacs-user ',name #f)))
            (if (not r)
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "
                                               (symbol->string name))))
           (display* "lazy:" ',name "\n")
-          (apply r args)))))
+          (apply r args))))
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)
