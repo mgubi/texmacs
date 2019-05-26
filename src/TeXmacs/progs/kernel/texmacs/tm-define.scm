@@ -238,40 +238,43 @@
 (define-public-macro (tm-define-overloaded once? head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
-         (nval (make-lambda head nbody)))
-    (if (ahash-ref tm-defined-table var)
-        (if once? `(begin)
-        `(begin
-           (let ((former ,var))
-           ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
-           ;;    (display* "Overloaded " ',var "\n"))
-           ;; (display* "Overloaded " ',var "\n")
-           ;;(display* "   " ',nval "\n")
-           (module-set! texmacs-user ',var ,nval)
-           (ahash-set! tm-defined-table ',var
-                       (cons ',nval (ahash-ref tm-defined-table ',var)))
-           (ahash-set! tm-defined-name ,var ',var)
-	         (ahash-set! tm-defined-module ',var
-             (cons (module-name (current-module))
-                   (ahash-ref tm-defined-module ',var)))
-           ,@(map property-rewrite cur-props))))
-        `(begin
-           (when (nnull? cur-conds)
-             (display* "warning: conditional master routine " ',var "\n")
-             (display* "   " ',nval "\n"))
-           ;;(display* "Defined " ',var "\n")
-           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           ;;(display* "   " ',head "|||" ',nbody "\n")
-           (module-define! texmacs-user ',var
-                 (if (null? cur-conds) ,nval
-                     ,(list 'let '((former (lambda args (noop)))) nval)))
-           (module-export! texmacs-user '(,var))
-           (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name ,var ',var)
-      	   (ahash-set! tm-defined-module ',var
-                       (list (module-name (current-module))))
-           ,@(map property-rewrite cur-props)))))
-
+         (nval (make-lambda head nbody))
+         (basevar (string->symbol (string-append (symbol->string var) "$base")))
+         (s `(begin
+            ,@(if (not (ahash-ref tm-defined-table var))
+                `(,@(if (nnull? cur-conds)
+                        `((module-define! texmacs-user ',basevar (lambda args (noop)))
+                          (module-define! texmacs-user ',var (lambda args (apply (@@ (guile-user) ,basevar) args))))
+                         `((module-define! texmacs-user ',var ,nval)))
+                  (module-export! texmacs-user '(,var))
+                  (ahash-set! tm-defined-table ',var (list ',nval))
+                  (ahash-set! tm-defined-name ,var ',var)
+                  (ahash-set! tm-defined-module ',var
+                               (list (module-name (current-module)))))
+                `((ahash-set! tm-defined-name ,var ',var)
+                  (ahash-set! tm-defined-module ',var
+                     (cons (module-name (current-module))
+                           (ahash-ref tm-defined-module ',var)))))
+            ,@(if once? '()
+                (if (nnull? cur-conds)
+                `((let ((former ,var))
+                   ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
+                   ;;    (display* "Overloaded " ',var "\n"))
+                   ;; (display* "Overloaded " ',var "\n")
+                   ;;(display* "   " ',nval "\n")
+                   (module-set! texmacs-user ',var ,nval)
+                   (ahash-set! tm-defined-table ',var
+                               (cons ',nval (ahash-ref tm-defined-table ',var)))
+                   (ahash-set! tm-defined-name ,var ',var)
+                   (ahash-set! tm-defined-module ',var
+                     (cons (module-name (current-module))
+                           (ahash-ref tm-defined-module ',var)))))
+                 `((if (module-variable texmacs-user ',basevar)
+                       (module-set! texmacs-user ',basevar ,nval)
+                       (module-set! texmacs-user ',var ,nval)))))
+            ,@(map property-rewrite cur-props))))
+        ;(display s) (newline)
+         s))
 
 (define-public (tm-define-sub symb head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
