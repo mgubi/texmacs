@@ -247,14 +247,15 @@
                           (module-define! texmacs-user ',var (lambda args (apply (@@ (guile-user) ,basevar) args))))
                          `((module-define! texmacs-user ',var ,nval)))
                   (module-export! texmacs-user '(,var))
-                  (ahash-set! tm-defined-table ',var (list ',nval))
-                  (ahash-set! tm-defined-name ,var ',var)
-                  (ahash-set! tm-defined-module ',var
-                               (list (module-name (current-module)))))
-                `((ahash-set! tm-defined-name ,var ',var)
-                  (ahash-set! tm-defined-module ',var
-                     (cons (module-name (current-module))
-                           (ahash-ref tm-defined-module ',var)))))
+                  (ahash-set! tm-defined-table ',var '())
+                  (ahash-set! tm-defined-module ',var '())
+                  (ahash-set! tm-defined-name ,var ',var))
+                 `())
+            (ahash-set! tm-defined-table ',var
+                       (cons ',nval (ahash-ref tm-defined-table ',var)))
+            (ahash-set! tm-defined-module ',var
+                       (cons (module-name (current-module))
+                           (ahash-ref tm-defined-module ',var)))
             ,@(if once? '()
                 (if (nnull? cur-conds)
                 `((let ((former ,var))
@@ -262,13 +263,7 @@
                    ;;    (display* "Overloaded " ',var "\n"))
                    ;; (display* "Overloaded " ',var "\n")
                    ;;(display* "   " ',nval "\n")
-                   (module-set! texmacs-user ',var ,nval)
-                   (ahash-set! tm-defined-table ',var
-                               (cons ',nval (ahash-ref tm-defined-table ',var)))
-                   (ahash-set! tm-defined-name ,var ',var)
-                   (ahash-set! tm-defined-module ',var
-                     (cons (module-name (current-module))
-                           (ahash-ref tm-defined-module ',var)))))
+                   (module-set! texmacs-user ',var ,nval)))
                  `((if (module-variable texmacs-user ',basevar)
                        (module-set! texmacs-user ',basevar ,nval)
                        (module-set! texmacs-user ',var ,nval)))))
