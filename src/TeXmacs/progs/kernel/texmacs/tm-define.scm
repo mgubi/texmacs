@@ -332,18 +332,19 @@
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-    `(begin
-       (module-define! texmacs-user ',name
-          (lambda args
-            (let* ((m (resolve-module ',module))
-                   (r (module-ref texmacs-user ',name #f)))
-              (if (not r)
-                  (texmacs-error "lazy-define"
-                                ,(string-append "Could not retrieve "
-                                              (symbol->string name))))
-              (display* "lazy:" ',name "\n")
-              (apply r args))))
-       (module-export! texmacs-user '(,name))))
+    `(if (not (module-ref texmacs-user ',name #f))
+         (begin
+           (module-define! texmacs-user ',name
+            (lambda args
+              (let* ((m (resolve-module ',module))
+                     (r (module-ref texmacs-user ',name #f)))
+                (if (not r)
+                    (texmacs-error "lazy-define"
+                                  ,(string-append "Could not retrieve "
+                                                (symbol->string name))))
+                (display* "lazy:" ',name "\n")
+                (apply r args))))
+           (module-export! texmacs-user '(,name)))))
 
 (define-public-macro (lazy-define module . names)
    `(begin
