@@ -235,7 +235,7 @@
             ,(begin* body)
             ,(apply* 'former head)))))
 
-(define-public-macro (tm-define-overloaded once? head . body)
+(define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (make-lambda head nbody))
@@ -250,17 +250,14 @@
                   (module-export! texmacs-user '(,var))
                   (ahash-set! tm-defined-table ',var '())
                   (ahash-set! tm-defined-module ',var '())))
-             ,(if once?
-                `(if first? (module-set! texmacs-user ',var ,nval))
-                `(begin
-                  (ahash-set! tm-defined-name ,var ',var)
-                  (ahash-set! tm-defined-table ',var
+               (ahash-set! tm-defined-name ,var ',var)
+               (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
-                  (ahash-set! tm-defined-module ',var
+               (ahash-set! tm-defined-module ',var
                        (cons (module-name (current-module))
                            (ahash-ref tm-defined-module ',var)))
-                  (let ((former ,var))
-                     (module-set! texmacs-user ',var ,nval))))
+               (let ((former ,var))
+                     (module-set! texmacs-user ',var ,nval))
             ,@(map property-rewrite cur-props))))
         ;(display s) (newline)
          s))
@@ -273,27 +270,14 @@
 	((hash-ref define-option-table (caar body)) (cdar body) decl))
        `(,symb ,head ,@body)))
 
-;; HACK (mg): the way tm-define-sub works does not allow to pass direclty the once? argument
-;; to tm-define-overloaded, otherwise in particular compute-arguments, would have
-;; to be rewritten. Therefore we let tm-define-sub parse the arguments and then
-;; we dispatch and call tm-define-overloaded with the right arguments.
-
-(define-public-macro (tm-define-overloaded-once head . body)
-  `(tm-define-overloaded #t ,head ,@body))
-
-(define-public-macro (tm-define-overloaded-multiple head . body)
- `(tm-define-overloaded #f ,head ,@body))
-
-
 (define-public-macro (tm-define head . body)
   (set! cur-conds '())
   (set! cur-props '())
-  (tm-define-sub 'tm-define-overloaded-multiple head body))
+  (tm-define-sub 'tm-define-overloaded head body))
 
 (define-public-macro (tm-define-once head . body)
-  (set! cur-conds '())
-  (set! cur-props '())
-  (tm-define-sub 'tm-define-overloaded-once head body))
+  `(if (not (ahash-ref tm-defined-table ',(ca*r head)))
+     (tm-define ,head ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloaded macros with properties

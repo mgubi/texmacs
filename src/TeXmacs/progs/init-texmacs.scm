@@ -60,7 +60,7 @@
                                 tm-define-macro))
 (define-public def-keywords
   `(define-public provide-public
-    tm-define tm-menu menu-bind tm-widget ,@macro-keywords))
+    tm-define tm-define-once tm-menu menu-bind tm-widget ,@macro-keywords))
 
 (define old-read read)
 (define (new-read port)
