@@ -239,34 +239,28 @@
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (make-lambda head nbody))
-         (basevar (string->symbol (string-append (symbol->string var) "$base")))
-         (s `(begin
-            ,@(if (not (ahash-ref tm-defined-table var))
-                `(,@(if (nnull? cur-conds)
-                        `((module-define! texmacs-user ',basevar (lambda args (noop)))
-                          (module-define! texmacs-user ',var (lambda args (apply (@@ (guile-user) ,basevar) args))))
-                         `((module-define! texmacs-user ',var ,nval)))
+         (s `(let ((first? (and (not (ahash-ref tm-defined-table ',var))
+                           (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
+              (if first?
+                 (begin
+                   (when (nnull? ',cur-conds)
+                     (display* "warning: conditional master routine " ',var "\n")
+                     (display* "   " ',nval "\n"))
+                  (module-define! texmacs-user ',var (lambda args (apply former args)))
                   (module-export! texmacs-user '(,var))
                   (ahash-set! tm-defined-table ',var '())
-                  (ahash-set! tm-defined-module ',var '()))
-                 `())
-            (ahash-set! tm-defined-name ,var ',var)
-            (ahash-set! tm-defined-table ',var
+                  (ahash-set! tm-defined-module ',var '())))
+             ,(if once?
+                `(if first? (module-set! texmacs-user ',var ,nval))
+                `(begin
+                  (ahash-set! tm-defined-name ,var ',var)
+                  (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
-            (ahash-set! tm-defined-module ',var
+                  (ahash-set! tm-defined-module ',var
                        (cons (module-name (current-module))
                            (ahash-ref tm-defined-module ',var)))
-            ,@(if once? '()
-                (if (nnull? cur-conds)
-                `((let ((former ,var))
-                   ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
-                   ;;    (display* "Overloaded " ',var "\n"))
-                   ;; (display* "Overloaded " ',var "\n")
-                   ;;(display* "   " ',nval "\n")
-                   (module-set! texmacs-user ',var ,nval)))
-                 `((if (module-variable texmacs-user ',basevar)
-                       (module-set! texmacs-user ',basevar ,nval)
-                       (module-set! texmacs-user ',var ,nval)))))
+                  (let ((former ,var))
+                     (module-set! texmacs-user ',var ,nval))))
             ,@(map property-rewrite cur-props))))
         ;(display s) (newline)
          s))
@@ -350,25 +344,26 @@
 (define-public (not-define-option? item)
   (not (and (pair? item) (keyword? (car item)))))
 
-(define-public (lazy-define-one module opts name)
+(define (lazy-define-one module name)
   (let* ((old (ahash-ref lazy-define-table name))
-	       (new (if old (cons module old) (list module))))
+         (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-    `(tm-define-once (,name . args)
-         ,@opts
-         (let* ((m (resolve-module ',module))
-                (r (module-ref texmacs-user ',name #f)))
-           (if (not r)
-               (texmacs-error "lazy-define"
-                              ,(string-append "Could not retrieve "
+    `(begin
+       (module-define! texmacs-user ',name
+          (lambda args
+            (let* ((m (resolve-module ',module))
+                   (r (module-ref texmacs-user ',name #f)))
+              (if (not r)
+                  (texmacs-error "lazy-define"
+                                ,(string-append "Could not retrieve "
                                               (symbol->string name))))
-          (display* "lazy:" ',name "\n")
-          (apply r args))))
+              (display* "lazy:" ',name "\n")
+              (apply r args))))
+       (module-export! texmacs-user '(,name))))
 
 (define-public-macro (lazy-define module . names)
-  (receive (opts real-names) (list-break names not-define-option?)
-    `(begin
-       ,@(map (lambda (name) (lazy-define-one module opts name)) names))))
+   `(begin
+       ,@(map (lambda (name) (lazy-define-one module name)) names)))
 
 (define-public (lazy-define-force name)
   (if (procedure? name) (set! name (procedure-name name)))
