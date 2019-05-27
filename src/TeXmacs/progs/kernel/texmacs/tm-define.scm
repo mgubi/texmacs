@@ -248,9 +248,9 @@
                          `((module-define! texmacs-user ',var ,nval)))
                   (module-export! texmacs-user '(,var))
                   (ahash-set! tm-defined-table ',var '())
-                  (ahash-set! tm-defined-module ',var '())
-                  (ahash-set! tm-defined-name ,var ',var))
+                  (ahash-set! tm-defined-module ',var '()))
                  `())
+            (ahash-set! tm-defined-name ,var ',var)
             (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
             (ahash-set! tm-defined-module ',var
