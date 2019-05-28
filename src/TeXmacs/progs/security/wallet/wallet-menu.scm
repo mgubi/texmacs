@@ -180,11 +180,11 @@
             ("Ok"
              (with n (length (form-values))
                (when (and (> n 0) (string? (first (form-values))))
-                 (when (and (wallet-correct-passphrase? (first (form-values)))
+                 (when (wallet-correct-passphrase? (first (form-values)))
                             (when (and (wallet-turn-on (first (form-values)))
                                        (== (second (form-values)) "yes"))
                               (wallet-save-passphrase (first (form-values))))
-                            (cmd "Ok")))))
+                            (cmd "Ok"))))
              (set! wallet-widget-wrong-passphrase? #t)
              (refresh-now "wallet-widget-reask-passphrase"))))))))
 
