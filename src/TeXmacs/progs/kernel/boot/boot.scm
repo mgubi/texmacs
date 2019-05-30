@@ -12,6 +12,10 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(cond-expand (guile-2.2
+   (use-modules  (ice-9 iconv)) ;; for string->bytevector, bytevector->string
+) (else))
+
 (define texmacs-user (current-module))
 (define temp-module (current-module))
 (define temp-value #f)
@@ -27,6 +31,24 @@
     (if (guile-c?) (use-modules (ice-9 rdelim) (ice-9 pretty-print)))))
 
 (define has-look-and-feel? (lambda (x) (== x "emacs")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Glue helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; We need to inject a string containing glyphs out of the first 8bit unicode
+;; plane into a Latin1 string, which is the encoding used in the glue code.
+;; Internally the C++ string type is  really a bytevector and TeXmacs uses a
+;; variety of encodings, mostly Cork and the universal encoding.
+;; We smuggle the C++ strings into Latin1 encoded Scheme strings
+;; but sometimes we need to inject a real Scheme string into a UTF-8 encoded
+;; TeXmacs string, and for this we use the function below.
+
+(cond-expand (guile-2.2
+(define-public (inject-utf8 s)
+  (bytevector->string (string->bytevector s "UTF-8") "ISO-8859-1")))
+  (else (define-public (inject-utf8 s) s)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Redirect standard output

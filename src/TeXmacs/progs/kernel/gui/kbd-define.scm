@@ -204,7 +204,7 @@
 (tm-define (kbd-binding conds key2 cmd help)
   (:synopsis "Helper routine for kbd-map macro")
   ;;(display* conds ", " key2 ", " cmd ", " help "\n")
-  (with key (kbd-pre-rewrite key2)
+  (with key (kbd-pre-rewrite (inject-utf8 key2))
     (kbd-sub-bindings conds key)
     (kbd-insert-key-binding conds key (list cmd help))))
 
