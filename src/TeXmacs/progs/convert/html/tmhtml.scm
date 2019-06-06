@@ -193,7 +193,8 @@
 	  (cond ((with-extract doc "html-title")
 		 (with-extract doc "html-title"))
 		((not title) "No title")
-		((or (in? "tmdoc" styles) (in? "tmweb" styles))
+		((or (in? "tmdoc" styles)
+                     (in? "tmweb" styles) (in? "tmweb2" styles))
 		 `(concat ,(tmhtml-force-string title)
 			  " (FSF GNU project)"))
 		(else (tmhtml-force-string title))))
@@ -211,7 +212,8 @@
 	(let* ((code (with-extract doc "html-head-javascript"))
 	       (script `(h:script (@ (language "javascript")) ,code)))
 	  (set! xhead (append xhead (list script)))))
-    (if (or (in? "tmdoc" styles) (in? "tmweb" styles)
+    (if (or (in? "tmdoc" styles)
+            (in? "tmweb" styles) (in? "tmweb2" styles)
             (in? "mmxdoc" styles) (in? "magix-web" styles)
             (in? "max-web" styles))
 	(set! body (tmhtml-tmdoc-post body)))
@@ -548,6 +550,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Formatting text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tmhtml-hidden l)
+  ;; FIXME: distinguish inline and block?
+  (with r (tmhtml (car l))
+    `((div (@ (class "toggle") (style "display: none")) ,@r))))
+
+(define (tmhtml-shown l)
+  ;; FIXME: distinguish inline and block?
+  (with r (tmhtml (car l))
+    `((div (@ (class "toggle") (style "display: block")) ,@r))))
 
 (define (tmhtml-hspace l)
   (with len (tmlength->htmllength (if (list-1? l) (car l) (cadr l)) #t)
@@ -940,7 +952,9 @@
 	(else '())))
 
 (define (tmhtml-action l)
-  `((h:u ,@(tmhtml (car l)))))
+  (if tmhtml-css?
+      (tmhtml (car l))
+      `((h:u ,@(tmhtml (car l))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Tables
@@ -1367,7 +1381,7 @@
     (list `(,(string->symbol s) ,@r))))
 
 (define (tmhtml-html-attr l)
-  (let* ((a (tmhtml-force-string (car l)))
+  (let* ((a (string->symbol (tmhtml-force-string (car l))))
          (v (tmhtml-force-string (cadr l)))
          (r (tmhtml (caddr l))))
     (map (cut tmhtml-append-attribute <> a v) r)))
@@ -1541,6 +1555,7 @@
   (surround tmhtml-surround)
   (concat tmhtml-concat)
   (rigid tmhtml-id)
+  (hidden tmhtml-hidden)
   (format tmhtml-noop)
   (hspace tmhtml-hspace)
   (vspace* tmhtml-vspace)
@@ -1695,6 +1710,7 @@
   (TeX ,(lambda x '("TeX")))
   (LaTeX ,(lambda x '("LaTeX")))
   ;; additional tags
+  (shown ,tmhtml-shown)
   (hidden-title ,tmhtml-noop)
   (doc-title-block ,tmhtml-doc-title-block)
   (equation* ,tmhtml-equation*)

@@ -1,84 +1,130 @@
 <TeXmacs|1.99.9>
 
-<style|<tuple|tmweb|english|old-spacing>>
+<style|tmweb2>
 
 <\body>
-  <tmweb-current|Download|Linux><tmweb-title|<TeXmacs> inside
-  GNU/<name|Linux> distributions|<tmweb-download-links>>
+  <tmweb-current|Download|Linux><tmweb-title|Installing <TeXmacs> for
+  GNU/<name|Linux>|<tmweb-download-links>>
 
-  The following GNU/<name|Linux> distributions provide packages or third-part
-  packages for <TeXmacs>:
+  \;
 
-  <\itemize>
-    <item><hlink|Gentoo|#gentoo>.
+  <center|<center|<image|../images/Download-TeXmacs.png|600px|||>>>
 
-    <item><hlink|Knoppix|knoppix.en.tm>.
+  <tabular|<tformat|<cwith|1|4|1|1|cell-hyphen|n>|<cwith|1|-1|2|2|cell-hyphen|t>|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|-1|1|1|cell-width|>|<cwith|1|-1|1|1|cell-hmode|auto>|<cwith|1|-1|2|2|cell-lsep|1spc>|<cwith|1|-1|2|2|cell-bsep|1em>|<cwith|1|-1|2|2|cell-tsep|1em>|<cwith|2|2|1|1|cell-hyphen|n>|<cwith|2|2|2|2|cell-hyphen|t>|<cwith|2|2|1|1|cell-width|>|<cwith|2|2|1|1|cell-hmode|auto>|<cwith|2|2|2|2|cell-lsep|1spc>|<cwith|2|2|2|2|cell-bsep|1em>|<cwith|2|2|2|2|cell-tsep|1em>|<table|<row|<cell|<item-pic|../images/install-method.png>>|<\cell>
+    <strong|Selection of the installation method>
 
-    <item><hlink|Open Suse|#suse>.
+    Depending on your GNU/<name|Linux> distribution, you may choose between
+    the following installation methods:
 
-    <item><hlink|Ubuntu|#ubuntu>.
+    <\itemize>
+      <item>Please <hlink|check|linux.en.tm> whether your distribution
+      already supports <TeXmacs>, in which case you may directly install
+      <TeXmacs> using the standard tools of your system.
 
-    <item><hlink|Arch Linux|#arch>.
-  </itemize>
+      <item>Please <hlink|check|linux-packages.en.tm> whether your
+      distribution is in the list of standard GNU/<name|Linux> distributions
+      for which we provide ready-to-install packages.
 
-  Please report any other distributions with sufficiently up-to-date
-  <TeXmacs> packages to us. The <hlink|up-to-date
-  list|http://www.inp.nsk.su/~grozin/TeXmacs/> of distributions with
-  <TeXmacs> is maintained by <hlink|<name|Andrey
-  Grozin>|http://www.inp.nsk.su/~grozin/>.
+      <item>Otherwise, you may install a generic binary package for
+      <TeXmacs>, as explained below.
+    </itemize>
+  </cell>>|<row|<cell|<item-pic|../images/small-download.png>>|<\cell>
+    <strong|Downloading <TeXmacs>>
 
-  <section*|Gentoo><label|gentoo>
+    Depending on the version of your GNU/<name|Linux> system, download one of
+    the following static binary distributions of GNU <TeXmacs>:
 
-  The portage tree of <hlink|Gentoo|http://www.gentoo.org/> usually contains
-  an outdated version of <TeXmacs>. An up-to-date version can be found in the
-  <hlink|Gentoo science overlay|https://wiki.gentoo.org/wiki/Project:Science/Overlay>.
+    <\itemize>
+      <item><hlink|<TeXmacs> package for 32 bit GNU/<name|Linux>
+      distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-B.tar.gz>>.
 
-  First time installation:
+      <item><hlink|<TeXmacs> package for 64 bit GNU/<name|Linux>
+      distributions|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-C.tar.gz>>.
 
-  <\enumerate>
-    <item><verbatim|emerge layman>
+      <item>If the above packages do not work on your computer, then you may
+      try our <hlink|alternate <TeXmacs> package|<merge|http://www.texmacs.org/Download/ftp/tmftp/generic/|<TeXmacs-version-release|devel>|-A.tar.gz>>,
+      which should be suitable for older systems.
+    </itemize>
 
-    <item><verbatim|layman -a science>
+    Notice that we only provide static binary packages for Intel or AMD based
+    PC's.
+  </cell>>|<row|<cell|<item-pic|../images/TeXmacs.png>>|<\cell>
+    <strong|Unpacking <TeXmacs>>
 
-    <item>Add the line: <verbatim|source /usr/portage/local/layman/make.conf>
-    to your <verbatim|/etc/make.conf>
+    In a shell session, <verbatim|cd> into the directory where you wish to
+    install <TeXmacs> and type
 
-    <item><verbatim|emerge layman>
+    <\shell-code>
+      gunzip -c TeXmacs-<with|color|brown|[version]>-<with|color|brown|[your
+      system]>.tar.gz \| tar xvf -
+    </shell-code>
 
-    <item>Add the line: <verbatim|app-office/texmacs ~x86> to your
-    <verbatim|/etc/portage/packages.keywords> (of course, assuming your
-    computer is x86)
+    All files will be unpacked into the directory
+    <with|font-family|tt|TeXmacs-<with|color|brown|[version]>-<with|color|brown|[your
+    system]>> (or <with|font-family|tt|TeXmacs-<with|color|brown|[version]>>,
+    for some older versions). Let <with|font-family|tt|<with|color|brown|[installation
+    directory]>> be the full path of this directory.
 
-    <item><verbatim|emerge texmacs>
-  </enumerate>
+    Depending on your shell, either type
 
-  Updating <TeXmacs>
+    <\shell-code>
+      export TEXMACS_PATH=<with|color|brown|[installation directory]>
 
-  <\enumerate>
-    <item><verbatim|layman -s science>
+      export PATH=$TEXMACS_PATH/bin:$PATH
+    </shell-code>
 
-    <item><verbatim|emerge texmacs>
-  </enumerate>
+    or
 
-  <section*|Open Suse><label|suse>
+    <\shell-code>
+      setenv TEXMACS_PATH <with|color|brown|[installation directory]>
 
-  Recent versions of <hlink|OpenSUSE|http://www.opensuse.org/> contain rather
-  up-to-date <TeXmacs>. Just use <verbatim|yast> to install it.
+      setenv PATH $TEXMACS_PATH/bin:$PATH
+    </shell-code>
 
-  <section*|Ubuntu><label|ubuntu>
+    where <with|font-family|tt|<with|color|brown|[installation directory]>>
+    is as above. We recommend to put these lines in your personal startup
+    script, such as <with|font-family|tt|.bash_profile>.
 
-  <hlink|Ubuntu|http://www.ubuntu.com/> is based on <hlink|Debian|#debian>
-  "<verbatim|unstable>", and therefore contains <TeXmacs>. You can (probably)
-  install an up-to-date TeXmacs from Debian "<verbatim|experimental>".
+    You may now run the program using
 
-  <section*|Arch Linux><label|arch>
+    <\shell-code>
+      texmacs &
+    </shell-code>
+  </cell>>|<row|<cell|<item-pic|../images/Book_icon_1.png>>|<\cell>
+    <strong|Learning <TeXmacs>>
 
-  You may install the latest GNU <TeXmacs> via <verbatim|pacman>. For the
-  details of the package, just visit the official
-  <hlink|page|https://www.archlinux.org/packages/extra/x86_64/texmacs/> on
-  Arch Linux for GNU <TeXmacs>.
+    <\itemize>
+      <item>Get started by watching our introductory
+      <hlink|videos|../home/videos-new.en.tm>.
 
-  <tmdoc-copyright|1999--2018|Andrey Grozin|Joris van der Hoeven, Darcy Shen>
+      <item>Or by reading one of the <TeXmacs>
+      <hlink|tutorials|../help/tutorial.en.tm>.
+
+      <item>For more information, please consult the <hlink|user
+      manual|../help/book.en.tm>.
+    </itemize>
+  </cell>>|<row|<cell|<item-pic|../images/FAQ_icon.svg.png>>|<\cell>
+    <strong|Any questions?>
+
+    <\itemize>
+      <item><hlink|Frequently asked questions|../help/faq.en.tm>.
+
+      <item>Ask questions on the <hlink|<verbatim|texmacs-users> mailing
+      list|../home/ml.en.tm#tmusers>.
+    </itemize>
+  </cell>>|<row|<cell|<item-pic|../images/Crystal_Project_money.png>>|<\cell>
+    <strong|Donate>
+
+    <\itemize>
+      <item>If you like <TeXmacs>, then please consider
+      <hlink|donating|../contribute/donations.en.tm> money or services to us.
+    </itemize>
+  </cell>>>>>
+
+  <tmdoc-copyright|1999--2019|Joris van der Hoeven>
 
   <tmweb-license>
 </body>
+
+<initial|<\collection>
+</collection>>

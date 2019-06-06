@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|1.99.9>
 
-<style|source>
+<style|<tuple|source|english>>
 
 <\body>
   <\active*>
@@ -11,7 +11,7 @@
         Style for generating the <TeXmacs> web pages.
       </src-purpose>
 
-      <\src-copyright|2003--2004>
+      <\src-copyright|2003--2018>
         Joris van der Hoeven
       </src-copyright>
 
@@ -31,7 +31,6 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
     <associate|preamble|true>
   </collection>
 </initial>

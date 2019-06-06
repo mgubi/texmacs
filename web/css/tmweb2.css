@@ -369,19 +369,19 @@ a:active, a:focus, a:hover {
     display: inline-block;
     text-align: center;
     position: relative;
-    top: -1.8em;
-    margin-bottom: -1.8em;
+    top: -1.5em;
+    margin-bottom: -1.5em;
 
-    background-color: #D03445;
+    background-color: #905465; /* #D03445; */
     border-radius: 0.4em;
     border-color: transparent;
     border-style: solid;
     color: white;
-    font-size: 1.4em;
+    font-size: 1.25em;
     font-weight: bold;
-    padding: 0.4em;
-    text-shadow: 0.1em 0.1em 0px #A02C2C;
-    box-shadow: 0.2em 0.2em #A02C2C;
+    padding: 0.2em;
+    text-shadow: 0.1em 0.1em 0px #604C4C; /* #A02C2C; */
+    box-shadow: 0.1em 0.1em #604C4C; /* #A02C2C; */
 }
 
 /******************************************************************************
@@ -428,38 +428,134 @@ a:active, a:focus, a:hover {
 }
 
 /******************************************************************************
+* Galleries
+******************************************************************************/
+
+.tmweb-hlist {
+    text-align: left;
+}
+
+.tmweb-hlist div {
+    display: inline;
+}
+
+.tmweb-hlist .tmweb-caption-below {
+    display: inline-block;
+    width: 48%;
+}
+
+.tmweb-hlist .tmweb-caption-below .tmweb-figure {
+    display: inline-block;
+}
+
+.tmweb-hlist .tmweb-caption-below .tmweb-caption {
+    display: inline-block;
+}
+    
+.tmweb-gallery img {
+    display: inline;
+    width: 95%;
+    padding-top: 50px;
+}
+
+@media screen and (max-width: 1200px) {
+    .tmweb-hlist .tmweb-caption-below {
+        width: 95%;
+    }
+}
+
+@media screen and (min-width: 1800px) {
+    .tmweb-hlist .tmweb-caption-below {
+        width: 30%;
+    }
+}
+
+/******************************************************************************
+* Video galleries
+******************************************************************************/
+
+.tmweb-hlist .tmweb-thumbnail {
+    display: inline-block;
+    text-align: left;
+    vertical-align: top;
+    max-width: 320px;
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+}
+
+.tmweb-thumbnail-image {
+    transition: transform .2s; /* Animation */
+}
+
+.tmweb-thumbnail-image:hover {
+    transform: scale(1.2);
+}
+
+.tmweb-hlist .tmweb-thumbnail .tmweb-thumbnail-legend {
+    font-size: 0.8em;
+}
+
+.tmweb-hlist .tmweb-youtube {
+    display: inline-block;
+    text-align: left;
+    vertical-align: top;
+    padding-left: 2em;
+    padding-right: 2em;
+}
+
+.tmweb-youtube .tmweb-youtube-video {
+    width: 72vw;
+    height: 45vw;
+    max-width: 1200px;
+    max-height: 750px;
+}
+
+.tmweb-youtube .tmweb-youtube-legend {
+    font-size: 1em;
+}
+
+/******************************************************************************
+* Miscellaneous elements
+******************************************************************************/
+
+.tmweb-item-pic img {
+    width: 2.5em;
+    vertical-align: top;
+}
+
+/******************************************************************************
 * Special markup
 ******************************************************************************/
 
 .subsup {
     display: inline;
-    vertical-align: -0.2em
+    vertical-align: -0.2em;
 }
 
 .subsup td {
     padding: 0px;
-    text-align: left
+    text-align: left;
 }
 
 .fraction {
     display: inline;
-    vertical-align: -0.8em
+    vertical-align: -0.8em;
 }
 
 .fraction td {
     padding: 0px;
-    text-align: center
+    text-align: center;
 }
 
 .wide {
     position: relative;
-    margin-left: -0.4em
+    margin-left: -0.4em;
 }
 
 .accent {
     position: relative;
     margin-left: -0.4em;
-    top: -0.1em
+    top: -0.1em;
 }
 
 .compact-block p, .compact-block center {

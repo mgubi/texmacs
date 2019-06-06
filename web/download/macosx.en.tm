@@ -1,56 +1,68 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.9>
 
-<style|<tuple|tmweb|english>>
+<style|tmweb2>
 
 <\body>
-  <tmweb-current|Download|MacOS><tmweb-title|Installing <TeXmacs> on
-  MacOS-X|<tmweb-download-links>>
+  <tmweb-current|Download|MacOS><tmweb-title|Installing <TeXmacs> for
+  MacOS|<tmweb-download-links>>
 
-  <section|Standard installation>
+  <\tmweb-split>
+    <center|<image|../images/Download-TeXmacs.png|600px|||>>
+  <|tmweb-split>
+    <tabular|<tformat|<cwith|1|3|1|1|cell-hyphen|n>|<cwith|1|-1|2|2|cell-hyphen|t>|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|-1|1|1|cell-width|>|<cwith|1|-1|1|1|cell-hmode|auto>|<cwith|1|-1|2|2|cell-lsep|1spc>|<cwith|1|-1|2|2|cell-bsep|1em>|<cwith|1|-1|2|2|cell-tsep|1em>|<table|<row|<cell|<item-pic|../images/small-download.png>>|<\cell>
+      <strong|Downloading the diskimage for <TeXmacs>>
 
-  In order to install the native <name|Qt>-based version of <TeXmacs> under
-  <name|MacOS-X>, you should:
+      <\itemize>
+        <item>Download <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|-yosemite.dmg>>|<merge|http://www.texmacs.org/Download/ftp/tmftp/macos/|<TeXmacs-version-release|devel>|-yosemite.dmg>>
+        for MacOS 10.10 and later.
 
-  <\enumerate>
-    <item>Download the diskimage <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|-yosemite.dmg>>|<merge|http://www.texmacs.org/Download/ftp/tmftp/macos/|<TeXmacs-version-release|devel>|-yosemite.dmg>>
-    (for MacOS-10.10 and later) or <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|.dmg>>|<merge|http://www.texmacs.org/Download/ftp/tmftp/macos/|<TeXmacs-version-release|devel>|.dmg>>
-    (for MacOS versions 10.6, 10.7, 10.8, and 10.9).
+        <item>Download <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|.dmg>>|<merge|http://www.texmacs.org/Download/ftp/tmftp/macos/|<TeXmacs-version-release|devel>|.dmg>>
+        for MacOS versions 10.6 until 10.9.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/TeXmacs.png>>|<\cell>
+      <strong|Installing and running <TeXmacs>>
 
-    <item>Open the diskimage and drag the <TeXmacs> icon to your applications
-    folder.
+      <\itemize>
+        <item>Open the diskimage and drag the <TeXmacs> icon to your
+        applications folder.
 
-    <item>Launch <TeXmacs> from your applications folder.
-  </enumerate>
+        <item>Launch <TeXmacs> from your applications folder.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/Book_icon_1.png>>|<\cell>
+      <strong|Learning <TeXmacs>>
 
-  If you like the program, then please consider
-  <hlink|donating|../contribute/donations.en.tm> money or services to us. Of
-  course, you may also <hlink|contribute|../contribute/contribute.en.tm>
-  yourself. In case of problems, please <hlink|subscribe|../home/ml.en.tm> to
-  the <verbatim|texmacs-dev> or <verbatim|texmacs-users> mailing lists and
-  ask your questions there. You may also directly
-  <hlink|contact|../contact/contact.en.tm> us, but you might need to be more
-  patient.
+      <\itemize>
+        <item>Get started by watching our introductory
+        <hlink|videos|../home/videos-new.en.tm>.
 
-  <section|Alternative installation methods>
+        <item>Or by reading one of the <TeXmacs>
+        <hlink|tutorials|../help/tutorial.en.tm>.
 
-  If you are using <hlink|<name|Fink>|http://www.finkproject.org/>, then you
-  may also install <TeXmacs> from a shell session by typing
+        <item>For more information, please consult the <hlink|user
+        manual|../help/book.en.tm>.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/FAQ_icon.svg.png>>|<\cell>
+      <strong|Any questions?>
 
-  <\shell-code>
-    sudo fink install texmacs
-  </shell-code>
+      <\itemize>
+        <item><hlink|Frequently asked questions|../help/faq.en.tm>.
 
-  Similarly, if you are using <hlink|<name|MacPorts>|http://www.macports.org/>,
-  then you may install <TeXmacs> by typing
+        <item>Ask questions on the <hlink|<verbatim|texmacs-users> mailing
+        list|../home/ml.en.tm#tmusers>.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/Crystal_Project_money.png>>|<\cell>
+      <strong|Donate>
 
-  <\shell-code>
-    sudo port install texmacs
-  </shell-code>
+      <\itemize>
+        <item>If you like <TeXmacs>, then please consider
+        <hlink|donating|../contribute/donations.en.tm> money or services to
+        us.
+      </itemize>
+    </cell>>>>>
+  </tmweb-split>
 
-  Of course, you may all <hlink|compile <TeXmacs> from the
-  sources|sources.en.tm>.
-
-  <tmdoc-copyright|1999--2017|Joris van der Hoeven|Massimiliano Gubinelli>
+  <tmdoc-copyright|1999--2019|Joris van der Hoeven|Massimiliano
+  Gubinelli|Denis Raux>
 
   <tmweb-license>
 </body>

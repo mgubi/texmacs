@@ -1,6 +1,6 @@
-<TeXmacs|1.99.4>
+<TeXmacs|1.99.9>
 
-<style|<tuple|tmdoc|english>>
+<style|<tuple|tmdoc|english|old-spacing>>
 
 <\body>
   <tmdoc-title|Developers of <TeXmacs>>
@@ -37,6 +37,10 @@
     <item>Philippe Joyez provided help concerning the support of various
     image formats and the compatability with <name|Inkscape>.
 
+    <item>Darcy Shen is the main translator for Chinese. He also helped with
+    the CJK support, contributed various patches, and provided a lot of
+    community work.
+
     <item>Dan Martens made a first <name|Windows> port that is no longer
     maintained.
 
@@ -67,6 +71,9 @@
 
     <item>Josef Weidendorfer made several patches for improving the
     performance of <TeXmacs>.
+
+    <item>Basile Audoly contributed a series of detailed bug descriptions and
+    suggestions for improvements.
 
     <item>Sam Liddicott for several patches, including hyperlink support for
     <name|Pdf> files.
@@ -111,9 +118,12 @@
     <item>Rob Clark made a patch which improves the system time support.
 
     <item>Stanislav Brabec for several patches so as to increase portability.
+
+    <item>Bruno Haible helped coining the name <TeXmacs>, thereby
+    acknowledging some initial inspiration from both <TeX> and <name|Emacs>.
   </itemize>
 
-  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|1998--2019|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
