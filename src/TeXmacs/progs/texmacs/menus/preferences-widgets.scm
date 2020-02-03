@@ -41,33 +41,43 @@
   ("simple ""Simplified menus")
   ("detailed" "Detailed menus"))
 
+(define-preference-names "buffer management"
+  ("separate" "Documents in separate windows")
+  ("shared" "Multiple documents share window"))
+
 (tm-widget (general-preferences-widget)
   (aligned
     (item (text "Look and feel:")
       (enum (set-pretty-preference "look and feel" answer)
             '("Default" "Emacs" "Gnome" "KDE" "Mac OS" "Windows")
             (get-pretty-preference "look and feel")
-            "18em"))
+            "21em"))
     (item (text "User interface language:")
       (enum (set-pretty-preference "language" answer)
             (map upcase-first supported-languages)
             (get-pretty-preference "language")
-            "18em"))
+            "21em"))
     (item (text "Complex actions:")
       (enum (set-pretty-preference "complex actions" answer)
             '("Through the menus" "Through popup windows")
             (get-pretty-preference "complex actions")
-            "18em"))
+            "21em"))
     (item (text "Interactive questions:")
       (enum (set-pretty-preference "interactive questions" answer)
             '("On the footer" "In popup windows")
             (get-pretty-preference "interactive questions")
-            "18em"))
+            "21em"))
     (item (text "Details in menus:")
       (enum (set-pretty-preference "detailed menus" answer)
             '("Simplified menus" "Detailed menus")
             (get-pretty-preference "detailed menus")
-            "18em"))))
+            "21em"))
+    (item (text "Buffer management:")
+      (enum (set-pretty-preference "buffer management" answer)
+            '("Documents in separate windows"
+              "Multiple documents share window")
+            (get-pretty-preference "buffer management")
+            "21em"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keyboard preferences
@@ -104,22 +114,20 @@
   ("none" "None")
   ("translit" "Translit")
   ("jcuken" "Jcuken")
-  ("yawerty" "Yawerty")
-  ("koi8-r" "Koi8-r")
-  ("cp1251" "Cp1251"))
+  ("yawerty" "Yawerty"))
 
 (tm-widget (keyboard-preferences-widget)
   (aligned
     (item (text "Space bar in text mode:")
       (enum (set-pretty-preference "text spacebar" answer)
             '("Default" "No multiple spaces"
-	      "Glue multiple spaces" "Allow multiple spaces")
+              "Glue multiple spaces" "Allow multiple spaces")
             (get-pretty-preference "text spacebar")
             "15em"))
     (item (text "Space bar in math mode:")
       (enum (set-pretty-preference "math spacebar" answer)
             '("Default" "No spurious spaces"
-	      "Avoid spurious spaces" "Allow spurious spaces")
+              "Avoid spurious spaces" "Allow spurious spaces")
             (get-pretty-preference "math spacebar")
             "15em"))
     (item (text "Automatic quotes:")
@@ -134,7 +142,7 @@
             "15em"))
     (item (text "Cyrillic input method:")
       (enum (set-pretty-preference "cyrillic input method" answer)
-            '("None" "Translit" "Jcuken" "Yawerty" "Koi8-r" "Cp1251")
+            '("None" "Translit" "Jcuken" "Yawerty")
             (get-pretty-preference "cyrillic input method")
             "15em")))
   ======
@@ -261,20 +269,55 @@
 
 ;; Html ----------
 
+(define (export-formulas-as-mathjax on?)
+  (set-boolean-preference "texmacs->html:mathjax" on?)
+  (when on?
+    (set-boolean-preference "texmacs->html:mathml" #f)
+    (set-boolean-preference "texmacs->html:images" #f)
+    (refresh-now "texmacs to html")))
+
+(define (export-formulas-as-mathml on?)
+  (set-boolean-preference "texmacs->html:mathml" on?)
+  (when on?
+    (set-boolean-preference "texmacs->html:mathjax" #f)
+    (set-boolean-preference "texmacs->html:images" #f)
+    (refresh-now "texmacs to html")))
+
+(define (export-formulas-as-images on?)
+  (set-boolean-preference "texmacs->html:images" on?)
+  (when on?
+    (set-boolean-preference "texmacs->html:mathjax" #f)
+    (set-boolean-preference "texmacs->html:mathml" #f)
+    (refresh-now "texmacs to html")))
+
 (tm-widget (html-preferences-widget)
   ===
   (bold (text "TeXmacs -> Html"))
   ===
-  (aligned
-    (meti (hlist // (text "Use CSS for more advanced formatting"))
-      (toggle (set-boolean-preference "texmacs->html:css" answer)
-              (get-boolean-preference "texmacs->html:css")))
-    (meti (hlist // (text "Export mathematical formulas as MathML"))
-      (toggle (set-boolean-preference "texmacs->html:mathml" answer)
-              (get-boolean-preference "texmacs->html:mathml")))
-    (meti (hlist // (text "Export mathematical formulas as images"))
-      (toggle (set-boolean-preference "texmacs->html:images" answer)
-              (get-boolean-preference "texmacs->html:images")))))
+  (refreshable "texmacs to html"
+    (aligned
+      (meti (hlist // (text "Use CSS for more advanced formatting"))
+        (toggle (set-boolean-preference "texmacs->html:css" answer)
+                (get-boolean-preference "texmacs->html:css")))
+      (meti (hlist // (text "Export mathematical formulas as MathJax"))
+        (toggle (export-formulas-as-mathjax answer)
+                (get-boolean-preference "texmacs->html:mathjax")))
+      (meti (hlist // (text "Export mathematical formulas as MathML"))
+        (toggle (export-formulas-as-mathml answer)
+                (get-boolean-preference "texmacs->html:mathml")))
+      (meti (hlist // (text "Export mathematical formulas as images"))
+        (toggle (export-formulas-as-images answer)
+                (get-boolean-preference "texmacs->html:images")))))
+  ======
+  (bold (text "Html -> TeXmacs"))
+  ===
+  (refreshable "html -> texmacs"
+    (aligned
+      (meti (hlist // (text "Try to import formulas using LaTeX annotations"))
+        (toggle (set-boolean-preference
+                 "mathml->texmacs:latex-annotations" answer)
+                (get-boolean-preference
+                 "mathml->texmacs:latex-annotations"))))))
 
 ;; LaTeX ----------
 
@@ -391,7 +434,7 @@
   (aligned
     (item (text "BibTeX command:")
       (enum (set-pretty-preference "bibtex command" answer)
-            '("bibtex" "rubibtex" "")
+            '("bibtex" "biber" "biblatex" "rubibtex" "")
             (get-pretty-preference "bibtex command")
             "15em")))
   ===
@@ -466,26 +509,26 @@
   (aligned
     (assuming (supports-native-pdf?)
       (meti (hlist // (text "Produce Pdf using native export filter"))
-	(toggle (set-boolean-preference "native pdf" answer)
-		(get-boolean-preference "native pdf"))))
+        (toggle (set-boolean-preference "native pdf" answer)
+                (get-boolean-preference "native pdf"))))
     (assuming (supports-ghostscript?)
       (meti (hlist // (text "Produce Postscript using native export filter"))
-	(toggle (set-boolean-preference "native postscript" answer)
-		(get-boolean-preference "native postscript"))))
+        (toggle (set-boolean-preference "native postscript" answer)
+                (get-boolean-preference "native postscript"))))
    (meti (hlist // (text "Expand beamer slides"))
       (toggle (set-boolean-preference "texmacs->pdf:expand slides" answer)
-	      (get-boolean-preference "texmacs->pdf:expand slides"))))
+              (get-boolean-preference "texmacs->pdf:expand slides"))))
     (assuming (supports-native-pdf?)
       (aligned (meti (hlist // (text "Distill encapsulated Pdf files"))
-	(toggle (set-boolean-preference "texmacs->pdf:distill inclusion" answer)
-		(get-boolean-preference "texmacs->pdf:distill inclusion"))))
+        (toggle (set-boolean-preference "texmacs->pdf:distill inclusion" answer)
+                (get-boolean-preference "texmacs->pdf:distill inclusion"))))
       (aligned (meti (hlist // (text "Check exported Pdf files for correctness"))
-	(toggle (set-boolean-preference "texmacs->pdf:check" answer)
-		(get-boolean-preference "texmacs->pdf:check"))))
+        (toggle (set-boolean-preference "texmacs->pdf:check" answer)
+                (get-boolean-preference "texmacs->pdf:check"))))
       (aligned (item (text "Pdf version number:")
         (enum (set-preference "texmacs->pdf:version" answer)
-	      '("default" "1.4" "1.5" "1.6" "1.7")
-	      (get-preference "texmacs->pdf:version") "8em")))))
+              '("default" "1.4" "1.5" "1.6" "1.7")
+              (get-preference "texmacs->pdf:version") "8em")))))
 
 ;; Images ----------
 
@@ -498,21 +541,35 @@
    (eval `(define-preference-names "texmacs->image:format" ,@valid-image-format-list))
    (cadr (apply map list valid-image-format-list))))
 
+(define (supports-inkscape?) (url-exists-in-path? "inkscape"))
+
 (tm-widget (image-preferences-widget)
   ===
   (bold (text "TeXmacs -> Image"))
   ===
   (aligned
-      (item (text "Bitmap resolution (dpi):")
-        (enum (set-preference "texmacs->image:raster-resolution" answer)
-	      '("1200" "600" "300" "150" "")
-	      (get-preference "texmacs->image:raster-resolution")
-	      "5em"))
-      (item (text "Clipboard image format:")
-        (enum (set-pretty-preference "texmacs->image:format" answer)
-	      (pretty-format-list)
-	      (get-pretty-preference "texmacs->image:format")
-	      "5em"))))
+    (item (text "Bitmap resolution (dpi):")
+      (enum (set-preference "texmacs->image:raster-resolution" answer)
+            '("1200" "600" "300" "150" "")
+            (get-preference "texmacs->image:raster-resolution")
+            "5em"))
+    (item (text "Clipboard image format:")
+      (enum (set-pretty-preference "texmacs->image:format" answer)
+            (pretty-format-list)
+            (get-pretty-preference "texmacs->image:format")
+            "5em")))
+  ===
+  (bold (text "Image -> TeXmacs"))
+  ===
+  (aligned
+    (meti
+      (when (supports-inkscape?)
+        (hlist // (text "Use Inkscape for conversion from SVG")))
+      (when (supports-inkscape?)
+        (toggle (set-boolean-preference
+                 "image->texmacs:svg-prefer-inkscape" answer)
+                (get-boolean-preference
+                 "image->texmacs:svg-prefer-inkscape"))))))
 
 ;; All converters ----------
 
@@ -569,10 +626,13 @@
   ("2" "Twice")
   ("3" "Three times"))
 
+(define-preference-names "scripting language"
+  ("none" "None"))
+
 (define (updater-last-check-formatted)
   "Time since last update check formatted for use in the preferences dialog"
   (with c (updater-last-check)
-    (if (== c 0) 
+    (if (<= c 0) 
         "Never"
         (with h (ceiling (/ (- (current-time) c) 3600))
           (cond ((< h 24) (replace "Less than %1 hour(s) ago" h))
@@ -592,7 +652,6 @@
 (tm-define (scripts-preferences-list)
   (lazy-plugin-force)
   (with l (scripts-list)
-    (set-preference-name "scripting language" "none" "None")
     (for (x l) (set-preference-name "scripting language" x (scripts-name x)))
     (cons "None" (map scripts-name l))))
 
@@ -688,10 +747,10 @@
               (get-pretty-preference "scripting language")
               "15em"))
       (item (text "Document updates run:")
-	(enum (set-pretty-preference "document update times" answer)
-	      '("Once" "Twice" "Three times")
-	      (get-pretty-preference "document update times") 
-	      "15em"))
+        (enum (set-pretty-preference "document update times" answer)
+              '("Once" "Twice" "Three times")
+              (get-pretty-preference "document update times") 
+              "15em"))
       (assuming (updater-supported?)
         (item (text "Check for automatic updates:")
           (enum (set-pretty-preference "updater:interval" answer)

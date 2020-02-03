@@ -670,9 +670,10 @@ operator != (cursor cu1, cursor cu2) {
 
 tm_ostream&
 operator << (tm_ostream& out, cursor cu) {
-  out << "cursor (" << (cu->ox>>8) << ", " << (cu->oy>>8) << ": "
+  int sh= 8;
+  out << "cursor (" << (cu->ox>>sh) << ", " << (cu->oy>>sh) << ": "
       << cu->delta << ": "
-      << (cu->y1>>8) << ", " << (cu->y2>>8) << ": "
+      << (cu->y1>>sh) << ", " << (cu->y2>>sh) << ": "
       << cu->slope << ")";
   return out;
 }
@@ -930,5 +931,24 @@ make_eps (url name, box b, int dpi) {
   ren->set_pencil (black);
   rectangles rs;
   b->redraw (ren, path (0), rs);
+  tm_delete (ren);
+}
+
+void
+make_raster_image (url name, box b, double zoomf) {
+  SI pixel= 5*PIXEL;
+  SI w= b->x4 - b->x3;
+  SI h= b->y4 - b->y3;
+  SI ww= (SI) round (zoomf * w);
+  SI hh= (SI) round (zoomf * h);
+  int pxw= (ww+pixel-1)/pixel;
+  int pxh= (hh+pixel-1)/pixel;  
+  b->x0= -b->x3;
+  b->y0= -b->y4;
+  picture pic= native_picture (pxw, pxh, 0, 0);
+  renderer ren= picture_renderer (pic, zoomf);
+  rectangles rs;
+  b->redraw (ren, path (0), rs);
+  save_picture (name, pic);
   tm_delete (ren);
 }

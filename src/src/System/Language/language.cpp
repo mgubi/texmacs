@@ -63,11 +63,12 @@ text_property_rep tp_apply_rep
 text_property_rep::text_property_rep (
   int type2, int spc_before2, int spc_after2,
   int pen_before2, int pen_after2,
-  int op_type2, int priority2, int limits2):
+  int op_type2, int priority2, int limits2, tree_label macro2):
     type (type2),
     spc_before (spc_before2), spc_after (spc_after2),
     pen_before (pen_before2), pen_after (pen_after2),
-    op_type (op_type2), priority (priority2), limits (limits2) {}
+    op_type (op_type2), priority (priority2), limits (limits2),
+    macro (macro2) {}
 
 bool
 operator == (text_property_rep tpr1, text_property_rep tpr2) {
@@ -79,12 +80,22 @@ operator == (text_property_rep tpr1, text_property_rep tpr2) {
     (tpr1.pen_after == tpr2.pen_after) &&
     (tpr1.op_type == tpr2.op_type) &&
     (tpr1.priority == tpr2.priority) &&
-    (tpr1.limits == tpr2.limits);
+    (tpr1.limits == tpr2.limits) &&
+    (tpr1.macro == tpr2.macro);
 }
 
 bool
 operator != (text_property_rep tpr1, text_property_rep tpr2) {
   return !(tpr1 == tpr2);
+}
+
+text_property_rep
+copy (text_property_rep tpr) {
+  return text_property_rep (tpr.type,
+                            tpr.spc_before, tpr.spc_after,
+                            tpr.pen_before, tpr.pen_after,
+                            tpr.op_type, tpr.priority, tpr.limits,
+                            tpr.macro);
 }
 
 /******************************************************************************
@@ -117,6 +128,7 @@ static inline void init_expect_after (int op) {
   set_status (op, OP_BINARY, REMOVE_SPACE_BEFORE);
   set_status (op, OP_POSTFIX, REMOVE_CURRENT_SPACE);
   set_status (op, OP_INFIX, REMOVE_CURRENT_SPACE);
+  set_status (op, OP_PREFIX_INFIX, REMOVE_CURRENT_SPACE);
   set_status (op, OP_APPLY, REMOVE_SPACE_BEFORE);
   set_status (op, OP_SEPARATOR, REMOVE_SPACE_BEFORE);
   set_status (op, OP_MIDDLE_BRACKET, REMOVE_SPACE_BEFORE);
@@ -132,6 +144,7 @@ static inline void init_expect_space (int op) {
   set_status (op, OP_PREFIX, REMOVE_SPACE_BEFORE);
   set_status (op, OP_POSTFIX, REMOVE_SPACE_BEFORE);
   set_status (op, OP_INFIX, REMOVE_SPACE_BEFORE);
+  set_status (op, OP_PREFIX_INFIX, REMOVE_SPACE_BEFORE);
   set_status (op, OP_SEPARATOR, REMOVE_SPACE_BEFORE);
   set_status (op, OP_MIDDLE_BRACKET, REMOVE_SPACE_BEFORE);
   set_status (op, OP_CLOSING_BRACKET, REMOVE_SPACE_BEFORE);
@@ -156,6 +169,7 @@ init_succession_status_table () {
   init_expect_after (OP_PREFIX);
   init_could_end    (OP_POSTFIX);
   init_expect_after (OP_INFIX);
+  init_expect_after (OP_PREFIX_INFIX);
   init_expect_after (OP_APPLY);
   init_expect_after (OP_SEPARATOR);
   init_expect_after (OP_OPENING_BRACKET);
@@ -298,6 +312,49 @@ decode_color (string lan_name, int c) {
 }
 
 /******************************************************************************
+* Disable hyphenation
+******************************************************************************/
+
+struct hyphenless_language_rep: language_rep {
+  language base;
+  hyphenless_language_rep (string lan_name, language lan);
+  text_property advance (tree t, int& pos);
+  array<int> get_hyphens (string s);
+  void hyphenate (string s, int after, string& left, string& right);
+};
+
+hyphenless_language_rep::hyphenless_language_rep (string nm, language lan):
+  language_rep (nm), base (lan) {}
+
+text_property
+hyphenless_language_rep::advance (tree t, int& pos) {
+  return base->advance (t, pos);
+}
+
+array<int>
+hyphenless_language_rep::get_hyphens (string s) {
+  ASSERT (N(s) != 0, "hyphenation of empty string");
+  int i, n= N(s)-1;
+  array<int> penalty (n);
+  for (i=0; i<n; i++) penalty[i]= HYPH_INVALID;
+  return penalty;
+}
+
+void
+hyphenless_language_rep::hyphenate (
+  string s, int after, string& left, string& right)
+{
+  base->hyphenate (s, after, left, right);
+}
+
+language
+hyphenless_language (language base) {
+  string name= base->res_name * "-hyphenless";
+  if (language::instances -> contains (name)) return language (name);
+  return tm_new<hyphenless_language_rep> (name, base);
+}
+
+/******************************************************************************
 * Ad hoc hyphenation patterns
 ******************************************************************************/
 
@@ -437,10 +494,16 @@ spell_check (string lan, string s) {
     }
   }
   else {
-    spell_start (lan);
-    tree r= spell_check (lan, s);
-    spell_done (lan);
-    return r;
+    if (spell_start (lan) == "ok"){
+      tree r= spell_check (lan, s);
+      spell_done (lan);
+      return r;
+    }
+    else {
+      spell_active= false;
+      spell_done (lan);
+      return "ok";  
+    }
   }
 }
 

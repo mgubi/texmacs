@@ -112,7 +112,8 @@
     (and-with id (bib-cache-id f)
       (let* ((doc (string-load imported))
              (t (convert doc "texmacs-document" "texmacs-stree"))
-             (body (tmfile-extract t 'body))
+             (body* (tmfile-extract t 'body))
+             (body (if (tm-compound? body*) body* '(document)))
              (db (url->url (string-append bib-cache-dir "/" id ".tmdb")))
              (h (list->ahash-set names))
              (ok? (lambda (e) (and (ahash-ref h (tm-ref e 2)) (db-entry? e))))
@@ -142,6 +143,10 @@
   (when (db-url? (current-buffer))
     (revert-buffer)))
 
+(define (bib-confirm-tree doc)
+  (with-database (bib-database)
+    (db-confirm-entries-in doc)))
+
 (tm-define (bib-import-bibtex f)
   (with imported (bib-cache-bibtex f)
     (when (url-exists? imported)
@@ -154,12 +159,12 @@
 
 (tm-define (bib-import-selection)
   (when (selection-active-any?)
-    (bib-import-tree (selection-tree))
+    (bib-confirm-tree (selection-tree))
     (selection-cancel)))
 
 (tm-define (bib-import-current-buffer)
   (when (and (in-bib?) (not (db-url? (current-buffer))))
-    (bib-import-tree (buffer-tree))))
+    (bib-confirm-tree (buffer-tree))))
 
 (tm-define (bib-importable?)
   (cond ((selection-active-any?)
@@ -277,6 +282,7 @@
         ((== bib-file :local) :local)
         ((== bib-file :attached) :attached)
         ((== (url-suffix bib-file) "tmdb") (url->url bib-file))
+        ((== (url->string bib-file) "tmfs://.bib") :local)
         (else (bib-cache-database bib-file names))))
 
 (tm-define (bib-retrieve-entries names . bib-files)
@@ -301,8 +307,19 @@
 (define (bib-file? f)
   (and (url? f) (== (url-suffix f) "bib")))
 
+(define (bib-warning msg)
+  (debug-message "bibtex-warning" msg))
+
 (define (bib-compile-sub prefix style names . bib-files)
   (set! names (list-remove-duplicates names))
+  (when (and (not (supports-bibtex?))
+             (nin? style (bib-standard-styles)))
+    (bib-warning "bibtex has not been installed on your system\n")
+    (bib-warning "  using integrated replacement instead\n")
+    (set! style (string-append "tm-" style))
+    (when (nin? style (bib-standard-styles))
+      (bib-warning "  switching to tm-plain style\n")
+      (set! style "tm-plain")))      
   (if (in? style (bib-standard-styles))
       (let* ((all-files `(:local ,@bib-files :default :attached))
              (l (apply bib-retrieve-entries (cons names all-files)))
@@ -329,7 +346,11 @@
   (when (and (tm? names) (tm-func? names 'document))
     (set! names (tm-children (tm->stree names))))
   ;;(display* "Compile " style ", " names ", " bib-files "\n")
-  (cond ((not (supports-db?)) (tree "Error: database tool not activated"))
+  (cond ((and (not (supports-db?))
+              (not (and (list-1? bib-files)
+                        (== (url->string (url-tail (car bib-files)))
+                            "texmacs.bib"))))
+         (tree "Error: database tool not activated"))
         ((not (and (list? names) (list-and (map string? names))))
          (tree "Error: invalid bibliographic key list"))
         (else
@@ -447,7 +468,7 @@
 (tm-define (db-import-this-entry)
   (:require (bib-importable?))
   (and-with t (tree-innermost db-entry-any?)
-    (bib-import-tree t)))
+    (bib-confirm-tree t)))
 
 (tm-define (db-import-current-buffer)
   (:require (bib-importable?))

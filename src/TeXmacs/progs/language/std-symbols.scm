@@ -29,18 +29,23 @@
     "<lflux>" "<gflux>")
 
   (define Models-symbol
-    (:type infix)
+    (:type prefix-infix)
     (:spacing default wide)
     "<models>"
-    "<vdash>" "<dashv>" "<vDash>" "<Dashv>"
-    "<Vdash>" "<dashV>" "<VDash>" "<DashV>"
-    "<Vvdash>" "<dashVv>" "<VvDash>" "<DashVv>"
-    "<longvdash>" "<longdashv>" "<longvDash>" "<longDashv>"
-    "<longVdash>" "<longdashV>" "<longVDash>" "<longDashV>"
-    "<longVvdash>" "<longdashVv>" "<longVvDash>" "<longDashVv>"
-    "<nvdash>" "<ndashv>" "<nvDash>" "<nDashv>"
-    "<nVdash>" "<ndashV>" "<nVDash>" "<nDashV>"
-    "<nVvdash>" "<ndashVv>" "<nVvDash>" "<nDashVv>")
+    "<vdash>" "<vDash>" "<Vdash>" "<VDash>" "<Vvdash>" "<VvDash>"
+    "<longvdash>" "<longvDash>"
+    "<longVdash>" "<longVDash>"
+    "<longVvdash>" "<longVvDash>"
+    "<nvdash>" "<nvDash>" "<nVdash>" "<nVDash>" "<nVvdash>" "<nVvDash>")
+
+  (define Modeled-symbol
+    (:type infix)
+    (:spacing default wide)
+    "<dashv>" "<Dashv>" "<dashV>" "<DashV>" "<dashVv>" "<DashVv>"
+    "<longdashv>" "<longDashv>"
+    "<longdashV>" "<longDashV>"
+    "<longdashVv>" "<longDashVv>"
+    "<ndashv>" "<nDashv>" "<ndashV>" "<nDashV>" "<ndashVv>" "<nDashVv>")
 
   (define Quantifier-symbol
     (:type prefix)
@@ -52,7 +57,8 @@
     (:spacing wide wide)
     "<implies>" "<equivalent>" "<Leftarrow>" "<Rightarrow>" "<Leftrightarrow>"
     "<Longleftarrow>" "<Longrightarrow>" "<Longleftrightarrow>"
-    "<Lleftarrow>" "<Rrightarrow>"
+    "<Llongleftarrow>" "<Llongrightarrow>" "<Llongleftrightarrow>"
+    "<Lleftarrow>" "<Rrightarrow>" "<LRleftrightarrow>"
     "<nLeftarrow>" "<nRightarrow>" "<nLeftrightarrow>")
 
   (define Imply-lim-symbol
@@ -88,7 +94,8 @@
     (:penalty 20)
     (:spacing wide wide)
 
-    "=" "<ne>" "<neq>" "<longequal>" "<less>" "<gtr>" "<le>" "<leq>"
+    "=" "<ne>" "<neq>" "<longequal>" "<longequiv>"
+    "<less>" "<gtr>" "<le>" "<leq>"
     "<prec>" "<preceq>" "<preceqq>" "<ll>" "<lleq>" "<subset>" "<subseteq>"
     "<sqsubset>" "<sqsubseteq>" "<sqsubseteqq>" "<in>" "<ni>" "<of>"
     "<ge>" "<geq>" "<succ>" "<succeq>" "<succeqq>"
@@ -171,7 +178,7 @@
     (:penalty 20)
     (:spacing wide wide)
     (:limits always)
-    "<equallim>" "<longequallim>")
+    "<equallim>" "<longequallim>" "<longequivlim>")
 
   (define Relation-symbol
     Relation-nolim-symbol Relation-lim-symbol)
@@ -200,6 +207,8 @@
     "<longdownharpoonleft>" "<longdownharpoonright>"
     "<leftarrowtail>" "<leftleftarrows>" "<leftrightarrows>"
     "<longleftleftarrows>" "<longleftrightarrows>"
+    "<longthreeleftarrows>" "<longthreerightarrows>"
+    "<longfourleftarrows>" "<longfourrightarrows>"
     "<leftrightharpoons>" "<rightleftharpoons>"
     "<longleftrightharpoons>" "<longrightleftharpoons>"
     "<looparrowleft>" "<looparrowright>" "<Lsh>"
@@ -211,7 +220,9 @@
     "<Rsh>" "<twoheadleftarrow>" "<twoheadrightarrow>"
     "<upharpoonleft>" "<upharpoonright>"
     "<longupharpoonleft>" "<longupharpoonright>"
-    "<upuparrows>" "<leftrightmap>" "<pointer>")
+    "<upuparrows>" "<leftrightmap>" "<pointer>"
+    "<threeleftarrows>" "<threerightarrows>"
+    "<fourleftarrows>" "<fourrightarrows>")
   
   (define Arrow-lim-symbol
     (:type infix)
@@ -221,7 +232,9 @@
     "<leftarrowlim>" "<rightarrowlim>" "<leftrightarrowlim>"
     "<longleftarrowlim>" "<longrightarrowlim>" "<longleftrightarrowlim>"
     "<mapstolim>" "<longmapstolim>"
-    "<leftsquigarrowlim>" "<rightsquigarrowlim>" "<leftrightsquigarrowlim>")
+    "<leftsquigarrowlim>" "<rightsquigarrowlim>" "<leftrightsquigarrowlim>"
+    "<longleftleftarrowslim>" "<longleftrightarrowslim>"
+    "<longrightleftarrowslim>" "<longrightrightarrowslim>")
 
   (define Arrow-symbol
     Arrow-nolim-symbol Arrow-lim-symbol)
@@ -245,14 +258,14 @@
     "<setminus>" "<smallsetminus>" "<bslash>")
 
   (define Plus-visible-symbol
-    (:type infix)
+    (:type prefix-infix)
     (:penalty 30)
     (:spacing default default)
     "+" "<amalg>" "<oplus>" "<boxplus>"
-    "<dotplus>" "<dotamalg>" "<dotoplus>")
+    "<dotplus>" "<dotamalg>" "<dotoplus>" "<pplus>")
 
   (define Plus-invisible-symbol
-    (:type infix)
+    (:type prefix-infix)
     (:penalty invalid)
     (:spacing none default)
     "<noplus>")
@@ -267,7 +280,7 @@
     "<upl>")
 
   (define Minus-symbol
-    (:type infix)
+    (:type prefix-infix)
     (:penalty 30)
     (:spacing default default)
     "-" "<pm>" "<mp>" "<minus>" "<longminus>"
@@ -495,7 +508,20 @@
     "<Eta>" "<Theta>" "<Iota>" "<Kappa>" "<Lambda>" "<Mu>" "<Nu>"
     "<Xi>" "<Omicron>" "<Pi>" "<Rho>" "<Sigma>" "<Tau>"
     "<Upsilon>" "<Phi>" "<Psi>" "<Chi>" "<Omega>"
-    "<Backepsilon>" "<Mho>"
+    "<Backepsilon>" "<Backsigma>" "<Mho>"
+
+    "<b-0>" "<b-1>" "<b-2>" "<b-3>" "<b-4>"
+    "<b-5>" "<b-6>" "<b-7>" "<b-8>" "<b-9>"
+
+    "<b-a>" "<b-b>" "<b-c>" "<b-d>" "<b-e>" "<b-f>" "<b-g>"
+    "<b-h>" "<b-i>" "<b-j>" "<b-k>" "<b-l>" "<b-m>" "<b-n>"
+    "<b-o>" "<b-p>" "<b-q>" "<b-r>" "<b-s>" "<b-t>" "<b-u>"
+    "<b-v>" "<b-w>" "<b-x>" "<b-y>" "<b-z>"
+
+    "<b-A>" "<b-B>" "<b-C>" "<b-D>" "<b-E>" "<b-F>" "<b-G>"
+    "<b-H>" "<b-I>" "<b-J>" "<b-K>" "<b-L>" "<b-M>" "<b-N>"
+    "<b-O>" "<b-P>" "<b-Q>" "<b-R>" "<b-S>" "<b-T>" "<b-U>"
+    "<b-V>" "<b-W>" "<b-X>" "<b-Y>" "<b-Z>"
 
     "<b-alpha>" "<b-beta>" "<b-gamma>" "<b-delta>" "<b-epsilon>"
     "<b-varepsilon>" "<b-zeta>" "<b-eta>" "<b-theta>" "<b-vartheta>"
@@ -510,7 +536,18 @@
     "<b-Lambda>" "<b-Mu>" "<b-Nu>" "<b-Xi>" "<b-Omicron>"
     "<b-Pi>" "<b-Rho>" "<b-Sigma>" "<b-Tau>" "<b-Upsilon>"
     "<b-Phi>" "<b-Psi>" "<b-Chi>" "<b-Omega>"
-    "<b-Backepsilon>" "<b-Mho>"
+    "<b-Backepsilon>" "<b-Backsigma>" "<b-Mho>"
+
+    "<up-a>" "<up-b>" "<up-c>" "<up-d>" "<up-e>" "<up-f>" "<up-g>"
+    "<up-h>" "<up-i>" "<up-j>" "<up-k>" "<up-l>" "<up-m>" "<up-n>"
+    "<up-o>" "<up-p>" "<up-q>" "<up-r>" "<up-s>" "<up-t>" "<up-u>"
+    "<up-v>" "<up-w>" "<up-x>" "<up-y>" "<up-z>"
+    "<up-imath>" "<up-jmath>" "<up-ell>"
+
+    "<up-A>" "<up-B>" "<up-C>" "<up-D>" "<up-E>" "<up-F>" "<up-G>"
+    "<up-H>" "<up-I>" "<up-J>" "<up-K>" "<up-L>" "<up-M>" "<up-N>"
+    "<up-O>" "<up-P>" "<up-Q>" "<up-R>" "<up-S>" "<up-T>" "<up-U>"
+    "<up-V>" "<up-W>" "<up-X>" "<up-Y>" "<up-Z>"
 
     "<up-alpha>" "<up-beta>" "<up-gamma>" "<up-delta>" "<up-epsilon>"
     "<up-varepsilon>" "<up-zeta>" "<up-eta>" "<up-theta>" "<up-vartheta>"
@@ -520,15 +557,12 @@
     "<up-phi>" "<up-varphi>" "<up-psi>" "<up-chi>" "<up-omega>"
     "<up-backepsilon>" "<up-mho>"
 
-    "<b-a>" "<b-b>" "<b-c>" "<b-d>" "<b-e>" "<b-f>" "<b-g>"
-    "<b-h>" "<b-i>" "<b-j>" "<b-k>" "<b-l>" "<b-m>" "<b-n>"
-    "<b-o>" "<b-p>" "<b-q>" "<b-r>" "<b-s>" "<b-t>" "<b-u>"
-    "<b-v>" "<b-w>" "<b-x>" "<b-y>" "<b-z>"
-
-    "<b-A>" "<b-B>" "<b-C>" "<b-D>" "<b-E>" "<b-F>" "<b-G>"
-    "<b-H>" "<b-I>" "<b-J>" "<b-K>" "<b-L>" "<b-M>" "<b-N>"
-    "<b-O>" "<b-P>" "<b-Q>" "<b-R>" "<b-S>" "<b-T>" "<b-U>"
-    "<b-V>" "<b-W>" "<b-X>" "<b-Y>" "<b-Z>"
+    "<up-Alpha>" "<up-Beta>" "<up-Gamma>" "<up-Delta>" "<up-Epsilon>"
+    "<up-Zeta>" "<up-Eta>" "<up-Theta>" "<up-Iota>" "<up-Kappa>"
+    "<up-Lambda>" "<up-Mu>" "<up-Nu>" "<up-Xi>" "<up-Omicron>"
+    "<up-Pi>" "<up-Rho>" "<up-Sigma>" "<up-Tau>" "<up-Upsilon>"
+    "<up-Phi>" "<up-Psi>" "<up-Chi>" "<up-Omega>"
+    "<up-Backepsilon>" "<up-Mho>"
 
     "<b-up-a>" "<b-up-b>" "<b-up-c>" "<b-up-d>" "<b-up-e>" "<b-up-f>"
     "<b-up-g>" "<b-up-h>" "<b-up-i>" "<b-up-j>" "<b-up-k>" "<b-up-l>"
@@ -542,8 +576,22 @@
     "<b-up-S>" "<b-up-T>" "<b-up-U>" "<b-up-V>" "<b-up-W>" "<b-up-X>"
     "<b-up-Y>" "<b-up-Z>"
 
-    "<b-0>" "<b-1>" "<b-2>" "<b-3>" "<b-4>"
-    "<b-5>" "<b-6>" "<b-7>" "<b-8>" "<b-9>"
+    "<b-up-alpha>" "<b-up-beta>" "<b-up-gamma>" "<b-up-delta>"
+    "<b-up-epsilon>" "<b-up-varepsilon>" "<b-up-zeta>" "<b-up-eta>"
+    "<b-up-theta>" "<b-up-vartheta>" "<b-up-iota>" "<b-up-kappa>"
+    "<b-up-varkappa>" "<b-up-lambda>" "<b-up-mu>" "<b-up-nu>"
+    "<b-up-xi>" "<b-up-omicron>" "<b-up-pi>" "<b-up-varpi>" "<b-up-rho>"
+    "<b-up-varrho>" "<b-up-sigma>" "<b-up-varsigma>" "<b-up-tau>"
+    "<b-up-upsilon>" "<b-up-phi>" "<b-up-varphi>" "<b-up-psi>"
+    "<b-up-chi>" "<b-up-omega>" "<b-up-backepsilon>" "<b-up-mho>"
+
+    "<b-up-Alpha>" "<b-up-Beta>" "<b-up-Gamma>" "<b-up-Delta>"
+    "<b-up-Epsilon>" "<b-up-Zeta>" "<b-up-Eta>" "<b-up-Theta>"
+    "<b-up-Iota>" "<b-up-Kappa>" "<b-up-Lambda>" "<b-up-Mu>"
+    "<b-up-Nu>" "<b-up-Xi>" "<b-up-Omicron>" "<b-up-Pi>"
+    "<b-up-Rho>" "<b-up-Sigma>" "<b-up-Tau>" "<b-up-Upsilon>"
+    "<b-up-Phi>" "<b-up-Psi>" "<b-up-Chi>" "<b-up-Omega>"
+    "<b-up-Backepsilon>" "<b-up-Mho>"
     
     "<cal-a>" "<cal-b>" "<cal-c>" "<cal-d>" "<cal-e>" "<cal-f>" "<cal-g>"
     "<cal-h>" "<cal-i>" "<cal-j>" "<cal-k>" "<cal-l>" "<cal-m>" "<cal-n>"
@@ -703,6 +751,7 @@
   (define Infix-symbol
     Assign-symbol
     Models-symbol
+    Modeled-symbol
     Imply-symbol
     Or-symbol
     And-symbol
@@ -721,4 +770,12 @@
     :<frac :<sqrt :<wide :<table :<row
     :<around :<around* :<big-around :<left :<mid :<right :<big
     :<lsub :<lsup :<rsub :<rsup :<lprime :<rprime
-    :<Prefix :<Postfix))
+    :<Prefix :<Postfix)
+
+  (attach-macro
+    ("<ldots>" low-dots)
+    ("<cdots>" center-dots)
+    ("<hdots>" high-dots)
+    ("<vdots>" vertical-dots)
+    ("<ddots>" diagonal-dots)
+    ("<udots>" upward-dots)))

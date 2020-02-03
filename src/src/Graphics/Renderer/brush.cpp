@@ -89,11 +89,26 @@ public:
 };
 
 url
+resolve_pattern (url im) {
+  url pats= expand (url ("$TEXMACS_PATTERN_PATH"));
+  url image= resolve (im);
+  if (is_none (image)) {
+    if (!is_rooted (im)) image= resolve (pats * im);
+    pats= subdirectories (pats);
+    if (!is_rooted (im) && is_none (image))
+      image= resolve (pats * im);
+    if (is_none (image))
+      image= resolve (pats * tail (im));
+  }
+  return image;
+}
+
+url
 brush_rep::get_pattern_url () {
   tree t= get_pattern ();
   if (is_atomic (t) || N(t) == 0 || !is_atomic (t[0])) return url ();
   url u= url_system (as_string (t[0]));
-  url r= resolve (url ("$TEXMACS_PATTERN_PATH") * u);
+  url r= resolve_pattern (u);
   if (!is_none (r)) return r;
   url base= get_current_buffer_safe ();
   r= resolve (relative (base, u));
@@ -156,7 +171,7 @@ mix (brush b1, double a1, brush b2, double a2) {
 ******************************************************************************/
 
 void
-get_pattern_data (url& u, SI& w, SI& h, brush br, SI pixel) {
+get_pattern_data (url& u, SI& w, SI& h, tree& eff, brush br, SI pixel) {
   // FIXME << what's about ratio and percentages wrt paper lengths?
   tree pattern= br->get_pattern ();
   u= br->get_pattern_url ();
@@ -178,4 +193,5 @@ get_pattern_data (url& u, SI& w, SI& h, brush br, SI pixel) {
     h= (SI) (as_percentage (pattern[2]) * ((double) w));
   w= ((w + pixel - 1) / pixel);
   h= ((h + pixel - 1) / pixel);
+  eff= (N(pattern) >= 4 && is_compound (pattern[3])? pattern[3]: tree (""));
 }

@@ -19,13 +19,16 @@ int    std_shrinkf  = 5;
 bool   retina_manual= false;
 bool   retina_iman  = false;
 int    retina_factor= 1;
+int    retina_zoom  = 1;
 int    retina_icons = 1;
 double retina_scale = 1.0;
 
 int    get_retina_factor () { return retina_factor; }
+int    get_retina_zoom () { return retina_zoom; }
 int    get_retina_icons () { return retina_icons; }
 double get_retina_scale () { return retina_scale; }
 void   set_retina_factor (int f) { retina_factor= f; }
+void   set_retina_zoom (int z) { retina_zoom= z; }
 void   set_retina_icons (int i) { retina_icons= i; }
 void   set_retina_scale (double s) { retina_scale= s; }
 
@@ -388,13 +391,16 @@ renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
 
     SI sx= -mx1;
     SI sy= -my2;
-    scalable im= load_scalable_image (u, w, h, pixel);
+    tree eff= "";
+    if (N(pattern) == 4 && is_compound (pattern[3])) eff= pattern[3];
+    scalable im= load_scalable_image (u, w, h, eff, pixel);
     for (int i= ((x1+sx)/w) - 1; i <= ((x2+sx)/w) + 1; i++)
       for (int j= ((y1+sy)/h) - 1; j <= ((y2+sy)/h) + 1; j++) {
 	SI X1= i*w     - sx, Y1= j*h     - sy;
 	SI X2= (i+1)*w - sx, Y2= (j+1)*h - sy;
 	if (X1 < x2 && X2 > x1 && Y1 < y2 && Y2 > y1)
-          draw_scalable (im, X1, Y1, pattern_alpha);
+          if (X1 < cx2 && X2 > cx1 && Y1 < cy2 && Y2 > cy1)
+            draw_scalable (im, X1, Y1, pattern_alpha);
       }
     set_clipping (cx1, cy1, cx2, cy2, true);
   }
@@ -526,8 +532,8 @@ picture_renderer (picture p, double zoomf) {
 }
 
 picture
-load_picture (url u, int w, int h) {
-  (void) u; (void) w; (void) h;
+load_picture (url u, int w, int h, tree eff, int pixel) {
+  (void) u; (void) w; (void) h; (void) eff; (void) pixel;
   FAILED ("not yet implemented");
   return picture ();
 }
@@ -536,6 +542,12 @@ picture
 as_native_picture (picture pict) {
   FAILED ("not yet implemented");
   return pict;
+}
+
+void
+save_picture (url dest, picture p) {
+  (void) dest; (void) p;
+  FAILED ("not yet implemented");
 }
 
 #endif

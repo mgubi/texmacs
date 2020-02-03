@@ -218,10 +218,10 @@ edit_interface_rep::mouse_scroll (SI x, SI y, bool up) {
       new_p= max (min (new_p, 100.0), 0.0);
       tree new_yt= as_string (new_p) * "%";
       if (new_yt != old_yt && is_accessible (obtain_ip (old_yt))) {
-	object fun= symbol_object ("tree-set");
-	object cmd= list_object (fun, old_yt, new_yt);
-	exec_delayed (scheme_cmd (cmd));
-	temp_invalid_cursor= true;
+        object fun= symbol_object ("tree-set");
+        object cmd= list_object (fun, old_yt, new_yt);
+        exec_delayed (scheme_cmd (cmd));
+        temp_invalid_cursor= true;
       }
     }
   }
@@ -526,6 +526,38 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
 * Event handlers
 ******************************************************************************/
 
+static tree
+relativize (tree t, url base) {
+  if (is_atomic (t)) return t;
+  else {
+    tree r (t, N(t));
+    for (int i=0; i<N(t); i++)
+      r[i]= relativize (t[i], base);
+    if (is_func (r, IMAGE) && N(r) >= 1 && is_atomic (r[0])) {
+      url name= url_system (r[0]->label);
+      if (descends (name, head (base)))
+        r[0]= as_string (delta (base, name));
+    }
+    return r;
+  }
+}
+
+static void
+call_drop_event (string kind, SI x, SI y, SI ticket, time_t t, url base) {
+#ifdef QTTEXMACS
+  extern hashmap<int, tree> payloads;
+  tree doc = payloads [ticket];
+  payloads->reset (ticket);
+  eval (list_object (symbol_object ("insert"), relativize (doc, base)));
+  //array<object> args;
+  //args << object (kind) << object (x) << object (y)
+  //<< object (doc) << object ((double) t);
+  //call ("mouse-event", args);
+#else
+  (void) kind; (void) x; (void) y; (void) ticket; (void) t;
+#endif
+}
+
 static void
 call_mouse_event (string kind, SI x, SI y, SI m, time_t t) {
   array<object> args;
@@ -559,20 +591,24 @@ edit_interface_rep::handle_mouse (string kind, SI x, SI y, int m, time_t t) {
     //cout << kind << " (" << x << ", " << y << "; " << m << ")"
     //     << " at " << t << "\n";
 
-    string rew= kind;
-    SI dist= (SI) (5 * PIXEL / magf);
-    rew= detect_left_drag ((void*) this, rew, x, y, t, m, dist);
-    if (rew == "start-drag-left") {
-      call_mouse_event (rew, left_x, left_y, m, t);
-      delayed_call_mouse_event ("dragging-left", x, y, m, t);
-    }
+    if (kind == "drop")
+      call_drop_event (kind, x, y, m, t, buf->buf->name);
     else {
-      rew= detect_right_drag ((void*) this, rew, x, y, t, m, dist);
-      if (rew == "start-drag-right") {
-        call_mouse_event (rew, right_x, right_y, m, t);
-        delayed_call_mouse_event ("dragging-right", x, y, m, t);
+      string rew= kind;
+      SI dist= (SI) (5 * PIXEL / magf);
+      rew= detect_left_drag ((void*) this, rew, x, y, t, m, dist);
+      if (rew == "start-drag-left") {
+        call_mouse_event (rew, left_x, left_y, m, t);
+        delayed_call_mouse_event ("dragging-left", x, y, m, t);
       }
-      else call_mouse_event (rew, x, y, m, t);
+      else {
+        rew= detect_right_drag ((void*) this, rew, x, y, t, m, dist);
+        if (rew == "start-drag-right") {
+          call_mouse_event (rew, right_x, right_y, m, t);
+          delayed_call_mouse_event ("dragging-right", x, y, m, t);
+        }
+        else call_mouse_event (rew, x, y, m, t);
+      }
     }
     end_editing ();
 #ifdef USE_EXCEPTIONS

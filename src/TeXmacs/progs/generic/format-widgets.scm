@@ -98,7 +98,7 @@
             '("1" "2" "3" "4" "5" "6")
             (ahash-ref new "par-columns") "10em"))
     (item (when (!= (ahash-ref new "par-columns") "1")
-            (text "Columns separation:"))
+            (text "Column separation:"))
       (refreshable "paragraph-formatter-columns-sep"
         (when (!= (ahash-ref new "par-columns") "1")
           (enum (ahash-set! new "par-columns-sep" answer)
@@ -268,7 +268,9 @@
           ((== what "color")
            (interactive-color setter (if old (list old) (list))))
           ((== what "pattern")
-           (open-pattern-selector setter "1cm")))))
+           (open-pattern-selector setter "1cm"))
+          ((== what "picture")
+           (open-background-picture-selector setter)))))
 
 (tm-widget ((page-formatter u style settings) quit)
   (padded
@@ -284,7 +286,7 @@
                 "unchanged" "10em"))
         (item (text "Page background:")
           (enum (page-set-background settings answer)
-                '("unchanged" "color" "pattern")
+                '("unchanged" "color" "pattern" "picture")
                 "unchanged" "10em"))))
     ======
     (bold (text "This page header"))
@@ -317,80 +319,3 @@
     (dialogue-window (page-formatter u st t)
                      noop "Page format"
                      (header-buffer) (footer-buffer))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Pattern selector
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (normalize-color col)
-  (if (tm-func? col 'pattern 3)
-      (tm-pattern (cadr col) (caddr col) (cadddr col))
-      col))
-
-(tm-widget ((pattern-selector u col w h) cmd)
-  (padded
-    (hlist
-      (vlist
-        (refreshable "pattern-sample"
-          (resize "300px" "300px"
-            (texmacs-output `(document
-                               (block
-                                (tformat
-                                 (cwith "1" "1" "1" "1" "cell-width" "290px")
-                                 (cwith "1" "1" "1" "1" "cell-height" "290px")
-                                 (cwith "1" "1" "1" "1" "cell-vmode" "exact")
-                                 (cwith "1" "1" "1" "1" "cell-background" ,col)
-                                 (table (row (cell ""))))))
-                            `(style (tuple "generic"))))))
-      // // //
-      (explicit-buttons
-        (vlist
-          (hlist
-            ("Color" (interactive-color
-                      (lambda (c)
-                        (set! col c)
-                        (refresh-now "pattern-sample"))
-                      '())) >>)
-          (hlist
-            ("Pattern" (choose-file
-                        (lambda (c)
-                          (when (and (pair? c) (url? (car c)))
-                            (set! col `(pattern ,(url->unix (car c)) ,w ,h)))
-                          (refresh-now "pattern-sample"))
-                        "Background pattern" "image"
-                        "" "$TEXMACS_PATH/misc/patterns/pine.png")) >>)
-          (hlist
-            ("Picture" (choose-file
-                        (lambda (c)
-                          (when (and (pair? c) (url? (car c)))
-                            (set! col `(pattern ,(url->unix (car c)) ,w ,h)))
-                          (refresh-now "pattern-sample"))
-                        "Background pattern" "image")) >>)
-          ======
-          (aligned
-            (item (text "Width:")
-              (enum (begin
-                      (set! w answer)
-                      (when (tm-func? col 'pattern 3)
-                        (set! col `(pattern ,(cadr col) ,w ,h)))
-                      (refresh-now "pattern-sample"))
-                    (list w "100%" "100@" "1cm") "" "10em"))
-            (item (text "Height:")
-              (enum (begin
-                      (set! h answer)
-                      (when (tm-func? col 'pattern 3)
-                        (set! col `(pattern ,(cadr col) ,w ,h)))
-                      (refresh-now "pattern-sample"))
-                    (list h "100%" "100@" "1cm") "" "10em")))
-          (glue #f #t 0 0))))
-    ======
-    (explicit-buttons
-      (hlist
-        >>>
-        ("Ok" (cmd (normalize-color col)))))))
-
-(tm-define (open-pattern-selector cmd w)
-  (:interactive #t)
-  (with u (current-buffer)
-    (dialogue-window (pattern-selector u "white" w "100@")
-                     cmd "Pattern selector")))

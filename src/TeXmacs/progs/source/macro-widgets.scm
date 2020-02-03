@@ -14,7 +14,44 @@
 (texmacs-module (source macro-widgets)
   (:use (source macro-edit)
 	(version version-edit) ;; FIXME: for selection-trees
-	))
+	(generic format-edit)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Major operation mode
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define macro-major-mode :global)
+(tm-define macro-major-focus #f)
+(tm-define macro-major-history (list))
+
+(define (initialize-macro-editor l mode)
+  (terminate-macro-editor)
+  (set! macro-major-mode mode)
+  (set! macro-major-history (list))
+  (when (func? mode :local)
+    (set! macro-major-focus (tree->tree-pointer (focus-tree)))))
+
+(define (terminate-macro-editor)
+  (when macro-major-focus
+    (tree-pointer-detach macro-major-focus)
+    (set! macro-major-focus #f)))
+
+(define (macro-editor-get l)
+  (cond ((== macro-major-mode :global)
+         (get-definition l))
+        ((func? macro-major-mode :local)
+         (and-with t (tree-pointer->tree macro-major-focus)
+           (with val (tree-with-get t l)
+             (if val (tm->tree `(assign ,l ,val)) (get-definition l)))))
+        (else #f)))
+
+(define (macro-editor-set l val u)
+  (when (symbol? l) (set! l (symbol->string l)))
+  (cond ((== macro-major-mode :global)
+         (macro-set-value l val u))
+        ((func? macro-major-mode :local)
+         (and-with t (tree-pointer->tree macro-major-focus)
+           (tree-with-set t l val)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Global variables
@@ -39,6 +76,13 @@
            `(,(tm-label t) ,@(cDr (tm-children t)) ,(tree-ref t :last 0)))
           (else t))))
 
+(define (macro-retrieve-name u)
+  (and-with t (macro-retrieve u)
+    (tree->string (tm-ref t 0))))
+
+(define (get-macro-mode)
+  macro-current-mode)
+
 (define (set-macro-mode u mode)
   (set! macro-current-mode mode)
   (and-with t (macro-retrieve u)
@@ -46,8 +90,14 @@
       (cond ((== mode "Source")
              (tree-set t* :last `(inactive* ,(cAr (tm-children t)))))
             (else
-             (tree-set t* :last (cAr (tm-children t))))))))
+              (tree-set t* :last (cAr (tm-children t)))))
+      (refresh-now "macro-editor-mode"))))
 
+(tm-define (toggle-source-mode)
+  (:require (has-style-package? "macro-editor"))
+  (with mode (if (== (get-macro-mode) "Text") "Source" "Text")
+    (set-macro-mode (current-buffer) mode)))
+  
 (define (buffer-has-preamble? buf)
   (tree-in? (tree-ref buf 0)
             '(show-preamble hide-preamble)))
@@ -66,15 +116,11 @@
         (tree-set m ass)
         (tree-insert pre (tree-arity pre) (list ass)))))
 
-(define (macro-apply* u t)
+(define (macro-set-value l mac u)
   (let* ((b   (buffer-get-master u))
          (m   (buffer-get-master b))
          (buf (buffer-get-body b))
-         (l   (tree->string (tm-ref t 0)))
          (old (get-definition* l buf))
-         (mac (if (tm-is? t 'edit-macro)
-                  `(macro ,@(cdr (tm-children t)))
-                  (tm-ref t 1)))
          (new `(assign ,l ,mac)))
     (cond ((or (not (buffer-exists? u)) (not (buffer-exists? b))) #f)
           ((and old (tree->path old)) (tree-set old 1 mac))
@@ -85,11 +131,16 @@
               (with pre (tree-ref buf 0 0)
                 (preamble-insert pre new)))
             (when (!= m b)
-              (macro-apply* b t))))))
+              (macro-set-value l mac b))))))
+
+(define (macro-value t)
+  (if (tm-is? t 'edit-macro)
+      `(macro ,@(cdr (tm-children t)))
+      (tm-ref t 1)))
 
 (define (macro-apply u)
   (and-with t (macro-retrieve u)
-    (macro-apply* u t)))
+    (macro-editor-set (tree->string (tm-ref t 0)) (macro-value t) u)))
 
 (define (build-macro-document* l def)
   (when (and (tm-func? def 'assign 2)
@@ -105,7 +156,7 @@
     doc))
 
 (define (build-macro-document l)
-  (and-with def (get-definition l)
+  (and-with def (macro-editor-get l)
     (build-macro-document* l def)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,9 +169,10 @@
       (texmacs-input doc `(style (tuple ,@packs)) u))
     ===
     (hlist
-      (enum (set-macro-mode u answer)
-            '("Text" "Source")
-            mode "6em")
+      (refreshable "macro-editor-mode"
+        (enum (set-macro-mode u answer)
+              '("Text" "Source")
+              (get-macro-mode) "6em"))
       >>
       (explicit-buttons
         ("Apply" (macro-apply u))
@@ -129,20 +181,39 @@
 
 (tm-define (editable-macro? l)
   (if (symbol? l) (set! l (symbol->string l)))
-  (get-definition l))
+  (and (tree-label-extension? (string->symbol l))
+       (nin? l (list "edit-macro" "edit-tag"))
+       (get-definition l)))
 
-(tm-define (open-macro-editor l)
+(tm-define (open-macro-editor l mode)
   (:interactive #t)
   (if (symbol? l) (set! l (symbol->string l)))
+  (initialize-macro-editor l mode)
   (let* ((b (current-buffer-url))
          (u (string->url (string-append "tmfs://aux/edit-" l)))
          (packs (get-style-list))
          (styps (list-remove-duplicates (append packs (list "macro-editor")))))
     (and-with doc (build-macro-document l)
       (dialogue-window (macro-editor u styps doc "Text")
-                       (lambda x (noop))
+                       (lambda x (terminate-macro-editor))
                        "Macro editor" u)
       (buffer-set-master u b))))
+
+(tm-define (edit-focus-macro)
+  (:interactive #t)
+  (with l (symbol->string (macro-label (focus-tree)))
+    (when (editable-macro? l)
+      (if (has-style-package? "macro-editor")
+          (with old (macro-retrieve-name (current-buffer))
+            (macros-editor-select (current-buffer) l "")
+            (set! macro-major-history (cons old macro-major-history)))
+          (open-macro-editor l :global)))))
+
+(tm-define (edit-previous-macro)
+  (when (and (nnull? macro-major-history)
+             (has-style-package? "macro-editor"))
+    (macros-editor-select (current-buffer) (car macro-major-history) "")
+    (set! macro-major-history (cdr macro-major-history))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table macros
@@ -177,7 +248,7 @@
 		    (map (cut tformat-subst-selection <> tf)
 			 (tm-children t))))))
 
-(tm-define (create-table-macro l)
+(tm-define (create-table-macro l mode)
   (:interactive #t)
   (when (can-create-table-macro?)
     (position-inside-table)
@@ -248,9 +319,10 @@
           (glue #t #f 0 0))))
     ======
     (hlist
-      (enum (set-macro-mode u answer)
-            '("Text" "Source")
-            macro-current-mode "6em")
+      (refreshable "macro-editor-mode"
+        (enum (set-macro-mode u answer)
+              '("Text" "Source")
+              (get-macro-mode) "6em"))
       >>
       (explicit-buttons
         ("Apply" (macro-apply u))
@@ -271,14 +343,15 @@
                                  "wide-std-framed-colored"))
           string<=?)))
 
-(tm-define (open-macros-editor)
+(tm-define (open-macros-editor mode)
   (:interactive #t)
+  (initialize-macro-editor :all mode)
   (let* ((b (current-buffer-url))
 	 (u (string->url "tmfs://aux/macro-editor"))
 	 (names (all-defined-macros))
          (packs (get-style-list))
          (styps (list-remove-duplicates (append packs (list "macro-editor")))))
     (dialogue-window (macros-editor u styps names)
-		     (lambda x (noop))
+		     (lambda x (terminate-macro-editor))
 		     "Macros editor" u)
     (buffer-set-master u b)))

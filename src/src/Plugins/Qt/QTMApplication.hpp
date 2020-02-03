@@ -13,7 +13,10 @@
 #define QTMAPPLICATION_HPP
 
 #include <QApplication>
+#include <QIcon>
 #include "string.hpp"
+#include "sys_utils.hpp"
+#include "url.hpp"
 
 /*
  FIXME: We would like to do the following
@@ -44,6 +47,16 @@ class QTMApplication: public QApplication {
 public:
   QTMApplication (int& argc, char** argv) :
     QApplication (argc, argv) { }
+
+  void set_window_icon (string icon_path) {
+    url icon_url= url_system (get_env ("TEXMACS_PATH") * icon_path);
+    if (exists (icon_url)) {
+      const c_string _icon (as_string (icon_url));
+      setWindowIcon (QIcon ((const char*) _icon));
+    }
+    else
+      std_warning << "Could not find TeXmacs icon file: " << as_string (icon_url) << LF;
+  }
 
   virtual bool notify (QObject* receiver, QEvent* event)
   {

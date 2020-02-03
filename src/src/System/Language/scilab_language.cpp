@@ -56,12 +56,9 @@ line_inc (tree t, int i) {
 */
 
 static void parse_number (string s, int& pos);
-static void parse_alpha (string s, int& pos);
-static inline bool belongs_to_identifier (char c);
 
 scilab_language_rep::scilab_language_rep (string name):
-  language_rep (name), colored ("")
-{}
+  abstract_language_rep (name) {}
 
 text_property
 scilab_language_rep::advance (tree t, int& pos) {
@@ -70,7 +67,7 @@ scilab_language_rep::advance (tree t, int& pos) {
   char c= s[pos];
   if (c == ' ') {
     pos++; return &tp_space_rep; }
-  if (c >= '0' && c <= '9') {
+  if (is_digit (c)) {
     parse_number (s, pos); return &tp_normal_rep; }
   if (belongs_to_identifier (c)) {
     parse_alpha (s, pos); return &tp_normal_rep; }
@@ -219,37 +216,10 @@ scilab_color_setup_operator_field (hashmap<string, string> & t) {
   t (".")= "operator_field";
 }
 
-static inline bool
-belongs_to_identifier (char c) {
-  return ((c<='9' && c>='0') ||
-          (c<='Z' && c>='A') ||
-	  (c<='z' && c>='a') ||
-          (c=='_' || c=='%' || c=='#' || c=='$' || c=='?' || c=='!'));
-}
-
-static inline bool
-is_number (char c) {
-  return (c>='0' && c<='9');
-}
-
-static void
-parse_identifier (hashmap<string, string>& t, string s, int& pos) {
-  int i=pos;
-  if (pos >= N(s)) return;
-  if (is_number (s[i])) return;
-  while (i<N(s) && belongs_to_identifier (s[i])) i++;
-  if (!(t->contains (s (pos, i)))) pos= i;
-}
-
-static void
-parse_alpha (string s, int& pos) {
-  static hashmap<string,string> empty;
-  parse_identifier (empty, s, pos);
-}
-
-static void
-parse_blanks (string s, int& pos) {
-  while (pos<N(s) && (s[pos] == ' ' || s[pos] == '\t')) pos++;
+bool
+scilab_language_rep::belongs_to_identifier (char c) {
+  return is_digit (c) || is_alpha(c) ||
+         (c=='_' || c=='%' || c=='#' || c=='$' || c=='?' || c=='!');
 }
 
 static bool
@@ -290,11 +260,11 @@ parse_string (string s, int& pos) {
   return false;
 }
   
-static string
-parse_keywords (hashmap<string,string>& t, string s, int& pos) {
+string
+scilab_language_rep::parse_keywords (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return "";
-  if (is_number (s[i])) return "";
+  if (is_digit (s[i])) return "";
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
   string r= s (pos, i);
   if (t->contains (r)) {
@@ -318,8 +288,8 @@ parse_keywords (hashmap<string,string>& t, string s, int& pos) {
   return "";
 }
 
-static string
-parse_operators (hashmap<string,string>& t, string s, int& pos) {
+string
+scilab_language_rep::parse_operators (hashmap<string,string>& t, string s, int& pos) {
   int i;
   for (i=11; i>=1; i--) {
     string r=s(pos,pos+i);
@@ -355,16 +325,16 @@ parse_number (string s, int& pos) {
   if (pos>=N(s)) return;
   if (s[i] == '.') return;
   while (i<N(s) && 
-	 (is_number (s[i]) ||
+	 (is_digit (s[i]) ||
 	  (s[i] == '.' && (i+1<N(s)) &&
-	   (is_number (s[i+1]) ||
+	   (is_digit (s[i+1]) ||
 	    s[i+1] == 'e' || s[i+1] == 'E' ||
             s[i+1] == 'd' || s[i+1] == 'D')))) i++;
   if (i == pos) return;
   if (i<N(s) && (s[i] == 'e' || s[i] == 'E' || s[i] == 'd' || s[i] == 'D' )) {
     i++;
     if (i<N(s) && s[i] == '-') i++;
-    while (i<N(s) && (is_number (s[i]))) i++;
+    while (i<N(s) && (is_digit (s[i]))) i++;
   }
   pos= i;
 }
@@ -421,19 +391,16 @@ scilab_language_rep::get_color (tree t, int start, int end) {
           break;
         }
       }
-      parse_blanks (s, pos);
-      if (opos < pos){
-        break;
-      }
+      if (blanks_parser.parse (s, pos)) break;
       parse_comment_single_line (s, pos);
       if (opos < pos) {
-	type= "comment";
-	break;
+        type= "comment";
+        break;
       }
       cut_str= parse_string (s, pos);
       if (opos < pos) {
-	type= "constant_string";
-	break;
+        type= "constant_string";
+        break;
       }
 
       if (!cut_str) {

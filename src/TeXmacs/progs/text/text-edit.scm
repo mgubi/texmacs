@@ -347,7 +347,8 @@
       (with lab (inside-which (list-tag-list))
 	(cond ((in? lab (itemize-tag-list)) (make 'item))
 	      ((in? lab (enumerate-tag-list)) (make 'item))
-	      ((in? lab (description-tag-list)) (make 'item*))))))
+	      ((in? lab (description-tag-list)) (make 'item*))
+              (else (make 'item))))))
 
 (tm-define (kbd-enter t shift?)
   (:require (list-context? t))
@@ -584,6 +585,27 @@
 	  (tree-go-to t (- (tree-arity t) 2) :start)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Possible to use a custom note symbol
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (detached-note-context? t)
+  (tree-in? t (detached-note-tag-list)))
+
+(tm-define (auto-note-context? t)
+  (tree-in? t (auto-note-tag-list)))
+
+(tm-define (custom-note-context? t)
+  (tree-in? t (custom-note-tag-list)))
+
+(tm-define (note-toggle-custom t)
+  (let* ((l (symbol-toggle-number (tree-label t)))
+         (c (tree-children t)))
+    (if (auto-note-context? t)
+        (tree-insert! t (tree-arity t) (list "<dag>"))
+        (tree-remove! t (- (tree-arity t) 1) 1))
+    (tree-assign-node! t l)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Possible to change the title of titled environments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -650,10 +672,18 @@
            (tree-set! t `(,l ,(tree-ref t 0)))
            (tree-go-to t 0 :end)))))
 
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "padding-above" "padding-below")))
+  (list "0fn" "0.5fn" "1fn" "1.5fn" "2fn" :other))
+
 (tm-define (customizable-parameters t)
   (:require (tree-in? t '(padded padded-titled)))
   (list (list "padding-above" "Above")
         (list "padding-below" "Below")))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "overlined-sep" "underlined-sep")))
+  (list "0sep" "0.5sep" "1sep" "1.5sep" "2sep" :other))
 
 (tm-define (customizable-parameters t)
   (:require (tree-in? t '(overlined overlined-titled)))
@@ -678,29 +708,37 @@
   (:require (tree-in? t '(framed framed-titled)))
   (list (list "padding-above" "Above")
         (list "padding-below" "Below")
-        (list "framed-vsep" "Inner")
-        (list "framed-hsep" "Indentation")
         (list "framed-color" "Color")))
 
-(tm-define (customizable-parameters t)
-  (:require (tree-is? t 'ornamented))
-  (list (list "padding-above" "Above")
-        (list "padding-below" "Below")
-        (list "ornament-vpadding" "Inner")
-        (list "ornament-hpadding" "Indentation")
-        (list "ornament-color" "Color")
-        (list "ornament-shape" "Shape")))
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "ornament-hpadding" "ornament-vpadding")))
+  (list "0spc" "0.5spc" "1spc" "1.5spc" "2spc" :other))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "ornament-border")))
+  (list "0ln" "0.5ln" "1ln" "2ln" "3ln" "4ln" "5ln" :other))
 
 (tm-define (customizable-parameters t)
-  (:require (tree-is? t 'ornamented-titled))
+  (:require (tree-in? t '(ornamented decorated)))
   (list (list "padding-above" "Above")
         (list "padding-below" "Below")
         (list "ornament-vpadding" "Inner")
         (list "ornament-hpadding" "Indentation")
-        (list "ornament-color" "Color")
         (list "ornament-shape" "Shape")
-        (list "ornament-extra-color" "Title color")
-        (list "ornament-title-style" "Title style")))
+        (list "ornament-color" "Color")
+        (list "ornament-border" "Border")))
+
+(tm-define (customizable-parameters t)
+  (:require (tree-in? t '(ornamented-titled decorated-titled)))
+  (list (list "padding-above" "Above")
+        (list "padding-below" "Below")
+        (list "ornament-vpadding" "Inner")
+        (list "ornament-hpadding" "Indentation")
+        (list "ornament-shape" "Shape")
+        (list "ornament-color" "Color")
+        (list "ornament-border" "Border")
+        (list "ornament-title-style" "Title style")
+        (list "ornament-extra-color" "Title color")))
 
 (tm-define (customizable-parameters t)
   (:require (tree-is? t 'ornament))
@@ -719,6 +757,35 @@
         (list "ornament-border" "Border width")
         (list "ornament-hpadding" "Horizontal padding")
         (list "ornament-vpadding" "Vertical padding")))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "frame-hpadding" "frame-vpadding")))
+  (list "0tab" "0.5tab" "1tab" "1.5tab" "2tab" :other))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "frame-thickness")))
+  (list "0.2" "0.5" "1" "1.5" "2" "3" "4" "5" :other))
+
+(tm-define (customizable-parameters t)
+  (:require (tree-in? t (art-frame-tag-list)))
+  (list (list "frame-thickness" "Thickness")
+        (list "frame-recolor" "Recolor")
+        (list "frame-hpadding" "Horizontal padding")
+        (list "frame-vpadding" "Vertical padding")))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "shadow-elevation")))
+  (list "0.2" "0.5" "1" "1.5" "2" "3" "4" "5" :other))
+
+(tm-define (parameter-choice-list var)
+  (:require (in? var (list "shadow-plain")))
+  (list "false" "true"))
+
+(tm-define (customizable-parameters t)
+  (:require (tree-in? t (shadow-tag-list)))
+  (list (list "shadow-elevation" "Elevation")
+        (list "shadow-recolor" "Recolor")
+        (list "shadow-plain" "Plain")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Floating objects and environments

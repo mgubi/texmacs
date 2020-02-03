@@ -25,6 +25,24 @@
       ("Several equations" (make-eqnarray*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; General purpose markup that is also relevant for mathematics
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(menu-bind math-content-tag-menu
+  ("Deleted" (make 'deleted))
+  ("Fill out" (make 'fill-out))
+  ("Marked" (make 'marked)))
+
+(menu-bind math-presentation-tag-menu
+  ("Decorated" (make 'decorated))
+  (if (and (style-has? "std-markup-dtd")
+           (== (get-preference "experimental alpha") "on"))
+      ---
+      ("Pastel" (make 'pastel))
+      ("Greyed" (make 'greyed))
+      ("Light" (make 'light))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special mathematical text properties
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -137,10 +155,10 @@
 
 (menu-bind textual-operator-menu
   ("Normal" (make 'math-up))
-  ("Sans serif" (make 'math-ss))
-  ("Typewriter" (make 'math-tt))
-  ("Bold" (make 'math-bf))
   ("Italic" (make 'math-it))
+  ("Bold" (make 'math-bf))
+  ("Typewriter" (make 'math-tt))
+  ("Sans serif" (make 'math-ss))
   ("Slanted" (make 'math-sl)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -449,7 +467,17 @@
   (symbol "<rightleftarrows>")
   (symbol "<mapsto>")
   (symbol "<rightsquigarrow>")
-  (symbol "<leftrightsquigarrow>"))
+  (symbol "<leftrightsquigarrow>")
+
+  (symbol "<leftleftarrows>")
+  (symbol "<threeleftarrows>")
+  (symbol "<fourleftarrows>")
+  (symbol "<rightrightarrows>")
+  (symbol "<threerightarrows>")
+  (symbol "<fourrightarrows>")
+  (symbol "<Lleftarrow>")
+  (symbol "<Rrightarrow>")
+  (symbol "<LRleftrightarrow>"))
 
 (menu-bind vertical-arrow-menu
   (symbol "<uparrow>")
@@ -1044,7 +1072,6 @@
   ("Negation" (make-neg))
   ("Tree" (make-tree))
   ---
-  (-> "Size tag" (link size-tag-menu))
   (-> "Script"
       ("Left subscript" (make-script #f #f))
       ("Left superscript" (make-script #t #f))
@@ -1111,7 +1138,11 @@
   (-> "Symbol" (link symbol-menu))
   (-> "Textual operator" (link textual-operator-menu))
   (if (== (get-preference "semantic editing") "on")
-      (-> "Semantics" (link semantic-annotation-menu))))
+      (-> "Semantics" (link semantic-annotation-menu)))
+  ---
+  (-> "Content tag" (link math-content-tag-menu))
+  (-> "Size tag" (link size-tag-menu))
+  (-> "Presentation tag" (link math-presentation-tag-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Mathematics menu

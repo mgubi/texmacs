@@ -19,7 +19,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define repo (url-concretize "$TEXMACS_HOME_PATH/server"))
-(define repo-seed-val (+ (* 4294967296 (abs (texmacs-time)))))
+(define repo-seed-val (* 65536 (abs (texmacs-time))))
 (define repo-seed (seed->random-state repo-seed-val))
 
 (define (repository-add-into dir name)
@@ -49,8 +49,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File hierarchy
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (safe-car l) (and (pair? l) (car l)))
 
 (define (search-file l . where)
   (if (null? l) where

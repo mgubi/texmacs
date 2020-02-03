@@ -32,6 +32,7 @@ struct math_language_rep: language_rep {
   void set_left_spacing (string cl, string s);
   void set_right_spacing (string cl, string s);
   void set_limits (string cl, string s);
+  void set_macro (string sym, string s);
 
   void skip_spaces (string s, int& pos, space fn_spc, space& spc);
   string next_word (string s, int& pos);
@@ -56,6 +57,7 @@ math_language_rep::set_type (string cl, string s) {
   else if (s == "prefix") ot= OP_PREFIX;
   else if (s == "postfix") ot= OP_POSTFIX;
   else if (s == "infix") ot= OP_INFIX;
+  else if (s == "prefix-infix") ot= OP_PREFIX_INFIX;
   else if (s == "separator") ot= OP_SEPARATOR;
   else if (s == "opening-bracket") ot= OP_OPENING_BRACKET;
   else if (s == "middle-bracket") ot= OP_MIDDLE_BRACKET;
@@ -134,6 +136,12 @@ math_language_rep::set_limits (string cl, string s) {
   }
 }
 
+void
+math_language_rep::set_macro (string sym, string s) {
+  tpr_member(sym)= copy (tpr_member(sym));
+  tpr_member(sym).macro= make_tree_label (s);
+}
+
 //math_language_rep::math_language_rep (string name, string s):
 math_language_rep::math_language_rep (string name):
   language_rep (name),
@@ -153,8 +161,8 @@ math_language_rep::math_language_rep (string name):
     C prop= ((C) (key >> 32));
     C sym = ((C) (key & 0xffffffff)) ^ prop;
     ASSERT (is_compound (packrat_decode[sym], "symbol", 1) &&
-	    is_compound (packrat_decode[prop], "property", 1),
-	    "invalid symbol or property");
+            is_compound (packrat_decode[prop], "property", 1),
+            "invalid symbol or property");
     string cl = packrat_decode[sym ][0]->label;
     string var= packrat_decode[prop][0]->label;
     string val= props[key];
@@ -176,6 +184,17 @@ math_language_rep::math_language_rep (string name):
       tpr_member (a[i])= tpr_class [cl];
     }
   }
+
+  it= iterate (props);
+  while (it->busy ()) {
+    D key = it->next ();
+    C prop= ((C) (key >> 32));
+    C sym = ((C) (key & 0xffffffff)) ^ prop;
+    string smb= packrat_decode[sym ][0]->label;
+    string var= packrat_decode[prop][0]->label;
+    string val= props[key];
+    if (var == "macro") set_macro (smb, val);
+  }
 }
 
 /******************************************************************************
@@ -188,7 +207,7 @@ math_language_rep::next_word (string s, int& pos) {
 
   if (pos>=N(s)) return string ("");
 
-  if ((s[pos]>='0') && (s[pos]<='9')) {
+  if (is_digit (s[pos])) {
     while ((pos<N(s)) && is_numeric (s[pos])) pos++;
     while (s[pos-1]=='.') pos--;
     return s (start, pos);
@@ -320,6 +339,8 @@ math_symbol_type (string sym, string lang) {
     return "postfix";
   case OP_INFIX:
     return "infix";
+  case OP_PREFIX_INFIX:
+    return "prefix-infix";
   case OP_SEPARATOR:
     return "separator";
   case OP_OPENING_BRACKET:

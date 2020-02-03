@@ -24,7 +24,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (beamer-themes)
-  (list "bluish" "ice" "metal" "reddish" "ridged-paper"))
+  (list "blackboard" "bluish" "boring-white" "dark-vador" "granite"
+        "ice" "manila-paper" "metal" "pale-blue" "parchment"
+        "pine" "reddish" "ridged-paper" "rough-paper"
+        "xperiment"))
 
 (tm-define (current-beamer-theme)
   (with l (get-style-list)

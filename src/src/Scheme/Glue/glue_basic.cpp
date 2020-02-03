@@ -85,19 +85,6 @@ tmg_updater_last_check () {
 }
 
 tmscm
-tmg_updater_set_appcast (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "updater-set-appcast");
-
-  url in1= tmscm_to_url (arg1);
-
-  // TMSCM_DEFER_INTS;
-  bool out= updater_set_appcast (in1);
-  // TMSCM_ALLOW_INTS;
-
-  return bool_to_tmscm (out);
-}
-
-tmscm
 tmg_updater_set_interval (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "updater-set-interval");
 
@@ -105,19 +92,6 @@ tmg_updater_set_interval (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   bool out= updater_set_interval (in1);
-  // TMSCM_ALLOW_INTS;
-
-  return bool_to_tmscm (out);
-}
-
-tmscm
-tmg_updater_set_automatic (tmscm arg1) {
-  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "updater-set-automatic");
-
-  bool in1= tmscm_to_bool (arg1);
-
-  // TMSCM_DEFER_INTS;
-  bool out= updater_set_automatic (in1);
   // TMSCM_ALLOW_INTS;
 
   return bool_to_tmscm (out);
@@ -232,6 +206,15 @@ tmg_get_retina_factor () {
 }
 
 tmscm
+tmg_get_retina_zoom () {
+  // TMSCM_DEFER_INTS;
+  int out= get_retina_zoom ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_get_retina_icons () {
   // TMSCM_DEFER_INTS;
   int out= get_retina_icons ();
@@ -257,6 +240,19 @@ tmg_set_retina_factor (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   set_retina_factor (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_set_retina_zoom (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-retina-zoom");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  set_retina_zoom (in1);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -999,6 +995,32 @@ tmg_named_color_2xcolormap (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
+}
+
+tmscm
+tmg_rgba_2named_color (tmscm arg1) {
+  TMSCM_ASSERT_ARRAY_INT (arg1, TMSCM_ARG1, "rgba->named-color");
+
+  array_int in1= tmscm_to_array_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= named_rgb_color (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_named_color_2rgba (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "named-color->rgba");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_int out= get_named_rgb_color (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_int_to_tmscm (out);
 }
 
 tmscm
@@ -6130,6 +6152,19 @@ tmg_conservative_bib_export (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_clean_html (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "clean-html");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= clean_html (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_upgrade_tmml (tmscm arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "upgrade-tmml");
 
@@ -6150,6 +6185,19 @@ tmg_upgrade_mathml (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   tree out= upgrade_mathml (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_retrieve_mathjax (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "retrieve-mathjax");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= retrieve_mathjax (in1);
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
@@ -6872,6 +6920,19 @@ tmg_url_resolve_in_path (tmscm arg1) {
 }
 
 tmscm
+tmg_url_resolve_pattern (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-resolve-pattern");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= resolve_pattern (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
 tmg_url_existsP (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-exists?");
 
@@ -6908,6 +6969,19 @@ tmg_url_exists_in_texP (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_url_concretize_dot (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-concretize*");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= concretize_url (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
 }
 
 tmscm
@@ -7287,6 +7361,15 @@ tmg_url_search_upwards (tmscm arg1, tmscm arg2, tmscm arg3) {
   // TMSCM_ALLOW_INTS;
 
   return url_to_tmscm (out);
+}
+
+tmscm
+tmg_picture_cache_reset () {
+  // TMSCM_DEFER_INTS;
+  picture_cache_reset ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -9032,6 +9115,19 @@ tmg_tree_import (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_tree_inclusion (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-inclusion");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= load_inclusion (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_tree_export (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-export");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "tree-export");
@@ -9599,6 +9695,15 @@ tmg_alt_window_search (tmscm arg1) {
 }
 
 tmscm
+tmg_supports_bibtexP () {
+  // TMSCM_DEFER_INTS;
+  bool out= bibtex_present ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_bibtex_run (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bibtex-run");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "bibtex-run");
@@ -9805,9 +9910,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("updater-check-background",  tmg_updater_check_background, 0, 0, 0);
   tmscm_install_procedure ("updater-check-foreground",  tmg_updater_check_foreground, 0, 0, 0);
   tmscm_install_procedure ("updater-last-check",  tmg_updater_last_check, 0, 0, 0);
-  tmscm_install_procedure ("updater-set-appcast",  tmg_updater_set_appcast, 1, 0, 0);
   tmscm_install_procedure ("updater-set-interval",  tmg_updater_set_interval, 1, 0, 0);
-  tmscm_install_procedure ("updater-set-automatic",  tmg_updater_set_automatic, 1, 0, 0);
   tmscm_install_procedure ("get-original-path",  tmg_get_original_path, 0, 0, 0);
   tmscm_install_procedure ("os-win32?",  tmg_os_win32P, 0, 0, 0);
   tmscm_install_procedure ("os-mingw?",  tmg_os_mingwP, 0, 0, 0);
@@ -9820,9 +9923,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("default-japanese-font",  tmg_default_japanese_font, 0, 0, 0);
   tmscm_install_procedure ("default-korean-font",  tmg_default_korean_font, 0, 0, 0);
   tmscm_install_procedure ("get-retina-factor",  tmg_get_retina_factor, 0, 0, 0);
+  tmscm_install_procedure ("get-retina-zoom",  tmg_get_retina_zoom, 0, 0, 0);
   tmscm_install_procedure ("get-retina-icons",  tmg_get_retina_icons, 0, 0, 0);
   tmscm_install_procedure ("get-retina-scale",  tmg_get_retina_scale, 0, 0, 0);
   tmscm_install_procedure ("set-retina-factor",  tmg_set_retina_factor, 1, 0, 0);
+  tmscm_install_procedure ("set-retina-zoom",  tmg_set_retina_zoom, 1, 0, 0);
   tmscm_install_procedure ("set-retina-icons",  tmg_set_retina_icons, 1, 0, 0);
   tmscm_install_procedure ("set-retina-scale",  tmg_set_retina_scale, 1, 0, 0);
   tmscm_install_procedure ("tm-output",  tmg_tm_output, 1, 0, 0);
@@ -9884,6 +9989,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("color",  tmg_color, 1, 0, 0);
   tmscm_install_procedure ("get-hex-color",  tmg_get_hex_color, 1, 0, 0);
   tmscm_install_procedure ("named-color->xcolormap",  tmg_named_color_2xcolormap, 1, 0, 0);
+  tmscm_install_procedure ("rgba->named-color",  tmg_rgba_2named_color, 1, 0, 0);
+  tmscm_install_procedure ("named-color->rgba",  tmg_named_color_2rgba, 1, 0, 0);
   tmscm_install_procedure ("new-author",  tmg_new_author, 0, 0, 0);
   tmscm_install_procedure ("set-author",  tmg_set_author, 1, 0, 0);
   tmscm_install_procedure ("get-author",  tmg_get_author, 0, 0, 0);
@@ -10250,8 +10357,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("parse-bib",  tmg_parse_bib, 1, 0, 0);
   tmscm_install_procedure ("conservative-bib-import",  tmg_conservative_bib_import, 3, 0, 0);
   tmscm_install_procedure ("conservative-bib-export",  tmg_conservative_bib_export, 3, 0, 0);
+  tmscm_install_procedure ("clean-html",  tmg_clean_html, 1, 0, 0);
   tmscm_install_procedure ("upgrade-tmml",  tmg_upgrade_tmml, 1, 0, 0);
   tmscm_install_procedure ("upgrade-mathml",  tmg_upgrade_mathml, 1, 0, 0);
+  tmscm_install_procedure ("retrieve-mathjax",  tmg_retrieve_mathjax, 1, 0, 0);
   tmscm_install_procedure ("vernac->texmacs",  tmg_vernac_2texmacs, 1, 0, 0);
   tmscm_install_procedure ("vernac-document->texmacs",  tmg_vernac_document_2texmacs, 1, 0, 0);
   tmscm_install_procedure ("compute-keys-string",  tmg_compute_keys_string, 2, 0, 0);
@@ -10306,9 +10415,11 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-complete",  tmg_url_complete, 2, 0, 0);
   tmscm_install_procedure ("url-resolve",  tmg_url_resolve, 2, 0, 0);
   tmscm_install_procedure ("url-resolve-in-path",  tmg_url_resolve_in_path, 1, 0, 0);
+  tmscm_install_procedure ("url-resolve-pattern",  tmg_url_resolve_pattern, 1, 0, 0);
   tmscm_install_procedure ("url-exists?",  tmg_url_existsP, 1, 0, 0);
   tmscm_install_procedure ("url-exists-in-path?",  tmg_url_exists_in_pathP, 1, 0, 0);
   tmscm_install_procedure ("url-exists-in-tex?",  tmg_url_exists_in_texP, 1, 0, 0);
+  tmscm_install_procedure ("url-concretize*",  tmg_url_concretize_dot, 1, 0, 0);
   tmscm_install_procedure ("url-concretize",  tmg_url_concretize, 1, 0, 0);
   tmscm_install_procedure ("url-materialize",  tmg_url_materialize, 2, 0, 0);
   tmscm_install_procedure ("url-test?",  tmg_url_testP, 2, 0, 0);
@@ -10336,6 +10447,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("system-url->string",  tmg_system_url_2string, 1, 0, 0);
   tmscm_install_procedure ("url-grep",  tmg_url_grep, 2, 0, 0);
   tmscm_install_procedure ("url-search-upwards",  tmg_url_search_upwards, 3, 0, 0);
+  tmscm_install_procedure ("picture-cache-reset",  tmg_picture_cache_reset, 0, 0, 0);
   tmscm_install_procedure ("persistent-set",  tmg_persistent_set, 3, 0, 0);
   tmscm_install_procedure ("persistent-remove",  tmg_persistent_remove, 2, 0, 0);
   tmscm_install_procedure ("persistent-has?",  tmg_persistent_hasP, 2, 0, 0);
@@ -10454,6 +10566,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-save",  tmg_buffer_save, 1, 0, 0);
   tmscm_install_procedure ("tree-import-loaded",  tmg_tree_import_loaded, 3, 0, 0);
   tmscm_install_procedure ("tree-import",  tmg_tree_import, 2, 0, 0);
+  tmscm_install_procedure ("tree-inclusion",  tmg_tree_inclusion, 1, 0, 0);
   tmscm_install_procedure ("tree-export",  tmg_tree_export, 3, 0, 0);
   tmscm_install_procedure ("tree-load-style",  tmg_tree_load_style, 1, 0, 0);
   tmscm_install_procedure ("buffer-focus",  tmg_buffer_focus, 1, 0, 0);
@@ -10499,6 +10612,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-position",  tmg_alt_window_set_position, 3, 0, 0);
   tmscm_install_procedure ("alt-window-search",  tmg_alt_window_search, 1, 0, 0);
+  tmscm_install_procedure ("supports-bibtex?",  tmg_supports_bibtexP, 0, 0, 0);
   tmscm_install_procedure ("bibtex-run",  tmg_bibtex_run, 4, 0, 0);
   tmscm_install_procedure ("bib-add-period",  tmg_bib_add_period, 1, 0, 0);
   tmscm_install_procedure ("bib-locase-first",  tmg_bib_locase_first, 1, 0, 0);

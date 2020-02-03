@@ -90,8 +90,10 @@
 
 (tm-define-macro ($with var val . l)
   (:synopsis "With primitive for content generation")
-  `(with ,var ,val
-     (cons* 'list ($list ,@l))))
+  (if (string? var)
+      ($quote `(with ,var ,val ($unquote ($inline ,@l))))
+      `(with ,var ,val
+         (cons* 'list ($list ,@l)))))
 
 (tm-define-macro ($execute cmd . l)
   (:synopsis "Execute one command")
@@ -540,6 +542,9 @@
 (tm-define-macro ($link dest . l)
   ($quote `(hlink ($unquote ($inline ,@l)) ($unquote ($textual ,dest)))))
 
+(tm-define-macro ($color col . l)
+  ($quote `(with "color" ,col ($unquote ($inline ,@l)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specific markup for TeXmacs documentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -612,6 +617,144 @@
 
 (tm-define-macro ($src-arg s)
   ($quote `(src-arg ($unquote ($textual ,s)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Graphics
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define-macro ($geometry w h unit . l)
+  `(list 'with
+         "gr-geometry" (list 'tuple "geometry" ,w ,h "center")
+         "gr-frame" (list 'tuple "scale" ,unit
+                          (list 'tuple "0.5gw" "0.5gh"))
+         ($inline ,@l)))
+
+(tm-define-macro ($auto-crop . l)
+  `(list 'with
+         "gr-auto-crop" "true"
+         ($inline ,@l)))
+
+(tm-define-macro ($grid unit . l)
+  `(list 'with
+         "gr-grid" (list 'tuple "cartesian" (list 'point "0" "0")
+                         ,(markup-build-coordinate unit))
+         ($inline ,@l)))
+
+(define (build-with w x)
+  (if (tm-func? x 'with)
+      `(with ,@w ,@(cdr x))
+      `(with ,@w ,x)))
+
+(tm-define (markup-build-graphics-items l)
+  (cond ((null? l) (list))
+        ((tm-func? (car l) 'concat)
+         (append (markup-build-graphics-items (cdar l))
+                 (markup-build-graphics-items (cdr l))))
+        ((tm-func? (car l) 'with)
+         (let* ((head (cDr (cdar l)))
+                (tail (cAr (car l)))
+                (sl (if (tm-func? tail 'concat) (cdr tail) (list tail)))
+                (sr (map markup-build-graphics-items sl))
+                (sr* (map (lambda (x) (build-with head x)) sr))
+                (r (markup-build-graphics-items (cdr l))))
+           (append sr* r)))
+        (else (cons (car l) (markup-build-graphics-items (cdr l))))))
+
+(tm-define (markup-build-graphics l)
+  (with x (append-map markup-expand-document l)
+    (cons 'graphics (markup-build-graphics-items x))))
+
+(tm-define-macro ($graphics . l)
+  `(markup-build-graphics ($list ,@l)))
+
+(tm-define (markup-build-coordinate x)
+  (cond ((string? x) x)
+        ((number? x)
+         (if (exact? x)
+             (number->string (exact->inexact x))
+             (number->string x)))
+        (else "0")))
+
+(tm-define (markup-build-point l)
+  (with x (append-map markup-expand-document l)
+    (cons 'point (map markup-build-coordinate x))))
+
+(tm-define-macro ($point . l)
+  `(markup-build-point ($list ,@l)))
+ 
+(tm-define-macro ($line . l)
+  `(cons 'line ($list ,@l)))
+
+(tm-define-macro ($cline . l)
+  `(cons 'cline ($list ,@l)))
+
+(tm-define-macro ($spline . l)
+  `(cons 'spline ($list ,@l)))
+
+(tm-define-macro ($cspline . l)
+  `(cons 'cspline ($list ,@l)))
+
+(tm-define-macro ($arc . l)
+  `(cons 'arc ($list ,@l)))
+
+(tm-define-macro ($carc . l)
+  `(cons 'carc ($list ,@l)))
+
+(tm-define-macro ($text-at p . l)
+  ($quote `(text-at ($unquote ($inline ,@l)) ($unquote ($inline ,p)))))
+
+(tm-define-macro ($math-at p . l)
+  ($quote `(math-at ($unquote ($inline ,@l)) ($unquote ($inline ,p)))))
+
+(tm-define (markup-build-graphical l)
+  (with x (append-map markup-expand-document l)
+    (if (== (length x) 1) (car x)
+        (cons 'gr-group x))))
+
+(tm-define-macro ($graphical . l)
+  `(markup-build-graphical ($list ,@l)))
+
+(tm-define-macro ($line-width w . l)
+  ($quote `(with "line-width" ,w ($unquote ($graphical ,@l)))))
+
+(tm-define-macro ($pen-color col . l)
+  ($quote `(with "color" ,col ($unquote ($graphical ,@l)))))
+
+(tm-define-macro ($fill-color col . l)
+  ($quote `(with "fill-color" ,col ($unquote ($graphical ,@l)))))
+
+(tm-define-macro ($text-align h v . l)
+  ($quote `(with "text-at-halign" ,h
+                 "text-at-valign" ,v
+                 ($unquote ($inline ,@l)))))
+
+(tm-define-macro ($graph2d x1 x2 steps fun)
+  `($line
+     ($for (_k_ (.. 0 (+ ,steps 1)))
+       ($let* ((f ,fun)
+               (dx (/ (- ,x2 ,x1) ,steps))
+               (x (+ ,x1 (* _k_ dx)))
+               (y (f x)))
+         ($point x y)))))
+
+(tm-define-macro ($curve2d t1 t2 steps xt yt)
+  `($line
+     ($for (_k_ (.. 0 (+ ,steps 1)))
+       ($let* ((fx ,xt)
+               (fy ,yt)
+               (dt (/ (- ,t2 ,t1) ,steps))
+               (t (+ ,t1 (* _k_ dt)))
+               (x (fx t))
+               (y (fy t)))
+         ($point x y)))))
+
+(tm-define (markup-build-animation duration l)
+  (with x (append-map markup-expand-document l)
+    (cons 'anim-compose
+          (map (lambda (f) `(anim-constant ,f ,duration)) x))))
+
+(tm-define-macro ($animation duration . l)
+  `(markup-build-animation ,duration ($list ,@l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User interface for dynamic content generation

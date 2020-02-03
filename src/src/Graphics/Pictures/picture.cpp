@@ -17,6 +17,22 @@
 #include "colors.hpp"
 #include "iterator.hpp"
 #include "file.hpp"
+#include "effect.hpp"
+
+/******************************************************************************
+* Unique id for pictures
+******************************************************************************/
+
+unsigned long long int
+unique_picture_id () {
+  static unsigned long long int n= -1;
+  n++;
+  if (n == (-((unsigned long long int) 1))) {
+    failed_error << "Unique id overflow for pictures" << LF;
+    FAILED ("Unique id overflow for pictures");
+  }
+  return n;
+}
 
 /******************************************************************************
 * Useful subroutines
@@ -128,15 +144,17 @@ static hashmap<tree,picture> picture_cache;
 static hashmap<tree,int> picture_stamp (- (int) (((unsigned int) (-1)) >> 1));
 
 void
-picture_cache_reserve (url file_name, int w, int h) {
-  tree key= tuple (file_name->t, as_string (w), as_string (h));
+picture_cache_reserve (url file_name, int w, int h, tree eff, int pixel) {
+  (void) pixel;
+  tree key= tuple (file_name->t, as_string (w), as_string (h), eff);
   picture_count (key) ++;
   //cout << key << " -> " << picture_count[key] << "\n";
 }
 
 void
-picture_cache_release (url file_name, int w, int h) {
-  tree key= tuple (file_name->t, as_string (w), as_string (h));
+picture_cache_release (url file_name, int w, int h, tree eff, int pixel) {
+  (void) pixel;
+  tree key= tuple (file_name->t, as_string (w), as_string (h), eff);
   picture_count (key) --;
   //cout << key << " -> " << picture_count[key] << "\n";
   if (picture_count [key] <= 0) picture_blacklist (key) ++;
@@ -161,9 +179,17 @@ picture_cache_clean () {
   picture_blacklist= hashmap<tree,int> ();
 }
 
+void
+picture_cache_reset () {
+  picture_blacklist= hashmap<tree,int> ();
+  picture_cache= hashmap<tree,picture> ();
+  picture_stamp= hashmap<tree,int> ();
+}
+
 static bool
-picture_is_cached (url file_name, int w, int h) {
-  tree key= tuple (file_name->t, as_string (w), as_string (h));
+picture_is_cached (url file_name, int w, int h, tree eff, int pixel) {
+  (void) pixel;
+  tree key= tuple (file_name->t, as_string (w), as_string (h), eff);
   if (!picture_cache->contains (key)) return false;
   int loaded= last_modified (file_name, false);
   int cached= picture_stamp [key];
@@ -178,12 +204,13 @@ picture_is_cached (url file_name, int w, int h) {
 }
 
 picture
-cached_load_picture (url file_name, int w, int h, bool permanent) {
-  tree key= tuple (file_name->t, as_string (w), as_string (h));
-  if (picture_is_cached (file_name, w, h))
+cached_load_picture (url file_name, int w, int h, tree eff,
+                     int pixel, bool permanent) {
+  tree key= tuple (file_name->t, as_string (w), as_string (h), eff);
+  if (picture_is_cached (file_name, w, h, eff, pixel))
     return picture_cache [key];
   //cout << "Loading " << key << "\n";
-  picture pic= load_picture (file_name, w, h);
+  picture pic= load_picture (file_name, w, h, eff, pixel);
   if (permanent || picture_count[key] > 0) {
     int pic_modif= last_modified (file_name, false);
     picture_cache (key)= pic;

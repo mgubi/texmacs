@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.6>
+<TeXmacs|1.99.11>
 
-<style|tmweb>
+<style|tmweb2>
 
 <\body>
   <tmweb-current|Home|Mailing lists><tmweb-title|Mailing lists for
@@ -41,7 +41,7 @@
   </code>
 
   as subject. The <hlink|<with|font-family|tt|texmacs-users> mailing list
-  archives|http://lists.texmacs.org/wws/info/texmacs-users> are also
+  archives|https://lists.texmacs.org/wws/arc/texmacs-users> are also
   available without subscription.
 
   <section|The <verbatim|texmacs-info> list><label|tminfo>
@@ -67,7 +67,7 @@
   </code>
 
   as subject. The <hlink|<with|font-family|tt|texmacs-info> mailing list
-  archives|http://lists.texmacs.org/wws/info/texmacs-info> are available
+  archives|https://lists.texmacs.org/wws/arc/texmacs-info> are available
   without subscription.
 
   <section|The <verbatim|texmacs-dev> list><label|tmdev>
@@ -80,8 +80,5 @@
   <tmweb-license>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

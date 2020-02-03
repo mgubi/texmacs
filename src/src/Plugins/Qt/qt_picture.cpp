@@ -113,10 +113,16 @@ qt_image_renderer_rep::qt_image_renderer_rep (picture p, double zoom):
 
   ox = pox * pixel;
   oy = poy * pixel;
+  /*
   cx1= 0;
   cy1= 0;
   cx2= pw * pixel;
   cy2= ph * pixel;
+  */
+  cx1= 0;
+  cy1= -ph * pixel;
+  cx2= pw * pixel;
+  cy2= 0;
 
   qt_picture_rep* handle= (qt_picture_rep*) pict->get_handle ();
   QImage& im (handle->pict);
@@ -154,9 +160,9 @@ picture_renderer (picture p, double zoomf) {
 ******************************************************************************/
 
 QImage*
-get_image (url u, int w, int h) {
+get_image_for_real (url u, int w, int h, tree eff, SI pixel) {
   QImage *pm = NULL;
-  if (qt_supports (u))
+  if (qt_supports (u) && !prefer_inkscape (suffix (u)))
     pm= new QImage (utf8_to_qstring (concretize (u)));
   else {
     url temp= url_temp (".png");
@@ -171,12 +177,36 @@ get_image (url u, int w, int h) {
   }
   if (pm->width () != w || pm->height () != h)
     (*pm)= pm->scaled (w, h);
+  if (eff != "") {
+    effect e= build_effect (eff);
+    picture src= qt_picture (*pm, 0, 0);
+    array<picture> a;
+    a << src;
+    picture pic= e->apply (a, pixel);
+    picture dest= as_qt_picture (pic);
+    qt_picture_rep* rep= (qt_picture_rep*) dest->get_handle ();
+    QImage *trf= (QImage*) &(rep->pict);
+    delete pm;
+    pm= new QImage (trf->copy ());
+  }
   return pm;
 }
 
+static hashmap<tree,QImage*> qt_pic_cache;
+
+QImage*
+get_image (url u, int w, int h, tree eff, SI pixel) {
+  // TODO: we may wish to flush the cache from time to time...
+  tree key= tuple (as_tree (u), as_tree (w), as_tree (h));
+  if (eff != "") key << eff << as_tree (pixel);
+  if (!qt_pic_cache->contains (key))
+    qt_pic_cache (key)= get_image_for_real (u, w, h, eff, pixel);
+  return qt_pic_cache[key];
+}
+
 picture
-load_picture (url u, int w, int h) {
-  QImage* im= get_image (u, w, h);
+load_picture (url u, int w, int h, tree eff, int pixel) {
+  QImage* im= get_image (u, w, h, eff, pixel);
   if (im == NULL) return error_picture (w, h);
   return qt_picture (*im, 0, 0);
 }
@@ -213,10 +243,18 @@ void
 qt_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
   array<picture> a;
   for (int i=0; i<N(src); i++)
-    a << load_picture (src[i], w, h);
+    a << load_picture (src[i], w, h, "", PIXEL);
   effect  e= build_effect (eff);
   picture t= e->apply (a, PIXEL);
   picture q= as_qt_picture (t);
   qt_picture_rep* pict= (qt_picture_rep*) q->get_handle ();
+  pict->pict.save (utf8_to_qstring (concretize (dest)));
+}
+
+void
+save_picture (url dest, picture p) {
+  picture q= as_qt_picture (p);
+  qt_picture_rep* pict= (qt_picture_rep*) q->get_handle ();
+  if (exists (dest)) remove (dest);
   pict->pict.save (utf8_to_qstring (concretize (dest)));
 }

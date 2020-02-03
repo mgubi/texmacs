@@ -39,24 +39,24 @@
   <provide|unframed-render-enunciation|<value|render-enunciation>>
 
   <assign|framed-render-enunciation|<\macro|which|body>
-    <surround|<no-indent>||<\ornament>
-      <\unframed-render-enunciation|<arg|which>>
-        <arg|body>
-      </unframed-render-enunciation>
-    </ornament>>
+    <\surround|<no-indent>|>
+      <\decorated>
+        <\unframed-render-enunciation|<with|strong-color|<value|color>|math-color|<value|color>|<arg|which>>>
+          <arg|body>
+        </unframed-render-enunciation>
+      </decorated>
+    </surround>
   </macro>>
-
-  <assign|enunciation-title-color|<macro|<if|<provides|ornament-title-color>|<value|ornament-title-color>|<if|<equal|<value|ornament-extra-color>|white>|<value|color>|<value|bg-color>>>>>
-
-  <assign|enunciation-title-name|<macro|which|<with|color|<enunciation-title-color>|strong-color|<enunciation-title-color>|<enunciation-name|<arg|which>>>>>
 
   <assign|framed-render-enunciation*|<\macro|which|body>
     <\with|enunciation-sep|>
-      <surround|<no-indent>||<\ornament>
-        <\surround||<right-flush>>
-          <arg|body>
-        </surround>
-      </ornament|<enunciation-title-name|<arg|which>>>>
+      <\surround|<no-indent>|>
+        <\decorated-titled|<with|strong-color|<value|color>|math-color|<value|color>|<arg|which>>>
+          <\surround||<right-flush>>
+            <arg|body>
+          </surround>
+        </decorated-titled>
+      </surround>
     </with>
   </macro>>
 

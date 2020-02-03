@@ -36,7 +36,8 @@
 (define-format html
   (:name "Html")
   (:suffix "html" "xhtml" "htm")
-  (:recognize html-recognizes?))
+  (:recognize html-recognizes?)
+  (:option "mathml->texmacs:latex-annotations" "off"))
 
 (lazy-define (convert html htmltm) parse-html-snippet)
 (lazy-define (convert html htmltm) parse-html-document)
@@ -62,9 +63,6 @@
 (converter texmacs-stree html-stree
   (:function-with-options texmacs->html)
   (:option "texmacs->html:css" "on")
+  (:option "texmacs->html:mathjax" "off")
   (:option "texmacs->html:mathml" "off")
   (:option "texmacs->html:images" "off"))
-
-(if (== (get-preference "texmacs->html:mathml") "on")
-    (define-format html
-      (:suffix "xhtml" "html" "htm")))

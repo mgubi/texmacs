@@ -12,6 +12,7 @@
 #include "env.hpp"
 #include "convert.hpp"
 #include "file.hpp"
+#include "locale.hpp"
 #include "image_files.hpp"
 #include "scheme.hpp"
 #include "page_type.hpp"
@@ -21,6 +22,7 @@
 
 extern int script_status;
 extern tree with_package_definitions (string package, tree body);
+static tree filter_style (tree t);
 
 /******************************************************************************
 * Subroutines
@@ -181,6 +183,16 @@ edit_env_rep::exec (tree t) {
   // cout << "Execute: " << t << "\n";
   if (is_atomic (t)) return t;
   switch (L(t)) {
+  case MOVE:
+  case SHIFT:
+  case RESIZE:
+  case CLIPPED: {
+    int i, n= N(t);
+    tree r (t, n);
+    r[0]= exec (t[0]);
+    for (i=1; i<n; i++) r[i]= t[i];
+    return r;
+  }
   case DATOMS:
     return exec_formatting (t, ATOM_DECORATIONS);
   case DLINES:
@@ -225,6 +237,14 @@ edit_env_rep::exec (tree t) {
     return exec_rewrite (t);
   case EVAL_ARGS:
     return exec_eval_args (t);
+  case NEW_THEME:
+    return exec_new_theme (t);
+  case COPY_THEME:
+    return exec_copy_theme (t);
+  case APPLY_THEME:
+    return exec_apply_theme (t);
+  case SELECT_THEME:
+    return exec_select_theme (t);
   case MARK:
     if (N(t) < 2)
       return tree (ERROR, "invalid mark");
@@ -413,6 +433,14 @@ edit_env_rep::exec (tree t) {
     return exec_tmpt_length ();
   case PX_LENGTH:
     return exec_px_length ();
+  case LCORNER_LENGTH:
+    return exec_lcorner_length ();
+  case BCORNER_LENGTH:
+    return exec_bcorner_length ();
+  case RCORNER_LENGTH:
+    return exec_rcorner_length ();
+  case TCORNER_LENGTH:
+    return exec_tcorner_length ();
   case MS_LENGTH:
     return exec_ms_length ();
   case S_LENGTH:
@@ -426,6 +454,8 @@ edit_env_rep::exec (tree t) {
   case HR_LENGTH:
     return exec_hr_length ();
 
+  case FILTER_STYLE:
+    return exec (filter_style (exec (t[0])));
   case STYLE_WITH:
   case VAR_STYLE_WITH:
     if (N(t) < 1)
@@ -454,6 +484,8 @@ edit_env_rep::exec (tree t) {
     return exec_set_binding (t);
   case GET_BINDING:
     return exec_get_binding (t);
+  case HAS_BINDING:
+    return exec_has_binding (t);
   case GET_ATTACHMENT:
     return exec_get_attachment (t);
 
@@ -476,12 +508,20 @@ edit_env_rep::exec (tree t) {
 
   case EFF_MOVE:
     return exec_eff_move (t);
+  case EFF_MAGNIFY:
+    return exec_eff_magnify (t);
   case EFF_BUBBLE:
     return exec_eff_bubble (t);
+  case EFF_CROP:
+    return exec_eff_crop (t);
   case EFF_TURBULENCE:
     return exec_eff_turbulence (t);
   case EFF_FRACTAL_NOISE:
     return exec_eff_fractal_noise (t);
+  case EFF_HATCH:
+    return exec_eff_hatch (t);
+  case EFF_DOTS:
+    return exec_eff_dots (t);
   case EFF_GAUSSIAN:
     return exec_eff_gaussian (t);
   case EFF_OVAL:
@@ -916,6 +956,135 @@ edit_env_rep::exec_eval_args (tree t) {
   macro_arg= old_var;
   macro_src= old_src;
   return r;
+}
+
+tree
+edit_env_rep::exec_new_theme (tree t) {
+  if (N(t)<1 || !is_atomic (t[0]))
+    return tree (ERROR, "bad new-theme");
+  string theme= t[0]->label;
+  array<string> attrs, inhs;
+  for (int i=1; i<N(t); i++) {
+    tree x= exec (t[i]);
+    if (!is_atomic (x)) return tree (ERROR, "bad variable in new-theme");
+    string var= x->label;
+    if (provides ("with-" * var)) inhs << var;
+    else attrs << var;
+  }
+  tree val (WITH), cc (CONCAT);
+  for (int i=0; i<N(attrs); i++) {
+    string oldv= attrs[i];
+    string newv= theme * "-" * attrs[i];
+    cc << tree (ASSIGN, newv, tree (VALUE, oldv));
+    val << tree (oldv) << tree (VALUE, newv);
+  }
+  val << tree (ARG, "body");
+  for (int i=N(inhs)-1; i>=0; i--) {
+    string winh= "with-" * inhs[i];
+    val= compound (winh, val);
+  }
+  val= tree (MACRO, "body", val);
+  cc << tree (ASSIGN, "with-" * theme, val);
+  return exec (cc);
+}
+
+tree
+edit_env_rep::exec_copy_theme (tree t) {
+  if (N(t)<1 || !is_atomic (t[0]))
+    return tree (ERROR, "bad copy-theme");
+  string new_theme= t[0]->label;
+  tree rew (NEW_THEME, new_theme);
+  array<tree> a;
+  for (int k=1; k<N(t); k++) {
+    string old_theme= t[k]->label;
+    if (!provides ("with-" * old_theme))
+      return tree (ERROR, "missing theme '" * old_theme * "'");
+    tree val= read ("with-" * old_theme);
+    if (is_func (val, MACRO, 2)) val= val[1];
+    while (is_compound (val, 1) && !is_func (val, WITH)) {
+      string lab= as_string (L(val));
+      if (starts (lab, "with-")) rew << tree (lab (5, N(lab)));
+      val= val[N(val)-1];
+    }
+  }
+  for (int k=1; k<N(t); k++) {
+    string old_theme= t[k]->label;
+    tree val= read ("with-" * old_theme);
+    if (is_func (val, MACRO, 2)) val= val[1];
+    while (is_compound (val, 1) && !is_func (val, WITH))
+      val= val[N(val)-1];
+    if (is_func (val, WITH))
+      for (int i=0; i+2<N(val); i+=2)
+        if (is_atomic (val[i])) {
+          rew << val[i];
+          string var= new_theme * "-" * val[i]->label;
+          a << tree (ASSIGN, var, val[i+1]);
+        }
+  }
+  rew= tree (CONCAT, rew);
+  rew << a;
+  return exec (rew);
+}
+
+tree
+edit_env_rep::exec_apply_theme_sub (string var) {
+  tree val= read (var);
+  if (!is_func (val, MACRO, 2)) return "";
+  val= val[1];
+  tree r (CONCAT);
+  while (is_compound (val, 1) && !is_func (val, WITH)) {
+    string lab= as_string (L(val));
+    r << exec_apply_theme_sub (lab);
+  }
+  if (is_func (val, WITH))
+    for (int i=0; i+2<N(val); i+=2)
+      r << exec (tree (ASSIGN, val[i], val[i+1]));
+  if (N(r) == 0) return "";
+  else if (N(r) == 1) return r[0];
+  else return r;
+}
+
+tree
+edit_env_rep::exec_apply_theme (tree t) {
+  if (N(t) != 1 || !is_atomic (t[0]))
+    return tree (ERROR, "bad apply-theme");
+  string theme= t[0]->label;
+  if (!provides ("with-" * theme))
+    return tree (ERROR, "missing theme '" * theme * "'");
+  return exec_apply_theme_sub ("with-" * theme);
+}
+
+tree
+edit_env_rep::exec_select_theme_sub (string theme, string from) {
+  tree r (CONCAT);
+  tree val= read ("with-" * from);
+  if (is_func (val, MACRO, 2)) val= val[1];
+  while (is_compound (val, 1) && !is_func (val, WITH)) {
+    string lab= as_string (L(val));
+    if (starts (lab, "with-"))
+      r << A(exec_select_theme_sub (theme, lab (5, N(lab))));
+    val= val[N(val)-1];
+  }
+  if (is_func (val, WITH))
+    for (int i=0; i+2<N(val); i+=2)
+      if (is_atomic (val[i]))
+        r << tree (ASSIGN, theme * "-" * val[i]->label, val[i+1]);
+  return r;
+}
+
+tree
+edit_env_rep::exec_select_theme (tree t) {
+  if (N(t)<1 || !is_atomic (t[0]))
+    return tree (ERROR, "bad copy-theme");
+  string theme= t[0]->label;
+  tree r (CONCAT);
+  for (int k=1; k<N(t); k++) {
+    string from= t[k]->label;
+    if (!provides ("with-" * from))
+      return tree (ERROR, "missing theme '" * from * "'");
+    r << A(exec_select_theme_sub (theme, from));
+  }
+  return exec (r);
 }
 
 tree
@@ -1472,8 +1641,8 @@ edit_env_rep::exec_change_case (tree t, tree nc, bool exec_flag, bool first) {
 
     for (i=0; i<n; tm_char_forwards (s, i))
       if (is_iso_alpha (s[i]) && (all || (first && (i==0)))) {
-	if (up && is_locase (s[i])) r->label[i]= upcase (s[i]);
-	if (lo && is_upcase (s[i])) r->label[i]= locase (s[i]);
+	if (up && is_iso_locase (s[i])) r->label[i]= upcase (s[i]);
+	if (lo && is_iso_upcase (s[i])) r->label[i]= locase (s[i]);
       }
     r->obs= list_observer (ip_observer (obtain_ip (t)), r->obs);
     return r;
@@ -1828,6 +1997,19 @@ edit_env_rep::exec_get_binding (tree t) {
 }
 
 tree
+edit_env_rep::exec_has_binding (tree t) {
+  if (N(t) != 1 && N(t) != 2) return tree (ERROR, "bad get binding");
+  string key= exec_string (t[0]);
+  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
+  int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
+  if (type != 0 && type != 1) type= 0;
+  if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
+  else if (type == 1) value= tree (UNINIT);
+  if (value == tree (UNINIT)) return "false";
+  else return "true";
+}
+
+tree
 edit_env_rep::exec_get_attachment (tree t) {
   if (N(t) != 1) return tree (ERROR, "bad get attachment");
   string key= exec_string (t[0]);
@@ -1838,11 +2020,9 @@ edit_env_rep::exec_get_attachment (tree t) {
 tree
 edit_env_rep::exec_pattern (tree t) {
   if (N(t)<1) return tree (ERROR, "bad pattern");
-  if (no_patterns && N(t) == 4) return exec (t[3]);
+  if (no_patterns && N(t) == 4 && is_atomic (t[3])) return exec (t[3]);
   url im= url_system (exec_string (t[0]));
-  url image= resolve (relative (base_file_name, im));
-  if (is_none (image))
-    image= resolve (url ("$TEXMACS_PATTERN_PATH") * im);
+  url image= resolve_pattern (relative (base_file_name, im));
   if (is_none (image)) return "white";
   int imw_pt, imh_pt;
   image_size (image, imw_pt, imh_pt);
@@ -1899,18 +2079,38 @@ tree
 edit_env_rep::exec_eff_move (tree t) {
   if (N(t) < 3) return tree (ERROR, "bad eff-move");
   tree body= exec (t[0]);
-  tree dx  = as_tree (as_length (exec (t[1])));
-  tree dy  = as_tree (as_length (exec (t[2])));
+  tree dx  = as_tree (as_eff_length (exec (t[1])));
+  tree dy  = as_tree (as_eff_length (exec (t[2])));
   return tree (EFF_MOVE, body, dx, dy);
+}
+
+tree
+edit_env_rep::exec_eff_magnify (tree t) {
+  if (N(t) < 3) return tree (ERROR, "bad eff-magnify");
+  tree body= exec (t[0]);
+  tree sx  = as_tree (as_double (exec (t[1])));
+  tree sy  = as_tree (as_double (exec (t[2])));
+  return tree (EFF_MAGNIFY, body, sx, sy);
 }
 
 tree
 edit_env_rep::exec_eff_bubble (tree t) {
   if (N(t) < 3) return tree (ERROR, "bad eff-bubble");
   tree body= exec (t[0]);
-  tree r   = as_tree (as_length (exec (t[1])));
+  tree r   = as_tree (as_eff_length (exec (t[1])));
   tree a   = exec (t[2]);
   return tree (EFF_BUBBLE, body, r, a);
+}
+
+tree
+edit_env_rep::exec_eff_crop (tree t) {
+  if (N(t) < 5) return tree (ERROR, "bad eff-crop");
+  tree body= exec (t[0]);
+  tree cx1 = as_tree (as_double (exec (t[1])));
+  tree cy1 = as_tree (as_double (exec (t[2])));
+  tree cx2 = as_tree (as_double (exec (t[3])));
+  tree cy2 = as_tree (as_double (exec (t[4])));
+  return tree (EFF_CROP, body, cx1, cy1, cx2, cy2);
 }
 
 tree
@@ -1918,8 +2118,8 @@ edit_env_rep::exec_eff_turbulence (tree t) {
   if (N(t) != 5) return tree (ERROR, "bad eff-turbulence");
   tree body= exec (t[0]);
   tree s   = exec (t[1]);
-  tree w   = as_tree (as_length (exec (t[2])));
-  tree h   = as_tree (as_length (exec (t[3])));
+  tree w   = as_tree (as_eff_length (exec (t[2])));
+  tree h   = as_tree (as_eff_length (exec (t[3])));
   tree o   = exec (t[4]);
   return tree (EFF_TURBULENCE, body, s, w, h, o);
 }
@@ -1929,47 +2129,71 @@ edit_env_rep::exec_eff_fractal_noise (tree t) {
   if (N(t) != 5) return tree (ERROR, "bad eff-fractal-noise");
   tree body= exec (t[0]);
   tree s   = exec (t[1]);
-  tree w   = as_tree (as_length (exec (t[2])));
-  tree h   = as_tree (as_length (exec (t[3])));
+  tree w   = as_tree (as_eff_length (exec (t[2])));
+  tree h   = as_tree (as_eff_length (exec (t[3])));
   tree o   = exec (t[4]);
   return tree (EFF_FRACTAL_NOISE, body, s, w, h, o);
 }
 
 tree
+edit_env_rep::exec_eff_hatch (tree t) {
+  if (N(t) < 5) return tree (ERROR, "bad eff-hatch");
+  tree body= exec (t[0]);
+  tree sx = as_tree (as_int (exec (t[1])));
+  tree sy = as_tree (as_int (exec (t[2])));
+  tree fp = as_tree (as_double (exec (t[3])));
+  tree de = as_tree (as_double (exec (t[4])));
+  return tree (EFF_HATCH, body, sx, sy, fp, de);
+}
+
+tree
+edit_env_rep::exec_eff_dots (tree t) {
+  if (N(t) < 7) return tree (ERROR, "bad eff-dots");
+  tree body= exec (t[0]);
+  tree a  = as_tree (as_int (exec (t[1])));
+  tree b  = as_tree (as_int (exec (t[2])));
+  tree c  = as_tree (as_int (exec (t[3])));
+  tree d  = as_tree (as_int (exec (t[4])));
+  tree fp = as_tree (as_double (exec (t[5])));
+  tree de = as_tree (as_double (exec (t[6])));
+  return tree (EFF_DOTS, body, a, b, c, d, fp, de);
+}
+
+tree
 edit_env_rep::exec_eff_gaussian (tree t) {
   if (N(t) < 1) return tree (ERROR, "bad eff-gaussian");
-  tree rx= as_tree (as_length (exec (t[0])));
+  tree rx= as_tree (as_eff_length (exec (t[0])));
   if (N(t) == 1) return tree (EFF_GAUSSIAN, as_tree (rx));
   if (N(t) < 3) return tree (ERROR, "bad eff-gaussian");
-  tree ry= as_tree (as_length (exec (t[1])));
+  tree ry= as_tree (as_eff_length (exec (t[1])));
   return tree (EFF_GAUSSIAN, rx, ry, exec (t[2]));
 }
 
 tree
 edit_env_rep::exec_eff_oval (tree t) {
   if (N(t) < 1) return tree (ERROR, "bad eff-oval");
-  tree rx= as_tree (as_length (exec (t[0])));
+  tree rx= as_tree (as_eff_length (exec (t[0])));
   if (N(t) == 1) return tree (EFF_OVAL, as_tree (rx));
   if (N(t) < 3) return tree (ERROR, "bad eff-oval");
-  tree ry= as_tree (as_length (exec (t[1])));
+  tree ry= as_tree (as_eff_length (exec (t[1])));
   return tree (EFF_OVAL, rx, ry, exec (t[2]));
 }
 
 tree
 edit_env_rep::exec_eff_rectangular (tree t) {
   if (N(t) < 1) return tree (ERROR, "bad eff-rectangular");
-  tree rx= as_tree (as_length (exec (t[0])));
+  tree rx= as_tree (as_eff_length (exec (t[0])));
   if (N(t) == 1) return tree (EFF_RECTANGULAR, as_tree (rx));
   if (N(t) < 3) return tree (ERROR, "bad eff-rectangular");
-  tree ry= as_tree (as_length (exec (t[1])));
+  tree ry= as_tree (as_eff_length (exec (t[1])));
   return tree (EFF_RECTANGULAR, rx, ry, exec (t[2]));
 }
 
 tree
 edit_env_rep::exec_eff_motion (tree t) {
   if (N(t) < 2) return tree (ERROR, "bad eff-motion");
-  tree dx= as_tree (as_length (exec (t[0])));
-  tree dy= as_tree (as_length (exec (t[1])));
+  tree dx= as_tree (as_eff_length (exec (t[0])));
+  tree dy= as_tree (as_eff_length (exec (t[1])));
   return tree (EFF_MOTION, dx, dy);
 }
 
@@ -1977,8 +2201,8 @@ tree
 edit_env_rep::exec_eff_degrade (tree t) {
   if (N(t) < 4) return tree (ERROR, "bad eff-degrade");
   tree b = exec (t[0]);
-  tree wx= as_tree (as_length (exec (t[1])));
-  tree wy= as_tree (as_length (exec (t[2])));
+  tree wx= as_tree (as_eff_length (exec (t[1])));
+  tree wy= as_tree (as_eff_length (exec (t[2])));
   tree th= as_tree (as_double (exec (t[3])));
   tree sh= as_tree (as_double (exec (t[4])));
   return tree (EFF_DEGRADE, b, wx, wy, th, sh);
@@ -1988,10 +2212,10 @@ tree
 edit_env_rep::exec_eff_distort (tree t) {
   if (N(t) < 5) return tree (ERROR, "bad eff-distort");
   tree b = exec (t[0]);
-  tree wx= as_tree (as_length (exec (t[1])));
-  tree wy= as_tree (as_length (exec (t[2])));
-  tree rx= as_tree (as_length (exec (t[3])));
-  tree ry= as_tree (as_length (exec (t[4])));
+  tree wx= as_tree (as_eff_length (exec (t[1])));
+  tree wy= as_tree (as_eff_length (exec (t[2])));
+  tree rx= as_tree (as_eff_length (exec (t[3])));
+  tree ry= as_tree (as_eff_length (exec (t[4])));
   return tree (EFF_DISTORT, b, wx, wy, rx, ry);
 }
 
@@ -1999,10 +2223,10 @@ tree
 edit_env_rep::exec_eff_gnaw (tree t) {
   if (N(t) < 5) return tree (ERROR, "bad eff-gnaw");
   tree b = exec (t[0]);
-  tree wx= as_tree (as_length (exec (t[1])));
-  tree wy= as_tree (as_length (exec (t[2])));
-  tree rx= as_tree (as_length (exec (t[3])));
-  tree ry= as_tree (as_length (exec (t[4])));
+  tree wx= as_tree (as_eff_length (exec (t[1])));
+  tree wy= as_tree (as_eff_length (exec (t[2])));
+  tree rx= as_tree (as_eff_length (exec (t[3])));
+  tree ry= as_tree (as_eff_length (exec (t[4])));
   return tree (EFF_GNAW, b, wx, wy, rx, ry);
 }
 
@@ -2260,6 +2484,12 @@ edit_env_rep::exec_until (tree t, path p, string var, int level) {
   case MAP_ARGS:
   case EVAL_ARGS:
     return exec_until_rewrite (t, p, var, level);
+  case NEW_THEME:
+  case COPY_THEME:
+  case APPLY_THEME:
+  case SELECT_THEME:
+    (void) exec (t);
+    return false;
   case MARK:
     return exec_until_mark (t, p, var, level);
   case EVAL:

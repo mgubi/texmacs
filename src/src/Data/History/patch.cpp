@@ -229,7 +229,7 @@ operator << (tm_ostream& out, patch p) {
     else {
       out << "Composite" << INDENT;
       for (int i=0; i<N(p); i++)
-	out << LF << p[i];
+        out << LF << p[i];
       out << UNINDENT;
     }
     break;
@@ -298,7 +298,7 @@ is_applicable (patch p, tree t) {
   case PATCH_AUTHOR:
     for (int i=0; i<N(p); i++)
       if (!is_applicable (p[i], t))
-	return false;
+        return false;
     return true;
   case PATCH_BIRTH:
     return true;
@@ -364,8 +364,8 @@ invert (patch p, tree t) {
       int i, n=N(p);
       array<patch> r(n);
       for (i=0; i<n; i++) {
-	r[n-1-i]= invert (p[i], t);
-	t= clean_apply (p[i], t);
+        r[n-1-i]= invert (p[i], t);
+        t= clean_apply (p[i], t);
       }
       return patch (get_type (p) == PATCH_BRANCH, r);
     }
@@ -544,6 +544,13 @@ co_pull (patch p1, patch p2) {
 ******************************************************************************/
 
 bool
+is_set_cursor (patch p) {
+  return
+    is_modification (p) && 
+    get_modification (p)->k == MOD_SET_CURSOR;
+}
+
+bool
 join (patch& p1, patch p2, tree t) {
   //cout << "Join " << p1 << LF << "with " << p2 << LF;
   if (get_type (p1) == PATCH_AUTHOR &&
@@ -571,27 +578,38 @@ join (patch& p1, patch p2, tree t) {
     }
   if (get_type (p1) == PATCH_COMPOUND &&
       nr_children (p1) > 0 &&
-      nr_children (remove_set_cursor (p1)) == 1 &&
-      nr_children (p1[0]) == 1)
+      nr_children (remove_set_cursor (p1)) == 1)
     {
-      patch q= p1[0];
-      bool rf= join (q, p2, t);
-      if (rf) p1= q;
-      return rf;
+      int nr= nr_children (p1);
+      patch p1b= remove_set_cursor (p1);
+      if (nr_children (p1b) == 1) {
+        bool rf= join (p1b, p2, t);
+        if (rf) {
+          if (nr >= 2 && is_set_cursor (child (p1, 0))) {
+            array<patch> a= range (children (p1), 0, 1);
+            array<patch> b= children (p1b);
+            p1= patch (append (a, b));
+          }
+          else p1= p1b;
+        }
+        return rf;
+      }
     }
   if (get_type (p2) == PATCH_COMPOUND &&
       nr_children (p2) > 0 &&
-      nr_children (remove_set_cursor (p2)) == 1 &&
-      nr_children (p2[0]) == 1)
+      nr_children (remove_set_cursor (p2)) == 1)
     {
-      patch q= p2[0];
-      bool rf= join (p1, q, t);
-      if (rf) {
-        array<patch> a= children (p1);
-        array<patch> b= children (p2);
-        p1= patch (append (a, range (b, 1, N(b))));
+      int nr= nr_children (p2);
+      patch p2b= remove_set_cursor (p2);
+      if (nr_children (p2b) == 1) {
+        bool rf= join (p1, p2b, t);
+        if (rf && nr >= 2 && is_set_cursor (child (p2, nr-1))) {
+          array<patch> a= children (p1);
+          array<patch> b= range (children (p2), nr-1, nr);
+          p1= patch (append (a, b));
+        }
+        return rf;
       }
-      return rf;
     }
   return false;
 }
@@ -608,10 +626,10 @@ insert (array<patch>& a, patch p) {
       insert (a, p[i]);
   }
   else if (get_type (p) == PATCH_MODIFICATION &&
-	   N(a) > 0 &&
-	   get_type (a[N(a)-1]) == PATCH_MODIFICATION &&
-	   (get_inverse (a[N(a)-1]) == get_modification (p) &&
-	    get_modification (a[N(a)-1]) == get_inverse (p)))
+           N(a) > 0 &&
+           get_type (a[N(a)-1]) == PATCH_MODIFICATION &&
+           (get_inverse (a[N(a)-1]) == get_modification (p) &&
+            get_modification (a[N(a)-1]) == get_inverse (p)))
     {
       // cout << "Cancel " << a[N(a)-1] << " against " << p << "\n";
       a->resize (N(a) - 1);
@@ -626,20 +644,20 @@ compactify (patch p) {
     {
       double a= 0;
       for (int i=0; i<N(p); i++)
-	if (get_type (p[i]) != PATCH_AUTHOR) a= -1;
-	else if (a == 0) a= get_author (p[i]);
-	else if (a != get_author (p[i])) a= -1;
+        if (get_type (p[i]) != PATCH_AUTHOR) a= -1;
+        else if (a == 0) a= get_author (p[i]);
+        else if (a != get_author (p[i])) a= -1;
       if (a <= 0) {
-	array<patch> r;
-	insert (r, p);
-	if (N(r) == 1) return r[0];
-	return patch (r);
+        array<patch> r;
+        insert (r, p);
+        if (N(r) == 1) return r[0];
+        return patch (r);
       }
       else {
-	array<patch> r;
-	for (int i=0; i<N(p); i++) insert (r, p[i][0]);
-	if (N(r) == 1) return patch (a, r[0]);
-	return patch (a, patch (r));
+        array<patch> r;
+        for (int i=0; i<N(p); i++) insert (r, p[i][0]);
+        if (N(r) == 1) return patch (a, r[0]);
+        return patch (a, patch (r));
       }
     }
   case PATCH_BRANCH:

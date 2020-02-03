@@ -16,7 +16,7 @@
 #include "dictionary.hpp"
 #include "file.hpp" // added for copy_as_graphics
 #include "analyze.hpp"
-#include "language.hpp"
+#include "locale.hpp"
 #include "message.hpp"
 #include "scheme.hpp"
 #include "tm_window.hpp"
@@ -147,8 +147,8 @@ needing_update (false)
     if (DEBUG_STD)
       debug_boot << "Screen extents: " << w/PIXEL << " x " << h/PIXEL << "\n";
     if (min (w, h) >= 1440 * PIXEL) {
-      retina_factor= 2;
-      retina_scale = 1.4;
+      retina_zoom = 2;
+      retina_scale= 1.0;
       if (!retina_iman) {
         retina_iman  = true;
         retina_icons = 2;
@@ -158,6 +158,8 @@ needing_update (false)
   }
   if (has_user_preference ("retina-factor"))
     retina_factor= get_user_preference ("retina-factor") == "on"? 2: 1;
+  if (has_user_preference ("retina-zoom"))
+    retina_zoom= get_user_preference ("retina-zoom") == "on"? 2: 1;
   if (has_user_preference ("retina-icons"))
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
@@ -288,8 +290,9 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   if (input_format == "picture") {
     tree t (IMAGE);
     QSize size= qvariant_cast<QImage>(md->imageData()).size ();
-    string w= as_string (size.width ()) * "px";
-    string h= as_string (size.height ()) * "px";
+    int ww= size.width (), hh= size.height ();
+    string w, h;
+    qt_pretty_image_size (ww, hh, w, h);
     t << tuple (tree (RAW_DATA, s), "png") << w << h << "" << "";
     s= as_string (call ("convert", t, "texmacs-tree", "texmacs-snippet"));
   }
@@ -1152,5 +1155,3 @@ int
 event_queue::size() const {
   return n;
 }
-
-

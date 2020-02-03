@@ -280,6 +280,12 @@ restricted_exec (edit_env env, tree t, int end) {
   else if (is_compound (t, "hide-preamble", 1) ||
            is_compound (t, "show-preamble", 1))
     env->exec (t[0]);
+  else if (is_compound (t, "script-input", 4) && end == 2) {
+    if (env->read (MODE) == "text") {
+      env->write (MODE, "prog");
+      env->write (PROG_LANGUAGE, t[0]);
+    }
+  }
 }
 
 static tree
@@ -619,6 +625,19 @@ edit_typeset_rep::exec_verbatim (tree t) {
   return exec_verbatim (t, rp * 0);
 }
 
+static tree
+search_doc_title (tree t) {
+  if (is_atomic (t)) return "";
+  else if (is_compound (t, "doc-title", 1)) return t[0];
+  else {
+    for (int i=0; i<N(t); i++) {
+      tree r= search_doc_title (t[i]);
+      if (r != "") return r;
+    }
+    return "";
+  }
+}
+
 tree
 edit_typeset_rep::exec_html (tree t, path p) {
   t= convert_OTS1_symbols_to_universal_encoding (t);
@@ -630,6 +649,9 @@ edit_typeset_rep::exec_html (tree t, path p) {
   H->join (P);
   prefix_specific (H, "tmhtml-");
   tree w (WITH);
+  tree doc_title= search_doc_title (t);
+  if (doc_title != "")
+    w << string ("html-doc-title") << doc_title;
   if (H->contains ("html-title"))
     w << string ("html-title") << H["html-title"];
   if (H->contains ("html-css"))
@@ -638,6 +660,13 @@ edit_typeset_rep::exec_html (tree t, path p) {
     w << string ("html-head-javascript") << H["html-head-javascript"];
   if (H->contains ("html-head-javascript-src"))
     w << string ("html-head-javascript-src") << H["html-head-javascript-src"];
+  if (H->contains ("html-extra-css"))
+    w << string ("html-extra-css") << H["html-extra-css"];
+  if (H->contains ("html-extra-javascript-src"))
+    w << string ("html-extra-javascript-src")
+      << H["html-extra-javascript-src"];
+  if (H->contains ("html-extra-javascript"))
+    w << string ("html-extra-javascript") << H["html-extra-javascript"];
   if (H->contains ("html-site-version"))
     w << string ("html-site-version") << H["html-site-version"];
   if (N(w) == 0) return exec (t, H);
@@ -875,8 +904,12 @@ void
 edit_typeset_rep::typeset (SI& x1, SI& y1, SI& x2, SI& y2) {
   int missing_nr= INT_MAX;
   int redefined_nr= INT_MAX;
+  x1= MAX_SI; y1= MAX_SI; x2= MIN_SI; y2= MIN_SI;
   while (true) {
-    typeset_sub (x1, y1, x2, y2);
+    SI sx1, sy1, sx2, sy2;
+    typeset_sub (sx1, sy1, sx2, sy2);
+    x1= min (x1, sx1); y1= min (y1, sy1);
+    x2= max (x2, sx2); y2= max (y2, sy2);
     if (!env->complete) break;
     env->complete= false;
     clean_unused (env->local_ref, env->touched);

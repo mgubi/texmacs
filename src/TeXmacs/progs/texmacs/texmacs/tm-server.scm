@@ -21,6 +21,13 @@
 (define (get-default-interactive-questions)
   (if (or (like-gnome?) (like-macos?) (like-windows?)) "popup" "footer"))
 
+(define (get-default-buffer-management)
+  (if (or (like-macos?) (like-windows?)) "separate" "shared"))
+
+(define (notify-buffer-management var val)
+  (when (== val (get-default-buffer-management))
+    (reset-preference "buffer management")))
+
 (define (get-default-show-table-cells)
   (if (qt-gui?) "on" "off"))
 
@@ -69,10 +76,13 @@
 (define-preferences
   ("profile" "beginner" (lambda args (noop)))
   ("look and feel" "default" notify-look-and-feel)
+  ("case sensitive shortcuts" "default" noop)
   ("detailed menus" "detailed" noop)
+  ("buffer management" (get-default-buffer-management) notify-buffer-management)
   ("complex actions" "popups" noop)
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
+  ("page medium" "paper" (lambda args (noop)))
   ("fast environments" "on" notify-fast-environments)
   ("show full context" "on" (lambda args (noop)))
   ("show table cells" (get-default-show-table-cells) (lambda args (noop)))
@@ -104,7 +114,9 @@
   ("experimental alpha" "on" notify-tool)
   ("new style fonts" "on" notify-new-fonts)
   ("bitmap effects" "on" notify-tool)
-  ("new style page breaking" "off" notify-new-page-breaking))
+  ("new style page breaking" "on" notify-new-page-breaking)
+  ("open console on errors" "on" noop)
+  ("open console on warnings" "on" noop))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Properties of some built-in routines
@@ -144,7 +156,7 @@
   (cond ((buffer-embedded? (current-buffer))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The buffer has not been saved. Really close it?" #f  
+         (user-confirm "The document has not been saved. Really close it?" #f  
            (lambda (answ)
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
@@ -152,7 +164,9 @@
 (define (do-kill-window)
   (with buf (current-buffer)
     (kill-window (current-window))
-    (delayed (:idle 100) (buffer-close buf))))
+    (delayed
+      (:idle 100)
+      (buffer-close buf))))
 
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
@@ -160,24 +174,31 @@
         ((<= (windows-number) 1)
          (safely-quit-TeXmacs))
         ((nnull? opt-name)
-         (kill-window (car opt-name)))
+         (with buf (window->buffer (car opt-name))
+           (kill-window (car opt-name))
+           (delayed
+             (:idle 100)
+             (buffer-close buf))))
         ((buffer-modified? (current-buffer))
-         (user-confirm "The buffer has not been saved. Really close it?" #f  
+         (user-confirm "The document has not been saved. Really close it?" #f
            (lambda (answ)
              (when answ (do-kill-window)))))
         (else (do-kill-window))))
 
 (tm-define (safely-quit-TeXmacs)
-  (if (not (buffers-modified?)) (quit-TeXmacs)
-      (user-confirm "There are unsaved files. Really quit?" #f  
-        (lambda (answ) (when answ (quit-TeXmacs))))))
+  (with l (filter buffer-modified? (buffer-list))
+    (if (null? l)
+        (quit-TeXmacs)
+        (begin
+          (when (not (buffer-modified? (current-buffer)))
+            ;; FIXME: focus on window with buffer, if any
+            (switch-to-buffer (car l)))
+          (user-confirm "There are unsaved documents. Really quit?" #f  
+            (lambda (answ) (when answ (quit-TeXmacs))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; System dependent conventions for buffer management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (window-per-buffer?)
-  (like-macos?))
 
 (tm-define (new-document)
   (if (window-per-buffer?) (open-window) (new-buffer)))

@@ -44,6 +44,8 @@ class concater_rep {
   // textual markup
   void typeset_substring (string s, path ip, int pos);
   void typeset_math_substring (string s, path ip, int pos, int op_type);
+  void typeset_math_macro (string s, tree_label m, path ip,
+                           int p1, int p2, int ot);
   void typeset_colored_substring (string s, path ip, int pos, string col);
   void typeset_text_string (tree t, path ip, int start, int end);
   void typeset_math_string (tree t, path ip, int start, int end);
@@ -66,6 +68,7 @@ class concater_rep {
   void typeset_decorated_box (tree t, path ip);
   void typeset_line_note (tree t, path ip);
   void typeset_page_note (tree t, path ip);
+  void typeset_if_page_break (tree t, path ip);
 
   // mathematical markup
   void typeset_around (tree t, path ip, bool colored);
@@ -170,6 +173,7 @@ class concater_rep {
   // markup for graphical user interface
   void typeset_canvas (tree t, path ip);
   void typeset_ornament (tree t, path ip);
+  void typeset_art_box (tree t, path ip);
 
   // postprocessing of brackets and scripts
   int  prec (int i);

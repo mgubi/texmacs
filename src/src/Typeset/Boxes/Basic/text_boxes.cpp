@@ -120,8 +120,10 @@ text_box_rep::adjust_kerning (int mode, double factor) {
     nxk->right= xk->right;
   }
   if ((mode & PROTRUSION_MASK) != 0) {
-    nxk->left = -fn->get_left_protrusion  (str, mode);
-    nxk->right= -fn->get_right_protrusion (str, mode);
+    if ((mode & START_OF_LINE) != 0)
+      nxk->left = -fn->get_left_protrusion  (str, mode);
+    if ((mode & END_OF_LINE) != 0)
+      nxk->right= -fn->get_right_protrusion (str, mode);
   }
   if ((mode & START_OF_LINE) != 0) nxk->left  -= pad;
   if ((mode & END_OF_LINE  ) != 0) nxk->right -= pad;
@@ -137,9 +139,11 @@ text_box_rep::expand_glyphs (int mode, double factor) {
 
 void
 text_box_rep::display (renderer ren) {
-  ren->set_pencil (pen);
-  if (is_nil (xk)) fn->draw (ren, str, 0, 0);
-  else fn->draw (ren, str, xk->left, 0, xk->padding);
+  if (N(str) > 0) {
+    ren->set_pencil (pen);
+    if (is_nil (xk)) fn->draw (ren, str, 0, 0);
+    else fn->draw (ren, str, xk->left, 0, xk->padding);
+  }
 }
 
 double text_box_rep::left_slope () {
@@ -388,7 +392,7 @@ get_delimiter (string s, font fn, SI height) {
   int ns= N(s);
   ASSERT (ns >= 2 && s[0] == '<' && s[ns-1] == '>',
 	  "invalid rubber character");
-  if (s[ns-2] >= '0' && s[ns-2] <= '9') {
+  if (is_digit (s[ns-2])) {
     int pos;
     int plus= get_number (s, pos);
     if (pos > 0) {
@@ -521,16 +525,17 @@ delimiter_box (path ip, string s, font fn, pencil pen, SI bot, SI top) {
   //     << " -> " << r << "; " << x/PIXEL << ", " << y/PIXEL << "\n";
   //cout << "  extents: " << b->x1/PIXEL << ", " << b->y1/PIXEL
   //     << "; " << b->x2/PIXEL << ", " << b->y2/PIXEL << "\n";
-  box mvb= move_box (ip, b, x, y, false, true);
+  SI var_bot= max (bot, b->y1 + y), var_top= min (top, b->y2 + y);
+  box mvb= move_delimiter_box (ip, b, x, y, var_bot, var_top);
   if (ends (r, "-0>")) return mvb;
-  return macro_box (ip, mvb, fn);
+  SI dy= ((mvb->y1 + mvb->y2)>>1) - fn->yfrac;
+  return macro_delimiter_box (ip, mvb, fn, dy);
 }
 
 box
 delimiter_box (path ip, string s, font fn, pencil pen,
                SI bot, SI top, SI mid, SI real_bot, SI real_top)
 {
-  (void) real_bot; (void) real_top;
   SI h= top - bot;
   string r= get_delimiter (s, fn, h);
   box b= text_box (ip, 0, r, fn, pen);
@@ -545,9 +550,10 @@ delimiter_box (path ip, string s, font fn, pencil pen,
   //     << " -> " << r << "; " << x/PIXEL << ", " << y/PIXEL << "\n";
   //cout << "  extents: " << b->x1/PIXEL << ", " << b->y1/PIXEL
   //     << "; " << b->x2/PIXEL << ", " << b->y2/PIXEL << "\n";
-  box mvb= move_box (ip, b, x, y, false, true);
+  box mvb= move_delimiter_box (ip, b, x, y, real_bot, real_top);
   if (ends (r, "-0>")) return mvb;
-  return macro_box (ip, mvb, fn);
+  SI dy= ((mvb->y1 + mvb->y2)>>1) - fn->yfrac;
+  return macro_delimiter_box (ip, mvb, fn, dy);
 }
 
 box

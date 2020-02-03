@@ -298,13 +298,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (test-default-font?)
-  (test-default? "font"))
+  (with l (get-style-list)
+    (with f (list-filter l (lambda (p) (string-ends? p "-font")))
+      (and (test-default? "font") (null? f)))))
 
 (tm-define (init-default-font)
   (:check-mark "*" test-default-font?)
   (init-default "font")
   (init-default "math-font")
-  (init-default "font-family"))
+  (init-default "font-family")
+  (remove-font-packages))
 
 (menu-bind document-short-chinese-font-menu
   (if (font-exists-in-tt? "AppleGothic")
@@ -370,6 +373,7 @@
       (if (font-exists-in-tt? "texgyretermes-math")
           ("Termes" (init-font "termes" "math-termes"))))
   (if (or (font-exists-in-tt? "DejaVuSerif")
+          (font-exists-in-tt? "FiraSans-Regular")
           (font-exists-in-tt? "LinLibertine_R")
           (font-exists-in-tt? "Optima")
           (font-exists-in-tt? "Papyrus"))
@@ -392,6 +396,8 @@
           ("Didot" (init-font "Didot")))
       (if (font-exists-in-tt? "Essays1743")
           ("Essays1743" (init-font "Essays1743")))
+      (if (font-exists-in-tt? "FiraSans-Regular")
+          ("Fira" (init-font "Fira")))
       (if (font-exists-in-tt? "MarkerFelt")
           ("Marker Felt" (init-font "Marker Felt")))
       (if (font-exists-in-tt? "meyne_textur")
@@ -603,7 +609,7 @@
 (menu-bind page-rendering-menu
   ("Paper" (init-page-rendering "paper"))
   ("Papyrus" (init-page-rendering "papyrus"))
-  ("Automatic" (init-page-rendering "automatic"))
+  ("Screen" (init-page-rendering "automatic"))
   ("Beamer" (init-page-rendering "beamer"))
   ("Book" (init-page-rendering "book"))
   ("Panorama" (init-page-rendering "panorama")))
@@ -626,6 +632,13 @@
       ---
       ("Portrait" (init-page-orientation "portrait"))
       ("Landscape" (init-page-orientation "landscape")))
+  (-> "Crop marks"
+      ("Default" (init-default "page-crop-marks"))
+      ---
+      ("None" (init-env "page-crop-marks" ""))
+      ("A3" (init-env "page-crop-marks" "a3"))
+      ("A4" (init-env "page-crop-marks" "a4"))
+      ("Letter" (init-env "page-crop-marks" "letter")))
   (-> "Margins"
       ("Default" (init-default "page-width-margin" "page-height-margin"
                                "page-odd" "page-even" "page-right"
@@ -741,6 +754,7 @@
   ---
   ("Palette" (interactive-background set-background '()))
   ("Pattern" (open-pattern-selector set-background "1cm"))
+  ("Picture" (open-background-picture-selector set-background))
   ("Other" (init-interactive-env "bg-color")))
 
 (menu-bind document-colors-menu
@@ -782,7 +796,8 @@
   (let* ((dummy (lazy-plugin-force))
          (l (scripts-list)))
     (for (name l)
-      ((eval (scripts-name name))
+      ((check (eval (scripts-name name)) "v"
+              (test-env? "prog-scripts" name))
        (noop) ;; NOTE: inhibit segfault due to property searching?
        (init-env "prog-scripts" name)))))
 
@@ -818,7 +833,7 @@
            (!= (get-init-tree "sectional-short-style") (tree 'macro "false")))
       (-> "Part" (link document-part-menu)))
   (-> "Source"
-      ("Edit source tree" (toggle-preamble))
+      ("Edit source tree" (toggle-source-mode))
       ---
       (group "Preferences")
       (link document-source-preferences-menu))
@@ -851,7 +866,7 @@
            (!= (get-init-tree "sectional-short-style") (tree 'macro "false")))
       (-> "Part" (link document-part-menu)))
   (-> "Source"
-      ("Edit source tree" (toggle-preamble))
+      ("Edit source tree" (toggle-source-mode))
       ("Preferences" (open-source-tree-preferences)))
   (-> "Update" (link document-update-menu))
   ---
@@ -890,6 +905,66 @@
 
 (tm-menu (focus-document-extra-menu t))
 (tm-menu (focus-style-extra-menu t))
+
+(menu-bind cite-texmacs-only-menu
+  ("TeXmacs website" (cite-texmacs "TeXmacs:website"))
+  ("TeXmacs manual" (cite-texmacs "TeXmacs:manual")))
+
+(menu-bind cite-texmacs-related-menu
+  (-> "Tutorials"
+      ("GNU TeXmacs: a scientific editing platform"
+       (cite-texmacs "TeXmacs:vdH2:2006"))
+      ("TeXmacs in 60 minutes"
+       (cite-texmacs "TeXmacs:Seidl:2003"))
+      ("TeXmacs Quick-Start Guide"
+       (cite-texmacs "TeXmacs:Ratier:2005")))
+  (-> "Surveys"
+      ("GNU TeXmacs (ASCM 2005)"
+       (cite-texmacs "TeXmacs:vdH:2005"))
+      ("GNU TeXmacs (Dagstuhl 2006)"
+       (cite-texmacs "TeXmacs:vdH1:2006"))
+      ("GNU TeXmacs: a scientific editing platform"
+       (cite-texmacs "TeXmacs:HGGLPR:2012"))
+      ("GNU TeXmacs: Towards a Scientific Office Suite"
+       (cite-texmacs "TeXmacs:GHPR:2014")))      
+  (-> "Research papers"
+      ("GNU TeXmacs, a free, structured, wysiwyg and technical text editor"
+       (cite-texmacs "TeXmacs:vdH:2001"))
+      ("Conservative conversion between LaTeX and TeXmacs"
+       (cite-texmacs "TeXmacs:HP:2014"))
+      ("Towards semantic mathematical editing"
+       (cite-texmacs "TeXmacs:vdH:2015"))
+      ("Preserving syntactic correctness while editing mathematical formulas"
+       (cite-texmacs "TeXmacs:HLR:2015"))
+      ("Mathematical Font Art"
+       (cite-texmacs "TeXmacs:vdH:2016")))
+  (-> "Plug-ins"
+      ("TeXmacs interfaces to Maxima, Mupad and Reduce"
+       (cite-texmacs "TeXmacs:Grozin:2001"))
+      ("TeXmacs-Maxima interface"
+       (cite-texmacs "TeXmacs:Grozin:2005"))
+      ("TeXmacs-Reduce interface"
+       (cite-texmacs "TeXmacs:Grozin:2012"))
+      ("TeXmacs as an authoring tool for formal developments"
+       (cite-texmacs "TeXmacs:AR:2004"))
+      ("A Document-Oriented Coq Plugin for TeXmacs"
+       (cite-texmacs "TeXmacs:MG:2006"))))
+
+(menu-bind cite-texmacs-menu
+  (assuming (or (in-beamer?) (in-seminar?) (in-browser?))
+    (group "Acknowledge")
+    ("Written with TeXmacs" (acknowledge-texmacs))
+    ---)
+  (group "Cite")
+  (link cite-texmacs-only-menu)
+  ---
+  (group "Cite related work")
+  (link cite-texmacs-related-menu))
+
+(menu-bind cite-texmacs-short-menu
+  (link cite-texmacs-only-menu)
+  ---
+  (link cite-texmacs-related-menu))
 
 (tm-menu (focus-style-menu t)
   (group "Style")
@@ -949,6 +1024,7 @@
   (dynamic (focus-style-menu t))
   ---
   (dynamic (focus-document-menu t))
+  (-> "Cite TeXmacs" (link cite-texmacs-menu))
   (dynamic (focus-document-extra-menu t))
   ---
   ("Help" (focus-help)))
@@ -978,7 +1054,26 @@
         ("Other package" (interactive add-style-package)))
     (assuming (tree-is-buffer? t)
       ((balloon (icon "tm_focus_help.xpm") "Describe tag")
-       (focus-help)))))
+       (focus-help)))
+    (=> (balloon (icon "tm_like.xpm") "Cite TeXmacs")
+        (link cite-texmacs-menu))))
+
+(define (is-background-picture? bg*)
+  (with bg (tm->stree bg*)
+    (and (tm-is? bg 'pattern)
+         (>= (tm-arity bg) 3)
+         (in? (tm-ref bg 1) '("100%" "100@"))
+         (in? (tm-ref bg 2) '("100%" "100@")))))
+
+(tm-menu (focus-background-color-icons)
+  (with setter (lambda (col) (init-env-tree "bg-color" col))
+    (assuming (not (is-background-picture? (get-init-tree "bg-color")))
+      (dynamic (focus-customizable-icons-item
+                "bg-color" "Background color" :global)))
+    (assuming (is-background-picture? (get-init-tree "bg-color"))
+      ((balloon (icon "tm_camera.xpm") "Select background picture")
+       (with bg (tree->stree (get-init-tree "bg-color"))
+         (open-background-picture-selector setter bg))))))
 
 (tm-define (current-page-icon)
   (cond ((test-init? "page-orientation" "landscape")
@@ -995,7 +1090,8 @@
     (=> (balloon (eval (upcase-first (get-init "page-type")))
                  "Paper size")
         (link document-page-size-menu))
-    (=> (balloon (eval (upcase-first (font-family-main (get-init "font"))))
+    (=> (balloon (eval `(verbatim ,(upcase-first
+                                    (font-family-main (get-init "font")))))
                  "Main document font")
         (link document-short-font-menu))
     (=> (balloon (eval (string-append (get-init "font-base-size") "pt"))

@@ -1,5 +1,16 @@
 
 /******************************************************************************
+* MODULE     : tmweb2.css
+* DESCRIPTION: CSS style sheet for TeXmacs web site
+* COPYRIGHT  : (C) 2019  Joris van der Hoeven
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
+
+
+/******************************************************************************
 * Font setup
 ******************************************************************************/
 
@@ -24,12 +35,36 @@
     font-weight: bold;
 }
 
+@font-face {
+    font-family: 'Liberation Mono';
+    src: url("../fonts/LiberationMono-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: 'Liberation Mono';
+    src: url("../fonts/LiberationMono-Bold.ttf") format("truetype");
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: 'Liberation Mono';
+    src: url("../fonts/LiberationMono-Italic.ttf") format("truetype");
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Liberation Mono';
+    src: url("../fonts/LiberationMono-BoldItalic.ttf") format("truetype");
+    font-weight: bold;
+    font-style: italic;
+}
+
 /******************************************************************************
 * Main text properties
 ******************************************************************************/
 
 html {
-    background-color: #E8E8E8;
+    background-color: #E0E0E0;
     border: 0px;
     padding: 0px;
     margin: 0px;
@@ -162,8 +197,8 @@ a:active, a:focus, a:hover {
     margin: 0px -5em;
 
     background-color: white;
-    background-image: url("../images/tiny-sigma-232.png"),
-                      url("../images/uniform-232.png");
+    background-image: url("../images/sigma-224.svg"),
+                      url("../images/uniform-224.png");
     background-position: bottom, top;
     background-repeat: repeat-x, repeat;
     
@@ -281,8 +316,8 @@ a:active, a:focus, a:hover {
     margin: 0px -5em;
 
     background-color: white;
-    background-image: url("../images/tiny-sigma-232-rev.png"),
-                      url("../images/uniform-232.png");
+    background-image: url("../images/sigma-224-rev.svg"),
+                      url("../images/uniform-224.png");
     background-position: top, bottom;
     background-repeat: repeat-x, repeat;
 
@@ -315,7 +350,9 @@ a:active, a:focus, a:hover {
 
 .tmweb-footer .tmweb-license {
     text-align: justify;
-    width: 400px;
+    width: 470px;
+    margin-left: 1em;
+    margin-right: 3em;
 }
 
 .tmweb-footer nav a {
@@ -327,12 +364,22 @@ a:active, a:focus, a:hover {
     display: none;
 }
 
+@media screen and (max-width: 1339px) {
+    .tmweb-footer .tmweb-license {
+        width: 350px;
+        margin-top: -0.5em;
+        margin-left: 1em;
+        margin-right: 2em;
+    }
+}
+
 @media screen and (max-width: 1199px) {
     .tmweb-footer .tmweb-license {
         width: initial;
         display: block;
         margin-left: 5em;
         margin-right: 5em;
+        margin-top: 0em;
         margin-bottom: 1em;
     }
 
@@ -369,19 +416,19 @@ a:active, a:focus, a:hover {
     display: inline-block;
     text-align: center;
     position: relative;
-    top: -1.8em;
-    margin-bottom: -1.8em;
+    top: -1.5em;
+    margin-bottom: -1.5em;
 
-    background-color: #D03445;
+    background-color: #905465; /* #D03445; */
     border-radius: 0.4em;
     border-color: transparent;
     border-style: solid;
     color: white;
-    font-size: 1.4em;
+    font-size: 1.25em;
     font-weight: bold;
-    padding: 0.4em;
-    text-shadow: 0.1em 0.1em 0px #A02C2C;
-    box-shadow: 0.2em 0.2em #A02C2C;
+    padding: 0.2em 0.5em;
+    text-shadow: 0.1em 0.1em 0px #604C4C; /* #A02C2C; */
+    box-shadow: 0.1em 0.1em #604C4C; /* #A02C2C; */
 }
 
 /******************************************************************************
@@ -402,7 +449,7 @@ a:active, a:focus, a:hover {
     .tmweb-split {
         display: block;
         width: 100%;
-        min-height: 60vh;
+        min-height: 58vh;
         margin-top: 4vw;
     }
 
@@ -428,38 +475,134 @@ a:active, a:focus, a:hover {
 }
 
 /******************************************************************************
+* Galleries
+******************************************************************************/
+
+.tmweb-hlist {
+    text-align: left;
+}
+
+.tmweb-hlist div {
+    display: inline;
+}
+
+.tmweb-hlist .tmweb-caption-below {
+    display: inline-block;
+    width: 48%;
+}
+
+.tmweb-hlist .tmweb-caption-below .tmweb-figure {
+    display: inline-block;
+}
+
+.tmweb-hlist .tmweb-caption-below .tmweb-caption {
+    display: inline-block;
+}
+    
+.tmweb-gallery img {
+    display: inline;
+    width: 95%;
+    padding-top: 50px;
+}
+
+@media screen and (max-width: 1200px) {
+    .tmweb-hlist .tmweb-caption-below {
+        width: 95%;
+    }
+}
+
+@media screen and (min-width: 1800px) {
+    .tmweb-hlist .tmweb-caption-below {
+        width: 30%;
+    }
+}
+
+/******************************************************************************
+* Video galleries
+******************************************************************************/
+
+.tmweb-hlist .tmweb-thumbnail {
+    display: inline-block;
+    text-align: left;
+    vertical-align: top;
+    max-width: 320px;
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+}
+
+.tmweb-thumbnail-image {
+    transition: transform .2s; /* Animation */
+}
+
+.tmweb-thumbnail-image:hover {
+    transform: scale(1.2);
+}
+
+.tmweb-hlist .tmweb-thumbnail .tmweb-thumbnail-legend {
+    font-size: 0.8em;
+}
+
+.tmweb-hlist .tmweb-youtube {
+    display: inline-block;
+    text-align: left;
+    vertical-align: top;
+    padding-left: 2em;
+    padding-right: 2em;
+}
+
+.tmweb-youtube .tmweb-youtube-video {
+    width: 72vw;
+    height: 45vw;
+    max-width: 1200px;
+    max-height: 750px;
+}
+
+.tmweb-youtube .tmweb-youtube-legend {
+    font-size: 1em;
+}
+
+/******************************************************************************
+* Miscellaneous elements
+******************************************************************************/
+
+.tmweb-item-pic img {
+    width: 2.5em;
+    vertical-align: top;
+}
+
+/******************************************************************************
 * Special markup
 ******************************************************************************/
 
 .subsup {
     display: inline;
-    vertical-align: -0.2em
+    vertical-align: -0.2em;
 }
 
 .subsup td {
     padding: 0px;
-    text-align: left
+    text-align: left;
 }
 
 .fraction {
     display: inline;
-    vertical-align: -0.8em
+    vertical-align: -0.8em;
 }
 
 .fraction td {
     padding: 0px;
-    text-align: center
+    text-align: center;
 }
 
 .wide {
     position: relative;
-    margin-left: -0.4em
+    margin-left: -0.4em;
 }
 
 .accent {
     position: relative;
     margin-left: -0.4em;
-    top: -0.1em
+    top: -0.1em;
 }
 
 .compact-block p, .compact-block center {
@@ -481,7 +624,8 @@ a:active, a:focus, a:hover {
 }
 
 tt, .verbatim {
-    font-family: monospace;
+    font-family: 'Liberation Mono', monospace;
+    font-size: 90%;
 }
 
 /******************************************************************************

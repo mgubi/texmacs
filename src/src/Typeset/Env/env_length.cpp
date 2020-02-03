@@ -9,10 +9,12 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "analyze.hpp"
 #include "env.hpp"
 #include "convert.hpp"
 #include "page_type.hpp"
 #include "typesetter.hpp"
+#include "Boxes/construct.hpp"
 
 /******************************************************************************
 * Length arithmetic
@@ -21,7 +23,7 @@
 bool
 edit_env_rep::is_length (string s) {
   int i;
-  for (i=0; (i<N(s)) && ((s[i]<'a') || (s[i]>'z')); i++) {}
+  for (i=0; (i<N(s)) && (!is_locase (s[i])); i++) {}
   return is_double (s (0, i)) && is_locase_alpha (s (i, N(s)));
 }
 
@@ -110,7 +112,7 @@ void
 edit_env_rep::get_length_unit (string s, SI& un, string& un_str) {
   int i;
   for (i=0; i<N(s); i++)
-    if ((s[i]>='a') && (s[i]<='z')) break;
+    if (is_locase (s[i])) break;
   un= as_length (string ("1" * s (i, N(s))));
   un_str= s (i, N(s));
 }
@@ -168,12 +170,14 @@ edit_env_rep::as_tmlen (tree t) {
     string s= t->label;
     int start= 0, i, n=N(s);
     while ((start+1<n) && (s[start]=='-') && (s[start+1]=='-')) start += 2;
-    for (i=start; (i<n) && ((s[i]<'a') || (s[i]>'z')); i++) {}
-    string s1= s (start, i);
-    string s2= s (i, n);
-    if (!(is_double (s1) && is_locase_alpha (s2))) return tree (TMLEN, "0");
-    return tmlen_times (as_double (s1),
-			as_tmlen (exec (compound (s2 * "-length"))));
+    double len;
+    string unit;
+    parse_length (s (start, n), len, unit);
+    if (unit == "error" || is_empty (unit)) {
+      return tree (TMLEN, "0");
+    } else {
+      return tmlen_times (len, as_tmlen (exec (compound (unit * "-length"))));
+    }
   }
   else if (is_func (t, MACRO, 1))
     return as_tmlen (exec (t[0]));
@@ -198,6 +202,12 @@ edit_env_rep::as_length (tree t, string perc) {
     string s= r[N(r)==1? 0: 1]->label;
     return (SI) (as_double (s));
   }
+}
+
+SI
+edit_env_rep::as_eff_length (tree t) {
+  if (is_int (t)) return as_int (t);
+  else return as_length (t);
 }
 
 space
@@ -430,6 +440,19 @@ tree edit_env_rep::exec_tmpt_length () {
   return tree (TMLEN, "1"); }
 tree edit_env_rep::exec_px_length () {
   return tree (TMLEN, as_string (pixel)); }
+
+tree edit_env_rep::exec_lcorner_length () {
+  ornament_parameters ps= get_ornament_parameters ();
+  return tree (TMLEN, as_string (ps->lcor)); }
+tree edit_env_rep::exec_bcorner_length () {
+  ornament_parameters ps= get_ornament_parameters ();
+  return tree (TMLEN, as_string (ps->bcor)); }
+tree edit_env_rep::exec_rcorner_length () {
+  ornament_parameters ps= get_ornament_parameters ();
+  return tree (TMLEN, as_string (ps->rcor)); }
+tree edit_env_rep::exec_tcorner_length () {
+  ornament_parameters ps= get_ornament_parameters ();
+  return tree (TMLEN, as_string (ps->tcor)); }
 
 tree edit_env_rep::exec_gw_length () {
   return tree (TMLEN, as_string (gw)); }

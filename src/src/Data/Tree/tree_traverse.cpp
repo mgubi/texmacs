@@ -177,17 +177,21 @@ move_any (tree t, path p, bool forward) {
   }
   if (is_atomic (st)) {
     string s= st->label;
+#ifdef SANITY_CHECKS
     ASSERT (l >= 0 && l <= N(s), "out of range");
+#else
+    l= max (min (l, N(s)), 0);
+#endif
     if (forward) {
       if (l<N(s)) {
-	tm_char_forwards (s, l);
-	return q * l;
+        tm_char_forwards (s, l);
+        return q * l;
       }
     }
     else {
       if (l>0) {
-	tm_char_backwards (s, l);
-	return q * l;
+        tm_char_backwards (s, l);
+        return q * l;
       }
     }
   }
@@ -195,13 +199,13 @@ move_any (tree t, path p, bool forward) {
     int i, n= N(st);
     if (forward) {
       for (i=0; i<n; i++)
-	if (the_drd->is_accessible_child (st, i))
-	  return q * path (i, 0);
+        if (the_drd->is_accessible_child (st, i))
+          return q * path (i, 0);
     }
     else {
       for (i=n-1; i>=0; i--)
-	if (the_drd->is_accessible_child (st, i))
-	  return q * path (i, right_index (st[i]));
+        if (the_drd->is_accessible_child (st, i))
+          return q * path (i, right_index (st[i]));
     }
     return q * (1-l);
   }
@@ -214,12 +218,12 @@ move_any (tree t, path p, bool forward) {
   if (forward) {
     for (i=l+1; i<n; i++)
       if (the_drd->is_accessible_child (st, i))
-	return q * path (i, 0);
+        return q * path (i, 0);
   }
   else {
     for (i=l-1; i>=0; i--)
       if (the_drd->is_accessible_child (st, i)) {
-	return q * path (i, right_index (st[i]));
+        return q * path (i, right_index (st[i]));
     }
   }
   return q * (forward? 1: 0);
@@ -234,9 +238,36 @@ path previous_any (tree t, path p) {
 * Traversal of a valid cursor positions inside a tree
 ******************************************************************************/
 
+path
+closest_up (tree t, path p) {
+  if (is_atomic (t)) {
+    if (is_nil (p)) return path (0);
+    else return path (max (0, min (p->item, N(t->label))));
+  }
+  else if (is_concat (t) || is_document (t)) {
+    if (N(t) == 0) return path (0);
+    else if (is_nil (p) || is_atom (p) || p->item < 0)
+      return path (0, closest_up (t[0], path ()));
+    else if (p->item >= N(t))
+      return path (N(t)-1, closest_up (t[N(t)-1], path ()));
+    else return path (p->item, closest_up (t[p->item], p->next));
+  }
+  else {
+    if (is_nil (p)) return path (0);
+    else if (is_atom (p)) return path (max (0, min (p->item, 1)));
+    else if (p->item < 0) return path (0);
+    else if (p->item >= N(t)) return path (1);
+    else return path (p->item, closest_up (t[p->item], p->next));
+  }
+}
+
 static path
 move_valid_sub (tree t, path p, bool forward) {
+#ifdef SANITY_CHECKS
   ASSERT (is_inside (t, p), "invalid cursor [move_valid]");
+#else
+  if (!is_inside (t, p)) p= closest_up (t, p);
+#endif
   path q= p;
   while (true) {
     path r= move_any (t, q, forward);
@@ -263,7 +294,11 @@ path previous_valid (tree t, path p) {
 
 static path
 move_accessible (tree t, path p, bool forward) {
+#ifdef SANITY_CHECKS
   ASSERT (is_inside (t, p), "invalid cursor [move_accessible]");
+#else
+  if (!is_inside (t, p)) p= closest_up (t, p);
+#endif
   path q= p;
   while (true) {
     path r= move_any (t, q, forward);
@@ -317,23 +352,23 @@ move_word (tree t, path p, bool forward) {
       int n= N(s);
       if (s == "") return q;
       if (forward && l>0 &&
-	  (is_iso_alphanum (s[l-1]) || (l<n && s[l] == ' ') ||
-	   (l==n && at_border (t, path_up (q), forward))) &&
-	  (l==n || !is_iso_alphanum (s[l])))
-	return q;
+          (is_iso_alphanum (s[l-1]) || (l<n && s[l] == ' ') ||
+           (l==n && at_border (t, path_up (q), forward))) &&
+          (l==n || !is_iso_alphanum (s[l])))
+        return q;
       if (!forward && l<n &&
-	  (is_iso_alphanum (s[l]) || (l>0 && s[l-1] == ' ') ||
-	   (l==0 && at_border (t, path_up (q), forward))) &&
-	  (l==0 || !is_iso_alphanum (s[l-1])))
-	return q;
+          (is_iso_alphanum (s[l]) || (l>0 && s[l-1] == ' ') ||
+           (l==0 && at_border (t, path_up (q), forward))) &&
+          (l==0 || !is_iso_alphanum (s[l-1])))
+        return q;
       if (!forward && l==n && next_is_word (t, path_up (q)))
-	return q;
+        return q;
     }
     else {
       if (forward && l==1) return q;
       if (!forward && l==0) return q;
       if (!forward && next_is_word (t, path_up (q)))
-	return q;
+        return q;
     }
     p= q;
   }
@@ -389,7 +424,7 @@ distinct_tag_or_argument (tree t, path p, path q, hashset<int> labs) {
   while (!is_nil (r) && (r != c)) {
     r= path_up (r);
     if (labs->contains ((int) L (subtree (t, r))) &&
-	!none_accessible (subtree (t, r)))
+        !none_accessible (subtree (t, r)))
       return true;
   }
   return false;
@@ -440,7 +475,7 @@ move_tag (tree t, path p, hashset<int> labs, bool forward, bool preserve) {
     if (distinct_tag_or_argument (t, p, r, labs) &&
         acceptable_border (t, p, r, labs) &&
         acceptable_child (t, r, labs) &&
-	(!preserve || tag_index (t, r, labs) == tag_index (t, p, labs)))
+        (!preserve || tag_index (t, r, labs) == tag_index (t, p, labs)))
       return r;
     q= r;
   }
@@ -455,7 +490,7 @@ get_labels (scheme_tree t) {
     int i, n= N(t);
     for (i=0; i<n; i++)
       if (is_atomic (t[i]))
-	labs->insert ((int) as_tree_label (t[i]->label));
+        labs->insert ((int) as_tree_label (t[i]->label));
   }
   return labs;
 }
@@ -483,12 +518,12 @@ move_argument (tree t, path p, bool forward) {
   if (forward) {
     for (i=l+1; i<n; i++)
       if (the_drd->is_accessible_child (st, i))
-	return start (t, q * i);
+        return start (t, q * i);
   }
   else {
     for (i=l-1; i>=0; i--)
       if (the_drd->is_accessible_child (st, i))
-	return end (t, q * i);
+        return end (t, q * i);
   }
   return path ();
 }
@@ -598,12 +633,12 @@ previous_section_impl (tree t, path p) {
     int i= is_nil (p)? N(t)-1: p->item;
     for (; i>=0; i--) {
       if (!is_nil (p) && i == p->item) {
-	path r= previous_section_impl (t[i], p->next);
-	if (!is_nil (r)) return path (i, r);
+        path r= previous_section_impl (t[i], p->next);
+        if (!is_nil (r)) return path (i, r);
       }
       else {
-	path r= previous_section_impl (t[i], path ());
-	if (!is_nil (r)) return path (i, r);
+        path r= previous_section_impl (t[i], path ());
+        if (!is_nil (r)) return path (i, r);
       }
     }
   }

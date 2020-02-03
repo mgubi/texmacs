@@ -63,6 +63,21 @@ hashmap<string,double> lsup_bonum_table ();
 hashmap<string,double> rsub_bonum_table ();
 hashmap<string,double> rsup_bonum_table ();
 hashmap<string,double> above_bonum_table ();
+hashmap<string,double> lsub_libertine_table ();
+hashmap<string,double> lsup_libertine_table ();
+hashmap<string,double> rsub_libertine_table ();
+hashmap<string,double> rsup_libertine_table ();
+hashmap<string,double> above_libertine_table ();
+hashmap<string,double> lsub_biolinum_table ();
+hashmap<string,double> lsup_biolinum_table ();
+hashmap<string,double> rsub_biolinum_table ();
+hashmap<string,double> rsup_biolinum_table ();
+hashmap<string,double> above_biolinum_table ();
+hashmap<string,double> lsub_fira_table ();
+hashmap<string,double> lsup_fira_table ();
+hashmap<string,double> rsub_fira_table ();
+hashmap<string,double> rsup_fira_table ();
+hashmap<string,double> above_fira_table ();
 
 hashmap<string,double> lsub_stix_italic_table ();
 hashmap<string,double> lsup_stix_italic_table ();
@@ -89,6 +104,21 @@ hashmap<string,double> lsup_bonum_italic_table ();
 hashmap<string,double> rsub_bonum_italic_table ();
 hashmap<string,double> rsup_bonum_italic_table ();
 hashmap<string,double> above_bonum_italic_table ();
+hashmap<string,double> lsub_libertine_italic_table ();
+hashmap<string,double> lsup_libertine_italic_table ();
+hashmap<string,double> rsub_libertine_italic_table ();
+hashmap<string,double> rsup_libertine_italic_table ();
+hashmap<string,double> above_libertine_italic_table ();
+hashmap<string,double> lsub_biolinum_italic_table ();
+hashmap<string,double> lsup_biolinum_italic_table ();
+hashmap<string,double> rsub_biolinum_italic_table ();
+hashmap<string,double> rsup_biolinum_italic_table ();
+hashmap<string,double> above_biolinum_italic_table ();
+hashmap<string,double> lsub_fira_italic_table ();
+hashmap<string,double> lsup_fira_italic_table ();
+hashmap<string,double> rsub_fira_italic_table ();
+hashmap<string,double> rsup_fira_italic_table ();
+hashmap<string,double> above_fira_italic_table ();
 
 /******************************************************************************
 * True Type fonts
@@ -233,7 +263,7 @@ unicode_font_rep::unicode_font_rep (string name,
     if (fnm->exists (0xfb03)) ligs += LIGATURE_FFI;
     if (fnm->exists (0xfb04)) ligs += LIGATURE_FFL;
     if (fnm->exists (0xfb05)) ligs += LIGATURE_FT;
-    if (fnm->exists (0xfb06)) ligs += LIGATURE_ST;
+    //if (fnm->exists (0xfb06)) ligs += LIGATURE_ST;
   }
   if (family == "Times New Roman")
     ligs= LIGATURE_FI + LIGATURE_FL;
@@ -344,6 +374,55 @@ unicode_font_rep::unicode_font_rep (string name,
     adjust_integral (lsup_correct, "2", -0.15);
     adjust_integral (rsub_correct, "1", 0.15);
     adjust_integral (rsub_correct, "2", 0.15);
+  }
+
+  else if (starts (family, "LinLibertine")) {
+    if (!ends (family, "I")) {
+      lsub_correct= lsub_libertine_table ();
+      lsup_correct= lsup_libertine_table ();
+      rsub_correct= rsub_libertine_table ();
+      rsup_correct= rsup_libertine_table ();
+      above_correct= above_libertine_table ();
+    }
+    else {
+      lsub_correct= lsub_libertine_italic_table ();
+      lsup_correct= lsup_libertine_italic_table ();
+      rsub_correct= rsub_libertine_italic_table ();
+      rsup_correct= rsup_libertine_italic_table ();
+      above_correct= above_libertine_italic_table ();
+    }
+  }
+  else if (starts (family, "LinBiolinum")) {
+    if (!ends (family, "I")) {
+      lsub_correct= lsub_biolinum_table ();
+      lsup_correct= lsup_biolinum_table ();
+      rsub_correct= rsub_biolinum_table ();
+      rsup_correct= rsup_biolinum_table ();
+      above_correct= above_biolinum_table ();
+    }
+    else {
+      lsub_correct= lsub_biolinum_italic_table ();
+      lsup_correct= lsup_biolinum_italic_table ();
+      rsub_correct= rsub_biolinum_italic_table ();
+      rsup_correct= rsup_biolinum_italic_table ();
+      above_correct= above_biolinum_italic_table ();
+    }
+  }
+  else if (starts (family, "FiraSans")) {
+    if (!ends (family, "Italic")) {
+      lsub_correct= lsub_fira_table ();
+      lsup_correct= lsup_fira_table ();
+      rsub_correct= rsub_fira_table ();
+      rsup_correct= rsup_fira_table ();
+      above_correct= above_fira_table ();
+    }
+    else {
+      lsub_correct= lsub_fira_italic_table ();
+      lsup_correct= lsup_fira_italic_table ();
+      rsub_correct= rsub_fira_italic_table ();
+      rsup_correct= rsup_fira_italic_table ();
+      above_correct= above_fira_italic_table ();
+    }
   }
 }
 
@@ -602,9 +681,9 @@ unicode_font_rep::get_extents (string s, metric& ex) {
 void
 unicode_font_rep::get_xpositions (string s, SI* xpos, bool ligf) {
   int i= 0, n= N(s);
-  if (n == 0) return;
-  
-  register SI x= 0;
+  if (n == 0) { xpos[0]= 0; return; }
+
+  SI x= 0;
   unsigned int uc= 0xffffffff;
   while (i<n) {
     int start= i;
@@ -669,6 +748,7 @@ unicode_font_rep::advance_glyph (string s, int& pos, bool ligf) {
 glyph
 unicode_font_rep::get_glyph (string s) {
   int i= 0, n= N(s);
+  if (n == 0) return font_rep::get_glyph (s);
   unsigned int uc= read_unicode_char (s, i);
   if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
     uc= ligature_replace (uc, s, i);
@@ -681,6 +761,7 @@ unicode_font_rep::get_glyph (string s) {
 int
 unicode_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
   int i= 0, n= N(s);
+  if (n == 0) return font_rep::index_glyph (s, rm, rg);
   unsigned int uc= read_unicode_char (s, i);
   if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
     uc= ligature_replace (uc, s, i);

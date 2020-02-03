@@ -101,7 +101,7 @@
     ---
     ("Smash" (make 'smash))
     ("Reduce" (make-reduce-by "0.5ex"))
-    ("Swell" (make 'swell))))
+    ("Inflate" (make 'inflate))))
 
 (menu-bind linear-transform-menu
   (when (not (selection-active-large?))
@@ -135,6 +135,7 @@
   ("Magnify vertically" (make 'vmagnified))
   ("Condensed" (make 'condensed))
   ("Extended" (make 'extended))
+  ("Monospaced" (make 'monospaced))
   ---
   ("Degraded" (make 'degraded))
   ("Distorted" (make 'distorted))
@@ -319,7 +320,7 @@
     ("Page number text" (make 'set-page-number-macro))))
 
 (menu-bind page-break-menu
-  (when (not (selection-active?))
+  (when (and (not (selection-active?)) (in-main-flow?))
     (group "Page break before")
     ("New page" (make 'new-page*))
     ("New double page" (make 'new-dpage*))

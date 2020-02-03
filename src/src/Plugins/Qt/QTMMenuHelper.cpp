@@ -435,13 +435,20 @@ QTMLineEdit::QTMLineEdit (QWidget* parent, string _type, string _ww,
   if (style & WIDGET_STYLE_MINI) {
     setStyle (qtmstyle());
       // FIXME: we should remove this and let the scheme code decide.
+#ifdef OS_MACOS
     QPalette pal (palette());
     pal.setColor (QPalette::Base, QColor (252, 252, 248));
     pal.setColor (QPalette::WindowText, Qt::black);
     setPalette (pal);
+#endif
   }
+<<<<<<< HEAD
 
     // just to be sure we don't capture the wrong keys in keyPressEvent
+=======
+  
+  // just to be sure we don't capture the wrong keys in keyPressEvent
+>>>>>>> origin/master
   setCompleter (0);
 
   qt_apply_tm_style (this, style);
@@ -517,7 +524,7 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
     string s  = from_qstring (text());
     if (last_key >= 32 && last_key <= 126) {
       key= string ((char) last_key);
-      if (key[0] >= 'A' && key[0] <= 'Z')
+      if (is_upcase (key[0]))
         if ((ev->modifiers() & Qt::ShiftModifier) == 0)
           key[0]= (int) (key[0] + ((int) 'a') - ((int) 'A'));
     }
@@ -946,7 +953,8 @@ QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
   opt.activeSubControls = QStyle::SC_ComboBoxArrow;
   QRect r = style()->subControlRect (QStyle::CC_ComboBox, &opt,
                                      QStyle::SC_ComboBoxArrow, &cb);
-  minSize.setWidth (r.width());
+  int max_w= (int) floor (40 * retina_scale);
+  minSize.setWidth (min (r.width(), max_w));
 }
 
 /*! Add items and fix the ComboBox size using texmacs length units.

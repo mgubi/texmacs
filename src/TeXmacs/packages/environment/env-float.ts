@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.11>
 
 <style|source>
 
@@ -148,27 +148,87 @@
     </with>>
   </float>>>>
 
-  <assign|custom-note-ref|<macro|sym|sep|id|body|<style-with|src-compact|none|<with|locus-color|preserve|visited-color|preserve|<locus|<id|<merge|source-|<arg|id>>>|<arg|body>>><rsup|<locus|<id|<merge|source-abbr-|<arg|id>>>|<link|footnote-text|<id|<merge|source-abbr-|<arg|id>>>|<id|<merge|dest-|<arg|id>>>>|<arg|sep><arg|sym>>>>>>
+  <assign|custom-note-ref|<macro|sym|sep|id|body|<style-with|src-compact|none|<with|locus-color|preserve|visited-color|preserve|<locus|<id|<merge|source-|<arg|id>>>|<arg|body>>><math|><rsup|<locus|<id|<merge|source-abbr-|<arg|id>>>|<link|footnote-text|<id|<merge|source-abbr-|<arg|id>>>|<id|<merge|dest-|<arg|id>>>>|<arg|sep><arg|sym>>>>>>
 
   <\active*>
     <\src-comment>
-      Second kind of customized footnotes.
+      Detached notes.
     </src-comment>
   </active*>
 
-  <assign|render-footnote**|<\macro|nr|lab|body>
+  <assign|render-inline-note|<macro|nr|lab|body|<smaller|<surround|<locus|<id|<hard-id|<arg|body>>>|<link|hyperlink|<id|<hard-id|<arg|body>>>|<url|<merge|#footnr-|<arg|nr>>>>|<arg|nr>><footnote-sep>|<set-binding|<merge|footnote-|<arg|nr>>|<arg|lab>|body>|<style-with|src-compact|none|<arg|body>>>>>>
+
+  <assign|render-wide-note|<\macro|nr|lab|body>
     <\style-with|src-compact|none>
       <smaller|<with|par-mode|justify|par-left|0cm|par-right|0cm|font-shape|right|dummy|<value|page-fnote-sep>|dummy|<value|page-fnote-barlen>|<style-with|src-compact|none|<surround|<locus|<id|<hard-id|<arg|body>>>|<link|hyperlink|<id|<hard-id|<arg|body>>>|<url|<merge|#footnr-|<arg|nr>>>>|<arg|nr>><footnote-sep>|<set-binding|<merge|footnote-|<arg|nr>>|<arg|lab>|body><right-flush>|<style-with|src-compact|none|<arg|body>>>>>>
     </style-with>
   </macro>>
 
-  <assign|footnote-text|<macro|body|var|<flag|Footnote|brown><next-footnote><assign|<merge|fnote-|<arg|var>>|<the-footnote><render-footnote|<the-footnote>|<arg|body>>>>>
+  \;
 
-  <assign|footnote-new|<macro|var|<flag|Footnote|brown><next-footnote><assign|<merge|fnote-|<arg|var>>|<the-footnote>><assign|<merge|fnlab-|<arg|var>>|<value|the-label>>>>
+  <assign|note-declare|<macro|id|<if|<not|<provides|<merge|fnote-|<arg|id>>>>|<next-footnote><assign|<merge|fnote-|<arg|id>>|<the-footnote>><assign|<merge|fnlab-|<arg|id>>|<value|the-label>>>>>
 
-  <assign|footnote-show|<macro|body|var|<render-footnote**|<value|<merge|fnote-|<arg|var>>>|<value|<merge|fnlab-|<arg|var>>>|<arg|body>>>>
+  <assign|note-declare*|<macro|id|sym|<if|<not|<provides|<merge|fnote-|<arg|id>>>>|<assign|<merge|fnote-|<arg|id>>|<arg|sym>><assign|<merge|fnlab-|<arg|id>>|<arg|sym>>>>>
 
-  <assign|footnote-reference|<macro|var|<space|0spc><label|<merge|footnr-|<value|<merge|fnote-|<arg|var>>>>><rsup|<with|font-shape|right|<reference|<merge|footnote-|<value|<merge|fnote-|<arg|var>>>>>>>>>
+  <assign|note-ref|<macro|id|<space|0spc><note-declare|<arg|id>><label|<merge|footnr-|<value|<merge|fnote-|<arg|id>>>>><rsup|<with|font-shape|right|<if|<has-binding|<merge|footnote-|<value|<merge|fnote-|<arg|id>>>>>|<reference|<merge|footnote-|<value|<merge|fnote-|<arg|id>>>>>|<value|<merge|fnlab-|<arg|id>>>>>>>>
+
+  <assign|note-ref*|<macro|id|sym|<space|0spc><note-declare*|<arg|id>|<arg|sym>><label|<merge|footnr-|<value|<merge|fnote-|<arg|id>>>>><rsup|<with|font-shape|right|<if|<has-binding|<merge|footnote-|<value|<merge|fnote-|<arg|id>>>>>|<reference|<merge|footnote-|<value|<merge|fnote-|<arg|id>>>>>|<value|<merge|fnlab-|<arg|id>>>>>>>>
+
+  <assign|note-inline|<macro|body|id|<surround|<note-declare|<arg|id>>||<render-inline-note|<value|<merge|fnote-|<arg|id>>>|<value|<merge|fnlab-|<arg|id>>>|<arg|body>>>>>
+
+  <assign|note-inline*|<macro|body|id|sym|<surround|<note-declare*|<arg|id>|<arg|sym>>||<render-inline-note|<value|<merge|fnote-|<arg|id>>>|<value|<merge|fnlab-|<arg|id>>>|<arg|body>>>>>
+
+  <assign|note-wide|<macro|body|id|<surround|<note-declare|<arg|id>>||<render-wide-note|<value|<merge|fnote-|<arg|id>>>|<value|<merge|fnlab-|<arg|id>>>|<arg|body>>>>>
+
+  <assign|note-wide*|<macro|body|id|sym|<surround|<note-declare*|<arg|id>|<arg|sym>>||<render-wide-note|<value|<merge|fnote-|<arg|id>>>|<value|<merge|fnlab-|<arg|id>>>|<arg|body>>>>>
+
+  <assign|note-footnote|<macro|body|id|<surround|<note-declare|<arg|id>><flag|Footnote|brown>||<with|the-label|<value|<merge|fnlab-|<arg|id>>>|<render-footnote|<value|<merge|fnote-|<arg|id>>>|<arg|body>>>>>>
+
+  <assign|note-footnote*|<macro|body|id|sym|<surround|<note-declare*|<arg|id>|<arg|sym>><flag|Footnote|brown>||<with|the-label|<value|<merge|fnlab-|<arg|id>>>|<render-footnote|<value|<merge|fnote-|<arg|id>>>|<arg|body>>>>>>
+
+  \;
+
+  <drd-props|note-declare|arity|1|unaccessible|0|identifier|0>
+
+  <drd-props|note-declare*|arity|2|unaccessible|all|identifier|0>
+
+  <drd-props|note-ref|arity|1|unaccessible|0|identifier|0>
+
+  <drd-props|note-ref*|arity|2|unaccessible|0|identifier|0|unaccessible|1>
+
+  <drd-props|note-inline|arity|2|accessible|0|unaccessible|1|identifier|1>
+
+  <drd-props|note-inline*|arity|3|accessible|0|unaccessible|1|unaccessible|2|identifier|1>
+
+  <drd-props|note-wide|arity|2|accessible|0|unaccessible|1|identifier|1>
+
+  <drd-props|note-wide*|arity|3|accessible|0|unaccessible|1|unaccessible|2|identifier|1>
+
+  <drd-props|note-footnote|arity|2|accessible|0|unaccessible|1|identifier|1>
+
+  <drd-props|note-footnote*|arity|3|accessible|0|unaccessible|1|unaccessible|2|identifier|1>
+
+  <\active*>
+    <\src-comment>
+      Legacy macros.
+    </src-comment>
+  </active*>
+
+  <assign|footnote-new|<value|note-declare>>
+
+  <assign|footnote-reference|<value|note-ref>>
+
+  <assign|footnote-text|<value|note-footnote>>
+
+  <assign|footnote-show|<value|note-wide>>
+
+  <drd-props|footnote-new|arity|1|unaccessible|0|identifier|0>
+
+  <drd-props|footnote-reference|arity|1|unaccessible|0|identifier|0>
+
+  <drd-props|footnote-text|arity|2|accessible|0|unaccessible|1|identifier|1>
+
+  <drd-props|footnote-show|arity|2|accessible|0|unaccessible|1|identifier|1>
 
   <\active*>
     <\src-comment>

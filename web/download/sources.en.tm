@@ -1,13 +1,13 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.10>
 
-<style|<tuple|tmweb|english>>
+<style|tmweb2>
 
 <\body>
   <tmweb-current|Download|Sources><tmweb-title|Compiling <TeXmacs> from the
   source code|<tmweb-download-links>>
 
   On this page, we explain how to compile <TeXmacs> from the source code on
-  <name|Unix>-like system, including <name|MacOS> and <name|Windows> with
+  <name|Unix>-like systems, including <name|MacOS> and <name|Windows> with
   <name|Mingw> or <name|Cygwin>. In the case of <name|Windows>, you may first
   want to install the appropriate build environment and follow our
   <hlink|instructions for compilation under <name|Windows>|winqt.en.tm>.
@@ -43,9 +43,9 @@
 
   <paragraph|Download the latest version>
 
-  Download the <hlink|latest version|<merge|http://www.texmacs.org/Download/ftp/tmftp/source/|<merge|<TeXmacs-version-release|devel>|-src.tar.gz>>>
+  Download the <hlink|latest version|<merge|https://www.texmacs.org/Download/ftp/tmftp/source/|<merge|<TeXmacs-version-release|devel>|-src.tar.gz>>>
   of the source code, or the <hlink|latest stable
-  version|<merge|http://www.texmacs.org/Download/ftp/tmftp/source/|<merge|<TeXmacs-version-release|stable>|-src.tar.gz>>>,
+  version|<merge|https://www.texmacs.org/Download/ftp/tmftp/source/|<merge|<TeXmacs-version-release|stable>|-src.tar.gz>>>,
   <verbatim|cd> into the directory where you wish to compile <TeXmacs> and
   type
 
@@ -82,7 +82,7 @@
   <TeXmacs>|https://savannah.gnu.org/svn/?group=texmacs>. You may also use
   <name|Savannah> in order to submit <hlink|patches|../contact/patches.en.tm>
   to <TeXmacs>. A <hlink|Git|http://git-scm.com/> mirror of the main
-  Subversion repository is maintained at <hlink|Gitorious|https://gitorious.org/texmacs/texmacs>.
+  Subversion repository is maintained at <hlink|Github|https://github.com/texmacs/texmacs>.
 
   <section|Compile, install and run>
 
@@ -184,7 +184,7 @@
   <hlink|contact|../contact/contact.en.tm> us, but you might need to be more
   patient.
 
-  <tmdoc-copyright|1999--2017|Joris van der Hoeven>
+  <tmdoc-copyright|1999--2019|Joris van der Hoeven>
 
   <tmweb-license>
 </body>

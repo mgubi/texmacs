@@ -445,12 +445,13 @@
 (define (default-post-handler u)
   (with (base qry) (process-url u)
     (with fm (file-format base)
-      (cond ((== fm "texmacs-file") (texmacs-file-post qry))
+      (cond ((== qry "") (noop))
+            ((== fm "texmacs-file") (texmacs-file-post qry))
             ((== fm "generic-file") (generic-file-post qry))
             ((== fm "scheme-file") (source-file-post qry))
             ((== fm "cpp-file") (source-file-post qry))
             ((== fm "html-file") (html-file-post qry))
-            (else 
+            (else
               (display* "Unhandled format for default queries: " fm "\n"))))))
 
 (define (http-post-handler u)
@@ -458,11 +459,14 @@
   (noop))
 
 (define (default-root-handler u)
-  (if (url-or? (url-expand u))
-      (default-root-disambiguator (url-expand u))
-      (with (base qry) (process-url u)
-        (if (!= "" (url->system base))
-            (load-browse-buffer base)))))
+  (cond ((and (url-rooted-protocol? u "default")
+              (url-rooted-web? (current-buffer)))
+         (default-root-handler (url-relative (current-buffer) u)))
+        ((url-or? (url-expand u))
+         (default-root-disambiguator (url-expand u)))
+        (else (with (base qry) (process-url u)
+                (if (!= "" (url->system base))
+                    (load-browse-buffer base))))))
 
 (define (tmfs-root-handler u)
   (load-browse-buffer u))
@@ -548,9 +552,9 @@
 
 (define (go-to-vertex v attrs)
   (cond ((func? v 'id 1)
-	 (go-to-id (cadr v) (cursor-path)))
+         (go-to-id (cadr v) (cursor-path)))
         ((func? v 'url 1)
-	 (go-to-url (escape-link-args (cadr v)) (cursor-path)))
+         (go-to-url (escape-link-args (cadr v)) (cursor-path)))
         ((func? v 'script)
          (with ok? (== (assoc-ref attrs "secure") "true")
            (apply execute-script (cons* (cadr v) ok? (cddr v)))))

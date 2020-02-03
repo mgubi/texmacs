@@ -125,7 +125,7 @@ font_rep::copy_math_pars (font fn) {
 
 void
 font_rep::draw (renderer ren, string s, SI x, SI y, SI xk, bool ext) {
-  if (ren->zoomf == 1.0 || !ren->is_screen) {
+  if (ren->zoomf == 1.0 || ren->is_printer ()) {
     if (ext) draw_fixed (ren, s, x, y, xk);
     else draw_fixed (ren, s, x, y);
   }
@@ -222,16 +222,63 @@ double font_rep::get_right_slope (string s) { (void) s; return slope; }
 SI     font_rep::get_left_correction  (string s) { (void) s; return 0; }
 SI     font_rep::get_right_correction (string s) { (void) s; return 0; }
 
-SI font_rep::get_lsub_correction (string s) {
-  return -get_left_correction (s); }
-SI font_rep::get_lsup_correction (string s) {
-  return get_right_correction (s); }
-SI font_rep::get_rsub_correction (string s) {
-  return 0; }
-SI font_rep::get_rsup_correction (string s) {
-  return get_right_correction (s); }
-SI font_rep::get_wide_correction (string s, int mode) {
-  (void) mode; return 0; }
+SI
+font_rep::get_lsub_correction (string s) {
+  //cout << "lsub " << this->res_name << ", " << s << LF;
+  SI r= -get_left_correction (s) + global_lsub_correct;
+  if (lsub_correct->contains (s))
+    r += (SI) (lsub_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[0]) &&
+           lsub_correct->contains (s (0, 1)))
+    r += (SI) (lsub_correct[s (0, 1)] * wfn);
+  return r;
+}
+
+SI
+font_rep::get_lsup_correction (string s) {
+  //cout << "lsup " << this->res_name << ", " << s << LF;
+  //SI r= get_right_correction (s) + global_lsup_correct;
+  SI r= global_lsup_correct;
+  if (lsup_correct->contains (s))
+    r += (SI) (lsup_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[0]) &&
+           lsup_correct->contains (s (0, 1)))
+    r += (SI) (lsup_correct[s (0, 1)] * wfn);
+  return r;
+}
+
+SI
+font_rep::get_rsub_correction (string s) {
+  //cout << "rsub " << this->res_name << ", " << s << LF;
+  SI r= global_rsub_correct;
+  if (rsub_correct->contains (s))
+    r += (SI) (rsub_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[N(s)-1]) &&
+           rsub_correct->contains (s (N(s)-1, N(s))))
+    r += (SI) (rsub_correct[s (N(s)-1, N(s))] * wfn);
+  return r;
+}
+
+SI
+font_rep::get_rsup_correction (string s) {
+  //cout << "rsup " << this->res_name << ", " << s << LF;
+  SI r= get_right_correction (s) + global_rsup_correct;
+  if (rsup_correct->contains (s))
+    r += (SI) (rsup_correct[s] * wfn);
+  else if (N(s) > 1 && is_alpha (s[N(s)-1]) &&
+           rsup_correct->contains (s (N(s)-1, N(s))))
+    r += (SI) (rsup_correct[s (N(s)-1, N(s))] * wfn);
+  return r;
+}
+
+SI
+font_rep::get_wide_correction (string s, int mode) {
+  if (mode > 0 && above_correct->contains (s))
+    return (SI) (above_correct[s] * wfn);
+  else if (mode < 0 && below_correct->contains (s))
+    return (SI) (below_correct[s] * wfn);
+  else return 0;
+}
 
 void
 font_rep::get_extents (string s, metric& ex, bool ligf) {
@@ -258,8 +305,8 @@ font_rep::get_xpositions (string s, SI* xpos) {
   while (i < N(s)) {
     if (s[i] == '<')
       while ((i < N(s)) && (s[i] != '>')) {
-	i++;
-	xpos[i]= x;
+        i++;
+        xpos[i]= x;
       }
     if (i < N(s)) i++;
     get_extents (s (0, i), ex);
@@ -285,8 +332,8 @@ font_rep::get_xpositions (string s, SI* xpos, SI xk) {
     SI dx= (2*count + 1) * xk;
     if (s[i] == '<')
       while ((i < N(s)) && (s[i] != '>')) {
-	i++;
-	xpos[i] += dx;
+        i++;
+        xpos[i] += dx;
       }
     if (i < N(s)) i++;
     count++;
@@ -307,17 +354,17 @@ font_rep::var_get_extents (string s, metric& ex) {
       metric ey;
       get_extents (s (start, end), ey);
       if (flag) {
-	ex->x3= ey->x3+ ex->x2; ex->y3= ey->y3+ ex->x2;
-	ex->x4= ey->x4; ex->y4= ey->y4;
-	ex->x2 += ey->x2;
-	flag= false;
+        ex->x3= ey->x3+ ex->x2; ex->y3= ey->y3+ ex->x2;
+        ex->x4= ey->x4; ex->y4= ey->y4;
+        ex->x2 += ey->x2;
+        flag= false;
       }
       else {
-	ex->x3= min (ex->x3, ex->x2+ ey->x3);
-	ex->x4= max (ex->x4, ex->x2+ ey->x4);
-	ex->y3= min (ex->y3, ey->y3);
-	ex->y4= max (ex->y4, ey->y4);
-	ex->x2 += ey->x2;
+        ex->x3= min (ex->x3, ex->x2+ ey->x3);
+        ex->x4= max (ex->x4, ex->x2+ ey->x4);
+        ex->y3= min (ex->y3, ey->y3);
+        ex->y4= max (ex->y4, ey->y4);
+        ex->x2 += ey->x2;
       }
     }
     for (; (end<N(s)) && (s[end]==' '); end++) ex->x2 += spc->def;
@@ -487,6 +534,9 @@ static font
 make_rubber_font (font fn) {
   if (starts (fn->res_name, "stix-"))
     return rubber_stix_font (fn);
+  else if (occurs ("mathlarge=", fn->res_name) ||
+           occurs ("mathrubber=", fn->res_name))
+    return fn;
   else if (has_poor_rubber && fn->type == FONT_TYPE_UNICODE)
     return poor_rubber_font (fn);
   else if (fn->type == FONT_TYPE_UNICODE)

@@ -1,4 +1,4 @@
-<TeXmacs|1.99.9>
+<TeXmacs|1.99.10>
 
 <style|<tuple|source|std|english>>
 
@@ -7,7 +7,7 @@
     <src-package|tmdoc-web2|1.0>
 
     <\src-purpose>
-      New design for <TeXmacs> web site.
+      New design for <TeXmacs>-2.* web site.
     </src-purpose>
 
     <src-copyright|2019|Joris van der Hoeven>
@@ -81,21 +81,21 @@
   language="javascript"\<gtr\>document.write (downloadRelativeLink
   ("Download"));\<less\>/script\<gtr\>>|<hlink|Learn|../help/learn.en.tm>|<hlink|Contribute|../contribute/contribute.en.tm>>>>>
 
-  <assign|tmweb-home-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|TeXmacs>|<hlink|Welcome|../home/welcome.en.tm>|<hlink|Gallery|../home/screenshots.en.tm>|<hlink|News|../home/news.en.tm>|<hlink|Plans|../about/plans.en.tm>|<hlink|Thanks|../home/thanks.en.tm>>>>>
+  <assign|tmweb-home-links|<macro|<style-with|||src-compact|none|<tmweb-link-section|<section*|TeXmacs>|<hlink|Welcome|../home/welcome.en.tm>|<hlink|Gallery|../home/gallery.en.tm>|<hlink|News|../home/news.en.tm>|<hlink|Changes|../about/changes.en.tm>|<hlink|Plans|../about/plans.en.tm>|<hlink|Authors|../about/authors.en.tm>>>>>
 
   <assign|tmweb-download-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Download>|<hlink|Sources|../download/sources.en.tm>|<hlink|GNU
-  Linux|../download/unix.en.tm>|<hlink|MacOS|../download/macosx.en.tm>|<hlink|Windows|../download/windows.en.tm>|<hlink|Other|../download/other.en.tm>|<hlink|License|../about/license.en.tm>>>>>
+  Linux|../download/linux.en.tm>|<hlink|MacOS|../download/macosx.en.tm>|<hlink|Windows|../download/windows.en.tm>|<hlink|Other|../download/other.en.tm>|<hlink|License|../about/license.en.tm>>>>>
 
-  <assign|tmweb-learn-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Learn>|<hlink|Videos|../home/videos.en.tm>|<hlink|Tutorials|../help/tutorial.en.tm>|<hlink|Books|../help/book.en.tm>|<obsolete|<hlink|Manual|../help/manual.en.tm>>|<hlink|FAQ|../help/faq.en.tm>|<hlink|Mailing
+  <assign|tmweb-learn-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Learn>|<hlink|Videos|../home/videos.en.tm>|<hlink|Tutorials|../help/tutorial.en.tm>|<hlink|Manuals|../help/book.en.tm>|<hlink|FAQ|../help/faq.en.tm>|<hlink|Mailing
   lists|../home/ml.en.tm>>>>>
 
-  <assign|tmweb-contribute-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Contribute>|<obsolete|<hlink|Contribute|../contribute/contribute.en.tm>>|<obsolete|<hlink|Team|../contribute/team.en.tm>>|<hlink|Donate|../contribute/donations.en.tm>|<hlink|Develop|../contribute/develop.en.tm>|<hlink|Document|../contribute/documentation.en.tm>|<hlink|Translate|../contribute/translations.en.tm>|<hlink|Plug-ins|../contribute/plugins.en.tm>>>>>
+  <assign|tmweb-contribute-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Contribute>|<obsolete|<hlink|Contribute|../contribute/contribute-old.en.tm>>|<obsolete|<hlink|Team|../contribute/team.en.tm>>|<hlink|Donate|../contribute/donations.en.tm>|<hlink|Develop|../contribute/develop.en.tm>|<hlink|Document|../contribute/documentation.en.tm>|<hlink|Translate|../contribute/translations.en.tm>|<hlink|Plug-ins|../contribute/plugins.en.tm>>>>>
 
   <assign|tmweb-contact-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Contact>|<hlink|Feedback|../contact/contact.en.tm>|<hlink|Bugs|../contact/bugs.en.tm>|<hlink|Suggestions|../contact/wishes.en.tm>|<hlink|Patches|../contact/patches.en.tm>|<hlink|Mailing
   lists|../home/ml.en.tm>>>>>
 
-  <assign|tmweb-further-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Further>|<obsolete|<hlink|Philosophy|../about/philosophy.en.tm>>|<obsolete|<hlink|Artwork|../about/artwork.en.tm>>|<obsolete|<hlink|Changes|../about/changes.en.tm>>|<obsolete|<hlink|Jobs|../home/jobs.en.tm>>|<obsolete|<hlink|To
-  do|../about/todo.en.tm>>|<obsolete|<hlink|Roadmap|../about/roadmap.en.tm>>|<obsolete|<hlink|Authors|../about/authors.en.tm>>|<obsolete|<hlink|Donators|../about/donators.en.tm>>>>>>
+  <assign|tmweb-further-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Further>|<obsolete|<hlink|Philosophy|../about/philosophy.en.tm>>|<obsolete|<hlink|Artwork|../about/artwork.en.tm>>|<obsolete|<hlink|Jobs|../home/jobs.en.tm>>|<obsolete|<hlink|To
+  do|../about/todo.en.tm>>|<obsolete|<hlink|Roadmap|../about/roadmap.en.tm>>|<obsolete|<hlink|Donators|../about/donators.en.tm>>>>>>
 
   <\active*>
     <\src-comment>
@@ -125,7 +125,7 @@
 
   <assign|tmweb-header|<macro|title|<tmweb-underline|<tmweb-tmimage><space|1em><with|font-series|bold|font-size|1.3|<arg|title>><htab|5mm><with|font-size|0.8|<tmweb-top-links>>><vspace|1fn>>>
 
-  <assign|tmhtml-tmweb-header|<macro|title|<html-div-class|tmweb-pad-below|<html-div-class|tmweb-header|<html-class|tmweb-title-image|<tmweb-tmimage>><space|1em><html-class|tmweb-title|<arg|title>><space|1em><html-class|tmweb-top-menu|<tmweb-top-links>>>>>>
+  <assign|tmhtml-tmweb-header|<macro|title|<web-title|<arg|title>><html-div-class|tmweb-pad-below|<html-div-class|tmweb-header|<html-class|tmweb-title-image|<tmweb-tmimage>><space|1em><html-class|tmweb-title|<arg|title>><space|1em><html-class|tmweb-top-menu|<tmweb-top-links>>>>>>
 
   <assign|tmweb-title|<macro|title|bar|<tmweb-header|<arg|title>>>>
 
@@ -155,7 +155,10 @@
       is preserved.
 
       <hlink|Free Software Foundation|http://www.fsf.org/fsf/fsf.html>, Inc.,
-      51 Franklin Street, Fifth Floor, Boston, MA 02111, USA
+      51 Franklin Street, Fifth Floor, Boston, MA 02111, USA.
+
+      With the support of <hlink|CNRS|http://www.cnrs.fr/>; hosted by
+      <hlink|INRIA|https://www.inria.fr/en/>.
     </active*>
   </macro>>
 
@@ -197,11 +200,29 @@
 
   <\active*>
     <\src-comment>
-      Captions for pictures
+      Horizontal lists
     </src-comment>
   </active*>
 
-  <assign|tmweb-caption-below|<macro|fig|cap|<tabular*|<tformat|<table|<row|<cell|<arg|fig>>>|<row|<cell|<arg|cap>>>>>>>>
+  <assign|tmweb-hlist-item|<macro|body|<arg|body><space|1em> >>
+
+  <assign|tmhtml-tmweb-hlist-item|<macro|body|<arg|body> >>
+
+  <assign|tmweb-hlist|<xmacro|args|<with|par-mode|left|<map-args|tmweb-hlist-item|concat|args>>>>
+
+  <assign|tmhtml-tmweb-hlist|<xmacro|args|<html-div-class|tmweb-hlist|<map-args|tmweb-hlist-item|concat|args>>>>
+
+  <\active*>
+    <\src-comment>
+      Pictures and captions
+    </src-comment>
+  </active*>
+
+  <assign|tmweb-gallery-picture|<macro|name|<image|<arg|name>|0.45par|||>>>
+
+  <assign|tmhtml-tmweb-gallery-picture|<macro|name|<html-div-class|tmweb-gallery|<image|<arg|name>||||>>>>
+
+  <assign|tmweb-caption-below|<macro|fig|cap|<tabular*|<tformat|<table|<row|<cell|<arg|fig>>>|<row|<cell|<small|<arg|cap>>>>>>>>>
 
   <assign|tmhtml-tmweb-caption-below|<macro|fig|cap|<html-div-class|tmweb-caption-below|<html-div-class|tmweb-figure|<arg|fig>><html-div-class|tmweb-caption|<arg|cap>>>>>
 
@@ -218,6 +239,48 @@
   <assign|tmhtml-tmweb-slide|<macro|body|<html-div-class|tmweb-slide|<arg|body>>>>
 
   <assign|tmhtml-tmweb-carousel|<xmacro|args|<style-with|src-compact|none|<html-javascript-src|http://www.texmacs.org/javascript/texmacs_carousel.js><html-div-class|tmweb-carousel|<map-args|tmhtml-tmweb-slide|concat|args>>>>>
+
+  <\active*>
+    <\src-comment>
+      Description lists with picture items
+    </src-comment>
+  </active*>
+
+  <new-list|description-plain|<value|aligned-space-item>|<macro|name|<active*|<with|mode|math|<with|font-series|bold|math-font-series|bold|<rigid|\<ast\>>>>>>>
+
+  <assign|description-pics|<\macro|body>
+    <\with|old-item-hsep|<value|item-hsep>|item-hsep|3tab>
+      <\description-plain>
+        <\with|item-hsep|<value|old-item-hsep>>
+          <arg|body>
+        </with>
+      </description-plain>
+    </with>
+  </macro>>
+
+  <assign|item-pic|<macro|name|<smash|<image|<arg|name>|3em|||-1.5em>><space|0.5em>>>
+
+  <assign|tmhtml-item-pic|<macro|name|<html-div-class|tmweb-item-pic|<image|<arg|name>|3em|||-1.5em>>>>
+
+  <\active*>
+    <\src-comment>
+      Videos from Youtube
+    </src-comment>
+  </active*>
+
+  <assign|youtube-legend|<macro|body|legend|width|<tabular*|<tformat|<cwith|1|-1|1|1|cell-lsep|0em>|<cwith|1|-1|1|1|cell-rsep|0em>|<cwith|2|2|1|1|cell-width|<arg|width>>|<cwith|2|2|1|1|cell-hmode|exact>|<twith|table-valign|T>|<cwith|2|2|1|1|cell-hyphen|t>|<cwith|1|-1|1|1|cell-tsep|1em>|<cwith|2|2|1|1|cell-bsep|1em>|<table|<row|<cell|<arg|body>>>|<row|<\cell>
+    <arg|legend>
+  </cell>>>>>>>
+
+  <assign|youtube-thumbnail|<macro|youtube-id|width|height|<action|<image|<merge|https://img.youtube.com/vi/|<arg|youtube-id>|/mqdefault.jpg>|<arg|width>|<arg|height>||>|youtube-select|<arg|youtube-id>>>>
+
+  <assign|youtube-thumbnail-legend|<macro|youtube-id|legend|width|height|<html-div-class|tmweb-thumbnail|<youtube-legend|<html-attr|onclick|<merge|selectVideo('|<arg|youtube-id>|')>|<html-attr|id|<arg|youtube-id>|<html-class|tmweb-thumbnail-image|<youtube-thumbnail|<arg|youtube-id>|<arg|width>|<arg|height>>>>>|<html-div-class|tmweb-thumbnail-legend|<small|<arg|legend>>>|<arg|width>>>>>
+
+  <assign|youtube-video|<macro|youtube-id|width|height|<image|<merge|https://img.youtube.com/vi/|<arg|youtube-id>|/hqdefault.jpg>|<merge|<arg|width>|pt>|<merge|<arg|height>|pt>||>>>
+
+  <assign|tmhtml-youtube-video|<macro|youtube-id|width|height|<html-attr|src|<merge|https://www.youtube.com/embed/|<arg|youtube-id>>|<html-attr|height|<arg|height>|<html-attr|width|<arg|width>|<html-tag|iframe|>>>>>>
+
+  <assign|youtube-video-legend|<macro|youtube-id|legend|width|height|<html-div-class|tmweb-youtube|<youtube-legend|<html-class|tmweb-youtube-video|<youtube-video|<arg|youtube-id>|<arg|width>|<arg|height>>>|<html-div-class|tmweb-youtube-legend|<small|<arg|legend>>>|<arg|width>>>>>
 
   <\active*>
     <\src-comment>

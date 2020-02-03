@@ -27,6 +27,7 @@
 ******************************************************************************/
 
 #include "file.hpp"
+#include "convert.hpp"
 #include "image_files.hpp"
 #include "web_files.hpp"
 #include "sys_utils.hpp"
@@ -262,13 +263,13 @@ clear_imgbox_cache(tree t){
 /******************************************************************************
 * Getting the original size of an image, using internal plug-ins if possible
 ******************************************************************************/
-void  image_size_sub (url image, int& w, int& h);
+void image_size_sub (url image, int& w, int& h);
 
 void
 image_size (url image, int& w, int& h) {
-/* Get original image size (in pt units) using cached result if possible,
-* otherwise actually fetch image size and cache it.
-* Caching is super important because the typesetter calls image_size */ 
+  /* Get original image size (in pt units) using cached result if possible,
+   * otherwise actually fetch image size and cache it.
+   * Caching is super important because the typesetter calls image_size */
   tree lookup= image->t;
   if (img_box->contains (lookup)) {
     imgbox box= img_box [lookup];
@@ -299,7 +300,11 @@ image_size_sub (url image, int& w, int& h) { // returns w,h in units of pt (1/72
   if (suf=="pdf") {
     pdf_image_size (image, w, h);
     return;
-    }
+  }
+  if (suf=="svg") {
+    svg_image_size (image, w, h);
+    return;
+  }
   if (suf=="eps" || suf=="ps") {
     int x1, y1, x2, y2;
     if (ps_bounding_box (image, x1, y1, x2, y2, false)) {
@@ -309,15 +314,15 @@ image_size_sub (url image, int& w, int& h) { // returns w,h in units of pt (1/72
       return;
     }
   }
-#ifdef QTTEXMACS
-  if (qt_supports (image)) { // native support by Qt : most bitmaps & svg  
-    qt_image_size (image, w, h); 
+#ifdef MACOSX_EXTENSIONS
+  if (mac_image_size (image, w, h) ) {
+    if (DEBUG_CONVERT) debug_convert << "image_size  mac  : " << w << " x " << h << "\n";
     return;
   }
 #endif
-#ifdef MACOSX_EXTENSIONS 
-  if (mac_image_size (image, w, h) ) {
-    if (DEBUG_CONVERT) debug_convert << "image_size  mac  : " << w << " x " << h << "\n";
+#ifdef QTTEXMACS
+  if (qt_supports (image)) { // native support by Qt : most bitmaps & svg
+    qt_image_size (image, w, h);
     return;
   }
 #endif
@@ -361,6 +366,22 @@ pdf_image_size (url image, int& w, int& h) {
 #endif
 // if above methods are absent :-(, fallback to 
   imagemagick_image_size(image, w, h, true);
+}
+
+void
+svg_image_size (url image, int& w, int& h) {
+  string content;
+  bool err= load_string (image, content, false);
+  if (!err) {
+    tree t= parse_xml (content);
+    tree result= find_first_element_by_name (t, "svg");
+    string width= get_attr_from_element (result, "width", "");
+    string height= get_attr_from_element (result, "height", "");
+    int try_width= parse_xml_length (width);
+    int try_height= parse_xml_length (height);
+    if (try_width > 0) w= try_width;
+    if (try_height > 0) h= try_height;
+  }
 }
  
 /******************************************************************************
@@ -443,8 +464,15 @@ image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi) {
   call_imagemagick_convert(image, pdf, w_pt, h_pt, dpi);
 }
 
+bool prefer_inkscape (string suffix) {
+  return suffix == "svg" &&
+    exists_in_path ("inkscape") &&
+    get_preference ("image->texmacs:svg-prefer-inkscape", "off") == "on";
+}
+
 void
 image_to_png (url image, url png, int w, int h) {// IN PIXEL UNITS!
+  string source_suffix= suffix (image);
   if (DEBUG_CONVERT) debug_convert << "image_to_png ... ";
   /* if (suffix (png) != "png") {
      std_warning << concretize (png) << " has no .png suffix\n";
@@ -452,21 +480,21 @@ image_to_png (url image, url png, int w, int h) {// IN PIXEL UNITS!
   */
 #ifdef MACOSX_EXTENSIONS
   //cout << "mac convert " << image << ", " << png << "\n";
-  if (mac_supports (image)) {
+  if (mac_supports (image) && !prefer_inkscape (source_suffix)) {
     if (DEBUG_CONVERT) debug_convert << " using mac_os "<<LF;
     mac_image_to_png (image, png, w, h);
     return;
   }
 #endif
 #ifdef QTTEXMACS
-  if (qt_supports (image)) {
+  if (qt_supports (image) && !prefer_inkscape (source_suffix)) {
     if (DEBUG_CONVERT) debug_convert << " using qt "<<LF;
     qt_convert_image (image, png, w, h);
     return;
   }
 #endif
 #ifdef USE_GS
-  if (gs_supports (image)) {
+  if (gs_supports (image) && !prefer_inkscape (source_suffix)) {
     if (DEBUG_CONVERT) debug_convert << " using gs "<<LF;
     if (gs_to_png (image, png, w, h)) return;
   }
@@ -476,11 +504,12 @@ image_to_png (url image, url png, int w, int h) {// IN PIXEL UNITS!
   if (! exists(png)) {
     convert_error << image << " could not be converted to png" <<LF;
     copy("$TEXMACS_PATH/misc/pixmaps/unknown.png",png);
-    } 
+  }
 }
 
 bool
 call_scm_converter(url image, url dest) {
+  if (DEBUG_CONVERT) debug_convert << " using scm" <<LF;
   if (as_bool (call ("file-converter-exists?",
                      "x." * suffix (image),
                      "x." * suffix (dest)))) {
@@ -596,8 +625,21 @@ imagemagick_image_size(url image, int& w, int& h, bool pt_units) {
 ******************************************************************************/
 
 #ifdef QTTEXMACS
+bool qt_native_image_size (url image, int& w, int& h);
 void qt_apply_effect (tree eff, array<url> src, url dest, int w, int h);
 #endif
+
+void
+native_image_size (url image, int& w, int& h) {
+#ifdef QTTEXMACS
+  if (qt_native_image_size (image, w, h)) return;
+#endif
+  // Scale to 300 dpi
+  image_size (image, w, h);
+  double scale= 30000.0 / (2834 * 2.54);
+  w= (int) round (scale * w);
+  h= (int) round (scale * h);
+}
 
 void
 apply_effect (tree eff, array<url> src, url dest, int w, int h) {

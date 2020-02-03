@@ -242,6 +242,17 @@
       (graphics-decorations-reset)
       (graphics-set-extents w h))))
 
+(tm-define (graphics-change-extents dw dh)
+  (:require (tree-innermost 'draw-over #t))
+  (and-with t (tree-innermost 'draw-over #t)
+    (and-with l (tree-ref t 2)
+      (let* ((d (if (!= (length-decode dw) 0) dw dh))
+             (old-pad (tree->stree l))
+             (new-pad (length-add old-pad d)))
+        (when (<= (length-decode new-pad) 0)
+          (set! new-pad "0cm"))
+        (tree-set l new-pad)))))
+
 (tm-define (graphics-change-geo-valign down?)
   (let* ((geo (graphics-geometry))
          (a (car (cddddr geo))))
@@ -769,7 +780,18 @@
       (graphics-set-grid-aspect 'detailed #f #t)))
 
 ;; Toggling grids
-(tm-define (graphics-toggle-grid visual?)
+
+(define (test-grid*? visual?)
+  (let* ((prop (if visual? "gr-grid" "gr-edit-grid"))
+	 (prop-old (if visual? "gr-grid-old" "gr-edit-grid-old"))
+	 (p (cDr (cursor-path)))
+	 (gr (get-upwards-property p prop))
+	 (gr-old (get-upwards-property p prop-old)))
+    (if (!= gr-old nothing)
+        (and (!= gr nothing) (!= (cadr gr) "empty"))
+        (!= gr nothing))))
+
+(define (graphics-toggle-grid* visual?)
   (let* ((prop (if visual? "gr-grid" "gr-edit-grid"))
 	 (prop-old (if visual? "gr-grid-old" "gr-edit-grid-old"))
 	 (p (cDr (cursor-path)))
@@ -784,6 +806,25 @@
             (begin
               (graphics-set-property prop '(tuple "empty"))
               (graphics-set-property prop-old gr))))))
+
+(define (test-visual-grid?) (test-grid*? #t))
+(tm-define (graphics-toggle-visual-grid)
+  (:check-mark "v" test-visual-grid?)
+  (graphics-toggle-grid* #t))
+
+(define (test-logical-grid?) (test-grid*? #f))
+(tm-define (graphics-toggle-logical-grid)
+  (:check-mark "v" test-logical-grid?)
+  (graphics-toggle-grid* #f))
+
+(define (test-grid?) (and (test-grid*? #f) (test-grid*? #t)))
+(tm-define (graphics-toggle-grid)
+  (:check-mark "v" test-grid?)
+  (if (grids-defaulted?)
+      (graphics-set-visual-grid 'cartesian)
+      (begin
+        (graphics-toggle-grid* #t)
+        (graphics-toggle-grid* #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graphics edit mode

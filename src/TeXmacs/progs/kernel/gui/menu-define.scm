@@ -478,30 +478,21 @@
     "dark green" "dark yellow" "dark orange" "dark brown"
     "red" "magenta" "blue" "cyan"
     "green" "yellow" "orange" "brown"
+    "#faa" "#faf" "#aaf" "#aff"
+    "#afa" "#ffa" "#fa6" "#a66"
     "pastel red" "pastel magenta" "pastel blue" "pastel cyan"
     "pastel green" "pastel yellow" "pastel orange" "pastel brown"))
 
 (define (standard-grey-list)
-  '("black" "darker grey" "dark grey" "light grey"
-    "pastel grey" "white"))
+  '("black" "darker grey" "dark grey" "#a0a0a0"
+    "light grey" "pastel grey" "#f0f0f0" "white"))
 
 (tm-menu (standard-color-menu cmd)
   (tile 8
-    (for (col (standard-color-list))
+    (for (col (append (standard-color-list) (standard-grey-list)))
       (explicit-buttons
         ((color col #f #f 32 24)
-         (cmd col)))))
-  (glue #f #f 0 5)
-  (tile 8
-    (for (col (standard-grey-list))
-      (explicit-buttons
-        ((color col #f #f 32 24)
-         (cmd col))))
-    (for (i (.. 0 2))
-      (when #f
-        (explicit-buttons
-          ((color "#fff0" #f #f 32 24)
-           (noop)))))))
+         (cmd col))))))
 
 (define (gui-make-pick-color x)
   `(menu-dynamic
@@ -514,14 +505,42 @@
 ;; Basic pattern picker
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public (tm-pattern name w h)
+(define-public (get-preferred-list type nr)
+  (with l (get-preference type)
+    (when (string? l) (set! l (string->object l)))
+    (cond ((nlist? l) (list))
+          ((> (length l) nr) (sublist l 0 nr))
+          (else l))))
+
+(define-public (insert-preferred-list type what nr)
+  (let* ((l (get-preferred-list type nr))
+         (i (list-find-index l (cut == <> what)))
+         (r l))
+    (if i (set! r (append (sublist r 0 i)
+                          (sublist r (+ i 1) (length r)))))
+    (set! r (cons what r))
+    (when (> (length r) nr)
+      (set! r (sublist r 0 nr)))
+    (when (!= r l)
+      (set-preference type r))))
+
+(define-public (tm-pattern name . args)
   (cond ((url-exists? (url-append "$TEXMACS_PATTERN_PATH" (url-tail name)))
-         `(pattern ,(url->unix (url-tail name)) ,w ,h))
+         `(pattern ,(url->unix (url-tail name)) ,@args))
         ((string-starts? (url->unix (url->delta-unix name)) "../")
          (when (url? name) (set! name (url->system name)))
-         `(pattern ,name ,w ,h))         
+         `(pattern ,name ,@args))
         (else
-         `(pattern ,(url->unix (url->delta-unix name)) ,w ,h))))
+         `(pattern ,(url->unix (url->delta-unix name)) ,@args))))
+
+(tm-menu (my-pattern-menu cmd)
+  (tile 8
+    (for (col (get-preferred-list "my patterns" 16))
+      (with args (cons* (cadr col) "100%" "100@" (cddddr col))
+        (with col2 (apply tm-pattern args)
+          (explicit-buttons
+            ((color col2 #f #f 32 32)
+             (cmd col))))))))
 
 (define (standard-pattern-list dir scale)
   (let* ((l1 (url-read-directory dir "*.png"))
@@ -553,6 +572,7 @@
    (list (list "Dot hatches" "$TEXMACS_PATH/misc/patterns/dots-hatches")
          (list "Line hatches" "$TEXMACS_PATH/misc/patterns/lines-default")
          (list "Artistic hatches" "$TEXMACS_PATH/misc/patterns/lines-artistic")
+         (list "Textile" "$TEXMACS_PATH/misc/patterns/textile")
          (list "Hatch" "/opt/local/share/openclipart/special/patterns")
          (list "Personal" "~/patterns")
          (list "Simple" "~/simple-tiles"))
@@ -566,14 +586,18 @@
 (define (gui-make-pick-background x)
   `(menu-dynamic
      (dynamic (standard-color-menu (lambda (answer) ,@(cddr x))))
-     (glue #f #f 0 5)
+     ---
      (dynamic (standard-pattern-menu (lambda (answer) ,@(cddr x))
-                                     "$TEXMACS_PATH/misc/patterns"
+                                     "$TEXMACS_PATH/misc/patterns/vintage"
                                      ,(cadr x)))
-     (assuming (nnull? (clipart-list))
+     (when (nnull? (get-preferred-list "my patterns" 16))
        ---
-       (dynamic (clipart-pattern-menu (lambda (answer) ,@(cddr x))
-                                      ,(cadr x))))))
+       (dynamic (my-pattern-menu (lambda (answer) ,@(cddr x)))))
+     ;;(assuming (nnull? (clipart-list))
+     ;;  ---
+     ;;  (dynamic (clipart-pattern-menu (lambda (answer) ,@(cddr x))
+     ;;                                 ,(cadr x))))
+     ))
 
 (extend-table gui-make-table
   (pick-background ,gui-make-pick-background))

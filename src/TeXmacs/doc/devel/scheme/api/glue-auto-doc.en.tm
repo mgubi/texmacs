@@ -75,26 +75,10 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(updater-set-appcast <scm-arg|url>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|updater_set_appcast> which returns
-    <scm|bool>.
-  </explain>
-
-  <\explain>
     <scm|(updater-set-interval <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|updater_set_interval> which returns
-    <scm|bool>.
-  </explain>
-
-  <\explain>
-    <scm|(updater-set-automatic <scm-arg|bool>)>
-<explain-synopsis|no synopsis>
-  <|explain>
-    Calls the <c++> function <cpp|updater_set_automatic> which returns
     <scm|bool>.
   </explain>
 
@@ -195,6 +179,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(get-retina-zoom)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_retina_zoom> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(get-retina-icons)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -215,6 +207,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|set_retina_factor> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(set-retina-zoom <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_retina_zoom> which returns
     <scm|void>.
   </explain>
 
@@ -704,6 +704,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|named_color_to_xcolormap> which returns
     <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(rgba-\<gtr\>named-color <scm-arg|array_int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|named_rgb_color> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(named-color-\<gtr\>rgba <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_named_rgb_color> which returns
+    <scm|array_int>.
   </explain>
 
   <\explain>
@@ -3635,6 +3651,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(clean-html <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|clean_html> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(upgrade-tmml <scm-arg|scheme_tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3647,6 +3671,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|upgrade_mathml> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(retrieve-mathjax <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|retrieve_mathjax> which returns
     <scm|tree>.
   </explain>
 
@@ -4083,6 +4115,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-resolve-pattern <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|resolve_pattern> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
     <scm|(url-exists? <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4104,6 +4144,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|exists_in_tex> which returns
     <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(url-concretize* <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|concretize_url> which returns
+    <scm|url>.
   </explain>
 
   <\explain>
@@ -4320,6 +4368,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|search_file_upwards> which returns
     <scm|url>.
+  </explain>
+
+  <\explain>
+    <scm|(picture-cache-reset)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|picture_cache_reset> which returns
+    <scm|void>.
   </explain>
 
   <\explain>
@@ -5267,6 +5323,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(tree-inclusion <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|load_inclusion> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(tree-export <scm-arg|tree> <scm-arg|url> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5627,6 +5691,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(supports-bibtex?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|bibtex_present> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(bibtex-run <scm-arg|string> <scm-arg|string> <scm-arg|url> <scm-arg|array_string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5963,7 +6035,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(style-clear-cache)>
+    <scm|(cpp-style-clear-cache)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|style_clear_cache> which returns

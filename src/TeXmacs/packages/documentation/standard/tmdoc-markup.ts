@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.11>
 
 <style|<tuple|source|english>>
 
@@ -99,6 +99,14 @@
 
   <assign|if-nref*|<macro|lab|body|<with|warn-missing|false|<if|<equal|<get-binding|<arg|lab>>|<uninit>>|<arg|body>|<greyed|<arg|body>>>>>>
 
+  <drd-props|if-ref|arity|3|identifier|0|accessible|1>
+
+  <drd-props|if-ref*|arity|3|identifier|0|accessible|1>
+
+  <drd-props|if-nref|arity|3|identifier|0|accessible|1>
+
+  <drd-props|if-nref*|arity|3|identifier|0|accessible|1>
+
   <assign|tmdoc-file|<macro|name|<or|<find-file|<arg|name>>|<find-file-upwards|<merge|<arg|name>|.|<language-suffix>|.tm>|doc|web|texmacs>|<find-file-upwards|<merge|<arg|name>|.en.tm>|doc|web|texmacs>|<arg|name>>>>
 
   <assign|tmdoc-image|<macro|name|<find-file|$TEXMACS_IMAGE_PATH|<arg|name>>>>
@@ -121,20 +129,30 @@
 
   <assign|example-plugin-link|<macro|plugin|<style-with|src-compact|none|<hlink|<with|font-family|tt|<arg|plugin>>|<merge|$TEXMACS_PATH/examples/plugins/|<arg|plugin>>>>>>
 
+  <assign|tmdoc-length-unit|<macro|unit|<with|font-family|tt|<src-length|<arg|unit>>>>>
+
+  <assign|tmdoc-length|<macro|val|unit|<with|font-family|tt|<src-length|<arg|val><space|0.2spc><arg|unit>>>>>
+
   <\active*>
     <\src-comment>
       Tabular environments.
     </src-comment>
   </active*>
 
-  <assign|descriptive-table|<macro|body|<tformat|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<cwith|1|-1|1|1|cell-lborder|0.5ln>|<cwith|1|1|1|-1|cell-tborder|0.5ln>|<cwith|1|1|1|-1|cell-background|pastel
-  blue>|<twith|table-min-rows|2>|<twith|table-lborder|1ln>|<twith|table-rborder|1ln>|<twith|table-bborder|1ln>|<twith|table-tborder|1ln>|<cwith|1|1|1|-1|cell-bborder|1ln>|<twith|table-min-cols|2>|<arg|body>>>>
+  <assign|descriptive-table|<macro|body|<tformat|<cwith|1|-1|1|-1|cell-rborder|0.5ln>|<cwith|1|-1|1|-1|cell-bborder|0.5ln>|<cwith|1|-1|1|1|cell-lborder|0.5ln>|<cwith|1|1|1|-1|cell-tborder|0.5ln>|<cwith|1|-1|1|1|cell-lborder|1ln>|<cwith|1|-1|-1|-1|cell-rborder|1ln>|<cwith|1|1|1|-1|cell-tborder|1ln>|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|-1|-1|1|-1|cell-bborder|1ln>|<cwith|1|1|1|-1|cell-background|pastel
+  blue>|<twith|table-min-rows|2>|<twith|table-min-cols|2>|<arg|body>>>>
 
   <\active*>
     <\src-comment>
       Miscellaneous markup.
     </src-comment>
   </active*>
+
+  <assign|via|<macro|<em|via>>>
+
+  <assign|emacs|<macro|<name|Emacs>>>
+
+  <assign|name*|<macro|body|<with|font-shape|small-caps|<arg|body>><index|<with|font-shape|small-caps|<arg|body>>>>>
 
   <new-theorem|question|Question>
 

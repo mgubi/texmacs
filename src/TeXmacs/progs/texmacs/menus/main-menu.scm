@@ -98,8 +98,19 @@
 ;; The TeXmacs popup menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(menu-bind presentation-popup-menu
+  ("Presentation mode" (toggle-full-screen-mode))
+  ("Show panorama" (toggle-panorama-mode))
+  ("Remote control" (toggle-remote-control-mode)))
+
 (menu-bind texmacs-popup-menu
   (link focus-menu))
+
+(tm-menu (texmacs-popup-menu)
+  (:require (full-screen?))
+  (link presentation-popup-menu)
+  ---
+  (former))
 
 (menu-bind texmacs-alternative-popup-menu
   (-> "File" (link file-menu))
@@ -136,13 +147,23 @@
   ---
   (-> "Help" (link help-menu)))
 
+(tm-menu (texmacs-alternative-popup-menu)
+  (:require (full-screen?))
+  (link presentation-popup-menu)
+  ---
+  (former))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main icon bar
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind texmacs-main-icons
-  (=> (balloon (icon "tm_new.xpm") "Create a new document")
-      (link new-file-menu))
+  (if (window-per-buffer?)
+      ((balloon (icon "tm_new.xpm") "Create a new document")
+       (new-document)))
+  (if (not (window-per-buffer?))
+      (=> (balloon (icon "tm_new.xpm") "Create a new document")
+          (link new-file-menu)))
   (=> (balloon (icon "tm_open.xpm") "Load a file") (link load-menu))
   (=> (balloon (icon "tm_save.xpm") "Save this buffer") (link save-menu))
   ((balloon (icon "tm_build.xpm") "Update this buffer")
@@ -163,11 +184,11 @@
   (=> (balloon (icon "tm_cancel.xpm") "Close") (link close-menu))
   /
   ((balloon (icon "tm_cut.xpm") "Cut text")
-   (clipboard-cut "primary"))
+   (kbd-cut))
   ((balloon (icon "tm_copy.xpm") "Copy text")
-   (clipboard-copy "primary"))
+   (kbd-copy))
   ((balloon (icon "tm_paste.xpm") "Paste text")
-   (clipboard-paste "primary"))
+   (kbd-paste))
   ((balloon (icon "tm_find.xpm") "Find text")
    (interactive-search))
   ((balloon (icon "tm_replace.xpm") "Query replace")

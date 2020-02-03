@@ -32,11 +32,11 @@ get_cache (url name) {
     tree tmp= web_cache_resolve [name->t];
     for (i=0; i<MAX_CACHED; i++)
       if (web_cache[i] == name->t) {
-	// cout << name << " in cache as " << tmp << " at " << i << "\n";
-	for (j=i; ((j+1) % MAX_CACHED) != web_nr; j= (j+1) % MAX_CACHED)
-	  web_cache[j]= web_cache[(j+1) % MAX_CACHED];
-	web_cache[j]= name->t;
-	break;
+        // cout << name << " in cache as " << tmp << " at " << i << "\n";
+        for (j=i; ((j+1) % MAX_CACHED) != web_nr; j= (j+1) % MAX_CACHED)
+          web_cache[j]= web_cache[(j+1) % MAX_CACHED];
+        web_cache[j]= name->t;
+        break;
       }
     return as_url (tmp); // url_system (tmp);
   }
@@ -70,22 +70,51 @@ web_encode (string s) {
   return tm_decode (s);
 }
 
+static string
+fetch_tool () {
+  static bool done= false;
+  static string tool= "";
+  if (done) return tool;
+  if (tool == "") {
+    string test= var_eval_system ("which wget");
+    if (ends (test, "wget")) tool= "wget";
+  }
+  if (tool == "") {
+    string test= var_eval_system ("which curl");
+    if (ends (test, "curl")) tool= "curl";
+  }
+  done= true;
+  return tool;
+}
+
 url
 get_from_web (url name) {
   if (!is_rooted_web (name)) return url_none ();
   url res= get_cache (name);
   if (!is_none (res)) return res;
 
-  string test= var_eval_system ("which wget");
-  if (!ends (test, "wget")) return url_none ();
+  string tool= fetch_tool ();
+  if (tool == "") return url_none ();
+  
   url tmp= url_temp ();
   string tmp_s= escape_sh (concretize (tmp));
-  string cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
-  cmd << " --no-check-certificate --tries=1";
-  cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
-  // cout << cmd << "\n";
+  string cmd= "";
+  
+  if (tool == "wget") {
+    cmd= "wget --header='User-Agent: TeXmacs-" TEXMACS_VERSION "' -q";
+    cmd << " --no-check-certificate --tries=1";
+    cmd << " -O " << tmp_s << " " << escape_sh (web_encode (as_string (name)));
+  }
+  
+  if (tool == "curl") {
+    cmd= "curl --user-agent TeXmacs-" TEXMACS_VERSION;
+    cmd << " " << escape_sh (web_encode (as_string (name)));
+    cmd << " --output " << tmp_s;
+  }
+
+  //cout << cmd << LF;
   system (cmd);
-  // cout << "got " << name << " as " << tmp << "\n";
+  //cout << "got " << name << " as " << tmp << LF;
 
   if (var_eval_system ("cat " * tmp_s * " 2> /dev/null") == "") {
     remove (tmp);
@@ -112,7 +141,7 @@ get_from_server (url u) {
   }
   string r= as_string (call ("tmfs-load", object (name)));
   if (r == "") return url_none ();
-  url tmp= url_temp ();
+  url tmp= url_temp (string (".") * suffix (name));
   (void) save_string (tmp, r, true);
 
   //return set_cache (u, tmp);

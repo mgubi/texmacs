@@ -58,10 +58,12 @@
 
 (define old-primitive-load primitive-load)
 (define (new-primitive-load filename)
-  ;; We explicitly circumvent guile's decision to set the current-reader
-  ;; to #f inside ice-9/boot-9.scm, try-module-autoload
-  (with-fluids ((current-reader read))
-               (old-primitive-load filename)))
+  (if (member (scheme-dialect) (list "guile-a" "guile-b"))
+      (old-primitive-load filename)
+      ;; We explicitly circumvent guile's decision to set the current-reader
+      ;; to #f inside ice-9/boot-9.scm, try-module-autoload
+      (with-fluids ((current-reader read))
+                   (old-primitive-load filename))))
 
 (if developer-mode?
     (begin
@@ -128,6 +130,7 @@
 (use-modules (utils library smart-table))
 (use-modules (utils plugins plugin-convert))
 (use-modules (utils misc markup-funcs))
+(use-modules (utils misc artwork))
 (use-modules (utils handwriting handwriting))
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
@@ -173,6 +176,7 @@
            page-header-menu page-footer-menu page-numbering-menu
            page-break-menu)
 (lazy-menu (generic document-menu) document-menu
+           cite-texmacs-menu cite-texmacs-short-menu
            project-menu document-style-menu global-language-menu)
 (lazy-menu (generic document-part)
            preamble-menu document-part-menu project-manage-menu)
@@ -188,8 +192,9 @@
              search-next-match)
 (lazy-define (generic spell-widgets) spell-toolbar
              open-spell toolbar-spell-start interactive-spell)
-(lazy-define (generic format-widgets) open-paragraph-format open-page-format
-             open-pattern-selector)
+(lazy-define (generic format-widgets) open-paragraph-format open-page-format)
+(lazy-define (generic pattern-selector)
+             open-pattern-selector open-background-picture-selector)
 (lazy-define (generic document-widgets) open-source-tree-preferences
              open-document-paragraph-format open-document-page-format
              open-document-metadata open-document-colors)
@@ -204,6 +209,7 @@
 (tm-property (open-document-metadata) (:interactive #t))
 (tm-property (open-document-colors) (:interactive #t))
 (tm-property (open-pattern-selector cmd w) (:interactive #t))
+(tm-property (open-background-picture-selector cmd) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -229,6 +235,7 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting programming modes\n")
+(lazy-format (prog prog-format) cpp scheme)
 (lazy-keyboard (prog prog-kbd) in-prog?)
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
 	   prog-menu prog-icons)
@@ -239,12 +246,16 @@
 (lazy-keyboard (source source-kbd) always?)
 (lazy-menu (source source-menu) source-macros-menu source-menu source-icons
            source-transformational-menu source-executable-menu)
-(lazy-define (source macro-edit) has-macro-source? edit-macro-source)
-(lazy-define (source macro-widgets) editable-macro? open-macros-editor
-	     open-macro-editor create-table-macro)
-(tm-property (open-macro-editor l) (:interactive #t))
-(tm-property (create-table-macro l) (:interactive #t))
-(tm-property (open-macros-editor) (:interactive #t))
+(lazy-define (source macro-edit)
+             has-macro-source? edit-macro-source edit-focus-macro-source)
+(lazy-define (source macro-widgets)
+             editable-macro? open-macros-editor
+	     open-macro-editor create-table-macro
+             edit-focus-macro edit-previous-macro)
+(tm-property (open-macro-editor l mode) (:interactive #t))
+(tm-property (create-table-macro l mode) (:interactive #t))
+(tm-property (open-macros-editor mode) (:interactive #t))
+(tm-property (edit-focus-macro) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -307,6 +318,7 @@
              screens-switch-to dynamic-make-slides overlays-context?)
 (lazy-define (dynamic session-edit) scheme-eval)
 (lazy-define (dynamic calc-edit) calc-ready? calc-table-renumber)
+(lazy-define (dynamic scripts-plot) open-plots-editor)
 (lazy-initialize (dynamic session-menu) (in-session?))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
@@ -322,7 +334,8 @@
              docgrep-in-texts docgrep-in-recent)
 (lazy-define (doc tmdoc-search) tmdoc-search-style tmdoc-search-tag
              tmdoc-search-parameter tmdoc-search-scheme)
-(lazy-define (doc tmweb) tmweb-convert-dir tmweb-update-dir
+(lazy-define (doc tmweb) youtube-select
+             tmweb-convert-dir tmweb-update-dir
              tmweb-convert-dir-keep-texmacs tmweb-update-dir-keep-texmacs
              tmweb-interactive-build tmweb-interactive-update)
 (lazy-define (doc apidoc) apidoc-all-modules apidoc-all-symbols)
@@ -330,12 +343,12 @@
 (lazy-tmfs-handler (doc docgrep) grep)
 (lazy-tmfs-handler (doc tmdoc) help)
 (lazy-tmfs-handler (doc apidoc) apidoc)
-(define-secure-symbols tmdoc-include)
+(define-secure-symbols tmdoc-include youtube-select)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting converters\n")
-(lazy-format (convert rewrite init-rewrite) texmacs scheme cpp verbatim)
+(lazy-format (convert rewrite init-rewrite) texmacs verbatim)
 (lazy-format (convert tmml init-tmml) tmml)
 (lazy-format (convert latex init-latex) latex)
 (lazy-format (convert html init-html) html)
@@ -452,7 +465,7 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting regression testing\n")
-(lazy-define (check check-master) check-all run-checks)
+(lazy-define (check check-master) check-all run-checks run-all-tests)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

@@ -518,7 +518,7 @@ as_string (url u, int type) {
     if (((is_root (u[1], "default") && type == URL_SYSTEM) ||
          is_root (u[1], "file"))) { // have to return the windows format
       string root, remain;
-      if (is_concat (u[2])) {		
+      if (is_concat (u[2])) {           
         root = as_string (u[2][1], type);
         // root might be unit letter or hostname. It depends on the length
         remain = as_string (u[2][2], type);
@@ -528,7 +528,7 @@ as_string (url u, int type) {
         remain = "";
       }
       if (is_root (u[1], "default")) {
-        if (N(root) == 1) return root * ":\\" * remain;	// drive letter
+        if (N(root) == 1) return root * ":\\" * remain; // drive letter
         else return "\\\\" * root * "\\" * remain;
       }
       else {
@@ -555,7 +555,7 @@ as_string (url u, int type) {
   if (is_root (u, "default")) {
     int stype= type;
     if (is_root (u[1]) && (!is_root (u[1], "default"))) stype= URL_STANDARD;
-	if (stype == URL_SYSTEM) return ""; else return "/";
+        if (stype == URL_SYSTEM) return ""; else return "/";
   }
 #else
   if (is_root (u, "default")) return "/";
@@ -669,8 +669,8 @@ delta_sub (url base, url u) {
     return u;
   if (is_concat (base) && is_concat (u) && (base[1] == u[1])) {
     if (is_special_root (base[1]) &&
-	is_concat (base[2]) && is_concat (u[2]) &&
-	base[2][1] != u[2][1])
+        is_concat (base[2]) && is_concat (u[2]) &&
+        base[2][1] != u[2][1])
       return url_none ();
     return delta_sub (base[2], u[2]);
   }
@@ -845,8 +845,10 @@ complete (url base, url u, string filter, bool flag) {
      if (is_none (base)) return base;
      if (is_none (u)) return u;
      if ((!is_root (base)) && (!is_rooted_name (base))) {
-        failed_error << "base= " << base << LF;
-        FAILED ("invalid base url");
+       failed_error << "base  = " << base << LF;
+       failed_error << "u     = " << u << LF;
+       failed_error << "filter= " << filter << LF;
+       FAILED ("invalid base url");
      }
   }
   if (is_name (u) || (is_concat (u) && is_root (u[1]) && is_name (u[2]))) {
@@ -859,8 +861,9 @@ complete (url base, url u, string filter, bool flag) {
       if (is_of_type (comp, filter)) return u;
       return url_none ();
     }
-    failed_error << "base= " << base << LF;
-    failed_error << "u= " << u << LF;
+    failed_error << "base  = " << base << LF;
+    failed_error << "u     = " << u << LF;
+    failed_error << "filter= " << filter << LF;
     ASSERT (is_rooted (comp), "unrooted url");
     FAILED ("bad protocol in url");
   }
@@ -871,7 +874,9 @@ complete (url base, url u, string filter, bool flag) {
   if (is_concat (u) && is_wildcard (u[1], 0) && is_wildcard (u[2], 1)) {
     // FIXME: ret= ret | ... is unefficient (quadratic) in main loop
     if (!(is_rooted (base, "default") || is_rooted (base, "file"))) {
-      failed_error << "base= " << base << LF;
+      failed_error << "base  = " << base << LF;
+      failed_error << "u     = " << u << LF;
+      failed_error << "filter= " << filter << LF;
       FAILED ("wildcards only implemented for files");
     }
     url ret= url_none ();
@@ -887,7 +892,7 @@ complete (url base, url u, string filter, bool flag) {
         if (is_directory (base * dir[i])) continue;
       ret= ret | (dir[i] * complete (base * dir[i], u, filter, flag));
       if (match_wildcard (dir[i], u[2][1]->t->label))
-	ret= ret | complete (base, dir[i], filter, flag);
+        ret= ret | complete (base, dir[i], filter, flag);
     }
     return ret;
   }
@@ -904,7 +909,9 @@ complete (url base, url u, string filter, bool flag) {
   if (is_wildcard (u)) {
     // FIXME: ret= ret | ... is unefficient (quadratic) in main loop
     if (!(is_rooted (base, "default") || is_rooted (base, "file"))) {
-      failed_error << "base= " << base << LF;
+      failed_error << "base  = " << base << LF;
+      failed_error << "u     = " << u << LF;
+      failed_error << "filter= " << filter << LF;
       FAILED ("wildcards only implemented for files");
     }
     url ret= url_none ();
@@ -920,9 +927,9 @@ complete (url base, url u, string filter, bool flag) {
           starts (dir[i], "ftp://"))
         if (is_directory (base * dir[i])) continue;
       if (is_wildcard (u, 0))
-	ret= ret | (dir[i] * complete (base * dir[i], u, filter, flag));
+        ret= ret | (dir[i] * complete (base * dir[i], u, filter, flag));
       else if (match_wildcard (dir[i], u[1]->t->label))
-	ret= ret | complete (base, dir[i], filter, flag);
+        ret= ret | complete (base, dir[i], filter, flag);
     }
     return ret;
   }
@@ -968,8 +975,8 @@ resolve_in_path (url u) {
     if (ends (which, name))
       return which;
     else if ((which != "") &&
-	     (!starts (which, "which: ")) &&
-	     (!starts (which, "no ")))
+             (!starts (which, "which: ")) &&
+             (!starts (which, "no ")))
       cout << "TeXmacs] " << which << "\n";
   }
 #ifdef OS_MINGW
@@ -988,8 +995,8 @@ bool
 exists_in_path (url u) {
 #ifdef OS_MINGW
   return !is_none (resolve_in_path (url (as_string (u) * ".bat"))) ||\
-  	 !is_none (resolve_in_path (url (as_string (u) * ".exe"))) ||\
-	 !is_none (resolve_in_path (url (as_string (u) * ".com")));
+         !is_none (resolve_in_path (url (as_string (u) * ".exe"))) ||\
+         !is_none (resolve_in_path (url (as_string (u) * ".com")));
 #else
   return !is_none (resolve_in_path (u));
 #endif
@@ -1014,23 +1021,48 @@ descendance (url u) {
   return factor (descendance_sub (u));
 }
 
+url
+subdirectories (url u) {
+  if (is_or (u))
+    return subdirectories (u[1]) | subdirectories (u[2]);
+  else if (is_directory (u)) {
+    url ret= u;
+    bool error_flag;
+    array<string> dir= read_directory (u, error_flag);
+    for (int i=0; i<N(dir); i++)
+      if (!starts (dir[i], ".") && is_directory (u * dir[i]))
+        ret= ret | subdirectories (u * dir[i]);
+    return ret;
+  }
+  else return url_none ();
+}
+
 /******************************************************************************
 * Concretization of resolved urls
 ******************************************************************************/
+
+url
+concretize_url (url u) {
+  // This routine transforms a resolved url into a system url.
+  // In the case of distant files from the web, a local copy is created.
+  if (is_rooted (u, "default") ||
+      is_rooted (u, "file") ||
+      is_rooted (u, "blank"))
+        return reroot (u, "default");
+  if (is_rooted_web (u)) return concretize_url (get_from_web (u));
+  if (is_rooted_tmfs (u)) return concretize_url (get_from_server (u));
+  if (is_ramdisc (u)) return concretize_url (get_from_ramdisc (u));
+  if (is_here (u)) return url_pwd ();
+  if (is_parent (u)) return url_pwd () * url_parent ();
+  return url_none ();
+}
 
 string
 concretize (url u) {
   // This routine transforms a resolved url into a system file name.
   // In the case of distant files from the web, a local copy is created.
-  if (is_rooted (u, "default") ||
-      is_rooted (u, "file") ||
-      is_rooted (u, "blank"))
-        return as_string (reroot (u, "default"));
-  if (is_rooted_web (u)) return concretize (get_from_web (u));
-  if (is_rooted_tmfs (u)) return concretize (get_from_server (u));
-  if (is_ramdisc (u)) return concretize (get_from_ramdisc (u));
-  if (is_here (u)) return as_string (url_pwd ());
-  if (is_parent (u)) return as_string (url_pwd () * url_parent ());
+  url c= concretize_url (u);
+  if (!is_none (c)) return as_string (c);
   if (is_wildcard (u, 1)) return u->t[1]->label;
   std_warning << "Couldn't concretize " << u->t << LF;
   // failed_error << "u= " << u << LF;

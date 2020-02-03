@@ -1,9 +1,8 @@
 
 /******************************************************************************
 * MODULE     : scala_language.cpp
-* DESCRIPTION: the scala language
-* COPYRIGHT  : (C) 2014  François Poulain
-*              (C) 2016  Darcy Shen
+* DESCRIPTION: the Scala language
+* COPYRIGHT  : (C) 2014-2019  François Poulain, Darcy Shen
 *******************************************************************************
 * This software falls under the GNU general public license and comes WITHOUT
 * ANY WARRANTY WHATSOEVER. See the file $TEXMACS_PATH/LICENSE for more details.
@@ -46,14 +45,22 @@ line_inc (tree t, int i) {
   return pt[p->item + i];
 }
 
-static void parse_escaped_char (string s, int& pos);
-static void parse_number (string s, int& pos);
-static void parse_various_number (string s, int& pos);
-static void parse_alpha (string s, int& pos);
-static inline bool belongs_to_identifier (char c);
-
 scala_language_rep::scala_language_rep (string name):
-  language_rep (name), colored ("") {}
+  abstract_language_rep (name)
+{
+  number_parser.use_scala_style ();
+
+  array<string> starts;
+  starts << string("//");
+  inline_comment_parser.set_starts (starts);
+
+  array<char> escape_chars;
+  escape_chars << '\\' << '\'' << '\"'
+    << 'b' << 'f' << 'n' << 'r' << 't';
+  escaped_char_parser.set_chars (escape_chars);
+
+  escaped_char_parser.support_hex_with_16_bits (true);
+}
 
 text_property
 scala_language_rep::advance (tree t, int& pos) {
@@ -65,18 +72,10 @@ scala_language_rep::advance (tree t, int& pos) {
     pos++;
     return &tp_space_rep;
   }
-  if (c == '\\') {
-    parse_escaped_char (s, pos);
+  if (escaped_char_parser.parse (s, pos)) {
     return &tp_normal_rep;
   }
-  if (pos+2 < N(s) && s[pos] == '0' &&
-       (s[pos+1] == 'x' || s[pos+1] == 'X' )) {
-    parse_various_number (s, pos);
-    return &tp_normal_rep;
-  }
-  if ((c >= '0' && c <= '9') ||
-      (c == '.' && pos+1 < N(s) && s[pos+1] >= '0' && s[pos+1] <= '9')) {
-    parse_number (s, pos);
+  if (number_parser.parse (s, pos)) {
     return &tp_normal_rep;
   }
   if (belongs_to_identifier (c)) {
@@ -197,7 +196,6 @@ scala_color_setup_keywords (hashmap<string, string> & t) {
   string c= "keyword";
   t ("abstract")= c;
   t ("case")= c;
-  t ("catch")= c;
   t ("extends")= c;
   t ("implicit")= c;
   t ("import")= c;
@@ -233,6 +231,7 @@ scala_color_setup_keywords_conditional (hashmap<string, string> & t) {
 static void
 scala_color_setup_keywords_control (hashmap<string, string> & t) {
   string c= "keyword_control";
+  t ("catch")= c;
   t ("final")= c;
   t ("finally")= c;
   t ("return")= c;
@@ -306,60 +305,6 @@ scala_color_setup_operator_decoration (hashmap<string, string> & t) {
 static void
 scala_color_setup_operator_field (hashmap<string, string> & t) {
   t (".")= "operator_field";
-}
-
-static inline bool
-belongs_to_identifier (char c) {
-  return ((c<='9' && c>='0') ||
-          (c<='Z' && c>='A') ||
-	  (c<='z' && c>='a') ||
-          (c=='_'));
-}
-
-static inline bool
-is_hex_number (char c) {
-  return (c>='0' && c<='9') || (c>='A' && c<='F') || (c>='a' && c<='f');
-}
-
-static inline bool
-is_number (char c) {
-  return (c>='0' && c<='9');
-}
-
-static void
-parse_identifier (hashmap<string, string>& t, string s, int& pos) {
-  int i=pos;
-  if (pos >= N(s)) return;
-  if (is_number (s[i])) return;
-  while (i<N(s) && belongs_to_identifier (s[i])) i++;
-  if (!(t->contains (s (pos, i)))) pos= i;
-}
-
-static void
-parse_alpha (string s, int& pos) {
-  static hashmap<string,string> empty;
-  parse_identifier (empty, s, pos);
-}
-
-static void
-parse_blanks (string s, int& pos) {
-  while (pos<N(s) && (s[pos] == ' ' || s[pos] == '\t')) pos++;
-}
-
-static void
-parse_escaped_char (string s, int& pos) {
-  int n= N(s), i= pos++;
-  if (i+2 >= n) return;
-  if (s[i] != '\\')
-    return;
-  i++;
-  if (s[i] == '\\' || s[i] == '\'' || s[i] == '\"' ||
-           s[i] == 'b'  || s[i] == 'f'  ||
-           s[i] == 'n'  || s[i] == 'r'  || s[i] == 't')
-    pos+= 1;
-  else if (s[i] == 'u')
-    pos+= 5;
-  return;
 }
 
 static bool
@@ -479,11 +424,11 @@ in_comment (int pos, tree t) {
   return false;
 }
 
-static string
-parse_keywords (hashmap<string,string>& t, string s, int& pos) {
+string
+scala_language_rep::parse_keywords (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return "";
-  if (is_number (s[i])) return "";
+  if (is_digit (s[i])) return "";
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
   string r= s (pos, i);
   if (t->contains (r)) {
@@ -501,8 +446,8 @@ parse_keywords (hashmap<string,string>& t, string s, int& pos) {
   return "";
 }
 
-static string
-parse_operators (hashmap<string,string>& t, string s, int& pos) {
+string
+scala_language_rep::parse_operators (hashmap<string,string>& t, string s, int& pos) {
   int i;
   for (i=12; i>=1; i--) {
     string r=s(pos,pos+i);
@@ -523,42 +468,6 @@ parse_operators (hashmap<string,string>& t, string s, int& pos) {
     }
   }
   return "";
-}
-
-static void
-parse_various_number (string s, int& pos) {
-  if (!(pos+2 < N(s) && s[pos] == '0' &&
-       (s[pos+1] == 'x' || s[pos+1] == 'X')))
-    return;
-  pos+= 2;
-  while (pos<N(s) && is_hex_number (s[pos])) pos++;
-  if (pos<N(s) && (s[pos] == 'l' || s[pos] == 'L')) pos++;
-}
-
-static void
-parse_number (string s, int& pos) {
-  int i= pos;
-  if (pos>=N(s) || !is_number(s[i])) return;
-  i++;
-  while (i<N(s) && (is_number (s[i]) || s[i] == '.'))
-    i++;
-  if (i == pos) return;
-  if (i<N(s) && (s[i] == 'e' || s[i] == 'E')) {
-    i++;
-    if (i<N(s) && s[i] == '-') i++;
-    while (i<N(s) && (is_number (s[i]) || s[i] == '.')) i++;
-  }
-  else if (i<N(s) && (s[i] == 'l' || s[i] == 'L')) i++;
-  else if (i<N(s) && (s[i] == 'f' || s[i] == 'F')) i++;
-  else if (i<N(s) && (s[i] == 'd' || s[i] == 'D')) i++;
-  pos= i;
-}
-
-static void
-parse_comment_single_line (string s, int& pos) {
-  if (pos+1>=N(s)) return;
-  if (s[pos]!='/' || s[pos+1]!='/') return;
-  pos=N(s);
 }
 
 string
@@ -603,21 +512,16 @@ scala_language_rep::get_color (tree t, int start, int end) {
         }
       }
       else if (in_esc) {
-        parse_escaped_char (s, pos);
         in_esc= false;
         in_str= true;
-        if (opos < pos) {
+        if (escaped_char_parser.parse (s, pos)) {
           type= "constant_char";
           break;
         }
       }
       else {
-        parse_blanks (s, pos);
-        if (opos < pos){
-          break;
-        }
-        parse_comment_single_line (s, pos);
-        if (opos < pos) {
+        if (blanks_parser.parse (s, pos)) break;
+        if (inline_comment_parser.parse (s, pos)) {
           type= "comment";
           break;
         }
@@ -630,13 +534,7 @@ scala_language_rep::get_color (tree t, int start, int end) {
         if (opos < pos) {
           break;
         }
-        parse_various_number (s, pos);
-        if (opos < pos) {
-          type= "constant_number";
-          break;
-        }
-        parse_number (s, pos);
-        if (opos < pos) {
+        if (number_parser.parse (s, pos)) {
           type= "constant_number";
           break;
         }

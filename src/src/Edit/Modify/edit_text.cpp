@@ -61,19 +61,19 @@ edit_text_rep::correct_concat (path p, int done) {
       return;
     }
     else if (is_multi_paragraph (t[i]) &&
-	     is_document (subtree (et, path_up (p))))
+             is_document (subtree (et, path_up (p))))
       {
-	if ((i+1)<n) {
-	  split (p * (i+1));
-	  correct_concat (path_inc (p));
-	}
-	if (i==0) remove_node (p * 0);
-	else {
-	  split (p * i);
-	  remove_node (path_inc (p) * 0);
-	  correct_concat (p);
-	}
-	return;
+        if ((i+1)<n) {
+          split (p * (i+1));
+          correct_concat (path_inc (p));
+        }
+        if (i==0) remove_node (p * 0);
+        else {
+          split (p * i);
+          remove_node (path_inc (p) * 0);
+          correct_concat (p);
+        }
+        return;
       }
   }
 }
@@ -96,7 +96,8 @@ edit_text_rep::pure_line (path p) {
   return
     is_document (st) ||
     ((is_func (st, WITH) || is_func (st, LOCUS) ||
-      is_func (st, CANVAS) || is_func (st, ORNAMENT) ||
+      is_func (st, CANVAS) ||
+      is_func (st, ORNAMENT) || is_func (st, ART_BOX) ||
       is_func (st, WITH_PACKAGE)) &&
      (last_item (p) == (N(st)-1)) && pure_line (p)) ||
     (is_extension (st) && (last_item (p) >= 0) && pure_line (p));
@@ -116,8 +117,10 @@ edit_text_rep::accepts_return (path p) {
     ((is_func (st, WITH) || is_mod_active (st) ||
       is_func (st, STYLE_WITH) || is_func (st, VAR_STYLE_WITH) ||
       is_func (st, LOCUS) || is_func (st, WITH_PACKAGE) ||
-      is_func (st, CANVAS) || is_func (st, ORNAMENT)) &&
+      is_func (st, CANVAS)) &&
      (last_item (p) == (N(st)-1)) && pure_line (p)) ||
+    ((is_func (st, ORNAMENT) || is_func (st, ART_BOX)) &&
+     (last_item (p) == 0) && pure_line (p)) ||
     (is_extension (st) && (last_item (p) >= 0) && pure_line (p));
 }
 
@@ -171,12 +174,12 @@ edit_text_rep::prepare_for_insert () {
       insert_node (p * 0, DOCUMENT);
     else {
       if (l == 0) {
-	insert (p, tree (DOCUMENT, ""));
-	go_to (p * 0);
+        insert (p, tree (DOCUMENT, ""));
+        go_to (p * 0);
       }
       else {
-	insert (path_inc (p), tree (DOCUMENT, ""));
-	go_to (path_inc (p) * 0);
+        insert (path_inc (p), tree (DOCUMENT, ""));
+        go_to (path_inc (p) * 0);
       }
     }
     return prepare_for_insert ();
@@ -264,7 +267,7 @@ get_unit (tree t) {
   int i;
   string s= as_string (t);
   for (i=0; i<N(s); i++)
-    if ((s[i]>='a') && (s[i]<='z')) break;
+    if (is_locase (s[i])) break;
   return s (i, N(s));
 }
 
@@ -273,7 +276,7 @@ get_quantity (tree t) {
   int i;
   string s= as_string (t);
   for (i=0; i<N(s); i++)
-    if ((s[i]>='a') && (s[i]<='z')) break;
+    if (is_locase (s[i])) break;
   return s (0, i);
 }
 

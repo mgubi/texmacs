@@ -1,54 +1,65 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.10>
 
-<style|<tuple|tmweb|english>>
+<style|tmweb2>
 
 <\body>
-  <tmweb-current|Download|Windows><tmweb-title|Installing <TeXmacs> under
+  <tmweb-current|Download|Windows><tmweb-title|Installing <TeXmacs> for
   <name|Windows>|<tmweb-download-links>>
 
-  <section|Standard installation>
+  <\tmweb-split>
+    <center|<image|../images/Download-TeXmacs.png|600px|||>>
+  <|tmweb-split>
+    <tabular|<tformat|<cwith|1|3|1|1|cell-hyphen|n>|<cwith|1|-1|2|2|cell-hyphen|t>|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|-1|1|1|cell-width|>|<cwith|1|-1|1|1|cell-hmode|auto>|<cwith|1|-1|2|2|cell-lsep|1spc>|<cwith|1|-1|2|2|cell-bsep|1em>|<cwith|1|-1|2|2|cell-tsep|1em>|<table|<row|<cell|<item-pic|../images/small-download.png>>|<\cell>
+      <strong|Downloading <TeXmacs>>
 
-  In order to install the <name|Qt>-based version of <TeXmacs> on Windows,
-  you should:
+      <\itemize>
+        <item>Download the installer <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|-installer.exe>>|<merge|https://www.texmacs.org/Download/ftp/tmftp/windows/|<TeXmacs-version-release|devel>|-installer.exe>>
+        (for <name|Windows 7> and later).
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/TeXmacs.png>>|<\cell>
+      <strong|Installing and running <TeXmacs>>
 
-  <\enumerate>
-    <item>Download <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|-installer.exe>>|<merge|http://www.texmacs.org/Download/ftp/tmftp/windows/|<TeXmacs-version-release|devel>|-installer.exe>>
-    the last stable version or an another
-    <hlink|here|http://ftp.texmacs.org/TeXmacs/tmftp/windows/>.
+      <\itemize>
+        <item>Execute the downloaded installer and follow the installation
+        instructions.
 
-    <item>Execute the downloaded installer and follow the installation
-    instructions.
+        <item>Click on the <TeXmacs> icon on your desktop in order to launch
+        <TeXmacs>.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/Book_icon_1.png>>|<\cell>
+      <strong|Learning <TeXmacs>>
 
-    <item>Click on the <TeXmacs> icon on your desktop in order to launch
-    <TeXmacs>.
-  </enumerate>
+      <\itemize>
+        <item>Get started by watching our introductory
+        <hlink|videos|../home/videos.en.tm>.
 
-  If you like the program, then please consider
-  <hlink|donating|../contribute/donations.en.tm> money or services to us. Of
-  course, you may also <hlink|contribute|../contribute/contribute.en.tm>
-  yourself. In case of problems, please <hlink|subscribe|../home/ml.en.tm> to
-  the <verbatim|texmacs-dev> or <verbatim|texmacs-users> mailing lists and
-  ask your questions there. You may also directly
-  <hlink|contact|../contact/contact.en.tm> us, but you might need to be more
-  patient.
+        <item>Or by reading one of the <TeXmacs>
+        <hlink|tutorials|../help/tutorial.en.tm>.
 
-  <section|Notes>
+        <item>For more information, please consult the <hlink|user
+        manual|../help/book.en.tm>.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/FAQ_icon.svg.png>>|<\cell>
+      <strong|Any questions?>
 
-  <\itemize>
-    <item>The current <name|Windows> version of <TeXmacs> only supports a
-    reduced set of plug-ins. As of version 1.0.7.18, <name|Maxima>,
-    <name|Mathemagix>, <name|Octave>, <name|Pari> and <name|Python> should
-    run out of the box after a standard installation.
+      <\itemize>
+        <item><hlink|Frequently asked questions|../help/faq.en.tm>.
 
-    <item>If you installed <hlink|<name|Mik><TeX>|http://www.miktex.org/> in
-    addition to <TeXmacs>, then, due to the availability of some additional
-    font templates, certain fonts may be generated automatically. This
-    results in a<nbsp>significant slow-down of <TeXmacs>. Don't panic: the
-    fonts have to be generated only once. Subsequent runs of <TeXmacs> will
-    be fast.
-  </itemize>
+        <item>Ask questions on the <hlink|<verbatim|texmacs-users> mailing
+        list|../home/ml.en.tm#tmusers>.
+      </itemize>
+    </cell>>|<row|<cell|<item-pic|../images/Crystal_Project_money.png>>|<\cell>
+      <strong|Donate>
 
-  <tmdoc-copyright|1999--2013|Joris van der Hoeven|David Michel|Denis Raux>
+      <\itemize>
+        <item>If you like <TeXmacs>, then please consider
+        <hlink|donating|../contribute/donations.en.tm> money or services to
+        us.
+      </itemize>
+    </cell>>>>>
+  </tmweb-split>
+
+  <tmdoc-copyright|1999--2019|Joris van der Hoeven|David Michel|Denis Raux>
 
   <tmweb-license>
 </body>

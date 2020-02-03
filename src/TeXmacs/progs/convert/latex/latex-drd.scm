@@ -112,6 +112,7 @@
   (euro "eurosym")
 
   (mdfsetup ("tikz" "mdframed"))
+  (tikz "tikz")
 
   (omicron "pslatex")
   (multicols "multicol")
@@ -143,7 +144,10 @@
 
   (listpart "expdlist")
 
-  (ifthispageodd "scrextend"))
+  (ifthispageodd "scrextend")
+
+  (begin-linenumbers "lineno")
+  (resetlinenumber "lineno"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page size settings

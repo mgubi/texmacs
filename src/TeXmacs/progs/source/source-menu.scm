@@ -61,7 +61,7 @@
   (-> "Definition" (link source-define-menu))
   (-> "Macro" (link source-macro-menu))
   (-> "Evaluation" (link source-quote-menu))
-  (-> "Flow control" (link source-flow-menu)))
+  (-> "Control flow" (link source-flow-menu)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Executable markup for the macro language
@@ -84,7 +84,7 @@
     ("Number" (make 'number))
     ("Today" (make 'date 0))
     ("Formatted date" (make 'date))
-    ("Translate" (make 'translate))
+    ("Translate::language" (make 'translate))
     ("Find file" (make 'find-file))))
 
 (menu-bind source-tuple-menu
@@ -122,9 +122,9 @@
 (menu-bind source-activation-menu
   ("Activate" (make-mod-active 'active*))
   ("Activate once" (make-mod-active 'active))
-  (when (not (in-source?))
-	("Deactivate" (make-mod-active 'inactive*))
-	("Deactivate once" (make-mod-active 'inactive))))
+  (when (or (not (in-source?)) (inside? 'active) (inside? 'active*))
+    ("Deactivate" (make-mod-active 'inactive*))
+    ("Deactivate once" (make-mod-active 'inactive))))
 
 (menu-bind source-layout-menu
   ("Compact" (make-style-with "src-compact" "all"))
@@ -142,11 +142,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind source-macros-menu
-  ("New macro" (open-macro-editor ""))
+  ("New macro" (open-macro-editor "" :global))
   (when (can-create-table-macro?)
-    ("Create table macro" (create-table-macro "")))
-  ("Edit macros" (open-macros-editor))
-  ("Edit preamble" (toggle-preamble))
+    ("Create table macro" (create-table-macro "" :global)))
+  ("Edit macros" (open-macros-editor :global))
+  ("Edit preamble" (toggle-source-mode))
   ("Extract style file" (extract-style-file #t))
   ("Extract style package" (extract-style-file #f)))
 

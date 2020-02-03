@@ -98,43 +98,43 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
     for (i=0; i<last; i++) {
       tree arg= env->exec (t[i]);
       if (is_compound (arg, "id", 1)) {
-	string id= as_string (arg[0]);
-	if (accessible) env->link_env->insert_locus (id, body);
-	else if (N (obtain_ip (body)) > 1) {
-	  extern tree get_subtree (path p);
-	  path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
-	  env->link_env->insert_locus ("&" * id, get_subtree (p));
-	}
-	ids= list<string> (id, ids);
-	visited= visited || has_been_visited ("id:" * id);
+        string id= as_string (arg[0]);
+        if (accessible) env->link_env->insert_locus (id, body);
+        else if (N (obtain_ip (body)) > 1) {
+          extern tree get_subtree (path p);
+          path p= path_up (reverse (descend_decode (obtain_ip (body), 1)));
+          env->link_env->insert_locus ("&" * id, get_subtree (p));
+        }
+        ids= list<string> (id, ids);
+        visited= visited || has_been_visited ("id:" * id);
       }
       else if (is_compound (arg, "link") && N(arg) >= 2) {
-	if (is_func (arg[1], ATTR)) arg= copy (arg);
-	else arg= arg (0, 1) * tree (LINK, tree (ATTR)) * arg (1, N(arg));
-	arg[1] << tree ("secure")
-	       << (env->secure? tree ("true"): tree ("false"));
-	env->link_env->insert_link (arg);
-	for (j=2; j<N(arg); j++) {
-	  if (is_compound (arg[j], "id", 1) && is_atomic (arg[j][0])) {
-	    visited= visited || has_been_visited ("id:" * arg[j][0]->label);
-	    anchor = arg[j][0]->label;
-	  }
-	  if (is_compound (arg[j], "url", 1) && is_atomic (arg[j][0])) {
-	    visited= visited || has_been_visited ("url:" * arg[j][0]->label);
-	    ref = arg[j][0]->label;
-	  }
-	}
+        if (is_func (arg[1], ATTR)) arg= copy (arg);
+        else arg= arg (0, 1) * tree (LINK, tree (ATTR)) * arg (1, N(arg));
+        arg[1] << tree ("secure")
+               << (env->secure? tree ("true"): tree ("false"));
+        env->link_env->insert_link (arg);
+        for (j=2; j<N(arg); j++) {
+          if (is_compound (arg[j], "id", 1) && is_atomic (arg[j][0])) {
+            visited= visited || has_been_visited ("id:" * arg[j][0]->label);
+            anchor = arg[j][0]->label;
+          }
+          if (is_compound (arg[j], "url", 1) && is_atomic (arg[j][0])) {
+            visited= visited || has_been_visited ("url:" * arg[j][0]->label);
+            ref = arg[j][0]->label;
+          }
+        }
       }
       else if (is_compound (arg, "observer", 2)) {
-	string id= as_string (arg[0]);
-	string cb= cork_to_utf8 (as_string (arg[1]));
-	if (accessible) {
+        string id= as_string (arg[0]);
+        string cb= cork_to_utf8 (as_string (arg[1]));
+        if (accessible) {
           if (env->secure ||
               as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
             env->link_env->insert_locus (id, body, cb);
         }
-	ids= list<string> (id, ids);
-	visited= visited || has_been_visited ("id:" * id);
+        ids= list<string> (id, ids);
+        visited= visited || has_been_visited ("id:" * id);
       }
     }
   }
@@ -157,31 +157,82 @@ bool
 build_locus (edit_env env, tree t, list<string>& ids, string& col) {
   string ref;
   string anchor;
-  return build_locus(env, t, ids, col, ref, anchor);
+  return build_locus (env, t, ids, col, ref, anchor);
+}
+
+static box
+produce_concat (path ip, array<line_item> a) {
+  if (N(a) == 1) return a[0]->b;
+  int i, n=N(a);
+  if (n == 0) return empty_box (ip); // FIXME: n=0 should never happen
+  array<box> items (n);
+  array<SI>  spc (n);
+  if (n>0) {
+    spc[0]=0;
+    for (i=0; i<n-1; i++) {
+      items[i]  = a[i]->b;
+      spc  [i+1]= a[i]->spc->def;
+    }
+    items[i]= a[i]->b;
+  }
+  return concat_box (ip, items, spc);
 }
 
 void
 concater_rep::typeset_locus (tree t, path ip) {
-  string ref;
-  string anchor;
-
   if (N(t) == 0) { typeset_error (t, ip); return; }
   int last= N(t)-1;
   list<string> ids;
-  string col;
-  if (build_locus (env, t, ids, col, ref, anchor)) {
-    marker (descend (ip, 0));
-    tree old= env->local_begin (COLOR, col);
-    typeset (t[last], descend (ip, last));
-    env->local_end (COLOR, old);
-    marker (descend (ip, 1));
+  string col, ref, anchor;
+  bool ok= build_locus (env, t, ids, col, ref, anchor);
+  marker (descend (ip, 0));
+  tree old= env->local_begin (COLOR, col);
+  int pos= N(a);
+  typeset (t[last], descend (ip, last));
+  if (!ok) {
+    path dip= decorate_middle (descend (ip, N(t) - 1));
+    array<line_item> new_a;
+    array<line_item> tmp_a;
+    for (int i=pos; i<N(a); i++) {
+      if ((a[i]->type == STD_ITEM ||
+           a[i]->type == STRING_ITEM ||
+           a[i]->type == CONTROL_ITEM) &&
+          !a[i]->limits) {
+        tmp_a << a[i];
+        int j= i;
+        while (true) {
+          j++;
+          while (j<N(a) &&
+                 a[j]->type == CONTROL_ITEM &&
+                 a[j]->spc == space(0)) j++;
+          if (j<N(a) &&
+              (a[j]->type == RSUB_ITEM || a[j]->type == RSUP_ITEM)) {
+            while (i<j) { i++; tmp_a << a[i]; }
+          }
+          else break;
+        }
+        if (i+1 == N(a) ||
+            (a[i+1]->type != STD_ITEM && a[i+1]->type != STRING_ITEM) ||
+            a[i+1]->limits ||
+            a[i]->spc != space (0) ||
+            a[i]->penalty < HYPH_PANIC ||
+            a[i]->op_type != a[i+1]->op_type) {
+          path sip= (N(tmp_a)==1? a[i]->b->ip: dip);
+          box cc= produce_concat (dip, tmp_a);
+          box lb= locus_box (sip, cc, ids, env->pixel, ref, anchor);
+          line_item item (STD_ITEM, a[i]->op_type, lb, a[i]->penalty);
+          item->spc= a[i]->spc;
+          new_a << item;
+          tmp_a= array<line_item> ();
+        }
+      }
+      else new_a << a[i];
+    }
+    a->resize (pos);
+    a << new_a;
   }
-  else {
-    tree old= env->local_begin (COLOR, col);
-    box b= typeset_as_concat (env, t[last], descend (ip, last));
-    env->local_end (COLOR, old);
-    print (locus_box (ip, b, ids, env->pixel, ref, anchor));
-  }
+  env->local_end (COLOR, old);
+  marker (descend (ip, 1));
 }
 
 void

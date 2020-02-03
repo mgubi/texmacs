@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.12>
 
 <style|<tuple|source|std-pattern>>
 
@@ -50,6 +50,13 @@
   GNU <TeXmacs> text editor (see <hlink|<with|font-family|tt|www.texmacs.org>|http://www.texmacs.org>).>>
 
   <assign|noteref-sep|<macro|>>
+
+  <assign|cite-website|<macro|<localize|This document has been written using>
+  GNU <TeXmacs><if|<equal|<value|language>|french>| ; |; ><localize|see>
+  <hlink|<with|font-family|tt|www.texmacs.org>|http://www.texmacs.org>.>>
+
+  <assign|cite-TeXmacs|<xmacro|keys|<localize|This document has been written
+  using> GNU <TeXmacs><nbsp><map-args|identity|cite|keys>.>>
 
   <\active*>
     <\src-comment>
@@ -175,7 +182,9 @@
     </cell>>>>>>
   </macro>>
 
-  <assign|author-by|<macro|body|<by-text> <arg|body>>>
+  <assign|skip-by-text|<macro|<or|<equal|<value|language>|croatian>|<equal|<value|language>|slovene>>>>
+
+  <assign|author-by|<macro|body|<if|<skip-by-text>||<by-text> ><arg|body>>>
 
   <assign|author-name|<macro|author|<surround|<vspace*|0.5fn>|<vspace|0.5fn>|<doc-author-block|<name|<author-by|<arg|author>>>>>>>
 

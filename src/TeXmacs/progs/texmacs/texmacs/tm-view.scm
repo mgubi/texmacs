@@ -17,9 +17,6 @@
 ;; View preferences
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (main-icon-bar-default)
-  (if (like-macos?) "off" "on"))
-
 (define (notify-header var val)
   (show-header (== val "on")))
 
@@ -51,7 +48,7 @@
 
 (define-preferences
   ("header" "on" notify-header)
-  ("main icon bar" (main-icon-bar-default) notify-icon-bar)
+  ("main icon bar" "on" notify-icon-bar)
   ("mode dependent icons" "on" notify-icon-bar)
   ("focus dependent icons" "on" notify-icon-bar)
   ("user provided icons" "off" notify-icon-bar)
@@ -76,7 +73,7 @@
   (:synopsis "Toggle the visibility of the window's header.")
   (:check-mark "v" visible-header?)
   (with val (not (visible-header?))
-    (if (== (windows-number) 1)
+    (if (and (== (windows-number) 1) (os-macos?))
         (set-boolean-preference "header" val)
         (show-header val))))
 
@@ -128,7 +125,7 @@
 	(restore-zoom (get-init-page-rendering)))
       (begin
 	(save-zoom (get-init-page-rendering))
-        (set! saved-informative-flags (get-init-env "info-flag"))
+        (set! saved-informative-flags (get-init "info-flag"))
         (init-env "info-flag" "none")
         (full-screen-mode #t #f)
         (fit-to-screen))))

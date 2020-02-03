@@ -419,7 +419,7 @@
 
 (define-public (format-skip-spaces s pos)
   (cond ((>= pos (string-length s)) pos)
-	((char-whitespace? (string-ref s pos))
+	((tm-char-whitespace? (string-ref s pos))
 	 (format-skip-spaces s (+ pos 1)))
 	(else pos)))
 
@@ -506,6 +506,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities for file conversions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (file-of-format? u fm)
+  (in? (url-suffix u) (format-get-suffixes fm)))
 
 (define-public (file-format u)
   (string-append (format-from-suffix (url-suffix u)) "-file"))

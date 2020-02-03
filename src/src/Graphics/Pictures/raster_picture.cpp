@@ -91,6 +91,14 @@ bubble (picture pic, double r, double a) {
 }
 
 picture
+crop (picture pic, double cx1, double cy1, double cx2, double cy2) {
+  cx1= max (cx1, 0.0); cy1= max (cy1, 0.0);
+  cx2= min (cx2, 1.0); cy2= min (cy2, 1.0);
+  raster<true_color> ras= as_raster<true_color> (pic);
+  return raster_picture (crop (ras, cx1, cy1, cx2, cy2));
+}
+
+picture
 turbulence (picture pic, long seed, double w, double h, int oct) {
   raster<true_color> ras= as_raster<true_color> (pic);
   return raster_picture (turbulence (ras, seed, w, h, oct, false));  
@@ -227,6 +235,33 @@ make_opaque (picture pic, color bgc) {
   raster<true_color> ras= as_raster<true_color> (pic);
   true_color tbgc (bgc);
   return raster_picture (map (make_opaque_function (tbgc), ras));
+}
+
+color
+average_color (picture pic) {
+  raster<true_color> tra= as_raster<true_color> (pic);
+  return average (tra);
+}
+
+picture
+copy_alpha (picture pic, picture alf) {
+  raster<true_color> rpic= as_raster<true_color> (pic);
+  raster<true_color> ralf= as_raster<true_color> (alf);
+  return raster_picture (copy_alpha<true_color> (rpic, ralf));
+}
+
+picture
+recolor (picture pic, color col) {
+  color bg= average_color (pic);
+  picture opa= make_opaque (pic, bg);
+  picture tra= make_transparent (opa, bg);
+  picture res= make_opaque (tra, col);
+  return copy_alpha (res, pic);
+}
+
+picture
+apply_skin (picture pic, color col) {
+  return compose (pic, col, compose_towards_source);
 }
 
 /******************************************************************************

@@ -1,4 +1,4 @@
-<TeXmacs|1.99.9>
+<TeXmacs|1.99.11>
 
 <style|<tuple|source|std>>
 
@@ -210,24 +210,28 @@
   </active*>
 
   <assign|ornamented|<\macro|body>
-    <padded|<\ornament>
-      <\surround||<right-flush>>
-        <arg|body>
-      </surround>
-    </ornament>>
+    <\padded>
+      <\decorated>
+        <\surround||<right-flush>>
+          <arg|body>
+        </surround>
+      </decorated>
+    </padded>
   </macro>>
 
   <assign|ornamented-titled|<\macro|body|title>
-    <padded|<\ornament>
-      <\surround||<right-flush>>
-        <arg|body>
-      </surround>
-    <|ornament>
-      <arg|title>
-    </ornament>>
+    <\padded>
+      <\decorated-titled|<arg|title>>
+        <\surround||<right-flush>>
+          <arg|body>
+        </surround>
+      </decorated-titled>
+    </padded>
   </macro>>
 
-  <drd-props|ornamented-titled|arity|2|accessible|all>
+  <drd-props|ornamented|arity|1|accessible|all|locals|<attrs>>
+
+  <drd-props|ornamented-titled|arity|2|accessible|all|locals|<attrs>>
 
   <assign|ornament-indent|<\macro|left|right|bottom|top|body>
     <\with|old-shape|<value|ornament-shape>|old-color|<value|ornament-color>|old-hpadding|<value|ornament-hpadding>|old-vpadding|<value|ornament-vpadding>|old-border|<value|ornament-border>|ornament-shape|classic|ornament-color|#fff0|ornament-hpadding|<tuple|<arg|left>|<arg|right>>|ornament-vpadding|<tuple|<arg|bottom>|<arg|top>>|ornament-border|0ln>
@@ -240,6 +244,60 @@
       </ornament>
     </with>
   </macro>>
+
+  <\active*>
+    <\src-comment>
+      Decorations based on ornaments.
+    </src-comment>
+  </active*>
+
+  <assign|ornament-render-title|<macro|body|<arg|body>>>
+
+  <assign|ornament-render-body|<macro|body|<arg|body>>>
+
+  <assign|ornament-render-extra|<macro|body|<arg|body>>>
+
+  \;
+
+  <assign|decorated-hook|<macro|body|<with|bg-color|<value|ornament-extra-color>|old-color|<value|color>|old-math-color|<value|math-color>|old-strong-color|<value|strong-color>|<ornament-render-title|<with|ornament-extra-color|<value|bg-color>|color|<value|old-color>|math-color|<value|old-math-color>|strong-color|<value|old-strong-color>|<with|bg-color|<value|ornament-color>|<ornament-render-body|<with|ornament-color|<value|bg-color>|<arg|body>>>>>>>>>
+
+  <assign|decorated-title|<macro|body|<ornament-render-title|<arg|body>>>>
+
+  <assign|decorated-body|<macro|body|<ornament-render-body|<arg|body>>>>
+
+  <assign|decorated-extra|<macro|body|<ornament-render-extra|<arg|body>>>>
+
+  \;
+
+  <assign|decorated|<macro|body|<decorated-hook|<decorated-extra|<ornament|<decorated-body|<arg|body>>>>>>>
+
+  <assign|decorated-block|<\macro|body>
+    <decorated-hook|<decorate-extra|<\ornament>
+      <\wide-normal>
+        <\decorated-body>
+          <arg|body>
+        </decorated-body>
+      </wide-normal>
+    </ornament>>>
+  </macro>>
+
+  <assign|decorated-titled|<macro|name|body|<decorated-hook|<decorated-extra|<ornament|<decorated-body|<arg|body>>|<decorated-title|<arg|name>>>>>>>
+
+  <assign|decorated-titled-block|<\macro|name|body>
+    <decorated-hook|<decorated-extra|<\ornament>
+      <\wide-normal>
+        <decorated-body|<arg|body>>
+      </wide-normal>
+    </ornament|<decorated-title|<arg|name>>>>>
+  </macro>>
+
+  <drd-props|decorated|arity|1|accessible|all|locals|<attrs>>
+
+  <drd-props|decorated-block|arity|1|accessible|all|locals|<attrs>>
+
+  <drd-props|decorated-titled|arity|2|accessible|all|locals|<attrs>>
+
+  <drd-props|decorated-titled-block|arity|2|accessible|all|locals|<attrs>>
 
   <\active*>
     <\src-comment>
@@ -321,6 +379,24 @@
 
   <\active*>
     <\src-comment>
+      Further table macros.
+    </src-comment>
+  </active*>
+
+  <assign|description-table|<macro|body|<tformat|<twith|table-width|1par>|<twith|table-hmode|exact>|<twith|table-block|yes>|<twith|table-min-cols|2>|<cwith|1|-1|2|-1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-hpart|0.001>|<cwith|1|-1|1|1|cell-lsep|0fn>|<cwith|1|-1|-1|-1|cell-rsep|0fn>|<cwith|1|-2|1|-1|cell-bsep|<value|par-par-sep>>|<cwith|2|-1|1|-1|cell-tsep|<value|par-sep>>|<arg|body>>>>
+
+  <assign|prefixed-line|<\macro|prefix|body>
+    <\with|par-first|0fn>
+      <\description-table>
+        <tformat|<twith|table-valign|T>|<twith|table-hmode|min>|<cwith|1|-1|1|-1|cell-lsep|0em>|<cwith|1|-1|1|-1|cell-rsep|0em>|<cwith|1|1|1|-1|cell-tsep|0em>|<cwith|-1|-1|1|-1|cell-bsep|0em>|<cwith|1|-1|1|-1|cell-vcorrect|n>|<table|<row|<cell|<arg|prefix>>|<\cell>
+          <arg|body>
+        </cell>>>>
+      </description-table>
+    </with>
+  </macro>>
+
+  <\active*>
+    <\src-comment>
       Other macros.
     </src-comment>
   </active*>
@@ -340,6 +416,12 @@
   <drd-props|comma-separated|arity|<tuple|repeat|1|1>|accessible|all>
 
   <drd-props|semicolon-separated|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <assign|prepend-space|<macro|x| <arg|x>>>
+
+  <assign|space-separated|<xmacro|items|<arg|items|0><map-args|prepend-space|concat|items|1>>>
+
+  <assign|document-bis|<xmacro|items|<map-args|identity|document|items>>>
 
   <assign|font-magnify|<macro|factor|body|<with|font-size|<times|<value|font-size>|<arg|factor>>|<arg|body>>>>
 

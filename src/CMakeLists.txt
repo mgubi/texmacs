@@ -16,7 +16,6 @@ cmake_minimum_required (VERSION 3.5)
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_AUTOMOC ON)
 set (CMAKE_INCLUDE_CURRENT_DIR ON)
-set (CMAKE_CXX_FLAGS "-Wno-deprecated-register")
 
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Debug CACHE STRING
@@ -42,10 +41,11 @@ project (TEXMACS CXX C) # check for C/C++ compiler
 
 set (PACKAGE TeXmacs)
 set (CMAKE_MODULE_PATH ${TEXMACS_SOURCE_DIR}/cmake)
-set (DEVEL_VERSION "1.99.9")
+set (DEVEL_VERSION "1.99.12")
 set (DEVEL_RELEASE "1")
-set (STABLE_VERSION "1.99.9")
+set (STABLE_VERSION "1.99.12")
 set (STABLE_RELEASE "1")
+set (TEXMACS_REVISION "1.99.12")
 
 
 ### --------------------------------------------------------------------
@@ -63,26 +63,26 @@ option (QTPIPES "use Qt pipes" ON)
 
 option (USE_SQLITE3 "Use SQLite3" ON)
 if (USE_SQLITE3)
-    find_package (SQLite3)
-    option (LINKED_SQLITE3 "Use Linked SQLite3" ON)
+  find_package (SQLite3)
+  option (LINKED_SQLITE3 "Use Linked SQLite3" ON)
 endif (USE_SQLITE3)
 
 option (USE_FREETYPE "use Freetype" ON)
 if (USE_FREETYPE)
-    find_package (Freetype)
-    option (LINKED_FREETYPE "linked Freetype" ON)
+  find_package (Freetype)
+  option (LINKED_FREETYPE "linked Freetype" ON)
 endif (USE_FREETYPE)
 
 option (USE_CAIRO "use Cairo" OFF)
 if (USE_CAIRO)
-    find_package(Cairo)
-    option (LINKED_CAIRO "linked Cairo" ON)
+  find_package(Cairo)
+  option (LINKED_CAIRO "linked Cairo" ON)
 endif (USE_CAIRO)
 
 option (USE_IMLIB2 "use Imlib2" OFF)
 if (USE_IMLIB2)
-    find_package(Imlib2)
-    option (LINKED_IMLIB2 "linked Imlib2" ON)
+  find_package(Imlib2)
+  option (LINKED_IMLIB2 "linked Imlib2" ON)
 endif (USE_IMLIB2)
 
 option (USE_SPARKLE "use Sparkle" OFF)
@@ -91,7 +91,7 @@ option (PDFHUMMUS_NO_TIFF "Disable TIFF in PDF Hummus" ON)
 
 option (USE_GMP "use GMP" ON)
 if (USE_GMP)
-    find_package(GMP)
+  find_package(GMP)
 endif (USE_GMP)
 
 if (APPLE)
@@ -366,6 +366,7 @@ set (TeXmacs_Include_Dirs
   ${TEXMACS_SOURCE_DIR}/src/Data/Drd
   ${TEXMACS_SOURCE_DIR}/src/Data/History
   ${TEXMACS_SOURCE_DIR}/src/Data/Observers
+  ${TEXMACS_SOURCE_DIR}/src/Data/Parser
   ${TEXMACS_SOURCE_DIR}/src/Data/String
   ${TEXMACS_SOURCE_DIR}/src/Data/Tree
   ${TEXMACS_SOURCE_DIR}/src/Edit
@@ -392,6 +393,9 @@ set (TeXmacs_Include_Dirs
   ${TEXMACS_SOURCE_DIR}/src/Scheme
   ${TEXMACS_SOURCE_DIR}/src/Scheme/Guile
   ${TEXMACS_SOURCE_DIR}/src/Scheme/Scheme
+  ${TEXMACS_SOURCE_DIR}/src/Style/Environment
+  ${TEXMACS_SOURCE_DIR}/src/Style/Evaluate
+  ${TEXMACS_SOURCE_DIR}/src/Style/Memorizer
   ${TEXMACS_SOURCE_DIR}/src/System
   ${TEXMACS_SOURCE_DIR}/src/System/Boot
   ${TEXMACS_SOURCE_DIR}/src/System/Classes
@@ -507,11 +511,12 @@ set (TeXmacs_MacOS_SRCS
 ### --------------------------------------------------------------------
 
 set (TeXmacs_Libraries
-    ${Guile_LIBRARIES}
-    ${ZLIB_LIBRARIES}
-    ${JPEG_LIBRARIES}
-    ${PNG_LIBRARIES}
-    -lpthread)
+  ${Guile_LIBRARIES}
+  ${ZLIB_LIBRARIES}
+  ${JPEG_LIBRARIES}
+  ${PNG_LIBRARIES}
+  -lpthread
+)
 
 if (LINKED_CAIRO)
   set (TeXmacs_Libraries ${TeXmacs_Libraries} ${CAIRO_LIBRARIES})
@@ -542,6 +547,10 @@ if (TEXMACS_GUI MATCHES "Qt.*")
     )
     include (${QT_USE_FILE})
   else (TEXMACS_GUI STREQUAL "Qt4")
+    # Homebrew installs Qt5 in /usr/local/opt/qt5
+    if (APPLE AND EXISTS /usr/local/opt/qt5)
+      list (APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt5")
+    endif()
     find_package (Qt5 COMPONENTS Core Gui Widgets PrintSupport REQUIRED)
     set (QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Widgets Qt5::PrintSupport)
     set (TeXmacs_Include_Dirs
@@ -554,6 +563,9 @@ if (TEXMACS_GUI MATCHES "Qt.*")
     if (Qt5_POSITION_INDEPENDENT_CODE)
       set (CMAKE_POSITION_INDEPENDENT_CODE ON)
     endif (Qt5_POSITION_INDEPENDENT_CODE)
+    if (APPLE)
+      add_definitions ("-DQ_WS_MAC")
+    endif (APPLE)
   endif (TEXMACS_GUI STREQUAL "Qt4")
 
   add_definitions (${QT_DEFINITIONS})
@@ -585,8 +597,8 @@ elseif (TEXMACS_GUI STREQUAL "Aqua")
   set (TeXmacs_All_SRCS ${TeXmacs_All_SRCS} ${TeXmacs_Cocoa_SRCS})
   set (TeXmacs_Libraries ${TeXmacs_Libraries} ${COCOA_LIBRARY})
 
-  MARK_AS_ADVANCED(COCOA_LIBRARY)
-  MARK_AS_ADVANCED(COCOA_INCLUDE_DIR)
+  mark_as_advanced(COCOA_LIBRARY)
+  mark_as_advanced(COCOA_INCLUDE_DIR)
 else (TEXMACS_GUI STREQUAL "Qt")
   find_package (X11)
 
@@ -597,13 +609,13 @@ else (TEXMACS_GUI STREQUAL "Qt")
   set (TeXmacs_All_SRCS ${TeXmacs_All_SRCS} ${TeXmacs_Widkit_SRCS} ${TeXmacs_X11_SRCS})
   set (TeXmacs_Libraries ${TeXmacs_Libraries} ${X11_LIBRARIES})
 
-  add_definitions("-DX11TEXMACS")
+  add_definitions ("-DX11TEXMACS")
   set (X11TEXMACS 1)
 
-  set(CONFIG_X11 "X11 Widkit Ghostscript")
-  set(CONFIG_GUI "X11")
+  set (CONFIG_X11 "X11 Widkit Ghostscript")
+  set (CONFIG_GUI "X11")
 
-  MESSAGE(STATUS "Enabling standard X11 interface")
+  message (STATUS "Enabling standard X11 interface")
 endif (TEXMACS_GUI MATCHES "Qt.*")
 
 if (APPLE AND TEXMACS_GUI STREQUAL "X11")
@@ -634,16 +646,17 @@ if (APPLE)
     "-framework CoreServices"
     "-framework CoreText"
     "-framework Foundation"
-    "-framework ImageIO")
+    "-framework ImageIO"
+  )
   set (TeXmacs_All_SRCS ${TeXmacs_All_SRCS} ${TeXmacs_MacOS_SRCS})
 
-  set(GUI_TYPE MACOSX_BUNDLE)
-  set(NO_FAST_ALLOC 1)
-  set(AQUATEXMACS 1)
-  set(COCOA_CFLAGS "")
-  set(COCOA_LDFLAGS "-framework COCOA")
-  set(CONFIG_GUI "COCOA")
-  set(CONFIG_COCOA "Cocoa")
+  set (GUI_TYPE MACOSX_BUNDLE)
+  set (NO_FAST_ALLOC 1)
+  set (AQUATEXMACS 1)
+  set (COCOA_CFLAGS "")
+  set (COCOA_LDFLAGS "-framework COCOA")
+  set (CONFIG_GUI "COCOA")
+  set (CONFIG_COCOA "Cocoa")
 
   message (STATUS "Enabling experimental Cocoa port")
 else (APPLE)
@@ -671,9 +684,9 @@ include_directories (${TeXmacs_Include_Dirs})
 ### --------------------------------------------------------------------
 
 if (APPLE)
-  set(TeXmacs_binary_name "TeXmacs")
+  set (TeXmacs_binary_name "TeXmacs")
 else (APPLE)
-  set(TeXmacs_binary_name "texmacs.bin")
+  set (TeXmacs_binary_name "texmacs.bin")
 endif (APPLE)
 
 ### --------------------------------------------------------------------
@@ -693,7 +706,7 @@ if (APPLE)
   install (FILES packages/macos/TeXmacs.icns DESTINATION ${CMAKE_INSTALL_PREFIX})
   install (FILES packages/macos/TeXmacs-document.icns DESTINATION ${CMAKE_INSTALL_PREFIX})
   install (DIRECTORY src/Plugins/Cocoa/English.lproj DESTINATION ${CMAKE_INSTALL_PREFIX})
-else (APPLE)
+  install (DIRECTORY src/Plugins/Cocoa/zh_CN.lproj DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif (APPLE)
 
 install (FILES ${TEXMACS_BINARY_DIR}/misc/script/texmacs
@@ -702,37 +715,38 @@ install (FILES ${TEXMACS_BINARY_DIR}/misc/script/texmacs
         DESTINATION bin
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
                     GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
-install (FILES  DESTINATION share/TeXmacs/bin
-  PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
 ### include/
-install (DIRECTORY TeXmacs/include DESTINATION ${CMAKE_INSTALL_PREFIX})
+install (DIRECTORY TeXmacs/include DESTINATION ${CMAKE_INSTALL_PREFIX}
+  FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
 ### share/
-install (DIRECTORY plugins DESTINATION share/TeXmacs PATTERN "bin" EXCLUDE)
-install (FILES TeXmacs/misc/mime/texmacs.applications DESTINATION share/application_registry)
+install (DIRECTORY plugins DESTINATION share/TeXmacs
+  FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
+  PATTERN "bin" EXCLUDE
+  PATTERN "CMakeLists.txt" EXCLUDE
+  PATTERN ".gitignore" EXCLUDE)
 install (FILES TeXmacs/misc/mime/texmacs.desktop DESTINATION share/applications)
-install (FILES TeXmacs/misc/images/TeXmacs.svg DESTINATION share/icons/gnome/scalable/apps)
-install (FILES TeXmacs/misc/images/text-texmacs.svg DESTINATION share/icons/gnome/scalable/mimetypes)
+install (FILES TeXmacs/misc/images/texmacs.svg DESTINATION share/icons/gnome/scalable/apps)
+install (FILES TeXmacs/misc/images/text-x-texmacs.svg DESTINATION share/icons/gnome/scalable/mimetypes)
 install (FILES TeXmacs/misc/mime/texmacs.xml DESTINATION share/mime/packages)
 install (FILES TeXmacs/misc/pixmaps/TeXmacs.xpm DESTINATION share/pixmaps)
 
 ### --------------------------------------------------------------------
 ### Testing
 ### --------------------------------------------------------------------
-include (CTest)
-set (GTEST_ROOT "${TEXMACS_SOURCE_DIR}/3rdparty/benchmark/googletest/googletest")
+set (GTEST_ROOT "${TEXMACS_SOURCE_DIR}/tests/gtest")
 set (GTEST_INCLUDE_DIR ${GTEST_ROOT}/include)
 set (GTEST_LIBRARIES gtest gtest_main)
 set (GTEST_MAIN_LIBRARY gtest_main)
 set (GTEST_LIBRARY gtest)
 
-add_subdirectory (3rdparty/benchmark EXCLUDE_FROM_ALL)
-add_subdirectory (${GTEST_ROOT} EXCLUDE_FROM_ALL)
-find_package (GTest REQUIRED)
+if (EXISTS ${GTEST_ROOT})
+  include (CTest)
+  find_package (GTest REQUIRED)
+  enable_testing ()
+  add_subdirectory (tests)
+  # add_subdirectory (misc/benchmark)
+endif (EXISTS ${GTEST_ROOT})
 
-enable_testing ()
-
-add_subdirectory (tests)
-add_subdirectory (benchmark)
 ### ---------------------------------------------------------------------
 ### VSCode Support
 ### ---------------------------------------------------------------------

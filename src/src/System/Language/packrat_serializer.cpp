@@ -72,11 +72,11 @@ packrat_parser_rep::serialize (tree t, path p) {
       int start= pos;
       tm_char_forwards (s, pos);
       if (pos == start+1)
-	current_string << s[start];
+        current_string << s[start];
       else {
         // FIXME: where did we use this kind of syntactical substitutions?
         tree r (UNINIT);
-	string ss= s (start, pos);
+        string ss= s (start, pos);
         if (N(ss) != 1 && existing_tree_label (ss))
           r= the_drd->get_syntax (as_tree_label (ss));
         //if (r != UNINIT) cout << "Rewrite " << ss << " -> " << r << "\n";
@@ -197,6 +197,7 @@ packrat_parser_rep::serialize (tree t, path p) {
       break;
     case SET_BINDING:
     case GET_BINDING:
+    case HAS_BINDING:
     case HIDDEN_BINDING:
     case LABEL:
     case REFERENCE:

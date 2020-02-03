@@ -15,7 +15,11 @@
   (:use (kernel gui kbd-define)
         (utils edit selections)
         (prog scheme-tools) 
-        (prog scheme-edit) (prog cpp-edit) (prog python-edit)))
+        (prog scheme-edit)
+        (prog scala-edit)
+        (prog cpp-edit)
+        (prog python-edit)
+        (prog fortran-edit)))
 
 (kbd-map
   (:mode in-prog?)
@@ -53,9 +57,6 @@
 
 (kbd-map
   (:mode in-prog-scheme?)
-  ("std c" (clipboard-copy-export "scheme" "primary"))
-  ("std v" (clipboard-paste-import "scheme" "primary"))
-  ("std x" (clipboard-cut-export "scheme" "primary"))
   ("(" (scheme-bracket-open "(" ")" ))
   (")" (scheme-bracket-close "(" ")" ))
   ("[" (scheme-bracket-open "[" "]" ))
@@ -101,3 +102,12 @@
   ("]" (python-bracket-close "[" "]" ))
   ("\"" (python-bracket-open "\"" "\"" ))
   ("'" (python-bracket-open "'" "'" )))
+
+(kbd-map
+  (:mode in-prog-fortran?)
+  ("(" (fortran-bracket-open "(" ")" ))
+  (")" (fortran-bracket-close "(" ")" ))
+  ("[" (fortran-bracket-open "[" "]" ))
+  ("]" (fortran-bracket-close "[" "]" ))
+  ("\"" (fortran-bracket-open "\"" "\"" ))
+  ("'" (fortran-bracket-open "'" "'" )))

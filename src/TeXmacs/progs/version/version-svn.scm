@@ -74,11 +74,14 @@
   (:require (== (version-tool name) "svn"))
   ;;(display* "Loading revision " rev " of " name "\n")
   (let* ((name-s (url->string name))
-         (nr (substring rev 1 (string-length rev)))
-         (cmd (string-append "svn cat -r " nr " " name-s))
+         (cmd (string-append "svn cat -r " rev " " name-s))
          (ret (eval-system cmd)))
     ;;(display* "Got " ret "\n")
     ret))
+
+(tm-define (version-beautify-revision name rev)
+  (:require (== (version-tool name) "svn"))
+  rev)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Updating, registering committing a file
@@ -97,6 +100,14 @@
   (:require (== (version-tool name) "svn"))
   (let* ((name-s (url->string name))
          (cmd (string-append "svn add " name-s))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    (if (null? l) "" (cAr l))))
+
+(tm-define (version-unregister name)
+  (:require (== (version-tool name) "svn"))
+  (let* ((name-s (url->string name))
+         (cmd (string-append "svn remove --force " name-s))
          (ret (eval-system cmd))
          (l (remove-empty-strings (string-decompose ret "\n"))))
     (if (null? l) "" (cAr l))))

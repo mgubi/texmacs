@@ -209,7 +209,7 @@ print_tree (tree t, int tab) {
 
 int
 hash (array<tree> a) {
-  register int i, h=0, n=N(a);
+  int i, h=0, n=N(a);
   for (i=0; i<n; i++) {
     h=(h<<7) + (h>>25);
     h=h + hash(a[i]);
@@ -322,6 +322,8 @@ is_multi_paragraph (tree t) {
       if (N(inline_set) == 0) {
 	inline_set->insert (make_tree_label ("footnote"));
 	inline_set->insert (make_tree_label ("footnote-anchor"));
+	inline_set->insert (make_tree_label ("note-footnote"));
+	inline_set->insert (make_tree_label ("note-footnote*"));
 	inline_set->insert (make_tree_label ("script-input"));
 	inline_set->insert (make_tree_label ("converter-input"));
       }

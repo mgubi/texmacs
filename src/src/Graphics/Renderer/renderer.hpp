@@ -22,6 +22,7 @@
 #define PIXEL          256
 #define PLUS_INFINITY  ((SI) 0x3fffffff)
 #define MINUS_INFINITY ((SI) 0xc0000000)
+#define PICTURE_ZOOM   1.0
 
 /******************************************************************************
 * The abstract renderer class
@@ -128,7 +129,7 @@ public:
   virtual void draw_scalable (scalable im , SI x, SI y, int alpha= 255);
 
   /* special routines for printers */
-  virtual bool is_printer (); // FIXME: redundant wrt is_screen?
+  virtual bool is_printer ();
   virtual void get_extents (int& w, int& h);
   virtual void set_page_nr (int nr);
   virtual void next_page ();
@@ -155,12 +156,15 @@ void reverse (int& r, int& g, int& b);
 extern bool   retina_manual;
 extern bool   retina_iman;
 extern int    retina_factor;
+extern int    retina_zoom;
 extern int    retina_icons;
 extern double retina_scale;
-int    get_retina_factor ();
+int    get_retina_factor ();   // MacOS style
+int    get_retina_zoom ();     // GNU/Linux and Windows style
 int    get_retina_icons ();
 double get_retina_scale ();
 void   set_retina_factor (int f);
+void   set_retina_zoom (int z);
 void   set_retina_icons (int i);
 void   set_retina_scale (double s);
 

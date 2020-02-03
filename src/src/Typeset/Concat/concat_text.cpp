@@ -12,6 +12,7 @@
 #include "concater.hpp"
 #include "formatter.hpp"
 #include "analyze.hpp"
+#include "boot.hpp"
 
 lazy make_lazy_vstream (edit_env env, tree t, path ip, tree channel);
 
@@ -29,6 +30,29 @@ void
 concater_rep::typeset_math_substring (string s, path ip, int pos, int otype) {
   box b= text_box (ip, pos, s, env->fn, env->pen);
   a << line_item (STRING_ITEM, otype, b, HYPH_INVALID, env->lan);
+}
+
+void
+concater_rep::typeset_math_macro
+  (string s, tree_label m, path ip, int p1, int p2, int otype)
+{
+  // NOTE: start dirty hack to get spacing of ,..., right
+  static tree_label LOW_DOTS= make_tree_label ("low-dots");
+  static tree_label VAR_LOW_DOTS= make_tree_label ("low-dots*");
+  if (m == LOW_DOTS) {
+    char c1= (p1>0? s[p1-1]: ' ');
+    char c2= (p2<N(s)? s[p2]: ' ');
+    if (c1 == ',' || c1 == ':' || c1 == ';' ||
+        c2 == ',' || c2 == ':' || c2 == ';') {
+      m= VAR_LOW_DOTS;
+      a[N(a)-1]->spc= 0;
+    }
+  }
+  // NOTE: end dirty hack to get spacing of ,..., right
+
+  marker (descend (ip, p1));
+  typeset_compound (tree (m), decorate_middle (ip));
+  marker (descend (ip, p2));
 }
 
 void
@@ -64,7 +88,7 @@ concater_rep::typeset_text_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_before);
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
-	typeset_substring ("", ip, pos);
+        typeset_substring ("", ip, pos);
     }
     else { // strings
       penalty_max (tp->pen_before);
@@ -126,10 +150,15 @@ concater_rep::typeset_math_string (tree t, path ip, int pos, int end) {
         box   rb= resize_box (decorate (ip), mb, 0, tb->y1, 0, tb->y2);
         a << line_item (STD_ITEM, OP_SKIP, rb, HYPH_INVALID);
       }
-      typeset_math_substring (s (start, pos), ip, start, tp->op_type);
+      if (tp->macro == 0 || env->read (as_string (tp->macro)) == UNINIT)
+        typeset_math_substring (s (start, pos), ip, start, tp->op_type);
+      else
+        typeset_math_macro (s, tp->macro, ip, start, pos, tp->op_type);
       penalty_min (tp->pen_after);
       if (tp->limits != LIMITS_NONE) with_limits (tp->limits);
       if (spc_ok) { PRINT_SPACE (tp->spc_after); }
+      else if (tp->op_type == OP_INFIX || tp->op_type == OP_PREFIX_INFIX)
+        penalty_max (HYPH_INVALID);
     }
   } while (pos<end);
 }
@@ -150,7 +179,7 @@ concater_rep::typeset_prog_string (tree t, path ip, int pos, int end) {
       PRINT_SPACE (tp->spc_before);
       PRINT_SPACE (tp->spc_after);
       if ((pos==end) || (s[pos]==' '))
-	typeset_substring ("", ip, pos);
+        typeset_substring ("", ip, pos);
     }
     else { // strings
       penalty_max (tp->pen_before);
@@ -207,7 +236,10 @@ concater_rep::typeset_hgroup (tree t, path ip) {
   if (N(t) != 1 && N(t) != 2) { typeset_error (t, ip); return; }
   marker (descend (ip, 0));
   int start= N(a);
+  language old_lan= env->lan;
+  env->lan= hyphenless_language (env->lan);
   typeset (t[0], descend (ip, 0));
+  env->lan= old_lan;
   int end= N(a);
   marker (descend (ip, 1));
   for (int i=start; i+1<end; i++)
@@ -438,5 +470,26 @@ concater_rep::typeset_page_note (tree t, path ip) {
   marker (descend (ip, 0));
   a << line_item (NOTE_PAGE_ITEM, OP_SKIP, c, HYPH_INVALID, p);
   flag ("page note", ip, brown);
+  marker (descend (ip, 1));
+}
+
+/******************************************************************************
+* Special additional content in case of page breaks
+******************************************************************************/
+
+void
+concater_rep::typeset_if_page_break (tree t, path ip) {
+  if (N(t) != 2) { typeset_error (t, ip); return; }
+  tree pos= env->exec (t[0]);
+  space spc= env->get_vspace (PAR_PAR_SEP);
+  tree sep= tree (TMLEN, as_string (spc->min),
+                         as_string (spc->def), as_string (spc->max));
+  tree ch= tuple ("if-page-break", pos, sep);
+  lazy lz= make_lazy_vstream (env, t[1], descend (ip, 1), ch);
+  marker (descend (ip, 0));
+  flag ("if-page-break", ip, brown);
+  if (get_user_preference ("new style page breaking") != "off")
+    print (FLOAT_ITEM, OP_SKIP,
+           control_box (decorate_middle (ip), lz, env->fn));
   marker (descend (ip, 1));
 }

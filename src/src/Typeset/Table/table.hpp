@@ -162,4 +162,6 @@ class cell {
 };
 CONCRETE_NULL_CODE(cell);
 
+void extract_format (tree fm, tree* r, int n);
+
 #endif // defined TABLE_H

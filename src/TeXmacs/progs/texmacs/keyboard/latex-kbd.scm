@@ -335,21 +335,20 @@
   ("textit" "Use italic font shape" (make-with "font-shape" "italic"))
   ("emph" "Use italic font shape" (make-with "font-shape" "italic"))
   ("textsl" "Use slanted font shape" (make-with "font-shape" "slanted"))
-  ("textsc" "Use small-caps font shape"
-   (make-with "font-shape" "small-caps"))
-  ("cal" "Use calligraphic font" (make-with "math-font" "cal"))
-  ("frak" "Use fraktur font" (make-with "math-font" "Euler"))
-  ("Bbb" "Use blackboard bold font" (make-with "math-font" "Bbb*"))
-  ("mathcal" "Use calligraphic font" (make-with "math-font" "cal"))
-  ("mathfrak" "Use fraktur font" (make-with "math-font" "Euler"))
-  ("mathbb" "Use blackboard math font" (make-with "math-font" "Bbb*"))
-  ("mathrm" "Use roman font family" (make-with "math-font-family" "rm"))
-  ("mathtt" "Use typewriter font family" (make-with "math-font-family" "tt"))
-  ("mathsf" "Use sans serif font family" (make-with "math-font-family" "ss"))
-  ("mathmd" "Use medium font series" (make-with "math-font-series" "medium"))
-  ("mathbf" "Use bold font series" (make-with "math-font-series" "bold"))
-  ("mathup" "Use right font shape" (make-with "math-font-shape" "right"))
-  ("mathit" "Use italic font shape" (make-with "math-font-shape" "italic"))
+  ("textsc" "Use small-caps font shape" (make-with "font-shape" "small-caps"))
+  ("cal" "Use calligraphic font" (make-with "font" "cal"))
+  ("frak" "Use fraktur font" (make-with "font" "Euler"))
+  ("Bbb" "Use blackboard bold font" (make-with "font" "Bbb*"))
+  ("mathcal" "Use calligraphic font" (make-with "font" "cal"))
+  ("mathfrak" "Use fraktur font" (make-with "font" "Euler"))
+  ("mathbb" "Use blackboard math font" (make-with "font" "Bbb*"))
+  ("mathrm" "Use roman font family" (make-with "font-family" "rm"))
+  ("mathtt" "Use typewriter font family" (make-with "font-family" "tt"))
+  ("mathsf" "Use sans serif font family" (make-with "font-family" "ss"))
+  ("mathmd" "Use medium font series" (make-with "font-series" "medium"))
+  ("mathbf" "Use bold font series" (make-with "font-series" "bold"))
+  ("mathup" "Use right font shape" (make-with "font-shape" "right"))
+  ("mathit" "Use italic font shape" (make-with "font-shape" "italic"))
   ("tiny" "Use tiny font font size" (make 'tiny))
   ("scriptsize" "Use script font size" (make 'very-small))
   ("footnotesize" "Use footnote font size" (make 'smaller))
@@ -385,6 +384,22 @@
   ("footnote" "Insert a footnote" (make-wrapped 'footnote))
   ("input" "Include a document" (make 'include)))
 
+(when (not (get-boolean-preference "new style fonts"))
+  (kbd-commands
+    ("cal" "Use calligraphic font" (make-with "math-font" "cal"))
+    ("frak" "Use fraktur font" (make-with "math-font" "Euler"))
+    ("Bbb" "Use blackboard bold font" (make-with "math-font" "Bbb*"))
+    ("mathcal" "Use calligraphic font" (make-with "math-font" "cal"))
+    ("mathfrak" "Use fraktur font" (make-with "math-font" "Euler"))
+    ("mathbb" "Use blackboard math font" (make-with "math-font" "Bbb*"))
+    ("mathrm" "Use roman font family" (make-with "math-font-family" "rm"))
+    ("mathtt" "Use typewriter font family" (make-with "math-font-family" "tt"))
+    ("mathsf" "Use sans serif font family" (make-with "math-font-family" "ss"))
+    ("mathmd" "Use medium font series" (make-with "math-font-series" "medium"))
+    ("mathbf" "Use bold font series" (make-with "math-font-series" "bold"))
+    ("mathup" "Use right font shape" (make-with "math-font-shape" "right"))
+    ("mathit" "Use italic font shape" (make-with "math-font-shape" "italic"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extensions to LaTeX
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -395,6 +410,6 @@
   ("overbrace" "Insert overbrace" (make-wide "<wide-overbrace>")))
 
 (kbd-symbols
-  "ddots" "mho" "Backepsilon" "homsim"
+  "ddots" "mho" "Backepsilon" "Backsigma" "homsim"
   "mathcatalan" "mathD" "mathd" "mathe" "mathi"
   "mathGamma" "mathLaplace" "matheuler" "mathlambda" "mathpi")

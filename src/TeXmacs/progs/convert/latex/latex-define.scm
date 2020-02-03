@@ -100,6 +100,7 @@
 					      (!math (longhookrightarrow))))))
   (Backepsilon (!group (mbox (rotatebox (!option "origin=c") "180"
 					"E"))))
+  (Backsigma (!group (mbox (reflectbox (!math "\\Sigma")))))
   (Mho (!group (mbox (rotatebox (!option "origin=c") "180"
 				(!math "\\Omega")))))
   (btimes (!group (mbox (rotatebox (!option "origin=c") "90"
@@ -155,10 +156,31 @@
   (divides "\\mathrel{|}")
   (ndivides "\\mathrel{\\nmid}")
   (asterisk "\\mathord{*}")
-  (npreccurlyeq (!annotate "\\mathrel{\\not\\preccurlyeq}" (preccurlyeq)))
   (dottimes "\\mathbin{\\dot{\\times}}")
-  (nequiv "\\mathrel{\\not\\equiv}")
   (precdot "\\mathrel{\\prec\\!\\!\\cdot")
+
+  ;; negations
+  (nin "\\not\\in")
+  (nni "\\not\\ni")
+  (notni "\\not\\ni")
+  (nequiv (!annotate "\\mathrel{\\not\\equiv}" (equiv)))
+  (nleadsto (!annotate "\\not\\leadsto" (leadsto)))
+  (napproxeq (!annotate "\\mathrel{\\not\\approxeq}" (approxeq)))
+  (nprecapprox (!annotate "\\mathrel{\\not\\precapprox}" (precapprox)))
+  (npreccurlyeq (!annotate "\\mathrel{\\not\\preccurlyeq}" (preccurlyeq)))
+  (npreceqq (!annotate "\\mathrel{\\not\\preceqq}" (preceqq)))
+  (nprecsim (!annotate "\\mathrel{\\not\\precsim}" (precsim)))
+  (nsimeq (!annotate "\\mathrel{\\not\\simeq}" (simeq)))
+  (nsqsubset (!annotate "\\mathrel{\\not\\sqsubset}" (sqsubset)))
+  (nsqsubseteq (!annotate "\\mathrel{\\not\\sqsubseteq}" (sqsubseteq)))
+  (nsqsubseteqq (!annotate "\\mathrel{\\not\\sqsubseteqq}" (sqsubseteqq)))
+  (nsqsupset (!annotate "\\mathrel{\\not\\sqsupset}" (sqsupset)))
+  (nsqsupseteq (!annotate "\\mathrel{\\not\\sqsupseteq}" (sqsupseteq)))
+  (nsqsupseteqq (!annotate "\\mathrel{\\not\\sqsupseteqq}" (sqsupseteqq)))
+  (nsuccapprox (!annotate "\\mathrel{\\not\\succapprox}" (succapprox)))
+  (nsucccurlyeq (!annotate "\\mathrel{\\not\\succcurlyeq}" (succcurlyeq)))
+  (nsucceqq (!annotate "\\mathrel{\\not\\succeqq}" (succeqq)))
+  (nsuccsim (!annotate "\\mathrel{\\not\\succsim}" (succsim)))
   
   ;; other extra symbols
   (oempty "\\circ")
@@ -179,10 +201,6 @@
   (nocomma "")
   (noplus "")
   (nosymbol "")
-  (nin "\\not\\in")
-  (nni "\\not\\ni")
-  (notni "\\not\\ni")
-  (nleadsto (!annotate "\\not\\leadsto" (leadsto)))
   (dotminus "\\mathaccent95{-}")
   (dotpm "\\mathaccent95{\\pm}")
   (dotmp "\\mathaccent95{\\mp}")
@@ -211,6 +229,7 @@
   (timesassign "\times\\!\\!=")
   (overassign "/\\!\\!=")
   (backassign "=:")
+  (pplus (mathbin "+\\!\\!\\!\\!+"))
   (lflux "\\ll")
   (gflux "\\gg")
   (colons "\\,:\\,")
@@ -227,7 +246,60 @@
   (rightmap (!group (!append (shortmid) "\\!\\!\\!-")))
   (leftmap (!group (!append "-\\!\\!\\!" (shortmid))))
   (leftrightmap (!group (!append (shortmid) "\\!\\!\\!-\\!\\!\\!"
-                                 (shortmid)))))
+                                 (shortmid))))
+  (LRleftrightarrow (!group (!append (Lleftarrow) "\\!\\!\\!" (Rrightarrow))))
+  (Llongleftarrow (!group (!append (Lleftarrow) "\\!" (equiv))))
+  (Llongrightarrow (!group (!append (equiv) "\\!" (Rrightarrow))))
+  (Llongleftrightarrow (!group (!append (Lleftarrow) "\\!" (equiv)
+                                        "\\!" (Rrightarrow))))
+  (threeleftarrows
+   (mathrel (substack (!append (leftarrow) "\\\\[-0.6ex]"
+                               (leftarrow) "\\\\[-0.6ex]"
+                               (leftarrow)))))
+  (fourleftarrows
+   (mathrel (substack (!append (leftarrow) "\\\\[-0.6ex]"
+                               (leftarrow) "\\\\[-0.6ex]"
+                               (leftarrow) "\\\\[-0.6ex]"
+                               (leftarrow)))))
+  (threerightarrows
+   (mathrel (substack (!append (rightarrow) "\\\\[-0.6ex]"
+                               (rightarrow) "\\\\[-0.6ex]"
+                               (rightarrow)))))
+  (fourrightarrows
+   (mathrel (substack (!append (rightarrow) "\\\\[-0.6ex]"
+                               (rightarrow) "\\\\[-0.6ex]"
+                               (rightarrow) "\\\\[-0.6ex]"
+                               (rightarrow)))))
+  (longleftrightarrows
+   (mathrel (substack (!append (longleftarrow) "\\\\[-0.6ex]"
+                               (longrightarrow)))))
+  (longleftleftarrows
+   (mathrel (substack (!append (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow)))))
+  (longthreeleftarrows
+   (mathrel (substack (!append (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow)))))
+  (longfourleftarrows
+   (mathrel (substack (!append (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow) "\\\\[-0.6ex]"
+                               (longleftarrow)))))
+  (longrightleftarrows
+   (mathrel (substack (!append (longrightarrow) "\\\\[-0.6ex]"
+                               (longleftarrow)))))
+  (longrightrightarrows
+   (mathrel (substack (!append (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow)))))
+  (longthreerightarrows
+   (mathrel (substack (!append (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow)))))
+  (longfourrightarrows
+   (mathrel (substack (!append (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow) "\\\\[-0.6ex]"
+                               (longrightarrow))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra TeXmacs macros
@@ -247,11 +319,17 @@
              (!group (!recurse (TeXmacs))) " " (!translate "text editor") " ("
              (!translate "see") " "
              (url "http://www.texmacs.org") ")"))
+  (citewebsite
+    (!append (!translate "This document has written using") " GNU "
+             (!group (!recurse (TeXmacs))) "; " (!translate "see") " "
+             (url "http://www.texmacs.org") "."))
+  (tmmade (!recurse (tikzframe (Backsigma))))
   (scheme "{\\sc Scheme}")
   (tmsep  ", ")
   (tmSep  "; ")
   (pari "{\\sc Pari}")
   (qed (!math (Box)))
+  (textdots "...")
 
   ;; Unary macros
   (tmrsub (ensuremath (!append "_{" (textrm 1) "}")))
@@ -302,6 +380,9 @@
   (tmieeeemail (!append (textit (!translate "Email:")) " " 1))
   (tmnote (thanks (!append (textit (!translate "Note:")) " " 1)))
   (tmmisc (thanks (!append (textit (!translate "Misc:")) " " 1)))
+  (citetexmacs
+    (!append (!translate "This document has written using") " GNU "
+             (!group (!recurse (TeXmacs))) " " (cite 1) "."))
   (key (!append
          (fcolorbox "black" "gray!25!white"
                     (raisebox "0pt" (!option "5pt") (!option "0pt") (texttt 1)))
@@ -476,6 +557,8 @@
             (endgroup)))
   ("tmindent"
    ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---))
+  ("tmlisting"
+   ((!begin "linenumbers") (!append (resetlinenumber) ---)))
   ("elsequation" ((!begin "eqnarray") (!append --- "&&")))
   ("elsequation*" ((!begin "eqnarray*") (!append --- "&&")))
   ("theglossary"
@@ -517,6 +600,7 @@
 (latex-texmacs-description "descriptionaligned")
 (latex-texmacs-description "descriptiondash")
 (latex-texmacs-description "descriptionlong")
+(latex-texmacs-description "descriptionparagraphs")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra preamble definitions which are needed to export certain macros
@@ -529,6 +613,13 @@
 			       "hidealllines=true,\ninnerleftmargin=0pt,"
 			       "innerrightmargin=0pt,innertopmargin=0pt,"
 			       "innerbottommargin=0pt" )) "\n"))
+  (tikzframe
+   (!append
+    (!ignore (tikz))
+    "\\newcommand{\\tikzframe}[1]{%\n"
+    "  \\tikz[baseline=(X.base)]\n"
+    "  \\node[draw=black,semithick,rectangle,inner sep=2pt,rounded corners=2pt]\n"
+    "  (X) {#1};}\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
 			(!append (textbf (!translate "Keywords:")) " "))
@@ -581,6 +672,11 @@
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))
+  (invbreve
+   (!append
+    "\\usepackage[T3,T1]{fontenc}\n"
+    "\\DeclareSymbolFont{tipa}{T3}{cmr}{m}{n}\n"
+    "\\DeclareMathAccent{\\invbreve}{\\mathalpha}{tipa}{16}\n"))
   (custombinding
    (!append
     "\\newcounter{tmcounter}\n"

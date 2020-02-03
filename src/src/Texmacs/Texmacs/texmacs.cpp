@@ -105,6 +105,8 @@ TeXmacs_init_paths (int& argc, char** argv) {
   }
 #endif
 
+  string current_texmacs_path = get_env ("TEXMACS_PATH");
+
 #if (defined(QTTEXMACS) && defined(Q_OS_MAC)) 
   // the following line can inibith external plugin loading
   // QCoreApplication::setLibraryPaths(QStringList());
@@ -135,7 +137,7 @@ TeXmacs_init_paths (int& argc, char** argv) {
   // Mac bundle environment initialization
   // We set some environment variables when the executable
   // is in a .app bundle on MacOSX
-  if (get_env ("TEXMACS_PATH") == "")
+  if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string(exedir * "../Resources/share/TeXmacs"));
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
   // * "../../Resources/share/TeXmacs/bin") << LF;
@@ -157,7 +159,7 @@ TeXmacs_init_paths (int& argc, char** argv) {
   // PWD is set to HOME
   // if PWD is lacking, then the path resolution machinery may not work
   
-  if (get_env ("TEXMACS_PATH") == "")
+  if (is_empty (current_texmacs_path))
     set_env ("TEXMACS_PATH", as_string (exedir * ".."));
   // if (get_env ("HOME") == "") //now set in immediate_options otherwise --setup option fails
   //   set_env ("HOME", get_env("USERPROFILE"));
@@ -170,6 +172,16 @@ TeXmacs_init_paths (int& argc, char** argv) {
   }
   // system("set");
 #endif
+
+  // check on the latest $TEXMACS_PATH
+  current_texmacs_path = get_env ("TEXMACS_PATH");
+  if (is_empty (current_texmacs_path) ||
+      !exists (url_system (current_texmacs_path))) {
+    cout << "The required TEXMACS_PATH("
+         << current_texmacs_path
+         << ") does not exists" << LF;
+    exit(1);
+  }
 }
 
 /******************************************************************************
@@ -254,6 +266,7 @@ TeXmacs_main (int argc, char** argv) {
       else if ((s == "-v") || (s == "-version")) {
         cout << "\n";
         cout << "TeXmacs version " << TEXMACS_VERSION << "\n";
+        cout << "SVN version " << TEXMACS_REVISION << "\n";
         cout << TEXMACS_COPYRIGHT << "\n";
         cout << "\n";
         exit (0);
@@ -273,14 +286,22 @@ TeXmacs_main (int argc, char** argv) {
       else if (s == "-no-retina") {
         retina_manual= true;
         retina_factor= 1;
+        retina_zoom  = 1;
         retina_icons = 1;
         retina_scale = 1.0;
       }
       else if ((s == "-R") || (s == "-retina")) {
         retina_manual= true;
+#ifdef MACOSX_EXTENSIONS
         retina_factor= 2;
-        retina_icons = 2;
+        retina_zoom  = 1;
         retina_scale = 1.4;
+#else
+        retina_factor= 1;
+        retina_zoom  = 2;
+        retina_scale = 1.0;
+#endif
+        retina_icons = 2;
       }
       else if (s == "-no-retina-icons") {
         retina_iman  = true;
@@ -365,9 +386,16 @@ TeXmacs_main (int argc, char** argv) {
   }
   if (get_env ("TEXMACS_RETINA") == "on") {
     retina_manual= true;
+#ifdef MACOSX_EXTENSIONS
     retina_factor= 2;
-    retina_icons = 2;
+    retina_zoom  = 1;
     retina_scale = 1.4;
+#else
+    retina_factor= 1;
+    retina_zoom  = 2;
+    retina_scale = 1.0;
+#endif
+    retina_icons = 2;
   }
   if (get_env ("TEXMACS_RETINA_ICONS") == "off") {
     retina_iman  = true;
@@ -431,10 +459,8 @@ TeXmacs_main (int argc, char** argv) {
   }
   if (install_status == 1) {
     if (DEBUG_STD) debug_boot << "Loading welcome message...\n";
-    url u= "tmfs://help/plain/tm/doc/about/welcome/first.en.tm";
-    string b= scm_quote (as_string (u));
-    string cmd= "(load-buffer " * b * " " * where * ")";
-    where= " :new-window";
+    string cmd= "(load-help-article \"about/welcome/new-welcome\")";
+    // FIXME: force to load welcome message into new window
     exec_delayed (scheme_cmd (cmd));
   }
   else if (install_status == 2) {
@@ -459,6 +485,7 @@ TeXmacs_main (int argc, char** argv) {
   texmacs_started= true;
   if (!disable_error_recovery) signal (SIGSEGV, clean_exit_on_segfault);
   if (start_server_flag) server_start ();
+  release_boot_lock ();
   if (N(extra_init_cmd) > 0) exec_delayed (scheme_cmd (extra_init_cmd));
   gui_start_loop ();
 
@@ -523,7 +550,7 @@ void
 immediate_options (int argc, char** argv) {
   if (get_env ("TEXMACS_HOME_PATH") == "")
 #ifdef OS_MINGW
-    {
+  {
     if (get_env ("HOME") == "")
         set_env ("HOME", get_env("USERPROFILE"));
     set_env ("TEXMACS_HOME_PATH", get_env ("APPDATA") * "\\TeXmacs");
@@ -594,8 +621,8 @@ main (int argc, char** argv) {
 #ifdef STACK_SIZE
   struct rlimit limit;
 
-  if(getrlimit(RLIMIT_STACK, &limit) == 0) {
-    if (limit.rlim_max <  STACK_SIZE) {
+  if (getrlimit(RLIMIT_STACK, &limit) == 0) {
+    if (limit.rlim_max < STACK_SIZE) {
       cerr << "Max stack allowed value : " << limit.rlim_max << "\n";
       limit.rlim_cur= limit.rlim_max;
     } else limit.rlim_cur= STACK_SIZE;
@@ -627,9 +654,12 @@ main (int argc, char** argv) {
 #endif
 #ifdef QTTEXMACS
   // initialize the Qt application infrastructure
-  new QTMApplication (argc, argv);
+  QTMApplication* qtmapp= new QTMApplication (argc, argv);  
 #endif
   TeXmacs_init_paths (argc, argv);
+#ifdef QTTEXMACS
+  qtmapp->set_window_icon("/misc/images/texmacs-512.png");
+#endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
   the_et->obs= ip_observer (path ());
@@ -644,5 +674,8 @@ main (int argc, char** argv) {
 //  test_environments ();
 //#endif
   start_scheme (argc, argv, TeXmacs_main);
+#ifdef QTTEXMACS
+  delete qtmapp;
+#endif
   return 0;
 }

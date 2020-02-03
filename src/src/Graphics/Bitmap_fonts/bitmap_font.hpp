@@ -40,6 +40,7 @@ struct glyph_rep: concrete_struct {
   short xoff, yoff;          // offset of origin
   short lwidth;              // logical width of character
   short status;              // status for extensible characters
+  short artistic;            // result of applying an artistic effect
   QN*   raster;              // character definition
 
   glyph_rep (int w, int h, int xoff, int yoff, int depth, int status=0);
@@ -118,6 +119,7 @@ glyph slanted     (glyph gl, double slant);
 glyph stretched   (glyph gl, double xf, double yf);
 glyph deepen      (glyph gl, double yf, SI penw);
 glyph widen       (glyph gl, double xf, SI penw);
+glyph mono        (glyph gl, SI lw, SI phw);
 glyph bolden      (glyph gl, SI dpen, SI dtot, SI dver);
 glyph make_bbb    (glyph gl, int code, SI penw, SI penh, SI fatw);
 glyph distorted   (glyph gl, tree kind, SI em, int c);
@@ -166,9 +168,13 @@ font_glyphs slanted (font_glyphs fng, double slant);
 font_metric stretched (font_metric fnm, double xf, double yf);
 font_glyphs stretched (font_glyphs fng, double xf, double yf);
 font_glyphs extended (font_glyphs fng, double xf, SI penw);
+font_metric mono (font_metric fnm, SI lw, SI phw);
+font_glyphs mono (font_glyphs fng, SI lw, SI phw);
 font_metric bolden (font_metric fnm, SI dtot, SI dver);
 font_glyphs bolden (font_glyphs fng, SI dpen, SI dtot, SI dver);
 font_glyphs make_bbb (font_glyphs fng, SI penw, SI penh, SI fatw);
 font_glyphs distorted (font_glyphs fng, tree kind, SI em);
+font_metric effected (font_metric fnm, tree eff, SI em);
+font_glyphs effected (font_glyphs fng, tree eff, SI em);
 
 #endif // defined BITMAP_FONT_H

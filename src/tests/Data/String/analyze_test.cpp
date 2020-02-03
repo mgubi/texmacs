@@ -49,6 +49,37 @@ TEST (string, string_union) {
   ASSERT_TRUE (string_union ("Hello World", "eo") == string ("Hll Wrldeo"));
 }
 
+TEST (string, scm_quote) {
+  ASSERT_STREQ (as_charp (scm_quote ("a")), "\"a\"");
+  ASSERT_STREQ (as_charp (scm_quote ("")), "\"\"");
+  ASSERT_STREQ (as_charp (scm_quote ("\\")), "\"\\\\\"");
+}
+
+TEST (string, scm_unquote) {
+  ASSERT_STREQ (as_charp (scm_unquote("\"\"")), "");
+  ASSERT_STREQ (as_charp (scm_unquote("\"abc\"")), "abc");
+  ASSERT_STREQ (as_charp (scm_unquote("abc")), "abc");
+  ASSERT_STREQ (as_charp (scm_unquote("")), "");
+  ASSERT_STREQ (as_charp (scm_unquote("\"\\\\\"")), "\\");
+}
+
+TEST (string, raw_quote) {
+  ASSERT_STREQ (as_charp (raw_quote ("a")), "\"a\"");
+  ASSERT_STREQ (as_charp (raw_quote ("")), "\"\"");
+}
+
+TEST (string, raw_unquote) {
+  ASSERT_STREQ (as_charp (raw_unquote ("\"a\"")), "a");
+  ASSERT_STREQ (as_charp (raw_unquote ("\"a")), "\"a");
+  ASSERT_STREQ (as_charp (raw_unquote ("a\"")), "a\"");
+  ASSERT_STREQ (as_charp (raw_unquote ("")), "");
+  ASSERT_STREQ (as_charp (raw_unquote ("a")), "a");
+}
+
+TEST (string, unescape_guile) {
+  ASSERT_STREQ (as_charp (unescape_guile ("\\\\")), "\\\\\\\\");
+}
+
 TEST (string, starts) {
   ASSERT_TRUE (starts ("abc_def", "abc"));
   ASSERT_FALSE (starts ("abc_def", "def"));

@@ -122,7 +122,7 @@ edit_interface_rep::try_shortcut (string comb) {
     tree rhs= (shorth == rew_s? tree (""): sv->kbd_system_rewrite (shorth));
     //cout << "Shortcut: " << sh_s << " -> " << rew << "\n";
     if ((search_forwards (" ", comb) >= 0 && comb != " ") ||
-	(search_forwards ("-", comb) >= 0 && comb != "-")) {
+        (search_forwards ("-", comb) >= 0 && comb != "-")) {
       tree t= rhs;
       if (is_compound (t, "render-key", 1)) t= t[0];
       if (is_func (t, WITH)) t= t[N(t)-1];
@@ -131,8 +131,9 @@ edit_interface_rep::try_shortcut (string comb) {
         if (cork_to_utf8 (r) != r)
           rhs= tree (CONCAT, rhs, " (" * r(1, N(r)-1) * ")");
       call ("set-temporary-message",
-	    tree (CONCAT, "keyboard shortcut: ", rew), rhs,
-	    shorth == ""? 1: 3000);
+            tree (CONCAT, "keyboard shortcut: ", rew),
+            verbatim (rhs),
+            shorth == ""? 1: 3000);
     }
     if ((status & 1) == 1) cmd ();
     else if (N(shorth) > 0) call ("kbd-insert", shorth);
@@ -235,7 +236,7 @@ edit_interface_rep::emulate_keyboard (string keys, string action) {
   }
   if (N (action) != 0)
     set_message (concat ("You can also obtain ", action, " by typing ", keys),
-		 action);
+                 action);
 }
 
 /******************************************************************************
@@ -281,7 +282,7 @@ edit_interface_rep::handle_keypress (string key, time_t t) {
       debug_keyboard << "Pressed " << key << " at " << t << "\n";
       debug_keyboard << "  Codes";
       for (int i=0; i<N(key); i++)
-	debug_keyboard << " " << (unsigned int) (unsigned char) key[i];
+        debug_keyboard << " " << (unsigned int) (unsigned char) key[i];
       debug_keyboard << "\n";      
     }
     //time_t t1= texmacs_time ();

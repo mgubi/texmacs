@@ -1,4 +1,4 @@
-<TeXmacs|1.99.9>
+<TeXmacs|1.99.12>
 
 <style|<tuple|source|std>>
 
@@ -35,6 +35,8 @@
   <assign|made-by-TeXmacs|<macro|<float|footnote||<with|font-size|0.84|par-mode|justify|par-left|0cm|par-right|0cm|<active*|<move|<image|local:$TEXMACS_PATH/misc/images/tm_gnu3.ps||1fn||>|0fn|-0.2fn>><space|2spc><localize|This
   document has been produced using> GNU <TeXmacs> (<localize|see>
   <with|font-family|tt|http://www.texmacs.org>).<right-flush>>>>>
+
+  <assign|tm-made|<macro|<with|ornament-color||ornament-shadow-color|<value|color>|ornament-sunny-color|<value|color>|ornament-border|1ln|ornament-shape|rounded|ornament-hpadding|0.5spc|ornament-vpadding|0.5spc|<ornament|<math|\<Backsigma\>>>>>>
 
   <assign|TeX|<macro|<active*|T<rsub|<space|-0.4spc><move|<resize|<with|math-level|0|E>||||0.5fn>|0fn|-0.1fn>><space|-0.4spc>X>>>
 
@@ -381,11 +383,11 @@
 
   <assign|extend-right|<macro|body|right|<resize|<arg|body>|||<maximum|1r|<arg|right>>|>>>
 
-  <assign|swell|<macro|body|<resize|<arg|body>||<minimum|1b|1fnbot>||<maximum|1t|1fntop>>>>
+  <assign|inflate|<macro|body|<resize|<arg|body>||<minimum|1b|1fnbot>||<maximum|1t|1fntop>>>>
 
-  <assign|swell-bottom|<macro|body|<resize|<arg|body>||<minimum|1b|1fnbot>||>>>
+  <assign|inflate-bottom|<macro|body|<resize|<arg|body>||<minimum|1b|1fnbot>||>>>
 
-  <assign|swell-top|<macro|body|<resize|<arg|body>||||<maximum|1t|1fntop>>>>
+  <assign|inflate-top|<macro|body|<resize|<arg|body>||||<maximum|1t|1fntop>>>>
 
   \;
 
@@ -526,6 +528,8 @@
     </src-comment>
   </active*>
 
+  <assign|web-title|<macro|title|>>
+
   <assign|html-tag|<macro|name|body|<arg|body>>>
 
   <assign|html-attr|<macro|attr|val|body|<arg|body>>>
@@ -574,6 +578,8 @@
 
   <assign|extended-factor|1.2>
 
+  <assign|monospaced-factor|0.75>
+
   <assign|degraded-threshold|0.667>
 
   <assign|degraded-frequency|1.0>
@@ -602,11 +608,31 @@
 
   <assign|extended|<macro|body|<add-font-effect|hextended|<value|extended-factor>|<arg|body>>>>
 
+  <assign|monospaced|<macro|body|<add-font-effect|mono|<value|monospaced-factor>|<arg|body>>>>
+
   <assign|degraded|<macro|body|<add-font-effect|degraded|<merge|<value|degraded-threshold>|;|<value|degraded-frequency>>|<arg|body>>>>
 
   <assign|distorted|<macro|body|<add-font-effect|distorted|<merge|<value|distorted-strength>|;|<value|distorted-frequency>>|<arg|body>>>>
 
   <assign|gnawed|<macro|body|<add-font-effect|gnawed|<merge|<value|gnawed-strength>|;|<value|gnawed-frequency>>|<arg|body>>>>
+
+  <\active*>
+    <\src-comment>
+      Artistic font effects.
+    </src-comment>
+  </active*>
+
+  <assign|blurred-radius|0.6pt>
+
+  <assign|shadow-font-color|#222>
+
+  <assign|sunny-font-color|#ddd>
+
+  \;
+
+  <assign|blurred|<macro|body|<add-font-effect|blurred|<value|blurred-radius>|<arg|body>>>>
+
+  <assign|enhanced|<macro|body|<add-font-effect|enhanced|<merge|<value|blurred-radius>|;|<value|shadow-font-color>|;|<value|sunny-font-color>>|<arg|body>>>>
 
   <\active*>
     <\src-comment>
@@ -629,6 +655,10 @@
   <assign|indent-par-first|1.5fn>
 
   <assign|padded-par-par-sep|0.6666fn>
+
+  <assign|math-color|<value|color>>
+
+  <assign|strong-color|<value|color>>
 </body>
 
 <\initial>

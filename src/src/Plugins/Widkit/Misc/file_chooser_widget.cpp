@@ -23,6 +23,7 @@
 #include "dictionary.hpp"
 #include "converter.hpp"
 #include "language.hpp"
+#include "locale.hpp"
 
 #ifdef OS_WIN32
 #include <X11/Xlib.h>
@@ -338,7 +339,7 @@ image_widget_rep::handle_repaint (repaint_event ev) { (void) ev;
     }
 
     SI px= ren->pixel;
-    scalable im= load_scalable_image (url_system (file_name), ww, hh, px);
+    scalable im= load_scalable_image (url_system (file_name), ww, hh, "", px);
     ren->draw_scalable (im, PIXEL, PIXEL);
   }
 }

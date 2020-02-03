@@ -54,6 +54,7 @@ printer_rep::printer_rep (
     landscape (landscape2), paper_w (paper_w2), paper_h (paper_h2),
     use_alpha (get_preference ("experimental alpha") == "on"),
     linelen (0), fg ((color) (-1)), bg ((color) (-1)), opacity (255),
+    pen (black), bgb (white),
     ncols (0), lw (-1), nwidths (0), cfn (""), nfonts (0),
     xpos (0), ypos (0), tex_flag (false), toc (TUPLE),
     defs ("?"), tex_chars ("?"), tex_width ("?"),
@@ -69,10 +70,10 @@ printer_rep::printer_rep (
   if (suffix (ps_file_name) == "eps")
     prologue << " EPSF-2.0";
   prologue   << "\n"
-	     << "%%Creator: TeXmacs-" TEXMACS_VERSION "\n"
-	     << "%%Title: " << as_string (tail (ps_file_name)) << "\n"
-	     << "%%Pages: " << as_string (nr_pages) << "\n"
-	     << "%%PageOrder: Ascend\n";
+             << "%%Creator: TeXmacs-" TEXMACS_VERSION "\n"
+             << "%%Title: " << as_string (tail (ps_file_name)) << "\n"
+             << "%%Pages: " << as_string (nr_pages) << "\n"
+             << "%%PageOrder: Ascend\n";
   if (page_type != "user")
     prologue << "%%DocumentPaperSizes: " << page_type << "\n";
   if (landscape) {
@@ -89,14 +90,14 @@ printer_rep::printer_rep (
   if (landscape)
     prologue << "%%Orientation: Landscape\n";
   prologue   << "%%EndComments\n\n"
-	     << tex_pro << "\n"
-	     << special_pro << "\n"
-	     << texps_pro << "\n"
-	     << "TeXDict begin\n"
-	     << as_string ((int) (1864680.0*paper_w+ 0.5)) << " "
-	     << as_string ((int) (1864680.0*paper_h+ 0.5)) << " 1000 "
-	     << as_string (dpi) << " " << as_string (dpi)
-	     << " (TeXmacs) @start\n";
+             << tex_pro << "\n"
+             << special_pro << "\n"
+             << texps_pro << "\n"
+             << "TeXDict begin\n"
+             << as_string ((int) (1864680.0*paper_w+ 0.5)) << " "
+             << as_string ((int) (1864680.0*paper_h+ 0.5)) << " 1000 "
+             << as_string (dpi) << " " << as_string (dpi)
+             << " (TeXmacs) @start\n";
 
   define (PS_CLIP, string ("/pt4 X /pt3 X /pt2 X /pt1 X\n") *
 	  string ("newpath pt1 pt2 moveto pt3 pt2 lineto ") *
@@ -134,13 +135,11 @@ printer_rep::~printer_rep () {
 
   generate_tex_fonts ();
   prologue << "end\n"
-
            << "systemdict /pdfmark known{userdict /?pdfmark systemdict /exec get put}{userdict /?pdfmark systemdict /pop get put userdict /pdfmark systemdict /cleartomark get put}ifelse\n"
-
            << "%%EndProlog\n\n"
-	   << "%%BeginSetup\n"
-	   << "%%Feature: *Resolution " << as_string (dpi) << "dpi\n"
-	   << "TeXDict begin\n";
+           << "%%BeginSetup\n"
+           << "%%Feature: *Resolution " << as_string (dpi) << "dpi\n"
+           << "TeXDict begin\n";
   prologue << "%%BeginPaperSize: " << page_type << "\n";
   if (page_type != "user")
     prologue << page_type << "\n";
@@ -176,7 +175,7 @@ printer_rep::next_page () {
        << as_string (cur_page-1) << " bop\n";
 
   set_clipping (0, (int) (-(dpi*PIXEL*paper_h)/2.54),
-		(int) ((dpi*PIXEL*paper_w)/2.54), 0);
+                (int) ((dpi*PIXEL*paper_w)/2.54), 0);
 
   fg  = (color) (-1);
   bg  = (color) (-1);
@@ -374,15 +373,15 @@ printer_rep::make_tex_char (string name, unsigned char c, glyph gl) {
   int d5= gl->lwidth;
   if ((d1<256) && (d2<256) && (d3<256) && (d4<256) && (d5<256)) {
     hex_code << as_hexadecimal (d1, 2) << as_hexadecimal (d2, 2)
-	     << as_hexadecimal (d3, 2) << as_hexadecimal (d4, 2)
-	     << as_hexadecimal (d5, 2);
+             << as_hexadecimal (d3, 2) << as_hexadecimal (d4, 2)
+             << as_hexadecimal (d5, 2);
     hex_code= "<" * hex_code * ">";
   }
   else {
     hex_code= "[<" * hex_code * ">";
     hex_code << as_string (d1) << " " << as_string (d2) << " "
-	     << as_string (d3) << " " << as_string (d4) << " "
-	     << as_string (d5) << " ";
+             << as_string (d3) << " " << as_string (d4) << " "
+             << as_string (d5) << " ";
   }
 
   tex_chars (char_name)= hex_code;
@@ -501,10 +500,10 @@ printer_rep::generate_tex_fonts () {
     if (ttf != "") {
       string ttf_name= find_ps_font_name (root, ttf);
       if (!done->contains (root)) {
-	prologue << "%%BeginFont: " << root << "\n";
-	prologue << ttf;
-	prologue << "\n%%EndFont\n";
-	done->insert (root);
+        prologue << "%%BeginFont: " << root << "\n";
+        prologue << ttf;
+        prologue << "\n%%EndFont\n";
+        done->insert (root);
       }
 
       array<string> cum;
@@ -534,8 +533,8 @@ printer_rep::generate_tex_fonts () {
     }
     else {
       prologue << "/" << tex_fonts [fn_name]
-	       << " " << as_string (N(a))
-	       << " " << as_string (a[N(a)-1]+1) << " df\n";
+               << " " << as_string (N(a))
+               << " " << as_string (a[N(a)-1]+1) << " df\n";
       for (i=0; i<N(a); i++) {
         int end;
         string hex_code= tex_chars [fn_name * "-" * as_string (a[i])];
@@ -900,8 +899,9 @@ printer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2) {
 
 renderer
 printer_rep::shadow (picture& pic, SI x1, SI y1, SI x2, SI y2) {
+  // NOTE: picture shadows are rasterized at PICTURE_ZOOM times the dpi
   double old_zoomf= this->zoomf;
-  set_zoom_factor (1.0);
+  set_zoom_factor (5.0 * PICTURE_ZOOM);
   renderer ren= renderer_rep::shadow (pic, x1, y1, x2, y2);
   set_zoom_factor (old_zoomf);
   return ren;
@@ -912,17 +912,17 @@ printer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   (void) alpha; // FIXME
   int w= p->get_width (), h= p->get_height ();
   int ox= p->get_origin_x (), oy= p->get_origin_y ();
-  int pixel= 5*PIXEL;
+  int pixel= (int) (PIXEL / PICTURE_ZOOM);
   string name= "picture";
   string eps= picture_as_eps (p, 600);
   int x1= 0;
   int y1= 0;
   int x2= w;
   int y2= h;
-  x -= (int) (1.2 * (ox * pixel)); // FIXME: why the magic 1.2?
-  y -= (int) (1.2 * (oy * pixel));
+  x -= (int) (ox * pixel);
+  y -= (int) (oy * pixel);
   image (name, eps, x1, y1, x2, y2, w * pixel, h * pixel, x, y, 255);
-  save_string ("~/Temp/hummus_aux.eps", eps);
+  //save_string ("~/Temp/hummus_aux.eps", eps);
 }
 
 void

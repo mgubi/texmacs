@@ -1,3 +1,4 @@
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; MODULE      : init-python.scm
@@ -26,18 +27,21 @@
 
 (define (python-serialize lan t)
   (with u (pre-serialize lan t)
-    (with s (texmacs->code (stree->tree u))
+    (with s (texmacs->code (stree->tree u) "SourceCode")
       (string-append  s  "\n<EOF>\n"))))
 
 (define (python-launcher)
-  (if (os-mingw?)
-      "tm_python.bat --texmacs"
-      "tm_python --texmacs"))
+  (if (url-exists? "$TEXMACS_HOME_PATH/plugins/tmpy")
+      (string-append "python \""
+                     (getenv "TEXMACS_HOME_PATH")
+                     "/plugins/tmpy/session/tm_python.py\"")
+      (string-append "python \""
+                     (getenv "TEXMACS_PATH")
+                     "/plugins/tmpy/session/tm_python.py\"")))
 
 (plugin-configure python
   (:winpath "Python2*" ".")
   (:require (url-exists-in-path? "python"))
-  (:require (url-exists-in-path? "tm_python"))
   (:launch ,(python-launcher))
   (:tab-completion #t)
   (:serializer ,python-serialize)

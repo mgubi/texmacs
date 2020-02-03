@@ -78,7 +78,9 @@
                                       (list (car l)))))))
 
 (tm-define (set-style-list l)
-  (set-style-tree (tm->tree `(tuple ,@(normalize-style-list l)))))
+  (set! l (normalize-style-list l))
+  (when (!= l (get-style-list))
+    (set-style-tree (tm->tree `(tuple ,@l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; High level routines for style and style package management
@@ -143,18 +145,31 @@
       (remove-style-package pack)
       (add-style-package pack)))
 
-(tm-define (edit-package-source name)
+(define (url-resolve-package name)
   (let* ((style-name (string-append name ".ts"))
-         (style-url (url-append "$TEXMACS_STYLE_PATH" style-name))
-         (file-name (url-resolve style-url "r")))
+         (style-url (url-append "$TEXMACS_STYLE_PATH" style-name)))
+    (url-resolve style-url "r")))
+
+(tm-define (edit-package-source name)
+  (with file-name (url-resolve-package name)
     (cursor-history-add (cursor-path))
-    (load-buffer file-name)
+    (load-document file-name)
     (cursor-history-add (cursor-path))))
 
 (tm-define (edit-style-source)
   (with l (get-style-list)
     (when (and (nnull? l) (string? (car l)))
       (edit-package-source (car l)))))
+
+(tm-define (make* l name)
+  (if (or (has-style-package? name)
+	  (style-has? (string-append name "-package")))
+      (make l)
+      (begin
+	(add-style-package name)
+	(delayed
+	  (:idle 1)
+	  (make l)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table with menu names for style packages which are used as style options
@@ -164,6 +179,8 @@
   ("framed-title"         "Framed titles")
   ("title-bar"            "Title bars")
   ("math-ss"              "Sans serif formulas")
+  ("shadowed-frames"      "Frames with shadows")
+  ("shadowed-titles"      "Titles with shadows")
 
   ("framed-session"       "Framed input fields")
   ("ring-session"         "Ring binder notebook style")
@@ -255,6 +272,7 @@
   ("framed-envs"        "Display various environments inside wide frames")
   ("ornaments"          "Tags for various fancy ornaments")
   ("presentation"       "Base package for laptop presentations")
+  ("blackboard"         "Blackboard beamer theme")
   ("bluish"             "Bluish beamer theme")
   ("ice"                "Ice beamer theme")
   ("metal"              "Metallic beamer theme")
@@ -263,7 +281,9 @@
   ("framed-title"       "Put titles of slides in wide frames")
   ("title-bar"          "Put titles of slides in bar at extreme top of screen")
   ("math-ss"            "Use sans serif font for mathematical formulas")
-
+  ("shadowed-frames"    "Display frames with a shadow")
+  ("shadowed-titles"    "Display titles with a shadow")
+  
   ("a0-poster"          "A0 page size for posters")
   ("a1-poster"          "A1 page size for posters")
   ("a2-poster"          "A2 page size for posters")

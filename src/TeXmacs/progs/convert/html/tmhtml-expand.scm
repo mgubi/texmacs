@@ -29,21 +29,29 @@
   ;; FIXME: we should use the DRD here
   `(collection
     ,@(map tmhtml-env-macro
-	   '(TeXmacs TeX LaTeX hrule item
+	   '(TeXmacs TeX LaTeX shown hrule item
 	     chapter-title section-title subsection-title subsubsection-title
 	     paragraph-title subparagraph-title
 	     itemize itemize-minus itemize-dot itemize-arrow
 	     enumerate enumerate-numeric enumerate-roman
 	     enumerate-Roman enumerate-alpha enumerate-Alpha
 	     description description-compact description-dash
-	     description-align description-long item*
+	     description-align description-long description-paragraphs item*
 	     strong em dfn code* samp kbd var abbr acronym
 	     verbatim code tt
 	     hidden-title doc-title-block
 	     equation* equation-lab equations-base
+             wide-float draw-over draw-under
              html-tag html-attr
 	     html-div-style html-div-class html-style html-class
              html-javascript html-javascript-src html-video
-	     tmdoc-title tmdoc-flag tmdoc-license
+	     web-title tmdoc-title tmdoc-flag tmdoc-license
 	     tmdoc-title* tmdoc-title** tmdoc-copyright
-	     hlink action hyper-link mouse-over-balloon mouse-over-balloon*))))
+	     hlink action hyper-link mouse-over-balloon mouse-over-balloon*))
+    ;; FIXME: should apply 'filter_style' to the environment
+    ;; in an appropriate way to avoid adding the primitives below
+    ,@(map tmhtml-env-macro
+           '(shrink-inline
+             binom tbinom dbinom choose ontop
+             tfrac dfrac cfrac
+             bmod pmod pod))))

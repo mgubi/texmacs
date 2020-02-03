@@ -1,3 +1,4 @@
+
 /******************************************************************************
 * MODULE     : xml.cpp
 * DESCRIPTION: routines on xml used in scheme
@@ -16,19 +17,40 @@
 * Convert between TeXmacs and XML strings
 ******************************************************************************/
 
+/*
+ * According to: https://www.w3.org/TR/2008/REC-xml-20081126/#sec-common-syn
+ * NameStartChar ::= ":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6]
+ *   | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D]
+ *   | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF]
+ *   | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+ * NameChar ::= NameStartChar | "-" | "." | [0-9] | #xB7
+ *   | [#x0300-#x036F] | [#x203F-#x2040]
+ * Name ::= NameStartChar (NameChar)*
+ *
+ * Currently, we only handle the visible ascii characters
+ */
 static bool
-is_xml_name (char c) {
-  return
-    is_alpha (c) || is_numeric (c) ||
-    (c == '.') || (c == '-') || (c == ':');
+is_xml_name (char c, int i) {
+  if ((c == ':') || (c == '_') || is_alpha (c)) {
+    return true;
+  } else if (i == 0) {
+    return false;
+  } else {
+    return (c == '-') || (c == '.') || is_digit (c);
+  }
 }
 
+/*
+ * Convert tm_name to xml_name using '_' as escape
+ * If x is not the escape and valid xml name, just keep it
+ * Else, escape x use "_${as_int(x)}_"
+ */
 string
 tm_to_xml_name (string s) {
   string r;
   int i, n= N(s);
   for (i=0; i<n; i++)
-    if (is_xml_name (s[i])) r << s[i];
+    if (s[i] != '_' && is_xml_name (s[i], i)) r << s[i];
     else r << "_" << as_string ((int) ((unsigned char) s[i])) << "_";
   return r;
 }
@@ -82,11 +104,11 @@ tm_to_xml_cdata (string s) {
       string qq= utf8_to_cork (rr);
       if (rr != ss && qq == ss && ss != "<less>" && ss != "<gtr>") r << rr;
       else {
-	if (r != "") a << object (r);
-	a << cons (symbol_object ("tm-sym"),
-		   cons (ss (1, N(ss)-1),
-			 null_object ()));
-	r= "";
+        if (r != "") a << object (r);
+        a << cons (symbol_object ("tm-sym"),
+                   cons (ss (1, N(ss)-1),
+                         null_object ()));
+        r= "";
       }
     }
   if (r != "") a << object (r);

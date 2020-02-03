@@ -23,7 +23,8 @@ void          set_imgbox_cache(tree t, int w,  int h, int xmin=0, int ymin=0);
 void          clear_imgbox_cache(tree t);
 string 	      ps_load (url image, bool conv=true);
 void          image_size (url image, int& w, int& h);
-void          pdf_image_size (url image, int& w, int& h) ;
+void          pdf_image_size (url image, int& w, int& h);
+void          svg_image_size (url image, int& w, int& h);
 void          image_to_eps (url image, url eps, int w_pt= 0, int h_pt= 0, int dpi= 0);
 void          image_to_pdf (url image, url eps, int w_pt= 0, int h_pt= 0, int dpi= 0);
 string        image_to_psdoc (url image);
@@ -33,6 +34,8 @@ void          call_imagemagick_convert(url image, url dest, int w_pt=0, int h_pt
 bool          imagemagick_image_size(url image, int& w, int& h, bool pt_units=true);
 bool          has_image_magick();
 string        imagemagick_cmd();
+void          native_image_size (url image, int& w, int& h);
 void          apply_effect (tree eff, array<url> src, url dest, int w, int h);
+bool          prefer_inkscape (string suffix);
 
 #endif // defined IMAGE_FILES_H

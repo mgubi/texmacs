@@ -160,7 +160,7 @@ concater_rep::typeset_lprime (tree t, path ip) {
     bool flag= (env->fn->type == FONT_TYPE_UNICODE);
     if (flag)
       for (int i=0; i<N(s); i++)
-	flag= flag && (s[i] == '\'' || s[i] == '`');
+        flag= flag && (s[i] == '\'' || s[i] == '`');
     if (env->fn->type == FONT_TYPE_TEX ||
         env->fn->math_type != MATH_TYPE_NORMAL)
       s= replace_primes (s);
@@ -170,9 +170,11 @@ concater_rep::typeset_lprime (tree t, path ip) {
     box b1, b2;
     b2= typeset_as_concat (env, s /*t[0]*/, sip);
     b2= symbol_box (sip, b2, N(t[0]->label));
-    b2= move_box (sip, b2,
-		  flag? 0: env->as_length (string ("-0.05fn")),
-		  flag? env->as_length ("-0.75ex"): 0);
+    if (flag || env->fn->math_type != MATH_TYPE_TEX_GYRE)
+      b2= move_box (sip, b2,
+                    flag? 0: env->as_length (string ("-0.05fn")),
+                    flag? env->as_length ("-0.75ex"): 0,
+                    false, true);
     if (!flag) env->local_end_script (old_il);
     print (LSUP_ITEM, OP_SKIP, script_box (ip, b1, b2, env->fn));
     penalty_max (HYPH_INVALID);
@@ -200,9 +202,11 @@ concater_rep::typeset_rprime (tree t, path ip) {
       // NOTE: hack for detection of poor italic font
       b2= shift_box (sip, b2, (SI) (-1.0 * b2->y1 * b2->right_slope ()), 0);
     b2= symbol_box (sip, b2, N(t[0]->label));
-    b2= move_box (sip, b2,
-		  flag? 0: env->as_length (string ("0.05fn")),
-		  flag? env->as_length ("-0.75ex"): 0);
+    if (flag || env->fn->math_type != MATH_TYPE_TEX_GYRE)
+      b2= move_box (sip, b2,
+                    flag? 0: env->as_length (string ("0.05fn")),
+                    flag? env->as_length ("-0.75ex"): 0,
+                    false, true);
     if (!flag) env->local_end_script (old_il);
     penalty_max (HYPH_INVALID);
     if (N(a)>0) a[N(a)-1]->limits= false;
@@ -275,6 +279,14 @@ concater_rep::typeset_above (tree t, path ip) {
   env->local_end_script (old_il);
   env->local_end (MATH_CONDENSED, old_mc);
   env->local_end (MATH_DISPLAY, old_ds);
+  // NOTE: start dirty hack to get scripts above ... right
+  if ((t[0] == "<ldots>" && env->read ("low-dots") != UNINIT) ||
+      (t[0] == "<cdots>" && env->read ("center-dots") != UNINIT)) {
+    string s= (t[0] == "<ldots>"? ",": "<cdot>");
+    box tb= typeset_as_concat (env, s, decorate_middle (descend (ip, 0)));
+    b1= resize_box (descend (ip, 0), b1, b1->x1, b1->y1, b1->x2, tb->y2);
+  }
+  // NOTE: end dirty hack to get scripts above ... right
   print (limit_box (ip, b1, box (), b2, env->fn, false));
 }
 

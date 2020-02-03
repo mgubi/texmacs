@@ -31,11 +31,13 @@
 
 #include "dictionary.hpp"
 #include "converter.hpp"
-#include "language.hpp"
+#include "locale.hpp"
 #include "scheme.hpp"
 #include "wencoding.hpp"
 
 #include "qt_gui.hpp"    // gui_maximal_extents()
+#include "editor.hpp"
+#include "new_view.hpp"  // get_current_editor()
 
 #ifdef USE_GS
 #include "Ghostscript/gs_utilities.hpp"
@@ -92,8 +94,13 @@ to_qfont (int style, QFont font) {
   return font;
 }
 
+<<<<<<< HEAD
 /*! Try to convert a TeXmacs lenght (em, px, w, h) into a QSize.
 
+=======
+/*! Try to convert a TeXmacs length (em, px, w, h) into a QSize.
+ 
+>>>>>>> origin/master
  This uses the widget's current size to compute relative sizes as specified
  with "FFw", where FF is the string representation of a double.
  A value of "1w" should not affect the widget size.
@@ -103,19 +110,19 @@ to_qfont (int style, QFont font) {
 QSize
 qt_decode_length (string width, string height,
                   const QSize& ref, const QFontMetrics& fm) {
-  QSize size = ref;
+  QSize size= ref;
+
+  string w_unit, h_unit;
+  double w_len, h_len;
+  parse_length (width, w_len, w_unit);
+  parse_length (height, h_len, h_unit);
 
     // Width as a function of the default width
-  if (ends (width, "w") && is_double (width (0, N(width) - 1))) {
-    double x = as_double (width (0, N(width) - 1));
-    size.rwidth() *= x;
-  }
+  if (w_unit == "w") size.rwidth() *= w_len;
     // Width as a function of the default height
-  else if (ends (width, "h") && is_double (width (0, N(width) - 1))) {
-    double y = as_double (width (0, N(width) - 1));
-    size.rwidth() = y * size.height();
-  }
+  else if (w_unit == "h") size.rwidth() = w_len * size.height();
     // Absolute EM units
+<<<<<<< HEAD
   else if (ends (width, "em") && is_double (width (0, N(width) - 2))) {
     double x = as_double (width (0, N(width) - 2));
     size.setWidth(x * fm.width("M"));
@@ -124,14 +131,19 @@ qt_decode_length (string width, string height,
   else if (ends (width, "px") && is_double (width (0, N(width) - 2))) {
     double x = as_double (width (0, N(width) - 2));
     size.setWidth(x);
+=======
+  else if (w_unit == "em") size.setWidth (w_len * fm.width("M"));
+    // Absolute pixel units
+  else if (w_unit == "px") {
+    if (retina_zoom == 2) w_len *= 1.5;
+    size.setWidth (w_len);
+>>>>>>> origin/master
   }
 
     // Height as a function of the default width
-  if (ends (height, "w") && is_double (height (0, N(height) - 1))) {
-    double x = as_double (height (0, N(height) - 1));
-    size.rheight() = x * size.width();
-  }
+  if (h_unit == "w") size.rheight() = h_len * size.width();
     // Height as a function of the default height
+<<<<<<< HEAD
   else if (ends (height, "h") && is_double (width (0, N(width) - 1))) {
     double y = as_double (height (0, N(height) - 1));
     size.rheight() *= y;
@@ -143,6 +155,13 @@ qt_decode_length (string width, string height,
   else if (ends (height, "px") && is_double (height (0, N(height) - 2))) {
     double y = as_double (height (0, N(height) - 2));
     size.setHeight(y);
+=======
+  else if (h_unit == "h") size.rheight() *= h_len;
+  else if (h_unit == "em") size.setHeight (h_len * fm.width("M"));
+  else if (h_unit == "px") {
+    if (retina_zoom == 2) h_len *= 1.5;
+    size.setHeight (h_len);
+>>>>>>> origin/master
   }
   return size;
 }
@@ -363,20 +382,23 @@ to_color (const QColor& c) {
   return rgb_color (r, g, b, a);
 }
 
+
+
+
 /******************************************************************************
  * Image conversion
  ******************************************************************************/
 
 bool
 qt_supports (url u) {
-  static QList<QByteArray> formats = QImageReader::supportedImageFormats();
+  static QList<QByteArray> formats= QImageReader::supportedImageFormats();
 /*  if (DEBUG_CONVERT) {
 	  debug_convert <<"QT valid formats:";
 	  foreach (QString _format, formats) debug_convert <<", "<< from_qstring(_format);
 	  debug_convert <<LF;
   }	*/
   string suf=suffix (u);
-  bool ans = (bool) formats.contains((QByteArray) as_charp(suf));
+  bool ans= (bool) formats.contains((QByteArray) as_charp(suf));
   //if (DEBUG_CONVERT) {debug_convert <<"QT valid format:"<<((ans)?"yes":"no")<<LF;}
   return ans;
 }
@@ -389,7 +411,7 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
       convert_error << "Cannot read image file '" << image << "'"
       << " in qt_image_size" << LF;
       w= 35; h= 35;
-	  return false;
+      return false;
   }
   else {
     w= (int) rint ((((double) im.width ())*2834)/im.dotsPerMeterX());
@@ -398,6 +420,47 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
         <<w<<" x "<<h<<LF;
     return true;
   }
+}
+
+bool
+qt_native_image_size (url image, int& w, int& h) {
+  if (DEBUG_CONVERT) debug_convert << "qt_image_size :" <<LF;
+  QImage im= QImage (utf8_to_qstring (concretize (image)));
+  if (im.isNull ()) return false;
+  else {
+    w= im.width ();
+    h= im.height();
+    return true;
+  }
+}
+
+void
+qt_pretty_image_size (int ww, int hh, string& w, string& h) {
+  SI pt = get_current_editor()->as_length ("1pt");
+  SI par= get_current_editor()->as_length ("1par");
+  if (ww <= 0 || hh <= 0 || ww * pt > par) {
+    w= "1par";
+    h= "";
+  }
+  else {
+    w= as_string (ww) * "pt";
+    h= as_string (hh) * "pt";
+  }
+}
+
+bool
+qt_pretty_image_size (url image, string& w, string& h) {
+  if (suffix (image) == "pdf" ||
+      suffix (image) == "ps" ||
+      suffix (image) == "eps") {
+    w= "";
+    h= "";
+    return false;
+  }
+  int ww, hh;
+  bool r= qt_image_size (image, ww, hh);
+  qt_pretty_image_size (ww, hh, w, h);
+  return r;
 }
 
 void
@@ -581,6 +644,7 @@ qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
 }
 */
 
+<<<<<<< HEAD
 void
 qt_image_data (url image, int& w, int&h, string& data, string& palette, string& mask) {
   // debug_convert << "in qt_image_data"<<LF;
@@ -607,6 +671,8 @@ qt_image_data (url image, int& w, int&h, string& data, string& palette, string& 
   }
 }
 
+=======
+>>>>>>> origin/master
 QPixmap
 as_pixmap (const QImage& im) {
   QPixmap pm (im.size ());
@@ -797,3 +863,58 @@ qt_print (bool& to_file, bool& landscape, string& pname, url& filename,
 }
 
 #endif //(not defined) _MBD_EXPERIMENTAL_PRINTER_WIDGET
+
+
+#ifdef OS_MACOS
+
+// Additional utilities for MACOS
+// this part has to be at the end because it imports CoreFoundation definitions
+// which interfere with TeXmacs and QT types...
+
+#define extend CFextend // avoid name clashes...
+#define outline CFoutline // avoid name clashes...
+#include <CoreFoundation/CoreFoundation.h>
+#undef extend
+
+
+// HACK: this function is needed on MacOS when dropping URLS
+// which could not correspond to standard Unix paths
+
+QString fromNSUrl(const QUrl &url) {
+  QString localFileQString = url.toLocalFile();
+  // [pzion 20150805] Work around
+  // https://bugreports.qt.io/browse/QTBUG-40449
+  if ( localFileQString.startsWith("/.file/id=") )
+  {
+    CFStringRef relCFStringRef =
+      CFStringCreateWithCString(kCFAllocatorDefault,
+                                localFileQString.toUtf8().constData(),
+                                kCFStringEncodingUTF8);
+    CFURLRef relCFURL =
+      CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
+                                    relCFStringRef,
+                                    kCFURLPOSIXPathStyle,
+                                    false); // isDirectory
+    CFErrorRef error = 0;
+    CFURLRef absCFURL =
+      CFURLCreateFilePathURL(kCFAllocatorDefault, relCFURL, &error);
+    if ( !error )
+    {
+      static const CFIndex maxAbsPathCStrBufLen = 4096;
+      char absPathCStr[maxAbsPathCStrBufLen];
+      if ( CFURLGetFileSystemRepresentation(absCFURL,
+                                            true, // resolveAgainstBase
+                                            reinterpret_cast<UInt8 *>( &absPathCStr[0] ),
+                                            maxAbsPathCStrBufLen))
+      {
+        localFileQString = QString( absPathCStr );
+      }
+    }
+    CFRelease( absCFURL );
+    CFRelease( relCFURL );
+    CFRelease( relCFStringRef );
+  }
+  return localFileQString;
+}
+#endif // OS_MACOS
+

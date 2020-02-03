@@ -97,6 +97,7 @@ initialize_default_var_type () {
   var_type (PAGE_FIRST)         = Env_Fixed;
   var_type (PAGE_WIDTH)         = Env_Page_Extents;
   var_type (PAGE_HEIGHT)        = Env_Page_Extents;
+  var_type (PAGE_CROP_MARKS)    = Env_Page_Extents;
   var_type (PAGE_WIDTH_MARGIN)  = Env_Page;
   var_type (PAGE_SCREEN_MARGIN) = Env_Page;
   var_type (PAGE_NR)            = Env_Page;
@@ -251,6 +252,18 @@ edit_env_rep::update_page_pars () {
     }
   }
 
+  string crop_marks= get_string (PAGE_CROP_MARKS);
+  page_real_type  = page_type;
+  page_real_width = page_width;
+  page_real_height= page_height;
+  if (crop_marks != "" && get_string (PAGE_MEDIUM) == "paper") {
+    page_real_type= crop_marks;
+    page_real_width=
+      as_length (page_get_feature (crop_marks, PAGE_WIDTH, page_landscape));
+    page_real_height=
+      as_length (page_get_feature (crop_marks, PAGE_HEIGHT, page_landscape));
+  }
+  
   page_single= get_bool (PAGE_SINGLE);
   page_packet= get_int (PAGE_PACKET);
   page_offset= get_int (PAGE_OFFSET);
@@ -345,6 +358,7 @@ edit_env_rep::get_ornament_parameters () {
   int   a     = alpha;
   tree  w     = read (ORNAMENT_BORDER);
   tree  ext   = read (ORNAMENT_SWELL);
+  tree  cor   = read (ORNAMENT_CORNER);
   tree  xpad  = read (ORNAMENT_HPADDING);
   tree  ypad  = read (ORNAMENT_VPADDING);
 
@@ -400,11 +414,76 @@ edit_env_rep::get_ornament_parameters () {
   }
   else bpad= tpad= as_length (ypad);
 
+
+  double corf= 1.0;
+  if (shape != "classic") {
+    if (shape == "rounded") corf= 2.0;
+    if (shape == "angular") corf= 1.5;
+  }
+  
+  SI lcor, bcor, rcor, tcor;
+  if (is_percentage (cor)) {
+    double a= as_percentage (cor) * corf;
+    lcor= rcor= (SI) round (a * min (lpad, rpad));
+    bcor= tcor= (SI) round (a * min (bpad, tpad));
+  }
+  else if (is_atomic (cor) && !occurs (",", cor->label))
+    lcor= bcor= rcor= tcor= as_length (cor);
+  else {
+    if (is_atomic (cor))
+      cor= tuplify (cor);
+    if (is_func (cor, TUPLE, 2))
+      cor= tuple (cor[0], cor[1], cor[0], cor[1]);
+    if (!is_func (cor, TUPLE, 4))
+      lcor= bcor= rcor= tcor= 0;
+    else {
+      if (is_percentage (cor[0]))
+        lcor= (SI) round (as_percentage (cor[0]) * corf * lpad);
+      else lcor= as_length (cor[0]);
+      if (is_percentage (cor[1])) 
+        bcor= (SI) round (as_percentage (cor[1]) * corf * bpad);
+      else bcor= as_length (cor[1]);
+      if (is_percentage (cor[2])) 
+        rcor= (SI) round (as_percentage (cor[2]) * corf * rpad);
+      else rcor= as_length (cor[2]);
+      if (is_percentage (cor[3])) 
+        tcor= (SI) round (as_percentage (cor[3]) * corf * tpad);
+      else tcor= as_length (cor[3]);
+    }
+  }
+  
   return ornament_parameters (shape, tst,
                               lw, bw, rw, tw,
 			      lx, bx, rx, tx,
 			      lpad, bpad, rpad, tpad,
+                              lcor, bcor, rcor, tcor,
                               brush (bg, a), brush (xc, a), border);
+}
+
+art_box_parameters
+edit_env_rep::get_art_box_parameters (tree t) {
+  tree data (TUPLE);
+  SI lpad= 0, rpad= 0, bpad= 0, tpad= 0;
+  for (int i=1; i<N(t); i++)
+    if (is_func (t[i], TUPLE) && N(t[i]) >= 2) {
+      tree u= t[i], r (TUPLE);
+      bool main_text= (u[0] == "text");
+      for (int j=0; j+1<N(u); j+=2) {
+        tree var= exec (u[j]);
+        tree val= exec (u[j+1]);
+        if (is_atomic (val) && is_length (val->label))
+          val= as_tmlen (val);
+        r << var << val;
+        if (main_text) {
+          if      (var == "lpadding") lpad= as_length (val);
+          else if (var == "rpadding") rpad= as_length (val);
+          else if (var == "bpadding") bpad= as_length (val);
+          else if (var == "tpadding") tpad= as_length (val);
+        }
+      }
+      data << r;
+    }
+  return art_box_parameters (data, lpad, bpad, rpad, tpad);
 }
 
 /******************************************************************************
@@ -747,7 +826,7 @@ void
 decompose_length (string s, double& x, string& un) {
   int i;
   for (i=0; i<N(s); i++)
-    if ((s[i]>='a') && (s[i]<='z')) break;
+    if (is_locase (s[i])) break;
   x = as_double (s (0, i));
   un= s (i, N(s));
 }

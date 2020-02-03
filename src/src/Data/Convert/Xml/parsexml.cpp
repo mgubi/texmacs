@@ -14,6 +14,9 @@
 #include "converter.hpp"
 #include "parse_string.hpp"
 
+#define xml_quote scm_quote
+// FIXME: to be checked that this is the correct quoting style
+
 /******************************************************************************
 * The xml/html parser aims to parse a superset of the set of valid documents.
 * In other words, no attempts are made to signal error messages for
@@ -98,8 +101,9 @@ static hashset<string> html_empty_tag_table;
 static hashset<string> html_auto_close_table;
 static hashset<string> html_block_table;
 static hashmap<string,string> html_entity ("");
+static hashmap<string,string> xml_entity ("");
 
-void load_html_entities (hashmap<string, string> table, string fname) {
+void load_entities (hashmap<string, string> table, string fname) {
   string s;
   if (DEBUG_CONVERT) debug_convert << "Loading " << fname << "\n";
   if (load_string (url ("$TEXMACS_PATH/langs/encoding", fname), s, false)) return;
@@ -109,11 +113,11 @@ void load_html_entities (hashmap<string, string> table, string fname) {
   int i, n= N(t);
   for (i=0; i<n; i++)
     if (is_func (t[i], TUPLE, 2) &&
-	is_atomic (t[i][0]) && is_atomic (t[i][1]))
+        is_atomic (t[i][0]) && is_atomic (t[i][1]))
       {
-	string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
-	string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
-	table (l)= r;
+        string l= t[i][0]->label; if (is_quoted (l)) l= scm_unquote (l);
+        string r= t[i][1]->label; if (is_quoted (r)) r= scm_unquote (r);
+        table (l)= r;
       }
 }
 
@@ -178,9 +182,13 @@ xml_html_parser::xml_html_parser (): entities ("") {
   }
 
   if (N (html_entity) == 0) {
-    load_html_entities (html_entity, "HTMLlat1.scm");
-    load_html_entities (html_entity, "HTMLspecial.scm");
-    load_html_entities (html_entity, "HTMLsymbol.scm");
+    load_entities (html_entity, "HTMLlat1.scm");
+    load_entities (html_entity, "HTMLspecial.scm");
+    load_entities (html_entity, "HTMLsymbol.scm");
+  }
+
+  if (xml_entity->empty()) {
+    load_entities (xml_entity, "XML.scm");
   }
 }
 
@@ -212,26 +220,26 @@ xml_html_parser::transcode (string s2) {
       // presence of an XML prolog is not enough to clear the flag.
       /* html= false; */
       while (s && !test (s, "?>")) {
-	string attname= parse_name ();
-	skip_space ();
-	if (!test (s, "=")) break;
-	s += 1;
-	skip_space ();
-	string val;
-	if (test (s, "\"")) {
-	  s += 1;
-	  val= parse_until ("\"");
-	  skip_space ();	  
-	}
-	else if (test (s, "'")) {
-	  s += 1;
-	  val= parse_until ("'");
-	  skip_space ();
-	}
-	if (attname == "encoding") {
-	  encoding= upcase_all (val);
-	  break;
-	}
+        string attname= parse_name ();
+        skip_space ();
+        if (!test (s, "=")) break;
+        s += 1;
+        skip_space ();
+        string val;
+        if (test (s, "\"")) {
+          s += 1;
+          val= parse_until ("\"");
+          skip_space ();
+        }
+        else if (test (s, "'")) {
+          s += 1;
+          val= parse_until ("'");
+          skip_space ();
+        }
+        if (attname == "encoding") {
+          encoding= upcase_all (val);
+          break;
+        }
       }
     }
   }
@@ -287,12 +295,15 @@ xml_html_parser::expand_entity (string s) {
       if (okay) return r;
       return s;
     }
-    else if (html) {
+    else {
       string ss= s (1, s [N(s)-1] == ';' ? N(s)-1 : N(s));
-      if (html_entity->contains (ss))
-	// HTML entity references expand to character references
-	// so they need to be finalized a second time.
-	return expand_entity (html_entity [ss]);
+      // XML/HTML entity references expand to character references
+      // so they need to be finalized a second time.
+      if (html && html_entity->contains (ss)) {
+        return expand_entity (html_entity [ss]);
+      } else if (xml_entity->contains (ss)) {
+        return expand_entity (xml_entity [ss]);
+      }
     }
   }
   return s;
@@ -306,12 +317,12 @@ xml_html_parser::expand_entities (string s) {
     if (s[i] == '&' || s[i] == '%') {
       int start= i++;
       if (i<n && s[i] == '#') {
-	i++;
-	if (i<n && (s[i] == 'x' || s[i] == 'X')) {
-	  i++;
-	  while (i<n && is_hex_digit (s[i])) i++;
-	}
-	else while (i<n && is_digit (s[i])) i++;
+        i++;
+        if (i<n && (s[i] == 'x' || s[i] == 'X')) {
+          i++;
+          while (i<n && is_hex_digit (s[i])) i++;
+        }
+        else while (i<n && is_digit (s[i])) i++;
       }
       else while (i<n && is_name_char (s[i])) i++;
       if (i<n && s[i] == ';') i++;
@@ -633,12 +644,12 @@ xml_html_parser::build (tree& r) {
       tree sub= copy (a[i]); sub[0]= "tag";
       i++;
       if (html && html_empty_tag_table->contains (name))
-	r << sub;
+        r << sub;
       else {
-	stack= tuple (name, stack);
-	build (sub);
-	r << sub;
-	stack= stack[1];
+        stack= tuple (name, stack);
+        build (sub);
+        r << sub;
+        stack= stack[1];
       }
     }
     else if (is_tuple (a[i], "end")) {
@@ -688,29 +699,24 @@ xml_html_parser::finalize_space (tree t) {
     int first= -1, last= -1;
     for (i=2; i<n; i++)
       if (!is_tuple (t[i], "attr")) {
-	first= i; break;
+        first= i; break;
       }
     if (!is_tuple (t[n-1], "attr"))
       last= n-1;
     (void) first; (void) last;
     for (i=2; i<n; i++) {
       if (is_atomic (t[i])) {
-	if (finalize_preserve_space (t[1]->label)) r << t[i];
-	else {
-	  string s= finalize_space (t[i]->label, i==2, i==(n-1));
-	  if (s != "") r << s;
-	}
+        if (finalize_preserve_space (t[1]->label)) r << t[i];
+        else {
+          string s= finalize_space (t[i]->label, i==2, i==(n-1));
+          if (s != "") r << s;
+        }
       }
       else if (is_tuple (t[i], "tag")) r << finalize_space (t[i]);
       else r << t[i];
     }
     return r;
   }
-}
-
-static string
-simple_quote (string s) {
-  return "\"" * s * "\"";
 }
 
 tree
@@ -725,20 +731,21 @@ xml_html_parser::finalize_sxml (tree t) {
     if (is_tuple (t[i], "attr")) {
       tree attr;
       if (N(t[i]) == 2) attr= tuple (t[i][1]);
-      else attr= tuple (t[i][1]->label, simple_quote (t[i][2]->label));
+      else attr= tuple (t[i][1]->label, xml_quote (t[i][2]->label));
       attrs << attr;
     }
     else if (is_tuple (t[i], "tag"))
       content << finalize_sxml (t[i]);
     else if (is_atomic (t[i]))
-      content << simple_quote (t[i]->label);
+      content << xml_quote (t[i]->label);
     else if (is_tuple (t[i], "pi"))
-      content << tuple ("*PI*", t[i][1]->label, simple_quote (t[i][2]->label));
+      content << tuple ("*PI*", t[i][1]->label, xml_quote (t[i][2]->label));
     else if (is_tuple (t[i], "doctype"))
       // TODO: convert DTD declarations
-      content << tuple ("*DOCTYPE*", simple_quote (t[i][1]->label));
+      content << tuple ("*DOCTYPE*", xml_quote (t[i][1]->label));
     else if (is_tuple (t[i], "cdata"))
-      content << simple_quote (t[i][1]->label);
+      content << xml_quote (t[i][1]->label);
+
   if (N(attrs) > 1) tag << attrs;
   tag << A(content);
   return tag;
@@ -800,7 +807,7 @@ parse_xml (string s) {
 }
 
 tree
-parse_html (string s) {
+parse_plain_html (string s) {
   xml_html_parser parser;
   parser.html= true;
   tree t= parser.parse (s);

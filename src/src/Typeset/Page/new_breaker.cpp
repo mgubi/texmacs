@@ -29,6 +29,19 @@ float_here (tree t) {
   return !float_has (t, 't') && !float_has (t, 'b');
 }
 
+space
+as_space (tree t) {
+  if (is_func (t, TMLEN, 1))
+    return space ((SI) (as_double (t[0]->label)));
+  else if (is_func (t, TMLEN, 3)) {
+    SI _min= (SI) as_double (t[0]->label);
+    SI _def= (SI) as_double (t[1]->label);
+    SI _max= (SI) as_double (t[2]->label);
+    return space (_min, _def, _max);
+  }
+  else return space (0);
+}
+
 /******************************************************************************
 * Constructor
 ******************************************************************************/
@@ -76,6 +89,7 @@ new_breaker_rep::new_breaker_rep (
     SI   bot_cor= max (0, l[i]->b->y1- fn->y1);
     SI   bod_cor= l[i]->b->h ();
     SI   top_cor= max (0, fn->y2- l[i]->b->y2);
+    if (l[i]->type != PAGE_LINE_ITEM) bot_cor= bod_cor= top_cor= 0;
     body_ht  << (space (l[i]->b->h()) + l[i]->spc);
     body_cor << space (bot_cor, bod_cor, top_cor);
     body_tot << (i==0? space(0): body_tot[i-1]) + body_ht[i];
@@ -85,6 +99,7 @@ new_breaker_rep::new_breaker_rep (
     space foot_spc (0);
     space float_spc (0);
     space wide_spc (0);
+    space break_spc (0);
     array<insertion> ins_here;
     for (int j=0; j<k; j++) {
       lazy_vstream lvs= (lazy_vstream) l[i]->fl[j];
@@ -98,6 +113,8 @@ new_breaker_rep::new_breaker_rep (
           wide_spc += ins->ht + fn_sep;
         else if (is_tuple (lvs->channel, "float"))
           wide_spc += ins->ht + float_sep;
+        else if (is_tuple (lvs->channel, "if-page-break"))
+          break_spc += ins->ht + as_space (lvs->channel[2]);
       }
       else {
         if (is_tuple (lvs->channel, "footnote"))
@@ -106,6 +123,8 @@ new_breaker_rep::new_breaker_rep (
           if (float_here (lvs->channel)) float_spc += ins->ht + 2*float_sep;
           else float_spc += ins->ht + float_sep;
         }
+        else if (is_tuple (lvs->channel, "if-page-break"))
+          break_spc += ins->ht + as_space (lvs->channel[2]);
       }
     }
     ins_list  << ins_here;
@@ -115,6 +134,7 @@ new_breaker_rep::new_breaker_rep (
     float_tot << (i==0? space(0): float_tot[i-1] + float_ht[i]);
     wide_ht   << wide_spc;
     wide_tot  << (i==0? space(0): wide_tot[i-1] + wide_ht[i]);
+    break_ht  << break_spc;
 
     if (i>0 && l[i]->nr_cols != l[i-1]->nr_cols) same= i;
     col_number << l[i]->nr_cols;
@@ -166,6 +186,7 @@ new_breaker_rep::make_insertion (lazy_vstream lvs, path p) {
     SI   bot_cor= max (0, l[i]->b->y1- fn->y1);
     SI   bod_cor= l[i]->b->h ();
     SI   top_cor= max (0, fn->y2- l[i]->b->y2);
+    if (l[i]->type != PAGE_LINE_ITEM) bot_cor= bod_cor= top_cor= 0;
     ins_ht  << (space (l[i]->b->h()) + l[i]->spc);
     ins_cor << space (bot_cor, bod_cor, top_cor);
     ins_tot << (i==0? space(0): ins_tot[i-1]) + ins_ht[i];
@@ -214,6 +235,7 @@ new_breaker_rep::compute_space (path b1, path b2) {
   else spc= body_tot[i2-2] - body_tot[i1-1];
   SI top_cor= body_cor[i1]->max;
   SI bot_cor= body_cor[i2-1]->min;
+  spc += break_ht[i1];
   spc += space (top_cor + body_cor[i2-1]->def + bot_cor);
 
   if (foot_tot[i2-1]->def > (i1==0? 0: foot_tot[i1-1]->def)) {
@@ -600,6 +622,12 @@ new_breaker_rep::assemble (path start, path end) {
     }
   }
   int pos= start->item;
+  if (pos < N(ins_list))
+    for (int j=0; j<N(ins_list[pos]); j++)
+      if (is_tuple (ins_list[pos][j]->type, "if-page-break")) {
+        pg << ins_list[pos][j];
+        pg << as_space (ins_list[pos][j]->type[2]);
+      }
   bool several= false;
   space done= space (0);
   while (!is_nil (here)) {

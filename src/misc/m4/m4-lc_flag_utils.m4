@@ -42,7 +42,8 @@ AC_DEFUN([LC_SUBST],[
   fi
 # adaptation layer remove when finished
   AC_SUBST([$1_CFLAGS],["$$1_CXXFLAGS $$1_CPPFLAGS"])
-  AC_SUBST([$1_LDFLAGS],[""])
+  AC_SUBST([$1_LDFLAGS])
+  AC_SUBST([$1_LIBS])
 ])
 
 # remove unwanted space in well know flags
@@ -214,12 +215,12 @@ m4_define([merged_flags],[[LDFLAGS],[LIBS]])
 m4_define([all_flags],[superseded_flags, merged_flags])
 
 # generic transfert flag $1 within the superseded list $2 and the merged list $3
-AC_DEFUN([_LC_TRANSFERT_FLAGS],
-  [m4_foreach([_tmp1], [$2], [ 
-    _tmp1="$BASE_[]_tmp1 $$1_[]_tmp1"
-  ])]
-  [m4_foreach([_tmp1], [$3], [LC_MERGE_FLAGS([$$1_[]_tmp1], [_tmp1])])]
-)
+m4_define([_LC_TRANSFERT_FLAGS],[
+  m4_foreach([_tmp1], [$2], [
+  	_tmp1="$BASE_[]_tmp1 $$1_[]_tmp1"
+  ])
+  m4_foreach([_tmp1], [$3], [LC_MERGE_FLAGS([$$1_[]_tmp1], [_tmp1])])
+])
 
 # set compile flags from the LIBRARY ($1) flags into standard flags
 # in order to test static linking set the -static if needed
@@ -230,7 +231,6 @@ AC_DEFUN([LC_SET_FLAGS],[
 # merge the LIBRARY ($1) flags into general compile flags
 AC_DEFUN([LC_COMBINE_FLAGS],[
   _LC_TRANSFERT_FLAGS([$1],[],[merged_flags])
-  unset ${![$0]_*}
 ])
 
 # supersede the $2 empty flags  by $1 flags 
@@ -295,7 +295,9 @@ AC_DEFUN([LC_SCATTER_FLAGS],[
       -l*@:}@ LC_APPEND_FLAG([$[$0]_flag],[[$0]_LIBS]);;
       -L*|-framework*@:}@ LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[LDFLAGS])]);;
       -I*|-U*|-D*@:}@ LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[CPPFLAGS])]);;
-      -F*@:}@ LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[CPPFLAGS])]);;
+      -F*@:}@ LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[CPPFLAGS])])
+              LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[LDFLAGS])])
+      ;;
       -Wl,-F*@:}@ LC_APPEND_FLAG([$[$0]_flag],[lc_libname([$2],[LDFLAGS])]);;
       -Wl,*@:}@ AC_MSG_WARN(Flag $[$0]_flag dropped for lib $2);;
       -*@:}@ 

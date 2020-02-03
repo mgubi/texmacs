@@ -14,9 +14,12 @@
 #include "qt_utilities.hpp"
 #include "qt_simple_widget.hpp"
 #include "converter.hpp"
+#include "boot.hpp"
+#include "scheme.hpp"
 
 #include "config.h"
 
+#include <QDebug>
 #include <QEvent>
 #include <QResizeEvent>
 #include <QKeyEvent>
@@ -24,6 +27,15 @@
 #include <QMouseEvent>
 #include <QFocusEvent>
 #include <QPainter>
+#include <QApplication>
+
+#include <QBuffer>
+#include <QMimeData>
+#include <QByteArray>
+#include <QImage>
+#include <QUrl>
+#include <QFileInfo>
+
 
 hashmap<int,string> qtkeymap (0);
 hashmap<int,string> qtdeadmap (0);
@@ -162,7 +174,8 @@ QTMWidget::QTMWidget (QWidget* _parent, qt_widget _tmwid)
   setObjectName (to_qstring ("QTMWidget" * as_string (QTMWcounter++)));// What is this for? (maybe only debugging?)
   setFocusPolicy (Qt::StrongFocus);
   setAttribute (Qt::WA_InputMethodEnabled);
-  surface()->setMouseTracking (true);
+  surface ()->setMouseTracking (true);
+  surface ()->setAcceptDrops (true);
   
   if (DEBUG_QT)
     debug_qt << "Creating " << from_qstring(objectName()) << " of widget "
@@ -237,6 +250,21 @@ QTMWidget::paintEvent (QPaintEvent* event) {
 }
 
 void
+set_shift_preference (int key_code, char shifted) {
+  set_user_preference ("shift-" * as_string (key_code), string (shifted));
+}
+
+bool
+has_shift_preference (int key_code) {
+  return has_user_preference ("shift-" * as_string (key_code));
+}
+
+string
+get_shift_preference (char key_code) {
+  return get_user_preference ("shift-" * as_string (key_code));
+}
+
+void
 QTMWidget::keyPressEvent (QKeyEvent* event) {
   if (is_nil (tmwid)) return;
   initkeymap();
@@ -273,11 +301,11 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
 * Hence, when "native modifiers" are (ControlLeft | AltRight) 
 * we clear Qt's Ctrl+Alt modifiers
 */
-    if ((event->nativeModifiers() & (ControlLeft | AltRight)) == (ControlLeft | AltRight)){
-		if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "assuming it's an AltGr key code"<<LF;
-		mods &= ~Qt::AltModifier;
-		mods &= ~Qt::ControlModifier;
-	}
+    if ((event->nativeModifiers() & (ControlLeft | AltRight)) == (ControlLeft | AltRight)) {
+      if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "assuming it's an AltGr key code"<<LF;
+      mods &= ~Qt::AltModifier;
+      mods &= ~Qt::ControlModifier;
+    }
 #endif
     if (qtkeymap->contains (key)) {
       r = qtkeymap[key];
@@ -289,15 +317,43 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
     else {
         // We need to use text(): Alt-{5,6,7,8,9} are []|{} under MacOS, etc.
       QString nss = event->text();
+      unsigned int   kc  = event->nativeVirtualKey();
       unsigned short unic= nss.data()[0].unicode();
+      /*
+      debug_qt << "key  : " << key << LF;
+      debug_qt << "text : " << event->text().toLatin1().data() << LF;
+      debug_qt << "count: " << event->text().count() << LF;
+      if (mods & Qt::ShiftModifier) debug_qt << "shift\n";
+      if (mods & Qt::MetaModifier) debug_qt << "meta\n";
+      if (mods & Qt::ControlModifier) debug_qt << "control\n";
+      if (mods & Qt::KeypadModifier) debug_qt << "keypad\n";
+      if (mods & Qt::AltModifier) debug_qt << "alt\n";
+      cout << kc << ", " << ((mods & Qt::ShiftModifier) != 0)
+           << " -> " << unic << LF;
+      */
+      if (unic > 32 && unic < 255 &&
+          (mods & Qt::ShiftModifier) != 0 &&
+          (mods & Qt::ControlModifier) == 0 &&
+          (mods & Qt::AltModifier) == 0 &&
+          (mods & Qt::MetaModifier) == 0)
+        set_shift_preference (kc, (char) unic);
       if (unic < 32 && key < 128 && key > 0) {
-        if (((char) key) >= 'A' && ((char) key) <= 'Z') {
+        // NOTE: For some reason, the 'shift' modifier key is not applied
+        // to 'key' when 'control' is pressed as well.  We perform some
+        // dirty hacking to figure out the right shifted variant of a key
+        // by ourselves...
+        if (is_upcase ((char) key)) {
           if ((mods & Qt::ShiftModifier) == 0)
-            key= (int) (key + ((int) 'a') - ((int) 'A'));
+            key= (int) locase ((char) key);
         }
+        else if (has_shift_preference (kc) &&
+                 (mods & Qt::ShiftModifier) != 0 &&
+                 (mods & Qt::ControlModifier) != 0)
+          key= (int) (unsigned char) get_shift_preference (kc) [0];
         mods &=~ Qt::ShiftModifier;
         r= string ((char) key);
-      } else {
+      }
+      else {
         switch (unic) {
           case 96:   r= "`"; 
             // unicode to cork conversion not appropriate for this case...
@@ -316,7 +372,7 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
           case 0x33e: r= "tilde"; break;
           default:
             QByteArray buf= nss.toUtf8();
-            string rr (buf.constData(), buf.count());
+            string rr (buf.constData(), buf.size());
             string tstr= utf8_to_cork (rr);
             // HACK! The encodings defined in langs/encoding and which
             // utf8_to_cork uses (via the converters loaded in
@@ -329,7 +385,7 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
             else
               r= tstr;
             if (r == "less") r= "<";
-            else if (r == "gtr")r= ">";
+            else if (r == "gtr") r= ">";
         }
 #ifdef Q_OS_MAC
           // Alt produces many symbols in Mac keyboards: []|{} etc.
@@ -572,8 +628,10 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
 QVariant 
 QTMWidget::inputMethodQuery (Qt::InputMethodQuery query) const {
   switch (query) {
-    case Qt::ImMicroFocus :
-      return QVariant (QRect (cursor_pos - tm_widget()->backing_pos, QSize (5,5)));
+    case Qt::ImMicroFocus : {
+      const QPoint &topleft= cursor_pos - tm_widget()->backing_pos + surface()->geometry().topLeft();
+      return QVariant (QRect (topleft, QSize (5, 5)));
+    }
     default:
       return QWidget::inputMethodQuery (query);
   }
@@ -660,3 +718,118 @@ QTMWidget::sizeHint () const {
   if (!is_nil (tmwid)) tm_widget()->handle_get_size_hint (w, h);
   return to_qsize (w, h);
 }
+
+void 
+QTMWidget::dragEnterEvent (QDragEnterEvent *event)
+{
+  if (is_nil (tmwid)) return;
+  const QMimeData *md = event->mimeData();
+
+  if (md->hasText() ||
+      md->hasUrls() ||
+      md->hasImage() ||
+      md->hasFormat("application/pdf") ||
+      md->hasFormat("application/postscript"))
+      event->acceptProposedAction();
+}
+
+
+// cache to transfer drop data to the editor
+// via standard mouse events, see dropEvent below
+
+int drop_payload_serial  =0;
+hashmap<int, tree> payloads;
+
+void
+QTMWidget::dropEvent (QDropEvent *event)
+{
+  if (is_nil (tmwid)) return;
+  
+  QPoint point = event->pos () + origin ();
+  coord2 pt= from_qpoint (point);
+
+  //qDebug() << event;
+  tree doc (CONCAT);
+  const QMimeData *md= event->mimeData ();
+  QByteArray buf;
+
+  if (md->hasUrls ()) {
+    QList<QUrl> l= md->urls ();
+//    qDebug() << l;
+    for (int i=0; i<l.size (); i++) {
+      string name;
+#ifdef OS_MACOS
+      name= from_qstring (fromNSUrl (l[i]));
+#else
+      name= from_qstring (l[i].toLocalFile ());
+#endif
+      string extension = suffix (name);
+      if ((extension == "eps") || (extension == "ps")   ||
+          (extension == "pdf") || (extension == "png")  ||
+          (extension == "jpg") || (extension == "jpeg")) {
+        string w, h;
+        qt_pretty_image_size (url_system (name), w, h);
+        tree im (IMAGE, name, w, h, "", "");
+        doc << im;
+      } else {
+        doc << name;
+      }
+    }
+  } else if (md->hasImage ()) {
+    QBuffer qbuf (&buf);
+    QImage image= qvariant_cast<QImage> (md->imageData());
+    QSize size= image.size ();
+    qbuf.open (QIODevice::WriteOnly);
+    image.save (&qbuf, "PNG");
+    int ww= size.width (), hh= size.height ();
+    string w, h;
+    qt_pretty_image_size (ww, hh, w, h);
+    tree t (IMAGE, tree (RAW_DATA, string (buf.constData (), buf.size()), "png"),
+            w, h, "", "");
+    doc << t;
+  } else if (md->hasFormat("application/postscript")) {
+    buf= md->data("application/postscript");
+    tree t (IMAGE, tree (RAW_DATA, string (buf.constData (), buf.size ()), "ps"),
+                   "", "", "", "");
+    doc << t;
+  } else if (md->hasFormat("application/pdf")) {
+    buf= md->data("application/pdf");
+    tree t (IMAGE, tree (RAW_DATA, string (buf.constData (), buf.size ()), "pdf"),
+                   "", "", "", "");
+    doc << t;
+  }  else if (md->hasText ()) {
+    buf= md->text ().toUtf8 ();
+    doc << string (buf.constData (), buf.size ());
+  }
+
+  if (N(doc)>0) {
+    if (N(doc) == 1)
+      doc= doc[0];
+    else {
+      tree sec (CONCAT, doc[0]);
+      for (int i=1; i<N(doc); i++)
+        sec << " " << doc[i];
+      doc= sec;
+    }
+    int ticket= drop_payload_serial++;
+    payloads (ticket)= doc;
+    the_gui->process_mouse (tm_widget(), "drop", pt.x1, pt.x2,
+                            ticket, texmacs_time ());
+    event->acceptProposedAction();
+  }
+}
+
+/*
+void
+QTMWidget::wheelEvent(QWheelEvent *event) {
+  if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
+    if (event->delta() > 0) {
+      the_gui->process_keypress (tm_widget(), string("C-+"), texmacs_time());
+    } else {
+      the_gui->process_keypress (tm_widget(), string("C--"), texmacs_time());
+    }
+  } else {
+    QAbstractScrollArea::wheelEvent(event);
+  }
+}
+*/

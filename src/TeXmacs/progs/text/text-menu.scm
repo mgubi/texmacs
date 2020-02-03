@@ -14,7 +14,8 @@
 (texmacs-module (text text-menu)
   (:use (text text-edit)
         (text text-structure)
-        (generic document-menu)))
+        (generic document-menu)
+	(generic document-style)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Format menu in text mode
@@ -37,8 +38,9 @@
   (group "Paragraph")
   (link paragraph-menu)
   ---
-  (group "Page")
-  (link page-menu))
+  (when (in-main-flow?)
+    (group "Page")
+    (link page-menu)))
 
 (menu-bind compressed-text-format-menu
   (if (new-fonts?)
@@ -46,7 +48,8 @@
   (if (not (new-fonts?))
       (-> "Font" (link text-font-menu)))
   ("Paragraph" (open-paragraph-format))
-  ("Page" (open-page-format))
+  (when (in-main-flow?)
+    ("Page" (open-page-format)))
   (when (inside? 'table)
     ("Cell" (open-cell-properties))
     ("Table" (open-table-properties)))
@@ -124,7 +127,7 @@
   ("Subsection" (make-section 'subsection))
   ("Subsubsection" (make-section 'subsubsection))
   ---
-  ("Paragraph" (make-section 'paragraph))
+  ("Paragraph::section" (make-section 'paragraph))
   ("Subparagraph" (make-section 'subparagraph)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -181,14 +184,36 @@
   ("Lines around" (make 'bothlined))
   ("Framed" (make 'framed))
   ("Ornamented" (make 'ornamented))
-  (if (style-has? "ornaments-dtd")
+  ---
+  (-> "Material"
+      ("Manila paper" (make* 'manila-paper "ornaments"))
+      ("Rough paper" (make* 'rough-paper "ornaments"))
+      ("Ridged paper" (make* 'ridged-paper "ornaments"))
+      ("Pine" (make* 'pine "ornaments"))
+      ("Granite" (make* 'granite "ornaments"))
+      ("Metal" (make* 'metal "ornaments")))
+  (-> "Art frame"
+      ("Carved wood" (make* 'carved-wood-frame "std-frame"))
+      ("Decorated wood" (make* 'decorated-wood-frame "std-frame"))
+      ("Black floral I" (make* 'black-floral1-frame "std-frame"))
+      ("Black floral II" (make* 'black-floral2-frame "std-frame")))
+  (-> "Shadow"
+      (group "Contour")
+      ("Drop" (make* 'drop-contour "std-shadow"))
+      ("Bend in" (make* 'bend-in-contour "std-shadow"))
+      ("Bend out" (make* 'bend-out-contour "std-shadow"))
+      ("Bend diagonal" (make* 'diagonal-bend-in-contour "std-shadow"))
       ---
-      ("Manila paper" (make 'manila-paper))
-      ("Rough paper" (make 'rough-paper))
-      ("Ridged paper" (make 'ridged-paper))
-      ("Pine" (make 'pine))
-      ("Granite" (make 'granite))
-      ("Metal" (make 'metal))))
+      (group "South east")
+      ("Drop" (make* 'drop-shadow "std-shadow"))
+      ("Bend in" (make* 'bend-in-shadow "std-shadow"))
+      ("Bend out" (make* 'bend-out-shadow "std-shadow"))
+      ("Bend bottom" (make* 'half-bend-in-shadow "std-shadow"))
+      ("Bend corner" (make* 'quarter-bend-in-shadow "std-shadow"))
+      ---
+      (group "South")
+      ("Drop" (make* 'drop-down "std-shadow"))
+      ("Bend bottom" (make* 'half-bend-in-down "std-shadow"))))
 
 (menu-bind code-menu
   ("Algorithm" (make 'algorithm))
@@ -200,6 +225,8 @@
   ---
   (-> "Inline code"
       ("C++" (make 'cpp))
+      ("Fortran" (make 'fortran))
+      ("Java" (make 'java))
       ("Mathemagix" (make 'mmx))
       ("Python" (make 'python))
       ("R" (make 'r))
@@ -210,6 +237,8 @@
       ("Verbatim" (make 'verbatim)))
   (-> "Block of code"
       ("C++" (make 'cpp-code))
+      ("Fortran" (make 'fortran-code))
+      ("Java" (make 'java-code))
       ("Mathemagix" (make 'mmx-code))
       ("Python" (make 'python-code))
       ("R" (make 'r-code))
@@ -225,28 +254,30 @@
 
 (menu-bind note-menu
   (when (not (or (inside? 'float) (inside? 'footnote)))
-    ("Footnote" (make-wrapped 'footnote))
+    (when (in-main-flow?)
+      ("Footnote" (make-wrapped 'footnote)))
     (when (not (selection-active-non-small?))
       ("Marginal note" (make-marginal-note)))
-    ;;("Balloon" (make-balloon))
+    ("Balloon" (make-balloon))
     ---
-    ("Floating object" (make-insertion "float"))
-    (when (not (selection-active-non-small?))
-      ("Floating phantom" (insert '(phantom-float "float" "hf"))))
-    (when (not (selection-active-non-small?))
-      ("Floating figure"
-       (wrap-selection-small
+    (when (in-main-flow?)
+      ("Floating object" (make-insertion "float"))
+      (when (not (selection-active-non-small?))
+        ("Floating phantom" (insert '(phantom-float "float" "hf"))))
+      (when (not (selection-active-non-small?))
+        ("Floating figure"
+         (wrap-selection-small
+           (make-insertion "float")
+           (insert-go-to '(big-figure "" (document "")) '(0 0))))
+        ("Floating table"
+         (wrap-selection-small
+           (make-insertion "float")
+           (insert-go-to '(big-table "" (document "")) '(0 0))
+           (make 'tabular))))
+      ("Floating algorithm"
+       (wrap-selection-any
          (make-insertion "float")
-         (insert-go-to '(big-figure "" (document "")) '(0 0))))
-      ("Floating table"
-       (wrap-selection-small
-         (make-insertion "float")
-         (insert-go-to '(big-table "" (document "")) '(0 0))
-         (make 'tabular))))
-    ("Floating algorithm"
-     (wrap-selection-any
-       (make-insertion "float")
-       (make 'algorithm)))))
+         (make 'algorithm))))))
 
 (menu-bind position-marginal-note-menu
   (group "Horizontal position")
@@ -686,12 +717,10 @@
   ("Subtitle" (make-doc-data-element 'doc-subtitle))
   ("Author" (make-doc-data-element 'doc-author))
   ("Date" (make-doc-data-element 'doc-date))
-  ("Today"
-   (begin (make-doc-data-element 'doc-date) (make 'date 0)))
-  ("Miscellanous" (make-doc-data-element 'doc-misc))
+  ("Today" (begin (make-doc-data-element 'doc-date) (make 'date 0)))
+  ("Miscellaneous" (make-doc-data-element 'doc-misc))
   ("Note" (make-doc-data-element 'doc-note))
-  ("TeXmacs notice" (begin (make-doc-data-element 'doc-note)
-                           (make 'with-TeXmacs-text))))
+  (-> "Cite TeXmacs" (link cite-texmacs-menu)))
 
 (tm-menu (focus-title-hidden-menu)
   ("Running title" (make-doc-data-element 'doc-running-title))
@@ -716,7 +745,9 @@
       (link focus-title-menu)
       (-> "Hidden" (link focus-title-hidden-menu)))
   (=> (balloon (icon "tm_focus_prefs.xpm") "Title presentation options")
-      (link focus-title-option-menu)))
+      (link focus-title-option-menu))
+  (=> (balloon (icon "tm_like.xpm") "Cite TeXmacs")
+      (link cite-texmacs-menu)))
 
 (tm-menu (focus-ancestor-menu t)
   (:require (doc-title-context? t))
@@ -858,12 +889,13 @@
 (tm-menu (focus-extra-icons t)
   (:require (section-context? t))
   (mini #t
+    //
     (=> (eval (tm/section-get-title-string t))
         (link focus-section-menu))))
 
 (tm-define (child-proposals t i)
-  (:require (and (tree-in? t '(bibliography bibliography*)) (== i 1)))
-  (bib-standard-styles))
+  (:require (and (tree-in? t '(bibliography bibliography*)) (<= i 1)))
+  (if (== i 0) (list "bib" :other) (rcons (bib-standard-styles) :other)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menu for lists
@@ -881,9 +913,13 @@
   (:require (or (in? l (enunciation-tag-list))
                 (in? l (render-enunciation-tag-list))
                 (in? l '(proof render-proof))))
-  (list "number-europe" ;; "number-us"
-        "number-long-article"
-        "framed-theorems" "hanging-theorems"))
+  (append (list "number-europe" ;; "number-us"
+                "number-long-article"
+                "framed-theorems"
+                "hanging-theorems")
+          (if (style-has? "base-deco-dtd")
+              (list "shadowed-frames")
+              (list))))
 
 (tm-menu (focus-extra-menu t)
   (:require (dueto-supporting-context? t))
@@ -895,7 +931,8 @@
   (:require (dueto-supporting-context? t))
   //
   (when (not (dueto-added? t))
-    ("Due to" (dueto-add t))))
+    (mini #t
+      ("Due to" (dueto-add t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menus for algorithms
@@ -993,6 +1030,23 @@
   (:require (in? l (numbered-unnumbered-append
                      (append (small-figure-tag-list) (big-figure-tag-list)))))
   (list "captions-above"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Detached notes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-menu (focus-toggle-menu t)
+  (:require (detached-note-context? t))
+  ((check "Named" "v" (custom-note-context? (focus-tree)))
+   (note-toggle-custom t))
+  (dynamic (former t)))
+
+(tm-menu (focus-toggle-icons t)
+  (:require (detached-note-context? t))
+  ((check (balloon (icon "tm_small_textual.xpm") "Use custom note symbol") "v"
+          (custom-note-context? (focus-tree)))
+   (note-toggle-custom t))
+  (dynamic (former t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Possibility to rename titled environments

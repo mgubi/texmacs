@@ -19,6 +19,8 @@
 #include <QString>
 #include <QColor>
 #include <QFont>
+#include <QUrl>
+
 
 class QStringList;
 class QKeySequence;
@@ -80,16 +82,22 @@ string  from_qstring_utf8 (const QString & s);
 QString qt_translate (const string& s);
 
 
+#ifdef OS_MACOS
+QString fromNSUrl(const QUrl &url);
+#endif
+
 /******************************************************************************
  * File formats and their conversion. Other stuff.
  ******************************************************************************/
 
 bool qt_supports (url u);
 bool qt_image_size (url image, int& w, int& h);
+bool qt_native_image_size (url image, int& w, int& h);
+void qt_pretty_image_size (int ww, int hh, string& w, string& h);
+bool qt_pretty_image_size (url image, string& w, string& h);
 void qt_convert_image (url image, url dest, int w =0, int h =0);
 void qt_image_to_eps (url image, url eps, int w_pt =0, int h_pt =0, int dpi= 0);
 string qt_image_to_eps (url image, int w_pt =0, int h_pt =0, int dpi= 0);
-void qt_image_data (url image, int& w, int&h, string& data, string& palette, string& mask);
 void qt_image_to_pdf (url image, url pdf, int w_pt =0, int h_pt =0, int dpi =0);
 
 string qt_application_directory ();

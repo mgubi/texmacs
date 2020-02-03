@@ -29,6 +29,7 @@ public:
   SI lw, bw, rw, tw;
   double lext, bext, rext, text;
   SI lpad, bpad, rpad, tpad;
+  SI lcor, bcor, rcor, tcor;
   brush bg, xc;
   array<brush> border;
 
@@ -37,11 +38,13 @@ public:
                            SI lw2, SI bw2, SI rw2, SI tw2,
 			   double lx, double bx, double rx, double tx,
                            SI lpad2, SI bpad2, SI rpad2, SI tpad2,
+                           SI lcor2, SI bcor2, SI rcor2, SI tcor2,
 			   brush bg2, brush xc2, array<brush> border2):
     shape (shape2), tst (tst2),
     lw (lw2), bw (bw2), rw (rw2), tw (tw2),
     lext (lx), bext (bx), rext (rx), text (tx),
     lpad (lpad2), bpad (bpad2), rpad (rpad2), tpad (tpad2),
+    lcor (lcor2), bcor (bcor2), rcor (rcor2), tcor (tcor2),
     bg (bg2), xc (xc2), border (border2) {}
   friend class ornament_parameters;
 };
@@ -53,11 +56,13 @@ class ornament_parameters {
                        SI lw2, SI bw2, SI rw2, SI tw2, 
 		       double lx, double bx, double rx, double tx,
 		       SI lpad2, SI bpad2, SI rpad2, SI tpad2,
+                       SI lcor2, SI bcor2, SI rcor2, SI tcor2,
 		       brush bg2, brush xc2, array<brush> border2):
     rep (tm_new<ornament_parameters_rep> (shape2, tst2,
                                           lw2, bw2, rw2, tw2,
 					  lx, bx, rx, tx,
                                           lpad2, bpad2, rpad2, tpad2,
+                                          lcor2, bcor2, rcor2, tcor2,
 					  bg2, xc2, border2)) {}
 };
 CONCRETE_CODE(ornament_parameters);
@@ -68,7 +73,32 @@ copy (ornament_parameters ps) {
                               ps->lw, ps->bw, ps->rw, ps->tw,
 			      ps->lext, ps->bext, ps->rext, ps->text,
                               ps->lpad, ps->bpad, ps->rpad, ps->tpad,
+                              ps->lcor, ps->bcor, ps->rcor, ps->tcor,
 			      ps->bg, ps->xc, ps->border);
+}
+
+class art_box_parameters_rep: concrete_struct {
+public:
+  tree data;
+  SI lpad, bpad, rpad, tpad;
+
+  inline
+  art_box_parameters_rep (tree data2, SI lpad2, SI bpad2, SI rpad2, SI tpad2):
+    data (data2), lpad (lpad2), bpad (bpad2), rpad (rpad2), tpad (tpad2) {}
+  friend class art_box_parameters;
+};
+
+class art_box_parameters {
+  CONCRETE(art_box_parameters);
+  inline
+  art_box_parameters (tree data2, SI lpad2, SI bpad2, SI rpad2, SI tpad2):
+    rep (tm_new<art_box_parameters_rep> (data2, lpad2, bpad2, rpad2, tpad2)) {}
+};
+CONCRETE_CODE(art_box_parameters);
+
+inline art_box_parameters
+copy (art_box_parameters ps) {
+  return art_box_parameters (ps->data, ps->lpad, ps->bpad, ps->rpad, ps->tpad);
 }
 
 /******************************************************************************
@@ -122,6 +152,7 @@ box cell_box (path ip, box b, SI x0, SI y0, SI x1, SI y1, SI x2, SI y2,
 box remember_box (path ip, box b);
 box highlight_box (path ip, box b, box xb, ornament_parameters ps);
 box highlight_box (path ip, box b, SI w, brush col, brush sunc, brush shad);
+box art_box (path ip, box b, art_box_parameters ps);
 
 box frac_box (path ip, box b1, box b2, font fn, font sfn, pencil pen);
 box sqrt_box (path ip, box b1, box b2, box sqrtb, font fn, pencil pen);
@@ -144,6 +175,7 @@ box symbol_box (path ip, box b, int n);
 box shorter_box (path ip, box b, int n);
 box frozen_box (path ip, box b);
 box move_box (path ip, box b, SI x, SI y, bool chf= false, bool bigf= false);
+box move_delimiter_box (path ip, box b, SI x, SI y, SI bot, SI top);
 box shift_box (path ip, box b, SI x, SI y, bool chf= false, bool bigf= false);
 box resize_box (path ip, box b, SI x1, SI y1, SI x2, SI y2,
 		bool chf= false, bool adjust= false);
@@ -158,9 +190,11 @@ box page_box (path ip, tree page, int page_nr, brush bgc, SI w, SI h,
 	      array<box> bs  , array<SI> bs_x  , array<SI> bs_y,
 	      array<box> decs, array<SI> decs_x, array<SI> decs_y);
 box page_border_box (path ip, box pb, color tmb, SI l, SI r, SI b, SI t, SI pix);
+box crop_marks_box (path ip, box pb, SI w, SI h, SI lw, SI ll);
 box locus_box (path ip, box b, list<string> ids, SI pixel);
 box locus_box (path ip, box b, list<string> ids, SI pixel, string ref, string anchor);
 box macro_box (path ip, box b, font big_fn= font (), int btype= STD_BOX);
+box macro_delimiter_box (path ip, box b, font fn, SI dy);
 box tag_box (path ip, path tip, box b, tree keys);
 box note_box (path ip, box b, box note, SI nx, SI ny);
 

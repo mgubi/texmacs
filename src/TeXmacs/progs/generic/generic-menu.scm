@@ -13,10 +13,10 @@
 
 (texmacs-module (generic generic-menu)
   (:use (utils edit variants)
-	(utils edit selections)
-	(generic generic-edit)
-	(generic format-edit)
-	(generic format-geometry-edit)
+        (utils edit selections)
+        (generic generic-edit)
+        (generic format-edit)
+        (generic format-geometry-edit)
         (generic document-edit)
         (source source-edit)))
 
@@ -28,10 +28,15 @@
   (variants-of (tree-label t)))
 
 (tm-define (focus-tag-name l)
-  (if (symbol-unnumbered? l)
-      (focus-tag-name (symbol-drop-right l 1))
-      (with r (upcase-first (tree-name (tree l)))
-        (string-replace r "-" " "))))
+  (let* ((s (symbol->string l))
+         (th (member->theme s)))
+    (if th
+        (with ns (string-drop s (+ (string-length th) 1))
+          (focus-tag-name (string->symbol ns)))
+        (if (symbol-unnumbered? l)
+            (focus-tag-name (symbol-drop-right l 1))
+            (with r (upcase-first (tree-name (tree l)))
+              (string-replace r "-" " "))))))
 
 (tm-menu (focus-variant-menu t)
   (for (v (focus-variants-of t))
@@ -115,6 +120,15 @@
   (cond ((== type "length") (rich-length->tm s))
 	(else s)))
 
+(tm-menu (string-input-name t i)
+  (let* ((name (tree-child-name* t i))
+         (s (string-append (upcase-first name) ":")))
+    (assuming (== name "")
+      //)
+    (assuming (!= name "")
+      (glue #f #f 3 0)
+      (mini #t (group (eval s))))))    
+
 (tm-menu (string-input-icon t i)
   (let* ((name (tree-child-name* t i))
          (type (tree-child-type t i))
@@ -122,37 +136,51 @@
          (active? (inputter-active? (tree-ref t i) type))
          (props (child-proposals t i))
 	 (in (if active? (inputter-decode (tree-ref t i) type) "n.a."))
-         (in* (if active? in ""))
-         (ins (if props (cons in props) (list in)))
          (fm (type->format type))
          (w (type->width type))
          (setter (lambda (x)
-		   (when x
+                   (when x
                      (tree-set (focus-tree) i (inputter-encode x type))
                      (focus-tree-modified (focus-tree))))))
-    (assuming (== name "")
-      //)
-    (assuming (!= name "")
-      (glue #f #f 3 0)
+    (dynamic (string-input-name t i))
+    (assuming props
       (mini #t
-        (if (and (!= type "color") props)
-            (=> (eval s)
-                (for (prop props)
-                  ((eval prop) (setter prop)))))
-        (if (or (== type "color") (not props))
-            (group (eval s)))))
-    (if (!= type "color")
-        (when active?
-          (mini #t
-            (input (setter answer) fm ins w))))
-    (if (== type "color")
-        (=> (color (tree->stree (tree-ref t i)) #f #f 24 16)
-            (pick-background "" (setter answer))
-            ---
-            ("Palette" (interactive-color setter '()))
-            ("Pattern" (open-pattern-selector setter "1cm"))
-            ("Other" (interactive setter
-                       (list (upcase-first name) "color" in*)))))))
+        (=> (eval in)
+            (for (prop props)
+              (assuming (string? prop)
+                ((eval prop) (setter prop)))
+              (assuming (== prop :other)
+                ---
+                ("Other"
+                 (interactive setter (list (upcase-first name) fm in))))))))
+    (assuming (not props)
+      (when active?
+        (mini #t
+          (input (setter answer) fm (list in) w))))))
+
+(tm-menu (string-input-icon t i)
+  (:require (== (tree-child-type t i) "color"))
+  (let* ((name (tree-child-name* t i))
+         (s (string-append (upcase-first name) ":"))
+         (active? (inputter-active? (tree-ref t i) "color"))
+	 (in (if active? (inputter-decode (tree-ref t i) "color") ""))
+         (setter (lambda (x)
+                   (when x
+                     (tree-set (focus-tree) i (inputter-encode x "color"))
+                     (focus-tree-modified (focus-tree))))))
+    (dynamic (string-input-name t i))
+    (=> (color (tree->stree (tree-ref t i)) #f #f 24 16)
+        (pick-background "" (setter answer))
+        ---
+        ("Palette" (interactive-color setter '()))
+        ("Pattern" (open-pattern-selector setter "1cm"))
+        ("Picture" (open-background-picture-selector setter))
+        ("Other" (interactive setter
+                   (list (upcase-first name) "color" in))))))
+
+(tm-define (child-proposals t i)
+  (:require (== (tree-child-type t i) "duration"))
+  (list "0.25s" "0.5s" "1s" "1.5s" "2s" "2.5s" "3s" "4s" "5s" "10s" :other))
 
 (tm-menu (string-input-menu t i)
   (let* ((name (tree-child-long-name* t i))
@@ -178,115 +206,241 @@
       (mini #t (group (eval (string-append s ":")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unified accessors for local and global parameters
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (parameter-test? l val mode)
+  (cond ((not (tm? val)) #f)
+        ((== mode :global)
+         (== (get-init-tree l) (string->tree val)))
+        ((and (func? mode :local) (tree-is? (focus-tree) (cadr mode)))
+         (== (tree-with-get (focus-tree) l) (string->tree val)))
+        (else #f)))
+
+(tm-define (parameter-set l val mode)
+  (cond ((not (tm? val)) (noop))
+        ((== mode :global)
+         (set-init-env l val))
+        ((and (func? mode :local) (tree-is? (focus-tree) (cadr mode)))
+         (tree-with-set (focus-tree) l val))))
+
+(tm-define (parameter-interactive-set l mode)
+  (:interactive #t)
+  (interactive (lambda (s) (parameter-set l s mode))
+    (list (or (logic-ref env-var-description% l) l) "string"
+          (parameter-get l mode))))
+
+(define (parameter-get* l mode)
+  (cond ((== mode :global)
+         (tm->stree (get-init-tree l)))
+        ((func? mode :local)
+         (tm->stree (get-env-tree l)))
+        (else "")))
+
+(tm-define (parameter-get l mode)
+  (with t (parameter-get* l mode)
+    (if (and (tm-func? t 'macro 1) (tm-atomic? (tm-ref t 0)))
+        (tm-ref t 0)
+        t)))
+
+(tm-define (parameter-default? l mode)
+  (cond ((== mode :global)
+         (not (init-has? l)))
+        ((and (func? mode :local) (tree-is? (focus-tree) (cadr mode)))
+         (not (tree-with-get (focus-tree) l)))
+        (else #f)))
+
+(tm-define (parameter-reset l mode)
+  (cond ((== mode :global)
+         (init-default-one l))
+        ((and (func? mode :local) (tree-is? (focus-tree) (cadr mode)))
+         (tree-with-reset (focus-tree) l))))
+
+(tm-define (parameter-enabled? l mode)
+  (parameter-test? l "true" mode))
+
+(tm-define (parameter-toggle l mode)
+  (:check-mark "*" parameter-enabled?)
+  (with new (if (== (parameter-get l mode) "true") "false" "true")
+    (parameter-reset l mode)
+    (delayed
+      (when (!= new (parameter-get l mode))
+        (parameter-set l new mode)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Submenus for editing various types of style parameters
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-menu (parameter-choice-menu l cs mode)
+  (with ss (list-filter cs string?)
+    ((check "Default" "*" (parameter-default? l mode))
+     (parameter-reset l mode))
+    (if (nnull? ss)
+        ---
+        (for (c ss)
+          (if (string? c)
+              ((check (eval (upcase-first c)) "*" (parameter-test? l c mode))
+               (parameter-set l c mode)))))
+    (if (and (nnull? ss) (in? :other cs))
+        ---)
+    (if (in? :other cs)
+        ("Other" (parameter-interactive-set l mode)))))
+
+(tm-menu (parameter-submenu l mode)
+  (dynamic (parameter-choice-menu l (list :other) mode)))
+
+(tm-menu (parameter-submenu l mode)
+  (:require (== (tree-label-type (string->symbol l)) "color"))
+  (with setter (lambda (col) (delayed (:idle 250) (parameter-set l col mode)))
+    ((check "Default" "*" (parameter-default? l mode))
+     (parameter-reset l mode))
+    ---
+    (pick-background "" (setter answer))
+    ---
+    (if (in? l (list "locus-color" "visited-color"))
+        ((check "Preserve" "*" (parameter-test? l "preserve" mode))
+         (parameter-set l "preserve" mode)))
+    ("Palette" (interactive-color setter '()))
+    ("Pattern" (open-pattern-selector setter "1cm"))
+    ("Picture" (open-background-picture-selector setter))
+    ("Other" (parameter-interactive-set l mode))))
+
+(tm-menu (parameter-submenu l mode)
+  ;;(:require (== (tree-label-type (string->symbol l)) "font"))
+  (:require (string-ends? l "-font"))
+  ((check "Default" "*" (parameter-default? l mode))
+   (parameter-reset l mode))
+  ---
+  ((check "Roman" "*" (parameter-test? l "roman" mode))
+   (parameter-set l "roman" mode))
+  ((check "Stix" "*" (parameter-test? l "stix" mode))
+   (parameter-set l "stix" mode))
+  ((check "Bonum" "*" (parameter-test? l "bonum" mode))
+   (parameter-set l "bonum" mode))
+  ((check "Pagella" "*" (parameter-test? l "pagella" mode))
+   (parameter-set l "pagella" mode))
+  ((check "Schola" "*" (parameter-test? l "schola" mode))
+   (parameter-set l "schola" mode))
+  ((check "Termes" "*" (parameter-test? l "termes" mode))
+   (parameter-set l "termes" mode))
+  ---
+  (with prefix (string-drop-right l 4)
+    ("Other" (open-document-other-font-selector prefix))))
+
+(tm-menu (parameter-submenu l mode)
+  (:require (== (tree-label-type (string->symbol l)) "font-size"))
+  ((check "Default" "*" (parameter-default? l mode))
+   (parameter-reset l mode))
+  ---
+  ((check "Small" "*" (parameter-test? l "0.841" mode))
+   (parameter-set l "0.841" mode))
+  ((check "Normal" "*" (parameter-test? l "1" mode))
+   (parameter-set l "1" mode))
+  ((check "Large" "*" (parameter-test? l "1.189" mode))
+   (parameter-set l "1.189" mode))
+  ((check "Very large" "*" (parameter-test? l "1.414" mode))
+   (parameter-set l "1.414" mode))
+  ((check "Huge" "*" (parameter-test? l "1.682" mode))
+   (parameter-set l "1.682" mode))
+  ---
+  ("Other" (parameter-interactive-set l mode)))
+
+(tm-menu (parameter-submenu l mode)
+  (:require (parameter-choice-list l))
+  (with cs (parameter-choice-list l)
+    (dynamic (parameter-choice-menu l cs mode))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Editing style parameters
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (parameter-name l)
   (focus-tag-name (string->symbol (tree-name (list (string->symbol l))))))
 
-(tm-menu (focus-parameter-menu-item l)
-  ((eval (parameter-name l)) (open-macro-editor l)))
+(tm-menu (focus-parameter-menu-item l mode)
+  ((eval (parameter-name l)) (open-macro-editor l mode)))
 
-(tm-menu (init-env-menu l cs)
-  (with ss (list-filter cs string?)
-    ((check "Default" "*" (test-default? l))
-     (init-default l))
-    (if (nnull? ss)
-        ---
-        (for (c ss)
-          (if (string? c)
-              ((check (eval (upcase-first c)) "*" (test-init? l c))
-               (set-init-env l c)))))
-    (if (and (nnull? ss) (in? :other cs))
-        ---)
-    (if (in? :other cs)
-        ("Other" (init-interactive-env l)))))
-
-(tm-menu (focus-parameter-menu-item l)
+(tm-menu (focus-parameter-menu-item l mode)
   (:require (and (tree-label-parameter? (string->symbol l))
-                 (string? (get-init-env l))
+                 (string? (parameter-get l mode))
                  (nin? (tree-label-type (string->symbol l))
                        (list "unknown" "regular" "adhoc"))))
   (-> (eval (focus-tag-name (string->symbol l)))
-      (dynamic (init-env-menu l (list :other)))))
+      (dynamic (parameter-choice-menu l (list :other) mode))))
 
-(tm-menu (focus-parameter-menu-item l)
+(tm-menu (focus-parameter-menu-item l mode)
   (:require (and (tree-label-parameter? (string->symbol l))
-                 (string? (get-init-env l))
+                 (string? (parameter-get l mode))
                  (== (tree-label-type (string->symbol l)) "boolean")))
   ((check (eval (focus-tag-name (string->symbol l))) "v"
-          (== (get-init-env l) "true"))
-   (toggle-init-env l)))
+          (== (parameter-get l mode) "true"))
+   (parameter-toggle l mode)))
 
-(tm-menu (focus-parameter-menu-item l)
+(tm-menu (focus-parameter-menu-item l mode)
   (:require (and (tree-label-parameter? (string->symbol l))
-                 (== (tree-label-type (string->symbol l)) "color")))
+                 (or (== (tree-label-type (string->symbol l)) "color")
+                     ;;(== (tree-label-type (string->symbol l)) "font")
+                     (string-ends? l "-font")
+                     (== (tree-label-type (string->symbol l)) "font-size"))))
   (-> (eval (focus-tag-name (string->symbol l)))
-      (with setter (lambda (col) (init-env-tree l col))
-        ((check "Default" "*" (test-default? l)) (init-default l))
-        ---
-        (pick-background "" (setter answer))
-        ---
-        (if (in? l (list "locus-color" "visited-color"))
-            ((check "Preserve" "*" (test-init? l "preserve"))
-             (set-init-env l "preserve")))
-        ("Palette" (interactive-color setter '()))
-        ("Pattern" (open-pattern-selector setter "1cm"))
-        ("Other" (init-interactive-env l)))))
+      (dynamic (parameter-submenu l mode))))
 
-(tm-menu (focus-parameter-menu-item l)
-  (:require (and (tree-label-parameter? (string->symbol l))
-                 ;;(== (tree-label-type (string->symbol l)) "font")
-                 (string-ends? l "-font")))
-  (-> (eval (focus-tag-name (string->symbol l)))
-      ((check "Default" "*" (test-default? l)) (init-default l))
-      ---
-      ((check "Roman" "*" (test-init? l "roman")) (init-env l "roman"))
-      ((check "Stix" "*" (test-init? l "stix")) (init-env l "stix"))
-      ((check "Bonum" "*" (test-init? l "bonum")) (init-env l "bonum"))
-      ((check "Pagella" "*" (test-init? l "pagella")) (init-env l "pagella"))
-      ((check "Schola" "*" (test-init? l "schola")) (init-env l "schola"))
-      ((check "Termes" "*" (test-init? l "termes")) (init-env l "termes"))
-      ---
-      (with prefix (string-drop-right l 4)
-        ("Other" (open-document-other-font-selector prefix)))))
-
-(tm-menu (focus-parameter-menu-item l)
-  (:require (and (tree-label-parameter? (string->symbol l))
-                 (== (tree-label-type (string->symbol l)) "font-size")))
-  (-> (eval (focus-tag-name (string->symbol l)))
-      ((check "Default" "*" (test-default? l)) (init-default l))
-      ---
-      ((check "Small" "*" (test-init? l "0.841")) (init-env l "0.841"))
-      ((check "Normal" "*" (test-init? l "1")) (init-env l "1"))
-      ((check "Large" "*" (test-init? l "1.189")) (init-env l "1.189"))
-      ((check "Very large" "*" (test-init? l "1.414")) (init-env l "1.414"))
-      ((check "Huge" "*" (test-init? l "1.682")) (init-env l "1.682"))
-      ---
-      ("Other" (init-interactive-env l))))
-
-(tm-menu (focus-parameter-menu-item l)
+(tm-menu (focus-parameter-menu-item l mode)
   (:require (parameter-choice-list l))
-  (with cs (parameter-choice-list l)
-    (-> (eval (focus-tag-name (string->symbol l)))
-        (dynamic (init-env-menu l cs)))))
+  (-> (eval (focus-tag-name (string->symbol l)))
+      (dynamic (parameter-submenu l mode))))
 
-(tm-define (parameter-show-in-menu? l) #t)
-
-(tm-menu (focus-parameters-menu t)
-  (with ps (list-filter (search-tag-parameters t) parameter-show-in-menu?)
-    (if (nnull? ps)
-        (group "Style parameters")
-        (for (p ps)
-          (dynamic (focus-parameter-menu-item p)))
-        (if (tree-label-extension? (tree-label t))
-            ---))))
+(tm-define (parameter-show-in-menu? l)
+  (not (member->theme l)))
 
 (tm-define (parameter-show-in-menu? l)
   (:require (in? l (list "the-label" "auto-nr" "current-part" "language"
                          "page-nr" "page-the-page" "prog-language"
-			 "caption-summarized" "figure-width")))
+                         "caption-summarized" "figure-width")))
   #f)
+
+(define (focus-parameters-list t mode)
+  (let* ((ls (list-filter (search-parameters (tree-label t))
+                          parameter-show-in-menu?))
+         (xs (if (== mode :global) (list)
+                 (map car (customizable-parameters-memo t)))))
+    (list-difference ls xs)))
+
+(define parameters-list-cache (make-ahash-table))
+
+(define (focus-parameters-list-memo t mode)
+  (with key (list (tree-label t) mode (tree->stree (get-style-tree)))
+    (when (not (ahash-ref parameters-list-cache key))
+      (ahash-set! parameters-list-cache key (focus-parameters-list t mode)))
+    (ahash-ref parameters-list-cache key)))
+
+(tm-define (style-clear-cache)
+  (former)
+  (set! parameters-list-cache (make-ahash-table)))
+
+(tm-menu (focus-parameters-menu t mode)
+  (with ps (focus-parameters-list-memo t mode)
+    (if (nnull? ps)
+        (group "Style parameters")
+        (for (p ps)
+          (dynamic (focus-parameter-menu-item p mode)))
+        (if (tree-label-extension? (tree-label t))
+            ---))))
+
+(tm-menu (focus-theme-parameters-submenu th mode)
+  (with mems (theme->members th)
+    (for (mem mems)
+      (with var (string-append th "-" mem)
+        (dynamic (focus-parameter-menu-item var mode))))))
+
+(tm-menu (focus-theme-parameters-menu t mode)
+  (with ths (search-tag-themes t)
+    (if (nnull? ths)
+        (group "Theme parameters")
+        (for (th ths)
+          (-> (eval th)
+              (dynamic (focus-theme-parameters-submenu th mode))))
+        ---)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main Focus menu
@@ -329,16 +483,25 @@
 (tm-menu (focus-tag-edit-menu l)
   (if (tree-label-extension? l)
       (when (editable-macro? l)
-        ("Edit macro" (open-macro-editor l)))
+        ("Edit macro" (edit-focus-macro)))
       (when (has-macro-source? l)
-        ("Edit source" (edit-macro-source l)))))
+        ("Edit source" (edit-focus-macro-source)))))
+
+(tm-menu (focus-tag-customize-menu l)
+  (if (tree-label-extension? l)
+      (when (editable-macro? l)
+        ("Customize macro" (open-macro-editor l (list :local l))))))
 
 (tm-menu (focus-preferences-menu t)
   (dynamic (focus-style-options-menu t))
-  (dynamic (focus-parameters-menu t))
+  (dynamic (focus-parameters-menu t :global))
+  (dynamic (focus-theme-parameters-menu t :global))
   (dynamic (focus-tag-edit-menu (tree-label t))))
 
-(tm-menu (focus-theme-menu t))
+(tm-menu (focus-rendering-menu t)
+  (dynamic (focus-parameters-menu t (list :local (tree-label t))))
+  (dynamic (focus-theme-parameters-menu t (list :local (tree-label t))))
+  (dynamic (focus-tag-customize-menu (tree-label t))))
 
 (tm-menu (focus-tag-menu t)
   (with l (focus-variants-of t)
@@ -354,13 +517,16 @@
   (assuming (focus-has-preferences? t)
     (-> "Preferences"
         (dynamic (focus-preferences-menu t))))
-  (assuming (focus-has-theme? t)
+  (assuming (focus-has-parameters? t)
     (-> "Rendering"
-        (dynamic (focus-theme-menu t))))
+        (dynamic (focus-rendering-menu t))))
   ("Describe" (focus-help))
+  ("Delete" (remove-structure-upwards))
+  (assuming (tree-in? t '(cite nocite cite-TeXmacs))
+    (-> "Cite TeXmacs"
+        (link cite-texmacs-short-menu)))
   (assuming (focus-can-search? t)
-    ("Search in database" (focus-open-search-tool t)))
-  ("Delete" (remove-structure-upwards)))
+    ("Search in database" (focus-open-search-tool t))))
 
 (tm-menu (focus-move-menu t)
   ("Previous similar" (traverse-previous))
@@ -478,11 +644,16 @@
   (assuming (focus-has-preferences? t)
     (=> (balloon (icon "tm_focus_prefs.xpm") "Preferences for tag")
 	(dynamic (focus-preferences-menu t))))
-  (assuming (focus-has-theme? t)
+  (assuming (focus-has-parameters? t)
     (=> (balloon (icon "tm_theme.xpm") "Rendering options for tag")
-        (dynamic (focus-theme-menu t))))
+        (dynamic (focus-rendering-menu t))))
   ((balloon (icon "tm_focus_help.xpm") "Describe tag")
    (focus-help))
+  (assuming (tree-in? t '(cite nocite cite-TeXmacs))
+    (=> (balloon (icon "tm_like.xpm") "Cite TeXmacs-related work")
+        (group "TeXmacs-related work")
+        ---
+        (link cite-texmacs-short-menu)))
   (assuming (focus-can-search? t)
     ((balloon (icon "tm_focus_search.xpm") "Search in database")
      (focus-open-search-tool t))))
@@ -560,65 +731,50 @@
 ;; Focus menus for customizable environments
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-menu (focus-customizable-menu-item setter var name)
-  ((eval name) (interactive setter (list name "string" (get-env var)))))
+(tm-menu (focus-customizable-menu-item var name mode)
+  (with setter (lambda (val) (parameter-set var val mode))
+    ((eval name)
+     (interactive setter (list name "string" (parameter-get var mode))))))
 
-(tm-menu (focus-customizable-menu-item setter var name)
+(tm-menu (focus-customizable-menu-item var name mode)
   (:require (parameter-choice-list var))
-  (-> (eval name)
-      (for (val (parameter-choice-list var))
-        ((eval val) (setter val)))))
+  (-> (eval name) (dynamic (parameter-submenu var mode))))
 
-(tm-menu (focus-customizable-menu-item setter var name)
+(tm-menu (focus-customizable-menu-item var name mode)
   (:require (== (tree-label-type (string->symbol var)) "color"))
-  (-> (eval name)
-      (pick-background "" (setter answer))
-      ---
-      ("Palette" (interactive-color setter '()))
-      ("Pattern" (open-pattern-selector setter "1cm"))
-      ("Other" (interactive setter (list name "string" (get-env var))))))
+  (-> (eval name) (dynamic (parameter-submenu var mode))))
 
 (tm-menu (focus-extra-menu t)
   (:require (customizable-context? t))
   ---
-  (for (p (customizable-parameters t))
+  (for (p (customizable-parameters-memo t))
     (with (var name) p
-      (with l (tree-label t)
-        (with setter (lambda (val)
-                       (when (tree-is? (focus-tree) l)
-                         (tree-with-set (focus-tree) var val)))
-          (dynamic (focus-customizable-menu-item setter var name)))))))
+      (with mode (list :local (tree-label t))
+        (dynamic (focus-customizable-menu-item var name mode))))))
 
-(tm-menu (focus-customizable-icons-item setter var name)
-  (input (setter answer) "string" (list (get-env var)) "5em"))
+(tm-menu (focus-customizable-icons-item var name mode)
+  (input (parameter-set var answer mode) "string"
+         (list (parameter-get var mode)) "5em"))
 
-(tm-menu (focus-customizable-icons-item setter var name)
+(tm-menu (focus-customizable-icons-item var name mode)
   (:require (parameter-choice-list var))
   (mini #t
-    (=> (eval (get-env var))
-        (for (val (parameter-choice-list var))
-          ((eval val) (setter val))))))
+    (=> (eval (parameter-get var mode))
+        (dynamic (parameter-submenu var mode)))))
 
-(tm-menu (focus-customizable-icons-item setter var name)
+(tm-menu (focus-customizable-icons-item var name mode)
   (:require (== (tree-label-type (string->symbol var)) "color"))
-  (=> (color (tree->stree (get-env-tree var)) #f #f 24 16)
-      (pick-background "" (setter answer))
-      ---
-      ("Palette" (interactive-color setter '()))
-      ("Pattern" (open-pattern-selector setter "1cm"))
-      ("Other" (interactive setter (list name "string" (get-env var))))))
+  (=> (color (parameter-get var mode) #f #f 24 16)
+      (dynamic (parameter-submenu var mode))))
 
 (tm-menu (focus-extra-icons t)
   (:require (customizable-context? t))
-  (for (p (customizable-parameters t))
+  (for (p (customizable-parameters-memo t))
     (with (var name) p
-      (with l (tree-label t)
-        (with setter (lambda (val)
-                       (when (tree-is? (focus-tree) l)
-                         (tree-with-set (focus-tree) var val)))
-          (glue #f #f 3 0)
-          (mini #t (group (eval (string-append name ":"))))
-          (dynamic (focus-customizable-icons-item setter var name)))))))
+      (with mode (list :local (tree-label t))
+        (glue #f #f 3 0)
+        (mini #t (group (eval (string-append name ":"))))
+        (dynamic (focus-customizable-icons-item var name mode))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Immediately load document-menu

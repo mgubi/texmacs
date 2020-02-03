@@ -287,6 +287,9 @@ concater_rep::typeset (tree t, path ip) {
   case PAGE_NOTE:
     typeset_page_note (t, ip);
     break;
+  case IF_PAGE_BREAK:
+    typeset_if_page_break (t, ip);
+    break;
 
   case WITH_LIMITS:
     with_limits (LIMITS_DISPLAY);
@@ -469,8 +472,6 @@ concater_rep::typeset (tree t, path ip) {
     typeset_inactive (t, ip);
     break;
   case GET_LABEL:
-    typeset_executable (t, ip);
-    break;
   case GET_ARITY:
     typeset_executable (t, ip);
     break;
@@ -479,6 +480,12 @@ concater_rep::typeset (tree t, path ip) {
     break;
   case EVAL_ARGS:
     typeset_eval_args (t, ip);
+    break;
+  case NEW_THEME:
+  case COPY_THEME:
+  case APPLY_THEME:
+  case SELECT_THEME:
+    typeset_executable (t, ip);
     break;
   case MARK:
     typeset_mark (t, ip);
@@ -606,9 +613,22 @@ concater_rep::typeset (tree t, path ip) {
   case GU_LENGTH:
   case TMPT_LENGTH:
   case PX_LENGTH:
+  case LCORNER_LENGTH:
+  case BCORNER_LENGTH:
+  case RCORNER_LENGTH:
+  case TCORNER_LENGTH:
+  case MS_LENGTH:
+  case S_LENGTH:
+  case MSEC_LENGTH:
+  case SEC_LENGTH:
+  case MIN_LENGTH:
+  case HR_LENGTH:
     typeset_executable (t, ip);
     break;
 
+  case FILTER_STYLE:
+    typeset_executable (t, ip);
+    break;
   case STYLE_ONLY:
   case VAR_STYLE_ONLY:
   case ACTIVE:
@@ -656,6 +676,7 @@ concater_rep::typeset (tree t, path ip) {
     typeset_set_binding (t, ip);
     break;
   case GET_BINDING:
+  case HAS_BINDING:
     typeset_executable (t, ip);
     break;
   case HIDDEN_BINDING:
@@ -805,8 +826,11 @@ concater_rep::typeset (tree t, path ip) {
   case EFF_MOVE:
   case EFF_MAGNIFY:
   case EFF_BUBBLE:
+  case EFF_CROP:
   case EFF_TURBULENCE:
   case EFF_FRACTAL_NOISE:
+  case EFF_HATCH:
+  case EFF_DOTS:
   case EFF_GAUSSIAN:
   case EFF_OVAL:
   case EFF_RECTANGULAR:
@@ -830,6 +854,8 @@ concater_rep::typeset (tree t, path ip) {
   case EFF_COLOR_MATRIX:
   case EFF_MAKE_TRANSPARENT:
   case EFF_MAKE_OPAQUE:
+  case EFF_RECOLOR:
+  case EFF_SKIN:
     typeset_inactive (t, ip);
     break;
 
@@ -838,6 +864,9 @@ concater_rep::typeset (tree t, path ip) {
     break;
   case ORNAMENT:
     typeset_ornament (t, ip);
+    break;
+  case ART_BOX:
+    typeset_art_box (t, ip);
     break;
 
   default:

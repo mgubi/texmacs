@@ -2,7 +2,7 @@
 /******************************************************************************
 * MODULE     : r_language.cpp
 * DESCRIPTION: the "r" language
-* COPYRIGHT  : (C) 2008  Francis Jamet
+* COPYRIGHT  : (C) 2008-2019  Francis Jamet, Darcy Shen
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -16,16 +16,13 @@
 
 #define COLOR_MARKUP "#500d04"
 
-static void parse_number (string s, int& pos);
 static void parse_string (string s, int& pos);
-static void parse_alpha (string s, int& pos);
 static bool is_in_str( char c, const char *str )  ;
-static bool is_number_start( char c ) ;
 //static inline bool is_identifier_start( char c ) ;
 static void advance_till( string s, int & pos, char c) ;
 
 r_language_rep::r_language_rep (string name):
-  language_rep (name), colored ("")
+  abstract_language_rep (name)
 { 
   eval ("(use-modules (utils misc tm-keywords))");
   list<string> l= as_list_string (eval ("(map symbol->string highlight-any)"));
@@ -33,6 +30,7 @@ r_language_rep::r_language_rep (string name):
     colored (l->item)= "blue";
     l= l->next;
   }
+  number_parser.use_r_style ();
 }
 
 text_property
@@ -47,14 +45,11 @@ r_language_rep::advance (tree t, int& pos) {
     pos++; return &tp_space_rep; 
   } 
 
-  if ( is_number_start(c) ) {
-    int opos =pos ;
-    parse_number (s, pos); 
-    if( opos != pos )
-      return &tp_normal_rep; 
-  } 
+  if (number_parser.parse (s, pos)) {
+    return &tp_normal_rep;
+  }
 
-  if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || is_in_str( c, "_." )
+  if (is_alpha (c) || is_in_str (c, "_.")
       //|| (c == '$') // For some reason, when this is uncommented, TeXmacs gets stuck on entering $.
       ) {
     parse_alpha (s, pos); 
@@ -160,23 +155,11 @@ r_color_setup_otherlexeme (hashmap<string, string>& t) {
   t ("&&")= c;
 }
 
-static inline bool
-belongs_to_identifier (char c) {
+bool
+r_language_rep::belongs_to_identifier (char c) {
   return ( is_digit(c) ||
 	   is_alpha(c) ||
 	   is_in_str( c, "_." ) ) ;
-}
-
-/* is already defined in analyse.cpp
-static inline bool
-is_digit (char c) {
-  return (c>='0' && c<='9');
-}
-*/
-
-static inline bool 
-is_number_start( char c ) {
-  return( is_digit(c) || is_in_str( c, "." ) ) ;
 }
 
 /*
@@ -186,16 +169,14 @@ is_identifier_start( char c ) {
 }
 */
 
-static void
-parse_identifier (hashmap<string, string>& t,
-		  string s, int& pos, bool postfix) {
-  (void) postfix;
+void
+r_language_rep::parse_identifier (hashmap<string, string>& t, string s, int& pos) {
   int i=pos;
-  if ( pos>=N(s) ) return;
+  if (pos >= N(s)) return;
 
-  if( s[pos] == '`' ) {
-    pos++ ;
-    advance_till( s, pos, '`' ) ;
+  if (s[pos] == '`') {
+    pos++;
+    advance_till ( s, pos, '`' );
     return ;
   }
   while (i<N(s) && belongs_to_identifier (s[i])) i++;
@@ -203,9 +184,9 @@ parse_identifier (hashmap<string, string>& t,
   if (!(t->contains (s (pos, i)))) pos= i;
 }
 
-static void
-parse_identifier_or_markup (hashmap<string, string>& t,
-			    string s, int& pos, bool postfix, bool& is_markup) {
+void
+r_language_rep::parse_identifier_or_markup (hashmap<string, string>& t,
+    string s, int& pos, bool postfix, bool& is_markup) {
   int i=pos;
   is_markup= false;
   if (pos>=N(s)) return;
@@ -221,18 +202,6 @@ parse_identifier_or_markup (hashmap<string, string>& t,
   }
   if (!(t->contains (s (pos, i)))) pos= i;
 }
-
-static void
-parse_alpha (string s, int& pos) {
-  static hashmap<string,string> empty;
-  parse_identifier (empty, s, pos, false);
-}
-
-static void
-parse_blanks (string s, int& pos) {
-  while (pos<N(s) && (s[pos]==' ' || s[pos]=='\t')) pos++;
-}
-
 
 static void
 advance_till_unescaped( string s, int & pos, char c) {
@@ -283,8 +252,8 @@ parse_string (string s, int& pos) {
   }
 }
   
-static void
-parse_keyword (hashmap<string,string>& t, string s, int& pos) {
+void
+r_language_rep::parse_keyword (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return;
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
@@ -292,8 +261,8 @@ parse_keyword (hashmap<string,string>& t, string s, int& pos) {
   if (t->contains (r) && t(r)=="keyword") { pos=i; return; }
 }
 
-static void
-parse_modifier (hashmap<string,string>& t, string s, int& pos) {
+void
+r_language_rep::parse_modifier (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if ( pos >= N(s) ) return;
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
@@ -301,8 +270,8 @@ parse_modifier (hashmap<string,string>& t, string s, int& pos) {
   if (t->contains (r) && t(r)=="modifier") { pos=i; return; }
 }
 
-static void
-parse_class (hashmap<string,string>& t, string s, int& pos) {
+void
+r_language_rep::parse_class (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return;
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
@@ -311,8 +280,8 @@ parse_class (hashmap<string,string>& t, string s, int& pos) {
 }
 
 
-static void
-parse_postfix (hashmap<string,string>& t, string s, int& pos) {
+void
+r_language_rep::parse_postfix (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
   if (pos>=N(s)) return;
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
@@ -320,8 +289,8 @@ parse_postfix (hashmap<string,string>& t, string s, int& pos) {
   if (t->contains (r) && t(r)=="postfix") { pos=i; return; }
 }
 
-static void
-parse_constant (hashmap<string,string>& t, string s, int& pos) {
+void
+r_language_rep::parse_constant (hashmap<string,string>& t, string s, int& pos) {
   int i=pos;
   if (pos>=N(s)) return;
   while ((i<N(s)) && belongs_to_identifier (s[i])) i++;
@@ -386,125 +355,6 @@ is_in_str( char c, const char *str ) {
   return false ;
 }
 
-// TODO: add hex
-static void
-parse_number (string s, int& pos) {
-  bool valid_number = false ;
-  bool first= true ;
-  int i ;
-  int possible_exp = 0 ;
-  int possible_hex = 0 ;
-
-  if (pos>=N(s)) return;
-
-  for( i=pos; i< N(s); i++ ) {
-    if( first ) {
-#if 0 // It would be better if +/- were part of the number, but then 10+3 is hard to interpret.
-      if( is_in_str( s[i], "-+" ) ) {
-	possible_hex = 1 ;
-	possible_exp = 1 ;
-	first = false ;
-	// valid_number = true ; // ????? 
-	continue ;
-      }
-#endif
-      if( s[i] == '0' ) {
-	possible_hex = 2 ;
-	possible_exp = 1 ;
-	first = false ; 
-	valid_number = true ;
-	continue ;
-      }
-      if( s[i] == '.' ) {
-	first = false ;
-	possible_hex = 0 ;
-	possible_exp = 1 ;
-	valid_number = true ; // ????
-	continue ;
-      }
-      if( is_digit( s[i] ) ) {
-	first = false ;
-	possible_hex = 0 ;
-	possible_exp = 1 ;
-	valid_number = true ;
-	continue ;
-      }
-      break ;
-    } else { // not first
-      if( (possible_hex == 1) && (s[i] == '0' ) ) {
-	possible_hex = 2 ;
-	valid_number = true ;
-	continue ;
-      }
-      if( (possible_hex == 2 ) && ( is_in_str(s[i], "xX" ) ) ) {
-	possible_hex = 3 ;
-	possible_exp = 0 ;
-	continue ;
-      }
-      if( possible_hex == 3 ) {
-	if( is_in_str( s[i], "0123456789abcdefABCDEF" ) ) {
-	  valid_number = true ;
-	  continue ;
-	} else 
-	  break ;
-      }
-      if( (possible_exp > 0) && valid_number && is_in_str( s[i], "eE" ) ) {
-	possible_exp = 3 ; // this means we are in the exponent
-	continue ;
-      }
-
-      // values for possible_exp:
-      // 0 - no exp possible
-      // 1 - '.' possible
-      // 2 - '.' found
-      // 3 - in exp, 
-      // 4 - saw +-or 0-9 in exp (i.e. no -/+ possible )
-      if( (possible_exp >= 3) ) { // in exponent
-	if( is_digit( s[i] ) ) {
-	  possible_exp = 4 ;
-	  valid_number = true ;
-	  continue ;
-	}
-	if( (possible_exp == 3) && is_in_str( s[i], "+-" ) ) {
-	  //	  valid_number = true ;
-	  possible_exp = 4 ;
-	  continue ;
-	}
-	break ;
-      }
-
-      if( (possible_exp == 1) && (s[i] == '.') ) {
-	possible_exp = 2 ;
-	//valid_number = true ;
-	continue ;
-      }
-
-      if( is_digit( s[i] ) ) {
-	valid_number = true ;
-	continue ;
-      }
-    } // else: not first
-    break ;
-  }
-
-  if( valid_number ) {
-    if( s[i]=='i' ) i++ ;
-    if( (s[i]=='L') && (possible_exp<2) ) i++ ;
-    pos = i ;
-  }
-}
-
-
-static void
-parse_comment_single_line (string s, int& pos) {
-  if (pos>=N(s)) return;
-  if (s[pos]!='#') return;
-  pos=N(s);	
-}
-
-
-  
-
 static void
 parse_parenthesized (string s, int& pos) {
   int i=pos;
@@ -521,8 +371,10 @@ parse_parenthesized (string s, int& pos) {
       break;
     case '/':
       if (i+1<N(s) && 
-	  (s[i+1]=='\042' || s[i+1]=='{' || s[i+1]=='/')) {
-	pos= i; return; }
+          (s[i+1]=='\042' || s[i+1]=='{' || s[i+1]=='/')) {
+        pos= i;
+        return;
+      }
       break;
     case '\042':
       pos=i;
@@ -577,10 +429,9 @@ r_language_rep::get_color (tree t, int start, int end) {
       parse_string (s, pos);
       if (opos<pos) break;
 
-      parse_comment_single_line (s, pos);
-      if (opos < pos) {
-	type= "comment";
-	break;
+      if (inline_comment_parser.parse (s, pos)) {
+        type= "comment";
+        break;
       }
 
       pos++;
@@ -598,177 +449,174 @@ r_language_rep::get_color (tree t, int start, int end) {
       possible_class= possible_future_class;
       opos= pos;
 
-      parse_blanks (s, pos);
-      if (opos<pos) break;
+      if (blanks_parser.parse (s, pos)) break;
 
       parse_string (s, pos);
       if (opos<pos) {
-	type= "string";
-	backquote= false;
-	postfix= false;
-	possible_future_function= false;
-	possible_future_type= false;
-	possible_future_class= false;
-	possible_type= false;
-	break;
+        type= "string";
+        backquote= false;
+        postfix= false;
+        possible_future_function= false;
+        possible_future_type= false;
+        possible_future_class= false;
+        possible_type= false;
+        break;
       }
 
-      parse_number (s, pos);
-      if (opos<pos) {
-	type= "number";
-	backquote= false;
-	postfix= false;
-	possible_future_function= false;
-	possible_future_class= false;
-	break;
+      if (number_parser.parse (s, pos)) {
+        type= "number";
+        backquote= false;
+        postfix= false;
+        possible_future_function= false;
+        possible_future_class= false;
+        break;
       }
 
-      parse_comment_single_line (s, pos);
-      if (opos<pos) {
-	type= "comment";
-	backquote= false;
-	postfix= false;
-	possible_future_type= false;
-	possible_type= false;
-	break;
+      if (inline_comment_parser.parse (s, pos)) {
+        type= "comment";
+        backquote= false;
+        postfix= false;
+        possible_future_type= false;
+        possible_type= false;
+        break;
       }
 
       parse_modifier (colored, s, pos);
       if (opos<pos) {
-	type="keyword";
-	backquote= false;
-	postfix= false;
-	possible_future_type= false;
-	possible_type= false;
-	possible_function= false;
-	break;
+        type="keyword";
+        backquote= false;
+        postfix= false;
+        possible_future_type= false;
+        possible_type= false;
+        possible_function= false;
+        break;
       }
 
       parse_postfix (colored, s, pos);
       if (opos<pos) {
-	type="keyword";
-	backquote= false;
-	postfix= true;
-	possible_future_type= false;
-	possible_future_class= false;
-	possible_type= false;
-	possible_function= false;
-	possible_future_class= false;
-	break;
+        type="keyword";
+        backquote= false;
+        postfix= true;
+        possible_future_type= false;
+        possible_future_class= false;
+        possible_type= false;
+        possible_function= false;
+        possible_future_class= false;
+        break;
       }
 
       parse_class (colored, s, pos);
       if (opos<pos) {
-	type= "keyword";
-	backquote=false;
-	postfix=false;
-	possible_future_type= false;
-	possible_type= false;
-	possible_future_class=true;
-	possible_future_function= false;
-	break;
+        type= "keyword";
+        backquote=false;
+        postfix=false;
+        possible_future_type= false;
+        possible_type= false;
+        possible_future_class=true;
+        possible_future_function= false;
+        break;
       }
 
       parse_keyword (colored, s, pos);
       if (opos<pos) {
-	type= "keyword";
-	backquote= false;
-	postfix= false;
-	possible_future_type= false;
-	possible_type= false;
-	possible_function= false;
-	possible_future_function= false;
-	possible_future_class= false;
-	break;
+        type= "keyword";
+        backquote= false;
+        postfix= false;
+        possible_future_type= false;
+        possible_type= false;
+        possible_function= false;
+        possible_future_function= false;
+        possible_future_class= false;
+        break;
       }
 
       parse_other_op_assign (colored, s, pos);  //not left parenthesis
       if (opos<pos) {
-	type= "other_lexeme";// was
-	type = "op assign" ;
-	backquote= false;
-	postfix= false;
-	possible_function= false;
-	possible_future_function= true;
-	possible_future_type= false;
-	possible_future_class= false;
-	possible_type= false;
-	break;
+        type= "other_lexeme";// was
+        type = "op assign" ;
+        backquote= false;
+        postfix= false;
+        possible_function= false;
+        possible_future_function= true;
+        possible_future_type= false;
+        possible_future_class= false;
+        possible_type= false;
+        break;
       }
 
       parse_other_op_index (colored, s, pos);  //not left parenthesis
       if (opos<pos) {
-	type= "other_lexeme";// was
-	type = "op index" ;
-	backquote= false;
-	postfix= false;
-	possible_function= false;
-	possible_future_function= true;
-	possible_future_type= false;
-	possible_future_class= false;
-	possible_type= false;
-	break;
+        type= "other_lexeme";// was
+        type = "op index" ;
+        backquote= false;
+        postfix= false;
+        possible_function= false;
+        possible_future_function= true;
+        possible_future_type= false;
+        possible_future_class= false;
+        possible_type= false;
+        break;
       }
 
       parse_other_lexeme (colored, s, pos);  //not left parenthesis
       if (opos<pos) {
-	type= "other_lexeme";// was
-	type = "operator" ;
-	backquote= false;
-	postfix= false;
-	possible_function= false;
-	possible_future_function= true;
-	possible_future_type= false;
-	possible_future_class= false;
-	possible_type= false;
-	break;
+        type= "other_lexeme";// was
+        type = "operator" ;
+        backquote= false;
+        postfix= false;
+        possible_function= false;
+        possible_future_function= true;
+        possible_future_type= false;
+        possible_future_class= false;
+        possible_type= false;
+        break;
       }
 
       parse_constant (colored, s, pos);
       if (opos<pos) {
-	type= "constant";
-	backquote= false;
-	postfix= false;
-	possible_future_function= false;
-	possible_future_class= false;
-	break;
+        type= "constant";
+        backquote= false;
+        postfix= false;
+        possible_future_function= false;
+        possible_future_class= false;
+        break;
       }
 
 
       parse_backquote (s, pos);
       if (opos<pos) {
-	backquote= true;
-	postfix= false;
-	possible_future_function= false;
-	possible_future_class= false;
-	break;
+        backquote= true;
+        postfix= false;
+        possible_future_function= false;
+        possible_future_class= false;
+        break;
       }
 
       parse_identifier_or_markup (colored, s, pos, postfix, is_markup);
       if (opos<pos) {
-	if (is_markup) {type= "identifier_markup";} else type= "identifier";
-	backquote= false;
-	postfix= false;
-	possible_future_function=false;
-	possible_future_class= false;
-	break;
+        if (is_markup) {type= "identifier_markup";} else type= "identifier";
+        backquote= false;
+        postfix= false;
+        possible_future_function=false;
+        possible_future_class= false;
+        break;
       }
 
       parse_parenthesized (s, pos);
       // stops after well parenthesized ) or before  // or /{ or " or /"
       if (opos<pos && pos<=start) {
-	type="left_parenthesis";
-	backquote= false;
-	postfix= false;
-	possible_function= false;
-	possible_future_function= true;
-	possible_future_class= false;
-	break;
+        type="left_parenthesis";
+        backquote= false;
+        postfix= false;
+        possible_function= false;
+        possible_future_function= true;
+        possible_future_class= false;
+        break;
       }
       if (opos<pos && possible_type==true)
-	return "dark green";
+        return "dark green";
       if (opos<pos && after_backquote)  
-	return none;
+        return none;
 
       backquote= false;
       postfix= false;
@@ -795,25 +643,26 @@ r_language_rep::get_color (tree t, int start, int end) {
     possible_function= false;
     do {
       do {
-	opos=pos;
-	parse_blanks (s, pos);
-	if (opos<pos) break;
+        opos=pos;
+        if (blanks_parser.parse (s, pos)) break;
 
-	parse_identifier (colored, s, pos,false);
-	if (opos<pos) { possible_function= true; break; }
+        parse_identifier (colored, s, pos);
+        if (opos<pos) { possible_function= true; break; }
 
-	parse_number (s, pos);
-	if (opos<pos) { possible_function= true; break; }
+        if (number_parser.parse (s, pos)) {
+          possible_function= true;
+          break;
+        }
 
-	parse_constant (colored, s, pos);
-	if (opos<pos) { possible_function= true; break; }
+        parse_constant (colored, s, pos);
+        if (opos<pos) { possible_function= true; break; }
 
-	parse_comment_single_line (s, pos);
-	if (opos<pos) break;
+        if (inline_comment_parser.parse (s, pos)) {
+          break;
+        }
 
-	parse_parenthesized (s, pos);
-	if (opos<pos) { possible_function= true; break; }
-
+        parse_parenthesized (s, pos);
+        if (opos<pos) { possible_function= true; break; }
       } while (false);
     } while (opos != pos);
 
@@ -821,53 +670,53 @@ r_language_rep::get_color (tree t, int start, int end) {
       if (type=="identifier") {return none;} 
       else return COLOR_MARKUP; // type=="identifier_markup"
     } else do {
-	do {
-	  opos=pos;
-	  parse_blanks (s, pos);
-	  if (opos<pos) break;
-	  parse_identifier (colored, s, pos,false);
-	  if (opos<pos) break;
-	  parse_number(s,pos);
-	  if (opos<pos) break;
-	  parse_constant (colored, s, pos);
-	  if (opos<pos) break;
-	  parse_comment_single_line(s,pos);
-	  if (opos<pos) break;
-	  parse_parenthesized (s, pos);
-	  if (opos<pos) break;
+      do {
+        opos=pos;
+        if (blanks_parser.parse (s, pos)) break;
+        parse_identifier (colored, s, pos);
+        if (opos<pos) break;
+        number_parser.parse (s, pos);
+        if (opos<pos) break;
+        parse_constant (colored, s, pos);
+        if (opos<pos) break;
+        if (inline_comment_parser.parse (s, pos)) {
+          break;
+        }
+        parse_parenthesized (s, pos);
+        if (opos<pos) break;
 
-	  if (type=="identifier") {return none;} 
-	  else return COLOR_MARKUP;
+        if (type=="identifier") {return none;} 
+        else return COLOR_MARKUP;
 
-	} while (false);
-      }
-      while (pos<N(s));
+      } while (false);
+    } while (pos<N(s));
   } // type==identifier || type==identifier_markup && possible function
 
   if ( (type=="identifier" || type=="identifier_markup") && possible_class) {
     do {
       do {
-	opos=pos;
-	parse_blanks (s, pos);
-	if (opos<pos) break;
+        opos=pos;
+        if (blanks_parser.parse (s, pos)) break;
 
-	parse_identifier (colored, s, pos,false);
-	if (opos<pos) break;
+        parse_identifier (colored, s, pos);
+        if (opos<pos) break;
 
-	parse_number(s,pos);
-	if (opos<pos) break;
+        if (number_parser.parse (s, pos)) {
+          break;
+        }
 
-	parse_constant (colored, s, pos);
-	if (opos<pos) break;
+        parse_constant (colored, s, pos);
+        if (opos<pos) break;
 
-	parse_comment_single_line(s,pos);
-	if (opos<pos) break;
+        if (inline_comment_parser.parse (s, pos)) {
+          break;
+        }
 
-	parse_parenthesized (s, pos);
-	if (opos<pos) break;
+        parse_parenthesized (s, pos);
+        if (opos<pos) break;
 
-	if (type=="identifier") {return none;} 
-	else return COLOR_MARKUP;
+        if (type=="identifier") {return none;} 
+        else return COLOR_MARKUP;
       } while (false);
     }
     while (pos<N(s));

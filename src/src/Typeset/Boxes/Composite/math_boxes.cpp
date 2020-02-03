@@ -630,6 +630,8 @@ wide_box_rep::wide_box_rep (
   dd= fn->sep;
   x1= m- hw- dx;
   x2= m+ hw- dx;
+  x1= min (x1, ref->x1);
+  x2= max (x2, ref->x2);
   if (!above) y1 += fn->sep - sep;
   finalize ();
 }
@@ -668,10 +670,17 @@ wide_box_rep::right_slope () {
 
 void
 wide_box_rep::get_bracket_extents (SI& lo, SI& hi) {
-  if (wide) box_rep::get_bracket_extents (lo, hi);
+  box_rep::get_bracket_extents (lo, hi);
+  SI dd= fn->yx / 2;
+  SI slo, shi;
+  ref->get_bracket_extents (slo, shi);
+  if (above) {
+    lo= slo;
+    hi= max (shi, hi - dd);
+  }
   else {
-    lo= ref->y1;
-    hi= ref->y2;
+    lo= min (slo, lo + dd);
+    hi= shi;
   }
 }
 

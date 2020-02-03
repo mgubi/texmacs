@@ -116,7 +116,7 @@
 (menu-bind table-special-menu
   ("Table breaking" (toggle-table-hyphen))
   ;;("Deactivate" (table-deactivate))
-  ("Create table macro" (create-table-macro "")))
+  ("Create table macro" (create-table-macro "" :global)))
 
 (menu-bind cell-mode-menu
   ("Cells" (set-cell-mode "cell"))
@@ -268,6 +268,7 @@
   ("Palette" (interactive-background
               (lambda (col) (cell-set-background col)) '()))
   ("Pattern" (open-pattern-selector cell-set-background "1cm"))
+  ("Picture" (open-background-picture-selector cell-set-background))
   ("Other" (interactive cell-set-background)))
 
 (menu-bind cell-wrapping-menu
@@ -355,7 +356,7 @@
 (tm-menu (standard-focus-menu t)
   (:require (table-markup-context? t))
   (dynamic (focus-tag-menu t))
-  (-> "Move" (dynamic (focus-move-menu t)))
+  (-> "Move::similar" (dynamic (focus-move-menu t)))
   (-> "Resize" (dynamic (focus-insert-menu t)))
   ---
   (group "Table")

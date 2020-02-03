@@ -99,7 +99,7 @@ initialize_default_env () {
   env (MATH_BOT_SWELL_END)  = "-2.5ex"; // maximal padding reached here
 
   env (PROG_LANGUAGE)    = "scheme";    // the default programming language
-  env (PROG_SCRIPTS)     = "scheme";    // the scripting language
+  env (PROG_SCRIPTS)     = "none";      // the scripting language
   env (PROG_FONT)        = "roman";     // the font name in prog mode
   env (PROG_FONT_FAMILY) = "tt";        // the font family in prog mode
   env (PROG_FONT_SERIES) = "medium";    // the font series in prog mode
@@ -135,6 +135,7 @@ initialize_default_env () {
   env (PAGE_PRINTED)     = "false";     // printed version?
   env (PAGE_TYPE)        = "a4";        // paper type (-> width & height)
   env (PAGE_ORIENTATION) = "portrait";  // paper orientation
+  env (PAGE_CROP_MARKS)  = "";          // paper size on which we print
   env (PAGE_WIDTH_MARGIN)  = "false";   // compute margins from par-width?
   env (PAGE_HEIGHT_MARGIN) = "false";   // compute margins from par-width?
   env (PAGE_SCREEN_MARGIN) = "true";    // special margins for screen editing?
@@ -323,6 +324,7 @@ initialize_default_env () {
   env (ORNAMENT_TITLE_STYLE)  = "classic";      // title style
   env (ORNAMENT_BORDER)       = "1ln";          // border width
   env (ORNAMENT_SWELL)        = "0.5";          // border swell
+  env (ORNAMENT_CORNER)       = "100%";         // corner rounding
   env (ORNAMENT_HPADDING)     = "1spc";         // horizontal padding of body
   env (ORNAMENT_VPADDING)     = "1spc";         // vertical padding of body
   env (ORNAMENT_COLOR)        = "";             // background color

@@ -128,7 +128,8 @@
 
 (menu-bind graphics-visual-grid-menu
   (-> "Type"
-      ("No grid"     (graphics-set-visual-grid 'empty))
+      ;;("No grid"     (graphics-set-visual-grid 'empty))
+      ("No grid"     (graphics-reset-grids))
       ---
       ("Cartesian"   (graphics-set-visual-grid 'cartesian))
       ("Polar"       (graphics-set-visual-grid 'polar))
@@ -267,7 +268,8 @@
 	("Other" (graphics-interactive-set-grid-nsubds #f)))))
 
 (menu-bind graphics-grids-menu
-  ("Default" (graphics-reset-grids))
+  ("Show grid" (graphics-toggle-grid))
+  ;;("Default" (graphics-reset-grids))
   ---
   (link graphics-visual-grid-menu))
 
@@ -560,7 +562,7 @@
   ---
   (if (!= (graphics-get-grid-type #t) 'empty)
       ("Grid points" (graphics-toggle-snap "grid point"))
-      ("Grid curves" (graphics-toggle-snap "grid curve point"))
+      ("Grid lines" (graphics-toggle-snap "grid curve point"))
       ("Grid-curve intersections"
        (graphics-toggle-snap "curve-grid intersection")))
   ("Curve points" (graphics-toggle-snap "curve point"))

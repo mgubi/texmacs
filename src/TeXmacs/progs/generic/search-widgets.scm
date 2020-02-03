@@ -132,7 +132,7 @@
   (when (and (not (cursor-accessible?)) (not (in-source?)))
     (cursor-show-hidden)
     (delayed
-      (:pause 25)
+      (:pause 50)
       (set! search-serial (+ search-serial 1))
       (perform-search-sub 100 #f))))
 
@@ -747,6 +747,7 @@
 
 (tm-define (interactive-search)
   (:interactive #t)
+  (set-boolean-preference "search-and-replace" #f)
   (if (and (get-boolean-preference "toolbar search")
 	   (not (buffer-aux? (current-buffer))))
       (toolbar-search-start)
@@ -754,6 +755,7 @@
 
 (tm-define (interactive-replace)
   (:interactive #t)
+  (set-boolean-preference "search-and-replace" #t)
   (if (and (get-boolean-preference "toolbar replace")
 	   (not (buffer-aux? (current-buffer))))
       (toolbar-replace-start)

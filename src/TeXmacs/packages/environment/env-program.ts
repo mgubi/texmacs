@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.11>
 
 <style|<tuple|source|std>>
 
@@ -162,9 +162,13 @@
 
   <assign|c++|<macro|<name|C++>>>
 
+  <assign|java|<macro|<name|Java>>>
+
   <assign|mathemagix|<macro|<name|Mathemagix>>>
 
   <assign|scilab|<macro|<name|Scilab>>>
+
+  <assign|fortran|<macro|<name|Fortran>>>
 
   <assign|python|<macro|<name|Python>>>
 
@@ -178,6 +182,8 @@
 
   <assign|cpp|<macro|body|<with|mode|prog|prog-language|cpp|font-family|rm|<arg|body>>>>
 
+  <assign|java|<macro|body|<with|mode|prog|prog-language|java|font-family|rm|<arg|body>>>>
+
   <assign|python|<macro|body|<with|mode|prog|prog-language|python|font-family|rm|<arg|body>>>>
 
   <assign|scala|<macro|body|<with|mode|prog|prog-language|scala|font-family|rm|<arg|body>>>>
@@ -185,6 +191,8 @@
   <assign|r|<macro|body|<with|mode|prog|prog-language|r|font-family|rm|<arg|body>>>>
 
   <assign|scilab|<macro|body|<with|mode|prog|prog-language|scilab|font-family|rm|<arg|body>>>>
+
+  <assign|fortran|<macro|body|<with|mode|prog|prog-language|fortran|font-family|rm|<arg|body>>>>
 
   <assign|mmx|<macro|body|<with|mode|prog|prog-language|mathemagix|font-family|rm|<arg|body>>>>
 
@@ -224,9 +232,21 @@
     </pseudo-code>
   </macro>>
 
+  <assign|java-code|<\macro|body>
+    <\pseudo-code>
+      <java|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
   <assign|scilab-code|<\macro|body>
     <\pseudo-code>
       <scilab|<arg|body>>
+    </pseudo-code>
+  </macro>>
+
+  <assign|fortran-code|<\macro|body>
+    <\pseudo-code>
+      <fortran|<arg|body>>
     </pseudo-code>
   </macro>>
 

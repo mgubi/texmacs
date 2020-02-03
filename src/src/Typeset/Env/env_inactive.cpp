@@ -75,8 +75,11 @@ is_long_arg (tree t, int i) {
     return is_multi_paragraph (t[i]);
   case LOCUS:
   case CANVAS:
-  case ORNAMENT:
     if (i == n-1) return is_long (t[i]);
+    break;
+  case ORNAMENT:
+  case ART_BOX:
+    if (i == 0) return is_long (t[i]);
     break;
   default:
     break;
@@ -421,9 +424,9 @@ edit_env_rep::rewrite_inactive (tree t, tree var, bool block, bool flush) {
   if (is_atomic (t)) {
     if (src_style == STYLE_SCHEME)
       return tree (CONCAT,
-		   tree (WITH, COLOR, src_tag_color, "``"),
+		   tree (WITH, COLOR, src_tag_color, "\20"),
 		   var,
-		   tree (WITH, COLOR, src_tag_color, "''"));
+		   tree (WITH, COLOR, src_tag_color, "\21"));
     return var;
   }
   switch (L(t)) {

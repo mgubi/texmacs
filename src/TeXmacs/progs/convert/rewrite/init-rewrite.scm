@@ -72,74 +72,30 @@
   (:function stm-snippet->texmacs))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Scheme source files
+;; Generic source files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-format scheme
-  (:name "Scheme source")
-  (:suffix "scm"))
-
-(define (texmacs->scheme x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (scheme->texmacs x . opts)
-  (verbatim->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
-
-(define (scheme-snippet->texmacs x . opts)
-  (verbatim-snippet->texmacs x 
-    (acons "verbatim->texmacs:encoding" "SourceCode" '())))
-
-(converter texmacs-tree scheme-document
-  (:function texmacs->scheme))
-
-(converter scheme-document texmacs-tree
-  (:function scheme->texmacs))
-  
-(converter texmacs-tree scheme-snippet
-  (:function texmacs->scheme))
-
-(converter scheme-snippet texmacs-tree
-  (:function scheme-snippet->texmacs))
-  
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; C++ source files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-format cpp
-  (:name "C++ source")
-  (:suffix "cpp" "cc" "hpp" "hh"))
-
-(define (texmacs->cpp x . opts)
-  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
-
-(define (cpp->texmacs x . opts)
-  (verbatim->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
-
-(define (cpp-snippet->texmacs x . opts)
-  (verbatim-snippet->texmacs x 
-    (acons "verbatim->texmacs:encoding" "SourceCode" '())))
-
-(converter texmacs-tree cpp-document
-  (:function texmacs->cpp))
-
-(converter cpp-document texmacs-tree
-  (:function cpp->texmacs))
-  
-(converter texmacs-tree cpp-snippet
-  (:function texmacs->cpp))
-
-(converter cpp-snippet texmacs-tree
-  (:function cpp-snippet->texmacs))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Verbatim
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define-format code
+  (:name "Source Code"))
 
 (tm-define (texmacs->code t . enc)
   (if (null? enc) (set! enc (list (get-locale-charset))))
   (if (tree? t)
       (cpp-texmacs->verbatim t #f (car enc))
       (texmacs->code (tm->tree t) (car enc))))
+
+(tm-define (code->texmacs x . opts)
+  (verbatim-->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
+
+(tm-define (code-snippet->texmacs x . opts)
+  (verbatim-snippet->texmacs x (acons "verbatim->texmacs:encoding" "SourceCode" '())))
+
+(converter code-snippet texmacs-tree
+  (:function code-snippet->texmacs))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Verbatim
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (texmacs->verbatim x . opts)
   (if (list-1? opts) (set! opts (car opts)))
@@ -151,10 +107,12 @@
   (if (list-1? opts) (set! opts (car opts)))
   (let* ((wrap? (== (assoc-ref opts "texmacs->verbatim:wrap") "on"))
          (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "auto")))
-    ;; FIXME: dirty hack for "copy to verbatim" of code snippets
     (if (or (== (get-env "mode") "prog") (== (get-env "font-family") "tt"))
-        (set! wrap? #f))
-    (cpp-texmacs->verbatim x wrap? enc)))
+        ;; FIXME: dirty hacks for "copy to verbatim" of code snippets
+        (let ((conv (cpp-texmacs->verbatim x #f enc))
+              (tick (cpp-texmacs->verbatim (tm->tree "`") #f enc)))
+          (string-replace conv tick "`"))
+        (cpp-texmacs->verbatim x wrap? enc))))
 
 (tm-define (verbatim->texmacs x . opts)
   (if (list-1? opts) (set! opts (car opts)))

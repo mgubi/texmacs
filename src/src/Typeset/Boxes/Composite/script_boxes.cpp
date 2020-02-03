@@ -331,6 +331,19 @@ struct side_box_rep: public composite_box_rep {
   SI rsup_correction () {
     return nr_right==0? bs[0]->rsup_correction (): right_correction (); }
   void get_bracket_extents (SI& lo, SI& hi);
+
+  /*
+  SI sub_lo_base (int level) {
+    return bs[0]->sub_lo_base (level); }
+  SI sub_hi_lim  (int level) {
+    return bs[0]->sub_hi_lim (level); }
+  SI sup_lo_lim  (int level) {
+    return bs[0]->sup_lo_lim (level); }
+  SI sup_lo_base (int level) {
+    return bs[0]->sup_lo_base (level); }
+  SI sup_hi_lim  (int level) {
+    return bs[0]->sup_hi_lim (level); }
+  */
 };
 
 side_box_rep::side_box_rep (
@@ -649,10 +662,8 @@ side_box_rep::find_selection (path lbp, path rbp) {
 void
 side_box_rep::get_bracket_extents (SI& lo, SI& hi) {
   int i;
-  SI ex= fn->yx;
-  SI dd= ex / 4;
-  lo= sy1 (0);
-  hi= sy2 (0);
+  SI dd= fn->yx / 4;
+  bs[0]->get_bracket_extents (lo, hi);
   for (i=1; i<N(bs); i++) {
     lo= min (lo, sy1 (i) + dd);
     hi= max (hi, sy2 (i) - dd);

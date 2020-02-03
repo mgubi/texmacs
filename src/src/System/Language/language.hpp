@@ -74,13 +74,14 @@ RESOURCE(language);
 #define OP_PREFIX             7
 #define OP_POSTFIX            8
 #define OP_INFIX              9
-#define OP_APPLY             10
-#define OP_SEPARATOR         11
-#define OP_OPENING_BRACKET   12
-#define OP_MIDDLE_BRACKET    13
-#define OP_CLOSING_BRACKET   14
-#define OP_BIG               15
-#define OP_TOTAL             16
+#define OP_PREFIX_INFIX      10
+#define OP_APPLY             11
+#define OP_SEPARATOR         12
+#define OP_OPENING_BRACKET   13
+#define OP_MIDDLE_BRACKET    14
+#define OP_CLOSING_BRACKET   15
+#define OP_BIG               16
+#define OP_TOTAL             17
 
 #define LIMITS_NONE           0
 #define LIMITS_DISPLAY        1
@@ -97,13 +98,17 @@ struct text_property_rep {
   int  priority;
   int  limits;
 
+  tree_label macro;
+
   text_property_rep (int type= TP_OTHER,
 		     int spc_before= SPC_NONE, int spc_after= SPC_NONE,
 		     int pen_before= 0, int pen_after= HYPH_INVALID,
 		     int op_type= OP_SYMBOL, int priority= 1000,
-		     int limits= LIMITS_NONE);
+		     int limits= LIMITS_NONE,
+                     tree_label macro= STRING);
 };
 
+text_property_rep copy (text_property_rep tpr);
 typedef text_property_rep* text_property;
 
 /******************************************************************************
@@ -145,20 +150,8 @@ array<string> get_supported_languages ();
 language text_language (string s);
 language math_language (string s);
 language prog_language (string s);
+language hyphenless_language (language base);
 language ad_hoc_language (language base, tree hyphs);
-
-string locale_to_language (string s);
-string language_to_locale (string s);
-string language_to_local_ISO_charset (string s);
-string get_locale_language ();
-string get_locale_charset ();
-#ifdef OS_MINGW
-namespace win32 {
-  string get_date (string lan, string fm);
-}
-#endif
-string get_date (string lan, string fm);
-string pretty_time (int t);
 
 string math_symbol_group (string s, string lan= "std-math");
 array<string> math_group_members (string s, string lan= "std-math");

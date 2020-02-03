@@ -73,6 +73,9 @@
     (enum ("Details in menus" "detailed menus")
           ("Simplified menus" "simple")
           ("Detailed menus" "detailed"))
+    (enum ("Buffer management" "buffer management")
+          ("Documents in separate windows" "separate")
+          ("Multiple documents share window" "shared"))
     ---
     (enum ("Language" "language")
           ,@(map (lambda (lan) (list (upcase-first lan) lan))
@@ -90,9 +93,7 @@
         (enum ("Cyrillic input method" "cyrillic input method")
               ("Translit" "translit")
               ("Jcuken" "jcuken")
-              ("Yawerty" "yawerty")
-              ("Koi8-r" "koi8-r")
-              ("Cp1251" "cp1251"))
+              ("Yawerty" "yawerty"))
         (enum ("Spacebar in text mode" "text spacebar")
               ("Default" "default")
               ---
@@ -127,6 +128,7 @@
     (-> "Converters"
         (-> "TeXmacs -> Html"
 ;           (toggle ("Use CSS" "texmacs->html:css"))
+            (toggle ("Use MathJax" "texmacs->html:mathjax"))
             (toggle ("Use MathML" "texmacs->html:mathml"))
             (toggle ("Export formulas as images" "texmacs->html:images")))
         (-> "LaTeX -> TeXmacs"
@@ -241,7 +243,7 @@
           ---
           ("Disable" "0"))
     (enum ("Bibtex command" "bibtex command")
-          "bibtex" "rubibtex" *)))
+          "bibtex" "biber" "biblatex" "rubibtex" *)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Computation of the preference menu

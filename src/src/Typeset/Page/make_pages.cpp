@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "page_type.hpp"
 #include "Format/page_item.hpp"
 #include "Format/stack_border.hpp"
 #include "pager.hpp"
@@ -17,6 +18,7 @@ box format_stack (path ip, array<box> bx, array<space> ht, SI height,
 #include "Boxes/construct.hpp"
 array<page_item> sub (array<page_item> l, path p, path q);
 page_item access (array<page_item> l, path p);
+space as_space (tree t);
 skeleton break_pages (array<page_item> l, space ph, int qual,
 		      space fn_sep, space fnote_sep, space float_sep,
                       font fn, int first_page);
@@ -145,6 +147,11 @@ pager_rep::pages_format (pagelet pg) {
 	  // cout << "sep " << stretch_space (float_sep, ins->stretch) << LF;
 	  y -= stretch_space (float_sep, ins->stretch);
 	}
+	if (is_tuple (ins->type, "if-page-break")) {
+          // cout << "sep "
+          // << stretch_space (as_space (ins->type[2]), ins->stretch) << LF;
+          y -= stretch_space (as_space (ins->type[2]), ins->stretch);
+	}
       }
     }
     if (fnote_y != MAX_SI) {
@@ -172,9 +179,17 @@ pager_rep::pages_make_page (pagelet pg) {
   box footer= make_footer (empty);
   brush bgc = make_background (empty);
   adjust_margins (empty);
-  return page_box (ip, lb, page_t, nr, bgc, width, height,
-                   left, top + dtop, top + dtop + text_height,
-		   header, footer, head_sep, foot_sep);
+  box page= page_box (ip, lb, page_t, nr, bgc, width, height,
+                      left, top + dtop, top + dtop + text_height,
+                      header, footer, head_sep, foot_sep);
+  if (env->get_string (PAGE_CROP_MARKS) == "") return page;
+  bool ls= env->page_landscape;
+  string sz= env->get_string (PAGE_CROP_MARKS);
+  SI w= env->as_length (page_get_feature (sz, PAGE_WIDTH, ls));
+  SI h= env->as_length (page_get_feature (sz, PAGE_HEIGHT, ls));
+  SI lw= env->as_length ("0.2ln");
+  SI ll= env->as_length ("1cm");
+  return crop_marks_box (ip, page, w, h, lw, ll);
 }
 
 void

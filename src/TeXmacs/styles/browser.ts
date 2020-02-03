@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.9>
+<TeXmacs|1.99.11>
 
 <style|source>
 
@@ -29,8 +29,6 @@
   \;
 
   <assign|par-hyphen|professional>
-
-  <assign|font|modern>
 
   <assign|font-family|ss>
 

@@ -4,6 +4,7 @@
 ;; MODULE      : init-gnuplot.scm
 ;; DESCRIPTION : Initialize GNUplot plugin
 ;; COPYRIGHT   : (C) 1999  Joris van der Hoeven
+;;                   2019  Darcy Shen
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -12,13 +13,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (gnuplot-serialize lan t)
-  (with u (pre-serialize lan t)
-    (with s (texmacs->code u)
-      (string-append (escape-verbatim (string-replace s "\n" "~")) "\n"))))
+    (with u (pre-serialize lan t)
+      (with s (texmacs->code (stree->tree u) "SourceCode")
+        (string-append s "\n<EOF>\n"))))
+
+(define (gnuplot-launcher)
+  (if (url-exists? "$TEXMACS_HOME_PATH/plugins/tmpy")
+      `((:launch ,(string-append "python \""
+                                 (getenv "TEXMACS_HOME_PATH")
+                                 "/plugins/tmpy/session/tm_gnuplot.py\"")))
+      `((:launch ,(string-append "python \""
+                                 (getenv "TEXMACS_PATH")
+                                 "/plugins/tmpy/session/tm_gnuplot.py\"")))))
+
 
 (plugin-configure gnuplot
   (:require (url-exists-in-path? "gnuplot"))
-  (:launch "tm_gnuplot --texmacs")
+  (:require (url-exists-in-path? "python"))
+  ,@(gnuplot-launcher)
   (:serializer ,gnuplot-serialize)
   (:session "Gnuplot")
   (:scripts "Gnuplot"))

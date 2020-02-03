@@ -30,6 +30,7 @@
   (if (cpp-has-preference? which)
       (preference-on? which)
       (cond ((== which "retina-factor") (== (get-retina-factor) 2))
+            ((== which "retina-zoom") (== (get-retina-zoom) 2))
             ((== which "retina-icons") (== (get-retina-icons) 2))
             (else #f))))
 
@@ -38,6 +39,7 @@
 
 (tm-define (reset-retina-preferences)
   (reset-preference "retina-factor")
+  (reset-preference "retina-zoom")
   (reset-preference "retina-icons")
   (reset-preference "retina-scale"))
 
@@ -54,23 +56,23 @@
 		    (get-retina-boolean-preference "retina-icons")))
 	  (meti (hlist // (text "Use unified toolbars"))
             (toggle (set-boolean-preference "use unified toolbar" answer)
-                    (get-boolean-preference "use unified toolbar"))))))
+                    (get-boolean-preference "use unified toolbar")))))
+      ===
+      (aligned
+        (item (text "Graphical interface font scale:")
+          (enum (set-retina-preference "retina-scale" answer)
+                '("1" "1.2" "1.4" "1.6" "1.8" "2" "")
+                (get-retina-preference "retina-scale")
+                "5em"))))
     (assuming (not (os-macos?))
       (centered
 	(aligned
-	  (meti (hlist // (text "Use high resolution fonts"))
-	    (toggle (set-retina-boolean-preference "retina-factor" answer)
-		    (get-retina-boolean-preference "retina-factor")))
+	  (meti (hlist // (text "Double the zoom factor for TeXmacs documents"))
+	    (toggle (set-retina-boolean-preference "retina-zoom" answer)
+		    (get-retina-boolean-preference "retina-zoom")))
 	  (meti (hlist // (text "Use high resolution icons"))
 	    (toggle (set-retina-boolean-preference "retina-icons" answer)
 		    (get-retina-boolean-preference "retina-icons"))))))
-    ===
-    (aligned
-      (item (text "Graphical interface font scale:")
-        (enum (set-retina-preference "retina-scale" answer)
-              '("1" "1.2" "1.4" "1.6" "1.8" "")
-              (get-retina-preference "retina-scale")
-              "5em")))
     === ===
     (bottom-buttons
       ("Cancel" (cmd "cancel")) >>

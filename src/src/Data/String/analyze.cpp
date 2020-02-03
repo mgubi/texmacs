@@ -13,18 +13,14 @@
 #include "merge_sort.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
+#include "ntuple.hpp"
 
 /******************************************************************************
 * Tests for characters
 ******************************************************************************/
 
 bool
-is_alpha (register char c) {
-  return ((c>='a') && (c<='z')) || ((c>='A') && (c<='Z'));
-}
-
-bool
-is_iso_alpha (register char c) {
+is_iso_alpha (char c) {
   int i= ((int) ((unsigned char) c));
   return
     ((c>='a') && (c<='z')) ||
@@ -33,7 +29,7 @@ is_iso_alpha (register char c) {
 }
 
 bool
-is_locase (register char c) {
+is_iso_locase (char c) {
   int code= (int) ((unsigned char) c);
   return
     ((c>='a') && (c<='z')) ||
@@ -42,34 +38,12 @@ is_locase (register char c) {
 }
 
 bool
-is_upcase (register char c) {
+is_iso_upcase (char c) {
   int code= (int) ((unsigned char) c);
   return
     ((c>='A') && (c<='Z')) ||
     ((code >= 128) && (code < 159)) ||
     ((code >= 192) && (code < 224));
-}
-
-bool
-is_digit (register char c) {
-  return (c>='0') && (c<='9');
-}
-
-bool
-is_numeric (register char c) {
-  return ((c>='0') && (c<='9')) || (c=='.');
-}
-
-bool
-is_punctuation (register char c) {
-  return
-    (c=='.') || (c==',') || (c==':') || (c=='\'') || (c=='`') ||
-    (c==';') || (c=='!') || (c=='?');
-}
-
-bool
-is_space (register char c) {
-  return (c == ' ') || (c == '\11') || (c == '\12') || (c == '\15');
 }
 
 /******************************************************************************
@@ -118,14 +92,14 @@ is_numeric (string s) {
 
 char
 upcase (char c) {
-  if (is_locase (c))
+  if (is_iso_locase (c))
     return (char) (((int) ((unsigned char) c)) - 32);
   else return c;
 }
 
 char
 locase (char c) {
-  if (is_upcase (c))
+  if (is_iso_upcase (c))
     return (char) (((int) ((unsigned char) c)) + 32);
   else return c;
 }
@@ -140,13 +114,13 @@ closing_delimiter (char c) {
 
 string
 upcase_first (string s) {
-  if ((N(s)==0) || (!is_locase (s[0]))) return s;
+  if ((N(s)==0) || (!is_iso_locase (s[0]))) return s;
   return string ((char) (((int) ((unsigned char) s[0]))-32)) * s (1, N(s));
 }
 
 string
 locase_first (string s) {
-  if ((N(s)==0) || (!is_upcase (s[0]))) return s;
+  if ((N(s)==0) || (!is_iso_upcase (s[0]))) return s;
   return string ((char) (((int) ((unsigned char) s[0]))+32)) * s (1, N(s));
 }
 
@@ -155,7 +129,7 @@ upcase_all (string s) {
   int i;
   string r (N(s));
   for (i=0; i<N(s); i++)
-    if (!is_locase (s[i])) r[i]= s[i];
+    if (!is_iso_locase (s[i])) r[i]= s[i];
     else r[i]= (char) (((int) ((unsigned char) s[i]))-32);
   return r;
 }
@@ -165,7 +139,7 @@ locase_all (string s) {
   int i;
   string r (N(s));
   for (i=0; i<N(s); i++)
-    if (!is_upcase (s[i])) r[i]= s[i];
+    if (!is_iso_upcase (s[i])) r[i]= s[i];
     else r[i]= (char) (((int) ((unsigned char) s[i]))+32);
   return r;
 }
@@ -274,7 +248,7 @@ german_to_igerman (string s) {
 ******************************************************************************/
 
 static string il2_to_cork_string=
-  "\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237 \201\212 \211\221\237\222\223\224\231\232\233 \241\252\251\261\262\263\264\271\272\273\217\301\302\200\304\210\202\307\203\311\206\313\205\315\316\204\320\213\214\323\324\216\326.\220\227\332\226\334\335\225\377\257\341\342\240\344\250\242\347\243\351\246\353\245\355\356\244\236\253\254\363\364\256\366/\260\267\372\266\374\375\265 ";
+  "\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237 \20\212 \211\221\237¨\222\223\224\231‐\232\233 \241˛\252´\251\261ˇ¸\262\263\264\271˝\272\273\217\301\302\200\304\210\202\307\203\311\206\313\205\315\316\204\320\213\214\323\324\216\326.\220\227\332\226\334\335\225\377\257\341\342\240\344\250\242\347\243\351\246\353\245\355\356\244\236\253\254\363\364\256\366/\260\267\372\266\374\375\265 ";
 static string cork_to_il2_string=
   "\303\241\306\310\317\314\312G\305\245\243\321\322 \325\300\330\246\251\252\253\336\333\331Y\254\256\257II\360\247\343\261\346\350\357\354\352g\345\265\263\361\362 \365\340\370\266\271\272\273\376\373\371y\274\276\277i!?LA\301\302A\304AA\307E\311E\313I\315\316I\320NO\323\324O\326OOU\332U\334\335 Sa\341\342a\344aa\347e\351e\353i\355\356i\360no\363\364o\366oou\372u\374\375 \337";
 
@@ -543,7 +517,7 @@ from_hexadecimal (string s) {
     return -from_hexadecimal (s (1, n));
   for (i=0; i<n; i++) {
     res= res << 4;
-    if ((s[i] >= '0') && (s[i] <= '9')) res += (int) (s[i] - '0');
+    if (is_digit (s[i])) res += (int) (s[i] - '0');
     if ((s[i] >= 'A') && (s[i] <= 'F')) res += (int) (s[i] + 10 - 'A');
     if ((s[i] >= 'a') && (s[i] <= 'f')) res += (int) (s[i] + 10 - 'a');
   }
@@ -557,7 +531,7 @@ from_hexadecimal (string s) {
 string
 tm_encode (string s) {
   // verbatim to TeXmacs encoding
-  register int i;
+  int i;
   string r;
   for (i=0; i<N(s); i++) {
     if (s[i]=='<') r << "<less>";
@@ -570,11 +544,11 @@ tm_encode (string s) {
 string
 tm_decode (string s) {
   // TeXmacs encoding to verbatim
-  register int i;
+  int i;
   string r;
   for (i=0; i<N(s); i++) {
     if (s[i]=='<') {
-      register int j;
+      int j;
       for (j=i+1; j<N(s); j++)
         if (s[j]=='>') break;
       if (j<N(s)) j++;
@@ -592,7 +566,7 @@ tm_decode (string s) {
 
 string
 tm_var_encode (string s) {
-  register int i, n= N(s);
+  int i, n= N(s);
   string r;
   for (i=0; i<n; i++) {
     if (s[i]=='<') {
@@ -610,12 +584,12 @@ tm_var_encode (string s) {
 
 string
 tm_correct (string s) {
-  register int i;
+  int i;
   string r;
   for (i=0; i<N(s); i++) {
     if (s[i]=='<') {
-      register bool flag= true;
-      register int j, k;
+      bool flag= true;
+      int j, k;
       for (j=i+1; j<N(s); j++)
         if (s[j]=='>') break;
       if (j==N(s)) return r;
@@ -816,7 +790,7 @@ scm_quote (string s) {
 
 string
 scm_unquote (string s) {
-  if ((N(s)>=2) && (s[0]=='\"') && (s[N(s)-1]=='\"')) {
+  if (is_quoted (s)) {
     int i, n= N(s);
     string r;
     for (i=1; i<n-1; i++)
@@ -837,7 +811,7 @@ raw_quote (string s) {
 string
 raw_unquote (string s) {
   // Get the string value of a STRING tree label representing a string.
-  if ((N(s)>=2) && (s[0]=='\"') && (s[N(s)-1]=='\"'))
+  if (is_quoted (s))
     return s (1, N(s)-1);
   else return s;
 }
@@ -929,7 +903,11 @@ unescape_guile (string s) {
   string r;
   for (i=0; i<n; i++) {
     if (s[i] == '\\') {
-      if (i+3 < n && s[i+1] == 'x'
+      if (i+1 < n && s[i+1] == '\\') {
+        r << "\\\\\\\\";
+        i+=1;
+      }
+      else if (i+3 < n && s[i+1] == 'x'
           && is_hex_digit (s[i+2]) && is_hex_digit (s[i+3])) {
         string e= s(i+2, i+4);
         r << (unsigned char) from_hexadecimal (e);
@@ -1108,7 +1086,7 @@ skip_symbol (string s, int& i) {
   if (i<n) {
     if (s[i]=='<') {
       for (i++; i<n; i++)
-	if (s[i-1]=='>') break;
+        if (s[i-1]=='>') break;
     }
     else i++;
   }
@@ -1639,4 +1617,24 @@ distance (string s1, string s2) {
   for (int k=0; k<N(r); k+=4)
     d += max (r[k+1] - r[k], r[k+3] - r[k+2]);
   return d;
+}
+
+/******************************************************************************
+* Parse length
+******************************************************************************/
+
+void
+parse_length (string s, double& len, string& unit) {
+  int start= 0;
+  int i, n= N(s);
+  for (i=start; i<n && !is_locase (s[i]); i++) {}
+  string s1= s (start, i);
+  string s2= s (i, n);
+  if (is_double (s1) && (is_locase_alpha (s2) || is_empty (s2))) {
+    len= as_double (s1);
+    unit= s2;
+  } else {
+    len= 0.0;
+    unit= "error";
+  }
 }

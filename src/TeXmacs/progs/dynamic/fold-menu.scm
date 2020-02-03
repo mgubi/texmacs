@@ -220,24 +220,27 @@
 
 (menu-bind document-style-extra-menu
   (:require (style-has? "beamer-style"))
-  (=> "Beamer theme"
+  (-> "Beamer theme"
       (for (theme (beamer-themes))
         ((check (eval (upcase-first theme)) "v" (has-style-package? theme))
          (add-style-package theme)))))
 
 (tm-menu (focus-style-extra-menu t)
   (:require (style-has? "beamer-style"))
-  (=> "Beamer theme"
+  (-> "Beamer theme"
       (for (theme (beamer-themes))
         ((check (eval (upcase-first theme)) "v" (has-style-package? theme))
-         (add-style-package theme)))))
+         (add-style-package theme))))
+  (-> "Background color"
+      (link document-background-color-menu)))
 
 (tm-menu (focus-style-extra-icons t)
   (:require (style-has? "beamer-style"))
   (=> (balloon (eval (upcase-first (current-beamer-theme))) "Beamer theme")
       (for (theme (beamer-themes))
         ((check (eval (upcase-first theme)) "v" (has-style-package? theme))
-         (add-style-package theme)))))
+         (add-style-package theme))))
+  (link focus-background-color-icons))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Propose insertion of 'screens' tag in beamer style
@@ -298,7 +301,10 @@
 
 (tm-define (standard-options l)
   (:require (== l 'tit))
-  (list "framed-title" "title-bar"))
+  (append (list "framed-title" "title-bar")
+          (if (style-has? "framed-title-package")
+              (list "shadowed-frames")
+              (list "shadowed-titles"))))
 
 (tm-define (parameter-show-in-menu? l)
   (:require (== l "title-theme"))
@@ -386,6 +392,7 @@
           (vlist
             ("Color" (interactive-color setter (list)))
             ("Pattern" (open-pattern-selector setter "1cm"))
+            ("Picture" (open-background-picture-selector setter))
             (glue #f #t 0 0))))
       ======
       (explicit-buttons
@@ -514,8 +521,9 @@
 (tm-menu (focus-hidden-icons t)
   (:require (overlays-context? t))
   //
-  (=> (eval (get-overlays-menu-name "Overlay " t))
-      (dynamic (focus-overlays-menu t))))
+  (mini #t
+    (=> (eval (get-overlays-menu-name "Overlay " t))
+        (dynamic (focus-overlays-menu t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu customizations for overlay filters
@@ -536,8 +544,12 @@
 
 (tm-menu (focus-hidden-icons t)
   (:require (overlay-context? t))
+  (with p (tree-search-upwards t overlays-context?)
+    (assuming p
+      (dynamic (focus-hidden-icons p))))
   //
-  (dynamic (focus-overlay-icons t)))
+  (mini #t
+    (dynamic (focus-overlay-icons t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overlays in graphics mode

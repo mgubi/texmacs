@@ -172,8 +172,9 @@ collect_abstract_data (tree u) {
 
 static array<tree>
 get_latex_author_datas (tree t) {
-  int i, n=N(t);
   array<tree> r;
+  if (is_atomic (t)) return r;
+  int i, n=N(t);
   tree u;
   tree author_data (APPLY, "\\author-data");
   tree author_name (CONCAT);
@@ -236,7 +237,10 @@ collect_metadata_latex (tree t, array<tree>(*get_author_datas)(tree)) {
       doc_data << tuple ("\\doc-title", cltm (u[N(u)-1]));
     }
     else if (is_tuple (u, "\\author", 1)  || is_tuple (u, "\\author*", 2)) {
-      array<tree> author_datas= (*get_author_datas) (u[1]);
+      int k=1;
+      if (N(u) == 3 && is_atomic (u[1]) && is_compound (u[2])) k=2;
+      array<tree> author_datas= (*get_author_datas) (u[k]);
+      // TODO: do something useful with the ignored argument
       for (int j=0; j<N(author_datas); j++)
         doc_data << tree (APPLY, "\\doc-author", author_datas[j]);
     }

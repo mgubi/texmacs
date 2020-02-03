@@ -30,7 +30,7 @@
   (generic-document '(document "")))
 
 (define (buffer-set-stm u doc)
-  (let* ((s (unescape-guile (object->string doc)))
+  (let* ((s (object->tmstring doc))
          (t (tree-import-loaded s u "stm")))
     (buffer-set u t)))
 
@@ -139,7 +139,7 @@
          (msg remote-commit-message))
     (client-remote-eval server `(remote-file-create ,name ,tm ,msg)
       (lambda (msg)
-        (load-buffer fname))
+        (load-document fname))
       (lambda (err)
         (set-message err "create remote file")))))
 
@@ -230,7 +230,7 @@
          (name (substring fname 18 (string-length fname))))
     (client-remote-eval server `(remote-dir-create ,name)
       (lambda (entries)
-        (load-buffer fname))
+        (load-document fname))
       (lambda (err)
         (set-message err "create remote directory")))))
 

@@ -73,6 +73,51 @@
   (search-options (tree-label t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Determine which parameters are set by a tag
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (assigned-parameters-with l v t)
+  (if (null? (cdr l))
+      (assigned-parameters-sub (car l) v t)
+      (let* ((v* (make-ahash-table))
+             (t* (make-ahash-table)))
+        (collect-parameters-sub (car l) v* t*)
+        (collect-parameters-sub (cadr l) v* t*)
+        (assigned-parameters-with (cddr l) v t)
+        (when (tree-atomic? (car l))
+          (ahash-set! v (tree->string (car l)) #t))
+        (for (x (ahash-set->list v*)) (ahash-remove! v x)))))
+
+(define (assigned-parameters-sub def v t)
+  (cond ((tree-atomic? def) (noop))
+	((tree-is? def 'with)
+         (assigned-parameters-with (tree-children def) v t))
+	((and (tree-is? def 'compound) (tree-atomic? (tree-ref def 0)))
+         (let* ((c (tree-children def))
+                (l (string->symbol (tree->string (car c))))
+                (u (tm->tree (cons l (cdr c)))))
+           (assigned-parameters-sub u v t)))
+	((== (tree-arity def) 1)
+         (assigned-parameters (symbol->string (tree-label def)) v t))))
+
+(define (assigned-parameters l v t)
+  (when (not (ahash-ref t l))
+    ;;(display* "Assigned by " l "\n")
+    (ahash-set! t l #t)
+    (with def (get-init-tree l)
+      ;;(display* "  Def= " def "\n")
+      (cond ((tree-is? def 'uninit) (noop))
+            ((tree-in? def '(macro xmacro))
+             (assigned-parameters-sub (cAr (tree-children def)) v t))))))
+
+(tm-define (assigned-parameters l)
+  (if (symbol? l) (set! l (symbol->string l)))
+  (let* ((v (make-ahash-table))
+	 (t (make-ahash-table)))
+    (assigned-parameters l v t)
+    (sort (ahash-set->list v) string<=?)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collecting environment variables which are parameters for a tag
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -100,6 +145,18 @@
                 (l (string->symbol (tree->string (car c))))
                 (u (tm->tree (cons l (cdr c)))))
            (collect-parameters-sub u v t)))
+        ((tree-label-extension? (tree-label def))
+         (when (tree-parameter? def)
+           (ahash-set! v (symbol->string (tree-label def)) #t))
+         (let* ((v* (make-ahash-table))
+                (t* (make-ahash-table)))
+           (assigned-parameters (symbol->string (tree-label def)) v* t*)
+	   (with al (filter (lambda (x) (not (ahash-ref v x)))
+                            (ahash-set->list v*))
+             (collect-parameters (symbol->string (tree-label def)) v t)
+             (for-each (cut collect-parameters-sub <> v t)
+                       (tree-children def))
+             (for (x al) (ahash-remove! v x)))))
 	(else
           (when (tree-parameter? def)
             (ahash-set! v (symbol->string (tree-label def)) #t))
@@ -133,3 +190,63 @@
 
 (tm-define (search-tag-parameters t)
   (search-parameters (tree-label t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Theme analysis
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (theme-guess var)
+  (with def (get-init-tree var)
+    (and (tree-is? def 'macro)
+         (== (tree-arity def) 2)
+         (tree-is? (tree-ref def 1) 'with)
+         (with l (cDr (tm-children (tree->stree (tm-ref def 1))))
+           (and (>= (length l) 2)
+                (let* ((var (car l))
+                       (val (cadr l)))
+                  (and (string? var)
+                       (tm-is? val 'value)
+                       (== (tm-arity val) 1)
+                       (string? (tm-ref val 0))
+                       (string-ends? (tm-ref val 0) (string-append "-" var))
+                       (string-drop-right (tm-ref val 0)
+                                          (+ (string-length var) 1)))))))))
+
+(define (theme-read-members th l)
+  (if (or (null? l) (null? (cdr l))) l
+      (and-with r (theme-read-members th (cddr l))
+        (let* ((var (car l))
+               (val (cadr l)))
+          (and (string? var)
+               (tm-is? val 'value)
+               (== (tm-arity val) 1)
+               (== (tm-ref val 0) (string-append th "-" var))
+               (cons var r))))))
+
+(tm-define (theme->members th)
+  ;; FIXME: does not handle subthemes yet
+  (with def (get-init-tree (string-append "with-" th))
+    (and (tree-is? def 'macro)
+         (== (tree-arity def) 2)
+         (tree-is? (tree-ref def 1) 'with)
+         (with l (cDr (tm-children (tree->stree (tm-ref def 1))))
+           (theme-read-members th l)))))
+
+(define (member->theme-at var at)
+  (with pos (string-search-backwards "-" at var)
+    (and (>= pos 0)
+         (or (and-with mems (theme->members (substring var 0 pos))
+               (and (in? (substring var (+ pos 1) (string-length var)) mems)
+                    (substring var 0 pos)))
+             (member->theme-at var (- pos 1))))))
+
+(tm-define (member->theme var)
+  (member->theme-at var (- (string-length var) 1)))
+
+(tm-define (search-themes l)
+  (let* ((l1 (search-parameters l))
+         (l2 (list-filter (map member->theme l1) identity)))
+    (list-remove-duplicates l2)))
+
+(tm-define (search-tag-themes l)
+  (search-themes (tree-label l)))

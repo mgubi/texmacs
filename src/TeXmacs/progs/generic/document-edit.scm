@@ -29,12 +29,12 @@
 ;; Preamble mode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (in-preamble?)
+(define (in-source-mode?)
   (== (get-env "preamble") "true"))
 
-(tm-define (toggle-preamble)
-  (:synopsis "Toggle preamble mode.")
-  (:check-mark "v" in-preamble?)
+(tm-define (toggle-source-mode)
+  (:synopsis "Toggle source code editing mode.")
+  (:check-mark "v" in-source-mode?)
   (let ((new (if (string=? (get-env "preamble") "true") "false" "true")))
     (init-env "preamble" new)))
 
@@ -99,7 +99,18 @@
       (init-multi* l)))
 
 (tm-define (test-init-font? val . opts)
-  (== (get-init "font") val))
+  (== (font-family-main (get-init "font")) val))
+
+(tm-define (remove-font-packages)
+  (with l (get-style-list)
+    (with f (list-filter l (lambda (p) (not (string-ends? p "-font"))))
+      (set-style-list f))))
+
+(define (font-package-name val)
+  (cond ((== val "Fira") "fira-font")
+        ((== val "Linux Biolinum") "biolinum-font")
+        ((== val "Linux Libertine") "libertine-font")
+        (else (string-append val "-font"))))
 
 (tm-define (init-font val . opts)
   (:check-mark "*" test-init-font?)
@@ -121,7 +132,14 @@
           (init-env "font" val)
           (when (nnull? opts)
             (init-env "math-font" (car opts)))
-          (init-env "font-family" "rm"))))
+          (init-env "font-family" "rm")
+          (remove-font-packages)
+          (with pack (font-package-name val)
+            (with dir "$TEXMACS_PATH/packages/customize/fonts"
+              (when (url-exists? (url-append dir (string-append pack ".ts")))
+                (init-default "font")
+                (init-default "font-family")
+                (add-style-package pack)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initial environment management in specific buffers
@@ -302,6 +320,8 @@
 (define (test-page-rendering? s) (== (get-init-page-rendering) s))
 (tm-define (init-page-rendering s)
   (:check-mark "*" test-page-rendering?)
+  (when (in? s (list "paper" "papyrus"))
+    (set-preference "page medium" s))
   (save-zoom (get-init-page-rendering))
   (cond ((== s "book")
          (init-env "page-medium" "paper")
@@ -409,6 +429,127 @@
         (else
          (add-style-package "no-page-numbers"))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Citing TeXmacs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (document-search-first lab)
+  (safe-car (tree-search (buffer-tree) (cut tree-is? <> lab))))
+
+(define (acknowledged-texmacs? . refs)
+  (if (null? refs)
+      (document-search-first 'cite-website)
+      (document-search-first 'cite-TeXmacs)))
+
+(define (tail-document doc)
+  (when (and (tm-is? doc 'document)
+             (tm-is? (tm-ref doc :last) 'screens)
+             (tm-in? (tm-ref doc :last :last) '(shown hidden))
+             (tm-is? (tm-ref doc :last :last :last) 'document))
+    (set! doc (tm-ref doc :last :last :last)))
+  doc)
+
+(define (add-biblio)
+  (with bib (document-search-first 'bibliography)
+    (when (and (not bib) (tree-is? (buffer-tree) 'document))
+      (with doc (tail-document (buffer-tree))
+        (tree-insert doc (tree-arity doc)
+                     `((bibliography "bib" "tm-plain" "" (document ""))))))))
+
+(define (update-biblio)
+  (update-document "bibliography")
+  (delayed (:idle 1) (update-document "bibliography")))
+
+(tm-define (acknowledge-texmacs . refs)
+  (:synopsis "Acknowledge that a document has been written using TeXmacs")
+  (:check-mark "v" acknowledged-texmacs?)
+  (let* ((tit  (document-search-first 'doc-data))
+         (bib  (document-search-first 'bibliography))
+         (aweb (document-search-first 'cite-website))
+         (nweb (and aweb (tree-search-upwards aweb 'doc-note)))
+         (acit (document-search-first 'cite-TeXmacs))
+         (ncit (and acit (tree-search-upwards acit 'doc-note))))
+    (cond ((and nweb (nnull? refs))
+           (tree-set! aweb `(cite-TeXmacs ,@refs))
+           (update-biblio))
+          ((and ncit (null? refs))
+           (tree-set! acit `(cite-website))
+           (update-biblio))
+          ((and nweb (null? refs))
+           (tree-remove (tree-up nweb) (tree-index nweb) 1)
+           (update-biblio))
+          ((and aweb (null? refs))
+           (tree-cut aweb))
+          ((and ncit (nnull? refs))
+           (tree-remove (tree-up ncit) (tree-index ncit) 1)
+           (update-biblio))
+          ((and tit (nnull? refs))
+           (add-biblio)
+           (tree-insert! tit (tree-arity tit)
+                         `((doc-note (document (cite-TeXmacs ,@refs)))))
+           (update-biblio))
+          ((and tit (null? refs))
+           (tree-insert! tit (tree-arity tit)
+                         `((doc-note (document (cite-website))))))
+          ((nnull? refs)
+           (add-biblio)
+           (insert `(cite-TeXmacs ,@refs))
+           (update-biblio))
+          (else (make 'cite-website)))))
+
+(define (is-cite? t)
+  (tree-in? t '(cite nocite cite-TeXmacs)))
+
+(define (is-citation? t ref types)
+  (and (tm-equal? t ref)
+       (tree-up t)
+       (tree-in? (tree-up t) types)))
+
+(define (cited-texmacs? ref)
+  (let* ((l '(cite nocite cite-TeXmacs))
+         (pred? (cut is-citation? <> ref l))
+         (alt-pred? (cut is-citation? <> ref '(cite-TeXmacs))))
+    (cond ((is-cite? (cursor-tree))
+           (safe-car (tree-search (cursor-tree) pred?)))
+          ((is-cite? (tree-up (cursor-tree)))
+           (safe-car (tree-search (tree-up (cursor-tree)) pred?)))
+          ((document-search-first 'doc-data)
+           (safe-car (tree-search (buffer-tree) alt-pred?)))
+          (else (safe-car (tree-search (buffer-tree) pred?))))))
+
+(tm-define (cite-texmacs ref)
+  (:synopsis "Cite a paper or other work on TeXmacs")
+  (:check-mark "v" cited-texmacs?)
+  (cond ((cited-texmacs? ref)
+         (with t (cited-texmacs? ref)
+           (cond ((and (== (tree-arity (tree-up t)) 1)
+                       (tree-search-upwards t 'doc-note))
+                  (with note (tree-search-upwards t 'doc-note)
+                    (tree-remove (tree-up note) (tree-index note) 1)
+                    (update-biblio)))
+                 ((> (tree-arity (tree-up t)) 1)
+                  (tree-remove (tree-up t) (tree-index t) 1)))))
+        ((tree-in? (cursor-tree) '(cite nocite cite-TeXmacs))
+         (tree-insert (cursor-tree) (tree-arity (cursor-tree)) (list ref))
+         (update-biblio))
+        ((and (tree-in? (tree-up (cursor-tree)) '(cite nocite cite-TeXmacs))
+              (tm-equal? (cursor-tree) ""))
+         (tree-set (cursor-tree) ref))
+        ((tree-in? (tree-up (cursor-tree)) '(cite nocite cite-TeXmacs))
+         (with i (+ (tree-index (cursor-tree)) 1)
+           (tree-insert (tree-up (cursor-tree)) i (list ref))
+           (tree-go-to (tree-up (cursor-tree)) i :end)))
+        ((document-search-first 'cite-TeXmacs)
+         (with t (document-search-first 'cite-TeXmacs)
+           (tree-insert t (tree-arity t) (list ref))
+           (update-biblio)))
+        ((document-search-first 'doc-data)
+         (acknowledge-texmacs ref))
+        (else
+         (add-biblio)
+         (insert `(cite ,ref))
+         (update-biblio))))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Document updates
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

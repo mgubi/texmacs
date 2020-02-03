@@ -124,6 +124,7 @@
 
 class edit_env;
 class ornament_parameters;
+class art_box_parameters;
 class edit_env_rep: public concrete_struct {
 public:
   drd_info&                    drd;
@@ -218,6 +219,7 @@ public:
   string       doc_at_valign;
 
   string       page_type;
+  string       page_real_type;
   bool         page_landscape;
   bool         page_automatic;
   bool         page_single;
@@ -228,6 +230,8 @@ public:
   int          page_margin_mode;
   SI           page_width;
   SI           page_height;
+  SI           page_real_width;
+  SI           page_real_height;
   SI           page_user_width;
   SI           page_user_height;
   SI           page_odd_margin;
@@ -261,6 +265,12 @@ private:
   tree exec_quote_arg (tree t);
   tree exec_get_label (tree t);
   tree exec_get_arity (tree t);
+  tree exec_new_theme (tree t);
+  tree exec_copy_theme (tree t);
+  tree exec_apply_theme_sub (string var);
+  tree exec_apply_theme (tree t);
+  tree exec_select_theme_sub (string theme, string from);
+  tree exec_select_theme (tree t);
   tree exec_eval_args (tree t);
   bool exec_until_mark (tree t, path p, string var, int level);
   bool exec_until_quasi (tree t, path p, string var, int level);
@@ -338,11 +348,15 @@ private:
   tree exec_xspc_length ();
   tree exec_par_length ();
   tree exec_pag_length ();
-  tree exec_tmpt_length ();
-  tree exec_px_length ();
   tree exec_gw_length ();
   tree exec_gh_length ();
   tree exec_gu_length ();
+  tree exec_tmpt_length ();
+  tree exec_px_length ();
+  tree exec_lcorner_length ();
+  tree exec_bcorner_length ();
+  tree exec_rcorner_length ();
+  tree exec_tcorner_length ();
   tree exec_ms_length ();
   tree exec_s_length ();
   tree exec_msec_length ();
@@ -355,6 +369,7 @@ private:
   tree exec_find_accessible (tree t);
   tree exec_set_binding (tree t);
   tree exec_get_binding (tree t);
+  tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
 
   tree exec_pattern (tree t);
@@ -368,9 +383,13 @@ private:
   tree exec_point (tree t);
 
   tree exec_eff_move (tree t);
+  tree exec_eff_magnify (tree t);
   tree exec_eff_bubble (tree t);
+  tree exec_eff_crop (tree t);
   tree exec_eff_turbulence (tree t);
   tree exec_eff_fractal_noise (tree t);
+  tree exec_eff_hatch (tree t);
+  tree exec_eff_dots (tree t);
   tree exec_eff_gaussian (tree t);
   tree exec_eff_oval (tree t);
   tree exec_eff_rectangular (tree t);
@@ -459,6 +478,7 @@ public:
 
   /* updating environment variables */
   ornament_parameters get_ornament_parameters ();
+  art_box_parameters get_art_box_parameters (tree t);
   void   update_page_pars ();
   void   get_page_pars (SI& w, SI& h, SI& ww, SI& hh,
 			SI& odd, SI& even, SI& top, SI& bottom);
@@ -504,6 +524,7 @@ public:
   tree      as_tmlen (tree t);
   SI        as_length (tree t);
   SI        as_length (tree t, string perc);
+  SI        as_eff_length (tree t);
   space     as_hspace (tree t);
   space     as_vspace (tree t);
   point     as_point (tree t);
@@ -556,7 +577,6 @@ CONCRETE_NULL_CODE(edit_env);
 
 tm_ostream& operator << (tm_ostream& out, edit_env env);
 tree texmacs_exec (edit_env env, tree cmd);
-void extract_format (tree fm, tree* r, int n);
 tree load_inclusion (url u); // implemented in tm_file.cpp
 tree tree_extents (tree t);
 bool is_percentage (tree t, string s);

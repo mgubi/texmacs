@@ -29,16 +29,17 @@ RESOURCE(smart_map);
 #define SUBFONT_MAIN  0
 #define SUBFONT_ERROR 1
 
-#define REWRITE_NONE           0
-#define REWRITE_MATH           1
-#define REWRITE_CYRILLIC       2
-#define REWRITE_LETTERS        3
-#define REWRITE_SPECIAL        4
-#define REWRITE_EMULATE        5
-#define REWRITE_POOR_BBB       6
-#define REWRITE_ITALIC_GREEK   7
-#define REWRITE_UPRIGHT_GREEK  8
-#define REWRITE_IGNORE         9
+#define REWRITE_NONE            0
+#define REWRITE_MATH            1
+#define REWRITE_CYRILLIC        2
+#define REWRITE_LETTERS         3
+#define REWRITE_SPECIAL         4
+#define REWRITE_EMULATE         5
+#define REWRITE_POOR_BBB        6
+#define REWRITE_ITALIC_GREEK    7
+#define REWRITE_UPRIGHT_GREEK   8
+#define REWRITE_UPRIGHT         9
+#define REWRITE_IGNORE         10
 
 struct smart_map_rep: rep<smart_map> {
   int chv[256];
@@ -170,11 +171,6 @@ is_math_family (string f) {
     f == "ENR";
 }
 
-inline bool
-is_letter (char c) {
-  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-}
-
 static bool
 is_greek (string c) {
   static hashmap<string,bool> t (false);
@@ -211,18 +207,19 @@ unicode_provides (string s) {
 static bool
 is_special (string s) {
   if (N (special_table) == 0) {
-    special_table ("*")= "";
     special_table ("<noplus>")= "";
     special_table ("<nocomma>")= "";
     special_table ("<nospace>")= "";
     special_table ("<nobracket>")= "";
     special_table ("<nosymbol>")= "";
+    special_table ("*")= "";
     special_table ("-")= "<minus>";
     special_table ("|")= "<mid>";
     special_table ("'")= "<#2B9>";
     special_table ("`")= "<backprime>";
     special_table ("<hat>")= "<#2C6>";
     special_table ("<tilde>")= "<#2DC>";
+    special_table ("<comma>")= ",";
   }
   if (starts (s, "<big-."))
     special_table (s)= "";
@@ -422,6 +419,13 @@ substitute_upright_greek (string c) {
   return c;
 }
 
+string
+substitute_upright (string c) {
+  if (!starts (c, "<up-") || !ends (c, ">")) return "";
+  if (N(c) == 6) return c (4, 5);
+  return "<" * c (4, N(c));
+}
+
 /******************************************************************************
 * Font sequences
 ******************************************************************************/
@@ -438,8 +442,25 @@ main_family (string f) {
     if (N (trimmed_tokenize (a[i], "=")) <= 1)
       return a[i];
   if (N(a) == 0) return f;
-  a= trimmed_tokenize (f, "=");
+  a= trimmed_tokenize (a[0], "=");
+  if (N(a) <= 1) return f;
   return a[1];
+}
+
+string
+get_unicode_range (int code) {
+  if (code <= 0x7f) return "ascii";
+  else if (code >= 0x80 && code <= 0x37f) return "latin";
+  else if (code >= 0x380 && code <= 0x3ff) return "greek";
+  else if (code >= 0x400 && code <= 0x4ff) return "cyrillic";
+  else if (code >= 0x3000 && code <= 0x303f) return "cjk";
+  else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
+  else if (code >= 0xff00 && code <= 0xffef) return "cjk";
+  else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
+  else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
+  else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
+  else if (code >= 0x1d400 && code <= 0x1d7ff) return "mathletters";
+  else return "";
 }
 
 string
@@ -448,20 +469,33 @@ get_unicode_range (string c) {
   if (N(uc) == 0) return "";
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
-  string range= "";
-  if (code <= 0x7f) range= "ascii";
-  else if (code >= 0x80 && code <= 0x37f) range= "latin";
-  else if (code >= 0x380 && code <= 0x3ff) range= "greek";
-  else if (code >= 0x400 && code <= 0x4ff) range= "cyrillic";
-  else if (code >= 0x3000 && code <= 0x303f) range= "cjk";
-  else if (code >= 0x4e00 && code <= 0x9fcc) range= "cjk";
-  else if (code >= 0xff00 && code <= 0xffef) range= "cjk";
-  else if (code >= 0xac00 && code <= 0xd7af) range= "hangul";
-  else if (code >= 0x2000 && code <= 0x23ff) range= "mathsymbols";
-  else if (code >= 0x2900 && code <= 0x2e7f) range= "mathextra";
-  else if (code >= 0x1d400 && code <= 0x1d7ff) range= "mathletters";
+  string range= get_unicode_range (code);
   if (pos == N(uc)) return range;
   return "";
+}
+
+bool
+in_unicode_range (string c, string range) {
+  string uc= strict_cork_to_utf8 (c);
+  if (N(uc) == 0) return "";
+  int pos= 0;
+  int code= decode_from_utf8 (uc, pos);
+  if (range == get_unicode_range (code)) return range != "";
+  if (range == "mathlarge" || range == "mathbigop")
+    if (starts (c, "<big-") ||
+        (code >= 0x220f && code <= 0x2211) ||
+        (code >= 0x222b && code <= 0x2233) ||
+        (code >= 0x22c0 && code <= 0x22c3) ||
+        (code >= 0x2a00 && code <= 0x2a1c))
+      return true;
+  if (range == "mathlarge" || range == "mathrubber")
+    if (starts (c, "<wide-") ||
+        starts (c, "<large-") ||
+        starts (c, "<left-") ||
+        starts (c, "<mid-") ||
+        starts (c, "<right-"))
+      return true;
+  return false;
 }
 
 /******************************************************************************
@@ -685,6 +719,7 @@ smart_font_rep::smart_font_rep (
 {
   fn[SUBFONT_MAIN ]= adjust_subfont (base_fn);
   fn[SUBFONT_ERROR]= adjust_subfont (err_fn);
+  this->copy_math_pars (base_fn);
   if (shape == "mathitalic" || shape == "mathupright" || shape == "mathshape") {
     if (is_math_family (mfam)) {
       rshape= "right";
@@ -697,7 +732,7 @@ smart_font_rep::smart_font_rep (
         this->copy_math_pars (fn[nr]);
         fn[SUBFONT_MAIN]= fn[nr];
       }
-    } 
+    }
     else {
       math_kind= 1;
       if (shape == "mathupright") math_kind= 2;
@@ -813,6 +848,8 @@ rewrite (string s, int kind) {
     return substitute_italic_greek (s);
   case REWRITE_UPRIGHT_GREEK:
     return substitute_upright_greek (s);
+  case REWRITE_UPRIGHT:
+    return substitute_upright (s);
   case REWRITE_IGNORE:
     return "";
   default:
@@ -835,11 +872,15 @@ smart_font_rep::advance (string s, int& pos, string& r, int& nr) {
     if (s[pos] != '<') {
       int c= (int) (unsigned char) s[pos];
       int next= chv[c];
-      if (math_kind != 0 && math_kind != 2 && is_letter (c) &&
-          (pos == 0 || !is_letter (s[pos-1])) &&
-          (pos+1 == N(s) || !is_letter (s[pos+1])))
+      if (math_kind != 0 && math_kind != 2 && is_alpha (c) &&
+          (pos == 0 || !is_alpha (s[pos-1])) &&
+          (pos+1 == N(s) || !is_alpha (s[pos+1])))
         next= italic_nr;
       else if (chv[c] == -1) next= resolve (s (pos, pos+1));
+      if (count == 1 && nr != -1 && next == nr) {
+        // NOTE: rewrite strings like --- character by character if necessary
+        if (sm->fn_rewr[nr] == REWRITE_SPECIAL) break;
+      }
       if (next == nr) pos++;
       else if (nr == -1) { pos++; nr= next; }
       else break;
@@ -889,7 +930,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         string wanted= locase_all (v[j]);
         if (wanted == "") ok= true;
         else if (contains (wanted, given)) ok= true;
-        else if (wanted == get_unicode_range (c)) ok= true;
+        else if (in_unicode_range (c, wanted)) ok= true;
         else if (wanted == substitute_math_letter (c, 2)) ok= true;
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
@@ -1069,7 +1110,7 @@ smart_font_rep::resolve_rubber (string c, string fam, int attempt) {
         goal == "<trbracket>" || goal == "<trfloor>" || goal == "<trceil>")
       goal= "]";
   }
-  int bnr= resolve (goal, fam, attempt);
+  int bnr= resolve (goal, main_family (fam), attempt);
   if (bnr >= 0 && bnr < N(fn) && !is_nil (fn[bnr])) {
     tree key= tuple ("rubber", as_string (bnr));
     int nr= sm->add_font (key, REWRITE_NONE);
@@ -1082,15 +1123,34 @@ smart_font_rep::resolve_rubber (string c, string fam, int attempt) {
   return -1;
 }
 
+static bool
+use_italic_greek (array<string> a) {
+  // FIXME: this is a very hacky fix for fonts such as
+  // 'math basic-letters=Linux Libertine,math=TeX Gyre Termes,Linux Libertine'
+  // which get rewritten as follows in math mode:
+  // 'math basic-letters=Linux Libertine,TeX Gyre Termes,Linux Libertine'
+  int count= 0;
+  for (int i=0; i<N(a); i++)
+    if (!occurs ("=", a[i])) count++;
+  return count <= 1;
+}
+
 int
 smart_font_rep::resolve (string c) {
   //cout << "Resolving " << c
   //     << " for " << mfam << ", " << family << ", " << variant
   //     << ", " << series << ", " << shape << ", " << rshape
-  //     << "; " << fn[SUBFONT_MAIN]->res_name << "\n";
+  //     << "; " << fn[SUBFONT_MAIN]->res_name << "; " << math_kind << "\n";
   array<string> a= trimmed_tokenize (family, ",");
 
   if (math_kind != 0) {
+    string upc= substitute_upright (c);
+    if (upc != "" && fn[SUBFONT_MAIN]->supports (upc)) {
+      tree key= tuple ("up");
+      int nr= sm->add_font (key, REWRITE_UPRIGHT);
+      initialize_font (nr);
+      return sm->add_char (key, c);
+    }
     string ugc= substitute_upright_greek (c);
     if (ugc != "" && fn[SUBFONT_MAIN]->supports (ugc)) {
       tree key= tuple ("upright-greek");
@@ -1098,7 +1158,7 @@ smart_font_rep::resolve (string c) {
       initialize_font (nr);
       return sm->add_char (key, c);
     }
-    if (N(a) == 1 && is_greek (c)) {
+    if (is_greek (c) && use_italic_greek (a)) {
       string gc= substitute_italic_greek (c);
       if (gc != "" && fn[SUBFONT_MAIN]->supports (gc)) {
         tree key= tuple ("italic-greek");
@@ -1113,9 +1173,12 @@ smart_font_rep::resolve (string c) {
       //cout << "Found " << c << " in italic prime\n";
       return sm->add_char (tuple ("italic-math"), c);      
     }
-    if (is_special (c) && (c != "*" || !ends (variant, "-tt")) &&
+    if (is_special (c) && (N(c) != 1 || !ends (variant, "-tt")) &&
         (!starts (c, "<big") ||
-         !starts (mfam, "TeX Gyre") || !ends (mfam, " Math"))) {
+         !starts (mfam, "TeX Gyre") || !ends (mfam, " Math")) &&
+        (!starts (c, "<big") ||
+         (!occurs ("mathlarge=", family) &&
+          !occurs ("mathbigop=", family)))) {
       //cout << "Found " << c << " in special\n";
       return sm->add_char (tuple ("special"), c);
     }
@@ -1218,16 +1281,18 @@ smart_font_rep::initialize_font (int nr) {
     fn[nr]= fn[SUBFONT_MAIN];
   else if (a[0] == "upright-greek")
     fn[nr]= fn[SUBFONT_MAIN];
+  else if (a[0] == "up")
+    fn[nr]= fn[SUBFONT_MAIN];
   else if (a[0] == "tt")
     fn[nr]= smart_font_bis (family, "tt", series, "right", sz, hdpi, dpi);
   else if (a[0] == "ss")
-    fn[nr]= smart_font_bis (family, "tt", series, "right", sz, hdpi, dpi);
+    fn[nr]= smart_font_bis (family, "ss", series, "right", sz, hdpi, dpi);
   else if (a[0] == "bold-ss")
-    fn[nr]= smart_font_bis (family, "tt", "bold", "right", sz, hdpi, dpi);
+    fn[nr]= smart_font_bis (family, "ss", "bold", "right", sz, hdpi, dpi);
   else if (a[0] == "italic-ss")
-    fn[nr]= smart_font_bis (family, "tt", series, "italic", sz, hdpi, dpi);
+    fn[nr]= smart_font_bis (family, "ss", series, "italic", sz, hdpi, dpi);
   else if (a[0] == "bold-italic-ss")
-    fn[nr]= smart_font_bis (family, "tt", "bold", "italic", sz, hdpi, dpi);
+    fn[nr]= smart_font_bis (family, "ss", "bold", "italic", sz, hdpi, dpi);
   else if (a[0] == "cal" && N(a) == 1)
     fn[nr]= smart_font_bis (family, "calligraphic", series, "italic", sz,
                             hdpi, dpi);
@@ -1490,7 +1555,7 @@ smart_font_rep::index_glyph (string s, font_metric& fnm, font_glyphs& fng) {
   if (n == 0) return -1;
   string r= s;
   advance (s, i, r, nr);
-  if (nr < 0) return -1;
+  if (nr < 0 || N(r) == 0) return -1;
   return fn[nr]->index_glyph (r, fnm, fng);
 }
 
@@ -1674,11 +1739,31 @@ smart_font (string family, string variant, string series, string shape,
   return smart_font (tfam, tvar, tser, tsh, sz, dpi);
 }
 
+static string
+get_string_parameter (string val, int i, string def) {
+  array<string> a= trimmed_tokenize (val, ";");
+  if (i < N(a)) return a[i];
+  return def;
+}
+  
 static double
-get_parameter (string val, int i, double def) {
+get_double_parameter (string val, int i, double def) {
   array<string> a= trimmed_tokenize (val, ";");
   if (i < N(a) && is_double (a[i])) return as_double (a[i]);
   return def;
+}
+
+static void
+get_length_parameter (string val, int i, double& quan, string& unit) {
+  array<string> a= trimmed_tokenize (val, ";");
+  if (i < N(a)) {
+    string s= a[i];
+    int k= N(s);
+    while (k>0 && is_alpha (s[k-1])) k--;
+    unit= s (k, N(s));
+    quan= 0.0;
+    if (is_double (s (0, k))) quan= as_double (s (0, k));
+  }
 }
 
 font
@@ -1736,9 +1821,15 @@ apply_effects (font fn, string effects) {
         fn= poor_vextended_font (fn, yf);
       }
       */
+      else if (b[0] == "mono" && is_double (b[1])) {
+        double Mmag= as_double (b[1]);
+        if (Mmag < 0.1) Mmag= 0.1;
+        if (Mmag > 10.0) Mmag= 10.0;
+        fn= poor_mono_font (fn, Mmag, Mmag);
+      }
       else if (b[0] == "degraded") {
-        double threshold= get_parameter (b[1], 0, 0.666);
-        double freq     = get_parameter (b[1], 1, 1.0);
+        double threshold= get_double_parameter (b[1], 0, 0.666);
+        double freq     = get_double_parameter (b[1], 1, 1.0);
         if (threshold < 0.01) threshold= 0.01;
         if (threshold > 0.99) threshold= 0.99;
         if (freq < 0.10) freq= 0.10;
@@ -1747,8 +1838,8 @@ apply_effects (font fn, string effects) {
         fn= poor_distorted_font (fn, kind);
       }
       else if (b[0] == "distorted") {
-        double strength= get_parameter (b[1], 0, 1.0);
-        double freq    = get_parameter (b[1], 1, 1.0);
+        double strength= get_double_parameter (b[1], 0, 1.0);
+        double freq    = get_double_parameter (b[1], 1, 1.0);
         if (strength < 0.1) strength= 0.1;
         if (strength > 9.9) strength= 9.9;
         if (freq < 0.10) freq= 0.10;
@@ -1757,14 +1848,45 @@ apply_effects (font fn, string effects) {
         fn= poor_distorted_font (fn, kind);
       }
       else if (b[0] == "gnawed") {
-        double strength= get_parameter (b[1], 0, 1.0);
-        double freq    = get_parameter (b[1], 1, 1.0);
+        double strength= get_double_parameter (b[1], 0, 1.0);
+        double freq    = get_double_parameter (b[1], 1, 1.0);
         if (strength < 0.1) strength= 0.1;
         if (strength > 9.9) strength= 9.9;
         if (freq < 0.10) freq= 0.10;
         if (freq > 10.0) freq= 10.0;
         tree kind= tuple ("gnawed", as_string (strength), as_string (freq));
         fn= poor_distorted_font (fn, kind);
+      }
+      else if (b[0] == "blurred") {
+        double rad_val = 1.0;
+        string rad_unit= "pt";
+        get_length_parameter (b[1], 0, rad_val, rad_unit);
+        if (rad_unit == "pt") rad_val= rad_val / fn->size;
+        if (rad_val < 0.01) rad_val= 0.01;
+        if (rad_val > 1.00) rad_val= 1.00;
+        tree kind= tuple ("blurred", as_string (rad_val));
+        fn= poor_effected_font (fn, kind);
+      }
+      else if (b[0] == "enhanced") {
+        double rad_val = 1.0;
+        string rad_unit= "pt";
+        get_length_parameter (b[1], 0, rad_val, rad_unit);
+        string shadow  = get_string_parameter (b[1], 1, "black");
+        string sunny   = get_string_parameter (b[1], 2, "white");
+        if (rad_unit == "pt") rad_val= rad_val / fn->size;
+        if (rad_val < 0.01) rad_val= 0.01;
+        if (rad_val > 1.00) rad_val= 1.00;
+        double m= sqrt (0.5);
+        tree kind1= tuple ("blurred", as_string (rad_val),
+                           as_string (m*rad_val), as_string (-m*rad_val));
+        font blurred1= poor_effected_font (fn, kind1);
+        font fn1= recolored_font (blurred1, shadow);
+        tree kind2= tuple ("blurred", as_string (rad_val),
+                           as_string (-m*rad_val), as_string (m*rad_val));
+        font blurred2= poor_effected_font (fn, kind2);
+        font fn2= recolored_font (blurred2, sunny);
+        array<font> a; a << fn1 << fn2 << fn;
+        fn= superposed_font (a, 2);
       }
     }
   }

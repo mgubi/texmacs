@@ -195,15 +195,33 @@ string
 uni_locase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((c >= 'A' && c <= 'Z') ||
-	(c >= ((unsigned char) 0x80) && (c <= ((unsigned char) 0x9F))) ||
-	(c >= ((unsigned char) 0xC0) && (c <= ((unsigned char) 0xDF))))
+    if ((is_iso_upcase (c)) ||
+        (c >= ((unsigned char) 0x80) && (c <= ((unsigned char) 0x9F))) ||
+        (c >= ((unsigned char) 0xC0) && (c <= ((unsigned char) 0xDF))))
       return string ((char) (c + 0x20));
     return s;
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));
-    if (code >= 0x386 && code <= 0x3AB) {
+    if (code >= 0x100 && code <= 0x17F) {
+      if (code == 0x138 || code == 0x149 || code == 0x178 || code == 0x17F);
+      else if ((code > 0x138 && code < 0x149) ||
+               (code > 0x178 && code < 0x17F)) {
+        if ((code & 1) == 1) code += 1; }
+      else if ((code & 1) == 0) code += 1;
+    }
+    else if (code >= 0x180 && code <= 0x24F) {
+      if (code <= 0x181 ||
+          code == 0x186 || code == 0x18D ||
+          (code >= 0x18E && code <= 0x1CC) || code == 0x1DD ||
+          (code >= 0x1F0 && code <= 0x1F3) ||
+          code >= 0x23A); // FIXME: some characters not treated
+      else if ((code > 0x186 && code < 0x18D) ||
+               (code > 0x1CC && code < 0x1DD)) {
+        if ((code & 1) == 1) code += 1; }
+      else if ((code & 1) == 0) code += 1;
+    }
+    else if (code >= 0x386 && code <= 0x3AB) {
       if      (code >= 0x391 && code <= 0x3AB) code += 0x20;
       else if (code >= 0x386 && code <= 0x386) code += 0x26;
       else if (code >= 0x388 && code <= 0x38A) code += 0x25;
@@ -228,15 +246,33 @@ string
 uni_upcase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((c >= 'a' && c <= 'z') ||
-	(c >= ((unsigned char) 0xA0) && (c <= ((unsigned char) 0xBF))) ||
-	(c >= ((unsigned char) 0xE0)))
+    if ((is_iso_locase (c)) ||
+        (c >= ((unsigned char) 0xA0) && (c <= ((unsigned char) 0xBF))) ||
+        (c >= ((unsigned char) 0xE0)))
       return string ((char) (c - 0x20));
     return s;
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));
-    if (code >= 0x3AC && code <= 0x3CE) {
+    if (code >= 0x100 && code <= 0x17F) {
+      if (code == 0x138 || code == 0x149 || code == 0x178 || code == 0x17F);
+      else if ((code > 0x138 && code < 0x149) ||
+               (code > 0x178 && code < 0x17F)) {
+        if ((code & 1) == 0) code -= 1; }
+      else if ((code & 1) == 1) code -= 1;
+    }
+    else if (code >= 0x180 && code <= 0x24F) {
+      if (code <= 0x181 ||
+          code == 0x186 || code == 0x18D ||
+          (code >= 0x18E && code <= 0x1CC) || code == 0x1DD ||
+          (code >= 0x1F0 && code <= 0x1F3) ||
+          code >= 0x23A); // FIXME: some characters not treated
+      else if ((code > 0x186 && code < 0x18D) ||
+               (code > 0x1CC && code < 0x1DD)) {
+        if ((code & 1) == 0) code -= 1; }
+      else if ((code & 1) == 1) code -= 1;
+    }
+    else if (code >= 0x3AC && code <= 0x3CE) {
       if      (code >= 0x3B1 && code <= 0x3CB) code -= 0x20;
       else if (code >= 0x3AC && code <= 0x3AC) code -= 0x26;
       else if (code >= 0x3AD && code <= 0x3AF) code -= 0x25;
@@ -420,8 +456,7 @@ uni_is_letter (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
     return
-      (c >= 'A' && c <= 'Z') ||
-      (c >= 'a' && c <= 'z') ||
+      is_alpha (c) ||
       (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
   }
   else if (starts (s, "<#") && ends (s, ">")) {

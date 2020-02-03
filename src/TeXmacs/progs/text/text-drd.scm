@@ -20,14 +20,17 @@
   (section-tag) (list-tag) (figure-tag)
   (enunciation-tag) (prominent-tag) (alignment-tag) (compression-tag)
   (frame-tag) (frame-titled-tag)
-  (textual-tag) (code-tag) (ornament-tag) (balloon-tag)
-  (reference-tag))
+  (textual-tag) (code-tag)
+  (ornament-tag) (art-frame-tag) (shadow-tag)
+  (balloon-tag) (reference-tag))
 
 (define-group similar-tag
   (section-tag) (list-tag) (figure-tag)
   (enunciation-tag) (prominent-tag) (alignment-tag) (compression-tag)
   (frame-tag) (frame-titled-tag)
-  (textual-tag) (code-tag) (equation-tag) (ornament-tag) (balloon-tag))
+  (textual-tag) (code-tag) (equation-tag)
+  (ornament-tag) (art-frame-tag) (shadow-tag)
+  (balloon-tag))
 
 (define-group numbered-tag
   (section-tag)
@@ -206,19 +209,40 @@
   (inline-code-tag) (block-code-tag))
 
 (define-group inline-code-tag
-  verbatim scm cpp mmx r
-  python scala scilab shell)
+  verbatim scm cpp mmx r fortran
+  python java scala scilab shell)
 
 (define-group block-code-tag
-  verbatim-code scm-code cpp-code mmx-code r-code
-  python-code scala-code scilab-code shell-code)
+  verbatim-code scm-code cpp-code mmx-code r-code fortran-code
+  python-code java-code scala-code scilab-code shell-code)
 
 ;; ornaments
 
 (define-group ornament-tag
   manila-paper rough-paper ridged-paper pine granite metal)
 
+(define-group art-frame-tag
+  carved-wood-frame decorated-wood-frame
+  black-floral1-frame black-floral2-frame)
+
+(define-group shadow-tag
+  drop-contour bend-in-contour bend-out-contour diagonal-bend-in-contour
+  drop-shadow bend-in-shadow bend-out-shadow
+  half-bend-in-shadow quarter-bend-in-shadow
+  drop-down half-bend-in-down)
+
 ;; balloons
 
 (define-group balloon-tag
   mouse-over-balloon mouse-over-balloon* focus-balloon help-balloon)
+
+;; detached notes
+
+(define-group detached-note-tag
+  (auto-note-tag) (custom-note-tag))
+
+(define-group auto-note-tag
+  note-ref note-inline note-wide note-footnote)
+
+(define-group custom-note-tag
+  note-ref* note-inline* note-wide* note-footnote*)

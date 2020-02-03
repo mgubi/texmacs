@@ -135,20 +135,36 @@
   (with t (tree-import file-name "texmacs")
     (tmfile-language t)))
 
+(define (has-bib? doc)
+  (cond ((tm-atomic? doc) #f)
+        ((tm-is? doc 'cite) #t)
+        (else (list-or (map has-bib? (tm-children doc))))))
+
+(define (replace-special doc)
+  (cond ((tm-atomic? doc) doc)
+        ((tm-equal? doc '(chapter "Preface")) `(chapter* "Preface"))
+        (else (cons (tm-label doc) (map replace-special (tm-children doc))))))
+
 (define (tmdoc-add-aux doc)
-  (let* ((l0 (cdr doc))
+  (let* ((doc* (replace-special doc))
+         (l0 (cdr doc*))
          (i  (list-find-index l0 (lambda (x) (func? x 'title))))
          (l1 (if i (sublist l0 0 (+ i 1)) '()))
-         (l2 (if i (sublist l0 (+ i 1) (length l0)) l0)))
+         (l2 (if i (sublist l0 (+ i 1) (length l0)) l0))
+         (bib? (has-bib? `(document ,@l2))))
     `(document
        ,@l1
        (table-of-contents "toc" (document ""))
        ,@l2
+       ,@(if bib? `((bibliography "bib" "tm-plain" "" (document ""))) '())
        (the-index "idx" (document "")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-preferences
+  ("manual style" "tmmanual" (lambda args (noop))))
 
 (tmfs-permission-handler (help name type)
   (and (== type "read")
@@ -186,7 +202,7 @@
              (tm->stree
               `(document
                  (TeXmacs ,(texmacs-version))
-                 (style (tuple "tmmanual" ,lan))
+                 (style (tuple ,(get-preference "manual style") ,lan))
                  (body ,(tmdoc-add-aux body))
                  (initial (collection (associate "page-medium" "paper")))))))
           (else

@@ -194,7 +194,7 @@ propose_title (string old_title, url u, tree doc) {
     string no_name= translate ("No name");
     for (int i=0; i<N(no_name); i++)
       if (((unsigned char) (no_name[i])) >= (unsigned char) 128)
-	{ no_name= "No name"; break; }
+        { no_name= "No name"; break; }
     name= no_name * " [" * name (8, N(name) - 3) * "]";
   }
   if ((name == "") || (name == "."))
@@ -421,6 +421,7 @@ attach_subformat (tree t, url u, string fm) {
   if (fm != "verbatim" && fm != "scheme" && fm != "cpp") return t;
   string s= suffix (u);
   if (s == "scm") fm= "scheme";
+  if (s == "java") fm= "java";
   if (s == "scala") fm= "scala";
   if (s == "py")  fm= "python";
   if (s == "cpp" || s == "hpp" || s == "cc" || s == "hh") fm= "cpp";

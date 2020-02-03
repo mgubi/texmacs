@@ -18,13 +18,11 @@
 ;; Automatic indentation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define char-set:not-whitespace
-  (char-set-complement char-set:whitespace))
-
 (define (string-strip-right s)
-  (with n (string-length s)
-    (with r (or (string-rindex s char-set:not-whitespace) n)
-      (string-take s (min n (+ 1 r))))))
+  (with char-set:not-whitespace (char-set-complement char-set:whitespace)
+    (with n (string-length s)
+      (with r (or (string-rindex s char-set:not-whitespace) n)
+	(string-take s (min n (+ 1 r)))))))
 
 ; FIXME: '#' in a string is interpreted as a comment
 (define (strip-comment-buggy s)
@@ -86,4 +84,12 @@
   ("syntax:python:keyword" "#309090" notify-python-syntax)
   ("syntax:python:keyword_conditional" "#309090" notify-python-syntax)
   ("syntax:python:keyword_control" "#309090" notify-python-syntax))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Copy and Paste
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (kbd-paste)
+  (:mode in-prog-python?)
+  (clipboard-paste-import "python" "primary"))
 

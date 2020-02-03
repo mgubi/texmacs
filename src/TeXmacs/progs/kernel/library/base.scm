@@ -46,6 +46,14 @@
   "Convert @c to a string"
   (list->string (list c)))
 
+(define-public (tm-char-whitespace? c)
+  "Is @c a whitespace character?"
+  ;; NOTE: this routine is implemented in an incorrect way in certain
+  ;; versions of Guile.  These erroneous versions incorrectly recognize
+  ;; characters such as A0 (hexadecimal), which breaks certain routines
+  ;; involving unicode or cork.
+  (in? c '(#\space #\ht #\newline #\return)))
+
 (define-public (string-tail s n)
   "Return all but the first @n chars of @s."
   (substring s n (string-length s)))
@@ -99,23 +107,23 @@
   (let ((l (string-length s)))
     (substring s (- l n) l)))
 
-(provide-public (string-trim s)		; srfi-13 (subset)
+(define-public (tm-string-trim s)		; srfi-13 (subset)
   "Remove whitespace at start of @s."
-  (list->string (list-drop-while (string->list s) char-whitespace?)))
+  (list->string (list-drop-while (string->list s) tm-char-whitespace?)))
 
 (define-public (list-drop-right-while l pred)
   (reverse! (list-drop-while (reverse l) pred)))
 
-(provide-public (string-trim-right s)	; srfi-13 (subset)
+(define-public (tm-string-trim-right s)	; srfi-13 (subset)
   "Remove whitespace at end of @s."
-  (list->string (list-drop-right-while (string->list s) char-whitespace?)))
+  (list->string (list-drop-right-while (string->list s) tm-char-whitespace?)))
 
-(provide-public (string-trim-both s)		; srfi-13 (subset)
+(define-public (tm-string-trim-both s)		; srfi-13 (subset)
   "Remove whitespace at start and end of @s."
   (list->string
    (list-drop-right-while
-    (list-drop-while (string->list s) char-whitespace?)
-    char-whitespace?)))
+    (list-drop-while (string->list s) tm-char-whitespace?)
+    tm-char-whitespace?)))
 
 (provide-public (string-concatenate ss)	; srfi-13
   "Append the elements of @ss toghether."
@@ -158,9 +166,10 @@
     (if (or (= n 0) (not d))
 	(list s)
 	(cons (substring s 0 d)
-	      (string-tokenize-by-char-n (substring s (+ 1 d) (string-length s))
-				 sep
-				 (- n 1))))))
+	      (string-tokenize-by-char-n
+               (substring s (+ 1 d) (string-length s))
+               sep
+               (- n 1))))))
 
 (define-public (string-decompose s sep)
   (with d (string-search-forwards sep 0 s)
@@ -179,7 +188,7 @@
 
 (define-public (string-tokenize-comma s)
   "Cut string @s into pieces using comma as a separator and remove whitespace."
-  (map string-trim-both (string-tokenize-by-char s #\,)))
+  (map tm-string-trim-both (string-tokenize-by-char s #\,)))
 
 (define-public (string-recompose-comma l)
   "Turn list @l of strings into comma separated string."
@@ -352,6 +361,10 @@
 (define-public (window->buffer win)
   (with u (window-to-buffer win)
     (and (not (url-none? u)) u)))
+
+(define-public (buffer->window buf)
+  (with l (buffer->windows buf)
+    (and (nnull? l) (car l))))
 
 (define-public (current-view)
   (with u (current-view-url)

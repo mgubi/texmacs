@@ -11,6 +11,7 @@
 
 #include "pencil.hpp"
 #include "gui.hpp"
+#include "url.hpp"
 
 /******************************************************************************
 * Invisible pencils
@@ -110,9 +111,13 @@ static pencil_rep*
 make_pencil (tree t, int alpha, SI w) {
   if (is_atomic (t))
     return tm_new<simple_pencil_rep> (named_color (t->label, alpha), w);
-  else
-    return tm_new<complex_pencil_rep> (pencil_brush, brush (t, alpha), w,
+  else {
+    brush br (t, alpha);
+    if (is_none (br->get_pattern_url ()))
+      return make_pencil ("grey", alpha, w);
+    return tm_new<complex_pencil_rep> (pencil_brush, br, w,
 				       cap_round, join_round, 2.0);
+  }
 }
 
 static pencil_rep*
@@ -131,9 +136,13 @@ make_pencil (tree t, int a, SI w, pencil_cap c, pencil_join j, double l) {
   if (is_atomic (t))
     return tm_new<complex_pencil_rep> (pencil_standard,
 				       named_color (t->label, a), w, c, j, l);
-  else
+  else {
+    brush br (t, a);
+    if (is_none (br->get_pattern_url ()))
+      return make_pencil ("grey", a, w, c, j, l);
     return tm_new<complex_pencil_rep> (pencil_brush,
 				       brush (t, a), w, c, j, l);
+  }
 }
 
 pencil::pencil (bool b):

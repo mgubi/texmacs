@@ -103,7 +103,7 @@ math_font_rep::search_font (string& s, font& fn) {
   //  if (s == "<noplus>" || s == "<nocomma>" || s == "<nospace>" ||
   //      s == "<nobracket>" || s == "<nosymbol>")
   //    s = "";
-  if ((N(s)>=9) && (s[N(s)-2]>='0') && (s[N(s)-2]<='9')) {
+  if ((N(s)>=9) && is_digit (s[N(s)-2])) {
     int i;
     for (i=N(s)-1; i>0; i--)
       if (s[i]=='-') break;
@@ -117,7 +117,7 @@ math_font_rep::search_font (string& s, font& fn) {
           fn= find_magnified_font (rubber_name [fn_nr], hzf, vzf);
           ASSERT (!is_nil (fn), "font not found");
           fn->yfrac= base_fn->yfrac;
-	  // fn->copy_math_pars (base_fn);
+          // fn->copy_math_pars (base_fn);
           rubber_table [fn_nr]= fn;
         }
         else fn= rubber_table [fn_nr];
@@ -144,9 +144,8 @@ math_font_rep::search_font (string& s, font& fn) {
   else {
     int i, n= N(s);
     for (i=0; i<n; i++)
-      if (((s[i]<'0') || (s[i]>'9')) &&
-          ((s[i]<'a') || (s[i]>'z')) &&
-          ((s[i]<'A') || (s[i]>'Z')) &&
+      if ((!is_digit (s[i])) &&
+          (!is_alpha (s[i])) &&
           (s[i] != '.') && (s[i] != '\\') && (s[i] != '_'))
       {
         fn= error_fn;

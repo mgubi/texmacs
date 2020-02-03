@@ -30,8 +30,8 @@
        (load-help-article (string-append name))))))
 
 (menu-bind help-menu
-  (when (url-exists-in-help? "about/welcome/welcome.en.tm")
-	("Welcome" (load-help-buffer "about/welcome/welcome"))
+  (when (url-exists-in-help? "about/welcome/new-welcome.en.tm")
+	("Welcome" (load-help-article "about/welcome/new-welcome"))
 	---)
   (if (detailed-menus?)
       (when (url-exists-in-help? "main/config/man-configuration.en.tm")
@@ -103,12 +103,15 @@
 	    ("Summary"
 	     (load-help-article "about/about-summary"))
 	    ("License"
-	     (load-help-buffer "$TEXMACS_PATH/LICENSE"))
+	     (load-document "$TEXMACS_PATH/LICENSE"))
 	    ("Philosophy"
 	     (load-help-article "about/philosophy/philosophy"))
 	    ("The TeXmacs authors"
 	     (load-help-article "about/authors/authors"))
 	    ---
+	    (when (and (updater-supported?) (not (updater-running?)))
+		  ("Check for updates"
+		   (updater-check-foreground)))
 	    (when (url-exists-in-help? "about/changes/changes-recent")
 		  ("What is new"
 		   (load-help-article "about/changes/changes-recent")))
@@ -230,8 +233,8 @@
 	    ("Writing TeXmacs bibliography styles"
 	     (load-help-article "devel/scheme/bibliography/bibliography"))
             ---
-            ("Browse modules documentation" (apidoc-all-modules)))))
-            ;("List all symbols" (apidoc-all-symbols)))))
+            ("Browse modules documentation" (apidoc-all-modules))
+            ("Browse symbols documentation" (apidoc-all-symbols)))))
   ---
   (-> "Search"
       ("Documentation" (interactive docgrep-in-doc))

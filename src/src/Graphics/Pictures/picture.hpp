@@ -27,7 +27,10 @@ class picture {
 ABSTRACT_NULL(picture);
 };
 
+unsigned long long int unique_picture_id ();
+
 class picture_rep: public abstract_struct {
+  unsigned long long int unique_id;
 protected:
   virtual color internal_smooth_pixel (double x, double y);
   virtual color internal_get_pixel (int x, int y) = 0;
@@ -38,9 +41,10 @@ protected:
                                    int x1, int y1, int x2, int y2);
 
 public:
-  inline picture_rep () {}
+  inline picture_rep () : unique_id (unique_picture_id ()) {}
   inline virtual ~picture_rep () {}
 
+  inline unsigned long long int get_unique_id () { return unique_id; }
   virtual picture_kind get_type () = 0;
   virtual void* get_handle () = 0;
   virtual url get_name ();
@@ -72,13 +76,16 @@ ABSTRACT_NULL_CODE(picture);
 * Pictures on disk
 ******************************************************************************/
 
-picture load_picture (url u, int w, int h);
+picture load_picture (url u, int w, int h, tree eff, int pixel);
 picture load_xpm (url file_name);
-void picture_cache_reserve (url u, int w, int h);
-void picture_cache_release (url u, int w, int h);
+void picture_cache_reserve (url u, int w, int h, tree eff, int pixel);
+void picture_cache_release (url u, int w, int h, tree eff, int pixel);
 void picture_cache_clean ();
-picture cached_load_picture (url u, int w, int h, bool permanent= true);
+void picture_cache_reset ();
+picture cached_load_picture (url u, int w, int h, tree eff,
+                             int pixel, bool perma= true);
 string picture_as_eps (picture pic, int dpi);
+void save_picture (url dest, picture p);
 
 /******************************************************************************
 * Drawing on pictures and combining pictures
@@ -118,6 +125,7 @@ picture mix (picture pic1, double a1, picture pic2, double a2);
 picture shift (picture pic, double dx, double dy);
 picture magnify (picture pic, double sx, double sy);
 picture bubble (picture pic, double r, double a);
+picture crop (picture pic, double cx1, double cy1, double cx2, double cy2);
 picture turbulence (picture pic, long seed, double w, double h, int oct);
 picture fractal_noise (picture pic, long seed, double w, double h, int oct);
 picture hatch (picture pic, int sx, int sy, double fill_prop, double deform);
@@ -140,9 +148,12 @@ picture degrade (picture pic, double wx, double wy, double th, double sh);
 picture distort (picture pic, double wx, double wy, double rx, double ry);
 picture gnaw (picture pic, double wx, double wy, double rx, double ry);
 
-picture normalize (picture eff);
-picture color_matrix (picture eff, array<double> m);
-picture make_transparent (picture eff, color bgc);
-picture make_opaque (picture eff, color bgc);
+picture normalize (picture pic);
+picture color_matrix (picture pic, array<double> m);
+picture make_transparent (picture pic, color bgc);
+picture make_opaque (picture pic, color bgc);
+color   average_color (picture pic);
+picture recolor (picture pic, color col);
+picture apply_skin (picture pic, color col);
 
 #endif // defined PICTURE_H

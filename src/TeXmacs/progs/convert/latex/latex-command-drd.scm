@@ -205,20 +205,23 @@
 
 (logic-group latex-enunciation%
   begin-theorem begin-proposition begin-lemma begin-corollary begin-proof
-  begin-axiom begin-definition begin-notation begin-conjecture begin-remark
-  begin-note begin-example begin-exercise begin-problem begin-warning
-  begin-convention begin-quote-begin-env begin-quotation begin-verse
-  begin-solution begin-question begin-answer begin-acknowledgments
+  begin-axiom begin-definition begin-notation begin-conjecture
+  begin-remark begin-note begin-example begin-warning
+  begin-convention begin-acknowledgments
+  begin-exercise begin-problem
+  begin-solution begin-question begin-answer
+  begin-quote-env begin-quotation begin-verse
 
   begin-theorem* begin-proposition* begin-lemma* begin-corollary*
   begin-axiom* begin-definition* begin-notation* begin-conjecture*
   begin-remark* begin-note* begin-example* begin-warning*
-  begin-convention* begin-exercise* begin-problem*
+  begin-convention* begin-acknowledgments*
+  begin-exercise* begin-problem*
   begin-solution* begin-question* begin-answer*
 
   ;; guessed
   begin-th begin-thm begin-prop begin-lem begin-cor begin-corr
-  begin-dem begin-preuve begin-IEEEproof
+  begin-pf begin-dem begin-preuve begin-IEEEproof
   begin-ax begin-def begin-dfn begin-defn
   begin-not begin-ex begin-exa begin-rem begin-war begin-conv
   begin-exe begin-exc begin-exo begin-prop begin-sol begin-ans
@@ -385,7 +388,8 @@
 (logic-group latex-ignore-0%
   allowbreak notag xspace break sloppy makeatother makeatletter relax
   qedhere
-  ignorespacesafterend ignorespaces balancecolumns)
+  ignorespacesafterend ignorespaces balancecolumns
+  tightlist)
 
 (logic-group latex-ignore-0*%
   displaybreak allowdisplaybreaks)

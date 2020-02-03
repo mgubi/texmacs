@@ -154,7 +154,7 @@
   (if (complete-try?) (noop)))
 
 (tm-define (bib-cite-context? t)
-  (and (tree-in? t '(cite nocite cite-detail))
+  (and (tree-in? t '(cite nocite cite-detail cite-TeXmacs))
        (cursor-inside? t)))
 
 (tm-define (kbd-variant t forwards?)
@@ -201,6 +201,14 @@
   (kbd-alternate-variant (focus-tree) #t))
 (tm-define (kbd-shift-alternate-tab)
   (kbd-alternate-variant (focus-tree) #f))
+(tm-define (kbd-copy)
+  (clipboard-copy "primary"))
+(tm-define (kbd-cut)
+  (clipboard-cut "primary"))
+(tm-define (kbd-paste)
+  (clipboard-paste "primary"))
+(tm-define (kbd-cancel)
+  (clipboard-clear "primary"))
 
 (tm-define (notify-activated t) (noop))
 (tm-define (notify-disactivated t) (noop))
@@ -273,8 +281,8 @@
   (:require (tree-in? t '(reference pageref eqref hlink locus ornament)))
   #t)
 
-(tm-define (focus-has-theme? t)
-  #f)
+(tm-define (focus-has-parameters? t)
+  (focus-has-preferences? t))
 
 (tm-define (focus-can-search? t)
   #f)
@@ -665,7 +673,8 @@
 
 (tm-define (standard-parameters l)
   (:require (== l "ornament"))
-  (list "ornament-shape" "ornament-title-style" "ornament-border"
+  (list "ornament-shape" "ornament-title-style"
+        "ornament-border" "ornament-corner"
 	"ornament-hpadding" "ornament-vpadding"
 	"ornament-color" "ornament-extra-color"
 	"ornament-sunny-color" "ornament-shadow-color"))
@@ -732,10 +741,8 @@
         (with selection (selection-tree)
           (clipboard-cut "graphics background")
           (insert-go-to `(draw-over ,selection ,g "2cm") '(1 2 1))))
-      (with g `(with "gr-mode" (tuple "hand-edit" "line")
-                     "gr-geometry" (tuple "geometry" "4cm" "4cm" "center")
-                 (graphics))
-        (insert-go-to `(draw-over "" ,g "2cm") '(1 4 1)))))
+      (with g `(with "gr-mode" (tuple "hand-edit" "line") (graphics))
+        (insert-go-to `(draw-over "" ,g "2cm") '(1 2 1)))))
 
 (tm-define (make-anim l)
   (with duration "1s"
@@ -749,6 +756,41 @@
           (insert-go-to `(,l ,selection ,duration) (cons 0 p)))
         (insert-go-to `(,l "" ,duration) (list 0 0)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Detached notes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (propose-note-id ref?)
+  (let* ((buf (buffer-tree))
+         (is-ref? (cut tree-in? <> '(note-ref note-ref*)))
+         (is-text? (cut tree-in? <> '(note-inline note-inline*
+                                      note-wide note-wide*
+                                      note-footnote note-footnote*)))
+         (ref-l (tree-search buf is-ref?))
+         (text-l (tree-search buf is-text?))
+         (ref-id (lambda (t) (tree->stree (tm-ref t 0))))
+         (text-id (lambda (t) (tree->stree (tm-ref t 1))))
+         (refs (map ref-id ref-l))
+         (texts (map text-id text-l))
+         (diff (if ref?
+                   (list-difference texts refs)
+                   (list-difference refs texts))))
+    (if (null? diff)
+        (create-unique-id)
+        (cAr diff))))
+
+(tm-define (make-note-ref)
+  (insert `(note-ref ,(propose-note-id #t))))
+
+(tm-define (make-note-inline)
+  (insert-go-to `(note-inline "" ,(propose-note-id #f)) '(0 0)))
+
+(tm-define (make-note-wide)
+  (insert-go-to `(note-wide (document "") ,(propose-note-id #f)) '(0 0 0)))
+
+(tm-define (make-note-footnote)
+  (insert-go-to `(note-footnote (document "") ,(propose-note-id #f)) '(0 0 0)))
+                                      
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Thumbnails facility
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -792,6 +834,11 @@
 ;; Routines for floats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (in-main-flow?)
+  (:synopsis "Are we inside the main document flow?")
+  ;; FIXME: this routine can be improved quite a lot
+  (not (or (inside? 'table) (inside? 'graphics))))
+
 (tm-define (make-marginal-note)
   (:synopsis "Insert a marginal note.")
   (wrap-selection-small
@@ -817,6 +864,7 @@
 
 (tm-define (make-insertion s)
   (:synopsis "Make an insertion of type @s.")
+  (:applicable (in-main-flow?))
   (with pos (if (== s "float") "tbh" "")
     (insert-go-to (list 'float s pos (list 'document ""))
                   (list 2 0 0))))
@@ -861,17 +909,17 @@
   (:secure #t)
   (with (x1 y1 x2 y2) (tree-bounding-rectangle body)
     (let* ((zf (get-window-zoom-factor))
-           (sf (/ 5.0 zf))
+           (sf (/ 4.0 zf))
            (balloon* `(with "magnification" ,(number->string zf) ,balloon))
            (w (widget-texmacs-output balloon* '(style "generic")))
            (ww (integer-floor (/ (tree->number (tree-ref extents 0)) sf)))
            (wh (integer-floor (/ (tree->number (tree-ref extents 1)) sf)))
            (ha (tree->stree halign))
            (va (tree->stree valign))
-           (x (cond ((== ha "Left") (- (- x1 ww) (* 3 256)))
+           (x (cond ((== ha "Left") (- x1 ww))
                     ((== ha "left") x1)
                     ((== ha "center") (quotient (+ x1 x2 (- ww)) 2))
-                    ((== ha "right") (- (- x2 ww) (* 3 256)))
+                    ((== ha "right") (- x2 ww))
                     ((== ha "Right") x2)
                     (else x1)))
            (y (cond ((== va "Bottom") (- y1 (* 5 256)))
@@ -887,7 +935,7 @@
   (:secure #t)
   (with (mx my) (get-mouse-position)
     (let* ((zf (get-window-zoom-factor))
-           (sf (/ 5.0 zf))
+           (sf (/ 4.0 zf))
            (balloon* `(with "magnification" ,(number->string zf) ,balloon))
            (w (widget-texmacs-output balloon* '(style "generic")))
            (ww (integer-floor (/ (tree->number (tree-ref extents 0)) sf)))

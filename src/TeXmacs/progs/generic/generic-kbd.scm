@@ -166,6 +166,12 @@
   ("altcmd ? var var" (make 'pageref))
   ("altcmd P" (make 'pageref))
 
+  ("extra e" (edit-focus-macro))
+  ("extra r" (edit-previous-macro))
+  ("extra m" (edit-focus-macro-source))
+  ("extra p" (toggle-preamble-mode))
+  ("extra s" (toggle-source-mode))
+
   ("accent:hat" "^")
   ("accent:deadhat" "^")
   ("accent:tilde" "~")
@@ -191,10 +197,10 @@
 
   ("undo" (noop) (undo 0))
   ("redo" (noop) (redo 0))
-  ("cancel" (noop) (clipboard-clear "primary"))
-  ("cut" (noop) (clipboard-cut "primary"))
-  ("paste" (noop) (clipboard-paste "primary"))
-  ("copy" (noop) (clipboard-copy "primary"))
+  ("cancel" (noop) (kbd-cancel))
+  ("cut" (noop) (kbd-cut))
+  ("paste" (noop) (kbd-paste))
+  ("copy" (noop) (kbd-copy))
   ("find" (noop) (interactive-search))
   ("search find" (search-next-match #t))
   ("search again" (search-next-match #t))
@@ -250,14 +256,14 @@
   ("emacs r" (interactive-search))
   ("emacs s" (interactive-search))
   ("emacs v" (kbd-page-down))
-  ("emacs w" (clipboard-cut "primary"))
-  ("emacs y" (clipboard-paste "primary"))
-  ("emacs insert" (clipboard-copy "primary"))
+  ("emacs w" (kbd-cut))
+  ("emacs y" (kbd-paste))
+  ("emacs insert" (kbd-copy))
   ("emacs _" (undo 0))
   ("emacs /" (undo 0))
 
   ("emacs:meta v" (kbd-page-up))
-  ("emacs:meta w" (clipboard-copy "primary"))
+  ("emacs:meta w" (kbd-copy))
   ("emacs:meta x" (interactive exec-interactive-command))
   ("emacs:meta X" (interactive footer-eval))
   ("emacs:meta <" (go-start))
@@ -271,7 +277,7 @@
   ("emacs:prefix k" (close-document))
   ("emacs:prefix K" (close-document*))
   ("emacs:prefix C-c" (safely-quit-TeXmacs))
-  ("emacs:prefix C-f" (interactive load-buffer))
+  ("emacs:prefix C-f" (interactive load-document))
   ("emacs:prefix C-s" (save-buffer))
   ("emacs:prefix C-w" (interactive save-buffer-as))
 
@@ -364,7 +370,7 @@
   ("M-S-F4" (interactive print-pages-to-file))
 
   ("emacs =" (interactive-replace))
-  ("emacs:meta g" (clipboard-clear "primary"))
+  ("emacs:meta g" (kbd-cancel))
   ("emacs:meta [" (undo 0))
   ("emacs:meta ]" (redo 0))
   ("emacs:meta C-tab" (geometry-circulate #t))
@@ -379,9 +385,11 @@
   ("C-*" (alternate-toggle (focus-tree)))
   ("C-+" (zoom-in (sqrt (sqrt 2.0))))
   ("C--" (zoom-out (sqrt (sqrt 2.0))))
-  ("C-8" (fit-all-to-screen))
-  ("C-9" (fit-to-screen))
-  ("C-0" (fit-to-screen-width)))
+  ("C-0" (change-zoom-factor 1.0))
+  
+  ("C-7" (fit-all-to-screen))
+  ("C-8" (fit-to-screen))
+  ("C-9" (fit-to-screen-width)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Standard cross-platform keybindings
@@ -393,7 +401,7 @@
   ;; standard cross-platform shortcuts
   ("std a" (select-all))
   ("std b" (toggle-bold))
-  ("std c" (clipboard-copy "primary"))
+  ("std c" (kbd-copy))
   ("std f" (interactive-search))
   ("std i" (toggle-italic))
   ("std n" (new-document))
@@ -406,21 +414,25 @@
   ("std s" (save-buffer))
   ("std S" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("std u" (toggle-underlined))
-  ("std v" (clipboard-paste "primary"))
+  ("std v" (kbd-paste))
   ("std w" (close-document))
   ("std W" (close-document*))
-  ("std x" (clipboard-cut "primary"))
+  ("std x" (kbd-cut))
   ("std z" (undo 0))
   ("std Z" (redo 0))
   ("std +" (zoom-in (sqrt (sqrt 2.0))))
   ("std -" (zoom-out (sqrt (sqrt 2.0))))
-  ("std 0" (fit-to-screen-width))
+  ("std 0" (change-zoom-factor 1.0))
 
   ;; not yet implemented
   ;;("std t" (add-tab))
   ;;("std tab" (next-tab))
   ;;("std S-tab" (previous-tab))
 
+  ;; extras
+  ("std 7" (fit-all-to-screen))
+  ("std 8" (fit-to-screen))
+  ("std 9" (fit-to-screen-width))  
   ("search std f" (search-next-match #t))   ;; added for convenience
   ("search std F" (search-next-match #f)))  ;; added for convenience
 
@@ -457,15 +469,15 @@
   ("gnome S-end" (kbd-select go-end))
 
   ("F14" (undo 0))
-  ("F16" (clipboard-copy "primary"))
-  ("F18" (clipboard-paste "primary"))
-  ("F20" (clipboard-cut "primary"))
-  ("C-insert" (clipboard-copy "primary"))
-  ("S-insert" (clipboard-paste "primary"))
-  ("S-delete" (clipboard-cut "primary"))
-  ("gnome c" (clipboard-copy "primary"))
-  ("gnome v" (clipboard-paste "primary"))
-  ("gnome x" (clipboard-cut "primary"))
+  ("F16" (kbd-copy))
+  ("F18" (kbd-paste))
+  ("F20" (kbd-cut))
+  ("C-insert" (kbd-copy))
+  ("S-insert" (kbd-paste))
+  ("S-delete" (kbd-cut))
+  ("gnome c" (kbd-copy))
+  ("gnome v" (kbd-paste))
+  ("gnome x" (kbd-cut))
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
 
@@ -485,7 +497,7 @@
   ("gnome l" (refresh-window))
   ("gnome F" (interactive-search))
 
-  ("altcmd g" (clipboard-clear "primary"))
+  ("altcmd g" (kbd-cancel))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
   ("altcmd X" (interactive exec-interactive-command))
@@ -525,12 +537,12 @@
   ("kde S-end" (kbd-select go-end))
 
   ("F14" (undo 0))
-  ("F16" (clipboard-copy "primary"))
-  ("F18" (clipboard-paste "primary"))
-  ("F20" (clipboard-cut "primary"))
-  ("C-insert" (clipboard-copy "primary"))
-  ("S-insert" (clipboard-paste "primary"))
-  ("S-delete" (clipboard-cut "primary"))
+  ("F16" (kbd-copy))
+  ("F18" (kbd-paste))
+  ("F20" (kbd-cut))
+  ("C-insert" (kbd-copy))
+  ("S-insert" (kbd-paste))
+  ("S-delete" (kbd-cut))
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
 
@@ -549,7 +561,7 @@
   ("kde l" (refresh-window))
   ("kde F" (interactive-search))
 
-  ("altcmd g" (clipboard-clear "primary"))
+  ("altcmd g" (kbd-cancel))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
   ("altcmd X" (interactive exec-interactive-command))
@@ -628,7 +640,6 @@
   ("macos F" (toggle-full-screen-mode))
   ("macos C-f" (toggle-full-screen-edit-mode))
 
-  ("macos A-u" (toggle-preamble))
   ("altcmd x" (interactive footer-eval))
   ("altcmd X" (interactive exec-interactive-command))
 
@@ -683,9 +694,9 @@
   ("windows y" (redo 0))
 
   ("F2" (interactive-replace))
-  ("S-delete" (clipboard-cut "primary"))
-  ("S-insert" (clipboard-paste "primary"))
-  ("C-insert" (clipboard-copy "primary"))
+  ("S-delete" (kbd-cut))
+  ("S-insert" (kbd-paste))
+  ("C-insert" (kbd-copy))
   ("A-F4" (close-document))
   ("A-left" (cursor-history-backward))
   ("A-right" (cursor-history-forward))
@@ -763,7 +774,7 @@
   ("windows g" (selection-cancel))
   ("windows l" (refresh-window))
 
-  ("altcmd g" (clipboard-clear "primary"))
+  ("altcmd g" (kbd-cancel))
   ("altcmd q" (make 'symbol))
   ("altcmd x" (interactive footer-eval))
   ("altcmd X" (interactive exec-interactive-command))

@@ -43,9 +43,10 @@
 
 (define (build-doc-search-results keyword the-result)
   ($tmdoc
-    ($tmdoc-title (replace "Search results for ``%1''" `(verbatim ,keyword)))
+    ($tmdoc-title (replace "Search results for \x10%1\x11"
+                           `(verbatim ,keyword)))
     ($when (null? the-result)
-      (replace "No matches found for ``%1''." keyword))
+      (replace "No matches found for \x10%1\x11." keyword))
     ($when (nnull? the-result)
       ($with highest-score (cdar the-result)
         ($description-aligned
@@ -78,9 +79,10 @@
 
 (define (build-src-search-results keyword the-result)
   ($tmdoc
-    ($tmdoc-title (replace "Search results for ``%1''" `(verbatim ,keyword)))
+    ($tmdoc-title (replace "Search results for \x10%1\x11"
+                           `(verbatim ,keyword)))
     ($when (null? the-result)
-      (replace "No matches found for ``%1''." keyword))
+      (replace "No matches found for \x10%1\x11." keyword))
     ($when (nnull? the-result)
       ($with highest-score (cdar the-result)
         ($description-aligned
@@ -160,26 +162,26 @@
 
 (tmfs-title-handler (grep query doc)
   (with what (query-ref query "what")
-    (replace "Help - Search results for ``%1''" what)))
+    (replace "Help - Search results for \x10%1\x11" what)))
 
 (tm-define (docgrep-in-doc what)
   (:argument what "Search words in the documentation")
   (with query (list->query (list (cons "type" "doc") (cons "what" what)))
-    (load-buffer (string-append "tmfs://grep/" query))))
+    (load-document (string-append "tmfs://grep/" query))))
 
 (tm-define (docgrep-in-src what where)
   (:argument what "Search words")
   (:argument where "In")
   (:proposals where '("Scheme" "Styles" "C++" "All code"))
   (with query (list->query (list (cons "type" where) (cons "what" what)))
-    (load-buffer (string-append "tmfs://grep/" query))))
+    (load-document (string-append "tmfs://grep/" query))))
 
 (tm-define (docgrep-in-texts what)
   (:argument what "Search words in my documents")
   (with query (list->query (list (cons "type" "texts") (cons "what" what)))
-    (load-buffer (string-append "tmfs://grep/" query))))
+    (load-document (string-append "tmfs://grep/" query))))
 
 (tm-define (docgrep-in-recent what)
   (:argument what "Search words in recent documents")
   (with query (list->query (list (cons "type" "recent") (cons "what" what)))
-    (load-buffer (string-append "tmfs://grep/" query))))
+    (load-document (string-append "tmfs://grep/" query))))

@@ -45,7 +45,8 @@
 	    ($if (== s "body")
 		 "The main body of the macro."
 		 ($begin
-		   "An argument of type ``" (tree-child-type t i) "''."))))))))
+		   "An argument of type \x10"
+                   (tree-child-type t i) "\x11."))))))))
 
 (tm-generate (focus-doc-usage t)
   ($let* ((lab (tree-label t))
@@ -108,7 +109,7 @@
           (lab* (symbol-toggle-alternate lab)))
     ($para
       ($when (alternate-first? t)
-        "The " ($markup lab) " environment is ``folded'' "
+        "The " ($markup lab) " environment is \x10folded\x11 "
         "and admits an unfolded variant  " ($markup lab*) ". "
         "You may unfold the environment using the keyboard shortcut "
         ($shortcut (alternate-toggle (focus-tree))) ", the menu entry "
@@ -116,7 +117,7 @@
         ($tmdoc-icon "tm_alternate_first.xpm")
         " icon on the focus toolbar. ")
       ($when (alternate-second? t)
-        "The " ($markup lab) " environment is ``unfolded'' "
+        "The " ($markup lab) " environment is \x10unfolded\x11 "
         "and admits a folded variant " ($markup lab*) ". "
         "You may fold the environment using the keyboard shortcut "
         ($shortcut (alternate-toggle (focus-tree))) ", the menu entry "
@@ -166,7 +167,8 @@
   ($let* ((lab (tree-label t))
           (opts (search-tag-options t))
           (pars (list-filter (search-tag-parameters t)
-                             parameter-show-in-menu?)))
+                             parameter-show-in-menu?))
+          (ths (search-tag-themes t)))
     ($block
       ($para
         "The rendering of the " ($markup lab)
@@ -178,7 +180,7 @@
         "You may also directly edit the macro in the style file or package "
         "where it was defined, using " ($menu "Edit source") ".")
     
-      ($when (nnull? (append opts pars))
+      ($when (nnull? (append opts pars ths))
         ($para
           "Still using the " ($menu "Focus" "Preferences") " menu, "
           "you may also specify "
@@ -188,11 +190,18 @@
             "style parameters")
           ($when (and (nnull? opts) (nnull? pars))
             "style options and parameters")
-          " which apply to the " ($markup lab) " tag. "
+          " that apply to the " ($markup lab) " tag. "
           "These settings are global, so they will apply to all other "
           ($markup lab) " tags in your document, and generally also to "
           "other similar tags."))
 
+      ($when (nnull? ths)
+        ($para
+          "The " ($markup lab) " tag uses themes for its rendering. "
+          "These themes come with their own style parameters that "
+          "can be customized via "
+          ($menu "Focus" "Preferences" "Theme parameters") "."))
+      
       ($when (nnull? opts)
         ($folded ($strong "Style options")
           ($for (opt opts)
@@ -201,7 +210,12 @@
       ($when (nnull? pars)
         ($folded ($strong "Style parameters")
           ($for (par pars)
-            (focus-doc-parameter par)))))))
+            (focus-doc-parameter par))))
+      
+      ($for (th ths)
+        ($folded ($strong "Parameters for the " th " theme")
+          ($for (mem (theme->members th))
+            (focus-doc-parameter mem)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Document structured editing operations
@@ -346,8 +360,8 @@
 
 (tm-define (focus-doc t)
   ($tmdoc
-    ($tmdoc-title "Contextual help on the ``"
-                  (symbol->string (tree-label t)) "'' tag")
+    ($tmdoc-title "Contextual help on the \x10"
+                  (symbol->string (tree-label t)) "\x11 tag")
     ($when #t
       ($unfolded-documentation "Usage"
 	(focus-doc-usage t)))

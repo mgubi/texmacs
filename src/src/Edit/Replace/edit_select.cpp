@@ -381,8 +381,7 @@ void
 edit_select_rep::selection_correct (path i1, path i2, path& o1, path& o2) {
   ASSERT (rp <= i1 && rp <= i2, "paths not inside document");
   int old_mode= get_access_mode ();
-  if (get_init_string (MODE) == "src")
-    set_access_mode (DRD_ACCESS_SOURCE);
+  if (in_source ()) set_access_mode (DRD_ACCESS_SOURCE);
   ::selection_correct (subtree (et, rp), i1 / rp, i2 / rp, o1, o2);
   set_access_mode (old_mode);
   o1= rp * o1; o2= rp * o2;
@@ -670,7 +669,8 @@ edit_select_rep::selection_paste (string key) {
           s= "$" * s * "$";
       }
     string fm;
-    if (selection_import == "default") fm= "texmacs-snippet";
+    if (selection_import == "verbatim" && mode == "prog") fm= "code-snippet";
+    else if (selection_import == "default") fm= "texmacs-snippet";
     else fm= selection_import * "-snippet";
     tree doc= generic_to_tree (s, fm);
     if (is_func (doc, DOCUMENT, 1)) doc= doc[0]; // temporary fix
@@ -693,7 +693,7 @@ edit_select_rep::selection_paste (string key) {
     }
     else {
       if ((t[2] != mode) && (t[2] != "src") && (mode != "src") &&
-	  ((t[2] == "math") || (mode == "math"))) {
+  ((t[2] == "math") || (mode == "math"))) {
         if (t[2] == "math")
           insert_tree (compound ("math", ""), path (0, 0));
         else if (t[2] == "text")
@@ -968,6 +968,8 @@ edit_select_rep::focus_get (bool skip_flag) {
     if (is_compound (st, "footnote")) skip_flag= false;
     if (is_compound (st, "footnote-anchor")) skip_flag= false;
     if (is_compound (st, "wide-footnote")) skip_flag= false;
+    if (is_compound (st, "note-footnote")) skip_flag= false;
+    if (is_compound (st, "note-footnote*")) skip_flag= false;
     return focus_search (path_up (tp), skip_flag, true);
   }
 }

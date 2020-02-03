@@ -166,7 +166,7 @@ clean_temp_dirs () {
         url cur = url (main_tmp_dir) * url (a[i]);
         array<string> f= read_directory (cur, err);
         for (int j=0; j<N(f); j++) remove (cur * url (f[j]));
-	rmdir (as_charp (as_string (cur)));
+        rmdir (as_charp (as_string (cur)));
       }
     }
 #endif
@@ -212,6 +212,7 @@ init_user_dirs () {
   make_dir ("$TEXMACS_HOME_PATH/system/cache");
   make_dir ("$TEXMACS_HOME_PATH/system/database");
   make_dir ("$TEXMACS_HOME_PATH/system/database/bib");
+  make_dir ("$TEXMACS_HOME_PATH/system/make");
   make_dir ("$TEXMACS_HOME_PATH/system/tmp");
   make_dir ("$TEXMACS_HOME_PATH/texts");
   make_dir ("$TEXMACS_HOME_PATH/users");
@@ -219,6 +220,30 @@ init_user_dirs () {
   change_mode ("$TEXMACS_HOME_PATH/system", 7 << 6);
   change_mode ("$TEXMACS_HOME_PATH/users", 7 << 6);
   clean_temp_dirs ();
+}
+
+/******************************************************************************
+* Boot locks
+******************************************************************************/
+
+static void
+acquire_boot_lock () {
+  //cout << "Acquire lock\n";
+  url lock_file= "$TEXMACS_HOME_PATH/system/boot_lock";
+  if (exists (lock_file)) {
+    remove (url ("$TEXMACS_HOME_PATH/system/settings.scm"));
+    remove (url ("$TEXMACS_HOME_PATH/system/setup.scm"));
+    remove (url ("$TEXMACS_HOME_PATH/system/cache") * url_wildcard ("*"));
+    remove (url ("$TEXMACS_HOME_PATH/fonts/error") * url_wildcard ("*"));    
+  }
+  else save_string (lock_file, "", false);
+}
+
+void
+release_boot_lock () {
+  //cout << "Release lock\n";
+  url lock_file= "$TEXMACS_HOME_PATH/system/boot_lock";
+  remove (lock_file);
 }
 
 /******************************************************************************
@@ -256,13 +281,13 @@ init_guile () {
     if (guile_version == "") {
       var_eval_system ("guile-config info top_srcdir");
       for (i=N(guile_version); i>0; i--)
-	if (guile_version[i-1] == '-') break;
+        if (guile_version[i-1] == '-') break;
       guile_version= guile_version (i, N (guile_version));
       for (i=0; i<N(guile_version); i++)
-	if ((guile_version[i] == '/') || (guile_version[i] == '\\')) {
-	  guile_version= guile_version (0, i);
-	  break;
-	}
+        if ((guile_version[i] == '/') || (guile_version[i] == '\\')) {
+          guile_version= guile_version (0, i);
+          break;
+        }
     }
     url guile_dir= url_system (guile_data) * url ("guile", guile_version);
     guile_path= guile_path | guile_dir;
@@ -293,20 +318,20 @@ init_env_vars () {
   // Get TeXmacs style and package paths
   url style_root=
     get_env_path ("TEXMACS_STYLE_ROOT",
-		  "$TEXMACS_HOME_PATH/styles:$TEXMACS_PATH/styles" |
-		  plugin_path ("styles"));
+                  "$TEXMACS_HOME_PATH/styles:$TEXMACS_PATH/styles" |
+                  plugin_path ("styles"));
   url package_root=
     get_env_path ("TEXMACS_PACKAGE_ROOT",
-		  "$TEXMACS_HOME_PATH/packages:$TEXMACS_PATH/packages" |
-		  plugin_path ("packages"));
+                  "$TEXMACS_HOME_PATH/packages:$TEXMACS_PATH/packages" |
+                  plugin_path ("packages"));
   url all_root= style_root | package_root;
   url style_path=
     get_env_path ("TEXMACS_STYLE_PATH",
                   search_sub_dirs (all_root));
   url text_root=
     get_env_path ("TEXMACS_TEXT_ROOT",
-		  "$TEXMACS_HOME_PATH/texts:$TEXMACS_PATH/texts" |
-		  plugin_path ("texts"));
+                  "$TEXMACS_HOME_PATH/texts:$TEXMACS_PATH/texts" |
+                  plugin_path ("texts"));
   url text_path=
     get_env_path ("TEXMACS_TEXT_PATH",
                   search_sub_dirs (text_root));
@@ -314,29 +339,29 @@ init_env_vars () {
   // Get other data paths
   (void) get_env_path ("TEXMACS_FILE_PATH",text_path | style_path);
   (void) set_env_path ("TEXMACS_DOC_PATH",
-		       get_env_path ("TEXMACS_DOC_PATH") |
-		       "$TEXMACS_HOME_PATH/doc:$TEXMACS_PATH/doc" |
-		       plugin_path ("doc"));
+                       get_env_path ("TEXMACS_DOC_PATH") |
+                       "$TEXMACS_HOME_PATH/doc:$TEXMACS_PATH/doc" |
+                       plugin_path ("doc"));
   (void) set_env_path ("TEXMACS_SECURE_PATH",
-		       get_env_path ("TEXMACS_SECURE_PATH") |
-		       "$TEXMACS_PATH:$TEXMACS_HOME_PATH");
+                       get_env_path ("TEXMACS_SECURE_PATH") |
+                       "$TEXMACS_PATH:$TEXMACS_HOME_PATH");
   (void) get_env_path ("TEXMACS_PATTERN_PATH",
-		       "$TEXMACS_HOME_PATH/misc/patterns" |
-		       url ("$TEXMACS_PATH/misc/patterns") |
-		       plugin_path ("misc/patterns"));
+                       "$TEXMACS_HOME_PATH/misc/patterns" |
+                       url ("$TEXMACS_PATH/misc/patterns") |
+                       plugin_path ("misc/patterns"));
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
-		       "$TEXMACS_HOME_PATH/misc/pixmaps" |
-		       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/settings") |
-		       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/table") |
-		       url ("$TEXMACS_PATH/misc/pixmaps/modern/24x24/main") |
-		       url ("$TEXMACS_PATH/misc/pixmaps/modern/20x20/mode") |
-		       url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
-		       url ("$TEXMACS_PATH/misc/pixmaps/traditional/--x17") |
-		       plugin_path ("misc/pixmaps"));
+                       "$TEXMACS_HOME_PATH/misc/pixmaps" |
+                       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/settings") |
+                       url ("$TEXMACS_PATH/misc/pixmaps/modern/32x32/table") |
+                       url ("$TEXMACS_PATH/misc/pixmaps/modern/24x24/main") |
+                       url ("$TEXMACS_PATH/misc/pixmaps/modern/20x20/mode") |
+                       url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
+                       url ("$TEXMACS_PATH/misc/pixmaps/traditional/--x17") |
+                       plugin_path ("misc/pixmaps"));
   (void) get_env_path ("TEXMACS_DIC_PATH",
-		       "$TEXMACS_HOME_PATH/langs/natural/dic" |
-		       url ("$TEXMACS_PATH/langs/natural/dic") |
-		       plugin_path ("langs/natural/dic"));
+                       "$TEXMACS_HOME_PATH/langs/natural/dic" |
+                       url ("$TEXMACS_PATH/langs/natural/dic") |
+                       plugin_path ("langs/natural/dic"));
 #ifdef OS_WIN32
   set_env ("TEXMACS_SOURCE_PATH", "");
 #else
@@ -474,14 +499,16 @@ setup_texmacs () {
 
 void
 init_texmacs () {
-  //cout << "Initialize -- Succession status table\n";
-  init_succession_status_table ();
-  //cout << "Initialize -- Succession standard DRD\n";
-  init_std_drd ();
   //cout << "Initialize -- Main paths\n";
   init_main_paths ();
   //cout << "Initialize -- User dirs\n";
   init_user_dirs ();
+  //cout << "Initialize -- Boot lock\n";
+  acquire_boot_lock ();
+  //cout << "Initialize -- Succession status table\n";
+  init_succession_status_table ();
+  //cout << "Initialize -- Succession standard DRD\n";
+  init_std_drd ();
   //cout << "Initialize -- User preferences\n";
   load_user_preferences ();
   //cout << "Initialize -- Guile\n";

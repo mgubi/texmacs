@@ -20,7 +20,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (poster-themes)
-  (list "boring-white" "pale-blue" "dark-vador"))
+  (list "blackboard" "bluish" "boring-white" "dark-vador" "granite"
+        "ice" "manila-paper" "metal" "pale-blue" "parchment"
+        "pine" "reddish" "ridged-paper" "rough-paper"
+        "xperiment"))
 
 (tm-define (poster-title-styles)
   (list "plain-poster-title" "framed-poster-title" "topless-poster-title"))

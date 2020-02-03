@@ -1,8 +1,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; MODULE      : link-navigate.scm
-;; DESCRIPTION : navigation routines for links
+;; MODULE      : link-extract.scm
+;; DESCRIPTION : extract routines for links
 ;; COPYRIGHT   : (C) 2006  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
@@ -17,12 +17,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (tree-search t pred?)
-  (with me (if (pred? t) (list t) '())
-    (if (tree-atomic? t) me
-	(append me (append-map (cut tree-search <> pred?)
-			       (tree-children t))))))
 
 (define (locified? x)
   (cond ((list? x) (list-and (map locified? x)))

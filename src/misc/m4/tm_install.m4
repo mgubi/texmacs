@@ -110,11 +110,16 @@ AC_DEFUN([TM_INSTALL],[
   fi
   tm_devel_release=${PACKAGE}-${DEVEL_VERSION}-${DEVEL_RELEASE}
   tm_underscore_devel=${PACKAGE}_${DEVEL_VERSION}
+
+  if test -z "$VERSION_BUILD"
+  then tm_windows_release="$VERSION_MAJOR,$VERSION_MINOR,0,0"
+  else tm_windows_release="$VERSION_MAJOR,$VERSION_MINOR,$VERSION_BUILD,0"
+  fi
+  
   tm_debian_name_devel=${DEBIAN_NAME}_${DEVEL_VERSION}
 
   AC_SUBST(tm_devel)
   AC_SUBST(tm_devel_release)
-  AC_SUBST(tm_underscore_devel)
   AC_SUBST(tm_debian_name_devel)
 
   if test "$STABLE_RELEASE" = "1"; then
@@ -128,4 +133,5 @@ AC_DEFUN([TM_INSTALL],[
   AC_SUBST(tm_stable)
   AC_SUBST(tm_stable_release)
   AC_SUBST(tm_underscore_stable)
+  AC_SUBST(tm_windows_release)
 ])

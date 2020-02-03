@@ -44,12 +44,12 @@ CXXSQLITE3 = @SQLITE3_CXX@
 CXXFREETYPE = @FREETYPE_CFLAGS@
 CXXICONV = @ICONV_CXX@
 CXXGUILE = @GUILE_CFLAGS@
-CXXSPARKLE = @SPARKLE_CXX@
+CXXSPARKLE = @SPARKLE_CXX@ @SPARKLE_CPP@
 CXXPDF = @PDF_CFLAGS@
 
 LD = @CXX@
 LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE)
-LIBS = @LIBS@
+LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @LIBS@ 
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
@@ -139,7 +139,7 @@ texmacs_mm_deps += $(call make_mm_deps,$(cocoa_mm_src))
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
 
-deps += $(texmacs_cpp_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
+#deps += $(texmacs_cpp_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
 
 ###############################################################################
 # Include files
@@ -151,7 +151,7 @@ system_incl   := $(call incl_flags,System System/Boot System/Classes \
   System/Files System/Link System/Misc System/Language Kernel/Abstractions \
   Kernel/Containers Kernel/Types Data/Convert Data/Drd Data/History \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree \
-  Scheme \
+  Data/Parser Scheme \
   Graphics/Bitmap_fonts Graphics/Fonts Graphics/Gui Graphics/Mathematics \
   Graphics/Renderer Graphics/Handwriting Graphics/Types Graphics/Pictures \
   Graphics/Spacial Graphics/Colors Plugins Plugins/@CONFIG_OS_COMPAT@)
@@ -223,10 +223,13 @@ endif
 
 deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
   System/Link System/Misc System/Language Kernel/Abstractions \
-  Kernel/Containers\ Kernel/Types Data/Convert Data/Drd Data/History \
+  Kernel/Containers Kernel/Types Data/Convert \
+  Data/Document Data/Drd Data/History Data/Parser \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree Graphics \
-  Plugins Style/Environment Style/Evaluate Style/Memorizer \
-  Typeset Edit Texmacs Scheme Graphics/Bitmap_fonts Graphics/Fonts \
+  Plugins Plugins/Pdf/LibAesgm Plugins/Qt \
+  Style/Environment Style/Evaluate Style/Memorizer \
+  Typeset Edit Texmacs Texmacs/Data Scheme Graphics/Bitmap_fonts \
+  Graphics/Colors Graphics/Fonts \
   Graphics/Gui Graphics/Mathematics Graphics/Renderer Graphics/Pictures \
   Graphics/Handwriting Graphics/Types Graphics/Spacial)
 
@@ -298,7 +301,14 @@ freetype_obj := $(call makeobj,$(freetype_src))
 %.o: %.cpp # Disable implicit compilation rule
 %.o: %.c # Disable implicit compilation rule
 
-cxx_flags    = $(strip $(CXX) $(1) -c $< -o $@)
+ifneq "@PREPROC@" "yes"
+cxx_flags = $(strip $(CXX) $(1) -c $< -o $@)
+else
+define cxx_flags
+$(strip $(CXX) $(1) -E $< -o $@.lst)
+$(strip $(CXX) $(1) -c $< -o $@)
+endef
+endif
 cxx_incl     = $(call cxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS)) 
 objcxx_flags = $(strip $(OBJCXX) $(1) -c $< -o $@)
@@ -420,8 +430,8 @@ TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
  freetype windowsres)) $(texmacs_c_deps)
 
 link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
-   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) \
-   $(LDSPARKLE)
+   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) @SPARKLE_LDFLAGS@
+
 
 $(tmsrc)/bin/texmacs.bin: Objects/texmacs-$(link).bin
 	$(CP) $^ $@
@@ -476,6 +486,7 @@ DISTR:
 
 CLEAN: DISTR
 	$(RM) Objects/*.o
+	$(RM) Objects/*.lst
 	$(RM) Plugins/Qt/moc_*.cpp
 
 clean: CLEAN

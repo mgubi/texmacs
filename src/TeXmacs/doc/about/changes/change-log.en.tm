@@ -1,13 +1,76 @@
-<TeXmacs|1.99.8>
+<TeXmacs|1.99.11>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english|old-spacing|old-dots>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.9>
+  <section|Changes from version 1.99.1 to 1.99.12>
 
   <\itemize>
+    <item>Many bug fixes (1.99.12).
+
+    <item>Make it easier to cite work on <TeXmacs> (1.99.12).
+
+    <item>Improved <name|Html> import/export filters and support for
+    <name|MathJax> (1.99.12).
+
+    <item>Faster native (<name|Qt>-based) image export of formulas to
+    <name|Html> (1.99.12).
+
+    <item>Improved large bracket sizes and script positioning (1.99.12).
+
+    <item>Various artwork related improvements (1.99.12).
+
+    <item>Interface for SymPy (1.99.12).
+
+    <item>Re-implement Asymptote, DraTex, Gnuplot, Graphviz, Xypic using
+    Python for full platform support (1.99.12).
+
+    <item>Documentation on how to write plugins using Python (1.99.12).
+
+    <item>Updates of the dictionaries for French and Dutch (1.99.12).
+
+    <item><scm|(run-all-tests)> aggregates and runs all the tests in <scheme>
+    (1.99.12).
+
+    <item>Support for <name|Java> language (1.99.12).
+
+    <item>Several bug fixes (1.99.11).
+
+    <item>Repositories for <name|Debian> and <name|Ubuntu> (1.99.11).
+
+    <item>Many bug fixes (1.99.10).
+
+    <item>Redesigned web site (1.99.10).
+
+    <item>Extended <name|Css> stylability when exporting to <name|Html>
+    (1.99.10).
+
+    <item>New <TeXmacs> videos on web site (1.99.10).
+
+    <item>Drag and drop for images (1.99.10).
+
+    <item>Unification of beamer and poster styles, work in progress
+    (1.99.10).
+
+    <item>Automatic retrieval of artwork from <verbatim|texmacs.org>
+    (1.99.10).
+
+    <item>New background patterns and pictures (1.99.10).
+
+    <item>Experimental pattern effects (1.99.10).
+
+    <item>Experimental <name|Sparkle> support under <name|MacOS> (1.99.10).
+
+    <item>Experimental and partial support for <name|Git> as a versioning
+    tool (1.99.10).
+
+    <item>Experimantal <name|Graph> plug-in for graphs drawn by various
+    external tools (1.99.10).
+
+    <item>User interface for new features in educational styles (1.99.10).
+
     <item>Many bug fixes (1.99.9).
 
     <item>Similar spell checking widgets as for search and replace (1.99.9).

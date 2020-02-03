@@ -1,14 +1,13 @@
 [Desktop Entry]
-Name=GNU TeXmacs
-Comment=A structured wysiwyg scientific text editor
-BinaryPattern=texmacs
-Protocols=
-MimeType=text/x-texmacs;text/plain;text/x-tex;
-Exec=texmacs %f
-Icon=TeXmacs
-TerminalOptions=
-Path=
+Version=1.0
 Type=Application
-Terminal=0
-MapNotify=false
+Name=GNU TeXmacs
+GenericName=Text Editor
+Comment=A structured wysiwyg scientific text editor
+MimeType=text/x-texmacs.doc;text/x-texmacs.sty;text/plain;text/x-tex;
+Exec=texmacs %f
+Icon=texmacs
+Terminal=false
 Categories=Education;Science;Math;
+X-KDE-Priority=TopLevel
+InitialPreference=99

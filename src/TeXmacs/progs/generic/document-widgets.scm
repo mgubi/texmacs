@@ -121,14 +121,30 @@
 (define (user-page-size? u)
   (== (initial-get u "page-type") "user"))
 
+(define (encode-rendering s)
+  (cond ((== s "screen") "automatic")
+        (else s)))
+
+(define (decode-rendering s)
+  (cond ((== s "automatic") "screen")
+        (else s)))
+
+(define (encode-crop-marks s)
+  (cond ((== s "none") "")
+        (else s)))
+
+(define (decode-crop-marks s)
+  (cond ((== s "") "none")
+        (else s)))
+
 (tm-widget (page-formatter-format u quit)
   (centered
     (refreshable "page-format-settings"
       (aligned
-        (item (text "Screen rendering:")
-          (enum (initial-set-page-rendering u answer)
-                '("paper" "papyrus" "automatic" "beamer" "book" "panorama")
-                (initial-get-page-rendering u) "10em"))
+        (item (text "Page rendering:")
+          (enum (initial-set-page-rendering u (encode-rendering answer))
+                '("paper" "papyrus" "screen" "beamer" "book" "panorama")
+                (decode-rendering (initial-get-page-rendering u)) "10em"))
         (item (text "Page type:")
           (enum (begin
                   (initial-set u "page-type" answer)
@@ -145,7 +161,12 @@
         (item (text "First page:")
           (enum (initial-set u "page-first" answer)
                 (list (initial-get u "page-first") "")
-                (initial-get u "page-first") "10em")))))
+                (initial-get u "page-first") "10em"))
+        (item (text "Crop marks:")
+          (enum (initial-set u "page-crop-marks" (encode-crop-marks answer))
+                '("none" "a3" "a4" "letter")
+                (decode-crop-marks (initial-get u "page-crop-marks"))
+                "10em")))))
   ===
   (centered
     (refreshable "page-user-format-settings"
@@ -168,7 +189,7 @@
      ("Reset"
       (initial-default u "page-medium" "page-type" "page-orientation"
                          "page-border" "page-packet" "page-offset"
-                         "page-width" "page-height")
+                         "page-width" "page-height" "page-crop-marks")
       (refresh-now "page-format-settings")
       (refresh-now "page-user-format-settings"))
      // //

@@ -3,13 +3,12 @@
 * MODULE     : tm_sparkle.mm
 * DESCRIPTION: Manager class for the autoupdater Sparkle framework
 * COPYRIGHT  : (C) 2013 Miguel de Benito Delgado
+*              2019 modified by Gregoire Lecerf
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
-
-#include "tm_configure.hpp"
 
   // HACK, should be fixed with autotools
 #if defined (OS_MACOS) && defined (USE_SPARKLE)
@@ -47,8 +46,7 @@ tm_sparkle::tm_sparkle () : tm_updater ()
 tm_sparkle::~tm_sparkle ()
 {
   if (DEBUG_STD)
-    debug_updater << "Deleting Sparkle object for "
-                  << as_string (appcast) << LF;
+    debug_updater << "Deleting Sparkle object" << LF;
   delete updater;
 }
 
@@ -71,13 +69,6 @@ time_t tm_sparkle::lastCheck() const
    */
 }
 
-bool tm_sparkle::setAutomaticChecks (bool enable)
-{
-  [updater->p setAutomaticallyChecksForUpdates: enable];
-  [updater->p resetUpdateCycle];
-  return true;
-}
-
 bool tm_sparkle::setCheckInterval (int hours)
 {
   if (interval == hours)
@@ -94,24 +85,6 @@ bool tm_sparkle::setCheckInterval (int hours)
   return true;
 }
 
-bool tm_sparkle::setAppcast (url _appcast)
-{
-  if (_appcast == appcast)
-    return true;
-
-  if (DEBUG_STD)
-    debug_updater << "Changing appcast url from "
-                  << as_string (appcast) << " to "
-                  << as_string (_appcast) << ".\n";
-  
-  c_string s (as_string (_appcast));  // FIXME! This has to be UTF8!
-  NSURL* nsurl = [NSURL URLWithString: [NSString stringWithUTF8String: s]];
-  [updater->p setFeedURL: nsurl];
-
-  appcast = _appcast;
-  return true;
-}
-
 bool tm_sparkle::checkInBackground ()
 {
   if (isRunning()) {
@@ -121,8 +94,7 @@ bool tm_sparkle::checkInBackground ()
   }
 
   if (DEBUG_STD)
-    debug_updater << "Scheduling background check at "
-                  << as_string (appcast) << LF;
+    debug_updater << "Scheduling background check" << LF;
   
   [updater->p checkForUpdatesInBackground];
   return true;
@@ -137,8 +109,7 @@ bool tm_sparkle::checkInForeground ()
   }
 
   if (DEBUG_STD)
-    debug_updater << "Starting foreground check at "
-                  << as_string (appcast) << LF;
+    debug_updater << "Starting foreground check" << LF;
 
   [updater->p checkForUpdates:nil];
   return true;

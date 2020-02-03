@@ -1,6 +1,6 @@
 
 /******************************************************************************
-* MODULE     : language_internals.h
+* MODULE     : impl_language.hpp
 * COPYRIGHT  : (C) 1999  Joris van der Hoeven
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -10,7 +10,12 @@
 
 #ifndef IMPL_LANGUAGE_H
 #define IMPL_LANGUAGE_H
+
 #include "language.hpp"
+#include "number_parser.hpp"
+#include "inline_comment_parser.hpp"
+#include "blanks_parser.hpp"
+#include "escaped_char_parser.hpp"
 
 extern text_property_rep tp_normal_rep;
 extern text_property_rep tp_hyph_rep;
@@ -31,6 +36,22 @@ extern text_property_rep tp_operator_rep;
 extern text_property_rep tp_short_apply_rep;
 extern text_property_rep tp_apply_rep;
 
+struct abstract_language_rep: language_rep {
+  hashmap<string,string> colored= hashmap<string,string>();
+  blanks_parser_rep blanks_parser;
+  inline_comment_parser_rep inline_comment_parser;
+  number_parser_rep number_parser;
+  escaped_char_parser_rep escaped_char_parser;
+
+  abstract_language_rep (string s): language_rep(s) {};
+  virtual bool belongs_to_identifier (char c);
+  void parse_identifier (hashmap<string, string>& t, string s, int& pos);
+  void parse_alpha (string s, int& pos);
+  void parse_type (hashmap<string,string>& t, string s, int& pos);
+  void parse_keyword (hashmap<string,string>& t, string s, int& pos);
+  void parse_constant (hashmap<string,string>& t, string s, int& pos);
+};
+
 struct verb_language_rep: language_rep {
   verb_language_rep (string name);
   text_property advance (tree t, int& pos);
@@ -48,58 +69,106 @@ struct scheme_language_rep: language_rep {
   string get_color (tree t, int start, int end);
 };
 
-struct mathemagix_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct mathemagix_language_rep: abstract_language_rep {
   mathemagix_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  bool belongs_to_identifier (char c);
+  void parse_identifier_or_markup (hashmap<string, string>& t,
+    string s, int& pos, bool postfix, bool& is_markup);
+  void parse_keyword (hashmap<string,string>& t, string s, int& pos);
+  void parse_modifier (hashmap<string,string>& t, string s, int& pos);
+  void parse_class (hashmap<string,string>& t, string s, int& pos);
+  void parse_postfix (hashmap<string,string>& t, string s, int& pos);
+  void parse_constant (hashmap<string,string>& t, string s, int& pos);
 };
 
-struct r_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct r_language_rep: abstract_language_rep {
   r_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  bool belongs_to_identifier (char c);
+  void parse_identifier (hashmap<string, string>& t, string s, int& pos);
+  void parse_identifier_or_markup (hashmap<string, string>& t,
+    string s, int& pos, bool postfix, bool& is_markup);
+  void parse_keyword (hashmap<string,string>& t, string s, int& pos);
+  void parse_modifier (hashmap<string,string>& t, string s, int& pos);
+  void parse_class (hashmap<string,string>& t, string s, int& pos);
+  void parse_postfix (hashmap<string,string>& t, string s, int& pos);
+  void parse_constant (hashmap<string,string>& t, string s, int& pos);
 };
 
 
-struct cpp_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct cpp_language_rep: abstract_language_rep {
   cpp_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  void parse_preprocessing (string s, int & pos);
 };
 
-struct scilab_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct scilab_language_rep: abstract_language_rep {
   scilab_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  bool belongs_to_identifier (char c);
+  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
+  string parse_operators (hashmap<string,string>& t, string s, int& pos);
 };
 
-struct python_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct python_language_rep: abstract_language_rep {
   python_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
+  string parse_operators (hashmap<string,string>& t, string s, int& pos);
 };
 
-struct scala_language_rep: language_rep {
-  hashmap<string,string> colored;
+struct java_language_rep: abstract_language_rep {
+  java_language_rep (string name);
+  text_property advance (tree t, int& pos);
+  array<int> get_hyphens (string s);
+  void hyphenate (string s, int after, string& left, string& right);
+  string get_color (tree t, int start, int end);
+
+  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
+  string parse_operators (hashmap<string,string>& t, string s, int& pos);
+};
+
+struct scala_language_rep: abstract_language_rep {
   scala_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+
+  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
+  string parse_operators (hashmap<string,string>& t, string s, int& pos);
 };
+
+struct fortran_language_rep: abstract_language_rep {
+  fortran_language_rep (string name);
+  text_property advance (tree t, int& pos);
+  array<int> get_hyphens (string s);
+  void hyphenate (string s, int after, string& left, string& right);
+  string get_color (tree t, int start, int end);
+
+  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
+  string parse_operators (hashmap<string,string>& t, string s, int& pos);
+};
+
 #endif // defined IMPL_LANGUAGE_H

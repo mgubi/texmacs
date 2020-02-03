@@ -21,6 +21,7 @@
 #include "message.hpp"
 #include <setjmp.h>
 #include "image_files.hpp"
+#include "iterator.hpp"
 
 #ifdef EXPERIMENTAL
 #include "../../Style/Memorizer/clean_copy.hpp"
@@ -243,6 +244,8 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   env->write (PAGE_SHOW_HF, "true");
   env->write (PAGE_SCREEN_MARGIN, "false");
   env->write (PAGE_BORDER, "none");
+  if (is_func (env->read (BG_COLOR), PATTERN))
+    env->write (BG_COLOR, env->exec (env->read (BG_COLOR)));
   if (!conform) {
     env->write (PAGE_MEDIUM, "paper");
     env->write (PAGE_PRINTED, "true");
@@ -254,9 +257,9 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
 
   // Determine parameters for printer
 
-  string page_type = env->get_string (PAGE_TYPE);
-  double w         = env->page_width;
-  double h         = env->page_height;
+  string page_type = env->page_real_type;
+  double w         = env->page_real_width;
+  double h         = env->page_real_height;
   double cm        = env->as_length (string ("1cm"));
   bool   landsc    = env->page_landscape;
   int    dpi       = as_int (printing_dpi);
@@ -369,23 +372,32 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
       t= tree (SURROUND, buft[0], "", t);
 
   string s= suffix (name);
+  bool bitmap=
+    (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
+#ifndef QTTEXMACS
+  bitmap= false;
+#endif
   bool ps= (s == "ps" || s == "eps");
   if (use_pdf ()) ps= (ps || s == "pdf");
+
   typeset_prepare ();
   int dpi= as_int (printing_dpi);
-  //if (!ps) t= tree (WITH, MAGNIFICATION, "2", PAGE_WIDTH, "40cm", t);
-  //if (!ps) t= tree (WITH, MAGNIFICATION, "1.6", PAGE_WIDTH, "40cm", t);
-  double mag= ( 1.0 * dpi) / 600;
-  double wid= (25.0 * dpi) / 600;
-  if (!ps) {
-    mag *= 1.6;
-    wid *= 1.6;
-  }
-  t= tree (WITH, MAGNIFICATION, as_string (mag),
-           PAGE_WIDTH, as_string (wid) * "cm", t);
+  tree old_dpi= env->read (DPI);
+  tree old_info_flag= env->read (INFO_FLAG);
+  env->write (DPI, printing_dpi);
+  if (is_compound (old_info_flag) || !ends (old_info_flag->label, "paper"))
+    env->write (INFO_FLAG, "none");
+  env->style_init_env ();
+  env->update ();
   box b= typeset_as_box (env, t, path ());
+  env->write (DPI, old_dpi);
+  env->write (INFO_FLAG, old_info_flag);
+  env->style_init_env ();
+  env->update ();
+  
   if (b->x4 - b->x3 >= 5*PIXEL && b->y4 - b->y3 >= 5*PIXEL) {
-    if (ps) make_eps (name, b, dpi);
+    if (bitmap) make_raster_image (name, b, 5.0);
+    else if (ps) make_eps (name, b, dpi);
     else {
       url temp= url_temp (use_pdf ()? ".pdf": ".eps");
       make_eps (temp, b, dpi);
@@ -400,7 +412,8 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
     }
   }
   array<int> a;
-  a << b->x3 << b->y3 << b->x4 << b->y4;
+  a << b->x3 << b->y3 << b->x4 << b->y4 << b->x1 << b->y1 << b->x2 << b->y2;
+  a << env->get_int (FONT_BASE_SIZE) << dpi;
   return a;
 }
 

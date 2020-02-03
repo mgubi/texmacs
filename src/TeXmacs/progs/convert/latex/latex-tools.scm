@@ -230,9 +230,11 @@
 			 (latex-texmacs-environment-body (cadr head))))
 	     (envar (and env (latex-texmacs-arity head))))
 	(cond ((and body (== (length tail) arity))
-	       (latex-substitute body t))
+	       ;;(latex-substitute body t)
+	       (latex-substitute body (cons head tail)))
 	      ((and env (== (length tail) 1) (== (length (cddr head)) envar))
-	       (latex-substitute env (append (cdr t) (cddr head))))
+	       ;;(latex-substitute env (append (cdr t) (cddr head)))
+	       (latex-substitute env (append tail (cddr head))))
 	      (else (cons head tail))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -465,6 +467,8 @@
   (:synopsis "Return the usepackage command for @doc")
   (set! latex-uses-table (make-ahash-table))
   (latex-use-which-package doc)
+  (for (p (ahash-table->list latex-packages-option))
+    (ahash-set! latex-uses-table (car p) #t))
   (let* ((l1 latex-all-packages)
 	 (s1 (latex-as-use-package (list-difference l1 '("amsthm"))))
 	 (l2 (map car (ahash-table->list latex-uses-table)))
@@ -481,14 +485,14 @@
          (l2 (map cdr l0))
          (l3 (map (cut logic-ref latex-paper-opts% <>) l1))
          (l4 (map (lambda (key val)
-                    (cond ((not val) '())
+                    (cond ((not val) #f)
                           ((== key "page-type")
                            (or (logic-ref latex-paper-type% val) '()))
                           ((== key "page-orientation") val)
-                          ((string? key)
-                           (string-append key "= " (tmtex-decode-length val)))
-                          (else '()))) l3 l2))
-         (l5 (filter nnull? l4))
+                          ((and (string? key) (!= val "auto"))
+                           (string-append key "=" (tmtex-decode-length val)))
+                          (else #f))) l3 l2))
+         (l5 (filter string? l4))
          (page-opts (list-intersperse l5 ",")))
     (if (nnull? page-opts)
       `(!append (geometry (!concat ,@page-opts)) "\n") "")))
@@ -515,7 +519,7 @@
   (apply string-append
          (map (lambda (x)
                 (string-append
-                  "\\definecolor{" x "}{HTML}{"
+                  "\\definecolor{" (string-replace x " " "") "}{HTML}{"
                   (html-color->latex-xcolor (get-hex-color x)) "}\n"))
               colors)))
 
@@ -526,15 +530,17 @@
 (define (latex-make-option l)
   (string-append "[" (apply string-append (list-intersperse l ",")) "]"))
 
-(define (set-packages-option pack opts)
-  (if (nnull? opts)
-    (ahash-set! latex-packages-option pack opts)))
+(define (set-packages-option pack opts colors)
+  (cond ((nnull? opts)
+         (ahash-set! latex-packages-option pack opts))
+        ((nnull? colors)
+         (ahash-set! latex-packages-option pack (list "")))))
 
 (tm-define (latex-preamble text style lan init colors colormaps)
   (:synopsis "Compute preamble for @text")
   (with-global tmtex-style (if (list? style) (cAr style) style)
     (set! latex-packages-option (make-ahash-table))
-    (set-packages-option "xcolor" colormaps)
+    (set-packages-option "xcolor" colormaps colors)
     (let* ((Page         (latex-preamble-page-type init))
            (Macro        (latex-macro-defs text))
            (Colors       (latex-colors-defs colors))
@@ -552,3 +558,48 @@
         (string-append pre-uses)
         (string-append pre-page)
         (string-append pre-catcode pre-macro pre-colors)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Clean-up the produced LaTeX for use with MathJax
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (latex-mathjax-text l x)
+  (cond ((or (npair? x) (nlist? x)) `(,l ,x))
+        ((func? x 'tmtextsf 1) (latex-mathjax-text 'textsf (cadr x)))
+        ((func? x 'tmtexttt 1) (latex-mathjax-text 'texttt (cadr x)))
+        ((func? x 'tmtextit 1) (latex-mathjax-text 'textit (cadr x)))
+        ((func? x 'tmtextbf 1) (latex-mathjax-text 'textbf (cadr x)))
+        ((func? x 'tmtextrm 1) (latex-mathjax-text l (cadr x)))
+        ((func? x 'tmtextup 1) (latex-mathjax-text l (cadr x)))
+        (else `(,l ,x))))
+
+(tm-define (latex-mathjax-pre x)
+  (:synopsis "Produce cleaner LaTeX for @x for use with MathJax, pass 1")
+  (cond ((or (npair? x) (nlist? x)) x)
+        ((func? x 'text 1)
+         (latex-mathjax-text 'text (cadr x)))
+        ((func? x 'dotminus 0) `(dot "-"))
+        ((func? x 'dotpm 0) `(dot (pm)))
+        ((func? x 'dotmp 0) `(dot (mp)))
+        ((func? x 'dotamalg 0) `(dot (amalg)))
+        ((func? x 'dotplus 0) `(dot "+"))
+        ((func? x 'dottimes 0) `(dot (times)))
+        ((func? x 'dotast 0) `(dot (ast)))
+        ((and (func? x 'color 2) (func? (cadr x) '!option 1))
+         ;; NOTE : MathJax has broken color support, so ignore certain colors
+         ;; FIXME: this hack may have to be suppressed when MathJax improves
+         "")
+        (else (cons (car x) (map latex-mathjax-pre (cdr x))))))
+
+(tm-define (latex-mathjax x)
+  (:synopsis "Produce cleaner LaTeX for @x for use with MathJax, pass 2")
+  (cond ((or (npair? x) (nlist? x)) x)
+        ((func? x 'ensuremath 1) (latex-mathjax (cadr x)))
+        ((func? x 'hspace* 1) `(hspace ,(latex-mathjax (cadr x))))
+        ((func? x 'mathbbm 1) `(mathbb ,(latex-mathjax (cadr x))))
+        ((func? x 'fill 0) "3cm")
+        ((func? x 'newcommand) "")
+        ((func? x 'custombinding) "")
+        ((func? x 'nobreak) "")
+        ((func? x 'label) "")
+        (else (cons (car x) (map latex-mathjax (cdr x))))))

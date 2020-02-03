@@ -80,23 +80,31 @@
          (master (if (null? opt-master) (buffer-master) (car opt-master))))
     (aux-set-document aux body)
     (aux-set-master aux master)
-    (switch-to-buffer name)))
+    (switch-document name)))
 
 (define-public-macro (with-aux u . prg)
   `(let* ((u ,u)
           (t (tree-import u "texmacs"))
-          (name (current-buffer)))
-     (open-auxiliary "* Aux *" t u)
+          (name (current-buffer))
+          (aux "* Aux *"))
+     (aux-set-document aux t)
+     (aux-set-master aux u)
+     (switch-to-buffer (aux-name aux))
      (with r (begin ,@prg)
        (switch-to-buffer name)
        r)))
 
 (define buffer-newly-created-table (make-ahash-table))
+(define buffer-initialized-table (make-ahash-table))
 
 (tm-define (buffer-newly-created? name)
   (and name
-       (or (not (buffer-has-name? name))
+       (or (and (not (buffer-has-name? name))
+                (not (ahash-ref buffer-initialized-table name)))
            (ahash-ref buffer-newly-created-table name))))
+
+(tm-define (buffer-initialized name)
+  (ahash-set! buffer-initialized-table name #t))
 
 (tm-define (buffer-copy buf u)
   (:synopsis "Creates a copy of @buf in @u and return @u.")
@@ -123,6 +131,7 @@
 ;; Saving buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define current-save-source (url-none))
 (tm-define current-save-target (url-none))
 
 (define (buffer-notify-recent name)
@@ -175,6 +184,7 @@
 
 (define (save-buffer-check-permissions name opts)
   ;;(display* "save-buffer-check-permissions " name "\n")
+  (set! current-save-source name)
   (set! current-save-target name)
   (with vname `(verbatim ,(url->system name))
     (cond ((url-scratch? name)
@@ -286,6 +296,7 @@
 (tm-define (export-buffer-main name to fm opts)
   ;;(display* "export-buffer-main " name ", " to ", " fm "\n")
   (if (string? to) (set! to (url-relative (buffer-get-master name) to)))
+  (if (url? name) (set! current-save-source name))
   (if (url? to) (set! current-save-target to))
   (export-buffer-check-permissions name to fm opts))
 
@@ -382,6 +393,31 @@
   ("autosave" "120" notify-autosave))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Opening files using external tools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (buffer-external? u)
+  (or (and (url-rooted-web? u)
+           ;; FIXME: Use HTTP HEADERS to determine the real file format
+           (!= (file-format u) "texmacs-file"))
+      (file-of-format? u "image")
+      (file-of-format? u "pdf")
+      (file-of-format? u "postscript")
+      (file-of-format? u "generic")))
+
+(tm-define (default-open)
+  (cond ((os-macos?) "open")
+        ((or (os-mingw?) (os-win32?)) "start")
+        (else "xdg-open")))
+
+(tm-define (load-external u)
+  (if (not (url-rooted? u))
+      (set! u (url-relative (current-buffer) u)))
+  (if (url-rooted-web? u)
+      (system (string-append (default-open) " " (url->system u)))
+      (system-1 (default-open) u)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loading buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -470,11 +506,16 @@
 (tm-define (load-buffer-in-new-window name . opts)
   (:argument name smart-file "File name")
   (:default  name (propose-name-buffer))
-  (apply load-buffer-main (cons name (cons :new-window opts))))
+  (if (buffer->window name)
+      (noop) ;;(window-focus (buffer->window name))
+      (apply load-buffer-main (cons name (cons :new-window opts)))))
 
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
-  (if (buffer-exists? name) (switch-to-buffer name) (load-buffer name)))
+  (cond ((buffer-exists? name) (switch-to-buffer name))
+        ((url-rooted-web? (current-buffer)) (load-buffer name))
+        ((buffer-external? name) (load-external name))
+        (else (load-buffer name))))
 
 (tm-define (open-buffer)
   (:synopsis "Open a new file")
@@ -547,10 +588,26 @@
   (if (window-per-buffer?) (open-buffer) (open-in-window)))
 
 (tm-define (load-document u)
-  (if (window-per-buffer?) (load-buffer-in-new-window u) (load-buffer u)))
+  (:argument u smart-file "File name")
+  (:default  u (propose-name-buffer))
+  (when (not (url-none? u))
+    (if (window-per-buffer?) (load-buffer-in-new-window u) (load-buffer u))))
 
 (tm-define (load-document* u)
-  (if (window-per-buffer?) (load-buffer u) (load-buffer-in-new-window u)))
+  (:argument u smart-file "File name")
+  (:default  u (propose-name-buffer))
+  (when (not (url-none? u))
+    (if (window-per-buffer?) (load-buffer u) (load-buffer-in-new-window u))))
+
+(tm-define (switch-document u)
+  (:argument u smart-file "File name")
+  (:default  u (propose-name-buffer))
+  (when (not (url-none? u))
+    (if (window-per-buffer?)
+        (if (buffer->window u)
+            (noop) ;;(window-focus (buffer->window u))
+            (open-buffer-in-window u (buffer-get u) ""))
+        (load-buffer u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Printing buffers

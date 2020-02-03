@@ -29,6 +29,15 @@
   Leftrightarrowlim Longleftarrowlim Longrightarrowlim Longleftrightarrowlim
   cdotslim
 
+  ;; further arrows
+  threeleftarrows threerightarrows
+  fourleftarrows fourrightarrows
+  longleftrightarrows longleftleftarrows
+  longthreeleftarrows longthreerightarrows
+  longrightleftarrows longrightrightarrows
+  longfourleftarrows longfourrightarrows
+  LRleftrightarrow Llongleftarrow Llongrightarrow Llongleftrightarrow
+
   ;; rotated arrows and other symbols
   mapsfrom longmapsfrom mapmulti leftsquigarrow
   upequal downequal longupequal longdownequal longupminus longdownminus
@@ -37,7 +46,7 @@
   mapsup mapsdown longmapsup longmapsdown
   upsquigarrow downsquigarrow updownsquigarrow
   hookuparrow hookdownarrow longhookuparrow longhookdownarrow
-  Backepsilon Mho btimes
+  Backepsilon Backsigma Mho btimes
 
   ;; asymptotic relations by Joris
   nasymp asympasymp nasympasymp simsim nsimsim
@@ -46,22 +55,28 @@
   lleq llleq ggeq gggeq triplesim ntriplesim
 
   ;; replacements for symbols from mathabx
-  divides ndivides asterisk npreccurlyeq dottimes nequiv precdot
+  divides ndivides asterisk dottimes precdot
 
   ;; extra literal symbols
   mathcatalan mathd mathD mathe matheuler mathlambda mathi mathpi
   Alpha Beta Epsilon Eta Iota Kappa Mu Nu Omicron Chi Rho Tau Zeta
 
+  ;; negations
+  nin nni notni nequiv nleadsto
+  npreccurlyeq npreceqq nprecsim
+  nsimeq nsqsubset nsqsubseteq nsqsubseteqq
+  nsqsupset nsqsupseteq nsqsupseteqq
+  nsucccurlyeq nsucceqq nsuccsim  
+  
   ;; other extra symbols
   oempty exterior Exists bigintwl bigointwl
   of suchthat barsuchthat asterisk point cdummy comma copyright
   bignone nobracket nospace nocomma noplus nosymbol
-  nin nni notni nequiv nleadsto
   dotminus dotpm dotmp dotamalg dottimes dotoplus dototimes dotast
   into longminus longequal
   longhookrightarrow longhookleftarrow
   triangleup tmprecdot preceqdot
-  llangle rrangle join um upl upm ump
+  llangle rrangle join um upl upm ump pplus
   assign plusassign minusassign timesassign overassign backassign
   lflux gflux colons transtype
   lebar gebar leangle geangle leqangle geqangle
@@ -78,11 +93,11 @@
 
 (logic-group latex-texmacs-0%
   tmunsc emdash tmhrule tmat tmbsl tmdummy
-  TeXmacs madebyTeXmacs withTeXmacstext
-  scheme tmsep tmSep pari qed hrule)
+  TeXmacs madebyTeXmacs withTeXmacstext citewebsite tmmade
+  scheme tmsep tmSep pari qed textdots hrule)
 
 (logic-group latex-texmacs-1%
-  key tmrsub tmrsup keepcase
+  citetexmacs key tmrsub tmrsup keepcase
   tmtextrm tmtextsf tmtexttt tmtextmd tmtextbf
   tmtextup tmtextsl tmtextit tmtextsc tmmathbf tmmathmd
   tmverbatim tmop tmstrong tmem tmtt tmname tmsamp tmabbr
@@ -154,6 +169,7 @@
   ("tmparmod" 3)
   ("tmparsep" 1)
   ("tmindent" 0)
+  ("tmlisting" 0)
   ("elsequation" 0)
   ("elsequation*" 0)
   ("theglossary" 1))
@@ -163,7 +179,7 @@
 
 (logic-group latex-texmacs-environment-0%
   begin-proof begin-leftaligned begin-rightaligned begin-quoteenv
-  begin-tmindent begin-elsequation begin-elsequation*)
+  begin-tmindent begin-tmlisting begin-elsequation begin-elsequation*)
 
 (logic-group latex-texmacs-environment-0*%
   begin-tmcode)
@@ -201,14 +217,15 @@
   ("descriptioncompact" 0)
   ("descriptionaligned" 0)
   ("descriptiondash" 0)
-  ("descriptionlong" 0))
+  ("descriptionlong" 0)
+  ("descriptionparagraphs" 0))
 
 (logic-group latex-texmacs-list%
   begin-itemizeminus begin-itemizedot begin-itemizearrow
   begin-enumeratenumeric begin-enumerateroman begin-enumerateromancap
   begin-enumeratealpha begin-enumeratealphacap
   begin-descriptioncompact begin-descriptionaligned
-  begin-descriptiondash begin-descriptionlong)
+  begin-descriptiondash begin-descriptionlong begin-descriptionparagraphs)
 
 (logic-rules
   ((latex-texmacs-arity% 'x 0) (latex-texmacs-list% 'x))
@@ -219,7 +236,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (logic-group latex-texmacs-preamble-command%
-  newmdenv
+  newmdenv tikzframe
   tmkeywords tmacm tmarxiv tmpacs tmmsc
   fmtext tdatetext tmisctext tsubtitletext
   thankshomepage thanksemail thanksdate thanksamisc thanksmisc thankssubtitle

@@ -133,6 +133,16 @@ move_box_rep::expand_glyphs (int mode, double factor) {
   return move_box (ip, body, dx, dy, child_flag, big_flag);
 }
 
+struct move_delimiter_box_rep: public move_box_rep {
+  SI bot, top;
+  move_delimiter_box_rep (path ip, box b, SI x, SI y, SI bot2, SI top2):
+    move_box_rep (ip, b, x, y, false, true), bot (bot2), top (top2) {}
+  operator tree () {
+    return tree (TUPLE, "move_delimiter", (tree) bs[0]); }
+  void get_bracket_extents (SI& lo, SI& hi) {
+    lo= bot; hi= top; }
+};
+
 struct shift_box_rep: public change_box_rep {
   SI dx, dy;
   shift_box_rep (path ip, box b, SI x, SI y, bool fl1, bool fl2);
@@ -488,6 +498,10 @@ repeat_box_rep::repeat_box_rep (path ip, box b, box r2, SI xoff2, bool u2):
     for (i=i1; i<i2; i++) {
       box bb= move_box (decorate_right (ip), repeat, 0, 0);
       insert (bb, i*width-xoff, 0);
+      x3= min (x3, i*width-xoff + repeat->x3);
+      x4= max (x4, i*width-xoff + repeat->x4);
+      y3= min (y3, repeat->y3);
+      y4= max (y4, repeat->y4);
     }
   }
 
@@ -899,6 +913,11 @@ text_at_box_rep::graphical_select (SI x, SI y, SI dist) {
 box
 move_box (path ip, box b, SI x, SI y, bool child_flag, bool big_flag) {
   return tm_new<move_box_rep> (ip, b, x, y, child_flag, big_flag);
+}
+
+box
+move_delimiter_box (path ip, box b, SI x, SI y, SI bot, SI top) {
+  return tm_new<move_delimiter_box_rep> (ip, b, x, y, bot, top);
 }
 
 box
