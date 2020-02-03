@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include <QImage>
+#include <QPrinter>
 #include <QPainter>
 #include <QCoreApplication>
 #include <QLocale>
@@ -23,8 +24,8 @@
 #include <QStringList>
 #include <QKeySequence>
 
-#include <QtPrintSupport/QPrinter>
-#include <QtPrintSupport/QPrintDialog>
+#include <QPrinter>
+#include <QPrintDialog>
 #include <QImageReader>
 
 #include "colors.hpp"
@@ -94,17 +95,12 @@ to_qfont (int style, QFont font) {
   return font;
 }
 
-<<<<<<< HEAD
-/*! Try to convert a TeXmacs lenght (em, px, w, h) into a QSize.
-
-=======
 /*! Try to convert a TeXmacs length (em, px, w, h) into a QSize.
  
->>>>>>> origin/master
  This uses the widget's current size to compute relative sizes as specified
  with "FFw", where FF is the string representation of a double.
  A value of "1w" should not affect the widget size.
-
+ 
  FIXME: does 1w mean 100% of the contents' size or 100% of the available size?
  */
 QSize
@@ -122,46 +118,21 @@ qt_decode_length (string width, string height,
     // Width as a function of the default height
   else if (w_unit == "h") size.rwidth() = w_len * size.height();
     // Absolute EM units
-<<<<<<< HEAD
-  else if (ends (width, "em") && is_double (width (0, N(width) - 2))) {
-    double x = as_double (width (0, N(width) - 2));
-    size.setWidth(x * fm.width("M"));
-  }
-    // Absolute pixel units
-  else if (ends (width, "px") && is_double (width (0, N(width) - 2))) {
-    double x = as_double (width (0, N(width) - 2));
-    size.setWidth(x);
-=======
   else if (w_unit == "em") size.setWidth (w_len * fm.width("M"));
     // Absolute pixel units
   else if (w_unit == "px") {
     if (retina_zoom == 2) w_len *= 1.5;
     size.setWidth (w_len);
->>>>>>> origin/master
   }
 
     // Height as a function of the default width
   if (h_unit == "w") size.rheight() = h_len * size.width();
     // Height as a function of the default height
-<<<<<<< HEAD
-  else if (ends (height, "h") && is_double (width (0, N(width) - 1))) {
-    double y = as_double (height (0, N(height) - 1));
-    size.rheight() *= y;
-  }
-  else if (ends (height, "em") && is_double (height (0, N(height) - 2))) {
-    double y = as_double (height (0, N(height) - 2));
-    size.setHeight(y * fm.width("M"));
-  }
-  else if (ends (height, "px") && is_double (height (0, N(height) - 2))) {
-    double y = as_double (height (0, N(height) - 2));
-    size.setHeight(y);
-=======
   else if (h_unit == "h") size.rheight() *= h_len;
   else if (h_unit == "em") size.setHeight (h_len * fm.width("M"));
   else if (h_unit == "px") {
     if (retina_zoom == 2) h_len *= 1.5;
     size.setHeight (h_len);
->>>>>>> origin/master
   }
   return size;
 }
@@ -173,7 +144,7 @@ conv_sub (const string& ks) {
   r = replace (r, "S-", "Shift+");
   r = replace (r, "A-", "Alt+");
   //r = replace (r, "K-", "");
-#ifdef Q_OS_MAC
+#ifdef Q_WS_MAC
   r = replace (r, "C-", "Meta+");
   r = replace (r, "M-", "Ctrl+");
 #else
@@ -228,7 +199,7 @@ coord4
 from_qrect (const QRect & rect) {
   SI c1, c2, c3, c4;
   c1= rect.x() * SCREEN_PIXEL;
-  c2= -(rect.y() + rect.height()) * SCREEN_PIXEL;
+  c2= -(rect.y() + rect.height()) * SCREEN_PIXEL;       
   c3= (rect.x() + rect.width()) * SCREEN_PIXEL;
   c4= -rect.y() * SCREEN_PIXEL;
   return coord4 (c1, c2, c3, c4);
@@ -296,7 +267,7 @@ to_qstringlist (array<string> l) {
  stored using the os 8-bit encoding (UTF-8 on linux/Mac OS locale code page on windows),
  but we assume that strings are sent to us for display in
  widgets as cork and thus display the wrong encoding.
-
+ 
  It gets tricky soon, so for the time being we use this hack.
  */
 QString //uses heuristics
@@ -333,7 +304,6 @@ from_qstring_utf8 (const QString &s) {
   return string ((char*) cstr);
 }
 
-
 // This should provide better lookup times
 static QHash<QString, QColor> _NamedColors;
 
@@ -351,15 +321,15 @@ to_qcolor (const string& col) {
     if(DEBUG_QT_WIDGETS)
       debug_widgets << "to_qcolor(" << col << "): "
         << "name is not defined.\n";
-    return QColor(100,100,100);  // FIXME?
+    return QColor(100,100,100);  // FIXME? 
   }
   QColor _c= to_qcolor (c);
   _NamedColors.insert(_col, _c);
   return _c;
 }
 
-/*! Returns a color encoded as a string with hexadecimal RGB values,
- as in #e3a1ff
+/*! Returns a color encoded as a string with hexadecimal RGB values, 
+ as in #e3a1ff 
  */
 string
 from_qcolor (const QColor& col) {
@@ -396,7 +366,7 @@ qt_supports (url u) {
 	  debug_convert <<"QT valid formats:";
 	  foreach (QString _format, formats) debug_convert <<", "<< from_qstring(_format);
 	  debug_convert <<LF;
-  }	*/
+  }	*/  
   string suf=suffix (u);
   bool ans= (bool) formats.contains((QByteArray) as_charp(suf));
   //if (DEBUG_CONVERT) {debug_convert <<"QT valid format:"<<((ans)?"yes":"no")<<LF;}
@@ -418,7 +388,7 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
     h= (int) rint ((((double) im.height())*2834)/im.dotsPerMeterY());
     if (DEBUG_CONVERT) debug_convert <<"QT dotsPerMeter: "
         <<w<<" x "<<h<<LF;
-    return true;
+    return true;      
   }
 }
 
@@ -481,7 +451,7 @@ void
 qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
 // use a QPrinter to output raster images to eps or pdf
 // dpi is the maximum dpi : the image will either be dowsampled to that dpi
-// or the actual dpi will be lower
+// or the actual dpi will be lower  
   if (DEBUG_CONVERT) debug_convert << "qt_image_to_eps_or_pdf " << image << " -> "<<outfile<<LF;
   QPrinter printer;
   printer.setOrientation(QPrinter::Portrait);
@@ -490,13 +460,13 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
     //note that PostScriptFormat is gone in Qt5. a substitute?: http://soft.proindependent.com/eps/
     cout << "TeXmacs] warning: PostScript format no longer supported in Qt5\n";
     printer.setOutputFormat(QPrinter::PdfFormat);
-#else
+#else    
     printer.setOutputFormat(QPrinter::PostScriptFormat);
 #endif
   }
   else printer.setOutputFormat(QPrinter::PdfFormat);
   printer.setFullPage(true);
-  if (!dpi) dpi=96;
+  if (!dpi) dpi=96; 
   printer.setResolution(dpi);
   printer.setOutputFileName(utf8_to_qstring (concretize (outfile)));
   QImage im (utf8_to_qstring (concretize (image)));
@@ -544,7 +514,7 @@ qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
 
 string
 qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
-  if (DEBUG_CONVERT) debug_convert << "in qt_image_to_eps"<<LF;
+  if (DEBUG_CONVERT) debug_convert << "in qt_image_to_eps"<<LF; 
 
   static const char* d= "0123456789ABCDEF";
   QImage im (utf8_to_qstring (concretize (image)));
@@ -573,7 +543,7 @@ qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
     << " def\n/ImageHeight " << sh << " def\nImageWidth ImageHeight max "
     << "ImageWidth ImageHeight max scale\n\n/ImageDatas\n\tcurrentfile\n\t"
     << "<< /Filter /ASCIIHexDecode >>\n\t/ReusableStreamDecode\n\tfilter\n";
-
+    
     int v, i= 0, j= 0, k= 0, l= 0;
     string mask;
     for (j= 0; j < im.height (); j++) {
@@ -614,7 +584,7 @@ qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
       }
     }
     r << ">\ndef\n\n";
-
+    
     if (alpha) {
       r << "/MaskDatas\n\tcurrentfile\n\t<< /Filter /ASCIIHexDecode >>\n"
       << "\t/ReusableStreamDecode\n\tfilter\n"
@@ -644,35 +614,6 @@ qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
 }
 */
 
-<<<<<<< HEAD
-void
-qt_image_data (url image, int& w, int&h, string& data, string& palette, string& mask) {
-  // debug_convert << "in qt_image_data"<<LF;
-  (void) palette;
-  QImage im (utf8_to_qstring (concretize (image)));
-  if (im.isNull ()) {
-    convert_error << "Cannot read image file '" << image << "'"
-    << " in qt_image_data" << LF;
-    return;
-  }
-  w=  im.width ();
-  h=  im.height ();
-  data = string ((w*h)*3);
-  mask = string (w*h);
-  int i= 0, j= 0, k= 0, l= 0;
-  for (j= 0; j < im.height (); j++) {
-    for (i=0; i < im.width (); i++) {
-      QRgb p= im.pixel (i, j);
-      data[l++] = qRed (p);
-      data[l++] = qGreen (p);
-      data[l++] = qBlue (p);
-      mask[k++] = qAlpha (p);
-    }
-  }
-}
-
-=======
->>>>>>> origin/master
 QPixmap
 as_pixmap (const QImage& im) {
   QPixmap pm (im.size ());
@@ -732,8 +673,8 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
   + QString("color: rgba(%1, %2, %3, %4%);").arg(r).arg(g).arg(b).arg(a)
   + "} ";
 
-#ifdef Q_OS_MAC
-    /* Disabled QLabels are not greyed out (at least in MacOS, since Qt 4.7.2),
+#ifdef Q_WS_MAC
+    /* Disabled QLabels are not greyed out (at least in MacOS, since Qt 4.7.2), 
      see: https://bugreports.qt-project.org/browse/QTBUG-19008
      For consistency we set the disabled color for all widgets.
      */
@@ -806,7 +747,7 @@ qt_pretty_time (int t) {
 #ifndef _MBD_EXPERIMENTAL_PRINTER_WIDGET  // this is in qt_printer_widget
 
 #define PAPER(fmt)  case QPrinter::fmt : return "fmt"
-static string
+static string 
 qt_papersize_to_string (QPrinter::PaperSize sz) {
   switch (sz) {
       PAPER (A0) ;
@@ -829,7 +770,7 @@ qt_papersize_to_string (QPrinter::PaperSize sz) {
       PAPER (B7) ;
       PAPER (B8) ;
       PAPER (B9) ;
-      PAPER (B10) ;
+      PAPER (B10) ;      
       PAPER (Letter) ;
     default:
       return "A4";
@@ -837,8 +778,8 @@ qt_papersize_to_string (QPrinter::PaperSize sz) {
 }
 #undef PAPER
 
-bool
-qt_print (bool& to_file, bool& landscape, string& pname, url& filename,
+bool 
+qt_print (bool& to_file, bool& landscape, string& pname, url& filename, 
           string& first, string& last, string& paper_type) {
   static QPrinter *qprinter = NULL;
   if (!qprinter) {
@@ -852,8 +793,8 @@ qt_print (bool& to_file, bool& landscape, string& pname, url& filename,
     landscape = (qprinter->orientation() == QPrinter::Landscape);
     paper_type = qt_papersize_to_string(qprinter->paperSize());
     if (qprinter->printRange() == QPrinter::PageRange) {
-      first = qprinter->fromPage();
-      last = qprinter->toPage();
+      first = qprinter->fromPage(); 
+      last = qprinter->toPage(); 
     }
     //cout << "Printer :" << pname << LF;
     //cout << "File :" << filename << LF;
