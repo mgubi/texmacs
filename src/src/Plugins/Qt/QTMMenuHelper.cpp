@@ -442,13 +442,8 @@ QTMLineEdit::QTMLineEdit (QWidget* parent, string _type, string _ww,
     setPalette (pal);
 #endif
   }
-<<<<<<< HEAD
-
-    // just to be sure we don't capture the wrong keys in keyPressEvent
-=======
   
   // just to be sure we don't capture the wrong keys in keyPressEvent
->>>>>>> origin/master
   setCompleter (0);
 
   qt_apply_tm_style (this, style);
