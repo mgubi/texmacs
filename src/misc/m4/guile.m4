@@ -58,6 +58,7 @@ AC_DEFUN([LC_WITH_GUILE],[
 	location=$1
   m4_define([embedded_guile],[tm-guile168])
   AC_SUBST([MKGUILE])
+  AC_SUBST([CLNGUILE])
   AC_SUBST([GUILE_STATIC])
   AS_IF(test "$location" = "embedded", [unset location], test -z $location,[
     # build the prefered guile version search line
@@ -92,8 +93,9 @@ AC_DEFUN([LC_WITH_GUILE],[
     unset LC_WITH_GUILE_tmp1 LC_WITH_GUILE_tmp2
   ],test -z "$location" -a -d embedded_guile,[
       AC_MSG_NOTICE([use embedded guile])
-      AC_SUBST([MKGUILE])
+      AC_SUBST([MKGUILE],[embedded_guile/build/lib/libguile.a])
       AC_SUBST([DIRGUILE],embedded_guile)
+  		AC_SUBST([CLNGUILE],[CLNGUILE])
       $0_use_embedded_guile=1
       AX_SUBDIRS_CONFIGURE([embedded_guile],
         [[--without-guile-readline]],
@@ -116,7 +118,7 @@ AC_DEFUN([LC_WITH_GUILE],[
 
 AC_DEFUN([LC_GUILE],[
   AC_ARG_WITH(guile,
-    AS_HELP_STRING([--with-guile@<:@=sustem@:>@],[path to to find guile-config or [embedded] if any tm-guile package included]), 
+    AS_HELP_STRING([--with-guile@<:@=system@:>@],[path to to find guile-config or [embedded] if any tm-guile package included]), 
     [AS_IF(test "$withval" == no,[AC_MSG_ERROR([cannot work without Guile])],test "$withval" = yes,[unset withval])],[unset withval])
     
   LC_WITH_GUILE($withval)
