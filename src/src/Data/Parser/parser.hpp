@@ -17,7 +17,7 @@
 class parser_rep {
 public:
   bool parse (string s, int& pos) {
-    if (!can_parse(s, pos)) {
+    if (!can_parse (s, pos)) {
       return false;
     }
 
@@ -41,7 +41,7 @@ protected:
    * @param s     the string to parse
    * @param[out]  the position to parse
    */
-  virtual void do_parse (string s, int& pos) {}
+  virtual void do_parse (string s, int& pos) { (void) s; (void) pos; }
 
   /** Test if a string is parsable at the position
    * @param s     the string to parse

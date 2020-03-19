@@ -120,7 +120,7 @@ protected:
   QHash<QString, QString> printerOptions;
 };
 
-#if defined(Q_OS_MAC) || defined (Q_WS_X11)
+#if defined(Q_OS_MAC) || defined (Q_OS_LINUX)
 
 /*!
  * Implementation specific to the CUPS driver under MacOS and Linux. This

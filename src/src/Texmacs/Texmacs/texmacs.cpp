@@ -107,7 +107,7 @@ TeXmacs_init_paths (int& argc, char** argv) {
 
   string current_texmacs_path = get_env ("TEXMACS_PATH");
 
-#if (defined(QTTEXMACS) && defined(Q_OS_MAC)) 
+#if (defined(QTTEXMACS) && defined(Q_OS_MAC))
   // the following line can inibith external plugin loading
   // QCoreApplication::setLibraryPaths(QStringList());
   // ideally we would like to control the external plugins

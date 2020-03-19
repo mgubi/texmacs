@@ -26,7 +26,7 @@
 #include "Cairo/cairo_renderer.hpp"
 #include "Cairo/tm_cairo.hpp"
 
-#if defined (Q_WS_X11)
+#if defined (Q_OS_LINUX)
 #include <QX11Info>
 extern Drawable qt_x11Handle (const QPaintDevice *pd);
 extern const QX11Info *qt_x11Info (const QPaintDevice *pd);
@@ -434,7 +434,7 @@ qt_simple_widget_rep::get_renderer() {
 #ifdef USE_CAIRO
   cairo_renderer_rep *ren = the_cairo_renderer ();
   cairo_surface_t *surf;
-#ifdef Q_WS_X11
+#ifdef Q_OS_LINUX
   //const QX11Info & info = x11Info();//qt_x11Info (this);
   //    Display *dpy = x11Info().display();
   //backingPixmap = QPixmap (width(),height());
