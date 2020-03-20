@@ -51,12 +51,13 @@
 ;; User id attached to document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (expand load eval)
 (tm-define (tm-gpg-get-key-user-id t)
   (:secure #t)
   (:synopsis "Retrieve user id from fingerprint @t")
   (with fingerprint (tree->string t)
     (with l (gpg-get-ahash-ref-attachment "gpg" fingerprint)
-      (if l (string->tree (first l)) t))))
+      (if l (string->tree (first l)) t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public key data attached to document
@@ -392,17 +393,17 @@
   (scrollable
     (padded
       (aligned
-        (for (x fingerprints)
-          (item (text (tm-gpg-get-key-user-id (string->tree x))))))))
+        (for (x (map (lambda (y) (tree->string (tm-gpg-get-key-user-id (string->tree y)))) fingerprints))
+          (text x)))))
   ===
   (bottom-buttons
     ("Cancel" (cmd "Cancel"))
     >>
     ("Ok"
-      (for (x fingerprints))
+      (for (x fingerprints)
         (gpg-import-public-keys
           (tree->string (tm-gpg-get-key-data (string->tree x)))))
-      (cmd "Ok"))))
+      (cmd "Ok")))))
 
 (tm-widget (gpg-widget-no-new-public-key-from-buffer cmd)
   (resize ("400px" "400px" "400px") ("100px" "100px" "100px") 

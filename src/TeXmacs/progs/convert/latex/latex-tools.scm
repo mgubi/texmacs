@@ -550,7 +550,7 @@
            (pre-colors   (latex-serialize-preamble Colors))
            (pre-catcode  (latex-catcode-defs Text))
            (pre-uses     (latex-use-package-command Text)))
-      (values
+       (values
         (cond ((and (in? "amsthm" latex-all-packages)
                     (== style "amsart")) "[amsthm]")
               ((list? style) (latex-make-option (cDr style)))

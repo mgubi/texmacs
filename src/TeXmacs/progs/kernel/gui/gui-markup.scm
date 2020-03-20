@@ -260,7 +260,7 @@
   (:synopsis "Make button")
   (if developer-mode?
     (ahash-set! all-translations text #t))
-  `(list ,text (lambda () ,@cmds)))
+  `(list ,text (tagged-lambda () ,@cmds)))
 
 (tm-define-macro ($check text check pred?)
   (:synopsis "Make button")

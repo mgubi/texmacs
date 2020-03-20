@@ -153,5 +153,7 @@
 
 (define-public (match? x pattern)
   "Does @x match the pattern @pat?"
+;;(display* "matching:" x " pat:" pattern "\n")
   (let ((sols (match (list x) (list pattern) '())))
-    (if (null? sols) #f sols)))
+;;(display* "sols:" sols "\n")
+(if (null? sols) #f sols)))

@@ -67,6 +67,13 @@
   (set! u (or (remote-file-name u) (url->string u)))
   (client-remote-eval server `(remote-identifier ,u) cont))
 
+;;FIXME: seems that the uses of this macro pose problems to the compiler
+;; (to be investigated further)
+;;; client/client-tmfs.scm:293:8: warning: possibly wrong number of arguments to `#<procedure 122a426e8 at server/server-tmfs.scm:85:32 (envelope rname)>'
+;;; client/client-tmfs.scm:292:6: warning: possibly wrong number of arguments to `#<procedure 122a426e8 at server/server-tmfs.scm:85:32 (envelope rname)>'
+;;; client/client-tmfs.scm:291:4: warning: possibly wrong number of arguments to `#<procedure 122a426e8 at server/server-tmfs.scm:85:32 (envelope rname)>'
+;;; client/client-tmfs.scm:178:8: warning: possibly wrong number of arguments to `#<procedure 122a426e8 at server/server-tmfs.scm:85:32 (envelope rname)>'
+
 (tm-define-macro (with-remote-identifier r server u . body)
   `(remote-identifier ,server ,u
                       (lambda (msg) (with ,r msg ,@body))))

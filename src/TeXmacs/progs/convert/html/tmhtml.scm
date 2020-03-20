@@ -1090,6 +1090,7 @@
     (if (!= sum 0) (set! cellf (map (cut tmhtml-width-replace <> sum) cellf)))
     (tmhtml-make-cells-bis l cellf)))
 
+;;FIXME: compiler complains about argument number here
 (define (tmhtml-make-row-attr x)
   (tmhtml-make-cell-attr x))
 
@@ -1102,6 +1103,7 @@
       (cons (tmhtml-make-row  (car l) (car rowf) (car cellf))
 	    (tmhtml-make-rows (cdr l) (cdr rowf) (cdr cellf)))))
 
+;;FIXME: compiler complains about argument number here
 (define (tmhtml-make-column-attr x)
   (tmhtml-make-cell-attr x))
 

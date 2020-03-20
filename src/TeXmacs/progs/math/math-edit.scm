@@ -157,7 +157,7 @@
 ;; Switching between different types of formulas
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (concat-isolate! t)
+(define (concat-isolate! t)
   `(cond ((not (tree-is? t :up 'concat)) (noop))
 	 ((not (tree-is? t :up :up 'document)) (noop))
 	 ((= (tree-arity (tree-up t)) 1) (tree-set! t :up t))

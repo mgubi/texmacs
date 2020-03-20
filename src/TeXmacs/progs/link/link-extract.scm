@@ -62,6 +62,7 @@
                                       " - " env))
                  (style `(tuple ,@(get-style-list)))
 		 (r (filter-map environment->locus l)))
+        ;;FIXME: there is a wrong number of args in the call to build-locus-page-sub
 	    (delayed (:pause 25) (build-locus-page-sub name style r #f))))
       (if (locified? l) (cont)
 	  (user-confirm "Locify environments?" #f 

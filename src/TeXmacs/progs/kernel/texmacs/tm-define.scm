@@ -13,6 +13,7 @@
 
 (texmacs-module (kernel texmacs tm-define))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Contextual overloading
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -65,9 +66,9 @@
 (define (ca*r x) (if (pair? x) (ca*r (car x)) x))
 (define (ca*adr x) (ca*r (cadr x)))
 
-(define (lambda* head body)
+(define (make-lambda head body)
   (if (pair? head)
-      (lambda* (car head) `((lambda ,(cdr head) ,@body)))
+      (make-lambda (car head) `((lambda ,(cdr head) ,@body)))
       (car body)))
 
 (define (listify args)
@@ -238,56 +239,46 @@
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
-         (nval (lambda* head nbody)))
-    (if (ahash-ref tm-defined-table var)
-        `(let ((former ,var))
-           ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
-           ;;    (display* "Overloaded " ',var "\n"))
-           ;;(display* "Overloaded " ',var "\n")
-           ;;(display* "   " ',nval "\n")
-           (set! temp-module ,(current-module))
-           (set! temp-value ,nval)
-           (set-current-module texmacs-user)
-           (set! ,var temp-value)
-           (set-current-module temp-module)
-           (ahash-set! tm-defined-table ',var
+         (nval (make-lambda head nbody))
+         (s `(let ((first? (and (not (ahash-ref tm-defined-table ',var))
+                           (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
+              (if first?
+                 (begin
+                   (when (nnull? ',cur-conds)
+                     (display* "warning: conditional master routine " ',var "\n")
+                     (display* "   " ',nval "\n"))
+                  (module-define! texmacs-user ',var (lambda args (apply former args)))
+                  (module-export! texmacs-user '(,var))
+                  (ahash-set! tm-defined-table ',var '())
+                  (ahash-set! tm-defined-module ',var '())))
+               (ahash-set! tm-defined-name ,var ',var)
+               (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
-           (ahash-set! tm-defined-name ,var ',var)
-	   (ahash-set! tm-defined-module ',var
-		       (cons (module-name temp-module)
-			     (ahash-ref tm-defined-module ',var)))
-           ,@(map property-rewrite cur-props))
-        `(begin
-           (when (nnull? cur-conds)
-             (display* "warning: conditional master routine " ',var "\n")
-             (display* "   " ',nval "\n"))
-           ;;(display* "Defined " ',var "\n")
-           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           (set! temp-module ,(current-module))
-           (set! temp-value
-                 (if (null? cur-conds) ,nval
-                     ,(list 'let '((former (lambda args (noop)))) nval)))
-           (set-current-module texmacs-user)
-           (define-public ,var temp-value)
-           (set-current-module temp-module)
-           (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name ,var ',var)
-	   (ahash-set! tm-defined-module ',var
-                       (list (module-name temp-module)))
-           ,@(map property-rewrite cur-props)))))
+               (ahash-set! tm-defined-module ',var
+                       (cons (module-name (current-module))
+                           (ahash-ref tm-defined-module ',var)))
+               (let ((former ,var))
+                     (module-set! texmacs-user ',var ,nval))
+            ,@(map property-rewrite cur-props))))
+        ;(display s) (newline)
+         s))
 
-(define-public (tm-define-sub head body)
+(define-public (tm-define-sub symb head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-define-sub head (cdr body))))
+      (let ((decl (tm-define-sub symb head (cdr body))))
 	(if (not (hash-ref define-option-table (caar body)))
 	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
 	((hash-ref define-option-table (caar body)) (cdar body) decl))
-      (cons 'tm-define-overloaded (cons head body))))
+       `(,symb ,head ,@body)))
 
 (define-public-macro (tm-define head . body)
   (set! cur-conds '())
   (set! cur-props '())
-  (tm-define-sub head body))
+  (tm-define-sub 'tm-define-overloaded head body))
+
+(define-public-macro (tm-define-once head . body)
+  `(eval-when (expand load eval) (if (not (ahash-ref tm-defined-table ',(ca*r head)))
+     (tm-define ,head ,@body))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloaded macros with properties
@@ -305,12 +296,10 @@
     ;;(display* "   " `(define-public-macro ,head
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
-       (tm-define ,macro-head ,@body)
-       (set! temp-module ,(current-module))
-       (set-current-module texmacs-user)
-       (define-public-macro ,head
-         ,(apply* (ca*r macro-head) head))
-       (set-current-module temp-module))))
+       (eval-when (expand load eval) (tm-define ,macro-head ,@body))
+       (with-module texmacs-user
+         (define-public-macro ,head
+            ,(apply* (ca*r macro-head) head))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -340,31 +329,31 @@
 (define-public (not-define-option? item)
   (not (and (pair? item) (keyword? (car item)))))
 
-(define-public (lazy-define-one module opts name)
+(define (lazy-define-one module name)
   (let* ((old (ahash-ref lazy-define-table name))
-	 (new (if old (cons module old) (list module))))
+         (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-  (with name-star (string->symbol (string-append (symbol->string name) "*"))
-    `(when (not (defined? ',name))
-       (tm-define (,name . args)
-         ,@opts
-         (let* ((m (resolve-module ',module))
-                (p (module-ref texmacs-user '%module-public-interface))
-                (r (module-ref p ',name #f)))
-           (if (not r)
-               (texmacs-error "lazy-define"
-                              ,(string-append "Could not retrieve "
-                                              (symbol->string name))))
-           (apply r args))))))
+    `(if (not (module-ref texmacs-user ',name #f))
+         (begin
+           (module-define! texmacs-user ',name
+            (lambda args
+              (let* ((m (resolve-module ',module))
+                     (r (module-ref texmacs-user ',name #f)))
+                (if (not r)
+                    (texmacs-error "lazy-define"
+                                  ,(string-append "Could not retrieve "
+                                                (symbol->string name))))
+                ;;(display* "lazy:" ',name "\n")
+                (apply r args))))
+           (module-export! texmacs-user '(,name)))))
 
 (define-public-macro (lazy-define module . names)
-  (receive (opts real-names) (list-break names not-define-option?)
-    `(begin
-       ,@(map (lambda (name) (lazy-define-one module opts name)) names))))
+   `(begin
+       ,@(map (lambda (name) (lazy-define-one module name)) names)))
 
 (define-public (lazy-define-force name)
   (if (procedure? name) (set! name (procedure-name name)))
   (let* ((im (ahash-ref lazy-define-table name))
 	 (modules (if im im '())))
     (ahash-remove! lazy-define-table name)
-    (for-each module-provide modules)))
+    (for-each module-load modules)))
