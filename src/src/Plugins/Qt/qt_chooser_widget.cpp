@@ -265,7 +265,7 @@ qt_chooser_widget_rep::perform_dialog () {
       string imname    = from_qstring_utf8 (fileNames.first());
       file = "(system->url " * scm_quote (imname) * ")";
       if (type == "image") {
-#if !defined(Q_OS_MAC) // && !defined(Q_OS_WIN)   //at least windows Xp and 7 lack image preview, switch to custom dialog
+#if !defined(Q_OS_MAC) // && !defined(Q_WS_WIN)   //at least windows Xp and 7 lack image preview, switch to custom dialog
         file = "(list " * file * imgdialog->getParamsAsString () * ")"; //set image size from preview
 #else //MacOs only now
         /*

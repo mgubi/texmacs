@@ -13,9 +13,10 @@
 #define QT_GUI_HPP
 
 #include <QtGui>
+#if (QT_VERSION >= 0x050000)
 #include <QtCore>
 #include <QtWidgets>
-
+#endif
 //#include <QTranslator>
 //#include <QTimer>
 //#include <QLabel>
@@ -69,11 +70,11 @@ class event_queue {
   list<queued_event> q;
   event_queue (const event_queue& q2);  // = delete;
   event_queue& operator= (const event_queue& q2); // = delete;
-
+  
   unsigned int n;  // ugly internal counter to avoid traversal of list in N(q)
 public:
   event_queue();
-
+  
   void append (const queued_event& ev);
   queued_event next ();
   bool is_empty() const;
@@ -91,7 +92,7 @@ class command_queue {
   array<object> q;
   array<time_t> start_times;
   time_t lapse;
-
+  
   bool wait;
     // this flag is used in update() to insert QP_DELAYED_COMMANDS events in
     // the TeXmacs event queue to have delayed command handling properly
@@ -106,7 +107,7 @@ public:
   void exec_pending ();
   void clear_pending ();
   bool must_wait (time_t now) const;
-
+  
   friend class qt_gui_rep;
 };
 
@@ -125,15 +126,15 @@ class qt_gui_rep {
   QWidget*        waitWindow;
   widget          _popup_wid;
   time_t      popup_wid_time; //!< 0 means not to show _popup_wid
-
+  
   hashmap<string,tree>   selection_t;
   hashmap<string,string> selection_s;
-
+  
   QTranslator* q_translator;
-
+  
   time_t time_credit;        // interval to interrupt long redrawings
   time_t timeout_time;       // new redraw interruption
-
+  
     // marshalling flags between update, needs_update and check_event.
   bool do_check_events;
   bool        updating;
@@ -177,7 +178,7 @@ public:
   void force_update();
   void need_update();
   void refresh_language();
-
+  
   /* queued processing */
   void process_keypress (qt_simple_widget_rep *wid, string key, time_t t);
   void process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus,
@@ -187,9 +188,9 @@ public:
   void process_resize (qt_simple_widget_rep *wid, SI x, SI y);
   void process_command (command _cmd);
   void process_command (command _cmd, object _args);
-  void process_delayed_commands ();
+  void process_delayed_commands (); 
   void process_queued_events (int max = -1);
-
+  
   /* befriended interface functions */
   friend class QTMGuiHelper;
   friend void exec_delayed (object cmd);

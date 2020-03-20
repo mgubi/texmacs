@@ -231,7 +231,9 @@ qt_load_xpm (url file_name) {
   c_string buf (sss);
   QImage pm;
   pm.loadFromData ((uchar*) (char*) buf, N(sss));
+#if (QT_VERSION >= 0x050000)
   pm.setDevicePixelRatio (dpr);
+#endif
   return qt_picture (pm, 0, 0);
 }
 
