@@ -1,0 +1,135 @@
+
+/******************************************************************************
+* MODULE     : qtws_gui.hpp
+* DESCRIPTION: QT WebSockets GUI class
+* COPYRIGHT  : (C) 2020 Massimiliano Gubinelli
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
+
+#ifndef QTWS_GUI_HPP
+#define QTWS_GUI_HPP
+
+#include "gui.hpp"
+
+typedef class qtws_gui_rep* qtws_gui;
+extern qtws_gui the_gui;
+
+
+/******************************************************************************
+ * Delayed commands
+ ******************************************************************************/
+
+/*! The queue of delayed commands.
+ */
+class command_queue {
+  array<object> q;
+  array<time_t> start_times;
+  time_t lapse;
+  
+  bool wait;
+    // this flag is used in update() to insert QP_DELAYED_COMMANDS events in
+    // the TeXmacs event queue to have delayed command handling properly
+    // interspersed with the other events
+
+public:
+  command_queue();
+  ~command_queue();
+
+  void exec (object cmd);
+  void exec_pause (object cmd);
+  void exec_pending ();
+  void clear_pending ();
+  bool must_wait (time_t now) const;
+  
+  friend class qtws_gui_rep;
+};
+
+
+/******************************************************************************
+* The qtws_gui class
+******************************************************************************/
+
+class qtws_gui_rep {
+  bool           interrupted;
+  time_t      interrupt_time;
+  QTimer*        updatetimer;
+//  QList<QLabel*> waitDialogs;
+//  QWidget*        waitWindow;
+  widget          _popup_wid;
+  time_t      popup_wid_time; //!< 0 means not to show _popup_wid
+  
+  hashmap<string,tree>   selection_t;
+  hashmap<string,string> selection_s;
+  
+//  QTranslator* q_translator;
+  
+  time_t time_credit;        // interval to interrupt long redrawings
+  time_t timeout_time;       // new redraw interruption
+  
+    // marshalling flags between update, needs_update and check_event.
+  bool do_check_events;
+  bool        updating;
+  bool  needing_update;
+
+//  event_queue     waiting_events;
+  command_queue delayed_commands;
+
+public:
+//  QTMGuiHelper*  gui_helper;
+
+public:
+  qtws_gui_rep (int &argc, char **argv);
+  virtual ~qtws_gui_rep ();
+
+  /* extents, grabbing, selections */
+  void get_extents (SI& width, SI& height);
+  void get_max_size (SI& width, SI& height);
+  // void set_button_state (unsigned int state);
+
+  /* important routines */
+  void event_loop ();
+
+  /* interclient communication */
+  virtual bool get_selection (string key, tree& t, string& s, string format);
+  virtual bool set_selection (string key, tree t, string s, string sv,
+                              string sh, string format);
+  virtual void clear_selection (string key);
+  bool put_graphics_on_clipboard (url file);
+
+  /* miscellaneous */
+  void set_mouse_pointer (string name);
+  void set_mouse_pointer (string curs_name, string mask_name);
+  void show_wait_indicator (widget w, string message, string arg);
+  void show_help_balloon (widget wid, SI x, SI y);
+  void add_event (const queued_event& ev);
+  bool check_event (int type);
+  void set_check_events (bool enable_check);
+
+  void update();
+  void force_update();
+  void need_update();
+  void refresh_language();
+  
+  /* befriended interface functions */
+//  friend class QTMGuiHelper;
+  friend void exec_delayed (object cmd);
+  friend void exec_delayed_pause (object cmd);
+  friend void clear_pending_commands ();
+  friend void needs_update ();
+};
+
+/*! Force an immediate update of the internal texmacs state. */
+void force_update();
+
+#define BEGIN_SLOT                              \
+  try {
+#define END_SLOT                                \
+  }                                             \
+  catch (string s) {                            \
+    the_exception= s;                           \
+  }
+
+#endif // defined QTWS_GUI_HPP
