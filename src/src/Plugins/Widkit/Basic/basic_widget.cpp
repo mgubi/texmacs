@@ -11,7 +11,7 @@
 
 #include "Widkit/basic_widget.hpp"
 #include "gui.hpp"
-#include "window.hpp"
+
 #include "Widkit/Event/attribute_event.hpp"
 
 SI get_dx (gravity grav, SI w);

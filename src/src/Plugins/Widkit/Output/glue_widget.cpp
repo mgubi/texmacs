@@ -10,7 +10,7 @@
 ******************************************************************************/
 
 #include "gui.hpp"
-#include "window.hpp"
+
 #include "Widkit/layout.hpp"
 #include "Widkit/basic_widget.hpp"
 

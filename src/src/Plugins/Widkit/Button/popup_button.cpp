@@ -10,7 +10,7 @@
 ******************************************************************************/
 
 #include "tm_timer.hpp"
-#include "window.hpp"
+
 #include "promise.hpp"
 #include "Widkit/Button/button_widget.hpp"
 #include "message.hpp"

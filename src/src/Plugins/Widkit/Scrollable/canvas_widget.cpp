@@ -10,7 +10,7 @@
 ******************************************************************************/
 
 #include "rectangles.hpp"
-#include "window.hpp"
+
 #include "message.hpp"
 #include "Widkit/basic_widget.hpp"
 #include "Widkit/Event/attribute_event.hpp"

@@ -11,7 +11,7 @@
 
 #include "analyze.hpp"
 #include "font.hpp"
-#include "window.hpp"
+
 #include "Widkit/basic_widget.hpp"
 #include "Widkit/layout.hpp"
 #include "dictionary.hpp"

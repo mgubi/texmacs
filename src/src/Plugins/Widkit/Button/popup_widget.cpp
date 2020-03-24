@@ -12,7 +12,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "window.hpp"
+
 #include "Widkit/layout.hpp"
 #include "Widkit/basic_widget.hpp"
 #include "Widkit/Event/attribute_event.hpp"

@@ -12,7 +12,7 @@
 #include "analyze.hpp"
 #include "font.hpp"
 #include "file.hpp"
-#include "window.hpp"
+
 #include "Widkit/attribute_widget.hpp"
 #include "Widkit/layout.hpp"
 #include "scheme.hpp"

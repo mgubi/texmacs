@@ -11,7 +11,7 @@
 ******************************************************************************/
 
 #include "rectangles.hpp"
-#include "window.hpp"
+
 #include "Widkit/composite_widget.hpp"
 #include "Widkit/layout.hpp"
 

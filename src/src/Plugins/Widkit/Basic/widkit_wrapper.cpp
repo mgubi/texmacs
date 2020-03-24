@@ -13,7 +13,7 @@
 #include "url.hpp"
 #include "Widkit/wk_widget.hpp"
 #include "message.hpp"
-#include "window.hpp"
+
 #include "dictionary.hpp"
 #include "Scheme/object.hpp"
 

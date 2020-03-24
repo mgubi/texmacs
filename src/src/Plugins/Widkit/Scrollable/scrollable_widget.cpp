@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "window.hpp"
+
 #include "message.hpp"
 #include "Widkit/scroll_widget.hpp"
 #include "Widkit/layout.hpp"

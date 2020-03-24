@@ -19,7 +19,7 @@
 
 #include "message.hpp"
 #include "analyze.hpp"
-#include "window.hpp"
+
 
 #include <QWidget>
 #include <QVariant>

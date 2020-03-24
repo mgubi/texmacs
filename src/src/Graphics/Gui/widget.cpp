@@ -12,7 +12,7 @@
 #include "gui.hpp"
 #include "message.hpp"
 #include "font.hpp"
-#include "window.hpp"
+
 
 /******************************************************************************
 * slot names, useful for debugging

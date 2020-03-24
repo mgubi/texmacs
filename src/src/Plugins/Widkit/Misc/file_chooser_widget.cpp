@@ -15,7 +15,7 @@
 
 #include "bitmap_font.hpp"
 #include "font.hpp"
-#include "window.hpp"
+
 #include "file.hpp"
 #include "image_files.hpp"
 #include "analyze.hpp"

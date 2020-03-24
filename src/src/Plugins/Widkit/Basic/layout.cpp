@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "window.hpp"
+
 
 color layout_pastel (renderer ren) { return rgb_color (228, 228, 220); }
 color layout_light (renderer ren) { return light_grey; }
