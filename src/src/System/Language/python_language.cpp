@@ -35,6 +35,13 @@ python_language_rep::python_language_rep (string name):
   escaped_char_parser.support_hex_with_16_bits (true);
   escaped_char_parser.support_hex_with_32_bits (true);
   escaped_char_parser.support_octal_upto_3_digits (true);
+
+  string_parser.set_escaped_char_parser (escaped_char_parser);
+  hashmap<string, string> pairs;
+  pairs("\"") = "\"";
+  pairs("\"\"\"") = "\"\"\"";
+  pairs("\'")= "\'";
+  string_parser.set_pairs(pairs);
 }
 
 text_property
@@ -359,6 +366,7 @@ python_color_setup_operator_field (hashmap<string, string> & t) {
   t (".")= "operator_field";
 }
 
+/*
 static bool
 parse_string (string s, int& pos, bool force) {
   int n= N(s);
@@ -385,7 +393,8 @@ parse_string (string s, int& pos, bool force) {
     pos+= N(delim);
   return false;
 }
- 
+*/ 
+
 string
 python_language_rep::parse_keywords (hashmap<string,string>& t, string s, int& pos) {
   int i= pos;
@@ -464,61 +473,54 @@ python_language_rep::get_color (tree t, int start, int end) {
 
   static string none= "";
   if (start >= end) return none;
-  string s= t->label;
 
   int pos= 0;
-  int opos=0;
-  string type;
-  bool in_str= false;
-  bool in_esc= false;
+  int opos= 0;
+  string type= none;
+  string s= t->label;
+  string_parser.reset ();
+
   do {
     type= none;
     do {
       opos= pos;
-      if (in_str) {
-        in_esc= parse_string (s, pos, true);
-        in_str= false;
-        if (opos < pos) {
-          type= "constant_string";
-          break;
-        }
-      }
-      else if (in_esc) {
-        in_esc= false;
-        in_str= true;
-        if (escaped_char_parser.parse (s, pos)) {
+      if (string_parser.unfinished ()) {
+        if (string_parser.escaped () && string_parser.parse_escaped (s, pos)) {
           type= "constant_char";
           break;
         }
-      }
-      else {
-        if (blanks_parser.parse (s, pos)) break;
-        if (inline_comment_parser.parse (s, pos)) {
-          type= "comment";
-          break;
-        }
-        in_esc= parse_string (s, pos, false);
-        if (opos < pos) {
+        if (string_parser.parse (s, pos)) {
           type= "constant_string";
           break;
         }
-        if (number_parser.parse(s, pos)) {
-          type= "constant_number";
-          break;
-        }
-        type= parse_keywords (colored, s, pos);
-        if (opos < pos) {
-          break;
-        }
-        type= parse_operators (colored, s, pos);
-        if (opos < pos) {
-          break;
-        }
-        if (identifier_parser.parse (s, pos)) {
-          type= none;
-          break;
-        }
       }
+
+      if (blanks_parser.parse (s, pos)) break;
+      if (inline_comment_parser.parse (s, pos)) {
+        type= "comment";
+        break;
+      }
+      if (string_parser.parse (s, pos)) {
+        type= "constant_string";
+        break;
+      }
+      if (number_parser.parse(s, pos)) {
+        type= "constant_number";
+        break;
+      }
+      type= parse_keywords (colored, s, pos);
+      if (opos < pos) {
+        break;
+      }
+      type= parse_operators (colored, s, pos);
+      if (opos < pos) {
+        break;
+      }
+      if (identifier_parser.parse (s, pos)) {
+        type= none;
+        break;
+      }
+      
       pos= opos;
       pos++;
     }

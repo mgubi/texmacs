@@ -19,6 +19,7 @@
 #include "keyword_parser.hpp"
 #include "operator_parser.hpp"
 #include "identifier_parser.hpp"
+#include "string_parser.hpp"
 
 extern text_property_rep tp_normal_rep;
 extern text_property_rep tp_hyph_rep;
@@ -39,8 +40,14 @@ extern text_property_rep tp_operator_rep;
 extern text_property_rep tp_short_apply_rep;
 extern text_property_rep tp_apply_rep;
 
+int line_number (tree t);
+int number_of_lines (tree t);
+tree line_inc (tree t, int i);
+bool in_comment (int pos, tree t);
+
 struct abstract_language_rep: language_rep {
   hashmap<string,string> colored;
+  string current_parser;
   blanks_parser_rep blanks_parser;
   inline_comment_parser_rep inline_comment_parser;
   number_parser_rep number_parser;
@@ -48,6 +55,7 @@ struct abstract_language_rep: language_rep {
   keyword_parser_rep keyword_parser;
   operator_parser_rep operator_parser;
   identifier_parser_rep identifier_parser;
+  string_parser_rep string_parser;
 
   abstract_language_rep (string s): language_rep(s) {};
   virtual bool belongs_to_identifier (char c);
@@ -117,7 +125,8 @@ struct cpp_language_rep: abstract_language_rep {
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
 
-  void parse_preprocessing (string s, int & pos);
+  void parse_preprocessing (string s, int& pos);
+  string get_identifier_type (string s, int& pos);
 };
 
 struct dot_language_rep: abstract_language_rep {
