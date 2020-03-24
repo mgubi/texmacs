@@ -3246,7 +3246,7 @@
 		9CA0E770242AB77F00DC273E /* string_parser.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = string_parser.hpp; sourceTree = "<group>"; };
 		9CA0E771242AB77F00DC273E /* identifier_parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = identifier_parser.cpp; sourceTree = "<group>"; };
 		9CA0E772242AB77F00DC273E /* identifier_parser.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = identifier_parser.hpp; sourceTree = "<group>"; };
-		9CA0E783242ABAF600DC273E /* qtws_gui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = qtws_gui.cpp; path = ../../Plugins/Qtws/qtws_gui.cpp; sourceTree = "<group>"; };
+		9CA0E783242ABAF600DC273E /* qtws_gui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qtws_gui.cpp; sourceTree = "<group>"; };
 		9CA0E785242ABC6400DC273E /* dot_language.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dot_language.cpp; sourceTree = "<group>"; };
 		9CA0E786242ABC6500DC273E /* locale.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = locale.hpp; sourceTree = "<group>"; };
 		9CA0E7BD242ACC4F00DC273E /* qtws_window.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qtws_window.cpp; sourceTree = "<group>"; };
@@ -4269,7 +4269,6 @@
 		9C0B47E410A8CC100097A335 /* Gui */ = {
 			isa = PBXGroup;
 			children = (
-				9CA0E783242ABAF600DC273E /* qtws_gui.cpp */,
 				9C0B47E510A8CC100097A335 /* gui.hpp */,
 				9C0B47E610A8CC100097A335 /* message.hpp */,
 				9C0B47E710A8CC100097A335 /* widget.cpp */,
@@ -5459,10 +5458,11 @@
 		9CA0E5C2242AAE0500DC273E /* Qtws */ = {
 			isa = PBXGroup;
 			children = (
+				9CA0E767242AAFEA00DC273E /* qtws_gui.hpp */,
+				9CA0E783242ABAF600DC273E /* qtws_gui.cpp */,
+				9CA0E766242AAFEA00DC273E /* qtws_renderer.hpp */,
 				9CA0E7BD242ACC4F00DC273E /* qtws_window.cpp */,
 				9CA0E7BE242ACC5000DC273E /* qtws_window.hpp */,
-				9CA0E767242AAFEA00DC273E /* qtws_gui.hpp */,
-				9CA0E766242AAFEA00DC273E /* qtws_renderer.hpp */,
 			);
 			path = Qtws;
 			sourceTree = "<group>";
