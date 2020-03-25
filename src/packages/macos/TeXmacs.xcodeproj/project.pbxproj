@@ -1038,6 +1038,8 @@
 		9C7FA62C14FC5812006F4449 /* enum_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7FA62A14FC5812006F4449 /* enum_widget.cpp */; };
 		9C7FA62F14FC581A006F4449 /* ink_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7FA62D14FC581A006F4449 /* ink_widget.cpp */; };
 		9C7FA63014FC581A006F4449 /* refresh_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7FA62E14FC581A006F4449 /* refresh_widget.cpp */; };
+		9C850349242AD9DC0091DDF2 /* QTWSGuiHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C850347242AD9DB0091DDF2 /* QTWSGuiHelper.cpp */; };
+		9C85034B242B5BA10091DDF2 /* NOTES.md in Resources */ = {isa = PBXBuildFile; fileRef = 9C85034A242B5BA10091DDF2 /* NOTES.md */; };
 		9C855AC012BEB4EC00DCBE1D /* QTMPrintDialog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C855ABC12BEB4EC00DCBE1D /* QTMPrintDialog.cpp */; };
 		9C855AC112BEB4EC00DCBE1D /* QTMPrinterSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C855ABE12BEB4EC00DCBE1D /* QTMPrinterSettings.cpp */; };
 		9C855AC612BEB71600DCBE1D /* QTMPrintDialog.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C855ABD12BEB4EC00DCBE1D /* QTMPrintDialog.hpp */; };
@@ -3227,6 +3229,9 @@
 		9C7FA62A14FC5812006F4449 /* enum_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = enum_widget.cpp; sourceTree = "<group>"; };
 		9C7FA62D14FC581A006F4449 /* ink_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ink_widget.cpp; sourceTree = "<group>"; };
 		9C7FA62E14FC581A006F4449 /* refresh_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = refresh_widget.cpp; sourceTree = "<group>"; };
+		9C850347242AD9DB0091DDF2 /* QTWSGuiHelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTWSGuiHelper.cpp; sourceTree = "<group>"; };
+		9C850348242AD9DC0091DDF2 /* QTWSGuiHelper.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTWSGuiHelper.hpp; sourceTree = "<group>"; };
+		9C85034A242B5BA10091DDF2 /* NOTES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = NOTES.md; sourceTree = "<group>"; };
 		9C855ABC12BEB4EC00DCBE1D /* QTMPrintDialog.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMPrintDialog.cpp; sourceTree = "<group>"; };
 		9C855ABD12BEB4EC00DCBE1D /* QTMPrintDialog.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = QTMPrintDialog.hpp; sourceTree = "<group>"; };
 		9C855ABE12BEB4EC00DCBE1D /* QTMPrinterSettings.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = QTMPrinterSettings.cpp; sourceTree = "<group>"; };
@@ -5458,11 +5463,14 @@
 		9CA0E5C2242AAE0500DC273E /* Qtws */ = {
 			isa = PBXGroup;
 			children = (
+				9C850347242AD9DB0091DDF2 /* QTWSGuiHelper.cpp */,
+				9C850348242AD9DC0091DDF2 /* QTWSGuiHelper.hpp */,
 				9CA0E767242AAFEA00DC273E /* qtws_gui.hpp */,
 				9CA0E783242ABAF600DC273E /* qtws_gui.cpp */,
 				9CA0E766242AAFEA00DC273E /* qtws_renderer.hpp */,
 				9CA0E7BD242ACC4F00DC273E /* qtws_window.cpp */,
 				9CA0E7BE242ACC5000DC273E /* qtws_window.hpp */,
+				9C85034A242B5BA10091DDF2 /* NOTES.md */,
 			);
 			path = Qtws;
 			sourceTree = "<group>";
@@ -5897,6 +5905,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C85034B242B5BA10091DDF2 /* NOTES.md in Resources */,
 				9CA0E5CA242AAE9200DC273E /* build-glue.scm in Resources */,
 				9CA0E5CB242AAE9200DC273E /* TeXmacs.icns in Resources */,
 				9CA0E76A242AB07100DC273E /* TeXmacsQtws.xcconfig in Resources */,
@@ -6718,6 +6727,7 @@
 				9CA0E62F242AAE9200DC273E /* iterator.cpp in Sources */,
 				9CA0E630242AAE9200DC273E /* env_animate.cpp in Sources */,
 				9CA0E631242AAE9200DC273E /* list.cpp in Sources */,
+				9C850349242AD9DC0091DDF2 /* QTWSGuiHelper.cpp in Sources */,
 				9CA0E632242AAE9200DC273E /* rel_hashmap.cpp in Sources */,
 				9CA0E633242AAE9200DC273E /* modification.cpp in Sources */,
 				9CA0E7AB242ACA8400DC273E /* inputs_list_widget.cpp in Sources */,

@@ -36,6 +36,10 @@ void mac_fix_paths ();
 #include <QDir>
 #endif
 
+#ifdef QTWSTEXMACS
+#include <QCorepplication>
+#endif
+
 #ifdef OS_MINGW
 #include "Windows/win-utf8-compat.hpp"
 #endif
@@ -670,6 +674,10 @@ main (int argc, char** argv) {
   // initialize the Qt application infrastructure
   QTMApplication* qtmapp= new QTMApplication (argc, argv);  
 #endif
+#ifdef QTWSTEXMACS
+  // initialize the QtWS application infrastructure
+  QCoreApplication* qtwsapp= new QCoreApplication (argc, argv);
+#endif
   TeXmacs_init_paths (argc, argv);
 #ifdef QTTEXMACS
   qtmapp->set_window_icon("/misc/images/texmacs-512.png");
@@ -690,6 +698,9 @@ main (int argc, char** argv) {
   start_scheme (argc, argv, TeXmacs_main);
 #ifdef QTTEXMACS
   delete qtmapp;
+#endif
+#ifdef QTWSTEXMACS
+  delete qtwsapp;
 #endif
   return 0;
 }
