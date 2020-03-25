@@ -15,6 +15,8 @@
 
 extern int nr_windows;
 
+Window window_unique_id= 0;
+
 hashmap<Window,pointer> Window_to_window (NULL);
 
 /******************************************************************************
@@ -26,28 +28,32 @@ qtws_window_rep::set_hints (int min_w, int min_h, int max_w, int max_h) {
 }
 
 void
-x_window_rep::initialize () {
+qtws_window_rep::initialize () {
   SI min_w= Min_w, min_h= Min_h;
   SI def_w= Def_w, def_h= Def_h;
   SI max_w= Max_w, max_h= Max_h;
 
   full_screen_flag= false;
 
+  renderer ren= the_qt_renderer();
+  
   ren->set_origin (0, 0);
   ren->decode (def_w, def_h); def_h= -def_h;
   ren->decode (min_w, min_h); min_h= -min_h;
   ren->decode (max_w, max_h); max_h= -max_h;
 
+  SI screen_width, screen_height;
+  gui->get_extents(screen_width, screen_height);
+  
   if (win_w == 0) win_w= def_w;
   if (win_h == 0) win_h= def_h;
-  if ((win_x+ win_w) > gui->screen_width) win_x= gui->screen_width- win_w;
+  if ((win_x+ win_w) > screen_width) win_x= screen_width- win_w;
   if (win_x < 0) win_x= 0;
-  if ((win_y+ win_h) > gui->screen_height) win_y= gui->screen_height- win_h;
+  if ((win_y+ win_h) > screen_height) win_y= screen_height- win_h;
   if (win_y < 0) win_y=0;
-  win= XCreateWindow (dpy, gui->root, win_x, win_y, win_w, win_h, 0,
-		      gui->depth, InputOutput, CopyFromParent,
-		      valuemask, &setattr);
-  ren->win= (Drawable) win;
+
+  win = window_unique_id++;
+  //ren->win= (Drawable) win;
 
   if (name == NULL) name= const_cast<char*> ("popup");
   if (the_name == "") {
@@ -65,14 +71,14 @@ x_window_rep::initialize () {
 }
 
 static x_drawable_rep*
-new_drawable (x_gui gui, x_window win) {
+new_drawable (x_gui gui, qtws_window win) {
   // FIXME: for gcc 3.*, use this in order to avoid ambiguity
   // for tm_new with two arguments
   return new x_drawable_rep (gui, win);
   //return tm_new<x_drawable_rep> (gui, win);
 }
 
-qtws_window_rep::qtws_window_rep (widget w2, x_gui gui2, char* n2,
+qtws_window_rep::qtws_window_rep (widget w2, qtws_gui gui2, char* n2,
 			    SI min_w, SI min_h, SI def_w, SI def_h,
 			    SI max_w, SI max_h):
   window_rep (), w (w2), gui (gui2),
@@ -91,7 +97,7 @@ qtws_window_rep::qtws_window_rep (widget w2, x_gui gui2, char* n2,
   gui->created_window (win);
 }
 
-x_window_rep::~x_window_rep () {
+qtws_window_rep::~qtws_window_rep () {
   set_identifier (w, 0);
 
   XEvent report;
@@ -106,12 +112,12 @@ x_window_rep::~x_window_rep () {
 }
 
 widget
-x_window_rep::get_widget () {
+qtws_window_rep::get_widget () {
   return w;
 }
 
 void
-x_window_rep::get_extents (int& w, int& h) {
+qtws_window_rep::get_extents (int& w, int& h) {
   w= win_w;
   h= win_h;
 }
@@ -126,23 +132,23 @@ get_Window (widget w) {
   return (Window) id;
 }
 
-x_window
-get_x_window (widget w) {
+qtws_window
+get_qtws_window (widget w) {
   int id= get_identifier (w);
   if (id == 0) return NULL;
-  else return (x_window) Window_to_window[(Window) id];
+  else return (qtws_window) Window_to_window[(Window) id];
 }
 
 int
 get_identifier (window w) {
   if (w == NULL) return 0;
-  else return (int) (((x_window) w) -> win);
+  else return (int) (((qtws_window) w) -> win);
 }
 
 window
 get_window (int id) {
   if (id == 0) return NULL;
-  else return (window) ((x_window) Window_to_window[(Window) id]);
+  else return (window) ((qtws_window) Window_to_window[(Window) id]);
 }
 
 /******************************************************************************
@@ -150,7 +156,7 @@ get_window (int id) {
 ******************************************************************************/
 
 void
-x_window_rep::get_position (SI& x, SI& y) {
+qtws_window_rep::get_position (SI& x, SI& y) {
 #ifdef OS_WIN32
   XGetWindowPos (dpy, win, &win_x, &win_y);
   x=  win_x*PIXEL;
@@ -165,18 +171,18 @@ x_window_rep::get_position (SI& x, SI& y) {
 }
 
 void
-x_window_rep::get_size (SI& ww, SI& hh) {
+qtws_window_rep::get_size (SI& ww, SI& hh) {
   ww= win_w*PIXEL;
   hh= win_h*PIXEL;
 }
 
 void
-x_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
+qtws_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
   min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
 }
 
 void
-x_window_rep::set_position (SI x, SI y) {
+qtws_window_rep::set_position (SI x, SI y) {
   x= x/PIXEL;
   y= -y/PIXEL;
   if ((x+ win_w) > gui->screen_width) x= gui->screen_width- win_w;
@@ -187,14 +193,14 @@ x_window_rep::set_position (SI x, SI y) {
 }
 
 void
-x_window_rep::set_size (SI w, SI h) {
+qtws_window_rep::set_size (SI w, SI h) {
   w= w/PIXEL; h= h/PIXEL;
   //h=-h; ren->decode (w, h);
   XResizeWindow (dpy, win, w, h);
 }
 
 void
-x_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
+qtws_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
   if (min_w == Min_w && min_h == Min_h && max_w == Max_w && max_h == Max_h)
     return;
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
@@ -213,7 +219,7 @@ x_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 }
 
 void
-x_window_rep::set_name (string name) {
+qtws_window_rep::set_name (string name) {
   if (the_name != name) {
     c_string s (name);
     XStoreName (dpy, win, s);
@@ -224,12 +230,12 @@ x_window_rep::set_name (string name) {
 }
 
 string
-x_window_rep::get_name () {
+qtws_window_rep::get_name () {
   return the_name;
 }
 
 void
-x_window_rep::set_modified (bool flag) {
+qtws_window_rep::set_modified (bool flag) {
   string name= (flag? (the_name * " *"): the_name);
   if (mod_name != name) {
     c_string s (name);
@@ -240,13 +246,13 @@ x_window_rep::set_modified (bool flag) {
 }
 
 void
-x_window_rep::set_visibility (bool flag) {
+qtws_window_rep::set_visibility (bool flag) {
   if (flag) XMapRaised (dpy, win);
   else XUnmapWindow (dpy, win);
 }
 
 void
-x_window_rep::set_full_screen (bool flag) {
+qtws_window_rep::set_full_screen (bool flag) {
   if (full_screen_flag == flag) return;
   string old_name= get_name ();
   if (old_name == "")
@@ -289,7 +295,7 @@ x_window_rep::set_full_screen (bool flag) {
 }
 
 void
-x_window_rep::move_event (int x, int y) {
+qtws_window_rep::move_event (int x, int y) {
   bool flag= (win_x!=x) || (win_y!=y);
   win_x= x; win_y= y;
   if (flag) {
@@ -305,7 +311,7 @@ x_window_rep::move_event (int x, int y) {
 }
 
 void
-x_window_rep::resize_event (int ww, int hh) {
+qtws_window_rep::resize_event (int ww, int hh) {
   bool flag= (win_w!=ww) || (win_h!=hh);
   win_w= ww; win_h= hh;
   if (flag) {
@@ -315,7 +321,7 @@ x_window_rep::resize_event (int ww, int hh) {
 }
 
 void
-x_window_rep::destroy_event () {
+qtws_window_rep::destroy_event () {
   notify_window_destroy (orig_name);
   send_destroy (w);
 }
@@ -325,17 +331,17 @@ x_window_rep::destroy_event () {
 ******************************************************************************/
 
 void
-x_window_rep::invalidate_event (int x1, int y1, int x2, int y2) {
+qtws_window_rep::invalidate_event (int x1, int y1, int x2, int y2) {
   invalid_regions= invalid_regions | rectangles (rectangle (x1, y1, x2, y2));
 }
 
 void
-x_window_rep::key_event (string key) {
+qtws_window_rep::key_event (string key) {
   send_keyboard (kbd_focus, key);
 }
 
 void
-x_window_rep::focus_in_event () {
+qtws_window_rep::focus_in_event () {
   if (ic_ok) XSetICFocus (ic);
   has_focus= true;
   notify_keyboard_focus (kbd_focus, true);
@@ -343,21 +349,21 @@ x_window_rep::focus_in_event () {
 }
 
 void
-x_window_rep::focus_out_event () {
+qtws_window_rep::focus_out_event () {
   if (ic_ok) XUnsetICFocus (ic);
   has_focus= false;
   notify_keyboard_focus (kbd_focus, false);
 }
 
 void
-x_window_rep::mouse_event (string ev, int x, int y, time_t t) {
-  if (is_nil (gui->grab_ptr) || (get_x_window (gui->grab_ptr->item) == NULL)) {
+qtws_window_rep::mouse_event (string ev, int x, int y, time_t t) {
+  if (is_nil (gui->grab_ptr) || (get_qtws_window (gui->grab_ptr->item) == NULL)) {
     ren->set_origin (0, 0);
     ren->encode (x, y);
     send_mouse (w, ev, x, y, gui->state, t);
   }
   else {
-    x_window grab_win= get_x_window (gui->grab_ptr->item);
+    qtws_window grab_win= get_qtws_window (gui->grab_ptr->item);
     if (this != grab_win) {
       x += win_x - grab_win->win_x;
       y += win_y - grab_win->win_y;
@@ -370,7 +376,7 @@ x_window_rep::mouse_event (string ev, int x, int y, time_t t) {
 }
 
 void
-x_window_rep::repaint_invalid_regions () {
+qtws_window_rep::repaint_invalid_regions () {
   //if (!is_nil (invalid_regions)) cout << invalid_regions << "\n";
   //else { cout << "."; cout.flush (); }
   rectangles new_regions;
@@ -395,7 +401,7 @@ x_window_rep::repaint_invalid_regions () {
 }
 
 void
-x_window_rep::set_keyboard_focus (widget wid, bool get_focus) {
+qtws_window_rep::set_keyboard_focus (widget wid, bool get_focus) {
   ASSERT (get_focus, "explicit loss of keyboard focus not yet implemented");
   if (has_focus && (kbd_focus != wid.rep)) {
     notify_keyboard_focus (kbd_focus, false);
@@ -405,23 +411,23 @@ x_window_rep::set_keyboard_focus (widget wid, bool get_focus) {
 }
 
 bool
-x_window_rep::get_keyboard_focus (widget wid) {
+qtws_window_rep::get_keyboard_focus (widget wid) {
   return has_focus && kbd_focus == wid.rep;
 }
 
 void
-x_window_rep::set_mouse_grab (widget wid, bool get_grab) {
+qtws_window_rep::set_mouse_grab (widget wid, bool get_grab) {
   if (get_grab) gui->obtain_mouse_grab (wid);
   else gui->release_mouse_grab ();
 }
 
 bool
-x_window_rep::get_mouse_grab (widget w) {
+qtws_window_rep::get_mouse_grab (widget w) {
   return gui->has_mouse_grab (w);
 }
 
 void
-x_window_rep::set_mouse_pointer (widget wid, string name, string mask) {
+qtws_window_rep::set_mouse_pointer (widget wid, string name, string mask) {
   if (mask == "") gui->set_mouse_pointer (wid, name);
   else gui->set_mouse_pointer (wid, name, mask);
 }
@@ -450,7 +456,7 @@ insert_message (list<message> l, widget wid, string s, time_t cur, time_t t) {
 }
 
 void
-x_window_rep::delayed_message (widget wid, string s, time_t delay) {
+qtws_window_rep::delayed_message (widget wid, string s, time_t delay) {
   time_t ct= texmacs_time ();
   the_gui->messages= insert_message (the_gui->messages, wid, s, ct, ct+ delay);
 }
@@ -460,7 +466,7 @@ x_window_rep::delayed_message (widget wid, string s, time_t delay) {
 ******************************************************************************/
 
 void
-x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
+qtws_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
   ren->set_origin(0,0);
   begin_draw ();
   ren->clip (x1, y1, x2, y2);
@@ -495,7 +501,7 @@ x_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
 }
 
 void
-x_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
+qtws_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
   ren->outer_round (x1, y1, x2, y2);
   ren->decode (x1, y1);
   ren->decode (x2, y2);
@@ -503,7 +509,7 @@ x_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
 }
 
 bool
-x_window_rep::is_invalid () {
+qtws_window_rep::is_invalid () {
   return ! is_nil (invalid_regions);
 }
 
@@ -515,7 +521,7 @@ window
 popup_window (widget w, string name, SI min_w, SI min_h,
 	      SI def_w, SI def_h, SI max_w, SI max_h)
 {
-  window win= tm_new<x_window_rep> (w, the_gui, (char*) NULL,
+  window win= tm_new<qtws_window_rep> (w, the_gui, (char*) NULL,
 				    min_w, min_h, def_w, def_h, max_w, max_h);
   return win;
 }
@@ -525,7 +531,7 @@ plain_window (widget w, string name, SI min_w, SI min_h,
 	      SI def_w, SI def_h, SI max_w, SI max_h)
 {
   c_string _name (name);
-  window win= tm_new<x_window_rep> (w, the_gui, _name,
+  window win= tm_new<qtws_window_rep> (w, the_gui, _name,
 				    min_w, min_h, def_w, def_h, max_w, max_h);
   return win;
 }

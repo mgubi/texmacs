@@ -14,9 +14,62 @@
 
 #include "gui.hpp"
 
+#include "blackbox.hpp"
+#include "widget.hpp"
+
+#include "QTWSGuiHelper.hpp"
+
+#include <QTimer>
+
 typedef class qtws_gui_rep* qtws_gui;
 extern qtws_gui the_gui;
 
+/******************************************************************************
+ * Event queue
+ ******************************************************************************/
+
+class qp_type {
+public:
+  enum id_t {
+    QP_NULL,    QP_KEYPRESS,     QP_KEYBOARD_FOCUS,
+    QP_MOUSE,   QP_RESIZE,       QP_SOCKET_NOTIFICATION,
+    QP_COMMAND, QP_COMMAND_ARGS, QP_DELAYED_COMMANDS };
+  id_t sid;
+  inline qp_type (id_t sid2 = QP_NULL): sid (sid2) {}
+  inline qp_type (const qp_type& s): sid (s.sid) {}
+  inline qp_type& operator = (qp_type s) { sid = s.sid; return *this; }
+  inline operator id_t () const { return sid; }
+  inline bool operator == (id_t sid2) { return sid == sid2; }
+  inline bool operator != (id_t sid2) { return sid != sid2; }
+  inline bool operator == (qp_type s) { return sid == s.sid; }
+  inline bool operator != (qp_type s) { return sid != s.sid; }
+  inline friend tm_ostream& operator << (tm_ostream& out, qp_type s)
+  { return out << s.sid; }
+};
+
+class queued_event : public pair<qp_type, blackbox>
+{
+public:
+  queued_event (qp_type _type = qp_type(), blackbox _bb = blackbox())
+  : pair<qp_type, blackbox>(_type, _bb) { }
+};
+
+/*!
+ */
+class event_queue {
+  list<queued_event> q;
+  event_queue (const event_queue& q2);  // = delete;
+  event_queue& operator= (const event_queue& q2); // = delete;
+  
+  unsigned int n;  // ugly internal counter to avoid traversal of list in N(q)
+public:
+  event_queue();
+  
+  void append (const queued_event& ev);
+  queued_event next ();
+  bool is_empty() const;
+  int size() const;
+};
 
 /******************************************************************************
  * Delayed commands
@@ -74,11 +127,11 @@ class qtws_gui_rep {
   bool        updating;
   bool  needing_update;
 
-//  event_queue     waiting_events;
+  event_queue     waiting_events;
   command_queue delayed_commands;
 
 public:
-//  QTMGuiHelper*  gui_helper;
+  QTWSGuiHelper*  gui_helper;
 
 public:
   qtws_gui_rep (int &argc, char **argv);

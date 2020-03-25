@@ -45,8 +45,8 @@ tm_sleep () {
 * Constructor and geometry
 ******************************************************************************/
 
-qtws_gui_rep::qt_gui_rep (int &argc, char **argv)
-  : interrupted (false), waitWindow (NULL), popup_wid_time (0), q_translator (0),
+qtws_gui_rep::qtws_gui_rep (int &argc, char **argv)
+  : interrupted (false), waitWindow (NULL), popup_wid_time (0),
     time_credit (100), do_check_events (false), updating (false),
     needing_update (false)
 {
@@ -71,19 +71,19 @@ qtws_gui_rep::qt_gui_rep (int &argc, char **argv)
 
 /* important routines */
 void
-qt_gui_rep::get_extents (SI& width, SI& height) {
+qtws_gui_rep::get_extents (SI& width, SI& height) {
   //FIXME: fixme
   width  = 100;
   height = 100;
 }
 
 void
-qt_gui_rep::get_max_size (SI& width, SI& height) {
+qtws_gui_rep::get_max_size (SI& width, SI& height) {
   width = 8000 * PIXEL;
   height = 6000 * PIXEL;
 }
 
-qt_gui_rep::~qt_gui_rep()  {
+qtws_gui_rep::~qtws_gui_rep()  {
   delete gui_helper;
   
   while (waitDialogs.count()) {
@@ -102,13 +102,13 @@ qt_gui_rep::~qt_gui_rep()  {
  ******************************************************************************/
 
 bool
-qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
+qtws_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   //FIXME: implement
   return true;
 }
 
 bool
-qt_gui_rep::set_selection (string key, tree t,
+qtws_gui_rep::set_selection (string key, tree t,
                            string s, string sv, string sh, string format) {
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
@@ -117,7 +117,7 @@ qt_gui_rep::set_selection (string key, tree t,
 }
 
 void
-qt_gui_rep::clear_selection (string key) {
+qtws_gui_rep::clear_selection (string key) {
   selection_t->reset (key);
   selection_s->reset (key);
   //FIXME: implement
@@ -127,9 +127,9 @@ qt_gui_rep::clear_selection (string key) {
  * Miscellaneous
  ******************************************************************************/
 
-void qt_gui_rep::set_mouse_pointer (string name) { (void) name; }
+void qtws_gui_rep::set_mouse_pointer (string name) { (void) name; }
   // FIXME: implement this function
-void qt_gui_rep::set_mouse_pointer (string curs_name, string mask_name)
+void qtws_gui_rep::set_mouse_pointer (string curs_name, string mask_name)
 { (void) curs_name; (void) mask_name; } ;
 
 /******************************************************************************
@@ -137,7 +137,7 @@ void qt_gui_rep::set_mouse_pointer (string curs_name, string mask_name)
  ******************************************************************************/
 
 void
-qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
+qtws_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
   if (DEBUG_QT)
     debug_qt << "show_wait_indicator \"" << message << "\"\"" << arg << "\"\n";
   
@@ -215,8 +215,8 @@ void (*the_interpose_handler) (void) = NULL;
 void gui_interpose (void (*r) (void)) { the_interpose_handler = r; }
 
 void
-qt_gui_rep::event_loop () {
-  QTMApplication* app = static_cast<QTMApplication*>(QApplication::instance());
+qtws_gui_rep::event_loop () {
+  QCoreApplication* app = QCoreApplication::instance();
   update();
     //need_update();
   app->exec();
@@ -231,7 +231,7 @@ void
 gui_open (int& argc, char** argv) {
     // start the gui
     // new QApplication (argc,argv); now in texmacs.cpp
-  the_gui = tm_new<qt_gui_rep> (argc, argv);
+  the_gui = tm_new<qtws_gui_rep> (argc, argv);
 }
 
 void
@@ -284,7 +284,7 @@ static int keyboard_events = 0;
 static int keyboard_special= 0;
 
 void
-qt_gui_rep::process_queued_events (int max) {
+qtws_gui_rep::process_queued_events (int max) {
   int count = 0;
   while (max < 0 || count < max)  {
     const queued_event& ev = waiting_events.next();
@@ -371,14 +371,14 @@ qt_gui_rep::process_queued_events (int max) {
 }
 
 void
-qt_gui_rep::process_keypress (qt_simple_widget_rep *wid, string key, time_t t) {
+qtws_gui_rep::process_keypress (qt_simple_widget_rep *wid, string key, time_t t) {
   typedef triple<widget, string, time_t > T;
   add_event (queued_event (qp_type::QP_KEYPRESS,
                            close_box<T> (T (wid, key, t))));
 }
 
 void
-qt_gui_rep::process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus,
+qtws_gui_rep::process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus,
                                     time_t t ) {
   typedef triple<widget, bool, time_t > T;
   add_event (queued_event (qp_type::QP_KEYBOARD_FOCUS,
@@ -386,7 +386,7 @@ qt_gui_rep::process_keyboard_focus (qt_simple_widget_rep *wid, bool has_focus,
 }
 
 void
-qt_gui_rep::process_mouse (qt_simple_widget_rep *wid, string kind, SI x, SI y,
+qtws_gui_rep::process_mouse (qt_simple_widget_rep *wid, string kind, SI x, SI y,
                            int mods, time_t t ) {
   typedef quintuple<string, SI, SI, int, time_t > T1;
   typedef pair<widget, T1> T;
@@ -395,25 +395,25 @@ qt_gui_rep::process_mouse (qt_simple_widget_rep *wid, string kind, SI x, SI y,
 }
 
 void
-qt_gui_rep::process_resize (qt_simple_widget_rep *wid, SI x, SI y ) {
+qtws_gui_rep::process_resize (qt_simple_widget_rep *wid, SI x, SI y ) {
   typedef triple<widget, SI, SI > T;
   add_event (queued_event (qp_type::QP_RESIZE, close_box<T> (T (wid, x, y))));
 }
 
 void
-qt_gui_rep::process_command (command _cmd) {
+qtws_gui_rep::process_command (command _cmd) {
   add_event (queued_event (qp_type::QP_COMMAND, close_box<command> (_cmd)));
 }
 
 void
-qt_gui_rep::process_command (command _cmd, object _args) {
+qtws_gui_rep::process_command (command _cmd, object _args) {
   typedef pair<command, object > T;
   add_event (queued_event (qp_type::QP_COMMAND_ARGS,
                            close_box<T> (T (_cmd,_args))));
 }
 
 void
-qt_gui_rep::process_delayed_commands () {
+qtws_gui_rep::process_delayed_commands () {
   add_event (queued_event (qp_type::QP_DELAYED_COMMANDS, blackbox()));
 }
 
@@ -421,7 +421,7 @@ qt_gui_rep::process_delayed_commands () {
   FIXME: add more types and refine, compare with X11 version.
  */
 bool
-qt_gui_rep::check_event (int type) {
+qtws_gui_rep::check_event (int type) {
     // do not interrupt if not updating (e.g. while painting the icons in menus)
   if (!updating || !do_check_events) return false;
   
@@ -443,12 +443,12 @@ qt_gui_rep::check_event (int type) {
 }
 
 void
-qt_gui_rep::set_check_events (bool enable_check) {
+qtws_gui_rep::set_check_events (bool enable_check) {
   do_check_events = enable_check;
 }
 
 void
-qt_gui_rep::add_event (const queued_event& ev) {
+qtws_gui_rep::add_event (const queued_event& ev) {
   waiting_events.append (ev);
   if (updating) {
     needing_update = true;
@@ -471,7 +471,7 @@ qt_gui_rep::add_event (const queued_event& ev) {
  */
 
 void
-qt_gui_rep::update () {
+qtws_gui_rep::update () {
 #ifdef QT_CPU_FIX
   int std_delay= 1;
   tm_sleep ();
@@ -570,13 +570,13 @@ qt_gui_rep::update () {
 }
 
 void
-qt_gui_rep::force_update() {
+qtws_gui_rep::force_update() {
   if (updating) needing_update = true;
   else          update();
 }
 
 void
-qt_gui_rep::need_update () {
+qtws_gui_rep::need_update () {
   if (updating) needing_update = true;
   else          updatetimer->start (0);
     // 0 ms - call immediately when all other events have been processed
@@ -593,7 +593,7 @@ void needs_update () {
  LanguageChange events (these are triggered upon installation of QTranslators)
  */
 void
-qt_gui_rep::refresh_language() {
+qtws_gui_rep::refresh_language() {
   /* FIXME: why is this here? We don't use QTranslators...
   QTranslator* qtr = new QTranslator();
   if (qtr->load ("qt_" +
@@ -622,7 +622,7 @@ qt_gui_rep::refresh_language() {
  close operation if he gets there.
  */
 void
-qt_gui_rep::show_help_balloon (widget wid, SI x, SI y) {
+qtws_gui_rep::show_help_balloon (widget wid, SI x, SI y) {
   if (popup_wid_time > 0) return;
   
   _popup_wid = popup_window_widget (wid, "Balloon");
@@ -697,7 +697,7 @@ clear_selection (string key) {
 }
 
 bool
-qt_gui_rep::put_graphics_on_clipboard (url file) {
+qtws_gui_rep::put_graphics_on_clipboard (url file) {
   string extension = suffix (file) ;
   
     // for bitmaps this works :

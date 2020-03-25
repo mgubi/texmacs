@@ -11,14 +11,18 @@
 
 #ifndef QTWS_WINDOW_H
 #define QTWS_WINDOW_H
+#include "widget.hpp"
 #include "window.hpp"
 #include "Qt/qt_renderer.hpp"
+#include "qtws_gui.hpp"
 #include "rectangles.hpp"
 #include "array.hpp"
 
 /******************************************************************************
 * The qtws_window class
 ******************************************************************************/
+
+typedef int Window; // window id
 
 class qtws_window_rep: public window_rep {
 public:
@@ -28,7 +32,8 @@ public:
   char*            name;
   string           the_name;
   string           mod_name;
-  x_drawable_rep*  ren;
+  Window           win;
+//  x_drawable_rep*  ren;
 
   rectangles    invalid_regions;
   SI            Min_w, Min_h;
@@ -37,8 +42,6 @@ public:
   int           win_x, win_y;
   int           win_w, win_h;
 
-  bool          ic_ok;
-  XIC           ic;
   widget_rep*   kbd_focus;
   bool          has_focus;
 
