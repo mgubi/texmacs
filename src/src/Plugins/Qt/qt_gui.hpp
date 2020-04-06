@@ -12,10 +12,15 @@
 #ifndef QT_GUI_HPP
 #define QT_GUI_HPP
 
-#include <QTranslator>
-#include <QTimer>
-#include <QLabel>
-#include <QList>
+#include <QtGui>
+#if (QT_VERSION >= 0x050000)
+#include <QtCore>
+#include <QtWidgets>
+#endif
+//#include <QTranslator>
+//#include <QTimer>
+//#include <QLabel>
+//#include <QList>
 
 #include "qt_simple_widget.hpp"
 #include "tm_timer.hpp"
