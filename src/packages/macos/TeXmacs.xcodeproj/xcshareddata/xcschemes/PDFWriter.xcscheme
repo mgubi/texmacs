@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-               BuildableName = "PDFWriter.a"
+               BuildableName = ".a"
                BlueprintName = "PDFWriter"
                ReferencedContainer = "container:TeXmacs.xcodeproj">
             </BuildableReference>
@@ -29,8 +29,6 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
       </Testables>
-      <AdditionalOptions>
-      </AdditionalOptions>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -46,13 +44,11 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-            BuildableName = "PDFWriter.a"
+            BuildableName = ".a"
             BlueprintName = "PDFWriter"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
-      <AdditionalOptions>
-      </AdditionalOptions>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -64,7 +60,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-            BuildableName = "PDFWriter.a"
+            BuildableName = ".a"
             BlueprintName = "PDFWriter"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>
