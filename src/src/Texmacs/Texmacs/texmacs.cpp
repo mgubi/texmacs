@@ -36,6 +36,16 @@ void mac_fix_paths ();
 #include <QDir>
 #endif
 
+#ifdef QTWKTEXMACS
+#include "Qt/QTMApplication.hpp"
+#include "Qt/qt_utilities.hpp"
+#include <QDir>
+#endif
+
+#ifdef QTWSTEXMACS
+#include <QCorepplication>
+#endif
+
 #ifdef OS_MINGW
 #include "Windows/win-utf8-compat.hpp"
 #endif
@@ -96,7 +106,7 @@ clean_exit_on_segfault (int sig_num) {
 void
 TeXmacs_init_paths (int& argc, char** argv) {
   (void) argc; (void) argv;
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   url exedir = url_system (qt_application_directory ());
 #else
   url exedir = url_system(argv[0]) * ".." ;
@@ -542,7 +552,7 @@ boot_hacks () {
   mac_fix_yosemite_bug();
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
 #if defined(MAC_OS_X_VERSION_10_9) || defined(MAC_OS_X_VERSION_10_10)
 #if QT_VERSION <= QT_VERSION_CHECK(4,8,5)
   // Work around Qt bug: https://bugreports.qt-project.org/browse/QTBUG-32789
@@ -666,13 +676,14 @@ main (int argc, char** argv) {
     remove (url ("$TEXMACS_HOME_PATH/fonts/error") * url_wildcard ("*"));    
   }
 #endif
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   // initialize the Qt application infrastructure
-  QTMApplication* qtmapp= new QTMApplication (argc, argv);  
+  QApplication* qtmapp= new QApplication (argc, argv);
+  //QTMApplication* qtmapp= new QTMApplication (argc, argv);
 #endif
   TeXmacs_init_paths (argc, argv);
-#ifdef QTTEXMACS
-  qtmapp->set_window_icon("/misc/images/texmacs-512.png");
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
+  //qtmapp->set_window_icon("/misc/images/texmacs-512.png");
 #endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
@@ -688,7 +699,7 @@ main (int argc, char** argv) {
 //  test_environments ();
 //#endif
   start_scheme (argc, argv, TeXmacs_main);
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   delete qtmapp;
 #endif
   return 0;

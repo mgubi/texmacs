@@ -36,7 +36,12 @@
 #include "scheme.hpp"
 #include "wencoding.hpp"
 
+#ifdef QTTEXMACS
 #include "qt_gui.hpp"    // gui_maximal_extents()
+#else
+#include "qtwk_gui.hpp"    // gui_maximal_extents()
+#endif
+
 #include "editor.hpp"
 #include "new_view.hpp"  // get_current_editor()
 

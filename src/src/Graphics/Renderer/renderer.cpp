@@ -515,6 +515,7 @@ delete_renderer (renderer ren) {
 }
 
 #ifndef QTTEXMACS
+#ifndef QTWKTEXMACS
 #ifndef X11TEXMACS
 
 picture
@@ -550,5 +551,6 @@ save_picture (url dest, picture p) {
   FAILED ("not yet implemented");
 }
 
+#endif
 #endif
 #endif

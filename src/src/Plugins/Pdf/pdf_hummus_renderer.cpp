@@ -30,7 +30,7 @@
 #ifdef QT_CORE_LIB
 #include <QtCore>
 #endif
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
 #include "Qt/qt_utilities.hpp"
 #include "Qt/qt_picture.hpp"
 #include <QImage>
