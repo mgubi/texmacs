@@ -678,6 +678,10 @@ main (int argc, char** argv) {
 #endif
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   // initialize the Qt application infrastructure
+  #if (QT_VERSION >= 0x050000)
+      QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+      QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+  #endif
   QApplication* qtmapp= new QApplication (argc, argv);
   //QTMApplication* qtmapp= new QTMApplication (argc, argv);
 #endif

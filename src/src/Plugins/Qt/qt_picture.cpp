@@ -90,7 +90,10 @@ qt_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   decode (x, y);
   qreal old_opacity= painter->opacity ();
   painter->setOpacity (qreal (alpha) / qreal (255));
-  painter->drawImage (x - x0, y - y0, pict->pict);
+  painter->drawImage (QRect (x - x0, y - y0,
+                             pict->pict.width(),
+                             pict->pict.height()),
+                      pict->pict);
   painter->setOpacity (old_opacity);
 }
 

@@ -122,8 +122,10 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   
   QMainWindow* mw= mainwindow ();
   mw->setStyle (qtmstyle ());
+#if !defined(Q_OS_MAC)
   mw->menuBar()->setStyle (qtmstyle ());
-
+#endif
+  
 #if (defined(MACOS_QT_MENU))
   mw->menuBar()->setNativeMenuBar(false);
 #endif
@@ -198,11 +200,6 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   bottomTools->setStyle (qtmstyle ());
   
   {
-#if (QT_VERSION >= 0x050000)
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
-    
     // set proper sizes for icons
     QImage *pxm = xpm_image ("tm_new.xpm");
     QSize sz = (pxm ? pxm->size() : QSize (24, 24));
