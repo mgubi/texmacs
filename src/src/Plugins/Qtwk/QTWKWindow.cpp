@@ -641,12 +641,16 @@ QTWKWindow::mouseMoveEvent (QMouseEvent* event) {
 void
 QTWKWindow::wheelEvent (QWheelEvent* event) {
   if (is_nil (tm_widget ())) return;
-  QPoint delta = event->pixelDelta ();
-  coord2 d = from_qpoint (delta);
+  QPoint delta= event->angleDelta ();
+  QPoint pos= QCursor::pos ();
+  coord2 p= from_qpoint (pos);
   unsigned int mstate= mouse_state (event->buttons(), event->modifiers());
-  string s = "wheel";
-  the_gui->process_mouse (tm_widget (), s, d.x1, d.x2,
-                          mstate, texmacs_time ());
+  if (delta.y () >= 1.0)
+    the_gui->process_mouse (tm_widget (), "press-up", p.x1, p.x2,
+                            mstate, texmacs_time ());
+  else if (delta.y () <= -1.0)
+    the_gui->process_mouse (tm_widget (), "press-down", p.x1, p.x2,
+                            mstate, texmacs_time ());
   event->accept();
 }
 
