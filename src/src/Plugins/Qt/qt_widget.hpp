@@ -12,6 +12,7 @@
 #ifndef QT_WIDGET_HPP
 #define QT_WIDGET_HPP
 
+#include "fast_alloc.hpp"
 #include "widget.hpp"
 #include "message.hpp"
 #include <QPointer>
@@ -220,5 +221,7 @@ inline widget abstract (qt_widget w) { return widget (w.rep); }
 inline qt_widget concrete (widget w) {
   return qt_widget (static_cast<qt_widget_rep*> (w.rep));
 }
+
+void tm_delete (qt_widget_rep* ptr);
 
 #endif // defined QT_WIDGET_HPP
