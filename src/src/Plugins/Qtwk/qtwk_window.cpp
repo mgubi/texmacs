@@ -128,7 +128,8 @@ get_window (int id) {
 
 void
 qtwk_window_rep::get_position (SI& x, SI& y) {
-  QPoint pos= win->pos ();
+  // we need to use the top left corner of the content, without margins
+  QPoint pos= win->geometry ().topLeft ();
   coord2 Pos= from_qpoint (pos);
   x= Pos.x1;
   y= Pos.x2;
