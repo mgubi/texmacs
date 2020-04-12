@@ -1890,7 +1890,6 @@
 		9CAF7D42242EB6EF000EF390 /* QTMSockets.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 49E5CC261B26C92E00A02C5A /* QTMSockets.hpp */; };
 		9CAF7D43242EB6EF000EF390 /* QTMApplication.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 490536B7184A2C69008B9ECE /* QTMApplication.hpp */; };
 		9CAF7D49242EB6EF000EF390 /* QTMPipeLink.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1D126710D102B300232476 /* QTMPipeLink.hpp */; };
-		9CC6149010A999460055F808 /* QTMInteractiveInputHelper.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48B510A8CC100097A335 /* QTMInteractiveInputHelper.hpp */; };
 		9CC6149110A999460055F808 /* QTMMenuHelper.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48B710A8CC100097A335 /* QTMMenuHelper.hpp */; };
 		9CC6149310A999460055F808 /* QTMWidget.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48BB10A8CC100097A335 /* QTMWidget.hpp */; };
 		9CC6149410A999460055F808 /* QTMWindow.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48BD10A8CC100097A335 /* QTMWindow.hpp */; };
@@ -3676,7 +3675,6 @@
 		9C61B428141A1B780035D78F /* TeXmacs-document.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = "TeXmacs-document.icns"; sourceTree = "<group>"; };
 		9C61B429141A1B780035D78F /* TeXmacs-document.psd */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TeXmacs-document.psd"; sourceTree = "<group>"; };
 		9C61B42A141A1B780035D78F /* TeXmacs.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = TeXmacs.icns; sourceTree = "<group>"; };
-		9C61B42B141A1B780035D78F /* TeXmacs.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = TeXmacs.xcodeproj; sourceTree = "<group>"; };
 		9C61B42E141A1B780035D78F /* TeXmacsCocoa.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsCocoa.xcconfig; sourceTree = "<group>"; };
 		9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsQt.xcconfig; sourceTree = "<group>"; };
 		9C61B430141A1B780035D78F /* TeXmacsX11.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsX11.xcconfig; sourceTree = "<group>"; };
@@ -5929,7 +5927,6 @@
 				9C61B428141A1B780035D78F /* TeXmacs-document.icns */,
 				9C61B429141A1B780035D78F /* TeXmacs-document.psd */,
 				9C61B42A141A1B780035D78F /* TeXmacs.icns */,
-				9C61B42B141A1B780035D78F /* TeXmacs.xcodeproj */,
 				9C61B42E141A1B780035D78F /* TeXmacsCocoa.xcconfig */,
 				9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */,
 				9C61B430141A1B780035D78F /* TeXmacsX11.xcconfig */,
@@ -5937,13 +5934,6 @@
 			);
 			name = macos;
 			path = packages/macos;
-			sourceTree = "<group>";
-		};
-		9C61B42C141A1B780035D78F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 		9C722C0C10D2F88800C41915 /* Unix */ = {
@@ -6433,12 +6423,6 @@
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* TeXmacs */;
 			projectDirPath = "";
-			projectReferences = (
-				{
-					ProductGroup = 9C61B42C141A1B780035D78F /* Products */;
-					ProjectRef = 9C61B42B141A1B780035D78F /* TeXmacs.xcodeproj */;
-				},
-			);
 			projectRoot = ../..;
 			targets = (
 				8D1107260486CEB800E47090 /* TeXmacsQt */,
