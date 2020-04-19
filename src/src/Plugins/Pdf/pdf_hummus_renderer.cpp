@@ -657,6 +657,7 @@ CONCRETE_NULL_CODE(pdf_pattern);
 
 void
 pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
+#ifdef X11TEXMACS
   // debug_convert << "register_pattern_image\n";
   if (is_nil (br) || br->get_type () != brush_pattern) {
     convert_warning << "register_pattern_image: "
@@ -710,6 +711,7 @@ pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
 		     ((double) default_dpi) / dpi,
 		     ((double) default_dpi) / dpi, id);
   pattern_pool(p) = p_pdf;
+#endif
 }
 
 /******************************************************************************
