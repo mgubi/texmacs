@@ -717,17 +717,13 @@ qt_gui_rep::set_check_events (bool enable_check) {
 void
 qt_gui_rep::add_event (const queued_event& ev) {
   waiting_events.append (ev);
-  if (updating) {
-    needing_update = true;
-  } else {
-    need_update();
+  need_update ();
       // NOTE: we cannot update now since sometimes this seems to give problems
       // to the update of the window size after a resize. In that situation
       // sometimes when the window receives focus again, update will be called
       // for the focus_in event and interpose_handler is run which sends a
       // slot_extent message to the widget causing a wrong resize of the window.
       // This seems to cure the problem.
-  }
 }
 
 
