@@ -112,6 +112,8 @@ public:
   virtual void   shell (string s) = 0;
 };
 
+template<> void tm_delete<server_rep> (server_rep* ptr);
+
 class server {
   ABSTRACT(server);
   server ();

@@ -29,6 +29,13 @@ url tm_init_file= url_none ();
 url my_init_file= url_none ();
 string my_init_cmds= "";
 
+template<> void
+tm_delete<server_rep> (server_rep* ptr) {
+  void *mem= ptr->derived_this ();
+  ptr -> ~server_rep ();
+  fast_delete (mem);
+}
+
 /******************************************************************************
 * Execution of commands
 ******************************************************************************/
