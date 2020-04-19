@@ -66,15 +66,6 @@ inline void* operator new[] (size_t s, void* loc) { return loc; }
 #include <new>
 #endif
 
-class widget_rep;
-void tm_delete (widget_rep* ptr);
-
-class editor_rep;
-void tm_delete (editor_rep* ptr);
-
-class server_rep;
-void tm_delete (server_rep* ptr);
-
 template<typename C> inline C*
 tm_new () {
   void* ptr= fast_new (sizeof (C));

@@ -192,7 +192,8 @@ public:
   }
 };
 
-
+template <> void tm_delete<qt_widget_rep>(qt_widget_rep *);
+ 
 /*! Reference counting mechanism.
 
  Like elsewhere in TeXmacs, this is a wrapper around its corresponding 
@@ -222,6 +223,5 @@ inline qt_widget concrete (widget w) {
   return qt_widget (static_cast<qt_widget_rep*> (w.rep));
 }
 
-void tm_delete (qt_widget_rep* ptr);
 
 #endif // defined QT_WIDGET_HPP
