@@ -59,7 +59,7 @@ public:
   virtual void* get_handle ();
   virtual void* get_data_handle ();
   
-  inline virtual void* derived_this () {return (widget_rep*)this; }
+  inline virtual void* derived_this () { return (renderer_rep*)this; }
 
   /* coordinate system */
   void set_origin (SI x, SI y);
