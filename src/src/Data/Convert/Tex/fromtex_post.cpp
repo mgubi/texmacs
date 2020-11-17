@@ -597,6 +597,36 @@ finalize_layout (tree t) {
         continue;
       }
 
+      if (is_func (v, BEGIN) && v[0] == "tmcompact") {
+        r << tree (BEGIN, "compact");
+        continue;
+      }
+
+      if (is_func (v, END) && v[0] == "tmcompact") {
+        r << tree (END, "compact");
+        continue;
+      }
+
+      if (is_func (v, BEGIN) && v[0] == "tmcompressed") {
+        r << tree (BEGIN, "compressed");
+        continue;
+      }
+
+      if (is_func (v, END) && v[0] == "tmcompressed") {
+        r << tree (END, "compressed");
+        continue;
+      }
+
+      if (is_func (v, BEGIN) && v[0] == "tmamplified") {
+        r << tree (BEGIN, "amplified");
+        continue;
+      }
+
+      if (is_func (v, END) && v[0] == "tmamplified") {
+        r << tree (END, "amplified");
+        continue;
+      }
+
       if (is_func (v, BEGIN) && v[0] == "tmindent") {
         r << tree (BEGIN, "indent");
         continue;
@@ -604,6 +634,16 @@ finalize_layout (tree t) {
 
       if (is_func (v, END) && v[0] == "tmindent") {
         r << tree (END, "indent");
+        continue;
+      }
+
+      if (is_func (v, BEGIN) && v[0] == "tmjumpin") {
+        r << tree (BEGIN, "jump-in");
+        continue;
+      }
+
+      if (is_func (v, END) && v[0] == "tmjumpin") {
+        r << tree (END, "jump-in");
         continue;
       }
 
@@ -2125,6 +2165,11 @@ auto_vspace (tree t) {
   string s= as_string (L(t));
   if (starts (s, "equation") ||
       starts (s, "eqnarray") ||
+      starts (s, "gather") ||
+      starts (s, "multline") ||
+      starts (s, "align") ||
+      starts (s, "alignat") ||
+      starts (s, "flalign") ||
       starts (s, "itemize") ||
       starts (s, "enumerate") ||
       starts (s, "description") ||
@@ -2394,7 +2439,7 @@ latex_to_tree (tree t0) {
       the_style= compound ("style", tuple (style, "cite-author-year"));
     if (style != "acmart" && style != "acmsmall" && style != "acmlarge" &&
         style != "acmtog" && style != "sigconf" && style != "sigchi" &&
-        style != "sigplan")
+        style != "sigplan" && style != "amsart")
       the_style[0] << "std-latex";
     tree r= tree (DOCUMENT, the_version, the_style, the_body);
     if (N (initial) > 0) r << compound ("initial", initial);

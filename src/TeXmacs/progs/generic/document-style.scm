@@ -60,7 +60,10 @@
         ((list-find (cdr l) (cut style-overrides? <> (car l)))
          (normalize-style-list* (cdr l)))
         ((list-find (cdr l) (cut style-precedes? <> (car l)))
-         (normalize-style-list* (cons (cadr l) (cons (car l) (cddr l)))))
+         (let* ((el (cut style-precedes? <> (car l)))
+                (rem (list-delete (cdr l) el))
+                (norm (normalize-style-list* rem)))
+           (cons (car norm) (normalize-style-list* (cons (car l) (cdr norm))))))
         (else (cons (car l) (normalize-style-list* (cdr l))))))
 
 (define (normalize-style-list** l before)
@@ -146,9 +149,10 @@
       (add-style-package pack)))
 
 (define (url-resolve-package name)
-  (let* ((style-name (string-append name ".ts"))
-         (style-url (url-append "$TEXMACS_STYLE_PATH" style-name)))
-    (url-resolve style-url "r")))
+  (let* ((style-name  (string-append name ".ts"))
+         (style-local (url-relative (current-buffer) style-name))
+         (style-url   (url-append "$TEXMACS_STYLE_PATH" style-name)))
+    (url-resolve (url-or style-local style-url) "r")))
 
 (tm-define (edit-package-source name)
   (with file-name (url-resolve-package name)

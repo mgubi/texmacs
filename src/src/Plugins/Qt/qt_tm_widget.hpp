@@ -18,6 +18,7 @@
 #include "qt_simple_widget.hpp"
 #include "qt_window_widget.hpp"
 
+#include "QTMInteractiveInputHelper.hpp"
 #include "QTMWidget.hpp"
 #include "QTMScrollView.hpp"
 
@@ -65,6 +66,7 @@ class qt_tm_widget_rep: public qt_window_widget_rep {
   QWidget*       rulerWidget;
 #endif
 
+  QTMInteractiveInputHelper helper;
   QTMInteractivePrompt*     prompt;
   qt_widget int_prompt;
   qt_widget int_input;
@@ -88,7 +90,7 @@ public:
   qt_tm_widget_rep (int mask, command _quit);
   ~qt_tm_widget_rep ();
   
-  virtual widget plain_window_widget (string name, command quit);
+  virtual widget plain_window_widget (string name, command quit, int b);
 
   virtual void      send (slot s, blackbox val);
   virtual blackbox query (slot s, int type_id);
@@ -100,6 +102,8 @@ public:
   void install_main_menu ();
   static void tweak_iconbar_size (QSize& sz);
 
+  friend class QTMInteractiveInputHelper;
+  
 protected:
   
       ////// Convenience methods to access our QWidgets

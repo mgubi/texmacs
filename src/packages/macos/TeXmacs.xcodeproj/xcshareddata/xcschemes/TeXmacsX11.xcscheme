@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9CD4E5EB10B14AB300E0DD5C"
-               BuildableName = ".app"
+               BuildableName = "TeXmacsX11.app"
                BlueprintName = "TeXmacsX11"
                ReferencedContainer = "container:TeXmacs.xcodeproj">
             </BuildableReference>
@@ -31,7 +31,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CD4E5EB10B14AB300E0DD5C"
-            BuildableName = ".app"
+            BuildableName = "TeXmacsX11.app"
             BlueprintName = "TeXmacsX11"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>
@@ -54,7 +54,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CD4E5EB10B14AB300E0DD5C"
-            BuildableName = ".app"
+            BuildableName = "TeXmacsX11.app"
             BlueprintName = "TeXmacsX11"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>
@@ -78,7 +78,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9CD4E5EB10B14AB300E0DD5C"
-            BuildableName = ".app"
+            BuildableName = "TeXmacsX11.app"
             BlueprintName = "TeXmacsX11"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>

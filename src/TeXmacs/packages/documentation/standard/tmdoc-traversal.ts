@@ -1,4 +1,4 @@
-<TeXmacs|1.99.12>
+<TeXmacs|1.99.13>
 
 <style|<tuple|source|english>>
 
@@ -56,7 +56,9 @@
 
   <assign|tmdoc-tmimage|<macro|<image|$TEXMACS_PATH/misc/images/texmacs-256.png|3em|3em||-0.3h>>>
 
-  <assign|fira-font|<macro|x|<with|TeXmacs|<macro|<active*|T<rsub|<space|-0.4spc><resize|<with|math-level|0|E>||||0.5fn>>X<rsub|<resize|M<space|0.2spc>AC<space|0.1spc>S||||0.5fn>>>>|font|Fira|<arg|x>>>>
+  <assign|fira-font|<macro|x|<case|<equal|<value|language>|chinese>|<arg|x>|<with|TeXmacs|<macro|<active*|T<rsub|<space|-0.4spc><resize|<with|math-level|0|E>||||0.5fn>>X<rsub|<resize|M<space|0.2spc>AC<space|0.1spc>S||||0.5fn>>>>|font|Fira|<arg|x>>>>>
+
+  <drd-props|fira-font|arity|1|accessible|all>
 
   <assign|tmdoc-title-font|<macro|title|<fira-font|<with|font-series|bold|font-shape|small-caps|font-size|1.6|<arg|title>>>>>
 
@@ -92,7 +94,7 @@
   <assign|tmdoc-flag|<macro|flag| <with|color|black|<block|<tformat|<cwith|1|1|1|1|cell-lsep|0fn>|<cwith|1|1|1|1|cell-rsep|0fn>|<cwith|1|1|1|1|cell-bsep|0fn>|<cwith|1|1|1|1|cell-tsep|0fn>|<cwith|1|1|1|1|cell-vcorrect|n>|<table|<row|<cell|<arg|flag>>>>>>>
   >>
 
-  <assign|tmdoc-translation|<macro|name|suffix|<if|<unequal|<find-file|<merge|<arg|name>|<merge|<arg|suffix>|.tm>>>|false>|<hlink|<compound|tmdoc-flag|<image|<merge|http://www.texmacs.org/Images/flag|<merge|<arg|suffix>|.png>>|0.5w|0.5h||>>|<merge|<arg|name>|<merge|<arg|suffix>|.tm>>>>>>
+  <assign|tmdoc-translation|<macro|name|suffix|<if|<unequal|<find-file|<merge|<arg|name>|<merge|<arg|suffix>|.tm>>>|false>|<hlink|<compound|tmdoc-flag|<image|<merge|https://www.texmacs.org/Images/flag|<merge|<arg|suffix>|.png>>|0.5w|0.5h||>>|<merge|<arg|name>|<merge|<arg|suffix>|.tm>>>>>>
 
   <assign|tmdoc-translations|<\macro|name>
     <\surround||<vspace|0.5fn>>

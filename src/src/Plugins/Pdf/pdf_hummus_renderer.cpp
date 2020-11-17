@@ -295,8 +295,8 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
     pen (black), bgb (white), fgb (black),
     cfn (""), cfid (NULL),
     native_fonts (NULL),
-    destId(0),
     t3font_registry_id(-1),
+    destId(0),
     label_count(0),
     outlineId(0)
 {
@@ -334,7 +334,7 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
       		buf << "/LC 0\r\n";
       		buf << "/LJ 0\r\n";
       		buf << "/ML 10.0\r\n";
-      		buf << "/D [[] 0]\r\n";
+      		//buf << "/D [[] 0]\r\n"; // useless
       		buf << "/RI /RelativeColorimetric\r\n";
       		buf << "/OP false\r\n";
       		buf << "/op false\r\n";
@@ -588,7 +588,9 @@ public:
   ~pdf_image_rep() {}
 
   bool flush_jpg (PDFWriter& pdfw, url image);
-  bool flush_raster (PDFWriter& pdfw, url image);
+#ifndef PDFHUMMUS_NO_PNG
+  bool flush_png (PDFWriter& pdfw, url image);
+#endif
   void flush (PDFWriter& pdfw);
 
   bool flush_for_pattern (PDFWriter& pdfw);
@@ -1006,7 +1008,7 @@ pdf_hummus_renderer_rep::flush_glyphs ()
 void
 pdf_hummus_renderer_rep::draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y)
 {
-  // use bitmap (to be improven)
+  // use bitmap (to be improved)
   string fontname = fn->res_name;
   string char_name (fontname * "-" * as_string ((int) ch));
   if (!pdf_glyphs->contains(char_name)) {
@@ -1720,7 +1722,10 @@ pdf_image_rep::flush (PDFWriter& pdfw)
   
     if ((s == "jpg") || (s == "jpeg")) 
       if (flush_jpg(pdfw, name)) return;
-          
+#ifndef PDFHUMMUS_NO_PNG
+    if (s == "png")
+      if (flush_png(pdfw, name)) return;
+#endif
     // other formats we generate a pdf (with available converters) that we'll embbed
     image_to_pdf (name, temp, w, h, 300);
     // the 300 dpi setting is the maximum dpi of raster images that will be generated:
@@ -1966,6 +1971,40 @@ pdf_image_rep::flush_jpg (PDFWriter& pdfw, url image) {
   return status == eSuccess;
 }
 
+#ifndef PDFHUMMUS_NO_PNG
+bool
+pdf_image_rep::flush_png (PDFWriter& pdfw, url image) {
+  c_string f (concretize (image));
+  PNGImageHandler pngHandler;
+  InputFile file;
+  if (file.OpenFile (std::string ((char*) f)) != PDFHummus::eSuccess) {
+    convert_error << "pdf_hummus, failed to include PNG file " << image << LF;
+    return false;
+  }
+  IByteReaderWithPosition* stream= file.GetInputStream ();
+  DoubleAndDoublePair dim= pngHandler.ReadImageDimensions (stream);
+  double iw= dim.first, ih= dim.second;
+
+  stream->SetPosition (0);
+  PDFFormXObject* formXObject= pdfw.CreateFormXObjectFromPNGStream (stream);
+  if ((void*) formXObject == NULL) { 
+    convert_error << "pdf_hummus, failed to create Form from PNG stream" << LF;
+    return false;
+  }
+  PDFFormXObject* xobjectForm= pdfw.StartFormXObject (PDFRectangle (0, 0, w, h), id); 
+  XObjectContentContext* xobjectContentContext = xobjectForm->GetContentContext ();
+  xobjectContentContext->q ();
+  xobjectContentContext->cm (w / iw, 0, 0, h / ih, 0, 0);
+  std::string pdfImageName = xobjectForm->GetResourcesDictionary ()
+    .AddFormXObjectMapping (formXObject->GetObjectID ());
+  xobjectContentContext->Do (pdfImageName);
+  xobjectContentContext->Q ();
+  EStatusCode status = pdfw.EndFormXObjectAndRelease (xobjectForm);
+  delete formXObject;
+  return status == eSuccess;
+}
+#endif
+
 void
 pdf_hummus_renderer_rep::flush_images ()
 {
@@ -2172,6 +2211,9 @@ pdf_hummus_renderer_rep::on_catalog_write (CatalogInformation* inCatalogInformat
                                          ObjectsContext* inPDFWriterObjectContext,
                                          PDFHummus::DocumentContext* inDocumentContext)
 {
+  (void) inCatalogInformation;
+  (void) inPDFWriterObjectContext;
+  (void) inDocumentContext;
   if (destId) {
     inCatalogDictionaryContext->WriteKey("Dests");
     inCatalogDictionaryContext->WriteNewObjectReferenceValue(destId);
@@ -2195,6 +2237,7 @@ int pdf_hummus_renderer_rep::get_label_id(string label)
 void
 pdf_hummus_renderer_rep::anchor (string label, SI x1, SI y1, SI x2, SI y2)
 {
+  (void) x2; (void) y1;
   string l = prepare_text (label);
   dests << dest_data(l, page_num, to_x(x1), to_y(y2+20*pixel));
 }

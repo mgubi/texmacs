@@ -268,6 +268,7 @@
   ("Palette" (interactive-background
               (lambda (col) (cell-set-background col)) '()))
   ("Pattern" (open-pattern-selector cell-set-background "1cm"))
+  ("Gradient" (open-gradient-selector cell-set-background))
   ("Picture" (open-background-picture-selector cell-set-background))
   ("Other" (interactive cell-set-background)))
 
@@ -368,7 +369,8 @@
   (if (== (get-cell-mode) "table") (group "Cells"))
   (link cell-menu)
   (dynamic (focus-extra-menu t))
-  (dynamic (focus-hidden-menu t)))
+  (dynamic (focus-hidden-menu t))
+  (dynamic (focus-label-menu t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Icons for manipulation of tables

@@ -117,9 +117,9 @@ public:
   virtual ~qt_widget_rep ();
   virtual inline string get_nickname () { return "popup"; }
   
-  virtual widget plain_window_widget (string name, command quit);
-  virtual widget make_popup_widget ();
+  virtual widget plain_window_widget (string name, command quit, int b= 3);
   virtual widget popup_window_widget (string s);
+  virtual widget tooltip_window_widget (string s);
 
   void add_child (widget a);
   void add_children (array<widget> a);
@@ -193,7 +193,7 @@ public:
 };
 
 template <> void tm_delete<qt_widget_rep>(qt_widget_rep *);
- 
+
 /*! Reference counting mechanism.
 
  Like elsewhere in TeXmacs, this is a wrapper around its corresponding 
@@ -222,6 +222,5 @@ inline widget abstract (qt_widget w) { return widget (w.rep); }
 inline qt_widget concrete (widget w) {
   return qt_widget (static_cast<qt_widget_rep*> (w.rep));
 }
-
 
 #endif // defined QT_WIDGET_HPP

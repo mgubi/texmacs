@@ -174,6 +174,7 @@
         ---
         ("Palette" (interactive-color setter '()))
         ("Pattern" (open-pattern-selector setter "1cm"))
+        ("Gradient" (open-gradient-selector setter))
         ("Picture" (open-background-picture-selector setter))
         ("Other" (interactive setter
                    (list (upcase-first name) "color" in))))))
@@ -302,6 +303,7 @@
          (parameter-set l "preserve" mode)))
     ("Palette" (interactive-color setter '()))
     ("Pattern" (open-pattern-selector setter "1cm"))
+    ("Gradient" (open-gradient-selector setter))
     ("Picture" (open-background-picture-selector setter))
     ("Other" (parameter-interactive-set l mode))))
 
@@ -462,7 +464,7 @@
      (alternate-toggle (focus-tree))))
   (assuming (!= (tree-children t) (tree-accessible-children t))
     ((check "Show hidden" "v" (tree-is? t :up 'inactive))
-     (inactive-toggle t))))
+     (inactive-toggle (focus-tree)))))
 
 (tm-menu (focus-float-menu t))
 (tm-menu (focus-animate-menu t))
@@ -503,6 +505,9 @@
   (dynamic (focus-theme-parameters-menu t (list :local (tree-label t))))
   (dynamic (focus-tag-customize-menu (tree-label t))))
 
+(tm-menu (focus-search-menu t)
+  ("Search in database" (focus-open-search-tool t)))
+
 (tm-menu (focus-tag-menu t)
   (with l (focus-variants-of t)
     (assuming (<= (length l) 1)
@@ -525,6 +530,8 @@
   (assuming (tree-in? t '(cite nocite cite-TeXmacs))
     (-> "Cite TeXmacs"
         (link cite-texmacs-short-menu)))
+  (assuming (focus-has-search-menu? t)
+    (-> "Search" (dynamic (focus-search-menu t))))
   (assuming (focus-can-search? t)
     ("Search in database" (focus-open-search-tool t))))
 
@@ -576,6 +583,14 @@
 (tm-menu (focus-hidden-menu t)
   (:require (pure-alternate-context? t)))
 
+(tm-menu (focus-label-menu t)
+  (assuming (focus-label t)
+    ---
+    (with s (focus-get-label t)
+      ((eval (string-append "#" s))
+       (interactive (lambda (l) (focus-set-label t l))
+         (list "Label" "string" s))))))  
+
 (tm-menu (standard-focus-menu t)
   (dynamic (focus-ancestor-menu t))
   (dynamic (focus-tag-menu t))
@@ -586,7 +601,8 @@
     ---
     (dynamic (focus-insert-menu t)))
   (dynamic (focus-extra-menu t))
-  (dynamic (focus-hidden-menu t)))
+  (dynamic (focus-hidden-menu t))
+  (dynamic (focus-label-menu t)))
 
 (tm-menu (focus-menu)
   (dynamic (standard-focus-menu (focus-tree))))
@@ -613,7 +629,7 @@
   (assuming (!= (tree-children t) (tree-accessible-children t))
     ((check (balloon (icon "tm_show_hidden.xpm") "Show hidden") "v"
             (tree-is? t :up 'inactive))
-     (inactive-toggle t))))
+     (inactive-toggle (focus-tree)))))
 
 (tm-menu (focus-float-icons t))
 (tm-menu (focus-animate-icons t))
@@ -654,6 +670,9 @@
         (group "TeXmacs-related work")
         ---
         (link cite-texmacs-short-menu)))
+  (assuming (focus-has-search-menu? t)
+    (=> (balloon (icon "tm_focus_search.xpm") "Search")
+        (dynamic (focus-search-menu t))))
   (assuming (focus-can-search? t)
     ((balloon (icon "tm_focus_search.xpm") "Search in database")
      (focus-open-search-tool t))))
@@ -708,6 +727,14 @@
 (tm-menu (focus-hidden-icons t)
   (:require (pure-alternate-context? t)))
 
+(tm-menu (focus-label-icons t)
+  (assuming (focus-label t)
+    (with s (focus-get-label t)
+      (glue #f #f 3 0)
+      (mini #t (group "Label:"))
+      (mini #t (input (focus-set-label (focus-tree) answer) "string"
+                      (list s) "12em")))))
+
 (tm-menu (standard-focus-icons t)
   (dynamic (focus-ancestor-icons t))
   (assuming (focus-can-move? t)
@@ -717,8 +744,9 @@
     (minibar (dynamic (focus-insert-icons t)))
     //)
   (minibar (dynamic (focus-tag-icons t)))
-  (dynamic (focus-extra-icons t))
   (dynamic (focus-hidden-icons t))
+  (dynamic (focus-extra-icons t))
+  (dynamic (focus-label-icons t))
   //)
 
 (tm-menu (texmacs-focus-icons)

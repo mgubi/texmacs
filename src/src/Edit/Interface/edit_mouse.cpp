@@ -126,7 +126,7 @@ edit_interface_rep::mouse_drag (SI x, SI y) {
 void
 edit_interface_rep::mouse_select (SI x, SI y, int mods, bool drag) {
   if (eb->action ("select" , x, y, 0) != "") return;
-  if (!is_nil (mouse_ids) && (mods & ShiftMask) == 0 && !drag) {
+  if (!is_nil (mouse_ids) && (mods & (ShiftMask+Mod2Mask)) == 0 && !drag) {
     call ("link-follow-ids", object (mouse_ids), object ("click"));
     disable_double_clicks ();
     return;
@@ -280,6 +280,9 @@ edit_interface_rep::update_mouse_loci () {
     return;
   }
 
+#ifdef USE_EXCEPTIONS
+  try {
+#endif
   int old_mode= set_access_mode (DRD_ACCESS_SOURCE);
   path cp= path_up (tree_path (path (), last_x, last_y, 0));
   set_access_mode (old_mode);
@@ -312,6 +315,11 @@ edit_interface_rep::update_mouse_loci () {
     mouse_ids= ids1 * ids2;
   }
   if (locus_new_rects != locus_rects) notify_change (THE_LOCUS);
+#ifdef USE_EXCEPTIONS
+  }
+  catch (string msg) {}
+  handle_exceptions ();
+#endif
 }
 
 void
@@ -457,13 +465,34 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
     //cout << "Ignored " << type << ", " << x << ", " << y << "; " << mods << ", " << t << "\n";
     return;
   }
+  if (((x > last_x && !tremble_right) || (x < last_x && tremble_right)) &&
+      (abs (x - last_x) > abs (y - last_y)) &&
+      type == "move") {
+    tremble_count= min (tremble_count + 1, 35);
+    tremble_right= (x > last_x);
+    if (texmacs_time () - last_change > 500) {
+      tremble_count= max (tremble_count - 1, 0);
+      env_change = env_change | (THE_CURSOR + THE_FREEZE);
+      last_change= texmacs_time ();
+    }
+    else if (tremble_count > 3) {
+      env_change = env_change | (THE_CURSOR + THE_FREEZE);
+      last_change= texmacs_time ();
+    }
+    //cout << "Tremble+ " << tremble_count << LF;
+  }
   last_x= x; last_y= y; last_t= t;
   bool move_like=
     (type == "move" || type == "dragging-left" || type == "dragging-right");
   if ((!move_like) || (is_attached (this) && !check_event (MOTION_EVENT)))
     update_mouse_loci ();
-  if (!is_nil (mouse_ids) && type == "move")
+  if (!is_nil (mouse_ids) && type == "move") {
+    notify_change (THE_FREEZE);
+    // NOTE: this notification is needed to prevent the window to scroll to
+    // the current cursor position when hovering over the locus
+    // but a cleaner solution would be welcome
     call ("link-follow-ids", object (mouse_ids), object ("mouse-over"));
+  }
 
   if (type == "leave")
     set_pointer ("XC_top_left_arrow");
@@ -545,10 +574,14 @@ relativize (tree t, url base) {
 static void
 call_drop_event (string kind, SI x, SI y, SI ticket, time_t t, url base) {
 #ifdef QTTEXMACS
+  (void) kind; (void) x; (void) y; (void) t;
   extern hashmap<int, tree> payloads;
   tree doc = payloads [ticket];
   payloads->reset (ticket);
-  eval (list_object (symbol_object ("insert"), relativize (doc, base)));
+  array<object> args;
+  args << object (x) << object (y) << object (relativize (doc, base));
+  call ("mouse-drop-event", args);
+  //eval (list_object (symbol_object ("insert"), relativize (doc, base)));
   //array<object> args;
   //args << object (kind) << object (x) << object (y)
   //<< object (doc) << object ((double) t);
@@ -579,38 +612,43 @@ delayed_call_mouse_event (string kind, SI x, SI y, SI m, time_t t) {
 
 void
 edit_interface_rep::handle_mouse (string kind, SI x, SI y, int m, time_t t) {
+  if (is_nil (buf)) return;
   bool started= false;
 #ifdef USE_EXCEPTIONS
   try {
 #endif
-    if (is_nil (eb)) apply_changes ();
-    start_editing ();
-    started= true;
-    x= ((SI) (x / magf));
-    y= ((SI) (y / magf));
-    //cout << kind << " (" << x << ", " << y << "; " << m << ")"
-    //     << " at " << t << "\n";
+  if (is_nil (eb) || (env_change & (THE_TREE + THE_ENVIRONMENT)) != 0)
+    apply_changes ();
+  start_editing ();
+  started= true;
+  x= ((SI) (x / magf));
+  y= ((SI) (y / magf));
+  //cout << kind << " (" << x << ", " << y << "; " << m << ")"
+  //     << " at " << t << "\n";
 
-    if (kind == "drop")
-      call_drop_event (kind, x, y, m, t, buf->buf->name);
-    else {
-      string rew= kind;
-      SI dist= (SI) (5 * PIXEL / magf);
-      rew= detect_left_drag ((void*) this, rew, x, y, t, m, dist);
-      if (rew == "start-drag-left") {
-        call_mouse_event (rew, left_x, left_y, m, t);
-        delayed_call_mouse_event ("dragging-left", x, y, m, t);
-      }
-      else {
-        rew= detect_right_drag ((void*) this, rew, x, y, t, m, dist);
-        if (rew == "start-drag-right") {
-          call_mouse_event (rew, right_x, right_y, m, t);
-          delayed_call_mouse_event ("dragging-right", x, y, m, t);
-        }
-        else call_mouse_event (rew, x, y, m, t);
-      }
+  if (kind == "drop") {
+    call_drop_event (kind, x, y, m, t, buf->buf->name);
+    if (inside_graphics (true))
+      mouse_graphics ("drop-object", x, y, m, t);
+  }
+  else {
+    string rew= kind;
+    SI dist= (SI) (5 * PIXEL / magf);
+    rew= detect_left_drag ((void*) this, rew, x, y, t, m, dist);
+    if (rew == "start-drag-left") {
+      call_mouse_event (rew, left_x, left_y, m, t);
+      delayed_call_mouse_event ("dragging-left", x, y, m, t);
     }
-    end_editing ();
+    else {
+      rew= detect_right_drag ((void*) this, rew, x, y, t, m, dist);
+      if (rew == "start-drag-right") {
+        call_mouse_event (rew, right_x, right_y, m, t);
+        delayed_call_mouse_event ("dragging-right", x, y, m, t);
+      }
+      else call_mouse_event (rew, x, y, m, t);
+    }
+  }
+  end_editing ();
 #ifdef USE_EXCEPTIONS
   }
   catch (string msg) {

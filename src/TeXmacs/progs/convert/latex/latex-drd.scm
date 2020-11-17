@@ -35,7 +35,8 @@
   ("euscript" 120)
   ("multicol" 130)
   ("hyperref" 140)
-  ("mathtools" 150))
+  ("mathtools" 150)
+  ("cleveref" 160))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dependencies between style files and packages
@@ -54,6 +55,8 @@
   (!verbatim "alltt")
   (!verbatim* "alltt")
   (begin-alltt "alltt")
+
+  (begin-tabularx "tabularx")
 
   (geometry "geometry")
   (epsfig "epsfig")
@@ -100,7 +103,14 @@
   (underset "amsmath")
   (operatorname "amsmath")
   (boldsymbol "amsmath")
+  (overleftrightarrow "amsmath")
+  (underleftarrow "amsmath")
+  (underrightarrow "amsmath")
+  (underleftrightarrow "amsmath")
 
+  (underaccent "accents")
+  (ring "accents")
+  
   (ifthenelse "ifthen")
   (captionof "capt-of")
   (widthof "calc")
@@ -124,6 +134,8 @@
   (url "hyperref")
   (href "hyperref")
 
+  (cref "cleveref")
+  
   (citet "natbib")
   (citep "natbib")
   (citet* "natbib")

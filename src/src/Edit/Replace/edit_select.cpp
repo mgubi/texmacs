@@ -622,9 +622,10 @@ edit_select_rep::selection_set (tree t) {
 
 void
 edit_select_rep::selection_copy (string key) {
+  bool emacs= (get_preference ("look and feel", "default") == "emacs");
   if (inside_active_graphics ()) {
     tree t= as_tree (eval ("(graphics-copy)"));
-    selection_set (key, t);
+    selection_set (key, t, !emacs);
     return;
   }
   if (selection_active_any ()) {
@@ -633,7 +634,7 @@ edit_select_rep::selection_copy (string key) {
     go_to (sel->end);
     tree t= selection_get ();
     go_to (sel->start);
-    selection_set (key, t);
+    selection_set (key, t, !emacs);
     go_to (old_tp);
   }
 }
@@ -970,6 +971,7 @@ edit_select_rep::focus_get (bool skip_flag) {
     if (is_compound (st, "wide-footnote")) skip_flag= false;
     if (is_compound (st, "note-footnote")) skip_flag= false;
     if (is_compound (st, "note-footnote*")) skip_flag= false;
+    if (is_compound (st, "cite-detail")) skip_flag= false;
     return focus_search (path_up (tp), skip_flag, true);
   }
 }

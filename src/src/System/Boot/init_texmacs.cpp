@@ -311,6 +311,11 @@ static void
 init_env_vars () {
   // Handle binary, library and guile paths for plugins
   url bin_path= get_env_path ("PATH") | plugin_path ("bin");
+#ifdef OS_MINGW
+  bin_path= bin_path | url ("$TEXMACS_PATH/bin");
+  if (has_user_preference ("manual path"))
+    bin_path= bin_path | url_system (get_user_preference ("manual path"));
+#endif
   set_env_path ("PATH", bin_path);
   url lib_path= get_env_path ("LD_LIBRARY_PATH") | plugin_path ("lib");
   set_env_path ("LD_LIBRARY_PATH", lib_path);
@@ -348,6 +353,7 @@ init_env_vars () {
   (void) get_env_path ("TEXMACS_PATTERN_PATH",
                        "$TEXMACS_HOME_PATH/misc/patterns" |
                        url ("$TEXMACS_PATH/misc/patterns") |
+                       url ("$TEXMACS_PATH/misc/pictures") |
                        plugin_path ("misc/patterns"));
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
                        "$TEXMACS_HOME_PATH/misc/pixmaps" |
@@ -527,9 +533,10 @@ init_texmacs () {
 
 void
 init_plugins () {
-  install_status= 0;
   url old_settings= "$TEXMACS_HOME_PATH/system/TEX_PATHS";
   url new_settings= "$TEXMACS_HOME_PATH/system/settings.scm";
+
+  install_status= 0;
   string s;
   if (load_string (new_settings, s, false)) {
     if (load_string (old_settings, s, false)) {
@@ -539,6 +546,7 @@ init_plugins () {
     else get_old_settings (s);
   }
   else texmacs_settings= block_to_scheme_tree (s);
+
   if (get_setting ("VERSION") != TEXMACS_VERSION) {
     init_upgrade ();
     url ch ("$TEXMACS_HOME_PATH/doc/about/changes/changes-recent.en.tm");

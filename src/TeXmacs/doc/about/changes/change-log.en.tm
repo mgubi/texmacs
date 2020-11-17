@@ -1,26 +1,48 @@
-<TeXmacs|1.99.12>
+<TeXmacs|1.99.15>
 
-<style|<tuple|tmdoc|english|old-spacing|old-dots>>
+<style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.12>
+  <section|Changes from version 1.99.1 to 1.99.15>
 
   <\itemize>
-    <item>Drop Python 2 support for Python Session ().
+    <item>Improved help balloons and preview facility for references and
+    citations (1.99.15).
 
-    <item>Plugins implemented in Python use Python 3 by default ().
+    <item>Improved navigation and search tools for labels, references, and
+    citations (1.99.15).
 
-    <item>A Parser Framework for programming languages ().
+    <item>Indicate the current cursor position by shaking the mouse
+    (1.99.15).
+
+    <item>Various bug fixes (1.99.15).
+
+    <item>Release of <hlink|\PThe Jolly Writer\Q|https://www.scypress.com/book_info.html>\VYour
+    Guide to GNU <TeXmacs> (1.99.14).
+
+    <item>Many bug fixes (1.99.14).
+
+    <item>Improved Html export with better CSS stylability (1.99.14).
+
+    <item>Improved support for Qt5 (1.99.14).
+
+    <item>Improved Octave plugin (1.99.14).
+
+    <item>Continued bug fixes (1.99.13).
+
+    <item>Switch to Python 3 for plug-ins programmed in Python (1.99.13).
+
+    <item>A Parser Framework for programming languages (1.99.13).
 
     <item>Improved Graphviz plugin with documentation in Chinese and syntax
-    highlight ().
+    highlight (1.99.13).
 
     <item>Improved Maxima plugin with documentation in Chinese and bug fixes
-    ().
+    (1.99.13).
 
-    <item>Improved Octave plugin on Windows for Octave 5.x ().
+    <item>Improved Octave plugin on Windows for Octave 5.x (1.99.13).
 
     <item>Many bug fixes (1.99.12).
 
@@ -2008,7 +2030,7 @@
     <item>Implementation of symbol menus.
   </itemize>
 
-  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|1998\U2020|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

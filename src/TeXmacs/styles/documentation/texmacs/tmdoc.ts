@@ -1,4 +1,4 @@
-<TeXmacs|1.99.12>
+<TeXmacs|1.99.13>
 
 <style|<tuple|source|english>>
 
@@ -48,9 +48,9 @@
 
   <assign|sectional-post-sep|<macro|<space|2spc>>>
 
-  <assign|html-css|http://www.texmacs.org/css/tmdoc.css>
+  <assign|html-css|https://www.texmacs.org/css/tmdoc.css>
 
-  <assign|html-head-javascript-src|http://www.texmacs.org/javascript/texmacs_functions.js>
+  <assign|html-head-javascript-src|https://www.texmacs.org/javascript/texmacs_functions.js>
 
   <\active*>
     <\src-comment>
@@ -59,10 +59,6 @@
   </active*>
 
   <assign|sectional-sep|<macro|.<space|2spc>>>
-
-  \;
-
-  <assign|fira-font|<macro|x|<with|TeXmacs|<macro|<active*|T<rsub|<space|-0.4spc><resize|<with|math-level|0|E>||||0.5fn>>X<rsub|<resize|M<space|0.2spc>AC<space|0.1spc>S||||0.5fn>>>>|font|Fira|<arg|x>>>>
 
   <assign|section-font|<macro|name|<fira-font|<large|<arg|name>>>>>
 

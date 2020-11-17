@@ -1,0 +1,52 @@
+
+/******************************************************************************
+* MODULE     : theme-vdh.css
+* DESCRIPTION: personal CSS style sheet
+* COPYRIGHT  : (C) 2020  Joris van der Hoeven
+*******************************************************************************
+* This software falls under the GNU general public license version 3 or later.
+* It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
+* in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
+******************************************************************************/
+
+
+/******************************************************************************
+* Main text properties
+******************************************************************************/
+
+body {
+    padding: 3em;
+    padding-top: 0em;
+}
+
+.maybe-small {
+    font-size: 90%;
+}
+
+.vdh-image {
+    filter: sepia(60%);
+}
+
+@media screen and (max-width: 1199px) {
+    body {
+        padding: 2em;
+        padding-top: 0em;
+    }
+
+    .vdh-image {
+        width: 250px;
+        height: auto;
+    }
+}
+
+@media screen and (max-width: 799px) {
+    body {
+        padding: 1.25em;
+        padding-top: 0em;
+    }
+
+    .vdh-image {
+        width: 180px;
+        height: auto;
+    }
+}

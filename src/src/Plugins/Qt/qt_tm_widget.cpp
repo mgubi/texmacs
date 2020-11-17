@@ -37,6 +37,7 @@
 #include "QTMStyle.hpp"      // qtstyle()
 #include "QTMGuiHelper.hpp"  // needed to connect()
 #include "QTMInteractivePrompt.hpp"
+#include "QTMInteractiveInputHelper.hpp"
 
 int menu_count = 0;  // zero if no menu is currently being displayed
 list<qt_tm_widget_rep*> waiting_widgets;
@@ -81,12 +82,26 @@ replaceButtons (QToolBar* dest, QList<QAction*>* src) {
   dest->setUpdatesEnabled (true);
 }
 
+void
+QTMInteractiveInputHelper::commit (int result) {
+  if (wid && result == QDialog::Accepted) {
+    QString  item = "#f";
+    QComboBox* cb = sender()->findChild<QComboBox*> ("input");
+    if (cb)  item = cb->currentText();
+    static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->input =
+      from_qstring (item);
+    static_cast<qt_input_text_widget_rep*>(wid->int_input.rep)->cmd ();
+  }
+  sender()->deleteLater();
+}
+
+
 /******************************************************************************
 * qt_tm_widget_rep
 ******************************************************************************/
 
 qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
- : qt_window_widget_rep (new QTMWindow (0), "popup", _quit),
+ : qt_window_widget_rep (new QTMWindow (0), "popup", _quit), helper (this),
    prompt (NULL), full_screen (false)
 {
   type = texmacs_widget;
@@ -154,10 +169,15 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   int min_h= (int) floor (28 * retina_scale);
   bar->setMinimumHeight (min_h);
 #else
+#if (QT_VERSION >= 0x050000)
+  int min_h= (int) floor (24 * retina_scale);
+  bar->setMinimumHeight (min_h);
+#else
   if (retina_scale > 1.0) {
     int min_h= (int) floor (20 * retina_scale);
     bar->setMinimumHeight (min_h);
   }
+#endif
 #endif
   mw->setStatusBar (bar);
  
@@ -217,9 +237,19 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   //
   // NOTICE: setFixedHeight must be after setIconSize
   // TODO: the size of the toolbar should be calculated dynamically
+#if (QT_VERSION >= 0x050000)
   int toolbarHeight= 30;
-  modeToolBar->setFixedHeight (toolbarHeight);
+  mainToolBar->setFixedHeight (toolbarHeight + 8);
+  modeToolBar->setFixedHeight (toolbarHeight + 4);
   focusToolBar->setFixedHeight (toolbarHeight);
+#else
+#ifndef Q_OS_MAC
+  int toolbarHeight= 30 * retina_icons;
+  mainToolBar->setFixedHeight (toolbarHeight + 8);
+  modeToolBar->setFixedHeight (toolbarHeight + 4);
+  focusToolBar->setFixedHeight (toolbarHeight);  
+#endif
+#endif
   
   QWidget *cw= new QWidget();
   cw->setObjectName("central widget");  // this is important for styling toolbars.
@@ -341,6 +371,10 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
 #ifndef Q_OS_MAC
   mainwindow()->menuBar()->setVisible (false);
 #endif  
+  QPalette pal;
+  QColor bgcol (160, 160, 160); // same as tm_background
+  pal.setColor (QPalette::Mid, bgcol);
+  mainwindow()->setPalette(pal);
 }
 
 qt_tm_widget_rep::~qt_tm_widget_rep () {
@@ -386,7 +420,8 @@ qt_tm_widget_rep::tweak_iconbar_size (QSize& sz) {
  \param name A unique identifier for the window (e.g. "TeXmacs:3")
  */
 widget
-qt_tm_widget_rep::plain_window_widget (string name, command _quit) {
+qt_tm_widget_rep::plain_window_widget (string name, command _quit, int b) {
+  (void) b;
   (void) _quit; // The widget already has a command. Don't overwrite. 
   orig_name = name;
   return this;
@@ -945,6 +980,8 @@ qt_tm_widget_rep::set_full_screen(bool flag) {
     }
     else {
       QPalette pal;
+      QColor bgcol (160, 160, 160); // same as tm_background
+      pal.setColor (QPalette::Mid, bgcol);
       mainwindow()->setPalette(pal);
       bool cache = visibility[0];
       visibility[0] = false;
@@ -1131,14 +1168,4 @@ qt_tm_embedded_widget_rep::as_qwidget() {
 QLayoutItem*
 qt_tm_embedded_widget_rep::as_qlayoutitem () {
   return new QWidgetItem(as_qwidget());
-}
-
-
-/*******************************************************************************
-*  Interface
-******************************************************************************/
-
-widget texmacs_widget (int mask, command quit) {
-  if (mask) return tm_new<qt_tm_widget_rep> (mask, quit);
-  else      return tm_new<qt_tm_embedded_widget_rep> (quit);
 }

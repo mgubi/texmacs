@@ -9,10 +9,12 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "qt_chooser_widget.hpp"
 #include "qt_utilities.hpp"
 #include "widget.hpp"
 #include "message.hpp"
 #include "analyze.hpp"
+#include "convert.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
 #include "dictionary.hpp"
@@ -25,42 +27,6 @@
 #include <QStringList>
 #include <QFileDialog>
 #include <QByteArray>
-
-
-/*!
-  A file/directory chooser dialog, using native dialogs where available.
-  See @link widget.cpp @endlink for an explanation of send(), query(),
-  read(), etc.
- */
-class qt_chooser_widget_rep: public qt_widget_rep {
-protected:
-  command cmd;           //!< Scheme closure to execute when the file is chosen
-  command quit;          //!< Execute when the dialog closes.
-  string type;           //!< File types to filter in the dialog
-  string prompt;         //!< Is this a "Save" dialog?
-  string win_title;      //!< Set by plain_window_widget()
-  
-  string directory; //!< Set this property sending SLOT_DIRECTORY to this widget
-  coord2 position;  //!< Set this property sending SLOT_POSITION to this widget
-  coord2 size;      //!< Set this property sending SLOT_SIZE to this widget
-  string file;      //!< Set this property sending SLOT_FILE to this widget
-
-  QString nameFilter;    //!< For use in QFileDialog::setNameFilter()
-  QString defaultSuffix; //!< For use in QFileDialog::setDefaultSuffix()
-
-public:
-  qt_chooser_widget_rep (command, string, string);
-  
-  virtual void send (slot s, blackbox val);
-  virtual blackbox query (slot s, int type_id);
-  virtual widget read (slot s, blackbox index);
-  virtual widget plain_window_widget (string s, command q);
-  
-  bool set_type (const string& _type);
-  void perform_dialog();
-};
-
-
 
 /*!
   \param _cmd  Scheme closure to execute after the dialog is closed.
@@ -186,8 +152,8 @@ qt_chooser_widget_rep::read (slot s, blackbox index) {
  identify it with the window title. This is not always the case.
  */
 widget
-qt_chooser_widget_rep::plain_window_widget (string s, command q)
-{
+qt_chooser_widget_rep::plain_window_widget (string s, command q, int b) {
+  (void) b;
   win_title = s;
   quit      = q;
   return this;
@@ -205,7 +171,7 @@ qt_chooser_widget_rep::set_type (const string& _type)
     return true;
   }
 
-  if (as_bool (call ("format?", _type))) {
+  if (format_exists (_type)) {
     nameFilter = to_qstring (translate
                              (as_string (call ("format-get-name", _type))
                               * " file"));
@@ -350,12 +316,4 @@ qt_chooser_widget_rep::perform_dialog () {
   
   cmd ();
   if (!is_nil (quit)) quit ();
-}
-
-/*******************************************************************************
-*  Interface
-******************************************************************************/
-
-widget file_chooser_widget (command cmd, string type, string prompt) {
-  return tm_new<qt_chooser_widget_rep> (cmd, type, prompt);
 }

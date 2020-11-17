@@ -181,7 +181,7 @@
   (nsucccurlyeq (!annotate "\\mathrel{\\not\\succcurlyeq}" (succcurlyeq)))
   (nsucceqq (!annotate "\\mathrel{\\not\\succeqq}" (succeqq)))
   (nsuccsim (!annotate "\\mathrel{\\not\\succsim}" (succsim)))
-  
+
   ;; other extra symbols
   (oempty "\\circ")
   (exterior "\\wedge")
@@ -318,11 +318,11 @@
     (!append (!translate "This document has been produced using the GNU") " "
              (!group (!recurse (TeXmacs))) " " (!translate "text editor") " ("
              (!translate "see") " "
-             (url "http://www.texmacs.org") ")"))
+             (url "https://www.texmacs.org") ")"))
   (citewebsite
     (!append (!translate "This document has been written using") " GNU "
              (!group (!recurse (TeXmacs))) "; " (!translate "see") " "
-             (url "http://www.texmacs.org") "."))
+             (url "https://www.texmacs.org") "."))
   (tmmade (!recurse (tikzframe (Backsigma))))
   (scheme "{\\sc Scheme}")
   (tmsep  ", ")
@@ -387,6 +387,21 @@
          (fcolorbox "black" "gray!25!white"
                     (raisebox "0pt" (!option "5pt") (!option "0pt") (texttt 1)))
          (hspace "0.5pt")))
+  (uhat (underaccent (hat) 1))
+  (uwidehat (underaccent (widehat (hphantom 1)) 1))
+  (utilde (underaccent (tilde) 1))
+  (uwidetilde (underaccent (widetilde (hphantom 1)) 1))
+  (uvec (underaccent (vec) 1))
+  (ubreve (underaccent (breve) 1))
+  (uinvbreve (underaccent (invbreve) 1))
+  (ucheck (underaccent (check) 1))
+  (uring (underaccent (ring) 1))
+  (uacute (underaccent (acute) 1))
+  (ugrave (underaccent (grave) 1))
+  (underdot (underaccent (dot) 1))
+  (uddot (underaccent (ddot) 1))
+  (udddot (underaccent (dddot (hphantom 1)) 1))
+  (uddddot (underaccent (ddddot (hphantom 1)) 1))
 
   ;; With options
   (tmcodeinline ((!option "") (!group (ttfamily) (!group 2))))
@@ -555,6 +570,14 @@
    (!append (begingroup) "\\setlength{\\parskip}{" 1 "}"
             ---
             (endgroup)))
+  ("tmcompact"
+   ((!begin "tmparsep" "0em") ---))
+  ("tmcompressed"
+   ((!begin "tmparsep" "0.25em") ---))
+  ("tmamplified"
+   ((!begin "tmparsep" "0.75em") ---))
+  ("tmjumpin"
+   ((!begin "tmparmod" "1.5em" "0pt" "-1.5em") ---))
   ("tmindent"
    ((!begin "tmparmod" "1.5em" "0pt" "0pt") ---))
   ("tmlisting"

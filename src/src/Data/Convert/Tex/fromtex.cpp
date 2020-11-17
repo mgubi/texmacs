@@ -882,6 +882,7 @@ latex_symbol_to_tree (string s) {
       if (s == "bgroup")     return "";
       if (s == "egroup")     return "";
       if (s == "colon")      return ":";
+      if (s == "coloneqq")   return "<assign>";
       if (s == "dotsc")      return "<ldots>";
       if (s == "dotsb")      return "<cdots>";
       if (s == "dotsm")      return "<cdots>";
@@ -2342,33 +2343,55 @@ latex_command_to_tree (tree t) {
     return tree (VAR_WIDE, l2e (t[1]), "<wide-Leftarrow>");
   if (is_tuple (t, "\\hat", 1) || is_tuple (t, "\\Hat", 1))
     return tree (WIDE, l2e (t[1]), "^");
+  if (is_tuple (t, "\\uhat", 1))
+    return tree (VAR_WIDE, l2e (t[1]), "^");
   if (is_tuple (t, "\\tilde", 1) || is_tuple (t, "\\Tilde", 1))
     return tree (WIDE, l2e (t[1]), "~");
+  if (is_tuple (t, "\\utilde", 1))
+    return tree (VAR_WIDE, l2e (t[1]), "~");
   if (is_tuple (t, "\\widehat", 1)) return tree (WIDE, l2e (t[1]), "^");
+  if (is_tuple (t, "\\uwidehat", 1)) return tree (VAR_WIDE, l2e (t[1]), "^");
   if (is_tuple (t, "\\widetilde", 1)) return tree (WIDE, l2e (t[1]), "~");
+  if (is_tuple (t, "\\uwidetilde", 1)) return tree (VAR_WIDE, l2e (t[1]), "~");
   if (is_tuple (t, "\\dot", 1) || is_tuple (t, "\\Dot", 1))
     return tree (WIDE, l2e (t[1]), "<dot>");
+  if (is_tuple (t, "\\underdot", 1)) return tree (VAR_WIDE, l2e (t[1]), "<dot>");
   if (is_tuple (t, "\\ddot", 1) || is_tuple (t, "\\Ddot", 1))
     return tree (WIDE, l2e (t[1]), "<ddot>");
+  if (is_tuple (t, "\\uddot", 1)) return tree (VAR_WIDE, l2e (t[1]), "<ddot>");
   if (is_tuple (t, "\\dddot", 1)) return tree (WIDE, l2e (t[1]), "<dddot>");
+  if (is_tuple (t, "\\udddot", 1)) return tree (VAR_WIDE, l2e (t[1]), "<dddot>");
   if (is_tuple (t, "\\ddddot", 1)) return tree (WIDE, l2e (t[1]), "<ddddot>");
+  if (is_tuple (t, "\\uddddot", 1))
+    return tree (VAR_WIDE, l2e (t[1]), "<ddddot>");
   if (is_tuple (t, "\\check", 1) || is_tuple (t, "\\Check", 1))
     return tree (WIDE, l2e (t[1]), "<check>");
+  if (is_tuple (t, "\\ucheck", 1)) return tree (VAR_WIDE, l2e (t[1]), "<check>");
   if (is_tuple (t, "\\grave", 1) || is_tuple (t, "\\Grave", 1))
     return tree (WIDE, l2e (t[1]), "<grave>");
+  if (is_tuple (t, "\\ugrave", 1)) return tree (VAR_WIDE, l2e (t[1]), "<grave>");
   if (is_tuple (t, "\\acute", 1) || is_tuple (t, "\\Acute", 1))
     return tree (WIDE, l2e (t[1]), "<acute>");
+  if (is_tuple (t, "\\uacute", 1)) return tree (VAR_WIDE, l2e (t[1]), "<acute>");
   if (is_tuple (t, "\\vec", 1) || is_tuple (t, "\\Vec", 1))
     return tree (WIDE, l2e (t[1]), "<vect>");
+  if (is_tuple (t, "\\uvec", 1)) return tree (VAR_WIDE, l2e (t[1]), "<vect>");
   if (is_tuple (t, "\\breve", 1) || is_tuple (t, "\\Breve", 1))
     return tree (WIDE, l2e (t[1]), "<breve>");
-  if (is_tuple (t, "\\textroundcap", 1))
+  if (is_tuple (t, "\\ubreve", 1)) return tree (VAR_WIDE, l2e (t[1]), "<breve>");
+  if (is_tuple (t, "\\textroundcap", 1) || is_tuple (t, "\\invbreve", 1))
     return tree (WIDE, l2e (t[1]), "<invbreve>");
-  if (is_tuple (t, "\\abovering", 1) || is_tuple (t, "\\mathring", 1))
+  if (is_tuple (t, "\\uinvbreve", 1))
+    return tree (VAR_WIDE, l2e (t[1]), "<invbreve>");
+  if (is_tuple (t, "\\abovering", 1) ||
+      is_tuple (t, "\\ring", 1) || is_tuple (t, "\\mathring", 1))
     return tree (WIDE, l2e (t[1]), "<abovering>");
-  if (is_tuple (t, "\\hspace", 1) || is_tuple (t, "\\hspace*", 1)) {
+  if (is_tuple (t, "\\uring", 1))
+    return tree (VAR_WIDE, l2e (t[1]), "<abovering>");
+  if (is_tuple (t, "\\hspace", 1) || is_tuple (t, "\\hspace*", 1) ||
+      is_tuple (t, "\\mspace", 1)) {
     if (is_tuple (t[1], "\\tex-len", 3))
-          return tree (SPACE, l2e (t[1]));
+      return tree (SPACE, l2e (t[1]));
     else {
       tree r= t2e (t[1]);
       if (is_var_compound (r, "fill", 0)) return tree (HTAB, "1fn");
@@ -2388,10 +2411,11 @@ latex_command_to_tree (tree t) {
     return compound ("verbatim", v2e (t[1]));
   if (is_tuple (t, "\\tmcodeinline*", 2))
     return compound (string_arg (t[1]), v2e (t[2]));
-  if (is_tuple (t, "\\label", 1)) return tree (LABEL, t2e (t[1]));
-  if (is_tuple (t, "\\ref", 1)) return tree (REFERENCE, t2e (t[1]));
+  if (is_tuple (t, "\\label", 1)) return tree (LABEL, v2e (t[1]));
+  if (is_tuple (t, "\\ref", 1)) return tree (REFERENCE, v2e (t[1]));
   if (is_tuple (t, "\\cref", 1) || is_tuple (t, "\\Cref", 1))
     return latex_cref_to_tree (v2e (t[1]));
+  if (is_tuple (t, "\\eqref", 1)) return compound ("eqref", v2e (t[1]));
   if (is_tuple (t, "\\newcounter", 1))
     return compound ("new-counter", v2e (t[1]));
   if (is_tuple (t, "\\value", 1))
@@ -2478,14 +2502,18 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\enlargethispage")) return "";
   if (is_tuple (t, "\\mathop", 1)) return l2e (t[1]);
   if (is_tuple (t, "\\mathrel", 1)) return l2e (t[1]);
+  if (is_tuple (t, "\\mathinner", 1)) return l2e (t[1]);
   if (is_tuple (t, "\\overbrace", 1))
     return tree (WIDE, l2e (t[1]), "<wide-overbrace>");
   if (is_tuple (t, "\\underbrace", 1))
     return tree (VAR_WIDE, l2e (t[1]), "<wide-underbrace>");
 
   if (is_tuple (t, "\\text", 1) || is_tuple (t, "\\textnormal", 1) ||
-      is_tuple (t, "\\mbox", 1) || is_tuple (t, "\\hbox", 1))
+      is_tuple (t, "\\mbox", 1) || is_tuple (t, "\\hbox", 1) ||
+      is_tuple (t, "\\makebox", 1))
     return var_m2e (t, MODE, "text");
+  if (is_tuple (t, "\\makebox*", 2))
+    return var_m2e (tuple ("\\makebox", t[2]), MODE, "text");
   if (is_tuple (t, "\\mathchoice", 4))
     return compound ("math-choice",
         l2e (t[1]), l2e (t[2]), l2e (t[3]), l2e (t[4]));

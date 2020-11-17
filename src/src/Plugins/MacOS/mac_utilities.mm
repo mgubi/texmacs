@@ -15,14 +15,25 @@
 #include "analyze.hpp"
 #include "hashset.hpp"
 #include "iterator.hpp"
-#pragma push_macro("FAILED")  // CoreFoundation will rewrite our macro FAILED
+
+#undef FAILED // redefined by CARBON
 #define extend CARBON_extends // avoid name collision
 #include "Cocoa/mac_cocoa.h"
 #include <Carbon/Carbon.h>
 #include <crt_externs.h>
 #include "HIDRemote.h"
 #undef extend
-#pragma pop_macro("FAILED")   // Restore our definition
+
+#undef FAILED // restore TeXmacs definition
+#ifdef USE_EXCEPTIONS
+#define FAILED(msg) { tm_throw (msg); }
+#else
+#ifdef DEBUG_ASSERT
+#define FAILED(msg) { tm_failure (msg); assert (false); }
+#else
+#define FAILED(msg) { tm_failure (msg); }
+#endif
+#endif
 
 #ifdef QTTEXMACS
 #include <QApplication>
@@ -30,6 +41,7 @@
 #include <QString>
 #include "Qt/QTMWidget.hpp"
 #include "Qt/qt_gui.hpp"
+#include "Qt/qt_utilities.hpp"
 #endif
 
 bool 
@@ -108,14 +120,29 @@ mac_handler_body (NSEvent *event) {
         if (nsmods &  NSAlternateKeyMask) str.append("Alt+");
         if (nsmods &  NSCommandKeyMask) str.append("Meta+");
         str.append("Tab");
-        cout << str.toAscii().constData() << LF;
-#endif      
+        cout << from_qstring (str) << LF;
+#endif
         
         QKeyEvent *qe = new QKeyEvent(([event type] == NSKeyDown) ? 
                                       QEvent::KeyPress : QEvent::KeyRelease, 
                                       Qt::Key_Tab, modifs);
         QApplication::postEvent(qApp->focusWidget(), qe);
         return nil;
+      }
+      if (key == 0x0051 || key == 0x0071) {
+        NSUInteger nsmods = [event modifierFlags];
+        Qt::KeyboardModifiers modifs = 0;
+        if (key == NSBackTabCharacter) modifs |= Qt::ShiftModifier;
+        if (nsmods &  NSControlKeyMask) modifs |= Qt::MetaModifier;
+        if (nsmods &  NSAlternateKeyMask) modifs |= Qt::AltModifier;
+        if (nsmods &  NSCommandKeyMask) modifs |= Qt::ControlModifier;
+        if (nsmods & NSCommandKeyMask) {
+          QKeyEvent *qe = new QKeyEvent(([event type] == NSKeyDown) ? 
+                                        QEvent::KeyPress : QEvent::KeyRelease, 
+                                        Qt::Key_Q, modifs);
+          QApplication::postEvent(qApp->focusWidget(), qe);
+          return nil;
+        }
       }
     }
   }

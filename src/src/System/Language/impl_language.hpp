@@ -20,6 +20,7 @@
 #include "operator_parser.hpp"
 #include "identifier_parser.hpp"
 #include "string_parser.hpp"
+#include "preprocessor_parser.hpp"
 
 extern text_property_rep tp_normal_rep;
 extern text_property_rep tp_hyph_rep;
@@ -56,6 +57,7 @@ struct abstract_language_rep: language_rep {
   operator_parser_rep operator_parser;
   identifier_parser_rep identifier_parser;
   string_parser_rep string_parser;
+  preprocessor_parser_rep preprocessor_parser;
 
   abstract_language_rep (string s): language_rep(s) {};
   virtual bool belongs_to_identifier (char c);
@@ -71,6 +73,22 @@ struct verb_language_rep: language_rep {
   array<int> get_hyphens (string s);
   void hyphenate (string s, int after, string& left, string& right);
   string get_color (tree t, int start, int end);
+};
+
+struct prog_language_rep: abstract_language_rep {
+  prog_language_rep (string name);
+  text_property advance (tree t, int& pos);
+  array<int> get_hyphens (string s);
+  void hyphenate (string s, int after, string& left, string& right);
+  string get_color (tree t, int start, int end);
+
+  void customize_keyword (keyword_parser_rep parser, tree config);
+  void customize_operator (tree config);
+  void customize_number (tree config);
+  void customize_string (tree config);
+  void customize_preprocessor (tree config);
+  void customize_comment (tree config);
+  tree get_parser_config (string lan, string key);
 };
 
 struct scheme_language_rep: language_rep {
@@ -129,14 +147,6 @@ struct cpp_language_rep: abstract_language_rep {
   string get_identifier_type (string s, int& pos);
 };
 
-struct dot_language_rep: abstract_language_rep {
-  dot_language_rep (string name);
-  text_property advance (tree t, int& pos);
-  array<int> get_hyphens (string s);
-  void hyphenate (string s, int after, string& left, string& right);
-  string get_color (tree t, int start, int end);
-};
-
 struct scilab_language_rep: abstract_language_rep {
   scilab_language_rep (string name);
   text_property advance (tree t, int& pos);
@@ -145,39 +155,6 @@ struct scilab_language_rep: abstract_language_rep {
   string get_color (tree t, int start, int end);
 
   bool belongs_to_identifier (char c);
-  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
-  string parse_operators (hashmap<string,string>& t, string s, int& pos);
-};
-
-struct python_language_rep: abstract_language_rep {
-  python_language_rep (string name);
-  text_property advance (tree t, int& pos);
-  array<int> get_hyphens (string s);
-  void hyphenate (string s, int after, string& left, string& right);
-  string get_color (tree t, int start, int end);
-
-  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
-  string parse_operators (hashmap<string,string>& t, string s, int& pos);
-};
-
-struct java_language_rep: abstract_language_rep {
-  java_language_rep (string name);
-  text_property advance (tree t, int& pos);
-  array<int> get_hyphens (string s);
-  void hyphenate (string s, int after, string& left, string& right);
-  string get_color (tree t, int start, int end);
-
-  string parse_keywords (hashmap<string,string>& t, string s, int& pos);
-  string parse_operators (hashmap<string,string>& t, string s, int& pos);
-};
-
-struct scala_language_rep: abstract_language_rep {
-  scala_language_rep (string name);
-  text_property advance (tree t, int& pos);
-  array<int> get_hyphens (string s);
-  void hyphenate (string s, int after, string& left, string& right);
-  string get_color (tree t, int start, int end);
-
   string parse_keywords (hashmap<string,string>& t, string s, int& pos);
   string parse_operators (hashmap<string,string>& t, string s, int& pos);
 };

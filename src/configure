@@ -678,8 +678,8 @@ QT_VERSION_MAJOR
 RCC
 UIC
 MOC
-QMAKE
 QT_PATH
+QMAKE
 XTRA_CMD
 MACOSX_TARGET
 OSXVERMIN
@@ -2970,7 +2970,7 @@ function cmp_dot_number {
 
   VERSION_MAJOR="1"
   VERSION_MINOR="99"
-  VERSION_BUILD="12"
+  VERSION_BUILD="15"
 
   # the svn revision of this version
   DEVEL_REVISION="$Rev$:"
@@ -4440,7 +4440,7 @@ $as_echo_n "checking version of g++... " >&6; }
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GXX_VERSION" >&5
 $as_echo "$GXX_VERSION" >&6; }
     case "$GXX_VERSION" in
-      0* | 1* | 2*)
+      0.* | 1.* | 2.*)
         { $as_echo "$as_me:${as_lineno-$LINENO}: old style GNU compiler" >&5
 $as_echo "$as_me: old style GNU compiler" >&6;}
         $as_echo "#define OLD_GNU_COMPILER /**/" >>confdefs.h
@@ -6060,7 +6060,8 @@ $as_echo "$as_me: WARNING: Drop duplicate flag -Wl" >&2;}
     fi
   fi
 
-      test -d /sw &&
+      test -z "$with_tmrepo" -a -d /sw/include -a -d /sw/lib &&
+
   LC_SCATTER_FLAGS_list="-I/sw/include -L/sw/lib"
 
 
@@ -6600,7 +6601,8 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
 
   unset ${!LC_SCATTER_FLAGS_*}
 
-      test -d /opt &&
+      test -z "$with_tmrepo" -a -d /opt/local/include -a -d /opt/local/lib &&
+
   LC_SCATTER_FLAGS_list="-I/opt/local/include -L/opt/local/lib"
 
 
@@ -7140,7 +7142,7 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
 
   unset ${!LC_SCATTER_FLAGS_*}
 
-  ;;
+    ;;
     *darwin*)
       echo "$ac_t""for a generic Darwin host" 1>&6
 
@@ -7529,7 +7531,8 @@ fi
 
 
 
-	location=$withval
+  location=$withval
+
 
 
 
@@ -8209,7 +8212,7 @@ $as_echo "$as_me: use embedded guile" >&6;}
 
       DIRGUILE=tm-guile168
 
-  		CLNGUILE=CLNGUILE
+      CLNGUILE=CLNGUILE
 
       LC_WITH_GUILE_use_embedded_guile=1
 
@@ -8427,7 +8430,6 @@ else
   as_fn_error $? "cannot find guile-config; is Guile installed?" "$LINENO" 5
 
 fi
-
 
 
   if test -n "$GUILE_VERSION"; then :
@@ -19610,7 +19612,7 @@ ac_link='$OBJC -o conftest$ac_exeext $OBJCFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_
 ac_compiler_gnu=$ac_cv_objc_compiler_gnu
 
 
-  LC_SCATTER_FLAGS_list="-I$with_sparkle/Sparkle.framework/Headers -F$with_sparkle -framework Sparkle"
+  LC_SCATTER_FLAGS_list="-I$with_sparkle/Sparkle.framework/Headers -F$with_sparkle -framework Sparkle -Wl,-rpath,$with_sparkle"
 
 
   LC_GETPOP_FLAG_sepa=-
@@ -20508,35 +20510,37 @@ else
 fi
 
     case "$enable_macosx_extensions" in
-	yes)
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Mac OSX extensions" >&5
+    (yes)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Mac OSX extensions" >&5
 $as_echo "enabling Mac OSX extensions" >&6; }
 
 $as_echo "#define MACOSX_EXTENSIONS 1" >>confdefs.h
 
-	    CONFIG_MACOS="MacOS"
-    #        CONFIG_BFLAGS="$CONFIG_BFLAGS -framework IOKit"
-	    ;;
-	no)
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabling Mac OSX extensions" >&5
+      CONFIG_MACOS="MacOS"
+      #        CONFIG_BFLAGS="$CONFIG_BFLAGS -framework IOKit"
+      ;;
+    (no)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabling Mac OSX extensions" >&5
 $as_echo "disabling Mac OSX extensions" >&6; }
-	    ;;
-	*)
-	    as_fn_error $? "bad option --enable-macosx-extensions=$enable_macosx_extensions" "$LINENO" 5
-	    ;;
+      ;;
+    (*)
+      as_fn_error $? "bad option --enable-macosx-extensions=$enable_macosx_extensions" "$LINENO" 5
+      ;;
     esac
 
 
 # Check whether --with-sdk was given.
 if test "${with_sdk+set}" = set; then :
   withval=$with_sdk;
-         sdk=/Developer/SDKs/MacOSX$withval.sdk
-         [ -d $sdk ] || as_fn_error $? "Apple SDK not found in $sdk" "$LINENO" 5
 
-  LC_MERGE_FLAGS_list="-isysroot $sdk "
+        TM_MACOS_sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$withval.sdk
+        if test -z "$TM_MACOS_sdk" -a -d $TM_MACOS_sdk; then :
+
+
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk "
   if [[ "CFLAGS" =~ $(echo "(^|_)LIBS") ]]
   then
-  LC_PREPEND_LIST_nlist="-isysroot $sdk "
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk "
   #pop the old list
 
   LC_GETPOP_FLAG_sepa=-
@@ -20709,10 +20713,10 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
   unset ${!LC_MERGE_FLAGS_*}
 
 
-  LC_MERGE_FLAGS_list="-isysroot $sdk"
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk"
   if [[ "CXXFLAGS" =~ $(echo "(^|_)LIBS") ]]
   then
-  LC_PREPEND_LIST_nlist="-isysroot $sdk"
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk"
   #pop the old list
 
   LC_GETPOP_FLAG_sepa=-
@@ -20885,10 +20889,10 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
   unset ${!LC_MERGE_FLAGS_*}
 
 
-  LC_MERGE_FLAGS_list="-Wl,-syslibroot,$sdk"
+  LC_MERGE_FLAGS_list="-Wl,-syslibroot,$TM_MACOS_sdk"
   if [[ "LDFLAGS" =~ $(echo "(^|_)LIBS") ]]
   then
-  LC_PREPEND_LIST_nlist="-Wl,-syslibroot,$sdk"
+  LC_PREPEND_LIST_nlist="-Wl,-syslibroot,$TM_MACOS_sdk"
   #pop the old list
 
   LC_GETPOP_FLAG_sepa=-
@@ -21063,11 +21067,1087 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
 
 fi
 
+        TM_MACOS_sdk=/Library/Developer/CommandLineTools/SDKs/MacOSX$withval.sdk
+        if test -z "$TM_MACOS_sdk" -a -d $TM_MACOS_sdk; then :
+
+
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk "
+  if [[ "CFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk "
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CFLAGS)" # remove unnecessary spaces and add a heading space
+  CFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CFLAGS=${CFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CFLAGS=$(echo $CFLAGS)
+    else CFLAGS=$(echo $CFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CFLAGS)" # remove unnecessary spaces and add a heading space
+  CFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CFLAGS=${CFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CFLAGS=$(echo $CFLAGS)
+    else CFLAGS=$(echo $CFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  CFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then CFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $CFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$CFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$CFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then CFLAGS=
+  else  while test "$CFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$CFLAGS"
+        CFLAGS="${CFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        CFLAGS="${CFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        CFLAGS="${CFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  CFLAGS=$(echo $CFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       CFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$CFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else CFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk"
+  if [[ "CXXFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk"
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CXXFLAGS)" # remove unnecessary spaces and add a heading space
+  CXXFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CXXFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CXXFLAGS=${CXXFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CXXFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CXXFLAGS=$(echo $CXXFLAGS)
+    else CXXFLAGS=$(echo $CXXFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CXXFLAGS)" # remove unnecessary spaces and add a heading space
+  CXXFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CXXFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CXXFLAGS=${CXXFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CXXFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CXXFLAGS=$(echo $CXXFLAGS)
+    else CXXFLAGS=$(echo $CXXFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  CXXFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $CXXFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$CXXFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$CXXFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then CXXFLAGS=
+  else  while test "$CXXFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$CXXFLAGS"
+        CXXFLAGS="${CXXFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        CXXFLAGS="${CXXFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        CXXFLAGS="${CXXFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  CXXFLAGS=$(echo $CXXFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$CXXFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+  LC_MERGE_FLAGS_list="-Wl,-syslibroot,$TM_MACOS_sdk"
+  if [[ "LDFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-Wl,-syslibroot,$TM_MACOS_sdk"
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  LDFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $LDFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LDFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$LDFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then LDFLAGS=
+  else  while test "$LDFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LDFLAGS"
+        LDFLAGS="${LDFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LDFLAGS="${LDFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LDFLAGS="${LDFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LDFLAGS=$(echo $LDFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$LDFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+fi
+
+        TM_MACOS_sdk=/Developer/SDKs/MacOSX$withval.sdk
+        if test -z "$TM_MACOS_sdk" -a -d $TM_MACOS_sdk; then :
+
+
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk "
+  if [[ "CFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk "
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CFLAGS)" # remove unnecessary spaces and add a heading space
+  CFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CFLAGS=${CFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CFLAGS=$(echo $CFLAGS)
+    else CFLAGS=$(echo $CFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CFLAGS)" # remove unnecessary spaces and add a heading space
+  CFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CFLAGS=${CFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CFLAGS=$(echo $CFLAGS)
+    else CFLAGS=$(echo $CFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  CFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then CFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $CFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$CFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$CFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then CFLAGS=
+  else  while test "$CFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$CFLAGS"
+        CFLAGS="${CFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        CFLAGS="${CFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        CFLAGS="${CFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  CFLAGS=$(echo $CFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       CFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$CFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else CFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+  LC_MERGE_FLAGS_list="-isysroot $TM_MACOS_sdk"
+  if [[ "CXXFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-isysroot $TM_MACOS_sdk"
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CXXFLAGS)" # remove unnecessary spaces and add a heading space
+  CXXFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CXXFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CXXFLAGS=${CXXFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CXXFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CXXFLAGS=$(echo $CXXFLAGS)
+    else CXXFLAGS=$(echo $CXXFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $CXXFLAGS)" # remove unnecessary spaces and add a heading space
+  CXXFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$CXXFLAGS" = "$LC_GETPOP_FLAG_1"
+  then CXXFLAGS=${CXXFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$CXXFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then CXXFLAGS=$(echo $CXXFLAGS)
+    else CXXFLAGS=$(echo $CXXFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  CXXFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $CXXFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$CXXFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$CXXFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then CXXFLAGS=
+  else  while test "$CXXFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$CXXFLAGS"
+        CXXFLAGS="${CXXFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        CXXFLAGS="${CXXFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        CXXFLAGS="${CXXFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  CXXFLAGS=$(echo $CXXFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$CXXFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else CXXFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+  LC_MERGE_FLAGS_list="-Wl,-syslibroot,$TM_MACOS_sdk"
+  if [[ "LDFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="-Wl,-syslibroot,$TM_MACOS_sdk"
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  LDFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $LDFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LDFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$LDFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then LDFLAGS=
+  else  while test "$LDFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LDFLAGS"
+        LDFLAGS="${LDFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LDFLAGS="${LDFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LDFLAGS="${LDFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LDFLAGS=$(echo $LDFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$LDFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+fi
+
+      if test -z "$TM_MACOS_sdk"; then :
+  as_fn_error $? "Apple SDK not found" "$LINENO" 5
+fi
+      unset TM_MACOS_sdk
+
+fi
+
+
 
 # Check whether --with-osx was given.
 if test "${with_osx+set}" = set; then :
   withval=$with_osx;
-         MACOSX_TARGET=-os$withval
+          MACOSX_TARGET=-os$withval
 
   LC_MERGE_FLAGS_list="-mmacosx-version-min=$withval"
   if [[ "CFLAGS" =~ $(echo "(^|_)LIBS") ]]
@@ -21596,7 +22676,7 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
   fi
   unset ${!LC_MERGE_FLAGS_*}
 
-         OSXVERMIN=$withval
+          OSXVERMIN=$withval
 
 
 else
@@ -21606,7 +22686,7 @@ else
 fi
 
 
-fi
+  fi
 
 
   if test "$CONFIG_OS" = MINGW; then
@@ -22728,7 +23808,58 @@ fi
   case $CONFIG_OS in
     MINGW) xtralibs="+xml";;
   esac
-  echo "$as_me: this is autotroll.m4 serial 10" >&5
+
+  for ac_prog in qmake qmake-qt4 qmake-qt5
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_QMAKE+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $QMAKE in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_QMAKE="$QMAKE" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_QMAKE="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+QMAKE=$ac_cv_path_QMAKE
+if test -n "$QMAKE"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $QMAKE" >&5
+$as_echo "$QMAKE" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$QMAKE" && break
+done
+test -n "$QMAKE" || QMAKE="echo"
+
+  case $($QMAKE -query QT_VERSION 2>/dev/null) in
+  5.*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: Qt5 found" >&5
+$as_echo "$as_me: Qt5 found" >&6;}
+    echo "$as_me: this is autotroll.m4 serial 10" >&5
 
   test x"$TROLL" != x && echo 'ViM rox emacs.'
 
@@ -23315,10 +24446,984 @@ $at_mod"
   echo "$qt_conf" | sed 1d >>"$pro_file"
 
 
- # Tweak the value of QT in the .pro file for $xtralibs +printsupport.
+ # Tweak the value of QT in the .pro file for $xtralibs +printsupport +svg.
 
   qt_conf=''
-  for at_mod in $xtralibs +printsupport; do
+  for at_mod in $xtralibs +printsupport +svg; do
+    at_mod=`echo "$at_mod" | sed 's/^-//; tough
+                                  s/^+//; beef
+                                  :ough
+                                  s/^/QT -= /;n
+                                  :eef
+                                  s/^/QT += /'`
+    qt_conf="$qt_conf
+$at_mod"
+  done
+  echo "$qt_conf" | sed 1d >>"$pro_file"
+
+
+ # Tweak the value of CONFIG in the .pro file for +exceptions.
+
+  qt_conf=''
+  for at_mod in +exceptions; do
+    at_mod=`echo "$at_mod" | sed 's/^-//; tough
+                                  s/^+//; beef
+                                  :ough
+                                  s/^/CONFIG -= /;n
+                                  :eef
+                                  s/^/CONFIG += /'`
+    qt_conf="$qt_conf
+$at_mod"
+  done
+  echo "$qt_conf" | sed 1d >>"$pro_file"
+
+
+ # Add the extra-settings the user wants to set in the .pro
+  echo "
+      LIBS += $LDFLAGS
+      QTPLUGIN = qjpeg qgif qico qsvg
+    " >>"$pro_file"
+
+
+  echo "$as_me:$LINENO: Invoking $QMAKE on $pro_file" >&5
+  sed 's/^/| /' "$pro_file" >&5
+
+  if $QMAKE $at_qmake_args; then :; else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Calling $QMAKE $at_qmake_args failed." >&5
+$as_echo "$as_me: WARNING: Calling $QMAKE $at_qmake_args failed." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  # QMake has a very annoying misfeature: sometimes it generates Makefiles
+  # where all the references to the files from the Qt installation are
+  # relative.  We can't use them as-is because if we take, say, a
+  # -I../../usr/include/Qt from that Makefile, the flag is invalid as soon
+  # as we use it in another (sub) directory.  So what this perl pass does is
+  # that it rewrite all relative paths to absolute paths.  Another problem
+  # when building on Cygwin is that QMake mixes paths with blackslashes and
+  # forward slashes and paths must be handled with extra care because of the
+  # stupid Windows drive letters.
+  echo "$as_me:$LINENO: fixing the Makefiles:" Makefile* >&5
+  cat >fixmk.pl <<\EOF
+use strict;
+use Cwd qw(cwd abs_path);
+# This variable is useful on Cygwin for the following reason: Say that you are
+# in `/' (that is, in fact you are in C:/cygwin, or something like that) if you
+# `cd ..' then obviously you remain in `/' (that is in C:/cygwin).  QMake
+# generates paths that are relative to C:/ (or another driver letter, whatever)
+# so the trick to get the `..' resolved properly is to prepend the absolute
+# path of the current working directory in a Windows-style.  C:/cygwin/../ will
+# properly become C:/.
+my $d = "";
+my $r2a = 0;
+my $b2f = 0;
+
+my $cygwin = 0;
+if ($^O eq "cygwin") {
+  $cygwin = 1;
+  $d = cwd();
+  $d = `cygpath --mixed '$d'`;
+  chomp($d);
+  $d .= "/";
+}
+
+sub rel2abs($)
+{
+  my $p = $d . shift;
+  # print "r2a p=$p";
+  -e $p || return $p;
+  if ($cygwin) {
+    $p = `cygpath --mixed '$p'`;
+    chomp($p);
+  }
+  else {
+    # Do not use abs_path on Cygwin: it incorrectly resolves the paths that are
+    # relative to C:/ rather than `/'.
+    $p = abs_path($p);
+  }
+  # print " -> $p\n";
+  ++$r2a;
+  return $p;
+}
+
+# Only useful on Cygwin.
+sub back2forward($)
+{
+  my $p = shift;
+  # print "b2f p=$p";
+  -e $p || return $p;
+  $p = `cygpath --mixed '$p'`;
+  chomp($p);
+  # print " -> $p\n";
+  ++$b2f;
+  return $p;
+}
+
+foreach my $mk (@ARGV)
+{
+  next if $mk =~ /~$/;
+  open(MK, $mk) or die("open $mk: $!");
+  # print "mk=$mk\n";
+  my $file = join("", <MK>);
+  close(MK) or die("close $mk: $!");
+  rename $mk, $mk . "~" or die("rename $mk: $!");
+  $file =~ s{(?:\.\.[\\/])+(?:[^"'\s:]+)}{rel2abs($&)}gse;
+  $file =~ s{(?:[a-zA-Z]:[\\/])?(?:[^"\s]+\\[^"\s:]+)+}
+            {back2forward($&)}gse if $cygwin;
+  open(MK, ">", $mk) or die("open >$mk: $!");
+  print MK $file;
+  close(MK) or die("close >$mk: $!");
+  print "$mk: updated $r2a relative paths and $b2f backslash-style paths\n";
+  $r2a = 0;
+  $b2f = 0;
+}
+EOF
+
+  perl >&5 -w fixmk.pl Makefile* ||
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: failed to fix the Makefiles generated by $QMAKE" >&5
+$as_echo "$as_me: WARNING: failed to fix the Makefiles generated by $QMAKE" >&2;}
+  rm -f fixmk.pl
+
+  # Try to compile a simple Qt app.
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we can build a simple Qt app" >&5
+$as_echo_n "checking whether we can build a simple Qt app... " >&6; }
+if ${at_cv_qt_build+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_qt_build=ko
+  : ${MAKE=make}
+
+  if $MAKE >&5 2>&1; then
+    at_cv_qt_build='ok, looks like Qt 4 or Qt 5'
+  else
+    echo "$as_me:$LINENO: Build failed, trying to #include <qobject.h> \
+instead" >&5
+    sed 's/<QObject>/<qobject.h>/' conftest.h > tmp.h && mv tmp.h conftest.h
+    if $MAKE >&5 2>&1; then
+      at_cv_qt_build='ok, looks like Qt 3'
+    else
+      # Sometimes (such as on Debian) build will fail because Qt hasn't been
+      # installed in debug mode and qmake tries (by default) to build apps in
+      # debug mode => Try again in release mode.
+      echo "$as_me:$LINENO: Build failed, trying to enforce release mode" \
+            >&5
+
+       # Tweak the value of CONFIG in the .pro file for +release.
+
+  qt_conf=''
+  for at_mod in +release; do
+    at_mod=`echo "$at_mod" | sed 's/^-//; tough
+                                  s/^+//; beef
+                                  :ough
+                                  s/^/CONFIG -= /;n
+                                  :eef
+                                  s/^/CONFIG += /'`
+    qt_conf="$qt_conf
+$at_mod"
+  done
+  echo "$qt_conf" | sed 1d >>"$pro_file"
+
+
+      sed 's/<qobject.h>/<QObject>/' conftest.h > tmp.h && mv tmp.h conftest.h
+      if $MAKE >&5 2>&1; then
+        at_cv_qt_build='ok, looks like Qt 4 or Qt 5, release mode forced'
+      else
+        echo "$as_me:$LINENO: Build failed, trying to #include <qobject.h> \
+instead" >&5
+        sed 's/<QObject>/<qobject.h>/' conftest.h >tmp.h && mv tmp.h conftest.h
+        if $MAKE >&5 2>&1; then
+          at_cv_qt_build='ok, looks like Qt 3, release mode forced'
+        else
+          at_cv_qt_build=ko
+          echo "$as_me:$LINENO: failed program was:" >&5
+          sed 's/^/| /' conftest.h >&5
+          echo "$as_me:$LINENO: failed program was:" >&5
+          sed 's/^/| /' conftest.cpp >&5
+        fi # if make with Qt3-style #include and release mode forced.
+      fi # if make with Qt4/5-style #include and release mode forced.
+    fi # if make with Qt3-style #include.
+  fi # if make with Qt4/5-style #include.
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_qt_build" >&5
+$as_echo "$at_cv_qt_build" >&6; }
+  if test x"$at_cv_qt_build" = xko; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot build a test Qt program" >&5
+$as_echo "$as_me: WARNING: Cannot build a test Qt program" >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    cd ..
+    break
+  fi
+  QT_VERSION_MAJOR=`echo "$at_cv_qt_build" | sed 's/[^0-9]*//g'`
+
+
+  # This sed filter is applied after an expression of the form: /^FOO.*=/!d;
+  # It starts by removing the beginning of the line, removing references to
+  # SUBLIBS, removing unnecessary whitespaces at the beginning, and prefixes
+  # all variable uses by QT_.
+  qt_sed_filter='s///;
+                 s/$(SUBLIBS)//g;
+                 s/^ *//;
+                 s/\$(\([A-Z_][A-Z_]*\))/$(QT_\1)/g'
+
+  # Find the Makefile (qmake happens to generate a fake Makefile which invokes
+  # a Makefile.Debug or Makefile.Release). We we have both, we'll pick the
+  # Makefile.Release. The reason is that the main difference is that release
+  # uses -Os and debug -g. We can override -Os by passing another -O but we
+  # usually don't override -g.
+  if test -f Makefile.Release; then
+    at_mfile='Makefile.Release'
+  else
+    at_mfile='Makefile'
+  fi
+  if test -f $at_mfile; then :; else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find the Makefile generated by qmake." >&5
+$as_echo "$as_me: WARNING: Cannot find the Makefile generated by qmake." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    cd ..
+    break
+  fi
+
+  # Find the DEFINES of Qt (should have been named CPPFLAGS).
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the DEFINES to use with Qt" >&5
+$as_echo_n "checking for the DEFINES to use with Qt... " >&6; }
+if ${at_cv_env_QT_DEFINES+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_DEFINES=`sed "/^DEFINES[^A-Z=]*=/!d;$qt_sed_filter" $at_mfile`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_DEFINES" >&5
+$as_echo "$at_cv_env_QT_DEFINES" >&6; }
+  QT_DEFINES=$at_cv_env_QT_DEFINES
+
+
+  # Find the CFLAGS of Qt (We can use Qt in C?!)
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the CFLAGS to use with Qt" >&5
+$as_echo_n "checking for the CFLAGS to use with Qt... " >&6; }
+if ${at_cv_env_QT_CFLAGS+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_CFLAGS=`sed "/^CFLAGS[^A-Z=]*=/!d;$qt_sed_filter" $at_mfile`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_CFLAGS" >&5
+$as_echo "$at_cv_env_QT_CFLAGS" >&6; }
+  QT_CFLAGS=$at_cv_env_QT_CFLAGS
+
+
+  DR_MERGE_tmp1=$QT_CFLAGS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_CFLAGS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  # Find the CXXFLAGS of Qt.
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the CXXFLAGS to use with Qt" >&5
+$as_echo_n "checking for the CXXFLAGS to use with Qt... " >&6; }
+if ${at_cv_env_QT_CXXFLAGS+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_CXXFLAGS=`sed "/^CXXFLAGS[^A-Z=]*=/!d;$qt_sed_filter" $at_mfile`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_CXXFLAGS" >&5
+$as_echo "$at_cv_env_QT_CXXFLAGS" >&6; }
+  QT_CXXFLAGS=$at_cv_env_QT_CXXFLAGS
+
+
+  DR_MERGE_tmp1=$QT_CXXFLAGS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_CXXFLAGS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  # Find the INCPATH of Qt.
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the INCPATH to use with Qt" >&5
+$as_echo_n "checking for the INCPATH to use with Qt... " >&6; }
+if ${at_cv_env_QT_INCPATH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_INCPATH=`sed "/^INCPATH[^A-Z=]*=/!d;$qt_sed_filter" $at_mfile`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_INCPATH" >&5
+$as_echo "$at_cv_env_QT_INCPATH" >&6; }
+  QT_INCPATH=$at_cv_env_QT_INCPATH
+
+
+  DR_MERGE_tmp1=$QT_INCPATH
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_INCPATH=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  QT_CPPFLAGS="$at_cv_env_QT_DEFINES $at_cv_env_QT_INCPATH"
+
+
+  DR_MERGE_tmp1=$QT_CPPFLAGS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_CPPFLAGS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  # Find the LFLAGS of Qt (Should have been named LDFLAGS)
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the LDFLAGS to use with Qt" >&5
+$as_echo_n "checking for the LDFLAGS to use with Qt... " >&6; }
+if ${at_cv_env_QT_LDFLAGS+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_LDFLAGS=`sed "/^LFLAGS[^A-Z=]*=/!d;$qt_sed_filter" $at_mfile`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_LDFLAGS" >&5
+$as_echo "$at_cv_env_QT_LDFLAGS" >&6; }
+  QT_LFLAGS=$at_cv_env_QT_LDFLAGS
+
+  QT_LDFLAGS=$at_cv_env_QT_LDFLAGS
+
+
+  DR_MERGE_tmp1=$QT_LFLAGS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_LFLAGS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  DR_MERGE_tmp1=$QT_LDFLAGS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_LDFLAGS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  # Find the LIBS of Qt.
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the LIBS to use with Qt" >&5
+$as_echo_n "checking for the LIBS to use with Qt... " >&6; }
+if ${at_cv_env_QT_LIBS+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  at_cv_env_QT_LIBS=`sed "/^LIBS[^A-Z]*=/!d;$qt_sed_filter" $at_mfile`
+   if test x$at_darwin = xyes; then
+     # Fix QT_LIBS: as of today Libtool (GNU Libtool 1.5.23a) doesn't handle
+     # -F properly. The "bug" has been fixed on 22 October 2006
+     # by Peter O'Gorman but we provide backward compatibility here.
+     at_cv_env_QT_LIBS=`echo "$at_cv_env_QT_LIBS" \
+                             | sed 's/^-F/-Wl,-F/;s/ -F/ -Wl,-F/g'`
+   fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_cv_env_QT_LIBS" >&5
+$as_echo "$at_cv_env_QT_LIBS" >&6; }
+  QT_LIBS=$at_cv_env_QT_LIBS
+
+
+  DR_MERGE_tmp1=$QT_LIBS
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//(/}
+  DR_MERGE_tmp1=${DR_MERGE_tmp1//)/}
+  eval QT_LIBS=\"$DR_MERGE_tmp1\"
+  unset ${!DR_MERGE_*}
+
+
+  cd .. && rm -rf conftest.dir
+
+  # Run the user code
+
+
+  done  # end hack (useless for to be able to use break)
+
+    ;;
+  4.*)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: Qt4 found" >&5
+$as_echo "$as_me: Qt4 found" >&6;}
+    echo "$as_me: this is autotroll.m4 serial 10" >&5
+
+  test x"$TROLL" != x && echo 'ViM rox emacs.'
+
+
+# Check whether --with-qt was given.
+if test "${with_qt+set}" = set; then :
+  withval=$with_qt;
+fi
+
+
+  if test x"$with_qt" = x"no"; then
+    break
+  else
+
+$as_echo "#define HAVE_QT 1" >>confdefs.h
+
+  fi
+
+  if test x"$with_qt" = x"yes"; then
+    QT_PATH=
+  else
+    QT_PATH=$with_qt
+  fi
+
+  # this is a hack to get decent flow control with 'break'
+  for _qt_ignored in once; do
+
+  # Find Qt.
+
+  if test -d /usr/local/Trolltech; then
+    # Try to find the latest version.
+    tmp_qt_paths=`echo /usr/local/Trolltech/*/bin | tr ' ' '\n' | sort -nr \
+                                              | xargs | sed 's/  */:/g'`
+  fi
+  # Path to which recent MacPorts (~v1.7) install Qt4.
+  test -d /opt/local/libexec/qt4-mac/bin \
+    && tmp_qt_paths="$tmp_qt_paths:/opt/local/libexec/qt4-mac/bin"
+
+  # Find qmake.
+
+  for ax_tool in qmake qmake-qt5 qmake-qt4 qmake-qt3; do
+  if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}$ax_tool", so it can be a program name with args.
+set dummy ${ac_tool_prefix}$ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_QMAKE+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $QMAKE in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_QMAKE="$QMAKE" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_DIR:$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_QMAKE="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+QMAKE=$ac_cv_path_QMAKE
+if test -n "$QMAKE"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $QMAKE" >&5
+$as_echo "$QMAKE" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_QMAKE"; then
+  ac_pt_QMAKE=$QMAKE
+  # Extract the first word of "$ax_tool", so it can be a program name with args.
+set dummy $ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_QMAKE+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_QMAKE in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_QMAKE="$ac_pt_QMAKE" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_DIR:$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_QMAKE="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_QMAKE=$ac_cv_path_ac_pt_QMAKE
+if test -n "$ac_pt_QMAKE"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_QMAKE" >&5
+$as_echo "$ac_pt_QMAKE" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_QMAKE" = x; then
+    QMAKE=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    QMAKE=$ac_pt_QMAKE
+  fi
+else
+  QMAKE="$ac_cv_path_QMAKE"
+fi
+
+  test -n "$QMAKE" && break
+done
+test -n "$QMAKE" || QMAKE="missing"
+
+  if test x"$QMAKE" = xmissing; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find qmake. Try --with-qt=PATH." >&5
+$as_echo "$as_me: WARNING: Cannot find qmake. Try --with-qt=PATH." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  # Find moc (Meta Object Compiler).
+
+  for ax_tool in moc moc-qt5 moc-qt4 moc-qt3; do
+  if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}$ax_tool", so it can be a program name with args.
+set dummy ${ac_tool_prefix}$ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_MOC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $MOC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_MOC="$MOC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_MOC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+MOC=$ac_cv_path_MOC
+if test -n "$MOC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $MOC" >&5
+$as_echo "$MOC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_MOC"; then
+  ac_pt_MOC=$MOC
+  # Extract the first word of "$ax_tool", so it can be a program name with args.
+set dummy $ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_MOC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_MOC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_MOC="$ac_pt_MOC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_MOC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_MOC=$ac_cv_path_ac_pt_MOC
+if test -n "$ac_pt_MOC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_MOC" >&5
+$as_echo "$ac_pt_MOC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_MOC" = x; then
+    MOC=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    MOC=$ac_pt_MOC
+  fi
+else
+  MOC="$ac_cv_path_MOC"
+fi
+
+  test -n "$MOC" && break
+done
+test -n "$MOC" || MOC="missing"
+
+  if test x"$MOC" = xmissing; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find moc (Meta Object Compiler). Try --with-qt=PATH." >&5
+$as_echo "$as_me: WARNING: Cannot find moc (Meta Object Compiler). Try --with-qt=PATH." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  # Find uic (User Interface Compiler).
+
+  for ax_tool in uic uic-qt5 uic-qt4 uic-qt3 uic3; do
+  if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}$ax_tool", so it can be a program name with args.
+set dummy ${ac_tool_prefix}$ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_UIC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $UIC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_UIC="$UIC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_UIC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+UIC=$ac_cv_path_UIC
+if test -n "$UIC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $UIC" >&5
+$as_echo "$UIC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_UIC"; then
+  ac_pt_UIC=$UIC
+  # Extract the first word of "$ax_tool", so it can be a program name with args.
+set dummy $ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_UIC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_UIC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_UIC="$ac_pt_UIC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_UIC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_UIC=$ac_cv_path_ac_pt_UIC
+if test -n "$ac_pt_UIC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_UIC" >&5
+$as_echo "$ac_pt_UIC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_UIC" = x; then
+    UIC=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    UIC=$ac_pt_UIC
+  fi
+else
+  UIC="$ac_cv_path_UIC"
+fi
+
+  test -n "$UIC" && break
+done
+test -n "$UIC" || UIC="missing"
+
+  if test x"$UIC" = xmissing; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find uic (User Interface Compiler). Try --with-qt=PATH." >&5
+$as_echo "$as_me: WARNING: Cannot find uic (User Interface Compiler). Try --with-qt=PATH." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  # Find rcc (Qt Resource Compiler).
+
+  for ax_tool in rcc rcc-qt5; do
+  if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}$ax_tool", so it can be a program name with args.
+set dummy ${ac_tool_prefix}$ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_RCC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $RCC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_RCC="$RCC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_RCC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+RCC=$ac_cv_path_RCC
+if test -n "$RCC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $RCC" >&5
+$as_echo "$RCC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_RCC"; then
+  ac_pt_RCC=$RCC
+  # Extract the first word of "$ax_tool", so it can be a program name with args.
+set dummy $ax_tool; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_RCC+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_RCC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_RCC="$ac_pt_RCC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="$QT_PATH:$PATH:$tmp_qt_paths"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_RCC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_RCC=$ac_cv_path_ac_pt_RCC
+if test -n "$ac_pt_RCC"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_RCC" >&5
+$as_echo "$ac_pt_RCC" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_RCC" = x; then
+    RCC=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    RCC=$ac_pt_RCC
+  fi
+else
+  RCC="$ac_cv_path_RCC"
+fi
+
+  test -n "$RCC" && break
+done
+test -n "$RCC" || RCC="false"
+
+  if test x"$UIC" = xfalse; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find rcc (Qt Resource Compiler). Try --with-qt=PATH." >&5
+$as_echo "$as_me: WARNING: Cannot find rcc (Qt Resource Compiler). Try --with-qt=PATH." >&2;}
+  fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether host operating system is Darwin" >&5
+$as_echo_n "checking whether host operating system is Darwin... " >&6; }
+  at_darwin=no
+  at_qmake_args=
+  case $host_os in
+    darwin*)
+      at_darwin=yes
+      ;;
+  esac
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $at_darwin" >&5
+$as_echo "$at_darwin" >&6; }
+
+  # If we don't know the path to Qt, guess it from the path to qmake.
+  if test x"$QT_PATH" = x; then
+    QT_PATH=`dirname "$QMAKE"`
+  fi
+  if test x"$QT_PATH" = x; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find your Qt installation. Try --with-qt=PATH." >&5
+$as_echo "$as_me: WARNING: Cannot find your Qt installation. Try --with-qt=PATH." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+
+  # Get ready to build a test-app with Qt.
+  if mkdir conftest.dir && cd conftest.dir; then :; else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot mkdir conftest.dir or cd to that directory." >&5
+$as_echo "$as_me: WARNING: Cannot mkdir conftest.dir or cd to that directory." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  cat >conftest.h <<_ASEOF
+#include <QObject>
+
+class Foo: public QObject
+{
+  Q_OBJECT;
+public:
+  Foo();
+  ~Foo() {}
+public Q_SLOTS:
+  void setValue(int value);
+Q_SIGNALS:
+  void valueChanged(int newValue);
+private:
+  int value_;
+};
+_ASEOF
+
+  cat >conftest.cpp <<_ASEOF
+#include "conftest.h"
+Foo::Foo()
+  : value_ (42)
+{
+  connect(this, SIGNAL(valueChanged(int)), this, SLOT(setValue(int)));
+}
+
+void Foo::setValue(int value)
+{
+  value_ = value;
+}
+
+int main()
+{
+  Foo f;
+}
+_ASEOF
+  if $QMAKE -project; then :; else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Calling $QMAKE -project failed." >&5
+$as_echo "$as_me: WARNING: Calling $QMAKE -project failed." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+  # Find the .pro file generated by qmake.
+  pro_file='conftest.dir.pro'
+  test -f $pro_file || pro_file=`echo *.pro`
+  if test -f "$pro_file"; then :; else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Can't find the .pro file generated by Qmake." >&5
+$as_echo "$as_me: WARNING: Can't find the .pro file generated by Qmake." >&2;}; as_fn_error $? "Cannot find a working Qt library" "$LINENO" 5
+    break
+  fi
+
+ # Tweak the value of QT in the .pro file for +widgets.
+
+  qt_conf=''
+  for at_mod in +widgets; do
+    at_mod=`echo "$at_mod" | sed 's/^-//; tough
+                                  s/^+//; beef
+                                  :ough
+                                  s/^/QT -= /;n
+                                  :eef
+                                  s/^/QT += /'`
+    qt_conf="$qt_conf
+$at_mod"
+  done
+  echo "$qt_conf" | sed 1d >>"$pro_file"
+
+
+ # Tweak the value of QT in the .pro file for $xtralibs +printsupport +svg.
+
+  qt_conf=''
+  for at_mod in $xtralibs +printsupport +svg; do
     at_mod=`echo "$at_mod" | sed 's/^-//; tough
                                   s/^+//; beef
                                   :ough
@@ -23695,7 +25800,9 @@ $as_echo "$at_cv_env_QT_LIBS" >&6; }
 
   done  # end hack (useless for to be able to use break)
 
-
+    ;;
+  *) as_fn_error $? "Qt not found or Qt version not supported " "$LINENO" 5;;
+  esac
   # clean and dispatch the collected flags
 
     TMP_CFLAGS="${QT_CFLAGS}";TMP_CXXFLAGS="${QT_CXXFLAGS}";TMP_CPPFLAGS="${QT_CPPFLAGS}";TMP_LDFLAGS="${QT_LDFLAGS}";TMP_LIBS="${QT_LIBS}";
@@ -25486,6 +27593,422 @@ $as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
         done
   fi
   unset ${!LC_MERGE_FLAGS_*}
+
+
+
+
+
+  CFLAGS__ax_save_flags=$CFLAGS
+
+
+
+  CPPFLAGS__ax_save_flags=$CPPFLAGS
+
+
+
+  CXXFLAGS__ax_save_flags=$CXXFLAGS
+
+
+
+  LDFLAGS__ax_save_flags=$LDFLAGS
+
+
+
+  LIBS__ax_save_flags=$LIBS
+
+
+
+  OBJCFLAGS__ax_save_flags=$OBJCFLAGS
+
+
+
+  OBJCXXFLAGS__ax_save_flags=$OBJCXXFLAGS
+
+
+
+
+
+
+    CFLAGS="$BASE_CFLAGS $QT_CFLAGS"
+
+    CXXFLAGS="$BASE_CXXFLAGS $QT_CXXFLAGS"
+
+    CPPFLAGS="$BASE_CPPFLAGS $QT_CPPFLAGS"
+
+    LIBS="$BASE_LIBS $QT_LIBS"
+
+
+  LC_MERGE_FLAGS_list="$QT_LDFLAGS"
+  if [[ "LDFLAGS" =~ $(echo "(^|_)LIBS") ]]
+  then
+  LC_PREPEND_LIST_nlist="$QT_LDFLAGS"
+  #pop the old list
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+  while [[ $LC_PREPEND_LIST_flag ]]
+  do
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-Wl,') ]]
+  then LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  elif [[ "$LC_PREPEND_LIST_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_PREPEND_LIST_flag"
+  do  while [[ $LC_PREPEND_LIST_nlist != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LC_PREPEND_LIST_nlist
+
+  unset STRIP_ARG_memo
+  if test "$LC_PREPEND_LIST_nlist" = "$STRIP_ALL_ARGS_arg"
+  then LC_PREPEND_LIST_nlist=
+  else  while test "$LC_PREPEND_LIST_nlist" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LC_PREPEND_LIST_nlist"
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LC_PREPEND_LIST_nlist="${LC_PREPEND_LIST_nlist//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LC_PREPEND_LIST_nlist=$(echo $LC_PREPEND_LIST_nlist)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+  else
+    if [[ "$LC_PREPEND_LIST_nlist" =~ $(echo "(^|[[:space:]])$LC_PREPEND_LIST_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_PREPEND_LIST_flag" >&2;}
+    else LC_PREPEND_LIST_nlist+=" $LC_PREPEND_LIST_flag"
+    fi
+  fi
+
+
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LDFLAGS)" # remove unnecessary spaces and add a heading space
+  LDFLAGS=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LDFLAGS" = "$LC_GETPOP_FLAG_1"
+  then LDFLAGS=${LDFLAGS#}; unset LC_PREPEND_LIST_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LDFLAGS } # strip heading
+    LC_PREPEND_LIST_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_PREPEND_LIST_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LDFLAGS=$(echo $LDFLAGS)
+    else LDFLAGS=$(echo $LDFLAGS${LC_GETPOP_FLAG_tail#"$LC_PREPEND_LIST_flag"})
+    fi
+
+  LC_PREPEND_LIST_flag=$(echo $LC_PREPEND_LIST_flag)    # normalize whitespaces
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\/\//\/}   # normalize path separator
+  LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag//\'}   # remove quote
+
+  if [[ "$LC_PREPEND_LIST_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_PREPEND_LIST_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_PREPEND_LIST_flag=${LC_PREPEND_LIST_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  done
+  LDFLAGS="$LC_PREPEND_LIST_nlist"
+  unset ${!LC_PREPEND_LIST_*}
+
+  else  while [ "$LC_MERGE_FLAGS_list" ]
+        do
+  LC_GETPOP_FLAG_sepa=-
+  LC_GETPOP_FLAG_1=" $(echo $LC_MERGE_FLAGS_list)" # remove unnecessary spaces and add a heading space
+  LC_MERGE_FLAGS_list=${LC_GETPOP_FLAG_1%% $LC_GETPOP_FLAG_sepa*} # get heading
+  if test "$LC_MERGE_FLAGS_list" = "$LC_GETPOP_FLAG_1"
+  then LC_MERGE_FLAGS_list=${LC_MERGE_FLAGS_list#}; unset LC_MERGE_FLAGS_flag     # flag not found
+  else
+    LC_GETPOP_FLAG_tail=${LC_GETPOP_FLAG_1#$LC_MERGE_FLAGS_list } # strip heading
+    LC_MERGE_FLAGS_flag=${LC_GETPOP_FLAG_tail%% -*}        # get flag and data
+    if test "$LC_MERGE_FLAGS_flag" = "$LC_GETPOP_FLAG_tail"  # is there someting after the flag
+    then LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list)
+    else LC_MERGE_FLAGS_list=$(echo $LC_MERGE_FLAGS_list${LC_GETPOP_FLAG_tail#"$LC_MERGE_FLAGS_flag"})
+    fi
+
+  LC_MERGE_FLAGS_flag=$(echo $LC_MERGE_FLAGS_flag)    # normalize whitespaces
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\/\//\/}   # normalize path separator
+  LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag//\'}   # remove quote
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo "^-(l|L|D)[[:space:]]+([^[:space:]].*)$") ]]
+  then LC_MERGE_FLAGS_flag=-${BASH_REMATCH[1]}${BASH_REMATCH[2]}
+  fi
+
+    if [ $LC_GETPOP_FLAG_sepa != - ]    # just return the value
+    then LC_MERGE_FLAGS_flag=${LC_MERGE_FLAGS_flag#$LC_GETPOP_FLAG_sepa}
+    fi
+  fi
+
+  unset ${!LC_GETPOP_FLAG_*}
+
+
+  if [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-Wl,') ]]
+  then LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  elif [[ "$LC_MERGE_FLAGS_flag" =~ $(echo '^-l') ]]
+  then
+  unset STRIP_ALL_ARGS_list
+  for STRIP_ALL_ARGS_arg in "$LC_MERGE_FLAGS_flag"
+  do  while [[ $LDFLAGS != $STRIP_ALL_ARGS_list ]]
+      do STRIP_ALL_ARGS_list=$LDFLAGS
+
+  unset STRIP_ARG_memo
+  if test "$LDFLAGS" = "$STRIP_ALL_ARGS_arg"
+  then LDFLAGS=
+  else  while test "$LDFLAGS" != "$STRIP_ARG_memo"
+      do STRIP_ARG_memo="$LDFLAGS"
+        LDFLAGS="${LDFLAGS/#$STRIP_ALL_ARGS_arg[[:space:]]/}" # at the beginning
+        LDFLAGS="${LDFLAGS/%[[:space:]]$STRIP_ALL_ARGS_arg/}"    # at the end
+        LDFLAGS="${LDFLAGS//[[:space:]]$STRIP_ALL_ARGS_arg[[:space:]]/ }"  # all in the middle no consecutive
+      done
+    fi
+  LDFLAGS=$(echo $LDFLAGS)  # wipe extra blank if any
+  unset ${!STRIP_ARG_*}
+
+      done
+  done
+  unset ${!STRIP_ALL_ARGS_*}
+
+       LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+  else
+    if [[ "$LDFLAGS" =~ $(echo "(^|[[:space:]])$LC_MERGE_FLAGS_flag($|[[:space:]])") ]]
+    then { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&5
+$as_echo "$as_me: WARNING: Drop duplicate flag $LC_MERGE_FLAGS_flag" >&2;}
+    else LDFLAGS+=" $LC_MERGE_FLAGS_flag"
+    fi
+  fi
+
+        done
+  fi
+  unset ${!LC_MERGE_FLAGS_*}
+
+
+
+  if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <QtCore>
+#include <QtPlugin>
+#define qt_static_plugin_qjpeg qt_static_plugin_QJpegPlugin
+
+Q_IMPORT_PLUGIN(qjpeg)
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+
+$as_echo "#define qt_static_plugin_qjpeg qt_static_plugin_QJpegPlugin" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No static qjpeg plugin" >&5
+$as_echo "$as_me: WARNING: No static qjpeg plugin" >&2;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+  if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <QtCore>
+#include <QtPlugin>
+#define qt_static_plugin_qgif qt_static_plugin_QGifPlugin
+
+Q_IMPORT_PLUGIN(qgif)
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+
+$as_echo "#define qt_static_plugin_qgif qt_static_plugin_QGifPlugin" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No static qgif plugin" >&5
+$as_echo "$as_me: WARNING: No static qgif plugin" >&2;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+  if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <QtCore>
+#include <QtPlugin>
+#define qt_static_plugin_qico qt_static_plugin_QICOPlugin
+
+Q_IMPORT_PLUGIN(qico)
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+
+$as_echo "#define qt_static_plugin_qico qt_static_plugin_QICOPlugin" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No static qico plugin" >&5
+$as_echo "$as_me: WARNING: No static qico plugin" >&2;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+  if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <QtCore>
+#include <QtPlugin>
+#define qt_static_plugin_qsvg qt_static_plugin_QSvgPlugin
+
+Q_IMPORT_PLUGIN(qsvg)
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+
+$as_echo "#define qt_static_plugin_qsvg qt_static_plugin_QSvgPlugin" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No static qsvg plugin" >&5
+$as_echo "$as_me: WARNING: No static qsvg plugin" >&2;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+  if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <QtCore>
+#include <QtPlugin>
+
+Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin)
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+
+$as_echo "#define CocoaPlugin 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No static Cocoa plugin" >&5
+$as_echo "$as_me: WARNING: No static Cocoa plugin" >&2;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+  CFLAGS=$CFLAGS__ax_save_flags
+
+
+  CPPFLAGS=$CPPFLAGS__ax_save_flags
+
+
+  CXXFLAGS=$CXXFLAGS__ax_save_flags
+
+
+  LDFLAGS=$LDFLAGS__ax_save_flags
+
+
+  LIBS=$LIBS__ax_save_flags
+
+
+  OBJCFLAGS=$OBJCFLAGS__ax_save_flags
+
+
+  OBJCXXFLAGS=$OBJCXXFLAGS__ax_save_flags
 
 
 

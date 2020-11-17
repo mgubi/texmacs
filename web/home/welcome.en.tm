@@ -1,6 +1,6 @@
-<TeXmacs|1.99.10>
+<TeXmacs|1.99.14>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Home|Welcome><tmweb-title|Welcome to GNU
@@ -18,7 +18,7 @@
   <|tmweb-split>
     <\itemize>
       <item>GNU <TeXmacs> is a free scientific editing platform designed to
-      create beautiful technical documents.
+      create beautiful technical documents using a wysiwyg interface.
 
       <item>It provides a unified and user friendly framework for editing
       structured documents with different types of content: text,
@@ -41,12 +41,16 @@
 
       <item>Runs on all major <name|Unix> platforms, <name|MacOS>, and
       <name|Windows>.
+
+      <item><new-button> <hlink|The Jolly
+      Writer|https://www.scypress.com/book_info.html>, your guide to GNU
+      <TeXmacs>.
     </itemize>
 
     <center|<html-javascript-src|/counter/gcount.php?page=texmacs>>
   </tmweb-split>
 
-  <tmdoc-copyright|1999--2019|Joris van der Hoeven>
+  <tmdoc-copyright|1999\U2019|Joris van der Hoeven>
 
   <tmweb-license>
 </body>

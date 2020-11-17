@@ -1,4 +1,4 @@
-<TeXmacs|1.99.10>
+<TeXmacs|1.99.14>
 
 <style|<tuple|source|std|english>>
 
@@ -34,7 +34,7 @@
 
   <assign|obsolete|<macro|body|<greyed|<html-class|tmweb-obsolete|<arg|body>>>>>
 
-  <assign|tmweb-image|<macro|name|<image|<merge|http://www.texmacs.org/Samples/|<arg|name>>|0.666667w|||>>>
+  <assign|tmweb-image|<macro|name|<image|<merge|https://www.texmacs.org/Samples/|<arg|name>>|0.666667w|||>>>
 
   <assign|tmweb-email|<macro|name|domain|<active*|<with|font-family|tt|color|dark
   magenta|\<less\>>><with|font-family|tt|color|dark
@@ -87,7 +87,7 @@
   Linux|../download/linux.en.tm>|<hlink|MacOS|../download/macosx.en.tm>|<hlink|Windows|../download/windows.en.tm>|<hlink|Other|../download/other.en.tm>|<hlink|License|../about/license.en.tm>>>>>
 
   <assign|tmweb-learn-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Learn>|<hlink|Videos|../home/videos.en.tm>|<hlink|Tutorials|../help/tutorial.en.tm>|<hlink|Manuals|../help/book.en.tm>|<hlink|FAQ|../help/faq.en.tm>|<hlink|Mailing
-  lists|../home/ml.en.tm>>>>>
+  lists|../home/ml.en.tm>|<hlink|Forum|http://forum.texmacs.cn/>>>>>
 
   <assign|tmweb-contribute-links|<macro|<style-with|src-compact|none|<tmweb-link-section|<section*|Contribute>|<obsolete|<hlink|Contribute|../contribute/contribute-old.en.tm>>|<obsolete|<hlink|Team|../contribute/team.en.tm>>|<hlink|Donate|../contribute/donations.en.tm>|<hlink|Develop|../contribute/develop.en.tm>|<hlink|Document|../contribute/documentation.en.tm>|<hlink|Translate|../contribute/translations.en.tm>|<hlink|Plug-ins|../contribute/plugins.en.tm>>>>>
 
@@ -149,7 +149,7 @@
 
   <assign|tmweb-license-text|<\macro>
     <\active*>
-      This webpage is part of <hlink|GNU <TeXmacs>|http://www.texmacs.org>
+      This webpage is part of <hlink|GNU <TeXmacs>|https://www.texmacs.org>
       and the larger <hlink|GNU project|http://www.gnu.org>. Verbatim copying
       and distribution of it is permitted in any medium, provided this notice
       is preserved.
@@ -238,7 +238,7 @@
 
   <assign|tmhtml-tmweb-slide|<macro|body|<html-div-class|tmweb-slide|<arg|body>>>>
 
-  <assign|tmhtml-tmweb-carousel|<xmacro|args|<style-with|src-compact|none|<html-javascript-src|http://www.texmacs.org/javascript/texmacs_carousel.js><html-div-class|tmweb-carousel|<map-args|tmhtml-tmweb-slide|concat|args>>>>>
+  <assign|tmhtml-tmweb-carousel|<xmacro|args|<style-with|src-compact|none|<html-javascript-src|https://www.texmacs.org/javascript/texmacs_carousel.js><html-div-class|tmweb-carousel|<map-args|tmhtml-tmweb-slide|concat|args>>>>>
 
   <\active*>
     <\src-comment>
@@ -284,6 +284,16 @@
 
   <\active*>
     <\src-comment>
+      Miscellaneous content
+    </src-comment>
+  </active*>
+
+  <assign|new-button|<macro|<tabular|<tformat|<cwith|1|1|1|1|cell-background|#800>|<table|<row|<cell|<strong|<with|color|white|New>>>>>>>>>
+
+  <assign|tmhtml-new-button|<macro|<html-class|tmweb-new|New>>>
+
+  <\active*>
+    <\src-comment>
       Other customizations
     </src-comment>
   </active*>
@@ -301,6 +311,8 @@
   <assign|tmhtml-menu-item|<macro|body|<html-class|tmweb-menu|<with|font-family|ss|<localize|<arg|body>>>>>>
 
   <assign|tmhtml-menu-extra|<macro|body|\<rightarrow\><menu-item|<arg|body>>>>
+
+  \;
 
   \;
 </body>

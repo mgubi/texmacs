@@ -1,4 +1,4 @@
-<TeXmacs|1.99.6>
+<TeXmacs|1.99.13>
 
 <style|source>
 
@@ -24,7 +24,7 @@
     </src-title>
   </active*>
 
-  <use-package|std|env-base|env-math|env-theorem|env-float|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns>
+  <use-package|std|env-base|env-math|env-theorem|env-float|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns|html-font-size>
 
   <active*|<\src-comment>
     Page layout.
@@ -307,9 +307,11 @@
   </active*>
 
   <assign|bib-list|<\macro|largest|body>
-    <\with|par-left|1em|par-first|-1em|font-size|1|bibitem-nr|0>
-      <arg|body>
-    </with>
+    <\description>
+      <\with|par-left|1em|par-first|-1em|font-size|1|bibitem-nr|0>
+        <arg|body>
+      </with>
+    </description>
   </macro>>
 
   <assign|bibliography-text|<macro|<rule|9cm|1pt>>>

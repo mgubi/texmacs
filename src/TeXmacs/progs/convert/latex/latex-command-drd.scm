@@ -39,6 +39,8 @@
 
   ;; AMS commands
   dotsc dotsb dotsm dotsi dotso qed
+  ;; mathtools
+  coloneqq
   ;; temporarily
   hline hrulefill
   ;; rewritten
@@ -65,15 +67,18 @@
   footnote overline underline <sub> <sup> not left middle right
   big Big bigg Bigg bigl Bigl biggl Biggl
   bigm Bigm biggm Biggm bigr Bigr biggr Biggr
-  bar Bar hat Hat tilde Tilde widehat widetilde vec Vec bm
+  bar Bar hat Hat tilde Tilde widehat widetilde vec Vec bm ring
+  overrightarrow overleftarrow overleftrightarrow
+  underrightarrow underleftarrow underleftrightarrow
   grave Grave acute Acute check Check breve Breve invbreve abovering mathring
   dot Dot ddot Ddot dddot ddddot mod pod pmod
-  label ref pageref index hspace hspace* vspace vspace*
+  label ref pageref index hspace hspace* vspace vspace* mspace
   mbox hbox textnormal text not substack
   ,(string->symbol "'") ,(string->symbol "`") ,(string->symbol "\"")
   ^ over atop choose ~ = u v H t c d b k r textsuperscript textsubscript
   thispagestyle ensuremath
   mathord mathbin mathopen mathpunct mathop mathrel mathclose mathalpha
+  mathinner
   arabic alph Alph roman Roman fnsymbol displaylines cases underbrace overbrace
   phantom hphantom vphantom smash date terms
   newcounter stepcounter refstepcounter value
@@ -91,7 +96,7 @@
 
 (logic-group latex-command-2%
   binom tbinom dbinom cfrac tfrac equal href
-  sideset stackrel
+  sideset stackrel underaccent
   setcounter addtocounter setlength addtolength
   colorbox scalebox texorpdfstring raisebox foreignlanguage
   Call Function Procedure SetKw SetKwData SetKwFunction SetKwInOut
@@ -134,6 +139,7 @@
   title author thanks marginpar
   part chapter section subsection subsubsection paragraph subparagraph
   includegraphics includegraphics*
+  makebox
   subjclass declaretheorem footnotetext
   xleftarrow xrightarrow xleftrightarrow xminus
   xLeftarrow xRightarrow xLeftrightarrow xequal

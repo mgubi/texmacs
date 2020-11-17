@@ -67,7 +67,7 @@ texmacs_input_rep::get_mode (string s) {
   if (s == "channel")  return MODE_CHANNEL;
   if (s == "command")  return MODE_COMMAND;
   if (s == "file") return MODE_FILE;
-  if (as_bool (call ("format?", s))) return MODE_XFORMAT;
+  if (format_exists (s)) return MODE_XFORMAT;
   return MODE_VERBATIM;
 }
 
@@ -360,7 +360,6 @@ void parse_url (string buf, string& path_file, string& w_unit,
   int i= 0;
   while (i < N(param_toks)) {
     string param= param_toks[i];
-    int pos = 0;
     if (starts (param, "width=")) {
       param= replace (param, "width=", "");
       parse_length (param, width, w_unit);

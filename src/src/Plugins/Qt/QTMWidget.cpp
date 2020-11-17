@@ -39,6 +39,7 @@
 
 hashmap<int,string> qtkeymap (0);
 hashmap<int,string> qtdeadmap (0);
+hashmap<int,string> qtcomposemap (0);
 
 inline void
 map (int code, string name) {
@@ -57,9 +58,9 @@ initkeymap () {
   fInit= true;
   if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "Initializing keymap\n";
   map (Qt::Key_Space     , "space");
-  map (Qt::Key_Return    , "return");
   map (Qt::Key_Tab       , "tab");
-  map (Qt::Key_Backspace , "backspace");
+  map (Qt::Key_Backtab   , "tab");
+  map (Qt::Key_Return    , "return");
   map (Qt::Key_Enter     , "enter");
   map (Qt::Key_Escape    , "escape");
   map (Qt::Key_Backspace , "backspace");
@@ -278,6 +279,8 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
       debug_qt << "key  : " << key << LF;
       debug_qt << "text : " << event->text().toLatin1().data() << LF;
       debug_qt << "count: " << event->text().count() << LF;
+      debug_qt << "unic : " << event->text().data()[0].unicode() << LF;
+
 #ifdef OS_MINGW
       debug_qt << "nativeScanCode: " << event->nativeScanCode() << LF; 
       debug_qt << "nativeVirtualKey: " << event->nativeVirtualKey() << LF;
@@ -337,7 +340,14 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
           (mods & Qt::AltModifier) == 0 &&
           (mods & Qt::MetaModifier) == 0)
         set_shift_preference (kc, (char) unic);
-      if (unic < 32 && key < 128 && key > 0) {
+#ifdef Q_OS_WIN
+      if ((unic > 0 && unic < 32 && key > 0 && key < 128) ||
+          (unic > 0 && unic < 255 && key > 32 &&
+           (mods & Qt::ShiftModifier) != 0 &&
+           (mods & Qt::ControlModifier) != 0)) {
+#else
+      if (unic < 32 && key > 0 && key < 128) {
+#endif
         // NOTE: For some reason, the 'shift' modifier key is not applied
         // to 'key' when 'control' is pressed as well.  We perform some
         // dirty hacking to figure out the right shifted variant of a key
@@ -348,8 +358,12 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
         }
         else if (has_shift_preference (kc) &&
                  (mods & Qt::ShiftModifier) != 0 &&
-                 (mods & Qt::ControlModifier) != 0)
-          key= (int) (unsigned char) get_shift_preference (kc) [0];
+                 (mods & Qt::ControlModifier) != 0) {
+          string pref= get_shift_preference (kc);
+          if (N(pref) > 0) key= (int) (unsigned char) pref [0];
+          if (DEBUG_QT && DEBUG_KEYBOARD)
+            debug_qt << "Control+Shift " << kc << " -> " << key << LF;
+        }
         mods &=~ Qt::ShiftModifier;
         r= string ((char) key);
       }
@@ -388,8 +402,20 @@ QTMWidget::keyPressEvent (QKeyEvent* event) {
             else if (r == "gtr") r= ">";
         }
 #ifdef Q_OS_MAC
+        if (mods & Qt::AltModifier) {
           // Alt produces many symbols in Mac keyboards: []|{} etc.
-        mods &= ~Qt::AltModifier; //unset Alt
+          if ((N(r) != 1 ||
+               ((int) (unsigned char) r[0]) < 32 ||
+               ((int) (unsigned char) r[0]) >= 128) &&
+              key >= 32 && key < 128 &&
+              ((mods & (Qt::MetaModifier + Qt::ControlModifier)) == 0)) {
+            if ((mods & Qt::ShiftModifier) == 0 && key >= 65 && key <= 90)
+              key += 32;
+            qtcomposemap (key)= r;
+            r= string ((char) key);
+          }
+          else mods &= ~Qt::AltModifier; //unset Alt
+        }
 #endif
         mods &= ~Qt::ShiftModifier;
       }
@@ -466,6 +492,11 @@ static void setRoundedMask (QWidget *widget)
 }
 #endif
 
+void
+QTMWidget::kbdEvent (int key, Qt::KeyboardModifiers mods, const QString& s) {
+  QKeyEvent ev (QEvent::KeyPress, key, mods, s);
+  keyPressEvent (&ev);
+}
 
 #if 0 
 // OLD INPUT METHOD PREVIEW
@@ -561,19 +592,43 @@ QTMWidget::inputMethodEvent (QInputMethodEvent* event) {
   QString const & commit_string = event->commitString();
   
   if (!commit_string.isEmpty()) {
-    if (DEBUG_QT)
-      debug_qt << "IM committing :" << commit_string.toUtf8().data() << LF;
-    
-    int key = 0;
-#if 1
-    for (int i = 0; i < commit_string.size(); ++i) {
-      QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier, commit_string[i]);
-      keyPressEvent (&ev);
-    }
-#else
-    QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier, commit_string);
-    keyPressEvent (&ev);
+    bool done= false;
+#ifdef OS_MACOS
+#if (QT_VERSION < 0x050000)
+    // NOTE: this hack is only needed for Qt4 under MacOS,
+    // but it only works for standard US keyboards
+    done= true;
+    string s= from_qstring (commit_string);
+    Qt::KeyboardModifiers SA= Qt::ShiftModifier | Qt::AltModifier;
+    if (s == "\17") kbdEvent (36, Qt::AltModifier, commit_string);
+    else if (s == "<ddagger>") kbdEvent (38, Qt::AltModifier, commit_string);
+    else if (s == "<leq>") kbdEvent (44, Qt::AltModifier, commit_string);
+    else if (s == "<geq>") kbdEvent (46, Qt::AltModifier, commit_string);
+    else if (s == "<trademark>") kbdEvent (50, Qt::AltModifier, commit_string);
+    else if (s == "<infty>") kbdEvent (53, Qt::AltModifier, commit_string);
+    else if (s == "<ldots>") kbdEvent (59, Qt::AltModifier, commit_string);
+    else if (s == "<#20AC>") kbdEvent (64, Qt::AltModifier, commit_string);
+    else if (s == "<partial>") kbdEvent (68, Qt::AltModifier, commit_string);
+    else if (s == "<#192>") kbdEvent (70, Qt::AltModifier, commit_string);
+    else if (s == "<dagger>") kbdEvent (84, Qt::AltModifier, commit_string);
+    else if (s == "<sqrt>") kbdEvent (86, Qt::AltModifier, commit_string);
+    else if (s == "\35") kbdEvent (94, Qt::AltModifier, commit_string);
+    else if (s == "\31") kbdEvent (66, SA, commit_string);
+    else if (s == "<lozenge>") kbdEvent (89, SA, commit_string);
+    else done= false;
 #endif
+#endif
+    
+    if (!done) {
+      if (DEBUG_QT)
+        debug_qt << "IM committing: " << commit_string.toUtf8().data() << LF;
+#if 1
+      for (int i = 0; i < commit_string.size(); ++i)
+        kbdEvent (0, Qt::NoModifier, commit_string[i]);
+#else
+      kbdEvent (0, Qt::NoModifier, commit_string);
+#endif
+    }
   }
   
   if (DEBUG_QT)
@@ -675,6 +730,30 @@ QTMWidget::mouseMoveEvent (QMouseEvent* event) {
   event->accept();
 }
 
+/*
+void
+QTMWidget::tabletEvent (QTabletEvent* event) {
+  if (is_nil (tmwid)) return;
+  cout << HRULE << LF;
+  cout << "globalX= " << event->globalX() << LF;
+  cout << "globalY= " << event->globalY() << LF;
+  cout << "hiResGlobalX= " << event->hiResGlobalX() << LF;
+  cout << "hiResGlobalY= " << event->hiResGlobalY() << LF;
+  cout << "globalX= " << event->globalX() << LF;
+  cout << "globalY= " << event->globalY() << LF;
+  cout << "x= " << event->x() << LF;
+  cout << "y= " << event->y() << LF;
+  cout << "z= " << event->z() << LF;
+  cout << "xTilt= " << event->xTilt() << LF;
+  cout << "yTilt= " << event->yTilt() << LF;
+  cout << "pressure= " << event->pressure() << LF;
+  cout << "rotation= " << event->rotation() << LF;
+  cout << "tangentialPressure= " << event->tangentialPressure() << LF;
+  cout << "pointerType= " << event->pointerType() << LF;
+  cout << "uniqueId= " << event->uniqueId() << LF;
+  event->accept();
+}
+*/
 
 bool
 QTMWidget::event (QEvent* event) {
@@ -765,6 +844,9 @@ QTMWidget::dropEvent (QDropEvent *event)
 #endif
       string extension = suffix (name);
       if ((extension == "eps") || (extension == "ps")   ||
+#if (QT_VERSION >= 0x050000)
+          (extension == "svg") ||
+#endif
           (extension == "pdf") || (extension == "png")  ||
           (extension == "jpg") || (extension == "jpeg")) {
         string w, h;

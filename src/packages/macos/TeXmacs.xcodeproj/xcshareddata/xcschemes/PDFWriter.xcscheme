@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-               BuildableName = ".a"
+               BuildableName = "PDFWriter.a"
                BlueprintName = "PDFWriter"
                ReferencedContainer = "container:TeXmacs.xcodeproj">
             </BuildableReference>
@@ -44,7 +44,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-            BuildableName = ".a"
+            BuildableName = "PDFWriter.a"
             BlueprintName = "PDFWriter"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>
@@ -60,7 +60,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4907D0D71812E2BC00D893B4"
-            BuildableName = ".a"
+            BuildableName = "PDFWriter.a"
             BlueprintName = "PDFWriter"
             ReferencedContainer = "container:TeXmacs.xcodeproj">
          </BuildableReference>

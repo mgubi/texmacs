@@ -333,7 +333,7 @@ qtwk_window_rep::mouse_event (string ev, int x, int y, int flags, time_t t) {
       coord2 p= from_qpoint (QPoint (dx, dy));
       x += p.x1;
       y += p.x2;
-      cout << "-----\n";
+      //cout << "-----\n";
       // return;
     }
     send_mouse (gui->grab_ptr->item, ev, x, y, flags, t);

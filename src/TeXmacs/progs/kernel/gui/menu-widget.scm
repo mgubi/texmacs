@@ -1023,7 +1023,7 @@
          (lbd (lambda x (apply cmd x) (alt-window-delete win)))
          (com (object->command (menu-protect lbd)))
          (wid (wid-promise com)))
-    (alt-window-create win wid (translate name) #t)
+    (alt-window-create-plain win wid (translate name))
     (alt-window-show win)))
 
 (tm-define (interactive-print done u)
@@ -1098,3 +1098,8 @@
 (tm-define (show-message msg title)
   (:interactive #t)
   (dialogue-window (message-widget msg) noop title))
+
+(tm-define (restart-message)
+  (:interactive #t)
+  (show-message "Restart TeXmacs in order to let changes take effect"
+                "Notification"))

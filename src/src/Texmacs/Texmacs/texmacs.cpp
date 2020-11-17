@@ -235,8 +235,10 @@ TeXmacs_main (int argc, char** argv) {
       else if (s == "-debug-keyboard") debug (DEBUG_FLAG_KEYBOARD, true);
       else if (s == "-debug-packrat") debug (DEBUG_FLAG_PACKRAT, true);
       else if (s == "-debug-flatten") debug (DEBUG_FLAG_FLATTEN, true);
+      else if (s == "-debug-parser") debug (DEBUG_FLAG_PARSER, true);
       else if (s == "-debug-correct") debug (DEBUG_FLAG_CORRECT, true);
       else if (s == "-debug-convert") debug (DEBUG_FLAG_CONVERT, true);
+      else if (s == "-debug-remote") debug (DEBUG_FLAG_REMOTE, true);
       else if (s == "-debug-all") {
         debug (DEBUG_FLAG_EVENTS, true);
         debug (DEBUG_FLAG_STD, true);
@@ -430,7 +432,8 @@ TeXmacs_main (int argc, char** argv) {
   // End options via environment variables
 
   // Further user preferences
-  use_unified_toolbar= get_preference ("use unified toolbar", "on") == "on";
+  string unify= (gui_version () == "qt4"? string ("on"): string ("off"));
+  use_unified_toolbar= get_preference ("use unified toolbar", unify) == "on";
   // End user preferences
 
   if (DEBUG_STD) debug_boot << "Installing internal plug-ins...\n";
@@ -659,6 +662,10 @@ main (int argc, char** argv) {
   immediate_options (argc, argv);
 #ifndef OS_MINGW
   set_env ("LC_NUMERIC", "POSIX");
+#ifndef OS_MACOS
+  set_env ("QT_QPA_PLATFORM", "xcb");
+  set_env ("XDG_SESSION_TYPE", "x11");
+#endif
 #endif
 #ifdef MACOSX_EXTENSIONS
   // Reset TeXmacs if Alt is pressed during startup

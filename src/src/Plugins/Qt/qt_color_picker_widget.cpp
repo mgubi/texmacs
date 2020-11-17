@@ -9,38 +9,13 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "qt_color_picker_widget.hpp"
+#include "qt_utilities.hpp"
+
 #include "message.hpp"
 #include "scheme.hpp"
 
-#include "qt_utilities.hpp"
-#include "qt_widget.hpp"
-
 #include <QColorDialog>
-
-/**
- * This implements a color picker widget, using the native dialogs where
- * available.
- *
- * The "factory" function for this widget is called color_picker_widget(),
- * in qt_dialogues.cpp
- *
- * Please @see qt_widget_rep for some important info.
- */
-class qt_color_picker_widget_rep: public qt_widget_rep {
-public:
-  qt_color_picker_widget_rep (command, bool, array<tree>);
-  ~qt_color_picker_widget_rep ();
-  
-  virtual void            send (slot s, blackbox val);
-  widget   plain_window_widget (string s, command q);
-
-  void showDialog();
-  
-protected:
-  string            _windowTitle;
-  command _commandAfterExecution;
-  bool              _pickPattern;
-};
 
 
 /**
@@ -81,10 +56,9 @@ qt_color_picker_widget_rep::send (slot s, blackbox val) {
  identify it with the window title. This is not always the case.
  */
 widget
-qt_color_picker_widget_rep::plain_window_widget (string name, command q)
-{
+qt_color_picker_widget_rep::plain_window_widget (string name, command q, int b) {
+  (void) b; (void) q;
   _windowTitle = name;
-  (void) q;
   return this;
 }
 
@@ -104,10 +78,3 @@ qt_color_picker_widget_rep::showDialog() {
   }
 }
 
-/*******************************************************************************
-*  Interface
-******************************************************************************/
-
-widget color_picker_widget (command call_back, bool bg, array<tree> proposals) {
-  return tm_new<qt_color_picker_widget_rep> (call_back, bg, proposals);
-}

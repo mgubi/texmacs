@@ -263,6 +263,23 @@ a:active, a:focus, a:hover {
     }
 }
 
+@media screen and (max-width: 999px) {
+    .tmweb-top-menu {
+        padding-left: 78px;
+        border-color: silver;
+        border-style: solid none none none;
+        border-width: thin;
+        height: initial;
+        float: initial;
+        position: relative;
+        overflow: hidden;
+        text-align: left;
+        padding-top: 10px;
+        margin-bottom: 10px;
+        display: block;
+    }
+}
+
 @media screen and (max-width: 799px) {
     .tmweb-header {
         margin: 0px -2em;
@@ -284,7 +301,12 @@ a:active, a:focus, a:hover {
     .tmweb-title {
         height: 40px;
     }
-    
+
+    .tmweb-top-menu {
+        padding-left: 78px;
+    }
+
+    /*
     .tmweb-top-menu {
         height: initial;
         float: initial;
@@ -302,6 +324,7 @@ a:active, a:focus, a:hover {
         padding: 5px 2em;
         text-align: left;
     }
+    */
 }
 
 /******************************************************************************
@@ -657,4 +680,17 @@ tt, .verbatim {
 
 .tmweb-menu {
     font-size: 92%;
+}
+
+.tmweb-new {
+    display: inline-block;
+    background-color: #905465; /* #D03445; */
+    border-radius: 0.1em;
+    border-color: transparent;
+    border-style: solid;
+    color: white;
+    font-weight: bold;
+    padding: 0.1em 0.1em;
+    text-shadow: 0.1em 0.1em 0px #604C4C; /* #A02C2C; */
+    box-shadow: 0.1em 0.1em #604C4C; /* #A02C2C; */
 }

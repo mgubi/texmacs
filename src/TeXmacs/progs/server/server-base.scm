@@ -26,17 +26,19 @@
   (if (npair? proto) '(noop)
       (with (fun . args) proto
         `(begin
-           (tm-define (,fun envelope ,@args)
+           (tm-define (,(symbol-append 'service- fun) envelope ,@args)
              (with-database (server-database)
                (catch #t
                       (lambda () ,@body)
                       (lambda err
                         (display* "Server error: " err "\n")
                         (server-error envelope err)))))
-           (ahash-set! service-dispatch-table ',fun ,fun)))))
+           (ahash-set! service-dispatch-table
+                       ',fun ,(symbol-append 'service- fun))))))
 
 (tm-define (server-eval envelope cmd)
-  ;; (display* "server-eval " envelope ", " cmd "\n")
+  (when (debug-get "remote")
+    (display* "server-eval " envelope ", " cmd "\n"))
   (cond ((and (pair? cmd) (ahash-ref service-dispatch-table (car cmd)))
          (with (name . args) cmd
            (with fun (ahash-ref service-dispatch-table name)
@@ -110,6 +112,8 @@
 
 (tm-service (server-remote-result msg-id ret)
   (with client (car envelope)
+    (when (debug-get "remote")
+      (display* "server-remote-result " (list client msg-id) "\n"))
     (and-with val (ahash-ref server-continuations msg-id)
       (ahash-remove! server-continuations msg-id)
       (ahash-remove! server-error-handlers msg-id)
@@ -234,6 +238,7 @@
 (tm-service (remote-eval cmd)
   (if (server-check-admin? envelope)
       (with ret (eval cmd)
-        ;; (display* "remote-eval " cmd " -> " ret "\n")
+        (when (debug-get "remote")
+          (display* "server-remote-eval " cmd " -> " ret "\n"))
         (server-return envelope ret))
       (server-error envelope "execution of commands is not allowed")))
