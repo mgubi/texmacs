@@ -18,6 +18,7 @@
 #include <QMainWindow>
 #include <QMenuBar>
 #include <QLayoutItem>
+#include <QCoreApplication>
 
 #include "config.h"
 #include "analyze.hpp"
