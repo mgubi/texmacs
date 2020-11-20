@@ -498,7 +498,7 @@ widget refreshable_widget (object promise, string kind) {
 }
 widget glue_widget (bool hx, bool vx, SI w, SI h) {
   qt_widget wid = qt_ui_element_rep::create (qt_ui_element_rep::glue_widget,
-                                             hx, vx, w/PIXEL, h/PIXEL);
+                                             hx, vx, w, h);
   return abstract (wid);
 }
 widget glue_widget (tree col, bool hx, bool vx, SI w, SI h) {

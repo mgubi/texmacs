@@ -705,7 +705,7 @@ qt_ui_element_rep::as_qlayoutitem () {
     {
       typedef quartet<bool, bool, SI, SI> T;
       T x = open_box<T> (load);
-      QSize sz = QSize (x.x3, x.x4);
+      QSize sz = to_qsize (x.x3, x.x4);
       QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
       QSizePolicy::Policy vpolicy = x.x2 ? QSizePolicy::MinimumExpanding
@@ -806,7 +806,7 @@ qt_ui_element_rep::as_qwidget () {
     {
       typedef quartet<bool, bool, SI, SI> T;
       T x = open_box<T>(load);
-      QSize sz = QSize (x.x3, x.x4);
+      QSize sz = to_qsize (x.x3, x.x4);
       QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
       QSizePolicy::Policy vpolicy = x.x2 ? QSizePolicy::MinimumExpanding
