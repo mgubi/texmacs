@@ -221,8 +221,8 @@ qt_ui_element_rep::~qt_ui_element_rep() {
   if (cachedActionList) {
     while (!cachedActionList->empty()) {
       QAction *a = cachedActionList->takeFirst();
-      //if (a) delete a;
-      if (a) schedule_destruction (a);
+      if (a) a->deleteLater();
+      //if (a) schedule_destruction (a);
     }
     delete cachedActionList;
   }
