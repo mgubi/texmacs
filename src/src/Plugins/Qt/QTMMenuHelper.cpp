@@ -26,6 +26,7 @@
 #include <QToolTip>
 #include <QCompleter>
 #include <QKeyEvent>
+#include <QScreen>
 
 /******************************************************************************
  * QTMCommand
@@ -750,19 +751,80 @@ BEGIN_SLOT
     else
       widget(i)->setSizePolicy (QSizePolicy::Minimum, QSizePolicy::Minimum);
   }
-  
     // FIXME? this could loop indefinitely if parents are cyclic.
   QWidget* p = this;
-  while (p != window()) {
+  QWidget* win = window();
+  while (1) {
     p->adjustSize();
+    if (p == win) break;
     p = p->parentWidget();
   }
-  p->adjustSize();
 
   if (window()->minimumSize()!=QSize (0,0) && 
       window()->maximumSize() != QSize (QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
     window()->setFixedSize (window()->sizeHint());
 END_SLOT
+}
+
+
+/*!
+    \internal
+*/
+static inline QSize basicSize(
+    bool horizontal, const QSize &lc, const QSize &rc, const QSize &s, const QSize &t)
+{
+    return horizontal
+        ? QSize(qMax(s.width(), t.width() + rc.width() + lc.width()),
+                s.height() + (qMax(rc.height(), qMax(lc.height(), t.height()))))
+        : QSize(s.width() + (qMax(rc.width(), qMax(lc.width(), t.width()))),
+                qMax(s.height(), t.height() + rc.height() + lc.height()));
+}
+
+/*!
+ We need to reimplement QTabWidget::sizeHint to allow the tab widget to
+ dynamically change size as function of its content, in particular, compute
+ the current size as a function of the size of the current displayed widget.
+ We could implement also other policies if needed, see QTMTABWIDGET_CONSTANT_WIDTH
+ below.
+*/
+
+QSize
+QTMTabWidget::sizeHint() const
+{
+    QSize lc(0, 0), rc(0, 0);
+    QStyleOptionTabWidgetFrame opt;
+    initStyleOption(&opt);
+    opt.state = QStyle::State_None;
+
+    if (cornerWidget(Qt::TopLeftCorner))
+        lc = cornerWidget(Qt::TopLeftCorner)->sizeHint();
+    if (cornerWidget(Qt::TopRightCorner))
+        rc = cornerWidget(Qt::TopRightCorner)->sizeHint();
+    QSize s;
+#ifdef QTMTABWIDGET_CONSTANT_WIDTH
+    for (int i=0; i< count(); ++i) {
+        if (const QWidget* w = widget(i)) {
+            if (isTabVisible(i))
+                s = s.expandedTo(w->sizeHint());
+        }
+    }
+    s.setHeight(currentWidget()->sizeHint().height());
+#else
+   // we just look for the current widget
+    s = currentWidget()->sizeHint();
+#endif
+    QSize t;
+    if (!tabBarAutoHide()) {
+        t = tabBar()->sizeHint();
+        if (usesScrollButtons())
+            t = t.boundedTo(QSize(200,200));
+        else
+            t = t.boundedTo(QGuiApplication::primaryScreen()->virtualGeometry().size());
+    }
+
+    QSize sz = basicSize(tabPosition() == North || tabPosition() == South, lc, rc, s, t);
+
+    return style()->sizeFromContents(QStyle::CT_TabWidget, &opt, sz, this);
 }
 
 /******************************************************************************

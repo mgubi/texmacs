@@ -311,9 +311,11 @@ class QTMTabWidget : public QTabWidget {
 
 public:
   QTMTabWidget (QWidget* p = NULL);
+  QSize sizeHint() const;
 
 public slots:
   void resizeOthers(int index);
+  
 };
 
 
