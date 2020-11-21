@@ -205,9 +205,9 @@ qt_tm_widget_rep::qt_tm_widget_rep(int mask, command _quit)
   
   {
 #if (QT_VERSION >= 0x050000)
-     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    //FIXME: this should be moved in QTMApplication or made screen dependent.
      QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
- #endif
+#endif
 
     float dpr = 1.0;
     // set proper sizes for icons
