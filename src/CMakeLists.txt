@@ -50,11 +50,17 @@ project (TEXMACS CXX C) # check for C/C++ compiler
 
 set (PACKAGE TeXmacs)
 set (CMAKE_MODULE_PATH ${TEXMACS_SOURCE_DIR}/cmake)
-set (DEVEL_VERSION "1.99.16")
+
+set (VERSION_MAJOR "1")
+set (VERSION_MINOR "99")
+set (VERSION_BUILD "16")
+set (TEXMACS_VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_BUILD})
+
+set (DEVEL_VERSION ${TEXMACS_VERSION})
 set (DEVEL_RELEASE "1")
-set (STABLE_VERSION "1.99.16")
+set (STABLE_VERSION ${TEXMACS_VERSION})
 set (STABLE_RELEASE "1")
-set (TEXMACS_REVISION "1.99.16")
+set (TEXMACS_REVISION ${TEXMACS_VERSION})
 
 
 ### --------------------------------------------------------------------
@@ -703,18 +709,6 @@ include_directories (${TeXmacs_Include_Dirs})
 ### Optimization options
 ### --------------------------------------------------------------------
 
-
-
-### --------------------------------------------------------------------
-### Set the executable target name and other stuff
-### --------------------------------------------------------------------
-
-if (APPLE)
-  set (TeXmacs_binary_name "TeXmacs")
-else (APPLE)
-  set (TeXmacs_binary_name "texmacs.bin")
-endif (APPLE)
-
 ### --------------------------------------------------------------------
 ### Compile sources
 ### --------------------------------------------------------------------
@@ -735,21 +729,34 @@ if (APPLE)
   install (DIRECTORY src/Plugins/Cocoa/zh_CN.lproj DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif (APPLE)
 
-install (FILES ${TEXMACS_BINARY_DIR}/misc/script/texmacs
-              ${TEXMACS_BINARY_DIR}/misc/scripts/fig2ps
-              misc/scripts/tm_gs 
-        DESTINATION bin
-        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
-                    GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
+if (NOT WIN32)
+  install (FILES ${TEXMACS_BINARY_DIR}/misc/script/texmacs
+                 ${TEXMACS_BINARY_DIR}/misc/scripts/fig2ps
+                 misc/scripts/tm_gs
+          DESTINATION bin
+          PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
+                      GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
+endif (NOT WIN32)
+
 ### include/
 install (DIRECTORY TeXmacs/include DESTINATION ${CMAKE_INSTALL_PREFIX}
   FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
+
 ### share/
-install (DIRECTORY plugins DESTINATION share/TeXmacs
-  FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
-  PATTERN "bin" EXCLUDE
-  PATTERN "CMakeLists.txt" EXCLUDE
-  PATTERN ".gitignore" EXCLUDE)
+if (WIN32)
+  install (DIRECTORY plugins DESTINATION ${CMAKE_INSTALL_PREFIX}
+    FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
+    PATTERN "bin" EXCLUDE
+    PATTERN "CMakeLists.txt" EXCLUDE
+    PATTERN ".gitignore" EXCLUDE)
+else (WIN32)
+  install (DIRECTORY plugins DESTINATION share/TeXmacs
+    FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
+    PATTERN "bin" EXCLUDE
+    PATTERN "CMakeLists.txt" EXCLUDE
+    PATTERN ".gitignore" EXCLUDE)
+endif (WIN32)
+
 install (FILES TeXmacs/misc/mime/texmacs.desktop DESTINATION share/applications)
 install (FILES TeXmacs/misc/images/texmacs.svg DESTINATION share/icons/gnome/scalable/apps)
 install (FILES TeXmacs/misc/images/text-x-texmacs.svg DESTINATION share/icons/gnome/scalable/mimetypes)
