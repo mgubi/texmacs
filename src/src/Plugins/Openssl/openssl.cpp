@@ -93,7 +93,9 @@ secret_encode (string msg, string key) {
   save_string (_msg, msg);
   url _key= url_temp ();
   save_string (_key, key);
-  string r= eval_system ("openssl aes-256-cbc -nosalt -in " *
+  //Better specify the digest '-m' to avoid problems with different versions of openssl.
+  //(See https://stackoverflow.com/questions/39637388/encryption-decryption-doesnt-work-well-between-two-different-openssl-versions/39641378#39641378)
+  string r= eval_system ("openssl aes-256-cbc -md sha256 -nosalt -in " *
 			 as_string (_msg) * " -pass file:" * as_string (_key));
   remove (_msg);
   remove (_key);
@@ -106,7 +108,7 @@ secret_decode (string msg, string key) {
   save_string (_msg, msg);
   url _key= url_temp ();
   save_string (_key, key);
-  string r= eval_system ("openssl aes-256-cbc -nosalt -d -in " *
+  string r= eval_system ("openssl aes-256-cbc -md sha256 -nosalt -d -in " *
 			 as_string (_msg) * " -pass file:" * as_string (_key));
   remove (_msg);
   remove (_key);
