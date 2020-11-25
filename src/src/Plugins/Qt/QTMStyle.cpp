@@ -364,7 +364,7 @@ QTMStyle::drawComplexControl (ComplexControl cc, const QStyleOptionComplex* opt,
           int mbi = proxy()->pixelMetric(PM_MenuButtonIndicator, toolbutton, widget)*retina_factor;
           QRect ir = toolbutton->rect;
           QStyleOptionToolButton newBtn = *toolbutton;
-          newBtn.rect = QRect(ir.right() + 5 - mbi, ir.y() + ir.height() - mbi + 4, mbi - 6, mbi - 6);
+          newBtn.rect = QRect(ir.right() -1 - mbi, ir.y() + ir.height() - 2 - mbi, mbi, mbi);
           proxy()->drawPrimitive(PE_IndicatorArrowDown, &newBtn, p, widget);
         }
       }
