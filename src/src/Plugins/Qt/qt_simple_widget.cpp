@@ -54,9 +54,11 @@ qt_simple_widget_rep::as_qwidget () {
   scrollarea()->setExtents (QRect (QPoint (0,0), sz));
   canvas()->resize (sz);
   
+  // setup graphic buffer
   backingPixmap = QPixmap(sz);
   backingPixmap.fill (QPalette::Mid);
-
+  invalidate_all();
+  
   all_widgets->insert((pointer) this);
   backing_pos = canvas()->viewportToContents (QPoint(0,0));
 
