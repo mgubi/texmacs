@@ -89,7 +89,7 @@ STATIC_TEXMACS: EMPTY_DIRS
 
 @MKGUILE@: tm-guile168
 	cd @DIRGUILE@ && make -j1 && make -j1 install
-	
+
 DEPS: EMPTY_DIRS
 	cd src; $(MAKE) -f makefile deps
 
@@ -434,7 +434,7 @@ APPIMAGE_PACKAGE_DIR = ../distr/appimage
 APPIMAGE_APP := $$(pwd)/../distr/TeXmacs.AppImage
 APPIMAGE_DIR := $$(pwd)/../distr/TeXmacs.AppDir
 
-APPDIR_BUNDLE: TEXMACS
+APPIMAGE : TEXMACS
 	$(MKDIR) ../distr
 	$(RM) -r $(APPIMAGE_DIR)
 	$(MKDIR) $(APPIMAGE_DIR) 
@@ -446,24 +446,19 @@ APPDIR_BUNDLE: TEXMACS
 	mkdir -p $(APPIMAGE_DIR)/usr/share/applications/
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop
 	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/texmacs.png
-    $(MKDIR) -p $(APPIMAGE_DIR)/usr/bin
+	$(MKDIR) -p $(APPIMAGE_DIR)/usr/bin
 	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(APPIMAGE_DIR)/usr/bin/;fi
 	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ \;
 	$(CHMOD) -R go=rX $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ice-9
-	find -depth $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
+	find $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
+	$(APPIMAGE_PACKAGE_SRC)/appimagetool -s deploy $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop 
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/AppRun.sh $(APPIMAGE_DIR)/AppRun
+	$(CHMOD) go=rX $(APPIMAGE_DIR)/AppRun
+	VERSION=1.0 $(APPIMAGE_PACKAGE_SRC)/appimagetool $(APPIMAGE_DIR)
 
-#	@echo Deploying libraries into application bundle.
-#	QT_PLUGINS_PATH="$(QT_PLUGINS_PATH)" QT_PLUGINS_LIST="$(QT_PLUGINS_LIST)" \
-#	QT_FRAMEWORKS_PATH="$(QT_FRAMEWORKS_PATH)" \
-#		$(MACOS_PACKAGE_SRC)/bundle-libs.sh $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
-#	@echo ----------------------------------------------------
-#	@echo TeXmacs has been bundled in $(MACOS_PACKAGE_APP)
-#	@if test -n "@SIGNID@";then \
-#		codesign --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
-#		echo "Bundle successfully signed" || echo "Signing failed"; fi
 
-.PHONY: APPDIR_BUNDLE
+.PHONY: APPIMAGE
 
 ###############################################################################
 # Make Mac OS X bundles and diskimages

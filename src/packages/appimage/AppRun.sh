@@ -19,5 +19,5 @@ export TEXMACS_BIN_PATH
 
 export PATH="$TEXMACS_BIN_PATH/bin:$APPDIR"/usr/bin/:"$PATH"
 
-exec texmacs.bin "$@" < /dev/null
+exec texmacs "$@" < /dev/null
 
