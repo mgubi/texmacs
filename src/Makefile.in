@@ -442,15 +442,16 @@ APPDIR_BUNDLE: TEXMACS
 	$(CP) TeXmacs $(APPIMAGE_DIR)/usr/share
 #	$(CP) -rf /usr/share/guile/1.8/ice-9 $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share/metainfo
-	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.texmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
 	mkdir -p $(APPIMAGE_DIR)/usr/share/applications/
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop
 	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/texmacs.png
+    $(MKDIR) -p $(APPIMAGE_DIR)/usr/bin
 	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(APPIMAGE_DIR)/usr/bin/;fi
 	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ \;
 	$(CHMOD) -R go=rX $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ice-9
-	find -d $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
+	find -depth $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
 
 #	@echo Deploying libraries into application bundle.
 #	QT_PLUGINS_PATH="$(QT_PLUGINS_PATH)" QT_PLUGINS_LIST="$(QT_PLUGINS_LIST)" \
