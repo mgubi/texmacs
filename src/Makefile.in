@@ -440,10 +440,10 @@ APPDIR_BUNDLE: TEXMACS
 	$(MKDIR) $(APPIMAGE_DIR) 
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share
 	$(CP) TeXmacs $(APPIMAGE_DIR)/usr/share
-	$(CP) -rf /usr/share/guile/1.8/ice-9 $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/
+#	$(CP) -rf /usr/share/guile/1.8/ice-9 $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share/metainfo
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
-	mkdir -p $BUILD_APPDIR/usr/share/applications/
+	mkdir -p $(APPIMAGE_DIR)/usr/share/applications/
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop
 	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/texmacs.png
 	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
