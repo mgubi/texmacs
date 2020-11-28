@@ -455,7 +455,7 @@ APPIMAGE : TEXMACS
 	$(APPIMAGE_PACKAGE_SRC)/appimagetool -s deploy $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop 
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/AppRun.sh $(APPIMAGE_DIR)/AppRun
 	$(CHMOD) go=rX $(APPIMAGE_DIR)/AppRun
-	VERSION=1.0 $(APPIMAGE_PACKAGE_SRC)/appimagetool $(APPIMAGE_DIR)
+	VERSION=$(tm_devel_version) $(APPIMAGE_PACKAGE_SRC)/appimagetool $(APPIMAGE_DIR)
 
 
 .PHONY: APPIMAGE
