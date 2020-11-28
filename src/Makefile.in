@@ -427,7 +427,6 @@ UBUNTU_PACKAGE: COPY_SOURCES_TGZ
 QT_FRAMEWORKS_PATH = @QT_FRAMEWORKS_PATH@
 QT_PLUGINS_PATH = @QT_PLUGINS_PATH@
 QT_PLUGINS_LIST = @QT_PLUGINS_LIST@
-SPARKLE_FRAMEWORK_PATH = @SPARKLE_FRAMEWORK_PATH@
 
 APPIMAGE_PACKAGE_SRC = packages/appimage
 APPIMAGE_PACKAGE_DIR = ../distr/appimage
@@ -438,50 +437,32 @@ APPIMAGE_DIR := $$(pwd)/../distr/TeXmacs.AppDir
 APPDIR_BUNDLE: TEXMACS
 	$(MKDIR) ../distr
 	$(RM) -r $(APPIMAGE_DIR)
-	$(MKDIR) $(MACOS_PACKAGE_APP) $(MACOS_PACKAGE_CONTENTS) $(MACOS_PACKAGE_RESOURCES)
-	$(MKDIR) $(MACOS_PACKAGE_CONTENTS)/Frameworks $(MACOS_PACKAGE_CONTENTS)/Plugins \
-		$(MACOS_PACKAGE_CONTENTS)/MacOS
-	$(MKDIR) $(MACOS_PACKAGE_RESOURCES)/bin $(MACOS_PACKAGE_RESOURCES)/lib \
-		$(MACOS_PACKAGE_RESOURCES)/share
-	$(CP) $(MACOS_PACKAGE_SRC)/Info.plist $(MACOS_PACKAGE_CONTENTS)
-	$(CP) $(MACOS_PACKAGE_SRC)/PkgInfo $(MACOS_PACKAGE_CONTENTS)
-	$(CP) TeXmacs/bin/texmacs.bin $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
-	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs.icns $(MACOS_PACKAGE_RESOURCES)
-	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs-document.icns \
-				$(MACOS_PACKAGE_RESOURCES)
-	$(CP) src/Plugins/Cocoa/English.lproj $(MACOS_PACKAGE_RESOURCES)
-	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(MACOS_PACKAGE_RESOURCES)
-	$(CP) TeXmacs $(MACOS_PACKAGE_RESOURCES)/share
-	$(RM) $(MACOS_PACKAGE_TEXMACS)/bin/texmacs.bin
-	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(MACOS_PACKAGE_TEXMACS)/bin/;fi
-	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(MACOS_PACKAGE_TEXMACS)/progs/ \;
-	$(CHMOD) -R go=rX $(MACOS_PACKAGE_TEXMACS)/progs/ice-9
-	find -d $(MACOS_PACKAGE_TEXMACS) -name .svn -exec rm -rf {} \;
+	$(MKDIR) $(APPIMAGE_DIR) 
+	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share
+	$(CP) TeXmacs $(APPIMAGE_DIR)/usr/share
+	$(CP) -rf /usr/share/guile/1.8/ice-9 $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/
+	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share/metainfo
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
+	mkdir -p $BUILD_APPDIR/usr/share/applications/
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop
+	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/texmacs.png
+	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
+	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(APPIMAGE_DIR)/usr/bin/;fi
+	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ \;
+	$(CHMOD) -R go=rX $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ice-9
+	find -d $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
 
-	@echo Deploying libraries into application bundle.
-	QT_PLUGINS_PATH="$(QT_PLUGINS_PATH)" QT_PLUGINS_LIST="$(QT_PLUGINS_LIST)" \
-	QT_FRAMEWORKS_PATH="$(QT_FRAMEWORKS_PATH)" \
-		$(MACOS_PACKAGE_SRC)/bundle-libs.sh $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
-	@echo ----------------------------------------------------
-	@echo TeXmacs has been bundled in $(MACOS_PACKAGE_APP)
-	@if test -n "@SIGNID@";then \
-		codesign --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
-		echo "Bundle successfully signed" || echo "Signing failed"; fi
+#	@echo Deploying libraries into application bundle.
+#	QT_PLUGINS_PATH="$(QT_PLUGINS_PATH)" QT_PLUGINS_LIST="$(QT_PLUGINS_LIST)" \
+#	QT_FRAMEWORKS_PATH="$(QT_FRAMEWORKS_PATH)" \
+#		$(MACOS_PACKAGE_SRC)/bundle-libs.sh $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
+#	@echo ----------------------------------------------------
+#	@echo TeXmacs has been bundled in $(MACOS_PACKAGE_APP)
+#	@if test -n "@SIGNID@";then \
+#		codesign --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
+#		echo "Bundle successfully signed" || echo "Signing failed"; fi
 
-
-MACOS_PACKAGE: MACOS_BUNDLE
-	$(RM) $(MACOS_PACKAGE_DMG)
-	hdiutil create -srcfolder $(MACOS_PACKAGE_APP) $(MACOS_PACKAGE_DMG)
-	$(MKDIR) $(MACOS_PACKAGE_DIR)
-	$(MV) $(MACOS_PACKAGE_DMG) $(MACOS_PACKAGE_DIR)
-	$(RM) -r $(MACOS_PACKAGE_APP)
-
-MACOS_RELEASE: MACOS_BUNDLE
-	$(RM) $(MACOS_PACKAGE_ZIP)
-	(cd ../distr; zip -r9Tq $(tm_devel).zip $MACOS_PACKAGE_APP)
-	$(SIGN) $(MACOS_PACKAGE_ZIP) @SVNREV@ $(tm_devel_version)
-
-.PHONY: MACOS_BUNDLE MACOS_PACKAGE MACOS_RELEASE
+.PHONY: APPDIR_BUNDLE
 
 ###############################################################################
 # Make Mac OS X bundles and diskimages
