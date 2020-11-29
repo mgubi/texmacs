@@ -1,13 +1,24 @@
 
 
-
-wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases -O - | grep "appimagetool-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
-chmod +x appimagetool-*.AppImage
-./appimagetool-*.AppImage -s deploy appdir/usr/share/applications/*.desktop # Bundle EVERYTHING
-# or 
-./appimagetool-*.AppImage deploy appdir/usr/share/applications/*.desktop # Bundle everything expect what comes with the base system
-# and
-VERSION=1.0 ./appimagetool-*.AppImage ./Some.AppDir # turn AppDir into AppImage
+# AppImage for TeXmacs
 
 
-./appimagetool -s deploy 
+* We currently use appimage-builder:
+
+https://github.com/AppImageCrafters/appimage-builder
+https://appimage-builder.readthedocs.io
+
+
+* How to work with .AppImage files:
+
+https://superuser.com/questions/1301583/how-can-i-extract-files-from-an-appimage
+
+For example one can mount the filesystem with --appimage-mount
+
+
+* Alternative approaches, e.g. InkScape:
+https://gitlab.com/inkscape/inkscape/-/blob/master/packaging/appimage/generate.sh
+
+## TODO
+
+* Reduce the size of the AppImage (currently ~100MB)

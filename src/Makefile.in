@@ -431,7 +431,7 @@ QT_PLUGINS_LIST = @QT_PLUGINS_LIST@
 APPIMAGE_PACKAGE_SRC = packages/appimage
 APPIMAGE_DIR := $$(pwd)/../distr/TeXmacs-$(tm_devel_version).AppDir
 
-APPIMAGE : TEXMACS
+APPDIR : TEXMACS
 	$(MKDIR) ../distr
 	$(RM) -r $(APPIMAGE_DIR)
 	$(MKDIR) $(APPIMAGE_DIR) 
@@ -441,21 +441,23 @@ APPIMAGE : TEXMACS
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.TeXmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
 	mkdir -p $(APPIMAGE_DIR)/usr/share/applications/
 	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.TeXmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/org.texmacs.TeXmacs.desktop
-	$(MKDIR) $(APPIMAGE_DIR)/usr/share/icons/hicolor/256x256/apps/
-	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/usr/share/icons/hicolor/256x256/apps/org.texmacs.TeXmacs.png
+	$(MKDIR) $(APPIMAGE_DIR)/usr/share/icons/hicolor/512x512/apps/
+	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-512.png $(APPIMAGE_DIR)/usr/share/icons/hicolor/512x512/apps/org.texmacs.TeXmacs.png
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/bin
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(APPIMAGE_DIR)/usr/bin/;fi
 	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ \;
 	$(CHMOD) -R go=rX $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ice-9
 	find $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
+
+APPIMAGE : APPDIR
 # we need appimage-builder
 # to be found here: https://github.com/AppImageCrafters/appimage-builder
 # not sure why, but if we proceed in one step then the appimage does not work
-	TEXMACS_APPIMAGE_VERSION=$(tm_devel_version) appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test --skip-appimage
-	TEXMACS_APPIMAGE_VERSION=$(tm_devel_version) appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test --skip-build
+	TEXMACS_APPIMAGE_VERSION=$(tm_devel_version) appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test
+#	TEXMACS_APPIMAGE_VERSION=$(tm_devel_version) appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test --skip-build
 
 
-.PHONY: APPIMAGE
+.PHONY: APPDIR APPIMAGE
 
 ###############################################################################
 # Make Mac OS X bundles and diskimages
