@@ -442,20 +442,22 @@ APPIMAGE : TEXMACS
 	$(CP) TeXmacs $(APPIMAGE_DIR)/usr/share
 #	$(CP) -rf /usr/share/guile/1.8/ice-9 $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/share/metainfo
-	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.texmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.TeXmacs.appdata.xml $(APPIMAGE_DIR)/usr/share/metainfo/
 	mkdir -p $(APPIMAGE_DIR)/usr/share/applications/
-	$(CP) $(APPIMAGE_PACKAGE_SRC)/texmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop
-	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/texmacs.png
+	$(CP) $(APPIMAGE_PACKAGE_SRC)/org.texmacs.TeXmacs.desktop $(APPIMAGE_DIR)/usr/share/applications/org.texmacs.TeXmacs.desktop
+	$(MKDIR) $(APPIMAGE_DIR)/usr/share/icons/hicolor/256x256/apps/
+	$(CP) $(APPIMAGE_DIR)/usr/share/TeXmacs/misc/images/texmacs-256.png $(APPIMAGE_DIR)/usr/share/icons/hicolor/256x256/apps/org.texmacs.TeXmacs.png
 	$(MKDIR) -p $(APPIMAGE_DIR)/usr/bin
-	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
+#	$(MV) $(APPIMAGE_DIR)/usr/share/TeXmacs/bin/texmacs.bin $(APPIMAGE_DIR)/usr/bin/texmacs
 	if test -n "@GS_EXE@";then  $(CP) @GS_EXE@ $(APPIMAGE_DIR)/usr/bin/;fi
 	find @GUILE_DATA_PATH@ -type d -name ice-9 -exec $(CP) {} $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ \;
 	$(CHMOD) -R go=rX $(APPIMAGE_DIR)/usr/share/TeXmacs/progs/ice-9
 	find $(APPIMAGE_DIR)/usr/share/TeXmacs -name .svn -exec rm -rf {} \;
-	$(APPIMAGE_PACKAGE_SRC)/appimagetool -s deploy $(APPIMAGE_DIR)/usr/share/applications/texmacs.desktop 
-	$(CP) $(APPIMAGE_PACKAGE_SRC)/AppRun.sh $(APPIMAGE_DIR)/AppRun
-	$(CHMOD) go=rX $(APPIMAGE_DIR)/AppRun
-	VERSION=$(tm_devel_version) $(APPIMAGE_PACKAGE_SRC)/appimagetool $(APPIMAGE_DIR)
+# we need appimage-builder
+# to be found here: https://github.com/AppImageCrafters/appimage-builder
+# not sure why, but if we proceed in one step then the appimage does not work
+	appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test --skip-appimage
+	appimage-builder --recipe $(APPIMAGE_PACKAGE_SRC)/AppImageBuilder.yml --skip-test --skip-build
 
 
 .PHONY: APPIMAGE
