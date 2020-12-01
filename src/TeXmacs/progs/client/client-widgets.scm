@@ -13,7 +13,9 @@
 
 (texmacs-module (client client-widgets)
   (:use (client client-tmfs)
-        (client client-sync)))
+        (client client-sync)
+        (client client-chat)
+        (client client-live)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Account creation
@@ -172,8 +174,9 @@
      (when (== ret "ready")
        (with-wallet
          (wallet-set (list "remote" server-name pseudo) passwd))
-       (with server (client-find-server server-name)
-         (load-document (remote-home-directory server))))
+       (and-let* ((server (client-find-server server-name))
+                  (dir (remote-home-directory server)))
+         (load-document dir)))
      (when (== ret "invalid password")
        (with server (client-find-server server-name)
          (client-logout server))
@@ -640,17 +643,18 @@
     // //
     (explicit-buttons
       ("Browse"
-       (open-remote-file-browser
-        server
-        (with name (form-ref field-name)
-          (if (remote-file-name name)
-              (system->url name)
-              (system->url (remote-home-directory server))))
-        (if (== prompt "") :file (list :save-file prompt))
-        title
-        (lambda (name)
-          (form-set field-name (normalize (url->system name)))
-          (refresh-now "remote-name")))))))
+       (when (or (remote-file-name name) (remote-home-directory server))
+         (open-remote-file-browser
+          server
+          (with name (form-ref field-name)
+            (if (remote-file-name name)
+                (system->url name)
+                (system->url (remote-home-directory server))))
+          (if (== prompt "") :file (list :save-file prompt))
+          title
+          (lambda (name)
+            (form-set field-name (normalize (url->system name)))
+            (refresh-now "remote-name"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widget for selecting files to be synchronized
@@ -867,3 +871,93 @@
   (:interactive #t)
   (dialogue-window (download-widget server) noop
 		   "Download file or directory"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Message widgets
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (message-send server u to)
+  (and-let* ((doc (buffer-get-body u))
+             (msg (tm->stree doc))
+             (dest (map (cut string-append "mail-" <>) to))
+             (cmd `(remote-send-message ,dest "send-document" ,msg)))
+    (client-remote-eval server cmd
+      (lambda x
+        (set-message "message sent" "instant message")
+        (show-message "Your message has been sent."
+                      "Send instant message")))))
+
+(tm-widget ((message-editor server u users to) quit)
+  (padded
+    (horizontal
+      (vertical
+        (bold (text "To"))
+        === ===
+        (resize "250px" "350px"
+          (choices (set! to answer) (sort users string<=?) to)))
+      ///
+      (vertical
+        (bold (text "Message"))
+        === ===
+        (resize "500px" "350px"
+          (texmacs-input `(document "") `(style (tuple "generic")) u))))
+    ======
+    (hlist
+      >>
+      (explicit-buttons
+	("Send" (message-send server u to) (quit))))))
+
+(tm-define (open-message-editor server)
+  (:interactive #t)
+  (with-remote-search-user users server (list)
+    (let* ((b (current-buffer-url))
+           (u (string->url "tmfs://aux/message-editor")))
+      (dialogue-window (message-editor server u users (list))
+                       (lambda x (noop))
+                       "Message editor" u)
+      (buffer-set-master u b))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sharing documents
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (share-document server u to)
+  (and-let* ((msg (url->string u))
+             (dest (map (cut string-append "mail-" <>) to))
+             (cmd `(remote-send-message ,dest "share" ,msg)))
+    (client-remote-eval server cmd
+      (lambda x
+        (set-message (if (chat-room-url? u)
+                         "invitation sent"
+                         "document shared")
+                     "instant message")
+        (show-message (if (chat-room-url? u)
+                          "Your invitation has been sent."
+                          "Your document has been shared.")
+                      "Send instant message")))))
+
+(tm-widget ((share-document-widget server u users to) quit)
+  (padded
+    (with s (if (chat-room-url? u) "Invite" "Share with")
+      (bold (text s)))
+    === ===
+    (resize "250px" "350px"
+      (choices (set! to answer) (sort users string<=?) to))
+    ======
+    (hlist
+      >>
+      (explicit-buttons
+	("Send" (share-document server u to) (quit))))))
+
+(tm-define (open-share-document-widget server u)
+  (:interactive #t)
+  (with-remote-search-user users server (list)
+    (with-remote-identifier rid server u
+      (when rid
+        (with-remote-get-entry entry server rid
+          (with to (list-union (or (assoc-ref entry "readable") (list))
+                               (or (assoc-ref entry "owner") (list)))
+            (if (in? "all" to) (set! to users) (set! users to))
+            (dialogue-window (share-document-widget server u users to)
+                             (lambda x (noop))
+                             "Instant message")))))))

@@ -16,6 +16,10 @@
         (client client-db)
         (client client-widgets)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Remote client submenus
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (menu-bind start-client-menu
   (with l (client-accounts)
     (if (null? l)
@@ -29,7 +33,8 @@
     ("New account" (open-remote-account-creator))))
 
 (tm-menu (remote-submenu server)
-  ("Home" (load-document (remote-home-directory server)))
+  (when (remote-home-directory server)
+    ("Home" (load-document (remote-home-directory server))))
   ---
   (when (remote-file-name (current-buffer))
     ("New remote file" (remote-create-file-interactive server))
@@ -37,7 +42,8 @@
     (when (not (remote-home-directory? (current-buffer)))
       ("Rename" (remote-rename-interactive server)))
     ("Remove" (remote-remove-interactive server))
-    ("Permissions" (open-file-permissions-editor server (current-buffer))))
+    ("Permissions" (open-file-permissions-editor server (current-buffer)))
+    ("Share" (open-share-document-widget server (current-buffer))))
   ---
   ("Upload" (remote-interactive-upload server))
   ("Download" (remote-interactive-download server))
@@ -56,3 +62,77 @@
       (for (server l)
         (-> (eval (client-find-server-name server))
             (dynamic (remote-submenu server)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The main remote menus
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(menu-bind remote-menu
+  (if (and (null? remote-client-list) (not (server-started?)))
+      (link start-client-menu)
+      ;;---
+      ;;(link start-server-menu)
+      )
+  (if (and (null? remote-client-list) (server-started?))
+      (link server-menu))
+  (if (nnull? remote-client-list)
+      (link client-menu)))
+
+(menu-bind remote-icons
+  (let* ((servers (client-active-servers))
+         (server (and (nnull? servers) (car servers))))
+    (if (and (null? remote-client-list) (not (server-started?)))
+        (=> (balloon (icon "tm_cloud.xpm") "Connect with server")
+            (link start-client-menu)))
+    (if (and (null? remote-client-list) (server-started?))
+        (=> (balloon (icon "tm_cloud.xpm") "Server menu")
+            (link server-menu)))
+    (if (nnull? remote-client-list)
+        (=> (balloon (icon "tm_cloud.xpm") "Connection with server")
+            ("Logout" (client-logout server)))
+        (=> (balloon (icon "tm_cloud_home.xpm") "My resources on the server")
+            (when (remote-home-directory server)
+              ("Home directory" (load-document (remote-home-directory server))))
+            ("Chat rooms" (load-document (list-chat-rooms server)))
+            ("Live documents" (load-document (list-live server)))
+            ---
+            ("Shared resources" (load-document (list-shared server))))
+        (if (and (remote-file-name (current-buffer))
+                 (not (remote-home-directory? (current-buffer))))
+            (=> (balloon (icon "tm_cloud_file.xpm") "Remote file")
+                ("Rename" (remote-rename-interactive server))
+                ("Remove" (remote-remove-interactive server))
+                ("Permissions"
+                 (open-file-permissions-editor server (current-buffer)))
+                ("Share"
+                 (open-share-document-widget server (current-buffer)))))
+        (if (and (remote-file-name (current-buffer))
+                 (remote-home-directory? (current-buffer)))
+            (=> (balloon (icon "tm_cloud_dir.xpm") "Remote directory")
+                ("New remote file" (remote-create-file-interactive server))
+                ("New remote directory" (remote-create-dir-interactive server))
+                ("Remove" (remote-remove-interactive server))
+                ("Permissions"
+                 (open-file-permissions-editor server (current-buffer)))
+                ("Share"
+                 (open-share-document-widget server (current-buffer)))))
+        (if (and (chat-room-url? (current-buffer))
+                 (not (mail-box-url? (current-buffer))))
+            (=> (balloon (icon "tm_cloud_file.xpm") "Chat room")
+                ("Invite"
+                 (open-share-document-widget server (current-buffer)))))
+        (if (chat-rooms-url? (current-buffer))
+            (=> (balloon (icon "tm_cloud_dir.xpm") "Chat rooms")
+                ("New chat room" (chat-room-create-interactive server))
+                ("Join chat room" (chat-room-join-interactive server))))
+        (if (live-url? (current-buffer))
+            (=> (balloon (icon "tm_cloud_file.xpm") "Live document")
+                ("Share"
+                 (open-share-document-widget server (current-buffer)))))
+        (if (live-list-url? (current-buffer))
+            (=> (balloon (icon "tm_cloud_dir.xpm") "Live documents")
+                ("New live document" (live-create-interactive server))
+                ("Open live document" (live-open-interactive server))))
+        (=> (balloon (icon "tm_cloud_mail.xpm") "Messages")
+            ("Incoming messages" (mail-box-open server))
+            ("Send message" (open-message-editor server))))))

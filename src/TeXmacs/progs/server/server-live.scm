@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : server-live.scm
 ;; DESCRIPTION : Live shared documents (server side)
-;; COPYRIGHT   : (C) 2015  Joris van der Hoeven
+;; COPYRIGHT   : (C) 2015-2020  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -14,6 +14,61 @@
 (texmacs-module (server server-live)
   (:use (utils relate live-connection)
         (server server-tmfs)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Storing live documents
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (live-name lid)
+  (let* ((s1 (url->string (url-unroot lid)))
+         (s2 (if (== (tmfs-car s1) "live") (tmfs-cdr s1) s1))
+         (s3 (tmfs-cdr s2))
+         (s4 (if (== (tmfs-car s3) "live") (tmfs-cdr s3) s3)))
+    s4))
+
+(define (live-new uid lid)
+  (with-time-stamp #t
+    (with rid (db-create-entry `(("type" "live")
+                                 ("name" ,(live-name lid))
+                                 ("owner" ,uid)
+                                 ("readable" "all")
+                                 ("writable" "all")))
+      (repository-add rid "tm")
+      rid)))
+
+(define (live-find lid)
+  (with l (db-search `(("type" "live")
+                       ("name" ,(live-name lid))))
+    (and (nnull? l) (car l))))
+
+(tm-define (search-remote-identifier u)
+  (:require (string-starts? (url->string u) "tmfs://live/"))
+  (live-find (url->string u)))
+
+(define (live-load lid)
+  (and-let* ((rid (live-find lid))
+             (fname (repository-get rid))
+             (doc (if (url-exists? fname) (string-load fname) "")))
+    (if (== doc "")
+        `(document "")
+        (convert doc "texmacs-snippet" "texmacs-stree"))))
+
+(define (live-save lid t)
+  (and-let* ((rid (live-find lid))
+             (fname (repository-get rid))
+             (doc (convert t "texmacs-stree" "texmacs-snippet")))
+    (string-save doc fname)))
+
+(tm-service (remote-list-live)
+  ;; Return list of live discussions owned by the user
+  ;;(display* "remote-list-chat-rooms\n")
+  (with (client msg-id) envelope
+    (let* ((uid (server-get-user envelope))
+           (l (db-search `(("type" "live")
+                           ("owner" ,uid))))
+           (get-name (lambda (id) (db-get-field-first id "name" #f)))
+           (r (map get-name l)))
+      (server-return envelope r))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Applying modifications
@@ -84,17 +139,28 @@
     (when (== (cadr key) client)
       (ahash-remove! live-waiting key)))
   (for (lid (live-remote-connections client))
+    (with-database (server-database)
+      (live-save lid (tm->stree (live-current-document lid))))
     (live-hang-up lid client)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public services
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-service (live-exists? lid)
+  (server-return envelope (nnot (live-find lid))))
+
 (tm-service (live-open lid)
   ;; Connect client to the live channel lid
   ;;(display* "live-open " lid "\n")
   (when (not (live-current-document lid))
-    (live-create lid '(document "")))
+    (when (not (live-find lid))
+      (let* ((uid (server-get-user envelope))
+             (rid (live-new uid lid))
+             (doc '(document "")))
+        (live-save lid doc)))
+    (with doc (live-load lid)
+      (live-create lid doc)))
   (with (client msg-id) envelope
     (live-connect lid client)
     (let* ((doc (live-current-document lid))
