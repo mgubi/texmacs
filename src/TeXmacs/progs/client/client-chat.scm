@@ -50,10 +50,11 @@
 
 (define (message->document msg)
   (with (action pseudo full-name date doc) msg
-    (cond ((== action "share")
-           (with doc* `(document ,(message->share doc))
-             `(chat-output ,full-name ,pseudo "" ,date ,doc*)))
-          (else `(chat-output ,full-name ,pseudo "" ,date ,doc)))))
+    (with date* (pretty-time (string->number date))
+      (cond ((== action "share")
+             (with doc* `(document ,(message->share doc))
+               `(chat-output ,full-name ,pseudo "" ,date* ,doc*)))
+            (else `(chat-output ,full-name ,pseudo "" ,date* ,doc))))))
 
 (define (messages->document msgs name)
   `(document
@@ -74,6 +75,14 @@
 (define (chat-room-modified fname)
   ;;(display* "Received message in " fname "\n")
   (noop))
+
+(define chat-room-writable-table (make-ahash-table))
+
+(define (chat-room-set-writable fname w?)
+  (ahash-set! chat-room-writable-table fname w?))
+
+(define (chat-room-writable? fname)
+  (ahash-ref chat-room-writable-table fname))
 
 (define (chat-room-set fname msgs)
   (with doc (messages->document msgs (chat-room-name fname))
@@ -107,13 +116,24 @@
              (ok? (chat-room-url? (current-buffer)))
              (room (chat-room-name (current-buffer)))
              (server (chat-room-server (current-buffer)))
-             (cmd `(remote-send-message ,room "send-document" ,msg)))
-    (tree-set! mt `(document ""))
-    (client-remote-eval server cmd ignore)))
+             (cmd `(remote-send-message ,room "send-document" ,msg))
+             (sname (client-find-server-name server))
+             (fname (string-append "tmfs://chat/" sname "/" room)))
+    (if (chat-room-writable? fname)
+        (begin
+          (tree-set! mt `(document ""))
+          (client-remote-eval server cmd ignore))
+        (set-message "this chat room is read only" "send message"))))
 
 (tm-define (kbd-control-return)
   (:require (inside? 'chat-input))
   (chat-room-send))
+
+(tm-define (button-chat-send t)
+  (:secure #t)
+  (tree-go-to t :end)
+  (when (inside? 'chat-input)
+    (chat-room-send)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Creating and joining chat rooms
@@ -178,7 +198,7 @@
     (empty-document)))
 
 (tm-define (list-chat-rooms server)
-  (with sname (client-find-server-name server)
+  (and-with sname (client-find-server-name server)
     (string-append "tmfs://chat-rooms/" sname)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -227,7 +247,7 @@
     (empty-document)))
 
 (tm-define (list-shared server)
-  (with sname (client-find-server-name server)
+  (and-with sname (client-find-server-name server)
     (string-append "tmfs://shared/" sname)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -252,9 +272,12 @@
            (texmacs-error "chat" "invalid server"))
           ((not (string-starts? room "mail-"))
            (client-remote-eval server `(remote-chat-room-open ,room)
-             (lambda (msgs)
-               (chat-room-set fname msgs)
-               (set-message "retrieved contents" "join chat room"))
+             (lambda (ret)
+               (chat-room-set fname (cadr ret))
+               (chat-room-set-writable fname (car ret))
+               (if (car ret)
+                   (set-message "retrieved contents" "join chat room")
+                   (set-message "joined in read only mode" "join chat room")))
              (lambda (err)
                (set-message err "join chat room")))
            (set-message "loading..." "joining chat room")
@@ -263,6 +286,7 @@
            (client-remote-eval server `(remote-mail-open)
              (lambda (msgs)
                (chat-room-set fname msgs)
+               (chat-room-set-writable fname #t)
                (set-message "retrieved contents" "open mail box"))
              (lambda (err)
                (set-message err "join chat room")))

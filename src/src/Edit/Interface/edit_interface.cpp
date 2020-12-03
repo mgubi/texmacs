@@ -16,6 +16,7 @@
 #include "tm_window.hpp"
 #include "Metafont/tex_files.hpp"
 #include "data_cache.hpp"
+#include "drd_std.hpp"
 #include "drd_mode.hpp"
 #include "message.hpp"
 #include "tree_traverse.hpp"
@@ -114,11 +115,14 @@ edit_interface_rep::resume () {
   SERVER (bottom_tools (0, "(vertical (link texmacs-bottom-tools))"));
   cur_sb= 2;
   notify_change (THE_FOCUS + THE_EXTENTS);
+  drd_info old_drd= the_drd;
+  the_drd= drd;
   path new_tp= make_cursor_accessible (tp, true);
   if (new_tp != tp) {
     notify_change (THE_CURSOR);
     tp= new_tp;
   }
+  the_drd= old_drd;
 #ifdef QTTEXMACS
   // FIXME: dirty hack in order to correct a bug introduced
   // after a bugfix by Massimiliano during summer 2016
