@@ -31,5 +31,5 @@
   (:session "Sage")
   (:scripts "Sage"))
 
-(when (supports-sage?)
+(tm-cond-expand (supports-sage?)
   (lazy-input-converter (sage-input) sage))

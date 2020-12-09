@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (kernel texmacs tm-plugins)
-  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes)))
+  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes) (kernel texmacs tm-dialogue)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lazy exports from other modules
@@ -503,9 +503,10 @@
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (define (,supports-name?)
-         (or (ahash-ref plugin-data-table ,name)
-             (remote-connection-defined? ,name)))
+       (eval-when (expand load eval)
+         (define (,supports-name?)
+           (or (ahash-ref plugin-data-table ,name)
+               (remote-connection-defined? ,name))))
        (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
        (plugin-configure-cmds ,name
 	 ,(list 'quasiquote (map plugin-configure-sub options))))))
@@ -536,7 +537,7 @@
 	      ;;(with start (texmacs-time)
 	      ;;  (load fname)
 	      ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-	      (load fname)
+	      (primitive-load fname) ;; primitive-load suppress compilation of plugins
 	      ))
 	(if (plugin-all-initialized?) (plugin-save-setup)))))
 

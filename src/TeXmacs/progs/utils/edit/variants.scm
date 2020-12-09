@@ -18,8 +18,9 @@
 ;; Definition of tag groups (could be done using drds in the future)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define group-table (make-ahash-table))
-(tm-define group-resolve-table (make-ahash-table))
+(eval-when (expand load eval)
+  (tm-define group-table (make-ahash-table))
+  (tm-define group-resolve-table (make-ahash-table)))
 
 (define (group-resolve-one x)
   (if (pair? x) (group-resolve (car x)) (list x)))
