@@ -179,6 +179,7 @@
 ;(display "Booting utilities\n")
 (use-modules (utils library cpp-wrap))
 (lazy-define (utils library cursor) notify-cursor-moved)
+(lazy-define (utils edit variants) make-inline-tag-list make-wrapped-tag-list)
 (lazy-define (utils cas cas-out) cas->stree)
 (lazy-define (utils plugins plugin-cmd) pre-serialize verbatim-serialize)
 (lazy-define (utils test test-convert) delayed-quit
@@ -313,10 +314,14 @@
              editable-macro? open-macros-editor
 	     open-macro-editor create-table-macro
              edit-focus-macro edit-previous-macro)
+(lazy-define (source shortcut-edit) init-user-shortcuts has-user-shortcut?)
+(lazy-define (source shortcut-widgets) open-shortcuts-editor)
 (tm-property (open-macro-editor l mode) (:interactive #t))
 (tm-property (create-table-macro l mode) (:interactive #t))
 (tm-property (open-macros-editor mode) (:interactive #t))
 (tm-property (edit-focus-macro) (:interactive #t))
+(tm-property (open-shortcuts-editor . opt) (:interactive #t))
+(when (url-exists? "") (delayed (:idle 100) (init-user-shortcuts)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
