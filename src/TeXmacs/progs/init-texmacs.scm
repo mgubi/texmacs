@@ -192,6 +192,7 @@
 (lazy-tmfs-handler (utils automate auto-tmfs) automate)
 (lazy-define (utils automate auto-tmfs) auto-load-help)
 (lazy-keyboard (utils automate auto-kbd) in-auto?)
+;;FIXME: handle the evaluation phase of the following two lines
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")

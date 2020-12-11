@@ -138,6 +138,7 @@
 (define (url-append* base u)
   (if (== (url->url u) (string->url ".")) base (url-append base u)))
 
+;;FIXME: the symbol 'u is not bound
 (define (prepend-file-dir dir? name)
   (cond ((not name) u)
         (dir? (string->url (string-append "tmfs://remote-dir/" name)))

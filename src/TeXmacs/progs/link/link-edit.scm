@@ -110,10 +110,11 @@
 
 (define (link-component-is-script? nr . args)
   (func? (ahash-ref link-participants nr) 'script))
+  
 (tm-define (link-set-script nr t)
   (:synopsis "Set component @nr of a link to the script @t.")
   (:check-mark "o" link-component-is-script?)
-  (ahash-set! link-participants nr `(url ,name)))
+  (ahash-set! link-participants nr `(url ,t)))
 
 (tm-define (link-target-is-script? . args)
   (func? (ahash-ref link-participants 1) 'script))

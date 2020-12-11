@@ -802,6 +802,7 @@
   (with l (selection-trees)
     (and (nnull? l) (forall? session-selection-one? l))))
 
+;;FIXME: the symbol 'selection-as-document is not defined anywere in the whole project.
 (define (session-selection sel*)
   (let* ((sel (selection-as-document sel*))
          (doc (tree-up (tree-ref sel 0)))

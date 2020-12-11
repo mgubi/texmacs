@@ -22,7 +22,8 @@
         (doc apidoc-collect)
         (doc apidoc-widgets)
         (kernel texmacs tm-preferences)
-        (kernel gui kbd-handlers)))
+        (kernel gui kbd-handlers)
+        (link link-navigate)))
      
 (cond-expand
   (guile-2 #t)

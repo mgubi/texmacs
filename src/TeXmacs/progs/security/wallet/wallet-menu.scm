@@ -14,11 +14,13 @@
 (texmacs-module (security wallet wallet-menu)
   (:use (security wallet wallet-base)))
 
+(eval-when (expand load eval)
 (when (os-macos?) 
   (use-modules (security keychain macos-security)))
 
 (when (or (os-mingw?) (os-win32?))
   (use-modules (security keychain win-security)))
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Remember wallet master passphrase
