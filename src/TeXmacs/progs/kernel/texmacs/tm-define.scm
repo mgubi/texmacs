@@ -240,15 +240,19 @@
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (make-lambda head nbody))
-         (s `(let ((first? (and (not (ahash-ref tm-defined-table ',var))
+         (s `(begin
+             (eval-when (expand load eval)
+                  (when (not (module-local-variable texmacs-user ',var))
+                    (module-define! texmacs-user ',var (lambda args #f))
+                    (module-export! texmacs-user '(,var))
+                    (hash-clear! (module-import-obarray (current-module)))))
+             (let ((first? (and (not (ahash-ref tm-defined-table ',var))
                            (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
               (if first?
                  (begin
                    (when (nnull? ',cur-conds)
                      (display* "warning: conditional master routine " ',var "\n")
                      (display* "   " ',nval "\n"))
-                  (module-define! texmacs-user ',var (lambda args (apply former args)))
-                  (module-export! texmacs-user '(,var))
                   (ahash-set! tm-defined-table ',var '())
                   (ahash-set! tm-defined-module ',var '())))
                (ahash-set! tm-defined-name ,var ',var)
@@ -259,7 +263,7 @@
                            (ahash-ref tm-defined-module ',var)))
                (let ((former ,var))
                      (module-set! texmacs-user ',var ,nval))
-            ,@(map property-rewrite cur-props))))
+            ,@(map property-rewrite cur-props)))))
         ;(display s) (newline)
          s))
 
@@ -333,7 +337,7 @@
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-    `(if (not (module-ref texmacs-user ',name #f))
+    `(eval-when (expand load eval) (if (not (module-ref texmacs-user ',name #f))
          (begin
            (module-define! texmacs-user ',name
             (lambda args
@@ -345,7 +349,7 @@
                                                 (symbol->string name))))
                 ;;(display* "lazy:" ',name "\n")
                 (apply r args))))
-           (module-export! texmacs-user '(,name)))))
+           (module-export! texmacs-user '(,name))))))
 
 (define-public-macro (lazy-define module . names)
    `(begin
