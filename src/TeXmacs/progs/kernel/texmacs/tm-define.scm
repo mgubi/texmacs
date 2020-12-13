@@ -263,13 +263,14 @@
                        (cons (module-name (current-module))
                            (ahash-ref tm-defined-module ',var)))
                (let ((former ,var))
-                     (module-set! texmacs-user ',var ,nval)
-                     ;; tricky: module-set! do not set up the procedure name property
-                     ;; we have to do it ourselves
-                     (if (procedure? (module-ref texmacs-user ',var #f))
-                       (begin
-                         (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
-                         (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval))))
+                     (module-set! texmacs-user ',var ,nval))
+               ;; Tricky: module-set! do not set up the procedure name property
+               ;; we have to do it ourselves.
+               ;; We rely on the name to fetch properties
+               (if (procedure? (module-ref texmacs-user ',var #f))
+                   (begin
+                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
+                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval)))
             ,@(map property-rewrite cur-props)))))
         ;(display s) (newline)
          s))

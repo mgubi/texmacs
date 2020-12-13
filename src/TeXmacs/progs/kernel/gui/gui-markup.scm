@@ -302,7 +302,7 @@
   (:synopsis "Make a menu symbol")
   (if (null? l)
       `(list 'symbol ,sym)
-      `(list 'symbol ,sym (lambda () ,(car l)))))
+      `(list 'symbol ,sym (tagged-lambda () ,(car l)))))
 
 (tm-define-macro ($menu-group text)
   (:synopsis "Make a menu group")
