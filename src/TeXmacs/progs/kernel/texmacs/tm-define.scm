@@ -245,6 +245,7 @@
                   (when (not (module-local-variable texmacs-user ',var))
                     (module-define! texmacs-user ',var (lambda args #f))
                     (module-export! texmacs-user '(,var))
+                    (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
                     (hash-clear! (module-import-obarray (current-module)))))
              (let ((first? (and (not (ahash-ref tm-defined-table ',var))
                            (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
@@ -262,23 +263,29 @@
                        (cons (module-name (current-module))
                            (ahash-ref tm-defined-module ',var)))
                (let ((former ,var))
-                     (module-set! texmacs-user ',var ,nval))
+                     (module-set! texmacs-user ',var ,nval)
+                     ;; tricky: module-set! do not set up the procedure name property
+                     ;; we have to do it ourselves
+                     (if (procedure? (module-ref texmacs-user ',var #f))
+                       (begin
+                         (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
+                         (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval))))
             ,@(map property-rewrite cur-props)))))
         ;(display s) (newline)
          s))
 
-(define-public (tm-define-sub symb head body)
+(define-public (tm-define-sub head body)
   (if (and (pair? (car body)) (keyword? (caar body)))
-      (let ((decl (tm-define-sub symb head (cdr body))))
+      (let ((decl (tm-define-sub head (cdr body))))
 	(if (not (hash-ref define-option-table (caar body)))
 	    (texmacs-error "tm-define-sub" "unknown option ~S" (caar body)))
 	((hash-ref define-option-table (caar body)) (cdar body) decl))
-       `(,symb ,head ,@body)))
+      (cons 'tm-define-overloaded (cons head body))))
 
 (define-public-macro (tm-define head . body)
   (set! cur-conds '())
   (set! cur-props '())
-  (tm-define-sub 'tm-define-overloaded head body))
+  (tm-define-sub head body))
 
 (define-public-macro (tm-define-once head . body)
   `(eval-when (expand load eval) (if (not (ahash-ref tm-defined-table ',(ca*r head)))
