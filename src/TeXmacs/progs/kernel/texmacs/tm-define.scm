@@ -245,8 +245,9 @@
                   (when (not (module-local-variable texmacs-user ',var))
                     (module-define! texmacs-user ',var (lambda args #f))
                     (module-export! texmacs-user '(,var))
-                    (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
-                    (hash-clear! (module-import-obarray (current-module)))))
+                    (cond-expand (guile-2
+                        (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
+                        (hash-clear! (module-import-obarray (current-module)))) (else #t))))
              (let ((first? (and (not (ahash-ref tm-defined-table ',var))
                            (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
               (if first?
@@ -264,13 +265,14 @@
                            (ahash-ref tm-defined-module ',var)))
                (let ((former ,var))
                      (module-set! texmacs-user ',var ,nval))
+               (cond-expand (guile-2
                ;; Tricky: module-set! do not set up the procedure name property
                ;; we have to do it ourselves.
                ;; We rely on the name to fetch properties
                (if (procedure? (module-ref texmacs-user ',var #f))
                    (begin
                       (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
-                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval)))
+                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval)))) (else #t))
             ,@(map property-rewrite cur-props)))))
         ;(display s) (newline)
          s))
