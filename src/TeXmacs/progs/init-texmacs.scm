@@ -11,9 +11,11 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(cond-expand (guile-2
 ;; we remove all optimiztions from the compiler
 ;; this allows for faster loading times
-((@ (system base compile) default-optimization-level) 0)
+((@ (system base compile) default-optimization-level) 0))
+(else #t))
 
 ;(cond-expand (guile-2 (display "Guile-2\n")) (else #t))
 
