@@ -33,7 +33,7 @@
   (ahash-ref group-resolve-table which))
 
 (tm-define-macro (define-group group . l)
-`(eval-when (expand load eval) (begin
+`(eval-when (expand load eval)
   (set! group-resolve-table (make-ahash-table))
   (with old (ahash-ref group-table ',group)
     (if old
@@ -45,7 +45,7 @@
 	   (tm-define (,(symbol-append group '?) lab)
 	     (in? lab (group-resolve ',group)))
 	   (tm-define (,(symbol-append 'inside- group '?))
-	     (not (not (inside-which (group-resolve ',group)))))))))))
+	     (not (not (inside-which (group-resolve ',group))))))))))
 
 (tm-define (group-find which group)
   (:synopsis "Find subgroup of @group which contains @which")
