@@ -270,10 +270,20 @@
 (tm-define (version-supports-svn-style? name) (versioned? name))
 (tm-define (version-supports-git-style? name) #f)
 
+(tm-define (version-checkout name) "file is not under version control")
 (tm-define (version-update name) "file is not under version control")
 (tm-define (version-register name) "file is not under version control")
 (tm-define (version-unregister name) "file is not under version control")
 (tm-define (version-commit name comment) "file is not under version control")
+
+(tm-define (checkout-buffer name)
+  (let* ((old-stamp (url-last-modified name))
+         (ret1 (version-checkout name))
+         (ret2 (string-replace ret1 "\n" "; "))
+         (new-stamp (url-last-modified name)))
+    ;;(display* "ret2= " ret2 "\n")
+    (revert-buffer name)
+    (set-message ret2 "Checkout buffer")))
 
 (tm-define (update-buffer name)
   (let* ((old-stamp (url-last-modified name))

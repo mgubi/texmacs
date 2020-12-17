@@ -112,6 +112,15 @@
          (l (remove-empty-strings (string-decompose ret "\n"))))
     (if (null? l) "" (cAr l))))
 
+(tm-define (version-checkout name)
+  (:require (== (version-tool name) "svn"))
+  (let* ((name-s (url->string name))
+         (cmd (string-append "svn revert " name-s))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    ;;(display* "ret= " ret "\n")
+    (if (null? l) "" (cAr l))))
+
 (tm-define (version-commit name msg)
   (:require (== (version-tool name) "svn"))
   (let* ((name-s (url->string name))

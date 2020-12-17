@@ -14,6 +14,13 @@
 (texmacs-module (version version-git)
   (:use (version version-tmfs)))
 
+;;FIXME: duplicate from (version version-svn)
+(define (remove-empty-strings l)
+  (cond ((null? l) l)
+        ((== (car l) "") (remove-empty-strings (cdr l)))
+        (else (cons (car l) (remove-empty-strings (cdr l))))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Supported features
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -194,15 +201,17 @@
   (:require (== (version-tool name) "git"))
   (let* ((name-s (url->string name))
          (cmd (string-append (git-command name) " add " name-s))
-         (ret (eval-system cmd)))
-    (set-message cmd (string-append "Registered file"))))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    (if (null? l) "" (cAr l))))
 
 (tm-define (version-unregister name)
   (:require (== (version-tool name) "git"))
   (let* ((name-s (url->string name))
          (cmd (string-append (git-command name) " reset HEAD " name-s))
-         (ret (eval-system cmd)))
-    (set-message cmd "Unregistered file")))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    (if (null? l) "" (cAr l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Committing files
@@ -277,6 +286,38 @@
   (:interactive #t)
   (git-show-status)
   (interactive (lambda (message) (git-commit message))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Updating and committing a file
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (version-checkout name)
+  (:require (== (version-tool name) "git"))
+  (let* ((name-s (url->string name))
+         (cmd (string-append (current-git-command) " checkout --theirs --  " name-s))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    ;;(display* "ret= " ret "\n")
+    (if (null? l) "" (cAr l))))
+
+;;(tm-define (version-update name)
+;;  (:require (== (version-tool name) "git"))
+;;  (let* ((name-s (url->string name))
+;;         (cmd (string-append (current-git-command) " checkout --theirs --  " name-s))
+;;         (ret (eval-system cmd))
+;;         (l (remove-empty-strings (string-decompose ret "\n"))))
+;;    ;;(display* "ret= " ret "\n")
+;;    (if (null? l) "" (cAr l))))
+
+(tm-define (version-commit name msg)
+  (:require (== (version-tool name) "git"))
+  (let* ((name-s (url->string name))
+         (msg-s (string-replace msg "\"" "\\\""))
+         (encoded (cork->utf8 msg-s))
+         (cmd (string-append (current-git-command) " commit -m \"" encoded "\" " name-s))
+         (ret (eval-system cmd))
+         (l (remove-empty-strings (string-decompose ret "\n"))))
+    (if (null? l) "" (cAr l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Comparing versions
