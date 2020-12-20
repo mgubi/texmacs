@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (cond-expand (guile-2
-;; we remove all optimiztions from the compiler
+;; we remove all optimizations from the compiler
 ;; this allows for faster loading times
 ((@ (system base compile) default-optimization-level) 0))
 (else #t))
