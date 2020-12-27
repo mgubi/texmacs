@@ -17,202 +17,75 @@
 
 #include "s7.h"
 
-s7_scheme *tm_s7;
-
-#ifdef GUILE_D
+typedef s7_pointer tmscm;
+extern s7_scheme *tm_s7;
 
 #define SCM_NULL s7_nil(tm_s7)
 #define scm_bool2scm(x) (x? s7_t(tm_s7) : s7_f(tm_s7))
 #define scm_is_list(x) s7_is_list(tm_s7, x)
 #define scm_scm2bool(x) s7_boolean(x)
 #define scm_is_int(x) s7_is_integer(x)
-#define scm_is_double scm_is_real
-#define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,(scm_t_subr)r)
-#define scm_lookup_string(name) scm_variable_ref(scm_c_lookup(name))
-#define scm_long2scm scm_long2num
-#define scm_scm2long(x) scm_num2long(x,SCM_ARG1,"scm2long")
-#define scm_double2scm scm_from_double
-#define scm_scm2double scm_to_double
-#define scm_str2scm scm_from_locale_stringn
-#define scm_scm2str scm_to_locale_stringn
-#define scm_symbol2scm scm_from_locale_symbol
-#define scm_scm2symbol(x,y) scm_to_locale_stringn(scm_symbol_to_string(x),y)
+#define scm_is_double(x) scm_is_real(x)
+//#define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,(scm_t_subr)r)
+#define scm_lookup_string(name) s7_name_to_value(tm_s7, name)
+#define scm_long2scm(x) s7_make_integer(tm_s7, x)
+#define scm_scm2long(x) s7_integer(tm_s7,x)
+#define scm_double2scm(x) s7_make_real(tm_s7, x)
+#define scm_scm2double(x) s7_real(x)
+#define scm_str2scm(x) s7_make_string(tm_s7, x)
+#define scm_scm2str(x) s7_string(x)
+#define scm_symbol2scm(x) s7_make_symbol(tm_s7, x)
+//#define scm_scm2symbol(x,y) scm_to_locale_stringn(scm_symbol_to_string(x),y)
 
-#else
-#ifdef GUILE_C
-
-#define SCM_NULL scm_list_n (SCM_UNDEFINED)
-#define scm_bool2scm scm_from_bool
-#define scm_is_list(x) scm_is_true(scm_list_p(x))
-#define scm_scm2bool scm_is_true
-#define scm_is_int scm_is_integer
-#define scm_is_double scm_is_real
-#define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,r)
-#define scm_lookup_string(name) scm_variable_ref(scm_c_lookup(name))
-#define scm_long2scm scm_long2num
-#define scm_scm2long(x) scm_num2long(x,SCM_ARG1,"scm2long")
-#define scm_double2scm scm_from_double
-#define scm_scm2double scm_to_double
-#define scm_str2scm scm_from_locale_stringn
-#define scm_scm2str scm_to_locale_stringn
-#define scm_symbol2scm scm_from_locale_symbol
-#define scm_scm2symbol(x,y) scm_to_locale_stringn(scm_symbol_to_string(x),y)
-
-#else
-#ifdef GUILE_B
-
-#define SCM_NULL gh_list (SCM_UNDEFINED)
-#define scm_is_list(x) SCM_NFALSEP(scm_list_p(x))
-#define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,r)
-#define scm_lookup_string(name) scm_variable_ref(scm_c_lookup(name))
-#define scm_long2scm scm_long2num
-#define scm_scm2long(x) scm_num2long(x,SCM_ARG1,"scm2long")
-
-#define scm_is_null(x) SCM_NFALSEP(scm_null_p(x))
-#define scm_is_pair(x) SCM_NFALSEP(scm_pair_p(x))
-#define scm_is_bool(x) SCM_NFALSEP(scm_boolean_p(x))
-#define scm_is_int SCM_INUMP
-#define scm_is_double SCM_REALP
-#define scm_is_string(obj) (SCM_NIMP(obj) && SCM_STRINGP(obj))
-#define scm_is_symbol(x) SCM_NFALSEP(scm_symbol_p(x))
-
-#define scm_bool2scm SCM_BOOL
-#define scm_scm2bool SCM_NFALSEP
-#define scm_long2scm scm_long2num
-#define scm_scm2long(x) scm_num2long(x,SCM_ARG1,"scm2long")
-#define scm_double2scm scm_make_real
-#define scm_scm2double(x) scm_num2dbl(x,"scm2double")
-#define scm_symbol2scm scm_str2symbol
-#define scm_scm2symbol gh_symbol2newstr
-
-#define scm_str2scm scm_mem2string
-#define scm_scm2str gh_scm2newstr
-
-#else
-#ifdef GUILE_A
-
-#define SCM_NULL gh_list (SCM_UNDEFINED)
-#define scm_is_bool gh_boolean_p
-#define scm_is_int SCM_INUMP
-#define scm_is_double SCM_REALP
-#define scm_is_string(obj) (SCM_NIMP(obj) && SCM_STRINGP(obj))
-#define scm_is_symbol gh_symbol_p
-#define scm_is_null gh_null_p
-#define scm_is_pair gh_pair_p
-#define scm_is_list gh_list_p
-
-#define scm_bool2scm gh_bool2scm
-#define scm_scm2bool gh_scm2bool
-#define scm_long2scm gh_long2scm
-#define scm_scm2long gh_scm2long
-#define scm_double2scm gh_double2scm
-#define scm_scm2double gh_scm2double
-#define scm_str2scm gh_str2scm
-#define scm_scm2str gh_scm2newstr
-#define scm_symbol2scm gh_symbol2scm
-#define scm_scm2symbol gh_symbol2newstr
-
-#define scm_c_primitive_load gh_eval_file
-#define scm_c_eval_string gh_eval_str
-#define scm_apply_0 gh_apply
-#define scm_call_0 gh_call0
-#define scm_call_1 gh_call1
-#define scm_call_2 gh_call2
-#define scm_call_3 gh_call3
-#define scm_new_procedure gh_new_procedure
-#define scm_lookup_string gh_lookup
-
-typedef SCM (*scm_t_catch_body) (void *data);
-typedef SCM (*scm_t_catch_handler) (void *data, SCM tag, SCM throw_args);
-
-#else
-
-#error "At least one of the macros GUILE_{A,B,C,D} should be defined" 
-
-#endif // defined(GUILE_A)
-#endif // defined(GUILE_B)
-#endif // defined(GUILE_C)
-#endif // defined(GUILE_D)
 
 #define SCM_ARG8 8
 #define SCM_ARG9 9
 #define SCM_ARG10 10
 #define SCM_ARG11 11
 
-#ifdef DOTS_OK
-typedef SCM (*FN)(...);
-#else
-typedef SCM (*FN)();
-#endif
-
-#if defined(GUILE_A) || defined(GUILE_B)
-int scm_to_bool (SCM obj);
-int scm_to_int (SCM obj);
-long scm_to_long (SCM obj);
-double scm_to_double (SCM obj);
-#endif
-
-
-typedef SCM tmscm;
-
 bool tmscm_is_blackbox (tmscm obj);
 tmscm blackbox_to_tmscm (blackbox b);
 blackbox tmscm_to_blackbox (tmscm obj);
 
 inline tmscm tmscm_null () { return SCM_NULL; }
-inline tmscm tmscm_true () { return SCM_BOOL_T; }
-inline tmscm tmscm_false () { return SCM_BOOL_F; }
-inline void tmscm_set_car (tmscm a, tmscm b) { SCM_SETCAR(a,b); }
-inline void tmscm_set_cdr (tmscm a, tmscm b) { SCM_SETCDR(a,b); }
+inline tmscm tmscm_true () { return s7_t(tm_s7); }
+inline tmscm tmscm_false () { return s7_f(tm_s7); }
+inline void tmscm_set_car (tmscm a, tmscm b) { s7_set_car (a, b); }
+inline void tmscm_set_cdr (tmscm a, tmscm b) { s7_set_cdr (a, b); }
 	
-	
-inline bool tmscm_is_equal (tmscm o1, tmscm o2) { return SCM_NFALSEP ( scm_equal_p(o1, o2)); }
+inline bool tmscm_is_equal (tmscm o1, tmscm o2) { return s7_is_equal(tm_s7, o1, o2); }
 
+inline bool tmscm_is_null (tmscm obj) { return s7_is_null (tm_s7, obj); }
+inline bool tmscm_is_pair (tmscm obj) { return s7_is_pair (obj); }
+inline bool tmscm_is_list (tmscm obj) { return s7_is_list (tm_s7, obj); }
+inline bool tmscm_is_bool (tmscm obj) { return s7_is_boolean (obj); }
+inline bool tmscm_is_int (tmscm obj) { return s7_is_integer (obj); }
+inline bool tmscm_is_double (tmscm obj) { return s7_is_real (obj); }
+inline bool tmscm_is_string (tmscm obj) { return s7_is_string (obj); }
+inline bool tmscm_is_symbol (tmscm obj) { return s7_is_symbol (obj); }
 
+inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) { return s7_cons (tm_s7, obj1, obj2); }
+inline tmscm tmscm_car (tmscm obj) { return s7_car (obj); }
+inline tmscm tmscm_cdr (tmscm obj) { return s7_cdr (obj); }
+inline tmscm tmscm_caar (tmscm obj) { return s7_caar (obj); }
+inline tmscm tmscm_cadr (tmscm obj) { return s7_cadr (obj); }
+inline tmscm tmscm_cdar (tmscm obj) { return s7_cdar (obj); }
+inline tmscm tmscm_cddr (tmscm obj) { return s7_cddr (obj); }
+inline tmscm tmscm_caddr (tmscm obj) { return s7_caddr (obj); }
+inline tmscm tmscm_cadddr (tmscm obj) { return s7_cadddr (obj); }
 
-inline bool tmscm_is_null (tmscm obj) { return scm_is_null (obj); }
-inline bool tmscm_is_pair (tmscm obj) { return scm_is_pair (obj); }
-inline bool tmscm_is_list (tmscm obj) { return scm_is_list (obj); }
-inline bool tmscm_is_bool (tmscm obj) { return scm_is_bool (obj); }
-inline bool tmscm_is_int (tmscm obj) { return scm_is_int (obj); }
-inline bool tmscm_is_double (tmscm obj) { return scm_is_double (obj); }
-inline bool tmscm_is_string (tmscm obj) { return scm_is_string (obj); }
-inline bool tmscm_is_symbol (tmscm obj) { return scm_is_symbol (obj); }
-
-inline tmscm tmscm_cons (tmscm obj1, tmscm obj2) { return scm_cons (obj1, obj2); }
-inline tmscm tmscm_car (tmscm obj) { return SCM_CAR (obj); }
-inline tmscm tmscm_cdr (tmscm obj) { return SCM_CDR (obj); }
-inline tmscm tmscm_caar (tmscm obj) { return SCM_CAAR (obj); }
-inline tmscm tmscm_cadr (tmscm obj) { return SCM_CADR (obj); }
-inline tmscm tmscm_cdar (tmscm obj) { return SCM_CDAR (obj); }
-inline tmscm tmscm_cddr (tmscm obj) { return SCM_CDDR (obj); }
-inline tmscm tmscm_caddr (tmscm obj) { return SCM_CADDR (obj); }
-inline tmscm tmscm_cadddr (tmscm obj) { return SCM_CADDDR (obj); }
-
-
-
-SCM bool_to_scm (bool b);
-SCM int_to_scm (int i);
-SCM long_to_scm (long l);
-SCM double_to_scm (double i);
-
-
-
-inline tmscm bool_to_tmscm (bool b) { return bool_to_scm (b); }
-inline tmscm int_to_tmscm (int i) { return int_to_scm (i); }
-inline tmscm long_to_tmscm (long l) { return long_to_scm (l); }
-inline tmscm double_to_tmscm (double i) { return double_to_scm (i); }
+inline tmscm bool_to_tmscm (bool b) { return (b? s7_t(tm_s7) : s7_f(tm_s7)); }
+inline tmscm int_to_tmscm (int i) { return s7_make_integer(tm_s7, i); }
+inline tmscm long_to_tmscm (long l) { return s7_make_integer(tm_s7, l);  }
+inline tmscm double_to_tmscm (double r) { return s7_make_real(tm_s7, r); }
 tmscm string_to_tmscm (string s);
 tmscm symbol_to_tmscm (string s);
 
-inline bool tmscm_to_bool (tmscm obj) { return scm_to_bool (obj); }
-inline int tmscm_to_int (tmscm obj) { return scm_to_int (obj); }
-inline double tmscm_to_double (tmscm obj) { return scm_to_double (obj); }
+inline bool tmscm_to_bool (tmscm obj) { return s7_boolean (tm_s7, obj); }
+inline int tmscm_to_int (tmscm obj) { return s7_integer (obj); }
+inline double tmscm_to_double (tmscm obj) { return s7_real (obj); }
 string tmscm_to_string (tmscm obj);
 string tmscm_to_symbol (tmscm obj);
-
-
-
 
 tmscm eval_scheme_file (string name);
 tmscm eval_scheme (string s);
@@ -224,29 +97,161 @@ tmscm call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3, tmscm a4);
 tmscm call_scheme (tmscm fun, array<tmscm> a);
 
 
+/******************************************************************************
+ * Gluing
+ ******************************************************************************/
+
+template<tmscm (*PROC)()>
+static tmscm proc (s7_scheme*, tmscm ) {
+        tmscm res = PROC();
+        return (res);
+}
+template<tmscm (*PROC)(tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1);
+        return (res);
+}
+template<tmscm (*PROC)(tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2);
+        return (res);
+}
+template<tmscm (*PROC)(tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3);
+        return (res);
+}
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4);
+        return (res);
+}
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5);
+        return (res);
+}
+
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a6 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5,a6);
+        return (res);
+}
+
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a6 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a7 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5,a6,a7);
+        return (res);
+}
+
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a6 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a7 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a8 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5,a6,a7,a8);
+        return (res);
+}
+
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a6 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a7 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a8 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a9 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5,a6,a7,a8,a9);
+        return (res);
+}
+
+template<tmscm (*PROC)(tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm, tmscm)>
+static tmscm proc (s7_scheme*, tmscm args) {
+        tmscm a1 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a2 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a3 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a4 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a5 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a6 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a7 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a8 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a9 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm a10 = (tmscm_car(args)); args = tmscm_cdr (args);
+        tmscm res = PROC(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10);
+        return (res);
+}
+//FIXME: check the correct use of p0 and p1 and maybe add documentation
 #define tmscm_install_procedure(name, func, args, p0, p1) \
-  scm_new_procedure (name, ( FN )( func ), args, p0, p1)
+  s7_define_function (tm_s7, name, proc<func>, args, 0, false, "[missing doc]")
 
-#define TMSCM_ASSERT(_cond, _arg, _pos, _subr) \
- SCM_ASSERT(_cond, _arg, _pos, _subr)
+/* The SCM_EXPECT macros provide branch prediction hints to the
+   compiler.  To use only in places where the result of the expression
+   under "normal" circumstances is known.  */
+#ifdef __GNUC__
+# define TMSCM_EXPECT    __builtin_expect
+#else
+# define TMSCM_EXPECT(_expr, _value) (_expr)
+#endif
 
-#define TMSCM_ARG1 SCM_ARG1
-#define TMSCM_ARG2 SCM_ARG2
-#define TMSCM_ARG3 SCM_ARG3
-#define TMSCM_ARG4 SCM_ARG4
-#define TMSCM_ARG5 SCM_ARG5
-#define TMSCM_ARG6 SCM_ARG6
-#define TMSCM_ARG7 SCM_ARG7
-#define TMSCM_ARG8 SCM_ARG8
-#define TMSCM_ARG9 SCM_ARG9
-#define TMSCM_ARG10 SCM_ARG10
+#define TMSCM_LIKELY(_expr)    TMSCM_EXPECT ((_expr), 1)
+#define TMSCM_UNLIKELY(_expr)  TMSCM_EXPECT ((_expr), 0)
 
-#define TMSCM_UNSPECIFIED SCM_UNSPECIFIED
+#define TMSCM_ASSERT(_cond, _arg, _pos, _subr)                    \
+  do { if (TMSCM_UNLIKELY (!(_cond)))                             \
+     s7_wrong_type_arg_error (tm_s7, _subr, _pos, _arg, "wrong arg type"); } while (0)
 
+
+#define TMSCM_ARG1 1
+#define TMSCM_ARG2 2
+#define TMSCM_ARG3 3
+#define TMSCM_ARG4 4
+#define TMSCM_ARG5 5
+#define TMSCM_ARG6 6
+#define TMSCM_ARG7 7
+#define TMSCM_ARG8 8
+#define TMSCM_ARG9 9
+#define TMSCM_ARG10 10
+
+#define TMSCM_UNSPECIFIED (s7_unspecified (tm_s7))
 
 string scheme_dialect ();
 
-
-#endif // defined GUILE_TM_H
+#endif // defined S7_TM_H
 
 
