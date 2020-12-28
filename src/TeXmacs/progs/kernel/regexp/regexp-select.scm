@@ -264,16 +264,10 @@
     ;; (display* "sols= " sols "\n")
     (map cadr sols)))
 
-(if (os-mingw?) ;; mingw guile does not define select
-    (with-module texmacs-user
-      (define-public (select . args) (apply tm-select args)))
-    (with-module texmacs-user
-      (begin (define-public guile-select select)
-	     (define-public (select . args)
-	       (import-from (kernel regexp regexp-select))
-	       (if (= (length args) 2)
-		   (apply tm-select args)
-		   (apply guile-select args))))))
+(with-module *texmacs-module*
+   (define-public select #f))
+
+(set! select tm-select)
 
 (define-public (tm-ref t . l)
   (and (tm? t)
