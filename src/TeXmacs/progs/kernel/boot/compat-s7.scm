@@ -17,3 +17,14 @@
 (if (not (defined? 'filter))
     (define-public (filter pred? l)
       (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))
+
+;; curried define
+(define base-define define)
+(define-public-macro (curried-define head . body)
+    (if (pair? head)
+      `(curried-define ,(car head) (lambda ,(cdr head) ,@body))
+      `(base-define ,head ,@body)))
+
+(define-public (noop) (lambda () #f))
+
+

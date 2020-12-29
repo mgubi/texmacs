@@ -40,16 +40,16 @@
 
 ;(define texmacs-user (current-module))
 ;(define temp-module (current-module))
-;(define temp-value #f)
-
-(define *modules* (make-hash-table))
+(define temp-value #f)
 
 ;; setup the main modules
 (define *texmacs-module* (curlet))
 (define *current-module* *texmacs-module*)
-
-(set! (*modules* '(texmacs)) *texmacs-module*)
+(define *module-name* '(texmacs-user))
 (define *exports* '())
+
+(define *modules* (make-hash-table))
+(set! (*modules* '(texmacs)) *texmacs-module*)
 
 (define (current-module) *current-module*)
 
