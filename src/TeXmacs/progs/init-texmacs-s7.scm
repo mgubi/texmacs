@@ -14,11 +14,12 @@
 
 
 (display "Booting TeXmacs kernel functionality\n")
-
+(display (texmacs-version)) (display "\n")
+(display (curlet)) (display "\n")
 
 (define developer-mode? #f)
 
-(load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
+(load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm") (curlet))
 
 
 (inherit-modules (kernel boot compat-s7) (kernel boot abbrevs)

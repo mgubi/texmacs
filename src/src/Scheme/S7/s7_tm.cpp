@@ -20,6 +20,7 @@
  ******************************************************************************/
 
 s7_scheme *tm_s7;
+s7_pointer user_env;
 
 int tm_s7_argc;
 char **tm_s7_argv;
@@ -30,6 +31,10 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   tm_s7_argv = argv;
   
   tm_s7 = s7_init ();
+
+  // make a new user environment (used in evaluation)
+  user_env = s7_inlet (tm_s7, s7_nil (tm_s7));
+
   call_back (argc, argv);
 }
 
@@ -43,7 +48,7 @@ eval_scheme_file (string file) {
     //timer tm;
   if (DEBUG_STD) debug_std << "Evaluating " << file << "...\n";
   c_string _file (file);
-  tmscm result= s7_load (tm_s7, _file);
+  tmscm result= s7_load_with_environment (tm_s7, _file, user_env);
     //int extra= tm->watch (); cumul += extra;
     //cout << extra << "\t" << cumul << "\t" << file << "\n";
   return result;
@@ -55,9 +60,9 @@ eval_scheme_file (string file) {
 
 tmscm
 eval_scheme (string s) {
-  // cout << "Eval] " << s << "\n";
+   cout << "Eval] " << s << "\n";
   c_string _s (s);
-  tmscm result= s7_eval_c_string (tm_s7, _s);
+  tmscm result= s7_eval_c_string_with_environment (tm_s7, _s, user_env);
   return result;
 }
 
@@ -73,7 +78,7 @@ TeXmacs_call_scm (arg_list *args) {
   tmscm l= s7_nil (tm_s7);
   for (i=args->n; i>=1; i--)
     l= s7_cons (tm_s7, args->a[i], l);
-  s7_call (tm_s7, args->a[0], l);
+  return s7_call (tm_s7, args->a[0], l);
 }
 
 tmscm
@@ -276,7 +281,7 @@ tmscm object_stack;
 
 void
 initialize_scheme () {
-  const char* init_prg =
+  const char* init_prg = "(begin \n"
 //  "(read-set! keywords 'prefix)\n"
 //  "(read-enable 'positions)\n"
 //  "(debug-enable 'debug)\n"
@@ -292,8 +297,10 @@ initialize_scheme () {
   "    (lambda (port) (write obj port))))\n"
   "\n"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
-  "(define object-stack '(()))";
+  "(define object-stack '(()))\n"
+  ")";
   
+  // eval in the root enviornment
   s7_eval_c_string (tm_s7, init_prg);
   initialize_smobs ();
   initialize_glue ();

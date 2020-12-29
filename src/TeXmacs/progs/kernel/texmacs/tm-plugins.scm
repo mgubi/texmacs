@@ -536,7 +536,7 @@
 	      ;;(with start (texmacs-time)
 	      ;;  (load fname)
 	      ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-	      (load fname)
+	      (load fname *texmacs-module*)
 	      ))
 	(if (plugin-all-initialized?) (plugin-save-setup)))))
 

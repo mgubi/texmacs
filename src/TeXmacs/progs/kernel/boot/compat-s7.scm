@@ -22,8 +22,9 @@
 (define base-define define)
 (define-public-macro (curried-define head . body)
     (if (pair? head)
-      `(curried-define ,(car head) (lambda ,(cdr head) ,@body))
-      `(base-define ,head ,@body)))
+      `(,curried-define ,(car head) (lambda ,(cdr head) ,@body))
+      `(,base-define ,head ,@body)))
+(varlet *texmacs-module* 'define curried-define)
 
 (define-public (noop . l) (if #f #f #f))
 
@@ -34,13 +35,44 @@
 
 (define-public (map-in-order . l) (apply map l))
 
-;;FIXME
-(define-public (texmacs-version) "1.99.17")
+(define-public lazy-catch catch)
+
+(define-public (last-pair lis)
+;;  (check-arg pair? lis last-pair)
+  (let lp ((lis lis))
+    (let ((tail (cdr lis)))
+      (if (pair? tail) (lp tail) lis))))
+
+
+(define-public (seed->random-state seed) (random-state seed))
+
+
+(define-public (copy-tree tree)
+  (let loop ((tree tree))
+    (if (pair? tree)
+        (cons (loop (car tree)) (loop (cdr tree)))
+        tree)))
+
+
+(define-public (assoc-set! l what val)
+  (let ((b (assoc what l)))
+    (if b (set! (cdr b) val) (set! l (cons (cons what val) l)))
+    l))
+
+;;FIXME: assoc-set! is tricky to use, maybe just get rid in the code
+(define (assoc-set! l what val)
+  (let ((b (assoc what l)))
+    (if b (set! (cdr b) val) (set! l (cons (cons what val) l)))
+    l))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; FIXME
+
+(define-public (getpid) 1)
 (define-public (access? . l) #f)
 (define-public R_OK #f)
 
-
-
+(define-public (current-time) 100)
 
 (define *default-bound* (- (expt 2 29) 3))
 
@@ -64,6 +96,14 @@
 (define (symbol-hash s . maybe-bound)
   (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
     (%string-hash (symbol->string s) (lambda (x) x) bound)))
+
+(define (vector-hash v bound)
+  (let ((hashvalue 571)
+    (len (vector-length v)))
+    (do ((index 0 (+ index 1)))
+      ((>= index len) (modulo hashvalue bound))
+      (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (vector-ref v index)))
+                  *default-bound*)))))
 
 (define-public (hash obj . maybe-bound)
   (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
