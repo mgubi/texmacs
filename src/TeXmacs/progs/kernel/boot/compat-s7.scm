@@ -60,13 +60,27 @@
     l))
 
 ;;FIXME: assoc-set! is tricky to use, maybe just get rid in the code
-(define (assoc-set! l what val)
+(define-public (assoc-set! l what val)
   (let ((b (assoc what l)))
     (if b (set! (cdr b) val) (set! l (cons (cons what val) l)))
     l))
 
+(define-public (assoc-ref l what)
+  (let ((b (assoc what l)))
+    (if b (cdr b) #f)))
+
+(define-public (sort l op) (sort! (copy l) op))
+
+(define-public (force-output) (flush-output-port *stdout*))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FIXME
+
+;getlogin
+;string-split
+; char-set-adjoin
+;make-record-type
+;string-index
 
 (define-public (getpid) 1)
 (define-public (access? . l) #f)
