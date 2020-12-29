@@ -12,7 +12,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+
 (display "Booting TeXmacs kernel functionality\n")
+
+
+(define developer-mode? #f)
 
 (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
 
