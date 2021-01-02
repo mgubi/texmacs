@@ -265,7 +265,7 @@
     (map cadr sols)))
 
 (with-module *texmacs-module*
-   (define-public select #f))
+   (define select #f))
 
 (set! select tm-select)
 

@@ -241,9 +241,7 @@
            ;;    (display* "Overloaded " ',var "\n"))
            ;;(display* "Overloaded " ',var "\n")
            ;;(display* "   " ',nval "\n")
-           (set! temp-value ,nval)
-           (with-module *texmacs-module*
-             (set! ,var temp-value))
+           (set! ,var ,nval)
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
            (ahash-set! tm-defined-name ,var ',var)
@@ -257,11 +255,9 @@
              (display* "   " ',nval "\n"))
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           (set! temp-value
+           (varlet (rootlet) ',var
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)))
-           (with-module *texmacs-module*
-             (define-public ,var temp-value))
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name ,var ',var)
 	   (ahash-set! tm-defined-module ',var
@@ -298,7 +294,7 @@
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
        (tm-define ,macro-head ,@body)
-       (with-module *texmacs-module*
+       (with-module *texmacs-user-module*
          (define-public-macro ,head
            ,(apply* (ca*r macro-head) head))))))
 

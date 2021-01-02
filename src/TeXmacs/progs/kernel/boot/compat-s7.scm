@@ -24,7 +24,7 @@
     (if (pair? head)
       `(,curried-define ,(car head) (lambda ,(cdr head) ,@body))
       `(,base-define ,head ,@body)))
-(varlet *texmacs-module* 'define curried-define)
+(varlet *texmacs-user-module* 'define curried-define)
 
 (define-public (noop . l) (if #f #f #f))
 

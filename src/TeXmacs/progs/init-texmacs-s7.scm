@@ -11,7 +11,16 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define define-macro define-expansion)
 
+(let ()
+  (display "Benchmark 1\n")
+  (define start (texmacs-time))
+  (define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+  (display (fib 30))
+  (newline)
+  (display "Time: ") (display (- (texmacs-time) start)) (newline)
+)
 
 (display "Booting TeXmacs kernel functionality\n")
 (display (texmacs-version)) (display "\n")
@@ -430,3 +439,29 @@
 (delayed (:idle 10000) (autosave-delayed))
 (texmacs-banner)
 ;(display "Initialization done\n")
+
+(let ()
+  (display "------------------------------------------------------\n")
+  (display "Benchmark 2\n")
+  (define start (texmacs-time))
+  (tm-define (tm-fib n) (if (< n 2) n (+ (tm-fib (- n 1)) (tm-fib (- n 2)))))
+  (display (tm-fib 30))
+  (newline)
+  (display "Time: ") (display (- (texmacs-time) start)) (newline)
+  (display "------------------------------------------------------\n")
+)
+
+
+(tm-define (benchmark-menu-expand)
+  (display "------------------------------------------------------\n")
+  (display "Benchmark menu-expand\n")
+  (let ((start (texmacs-time)))
+  (display (menu-expand '(horizontal (link texmacs-main-icons))))
+  (newline)
+  (display "Time: ") (display (- (texmacs-time) start)) (newline))
+  (display "------------------------------------------------------\n")
+)
+
+(delayed (:idle 1000) (benchmark-menu-expand))
+
+

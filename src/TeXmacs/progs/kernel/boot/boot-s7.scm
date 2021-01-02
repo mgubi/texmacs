@@ -40,18 +40,22 @@
 ;; Modules
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;(define texmacs-user (current-module))
-;(define temp-module (current-module))
-(define temp-value #f)
+;(varlet (rootlet) 'temp-value #f)
 
 ;; setup the main modules
-(define *texmacs-module* (curlet))
-(define *current-module* *texmacs-module*)
-(define *module-name* '(texmacs-user))
+(with-let (rootlet)
+  (define *texmacs-module* (rootlet))
+  (define *current-module* (rootlet))
+  (define *module-name* '(texmacs))
+  (define *modules* (make-hash-table)))
+
+(define *texmacs-user-module* (curlet))
+(set! *current-module* *texmacs-user-module*)
+(set! *module-name* '(texmacs-user))
 (define *exports* '())
 
-(define *modules* (make-hash-table))
 (set! (*modules* '(texmacs)) *texmacs-module*)
+(set! (*modules* '(texmacs-user)) *texmacs-user-module*)
 
 (define (current-module) *current-module*)
 
@@ -102,7 +106,7 @@
              (loaded (hash-table-ref *modules* module)))
     (when (not loaded)
         (display "TeXmacs] Loading module ") (display module) (display "\n")
-        (with-module (sublet (hash-table-ref *modules* '(texmacs))
+        (with-module (sublet (hash-table-ref *modules* '(texmacs-user))
                              '*exports* ()
                              '*module-file* module-file)
                 (load *module-file* (curlet)))))))
