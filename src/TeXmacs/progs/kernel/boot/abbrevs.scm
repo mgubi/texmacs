@@ -70,8 +70,7 @@
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
 (define-public (save-object file value)
-  (string-save (with-output-to-string (lambda () (write value)))
-       (url-materialize file "")))
+  (with-output-to-file  (url-materialize file "") (lambda () (write value))))
 
 (define-public (load-object file)
   (let ((r (with-input-from-file (url-materialize file "r") read)))
