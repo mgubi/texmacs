@@ -105,7 +105,7 @@
       (let ((module-file (list->module module))
              (loaded (hash-table-ref *modules* module)))
     (when (not loaded)
-        (display "TeXmacs] Loading module ") (display module) (display "\n")
+        ;;(display "TeXmacs] Loading module ") (display module) (display "\n")
         (with-module (sublet (hash-table-ref *modules* '(texmacs-user))
                              '*exports* ()
                              '*module-file* module-file)

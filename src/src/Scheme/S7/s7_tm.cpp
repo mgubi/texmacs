@@ -60,7 +60,7 @@ eval_scheme_file (string file) {
 
 tmscm
 eval_scheme (string s) {
-   cout << "Eval] " << s << "\n";
+  // cout << "Eval] " << s << "\n";
   c_string _s (s);
   tmscm result= s7_eval_c_string_with_environment (tm_s7, _s, user_env);
   return result;
