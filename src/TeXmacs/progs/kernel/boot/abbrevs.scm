@@ -74,7 +74,8 @@
        (url-materialize file "")))
 
 (define-public (load-object file)
-  (with-input-from-string (string-load (url-materialize file "r")) read))
+  (let ((r (with-input-from-file (url-materialize file "r") read)))
+        (if (eof-object? r) '() r)))
 
 (define-public (persistent-ref dir key)
   (and (persistent-has? dir key)
