@@ -73,20 +73,6 @@
 
 (define-public (force-output) (flush-output-port *stdout*))
 
-;;;@ Return the index of the first occurence of chr in str, or #f
-;; From SLIB/strsrch.scm
-(define-public (string-index str chr)
-  (define len (string-length str))
-  (do ((pos 0 (+ 1 pos)))
-      ((or (>= pos len) (char=? chr (string-ref str pos)))
-       (and (< pos len) pos))))
-;@
-;; From SLIB/strsrch.scm
-(define-public (string-rindex str chr)
-  (do ((pos (+ -1 (string-length str)) (+ -1 pos)))
-      ((or (negative? pos) (char=? (string-ref str pos) chr))
-       (and (not (negative? pos)) pos))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (string-split s ch)
@@ -213,10 +199,41 @@
         (break))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; string search and charsets
+
+; we implement char-sets via predicates
+
+(define-public (char-set-adjoin cs . l)
+   (lambda (ch) (or (cs ch) (memq ch l))))
+   
+(define-public (char-set-complement cs)
+  (lambda (ch) (not (cs ch))))
+
+(define-public (char-set:whitespace ch)
+  (memq ch '(#\space #\tab #\newline)))
+  
+
+; string-index and string-rindex accepts char-sets
+
+(define-public (string-index str cs)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
+  (define len (string-length str))
+  (do ((pos 0 (+ 1 pos)))
+      ((or (>= pos len) (chr (string-ref str pos)))
+       (and (< pos len) pos)))))
+
+(define-public (string-rindex str cs)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
+  (do ((pos (+ -1 (string-length str)) (+ -1 pos)))
+      ((or (negative? pos) (chr (string-ref str pos)))
+       (and (not (negative? pos)) pos)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TODO/FIXME
 
-; char-set-adjoin
 
 (define-public (getpid) 1)
 (define-public (getlogin) "fake-getlogin")
