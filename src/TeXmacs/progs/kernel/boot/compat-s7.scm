@@ -89,7 +89,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (string-split s ch)
+(define-public (string-split s ch)
   (let ((len (length s)))
     (let f ((start 0) (acc ()))
       (if (< start len)
@@ -197,18 +197,30 @@
                    bound))
       ((null? obj) 0)
       ((not obj) 0)
-      ((procedure? obj) (error "hash: procedures cannot be hashed" obj))
+      ((procedure? obj) 245) ;(error "hash: procedures cannot be hashed" obj))
       (else 1))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public-macro (while test . body)      ; while loop with predefined break and continue
+  `(call-with-exit
+    (lambda (break)
+      (let continue ()
+    (if (let () ,test)
+        (begin
+          (let () ,@body)
+          (continue))
+        (break))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TODO/FIXME
 
-;getlogin
 ; char-set-adjoin
 
 (define-public (getpid) 1)
+(define-public (getlogin) "fake-getlogin")
+(define-public (getpwnam) "fake-getpwnam")
 (define-public (access? . l) #f)
 (define-public R_OK #f)
 

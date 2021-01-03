@@ -34,7 +34,8 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
 
   // make a new user environment (used in evaluation)
   user_env = s7_inlet (tm_s7, s7_nil (tm_s7));
-
+  s7_gc_protect (tm_s7, user_env);
+  
   call_back (argc, argv);
 }
 

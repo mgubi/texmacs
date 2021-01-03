@@ -11,7 +11,16 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define define-macro define-expansion)
+
+;; S7 macros are not usual macros...
+;(define define-macro define-expansion)
+
+;; S7 loads by default in rootlet
+;; but we prefer to load into *texmacs-user-module*
+(define primitive-load load)
+(let ((base-env (curlet)))
+  (set! load (lambda (file . env) (primitive-load file (if (null? env) base-env (car env))))))
+
 
 (let ()
   (display "Benchmark 1\n")
@@ -30,9 +39,9 @@
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
 
-(display "Booting TeXmacs kernel functionality\n")
 
-(load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm") (curlet))
+(display "Booting TeXmacs kernel functionality\n")
+(load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
 
 
 (inherit-modules (kernel boot compat-s7) (kernel boot abbrevs)
