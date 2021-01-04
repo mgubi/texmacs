@@ -234,7 +234,7 @@ static tmscm proc (s7_scheme*, tmscm args) {
 
 #define TMSCM_ASSERT(_cond, _arg, _pos, _subr)                    \
   do { if (TMSCM_UNLIKELY (!(_cond)))                             \
-     s7_wrong_type_arg_error (tm_s7, _subr, _pos, _arg, "wrong arg type"); } while (0)
+     s7_wrong_type_arg_error (tm_s7, _subr, _pos, _arg, "some other thing"); } while (0)
 
 
 #define TMSCM_ARG1 1

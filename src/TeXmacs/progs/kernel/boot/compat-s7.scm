@@ -26,6 +26,7 @@
       `(,base-define ,head ,@body)))
 (varlet *texmacs-user-module* 'define curried-define)
 
+(define-public-macro (1+ n) `(+ 1 ,n))
 (define-public (noop . l) (if #f #f #f))
 
 (define-public (acons key datum alist) (cons (cons key datum) alist))

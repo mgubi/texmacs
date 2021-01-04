@@ -264,10 +264,7 @@
     ;; (display* "sols= " sols "\n")
     (map cadr sols)))
 
-(with-module *texmacs-module*
-   (define select #f))
-
-(set! select tm-select)
+(varlet *texmacs-module* 'select tm-select)
 
 (define-public (tm-ref t . l)
   (and (tm? t)

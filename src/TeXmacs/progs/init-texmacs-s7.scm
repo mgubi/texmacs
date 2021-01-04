@@ -15,10 +15,14 @@
 ;; S7 macros are not usual macros...
 ;(define define-macro define-expansion)
 
+(define primitive-symbol? symbol?)
+(set! symbol? (lambda (s) (and (not (keyword? s)) (primitive-symbol? s))))
+
 ;; S7 loads by default in rootlet
 ;; but we prefer to load into *texmacs-user-module*
 (define primitive-load load)
 (let ((base-env (curlet)))
+  (varlet (rootlet) 'tm-eval (lambda (obj) (eval obj base-env)))
   (set! load (lambda (file . env) (primitive-load file (if (null? env) base-env (car env))))))
 
 
@@ -472,4 +476,5 @@
 
 (delayed (:idle 1000) (benchmark-menu-expand))
 
-
+(display "test select ------------\n")
+(display (select '(foo "x" (bar)) '(:%1 (:match :string?)))) (newline)
