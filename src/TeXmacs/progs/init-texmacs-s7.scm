@@ -18,12 +18,25 @@
 (define primitive-symbol? symbol?)
 (set! symbol? (lambda (s) (and (not (keyword? s)) (primitive-symbol? s))))
 
-;; S7 loads by default in rootlet
-;; but we prefer to load into *texmacs-user-module*
-(define primitive-load load)
-(let ((base-env (curlet)))
-  (varlet (rootlet) 'tm-eval (lambda (obj) (eval obj base-env)))
-  (set! load (lambda (file . env) (primitive-load file (if (null? env) base-env (car env))))))
+;; S7 loads by default in rootlet and eval in curlet
+;; but we prefer to load and eval into *texmacs-user-module*
+;; (the current toplevel)
+;; FIXME: we have to clarify the situation with *current-module* when evaluating
+;; in a different environment. In Guile *current-module* is set/reset.
+
+(varlet (rootlet) '*current-module* (curlet))
+(let ()
+  (define primitive-load load)
+  (define primitive-eval eval)
+
+  (varlet (rootlet) 'tm-eval (lambda (obj) (eval obj *texmacs-user-module*)))
+  (set! load (lambda (file . env) (primitive-load file (if (null? env) *current-module* (car env)))))
+  (set! eval (lambda (obj . env)
+    (let ((res (primitive-eval obj (if (null? env) *current-module* (car env)))))
+    ;;(format #t "Eval: ~A -> ~A\n" obj res)
+    res)
+    ))
+  )
 
 
 (let ()

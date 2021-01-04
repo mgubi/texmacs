@@ -45,7 +45,7 @@
 ;; setup the main modules
 (with-let (rootlet)
   (define *texmacs-module* (rootlet))
-  (define *current-module* (rootlet))
+  ;(define *current-module* (rootlet))
   (define *module-name* '(texmacs))
   (define *modules* (make-hash-table)))
 
