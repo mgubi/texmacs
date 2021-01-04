@@ -488,3 +488,30 @@
 )
 
 (delayed (:idle 1000) (benchmark-menu-expand))
+
+;; you can run
+;;   texmacs.bin -x "(benchmark-manual)"
+;; to run this test
+
+(tm-define (benchmark-manual)
+(exec-delayed (lambda ()
+(let ((root (url-resolve (url-unix "$TEXMACS_DOC_PATH" "main/man-manual.en.tm") "r"))
+      (start-time (texmacs-time))
+      (update (lambda (cont)
+                (generate-all-aux)
+                (update-current-buffer)
+                (exec-delayed cont))))
+  (tmdoc-expand-help root "book")
+  (exec-delayed
+    (lambda ()
+      (update
+        (lambda ()
+          (update
+            (lambda ()
+              (update
+                (lambda ()
+                  (buffer-pretend-saved (current-buffer))
+                  (display "Timing:") (display (- (texmacs-time) start-time)) (newline)
+                  ;(quit-TeXmacs)
+                  ))))))))))))
+
