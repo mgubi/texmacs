@@ -293,14 +293,11 @@ initialize_scheme () {
   "(define (display-to-string obj)\n"
   "  (call-with-output-string\n"
   "    (lambda (port) (display obj port))))\n"
-  "(define (object->string obj)\n"
-  "  (call-with-output-string\n"
-  "    (lambda (port) (write obj port))))\n"
   "\n"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
   "(define object-stack '(()))\n"
   ")";
-  
+
   // eval in the root enviornment
   s7_eval_c_string (tm_s7, init_prg);
   initialize_smobs ();
