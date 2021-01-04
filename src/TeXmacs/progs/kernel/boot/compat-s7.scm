@@ -47,7 +47,9 @@
 
 (define-public (seed->random-state seed) (random-state seed))
 
-
+(define-public (list-copy lst)
+  (copy lst)) ;; S7 has generic functions. copy do a shallow copy
+  
 (define-public (copy-tree tree)
   (let loop ((tree tree))
     (if (pair? tree)

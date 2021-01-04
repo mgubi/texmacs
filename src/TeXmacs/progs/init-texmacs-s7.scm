@@ -13,7 +13,7 @@
 
 
 ;; S7 macros are not usual macros...
-;(define define-macro define-expansion)
+(define define-macro define-expansion)
 
 (define primitive-symbol? symbol?)
 (set! symbol? (lambda (s) (and (not (keyword? s)) (primitive-symbol? s))))
@@ -488,6 +488,3 @@
 )
 
 (delayed (:idle 1000) (benchmark-menu-expand))
-
-(display "test select ------------\n")
-(display (select '(foo "x" (bar)) '(:%1 (:match :string?)))) (newline)
