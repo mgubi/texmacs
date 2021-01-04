@@ -50,6 +50,11 @@
 ;; Checking modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;FIXME: in-active-graphics% and developer-mode%
+; seems to be the only two modes which do not have the associated procedure
+; is the code below meaningful? why we need to do the eval?
+; I want maybe to have the catch inside the eval
+
 (define-public (texmacs-in-mode? mode)
   (with proc (symbol-procedure mode)
     (if proc (proc)

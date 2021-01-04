@@ -31,14 +31,9 @@
   (display "Time: ") (display (- (texmacs-time) start)) (newline)
 )
 
-(display "Booting TeXmacs kernel functionality\n")
-(display (texmacs-version)) (display "\n")
-(display (curlet)) (display "\n")
-
 (define developer-mode? #f)
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
-
 
 (display "Booting TeXmacs kernel functionality\n")
 (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
