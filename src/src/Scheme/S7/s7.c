@@ -437,7 +437,7 @@ enum {T_FREE = 0,
       T_STRING, T_C_OBJECT, T_VECTOR, T_INT_VECTOR, T_FLOAT_VECTOR, T_BYTE_VECTOR,
       T_CATCH, T_DYNAMIC_WIND, T_HASH_TABLE, T_LET, T_ITERATOR,
       T_STACK, T_COUNTER, T_SLOT, T_C_POINTER, T_OUTPUT_PORT, T_INPUT_PORT, T_RANDOM_STATE,
-      T_BAFFLE, T_CONTINUATION, T_GOTO,
+      T_CONTINUATION, T_GOTO,
       T_CLOSURE, T_CLOSURE_STAR, T_MACRO, T_MACRO_STAR, T_BACRO, T_BACRO_STAR, T_C_MACRO,
       T_C_FUNCTION_STAR, T_C_FUNCTION, T_C_ANY_ARGS_FUNCTION, T_C_OPT_ARGS_FUNCTION, T_C_RST_ARGS_FUNCTION,
       NUM_TYPES};
@@ -448,7 +448,7 @@ static const char *s7_type_names[] =
   {"free", "pair", "nil", "unused", "undefined", "unspecified", "eof_object", "boolean", "character",
      "syntax", "symbol", "integer", "ratio", "real", "complex", "big_integer", "big_ratio", "big_real", "big_complex",
      "string", "c_object", "vector", "int_vector", "float_vector", "byte_vector", "catch", "dynamic_wind", "hash_table", "let",
-     "iterator", "stack", "counter", "slot", "c_pointer", "output_port", "input_port", "random_state", "baffle", "continuation", "goto",
+     "iterator", "stack", "counter", "slot", "c_pointer", "output_port", "input_port", "random_state", "continuation", "goto",
      "closure", "closure*", "c_macro", "macro", "macro*", "bacro", "bacro*", "c_function*", "c_function",
      "c_any_args_function", "c_opt_args_function", "c_rst_args_function"
    };
@@ -794,8 +794,6 @@ typedef struct s7_cell {
       s7_pointer c_type, info, weak1, weak2;
     } cptr;
 
-    s7_int baffle_key;             /* baffles */
-
     struct {                       /* vectors */
       s7_int length;
       union {
@@ -908,6 +906,9 @@ typedef struct s7_cell {
 	struct {                   /* (catch #t ...) opts */
 	  uint64_t op_stack_loc, goto_loc;
 	} ctall;
+	struct {
+	  s7_int key;              /* s7_int is sc->baffle_ctr type */
+	} bafl;
       } edat;
     } envr;
 
@@ -1235,7 +1236,7 @@ struct s7_scheme {
              hash_table_entries_symbol, hash_table_ref_symbol, hash_table_set_symbol, hash_table_symbol, help_symbol,
              imag_part_symbol, immutable_symbol, inexact_to_exact_symbol, inlet_symbol, int_vector_ref_symbol, int_vector_set_symbol, int_vector_symbol,
              integer_decode_float_symbol, integer_to_char_symbol,
-             is_aritable_symbol, is_baffle_symbol, is_bignum_symbol, is_boolean_symbol, is_byte_symbol, is_byte_vector_symbol,
+             is_aritable_symbol, is_bignum_symbol, is_boolean_symbol, is_byte_symbol, is_byte_vector_symbol,
              is_c_object_symbol, c_object_type_symbol, is_c_pointer_symbol, is_char_alphabetic_symbol, is_char_lower_case_symbol, is_char_numeric_symbol,
              is_char_symbol, is_char_upper_case_symbol, is_char_whitespace_symbol, is_complex_symbol, is_constant_symbol,
              is_continuation_symbol, is_defined_symbol, is_dilambda_symbol, is_eof_object_symbol, is_eq_symbol, is_equal_symbol,
@@ -1291,7 +1292,7 @@ struct s7_scheme {
 
   /* syntax symbols et al */
   s7_pointer else_symbol, lambda_symbol, lambda_star_symbol, let_symbol, quote_symbol, quasiquote_symbol, unquote_symbol, macroexpand_symbol,
-             define_expansion_symbol, define_expansion_star_symbol, baffle_symbol, with_let_symbol, if_symbol, autoload_error_symbol,
+             define_expansion_symbol, define_expansion_star_symbol, with_let_symbol, if_symbol, autoload_error_symbol,
              when_symbol, unless_symbol, begin_symbol, cond_symbol, case_symbol, and_symbol, or_symbol, do_symbol,
              define_symbol, define_star_symbol, define_constant_symbol, with_baffle_symbol, define_macro_symbol,
              define_macro_star_symbol, define_bacro_symbol, define_bacro_star_symbol, letrec_symbol, letrec_star_symbol, let_star_symbol,
@@ -1893,7 +1894,6 @@ void s7_show_history(s7_scheme *sc);
   #define T_Eof(P) check_ref(P, T_EOF,               __func__, __LINE__, "sweep", NULL)
   #define T_Ctr(P) check_ref(P, T_COUNTER,           __func__, __LINE__, NULL, NULL)
   #define T_Ptr(P) check_ref(P, T_C_POINTER,         __func__, __LINE__, NULL, NULL)
-  #define T_Bfl(P) check_ref(P, T_BAFFLE,            __func__, __LINE__, NULL, NULL)
   #define T_Got(P) check_ref(P, T_GOTO,              __func__, __LINE__, NULL, NULL)
   #define T_Stk(P) check_ref(P, T_STACK,             __func__, __LINE__, NULL, NULL)
   #define T_Pair(P) check_ref(P, T_PAIR,             __func__, __LINE__, NULL, NULL)
@@ -1957,7 +1957,6 @@ void s7_show_history(s7_scheme *sc);
   #define T_Hsh(P)  P
   #define T_Itr(P)  P
   #define T_Ptr(P)  P
-  #define T_Bfl(P)  P
   #define T_Got(P)  P
   #define T_Con(P)  P
   #define T_Stk(P)  P
@@ -2169,7 +2168,11 @@ void s7_show_history(s7_scheme *sc);
 
 #define T_DOX_SLOT1                    T_GLOBAL
 #define has_dox_slot1(p)               has_type_bit(T_Let(p), T_DOX_SLOT1)
+#if S7_DEBUGGING
+#define set_has_dox_slot1(p)           do {if (is_baffle_let(p)) fprintf(stderr, "baffle let->dox1\n"); set_type_bit(T_Let(p), T_DOX_SLOT1);} while (0)
+#else
 #define set_has_dox_slot1(p)           set_type_bit(T_Let(p), T_DOX_SLOT1)
+#endif
 /* marks a let that includes the dox_slot1 */
 
 #define T_COLLECTED                    (1 << (TYPE_BITS + 9))
@@ -2256,7 +2259,11 @@ void s7_show_history(s7_scheme *sc);
 
 #define T_DOX_SLOT2                    T_UNSAFE
 #define has_dox_slot2(p)               has_type_bit(T_Let(p), T_DOX_SLOT2)
+#if S7_DEBUGGING
+#define set_has_dox_slot2(p)           do {if (is_baffle_let(p)) fprintf(stderr, "baffle let->dox2\n"); set_type_bit(T_Let(p), T_DOX_SLOT2);} while (0)
+#else
 #define set_has_dox_slot2(p)           set_type_bit(T_Let(p), T_DOX_SLOT2)
+#endif
 /* marks a let that includes the dox_slot2 */
 
 #define T_IMMUTABLE                    (1 << (TYPE_BITS + 16))
@@ -2488,7 +2495,7 @@ void s7_show_history(s7_scheme *sc);
 /* this marks a maclet */
 
 #define T_HAS_FX                       T_DEFINER
-/* #define set_has_fx(p)                  do {fprintf(stderr, "%s[%d]: %s\n", __func__, __LINE__, display(p)); set_type1_bit(T_Pair(p), T_HAS_FX);} while (0) */
+/* #define set_has_fx(p)               do {fprintf(stderr, "%s[%d]: %s\n", __func__, __LINE__, display(p)); set_type1_bit(T_Pair(p), T_HAS_FX);} while (0) */
 #define set_has_fx(p)                  set_type1_bit(T_Pair(p), T_HAS_FX)
 #define has_fx(p)                      has_type1_bit(T_Pair(p), T_HAS_FX)
 #define clear_has_fx(p)                clear_type1_bit(T_Pair(p), T_HAS_FX)
@@ -2530,6 +2537,10 @@ void s7_show_history(s7_scheme *sc);
 #define closure_bits(p)                (typeflag(T_Pair(p)) & (T_SAFE_CLOSURE | T_VERY_SAFE_CLOSURE | T_FULL_NO_DEFAULTS))
 #define is_very_safe_closure_body(p)   has_type1_bit(T_Pair(p), T_SHORT_VERY_SAFE_CLOSURE)
 #define set_very_safe_closure_body(p)  set_type1_bit(T_Pair(p), T_SHORT_VERY_SAFE_CLOSURE)
+
+#define T_BAFFLE_LET                   T_SHORT_VERY_SAFE_CLOSURE
+#define is_baffle_let(p)               has_type1_bit(T_Let(p), T_BAFFLE_LET)
+#define set_baffle_let(p)              set_type1_bit(T_Let(p), T_BAFFLE_LET)
 
 #define T_CYCLIC                       (1LL << (TYPE_BITS + BIT_ROOM + 29))
 #define T_SHORT_CYCLIC                 (1 << 5)
@@ -3053,6 +3064,9 @@ static s7_pointer slot_expression(s7_pointer p)    \
 #define funclet_function(p)            T_Sym((C_Let(p, L_FUNC))->object.envr.edat.efnc.function)
 #define funclet_set_function(p, F)     (S_Let(p, L_FUNC))->object.envr.edat.efnc.function = T_Sym(F)
 
+#define let_baffle_key(p)              (T_Let(p))->object.envr.edat.bafl.key
+#define set_let_baffle_key(p, K)       (T_Let(p))->object.envr.edat.bafl.key = K
+
 #define let_line(p)                    (C_Let(p, L_FUNC))->object.envr.edat.efnc.line
 #define let_set_line(p, L)             (S_Let(p, L_FUNC))->object.envr.edat.efnc.line = L
 #define let_file(p)                    (C_Let(p, L_FUNC))->object.envr.edat.efnc.file
@@ -3348,9 +3362,17 @@ static s7_pointer slot_expression(s7_pointer p)    \
 #define catch_set_handler(p, val)      (T_Cat(p))->object.rcatch.handler = T_Pos(val)
 
 #define catch_all_goto_loc(p)          (C_Let(p, L_CATCH))->object.envr.edat.ctall.goto_loc
+#if S7_DEBUGGING
+#define catch_all_set_goto_loc(p, L)   do {if (is_baffle_let(p)) fprintf(stderr, "baffle-let->goto_loc\n"); (S_Let(p, L_CATCH))->object.envr.edat.ctall.goto_loc = L;} while (0)
+#else
 #define catch_all_set_goto_loc(p, L)   (S_Let(p, L_CATCH))->object.envr.edat.ctall.goto_loc = L
+#endif
 #define catch_all_op_loc(p)            (C_Let(p, L_CATCH))->object.envr.edat.ctall.op_stack_loc
+#if S7_DEBUGGING
+#define catch_all_set_op_loc(p, L)     do {if (is_baffle_let(p)) fprintf(stderr, "baffle-let->op_stack_loc\n"); (S_Let(p, L_CATCH))->object.envr.edat.ctall.op_stack_loc = L;} while (0)
+#else
 #define catch_all_set_op_loc(p, L)     (S_Let(p, L_CATCH))->object.envr.edat.ctall.op_stack_loc = L
+#endif
 
 #define dynamic_wind_state(p)          (T_Dyn(p))->object.winder.state
 #define dynamic_wind_in(p)             (T_Dyn(p))->object.winder.in
@@ -3407,9 +3429,6 @@ static s7_pointer slot_expression(s7_pointer p)    \
 #define counter_set_let(p, L)          (T_Ctr(p))->object.ctr.env = T_Lid(L)
 #define counter_slots(p)               T_Sln(T_Ctr(p)->object.ctr.slots)
 #define counter_set_slots(p, Val)      (T_Ctr(p))->object.ctr.slots = T_Sln(Val)
-
-#define is_baffle(p)                   (type(p) == T_BAFFLE)
-#define baffle_key(p)                  (T_Bfl(p))->object.baffle_key
 
 #if __cplusplus && HAVE_COMPLEX_NUMBERS
   using namespace std;                /* the code has to work in C as well as C++, so we can't scatter std:: all over the place */
@@ -4689,7 +4708,9 @@ static char *describe_type_bits(s7_scheme *sc, s7_pointer obj) /* used outside S
 						    ((is_normal_symbol(obj)) ? " binder" :
 						     " ?27?"))) : "",
 	   /* bit 28+16 */
-	   ((full_typ & T_VERY_SAFE_CLOSURE) != 0) ? (((is_pair(obj)) || (is_any_closure(obj))) ? " very-safe-closure" : " ?28?") : "",
+	   ((full_typ & T_VERY_SAFE_CLOSURE) != 0) ? (((is_pair(obj)) || (is_any_closure(obj))) ? " very-safe-closure" : 
+						      ((is_let(obj)) ? " baffle-let" :
+						      " ?28?")) : "",
 	   /* bit 29+16 */
 	   ((full_typ & T_CYCLIC) != 0) ?         (((is_simple_sequence(obj)) || (t_structure_p[type(obj)]) ||
 						    (is_any_closure(obj))) ? " cyclic" : " ?29?") : "",
@@ -4746,7 +4767,7 @@ static bool has_odd_bits(s7_pointer obj)
   if (((full_typ & T_LOCAL) != 0) && (!is_normal_symbol(obj)) && (!is_pair(obj))) return(true);
   if (((full_typ & T_COPY_ARGS) != 0) && (!is_pair(obj)) && (!is_any_macro(obj)) && (!is_any_closure(obj)) && (!is_c_function(obj))) return(true);
   if (((full_typ & T_UNSAFE) != 0) && (!is_symbol(obj)) && (!is_slot(obj)) && (!is_let(obj)) && (!is_pair(obj))) return(true);
-  if (((full_typ & T_VERY_SAFE_CLOSURE) != 0) && (!is_pair(obj)) && (!is_any_closure(obj))) return(true);
+  if (((full_typ & T_VERY_SAFE_CLOSURE) != 0) && (!is_pair(obj)) && (!is_any_closure(obj)) && (!is_let(obj))) return(true);
   if (((full_typ & T_FULL_CASE_KEY) != 0) && (!is_symbol(obj))) return(true);
   if (((full_typ & T_FULL_UNKNOPT) != 0) && (!is_pair(obj))) return(true);
   if (((full_typ & T_FULL_SAFETY_CHECKED) != 0) && (!is_pair(obj))) return(true);
@@ -6791,7 +6812,6 @@ static void init_mark_functions(void)
   mark_function[T_RANDOM_STATE]        = just_mark;
   mark_function[T_GOTO]                = just_mark;
   mark_function[T_OUTPUT_PORT]         = just_mark; /* changed to mark_output_port if output function ports are active */
-  mark_function[T_BAFFLE]              = just_mark;
   mark_function[T_C_MACRO]             = just_mark;
   mark_function[T_C_POINTER]           = mark_c_pointer;
   mark_function[T_C_FUNCTION]          = just_mark;
@@ -11451,46 +11471,19 @@ static s7_pointer copy_op_stack(s7_scheme *sc)
 /* (with-baffle . body) calls body guaranteeing that there can be no jumps into the
  *    middle of it from outside -- no outer evaluation of a continuation can jump across this
  *    barrier:  The flip-side of call-with-exit.
- *    It sets a T_BAFFLE var in a new let, that has a unique key.  Call/cc then always
- *    checks the let chain for any such variable, saving the localmost.  Apply of a continuation
- *    looks for such a saved variable, if none, go ahead, else check the current lets (before the
- *    jump) for that variable.  If none, error, else go ahead.
  */
-
-static s7_pointer make_baffle(s7_scheme *sc)
-{
-  s7_pointer x;
-  new_cell(sc, x, T_BAFFLE);
-  baffle_key(x) = sc->baffle_ctr++;
-  return(x);
-}
-
-static s7_pointer g_is_baffle(s7_scheme *sc, s7_pointer args)
-{
-  #define H_is_baffle "(baffle? obj) returns #t if obj is a baffle"
-  #define Q_is_baffle sc->pl_bt
-  return(make_boolean(sc, is_baffle(car(args))));
-}
 
 static bool find_baffle(s7_scheme *sc, s7_int key)
 {
-  /* search backwards through sc->curlet for sc->baffle_symbol with (continuation_)key as its baffle_key value */
+  /* search backwards through sc->curlet for baffle_let with (continuation_)key as its baffle_key value */
   if (sc->baffle_ctr > 0)
     {
       s7_pointer x;
-      for (x = sc->curlet; symbol_id(sc->baffle_symbol) < let_id(x); x = let_outlet(x));
-      if ((let_id(x) == symbol_id(sc->baffle_symbol)) &&
-	  (baffle_key(slot_value(local_slot(sc->baffle_symbol))) == key))
-	return(true);
-      for (; is_let(x); x = let_outlet(x))
-	{
-	  s7_pointer y;
-	  for (y = let_slots(x); tis_slot(y); y = next_slot(y))
-	    if ((slot_symbol(y) == sc->baffle_symbol) &&
-		(baffle_key(slot_value(y)) == key))
-	      return(true);
-	  /* baffle_symbol can't be global */
-	}}
+      for (x = sc->curlet; is_let(x); x = let_outlet(x))
+	if ((is_baffle_let(x)) &&
+	    (let_baffle_key(x) == key))
+	  return(true);
+    }
   return(false);
 }
 
@@ -11501,11 +11494,10 @@ static s7_int find_any_baffle(s7_scheme *sc)
   /* search backwards through sc->curlet for any sc->baffle_symbol -- called by s7_make_continuation to set continuation_key */
   if (sc->baffle_ctr > 0)
     {
-      s7_pointer x, y;
+      s7_pointer x;
       for (x = sc->curlet; is_let(x); x = let_outlet(x))
-	for (y = let_slots(x); tis_slot(y); y = next_slot(y))
-	  if (slot_symbol(y) == sc->baffle_symbol)
-	    return(baffle_key(slot_value(y)));
+	if (is_baffle_let(x))
+	  return(let_baffle_key(x));
     }
   return(NOT_BAFFLED);
 }
@@ -11526,7 +11518,8 @@ static bool op_with_baffle_unchecked(s7_scheme *sc)
       return(true);
     }
   sc->curlet = make_let(sc, sc->curlet);
-  make_slot_2(sc, sc->curlet, sc->baffle_symbol, make_baffle(sc));
+  set_baffle_let(sc->curlet);
+  set_let_baffle_key(sc->curlet, sc->baffle_ctr++);
   return(false);
 }
 
@@ -35220,14 +35213,6 @@ static void iterator_to_port(s7_scheme *sc, s7_pointer obj, s7_pointer port, use
     }
 }
 
-static void baffle_to_port(s7_scheme *sc, s7_pointer obj, s7_pointer port, use_write_t use_write, shared_info_t *ci)
-{
-  int32_t nlen;          /* (with-baffle (display (curlet)) (newline)) */
-  char buf[64];
-  nlen = catstrs_direct(buf, "#<baffle: ", pos_int_to_str_direct(sc, baffle_key(obj)), ">", (const char *)NULL);
-  port_write_string(port)(sc, buf, nlen, port);
-}
-
 static void c_pointer_to_port(s7_scheme *sc, s7_pointer obj, s7_pointer port, use_write_t use_write, shared_info_t *ci)
 {
   int32_t nlen;
@@ -35661,7 +35646,6 @@ static void init_display_functions(void)
   display_functions[T_INPUT_PORT] =   input_port_to_port;
   display_functions[T_OUTPUT_PORT] =  output_port_to_port;
   display_functions[T_COUNTER] =      counter_to_port;
-  display_functions[T_BAFFLE] =       baffle_to_port;
   display_functions[T_STACK] =        stack_to_port;
   display_functions[T_INTEGER] =      integer_to_port;
   display_functions[T_RATIO] =        number_to_port;
@@ -47147,7 +47131,8 @@ static s7_pointer make_baffled_closure(s7_scheme *sc, s7_pointer inp)
   s7_pointer nclo, let;
   nclo = make_closure(sc, sc->nil, closure_body(inp), type(inp), 0);
   let = make_let_slowly(sc, closure_let(inp)); /* let_outlet(let) = closure_let(inp) */
-  make_slot_2(sc, let, sc->baffle_symbol, make_baffle(sc));
+  set_baffle_let(let);
+  set_let_baffle_key(let, sc->baffle_ctr++);
   closure_set_let(nclo, let);
   return(nclo);
 }
@@ -48372,7 +48357,6 @@ static s7_pointer b_is_boolean_setter(s7_scheme *sc, s7_pointer args)      {retu
 static s7_pointer b_is_undefined_setter(s7_scheme *sc, s7_pointer args)    {return(b_simple_setter(sc, T_UNDEFINED, args));}
 static s7_pointer b_is_unspecified_setter(s7_scheme *sc, s7_pointer args)  {return(b_simple_setter(sc, T_UNSPECIFIED, args));}
 static s7_pointer b_is_c_object_setter(s7_scheme *sc, s7_pointer args)     {return(b_simple_setter(sc, T_C_OBJECT, args));}
-static s7_pointer b_is_baffle_setter(s7_scheme *sc, s7_pointer args)       {return(b_simple_setter(sc, T_BAFFLE, args));}
 static s7_pointer b_is_goto_setter(s7_scheme *sc, s7_pointer args)         {return(b_simple_setter(sc, T_GOTO, args));}
 
 #define b_setter(sc, typer, args, str, len)	\
@@ -52968,7 +52952,6 @@ static const char *type_name_from_type(int32_t typ, article_t article)
     case T_ITERATOR:        return((article == NO_ARTICLE) ? "iterator"          : "an iterator");
     case T_LET:             return((article == NO_ARTICLE) ? "let"               : "a let");
     case T_COUNTER:         return((article == NO_ARTICLE) ? "internal-counter"  : "an internal counter");
-    case T_BAFFLE:          return((article == NO_ARTICLE) ? "baffle"            : "a baffle");
     case T_RANDOM_STATE:    return((article == NO_ARTICLE) ? "random-state"      : "a random-state");
     case T_SLOT:            return((article == NO_ARTICLE) ? "slot"              : "a slot (variable binding)");
     case T_INTEGER:         return((article == NO_ARTICLE) ? "integer"           : "an integer");
@@ -55248,7 +55231,6 @@ static void init_typers(s7_scheme *sc)
   sc->type_to_typers[T_C_POINTER] =           sc->is_c_pointer_symbol;
   sc->type_to_typers[T_OUTPUT_PORT] =         sc->is_output_port_symbol;
   sc->type_to_typers[T_INPUT_PORT] =          sc->is_input_port_symbol;
-  sc->type_to_typers[T_BAFFLE] =              sc->is_baffle_symbol;
   sc->type_to_typers[T_RANDOM_STATE] =        sc->is_random_state_symbol;
   sc->type_to_typers[T_GOTO] =                sc->is_goto_symbol;
   sc->type_to_typers[T_CONTINUATION] =        sc->is_continuation_symbol;
@@ -57688,6 +57670,17 @@ static s7_pointer fx_c_op_opsq_sq(s7_scheme *sc, s7_pointer arg)
   return(c_call(arg)(sc, sc->t1_1));
 }
 
+static s7_pointer fx_not_op_optq_sq(s7_scheme *sc, s7_pointer arg)
+{
+  s7_pointer outer, args;
+  outer = cadr(arg);
+  args = cadr(outer);
+  set_car(sc->t1_1, t_lookup(sc, cadr(args), arg));
+  set_car(sc->t2_1, c_call(args)(sc, sc->t1_1));
+  set_car(sc->t2_2, lookup(sc, caddr(outer)));
+  return((c_call(outer)(sc, sc->t2_1) == sc->F) ? sc->T : sc->F);
+}
+
 static s7_pointer fx_c_c_opsq(s7_scheme *sc, s7_pointer arg)
 {
   s7_pointer largs;
@@ -60075,6 +60068,11 @@ static bool fx_tree_in(s7_scheme *sc, s7_pointer tree, s7_pointer var1, s7_point
 	}
       break;
 
+    case HOP_SAFE_C_op_opSq_Sq:
+      if ((car(p) == sc->not_symbol) && (is_global(sc->not_symbol)) && (var1 == cadr(cadadr(p))))
+	return(with_c_call(tree, fx_not_op_optq_sq));
+      break;
+
     case HOP_SAFE_C_AC:
       if ((c_callee(tree) == fx_c_ac) && (c_callee(p) == g_num_eq_xi) && (caddr(p) == int_zero) &&
 	  (c_callee(cdr(p)) == fx_c_opuq_t_direct) && (caadr(p) == sc->remainder_symbol))
@@ -60128,6 +60126,7 @@ static void fx_tree(s7_scheme *sc, s7_pointer tree, s7_pointer var1, s7_pointer 
 	}
       return;
     }
+  if (is_syntax(car(tree))) return; /* someday let #_when/#_if etc through */
 
   if ((!has_fx(tree)) ||
       (!fx_tree_in(sc, tree, var1, var2)))
@@ -60140,8 +60139,8 @@ static void fx_tree_outer(s7_scheme *sc, s7_pointer tree, s7_pointer var1, s7_po
   /* if (is_pair(tree)) fprintf(stderr, "%s[%d]: %s %d %s %s\n", __func__, __LINE__, display_80(tree), has_fx(tree), display(var1), (var2) ? display(var2) : ""); */
 
   if ((!is_pair(tree)) ||
-      ((is_symbol(car(tree))) &&
-       (is_definer_or_binder(car(tree)))))
+      ((is_symbol(car(tree))) && (is_definer_or_binder(car(tree)))) ||
+      (is_syntax(car(tree))))
     return;
 
   if ((!has_fx(tree)) ||
@@ -74608,7 +74607,7 @@ static opt_t optimize_syntax(s7_scheme *sc, s7_pointer expr, s7_pointer func, in
 	  vars = cadr(expr);
 	  body = cddr(expr);
 	  if (is_null(vars))
-	    e = cons(sc, sc->nil, e);
+	    e = cons(sc, sc->nil, e); /* () in e = empty let */
 	  else
 	    if (!is_pair(vars))
 	      return(OPT_OOPS);
@@ -80861,6 +80860,7 @@ static s7_pointer op_set1(s7_scheme *sc)
       if (is_immutable(lx))
 	immutable_object_error(sc, set_elist_3(sc, immutable_error_string, sc->set_symbol, lx));
       slot_set_value(lx, sc->value);
+      symbol_increment_ctr(sc->code);                         /* see define setfib example in s7test.scm */
       return(sc->value); /* goto START */
     }
 
@@ -96032,8 +96032,6 @@ static void init_syntax(s7_scheme *sc)
   sc->bacro_star_symbol =        definer_syntax(sc, "bacro*",          OP_BACRO_STAR,        int_two,  max_arity,  H_bacro_star);
   sc->with_let_symbol =          binder_syntax(sc, "with-let",         OP_WITH_LET,          int_one,  max_arity,  H_with_let);
   sc->with_baffle_symbol =       definer_syntax(sc, "with-baffle",     OP_WITH_BAFFLE,       int_zero, max_arity,  H_with_baffle); /* (with-baffle) is () */
-  set_is_binder(sc->with_baffle_symbol);
-  /* with-baffle introduces a let: (inlet (symbol "(baffle)") #<baffle: 0>) */
   set_local_slot(sc->with_let_symbol, global_slot(sc->with_let_symbol)); /* for set_locals */
   set_immutable(sc->with_let_symbol);
   sc->setter_symbol = make_symbol(sc, "setter");
@@ -96049,7 +96047,6 @@ static void init_syntax(s7_scheme *sc)
 #endif
 
   sc->feed_to_symbol =              make_symbol(sc, "=>");
-  sc->baffle_symbol =               make_symbol(sc, "(baffle)");
   sc->body_symbol =                 make_symbol(sc, "body");
   sc->read_error_symbol =           make_symbol(sc, "read-error");
   sc->string_read_error_symbol =    make_symbol(sc, "string-read-error");
@@ -96158,7 +96155,6 @@ static void init_rootlet(s7_scheme *sc)
   sc->is_c_object_symbol =        b_defun("c-object?",	      is_c_object,	  0, T_C_OBJECT,     mark_vector_1,      false);
   sc->is_subvector_symbol =       b_defun("subvector?",	      is_subvector,	  0, T_FREE,         mark_vector_1,      false);
   sc->is_weak_hash_table_symbol = b_defun("weak-hash-table?", is_weak_hash_table, 0, T_FREE,         mark_vector_1,      false);
-  sc->is_baffle_symbol =          b_defun("baffle?",	      is_baffle,	  0, T_BAFFLE,       mark_vector_1,      true);
   sc->is_goto_symbol =            b_defun("goto?",	      is_goto,	          0, T_GOTO,         mark_vector_1,      true);
 
   /* these are for signatures */
@@ -97705,7 +97701,7 @@ int main(int argc, char **argv)
  * tall       26.9         15.6   15.6   15.6
  * calls      60.2         36.7   37.5   37.3
  * sg         97.4         71.9   72.3   72.5
- * lg        105.5        106.6  105.0  104.9
+ * lg        105.5        106.6  105.0  105.0
  * tbig      601.8        177.4  175.8  175.6
  * ---------------------------------------------
  *
@@ -97717,15 +97713,12 @@ int main(int argc, char **argv)
  *   fx_call not fx* in eval? (check tus case too)
  *   if target func known, why not use direct rather than tn_n?  or specialize t3_n callee etc)
  *   possibly c_op[a|c|s][a|c|s]q 
- *   possibly op_opsq_sq -> not_opsq_s, tu cases in these (see fx_tree_in, hop, maybe check TU)
  * qq copy-tree (not car if immutable, or set entire thing immutable?)
  * t725 functional exprs (args too?)
- *   fixup ((let () cond|with-let|quasiquote)...) fx flags (t718), but not if!
- * with-baffle use baffle flag on empty let, extra let field for id (so baffle is not a definer) [see find_baffle and find_any_baffle, op_with_baffle_unchecked]
+ *   fixup ((let () cond|with-let|quasiquote|quote)...) fx flags (t718), but not if!
  * there are many opt3_any -> con cases, check opt*_any [opt1..3, about 65 of each]
- * t718
+ * list-values or copy-tree circular list
  * with-let unlet t101
- * (define fib (lambda (n) #f))
- *    (set! fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))
- *    bug in closure_is_ok -- it thinks the older fib is ok!  We need to handle set! here like define
+ * more tests like setfib (t408), ideally we'd catch this trope and handle it like define, also t101
+ * in fx_tree, if syntax anywhere in car tree, return? or don't call fx_tree to begin with -- syntax not as car = unsafe
  */
