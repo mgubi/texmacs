@@ -43,7 +43,7 @@ For the standard r7rs benchmarks [here](https://github.com/ecraven/r7rs-benchmar
 | cat     | 1.187   | TIMELIM | 28.396944 |
 | tail    | 1.188   | TIMELIM | 9.821691  |
 | wc      | 8.266   | 57.91   | 16.963138 |
-| read1   | 406     | 0.95    | 5.804979  |
+| read1   | 0.406     | 0.95    | 5.804979  |
 | compiler | 41.155  | TIMELIM | 5.149011  |
 | conform | 51.031  | TIMELIM | 10.508732 |
 | dynamic | 22.736  | 69.58   | 7.374259  |
@@ -66,7 +66,7 @@ For the standard r7rs benchmarks [here](https://github.com/ecraven/r7rs-benchmar
 | sboyer  | 31.537  | 168.81  | 4.755798  |
 | gcbench | 20.54   | TIMELIM | 3.511493  |
 | mperm   | 173.33  | TIMELIM | 10.650118 |
-| equal   | 781     | TIMELIM | TIMELIM   |
+| equal   | 0.781     | TIMELIM | TIMELIM   |
 | bv2string | 10.782  | TIMELIM | 4.489627  |
 |  | | | |
 
