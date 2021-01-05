@@ -53,7 +53,7 @@ set (CMAKE_MODULE_PATH ${TEXMACS_SOURCE_DIR}/cmake)
 
 set (VERSION_MAJOR "1")
 set (VERSION_MINOR "99")
-set (VERSION_BUILD "17")
+set (VERSION_BUILD "18")
 set (TEXMACS_VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_BUILD})
 
 set (DEVEL_VERSION ${TEXMACS_VERSION})
@@ -736,7 +736,7 @@ if (APPLE)
 endif (APPLE)
 
 if (NOT WIN32)
-  install (FILES ${TEXMACS_BINARY_DIR}/misc/script/texmacs
+  install (FILES ${TEXMACS_BINARY_DIR}/misc/scripts/texmacs
                  ${TEXMACS_BINARY_DIR}/misc/scripts/fig2ps
                  misc/scripts/tm_gs
           DESTINATION bin
