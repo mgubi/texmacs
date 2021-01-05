@@ -70,10 +70,11 @@
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
 (define-public (save-object file value)
-  (with-output-to-file  (url-materialize file "") (lambda () (write value))))
+  (call-with-output-file (url-materialize file "") (lambda (port)
+    (let-temporarily (((*s7* 'print-length) 9223372036854775807)) (write value port)))))
 
 (define-public (load-object file)
-  (let ((r (with-input-from-file (url-materialize file "r") read)))
+  (let ((r (call-with-input-file (url-materialize file "r") (lambda (port) (read port)))))
         (if (eof-object? r) '() r)))
 
 (define-public (persistent-ref dir key)
