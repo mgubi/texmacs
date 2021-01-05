@@ -7,6 +7,9 @@ This version of TeXmacs uses [S7 scheme](https://cm-gitlab.stanford.edu/bil/s7.g
 
 At this point performance is good. TeXmacs/S7 compiles the full user manual in 20 sec while TeXmacs/Guile-1.8 in 15 sec. However there should be some margin for improvement. S7 is much faster than Guile 1.8 in standard benchmarks. 
 
+Update 4.1.2021: I've found a trick to improve lookup of symbols in S7 and now TeXmacs/S7 compiles the manual in the same time as TeXmacs/Guile (15 sec). Moreover startup time is reduced by half. So we have similar performances in these tasks.
+
+
 For the standard r7rs benchmarks [here](https://github.com/ecraven/r7rs-benchmarks) I got the following results on my MacBook Air (2019). 
 
 | test    | S7      | Guile1.8.8  | Guile3.0.4    |
@@ -69,6 +72,7 @@ For the standard r7rs benchmarks [here](https://github.com/ecraven/r7rs-benchmar
 | equal   | 0.781     | TIMELIM | TIMELIM   |
 | bv2string | 10.782  | TIMELIM | 4.489627  |
 |  | | | |
+
 
 
 
