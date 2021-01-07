@@ -26,8 +26,16 @@
       `(,base-define ,head ,@body)))
 (varlet *texmacs-user-module* 'define curried-define)
 
-(define-public-macro (1+ n) `(+ 1 ,n))
-(define-public (noop . l) (if #f #f #f))
+
+;(define primitive-string->symbol string->symbol)
+;(define-public (string->symbol s) (if (string-null? s) '() (primitive-string->symbol s)))
+
+(define-public-macro (1+ n) `(+ ,n 1))
+(define-public-macro (1- n) `(- ,n 1))
+(define-public (noop . args) (and (pair? args) (car args)))
+
+(define-public (delq x l)
+  (if (pair? l) (if (eq? x (car l)) (delq x (cdr l)) (cons (car l) (delq x (cdr l)))) ()))
 
 (define-public (acons key datum alist) (cons (cons key datum) alist))
 
@@ -77,6 +85,10 @@
 (define-public (force-output) (flush-output-port *stdout*))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-public (string-null? s) (equal? (length s) 0))
+
+(define-public (append! . ls) (apply append ls))
 
 (define-public (string-split s ch)
   (let ((len (length s)))
@@ -244,4 +256,4 @@
 (define-public (access? . l) #f)
 (define-public R_OK #f)
 
-(define-public (current-time) 100)
+;(define-public (current-time) 100)
