@@ -47,11 +47,20 @@
 
 (define-public scheme-completions-built? #f)
 
-(tm-define (all-used-modules)
-  (cons (current-module) (module-uses (current-module))))
+; redefine
+(tm-define (all-used-modules) *modules*)
+; anyway the previous definition was wrong.
+; (tm-define (all-used-modules)
+;  (cons (current-module) (module-uses (current-module))))
+
 
 (tm-define (all-used-symbols)
-  (list-fold obarray-fold-sub '() (all-used-modules)))
+  (map symbol->string (apply append (map (lambda (m)
+     (let ((e ((cdr m) '*exports*)))
+       (if (undefined? e) (values) e))) *modules*))))
+
+;(tm-define (all-used-symbols)
+;  (list-fold obarray-fold-sub '() (all-used-modules)))
 
 (tm-define (scheme-completions-add str)
   (set! completions (pt-add completions str)))
