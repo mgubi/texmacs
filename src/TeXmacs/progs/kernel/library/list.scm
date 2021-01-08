@@ -323,12 +323,9 @@
 	  ((pred? (car l)) i)
 	  (else (find (cdr l) (+ i 1))))))
 
+;; Internal helper.
 (define (any1 pred? ls)
-  ;; Internal helper.
-  (let lp ((ls ls))
-    (cond ((null? ls) #f)
-	  ((null? (cdr ls)) (pred? (car ls)))
-	  (else (or (pred? (car ls)) (lp (cdr ls)))))))
+  (if (null? ls) #f (or (pred? (car ls)) (any1 pred? (cdr ls)))))
 
 (define-public (list-any pred? ls . lists)
   "Applies @pred? on elements of @ls until it evaluates to true."
@@ -341,12 +338,9 @@
 	      (else (or (apply pred? (map-in-order car lists))
 			(lp (map-in-order cdr lists))))))))
 
+;; Internal helper.
 (define (every1 pred? ls)
-  ;; Internal helper.
-  (let lp ((ls ls))
-    (cond ((null? ls)  #t)
-	  ((null? (cdr ls)) (pred? (car ls)))
-	  (else (and (pred? (car ls)) (lp (cdr ls)))))))
+  (if (null? ls) #t (and (pred? (car ls)) (every1 pred? (cdr ls)))))
 
 (define-public (list-every pred? ls . lists)
   "Applies @pred? on elements of @ls until it evaluates to @#f."
