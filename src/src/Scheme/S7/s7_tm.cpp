@@ -296,44 +296,12 @@ static s7_pointer g_getpid (s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, (s7_int)getpid()));
 }
 
-
-#if 0
-
-static s7_pointer s7__getlogin(s7_scheme *sc, s7_pointer args)
-{
-  return(s7_make_string(sc, (char*)getlogin()));
-}
-
-static s7_pointer s7__getpwnam(s7_scheme *sc, s7_pointer arg)
-{
-  char* s7__getpwnam_0;
-  if (s7_is_string(s7_car(arg)))
-    s7__getpwnam_0 = (char*)s7_string(s7_car(arg));
-  else return(s7_wrong_type_arg_error(sc, __func__, 0, s7_car(arg), "string"));
-  return(s7_make_c_pointer_with_type(sc, (void*)getpwnam(s7__getpwnam_0), s7_make_symbol(sc, "passwd*"), s7_f(sc)));
-}
-
-
-(define-public (getpid) 1)
-(define-public (getlogin) "fake-getlogin")
-(define-public (getpwnam) "fake-getpwnam")
-(define-public (access? . l) #f)
-(define-public R_OK #f)
-
-(define-public (current-time) 100)
-#endif
-
-
 void
 initialize_compat () {
 
   s7_pointer cur_env = s7_curlet (tm_s7);
   s7_scheme *sc = tm_s7;
   
-#ifdef R_OK
-  s7_define(sc, cur_env, s7_make_symbol(sc, "R_OK"), s7_make_integer(sc, (s7_int)R_OK));
-#endif
-
   s7_define(sc, cur_env, s7_make_symbol (tm_s7, "current-time"),
     s7_make_typed_function (sc, "current-time", g_current_time, 0, 0,
                             false, "current-time", NULL));
