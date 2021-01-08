@@ -246,7 +246,7 @@ static s7_pointer blackbox_is_equal(s7_scheme *sc, s7_pointer args)
   if ((!s7_is_c_object (p2)) ||
       (s7_c_object_type (p2) != blackbox_tag))
     return s7_f (sc);
-  return scm_bool2scm (tmscm_to_blackbox (p1) == tmscm_to_blackbox (p2));
+  return bool_to_tmscm (tmscm_to_blackbox (p1) == tmscm_to_blackbox (p2));
 }
 
 
@@ -378,7 +378,7 @@ initialize_scheme () {
   initialize_compat ();
   initialize_smobs ();
   initialize_glue ();
-  object_stack= scm_lookup_string ("object-stack");
+  object_stack= s7_name_to_value (tm_s7, "object-stack");
   
     // uncomment to have a guile repl available at startup	
     //	gh_repl(guile_argc, guile_argv);

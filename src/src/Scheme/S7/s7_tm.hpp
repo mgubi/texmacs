@@ -17,37 +17,17 @@
 
 #include "s7.h"
 
+// the type of scheme objects
 typedef s7_pointer tmscm;
+
+// the global scheme interpreter state
 extern s7_scheme *tm_s7;
-
-#define SCM_NULL s7_nil(tm_s7)
-#define scm_bool2scm(x) (x? s7_t(tm_s7) : s7_f(tm_s7))
-#define scm_is_list(x) s7_is_list(tm_s7, x)
-#define scm_scm2bool(x) s7_boolean(x)
-#define scm_is_int(x) s7_is_integer(x)
-#define scm_is_double(x) scm_is_real(x)
-//#define scm_new_procedure(name,r,a,b,c) scm_c_define_gsubr(name,a,b,c,(scm_t_subr)r)
-#define scm_lookup_string(name) s7_name_to_value(tm_s7, name)
-#define scm_long2scm(x) s7_make_integer(tm_s7, x)
-#define scm_scm2long(x) s7_integer(tm_s7,x)
-#define scm_double2scm(x) s7_make_real(tm_s7, x)
-#define scm_scm2double(x) s7_real(x)
-#define scm_str2scm(x) s7_make_string(tm_s7, x)
-#define scm_scm2str(x) s7_string(x)
-#define scm_symbol2scm(x) s7_make_symbol(tm_s7, x)
-//#define scm_scm2symbol(x,y) scm_to_locale_stringn(scm_symbol_to_string(x),y)
-
-
-#define SCM_ARG8 8
-#define SCM_ARG9 9
-#define SCM_ARG10 10
-#define SCM_ARG11 11
 
 bool tmscm_is_blackbox (tmscm obj);
 tmscm blackbox_to_tmscm (blackbox b);
 blackbox tmscm_to_blackbox (tmscm obj);
 
-inline tmscm tmscm_null () { return SCM_NULL; }
+inline tmscm tmscm_null () { return s7_nil(tm_s7); }
 inline tmscm tmscm_true () { return s7_t(tm_s7); }
 inline tmscm tmscm_false () { return s7_f(tm_s7); }
 inline void tmscm_set_car (tmscm a, tmscm b) { s7_set_car (a, b); }
