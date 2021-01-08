@@ -196,6 +196,7 @@ static tmscm proc (s7_scheme*, tmscm args) {
         tmscm res = PROC(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10);
         return (res);
 }
+
 //FIXME: check the correct use of p0 and p1 and maybe add documentation
 #define tmscm_install_procedure(name, func, args, p0, p1) \
   s7_define_function (tm_s7, name, proc<func>, args, 0, false, "[missing doc]")
