@@ -252,10 +252,3 @@
 ; redefine (error ...) to match guile usage
 ; https://www.gnu.org/software/guile/manual/html_node/Error-Reporting.html
 
-; implement the interfaces below
-
-(define-public (getpid) 1)
-(define-public (getlogin) "fake-getlogin")
-(define-public (getpwnam) "fake-getpwnam")
-(define-public (access? . l) #f)
-(define-public R_OK #f)

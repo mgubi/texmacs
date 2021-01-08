@@ -15,6 +15,8 @@
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs (should not belong here)
 
+#include <unistd.h> // for getpid
+
 /******************************************************************************
  * Initialization of s7
  ******************************************************************************/
@@ -286,11 +288,16 @@ static s7_pointer g_current_time (s7_scheme *sc, s7_pointer args)
   return s7_make_integer(sc, res);
 }
 
-#if 0
-static s7_pointer g__getpid (s7_scheme *sc, s7_pointer args)
+static s7_pointer g_getpid (s7_scheme *sc, s7_pointer args)
 {
+//FIXME: we really have to use QCoreApplication::applicationPid()
+//for cross-platform support
+  
   return(s7_make_integer(sc, (s7_int)getpid()));
 }
+
+
+#if 0
 
 static s7_pointer s7__getlogin(s7_scheme *sc, s7_pointer args)
 {
@@ -331,11 +338,10 @@ initialize_compat () {
     s7_make_typed_function (sc, "current-time", g_current_time, 0, 0,
                             false, "current-time", NULL));
   
-#if 0
-  s7_define(sc, cur_env,
-            s7_make_symbol(sc, "getpid"),
-            s7_make_typed_function(sc, "getpid", s7__getpid, 0, 0, false, "int getpid(void)", pl_it));
-#endif
+  s7_define(sc, cur_env, s7_make_symbol(sc, "getpid"),
+            s7_make_typed_function(sc, "getpid", g_getpid, 0, 0,
+                                   false, "int getpid(void)",
+                                   s7_make_signature(sc, 2, s7_make_symbol(sc, "integer?"), s7_t(sc))));
 }
 
 
