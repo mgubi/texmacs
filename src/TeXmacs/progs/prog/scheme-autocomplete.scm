@@ -53,11 +53,16 @@
 ; (tm-define (all-used-modules)
 ;  (cons (current-module) (module-uses (current-module))))
 
-
+;;FIXME: this function is implementation dependent, move it in the compat layer
+;;also move some other parts of this module
 (tm-define (all-used-symbols)
-  (map symbol->string (apply append (map (lambda (m)
-     (let ((e ((cdr m) '*exports*)))
-       (if (undefined? e) (values) e))) *modules*))))
+  (map symbol->string (append
+     ;; add tm-defined symbols
+     (map car tm-defined-table)
+    ;; add all other exported symbols
+     (apply append (map (lambda (m)
+       (let ((e ((cdr m) '*exports*)))
+         (if (undefined? e) (values) e))) *modules*)))))
 
 ;(tm-define (all-used-symbols)
 ;  (list-fold obarray-fold-sub '() (all-used-modules)))
