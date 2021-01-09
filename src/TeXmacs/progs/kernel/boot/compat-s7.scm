@@ -150,56 +150,13 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; hashing (from the SRFI reference implementation)
+;; hashing (use S7 internal hash)
 
 (define *default-bound* (- (expt 2 29) 3))
 
-(define (%string-hash s ch-conv bound)
-  (let ((hash 31)
-    (len (string-length s)))
-    (do ((index 0 (+ index 1)))
-      ((>= index len) (modulo hash bound))
-      (set! hash (modulo (+ (* 37 hash)
-                (char->integer (ch-conv (string-ref s index))))
-             *default-bound*)))))
-
-(define (string-hash s . maybe-bound)
-  (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-    (%string-hash s (lambda (x) x) bound)))
-
-(define (string-ci-hash s . maybe-bound)
-  (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-    (%string-hash s char-downcase bound)))
-
-(define (symbol-hash s . maybe-bound)
-  (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-    (%string-hash (symbol->string s) (lambda (x) x) bound)))
-
-(define (vector-hash v bound)
-  (let ((hashvalue 571)
-    (len (vector-length v)))
-    (do ((index 0 (+ index 1)))
-      ((>= index len) (modulo hashvalue bound))
-      (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (vector-ref v index)))
-                  *default-bound*)))))
-
 (define-public (hash obj . maybe-bound)
   (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-    (cond ((integer? obj) (modulo obj bound))
-      ((string? obj) (string-hash obj bound))
-      ((symbol? obj) (symbol-hash obj bound))
-      ((real? obj) (modulo (+ (numerator obj) (denominator obj)) bound))
-      ((number? obj)
-       (modulo (+ (hash (real-part obj)) (* 3 (hash (imag-part obj))))
-           bound))
-      ((char? obj) (modulo (char->integer obj) bound))
-      ((vector? obj) (vector-hash obj bound))
-      ((pair? obj) (modulo (+ (hash (car obj)) (* 3 (hash (cdr obj))))
-                   bound))
-      ((null? obj) 0)
-      ((not obj) 0)
-      ((procedure? obj) 245) ;(error "hash: procedures cannot be hashed" obj))
-      (else 1))))
+    (modulo (hash-code obj) bound))) 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
