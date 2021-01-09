@@ -16,8 +16,8 @@
 #include "scheme.hpp" // interface to texmacs
 //#include "../Tiny/tinytmscm_tm.hpp" // interface to TinyScheme
 //#include "../Guile/guile_tm.hpp" // interface to guile
-#include "../S7/s7_tm.hpp" // interface to S7
-
+//#include "../S7/s7_tm.hpp" // interface to S7
+#include "../Chez/chez_tm.hpp" // interface to Chez Scheme
 
 
 class tmscm_object_rep: public object_rep {

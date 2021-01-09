@@ -264,6 +264,18 @@ static tmscm free_blackbox (tmscm obj)
 tmscm object_stack;
 
 void
+scheme_install_procedure (const char *name, void * func, int args ) {
+  Sforeign_symbol (name, func);
+  string s;
+  s << "(foreign-procedure \"" << name << "\" (";
+  for (int i=0; i<args; i++) s << "ptr ";
+  s << ") ptr)";
+  Scall1 (Stop_level_value (Sstring_to_symbol ("eval")), string_to_tmscm (s));
+}
+
+
+
+void
 initialize_scheme () {
   const char* init_prg = "(begin \n"
   "(define (display-to-string obj)\n"

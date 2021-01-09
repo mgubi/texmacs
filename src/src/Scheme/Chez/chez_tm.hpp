@@ -80,8 +80,10 @@ tmscm call_scheme (tmscm fun, array<tmscm> a);
  * Gluing
  ******************************************************************************/
 
-#define tmscm_install_procedure(name, func, args, p0, p1) \
-   Sforeign_symbol (name, (void*) func)
+void scheme_install_procedure (const char *name, void * func, int args );
+
+#define tmscm_install_procedure(name, func, args, p0, p1 ) \
+  scheme_install_procedure ((const char*)name, (void*)&func, args )
 
 /* The SCM_EXPECT macros provide branch prediction hints to the
    compiler.  To use only in places where the result of the expression
