@@ -166,7 +166,7 @@ string_to_tmscm (string s) {
 
 string
 tmscm_to_string (tmscm s) {
-  tmscm bv = Scall1 (Stop_level_value (Sstring_to_symbol("tm_string_decode")), s);
+  tmscm bv = Scall1 (Stop_level_value (Sstring_to_symbol("tm-string-decode")), s);
   if (!Sbytevectorp (bv)) return "";
   int len_r = Sbytevector_length (bv);
   const char* _r= (const char*) Sbytevector_data (bv);
@@ -287,9 +287,13 @@ initialize_scheme () {
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
   "(define object-stack '(()))"
   "(define *texmacs-user-module* #f)"
-  "(define eval-string (lambda (s . env) (apply eval (cons (with-input-from-string s read)  env))))"
+  "(define eval-string (lambda (s . env) \
+      (apply eval (cons (with-input-from-string s read)  env))))"
   "(define tm-eval-string (lambda (s) (eval-string s *texmacs-user-module*)))"
   "(define tm-load (lambda (file) (load file (lambda (e) (eval e *texmacs-user-module*)))))"
+  "(define *latin1-transcoder* (make-transcoder \
+      (latin-1-codec) (eol-style none) (error-handling-mode raise)))"
+  "(define tm-string-decode (lambda (str)  (string->bytevector str *latin1-transcoder*)))"
   "(set! *texmacs-user-module* (copy-environment (interaction-environment)))"
   ")";
 
