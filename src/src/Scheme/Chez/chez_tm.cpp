@@ -49,9 +49,16 @@ eval_scheme_file (string file) {
     //static int cumul= 0;
     //timer tm;
   if (DEBUG_STD) debug_std << "Evaluating " << file << "...\n";
-  tmscm result= Scall2 (Stop_level_value (Sstring_to_symbol ("load")),
-                        string_to_tmscm (file),
-                        Stop_level_value (Sstring_to_symbol ("*texmacs-user-module*")));
+//  tmscm result= Scall2 (Stop_level_value (Sstring_to_symbol ("load")),
+//                        string_to_tmscm (file),
+//                        Stop_level_value (Sstring_to_symbol ("*texmacs-user-module*")));
+  string s;
+  s << "(begin (display *texmacs-user-module*) (newline) (load  \"" << file << "\" (lambda (e) (eval e *texmacs-user-module*))))";
+  cout << s << "\n";
+//  tmscm result= eval_scheme (s);
+  tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("eval")),
+                        string_to_tmscm (s));
+
     //int extra= tm->watch (); cumul += extra;
     //cout << extra << "\t" << cumul << "\t" << file << "\n";
   return result;
@@ -265,15 +272,14 @@ tmscm object_stack;
 
 void
 scheme_install_procedure (const char *name, void * func, int args ) {
-  Sforeign_symbol (name, func);
   string s;
-  s << "(foreign-procedure \"" << name << "\" (";
+  s << "(define " << name << " (foreign-procedure \"" << name << "\" (";
   for (int i=0; i<args; i++) s << "ptr ";
-  s << ") ptr)";
+  s << ") ptr))";
+  //cout << s << "\n";
+  Sforeign_symbol (name, func);
   Scall1 (Stop_level_value (Sstring_to_symbol ("eval")), string_to_tmscm (s));
 }
-
-
 
 void
 initialize_scheme () {
@@ -284,6 +290,7 @@ initialize_scheme () {
   "\n"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
   "(define object-stack '(()))\n"
+  "(define *texmacs-user-module* (copy-environment (interaction-environment)))\n"
   ")";
 
   // eval in the root environment
@@ -297,7 +304,7 @@ initialize_scheme () {
   
   object_stack= Stop_level_value (Sstring_to_symbol ("object-stack"));
   Slock_object(object_stack);
-  
+  cout << "Init Scheme complete\n";
     // uncomment to have a guile repl available at startup	
     //	gh_repl(guile_argc, guile_argv);
     //scm_shell (guile_argc, guile_argv);
