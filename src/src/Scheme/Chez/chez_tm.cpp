@@ -32,10 +32,10 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   tm_chez_argc = argc;
   tm_chez_argv = argv;
   
-  Sscheme_init(NULL);
-  Sregister_boot_file("/Users/mgubi/t/ChezScheme/usr/lib/csv9.5.5/a6osx/petite.boot");
-  Sregister_boot_file("/Users/mgubi/t/ChezScheme/usr/lib/csv9.5.5/a6osx/scheme.boot");
-  Sbuild_heap(NULL, NULL);
+  Sscheme_init (NULL);
+  Sregister_boot_file ("/Users/mgubi/t/ChezScheme/usr/lib/csv9.5.5/a6osx/petite.boot");
+  Sregister_boot_file ("/Users/mgubi/t/ChezScheme/usr/lib/csv9.5.5/a6osx/scheme.boot");
+  Sbuild_heap (NULL, NULL);
     
   call_back (argc, argv);
 }
@@ -52,12 +52,9 @@ eval_scheme_file (string file) {
 //  tmscm result= Scall2 (Stop_level_value (Sstring_to_symbol ("load")),
 //                        string_to_tmscm (file),
 //                        Stop_level_value (Sstring_to_symbol ("*texmacs-user-module*")));
-  string s;
-  s << "(begin (display *texmacs-user-module*) (newline) (load  \"" << file << "\" (lambda (e) (eval e *texmacs-user-module*))))";
-  cout << s << "\n";
 //  tmscm result= eval_scheme (s);
-  tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("eval")),
-                        string_to_tmscm (s));
+  tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("tm-load")),
+                        string_to_tmscm (file));
 
     //int extra= tm->watch (); cumul += extra;
     //cout << extra << "\t" << cumul << "\t" << file << "\n";
@@ -71,9 +68,8 @@ eval_scheme_file (string file) {
 tmscm
 eval_scheme (string s) {
   // cout << "Eval] " << s << "\n";
-  tmscm result= Scall2 (Stop_level_value (Sstring_to_symbol ("eval")),
-                        string_to_tmscm (s),
-                        Stop_level_value (Sstring_to_symbol ("*texmacs-user-module*")));
+  tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("tm-eval-string")),
+                        string_to_tmscm (s));
   return result;
 }
 
@@ -283,32 +279,34 @@ scheme_install_procedure (const char *name, void * func, int args ) {
 
 void
 initialize_scheme () {
-  const char* init_prg = "(begin \n"
-  "(define (display-to-string obj)\n"
-  "  (call-with-output-string\n"
-  "    (lambda (port) (display obj port))))\n"
-  "\n"
-  "(define (texmacs-version) \"" TEXMACS_VERSION "\")\n"
-  "(define object-stack '(()))\n"
-  "(define *texmacs-user-module* (copy-environment (interaction-environment)))\n"
+  
+  // setup basic infrastructure from within Scheme
+  
+  const char* init_prg = "(begin "
+  "(define (display-to-string obj) (call-with-output-string (lambda (port) (display obj port))))"
+  "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
+  "(define object-stack '(()))"
+  "(define *texmacs-user-module* #f)"
+  "(define eval-string (lambda (s . env) (apply eval (cons (with-input-from-string s read)  env))))"
+  "(define tm-eval-string (lambda (s) (eval-string s *texmacs-user-module*)))"
+  "(define tm-load (lambda (file) (load file (lambda (e) (eval e *texmacs-user-module*)))))"
+  "(set! *texmacs-user-module* (copy-environment (interaction-environment)))"
   ")";
 
-  // eval in the root environment
-  Scall1 (Stop_level_value (Sstring_to_symbol ("eval")),
-                            string_to_tmscm (init_prg));
-
+  // eval in the top level environment the initialization code
+  Scall1(Stop_level_value (Sstring_to_symbol ("eval")),
+      Scall2 (Stop_level_value (Sstring_to_symbol ("with-input-from-string")),
+                              string_to_tmscm (init_prg),
+              Stop_level_value (Sstring_to_symbol ("read"))));
+  
+  // now the glue
   initialize_glue ();
 
   // we have to lock object_stack otherwise the GC will move it
   // alternatively we will have to change the code in object.cpp
-  
   object_stack= Stop_level_value (Sstring_to_symbol ("object-stack"));
-  Slock_object(object_stack);
+  Slock_object (object_stack);
+
   cout << "Init Scheme complete\n";
-    // uncomment to have a guile repl available at startup	
-    //	gh_repl(guile_argc, guile_argv);
-    //scm_shell (guile_argc, guile_argv);
-  
-  
 }
 
