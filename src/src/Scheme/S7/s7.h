@@ -1,10 +1,10 @@
 #ifndef S7_H
 #define S7_H
 
-#define S7_VERSION "9.7"
-#define S7_DATE "2-1-2021"
+#define S7_VERSION "9.8"
+#define S7_DATE "11-1-2021"
 #define S7_MAJOR_VERSION 9
-#define S7_MINOR_VERSION 7
+#define S7_MINOR_VERSION 8
 
 #include <stdint.h>           /* for int64_t */
 
@@ -326,6 +326,7 @@ s7_pointer s7_hash_table_ref(s7_scheme *sc, s7_pointer table, s7_pointer key);
                                                                             /* (hash-table-ref table key) */
 s7_pointer s7_hash_table_set(s7_scheme *sc, s7_pointer table, s7_pointer key, s7_pointer value);  
                                                                             /* (hash-table-set! table key value) */
+s7_int s7_hash_code(s7_scheme *sc, s7_pointer obj, s7_pointer eqfunc);      /* (hash-code obj [eqfunc]) */
 
 s7_pointer s7_hook_functions(s7_scheme *sc, s7_pointer hook);                              /* (hook-functions hook) */
 s7_pointer s7_hook_set_functions(s7_scheme *sc, s7_pointer hook, s7_pointer functions);    /* (set! (hook-functions hook) ...) */
@@ -890,6 +891,8 @@ typedef s7_double s7_Double;
  * 
  *        s7 changes
  *
+ * 6-Jan-21:  s7_hash_code.
+ * --------
  * 14-Oct:    s7_load_c_string and s7_load_c_string_with_environment.
  * 10-Sep:    s7_free.
  * 5-Aug:     s7_make_list.
