@@ -198,7 +198,7 @@ string get_user_name () {
   return ("<get_user_name not implemented in Windows>");
 #elif defined(OS_MACOS)
   return eval_system ("id -P $USER | awk -F '[:]' '{print $8}'");
-#elif
+#else // Linux
   return eval_system ("getent passwd $USER | cut -d: -f5 | cut -d, -f1");
 #endif
 }
