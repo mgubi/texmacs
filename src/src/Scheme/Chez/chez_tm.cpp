@@ -274,7 +274,7 @@ scheme_install_procedure (const char *name, void * func, int args ) {
   s << ") ptr))";
   //cout << s << "\n";
   Sforeign_symbol (name, func);
-  Scall1 (Stop_level_value (Sstring_to_symbol ("eval")), string_to_tmscm (s));
+  Scall1 (Stop_level_value (Sstring_to_symbol ("tm-eval-string")), string_to_tmscm (s));
 }
 
 void

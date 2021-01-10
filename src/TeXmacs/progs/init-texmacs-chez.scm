@@ -11,22 +11,9 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(display "Hey!\n")
+(display "Hey there!\n")
 
-;; S7 macros are not usual macros...
-(define define-macro define-expansion)
-
-(define primitive-symbol? symbol?)
-(set! symbol? (lambda (s) (and (not (keyword? s)) (primitive-symbol? s))))
-
-;; S7 loads by default in rootlet and eval in curlet
-;; but we prefer to load and eval into *texmacs-user-module*
-;; (the current toplevel)
-;; FIXME: we have to clarify the situation with *current-module* when evaluating
-;; in a different environment. In Guile *current-module* is set/reset.
-
-(varlet (rootlet) '*current-module* (curlet))
-(let ()
+#;(let ()
   (define primitive-load load)
   (define primitive-eval eval)
   (define primitive-catch catch)
@@ -47,9 +34,9 @@
 
 
 (let ()
-  (display "Benchmark 1\n")
   (define start (texmacs-time))
   (define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+  (display "Benchmark 1\n")
   (display (fib 30))
   (newline)
   (display "Time: ") (display (- (texmacs-time) start)) (newline)
@@ -59,10 +46,14 @@
 (define boot-start (texmacs-time))
 (define remote-client-list (list))
 
-(display "Booting TeXmacs kernel functionality\n")
-(load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
+(define has-look-and-feel? (lambda (x) (== x "emacs")))
 
-(inherit-modules (kernel boot compat-s7) (kernel boot abbrevs)
+(display "Booting TeXmacs kernel functionality\n")
+(load (url-concretize "$TEXMACS_PATH/progs/chez/boot.scm"))
+
+(inherit-modules (chez compat))
+
+(inherit-modules (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
                  (kernel boot ahash-table) (kernel boot prologue))
 (inherit-modules (kernel library base) (kernel library list)
