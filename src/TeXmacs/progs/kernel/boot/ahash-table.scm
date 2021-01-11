@@ -17,14 +17,16 @@
 ;; Adaptive hash tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-public make-ahash-table make-hash-table)
-(define-public ahash-ref hash-table-ref)
+(define-public (make-ahash-table) (make-hashtable equal-hash equal?))
+(define-public (ahash-ref h r) (hashtable-ref h r #f))
 (define-public (ahash-get-handle h s)
-  (let ((v  (hash-table-ref h s))) (if v (cons s v) #f)))
-(define-public ahash-set! hash-table-set!)
-(define-public (ahash-remove! h s) (hash-table-set! h s #f))
-(define-public (ahash-table->list h) (map values h))
-(define-public (ahash-size h) (lenght h))
+  (let ((v  (hashtable-ref h s #f))) (if v (cons s v) #f)))
+(define-public ahash-set! hashtable-set!)
+(define-public (ahash-remove! h s) (hashtable-delete! h s))
+(define-public (ahash-table->list h)
+  (let-values ([(vkeys vvals) (hashtable-entries h)])
+            (vector-for-each (lambda (a b) (cons a b)) vkeys vvals)))
+(define-public (ahash-size h) (hashtable-size h))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra routines on adaptive hash tables

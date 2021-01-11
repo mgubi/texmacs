@@ -23,7 +23,34 @@
 ;;; from GNU Guile 3.0.5 // ice-9/boot.scm
 ;;; See also https://gist.github.com/yuhr/bba4de4b34db940dcfba2b756f6cbc32
 
+(define-syntax macro
+  (syntax-rules ()
+    ((k transformer)
+       (lambda (stx)
+         (syntax-case stx ()
+           ((l . sv)
+            (let* ((v (syntax->datum (syntax sv)))
+                   (e (apply transformer v)))
+              (if (eq? (void) e)
+                  (syntax (void))
+                  (datum->syntax (syntax l) e)))))))))
+
 (define-syntax define-macro
+  (syntax-rules ()
+    ((k (name . args) body ...)
+     (define-macro name (lambda args body ...)))
+    ((k name transformer)
+     (define-syntax name
+       (lambda (stx)
+         (syntax-case stx ()
+           ((l . sv)
+            (let* ((v (syntax->datum (syntax sv)))
+                   (e (apply transformer v)))
+              (if (eq? (void) e)
+                  (syntax (void))
+                  (datum->syntax (syntax l) e))))))))))
+
+#;(define-syntax define-macro
   (lambda (x)
     "Define a defmacro."
     (syntax-case x ()
@@ -48,6 +75,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (noop . args) (and (pair? args) (car args)))
 
 
 ;(define list? proper-list?)
@@ -80,22 +109,25 @@
 ;; we assume *texmacs-user-module* is the current top-level environment
 ;;(define *texmacs-user-module* (curlet))
 
-(define *current-module* *texmacs-user-module*)
+(module (*current-module* *modules*)
+  (define *current-module* *texmacs-user-module*)
+  (define *modules* (make-hashtable equal-hash equal?))
+)
+
 (define *module-name* '(texmacs-user))
-(define *modules* (make-eq-hashtable))
 (define *exports* '())
 
 (hashtable-set! *modules* '(texmacs-user) *texmacs-user-module*)
 
 (define (current-module) *current-module*)
 
-;(define-macro (export . symbols)
-;    `(set! *exports* (append ',symbols *exports*)))
+(define-macro (tm-export . symbols)
+    `(set! *exports* (append ',symbols *exports*)))
 
 (define-macro (define-public head . body)
     `(begin
         (define ,head ,@body)
-        (export ,(if (pair? head) (car head) head))))
+        (tm-export ,(if (pair? head) (car head) head))))
                 
 (define-macro (provide-public head . body)
   (if (or (and (symbol? head) (not (defined? head)))
@@ -106,7 +138,7 @@
 (define-macro (define-public-macro head . body)
     `(begin
        (define-macro ,head ,@body)
-       (export ,(if (pair? head) (car head) head))))
+       (tm-export ,(if (pair? head) (car head) head))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Module handling
@@ -131,37 +163,45 @@
              (uname (gensym))
              (env (copy-environment *texmacs-user-module*)))
     (when (not loaded)
-        (display "TeXmacs] Loading module ") (display module) (display "\n")
-        (set-top-level-value '*current-module* env env)
-        (eval '(define (current-module) *current-module*) env)
-        (load module-file (lambda (e) (eval e env)))))))
+        (fluid-let ((*current-module* env))
+          (display "TeXmacs] Loading module ") (display module) (newline)
+          (load module-file (lambda (e) (eval e env)))
+          (display "TeXmacs] Loaded module ") (display module) (newline)
+     )))))
 
 (define (module-provide module)
   (if (not (module-available? module)) (module-load module)))
 
 (define (resolve-module module)
   (module-provide module)
-    (hashtable-ref *modules* module #f))
+  (hashtable-ref *modules* module #f))
 
 (define (module-exports which)
-   (let ((m (resolve-module which)))
-      (top-level-value '*exports* m)))
+   (let* ((m  (resolve-module which))
+          (ex (and m (top-level-value '*exports* m))))
+          (if ex ex '())))
 
 (define-macro (use-modules . modules)
-  `(map (lambda (module)
-      (map (lambda (symb) (define-top-level-value symb
-         (top-level-value symb module) *current-module*)) (module-exports module)))))
+  `(map (lambda (module) (let ((m (resolve-module module)))
+      (map (lambda (symb)
+        (if (top-level-bound? symb m)
+          (define-top-level-value symb
+            (top-level-value symb m) *current-module*)
+          (if (top-level-syntax? symb m)
+            (define-top-level-syntax symb
+              (top-level-syntax symb m) *current-module*))))
+        (module-exports module)))) ',modules))
 
 (define-macro (import-from . modules)
   `(use-modules ,@modules))
 
 (define-macro (re-export . symbols)
-  `(export ,@symbols))
+  `(tm-export ,@symbols))
 
 (define-macro (inherit-modules . which-list)
   (let ((l (apply append (map module-exports which-list))))
     `(begin
-       (use-modules ,@which-list)
+       (use-modules ,@which-list )
        (re-export ,@l))))
 
 (define-macro (texmacs-module name . options)
@@ -177,7 +217,7 @@
     ;;(display "loading ") (display name) (display "\n")
     `(begin
         (define *module-name* ',name)
-        (define *exports* ())
+        (define *exports* '())
         (hashtable-set! *modules* ',name (current-module))
        ,@l)))
 
@@ -185,18 +225,20 @@
 ;; On-entry and on-exit macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (quit-TeXmacs-scheme) (noop))
+(module (quit-TeXmacs-scheme)
+(define quit-TeXmacs-scheme (lambda args (noop)))
+)
 
 (define-macro (on-entry . cmd)
   `(begin ,@cmd))
 
 (define-macro (on-exit . cmd)
-  `(set! quit-TeXmacs-scheme (lambda () ,@cmd (,quit-TeXmacs-scheme))))
-
+  `(let ((prev quit-TeXmacs-scheme))
+     (set! quit-TeXmacs-scheme (lambda () ,@cmd (prev)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; compatibility layer
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (inherit-modules (chez keywords))
 
@@ -204,7 +246,7 @@
 (define-keywords or and not repeat group quote exclude range and-not match replace up down first last next previous)
 
 (define-keywords mode require type synopsis returns note argument arguments default proposals secure check-mark interactive balloon)
-(define-keywords all)
+(define-keywords all applicable)
 (define-keywords pause every idle)
 
 (define-keywords
@@ -237,7 +279,7 @@
 |order| |ornament-| |ornament-border| |ornament-color| |ornament-extra-color| |ornament-hpadding| |ornament-shadow-color|
 |ornament-shape| |ornament-sunny-color| |ornament-swell| |ornament-title-style| |ornament-vpadding| |other| |out-row|
 |out-row-group| |out-table| |over| |overwrite| |p| |p.| |p>| |parent| |pasprat| |pause| |pen| |penalty| |permanent|
-person| |pre| |preamble| |prefix| |preformatted| |preprocessor| |preprocessor_directive| |pretty| |previous| |print|
+|person| |pre| |preamble| |prefix| |preformatted| |preprocessor| |preprocessor_directive| |pretty| |previous| |print|
 |prioritary| |procedure| |profile| |program-theme| |promptrepl| |proposals| |pseudos| |public-dsa-key| |python:comment|
 |python:constant| |python:constant_char| |python:constant_number| |python:constant_string| |python:declare_function|
 |python:declare_type| |python:error| |python:keyword| |python:keyword_conditional| |python:keyword_control| |python:none|
@@ -260,4 +302,5 @@ person| |pre| |preamble| |prefix| |preformatted| |preprocessor| |preprocessor_di
 
 )
 
+(display "End of boot.scm\n")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

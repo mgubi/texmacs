@@ -283,7 +283,9 @@ initialize_scheme () {
   // setup basic infrastructure from within Scheme
   
   const char* init_prg = "(begin "
-  "(define (display-to-string obj) (call-with-output-string (lambda (port) (display obj port))))"
+//  "(current-eval interpret)"
+//  "(display \"Interpreting code\") (newline)"
+  "(define (display-to-string obj) (call-with-string-output-port (lambda (port) (display obj port))))"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
   "(define object-stack '(()))"
   "(define *texmacs-user-module* #f)"
@@ -294,7 +296,7 @@ initialize_scheme () {
   "(define *latin1-transcoder* (make-transcoder \
       (latin-1-codec) (eol-style none) (error-handling-mode raise)))"
   "(define tm-string-decode (lambda (str)  (string->bytevector str *latin1-transcoder*)))"
-  "(set! *texmacs-user-module* (copy-environment (interaction-environment)))"
+  "(set! *texmacs-user-module* (interaction-environment))"
   ")";
 
   // eval in the top level environment the initialization code

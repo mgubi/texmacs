@@ -7,10 +7,10 @@
 ;; from https://srfi.schemers.org/srfi-88/srfi-88.html
 ;; slightly modified to have keywords of the form :my-keyword
 ;; (i.e. lisp-like leading colon)
-
-(define real-symbol? symbol?)
-(define real-symbol->string symbol->string)
-(define real-string->symbol string->symbol)
+(import (rename scheme (symbol? real-symbol?) (symbol->string real-symbol->string) (string->symbol real-string->symbol)))
+;(define real-symbol? symbol?)
+;(define real-symbol->string symbol->string)
+;(define real-string->symbol string->symbol)
 
 (define looks-like-an-unquoted-keyword?
   (lambda (s)
@@ -18,7 +18,7 @@
       (and (> n 1)
            (char=? (string-ref s 0) #\:)))))
 
-(set! symbol?
+(define-public symbol?
   (lambda (obj)
     (and (real-symbol? obj)
          (not (looks-like-an-unquoted-keyword?
@@ -45,9 +45,9 @@
           (real-string->symbol s-colon)
           (error "sorry... the keyword would look like a symbol!")))))
 
-(set! symbol->string real-symbol->string)
+(define-public symbol->string real-symbol->string)
 
-(set! string->symbol
+(define-public string->symbol
   (lambda (s)
     (if (looks-like-an-unquoted-keyword? s)
         (error "sorry... the symbol would look like a keyword!")

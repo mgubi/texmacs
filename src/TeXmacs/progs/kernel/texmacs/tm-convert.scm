@@ -425,7 +425,7 @@
 
 (define-public (format-skip-line s pos)
   (cond ((>= pos (string-length s)) pos)
-	((in? (string-ref s pos) '(#\newline #\cr)) (+ pos 1))
+	((in? (string-ref s pos) '(#\newline #\return)) (+ pos 1))
 	(else (format-skip-line s (+ pos 1)))))
 
 (define-public (format-test? s pos what)

@@ -79,7 +79,7 @@
 ;; Copied from guile-1.6.0.
 
 (define-public-macro (receive vars vals . body)
-  `((lambda ,vars ,@body) ,vals))
+  `(call-with-values (lambda () ,vals) (lambda ,vars ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SECTION : case-lambda special form (SRFI-16)

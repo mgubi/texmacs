@@ -22,12 +22,13 @@
 ;(define primitive-string->symbol string->symbol)
 ;(define-public (string->symbol s) (if (string-null? s) '() (primitive-string->symbol s)))
 
+(define-public (defined? s) (or (top-level-bound? s) (top-level-syntax? s)))
+
 (define-public-macro (1+ n) `(+ ,n 1))
 (define-public-macro (1- n) `(- ,n 1))
-(define-public (noop . args) (and (pair? args) (car args)))
 
 (define-public (delq x l)
-  (if (pair? l) (if (eq? x (car l)) (delq x (cdr l)) (cons (car l) (delq x (cdr l)))) ()))
+  (if (pair? l) (if (eq? x (car l)) (delq x (cdr l)) (cons (car l) (delq x (cdr l)))) '()))
 
 (define-public (acons key datum alist) (cons (cons key datum) alist))
 
@@ -36,6 +37,9 @@
 
 (define-public (map-in-order . l) (apply map l))
 
+(define-public (catch thunk handler)
+  (with-exception-handler handler thunk))
+  
 (define-public lazy-catch catch)
 
 (define-public (last-pair lis)
@@ -59,13 +63,13 @@
 
 (define-public (assoc-set! l what val)
   (let ((b (assoc what l)))
-    (if b (set! (cdr b) val) (set! l (cons (cons what val) l)))
+    (if b (set-cdr! b val) (set! l (cons (cons what val) l)))
     l))
 
 ;;FIXME: assoc-set! is tricky to use, maybe just get rid in the code
 (define-public (assoc-set! l what val)
   (let ((b (assoc what l)))
-    (if b (set! (cdr b) val) (set! l (cons (cons what val) l)))
+    (if b (set-cdr! b val) (set! l (cons (cons what val) l)))
     l))
 
 (define-public (assoc-ref l what)
@@ -84,7 +88,7 @@
 
 (define-public (string-split s ch)
   (let ((len (length s)))
-    (let f ((start 0) (acc ()))
+    (let f ((start 0) (acc '()))
       (if (< start len)
         (let ((end (+ (or (char-position ch s start) (- len 1)) 1)))
            (f end (cons (substring s start end)  acc)))
@@ -128,7 +132,7 @@
   `(make-promise #f (lambda () ,expr)))
 
 (define-public-macro (delay expr) ; "delay" is taken damn it
-  (list 'delay-force (list 'make-promise #t (list 'lambda () expr))))
+  (list 'delay-force (list 'make-promise #t (list 'lambda '() expr))))
 
 (define-public (force promise)
   (if (caar promise)

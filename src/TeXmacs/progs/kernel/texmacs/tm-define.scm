@@ -253,13 +253,18 @@
            (when (nnull? cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
              (display* "   " ',nval "\n"))
-           ;;(display* "Defined " ',var "\n")
-           ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           (varlet (rootlet) ',var
+           (display* "Defined " ',var "\n")
+           (if (nnull? cur-conds) (display* "   " ',nval "\n"))
+           (define-top-level-value ',var
                  (if (null? cur-conds) ,nval
-                     ,(list 'let '((former (lambda args (noop)))) nval)))
+                     ,(list 'let '((former (lambda args (noop)))) nval)) *texmacs-user-module*)
+            (define-top-level-value ',var (top-level-value ',var *texmacs-user-module*) *current-module*)
+      #;     (define-top-level-syntax ',var
+             (make-variable-transformer (lambda (x)
+                (syntax-case x ()
+                  [(_ e ...) #'((top-level-value ',var *texmacs-user-module*) e ...)]))) *current-module*)
            (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name ,var ',var)
+           (ahash-set! tm-defined-name (top-level-value ',var *texmacs-user-module*) ',var)
 	   (ahash-set! tm-defined-module ',var
                        (list *module-name*))
            ,@(map property-rewrite cur-props)))))
@@ -294,9 +299,13 @@
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
        (tm-define ,macro-head ,@body)
-       (with-module *texmacs-user-module*
-         (define-public-macro ,head
-           ,(apply* (ca*r macro-head) head))))))
+       (define-top-level-syntax ',(car head)
+         (macro (lambda  ,(cdr head)
+           ,(apply* (ca*r macro-head) head)))  *texmacs-user-module*)
+       (define-top-level-syntax ',(car head)
+         (macro (lambda  ,(cdr head)
+           ,(apply* (ca*r macro-head) head)))  *current-module*)
+           )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -344,6 +353,7 @@
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)
+   (display opts) (newline) (display real-names) (newline)
     `(begin
        ,@(map (lambda (name) (lazy-define-one module opts name)) names))))
 
