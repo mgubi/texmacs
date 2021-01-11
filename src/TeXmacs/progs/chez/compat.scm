@@ -27,6 +27,13 @@
 (define-public-macro (1+ n) `(+ ,n 1))
 (define-public-macro (1- n) `(- ,n 1))
 
+(define-public (first x) (car x))
+(define-public (second x) (cadr x))
+(define-public (third x) (caddr x))
+(define-public (fourth x) (cadddr x))
+(define-public (fifth x) (cadddr (cdr x)))
+(define-public (sixth x) (cadddr (cddr x)))
+
 (define-public (delq x l)
   (if (pair? l) (if (eq? x (car l)) (delq x (cdr l)) (cons (car l) (delq x (cdr l)))) '()))
 

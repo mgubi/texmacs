@@ -110,12 +110,9 @@
   (for-each insert l))
 
 (define-public-macro (define-table name . l)
-  `(begin
-     (when (not (defined? ',name))
-       (if (defined? 'tm-define)
-           (tm-define ,name (make-ahash-table))
-           (define-public ,name (make-ahash-table))))
-     (define-table-decls ,name ,(list 'quasiquote l))))
+   `(begin
+       (tm-define ,name (make-ahash-table))
+       (define-table-decls ,name ,(list 'quasiquote l))))
 
 (define-public-macro (extend-table name . l)
   `(define-table-decls ,name ,(list 'quasiquote l)))

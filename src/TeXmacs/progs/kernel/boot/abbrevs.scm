@@ -60,10 +60,6 @@
 (provide-public (ignore . l) (noop))
 (provide-public (negate pred?) (lambda x (not (apply pred? x))))
 
-(define-public (keyword->string x)
-  (symbol->string (keyword->symbol x)))
-(define-public (string->keyword x)
-  (symbol->keyword (string->symbol x)))
 (define-public (keyword->number x)
   (string->number (string-tail (symbol->string (keyword->symbol x)) 1)))
 (define-public (number->keyword x)

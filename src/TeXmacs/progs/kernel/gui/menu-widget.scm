@@ -676,7 +676,7 @@
             (else
              (make-menu-items-list p style bar?)))
       (cond ((== p '---) (list (make-menu-hsep)))
-            ((== p '|) (list (make-menu-vsep))) ;; '|
+            ((== p '\x7C;) (list (make-menu-vsep))) ;; '|
             ((== p '()) p)
             (else (list (make-menu-bad-format p style))))))
 
@@ -911,7 +911,7 @@
 
 (define-table menu-expand-table
   (--- ,(lambda (p) `(--- ,@(menu-expand-list (cdr p)))))
-  (| ,(lambda (p) `(| ,@(menu-expand-list (cdr p)))))
+  (\x7C; ,(lambda (p) `(\x7C; ,@(menu-expand-list (cdr p))))) ;; '\x7C; = '|
   (group ,replace-procedures)
   (text ,replace-procedures)
   (invisible ,replace-procedures)
