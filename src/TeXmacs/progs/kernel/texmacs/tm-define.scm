@@ -259,6 +259,7 @@
                  (if (null? cur-conds) ,nval
                      ,(list 'let '((former (lambda args (noop)))) nval)) *texmacs-user-module*)
             (define-top-level-value ',var (top-level-value ',var *texmacs-user-module*) *current-module*)
+            (set! *tm-defines* (cons ',var *tm-defines*))
       #;     (define-top-level-syntax ',var
              (make-variable-transformer (lambda (x)
                 (syntax-case x ()
@@ -302,10 +303,10 @@
        (define-top-level-syntax ',(car head)
          (macro (lambda  ,(cdr head)
            ,(apply* (ca*r macro-head) head)))  *texmacs-user-module*)
-       (define-top-level-syntax ',(car head)
-         (macro (lambda  ,(cdr head)
-           ,(apply* (ca*r macro-head) head)))  *current-module*)
-           )))
+       (define-macro ,head
+           ,(apply* (ca*r macro-head) head))
+       (set! *tm-defines* (cons ',(car head) *tm-defines*))
+       (display* "Defined macro " ',(car head) #\newline))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols

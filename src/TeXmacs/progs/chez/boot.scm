@@ -116,6 +116,7 @@
 
 (define *module-name* '(texmacs-user))
 (define *exports* '())
+(define *tm-defines* '())
 
 (hashtable-set! *modules* '(texmacs-user) *texmacs-user-module*)
 
@@ -165,7 +166,7 @@
     (when (not loaded)
         (fluid-let ((*current-module* env))
           (display "TeXmacs] Loading module ") (display module) (newline)
-          (load module-file (lambda (e) (eval e env)))
+          (load module-file (lambda (e) (eval e *current-module*)))
           (display "TeXmacs] Loaded module ") (display module) (newline)
      )))))
 
@@ -181,8 +182,14 @@
           (ex (and m (top-level-value '*exports* m))))
           (if ex ex '())))
 
+(define (module-tm-defines which)
+   (let* ((m  (resolve-module which))
+          (ex (and m (top-level-value '*tm-defines* m))))
+          (if ex ex '())))
+
 (define-macro (use-modules . modules)
   `(map (lambda (module) (let ((m (resolve-module module)))
+     ; export bindings
       (map (lambda (symb)
         (if (top-level-bound? symb m)
           (define-top-level-value symb
@@ -190,7 +197,17 @@
           (if (top-level-syntax? symb m)
             (define-top-level-syntax symb
               (top-level-syntax symb m) *current-module*))))
-        (module-exports module)))) ',modules))
+        (module-exports module))
+       (map (lambda (symb)
+        (set! *tm-defines* (cons symb *tm-defines*))
+        (if (top-level-bound? symb m)
+          (define-top-level-value symb
+            (top-level-value symb *texmacs-user-module*) *current-module*)
+          (if (top-level-syntax? symb m)
+            (define-top-level-syntax symb
+              (top-level-syntax symb *texmacs-user-module*) *current-module*))))
+        (module-tm-defines module))
+       )) ',modules))
 
 (define-macro (import-from . modules)
   `(use-modules ,@modules))
@@ -218,6 +235,7 @@
     `(begin
         (define *module-name* ',name)
         (define *exports* '())
+        (define *tm-defines* '())
         (hashtable-set! *modules* ',name (current-module))
        ,@l)))
 
