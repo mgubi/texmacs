@@ -25,7 +25,7 @@
 (define-public (ahash-remove! h s) (hashtable-delete! h s))
 (define-public (ahash-table->list h)
   (let-values ([(vkeys vvals) (hashtable-entries h)])
-            (vector-for-each (lambda (a b) (cons a b)) vkeys vvals)))
+            (vector->list (vector-map (lambda (a b) (cons a b)) vkeys vvals))))
 (define-public (ahash-size h) (hashtable-size h))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
