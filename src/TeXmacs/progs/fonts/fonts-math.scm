@@ -469,8 +469,8 @@
 		  LucidaGrande LucidaGrande
 		  $t $a $b $s $d))
    ((math-apple $t $a $b $s $d)
-    (unicode-math #{Apple Symbols}# #{Apple Symbols}#
-		  #{Apple Symbols}# #{Apple Symbols}#
+    (unicode-math |Apple Symbols| |Apple Symbols|
+		  |Apple Symbols| |Apple Symbols|
 		  $t $a $b $s $d))
 
    ((math-dejavu ms bold right $s $d)
