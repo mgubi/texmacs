@@ -67,7 +67,7 @@ eval_scheme_file (string file) {
 
 tmscm
 eval_scheme (string s) {
-  // cout << "Eval] " << s << "\n";
+   cout << "Eval] " << s << "\n";
   tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("tm-eval-string")),
                         string_to_tmscm (s));
   return result;
@@ -95,7 +95,7 @@ TeXmacs_call_scm (arg_list *args) {
     for (int i=1; i <= args->n; i++)
       Sput_arg (i, args->a[i]);
     r= Scall(args->a[0], args->n);
-  }
+  } else r= tmscm_null();
   return r;
 }
 
@@ -166,11 +166,25 @@ string_to_tmscm (string s) {
 
 string
 tmscm_to_string (tmscm s) {
+  string r;
+  tmscm_lock (s);
   tmscm bv = Scall1 (Stop_level_value (Sstring_to_symbol("tm-string-decode")), s);
-  if (!Sbytevectorp (bv)) return "";
-  int len_r = Sbytevector_length (bv);
-  const char* _r= (const char*) Sbytevector_data (bv);
-  string r (_r, len_r);
+  tmscm_lock (bv);   tmscm_unlock (s);
+  if (!Sbytevectorp (bv)) {
+    if (Spairp (bv) && Sbytevectorp (Scar (bv))) {
+      int len_r = Sbytevector_length (Scar (bv));
+      const char* _r= (const char*) Sbytevector_data (Scar (bv));
+      string r1 (_r, len_r);
+      string rr= utf8_to_cork (r);
+      r = rr;
+    } else r = "<tm string conversion error>";
+  } else {
+    int len_r = Sbytevector_length (bv);
+    const char* _r= (const char*) Sbytevector_data (bv);
+    string r1 (_r, len_r);
+    r = r1;
+  }
+  tmscm_unlock (bv);
   return r;
 }
 
@@ -248,6 +262,8 @@ static tmscm blackbox_to_string (tmscm o)
   return string_to_tmscm (s);
 }
   
+// FIXME: What about this ?????
+// Remember to free the blackboxes!!!!
 static tmscm free_blackbox (tmscm obj)
 {
   ASSERT (tmscm_is_blackbox (obj),  "free_blackbox : wrong type");
@@ -295,7 +311,11 @@ initialize_scheme () {
   "(define tm-load (lambda (file) (load file (lambda (e) (eval e *texmacs-user-module*)))))"
   "(define *latin1-transcoder* (make-transcoder \
       (latin-1-codec) (eol-style none) (error-handling-mode raise)))"
-  "(define tm-string-decode (lambda (str)  (string->bytevector str *latin1-transcoder*)))"
+  "(define *utf8-transcoder* (make-transcoder \
+      (utf-8-codec) (eol-style none) (error-handling-mode raise)))"
+  "(define tm-string-decode (lambda (str) (call/cc (lambda (k) (with-exception-handler \
+     (lambda (err) (k (cons 'utf8 (string->bytevector str *utf8-transcoder*))))\
+     (lambda () (string->bytevector str *latin1-transcoder*)))))))"
   "(set! *texmacs-user-module* (interaction-environment))"
   ")";
 

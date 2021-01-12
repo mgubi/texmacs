@@ -432,21 +432,26 @@ scheme_tree_to_tmscm (scheme_tree t) {
 
 scheme_tree
 tmscm_to_scheme_tree (tmscm p) {
-  if (tmscm_is_list (p)) {
+  scheme_tree r= "?";
+  tmscm_lock (p);
+  if (tmscm_is_pair (p)) {
     tree t (TUPLE);
     while (!tmscm_is_null (p)) {
       t << tmscm_to_scheme_tree (tmscm_car (p));
+      tmscm_unlock (p);
       p= tmscm_cdr (p);
+      tmscm_lock (p);
     }
-    return t;
+    r= t;
   }
-  if (tmscm_is_symbol (p)) return tmscm_to_symbol (p);
-  if (tmscm_is_string (p)) return scm_quote (tmscm_to_string (p));
+  else if (tmscm_is_symbol (p)) r= tmscm_to_symbol (p);
+  else if (tmscm_is_string (p)) r= scm_quote (tmscm_to_string (p));
   //if (tmscm_is_string (p)) return "\"" * tmscm_to_string (p) * "\"";
-  if (tmscm_is_int (p)) return as_string ((int) tmscm_to_int (p));
-  if (tmscm_is_bool (p)) return (tmscm_to_bool (p)? string ("#t"): string ("#f"));
-  if (tmscm_is_tree (p)) return tree_to_scheme_tree (tmscm_to_tree (p));
-  return "?";
+  else if (tmscm_is_int (p)) r= as_string ((int) tmscm_to_int (p));
+  else if (tmscm_is_bool (p)) r= (tmscm_to_bool (p)? string ("#t"): string ("#f"));
+  else if (tmscm_is_tree (p)) r= tree_to_scheme_tree (tmscm_to_tree (p));
+  tmscm_unlock (p);
+  return r;
 }
 
 /******************************************************************************

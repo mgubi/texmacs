@@ -31,22 +31,25 @@ static list<tmscm > destroy_list;
 extern tmscm object_stack;
 
 tmscm_object_rep::tmscm_object_rep (tmscm obj) {
+  tmscm_lock (obj);
   while (!is_nil (destroy_list)) {
     tmscm handle= destroy_list->item;
     tmscm_set_car (handle, tmscm_null ());
     while (tmscm_is_pair (tmscm_cdr (handle)) && tmscm_is_null (tmscm_cadr (handle)))
       tmscm_set_cdr (handle, tmscm_cddr( (handle)) );
-    Sunlock_object (handle);
+    tmscm_unlock (handle);
     destroy_list= destroy_list->next;
   }
   handle = tmscm_cons ( tmscm_cons (obj, tmscm_null ()), tmscm_car (object_stack) );
-  Slock_object (handle);
+  tmscm_lock (handle);
   tmscm_set_car (object_stack, handle);
 }
 
 tmscm_object_rep::~tmscm_object_rep () {
     // Be careful: can't call Scheme code from this destructor,
     // because the destructor can be called during garbage collection.
+  tmscm_unlock (tmscm_car (handle));
+
   destroy_list= list<tmscm > ( handle, destroy_list);
 }
 

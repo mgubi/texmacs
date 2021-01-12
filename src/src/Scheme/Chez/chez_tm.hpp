@@ -75,6 +75,8 @@ tmscm call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3);
 tmscm call_scheme (tmscm fun, tmscm a1, tmscm a2, tmscm a3, tmscm a4);
 tmscm call_scheme (tmscm fun, array<tmscm> a);
 
+inline void tmscm_lock (tmscm p) { Slock_object(p); }
+inline void tmscm_unlock (tmscm p) { Sunlock_object(p); }
 
 /******************************************************************************
  * Gluing
