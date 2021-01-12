@@ -57,7 +57,7 @@
 (define-public tm-defined-module (make-ahash-table))
 (define-public define-option-table (make-hash-table 100))
 
-(define-public cur-conds '())
+(define cur-conds '())
 
 (define cur-props-table (make-ahash-table))
 (define cur-props '())
@@ -101,7 +101,7 @@
   (ctx-add-condition! 0 (car opt))
   decl)
 
-(define-public (predicate-option? x)
+(define (predicate-option? x)
   (or (and (symbol? x) (string-ends? (symbol->string x) "?"))
       (and (pair? x) (== (car x) 'lambda))))
 
@@ -233,15 +233,16 @@
 
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
+         (xvar (symbol-append var '$global))
          (nbody (tm-add-condition var head body))
          (nval (lambda* head nbody)))
     (if (ahash-ref tm-defined-table var)
         `(let ((former ,var))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
-           ;;(display* "Overloaded " ',var "\n")
-           ;;(display* "   " ',nval "\n")
-           (set! ,var ,nval)
+           ;(display* "Overloaded " ',var "\n")
+           ;(display* "   " ',nval "\n")
+           (set-top-level-value! ',xvar ,nval *texmacs-user-module*)
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
            (ahash-set! tm-defined-name ,var ',var)
@@ -249,23 +250,26 @@
 		       (cons *module-name*
 			     (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props))
-        `(begin
-           (when (nnull? cur-conds)
+        `(let ()
+          (define-syntax ,var
+             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
+                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))))
+           (when (nnull? ',cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
-             (display* "   " ',nval "\n"))
-           (display* "Defined " ',var "\n")
-           (if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           (define-top-level-value ',var
-                 (if (null? cur-conds) ,nval
-                     ,(list 'let '((former (lambda args (noop)))) nval)) *texmacs-user-module*)
-            (define-top-level-value ',var (top-level-value ',var *texmacs-user-module*) *current-module*)
+             (display* "   " ',nval "\n")
+             (display* ">>>" ',cur-conds #\newline))
+           ;(display* "Defined " ',var " " ',xvar "\n")
+           (if (nnull? ',cur-conds) (display* "   " ',nval "\n"))
+           (define-top-level-syntax ',var
+             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
+                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))) *current-module*)
+            (define-top-level-syntax ',var (top-level-syntax ',var *current-module*) *texmacs-user-module*)
+           (define-top-level-value ',xvar
+                 ,(if (null? cur-conds) nval
+                     (list 'let '((former (lambda args (noop)))) nval)) *texmacs-user-module*)
             (set! *tm-defines* (cons ',var *tm-defines*))
-      #;     (define-top-level-syntax ',var
-             (make-variable-transformer (lambda (x)
-                (syntax-case x ()
-                  [(_ e ...) #'((top-level-value ',var *texmacs-user-module*) e ...)]))) *current-module*)
            (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name (top-level-value ',var *texmacs-user-module*) ',var)
+           (ahash-set! tm-defined-name (top-level-value ',xvar *texmacs-user-module*) ',var)
 	   (ahash-set! tm-defined-module ',var
                        (list *module-name*))
            ,@(map property-rewrite cur-props)))))
@@ -298,15 +302,18 @@
     ;;(display* "   " `(tm-define ,macro-head ,@body) "\n")
     ;;(display* "   " `(define-public-macro ,head
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
-    `(begin
-       (tm-define ,macro-head ,@body)
+    (with r `(begin
        (define-top-level-syntax ',(car head)
          (macro (lambda  ,(cdr head)
-           ,(apply* (ca*r macro-head) head)))  *texmacs-user-module*)
-       (define-macro ,head
-           ,(apply* (ca*r macro-head) head))
+           ,(apply* `(top-level-value ',(symbol-append (ca*r macro-head) '$global) *texmacs-user-module*)  head)))  *current-module*)
+       (define-top-level-syntax ',(car head) (top-level-syntax ',(car head) *current-module*) *texmacs-user-module*)
        (set! *tm-defines* (cons ',(car head) *tm-defines*))
-       (display* "Defined macro " ',(car head) #\newline))))
+       ;(display* "Defined macro " ',(car head) #\newline)
+
+       (tm-define ,macro-head ,@body)
+ ;      (define-macro ,head
+ ;          ,(apply* (ca*r macro-head) head))
+       ) #;(display* "YYY" r) #;(newline) r)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -354,7 +361,6 @@
 
 (define-public-macro (lazy-define module . names)
   (receive (opts real-names) (list-break names not-define-option?)
-   (display opts) (newline) (display real-names) (newline)
     `(begin
        ,@(map (lambda (name) (lazy-define-one module opts name)) names))))
 

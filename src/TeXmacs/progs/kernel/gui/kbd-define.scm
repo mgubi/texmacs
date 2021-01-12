@@ -98,6 +98,15 @@
 (tm-define (kbd-get-rev key) (ahash-ref kbd-rev-table key))
 (define (kbd-remove-map! key) (ahash-remove! kbd-map-table key))
 
+(define-public (promise-source action)
+  "Helper routines for menu-widget and kbd-define"
+  (and (procedure? action)
+       (with source (procedure-source action)
+         (and (== (car source) 'lambda)
+              (== (cadr source) '())
+              (null? (cdddr source))
+              (caddr source)))))
+
 (define (kbd-source cmd)
   (if (procedure? cmd) (promise-source cmd) cmd))
 
@@ -108,6 +117,8 @@
 (define (simple-remove l x)
   (if (nlist? l) (list)
       (list-difference l (list x))))
+
+(tm-define kbd-delete-key-binding2 noop)
 
 (define (kbd-insert-key-binding conds key im)
   (let* ((com (kbd-source (car im)))

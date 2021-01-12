@@ -9,12 +9,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (module curried-define-module (curried-define)
+(import (rename scheme (define primitive-define)))
 (define-syntax curried-define
   (syntax-rules ()
     ((_ ((x a1 ...) a ...) body ...) (curried-define (x a1 ...) (lambda (a ...) body ...)))
-    ((_ x body ...) (define x body ...)))))
+    ((_ x body ...) (primitive-define x body ...)))))
     
-;(import (rename curried-define-module (curried-define define)))
+(import (rename curried-define-module (curried-define define)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,15 +28,25 @@
   (syntax-rules ()
     ((k transformer)
        (lambda (stx)
+         (let ((r
          (syntax-case stx ()
            ((l . sv)
             (let* ((v (syntax->datum (syntax sv)))
                    (e (apply transformer v)))
               (if (eq? (void) e)
                   (syntax (void))
-                  (datum->syntax (syntax l) e)))))))))
+                  (datum->syntax (syntax l) e)))))))
+                  ;(display "=========================\n")(display r)(display "=========================\n")(newline)
+                    r)))))
 
 (define-syntax define-macro
+  (syntax-rules ()
+    ((k (name . args) body ...)
+     (define-macro name (lambda args body ...)))
+    ((k name transformer)
+     (define-syntax name (macro transformer)))))
+
+#;(define-syntax define-macro
   (syntax-rules ()
     ((k (name . args) body ...)
      (define-macro name (lambda args body ...)))
@@ -200,12 +211,13 @@
         (module-exports module))
        (map (lambda (symb)
         (set! *tm-defines* (cons symb *tm-defines*))
-        (if (top-level-bound? symb m)
-          (define-top-level-value symb
-            (top-level-value symb *texmacs-user-module*) *current-module*)
-          (if (top-level-syntax? symb m)
+;        (if (top-level-bound? symb m)
+;          (define-top-level-value symb
+;            (top-level-value symb *texmacs-user-module*) *current-module*)
+ ;         (if (top-level-syntax? symb m)
             (define-top-level-syntax symb
-              (top-level-syntax symb *texmacs-user-module*) *current-module*))))
+              (top-level-syntax symb m) *current-module*))
+              ;))
         (module-tm-defines module))
        )) ',modules))
 

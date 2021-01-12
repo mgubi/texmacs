@@ -112,7 +112,8 @@
 (define-public-macro (define-table name . l)
    `(begin
        (tm-define ,name (make-ahash-table))
-       (define-table-decls ,name ,(list 'quasiquote l))))
+       (define-table-decls (top-level-value (symbol-append ',name '$global) *texmacs-user-module*) ,(list 'quasiquote l))))
+;        (define-table-decls ',name  ,(list 'quasiquote l))))
 
 (define-public-macro (extend-table name . l)
   `(define-table-decls ,name ,(list 'quasiquote l)))

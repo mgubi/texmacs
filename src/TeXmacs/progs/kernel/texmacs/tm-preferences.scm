@@ -14,6 +14,8 @@
 (texmacs-module (kernel texmacs tm-preferences)
   (:use (kernel texmacs tm-define)))
 
+(tm-define get-preference noop)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining preference call back routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

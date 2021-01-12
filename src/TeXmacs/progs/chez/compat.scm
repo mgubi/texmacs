@@ -34,6 +34,11 @@
 (define-public (fifth x) (cadddr (cdr x)))
 (define-public (sixth x) (cadddr (cddr x)))
 
+(define-public (object->string obj)
+ (call-with-string-output-port (lambda (p) (write obj p))))
+ 
+(define-public (procedure-source . args)  '(lambda () (noop))) ;FIXME
+
 (define-public (delq x l)
   (if (pair? l) (if (eq? x (car l)) (delq x (cdr l)) (cons (car l) (delq x (cdr l)))) '()))
 
@@ -124,32 +129,6 @@
 
 (define-public (record-predicate rec-type)
   (lambda (rec) (eq? (rec 'type) (rec-type 'type))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; From S7/r7rs.scm
-
-;; delay and force: ugh
-;;   this implementation is based on the r7rs spec
-
-(define-public (make-promise done? proc)
-  (list (cons done? proc)))
-
-(define-public-macro (delay-force expr)
-  `(make-promise #f (lambda () ,expr)))
-
-(define-public-macro (delay expr) ; "delay" is taken damn it
-  (list 'delay-force (list 'make-promise #t (list 'lambda '() expr))))
-
-(define-public (force promise)
-  (if (caar promise)
-      ((cdar promise))
-      (let ((promise* ((cdar promise))))
-        (if (not (caar promise))
-            (begin
-              (set-car! (car promise) (caar promise*))
-              (set-cdr! (car promise) (cdar promise*))))
-        (force promise))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
