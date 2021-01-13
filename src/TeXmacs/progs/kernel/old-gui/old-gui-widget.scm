@@ -161,6 +161,8 @@
 			    (associate "prog-scripts" "maxima"))))
     `(document (style ,style) (body ,body) (initial ,init))))
 
+(tm-declare build-content)
+
 (tm-define (widget-build w)
   (tm->tree (eval (widget-armour (build-content w)))))
 

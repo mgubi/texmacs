@@ -156,6 +156,29 @@
 ;; Module handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-syntax tm-declare (lambda (x)
+   (syntax-case x ()
+     [(_ var) (identifier? #'var)
+        (with-syntax ([xvar (datum->syntax #'var
+          (string->symbol (string-append (symbol->string (syntax->datum #'var)) "$global")))]
+                [*current-module* (datum->syntax #'var '*current-module*)]
+                [*exports* (datum->syntax #'var '*exports*)])
+          #'(begin
+              (define-syntax var
+               (identifier-syntax (var (top-level-value 'xvar *texmacs-user-module*))
+                  ((set! var expr) (set-top-level-value! 'xvar expr *texmacs-user-module*))))
+               (define-top-level-syntax 'var
+               (identifier-syntax (var (top-level-value 'xvar *texmacs-user-module*))
+                  ((set! var expr) (set-top-level-value! 'xvar expr *texmacs-user-module*))) *current-module*)
+               (if (not (eq? *current-module* *texmacs-user-module*))
+                  (define-top-level-syntax 'var (top-level-syntax 'var *current-module*) *texmacs-user-module*))
+              (set! *exports* (cons 'var *exports*))
+             ))]))) 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Module handling
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define (module-available? module)
   (if (hashtable-ref *modules* module #f) #t #f))
 

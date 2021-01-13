@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (kernel texmacs tm-convert)
-  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes)))
+  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes) (kernel texmacs tm-preferences)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lazy formats

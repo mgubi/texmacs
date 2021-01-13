@@ -356,9 +356,9 @@
 (kbd-map
   (:mode in-chinese?)
   ; Convert Cork to Chinese punctuations directly
-  ("\x10" "<#201C>")
-  ("\x11" "<#201D>")
-  ("\x16" "<#2014>")
+  ("\x10;" "<#201C>")
+  ("\x11;" "<#201D>")
+  ("\x16;" "<#2014>")
   ; Pinyin Support via Tab Cycling
   ("a var" "<#0101>")
   ("a var var" "<#00E1>")

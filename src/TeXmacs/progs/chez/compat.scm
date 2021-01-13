@@ -22,7 +22,7 @@
 ;(define primitive-string->symbol string->symbol)
 ;(define-public (string->symbol s) (if (string-null? s) '() (primitive-string->symbol s)))
 
-(define-public (defined? s) (or (top-level-bound? s) (top-level-syntax? s)))
+(define-public (defined? s) (or (top-level-bound? s) (top-level-syntax? s (scheme-environment))))
 
 (define-public-macro (1+ n) `(+ ,n 1))
 (define-public-macro (1- n) `(- ,n 1))

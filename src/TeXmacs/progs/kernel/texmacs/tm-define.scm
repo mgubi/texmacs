@@ -251,23 +251,24 @@
 			     (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props))
         `(let ()
-          (define-syntax ,var
-             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
-                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))))
+           (tm-declare ,var)
+;          (define-syntax ,var
+;             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
+;                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))))
            (when (nnull? ',cur-conds)
              (display* "warning: conditional master routine " ',var "\n")
              (display* "   " ',nval "\n")
              (display* ">>>" ',cur-conds #\newline))
            ;(display* "Defined " ',var " " ',xvar "\n")
            (if (nnull? ',cur-conds) (display* "   " ',nval "\n"))
-           (define-top-level-syntax ',var
-             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
-                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))) *current-module*)
-            (define-top-level-syntax ',var (top-level-syntax ',var *current-module*) *texmacs-user-module*)
+;           (define-top-level-syntax ',var
+;             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
+;                ((set! ,var expr) (set-top-level-value! ',xvar expr *texmacs-user-module*))) *current-module*)
+;            (define-top-level-syntax ',var (top-level-syntax ',var *current-module*) *texmacs-user-module*)
+;            (set! *tm-defines* (cons ',var *tm-defines*))
            (define-top-level-value ',xvar
                  ,(if (null? cur-conds) nval
                      (list 'let '((former (lambda args (noop)))) nval)) *texmacs-user-module*)
-            (set! *tm-defines* (cons ',var *tm-defines*))
            (ahash-set! tm-defined-table ',var (list ',nval))
            (ahash-set! tm-defined-name (top-level-value ',xvar *texmacs-user-module*) ',var)
 	   (ahash-set! tm-defined-module ',var
