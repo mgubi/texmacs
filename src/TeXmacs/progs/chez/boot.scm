@@ -20,8 +20,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Defmacros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; from GNU Guile 3.0.5 // ice-9/boot.scm
-;;; See also https://gist.github.com/yuhr/bba4de4b34db940dcfba2b756f6cbc32
+;;; See https://gist.github.com/yuhr/bba4de4b34db940dcfba2b756f6cbc32
 
 (define-syntax macro
   (syntax-rules ()
