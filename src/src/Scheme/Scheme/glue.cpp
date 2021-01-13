@@ -30,8 +30,8 @@
 #include "Sqlite3/sqlite3.hpp"
 #include "Updater/tm_updater.hpp"
 
-tmscm 
-blackboxP (tmscm t) {
+scm_obj
+blackboxP (scm_obj t) {
   bool b= tmscm_is_blackbox (t);
   return bool_to_tmscm (b);
 }
@@ -235,8 +235,8 @@ tmscm_to_tree (tmscm obj) {
   return open_box<tree>(tmscm_to_blackbox (obj));
 }
 
-tmscm 
-treeP (tmscm t) {
+scm_obj
+treeP (scm_obj t) {
   bool b= tmscm_is_blackbox (t) && 
           (type_box (tmscm_to_blackbox(t)) == type_helper<tree>::id);
   return bool_to_tmscm (b);
@@ -437,6 +437,10 @@ tmscm_to_scheme_tree (tmscm p) {
   if (tmscm_is_pair (p)) {
     tree t (TUPLE);
     while (!tmscm_is_null (p)) {
+      if (!tmscm_is_pair(p)) {
+        cout << "stree is not right!\n";
+        break;
+      }
       t << tmscm_to_scheme_tree (tmscm_car (p));
       tmscm_unlock (p);
       p= tmscm_cdr (p);
@@ -491,8 +495,8 @@ tmscm_to_content (tmscm p) {
   return "?";
 }
 
-tmscm 
-contentP (tmscm t) {
+scm_obj
+contentP (scm_obj t) {
   bool b= tmscm_is_content (t);
   return bool_to_tmscm (b);
 }
@@ -548,8 +552,8 @@ tmscm_to_observer (tmscm obj) {
   return open_box<observer>(tmscm_to_blackbox (obj));
 }
 
-tmscm 
-observerP (tmscm t) {
+scm_obj
+observerP (scm_obj t) {
   bool b= tmscm_is_blackbox (t) && 
   (type_box (tmscm_to_blackbox(t)) == type_helper<observer>::id);
   return bool_to_tmscm (b);
@@ -655,8 +659,8 @@ tmscm_to_url (tmscm obj) {
   return open_box<url> (tmscm_to_blackbox (obj));
 }
 
-tmscm 
-urlP (tmscm t) {
+scm_obj
+urlP (scm_obj t) {
   bool b= tmscm_is_url (t);
   return bool_to_tmscm (b);
 }
@@ -690,8 +694,8 @@ tmscm_to_modification (tmscm obj) {
   return open_box<modification> (tmscm_to_blackbox (obj));
 }
 
-tmscm 
-modificationP (tmscm t) {
+scm_obj
+modificationP (scm_obj t) {
   bool b= tmscm_is_modification (t);
   return bool_to_tmscm (b);
 }
@@ -728,8 +732,8 @@ tmscm_to_patch (tmscm obj) {
   return open_box<patch> (tmscm_to_blackbox (obj));
 }
 
-tmscm 
-patchP (tmscm t) {
+scm_obj
+patchP (scm_obj t) {
   bool b= tmscm_is_patch (t);
   return bool_to_tmscm (b);
 }

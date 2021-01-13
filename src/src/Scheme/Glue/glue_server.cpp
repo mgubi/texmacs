@@ -11,8 +11,8 @@
 *
 ******************************************************************************/
 
-tmscm
-tmg_insert_kbd_wildcard (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_insert_kbd_wildcard (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "insert-kbd-wildcard");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "insert-kbd-wildcard");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "insert-kbd-wildcard");
@@ -32,8 +32,8 @@ tmg_insert_kbd_wildcard (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm a
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_variant_keys (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_variant_keys (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-variant-keys");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-variant-keys");
 
@@ -47,8 +47,8 @@ tmg_set_variant_keys (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_kbd_pre_rewrite (tmscm arg1) {
+scm_obj
+tmg_kbd_pre_rewrite (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "kbd-pre-rewrite");
 
   string in1= tmscm_to_string (arg1);
@@ -60,8 +60,8 @@ tmg_kbd_pre_rewrite (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_kbd_post_rewrite (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_kbd_post_rewrite (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "kbd-post-rewrite");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "kbd-post-rewrite");
 
@@ -75,8 +75,8 @@ tmg_kbd_post_rewrite (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_kbd_system_rewrite (tmscm arg1) {
+scm_obj
+tmg_kbd_system_rewrite (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "kbd-system-rewrite");
 
   string in1= tmscm_to_string (arg1);
@@ -88,8 +88,8 @@ tmg_kbd_system_rewrite (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_font_rules (tmscm arg1) {
+scm_obj
+tmg_set_font_rules (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "set-font-rules");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -101,7 +101,7 @@ tmg_set_font_rules (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_window_get_serial () {
   // TMSCM_DEFER_INTS;
   int out= get_server()->get_window_serial ();
@@ -110,8 +110,8 @@ tmg_window_get_serial () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_window_set_property (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_window_set_property (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "window-set-property");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "window-set-property");
 
@@ -125,8 +125,8 @@ tmg_window_set_property (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_window_get_property (tmscm arg1) {
+scm_obj
+tmg_window_get_property (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "window-get-property");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -138,8 +138,8 @@ tmg_window_get_property (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_show_header (tmscm arg1) {
+scm_obj
+tmg_show_header (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "show-header");
 
   bool in1= tmscm_to_bool (arg1);
@@ -151,8 +151,8 @@ tmg_show_header (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_show_icon_bar (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_show_icon_bar (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "show-icon-bar");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "show-icon-bar");
 
@@ -166,8 +166,8 @@ tmg_show_icon_bar (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_show_side_tools (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_show_side_tools (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "show-side-tools");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "show-side-tools");
 
@@ -181,8 +181,8 @@ tmg_show_side_tools (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_show_bottom_tools (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_show_bottom_tools (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "show-bottom-tools");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "show-bottom-tools");
 
@@ -196,8 +196,8 @@ tmg_show_bottom_tools (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_show_footer (tmscm arg1) {
+scm_obj
+tmg_show_footer (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "show-footer");
 
   bool in1= tmscm_to_bool (arg1);
@@ -209,7 +209,7 @@ tmg_show_footer (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_visible_headerP () {
   // TMSCM_DEFER_INTS;
   bool out= get_server()->visible_header ();
@@ -218,8 +218,8 @@ tmg_visible_headerP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_visible_icon_barP (tmscm arg1) {
+scm_obj
+tmg_visible_icon_barP (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "visible-icon-bar?");
 
   int in1= tmscm_to_int (arg1);
@@ -231,8 +231,8 @@ tmg_visible_icon_barP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_visible_side_toolsP (tmscm arg1) {
+scm_obj
+tmg_visible_side_toolsP (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "visible-side-tools?");
 
   int in1= tmscm_to_int (arg1);
@@ -244,8 +244,8 @@ tmg_visible_side_toolsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_visible_bottom_toolsP (tmscm arg1) {
+scm_obj
+tmg_visible_bottom_toolsP (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "visible-bottom-tools?");
 
   int in1= tmscm_to_int (arg1);
@@ -257,7 +257,7 @@ tmg_visible_bottom_toolsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_visible_footerP () {
   // TMSCM_DEFER_INTS;
   bool out= get_server()->visible_footer ();
@@ -266,8 +266,8 @@ tmg_visible_footerP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_full_screen_mode (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_full_screen_mode (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "full-screen-mode");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "full-screen-mode");
 
@@ -281,7 +281,7 @@ tmg_full_screen_mode (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_full_screenP () {
   // TMSCM_DEFER_INTS;
   bool out= get_server()->in_full_screen_mode ();
@@ -290,7 +290,7 @@ tmg_full_screenP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_full_screen_editP () {
   // TMSCM_DEFER_INTS;
   bool out= get_server()->in_full_screen_edit_mode ();
@@ -299,8 +299,8 @@ tmg_full_screen_editP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_set_window_zoom_factor (tmscm arg1) {
+scm_obj
+tmg_set_window_zoom_factor (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-window-zoom-factor");
 
   double in1= tmscm_to_double (arg1);
@@ -312,7 +312,7 @@ tmg_set_window_zoom_factor (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_window_zoom_factor () {
   // TMSCM_DEFER_INTS;
   double out= get_server()->get_window_zoom_factor ();
@@ -321,8 +321,8 @@ tmg_get_window_zoom_factor () {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_shell (tmscm arg1) {
+scm_obj
+tmg_shell (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "shell");
 
   string in1= tmscm_to_string (arg1);
@@ -334,7 +334,7 @@ tmg_shell (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_dialogue_end () {
   // TMSCM_DEFER_INTS;
   get_server()->dialogue_end ();
@@ -343,8 +343,8 @@ tmg_dialogue_end () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_choose_file (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_cpp_choose_file (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "cpp-choose-file");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-choose-file");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-choose-file");
@@ -364,8 +364,8 @@ tmg_cpp_choose_file (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5)
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tm_interactive (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tm_interactive (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "tm-interactive");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "tm-interactive");
 
@@ -379,7 +379,7 @@ tmg_tm_interactive (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_style_clear_cache () {
   // TMSCM_DEFER_INTS;
   get_server()->style_clear_cache ();
@@ -388,8 +388,8 @@ tmg_cpp_style_clear_cache () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_script_status (tmscm arg1) {
+scm_obj
+tmg_set_script_status (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-script-status");
 
   int in1= tmscm_to_int (arg1);
@@ -401,8 +401,8 @@ tmg_set_script_status (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_printing_command (tmscm arg1) {
+scm_obj
+tmg_set_printing_command (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-printing-command");
 
   string in1= tmscm_to_string (arg1);
@@ -414,8 +414,8 @@ tmg_set_printing_command (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_printer_paper_type (tmscm arg1) {
+scm_obj
+tmg_set_printer_paper_type (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-printer-paper-type");
 
   string in1= tmscm_to_string (arg1);
@@ -427,7 +427,7 @@ tmg_set_printer_paper_type (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_printer_paper_type () {
   // TMSCM_DEFER_INTS;
   string out= get_server()->get_printer_page_type ();
@@ -436,8 +436,8 @@ tmg_get_printer_paper_type () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_printer_dpi (tmscm arg1) {
+scm_obj
+tmg_set_printer_dpi (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-printer-dpi");
 
   string in1= tmscm_to_string (arg1);
@@ -449,8 +449,8 @@ tmg_set_printer_dpi (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_default_zoom_factor (tmscm arg1) {
+scm_obj
+tmg_set_default_zoom_factor (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-default-zoom-factor");
 
   double in1= tmscm_to_double (arg1);
@@ -462,7 +462,7 @@ tmg_set_default_zoom_factor (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_default_zoom_factor () {
   // TMSCM_DEFER_INTS;
   double out= get_server()->get_default_zoom_factor ();
@@ -471,7 +471,7 @@ tmg_get_default_zoom_factor () {
   return double_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_inclusions_gc () {
   // TMSCM_DEFER_INTS;
   get_server()->inclusions_gc ();
@@ -480,8 +480,8 @@ tmg_inclusions_gc () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_update_all_path (tmscm arg1) {
+scm_obj
+tmg_update_all_path (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-all-path");
 
   path in1= tmscm_to_path (arg1);
@@ -493,7 +493,7 @@ tmg_update_all_path (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_update_all_buffers () {
   // TMSCM_DEFER_INTS;
   get_server()->typeset_update_all ();
@@ -502,8 +502,8 @@ tmg_update_all_buffers () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_message (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_message (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "set-message");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-message");
 
@@ -517,8 +517,8 @@ tmg_set_message (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_message_temp (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_set_message_temp (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "set-message-temp");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-message-temp");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "set-message-temp");
@@ -534,7 +534,7 @@ tmg_set_message_temp (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_recall_message () {
   // TMSCM_DEFER_INTS;
   get_server()->recall_message ();
@@ -543,8 +543,8 @@ tmg_recall_message () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_yesP (tmscm arg1) {
+scm_obj
+tmg_yesP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "yes?");
 
   string in1= tmscm_to_string (arg1);
@@ -556,7 +556,7 @@ tmg_yesP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_quit_TeXmacs () {
   // TMSCM_DEFER_INTS;
   get_server()->quit ();

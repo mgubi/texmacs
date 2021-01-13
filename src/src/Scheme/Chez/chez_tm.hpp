@@ -18,7 +18,30 @@
 #include "scheme.h"
 
 // the type of scheme objects
+typedef ptr scm_obj;
 typedef ptr tmscm;
+
+#if 0
+#define Simmediatep(x) (((uptr)(x)&0x7)==0x6)
+class tmscm {
+  ptr obj;
+public:
+//  tmscm () : obj (Svoid) {   }
+ // tmscm (uptr _obj) : obj((ptr)_obj){ Slock_object (obj); }
+  tmscm (ptr _obj) : obj (_obj)  {
+//     if(Sfixnump(obj) || Simmediatep(obj)) return;
+     Slock_object (obj); }
+  tmscm (tmscm & a) : obj (a.obj) {
+    //if(Sfixnump(obj) || Simmediatep(obj)) return;
+    Slock_object (obj);  }
+  ~tmscm () {
+    //if(Sfixnump(obj) || Simmediatep(obj)) return;
+    Sunlock_object((ptr)obj); }
+  operator uptr () const { return (uptr) obj; }
+  operator ptr () const { return (ptr)obj; }
+  bool operator == (tmscm& a) { return obj == a.obj; }
+};
+#endif
 
 bool tmscm_is_blackbox (tmscm obj);
 tmscm blackbox_to_tmscm (blackbox b);

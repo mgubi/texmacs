@@ -11,8 +11,8 @@
 *
 ******************************************************************************/
 
-tmscm
-tmg_texmacs_version_release (tmscm arg1) {
+scm_obj
+tmg_texmacs_version_release (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "texmacs-version-release");
 
   string in1= tmscm_to_string (arg1);
@@ -24,8 +24,8 @@ tmg_texmacs_version_release (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_version_beforeP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_version_beforeP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "version-before?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "version-before?");
 
@@ -39,7 +39,7 @@ tmg_version_beforeP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_updater_supportedP () {
   // TMSCM_DEFER_INTS;
   bool out= updater_supported ();
@@ -48,7 +48,7 @@ tmg_updater_supportedP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_updater_runningP () {
   // TMSCM_DEFER_INTS;
   bool out= updater_is_running ();
@@ -57,7 +57,7 @@ tmg_updater_runningP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_updater_check_background () {
   // TMSCM_DEFER_INTS;
   bool out= updater_check_background ();
@@ -66,7 +66,7 @@ tmg_updater_check_background () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_updater_check_foreground () {
   // TMSCM_DEFER_INTS;
   bool out= updater_check_foreground ();
@@ -75,7 +75,7 @@ tmg_updater_check_foreground () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_updater_last_check () {
   // TMSCM_DEFER_INTS;
   long out= updater_last_check ();
@@ -84,8 +84,8 @@ tmg_updater_last_check () {
   return long_to_tmscm (out);
 }
 
-tmscm
-tmg_updater_set_interval (tmscm arg1) {
+scm_obj
+tmg_updater_set_interval (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "updater-set-interval");
 
   int in1= tmscm_to_int (arg1);
@@ -97,7 +97,7 @@ tmg_updater_set_interval (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_original_path () {
   // TMSCM_DEFER_INTS;
   string out= get_original_path ();
@@ -106,7 +106,7 @@ tmg_get_original_path () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_os_win32P () {
   // TMSCM_DEFER_INTS;
   bool out= os_win32 ();
@@ -115,7 +115,7 @@ tmg_os_win32P () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_os_mingwP () {
   // TMSCM_DEFER_INTS;
   bool out= os_mingw ();
@@ -124,7 +124,7 @@ tmg_os_mingwP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_os_macosP () {
   // TMSCM_DEFER_INTS;
   bool out= os_macos ();
@@ -133,7 +133,7 @@ tmg_os_macosP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_has_printing_cmdP () {
   // TMSCM_DEFER_INTS;
   bool out= has_printing_cmd ();
@@ -142,7 +142,7 @@ tmg_has_printing_cmdP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_x_guiP () {
   // TMSCM_DEFER_INTS;
   bool out= gui_is_x ();
@@ -151,7 +151,7 @@ tmg_x_guiP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_qt_guiP () {
   // TMSCM_DEFER_INTS;
   bool out= gui_is_qt ();
@@ -160,7 +160,7 @@ tmg_qt_guiP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_gui_version () {
   // TMSCM_DEFER_INTS;
   string out= gui_version ();
@@ -169,7 +169,7 @@ tmg_gui_version () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_default_look_and_feel () {
   // TMSCM_DEFER_INTS;
   string out= default_look_and_feel ();
@@ -178,7 +178,7 @@ tmg_default_look_and_feel () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_default_chinese_font () {
   // TMSCM_DEFER_INTS;
   string out= default_chinese_font_name ();
@@ -187,7 +187,7 @@ tmg_default_chinese_font () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_default_japanese_font () {
   // TMSCM_DEFER_INTS;
   string out= default_japanese_font_name ();
@@ -196,7 +196,7 @@ tmg_default_japanese_font () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_default_korean_font () {
   // TMSCM_DEFER_INTS;
   string out= default_korean_font_name ();
@@ -205,7 +205,7 @@ tmg_default_korean_font () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_retina_factor () {
   // TMSCM_DEFER_INTS;
   int out= get_retina_factor ();
@@ -214,7 +214,7 @@ tmg_get_retina_factor () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_retina_zoom () {
   // TMSCM_DEFER_INTS;
   int out= get_retina_zoom ();
@@ -223,7 +223,7 @@ tmg_get_retina_zoom () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_retina_icons () {
   // TMSCM_DEFER_INTS;
   int out= get_retina_icons ();
@@ -232,7 +232,7 @@ tmg_get_retina_icons () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_retina_scale () {
   // TMSCM_DEFER_INTS;
   double out= get_retina_scale ();
@@ -241,8 +241,8 @@ tmg_get_retina_scale () {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_set_retina_factor (tmscm arg1) {
+scm_obj
+tmg_set_retina_factor (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-retina-factor");
 
   int in1= tmscm_to_int (arg1);
@@ -254,8 +254,8 @@ tmg_set_retina_factor (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_retina_zoom (tmscm arg1) {
+scm_obj
+tmg_set_retina_zoom (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-retina-zoom");
 
   int in1= tmscm_to_int (arg1);
@@ -267,8 +267,8 @@ tmg_set_retina_zoom (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_retina_icons (tmscm arg1) {
+scm_obj
+tmg_set_retina_icons (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-retina-icons");
 
   int in1= tmscm_to_int (arg1);
@@ -280,8 +280,8 @@ tmg_set_retina_icons (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_retina_scale (tmscm arg1) {
+scm_obj
+tmg_set_retina_scale (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-retina-scale");
 
   double in1= tmscm_to_double (arg1);
@@ -293,8 +293,8 @@ tmg_set_retina_scale (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tm_output (tmscm arg1) {
+scm_obj
+tmg_tm_output (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tm-output");
 
   string in1= tmscm_to_string (arg1);
@@ -306,8 +306,8 @@ tmg_tm_output (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tm_errput (tmscm arg1) {
+scm_obj
+tmg_tm_errput (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tm-errput");
 
   string in1= tmscm_to_string (arg1);
@@ -319,8 +319,8 @@ tmg_tm_errput (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_win32_display (tmscm arg1) {
+scm_obj
+tmg_win32_display (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "win32-display");
 
   string in1= tmscm_to_string (arg1);
@@ -332,7 +332,7 @@ tmg_win32_display (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_error () {
   // TMSCM_DEFER_INTS;
   cpp_error ();
@@ -341,7 +341,7 @@ tmg_cpp_error () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_supports_native_pdfP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_native_pdf ();
@@ -350,7 +350,7 @@ tmg_supports_native_pdfP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_supports_ghostscriptP () {
   // TMSCM_DEFER_INTS;
   bool out= supports_ghostscript ();
@@ -359,7 +359,7 @@ tmg_supports_ghostscriptP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_rescue_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= in_rescue_mode ();
@@ -368,7 +368,7 @@ tmg_rescue_modeP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_scheme_dialect () {
   // TMSCM_DEFER_INTS;
   string out= scheme_dialect ();
@@ -377,7 +377,7 @@ tmg_scheme_dialect () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_texmacs_path () {
   // TMSCM_DEFER_INTS;
   url out= get_texmacs_path ();
@@ -386,7 +386,7 @@ tmg_get_texmacs_path () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_texmacs_home_path () {
   // TMSCM_DEFER_INTS;
   url out= get_texmacs_home_path ();
@@ -395,7 +395,7 @@ tmg_get_texmacs_home_path () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_user_login () {
   // TMSCM_DEFER_INTS;
   string out= get_user_login ();
@@ -404,7 +404,7 @@ tmg_get_user_login () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_user_name () {
   // TMSCM_DEFER_INTS;
   string out= get_user_name ();
@@ -413,7 +413,7 @@ tmg_get_user_name () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_plugin_list () {
   // TMSCM_DEFER_INTS;
   scheme_tree out= plugin_list ();
@@ -422,8 +422,8 @@ tmg_plugin_list () {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_fast_environments (tmscm arg1) {
+scm_obj
+tmg_set_fast_environments (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "set-fast-environments");
 
   bool in1= tmscm_to_bool (arg1);
@@ -435,8 +435,8 @@ tmg_set_fast_environments (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_font_exists_in_ttP (tmscm arg1) {
+scm_obj
+tmg_font_exists_in_ttP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-exists-in-tt?");
 
   string in1= tmscm_to_string (arg1);
@@ -448,8 +448,8 @@ tmg_font_exists_in_ttP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_eval_system (tmscm arg1) {
+scm_obj
+tmg_eval_system (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "eval-system");
 
   string in1= tmscm_to_string (arg1);
@@ -461,8 +461,8 @@ tmg_eval_system (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_var_eval_system (tmscm arg1) {
+scm_obj
+tmg_var_eval_system (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "var-eval-system");
 
   string in1= tmscm_to_string (arg1);
@@ -474,8 +474,8 @@ tmg_var_eval_system (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_evaluate_system (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_evaluate_system (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "evaluate-system");
   TMSCM_ASSERT_ARRAY_INT (arg2, TMSCM_ARG2, "evaluate-system");
   TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "evaluate-system");
@@ -493,7 +493,7 @@ tmg_evaluate_system (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_locale_language () {
   // TMSCM_DEFER_INTS;
   string out= get_locale_language ();
@@ -502,7 +502,7 @@ tmg_get_locale_language () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_locale_charset () {
   // TMSCM_DEFER_INTS;
   string out= get_locale_charset ();
@@ -511,8 +511,8 @@ tmg_get_locale_charset () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_locale_to_language (tmscm arg1) {
+scm_obj
+tmg_locale_to_language (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "locale-to-language");
 
   string in1= tmscm_to_string (arg1);
@@ -524,8 +524,8 @@ tmg_locale_to_language (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_language_to_locale (tmscm arg1) {
+scm_obj
+tmg_language_to_locale (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "language-to-locale");
 
   string in1= tmscm_to_string (arg1);
@@ -537,7 +537,7 @@ tmg_language_to_locale (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_texmacs_time () {
   // TMSCM_DEFER_INTS;
   int out= texmacs_time ();
@@ -546,8 +546,8 @@ tmg_texmacs_time () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_pretty_time (tmscm arg1) {
+scm_obj
+tmg_pretty_time (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "pretty-time");
 
   int in1= tmscm_to_int (arg1);
@@ -559,7 +559,7 @@ tmg_pretty_time (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_texmacs_memory () {
   // TMSCM_DEFER_INTS;
   int out= mem_used ();
@@ -568,8 +568,8 @@ tmg_texmacs_memory () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_bench_print (tmscm arg1) {
+scm_obj
+tmg_bench_print (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bench-print");
 
   string in1= tmscm_to_string (arg1);
@@ -581,7 +581,7 @@ tmg_bench_print (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_bench_print_all () {
   // TMSCM_DEFER_INTS;
   bench_print ();
@@ -590,8 +590,8 @@ tmg_bench_print_all () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_wait (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_system_wait (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system-wait");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "system-wait");
 
@@ -605,7 +605,7 @@ tmg_system_wait (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_show_kbd () {
   // TMSCM_DEFER_INTS;
   bool out= get_show_kbd ();
@@ -614,8 +614,8 @@ tmg_get_show_kbd () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_set_show_kbd (tmscm arg1) {
+scm_obj
+tmg_set_show_kbd (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "set-show-kbd");
 
   bool in1= tmscm_to_bool (arg1);
@@ -627,8 +627,8 @@ tmg_set_show_kbd (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_latex_command (tmscm arg1) {
+scm_obj
+tmg_set_latex_command (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-latex-command");
 
   string in1= tmscm_to_string (arg1);
@@ -640,8 +640,8 @@ tmg_set_latex_command (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_bibtex_command (tmscm arg1) {
+scm_obj
+tmg_set_bibtex_command (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-bibtex-command");
 
   string in1= tmscm_to_string (arg1);
@@ -653,8 +653,8 @@ tmg_set_bibtex_command (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_number_latex_errors (tmscm arg1) {
+scm_obj
+tmg_number_latex_errors (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "number-latex-errors");
 
   url in1= tmscm_to_url (arg1);
@@ -666,8 +666,8 @@ tmg_number_latex_errors (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_number_latex_pages (tmscm arg1) {
+scm_obj
+tmg_number_latex_pages (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "number-latex-pages");
 
   url in1= tmscm_to_url (arg1);
@@ -679,8 +679,8 @@ tmg_number_latex_pages (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_math_symbol_group (tmscm arg1) {
+scm_obj
+tmg_math_symbol_group (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-symbol-group");
 
   string in1= tmscm_to_string (arg1);
@@ -692,8 +692,8 @@ tmg_math_symbol_group (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_math_group_members (tmscm arg1) {
+scm_obj
+tmg_math_group_members (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-group-members");
 
   string in1= tmscm_to_string (arg1);
@@ -705,8 +705,8 @@ tmg_math_group_members (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_math_symbol_type (tmscm arg1) {
+scm_obj
+tmg_math_symbol_type (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-symbol-type");
 
   string in1= tmscm_to_string (arg1);
@@ -718,8 +718,8 @@ tmg_math_symbol_type (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_object_2command (tmscm arg1) {
+scm_obj
+tmg_object_2command (scm_obj arg1) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "object->command");
 
   object in1= tmscm_to_object (arg1);
@@ -731,8 +731,8 @@ tmg_object_2command (tmscm arg1) {
   return command_to_tmscm (out);
 }
 
-tmscm
-tmg_exec_delayed (tmscm arg1) {
+scm_obj
+tmg_exec_delayed (scm_obj arg1) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "exec-delayed");
 
   object in1= tmscm_to_object (arg1);
@@ -744,8 +744,8 @@ tmg_exec_delayed (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_exec_delayed_pause (tmscm arg1) {
+scm_obj
+tmg_exec_delayed_pause (scm_obj arg1) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "exec-delayed-pause");
 
   object in1= tmscm_to_object (arg1);
@@ -757,8 +757,8 @@ tmg_exec_delayed_pause (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_protected_call (tmscm arg1) {
+scm_obj
+tmg_protected_call (scm_obj arg1) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "protected-call");
 
   object in1= tmscm_to_object (arg1);
@@ -770,7 +770,7 @@ tmg_protected_call (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_notify_preferences_booted () {
   // TMSCM_DEFER_INTS;
   notify_preferences_booted ();
@@ -779,8 +779,8 @@ tmg_notify_preferences_booted () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_has_preferenceP (tmscm arg1) {
+scm_obj
+tmg_cpp_has_preferenceP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-has-preference?");
 
   string in1= tmscm_to_string (arg1);
@@ -792,8 +792,8 @@ tmg_cpp_has_preferenceP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_get_preference (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_get_preference (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-get-preference");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-get-preference");
 
@@ -807,8 +807,8 @@ tmg_cpp_get_preference (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_set_preference (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_set_preference (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-set-preference");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-set-preference");
 
@@ -822,8 +822,8 @@ tmg_cpp_set_preference (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_reset_preference (tmscm arg1) {
+scm_obj
+tmg_cpp_reset_preference (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-reset-preference");
 
   string in1= tmscm_to_string (arg1);
@@ -835,7 +835,7 @@ tmg_cpp_reset_preference (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_save_preferences () {
   // TMSCM_DEFER_INTS;
   save_user_preferences ();
@@ -844,7 +844,7 @@ tmg_save_preferences () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_default_printing_command () {
   // TMSCM_DEFER_INTS;
   string out= get_printing_default ();
@@ -853,8 +853,8 @@ tmg_get_default_printing_command () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_input_language (tmscm arg1) {
+scm_obj
+tmg_set_input_language (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-input-language");
 
   string in1= tmscm_to_string (arg1);
@@ -866,7 +866,7 @@ tmg_set_input_language (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_input_language () {
   // TMSCM_DEFER_INTS;
   string out= get_input_language ();
@@ -875,8 +875,8 @@ tmg_get_input_language () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_output_language (tmscm arg1) {
+scm_obj
+tmg_set_output_language (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-output-language");
 
   string in1= tmscm_to_string (arg1);
@@ -888,7 +888,7 @@ tmg_set_output_language (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_output_language () {
   // TMSCM_DEFER_INTS;
   string out= get_output_language ();
@@ -897,8 +897,8 @@ tmg_get_output_language () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_translate (tmscm arg1) {
+scm_obj
+tmg_translate (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "translate");
 
   content in1= tmscm_to_content (arg1);
@@ -910,8 +910,8 @@ tmg_translate (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_translate (tmscm arg1) {
+scm_obj
+tmg_string_translate (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-translate");
 
   string in1= tmscm_to_string (arg1);
@@ -923,8 +923,8 @@ tmg_string_translate (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_translate_from_to (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "translate-from-to");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "translate-from-to");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "translate-from-to");
@@ -940,8 +940,8 @@ tmg_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_translate (tmscm arg1) {
+scm_obj
+tmg_tree_translate (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-translate");
 
   content in1= tmscm_to_content (arg1);
@@ -953,8 +953,8 @@ tmg_tree_translate (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_translate_from_to (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-translate-from-to");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-translate-from-to");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tree-translate-from-to");
@@ -970,8 +970,8 @@ tmg_tree_translate_from_to (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_force_load_translations (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_force_load_translations (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "force-load-translations");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "force-load-translations");
 
@@ -985,8 +985,8 @@ tmg_force_load_translations (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_color (tmscm arg1) {
+scm_obj
+tmg_color (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "color");
 
   string in1= tmscm_to_string (arg1);
@@ -998,8 +998,8 @@ tmg_color (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_hex_color (tmscm arg1) {
+scm_obj
+tmg_get_hex_color (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-hex-color");
 
   string in1= tmscm_to_string (arg1);
@@ -1011,8 +1011,8 @@ tmg_get_hex_color (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_named_color_2xcolormap (tmscm arg1) {
+scm_obj
+tmg_named_color_2xcolormap (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "named-color->xcolormap");
 
   string in1= tmscm_to_string (arg1);
@@ -1024,8 +1024,8 @@ tmg_named_color_2xcolormap (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_rgba_2named_color (tmscm arg1) {
+scm_obj
+tmg_rgba_2named_color (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_INT (arg1, TMSCM_ARG1, "rgba->named-color");
 
   array_int in1= tmscm_to_array_int (arg1);
@@ -1037,8 +1037,8 @@ tmg_rgba_2named_color (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_named_color_2rgba (tmscm arg1) {
+scm_obj
+tmg_named_color_2rgba (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "named-color->rgba");
 
   string in1= tmscm_to_string (arg1);
@@ -1050,7 +1050,7 @@ tmg_named_color_2rgba (tmscm arg1) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_new_author () {
   // TMSCM_DEFER_INTS;
   double out= new_author ();
@@ -1059,8 +1059,8 @@ tmg_new_author () {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_set_author (tmscm arg1) {
+scm_obj
+tmg_set_author (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-author");
 
   double in1= tmscm_to_double (arg1);
@@ -1072,7 +1072,7 @@ tmg_set_author (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_author () {
   // TMSCM_DEFER_INTS;
   double out= get_author ();
@@ -1081,8 +1081,8 @@ tmg_get_author () {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_debug_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_debug_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "debug-set");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "debug-set");
 
@@ -1096,8 +1096,8 @@ tmg_debug_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_debug_get (tmscm arg1) {
+scm_obj
+tmg_debug_get (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "debug-get");
 
   string in1= tmscm_to_string (arg1);
@@ -1109,8 +1109,8 @@ tmg_debug_get (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_debug_message (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_debug_message (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "debug-message");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "debug-message");
 
@@ -1124,8 +1124,8 @@ tmg_debug_message (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_get_debug_messages (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_get_debug_messages (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-debug-messages");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "get-debug-messages");
 
@@ -1139,7 +1139,7 @@ tmg_get_debug_messages (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_clear_debug_messages () {
   // TMSCM_DEFER_INTS;
   clear_debug_messages ();
@@ -1148,7 +1148,7 @@ tmg_clear_debug_messages () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cout_buffer () {
   // TMSCM_DEFER_INTS;
   cout_buffer ();
@@ -1157,7 +1157,7 @@ tmg_cout_buffer () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cout_unbuffer () {
   // TMSCM_DEFER_INTS;
   string out= cout_unbuffer ();
@@ -1166,7 +1166,7 @@ tmg_cout_unbuffer () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_mark_new () {
   // TMSCM_DEFER_INTS;
   double out= new_marker ();
@@ -1175,8 +1175,8 @@ tmg_mark_new () {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_glyph_register (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_glyph_register (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "glyph-register");
   TMSCM_ASSERT_ARRAY_ARRAY_ARRAY_DOUBLE (arg2, TMSCM_ARG2, "glyph-register");
 
@@ -1190,8 +1190,8 @@ tmg_glyph_register (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_glyph_recognize (tmscm arg1) {
+scm_obj
+tmg_glyph_recognize (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_ARRAY_ARRAY_DOUBLE (arg1, TMSCM_ARG1, "glyph-recognize");
 
   array_array_array_double in1= tmscm_to_array_array_array_double (arg1);
@@ -1203,8 +1203,8 @@ tmg_glyph_recognize (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_new_fonts (tmscm arg1) {
+scm_obj
+tmg_set_new_fonts (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "set-new-fonts");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1216,7 +1216,7 @@ tmg_set_new_fonts (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_new_fontsP () {
   // TMSCM_DEFER_INTS;
   bool out= get_new_fonts ();
@@ -1225,8 +1225,8 @@ tmg_new_fontsP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tmtm_eqnumber_2nonumber (tmscm arg1) {
+scm_obj
+tmg_tmtm_eqnumber_2nonumber (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tmtm-eqnumber->nonumber");
 
   tree in1= tmscm_to_tree (arg1);
@@ -1238,7 +1238,7 @@ tmg_tmtm_eqnumber_2nonumber (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_busy_versioningP () {
   // TMSCM_DEFER_INTS;
   bool out= is_busy_versioning ();
@@ -1247,8 +1247,8 @@ tmg_busy_versioningP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_players_set_elapsed (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_players_set_elapsed (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "players-set-elapsed");
   TMSCM_ASSERT_DOUBLE (arg2, TMSCM_ARG2, "players-set-elapsed");
 
@@ -1262,8 +1262,8 @@ tmg_players_set_elapsed (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_players_set_speed (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_players_set_speed (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "players-set-speed");
   TMSCM_ASSERT_DOUBLE (arg2, TMSCM_ARG2, "players-set-speed");
 
@@ -1277,8 +1277,8 @@ tmg_players_set_speed (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_apply_effect (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_apply_effect (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "apply-effect");
   TMSCM_ASSERT_ARRAY_URL (arg2, TMSCM_ARG2, "apply-effect");
   TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "apply-effect");
@@ -1298,8 +1298,8 @@ tmg_apply_effect (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tt_existsP (tmscm arg1) {
+scm_obj
+tmg_tt_existsP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-exists?");
 
   string in1= tmscm_to_string (arg1);
@@ -1311,8 +1311,8 @@ tmg_tt_existsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tt_dump (tmscm arg1) {
+scm_obj
+tmg_tt_dump (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tt-dump");
 
   url in1= tmscm_to_url (arg1);
@@ -1324,8 +1324,8 @@ tmg_tt_dump (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tt_font_name (tmscm arg1) {
+scm_obj
+tmg_tt_font_name (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tt-font-name");
 
   url in1= tmscm_to_url (arg1);
@@ -1337,8 +1337,8 @@ tmg_tt_font_name (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tt_analyze (tmscm arg1) {
+scm_obj
+tmg_tt_analyze (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tt-analyze");
 
   string in1= tmscm_to_string (arg1);
@@ -1350,8 +1350,8 @@ tmg_tt_analyze (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_database_build (tmscm arg1) {
+scm_obj
+tmg_font_database_build (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-build");
 
   url in1= tmscm_to_url (arg1);
@@ -1363,7 +1363,7 @@ tmg_font_database_build (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_build_local () {
   // TMSCM_DEFER_INTS;
   font_database_build_local ();
@@ -1372,8 +1372,8 @@ tmg_font_database_build_local () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_font_database_extend_local (tmscm arg1) {
+scm_obj
+tmg_font_database_extend_local (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-extend-local");
 
   url in1= tmscm_to_url (arg1);
@@ -1385,7 +1385,7 @@ tmg_font_database_extend_local (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_build_global () {
   // TMSCM_DEFER_INTS;
   font_database_build_global ();
@@ -1394,8 +1394,8 @@ tmg_font_database_build_global () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_font_database_build_characteristics (tmscm arg1) {
+scm_obj
+tmg_font_database_build_characteristics (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-database-build-characteristics");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1407,8 +1407,8 @@ tmg_font_database_build_characteristics (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_font_database_insert_global (tmscm arg1) {
+scm_obj
+tmg_font_database_insert_global (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-database-insert-global");
 
   url in1= tmscm_to_url (arg1);
@@ -1420,7 +1420,7 @@ tmg_font_database_insert_global (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_save_local_delta () {
   // TMSCM_DEFER_INTS;
   font_database_save_local_delta ();
@@ -1429,7 +1429,7 @@ tmg_font_database_save_local_delta () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_load () {
   // TMSCM_DEFER_INTS;
   font_database_load ();
@@ -1438,7 +1438,7 @@ tmg_font_database_load () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_save () {
   // TMSCM_DEFER_INTS;
   font_database_save ();
@@ -1447,7 +1447,7 @@ tmg_font_database_save () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_filter () {
   // TMSCM_DEFER_INTS;
   font_database_filter ();
@@ -1456,7 +1456,7 @@ tmg_font_database_filter () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_font_database_families () {
   // TMSCM_DEFER_INTS;
   array_string out= font_database_families ();
@@ -1465,7 +1465,7 @@ tmg_font_database_families () {
   return array_string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_font_database_delta_families () {
   // TMSCM_DEFER_INTS;
   array_string out= font_database_delta_families ();
@@ -1474,8 +1474,8 @@ tmg_font_database_delta_families () {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_database_styles (tmscm arg1) {
+scm_obj
+tmg_font_database_styles (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-styles");
 
   string in1= tmscm_to_string (arg1);
@@ -1487,8 +1487,8 @@ tmg_font_database_styles (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_database_search (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_font_database_search (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-search");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-database-search");
 
@@ -1502,8 +1502,8 @@ tmg_font_database_search (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_database_characteristics (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_font_database_characteristics (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-characteristics");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-database-characteristics");
 
@@ -1517,8 +1517,8 @@ tmg_font_database_characteristics (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_database_substitutions (tmscm arg1) {
+scm_obj
+tmg_font_database_substitutions (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-database-substitutions");
 
   string in1= tmscm_to_string (arg1);
@@ -1530,8 +1530,8 @@ tmg_font_database_substitutions (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_font_family_2master (tmscm arg1) {
+scm_obj
+tmg_font_family_2master (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family->master");
 
   string in1= tmscm_to_string (arg1);
@@ -1543,8 +1543,8 @@ tmg_font_family_2master (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_master_2families (tmscm arg1) {
+scm_obj
+tmg_font_master_2families (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-master->families");
 
   string in1= tmscm_to_string (arg1);
@@ -1556,8 +1556,8 @@ tmg_font_master_2families (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_master_features (tmscm arg1) {
+scm_obj
+tmg_font_master_features (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-master-features");
 
   string in1= tmscm_to_string (arg1);
@@ -1569,8 +1569,8 @@ tmg_font_master_features (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_family_features (tmscm arg1) {
+scm_obj
+tmg_font_family_features (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-features");
 
   string in1= tmscm_to_string (arg1);
@@ -1582,8 +1582,8 @@ tmg_font_family_features (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_family_strict_features (tmscm arg1) {
+scm_obj
+tmg_font_family_strict_features (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-strict-features");
 
   string in1= tmscm_to_string (arg1);
@@ -1595,8 +1595,8 @@ tmg_font_family_strict_features (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_style_features (tmscm arg1) {
+scm_obj
+tmg_font_style_features (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-style-features");
 
   string in1= tmscm_to_string (arg1);
@@ -1608,8 +1608,8 @@ tmg_font_style_features (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_guessed_features (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_font_guessed_features (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-guessed-features");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-guessed-features");
 
@@ -1623,8 +1623,8 @@ tmg_font_guessed_features (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_guessed_distance (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_font_guessed_distance (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-guessed-distance");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-guessed-distance");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "font-guessed-distance");
@@ -1642,8 +1642,8 @@ tmg_font_guessed_distance (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_font_master_guessed_distance (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_font_master_guessed_distance (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-master-guessed-distance");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-master-guessed-distance");
 
@@ -1657,8 +1657,8 @@ tmg_font_master_guessed_distance (tmscm arg1, tmscm arg2) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_font_family_guessed_features (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_font_family_guessed_features (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-guessed-features");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "font-family-guessed-features");
 
@@ -1672,8 +1672,8 @@ tmg_font_family_guessed_features (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_characteristic_distance (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_characteristic_distance (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "characteristic-distance");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "characteristic-distance");
 
@@ -1687,8 +1687,8 @@ tmg_characteristic_distance (tmscm arg1, tmscm arg2) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_trace_distance (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_trace_distance (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "trace-distance");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "trace-distance");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "trace-distance");
@@ -1704,8 +1704,8 @@ tmg_trace_distance (tmscm arg1, tmscm arg2, tmscm arg3) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_public (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_logical_font_public (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-public");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-public");
 
@@ -1719,8 +1719,8 @@ tmg_logical_font_public (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_exact (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_logical_font_exact (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-exact");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-exact");
 
@@ -1734,8 +1734,8 @@ tmg_logical_font_exact (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_private (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_logical_font_private (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "logical-font-private");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "logical-font-private");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "logical-font-private");
@@ -1753,8 +1753,8 @@ tmg_logical_font_private (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_family (tmscm arg1) {
+scm_obj
+tmg_logical_font_family (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-family");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1766,8 +1766,8 @@ tmg_logical_font_family (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_variant (tmscm arg1) {
+scm_obj
+tmg_logical_font_variant (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-variant");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1779,8 +1779,8 @@ tmg_logical_font_variant (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_series (tmscm arg1) {
+scm_obj
+tmg_logical_font_series (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-series");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1792,8 +1792,8 @@ tmg_logical_font_series (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_shape (tmscm arg1) {
+scm_obj
+tmg_logical_font_shape (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-shape");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1805,8 +1805,8 @@ tmg_logical_font_shape (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_search (tmscm arg1) {
+scm_obj
+tmg_logical_font_search (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-search");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1818,8 +1818,8 @@ tmg_logical_font_search (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_search_exact (tmscm arg1) {
+scm_obj
+tmg_logical_font_search_exact (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-search-exact");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1831,8 +1831,8 @@ tmg_logical_font_search_exact (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_search_font_families (tmscm arg1) {
+scm_obj
+tmg_search_font_families (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "search-font-families");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1844,8 +1844,8 @@ tmg_search_font_families (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_search_font_styles (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_search_font_styles (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "search-font-styles");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "search-font-styles");
 
@@ -1859,8 +1859,8 @@ tmg_search_font_styles (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_patch (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_logical_font_patch (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-patch");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "logical-font-patch");
 
@@ -1874,8 +1874,8 @@ tmg_logical_font_patch (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_logical_font_substitute (tmscm arg1) {
+scm_obj
+tmg_logical_font_substitute (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "logical-font-substitute");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -1887,8 +1887,8 @@ tmg_logical_font_substitute (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_font_family_main (tmscm arg1) {
+scm_obj
+tmg_font_family_main (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-family-main");
 
   string in1= tmscm_to_string (arg1);
@@ -1900,8 +1900,8 @@ tmg_font_family_main (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_image_2psdoc (tmscm arg1) {
+scm_obj
+tmg_image_2psdoc (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "image->psdoc");
 
   url in1= tmscm_to_url (arg1);
@@ -1913,8 +1913,8 @@ tmg_image_2psdoc (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_anim_control_times (tmscm arg1) {
+scm_obj
+tmg_anim_control_times (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "anim-control-times");
 
   content in1= tmscm_to_content (arg1);
@@ -1926,8 +1926,8 @@ tmg_anim_control_times (tmscm arg1) {
   return array_double_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_2stree (tmscm arg1) {
+scm_obj
+tmg_tree_2stree (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree->stree");
 
   tree in1= tmscm_to_tree (arg1);
@@ -1939,8 +1939,8 @@ tmg_tree_2stree (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_stree_2tree (tmscm arg1) {
+scm_obj
+tmg_stree_2tree (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "stree->tree");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -1952,8 +1952,8 @@ tmg_stree_2tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_2string (tmscm arg1) {
+scm_obj
+tmg_tree_2string (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree->string");
 
   tree in1= tmscm_to_tree (arg1);
@@ -1965,8 +1965,8 @@ tmg_tree_2string (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_2tree (tmscm arg1) {
+scm_obj
+tmg_string_2tree (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string->tree");
 
   string in1= tmscm_to_string (arg1);
@@ -1978,8 +1978,8 @@ tmg_string_2tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tm_2tree (tmscm arg1) {
+scm_obj
+tmg_tm_2tree (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tm->tree");
 
   content in1= tmscm_to_content (arg1);
@@ -1991,8 +1991,8 @@ tmg_tm_2tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_atomicP (tmscm arg1) {
+scm_obj
+tmg_tree_atomicP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-atomic?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2004,8 +2004,8 @@ tmg_tree_atomicP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_compoundP (tmscm arg1) {
+scm_obj
+tmg_tree_compoundP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-compound?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2017,8 +2017,8 @@ tmg_tree_compoundP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_label (tmscm arg1) {
+scm_obj
+tmg_tree_label (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-label");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2030,8 +2030,8 @@ tmg_tree_label (tmscm arg1) {
   return tree_label_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_children (tmscm arg1) {
+scm_obj
+tmg_tree_children (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-children");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2043,8 +2043,8 @@ tmg_tree_children (tmscm arg1) {
   return array_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_arity (tmscm arg1) {
+scm_obj
+tmg_tree_arity (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-arity");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2056,8 +2056,8 @@ tmg_tree_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_ref (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_child_ref (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-child-ref");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-ref");
 
@@ -2071,8 +2071,8 @@ tmg_tree_child_ref (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_setS (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_child_setS (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-child-set!");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-set!");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-child-set!");
@@ -2088,8 +2088,8 @@ tmg_tree_child_setS (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_child_insert (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-insert");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-insert");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-child-insert");
@@ -2105,8 +2105,8 @@ tmg_tree_child_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_ip (tmscm arg1) {
+scm_obj
+tmg_tree_ip (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-ip");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2118,8 +2118,8 @@ tmg_tree_ip (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_activeP (tmscm arg1) {
+scm_obj
+tmg_tree_activeP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-active?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2131,8 +2131,8 @@ tmg_tree_activeP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_eqP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_eqP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-eq?");
   TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "tree-eq?");
 
@@ -2146,8 +2146,8 @@ tmg_tree_eqP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_subtree (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_subtree (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "subtree");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "subtree");
 
@@ -2161,8 +2161,8 @@ tmg_subtree (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_range (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_range (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-range");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-range");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "tree-range");
@@ -2178,8 +2178,8 @@ tmg_tree_range (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_copy (tmscm arg1) {
+scm_obj
+tmg_tree_copy (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-copy");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2191,8 +2191,8 @@ tmg_tree_copy (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_append (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_append (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-append");
   TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "tree-append");
 
@@ -2206,8 +2206,8 @@ tmg_tree_append (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_right_index (tmscm arg1) {
+scm_obj
+tmg_tree_right_index (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-right-index");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2219,8 +2219,8 @@ tmg_tree_right_index (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_label_extensionP (tmscm arg1) {
+scm_obj
+tmg_tree_label_extensionP (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tree-label-extension?");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2232,8 +2232,8 @@ tmg_tree_label_extensionP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_label_macroP (tmscm arg1) {
+scm_obj
+tmg_tree_label_macroP (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tree-label-macro?");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2245,8 +2245,8 @@ tmg_tree_label_macroP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_label_parameterP (tmscm arg1) {
+scm_obj
+tmg_tree_label_parameterP (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tree-label-parameter?");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2258,8 +2258,8 @@ tmg_tree_label_parameterP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_label_type (tmscm arg1) {
+scm_obj
+tmg_tree_label_type (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tree-label-type");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2271,8 +2271,8 @@ tmg_tree_label_type (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_multi_paragraphP (tmscm arg1) {
+scm_obj
+tmg_tree_multi_paragraphP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-multi-paragraph?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2284,8 +2284,8 @@ tmg_tree_multi_paragraphP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_simplify (tmscm arg1) {
+scm_obj
+tmg_tree_simplify (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-simplify");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2297,8 +2297,8 @@ tmg_tree_simplify (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_minimal_arity (tmscm arg1) {
+scm_obj
+tmg_tree_minimal_arity (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-minimal-arity");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2310,8 +2310,8 @@ tmg_tree_minimal_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_maximal_arity (tmscm arg1) {
+scm_obj
+tmg_tree_maximal_arity (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-maximal-arity");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2323,8 +2323,8 @@ tmg_tree_maximal_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_possible_arityP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_possible_arityP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-possible-arity?");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-possible-arity?");
 
@@ -2338,8 +2338,8 @@ tmg_tree_possible_arityP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_insert_point (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_insert_point (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-insert_point");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-insert_point");
 
@@ -2353,8 +2353,8 @@ tmg_tree_insert_point (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_is_dynamicP (tmscm arg1) {
+scm_obj
+tmg_tree_is_dynamicP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-is-dynamic?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2366,8 +2366,8 @@ tmg_tree_is_dynamicP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_accessible_childP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_accessible_childP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-accessible-child?");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-accessible-child?");
 
@@ -2381,8 +2381,8 @@ tmg_tree_accessible_childP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_accessible_children (tmscm arg1) {
+scm_obj
+tmg_tree_accessible_children (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-accessible-children");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2394,8 +2394,8 @@ tmg_tree_accessible_children (tmscm arg1) {
   return array_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_all_accessibleP (tmscm arg1) {
+scm_obj
+tmg_tree_all_accessibleP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-all-accessible?");
 
   content in1= tmscm_to_content (arg1);
@@ -2407,8 +2407,8 @@ tmg_tree_all_accessibleP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_none_accessibleP (tmscm arg1) {
+scm_obj
+tmg_tree_none_accessibleP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-none-accessible?");
 
   content in1= tmscm_to_content (arg1);
@@ -2420,8 +2420,8 @@ tmg_tree_none_accessibleP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_name (tmscm arg1) {
+scm_obj
+tmg_tree_name (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-name");
 
   content in1= tmscm_to_content (arg1);
@@ -2433,8 +2433,8 @@ tmg_tree_name (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_long_name (tmscm arg1) {
+scm_obj
+tmg_tree_long_name (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-long-name");
 
   content in1= tmscm_to_content (arg1);
@@ -2446,8 +2446,8 @@ tmg_tree_long_name (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_name (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_child_name (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-name");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-name");
 
@@ -2461,8 +2461,8 @@ tmg_tree_child_name (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_long_name (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_child_long_name (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-long-name");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-long-name");
 
@@ -2476,8 +2476,8 @@ tmg_tree_child_long_name (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_type (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_child_type (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-type");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-type");
 
@@ -2491,8 +2491,8 @@ tmg_tree_child_type (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_env_dot (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_child_env_dot (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-env*");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-env*");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-child-env*");
@@ -2508,8 +2508,8 @@ tmg_tree_child_env_dot (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_child_env (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tree_child_env (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-child-env");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-child-env");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tree-child-env");
@@ -2527,8 +2527,8 @@ tmg_tree_child_env (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_descendant_env_dot (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_descendant_env_dot (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-descendant-env*");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "tree-descendant-env*");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-descendant-env*");
@@ -2544,8 +2544,8 @@ tmg_tree_descendant_env_dot (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_descendant_env (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tree_descendant_env (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-descendant-env");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "tree-descendant-env");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tree-descendant-env");
@@ -2563,8 +2563,8 @@ tmg_tree_descendant_env (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_load_inclusion (tmscm arg1) {
+scm_obj
+tmg_tree_load_inclusion (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-load-inclusion");
 
   url in1= tmscm_to_url (arg1);
@@ -2576,8 +2576,8 @@ tmg_tree_load_inclusion (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_as_string (tmscm arg1) {
+scm_obj
+tmg_tree_as_string (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-as-string");
 
   content in1= tmscm_to_content (arg1);
@@ -2589,8 +2589,8 @@ tmg_tree_as_string (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_extents (tmscm arg1) {
+scm_obj
+tmg_tree_extents (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-extents");
 
   content in1= tmscm_to_content (arg1);
@@ -2602,8 +2602,8 @@ tmg_tree_extents (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_emptyP (tmscm arg1) {
+scm_obj
+tmg_tree_emptyP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-empty?");
 
   content in1= tmscm_to_content (arg1);
@@ -2615,8 +2615,8 @@ tmg_tree_emptyP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_multi_lineP (tmscm arg1) {
+scm_obj
+tmg_tree_multi_lineP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-multi-line?");
 
   content in1= tmscm_to_content (arg1);
@@ -2628,8 +2628,8 @@ tmg_tree_multi_lineP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_is_bufferP (tmscm arg1) {
+scm_obj
+tmg_tree_is_bufferP (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-is-buffer?");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2641,8 +2641,8 @@ tmg_tree_is_bufferP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_search_sections (tmscm arg1) {
+scm_obj
+tmg_tree_search_sections (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-search-sections");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2654,8 +2654,8 @@ tmg_tree_search_sections (tmscm arg1) {
   return array_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_search_tree (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tree_search_tree (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-search-tree");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-search-tree");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-search-tree");
@@ -2673,8 +2673,8 @@ tmg_tree_search_tree (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_search_tree_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_tree_search_tree_at (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-search-tree-at");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-search-tree-at");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-search-tree-at");
@@ -2694,8 +2694,8 @@ tmg_tree_search_tree_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm a
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_spell (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tree_spell (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-spell");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-spell");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-spell");
@@ -2713,8 +2713,8 @@ tmg_tree_spell (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_spell_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_tree_spell_at (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-spell-at");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-spell-at");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-spell-at");
@@ -2734,8 +2734,8 @@ tmg_tree_spell_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_spell_selection (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6) {
+scm_obj
+tmg_tree_spell_selection (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5, scm_obj arg6) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-spell-selection");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-spell-selection");
   TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-spell-selection");
@@ -2757,8 +2757,8 @@ tmg_tree_spell_selection (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm 
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_previous_search_hit (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_previous_search_hit (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_ARRAY_PATH (arg1, TMSCM_ARG1, "previous-search-hit");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "previous-search-hit");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "previous-search-hit");
@@ -2774,8 +2774,8 @@ tmg_previous_search_hit (tmscm arg1, tmscm arg2, tmscm arg3) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_next_search_hit (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_next_search_hit (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_ARRAY_PATH (arg1, TMSCM_ARG1, "next-search-hit");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "next-search-hit");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "next-search-hit");
@@ -2791,8 +2791,8 @@ tmg_next_search_hit (tmscm arg1, tmscm arg2, tmscm arg3) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_navigate_search_hit (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_navigate_search_hit (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "navigate-search-hit");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "navigate-search-hit");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "navigate-search-hit");
@@ -2810,8 +2810,8 @@ tmg_navigate_search_hit (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_tag_minimal_arity (tmscm arg1) {
+scm_obj
+tmg_tag_minimal_arity (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tag-minimal-arity");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2823,8 +2823,8 @@ tmg_tag_minimal_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tag_maximal_arity (tmscm arg1) {
+scm_obj
+tmg_tag_maximal_arity (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tag-maximal-arity");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -2836,8 +2836,8 @@ tmg_tag_maximal_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tag_possible_arityP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tag_possible_arityP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "tag-possible-arity?");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tag-possible-arity?");
 
@@ -2851,8 +2851,8 @@ tmg_tag_possible_arityP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_set_access_mode (tmscm arg1) {
+scm_obj
+tmg_set_access_mode (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "set-access-mode");
 
   int in1= tmscm_to_int (arg1);
@@ -2864,7 +2864,7 @@ tmg_set_access_mode (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_access_mode () {
   // TMSCM_DEFER_INTS;
   int out= get_access_mode ();
@@ -2873,8 +2873,8 @@ tmg_get_access_mode () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_assign (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_assign (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-assign");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-assign");
 
@@ -2888,8 +2888,8 @@ tmg_tree_assign (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_var_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_var_insert (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-var-insert");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-var-insert");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-var-insert");
@@ -2905,8 +2905,8 @@ tmg_tree_var_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_remove (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_remove (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-remove");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-remove");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "tree-remove");
@@ -2922,8 +2922,8 @@ tmg_tree_remove (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_split (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_split (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-split");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-split");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "tree-split");
@@ -2939,8 +2939,8 @@ tmg_tree_split (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_join (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_join (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-join");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-join");
 
@@ -2954,8 +2954,8 @@ tmg_tree_join (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_assign_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_assign_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-assign-node");
   TMSCM_ASSERT_TREE_LABEL (arg2, TMSCM_ARG2, "tree-assign-node");
 
@@ -2969,8 +2969,8 @@ tmg_tree_assign_node (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_insert_node (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_insert_node (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-insert-node");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-insert-node");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "tree-insert-node");
@@ -2986,8 +2986,8 @@ tmg_tree_insert_node (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_remove_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_remove_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-remove-node");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-remove-node");
 
@@ -3001,8 +3001,8 @@ tmg_tree_remove_node (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_tree_correct_node (tmscm arg1) {
+scm_obj
+tmg_cpp_tree_correct_node (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-tree-correct-node");
 
   tree in1= tmscm_to_tree (arg1);
@@ -3014,8 +3014,8 @@ tmg_cpp_tree_correct_node (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_tree_correct_downwards (tmscm arg1) {
+scm_obj
+tmg_cpp_tree_correct_downwards (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-tree-correct-downwards");
 
   tree in1= tmscm_to_tree (arg1);
@@ -3027,8 +3027,8 @@ tmg_cpp_tree_correct_downwards (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_tree_correct_upwards (tmscm arg1) {
+scm_obj
+tmg_cpp_tree_correct_upwards (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-tree-correct-upwards");
 
   tree in1= tmscm_to_tree (arg1);
@@ -3040,8 +3040,8 @@ tmg_cpp_tree_correct_upwards (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_concat_tokenize_math (tmscm arg1) {
+scm_obj
+tmg_concat_tokenize_math (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "concat-tokenize-math");
 
   content in1= tmscm_to_content (arg1);
@@ -3053,8 +3053,8 @@ tmg_concat_tokenize_math (tmscm arg1) {
   return array_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_concat_decompose (tmscm arg1) {
+scm_obj
+tmg_concat_decompose (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "concat-decompose");
 
   content in1= tmscm_to_content (arg1);
@@ -3066,8 +3066,8 @@ tmg_concat_decompose (tmscm arg1) {
   return array_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_concat_recompose (tmscm arg1) {
+scm_obj
+tmg_concat_recompose (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_TREE (arg1, TMSCM_ARG1, "concat-recompose");
 
   array_tree in1= tmscm_to_array_tree (arg1);
@@ -3079,8 +3079,8 @@ tmg_concat_recompose (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_with_likeP (tmscm arg1) {
+scm_obj
+tmg_with_likeP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "with-like?");
 
   content in1= tmscm_to_content (arg1);
@@ -3092,8 +3092,8 @@ tmg_with_likeP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_with_same_typeP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_with_same_typeP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "with-same-type?");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "with-same-type?");
 
@@ -3107,8 +3107,8 @@ tmg_with_same_typeP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_with_similar_typeP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_with_similar_typeP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "with-similar-type?");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "with-similar-type?");
 
@@ -3122,8 +3122,8 @@ tmg_with_similar_typeP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_with_correct (tmscm arg1) {
+scm_obj
+tmg_with_correct (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "with-correct");
 
   content in1= tmscm_to_content (arg1);
@@ -3135,8 +3135,8 @@ tmg_with_correct (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_with_correct_superfluous (tmscm arg1) {
+scm_obj
+tmg_with_correct_superfluous (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "with-correct-superfluous");
 
   content in1= tmscm_to_content (arg1);
@@ -3148,8 +3148,8 @@ tmg_with_correct_superfluous (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_invisible_correct_superfluous (tmscm arg1) {
+scm_obj
+tmg_invisible_correct_superfluous (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "invisible-correct-superfluous");
 
   content in1= tmscm_to_content (arg1);
@@ -3161,8 +3161,8 @@ tmg_invisible_correct_superfluous (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_invisible_correct_missing (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_invisible_correct_missing (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "invisible-correct-missing");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "invisible-correct-missing");
 
@@ -3176,8 +3176,8 @@ tmg_invisible_correct_missing (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_automatic_correct (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_automatic_correct (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "automatic-correct");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "automatic-correct");
 
@@ -3191,8 +3191,8 @@ tmg_automatic_correct (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_manual_correct (tmscm arg1) {
+scm_obj
+tmg_manual_correct (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "manual-correct");
 
   content in1= tmscm_to_content (arg1);
@@ -3204,8 +3204,8 @@ tmg_manual_correct (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_upgrade_brackets (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_upgrade_brackets (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-upgrade-brackets");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-upgrade-brackets");
 
@@ -3219,8 +3219,8 @@ tmg_tree_upgrade_brackets (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_upgrade_big (tmscm arg1) {
+scm_obj
+tmg_tree_upgrade_big (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-upgrade-big");
 
   content in1= tmscm_to_content (arg1);
@@ -3232,8 +3232,8 @@ tmg_tree_upgrade_big (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_downgrade_brackets (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_downgrade_brackets (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-downgrade-brackets");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "tree-downgrade-brackets");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "tree-downgrade-brackets");
@@ -3249,8 +3249,8 @@ tmg_tree_downgrade_brackets (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_downgrade_big (tmscm arg1) {
+scm_obj
+tmg_tree_downgrade_big (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree-downgrade-big");
 
   content in1= tmscm_to_content (arg1);
@@ -3262,7 +3262,7 @@ tmg_tree_downgrade_big (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_math_status_print () {
   // TMSCM_DEFER_INTS;
   math_status_print ();
@@ -3271,7 +3271,7 @@ tmg_math_status_print () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_math_status_reset () {
   // TMSCM_DEFER_INTS;
   math_status_reset ();
@@ -3280,8 +3280,8 @@ tmg_math_status_reset () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_path_strip (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_strip (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-strip");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-strip");
 
@@ -3295,8 +3295,8 @@ tmg_path_strip (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_infP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_infP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-inf?");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-inf?");
 
@@ -3310,8 +3310,8 @@ tmg_path_infP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_path_inf_eqP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_inf_eqP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-inf-eq?");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-inf-eq?");
 
@@ -3325,8 +3325,8 @@ tmg_path_inf_eqP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_path_lessP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_lessP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-less?");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-less?");
 
@@ -3340,8 +3340,8 @@ tmg_path_lessP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_path_less_eqP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_less_eqP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-less-eq?");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-less-eq?");
 
@@ -3355,8 +3355,8 @@ tmg_path_less_eqP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_path_start (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_start (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-start");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-start");
 
@@ -3370,8 +3370,8 @@ tmg_path_start (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_end (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_end (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-end");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-end");
 
@@ -3385,8 +3385,8 @@ tmg_path_end (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_next (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next");
 
@@ -3400,8 +3400,8 @@ tmg_path_next (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_previous (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous");
 
@@ -3415,8 +3415,8 @@ tmg_path_previous (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next_word (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_next_word (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next-word");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next-word");
 
@@ -3430,8 +3430,8 @@ tmg_path_next_word (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_word (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_previous_word (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-word");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-word");
 
@@ -3445,8 +3445,8 @@ tmg_path_previous_word (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_next_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next-node");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next-node");
 
@@ -3460,8 +3460,8 @@ tmg_path_next_node (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_previous_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-node");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-node");
 
@@ -3475,8 +3475,8 @@ tmg_path_previous_node (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next_tag (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_path_next_tag (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next-tag");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next-tag");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "path-next-tag");
@@ -3492,8 +3492,8 @@ tmg_path_next_tag (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_tag (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_path_previous_tag (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-tag");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-tag");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "path-previous-tag");
@@ -3509,8 +3509,8 @@ tmg_path_previous_tag (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next_tag_same_argument (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_path_next_tag_same_argument (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next-tag-same-argument");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next-tag-same-argument");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "path-next-tag-same-argument");
@@ -3526,8 +3526,8 @@ tmg_path_next_tag_same_argument (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_tag_same_argument (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_path_previous_tag_same_argument (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-tag-same-argument");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-tag-same-argument");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "path-previous-tag-same-argument");
@@ -3543,8 +3543,8 @@ tmg_path_previous_tag_same_argument (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_next_argument (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_next_argument (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-next-argument");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-next-argument");
 
@@ -3558,8 +3558,8 @@ tmg_path_next_argument (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_argument (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_previous_argument (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-argument");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-argument");
 
@@ -3573,8 +3573,8 @@ tmg_path_previous_argument (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_path_previous_section (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_previous_section (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "path-previous-section");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "path-previous-section");
 
@@ -3588,8 +3588,8 @@ tmg_path_previous_section (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_make_modification (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_make_modification (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-modification");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "make-modification");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "make-modification");
@@ -3605,8 +3605,8 @@ tmg_make_modification (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_assign (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_assign (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-assign");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "modification-assign");
 
@@ -3620,8 +3620,8 @@ tmg_modification_assign (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_modification_insert (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-insert");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-insert");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "modification-insert");
@@ -3637,8 +3637,8 @@ tmg_modification_insert (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_remove (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_modification_remove (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-remove");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-remove");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "modification-remove");
@@ -3654,8 +3654,8 @@ tmg_modification_remove (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_split (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_modification_split (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-split");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-split");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "modification-split");
@@ -3671,8 +3671,8 @@ tmg_modification_split (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_join (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_join (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-join");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-join");
 
@@ -3686,8 +3686,8 @@ tmg_modification_join (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_assign_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_assign_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-assign-node");
   TMSCM_ASSERT_TREE_LABEL (arg2, TMSCM_ARG2, "modification-assign-node");
 
@@ -3701,8 +3701,8 @@ tmg_modification_assign_node (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_insert_node (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_modification_insert_node (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-insert-node");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-insert-node");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "modification-insert-node");
@@ -3718,8 +3718,8 @@ tmg_modification_insert_node (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_remove_node (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_remove_node (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-remove-node");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-remove-node");
 
@@ -3733,8 +3733,8 @@ tmg_modification_remove_node (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_set_cursor (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_modification_set_cursor (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "modification-set-cursor");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "modification-set-cursor");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "modification-set-cursor");
@@ -3750,8 +3750,8 @@ tmg_modification_set_cursor (tmscm arg1, tmscm arg2, tmscm arg3) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_kind (tmscm arg1) {
+scm_obj
+tmg_modification_kind (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-kind");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3763,8 +3763,8 @@ tmg_modification_kind (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_path (tmscm arg1) {
+scm_obj
+tmg_modification_path (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-path");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3776,8 +3776,8 @@ tmg_modification_path (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_tree (tmscm arg1) {
+scm_obj
+tmg_modification_tree (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-tree");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3789,8 +3789,8 @@ tmg_modification_tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_root (tmscm arg1) {
+scm_obj
+tmg_modification_root (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-root");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3802,8 +3802,8 @@ tmg_modification_root (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_index (tmscm arg1) {
+scm_obj
+tmg_modification_index (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-index");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3815,8 +3815,8 @@ tmg_modification_index (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_argument (tmscm arg1) {
+scm_obj
+tmg_modification_argument (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-argument");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3828,8 +3828,8 @@ tmg_modification_argument (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_label (tmscm arg1) {
+scm_obj
+tmg_modification_label (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-label");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3841,8 +3841,8 @@ tmg_modification_label (tmscm arg1) {
   return tree_label_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_copy (tmscm arg1) {
+scm_obj
+tmg_modification_copy (scm_obj arg1) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-copy");
 
   modification in1= tmscm_to_modification (arg1);
@@ -3854,8 +3854,8 @@ tmg_modification_copy (tmscm arg1) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_applicableP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_applicableP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "modification-applicable?");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-applicable?");
 
@@ -3869,8 +3869,8 @@ tmg_modification_applicableP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_apply (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_apply (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "modification-apply");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-apply");
 
@@ -3884,8 +3884,8 @@ tmg_modification_apply (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_inplace_apply (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_inplace_apply (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "modification-inplace-apply");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-inplace-apply");
 
@@ -3899,8 +3899,8 @@ tmg_modification_inplace_apply (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_invert (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_invert (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-invert");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "modification-invert");
 
@@ -3914,8 +3914,8 @@ tmg_modification_invert (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_commuteP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_commuteP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-commute?");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-commute?");
 
@@ -3929,8 +3929,8 @@ tmg_modification_commuteP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_can_pullP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_can_pullP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-can-pull?");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-can-pull?");
 
@@ -3944,8 +3944,8 @@ tmg_modification_can_pullP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_pull (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_pull (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-pull");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-pull");
 
@@ -3959,8 +3959,8 @@ tmg_modification_pull (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_modification_co_pull (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_modification_co_pull (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "modification-co-pull");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "modification-co-pull");
 
@@ -3974,8 +3974,8 @@ tmg_modification_co_pull (tmscm arg1, tmscm arg2) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_pair (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_pair (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_MODIFICATION (arg1, TMSCM_ARG1, "patch-pair");
   TMSCM_ASSERT_MODIFICATION (arg2, TMSCM_ARG2, "patch-pair");
 
@@ -3989,8 +3989,8 @@ tmg_patch_pair (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_compound (tmscm arg1) {
+scm_obj
+tmg_patch_compound (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_PATCH (arg1, TMSCM_ARG1, "patch-compound");
 
   array_patch in1= tmscm_to_array_patch (arg1);
@@ -4002,8 +4002,8 @@ tmg_patch_compound (tmscm arg1) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_branch (tmscm arg1) {
+scm_obj
+tmg_patch_branch (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_PATCH (arg1, TMSCM_ARG1, "patch-branch");
 
   array_patch in1= tmscm_to_array_patch (arg1);
@@ -4015,8 +4015,8 @@ tmg_patch_branch (tmscm arg1) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_birth (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_birth (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "patch-birth");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "patch-birth");
 
@@ -4030,8 +4030,8 @@ tmg_patch_birth (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_author (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_author (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "patch-author");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-author");
 
@@ -4045,8 +4045,8 @@ tmg_patch_author (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_pairP (tmscm arg1) {
+scm_obj
+tmg_patch_pairP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-pair?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4058,8 +4058,8 @@ tmg_patch_pairP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_compoundP (tmscm arg1) {
+scm_obj
+tmg_patch_compoundP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-compound?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4071,8 +4071,8 @@ tmg_patch_compoundP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_branchP (tmscm arg1) {
+scm_obj
+tmg_patch_branchP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-branch?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4084,8 +4084,8 @@ tmg_patch_branchP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_birthP (tmscm arg1) {
+scm_obj
+tmg_patch_birthP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-birth?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4097,8 +4097,8 @@ tmg_patch_birthP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_authorP (tmscm arg1) {
+scm_obj
+tmg_patch_authorP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-author?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4110,8 +4110,8 @@ tmg_patch_authorP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_arity (tmscm arg1) {
+scm_obj
+tmg_patch_arity (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-arity");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4123,8 +4123,8 @@ tmg_patch_arity (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_ref (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_ref (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-ref");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "patch-ref");
 
@@ -4138,8 +4138,8 @@ tmg_patch_ref (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_direct (tmscm arg1) {
+scm_obj
+tmg_patch_direct (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-direct");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4151,8 +4151,8 @@ tmg_patch_direct (tmscm arg1) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_inverse (tmscm arg1) {
+scm_obj
+tmg_patch_inverse (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-inverse");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4164,8 +4164,8 @@ tmg_patch_inverse (tmscm arg1) {
   return modification_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_get_birth (tmscm arg1) {
+scm_obj
+tmg_patch_get_birth (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-get-birth");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4177,8 +4177,8 @@ tmg_patch_get_birth (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_get_author (tmscm arg1) {
+scm_obj
+tmg_patch_get_author (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-get-author");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4190,8 +4190,8 @@ tmg_patch_get_author (tmscm arg1) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_copy (tmscm arg1) {
+scm_obj
+tmg_patch_copy (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-copy");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4203,8 +4203,8 @@ tmg_patch_copy (tmscm arg1) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_applicableP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_applicableP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-applicable?");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "patch-applicable?");
 
@@ -4218,8 +4218,8 @@ tmg_patch_applicableP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_apply (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_apply (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "patch-apply");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-apply");
 
@@ -4233,8 +4233,8 @@ tmg_patch_apply (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_inplace_apply (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_inplace_apply (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "patch-inplace-apply");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-inplace-apply");
 
@@ -4248,8 +4248,8 @@ tmg_patch_inplace_apply (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_compactify (tmscm arg1) {
+scm_obj
+tmg_patch_compactify (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-compactify");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4261,8 +4261,8 @@ tmg_patch_compactify (tmscm arg1) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_cursor_hint (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_cursor_hint (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-cursor-hint");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "patch-cursor-hint");
 
@@ -4276,8 +4276,8 @@ tmg_patch_cursor_hint (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_invert (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_invert (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-invert");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "patch-invert");
 
@@ -4291,8 +4291,8 @@ tmg_patch_invert (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_commuteP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_commuteP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-commute?");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-commute?");
 
@@ -4306,8 +4306,8 @@ tmg_patch_commuteP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_can_pullP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_can_pullP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-can-pull?");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-can-pull?");
 
@@ -4321,8 +4321,8 @@ tmg_patch_can_pullP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_pull (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_pull (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-pull");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-pull");
 
@@ -4336,8 +4336,8 @@ tmg_patch_pull (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_co_pull (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_patch_co_pull (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-co-pull");
   TMSCM_ASSERT_PATCH (arg2, TMSCM_ARG2, "patch-co-pull");
 
@@ -4351,8 +4351,8 @@ tmg_patch_co_pull (tmscm arg1, tmscm arg2) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_remove_set_cursor (tmscm arg1) {
+scm_obj
+tmg_patch_remove_set_cursor (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-remove-set-cursor");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4364,8 +4364,8 @@ tmg_patch_remove_set_cursor (tmscm arg1) {
   return patch_to_tmscm (out);
 }
 
-tmscm
-tmg_patch_modifiesP (tmscm arg1) {
+scm_obj
+tmg_patch_modifiesP (scm_obj arg1) {
   TMSCM_ASSERT_PATCH (arg1, TMSCM_ARG1, "patch-modifies?");
 
   patch in1= tmscm_to_patch (arg1);
@@ -4377,8 +4377,8 @@ tmg_patch_modifiesP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_2ids (tmscm arg1) {
+scm_obj
+tmg_tree_2ids (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree->ids");
 
   tree in1= tmscm_to_tree (arg1);
@@ -4390,8 +4390,8 @@ tmg_tree_2ids (tmscm arg1) {
   return list_string_to_tmscm (out);
 }
 
-tmscm
-tmg_id_2trees (tmscm arg1) {
+scm_obj
+tmg_id_2trees (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "id->trees");
 
   string in1= tmscm_to_string (arg1);
@@ -4403,8 +4403,8 @@ tmg_id_2trees (tmscm arg1) {
   return list_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_vertex_2links (tmscm arg1) {
+scm_obj
+tmg_vertex_2links (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "vertex->links");
 
   content in1= tmscm_to_content (arg1);
@@ -4416,8 +4416,8 @@ tmg_vertex_2links (tmscm arg1) {
   return list_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_2tree_pointer (tmscm arg1) {
+scm_obj
+tmg_tree_2tree_pointer (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree->tree-pointer");
 
   tree in1= tmscm_to_tree (arg1);
@@ -4429,8 +4429,8 @@ tmg_tree_2tree_pointer (tmscm arg1) {
   return observer_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_pointer_detach (tmscm arg1) {
+scm_obj
+tmg_tree_pointer_detach (scm_obj arg1) {
   TMSCM_ASSERT_OBSERVER (arg1, TMSCM_ARG1, "tree-pointer-detach");
 
   observer in1= tmscm_to_observer (arg1);
@@ -4442,8 +4442,8 @@ tmg_tree_pointer_detach (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tree_pointer_2tree (tmscm arg1) {
+scm_obj
+tmg_tree_pointer_2tree (scm_obj arg1) {
   TMSCM_ASSERT_OBSERVER (arg1, TMSCM_ARG1, "tree-pointer->tree");
 
   observer in1= tmscm_to_observer (arg1);
@@ -4455,7 +4455,7 @@ tmg_tree_pointer_2tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_current_link_types () {
   // TMSCM_DEFER_INTS;
   list_string out= all_link_types ();
@@ -4464,8 +4464,8 @@ tmg_current_link_types () {
   return list_string_to_tmscm (out);
 }
 
-tmscm
-tmg_get_locus_rendering (tmscm arg1) {
+scm_obj
+tmg_get_locus_rendering (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-locus-rendering");
 
   string in1= tmscm_to_string (arg1);
@@ -4477,8 +4477,8 @@ tmg_get_locus_rendering (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_locus_rendering (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_locus_rendering (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-locus-rendering");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-locus-rendering");
 
@@ -4492,8 +4492,8 @@ tmg_set_locus_rendering (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_declare_visited (tmscm arg1) {
+scm_obj
+tmg_declare_visited (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "declare-visited");
 
   string in1= tmscm_to_string (arg1);
@@ -4505,8 +4505,8 @@ tmg_declare_visited (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_has_been_visitedP (tmscm arg1) {
+scm_obj
+tmg_has_been_visitedP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "has-been-visited?");
 
   string in1= tmscm_to_string (arg1);
@@ -4518,8 +4518,8 @@ tmg_has_been_visitedP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_graphics_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_graphics_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "graphics-set");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "graphics-set");
 
@@ -4533,8 +4533,8 @@ tmg_graphics_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_graphics_hasP (tmscm arg1) {
+scm_obj
+tmg_graphics_hasP (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "graphics-has?");
 
   content in1= tmscm_to_content (arg1);
@@ -4546,8 +4546,8 @@ tmg_graphics_hasP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_graphics_ref (tmscm arg1) {
+scm_obj
+tmg_graphics_ref (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "graphics-ref");
 
   content in1= tmscm_to_content (arg1);
@@ -4559,7 +4559,7 @@ tmg_graphics_ref (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_graphics_needs_updateP () {
   // TMSCM_DEFER_INTS;
   bool out= graphics_needs_update ();
@@ -4568,8 +4568,8 @@ tmg_graphics_needs_updateP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_graphics_notify_update (tmscm arg1) {
+scm_obj
+tmg_graphics_notify_update (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "graphics-notify-update");
 
   content in1= tmscm_to_content (arg1);
@@ -4581,8 +4581,8 @@ tmg_graphics_notify_update (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_string_numberP (tmscm arg1) {
+scm_obj
+tmg_string_numberP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-number?");
 
   string in1= tmscm_to_string (arg1);
@@ -4594,8 +4594,8 @@ tmg_string_numberP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_string_occursP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_occursP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-occurs?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-occurs?");
 
@@ -4609,8 +4609,8 @@ tmg_string_occursP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_string_count_occurrences (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_count_occurrences (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-count-occurrences");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-count-occurrences");
 
@@ -4624,8 +4624,8 @@ tmg_string_count_occurrences (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_search_forwards (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_string_search_forwards (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-search-forwards");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-search-forwards");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "string-search-forwards");
@@ -4641,8 +4641,8 @@ tmg_string_search_forwards (tmscm arg1, tmscm arg2, tmscm arg3) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_search_backwards (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_string_search_backwards (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-search-backwards");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-search-backwards");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "string-search-backwards");
@@ -4658,8 +4658,8 @@ tmg_string_search_backwards (tmscm arg1, tmscm arg2, tmscm arg3) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_overlapping (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_overlapping (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-overlapping");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-overlapping");
 
@@ -4673,8 +4673,8 @@ tmg_string_overlapping (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_replace (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_string_replace (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-replace");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-replace");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "string-replace");
@@ -4690,8 +4690,8 @@ tmg_string_replace (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_alphaP (tmscm arg1) {
+scm_obj
+tmg_string_alphaP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-alpha?");
 
   string in1= tmscm_to_string (arg1);
@@ -4703,8 +4703,8 @@ tmg_string_alphaP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_string_locase_alphaP (tmscm arg1) {
+scm_obj
+tmg_string_locase_alphaP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-locase-alpha?");
 
   string in1= tmscm_to_string (arg1);
@@ -4716,8 +4716,8 @@ tmg_string_locase_alphaP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_upcase_first (tmscm arg1) {
+scm_obj
+tmg_upcase_first (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "upcase-first");
 
   string in1= tmscm_to_string (arg1);
@@ -4729,8 +4729,8 @@ tmg_upcase_first (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_locase_first (tmscm arg1) {
+scm_obj
+tmg_locase_first (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "locase-first");
 
   string in1= tmscm_to_string (arg1);
@@ -4742,8 +4742,8 @@ tmg_locase_first (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_upcase_all (tmscm arg1) {
+scm_obj
+tmg_upcase_all (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "upcase-all");
 
   string in1= tmscm_to_string (arg1);
@@ -4755,8 +4755,8 @@ tmg_upcase_all (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_locase_all (tmscm arg1) {
+scm_obj
+tmg_locase_all (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "locase-all");
 
   string in1= tmscm_to_string (arg1);
@@ -4768,8 +4768,8 @@ tmg_locase_all (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_union (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_union (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-union");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-union");
 
@@ -4783,8 +4783,8 @@ tmg_string_union (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_minus (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_minus (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-minus");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-minus");
 
@@ -4798,8 +4798,8 @@ tmg_string_minus (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_escape_generic (tmscm arg1) {
+scm_obj
+tmg_escape_generic (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "escape-generic");
 
   string in1= tmscm_to_string (arg1);
@@ -4811,8 +4811,8 @@ tmg_escape_generic (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_escape_verbatim (tmscm arg1) {
+scm_obj
+tmg_escape_verbatim (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "escape-verbatim");
 
   string in1= tmscm_to_string (arg1);
@@ -4824,8 +4824,8 @@ tmg_escape_verbatim (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_escape_shell (tmscm arg1) {
+scm_obj
+tmg_escape_shell (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "escape-shell");
 
   string in1= tmscm_to_string (arg1);
@@ -4837,8 +4837,8 @@ tmg_escape_shell (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_escape_to_ascii (tmscm arg1) {
+scm_obj
+tmg_escape_to_ascii (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "escape-to-ascii");
 
   string in1= tmscm_to_string (arg1);
@@ -4850,8 +4850,8 @@ tmg_escape_to_ascii (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_unescape_guile (tmscm arg1) {
+scm_obj
+tmg_unescape_guile (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "unescape-guile");
 
   string in1= tmscm_to_string (arg1);
@@ -4863,8 +4863,8 @@ tmg_unescape_guile (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_quote (tmscm arg1) {
+scm_obj
+tmg_string_quote (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-quote");
 
   string in1= tmscm_to_string (arg1);
@@ -4876,8 +4876,8 @@ tmg_string_quote (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_unquote (tmscm arg1) {
+scm_obj
+tmg_string_unquote (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-unquote");
 
   string in1= tmscm_to_string (arg1);
@@ -4889,8 +4889,8 @@ tmg_string_unquote (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_trim_spaces_left (tmscm arg1) {
+scm_obj
+tmg_string_trim_spaces_left (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-trim-spaces-left");
 
   string in1= tmscm_to_string (arg1);
@@ -4902,8 +4902,8 @@ tmg_string_trim_spaces_left (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_trim_spaces_right (tmscm arg1) {
+scm_obj
+tmg_string_trim_spaces_right (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-trim-spaces-right");
 
   string in1= tmscm_to_string (arg1);
@@ -4915,8 +4915,8 @@ tmg_string_trim_spaces_right (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_trim_spaces (tmscm arg1) {
+scm_obj
+tmg_string_trim_spaces (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-trim-spaces");
 
   string in1= tmscm_to_string (arg1);
@@ -4928,8 +4928,8 @@ tmg_string_trim_spaces (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_downgrade_math_letters (tmscm arg1) {
+scm_obj
+tmg_downgrade_math_letters (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "downgrade-math-letters");
 
   string in1= tmscm_to_string (arg1);
@@ -4941,8 +4941,8 @@ tmg_downgrade_math_letters (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_convert (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_string_convert (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-convert");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-convert");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "string-convert");
@@ -4958,8 +4958,8 @@ tmg_string_convert (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_encode_base64 (tmscm arg1) {
+scm_obj
+tmg_encode_base64 (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "encode-base64");
 
   string in1= tmscm_to_string (arg1);
@@ -4971,8 +4971,8 @@ tmg_encode_base64 (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_decode_base64 (tmscm arg1) {
+scm_obj
+tmg_decode_base64 (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "decode-base64");
 
   string in1= tmscm_to_string (arg1);
@@ -4984,8 +4984,8 @@ tmg_decode_base64 (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_sourcecode_2cork (tmscm arg1) {
+scm_obj
+tmg_sourcecode_2cork (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "sourcecode->cork");
 
   string in1= tmscm_to_string (arg1);
@@ -4997,8 +4997,8 @@ tmg_sourcecode_2cork (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cork_2sourcecode (tmscm arg1) {
+scm_obj
+tmg_cork_2sourcecode (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cork->sourcecode");
 
   string in1= tmscm_to_string (arg1);
@@ -5010,8 +5010,8 @@ tmg_cork_2sourcecode (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_utf8_2cork (tmscm arg1) {
+scm_obj
+tmg_utf8_2cork (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->cork");
 
   string in1= tmscm_to_string (arg1);
@@ -5023,8 +5023,8 @@ tmg_utf8_2cork (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cork_2utf8 (tmscm arg1) {
+scm_obj
+tmg_cork_2utf8 (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cork->utf8");
 
   string in1= tmscm_to_string (arg1);
@@ -5036,8 +5036,8 @@ tmg_cork_2utf8 (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_utf8_2t2a (tmscm arg1) {
+scm_obj
+tmg_utf8_2t2a (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->t2a");
 
   string in1= tmscm_to_string (arg1);
@@ -5049,8 +5049,8 @@ tmg_utf8_2t2a (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_t2a_2utf8 (tmscm arg1) {
+scm_obj
+tmg_t2a_2utf8 (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "t2a->utf8");
 
   string in1= tmscm_to_string (arg1);
@@ -5062,8 +5062,8 @@ tmg_t2a_2utf8 (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_utf8_2html (tmscm arg1) {
+scm_obj
+tmg_utf8_2html (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "utf8->html");
 
   string in1= tmscm_to_string (arg1);
@@ -5075,8 +5075,8 @@ tmg_utf8_2html (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_guess_wencoding (tmscm arg1) {
+scm_obj
+tmg_guess_wencoding (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "guess-wencoding");
 
   string in1= tmscm_to_string (arg1);
@@ -5088,8 +5088,8 @@ tmg_guess_wencoding (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tm_2xml_name (tmscm arg1) {
+scm_obj
+tmg_tm_2xml_name (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tm->xml-name");
 
   string in1= tmscm_to_string (arg1);
@@ -5101,8 +5101,8 @@ tmg_tm_2xml_name (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_old_tm_2xml_cdata (tmscm arg1) {
+scm_obj
+tmg_old_tm_2xml_cdata (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "old-tm->xml-cdata");
 
   string in1= tmscm_to_string (arg1);
@@ -5114,8 +5114,8 @@ tmg_old_tm_2xml_cdata (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tm_2xml_cdata (tmscm arg1) {
+scm_obj
+tmg_tm_2xml_cdata (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tm->xml-cdata");
 
   string in1= tmscm_to_string (arg1);
@@ -5127,8 +5127,8 @@ tmg_tm_2xml_cdata (tmscm arg1) {
   return object_to_tmscm (out);
 }
 
-tmscm
-tmg_xml_name_2tm (tmscm arg1) {
+scm_obj
+tmg_xml_name_2tm (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "xml-name->tm");
 
   string in1= tmscm_to_string (arg1);
@@ -5140,8 +5140,8 @@ tmg_xml_name_2tm (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_old_xml_cdata_2tm (tmscm arg1) {
+scm_obj
+tmg_old_xml_cdata_2tm (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "old-xml-cdata->tm");
 
   string in1= tmscm_to_string (arg1);
@@ -5153,8 +5153,8 @@ tmg_old_xml_cdata_2tm (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_xml_unspace (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_xml_unspace (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "xml-unspace");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "xml-unspace");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "xml-unspace");
@@ -5170,8 +5170,8 @@ tmg_xml_unspace (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_integer_2hexadecimal (tmscm arg1) {
+scm_obj
+tmg_integer_2hexadecimal (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "integer->hexadecimal");
 
   int in1= tmscm_to_int (arg1);
@@ -5183,8 +5183,8 @@ tmg_integer_2hexadecimal (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_integer_2padded_hexadecimal (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_integer_2padded_hexadecimal (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "integer->padded-hexadecimal");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "integer->padded-hexadecimal");
 
@@ -5198,8 +5198,8 @@ tmg_integer_2padded_hexadecimal (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_hexadecimal_2integer (tmscm arg1) {
+scm_obj
+tmg_hexadecimal_2integer (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "hexadecimal->integer");
 
   string in1= tmscm_to_string (arg1);
@@ -5211,8 +5211,8 @@ tmg_hexadecimal_2integer (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_string_tokenize (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_string_tokenize (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-string-tokenize");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-string-tokenize");
 
@@ -5226,8 +5226,8 @@ tmg_cpp_string_tokenize (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_string_recompose (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_string_recompose (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "cpp-string-recompose");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-string-recompose");
 
@@ -5241,8 +5241,8 @@ tmg_cpp_string_recompose (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_differences (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_differences (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-differences");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-differences");
 
@@ -5256,8 +5256,8 @@ tmg_string_differences (tmscm arg1, tmscm arg2) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_distance (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_distance (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-distance");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "string-distance");
 
@@ -5271,8 +5271,8 @@ tmg_string_distance (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_find_left_bracket (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_find_left_bracket (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "find-left-bracket");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "find-left-bracket");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "find-left-bracket");
@@ -5288,8 +5288,8 @@ tmg_find_left_bracket (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_find_right_bracket (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_find_right_bracket (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "find-right-bracket");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "find-right-bracket");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "find-right-bracket");
@@ -5305,8 +5305,8 @@ tmg_find_right_bracket (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_string_2tmstring (tmscm arg1) {
+scm_obj
+tmg_string_2tmstring (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string->tmstring");
 
   string in1= tmscm_to_string (arg1);
@@ -5318,8 +5318,8 @@ tmg_string_2tmstring (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_2string (tmscm arg1) {
+scm_obj
+tmg_tmstring_2string (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring->string");
 
   string in1= tmscm_to_string (arg1);
@@ -5331,8 +5331,8 @@ tmg_tmstring_2string (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_length (tmscm arg1) {
+scm_obj
+tmg_tmstring_length (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-length");
 
   string in1= tmscm_to_string (arg1);
@@ -5344,8 +5344,8 @@ tmg_tmstring_length (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_ref (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmstring_ref (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-ref");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tmstring-ref");
 
@@ -5359,8 +5359,8 @@ tmg_tmstring_ref (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_reverse_ref (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmstring_reverse_ref (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-reverse-ref");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tmstring-reverse-ref");
 
@@ -5374,8 +5374,8 @@ tmg_tmstring_reverse_ref (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_2list (tmscm arg1) {
+scm_obj
+tmg_tmstring_2list (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring->list");
 
   string in1= tmscm_to_string (arg1);
@@ -5387,8 +5387,8 @@ tmg_tmstring_2list (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_list_2tmstring (tmscm arg1) {
+scm_obj
+tmg_list_2tmstring (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "list->tmstring");
 
   array_string in1= tmscm_to_array_string (arg1);
@@ -5400,8 +5400,8 @@ tmg_list_2tmstring (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_next (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_next (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-next");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-next");
 
@@ -5415,8 +5415,8 @@ tmg_string_next (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_string_previous (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_previous (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-previous");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-previous");
 
@@ -5430,8 +5430,8 @@ tmg_string_previous (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_split (tmscm arg1) {
+scm_obj
+tmg_tmstring_split (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-split");
 
   string in1= tmscm_to_string (arg1);
@@ -5443,8 +5443,8 @@ tmg_tmstring_split (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_translit (tmscm arg1) {
+scm_obj
+tmg_tmstring_translit (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-translit");
 
   string in1= tmscm_to_string (arg1);
@@ -5456,8 +5456,8 @@ tmg_tmstring_translit (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_locase_first (tmscm arg1) {
+scm_obj
+tmg_tmstring_locase_first (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-locase-first");
 
   string in1= tmscm_to_string (arg1);
@@ -5469,8 +5469,8 @@ tmg_tmstring_locase_first (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_upcase_first (tmscm arg1) {
+scm_obj
+tmg_tmstring_upcase_first (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-upcase-first");
 
   string in1= tmscm_to_string (arg1);
@@ -5482,8 +5482,8 @@ tmg_tmstring_upcase_first (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_locase_all (tmscm arg1) {
+scm_obj
+tmg_tmstring_locase_all (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-locase-all");
 
   string in1= tmscm_to_string (arg1);
@@ -5495,8 +5495,8 @@ tmg_tmstring_locase_all (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_upcase_all (tmscm arg1) {
+scm_obj
+tmg_tmstring_upcase_all (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-upcase-all");
 
   string in1= tmscm_to_string (arg1);
@@ -5508,8 +5508,8 @@ tmg_tmstring_upcase_all (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_unaccent_all (tmscm arg1) {
+scm_obj
+tmg_tmstring_unaccent_all (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-unaccent-all");
 
   string in1= tmscm_to_string (arg1);
@@ -5521,8 +5521,8 @@ tmg_tmstring_unaccent_all (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_letterP (tmscm arg1) {
+scm_obj
+tmg_tmstring_letterP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-letter?");
 
   string in1= tmscm_to_string (arg1);
@@ -5534,8 +5534,8 @@ tmg_tmstring_letterP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tmstring_beforeP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmstring_beforeP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tmstring-before?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmstring-before?");
 
@@ -5549,7 +5549,7 @@ tmg_tmstring_beforeP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_multi_spell_start () {
   // TMSCM_DEFER_INTS;
   spell_start ();
@@ -5558,7 +5558,7 @@ tmg_multi_spell_start () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_multi_spell_done () {
   // TMSCM_DEFER_INTS;
   spell_done ();
@@ -5567,8 +5567,8 @@ tmg_multi_spell_done () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_single_spell_start (tmscm arg1) {
+scm_obj
+tmg_single_spell_start (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "single-spell-start");
 
   string in1= tmscm_to_string (arg1);
@@ -5580,8 +5580,8 @@ tmg_single_spell_start (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_single_spell_done (tmscm arg1) {
+scm_obj
+tmg_single_spell_done (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "single-spell-done");
 
   string in1= tmscm_to_string (arg1);
@@ -5593,8 +5593,8 @@ tmg_single_spell_done (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_spell_check (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_spell_check (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-check");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-check");
 
@@ -5608,8 +5608,8 @@ tmg_spell_check (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_spell_checkP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_spell_checkP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-check?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-check?");
 
@@ -5623,8 +5623,8 @@ tmg_spell_checkP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_spell_accept (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_spell_accept (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-accept");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-accept");
 
@@ -5638,8 +5638,8 @@ tmg_spell_accept (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_spell_var_accept (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_spell_var_accept (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-var-accept");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-var-accept");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "spell-var-accept");
@@ -5655,8 +5655,8 @@ tmg_spell_var_accept (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_spell_insert (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_spell_insert (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-insert");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-insert");
 
@@ -5670,8 +5670,8 @@ tmg_spell_insert (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_packrat_define (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_packrat_define (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-define");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-define");
   TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "packrat-define");
@@ -5687,8 +5687,8 @@ tmg_packrat_define (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_packrat_property (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_packrat_property (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-property");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-property");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "packrat-property");
@@ -5706,8 +5706,8 @@ tmg_packrat_property (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_packrat_inherit (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_packrat_inherit (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-inherit");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-inherit");
 
@@ -5721,8 +5721,8 @@ tmg_packrat_inherit (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_packrat_parse (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_packrat_parse (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-parse");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-parse");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "packrat-parse");
@@ -5738,8 +5738,8 @@ tmg_packrat_parse (tmscm arg1, tmscm arg2, tmscm arg3) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_packrat_correctP (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_packrat_correctP (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-correct?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-correct?");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "packrat-correct?");
@@ -5755,8 +5755,8 @@ tmg_packrat_correctP (tmscm arg1, tmscm arg2, tmscm arg3) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_packrat_context (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_packrat_context (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-context");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-context");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "packrat-context");
@@ -5774,8 +5774,8 @@ tmg_packrat_context (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return object_to_tmscm (out);
 }
 
-tmscm
-tmg_syntax_read_preferences (tmscm arg1) {
+scm_obj
+tmg_syntax_read_preferences (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "syntax-read-preferences");
 
   string in1= tmscm_to_string (arg1);
@@ -5787,8 +5787,8 @@ tmg_syntax_read_preferences (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_parse_texmacs (tmscm arg1) {
+scm_obj
+tmg_parse_texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -5800,8 +5800,8 @@ tmg_parse_texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_serialize_texmacs (tmscm arg1) {
+scm_obj
+tmg_serialize_texmacs (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "serialize-texmacs");
 
   tree in1= tmscm_to_tree (arg1);
@@ -5813,8 +5813,8 @@ tmg_serialize_texmacs (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_texmacs_snippet (tmscm arg1) {
+scm_obj
+tmg_parse_texmacs_snippet (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-texmacs-snippet");
 
   string in1= tmscm_to_string (arg1);
@@ -5826,8 +5826,8 @@ tmg_parse_texmacs_snippet (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_serialize_texmacs_snippet (tmscm arg1) {
+scm_obj
+tmg_serialize_texmacs_snippet (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "serialize-texmacs-snippet");
 
   tree in1= tmscm_to_tree (arg1);
@@ -5839,8 +5839,8 @@ tmg_serialize_texmacs_snippet (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_texmacs_2stm (tmscm arg1) {
+scm_obj
+tmg_texmacs_2stm (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "texmacs->stm");
 
   tree in1= tmscm_to_tree (arg1);
@@ -5852,8 +5852,8 @@ tmg_texmacs_2stm (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_stm_2texmacs (tmscm arg1) {
+scm_obj
+tmg_stm_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "stm->texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -5865,8 +5865,8 @@ tmg_stm_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_stm_snippet_2texmacs (tmscm arg1) {
+scm_obj
+tmg_stm_snippet_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "stm-snippet->texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -5878,8 +5878,8 @@ tmg_stm_snippet_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_texmacs_2verbatim (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_cpp_texmacs_2verbatim (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-texmacs->verbatim");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-texmacs->verbatim");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-texmacs->verbatim");
@@ -5895,8 +5895,8 @@ tmg_cpp_texmacs_2verbatim (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_verbatim_snippet_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_cpp_verbatim_snippet_2texmacs (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-verbatim-snippet->texmacs");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-verbatim-snippet->texmacs");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-verbatim-snippet->texmacs");
@@ -5912,8 +5912,8 @@ tmg_cpp_verbatim_snippet_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_verbatim_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_cpp_verbatim_2texmacs (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-verbatim->texmacs");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-verbatim->texmacs");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-verbatim->texmacs");
@@ -5929,8 +5929,8 @@ tmg_cpp_verbatim_2texmacs (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_latex (tmscm arg1) {
+scm_obj
+tmg_parse_latex (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-latex");
 
   string in1= tmscm_to_string (arg1);
@@ -5942,8 +5942,8 @@ tmg_parse_latex (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_latex_document (tmscm arg1) {
+scm_obj
+tmg_parse_latex_document (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-latex-document");
 
   string in1= tmscm_to_string (arg1);
@@ -5955,8 +5955,8 @@ tmg_parse_latex_document (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_latex_2texmacs (tmscm arg1) {
+scm_obj
+tmg_latex_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "latex->texmacs");
 
   tree in1= tmscm_to_tree (arg1);
@@ -5968,8 +5968,8 @@ tmg_latex_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_latex_document_2texmacs (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_latex_document_2texmacs (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-latex-document->texmacs");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-latex-document->texmacs");
 
@@ -5983,8 +5983,8 @@ tmg_cpp_latex_document_2texmacs (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_latex_class_document_2texmacs (tmscm arg1) {
+scm_obj
+tmg_latex_class_document_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "latex-class-document->texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -5996,8 +5996,8 @@ tmg_latex_class_document_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tracked_latex_2texmacs (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tracked_latex_2texmacs (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tracked-latex->texmacs");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "tracked-latex->texmacs");
 
@@ -6011,8 +6011,8 @@ tmg_tracked_latex_2texmacs (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_conservative_texmacs_2latex (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_conservative_texmacs_2latex (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "conservative-texmacs->latex");
   TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "conservative-texmacs->latex");
 
@@ -6026,8 +6026,8 @@ tmg_conservative_texmacs_2latex (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_tracked_texmacs_2latex (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tracked_texmacs_2latex (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tracked-texmacs->latex");
   TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "tracked-texmacs->latex");
 
@@ -6041,8 +6041,8 @@ tmg_tracked_texmacs_2latex (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_conservative_latex_2texmacs (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_conservative_latex_2texmacs (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "conservative-latex->texmacs");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "conservative-latex->texmacs");
 
@@ -6056,8 +6056,8 @@ tmg_conservative_latex_2texmacs (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_get_line_number (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_get_line_number (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-line-number");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "get-line-number");
 
@@ -6071,8 +6071,8 @@ tmg_get_line_number (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_column_number (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_get_column_number (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-column-number");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "get-column-number");
 
@@ -6086,8 +6086,8 @@ tmg_get_column_number (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_try_latex_export (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_try_latex_export (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "try-latex-export");
   TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "try-latex-export");
   TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "try-latex-export");
@@ -6105,8 +6105,8 @@ tmg_try_latex_export (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_xml (tmscm arg1) {
+scm_obj
+tmg_parse_xml (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-xml");
 
   string in1= tmscm_to_string (arg1);
@@ -6118,8 +6118,8 @@ tmg_parse_xml (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_html (tmscm arg1) {
+scm_obj
+tmg_parse_html (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-html");
 
   string in1= tmscm_to_string (arg1);
@@ -6131,8 +6131,8 @@ tmg_parse_html (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_parse_bib (tmscm arg1) {
+scm_obj
+tmg_parse_bib (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-bib");
 
   string in1= tmscm_to_string (arg1);
@@ -6144,8 +6144,8 @@ tmg_parse_bib (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_conservative_bib_import (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_conservative_bib_import (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "conservative-bib-import");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "conservative-bib-import");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "conservative-bib-import");
@@ -6161,8 +6161,8 @@ tmg_conservative_bib_import (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_conservative_bib_export (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_conservative_bib_export (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "conservative-bib-export");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "conservative-bib-export");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "conservative-bib-export");
@@ -6178,8 +6178,8 @@ tmg_conservative_bib_export (tmscm arg1, tmscm arg2, tmscm arg3) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_clean_html (tmscm arg1) {
+scm_obj
+tmg_clean_html (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "clean-html");
 
   content in1= tmscm_to_content (arg1);
@@ -6191,8 +6191,8 @@ tmg_clean_html (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_upgrade_tmml (tmscm arg1) {
+scm_obj
+tmg_upgrade_tmml (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "upgrade-tmml");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -6204,8 +6204,8 @@ tmg_upgrade_tmml (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_upgrade_mathml (tmscm arg1) {
+scm_obj
+tmg_upgrade_mathml (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "upgrade-mathml");
 
   content in1= tmscm_to_content (arg1);
@@ -6217,8 +6217,8 @@ tmg_upgrade_mathml (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_retrieve_mathjax (tmscm arg1) {
+scm_obj
+tmg_retrieve_mathjax (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "retrieve-mathjax");
 
   int in1= tmscm_to_int (arg1);
@@ -6230,8 +6230,8 @@ tmg_retrieve_mathjax (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_vernac_2texmacs (tmscm arg1) {
+scm_obj
+tmg_vernac_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "vernac->texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -6243,8 +6243,8 @@ tmg_vernac_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_vernac_document_2texmacs (tmscm arg1) {
+scm_obj
+tmg_vernac_document_2texmacs (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "vernac-document->texmacs");
 
   string in1= tmscm_to_string (arg1);
@@ -6256,8 +6256,8 @@ tmg_vernac_document_2texmacs (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_keys_string (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_compute_keys_string (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "compute-keys-string");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "compute-keys-string");
 
@@ -6271,8 +6271,8 @@ tmg_compute_keys_string (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_keys_tree (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_compute_keys_tree (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compute-keys-tree");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "compute-keys-tree");
 
@@ -6286,8 +6286,8 @@ tmg_compute_keys_tree (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_keys_url (tmscm arg1) {
+scm_obj
+tmg_compute_keys_url (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "compute-keys-url");
 
   url in1= tmscm_to_url (arg1);
@@ -6299,8 +6299,8 @@ tmg_compute_keys_url (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_index_string (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_compute_index_string (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "compute-index-string");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "compute-index-string");
 
@@ -6314,8 +6314,8 @@ tmg_compute_index_string (tmscm arg1, tmscm arg2) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_index_tree (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_compute_index_tree (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compute-index-tree");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "compute-index-tree");
 
@@ -6329,8 +6329,8 @@ tmg_compute_index_tree (tmscm arg1, tmscm arg2) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_compute_index_url (tmscm arg1) {
+scm_obj
+tmg_compute_index_url (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "compute-index-url");
 
   url in1= tmscm_to_url (arg1);
@@ -6342,8 +6342,8 @@ tmg_compute_index_url (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_url_2url (tmscm arg1) {
+scm_obj
+tmg_url_2url (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->url");
 
   url in1= tmscm_to_url (arg1);
@@ -6355,8 +6355,8 @@ tmg_url_2url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_root_2url (tmscm arg1) {
+scm_obj
+tmg_root_2url (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "root->url");
 
   string in1= tmscm_to_string (arg1);
@@ -6368,8 +6368,8 @@ tmg_root_2url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_string_2url (tmscm arg1) {
+scm_obj
+tmg_string_2url (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string->url");
 
   string in1= tmscm_to_string (arg1);
@@ -6381,8 +6381,8 @@ tmg_string_2url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_2string (tmscm arg1) {
+scm_obj
+tmg_url_2string (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->string");
 
   url in1= tmscm_to_url (arg1);
@@ -6394,8 +6394,8 @@ tmg_url_2string (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_2stree (tmscm arg1) {
+scm_obj
+tmg_url_2stree (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->stree");
 
   url in1= tmscm_to_url (arg1);
@@ -6407,8 +6407,8 @@ tmg_url_2stree (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_system_2url (tmscm arg1) {
+scm_obj
+tmg_system_2url (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system->url");
 
   string in1= tmscm_to_string (arg1);
@@ -6420,8 +6420,8 @@ tmg_system_2url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_2system (tmscm arg1) {
+scm_obj
+tmg_url_2system (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->system");
 
   url in1= tmscm_to_url (arg1);
@@ -6433,8 +6433,8 @@ tmg_url_2system (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_unix_2url (tmscm arg1) {
+scm_obj
+tmg_unix_2url (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "unix->url");
 
   string in1= tmscm_to_string (arg1);
@@ -6446,8 +6446,8 @@ tmg_unix_2url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_2unix (tmscm arg1) {
+scm_obj
+tmg_url_2unix (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->unix");
 
   url in1= tmscm_to_url (arg1);
@@ -6459,8 +6459,8 @@ tmg_url_2unix (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_unix (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_unix (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "url-unix");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-unix");
 
@@ -6474,7 +6474,7 @@ tmg_url_unix (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_none () {
   // TMSCM_DEFER_INTS;
   url out= url_none ();
@@ -6483,7 +6483,7 @@ tmg_url_none () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_any () {
   // TMSCM_DEFER_INTS;
   url out= url_wildcard ();
@@ -6492,8 +6492,8 @@ tmg_url_any () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_wildcard (tmscm arg1) {
+scm_obj
+tmg_url_wildcard (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "url-wildcard");
 
   string in1= tmscm_to_string (arg1);
@@ -6505,7 +6505,7 @@ tmg_url_wildcard (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_pwd () {
   // TMSCM_DEFER_INTS;
   url out= url_pwd ();
@@ -6514,7 +6514,7 @@ tmg_url_pwd () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_parent () {
   // TMSCM_DEFER_INTS;
   url out= url_parent ();
@@ -6523,7 +6523,7 @@ tmg_url_parent () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_ancestor () {
   // TMSCM_DEFER_INTS;
   url out= url_ancestor ();
@@ -6532,8 +6532,8 @@ tmg_url_ancestor () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_append (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_append (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-append");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-append");
 
@@ -6547,8 +6547,8 @@ tmg_url_append (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_or (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_or (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-or");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-or");
 
@@ -6562,8 +6562,8 @@ tmg_url_or (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_noneP (tmscm arg1) {
+scm_obj
+tmg_url_noneP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-none?");
 
   url in1= tmscm_to_url (arg1);
@@ -6575,8 +6575,8 @@ tmg_url_noneP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_rootedP (tmscm arg1) {
+scm_obj
+tmg_url_rootedP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-rooted?");
 
   url in1= tmscm_to_url (arg1);
@@ -6588,8 +6588,8 @@ tmg_url_rootedP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_rooted_protocolP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_rooted_protocolP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-rooted-protocol?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-rooted-protocol?");
 
@@ -6603,8 +6603,8 @@ tmg_url_rooted_protocolP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_rooted_webP (tmscm arg1) {
+scm_obj
+tmg_url_rooted_webP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-rooted-web?");
 
   url in1= tmscm_to_url (arg1);
@@ -6616,8 +6616,8 @@ tmg_url_rooted_webP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_rooted_tmfsP (tmscm arg1) {
+scm_obj
+tmg_url_rooted_tmfsP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-rooted-tmfs?");
 
   url in1= tmscm_to_url (arg1);
@@ -6629,8 +6629,8 @@ tmg_url_rooted_tmfsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_rooted_tmfs_protocolP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_rooted_tmfs_protocolP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-rooted-tmfs-protocol?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-rooted-tmfs-protocol?");
 
@@ -6644,8 +6644,8 @@ tmg_url_rooted_tmfs_protocolP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_root (tmscm arg1) {
+scm_obj
+tmg_url_root (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-root");
 
   url in1= tmscm_to_url (arg1);
@@ -6657,8 +6657,8 @@ tmg_url_root (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_unroot (tmscm arg1) {
+scm_obj
+tmg_url_unroot (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-unroot");
 
   url in1= tmscm_to_url (arg1);
@@ -6670,8 +6670,8 @@ tmg_url_unroot (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_atomicP (tmscm arg1) {
+scm_obj
+tmg_url_atomicP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-atomic?");
 
   url in1= tmscm_to_url (arg1);
@@ -6683,8 +6683,8 @@ tmg_url_atomicP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_concatP (tmscm arg1) {
+scm_obj
+tmg_url_concatP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-concat?");
 
   url in1= tmscm_to_url (arg1);
@@ -6696,8 +6696,8 @@ tmg_url_concatP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_orP (tmscm arg1) {
+scm_obj
+tmg_url_orP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-or?");
 
   url in1= tmscm_to_url (arg1);
@@ -6709,8 +6709,8 @@ tmg_url_orP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_ref (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_ref (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-ref");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "url-ref");
 
@@ -6724,8 +6724,8 @@ tmg_url_ref (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_head (tmscm arg1) {
+scm_obj
+tmg_url_head (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-head");
 
   url in1= tmscm_to_url (arg1);
@@ -6737,8 +6737,8 @@ tmg_url_head (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_tail (tmscm arg1) {
+scm_obj
+tmg_url_tail (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-tail");
 
   url in1= tmscm_to_url (arg1);
@@ -6750,8 +6750,8 @@ tmg_url_tail (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_format (tmscm arg1) {
+scm_obj
+tmg_url_format (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-format");
 
   url in1= tmscm_to_url (arg1);
@@ -6763,8 +6763,8 @@ tmg_url_format (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_suffix (tmscm arg1) {
+scm_obj
+tmg_url_suffix (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-suffix");
 
   url in1= tmscm_to_url (arg1);
@@ -6776,8 +6776,8 @@ tmg_url_suffix (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_basename (tmscm arg1) {
+scm_obj
+tmg_url_basename (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-basename");
 
   url in1= tmscm_to_url (arg1);
@@ -6789,8 +6789,8 @@ tmg_url_basename (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_glue (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_glue (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-glue");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-glue");
 
@@ -6804,8 +6804,8 @@ tmg_url_glue (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_unglue (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_unglue (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-unglue");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "url-unglue");
 
@@ -6819,8 +6819,8 @@ tmg_url_unglue (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_relative (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_relative (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-relative");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-relative");
 
@@ -6834,8 +6834,8 @@ tmg_url_relative (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_expand (tmscm arg1) {
+scm_obj
+tmg_url_expand (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-expand");
 
   url in1= tmscm_to_url (arg1);
@@ -6847,8 +6847,8 @@ tmg_url_expand (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_factor (tmscm arg1) {
+scm_obj
+tmg_url_factor (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-factor");
 
   url in1= tmscm_to_url (arg1);
@@ -6860,8 +6860,8 @@ tmg_url_factor (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_delta (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_delta (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-delta");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-delta");
 
@@ -6875,8 +6875,8 @@ tmg_url_delta (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_secureP (tmscm arg1) {
+scm_obj
+tmg_url_secureP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-secure?");
 
   url in1= tmscm_to_url (arg1);
@@ -6888,8 +6888,8 @@ tmg_url_secureP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_descendsP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_descendsP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-descends?");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-descends?");
 
@@ -6903,8 +6903,8 @@ tmg_url_descendsP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_complete (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_complete (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-complete");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-complete");
 
@@ -6918,8 +6918,8 @@ tmg_url_complete (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_resolve (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_resolve (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-resolve");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-resolve");
 
@@ -6933,8 +6933,8 @@ tmg_url_resolve (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_resolve_in_path (tmscm arg1) {
+scm_obj
+tmg_url_resolve_in_path (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-resolve-in-path");
 
   url in1= tmscm_to_url (arg1);
@@ -6946,8 +6946,8 @@ tmg_url_resolve_in_path (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_resolve_pattern (tmscm arg1) {
+scm_obj
+tmg_url_resolve_pattern (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-resolve-pattern");
 
   url in1= tmscm_to_url (arg1);
@@ -6959,8 +6959,8 @@ tmg_url_resolve_pattern (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_existsP (tmscm arg1) {
+scm_obj
+tmg_url_existsP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-exists?");
 
   url in1= tmscm_to_url (arg1);
@@ -6972,8 +6972,8 @@ tmg_url_existsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_exists_in_pathP (tmscm arg1) {
+scm_obj
+tmg_url_exists_in_pathP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-exists-in-path?");
 
   url in1= tmscm_to_url (arg1);
@@ -6985,8 +6985,8 @@ tmg_url_exists_in_pathP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_exists_in_texP (tmscm arg1) {
+scm_obj
+tmg_url_exists_in_texP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-exists-in-tex?");
 
   url in1= tmscm_to_url (arg1);
@@ -6998,8 +6998,8 @@ tmg_url_exists_in_texP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_concretize_dot (tmscm arg1) {
+scm_obj
+tmg_url_concretize_dot (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-concretize*");
 
   url in1= tmscm_to_url (arg1);
@@ -7011,8 +7011,8 @@ tmg_url_concretize_dot (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_concretize (tmscm arg1) {
+scm_obj
+tmg_url_concretize (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-concretize");
 
   url in1= tmscm_to_url (arg1);
@@ -7024,8 +7024,8 @@ tmg_url_concretize (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_materialize (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_materialize (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-materialize");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-materialize");
 
@@ -7039,8 +7039,8 @@ tmg_url_materialize (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_testP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_testP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-test?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-test?");
 
@@ -7054,8 +7054,8 @@ tmg_url_testP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_regularP (tmscm arg1) {
+scm_obj
+tmg_url_regularP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-regular?");
 
   url in1= tmscm_to_url (arg1);
@@ -7067,8 +7067,8 @@ tmg_url_regularP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_directoryP (tmscm arg1) {
+scm_obj
+tmg_url_directoryP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-directory?");
 
   url in1= tmscm_to_url (arg1);
@@ -7080,8 +7080,8 @@ tmg_url_directoryP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_linkP (tmscm arg1) {
+scm_obj
+tmg_url_linkP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-link?");
 
   url in1= tmscm_to_url (arg1);
@@ -7093,8 +7093,8 @@ tmg_url_linkP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_newerP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_newerP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-newer?");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-newer?");
 
@@ -7108,8 +7108,8 @@ tmg_url_newerP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_size (tmscm arg1) {
+scm_obj
+tmg_url_size (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-size");
 
   url in1= tmscm_to_url (arg1);
@@ -7121,8 +7121,8 @@ tmg_url_size (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_url_last_modified (tmscm arg1) {
+scm_obj
+tmg_url_last_modified (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-last-modified");
 
   url in1= tmscm_to_url (arg1);
@@ -7134,7 +7134,7 @@ tmg_url_last_modified (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_url_temp () {
   // TMSCM_DEFER_INTS;
   url out= url_temp ();
@@ -7143,8 +7143,8 @@ tmg_url_temp () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_scratch (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_url_scratch (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "url-scratch");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-scratch");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "url-scratch");
@@ -7160,8 +7160,8 @@ tmg_url_scratch (tmscm arg1, tmscm arg2, tmscm arg3) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_scratchP (tmscm arg1) {
+scm_obj
+tmg_url_scratchP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-scratch?");
 
   url in1= tmscm_to_url (arg1);
@@ -7173,8 +7173,8 @@ tmg_url_scratchP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_url_cache_invalidate (tmscm arg1) {
+scm_obj
+tmg_url_cache_invalidate (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-cache-invalidate");
 
   url in1= tmscm_to_url (arg1);
@@ -7186,8 +7186,8 @@ tmg_url_cache_invalidate (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_string_save (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_save (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-save");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "string-save");
 
@@ -7201,8 +7201,8 @@ tmg_string_save (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_string_load (tmscm arg1) {
+scm_obj
+tmg_string_load (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "string-load");
 
   url in1= tmscm_to_url (arg1);
@@ -7214,8 +7214,8 @@ tmg_string_load (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_string_append_to_file (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_string_append_to_file (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-append-to-file");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "string-append-to-file");
 
@@ -7229,8 +7229,8 @@ tmg_string_append_to_file (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_move (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_system_move (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-move");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "system-move");
 
@@ -7244,8 +7244,8 @@ tmg_system_move (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_copy (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_system_copy (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-copy");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "system-copy");
 
@@ -7259,8 +7259,8 @@ tmg_system_copy (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_remove (tmscm arg1) {
+scm_obj
+tmg_system_remove (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-remove");
 
   url in1= tmscm_to_url (arg1);
@@ -7272,8 +7272,8 @@ tmg_system_remove (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_mkdir (tmscm arg1) {
+scm_obj
+tmg_system_mkdir (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-mkdir");
 
   url in1= tmscm_to_url (arg1);
@@ -7285,8 +7285,8 @@ tmg_system_mkdir (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_rmdir (tmscm arg1) {
+scm_obj
+tmg_system_rmdir (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-rmdir");
 
   url in1= tmscm_to_url (arg1);
@@ -7298,8 +7298,8 @@ tmg_system_rmdir (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_search_score (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_system_search_score (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-search-score");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "system-search-score");
 
@@ -7313,8 +7313,8 @@ tmg_system_search_score (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_system_1 (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_system_1 (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system-1");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "system-1");
 
@@ -7328,8 +7328,8 @@ tmg_system_1 (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_2 (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_system_2 (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "system-2");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "system-2");
   TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "system-2");
@@ -7345,8 +7345,8 @@ tmg_system_2 (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_system_url_2string (tmscm arg1) {
+scm_obj
+tmg_system_url_2string (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-url->string");
 
   url in1= tmscm_to_url (arg1);
@@ -7358,8 +7358,8 @@ tmg_system_url_2string (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_grep (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_url_grep (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "url-grep");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "url-grep");
 
@@ -7373,8 +7373,8 @@ tmg_url_grep (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_url_search_upwards (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_url_search_upwards (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-search-upwards");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-search-upwards");
   TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "url-search-upwards");
@@ -7390,7 +7390,7 @@ tmg_url_search_upwards (tmscm arg1, tmscm arg2, tmscm arg3) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_picture_cache_reset () {
   // TMSCM_DEFER_INTS;
   picture_cache_reset ();
@@ -7399,8 +7399,8 @@ tmg_picture_cache_reset () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_file_focus (tmscm arg1) {
+scm_obj
+tmg_set_file_focus (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "set-file-focus");
 
   url in1= tmscm_to_url (arg1);
@@ -7412,7 +7412,7 @@ tmg_set_file_focus (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_file_focus () {
   // TMSCM_DEFER_INTS;
   url out= get_file_focus ();
@@ -7421,8 +7421,8 @@ tmg_get_file_focus () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_persistent_set (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_persistent_set (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-set");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-set");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "persistent-set");
@@ -7438,8 +7438,8 @@ tmg_persistent_set (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_persistent_remove (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_persistent_remove (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-remove");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-remove");
 
@@ -7453,8 +7453,8 @@ tmg_persistent_remove (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_persistent_hasP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_persistent_hasP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-has?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-has?");
 
@@ -7468,8 +7468,8 @@ tmg_persistent_hasP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_persistent_get (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_persistent_get (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-get");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-get");
 
@@ -7483,8 +7483,8 @@ tmg_persistent_get (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_persistent_file_name (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_persistent_file_name (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-file-name");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-file-name");
 
@@ -7498,8 +7498,8 @@ tmg_persistent_file_name (tmscm arg1, tmscm arg2) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_keep_history (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmdb_keep_history (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-keep-history");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "tmdb-keep-history");
 
@@ -7513,8 +7513,8 @@ tmg_tmdb_keep_history (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_set_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_tmdb_set_field (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-set-field");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-set-field");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tmdb-set-field");
@@ -7534,8 +7534,8 @@ tmg_tmdb_set_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) 
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_get_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tmdb_get_field (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-get-field");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-get-field");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tmdb-get-field");
@@ -7553,8 +7553,8 @@ tmg_tmdb_get_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_remove_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tmdb_remove_field (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-remove-field");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-remove-field");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tmdb-remove-field");
@@ -7572,8 +7572,8 @@ tmg_tmdb_remove_field (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_get_attributes (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tmdb_get_attributes (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-get-attributes");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-get-attributes");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "tmdb-get-attributes");
@@ -7589,8 +7589,8 @@ tmg_tmdb_get_attributes (tmscm arg1, tmscm arg2, tmscm arg3) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_set_entry (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tmdb_set_entry (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-set-entry");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-set-entry");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "tmdb-set-entry");
@@ -7608,8 +7608,8 @@ tmg_tmdb_set_entry (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_get_entry (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tmdb_get_entry (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-get-entry");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-get-entry");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "tmdb-get-entry");
@@ -7625,8 +7625,8 @@ tmg_tmdb_get_entry (tmscm arg1, tmscm arg2, tmscm arg3) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_remove_entry (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tmdb_remove_entry (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-remove-entry");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-remove-entry");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "tmdb-remove-entry");
@@ -7642,8 +7642,8 @@ tmg_tmdb_remove_entry (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_query (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_tmdb_query (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-query");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "tmdb-query");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "tmdb-query");
@@ -7661,8 +7661,8 @@ tmg_tmdb_query (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_inspect_history (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmdb_inspect_history (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-inspect-history");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-inspect-history");
 
@@ -7676,8 +7676,8 @@ tmg_tmdb_inspect_history (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_tmdb_get_completions (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmdb_get_completions (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-get-completions");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-get-completions");
 
@@ -7691,8 +7691,8 @@ tmg_tmdb_get_completions (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_tmdb_get_name_completions (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tmdb_get_name_completions (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-get-name-completions");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tmdb-get-name-completions");
 
@@ -7706,7 +7706,7 @@ tmg_tmdb_get_name_completions (tmscm arg1, tmscm arg2) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_supports_sqlP () {
   // TMSCM_DEFER_INTS;
   bool out= sqlite3_present ();
@@ -7715,8 +7715,8 @@ tmg_supports_sqlP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_sql_exec (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_sql_exec (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "sql-exec");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "sql-exec");
 
@@ -7730,8 +7730,8 @@ tmg_sql_exec (tmscm arg1, tmscm arg2) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_sql_quote (tmscm arg1) {
+scm_obj
+tmg_sql_quote (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "sql-quote");
 
   string in1= tmscm_to_string (arg1);
@@ -7743,7 +7743,7 @@ tmg_sql_quote (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_server_start () {
   // TMSCM_DEFER_INTS;
   server_start ();
@@ -7752,7 +7752,7 @@ tmg_server_start () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_server_stop () {
   // TMSCM_DEFER_INTS;
   server_stop ();
@@ -7761,8 +7761,8 @@ tmg_server_stop () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_server_read (tmscm arg1) {
+scm_obj
+tmg_server_read (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "server-read");
 
   int in1= tmscm_to_int (arg1);
@@ -7774,8 +7774,8 @@ tmg_server_read (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_server_write (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_server_write (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "server-write");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "server-write");
 
@@ -7789,7 +7789,7 @@ tmg_server_write (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_server_startedP () {
   // TMSCM_DEFER_INTS;
   bool out= server_started ();
@@ -7798,8 +7798,8 @@ tmg_server_startedP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_client_start (tmscm arg1) {
+scm_obj
+tmg_client_start (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "client-start");
 
   string in1= tmscm_to_string (arg1);
@@ -7811,8 +7811,8 @@ tmg_client_start (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_client_stop (tmscm arg1) {
+scm_obj
+tmg_client_stop (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "client-stop");
 
   int in1= tmscm_to_int (arg1);
@@ -7824,8 +7824,8 @@ tmg_client_stop (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_client_read (tmscm arg1) {
+scm_obj
+tmg_client_read (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "client-read");
 
   int in1= tmscm_to_int (arg1);
@@ -7837,8 +7837,8 @@ tmg_client_read (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_client_write (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_client_write (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "client-write");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "client-write");
 
@@ -7852,8 +7852,8 @@ tmg_client_write (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_enter_secure_mode (tmscm arg1) {
+scm_obj
+tmg_enter_secure_mode (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "enter-secure-mode");
 
   int in1= tmscm_to_int (arg1);
@@ -7865,8 +7865,8 @@ tmg_enter_secure_mode (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_connection_start (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_connection_start (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-start");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-start");
 
@@ -7880,8 +7880,8 @@ tmg_connection_start (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_connection_status (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_connection_status (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-status");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-status");
 
@@ -7895,8 +7895,8 @@ tmg_connection_status (tmscm arg1, tmscm arg2) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_connection_write_string (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_connection_write_string (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-write-string");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-write-string");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "connection-write-string");
@@ -7912,8 +7912,8 @@ tmg_connection_write_string (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_connection_write (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_connection_write (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-write");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-write");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "connection-write");
@@ -7929,8 +7929,8 @@ tmg_connection_write (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_connection_cmd (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_connection_cmd (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-cmd");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-cmd");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "connection-cmd");
@@ -7946,8 +7946,8 @@ tmg_connection_cmd (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_connection_eval (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_connection_eval (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-eval");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-eval");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "connection-eval");
@@ -7963,8 +7963,8 @@ tmg_connection_eval (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_connection_interrupt (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_connection_interrupt (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-interrupt");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-interrupt");
 
@@ -7978,8 +7978,8 @@ tmg_connection_interrupt (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_connection_stop (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_connection_stop (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "connection-stop");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "connection-stop");
 
@@ -7993,8 +7993,8 @@ tmg_connection_stop (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_widget_printer (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_printer (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-printer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "widget-printer");
 
@@ -8008,8 +8008,8 @@ tmg_widget_printer (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_color_picker (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_color_picker (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-color-picker");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "widget-color-picker");
   TMSCM_ASSERT_ARRAY_TREE (arg3, TMSCM_ARG3, "widget-color-picker");
@@ -8025,8 +8025,8 @@ tmg_widget_color_picker (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_extend (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_extend (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-extend");
   TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-extend");
 
@@ -8040,8 +8040,8 @@ tmg_widget_extend (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_hmenu (tmscm arg1) {
+scm_obj
+tmg_widget_hmenu (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-hmenu");
 
   array_widget in1= tmscm_to_array_widget (arg1);
@@ -8053,8 +8053,8 @@ tmg_widget_hmenu (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_vmenu (tmscm arg1) {
+scm_obj
+tmg_widget_vmenu (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-vmenu");
 
   array_widget in1= tmscm_to_array_widget (arg1);
@@ -8066,8 +8066,8 @@ tmg_widget_vmenu (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_tmenu (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_tmenu (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-tmenu");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "widget-tmenu");
 
@@ -8081,8 +8081,8 @@ tmg_widget_tmenu (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_minibar_menu (tmscm arg1) {
+scm_obj
+tmg_widget_minibar_menu (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-minibar-menu");
 
   array_widget in1= tmscm_to_array_widget (arg1);
@@ -8094,8 +8094,8 @@ tmg_widget_minibar_menu (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_separator (tmscm arg1) {
+scm_obj
+tmg_widget_separator (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "widget-separator");
 
   bool in1= tmscm_to_bool (arg1);
@@ -8107,8 +8107,8 @@ tmg_widget_separator (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_menu_group (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_menu_group (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "widget-menu-group");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "widget-menu-group");
 
@@ -8122,8 +8122,8 @@ tmg_widget_menu_group (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_pulldown_button (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_pulldown_button (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-pulldown-button");
   TMSCM_ASSERT_PROMISE_WIDGET (arg2, TMSCM_ARG2, "widget-pulldown-button");
 
@@ -8137,8 +8137,8 @@ tmg_widget_pulldown_button (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_pullright_button (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_pullright_button (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-pullright-button");
   TMSCM_ASSERT_PROMISE_WIDGET (arg2, TMSCM_ARG2, "widget-pullright-button");
 
@@ -8152,8 +8152,8 @@ tmg_widget_pullright_button (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_menu_button (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_widget_menu_button (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-menu-button");
   TMSCM_ASSERT_COMMAND (arg2, TMSCM_ARG2, "widget-menu-button");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-menu-button");
@@ -8173,8 +8173,8 @@ tmg_widget_menu_button (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm ar
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_toggle (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_toggle (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-toggle");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "widget-toggle");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "widget-toggle");
@@ -8190,8 +8190,8 @@ tmg_widget_toggle (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_balloon (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_balloon (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-balloon");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "widget-balloon");
 
@@ -8205,7 +8205,7 @@ tmg_widget_balloon (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_widget_empty () {
   // TMSCM_DEFER_INTS;
   widget out= empty_widget ();
@@ -8214,8 +8214,8 @@ tmg_widget_empty () {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_text (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_widget_text (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "widget-text");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "widget-text");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "widget-text");
@@ -8233,8 +8233,8 @@ tmg_widget_text (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_input (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_widget_input (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-input");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-input");
   TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "widget-input");
@@ -8254,8 +8254,8 @@ tmg_widget_input (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_enum (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_widget_enum (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-enum");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-enum");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-enum");
@@ -8275,8 +8275,8 @@ tmg_widget_enum (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_choice (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_choice (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-choice");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-choice");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-choice");
@@ -8292,8 +8292,8 @@ tmg_widget_choice (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_choices (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_choices (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-choices");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-choices");
   TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "widget-choices");
@@ -8309,8 +8309,8 @@ tmg_widget_choices (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_filtered_choice (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_widget_filtered_choice (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-filtered-choice");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-filtered-choice");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-filtered-choice");
@@ -8328,8 +8328,8 @@ tmg_widget_filtered_choice (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_tree_view (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_tree_view (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-tree-view");
   TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "widget-tree-view");
   TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "widget-tree-view");
@@ -8345,8 +8345,8 @@ tmg_widget_tree_view (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_xpm (tmscm arg1) {
+scm_obj
+tmg_widget_xpm (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "widget-xpm");
 
   url in1= tmscm_to_url (arg1);
@@ -8358,8 +8358,8 @@ tmg_widget_xpm (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_box (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_widget_box (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "widget-box");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-box");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "widget-box");
@@ -8379,8 +8379,8 @@ tmg_widget_box (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_glue (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_widget_glue (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "widget-glue");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "widget-glue");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "widget-glue");
@@ -8398,8 +8398,8 @@ tmg_widget_glue (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_color (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_widget_color (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "widget-color");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "widget-color");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "widget-color");
@@ -8419,8 +8419,8 @@ tmg_widget_color (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_hlist (tmscm arg1) {
+scm_obj
+tmg_widget_hlist (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-hlist");
 
   array_widget in1= tmscm_to_array_widget (arg1);
@@ -8432,8 +8432,8 @@ tmg_widget_hlist (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_vlist (tmscm arg1) {
+scm_obj
+tmg_widget_vlist (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-vlist");
 
   array_widget in1= tmscm_to_array_widget (arg1);
@@ -8445,8 +8445,8 @@ tmg_widget_vlist (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_aligned (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_aligned (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-aligned");
   TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-aligned");
 
@@ -8460,8 +8460,8 @@ tmg_widget_aligned (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_tabs (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_tabs (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-tabs");
   TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-tabs");
 
@@ -8475,8 +8475,8 @@ tmg_widget_tabs (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_icon_tabs (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_icon_tabs (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_ARRAY_URL (arg1, TMSCM_ARG1, "widget-icon-tabs");
   TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-icon-tabs");
   TMSCM_ASSERT_ARRAY_WIDGET (arg3, TMSCM_ARG3, "widget-icon-tabs");
@@ -8492,8 +8492,8 @@ tmg_widget_icon_tabs (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_scrollable (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_scrollable (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-scrollable");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "widget-scrollable");
 
@@ -8507,8 +8507,8 @@ tmg_widget_scrollable (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_resize (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6, tmscm arg7, tmscm arg8, tmscm arg9, tmscm arg10) {
+scm_obj
+tmg_widget_resize (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5, scm_obj arg6, scm_obj arg7, scm_obj arg8, scm_obj arg9, scm_obj arg10) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-resize");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "widget-resize");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-resize");
@@ -8538,8 +8538,8 @@ tmg_widget_resize (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, t
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_hsplit (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_hsplit (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-hsplit");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "widget-hsplit");
 
@@ -8553,8 +8553,8 @@ tmg_widget_hsplit (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_vsplit (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_vsplit (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-vsplit");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "widget-vsplit");
 
@@ -8568,8 +8568,8 @@ tmg_widget_vsplit (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_texmacs_output (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_texmacs_output (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "widget-texmacs-output");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "widget-texmacs-output");
 
@@ -8583,8 +8583,8 @@ tmg_widget_texmacs_output (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_texmacs_input (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_widget_texmacs_input (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "widget-texmacs-input");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "widget-texmacs-input");
   TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "widget-texmacs-input");
@@ -8600,8 +8600,8 @@ tmg_widget_texmacs_input (tmscm arg1, tmscm arg2, tmscm arg3) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_ink (tmscm arg1) {
+scm_obj
+tmg_widget_ink (scm_obj arg1) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-ink");
 
   command in1= tmscm_to_command (arg1);
@@ -8613,8 +8613,8 @@ tmg_widget_ink (tmscm arg1) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_refresh (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_refresh (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "widget-refresh");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-refresh");
 
@@ -8628,8 +8628,8 @@ tmg_widget_refresh (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_refreshable (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_widget_refreshable (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "widget-refreshable");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-refreshable");
 
@@ -8643,8 +8643,8 @@ tmg_widget_refreshable (tmscm arg1, tmscm arg2) {
   return widget_to_tmscm (out);
 }
 
-tmscm
-tmg_object_2promise_widget (tmscm arg1) {
+scm_obj
+tmg_object_2promise_widget (scm_obj arg1) {
   TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "object->promise-widget");
 
   object in1= tmscm_to_object (arg1);
@@ -8656,8 +8656,8 @@ tmg_object_2promise_widget (tmscm arg1) {
   return promise_widget_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_bounding_rectangle (tmscm arg1) {
+scm_obj
+tmg_tree_bounding_rectangle (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-bounding-rectangle");
 
   tree in1= tmscm_to_tree (arg1);
@@ -8669,8 +8669,8 @@ tmg_tree_bounding_rectangle (tmscm arg1) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_widget_size (tmscm arg1) {
+scm_obj
+tmg_widget_size (scm_obj arg1) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-size");
 
   widget in1= tmscm_to_widget (arg1);
@@ -8682,8 +8682,8 @@ tmg_widget_size (tmscm arg1) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_texmacs_widget_size (tmscm arg1) {
+scm_obj
+tmg_texmacs_widget_size (scm_obj arg1) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "texmacs-widget-size");
 
   widget in1= tmscm_to_widget (arg1);
@@ -8695,8 +8695,8 @@ tmg_texmacs_widget_size (tmscm arg1) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_show_balloon (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_show_balloon (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "show-balloon");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "show-balloon");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "show-balloon");
@@ -8712,7 +8712,7 @@ tmg_show_balloon (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_style_menu () {
   // TMSCM_DEFER_INTS;
   object out= get_style_menu ();
@@ -8721,8 +8721,8 @@ tmg_get_style_menu () {
   return object_to_tmscm (out);
 }
 
-tmscm
-tmg_hidden_packageP (tmscm arg1) {
+scm_obj
+tmg_hidden_packageP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "hidden-package?");
 
   string in1= tmscm_to_string (arg1);
@@ -8734,7 +8734,7 @@ tmg_hidden_packageP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_add_package_menu () {
   // TMSCM_DEFER_INTS;
   object out= get_add_package_menu ();
@@ -8743,7 +8743,7 @@ tmg_get_add_package_menu () {
   return object_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_remove_package_menu () {
   // TMSCM_DEFER_INTS;
   object out= get_remove_package_menu ();
@@ -8752,7 +8752,7 @@ tmg_get_remove_package_menu () {
   return object_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_toggle_package_menu () {
   // TMSCM_DEFER_INTS;
   object out= get_toggle_package_menu ();
@@ -8761,8 +8761,8 @@ tmg_get_toggle_package_menu () {
   return object_to_tmscm (out);
 }
 
-tmscm
-tmg_refresh_now (tmscm arg1) {
+scm_obj
+tmg_refresh_now (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "refresh-now");
 
   string in1= tmscm_to_string (arg1);
@@ -8774,7 +8774,7 @@ tmg_refresh_now (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_screen_size () {
   // TMSCM_DEFER_INTS;
   array_int out= get_screen_size ();
@@ -8783,7 +8783,7 @@ tmg_get_screen_size () {
   return array_int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_buffer_list () {
   // TMSCM_DEFER_INTS;
   array_url out= get_all_buffers ();
@@ -8792,7 +8792,7 @@ tmg_buffer_list () {
   return array_url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_current_buffer_url () {
   // TMSCM_DEFER_INTS;
   url out= get_current_buffer_safe ();
@@ -8801,8 +8801,8 @@ tmg_current_buffer_url () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_path_to_buffer (tmscm arg1) {
+scm_obj
+tmg_path_to_buffer (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-to-buffer");
 
   path in1= tmscm_to_path (arg1);
@@ -8814,7 +8814,7 @@ tmg_path_to_buffer (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_buffer_new () {
   // TMSCM_DEFER_INTS;
   url out= make_new_buffer ();
@@ -8823,8 +8823,8 @@ tmg_buffer_new () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_rename (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_buffer_rename (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-rename");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-rename");
 
@@ -8838,8 +8838,8 @@ tmg_buffer_rename (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_buffer_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "buffer-set");
 
@@ -8853,8 +8853,8 @@ tmg_buffer_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_get (tmscm arg1) {
+scm_obj
+tmg_buffer_get (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get");
 
   url in1= tmscm_to_url (arg1);
@@ -8866,8 +8866,8 @@ tmg_buffer_get (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_set_body (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_buffer_set_body (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-body");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "buffer-set-body");
 
@@ -8881,8 +8881,8 @@ tmg_buffer_set_body (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_get_body (tmscm arg1) {
+scm_obj
+tmg_buffer_get_body (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-body");
 
   url in1= tmscm_to_url (arg1);
@@ -8894,8 +8894,8 @@ tmg_buffer_get_body (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_set_master (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_buffer_set_master (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-master");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-set-master");
 
@@ -8909,8 +8909,8 @@ tmg_buffer_set_master (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_get_master (tmscm arg1) {
+scm_obj
+tmg_buffer_get_master (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-master");
 
   url in1= tmscm_to_url (arg1);
@@ -8922,8 +8922,8 @@ tmg_buffer_get_master (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_set_title (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_buffer_set_title (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-set-title");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "buffer-set-title");
 
@@ -8937,8 +8937,8 @@ tmg_buffer_set_title (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_get_title (tmscm arg1) {
+scm_obj
+tmg_buffer_get_title (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-get-title");
 
   url in1= tmscm_to_url (arg1);
@@ -8950,8 +8950,8 @@ tmg_buffer_get_title (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_last_save (tmscm arg1) {
+scm_obj
+tmg_buffer_last_save (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-last-save");
 
   url in1= tmscm_to_url (arg1);
@@ -8963,8 +8963,8 @@ tmg_buffer_last_save (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_last_visited (tmscm arg1) {
+scm_obj
+tmg_buffer_last_visited (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-last-visited");
 
   url in1= tmscm_to_url (arg1);
@@ -8976,8 +8976,8 @@ tmg_buffer_last_visited (tmscm arg1) {
   return double_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_modifiedP (tmscm arg1) {
+scm_obj
+tmg_buffer_modifiedP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-modified?");
 
   url in1= tmscm_to_url (arg1);
@@ -8989,8 +8989,8 @@ tmg_buffer_modifiedP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_modified_since_autosaveP (tmscm arg1) {
+scm_obj
+tmg_buffer_modified_since_autosaveP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-modified-since-autosave?");
 
   url in1= tmscm_to_url (arg1);
@@ -9002,8 +9002,8 @@ tmg_buffer_modified_since_autosaveP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_pretend_modified (tmscm arg1) {
+scm_obj
+tmg_buffer_pretend_modified (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-pretend-modified");
 
   url in1= tmscm_to_url (arg1);
@@ -9015,8 +9015,8 @@ tmg_buffer_pretend_modified (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_pretend_saved (tmscm arg1) {
+scm_obj
+tmg_buffer_pretend_saved (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-pretend-saved");
 
   url in1= tmscm_to_url (arg1);
@@ -9028,8 +9028,8 @@ tmg_buffer_pretend_saved (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_pretend_autosaved (tmscm arg1) {
+scm_obj
+tmg_buffer_pretend_autosaved (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-pretend-autosaved");
 
   url in1= tmscm_to_url (arg1);
@@ -9041,8 +9041,8 @@ tmg_buffer_pretend_autosaved (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_attach_notifier (tmscm arg1) {
+scm_obj
+tmg_buffer_attach_notifier (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-attach-notifier");
 
   url in1= tmscm_to_url (arg1);
@@ -9054,8 +9054,8 @@ tmg_buffer_attach_notifier (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_has_nameP (tmscm arg1) {
+scm_obj
+tmg_buffer_has_nameP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-has-name?");
 
   url in1= tmscm_to_url (arg1);
@@ -9067,8 +9067,8 @@ tmg_buffer_has_nameP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_auxP (tmscm arg1) {
+scm_obj
+tmg_buffer_auxP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-aux?");
 
   url in1= tmscm_to_url (arg1);
@@ -9080,8 +9080,8 @@ tmg_buffer_auxP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_embeddedP (tmscm arg1) {
+scm_obj
+tmg_buffer_embeddedP (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-embedded?");
 
   url in1= tmscm_to_url (arg1);
@@ -9093,8 +9093,8 @@ tmg_buffer_embeddedP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_import (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_buffer_import (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-import");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-import");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "buffer-import");
@@ -9110,8 +9110,8 @@ tmg_buffer_import (tmscm arg1, tmscm arg2, tmscm arg3) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_load (tmscm arg1) {
+scm_obj
+tmg_buffer_load (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-load");
 
   url in1= tmscm_to_url (arg1);
@@ -9123,8 +9123,8 @@ tmg_buffer_load (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_export (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_buffer_export (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-export");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "buffer-export");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "buffer-export");
@@ -9140,8 +9140,8 @@ tmg_buffer_export (tmscm arg1, tmscm arg2, tmscm arg3) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_save (tmscm arg1) {
+scm_obj
+tmg_buffer_save (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-save");
 
   url in1= tmscm_to_url (arg1);
@@ -9153,8 +9153,8 @@ tmg_buffer_save (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_import_loaded (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_import_loaded (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-import-loaded");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "tree-import-loaded");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tree-import-loaded");
@@ -9170,8 +9170,8 @@ tmg_tree_import_loaded (tmscm arg1, tmscm arg2, tmscm arg3) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_import (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_tree_import (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-import");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-import");
 
@@ -9185,8 +9185,8 @@ tmg_tree_import (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_inclusion (tmscm arg1) {
+scm_obj
+tmg_tree_inclusion (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tree-inclusion");
 
   url in1= tmscm_to_url (arg1);
@@ -9198,8 +9198,8 @@ tmg_tree_inclusion (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_export (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_tree_export (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-export");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "tree-export");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "tree-export");
@@ -9215,8 +9215,8 @@ tmg_tree_export (tmscm arg1, tmscm arg2, tmscm arg3) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_tree_load_style (tmscm arg1) {
+scm_obj
+tmg_tree_load_style (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-load-style");
 
   string in1= tmscm_to_string (arg1);
@@ -9228,8 +9228,8 @@ tmg_tree_load_style (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_focus (tmscm arg1) {
+scm_obj
+tmg_buffer_focus (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-focus");
 
   url in1= tmscm_to_url (arg1);
@@ -9241,7 +9241,7 @@ tmg_buffer_focus (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_view_list () {
   // TMSCM_DEFER_INTS;
   array_url out= get_all_views ();
@@ -9250,8 +9250,8 @@ tmg_view_list () {
   return array_url_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_2views (tmscm arg1) {
+scm_obj
+tmg_buffer_2views (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer->views");
 
   url in1= tmscm_to_url (arg1);
@@ -9263,7 +9263,7 @@ tmg_buffer_2views (tmscm arg1) {
   return array_url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_current_view_url () {
   // TMSCM_DEFER_INTS;
   url out= get_current_view_safe ();
@@ -9272,8 +9272,8 @@ tmg_current_view_url () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_window_2view (tmscm arg1) {
+scm_obj
+tmg_window_2view (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window->view");
 
   url in1= tmscm_to_url (arg1);
@@ -9285,8 +9285,8 @@ tmg_window_2view (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_2buffer (tmscm arg1) {
+scm_obj
+tmg_view_2buffer (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view->buffer");
 
   url in1= tmscm_to_url (arg1);
@@ -9298,8 +9298,8 @@ tmg_view_2buffer (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_2window_url (tmscm arg1) {
+scm_obj
+tmg_view_2window_url (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view->window-url");
 
   url in1= tmscm_to_url (arg1);
@@ -9311,8 +9311,8 @@ tmg_view_2window_url (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_new (tmscm arg1) {
+scm_obj
+tmg_view_new (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view-new");
 
   url in1= tmscm_to_url (arg1);
@@ -9324,8 +9324,8 @@ tmg_view_new (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_passive (tmscm arg1) {
+scm_obj
+tmg_view_passive (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view-passive");
 
   url in1= tmscm_to_url (arg1);
@@ -9337,8 +9337,8 @@ tmg_view_passive (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_recent (tmscm arg1) {
+scm_obj
+tmg_view_recent (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view-recent");
 
   url in1= tmscm_to_url (arg1);
@@ -9350,8 +9350,8 @@ tmg_view_recent (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_view_delete (tmscm arg1) {
+scm_obj
+tmg_view_delete (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view-delete");
 
   url in1= tmscm_to_url (arg1);
@@ -9363,8 +9363,8 @@ tmg_view_delete (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_window_set_view (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_window_set_view (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-set-view");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "window-set-view");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "window-set-view");
@@ -9380,8 +9380,8 @@ tmg_window_set_view (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_switch_to_buffer (tmscm arg1) {
+scm_obj
+tmg_switch_to_buffer (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "switch-to-buffer");
 
   url in1= tmscm_to_url (arg1);
@@ -9393,8 +9393,8 @@ tmg_switch_to_buffer (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_drd (tmscm arg1) {
+scm_obj
+tmg_set_drd (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "set-drd");
 
   url in1= tmscm_to_url (arg1);
@@ -9406,7 +9406,7 @@ tmg_set_drd (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_window_list () {
   // TMSCM_DEFER_INTS;
   array_url out= windows_list ();
@@ -9415,7 +9415,7 @@ tmg_window_list () {
   return array_url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_windows_number () {
   // TMSCM_DEFER_INTS;
   int out= get_nr_windows ();
@@ -9424,7 +9424,7 @@ tmg_windows_number () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_current_window () {
   // TMSCM_DEFER_INTS;
   url out= get_current_window ();
@@ -9433,8 +9433,8 @@ tmg_current_window () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_buffer_2windows (tmscm arg1) {
+scm_obj
+tmg_buffer_2windows (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer->windows");
 
   url in1= tmscm_to_url (arg1);
@@ -9446,8 +9446,8 @@ tmg_buffer_2windows (tmscm arg1) {
   return array_url_to_tmscm (out);
 }
 
-tmscm
-tmg_window_to_buffer (tmscm arg1) {
+scm_obj
+tmg_window_to_buffer (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-to-buffer");
 
   url in1= tmscm_to_url (arg1);
@@ -9459,8 +9459,8 @@ tmg_window_to_buffer (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_window_set_buffer (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_window_set_buffer (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-set-buffer");
   TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "window-set-buffer");
 
@@ -9474,8 +9474,8 @@ tmg_window_set_buffer (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_window_focus (tmscm arg1) {
+scm_obj
+tmg_window_focus (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-focus");
 
   url in1= tmscm_to_url (arg1);
@@ -9487,7 +9487,7 @@ tmg_window_focus (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_new_buffer () {
   // TMSCM_DEFER_INTS;
   url out= create_buffer ();
@@ -9496,8 +9496,8 @@ tmg_new_buffer () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_open_buffer_in_window (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_open_buffer_in_window (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "open-buffer-in-window");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "open-buffer-in-window");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "open-buffer-in-window");
@@ -9513,7 +9513,7 @@ tmg_open_buffer_in_window (tmscm arg1, tmscm arg2, tmscm arg3) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_open_window () {
   // TMSCM_DEFER_INTS;
   url out= open_window ();
@@ -9522,8 +9522,8 @@ tmg_open_window () {
   return url_to_tmscm (out);
 }
 
-tmscm
-tmg_open_window_geometry (tmscm arg1) {
+scm_obj
+tmg_open_window_geometry (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "open-window-geometry");
 
   content in1= tmscm_to_content (arg1);
@@ -9535,7 +9535,7 @@ tmg_open_window_geometry (tmscm arg1) {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_clone_window () {
   // TMSCM_DEFER_INTS;
   clone_window ();
@@ -9544,8 +9544,8 @@ tmg_clone_window () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_buffer_close (tmscm arg1) {
+scm_obj
+tmg_buffer_close (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-close");
 
   url in1= tmscm_to_url (arg1);
@@ -9557,8 +9557,8 @@ tmg_buffer_close (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_kill_window (tmscm arg1) {
+scm_obj
+tmg_kill_window (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "kill-window");
 
   url in1= tmscm_to_url (arg1);
@@ -9570,7 +9570,7 @@ tmg_kill_window (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_kill_current_window_and_buffer () {
   // TMSCM_DEFER_INTS;
   kill_current_window_and_buffer ();
@@ -9579,8 +9579,8 @@ tmg_kill_current_window_and_buffer () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_project_attach (tmscm arg1) {
+scm_obj
+tmg_project_attach (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "project-attach");
 
   string in1= tmscm_to_string (arg1);
@@ -9592,7 +9592,7 @@ tmg_project_attach (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_project_detach () {
   // TMSCM_DEFER_INTS;
   project_attach ();
@@ -9601,7 +9601,7 @@ tmg_project_detach () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_project_attachedP () {
   // TMSCM_DEFER_INTS;
   bool out= project_attached ();
@@ -9610,7 +9610,7 @@ tmg_project_attachedP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_project_get () {
   // TMSCM_DEFER_INTS;
   url out= project_get ();
@@ -9619,7 +9619,7 @@ tmg_project_get () {
   return url_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_alt_window_handle () {
   // TMSCM_DEFER_INTS;
   int out= window_handle ();
@@ -9628,8 +9628,8 @@ tmg_alt_window_handle () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_alt_window_create_quit (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_alt_window_create_quit (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-create-quit");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "alt-window-create-quit");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "alt-window-create-quit");
@@ -9647,8 +9647,8 @@ tmg_alt_window_create_quit (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_create_plain (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_alt_window_create_plain (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-create-plain");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "alt-window-create-plain");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "alt-window-create-plain");
@@ -9664,8 +9664,8 @@ tmg_alt_window_create_plain (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_create_popup (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_alt_window_create_popup (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-create-popup");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "alt-window-create-popup");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "alt-window-create-popup");
@@ -9681,8 +9681,8 @@ tmg_alt_window_create_popup (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_create_tooltip (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_alt_window_create_tooltip (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-create-tooltip");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "alt-window-create-tooltip");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "alt-window-create-tooltip");
@@ -9698,8 +9698,8 @@ tmg_alt_window_create_tooltip (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_delete (tmscm arg1) {
+scm_obj
+tmg_alt_window_delete (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-delete");
 
   int in1= tmscm_to_int (arg1);
@@ -9711,8 +9711,8 @@ tmg_alt_window_delete (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_show (tmscm arg1) {
+scm_obj
+tmg_alt_window_show (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-show");
 
   int in1= tmscm_to_int (arg1);
@@ -9724,8 +9724,8 @@ tmg_alt_window_show (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_hide (tmscm arg1) {
+scm_obj
+tmg_alt_window_hide (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-hide");
 
   int in1= tmscm_to_int (arg1);
@@ -9737,8 +9737,8 @@ tmg_alt_window_hide (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_get_size (tmscm arg1) {
+scm_obj
+tmg_alt_window_get_size (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-size");
 
   int in1= tmscm_to_int (arg1);
@@ -9750,8 +9750,8 @@ tmg_alt_window_get_size (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_alt_window_set_size (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_alt_window_set_size (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-set-size");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "alt-window-set-size");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "alt-window-set-size");
@@ -9767,8 +9767,8 @@ tmg_alt_window_set_size (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_get_position (tmscm arg1) {
+scm_obj
+tmg_alt_window_get_position (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-position");
 
   int in1= tmscm_to_int (arg1);
@@ -9780,8 +9780,8 @@ tmg_alt_window_get_position (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_alt_window_set_position (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_alt_window_set_position (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-set-position");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "alt-window-set-position");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "alt-window-set-position");
@@ -9797,8 +9797,8 @@ tmg_alt_window_set_position (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_alt_window_search (tmscm arg1) {
+scm_obj
+tmg_alt_window_search (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "alt-window-search");
 
   url in1= tmscm_to_url (arg1);
@@ -9810,7 +9810,7 @@ tmg_alt_window_search (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_supports_bibtexP () {
   // TMSCM_DEFER_INTS;
   bool out= bibtex_present ();
@@ -9819,8 +9819,8 @@ tmg_supports_bibtexP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_bibtex_run (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_bibtex_run (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "bibtex-run");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "bibtex-run");
   TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "bibtex-run");
@@ -9838,8 +9838,8 @@ tmg_bibtex_run (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_add_period (tmscm arg1) {
+scm_obj
+tmg_bib_add_period (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-add-period");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9851,8 +9851,8 @@ tmg_bib_add_period (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_locase_first (tmscm arg1) {
+scm_obj
+tmg_bib_locase_first (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-locase-first");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9864,8 +9864,8 @@ tmg_bib_locase_first (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_upcase_first (tmscm arg1) {
+scm_obj
+tmg_bib_upcase_first (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-upcase-first");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9877,8 +9877,8 @@ tmg_bib_upcase_first (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_locase (tmscm arg1) {
+scm_obj
+tmg_bib_locase (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-locase");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9890,8 +9890,8 @@ tmg_bib_locase (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_upcase (tmscm arg1) {
+scm_obj
+tmg_bib_upcase (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-upcase");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9903,8 +9903,8 @@ tmg_bib_upcase (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_default_preserve_case (tmscm arg1) {
+scm_obj
+tmg_bib_default_preserve_case (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-default-preserve-case");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9916,8 +9916,8 @@ tmg_bib_default_preserve_case (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_default_upcase_first (tmscm arg1) {
+scm_obj
+tmg_bib_default_upcase_first (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-default-upcase-first");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9929,8 +9929,8 @@ tmg_bib_default_upcase_first (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_purify (tmscm arg1) {
+scm_obj
+tmg_bib_purify (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-purify");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9942,8 +9942,8 @@ tmg_bib_purify (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_text_length (tmscm arg1) {
+scm_obj
+tmg_bib_text_length (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-text-length");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -9955,8 +9955,8 @@ tmg_bib_text_length (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_prefix (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_bib_prefix (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-prefix");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "bib-prefix");
 
@@ -9970,8 +9970,8 @@ tmg_bib_prefix (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_emptyP (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_bib_emptyP (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-empty?");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "bib-empty?");
 
@@ -9985,8 +9985,8 @@ tmg_bib_emptyP (tmscm arg1, tmscm arg2) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_field (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_bib_field (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-field");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "bib-field");
 
@@ -10000,8 +10000,8 @@ tmg_bib_field (tmscm arg1, tmscm arg2) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
-tmg_bib_abbreviate (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_bib_abbreviate (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "bib-abbreviate");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "bib-abbreviate");
   TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "bib-abbreviate");

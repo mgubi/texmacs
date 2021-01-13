@@ -11,7 +11,7 @@
 *
 ******************************************************************************/
 
-tmscm
+scm_obj
 tmg_root_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->the_root ();
@@ -20,7 +20,7 @@ tmg_root_tree () {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_buffer_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->the_buffer_path ();
@@ -29,7 +29,7 @@ tmg_buffer_path () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_buffer_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->the_buffer ();
@@ -38,7 +38,7 @@ tmg_buffer_tree () {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_paragraph_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->the_line ();
@@ -47,7 +47,7 @@ tmg_paragraph_tree () {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_cursor_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->the_path ();
@@ -56,7 +56,7 @@ tmg_cursor_path () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_cursor_path_dot () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->the_shifted_path ();
@@ -65,7 +65,7 @@ tmg_cursor_path_dot () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->selection_get ();
@@ -74,8 +74,8 @@ tmg_selection_tree () {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_path_existsP (tmscm arg1) {
+scm_obj
+tmg_path_existsP (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-exists?");
 
   path in1= tmscm_to_path (arg1);
@@ -87,8 +87,8 @@ tmg_path_existsP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_path_2tree (tmscm arg1) {
+scm_obj
+tmg_cpp_path_2tree (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "cpp-path->tree");
 
   path in1= tmscm_to_path (arg1);
@@ -100,8 +100,8 @@ tmg_cpp_path_2tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_path_correct_old (tmscm arg1) {
+scm_obj
+tmg_path_correct_old (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-correct-old");
 
   path in1= tmscm_to_path (arg1);
@@ -113,8 +113,8 @@ tmg_path_correct_old (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_path_insert_with (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_path_insert_with (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-insert-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "path-insert-with");
   TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "path-insert-with");
@@ -130,8 +130,8 @@ tmg_path_insert_with (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_path_remove_with (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_path_remove_with (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-remove-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "path-remove-with");
 
@@ -145,8 +145,8 @@ tmg_path_remove_with (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_position_new_path (tmscm arg1) {
+scm_obj
+tmg_position_new_path (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "position-new-path");
 
   path in1= tmscm_to_path (arg1);
@@ -158,8 +158,8 @@ tmg_position_new_path (tmscm arg1) {
   return observer_to_tmscm (out);
 }
 
-tmscm
-tmg_position_delete (tmscm arg1) {
+scm_obj
+tmg_position_delete (scm_obj arg1) {
   TMSCM_ASSERT_OBSERVER (arg1, TMSCM_ARG1, "position-delete");
 
   observer in1= tmscm_to_observer (arg1);
@@ -171,8 +171,8 @@ tmg_position_delete (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_position_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_position_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_OBSERVER (arg1, TMSCM_ARG1, "position-set");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "position-set");
 
@@ -186,8 +186,8 @@ tmg_position_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_position_get (tmscm arg1) {
+scm_obj
+tmg_position_get (scm_obj arg1) {
   TMSCM_ASSERT_OBSERVER (arg1, TMSCM_ARG1, "position-get");
 
   observer in1= tmscm_to_observer (arg1);
@@ -199,8 +199,8 @@ tmg_position_get (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_insideP (tmscm arg1) {
+scm_obj
+tmg_insideP (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "inside?");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -212,8 +212,8 @@ tmg_insideP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_insert (tmscm arg1) {
+scm_obj
+tmg_cpp_insert (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-insert");
 
   content in1= tmscm_to_content (arg1);
@@ -225,8 +225,8 @@ tmg_cpp_insert (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_insert_go_to (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_insert_go_to (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-insert-go-to");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "cpp-insert-go-to");
 
@@ -240,8 +240,8 @@ tmg_cpp_insert_go_to (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_insert_raw_go_to (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_insert_raw_go_to (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "insert-raw-go-to");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "insert-raw-go-to");
 
@@ -255,7 +255,7 @@ tmg_insert_raw_go_to (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_insert_raw_return () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->insert_return ();
@@ -264,8 +264,8 @@ tmg_insert_raw_return () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_remove_text (tmscm arg1) {
+scm_obj
+tmg_remove_text (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "remove-text");
 
   bool in1= tmscm_to_bool (arg1);
@@ -277,8 +277,8 @@ tmg_remove_text (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_remove_structure (tmscm arg1) {
+scm_obj
+tmg_remove_structure (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "remove-structure");
 
   bool in1= tmscm_to_bool (arg1);
@@ -290,7 +290,7 @@ tmg_remove_structure (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_remove_structure_upwards () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->remove_structure_upwards ();
@@ -299,8 +299,8 @@ tmg_remove_structure_upwards () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make (tmscm arg1) {
+scm_obj
+tmg_cpp_make (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "cpp-make");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -312,8 +312,8 @@ tmg_cpp_make (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_arity (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_make_arity (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "cpp-make-arity");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "cpp-make-arity");
 
@@ -327,7 +327,7 @@ tmg_cpp_make_arity (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_activate () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->activate ();
@@ -336,8 +336,8 @@ tmg_activate () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_insert_argument (tmscm arg1) {
+scm_obj
+tmg_insert_argument (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "insert-argument");
 
   bool in1= tmscm_to_bool (arg1);
@@ -349,8 +349,8 @@ tmg_insert_argument (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_remove_argument (tmscm arg1) {
+scm_obj
+tmg_remove_argument (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "remove-argument");
 
   bool in1= tmscm_to_bool (arg1);
@@ -362,8 +362,8 @@ tmg_remove_argument (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_insert_argument_at (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_insert_argument_at (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "insert-argument-at");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "insert-argument-at");
 
@@ -377,8 +377,8 @@ tmg_insert_argument_at (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_remove_argument_at (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_remove_argument_at (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "remove-argument-at");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "remove-argument-at");
 
@@ -392,8 +392,8 @@ tmg_remove_argument_at (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_with (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_make_with (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-make-with");
 
@@ -407,8 +407,8 @@ tmg_cpp_make_with (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_mod_active (tmscm arg1) {
+scm_obj
+tmg_make_mod_active (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "make-mod-active");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -420,8 +420,8 @@ tmg_make_mod_active (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_style_with (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_make_style_with (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-style-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-style-with");
 
@@ -435,7 +435,7 @@ tmg_make_style_with (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_hybrid () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_hybrid ();
@@ -444,7 +444,7 @@ tmg_cpp_make_hybrid () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_activate_latex () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->activate_latex ();
@@ -453,8 +453,8 @@ tmg_activate_latex () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_activate_hybrid (tmscm arg1) {
+scm_obj
+tmg_activate_hybrid (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "activate-hybrid");
 
   bool in1= tmscm_to_bool (arg1);
@@ -466,7 +466,7 @@ tmg_activate_hybrid (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_activate_symbol () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->activate_symbol ();
@@ -475,7 +475,7 @@ tmg_activate_symbol () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_make_return_before () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_return_before ();
@@ -484,7 +484,7 @@ tmg_make_return_before () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_make_return_after () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->make_return_after ();
@@ -493,7 +493,7 @@ tmg_make_return_after () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_temp_proof_fix () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->temp_proof_fix ();
@@ -502,7 +502,7 @@ tmg_temp_proof_fix () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_full_env () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->get_full_env ();
@@ -511,7 +511,7 @@ tmg_get_full_env () {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_all_inits () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->get_init_all ();
@@ -520,8 +520,8 @@ tmg_get_all_inits () {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_init_default_one (tmscm arg1) {
+scm_obj
+tmg_init_default_one (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-default-one");
 
   string in1= tmscm_to_string (arg1);
@@ -533,8 +533,8 @@ tmg_init_default_one (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_init_env (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_init_env (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-env");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "init-env");
 
@@ -548,8 +548,8 @@ tmg_init_env (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_init_env_tree (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_init_env_tree (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-env-tree");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "init-env-tree");
 
@@ -563,8 +563,8 @@ tmg_init_env_tree (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_init_style (tmscm arg1) {
+scm_obj
+tmg_init_style (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-style");
 
   string in1= tmscm_to_string (arg1);
@@ -576,7 +576,7 @@ tmg_init_style (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_style_tree () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->get_style ();
@@ -585,8 +585,8 @@ tmg_get_style_tree () {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_style_tree (tmscm arg1) {
+scm_obj
+tmg_set_style_tree (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "set-style-tree");
 
   tree in1= tmscm_to_tree (arg1);
@@ -598,8 +598,8 @@ tmg_set_style_tree (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_get_env (tmscm arg1) {
+scm_obj
+tmg_get_env (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-env");
 
   string in1= tmscm_to_string (arg1);
@@ -611,8 +611,8 @@ tmg_get_env (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_get_env_tree (tmscm arg1) {
+scm_obj
+tmg_get_env_tree (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-env-tree");
 
   string in1= tmscm_to_string (arg1);
@@ -624,8 +624,8 @@ tmg_get_env_tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_get_env_tree_at (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_get_env_tree_at (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-env-tree-at");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "get-env-tree-at");
 
@@ -639,8 +639,8 @@ tmg_get_env_tree_at (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_get_init (tmscm arg1) {
+scm_obj
+tmg_get_init (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-init");
 
   string in1= tmscm_to_string (arg1);
@@ -652,8 +652,8 @@ tmg_get_init (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_get_init_tree (tmscm arg1) {
+scm_obj
+tmg_get_init_tree (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-init-tree");
 
   string in1= tmscm_to_string (arg1);
@@ -665,8 +665,8 @@ tmg_get_init_tree (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_context_hasP (tmscm arg1) {
+scm_obj
+tmg_context_hasP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "context-has?");
 
   string in1= tmscm_to_string (arg1);
@@ -678,8 +678,8 @@ tmg_context_hasP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_style_hasP (tmscm arg1) {
+scm_obj
+tmg_style_hasP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "style-has?");
 
   string in1= tmscm_to_string (arg1);
@@ -691,8 +691,8 @@ tmg_style_hasP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_init_hasP (tmscm arg1) {
+scm_obj
+tmg_init_hasP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "init-has?");
 
   string in1= tmscm_to_string (arg1);
@@ -704,7 +704,7 @@ tmg_init_hasP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_page_count () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_page_count ();
@@ -713,8 +713,8 @@ tmg_get_page_count () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_page_width (tmscm arg1) {
+scm_obj
+tmg_get_page_width (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-page-width");
 
   bool in1= tmscm_to_bool (arg1);
@@ -726,8 +726,8 @@ tmg_get_page_width (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_pages_width (tmscm arg1) {
+scm_obj
+tmg_get_pages_width (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-pages-width");
 
   bool in1= tmscm_to_bool (arg1);
@@ -739,8 +739,8 @@ tmg_get_pages_width (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_page_height (tmscm arg1) {
+scm_obj
+tmg_get_page_height (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-page-height");
 
   bool in1= tmscm_to_bool (arg1);
@@ -752,8 +752,8 @@ tmg_get_page_height (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_total_width (tmscm arg1) {
+scm_obj
+tmg_get_total_width (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-total-width");
 
   bool in1= tmscm_to_bool (arg1);
@@ -765,8 +765,8 @@ tmg_get_total_width (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_total_height (tmscm arg1) {
+scm_obj
+tmg_get_total_height (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "get-total-height");
 
   bool in1= tmscm_to_bool (arg1);
@@ -778,8 +778,8 @@ tmg_get_total_height (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_get_reference (tmscm arg1) {
+scm_obj
+tmg_get_reference (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-reference");
 
   string in1= tmscm_to_string (arg1);
@@ -791,8 +791,8 @@ tmg_get_reference (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_reference (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_reference (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-reference");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-reference");
 
@@ -806,8 +806,8 @@ tmg_set_reference (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_reset_reference (tmscm arg1) {
+scm_obj
+tmg_reset_reference (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "reset-reference");
 
   string in1= tmscm_to_string (arg1);
@@ -819,8 +819,8 @@ tmg_reset_reference (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_find_references (tmscm arg1) {
+scm_obj
+tmg_find_references (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "find-references");
 
   string in1= tmscm_to_string (arg1);
@@ -832,7 +832,7 @@ tmg_find_references (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_list_references () {
   // TMSCM_DEFER_INTS;
   array_string out= get_current_editor()->list_refs ();
@@ -841,8 +841,8 @@ tmg_list_references () {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_list_references_dot (tmscm arg1) {
+scm_obj
+tmg_list_references_dot (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "list-references*");
 
   bool in1= tmscm_to_bool (arg1);
@@ -854,8 +854,8 @@ tmg_list_references_dot (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_get_auxiliary (tmscm arg1) {
+scm_obj
+tmg_get_auxiliary (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-auxiliary");
 
   string in1= tmscm_to_string (arg1);
@@ -867,8 +867,8 @@ tmg_get_auxiliary (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_auxiliary (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_auxiliary (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-auxiliary");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-auxiliary");
 
@@ -882,8 +882,8 @@ tmg_set_auxiliary (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_reset_auxiliary (tmscm arg1) {
+scm_obj
+tmg_reset_auxiliary (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "reset-auxiliary");
 
   string in1= tmscm_to_string (arg1);
@@ -895,7 +895,7 @@ tmg_reset_auxiliary (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_list_auxiliaries () {
   // TMSCM_DEFER_INTS;
   array_string out= get_current_editor()->list_auxs ();
@@ -904,8 +904,8 @@ tmg_list_auxiliaries () {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_list_auxiliaries_dot (tmscm arg1) {
+scm_obj
+tmg_list_auxiliaries_dot (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "list-auxiliaries*");
 
   bool in1= tmscm_to_bool (arg1);
@@ -917,8 +917,8 @@ tmg_list_auxiliaries_dot (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_get_attachment (tmscm arg1) {
+scm_obj
+tmg_get_attachment (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-attachment");
 
   string in1= tmscm_to_string (arg1);
@@ -930,8 +930,8 @@ tmg_get_attachment (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_attachment (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_attachment (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-attachment");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "set-attachment");
 
@@ -945,8 +945,8 @@ tmg_set_attachment (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_reset_attachment (tmscm arg1) {
+scm_obj
+tmg_reset_attachment (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "reset-attachment");
 
   string in1= tmscm_to_string (arg1);
@@ -958,7 +958,7 @@ tmg_reset_attachment (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_list_attachments () {
   // TMSCM_DEFER_INTS;
   array_string out= get_current_editor()->list_atts ();
@@ -967,8 +967,8 @@ tmg_list_attachments () {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_list_attachments_dot (tmscm arg1) {
+scm_obj
+tmg_list_attachments_dot (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "list-attachments*");
 
   bool in1= tmscm_to_bool (arg1);
@@ -980,8 +980,8 @@ tmg_list_attachments_dot (tmscm arg1) {
   return array_string_to_tmscm (out);
 }
 
-tmscm
-tmg_make_htab (tmscm arg1) {
+scm_obj
+tmg_make_htab (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-htab");
 
   string in1= tmscm_to_string (arg1);
@@ -993,8 +993,8 @@ tmg_make_htab (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_space (tmscm arg1) {
+scm_obj
+tmg_make_space (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-space");
 
   string in1= tmscm_to_string (arg1);
@@ -1006,8 +1006,8 @@ tmg_make_space (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_var_space (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_make_var_space (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-var-space");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-var-space");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "make-var-space");
@@ -1023,8 +1023,8 @@ tmg_make_var_space (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_hspace (tmscm arg1) {
+scm_obj
+tmg_make_hspace (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-hspace");
 
   string in1= tmscm_to_string (arg1);
@@ -1036,8 +1036,8 @@ tmg_make_hspace (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_var_hspace (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_make_var_hspace (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-var-hspace");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-var-hspace");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "make-var-hspace");
@@ -1053,8 +1053,8 @@ tmg_make_var_hspace (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_vspace_before (tmscm arg1) {
+scm_obj
+tmg_make_vspace_before (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-vspace-before");
 
   string in1= tmscm_to_string (arg1);
@@ -1066,8 +1066,8 @@ tmg_make_vspace_before (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_var_vspace_before (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_make_var_vspace_before (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-var-vspace-before");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-var-vspace-before");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "make-var-vspace-before");
@@ -1083,8 +1083,8 @@ tmg_make_var_vspace_before (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_vspace_after (tmscm arg1) {
+scm_obj
+tmg_make_vspace_after (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-vspace-after");
 
   string in1= tmscm_to_string (arg1);
@@ -1096,8 +1096,8 @@ tmg_make_vspace_after (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_var_vspace_after (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_make_var_vspace_after (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-var-vspace-after");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "make-var-vspace-after");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "make-var-vspace-after");
@@ -1113,8 +1113,8 @@ tmg_make_var_vspace_after (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_make_image (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6) {
+scm_obj
+tmg_make_image (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5, scm_obj arg6) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "make-image");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "make-image");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "make-image");
@@ -1136,8 +1136,8 @@ tmg_make_image (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmsc
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_length_decode (tmscm arg1) {
+scm_obj
+tmg_length_decode (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-decode");
 
   string in1= tmscm_to_string (arg1);
@@ -1149,8 +1149,8 @@ tmg_length_decode (tmscm arg1) {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_length_add (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_add (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-add");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-add");
 
@@ -1164,8 +1164,8 @@ tmg_length_add (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_length_sub (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_sub (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-sub");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-sub");
 
@@ -1179,8 +1179,8 @@ tmg_length_sub (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_length_max (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_max (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-max");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-max");
 
@@ -1194,8 +1194,8 @@ tmg_length_max (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_length_min (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_min (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-min");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-min");
 
@@ -1209,8 +1209,8 @@ tmg_length_min (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_length_mult (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_mult (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "length-mult");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-mult");
 
@@ -1224,8 +1224,8 @@ tmg_length_mult (tmscm arg1, tmscm arg2) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_lengthP (tmscm arg1) {
+scm_obj
+tmg_lengthP (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length?");
 
   string in1= tmscm_to_string (arg1);
@@ -1237,8 +1237,8 @@ tmg_lengthP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_length_divide (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_length_divide (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "length-divide");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "length-divide");
 
@@ -1252,7 +1252,7 @@ tmg_length_divide (tmscm arg1, tmscm arg2) {
   return double_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_rigid () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_rigid ();
@@ -1261,8 +1261,8 @@ tmg_cpp_make_rigid () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_lprime (tmscm arg1) {
+scm_obj
+tmg_cpp_make_lprime (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-lprime");
 
   string in1= tmscm_to_string (arg1);
@@ -1274,8 +1274,8 @@ tmg_cpp_make_lprime (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_rprime (tmscm arg1) {
+scm_obj
+tmg_cpp_make_rprime (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-rprime");
 
   string in1= tmscm_to_string (arg1);
@@ -1287,7 +1287,7 @@ tmg_cpp_make_rprime (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_below () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_below ();
@@ -1296,7 +1296,7 @@ tmg_cpp_make_below () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_above () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_above ();
@@ -1305,8 +1305,8 @@ tmg_cpp_make_above () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_script (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cpp_make_script (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "cpp-make-script");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "cpp-make-script");
 
@@ -1320,7 +1320,7 @@ tmg_cpp_make_script (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_fraction () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_fraction ();
@@ -1329,7 +1329,7 @@ tmg_cpp_make_fraction () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_sqrt () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_sqrt ();
@@ -1338,8 +1338,8 @@ tmg_cpp_make_sqrt () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_wide (tmscm arg1) {
+scm_obj
+tmg_cpp_make_wide (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-wide");
 
   string in1= tmscm_to_string (arg1);
@@ -1351,8 +1351,8 @@ tmg_cpp_make_wide (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_make_wide_under (tmscm arg1) {
+scm_obj
+tmg_cpp_make_wide_under (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-make-wide-under");
 
   string in1= tmscm_to_string (arg1);
@@ -1364,7 +1364,7 @@ tmg_cpp_make_wide_under (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_var_sqrt () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_var_sqrt ();
@@ -1373,7 +1373,7 @@ tmg_cpp_make_var_sqrt () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_neg () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_neg ();
@@ -1382,7 +1382,7 @@ tmg_cpp_make_neg () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cpp_make_tree () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_tree ();
@@ -1391,7 +1391,7 @@ tmg_cpp_make_tree () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_make_subtable () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->make_subtable ();
@@ -1400,7 +1400,7 @@ tmg_make_subtable () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_deactivate () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->table_deactivate ();
@@ -1409,7 +1409,7 @@ tmg_table_deactivate () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_extract_format () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->table_extract_format ();
@@ -1418,8 +1418,8 @@ tmg_table_extract_format () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_insert_row (tmscm arg1) {
+scm_obj
+tmg_table_insert_row (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-insert-row");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1431,8 +1431,8 @@ tmg_table_insert_row (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_insert_column (tmscm arg1) {
+scm_obj
+tmg_table_insert_column (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-insert-column");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1444,8 +1444,8 @@ tmg_table_insert_column (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_remove_row (tmscm arg1) {
+scm_obj
+tmg_table_remove_row (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-remove-row");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1457,8 +1457,8 @@ tmg_table_remove_row (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_remove_column (tmscm arg1) {
+scm_obj
+tmg_table_remove_column (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-remove-column");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1470,7 +1470,7 @@ tmg_table_remove_column (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_nr_rows () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->table_nr_rows ();
@@ -1479,7 +1479,7 @@ tmg_table_nr_rows () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_table_nr_columns () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->table_nr_columns ();
@@ -1488,7 +1488,7 @@ tmg_table_nr_columns () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_table_get_extents () {
   // TMSCM_DEFER_INTS;
   array_int out= get_current_editor()->table_get_extents ();
@@ -1497,8 +1497,8 @@ tmg_table_get_extents () {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_table_set_extents (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_table_set_extents (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "table-set-extents");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "table-set-extents");
 
@@ -1512,7 +1512,7 @@ tmg_table_set_extents (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_which_row () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->table_which_row ();
@@ -1521,7 +1521,7 @@ tmg_table_which_row () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_table_which_column () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->table_which_column ();
@@ -1530,7 +1530,7 @@ tmg_table_which_column () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_table_which_cells () {
   // TMSCM_DEFER_INTS;
   array_int out= get_current_editor()->table_which_cells ();
@@ -1539,8 +1539,8 @@ tmg_table_which_cells () {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_table_cell_path (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_table_cell_path (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "table-cell-path");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "table-cell-path");
 
@@ -1554,8 +1554,8 @@ tmg_table_cell_path (tmscm arg1, tmscm arg2) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_table_go_to (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_table_go_to (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "table-go-to");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "table-go-to");
 
@@ -1569,8 +1569,8 @@ tmg_table_go_to (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_set_format (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_table_set_format (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "table-set-format");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "table-set-format");
 
@@ -1584,7 +1584,7 @@ tmg_table_set_format (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_get_format_all () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->table_get_format ();
@@ -1593,8 +1593,8 @@ tmg_table_get_format_all () {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_table_get_format (tmscm arg1) {
+scm_obj
+tmg_table_get_format (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "table-get-format");
 
   string in1= tmscm_to_string (arg1);
@@ -1606,8 +1606,8 @@ tmg_table_get_format (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_table_del_format (tmscm arg1) {
+scm_obj
+tmg_table_del_format (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "table-del-format");
 
   string in1= tmscm_to_string (arg1);
@@ -1619,8 +1619,8 @@ tmg_table_del_format (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_row_decoration (tmscm arg1) {
+scm_obj
+tmg_table_row_decoration (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-row-decoration");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1632,8 +1632,8 @@ tmg_table_row_decoration (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_table_column_decoration (tmscm arg1) {
+scm_obj
+tmg_table_column_decoration (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "table-column-decoration");
 
   bool in1= tmscm_to_bool (arg1);
@@ -1645,7 +1645,7 @@ tmg_table_column_decoration (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_format_center () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->table_format_center ();
@@ -1654,7 +1654,7 @@ tmg_table_format_center () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_correct_block_content () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->table_correct_block_content ();
@@ -1663,8 +1663,8 @@ tmg_table_correct_block_content () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_cell_mode (tmscm arg1) {
+scm_obj
+tmg_set_cell_mode (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-cell-mode");
 
   string in1= tmscm_to_string (arg1);
@@ -1676,7 +1676,7 @@ tmg_set_cell_mode (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_cell_mode () {
   // TMSCM_DEFER_INTS;
   string out= get_current_editor()->get_cell_mode ();
@@ -1685,8 +1685,8 @@ tmg_get_cell_mode () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cell_set_format (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_cell_set_format (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cell-set-format");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "cell-set-format");
 
@@ -1700,8 +1700,8 @@ tmg_cell_set_format (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cell_get_format (tmscm arg1) {
+scm_obj
+tmg_cell_get_format (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cell-get-format");
 
   string in1= tmscm_to_string (arg1);
@@ -1713,8 +1713,8 @@ tmg_cell_get_format (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_cell_del_format (tmscm arg1) {
+scm_obj
+tmg_cell_del_format (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cell-del-format");
 
   string in1= tmscm_to_string (arg1);
@@ -1726,7 +1726,7 @@ tmg_cell_del_format (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_table_test () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->table_test ();
@@ -1735,8 +1735,8 @@ tmg_table_test () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_key_press (tmscm arg1) {
+scm_obj
+tmg_key_press (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "key-press");
 
   string in1= tmscm_to_string (arg1);
@@ -1748,8 +1748,8 @@ tmg_key_press (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_raw_emulate_keyboard (tmscm arg1) {
+scm_obj
+tmg_raw_emulate_keyboard (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "raw-emulate-keyboard");
 
   string in1= tmscm_to_string (arg1);
@@ -1761,7 +1761,7 @@ tmg_raw_emulate_keyboard (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_complete_tryP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->complete_try ();
@@ -1770,7 +1770,7 @@ tmg_complete_tryP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_input_mode () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_input_mode ();
@@ -1779,8 +1779,8 @@ tmg_get_input_mode () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_key_press_search (tmscm arg1) {
+scm_obj
+tmg_key_press_search (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "key-press-search");
 
   string in1= tmscm_to_string (arg1);
@@ -1792,8 +1792,8 @@ tmg_key_press_search (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_key_press_replace (tmscm arg1) {
+scm_obj
+tmg_key_press_replace (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "key-press-replace");
 
   string in1= tmscm_to_string (arg1);
@@ -1805,8 +1805,8 @@ tmg_key_press_replace (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_key_press_spell (tmscm arg1) {
+scm_obj
+tmg_key_press_spell (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "key-press-spell");
 
   string in1= tmscm_to_string (arg1);
@@ -1818,8 +1818,8 @@ tmg_key_press_spell (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_key_press_complete (tmscm arg1) {
+scm_obj
+tmg_key_press_complete (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "key-press-complete");
 
   string in1= tmscm_to_string (arg1);
@@ -1831,8 +1831,8 @@ tmg_key_press_complete (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_mouse_any (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
+scm_obj
+tmg_mouse_any (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4, scm_obj arg5) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "mouse-any");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "mouse-any");
   TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "mouse-any");
@@ -1852,7 +1852,7 @@ tmg_mouse_any (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_mouse_position () {
   // TMSCM_DEFER_INTS;
   array_int out= get_current_editor()->get_mouse_position ();
@@ -1861,8 +1861,8 @@ tmg_get_mouse_position () {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_mouse_pointer (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-mouse-pointer");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "set-mouse-pointer");
 
@@ -1876,8 +1876,8 @@ tmg_set_mouse_pointer (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_set_predef_mouse_pointer (tmscm arg1) {
+scm_obj
+tmg_set_predef_mouse_pointer (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-predef-mouse-pointer");
 
   string in1= tmscm_to_string (arg1);
@@ -1889,8 +1889,8 @@ tmg_set_predef_mouse_pointer (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_go_to_path (tmscm arg1) {
+scm_obj
+tmg_go_to_path (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "go-to-path");
 
   path in1= tmscm_to_path (arg1);
@@ -1902,7 +1902,7 @@ tmg_go_to_path (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_left () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_left ();
@@ -1911,7 +1911,7 @@ tmg_go_left () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_right () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_right ();
@@ -1920,7 +1920,7 @@ tmg_go_right () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_up () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_up ();
@@ -1929,7 +1929,7 @@ tmg_go_up () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_down () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_down ();
@@ -1938,7 +1938,7 @@ tmg_go_down () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_start () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_start ();
@@ -1947,7 +1947,7 @@ tmg_go_start () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_end () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_end ();
@@ -1956,8 +1956,8 @@ tmg_go_end () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_go_start_of (tmscm arg1) {
+scm_obj
+tmg_go_start_of (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "go-start-of");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -1969,8 +1969,8 @@ tmg_go_start_of (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_go_end_of (tmscm arg1) {
+scm_obj
+tmg_go_end_of (scm_obj arg1) {
   TMSCM_ASSERT_TREE_LABEL (arg1, TMSCM_ARG1, "go-end-of");
 
   tree_label in1= tmscm_to_tree_label (arg1);
@@ -1982,8 +1982,8 @@ tmg_go_end_of (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_go_start_with (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_go_start_with (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "go-start-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "go-start-with");
 
@@ -1997,8 +1997,8 @@ tmg_go_start_with (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_go_end_with (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_go_end_with (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "go-end-with");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "go-end-with");
 
@@ -2012,7 +2012,7 @@ tmg_go_end_with (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_start_line () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_start_line ();
@@ -2021,7 +2021,7 @@ tmg_go_start_line () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_end_line () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_end_line ();
@@ -2030,7 +2030,7 @@ tmg_go_end_line () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_page_up () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_page_up ();
@@ -2039,7 +2039,7 @@ tmg_go_page_up () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_page_down () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_page_down ();
@@ -2048,7 +2048,7 @@ tmg_go_page_down () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_start_paragraph () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_start_paragraph ();
@@ -2057,7 +2057,7 @@ tmg_go_start_paragraph () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_go_end_paragraph () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->go_end_paragraph ();
@@ -2066,8 +2066,8 @@ tmg_go_end_paragraph () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_label_2path (tmscm arg1) {
+scm_obj
+tmg_label_2path (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "label->path");
 
   string in1= tmscm_to_string (arg1);
@@ -2079,8 +2079,8 @@ tmg_label_2path (tmscm arg1) {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_go_to_label (tmscm arg1) {
+scm_obj
+tmg_go_to_label (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "go-to-label");
 
   string in1= tmscm_to_string (arg1);
@@ -2092,7 +2092,7 @@ tmg_go_to_label (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cursor_accessibleP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->cursor_is_accessible ();
@@ -2101,7 +2101,7 @@ tmg_cursor_accessibleP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_cursor_show_if_hidden () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_cursor_if_hidden ();
@@ -2110,7 +2110,7 @@ tmg_cursor_show_if_hidden () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_all () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_all ();
@@ -2119,7 +2119,7 @@ tmg_select_all () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_line () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_line ();
@@ -2128,7 +2128,7 @@ tmg_select_line () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_from_cursor () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_from_cursor ();
@@ -2137,7 +2137,7 @@ tmg_select_from_cursor () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_from_cursor_if_active () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_from_cursor_if_active ();
@@ -2146,8 +2146,8 @@ tmg_select_from_cursor_if_active () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_select_from_keyboard (tmscm arg1) {
+scm_obj
+tmg_select_from_keyboard (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "select-from-keyboard");
 
   bool in1= tmscm_to_bool (arg1);
@@ -2159,7 +2159,7 @@ tmg_select_from_keyboard (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_from_shift_keyboard () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_from_shift_keyboard ();
@@ -2168,7 +2168,7 @@ tmg_select_from_shift_keyboard () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_enlarge () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_enlarge ();
@@ -2177,7 +2177,7 @@ tmg_select_enlarge () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_select_enlarge_environmental () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->select_enlarge_environmental ();
@@ -2186,7 +2186,7 @@ tmg_select_enlarge_environmental () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_selection_active_anyP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->selection_active_any ();
@@ -2195,7 +2195,7 @@ tmg_selection_active_anyP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_active_normalP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->selection_active_normal ();
@@ -2204,7 +2204,7 @@ tmg_selection_active_normalP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_active_tableP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->selection_active_table ();
@@ -2213,7 +2213,7 @@ tmg_selection_active_tableP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_active_smallP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->selection_active_small ();
@@ -2222,7 +2222,7 @@ tmg_selection_active_smallP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_active_enlargingP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->selection_active_enlarging ();
@@ -2231,7 +2231,7 @@ tmg_selection_active_enlargingP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_set_start () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->selection_set_start ();
@@ -2240,7 +2240,7 @@ tmg_selection_set_start () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_selection_set_end () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->selection_set_end ();
@@ -2249,7 +2249,7 @@ tmg_selection_set_end () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_selection_get_start () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_get_start ();
@@ -2258,7 +2258,7 @@ tmg_selection_get_start () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_get_end () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_get_end ();
@@ -2267,7 +2267,7 @@ tmg_selection_get_end () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_get_start_dot () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_var_get_start ();
@@ -2276,7 +2276,7 @@ tmg_selection_get_start_dot () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_get_end_dot () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_var_get_end ();
@@ -2285,7 +2285,7 @@ tmg_selection_get_end_dot () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_selection_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->selection_get_path ();
@@ -2294,8 +2294,8 @@ tmg_selection_path () {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_selection_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_selection_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "selection-set");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "selection-set");
 
@@ -2309,8 +2309,8 @@ tmg_selection_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_selection_set_range_set (tmscm arg1) {
+scm_obj
+tmg_selection_set_range_set (scm_obj arg1) {
   TMSCM_ASSERT_ARRAY_PATH (arg1, TMSCM_ARG1, "selection-set-range-set");
 
   array_path in1= tmscm_to_array_path (arg1);
@@ -2322,8 +2322,8 @@ tmg_selection_set_range_set (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_set (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_clipboard_set (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-set");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "clipboard-set");
 
@@ -2337,8 +2337,8 @@ tmg_clipboard_set (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_get (tmscm arg1) {
+scm_obj
+tmg_clipboard_get (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-get");
 
   string in1= tmscm_to_string (arg1);
@@ -2350,8 +2350,8 @@ tmg_clipboard_get (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_cpp_clipboard_copy (tmscm arg1) {
+scm_obj
+tmg_cpp_clipboard_copy (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-copy");
 
   string in1= tmscm_to_string (arg1);
@@ -2363,8 +2363,8 @@ tmg_cpp_clipboard_copy (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_clipboard_cut (tmscm arg1) {
+scm_obj
+tmg_cpp_clipboard_cut (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-cut");
 
   string in1= tmscm_to_string (arg1);
@@ -2376,8 +2376,8 @@ tmg_cpp_clipboard_cut (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_cut_at (tmscm arg1) {
+scm_obj
+tmg_clipboard_cut_at (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "clipboard-cut-at");
 
   path in1= tmscm_to_path (arg1);
@@ -2389,8 +2389,8 @@ tmg_clipboard_cut_at (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_cut_between (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_clipboard_cut_between (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "clipboard-cut-between");
   TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "clipboard-cut-between");
 
@@ -2404,8 +2404,8 @@ tmg_clipboard_cut_between (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_cpp_clipboard_paste (tmscm arg1) {
+scm_obj
+tmg_cpp_clipboard_paste (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-clipboard-paste");
 
   string in1= tmscm_to_string (arg1);
@@ -2417,7 +2417,7 @@ tmg_cpp_clipboard_paste (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_selection_move () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->selection_move ();
@@ -2426,8 +2426,8 @@ tmg_selection_move () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_clear (tmscm arg1) {
+scm_obj
+tmg_clipboard_clear (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-clear");
 
   string in1= tmscm_to_string (arg1);
@@ -2439,7 +2439,7 @@ tmg_clipboard_clear (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_selection_cancel () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->selection_cancel ();
@@ -2448,8 +2448,8 @@ tmg_selection_cancel () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_set_import (tmscm arg1) {
+scm_obj
+tmg_clipboard_set_import (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-set-import");
 
   string in1= tmscm_to_string (arg1);
@@ -2461,8 +2461,8 @@ tmg_clipboard_set_import (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_clipboard_set_export (tmscm arg1) {
+scm_obj
+tmg_clipboard_set_export (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "clipboard-set-export");
 
   string in1= tmscm_to_string (arg1);
@@ -2474,7 +2474,7 @@ tmg_clipboard_set_export (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_clipboard_get_import () {
   // TMSCM_DEFER_INTS;
   string out= get_current_editor()->selection_get_import ();
@@ -2483,7 +2483,7 @@ tmg_clipboard_get_import () {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_clipboard_get_export () {
   // TMSCM_DEFER_INTS;
   string out= get_current_editor()->selection_get_export ();
@@ -2492,8 +2492,8 @@ tmg_clipboard_get_export () {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_set_manual_focus_path (tmscm arg1) {
+scm_obj
+tmg_set_manual_focus_path (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "set-manual-focus-path");
 
   path in1= tmscm_to_path (arg1);
@@ -2505,7 +2505,7 @@ tmg_set_manual_focus_path (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_get_manual_focus_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->manual_focus_get ();
@@ -2514,7 +2514,7 @@ tmg_get_manual_focus_path () {
   return path_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_focus_path () {
   // TMSCM_DEFER_INTS;
   path out= get_current_editor()->focus_get ();
@@ -2523,8 +2523,8 @@ tmg_get_focus_path () {
   return path_to_tmscm (out);
 }
 
-tmscm
-tmg_set_alt_selection (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_set_alt_selection (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-alt-selection");
   TMSCM_ASSERT_ARRAY_PATH (arg2, TMSCM_ARG2, "set-alt-selection");
 
@@ -2538,8 +2538,8 @@ tmg_set_alt_selection (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_get_alt_selection (tmscm arg1) {
+scm_obj
+tmg_get_alt_selection (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-alt-selection");
 
   string in1= tmscm_to_string (arg1);
@@ -2551,8 +2551,8 @@ tmg_get_alt_selection (tmscm arg1) {
   return array_path_to_tmscm (out);
 }
 
-tmscm
-tmg_cancel_alt_selection (tmscm arg1) {
+scm_obj
+tmg_cancel_alt_selection (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cancel-alt-selection");
 
   string in1= tmscm_to_string (arg1);
@@ -2564,7 +2564,7 @@ tmg_cancel_alt_selection (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cancel_alt_selections () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->cancel_alt_selections ();
@@ -2573,7 +2573,7 @@ tmg_cancel_alt_selections () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_clear_undo_history () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->clear_undo_history ();
@@ -2582,7 +2582,7 @@ tmg_clear_undo_history () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_commit_changes () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->end_editing ();
@@ -2591,8 +2591,8 @@ tmg_commit_changes () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_start_slave (tmscm arg1) {
+scm_obj
+tmg_start_slave (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "start-slave");
 
   double in1= tmscm_to_double (arg1);
@@ -2604,8 +2604,8 @@ tmg_start_slave (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_mark_start (tmscm arg1) {
+scm_obj
+tmg_mark_start (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "mark-start");
 
   double in1= tmscm_to_double (arg1);
@@ -2617,8 +2617,8 @@ tmg_mark_start (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_mark_end (tmscm arg1) {
+scm_obj
+tmg_mark_end (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "mark-end");
 
   double in1= tmscm_to_double (arg1);
@@ -2630,8 +2630,8 @@ tmg_mark_end (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_mark_cancel (tmscm arg1) {
+scm_obj
+tmg_mark_cancel (scm_obj arg1) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "mark-cancel");
 
   double in1= tmscm_to_double (arg1);
@@ -2643,7 +2643,7 @@ tmg_mark_cancel (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_remove_undo_mark () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->remove_undo_mark ();
@@ -2652,7 +2652,7 @@ tmg_remove_undo_mark () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_add_undo_mark () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->add_undo_mark ();
@@ -2661,7 +2661,7 @@ tmg_add_undo_mark () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_unredoable_undo () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->unredoable_undo ();
@@ -2670,7 +2670,7 @@ tmg_unredoable_undo () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_undo_possibilities () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->undo_possibilities ();
@@ -2679,8 +2679,8 @@ tmg_undo_possibilities () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_undo (tmscm arg1) {
+scm_obj
+tmg_undo (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "undo");
 
   int in1= tmscm_to_int (arg1);
@@ -2692,7 +2692,7 @@ tmg_undo (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_redo_possibilities () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->redo_possibilities ();
@@ -2701,8 +2701,8 @@ tmg_redo_possibilities () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_redo (tmscm arg1) {
+scm_obj
+tmg_redo (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "redo");
 
   int in1= tmscm_to_int (arg1);
@@ -2714,7 +2714,7 @@ tmg_redo (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_history () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_history ();
@@ -2723,7 +2723,7 @@ tmg_show_history () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_archive_state () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->archive_state ();
@@ -2732,7 +2732,7 @@ tmg_archive_state () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_start_editing () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->start_editing ();
@@ -2741,7 +2741,7 @@ tmg_start_editing () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_end_editing () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->end_editing ();
@@ -2750,7 +2750,7 @@ tmg_end_editing () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_cancel_editing () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->cancel_editing ();
@@ -2759,7 +2759,7 @@ tmg_cancel_editing () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_in_graphicsP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->inside_graphics ();
@@ -2768,7 +2768,7 @@ tmg_in_graphicsP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_graphical_x () {
   // TMSCM_DEFER_INTS;
   double out= get_current_editor()->get_x ();
@@ -2777,7 +2777,7 @@ tmg_get_graphical_x () {
   return double_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_graphical_y () {
   // TMSCM_DEFER_INTS;
   double out= get_current_editor()->get_y ();
@@ -2786,7 +2786,7 @@ tmg_get_graphical_y () {
   return double_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_graphical_object () {
   // TMSCM_DEFER_INTS;
   tree out= get_current_editor()->get_graphical_object ();
@@ -2795,8 +2795,8 @@ tmg_get_graphical_object () {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_set_graphical_object (tmscm arg1) {
+scm_obj
+tmg_set_graphical_object (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "set-graphical-object");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2808,7 +2808,7 @@ tmg_set_graphical_object (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_invalidate_graphical_object () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->invalidate_graphical_object ();
@@ -2817,8 +2817,8 @@ tmg_invalidate_graphical_object () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_graphical_select (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_graphical_select (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "graphical-select");
   TMSCM_ASSERT_DOUBLE (arg2, TMSCM_ARG2, "graphical-select");
 
@@ -2832,8 +2832,8 @@ tmg_graphical_select (tmscm arg1, tmscm arg2) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_graphical_select_area (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+scm_obj
+tmg_graphical_select_area (scm_obj arg1, scm_obj arg2, scm_obj arg3, scm_obj arg4) {
   TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "graphical-select-area");
   TMSCM_ASSERT_DOUBLE (arg2, TMSCM_ARG2, "graphical-select-area");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "graphical-select-area");
@@ -2851,7 +2851,7 @@ tmg_graphical_select_area (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_in_normal_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->in_normal_mode ();
@@ -2860,7 +2860,7 @@ tmg_in_normal_modeP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_in_search_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->in_search_mode ();
@@ -2869,7 +2869,7 @@ tmg_in_search_modeP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_in_replace_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->in_replace_mode ();
@@ -2878,7 +2878,7 @@ tmg_in_replace_modeP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_in_spell_modeP () {
   // TMSCM_DEFER_INTS;
   bool out= get_current_editor()->in_spell_mode ();
@@ -2887,8 +2887,8 @@ tmg_in_spell_modeP () {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_search_start (tmscm arg1) {
+scm_obj
+tmg_search_start (scm_obj arg1) {
   TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "search-start");
 
   bool in1= tmscm_to_bool (arg1);
@@ -2900,7 +2900,7 @@ tmg_search_start (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_search_button_next () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->search_button_next ();
@@ -2909,8 +2909,8 @@ tmg_search_button_next () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_replace_start (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_replace_start (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "replace-start");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "replace-start");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "replace-start");
@@ -2926,7 +2926,7 @@ tmg_replace_start (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_spell_start () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->spell_start ();
@@ -2935,8 +2935,8 @@ tmg_spell_start () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_spell_replace (tmscm arg1) {
+scm_obj
+tmg_spell_replace (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-replace");
 
   string in1= tmscm_to_string (arg1);
@@ -2948,8 +2948,8 @@ tmg_spell_replace (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_session_complete_command (tmscm arg1) {
+scm_obj
+tmg_session_complete_command (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "session-complete-command");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2961,8 +2961,8 @@ tmg_session_complete_command (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_custom_complete (tmscm arg1) {
+scm_obj
+tmg_custom_complete (scm_obj arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "custom-complete");
 
   tree in1= tmscm_to_tree (arg1);
@@ -2974,8 +2974,8 @@ tmg_custom_complete (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_keyboard_focus_on (tmscm arg1) {
+scm_obj
+tmg_keyboard_focus_on (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "keyboard-focus-on");
 
   string in1= tmscm_to_string (arg1);
@@ -2987,8 +2987,8 @@ tmg_keyboard_focus_on (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_view_set_property (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_view_set_property (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "view-set-property");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "view-set-property");
 
@@ -3002,8 +3002,8 @@ tmg_view_set_property (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_view_get_property (tmscm arg1) {
+scm_obj
+tmg_view_get_property (scm_obj arg1) {
   TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "view-get-property");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
@@ -3015,7 +3015,7 @@ tmg_view_get_property (tmscm arg1) {
   return scheme_tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_window_width () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_window_width ();
@@ -3024,7 +3024,7 @@ tmg_get_window_width () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_window_height () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_window_height ();
@@ -3033,7 +3033,7 @@ tmg_get_window_height () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_window_x () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_window_x ();
@@ -3042,7 +3042,7 @@ tmg_get_window_x () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_window_y () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_window_y ();
@@ -3051,7 +3051,7 @@ tmg_get_window_y () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_canvas_x () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_canvas_x ();
@@ -3060,7 +3060,7 @@ tmg_get_canvas_x () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_canvas_y () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_canvas_y ();
@@ -3069,7 +3069,7 @@ tmg_get_canvas_y () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_scroll_x () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_scroll_x ();
@@ -3078,7 +3078,7 @@ tmg_get_scroll_x () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_get_scroll_y () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->get_scroll_y ();
@@ -3087,7 +3087,7 @@ tmg_get_scroll_y () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_clear_buffer () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->clear_buffer ();
@@ -3096,7 +3096,7 @@ tmg_clear_buffer () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_tex_buffer () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->tex_buffer ();
@@ -3105,7 +3105,7 @@ tmg_tex_buffer () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_clear_local_info () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->clear_local_info ();
@@ -3114,7 +3114,7 @@ tmg_clear_local_info () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_refresh_window () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->invalidate_all ();
@@ -3123,7 +3123,7 @@ tmg_refresh_window () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_update_forced () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->typeset_forced ();
@@ -3132,8 +3132,8 @@ tmg_update_forced () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_update_path (tmscm arg1) {
+scm_obj
+tmg_update_path (scm_obj arg1) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-path");
 
   path in1= tmscm_to_path (arg1);
@@ -3145,7 +3145,7 @@ tmg_update_path (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_update_current_buffer () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->typeset_invalidate_all ();
@@ -3154,8 +3154,8 @@ tmg_update_current_buffer () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_update_players (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_update_players (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-players");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "update-players");
 
@@ -3169,7 +3169,7 @@ tmg_update_players (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_generate_all_aux () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->generate_aux ();
@@ -3178,8 +3178,8 @@ tmg_generate_all_aux () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_generate_aux (tmscm arg1) {
+scm_obj
+tmg_generate_aux (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "generate-aux");
 
   string in1= tmscm_to_string (arg1);
@@ -3191,7 +3191,7 @@ tmg_generate_aux (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_notify_page_change () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->notify_page_change ();
@@ -3200,8 +3200,8 @@ tmg_notify_page_change () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_notify_change (tmscm arg1) {
+scm_obj
+tmg_notify_change (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "notify-change");
 
   int in1= tmscm_to_int (arg1);
@@ -3213,8 +3213,8 @@ tmg_notify_change (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_notified_changeP (tmscm arg1) {
+scm_obj
+tmg_notified_changeP (scm_obj arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "notified-change?");
 
   int in1= tmscm_to_int (arg1);
@@ -3226,8 +3226,8 @@ tmg_notified_changeP (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_get_metadata (tmscm arg1) {
+scm_obj
+tmg_get_metadata (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-metadata");
 
   string in1= tmscm_to_string (arg1);
@@ -3239,7 +3239,7 @@ tmg_get_metadata (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_cpp_nr_pages () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->nr_pages ();
@@ -3248,8 +3248,8 @@ tmg_cpp_nr_pages () {
   return int_to_tmscm (out);
 }
 
-tmscm
-tmg_print_to_file (tmscm arg1) {
+scm_obj
+tmg_print_to_file (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-to-file");
 
   url in1= tmscm_to_url (arg1);
@@ -3261,8 +3261,8 @@ tmg_print_to_file (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_print_pages_to_file (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_print_pages_to_file (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-pages-to-file");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "print-pages-to-file");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "print-pages-to-file");
@@ -3278,7 +3278,7 @@ tmg_print_pages_to_file (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_print () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->print_buffer ();
@@ -3287,8 +3287,8 @@ tmg_print () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_print_pages (tmscm arg1, tmscm arg2) {
+scm_obj
+tmg_print_pages (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "print-pages");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "print-pages");
 
@@ -3302,8 +3302,8 @@ tmg_print_pages (tmscm arg1, tmscm arg2) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_print_snippet (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "print-snippet");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "print-snippet");
   TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "print-snippet");
@@ -3319,8 +3319,8 @@ tmg_print_snippet (tmscm arg1, tmscm arg2, tmscm arg3) {
   return array_int_to_tmscm (out);
 }
 
-tmscm
-tmg_graphics_file_to_clipboard (tmscm arg1) {
+scm_obj
+tmg_graphics_file_to_clipboard (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "graphics-file-to-clipboard");
 
   url in1= tmscm_to_url (arg1);
@@ -3332,8 +3332,8 @@ tmg_graphics_file_to_clipboard (tmscm arg1) {
   return bool_to_tmscm (out);
 }
 
-tmscm
-tmg_export_postscript (tmscm arg1) {
+scm_obj
+tmg_export_postscript (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "export-postscript");
 
   url in1= tmscm_to_url (arg1);
@@ -3345,8 +3345,8 @@ tmg_export_postscript (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_export_pages_postscript (tmscm arg1, tmscm arg2, tmscm arg3) {
+scm_obj
+tmg_export_pages_postscript (scm_obj arg1, scm_obj arg2, scm_obj arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "export-pages-postscript");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "export-pages-postscript");
   TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "export-pages-postscript");
@@ -3362,8 +3362,8 @@ tmg_export_pages_postscript (tmscm arg1, tmscm arg2, tmscm arg3) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_footer_eval (tmscm arg1) {
+scm_obj
+tmg_footer_eval (scm_obj arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "footer-eval");
 
   string in1= tmscm_to_string (arg1);
@@ -3375,8 +3375,8 @@ tmg_footer_eval (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
-tmg_texmacs_exec (tmscm arg1) {
+scm_obj
+tmg_texmacs_exec (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "texmacs-exec");
 
   content in1= tmscm_to_content (arg1);
@@ -3388,8 +3388,8 @@ tmg_texmacs_exec (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_texmacs_exec_dot (tmscm arg1) {
+scm_obj
+tmg_texmacs_exec_dot (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "texmacs-exec*");
 
   content in1= tmscm_to_content (arg1);
@@ -3401,8 +3401,8 @@ tmg_texmacs_exec_dot (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_texmacs_expand (tmscm arg1) {
+scm_obj
+tmg_texmacs_expand (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "texmacs-expand");
 
   content in1= tmscm_to_content (arg1);
@@ -3414,8 +3414,8 @@ tmg_texmacs_expand (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_verbatim_expand (tmscm arg1) {
+scm_obj
+tmg_verbatim_expand (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "verbatim-expand");
 
   content in1= tmscm_to_content (arg1);
@@ -3427,8 +3427,8 @@ tmg_verbatim_expand (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_latex_expand (tmscm arg1) {
+scm_obj
+tmg_latex_expand (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "latex-expand");
 
   content in1= tmscm_to_content (arg1);
@@ -3440,8 +3440,8 @@ tmg_latex_expand (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_html_expand (tmscm arg1) {
+scm_obj
+tmg_html_expand (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "html-expand");
 
   content in1= tmscm_to_content (arg1);
@@ -3453,8 +3453,8 @@ tmg_html_expand (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_animate_checkout (tmscm arg1) {
+scm_obj
+tmg_animate_checkout (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-checkout");
 
   content in1= tmscm_to_content (arg1);
@@ -3466,8 +3466,8 @@ tmg_animate_checkout (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
-tmg_animate_commit (tmscm arg1) {
+scm_obj
+tmg_animate_commit (scm_obj arg1) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "animate-commit");
 
   content in1= tmscm_to_content (arg1);
@@ -3479,7 +3479,7 @@ tmg_animate_commit (tmscm arg1) {
   return tree_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_idle_time () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->idle_time ();
@@ -3488,7 +3488,7 @@ tmg_idle_time () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_change_time () {
   // TMSCM_DEFER_INTS;
   int out= get_current_editor()->change_time ();
@@ -3497,7 +3497,7 @@ tmg_change_time () {
   return int_to_tmscm (out);
 }
 
-tmscm
+scm_obj
 tmg_menu_before_action () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->before_menu_action ();
@@ -3506,7 +3506,7 @@ tmg_menu_before_action () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_menu_after_action () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->after_menu_action ();
@@ -3515,7 +3515,7 @@ tmg_menu_after_action () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_update_menus () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->update_menus ();
@@ -3524,7 +3524,7 @@ tmg_update_menus () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_tree () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_tree ();
@@ -3533,7 +3533,7 @@ tmg_show_tree () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_env () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_env ();
@@ -3542,7 +3542,7 @@ tmg_show_env () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_path () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_path ();
@@ -3551,7 +3551,7 @@ tmg_show_path () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_cursor () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_cursor ();
@@ -3560,7 +3560,7 @@ tmg_show_cursor () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_selection () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_selection ();
@@ -3569,7 +3569,7 @@ tmg_show_selection () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_show_meminfo () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_meminfo ();
@@ -3578,7 +3578,7 @@ tmg_show_meminfo () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_edit_special () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->edit_special ();
@@ -3587,7 +3587,7 @@ tmg_edit_special () {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
+scm_obj
 tmg_edit_test () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->edit_test ();

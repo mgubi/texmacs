@@ -68,8 +68,8 @@ eval_scheme_file (string file) {
 tmscm
 eval_scheme (string s) {
    cout << "Eval] " << s << "\n";
-  tmscm result= Scall1 (Stop_level_value (Sstring_to_symbol ("tm-eval-string")),
-                        string_to_tmscm (s));
+  tmscm result= tmscm (Scall1 (Stop_level_value (Sstring_to_symbol ("tm-eval-string")),
+                        string_to_tmscm (s)));
   return result;
 }
 
@@ -210,17 +210,26 @@ tmscm_to_symbol (tmscm s) {
 
 bool
 tmscm_is_blackbox (tmscm t) {
-  return (tmscm_is_pair (t) && (tmscm_car (t) == Sstring_to_symbol("blackbox")));
+  if (!tmscm_is_pair (t)) return false;
+  t = tmscm_car (t);
+  tmscm_lock (t);
+  tmscm tt =  Sstring_to_symbol ("blackbox");
+  tmscm_unlock (t);
+  return (t == tt);
 }
 
 tmscm
 blackbox_to_tmscm (blackbox b) {
-  return Scons (Sstring_to_symbol ("blackbox"),
-                Sfixnum ((uptr)(tm_new<blackbox> (b))));
+  //  tmscm t = Scons (Sstring_to_symbol ("blackbox"),
+  //              Sfixnum ((uptr)(tm_new<blackbox> (b))));
+  //tmscm_lock (t);
+  return Scall1 (Stop_level_value (Sstring_to_symbol ("make-blackbox")), Sfixnum ((uptr)(tm_new<blackbox> (b))));
+  //tmscm_unlock (t);
 }
 
 blackbox
 tmscm_to_blackbox (tmscm blackbox_smob) {
+  ASSERT (tmscm_is_blackbox (blackbox_smob),  "tmscm_to_blackbox : wrong type");
   return *((blackbox *) Sfixnum_value (tmscm_cdr (blackbox_smob)));
 }
 
@@ -262,17 +271,15 @@ static tmscm blackbox_to_string (tmscm o)
   return string_to_tmscm (s);
 }
   
-// FIXME: What about this ?????
-// Remember to free the blackboxes!!!!
-static tmscm free_blackbox (tmscm obj)
+scm_obj free_blackbox (scm_obj obj)
 {
-  ASSERT (tmscm_is_blackbox (obj),  "free_blackbox : wrong type");
-  blackbox *ptr = (blackbox *)  Sfixnum_value (tmscm_cdr (obj));
-  tm_delete (ptr);
+  bool z =tmscm_is_blackbox (obj);
+  ASSERT (z,  "free_blackbox : wrong type");
+  blackbox *p = (blackbox *)  Sfixnum_value (tmscm_cdr (obj));
+  cout << "BLACKBOX-FREE " << z << " " << (unsigned long)p << "\n";
+  tm_delete (p);
+  return (Svoid); // Svoid
 }
-
-
-
 
 
 
@@ -299,8 +306,7 @@ initialize_scheme () {
   // setup basic infrastructure from within Scheme
   
   const char* init_prg = "(begin "
-//  "(current-eval interpret)"
-//  "(display \"Interpreting code\") (newline)"
+  "(current-eval interpret) (display \"Interpreting code\") (newline)"
   "(define (display-to-string obj) (call-with-string-output-port (lambda (port) (display obj port))))"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
   "(define object-stack '(()))"
@@ -317,6 +323,9 @@ initialize_scheme () {
      (lambda (err) (k (cons 'utf8 (string->bytevector str *utf8-transcoder*))))\
      (lambda () (string->bytevector str *latin1-transcoder*)))))))"
   "(set! *texmacs-user-module* (interaction-environment))"
+  "(include \"/Users/mgubi/t/lab/chez/src/TeXmacs/progs/chez/finalize.sls\")  (import (finalize))"
+  "(define (make-blackbox ptr) (let ((r (cons 'blackbox ptr))) \
+       (finalize r free-blackbox) r))"
   ")";
 
   // eval in the top level environment the initialization code
@@ -325,6 +334,7 @@ initialize_scheme () {
                               string_to_tmscm (init_prg),
               Stop_level_value (Sstring_to_symbol ("read"))));
   
+  scheme_install_procedure ("free-blackbox", (void*)&free_blackbox, 1);
   // now the glue
   initialize_glue ();
 
