@@ -9,14 +9,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (module curried-define-module (curried-define)
-(import (rename scheme (define primitive-define)))
-(define-syntax curried-define
-  (syntax-rules ()
-    ((_ ((x a1 ...) a ...) body ...) (curried-define (x a1 ...) (lambda (a ...) body ...)))
-    ((_ x body ...) (primitive-define x body ...)))))
+  (import (rename scheme (define primitive-define)))
+  (define-syntax curried-define
+    (syntax-rules ()
+      ((_ ((x a1 ...) a ...) body ...) (curried-define (x a1 ...) (lambda (a ...) body ...)))
+      ((_ x body ...) (primitive-define x body ...)))))
     
 (import (rename curried-define-module (curried-define define)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Defmacros
@@ -36,7 +35,6 @@
               (if (eq? (void) e)
                   (syntax (void))
                   (datum->syntax (syntax l) e)))))))
-                  ;(display "=========================\n")(display r)(display "=========================\n")(newline)
                     r)))))
 
 (define-syntax define-macro
@@ -45,43 +43,6 @@
      (define-macro name (lambda args body ...)))
     ((k name transformer)
      (define-syntax name (macro transformer)))))
-
-#;(define-syntax define-macro
-  (syntax-rules ()
-    ((k (name . args) body ...)
-     (define-macro name (lambda args body ...)))
-    ((k name transformer)
-     (define-syntax name
-       (lambda (stx)
-         (syntax-case stx ()
-           ((l . sv)
-            (let* ((v (syntax->datum (syntax sv)))
-                   (e (apply transformer v)))
-              (if (eq? (void) e)
-                  (syntax (void))
-                  (datum->syntax (syntax l) e))))))))))
-
-#;(define-syntax define-macro
-  (lambda (x)
-    "Define a defmacro."
-    (syntax-case x ()
-      ((_ (macro . args) doc body1 body ...)
-       (string? (syntax->datum #'doc))
-       #'(define-macro macro doc (lambda args body1 body ...)))
-      ((_ (macro . args) body ...)
-       #'(define-macro macro #f (lambda args body ...)))
-      ((_ macro transformer)
-       #'(define-macro macro #f transformer))
-      ((_ macro doc transformer)
-       (or (string? (syntax->datum #'doc))
-           (not (syntax->datum #'doc)))
-       #'(define-syntax macro
-           (lambda (y)
-             doc
-             (syntax-case y ()
-               ((_ . args)
-                (let ((v (syntax->datum #'args)))
-                  (datum->syntax y (apply transformer v)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc

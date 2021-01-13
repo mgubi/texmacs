@@ -49,12 +49,13 @@
 
 (define-public (map-in-order . l) (apply map l))
 
+;FIXME this below is not really correct
 (define-public (catch thunk handler)
   (with-exception-handler handler thunk))
   
 (define-public lazy-catch catch)
 
-(define-public (last-pair lis)
+#;(define-public (last-pair lis)
 ;;  (check-arg pair? lis last-pair)
   (let lp ((lis lis))
     (let ((tail (cdr lis)))
@@ -63,7 +64,7 @@
 
 (define-public (seed->random-state seed) (random-state seed))
 
-(define-public (list-copy lst)
+#;(define-public (list-copy lst)
   (copy lst)) ;; S7 has generic functions. copy do a shallow copy
   
 (define-public (copy-tree tree)
@@ -72,11 +73,6 @@
         (cons (loop (car tree)) (loop (cdr tree)))
         tree)))
 
-
-(define-public (assoc-set! l what val)
-  (let ((b (assoc what l)))
-    (if b (set-cdr! b val) (set! l (cons (cons what val) l)))
-    l))
 
 ;;FIXME: assoc-set! is tricky to use, maybe just get rid in the code
 (define-public (assoc-set! l what val)
@@ -88,7 +84,7 @@
   (let ((b (assoc what l)))
     (if b (cdr b) #f)))
 
-(define-public (sort l op) (sort! (copy l) op))
+#;(define-public (sort l op) (sort! (copy l) op))
 
 (define-public (force-output) (flush-output-port *stdout*))
 
@@ -96,7 +92,7 @@
 
 (define-public (string-null? s) (equal? (length s) 0))
 
-(define-public (append! . ls) (apply append ls))
+#;(define-public (append! . ls) (apply append ls))
 
 (define-public (string-split s ch)
   (let ((len (length s)))
@@ -117,17 +113,17 @@
 ;(tm-define tmtable-cells (record-accessor tmtable-type 'cells))
 ;(define tmtable-formats (record-accessor tmtable-type 'formats))
 
-(define-public (make-record-type type fields)
+#;(define-public (make-record-type type fields)
   (inlet 'type type 'fields fields))
 
-(define-public (record-constructor rec-type)
+#;(define-public (record-constructor rec-type)
   (eval `(lambda ,(rec-type 'fields)
      (inlet 'type ,(rec-type 'type) ,@(map (lambda (f) (values (list 'quote f) f)) (rec-type 'fields))))))
  
-(define-public-macro (record-accessor rec-type field)
+#;(define-public-macro (record-accessor rec-type field)
   `(lambda (rec) (rec ,field)))
 
-(define-public (record-predicate rec-type)
+#;(define-public (record-predicate rec-type)
   (lambda (rec) (eq? (rec 'type) (rec-type 'type))))
 
 
@@ -186,7 +182,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public-macro (while test . body)      ; while loop with predefined break and continue
-  `(call-with-exit
+  `(call/cc
     (lambda (break)
       (let continue ()
     (if (let () ,test)
@@ -210,7 +206,6 @@
 (define-public (char-set:whitespace ch)
   (memq ch '(#\space #\tab #\newline)))
   
-
 ; string-index and string-rindex accepts char-sets
 
 (define-public (string-index str cs)
