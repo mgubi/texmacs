@@ -223,7 +223,14 @@ blackbox_to_tmscm (blackbox b) {
   //  tmscm t = Scons (Sstring_to_symbol ("blackbox"),
   //              Sfixnum ((uptr)(tm_new<blackbox> (b))));
   //tmscm_lock (t);
-  return Scall1 (Stop_level_value (Sstring_to_symbol ("make-blackbox")), Sfixnum ((uptr)(tm_new<blackbox> (b))));
+  blackbox *p = tm_new<blackbox> (b);
+  blackbox *pp = (blackbox *)Sfixnum_value (Sfixnum ((uptr)p));
+
+  if (pp != p) {
+    cout << "Error : cannot encode blackbox* !!!\n";
+    ASSERT(pp == p, "Encode blackbox");
+  }
+  return Scall1 (Stop_level_value (Sstring_to_symbol ("make-blackbox")), Sfixnum ((uptr)p));
   //tmscm_unlock (t);
 }
 
@@ -237,12 +244,13 @@ tmscm_to_blackbox (tmscm blackbox_smob) {
 static tmscm blackbox_to_string (tmscm o)
 {
   string s = "<not a blackbox!>";
-
+  tmscm_lock (o);
   if (tmscm_is_blackbox (o)) {
-  tmscm blackbox_smob = tmscm_cdr (o);
-  int type_ = type_box (tmscm_to_blackbox (blackbox_smob)) ;
+//  tmscm blackbox_smob = tmscm_cdr (o);
+  blackbox bb = tmscm_to_blackbox (o);
+  int type_ = type_box (bb) ;
   if (type_ == type_helper<tree>::id) {
-    tree t= tmscm_to_tree (blackbox_smob);
+    tree t= open_box<tree> (bb);
     s= "<tree " * tree_to_texmacs (t) * ">";
   }
   else if (type_ == type_helper<observer>::id) {
@@ -258,7 +266,7 @@ static tmscm blackbox_to_string (tmscm o)
     s= "<command>";
   }
   else if (type_ == type_helper<url>::id) {
-    url u= tmscm_to_url (blackbox_smob);
+    url u= open_box<url> (bb);
     s= "<url " * as_string (u) * ">";
   }
   else if (type_ == type_helper<modification>::id) {
@@ -268,6 +276,7 @@ static tmscm blackbox_to_string (tmscm o)
     s= "<patch>";
   }
   }
+  tmscm_unlock (o);
   return string_to_tmscm (s);
 }
   
@@ -276,7 +285,7 @@ scm_obj free_blackbox (scm_obj obj)
   bool z =tmscm_is_blackbox (obj);
   ASSERT (z,  "free_blackbox : wrong type");
   blackbox *p = (blackbox *)  Sfixnum_value (tmscm_cdr (obj));
-  cout << "BLACKBOX-FREE " << z << " " << (unsigned long)p << "\n";
+  // cout << "BLACKBOX-FREE " << z << " " << (unsigned long)p << "\n";
   tm_delete (p);
   return (Svoid); // Svoid
 }
@@ -325,7 +334,8 @@ initialize_scheme () {
   "(set! *texmacs-user-module* (interaction-environment))"
   "(include \"/Users/mgubi/t/lab/chez/src/TeXmacs/progs/chez/finalize.sls\")  (import (finalize))"
   "(define (make-blackbox ptr) (let ((r (cons 'blackbox ptr))) \
-       (finalize r free-blackbox) r))"
+      #;(display* \"Make blackbox \" ptr  \" \" (blackbox->string r) #\\newline)\
+     #;(finalize r free-blackbox) r))"
   ")";
 
   // eval in the top level environment the initialization code
@@ -335,6 +345,7 @@ initialize_scheme () {
               Stop_level_value (Sstring_to_symbol ("read"))));
   
   scheme_install_procedure ("free-blackbox", (void*)&free_blackbox, 1);
+  scheme_install_procedure ("blackbox->string", (void*)&blackbox_to_string, 1);
   // now the glue
   initialize_glue ();
 
