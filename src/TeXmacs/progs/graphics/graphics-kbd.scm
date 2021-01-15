@@ -16,7 +16,8 @@
         (utils library cursor)
         (graphics graphics-env)
         (graphics graphics-main)
-        (graphics graphics-edit)))
+        (graphics graphics-edit)
+        (graphics graphics-drd)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Various contexts

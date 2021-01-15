@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (graphics graphics-menu)
-  (:use (graphics graphics-env)
+  (:use (graphics graphics-env) (graphics graphics-utils) (graphics graphics-drd)
 	(graphics graphics-main)
         (graphics graphics-edit)))
 

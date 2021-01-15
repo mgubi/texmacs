@@ -250,7 +250,7 @@
 		       (cons *module-name*
 			     (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props))
-        `(let ()
+        `(begin
            (tm-declare ,var)
 ;          (define-syntax ,var
 ;             (identifier-syntax (,var (top-level-value ',xvar *texmacs-user-module*))
@@ -349,11 +349,12 @@
 	 (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
   (with name-star (string->symbol (string-append (symbol->string name) "*"))
-    `(when (not (defined? ',name))
-       (tm-define (,name . args)
+    (if (ahash-ref tm-defined-table ',var)
+       `(begin)
+       `(tm-define (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))
-                (r (m ',name)))
+                (r (eval ',name m)))
            (if (not r)
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "

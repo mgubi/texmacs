@@ -21,15 +21,15 @@
 (tm-define group-table (make-ahash-table))
 (tm-define group-resolve-table (make-ahash-table))
 
-(define (group-resolve-one x)
-  (if (pair? x) (group-resolve (car x)) (list x)))
-
 (tm-define (group-resolve which)
   (if (not (ahash-ref group-resolve-table which))
       (with l (ahash-ref group-table which)
 	(ahash-set! group-resolve-table which
 		    (if l (append-map group-resolve-one l) '()))))
   (ahash-ref group-resolve-table which))
+
+(define (group-resolve-one x)
+  (if (pair? x) (group-resolve (car x)) (list x)))
 
 (tm-define-macro (define-group group . l)
   (set! group-resolve-table (make-ahash-table))

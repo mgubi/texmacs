@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (graphics graphics-animate)
-  (:use (graphics graphics-group)
+  (:use (graphics graphics-group) (graphics graphics-drd)
         (generic format-edit)
         (dynamic animate-edit)))
 

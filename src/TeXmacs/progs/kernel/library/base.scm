@@ -248,7 +248,7 @@
 
 (define-public (string->object s)
   "Parse @s and build scheme object"
-  (call-with-input-string s read))
+  (with-input-from-string s read))
 
 (define-public (object->string* obj)
   (cond ((null? obj) (object->string obj))

@@ -24,8 +24,8 @@
 (define-macro (define-export-macro head . body)
  `(begin
      (define-macro ,head ,@body)
-     (export ,(car head))))
-(export define-export-macro)
+     (tm-export ,(car head))))
+(tm-export define-export-macro)
   ;; NOTE: It seems that as soon as macros become a little bit complex,
   ;;   the Guile macroexpander interacts poorly with the memoizing stuff
   ;;   in (define-public-macro), and then it becomes unstable. This is

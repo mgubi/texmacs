@@ -22,7 +22,12 @@
 	 (cons (cons 'tm-define (cdar l)) (kw-transform (cdr l))))
 	(else (kw-transform (cdr l)))))
 
-(eval (cons 'begin (kw-transform kwo)))
+(display (cons 'begin (kw-transform kwo)))
+
+;(eval (cons 'begin (kw-transform kwo)))
+(define-macro (include-keywords)
+   (cons 'begin (kw-transform kwo)))
+(include-keywords)
 
 (define indent-arity-table (make-ahash-table))
 

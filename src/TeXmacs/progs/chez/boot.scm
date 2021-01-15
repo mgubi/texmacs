@@ -159,10 +159,11 @@
              (env (copy-environment *texmacs-user-module*)))
     (when (not loaded)
         (fluid-let ((*current-module* env))
+          (parameterize ((interaction-environment *current-module*))
           (display "TeXmacs] Loading module ") (display module) (newline)
           (load module-file (lambda (e) (eval e *current-module*)))
           (display "TeXmacs] Loaded module ") (display module) (newline)
-     )))))
+     ))))))
 
 (define (module-provide module)
   (if (not (module-available? module)) (module-load module)))

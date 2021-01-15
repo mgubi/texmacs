@@ -14,7 +14,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (graphics graphics-group)
-  (:use (graphics graphics-env)
+  (:use (graphics graphics-env) (graphics graphics-drd) (graphics graphics-utils)
         (graphics graphics-single)
         (kernel gui kbd-handlers)
         (dynamic animate-edit)))

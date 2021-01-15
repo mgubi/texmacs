@@ -14,7 +14,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (graphics graphics-edit)
-  (:use (graphics graphics-env)
+  (:use (graphics graphics-env) (graphics graphics-utils)
         (graphics graphics-single)
         (graphics graphics-group)
         (graphics graphics-animate)))

@@ -158,8 +158,9 @@
 ;; Switching between inlined and displayed equations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (concat-isolate! t)
-  `(cond ((not (tree-is? t :up 'concat)) (noop))
+;; FIXME: this was a macro in the original code. It seemed an error.
+(define (concat-isolate! t)
+  (cond ((not (tree-is? t :up 'concat)) (noop))
 	 ((not (tree-is? t :up :up 'document)) (noop))
 	 ((= (tree-arity (tree-up t)) 1) (tree-set! t :up t))
 	 ((< (tree-index t) (- (tree-arity (tree-up t)) 1))
