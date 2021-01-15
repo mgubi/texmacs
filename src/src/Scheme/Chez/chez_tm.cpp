@@ -220,9 +220,6 @@ tmscm_is_blackbox (tmscm t) {
 
 tmscm
 blackbox_to_tmscm (blackbox b) {
-  //  tmscm t = Scons (Sstring_to_symbol ("blackbox"),
-  //              Sfixnum ((uptr)(tm_new<blackbox> (b))));
-  //tmscm_lock (t);
   blackbox *p = tm_new<blackbox> (b);
   blackbox *pp = (blackbox *)Sfixnum_value (Sfixnum ((uptr)p));
 
@@ -231,7 +228,6 @@ blackbox_to_tmscm (blackbox b) {
     ASSERT(pp == p, "Encode blackbox");
   }
   return Scall1 (Stop_level_value (Sstring_to_symbol ("make-blackbox")), Sfixnum ((uptr)p));
-  //tmscm_unlock (t);
 }
 
 blackbox
@@ -315,7 +311,7 @@ initialize_scheme () {
   // setup basic infrastructure from within Scheme
   
   const char* init_prg = "(begin "
-  "(current-eval interpret) (display \"Interpreting code\") (newline)"
+ // "(current-eval interpret) (display \"Interpreting code\") (newline)"
   "(define (display-to-string obj) (call-with-string-output-port (lambda (port) (display obj port))))"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
   "(define object-stack '(()))"
@@ -335,7 +331,7 @@ initialize_scheme () {
   "(include \"/Users/mgubi/t/lab/chez/src/TeXmacs/progs/chez/finalize.sls\")  (import (finalize))"
   "(define (make-blackbox ptr) (let ((r (cons 'blackbox ptr))) \
       #;(display* \"Make blackbox \" ptr  \" \" (blackbox->string r) #\\newline)\
-     #;(finalize r free-blackbox) r))"
+     (finalize r free-blackbox) r))"
   ")";
 
   // eval in the top level environment the initialization code
