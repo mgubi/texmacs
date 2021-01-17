@@ -45,7 +45,8 @@
          (s (string-replace s "\\\\" "\\")))
     (stree->tree (string->object s))))
 
-(when (supports-scilab?)
+(tm-cond-expand (supports-scilab?)
+  (tm-declare scilab-add-to-demo-menu)
   (import-from (scilab-menus))
   (with f (url-concretize 
            "$TEXMACS_PATH/plugins/scilab/bin/scilab-demo.sce")

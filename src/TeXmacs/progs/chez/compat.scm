@@ -47,7 +47,19 @@
 (define-public (symbol-append . l)
    (string->symbol (apply string-append (map symbol->string l))))
 
-(define-public (map-in-order . l) (apply map l))
+(define-public (map-in-order f ls . more)
+    (if (null? more)
+        (let map1 ([ls ls])
+          (if (null? ls)
+              '()
+              (cons (f (car ls))
+                    (map1 (cdr ls)))))
+        (let map-more ([ls ls] [more more])
+          (if (null? ls)
+              '()
+              (cons
+                (apply f (car ls) (map car more))
+                (map-more (cdr ls) (map cdr more)))))))
 
 ;FIXME this below is not really correct
 (define-public (catch thunk handler)
@@ -62,7 +74,7 @@
       (if (pair? tail) (lp tail) lis))))
 
 
-(define-public (seed->random-state seed) (random-state seed))
+(define-public (seed->random-state seed) (random-seed seed))
 
 #;(define-public (list-copy lst)
   (copy lst)) ;; S7 has generic functions. copy do a shallow copy
@@ -94,8 +106,16 @@
 
 #;(define-public (append! . ls) (apply append ls))
 
+
+(define-public (char-position ch s start)
+  (let ((l (string-length s)))
+    (let h ((x start))
+      (if (< x l)
+            (if (eq? (string-ref s x) ch) x (h (+ x 1)))
+            #f))))
+
 (define-public (string-split s ch)
-  (let ((len (length s)))
+  (let ((len (string-length s)))
     (let f ((start 0) (acc '()))
       (if (< start len)
         (let ((end (+ (or (char-position ch s start) (- len 1)) 1)))
@@ -113,10 +133,10 @@
 ;(tm-define tmtable-cells (record-accessor tmtable-type 'cells))
 ;(define tmtable-formats (record-accessor tmtable-type 'formats))
 
-#;(define-public (make-record-type type fields)
-  (inlet 'type type 'fields fields))
+#;(define-public-macro (make-record-type type fields)
+  `(define-record-type ,(string->symbol type) ,fields))
 
-#;(define-public (record-constructor rec-type)
+#;(define-public-macro (record-constructor rec-type)
   (eval `(lambda ,(rec-type 'fields)
      (inlet 'type ,(rec-type 'type) ,@(map (lambda (f) (values (list 'quote f) f)) (rec-type 'fields))))))
  

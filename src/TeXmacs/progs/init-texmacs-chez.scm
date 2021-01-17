@@ -11,28 +11,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(display "Hey there!\n")
-
-#;(let ()
-  (define primitive-load load)
-  (define primitive-eval eval)
-  (define primitive-catch catch)
-  
-  (varlet (rootlet) 'tm-eval (lambda (obj) (eval obj *texmacs-user-module*)))
-  (set! load (lambda (file . env) (primitive-load file (if (null? env) *current-module* (car env)))))
-  (set! eval (lambda (obj . env)
-    (let ((res (primitive-eval obj (if (null? env) *current-module* (car env)))))
-    ;;(format #t "Eval: ~A -> ~A\n" obj res)
-    res)
-    ))
-    
-  (set! catch (lambda ( key cl hdl )
-    (primitive-catch key cl
-      (lambda args
-        (apply hdl (car args) "[not-implemented]" (caadr args)  (list (cdadr args)))))))
-  )
-
-
 (let ()
   (define start (texmacs-time))
   (define (fib n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
@@ -438,12 +416,16 @@
 (use-modules (fonts fonts-ec) (fonts fonts-adobe) (fonts fonts-x)
              (fonts fonts-math) (fonts fonts-foreign) (fonts fonts-misc)
              (fonts fonts-composite) (fonts fonts-truetype))
+(display "Pippo\n")
 (lazy-define (fonts font-old-menu)
 	     text-font-menu math-font-menu prog-font-menu)
+(display "Pippo\n")
 (lazy-define (fonts font-new-widgets)
              open-font-selector open-document-font-selector
              open-document-other-font-selector)
+(display "Pippo\n")
 (tm-property (open-font-selector) (:interactive #t))
+(display "Pippo\n")
 (tm-property (open-document-font-selector) (:interactive #t))
 (display* "time: " (- (texmacs-time) boot-start) "\n")
 (display* "memory: " (texmacs-memory) " bytes\n")
@@ -469,7 +451,6 @@
 (let ()
   (define start (texmacs-time))
   (display "------------------------------------------------------\n")
-  (display *current-module*)
   (display "Benchmark 2\n")
   (display (tm-fib 30))
   (newline)
@@ -515,3 +496,6 @@
                   ;(quit-TeXmacs)
                   ))))))))))))
 
+;(use-modules (math math-drd))
+;(use-modules  (math math-sem-edit))
+(lazy-keyboard-force #t)

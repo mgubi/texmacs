@@ -40,6 +40,7 @@
 ;; Delayed execution of commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (compile load eval)
 (define-public (delayed-sub body)
   (cond ((or (npair? body) (nlist? (car body)) (not (keyword? (caar body))))
 	 `(lambda () ,@body #t))
@@ -109,6 +110,7 @@
 	      ,(cadar body)
 	      (proc))))
 	(else (delayed-sub (cdr body)))))
+)
 
 (define-public-macro (delayed . body)
   `(exec-delayed-pause ,(delayed-sub body)))

@@ -67,7 +67,7 @@
 
 (define-public (save-object file value)
   (call-with-output-file (url-materialize file "") (lambda (port)
-    (let-temporarily (((*s7* 'print-length) 9223372036854775807)) (write value port)))))
+     (write value port))))
 
 (define-public (load-object file)
   (let ((r (call-with-input-file (url-materialize file "r") (lambda (port) (read port)))))

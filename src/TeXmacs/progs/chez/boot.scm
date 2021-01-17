@@ -4,6 +4,68 @@
 ;        (srfi 18) ;; current-time
 
 
+(display "Hey there!\n")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Various flags and temporary settings
+
+(compile-file-message #t)
+;(current-eval interpret)
+;(collect-request-handler void) ;disable the garbage collector
+;(collect-notify #t) ; notify GC sweeps
+(#%$enable-check-heap #t)
+(debug-on-exception #t)
+
+(run-cp0 (lambda (cp0 x) x)) ;; disable cp0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; from https://github.com/cisco/ChezScheme/issues/128
+(define (print-stack-trace e)
+  (define (get-func c)
+      (let ((cc ((c 'code) 'name)))
+        (if cc cc "--main--")))
+  (display-condition e) (newline)
+  (if (continuation-condition? e)
+  (let p ((t (inspect/object (condition-continuation e))))
+    (call/cc
+     (lambda (ret)
+       (if (> (t 'depth) 1)
+           (begin
+            (call-with-values
+             (lambda () (t 'source-path))
+             (case-lambda
+              ((file line column)
+               (printf "\tat ~a (~a:~a,~a)\n" (get-func t) file line column))
+              (else (ret))))
+            (p (t 'link))))))))
+  (exit))
+
+;(base-exception-handler print-stack-trace)
+
+
+#;(let ()
+  (define primitive-load load)
+  (define primitive-eval eval)
+  (define primitive-catch catch)
+  
+  (varlet (rootlet) 'tm-eval (lambda (obj) (eval obj *texmacs-user-module*)))
+  (set! load (lambda (file . env) (primitive-load file (if (null? env) *current-module* (car env)))))
+  (set! eval (lambda (obj . env)
+    (let ((res (primitive-eval obj (if (null? env) *current-module* (car env)))))
+    ;;(format #t "Eval: ~A -> ~A\n" obj res)
+    res)
+    ))
+    
+  (set! catch (lambda ( key cl hdl )
+    (primitive-catch key cl
+      (lambda args
+        (apply hdl (car args) "[not-implemented]" (caadr args)  (list (cdadr args)))))))
+  )
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; curried define
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -12,7 +74,8 @@
   (import (rename scheme (define primitive-define)))
   (define-syntax curried-define
     (syntax-rules ()
-      ((_ ((x a1 ...) a ...) body ...) (curried-define (x a1 ...) (lambda (a ...) body ...)))
+      ((_ ((x . as) . bs) body ...) (curried-define (x . as) (lambda bs body ...)))
+      ((_ (x1 . as) docstring body0 body ...) (string? (syntax->datum #'docstring))  (curried-define (x1 . as) body0 body ...)) ; ignore docstring
       ((_ x body ...) (primitive-define x body ...)))))
     
 (import (rename curried-define-module (curried-define define)))
@@ -44,13 +107,21 @@
      (define-syntax name (macro transformer)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; conditional expansion of code via macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Chez does not allow to have top-level definitions inside conditional statements
+; we go around this at macroexpansion
+; note that this macro introduces a binding which can clash with others!!!
+
+(define-macro (tm-cond-expand cond . code)
+  `(begin (define-macro (tm-cond-expand-init-TEMP) (if ,cond '(begin ,@code) '(begin #t))) (tm-cond-expand-init-TEMP)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (noop . args) (and (pair? args) (car args)))
-
-
-;(define list? proper-list?)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Redirect standard output
@@ -94,7 +165,7 @@
 (define (current-module) *current-module*)
 
 (define-macro (tm-export . symbols)
-    `(set! *exports* (append ',symbols *exports*)))
+    `(eval-when (compile load eval) (set! *exports* (append ',symbols *exports*))))
 
 (define-macro (define-public head . body)
     `(begin
@@ -122,17 +193,20 @@
         (with-syntax ([xvar (datum->syntax #'var
           (string->symbol (string-append (symbol->string (syntax->datum #'var)) "$global")))]
                 [*current-module* (datum->syntax #'var '*current-module*)]
-                [*exports* (datum->syntax #'var '*exports*)])
+                [*exports* (datum->syntax #'var '*exports*)]
+                [*tm-defines* (datum->syntax #'var '*tm-defines*)])
           #'(begin
               (define-syntax var
-               (identifier-syntax (var (top-level-value 'xvar *texmacs-user-module*))
+                (identifier-syntax (var (top-level-value 'xvar *texmacs-user-module*))
                   ((set! var expr) (set-top-level-value! 'xvar expr *texmacs-user-module*))))
-               (define-top-level-syntax 'var
-               (identifier-syntax (var (top-level-value 'xvar *texmacs-user-module*))
-                  ((set! var expr) (set-top-level-value! 'xvar expr *texmacs-user-module*))) *current-module*)
-               (if (not (eq? *current-module* *texmacs-user-module*))
-                  (define-top-level-syntax 'var (top-level-syntax 'var *current-module*) *texmacs-user-module*))
-              (set! *exports* (cons 'var *exports*))
+              (eval-when (compile load eval)
+                 (define-top-level-syntax 'var
+                   (identifier-syntax
+                      (var (top-level-value 'xvar *texmacs-user-module*))
+                      ((set! var expr) (set-top-level-value! 'xvar expr *texmacs-user-module*))) *current-module*)
+                 (if (not (eq? *current-module* *texmacs-user-module*))
+                    (define-top-level-syntax 'var (top-level-syntax 'var *current-module*) *texmacs-user-module*))
+                 (set! *tm-defines* (cons 'var *tm-defines*)))
              ))]))) 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -151,18 +225,28 @@
      )
     (url-materialize u "r")))
 
+(define (source->compiled filename)
+  (url-concretize
+    (url-glue (url-unglue filename
+      (+ 1 (string-length (url-suffix filename)))) ".so")))
+
 (define (module-load module)
   (if (list? module)
-      (let ((module-file (list->module module))
+      (let* ((module-file (list->module module))
+             (module-object (source->compiled module-file))
              (loaded (hashtable-ref *modules* module #f))
              (uname (gensym))
              (env (copy-environment *texmacs-user-module*)))
     (when (not loaded)
         (fluid-let ((*current-module* env))
-          (parameterize ((interaction-environment *current-module*))
-          (display "TeXmacs] Loading module ") (display module) (newline)
-          (load module-file (lambda (e) (eval e *current-module*)))
-          (display "TeXmacs] Loaded module ") (display module) (newline)
+          (parameterize ((interaction-environment *current-module*)
+                         (generate-inspector-information #t))
+            ;(display "TeXmacs] Compile module ") (display module) (newline)
+        ;    (maybe-compile-file module-file module-object)
+            (display "TeXmacs] Loading module ") (display module) (newline)
+         ;   (load module-object)
+            (load module-file)
+            (display "TeXmacs] Loaded module ") (display module) (newline)
      ))))))
 
 (define (module-provide module)
@@ -183,7 +267,8 @@
           (if ex ex '())))
 
 (define-macro (use-modules . modules)
-  `(map (lambda (module) (let ((m (resolve-module module)))
+  `(eval-when (compile load eval)
+    (map (lambda (module) (let ((m (resolve-module module)))
      ; export bindings
       (map (lambda (symb)
         (if (top-level-bound? symb m)
@@ -195,28 +280,31 @@
         (module-exports module))
        (map (lambda (symb)
         (set! *tm-defines* (cons symb *tm-defines*))
-;        (if (top-level-bound? symb m)
-;          (define-top-level-value symb
-;            (top-level-value symb *texmacs-user-module*) *current-module*)
- ;         (if (top-level-syntax? symb m)
             (define-top-level-syntax symb
               (top-level-syntax symb m) *current-module*))
-              ;))
         (module-tm-defines module))
-       )) ',modules))
+       )) ',modules)))
 
 (define-macro (import-from . modules)
-  `(use-modules ,@modules))
+  `(eval '(use-modules ,@modules) *current-module*))
 
 (define-macro (re-export . symbols)
+  ;(display `("*** Reexporting " ,@symbols #\newline))
   `(tm-export ,@symbols))
 
-(define-macro (inherit-modules . which-list)
+#;(define-macro (inherit-modules . which-list)
   (let ((l (apply append (map module-exports which-list))))
     `(begin
        (use-modules ,@which-list )
        (re-export ,@l))))
-
+       
+;;FIXME: we need to load modules in order?
+(define-macro (inherit-modules . which-list)
+  `(begin ,@(apply append (map (lambda (m)
+            `((use-modules ,m )
+              (eval-when (compile load eval) (set! *exports* (append (module-exports ',m) *exports*)))))
+              which-list))))
+      
 (define-macro (texmacs-module name . options)
   (define (transform action)
     (cond ((not (pair? action)) (noop))
@@ -232,8 +320,11 @@
         (define *module-name* ',name)
         (define *exports* '())
         (define *tm-defines* '())
-        (hashtable-set! *modules* ',name (current-module))
-       ,@l)))
+        (eval-when (compile load eval)
+          (hashtable-set! *modules* ',name (current-module)))
+       ,@l
+        (display "Body of module ") (display *module-name*) (newline)
+         )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; On-entry and on-exit macros
@@ -262,6 +353,7 @@
 (define-keywords mode require type synopsis returns note argument arguments default proposals secure check-mark interactive balloon)
 (define-keywords all applicable)
 (define-keywords pause every idle)
+(define-keywords global)
 
 (define-keywords
 |%0| |%1| |%2| |%3| |%4| |%5| |*| |->| |1%| |2| |2%| |3| |4| |5| |9| |:|  |a| |a>| |abbr| |abovedot| |abovering|

@@ -16,18 +16,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Internal record utilities
 
-(define tmcolor-type (make-record-type
-		      "tmcolor" '(name-promise red green blue)))
-(define tmcolor-record (record-constructor tmcolor-type))
-(define tmcolor-name-promise (record-accessor tmcolor-type 'name-promise))
+;(define tmcolor-type (make-record-type
+;		      "tmcolor" '(name-promise red green blue)))
+;(define tmcolor-record (record-constructor tmcolor-type))
+;(define tmcolor-name-promise (record-accessor tmcolor-type 'name-promise))
+
+(define-record-type tmcolor-internal (fields name-promise red green blue))
+(define tmcolor-record make-tmcolor-internal)
+(define tmcolor-name-promise tmcolor-internal-name-promise)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accessors
 
-(tm-define tmcolor? (record-predicate tmcolor-type))
-(define tmcolor-red (record-accessor tmcolor-type 'red))
-(define tmcolor-green (record-accessor tmcolor-type 'green))
-(define tmcolor-blue (record-accessor tmcolor-type 'blue))
+;(tm-define tmcolor? (record-predicate tmcolor-type))
+;(define tmcolor-red (record-accessor tmcolor-type 'red))
+;(define tmcolor-green (record-accessor tmcolor-type 'green))
+;(define tmcolor-blue (record-accessor tmcolor-type 'blue))
+
+(tm-define tmcolor? tmcolor-internal?)
+(define tmcolor-red tmcolor-internal-red)
+(define tmcolor-green tmcolor-internal-green)
+(define tmcolor-blue tmcolor-internal-blue)
+
 (define (tmcolor-name c) (force (tmcolor-name-promise c)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

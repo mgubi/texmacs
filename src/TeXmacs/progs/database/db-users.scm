@@ -14,6 +14,8 @@
 (texmacs-module (database db-users)
   (:use (database db-format)))
 
+(tm-declare get-default-user)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The current user
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -76,14 +78,14 @@
     (with l (db-get-field "root" "default-user")
       (and (pair? l) (car l)))))
 
+(tm-define (get-user-info attr)
+  (with-database users-master
+    (db-get-field-first (get-default-user) attr "")))
+
 (tm-define (set-user-info attr val)
   (with-database users-master
     (when (!= val (get-user-info attr))
       (db-set-field (get-default-user) attr (list val)))))
-
-(tm-define (get-user-info attr)
-  (with-database users-master
-    (db-get-field-first (get-default-user) attr "")))
 
 (tm-define (get-users-list)
   (with-database users-master

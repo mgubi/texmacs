@@ -13,16 +13,16 @@
 
 (texmacs-module (utils misc tm-keywords))
 
-(define kws (string-load (unix->url "$TEXMACS_PATH/progs/tm-mode.el")))
-(define kwo (string->object (string-append "(" kws ")")))
+(eval-when (compile load eval)
+  (define kws (string-load (unix->url "$TEXMACS_PATH/progs/tm-mode.el")))
+  (define kwo (string->object (string-append "(" kws ")"))))
 
-(define (kw-transform l)
+(eval-when (compile load eval)
+  (define (kw-transform l)
   (cond ((null? l) l)
 	((func? (car l) 'setq)
 	 (cons (cons 'tm-define (cdar l)) (kw-transform (cdr l))))
-	(else (kw-transform (cdr l)))))
-
-(display (cons 'begin (kw-transform kwo)))
+	(else (kw-transform (cdr l))))))
 
 ;(eval (cons 'begin (kw-transform kwo)))
 (define-macro (include-keywords)

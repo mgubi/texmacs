@@ -15,7 +15,7 @@
   (:use (client client-tmfs)
         (client client-sync)
         (client client-chat)
-        (client client-live)))
+        (client client-live) (database db-users)))
 
 (tm-define (tm-servers)
   (list "server.texmacs.org" "texmacs.math.unc.edu" "localhost"))

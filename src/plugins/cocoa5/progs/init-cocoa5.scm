@@ -13,8 +13,8 @@
 
 (define (cocoa5-launcher)
   (if (url-exists-in-path? "cocoa5")
-      "cocoa5 --prompt '\x05\x02verbatim:'"
-      "CoCoAInterpreter --prompt '\x05\x02verbatim:'"))
+      "cocoa5 --prompt '\x05;\x02;verbatim:'"
+      "CoCoAInterpreter --prompt '\x05;\x02;verbatim:'"))
 
 (plugin-configure cocoa5
   (:winpath "cocoa*" ".")

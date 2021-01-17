@@ -286,7 +286,34 @@ scm_obj free_blackbox (scm_obj obj)
   return (Svoid); // Svoid
 }
 
+/******************************************************************************
+ * Compatibility
+ ******************************************************************************/
 
+static tmscm g_current_time (tmscm args)
+{
+  int res;
+  
+#ifdef HAVE_GETTIMEOFDAY
+  struct timeval tp;
+  gettimeofday (&tp, NULL);
+  res = tp.tv_sec;
+#else
+  timeb tb;
+  ftime (&tb);
+  res = tb.time;
+#endif
+
+  return int_to_tmscm (res);
+}
+
+static tmscm g_getpid (tmscm args)
+{
+//FIXME: we really have to use QCoreApplication::applicationPid()
+//for cross-platform support
+  
+  return int_to_tmscm ((int)getpid());
+}
 
 /******************************************************************************
  * Initialization
@@ -315,7 +342,7 @@ initialize_scheme () {
   "(define (display-to-string obj) (call-with-string-output-port (lambda (port) (display obj port))))"
   "(define (texmacs-version) \"" TEXMACS_VERSION "\")"
   "(define object-stack '(()))"
-  "(define *texmacs-user-module* #f)"
+  "(define *texmacs-user-module* (interaction-environment))"
   "(define eval-string (lambda (s . env) \
       (apply eval (cons (with-input-from-string s read)  env))))"
   "(define tm-eval-string (lambda (s) (eval-string s *texmacs-user-module*)))"
@@ -327,7 +354,6 @@ initialize_scheme () {
   "(define tm-string-decode (lambda (str) (call/cc (lambda (k) (with-exception-handler \
      (lambda (err) (k (cons 'utf8 (string->bytevector str *utf8-transcoder*))))\
      (lambda () (string->bytevector str *latin1-transcoder*)))))))"
-  "(set! *texmacs-user-module* (interaction-environment))"
   "(include \"/Users/mgubi/t/lab/chez/src/TeXmacs/progs/chez/finalize.sls\")  (import (finalize))"
   "(define (make-blackbox ptr) (let ((r (cons 'blackbox ptr))) \
       #;(display* \"Make blackbox \" ptr  \" \" (blackbox->string r) #\\newline)\
@@ -342,6 +368,9 @@ initialize_scheme () {
   
   scheme_install_procedure ("free-blackbox", (void*)&free_blackbox, 1);
   scheme_install_procedure ("blackbox->string", (void*)&blackbox_to_string, 1);
+  scheme_install_procedure ("current-time", (void*)&g_current_time, 0);
+  scheme_install_procedure ("getpid", (void*)&g_getpid, 0);
+
   // now the glue
   initialize_glue ();
 

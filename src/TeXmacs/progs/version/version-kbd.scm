@@ -13,7 +13,8 @@
 
 (texmacs-module (version version-kbd)
   (:use (generic generic-kbd)
-	(version version-compare)))
+	(version version-compare)
+    (version version-edit)))
 
 (kbd-map
   (:mode with-versioning-tool?)

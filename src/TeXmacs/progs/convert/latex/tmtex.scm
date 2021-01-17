@@ -436,7 +436,7 @@
   ("gtr"           #\>)
   ("box"           (Box))
   ("over"          #\:)
-  ("||"            (|)) ;; |
+  ("||"            (\x7C;)) ;; |
   ("precdot"       (tmprecdot)))
 
 (logic-table latex-text-symbols%
@@ -524,27 +524,27 @@
 	      ((== c #\^)  (tmtex-text-sub "\\^{}" l))
 	      ((== c #\\)  (tmtex-text-sub '(textbackslash) l))
 	      ((== c #\`)  (tmtex-text-sub "`" l))
-	      ((== c #\00) (tmtex-text-sub "\\`{}" l))
-	      ((== c #\01) (tmtex-text-sub "\\'{}" l))
-	      ((== c #\04) (tmtex-text-sub "\\\"{}" l))
-	      ((== c #\05) (tmtex-text-sub "\\H{}" l))
-	      ((== c #\06) (tmtex-text-sub "\\r{}" l))
-	      ((== c #\07) (tmtex-text-sub "\\v{}" l))
-	      ((== c #\10) (tmtex-text-sub "\\u{}" l))
-	      ((== c #\11) (tmtex-text-sub "\\={}" l))
-	      ((== c #\12) (tmtex-text-sub "\\.{}" l))
-	      ((== c #\14) (tmtex-text-sub "\\k{}" l))
-	      ((== c #\20) (tmtex-text-sub "``" l))
-	      ((== c #\21) (tmtex-text-sub "''" l))
-	      ((== c #\22) (tmtex-text-sub ",," l))
-	      ((== c #\25) (tmtex-text-sub "--" l))
-	      ((== c #\26) (tmtex-text-sub "---" l))
-	      ((== c #\27) (tmtex-text-sub "{}" l))
-	      ((== c #\33) (tmtex-text-sub "ff" l))
-	      ((== c #\34) (tmtex-text-sub '(textbackslash) l))
-	      ((== c #\35) (tmtex-text-sub "fl" l))
-	      ((== c #\36) (tmtex-text-sub "ffi" l))
-	      ((== c #\37) (tmtex-text-sub "ffl" l))
+	      ((== c #\000) (tmtex-text-sub "\\`{}" l))
+	      ((== c #\001) (tmtex-text-sub "\\'{}" l))
+	      ((== c #\004) (tmtex-text-sub "\\\"{}" l))
+	      ((== c #\005) (tmtex-text-sub "\\H{}" l))
+	      ((== c #\006) (tmtex-text-sub "\\r{}" l))
+	      ((== c #\007) (tmtex-text-sub "\\v{}" l))
+	      ((== c #\010) (tmtex-text-sub "\\u{}" l))
+	      ((== c #\011) (tmtex-text-sub "\\={}" l))
+	      ((== c #\012) (tmtex-text-sub "\\.{}" l))
+	      ((== c #\014) (tmtex-text-sub "\\k{}" l))
+	      ((== c #\020) (tmtex-text-sub "``" l))
+	      ((== c #\021) (tmtex-text-sub "''" l))
+	      ((== c #\022) (tmtex-text-sub ",," l))
+	      ((== c #\025) (tmtex-text-sub "--" l))
+	      ((== c #\026) (tmtex-text-sub "---" l))
+	      ((== c #\027) (tmtex-text-sub "{}" l))
+	      ((== c #\033) (tmtex-text-sub "ff" l))
+	      ((== c #\034) (tmtex-text-sub '(textbackslash) l))
+	      ((== c #\035) (tmtex-text-sub "fl" l))
+	      ((== c #\036) (tmtex-text-sub "ffi" l))
+	      ((== c #\037) (tmtex-text-sub "ffl" l))
 	      ((== c #\174) (tmtex-text-sub '(textbar) l))
 	      (else
 		(append
@@ -3102,27 +3102,25 @@
 ;; Tags which are customized in particular style files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (compile load eval)
 (tm-define (style-dependent-declare x)
   (with (tag fun narg) x
     (with fun+bis (symbol-append fun '+bis)
       (if (== narg 2)
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun s l) (tmtex-function (string->symbol s) l)))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l) (,fun s l))))
+           (tm-define-once (,fun s l) (tmtex-function (string->symbol s) l))
+           (tm-define-once (,fun+bis s l) (,fun s l)))
         `(begin
-           (when (not (defined? ',fun))
-             (tm-define (,fun t)
-               (tmtex-function (string->symbol (car t)) (cdr t))))
-           (when (not (defined? ',fun+bis))
-             (tm-define (,fun+bis s l)
+             (tm-define-once (,fun t)
+               (tmtex-function (string->symbol (car t)) (cdr t)))
+             (tm-define-once (,fun+bis s l)
                (,fun (append (list (string->symbol s)) l)))))))))
 
+(eval-when (compile load eval)
 (tm-define (style-dependent-transform x)
   (with (tag fun narg) x
     (with fun+bis (symbol-append fun '+bis)
-      `(,tag (,(list 'unquote fun+bis) -1)))))
+      `(,tag (,(list 'unquote fun+bis) -1))))))
 
 (define-macro (tmtex-style-dependent . l)
   `(begin

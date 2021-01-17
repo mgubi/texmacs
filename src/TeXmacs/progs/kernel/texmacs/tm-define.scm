@@ -231,6 +231,9 @@
             ,(begin* body)
             ,(apply* 'former head)))))
 
+(define-public (tm-defined? var)
+  (ahash-ref tm-defined-table var))
+
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (xvar (symbol-append var '$global))
@@ -287,6 +290,10 @@
   (set! cur-conds '())
   (set! cur-props '())
   (tm-define-sub head body))
+
+(define-public-macro (tm-define-once head . body)
+  (if (tm-defined? (ca*r head)) '(begin)
+    `(tm-define ,head ,@body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloaded macros with properties

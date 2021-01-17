@@ -158,8 +158,9 @@
 		 (!= p (buffer-path))
 		 (math-correct? (cDr p)))))))
 
-(define (try-correct-rewrite l)
-  (cond ((null? l) `#f)
+(eval-when (compile load eval)
+  (define (try-correct-rewrite l)
+    (cond ((null? l) `#f)
         ((and (null? (cdr l)) (func? (car l) 'else))
          `(begin ,@(cdar l)))
         ((npair? (car l))
@@ -167,7 +168,7 @@
         (else
           (let* ((h `(and ,@(car l) (math-correct?)))
                  (r (try-correct-rewrite (cdr l))))
-            `(or (try-modification ,h) ,r)))))
+            `(or (try-modification ,h) ,r))))))
 
 (define-macro (try-correct . l)
   (try-correct-rewrite l))

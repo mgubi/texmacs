@@ -14,11 +14,14 @@
 (texmacs-module (kernel gui menu-define)
   (:use (kernel gui gui-markup)))
 
-(tm-define gui-make noop)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Definition of dynamic menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(eval-when (compile load eval)
+
+(tm-declare gui-make)
 
 (define (require-format x pattern)
   (if (not (match? x pattern))
@@ -353,9 +356,13 @@
   (require-format x '(form-toggle :%2))
   `($form-toggle ,@(cdr x)))
 
+)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table with Gui primitives and dispatching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(eval-when (compile load eval)
 
 (define-table gui-make-table
   (eval ,gui-make-eval)
@@ -434,7 +441,9 @@
   (form-choice ,gui-make-form-choice)
   (form-choices ,gui-make-form-choices)
   (form-toggle ,gui-make-form-toggle))
+)
 
+(eval-when (compile load eval)
 (tm-define (gui-make x)
   ;;(display* "x= " x "\n")
   (cond ((symbol? x)
@@ -455,7 +464,7 @@
         ((and (pair? x) (or (string? (car x)) (pair? (car x))))
          `($> ,(gui-make (car x)) ,@(cdr x)))
         (else
-          (texmacs-error "gui-make" "invalid menu item ~S" x))))
+          (texmacs-error "gui-make" "invalid menu item ~S" x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User interface for dynamic menu definitions

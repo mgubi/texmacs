@@ -21,8 +21,9 @@
 
 ;;NOTE: This section is OK
 ;; State variables
-(define-state graphics-state
-  (slots ((graphics-action #f)
+(eval-when (compile load eval)
+  (define-state graphics-state
+    (slots ((graphics-action #f)
 	  (current-graphical-object #f)
 	  (choosing #f)
 	  (sticky-point #f)
@@ -65,11 +66,12 @@
 	    (if (not sticky-point)
 		(begin
 		   (set! current-point-no (if sel (cAr (car sel)) #f))
-		   (set! current-edge-sel? (and sel (== (length sel) 2)))))))))
+		   (set! current-edge-sel? (and sel (== (length sel) 2))))))))))
 
 ;; State stack (1)
-(tm-define state-slots
-  `(quote ,(state-names graphics-state)))
+(eval-when (compile load eval)
+  (tm-define state-slots
+    `(quote ,(state-names graphics-state))))
 
 (define-public-macro (state-len)
   `(length ,state-slots))
@@ -379,11 +381,13 @@
 
 (ahash-set! define-option-table :state define-option-state)
 
-(define (define-option-state-slots opt decl)
-  (with (fun head . body) decl
-    `(,fun ,head (with-state-slots-by-name ,(car opt) ,@body))))
+(eval-when (compile load eval)
+  (define (define-option-state-slots opt decl)
+    (with (fun head . body) decl
+      `(,fun ,head (with-state-slots-by-name ,(car opt) ,@body)))))
 
-(ahash-set! define-option-table :state-slots define-option-state-slots)
+(eval-when (compile load eval)
+  (ahash-set! define-option-table :state-slots define-option-state-slots))
 
 
 ;; Graphics context [reset]

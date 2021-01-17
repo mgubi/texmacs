@@ -27,9 +27,9 @@
 		    ;;(if (defined? 'cuserid) (base256->number (cuserid)) 0)
 		    0))
 
-(define texmacs-seed (seed->random-state seed-val))
-(define texmacs-serial-pre (random 9340234783837 texmacs-seed))
-(define texmacs-serial-id  (random 8981283236030 texmacs-seed))
+;(define texmacs-seed (seed->random-state seed-val))
+(define texmacs-serial-pre (random 93483837))
+(define texmacs-serial-id  (random 283236030))
 
 (define (base62 x)
   (if (== x 0) '()

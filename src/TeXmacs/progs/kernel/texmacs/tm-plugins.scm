@@ -503,9 +503,10 @@
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (define (,supports-name?)
-         (or (ahash-ref plugin-data-table ,name)
-             (remote-connection-defined? ,name)))
+       (eval-when (compile load eval)
+         (define (,supports-name?)
+           (or (ahash-ref plugin-data-table ,name)
+               (remote-connection-defined? ,name))))
        (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
        (plugin-configure-cmds ,name
 	 ,(list 'quasiquote (map plugin-configure-sub options))))))
@@ -536,7 +537,7 @@
 	      ;;(with start (texmacs-time)
 	      ;;  (load fname)
 	      ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-	      (load fname *texmacs-user-module*)
+          (load fname (lambda (e) (eval e *texmacs-user-module*)))
 	      ))
 	(if (plugin-all-initialized?) (plugin-save-setup)))))
 

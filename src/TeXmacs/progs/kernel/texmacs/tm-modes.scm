@@ -20,6 +20,7 @@
 ;; Defining new modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (compile load eval)
 (define (texmacs-mode-pred mode)
   (let* ((mode-str (symbol->string mode))
          (mode-root (substring mode-str 0 (- (string-length mode-str) 1)))
@@ -32,8 +33,7 @@
            (deps* (map list (map texmacs-mode-pred deps)))
            (l (if (== action #t) deps* (cons action deps*)))
            (test (if (null? l) #t (if (null? (cdr l)) (car l) (cons 'and l))))
-           (defn `(begin (define-top-level-value ',pred (lambda () ,test) *texmacs-user-module*)
-                     (define-top-level-value ',pred (top-level-value ',pred *texmacs-user-module*) *current-module*)))
+           (defn `(define-public ( ,pred )  ,test))
            (rules (map (lambda (dep) (list dep mode)) deps))
            (logic-cmd `(logic-rules ,@rules))
            (arch1 `(set-symbol-procedure! ',mode ,pred))
@@ -42,10 +42,11 @@
       (if (null? deps)
           (list 'begin defn arch1 arch2)
           (list 'begin defn arch1 arch2 logic-cmd)))))
+)
 
 (define-public-macro (texmacs-modes . l)
-  `(begin
-     ,@(map texmacs-mode l)))
+ (with r  `(begin
+     ,@(map texmacs-mode l)) (display (expand r)) (newline) r))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking modes
