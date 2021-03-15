@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QResizeEvent>
 #include <QStyle>
+#include <QApplication>
 
 
 /*! Constructor.

@@ -41,6 +41,7 @@
   ---
   (-> "Update"
       ("Inclusions" (inclusions-gc))
+      ("Pictures" (picture-gc))
       ("Plugins" (reinit-plugin-cache))
       ("Styles" (style-clear-cache)))
   (if (url-exists-in-path? "pdflatex")
@@ -61,14 +62,16 @@
       ("Count words" (show-word-count))
       ("Count lines" (show-line-count)))
   ---
+  ("Create web site" (open-website-builder))
+  ;;(-> "Web"
+  ;;    ("Create web site" (tmweb-interactive-build))
+  ;;    ("Update web site" (tmweb-interactive-update)))
   (-> "Fonts"
       ("Look for more fonts"
        (system-wait "Full search for more fonts on your system"
                     "(can be long)")
-       (font-database-build-local)))
-  (-> "Web"
-      ("Create web site" (tmweb-interactive-build))
-      ("Update web site" (tmweb-interactive-update)))
+       (font-database-build-local))
+      ("Clear font cache" (clear-font-cache)))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history))
       ("Save auxiliary data" (toggle-save-aux))

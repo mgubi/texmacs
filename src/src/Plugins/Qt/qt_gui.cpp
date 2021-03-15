@@ -46,11 +46,11 @@
 #include <QImage>
 #include <QUrl>
 #include <QDesktopWidget>
+#include <QApplication>
 
 #include "QTMGuiHelper.hpp"
 #include "QTMWidget.hpp"
 #include "QTMWindow.hpp"
-#include "QTMApplication.hpp"
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_utilities.h"
@@ -374,6 +374,13 @@ qt_gui_rep::set_selection (string key, tree t,
     else
       md->setText (QString::fromLatin1 (selection));
   }
+  else if (format == "latex") {
+    string enc = get_preference ("texmacs->latex:encoding"); 
+    if (enc == "utf-8" || enc == "UTF-8" || enc == "cork")
+      md->setText (to_qstring (string (selection)));
+    else
+      md->setText (QString::fromLatin1 (selection));
+  }
   else
     md->setText (QString::fromLatin1 (selection));
   cb->setMimeData (md, mode);
@@ -493,7 +500,7 @@ void gui_interpose (void (*r) (void)) { the_interpose_handler = r; }
 
 void
 qt_gui_rep::event_loop () {
-  QTMApplication* app = static_cast<QTMApplication*>(QApplication::instance());
+  QCoreApplication* app = QApplication::instance ();
   update();
     //need_update();
   app->exec();
@@ -1032,9 +1039,10 @@ qt_gui_rep::put_graphics_on_clipboard (url file) {
     string filecontent;
     load_string (file, filecontent, true);
     
+    // warning: we need to tell Qt the size of the byte buffer
     c_string tmp (filecontent);
-    QByteArray rawdata (tmp);
-    
+    QByteArray rawdata (tmp, N(filecontent));
+
     QMimeData *mymimeData = new QMimeData;
     mymimeData->setData (mime, rawdata);
     
