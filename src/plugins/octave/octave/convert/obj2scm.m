@@ -16,7 +16,7 @@ function ret= obj2scm (n,c)
   	c= 0;
   endif
   switch (typeinfo (n))
-    case {"range", "matrix", "complex matrix", "bool matrix", "char matrix"}
+    case {"range", "matrix", "complex matrix", "bool matrix", "char matrix", "diagonal matrix"}
       ret= mat2scm (n);
     case {"int32 scalar", "int64 scalar", "complex scalar", "scalar", "bool"}
       ret= num2scm (n);
@@ -27,7 +27,12 @@ function ret= obj2scm (n,c)
     case ("cell")
       ret= cell2scm (n);
     case {"sq_string", "string"}
-      ret= str2scm (n);
+      [r, c]= size(n);
+      if (r == 1)
+        ret = "";
+      else
+        ret= str2scm (n);
+      endif
     otherwise
       ret= "";
   endswitch

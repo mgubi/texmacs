@@ -171,7 +171,7 @@
 
 (tm-define (use-database db)
   (set-preferred-database (get-default-user) (db-get-kind) db)
-  (revert-buffer))
+  (revert-buffer-revert))
 
 (tm-define (recent-databases)
   (recent-preferred-databases (get-default-user) (db-get-kind)))
