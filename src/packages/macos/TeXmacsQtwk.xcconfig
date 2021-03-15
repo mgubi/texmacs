@@ -4,5 +4,5 @@
 
 OTHER_CFLAGS = -DQTWKTEXMACS $(TM_CPPFLAGS) $(TM_QTCPPFLAGS) $(TM_CXXFREETYPE)  $(TM_CXXSPARKLE) $(TM_CXXPDF)  $(TM_CXXGUILE) 
 OTHER_CPLUSPLUSFLAGS = $(OTHER_CFLAGS) $(TM_CXXQT)
-OTHER_LDFLAGS = $(TM_LDFLAGS) $(TM_LIBS) $(TM_LDQT)
+OTHER_LDFLAGS = -headerpad_max_install_names -Wl,-rpath,/usr/local/Cellar/qt/5.15.2/lib -Wl,-rpath,@executable_path/../Frameworks -Wl,-stack_size,0x1000000,-headerpad_max_install_names $(TM_LDFLAGS) $(TM_LIBS) $(TM_LDQT)
 PRODUCT_NAME = TeXmacsQtwk

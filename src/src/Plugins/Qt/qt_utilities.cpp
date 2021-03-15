@@ -39,7 +39,9 @@
 #ifdef QTTEXMACS
 #include "qt_gui.hpp"    // gui_maximal_extents()
 #else
+#define center TEXMACS_center // avoid name clash
 #include "qtwk_gui.hpp"    // gui_maximal_extents()
+#undef center
 #endif
 
 #include "editor.hpp"
