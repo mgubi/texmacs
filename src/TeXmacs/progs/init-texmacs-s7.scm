@@ -481,6 +481,15 @@
   (display "------------------------------------------------------\n")
 )
 
+(display "------------------------------------------------------\n")
+(display "Forcing delayed loads\n")
+
+(lazy-keyboard-force #t)
+(display* "time: " (- (texmacs-time) boot-start) "\n")
+(display* "memory: " (texmacs-memory) " bytes\n")
+(display "------------------------------------------------------\n")
+
+
 
 (tm-define (benchmark-menu-expand)
   (display "------------------------------------------------------\n")
