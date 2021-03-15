@@ -239,6 +239,7 @@ TeXmacs_main (int argc, char** argv) {
       else if (s == "-debug-correct") debug (DEBUG_FLAG_CORRECT, true);
       else if (s == "-debug-convert") debug (DEBUG_FLAG_CONVERT, true);
       else if (s == "-debug-remote") debug (DEBUG_FLAG_REMOTE, true);
+      else if (s == "-debug-live") debug (DEBUG_FLAG_LIVE, true);
       else if (s == "-debug-all") {
         debug (DEBUG_FLAG_EVENTS, true);
         debug (DEBUG_FLAG_STD, true);
@@ -544,10 +545,7 @@ boot_hacks () {
   //getrlimit (RLIMIT_NOFILE, &lims);
   //printf ("cur: %i\n", lims.rlim_cur);
   //printf ("max: %i\n", lims.rlim_max);
-#if defined(MAC_OS_X_VERSION_10_10)
-  //if (release - 4 >= 10)
   mac_fix_yosemite_bug();
-#endif
 
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
 #if defined(MAC_OS_X_VERSION_10_9) || defined(MAC_OS_X_VERSION_10_10)

@@ -27,7 +27,8 @@
   (selection-tree selection_get (tree))
 
   ;; low-level modification routines
-  (path->tree the_subtree (tree path))
+  (path-exists? test_subtree (bool path))
+  (cpp-path->tree the_subtree (tree path))
   (path-correct-old correct (void path))
   (path-insert-with insert_with (void path string content))
   (path-remove-with remove_with (void path string))
@@ -326,6 +327,7 @@
   (generate-aux generate_aux (void string))
   (notify-page-change notify_page_change (void))
   (notify-change notify_change (void int))
+  (notified-change? has_changed (bool int))
   (get-metadata get_metadata (string string))
   (cpp-nr-pages nr_pages (int))
   (print-to-file print_to_file (void url))

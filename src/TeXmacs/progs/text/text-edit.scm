@@ -80,8 +80,14 @@
 	    ((== l 'doc-title-options)
 	     (tree-insert! t pos `((,l))))
 	    ((in? l doc-data-inactive-tags)
-	     (tree-insert! t pos `((doc-inactive (,l ""))))
-	     (tree-go-to t pos 0 0 0))
+             (let* ((r (tree-search t (cut tree-is? <> l)))
+                    (x (and (pair? r) (car r))))
+               (cond ((not x)
+                      (tree-insert! t pos `((doc-inactive (,l ""))))
+                      (tree-go-to t pos 0 0 0))
+                     (else
+                      (tree-set! x `(doc-inactive ,x))
+                      (tree-go-to x 0 0 :end)))))
 	    (else
 	     (tree-insert! t pos `((,l "")))
 	     (tree-go-to t pos 0 0))))))
@@ -157,6 +163,24 @@
 (tm-define (kbd-enter t shift?)
   (:require (tree-is? t 'doc-inactive))
   (doc-data-activate-here))
+
+(tm-define (doc-data-clean t)
+  (for (c (reverse (tree-children t)))
+    (cond ((tree-empty? c)
+           (tree-remove t (tree-index c) 1))
+          ((and (tree-func? c 'doc-author 1)
+                (tree-empty? (tree-ref c 0)))
+           (tree-remove t (tree-index c) 1))
+          ((and (tree-func? c 'doc-author 1)
+                (tm-is? (tree-ref c 0) 'author-data))
+           (doc-data-clean (tree-ref c 0))))))
+
+(tm-define (kbd-remove t forwards?)
+  (:require (tree-search-upwards t 'doc-data))
+  (with d (tree-search-upwards t 'doc-data)
+    (former t forwards?)
+    (when (and (tree->path d) (tree-is? d 'doc-data))
+      (doc-data-clean d))))
 
 (tm-define (set-doc-title-options opts)
   (with-innermost t 'doc-data
@@ -325,7 +349,7 @@
          (focus-search-label p))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Routines for lists, enumerations and description
+;; Routines for lists, enumerations and descriptions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (list-context? t)
@@ -389,15 +413,48 @@
 
 (tm-define (standard-parameters l)
   (:require (== l "itemize"))
-  (cons "itemize-levels" (search-parameters "itemize-1")))
+  (list-remove (cons* "itemize-levels"
+                      "item-tag" "item-1" "item-2" "item-3" "item-4"
+                      (search-parameters "itemize-1"))
+               "itemize-level"))
+
+(ahash-set! inhibit-global-table "item-tag" #t)
+(ahash-set! inhibit-local-table "item-1" #t)
+(ahash-set! inhibit-local-table "item-2" #t)
+(ahash-set! inhibit-local-table "item-3" #t)
+(ahash-set! inhibit-local-table "item-4" #t)
 
 (tm-define (standard-parameters l)
   (:require (== l "enumerate"))
-  (cons "enumerate-levels" (search-parameters "enumerate-1")))
+  (list-remove (cons* "enumerate-levels"
+                      "enum-tag" "enum-1" "enum-2" "enum-3" "enum-4"
+                      (search-parameters "enumerate-1"))
+               "enumerate-level"))
+
+(ahash-set! inhibit-global-table "enum-tag" #t)
+(ahash-set! inhibit-local-table "enum-1" #t)
+(ahash-set! inhibit-local-table "enum-2" #t)
+(ahash-set! inhibit-local-table "enum-3" #t)
+(ahash-set! inhibit-local-table "enum-4" #t)
 
 (tm-define (parameter-choice-list l)
   (:require (in? l (list "itemize-levels" "enumerate-levels")))
   (list "1" "2" "3" "4"))
+
+(tm-define (parameter-choice-list l)
+  (:require (in? l (list "item-tag" "item-1" "item-2" "item-3" "item-4")))
+  (list "<bullet>" "<circ>" "<minus>" "<cdot>" "*"
+        "<rightarrow>" "<Rightarrow>"
+        "<triangleright>" "<blacktriangleright>" :other))
+
+(tm-define (parameter-choice-list l)
+  (:require (in? l (list "enum-tag" "enum-1" "enum-2" "enum-3" "enum-4")))
+  (list (list "1, 2, 3, ..." '(macro "x" (arg "x")))
+        (list "a, b, c, ..." '(macro "x" (number (arg "x") "alpha")))
+        (list "A, B, C, ..." '(macro "x" (number (arg "x") "Alpha")))
+        (list "i, ii, iii, ..." '(macro "x" (number (arg "x") "roman")))
+        (list "I, II, III, ..." '(macro "x" (number (arg "x") "Roman")))
+        :other))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hyphenation

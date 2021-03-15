@@ -28,12 +28,12 @@
 #include "QTMGuiHelper.hpp"
 #include "QTMMenuHelper.hpp"
 #include "QTMStyle.hpp"
-#include "QTMApplication.hpp"
 #include "QTMTreeModel.hpp"
 
 #include <QCheckBox>
 #include <QPushButton>
 #include <QSplitter>
+#include <QApplication>
 #include <QTreeView>
 
 
@@ -254,20 +254,18 @@ qt_ui_element_rep::get_payload (qt_widget qtw, types check_type) {
   }
 }
 
-/*! Returns the ui element as a popup windo widget.
- If the widget is of type vertical_menu, it is understood that the popup window widget
+/*! Returns the ui element as a popup widget.
+ If the widget is of type vertical_menu, it is understood that the popup widget
  must be of the standard OS dependent type implemented by qt_menu_rep using
  QMenu.
  */
-
-widget
-qt_ui_element_rep::popup_window_widget (string s) {
+widget 
+qt_ui_element_rep::make_popup_widget () {
   if (type == qt_widget_rep::vertical_menu)
-    return tm_new<qt_menu_rep>(this)->popup_window_widget (s);
+    return tm_new<qt_menu_rep> (this);
   else
-    return qt_widget_rep::popup_window_widget (s);
+    return qt_widget_rep::make_popup_widget();
 }
-
 
 QList<QAction*>*
 qt_ui_element_rep::get_qactionlist() {
@@ -704,14 +702,14 @@ qt_ui_element_rep::as_qlayoutitem () {
         // Used only for non-colored glue widgets (skips qt_glue_widget_rep)
     {
       typedef quartet<bool, bool, SI, SI> T;
-      T x = open_box<T>(load);
-
+      T x = open_box<T> (load);
+      QSize sz = QSize (x.x3, x.x4);
       QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
       QSizePolicy::Policy vpolicy = x.x2 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
 
-      return new QSpacerItem (x.x3, x.x4, hpolicy, vpolicy);
+      return new QSpacerItem (sz.width (), sz.height (), hpolicy, vpolicy);
     }
       break;
     default:
@@ -796,11 +794,27 @@ qt_ui_element_rep::as_qwidget () {
       
     case menu_separator: 
     case menu_group:
-    case glue_widget:
     {
       qwid = new QWidget();
     }
       break;
+      
+    case glue_widget:
+    // Used only for non-colored glue widgets (skips qt_glue_widget_rep)
+    {
+      typedef quartet<bool, bool, SI, SI> T;
+      T x = open_box<T>(load);
+      QSize sz = QSize (x.x3, x.x4);
+      QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
+                                         : QSizePolicy::Minimum;
+      QSizePolicy::Policy vpolicy = x.x2 ? QSizePolicy::MinimumExpanding
+                                         : QSizePolicy::Minimum;
+      qwid = new QWidget();
+      qwid->setMinimumSize (sz);
+      qwid->setSizePolicy (hpolicy, vpolicy);
+    }
+      break;
+
       
     case pulldown_button:
     case pullright_button:

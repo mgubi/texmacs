@@ -143,7 +143,8 @@ public:
   editor_rep ();
   editor_rep (server_rep* sv, tm_buffer buf);
   inline virtual ~editor_rep () {}
-
+  bool is_current_editor ();
+  
   /* public routines from edit_interface */
   virtual void suspend () = 0;
   virtual void resume () = 0;
@@ -595,6 +596,7 @@ public:
   virtual tree the_line () = 0;
   virtual tree the_root () = 0;
   virtual tree the_buffer () = 0;
+  virtual bool test_subtree (path p) = 0;
   virtual tree the_subtree (path p) = 0;
   virtual path the_path () = 0;
   virtual path the_shifted_path () = 0;
@@ -617,6 +619,7 @@ public:
   friend void   tm_failure (const char* msg);
   friend void   set_buffer_tree (url name, tree doc);
   friend void   set_current_view (url u);
+  friend void   set_current_drd (url name);
   friend void   focus_on_editor (editor ed);
   friend void   delete_view (url u);
 };
@@ -628,6 +631,7 @@ EXTEND_NULL(widget,editor);
 public:
   inline bool operator == (editor w) { return rep == w.rep; }
   inline bool operator != (editor w) { return rep != w.rep; }
+  friend class editor_rep;
 };
 EXTEND_NULL_CODE(widget,editor);
 

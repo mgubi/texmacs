@@ -2811,6 +2811,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(string-find-non-alpha <scm-arg|string> <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|find_non_alpha> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(string-alpha? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4387,6 +4395,22 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-file-focus <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_file_focus> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(get-file-focus)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_file_focus> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
     <scm|(persistent-set <scm-arg|url> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5475,6 +5499,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-drd <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_current_drd> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(window-list)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5531,6 +5563,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(switch-to-window <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|switch_to_window> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(new-buffer)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5571,7 +5611,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(buffer-close <scm-arg|url>)>
+    <scm|(cpp-buffer-close <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|kill_buffer> which returns
@@ -6259,7 +6299,15 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(path-\<gtr\>tree <scm-arg|path>)>
+    <scm|(path-exists? <scm-arg|path>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|test_subtree> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-path-\<gtr\>tree <scm-arg|path>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|the_subtree> which returns
@@ -8400,6 +8448,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|notify_change> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(notified-change? <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|has_changed> which returns
+    <scm|bool>.
   </explain>
 
   <\explain>

@@ -294,6 +294,7 @@ edit_interface_rep::kbd_shortcut (string cmd) {
 void
 edit_interface_rep::handle_keypress (string key, time_t t) {
   if (is_nil (buf)) return;
+  if (t > last_event) last_event= t;
   bool started= false;
 #ifdef USE_EXCEPTIONS
   try {
@@ -361,6 +362,7 @@ edit_interface_rep::handle_keyboard_focus (bool has_focus, time_t t) {
     drag_right_reset ();
   }
   got_focus= has_focus; (void) t;
+  notify_change (THE_FREEZE);
   notify_change (THE_FOCUS);
   if (got_focus) {
     focus_on_this_editor ();

@@ -75,8 +75,21 @@ tmg_selection_tree () {
 }
 
 tmscm
-tmg_path_2tree (tmscm arg1) {
-  TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path->tree");
+tmg_path_existsP (tmscm arg1) {
+  TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "path-exists?");
+
+  path in1= tmscm_to_path (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->test_subtree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_path_2tree (tmscm arg1) {
+  TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "cpp-path->tree");
 
   path in1= tmscm_to_path (arg1);
 
@@ -3201,6 +3214,19 @@ tmg_notify_change (tmscm arg1) {
 }
 
 tmscm
+tmg_notified_changeP (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "notified-change?");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= get_current_editor()->has_changed (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_get_metadata (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "get-metadata");
 
@@ -3579,7 +3605,8 @@ initialize_glue_editor () {
   tmscm_install_procedure ("cursor-path",  tmg_cursor_path, 0, 0, 0);
   tmscm_install_procedure ("cursor-path*",  tmg_cursor_path_dot, 0, 0, 0);
   tmscm_install_procedure ("selection-tree",  tmg_selection_tree, 0, 0, 0);
-  tmscm_install_procedure ("path->tree",  tmg_path_2tree, 1, 0, 0);
+  tmscm_install_procedure ("path-exists?",  tmg_path_existsP, 1, 0, 0);
+  tmscm_install_procedure ("cpp-path->tree",  tmg_cpp_path_2tree, 1, 0, 0);
   tmscm_install_procedure ("path-correct-old",  tmg_path_correct_old, 1, 0, 0);
   tmscm_install_procedure ("path-insert-with",  tmg_path_insert_with, 3, 0, 0);
   tmscm_install_procedure ("path-remove-with",  tmg_path_remove_with, 2, 0, 0);
@@ -3847,6 +3874,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("generate-aux",  tmg_generate_aux, 1, 0, 0);
   tmscm_install_procedure ("notify-page-change",  tmg_notify_page_change, 0, 0, 0);
   tmscm_install_procedure ("notify-change",  tmg_notify_change, 1, 0, 0);
+  tmscm_install_procedure ("notified-change?",  tmg_notified_changeP, 1, 0, 0);
   tmscm_install_procedure ("get-metadata",  tmg_get_metadata, 1, 0, 0);
   tmscm_install_procedure ("cpp-nr-pages",  tmg_cpp_nr_pages, 0, 0, 0);
   tmscm_install_procedure ("print-to-file",  tmg_print_to_file, 1, 0, 0);

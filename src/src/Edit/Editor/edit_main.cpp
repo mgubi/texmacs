@@ -50,6 +50,12 @@ editor_rep::editor_rep (server_rep* sv2, tm_buffer buf2):
   simple_widget_rep (), sv (sv2), cvw (NULL), mvw (NULL), buf (buf2),
   drd (buf->buf->title, std_drd), et (the_et), rp (buf2->rp) {}
 
+bool
+editor_rep::is_current_editor () {
+  editor ed= get_current_editor ();
+  return ed.rep == (editor_rep*) this;
+}
+
 edit_main_rep::edit_main_rep (server_rep* sv, tm_buffer buf):
   editor_rep (sv, buf), props (UNKNOWN), ed_obs (edit_observer (this))
 {
@@ -453,6 +459,11 @@ edit_main_rep::the_root () {
 tree
 edit_main_rep::the_buffer () {
   return subtree (et, rp);
+}
+
+bool
+edit_main_rep::test_subtree (path p) {
+  return has_subtree (et, p);
 }
 
 tree

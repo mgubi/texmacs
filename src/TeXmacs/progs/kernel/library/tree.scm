@@ -77,6 +77,18 @@
 	(append me (append-map (cut tree-search <> pred?)
 			       (tree-children t))))))
 
+(define (prepend-index l i)
+  (if (null? l) l
+      (cons (map (lambda (x) (cons i x)) (car l))
+            (prepend-index (cdr l) (+ i 1)))))
+
+(define-public (tree-search-indices t pred?)
+  (with me (if (pred? t) (list (list)) (list))
+    (if (tree-atomic? t) me
+        (let* ((l1 (map (cut tree-search-indices <> pred?) (tree-children t)))
+               (l2 (prepend-index l1 0)))
+          (append me (apply append l2))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Navigation inside trees
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -174,6 +186,26 @@
              (> (length p) (length q)))
          (== (sublist p 0 (length q)) q)
          (sublist c (length q) (length c)))))
+
+(define-public (tree->fingerprint t)
+  (list (tree->path t) (tree-label t) (tree-arity t)
+        (list-common (tree->path t) (tree->path (focus-tree)))))
+
+(define-public (fingerprint->tree fp)
+  (with (p l n c) fp
+    (and-with t (path->tree p)
+      (and (== l (tree-label t))
+           (== n (tree-arity t))
+           (== c (list-common (tree->path t) (tree->path (focus-tree))))
+           t))))
+
+(define-public-macro (push-focus t . body)
+  `(with pushed-focus (tree->fingerprint t)
+     ,@body))
+
+(define-public-macro (pull-focus t . body)
+  `(and-with ,t (fingerprint->tree pushed-focus)
+     ,@body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Other special trees

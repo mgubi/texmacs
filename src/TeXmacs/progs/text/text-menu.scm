@@ -255,7 +255,7 @@
 (menu-bind note-menu
   (when (not (or (inside? 'float) (inside? 'footnote)))
     (when (in-main-flow?)
-      ("Footnote" (make-wrapped 'footnote))
+      ("Footnote" (make 'footnote))
       (when (not (selection-active-non-small?))
         ("Marginal note" (make-marginal-note))))
     ("Balloon" (make-balloon))
@@ -903,7 +903,7 @@
 
 (tm-define (standard-options l)
   (:require (in? l (list-tag-list)))
-  (list "compact-list" "triangle-list"))
+  (list "compact-list" "triangle-list" "prefix-enumerations"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menu for theorems and proofs

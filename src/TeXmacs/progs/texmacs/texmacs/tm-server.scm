@@ -120,6 +120,7 @@
   ("new style page breaking" "on" notify-new-page-breaking)
   ("open console on errors" "on" noop)
   ("open console on warnings" "on" noop)
+  ("gui:line-input:autocommit" "on" noop)
   ("use unified toolbar" (get-default-unified-toolbar) noop))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -153,6 +154,18 @@
 ;; Killing buffers, windows and TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define buffer-initialized-table (make-ahash-table))
+
+(tm-define (buffer-set-initialized name done?)
+  (ahash-set! buffer-initialized-table name done?))
+
+(tm-define (buffer-initialized? name)
+  (ahash-ref buffer-initialized-table name))
+
+(tm-define (buffer-close name)
+  (cpp-buffer-close name)
+  (buffer-set-initialized name #f))
+
 (tm-define (buffers-modified?)
   (list-or (map buffer-modified? (buffer-list))))
 
@@ -172,17 +185,25 @@
       (:idle 100)
       (buffer-close buf))))
 
+(define (do-kill-window* u)
+ (with buf (window->buffer u)
+   (kill-window u)
+   (delayed
+     (:idle 100)
+     (buffer-close buf))))
+
 (tm-define (safely-kill-window . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((<= (windows-number) 1)
          (safely-quit-TeXmacs))
         ((nnull? opt-name)
-         (with buf (window->buffer (car opt-name))
-           (kill-window (car opt-name))
-           (delayed
-             (:idle 100)
-             (buffer-close buf))))
+         (if (buffer-modified? (window->buffer (car opt-name)))
+             (user-confirm
+                 "The document has not been saved. Really close it?" #f
+               (lambda (answ)
+                 (when answ (do-kill-window* (car opt-name)))))
+             (do-kill-window* (car opt-name))))
         ((buffer-modified? (current-buffer))
          (user-confirm "The document has not been saved. Really close it?" #f
            (lambda (answ)

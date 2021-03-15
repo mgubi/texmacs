@@ -16,6 +16,7 @@
 #include "tm_window.hpp"
 #include "Metafont/tex_files.hpp"
 #include "data_cache.hpp"
+#include "drd_std.hpp"
 #include "drd_mode.hpp"
 #include "message.hpp"
 #include "tree_traverse.hpp"
@@ -54,6 +55,7 @@ edit_interface_rep::edit_interface_rep ():
   editor_rep (), // NOTE: ignored by the compiler, but suppresses warning
   env_change (0),
   last_change (texmacs_time()), last_update (last_change-1),
+  last_event (texmacs_time()),
   anim_next (1.0e12),
   full_screen (false), got_focus (false),
   sh_s (""), sh_mark (0),
@@ -87,11 +89,13 @@ edit_interface_rep::operator tree () {
 
 void
 edit_interface_rep::suspend () {
+  //cout << "Suspend " << buf->buf->name << LF;
   if (got_focus) {
     interrupt_shortcut ();
     set_message ("", "", false);
   }
   got_focus= false;
+  env_change= env_change & (~THE_FREEZE);
   notify_change (THE_FOCUS);
   if (shadow != NULL) tm_delete (shadow);
   if (stored != NULL) tm_delete (stored);
@@ -101,6 +105,7 @@ edit_interface_rep::suspend () {
 
 void
 edit_interface_rep::resume () {
+  //cout << "Resume " << buf->buf->name << LF;
   got_focus= true;
   SERVER (menu_main ("(horizontal (link texmacs-menu))"));
   SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
@@ -111,12 +116,16 @@ edit_interface_rep::resume () {
     { SERVER (side_tools (0, "(vertical (link texmacs-side-tools))")); }
   SERVER (bottom_tools (0, "(vertical (link texmacs-bottom-tools))"));
   cur_sb= 2;
+  env_change= env_change & (~THE_FREEZE);
   notify_change (THE_FOCUS + THE_EXTENTS);
+  drd_info old_drd= the_drd;
+  the_drd= drd;
   path new_tp= make_cursor_accessible (tp, true);
   if (new_tp != tp) {
     notify_change (THE_CURSOR);
     tp= new_tp;
   }
+  the_drd= old_drd;
 #ifdef QTTEXMACS
   // FIXME: dirty hack in order to correct a bug introduced
   // after a bugfix by Massimiliano during summer 2016
@@ -673,7 +682,8 @@ edit_interface_rep::apply_changes () {
 
   if (tremble_count > 0 &&
       last_change-last_update > 0 &&
-      idle_time (INTERRUPTED_EVENT) >= 80) {
+      (idle_time (INTERRUPTED_EVENT) >= 80 ||
+       texmacs_time() - last_event >= 3000)) {
     tremble_count--;
     if (tremble_count > 2) {
       env_change = env_change | (THE_CURSOR + THE_FREEZE);
@@ -842,10 +852,12 @@ edit_interface_rep::apply_changes () {
     int THE_CURSOR_BAK= env_change & THE_CURSOR;
     go_to_here ();
     env_change= (env_change & (~THE_CURSOR)) | THE_CURSOR_BAK;
-    if ((env_change & (THE_TREE+THE_FOCUS+THE_ENVIRONMENT+THE_CURSOR)) != 0 &&
-        ((env_change & THE_FREEZE) == 0 || (env_change & THE_FOCUS) != 0))
+    if ((env_change & (THE_TREE+THE_ENVIRONMENT+
+                       THE_CURSOR+THE_SELECTION+THE_FOCUS)) != 0)
       if (!inside_active_graphics ())
-        cursor_visible ();
+        if ((env_change & THE_FREEZE) == 0 ||
+            (env_change & THE_SELECTION) != 0)
+          cursor_visible ();
 
     SI dw= 0;
     if (tremble_count > 3) dw= (1 + min (tremble_count - 3, 25)) * 2 * pixel;
@@ -992,7 +1004,7 @@ edit_interface_rep::apply_changes () {
   }
 
   // cout << "Graphics snapping\n";
-  if (inside_active_graphics ()) {
+  if (inside_active_graphics () && is_current_editor ()) {
     tree t= as_tree (call ("graphics-get-snap-mode"));
     set_snap_mode (t);
     string val= as_string (call ("graphics-get-snap-distance"));

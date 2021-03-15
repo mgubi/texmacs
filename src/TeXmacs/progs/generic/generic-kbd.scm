@@ -240,10 +240,10 @@
 
   ("table N t" (make 'tabular))
   ("table N T" (make 'tabular*))
-  ("table N w" (make-wrapped 'wide-tabular))
+  ("table N w" (make 'wide-tabular))
   ("table N b" (make 'block))
   ("table N B" (make 'block*))
-  ("table N W" (make-wrapped 'wide-block)))
+  ("table N W" (make 'wide-block)))
 
 (kbd-map
   (:mode in-hybrid?)
@@ -302,13 +302,13 @@
   ("emacs:meta $" (interactive-spell))
   ("emacs:meta %" (interactive-replace))
 
-  ("emacs:prefix tab" (make 'indent))
   ("emacs:prefix b" (interactive go-to-buffer))
   ("emacs:prefix h" (select-all))
   ("emacs:prefix k" (close-document))
   ("emacs:prefix K" (close-document*))
   ("emacs:prefix C-c" (safely-quit-TeXmacs))
   ("emacs:prefix C-f" (interactive load-document))
+  ("emacs:prefix C-i" (make 'indent))
   ("emacs:prefix C-s" (save-buffer))
   ("emacs:prefix C-w" (interactive save-buffer-as))
 
@@ -726,8 +726,8 @@
   ("windows _" (make 'nbhyph))
   ("windows A-." "<ldots>")
   ("windows A-c" (make 'copyright))
-  ("windows e" (make-wrapped 'footnote))
-  ("windows F" (make-wrapped 'footnote))
+  ("windows e" (make 'footnote))
+  ("windows F" (make 'footnote))
   ("windows h" (interactive-replace))
   ("windows k" (make 'hlink))
   ("windows K" (toggle-small-caps))

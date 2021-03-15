@@ -1,4 +1,4 @@
-<TeXmacs|1.99.14>
+<TeXmacs|1.99.18>
 
 <style|<tuple|source|std>>
 
@@ -440,7 +440,7 @@
   <assign|tiny-block|<xmacro|switch-args|<map-args|identity|concat|switch-args>>>
 
   <assign|slide|<\macro|body>
-    <\surround||<new-page>>
+    <\surround||<if|<quasi|<tm-last?|<unquote|<quote-arg|body>>|up>>||<new-page>>>
       <arg|body>
     </surround>
   </macro>>
@@ -607,7 +607,9 @@
 
   <assign|help-balloon|<macro|x|y|halign|valign|<mouse-over-balloon*|<arg|x>|<colored-frame|<value|help-balloon-color>|<arg|y>>|<arg|halign>|<arg|valign>>>>
 
-  <assign|preview-balloon|<macro|body|<tabular|<tformat|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|#edc>|<twith|table-width|40em>|<twith|table-hmode|min>|<table|<row|<\cell>
+  <assign|preview-bg-color|#edc>
+
+  <assign|preview-balloon|<macro|body|<tabular|<tformat|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|<value|preview-bg-color>>|<twith|table-width|40em>|<twith|table-hmode|min>|<cwith|1|1|1|1|cell-lsep|1spc>|<cwith|1|1|1|1|cell-rsep|1spc>|<cwith|1|1|1|1|cell-bsep|1spc>|<cwith|1|1|1|1|cell-tsep|1spc>|<table|<row|<\cell>
     <arg|body>
   </cell>>>>>>>
 

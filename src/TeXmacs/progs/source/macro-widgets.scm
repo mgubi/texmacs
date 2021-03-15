@@ -179,6 +179,12 @@
               (get-macro-mode) "9em"))
       >>
       (explicit-buttons
+        ("Shortcut" (and-with t (macro-retrieve u)
+                      (let* ((s (tree->string (tm-ref t 0)))
+                             (sh (string-append "(make '" s ")"))
+                             (sh* (if (== s "") "" sh)))
+                        (open-shortcuts-editor "" sh*))))
+        //
         ("Apply" (macro-apply u))
         // //
         ("Ok" (macro-apply u) (quit))))))
@@ -238,7 +244,8 @@
            (add-context p `(document ,body)))
           ((tree-is? t 'with)
            (add-context p `(with ,@(cDr (tm-children t)) ,body)))
-          ((or (with-like? t) (unary-tree? t) (tree-is? t 'tformat))
+          ((or (with-like? t) (unary-tree? t)
+               (tree-in? t '(tformat ornament ornamented)))
            (add-context p `(,(tm-label t) ,@(cDr (tm-children t)) ,body)))
           ((tree-in? t '(table row cell))
            (add-context p `(,(tm-label t) ,body)))
@@ -378,6 +385,12 @@
               (get-macro-mode) "9em"))
       >>
       (explicit-buttons
+        ("Shortcut" (and-with t (macro-retrieve u)
+                      (let* ((s (tree->string (tm-ref t 0)))
+                             (sh (string-append "(make '" s ")"))
+                             (sh* (if (== s "") "" sh)))
+                        (open-shortcuts-editor "" sh*))))
+        //
         ("Apply" (macro-apply u))
 	// //
 	("Ok" (macro-apply u) (quit))))))
