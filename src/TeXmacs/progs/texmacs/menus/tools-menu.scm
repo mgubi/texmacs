@@ -41,6 +41,7 @@
   ---
   (-> "Update"
       ("Inclusions" (inclusions-gc))
+      ("Pictures" (picture-gc))
       ("Plugins" (reinit-plugin-cache))
       ("Styles" (style-clear-cache)))
   (if (url-exists-in-path? "pdflatex")
@@ -69,7 +70,8 @@
       ("Look for more fonts"
        (system-wait "Full search for more fonts on your system"
                     "(can be long)")
-       (font-database-build-local)))
+       (font-database-build-local))
+      ("Clear font cache" (clear-font-cache)))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history))
       ("Save auxiliary data" (toggle-save-aux))

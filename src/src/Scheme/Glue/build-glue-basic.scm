@@ -397,6 +397,7 @@
   (string-search-backwards search_backwards (int string int string))
   (string-overlapping overlapping (int string string))
   (string-replace replace (string string string string))
+  (string-find-non-alpha find_non_alpha (int string int bool))
   (string-alpha? is_alpha (bool string))
   (string-locase-alpha? is_locase_alpha (bool string))
   (upcase-first upcase_first (string string))
@@ -777,13 +778,14 @@
   (window-to-buffer window_to_buffer (url url))
   (window-set-buffer window_set_buffer (void url url))
   (window-focus window_focus (void url))
+  (switch-to-window switch_to_window (void url))
 
   (new-buffer create_buffer (url))
   (open-buffer-in-window new_buffer_in_new_window (url url content content))
   (open-window open_window (url))
   (open-window-geometry open_window (url content))
   (clone-window clone_window (void))
-  (buffer-close kill_buffer (void url))
+  (cpp-buffer-close kill_buffer (void url))
   (kill-window kill_window (void url))
   (kill-current-window-and-buffer kill_current_window_and_buffer (void))
 

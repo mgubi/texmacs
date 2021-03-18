@@ -3,7 +3,7 @@
 ;;
 ;; MODULE      : files.scm
 ;; DESCRIPTION : file handling
-;; COPYRIGHT   : (C) 2001  Joris van der Hoeven
+;; COPYRIGHT   : (C) 2001-2021  Joris van der Hoeven
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -95,16 +95,12 @@
        r)))
 
 (define buffer-newly-created-table (make-ahash-table))
-(define buffer-initialized-table (make-ahash-table))
 
 (tm-define (buffer-newly-created? name)
   (and name
        (or (and (not (buffer-has-name? name))
-                (not (ahash-ref buffer-initialized-table name)))
+                (not (buffer-initialized? name)))
            (ahash-ref buffer-newly-created-table name))))
-
-(tm-define (buffer-initialized name)
-  (ahash-set! buffer-initialized-table name #t))
 
 (tm-define (buffer-copy buf u)
   (:synopsis "Creates a copy of @buf in @u and return @u.")
@@ -129,6 +125,12 @@
          (tree-children init))
         (for-each set-reference refl refs))
       u)))
+
+(tm-define (switch-to-buffer* buf)
+  (cond ((== buf (current-buffer)) (noop))
+        ((nnull? (buffer->windows buf))
+         (switch-to-window (car (buffer->windows buf))))
+        (else (switch-to-buffer buf))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Saving buffers
@@ -204,9 +206,9 @@
           ((cannot-write? name "Save file")
            (noop))
           ((and (url-test? name "fr")
-		(and-with mod-t (url-last-modified name)
-		  (and-with save-t (buffer-last-save name)
-		    (> mod-t save-t))))
+                (and-with mod-t (url-last-modified name)
+                  (and-with save-t (buffer-last-save name)
+                    (> mod-t save-t))))
            (user-confirm "The file has changed on disk. Really save?" #f
              (lambda (answ)
                (when answ
@@ -417,7 +419,7 @@
   (if (not (url-rooted? u))
       (set! u (url-relative (current-buffer) u)))
   (if (url-rooted-web? u)
-      (system (string-append (default-open) " " (url->system u)))
+      (system (string-append (default-open) " " (raw-quote (url->system u))))
       (system-1 (default-open) u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -433,7 +435,7 @@
           (switch-to-buffer name)))
   (buffer-notify-recent name)
   (when (nnull? (select (buffer-get name)
-			'(:* gpg-passphrase-encrypted-buffer)))
+                        '(:* gpg-passphrase-encrypted-buffer)))
     (tm-gpg-dialogue-passphrase-decrypt-buffer name))
   (and-with master (and (url-rooted-tmfs? name) (tmfs-master name))
     (when (!= master name)
@@ -528,7 +530,7 @@
 ;; Reverting buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (revert-buffer . l)
+(tm-define (revert-buffer-revert . l)
   (with name (if (null? l) (current-buffer) (car l))
     (if (not (buffer-exists? name))
         (load-buffer name)
@@ -541,6 +543,14 @@
                 (set-message "Error: file not found" "Revert buffer")
                 (buffer-set name t)))))))
 
+(tm-define (revert-buffer . l)
+  (with name (if (null? l) (current-buffer) (car l))
+    (if (and (buffer-exists? name) (buffer-modified? name))
+        (user-confirm "Buffer has been modified. Really revert?" #f
+          (lambda (answ)
+            (when answ (apply revert-buffer-revert l))))
+        (apply revert-buffer-revert l))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Importing buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -548,10 +558,10 @@
 (define (import-buffer-import name fm opts)
   ;;(display* "import-buffer-import " name ", " fm "\n")
   (if (== fm (url-format name))
-      (load-buffer-main name opts)
+      (apply load-buffer-main (cons name opts))
       (let* ((s (url->tmfs-string name))
              (u (string-append "tmfs://import/" fm "/" s)))
-        (load-buffer-main u opts))))
+        (apply load-buffer-main (cons u opts)))))
 
 (define (import-buffer-check-permissions name fm opts)
   ;;(display* "import-buffer-check-permissions " name ", " fm "\n")
@@ -572,7 +582,9 @@
   (import-buffer-check-permissions name fm opts))
 
 (tm-define (import-buffer name fm . opts)
-  (import-buffer-main name fm opts))
+  (if (window-per-buffer?)
+      (import-buffer-main name fm (cons :new-window opts))
+      (import-buffer-main name fm opts)))
 
 (tm-define (buffer-importer fm)
   (lambda (s) (import-buffer s fm)))
@@ -649,7 +661,7 @@
         ((tree-in? t '(with with-bib))
          (linked-files-inside (tm-ref t :last)))
         ((or (tree-func? t 'bibliography 4)
-	     (tree-func? t 'bibliography* 5))
+             (tree-func? t 'bibliography* 5))
          (with name (tm->stree (tm-ref t 2))
            (if (or (== name "") (nstring? name)) (list)
                (with s (if (string-ends? name ".bib") name
