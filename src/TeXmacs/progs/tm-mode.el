@@ -88,7 +88,7 @@
 
 (setq binary-keywords
   '(with with-define with-global and-with with-innermost receive
-    with-environment with-environment* converter
+    with-environment with-environment* converter with-cache
     user-confirm user-url
     resize
     $with))

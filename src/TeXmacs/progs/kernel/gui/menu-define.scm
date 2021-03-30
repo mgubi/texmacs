@@ -48,8 +48,11 @@
 
 (define (gui-make-push-focus x)
   (require-format x '(push-focus :%1 :*))
-  `(with pushed-focus (tree->fingerprint ,(cadr x))
-     (menu-dynamic ,@(cddr x))))
+  `(with pushed-tree ,(cadr x)
+     (with pushed-focus (tree->fingerprint pushed-tree)
+       (menu-dynamic
+         (invisible (tree->path pushed-tree))
+         ,@(cddr x)))))
 
 (define (gui-make-cond x)
   (require-format x '(cond :*))
@@ -83,6 +86,10 @@
 (define (gui-make-text x)
   (require-format x '(text :%1))
   `($menu-text ,(cadr x)))
+
+(define (gui-make-invisible x)
+  (require-format x '(invisible :%1))
+  `($menu-invisible ,(cadr x)))
 
 (define (gui-make-glue x)
   (require-format x '(glue :%4))
@@ -147,6 +154,10 @@
 (define (gui-make-check x)
   (require-format x '(check :%3))
   `($check ,(gui-make (cadr x)) ,(caddr x) ,(cadddr x)))
+
+(define (gui-make-shortcut x)
+  (require-format x '(shortcut :%2))
+  `($shortcut* ,(gui-make (cadr x)) ,(caddr x)))
 
 (define (gui-make-balloon x)
   (require-format x '(balloon :%2))
@@ -360,6 +371,7 @@
   (refreshable ,gui-make-refreshable)
   (group ,gui-make-group)
   (text ,gui-make-text)
+  (invisible ,gui-make-invisible)
   (glue ,gui-make-glue)
   (color ,gui-make-color)
   (texmacs-output ,gui-make-texmacs-output)
@@ -376,6 +388,7 @@
   (concat ,gui-make-concat)
   (verbatim ,gui-make-verbatim)
   (check ,gui-make-check)
+  (shortcut ,gui-make-shortcut)
   (balloon ,gui-make-balloon)
   (-> ,gui-make-submenu)
   (=> ,gui-make-top-submenu)

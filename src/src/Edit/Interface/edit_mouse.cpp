@@ -465,6 +465,7 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t) {
     //cout << "Ignored " << type << ", " << x << ", " << y << "; " << mods << ", " << t << "\n";
     return;
   }
+  if (t > last_event) last_event= t;
   if (((x > last_x && !tremble_right) || (x < last_x && tremble_right)) &&
       (abs (x - last_x) > abs (y - last_y)) &&
       type == "move") {
@@ -617,8 +618,13 @@ edit_interface_rep::handle_mouse (string kind, SI x, SI y, int m, time_t t) {
 #ifdef USE_EXCEPTIONS
   try {
 #endif
-  if (is_nil (eb) || (env_change & (THE_TREE + THE_ENVIRONMENT)) != 0)
+  if (is_nil (eb) || (env_change & (THE_TREE + THE_ENVIRONMENT)) != 0) {
+    //cout << "handle_mouse in " << buf->buf->name << ", " << got_focus << LF;
+    //cout << kind << " (" << x << ", " << y << "; " << m << ")"
+    //     << " at " << t << "\n";
+    if (!got_focus) return;
     apply_changes ();
+  }
   start_editing ();
   started= true;
   x= ((SI) (x / magf));

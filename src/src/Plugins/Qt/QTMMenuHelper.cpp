@@ -20,12 +20,12 @@
 #include "QTMMenuHelper.hpp"
 #include "QTMGuiHelper.hpp"
 #include "QTMStyle.hpp"
-#include "QTMApplication.hpp"
 #include "QTMTreeModel.hpp"
 
 #include <QToolTip>
 #include <QCompleter>
 #include <QKeyEvent>
+#include <QApplication>
 
 /******************************************************************************
  * QTMCommand
@@ -694,6 +694,15 @@ QTMLineEdit::keyPressEvent (QKeyEvent* ev)
     }
   } else {
     QLineEdit::keyPressEvent (ev);
+  }
+}
+
+void
+QTMLineEdit::inputMethodEvent (QInputMethodEvent* ev) {
+  QLineEdit::inputMethodEvent (ev);
+  if (!ev->commitString().isEmpty() && ev->preeditString().isEmpty()) {
+    string str = from_qstring(ev->commitString());
+    cmd (list_object (list_object (object (str), object (str))));
   }
 }
 

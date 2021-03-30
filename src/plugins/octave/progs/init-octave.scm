@@ -11,16 +11,25 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (octave-source-path)
+(define (octave-serialize lan t)
+    (with u (pre-serialize lan t)
+      (with s (texmacs->code (stree->tree u) "SourceCode")
+        (string-append s "\n<EOF>\n"))))
+
+(define (octave-entry)
   (if (url-exists? "$TEXMACS_HOME_PATH/plugins/octave")
-      (string-append (getenv "TEXMACS_HOME_PATH") "/plugins/octave/octave")
-      (string-append (getenv "TEXMACS_PATH") "/plugins/octave/octave")))
+      (system-url->string "$TEXMACS_HOME_PATH/plugins/octave/octave/tmstart.m")
+      (system-url->string "$TEXMACS_PATH/plugins/octave/octave/tmstart.m")))
 
 (define (octave-launcher)
-  (with boot (string-append "\"" (octave-source-path) "/tmstart.m\"")
-    (if (url-exists-in-path? "octave-cli")
-        (string-append "octave-cli -qi " boot)
+  (with boot (raw-quote (octave-entry))
+    (if (url-exists-in-path? "octave")
+        (string-append "octave --no-gui -qi " boot)
         (string-append "octave-octave-app -qi " boot))))
+
+; when using `:macpath`, the (octave-launcher) uses `octave-octave-app`
+; that's why we are using `plugin-add-macos-path` here
+(plugin-add-macos-path "Octave*/Contents/Resources/usr/Cellar/octave-octave-app@*/*" "bin" #t)
 
 (plugin-configure octave
   (:winpath "Octave*" ".")
@@ -30,9 +39,11 @@
   (:winpath "Octave/Octave*" "bin")
   (:winpath "Octave/Octave*" "mingw64/bin")
   (:macpath "Octave*" "Contents/Resources/usr/bin")
-  (:require (or (url-exists-in-path? "octave-cli")
+  (:require (or (url-exists-in-path? "octave")
                 (url-exists-in-path? "octave-octave-app")))
+  (:serializer ,octave-serialize)
   (:launch ,(octave-launcher))
+  (:tab-completion #t)
   (:session "Octave"))
 
 (when (supports-octave?)

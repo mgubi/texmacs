@@ -4673,6 +4673,23 @@ tmg_string_replace (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_string_find_non_alpha (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-find-non-alpha");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "string-find-non-alpha");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "string-find-non-alpha");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  bool in3= tmscm_to_bool (arg3);
+
+  // TMSCM_DEFER_INTS;
+  int out= find_non_alpha (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
 tmg_string_alphaP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "string-alpha?");
 
@@ -7382,6 +7399,28 @@ tmg_picture_cache_reset () {
 }
 
 tmscm
+tmg_set_file_focus (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "set-file-focus");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  set_file_focus (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_get_file_focus () {
+  // TMSCM_DEFER_INTS;
+  url out= get_file_focus ();
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
 tmg_persistent_set (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "persistent-set");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "persistent-set");
@@ -9448,6 +9487,19 @@ tmg_window_focus (tmscm arg1) {
 }
 
 tmscm
+tmg_switch_to_window (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "switch-to-window");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  switch_to_window (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_new_buffer () {
   // TMSCM_DEFER_INTS;
   url out= create_buffer ();
@@ -9505,8 +9557,8 @@ tmg_clone_window () {
 }
 
 tmscm
-tmg_buffer_close (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-close");
+tmg_cpp_buffer_close (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "cpp-buffer-close");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10328,6 +10380,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("string-search-backwards",  tmg_string_search_backwards, 3, 0, 0);
   tmscm_install_procedure ("string-overlapping",  tmg_string_overlapping, 2, 0, 0);
   tmscm_install_procedure ("string-replace",  tmg_string_replace, 3, 0, 0);
+  tmscm_install_procedure ("string-find-non-alpha",  tmg_string_find_non_alpha, 3, 0, 0);
   tmscm_install_procedure ("string-alpha?",  tmg_string_alphaP, 1, 0, 0);
   tmscm_install_procedure ("string-locase-alpha?",  tmg_string_locase_alphaP, 1, 0, 0);
   tmscm_install_procedure ("upcase-first",  tmg_upcase_first, 1, 0, 0);
@@ -10525,6 +10578,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-grep",  tmg_url_grep, 2, 0, 0);
   tmscm_install_procedure ("url-search-upwards",  tmg_url_search_upwards, 3, 0, 0);
   tmscm_install_procedure ("picture-cache-reset",  tmg_picture_cache_reset, 0, 0, 0);
+  tmscm_install_procedure ("set-file-focus",  tmg_set_file_focus, 1, 0, 0);
+  tmscm_install_procedure ("get-file-focus",  tmg_get_file_focus, 0, 0, 0);
   tmscm_install_procedure ("persistent-set",  tmg_persistent_set, 3, 0, 0);
   tmscm_install_procedure ("persistent-remove",  tmg_persistent_remove, 2, 0, 0);
   tmscm_install_procedure ("persistent-has?",  tmg_persistent_hasP, 2, 0, 0);
@@ -10669,12 +10724,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("window-to-buffer",  tmg_window_to_buffer, 1, 0, 0);
   tmscm_install_procedure ("window-set-buffer",  tmg_window_set_buffer, 2, 0, 0);
   tmscm_install_procedure ("window-focus",  tmg_window_focus, 1, 0, 0);
+  tmscm_install_procedure ("switch-to-window",  tmg_switch_to_window, 1, 0, 0);
   tmscm_install_procedure ("new-buffer",  tmg_new_buffer, 0, 0, 0);
   tmscm_install_procedure ("open-buffer-in-window",  tmg_open_buffer_in_window, 3, 0, 0);
   tmscm_install_procedure ("open-window",  tmg_open_window, 0, 0, 0);
   tmscm_install_procedure ("open-window-geometry",  tmg_open_window_geometry, 1, 0, 0);
   tmscm_install_procedure ("clone-window",  tmg_clone_window, 0, 0, 0);
-  tmscm_install_procedure ("buffer-close",  tmg_buffer_close, 1, 0, 0);
+  tmscm_install_procedure ("cpp-buffer-close",  tmg_cpp_buffer_close, 1, 0, 0);
   tmscm_install_procedure ("kill-window",  tmg_kill_window, 1, 0, 0);
   tmscm_install_procedure ("kill-current-window-and-buffer",  tmg_kill_current_window_and_buffer, 0, 0, 0);
   tmscm_install_procedure ("project-attach",  tmg_project_attach, 1, 0, 0);

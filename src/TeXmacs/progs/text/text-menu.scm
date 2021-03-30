@@ -255,7 +255,7 @@
 (menu-bind note-menu
   (when (not (or (inside? 'float) (inside? 'footnote)))
     (when (in-main-flow?)
-      ("Footnote" (make-wrapped 'footnote))
+      ("Footnote" (make 'footnote))
       (when (not (selection-active-non-small?))
         ("Marginal note" (make-marginal-note))))
     ("Balloon" (make-balloon))
@@ -866,7 +866,7 @@
 
 (tm-menu (focus-section-menu)
   (for (s (tree-search-sections (buffer-tree)))
-    ((eval (tm/section-get-title-string s))
+    ((eval (tm/section-get-title-string s #t))
      (when (and (tree->path s) (section-context? s))
        (tree-go-to s 0 :end)))))
 
@@ -877,7 +877,7 @@
 (tm-menu (focus-document-extra-icons t)
   (:require (previous-section))
   (mini #t
-    (=> (eval (tm/section-get-title-string (previous-section)))
+    (=> (eval (tm/section-get-title-string (previous-section) #f))
         (link focus-section-menu))))
 
 (tm-menu (focus-extra-menu t)
@@ -890,7 +890,7 @@
   (:require (section-context? t))
   (mini #t
     //
-    (=> (eval (tm/section-get-title-string t))
+    (=> (eval (tm/section-get-title-string t #f))
         (link focus-section-menu))))
 
 (tm-define (child-proposals t i)

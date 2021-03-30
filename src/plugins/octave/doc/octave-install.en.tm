@@ -1,6 +1,6 @@
-<TeXmacs|1.99.13>
+<TeXmacs|1.99.18>
 
-<style|<tuple|tmdoc|english|old-spacing|old-dots>>
+<style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|Installation>
@@ -10,7 +10,8 @@
 
   <\enumerate>
     <item>Check if GNU Octave is installed, if not, please install GNU Octave
-    (5.x) first
+    first. GNU Octave 5.x is recommended. Plotting in <TeXmacs> for GNU
+    Octave 6.x on Windows is broken.
 
     <item>Check if the command line <shell|octave-cli> is available
 
@@ -34,25 +35,23 @@
   <code*|$TEXMACS_HOME_PATH>:
 
   <\shell-code>
-    <code|<\code*>
-      # For GNU/Linux or macOS
+    # For GNU/Linux or macOS
 
-      git clone git@github.com:texmacs/octave.git
-      $HOME/.TeXmacs/plugins/octave
+    git clone https://github.com/texmacs/octave.git
+    $HOME/.TeXmacs/plugins/octave
 
-      \;
+    \;
 
-      # For Windows
+    # For Windows
 
-      git clone git@github.com:texmacs/octave.git
-      %APPDATA%\\TeXmacs\\plugins/octave
-    </code*>>
+    git clone https://github.com/texmacs/octave.git
+    %APPDATA%\\TeXmacs\\plugins\\octave
   </shell-code>
 
   For users who does not know about Git, please download the zip from Github
   and unzip the <shell|master.zip> to the corresponding directory.
 
-  <tmdoc-copyright|2020|Darcy Shen>
+  <tmdoc-copyright|2020\U2021|Darcy Shen>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

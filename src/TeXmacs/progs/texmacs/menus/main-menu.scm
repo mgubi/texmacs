@@ -29,6 +29,7 @@
 (menu-bind bookmarks-menu)
 (menu-bind test-menu)
 (menu-bind help-icons (if (in-session?) (link session-help-icons)))
+(menu-bind comment-menu)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The TeXmacs main menu
@@ -49,6 +50,8 @@
           (=> "Source" (link source-menu)))
       (if (with-linking-tool?)
           (=> "Link" (link link-menu)))
+      (if (in-comment?)
+          (=> "Comment" (link comment-menu)))
       (if (in-presentation?)
           (=> "Dynamic" (link dynamic-menu)))
       (if (style-has? "icourse-dtd")

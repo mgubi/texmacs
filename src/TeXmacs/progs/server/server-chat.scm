@@ -38,6 +38,22 @@
                        ("name" ,name)))
     (and (nnull? l) (car l))))
 
+(tm-define (search-remote-identifier u)
+  (:require (string-starts? (url->string u) "tmfs://chat/"))
+  (chat-room-id (url->string (url-tail u))))
+
+(tm-service (remote-list-chat-rooms)
+  ;; Return list of chat rooms owned by the user
+  ;;(display* "remote-list-chat-rooms\n")
+  (with (client msg-id) envelope
+    (let* ((uid (server-get-user envelope))
+           (l (db-search `(("type" "chat-room")
+                           ("owner" ,uid))))
+           (get-name (lambda (id) (db-get-field-first id "name" #f)))
+           (r (list-filter (map get-name l)
+                           (lambda (s) (not (string-starts? s "mail-"))))))
+      (server-return envelope r))))
+
 (define chat-room-messages (make-ahash-table))
 (define chat-room-present  (make-ahash-table))
 
@@ -68,15 +84,36 @@
   ;; Connect client to a chat room and return list of past messages
   ;;(display* "remote-chat-room-open " name "\n")
   (with (client msg-id) envelope
-    (with crid (chat-room-id name)
-      (if (not crid)
-          (server-error envelope "Error: unknown chat room")
-          (begin
-            (chat-room-initialize crid)
-            (with l (ahash-ref chat-room-present crid)
-              (when (nin? client l)
-                (ahash-set! chat-room-present crid (cons client l))))
-            (server-return envelope (ahash-ref chat-room-messages crid)))))))
+    (let* ((uid (server-get-user envelope))
+           (crid (chat-room-id name)))
+      (cond ((not crid)
+             (server-error envelope "Error: unknown chat room"))
+            ((string-starts? name "mail-")
+             (server-error envelope "Error: invalid name of chat room"))
+            ((not (db-allow? crid uid "readable"))
+             (server-error envelope "Error: access to chat room denied"))
+            (else
+             (chat-room-initialize crid)
+             (with l (ahash-ref chat-room-present crid)
+               (when (nin? client l)
+                 (ahash-set! chat-room-present crid (cons client l))))
+             (let* ((ms (ahash-ref chat-room-messages crid))
+                    (w? (db-allow? crid uid "writable")))
+               (server-return envelope (list w? ms))))))))
+
+(tm-service (remote-mail-open)
+  ;; Open mail while creating mail box (a chat room) if necessary
+  ;;(display* "remote-chat-room-create " name "\n")
+  (with (client msg-id) envelope
+    (let* ((uid (server-get-user envelope))
+           (pseudo (or (user->pseudo uid) uid))
+           (name (string-append "mail-" pseudo))
+           (crid (or (chat-room-id name) (chat-room-create uid name))))
+      (chat-room-initialize crid)
+      (with l (ahash-ref chat-room-present crid)
+        (when (nin? client l)
+          (ahash-set! chat-room-present crid (cons client l))))
+      (server-return envelope (ahash-ref chat-room-messages crid)))))
 
 (define (chat-room-notify mid)
   ;; Notify the arrival of a new message to all participants
@@ -121,10 +158,17 @@
                                         ("message" ,msg)))
              (chat-room-notify mid))))
         ((chat-room-id dest)
-         (remote-send uid (chat-room-id dest) action msg))))
+         (with crid (chat-room-id dest)
+           (when (db-allow? crid uid "writable")
+             (remote-send uid (chat-room-id dest) action msg))))
+        ((string-starts? dest "mail-")
+         (let* ((pseudo (string-drop dest 5))
+                (user (or (pseudo->user pseudo) pseudo))
+                (crid (chat-room-create user dest)))
+           (remote-send uid crid action msg)))))
 
 (tm-service (remote-send-message dest action msg)
   ;;(display* "remote-send-message " dest ", " action ", " msg "\n")
   (with uid (server-get-user envelope)
     (remote-send uid dest action msg)
-    #t))
+    (server-return envelope #t)))

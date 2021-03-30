@@ -1,13 +1,37 @@
-<TeXmacs|1.99.15>
+<TeXmacs|1.99.18>
 
 <style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.16>
+  <section|Changes from version 1.99.1 to 1.99.19>
 
   <\itemize>
+    <item>Many bug fixes (1.99.19).
+
+    <item>Improved Octave plugin with tab completion and multi-line input
+    (1.99.19).
+
+    <item>Enhanced structured search & replace: added preferences and
+    wildcards (1.99.19).
+
+    <item>Minor bug fixes (1.99.18).
+
+    <item>Minor progress on the remote editing tools (1.99.18).
+
+    <item>Continued bug fixes (1.99.17).
+
+    <item>Improved remote editing tools (1.99.17).
+
+    <item>New style package \P<tmpackage|comment>\Q for various kinds of
+    comments (1.99.17).
+
+    <item>Lightweight facility for managing user-defined keyboard shortcuts
+    (1.99.17).
+
+    <item>Improved customizability of item lists and enumerations (1.99.17).
+
     <item>Further improvements for preview and help balloons (1.99.16).
 
     <item>Possibility to find labels from their numeric value (1.99.16).
@@ -2047,7 +2071,7 @@
     <item>Implementation of symbol menus.
   </itemize>
 
-  <tmdoc-copyright|1998\U2020|Joris van der Hoeven>
+  <tmdoc-copyright|1998\U2021|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
