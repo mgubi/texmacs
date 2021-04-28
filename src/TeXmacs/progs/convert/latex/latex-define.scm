@@ -328,7 +328,7 @@
   (tmsep  ", ")
   (tmSep  "; ")
   (pari "{\\sc Pari}")
-  (qed (!math (Box)))
+  (qed (ensuremath (Box)))
   (textdots "...")
   (filldots "{\\dotfill\\hfill\\hbox{}}")
   (infixand (text " and "))
@@ -770,11 +770,13 @@
 ;; Plain style theorems
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (latex-texmacs-thmenv prim name before after)
-  (let* ((prim* (string-append prim "*"))
+(tm-define-macro (latex-texmacs-thmenv prim name before after . opt-mode)
+  (let* ((head (if (null? opt-mode) (list) (list `(:mode ,(car opt-mode)))))
+         (prim* (string-append prim "*"))
          (nonum (string-append "nn" prim))
          (thenonum (string-append "\\the" nonum)))
     `(smart-table latex-texmacs-env-preamble
+       ,@head
        (,prim  (!append ,@before
                         (newtheorem ,prim (!translate ,name))
                         ,@after "\n"))
