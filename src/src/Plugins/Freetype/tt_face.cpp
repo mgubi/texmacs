@@ -57,6 +57,7 @@ tt_face_rep::tt_face_rep (string name): rep<tt_face> (name) {
       if (!is_nil(mathtable)) {
         // we have a MATH table
         cout << "Found MATH table for font  " << name << LF;
+        dump_mathtable (mathtable);
       }
     }
   }

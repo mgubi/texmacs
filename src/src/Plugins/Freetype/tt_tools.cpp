@@ -319,10 +319,11 @@ parse_variants (string tt, int var_offset,
     unsigned int glyphCount = get_U16 (tt, var_offset + coverage_offset + 2);
     for (unsigned int coverage_index=0; coverage_index< glyphCount; coverage_index++) {
       unsigned int glyph = get_U16 (tt, var_offset + coverage_offset + 4 + 2*coverage_index);
+      unsigned int constructionOffset = get_U16 (tt, var_offset + construction_offsets + 2*coverage_index);
       array<unsigned int> variants;
       array<int> adv;
       array<unsigned int> assembly;
-      parse_construction (tt, var_offset + construction_offsets + 2*coverage_index,
+      parse_construction (tt, var_offset + constructionOffset,
                           variants, adv, assembly);
       if (N(variants)>0) {
         glyph_variants(glyph)= variants;
@@ -340,10 +341,11 @@ parse_variants (string tt, int var_offset,
       unsigned int endGlyphID = get_U16 (tt, var_offset + coverage_offset + 6 + 6*i);
       //unsigned int startCoverageIndex = get_U16 (tt, var_offset + coverage_offset + 8 + 6*i);
       for(unsigned int glyph=startGlyphID; glyph<=endGlyphID; glyph++, coverage_index++) {
+        unsigned int constructionOffset = get_U16 (tt, var_offset + construction_offsets + 2*coverage_index);
         array<unsigned int> variants;
         array<int> adv;
         array<unsigned int> assembly;
-        parse_construction (tt, var_offset + construction_offsets + 2*coverage_index,
+        parse_construction (tt, var_offset + constructionOffset,
                             variants, adv, assembly);
         if (N(variants)>0) {
           glyph_variants(glyph)= variants;
@@ -364,10 +366,8 @@ parse_variants (string tt, int var_offset,
 // tt is a buffer which contains the full table.
 ot_mathtable
 parse_mathtable (string buf) {
+  if ((N(buf) == 0) || (!tt_correct_version(buf, 0))) return ot_mathtable();
   //TODO: what if multiple fonts?
-
-  if (N(buf) == 0) return ot_mathtable();
-  if (!tt_correct_version(buf, 0)) return ot_mathtable();
   string tt= tt_table (buf, 0, "MATH");
   if (N(tt) == 0) return ot_mathtable();
 
@@ -484,8 +484,8 @@ tt_dump (string tt) {
            << ", " << name_record_platform_id (nt, k) << "]"
            << " -> " << name_record_string (nt, k) << LF;
     
-    dump_mathtable (parse_mathtable (tt_table (tt, i, "MATH")));
   }
+  dump_mathtable (parse_mathtable (tt));
 }
 
 void
