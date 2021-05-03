@@ -13,6 +13,7 @@
 #include "tt_file.hpp"
 #include "analyze.hpp"
 #include "file.hpp"
+#include "iterator.hpp"
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -270,6 +271,195 @@ name_record_shape (string nt) {
   return name_record_english_string (nt, 2);
 }
 
+
+/******************************************************************************
+* OpenType MATH table
+******************************************************************************/
+
+static void
+parse_construction (string tt, unsigned int construction_offset,
+                    array<unsigned int> variants,
+                    array<int> adv,
+                    array<unsigned int> assembly  ) {
+  unsigned int glyphAssemblyOffset = get_U16 (tt, construction_offset);
+  unsigned int variantCount = get_U16 (tt, construction_offset + 2);
+  if (variantCount > 0) { // could be zero
+    for (unsigned int j=0; j<variantCount; j++) {
+      unsigned int mathGlyphVariantGlyph = get_U16 (tt, construction_offset + 4 + 4*j);
+      int mathGlyphVariantAdvanceMeasurement = get_U16 (tt, construction_offset + 6 + 4*j);
+      variants << mathGlyphVariantGlyph;
+      adv << mathGlyphVariantAdvanceMeasurement;
+    }
+  }
+  
+  // read glyph assembly instructions
+  if (glyphAssemblyOffset > 0) {
+    assembly << (unsigned int) get_U16 (tt, construction_offset + glyphAssemblyOffset + 0); // italicsCorrection
+    assembly << (unsigned int) get_U16 (tt, construction_offset + glyphAssemblyOffset + 2); // italicsCorrection
+    unsigned int partCount = get_U16 (tt, construction_offset + glyphAssemblyOffset + 4);
+    assembly << partCount; // partCount
+    int pos = 6;
+    for (unsigned int j=0; j< partCount; j++ ) {
+      for (int k=0; k< 5; k++, pos += 2 ) {
+        // part record
+        assembly << (unsigned int) get_U16 (tt, construction_offset + glyphAssemblyOffset + pos );
+      }
+    }
+  }
+}
+
+static void
+parse_variants (string tt, int var_offset,
+                int coverage_offset, int construction_offsets,
+                hashmap<unsigned int, array<unsigned int> > glyph_variants,
+                hashmap<unsigned int, array<int> > glyph_variants_adv,
+                hashmap<unsigned int, array<unsigned int> > glyph_assembly ) {
+  int glyphCoverageFormat = get_U16 (tt, var_offset + coverage_offset);
+  if (glyphCoverageFormat == 1) {
+    unsigned int glyphCount = get_U16 (tt, var_offset + coverage_offset + 2);
+    for (unsigned int coverage_index=0; coverage_index< glyphCount; coverage_index++) {
+      unsigned int glyph = get_U16 (tt, var_offset + coverage_offset + 4 + 2*coverage_index);
+      array<unsigned int> variants;
+      array<int> adv;
+      array<unsigned int> assembly;
+      parse_construction (tt, var_offset + construction_offsets + 2*coverage_index,
+                          variants, adv, assembly);
+      if (N(variants)>0) {
+        glyph_variants(glyph)= variants;
+        glyph_variants_adv(glyph)= adv;
+      }
+      if (N(assembly)>0) {
+        glyph_assembly(glyph)= assembly;
+      }
+    }
+  } else if (glyphCoverageFormat == 2) {
+    unsigned int rangeCount = get_U16 (tt, var_offset + coverage_offset + 2);
+    unsigned int coverage_index= 0;
+    for (unsigned int i=0; i<rangeCount; i++) {
+      unsigned int startGlyphID = get_U16 (tt, var_offset + coverage_offset + 4 + 6*i);
+      unsigned int endGlyphID = get_U16 (tt, var_offset + coverage_offset + 6 + 6*i);
+      //unsigned int startCoverageIndex = get_U16 (tt, var_offset + coverage_offset + 8 + 6*i);
+      for(unsigned int glyph=startGlyphID; glyph<=endGlyphID; glyph++, coverage_index++) {
+        array<unsigned int> variants;
+        array<int> adv;
+        array<unsigned int> assembly;
+        parse_construction (tt, var_offset + construction_offsets + 2*coverage_index,
+                            variants, adv, assembly);
+        if (N(variants)>0) {
+          glyph_variants(glyph)= variants;
+          glyph_variants_adv(glyph)= adv;
+        }
+        if (N(assembly)>0) {
+          glyph_assembly(glyph)= assembly;
+        }
+      }
+    }
+  } else {
+    cout << "parse_mathtable : glyphCoverageFormat " << glyphCoverageFormat << " not supported." << LF;
+  }
+}
+
+// parse the OpenType MATH table.
+// buf is the full font file
+// tt is a buffer which contains the full table.
+ot_mathtable
+parse_mathtable (string buf) {
+  //TODO: what if multiple fonts?
+
+  if (N(buf) == 0) return ot_mathtable();
+  if (!tt_correct_version(buf, 0)) return ot_mathtable();
+  string tt= tt_table (buf, 0, "MATH");
+  if (N(tt) == 0) return ot_mathtable();
+
+  ot_mathtable table (tm_new<ot_mathtable_rep>());
+  
+  // header
+  table->majorVersion = get_U16 (tt, 0);
+  table->minorVersion = get_U16 (tt, 2);
+  int mathConstantsOffset = get_U16 (tt, 4);
+  //int mathGlyphInfoOffset = get_U16 (tt, 6);
+  int mathVariantsOffset = get_U16 (tt, 8);
+
+  if ((table->majorVersion != 1) || (table->minorVersion != 0))
+    return ot_mathtable();
+    
+  for (int i=0; i<58; i++) {
+    table->params[i] = get_U16 (tt, mathConstantsOffset + 2*i);
+  }
+ 
+  // math variants
+  table->minConnectorOverlap = get_U16 (tt, mathVariantsOffset + 0);
+  int vertGlyphCoverageOffset = get_U16 (tt, mathVariantsOffset + 2);
+  int horizGlyphCoverageOffset = get_U16 (tt, mathVariantsOffset + 4);
+  int vertGlyphCount = get_U16 (tt, mathVariantsOffset + 6);
+  //int horizGlyphCount = get_U16 (tt, mathVariantsOffset + 8);
+  
+  // (tt-dump "/Users/mgubi/t/svn-src/TeXmacs/fonts/truetype/texgyre/texgyrepagella-math.otf")
+  
+  // parse vertical variants
+  parse_variants (tt, mathVariantsOffset,
+                  vertGlyphCoverageOffset, 10,
+                  table->ver_glyph_variants, table->ver_glyph_variants_adv,
+                  table->ver_glyph_assembly);
+
+  // parse horizontal variants
+  parse_variants (tt, mathVariantsOffset,
+                  horizGlyphCoverageOffset, 10 + 2*vertGlyphCount,
+                  table->hor_glyph_variants, table->hor_glyph_variants_adv,
+                  table->hor_glyph_assembly);
+
+  return table;
+}
+
+void
+dump_mathtable (ot_mathtable table) {
+  if (is_nil(table)) return;
+  
+  cout << "MATH table " << table->majorVersion << " "
+       << table->minorVersion << LF;
+  {
+    cout << "Vertical variants" << LF;
+    iterator<unsigned int> it= iterate (table->ver_glyph_variants);
+    while (it->busy())
+    {
+      int glyph= it->next();
+      cout << "glyph: " << glyph << " variants ("
+           << N(table->ver_glyph_variants[glyph])
+           << ") : " << table->ver_glyph_variants[glyph] << LF;
+    }
+    cout << "Vertical assembly" << LF;
+    it= iterate (table->ver_glyph_assembly);
+    while (it->busy())
+    {
+      int glyph= it->next();
+      cout << "glyph: " << glyph << " assembly ("
+           << N(table->ver_glyph_assembly[glyph])
+           << ") : " << table->ver_glyph_assembly[glyph] << LF;
+    }
+  }
+  {
+    cout << "Horizontal variants" << LF;
+    iterator<unsigned int> it= iterate (table->hor_glyph_variants);
+    while (it->busy())
+    {
+      int glyph= it->next();
+      cout << "glyph: " << glyph << " variants ("
+           << N(table->hor_glyph_variants[glyph])
+           << ") : " << table->hor_glyph_variants[glyph] << LF;
+    }
+    cout << "Horizontal assembly" << LF;
+    it= iterate (table->hor_glyph_assembly);
+    while (it->busy())
+    {
+      int glyph= it->next();
+      cout << "glyph: " << glyph << " assembly ("
+           << N(table->hor_glyph_assembly[glyph])
+           << ") : " << table->hor_glyph_assembly[glyph] << LF;
+    }
+
+  }
+}
+
 /******************************************************************************
 * Dump all font info to the screen
 ******************************************************************************/
@@ -293,6 +483,8 @@ tt_dump (string tt) {
            << " [" << name_record_language_id (nt, k)
            << ", " << name_record_platform_id (nt, k) << "]"
            << " -> " << name_record_string (nt, k) << LF;
+    
+    dump_mathtable (parse_mathtable (tt_table (tt, i, "MATH")));
   }
 }
 

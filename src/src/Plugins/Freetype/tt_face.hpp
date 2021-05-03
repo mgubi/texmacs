@@ -13,6 +13,7 @@
 #define TT_FACE_H
 #include "bitmap_font.hpp"
 #include "Freetype/free_type.hpp"
+#include "Freetype/tt_tools.hpp" // MATH table parser
 #include "hashmap.hpp"
 
 #ifdef USE_FREETYPE
@@ -22,6 +23,7 @@ RESOURCE(tt_face);
 struct tt_face_rep: rep<tt_face> {
   bool bad_face;
   FT_Face ft_face;
+  ot_mathtable mathtable;
   tt_face_rep (string name);
 };
 

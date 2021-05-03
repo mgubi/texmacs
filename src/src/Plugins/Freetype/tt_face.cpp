@@ -14,6 +14,7 @@
 #include "tt_face.hpp"
 #include "tt_file.hpp"
 #include "tm_timer.hpp"
+#include "file.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -47,6 +48,19 @@ tt_face_rep::tt_face_rep (string name): rep<tt_face> (name) {
   if (ft_new_face (ft_library, _name, 0, &ft_face)) {  return; }
   ft_select_charmap (ft_face, ft_encoding_adobe_custom);
   bad_face= false;
+  
+  {
+    // read additional tables not supported by FreeType
+    string buf;
+    if (!load_string (u, buf, false)) {
+      mathtable= parse_mathtable (buf);
+      if (!is_nil(mathtable)) {
+        // we have a MATH table
+        cout << "Found MATH table for font  " << name << LF;
+      }
+    }
+  }
+
 }
 
 tt_face

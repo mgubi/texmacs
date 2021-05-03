@@ -134,6 +134,8 @@ struct unicode_font_rep: font_rep {
 
   hashmap<string,int> native; // additional native (non unicode) characters
   
+  tt_face mathface; // additional data for math typesetting
+  
   unicode_font_rep (string name, string family, int size, int hdpi, int vdpi);
   void tex_gyre_operators ();
 
@@ -275,6 +277,15 @@ unicode_font_rep::unicode_font_rep (string name,
   if (starts (family, "texgyre") && ends (family, "-math"))
     tex_gyre_operators ();
 
+  {
+    // check for additional tables
+    tt_face f= tt_face (family);
+    if (!is_nil(f->mathtable)) {
+      // we have a MATH table
+      mathface= f;
+    }
+  }
+    
   if (starts (family, "STIX-")) {
     if (!ends (family, "italic")) {
       global_rsub_correct= (SI) (0.04 * wfn);
@@ -556,6 +567,59 @@ unicode_font_rep::tex_gyre_operators () {
 * Routines for font
 ******************************************************************************/
 
+int parse_variant (string s, string& r) {
+  int var=0;
+  int start= search_forwards ("-", 0, s);
+  int end= search_backwards ("-", N(s), s);
+  if (end == start) { end=N(s)-1; var=0; }
+  else {
+    if ((end == N(s)-3) && (s[N(s)-2] >= '1') && (s[N(s)-2] <= '9'))
+      var= max(s[N(s)-2] - '1', 9);
+    else
+      var= 0;
+  }
+  r= s(start+1,end);
+  return var;
+}
+
+unsigned int
+lookup_ot_math_variants (tt_face face, string s) {
+  // returns glyphid of the variant and 0 if nothing is found
+  // or 0xc000000 + glyphid if variant found
+  if (is_nil(face) || is_nil(face->mathtable)) return 0;
+  string r; // root character
+  int var= 0; // variant sequential number
+  bool hor= false; // horizontal or vertical?
+  if (starts (s, "<big-")) {
+    var= parse_variant (s, r);
+    if (var > 0) var= var-1;
+    hor= false;
+  } else if (starts (s, "<large-") || starts (s, "<left-") ||
+             starts (s, "<mid-") || starts (s, "<right-")) {
+    var= parse_variant (s, r);
+    if (var > 0) var= var-1;
+    hor= false;
+  } else if (starts (s, "<wide-")) {
+    var= parse_variant (s, r);
+    hor= true;
+  }
+  if (r != "") {
+    string uu= (N(r)>1 ? strict_cork_to_utf8 ("<" * r * ">") : r);
+    int j= 0;
+    unsigned int u= decode_from_utf8 (uu, j);
+    unsigned int glyphid= ft_get_char_index (face->ft_face, u);
+    if (glyphid == 0) return 0;
+    hashmap<unsigned int, array<unsigned int> > l=
+       (hor ? face->mathtable->hor_glyph_variants : face->mathtable->ver_glyph_variants);
+    if (l->contains (glyphid) && (var < N(l(glyphid)))) {
+      unsigned int res=  l(glyphid)[var];
+      return res;
+    }
+    return 0;
+  }
+  return 0;
+}
+
 unsigned int
 unicode_font_rep::read_unicode_char (string s, int& i) {
   if (s[i] == '<') {
@@ -577,7 +641,19 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
       string ss= s (start-1, ++i);
       string uu= strict_cork_to_utf8 (ss);
       if (uu == ss) {
-        if (native->contains (ss)) return 0xc000000 + native[ss];
+        cout << "Lookup for: " << ss << LF;
+        if (native->contains (ss))
+          return 0xc000000 + native[ss];
+        else if (!is_nil(mathface)) {
+          // lookup OpenType variants
+          unsigned int res= lookup_ot_math_variants (mathface, ss);
+          if (res > 0) {
+            cout << "OT_MATH: found variant  " << res << " for " << ss << LF;
+            // caching
+            native (ss) = res;
+            return 0xc000000 + res;
+          }
+        }
         return 0;
       }
       int j= 0;

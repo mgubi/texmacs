@@ -12,6 +12,41 @@
 #ifndef TT_TOOLS_H
 #define TT_TOOLS_H
 #include "url.hpp"
+#include "hashmap.hpp"
+
+/******************************************************************************
+* OpenType MATH table
+******************************************************************************/
+// for the specification
+// see https://docs.microsoft.com/en-gb/typography/opentype/spec/math
+
+struct ot_mathtable_rep : concrete_struct {
+  int majorVersion, minorVersion;
+  int params[58];
+  int minConnectorOverlap;
+  hashmap<unsigned int, array<unsigned int> > ver_glyph_variants;
+  hashmap<unsigned int, array<int> > ver_glyph_variants_adv;
+  hashmap<unsigned int, array<unsigned int> > hor_glyph_variants;
+  hashmap<unsigned int, array<int> > hor_glyph_variants_adv;
+  hashmap<unsigned int, array<unsigned int> > ver_glyph_assembly;
+  hashmap<unsigned int, array<unsigned int> > hor_glyph_assembly;
+  
+  ot_mathtable_rep () {};
+};
+
+struct ot_mathtable {
+  CONCRETE_NULL(ot_mathtable);
+  inline ot_mathtable (ot_mathtable_rep* rep2):
+    rep(rep2) { INC_COUNT_NULL (this->rep); }
+};
+CONCRETE_NULL_CODE(ot_mathtable);
+
+ot_mathtable parse_mathtable (string buf);
+void dump_mathtable (ot_mathtable table);
+
+/******************************************************************************
+* interface
+******************************************************************************/
 
 void tt_dump (url u);
 scheme_tree tt_font_name (url u);
