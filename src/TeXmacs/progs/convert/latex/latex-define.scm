@@ -133,7 +133,9 @@
   (mathD "\\mathrm{D}")
   (mathe "\\mathrm{e}")
   (matheuler "\\gamma")
+  (mathGamma "\\Gamma")
   (mathlambda "\\lambda")
+  (mathLaplace "\\Delta")
   (mathi "\\mathrm{i}")
   (mathpi "\\pi")
   (Alpha "\\mathrm{A}")
@@ -234,6 +236,7 @@
   (gflux "\\gg")
   (colons "\\,:\\,")
   (transtype "\\,:\\!!>")
+  (tmxspace (hspace "1em"))
   (lebar (mathrel (Yleft)))
   (gebar (mathrel (Yright)))
   (leangle (mathrel (angle)))
@@ -328,7 +331,6 @@
   (tmsep  ", ")
   (tmSep  "; ")
   (pari "{\\sc Pari}")
-  (qed (ensuremath (Box)))
   (textdots "...")
   (filldots "{\\dotfill\\hfill\\hbox{}}")
   (infixand (text " and "))
@@ -338,17 +340,17 @@
   ;; Unary macros
   (tmrsub (ensuremath (!append "_{" (textrm 1) "}")))
   (tmrsup (textsuperscript 1))
-  (tmverbatim (!group (ttfamily) (!group 1)))
-  (tmtextrm (!group (rmfamily) (!group 1)))
-  (tmtextsf (!group (sffamily) (!group 1)))
-  (tmtexttt (!group (ttfamily) (!group 1)))
-  (tmtextmd (!group (mdseries) (!group 1)))
-  (tmtextbf (!group (bfseries) (!group 1)))
-  (tmtextup (!group (upshape) (!group 1)))
-  (tmtextsl (!group (slshape) (!group 1)))
-  (tmtextit (!group (itshape) (!group 1)))
-  (tmtextsc (!group (scshape) (!group 1)))
-  (tmmathbf (ensuremath (boldsymbol 1)))
+  (tmverbatim (text (!group (ttfamily) (!group 1))))
+  (tmtextrm (text (!group (rmfamily) (!group 1))))
+  (tmtextsf (text (!group (sffamily) (!group 1))))
+  (tmtexttt (text (!group (ttfamily) (!group 1))))
+  (tmtextmd (text (!group (mdseries) (!group 1))))
+  (tmtextbf (text (!group (bfseries) (!group 1))))
+  (tmtextup (text (!group (upshape) (!group 1))))
+  (tmtextsl (text (!group (slshape) (!group 1))))
+  (tmtextit (text (!group (itshape) (!group 1))))
+  (tmtextsc (text (!group (scshape) (!group 1))))
+  (tmmathbf (ensuremath (!recurse (boldsymbol 1))))
   (tmmathmd (ensuremath 1))
   (tmop (ensuremath (operatorname 1)))
   (tmstrong (textbf 1))
@@ -367,6 +369,7 @@
   (tmdef 1)
   (dueto (textup (textbf (!append "(" 1 ") "))))
   (op 1)
+  (todo (!group (!append (color "red!75!black") "[To do: " 1 "]")))
   (tmoutput 1)
   (tmerrput (!append (color "red!50!black") 1))
   (tmtiming (!append (hfill) (footnotesize) (color "black!50") 1 (par)))
@@ -406,6 +409,7 @@
   (uddot (underaccent (ddot) 1))
   (udddot (underaccent (dddot (hphantom 1)) 1))
   (uddddot (underaccent (ddddot (hphantom 1)) 1))
+  (widespacing 1)
 
   ;; With options
   (tmcodeinline ((!option "") (!group (ttfamily) (!group 2))))
@@ -637,7 +641,7 @@
   (newmdenv
    (!append (mdfsetup (!append "linecolor=black,linewidth=0.5pt,"
 			       "skipabove=0.5em,skipbelow=0.5em,"
-			       "hidealllines=true,\ninnerleftmargin=0pt,"
+			       "hidealllines=true,innerleftmargin=0pt,"
 			       "innerrightmargin=0pt,innertopmargin=0pt,"
 			       "innerbottommargin=0pt" )) "\n"))
   (tikzframe
@@ -647,6 +651,8 @@
     "  \\tikz[baseline=(X.base)]\n"
     "  \\node[draw=black,semithick,rectangle,inner sep=2pt,rounded corners=2pt]\n"
     "  (X) {#1};}\n"))
+  (nonconverted
+   (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
 			(!append (textbf (!translate "Keywords:")) " "))
@@ -696,6 +702,7 @@
 		       (!translate "Misc:") " #2}}\n"))
   (thankssubtitle (!append "\\newcommand{\\thankssubtitle}[2][]{\\thanks[#1]{"
                            (!translate "Subtitle:") " #2}}\n"))
+  (qed (!append (providecommand "\\qed" (ensuremath (Box))) "\n"))
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))

@@ -404,6 +404,7 @@ unicode_font_rep::unicode_font_rep (string name,
       rsup_correct= rsup_libertine_italic_table ();
       above_correct= above_libertine_italic_table ();
     }
+    if (starts (family, "LinLibertine_a")) ligs= 0;
   }
   else if (starts (family, "LinBiolinum")) {
     if (!ends (family, "I")) {
@@ -420,6 +421,7 @@ unicode_font_rep::unicode_font_rep (string name,
       rsup_correct= rsup_biolinum_italic_table ();
       above_correct= above_biolinum_italic_table ();
     }
+    if (starts (family, "LinBiolinum_a")) ligs= 0;
   }
   else if (starts (family, "FiraSans")) {
     if (!ends (family, "Italic")) {

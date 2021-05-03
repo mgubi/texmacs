@@ -58,7 +58,8 @@
   divides ndivides asterisk dottimes precdot
 
   ;; extra literal symbols
-  mathcatalan mathd mathD mathe matheuler mathlambda mathi mathpi
+  mathcatalan mathd mathD mathe matheuler
+  mathGamma mathlambda mathLaplace mathi mathpi
   Alpha Beta Epsilon Eta Iota Kappa Mu Nu Omicron Chi Rho Tau Zeta
 
   ;; negations
@@ -81,7 +82,8 @@
   lflux gflux colons transtype
   lebar gebar leangle geangle leqangle geqangle
   udots subsetsim supsetsim
-  rightmap leftmap leftrightmap)
+  rightmap leftmap leftrightmap
+  tmxspace)
 
 (logic-rules
   ((latex-texmacs-arity% 'x 0) (latex-texmacs-symbol% 'x))
@@ -103,14 +105,15 @@
   tmtextup tmtextsl tmtextit tmtextsc tmmathbf tmmathmd
   tmverbatim tmop tmstrong tmem tmtt tmname tmsamp tmabbr
   tmdfn tmkbd tmvar tmacronym tmperson tmscript tmdef
-  dueto op tmdate tmoutput tmerrput tmtiming
+  dueto op todo tmdate tmoutput tmerrput tmtiming
   tmsubtitle tmrunningtitle tmrunningauthor
   tmaffiliation tmemail tmhomepage
   tmfnaffiliation tmfnemail tmfnhomepage
   tmacmhomepage tmacmmisc tmieeeemail tmnote tmmisc
   uhat uwidehat utilde uwidetilde
   uvec ubreve uinvbreve ucheck uring uacute ugrave
-  underdot uddot udddot uddddot)
+  underdot uddot udddot uddddot
+  widespacing nonconverted)
 
 (logic-group latex-texmacs-1*%
   tmcodeinline)

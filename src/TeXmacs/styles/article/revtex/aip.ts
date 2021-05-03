@@ -24,7 +24,7 @@
     </src-title>
   </active*>
 
-  <use-package|std|env-base|env-math|env-theorem|env-float|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns|html-font-size>
+  <use-package|std|env|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns|html-font-size>
 
   <active*|<\src-comment>
     Page layout.
@@ -198,6 +198,8 @@
 
   \;
 
+  <assign|left-margin-0|24pt>
+
   <assign|left-margin-1|24pt>
 
   <assign|left-margin-2|20pt>
@@ -212,6 +214,8 @@
 
   \;
 
+  <assign|top-sep-0|<tex-len|10pt|4pt|6pt>>
+
   <assign|top-sep-1|<tex-len|10pt|4pt|6pt>>
 
   <assign|top-sep-2|<tex-len|5pt|2.5pt|1pt>>
@@ -219,6 +223,8 @@
   <assign|top-sep-3|<tex-len|2.5pt|1pt|1pt>>
 
   \;
+
+  <assign|par-par-sep-0|<tex-len|5pt|2.5pt|1pt>>
 
   <assign|par-par-sep-1|<tex-len|5pt|2.5pt|1pt>>
 
@@ -266,10 +272,10 @@
 
   <assign|ruled-tabular*|<macro|body|<with|par-columns|1|<tformat|<twith|table-width|1par>|<cwith|1|1|1|-1|cell-bborder|0.5pt>|<cwith|1|1|1|-1|cell-tborder|1pt>|<cwith|-1|-1|1|-1|cell-bborder|1pt>|<arg|body>>>>>
 
-  <assign|big-table-enlarge|<macro|body|<if|<greater|<times|2|<look-up|<box-info|<arg|body>|w>|0>>|<look-up|<box-info|<space|<tex-text-width>>|w>|0>>|<with|par-columns|1|<arg|body>>|<arg|body>>>>
+  <assign|big-table-enlarge|<macro|contents|body|<if|<greater|<times|2|<look-up|<box-info|<arg|contents>|w>|0>>|<look-up|<box-info|<space|<tex-text-width>>|w>|0>>|<with|par-columns|1|<arg|body>>|<arg|body>>>>
 
   <assign|big-table|<\macro|body|caption>
-    <\big-table-enlarge>
+    <\big-table-enlarge|<arg|body>>
       <\surround|<compound|next-table>|>
         <\render-big-table>
           table

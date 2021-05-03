@@ -18,7 +18,7 @@
 (tm-define (tmtex-transform-style x)
   (:mode ams-style?) x)
 
-(tm-define tmtex-provided-packages
+(tm-define (tmtex-provided-packages)
   (:mode ams-style?)
   '("amsmath"))
 
@@ -62,13 +62,14 @@
 (tm-define (tmtex-make-doc-data titles subtitles authors dates miscs notes
                                 subtits-l dates-l miscs-l notes-l tr ar)
   (:mode ams-style?)
-  (let* ((title-opt (if (null? tr) '() `((!option ,@(tmtex-concat-Sep tr)))))
-         (titles    (tmtex-concat-Sep (map cadr titles)))
-         (titles    (if (null? titles) '() `((title ,@title-opt ,@titles))))
+  (let* ((title-opt  (if (null? tr) '() `((!option ,@(tmtex-concat-Sep tr)))))
+         (titles     (tmtex-concat-Sep (map cadr titles)))
+         (titles     (if (null? titles) '() `((title ,@title-opt ,@titles))))
          (title-data `(,@titles ,@subtitles ,@notes ,@miscs))
-         (title-data (if (null? title-data) '() `((!paragraph ,@title-data)))))
-    (if (and (null? title-data) (null? authors) (null? dates)) '()
-      `(!document ,@title-data ,@authors ,@dates))))
+         (title-data (if (null? title-data) '() `((!paragraph ,@title-data))))
+         (authors*   (filter pair? authors)))
+    (if (and (null? title-data) (null? authors*) (null? dates)) '()
+        `(!document ,@title-data ,@authors* ,@dates))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; AMS specific titlemarkup
@@ -145,6 +146,14 @@
   (:mode ams-style?)
   (with args (tmtex-concat-Sep (map tmtex (cdr t)))
     `(subjclass ,@args)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; AMS specific macros
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(smart-table latex-texmacs-macro
+  (:mode ams-style?)
+  (qed #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; AMS theorems
