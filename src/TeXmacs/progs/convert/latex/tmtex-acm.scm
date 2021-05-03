@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (convert latex tmtex-acm)
-  (:use (convert latex tmtex)))
+  (:use (convert latex tmtex)
+        (convert latex latex-define)))
 
 (tm-define (tmtex-transform-style x)
   (:mode acm-style?)
@@ -234,7 +235,7 @@
 (tm-define (tmtex-abstract-keywords t)
   (:mode acm-style?)
   (with args (tmtex-concat-sep (map tmtex (cdr t)))
-    `(keywords ,@args)))
+    `(keywords ,@(map tmtex args))))
 
 (tm-define (tmtex-abstract-acm t)
   (:mode acm-style?)
@@ -245,7 +246,7 @@
                 (else (append (sublist (cdr t) 0 3)
                               `((!option ,(fourth (cdr t))))
                               (sublist (cdr t) 4 (length (cdr t))))))
-    `(category ,@l)))
+    `(category ,@(map tmtex l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ACM specific misc markup
@@ -264,20 +265,61 @@
   `(crdata ,@(map tmtex l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Put 'maketitle' after abstract
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define removed-maketitle? #f)
+(define added-maketitle? #f)
+
+(define (remove-maketitle t)
+  (cond ((nlist? t) t)
+        ((and (func? t '!document) (== (cAr t) '(maketitle)))
+         (set! removed-maketitle? #t)
+         (cDr t))
+        (else (map remove-maketitle t))))
+
+(define (add-maketitle-sub l)
+  (cond ((null? l) l)
+        ((and (pair? (car l)) (== (caar l) '(!begin "abstract")))
+         (set! added-maketitle? #t)
+         (cons (car l) (cons '(maketitle) (cdr l))))
+        (else (cons (add-maketitle (car l))
+                    (add-maketitle-sub (cdr l))))))
+
+(define (add-maketitle t)
+  (cond ((nlist? t) t)
+        ((func? t '!document)
+         (cons (car t) (add-maketitle-sub (cdr t))))
+        (else (map add-maketitle t))))
+
+(tm-define (tmtex-postprocess x)
+  (:mode acm-style?)
+  (set! removed-maketitle? #f)
+  (set! added-maketitle? #f)
+  (let* ((y (remove-maketitle x))
+         (z (add-maketitle y)))
+    (if (and removed-maketitle? added-maketitle?) z x)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ACM specific macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(logic-group latex-texmacs-3%
+  (:mode acm-style?)
+  category)
+
 (smart-table latex-texmacs-macro
   (:mode acm-style?)
-  (qed #f))
+  (qed #f)
+  (category ""))
 
 (smart-table latex-texmacs-environment
   (:mode acm-style?)
   ("proof" #f))
 
-(tm-define (tmtex-cite-detail s l)
-  (:mode acm-style?)
-  (tmtex-cite-detail-poor s l))
+;;(tm-define (tmtex-cite-detail s l)
+;;  (:mode acm-style?)
+;;  (tmtex-cite-detail-poor s l))
 
 (smart-table latex-texmacs-env-preamble
   (:mode acm-art-style?)
@@ -293,20 +335,21 @@
 ;; Missing theorem types
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (acm-thmenv prim name before after)
-  `(smart-table latex-texmacs-env-preamble
-     (:mode acm-art-style?)
-     (,prim (!append ,@before
-                     (newtheorem ,prim (!translate ,name)) "\n"
-		     ,@after))))
-
 (define-macro (acm-theorem prim name)
-  `(acm-thmenv ,prim ,name () ()))
+  `(latex-texmacs-thmenv ,prim ,name () ()
+                         acm-art-style?))
 
 (define-macro (acm-remark prim name)
-  `(acm-thmenv ,prim ,name
-               ("\\theoremstyle{acmdefinition}\n")
-               ("\\theoremstyle{acmplain}\n")))
+  `(latex-texmacs-thmenv ,prim ,name
+                         ("\\theoremstyle{acmdefinition}\n")
+                         ("\n\\theoremstyle{acmplain}")
+                         acm-art-style?))
+
+(define-macro (acm-exercise prim name)
+  `(latex-texmacs-thmenv ,prim ,name
+                         ("\\theoremstyle{acmdefinition}\n")
+                         ("\n\\theoremstyle{acmplain}")
+                         acm-art-style?))
 
 (acm-theorem "axiom" "Axiom")
 (acm-theorem "notation" "Notation")
@@ -320,3 +363,6 @@
 (acm-remark "remark" "Remark")
 (acm-remark "problem" "Problem")
 (acm-remark "solution" "Solution")
+(acm-exercise "exercise" "Exercise")
+(acm-exercise "problem" "Problem")
+(acm-exercise "solution" "Solution")

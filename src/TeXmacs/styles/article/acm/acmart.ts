@@ -1,4 +1,4 @@
-<TeXmacs|1.99.13>
+<TeXmacs|1.99.19>
 
 <style|source>
 
@@ -99,7 +99,7 @@
 
   <assign|render-proof|<\macro|which|body>
     <\render-enunciation|<theorem-name|<arg|which>><remark-sep>>
-      <surround||<htab|5mm><qed>|<arg|body>>
+      <surround||<if|<occurs-inside|<quote|<qed>>|body>||<htab|5mm><qed>>|<arg|body>>
     </render-enunciation>
   </macro>>
 
@@ -177,7 +177,11 @@
 
   <assign|doc-make-title|<macro|body|<\surround||<vspace|0.5fn>>
     <\compact>
-      <doc-title-block|<arg|body>>
+      <\doc-title-block>
+        <arg|body>
+
+        \;
+      </doc-title-block>
     </compact>
   </surround>>>
 

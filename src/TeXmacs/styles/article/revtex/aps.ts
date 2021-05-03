@@ -1,4 +1,4 @@
-<TeXmacs|1.99.16>
+<TeXmacs|1.99.19>
 
 <style|source>
 
@@ -24,11 +24,13 @@
     </src-title>
   </active*>
 
-  <use-package|std|env-base|env-math|env-theorem|env-float|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns|html-font-size>
+  <use-package|std|env|header-generic|section-book|title-generic|std-latex|cite-author-year|std-automatic|two-columns|html-font-size>
 
   <active*|<\src-comment>
     Page layout.
   </src-comment>>
+
+  <assign|par-first|1em>
 
   <assign|parindent|<value|par-first>>
 
@@ -76,6 +78,8 @@
   <the-part><new-line><vspace*|<value|parindent>>><huge|<arg|name>><vspace|3ex><new-line>>>>>>>
 
   <assign|section-title|<macro|name|<style-with|src-compact|none|<sectional-centered-bold|<vspace*|<tex-len|0.8cm|1ex|0.2ex>><small|<change-case|<arg|name>|UPCASE>><vspace|0.5cm>>>>>
+
+  <assign|section-numbered-title|<macro|name|<section-title|<sectional-prefixed|<the-section><section-sep>|<change-case|<arg|name>|UPCASE><section-post-sep>>>>>
 
   <assign|subsection-title|<macro|name|<style-with|src-compact|none|<sectional-centered-bold|<vspace*|<tex-len|0.8cm|1ex|0.2ex>><small|<arg|name>><vspace|0.5cm>>>>>
 
@@ -190,6 +194,8 @@
 
   \;
 
+  <assign|left-margin-0|24pt>
+
   <assign|left-margin-1|24pt>
 
   <assign|left-margin-2|20pt>
@@ -204,6 +210,8 @@
 
   \;
 
+  <assign|top-sep-0|<tex-len|10pt|4pt|6pt>>
+
   <assign|top-sep-1|<tex-len|10pt|4pt|6pt>>
 
   <assign|top-sep-2|<tex-len|5pt|2.5pt|1pt>>
@@ -211,6 +219,8 @@
   <assign|top-sep-3|<tex-len|2.5pt|1pt|1pt>>
 
   \;
+
+  <assign|par-par-sep-0|<tex-len|5pt|2.5pt|1pt>>
 
   <assign|par-par-sep-1|<tex-len|5pt|2.5pt|1pt>>
 
@@ -258,10 +268,10 @@
 
   <assign|ruled-tabular*|<macro|body|<with|par-columns|1|<tformat|<twith|table-width|1par>|<cwith|1|1|1|-1|cell-bborder|0.5pt>|<cwith|1|1|1|-1|cell-tborder|1pt>|<cwith|-1|-1|1|-1|cell-bborder|1pt>|<arg|body>>>>>
 
-  <assign|big-table-enlarge|<macro|body|<if|<greater|<times|2|<look-up|<box-info|<arg|body>|w>|0>>|<look-up|<box-info|<space|<tex-text-width>>|w>|0>>|<with|par-columns|1|<arg|body>>|<arg|body>>>>
+  <assign|big-table-enlarge|<macro|contents|body|<if|<greater|<times|2|<look-up|<box-info|<arg|contents>|w>|0>>|<look-up|<box-info|<space|<tex-text-width>>|w>|0>>|<with|par-columns|1|<arg|body>>|<arg|body>>>>
 
   <assign|big-table|<\macro|body|caption>
-    <\big-table-enlarge>
+    <\big-table-enlarge|<arg|body>>
       <\surround|<compound|next-table>|>
         <\render-big-table>
           table
@@ -318,22 +328,32 @@
     </src-comment>
   </active*>
 
+  <assign|bibitem-width|2em>
+
+  <assign|transform-bibitem|<macro|body|[<arg|body>] >>
+
   <assign|bib-list|<\macro|largest|body>
-    <\description>
-      <\with|par-left|1em|par-first|-1em|font-size|1|bibitem-nr|0>
-        <arg|body>
+    <\small>
+      <\with|bibitem-width|<minimum|<box-info|<transform-bibitem|<arg|largest>>.|w.>|2em>|item-hsep|<value|bibitem-hsep>|bibitem-nr|0|par-flexibility|2.0>
+        <\description>
+          <arg|body>
+        </description>
       </with>
-    </description>
+    </small>
   </macro>>
 
   <assign|bibliography-text|<macro|<rule|9cm|1pt>>>
 
   <assign|bibliography-text|<\macro>
-    <tabular|<tformat|<cwith|1|-1|1|-1|cell-width|0.04par>|<cwith|1|-1|1|-1|cell-hmode|exact>|<cwith|1|-1|1|-1|cell-height|0.1pt>|<cwith|1|-1|1|-1|cell-vmode|exact>|<cwith|1|1|4|6|cell-bborder|0.7pt>|<cwith|1|1|3|3|cell-bborder|0.5pt>|<cwith|1|1|7|7|cell-bborder|0.5pt>|<cwith|1|1|8|8|cell-bborder|0.4pt>|<cwith|1|1|2|2|cell-bborder|0.4pt>|<cwith|1|1|1|1|cell-bborder|0.3pt>|<cwith|1|1|9|9|cell-bborder|0.3pt>|<table|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>>>>
+    <\with|par-columns|1>
+      <tabular|<tformat|<cwith|1|-1|1|-1|cell-width|0.04par>|<cwith|1|-1|1|-1|cell-hmode|exact>|<cwith|1|-1|1|-1|cell-height|0.1pt>|<cwith|1|-1|1|-1|cell-vmode|exact>|<cwith|1|1|4|6|cell-bborder|0.7pt>|<cwith|1|1|3|3|cell-bborder|0.5pt>|<cwith|1|1|7|7|cell-bborder|0.5pt>|<cwith|1|1|8|8|cell-bborder|0.4pt>|<cwith|1|1|2|2|cell-bborder|0.4pt>|<cwith|1|1|1|1|cell-bborder|0.3pt>|<cwith|1|1|9|9|cell-bborder|0.3pt>|<table|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>|<row|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>|<cell|>>>>>
+    </with>
   </macro>>
 
   <assign|render-bibliography|<\macro|name|body>
-    <section*|<arg|name>>
+    <\with|par-columns|1>
+      <center|<section*|<arg|name>>>
+    </with>
 
     <arg|body>
   </macro>>

@@ -184,7 +184,7 @@
   '("british" "bulgarian" "chinese" "croatian" "czech"
     "danish" "dutch" "english" "esperanto" "finnish" "french" "german" "greek"
     "hungarian" "italian" "japanese" "korean" "polish"
-    "portuguese" "romanian" "russian" "slovene" "spanish"
+    "portuguese" "romanian" "russian" "slovak" "slovene" "spanish"
     "swedish" "taiwanese" "ukrainian"))
 
 (define-public (supported-language? lan)
@@ -200,6 +200,9 @@
                      '("bulgarian" "russian" "ukrainian")) in-text%)
   (in-oriental% (in? (get-env "language")
                      '("chinese" "japanese" "korean" "taiwanese")) in-text%)
+  (in-english% (in? (get-env "language")
+                    '("british" "english")) in-text%)
+  (in-american% (== (get-env "language") "english") in-text%)
   (in-british% (== (get-env "language") "british") in-text%)
   (in-bulgarian% (== (get-env "language") "bulgarian") in-cyrillic%)
   (in-chinese% (== (get-env "language") "chinese") in-oriental%)
@@ -207,7 +210,6 @@
   (in-czech% (== (get-env "language") "czech") in-text%)
   (in-danish% (== (get-env "language") "danish") in-text%)
   (in-dutch% (== (get-env "language") "dutch") in-text%)
-  (in-english% (== (get-env "language") "english") in-text%)
   (in-esperanto% (== (get-env "language") "esperanto") in-text%)
   (in-finnish% (== (get-env "language") "finnish") in-text%)
   (in-french% (== (get-env "language") "french") in-text%)
@@ -221,14 +223,18 @@
   (in-portugese% (== (get-env "language") "portugese") in-text%)
   (in-romanian% (== (get-env "language") "romanian") in-text%)
   (in-russian% (== (get-env "language") "russian") in-cyrillic%)
+  (in-slovak% (== (get-env "language") "slovak") in-text%)
   (in-slovene% (== (get-env "language") "slovene") in-text%)
   (in-spanish% (== (get-env "language") "spanish") in-text%)
   (in-swedish% (== (get-env "language") "swedish") in-text%)
   (in-taiwanese% (== (get-env "language") "taiwanese") in-oriental%)
   (in-ukrainian% (== (get-env "language") "ukrainian") in-cyrillic%)
 
+  (in-math-english% (in? (get-env "language")
+                         '("british" "english")) in-math%)
+  (in-math-american% (== (get-env "language") "english") in-math%)
+  (in-math-british% (== (get-env "language") "british") in-math%)
   (in-math-dutch% (== (get-env "language") "dutch") in-math%)
-  (in-math-english% (== (get-env "language") "english") in-math%)
   (in-math-french% (== (get-env "language") "french") in-math%)
   (in-math-german% (== (get-env "language") "german") in-math%)
   (in-math-italian% (== (get-env "language") "italian") in-math%)

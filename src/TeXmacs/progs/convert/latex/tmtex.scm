@@ -30,7 +30,6 @@
 
 (tm-define tmtex-style "generic")
 (tm-define tmtex-packages '())
-(tm-define tmtex-provided-packages '())
 (tm-define tmtex-replace-style? #t)
 (define tmtex-languages '())
 (define tmtex-colors '())
@@ -105,7 +104,7 @@
 
   ;; Other styles
   (beamer-style%        (in? tmtex-style '("beamer" "old-beamer")))
-  (natbib-package%      (in? "cite-author-year" tmtex-packages)))
+  (natbib-package%      (in? "natbib" tmtex-packages)))
 
 (tm-define (tmtex-style-init body)
   (noop))
@@ -122,6 +121,8 @@
         ((or (springer-style?) (svmono-style?))
          (import-from (convert latex tmtex-springer)))
          (else (noop))))
+
+(tm-define (tmtex-provided-packages) '())
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization from options
@@ -210,6 +211,8 @@
          (cons '!paragraph (map-in-order tmtex-pre (tm-children t))))
         ((tm-func? t 'concat)
          (cons '!paragraph (map-in-order tmtex-pre (tm-children t))))
+        ((tm-func? t 'mtm 2)
+         `(mtm ,(cadr t) ,(tmtex-pre (caddr t))))
         ((and (tm-func? t 'assign 2) (tm-atomic? (tm-ref t 0)))
          (let* ((name (tm-ref t 0))
                 (tag (string->symbol name))
@@ -334,8 +337,7 @@
 
 (define (tmtex-env-get var)
   (let ((val (tmtex-env-list var)))
-    (if (null? val) #f
-	(car val))))
+    (and (pair? val) (car val))))
 
 (define (tmtex-env-get-previous var)
   (let ((val (tmtex-env-list var)))
@@ -482,9 +484,12 @@
            (list '!widechar (string->symbol cv))))
         (else (let* ((s2 (string-replace s "-" ""))
                      (ss (list (string->symbol s2))))
-                (cond ((not (logic-in? (car ss) latex-symbol%))
+                (cond ((logic-in? (car ss) tmtex-protected-symbol%)
+                       (with sy (string->symbol (string-append "tmx" s2))
+                         (list '!symbol (list sy))))
+                      ((not (logic-in? (car ss) latex-symbol%))
                        (display* "TeXmacs] non converted symbol: " s "\n")
-                       "")
+                       (list '!symbol (list 'nonconverted s2)))
                       (group? (list '!group ss))
                       (else (list '!symbol ss)))))))
 
@@ -621,8 +626,8 @@
     `(!concat ,@(map tmtex (tmstring-split s)))
     (let* ((l (string->list s))
            (t (if (tmtex-math-mode?)
-                (tmtex-math-list l)
-                (tmtex-text-list l)))
+                  (tmtex-math-list l)
+                  (tmtex-text-list l)))
            (r (tmtex-string-produce t)))
       (tex-concat r))))
 
@@ -632,6 +637,8 @@
            (map (lambda (x) (string-convert (char->string x) from to)) c))))
 
 (define (tmtex-verb-string s)
+  (when (nstring? s)
+    (set! s (texmacs->verbatim (tm->tree s))))
   (let* ((l (string->list s))
          (t (tmtex-verb-list l))
          (r (tmtex-string-produce t)))
@@ -710,12 +717,38 @@
                (cons (car l) (map tmtex-filter-body a)))))
         (else (cons (car l) (map tmtex-filter-body (cdr l))))))
 
+(define (tmtex-filter-duplicates* l t)
+  (cond ((null? l) l)
+        ((func? (car l) 'assign 2)
+         (let* ((var (cadr (car l)))
+                (r (tmtex-filter-duplicates* (cdr l) t))
+                (dup? (ahash-ref t var)))
+           (ahash-set! t var #t)
+           (if dup? r (cons (car l) r))))
+        ((or (func? (car l) 'concat)
+             (func? (car l) 'para)
+             (func? (car l) 'document))
+         (with r (tmtex-filter-duplicates* (cdr l) t)
+           (cons (cons (caar l) (tmtex-filter-duplicates* (cdar l) t)) r)))
+        (else (cons (car l) (tmtex-filter-duplicates* (cdr l) t)))))
+
+(define (tmtex-filter-duplicates l)
+  (with t (make-ahash-table)
+    (tmtex-filter-duplicates* l t)))
+
 (define (tmtex-apply-init body init)
   ;;(display* "init= " init "\n")
   (cond ((== (assoc-ref init "language") "verbatim")
 	 (with init* (assoc-remove! init "language")
 	   (tmtex-apply-init `(verbatim ,body) init*)))
 	(else body)))
+
+(define (tmtex-clean-body b)
+  (when (and (func? b '!document)
+             (> (length b) 1)
+             (== (cadr b) `(!document "")))
+    (set! b (cons (car b) (cddr b))))
+  b)
 
 (define (tmtex-file l)
   (let* ((doc (car l))
@@ -726,7 +759,8 @@
                      (map (lambda (x) (cons (cadr x) (caddr x))) (cdr init))
                      '()))
          (att (or (cadddr (cdr l)) '()))
-         (doc-preamble (tmtex-filter-preamble (tmtex-filter-style-macro doc)))
+         (doc-pre (tmtex-filter-preamble (tmtex-filter-style-macro doc)))
+         (doc-preamble (tmtex-filter-duplicates doc-pre))
          (doc-body-pre (tmtex-filter-body doc))
          (doc-body (tmtex-apply-init doc-body-pre init-bis)))
     (init-mode-stats doc-body-pre)
@@ -741,10 +775,11 @@
                            (list `("twocolumn" "article"))
                            styles*))
              (preamble* (ahash-with tmtex-env :preamble #t
-                                    (map-in-order tmtex-pre doc-preamble)))
-             (body* (tmtex doc-body))
+                          (map-in-order tmtex-pre doc-preamble)))
+             (body* (tmtex-postprocess-body (tmtex doc-body)))
+             (body** (tmtex-clean-body body*))
              (needs (list tmtex-languages tmtex-colors tmtex-colormaps)))
-        (list '!file body* styles** needs init preamble*)))))
+        (list '!file body** styles** needs init preamble*)))))
 
 (define (convert-charset t)
   (cond ((string? t) (unescape-angles (utf8->cork t)))
@@ -952,9 +987,13 @@
 	 (caption (tmtex (into-single-paragraph capt)))
 	 (body* `(!paragraph ,body (caption ,caption))))
     (cond ((and (== size "big") (== type "figure"))
-	   `((!begin ,type* (!option ,pos)) ,body*))
+           (if (== pos "")
+               `((!begin ,type) ,body*)
+               `((!begin ,type* (!option ,pos)) ,body*)))
 	  ((and (== size "big") (== type "table"))
-	   `((!begin ,type* (!option ,pos)) ,body*))
+           (if (== pos "")
+               `((!begin ,type) ,body*)
+               `((!begin ,type* (!option ,pos)) ,body*)))
 	  (else (list 'tmfloat pos size type* body caption)))))
 
 (define (tmtex-float-table? x)
@@ -1007,6 +1046,8 @@
          (disable-large? (cadr x) (- level 1)))
         ((tm-in? x '(with rigid locus))
          (disable-large? (cAr x) level))
+        ((tm-in? x '(math-up math-ss math-tt math-bf math-it math-sl))
+         (and (== (tm-arity x) 1) (disable-large? (cadr x) level)))
         (else #f)))
 
 (define (make-small s)
@@ -1071,42 +1112,53 @@
 	 (string-append "\\" (substring s 1 (- (string-length s) 1))))
 	(else (string-append "\\" s))))
 
+(define (tmtex-large-decode-text s)
+  (cond ((nstring? s) "")
+        ((== s ".") "")
+        ((in? s '("(" ")" "[" "]" "|" "/")) s)
+        ((in? s '("{" "}")) (string-append "\\" s))
+        (else
+         (display* "TeXmacs] non converted bracket: " s "\n")
+         "")))
+
 (define (tmtex-left l)
-  (let* ((s (tmtex-large-decode (car l)))
-	 (n (if (= (length l) 2) (string->number (cadr l)) 0))
-	 (b (cond ((not n) "left")
-                  ((= n 1) "bigl")
-		  ((= n 2) "Bigl")
-		  ((= n 3) "biggl")
-		  ((= n 4) "Biggl")
-		  (else "left"))))
-    (list (string->symbol (string-append b s)))))
+  (if (tmtex-math-mode?)
+      (let* ((s (tmtex-large-decode (car l)))
+             (n (if (= (length l) 2) (string->number (cadr l)) 0))
+             (b (cond ((not n) "left")
+                      ((= n 1) "bigl")
+                      ((= n 2) "Bigl")
+                      ((= n 3) "biggl")
+                      ((= n 4) "Biggl")
+                      (else "left"))))
+        (list (string->symbol (string-append b s))))
+      (tmtex-large-decode-text (car l))))
 
 (define (tmtex-mid l)
-  (let* ((s (tmtex-large-decode (car l)))
-	 (n (if (= (length l) 2) (string->number (cadr l)) 0))
-	 (b (cond ((not n) "middle")
-                  ((= n 1) "bigm")
-		  ((= n 2) "Bigm")
-		  ((= n 3) "biggm")
-		  ((= n 4) "Biggm")
-		  (else "middle"))))
-    (list (string->symbol (string-append b s)))))
+  (display* "TeXmacs] downgraded large middle delimiter: " (car l) "\n")
+  (if (tmtex-math-mode?)
+      (with s (tmtex-large-decode (car l))
+        (if (== s ".") "" s))
+      (tmtex-large-decode-text (car l))))
 
 (define (tmtex-right l)
-  (let* ((s (tmtex-large-decode (car l)))
-	 (n (if (= (length l) 2) (string->number (cadr l)) 0))
-	 (b (cond ((not n) "right")
-                  ((= n 1) "bigr")
-		  ((= n 2) "Bigr")
-		  ((= n 3) "biggr")
-		  ((= n 4) "Biggr")
-		  (else "right"))))
-    (list (string->symbol (string-append b s)))))
+  (if (tmtex-math-mode?)
+      (let* ((s (tmtex-large-decode (car l)))
+             (n (if (= (length l) 2) (string->number (cadr l)) 0))
+             (b (cond ((not n) "right")
+                      ((= n 1) "bigr")
+                      ((= n 2) "Bigr")
+                      ((= n 3) "biggr")
+                      ((= n 4) "Biggr")
+                      (else "right"))))
+        (list (string->symbol (string-append b s))))
+      (tmtex-large-decode-text (car l))))
 
 (define (tmtex-big-decode s)
   (cond ((nstring? s) "bignone")
         ((in? s '("sum" "prod" "int" "oint" "coprod")) s)
+        ((in? s '("iint" "iiint" "iiiint" "idotsint")) s)
+        ((in? s '("oiint" "oiiint")) s)
 	((== s "amalg") "coprod")
 	((== s "pluscup") "uplus")
 	((== s ".") "bignone")
@@ -1154,12 +1206,14 @@
   (list 'overset (tmtex (cadr l)) (tmtex (car l))))
 
 (define (tmtex-lsub l)
-  (tmtex (list
-           'concat (if (tmtex-math-mode?) '(!group) "") (list 'rsub (car l)))))
+  (cond ((== (car l) "") "")
+        ((tmtex-math-mode?) (tmtex `(concat (!group) (rsub ,(car l)))))
+        (else (tmtex `(rsub ,(car l))))))
 
 (define (tmtex-lsup l)
-  (tmtex (list
-           'concat (if (tmtex-math-mode?) '(!group) "") (list 'rsup (car l)))))
+  (cond ((== (car l) "") "")
+        ((tmtex-math-mode?) (tmtex `(concat (!group) (rsup ,(car l)))))
+        (else (tmtex `(rsup ,(car l))))))
 
 (define (tmtex-contains-table? x)
   (cond ((nlist? x) #f)
@@ -1173,14 +1227,14 @@
 	(list which r))))
 
 (define (tmtex-rsub l)
-  (if (tmtex-math-mode?)
-      (tmtex-script '!sub (car l))
-      (list 'tmrsub (tmtex (car l)))))
+  (cond ((== (car l) "") "")
+        ((tmtex-math-mode?) (tmtex-script '!sub (car l)))
+        (else (list 'tmrsub (tmtex (car l))))))
 
 (define (tmtex-rsup l)
-  (if (tmtex-math-mode?)
-      (tmtex-script '!sup (car l))
-      (list 'tmrsup (tmtex (car l)))))
+  (cond ((== (car l) "") "")
+        ((tmtex-math-mode?) (tmtex-script '!sup (car l)))
+        (else (list 'tmrsup (tmtex (car l))))))
 
 (define (tmtex-modulo l)
       (tmtex-script 'mod (car l)))
@@ -1591,7 +1645,12 @@
 	((logic-in? (string->symbol var) tmtex-protected%)
 	 (string-append "tm" var))
 	((<= (string-length var) 1) var)
-	(else (list->string (tmtex-var-name-sub (string->list var))))))
+	(else
+          (with r (list->string (tmtex-var-name-sub (string->list var)))
+            (if (and (string-occurs? "*" r)
+                     (== (latex-type r) "undefined"))
+                (string-replace r "*" "star")
+                r)))))
 
 (define (tmtex-tex-arg l)
   (cons '!arg l))
@@ -1657,6 +1716,9 @@
 
 (define (tmtex-pageref l)
   (list 'pageref (force-string (car l))))
+
+(define (tmtex-eqref s l)
+  (list 'eqref (force-string (car l))))
 
 (define (tmtex-smart-ref s l)
   (let* ((ss (map force-string l))
@@ -2072,6 +2134,22 @@
          (body    (filter-enunciation-body t)))
   `((!begin ,s ,@option*) ,(tmtex body))))
 
+(define (find-label x)
+  (cond ((npair? x) #f)
+        ((func? x 'label) x)
+        (else (or (find-label (car x)) (find-label (cdr x))))))
+
+(define (remove-labels x)
+  (cond ((npair? x) x)
+        ((func? x 'label) "")
+        (else (cons (remove-labels (car x)) (remove-labels (cdr x))))))
+
+(define (tmtex-sectional s l)
+  (let* ((lab (find-label (car l)))
+         (tit (if lab (remove-labels (car l)) (car l)))
+         (sec (list (string->symbol s) (tmtex tit))))
+    (if lab (list '!concat sec lab) sec)))
+
 (define (tmtex-appendix s l)
   (with app (list (if (latex-book-style?) 'chapter 'section) (tmtex (car l)))
     (if tmtex-appendices? app
@@ -2449,7 +2527,7 @@
 (define (tmtex-thebibliography s l)
   (list (list '!begin s (car l)) (tmtex (cadr l))))
 
-(define (tmtex-bibitem* s l)
+(define (tmtex-bibitem*-std s l)
   (cond ((= (length l) 1)
 	 `(bibitem ,(car l)))
 	((= (length l) 2)
@@ -2459,6 +2537,32 @@
 	    (display* "TeXmacs] non converted bibitem content: "
                       (list s l) "\n")
             ""))))
+
+(tm-define (tmtex-bibitem* s l)
+  (tmtex-bibitem*-std s l))
+
+(define (split-year s pos)
+  (if (and (> pos 0)
+           (string>=? (substring s (- pos 1) pos) "0")
+           (string<=? (substring s (- pos 1) pos) "9"))
+      (split-year s (- pos 1))
+      pos))
+
+(define (natbibify s)
+  (let* ((pos  (split-year s (string-length s)))
+         (auth (substring s 0 pos))
+         (year (substring s pos (string-length s))))
+    (when (== (string-length year) 2)
+      (set! year (string-append (if (string>=? year "30") "19" "20") year)))
+    (string-append auth "(" year ")")))
+
+(tm-define (tmtex-bibitem* s l)
+  (:mode natbib-package?)
+  (if (and (== (length l) 2)
+           (string? (cadr l))
+           (not (string-occurs? "(" (cadr l))))
+      (tmtex-bibitem*-std s (list (natbibify (cadr l)) (cadr l)))
+      (tmtex-bibitem*-std s l)))
 
 (define (tmtex-figure s l)
   (tmtex-float-sub #f "h" (cons (string->symbol s) l)))
@@ -2611,7 +2715,9 @@
 
 (define (tmtex-cite-list l)
   (cond ((null? l) "")
-	;((nstring? (car l)) (tmtex-cite-list (cdr l)))
+        ((nstring? (car l))
+         (display* "TeXmacs] non converted citation: " (car l) "\n")
+         (tmtex-cite-list (cdr l)))
 	((null? (cdr l)) (car l))
 	(else (string-append (car l) "," (tmtex-cite-list (cdr l))))))
 
@@ -2629,16 +2735,17 @@
   (tex-apply 'citetexmacs (tmtex-cite-list l)))
 
 (tm-define (tmtex-cite-detail s l)
-  (tex-apply 'cite `(!option ,(tmtex (cadr l))) (tmtex (car l))))
+  (with c (tmtex-cite-list (list (car l)))
+    (tex-apply 'cite `(!option ,(tmtex (cadr l))) c)))
 
 (tm-define (tmtex-cite-detail s l)
   (:mode natbib-package?)
-  (tex-apply 'citetext `(!concat (citealp ,(tmtex (car l))) ", "
-				 ,(tmtex (cadr l)))))
+  (with c (tmtex-cite-list (list (car l)))
+    (tex-apply 'citetext `(!concat (citealp ,c) ", " ,(tmtex (cadr l))))))
 
 (tm-define (tmtex-cite-detail-poor s l)
-  `(!concat ,(tex-apply 'cite (tmtex (car l)))
-            " (" ,(tmtex (cadr l)) ")"))
+  (with c (tmtex-cite-list (list (car l)))
+    `(!concat ,(tex-apply 'cite c) " (" ,(tmtex (cadr l)) ")")))
 
 (define (tmtex-cite-detail-hook s l)
   (tmtex-cite-detail s l))
@@ -2925,7 +3032,7 @@
 
 (logic-table tmtex-tmstyle%
   ((:or section subsection subsubsection paragraph subparagraph part chapter)
-   (,tmtex-default 1))
+   (,tmtex-sectional 1))
   ((:or hide-preamble show-preamble) (,tmtex-default -1))
   (hide-part (,tmtex-hide-part -1))
   (show-part (,tmtex-show-part -1))
@@ -2996,7 +3103,7 @@
   (really-huge (,tmtex-Huge 1))
   ((:or british bulgarian chinese croatian czech danish dutch english
 	esperanto finnish french german greek hungarian italian japanese
-	korean polish portuguese romanian russian slovene spanish
+	korean polish portuguese romanian russian slovak slovene spanish
 	swedish taiwanese ukrainian)
    (,tmtex-specific-language 1))
 
@@ -3034,6 +3141,7 @@
         flalign alignat align* flalign* alignat*) (,tmtex-eqnarray 1))
 
   (eq-number (,tmtex-default -1))
+  (separating-space (,tmtex-hspace* 1))
   (application-space (,tmtex-hspace* 1))
 
   ((:or code cpp-code mmx-code scm-code shell-code scilab-code verbatim-code)
@@ -3056,6 +3164,9 @@
   (listing (,tmtex-listing 1))
   (draw-over (,tmtex-make-eps 3))
   (draw-under (,tmtex-make-eps 3))
+  (version-old (,tmtex-style-first 2))
+  (version-both (,tmtex-style-second 2))
+  (version-new (,tmtex-style-second 2))
   (the-index (,tmtex-theindex -1))
   (glossary (,tmtex-glossary 1))
   (glossary-explain (,tmtex-glossary 2))
@@ -3077,6 +3188,7 @@
   (action (,tmtex-action -1))
   (href (,tmtex-href 1))
   (slink (,tmtex-href 1))
+  (eqref (,tmtex-eqref 1))
   (smart-ref (,tmtex-smart-ref -1))
   (choose (,tmtex-choose 2))
   (tt (,tmtex-text-tt 1))
@@ -3199,6 +3311,9 @@
   ne ng ni nu oe or pi pm rm rq sb sc sf sl sp ss th to tt wd wp wr xi
   AA AE DH DJ Im NG OE Pi Pr Re SS TH Xi)
 
+(logic-group tmtex-protected-symbol%
+  space)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Expansion of all macros which are not recognized by LaTeX
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3248,9 +3363,9 @@
 (define tmtex-always-expand
   ;; FIXME: find a cleaner way to handle these environments
   (list "render-theorem" "render-remark" "render-exercise" "render-proof"
-        "algorithm" "algorithm*" "named-algorithm"
+        "algorithm" "algorithm*" "named-algorithm" "named-algorithm-old"
         "specified-algorithm" "specified-algorithm*"
-        "named-specified-algorithm" "numbered"
+        "named-specified-algorithm" "algorithm-body" "numbered"
 
         "short-item" "short-question"
         "question-arabic" "question-alpha" "question-Alpha"
@@ -3299,6 +3414,9 @@
         ((null? sty) (set! sty '("article"))))
   sty)
 
+(tm-define (tmtex-postprocess x) x)
+(tm-define (tmtex-postprocess-body x) x)
+
 (tm-define (texmacs->latex x opts)
   ;;(display* "texmacs->latex [" opts "], " x "\n")
   (if (tmfile? x)
@@ -3323,7 +3441,7 @@
         (import-tmtex-styles)
         (tmtex-style-init body)
         (set! doc (tmtex-style-preprocess doc))
-        (with result (texmacs->latex doc opts)
+        (with result (tmtex-postprocess (texmacs->latex doc opts))
           (set! tmtex-style "generic")
           (set! tmtex-packages '())
           result))
