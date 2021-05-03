@@ -78,6 +78,8 @@ struct font_rep: rep<font> {
   double   last_zoom;        // last rendered zoom
   font     zoomed_fn;        // zoomed font for last_zoom (or nil)
 
+  bool     has_rubber;       // has rubber glyphs?
+  
   // Microtypography
   SI   global_lsub_correct;  // global left subscript correction
   SI   global_lsup_correct;  // global left superscript correction

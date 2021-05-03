@@ -283,6 +283,8 @@ unicode_font_rep::unicode_font_rep (string name,
     if (!is_nil(f->mathtable)) {
       // we have a MATH table
       mathface= f;
+      has_rubber= true;
+      math_type=  MATH_TYPE_TEX_GYRE; //FIXME: hack for <wide-XX> constructs
     }
   }
     
@@ -573,12 +575,9 @@ int parse_variant (string s, string& r) {
   int end= search_backwards ("-", N(s), s);
   if (end == start) { end=N(s)-1; var=0; }
   else {
-    if ((end == N(s)-3) && (s[N(s)-2] >= '1') && (s[N(s)-2] <= '9'))
-      var= max(s[N(s)-2] - '1', 9);
-    else
-      var= 0;
+    var= max (0, as_int (s (end+1, N(s))));
   }
-  r= s(start+1,end);
+  r= s (start+1, end);
   return var;
 }
 
@@ -597,7 +596,6 @@ lookup_ot_math_variants (tt_face face, string s) {
   } else if (starts (s, "<large-") || starts (s, "<left-") ||
              starts (s, "<mid-") || starts (s, "<right-")) {
     var= parse_variant (s, r);
-    if (var > 0) var= var-1;
     hor= false;
   } else if (starts (s, "<wide-")) {
     var= parse_variant (s, r);
@@ -611,9 +609,14 @@ lookup_ot_math_variants (tt_face face, string s) {
     if (glyphid == 0) return 0;
     hashmap<unsigned int, array<unsigned int> > l=
        (hor ? face->mathtable->hor_glyph_variants : face->mathtable->ver_glyph_variants);
-    if (l->contains (glyphid) && (var < N(l(glyphid)))) {
-      unsigned int res=  l(glyphid)[var];
-      return res;
+    if (l->contains (glyphid)) {
+      if (var < N(l(glyphid))) {
+        unsigned int res=  l(glyphid)[var];
+        return res;
+      } else {
+        //TODO: need assembly
+        return 0;
+      }
     }
     return 0;
   }
@@ -642,14 +645,15 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
       string uu= strict_cork_to_utf8 (ss);
       if (uu == ss) {
         cout << "Lookup for: " << ss << LF;
-        if (native->contains (ss))
+        if (native->contains (ss)) {
+          cout << "Found native  " << native[ss] << " for " << ss << LF;
           return 0xc000000 + native[ss];
-        else if (!is_nil(mathface)) {
+        } else if (!is_nil(mathface)) {
           // lookup OpenType variants
           unsigned int res= lookup_ot_math_variants (mathface, ss);
           if (res > 0) {
-            cout << "OT_MATH: found variant  " << res << " for " << ss << LF;
             // caching
+            cout << "OT_MATH: caching variant  " << res << " for " << ss << LF;
             native (ss) = res;
             return 0xc000000 + res;
           }

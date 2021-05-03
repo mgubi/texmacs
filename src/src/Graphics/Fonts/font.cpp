@@ -61,7 +61,8 @@ font_rep::font_rep (string s):
   rsup_correct (0.0),
   above_correct (0.0),
   below_correct (0.0),
-  protrusion_maps (-1)
+  protrusion_maps (-1),
+  has_rubber(false)
 {
   lsub_correct = lsub_guessed_table ();
   lsup_correct = lsup_guessed_table ();
@@ -540,6 +541,8 @@ make_rubber_font (font fn) {
     return rubber_stix_font (fn);
   else if (occurs ("mathlarge=", fn->res_name) ||
            occurs ("mathrubber=", fn->res_name))
+    return fn;
+  else if (fn->type == FONT_TYPE_UNICODE && fn->has_rubber)
     return fn;
   else if (has_poor_rubber && fn->type == FONT_TYPE_UNICODE)
     return poor_rubber_font (fn);
