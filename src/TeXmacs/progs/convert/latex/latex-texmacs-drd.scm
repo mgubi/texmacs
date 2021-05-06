@@ -81,6 +81,7 @@
   assign plusassign minusassign timesassign overassign backassign
   lflux gflux colons transtype
   lebar gebar leangle geangle leqangle geqangle
+  anglele anglege legeangle geleangle
   udots subsetsim supsetsim
   rightmap leftmap leftrightmap
   tmxspace)
@@ -113,10 +114,10 @@
   uhat uwidehat utilde uwidetilde
   uvec ubreve uinvbreve ucheck uring uacute ugrave
   underdot uddot udddot uddddot
-  widespacing nonconverted)
-
-(logic-group latex-texmacs-1*%
-  tmcodeinline)
+  widespacing nonconverted
+  tmcodeinline groupcommoncounter
+  ;; NOTE: for personal use from vdh style package
+  gb gbt)
 
 (logic-group latex-texmacs-2%
   tmcolor
@@ -132,11 +133,13 @@
   tmfoldedplain tmunfoldedplain tmfoldedenv tmunfoldedenv
   tmfoldedstd tmunfoldedstd tmfolded tmunfolded
   tminput tminputmath tmhlink tmaction ontop subindex
-  renderfootnote tmlinenumber)
+  renderfootnote tmlinenumber
+  addtocountergroup)
 
 (logic-group latex-texmacs-3%
   tmsession tmfoldedio tmunfoldedio tmfoldediomath tmunfoldediomath
-  tmlinenote subsubindex tmref glossaryentry natbib-triple)
+  tmlinenote subsubindex tmref glossaryentry natbib-triple
+  renderfootnotestar)
 
 (logic-group latex-texmacs-4%
   tmscriptinput tmscriptoutput tmconverterinput tmconverteroutput
@@ -265,7 +268,7 @@
   "tmpadded" "tmoverlined" "tmunderlined" "tmbothlined"
   "tmframed" "tmornamented")
 
-(logic-group latex-texmacs-env-preamble-environment%
+(logic-group latex-texmacs-theorem-environment%
   "theorem" "proposition" "lemma" "corollary"
   "axiom" "definition" "notation" "conjecture"
   "remark" "note" "example" "convention"
@@ -292,6 +295,8 @@
   begin-exercise* begin-problem* begin-solution*)
 
 (logic-rules
+  ((latex-texmacs-env-preamble-environment% 'x)
+   (latex-texmacs-theorem-environment% 'x))
   ((latex-texmacs-arity% 'x 0) (latex-texmacs-theorem% 'x))
   ((latex-environment-0% 'x) (latex-texmacs-theorem% 'x)))
 
