@@ -113,8 +113,8 @@ might_not_be_typesetted (tree t) {
           (is_func (t, TUPLE) && t[0] == "\\SetKwInOut")      ||
           (is_func (t, TUPLE) && t[0] == "\\SetKwInput")      ||
           (is_func (t, TUPLE) && t[0] == "\\SetKwFunction")   ||
-          (is_func (t, TUPLE) && t[0] == "\\blx")             ||
-          (is_func (t, TUPLE) && t[0] == "\\elx")             ||
+          //(is_func (t, TUPLE) && t[0] == "\\blx")           ||
+          //(is_func (t, TUPLE) && t[0] == "\\elx")           ||
            is_vertical_space (t));
 }
 
@@ -1466,7 +1466,7 @@ static bool
 is_left_type (string s) {
   return
     (s == "(") || (s == "[") || (s == "\\{") ||
-    (s == "\\lvert") || (s == "lVert") ||
+    (s == "\\lvert") || (s == "\\lVert") ||
     (s == "\\lfloor") || (s == "\\lceil") || (s == "\\langle");
 }
 

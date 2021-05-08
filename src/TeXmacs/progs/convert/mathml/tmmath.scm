@@ -286,6 +286,17 @@
     (if (null? attrs-3) body
 	`(m:mstyle (@ ,@attrs-3) ,body))))
 
+(define (tmmath-text x)
+  ;; we protect via non-breaking spaces the initial and final whitespaces 
+  ;; which are otherwise stripped by the MathML processor from <mtext> tags
+  ;; see https://www.xmlmind.com/tutorials/MathML/
+  (let* ((s (texmacs->code x  "utf-8"))
+         (s (if (string-starts? s " ") 
+            (string-append "&#xA0; " (substring s 1 (string-length s))) s))
+         (s (if (string-ends? s " ") 
+            (string-append (substring s 0 (- (string-length s) 1)) " &#xA0;") s)))
+    `(m:mtext ,s)))
+       
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main conversion routines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -296,10 +307,12 @@
 	 (x (cdr l)))))
 
 (define (tmmath x)
-  (cond ((!= (ahash-ref tmmath-env "mode") "math")
-	 `(m:mtext ,(texmacs->code x  "utf-8")))
-	((string? x) (tmmath-concat (list x)))
-	(else (or (tmmath-dispatch 'tmmath-primitives% x) ""))))
+  (if (!= (ahash-ref tmmath-env "mode") "math")
+      (cond ((string? x) (tmmath-text x))
+            ((== (car x) 'with) (tmmath-with (cdr x)))
+            (else `(m:mrow ,@(map tmmath (cdr x)))))
+      (cond ((string? x) (tmmath-concat (list x)))
+            (else (or (tmmath-dispatch 'tmmath-primitives% x) "")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dispatching
@@ -338,6 +351,7 @@
   (wide* tmmath-wide*)
   (neg tmmath-neg)
   (tree tmmath-noop)
+  (syntax tmmath-first)
 
   ;; Tabular markup
   (tformat tmmath-tformat)
