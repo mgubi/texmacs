@@ -78,8 +78,6 @@ struct font_rep: rep<font> {
   double   last_zoom;        // last rendered zoom
   font     zoomed_fn;        // zoomed font for last_zoom (or nil)
 
-  bool     has_rubber;       // has rubber glyphs?
-  
   // Microtypography
   SI   global_lsub_correct;  // global left subscript correction
   SI   global_lsup_correct;  // global left superscript correction
@@ -150,6 +148,8 @@ struct font_rep: rep<font> {
   inline array<space> get_wide_spacing (int id) {
     if (id < N(wide_spacing)) return wide_spacing[id];
     return get_spacing_table (1, id, wide_spacing); }
+  
+  virtual font make_rubber_font ();
 };
 
 string default_chinese_font_name ();

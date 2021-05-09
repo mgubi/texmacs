@@ -61,8 +61,7 @@ font_rep::font_rep (string s):
   rsup_correct (0.0),
   above_correct (0.0),
   below_correct (0.0),
-  protrusion_maps (-1),
-  has_rubber(false)
+  protrusion_maps (-1)
 {
   lsub_correct = lsub_guessed_table ();
   lsup_correct = lsup_guessed_table ();
@@ -535,28 +534,26 @@ use_poor_rubber (font fn) {
     !starts (fn->res_name, "stix-");
 }
 
-static font
-make_rubber_font (font fn) {
-  if (starts (fn->res_name, "stix-"))
-    return rubber_stix_font (fn);
-  else if (occurs ("mathlarge=", fn->res_name) ||
-           occurs ("mathrubber=", fn->res_name))
-    return fn;
-  else if (fn->type == FONT_TYPE_UNICODE && fn->has_rubber)
-    return fn;
-  else if (has_poor_rubber && fn->type == FONT_TYPE_UNICODE)
-    return poor_rubber_font (fn);
-  else if (fn->type == FONT_TYPE_UNICODE)
-    return rubber_unicode_font (fn);
+font
+font_rep::make_rubber_font () {
+  if (starts (res_name, "stix-"))
+    return rubber_stix_font (this);
+  else if (occurs ("mathlarge=", res_name) ||
+           occurs ("mathrubber=", res_name))
+    return this;
+  else if (has_poor_rubber && type == FONT_TYPE_UNICODE)
+    return poor_rubber_font (this);
+  else if (type == FONT_TYPE_UNICODE)
+    return rubber_unicode_font (this);
   else
-    return fn;
+    return this;
 }
 
 font
 rubber_font (font base) {
   if (larger_font_table->contains (base->res_name))
     return larger_font_table (base->res_name);
-  font larger= make_rubber_font (base);
+  font larger= base->make_rubber_font ();
   larger_font_table (base->res_name)= larger;
   return larger;
 }
