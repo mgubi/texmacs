@@ -12,6 +12,9 @@
 #include "config.h"
 #include "font.hpp"
 #include "converter.hpp"
+#include "convert.hpp" // string_to_scheme_tree
+#include "translator.hpp"
+#include "./Freetype/tt_face.hpp"
 
 #ifdef USE_FREETYPE
 
@@ -28,12 +31,16 @@ struct rubber_unicode_font_rep: font_rep {
   array<font> subfn;
   bool big_sums;
 
+  tt_face mathface; // additional data for math typesetting
+  translator virt; // virtual glyph translator
+  
   hashmap<string,int> mapper;
   hashmap<string,string> rewriter;
 
-  rubber_unicode_font_rep (string name, font base);
+  rubber_unicode_font_rep (string name, font base, tt_face face= tt_face ());
   font   get_font (int nr);
   int    search_font_sub (string s, string& rew);
+  int    search_font_sub_bis (string s, string& rew);
   int    search_font_cached (string s, string& rew);
   font   search_font (string& s);
 
@@ -62,9 +69,10 @@ struct rubber_unicode_font_rep: font_rep {
 * Initialization of main font parameters
 ******************************************************************************/
 
-rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2):
-  font_rep (name, base2), base (base2),
-  big_flag (supports_big_operators (base2->res_name))
+rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2, tt_face face2)
+  : font_rep (name, base2), base (base2),
+    big_flag (supports_big_operators (base2->res_name)),
+    mathface (face2)
 {
   this->copy_math_pars (base);
   big_sums= false;
@@ -75,10 +83,16 @@ rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2):
     //<< ((double) (ex->y2-ex->y1)) / base->yx << LF;
     if ((((double) (ex->y2-ex->y1)) / base->yx) >= 1.55) big_sums= true;
   }
-  for (int i=0; i<5; i++) {
+  for (int i=0; i<6; i++) {
     initialized << false;
     subfn << base;
   }
+  // we create an empty virtual translator which we populate lazily with
+  // informations from the OpenType MATH table (if present)
+  string vname= "opentype_virtual[" * res_name * "]";
+  virt= tm_new<translator_rep> (vname);
+  virt->virt_def= array<tree> ();
+  virt->virt_def << tree(); // fill out the 0 glyph
 }
 
 font
@@ -100,6 +114,13 @@ rubber_unicode_font_rep::get_font (int nr) {
     break;
   case 4:
     subfn[nr]= rubber_assemble_font (base);
+  case 5:
+    {
+      // the virtual font uses the info from the translator
+      int hdpi= (72 * base->wpt + (PIXEL/2)) / PIXEL;
+      int vdpi= (72 * base->hpt + (PIXEL/2)) / PIXEL;
+      subfn[nr]= virtual_font (base, virt->res_name, base->size, hdpi, vdpi, false);
+    }
     break;
   }
   return subfn[nr];
@@ -108,6 +129,157 @@ rubber_unicode_font_rep::get_font (int nr) {
 /******************************************************************************
 * Find the font
 ******************************************************************************/
+
+int parse_variant (string s, string& r, string& rg) {
+  int var=0;
+  int start= search_forwards ("-", 0, s);
+  int end= search_backwards ("-", N(s), s);
+  if (end == start) { end=N(s)-1; var=0; }
+  else {
+    var= max (0, as_int (s (end+1, N(s))));
+  }
+  r= s (start+1, end);
+  rg= s(0, start);
+  return var;
+}
+
+string
+normalized_cork_to_utf8 (string s) {
+  // FIXME: these rewritings should be really implemented via an hashtable
+  if (N(s) < 3) return s;
+  string r= s;
+  if (r == "<hat>") r= "<#2C6>";
+  else if (r == "<tilde>") r= "<#2DC>";
+  else if (r == "<check>") r= "<#2C7>";
+  else if (r == "<bar>") r= "<#203E>";
+  else if (r == "<vect>") r= "<#20D7>";
+  else if (r == "<breve>") r= "<#2D8>";
+  else if (r == "<invbreve>") r= "<#311>";
+  else if (r == "<punderbrace>") r= "<#23DD>";
+  else if (r == "<punderbrace*>") r= "<#23DD>";
+  else if (r == "<underbrace>") r= "<#23DF>";
+  else if (r == "<underbrace*>") r= "<#23DF>";
+  else if (r == "<squnderbrace>") r= "<#23B5>";
+  else if (r == "<squnderbrace*>") r= "<#23B5>";
+  else if (r == "<poverbrace>") r= "<#23DC>";
+  else if (r == "<poverbrace*>") r= "<#23DC>";
+  else if (r == "<overbrace>") r= "<#23DE>";
+  else if (r == "<overbrace*>") r= "<#23DE>";
+  else if (r == "<sqoverbrace>") r= "<#23B4>";
+  else if (r == "<sqoverbrace*>") r= "<#23B4>";
+  return strict_cork_to_utf8 (r);
+}
+
+int
+rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
+// look into mathtable and fill the virtual font lazily
+  string r; // root character
+  string rg; // head
+  int var= 0; // variant sequential number
+  bool hor= false; // horizontal or vertical?
+  if (starts (s, "<large-") || starts (s, "<left-") ||
+             starts (s, "<mid-") || starts (s, "<right-")) {
+    var= parse_variant (s, r, rg);
+    hor= false;
+    if (var <= 5) return 0; //FIXME: hardcoded
+    else var= var-5;
+  } else if (starts (s, "<wide-")) {
+    var= parse_variant (s, r, rg);
+    hor= true;
+  } else {
+    return 0;
+  }
+  if (r != "") {
+    string uu= (N(r)>1 ? normalized_cork_to_utf8 ("<" * r * ">") : r);
+    int j= 0;
+    unsigned int u= decode_from_utf8 (uu, j);
+    unsigned int glyphid= ft_get_char_index (mathface->ft_face, u);
+    if (glyphid == 0) return 0;
+    hashmap<unsigned int, array<unsigned int> > ass=
+       (hor ? mathface->mathtable->hor_glyph_assembly
+            : mathface->mathtable->ver_glyph_assembly);
+    if (ass->contains (glyphid)) {
+      // we have an assembly
+      // normalize name
+      if (r == "(") r= "lparen";
+      else if (r == ")") r= "rparen";
+      else if (r == "[") r= "lbracket";
+      else if (r == "]") r= "rbracket";
+      else if (r == "{") r= "lcurly";
+      else if (r == "}") r= "rcurly";
+      // make a generic symbol for the assembly (used as a key)
+      string symbol= rg * "-" * r * "-#>";
+      if (!virt->dict->contains (symbol)) {
+        // let us create a new virtual glyph from the assembly
+        // TODO: use the placement info
+        array<unsigned int> a= ass [glyphid];
+        tree glyph;
+        //unsigned int italics_correction_val= a[0];
+        //unsigned int italics_correction_devoff= a[1];
+        unsigned int part_count= a[2];
+        string l;
+        if (hor) {
+          // horizontal assembly
+          if (part_count == 3) {
+            unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2];
+            l= "(glue* #" * as_hexadecimal (0xc000000 + ga) * " \n\
+                  (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                     #" * as_hexadecimal (0xc000000 + gc) * " ))";
+          } else if (part_count == 5) {
+            unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2], gd= a[3+5*3], ge= a[3+5*4];
+            l= "(glue* #" * as_hexadecimal (0xc000000 + ga) * " \n\
+                  (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.125)\n\
+                    (glue* #" * as_hexadecimal (0xc000000 + gc) * "\n\
+                      (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gd) * " 0.5 # 0.125)\n\
+                         #" * as_hexadecimal (0xc000000 + ge) * " ))))";
+          } else {
+            cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
+            return 0;
+          }
+        } else {
+          // vertical assembly
+          if (part_count == 2) {
+            unsigned int ga= a[3], gb= a[3+5];
+            l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                     #" * as_hexadecimal (0xc000000 + gb) * " ))";
+          } else if (part_count == 3) {
+            unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2];
+            l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                     #" * as_hexadecimal (0xc000000 + gc) * " ))";
+          } else if (part_count == 5) {
+            unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2], gd= a[3+5*3], ge= a[3+5*4];
+            l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.125)\n\
+                    (glue-above #" * as_hexadecimal (0xc000000 + gc) * "\n\
+                      (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gd) * " 0.5 # 0.125)\n\
+                         #" * as_hexadecimal (0xc000000 + ge) * " ))))";
+          } else {
+            cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
+            return 0;
+          }
+        }
+        cout << "virtual glyph " << N(virt->virt_def) << " for [" << symbol << "] = " << l << LF;
+        glyph = string_to_scheme_tree (l);
+        virt->dict (symbol)= N(virt->virt_def); 
+        virt->virt_def << glyph;
+        if (initialized [5]) {
+          // reset the virtual font to refresh it
+          font::instances -> reset (subfn [5] -> res_name);
+          initialized [5]= false;
+        }
+
+      }
+      int code= virt->dict [symbol];
+      rew= string ((char) code) * as_string (var) * ">";
+      cout << "returning opentype rubber " << code << " with size " << var << LF;
+      return 5; // our virtual font
+    }
+  }
+  return 0;
+}
+
 
 int
 rubber_unicode_font_rep::search_font_sub (string s, string& rew) {
@@ -177,10 +349,13 @@ rubber_unicode_font_rep::search_font_cached (string s, string& rew) {
     rew= rewriter[s];
     return mapper[s];
   }
-  int nr= search_font_sub (s, rew);
+  int nr= 0;
+  if (!is_nil(mathface) && !is_nil(mathface->mathtable))
+    nr= search_font_sub_bis (s, rew); // we look in the MATH table
+  if (nr == 0) nr= search_font_sub (s, rew);
   mapper(s)= nr;
   rewriter(s)= rew;
-  //cout << s << " -> " << nr << ", " << rew << LF;
+  cout << s << " -> " << nr << ", " << rew << LF;
   return nr;
 }
 
@@ -196,8 +371,10 @@ rubber_unicode_font_rep::search_font (string& s) {
 * Getting extents and drawing strings
 ******************************************************************************/
 
+// TODO: update this function
 bool
 rubber_unicode_font_rep::supports (string s) {
+  if (starts (s, "<wide-")) return true; // FIXME: hack for developing, remove.
   if (starts (s, "<big-") && (ends (s, "-1>") || ends (s, "-2>"))) {
     string r= s (5, N(s) - 3);
     if (ends (r, "lim")) r= r (0, N(r) - 3);
@@ -361,6 +538,12 @@ rubber_unicode_font (font base) {
   return make (font, name, tm_new<rubber_unicode_font_rep> (name, base));
 }
 
+font
+rubber_unicode_font (font base, tt_face face) {
+  string name= "rubberunicode[" * base->res_name * "]";
+  return make (font, name, tm_new<rubber_unicode_font_rep> (name, base, face));
+}
+
 #else
 
 font
@@ -371,4 +554,8 @@ rubber_unicode_font (font base) {
   return font ();
 }
 
+font
+rubber_unicode_font (font base, tt_face face) {
+  return rubber_unicode_font (base);
+}
 #endif

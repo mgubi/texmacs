@@ -138,6 +138,8 @@ struct unicode_font_rep: font_rep {
   
   unicode_font_rep (string name, string family, int size, int hdpi, int vdpi);
   void tex_gyre_operators ();
+  
+  font make_rubber_font ();
 
   unsigned int read_unicode_char (string s, int& i);
   unsigned int ligature_replace (unsigned int c, string s, int& i);
@@ -162,6 +164,14 @@ struct unicode_font_rep: font_rep {
   SI     get_wide_correction  (string s, int mode);
 };
 
+
+tt_face get_mathface (font fn) {
+  if (fn->type == FONT_TYPE_UNICODE) {
+    return dynamic_cast<unicode_font_rep*>(fn.rep)->mathface;
+  }
+  return tt_face (NULL);
+}
+
 /******************************************************************************
 * Initialization of main font parameters
 ******************************************************************************/
@@ -169,7 +179,7 @@ struct unicode_font_rep: font_rep {
 unicode_font_rep::unicode_font_rep (string name,
   string family2, int size2, int hdpi2, int vdpi2):
     font_rep (name), family (family2), hdpi (hdpi2), vdpi (vdpi2), ligs (0),
-    native (0)
+    native (0), mathface (NULL)
 {
   type= FONT_TYPE_UNICODE;
   size= size2;
@@ -274,8 +284,8 @@ unicode_font_rep::unicode_font_rep (string name,
   //cout << "ligs= " << ligs << ", " << family << ", " << size << "\n";
 
   // direct translations for certain characters without Unicode names
-  if (starts (family, "texgyre") && ends (family, "-math"))
-    tex_gyre_operators ();
+ // if (starts (family, "texgyre") && ends (family, "-math"))
+ //   tex_gyre_operators ();
 
   {
     // check for additional tables
@@ -283,7 +293,6 @@ unicode_font_rep::unicode_font_rep (string name,
     if (!is_nil(f->mathtable)) {
       // we have a MATH table
       mathface= f;
-      has_rubber= true;
       math_type=  MATH_TYPE_TEX_GYRE; //FIXME: hack for <wide-XX> constructs
     }
   }
@@ -441,6 +450,18 @@ unicode_font_rep::unicode_font_rep (string name,
   }
 }
 
+
+//FIXME: find a better place for this declaration
+font rubber_unicode_font (font base, tt_face face);
+
+font
+unicode_font_rep::make_rubber_font () {
+  if (!is_nil(mathface) && !is_nil(mathface->mathtable)) {
+    return rubber_unicode_font (this, mathface);
+  }
+  return font_rep::make_rubber_font();
+}
+
 /******************************************************************************
 * Big operators in TeX Gyre fonts
 ******************************************************************************/
@@ -583,6 +604,9 @@ int parse_variant (string s, string& r) {
   return var;
 }
 
+//FIXME: we have to move the definition elsewhere
+string normalized_cork_to_utf8 (string s);
+
 unsigned int
 lookup_ot_math_variants (tt_face face, string s) {
   // returns glyphid of the variant and 0 if nothing is found
@@ -604,7 +628,7 @@ lookup_ot_math_variants (tt_face face, string s) {
     hor= true;
   }
   if (r != "") {
-    string uu= (N(r)>1 ? strict_cork_to_utf8 ("<" * r * ">") : r);
+    string uu= (N(r)>1 ? normalized_cork_to_utf8 ("<" * r * ">") : r);
     int j= 0;
     unsigned int u= decode_from_utf8 (uu, j);
     unsigned int glyphid= ft_get_char_index (face->ft_face, u);
@@ -644,7 +668,7 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
     }
     else {
       string ss= s (start-1, ++i);
-      string uu= strict_cork_to_utf8 (ss);
+      string uu= normalized_cork_to_utf8 (ss);
       if (uu == ss) {
         cout << "Lookup for: " << ss << LF;
         if (native->contains (ss)) {
