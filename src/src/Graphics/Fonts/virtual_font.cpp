@@ -17,6 +17,7 @@
 #include "iterator.hpp"
 
 int get_utf8_code (string c);
+extern glyph error_glyph;
 
 /******************************************************************************
 * The virtual font class
@@ -352,6 +353,8 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
       (is_tuple (t, "flood-fill", 3) && !svg) ||
       is_tuple (t, "hor-extend", 3) ||
       is_tuple (t, "hor-extend", 4) ||
+      is_tuple (t, "hor-take", 3) ||
+      is_tuple (t, "hor-take", 4) ||
       is_tuple (t, "ver-extend", 3) ||
       is_tuple (t, "ver-extend", 4) ||
       is_tuple (t, "ver-take", 3) ||
@@ -914,6 +917,22 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
     ex->x2 += add;
     ex->x4 += by * PIXEL;
     return hor_extend (gl, pos, by);
+  }
+
+  if (is_tuple (t, "hor-take", 3) || is_tuple (t, "hor-take", 4)) {
+    glyph gl= compile (t[1], ex);
+    int pos= (int) (as_double (t[2]) * gl->width);
+    SI  add= (SI)  (as_double (t[3]) * (ex->x2 - ex->x1));
+    if (is_tuple (t, "hor-take", 4))
+      add= (SI)  (as_double (t[3]) * as_double (t[4]) * (ex->x2 - ex->x1));
+    int nr = add / PIXEL;
+    if (pos < 0) pos= 0;
+    if (pos >= gl->width) pos= gl->width-1;
+    ex->x1= 0;
+    ex->x2= add;
+    ex->x3= 0;
+    ex->x4= nr * PIXEL;
+    return hor_take (gl, pos, nr);
   }
 
   if (is_tuple (t, "ver-extend", 3) || is_tuple (t, "ver-extend", 4)) {
@@ -1510,6 +1529,25 @@ virtual_font_rep::draw_tree (renderer ren, scheme_tree t, SI x, SI y) {
     return;
   }
 
+  if (is_tuple (t, "hor-take", 3) || is_tuple (t, "hor-take", 4)) {
+    metric ex;
+    get_metric (t[1], ex);
+    SI pos= (SI) (as_double (t[2]) * (ex->x2 - ex->x1));
+    SI add= (SI) (as_double (t[3]) * (ex->x2 - ex->x1));
+    if (is_tuple (t, "hor-take", 4))
+      add= (SI) (as_double (t[3]) * as_double (t[4]) * (ex->x2 - ex->x1));
+    if (add > 0 && ex->x2 > ex->x1) {
+      SI  w = ex->x2 - ex->x1;
+      int n = (int) ((20 * add + w - 1) / w);
+      SI  dx= (add + n - 1) / n;
+      SI  hx= (add + 2*n - 1) / (2*n);
+      for (int i=0; i<n; i++)
+        draw_clipped (ren, t[1], x + i*dx - (ex->x3 + pos), y,
+                      ex->x3 + pos - hx, ex->y3, ex->x3 + pos + hx, ex->y4);
+    }
+    return;
+  }
+
   if (is_tuple (t, "ver-extend", 3) || is_tuple (t, "ver-extend", 4)) {
     metric ex;
     get_metric (t[1], ex);
@@ -1792,7 +1830,8 @@ virtual_font_rep::get_char (string s, font_metric& cfnm, font_glyphs& cfng) {
     if ((c<0) || (c>=last)) return -1;
     cfnm= fnm;
     cfng= fng;
-    if (is_nil (fng->get(c)))
+    glyph& gl (fng->get (c));
+    if (is_nil (gl) || (&gl == &error_glyph))
       fng->get(c)= compile (virt->virt_def[c], fnm->get(c));
     return c;
   }
@@ -1811,7 +1850,8 @@ virtual_font_rep::get_char (string s, font_metric& cfnm, font_glyphs& cfng) {
     int c2= virt->dict [s];
     cfnm= fnm;
     cfng= fng;
-    if (is_nil (fng->get(c2)))
+    glyph& gl (fng->get (c2));
+    if (is_nil (gl) || (&gl == &error_glyph))
       fng->get(c2)= compile (virt->virt_def[c2], fnm->get(c2));
     return c2;
   }
@@ -1821,7 +1861,8 @@ virtual_font_rep::get_char (string s, font_metric& cfnm, font_glyphs& cfng) {
     string sub= "[" * as_string (c) * "," * s(1,n) * "]";
     make_char_font (res_name * sub, cfnm, cfng);
     tree t= subst_sharp (virt->virt_def[c], s(1,n));
-    if (is_nil (cfng->get(0)))
+    glyph& gl (cfng->get (0));
+    if (is_nil (gl) || (&gl == &error_glyph))
       cfng->get(0)= compile (t, cfnm->get(0));
     return 0;
   }
