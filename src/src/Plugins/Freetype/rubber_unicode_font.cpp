@@ -181,8 +181,6 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
              starts (s, "<mid-") || starts (s, "<right-")) {
     var= parse_variant (s, r, rg);
     hor= false;
-    if (var <= 5) return 0; //FIXME: hardcoded
-    else var= var-5;
   } else if (starts (s, "<wide-")) {
     var= parse_variant (s, r, rg);
     hor= true;
@@ -208,7 +206,7 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
       else if (r == "{") r= "lcurly";
       else if (r == "}") r= "rcurly";
       // make a generic symbol for the assembly (used as a key)
-      string symbol= rg * "-" * r * "-#>";
+      string symbol= rg * "-" * r * "-" * as_string (var) * ">";
       if (!virt->dict->contains (symbol)) {
         // let us create a new virtual glyph from the assembly
         // TODO: use the placement info
@@ -219,41 +217,43 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
         unsigned int part_count= a[2];
         string l;
         if (hor) {
+          var -= N(mathface->mathtable->hor_glyph_variants [glyphid])-1;
           // horizontal assembly
           if (part_count == 3) {
             unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2];
             l= "(glue* #" * as_hexadecimal (0xc000000 + ga) * " \n\
-                  (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                  (glue* (hor-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 " * as_string (var) * " 0.5)\n\
                      #" * as_hexadecimal (0xc000000 + gc) * " ))";
           } else if (part_count == 5) {
             unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2], gd= a[3+5*3], ge= a[3+5*4];
             l= "(glue* #" * as_hexadecimal (0xc000000 + ga) * " \n\
-                  (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.125)\n\
+                  (glue* (hor-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 " * as_string (var) * " 0.25)\n\
                     (glue* #" * as_hexadecimal (0xc000000 + gc) * "\n\
-                      (glue* (hor-extend #" * as_hexadecimal (0xc000000 + gd) * " 0.5 # 0.125)\n\
+                      (glue* (hor-take #" * as_hexadecimal (0xc000000 + gd) * " 0.5 " * as_string (var) * " 0.25)\n\
                          #" * as_hexadecimal (0xc000000 + ge) * " ))))";
           } else {
             cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
             return 0;
           }
         } else {
+          var -= N(mathface->mathtable->ver_glyph_variants [glyphid])-1;
           // vertical assembly
           if (part_count == 2) {
             unsigned int ga= a[3], gb= a[3+5];
             l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
-                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 " * as_string (var) * " 0.5)\n\
                      #" * as_hexadecimal (0xc000000 + gb) * " ))";
           } else if (part_count == 3) {
             unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2];
             l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
-                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.25)\n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 " * as_string (var) * " 0.5)\n\
                      #" * as_hexadecimal (0xc000000 + gc) * " ))";
           } else if (part_count == 5) {
             unsigned int ga= a[3], gb= a[3+5], gc= a[3+5*2], gd= a[3+5*3], ge= a[3+5*4];
             l= "(glue-above #" * as_hexadecimal (0xc000000 + ga) * " \n\
-                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 # 0.125)\n\
+                  (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gb) * " 0.5 " * as_string (var) * " 0.25)\n\
                     (glue-above #" * as_hexadecimal (0xc000000 + gc) * "\n\
-                      (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gd) * " 0.5 # 0.125)\n\
+                      (glue-above (ver-take #" * as_hexadecimal (0xc000000 + gd) * " 0.5 " * as_string (var) * " 0.25)\n\
                          #" * as_hexadecimal (0xc000000 + ge) * " ))))";
           } else {
             cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
@@ -271,9 +271,8 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
         }
 
       }
-      int code= virt->dict [symbol];
-      rew= string ((char) code) * as_string (var) * ">";
-      cout << "returning opentype rubber " << code << " with size " << var << LF;
+      rew= symbol;
+      cout << "returning opentype rubber " << symbol << LF;
       return 5; // our virtual font
     }
   }
