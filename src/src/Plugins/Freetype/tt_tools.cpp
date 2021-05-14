@@ -14,6 +14,7 @@
 #include "analyze.hpp"
 #include "file.hpp"
 #include "iterator.hpp"
+#include "analyze.hpp" // as_hexadecimal
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -411,6 +412,15 @@ parse_mathtable (string buf) {
   return table;
 }
 
+array<string>
+as_hexadecimal (array<unsigned int> a) {
+  array<string> as = array<string> ();
+  for (int i=0; i<N(a); i++) {
+    as << as_hexadecimal (a [i]);
+  }
+  return as;
+}
+
 void
 dump_mathtable (ot_mathtable table) {
   if (is_nil(table)) return;
@@ -423,18 +433,18 @@ dump_mathtable (ot_mathtable table) {
     while (it->busy())
     {
       int glyph= it->next();
-      cout << "glyph: " << glyph << " variants ("
+      cout << "glyph: " << as_hexadecimal (glyph) << " variants ("
            << N(table->ver_glyph_variants[glyph])
-           << ") : " << table->ver_glyph_variants[glyph] << LF;
+           << ") : " << as_hexadecimal (table->ver_glyph_variants[glyph]) << LF;
     }
     cout << "Vertical assembly" << LF;
     it= iterate (table->ver_glyph_assembly);
     while (it->busy())
     {
       int glyph= it->next();
-      cout << "glyph: " << glyph << " assembly ("
+      cout << "glyph: " << as_hexadecimal (glyph) << " assembly ("
            << N(table->ver_glyph_assembly[glyph])
-           << ") : " << table->ver_glyph_assembly[glyph] << LF;
+           << ") : " << as_hexadecimal (table->ver_glyph_assembly[glyph]) << LF;
     }
   }
   {
@@ -443,18 +453,18 @@ dump_mathtable (ot_mathtable table) {
     while (it->busy())
     {
       int glyph= it->next();
-      cout << "glyph: " << glyph << " variants ("
+      cout << "glyph: " << as_hexadecimal (glyph) << " variants ("
            << N(table->hor_glyph_variants[glyph])
-           << ") : " << table->hor_glyph_variants[glyph] << LF;
+           << ") : " << as_hexadecimal (table->hor_glyph_variants[glyph]) << LF;
     }
     cout << "Horizontal assembly" << LF;
     it= iterate (table->hor_glyph_assembly);
     while (it->busy())
     {
       int glyph= it->next();
-      cout << "glyph: " << glyph << " assembly ("
+      cout << "glyph: " << as_hexadecimal (glyph) << " assembly ("
            << N(table->hor_glyph_assembly[glyph])
-           << ") : " << table->hor_glyph_assembly[glyph] << LF;
+           << ") : " << as_hexadecimal (table->hor_glyph_assembly[glyph]) << LF;
     }
 
   }
