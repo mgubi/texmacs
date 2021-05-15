@@ -129,6 +129,8 @@ concater_rep::typeset_bigop (tree t, path ip) {
           print (env->display_style? (spc / 2): (spc / 4));
         else if (env->fn->math_type == MATH_TYPE_TEX_GYRE)
           print (env->display_style? (spc / 2): (spc / 4));
+        else if (env->fn->math_type == MATH_TYPE_OPENTYPE)
+          print (env->display_style? (spc / 2): (spc / 4));
         else if (it_flag)
           print (env->display_style? 0: (spc / 4));
         else print (spc / 4);
@@ -170,7 +172,8 @@ concater_rep::typeset_lprime (tree t, path ip) {
     box b1, b2;
     b2= typeset_as_concat (env, s /*t[0]*/, sip);
     b2= symbol_box (sip, b2, N(t[0]->label));
-    if (flag || env->fn->math_type != MATH_TYPE_TEX_GYRE)
+    if (flag || ((env->fn->math_type != MATH_TYPE_TEX_GYRE)
+                 && (env->fn->math_type != MATH_TYPE_OPENTYPE)))
       b2= move_box (sip, b2,
                     flag? 0: env->as_length (string ("-0.05fn")),
                     flag? env->as_length ("-0.75ex"): 0,
@@ -202,7 +205,8 @@ concater_rep::typeset_rprime (tree t, path ip) {
       // NOTE: hack for detection of poor italic font
       b2= shift_box (sip, b2, (SI) (-1.0 * b2->y1 * b2->right_slope ()), 0);
     b2= symbol_box (sip, b2, N(t[0]->label));
-    if (flag || env->fn->math_type != MATH_TYPE_TEX_GYRE)
+    if (flag || ((env->fn->math_type != MATH_TYPE_TEX_GYRE)
+                 && (env->fn->math_type != MATH_TYPE_OPENTYPE)))
       b2= move_box (sip, b2,
                     flag? 0: env->as_length (string ("0.05fn")),
                     flag? env->as_length ("-0.75ex"): 0,

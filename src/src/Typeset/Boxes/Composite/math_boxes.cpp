@@ -149,7 +149,11 @@ sqrt_box_rep::sqrt_box_rep (
     SI Y = sqrtb->y1;
     SI bw= sqrtb->w();
     SI bh= sqrtb->h();
-    if (fn->math_type == MATH_TYPE_TEX_GYRE) {
+    if (fn->math_type == MATH_TYPE_OPENTYPE) {
+      // FIXME: improve this basic behaviour
+      if (2*bh < 9*bw) Y += bh >> 1;
+      else Y += (15*bw) >> 3;
+    } else if (fn->math_type == MATH_TYPE_TEX_GYRE) {
       if (2*bh < 9*bw) Y += bh >> 1;
       else if (occurs ("ermes", fn->res_name)) Y += (19*bw) >> 3;
       else if (occurs ("agella", fn->res_name)) Y += (16*bw) >> 3;
@@ -362,10 +366,96 @@ tree_box_rep::find_child (SI x, SI y, SI delta, bool force) {
 * Computation of wide accent
 ******************************************************************************/
 
+static bool
+has_wide_opentype (string s, font fn, SI width, string& r) {
+  ASSERT (N(s) >= 2 && s[0] == '<' && s[N(s)-1] == '>',
+    "invalid rubber character");
+  string radical= s (0, N(s)-1) * "-";
+  metric ex;
+  int n= 0;
+  while (n < 20) {
+    string test= radical * as_string (n) * ">";
+    if (! fn->supports(test)) return false;
+    fn->get_extents (test, ex);
+    if (ex->x2- ex->x1 > width) {
+      r= radical * as_string (n) * ">";
+      return true;
+    }
+    n++;
+  }
+  return false;
+}
+
+bool
+compute_wide_accent_opentype (path ip, box b, string s,
+                     font fn, pencil pen, bool request_wide, bool above,
+                     box& wideb, SI& sep) {
+  bool wide= (b->w() > (fn->wquad)) || request_wide;
+  if (ends (s, "dot>") || (s == "<acute>") ||
+      (s == "<grave>") || (s == "<abovering>")) wide= false;
+  if (wide && !request_wide && b->wide_correction (0) != 0) wide= false;
+  //SI   accw= fn->wfn;
+  SI width= b->x2- b->x1 - fn->wfn/4;
+  string ws= "<wide-" * s (1, N(s)-1) * ">";
+  string wr= s;
+  bool very_wide= true;
+  if (wide) very_wide= !has_wide_opentype (ws, fn, width, wr);
+  else very_wide= false;
+  if (!very_wide) {
+    wideb= text_box (decorate_middle (ip), 0, wr, fn, pen);
+    if (b->right_slope () != 0) {
+      double factor= ( !above? 0.2: 0.5);
+      wideb= shift_box (decorate_middle (ip), wideb,
+                        (SI) (-factor * b->right_slope () * fn->yx), 0);
+    }
+    sep= above? -fn->yx: fn->sep;
+  } else {
+    SI w= fn->wline;
+    pencil wpen= pen->set_width (w);
+    if ((s == "^") || (s == "<hat>"))
+      wideb= wide_hat_box   (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if ((s == "~") || (s == "<tilde>"))
+      wideb= wide_tilda_box (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<bar>")
+      wideb= wide_bar_box   (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<vect>")
+      wideb= wide_vect_box  (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<check>")
+      wideb= wide_check_box (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<breve>" || s == "<punderbrace>" || s == "<punderbrace*>")
+      wideb= wide_breve_box (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<invbreve>" || s == "<poverbrace>" || s == "<poverbrace*>")
+      wideb= wide_invbreve_box(decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<squnderbrace>" || s == "<squnderbrace*>")
+      wideb= wide_squbr_box (decorate_middle (ip), b->x1, b->x2, wpen);
+    else if (s == "<sqoverbrace>" || s == "<sqoverbrace*>")
+      wideb= wide_sqobr_box (decorate_middle (ip), b->x1, b->x2, wpen);
+    else wideb= wide_box (decorate_middle (ip),
+                          "<rubber-" * s (1, N(s)-1) * ">",
+                          fn, pen, b->x2- b->x1);
+    sep= fn->sep;
+  }
+  if (above) {
+    SI min_d= fn->yx / 8;
+    SI max_d= fn->yx / 3;
+    if (wideb->y1 + sep <  min_d) sep= min_d - wideb->y1;
+    if (wideb->y1 + sep >= max_d) sep= max_d - wideb->y1;
+  }
+  if (s == "<vect>") {
+    if (wide);
+    else if (above) sep -= fn->yx + (fn->sep >> 1);
+    else wideb= vresize_box (wideb->ip, wideb, wideb->y1 + fn->yx, wideb->y2);
+  }
+  else sep += fn->sep >> 1;
+  return wide;
+}
+
 bool
 compute_wide_accent (path ip, box b, string s,
                      font fn, pencil pen, bool request_wide, bool above,
                      box& wideb, SI& sep) {
+  if (fn->math_type == MATH_TYPE_OPENTYPE)
+    return compute_wide_accent_opentype (ip, b, s, fn, pen, request_wide, above, wideb, sep);
   bool unicode= (fn->type == FONT_TYPE_UNICODE);
   bool stix= (fn->math_type == MATH_TYPE_STIX);
   bool tex_gyre= (fn->math_type == MATH_TYPE_TEX_GYRE);
@@ -405,6 +495,7 @@ compute_wide_accent (path ip, box b, string s,
     */
     else very_wide= true;
   }
+  very_wide= false; //FIXME: remove this!!! just for test (mg)
   if (wide && stix) {
     if (s == "^") s= "<hat>";
     if (s == "~") s= "<tilde>";
