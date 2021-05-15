@@ -30,6 +30,7 @@ struct font_glyphs;
 #define MATH_TYPE_NORMAL      0
 #define MATH_TYPE_STIX        1
 #define MATH_TYPE_TEX_GYRE    2
+#define MATH_TYPE_OPENTYPE    3
 
 #define START_OF_LINE         1
 #define END_OF_LINE           2
