@@ -40,7 +40,7 @@ struct rubber_unicode_font_rep: font_rep {
   rubber_unicode_font_rep (string name, font base, tt_face face= tt_face ());
   font   get_font (int nr);
   int    search_font_sub (string s, string& rew);
-  int    search_font_sub_bis (string s, string& rew);
+  bool   search_font_sub_bis (string s, string& rew, int& nr);
   int    search_font_cached (string s, string& rew);
   font   search_font (string& s);
 
@@ -86,6 +86,11 @@ rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2, tt_fa
   for (int i=0; i<6; i++) {
     initialized << false;
     subfn << base;
+  }
+  if (!is_nil (mathface) && !is_nil(mathface->mathtable)) {
+    // We have math informations
+    big_flag= true;
+    big_sums= true;
   }
   // we create an empty virtual translator which we populate lazily with
   // informations from the OpenType MATH table (if present)
@@ -148,12 +153,12 @@ normalized_cork_to_utf8 (string s) {
   // FIXME: these rewritings should be really implemented via an hashtable
   if (N(s) < 3) return s;
   string r= s;
-  if (r == "<hat>") r= "<#2C6>";
-  else if (r == "<tilde>") r= "<#2DC>";
-  else if (r == "<check>") r= "<#2C7>";
-  else if (r == "<bar>") r= "<#203E>";
+  if (r == "<hat>") r= "<#302>";
+  else if (r == "<tilde>") r= "<#303>";
+  else if (r == "<check>") r= "<#30C>";
+  else if (r == "<bar>") r= "<#305>";
   else if (r == "<vect>") r= "<#20D7>";
-  else if (r == "<breve>") r= "<#2D8>";
+  else if (r == "<breve>") r= "<#306>";
   else if (r == "<invbreve>") r= "<#311>";
   else if (r == "<punderbrace>") r= "<#23DD>";
   else if (r == "<punderbrace*>") r= "<#23DD>";
@@ -170,33 +175,49 @@ normalized_cork_to_utf8 (string s) {
   return strict_cork_to_utf8 (r);
 }
 
-int
-rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
+bool
+rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew, int& nr) {
 // look into mathtable and fill the virtual font lazily
   string r; // root character
   string rg; // head
   int var= 0; // variant sequential number
   bool hor= false; // horizontal or vertical?
-  if (starts (s, "<large-") || starts (s, "<left-") ||
-             starts (s, "<mid-") || starts (s, "<right-")) {
+  rew= s;
+  nr= 0;
+  if (starts (s, "<big-")) {
+    var= parse_variant (s, r, rg);
+    if (var > 0) var= var-1; //FIXME: is this ok?
+    hor= false;
+  } else if (starts (s, "<large-") || starts (s, "<left-") ||
+             starts (s, "<mid-")   || starts (s, "<right-")) {
     var= parse_variant (s, r, rg);
     hor= false;
   } else if (starts (s, "<wide-")) {
     var= parse_variant (s, r, rg);
     hor= true;
   } else {
-    return 0;
+    return false;
   }
-  if (r != "") {
-    string uu= (N(r)>1 ? normalized_cork_to_utf8 ("<" * r * ">") : r);
-    int j= 0;
-    unsigned int u= decode_from_utf8 (uu, j);
-    unsigned int glyphid= ft_get_char_index (mathface->ft_face, u);
-    if (glyphid == 0) return 0;
-    hashmap<unsigned int, array<unsigned int> > ass=
-       (hor ? mathface->mathtable->hor_glyph_assembly
-            : mathface->mathtable->ver_glyph_assembly);
-    if (ass->contains (glyphid)) {
+  if (r == "") return false;
+  string uu= (N(r)>1 ? normalized_cork_to_utf8 ("<" * r * ">") : r);
+  int j= 0;
+  unsigned int u= decode_from_utf8 (uu, j);
+  unsigned int glyphid= ft_get_char_index (mathface->ft_face, u);
+  if (glyphid == 0) return 0;
+  hashmap<unsigned int, array<unsigned int> > v=
+     (hor ? mathface->mathtable->hor_glyph_variants
+          : mathface->mathtable->ver_glyph_variants);
+  hashmap<unsigned int, array<unsigned int> > ass=
+     (hor ? mathface->mathtable->hor_glyph_assembly
+          : mathface->mathtable->ver_glyph_assembly);
+  if (v->contains (glyphid)) {
+    if (var < N(v (glyphid))) {
+      unsigned int res=  v (glyphid)[var];
+      rew= "<@" * as_hexadecimal (res) * ">";
+      nr= 0; // base font
+      cout << "returning opentype variant " << s << " -> " << rew << LF;
+      return true;
+    } else if (ass->contains (glyphid)) {
       // we have an assembly
       // normalize name
       if (r == "(") r= "lparen";
@@ -233,7 +254,7 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
                          #" * as_hexadecimal (0xc000000 + ge) * " ))))";
           } else {
             cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
-            return 0;
+            return false;
           }
         } else {
           var -= N(mathface->mathtable->ver_glyph_variants [glyphid])-1;
@@ -257,26 +278,26 @@ rubber_unicode_font_rep::search_font_sub_bis (string s, string& rew) {
                          #" * as_hexadecimal (0xc000000 + ge) * " ))))";
           } else {
             cout << "rubber_unicode_font: part_count not supported :" << part_count << LF;
-            return 0;
+            return false;
           }
         }
         cout << "virtual glyph " << N(virt->virt_def) << " for [" << symbol << "] = " << l << LF;
         glyph = string_to_scheme_tree (l);
-        virt->dict (symbol)= N(virt->virt_def); 
+        virt->dict (symbol)= N(virt->virt_def);
         virt->virt_def << glyph;
         if (initialized [5]) {
           // reset the virtual font to refresh it
           font::instances -> reset (subfn [5] -> res_name);
           initialized [5]= false;
         }
-
       }
       rew= symbol;
-      cout << "returning opentype rubber " << symbol << LF;
-      return 5; // our virtual font
+      nr= 5; // virtual font
+      cout << "returning opentype rubber " << s << " -> " << rew << LF;
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 
 
@@ -349,12 +370,12 @@ rubber_unicode_font_rep::search_font_cached (string s, string& rew) {
     return mapper[s];
   }
   int nr= 0;
-  if (!is_nil(mathface) && !is_nil(mathface->mathtable))
-    nr= search_font_sub_bis (s, rew); // we look in the MATH table
-  if (nr == 0) nr= search_font_sub (s, rew);
+  if (!is_nil (mathface) && !is_nil (mathface->mathtable)
+      && !search_font_sub_bis (s, rew, nr)) // we look in the MATH table
+    nr= search_font_sub (s, rew);
   mapper(s)= nr;
   rewriter(s)= rew;
-  cout << s << " -> " << nr << ", " << rew << LF;
+  cout << "search_font_cached " << s << " -> " << nr << ", " << rew << LF;
   return nr;
 }
 
@@ -451,9 +472,12 @@ rubber_unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, SI xk) 
   fn->draw_fixed (ren, s, x, y, xk);
 }
 
+//FIXME: move declaration elsewhere
+font rubber_unicode_font (font base, tt_face face);
+
 font
 rubber_unicode_font_rep::magnify (double zoomx, double zoomy) {
-  return rubber_unicode_font (base->magnify (zoomx, zoomy));
+  return rubber_unicode_font (base->magnify (zoomx, zoomy), mathface);
 }
 
 glyph
