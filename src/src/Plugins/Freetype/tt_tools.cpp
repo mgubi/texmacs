@@ -378,16 +378,81 @@ parse_mathtable (string buf) {
   table->majorVersion = get_U16 (tt, 0);
   table->minorVersion = get_U16 (tt, 2);
   int mathConstantsOffset = get_U16 (tt, 4);
-  //int mathGlyphInfoOffset = get_U16 (tt, 6);
+  int mathGlyphInfoOffset = get_U16 (tt, 6);
   int mathVariantsOffset = get_U16 (tt, 8);
 
   if ((table->majorVersion != 1) || (table->minorVersion != 0))
     return ot_mathtable();
-    
-  for (int i=0; i<58; i++) {
+  
+  // math constants
+  for (int i=0; i<otmath_constants_end; i++) {
     table->params[i] = get_U16 (tt, mathConstantsOffset + 2*i);
   }
  
+  // math glyph info
+  int mathItalicsCorrectionInfoOffset = mathGlyphInfoOffset + get_U16 (tt, mathGlyphInfoOffset + 0);
+  int mathTopAccentAttachmentOffset = mathGlyphInfoOffset + get_U16 (tt, mathGlyphInfoOffset + 2);
+  //int extendedShapeCoverageOffset = mathGlyphInfoOffset + get_U16 (tt, mathGlyphInfoOffset + 4);
+  //int mathKernInfoOffset = mathGlyphInfoOffset + get_U16 (tt, mathGlyphInfoOffset + 6);
+
+  // italics corrections
+  {
+    int italicsCorrectionCoverageOffset = mathItalicsCorrectionInfoOffset + get_U16 (tt, mathItalicsCorrectionInfoOffset + 0);
+    //int italicsCorrectionCount = get_U16 (tt, mathItalicsCorrectionInfoOffset + 2);
+    int glyphCoverageFormat = get_U16 (tt, italicsCorrectionCoverageOffset + 0);
+    if (glyphCoverageFormat == 1) {
+      unsigned int glyphCount = get_U16 (tt, italicsCorrectionCoverageOffset + 2);
+      for (unsigned int coverage_index=0; coverage_index< glyphCount; coverage_index++) {
+        unsigned int glyph = get_U16 (tt, italicsCorrectionCoverageOffset + 4 + 2*coverage_index);
+        table->italics_correction_value (glyph) = get_U16 (tt, mathItalicsCorrectionInfoOffset + 4 + 4*coverage_index);
+        table->italics_correction_devoff (glyph) = get_U16 (tt, mathItalicsCorrectionInfoOffset + 6 + 4*coverage_index);
+      }
+    } else if (glyphCoverageFormat == 2) {
+      unsigned int rangeCount = get_U16 (tt, italicsCorrectionCoverageOffset + 2);
+      unsigned int coverage_index= 0;
+      for (unsigned int i=0; i<rangeCount; i++) {
+        unsigned int startGlyphID = get_U16 (tt, italicsCorrectionCoverageOffset + 4 + 6*i);
+        unsigned int endGlyphID = get_U16 (tt, italicsCorrectionCoverageOffset + 6 + 6*i);
+        //unsigned int startCoverageIndex = get_U16 (tt, var_offset + coverage_offset + 8 + 6*i);
+        for(unsigned int glyph = startGlyphID; glyph<=endGlyphID; glyph++, coverage_index++) {
+          table->italics_correction_value (glyph) = get_U16 (tt, mathItalicsCorrectionInfoOffset + 4 + 4*coverage_index);
+          table->italics_correction_devoff (glyph) = get_U16 (tt, mathItalicsCorrectionInfoOffset + 6 + 4*coverage_index);
+        }
+      }
+    } else {
+      cout << "parse_mathtable (italics table) : glyphCoverageFormat " << glyphCoverageFormat << " not supported." << LF;
+    }
+  }
+  
+  // top accent attachment offsets
+  {
+    int topAccentCoverageOffset = mathTopAccentAttachmentOffset + get_U16 (tt, mathTopAccentAttachmentOffset + 0);
+    //int topAccentAttachmentCount = get_U16 (tt, mathTopAccentAttachmentOffset + 2);
+    int glyphCoverageFormat = get_U16 (tt, topAccentCoverageOffset + 0);
+    if (glyphCoverageFormat == 1) {
+      unsigned int glyphCount = get_U16 (tt, topAccentCoverageOffset + 2);
+      for (unsigned int coverage_index=0; coverage_index< glyphCount; coverage_index++) {
+        unsigned int glyph = get_U16 (tt, topAccentCoverageOffset + 4 + 2*coverage_index);
+        table->top_accent_value (glyph) = get_U16 (tt, mathTopAccentAttachmentOffset + 4 + 4*coverage_index);
+        table->top_accent_devoff (glyph) = get_U16 (tt, mathTopAccentAttachmentOffset + 6 + 4*coverage_index);
+      }
+    } else if (glyphCoverageFormat == 2) {
+      unsigned int rangeCount = get_U16 (tt, topAccentCoverageOffset + 2);
+      unsigned int coverage_index= 0;
+      for (unsigned int i=0; i<rangeCount; i++) {
+        unsigned int startGlyphID = get_U16 (tt, topAccentCoverageOffset + 4 + 6*i);
+        unsigned int endGlyphID = get_U16 (tt, topAccentCoverageOffset + 6 + 6*i);
+        //unsigned int startCoverageIndex = get_U16 (tt, var_offset + coverage_offset + 8 + 6*i);
+        for(unsigned int glyph = startGlyphID; glyph<=endGlyphID; glyph++, coverage_index++) {
+          table->top_accent_value (glyph) = get_U16 (tt, mathTopAccentAttachmentOffset + 4 + 4*coverage_index);
+          table->top_accent_devoff (glyph) = get_U16 (tt, mathTopAccentAttachmentOffset + 6 + 4*coverage_index);
+        }
+      }
+    } else {
+      cout << "parse_mathtable (top attchm table) : glyphCoverageFormat " << glyphCoverageFormat << " not supported." << LF;
+    }
+  }
+  
   // math variants
   table->minConnectorOverlap = get_U16 (tt, mathVariantsOffset + 0);
   int vertGlyphCoverageOffset = get_U16 (tt, mathVariantsOffset + 2);

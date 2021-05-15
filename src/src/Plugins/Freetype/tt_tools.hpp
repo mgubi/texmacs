@@ -20,9 +20,123 @@
 // for the specification
 // see https://docs.microsoft.com/en-gb/typography/opentype/spec/math
 
+// indexes into ot_mathtable_rep::params
+enum otmath_constants {
+  scriptPercentScaleDown,
+  scriptScriptPercentScaleDown,
+  delimitedSubFormulaMinHeight,
+  displayOperatorMinHeight,
+  mathLeading_value,
+  mathLeading_devoff,
+  axisHeight_value,
+  axisHeight_devoff,
+  accentBaseHeight_value,
+  accentBaseHeight_devoff,
+  flattenedAccentBaseHeight_value,
+  flattenedAccentBaseHeight_devoff,
+  subscriptShiftDown_value,
+  subscriptShiftDown_devoff,
+  subscriptTopMax_value,
+  subscriptTopMax_devoff,
+  subscriptBaselineDropMin_value,
+  subscriptBaselineDropMin_devoff,
+  superscriptShiftUp_value,
+  superscriptShiftUp_devoff,
+  superscriptShiftUpCramped_value,
+  superscriptShiftUpCramped_devoff,
+  superscriptBottomMin_value,
+  superscriptBottomMin_devoff,
+  superscriptBaselineDropMax_value,
+  superscriptBaselineDropMax_devoff,
+  subSuperscriptGapMin_value,
+  subSuperscriptGapMin_devoff,
+  superscriptBottomMaxWithSubscript_value,
+  superscriptBottomMaxWithSubscript_devoff,
+  spaceAfterScript_value,
+  spaceAfterScript_devoff,
+  upperLimitGapMin_value,
+  upperLimitGapMin_devoff,
+  upperLimitBaselineRiseMin_value,
+  upperLimitBaselineRiseMin_devoff,
+  lowerLimitGapMin_value,
+  lowerLimitGapMin_devoff,
+  lowerLimitBaselineDropMin_value,
+  lowerLimitBaselineDropMin_devoff,
+  stackTopShiftUp_value,
+  stackTopShiftUp_devoff,
+  stackTopDisplayStyleShiftUp_value,
+  stackTopDisplayStyleShiftUp_devoff,
+  stackBottomShiftDown_value,
+  stackBottomShiftDown_devoff,
+  stackBottomDisplayStyleShiftDown_value,
+  stackBottomDisplayStyleShiftDown_devoff,
+  stackGapMin_value,
+  stackGapMin_devoff,
+  stackDisplayStyleGapMin_value,
+  stackDisplayStyleGapMin_devoff,
+  stretchStackTopShiftUp_value,
+  stretchStackTopShiftUp_devoff,
+  stretchStackBottomShiftDown_value,
+  stretchStackBottomShiftDown_devoff,
+  stretchStackGapAboveMin_value,
+  stretchStackGapAboveMin_devoff,
+  stretchStackGapBelowMin_value,
+  stretchStackGapBelowMin_devoff,
+  fractionNumeratorShiftUp_value,
+  fractionNumeratorShiftUp_devoff,
+  fractionNumeratorDisplayStyleShiftUp_value,
+  fractionNumeratorDisplayStyleShiftUp_devoff,
+  fractionDenominatorShiftDown_value,
+  fractionDenominatorShiftDown_devoff,
+  fractionDenominatorDisplayStyleShiftDown_value,
+  fractionDenominatorDisplayStyleShiftDown_devoff,
+  fractionNumeratorGapMin_value,
+  fractionNumeratorGapMin_devoff,
+  fractionNumDisplayStyleGapMin_value,
+  fractionNumDisplayStyleGapMin_devoff,
+  fractionRuleThickness_value,
+  fractionRuleThickness_devoff,
+  fractionDenominatorGapMin_value,
+  fractionDenominatorGapMin_devoff,
+  fractionDenomDisplayStyleGapMin_value,
+  fractionDenomDisplayStyleGapMin_devoff,
+  skewedFractionHorizontalGap_value,
+  skewedFractionHorizontalGap_devoff,
+  skewedFractionVerticalGap_value,
+  skewedFractionVerticalGap_devoff,
+  overbarVerticalGap_value,
+  overbarVerticalGap_devoff,
+  overbarRuleThickness_value,
+  overbarRuleThickness_devoff,
+  overbarExtraAscender_value,
+  overbarExtraAscender_devoff,
+  underbarVerticalGap_value,
+  underbarVerticalGap_devoff,
+  underbarRuleThickness_value,
+  underbarRuleThickness_devoff,
+  underbarExtraDescender_value,
+  underbarExtraDescender_devoff,
+  radicalVerticalGap_value,
+  radicalVerticalGap_devoff,
+  radicalDisplayStyleVerticalGap_value,
+  radicalDisplayStyleVerticalGap_devoff,
+  radicalRuleThickness_value,
+  radicalRuleThickness_devoff,
+  radicalExtraAscender_value,
+  radicalExtraAscender_devoff,
+  radicalKernBeforeDegree_value,
+  radicalKernBeforeDegree_devoff,
+  radicalKernAfterDegree_value,
+  radicalKernAfterDegree_devoff,
+  radicalDegreeBottomRaisePercent,
+  otmath_constants_end // keep at the end
+};
+
+
+
 struct ot_mathtable_rep : concrete_struct {
   int majorVersion, minorVersion;
-  int params[58];
+  int params [otmath_constants_end];
   int minConnectorOverlap;
   hashmap<unsigned int, array<unsigned int> > ver_glyph_variants;
   hashmap<unsigned int, array<int> > ver_glyph_variants_adv;
@@ -30,7 +144,11 @@ struct ot_mathtable_rep : concrete_struct {
   hashmap<unsigned int, array<int> > hor_glyph_variants_adv;
   hashmap<unsigned int, array<unsigned int> > ver_glyph_assembly;
   hashmap<unsigned int, array<unsigned int> > hor_glyph_assembly;
-  
+  hashmap<unsigned int, int> italics_correction_value;
+  hashmap<unsigned int, int> italics_correction_devoff;
+  hashmap<unsigned int, int> top_accent_value;
+  hashmap<unsigned int, int> top_accent_devoff;
+
   ot_mathtable_rep () {};
 };
 
