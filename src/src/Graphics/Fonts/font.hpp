@@ -99,6 +99,8 @@ struct font_rep: rep<font> {
   font_rep (string name, font fn);
   void copy_math_pars (font fn);
 
+  virtual font make_rubber_font ();
+
   virtual bool   supports (string c) = 0;
   virtual void   get_extents (string s, metric& ex) = 0;
   virtual void   get_extents (string s, metric& ex, bool ligf);
@@ -150,7 +152,6 @@ struct font_rep: rep<font> {
     if (id < N(wide_spacing)) return wide_spacing[id];
     return get_spacing_table (1, id, wide_spacing); }
   
-  virtual font make_rubber_font ();
 };
 
 string default_chinese_font_name ();

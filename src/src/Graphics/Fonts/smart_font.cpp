@@ -195,7 +195,8 @@ is_rubber (string c) {
   return (starts (c, "<large-") ||
           starts (c, "<left-") ||
           starts (c, "<right-") ||
-          starts (c, "<mid-")) && ends (c, ">");
+          starts (c, "<mid-") ||
+          starts (c, "<wide-")) && ends (c, ">");
 }
 
 static hashmap<string,string> special_table ("");
@@ -715,6 +716,7 @@ struct smart_font_rep: font_rep {
   int    resolve (string c);
   void   initialize_font (int nr);
   int    adjusted_dpi (string fam, string var, string ser, string sh, int att);
+  font   make_rubber_font ();
 
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
@@ -1421,6 +1423,17 @@ smart_font_rep::adjusted_dpi (string fam, string var, string ser, string sh,
   //     << ex1 << ", " << ex2 << ", " << zoom << "\n";
   return (int) tm_round (dpi * zoom);
 }
+
+font
+smart_font_rep::make_rubber_font () {
+  if (occurs ("mathlarge=", res_name) ||
+           occurs ("mathrubber=", res_name))
+    return this;
+  else if (fn[SUBFONT_MAIN]->math_type == MATH_TYPE_OPENTYPE)
+    return fn[SUBFONT_MAIN]->make_rubber_font ();
+  return font_rep::make_rubber_font();
+}
+
 
 /******************************************************************************
 * Getting extents and drawing strings
