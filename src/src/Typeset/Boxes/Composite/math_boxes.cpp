@@ -495,7 +495,6 @@ compute_wide_accent (path ip, box b, string s,
     */
     else very_wide= true;
   }
-  very_wide= false; //FIXME: remove this!!! just for test (mg)
   if (wide && stix) {
     if (s == "^") s= "<hat>";
     if (s == "~") s= "<tilde>";
