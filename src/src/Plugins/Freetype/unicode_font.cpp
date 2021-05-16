@@ -163,7 +163,7 @@ struct unicode_font_rep: font_rep {
   SI     get_rsup_correction  (string s);
   SI     get_wide_correction  (string s, int mode);
   
-  bool get_ot_italic_correction (string s, SI& r);
+  bool get_ot_italic_correction (string s, bool left, SI& r);
 };
 
 
@@ -914,6 +914,8 @@ unicode_font_rep::get_right_slope (string s) {
 
 SI
 unicode_font_rep::get_left_correction  (string s) {
+  SI rr= 0;
+  if (get_ot_italic_correction (s, true, rr)) return -rr;
   metric ex;
   get_extents (s, ex);
   if (math_type == MATH_TYPE_TEX_GYRE && is_integral (s))
@@ -927,6 +929,8 @@ unicode_font_rep::get_left_correction  (string s) {
 
 SI
 unicode_font_rep::get_right_correction (string s) {
+  SI rr= 0;
+  if (get_ot_italic_correction (s, false, rr)) return rr;
   metric ex;
   get_extents (s, ex);
   if (math_type == MATH_TYPE_TEX_GYRE && is_integral (s))
@@ -945,11 +949,21 @@ decode_index (FT_Face face, int i) {
 }
 
 bool
-unicode_font_rep::get_ot_italic_correction (string s, SI& r) {
+unicode_font_rep::get_ot_italic_correction (string s, bool left, SI& r) {
   if (math_type == MATH_TYPE_OPENTYPE) {
+    if (N(s) == 0) return false;
+    int start= 0, end= N(s);
+    if (left) {
+      end= start;
+      tm_char_forwards (s, end);
+    } else {
+      start= end;
+      tm_char_backwards (s, start);
+    }
+    string ss= s (start, end);
     font_metric rm;
     font_glyphs rg;
-    int index= index_glyph(s, rm, rg);
+    int index= index_glyph (ss, rm, rg);
     FT_UInt glyph= decode_index (mathface->ft_face, index);
     if (mathface->mathtable->italics_correction_value->contains (glyph)) {
       int corr= mathface->mathtable->italics_correction_value[glyph];
@@ -963,8 +977,8 @@ unicode_font_rep::get_ot_italic_correction (string s, SI& r) {
 
 SI
 unicode_font_rep::get_lsub_correction (string s) {
-  SI rr;
-  if (get_ot_italic_correction (s, rr)) return -rr;
+  SI rr= 0;
+  if (get_ot_italic_correction (s, true, rr)) return -rr;
   SI r= -get_left_correction (s) + global_lsub_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)));
@@ -977,8 +991,8 @@ unicode_font_rep::get_lsub_correction (string s) {
 
 SI
 unicode_font_rep::get_lsup_correction (string s) {
-  SI rr;
-  if (get_ot_italic_correction (s, rr)) return rr;
+  SI rr= 0;
+  if (get_ot_italic_correction (s, true, rr)) return rr;
   SI r= global_lsup_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)))
@@ -992,8 +1006,8 @@ unicode_font_rep::get_lsup_correction (string s) {
 
 SI
 unicode_font_rep::get_rsub_correction (string s) {
-  SI rr;
-  if (get_ot_italic_correction (s, rr)) return -rr;
+  SI rr= 0;
+  if (get_ot_italic_correction (s, false, rr)) return -rr;
   SI r= global_rsub_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)));
@@ -1006,8 +1020,8 @@ unicode_font_rep::get_rsub_correction (string s) {
 
 SI
 unicode_font_rep::get_rsup_correction (string s) {
-  SI rr;
-  if (get_ot_italic_correction (s, rr)) return rr;
+  SI rr= 0;
+  if (get_ot_italic_correction (s, false, rr)) return rr;
   //cout << "Check " << s << ", " << rsup_correct[s] << ", " << this->res_name << LF;
   SI r= get_right_correction (s) + global_rsup_correct;
   if (math_type == MATH_TYPE_STIX &&
