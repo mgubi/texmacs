@@ -394,11 +394,11 @@ compute_wide_accent_opentype (path ip, box b, string s,
   if (ends (s, "dot>") || (s == "<acute>") ||
       (s == "<grave>") || (s == "<abovering>")) wide= false;
   if (wide && !request_wide && b->wide_correction (0) != 0) wide= false;
-  //SI   accw= fn->wfn;
   SI width= b->x2- b->x1 - fn->wfn/4;
   string ws= "<wide-" * s (1, N(s)-1) * ">";
   string wr= s;
   bool very_wide= true;
+  // we look for wide variants within the font
   if (wide) very_wide= !has_wide_opentype (ws, fn, width, wr);
   else very_wide= false;
   if (!very_wide) {
@@ -441,12 +441,7 @@ compute_wide_accent_opentype (path ip, box b, string s,
     if (wideb->y1 + sep <  min_d) sep= min_d - wideb->y1;
     if (wideb->y1 + sep >= max_d) sep= max_d - wideb->y1;
   }
-  if (s == "<vect>") {
-    if (wide);
-    else if (above) sep -= fn->yx + (fn->sep >> 1);
-    else wideb= vresize_box (wideb->ip, wideb, wideb->y1 + fn->yx, wideb->y2);
-  }
-  else sep += fn->sep >> 1;
+  sep += fn->sep >> 1;
   return wide;
 }
 
