@@ -625,7 +625,8 @@ unimath_fix (string family, string series, string shape) {
       starts (family, "Fira") ||
       starts (family, "GFS Neohellenic") ||
       starts (family, "Libertinus") ||
-      starts (family, "EB Garamond")) {
+      starts (family, "EB Garamond") ||
+      starts (family, "Latin Modern")) {
     if (starts (shape, "math") && series == "medium") {
       if (!ends (family, " Math")) family= family * " Math";
     }
