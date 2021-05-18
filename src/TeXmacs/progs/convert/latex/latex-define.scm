@@ -133,7 +133,9 @@
   (mathD "\\mathrm{D}")
   (mathe "\\mathrm{e}")
   (matheuler "\\gamma")
+  (mathGamma "\\Gamma")
   (mathlambda "\\lambda")
+  (mathLaplace "\\Delta")
   (mathi "\\mathrm{i}")
   (mathpi "\\pi")
   (Alpha "\\mathrm{A}")
@@ -234,12 +236,21 @@
   (gflux "\\gg")
   (colons "\\,:\\,")
   (transtype "\\,:\\!!>")
+  (tmxspace (hspace "1em"))
   (lebar (mathrel (Yleft)))
   (gebar (mathrel (Yright)))
   (leangle (mathrel (angle)))
   (geangle (mathrel (!group (mbox (reflectbox (!math (angle)))))))
-  (leqangle (mathrel (substack (!append (angle) "\\\\" "-"))))
-  (geqangle (mathrel (!group (mbox (reflectbox (!math (substack (!append (angle) "\\\\" "-"))))))))
+  (anglege (mathrel (!group (mbox (rotatebox (!option "origin=c") "180"
+                                             (!math (angle)))))))
+  (anglele (mathrel (!group (mbox (rotatebox (!option "origin=c") "180"
+                                             (!math (!recurse (geangle))))))))
+  ;;(leqangle (mathrel (substack (!append (angle) "\\\\" (smash "-")))))
+  (leqangle (mathrel (!append (angle) " \\llap "
+                              (!group (raisebox "-1ex" (!math "-"))))))
+  (geqangle (mathrel (!group (mbox (reflectbox (!math (!recurse (leqangle))))))))
+  (legeangle (mathrel (substack (!append (leangle) "\\\\" (!recurse (anglege))))))
+  (geleangle (mathrel (substack (!append (geangle) "\\\\" (!recurse (anglele))))))
   (udots "{\\mathinner{\\mskip1mu\\raise1pt\\vbox{\\kern7pt\\hbox{.}}\\mskip2mu\\raise4pt\\hbox{.}\\mskip2mu\\raise7pt\\hbox{.}\\mskip1mu}}")
   (subsetsim (underset (sim) (subset)))
   (supsetsim (underset (sim) (supset)))
@@ -328,23 +339,26 @@
   (tmsep  ", ")
   (tmSep  "; ")
   (pari "{\\sc Pari}")
-  (qed (!math (Box)))
   (textdots "...")
+  (filldots "{\\dotfill\\hfill\\hbox{}}")
+  (infixand (text " and "))
+  (infixor (text " or "))
+  (infixiff (text " iff "))
 
   ;; Unary macros
   (tmrsub (ensuremath (!append "_{" (textrm 1) "}")))
   (tmrsup (textsuperscript 1))
-  (tmverbatim (!group (ttfamily) (!group 1)))
-  (tmtextrm (!group (rmfamily) (!group 1)))
-  (tmtextsf (!group (sffamily) (!group 1)))
-  (tmtexttt (!group (ttfamily) (!group 1)))
-  (tmtextmd (!group (mdseries) (!group 1)))
-  (tmtextbf (!group (bfseries) (!group 1)))
-  (tmtextup (!group (upshape) (!group 1)))
-  (tmtextsl (!group (slshape) (!group 1)))
-  (tmtextit (!group (itshape) (!group 1)))
-  (tmtextsc (!group (scshape) (!group 1)))
-  (tmmathbf (ensuremath (boldsymbol 1)))
+  (tmverbatim (text (!group (ttfamily) (!group 1))))
+  (tmtextrm (text (!group (rmfamily) (!group 1))))
+  (tmtextsf (text (!group (sffamily) (!group 1))))
+  (tmtexttt (text (!group (ttfamily) (!group 1))))
+  (tmtextmd (text (!group (mdseries) (!group 1))))
+  (tmtextbf (text (!group (bfseries) (!group 1))))
+  (tmtextup (text (!group (upshape) (!group 1))))
+  (tmtextsl (text (!group (slshape) (!group 1))))
+  (tmtextit (text (!group (itshape) (!group 1))))
+  (tmtextsc (text (!group (scshape) (!group 1))))
+  (tmmathbf (ensuremath (!recurse (boldsymbol 1))))
   (tmmathmd (ensuremath 1))
   (tmop (ensuremath (operatorname 1)))
   (tmstrong (textbf 1))
@@ -363,6 +377,7 @@
   (tmdef 1)
   (dueto (textup (textbf (!append "(" 1 ") "))))
   (op 1)
+  (todo (!group (!append (color "red!75!black") "[To do: " 1 "]")))
   (tmoutput 1)
   (tmerrput (!append (color "red!50!black") 1))
   (tmtiming (!append (hfill) (footnotesize) (color "black!50") 1 (par)))
@@ -402,6 +417,9 @@
   (uddot (underaccent (ddot) 1))
   (udddot (underaccent (dddot (hphantom 1)) 1))
   (uddddot (underaccent (ddddot (hphantom 1)) 1))
+  (widespacing 1)
+  (gb  (!append (texttt "[\\!\\![") 1 (texttt "]\\!\\!]")))
+  (gbt (!append (texttt "[\\!\\![\\!\\![") 1 (texttt "]\\!\\!]\\!\\!]")))
 
   ;; With options
   (tmcodeinline ((!option "") (!group (ttfamily) (!group 2))))
@@ -481,6 +499,7 @@
   (ontop (genfrac "" "" "0pt" "" 1 2))
   (subindex (index (!append 1 "!" 2)))
   (renderfootnote (footnotetext (!append (tmrsup 1) " " 2)))
+  (renderfootnotestar (footnotetext (!append (tmrsup 1) " " 3)))
   (tmlinenumber (!append (custombinding 1)
                          (tmlinenote (footnotesize 1) 2 "0cm")))
 
@@ -633,7 +652,7 @@
   (newmdenv
    (!append (mdfsetup (!append "linecolor=black,linewidth=0.5pt,"
 			       "skipabove=0.5em,skipbelow=0.5em,"
-			       "hidealllines=true,\ninnerleftmargin=0pt,"
+			       "hidealllines=true,innerleftmargin=0pt,"
 			       "innerrightmargin=0pt,innertopmargin=0pt,"
 			       "innerbottommargin=0pt" )) "\n"))
   (tikzframe
@@ -643,6 +662,8 @@
     "  \\tikz[baseline=(X.base)]\n"
     "  \\node[draw=black,semithick,rectangle,inner sep=2pt,rounded corners=2pt]\n"
     "  (X) {#1};}\n"))
+  (nonconverted
+   (!append "\\newcommand{\\nonconverted}[1]{\\mbox{}}\n"))
   (tmkeywords
    (!append (newcommand (tmkeywords)
 			(!append (textbf (!translate "Keywords:")) " "))
@@ -692,6 +713,7 @@
 		       (!translate "Misc:") " #2}}\n"))
   (thankssubtitle (!append "\\newcommand{\\thankssubtitle}[2][]{\\thanks[#1]{"
                            (!translate "Subtitle:") " #2}}\n"))
+  (qed (!append (providecommand "\\qed" (ensuremath (Box))) "\n"))
   (mho
    (!append
     "\\renewcommand{\\mho}{\\mbox{\\rotatebox[origin=c]{180}{$\\omega$}}}"))
@@ -728,7 +750,9 @@
     "      \\tmfloatcontents\n"
     "      \\captionof{#3}{#5}\n"
     "    \\end{center}\n"
-    "  \\end{minipage}}\n")))
+    "  \\end{minipage}}\n"))
+  (addtocountergroup (!append "\\newcommand{\\addtocountergroup}[2]{}\n"))
+  (groupcommoncounter (!append "\\newcommand{\\groupcommoncounter}[1]{}\n")))
 
 ;;(define-macro (latex-texmacs-long prim x l m r)
 ;;  `(smart-table latex-texmacs-preamble
@@ -766,11 +790,13 @@
 ;; Plain style theorems
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (latex-texmacs-thmenv prim name before after)
-  (let* ((prim* (string-append prim "*"))
+(tm-define-macro (latex-texmacs-thmenv prim name before after . opt-mode)
+  (let* ((head (if (null? opt-mode) (list) (list `(:mode ,(car opt-mode)))))
+         (prim* (string-append prim "*"))
          (nonum (string-append "nn" prim))
          (thenonum (string-append "\\the" nonum)))
     `(smart-table latex-texmacs-env-preamble
+       ,@head
        (,prim  (!append ,@before
                         (newtheorem ,prim (!translate ,name))
                         ,@after "\n"))

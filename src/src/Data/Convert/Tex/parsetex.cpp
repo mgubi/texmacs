@@ -50,6 +50,7 @@ struct latex_parser {
   char lf;
   bool pic;
   hashmap<string,bool> loaded_package;
+  hashmap<string,bool> loaded_include;
   latex_parser (bool unicode2): level (0), unicode (unicode2) {}
   void latex_error (string s, int i, string message);
 
@@ -1126,7 +1127,8 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       command_type  (var)= "length";
       command_arity (var)= 0;
     }
-    if (is_tuple (t, "\\newenvironment", 3)) {
+    if (is_tuple (t, "\\newenvironment", 3) &&
+        latex_type ("\\begin-" * string_arg (t[1])) != "enunciation") {
       string var= "\\begin-" * string_arg (t[1]);
       command_type  (var)= "user";
       command_arity (var)= 0;
@@ -1143,7 +1145,8 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       command_def   (var)= tree_to_str_array (u[3]);
       if (is_math_environment (t)) command_type (var)= "math-environment";
     }
-    if (is_tuple (t, "\\newenvironment*", 4)) {
+    if (is_tuple (t, "\\newenvironment*", 4) &&
+        latex_type ("\\begin-" * string_arg (t[1])) != "enunciation") {
       string var= "\\begin-" * string_arg (t[1]);
       command_type  (var)= "user";
       command_arity (var)= as_int (t[2]);
@@ -1155,7 +1158,8 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       command_def   (var)= tree_to_str_array (u[4]);
       if (is_math_environment (t)) command_type (var)= "math-environment";
     }
-    if (is_tuple (t, "\\newenvironment**", 5)) {
+    if (is_tuple (t, "\\newenvironment**", 5) &&
+        latex_type ("\\begin-" * string_arg (t[1])) != "enunciation") {
       string var= "\\begin-" * string_arg (t[1]);
       command_type  (var)= "user";
       command_arity (var)= -as_int (t[2]);
@@ -1180,7 +1184,7 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
         string name= string_arg (t[1]);
         command_type (name)= "replace";
       }
-      if (subs && starts (as_string (t[0]), "\\newenvironment")) {
+      if (subs && starts (as_string (t[0]), "\\newenvironment") && N(t) >= 2) {
         string name= string_arg (t[1]);
         command_type ("\\begin-"*name)= "replace";
         command_type ("\\end-"*name)=   "replace";
@@ -1193,13 +1197,13 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       string name= string_arg (t[1]);
       command_type (name)= "side-effect!";
     }
-    if ((is_tuple (t, "\\newenvironment")
+    if ((is_tuple (t, "\\newenvironment") && N(t) >= 2
           && contains_side_effects (concat (t[N(t)-2], t[N(t)-1]))) ||
-        (is_tuple (t, "\\newenvironment*")
+        (is_tuple (t, "\\newenvironment*") && N(t) >= 2
          && contains_side_effects (concat (t[N(t)-2], t[N(t)-1]))) ||
-        (is_tuple (t, "\\newenvironment**")
+        (is_tuple (t, "\\newenvironment**") && N(t) >= 2
          && contains_side_effects (concat (t[N(t)-2], t[N(t)-1]))) ||
-        (is_tuple (t, "\\newenvironment**")
+        (is_tuple (t, "\\newenvironment**") && N(t) >= 3
          && contains_side_effects (t[N(t)-3]))) {
       string name= string_arg (t[1]);
       command_type ("\\begin-"*name)= "side-effect!";
@@ -1207,13 +1211,14 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     }
   }
 
-  /***************** apply substitutions and bords effects  ******************/
+  /***************** apply substitutions and side effects  ******************/
   if ((pic && latex_type (cmd) == "replace")
       || latex_type (cmd) == "begin-end!"
       || latex_type (cmd) == "defined-env!"
       || latex_type (cmd) == "side-effect!") {
     int pos= 0;
     array<string> body= command_def[cmd];
+    if (cmd == "\\def") body= array<string> ();
     arity= command_arity[cmd];
     if (N(body) > 0 && latex_type (cmd) == "side-effect!"
         && !occurs (cmd, body[0]))
@@ -1648,20 +1653,25 @@ skip_expansion (url u) {
     s == "buxlayout.sty" ||
     s == "chicagob.sty" ||
     s == "chicagor.sty" ||
+    s == "cleveref.sty" ||
+    s == "courier.sty" ||
     s == "dfadobe.sty" ||
     s == "eepic.sty" ||
     s == "fancyhdr.sty" ||
     s == "geompsfi.sty" ||
+    s == "helvet.sty" ||
     s == "hyperref.sty" ||
     s == "IEEEtrantools.sty" ||
     s == "jair.sty" ||
     s == "jmlr2e.sty" ||
     s == "latexsym.sty" ||
+    s == "microtype.sty" ||
     s == "natbib.sty" ||
     s == "psfig.tex" ||
     s == "soul.sty" ||
     s == "tcolorbox.sty" ||
     s == "theapa.sty" ||
+    s == "tikz.sty" ||
     s == "times.sty";
 }
 
@@ -1723,12 +1733,15 @@ latex_parser::parse (string s, int change) {
           if (!ends (name, suffix)) name= name * suffix;
           url incl= relative (get_file_focus (), name);
           string body;
-          if (!exists (incl) || skip_expansion (incl) ||
+          if (!exists (incl) ||
+              skip_expansion (incl) ||
+              loaded_include[as_string (incl)] ||
               load_string (incl, body, false));
           else {
             //cout << "Include " << name << " -> " << incl << "\n";
             s= s (0, cut) * "\n" * body * "\n" * s (i+1, N(s));
             n= N(s);
+            loaded_include (as_string (incl))= true;
           }
           i= cut + 1;
         }
@@ -1837,7 +1850,8 @@ get_latex_language (string s) {
         << "danish" << "dutch" << "finnish" << "french" << "german"
         << "greek" << "hungarian" << "italian" << "japanese" << "korean"
         << "polish" << "portuguese" << "romanian" << "russian"
-        << "slovene" << "spanish" << "swedish" << "taiwanese" << "ukrainian";
+        << "slovak" << "slovene" << "spanish" << "swedish"
+        << "taiwanese" << "ukrainian";
 
   for (int i = 0 ; i < N(langs) ; i++)
     if (test (r, 0, as_string (langs[i])))

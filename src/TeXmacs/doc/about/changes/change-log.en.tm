@@ -1,13 +1,31 @@
-<TeXmacs|1.99.18>
+<TeXmacs|1.99.19>
 
 <style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.18>
+  <section|Changes from version 1.99.1 to 1.99.20>
 
   <\itemize>
+    <item>Better support for the most common <LaTeX> style files (1.99.20).
+
+    <item>Many corrections for the <LaTeX> export when using common <LaTeX>
+    styles (1.99.20).
+
+    <item>Various bug fixes (1.99.20).
+
+    <item>Added Slovak language support with the help of Peter Rap£an
+    (1.99.20).
+
+    <item>Many bug fixes (1.99.19).
+
+    <item>Improved Octave plugin with tab completion and multi-line input
+    (1.99.19).
+
+    <item>Enhanced structured search & replace: added preferences and
+    wildcards (1.99.19).
+
     <item>Minor bug fixes (1.99.18).
 
     <item>Minor progress on the remote editing tools (1.99.18).
@@ -2063,7 +2081,7 @@
     <item>Implementation of symbol menus.
   </itemize>
 
-  <tmdoc-copyright|1998\U2020|Joris van der Hoeven>
+  <tmdoc-copyright|1998\U2021|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

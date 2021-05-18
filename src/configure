@@ -685,7 +685,6 @@ XTRA_CMD
 MACOSX_TARGET
 OSXVERMIN
 APPCAST
-CONFIG_SPARKLE
 SPARKLE_LIBS
 SPARKLE_LDFLAGS
 SPARKLE_CFLAGS
@@ -693,6 +692,7 @@ SPARKLE_CPP
 SPARKLE_CXX
 WINSPARKLE_PATH
 WINSPARKLE_DLL
+CONFIG_SPARKLE
 SQLITE3_LIBS
 SQLITE3_LDFLAGS
 SQLITE3_CFLAGS
@@ -2971,7 +2971,7 @@ function cmp_dot_number {
 
   VERSION_MAJOR="1"
   VERSION_MINOR="99"
-  VERSION_BUILD="18"
+  VERSION_BUILD="20"
 
   # the svn revision of this version
   DEVEL_REVISION="$Rev$:"
@@ -8351,7 +8351,7 @@ $as_echo "$as_me: WARNING: could not find source tree for $ax_dir" >&2;}
 
 
 
-      GUILE_STATIC="$(pwd)/tm-guile168/build/lib/libguile.a $(pwd)/tm-guile168/build/lib/libguile-ltdl.a -lm"
+      GUILE_STATIC='$(shell ../tm-guile168/guile-config/guile-config link)'
 
 
   if [[ "-I$(pwd)/tm-guile168/build/include" =~ $(echo '^-Wl,') ]]
@@ -18802,6 +18802,7 @@ $as_echo "disabling Sparkle usage" >&6; }
     unset sparkle_ok
 
 
+
   CFLAGS__ax_save_flags=$CFLAGS
 
 
@@ -20360,6 +20361,8 @@ main ()
 _ACEOF
 if ac_fn_objc_try_link "$LINENO"; then :
    sparkle_ok=1
+      CONFIG_SPARKLE=Updater
+
 
 else
   as_fn_error $? "Can't use WinSparkle" "$LINENO" 5
@@ -20381,7 +20384,6 @@ $as_echo "yes" >&6; }
 
 $as_echo "#define USE_SPARKLE 1" >>confdefs.h
 
-      CONFIG_SPARKLE="Updater"
 
   CFLAGS=$CFLAGS__ax_save_flags
 
@@ -20430,8 +20432,6 @@ $as_echo "$as_me: SPARKLE_LDFLAGS:$SPARKLE_LDFLAGS" >&6;}
 
 
 
-
-      CONFIG_SPARKLE=Updater
 
     else
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5

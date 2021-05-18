@@ -18,6 +18,8 @@
 #include "fast_search.hpp"
 #include "file.hpp"
 
+tree latex_expand (tree doc);
+
 /******************************************************************************
 * Add markers to TeXmacs document
 ******************************************************************************/
@@ -215,15 +217,16 @@ tracked_tree_to_latex_document (tree d, object opts, string& s, string& ms) {
 }
 
 string
-tracked_texmacs_to_latex (tree d, object opts) {
+tracked_texmacs_to_latex (tree doc, object opts) {
+  tree xdoc= latex_expand (doc);
   if (get_preference ("texmacs->latex:source-tracking", "off") != "on")
-    return tree_to_latex_document (d, opts);
+    return tree_to_latex_document (xdoc, opts);
 
   string ms, s;
-  if (tracked_tree_to_latex_document (d, opts, s, ms)) return s;
+  if (tracked_tree_to_latex_document (xdoc, opts, s, ms)) return s;
 
   string post;
-  post << tree_to_scheme (purify (d));
+  post << tree_to_scheme (purify (doc));
   post << "\n% Separate attachments\n";
   post << ms;
   // TODO: add integrity checksum

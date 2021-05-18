@@ -23,12 +23,16 @@ else
   prefix= [getenv("TEXMACS_PATH"), filesep, relative_path];
 endif
 
+if (strcmp (PS1(), "octave:\\#> "))
+  PS1 (">> ");
+endif
+
 if (length (prefix) > 0)
   addpath (genpath (prefix))
 
   flush_verbatim (["GNU Octave (", version, ") Session in GNU TeXmacs\n"])
   flush_verbatim ("Welcome to star and fork it at https://github.com/texmacs/octave\n")
-  flush_prompt ("octave> ")
+  flush_prompt (PS1 ())
 
   # Define some global variables.
   global TMSTRUCT= 0;
@@ -43,5 +47,8 @@ if (length (prefix) > 0)
   set (0, "defaultaxesfontsize", 18);
   set (0, "defaultlinelinewidth", 1.5);
 endif
+
+# Default to $HOME
+cd ("~");
 
 tmrepl ()

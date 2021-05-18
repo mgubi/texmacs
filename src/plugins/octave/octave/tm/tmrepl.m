@@ -5,7 +5,7 @@
 ## DESCRIPTION : REPL loop
 ## COPYRIGHT   : (C) 2004-2010  Joris van der Hoeven
 ##               (C) 2014       François Poulain
-##               (C) 2020       Darcy Shen
+##               (C) 2020-2021  Darcy Shen
 ##
 ## This software falls under the GNU general public license version 3 or later.
 ## It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -13,34 +13,53 @@
 
 
 function tmrepl()
-  while (true)
-    __r= input ("", "s");
+  cmds_for_plot= plot_cmds();
 
-    if __r(length (__r)) != ";"
+  while (true)
+    # If it was cleared, initialize it again
+    if exist ("cmds_for_plot") != 1
+      cmds_for_plot= plot_cmds();
+    endif
+
+    line = input ("", "s");
+    code = line;
+    if (index(line, char(16)) == 1)
+      flush_scheme (complete (parse_complete (substr (line, 2))));
+      continue
+    else
+      line = input ("", "s");
+      while (!strcmp (line, "<EOF>"))
+        code = [code, "\n", line];
+        line = input ("", "s");
+      endwhile
+    endif
+  
+    if code(length (code)) != ";"
       disp_ans= true;
     else
       disp_ans= false;
     endif
 
-    trimed_r= strtrim (__r);
-    if isvarname (trimed_r) && exist (trimed_r)
-      __r= sprintf ("ans= %s;", __r);
+    trimed_r= strtrim (code);
+    if isvarname (trimed_r) && exist (trimed_r) == 1
+      code= sprintf ("ans= %s;", code);
     else
       # Reset ans to empty string
       ans= "";
       # Suppress the output
-      __r= sprintf ("%s;", __r);
+      code= sprintf ("%s;", code);
     endif
 
     # NOTE: the evaled code will use the polluted env
-    eval (__r, "tmlasterr");
+    eval (code, "tmlasterr");
+
+    # For `clear` or `clear all`, disp_ans will be cleared
+    if exist ("disp_ans") == 0
+      disp_ans= false;
+    endif
 
     if disp_ans
-      global TM_OCTAVE_PLOT_DIGEST;
-      
-      updated_digest= hash ("md5", serialize (get(gcf())));
-      if !strcmp (TM_OCTAVE_PLOT_DIGEST, updated_digest)
-        TM_OCTAVE_PLOT_DIGEST= updated_digest;
+      if (isplot (cmds_for_plot, code))
         plotted= tmplot (); ## call TeXmacs plotting interface
         if plotted
           disp_ans= false;
@@ -53,6 +72,8 @@ function tmrepl()
     else
       flush_verbatim ("\n");
     endif
+
+    flush_prompt (PS1 ());
 
     # Debugging Hints:
     # fid= fopen ("/tmp/octave.log", "a");

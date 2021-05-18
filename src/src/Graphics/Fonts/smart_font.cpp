@@ -614,6 +614,22 @@ tex_gyre_fix (string family, string series, string shape) {
 }
 
 string
+kepler_fix (string family, string series, string shape) {
+  for (int i=N(family)-1; i>=0; i--)
+    if (family[i] == ',')
+      return family (0, i+1) *
+             kepler_fix (family (i+1, N(family)), series, shape);
+  if (starts (family, "Kepler")) {
+    if (starts (shape, "math") && series == "medium") {
+      if (!ends (family, " Math")) family= family * " Math";
+    }
+    else if (ends (family, " Math"))
+      family= family (0, N(family) - 5);
+  }
+  return family;
+}
+
+string
 stix_fix (string family, string series, string shape) {
   if (family == "stix") family= "Stix";
   if (starts (family, "Stix")) {
@@ -642,6 +658,7 @@ math_fix (string family, string series, string shape) {
             }
           string conds = recompose (c, " ");
           string base  = tex_gyre_fix (b[1], series, shape);
+          base= kepler_fix (base, series, shape);
           //base= stix_fix (base, series, shape);
           string mathfn= (N(c)==0? base: conds * "=" * base);
           r << mathfn;
@@ -961,6 +978,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
       if (!ok) return -1;
     }
     fam= tex_gyre_fix (fam, series, shape);
+    fam= kepler_fix (fam, series, shape);
     //fam= stix_fix (fam, series, shape);
 
     if (math_kind != 0 && shape == "mathitalic" &&
@@ -1052,32 +1070,30 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
     if (fam == mfam && !is_italic_font (mfam)) {
       array<string> emu_names= emu_font_names ();
       for (int i=0; i<N(emu_names); i++)
-	if (virtually_defined (c, emu_names[i])) {
-	  tree key= tuple ("emulate", emu_names[i]);
-	  int nr= sm->add_font (key, REWRITE_NONE);
-	  initialize_font (nr);
-	  if (fn[nr]->supports (c))
-	    return sm->add_char (key, c);
-	}
+        if (virtually_defined (c, emu_names[i])) {
+          tree key= tuple ("emulate", emu_names[i]);
+          int nr= sm->add_font (key, REWRITE_NONE);
+          initialize_font (nr);
+          if (fn[nr]->supports (c))
+            return sm->add_char (key, c);
+        }
     }
   }
 
   if (attempt > 1) {
     string range= get_unicode_range (c);
-    if (true) {
-      int a= attempt - 1;
-      string v;
-      if (range == "") v= variant;
-      else if (v == "rm") v= range;
-      else v= variant * "-" * range;
-      font cfn= closest_font (fam, v, series, rshape, sz, dpi, a);
-      //cout << "Trying " << c << " in " << cfn->res_name << "\n";
-      if (cfn->supports (c)) {
-        tree key= tuple (fam, v, series, rshape, as_string (a));
-        int nr= sm->add_font (key, REWRITE_NONE);
-        initialize_font (nr);
-        return sm->add_char (key, c);
-      }
+    int a= attempt - 1;
+    string v;
+    if (range == "") v= variant;
+    else if (v == "rm") v= range;
+    else v= variant * "-" * range;
+    font cfn= closest_font (fam, v, series, rshape, sz, dpi, a);
+    //cout << "Trying " << c << " in " << cfn->res_name << "\n";
+    if (cfn->supports (c)) {
+      tree key= tuple (fam, v, series, rshape, as_string (a));
+      int nr= sm->add_font (key, REWRITE_NONE);
+      initialize_font (nr);
+      return sm->add_char (key, c);
     }
   }
 
@@ -1108,7 +1124,7 @@ smart_font_rep::resolve_rubber (string c, string fam, int attempt) {
   string ss= c (l, r);
   string goal= ss;
   if (N(goal) != 1) goal= "<" * goal * ">";
-  if (goal == ".") {
+  if (goal == "." || goal == "<nobracket>") {
     tree key= tuple ("ignore");
     int nr= sm->add_font (key, REWRITE_IGNORE);
     initialize_font (nr);
@@ -1724,6 +1740,7 @@ smart_font_bis (string family, string variant, string series, string shape,
     }
   }
   family= tex_gyre_fix (family, series, shape);
+  family= kepler_fix (family, series, shape);
   //family= stix_fix (family, series, shape);
   family= math_fix (family, series, shape);
   string sh= shape;

@@ -2827,6 +2827,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(string-find-non-alpha <scm-arg|string> <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|find_non_alpha> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
     <scm|(string-alpha? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4183,6 +4191,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|concretize> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(url-sys-concretize <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|sys_concretize> which returns
     <scm|string>.
   </explain>
 
@@ -5571,6 +5587,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(switch-to-window <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|switch_to_window> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(new-buffer)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5611,7 +5635,7 @@ source code.
   </explain>
 
   <\explain>
-    <scm|(buffer-close <scm-arg|url>)>
+    <scm|(cpp-buffer-close <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|kill_buffer> which returns

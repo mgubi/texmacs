@@ -166,7 +166,8 @@
   ;; Each inner list correspond to a table row.
   (map stm-table-row->list
        (do ((x x (last x)))
-	   ((func? x 'table) (cdr x)))))
+	   ((or (func? x 'table) (func? x '!arg))
+            (if (func? x 'table) (cdr x) `((row (cell ""))))))))
 
 (define (stm-table-formats x)
     (cond ((func? x 'table) '())
@@ -331,4 +332,8 @@
       '()))
 
 (tm-define (tmtable-cell-halign x)
-  `((cwith "1" "-1" "1" "-1" "cell-halign" ,x)))
+  (if (== x "rcl")
+      `((cwith "1" "-1" "2" "-2" "cell-halign" "c")
+        (cwith "1" "-1" "1" "1" "cell-halign" "r")
+        (cwith "1" "-1" "-1" "-1" "cell-halign" "l"))
+      `((cwith "1" "-1" "1" "-1" "cell-halign" ,x))))
