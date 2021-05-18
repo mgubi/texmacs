@@ -392,7 +392,7 @@
 |python:operator| |python:operator_field| |python:operator_openclose| |python:operator_special| |quote| |range|
 |raster-resolution| |raw| |recognize| |recurse| |refresh| |remove-folded| |remove-unfolded| |removed| |repeat| |replace|
 |replace-style| |require| |required| |returns| |right| |right-margin| |root| |rotate-backward| |rotate-forward|
-|row| |samp| |sansserif| |save-directory| |save-file| |saved| |scale| |scheme:comment| |scheme:constant_char|
+|row| |same| |samp| |sansserif| |save-directory| |save-file| |saved| |scale| |scheme:comment| |scheme:constant_char|
 |scheme:constant_number| |scheme:constant_string| |scheme:declare_category| |scheme:error| |scheme:keyword|
 |scheme:none| |scheme:variable_identifier| |script| |scripts| |secure| |select| |selectable| |serializer|
 |session| |session-theme| |setup| |several| |shell| |short-width| |simplify-output| |slant| |small| |smallcaps|
