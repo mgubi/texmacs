@@ -3482,7 +3482,7 @@ tmg_animate_commit (scm_obj arg1) {
 scm_obj
 tmg_idle_time () {
   // TMSCM_DEFER_INTS;
-  int out= get_current_editor()->idle_time ();
+  int out= (has_current_view () ? get_current_editor()->idle_time () : 1000);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);

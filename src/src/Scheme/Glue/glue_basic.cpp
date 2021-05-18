@@ -7041,12 +7041,8 @@ tmg_url_concretize (scm_obj arg1) {
   return string_to_tmscm (out);
 }
 
-<<<<<<< HEAD
 scm_obj
-tmg_url_materialize (scm_obj arg1, scm_obj arg2) {
-=======
-tmscm
-tmg_url_sys_concretize (tmscm arg1) {
+tmg_url_sys_concretize (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-sys-concretize");
 
   url in1= tmscm_to_url (arg1);
@@ -7058,9 +7054,8 @@ tmg_url_sys_concretize (tmscm arg1) {
   return string_to_tmscm (out);
 }
 
-tmscm
-tmg_url_materialize (tmscm arg1, tmscm arg2) {
->>>>>>> master
+scm_obj
+tmg_url_materialize (scm_obj arg1, scm_obj arg2) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-materialize");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "url-materialize");
 
@@ -9522,11 +9517,8 @@ tmg_window_focus (scm_obj arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-<<<<<<< HEAD
 scm_obj
-=======
-tmscm
-tmg_switch_to_window (tmscm arg1) {
+tmg_switch_to_window (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "switch-to-window");
 
   url in1= tmscm_to_url (arg1);
@@ -9538,8 +9530,7 @@ tmg_switch_to_window (tmscm arg1) {
   return TMSCM_UNSPECIFIED;
 }
 
-tmscm
->>>>>>> master
+scm_obj
 tmg_new_buffer () {
   // TMSCM_DEFER_INTS;
   url out= create_buffer ();
@@ -9596,15 +9587,9 @@ tmg_clone_window () {
   return TMSCM_UNSPECIFIED;
 }
 
-<<<<<<< HEAD
 scm_obj
-tmg_buffer_close (scm_obj arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-close");
-=======
-tmscm
-tmg_cpp_buffer_close (tmscm arg1) {
+tmg_cpp_buffer_close (scm_obj arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "cpp-buffer-close");
->>>>>>> master
 
   url in1= tmscm_to_url (arg1);
 
