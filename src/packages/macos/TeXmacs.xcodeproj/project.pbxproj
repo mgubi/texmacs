@@ -1053,10 +1053,7 @@
 		9CACE326242BD54F00D0B7CA /* string_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE31C242BD54F00D0B7CA /* string_parser.cpp */; };
 		9CACE327242BD54F00D0B7CA /* string_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE31C242BD54F00D0B7CA /* string_parser.cpp */; };
 		9CACE328242BD54F00D0B7CA /* string_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE31C242BD54F00D0B7CA /* string_parser.cpp */; };
-		9CB549E925A8CD8B007E9B59 /* mingw_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CB549D025A8CD8B007E9B59 /* mingw_sys_utils.cpp */; };
 		9CB549EA25A8CD8B007E9B59 /* texmacs_modifications.patch in Resources */ = {isa = PBXBuildFile; fileRef = 9CB549D225A8CD8B007E9B59 /* texmacs_modifications.patch */; };
-		9CB549EB25A8CD8B007E9B59 /* spawn.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CB549E525A8CD8B007E9B59 /* spawn.cpp */; };
-		9CB549EC25A8CD8B007E9B59 /* iostream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CB549E725A8CD8B007E9B59 /* iostream.cpp */; };
 		9CC5F1A22598D8C5000D5E6C /* s7_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CC5F1A02598D8C4000D5E6C /* s7_tm.cpp */; };
 		9CC5F1A32598D8C5000D5E6C /* s7_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CC5F1A02598D8C4000D5E6C /* s7_tm.cpp */; };
 		9CC5F1A42598D8C5000D5E6C /* s7_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CC5F1A02598D8C4000D5E6C /* s7_tm.cpp */; };
@@ -5877,10 +5874,8 @@
 				9C0B4ADF10A8CC110097A335 /* dictionary.cpp in Sources */,
 				9C0B4AE110A8CC110097A335 /* hyphenate.cpp in Sources */,
 				9C0B4AE210A8CC110097A335 /* language.cpp in Sources */,
-				9CB549EC25A8CD8B007E9B59 /* iostream.cpp in Sources */,
 				9C0B4AE310A8CC110097A335 /* math_language.cpp in Sources */,
 				9C0B4AE410A8CC110097A335 /* mathemagix_language.cpp in Sources */,
-				9CB549E925A8CD8B007E9B59 /* mingw_sys_utils.cpp in Sources */,
 				9C0B4AE510A8CC110097A335 /* scheme_language.cpp in Sources */,
 				9C0B4AE610A8CC110097A335 /* text_language.cpp in Sources */,
 				9C4A74121D22C38200572468 /* raster_random.cpp in Sources */,
@@ -5939,7 +5934,6 @@
 				9C0B4B1610A8CC110097A335 /* bridge_docrange.cpp in Sources */,
 				9C0B4B1710A8CC110097A335 /* bridge_document.cpp in Sources */,
 				9C0B4B1810A8CC110097A335 /* bridge_eval.cpp in Sources */,
-				9CB549EB25A8CD8B007E9B59 /* spawn.cpp in Sources */,
 				9C0B4B1910A8CC110097A335 /* bridge_expand_as.cpp in Sources */,
 				9C33F43A2412C20100F73F5A /* recolored_font.cpp in Sources */,
 				9C33F40C2412BF6400F73F5A /* glyph_distorted.cpp in Sources */,
