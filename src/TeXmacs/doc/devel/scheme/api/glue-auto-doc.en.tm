@@ -4195,6 +4195,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(url-sys-concretize <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|sys_concretize> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(url-materialize <scm-arg|url> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

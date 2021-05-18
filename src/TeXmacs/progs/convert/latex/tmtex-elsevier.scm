@@ -42,16 +42,48 @@
 (tm-define (tmtex-style-init body)
   (:mode ifac-style?)
   (init-elsevier body)
-  ;;(set! tmtex-packages (cons "natbib" tmtex-packages))
-  ;;(latex-set-packages '("natbib"))
+  (set! tmtex-packages (cons "cite-author-year" tmtex-packages))
+  (latex-set-packages '("natbib"))
   )
 
 (tm-define (tmtex-style-init body)
   (:mode jsc-style?)
   (init-elsevier body)
-  (set! tmtex-packages (cons "natbib" tmtex-packages))
+  ;;(set! tmtex-packages (cons "cite-author-year" tmtex-packages))
   (latex-set-packages '("amsthm" "yjsco" ;;"natbib"
                         )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hack for ifac incompatibility with hyperref package
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (latex-as-use-package l)
+  (:require (latex-ifacconf-style?))
+  (if (nin? "hyperref" l)
+      (former l)
+      (let* ((l* (list-remove l "hyperref"))
+             (s1 (if (null? l*) "" (former l*)))
+             (s2 (string-append
+                  "\\makeatletter\n"
+                  "\\let\\old@ssect\\@ssect\n"
+                  "\\makeatother\n"
+                  "\\usepackage{hyperref}\n"
+                  "\\makeatletter\n"
+                  "\\def\\@ssect#1#2#3#4#5#6{%\n"
+                  "  \\NR@gettitle{#6}%\n"
+                  "  \\old@ssect{#1}{#2}{#3}{#4}{#5}{#6}%\n"
+                  "}\n"
+                  "\\makeatother\n")))
+        (string-append s1 s2))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hack for incomplete ifac list environments
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (latex-extra-preamble)
+  (:require (latex-ifacconf-style?))
+  (string-append "\\newcommand{\\labelitemiii}{\\labelitemi}\n"
+                 "\\newcommand{\\labelitemiv}{\\labelitemii}\n"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preprocessing data
@@ -104,10 +136,6 @@
     (set! r (tex-concat* (list-intersperse r ",")))
     (set! r (string-append l r)))
   `(tnoteref ,r))
-
-(tm-define (tmtex-doc-title t)
-  (:mode elsevier-style?)
-  `(title ,(tmtex (cadr t))))
 
 (tm-define (tmtex-doc-subtitle-ref s l)
   (:mode elsevier-style?)
@@ -278,9 +306,9 @@
   (with label (string-append "author-misc-" (car l))
     `(thanksamisc (!option ,label) ,(tmtex (cadr l)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; IFAC specific authors macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmtex-author-email-label s l)
   (:mode ifac-style?)
@@ -401,10 +429,10 @@
 ;; The elsarticle class does not insert a 'References' section title
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (tmtex-bib t)
-  (:mode elsevier-style?)
-  (:require (elsarticle-style?))
-  (tmtex-biblio (car t) (cdr t) #t))
+;;(tm-define (tmtex-bib t)
+;;  (:mode elsevier-style?)
+;;  (:require (elsarticle-style?))
+;;  (tmtex-biblio (car t) (cdr t) #t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Elsevier specific macros
@@ -412,4 +440,10 @@
 
 (smart-table latex-texmacs-macro
   (:mode elsevier-style?)
-  (qed #f))
+  (:require (elsarticle-style?))
+  (comma #f))
+
+(smart-table latex-texmacs-preamble
+  (:mode elsevier-style?)
+  (:require (elsarticle-style?))
+  (qed (!append (renewcommand "\\qed" "") "\n")))

@@ -152,15 +152,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmtex-author-affiliation-ref s l)
+  (:mode ieee-tran-style?)
   `(IEEEauthorrefmark ,(car l)))
 
 (tm-define (tmtex-author-affiliation-label s l)
+  (:mode ieee-tran-style?)
   `(!concat (IEEEauthorrefmark ,(car l))
-                               ,(tmtex (cadr l))))
+            ,(tmtex (cadr l))))
+
 (tm-define (tmtex-author-email-ref s l)
+  (:mode ieee-tran-style?)
   `(IEEEauthorrefmark ,(car l)))
 
 (tm-define (tmtex-author-email-label s l)
+  (:mode ieee-tran-style?)
   `(!concat (IEEEauthorrefmark ,(car l))
                                ,(tmtex-author-email l)))
 
@@ -179,3 +184,32 @@
   (:mode ieee-tran-style?)
   (with args (list-intersperse (map tmtex (cdr t)) '(!concat (tmsep) " "))
     `((!begin "IEEEkeywords") (!concat ,@args))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Further tweaking for IEEE styles
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ieee-replace t)
+  (cond ((nlist? t) t)
+        ((== t '(hbar)) '(ieeehbar))
+        ((== t '(jmath)) '(ieeejmath))
+        ((== t '(amalg)) '(ieeeamalg))
+        ((== t '(coprod)) '(ieeecoprod))
+        (else (map ieee-replace t))))
+
+(tm-define (tmtex-postprocess-body x)
+  (:mode ieee-conf-style?)
+  (ieee-replace x))
+
+(logic-group latex-texmacs-symbol%
+  ieeehbar ieeejmath ieeeamalg ieeecoprod)
+
+(smart-table latex-texmacs-macro
+  (ieeehbar (not "h"))
+  (ieeejmath "j")
+  (ieeecoprod
+   (!group (mathop (mbox (reflectbox (rotatebox
+     (!option "origin=c") "180" (!math (prod))))))))
+  (ieeeamalg
+   (!group (mathop (mbox (reflectbox (rotatebox
+     (!option "origin=c") "180" (!math (Pi)))))))))
