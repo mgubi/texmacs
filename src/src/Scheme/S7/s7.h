@@ -1,10 +1,10 @@
 #ifndef S7_H
 #define S7_H
 
-#define S7_VERSION "9.9"
-#define S7_DATE "16-Mar-2021"
+#define S7_VERSION "9.12"
+#define S7_DATE "3-Jun-2021"
 #define S7_MAJOR_VERSION 9
-#define S7_MINOR_VERSION 9
+#define S7_MINOR_VERSION 12
 
 #include <stdint.h>           /* for int64_t */
 
@@ -23,6 +23,13 @@ typedef double s7_double;
 #endif
 #endif
 
+#if WITH_GMP
+  /* in g++ these includes need to be outside the extern "C" business */
+  #include <gmp.h>
+  #include <mpfr.h>
+  #include <mpc.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,6 +46,7 @@ s7_scheme *s7_init(void);
 void s7_free(s7_scheme *sc);
 
 typedef s7_pointer (*s7_function)(s7_scheme *sc, s7_pointer args);   /* that is, obj = func(s7, args) -- args is a list of arguments */
+typedef s7_pointer (*s7_pfunc)(s7_scheme *sc);
 
 s7_pointer s7_f(s7_scheme *sc);                                      /* #f */
 s7_pointer s7_t(s7_scheme *sc);                                      /* #t */
@@ -626,6 +634,7 @@ void *s7_c_object_value(s7_pointer obj);
 void *s7_c_object_value_checked(s7_pointer obj, s7_int type);
 s7_pointer s7_make_c_object(s7_scheme *sc, s7_int type, void *value);
 s7_pointer s7_make_c_object_with_let(s7_scheme *sc, s7_int type, void *value, s7_pointer let);
+s7_pointer s7_make_c_object_without_gc(s7_scheme *sc, s7_int type, void *value);
 s7_pointer s7_c_object_let(s7_pointer obj);
 s7_pointer s7_c_object_set_let(s7_scheme *sc, s7_pointer obj, s7_pointer e);
 /* the "let" in s7_make_c_object_with_let and s7_c_object_set_let needs to be GC protected by marking it in the c_object's mark function */
@@ -702,9 +711,9 @@ void s7_c_type_set_setter       (s7_scheme *sc, s7_int tag, s7_pointer setter);
  *   wrapping up the result as a scheme cell.
  */
 
-s7_function s7_optimize(s7_scheme *sc, s7_pointer expr);
+s7_pfunc s7_optimize(s7_scheme *sc, s7_pointer expr);
 
-typedef s7_double (*s7_float_function)(s7_scheme *sc, s7_pointer args);
+typedef s7_double (*s7_float_function)(s7_scheme *sc);
 s7_float_function s7_float_optimize(s7_scheme *sc, s7_pointer expr);
 
 typedef s7_double (*s7_d_t)(void);
@@ -863,10 +872,6 @@ s7_pointer s7_apply_n_9(s7_scheme *sc, s7_pointer args,
 				       s7_pointer a5, s7_pointer a6, s7_pointer a7, s7_pointer a8, s7_pointer a9));
 
 #if WITH_GMP
-  #include <gmp.h>
-  #include <mpfr.h>
-  #include <mpc.h>
-
   mpfr_t *s7_big_real(s7_pointer x);
   mpz_t  *s7_big_integer(s7_pointer x);
   mpq_t  *s7_big_ratio(s7_pointer x);
@@ -903,7 +908,11 @@ typedef s7_double s7_Double;
 /* --------------------------------------------------------------------------------
  * 
  *        s7 changes
- *
+ * 
+ * 12-Apr:    s7_optimize now returns an s7_pfunc, not an s7_function.
+ * 7-Apr:     removed the "args" parameter from s7_float_function. added s7_make_c_object_without_gc.
+ * 31-Mar:    vector-rank, vector-dimension.
+ * 17-Mar:    removed deprecated nan.0 and inf.0 due to compiler stupidity.
  * 25-Jan:    s7_define_semisafe_typed_function.
  * 6-Jan-21:  s7_hash_code.
  * --------
