@@ -241,8 +241,16 @@
   (gebar (mathrel (Yright)))
   (leangle (mathrel (angle)))
   (geangle (mathrel (!group (mbox (reflectbox (!math (angle)))))))
-  (leqangle (mathrel (substack (!append (angle) "\\\\" "-"))))
-  (geqangle (mathrel (!group (mbox (reflectbox (!math (substack (!append (angle) "\\\\" "-"))))))))
+  (anglege (mathrel (!group (mbox (rotatebox (!option "origin=c") "180"
+                                             (!math (angle)))))))
+  (anglele (mathrel (!group (mbox (rotatebox (!option "origin=c") "180"
+                                             (!math (!recurse (geangle))))))))
+  ;;(leqangle (mathrel (substack (!append (angle) "\\\\" (smash "-")))))
+  (leqangle (mathrel (!append (angle) " \\llap "
+                              (!group (raisebox "-1ex" (!math "-"))))))
+  (geqangle (mathrel (!group (mbox (reflectbox (!math (!recurse (leqangle))))))))
+  (legeangle (mathrel (substack (!append (leangle) "\\\\" (!recurse (anglege))))))
+  (geleangle (mathrel (substack (!append (geangle) "\\\\" (!recurse (anglele))))))
   (udots "{\\mathinner{\\mskip1mu\\raise1pt\\vbox{\\kern7pt\\hbox{.}}\\mskip2mu\\raise4pt\\hbox{.}\\mskip2mu\\raise7pt\\hbox{.}\\mskip1mu}}")
   (subsetsim (underset (sim) (subset)))
   (supsetsim (underset (sim) (supset)))
@@ -410,6 +418,8 @@
   (udddot (underaccent (dddot (hphantom 1)) 1))
   (uddddot (underaccent (ddddot (hphantom 1)) 1))
   (widespacing 1)
+  (gb  (!append (texttt "[\\!\\![") 1 (texttt "]\\!\\!]")))
+  (gbt (!append (texttt "[\\!\\![\\!\\![") 1 (texttt "]\\!\\!]\\!\\!]")))
 
   ;; With options
   (tmcodeinline ((!option "") (!group (ttfamily) (!group 2))))
@@ -489,6 +499,7 @@
   (ontop (genfrac "" "" "0pt" "" 1 2))
   (subindex (index (!append 1 "!" 2)))
   (renderfootnote (footnotetext (!append (tmrsup 1) " " 2)))
+  (renderfootnotestar (footnotetext (!append (tmrsup 1) " " 3)))
   (tmlinenumber (!append (custombinding 1)
                          (tmlinenote (footnotesize 1) 2 "0cm")))
 
@@ -739,7 +750,9 @@
     "      \\tmfloatcontents\n"
     "      \\captionof{#3}{#5}\n"
     "    \\end{center}\n"
-    "  \\end{minipage}}\n")))
+    "  \\end{minipage}}\n"))
+  (addtocountergroup (!append "\\newcommand{\\addtocountergroup}[2]{}\n"))
+  (groupcommoncounter (!append "\\newcommand{\\groupcommoncounter}[1]{}\n")))
 
 ;;(define-macro (latex-texmacs-long prim x l m r)
 ;;  `(smart-table latex-texmacs-preamble

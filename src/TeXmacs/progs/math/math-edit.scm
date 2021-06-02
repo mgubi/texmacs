@@ -40,7 +40,7 @@
            (let* ((s (tm->string b))
                   (last (and (!= s "") (tmstring-reverse-ref s 0)))
                   (type (and last (math-symbol-type last))))
-	     (nin? type (list "prefix" "infix" "separator"
+	     (nin? type (list "prefix" "infix" "separator" "prefix-infix"
 			      "opening-bracket" "middle-bracket"))))))
 
 (tm-define (skip-decorations-leftwards t)
@@ -76,7 +76,7 @@
   (when (== (before-cursor) " ")
     (let* ((p (get-preference "math spacebar"))
 	   (type (if (string? s) (math-symbol-type s) "symbol")))
-      (when (in? type (list "postfix" "infix" "separator"
+      (when (in? type (list "postfix" "infix" "separator" "prefix-infix"
 			    "middle-bracket" "closing-bracket"))
 	(remove-text #f))))
   (former s))
@@ -273,7 +273,10 @@
         (tree-go-to t 0 :end)))))
 
 (define (binary-relations)
-  (or (get-packrat-definition "std-symbols" "Relation-nolim-symbol") (list)))
+  (append (or (get-packrat-definition "std-symbols" "Relation-nolim-symbol")
+              (list))
+          (or (get-packrat-definition "std-symbols" "Assign-symbol")
+              (list))))
 
 (define (binary-relation? t)
   (in? (tm->stree t) (binary-relations)))

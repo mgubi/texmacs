@@ -133,8 +133,10 @@
 
   (url "hyperref")
   (href "hyperref")
+  (hyperref "hyperref")
 
   (cref "cleveref")
+  (Cref "cleveref")
   
   (citet "natbib")
   (citep "natbib")
