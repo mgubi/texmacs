@@ -21,7 +21,9 @@
 
 #ifdef Q_OS_MAC
 
+#define extend COCOA_extend
 #include <QMacPasteboardMime>
+#undef extend 
 
 // On MacOS we have to register appropriate mime types for PDF files
 // The QMacPasteboardMimePDF class is instantiated in QTMApplication
