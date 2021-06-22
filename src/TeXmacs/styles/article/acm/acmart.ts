@@ -1,4 +1,4 @@
-<TeXmacs|1.99.13>
+<TeXmacs|1.99.19>
 
 <style|source>
 
@@ -39,27 +39,27 @@
 
   <active*|<src-comment|Font sizes>>
 
-  <assign|tiny|<macro|x|<with|font-base-size|5|par-sep|1pt|<arg|x>>>>
+  <assign|tiny|<macro|x|<with|font-size|0.5|par-sep|1pt|<arg|x>>>>
 
-  <assign|very-small|<macro|x|<with|font-base-size|7|par-sep|1pt|<arg|x>>>>
+  <assign|very-small|<macro|x|<with|font-size|0.7|par-sep|1pt|<arg|x>>>>
 
-  <assign|small|<macro|x|<with|font-base-size|9|par-sep|1pt|<arg|x>>>>
+  <assign|small|<macro|x|<with|font-size|0.9|par-sep|1pt|<arg|x>>>>
 
-  <assign|flat-size|<macro|x|<with|font-base-size|9|par-sep|1pt|<arg|x>>>>
+  <assign|flat-size|<macro|x|<with|font-size|0.9|par-sep|1pt|<arg|x>>>>
 
-  <assign|normal-size|<macro|x|<with|font-base-size|10|par-sep|1pt|<arg|x>>>>
+  <assign|normal-size|<macro|x|<with|font-size|1.0|par-sep|1pt|<arg|x>>>>
 
-  <assign|sharp-size|<macro|x|<with|font-base-size|11|par-sep|1.5pt|<arg|x>>>>
+  <assign|sharp-size|<macro|x|<with|font-size|1.1|par-sep|1.5pt|<arg|x>>>>
 
-  <assign|large|<macro|x|<with|font-base-size|12|par-sep|2pt|<arg|x>>>>
+  <assign|large|<macro|x|<with|font-size|1.2|par-sep|2pt|<arg|x>>>>
 
-  <assign|larger|<macro|x|<with|font-base-size|14|par-sep|4pt|<arg|x>>>>
+  <assign|larger|<macro|x|<with|font-size|1.4|par-sep|4pt|<arg|x>>>>
 
-  <assign|very-large|<macro|x|<with|font-base-size|17|par-sep|5pt|<arg|x>>>>
+  <assign|very-large|<macro|x|<with|font-size|1.7|par-sep|5pt|<arg|x>>>>
 
-  <assign|huge|<macro|x|<with|font-base-size|20|par-sep|5pt|<arg|x>>>>
+  <assign|huge|<macro|x|<with|font-size|2.0|par-sep|5pt|<arg|x>>>>
 
-  <assign|really-huge|<macro|x|<with|font-base-size|25|par-sep|5pt|<arg|x>>>>
+  <assign|really-huge|<macro|x|<with|font-size|2.5|par-sep|5pt|<arg|x>>>>
 
   <active*|<src-comment|Sectional macros>>
 
@@ -99,7 +99,7 @@
 
   <assign|render-proof|<\macro|which|body>
     <\render-enunciation|<theorem-name|<arg|which>><remark-sep>>
-      <surround||<htab|5mm><qed>|<arg|body>>
+      <surround||<if|<occurs-inside|<quote|<qed>>|body>||<htab|5mm><qed>>|<arg|body>>
     </render-enunciation>
   </macro>>
 
@@ -177,7 +177,11 @@
 
   <assign|doc-make-title|<macro|body|<\surround||<vspace|0.5fn>>
     <\compact>
-      <doc-title-block|<arg|body>>
+      <\doc-title-block>
+        <arg|body>
+
+        \;
+      </doc-title-block>
     </compact>
   </surround>>>
 

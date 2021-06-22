@@ -1,4 +1,4 @@
-<TeXmacs|1.99.13>
+<TeXmacs|1.99.19>
 
 <style|source>
 
@@ -63,11 +63,13 @@
     </src-comment>
   </active*>
 
+  <assign|sectional-no-indent|<macro|<no-indent*>>>
+
   <assign|sectional-short|<macro|name|<no-indent><arg|name>>>
 
-  <assign|sectional-normal|<macro|name|<wide-normal|<arg|name><no-page-break><no-indent*>>>>
+  <assign|sectional-normal|<macro|name|<wide-normal|<arg|name><no-page-break><sectional-no-indent>>>>
 
-  <assign|sectional-centered|<macro|name|<wide-centered|<arg|name><no-page-break><no-indent*>>>>
+  <assign|sectional-centered|<macro|name|<wide-centered|<arg|name><no-page-break><sectional-no-indent>>>>
 
   <assign|sectional-short-italic|<macro|name|<sectional-short|<with|font-shape|italic|<arg|name>>>>>
 
@@ -223,7 +225,7 @@
     </src-comment>
   </active*>
 
-  <assign|toc-title|<macro|env|title|<style-with|src-compact|none|<if|<compound|<unquote|<merge|<arg|env>|-numbered>>>|<compound|<unquote|<merge|the-|<arg|env>>>><compound|<unquote|<merge|<arg|env>|-sep>>><arg|title>|<arg|title>>>>>
+  <assign|toc-title|<macro|env|title|<quasi|<style-with|src-compact|none|<if|<compound|<unquote|<merge|<arg|env>|-numbered>>>|<compound|<unquote|<merge|the-|<arg|env>>>><compound|<unquote|<merge|<arg|env>|-sep>>><arg|title>|<arg|title>>>>>>
 
   <assign|part-toc|<macro|name|<toc-main-1|<toc-title|part|<arg|name>>>>>
 

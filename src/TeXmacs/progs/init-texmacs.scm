@@ -151,6 +151,8 @@
 ;(display "Booting main TeXmacs functionality\n")
 (use-modules (texmacs texmacs tm-server) (texmacs texmacs tm-view)
              (texmacs texmacs tm-files) (texmacs texmacs tm-print))
+(lazy-define (texmacs texmacs tm-files)
+             buffer-missing-style? buffer-set-default-style)
 (use-modules (texmacs keyboard config-kbd))
 (lazy-keyboard (texmacs keyboard prefix-kbd) always?)
 (lazy-keyboard (texmacs keyboard latex-kbd) always?)
@@ -186,7 +188,7 @@
            preamble-menu document-part-menu project-manage-menu)
 (lazy-menu (generic insert-menu) insert-menu texmacs-insert-menu
            texmacs-insert-icons insert-link-menu insert-image-menu)
-(lazy-define (generic document-edit) update-document
+(lazy-define (generic document-edit) update-document set-document-language
              get-init-page-rendering init-page-rendering)
 (lazy-define (generic generic-edit) notify-activated notify-disactivated)
 (lazy-define (generic generic-doc) focus-help)
@@ -240,7 +242,7 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting programming modes\n")
-(lazy-format (prog prog-format) cpp scheme scala java python)
+(lazy-format (prog prog-format) cpp scheme scala java python julia)
 (lazy-keyboard (prog prog-kbd) in-prog?)
 (lazy-menu (prog prog-menu) prog-format-menu prog-format-icons
 	   prog-menu prog-icons)

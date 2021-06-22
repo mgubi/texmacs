@@ -60,8 +60,9 @@
   (latex-set-dependencies))
 
 (tm-define (latex-add-extra p)
-  (set! latex-extra-packages (cons p latex-extra-packages))
-  (latex-set-dependencies))
+  (when (nin? p latex-extra-packages)
+    (set! latex-extra-packages (cons p latex-extra-packages))
+    (latex-set-dependencies)))
 
 (tm-define (latex-set-virtual-packages ps)
   (set! latex-virtual-packages ps)
@@ -423,7 +424,13 @@
 (define (latex-use-which-package l)
   (when (and (list? l) (nnull? l))
     (let ((x (car l)))
-      (if (symbol? x) (latex-command-uses x))
+      (when (symbol? x)
+        (with s (symbol->string x)
+          (cond ((string-starts? s "left\\")
+                 (latex-command-uses (string->symbol (string-drop s 5))))
+                ((string-starts? s "right\\")
+                 (latex-command-uses (string->symbol (string-drop s 6))))
+                (else (latex-command-uses x)))))
       (if (and (list? x) (>= (length l) 2) (== (car x) '!begin))
 	  (latex-command-uses
            (string->symbol (string-append "begin-" (cadr x)))))
@@ -439,10 +446,10 @@
     (< vl vr)))
 
 (define (filter-packages l)
-  (filter (lambda (x) (nin? x tmtex-provided-packages)) l))
+  (filter (lambda (x) (nin? x (tmtex-provided-packages))) l))
 
 (define (filter-packages* l)
-  (filter (lambda (x) (nin? (cAr x) tmtex-provided-packages)) l))
+  (filter (lambda (x) (nin? (cAr x) (tmtex-provided-packages))) l))
 
 (define (make-use-package l)
   (with po (ahash-ref latex-packages-option (cAr l))
@@ -452,7 +459,10 @@
       (with opts (if (== opt "") "" (string-append "["  opt "]"))
         (string-append "\\usepackage" opts "{" sty "}\n")))))
 
-(define (latex-as-use-package l1)
+(tm-define (latex-ifacconf-style?)
+  (== tmtex-style "ifacconf"))
+
+(tm-define (latex-as-use-package l1)
   (let* ((l2  (sort l1 latex-use-package-compare))
 	 (l3  (filter
                 (lambda (x)
@@ -547,6 +557,8 @@
         ((nnull? colors)
          (ahash-set! latex-packages-option pack (list "")))))
 
+(tm-define (latex-extra-preamble) "")
+
 (tm-define (latex-preamble text style lan init colors colormaps)
   (:synopsis "Compute preamble for @text")
   (with-global tmtex-style (if (list? style) (cAr style) style)
@@ -560,13 +572,14 @@
            (pre-macro    (latex-serialize-preamble Macro))
            (pre-colors   (latex-serialize-preamble Colors))
            (pre-catcode  (latex-catcode-defs Text))
-           (pre-uses     (latex-use-package-command Text)))
+           (pre-uses     (latex-use-package-command Text))
+           (pre-extra    (latex-extra-preamble)))
       (values
         (cond ((and (in? "amsthm" latex-all-packages)
                     (== style "amsart")) "[amsthm]")
               ((list? style) (latex-make-option (cDr style)))
               (else ""))
-        (string-append pre-uses)
+        (string-append pre-uses pre-extra)
         (string-append pre-page)
         (string-append pre-catcode pre-macro pre-colors)))))
 
