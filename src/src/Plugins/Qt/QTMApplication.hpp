@@ -19,7 +19,7 @@
 #include "url.hpp"
 
 
-#ifdef Q_OS_MAC
+#if defined(Q_OS_MAC) && (QT_VERSION < 0x060000)
 
 #define extend COCOA_extend
 #include <QMacPasteboardMime>
@@ -33,6 +33,9 @@
 // https://www.lyx.org/trac/browser/lyxsvn/lyx-devel/trunk/src/frontends/qt4/GuiApplication.cpp?rev=24894
 
 // (mg) I'm not sure this is the right place to have this code, but well...
+
+// (mg) QMacPasteboardMime is not available in Qt 6.0
+
 
 class QMacPasteboardMimePDF : public QMacPasteboardMime
 {
@@ -105,7 +108,7 @@ public:
 class QTMApplication: public QApplication {
   Q_OBJECT
   
-#ifdef Q_OS_MAC
+#if defined(Q_OS_MAC) && (QT_VERSION < 0x060000)
   QMacPasteboardMimePDF mac_pasteboard_mime_pdf;
 #endif
   
