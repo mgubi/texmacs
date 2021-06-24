@@ -45,6 +45,9 @@
 #include <QImage>
 #include <QUrl>
 #include <QApplication>
+#if (QT_VERSION < 0x060000)
+#include <QScreen>
+#endif
 
 #include "QTMGuiHelper.hpp"
 #include "QTMWidget.hpp"
