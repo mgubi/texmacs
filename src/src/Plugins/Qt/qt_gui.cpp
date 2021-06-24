@@ -45,6 +45,7 @@
 #include <QImage>
 #include <QUrl>
 #include <QApplication>
+#include <QScreen>
 
 #include "QTMGuiHelper.hpp"
 #include "QTMWidget.hpp"
