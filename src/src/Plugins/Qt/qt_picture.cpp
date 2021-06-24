@@ -231,7 +231,7 @@ qt_load_xpm (url file_name) {
   if (retina_icons > 1 && suffix (file_name) == "xpm") {
     url png_equiv= glue (unglue (file_name, 4), "_x2.png");
     load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
-    dpr= 2.0;
+    if (sss != "") dpr = 2.0;
   }
   if (sss == "" && suffix (file_name) == "xpm") {
     url png_equiv= glue (unglue (file_name, 3), "png");
@@ -244,7 +244,9 @@ qt_load_xpm (url file_name) {
   c_string buf (sss);
   QImage pm;
   pm.loadFromData ((uchar*) (char*) buf, N(sss));
+#if (QT_VERSION >= 0x050000)
   pm.setDevicePixelRatio (dpr);
+#endif
   return qt_picture (pm, 0, 0);
 }
 
