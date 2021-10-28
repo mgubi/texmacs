@@ -539,7 +539,6 @@ set (TeXmacs_MacOS_SRCS
 ### --------------------------------------------------------------------
 ### Determine TeXmacs_Libraries
 ### --------------------------------------------------------------------
-
 set (TeXmacs_Libraries
   # ${Guile_LIBRARIES}
   ${ZLIB_LIBRARIES}
@@ -547,6 +546,16 @@ set (TeXmacs_Libraries
   ${PNG_LIBRARIES}
   -lpthread
 )
+
+if (WIN32)
+# explore this
+# CMAKE_INSTALL_UCRT_LIBRARIES
+# I only to manage to get it working for msys2-ucrt.
+set (TeXmacs_Libraries
+  ${TeXmacs_Libraries}
+  wsock32 ws2_32
+)
+endif (WIN32)
 
 if (LINKED_CAIRO)
   set (TeXmacs_Libraries ${TeXmacs_Libraries} ${CAIRO_LIBRARIES})
