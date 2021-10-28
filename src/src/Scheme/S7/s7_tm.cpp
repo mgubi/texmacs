@@ -230,13 +230,15 @@ static tmscm blackbox_to_string (s7_scheme *sc, tmscm args)
   
 static s7_pointer free_blackbox (s7_scheme *sc, s7_pointer obj)
 {
-  // Figure this out. I debug a whole day for this man.
-//  blackbox *ptr = (blackbox *) s7_c_object_value (obj);
-//  tm_delete (ptr);
+  blackbox *ptr = (blackbox *) s7_c_object_value (obj);
+  tm_delete (ptr);
+  // Don't remove this, segmentation error could happen :)
+  return (NULL);
 }
 
 static s7_pointer mark_blackbox (s7_scheme *sc, s7_pointer obj)
 {
+  return (NULL);
 }
 
 static s7_pointer blackbox_is_equal(s7_scheme *sc, s7_pointer args)
