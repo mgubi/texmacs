@@ -812,3 +812,7 @@ configure_file (${TEXMACS_SOURCE_DIR}/misc/vscode/c_cpp_properties.json.in
 )
 
 message (STATUS "TeXmacs_Libraries" ${TeXmacs_Libraries})
+
+## MINGW packaging
+# copydll.sh and QT_PLUGINS_PATH
+# Also need to copy all scheme source code one directory outside of the binary.

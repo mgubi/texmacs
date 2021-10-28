@@ -1,3 +1,7 @@
+# Plans
+I want to enable better support for Windows 10 on this branch (mostly fixing up the building process and sometimes add code 
+to provide better experience for Windows users).
+
 # GNU TeXmacs (experimental branch for S7 Scheme)
 
 January 2021.
