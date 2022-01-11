@@ -464,6 +464,7 @@ get_unicode_range (int code) {
   else if (code >= 0x3000 && code <= 0x303f) return "cjk";
   else if (code >= 0x4e00 && code <= 0x9fcc) return "cjk";
   else if (code >= 0xff00 && code <= 0xffef) return "cjk";
+  else if (code >= 0x3040 && code <= 0x309F) return "hiragana";
   else if (code >= 0xac00 && code <= 0xd7af) return "hangul";
   else if (code >= 0x2000 && code <= 0x23ff) return "mathsymbols";
   else if (code >= 0x2900 && code <= 0x2e7f) return "mathextra";
@@ -488,7 +489,13 @@ in_unicode_range (string c, string range) {
   if (N(uc) == 0) return "";
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
-  if (range == get_unicode_range (code)) return range != "";
+  string got= get_unicode_range (code);
+  if (range == got) return range != "";
+  if (range == "cjk" && (got == "hangul" || got == "hiragana")) return true;
+    // There are actually two ranges (cjk/hangul) for Korean characters and
+    // two ranges (cjk/hiragana) for Japanese characters
+    // For example, on macOS, `sys-korean` is expanded to `cjk=Apple SD Gothic Neo,roman`,
+    // assuming that `Apple SD Gothic Neo` is the default korean font on macOS
   if (range == "mathlarge" || range == "mathbigop")
     if (starts (c, "<big-") ||
         (code >= 0x220f && code <= 0x2211) ||
@@ -1035,7 +1042,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
       if (fn[nr]->supports (rewrite (c, REWRITE_MATH)))
         return sm->add_char (key, c);
     }
-    if (fam == "roman" && N(c) > 1) {
+    if ((fam == "roman" || fam == "cyrillic") && N(c) > 1) {
       tree key= tuple ("cyrillic", fam, variant, series, rshape);
       int nr= sm->add_font (key, REWRITE_CYRILLIC);
       initialize_font (nr);
@@ -1274,8 +1281,8 @@ smart_font_rep::resolve (string c) {
   string virt= find_in_virtual (c);
   if (math_kind != 0 && !unicode_provides (c) && virt == "")
     if (!starts (c, "<left-") &&
-	!starts (c, "<right-") &&
-	!starts (c, "<mid-")) {
+        !starts (c, "<right-") &&
+        !starts (c, "<mid-")) {
       //cout << "Found " << c << " in other\n";
       return sm->add_char (tuple ("other"), c);
     }

@@ -269,8 +269,9 @@
       (set! l (cdr l)))))
 
 (define (load-tag-file relative_filename)
-  (let ((filename (url->unix (url-append
-		   (url-head (current-buffer)) relative_filename))))
+  (let ((filename (url->system
+                   (url-append
+                    (url-head (current-buffer)) relative_filename))))
     (if (url-test? filename "r")
 	(let ((nst (url-last-modified filename))
 	      (ost (ahash-ref* file->stamp filename '())))
@@ -279,7 +280,7 @@
 		     (s (read-delimited "" p)))
 		(close-input-port p)
 		(ahash-set! file->stamp filename nst)
-		(set! current-dir (url-head relative_filename))
+		(set! current-dir (url->system (url-head relative_filename)))
 		(parse-main s))))
 	(texmacs-error "Doxygen: file not found" filename))))
 
@@ -289,7 +290,7 @@
     (if (not loaded?)
 	(if (url-exists? filename)
 	    (let ((s (string-load filename)))
-	      (set! current-dir (url-head relative_filename))
+	      (set! current-dir (url->system (url-head relative_filename)))
 	      (parse-main s)
 	      (ahash-set! web->loaded? filename #t))
 	    (texmacs-error "Doxygen: file not found" filename)))))

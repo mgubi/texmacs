@@ -9,6 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "boot.hpp"
 #include "font.hpp"
 #include "gui.hpp"
 #include "Freetype/tt_file.hpp"
@@ -569,6 +570,10 @@ script (int sz, int level) {
 
 string
 default_chinese_font_name () {
+  if (has_user_preference("default chinese font name")) {
+    return get_user_preference("default chinese font name");
+  }
+
   // Set default Chinese font for Windows
   // see: https://docs.microsoft.com/en-us/typography/fonts/windows_10_font_list
 #ifdef OS_MINGW
@@ -591,17 +596,43 @@ default_chinese_font_name () {
 
 string
 default_japanese_font_name () {
+  if (has_user_preference("default japanese font name")) {
+    return get_user_preference("default japanese font name");
+  }
+
+  // Set default Japanese font for macOS
+  // see: https://developer.apple.com/fonts/system-fonts/
+#ifdef OS_MACOS
+  if (tt_font_exists ("ヒラギノ角ゴシック W3")) return "Hiragino Kaku Gothic ProN";
+#endif
+
+#ifdef OS_MINGW
+  if (tt_font_exists ("msmincho")) return "MS PMincho";
+#endif
+
   if (tt_font_exists ("ipam")) return (new_fonts? "IPAMincho": "modern");
   if (tt_font_exists ("sazanami")) return "sazanami";
   if (tt_font_exists ("ttf-japanese-gothic")) return "ttf-japanese";
   if (tt_font_exists ("ヒラギノ明朝 ProN W6")) return "kaku";
-  if (tt_font_exists ("MS PGothic")) return "ms-gothic";
-  if (tt_font_exists ("MS PMincho")) return "ms-mincho";
   return "roman";  
 }
 
 string
 default_korean_font_name () {
+  if (has_user_preference("default korean font name")) {
+    return get_user_preference("default korean font name");
+  }
+
+  // Set default Korean font for macOS
+  // see: https://developer.apple.com/fonts/system-fonts/
+#ifdef OS_MACOS
+  if (tt_font_exists ("AppleSDGothicNeo")) return "Apple SD Gothic Neo";
+#endif
+
+#ifdef OS_MINGW
+  if (tt_font_exists ("batang")) return "Batang";
+#endif
+
   if (tt_font_exists ("unbatang")) return (new_fonts? "UnBatang": "modern");
   if (tt_font_exists ("UnBatang")) return (new_fonts? "UnBatang": "modern");
   if (tt_font_exists ("AppleGothic")) return "apple-gothic";
