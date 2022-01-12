@@ -5958,6 +5958,9 @@ $as_echo "#define OS_MINGW (defined (__MINGW__) || defined (__MINGW32__))" >>con
       CONFIG_OS_COMPAT="Windows"
       CPPFLAGS="$CPPFLAGS -I/usr/local/include -IPlugins/Windows -I."
       GUILE_LDFLAGS="-lmingwex $GUILE_LDFLAGS -lintl" #added mingwex to mask the internal guile readdir function
+      # Some Windows libs
+      WIN_LDFLAGS="-lwsock32 -lws2_32 -lucrt"
+      LIBS+=" $WIN_LDFLAGS"
 
   if [[ "-Wl,--stack=16777216" =~ $(echo '^-Wl,') ]]
   then LDFLAGS+=" -Wl,--stack=16777216"
@@ -8425,8 +8428,8 @@ $as_echo "$as_me: WARNING: Drop duplicate flag -I$(pwd)/tm-guile168/build/includ
       GUILE_VERSION=1.6
       GUILE_DATA_PATH=$(pwd)/tm-guile168/build/share/guile/${GUILE_VERSION}
 
-else
-  as_fn_error $? "cannot find guile-config; is Guile installed?" "$LINENO" 5
+# else
+  # as_fn_error $? "cannot find guile-config; is Guile installed?" "$LINENO" 5
 
 fi
 
@@ -8473,8 +8476,8 @@ _ACEOF
 
 
 
-else
-  as_fn_error $? "Guile nor found" "$LINENO" 5
+#else
+ # as_fn_error $? "Guile nor found" "$LINENO" 5
 fi
 
   if test -z "LC_GUILE_use_embedded_guile"; then :

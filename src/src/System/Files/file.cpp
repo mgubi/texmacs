@@ -520,6 +520,7 @@ read_directory (url u, bool& error_flag) {
   u= resolve (u, "dr");
   if (is_none (u)) return array<string> ();
   string name= concretize (u);
+  // cout << "concretize: " << name << "\n";
 
   // Directory contents in cache?
   if (is_cached ("dir_cache.scm", name) && is_up_to_date (u))
@@ -529,6 +530,7 @@ read_directory (url u, bool& error_flag) {
 
   DIR* dp;
   c_string temp (name);
+  // cout << "converted dir name: " << temp << '\n';
   dp= opendir (temp);
   error_flag= (dp==NULL);
   if (error_flag) return array<string> ();
@@ -536,9 +538,14 @@ read_directory (url u, bool& error_flag) {
   array<string> dir;
   #ifdef OS_MINGW
   while (true) {
-    const char* nextname =  nowide::readir_entry (dp);
-    if (nextname==NULL) break;
-    dir << string (nextname);
+    // const char* nextname =  nowide::readir_entry (dp);
+    string nextname = nowide::readir_entry (dp);
+    // nowide::stackstring dir_entry = nowide::readir_entry (dp);
+    // const char* nextname = dir_entry.c_str();
+    
+    if (N(nextname) == 0) break;
+    dir << nextname;
+    // cout << "nowide::readir_entry() " << dir << '\n';
   #else
   struct dirent* ep;
   while (true) {
@@ -879,9 +886,11 @@ search_sub_dirs (url& all, url root) {
     bool err= false;
     array<string> a= read_directory (root, err);
     if (!err) {
-      for (int i=N(a)-1; i>=0; i--)
+      for (int i=N(a)-1; i>=0; i--) {
+	// cout << "subdirs:" << a[i] << '\n';
         if (N(a[i])>0 && a[i][0] != '.')
           search_sub_dirs (all, root * a[i]);
+      }
     }
     all= root | all;
   }

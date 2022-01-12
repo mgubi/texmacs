@@ -232,10 +232,13 @@ static s7_pointer free_blackbox (s7_scheme *sc, s7_pointer obj)
 {
   blackbox *ptr = (blackbox *) s7_c_object_value (obj);
   tm_delete (ptr);
+  // Don't remove this, segmentation error could happen :)
+  return (NULL);
 }
 
 static s7_pointer mark_blackbox (s7_scheme *sc, s7_pointer obj)
 {
+  return (NULL);
 }
 
 static s7_pointer blackbox_is_equal(s7_scheme *sc, s7_pointer args)
@@ -353,11 +356,11 @@ initialize_scheme () {
   initialize_smobs ();
   initialize_glue ();
   object_stack= s7_name_to_value (tm_s7, "object-stack");
-  
+
     // uncomment to have a guile repl available at startup	
     //	gh_repl(guile_argc, guile_argv);
     //scm_shell (guile_argc, guile_argv);
-  
-  
+
+
 }
 
