@@ -489,7 +489,8 @@
         ((func? cmd :test-input-done 1)
          (if (second cmd) (plugin-supports-input-done-set! name))))
 
-   (ahash-ref plugin-data-table name))
+  (or (in? (car cmd) '(:macpath :winpath))
+      (ahash-ref plugin-data-table name)))
 
 (define-public (plugin-configure-cmds name cmds)
   "Helper function for plugin-configure"
@@ -545,7 +546,7 @@
               ;;(with start (texmacs-time)
               ;;  (load fname)
               ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-              (load fname *texmacs-user-module*)
+              (load fname)
               ))
         (if (plugin-all-initialized?) (plugin-save-setup)))))
 

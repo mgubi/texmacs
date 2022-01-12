@@ -185,20 +185,17 @@ has_printing_cmd () {
 }
 
 string get_user_login () {
-#if defined (OS_MINGW)
+#if OS_MINGW
   return getenv ("USERNAME");
 #else
-  return getenv ("USER");
+  return unix_get_login ();
 #endif
 }
 
 string get_user_name () {
-#if defined (OS_MINGW)
-  //FIXME: Add the equivalent in Windows!!!
-  return ("<get_user_name not implemented in Windows>");
-#elif defined(OS_MACOS)
-  return eval_system ("id -P $USER | awk -F '[:]' '{print $8}'");
-#else // Linux
-  return eval_system ("getent passwd $USER | cut -d: -f5 | cut -d, -f1");
+#if OS_MINGW
+  return sys_utils::mingw_get_username ();
+#else // Linux and macOS
+  return unix_get_username ();
 #endif
 }

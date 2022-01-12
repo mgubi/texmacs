@@ -165,7 +165,7 @@
    (if (and (in-maxima?) help)
       /
       ((balloon (icon "tm_help.xpm") "Maxima manual")
-       (load-buffer help)))))
+       (load-help-buffer help)))))
 
 (menu-bind session-help-icons
   (:require (and (in-maxima?) (in-session?)))

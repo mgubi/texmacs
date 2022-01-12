@@ -88,7 +88,21 @@
 (define (begin* conds)
   (if (list-1? conds) (car conds) `(begin ,@conds)))
 
-(define-public (procedure-name fun) (ahash-ref tm-defined-name fun))
+(define-public (procedure-name fun) 
+  (if (procedure? fun) fun #f))
+
+(define-public (procedure-symbol-name fun)
+  (cond ((symbol? fun) fun)
+        ((string? fun) (string->symbol fun))
+        ((and (procedure? fun) (ahash-ref tm-defined-name fun))
+         (ahash-ref tm-defined-name fun))
+        ((and (procedure? fun) (string-alpha? (object->string fun)))
+         (string->symbol (object->string fun)))
+        (else #f)))
+
+(define-public (procedure-string-name fun)
+  (and-with name (procedure-symbol-name fun)
+    (symbol->string name)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Overloading
