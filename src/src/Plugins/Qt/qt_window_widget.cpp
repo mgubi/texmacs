@@ -62,7 +62,7 @@ qt_window_widget_rep::qt_window_widget_rep (QWidget* _wid, string name,
     QPalette pal;
     QColor winbg= pal.color (QPalette::Base);
     if (winbg.red() + winbg.green() + winbg.blue () < 255)
-      pal.setColor (QPalette::Background, QColor (240, 240, 240));
+      pal.setColor (QPalette::Base, QColor (240, 240, 240));
     _wid->setPalette (pal);
   }
 }

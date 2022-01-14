@@ -836,7 +836,7 @@ QTMWidget::dropEvent (QDropEvent *event) {
 void
 QTMWidget::wheelEvent(QWheelEvent *event) {
   if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
-    if (event->delta() > 0) {
+    if (event->angleDelta().y() > 0) {
       call ("zoom-in", object (sqrt (sqrt (2.0))));
     } else {
       call ("zoom-out", object (sqrt (sqrt (2.0))));
