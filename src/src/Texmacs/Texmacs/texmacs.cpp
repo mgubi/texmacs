@@ -76,7 +76,7 @@ bool start_server_flag= false;
 string extra_init_cmd;
 void server_start ();
 
-#ifdef QTTEXMACS
+#if (defined(QTTEXMACS)||defined(QTWKTEXMACS))
 // Qt application infrastructure
 static QTMApplication* qtmapp;
 #endif
@@ -709,7 +709,7 @@ main (int argc, char** argv) {
       QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
       QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
   #endif
-  qtmapp= new QApplication (argc, argv);
+  qtmapp= new QTMApplication (argc, argv);
   //QTMApplication* qtmapp= new QTMApplication (argc, argv);
 #endif
   TeXmacs_init_paths (argc, argv);
