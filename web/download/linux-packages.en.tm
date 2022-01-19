@@ -1,4 +1,4 @@
-<TeXmacs|1.99.13>
+<TeXmacs|2.1.1>
 
 <style|<tuple|tmweb2|old-dots|old-lengths>>
 
@@ -160,6 +160,9 @@
       <item><hlink|<TeXmacs> package for Fedora-30 with a 32 bits Intel/AMD
       processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/Fedora_30/|<merge|<TeXmacs-version-release|devel>|.i686.rpm>>>
 
+      <item><hlink|<TeXmacs> package for Fedora-30 with a 64 bits Intel/AMD
+      processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/Fedora_30/|<merge|<TeXmacs-version-release|devel>|.x86_64.rpm>>>
+
       <item><hlink|<TeXmacs> package for Fedora-31 with a 64 bits Intel/AMD
       processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/Fedora_31/|<merge|<TeXmacs-version-release|devel>|.x86_64.rpm>>>
 
@@ -193,7 +196,8 @@
       Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ScientificLinux_6/|<merge|<TeXmacs-version-release|devel>|.x86_64.rpm>>>
 
       <item><hlink|<TeXmacs> package for Scientific Linux-7 with a 64 bits
-      Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ScientificLinux_7/|<merge|<TeXmacs-version-release|devel>|.x86_64.rpm>>>
+      Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ScientificLinux_7/|<merge|TeXmacs-1.99.13|.x86_64.rpm>>>
+      (version 1.99.13 only)
     </itemize>
 
     <item>Install the package using
@@ -306,6 +310,15 @@
 
       <item><hlink|<TeXmacs> package for xUbuntu_20.04 with a 64 bits
       Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_20.04/|<merge|<TeXmacs-version-release|devel>|.amd64.deb>>>
+
+      <item><hlink|<TeXmacs> package for xUbuntu_20.10 with a 64 bits
+      Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ubuntu2010/|<merge|<TeXmacs-version-release|devel>|.amd64.deb>>>
+
+      <item><hlink|<TeXmacs> package for xUbuntu_21.04 with a 64 bits
+      Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ubuntu2104/|<merge|<TeXmacs-version-release|devel>|.amd64.deb>>>
+
+      <item><hlink|<TeXmacs> package for xUbuntu_21.10 with a 64 bits
+      Intel/AMD processor|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/ubuntu2110/|<merge|<TeXmacs-version-release|devel>|.amd64.deb>>>
     </itemize>
 
     <item>As <verbatim|root>, install the package using

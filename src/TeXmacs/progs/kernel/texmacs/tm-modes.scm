@@ -99,6 +99,9 @@
 (define-public (supports-db?)
   (== (get-preference "database tool") "on"))
 
+(define-public (side-tools?)
+  (visible-side-tools? 0))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mode related
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -170,6 +173,8 @@
   (in-prog-scheme% #t in-prog% in-scheme%)
   (in-python% (== (get-env "prog-language") "python"))
   (in-prog-python% #t in-prog% in-python%)
+  (in-julia% (== (get-env "prog-language") "julia"))
+  (in-prog-julia% #t in-prog% in-julia%)
   (in-verbatim% (or (inside? 'verbatim) (inside? 'verbatim-code) 
                     (inside? 'code)) in-text%)
   (in-variants-disabled% 

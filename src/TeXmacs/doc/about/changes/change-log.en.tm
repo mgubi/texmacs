@@ -1,13 +1,33 @@
-<TeXmacs|1.99.19>
+<TeXmacs|2.1>
 
 <style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|<TeXmacs> changelog>
 
-  <section|Changes from version 1.99.1 to 1.99.20>
+  <section|Changes from version 2.1 to 2.1.1>
 
   <\itemize>
+    <item>Creation of various interface themes for <TeXmacs>, such as dark
+    and bright (2.1.1).
+
+    <item>Improved high resolution support under Linux and Windows (2.1.1).
+
+    <item>Progress on (not yet default) Qt5 version of <TeXmacs> (2.1.1).
+
+    <item>Updated font database for recent pre-installed Linux/Mac/Window
+    fonts (2.1.1).
+  </itemize>
+
+  <section|Changes from version 1.99.1 to 2.1>
+
+  <\itemize>
+    <item>Minor bug fixes (2.1).
+
+    <item>Various minor bug fixes (1.99.21).
+
+    <item>Updated plug-in for <name|Giac> (1.99.21).
+
     <item>Better support for the most common <LaTeX> style files (1.99.20).
 
     <item>Many corrections for the <LaTeX> export when using common <LaTeX>

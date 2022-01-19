@@ -179,7 +179,7 @@ QTMWidget::QTMWidget (QWidget* _parent, qt_widget _tmwid)
   surface ()->setMouseTracking (true);
   surface ()->setAcceptDrops (true);
 
-#if (QT_VERSION >= 0x050000)
+#if (QT_VERSION >= QT_VERSION_CHECK(5,9,0))
   surface ()->setTabletTracking (true);
   for (QWidget *parent = surface()->parentWidget();
        parent != nullptr; parent = parent->parentWidget())
@@ -750,29 +750,31 @@ QTMWidget::dragEnterEvent (QDragEnterEvent *event)
 
 int drop_payload_serial  =0;
 hashmap<int, tree> payloads;
-
+ 
 void
-QTMWidget::dropEvent (QDropEvent *event)
-{
+QTMWidget::dropEvent (QDropEvent *event) {
   if (is_nil (tmwid)) return;
   
   QPoint point = event->pos () + origin ();
   coord2 pt= from_qpoint (point);
 
-  //qDebug() << event;
   tree doc (CONCAT);
   const QMimeData *md= event->mimeData ();
   QByteArray buf;
 
   if (md->hasUrls ()) {
     QList<QUrl> l= md->urls ();
-//    qDebug() << l;
     for (int i=0; i<l.size (); i++) {
       string name;
 #ifdef OS_MACOS
       name= from_qstring (fromNSUrl (l[i]));
 #else
       name= from_qstring (l[i].toLocalFile ());
+#endif
+      string orig_name= name;
+#ifdef OS_MINGW
+      if (N(name) >=2 && is_alpha (name[0]) && name[1] == ':')
+        name= "/" * locase_all (name (0, 1)) * name (2, N(name));
 #endif
       string extension = suffix (name);
       if ((extension == "eps") || (extension == "ps")   ||
@@ -782,7 +784,7 @@ QTMWidget::dropEvent (QDropEvent *event)
           (extension == "pdf") || (extension == "png")  ||
           (extension == "jpg") || (extension == "jpeg")) {
         string w, h;
-        qt_pretty_image_size (url_system (name), w, h);
+        qt_pretty_image_size (url_system (orig_name), w, h);
         tree im (IMAGE, name, w, h, "", "");
         doc << im;
       } else {
@@ -811,7 +813,7 @@ QTMWidget::dropEvent (QDropEvent *event)
     tree t (IMAGE, tree (RAW_DATA, string (buf.constData (), buf.size ()), "pdf"),
                    "", "", "", "");
     doc << t;
-  }  else if (md->hasText ()) {
+  } else if (md->hasText ()) {
     buf= md->text ().toUtf8 ();
     doc << string (buf.constData (), buf.size ());
   }
@@ -833,17 +835,15 @@ QTMWidget::dropEvent (QDropEvent *event)
   }
 }
 
-/*
 void
 QTMWidget::wheelEvent(QWheelEvent *event) {
   if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
     if (event->delta() > 0) {
-      the_gui->process_keypress (tm_widget(), string("C-+"), texmacs_time());
+      call ("zoom-in", object (sqrt (sqrt (2.0))));
     } else {
-      the_gui->process_keypress (tm_widget(), string("C--"), texmacs_time());
+      call ("zoom-out", object (sqrt (sqrt (2.0))));
     }
   } else {
     QAbstractScrollArea::wheelEvent(event);
   }
 }
-*/
