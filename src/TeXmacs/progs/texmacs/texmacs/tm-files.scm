@@ -425,11 +425,15 @@
         (else "xdg-open")))
 
 (tm-define (load-external u)
-  (if (not (url-rooted? u))
-      (set! u (url-relative (current-buffer) u)))
-  (if (url-rooted-web? u)
-      (system (string-append (default-open) " " (raw-quote (url->system u))))
-      (system-1 (default-open) u)))
+  (when (not (url-rooted? u))
+    (set! u (url-relative (current-buffer) u)))
+  (cond ((not (url-rooted-web? u))
+         (system-1 (default-open) u))
+        ((or (os-mingw?) (os-win32?))
+         (system (string-append (default-open) " " (url->system u))))
+        (else
+         (system (string-append (default-open) " "
+                                (raw-quote (url->system u)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loading buffers
@@ -526,8 +530,8 @@
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
   (cond ((buffer-exists? name) (switch-to-buffer name))
-        ((url-rooted-web? (current-buffer)) (load-buffer name))
         ((buffer-external? name) (load-external name))
+        ((url-rooted-web? (current-buffer)) (load-buffer name))
         (else (load-buffer name))))
 
 (tm-define (open-buffer)

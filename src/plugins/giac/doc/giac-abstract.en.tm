@@ -1,6 +1,6 @@
-<TeXmacs|1.99.12>
+<TeXmacs|2.1.1>
 
-<style|<tuple|tmdoc|english|old-spacing|old-dots>>
+<style|<tuple|tmdoc|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmdoc-title|The <name|Giac> system>
@@ -50,7 +50,7 @@
     drawing
 
     <item*|Programming>Functions, local variables, conditionals, loops,
-    choice of syntax (C-like, Maple, Mupad, <abbr|TI89>)
+    choice of syntax (C-like, Python, Maple, Mupad, <abbr|TI89>)
 
     <item*|Syntax compatibility with other systems>Maple compatibility, MuPAD
     compatibility, Python compatibility, MathML export (content and
@@ -62,7 +62,17 @@
   copied back to <name|Giac>. Interactive plotting and mathematical input are
   supported as well.
 
-  <tmdoc-copyright|1998--2002|Joris van der Hoeven, 2020 by Luka Marohni¢>
+  <paragraph|A note on session plots.>Any interactive <name|Giac> figure can
+  be automatically embedded into the <TeXmacs> document by pressing \POK\Q.
+  However, the PostScript conversion requires <scm|eps2eps> script to be
+  available in PATH, which is resolved by installing Ghostscript. In
+  <abbr|MS> Windows, paths to <scm|bin> and <scm|lib> folders in the
+  Ghostscript installation directory (e.g.<nbsp><scm|C:\\Program
+  Files\\gs\\gs9.53.3\\bin> and also <scm|lib>) must be manually added to the
+  PATH variable after installation (type <verbatim|env> in the Start menu to
+  edit environment variables).
+
+  <tmdoc-copyright|1998\U2002|Joris van der Hoeven, 2021 by Luka Marohni¢>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

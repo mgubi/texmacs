@@ -376,7 +376,7 @@
     (let* ((file (url->system u))
            (help? (and (== "texmacs-file" (file-format u)) 
                        (url-exists-in-help? file)))
-           (text (if help? (help-file-title u) (basename (url->system base)))))
+           (text (if help? (help-file-title u) (url->system (url-tail base)))))
       ($link file text))))
 
 (define (url-list->document l)
@@ -454,6 +454,7 @@
             ((== fm "java-file") (source-file-post qry))
             ((== fm "scala-file") (source-file-post qry))
             ((== fm "python-file") (source-file-post qry))
+            ((== fm "julia-file") (source-file-post qry))
             ((== fm "html-file") (html-file-post qry))
             (else
               (display* "Unhandled format for default queries: " fm "\n"))))))
@@ -558,7 +559,7 @@
   (cond ((func? v 'id 1)
          (go-to-id (cadr v) (cursor-path)))
         ((func? v 'url 1)
-         (go-to-url (escape-link-args (cadr v)) (cursor-path)))
+         (go-to-url (escape-link-args (cork->utf8 (cadr v))) (cursor-path)))
         ((func? v 'script)
          (with ok? (== (assoc-ref attrs "secure") "true")
            (apply execute-script (cons* (cadr v) ok? (cddr v)))))
