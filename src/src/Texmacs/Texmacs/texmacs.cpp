@@ -73,12 +73,14 @@ extern bool texmacs_started;
 
 bool disable_error_recovery= false;
 bool start_server_flag= false;
+bool headless_mode= false;
 string extra_init_cmd;
 void server_start ();
 
 #if (defined(QTTEXMACS)||defined(QTWKTEXMACS))
 // Qt application infrastructure
-static QTMApplication* qtmapp;
+static QTMApplication* qtmapp= NULL;
+static QTMCoreApplication* qtmcoreapp= NULL;
 #endif
 
 /******************************************************************************
@@ -363,7 +365,8 @@ TeXmacs_main (int argc, char** argv) {
                (s == "-delete-cache") || (s == "-delete-font-cache") ||
                (s == "-delete-style-cache") || (s == "-delete-file-cache") ||
                (s == "-delete-doc-cache") || (s == "-delete-plugin-cache") ||
-               (s == "-delete-server-data") || (s == "-delete-databases"));
+               (s == "-delete-server-data") || (s == "-delete-databases") ||
+	       (s == "-headless"));
       else if (s == "-build-manual") {
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
@@ -486,7 +489,7 @@ TeXmacs_main (int argc, char** argv) {
              (s == "-x") || (s == "-execute") ||
              (s == "-log-file") ||
              (s == "-build-manual") ||
-             (s == "-reference-suite") || (s == "-test-suite")) {}
+             (s == "-reference-suite") || (s == "-test-suite")) {i++;}
   }
   if (install_status == 1) {
     if (DEBUG_STD) debug_boot << "Loading welcome message...\n";
@@ -513,7 +516,8 @@ TeXmacs_main (int argc, char** argv) {
   bench_reset ("initialize scheme");
 
 #ifdef QTTEXMACS
-  init_style_sheet (qtmapp);
+  if (!headless_mode)
+    init_style_sheet (qtmapp);
 #endif
 
   if (DEBUG_STD) debug_boot << "Starting event loop...\n";
@@ -560,7 +564,9 @@ boot_hacks () {
   //getrlimit (RLIMIT_NOFILE, &lims);
   //printf ("cur: %i\n", lims.rlim_cur);
   //printf ("max: %i\n", lims.rlim_max);
+#ifdef MACOSX_EXTENSIONS
   mac_fix_yosemite_bug();
+#endif
 
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
 #if defined(MAC_OS_X_VERSION_10_9) || defined(MAC_OS_X_VERSION_10_10)
@@ -635,6 +641,10 @@ immediate_options (int argc, char** argv) {
       system ("rm -rf", url ("$TEXMACS_HOME_PATH/system/database"));
       system ("rm -rf", url ("$TEXMACS_HOME_PATH/users"));
     }
+#ifdef QTTEXMACS
+    else if (s == "-headless")
+      headless_mode= true;
+#endif
     else if (s == "-log-file" && i + 1 < argc) {
       i++;
       char* log_file = argv[i];
@@ -675,7 +685,7 @@ main (int argc, char** argv) {
   immediate_options (argc, argv);
   load_user_preferences ();
   string theme= get_user_preference ("gui theme", "default");
-#ifdef OS_MACOS
+#if defined(OS_MACOS) && !defined(__arm64__)
   if (theme == "default") theme= "";  
 #else
   if (theme == "default") theme= "light";
@@ -705,16 +715,19 @@ main (int argc, char** argv) {
 #endif
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   // initialize the Qt application infrastructure
-  #if (QT_VERSION >= 0x050000)
-      QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-      QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-  #endif
-  qtmapp= new QTMApplication (argc, argv);
-  //QTMApplication* qtmapp= new QTMApplication (argc, argv);
+#if (QT_VERSION >= 0x050000)
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
+  if (headless_mode)
+    qtmcoreapp= new QTMCoreApplication (argc, argv);
+  else
+    qtmapp= new QTMApplication (argc, argv);
 #endif
   TeXmacs_init_paths (argc, argv);
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
-  //qtmapp->set_window_icon("/misc/images/texmacs-512.png");
+  if (!headless_mode)
+    qtmapp->set_window_icon("/misc/images/texmacs-512.png");
 #endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
@@ -731,7 +744,10 @@ main (int argc, char** argv) {
 //#endif
   start_scheme (argc, argv, TeXmacs_main);
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
-  delete qtmapp;
+  if (headless_mode)
+    delete qtmcoreapp;
+  else
+    delete qtmapp;
 #endif
   return 0;
 }
