@@ -1,3 +1,9 @@
+# TeXmacs/Qt/Widkit branch
+
+In this branch we experiment with Widkit on top of a slim Qt layer for UI. 
+
+(old README.md followe)
+
 # GNU TeXmacs
 [![Join the chat at https://gitter.im/texmacs/Lobby](https://badges.gitter.im/texmacs/Lobby.svg)](https://gitter.im/texmacs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
