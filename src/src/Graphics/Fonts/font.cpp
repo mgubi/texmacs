@@ -535,16 +535,16 @@ use_poor_rubber (font fn) {
 }
 
 font
-font_rep::make_rubber_font () {
+font_rep::make_rubber_font (font base) {
   if (starts (res_name, "stix-"))
     return rubber_stix_font (this);
   else if (occurs ("mathlarge=", res_name) ||
            occurs ("mathrubber=", res_name))
     return this;
   else if (has_poor_rubber && type == FONT_TYPE_UNICODE)
-    return poor_rubber_font (this);
+    return poor_rubber_font (base);
   else if (type == FONT_TYPE_UNICODE)
-    return rubber_unicode_font (this);
+    return rubber_unicode_font (base);
   else
     return this;
 }
@@ -553,7 +553,7 @@ font
 rubber_font (font base) {
   if (larger_font_table->contains (base->res_name))
     return larger_font_table (base->res_name);
-  font larger= base->make_rubber_font ();
+  font larger= base->make_rubber_font (base);
   larger_font_table (base->res_name)= larger;
   return larger;
 }

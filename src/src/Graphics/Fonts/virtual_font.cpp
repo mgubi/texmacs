@@ -76,6 +76,8 @@ struct virtual_font_rep: font_rep {
   SI     get_rsub_correction  (string s);
   SI     get_rsup_correction  (string s);
   SI     get_wide_correction  (string s, int mode);
+  
+  font make_rubber_font (font base);
 };
 
 virtual_font_rep::virtual_font_rep (
@@ -94,6 +96,12 @@ virtual_font_rep::virtual_font_rep (
   hunit= ((size*hdpi)/72)*PIXEL;
   vunit= ((size*vdpi)/72)*PIXEL;
 }
+
+font
+virtual_font_rep::make_rubber_font (font base) {
+  return base_fn->make_rubber_font (base);
+}
+
 
 /******************************************************************************
 * Execution of expressions

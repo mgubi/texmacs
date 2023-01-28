@@ -390,17 +390,12 @@ bool
 compute_wide_accent_opentype (path ip, box b, string s,
                      font fn, pencil pen, bool request_wide, bool above,
                      box& wideb, SI& sep) {
-  bool wide= (b->w() > (fn->wquad)) || request_wide;
-  if (ends (s, "dot>") || (s == "<acute>") ||
-      (s == "<grave>") || (s == "<abovering>")) wide= false;
-  if (wide && !request_wide && b->wide_correction (0) != 0) wide= false;
   SI width= b->x2- b->x1 - fn->wfn/4;
   string ws= "<wide-" * s (1, N(s)-1) * ">";
   string wr= s;
   bool very_wide= true;
   // we look for wide variants within the font
-  if (wide) very_wide= !has_wide_opentype (ws, fn, width, wr);
-  else very_wide= false;
+  very_wide= !has_wide_opentype (ws, fn, width, wr);
   if (!very_wide) {
     wideb= text_box (decorate_middle (ip), 0, wr, fn, pen);
     if (b->right_slope () != 0) {
@@ -442,15 +437,13 @@ compute_wide_accent_opentype (path ip, box b, string s,
     if (wideb->y1 + sep >= max_d) sep= max_d - wideb->y1;
   }
   sep += fn->sep >> 1;
-  return wide;
+  return true;
 }
 
 bool
 compute_wide_accent (path ip, box b, string s,
                      font fn, pencil pen, bool request_wide, bool above,
                      box& wideb, SI& sep) {
-  if (fn->math_type == MATH_TYPE_OPENTYPE)
-    return compute_wide_accent_opentype (ip, b, s, fn, pen, request_wide, above, wideb, sep);
   bool unicode= (fn->type == FONT_TYPE_UNICODE);
   bool stix= (fn->math_type == MATH_TYPE_STIX);
   bool tex_gyre= (fn->math_type == MATH_TYPE_TEX_GYRE);
@@ -461,7 +454,9 @@ compute_wide_accent (path ip, box b, string s,
   bool very_wide= false;
   SI   accw= fn->wfn;
   if (wide) {
-    if (tex_gyre) {
+    if (fn->math_type == MATH_TYPE_OPENTYPE)
+      return compute_wide_accent_opentype (ip, b, s, fn, pen, request_wide, above, wideb, sep);
+    else if (tex_gyre) {
       if (s == "^" || s == "<hat>" ||
           s == "~" || s == "<tilde>" ||
           s == "<check>")

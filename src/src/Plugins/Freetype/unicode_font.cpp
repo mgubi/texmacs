@@ -139,7 +139,7 @@ struct unicode_font_rep: font_rep {
   unicode_font_rep (string name, string family, int size, int hdpi, int vdpi);
   void tex_gyre_operators ();
   
-  font make_rubber_font ();
+  font make_rubber_font (font base);
 
   unsigned int read_unicode_char (string s, int& i);
   unsigned int ligature_replace (unsigned int c, string s, int& i);
@@ -298,7 +298,8 @@ unicode_font_rep::unicode_font_rep (string name,
       math_type=  MATH_TYPE_OPENTYPE;
     }
   }
-    
+  return;
+  
   if (starts (family, "STIX-")) {
     if (!ends (family, "italic")) {
       global_rsub_correct= (SI) (0.04 * wfn);
@@ -457,11 +458,11 @@ unicode_font_rep::unicode_font_rep (string name,
 font rubber_unicode_font (font base, tt_face face);
 
 font
-unicode_font_rep::make_rubber_font () {
+unicode_font_rep::make_rubber_font (font base) {
   if (!is_nil (mathface) && !is_nil (mathface->mathtable)) {
-    return rubber_unicode_font (this, mathface);
+    return rubber_unicode_font (base, mathface);
   }
-  return font_rep::make_rubber_font ();
+  return font_rep::make_rubber_font (base);
 }
 
 /******************************************************************************
@@ -594,8 +595,71 @@ unicode_font_rep::tex_gyre_operators () {
 * Routines for font
 ******************************************************************************/
 
-//FIXME: we have to move the definition elsewhere
+//FIXME: make these proper declarations
 string normalized_cork_to_utf8 (string s);
+int parse_variant (string s, string& r, string& rg);
+
+unsigned int
+get_variant (string ss, tt_face mathface) {
+  // look into mathtable
+  string uu;
+  string r; // root character
+  string rg; // head
+  int var= 0; // variant sequential number
+  bool hor= false; // horizontal or vertical?
+  if (starts (ss, "<big-")) {
+    var= parse_variant (ss, r, rg);
+    if (var > 0) var= var-1; //FIXME: is this ok?
+    hor= false;
+  } else if (starts (ss, "<large-") || starts (ss, "<left-") ||
+             starts (ss, "<mid-")   || starts (ss, "<right-")) {
+    var= parse_variant (ss, r, rg);
+    hor= false;
+  } else if (starts (ss, "<wide-")) {
+    var= parse_variant (ss, r, rg);
+    hor= true;
+  } else {
+    return 0;
+  }
+  if (r == "") return 0;
+  if ((var == 0) && (hor)) {
+    // find base glyph
+    if (N(r) == 1) {
+      uu= r;
+    } else {
+      r= "<" * r * ">";
+      if (r == "<hat>")        r= "<#2C6>";
+      else if (r == "<tilde>") r= "<#2DC>";
+      else if (r == "<check>") r= "<#2C7>";
+      else if (r == "<bar>")   r= "<#203E>";
+      else if (r == "<vect>")  r= "<#20D7>";
+      else if (r == "<breve>") r= "<#2D8>";
+      uu= normalized_cork_to_utf8 (r);
+      if (uu == r) return 0;
+    }
+    int j= 0;
+    unsigned int u= decode_from_utf8 (uu, j);
+    unsigned int glyphid= ft_get_char_index (mathface->ft_face, u);
+    return glyphid;
+  } else {
+    // var > 0 : look for variants
+    uu= (N(r)>1 ? normalized_cork_to_utf8 ("<" * r * ">") : r);
+    int j= 0;
+    unsigned int u= decode_from_utf8 (uu, j);
+    unsigned int glyphid= ft_get_char_index (mathface->ft_face, u);
+    if (glyphid == 0) return 0;
+    hashmap<unsigned int, array<unsigned int> > v=
+       (hor ? mathface->mathtable->hor_glyph_variants
+            : mathface->mathtable->ver_glyph_variants);
+    if (v->contains (glyphid)) {
+      if (var < N(v (glyphid))) {
+        unsigned int res=  v (glyphid)[var];
+        return res;
+      }
+    }
+  }
+  return 0;
+}
 
 unsigned int
 unicode_font_rep::read_unicode_char (string s, int& i) {
@@ -619,16 +683,24 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
       return 0xc000000 + (unsigned int) from_hexadecimal (s (start, i++));
     } else {
       string ss= s (start-1, ++i);
-      string uu= normalized_cork_to_utf8 (ss);
+      string uu= strict_cork_to_utf8 (ss);
       if (uu == ss) {
+        // check cache
         //cout << "Lookup for: " << ss << LF;
         if (native->contains (ss)) {
           //cout << "Found native  " << native[ss] << " for " << ss << LF;
           return 0xc000000 + native[ss];
+        } else if (!is_nil(mathface) && !is_nil(mathface->mathtable)) {
+          unsigned int res= get_variant (ss, mathface);
+          if (res == 0) return 0;
+          native (ss)= res; // cache
+          cout << "returning opentype variant " << s << " -> " << res << LF;
+          return 0xc000000 + res;
         }
         return 0;
       }
       int j= 0;
+      cout << uu << LF;
       return decode_from_utf8 (uu, j);
     }
   }
@@ -679,7 +751,7 @@ unicode_font_rep::supports (string c) {
   if (uc >= 0x42 && uc <= 0x5a && !fnm->exists (0x41)) return false;
   if (uc >= 0x62 && uc <= 0x7a && !fnm->exists (0x61)) return false;
   metric_struct* m= fnm->get (uc);
-  return m->x1 < m->x2 || m->y1 < m->y2; // some combinin glyphs have width == 0
+  return m->x1 < m->x2 && m->y1 < m->y2;
 }
 
 void

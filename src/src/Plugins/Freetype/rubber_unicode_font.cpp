@@ -394,7 +394,11 @@ rubber_unicode_font_rep::search_font (string& s) {
 // TODO: update this function
 bool
 rubber_unicode_font_rep::supports (string s) {
-  if (starts (s, "<wide-")) return true; // FIXME: hack for developing, remove.
+  if (starts (s, "<wide-")) {
+    string rew;
+    int nr;
+    return search_font_sub_bis (s, rew, nr);
+  }
   if (starts (s, "<big-") && (ends (s, "-1>") || ends (s, "-2>"))) {
     string r= s (5, N(s) - 3);
     if (ends (r, "lim")) r= r (0, N(r) - 3);

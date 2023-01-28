@@ -717,7 +717,7 @@ struct smart_font_rep: font_rep {
   int    resolve (string c);
   void   initialize_font (int nr);
   int    adjusted_dpi (string fam, string var, string ser, string sh, int att);
-  font   make_rubber_font ();
+  font   make_rubber_font (font base);
 
   bool   supports (string c);
   void   get_extents (string s, metric& ex);
@@ -1138,7 +1138,32 @@ smart_font_rep::resolve_rubber (string c, string fam, int attempt) {
     initialize_font (nr);
     return sm->add_char (key, c);
   }
-  if (has_poor_rubber) {
+  if (starts(c, "<wide-")) {
+    string r= goal;
+#if 0
+    if (r == "<hat>") r= "<#302>";
+    else if (r == "<tilde>") r= "<#303>";
+    else if (r == "<check>") r= "<#30C>";
+    else if (r == "<bar>") r= "<#305>";
+    else if (r == "<vect>") r= "<#20D7>";
+    else if (r == "<breve>") r= "<#306>";
+    else if (r == "<invbreve>") r= "<#311>";
+    else
+#endif
+      if (r == "<punderbrace>") r= "<#23DD>";
+    else if (r == "<punderbrace*>") r= "<#23DD>";
+    else if (r == "<underbrace>") r= "<#23DF>";
+    else if (r == "<underbrace*>") r= "<#23DF>";
+    else if (r == "<squnderbrace>") r= "<#23B5>";
+    else if (r == "<squnderbrace*>") r= "<#23B5>";
+    else if (r == "<poverbrace>") r= "<#23DC>";
+    else if (r == "<poverbrace*>") r= "<#23DC>";
+    else if (r == "<overbrace>") r= "<#23DE>";
+    else if (r == "<overbrace*>") r= "<#23DE>";
+    else if (r == "<sqoverbrace>") r= "<#23B4>";
+    else if (r == "<sqoverbrace*>") r= "<#23B4>";
+    goal= r;
+  } else if (has_poor_rubber) {
     if (goal == "<sqrt>") goal= "|"; // FIXME: better goal?
     if (goal == "<||>" || goal == "<interleave>") goal= "|";
     if (goal == "<langle>" || goal == "<rangle>" ||
@@ -1426,13 +1451,13 @@ smart_font_rep::adjusted_dpi (string fam, string var, string ser, string sh,
 }
 
 font
-smart_font_rep::make_rubber_font () {
+smart_font_rep::make_rubber_font (font base) {
   if (occurs ("mathlarge=", res_name) ||
            occurs ("mathrubber=", res_name))
     return this;
   else if (fn[SUBFONT_MAIN]->math_type == MATH_TYPE_OPENTYPE)
-    return fn[SUBFONT_MAIN]->make_rubber_font ();
-  return font_rep::make_rubber_font();
+    return fn[SUBFONT_MAIN]->make_rubber_font (base);
+  return font_rep::make_rubber_font (base);
 }
 
 
@@ -1444,7 +1469,15 @@ static string empty_string ("");
 
 bool
 smart_font_rep::supports (string c) {
-  (void) c;
+  if (starts (c, "<wide-")) {
+        // we check if we have an extensible glyph
+    int nr= resolve (c);
+    if (nr == SUBFONT_ERROR) return false;
+    if (N(fn) <= nr || is_nil (fn[nr])) initialize_font (nr);
+    font f= fn [nr];
+    bool res= f->supports (c);
+    return res;
+  }
   return true;
 }
 
