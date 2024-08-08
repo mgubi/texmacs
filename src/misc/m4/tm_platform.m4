@@ -30,7 +30,7 @@ AC_DEFUN([TM_PLATFORM],[
   CONFIG_HOST_VENDOR="$host_vendor"
   CONFIG_HOST_CPU="$host_cpu"
   CONFIG_USER="$USER"
-  DATE_FMT="+%Y-%m-%dT%H:%M:%S"
+  DATE_FMT="+%Y-%m-%dT%H:%M:%SZ"
   CONFIG_DATE="`SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"; date -u -d "@$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u "$DATE_FMT"`"
   CONFIG_QTPIPES="no"
   CONFIG_FASTALLOC="yes"
