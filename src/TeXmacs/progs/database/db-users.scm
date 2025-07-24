@@ -119,8 +119,8 @@
      (safe-getpwnam user))))
 
 (define (create-default-user)
-  (let* ((pseudo (or (getlogin) (safe-getpwuid (getuid))))
-         (name (get-full-name pseudo)))
+  (let* ((pseudo (get-user-login))
+         (name (get-user-name)))
     ;;(display* "pseudo= " pseudo "\n")
     ;;(display* "name= " name "\n")
     (when (== pseudo "") (set! pseudo "default"))
