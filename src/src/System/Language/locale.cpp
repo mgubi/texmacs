@@ -217,6 +217,8 @@ get_locale_charset () {
   return "UTF-8";
 #elif OS_HAIKU
   return "UTF-8";
+#elif __EMSCRIPTEN__
+  return "UTF-8";
 #elif OS_ANDROID
   return "UTF-8";
 #else
