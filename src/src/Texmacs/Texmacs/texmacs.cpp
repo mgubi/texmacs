@@ -111,7 +111,7 @@ void TeXmacs_init_font() {
 void
 TeXmacs_init_paths (int& argc, char** argv) {
   (void) argc; (void) argv;
-#if defined(QTTEXMACS) && QT_VERSION < 0x050000
+#if 1 // defined(QTTEXMACS) && QT_VERSION < 0x050000
   url exedir = url_system (qt_application_directory ());
 #else
   url exedir = texmacs_get_application_directory();

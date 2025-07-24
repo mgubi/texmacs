@@ -12,9 +12,11 @@
 #include "unix_system.hpp"
 #include "config.h"
 
+#if 0
 #include "Guile/guile_tm.hpp"
 #ifdef SCM_HAVE_HOOKS
 #include "libguile/system.h"
+#endif
 #endif
 
 #ifdef QTTEXMACS

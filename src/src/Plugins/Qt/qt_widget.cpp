@@ -584,7 +584,8 @@ widget file_chooser_widget (command cmd, string type, string prompt) {
 }
 widget printer_widget (command cmd, url ps_pdf_file) {
   if (headless_mode) return headless_widget ();
-  return tm_new<qt_printer_widget_rep> (cmd, ps_pdf_file);
+  //return tm_new<qt_printer_widget_rep> (cmd, ps_pdf_file);
+  return widget();
 }
 widget texmacs_widget (int mask, command quit) {
   if (headless_mode) return headless_widget ();

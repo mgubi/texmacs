@@ -99,3 +99,31 @@ tm_link_rep::secure_client () {
   if (!success) { stop (); return; }
   secret= rsa_decode (r, rsa_my_private_key ());
 }
+
+
+
+struct mock_link_rep: public tm_link_rep {
+
+  string s;
+public:
+  inline mock_link_rep () {}
+
+  virtual string  start () { return ""; };
+  virtual void    write (string s, int channel) {};
+  virtual string& watch (int channel) { return s; };
+  virtual string  read (int channel)  {} ;
+  virtual void    listen (int msecs) {} ;
+  virtual void    interrupt () {};
+  virtual void    stop () {};
+
+  friend class tm_link;
+};
+
+tm_link
+make_pipe_link (string cmd) {
+  return tm_new<mock_link_rep> ();
+}
+
+void close_all_pipes () {}
+void process_all_pipes () {}
+

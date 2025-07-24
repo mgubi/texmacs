@@ -13,6 +13,7 @@
 #include "unix_system.hpp"
 #include "boot.hpp"
 #include "sys_utils.hpp"
+#include "../Qt/qt_utilities.hpp"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -21,7 +22,8 @@
 void setup_texmacs_path () {
   string environment_texmacs_path;
   if (texmacs_getenv ("TEXMACS_PATH", environment_texmacs_path)) return;
-  url exedir = texmacs_get_application_directory ();
+  url exedir = url_system (qt_application_directory ());
+//  url exedir = texmacs_get_application_directory ();
     if (test_texmacs_path (exedir * "TeXmacs")) {
     return;
   }
