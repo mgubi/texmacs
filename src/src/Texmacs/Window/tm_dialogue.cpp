@@ -34,7 +34,7 @@ public:
     sv (sv2), fun (fun2), p (p2), nr_args (N(p2)) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
-    return out << "Dialogue"; }
+    return out << "<command dialogue>"; }
 };
 
 static string
@@ -52,6 +52,7 @@ dialogue_command_rep::apply () {
       exec_delayed (scheme_cmd ("(dialogue-end)"));
       return;
     }
+    if (N(s_arg) == 0) s_arg = "\"\"";
     object arg= string_to_object (s_arg);
     cmd= cons (arg, cmd);
     if (!is_empty (p) && get_type (p, i) == "password")
@@ -201,7 +202,7 @@ public:
       sv (sv2), win (win2), fun (fun2), p (p2), i (0), s (N(p)) {}
   void apply ();
   tm_ostream& print (tm_ostream& out) {
-    return out << "interactive command " << p; }
+    return out << "<command interactive " << p << ">"; }
 };
 
 void

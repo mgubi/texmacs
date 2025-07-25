@@ -125,9 +125,27 @@ tmg_os_mingwP () {
 }
 
 tmscm
+tmg_os_mingw64P () {
+  // TMSCM_DEFER_INTS;
+  bool out= os_mingw64 ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_os_macosP () {
   // TMSCM_DEFER_INTS;
   bool out= os_macos ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_os_androidP () {
+  // TMSCM_DEFER_INTS;
+  bool out= os_android ();
   // TMSCM_ALLOW_INTS;
 
   return bool_to_tmscm (out);
@@ -711,6 +729,34 @@ tmg_object_2command (tmscm arg1) {
   // TMSCM_ALLOW_INTS;
 
   return command_to_tmscm (out);
+}
+
+tmscm
+tmg_command_eval (tmscm arg1) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "command-eval");
+
+  command in1= tmscm_to_command (arg1);
+
+  // TMSCM_DEFER_INTS;
+  eval (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_command_apply (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "command-apply");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "command-apply");
+
+  command in1= tmscm_to_command (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  apply (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -5122,6 +5168,19 @@ tmg_utf8_2html (tmscm arg1) {
 }
 
 tmscm
+tmg_html_2utf8 (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "html->utf8");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= html_to_utf8 (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_guess_wencoding (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "guess-wencoding");
 
@@ -6389,6 +6448,113 @@ tmg_compute_index_url (tmscm arg1) {
 }
 
 tmscm
+tmg_compress_tree (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-tree");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= compress_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_decompress_tree (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "decompress-tree");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= decompress_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_compress_html (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-html");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "compress-html");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= compress_html (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_decompress_html (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "decompress-html");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "decompress-html");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= decompress_html (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_ai_chat (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "ai-chat");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "ai-chat");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_chat (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_correct (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-ai-correct");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-correct");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-ai-correct");
+
+  content in1= tmscm_to_content (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  tree out= ai_correct (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_translate (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "cpp-ai-translate");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-translate");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-ai-translate");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "cpp-ai-translate");
+
+  content in1= tmscm_to_content (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  tree out= ai_translate (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_url_2url (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url->url");
 
@@ -7197,6 +7363,15 @@ tmscm
 tmg_url_temp () {
   // TMSCM_DEFER_INTS;
   url out= url_temp ();
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
+tmg_url_temp_dir () {
+  // TMSCM_DEFER_INTS;
+  url out= url_temp_dir ();
   // TMSCM_ALLOW_INTS;
 
   return url_to_tmscm (out);
@@ -9331,6 +9506,19 @@ tmg_buffer_focus (tmscm arg1) {
 }
 
 tmscm
+tmg_buffer_focus_dot (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer-focus*");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= var_focus_on_buffer (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_view_list () {
   // TMSCM_DEFER_INTS;
   array_url out= get_all_views ();
@@ -10119,6 +10307,94 @@ tmg_bib_abbreviate (tmscm arg1, tmscm arg2, tmscm arg3) {
   return scheme_tree_to_tmscm (out);
 }
 
+tmscm
+tmg_extract_attachments (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "extract-attachments");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= scm_extract_attachments (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_make_attachments (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf-make-attachments");
+  TMSCM_ASSERT_ARRAY_URL (arg2, TMSCM_ARG2, "pdf-make-attachments");
+  TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "pdf-make-attachments");
+
+  url in1= tmscm_to_url (arg1);
+  array_url in2= tmscm_to_array_url (arg2);
+  url in3= tmscm_to_url (arg3);
+
+  // TMSCM_DEFER_INTS;
+  bool out= pdf_hummus_make_attachments (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_get_linked_file_paths (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "pdf-get-linked-file-paths");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf-get-linked-file-paths");
+
+  tree in1= tmscm_to_tree (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_url out= get_linked_file_paths (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_url_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_replace_linked_path (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "pdf-replace-linked-path");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf-replace-linked-path");
+
+  tree in1= tmscm_to_tree (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= replace_with_relative_path (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_pdf_get_attached_main_tm (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf-get-attached-main-tm");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= get_main_tm (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
+tmg_array_url_append (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "array-url-append");
+  TMSCM_ASSERT_ARRAY_URL (arg2, TMSCM_ARG2, "array-url-append");
+
+  url in1= tmscm_to_url (arg1);
+  array_url in2= tmscm_to_array_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  array_url out= append (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_url_to_tmscm (out);
+}
+
 void
 initialize_glue_basic () {
   tmscm_install_procedure ("texmacs-version-release",  tmg_texmacs_version_release, 1, 0, 0);
@@ -10132,7 +10408,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("get-original-path",  tmg_get_original_path, 0, 0, 0);
   tmscm_install_procedure ("os-win32?",  tmg_os_win32P, 0, 0, 0);
   tmscm_install_procedure ("os-mingw?",  tmg_os_mingwP, 0, 0, 0);
+  tmscm_install_procedure ("os-mingw64?",  tmg_os_mingw64P, 0, 0, 0);
   tmscm_install_procedure ("os-macos?",  tmg_os_macosP, 0, 0, 0);
+  tmscm_install_procedure ("os-android?",  tmg_os_androidP, 0, 0, 0);
   tmscm_install_procedure ("has-printing-cmd?",  tmg_has_printing_cmdP, 0, 0, 0);
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
@@ -10185,6 +10463,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("math-group-members",  tmg_math_group_members, 1, 0, 0);
   tmscm_install_procedure ("math-symbol-type",  tmg_math_symbol_type, 1, 0, 0);
   tmscm_install_procedure ("object->command",  tmg_object_2command, 1, 0, 0);
+  tmscm_install_procedure ("command-eval",  tmg_command_eval, 1, 0, 0);
+  tmscm_install_procedure ("command-apply",  tmg_command_apply, 2, 0, 0);
   tmscm_install_procedure ("exec-delayed",  tmg_exec_delayed, 1, 0, 0);
   tmscm_install_procedure ("exec-delayed-pause",  tmg_exec_delayed_pause, 1, 0, 0);
   tmscm_install_procedure ("protected-call",  tmg_protected_call, 1, 0, 0);
@@ -10503,6 +10783,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("utf8->t2a",  tmg_utf8_2t2a, 1, 0, 0);
   tmscm_install_procedure ("t2a->utf8",  tmg_t2a_2utf8, 1, 0, 0);
   tmscm_install_procedure ("utf8->html",  tmg_utf8_2html, 1, 0, 0);
+  tmscm_install_procedure ("html->utf8",  tmg_html_2utf8, 1, 0, 0);
   tmscm_install_procedure ("guess-wencoding",  tmg_guess_wencoding, 1, 0, 0);
   tmscm_install_procedure ("tm->xml-name",  tmg_tm_2xml_name, 1, 0, 0);
   tmscm_install_procedure ("old-tm->xml-cdata",  tmg_old_tm_2xml_cdata, 1, 0, 0);
@@ -10592,6 +10873,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("compute-index-string",  tmg_compute_index_string, 2, 0, 0);
   tmscm_install_procedure ("compute-index-tree",  tmg_compute_index_tree, 2, 0, 0);
   tmscm_install_procedure ("compute-index-url",  tmg_compute_index_url, 1, 0, 0);
+  tmscm_install_procedure ("compress-tree",  tmg_compress_tree, 1, 0, 0);
+  tmscm_install_procedure ("decompress-tree",  tmg_decompress_tree, 1, 0, 0);
+  tmscm_install_procedure ("compress-html",  tmg_compress_html, 2, 0, 0);
+  tmscm_install_procedure ("decompress-html",  tmg_decompress_html, 2, 0, 0);
+  tmscm_install_procedure ("ai-chat",  tmg_ai_chat, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-correct",  tmg_cpp_ai_correct, 3, 0, 0);
+  tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
   tmscm_install_procedure ("string->url",  tmg_string_2url, 1, 0, 0);
@@ -10654,6 +10942,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-size",  tmg_url_size, 1, 0, 0);
   tmscm_install_procedure ("url-last-modified",  tmg_url_last_modified, 1, 0, 0);
   tmscm_install_procedure ("url-temp",  tmg_url_temp, 0, 0, 0);
+  tmscm_install_procedure ("url-temp-dir",  tmg_url_temp_dir, 0, 0, 0);
   tmscm_install_procedure ("url-scratch",  tmg_url_scratch, 3, 0, 0);
   tmscm_install_procedure ("url-scratch?",  tmg_url_scratchP, 1, 0, 0);
   tmscm_install_procedure ("url-cache-invalidate",  tmg_url_cache_invalidate, 1, 0, 0);
@@ -10800,6 +11089,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-export",  tmg_tree_export, 3, 0, 0);
   tmscm_install_procedure ("tree-load-style",  tmg_tree_load_style, 1, 0, 0);
   tmscm_install_procedure ("buffer-focus",  tmg_buffer_focus, 1, 0, 0);
+  tmscm_install_procedure ("buffer-focus*",  tmg_buffer_focus_dot, 1, 0, 0);
   tmscm_install_procedure ("view-list",  tmg_view_list, 0, 0, 0);
   tmscm_install_procedure ("buffer->views",  tmg_buffer_2views, 1, 0, 0);
   tmscm_install_procedure ("current-view-url",  tmg_current_view_url, 0, 0, 0);
@@ -10861,4 +11151,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("bib-empty?",  tmg_bib_emptyP, 2, 0, 0);
   tmscm_install_procedure ("bib-field",  tmg_bib_field, 2, 0, 0);
   tmscm_install_procedure ("bib-abbreviate",  tmg_bib_abbreviate, 3, 0, 0);
+  tmscm_install_procedure ("extract-attachments",  tmg_extract_attachments, 1, 0, 0);
+  tmscm_install_procedure ("pdf-make-attachments",  tmg_pdf_make_attachments, 3, 0, 0);
+  tmscm_install_procedure ("pdf-get-linked-file-paths",  tmg_pdf_get_linked_file_paths, 2, 0, 0);
+  tmscm_install_procedure ("pdf-replace-linked-path",  tmg_pdf_replace_linked_path, 2, 0, 0);
+  tmscm_install_procedure ("pdf-get-attached-main-tm",  tmg_pdf_get_attached_main_tm, 1, 0, 0);
+  tmscm_install_procedure ("array-url-append",  tmg_array_url_append, 2, 0, 0);
 }

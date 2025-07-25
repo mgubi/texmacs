@@ -1,5 +1,8 @@
 /* src/System/config.in.  Generated from configure.in by autoheader.  */
 
+/* Qt major version number */
+#undef AC_QT_MAJOR_VERSION
+
 /* The normal alignment of `void *', in bytes. */
 #undef ALIGNOF_VOID_P
 
@@ -66,17 +69,20 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
-
 /* Define to 1 if you have the <pty.h> header file. */
 #undef HAVE_PTY_H
 
 /* Define if the Qt framework is available. */
 #undef HAVE_QT
 
+/* Define to 1 if you have the `snprintf' function. */
+#undef HAVE_SNPRINTF
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#undef HAVE_STDIO_H
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
@@ -126,6 +132,9 @@
 /* Enabling Mac OSX extensions */
 #undef MACOSX_EXTENSIONS
 
+/* makeappx location */
+#undef MAKEAPPX
+
 /* Max fast alloc // WORD_LENGTH more than power of 2 */
 #undef MAX_FAST
 
@@ -134,6 +143,9 @@
 
 /* Use g++ strictly prior to g++ 3.0 */
 #undef OLD_GNU_COMPILER
+
+/* OS type */
+#undef OS_ANDROID
 
 /* OS type */
 #undef OS_CYGWIN
@@ -158,6 +170,9 @@
 
 /* OS type */
 #undef OS_MINGW
+
+/* OS type */
+#undef OS_MINGW64
 
 /* OS type */
 #undef OS_POWERPC_GNU_LINUX
@@ -204,13 +219,18 @@
 /* Enable checks style rewriting code */
 #undef SANITY_CHECKS
 
+/* signtool location */
+#undef SIGNTOOL
+
 /* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* If not set during link */
 #undef STACK_SIZE
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #undef STDC_HEADERS
 
 /* Svn build revision */
@@ -264,6 +284,9 @@
 /* Guile string size type */
 #undef guile_str_size_t
 
+/* Qt without fontconfig */
+#undef qt_no_fontconfig
+
 /* If there is a static plugin qgif */
 #undef qt_static_plugin_qgif
 
@@ -275,3 +298,6 @@
 
 /* If there is a static plugin qsvg */
 #undef qt_static_plugin_qsvg
+
+/* If Qt is statically linked */
+#undef qt_static_plugin_xcb

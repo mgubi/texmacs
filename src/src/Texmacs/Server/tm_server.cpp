@@ -192,9 +192,11 @@ tm_server_rep::interpose_handler () {
 
 void
 tm_server_rep::wait_handler (string message, string arg) {
+#ifndef QTTEXMACS
   if (has_current_window ())
     show_wait_indicator (concrete_window () -> win, translate (message), arg);
   else
+#endif
     cout << "TeXmacs] Please wait: " << message << " " << arg << "\n";
 }
 
@@ -272,7 +274,17 @@ tm_server_rep::quit () {
 #if (defined(QTTEXMACS) || defined(QTWKTEXMACS))
   del_obj_qt_renderer ();
 #endif
+
+#ifdef ADVANCED_DEVELOPER_MODE
+  // Crashes sometimes occur when destructing Qt objects at exit.
+  // Developers are invited to investigate this issue.
+  // An example where it crashes with macOS SDK 14 and qt-6.8.2:
+  //   open texmacs, write something in the buffer, close texmacs,
+  //   and confirm exit in the lower status bar.
   exit (0);
+#else
+  _exit (0);
+#endif
 }
 
 /******************************************************************************

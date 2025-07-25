@@ -17,6 +17,9 @@
 #include <signal.h>
 #ifdef STACK_SIZE
 #include <sys/resource.h>
+#ifdef OS_ANDROID
+#include "Android/android.hpp"
+#endif
 #endif
 
 #include "tm_ostream.hpp"
@@ -110,16 +113,22 @@ clean_exit_on_segfault (int sig_num) {
 * Texmacs paths
 ******************************************************************************/
 
+void TeXmacs_init_font() {
+#if defined(QTTEXMACS) && defined(qt_no_fontconfig)
+  string default_font_dir = get_env ("TEXMACS_PATH") * "/fonts/truetype/stix";
+  string current_qt_qpa_fontdir = get_env ("QT_QPA_FONTDIR");
+  if (is_empty(current_qt_qpa_fontdir))
+    set_env("QT_QPA_FONTDIR", default_font_dir);
+#endif
+}
+
 void
 TeXmacs_init_paths (int& argc, char** argv) {
   (void) argc; (void) argv;
-#if defined(QTTEXMACS) || defined(QTWKTEXMACS)
+#if (defined(QTTEXMACS) || defined(QTWKTEXMACS)) && QT_VERSION < 0x050000
   url exedir = url_system (qt_application_directory ());
 #else
-  url exedir = url_system(argv[0]) * ".." ;
-  if (! is_rooted(exedir)) {
-    exedir = url_pwd() * exedir ;
-  }
+  url exedir = texmacs_get_application_directory();
 #endif
 
   string current_texmacs_path = get_env ("TEXMACS_PATH");
@@ -133,7 +142,12 @@ TeXmacs_init_paths (int& argc, char** argv) {
   // so just allow everything that is reachable.
         
   // plugins need to be installed in TeXmacs.app/Contents/Plugins        
+#if QT_VERSION < 0x050000
   QCoreApplication::addLibraryPath( QDir::cleanPath(QCoreApplication::applicationDirPath().append("/../Plugins")) );
+#else
+  string plugins_path = concretize (exedir * "../Plugins");
+  QCoreApplication::addLibraryPath(QString::fromUtf8(&plugins_path[0], N(plugins_path)));
+#endif
   // cout << from_qstring ( QCoreApplication::libraryPaths () .join("\n") ) << LF;
   {
     // ensure that private versions of the Qt frameworks have priority on
@@ -146,6 +160,7 @@ TeXmacs_init_paths (int& argc, char** argv) {
     set_env ("DYLD_FRAMEWORK_PATH", buf);    
     buf = as_string(exedir * "../Resources/lib");
     if (get_env("DYLD_LIBRARY_PATH") != "") buf = buf * ":" * get_env("DYLD_LIBRARY_PATH");    
+    if (get_env("TMLD_LIBRARY_PATH") != "") buf = buf * ":" * get_env("TMLD_LIBRARY_PATH");    
     set_env ("DYLD_LIBRARY_PATH", buf);    
   }
 #endif
@@ -307,6 +322,10 @@ TeXmacs_main (int argc, char** argv) {
         cout << get_env ("TEXMACS_PATH") << "\n";
         exit (0);
       }
+      else if ((s == "-hp") || (s == "-homepath")) {
+        cout << get_env ("TEXMACS_HOME_PATH") << "\n";
+        exit (0);
+      }
       else if ((s == "-bp") || (s == "-binpath")) {
         cout << get_env ("TEXMACS_BIN_PATH") << "\n";
         exit (0);
@@ -315,6 +334,7 @@ TeXmacs_main (int argc, char** argv) {
         my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
       else if ((s == "-r") || (s == "-reverse"))
         set_reverse_colors (true);
+#if QT_VERSION < 0x060000
       else if (s == "-no-retina") {
         retina_manual= true;
         retina_factor= 1;
@@ -343,7 +363,8 @@ TeXmacs_main (int argc, char** argv) {
         retina_iman  = true;
         retina_icons = 2;
       }
-      else if ((s == "-c") || (s == "-convert")) {
+#endif
+      else if ((s == "-c") || (s == "-convert") || (s == "-C")) {
         i+=2;
         if (i<argc) {
           url in  ("$PWD", argv[i-1]);
@@ -357,6 +378,19 @@ TeXmacs_main (int argc, char** argv) {
         i++;
         if (i<argc) my_init_cmds= (my_init_cmds * " ") * argv[i];
       }
+      else if (s == "-W" || s == "-build-website" ||
+	       s == "-U" || s == "-update-website") {
+        i+=2;
+        if (i<argc) {
+	  string cmd= "tmweb-convert-dir";
+	  if (s == "-U" || s == "-update-website") cmd = "tmweb-update-dir";
+          url in  ("$PWD", argv[i-1]);
+          url out ("$PWD", argv[ i ]);
+          my_init_cmds= my_init_cmds * " " *
+            "(" * cmd * " " * scm_quote (as_string (in)) *
+            " " * scm_quote (as_string (out)) * ")";
+        }
+      }
       else if (s == "-server") start_server_flag= true;
       else if (s == "-log-file") i++;
       else if ((s == "-Oc") || (s == "-no-char-clipping")) char_clip= false;
@@ -366,7 +400,7 @@ TeXmacs_main (int argc, char** argv) {
                (s == "-delete-style-cache") || (s == "-delete-file-cache") ||
                (s == "-delete-doc-cache") || (s == "-delete-plugin-cache") ||
                (s == "-delete-server-data") || (s == "-delete-databases") ||
-	       (s == "-headless"));
+	       (s == "-headless") || (s == "-H"));
       else if (s == "-build-manual") {
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
@@ -387,11 +421,12 @@ TeXmacs_main (int argc, char** argv) {
         cout << "\n";
         cout << "Options for TeXmacs:\n\n";
         cout << "  -b [file]  Specify scheme buffers initialization file\n";
-        cout << "  -c [i] [o] Convert file 'i' into file 'o'\n";
+        cout << "  -C [i] [o] Convert file 'i' into file 'o'\n";
         cout << "  -d         For debugging purposes\n";
         cout << "  -fn [font] Set the default TeX font\n";
         cout << "  -g [geom]  Set geometry of window in pixels\n";
         cout << "  -h         Display this help message\n";
+        cout << "  -H         Run TeXmacs in headless mode\n";
         cout << "  -i [file]  Specify scheme initialization file\n";
         cout << "  -p         Get the TeXmacs path\n";
         cout << "  -q         Shortcut for -x \"(quit-TeXmacs)\"\n";
@@ -400,6 +435,7 @@ TeXmacs_main (int argc, char** argv) {
         cout << "  -S         Rerun TeXmacs setup program before starting\n";
         cout << "  -v         Display current TeXmacs version\n";
         cout << "  -V         Show some informative messages\n";
+        cout << "  -W [i] [o] Recursively convert directory into website\n";
         cout << "  -x [cmd]   Execute scheme command\n";
         cout << "  -Oc        TeX characters bitmap clipping off\n";
         cout << "  +Oc        TeX characters bitmap clipping on (default)\n";
@@ -409,8 +445,10 @@ TeXmacs_main (int argc, char** argv) {
       }
     }
   if (flag) debug (DEBUG_FLAG_AUTO, true);
+  if (headless_mode) my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
 
   // Further options via environment variables
+#if QT_VERSION < 0x060000
   if (get_env ("TEXMACS_RETINA") == "off") {
     retina_manual= true;
     retina_factor= 1;
@@ -438,6 +476,7 @@ TeXmacs_main (int argc, char** argv) {
     retina_iman  = true;
     retina_icons = 2;
   }
+#endif
   // End options via environment variables
 
   // Further user preferences
@@ -445,7 +484,11 @@ TeXmacs_main (int argc, char** argv) {
   string unify = (gui_version () == "qt4"? string ("on"): string ("off"));
   string mini  = (os_macos ()? string ("off"): string ("on"));
   if (tm_style_sheet != "") mini= "off";
-  use_native_menubar = get_preference ("use native menubar", native) == "on";
+  #if (defined(OS_MACOS) && QT_VERSION <= QT_VERSION_CHECK(5, 15, 9)) || defined(qt_no_fontconfig)
+  use_native_menubar = get_preference ("use native menubar", native) == "force";
+  #else
+  use_native_menubar = get_preference ("use native menubar", native) == "on" || get_preference ("use native menubar", native) == "force";
+  #endif
   use_unified_toolbar= get_preference ("use unified toolbar", unify) == "on";
   use_mini_bars      = get_preference ("use minibars",         mini) == "on";
   if (!use_native_menubar) use_unified_toolbar= false;
@@ -481,7 +524,9 @@ TeXmacs_main (int argc, char** argv) {
       where= " :new-window";
       exec_delayed (scheme_cmd (cmd));
     }
-    if      ((s == "-c") || (s == "-convert")) i+=2;
+    if      ((s == "-c") || (s == "-convert") || (s == "-C") ||
+	     (s == "-W") || (s == "-build-website") ||
+	     (s == "-U") || (s == "-update-website")) i+=2;
     else if ((s == "-b") || (s == "-initialize-buffer") ||
              (s == "-fn") || (s == "-font") ||
              (s == "-i") || (s == "-initialize") ||
@@ -642,7 +687,9 @@ immediate_options (int argc, char** argv) {
       system ("rm -rf", url ("$TEXMACS_HOME_PATH/users"));
     }
 #ifdef QTTEXMACS
-    else if (s == "-headless")
+    else if (s == "-headless" || s == "-H" || s == "-C" ||
+	     s == "-build-website" || s == "-W" ||
+	     s == "-update-website" || s == "-U")
       headless_mode= true;
 #endif
     else if (s == "-log-file" && i + 1 < argc) {
@@ -660,7 +707,14 @@ immediate_options (int argc, char** argv) {
 #include <cstdio>
 
 int
-main (int argc, char** argv) {
+texmacs_entrypoint (int argc, char** argv) {
+  immediate_options (argc, argv);
+#ifdef QTTEXMACS
+  if (!headless_mode) qtmapp= new QTMApplication (argc, argv);
+#endif
+#ifdef OS_ANDROID
+  init_android();
+#endif
 
 #ifdef STACK_SIZE
   struct rlimit limit;
@@ -674,34 +728,13 @@ main (int argc, char** argv) {
   } else cerr << "Cannot get stack value\n";
 #endif
 
-#ifdef OS_MINGW
-	nowide::args a(argc,argv); // Fix arguments - make them UTF-8
-#endif
-
-
   original_path= get_env ("PATH");
   boot_hacks ();
   windows_delayed_refresh (1000000000);
-  immediate_options (argc, argv);
+  TeXmacs_init_paths (argc, argv);
   load_user_preferences ();
-  string theme= get_user_preference ("gui theme", "default");
-#if defined(OS_MACOS) && !defined(__arm64__)
-  if (theme == "default") theme= "";  
-#else
-  if (theme == "default") theme= "light";
-#endif
-  if (theme == "light")
-    tm_style_sheet= "$TEXMACS_PATH/misc/themes/standard-light.css";
-  else if (theme == "dark")
-    tm_style_sheet= "$TEXMACS_PATH/misc/themes/standard-dark.css";
-  else if (theme != "")
-    tm_style_sheet= theme;
 #ifndef OS_MINGW
   set_env ("LC_NUMERIC", "POSIX");
-#ifndef OS_MACOS
-  set_env ("QT_QPA_PLATFORM", "xcb");
-  set_env ("XDG_SESSION_TYPE", "x11");
-#endif
 #endif
 #ifdef MACOSX_EXTENSIONS
   // Reset TeXmacs if Alt is pressed during startup
@@ -722,12 +755,17 @@ main (int argc, char** argv) {
   if (headless_mode)
     qtmcoreapp= new QTMCoreApplication (argc, argv);
   else
-    qtmapp= new QTMApplication (argc, argv);
+    ((QTMApplication*)qtmapp)->load();
 #endif
-  TeXmacs_init_paths (argc, argv);
+
+  TeXmacs_init_font  ();
 #if defined(QTTEXMACS) || defined(QTWKTEXMACS)
   if (!headless_mode)
-    qtmapp->set_window_icon("/misc/images/texmacs-512.png");
+#  if QT_VERSION >= 0x060000
+    tmapp()->set_window_icon("/misc/images/texmacs.svg");
+#  else
+    tmapp()->set_window_icon("/misc/images/texmacs-512.png");
+#  endif
 #endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();

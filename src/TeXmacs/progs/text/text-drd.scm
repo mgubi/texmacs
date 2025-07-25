@@ -81,7 +81,7 @@
 ;; Lists
 
 (define-group list-tag
-  (itemize-tag) (enumerate-tag) (description-tag))
+  (itemize-tag) (enumerate-tag) (description-tag) (new-list-tag))
 
 (define-group itemize-tag
   itemize itemize-minus itemize-dot itemize-arrow)
@@ -93,6 +93,17 @@
 (define-group description-tag
   description description-compact description-aligned
   description-dash description-long description-paragraphs)
+
+;; List tags that are created dynamically (fragile)
+
+(define-group new-list-tag)
+
+(tm-define (tm-register-new-list-tag x)
+  (:secure #t)
+  (when (string? (tree->stree x))
+    (with t (tree->symbol x)
+      (when (not (group-find t 'list-tag)) 
+	(eval `(define-group new-list-tag ,t))))))
 
 ;; Document titles
 
@@ -239,7 +250,9 @@
 ;; balloons
 
 (define-group balloon-tag
-  mouse-over-balloon mouse-over-balloon* focus-balloon help-balloon)
+  hover-balloon hover-balloon*
+  popup-balloon popup-balloon*
+  focus-balloon help-balloon)
 
 ;; detached notes
 

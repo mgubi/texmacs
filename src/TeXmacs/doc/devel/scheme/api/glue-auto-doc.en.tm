@@ -107,10 +107,26 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(os-mingw64?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|os_mingw64> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(os-macos?)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|os_macos> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(os-android?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|os_android> which returns
     <scm|bool>.
   </explain>
 
@@ -528,6 +544,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|as_command> which returns
     <scm|command>.
+  </explain>
+
+  <\explain>
+    <scm|(command-eval <scm-arg|command>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|eval> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(command-apply <scm-arg|command> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|apply> which returns
+    <scm|void>.
   </explain>
 
   <\explain>
@@ -3075,6 +3107,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(html-\<gtr\>utf8 <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|html_to_utf8> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(guess-wencoding <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -3787,6 +3827,62 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(compress-tree <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(decompress-tree <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|decompress_tree> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(compress-html <scm-arg|content> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|compress_html> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(decompress-html <scm-arg|string> <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|decompress_html> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(ai-chat <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_chat> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-correct <scm-arg|content> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_correct> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(cpp-ai-translate <scm-arg|content> <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ai_translate> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(url-\<gtr\>url <scm-arg|url>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -4279,6 +4375,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|url_temp> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
+    <scm|(url-temp-dir)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|url_temp_dir> which returns
     <scm|url>.
   </explain>
 
@@ -5451,6 +5555,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(buffer-focus* <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|var_focus_on_buffer> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(view-list)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -5936,6 +6048,54 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|bib_abbreviate> which returns
     <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(extract-attachments <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|scm_extract_attachments> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-make-attachments <scm-arg|url> <scm-arg|array_url> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|pdf_hummus_make_attachments> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-get-linked-file-paths <scm-arg|tree> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_linked_file_paths> which returns
+    <scm|array_url>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-replace-linked-path <scm-arg|tree> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|replace_with_relative_path> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(pdf-get-attached-main-tm <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_main_tm> which returns
+    <scm|url>.
+  </explain>
+
+  <\explain>
+    <scm|(array-url-append <scm-arg|url> <scm-arg|array_url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|append> which returns
+    <scm|array_url>.
   </explain>
 
   <\explain>
@@ -8711,6 +8871,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|show_tree> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(show-box)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|show_box> which returns
     <scm|void>.
   </explain>
 

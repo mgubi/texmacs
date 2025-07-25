@@ -307,7 +307,11 @@ pdf_hummus_renderer_rep::pdf_hummus_renderer_rep (
 
   EStatusCode status;
   ePDFVersion= ePDFVersion14; // PDF 1.4 for alpha
+#ifdef USE_GS
   string version= pdf_version ();
+#else
+  string version= "1.4";
+#endif
   if (version == "1.5") ePDFVersion= ePDFVersion15;
   if (version == "1.6") ePDFVersion= ePDFVersion16;
   if (version == "1.7") ePDFVersion= ePDFVersion17;
@@ -846,10 +850,10 @@ pdf_hummus_renderer_rep::set_brush (brush br) {
   // debug_convert << "set_brush\n";
   fgb= br;
   pen= pencil (br);
-  set_pencil (pen);  // FIXME ???
+  //set_pencil (pen);  // FIXME ???
   if (is_nil (br)) return;
   if (br->get_type () == brush_none) {
-    pen = pencil ();
+    //pen = pencil ();
     fgb = brush ();
   }
   else {
@@ -1134,12 +1138,12 @@ t3font_rep::write_char (glyph gl, ObjectIDType inCharID) {
 	  << as_string ((double)(lly)) << " cm\r\n";
     data << "BI\r\n/W " << as_string (cwidth)
 	 << "\r\n/H " << as_string (cheight) << "\r\n";
-    data << "/CS /G /BPC 1 /F /AHx /D [0.0 1.0] /IM true\r\nID\r\n";
+    data << "/BPC 1 /F /AHx /D [0.0 1.0] /IM true\r\nID\r\n";
     static const char* hex_string= "0123456789ABCDEF";
     string hex_code;
     int i, j, count= 0, cur= 0;
     for (j= 0; j < cheight; j++)
-      for ( i= 0; i < ((cwidth+7) & (-8)); i++) {
+      for (i= 0; i < ((cwidth+7) & (-8)); i++) {
 	cur= cur << 1;
 	if ((i < cwidth) && (gl->get_x(i,j) == 0)) cur++;
 	count++;
@@ -1732,10 +1736,12 @@ pdf_image_rep::flush (PDFWriter& pdfw)
     // 		      << " (see the preference menu)." << LF;
     if (get_preference ("texmacs->pdf:distill inclusion") == "on") {
       temp= url_temp (".pdf");
+#ifdef USE_GS
       if (!gs_PDF_EmbedAllFonts (name, temp)) {
 	temp= name;
 	name= url_none ();
       }
+#endif
     }
     else {
       temp= name;
@@ -2095,6 +2101,7 @@ pdf_hummus_renderer_rep::image (
 		      0, ((double)h) / ((double)im->h),
 		      to_x (x), to_y (y));
   std::string pdfFormName = page->GetResourcesDictionary().AddFormXObjectMapping(im->id);
+  contentContext->RG(0, 0, 0);
   select_alpha((1000 * alpha) / 255);
   contentContext->Do(pdfFormName);
   //contentContext->re(0,0,im->w,im->h);

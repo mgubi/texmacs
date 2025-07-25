@@ -819,7 +819,10 @@
         (assuming (os-macos?)
           (meti (hlist // (text "Use unified toolbars"))
             (toggle (set-boolean-preference "use unified toolbar" answer)
-                    (get-boolean-preference "use unified toolbar")))))
+                    (get-boolean-preference "use unified toolbar"))))
+	(meti (hlist // (text "Use multi-tabs"))
+	  (toggle (set-boolean-preference "enable tab" answer)
+		  (get-boolean-preference "enable tab"))))
       (glue #f #t 0 0))))
 
 (tm-widget (experimental-preferences-widget*)
@@ -907,6 +910,12 @@
         (centered
           (dynamic (other-preferences-widget)))))))
 
-(tm-define (open-preferences)
+(tm-define (open-preferences-window)
   (:interactive #t)
   (top-window preferences-widget "User preferences"))
+
+(tm-define (open-preferences)
+  (:interactive #t)
+  (if (side-tools?)
+      (tool-select :right 'preferences-tool)
+      (open-preferences-window)))

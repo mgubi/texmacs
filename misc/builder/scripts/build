@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -e
+
+SCRIPT=$(realpath "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+OSPATH=$(dirname "$SCRIPT")/os
+
+# Detect the option --os=???
+os=$(echo $* | grep -o -- '--os=[^ ]*' | cut -d= -f2)
+if [ -z $os ]; then
+    if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]; then
+        os=windows-qt6
+    else
+        echo "Option --os=??? is required."
+        echo ""
+        echo "Available os are: "
+        ls $OSPATH
+        exit 1
+    fi
+fi
+
+# Check that scripts/$os/Makefile exists
+if [ ! -f $OSPATH/$os/Makefile ]; then
+    echo "$OSPATH/$os/Makefile does not exist."
+    exit 1
+fi
+
+# Check that scripts/$os/set-devel-paths exists
+if [ ! -f $OSPATH/$os/set-devel-paths ]; then
+    echo "$OSPATH/$os/set-devel-paths does not exist."
+    exit 1
+fi
+
+# Check that scripts/$os/archive-urls.txt exists
+if [ ! -f $OSPATH/$os/archives-urls.txt ]; then
+    echo "$OSPATH/$os/archives-urls.txt does not exist."
+    exit 1
+fi
+
+# Copy the required file
+if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]; then
+    # Test if the path exists. If so, stop the script
+    if [ -d /$os ]; then
+        echo "The path /$os already exists. Please remove it before running this script."
+        exit 1
+    fi
+    # Windows path limit fix
+    cp -R $OSPATH/$os /$os
+    cd /$os
+else
+    arch=$(arch)
+    # Test if the path exists. If so, stop the script
+    if [ -d ./$os-$arch ]; then
+        echo "The path ./$os-$arch already exists. Please remove it before running this script."
+        exit 1
+    fi
+    cp -R $OSPATH/$os ./$os-$arch
+    cd ./$os-$arch
+fi
+
+# Check if a 'install-packages' script exists
+if [ -f $OSPATH/$os/install-packages ]; then
+    # Check if the script is executable
+    if [ ! -x $OSPATH/$os/install-packages ]; then
+        echo "$OSPATH/$os/install-packages is not executable."
+        exit 1
+    fi
+    # Run the script
+    $OSPATH/$os/install-packages
+fi
+
+# Download the archives
+mkdir texmacs
+$SCRIPTPATH/download-archives
+$SCRIPTPATH/rename-folders
+
+# Make
+source set-devel-paths
+if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]; then
+    mingw32-make
+else
+    make
+fi

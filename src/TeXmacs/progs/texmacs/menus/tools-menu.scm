@@ -15,7 +15,7 @@
   (:use (texmacs texmacs tm-tools)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Dynamic menus for formats
+;; Dynamic menus for formats and languages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-menu (clipboard-preference-menu cvs fun)
@@ -28,6 +28,11 @@
   (clipboard-preference-menu converters-to-special clipboard-set-import))
 (tm-define (clipboard-export-preference-menu)
   (clipboard-preference-menu converters-from-special clipboard-set-export))
+
+(menu-bind ai-translate-menu
+  (for (lan supported-languages)
+    ((eval (upcase-first lan))
+     (ai-translate lan))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
@@ -72,10 +77,7 @@
   ;;    ("Create web site" (tmweb-interactive-build))
   ;;    ("Update web site" (tmweb-interactive-update)))
   (-> "Fonts"
-      ("Look for more fonts"
-       (system-wait "Full search for more fonts on your system"
-                    "(can be long)")
-       (font-database-build-local))
+      ("Scan disk for fonts" (scan-disk-for-fonts))
       ("Clear font cache" (clear-font-cache)))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history))
@@ -86,6 +88,16 @@
           (link clipboard-import-preference-menu))
       (-> "Export selections as"
           (link clipboard-export-preference-menu)))
+  ---
+  (when (and (supports-ai?) (selection-active-any?))
+    ("Correct" (ai-correct))
+    (-> "Translate"
+        (link ai-translate-menu)))
+  (-> "External AI"
+      (when (selection-active-any?)
+        ("Copy" (ai-copy))
+        ("Cut" (ai-cut)))
+      ("Paste" (ai-paste)))
   ---
   ("Database tool" (toggle-preference "database tool"))
   ("Debugging tool" (toggle-preference "debugging tool"))

@@ -26,7 +26,22 @@
 #include <QtCore/QLocale>
 #include <QtCore/QVariant>
 #if (QT_VERSION >= 0x050000)
-#include <QtWidgets>
+//#include <QtWidgets/QAction>
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QButtonGroup>
+#include <QtWidgets/QCheckBox>
+#include <QtWidgets/QComboBox>
+#include <QtWidgets/QDialog>
+#include <QtWidgets/QDialogButtonBox>
+#include <QtWidgets/QFrame>
+#include <QtWidgets/QGridLayout>
+#include <QtWidgets/QHBoxLayout>
+#include <QtWidgets/QHeaderView>
+#include <QtWidgets/QLabel>
+#include <QtWidgets/QLineEdit>
+#include <QtWidgets/QRadioButton>
+#include <QtWidgets/QSpacerItem>
+#include <QtWidgets/QVBoxLayout>
 #else
 #include <QtGui>
 #endif
@@ -345,8 +360,13 @@ public:
     QWidget::setTabOrder(blackWhiteCheck, buttonBox);
     
     retranslateUi(QTMPrintDialog);
+#if QT_VERSION < 0x060000
     QObject::connect(buttonBox, SIGNAL(accepted()), QTMPrintDialog, SLOT(accept()));
     QObject::connect(buttonBox, SIGNAL(rejected()), QTMPrintDialog, SLOT(reject()));
+#else
+    QObject::connect(buttonBox, &QDialogButtonBox::accepted, QTMPrintDialog, &QDialog::accept);
+    QObject::connect(buttonBox, &QDialogButtonBox::rejected, QTMPrintDialog, &QDialog::reject);
+#endif
     
     QMetaObject::connectSlotsByName(QTMPrintDialog);
   } // setupUi

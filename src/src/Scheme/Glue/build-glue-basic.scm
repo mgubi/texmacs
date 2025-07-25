@@ -28,7 +28,9 @@
   (get-original-path get_original_path (string))
   (os-win32? os_win32 (bool))
   (os-mingw? os_mingw (bool))
+  (os-mingw64? os_mingw64 (bool))
   (os-macos? os_macos (bool))
+  (os-android? os_android (bool))
   (has-printing-cmd? has_printing_cmd (bool))
   (x-gui? gui_is_x (bool))
   (qt-gui? gui_is_qt (bool))
@@ -82,6 +84,8 @@
   (math-group-members math_group_members (array_string string))
   (math-symbol-type math_symbol_type (string string))
   (object->command as_command (command object))
+  (command-eval eval (void command))
+  (command-apply apply (void command object))
   (exec-delayed exec_delayed (void object))
   (exec-delayed-pause exec_delayed_pause (void object))
   (protected-call protected_call (void object))
@@ -430,6 +434,7 @@
   (utf8->t2a utf8_to_t2a (string string))
   (t2a->utf8 t2a_to_utf8 (string string))
   (utf8->html utf8_to_html (string string))
+  (html->utf8 html_to_utf8 (string string))
   (guess-wencoding guess_wencoding (string string))
   (tm->xml-name tm_to_xml_name (string string))
   (old-tm->xml-cdata old_tm_to_xml_cdata (string string))
@@ -533,6 +538,13 @@
   (compute-index-string compute_index (scheme_tree string string))
   (compute-index-tree compute_index (scheme_tree content string))
   (compute-index-url compute_index (scheme_tree url))
+  (compress-tree compress_tree (tree content))
+  (decompress-tree decompress_tree (tree content))
+  (compress-html compress_html (string content int))
+  (decompress-html decompress_html (tree string int))
+  (ai-chat ai_chat (string string string))
+  (cpp-ai-correct ai_correct (tree content string string))
+  (cpp-ai-translate ai_translate (tree content string string string))
 
   ;; routines for urls
   (url->url url (url url))
@@ -598,6 +610,7 @@
   (url-size file_size (int url))
   (url-last-modified last_modified (int url))
   (url-temp url_temp (url))
+  (url-temp-dir url_temp_dir (url))
   (url-scratch url_scratch (url string string int))
   (url-scratch? is_scratch (bool url))
   (url-cache-invalidate web_cache_invalidate (void url))
@@ -762,6 +775,7 @@
   (tree-export export_tree (bool tree url string))
   (tree-load-style load_style_tree (tree string))
   (buffer-focus focus_on_buffer (bool url))
+  (buffer-focus* var_focus_on_buffer (bool url))
 
   (view-list get_all_views (array_url))
   (buffer->views buffer_to_views (array_url url))
@@ -831,4 +845,15 @@
   (bib-empty? bib_empty (bool scheme_tree string))
   (bib-field bib_field (scheme_tree scheme_tree string))
   (bib-abbreviate bib_abbreviate
-		  (scheme_tree scheme_tree scheme_tree scheme_tree)))
+		  (scheme_tree scheme_tree scheme_tree scheme_tree))
+      
+  ;; pdf-tm support
+  (extract-attachments scm_extract_attachments (bool url))
+  (pdf-make-attachments pdf_hummus_make_attachments (bool url array_url url))
+  (pdf-get-linked-file-paths get_linked_file_paths (array_url tree url))
+  (pdf-replace-linked-path replace_with_relative_path (tree tree url))
+  (pdf-get-attached-main-tm get_main_tm (url url))
+  
+  ;; utilities
+  (array-url-append append (array_url url array_url))
+  )

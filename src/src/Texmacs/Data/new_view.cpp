@@ -173,8 +173,12 @@ view_to_editor (url u) {
   tm_view vw= concrete_view (u);
   if (vw == NULL) {
     notify_delete_view (u); // HACK: returns to valid (?) state.
+#ifdef ADVANCED_DEVELOPER_MODE
     failed_error << "View is " << u << "\n";
     FAILED ("View admits no editor");
+#else
+    return editor ();
+#endif
   }
   return vw->ed;
 }
@@ -455,5 +459,23 @@ focus_on_buffer (url name) {
   }
   if (is_none (r)) return false;
   set_current_view (r);
+  return true;
+}
+
+bool
+var_focus_on_buffer (url name) {
+  if (the_view != NULL && the_view->buf->buf->name == name) return true;
+  url r= get_recent_view (name, true, false, true, false);
+  if (is_none (r)) r= get_recent_view (name, true, false, false, false);
+  if (is_none (r)) {
+    array<url> vws= buffer_to_views (name);
+    if (N(vws) > 0) r= vws[0];
+  }
+  if (is_none (r)) return false;
+  the_view->ed->suspend ();
+  set_current_view (r);
+  tm_view new_vw = concrete_view (r);
+  new_vw->ed->resume ();
+  send_keyboard_focus (new_vw->ed);
   return true;
 }
