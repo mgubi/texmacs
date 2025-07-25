@@ -644,6 +644,7 @@ QTWKWindow::wheelEvent (QWheelEvent* event) {
   QPoint delta= event->angleDelta ();
   QPoint pos= QCursor::pos ();
   coord2 p= from_qpoint (pos);
+  cout << "Wheel " << delta.y () << LF;
   unsigned int mstate= mouse_state (event->buttons(), event->modifiers());
   if (delta.y () >= 1.0)
     the_gui->process_mouse (tm_widget (), "press-up", p.x1, p.x2,
@@ -693,6 +694,7 @@ QTWKWindow::focusOutEvent (QFocusEvent * event) {
 
 void
 QTWKWindow::enterEvent (QEvent* event) {
+  cout << "enter window " << this << LF;
   if (is_nil (tm_widget ())) return;
   QPoint point = mapFromGlobal(QCursor::pos());
   coord2 pt = from_qpoint (point);
@@ -706,6 +708,7 @@ QTWKWindow::enterEvent (QEvent* event) {
 
 void
 QTWKWindow::leaveEvent (QEvent* event) {
+  cout << "leave window " << this << LF;
   if (is_nil (tm_widget ())) return;
   QPoint point = mapFromGlobal(QCursor::pos());
   coord2 pt = from_qpoint (point);
