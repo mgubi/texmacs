@@ -930,8 +930,11 @@ qt_shadow_renderer_rep::qt_shadow_renderer_rep (QTMPixmapOrImage _px)
 { 
   //cout << px.width() << "," << px.height() << " " << LF;
  // painter->begin(&px);
+  if (headless_mode)
+      painter->begin (px.QImage_ptr ());
+    else
+      painter->begin (px.QPixmap_ptr ());
 }
-#endif
 
 qt_shadow_renderer_rep::~qt_shadow_renderer_rep () 
 { 
