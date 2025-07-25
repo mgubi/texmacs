@@ -342,7 +342,13 @@ qtwk_window_rep::mouse_event (string ev, int x, int y, int flags, time_t t) {
 
 basic_renderer
 qtwk_window_rep::get_renderer () {
-  qt_renderer_rep *ren = the_qt_renderer ();
+//  qt_renderer_rep *ren = the_qt_renderer (1.0);
+#if QT_VERSION >= 0x060000
+        double dpr = canvas()->devicePixelRatio();
+        qt_renderer_rep* ren = the_qt_renderer(dpr);
+#else
+        qt_renderer_rep* ren = the_qt_renderer(retina_factor);
+#endif
   ren->begin (&backingPixmap);
   return ren;
 }
@@ -523,7 +529,13 @@ qtwk_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
 
 void
 qtwk_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
-  qt_renderer_rep* ren = the_qt_renderer();
+//  qt_renderer_rep* ren = the_qt_renderer(1.0);
+#if QT_VERSION >= 0x060000
+        double dpr = canvas()->devicePixelRatio();
+        qt_renderer_rep* ren = the_qt_renderer(dpr);
+#else
+        qt_renderer_rep* ren = the_qt_renderer(retina_factor);
+#endif
   ren->set_origin(0, 0);
   ren->outer_round (x1, y1, x2, y2);
   ren->decode (x1, y1);
