@@ -1870,7 +1870,6 @@
 		9CA0E7BC242ACC1600DC273E /* qt_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49DEED29170ACFDB00332D9F /* qt_picture.cpp */; };
 		9CAF7D3F242E77C3000EF390 /* QTWKWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CAF7D3D242E77C3000EF390 /* QTWKWindow.cpp */; };
 		9CAF7D42242EB6EF000EF390 /* QTMSockets.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 49E5CC261B26C92E00A02C5A /* QTMSockets.hpp */; };
-		9CAF7D43242EB6EF000EF390 /* QTMApplication.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 490536B7184A2C69008B9ECE /* QTMApplication.hpp */; };
 		9CAF7D49242EB6EF000EF390 /* QTMPipeLink.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C1D126710D102B300232476 /* QTMPipeLink.hpp */; };
 		9CC6149110A999460055F808 /* QTMMenuHelper.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48B710A8CC100097A335 /* QTMMenuHelper.hpp */; };
 		9CC6149310A999460055F808 /* QTMWidget.hpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48BB10A8CC100097A335 /* QTMWidget.hpp */; };
@@ -2420,7 +2419,7 @@
 		9CDC285E2E3401E2002B75A0 /* QTMToolbar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDC28572E3401E2002B75A0 /* QTMToolbar.cpp */; };
 		9CDC285F2E3401E2002B75A0 /* QTMMainTabWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDC28542E3401E2002B75A0 /* QTMMainTabWindow.cpp */; };
 		9CDC28602E3401E2002B75A0 /* QTMIconManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDC284C2E3401E2002B75A0 /* QTMIconManager.cpp */; };
-		9CDC28632E3402DD002B75A0 /* QTMApplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDC28622E3402DD002B75A0 /* QTMApplication.cpp */; };
+		9CDC28632E3402DD002B75A0 /* QTWKApplication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDC28622E3402DD002B75A0 /* QTWKApplication.cpp */; };
 		9CE18E83125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
 		9CE18E84125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
 		9CE18E85125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
@@ -3833,8 +3832,8 @@
 		9CDC28572E3401E2002B75A0 /* QTMToolbar.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QTMToolbar.cpp; sourceTree = "<group>"; };
 		9CDC28582E3401E2002B75A0 /* QTMWaitDialog.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QTMWaitDialog.hpp; sourceTree = "<group>"; };
 		9CDC28592E3401E2002B75A0 /* QTMWaitDialog.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QTMWaitDialog.cpp; sourceTree = "<group>"; };
-		9CDC28622E3402DD002B75A0 /* QTMApplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QTMApplication.cpp; sourceTree = "<group>"; };
-		9CDC28642E34033D002B75A0 /* QTMApplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QTMApplication.hpp; sourceTree = "<group>"; };
+		9CDC28622E3402DD002B75A0 /* QTWKApplication.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = QTWKApplication.cpp; sourceTree = "<group>"; };
+		9CDC28642E34033D002B75A0 /* QTWKApplication.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = QTWKApplication.hpp; sourceTree = "<group>"; };
 		9CE18E81125E685D00641CFC /* tree_brackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_brackets.cpp; sourceTree = "<group>"; };
 		9CE4F0041238FAF800993AF7 /* packrat.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat.hpp; sourceTree = "<group>"; };
 		9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_analyze.cpp; sourceTree = "<group>"; };
@@ -5968,8 +5967,8 @@
 		9C5BBE9B242BDB4D0009B634 /* Qtwk */ = {
 			isa = PBXGroup;
 			children = (
-				9CDC28642E34033D002B75A0 /* QTMApplication.hpp */,
-				9CDC28622E3402DD002B75A0 /* QTMApplication.cpp */,
+				9CDC28642E34033D002B75A0 /* QTWKApplication.hpp */,
+				9CDC28622E3402DD002B75A0 /* QTWKApplication.cpp */,
 				9CAF7D3E242E77C3000EF390 /* QTWKWindow.hpp */,
 				9CAF7D3D242E77C3000EF390 /* QTWKWindow.cpp */,
 				9C5BBE9D242BDB4D0009B634 /* QTWKGuiHelper.hpp */,
@@ -7286,7 +7285,7 @@
 				9C5BBCE7242BD9640009B634 /* parsetex.cpp in Sources */,
 				9C5BBCE8242BD9640009B634 /* scrollbar_widget.cpp in Sources */,
 				9C5BBCE9242BD9640009B634 /* adjust_stix.cpp in Sources */,
-				9CDC28632E3402DD002B75A0 /* QTMApplication.cpp in Sources */,
+				9CDC28632E3402DD002B75A0 /* QTWKApplication.cpp in Sources */,
 				9C5BBCEA242BD9640009B634 /* fromtm.cpp in Sources */,
 				9C5BBCEB242BD9640009B634 /* totm.cpp in Sources */,
 				9C5BBCEC242BD9640009B634 /* texmacs_widget.cpp in Sources */,
@@ -8142,7 +8141,6 @@
 				9CF03162242F959900A0C8D6 /* QTWKGuiHelper.hpp in Sources */,
 				9CF03159242F8C2B00A0C8D6 /* QTWKWindow.hpp in Sources */,
 				9CAF7D42242EB6EF000EF390 /* QTMSockets.hpp in Sources */,
-				9CAF7D43242EB6EF000EF390 /* QTMApplication.hpp in Sources */,
 				9CAF7D49242EB6EF000EF390 /* QTMPipeLink.hpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
