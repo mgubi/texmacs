@@ -356,6 +356,28 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
       }
     }
   }
+  else if (ev->which == "left tools") {
+    if (use_side_tools) {
+      wk_widget side=
+        resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
+                       "left", "top");
+      THIS ["middle"] << set_widget ("left", side);
+      if (attached ()) {
+        side << emit_attach_window (win);
+        THIS ["middle"] << emit_reposition ();
+        THIS ["middle"] ["left"] << emit_invalidate_all ();
+      }
+    }
+  }
+  else if (ev->which == "extra tools") {
+    wk_widget extra= ev->w;
+    THIS ["bottom"] << set_widget ("tools", extra);
+    if (attached ()) {
+      extra << emit_attach_window (win);
+      THIS << emit_reposition ();
+      THIS ["bottom"] << emit_invalidate_all ();
+    }
+  }
   else if (ev->which == "bottom tools") {
     wk_widget bottom= ev->w;
     THIS ["bottom"] << set_widget ("tools", bottom);
