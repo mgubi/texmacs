@@ -3,7 +3,11 @@
 
 #if defined(Q_OS_MAC) && QT_VERSION < 0x060000 
 
+
+#define extend CARBON_extends
 #include <QMacPasteboardMime>
+#undef extend
+
 #include <QString>
 #include <QList>
 #include <QByteArray>
