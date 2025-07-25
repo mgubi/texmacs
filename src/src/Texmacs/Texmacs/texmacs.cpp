@@ -40,7 +40,7 @@ void mac_fix_paths ();
 #endif
 
 #ifdef QTWKTEXMACS
-#include "Qt/QTMApplication.hpp"
+#include "Qtwk/QTWKApplication.hpp"
 #include "Qt/qt_utilities.hpp"
 #include <QDir>
 #endif
@@ -80,10 +80,14 @@ bool headless_mode= false;
 string extra_init_cmd;
 void server_start ();
 
-#if (defined(QTTEXMACS)||defined(QTWKTEXMACS))
+#if defined(QTTEXMACS)
 // Qt application infrastructure
 static QTMApplication* qtmapp= NULL;
 static QTMCoreApplication* qtmcoreapp= NULL;
+#elif defined(QTWKTEXMACS)
+// Qt application infrastructure
+static QTWKApplication* qtmapp= NULL;
+static QTWKCoreApplication* qtmcoreapp= NULL;
 #endif
 
 /******************************************************************************
@@ -711,6 +715,8 @@ texmacs_entrypoint (int argc, char** argv) {
   immediate_options (argc, argv);
 #ifdef QTTEXMACS
   if (!headless_mode) qtmapp= new QTMApplication (argc, argv);
+#elif QTWKTEXMACS
+  if (!headless_mode) qtmapp= new QTWKApplication (argc, argv);
 #endif
 #ifdef OS_ANDROID
   init_android();
@@ -752,10 +758,17 @@ texmacs_entrypoint (int argc, char** argv) {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
+#if defined(QTTEXMACS)
   if (headless_mode)
     qtmcoreapp= new QTMCoreApplication (argc, argv);
   else
     ((QTMApplication*)qtmapp)->load();
+#elif defined(QTWKTEXMACS)
+  if (headless_mode)
+    qtmcoreapp= new QTWKCoreApplication (argc, argv);
+  else
+    ((QTWKApplication*)qtmapp)->load();
+#endif
 #endif
 
   TeXmacs_init_font  ();
