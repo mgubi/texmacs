@@ -10,6 +10,7 @@
  ******************************************************************************/
 
 #include <locale.h>
+#include "config.h"
 
 #include "convert.hpp"
 #include "iterator.hpp"
@@ -26,13 +27,15 @@
 #include "boot.hpp"
 
 #include "qtwk_gui.hpp"
-#include "qt_utilities.hpp"
-#include "qt_renderer.hpp" // for the_qt_renderer
+#include "../Qt/qt_utilities.hpp"
+#include "../Qt/qt_renderer.hpp" // for the_qt_renderer
 //#include "qtwk_simple_widget.hpp"
 #include "qtwk_window.hpp"
 #include "widget.hpp"
 
-#include <QDesktopWidget>
+#if QT_VERSION < 0x060000
+  #include <QDesktopWidget>
+#endif
 #include <QClipboard>
 #include <QBuffer>
 #include <QFileOpenEvent>
@@ -48,13 +51,12 @@
 #include <QLibraryInfo>
 #include <QImage>
 #include <QUrl>
-#include <QDesktopWidget>
 #include <QWidget>
 
 #include "QTWKGuiHelper.hpp"
 //#include "QTMWidget.hpp"
 //#include "QTMWindow.hpp"
-#include "QTMApplication.hpp"
+#include "QTWKApplication.hpp"
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_utilities.h"
@@ -123,7 +125,8 @@ needing_update (false)
   gui_helper = new QTWKGuiHelper (this);
   qApp->installEventFilter (gui_helper);
   
-#ifdef QT_MAC_USE_COCOA
+#if defined(QT_MAC_USE_COCOA) \
+  || (defined(OS_MACOS) && QT_VERSION >= 0x060000)
     //HACK: this filter is needed to overcome a bug in Qt/Cocoa
   extern void mac_install_filter(); // defined in src/Plugins/MacOS/mac_app.mm
   mac_install_filter();
@@ -134,10 +137,16 @@ needing_update (false)
   
   updatetimer = new QTimer (gui_helper);
   updatetimer->setSingleShot (true);
+#if QT_VERSION < 0x060000
   QObject::connect (updatetimer, SIGNAL (timeout()),
                     gui_helper, SLOT (doUpdate()));
+#else
+  QObject::connect (updatetimer, &QTimer::timeout,
+                    gui_helper, &QTWKGuiHelper::doUpdate);
+#endif
   // (void) default_font ();
 
+#if QT_VERSION < 0x060000
   if (!retina_manual) {
     retina_manual= true;
 #ifdef MACOSX_EXTENSIONS
@@ -147,14 +156,19 @@ needing_update (false)
           
     if (mac_hidpi == 2) {
       if (DEBUG_STD) debug_boot << "Setting up HiDPI mode\n";
+#if (QT_VERSION < 0x050000)
       retina_factor= 2;
-      retina_scale = 1.4;
+      if (tm_style_sheet == "") retina_scale = 1.4;
+      else retina_scale = 1.0;
       if (!retina_iman) {
         retina_iman  = true;
         retina_icons = 2;
         // retina_icons = 1;
         // retina_icons = 2;  // FIXME: why is this not better?
       }
+#else
+      retina_factor= 2;      
+#endif
     }
 #else
     SI w, h;
@@ -179,12 +193,17 @@ needing_update (false)
     retina_icons= get_user_preference ("retina-icons") == "on"? 2: 1;
   if (has_user_preference ("retina-scale"))
     retina_scale= as_double (get_user_preference ("retina-scale"));
+#endif
 }
 
 /* important routines */
 void
 qtwk_gui_rep::get_extents (SI& width, SI& height) {
-  coord2 size = from_qsize (QApplication::desktop ()->size ());
+#if QT_VERSION < 0x060000
+  coord2 size = from_qsize (QApplication::desktop()->size());
+#else
+  coord2 size = from_qsize (QGuiApplication::primaryScreen()->size()); // todo : improve this
+#endif
   width  = size.x1;
   height = size.x2;
 }
@@ -220,7 +239,11 @@ get_button_state () {
   Qt::MouseButtons bstate= QApplication::mouseButtons ();
   Qt::KeyboardModifiers kstate= QApplication::keyboardModifiers ();
   if ((bstate & Qt::LeftButton     ) != 0) i += 1;
+#if QT_VERSION < 0x060000
   if ((bstate & Qt::MidButton      ) != 0) i += 2;
+#else
+  if ((bstate & Qt::MiddleButton   ) != 0) i += 2;
+#endif
   if ((bstate & Qt::RightButton    ) != 0) i += 4;
   if ((bstate & Qt::XButton1       ) != 0) i += 8;
   if ((bstate & Qt::XButton2       ) != 0) i += 16;
@@ -447,11 +470,13 @@ qtwk_gui_rep::set_selection (string key, tree t,
     mode = QClipboard::Selection;
   else return true;
   cb->clear (mode);
-  
+
   c_string selection (s);
-  cb->setText (QString::fromLatin1 (selection), mode);
+  int N_selection= N(s);
+
+  cb->setText (QString::fromLatin1 (selection, N_selection), mode);
   QMimeData *md = new QMimeData;
-  
+
   if (format == "verbatim" || format == "default") {
     if (format == "default") {
       md->setData ("application/x-texmacs-clipboard", (char*)selection);
@@ -461,11 +486,9 @@ qtwk_gui_rep::set_selection (string key, tree t,
       md->setData ("application/x-texmacs-pid", pid_str.toLatin1());
       
       (void) sh;
-        //selection = c_string (sh);
-        //md->setHtml (selection);
-        //tm_delete_array (selection);
       
       selection = c_string (sv);
+      N_selection = N(sv);
     }
     
     string enc = get_preference ("texmacs->verbatim:encoding");
@@ -473,14 +496,23 @@ qtwk_gui_rep::set_selection (string key, tree t,
       enc = get_locale_charset ();
     
     if (enc == "utf-8" || enc == "UTF-8")
-      md->setText (QString::fromUtf8 (selection));
+      md->setText (QString::fromUtf8 (selection, N_selection));
     else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
-      md->setText (QString::fromLatin1 (selection));
+      md->setText (QString::fromLatin1 (selection, N_selection));
     else
-      md->setText (QString::fromLatin1 (selection));
+      md->setText (QString::fromLatin1 (selection, N_selection));
+  }
+  else if (format == "html") 
+      md->setHtml (QString::fromUtf8 (selection, N_selection));
+  else if (format == "latex") {
+    string enc = get_preference ("texmacs->latex:encoding"); 
+    if (enc == "utf-8" || enc == "UTF-8" || enc == "cork")
+      md->setText (utf8_to_qstring (string ((char*) selection, N_selection)));
+    else
+      md->setText (QString::fromLatin1 (selection, N_selection));
   }
   else
-    md->setText (QString::fromLatin1 (selection));
+    md->setText (QString::fromLatin1 (selection, N_selection));
   cb->setMimeData (md, mode);
     // according to the docs, ownership of mimedata is transferred to clipboard
     // so no memory leak here
@@ -588,7 +620,7 @@ qtwk_gui_rep::event_loop () {
 void
 gui_open (int& argc, char** argv) {
     // start the gui
-    // new QApplication (argc,argv); now in texmacs.cpp
+     new QApplication (argc,argv); //now in texmacs.cpp
   the_gui = tm_new<qtwk_gui_rep> (argc, argv);
   
 #ifdef MACOSX_EXTENSIONS

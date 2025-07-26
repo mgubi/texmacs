@@ -11,8 +11,8 @@
 
 #include "qtwk_window.hpp"
 #include "message.hpp"
-#include "qt_picture.hpp"
-#include "qt_utilities.hpp"
+#include "../Qt/qt_picture.hpp"
+#include "../Qt/qt_utilities.hpp"
 
 #include "qtwk_gui.hpp"
 #include "QTWKWindow.hpp"
@@ -344,7 +344,7 @@ basic_renderer
 qtwk_window_rep::get_renderer () {
 //  qt_renderer_rep *ren = the_qt_renderer (1.0);
 #if QT_VERSION >= 0x060000
-        double dpr = canvas()->devicePixelRatio();
+        double dpr = win->devicePixelRatio();
         qt_renderer_rep* ren = the_qt_renderer(dpr);
 #else
         qt_renderer_rep* ren = the_qt_renderer(retina_factor);
@@ -531,7 +531,7 @@ void
 qtwk_window_rep::invalidate (SI x1, SI y1, SI x2, SI y2) {
 //  qt_renderer_rep* ren = the_qt_renderer(1.0);
 #if QT_VERSION >= 0x060000
-        double dpr = canvas()->devicePixelRatio();
+        double dpr = win->devicePixelRatio();
         qt_renderer_rep* ren = the_qt_renderer(dpr);
 #else
         qt_renderer_rep* ren = the_qt_renderer(retina_factor);

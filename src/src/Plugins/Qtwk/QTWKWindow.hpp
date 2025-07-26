@@ -60,7 +60,7 @@ protected:
   //virtual void dragMoveEvent (QDragMoveEvent *event);
   virtual void dropEvent (QDropEvent *event);
   virtual void wheelEvent (QWheelEvent* event);
-  virtual void enterEvent (QEvent* event);
+  virtual void enterEvent (QEnterEvent* event);
   virtual void leaveEvent (QEvent* event);
 
   // void wheelEvent(QWheelEvent *event) override;

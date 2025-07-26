@@ -743,8 +743,14 @@ qt_renderer_rep::new_shadow (renderer& ren) {
   }
 //  if (ren == NULL)  ren= (renderer) tm_new<qt_proxy_renderer_rep> (this);
   
+
+#if QT_VERSION >= 0x060000
+  if (ren == NULL)
+    ren= (renderer) tm_new<qt_shadow_renderer_rep> (QTMPixmapOrImage (mw, mh), this);
+#else
   if (ren == NULL)
     ren= (renderer) tm_new<qt_shadow_renderer_rep> (QTMPixmapOrImage (mw, mh));
+#endif
   
   // cout << "Create " << mw << ", " << mh << "\n";
  // static_cast<qt_shadow_renderer_rep*>(ren)->begin(
@@ -924,9 +930,14 @@ qt_proxy_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
  * shadow qt renderer
  ******************************************************************************/
 
-qt_shadow_renderer_rep::qt_shadow_renderer_rep (QTMPixmapOrImage _px) 
+#if QT_VERSION >= 0x060000
+qt_shadow_renderer_rep::qt_shadow_renderer_rep (QTMPixmapOrImage _px, qt_renderer_rep *_parent)
+: qt_renderer_rep (new QPainter(), _parent), px(_px)
+#else
+qt_shadow_renderer_rep::qt_shadow_renderer_rep (QTMPixmapOrImage _px)
 // : qt_renderer_rep (_px.width(),_px.height()), px(_px) 
-: qt_renderer_rep (new QPainter()), px(_px) 
+: qt_renderer_rep (new QPainter()), px(_px)
+#endif
 { 
   //cout << px.width() << "," << px.height() << " " << LF;
  // painter->begin(&px);

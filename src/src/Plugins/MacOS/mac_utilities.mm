@@ -36,7 +36,7 @@
 #endif
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS)
 #include <QApplication>
 #include <QKeyEvent>
 #include <QString>
@@ -44,6 +44,14 @@
 #include "Qt/qt_gui.hpp"
 #include "Qt/qt_utilities.hpp"
 #endif
+
+#if defined(QTWKTEXMACS) 
+#include <QApplication>
+#include <QKeyEvent>
+#include <QString>
+#include <QWidget>
+#endif
+
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1012
 #define NSKeyDown NSEventTypeKeyDown
@@ -96,7 +104,7 @@ mac_fix_paths () {
 
 
 
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined(QTWKTEXMACS) 
 #if 1
 //HACK:
 // the following code fixes a bug in Qt/Cocoa which do not correctly handle

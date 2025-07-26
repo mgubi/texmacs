@@ -28,7 +28,7 @@
 #include "tm_timer.hpp"
 #include "socket_notifier.hpp"
 
-#include "simple_wk_widget.hpp"
+#include "../Widkit/simple_wk_widget.hpp"
 #include "qtwk_window.hpp"
 
 

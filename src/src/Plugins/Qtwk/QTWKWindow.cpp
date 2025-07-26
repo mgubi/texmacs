@@ -13,7 +13,7 @@
 
 #include "QTWKWindow.hpp"
 #include "qtwk_gui.hpp"
-#include "qt_utilities.hpp"
+#include "../Qt/qt_utilities.hpp"
 #include "converter.hpp"
 #include "boot.hpp"
 #include "scheme.hpp"
@@ -202,9 +202,8 @@ QTWKWindow::resizeEvent (QResizeEvent *event) {
 void
 QTWKWindow::paintEvent (QPaintEvent* event) {
   QPainter p (this);
-  QVector<QRect> rects = event->region().rects();
-  for (int i = 0; i < rects.count(); ++i) {
-    QRect qr = rects.at (i);
+  for (const auto &qr : event->region().rects())
+  {
     p.drawPixmap (QRect (qr.x(), qr.y(), qr.width(), qr.height()),
                   tmwid->backingPixmap,
                   QRect (retina_factor * qr.x(),
@@ -242,7 +241,7 @@ QTWKWindow::keyPressEvent (QKeyEvent* event) {
     if (DEBUG_QT && DEBUG_KEYBOARD) {
       debug_qt << "key  : " << key << LF;
       debug_qt << "text : " << event->text().toLatin1().data() << LF;
-      debug_qt << "count: " << event->text().count() << LF;
+      debug_qt << "length: " << event->text().length() << LF;
 #ifdef OS_MINGW
       debug_qt << "nativeScanCode: " << event->nativeScanCode() << LF; 
       debug_qt << "nativeVirtualKey: " << event->nativeVirtualKey() << LF;
@@ -380,7 +379,7 @@ static unsigned int
 mouse_state (Qt::MouseButtons bstate, Qt::KeyboardModifiers kstate) {
   unsigned int i= 0;
   if ((bstate & Qt::LeftButton     ) != 0) i += 1;
-  if ((bstate & Qt::MidButton      ) != 0) i += 2;
+  if ((bstate & Qt::MiddleButton   ) != 0) i += 2;
   if ((bstate & Qt::RightButton    ) != 0) i += 4;
   if ((bstate & Qt::XButton1       ) != 0) i += 8;
   if ((bstate & Qt::XButton2       ) != 0) i += 16;
@@ -558,7 +557,7 @@ QTWKWindow::inputMethodEvent (QInputMethodEvent* event) {
     // find selection in the preedit string
     int sel_start = 0;
     int sel_length = 0;
-    if (pos <  preedit_string.count()) {
+    if (pos <  preedit_string.size()) {
       for (int i=0; i< attrs.count(); i++) 
         if ((attrs[i].type == QInputMethodEvent::TextFormat) &&
             (attrs[i].start <= pos) &&
@@ -589,22 +588,35 @@ QTWKWindow::inputMethodEvent (QInputMethodEvent* event) {
 QVariant 
 QTWKWindow::inputMethodQuery (Qt::InputMethodQuery query) const {
   switch (query) {
+#if QT_VERSION < 0x060000
     case Qt::ImMicroFocus : {
-//      const QPoint &topleft= cursor_pos - tmwid->backing_pos + surface()->geometry().topLeft();
       const QPoint &topleft= cursor_pos  + geometry().topLeft();
       return QVariant (QRect (topleft, QSize (5, 5)));
     }
+#else
+    case Qt::ImEnabled : {
+      return QVariant (true);
+    }
+    case Qt::ImCursorRectangle : {
+      const QPoint &topleft= cursor_pos  + geometry().topLeft();
+      return QVariant (QRect (topleft, QSize (5, 5)));
+    }
+#endif // TODO : Correctly implement input methods
     default:
       return QWidget::inputMethodQuery (query);
   }
 }
+
+
+
+
 
 #endif // input method variants
 
 void
 QTWKWindow::mousePressEvent (QMouseEvent* event) {
   if (is_nil (tm_widget ())) return;
-  QPoint point = event->pos ();// + origin();
+  QPoint point = event->position().toPoint();// + origin();
   coord2 pt = from_qpoint (point);
   unsigned int mstate= mouse_state (event->buttons(), event->modifiers());
   string s= "press-" * mouse_decode (event->button());
@@ -616,7 +628,7 @@ QTWKWindow::mousePressEvent (QMouseEvent* event) {
 void
 QTWKWindow::mouseReleaseEvent (QMouseEvent* event) {
   if (is_nil (tm_widget ())) return;
-  QPoint point = event->pos ();// + origin();
+  QPoint point = event->position().toPoint();// + origin();
   coord2 pt = from_qpoint (point);
   unsigned int mstate= mouse_state (event->buttons(), event->modifiers());
   string s = "release-" * mouse_decode (event->button());
@@ -628,7 +640,7 @@ QTWKWindow::mouseReleaseEvent (QMouseEvent* event) {
 void
 QTWKWindow::mouseMoveEvent (QMouseEvent* event) {
   if (is_nil (tm_widget ())) return;
-  QPoint point = event->pos ();// + origin();
+  QPoint point = event->position().toPoint();// + origin();
   coord2 pt = from_qpoint (point);
   unsigned int mstate= mouse_state (event->buttons(), event->modifiers());
   string s = "move";
@@ -693,7 +705,7 @@ QTWKWindow::focusOutEvent (QFocusEvent * event) {
 }
 
 void
-QTWKWindow::enterEvent (QEvent* event) {
+QTWKWindow::enterEvent (QEnterEvent* event) {
   cout << "enter window " << this << LF;
   if (is_nil (tm_widget ())) return;
   QPoint point = mapFromGlobal(QCursor::pos());

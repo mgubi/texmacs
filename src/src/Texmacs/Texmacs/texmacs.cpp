@@ -45,10 +45,6 @@ void mac_fix_paths ();
 #include <QDir>
 #endif
 
-#ifdef QTWSTEXMACS
-#include <QCorepplication>
-#endif
-
 #ifdef OS_MINGW
 #include "Windows/win-utf8-compat.hpp"
 #endif

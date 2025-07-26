@@ -45,9 +45,9 @@
 
 #ifdef QTTEXMACS
 #include "qt_gui.hpp"    // gui_maximal_extents()
-#else
+#elif  defined(QTWKTEXMACS)
 #define center TEXMACS_center // avoid name clash
-#include "qtwk_gui.hpp"    // gui_maximal_extents()
+#include "../Qtwk/qtwk_gui.hpp"    // gui_maximal_extents()
 #undef center
 #endif
 
@@ -929,7 +929,7 @@ qt_print (bool& to_file, bool& landscape, string& pname, url& filename,
 #define outline CFoutline // avoid name clashes...
 #include <CoreFoundation/CoreFoundation.h>
 #undef extend
-
+#undef outline
 
 // HACK: this function is needed on MacOS when dropping URLS
 // which could not correspond to standard Unix paths

@@ -142,6 +142,10 @@ if [[[ "0$QT_MAJOR" -ge 6 ]]]; then
         A=(${CXX// / })
         CXX="${A[[0]]} -std=c++17"
       fi
+      if [[[ "${OBJCXX}" =~ "clang" ]]]; then
+        A=(${OBJCXX// / })
+        OBJCXX="${A[[0]]} -std=c++17"
+      fi
     ;;
   esac
 fi

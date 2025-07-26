@@ -21,6 +21,16 @@ AC_DEFUN([TM_GUI],[
   [  --disable-qt            replace Qt by X11 interface],
       [], [enable_qt="yes"])
 
+  AC_ARG_ENABLE(qtwk,
+  [  --enable-qtwk           replace Qt widgets by Widkit],
+      [], [enable_qtwk="no"])
+
+  case "$enable_qtwk" in
+      yes)
+         enable_qt=yes
+         ;;
+  esac
+
   case "$enable_qt" in
       yes)
          LC_WITH_QT
@@ -53,7 +63,6 @@ AC_DEFUN([TM_GUI],[
          AC_MSG_ERROR([bad option --enable-qt=$enable_qt])
          ;;
   esac
-
 
   # Qt Pipes
   AC_ARG_ENABLE(qtpipes,
@@ -97,6 +106,13 @@ AC_DEFUN([TM_GUI],[
          ;;
   esac
 
+  case "$enable_qtwk" in
+      yes)
+         AC_MSG_RESULT([enabling Qt port with Widkit])
+         CONFIG_GUI="QTWK"
+         ;;
+  esac
+
   case "$CONFIG_GUI" in
       X11)
          CONFIG_X11="X11 Widkit"
@@ -114,7 +130,12 @@ AC_DEFUN([TM_GUI],[
       QT)
          CONFIG_QT="Qt"
          CONFIG_GUI_DEFINE="QTTEXMACS"
-          AC_DEFINE(QTTEXMACS, 1, [Enable experimental Qt port])
+          AC_DEFINE(QTTEXMACS, 1, [Enable Qt port])
+         ;;
+      QTWK)
+         CONFIG_QT="Qtwk Widkit"
+         CONFIG_GUI_DEFINE="QTWKTEXMACS"
+          AC_DEFINE(QTWKTEXMACS, 1, [Enable Qt port with Widkit])
          ;;
   esac
 
