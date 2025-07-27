@@ -801,8 +801,12 @@ qt_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
     QRect rect = QRect(x1, y2, x2-x1, y1-y2);
     //    shadow->painter->setCompositionMode(QPainter::CompositionMode_Source);  
     shadow->painter->setClipRect(rect);
-    shadow->painter->drawPixmap (rect, * dynamic_cast<QPixmap*> (painter->device ()), rect);
-    //    cout << "qt_shadow_renderer_rep::get_shadow " 
+    QPixmap *_pix = dynamic_cast<QPixmap*>(painter->device());
+    if (_pix) {
+      cout << "qt_shadow_renderer_rep::get_shadow: null Pixmap! " << LF;
+      shadow->painter->drawPixmap (rect, *_pix, rect);
+    }
+    //    cout << "qt_shadow_renderer_rep::get_shadow "
     //         << rectangle(x1,y2,x2,y1) << LF;
     //  XCopyArea (dpy, win, shadow->win, gc, x1, y2, x2-x1, y1-y2, x1, y2);
   } else {
