@@ -332,6 +332,9 @@ use_macos_fonts () {
 
 static const char*
 default_look_and_feel_impl () {
+#if __EMSCRIPTEN__
+  return "emacs";
+#endif
   if (os_mingw () || os_win32 ()) return "windows";
   if (os_macos ()) return "macos";
   string session= get_env ("DESKTOP_SESSION");

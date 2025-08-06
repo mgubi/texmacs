@@ -411,7 +411,7 @@ add_link_options ("SHELL:-s USE_FREETYPE=1" "SHELL:-s USE_LIBPNG=1" "SHELL:--pre
 #"SHELL:--source-map-base /" 
 #"SHELL:-s DISABLE_EXCEPTION_CATCHING=0" 
 #add_compile_options ("SHELL:-s ASSERTIONS=1" "SHELL:-s DEMANGLE_SUPPORT=1" "-g3")
-add_link_options ("SHELL:-s ASSERTIONS=1" "SHELL:-s DEMANGLE_SUPPORT=1"  "-g3" "-gsource-map")
+add_link_options ("SHELL:-s ASSERTIONS=1" "SHELL:-g3" "SHELL:-gsource-map"  "SHELL:-sASYNCIFY" "SHELL:-Os")
 
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
