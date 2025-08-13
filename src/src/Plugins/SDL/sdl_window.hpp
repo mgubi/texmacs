@@ -18,7 +18,7 @@
 #include "widget.hpp"
 #include "sdl_gui.hpp"
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 /******************************************************************************
 * The sdl_window class

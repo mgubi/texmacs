@@ -278,8 +278,8 @@
 /* Use MuPDF library */
 #undef USE_MUPDF
 
-/* Use SDL2 library */
-#undef USE_SDL2
+/* Use SDL3 library */
+#undef USE_SDL3
 
 /* Use Sparkle framework */
 #undef USE_SPARKLE

@@ -61,13 +61,13 @@ AC_DEFUN([TM_GUI],[
          ;;
       sdl) 
          AC_MSG_RESULT([enabling experimental SDL port])
-         LC_SDL2
-         AC_MSG_RESULT([SDL2_CFLAGS=$SDL2_CFLAGS])
-         AC_MSG_RESULT([SDL2_LDFLAGS=$SDL2_LDFLAGS])
-         AC_MSG_RESULT([SDL2_LIBS=$SDL2_LIBS])
-         SDL_CFLAGS="$SDL2_CFLAGS"
-         SDL_LDFLAGS="$SDL2_LDFLAGS"
-         SDL_LIBS="$SDL2_LIBS"
+         LC_SDL3
+         AC_MSG_RESULT([SDL3_CFLAGS=$SDL3_CFLAGS])
+         AC_MSG_RESULT([SDL3_LDFLAGS=$SDL3_LDFLAGS])
+         AC_MSG_RESULT([SDL3_LIBS=$SDL3_LIBS])
+         SDL_CFLAGS="$SDL3_CFLAGS"
+         SDL_LDFLAGS="$SDL3_LDFLAGS"
+         SDL_LIBS="$SDL3_LIBS"
          CONFIG_GUI="SDL"
          ;;
       *)

@@ -47,21 +47,22 @@ sdl_window_rep::initialize () {
   
   if (name == NULL) {
     name= const_cast<char*> ("popup");
-    win= SDL_CreateWindow (name, win_x, win_y, win_w, win_h,
+    win= SDL_CreateWindow (name, win_w/2, win_h/2,
                            SDL_WINDOW_BORDERLESS
-                           | SDL_WINDOW_ALLOW_HIGHDPI);
+                           | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
   } else {
-    win= SDL_CreateWindow (name, win_x, win_y, win_w, win_h,
-                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    win= SDL_CreateWindow (name, win_w/2, win_h/2,
+                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   }
-  sdl_ren= SDL_CreateRenderer (win, -1, SDL_RENDERER_ACCELERATED);
+  sdl_ren= SDL_CreateRenderer (win, NULL);
   
   if (the_name == "") {
     the_name= name;
     mod_name= name;
   }
 
+  SDL_SetWindowPosition (win, win_x, win_y), 
   SDL_SetWindowMaximumSize (win, max_w, max_h);
   SDL_SetWindowMinimumSize (win, min_w, min_h);
 
@@ -287,7 +288,7 @@ sdl_window_rep::move_event (int x, int y) {
 void
 sdl_window_rep::resize_event (int ww, int hh) {
   bool flag= (win_w!=ww) || (win_h!=hh);
-  win_w= ww; win_h= hh;
+  win_w= ww/retina_factor; win_h= hh/retina_factor;
   if (flag) {
     notify_size (w, win_w*PIXEL, win_h*PIXEL);
     notify_window_resize (orig_name, ww*PIXEL, hh*PIXEL);
@@ -325,7 +326,7 @@ sdl_window_rep::focus_in_event () {
 
 void
 sdl_window_rep::focus_out_event () {
- // SDL_SetWindowKeyboardGrab (win, SDL_FALSE);
+ // SDL_SetWindowKeyboardGrab (win, false);
   has_focus= false;
   notify_keyboard_focus (kbd_focus, false);
 }
@@ -435,18 +436,18 @@ sdl_window_rep::repaint_invalid_regions () {
       SDL_Surface *surf= get_backing_store ();
       SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
       SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_NONE);
-      SDL_Rect srcrect;
+      SDL_FRect srcrect;
       srcrect.x= 0; srcrect.y= 0;
       srcrect.w= surf->w; srcrect.h= surf->h;
-      SDL_Rect destrect;
+      SDL_FRect destrect;
       destrect.x= 0; destrect.y= 0;
       destrect.w= surf->w*2; destrect.h= surf->h*2;
       SDL_RenderClear (sdl_ren);
-      SDL_RenderCopy (sdl_ren, tex, &srcrect, &srcrect);
-      //    SDL_RenderCopy (sdl_ren, tex, NULL, NULL);
+      SDL_RenderTexture (sdl_ren, tex, &srcrect, &srcrect);
+      //    SDL_RenderTexture (sdl_ren, tex, NULL, NULL);
       SDL_DestroyTexture (tex);
       unsigned char *p= (unsigned char*)surf->pixels;
-      SDL_FreeSurface (surf);
+      SDL_DestroySurface (surf);
       tm_delete_array (p);
       SDL_RenderPresent (sdl_ren);
     }
@@ -485,8 +486,8 @@ sdl_window_rep::get_backing_store () {
   memcpy (pixels, samples, w*h*4);
 #endif
   // the SDL pixel data is not copied so we need to ensure that the pixmap stays alive.
-  surf= SDL_CreateRGBSurfaceWithFormatFrom (pixels, w, h, 32, 4*w,
-                                            SDL_PIXELFORMAT_RGBA32); // FIXME: premultiplied?
+  surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
+  // FIXME: premultiplied?
   return surf;
 }
 #else

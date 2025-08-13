@@ -18,7 +18,7 @@
 #include "hashmap.hpp"
 #include "colors.hpp"
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 class sdl_gui_rep;
 class sdl_drawable_rep;

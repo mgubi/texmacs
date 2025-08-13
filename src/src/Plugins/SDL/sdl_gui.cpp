@@ -40,7 +40,7 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
 {
   the_gui= this;
   
-  if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) != 0) {
+  if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
           SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
     exit(-1);
   }
@@ -53,8 +53,8 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
   if (SDL_GetDisplayBounds(0, &r) != 0) {
       SDL_Log("SDL_GetDisplayBounds failed: %s", SDL_GetError());
   } else {
-    screen_width= r.w;
-    screen_height= r.h;
+    screen_width= r.w/2;
+    screen_height= r.h/2;
   }
   
   initialize_colors ();
@@ -80,7 +80,7 @@ sdl_gui_rep::get_max_size (SI& width, SI& height) {
 void sdl_gui_rep::update_mouse_state (Uint32 mask) {
   unsigned int state= 0;
 
-  int x, y;
+  float x, y;
 
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
   SDL_Keymod mods= SDL_GetModState();
@@ -93,16 +93,17 @@ void sdl_gui_rep::update_mouse_state (Uint32 mask) {
   if ((buttons & SDL_BUTTON_RMASK) != 0)  state += 4;
   if ((buttons & SDL_BUTTON_X1MASK) != 0) state += 8;
   if ((buttons & SDL_BUTTON_X2MASK) != 0) state += 16;
-  if ((mods & KMOD_SHIFT) != 0) state += 256;
-  if ((mods & KMOD_CTRL)  != 0) state += 1024;
-  if ((mods & KMOD_ALT)  != 0)  state += 2048;
+  if ((mods & SDL_KMOD_SHIFT) != 0) state += 256;
+  if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024;
+  if ((mods & SDL_KMOD_ALT)  != 0)  state += 2048;
 //  if ((mods & KMOD_CAPS)  != 0) state += 1024;
   mouse_state= state;
 }
 
 void
 sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
-  int x, y, ox, oy, x1, y1;
+  float x, y;
+  int ox, oy, x1, y1;
   
   //update_mouse_state ();
   // cout << "emulate_leave_enter mouse_state " << mouse_state << LF;
@@ -112,7 +113,7 @@ sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   //update_mouse_state ();
 
   SDL_GetWindowPosition (get_Window (old_widget), &ox, &oy);
-  x1= x - ox; y1= y - oy;
+  x1= (int)x - ox; y1= (int)y - oy;
   x1= (x1 * PIXEL); y1= ((-y1) * PIXEL);
   // cout << "Emulate leave " << old_widget << "\n";
   send_mouse (old_widget, "leave", x1, y1, mouse_state, 0);
@@ -138,8 +139,8 @@ sdl_gui_rep::obtain_mouse_grab (widget wid) {
   widget new_widget= grab_ptr->item;
   notify_mouse_grab (new_widget, true);
   SDL_RaiseWindow (win);
-  SDL_CaptureMouse (SDL_TRUE);
-  // SDL_SetWindowGrab (win, SDL_TRUE);
+  SDL_CaptureMouse (true);
+  // SDL_SetWindowGrab (win, true);
   // cout << "---> obtain_mouse_grab: in grab " << wid << "\n";
   if (!is_nil (old_widget)) {
     notify_mouse_grab (old_widget, false);
@@ -155,16 +156,16 @@ sdl_gui_rep::release_mouse_grab () {
   widget new_widget; if (!is_nil (grab_ptr)) new_widget= grab_ptr->item;
   if (is_nil (grab_ptr)) {
     SDL_Window *win= SDL_GetGrabbedWindow ();
-    // if (win) SDL_SetWindowGrab (win, SDL_FALSE);
-    SDL_CaptureMouse (SDL_FALSE);
+    // if (win) SDL_SetWindowGrab (win, false);
+    SDL_CaptureMouse (false);
     // cout << "---> release_mouse_grab: no grab\n";
   }
   else {
     sdl_window grab_win= get_sdl_window (new_widget);
     notify_mouse_grab (new_widget, true);
     SDL_RaiseWindow (grab_win->win);
-    SDL_CaptureMouse (SDL_TRUE);
-    // SDL_SetWindowGrab (grab_win->win, SDL_TRUE);
+    SDL_CaptureMouse (true);
+    // SDL_SetWindowGrab (grab_win->win, true);
     // cout << "---> release_mouse_grab: next grab " <<  new_widget  << "\n";
     notify_mouse_grab (old_widget, false);
     emulate_leave_enter (old_widget, new_widget);
@@ -241,32 +242,32 @@ initialize_keyboard () {
   initialized= true;
   
   // Latin characters
-  MMap (SDLK_a, "a", "A");
-  MMap (SDLK_b, "b", "B");
-  MMap (SDLK_c, "c", "C");
-  MMap (SDLK_d, "d", "D");
-  MMap (SDLK_e, "e", "E");
-  MMap (SDLK_f, "f", "F");
-  MMap (SDLK_g, "g", "G");
-  MMap (SDLK_h, "h", "H");
-  MMap (SDLK_i, "i", "I");
-  MMap (SDLK_j, "j", "J");
-  MMap (SDLK_k, "k", "K");
-  MMap (SDLK_l, "l", "L");
-  MMap (SDLK_m, "m", "M");
-  MMap (SDLK_n, "n", "N");
-  MMap (SDLK_o, "o", "O");
-  MMap (SDLK_p, "p", "P");
-  MMap (SDLK_q, "q", "Q");
-  MMap (SDLK_r, "r", "R");
-  MMap (SDLK_s, "s", "S");
-  MMap (SDLK_t, "t", "T");
-  MMap (SDLK_u, "u", "U");
-  MMap (SDLK_v, "v", "V");
-  MMap (SDLK_w, "w", "W");
-  MMap (SDLK_x, "x", "X");
-  MMap (SDLK_y, "y", "Y");
-  MMap (SDLK_z, "z", "Z");
+  MMap (SDLK_A, "a", "A");
+  MMap (SDLK_B, "b", "B");
+  MMap (SDLK_C, "c", "C");
+  MMap (SDLK_D, "d", "D");
+  MMap (SDLK_E, "e", "E");
+  MMap (SDLK_F, "f", "F");
+  MMap (SDLK_G, "g", "G");
+  MMap (SDLK_H, "h", "H");
+  MMap (SDLK_I, "i", "I");
+  MMap (SDLK_J, "j", "J");
+  MMap (SDLK_K, "k", "K");
+  MMap (SDLK_L, "l", "L");
+  MMap (SDLK_M, "m", "M");
+  MMap (SDLK_N, "n", "N");
+  MMap (SDLK_O, "o", "O");
+  MMap (SDLK_P, "p", "P");
+  MMap (SDLK_Q, "q", "Q");
+  MMap (SDLK_R, "r", "R");
+  MMap (SDLK_S, "s", "S");
+  MMap (SDLK_T, "t", "T");
+  MMap (SDLK_U, "u", "U");
+  MMap (SDLK_V, "v", "V");
+  MMap (SDLK_W, "w", "W");
+  MMap (SDLK_X, "x", "X");
+  MMap (SDLK_Y, "y", "Y");
+  MMap (SDLK_Z, "z", "Z");
 #if 0
   Map (SDLK_A, "A");
   Map (SDLK_B, "B");
@@ -390,12 +391,12 @@ initialize_keyboard () {
   
   // Standard ASCII Symbols
   Map (SDLK_EXCLAIM, "!");
-  Map (SDLK_QUOTEDBL, "\x22");
+  Map (SDLK_DBLAPOSTROPHE, "\x22");
   Map (SDLK_HASH, "#");
   Map (SDLK_DOLLAR, "$");
   Map (SDLK_PERCENT, "%");
   Map (SDLK_AMPERSAND, "&");
-  Map (SDLK_QUOTE, "'");
+  Map (SDLK_APOSTROPHE, "'");
   Map (SDLK_LEFTPAREN, "(");
   Map (SDLK_RIGHTPAREN, ")");
   Map (SDLK_ASTERISK, "*");
@@ -416,7 +417,7 @@ initialize_keyboard () {
   Map (SDLK_RIGHTBRACKET, "]");
   Map (SDLK_CARET, "^");
   Map (SDLK_UNDERSCORE, "_");
-  Map (SDLK_BACKQUOTE, "`");
+  Map (SDLK_GRAVE, "`");
   Map (SDLK_LEFTBRACKET, "{");
   Map (SDLK_KP_VERTICALBAR, "|");
   Map (SDLK_RIGHTBRACKET, "}");
@@ -806,18 +807,18 @@ lookup_mouse (Uint8 button) {
 }
 
 static string
-lookup_key (SDL_Keysym *key) {
-  const char* str= SDL_GetKeyName (key->sym);
+lookup_key (SDL_Keycode key, SDL_Keymod mod) {
+  const char* str= SDL_GetKeyName (key);
   string r(str, strlen(str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
 //  string s=r;
-  string s= ((key->mod & KMOD_SHIFT) ? upper_key [key->sym] : lower_key [key->sym]);
+  string s= ((mod & SDL_KMOD_SHIFT) ? upper_key [key] : lower_key [key]);
   if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
 
-  if (key->mod & KMOD_CTRL) s= "C-" * s;
-  if (key->mod & KMOD_ALT)  s= "A-" * s;
-  if (key->mod & KMOD_GUI)  s= "M-" * s;
+  if (mod & SDL_KMOD_CTRL) s= "C-" * s;
+  if (mod & SDL_KMOD_ALT)  s= "A-" * s;
+  if (mod & SDL_KMOD_GUI)  s= "M-" * s;
   cout << "key press: " << s << LF;
   return s;
 }
@@ -825,110 +826,119 @@ lookup_key (SDL_Keysym *key) {
 void
 sdl_gui_rep::process_event (SDL_Event *event) {
   switch (event->type) {
-    case SDL_WINDOWEVENT:
-    {
-      sdl_window win= get_window_from_ID (event->window.windowID);
-      if (win == NULL) break;
-      switch (event->window.event) {
-        case SDL_WINDOWEVENT_SHOWN:
-          SDL_Log("Window %d shown", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_HIDDEN:
-          SDL_Log("Window %d hidden", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_EXPOSED:
-          SDL_Log("Window %d exposed", event->window.windowID);
-          win->invalidate_all ();
-          break;
-        case SDL_WINDOWEVENT_MOVED:
-          SDL_Log("Window %d moved to %d,%d",
-                  event->window.windowID, event->window.data1,
-                  event->window.data2);
-          win->move_event (event->window.data1, event->window.data2);
-          break;
-        case SDL_WINDOWEVENT_RESIZED:
-          SDL_Log("Window %d resized to %dx%d",
-                  event->window.windowID, event->window.data1,
-                  event->window.data2);
-          break;
-        case SDL_WINDOWEVENT_SIZE_CHANGED:
-          SDL_Log("Window %d size changed to %dx%d",
-                  event->window.windowID, event->window.data1,
-                  event->window.data2);
+    case SDL_EVENT_WINDOW_SHOWN:
+      SDL_Log("Window %d shown", event->window.windowID);
+      break;
+    case SDL_EVENT_WINDOW_HIDDEN:
+      SDL_Log("Window %d hidden", event->window.windowID);
+      break;
+    case SDL_EVENT_WINDOW_EXPOSED:
+      SDL_Log("Window %d exposed", event->window.windowID);
+      {
+        sdl_window win= get_window_from_ID (event->window.windowID);
+        if (win) win->invalidate_all ();
+      }
+      break;
+    case SDL_EVENT_WINDOW_MOVED:
+      SDL_Log("Window %d moved to %d,%d",
+              event->window.windowID, event->window.data1,
+              event->window.data2);
+      {
+        sdl_window win= get_window_from_ID (event->window.windowID);
+        if (win) win->move_event (event->window.data1, event->window.data2);
+      }
+      break;
+    case SDL_EVENT_WINDOW_RESIZED:
+      SDL_Log("Window %d resized to %dx%d",
+              event->window.windowID, event->window.data1,
+              event->window.data2);
+      break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      SDL_Log("Window %d pixel size changed to %dx%d",
+              event->window.windowID, event->window.data1,
+              event->window.data2);
+      {
+        sdl_window win= get_window_from_ID (event->window.windowID);
+        if (win) {
           win->resize_event (event->window.data1, event->window.data2);
           win->invalidate_all ();
-          break;
-        case SDL_WINDOWEVENT_MINIMIZED:
-          SDL_Log("Window %d minimized", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_MAXIMIZED:
-          SDL_Log("Window %d maximized", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_RESTORED:
-          SDL_Log("Window %d restored", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_ENTER:
-          SDL_Log("Mouse entered window %d",
-                  event->window.windowID);
-          //unmap_balloon ();
-        {
+        }
+      }       
+      break;
+    case SDL_EVENT_WINDOW_MINIMIZED:
+      SDL_Log("Window %d minimized", event->window.windowID);
+      break;
+    case SDL_EVENT_WINDOW_MAXIMIZED:
+      SDL_Log("Window %d maximized", event->window.windowID);
+      break;
+    case SDL_EVENT_WINDOW_RESTORED:
+      SDL_Log("Window %d restored", event->window.windowID);
+      break;
+    case SDL_EVENT_WINDOW_MOUSE_ENTER:
+      SDL_Log("Mouse entered window %d",
+              event->window.windowID);
+        //unmap_balloon ();
+      {
+        sdl_window win= get_window_from_ID (event->window.windowID);
+        if (win) {
           // FIXME: not quite right
-          int x,y, ox,oy;
+          float x,y;
+          int ox,oy;
           update_mouse_state ();
           SDL_GetGlobalMouseState (&x, &y);
           SDL_GetWindowPosition (win->win, &ox, &oy);
           x -= ox; y -= oy;
           win->mouse_event ("enter", x, y, event->window.timestamp);
-
         }
-          break;
-        case SDL_WINDOWEVENT_LEAVE:
-          SDL_Log("Mouse left window %d", event->window.windowID);
-          //unmap_balloon ();
-        {
+      }
+        break;
+      case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+        SDL_Log("Mouse left window %d", event->window.windowID);
+        //unmap_balloon ();
+      {
+        sdl_window win= get_window_from_ID (event->window.windowID);
+        if (win) {
           // FIXME: not quite right
-          int x,y, ox,oy;
+          float x,y;
+          int ox,oy;
           update_mouse_state ();
           SDL_GetGlobalMouseState (&x, &y);
           SDL_GetWindowPosition(win->win, &ox, &oy);
           x -= ox; y -= oy;
           win->mouse_event ("leave", x, y, event->window.timestamp);
-
         }
-          break;
-        case SDL_WINDOWEVENT_FOCUS_GAINED:
-          SDL_Log("Window %d gained keyboard focus",
-                  event->window.windowID);
-          win->focus_in_event ();
-          break;
-        case SDL_WINDOWEVENT_FOCUS_LOST:
-          SDL_Log("Window %d lost keyboard focus",
-                  event->window.windowID);
-          win->focus_out_event ();
-          break;
-        case SDL_WINDOWEVENT_CLOSE:
-          SDL_Log("Window %d closed", event->window.windowID);
-          win->destroy_event();
-          break;
-#if SDL_VERSION_ATLEAST(2, 0, 5)
-        case SDL_WINDOWEVENT_TAKE_FOCUS:
-          SDL_Log("Window %d is offered a focus", event->window.windowID);
-          break;
-        case SDL_WINDOWEVENT_HIT_TEST:
-          SDL_Log("Window %d has a special hit test", event->window.windowID);
-          break;
-#endif
-        default:
-          SDL_Log("Window %d got unknown event %d",
-                  event->window.windowID, event->window.event);
-          break;
-      } // switch (event->window.event)
-      break;
-    } // case SDL_WINDOWEVENT:
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
+      }
+        break;
+      case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        SDL_Log("Window %d gained keyboard focus",
+                event->window.windowID);
+        {
+          sdl_window win= get_window_from_ID (event->window.windowID);
+          if (win) win->focus_in_event ();
+        }
+        break;
+      case SDL_EVENT_WINDOW_FOCUS_LOST:
+        SDL_Log("Window %d lost keyboard focus",
+                event->window.windowID);
+        {
+          sdl_window win= get_window_from_ID (event->window.windowID);
+          if (win) win->focus_out_event ();
+        }
+        break;
+      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+        SDL_Log("Window %d close requested", event->window.windowID);
+        {
+          sdl_window win= get_window_from_ID (event->window.windowID);
+          if (win) win->destroy_event();
+        }
+        break;
+      case SDL_EVENT_WINDOW_HIT_TEST:
+        SDL_Log("Window %d has a special hit test", event->window.windowID);
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
     {
-      update_mouse_state ( SDL_BUTTON(event->button.button) );
+      update_mouse_state ( SDL_BUTTON_MASK(event->button.button) );
       // we need to take into account explicitly the current button
 #if 0
       if (event->type == SDL_MOUSEBUTTONDOWN)
@@ -940,35 +950,37 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       sdl_window win= get_window_from_ID (event->button.windowID);
       if (win == NULL) break;
       unmap_balloon ();
-      string action = event->button.type == SDL_MOUSEBUTTONDOWN ? "press-" : "release-";
+      string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
 //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
+cout << event->button.x << "," << event->button.y << LF;  
       win->mouse_event (action * lookup_mouse (event->button.button),
             event->button.x, event->button.y,  texmacs_time ());
       break;
-    } // case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEWHEEL:
+    } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_WHEEL:
     {
       SDL_Log("Window %d got wheel event event %f %f",
-              event->window.windowID, event->wheel.preciseX, event->wheel.preciseY);
+              event->window.windowID, event->wheel.x, event->wheel.y);
 
       sdl_window win= get_window_from_ID (event->button.windowID);
       if (win == NULL) break;
       unmap_balloon ();
       update_mouse_state ();
-      int x,y, ox,oy;
+      float x,y;
+      int ox,oy;
       SDL_GetGlobalMouseState (&x, &y);
       SDL_GetWindowPosition(win->win, &ox, &oy);
       x -= ox; y -= oy;
-      float deltaX= event->wheel.preciseX;
-      float deltaY= event->wheel.preciseY;
+      float deltaX= event->wheel.x;
+      float deltaY= event->wheel.y;
       if (deltaY >= 0.5) {
         win->mouse_event ("press-up", x, y, texmacs_time ());
       } else if (deltaY <= -0.5) {
         win->mouse_event ("press-down", x, y, texmacs_time ());
       }
       break;
-    } // case SDL_MOUSEWHEEL:
-    case SDL_MOUSEMOTION:
+    } // case SDL_EVENT_MOUSE_WHEEL:
+    case SDL_EVENT_MOUSE_MOTION:
     {
       unmap_balloon ();
       update_mouse_state ();
@@ -978,14 +990,15 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       win->mouse_event ("move",
             event->motion.x, event->motion.y, event->motion.timestamp);
       break;
-    } // case SDL_MOUSEMOTION:
-    case SDL_KEYDOWN:
+    } // case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_KEY_DOWN:
     {
-      SDL_Log("Keydown: %s key acting as %s key", SDL_GetScancodeName(event->key.keysym.scancode), SDL_GetKeyName(event->key.keysym.sym));
+      // maybe use SDL_GetKeyFromScancode
+//      SDL_Log("Keydown: %s key acting as %s key", SDL_GetScancodeName(event->key.keysym.scancode), SDL_GetKeyName(event->key.keysym.sym));
       unmap_balloon ();
       sdl_window win= get_window_from_ID (event->key.windowID);
       if (win == NULL) break;
-      string key= lookup_key (&event->key.keysym);
+      string key= lookup_key(event->key.key, event->key.mod);
       //cout << "Press " << key << " at " << (time_t) ev->xkey.time
       //<< " (" << texmacs_time() << ")\n";
       kbd_count++;
@@ -997,7 +1010,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       //cout << "redraw: " << request_partial_redraw << "\n";
       if (N(key)>0) win->key_event (key);
       break;
-    } // case SDL_KEYDOWN:
+    } // case SDL_EVENT_KEY_DOWN:
   } // switch (event->type)
 }
 
@@ -1141,23 +1154,23 @@ sdl_gui_rep::check_event (int type) {
       time_t now= texmacs_time ();
       if (now - interrupt_time < 0) return false;
       else interrupt_time= now + (100 / (n + 1));
-      interrupted= (SDL_HasEvent (SDL_KEYDOWN) == SDL_TRUE) ||
-                   (SDL_HasEvent (SDL_MOUSEBUTTONDOWN) == SDL_TRUE);
+      interrupted= (SDL_HasEvent (SDL_EVENT_KEY_DOWN) == true) ||
+                   (SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_DOWN) == true);
       return interrupted;
     }
   case INTERRUPTED_EVENT:
     return interrupted;
   case ANY_EVENT:
-    return (SDL_HasEvents(SDL_FIRSTEVENT, SDL_LASTEVENT) == SDL_TRUE);
+    return (SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST) == true);
   case MOTION_EVENT:
-    status= (SDL_HasEvent (SDL_MOUSEMOTION) == SDL_TRUE);
+    status= (SDL_HasEvent (SDL_EVENT_MOUSE_MOTION) == true);
     return status;
   case DRAG_EVENT:
     {
       status= false;
       SDL_Event event;
       if (SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                          SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {
+                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION)) {
         if (event.motion.state) {
           status= true;
         }
@@ -1165,11 +1178,11 @@ sdl_gui_rep::check_event (int type) {
     }
     return status;
   case MENU_EVENT:
-    status= (SDL_HasEvent (SDL_MOUSEBUTTONUP) == SDL_TRUE);
+    status= (SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_UP) == true);
     if (!status) {
       SDL_Event event;
       if (SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                          SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {
+                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION)) {
         status=  (event.motion.state != 0);
       }
     }

@@ -679,11 +679,11 @@ CONFIG_SDL
 CONFIG_QT
 CONFIG_COCOA
 CONFIG_X11
-SDL2_LIBS
-SDL2_LDFLAGS
-SDL2_CFLAGS
-SDL2_CPP
-SDL2_CXX
+SDL3_LIBS
+SDL3_LDFLAGS
+SDL3_CFLAGS
+SDL3_CPP
+SDL3_CXX
 X_EXTRA_LIBS
 X_LIBS
 X_PRE_LIBS
@@ -729,11 +729,6 @@ SPARKLE_CXX
 WINSPARKLE_PATH
 WINSPARKLE_DLL
 CONFIG_SPARKLE
-GNUTLS_LIBS
-GNUTLS_LDFLAGS
-GNUTLS_CFLAGS
-GNUTLS_CPP
-GNUTLS_CXX
 GNUTLS_LIBS
 GNUTLS_LDFLAGS
 GNUTLS_CFLAGS
@@ -950,7 +945,7 @@ with_gui
 with_qt_find_method
 with_qt
 with_x
-with_sdl2
+with_sdl3
 enable_qtpipes
 enable_pdf_renderer
 enable_profile
@@ -1662,7 +1657,7 @@ Optional Packages:
                           a path to Qt binaries; if `yes' or empty, use PATH
                           and some default directories to find Qt binaries
   --with-x                use the X Window System
-  --with-sdl2[=ARG]       with sdl2 support [ARG=no]
+  --with-sdl3[=ARG]       with sdl3 support [ARG=no]
 
 Some influential environment variables:
   CC          C compiler command
@@ -4699,11 +4694,11 @@ if test x$ac_prog_cxx_stdcxx = xno
 then :
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $CXX option to enable C++11 features" >&5
 printf %s "checking for $CXX option to enable C++11 features... " >&6; }
-if test ${ac_cv_prog_cxx_11+y}
+if test ${ac_cv_prog_cxx_cxx11+y}
 then :
   printf %s "(cached) " >&6
-else $as_nop
-  ac_cv_prog_cxx_11=no
+else case e in #(
+  e) ac_cv_prog_cxx_cxx11=no
 ac_save_CXX=$CXX
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -4748,11 +4743,11 @@ if test x$ac_prog_cxx_stdcxx = xno
 then :
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $CXX option to enable C++98 features" >&5
 printf %s "checking for $CXX option to enable C++98 features... " >&6; }
-if test ${ac_cv_prog_cxx_98+y}
+if test ${ac_cv_prog_cxx_cxx98+y}
 then :
   printf %s "(cached) " >&6
-else $as_nop
-  ac_cv_prog_cxx_98=no
+else case e in #(
+  e) ac_cv_prog_cxx_cxx98=no
 ac_save_CXX=$CXX
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -21431,8 +21426,9 @@ printf "%s\n" "$as_me: SQLITE3_LDFLAGS:$SQLITE3_LDFLAGS" >&6;}
 if test ${with_gnutls+y}
 then :
   withval=$with_gnutls; with_gnutls=$withval
-else $as_nop
-  with_gnutls="no"
+else case e in #(
+  e) with_gnutls="no" ;;
+esac
 fi
 
   SAVE_CPPFLAGS="$CPPFLAGS"
@@ -21445,13 +21441,18 @@ printf "%s\n" "disabling GnuTLS support" >&6; }
       CPPFLAGS=`pkg-config --cflags gnutls hogweed nettle`
       LIBS=`pkg-config --libs gnutls hogweed nettle`
       if test "$TMREPO" != "" -a "$TMREPO" != "no" -a "$CONFIG_OS" = "MINGW"; then
-          LIBS="$LIBS -lintl -liconv -lcrypt32 -lws2_32"
 
 printf "%s\n" "#define TEXMACS_FIX_1_GNUTLS 1" >>confdefs.h
 
       fi
       if test "$TMREPO" != "" -a "$TMREPO" != "no" -a "$CONFIG_OS" = "MACOS"; then
           LIBS="$LIBS -framework CoreFoundation -framework Security -lz"
+      fi
+      if test "$TMREPO" != "" -a "$TMREPO" != "no" -a "$CONFIG_OS" = "GNU_LINUX"; then
+          LIBS="$LIBS -lz"
+      fi
+      if test "$TMREPO" != "" -a "$TMREPO" != "no" -a "$CONFIG_OS" = "ANDROID"; then
+          LIBS="$LIBS -lz"
       fi
       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GnuTLS version >= 3 (https://www.gnutls.org)" >&5
 printf %s "checking for GnuTLS version >= 3 (https://www.gnutls.org)... " >&6; }
@@ -21490,12 +21491,13 @@ printf "%s\n" "#define USE_GNUTLS 1" >>confdefs.h
         GNUTLS_CPPFLAGS="$CPPFLAGS"
         GNUTLS_LDFLAGS="$LIBS"
 
-else $as_nop
-
+else case e in #(
+  e)
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
 	as_fn_error $? "Cannot find a GnuTLS library version >=3 (https://www.gnutls.org)" "$LINENO" 5
-
+      ;;
+esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
     conftest$ac_exeext conftest.$ac_ext
@@ -35472,31 +35474,31 @@ printf "%s\n" "enabling experimental Cocoa port" >&6; }
 printf "%s\n" "enabling experimental SDL port" >&6; }
 
 
-# Check whether --with-sdl2 was given.
-if test ${with_sdl2+y}
+# Check whether --with-sdl3 was given.
+if test ${with_sdl3+y}
 then :
-  withval=$with_sdl2;
+  withval=$with_sdl3;
 fi
 
 
   SAVE_CPPFLAGS="$CPPFLAGS"
   SAVE_LDFLAGS="$LDFLAGS"
   SAVE_LIBS="$LIBS"
-  if test "$with_sdl2" = "no" -o "$with_sdl2" = "" ; then
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabling sdl2 support" >&5
-printf "%s\n" "disabling sdl2 support" >&6; }
+  if test "$with_sdl3" = "no" -o "$with_sdl3" = "" ; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabling sdl3 support" >&5
+printf "%s\n" "disabling sdl3 support" >&6; }
   else
-      CPPFLAGS=`pkg-config --cflags sdl2`
-      LIBS=`pkg-config --libs sdl2`
-      ac_fn_cxx_check_header_compile "$LINENO" "SDL.h" "ac_cv_header_SDL_h" "$ac_includes_default"
-if test "x$ac_cv_header_SDL_h" = xyes
+      CPPFLAGS=`pkg-config --cflags sdl3`
+      LIBS=`pkg-config --libs sdl3`
+      ac_fn_cxx_check_header_compile "$LINENO" "SDL3/SDL.h" "ac_cv_header_SDL3_SDL_h" "$ac_includes_default"
+if test "x$ac_cv_header_SDL3_SDL_h" = xyes
 then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for sdl2" >&5
-printf %s "checking for sdl2... " >&6; }
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for sdl3" >&5
+printf %s "checking for sdl3... " >&6; }
       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 int
 main (void)
@@ -35514,10 +35516,10 @@ then :
       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
 
-printf "%s\n" "#define USE_SDL2 1" >>confdefs.h
+printf "%s\n" "#define USE_SDL3 1" >>confdefs.h
 
-      SDL2_CPPFLAGS="$CPPFLAGS"
-      SDL2_LDFLAGS="$LIBS"
+      SDL3_CPPFLAGS="$CPPFLAGS"
+      SDL3_LDFLAGS="$LIBS"
 
 else case e in #(
   e)
@@ -35536,41 +35538,41 @@ fi
   LIBS="$SAVE_LIBS"
 
 
-  SDL2_CXX=$SDL2_CXXFLAGS
+  SDL3_CXX=$SDL3_CXXFLAGS
 
-  SDL2_CPP=$SDL2_CPPFLAGS
+  SDL3_CPP=$SDL3_CPPFLAGS
 
-  if [[ $enable_dumpflags =~ $(echo "(^|[[:space:]])(SDL2|ALL)($|[[:space:]])") ]]
+  if [[ $enable_dumpflags =~ $(echo "(^|[[:space:]])(SDL3|ALL)($|[[:space:]])") ]]
   then
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL2_CFLAGS:$SDL2_CFLAGS" >&5
-printf "%s\n" "$as_me: SDL2_CFLAGS:$SDL2_CFLAGS" >&6;}
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL2_CXXFLAGS:$SDL2_CXXFLAGS" >&5
-printf "%s\n" "$as_me: SDL2_CXXFLAGS:$SDL2_CXXFLAGS" >&6;}
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL2_CPPFLAGS:$SDL2_CPPFLAGS" >&5
-printf "%s\n" "$as_me: SDL2_CPPFLAGS:$SDL2_CPPFLAGS" >&6;}
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL2_LIBS:$SDL2_LIBS" >&5
-printf "%s\n" "$as_me: SDL2_LIBS:$SDL2_LIBS" >&6;}
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL2_LDFLAGS:$SDL2_LDFLAGS" >&5
-printf "%s\n" "$as_me: SDL2_LDFLAGS:$SDL2_LDFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CFLAGS:$SDL3_CFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CFLAGS:$SDL3_CFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CXXFLAGS:$SDL3_CXXFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CXXFLAGS:$SDL3_CXXFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CPPFLAGS:$SDL3_CPPFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CPPFLAGS:$SDL3_CPPFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_LIBS:$SDL3_LIBS" >&5
+printf "%s\n" "$as_me: SDL3_LIBS:$SDL3_LIBS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_LDFLAGS:$SDL3_LDFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_LDFLAGS:$SDL3_LDFLAGS" >&6;}
 
 
   fi
 # adaptation layer remove when finished
-  SDL2_CFLAGS="$SDL2_CXXFLAGS $SDL2_CPPFLAGS"
+  SDL3_CFLAGS="$SDL3_CXXFLAGS $SDL3_CPPFLAGS"
 
 
 
 
 
-         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL2_CFLAGS=$SDL2_CFLAGS" >&5
-printf "%s\n" "SDL2_CFLAGS=$SDL2_CFLAGS" >&6; }
-         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL2_LDFLAGS=$SDL2_LDFLAGS" >&5
-printf "%s\n" "SDL2_LDFLAGS=$SDL2_LDFLAGS" >&6; }
-         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL2_LIBS=$SDL2_LIBS" >&5
-printf "%s\n" "SDL2_LIBS=$SDL2_LIBS" >&6; }
-         SDL_CFLAGS="$SDL2_CFLAGS"
-         SDL_LDFLAGS="$SDL2_LDFLAGS"
-         SDL_LIBS="$SDL2_LIBS"
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_CFLAGS=$SDL3_CFLAGS" >&5
+printf "%s\n" "SDL3_CFLAGS=$SDL3_CFLAGS" >&6; }
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_LDFLAGS=$SDL3_LDFLAGS" >&5
+printf "%s\n" "SDL3_LDFLAGS=$SDL3_LDFLAGS" >&6; }
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_LIBS=$SDL3_LIBS" >&5
+printf "%s\n" "SDL3_LIBS=$SDL3_LIBS" >&6; }
+         SDL_CFLAGS="$SDL3_CFLAGS"
+         SDL_LDFLAGS="$SDL3_LDFLAGS"
+         SDL_LIBS="$SDL3_LIBS"
          CONFIG_GUI="SDL"
          ;;
       *)
