@@ -31,7 +31,10 @@
 #include "Ghostscript/gs_utilities.hpp"
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTWKTEXMACS)
+#include "Qtwk/qtwk_gui.hpp"
+#include "Qt/qt_utilities.hpp"
+#elif defined(QTTEXMACS)
 #include "Qt/qt_gui.hpp"
 #include "Qt/qt_utilities.hpp"
 #endif

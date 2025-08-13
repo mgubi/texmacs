@@ -15,7 +15,7 @@
 #include "message.hpp"
 #include "window.hpp"
 #include "dictionary.hpp"
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 
 #define THIS wk_widget (this)
 

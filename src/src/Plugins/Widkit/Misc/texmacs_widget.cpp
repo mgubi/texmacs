@@ -343,15 +343,39 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
     set_subwidget (THIS ["header"] ["focus"] ["bar"], "icons", ev->w);
   else if (ev->which == "user icons bar")
     set_subwidget (THIS ["header"] ["user"] ["bar"], "icons", ev->w);
-  else if (use_side_tools && ev->which == "side tools") {
-    wk_widget side=
-      resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
-                     "left", "top");
-    THIS ["middle"] << set_widget ("right", side);
+  else if (ev->which == "side tools") {
+    if (use_side_tools) {
+      wk_widget side=
+        resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
+                       "left", "top");
+      THIS ["middle"] << set_widget ("right", side);
+      if (attached ()) {
+        side << emit_attach_window (win);
+        THIS ["middle"] << emit_reposition ();
+        THIS ["middle"] ["right"] << emit_invalidate_all ();
+     }
+    }
+  }
+  else if (ev->which == "left tools") {
+    if (use_side_tools) {
+      wk_widget side=
+        resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
+                       "left", "top");
+      THIS ["middle"] << set_widget ("left", side);
+      if (attached ()) {
+        side << emit_attach_window (win);
+        THIS ["middle"] << emit_reposition ();
+        THIS ["middle"] ["left"] << emit_invalidate_all ();
+      }
+    }
+  }
+  else if (ev->which == "extra tools") {
+    wk_widget extra= ev->w;
+    THIS ["bottom"] << set_widget ("tools", extra);
     if (attached ()) {
-      side << emit_attach_window (win);
-      THIS ["middle"] << emit_reposition ();
-      THIS ["middle"] ["right"] << emit_invalidate_all ();
+      extra << emit_attach_window (win);
+      THIS << emit_reposition ();
+      THIS ["bottom"] << emit_invalidate_all ();
     }
   }
   else if (ev->which == "bottom tools") {

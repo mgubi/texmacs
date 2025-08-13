@@ -150,7 +150,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
   for (int i=0; i<N(alt_selection_rects); i++) {
     color col= get_env_color (MATCH_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined (SDLTEXMACS)
     ren->draw_selection (alt_selection_rects[i] & visible);
 #else
     ren->draw_rectangles (alt_selection_rects[i] & visible);
@@ -160,7 +160,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
     color col= get_env_color (SELECTION_COLOR);
     if (table_selection) col= get_env_color (TABLE_SELECTION_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined (SDLTEXMACS)
     ren->draw_selection (selection_rects & visible);
 #else
     ren->draw_rectangles (selection_rects & visible);

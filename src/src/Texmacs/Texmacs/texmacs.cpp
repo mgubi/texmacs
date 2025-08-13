@@ -33,7 +33,13 @@
 void mac_fix_paths ();
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTWKTEXMACS)
+#include "Qtwk/QTWKApplication.hpp"
+#include "Qt/qt_utilities.hpp"
+#include <QDir>
+#define QTMApplication QTWKApplication
+#define QTMCoreApplication QTWKCoreApplication
+#elif defined(QTTEXMACS)
 #include "Qt/QTMApplication.hpp"
 #include "Qt/qt_utilities.hpp"
 #include <QDir>
@@ -483,6 +489,7 @@ set_global_options  (int argc, char** argv)  {
 #endif
   // End options via environment variables
 
+#if defined(QTTEXMACS)
   // Further user preferences
   string native= (gui_version () == "qt4"? string ("on"): string ("off"));
   string unify = (gui_version () == "qt4"? string ("on"): string ("off"));
@@ -497,6 +504,7 @@ set_global_options  (int argc, char** argv)  {
   use_mini_bars      = get_preference ("use minibars",         mini) == "on";
   if (!use_native_menubar) use_unified_toolbar= false;
   // End user preferences
+#endif
 }
  
 /******************************************************************************

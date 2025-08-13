@@ -28,7 +28,12 @@
 #include "qt_utilities.hpp"
 #include "qt_renderer.hpp"
 #include "qt_gui.hpp"
-#include "qt_picture.hpp"
+#ifdef MUPDF_RENDERER
+  #include "MuPDF/mupdf_picture.hpp"
+  #include "MuPDF/mupdf_renderer.hpp"
+#else
+  #include "qt_picture.hpp"
+#endif
 
 #include "qt_dialogues.hpp"
 #include "qt_simple_widget.hpp"

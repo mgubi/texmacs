@@ -133,7 +133,7 @@ process_all_cmdlines () {
 /******************************************************************************
 * Routines for cmdline_links
 ******************************************************************************/
-
+#if defined (QTTEXMACS)
 #ifndef OS_MINGW
 void
 execute_shell (string s) {
@@ -146,6 +146,10 @@ execute_shell (string s) {
   execve ("/bin/sh", argv, environ);
 }
 #endif
+#else
+void
+execute_shell (string s);
+#endif 
 
 string
 cmdline_link_rep::start () {

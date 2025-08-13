@@ -14,7 +14,12 @@
 #if QT_VERSION >= 0x060000
 
 #include "QTMIconManager.hpp"
-#include "qt_picture.hpp"
+#ifdef MUPDF_RENDERER
+  #include "MuPDF/mupdf_picture.hpp"
+  #include "MuPDF/mupdf_renderer.hpp"
+#else
+  #include "qt_picture.hpp"
+#endif
 #include "qt_utilities.hpp"
 
 bool may_transform (url file_name, const QImage& pm);

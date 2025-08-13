@@ -193,6 +193,12 @@ client_start (string host) {
 }
 
 int
+legacy_client_start (string host, int port) {
+  io_error << "sockets are not implemented";
+  return -1;
+}
+
+int
 tls_client_start (string host, scheme_tree args) {
   io_error << "sockets are not implemented";
   return -1;
@@ -208,9 +214,10 @@ client_read (int fd) {
   return "";
 }
 
-void
+int
 client_write (int fd, string s) {
   io_error << "sockets are not implemented";
+  return 0;
 }
 
 void

@@ -16,19 +16,24 @@ AC_DEFUN([TM_GUI],[
   CONFIG_X11=""
   CONFIG_COCOA=""
   CONFIG_GUI="X11"
+  CONFIG_QTPIPES="no"
 
-  AC_ARG_ENABLE(qt,
-  [  --disable-qt            replace Qt by X11 interface],
-      [], [enable_qt="yes"])
+  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl],
+            gui_selector="$withval", gui_selector="qt")
 
-  case "$enable_qt" in
-      yes)
+  case "$gui_selector" in
+      qt | qtwk)
          LC_WITH_QT
          if test x"$at_cv_qt_build" = xko; then 
             AC_MSG_ERROR([cannot find Qt!])
          else
-            AC_MSG_RESULT([enabling Qt port])
-            CONFIG_GUI="QT"
+            if test x"$gui_selector" = xqt; then
+               AC_MSG_RESULT([enabling Qt port])
+               CONFIG_GUI="QT"
+            else 
+               AC_MSG_RESULT([enabling Qt port with Widkit])
+               CONFIG_GUI="QTWK"
+            fi
             if test x"$CONFIG_OS" = xMACOS; then
                # on Mac we rely on some ObjC code contained in 
                # src/Plugins/MacOS    
@@ -40,20 +45,35 @@ AC_DEFUN([TM_GUI],[
             else QT_PLUGINS_LIST="accessible,imageformats"
             fi
          fi
+         CONFIG_QTPIPES="yes"
          ;;
-      no)
-         CONFIG_QTPIPES="no"
+      x11)
          AC_MSG_RESULT([enabling X11 port])
          LC_X_HEADERS
          AC_PATH_X
          AC_PATH_XTRA
          ;;
+      cocoa)
+         AC_MSG_RESULT([enabling experimental Cocoa port])
+         COCOA_CFLAGS=""
+         COCOA_LDFLAGS="-framework Cocoa"
+         CONFIG_GUI="COCOA"
+         ;;
+      sdl) 
+         AC_MSG_RESULT([enabling experimental SDL port])
+         LC_SDL2
+         AC_MSG_RESULT([SDL2_CFLAGS=$SDL2_CFLAGS])
+         AC_MSG_RESULT([SDL2_LDFLAGS=$SDL2_LDFLAGS])
+         AC_MSG_RESULT([SDL2_LIBS=$SDL2_LIBS])
+         SDL_CFLAGS="$SDL2_CFLAGS"
+         SDL_LDFLAGS="$SDL2_LDFLAGS"
+         SDL_LIBS="$SDL2_LIBS"
+         CONFIG_GUI="SDL"
+         ;;
       *)
-         CONFIG_QTPIPES="no"
-         AC_MSG_ERROR([bad option --enable-qt=$enable_qt])
+         AC_MSG_ERROR([bad option --with-gui=$gui_selector])
          ;;
   esac
-
 
   # Qt Pipes
   AC_ARG_ENABLE(qtpipes,
@@ -62,12 +82,15 @@ AC_DEFUN([TM_GUI],[
 
   case "$enable_qtpipes" in
       yes)
-         if test x"$CONFIG_GUI" = xQT; then
-            AC_DEFINE(QTPIPES, 1, [Enabling Qt pipes])
-            AC_MSG_RESULT([enabling Qt pipes])
-         else
-            AC_MSG_ERROR([QT not enabled!])
-         fi
+         case "$CONFIG_GUI" in
+            QT | QTWK )
+               AC_DEFINE(QTPIPES, 1, [Enabling Qt pipes])
+               AC_MSG_RESULT([enabling Qt pipes])
+               ;;
+            *)
+               AC_MSG_ERROR([QT not enabled!])
+               ;;
+         esac
          ;;
       no)
          if test x"$CONFIG_GUI" = xQT; then
@@ -79,24 +102,6 @@ AC_DEFUN([TM_GUI],[
          ;;
   esac
 
-  AC_ARG_ENABLE(cocoa,
-  [  --enable-cocoa          replace X11 by Cocoa interface],
-      [], [enable_cocoa="no"])
-  case "$enable_cocoa" in
-      yes)
-         AC_MSG_RESULT([enabling experimental Cocoa port])
-         COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa"
-         CONFIG_GUI="COCOA"
-         ;;
-      no)
-         AC_MSG_RESULT([disabling experimental Cocoa port])
-         ;;
-      *)
-         AC_MSG_ERROR([bad option --enable-cocoa=$enable_cocoa])
-         ;;
-  esac
-
   case "$CONFIG_GUI" in
       X11)
          CONFIG_X11="X11 Widkit"
@@ -104,30 +109,46 @@ AC_DEFUN([TM_GUI],[
            CONFIG_X11="$CONFIG_X11 Ghostscript"
          fi
          CONFIG_GUI_DEFINE="X11TEXMACS"
-          AC_DEFINE(X11TEXMACS, 1, [Use standard X11 port])
+         AC_DEFINE(X11TEXMACS, 1, [Use standard X11 port])
          ;;
       COCOA)
          CONFIG_COCOA="Cocoa"
          CONFIG_GUI_DEFINE="AQUATEXMACS"
-          AC_DEFINE(AQUATEXMACS, 1, [Enable experimental Cocoa port])
+         AC_DEFINE(AQUATEXMACS, 1, [Enable experimental Cocoa port])
          ;;
       QT)
          CONFIG_QT="Qt"
          CONFIG_GUI_DEFINE="QTTEXMACS"
-          AC_DEFINE(QTTEXMACS, 1, [Enable experimental Qt port])
+         AC_DEFINE(QTTEXMACS, 1, [Enable standard Qt port])
+         ;;
+      QTWK)
+         CONFIG_QT="Qtwk Widkit"
+         # HACK!
+         CONFIG_GUI_DEFINE="QTWKTEXMACS -DQTTEXMACS" 
+         AC_DEFINE(QTTEXMACS, 1, [Enable Qt port])
+         AC_DEFINE(QTWKTEXMACS, 1, [Enable experimental Qt port with Widkit])
+         ;;
+      SDL)
+         CONFIG_SDL="SDL Widkit"
+         CONFIG_GUI_DEFINE="SDLTEXMACS"
+         AC_DEFINE(SDLTEXMACS, 1, [Enable experimental SDL port])
          ;;
   esac
-
-  AC_SUBST(COCOA_CFLAGS)
-  AC_SUBST(COCOA_LDFLAGS)
 
   AC_SUBST(CONFIG_X11)
   AC_SUBST(CONFIG_COCOA)
   AC_SUBST(CONFIG_QT)
+  AC_SUBST(CONFIG_SDL)
   AC_SUBST(CONFIG_GUI)
   AC_SUBST(CONFIG_GUI_DEFINE)
 
   AC_SUBST(QT_FRAMEWORKS_PATH)  
   AC_SUBST(QT_PLUGINS_PATH)
   AC_SUBST(QT_PLUGINS_LIST)
+
+  AC_SUBST(COCOA_CFLAGS)
+  AC_SUBST(COCOA_LDFLAGS)
+
+  AC_SUBST(SDL_CFLAGS)
+  AC_SUBST(SDL_LDFLAGS)
 ])

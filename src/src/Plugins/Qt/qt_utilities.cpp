@@ -44,7 +44,14 @@
 #include "scheme.hpp"
 #include "wencoding.hpp"
 
+#if  defined(QTWKTEXMACS)
+#define center TEXMACS_center // avoid name clash
+#include "../Qtwk/qtwk_gui.hpp"    // gui_maximal_extents()
+#undef center
+#elif defined(QTTEXMACS)
 #include "qt_gui.hpp"    // gui_maximal_extents()
+#endif
+
 #include "editor.hpp"
 #include "new_view.hpp"  // get_current_editor()
 

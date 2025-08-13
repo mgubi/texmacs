@@ -15,9 +15,11 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 
+#if defined(QTTEXMACS)
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#endif
 
 void setup_texmacs_path () {
   string environment_texmacs_path;

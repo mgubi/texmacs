@@ -47,16 +47,19 @@ CXXICONV = @ICONV_CXX@
 CXXGUILE = @GUILE_CFLAGS@
 CXXSPARKLE = @SPARKLE_CXX@ @SPARKLE_CPP@
 CXXPDF = @PDF_CFLAGS@
+CXXMUPDF = @MUPDF_CFLAGS@
+CXXSDL = @SDL_CFLAGS@
 
 LD = @CXX@
 LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE)
-LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @LIBS@ 
+LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ 
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
 LDX11 =
 LDCOCOA = @COCOA_LDFLAGS@
 LDQT = @QT_LIBS@
+LDSDL = @SDL_LDFLAGS@
 LDGUI = $(LD@CONFIG_GUI@)
 LDGNUTLS= @GNUTLS_LDFLAGS@
 
@@ -109,6 +112,10 @@ cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
 qt_src       := $(call findsrc_in,Plugins,@CONFIG_QT@)
+ifeq "@CONFIG_QT@" "Qtwk Widkit"
+qt_src :=  $(qt_src) qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
+           QTMPipeLink.cpp QTMSockets.cpp 
+endif
 gs_src       := $(call findsrc_in,Plugins,@CONFIG_GS@)
 style_src    := $(call findsrc_in,Style,@CONFIG_EXPERIMENTAL@)
 typeset_src  := $(call findsrc,Typeset)
@@ -119,6 +126,8 @@ pdf_src      := $(call findsrc_in,Plugins,@CONFIG_PDF@)
 pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
+mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
+sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
 
 # Each makefile will have its own Deps directory. Okay that is a bit
 # inefficient, but that is much simpler to maintain.
@@ -136,7 +145,7 @@ texmacs_cpp_deps := $(call make_cpp_deps,$(system_src) $(kernel_src) $(data_src)
  $(edit_src) $(scheme_src) $(graphics_src)\
  $(plugins_src) $(x11_src) $(texmacs_src)\
  $(typeset_src) $(style_src) $(qt_src) $(gs_src) $(os_src)\
- $(pdf_src) $(freetype_src) $(gnutls_src))
+ $(pdf_src) $(freetype_src) $(mupdf_src) $(sdl_src) $(gnutls_src))
 texmacs_m_deps += $(call make_m_deps,$(cocoa_m_src))
 texmacs_mm_deps += $(call make_mm_deps,$(cocoa_mm_src))
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
@@ -181,6 +190,8 @@ pdf_incl      := $(system_incl) \
   $(call incl_flags,Plugins/Pdf/LibAesgm Texmacs/Data)
 freetype_incl := $(system_incl)
 gnutls_incl   := $(system_incl)
+mupdf_incl    := $(system_incl)
+sdl_incl      := $(system_incl)
 
 ###############################################################################
 # MOC files
@@ -189,21 +200,32 @@ gnutls_incl   := $(system_incl)
 # moc source files are generated for each header present in $(qt_moc) and
 # put in the Plugins/Qt directory
 
-ifeq "@CONFIG_QT@" ""
-qt_moc := 
-else
+ifeq "@CONFIG_QT@" "Qt"
 qt_moc := QTMStyle.hpp QTMGuiHelper.hpp QTMInteractiveInputHelper.hpp \
   QTMMenuHelper.hpp QTMWidget.hpp  QTMWindow.hpp QTMScrollView.hpp \
   QTMPipeLink.hpp QTMInteractivePrompt.hpp QTMFileDialog.hpp \
   QTMPrintDialog.hpp QTMPrinterSettings.hpp QTMApplication.hpp \
   QTMTreeModel.hpp QTMSockets.hpp QTMMainTabWindow.hpp QTMWaitDialog.hpp \
   QTMToolbar.hpp
+qtwk_moc :=
+else ifeq "@CONFIG_QT@" "Qtwk Widkit"
+qt_moc :=  QTMSockets.hpp QTMPipeLink.hpp 
+qtwk_moc :=  QTWKGuiHelper.hpp QTWKWindow.hpp QTWKApplication.hpp
+else
+qt_moc := 
+qtwk_moc :=
 endif
 
 qt_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qt_moc))
 qt_moc_paths = $(patsubst %,./Plugins/Qt/%,$(qt_moc_src))
 
 $(qt_moc_paths): ./Plugins/Qt/moc_%.cpp: ./Plugins/Qt/%.hpp
+	$(MOC) $(MOCFLAGS) $< -o $@
+
+qtwk_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qtwk_moc))
+qtwk_moc_paths = $(patsubst %,./Plugins/Qtwk/%,$(qtwk_moc_src))
+
+$(qtwk_moc_paths): ./Plugins/Qtwk/moc_%.cpp: ./Plugins/Qtwk/%.hpp
 	$(MOC) $(MOCFLAGS) $< -o $@
 
 ###############################################################################
@@ -289,6 +311,7 @@ cocoa_m_obj  := $(call makeobj_m,$(cocoa_m_src))
 cocoa_mm_obj := $(call makeobj_mm,$(cocoa_mm_src))
 os_obj       := $(call makeobj,$(os_src))
 moc_obj	     := $(call makeobj,$(qt_moc_src))
+moc_obj_2	 := $(call makeobj,$(qtwk_moc_src))
 qt_obj 	     := $(filter-out $(moc_obj), $(call makeobj,$(qt_src)))
 gs_obj       := $(call makeobj,$(gs_src))
 plugins_obj  := $(call makeobj,$(plugins_src))
@@ -298,6 +321,8 @@ style_obj    := $(call makeobj,$(style_src))
 pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
 gnutls_obj   := $(call makeobj,$(gnutls_src))
+mupdf_obj    := $(call makeobj,$(mupdf_src))
+sdl_obj      := $(call makeobj,$(sdl_src))
 
 # To enforce some degree of modularity, each object file must be
 # compiled with only a specific set of include flags. To achieve that,
@@ -352,6 +377,8 @@ $(qt_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
 $(moc_obj): Objects/%.o: ./Plugins/Qt/%.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
+$(moc_obj_2): Objects/%.o: ./Plugins/Qtwk/%.cpp
+	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
 $(gs_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gs_incl)  $(CXXX11))
 $(cocoa_m_obj): Objects/%.o: %.m
@@ -368,6 +395,10 @@ $(pdf_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(pdf_incl) $(CXXFREETYPE) $(CXXPDF) $(CXXGUI))
 $(freetype_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
+$(mupdf_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(mupdf_incl) $(CXXFREETYPE) $(CXXMUPDF))
+$(sdl_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(sdl_incl) $(CXXMUPDF) $(CXXSDL))
 $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
@@ -420,7 +451,7 @@ uses_graphics := $(graphics_obj)
 uses_plugins  := $(plugins_obj) $(plugins_c_obj)
 uses_x11      := $(x11_obj)
 uses_os       := $(os_obj)
-uses_qt       := $(qt_obj) $(moc_obj)
+uses_qt       := $(qt_obj) $(moc_obj) $(moc_obj_2)
 uses_gs       := $(gs_obj)
 uses_cocoa    := $(cocoa_m_obj) $(cocoa_mm_obj)
 uses_typeset  := $(typeset_obj)
@@ -431,13 +462,15 @@ uses_texmacs  := $(texmacs_obj)
 uses_pdf      := $(pdf_obj)
 uses_freetype := $(freetype_obj)
 uses_gnutls   := $(gnutls_obj)
+uses_mupdf    := $(mupdf_obj)
+uses_sdl    := $(sdl_obj)
 #"uses_windowsres" is defined above
 
 # Compilation rules
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
  plugins x11 os qt gs cocoa style typeset edit scheme texmacs pdf\
- freetype gnutls windowsres)) $(texmacs_c_deps)
+ freetype gnutls mupdf sdl windowsres)) $(texmacs_c_deps)
 
 link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
    $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) @SPARKLE_LDFLAGS@

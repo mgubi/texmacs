@@ -16,7 +16,7 @@
 #ifdef AQUATEXMACS
 #  include "Cocoa/aqua_simple_widget.h"
 #else
-#  ifdef QTTEXMACS
+#  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 #    include "Qt/qt_simple_widget.hpp"
 #  else
 #    include "Widkit/simple_wk_widget.hpp"
