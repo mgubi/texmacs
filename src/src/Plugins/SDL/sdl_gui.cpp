@@ -993,12 +993,12 @@ cout << event->button.x << "," << event->button.y << LF;
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:
     {
-      // maybe use SDL_GetKeyFromScancode
-//      SDL_Log("Keydown: %s key acting as %s key", SDL_GetScancodeName(event->key.keysym.scancode), SDL_GetKeyName(event->key.keysym.sym));
+      SDL_Keycode keycode = SDL_GetKeyFromScancode(event->key.scancode, event->key.mod, false);
+      SDL_Log("Keydown: %s key acting as %s key", SDL_GetScancodeName(event->key.scancode), SDL_GetKeyName(keycode));
       unmap_balloon ();
       sdl_window win= get_window_from_ID (event->key.windowID);
       if (win == NULL) break;
-      string key= lookup_key(event->key.key, event->key.mod);
+      string key= lookup_key(keycode, event->key.mod);
       //cout << "Press " << key << " at " << (time_t) ev->xkey.time
       //<< " (" << texmacs_time() << ")\n";
       kbd_count++;
