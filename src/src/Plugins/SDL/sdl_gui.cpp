@@ -894,14 +894,17 @@ sdl_gui_rep::process_event (SDL_Event *event) {
   switch (event->type) {
     case SDL_EVENT_WINDOW_SHOWN:
       SDL_Log("Window %d shown", event->window.windowID);
+      win= get_window_from_ID (event->window.windowID);
+      if (win) {
+        win->invalidate_all ();
+        win->repaint_invalid_regions();
+      }
       break;
     case SDL_EVENT_WINDOW_HIDDEN:
       SDL_Log("Window %d hidden", event->window.windowID);
       break;
     case SDL_EVENT_WINDOW_EXPOSED:
       SDL_Log("Window %d exposed", event->window.windowID);
-      win= get_window_from_ID (event->window.windowID);
-      if (win) win->invalidate_all ();
       break;
     case SDL_EVENT_WINDOW_MOVED:
       SDL_Log("Window %d moved to %d,%d",
@@ -1002,7 +1005,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
         unmap_balloon ();
         string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
         //        action = action * lookup_mouse (event->button.button);
-        action = action * mouse_decode (event->button.button);
+        action = action * mouse_decode (mouse_state);
         //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
         win->mouse_event (action,
                           event->button.x, event->button.y, texmacs_time ());
