@@ -80,7 +80,7 @@ public:
   sdl_gui_rep (int& argc, char** argv);
   ~sdl_gui_rep ();
   
-  void update_mouse_state (Uint32 mask = 0); // update mouse_state
+  void update_mouse_state (); // update mouse_state
 
   /********************* extents, grabbing, selections ***********************/
   void   get_extents (SI& width, SI& height);
