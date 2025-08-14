@@ -45,32 +45,34 @@ sdl_window_rep::initialize () {
   if ((win_y+ win_h) > gui->screen_height) win_y= gui->screen_height- win_h;
   if (win_y < 0) win_y=0;
   
+  SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY;
   if (name == NULL) {
     name= const_cast<char*> ("popup");
-    win= SDL_CreateWindow (name, win_w, win_h,
-                           SDL_WINDOW_BORDERLESS
-                           | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-
+    flags |= SDL_WINDOW_BORDERLESS;
   } else {
-    win= SDL_CreateWindow (name, win_w, win_h,
-                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    flags |= SDL_WINDOW_RESIZABLE;
   }
-  sdl_ren= SDL_CreateRenderer (win, NULL);
+  
+  if (!SDL_CreateWindowAndRenderer (name, win_w, win_h, flags, &sdl_win, &sdl_ren)) {
+    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
+  }
+  
+//  sdl_ren= SDL_CreateRenderer (win, NULL);
   
   if (the_name == "") {
     the_name= name;
     mod_name= name;
   }
 
-  SDL_SetWindowPosition (win, win_x, win_y), 
-  SDL_SetWindowMaximumSize (win, max_w, max_h);
-  SDL_SetWindowMinimumSize (win, min_w, min_h);
+  SDL_SetWindowPosition (sdl_win, win_x, win_y),
+  SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
+  SDL_SetWindowMinimumSize (sdl_win, min_w, min_h);
 
   backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   
   nr_windows++;
-  Window_to_window (win)= (void*) this;
+  Window_to_window (sdl_win)= (void*) this;
   id= serial++;
   id_to_window (id)= this;
   
@@ -79,7 +81,7 @@ sdl_window_rep::initialize () {
   notify_position (w, 0, 0);
   notify_size (w, Def_w,  Def_h);
 
-  gui->created_window (win);
+  gui->created_window (sdl_win);
   cout << "create window " << id << LF;
 }
 
@@ -105,11 +107,11 @@ sdl_window_rep::~sdl_window_rep () {
   id_to_window->reset (id);
   id= 0;
   set_identifier (w, 0); // FIXME: is this ok?
-  Window_to_window->reset (win);
+  Window_to_window->reset (sdl_win);
   nr_windows--;
-  gui->deleted_window (win);
-  SDL_DestroyWindow (win);
+  gui->deleted_window (sdl_win);
   SDL_DestroyRenderer (sdl_ren);
+  SDL_DestroyWindow (sdl_win);
   delete_renderer (ren);
 }
 
@@ -126,7 +128,7 @@ get_Window (widget w) {
     FAILED ("widget is not attached to a window");
   }
   sdl_window w2= (sdl_window)id_to_window [id];
-  return w2->win;
+  return w2->sdl_win;
 }
 
 sdl_window
@@ -155,7 +157,7 @@ get_window (int id) {
 void
 sdl_window_rep::get_position (SI& x, SI& y) {
   int xx, yy;
-  SDL_GetWindowPosition (win, &xx, &yy);
+  SDL_GetWindowPosition (sdl_win, &xx, &yy);
   x=  xx*PIXEL;
   y= -yy*PIXEL;
 }
@@ -181,14 +183,14 @@ sdl_window_rep::set_position (SI x, SI y) {
   if (y<0) y=0;
   win_x= x;
   win_y= y;
-  SDL_SetWindowPosition (win, win_x, win_y);
+  SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
 void
 sdl_window_rep::set_size (SI w, SI h) {
   w= w/PIXEL; h= h/PIXEL;
   //h=-h; ren->decode (w, h);
-  SDL_SetWindowSize (win, w, h);
+  SDL_SetWindowSize (sdl_win, w, h);
 }
 
 void
@@ -198,15 +200,15 @@ sdl_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
   min_w= min_w/PIXEL; min_h= min_h/PIXEL;
   max_w= max_w/PIXEL; max_h= max_h/PIXEL;
-  SDL_SetWindowMaximumSize (win, max_w, max_h);
-  SDL_SetWindowMinimumSize (win, min_w, min_h);
+  SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
+  SDL_SetWindowMinimumSize (sdl_win, min_w, min_h);
 }
 
 void
 sdl_window_rep::set_name (string name) {
   if (the_name != name) {
     c_string s (name);
-    SDL_SetWindowTitle (win, s);
+    SDL_SetWindowTitle (sdl_win, s);
     the_name= name;
     mod_name= name;
   }
@@ -222,15 +224,15 @@ sdl_window_rep::set_modified (bool flag) {
   string name= (flag? (the_name * " *"): the_name);
   if (mod_name != name) {
     c_string s (name);
-    SDL_SetWindowTitle (win, s);
+    SDL_SetWindowTitle (sdl_win, s);
     mod_name= name;
   }
 }
 
 void
 sdl_window_rep::set_visibility (bool flag) {
-  if (flag) SDL_ShowWindow (win);
-  else SDL_HideWindow (win);
+  if (flag) SDL_ShowWindow (sdl_win);
+  else SDL_HideWindow (sdl_win);
 }
 
 void
@@ -240,27 +242,27 @@ sdl_window_rep::set_full_screen (bool flag) {
   if (old_name == "")
     old_name= as_string (name);
   if (flag) {
-    save_win= win;
+    save_win= sdl_win;
     name= NULL;
     save_x= win_x; save_y= win_y;
     save_w= win_w; save_h= win_h;
 //    initialize ();
-    SDL_SetWindowFullscreen (win,  SDL_WINDOW_FULLSCREEN);
+    SDL_SetWindowFullscreen (sdl_win,  SDL_WINDOW_FULLSCREEN);
     move_event   (0, 0);
     resize_event (gui->screen_width, gui->screen_height);
     set_visibility (true);
 //    XSetInputFocus (dpy, win, PointerRoot, CurrentTime);
   }
   else {
-    SDL_SetWindowFullscreen (win,  0);
-    win= save_win;
+    SDL_SetWindowFullscreen (sdl_win,  0);
+    sdl_win= save_win;
     //FIXME: is this 'as_charp' a possible memory leak?
     name= as_charp (old_name);
     win_x= save_x; win_y= save_y;
     win_w= save_w; win_h= save_h;
     set_visibility (true);
-    SDL_SetWindowPosition (win, save_x, save_y);
-    SDL_SetWindowSize (win, save_w, save_h);
+    SDL_SetWindowPosition (sdl_win, save_x, save_y);
+    SDL_SetWindowSize (sdl_win, save_w, save_h);
     resize_event (save_w, save_h);
     move_event   (save_x, save_y);
   }
@@ -322,7 +324,7 @@ sdl_window_rep::focus_in_event () {
 //  SDL_SetWindowKeyboardGrab (win, SDL_TRUE);
   has_focus= true;
   notify_keyboard_focus (kbd_focus, true);
-  gui->focussed_window (win);
+  gui->focussed_window (sdl_win);
 }
 
 void
@@ -346,9 +348,9 @@ sdl_window_rep::mouse_event (string ev, int x, int y, time_t t) {
   else {
     sdl_window grab_win= get_sdl_window (gui->grab_ptr->item);
     int gw_x, gw_y;
-    SDL_GetWindowPosition (grab_win->win, &gw_x, &gw_y);
+    SDL_GetWindowPosition (grab_win->sdl_win, &gw_x, &gw_y);
     int w_x, w_y;
-    SDL_GetWindowPosition (win, &w_x, &w_y);
+    SDL_GetWindowPosition (sdl_win, &w_x, &w_y);
     if (this != grab_win) {
 //      x += win_x - grab_win->win_x;
 //      y += win_y - grab_win->win_y;
@@ -369,7 +371,7 @@ sdl_window_rep::repaint_invalid_regions () {
   int bs_h= backing_store->get_height();
 
   int new_bs_w, new_bs_h;
-  SDL_GetWindowSize (win, &new_bs_w, &new_bs_h);
+  SDL_GetWindowSize (sdl_win, &new_bs_w, &new_bs_h);
   new_bs_w *= retina_factor;
   new_bs_h *= retina_factor;
   

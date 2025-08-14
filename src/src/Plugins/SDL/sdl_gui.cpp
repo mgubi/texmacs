@@ -164,7 +164,7 @@ sdl_gui_rep::release_mouse_grab () {
   else {
     sdl_window grab_win= get_sdl_window (new_widget);
     notify_mouse_grab (new_widget, true);
-    SDL_RaiseWindow (grab_win->win);
+    SDL_RaiseWindow (grab_win->sdl_win);
     SDL_CaptureMouse (true);
     // SDL_SetWindowGrab (grab_win->win, true);
     // cout << "---> release_mouse_grab: next grab " <<  new_widget  << "\n";
@@ -887,7 +887,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
           int ox,oy;
           update_mouse_state ();
           SDL_GetGlobalMouseState (&x, &y);
-          SDL_GetWindowPosition (win->win, &ox, &oy);
+          SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
           x -= ox; y -= oy;
           win->mouse_event ("enter", x, y, event->window.timestamp);
         }
@@ -904,7 +904,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
           int ox,oy;
           update_mouse_state ();
           SDL_GetGlobalMouseState (&x, &y);
-          SDL_GetWindowPosition(win->win, &ox, &oy);
+          SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
           x -= ox; y -= oy;
           win->mouse_event ("leave", x, y, event->window.timestamp);
         }

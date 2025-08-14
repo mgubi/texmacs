@@ -34,7 +34,7 @@ public:
   string           the_name;
   string           mod_name;
 
-  SDL_Window*   win;
+  SDL_Window*   sdl_win;
 
   renderer      ren;
   
