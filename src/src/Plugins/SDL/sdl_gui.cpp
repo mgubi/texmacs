@@ -35,8 +35,9 @@ void initialize_keyboard ();
 ******************************************************************************/
 
 sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
-  : selection_t ("none"), selection_s (""), selection_w ((SDL_Window*) 0),
-    mouse_state (0)
+  : mouse_state (0), selection_t ("none"), selection_s (""),
+    selection_w ((SDL_Window*) 0)
+    
 {
   the_gui= this;
   
@@ -110,6 +111,7 @@ sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   // cout << "emulate_leave_enter mouse_state " << mouse_state << LF;
   //SDL_PumpEvents();  // make sure we have the latest mouse state.
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
+  (void) buttons;
   // cout << "emulate_leave_enter buttons " << buttons << LF;
   //update_mouse_state ();
 
@@ -156,7 +158,7 @@ sdl_gui_rep::release_mouse_grab () {
   grab_ptr= grab_ptr->next;
   widget new_widget; if (!is_nil (grab_ptr)) new_widget= grab_ptr->item;
   if (is_nil (grab_ptr)) {
-    SDL_Window *win= SDL_GetGrabbedWindow ();
+    // SDL_Window *win= SDL_GetGrabbedWindow ();
     // if (win) SDL_SetWindowGrab (win, false);
     SDL_CaptureMouse (false);
     // cout << "---> release_mouse_grab: no grab\n";
@@ -966,16 +968,10 @@ cout << event->button.x << "," << event->button.y << LF;
       sdl_window win= get_window_from_ID (event->button.windowID);
       if (win == NULL) break;
       unmap_balloon ();
-//      update_mouse_state ();
-//      float x,y;
-//      int ox,oy;
-//      SDL_GetGlobalMouseState (&x, &y);
-//      SDL_GetWindowPosition(win->win, &ox, &oy);
-//      x -= ox; y -= oy;
       int x, y;
       x= event->wheel.mouse_x;
       y= event->wheel.mouse_y;
-      float deltaX= event->wheel.x;
+      //float deltaX= event->wheel.x;
       float deltaY= event->wheel.y;
       if (deltaY >= 0.5) {
         win->mouse_event ("press-up", x, y, texmacs_time ());
@@ -1043,13 +1039,12 @@ bool
 sdl_gui_rep::get_selection (string key, tree& t, string& s) {
   t= "none";
   s= "";
-  bool res=false;
-
   if (selection_t->contains (key)) {
     t= copy (selection_t [key]);
     s= copy (selection_s [key]);
     return true;
   }
+  return false;
 }
 
 bool
