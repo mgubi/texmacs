@@ -81,7 +81,7 @@ sdl_gui_rep::get_max_size (SI& width, SI& height) {
   height= 6000 * PIXEL;
 }
 
-void sdl_gui_rep::update_mouse_state (Uint32 mask) {
+void sdl_gui_rep::update_mouse_state () {
   unsigned int state= 0;
 
   float x, y;
@@ -89,8 +89,6 @@ void sdl_gui_rep::update_mouse_state (Uint32 mask) {
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
   SDL_Keymod mods= SDL_GetModState();
 
-//  buttons ^= mask;
-  
   // compute state
   if ((buttons & SDL_BUTTON_LMASK) != 0)  state += 1;
   if ((buttons & SDL_BUTTON_MMASK) != 0)  state += 2;
@@ -992,22 +990,21 @@ sdl_gui_rep::process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
     {
-      update_mouse_state ( SDL_BUTTON_MASK(event->button.button) );
+      unmap_balloon ();
+      update_mouse_state ();
       // we need to take into account explicitly the current button
-#if 0
-      if (event->type == SDL_MOUSEBUTTONDOWN)
-        mouse_state = mouse_state | SDL_BUTTON (event->button.button);
-      else
-        mouse_state = mouse_state & ~SDL_BUTTON (event->button.button);
-#endif
       cout << "new mouse state " << mouse_state << LF;
       win= get_window_from_ID (event->button.windowID);
       if (win) {
-        unmap_balloon ();
-        string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
+        string action;
+        if (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+          action= "press-" * mouse_decode (mouse_state);
+        } else {
+          action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
+        }
         //FIXME: this is not yet correct, as we need to take into account modifiers
-                action = action * lookup_mouse (event->button.button);
-        //action = action * mouse_decode (mouse_state);
+        //        action = action * lookup_mouse (event->button.button);
+        cout << ">>>>>" << action << LF;
         //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
         win->mouse_event (action,
                           event->button.x, event->button.y, texmacs_time ());
@@ -1016,11 +1013,12 @@ sdl_gui_rep::process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_WHEEL:
     {
+      unmap_balloon ();
+      update_mouse_state ();
       SDL_Log("Window %d got wheel event event %f %f",
               event->wheel.windowID, event->wheel.x, event->wheel.y);
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
-        unmap_balloon ();
         int x, y;
         x= event->wheel.mouse_x;
         y= event->wheel.mouse_y;
@@ -1040,8 +1038,6 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       if (win) {
-        cout << "mouse move for win id " << win->id << LF;
-        //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
         win->mouse_event ("move",
                           event->motion.x, event->motion.y, texmacs_time ());
       }
