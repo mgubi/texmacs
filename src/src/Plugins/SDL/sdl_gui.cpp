@@ -46,6 +46,8 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
     exit (-1);
   }
   
+  SDL_SetHint (SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+  
   screen_width= 600;
   screen_height= 600;
   set_retina_factor (2);
@@ -96,8 +98,9 @@ void sdl_gui_rep::update_mouse_state (Uint32 mask) {
   if ((buttons & SDL_BUTTON_X1MASK) != 0) state += 8;
   if ((buttons & SDL_BUTTON_X2MASK) != 0) state += 16;
   if ((mods & SDL_KMOD_SHIFT) != 0) state += 256;
-  if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024;
-  if ((mods & SDL_KMOD_ALT)  != 0)  state += 2048;
+  if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024 + 4;
+  if ((mods & SDL_KMOD_ALT)  != 0)  state += 2048 + 2;
+  if ((mods & SDL_KMOD_GUI)  != 0)  state += 4096;
 //  if ((mods & SDL_KMOD_CAPS)  != 0) state += 1024;
   mouse_state= state;
 }
@@ -141,6 +144,7 @@ sdl_gui_rep::obtain_mouse_grab (widget wid) {
   grab_ptr= list<widget> (wid, grab_ptr);
   widget new_widget= grab_ptr->item;
   notify_mouse_grab (new_widget, true);
+  SDL_CaptureMouse (false);
   SDL_RaiseWindow (win);
   SDL_CaptureMouse (true);
   // SDL_SetWindowGrab (win, true);
@@ -810,9 +814,20 @@ lookup_mouse (Uint8 button) {
 }
 
 static string
+mouse_decode (unsigned int mstate) {
+  // we check (mstate & 1) at last since it is usually set
+  if (mstate & 2)       return "middle";
+  else if (mstate & 4)  return "right";
+  else if (mstate & 8)  return "up";
+  else if (mstate & 16) return "down";
+  else if (mstate & 1)  return "left";
+  return "unknown";
+}
+
+static string
 lookup_key (SDL_Keycode key, SDL_Keymod mod) {
   const char* str= SDL_GetKeyName (key);
-  string r(str, strlen(str));
+  string r (str, strlen (str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
 //  string s=r;
@@ -825,6 +840,53 @@ lookup_key (SDL_Keycode key, SDL_Keymod mod) {
   cout << "key press: " << s << LF;
   return s;
 }
+
+// Print modifier info
+static string
+print_modifiers (SDL_Keymod mod) {
+  string s;
+  s << " Modifers: [" << as_string (mod) << " ";
+  
+  // If there are none then say so and return.
+  if( mod == SDL_KMOD_NONE ){
+    s << "None ]\n";
+    return s;
+  }
+  
+  // Check for the presence of each SDLMod value
+  if( mod & SDL_KMOD_NUM )    s << "NUMLOCK ";
+  if( mod & SDL_KMOD_CAPS )   s << "CAPSLOCK ";
+  if( mod & SDL_KMOD_LCTRL )  s << "LCTRL ";
+  if( mod & SDL_KMOD_RCTRL )  s << "RCTRL ";
+  if( mod & SDL_KMOD_RSHIFT ) s << "RSHIFT ";
+  if( mod & SDL_KMOD_LSHIFT ) s << "LSHIFT ";
+  if( mod & SDL_KMOD_RALT )   s << "RALT ";
+  if( mod & SDL_KMOD_LALT )   s << "LALT ";
+  if( mod & SDL_KMOD_RGUI )   s << "RGUI ";
+  if( mod & SDL_KMOD_LGUI )   s << "LGUI ";
+  if( mod & SDL_KMOD_CTRL )   s << "CTRL ";
+  if( mod & SDL_KMOD_SHIFT )  s << "SHIFT ";
+  if( mod & SDL_KMOD_ALT )    s << "ALT ";
+  if( mod & SDL_KMOD_GUI )    s << "GUI ";
+  s << "]";
+  return s;
+}
+
+// Print all information about a key event
+static string
+print_key_info ( SDL_KeyboardEvent *key ) {
+  string s;
+  // Is it a release or a press?
+  s <<  (key->type == SDL_EVENT_KEY_UP ? "Release:- " : "Press:- ");
+  // Print the hardware scancode first
+  s << "Scancode: " << as_hexadecimal (key->scancode);
+  // Print the name of the key
+  s << ", Name: " << SDL_GetKeyName (key->key);
+  // Print modifier info
+  s << print_modifiers (key->mod);
+  return s;
+}
+
 
 void
 sdl_gui_rep::process_event (SDL_Event *event) {
@@ -954,9 +1016,11 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       if (win == NULL) break;
       unmap_balloon ();
       string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
+//      action = action * lookup_mouse (event->button.button);
+      action = action * mouse_decode (event->button.button);
 //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
 cout << event->button.x << "," << event->button.y << LF;  
-      win->mouse_event (action * lookup_mouse (event->button.button),
+      win->mouse_event (action,
             event->button.x, event->button.y,  texmacs_time ());
       break;
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -994,7 +1058,10 @@ cout << event->button.x << "," << event->button.y << LF;
     case SDL_EVENT_KEY_DOWN:
     {
       SDL_Keycode keycode = SDL_GetKeyFromScancode(event->key.scancode, event->key.mod, false);
-      SDL_Log("Keydown: %s key acting as %s key", SDL_GetScancodeName(event->key.scancode), SDL_GetKeyName(keycode));
+      {
+        c_string buf (print_key_info (&(event->key)));
+        SDL_Log("Keydown: %s ", (char*)buf);
+      }
       unmap_balloon ();
       sdl_window win= get_window_from_ID (event->key.windowID);
       if (win == NULL) break;
@@ -1002,6 +1069,7 @@ cout << event->button.x << "," << event->button.y << LF;
       //cout << "Press " << key << " at " << (time_t) ev->xkey.time
       //<< " (" << texmacs_time() << ")\n";
       kbd_count++;
+      //FIXME: conversion below loses precision from UInt64 to UInt32
       synchronize_time (event->key.timestamp);
       if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
           (kbd_count & 15) == 0)
