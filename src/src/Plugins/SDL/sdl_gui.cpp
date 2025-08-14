@@ -890,6 +890,7 @@ print_key_info ( SDL_KeyboardEvent *key ) {
 
 void
 sdl_gui_rep::process_event (SDL_Event *event) {
+  sdl_window win;
   switch (event->type) {
     case SDL_EVENT_WINDOW_SHOWN:
       SDL_Log("Window %d shown", event->window.windowID);
@@ -899,31 +900,25 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       break;
     case SDL_EVENT_WINDOW_EXPOSED:
       SDL_Log("Window %d exposed", event->window.windowID);
-      {
-        sdl_window win= get_window_from_ID (event->window.windowID);
-        if (win) win->invalidate_all ();
-      }
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->invalidate_all ();
       break;
     case SDL_EVENT_WINDOW_MOVED:
       SDL_Log("Window %d moved to %d,%d",
               event->window.windowID, event->window.data1,
               event->window.data2);
-      {
-        sdl_window win= get_window_from_ID (event->window.windowID);
-        if (win) win->move_event (event->window.data1, event->window.data2);
-      }
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->move_event (event->window.data1, event->window.data2);
       break;
     case SDL_EVENT_WINDOW_RESIZED:
       SDL_Log("Window %d resized to %dx%d",
               event->window.windowID, event->window.data1,
               event->window.data2);
-      {
-        sdl_window win= get_window_from_ID (event->window.windowID);
-        if (win) {
-          win->resize_event (event->window.data1, event->window.data2);
-          win->invalidate_all ();
-        }
-      }       
+      win= get_window_from_ID (event->window.windowID);
+      if (win) {
+        win->resize_event (event->window.data1, event->window.data2);
+        win->invalidate_all ();
+      }
       break;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
       SDL_Log("Window %d pixel size changed to %dx%d",
@@ -943,63 +938,53 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       SDL_Log("Mouse entered window %d",
               event->window.windowID);
         //unmap_balloon ();
-      {
-        sdl_window win= get_window_from_ID (event->window.windowID);
-        if (win) {
-          // FIXME: not quite right
-          float x,y;
-          int ox,oy;
-          update_mouse_state ();
-          SDL_GetGlobalMouseState (&x, &y);
-          SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
-          x -= ox; y -= oy;
-          win->mouse_event ("enter", x, y, texmacs_time ());
-        }
+      win= get_window_from_ID (event->window.windowID);
+      if (win) {
+        // FIXME: not quite right
+        float x,y;
+        int ox,oy;
+        update_mouse_state ();
+        SDL_GetGlobalMouseState (&x, &y);
+        SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
+        x -= ox; y -= oy;
+        win->mouse_event ("enter", x, y, texmacs_time ());
       }
         break;
-      case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-        SDL_Log("Mouse left window %d", event->window.windowID);
-        //unmap_balloon ();
-      {
-        sdl_window win= get_window_from_ID (event->window.windowID);
-        if (win) {
-          // FIXME: not quite right
-          float x,y;
-          int ox,oy;
-          update_mouse_state ();
-          SDL_GetGlobalMouseState (&x, &y);
-          SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
-          x -= ox; y -= oy;
-          win->mouse_event ("leave", x, y, texmacs_time ());
-        }
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+      SDL_Log("Mouse left window %d", event->window.windowID);
+      //unmap_balloon ();
+      win= get_window_from_ID (event->window.windowID);
+      if (win) {
+        // FIXME: not quite right
+        float x,y;
+        int ox,oy;
+        update_mouse_state ();
+        SDL_GetGlobalMouseState (&x, &y);
+        SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
+        x -= ox; y -= oy;
+        win->mouse_event ("leave", x, y, texmacs_time ());
       }
-        break;
-      case SDL_EVENT_WINDOW_FOCUS_GAINED:
-        SDL_Log("Window %d gained keyboard focus",
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      SDL_Log("Window %d gained keyboard focus",
+              event->window.windowID);
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->focus_in_event ();
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+      SDL_Log("Window %d lost keyboard focus",
                 event->window.windowID);
-        {
-          sdl_window win= get_window_from_ID (event->window.windowID);
-          if (win) win->focus_in_event ();
-        }
-        break;
-      case SDL_EVENT_WINDOW_FOCUS_LOST:
-        SDL_Log("Window %d lost keyboard focus",
-                event->window.windowID);
-        {
-          sdl_window win= get_window_from_ID (event->window.windowID);
-          if (win) win->focus_out_event ();
-        }
-        break;
-      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-        SDL_Log("Window %d close requested", event->window.windowID);
-        {
-          sdl_window win= get_window_from_ID (event->window.windowID);
-          if (win) win->destroy_event();
-        }
-        break;
-      case SDL_EVENT_WINDOW_HIT_TEST:
-        SDL_Log("Window %d has a special hit test", event->window.windowID);
-        break;
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->focus_out_event ();
+      break;
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      SDL_Log("Window %d close requested", event->window.windowID);
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->destroy_event();
+      break;
+    case SDL_EVENT_WINDOW_HIT_TEST:
+      SDL_Log("Window %d has a special hit test", event->window.windowID);
+      break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
     {
@@ -1012,35 +997,35 @@ sdl_gui_rep::process_event (SDL_Event *event) {
         mouse_state = mouse_state & ~SDL_BUTTON (event->button.button);
 #endif
       cout << "new mouse state " << mouse_state << LF;
-      sdl_window win= get_window_from_ID (event->button.windowID);
-      if (win == NULL) break;
-      unmap_balloon ();
-      string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
-//      action = action * lookup_mouse (event->button.button);
-      action = action * mouse_decode (event->button.button);
-//      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
-cout << event->button.x << "," << event->button.y << LF;  
-      win->mouse_event (action,
-            event->button.x, event->button.y,  texmacs_time ());
+      win= get_window_from_ID (event->button.windowID);
+      if (win) {
+        unmap_balloon ();
+        string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
+        //        action = action * lookup_mouse (event->button.button);
+        action = action * mouse_decode (event->button.button);
+        //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
+        win->mouse_event (action,
+                          event->button.x, event->button.y, texmacs_time ());
+      }
       break;
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_WHEEL:
     {
       SDL_Log("Window %d got wheel event event %f %f",
-              event->window.windowID, event->wheel.x, event->wheel.y);
-
-      sdl_window win= get_window_from_ID (event->button.windowID);
-      if (win == NULL) break;
-      unmap_balloon ();
-      int x, y;
-      x= event->wheel.mouse_x;
-      y= event->wheel.mouse_y;
-      //float deltaX= event->wheel.x;
-      float deltaY= event->wheel.y;
-      if (deltaY >= 0.5) {
-        win->mouse_event ("press-up", x, y, texmacs_time ());
-      } else if (deltaY <= -0.5) {
-        win->mouse_event ("press-down", x, y, texmacs_time ());
+              event->wheel.windowID, event->wheel.x, event->wheel.y);
+      win= get_window_from_ID (event->wheel.windowID);
+      if (win) {
+        unmap_balloon ();
+        int x, y;
+        x= event->wheel.mouse_x;
+        y= event->wheel.mouse_y;
+        //float deltaX= event->wheel.x;
+        float deltaY= event->wheel.y;
+        if (deltaY >= 0.5) {
+          win->mouse_event ("press-up", x, y, texmacs_time ());
+        } else if (deltaY <= -0.5) {
+          win->mouse_event ("press-down", x, y, texmacs_time ());
+        }
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
@@ -1048,7 +1033,7 @@ cout << event->button.x << "," << event->button.y << LF;
     {
       unmap_balloon ();
       update_mouse_state ();
-      sdl_window win= get_window_from_ID (event->motion.windowID);
+      win= get_window_from_ID (event->motion.windowID);
       if (win == NULL) break;
 //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
       win->mouse_event ("move",
@@ -1063,20 +1048,21 @@ cout << event->button.x << "," << event->button.y << LF;
         SDL_Log("Keydown: %s ", (char*)buf);
       }
       unmap_balloon ();
-      sdl_window win= get_window_from_ID (event->key.windowID);
-      if (win == NULL) break;
-      string key= lookup_key(keycode, event->key.mod);
-      //cout << "Press " << key << " at " << (time_t) ev->xkey.time
-      //<< " (" << texmacs_time() << ")\n";
-      kbd_count++;
-      //FIXME: conversion below loses precision from UInt64 to UInt32
-      synchronize_time (event->key.timestamp);
-      if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
-          (kbd_count & 15) == 0)
-        request_partial_redraw= true;
-      //cout << "key   : " << key << "\n";
-      //cout << "redraw: " << request_partial_redraw << "\n";
-      if (N(key)>0) win->key_event (key);
+      win= get_window_from_ID (event->key.windowID);
+      if (win) {
+        string key= lookup_key(keycode, event->key.mod);
+        //cout << "Press " << key << " at " << (time_t) ev->xkey.time
+        //<< " (" << texmacs_time() << ")\n";
+        kbd_count++;
+        //FIXME: conversion below loses precision from UInt64 to UInt32
+        synchronize_time (event->key.timestamp);
+        if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
+            (kbd_count & 15) == 0)
+          request_partial_redraw= true;
+        //cout << "key   : " << key << "\n";
+        //cout << "redraw: " << request_partial_redraw << "\n";
+        if (N(key)>0) win->key_event (key);
+      }
       break;
     } // case SDL_EVENT_KEY_DOWN:
   } // switch (event->type)
