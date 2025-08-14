@@ -16,7 +16,7 @@
 #include "string.hpp"
 #include "scheme.hpp"
 #include "server_log.hpp"
-#include "gnutls.hpp"
+#include <Gnutls/gnutls.hpp>
 
 // TeXmacs server and client
 void   server_start ();
