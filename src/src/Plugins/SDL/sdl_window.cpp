@@ -440,15 +440,8 @@ sdl_window_rep::repaint_invalid_regions () {
       SDL_Surface *surf= get_backing_store ();
       SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
       SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_NONE);
-      SDL_FRect srcrect;
-      srcrect.x= 0; srcrect.y= 0;
-      srcrect.w= surf->w; srcrect.h= surf->h;
-      SDL_FRect destrect;
-      destrect.x= 0; destrect.y= 0;
-      destrect.w= surf->w*2; destrect.h= surf->h*2;
       SDL_RenderClear (sdl_ren);
-      SDL_RenderTexture (sdl_ren, tex, &srcrect, &srcrect);
-      //    SDL_RenderTexture (sdl_ren, tex, NULL, NULL);
+      SDL_RenderTexture (sdl_ren, tex, NULL, NULL);
       SDL_DestroyTexture (tex);
       unsigned char *p= (unsigned char*)surf->pixels;
       SDL_DestroySurface (surf);
