@@ -40,9 +40,9 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
 {
   the_gui= this;
   
-  if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
-          SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
-    exit(-1);
+  if (!SDL_Init (SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
+    SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
+    exit (-1);
   }
   
   screen_width= 600;
@@ -50,11 +50,12 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
   set_retina_factor (2);
 
   SDL_Rect r;
-  if (SDL_GetDisplayBounds(0, &r) != 0) {
-      SDL_Log("SDL_GetDisplayBounds failed: %s", SDL_GetError());
+  if (SDL_GetDisplayBounds (1, &r)) {
+    screen_width= r.w;
+    screen_height= r.h;
+    //cout << "SCREEN:" << screen_width << "," << screen_height << LF;
   } else {
-    screen_width= r.w/2;
-    screen_height= r.h/2;
+    SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
   }
   
   initialize_colors ();
@@ -96,7 +97,7 @@ void sdl_gui_rep::update_mouse_state (Uint32 mask) {
   if ((mods & SDL_KMOD_SHIFT) != 0) state += 256;
   if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024;
   if ((mods & SDL_KMOD_ALT)  != 0)  state += 2048;
-//  if ((mods & KMOD_CAPS)  != 0) state += 1024;
+//  if ((mods & SDL_KMOD_CAPS)  != 0) state += 1024;
   mouse_state= state;
 }
 
@@ -852,11 +853,6 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       SDL_Log("Window %d resized to %dx%d",
               event->window.windowID, event->window.data1,
               event->window.data2);
-      break;
-    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-      SDL_Log("Window %d pixel size changed to %dx%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
       {
         sdl_window win= get_window_from_ID (event->window.windowID);
         if (win) {
@@ -864,6 +860,11 @@ sdl_gui_rep::process_event (SDL_Event *event) {
           win->invalidate_all ();
         }
       }       
+      break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      SDL_Log("Window %d pixel size changed to %dx%d",
+              event->window.windowID, event->window.data1,
+              event->window.data2);
       break;
     case SDL_EVENT_WINDOW_MINIMIZED:
       SDL_Log("Window %d minimized", event->window.windowID);
@@ -965,12 +966,15 @@ cout << event->button.x << "," << event->button.y << LF;
       sdl_window win= get_window_from_ID (event->button.windowID);
       if (win == NULL) break;
       unmap_balloon ();
-      update_mouse_state ();
-      float x,y;
-      int ox,oy;
-      SDL_GetGlobalMouseState (&x, &y);
-      SDL_GetWindowPosition(win->win, &ox, &oy);
-      x -= ox; y -= oy;
+//      update_mouse_state ();
+//      float x,y;
+//      int ox,oy;
+//      SDL_GetGlobalMouseState (&x, &y);
+//      SDL_GetWindowPosition(win->win, &ox, &oy);
+//      x -= ox; y -= oy;
+      int x, y;
+      x= event->wheel.mouse_x;
+      y= event->wheel.mouse_y;
       float deltaX= event->wheel.x;
       float deltaY= event->wheel.y;
       if (deltaY >= 0.5) {

@@ -47,12 +47,12 @@ sdl_window_rep::initialize () {
   
   if (name == NULL) {
     name= const_cast<char*> ("popup");
-    win= SDL_CreateWindow (name, win_w/2, win_h/2,
+    win= SDL_CreateWindow (name, win_w, win_h,
                            SDL_WINDOW_BORDERLESS
                            | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
   } else {
-    win= SDL_CreateWindow (name, win_w/2, win_h/2,
+    win= SDL_CreateWindow (name, win_w, win_h,
                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   }
   sdl_ren= SDL_CreateRenderer (win, NULL);
@@ -288,7 +288,8 @@ sdl_window_rep::move_event (int x, int y) {
 void
 sdl_window_rep::resize_event (int ww, int hh) {
   bool flag= (win_w!=ww) || (win_h!=hh);
-  win_w= ww/retina_factor; win_h= hh/retina_factor;
+  win_w= ww; win_h= hh;
+  cout << win_w << "," << win_h << LF;
   if (flag) {
     notify_size (w, win_w*PIXEL, win_h*PIXEL);
     notify_window_resize (orig_name, ww*PIXEL, hh*PIXEL);
@@ -333,6 +334,7 @@ sdl_window_rep::focus_out_event () {
 
 void
 sdl_window_rep::mouse_event (string ev, int x, int y, time_t t) {
+  cout << "mouse_event " << ev << " " << x << "," << y << LF;
   x *= retina_factor;
   y *= retina_factor;
   if (is_nil (gui->grab_ptr) ||
