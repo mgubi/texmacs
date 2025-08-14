@@ -889,7 +889,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
           SDL_GetGlobalMouseState (&x, &y);
           SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
           x -= ox; y -= oy;
-          win->mouse_event ("enter", x, y, event->window.timestamp);
+          win->mouse_event ("enter", x, y, texmacs_time ());
         }
       }
         break;
@@ -906,7 +906,7 @@ sdl_gui_rep::process_event (SDL_Event *event) {
           SDL_GetGlobalMouseState (&x, &y);
           SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
           x -= ox; y -= oy;
-          win->mouse_event ("leave", x, y, event->window.timestamp);
+          win->mouse_event ("leave", x, y, texmacs_time ());
         }
       }
         break;
@@ -992,7 +992,7 @@ cout << event->button.x << "," << event->button.y << LF;
       if (win == NULL) break;
 //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
       win->mouse_event ("move",
-            event->motion.x, event->motion.y, event->motion.timestamp);
+            event->motion.x, event->motion.y, texmacs_time ());
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:
