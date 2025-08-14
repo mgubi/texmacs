@@ -661,7 +661,6 @@ mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   select_fill_color (bg);
   select_fill_pattern (bg_brush);
   proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
-  proc->op_h (mupdf_context (), proc);
   proc->op_f (mupdf_context (), proc);
   select_fill_color (fg);
   select_fill_pattern (fg_brush);
@@ -678,7 +677,6 @@ mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
     float xx2= to_x (max (x1, x2));
     float yy2= to_y (max (y1, y2));
     proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
-    proc->op_h (mupdf_context (), proc);
     proc->op_f (mupdf_context (), proc); // FIXME Winding
   }
 }
