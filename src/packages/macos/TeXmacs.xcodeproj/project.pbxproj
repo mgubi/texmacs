@@ -2009,6 +2009,7 @@
 		9CEB8E052E4DCFA000607831 /* glue_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B48EC10A8CC100097A335 /* glue_widget.cpp */; };
 		9CEB8E062E4DCFA000607831 /* enum_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7FA62A14FC5812006F4449 /* enum_widget.cpp */; };
 		9CEB8E072E4DCFA000607831 /* ink_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7FA62D14FC581A006F4449 /* ink_widget.cpp */; };
+		9CEB8E082E4DE21500607831 /* Info-Xcode.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9C61B422141A1B780035D78F /* Info-Xcode.plist */; };
 		9CEDAA301264FF6C009630CC /* tree_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */; };
 		9CEDAA311264FF6C009630CC /* tree_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */; };
 		9CEDAA321264FF6C009630CC /* tree_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */; };
@@ -3333,7 +3334,6 @@
 		9CE18E81125E685D00641CFC /* tree_brackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_brackets.cpp; sourceTree = "<group>"; };
 		9CE4F0041238FAF800993AF7 /* packrat.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat.hpp; sourceTree = "<group>"; };
 		9CEB8DCA2E4DCA2800607831 /* TeXmacsSDL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsSDL.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9CEB8DCB2E4DCA2800607831 /* TeXmacsQt copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "TeXmacsQt copy-Info.plist"; path = "/Users/mgubi/t/lab/wip_other_guis/src/packages/macos/TeXmacsQt copy-Info.plist"; sourceTree = "<absolute>"; };
 		9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsSDL.xcconfig; sourceTree = "<group>"; };
 		9CEB8DCE2E4DCC4200607831 /* mupdf_picture.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = mupdf_picture.hpp; sourceTree = "<group>"; };
 		9CEB8DCF2E4DCC4200607831 /* mupdf_picture.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = mupdf_picture.cpp; sourceTree = "<group>"; };
@@ -3437,7 +3437,6 @@
 				9C0B475B10A8CBE40097A335 /* Resources */,
 				29B97315FDCFA39411CA2CEA /* Sources */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
-				9CEB8DCB2E4DCA2800607831 /* TeXmacsQt copy-Info.plist */,
 			);
 			indentWidth = 2;
 			name = TeXmacs;
@@ -5990,6 +5989,7 @@
 			files = (
 				9CEB8DCD2E4DCA8000607831 /* TeXmacsSDL.xcconfig in Resources */,
 				9CEB8C1F2E4DCA2800607831 /* build-glue.scm in Resources */,
+				9CEB8E082E4DE21500607831 /* Info-Xcode.plist in Resources */,
 				9CEB8C202E4DCA2800607831 /* TeXmacs.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -8121,14 +8121,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */;
 			buildSettings = {
-				INFOPLIST_FILE = "TeXmacsQt copy-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = TeXmacsSDL;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
 		};
@@ -8136,14 +8132,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */;
 			buildSettings = {
-				INFOPLIST_FILE = "TeXmacsQt copy-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = TeXmacsSDL;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				WRAPPER_EXTENSION = app;
 			};
 			name = Release;
 		};
@@ -8151,6 +8143,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
+				INFOPLIST_KEY_CFBundleDisplayName = TeXmacsQt;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -8164,6 +8157,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */;
 			buildSettings = {
+				INFOPLIST_KEY_CFBundleDisplayName = TeXmacsQt;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
