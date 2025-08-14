@@ -139,13 +139,14 @@ sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
 void
 sdl_gui_rep::obtain_mouse_grab (widget wid) {
   SDL_Window *win= get_Window (wid);
-  if ((!is_nil (grab_ptr)) && (wid==grab_ptr->item)) return;
-  widget old_widget; if (!is_nil (grab_ptr)) old_widget= grab_ptr->item;
+  widget old_widget;
+  if (!is_nil (grab_ptr)) old_widget= grab_ptr->item;
+  if (wid == old_widget) return;
   grab_ptr= list<widget> (wid, grab_ptr);
   widget new_widget= grab_ptr->item;
   notify_mouse_grab (new_widget, true);
   SDL_CaptureMouse (false);
-  SDL_RaiseWindow (win);
+//  SDL_RaiseWindow (win);
   SDL_CaptureMouse (true);
   // SDL_SetWindowGrab (win, true);
   // cout << "---> obtain_mouse_grab: in grab " << wid << "\n";
@@ -160,7 +161,6 @@ sdl_gui_rep::release_mouse_grab () {
   if (is_nil (grab_ptr)) return;
   widget old_widget= grab_ptr->item;
   grab_ptr= grab_ptr->next;
-  widget new_widget; if (!is_nil (grab_ptr)) new_widget= grab_ptr->item;
   if (is_nil (grab_ptr)) {
     // SDL_Window *win= SDL_GetGrabbedWindow ();
     // if (win) SDL_SetWindowGrab (win, false);
@@ -168,6 +168,7 @@ sdl_gui_rep::release_mouse_grab () {
     // cout << "---> release_mouse_grab: no grab\n";
   }
   else {
+    widget new_widget= grab_ptr->item;
     sdl_window grab_win= get_sdl_window (new_widget);
     notify_mouse_grab (new_widget, true);
     SDL_RaiseWindow (grab_win->sdl_win);
@@ -1004,8 +1005,9 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       if (win) {
         unmap_balloon ();
         string action = event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "press-" : "release-";
-        //        action = action * lookup_mouse (event->button.button);
-        action = action * mouse_decode (mouse_state);
+        //FIXME: this is not yet correct, as we need to take into account modifiers
+                action = action * lookup_mouse (event->button.button);
+        //action = action * mouse_decode (mouse_state);
         //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
         win->mouse_event (action,
                           event->button.x, event->button.y, texmacs_time ());
@@ -1037,10 +1039,12 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       unmap_balloon ();
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
-      if (win == NULL) break;
-//      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
-      win->mouse_event ("move",
-            event->motion.x, event->motion.y, texmacs_time ());
+      if (win) {
+        cout << "mouse move for win id " << win->id << LF;
+        //      set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
+        win->mouse_event ("move",
+                          event->motion.x, event->motion.y, texmacs_time ());
+      }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:

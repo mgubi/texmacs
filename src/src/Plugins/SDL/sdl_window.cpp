@@ -336,7 +336,7 @@ sdl_window_rep::focus_out_event () {
 
 void
 sdl_window_rep::mouse_event (string ev, int x, int y, time_t t) {
-  cout << "mouse_event " << ev << " " << x << "," << y << LF;
+  //cout << "mouse_event " << ev << " " << x << "," << y << LF;
   x *= retina_factor;
   y *= retina_factor;
   if (is_nil (gui->grab_ptr) ||
