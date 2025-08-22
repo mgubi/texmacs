@@ -136,7 +136,7 @@ sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
 
 void
 sdl_gui_rep::obtain_mouse_grab (widget wid) {
-  SDL_Window *win= get_Window (wid);
+  //SDL_Window *win= get_Window (wid);
   widget old_widget;
   if (!is_nil (grab_ptr)) old_widget= grab_ptr->item;
   if (wid == old_widget) return;

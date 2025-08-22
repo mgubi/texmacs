@@ -16,13 +16,17 @@
 #include "tm_buffer.hpp"
 #include "message.hpp"
 #ifdef AQUATEXMACS
-#include "Cocoa/aqua_simple_widget.h"
+#  include "Cocoa/aqua_simple_widget.h"
 #else
-#if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
-#include "Qt/qt_simple_widget.hpp"
-#else
-#include "Widkit/simple_wk_widget.hpp"
-#endif
+#  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
+#    include "Qt/qt_simple_widget.hpp"
+#  else
+#    if defined(VUETEXMACS)
+#      include "Vue/vue_widget.hpp"
+#    else
+#      include "Widkit/simple_wk_widget.hpp"
+#    endif
+#  endif
 #endif
 
 /******************************************************************************

@@ -19,7 +19,11 @@
 #  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 #    include "Qt/qt_simple_widget.hpp"
 #  else
-#    include "Widkit/simple_wk_widget.hpp"
+#    if defined(VUETEXMACS)
+#      include "Vue/vue_widget.hpp"
+#    else
+#      include "Widkit/simple_wk_widget.hpp"
+#    endif
 #  endif
 #endif
 #include "server.hpp"

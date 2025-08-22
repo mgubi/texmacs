@@ -8,7 +8,7 @@
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
-#if !(defined(QTTEXMACS) || defined(SDLTEXMACS))
+#if !(defined(QTTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS))
 #include "socket_server.hpp"
 #include "sys_utils.hpp"
 #include "hashset.hpp"

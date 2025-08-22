@@ -196,7 +196,7 @@ edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
     SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
     widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
-#if defined (QTTEXMACS) || defined(AQUATEXMACS)
+#if defined (QTTEXMACS) || defined(AQUATEXMACS) || defined(VUETEXMACS)
     SI ox, oy, sx, sy;
     get_position (this, ox, oy);
     get_scroll_position(this, sx, sy);

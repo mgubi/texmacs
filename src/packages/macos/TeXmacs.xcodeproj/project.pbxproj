@@ -1574,6 +1574,393 @@
 		9CDA725E126CC926006E8028 /* tree_modify.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDA725C126CC926006E8028 /* tree_modify.cpp */; };
 		9CDA725F126CC926006E8028 /* tree_modify.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDA725C126CC926006E8028 /* tree_modify.cpp */; };
 		9CDA7260126CC926006E8028 /* tree_modify.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDA725C126CC926006E8028 /* tree_modify.cpp */; };
+		9CDABB9A2E4F64D4002D3806 /* TeXmacsSDL.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */; };
+		9CDABB9B2E4F64D4002D3806 /* build-glue.scm in Resources */ = {isa = PBXBuildFile; fileRef = 9C19A57C14FD624700738BD2 /* build-glue.scm */; };
+		9CDABB9C2E4F64D4002D3806 /* Info-Xcode.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9C61B422141A1B780035D78F /* Info-Xcode.plist */; };
+		9CDABB9D2E4F64D4002D3806 /* TeXmacs.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9C61B42A141A1B780035D78F /* TeXmacs.icns */; };
+		9CDABB9F2E4F64D4002D3806 /* generic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476110A8CC0F0097A335 /* generic.cpp */; };
+		9CDABBA02E4F64D4002D3806 /* input.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476210A8CC0F0097A335 /* input.cpp */; };
+		9CDABBA12E4F64D4002D3806 /* poor_bold.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B1791CCA191400F0AFFD /* poor_bold.cpp */; };
+		9CDABBA22E4F64D4002D3806 /* from_scheme.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476510A8CC0F0097A335 /* from_scheme.cpp */; };
+		9CDABBA32E4F64D4002D3806 /* to_scheme.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476610A8CC0F0097A335 /* to_scheme.cpp */; };
+		9CDABBA42E4F64D4002D3806 /* fromtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476910A8CC0F0097A335 /* fromtex.cpp */; };
+		9CDABBA52E4F64D4002D3806 /* inittex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476A10A8CC0F0097A335 /* inittex.cpp */; };
+		9CDABBA62E4F64D4002D3806 /* parsetex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476B10A8CC0F0097A335 /* parsetex.cpp */; };
+		9CDABBA72E4F64D4002D3806 /* adjust_stix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52100D2028B7AF00A2B5B6 /* adjust_stix.cpp */; };
+		9CDABBA82E4F64D4002D3806 /* fromtm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476D10A8CC0F0097A335 /* fromtm.cpp */; };
+		9CDABBA92E4F64D4002D3806 /* totm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476E10A8CC0F0097A335 /* totm.cpp */; };
+		9CDABBAA2E4F64D4002D3806 /* upgradetm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B476F10A8CC0F0097A335 /* upgradetm.cpp */; };
+		9CDABBAB2E4F64D4002D3806 /* verbatim.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477110A8CC0F0097A335 /* verbatim.cpp */; };
+		9CDABBAC2E4F64D4002D3806 /* db_sort.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C096101B0F945300E038BA /* db_sort.cpp */; };
+		9CDABBAD2E4F64D4002D3806 /* fromxml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477310A8CC0F0097A335 /* fromxml.cpp */; };
+		9CDABBAE2E4F64D4002D3806 /* parsexml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477410A8CC0F0097A335 /* parsexml.cpp */; };
+		9CDABBAF2E4F64D4002D3806 /* drd_info.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477610A8CC0F0097A335 /* drd_info.cpp */; };
+		9CDABBB02E4F64D4002D3806 /* drd_mode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477810A8CC0F0097A335 /* drd_mode.cpp */; };
+		9CDABBB12E4F64D4002D3806 /* drd_std.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477A10A8CC0F0097A335 /* drd_std.cpp */; };
+		9CDABBB22E4F64D4002D3806 /* tag_info.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477C10A8CC0F0097A335 /* tag_info.cpp */; };
+		9CDABBB32E4F64D4002D3806 /* base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49D6464418478DD2001541E1 /* base64.cpp */; };
+		9CDABBB42E4F64D4002D3806 /* vars.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B477E10A8CC0F0097A335 /* vars.cpp */; };
+		9CDABBB52E4F64D4002D3806 /* archiver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478110A8CC0F0097A335 /* archiver.cpp */; };
+		9CDABBB62E4F64D4002D3806 /* commute.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478310A8CC0F0097A335 /* commute.cpp */; };
+		9CDABBB72E4F64D4002D3806 /* patch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478410A8CC0F0097A335 /* patch.cpp */; };
+		9CDABBB82E4F64D4002D3806 /* edit_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478710A8CC0F0097A335 /* edit_observer.cpp */; };
+		9CDABBB92E4F64D4002D3806 /* db_index.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C0960E1B0F945300E038BA /* db_index.cpp */; };
+		9CDABBBA2E4F64D4002D3806 /* ip_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478810A8CC0F0097A335 /* ip_observer.cpp */; };
+		9CDABBBB2E4F64D4002D3806 /* link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478910A8CC0F0097A335 /* link.cpp */; };
+		9CDABBBC2E4F64D4002D3806 /* list_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478B10A8CC0F0097A335 /* list_observer.cpp */; };
+		9CDABBBD2E4F64D4002D3806 /* tree_pointer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478C10A8CC0F0097A335 /* tree_pointer.cpp */; };
+		9CDABBBE2E4F64D4002D3806 /* tree_position.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478D10A8CC0F0097A335 /* tree_position.cpp */; };
+		9CDABBBF2E4F64D4002D3806 /* undo_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B478E10A8CC0F0097A335 /* undo_observer.cpp */; };
+		9CDABBC02E4F64D4002D3806 /* analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479010A8CC0F0097A335 /* analyze.cpp */; };
+		9CDABBC12E4F64D4002D3806 /* converter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B479210A8CC0F0097A335 /* converter.cpp */; };
+		9CDABBC22E4F64D4002D3806 /* number_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3EE2412BF0200F73F5A /* number_parser.cpp */; };
+		9CDABBC32E4F64D4002D3806 /* tree_correct.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A410A8CC100097A335 /* tree_correct.cpp */; };
+		9CDABBC42E4F64D4002D3806 /* poor_stretched.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B17B1CCA191400F0AFFD /* poor_stretched.cpp */; };
+		9CDABBC52E4F64D4002D3806 /* fakedlopen.c in Sources */ = {isa = PBXBuildFile; fileRef = 495DB2D518CCB02300FE485A /* fakedlopen.c */; };
+		9CDABBC62E4F64D4002D3806 /* metadata_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0104ED22BC0FCF00F81331 /* metadata_post.cpp */; };
+		9CDABBC72E4F64D4002D3806 /* tree_cursor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A610A8CC100097A335 /* tree_cursor.cpp */; };
+		9CDABBC82E4F64D4002D3806 /* tree_traverse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47A810A8CC100097A335 /* tree_traverse.cpp */; };
+		9CDABBC92E4F64D4002D3806 /* edit_main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47AC10A8CC100097A335 /* edit_main.cpp */; };
+		9CDABBCA2E4F64D4002D3806 /* latex_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49CC0DFD18D30BDB007AB053 /* latex_tools.cpp */; };
+		9CDABBCB2E4F64D4002D3806 /* edit_typeset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47AE10A8CC100097A335 /* edit_typeset.cpp */; };
+		9CDABBCC2E4F64D4002D3806 /* edit_complete.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47B210A8CC100097A335 /* edit_complete.cpp */; };
+		9CDABBCD2E4F64D4002D3806 /* edit_cursor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47B310A8CC100097A335 /* edit_cursor.cpp */; };
+		9CDABBCE2E4F64D4002D3806 /* edit_footer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47B510A8CC100097A335 /* edit_footer.cpp */; };
+		9CDABBCF2E4F64D4002D3806 /* edit_graphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47B610A8CC100097A335 /* edit_graphics.cpp */; };
+		9CDABBD02E4F64D4002D3806 /* edit_interface.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47B810A8CC100097A335 /* edit_interface.cpp */; };
+		9CDABBD12E4F64D4002D3806 /* edit_keyboard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47BA10A8CC100097A335 /* edit_keyboard.cpp */; };
+		9CDABBD22E4F64D4002D3806 /* edit_mouse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47BB10A8CC100097A335 /* edit_mouse.cpp */; };
+		9CDABBD32E4F64D4002D3806 /* edit_repaint.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47BC10A8CC100097A335 /* edit_repaint.cpp */; };
+		9CDABBD42E4F64D4002D3806 /* columns_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C25EAB61D2A9ED400D7F2D5 /* columns_breaker.cpp */; };
+		9CDABBD52E4F64D4002D3806 /* edit_delete.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47BE10A8CC100097A335 /* edit_delete.cpp */; };
+		9CDABBD62E4F64D4002D3806 /* edit_dynamic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47BF10A8CC100097A335 /* edit_dynamic.cpp */; };
+		9CDABBD72E4F64D4002D3806 /* conservative_fromtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A46318C5D00000BF1E6A /* conservative_fromtex.cpp */; };
+		9CDABC042E4F64D4002D3806 /* edit_math.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47C110A8CC100097A335 /* edit_math.cpp */; };
+		9CDABC052E4F64D4002D3806 /* edit_modify.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47C310A8CC100097A335 /* edit_modify.cpp */; };
+		9CDABC062E4F64D4002D3806 /* player.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A740A1D22BEE900572468 /* player.cpp */; };
+		9CDABC072E4F64D4002D3806 /* edit_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47C510A8CC100097A335 /* edit_table.cpp */; };
+		9CDABC082E4F64D4002D3806 /* edit_text.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47C710A8CC100097A335 /* edit_text.cpp */; };
+		9CDABC092E4F64D4002D3806 /* edit_process.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47CA10A8CC100097A335 /* edit_process.cpp */; };
+		9CDABC0A2E4F64D4002D3806 /* edit_search.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47CE10A8CC100097A335 /* edit_search.cpp */; };
+		9CDABC0B2E4F64D4002D3806 /* edit_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47CF10A8CC100097A335 /* edit_select.cpp */; };
+		9CDABC0C2E4F64D4002D3806 /* edit_spell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47D110A8CC100097A335 /* edit_spell.cpp */; };
+		9CDABC0D2E4F64D4002D3806 /* string_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE31C242BD54F00D0B7CA /* string_parser.cpp */; };
+		9CDABC0E2E4F64D4002D3806 /* bitmap_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47D410A8CC100097A335 /* bitmap_font.cpp */; };
+		9CDABC0F2E4F64D4002D3806 /* glyph.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47D610A8CC100097A335 /* glyph.cpp */; };
+		9CDABC102E4F64D4002D3806 /* glyph_ops.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47D710A8CC100097A335 /* glyph_ops.cpp */; };
+		9CDABC112E4F64D4002D3806 /* glyph_shrink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47D810A8CC100097A335 /* glyph_shrink.cpp */; };
+		9CDABC122E4F64D4002D3806 /* charmap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47DA10A8CC100097A335 /* charmap.cpp */; };
+		9CDABC132E4F64D4002D3806 /* conservative_totex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A46418C5D00000BF1E6A /* conservative_totex.cpp */; };
+		9CDABC142E4F64D4002D3806 /* compound_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47DC10A8CC100097A335 /* compound_font.cpp */; };
+		9CDABC152E4F64D4002D3806 /* find_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47DD10A8CC100097A335 /* find_font.cpp */; };
+		9CDABC162E4F64D4002D3806 /* font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47DE10A8CC100097A335 /* font.cpp */; };
+		9CDABC172E4F64D4002D3806 /* math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47E010A8CC100097A335 /* math_font.cpp */; };
+		9CDABC182E4F64D4002D3806 /* translator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47E110A8CC100097A335 /* translator.cpp */; };
+		9CDABC192E4F64D4002D3806 /* virtual_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47E310A8CC100097A335 /* virtual_font.cpp */; };
+		9CDABC1A2E4F64D4002D3806 /* widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47E710A8CC100097A335 /* widget.cpp */; };
+		9CDABC1B2E4F64D4002D3806 /* math_tree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47EE10A8CC100097A335 /* math_tree.cpp */; };
+		9CDABC1C2E4F64D4002D3806 /* poor_distorted.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A74171D22C3A000572468 /* poor_distorted.cpp */; };
+		9CDABC1D2E4F64D4002D3806 /* preprocessor_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A07BF255B36CB0029D8B4 /* preprocessor_parser.cpp */; };
+		9CDABC1E2E4F64D4002D3806 /* test_math.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47F410A8CC100097A335 /* test_math.cpp */; };
+		9CDABC1F2E4F64D4002D3806 /* basic_renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47F710A8CC100097A335 /* basic_renderer.cpp */; };
+		9CDABC202E4F64D4002D3806 /* page_type.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47F910A8CC100097A335 /* page_type.cpp */; };
+		9CDABC212E4F64D4002D3806 /* adjust_termes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52100E2028B7AF00A2B5B6 /* adjust_termes.cpp */; };
+		9CDABC222E4F64D4002D3806 /* printer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47FB10A8CC100097A335 /* printer.cpp */; };
+		9CDABC232E4F64D4002D3806 /* renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B47FD10A8CC100097A335 /* renderer.cpp */; };
+		9CDABC242E4F64D4002D3806 /* basic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B481710A8CC100097A335 /* basic.cpp */; };
+		9CDABC252E4F64D4002D3806 /* command.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B481A10A8CC100097A335 /* command.cpp */; };
+		9CDABC262E4F64D4002D3806 /* observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B481C10A8CC100097A335 /* observer.cpp */; };
+		9CDABC272E4F64D4002D3806 /* array.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482010A8CC100097A335 /* array.cpp */; };
+		9CDABC282E4F64D4002D3806 /* hashfunc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482210A8CC100097A335 /* hashfunc.cpp */; };
+		9CDABC292E4F64D4002D3806 /* adjust_bonum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210112028B7B000A2B5B6 /* adjust_bonum.cpp */; };
+		9CDABC2A2E4F64D4002D3806 /* hashmap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482410A8CC100097A335 /* hashmap.cpp */; };
+		9CDABC2B2E4F64D4002D3806 /* hashmap_extra.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482610A8CC100097A335 /* hashmap_extra.cpp */; };
+		9CDABC2C2E4F64D4002D3806 /* hashset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482710A8CC100097A335 /* hashset.cpp */; };
+		9CDABC2D2E4F64D4002D3806 /* hashtree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482910A8CC100097A335 /* hashtree.cpp */; };
+		9CDABC2E2E4F64D4002D3806 /* iterator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482B10A8CC100097A335 /* iterator.cpp */; };
+		9CDABC2F2E4F64D4002D3806 /* env_animate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49705A611CA3F4A00081B937 /* env_animate.cpp */; };
+		9CDABC302E4F64D4002D3806 /* list.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B482D10A8CC100097A335 /* list.cpp */; };
+		9CDABC312E4F64D4002D3806 /* rel_hashmap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483110A8CC100097A335 /* rel_hashmap.cpp */; };
+		9CDABC322E4F64D4002D3806 /* modification.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483510A8CC100097A335 /* modification.cpp */; };
+		9CDABC332E4F64D4002D3806 /* tracked_totex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A46618C5D00000BF1E6A /* tracked_totex.cpp */; };
+		9CDABC342E4F64D4002D3806 /* parse_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483710A8CC100097A335 /* parse_string.cpp */; };
+		9CDABC352E4F64D4002D3806 /* path.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483910A8CC100097A335 /* path.cpp */; };
+		9CDABC362E4F64D4002D3806 /* rectangles.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483B10A8CC100097A335 /* rectangles.cpp */; };
+		9CDABC372E4F64D4002D3806 /* space.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483D10A8CC100097A335 /* space.cpp */; };
+		9CDABC382E4F64D4002D3806 /* string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B483F10A8CC100097A335 /* string.cpp */; };
+		9CDABC392E4F64D4002D3806 /* tab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484110A8CC100097A335 /* tab.cpp */; };
+		9CDABC3A2E4F64D4002D3806 /* adjust_schola.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C52100F2028B7B000A2B5B6 /* adjust_schola.cpp */; };
+		9CDABC3B2E4F64D4002D3806 /* prog_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A07CA255B37840029D8B4 /* prog_language.cpp */; };
+		9CDABC3C2E4F64D4002D3806 /* tree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484310A8CC100097A335 /* tree.cpp */; };
+		9CDABC3D2E4F64D4002D3806 /* tree_label.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484510A8CC100097A335 /* tree_label.cpp */; };
+		9CDABC3E2E4F64D4002D3806 /* bibtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B484C10A8CC100097A335 /* bibtex.cpp */; };
+		9CDABC3F2E4F64D4002D3806 /* db_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C0960D1B0F945300E038BA /* db_disk.cpp */; };
+		9CDABC402E4F64D4002D3806 /* free_type.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487110A8CC100097A335 /* free_type.cpp */; };
+		9CDABC412E4F64D4002D3806 /* db_query.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C0960F1B0F945300E038BA /* db_query.cpp */; };
+		9CDABC422E4F64D4002D3806 /* tt_face.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487310A8CC100097A335 /* tt_face.cpp */; };
+		9CDABC432E4F64D4002D3806 /* tt_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487510A8CC100097A335 /* tt_file.cpp */; };
+		9CDABC442E4F64D4002D3806 /* tt_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487710A8CC100097A335 /* tt_font.cpp */; };
+		9CDABC452E4F64D4002D3806 /* unicode_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487810A8CC100097A335 /* unicode_font.cpp */; };
+		9CDABC462E4F64D4002D3806 /* imlib2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B487D10A8CC100097A335 /* imlib2.cpp */; };
+		9CDABC472E4F64D4002D3806 /* tree_addendum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49195AEE1872CF22007E3C27 /* tree_addendum.cpp */; };
+		9CDABC482E4F64D4002D3806 /* ispell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488010A8CC100097A335 /* ispell.cpp */; };
+		9CDABC492E4F64D4002D3806 /* mac_app.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488610A8CC100097A335 /* mac_app.mm */; };
+		9CDABC4A2E4F64D4002D3806 /* mac_images.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488810A8CC100097A335 /* mac_images.mm */; };
+		9CDABC4B2E4F64D4002D3806 /* mac_spellservice.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488A10A8CC100097A335 /* mac_spellservice.mm */; };
+		9CDABC4C2E4F64D4002D3806 /* load_pk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488C10A8CC100097A335 /* load_pk.cpp */; };
+		9CDABC4D2E4F64D4002D3806 /* load_tex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B488E10A8CC100097A335 /* load_tex.cpp */; };
+		9CDABC4E2E4F64D4002D3806 /* load_tfm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489010A8CC100097A335 /* load_tfm.cpp */; };
+		9CDABC4F2E4F64D4002D3806 /* glyph_effected.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F40B2412BF6400F73F5A /* glyph_effected.cpp */; };
+		9CDABC502E4F64D4002D3806 /* tex_files.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489210A8CC100097A335 /* tex_files.cpp */; };
+		9CDABC512E4F64D4002D3806 /* tex_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489410A8CC100097A335 /* tex_font.cpp */; };
+		9CDABC522E4F64D4002D3806 /* cleanhtml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3F92412BF2700F73F5A /* cleanhtml.cpp */; };
+		9CDABC532E4F64D4002D3806 /* tex_init.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489510A8CC100097A335 /* tex_init.cpp */; };
+		9CDABC542E4F64D4002D3806 /* tex_rubber_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489610A8CC100097A335 /* tex_rubber_font.cpp */; };
+		9CDABC552E4F64D4002D3806 /* openssl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B489B10A8CC100097A335 /* openssl.cpp */; };
+		9CDABC562E4F64D4002D3806 /* indexation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4952408B1AC402A800A611AD /* indexation.cpp */; };
+		9CDABC572E4F64D4002D3806 /* keyword_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE31B242BD54F00D0B7CA /* keyword_parser.cpp */; };
+		9CDABC582E4F64D4002D3806 /* init_texmacs.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B492410A8CC110097A335 /* init_texmacs.cpp */; };
+		9CDABC592E4F64D4002D3806 /* init_upgrade.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B492510A8CC110097A335 /* init_upgrade.cpp */; };
+		9CDABC5A2E4F64D4002D3806 /* adjust_pagella.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210102028B7B000A2B5B6 /* adjust_pagella.cpp */; };
+		9CDABC5B2E4F64D4002D3806 /* url.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B492910A8CC110097A335 /* url.cpp */; };
+		9CDABC5C2E4F64D4002D3806 /* file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B492F10A8CC110097A335 /* file.cpp */; };
+		9CDABC5D2E4F64D4002D3806 /* image_files.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B493110A8CC110097A335 /* image_files.cpp */; };
+		9CDABC5E2E4F64D4002D3806 /* web_files.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B493310A8CC110097A335 /* web_files.cpp */; };
+		9CDABC5F2E4F64D4002D3806 /* dictionary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B493710A8CC110097A335 /* dictionary.cpp */; };
+		9CDABC602E4F64D4002D3806 /* hyphenate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B493B10A8CC110097A335 /* hyphenate.cpp */; };
+		9CDABC612E4F64D4002D3806 /* language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B493E10A8CC110097A335 /* language.cpp */; };
+		9CDABC622E4F64D4002D3806 /* math_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494010A8CC110097A335 /* math_language.cpp */; };
+		9CDABC632E4F64D4002D3806 /* mathemagix_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494110A8CC110097A335 /* mathemagix_language.cpp */; };
+		9CDABC642E4F64D4002D3806 /* scheme_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494210A8CC110097A335 /* scheme_language.cpp */; };
+		9CDABC652E4F64D4002D3806 /* text_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494310A8CC110097A335 /* text_language.cpp */; };
+		9CDABC662E4F64D4002D3806 /* raster_random.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4A74111D22C38200572468 /* raster_random.cpp */; };
+		9CDABC672E4F64D4002D3806 /* verb_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494410A8CC110097A335 /* verb_language.cpp */; };
+		9CDABC682E4F64D4002D3806 /* connection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494810A8CC110097A335 /* connection.cpp */; };
+		9CDABC692E4F64D4002D3806 /* dyn_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494910A8CC110097A335 /* dyn_link.cpp */; };
+		9CDABC6A2E4F64D4002D3806 /* pipe_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494B10A8CC110097A335 /* pipe_link.cpp */; };
+		9CDABC6B2E4F64D4002D3806 /* poor_bbb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B1781CCA191400F0AFFD /* poor_bbb.cpp */; };
+		9CDABC6C2E4F64D4002D3806 /* socket_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494D10A8CC110097A335 /* socket_link.cpp */; };
+		9CDABC6D2E4F64D4002D3806 /* socket_notifier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B494F10A8CC110097A335 /* socket_notifier.cpp */; };
+		9CDABC6E2E4F64D4002D3806 /* socket_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495110A8CC110097A335 /* socket_server.cpp */; };
+		9CDABC6F2E4F64D4002D3806 /* texmacs_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495310A8CC110097A335 /* texmacs_client.cpp */; };
+		9CDABC702E4F64D4002D3806 /* texmacs_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495410A8CC110097A335 /* texmacs_server.cpp */; };
+		9CDABC712E4F64D4002D3806 /* tm_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495510A8CC110097A335 /* tm_link.cpp */; };
+		9CDABC722E4F64D4002D3806 /* poor_smallcaps.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FB1B031CB30D6000B983F3 /* poor_smallcaps.cpp */; };
+		9CDABC732E4F64D4002D3806 /* data_cache.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495810A8CC110097A335 /* data_cache.cpp */; };
+		9CDABC742E4F64D4002D3806 /* fast_alloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495A10A8CC110097A335 /* fast_alloc.cpp */; };
+		9CDABC752E4F64D4002D3806 /* sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B495C10A8CC110097A335 /* sys_utils.cpp */; };
+		9CDABC762E4F64D4002D3806 /* tm_config.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B496610A8CC110097A335 /* tm_config.cpp */; };
+		9CDABC772E4F64D4002D3806 /* unix_entrypoint.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C2E28BB2D20701200AB85BF /* unix_entrypoint.cpp */; };
+		9CDABC782E4F64D4002D3806 /* tm_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B496710A8CC110097A335 /* tm_server.cpp */; };
+		9CDABC792E4F64D4002D3806 /* texmacs.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B496A10A8CC110097A335 /* texmacs.cpp */; };
+		9CDABC7A2E4F64D4002D3806 /* tm_button.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497310A8CC110097A335 /* tm_button.cpp */; };
+		9CDABC7B2E4F64D4002D3806 /* tm_dialogue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497410A8CC110097A335 /* tm_dialogue.cpp */; };
+		9CDABC7C2E4F64D4002D3806 /* tm_frame.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497510A8CC110097A335 /* tm_frame.cpp */; };
+		9CDABC7D2E4F64D4002D3806 /* tm_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497610A8CC110097A335 /* tm_window.cpp */; };
+		9CDABC7E2E4F64D4002D3806 /* animate_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497A10A8CC110097A335 /* animate_boxes.cpp */; };
+		9CDABC7F2E4F64D4002D3806 /* basic_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497C10A8CC110097A335 /* basic_boxes.cpp */; };
+		9CDABC802E4F64D4002D3806 /* boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497D10A8CC110097A335 /* boxes.cpp */; };
+		9CDABC812E4F64D4002D3806 /* rubber_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */; };
+		9CDABC822E4F64D4002D3806 /* stretch_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */; };
+		9CDABC832E4F64D4002D3806 /* text_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498010A8CC110097A335 /* text_boxes.cpp */; };
+		9CDABC842E4F64D4002D3806 /* composite_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498210A8CC110097A335 /* composite_boxes.cpp */; };
+		9CDABC852E4F64D4002D3806 /* concat_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498310A8CC110097A335 /* concat_boxes.cpp */; };
+		9CDABC862E4F64D4002D3806 /* decoration_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498410A8CC110097A335 /* decoration_boxes.cpp */; };
+		9CDABC872E4F64D4002D3806 /* math_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498610A8CC110097A335 /* math_boxes.cpp */; };
+		9CDABC882E4F64D4002D3806 /* escaped_char_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3F12412BF0200F73F5A /* escaped_char_parser.cpp */; };
+		9CDABC892E4F64D4002D3806 /* misc_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498710A8CC110097A335 /* misc_boxes.cpp */; };
+		9CDABC8A2E4F64D4002D3806 /* latex_recover.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 499CCC091B16242B0094E0A9 /* latex_recover.cpp */; };
+		9CDABC8B2E4F64D4002D3806 /* make_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4222412BF8400F73F5A /* make_file.cpp */; };
+		9CDABC8C2E4F64D4002D3806 /* script_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498810A8CC110097A335 /* script_boxes.cpp */; };
+		9CDABC8D2E4F64D4002D3806 /* stack_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498910A8CC110097A335 /* stack_boxes.cpp */; };
+		9CDABC8E2E4F64D4002D3806 /* operator_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE316242BD54E00D0B7CA /* operator_parser.cpp */; };
+		9CDABC8F2E4F64D4002D3806 /* sdl_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD42E4DCC4200607831 /* sdl_gui.cpp */; };
+		9CDABC902E4F64D4002D3806 /* mupdf_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DCF2E4DCC4200607831 /* mupdf_picture.cpp */; };
+		9CDABC912E4F64D4002D3806 /* mupdf_renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD12E4DCC4200607831 /* mupdf_renderer.cpp */; };
+		9CDABC922E4F64D4002D3806 /* sdl_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD62E4DCC4200607831 /* sdl_window.cpp */; };
+		9CDABC932E4F64D4002D3806 /* cmdline_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5387922E42B404008BD1D9 /* cmdline_link.cpp */; };
+		9CDABC942E4F64D4002D3806 /* fast_search.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A47318C5D01E00BF1E6A /* fast_search.cpp */; };
+		9CDABC952E4F64D4002D3806 /* superpose_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498A10A8CC110097A335 /* superpose_boxes.cpp */; };
+		9CDABC962E4F64D4002D3806 /* graphics_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498E10A8CC110097A335 /* graphics_boxes.cpp */; };
+		9CDABC972E4F64D4002D3806 /* grid_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498F10A8CC110097A335 /* grid_boxes.cpp */; };
+		9CDABC982E4F64D4002D3806 /* change_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499210A8CC110097A335 /* change_boxes.cpp */; };
+		9CDABC992E4F64D4002D3806 /* modifier_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499310A8CC110097A335 /* modifier_boxes.cpp */; };
+		9CDABC9A2E4F64D4002D3806 /* bridge.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499710A8CC110097A335 /* bridge.cpp */; };
+		9CDABC9B2E4F64D4002D3806 /* bridge_argument.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499910A8CC110097A335 /* bridge_argument.cpp */; };
+		9CDABC9C2E4F64D4002D3806 /* adjust_fira.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F42B2412C1DF00F73F5A /* adjust_fira.cpp */; };
+		9CDABC9D2E4F64D4002D3806 /* bridge_auto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499A10A8CC110097A335 /* bridge_auto.cpp */; };
+		9CDABC9E2E4F64D4002D3806 /* bridge_compound.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499B10A8CC110097A335 /* bridge_compound.cpp */; };
+		9CDABC9F2E4F64D4002D3806 /* bridge_default.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499C10A8CC110097A335 /* bridge_default.cpp */; };
+		9CDABCA02E4F64D4002D3806 /* bridge_docrange.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499D10A8CC110097A335 /* bridge_docrange.cpp */; };
+		9CDABCA12E4F64D4002D3806 /* bridge_document.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499E10A8CC110097A335 /* bridge_document.cpp */; };
+		9CDABCA22E4F64D4002D3806 /* bridge_eval.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B499F10A8CC110097A335 /* bridge_eval.cpp */; };
+		9CDABCA32E4F64D4002D3806 /* bridge_expand_as.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A010A8CC110097A335 /* bridge_expand_as.cpp */; };
+		9CDABCA42E4F64D4002D3806 /* recolored_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4362412C20000F73F5A /* recolored_font.cpp */; };
+		9CDABCA52E4F64D4002D3806 /* glyph_distorted.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F40A2412BF6400F73F5A /* glyph_distorted.cpp */; };
+		9CDABCA62E4F64D4002D3806 /* bridge_formatting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A110A8CC110097A335 /* bridge_formatting.cpp */; };
+		9CDABCA72E4F64D4002D3806 /* bridge_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A210A8CC110097A335 /* bridge_gui.cpp */; };
+		9CDABCA82E4F64D4002D3806 /* bridge_hidden.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A310A8CC110097A335 /* bridge_hidden.cpp */; };
+		9CDABCA92E4F64D4002D3806 /* universal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C096201B0F947D00E038BA /* universal.cpp */; };
+		9CDABCAA2E4F64D4002D3806 /* bridge_locus.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A410A8CC110097A335 /* bridge_locus.cpp */; };
+		9CDABCAB2E4F64D4002D3806 /* rubber_unicode_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C096001B0F93C600E038BA /* rubber_unicode_font.cpp */; };
+		9CDABCAC2E4F64D4002D3806 /* bridge_mark.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A510A8CC110097A335 /* bridge_mark.cpp */; };
+		9CDABCAD2E4F64D4002D3806 /* bridge_rewrite.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A610A8CC110097A335 /* bridge_rewrite.cpp */; };
+		9CDABCAE2E4F64D4002D3806 /* bridge_surround.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A710A8CC110097A335 /* bridge_surround.cpp */; };
+		9CDABCAF2E4F64D4002D3806 /* bridge_with.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49A810A8CC110097A335 /* bridge_with.cpp */; };
+		9CDABCB02E4F64D4002D3806 /* typesetter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49AA10A8CC110097A335 /* typesetter.cpp */; };
+		9CDABCB12E4F64D4002D3806 /* concat_active.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49AD10A8CC110097A335 /* concat_active.cpp */; };
+		9CDABCB22E4F64D4002D3806 /* concat_animate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49AE10A8CC110097A335 /* concat_animate.cpp */; };
+		9CDABCB32E4F64D4002D3806 /* concat_graphics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49AF10A8CC110097A335 /* concat_graphics.cpp */; };
+		9CDABCB42E4F64D4002D3806 /* concat_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B010A8CC110097A335 /* concat_gui.cpp */; };
+		9CDABCB52E4F64D4002D3806 /* concat_inactive.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B110A8CC110097A335 /* concat_inactive.cpp */; };
+		9CDABCB62E4F64D4002D3806 /* concat_macro.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B210A8CC110097A335 /* concat_macro.cpp */; };
+		9CDABCB72E4F64D4002D3806 /* concat_math.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B310A8CC110097A335 /* concat_math.cpp */; };
+		9CDABCB82E4F64D4002D3806 /* font_scripts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210252028B86900A2B5B6 /* font_scripts.cpp */; };
+		9CDABCB92E4F64D4002D3806 /* new_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C25EAB71D2A9ED400D7F2D5 /* new_breaker.cpp */; };
+		9CDABCBA2E4F64D4002D3806 /* concat_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B410A8CC110097A335 /* concat_post.cpp */; };
+		9CDABCBB2E4F64D4002D3806 /* concat_text.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B510A8CC110097A335 /* concat_text.cpp */; };
+		9CDABCBC2E4F64D4002D3806 /* concater.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B610A8CC110097A335 /* concater.cpp */; };
+		9CDABCBD2E4F64D4002D3806 /* env.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49B910A8CC110097A335 /* env.cpp */; };
+		9CDABCBE2E4F64D4002D3806 /* env_default.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49BA10A8CC110097A335 /* env_default.cpp */; };
+		9CDABCBF2E4F64D4002D3806 /* env_exec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49BB10A8CC110097A335 /* env_exec.cpp */; };
+		9CDABCC02E4F64D4002D3806 /* env_inactive.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49BC10A8CC110097A335 /* env_inactive.cpp */; };
+		9CDABCC12E4F64D4002D3806 /* env_length.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49BD10A8CC110097A335 /* env_length.cpp */; };
+		9CDABCC22E4F64D4002D3806 /* env_semantics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49BE10A8CC110097A335 /* env_semantics.cpp */; };
+		9CDABCC32E4F64D4002D3806 /* tree_spell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0104EF22BC0FF500F81331 /* tree_spell.cpp */; };
+		9CDABCC42E4F64D4002D3806 /* r_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4973E9A018BC945F001F74F0 /* r_language.cpp */; };
+		9CDABCC52E4F64D4002D3806 /* format.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49C110A8CC110097A335 /* format.cpp */; };
+		9CDABCC62E4F64D4002D3806 /* unix_stacktrace.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C2E28B92D20701200AB85BF /* unix_stacktrace.cpp */; };
+		9CDABCC72E4F64D4002D3806 /* impl_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4122412BF7D00F73F5A /* impl_language.cpp */; };
+		9CDABCC82E4F64D4002D3806 /* poor_rubber.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FB1B021CB30D6000B983F3 /* poor_rubber.cpp */; };
+		9CDABCC92E4F64D4002D3806 /* formatter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49C310A8CC110097A335 /* formatter.cpp */; };
+		9CDABCCA2E4F64D4002D3806 /* line_item.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49C410A8CC110097A335 /* line_item.cpp */; };
+		9CDABCCB2E4F64D4002D3806 /* page_item.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49C610A8CC110097A335 /* page_item.cpp */; };
+		9CDABCCC2E4F64D4002D3806 /* lazy_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49D710A8CC110097A335 /* lazy_gui.cpp */; };
+		9CDABCCD2E4F64D4002D3806 /* xml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0104EB22BC0F9E00F81331 /* xml.cpp */; };
+		9CDABCCE2E4F64D4002D3806 /* lazy_paragraph.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49D810A8CC110097A335 /* lazy_paragraph.cpp */; };
+		9CDABCCF2E4F64D4002D3806 /* adjust_libertine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F42C2412C1DF00F73F5A /* adjust_libertine.cpp */; };
+		9CDABCD02E4F64D4002D3806 /* lazy_typeset.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49DA10A8CC110097A335 /* lazy_typeset.cpp */; };
+		9CDABCD12E4F64D4002D3806 /* lazy_vstream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49DC10A8CC110097A335 /* lazy_vstream.cpp */; };
+		9CDABCD22E4F64D4002D3806 /* tm_timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210092028AFE500A2B5B6 /* tm_timer.cpp */; };
+		9CDABCD32E4F64D4002D3806 /* line_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49DE10A8CC110097A335 /* line_breaker.cpp */; };
+		9CDABCD42E4F64D4002D3806 /* make_pages.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E010A8CC110097A335 /* make_pages.cpp */; };
+		9CDABCD52E4F64D4002D3806 /* page_breaker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E110A8CC110097A335 /* page_breaker.cpp */; };
+		9CDABCD62E4F64D4002D3806 /* pager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E210A8CC110097A335 /* pager.cpp */; };
+		9CDABCD72E4F64D4002D3806 /* skeleton.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E410A8CC110097A335 /* skeleton.cpp */; };
+		9CDABCD82E4F64D4002D3806 /* vpenalty.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E610A8CC110097A335 /* vpenalty.cpp */; };
+		9CDABCD92E4F64D4002D3806 /* stacker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49E910A8CC110097A335 /* stacker.cpp */; };
+		9CDABCDA2E4F64D4002D3806 /* cell.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49EC10A8CC110097A335 /* cell.cpp */; };
+		9CDABCDB2E4F64D4002D3806 /* table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B49ED10A8CC110097A335 /* table.cpp */; };
+		9CDABCDC2E4F64D4002D3806 /* fromtex_post.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492EA53C18634091007F16D8 /* fromtex_post.cpp */; };
+		9CDABCDD2E4F64D4002D3806 /* unix_system.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C2E28BA2D20701200AB85BF /* unix_system.cpp */; };
+		9CDABCDE2E4F64D4002D3806 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
+		9CDABCDF2E4F64D4002D3806 /* tm_ostream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C060A9A10FC6D8B00C51583 /* tm_ostream.cpp */; };
+		9CDABCE02E4F64D4002D3806 /* poor_mono.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4382412C20000F73F5A /* poor_mono.cpp */; };
+		9CDABCE12E4F64D4002D3806 /* gs_utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6061E8112442BC00054149 /* gs_utilities.cpp */; };
+		9CDABCE22E4F64D4002D3806 /* bibtex_functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3F511D79783005C12C4 /* bibtex_functions.cpp */; };
+		9CDABCE32E4F64D4002D3806 /* parsebib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CFEB3FF11D79AF6005C12C4 /* parsebib.cpp */; };
+		9CDABCE42E4F64D4002D3806 /* packrat_grammar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C74D95A123BF892008959D1 /* packrat_grammar.cpp */; };
+		9CDABCE52E4F64D4002D3806 /* packrat_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C74D95C123BF892008959D1 /* packrat_parser.cpp */; };
+		9CDABCE62E4F64D4002D3806 /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
+		9CDABCE72E4F64D4002D3806 /* poor_italic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B17A1CCA191400F0AFFD /* poor_italic.cpp */; };
+		9CDABCE82E4F64D4002D3806 /* highlight_observer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF78E0C125FBF9700CA5846 /* highlight_observer.cpp */; };
+		9CDABCE92E4F64D4002D3806 /* poor_extended.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49E861E01CE9EE2C0059B831 /* poor_extended.cpp */; };
+		9CDABCEA2E4F64D4002D3806 /* tree_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */; };
+		9CDABCEB2E4F64D4002D3806 /* unicode_math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA351264FF88009630CC /* unicode_math_font.cpp */; };
+		9CDABCEC2E4F64D4002D3806 /* tree_modify.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDA725C126CC926006E8028 /* tree_modify.cpp */; };
+		9CDABCED2E4F64D4002D3806 /* mac_utilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9C646EBD12842B7A000ABCDF /* mac_utilities.mm */; };
+		9CDABCEE2E4F64D4002D3806 /* true_color.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A513ED19426DD70017E373 /* true_color.cpp */; };
+		9CDABCEF2E4F64D4002D3806 /* curve_extras.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CCC74E6298A7AB20071E179 /* curve_extras.cpp */; };
+		9CDABCF02E4F64D4002D3806 /* HIDRemote.m in Sources */ = {isa = PBXBuildFile; fileRef = 9CCC738E12A7D6DA006EDBDA /* HIDRemote.m */; };
+		9CDABCF12E4F64D4002D3806 /* glyph_unserif.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 494DEEE21CD0EF8F00D882BE /* glyph_unserif.cpp */; };
+		9CDABCF22E4F64D4002D3806 /* parsehtml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3F82412BF2700F73F5A /* parsehtml.cpp */; };
+		9CDABCF32E4F64D4002D3806 /* packrat_serializer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4B87A512AE5BD100F8571A /* packrat_serializer.cpp */; };
+		9CDABCF42E4F64D4002D3806 /* tree_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C3D2E5712B0D662009E33AD /* tree_select.cpp */; };
+		9CDABCF52E4F64D4002D3806 /* tm_debug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C61B45C141A25200035D78F /* tm_debug.cpp */; };
+		9CDABCF62E4F64D4002D3806 /* learn_handwriting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B09A714FF0A1C004ABDCE /* learn_handwriting.cpp */; };
+		9CDABCF72E4F64D4002D3806 /* poly_line.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B09A814FF0A1C004ABDCE /* poly_line.cpp */; };
+		9CDABCF82E4F64D4002D3806 /* recognize_handwriting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B09AA14FF0A1C004ABDCE /* recognize_handwriting.cpp */; };
+		9CDABCF92E4F64D4002D3806 /* art_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4262412BF9900F73F5A /* art_boxes.cpp */; };
+		9CDABCFA2E4F64D4002D3806 /* fromcls.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B09B614FF0A3D004ABDCE /* fromcls.cpp */; };
+		9CDABCFB2E4F64D4002D3806 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
+		9CDABCFC2E4F64D4002D3806 /* glyph_transforms.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B18C1CCA195900F0AFFD /* glyph_transforms.cpp */; };
+		9CDABCFD2E4F64D4002D3806 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
+		9CDABCFE2E4F64D4002D3806 /* tree_math_stats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CCC74EB298A7AE10071E179 /* tree_math_stats.cpp */; };
+		9CDABCFF2E4F64D4002D3806 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
+		9CDABD002E4F64D4002D3806 /* new_document.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4FCFF5150F73100087378D /* new_document.cpp */; };
+		9CDABD012E4F64D4002D3806 /* new_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492ED6C8150FD27D00DB0FB5 /* new_data.cpp */; };
+		9CDABD022E4F64D4002D3806 /* new_style.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 492ED6CA150FD27D00DB0FB5 /* new_style.cpp */; };
+		9CDABD032E4F64D4002D3806 /* new_buffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 493D309915190AEA00A19C3D /* new_buffer.cpp */; };
+		9CDABD042E4F64D4002D3806 /* case_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CCC74EF298A7AFF0071E179 /* case_boxes.cpp */; };
+		9CDABD052E4F64D4002D3806 /* persistent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F251D2151B70840091FF99 /* persistent.cpp */; };
+		9CDABD062E4F64D4002D3806 /* new_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4906929A151B743F006645F4 /* new_view.cpp */; };
+		9CDABD072E4F64D4002D3806 /* new_project.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F9FA0E1573BA86006C7258 /* new_project.cpp */; };
+		9CDABD082E4F64D4002D3806 /* adjust_cmr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210212028B82C00A2B5B6 /* adjust_cmr.cpp */; };
+		9CDABD092E4F64D4002D3806 /* font_wide.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5210262028B86900A2B5B6 /* font_wide.cpp */; };
+		9CDABD0A2E4F64D4002D3806 /* new_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49F9FA111573BA86006C7258 /* new_window.cpp */; };
+		9CDABD0B2E4F64D4002D3806 /* metadata.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD1513A15A72D0F006F2205 /* metadata.cpp */; };
+		9CDABD0C2E4F64D4002D3806 /* conservative_bib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C096251B0F94B100E038BA /* conservative_bib.cpp */; };
+		9CDABD0D2E4F64D4002D3806 /* wencoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFF7C41635D3690031CFDC /* wencoding.cpp */; };
+		9CDABD0E2E4F64D4002D3806 /* font_database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632E11676B229000D7974 /* font_database.cpp */; };
+		9CDABD0F2E4F64D4002D3806 /* preferences.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632E71676B272000D7974 /* preferences.cpp */; };
+		9CDABD102E4F64D4002D3806 /* tt_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632ED1676B28E000D7974 /* tt_tools.cpp */; };
+		9CDABD112E4F64D4002D3806 /* font_select.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4942BEF61679293B00A6C354 /* font_select.cpp */; };
+		9CDABD122E4F64D4002D3806 /* sqlite3.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49DD8FA716DB75C100647CA2 /* sqlite3.cpp */; };
+		9CDABD132E4F64D4002D3806 /* metadata-acm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F716E90E5900934EA3 /* metadata-acm.cpp */; };
+		9CDABD142E4F64D4002D3806 /* font_spacing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C21A02121C116660035B5B3 /* font_spacing.cpp */; };
+		9CDABD152E4F64D4002D3806 /* metadata-elsevier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 495712F816E90E5900934EA3 /* metadata-elsevier.cpp */; };
+		9CDABD162E4F64D4002D3806 /* post_convert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4910FA7216EB3E2F0088B175 /* post_convert.cpp */; };
+		9CDABD172E4F64D4002D3806 /* identifier_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE317242BD54E00D0B7CA /* identifier_parser.cpp */; };
+		9CDABD182E4F64D4002D3806 /* tt_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 497822CA16EC86D40054F5BA /* tt_analyze.cpp */; };
+		9CDABD192E4F64D4002D3806 /* glyph_analyze.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FFB07816EDF83A004A2A32 /* glyph_analyze.cpp */; };
+		9CDABD1A2E4F64D4002D3806 /* metadata-ams.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49FDFA6416F0C677002B830A /* metadata-ams.cpp */; };
+		9CDABD1B2E4F64D4002D3806 /* font_guess.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4964704F16F72CB500D95FC4 /* font_guess.cpp */; };
+		9CDABD1C2E4F64D4002D3806 /* smart_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4964705016F72CB500D95FC4 /* smart_font.cpp */; };
+		9CDABD1D2E4F64D4002D3806 /* metadata-revtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 490A9D2516F8A5EC00EC29D5 /* metadata-revtex.cpp */; };
+		9CDABD1E2E4F64D4002D3806 /* font_translate.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491FC57B16F900140038929C /* font_translate.cpp */; };
+		9CDABD1F2E4F64D4002D3806 /* metadata-springer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49BEF71616FDD566004BAE73 /* metadata-springer.cpp */; };
+		9CDABD202E4F64D4002D3806 /* superposed_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4372412C20000F73F5A /* superposed_font.cpp */; };
+		9CDABD212E4F64D4002D3806 /* fortran_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4132412BF7E00F73F5A /* fortran_language.cpp */; };
+		9CDABD222E4F64D4002D3806 /* curve.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A87F170207440028991F /* curve.cpp */; };
+		9CDABD232E4F64D4002D3806 /* equations.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A881170207440028991F /* equations.cpp */; };
+		9CDABD242E4F64D4002D3806 /* frame.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A883170207440028991F /* frame.cpp */; };
+		9CDABD252E4F64D4002D3806 /* grid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A885170207440028991F /* grid.cpp */; };
+		9CDABD262E4F64D4002D3806 /* point.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4929A888170207440028991F /* point.cpp */; };
+		9CDABD272E4F64D4002D3806 /* queryxml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3FA2412BF2700F73F5A /* queryxml.cpp */; };
+		9CDABD282E4F64D4002D3806 /* brush.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4932C1A11704F54200E87D8C /* brush.cpp */; };
+		9CDABD292E4F64D4002D3806 /* picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49DEED1C170ACFB800332D9F /* picture.cpp */; };
+		9CDABD2A2E4F64D4002D3806 /* raster_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49DEED20170ACFB800332D9F /* raster_picture.cpp */; };
+		9CDABD2B2E4F64D4002D3806 /* enlightened.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5911731182600A755DF /* enlightened.cpp */; };
+		9CDABD2C2E4F64D4002D3806 /* transformed.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5931731182600A755DF /* transformed.cpp */; };
+		9CDABD2D2E4F64D4002D3806 /* triangulated.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5941731182600A755DF /* triangulated.cpp */; };
+		9CDABD2E2E4F64D4002D3806 /* pencil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB59E1731183800A755DF /* pencil.cpp */; };
+		9CDABD2F2E4F64D4002D3806 /* inline_comment_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F3F22412BF0200F73F5A /* inline_comment_parser.cpp */; };
+		9CDABD302E4F64D4002D3806 /* effect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5A21731186A00A755DF /* effect.cpp */; };
+		9CDABD312E4F64D4002D3806 /* tracked_fromtex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A46518C5D00000BF1E6A /* tracked_fromtex.cpp */; };
+		9CDABD322E4F64D4002D3806 /* scalable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5A41731186A00A755DF /* scalable.cpp */; };
+		9CDABD332E4F64D4002D3806 /* compress.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C53878A2E42B3B3008BD1D9 /* compress.cpp */; };
+		9CDABD342E4F64D4002D3806 /* ai.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5387892E42B3B3008BD1D9 /* ai.cpp */; };
+		9CDABD352E4F64D4002D3806 /* metadata-ieee.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B1173118C700A755DF /* metadata-ieee.cpp */; };
+		9CDABD362E4F64D4002D3806 /* virtual_enhance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4911B17C1CCA191400F0AFFD /* virtual_enhance.cpp */; };
+		9CDABD372E4F64D4002D3806 /* rewrite_equation_number.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BB5B5173118F700A755DF /* rewrite_equation_number.cpp */; };
+		9CDABD382E4F64D4002D3806 /* scilab_language.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 490DBDA8176EEEBD001F362A /* scilab_language.cpp */; };
+		9CDABD392E4F64D4002D3806 /* tm_sparkle.mm in Sources */ = {isa = PBXBuildFile; fileRef = 491BF369178BFF4C00C69EEF /* tm_sparkle.mm */; };
+		9CDABD3A2E4F64D4002D3806 /* locale.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4152412BF7E00F73F5A /* locale.cpp */; };
+		9CDABD3B2E4F64D4002D3806 /* colors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A513E719426DD70017E373 /* colors.cpp */; };
+		9CDABD3C2E4F64D4002D3806 /* rubber_assemble_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C095FE1B0F93C600E038BA /* rubber_assemble_font.cpp */; };
+		9CDABD3D2E4F64D4002D3806 /* rubber_stix_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C095FF1B0F93C600E038BA /* rubber_stix_font.cpp */; };
+		9CDABD3E2E4F64D4002D3806 /* tm_updater.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36A178BFF4C00C69EEF /* tm_updater.cpp */; };
+		9CDABD3F2E4F64D4002D3806 /* tm_winsparkle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 491BF36C178BFF4C00C69EEF /* tm_winsparkle.cpp */; };
+		9CDABD402E4F64D4002D3806 /* latex_preview.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 493F45F7179EC49F00E2972D /* latex_preview.cpp */; };
+		9CDABD412E4F64D4002D3806 /* highlight_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4950FA5217E8349800425005 /* highlight_boxes.cpp */; };
+		9CDABD422E4F64D4002D3806 /* parse_vernac.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4915C7D118093E4D00C3D2B7 /* parse_vernac.cpp */; };
+		9CDABD432E4F64D4002D3806 /* adjust_biolinum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F42A2412C1DF00F73F5A /* adjust_biolinum.cpp */; };
+		9CDABD442E4F64D4002D3806 /* font_protrusion.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49AA0884181166140090FD84 /* font_protrusion.cpp */; };
+		9CDABD452E4F64D4002D3806 /* poor_effected.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C33F4392412C20100F73F5A /* poor_effected.cpp */; };
+		9CDABD462E4F64D4002D3806 /* tree_search.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49194C6A184E892800DC45E2 /* tree_search.cpp */; };
+		9CDABD472E4F64D4002D3806 /* database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49C0960B1B0F945300E038BA /* database.cpp */; };
+		9CDABD4A2E4F64D4002D3806 /* TeXmacs in CopyFiles */ = {isa = PBXBuildFile; fileRef = 9C0B430010A8CB4E0097A335 /* TeXmacs */; };
+		9CDABD522E4F6991002D3806 /* vue_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CDABB952E4F51B0002D3806 /* vue_widget.cpp */; };
 		9CE18E83125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
 		9CE18E84125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
 		9CE18E85125E685D00641CFC /* tree_brackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CE18E81125E685D00641CFC /* tree_brackets.cpp */; };
@@ -2016,6 +2403,7 @@
 		9CEDAA361264FF88009630CC /* unicode_math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA351264FF88009630CC /* unicode_math_font.cpp */; };
 		9CEDAA371264FF88009630CC /* unicode_math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA351264FF88009630CC /* unicode_math_font.cpp */; };
 		9CEDAA381264FF88009630CC /* unicode_math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA351264FF88009630CC /* unicode_math_font.cpp */; };
+		9CEEC6392E58D14A00D0B5C3 /* TeXmacsVue.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */; };
 		9CF1389612A9B65F009F02C9 /* qt_ui_element.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF1389512A9B65F009F02C9 /* qt_ui_element.cpp */; };
 		9CF5BC73128A13CB00F691BF /* qt_tm_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5BC6B128A13CB00F691BF /* qt_tm_widget.cpp */; };
 		9CF5BC75128A13CB00F691BF /* qt_window_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5BC6F128A13CB00F691BF /* qt_window_widget.cpp */; };
@@ -2120,6 +2508,25 @@
 			dstSubfolderSpec = 7;
 			files = (
 				9CD4E70010B14AB300E0DD5C /* TeXmacs in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9CDABD492E4F64D4002D3806 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = share;
+			dstSubfolderSpec = 7;
+			files = (
+				9CDABD4A2E4F64D4002D3806 /* TeXmacs in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9CDABD4B2E4F64D4002D3806 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3331,6 +3738,10 @@
 		9CD4E70410B14AB300E0DD5C /* TeXmacsX11.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsX11.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CDA725C126CC926006E8028 /* tree_modify.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_modify.cpp; sourceTree = "<group>"; };
 		9CDA725D126CC926006E8028 /* tree_modify.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tree_modify.hpp; sourceTree = "<group>"; };
+		9CDABB942E4F51B0002D3806 /* vue_widget.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = vue_widget.hpp; sourceTree = "<group>"; };
+		9CDABB952E4F51B0002D3806 /* vue_widget.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vue_widget.cpp; sourceTree = "<group>"; };
+		9CDABD502E4F64D4002D3806 /* TeXmacsVue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsVue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9CDABD512E4F64D4002D3806 /* TeXmacsSDL copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "TeXmacsSDL copy-Info.plist"; path = "/Users/mgubi/t/lab/wip_other_guis/src/packages/macos/TeXmacsSDL copy-Info.plist"; sourceTree = "<absolute>"; };
 		9CE18E81125E685D00641CFC /* tree_brackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_brackets.cpp; sourceTree = "<group>"; };
 		9CE4F0041238FAF800993AF7 /* packrat.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat.hpp; sourceTree = "<group>"; };
 		9CEB8DCA2E4DCA2800607831 /* TeXmacsSDL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsSDL.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -3346,6 +3757,7 @@
 		9CEDAA2E1264FF6C009630CC /* tree_analyze.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_analyze.cpp; sourceTree = "<group>"; };
 		9CEDAA2F1264FF6C009630CC /* tree_analyze.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tree_analyze.hpp; sourceTree = "<group>"; };
 		9CEDAA351264FF88009630CC /* unicode_math_font.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unicode_math_font.cpp; sourceTree = "<group>"; };
+		9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsVue.xcconfig; sourceTree = "<group>"; };
 		9CF1389412A9B65F009F02C9 /* qt_ui_element.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_ui_element.hpp; sourceTree = "<group>"; };
 		9CF1389512A9B65F009F02C9 /* qt_ui_element.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_ui_element.cpp; sourceTree = "<group>"; };
 		9CF5BC6B128A13CB00F691BF /* qt_tm_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.cpp; path = qt_tm_widget.cpp; sourceTree = "<group>"; tabWidth = 2; };
@@ -3408,6 +3820,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9CDABD482E4F64D4002D3806 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9CEB8DC02E4DCA2800607831 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -3427,6 +3846,7 @@
 				9CCC751410D303D900E88D90 /* TeXmacsCocoa.app */,
 				4907D0D81812E2BC00D893B4 /* PDFWriter.a */,
 				9CEB8DCA2E4DCA2800607831 /* TeXmacsSDL.app */,
+				9CDABD502E4F64D4002D3806 /* TeXmacsVue.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -3437,6 +3857,7 @@
 				9C0B475B10A8CBE40097A335 /* Resources */,
 				29B97315FDCFA39411CA2CEA /* Sources */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
+				9CDABD512E4F64D4002D3806 /* TeXmacsSDL copy-Info.plist */,
 			);
 			indentWidth = 2;
 			name = TeXmacs;
@@ -4437,6 +4858,7 @@
 		9C0B484710A8CC100097A335 /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
+				9CDABB962E4F51B0002D3806 /* Vue */,
 				9CEB8DD22E4DCC4200607831 /* MuPDF */,
 				9CEB8DD72E4DCC4200607831 /* SDL */,
 				9C0B484810A8CC100097A335 /* Axel */,
@@ -5471,6 +5893,7 @@
 				9C61B42E141A1B780035D78F /* TeXmacsCocoa.xcconfig */,
 				9C61B42F141A1B780035D78F /* TeXmacsQt.xcconfig */,
 				9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */,
+				9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */,
 				9C61B430141A1B780035D78F /* TeXmacsX11.xcconfig */,
 				9C5A817C181DC97900B9C03D /* PDFWriter.xcconfig */,
 			);
@@ -5541,6 +5964,15 @@
 				9CD46B11147429F900A7E2FC /* guile_tm.cpp */,
 			);
 			path = Guile;
+			sourceTree = "<group>";
+		};
+		9CDABB962E4F51B0002D3806 /* Vue */ = {
+			isa = PBXGroup;
+			children = (
+				9CDABB942E4F51B0002D3806 /* vue_widget.hpp */,
+				9CDABB952E4F51B0002D3806 /* vue_widget.cpp */,
+			);
+			path = Vue;
 			sourceTree = "<group>";
 		};
 		9CEB8DD22E4DCC4200607831 /* MuPDF */ = {
@@ -5898,6 +6330,28 @@
 			productReference = 9CD4E70410B14AB300E0DD5C /* TeXmacsX11.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9CDABB972E4F64D4002D3806 /* TeXmacsVue */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9CDABD4D2E4F64D4002D3806 /* Build configuration list for PBXNativeTarget "TeXmacsVue" */;
+			buildPhases = (
+				9CDABB982E4F64D4002D3806 /* Print Environment */,
+				9CDABB992E4F64D4002D3806 /* Resources */,
+				9CDABB9E2E4F64D4002D3806 /* Sources */,
+				9CDABD482E4F64D4002D3806 /* Frameworks */,
+				9CDABD492E4F64D4002D3806 /* CopyFiles */,
+				9CDABD4B2E4F64D4002D3806 /* CopyFiles */,
+				9CDABD4C2E4F64D4002D3806 /* Bundle scripts */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TeXmacsVue;
+			productInstallPath = "$(HOME)/Applications";
+			productName = TeXmacsQt;
+			productReference = 9CDABD502E4F64D4002D3806 /* TeXmacsVue.app */;
+			productType = "com.apple.product-type.application";
+		};
 		9CEB8C182E4DCA2800607831 /* TeXmacsSDL */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9CEB8DC72E4DCA2800607831 /* Build configuration list for PBXNativeTarget "TeXmacsSDL" */;
@@ -5955,6 +6409,7 @@
 				9C146EC714705D62003E9327 /* LittleScheme */,
 				4907D0D71812E2BC00D893B4 /* PDFWriter */,
 				9CEB8C182E4DCA2800607831 /* TeXmacsSDL */,
+				9CDABB972E4F64D4002D3806 /* TeXmacsVue */,
 			);
 		};
 /* End PBXProject section */
@@ -5980,6 +6435,18 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9CDABB992E4F64D4002D3806 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9CDABB9A2E4F64D4002D3806 /* TeXmacsSDL.xcconfig in Resources */,
+				9CDABB9B2E4F64D4002D3806 /* build-glue.scm in Resources */,
+				9CDABB9C2E4F64D4002D3806 /* Info-Xcode.plist in Resources */,
+				9CDABB9D2E4F64D4002D3806 /* TeXmacs.icns in Resources */,
+				9CEEC6392E58D14A00D0B5C3 /* TeXmacsVue.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -6080,6 +6547,34 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "";
+		};
+		9CDABB982E4F64D4002D3806 /* Print Environment */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Print Environment";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "";
+		};
+		9CDABD4C2E4F64D4002D3806 /* Bundle scripts */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle scripts";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p $TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/share/TeXmacs/bin\ncp -f $TM_BASE/misc/scripts/fig2ps  $TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/share/TeXmacs/bin\ncp -f $TM_BASE/misc/scripts/tm_gs  $TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/share/TeXmacs/bin\nchmod 755 $TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/share/TeXmacs/bin/*\n";
 		};
 		9CEB8C1D2E4DCA2800607831 /* Print Environment */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -7536,6 +8031,395 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9CDABB9E2E4F64D4002D3806 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9CDABB9F2E4F64D4002D3806 /* generic.cpp in Sources */,
+				9CDABBA02E4F64D4002D3806 /* input.cpp in Sources */,
+				9CDABBA12E4F64D4002D3806 /* poor_bold.cpp in Sources */,
+				9CDABBA22E4F64D4002D3806 /* from_scheme.cpp in Sources */,
+				9CDABBA32E4F64D4002D3806 /* to_scheme.cpp in Sources */,
+				9CDABBA42E4F64D4002D3806 /* fromtex.cpp in Sources */,
+				9CDABBA52E4F64D4002D3806 /* inittex.cpp in Sources */,
+				9CDABBA62E4F64D4002D3806 /* parsetex.cpp in Sources */,
+				9CDABBA72E4F64D4002D3806 /* adjust_stix.cpp in Sources */,
+				9CDABBA82E4F64D4002D3806 /* fromtm.cpp in Sources */,
+				9CDABBA92E4F64D4002D3806 /* totm.cpp in Sources */,
+				9CDABBAA2E4F64D4002D3806 /* upgradetm.cpp in Sources */,
+				9CDABBAB2E4F64D4002D3806 /* verbatim.cpp in Sources */,
+				9CDABBAC2E4F64D4002D3806 /* db_sort.cpp in Sources */,
+				9CDABBAD2E4F64D4002D3806 /* fromxml.cpp in Sources */,
+				9CDABBAE2E4F64D4002D3806 /* parsexml.cpp in Sources */,
+				9CDABBAF2E4F64D4002D3806 /* drd_info.cpp in Sources */,
+				9CDABBB02E4F64D4002D3806 /* drd_mode.cpp in Sources */,
+				9CDABBB12E4F64D4002D3806 /* drd_std.cpp in Sources */,
+				9CDABBB22E4F64D4002D3806 /* tag_info.cpp in Sources */,
+				9CDABBB32E4F64D4002D3806 /* base64.cpp in Sources */,
+				9CDABBB42E4F64D4002D3806 /* vars.cpp in Sources */,
+				9CDABBB52E4F64D4002D3806 /* archiver.cpp in Sources */,
+				9CDABBB62E4F64D4002D3806 /* commute.cpp in Sources */,
+				9CDABBB72E4F64D4002D3806 /* patch.cpp in Sources */,
+				9CDABBB82E4F64D4002D3806 /* edit_observer.cpp in Sources */,
+				9CDABBB92E4F64D4002D3806 /* db_index.cpp in Sources */,
+				9CDABBBA2E4F64D4002D3806 /* ip_observer.cpp in Sources */,
+				9CDABBBB2E4F64D4002D3806 /* link.cpp in Sources */,
+				9CDABBBC2E4F64D4002D3806 /* list_observer.cpp in Sources */,
+				9CDABBBD2E4F64D4002D3806 /* tree_pointer.cpp in Sources */,
+				9CDABBBE2E4F64D4002D3806 /* tree_position.cpp in Sources */,
+				9CDABBBF2E4F64D4002D3806 /* undo_observer.cpp in Sources */,
+				9CDABBC02E4F64D4002D3806 /* analyze.cpp in Sources */,
+				9CDABBC12E4F64D4002D3806 /* converter.cpp in Sources */,
+				9CDABBC22E4F64D4002D3806 /* number_parser.cpp in Sources */,
+				9CDABBC32E4F64D4002D3806 /* tree_correct.cpp in Sources */,
+				9CDABBC42E4F64D4002D3806 /* poor_stretched.cpp in Sources */,
+				9CDABBC52E4F64D4002D3806 /* fakedlopen.c in Sources */,
+				9CDABBC62E4F64D4002D3806 /* metadata_post.cpp in Sources */,
+				9CDABBC72E4F64D4002D3806 /* tree_cursor.cpp in Sources */,
+				9CDABBC82E4F64D4002D3806 /* tree_traverse.cpp in Sources */,
+				9CDABBC92E4F64D4002D3806 /* edit_main.cpp in Sources */,
+				9CDABBCA2E4F64D4002D3806 /* latex_tools.cpp in Sources */,
+				9CDABBCB2E4F64D4002D3806 /* edit_typeset.cpp in Sources */,
+				9CDABBCC2E4F64D4002D3806 /* edit_complete.cpp in Sources */,
+				9CDABBCD2E4F64D4002D3806 /* edit_cursor.cpp in Sources */,
+				9CDABBCE2E4F64D4002D3806 /* edit_footer.cpp in Sources */,
+				9CDABBCF2E4F64D4002D3806 /* edit_graphics.cpp in Sources */,
+				9CDABBD02E4F64D4002D3806 /* edit_interface.cpp in Sources */,
+				9CDABBD12E4F64D4002D3806 /* edit_keyboard.cpp in Sources */,
+				9CDABBD22E4F64D4002D3806 /* edit_mouse.cpp in Sources */,
+				9CDABBD32E4F64D4002D3806 /* edit_repaint.cpp in Sources */,
+				9CDABBD42E4F64D4002D3806 /* columns_breaker.cpp in Sources */,
+				9CDABBD52E4F64D4002D3806 /* edit_delete.cpp in Sources */,
+				9CDABBD62E4F64D4002D3806 /* edit_dynamic.cpp in Sources */,
+				9CDABBD72E4F64D4002D3806 /* conservative_fromtex.cpp in Sources */,
+				9CDABC042E4F64D4002D3806 /* edit_math.cpp in Sources */,
+				9CDABC052E4F64D4002D3806 /* edit_modify.cpp in Sources */,
+				9CDABC062E4F64D4002D3806 /* player.cpp in Sources */,
+				9CDABC072E4F64D4002D3806 /* edit_table.cpp in Sources */,
+				9CDABC082E4F64D4002D3806 /* edit_text.cpp in Sources */,
+				9CDABC092E4F64D4002D3806 /* edit_process.cpp in Sources */,
+				9CDABC0A2E4F64D4002D3806 /* edit_search.cpp in Sources */,
+				9CDABC0B2E4F64D4002D3806 /* edit_select.cpp in Sources */,
+				9CDABC0C2E4F64D4002D3806 /* edit_spell.cpp in Sources */,
+				9CDABC0D2E4F64D4002D3806 /* string_parser.cpp in Sources */,
+				9CDABC0E2E4F64D4002D3806 /* bitmap_font.cpp in Sources */,
+				9CDABC0F2E4F64D4002D3806 /* glyph.cpp in Sources */,
+				9CDABC102E4F64D4002D3806 /* glyph_ops.cpp in Sources */,
+				9CDABC112E4F64D4002D3806 /* glyph_shrink.cpp in Sources */,
+				9CDABC122E4F64D4002D3806 /* charmap.cpp in Sources */,
+				9CDABC132E4F64D4002D3806 /* conservative_totex.cpp in Sources */,
+				9CDABC142E4F64D4002D3806 /* compound_font.cpp in Sources */,
+				9CDABC152E4F64D4002D3806 /* find_font.cpp in Sources */,
+				9CDABC162E4F64D4002D3806 /* font.cpp in Sources */,
+				9CDABC172E4F64D4002D3806 /* math_font.cpp in Sources */,
+				9CDABC182E4F64D4002D3806 /* translator.cpp in Sources */,
+				9CDABC192E4F64D4002D3806 /* virtual_font.cpp in Sources */,
+				9CDABC1A2E4F64D4002D3806 /* widget.cpp in Sources */,
+				9CDABC1B2E4F64D4002D3806 /* math_tree.cpp in Sources */,
+				9CDABC1C2E4F64D4002D3806 /* poor_distorted.cpp in Sources */,
+				9CDABC1D2E4F64D4002D3806 /* preprocessor_parser.cpp in Sources */,
+				9CDABC1E2E4F64D4002D3806 /* test_math.cpp in Sources */,
+				9CDABC1F2E4F64D4002D3806 /* basic_renderer.cpp in Sources */,
+				9CDABC202E4F64D4002D3806 /* page_type.cpp in Sources */,
+				9CDABC212E4F64D4002D3806 /* adjust_termes.cpp in Sources */,
+				9CDABC222E4F64D4002D3806 /* printer.cpp in Sources */,
+				9CDABC232E4F64D4002D3806 /* renderer.cpp in Sources */,
+				9CDABC242E4F64D4002D3806 /* basic.cpp in Sources */,
+				9CDABC252E4F64D4002D3806 /* command.cpp in Sources */,
+				9CDABC262E4F64D4002D3806 /* observer.cpp in Sources */,
+				9CDABC272E4F64D4002D3806 /* array.cpp in Sources */,
+				9CDABC282E4F64D4002D3806 /* hashfunc.cpp in Sources */,
+				9CDABC292E4F64D4002D3806 /* adjust_bonum.cpp in Sources */,
+				9CDABC2A2E4F64D4002D3806 /* hashmap.cpp in Sources */,
+				9CDABC2B2E4F64D4002D3806 /* hashmap_extra.cpp in Sources */,
+				9CDABC2C2E4F64D4002D3806 /* hashset.cpp in Sources */,
+				9CDABC2D2E4F64D4002D3806 /* hashtree.cpp in Sources */,
+				9CDABC2E2E4F64D4002D3806 /* iterator.cpp in Sources */,
+				9CDABC2F2E4F64D4002D3806 /* env_animate.cpp in Sources */,
+				9CDABC302E4F64D4002D3806 /* list.cpp in Sources */,
+				9CDABC312E4F64D4002D3806 /* rel_hashmap.cpp in Sources */,
+				9CDABC322E4F64D4002D3806 /* modification.cpp in Sources */,
+				9CDABC332E4F64D4002D3806 /* tracked_totex.cpp in Sources */,
+				9CDABC342E4F64D4002D3806 /* parse_string.cpp in Sources */,
+				9CDABC352E4F64D4002D3806 /* path.cpp in Sources */,
+				9CDABC362E4F64D4002D3806 /* rectangles.cpp in Sources */,
+				9CDABC372E4F64D4002D3806 /* space.cpp in Sources */,
+				9CDABC382E4F64D4002D3806 /* string.cpp in Sources */,
+				9CDABC392E4F64D4002D3806 /* tab.cpp in Sources */,
+				9CDABC3A2E4F64D4002D3806 /* adjust_schola.cpp in Sources */,
+				9CDABC3B2E4F64D4002D3806 /* prog_language.cpp in Sources */,
+				9CDABC3C2E4F64D4002D3806 /* tree.cpp in Sources */,
+				9CDABC3D2E4F64D4002D3806 /* tree_label.cpp in Sources */,
+				9CDABC3E2E4F64D4002D3806 /* bibtex.cpp in Sources */,
+				9CDABC3F2E4F64D4002D3806 /* db_disk.cpp in Sources */,
+				9CDABC402E4F64D4002D3806 /* free_type.cpp in Sources */,
+				9CDABC412E4F64D4002D3806 /* db_query.cpp in Sources */,
+				9CDABC422E4F64D4002D3806 /* tt_face.cpp in Sources */,
+				9CDABC432E4F64D4002D3806 /* tt_file.cpp in Sources */,
+				9CDABC442E4F64D4002D3806 /* tt_font.cpp in Sources */,
+				9CDABC452E4F64D4002D3806 /* unicode_font.cpp in Sources */,
+				9CDABC462E4F64D4002D3806 /* imlib2.cpp in Sources */,
+				9CDABC472E4F64D4002D3806 /* tree_addendum.cpp in Sources */,
+				9CDABC482E4F64D4002D3806 /* ispell.cpp in Sources */,
+				9CDABC492E4F64D4002D3806 /* mac_app.mm in Sources */,
+				9CDABC4A2E4F64D4002D3806 /* mac_images.mm in Sources */,
+				9CDABC4B2E4F64D4002D3806 /* mac_spellservice.mm in Sources */,
+				9CDABC4C2E4F64D4002D3806 /* load_pk.cpp in Sources */,
+				9CDABC4D2E4F64D4002D3806 /* load_tex.cpp in Sources */,
+				9CDABC4E2E4F64D4002D3806 /* load_tfm.cpp in Sources */,
+				9CDABC4F2E4F64D4002D3806 /* glyph_effected.cpp in Sources */,
+				9CDABC502E4F64D4002D3806 /* tex_files.cpp in Sources */,
+				9CDABC512E4F64D4002D3806 /* tex_font.cpp in Sources */,
+				9CDABC522E4F64D4002D3806 /* cleanhtml.cpp in Sources */,
+				9CDABC532E4F64D4002D3806 /* tex_init.cpp in Sources */,
+				9CDABC542E4F64D4002D3806 /* tex_rubber_font.cpp in Sources */,
+				9CDABC552E4F64D4002D3806 /* openssl.cpp in Sources */,
+				9CDABC562E4F64D4002D3806 /* indexation.cpp in Sources */,
+				9CDABC572E4F64D4002D3806 /* keyword_parser.cpp in Sources */,
+				9CDABC582E4F64D4002D3806 /* init_texmacs.cpp in Sources */,
+				9CDABC592E4F64D4002D3806 /* init_upgrade.cpp in Sources */,
+				9CDABC5A2E4F64D4002D3806 /* adjust_pagella.cpp in Sources */,
+				9CDABC5B2E4F64D4002D3806 /* url.cpp in Sources */,
+				9CDABC5C2E4F64D4002D3806 /* file.cpp in Sources */,
+				9CDABC5D2E4F64D4002D3806 /* image_files.cpp in Sources */,
+				9CDABC5E2E4F64D4002D3806 /* web_files.cpp in Sources */,
+				9CDABC5F2E4F64D4002D3806 /* dictionary.cpp in Sources */,
+				9CDABC602E4F64D4002D3806 /* hyphenate.cpp in Sources */,
+				9CDABC612E4F64D4002D3806 /* language.cpp in Sources */,
+				9CDABC622E4F64D4002D3806 /* math_language.cpp in Sources */,
+				9CDABC632E4F64D4002D3806 /* mathemagix_language.cpp in Sources */,
+				9CDABC642E4F64D4002D3806 /* scheme_language.cpp in Sources */,
+				9CDABC652E4F64D4002D3806 /* text_language.cpp in Sources */,
+				9CDABC662E4F64D4002D3806 /* raster_random.cpp in Sources */,
+				9CDABC672E4F64D4002D3806 /* verb_language.cpp in Sources */,
+				9CDABC682E4F64D4002D3806 /* connection.cpp in Sources */,
+				9CDABC692E4F64D4002D3806 /* dyn_link.cpp in Sources */,
+				9CDABC6A2E4F64D4002D3806 /* pipe_link.cpp in Sources */,
+				9CDABC6B2E4F64D4002D3806 /* poor_bbb.cpp in Sources */,
+				9CDABC6C2E4F64D4002D3806 /* socket_link.cpp in Sources */,
+				9CDABC6D2E4F64D4002D3806 /* socket_notifier.cpp in Sources */,
+				9CDABC6E2E4F64D4002D3806 /* socket_server.cpp in Sources */,
+				9CDABC6F2E4F64D4002D3806 /* texmacs_client.cpp in Sources */,
+				9CDABC702E4F64D4002D3806 /* texmacs_server.cpp in Sources */,
+				9CDABC712E4F64D4002D3806 /* tm_link.cpp in Sources */,
+				9CDABC722E4F64D4002D3806 /* poor_smallcaps.cpp in Sources */,
+				9CDABC732E4F64D4002D3806 /* data_cache.cpp in Sources */,
+				9CDABC742E4F64D4002D3806 /* fast_alloc.cpp in Sources */,
+				9CDABC752E4F64D4002D3806 /* sys_utils.cpp in Sources */,
+				9CDABC762E4F64D4002D3806 /* tm_config.cpp in Sources */,
+				9CDABC772E4F64D4002D3806 /* unix_entrypoint.cpp in Sources */,
+				9CDABC782E4F64D4002D3806 /* tm_server.cpp in Sources */,
+				9CDABD522E4F6991002D3806 /* vue_widget.cpp in Sources */,
+				9CDABC792E4F64D4002D3806 /* texmacs.cpp in Sources */,
+				9CDABC7A2E4F64D4002D3806 /* tm_button.cpp in Sources */,
+				9CDABC7B2E4F64D4002D3806 /* tm_dialogue.cpp in Sources */,
+				9CDABC7C2E4F64D4002D3806 /* tm_frame.cpp in Sources */,
+				9CDABC7D2E4F64D4002D3806 /* tm_window.cpp in Sources */,
+				9CDABC7E2E4F64D4002D3806 /* animate_boxes.cpp in Sources */,
+				9CDABC7F2E4F64D4002D3806 /* basic_boxes.cpp in Sources */,
+				9CDABC802E4F64D4002D3806 /* boxes.cpp in Sources */,
+				9CDABC812E4F64D4002D3806 /* rubber_boxes.cpp in Sources */,
+				9CDABC822E4F64D4002D3806 /* stretch_boxes.cpp in Sources */,
+				9CDABC832E4F64D4002D3806 /* text_boxes.cpp in Sources */,
+				9CDABC842E4F64D4002D3806 /* composite_boxes.cpp in Sources */,
+				9CDABC852E4F64D4002D3806 /* concat_boxes.cpp in Sources */,
+				9CDABC862E4F64D4002D3806 /* decoration_boxes.cpp in Sources */,
+				9CDABC872E4F64D4002D3806 /* math_boxes.cpp in Sources */,
+				9CDABC882E4F64D4002D3806 /* escaped_char_parser.cpp in Sources */,
+				9CDABC892E4F64D4002D3806 /* misc_boxes.cpp in Sources */,
+				9CDABC8A2E4F64D4002D3806 /* latex_recover.cpp in Sources */,
+				9CDABC8B2E4F64D4002D3806 /* make_file.cpp in Sources */,
+				9CDABC8C2E4F64D4002D3806 /* script_boxes.cpp in Sources */,
+				9CDABC8D2E4F64D4002D3806 /* stack_boxes.cpp in Sources */,
+				9CDABC8E2E4F64D4002D3806 /* operator_parser.cpp in Sources */,
+				9CDABC8F2E4F64D4002D3806 /* sdl_gui.cpp in Sources */,
+				9CDABC902E4F64D4002D3806 /* mupdf_picture.cpp in Sources */,
+				9CDABC912E4F64D4002D3806 /* mupdf_renderer.cpp in Sources */,
+				9CDABC922E4F64D4002D3806 /* sdl_window.cpp in Sources */,
+				9CDABC932E4F64D4002D3806 /* cmdline_link.cpp in Sources */,
+				9CDABC942E4F64D4002D3806 /* fast_search.cpp in Sources */,
+				9CDABC952E4F64D4002D3806 /* superpose_boxes.cpp in Sources */,
+				9CDABC962E4F64D4002D3806 /* graphics_boxes.cpp in Sources */,
+				9CDABC972E4F64D4002D3806 /* grid_boxes.cpp in Sources */,
+				9CDABC982E4F64D4002D3806 /* change_boxes.cpp in Sources */,
+				9CDABC992E4F64D4002D3806 /* modifier_boxes.cpp in Sources */,
+				9CDABC9A2E4F64D4002D3806 /* bridge.cpp in Sources */,
+				9CDABC9B2E4F64D4002D3806 /* bridge_argument.cpp in Sources */,
+				9CDABC9C2E4F64D4002D3806 /* adjust_fira.cpp in Sources */,
+				9CDABC9D2E4F64D4002D3806 /* bridge_auto.cpp in Sources */,
+				9CDABC9E2E4F64D4002D3806 /* bridge_compound.cpp in Sources */,
+				9CDABC9F2E4F64D4002D3806 /* bridge_default.cpp in Sources */,
+				9CDABCA02E4F64D4002D3806 /* bridge_docrange.cpp in Sources */,
+				9CDABCA12E4F64D4002D3806 /* bridge_document.cpp in Sources */,
+				9CDABCA22E4F64D4002D3806 /* bridge_eval.cpp in Sources */,
+				9CDABCA32E4F64D4002D3806 /* bridge_expand_as.cpp in Sources */,
+				9CDABCA42E4F64D4002D3806 /* recolored_font.cpp in Sources */,
+				9CDABCA52E4F64D4002D3806 /* glyph_distorted.cpp in Sources */,
+				9CDABCA62E4F64D4002D3806 /* bridge_formatting.cpp in Sources */,
+				9CDABCA72E4F64D4002D3806 /* bridge_gui.cpp in Sources */,
+				9CDABCA82E4F64D4002D3806 /* bridge_hidden.cpp in Sources */,
+				9CDABCA92E4F64D4002D3806 /* universal.cpp in Sources */,
+				9CDABCAA2E4F64D4002D3806 /* bridge_locus.cpp in Sources */,
+				9CDABCAB2E4F64D4002D3806 /* rubber_unicode_font.cpp in Sources */,
+				9CDABCAC2E4F64D4002D3806 /* bridge_mark.cpp in Sources */,
+				9CDABCAD2E4F64D4002D3806 /* bridge_rewrite.cpp in Sources */,
+				9CDABCAE2E4F64D4002D3806 /* bridge_surround.cpp in Sources */,
+				9CDABCAF2E4F64D4002D3806 /* bridge_with.cpp in Sources */,
+				9CDABCB02E4F64D4002D3806 /* typesetter.cpp in Sources */,
+				9CDABCB12E4F64D4002D3806 /* concat_active.cpp in Sources */,
+				9CDABCB22E4F64D4002D3806 /* concat_animate.cpp in Sources */,
+				9CDABCB32E4F64D4002D3806 /* concat_graphics.cpp in Sources */,
+				9CDABCB42E4F64D4002D3806 /* concat_gui.cpp in Sources */,
+				9CDABCB52E4F64D4002D3806 /* concat_inactive.cpp in Sources */,
+				9CDABCB62E4F64D4002D3806 /* concat_macro.cpp in Sources */,
+				9CDABCB72E4F64D4002D3806 /* concat_math.cpp in Sources */,
+				9CDABCB82E4F64D4002D3806 /* font_scripts.cpp in Sources */,
+				9CDABCB92E4F64D4002D3806 /* new_breaker.cpp in Sources */,
+				9CDABCBA2E4F64D4002D3806 /* concat_post.cpp in Sources */,
+				9CDABCBB2E4F64D4002D3806 /* concat_text.cpp in Sources */,
+				9CDABCBC2E4F64D4002D3806 /* concater.cpp in Sources */,
+				9CDABCBD2E4F64D4002D3806 /* env.cpp in Sources */,
+				9CDABCBE2E4F64D4002D3806 /* env_default.cpp in Sources */,
+				9CDABCBF2E4F64D4002D3806 /* env_exec.cpp in Sources */,
+				9CDABCC02E4F64D4002D3806 /* env_inactive.cpp in Sources */,
+				9CDABCC12E4F64D4002D3806 /* env_length.cpp in Sources */,
+				9CDABCC22E4F64D4002D3806 /* env_semantics.cpp in Sources */,
+				9CDABCC32E4F64D4002D3806 /* tree_spell.cpp in Sources */,
+				9CDABCC42E4F64D4002D3806 /* r_language.cpp in Sources */,
+				9CDABCC52E4F64D4002D3806 /* format.cpp in Sources */,
+				9CDABCC62E4F64D4002D3806 /* unix_stacktrace.cpp in Sources */,
+				9CDABCC72E4F64D4002D3806 /* impl_language.cpp in Sources */,
+				9CDABCC82E4F64D4002D3806 /* poor_rubber.cpp in Sources */,
+				9CDABCC92E4F64D4002D3806 /* formatter.cpp in Sources */,
+				9CDABCCA2E4F64D4002D3806 /* line_item.cpp in Sources */,
+				9CDABCCB2E4F64D4002D3806 /* page_item.cpp in Sources */,
+				9CDABCCC2E4F64D4002D3806 /* lazy_gui.cpp in Sources */,
+				9CDABCCD2E4F64D4002D3806 /* xml.cpp in Sources */,
+				9CDABCCE2E4F64D4002D3806 /* lazy_paragraph.cpp in Sources */,
+				9CDABCCF2E4F64D4002D3806 /* adjust_libertine.cpp in Sources */,
+				9CDABCD02E4F64D4002D3806 /* lazy_typeset.cpp in Sources */,
+				9CDABCD12E4F64D4002D3806 /* lazy_vstream.cpp in Sources */,
+				9CDABCD22E4F64D4002D3806 /* tm_timer.cpp in Sources */,
+				9CDABCD32E4F64D4002D3806 /* line_breaker.cpp in Sources */,
+				9CDABCD42E4F64D4002D3806 /* make_pages.cpp in Sources */,
+				9CDABCD52E4F64D4002D3806 /* page_breaker.cpp in Sources */,
+				9CDABCD62E4F64D4002D3806 /* pager.cpp in Sources */,
+				9CDABCD72E4F64D4002D3806 /* skeleton.cpp in Sources */,
+				9CDABCD82E4F64D4002D3806 /* vpenalty.cpp in Sources */,
+				9CDABCD92E4F64D4002D3806 /* stacker.cpp in Sources */,
+				9CDABCDA2E4F64D4002D3806 /* cell.cpp in Sources */,
+				9CDABCDB2E4F64D4002D3806 /* table.cpp in Sources */,
+				9CDABCDC2E4F64D4002D3806 /* fromtex_post.cpp in Sources */,
+				9CDABCDD2E4F64D4002D3806 /* unix_system.cpp in Sources */,
+				9CDABCDE2E4F64D4002D3806 /* unix_sys_utils.cpp in Sources */,
+				9CDABCDF2E4F64D4002D3806 /* tm_ostream.cpp in Sources */,
+				9CDABCE02E4F64D4002D3806 /* poor_mono.cpp in Sources */,
+				9CDABCE12E4F64D4002D3806 /* gs_utilities.cpp in Sources */,
+				9CDABCE22E4F64D4002D3806 /* bibtex_functions.cpp in Sources */,
+				9CDABCE32E4F64D4002D3806 /* parsebib.cpp in Sources */,
+				9CDABCE42E4F64D4002D3806 /* packrat_grammar.cpp in Sources */,
+				9CDABCE52E4F64D4002D3806 /* packrat_parser.cpp in Sources */,
+				9CDABCE62E4F64D4002D3806 /* tree_brackets.cpp in Sources */,
+				9CDABCE72E4F64D4002D3806 /* poor_italic.cpp in Sources */,
+				9CDABCE82E4F64D4002D3806 /* highlight_observer.cpp in Sources */,
+				9CDABCE92E4F64D4002D3806 /* poor_extended.cpp in Sources */,
+				9CDABCEA2E4F64D4002D3806 /* tree_analyze.cpp in Sources */,
+				9CDABCEB2E4F64D4002D3806 /* unicode_math_font.cpp in Sources */,
+				9CDABCEC2E4F64D4002D3806 /* tree_modify.cpp in Sources */,
+				9CDABCED2E4F64D4002D3806 /* mac_utilities.mm in Sources */,
+				9CDABCEE2E4F64D4002D3806 /* true_color.cpp in Sources */,
+				9CDABCEF2E4F64D4002D3806 /* curve_extras.cpp in Sources */,
+				9CDABCF02E4F64D4002D3806 /* HIDRemote.m in Sources */,
+				9CDABCF12E4F64D4002D3806 /* glyph_unserif.cpp in Sources */,
+				9CDABCF22E4F64D4002D3806 /* parsehtml.cpp in Sources */,
+				9CDABCF32E4F64D4002D3806 /* packrat_serializer.cpp in Sources */,
+				9CDABCF42E4F64D4002D3806 /* tree_select.cpp in Sources */,
+				9CDABCF52E4F64D4002D3806 /* tm_debug.cpp in Sources */,
+				9CDABCF62E4F64D4002D3806 /* learn_handwriting.cpp in Sources */,
+				9CDABCF72E4F64D4002D3806 /* poly_line.cpp in Sources */,
+				9CDABCF82E4F64D4002D3806 /* recognize_handwriting.cpp in Sources */,
+				9CDABCF92E4F64D4002D3806 /* art_boxes.cpp in Sources */,
+				9CDABCFA2E4F64D4002D3806 /* fromcls.cpp in Sources */,
+				9CDABCFB2E4F64D4002D3806 /* guile_tm.cpp in Sources */,
+				9CDABCFC2E4F64D4002D3806 /* glyph_transforms.cpp in Sources */,
+				9CDABCFD2E4F64D4002D3806 /* object.cpp in Sources */,
+				9CDABCFE2E4F64D4002D3806 /* tree_math_stats.cpp in Sources */,
+				9CDABCFF2E4F64D4002D3806 /* glue.cpp in Sources */,
+				9CDABD002E4F64D4002D3806 /* new_document.cpp in Sources */,
+				9CDABD012E4F64D4002D3806 /* new_data.cpp in Sources */,
+				9CDABD022E4F64D4002D3806 /* new_style.cpp in Sources */,
+				9CDABD032E4F64D4002D3806 /* new_buffer.cpp in Sources */,
+				9CDABD042E4F64D4002D3806 /* case_boxes.cpp in Sources */,
+				9CDABD052E4F64D4002D3806 /* persistent.cpp in Sources */,
+				9CDABD062E4F64D4002D3806 /* new_view.cpp in Sources */,
+				9CDABD072E4F64D4002D3806 /* new_project.cpp in Sources */,
+				9CDABD082E4F64D4002D3806 /* adjust_cmr.cpp in Sources */,
+				9CDABD092E4F64D4002D3806 /* font_wide.cpp in Sources */,
+				9CDABD0A2E4F64D4002D3806 /* new_window.cpp in Sources */,
+				9CDABD0B2E4F64D4002D3806 /* metadata.cpp in Sources */,
+				9CDABD0C2E4F64D4002D3806 /* conservative_bib.cpp in Sources */,
+				9CDABD0D2E4F64D4002D3806 /* wencoding.cpp in Sources */,
+				9CDABD0E2E4F64D4002D3806 /* font_database.cpp in Sources */,
+				9CDABD0F2E4F64D4002D3806 /* preferences.cpp in Sources */,
+				9CDABD102E4F64D4002D3806 /* tt_tools.cpp in Sources */,
+				9CDABD112E4F64D4002D3806 /* font_select.cpp in Sources */,
+				9CDABD122E4F64D4002D3806 /* sqlite3.cpp in Sources */,
+				9CDABD132E4F64D4002D3806 /* metadata-acm.cpp in Sources */,
+				9CDABD142E4F64D4002D3806 /* font_spacing.cpp in Sources */,
+				9CDABD152E4F64D4002D3806 /* metadata-elsevier.cpp in Sources */,
+				9CDABD162E4F64D4002D3806 /* post_convert.cpp in Sources */,
+				9CDABD172E4F64D4002D3806 /* identifier_parser.cpp in Sources */,
+				9CDABD182E4F64D4002D3806 /* tt_analyze.cpp in Sources */,
+				9CDABD192E4F64D4002D3806 /* glyph_analyze.cpp in Sources */,
+				9CDABD1A2E4F64D4002D3806 /* metadata-ams.cpp in Sources */,
+				9CDABD1B2E4F64D4002D3806 /* font_guess.cpp in Sources */,
+				9CDABD1C2E4F64D4002D3806 /* smart_font.cpp in Sources */,
+				9CDABD1D2E4F64D4002D3806 /* metadata-revtex.cpp in Sources */,
+				9CDABD1E2E4F64D4002D3806 /* font_translate.cpp in Sources */,
+				9CDABD1F2E4F64D4002D3806 /* metadata-springer.cpp in Sources */,
+				9CDABD202E4F64D4002D3806 /* superposed_font.cpp in Sources */,
+				9CDABD212E4F64D4002D3806 /* fortran_language.cpp in Sources */,
+				9CDABD222E4F64D4002D3806 /* curve.cpp in Sources */,
+				9CDABD232E4F64D4002D3806 /* equations.cpp in Sources */,
+				9CDABD242E4F64D4002D3806 /* frame.cpp in Sources */,
+				9CDABD252E4F64D4002D3806 /* grid.cpp in Sources */,
+				9CDABD262E4F64D4002D3806 /* point.cpp in Sources */,
+				9CDABD272E4F64D4002D3806 /* queryxml.cpp in Sources */,
+				9CDABD282E4F64D4002D3806 /* brush.cpp in Sources */,
+				9CDABD292E4F64D4002D3806 /* picture.cpp in Sources */,
+				9CDABD2A2E4F64D4002D3806 /* raster_picture.cpp in Sources */,
+				9CDABD2B2E4F64D4002D3806 /* enlightened.cpp in Sources */,
+				9CDABD2C2E4F64D4002D3806 /* transformed.cpp in Sources */,
+				9CDABD2D2E4F64D4002D3806 /* triangulated.cpp in Sources */,
+				9CDABD2E2E4F64D4002D3806 /* pencil.cpp in Sources */,
+				9CDABD2F2E4F64D4002D3806 /* inline_comment_parser.cpp in Sources */,
+				9CDABD302E4F64D4002D3806 /* effect.cpp in Sources */,
+				9CDABD312E4F64D4002D3806 /* tracked_fromtex.cpp in Sources */,
+				9CDABD322E4F64D4002D3806 /* scalable.cpp in Sources */,
+				9CDABD332E4F64D4002D3806 /* compress.cpp in Sources */,
+				9CDABD342E4F64D4002D3806 /* ai.cpp in Sources */,
+				9CDABD352E4F64D4002D3806 /* metadata-ieee.cpp in Sources */,
+				9CDABD362E4F64D4002D3806 /* virtual_enhance.cpp in Sources */,
+				9CDABD372E4F64D4002D3806 /* rewrite_equation_number.cpp in Sources */,
+				9CDABD382E4F64D4002D3806 /* scilab_language.cpp in Sources */,
+				9CDABD392E4F64D4002D3806 /* tm_sparkle.mm in Sources */,
+				9CDABD3A2E4F64D4002D3806 /* locale.cpp in Sources */,
+				9CDABD3B2E4F64D4002D3806 /* colors.cpp in Sources */,
+				9CDABD3C2E4F64D4002D3806 /* rubber_assemble_font.cpp in Sources */,
+				9CDABD3D2E4F64D4002D3806 /* rubber_stix_font.cpp in Sources */,
+				9CDABD3E2E4F64D4002D3806 /* tm_updater.cpp in Sources */,
+				9CDABD3F2E4F64D4002D3806 /* tm_winsparkle.cpp in Sources */,
+				9CDABD402E4F64D4002D3806 /* latex_preview.cpp in Sources */,
+				9CDABD412E4F64D4002D3806 /* highlight_boxes.cpp in Sources */,
+				9CDABD422E4F64D4002D3806 /* parse_vernac.cpp in Sources */,
+				9CDABD432E4F64D4002D3806 /* adjust_biolinum.cpp in Sources */,
+				9CDABD442E4F64D4002D3806 /* font_protrusion.cpp in Sources */,
+				9CDABD452E4F64D4002D3806 /* poor_effected.cpp in Sources */,
+				9CDABD462E4F64D4002D3806 /* tree_search.cpp in Sources */,
+				9CDABD472E4F64D4002D3806 /* database.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9CEB8C212E4DCA2800607831 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -8117,6 +9001,30 @@
 			};
 			name = Release;
 		};
+		9CDABD4E2E4F64D4002D3806 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+			};
+			name = Debug;
+		};
+		9CDABD4F2E4F64D4002D3806 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+			};
+			name = Release;
+		};
 		9CEB8DC82E4DCA2800607831 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9CEB8DCC2E4DCA7F00607831 /* TeXmacsSDL.xcconfig */;
@@ -8227,6 +9135,15 @@
 			buildConfigurations = (
 				9CD4E70210B14AB300E0DD5C /* Debug */,
 				9CD4E70310B14AB300E0DD5C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9CDABD4D2E4F64D4002D3806 /* Build configuration list for PBXNativeTarget "TeXmacsVue" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9CDABD4E2E4F64D4002D3806 /* Debug */,
+				9CDABD4F2E4F64D4002D3806 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
