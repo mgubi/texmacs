@@ -16,12 +16,10 @@
 
 class vue_widget_rep : public widget_rep {
 protected:
-  blackbox data;
   string type;
   
 public:
-  vue_widget_rep (string _type, blackbox _data= NULL)
-    : type (_type), data (_data) {};
+  vue_widget_rep (string _type) : type (_type) {};
   virtual ~vue_widget_rep () {};
   
   virtual void send (slot s, blackbox val);
