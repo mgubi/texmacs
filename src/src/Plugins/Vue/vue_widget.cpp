@@ -8,6 +8,8 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include "vue_gui.hpp"
+
 #include "config.h"
 #include "vue_widget.hpp"
 #include "blackbox.hpp"
@@ -20,13 +22,66 @@
 #include "message.hpp"
 #include "font.hpp"
 
-#include "vue_gui.hpp"
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include "../MuPDF/mupdf_picture.hpp"
 
-#include "SDL3/SDL.h"
-
+#include "clay.h"
 
 #define DEBUG_VUE (debug (DEBUG_FLAG_QT))
 #define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
+
+
+Clay_Sizing layoutExpand = {
+    .width = CLAY_SIZING_GROW(0),
+    .height = CLAY_SIZING_GROW(0)
+};
+
+
+
+/******************************************************************************
+ * Type checking
+ ******************************************************************************/
+
+inline void
+check_type_void (blackbox bb, slot s) {
+  if (!is_nil (bb)) {
+    failed_error << "slot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+}
+
+template<class T> inline void
+check_type_id (int type_id, slot s) {
+  if (type_id != type_helper<T>::id) {
+    failed_error << "slot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+}
+
+template<class T> void
+check_type (blackbox bb, slot s) {
+  if (type_box (bb) != type_helper<T>::id) {
+    failed_error << "slot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+}
+
+template<class T> T
+check_open (blackbox bb, slot s) {
+  if (type_box (bb) != type_helper<T>::id) {
+    failed_error << "slot type= " << as_string(s) << LF;
+    FAILED ("type mismatch");
+  }
+  return open_box<T> (bb);
+}
+
+template<class T1, class T2> inline void
+check_type (blackbox bb, string s) {
+  check_type<pair<T1,T2> > (bb, s);
+}
+
+/******************************************************************************/
 
 #ifdef NO_FAST_ALLOC
 template<> void
@@ -56,6 +111,8 @@ public:
   vue_ui_rep (string _type, blackbox _data= NULL)
     : vue_widget_rep (_type), data (_data) {};
   virtual ~vue_ui_rep () {};
+  
+  void do_layout ();
 };
 
 template<typename T> widget vue_create (string type, T args) {
@@ -145,7 +202,7 @@ VUE_WIDGET(tooltip_window_widget, widget, w, string, s);
 * See also message.hpp for specific messages for these widgets
 ******************************************************************************/
 
-VUE_WIDGET(texmacs_widget, int, mask, command, quit);
+//VUE_WIDGET(texmacs_widget, int, mask, command, quit);
 // the main TeXmacs widget and a command which is called on exit
 // the mask variable indicates whether the menu, icon bars, status bar, etc.
 // are visible or not
@@ -300,6 +357,15 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
   // the contents should also be updated dynamically by reevaluating
   // the scheme widget promise (in case of matching kind)
 
+//******************************************************************************
+
+
+void
+vue_ui_rep::do_layout () {
+}
+
+vue_widget current_window_widget; // used during layout to propagate information
+
 /******************************************************************************
 * Besides the widget constructors, any GUI implementation should also provide
 * a simple_widget_rep class with the following virtual methods:
@@ -336,9 +402,155 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 string vue_type_simple_widget("simple_widget");
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
-: vue_widget_rep (vue_type_simple_widget) {};
+: vue_widget_rep (vue_type_simple_widget),
+  size (coord2 (10, 10)), extents (coord4 (0,0,0,0)),
+  scroll_pos (coord2 (0, 0)), mouse_cursor (coord2 (0, 0)),
+  backing_pos (pair<SI,SI>(0, 0)) {
+  // note that size is set to an arbitrary value to init the backing_store
+  // create a backing store and the renderer
+  backing_store= native_picture (size.x1, size.x2, 0, 0);
+  ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+};
 
+void
+vue_simple_widget_rep::send (slot s, blackbox val) {
+  //save_send_slot (s, val);
+  switch (s) {
+    case SLOT_INVALIDATE:
+      {
+        coord4 p= check_open<coord4> (val, s);
+        SI ox = backing_pos.x1;
+        SI oy = backing_pos.x2;
+        ren->set_origin (ox,oy);
+        SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;
+        ren->outer_round (x1, y1, x2, y2);
+        ren->decode (x1, y1);
+        ren->decode (x2, y2);
+        invalidate_rect (x1, y2, x2, y1);
+      }
+      break;
+    case SLOT_INVALIDATE_ALL:
+      {
+        check_type_void (val, s);
+        invalidate_all ();
+      }
+      break;
+    case SLOT_EXTENTS:
+      {
+        extents= check_open<coord4> (val, s);
+      }
+      break;
+      
+    case SLOT_SIZE:
+      {
+        size= check_open<coord2> (val, s);
+      }
+      break;
+      
+    case SLOT_SCROLL_POSITION:
+    {
+      scroll_pos= check_open<coord2> (val, s);
+    }
+      break;
+      
+    case SLOT_ZOOM_FACTOR:
+      {
+        new_zoom= check_open<double> (val, s);
+      }
+      break;
+    case SLOT_MOUSE_GRAB:
+      {
+        mouse_grab= check_open<bool> (val, s);
+      }
+      break;
+    case SLOT_MOUSE_POINTER:
+      {
+        typedef pair<string, string> T;
+        T contents = check_open<T> (val, s); // x1 = name, x2 = mask.
+        //NOT_IMPLEMENTED("qt_simple_widget::SLOT_MOUSE_POINTER");
+      }
+      break;
+    case SLOT_CURSOR:
+      {
+        mouse_cursor= check_open <coord2> (val, s);
+      }
+      break;
+    default:
+      vue_widget_rep::send(s, val);
+      return;
+  }
+  if (DEBUG_VUE_WIDGETS && s != SLOT_INVALIDATE)
+    debug_widgets << "vue_simple_widget_rep: sent " << slot_name (s)
+    << "\t\tto widget\t" << type << LF;
+}
 
+blackbox
+vue_simple_widget_rep::query (slot s, int type_id) {
+    // Some slots are too noisy
+  if (DEBUG_VUE_WIDGETS && (s != SLOT_IDENTIFIER))
+    debug_widgets << "vue_simple_widget_rep: queried " << slot_name(s)
+                  << "\t\tto widget\t" << type << LF;
+  
+  switch (s) {
+    case SLOT_IDENTIFIER:
+    {
+      if (is_nil(win))
+        return close_box<int>(0);
+      else
+        return win->query(s, type_id);
+    }
+    case SLOT_INVALID:
+    {
+      return close_box<bool> (is_invalid());
+    }
+    case SLOT_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      //FIXME: implement
+      return close_box<coord2> (coord2 (0, 0));
+    }
+    case SLOT_SIZE:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (size);
+    }
+    case SLOT_SCROLL_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (scroll_pos);
+    }
+    case SLOT_EXTENTS:
+    {
+      check_type_id<coord4> (type_id, s);
+      return close_box<coord4> (extents);
+    }
+    case SLOT_VISIBLE_PART:
+    {
+      check_type_id<coord4> (type_id, s);
+      return close_box<coord4> (
+        coord4 (scroll_pos.x1, scroll_pos.x2,
+                scroll_pos.x1 + size.x1,
+                scroll_pos.x2 - size.x2));
+    }
+    default:
+      return vue_widget_rep::query(s, type_id);
+  }
+}
+
+widget
+vue_simple_widget_rep::read (slot s, blackbox index) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_simple_widget_rep::read " << slot_name(s)
+    << "\tWidget type: " << type << LF;
+  
+  switch (s) {
+    case SLOT_WINDOW:
+      check_type_void (index, s);
+      return abstract (win);
+    default:
+      return vue_widget_rep::read (s, index);
+  }
+}
 
 /******************************************************************************
 * Empty handlers for redefinition by our subclasses editor_rep,
@@ -396,41 +608,214 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
   (void) win; (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
+void vue_simple_widget_rep::do_layout () {
+  win= current_window_widget; // save the info
+  CLAY({
+    .layout = { .sizing= layoutExpand },
+    .custom = { .customData = this } }) {}
+}
+
 /******************************************************************************
- * Type checking
+ * Backing store management
  ******************************************************************************/
 
-inline void
-check_type_void (blackbox bb, slot s) {
-  if (!is_nil (bb)) {
-    failed_error << "slot type= " << as_string(s) << LF;
-    FAILED ("type mismatch");
+void
+vue_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
+  int padding = 16;
+  rectangle r = rectangle (x1-padding, y1-padding, x2+padding, y2+padding);
+  invalid_regions = invalid_regions | rectangles (r);
+}
+
+void
+vue_simple_widget_rep::invalidate_all () {
+  //cout << "invalidate all " << LF;
+  invalid_regions = rectangles();
+  invalidate_rect (0, 0, retina_factor * size.x1,
+                   retina_factor * size.x2);
+}
+
+bool
+vue_simple_widget_rep::is_invalid () {
+  return !is_nil (invalid_regions);
+}
+
+void
+vue_simple_widget_rep::translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
+  ren->set_origin (0,0);
+  SI X1= x1+ dx;
+  SI Y2= y2+ dy;
+  ren->decode (x1, y1);
+  ren->decode (x2, y2);
+  ren->decode (X1, Y2);
+  dx= X1- x1;
+  dy= Y2- y2;
+
+  rectangles region (rectangle (x1, y2, x2, y1));
+  rectangles invalid_intern= invalid_regions & region;
+  rectangles invalid_extern= invalid_regions - invalid_intern;
+  invalid_intern = ::translate (invalid_intern, dx, dy) & region;
+  invalid_regions= invalid_extern | invalid_intern;
+
+  rectangles extra= thicken (region - ::translate (region, dx, dy), 1, 1);
+  invalid_regions= invalid_regions | extra;
+
+  if (x1<x2 && y2<y1) {
+//    cout << "translate " << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ", " << X1 << ", " << Y2  << LF;
+    fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
+    int w= fz_pixmap_width (mupdf_context (), pix);
+    int h= fz_pixmap_height (mupdf_context (), pix);
+    fz_pixmap *area= fz_new_pixmap (mupdf_context (),
+                                   fz_device_rgb (mupdf_context ()),
+                                   w, h, NULL, 1);
+    fz_irect r= fz_make_irect (x1, y2, x2, y1);
+    fz_copy_pixmap_rect (mupdf_context(), area, pix, r, NULL);
+    area->x= dx;
+    area->y= dy;
+    fz_copy_pixmap_rect (mupdf_context(), pix, area, r, NULL);
+    fz_drop_pixmap (mupdf_context(), area);
   }
 }
 
-template<class T> inline void
-check_type_id (int type_id, slot s) {
-  if (type_id != type_helper<T>::id) {
-    failed_error << "slot type= " << as_string(s) << LF;
-    FAILED ("type mismatch");
+void
+vue_simple_widget_rep::repaint_invalid_regions () {
+  int bs_w= backing_store->get_width ();
+  int bs_h= backing_store->get_height ();
+
+
+  // Look if the scroll position has changed. backing_pos is the old position,
+  // while origin is the new one. Instead of repainting the whole backing store,
+  // we move the contents of the backing store, and invalidate the regions that
+  // are not covered by the moved contents.
+  
+  if (backing_pos != scroll_pos) {
+    int dx =  retina_factor * (scroll_pos.x1 - backing_pos.x1);
+    int dy =  retina_factor * (scroll_pos.x2 - backing_pos.x2);
+
+    backing_pos = scroll_pos;
+    translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
+    //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
+        
+    rectangles invalid;
+    while (!is_nil (invalid_regions)) {
+      rectangle r = invalid_regions->item ;
+      rectangle q = rectangle (r->x1-dx,r->y1-dy,r->x2-dx,r->y2-dy);
+      invalid = rectangles (q, invalid);
+      //cout << r << " ---> " << q << LF;
+      invalid_regions = invalid_regions->next;
+    }
+    invalid_regions= invalid & rectangles (rectangle (0,0, bs_w, bs_h));
+
+    if (!backing_valid) {
+      invalidate_rect (0, 0, bs_w, bs_h);
+    } else {
+      if (dy<0)
+  invalidate_rect (0, 0, bs_w, min (bs_h,-dy));
+      else if (dy>0)
+  invalidate_rect (0, max (0,bs_h-dy), bs_w, bs_h);
+      
+      if (dx<0)
+  invalidate_rect (0, 0, min (-dx, bs_w), bs_h);
+      else if (dx>0)
+  invalidate_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
+    }
   }
-}
+  
+  // Check if the window has been resized. If so, we need to resize the backing
+  // store as well. During the resize, the origin remain the same. So we can just
+  // crop the backing store if the window is smaller, or fill the new regions with
+  // the background color if the window is bigger.
 
-template<class T> void
-check_type (blackbox bb, slot s) {
-  if (type_box (bb) != type_helper<T>::id) {
-    failed_error << "slot type= " << as_string(s) << LF;
-    FAILED ("type mismatch");
+  int new_bs_w, new_bs_h;
+  new_bs_w= retina_factor*size.x1;
+  new_bs_h= retina_factor*size.x2;
+  
+  if ((new_bs_w != bs_w)   || (new_bs_h != bs_h)) {
+    // the viewport size changed, reset the backing store
+    
+    // create a new backing store with updated viewport and the renderer
+    picture new_backing_store= native_picture (new_bs_w, new_bs_h, 0, 0);
+    renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
+    
+    // copy the old backingstore
+    SI x1=0, y1=0, x2=bs_w, y2=bs_h;
+    ren->encode (x1, y1);
+    ren->encode (x2, y2);
+    ren2->fetch (x1, y2, x2, y1, ren, x1, y2);
+    
+    // compute new invalid regions
+    // add new exposed regions due to resize
+    if (new_bs_w > bs_w) {
+      rectangle r = rectangle (bs_w, 0, new_bs_w, new_bs_h);
+      invalid_regions = invalid_regions | rectangles (r);
+    }
+    if (new_bs_h > bs_h) {
+      rectangle r = rectangle (0, bs_h, new_bs_w, new_bs_h);
+      invalid_regions = invalid_regions | rectangles (r);
+    }
+    
+    // update the state
+    bs_w = new_bs_w;
+    bs_h = new_bs_h;
+    backing_store= new_backing_store;
+    delete_renderer (ren);
+    ren= ren2;
   }
+  
+  //invalid_regions= rectangles (rectangle (0,0, bs_w, bs_h));
+  
+  // repaint invalid rectangles if needed
+  if (!is_nil (invalid_regions)) {
+    rectangles new_regions;
+    
+    // simplify
+    rectangle lub= least_upper_bound (invalid_regions);
+    if (area (lub) < 1.2 * area (invalid_regions))
+      invalid_regions= rectangles (lub);
+    
+    while (!is_nil (invalid_regions)) {
+      ren->set_origin (0, 0);
+      rectangle r= copy (invalid_regions->item);
+//      cout << "repaint " << r->x1 << ", " << r->y1 << ", "
+//           << r->x2 << ", " << r->y2 << LF;
+      r= thicken (r, 1, 1);
+      ren->encode (r->x1, r->y1);
+      ren->encode (r->x2, r->y2);
+      ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
+      send_repaint (this, ren, r->x1, r->y2, r->x2, r->y1);
+      ren->set_clipping (r->x1, r->y2, r->x2, r->y1, true);
+      if (gui_interrupted ())
+        new_regions= rectangles (invalid_regions->item, new_regions);
+      invalid_regions= invalid_regions->next;
+    }
+    invalid_regions= new_regions;
+  } // if (!is_nil (invalid_regions))
 }
 
-template<class T1, class T2> inline void
-check_type (blackbox bb, string s) {
-  check_type<pair<T1,T2> > (bb, s);
+void draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
+  // propagate immediately the changes to the screen
+  fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
+  //snapshot_pixmap (pix);
+  unsigned char *samples= fz_pixmap_samples (mupdf_context (), pix);
+  int w= fz_pixmap_width (mupdf_context (), pix);
+  int h= fz_pixmap_height (mupdf_context (), pix);
+  //  fz_keep_pixmap (mupdf_context (), pix);
+  SDL_Surface *surf= NULL;
+  unsigned char *pixels= tm_new_array<unsigned char>(w*h*4);
+  memcpy (pixels, samples, w*h*4);
+  // the SDL pixel data is not copied so we need to ensure that the pixmap stays alive.
+  surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
+  // FIXME: premultiplied?
+  SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
+  SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_NONE);
+  SDL_RenderClear (sdl_ren);
+  SDL_RenderTexture (sdl_ren, tex, NULL, dest);
+  SDL_DestroyTexture (tex);
+  unsigned char *p= (unsigned char*)surf->pixels;
+  SDL_DestroySurface (surf);
+  tm_delete_array (p);
+//  SDL_RenderPresent (sdl_ren);
 }
 
-typedef quartet<SI,SI,SI,SI> coord4;
-typedef pair<SI,SI> coord2;
 
 /******************************************************************************
 * Message passing
@@ -538,7 +923,11 @@ public:
   
   picture backing_store;
   renderer ren;
-
+  Clay_Context *clay_ctx;
+  Clay_Arena clay_arena;
+  
+  bool relayout;
+  
   vue_window_rep (vue_widget w, string name);
   ~vue_window_rep ();
   
@@ -552,6 +941,8 @@ public:
   void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h);
   void   set_position (SI x, SI y);
   void   get_position (SI& x, SI& y);
+  
+  void process_layout ();
 };
 
 typedef vue_window_rep* vue_window;
@@ -579,6 +970,8 @@ public:
   widget read (slot s, blackbox index);
   void write (slot s, blackbox index, widget w);
   void notify (slot s, blackbox new_val);
+  
+  void do_layout ();
 }; // class vue_plain_window_widget_rep
 
 widget plain_window_widget (widget wid, string s, command quit) {
@@ -601,21 +994,19 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
 
 void
 vue_plain_window_widget_rep::send (slot s, blackbox val) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_plain_window_widget_rep::send " << slot_name (s) << LF;
   
   switch (s) {
     case SLOT_IDENTIFIER:
       {
-        check_type<int>(val, s);
-        int id= open_box<int> (val);
+        int id= check_open<int> (val, s);
         win= (vue_window) id_to_window [id];
       }
       break;
     case SLOT_SIZE:
       {
-        check_type<coord2>(val, s);
-        coord2 p = open_box<coord2> (val);
+        coord2 p= check_open<coord2> (val, s);
         if (win) {
           win->set_size (p.x1, p.x2);
         }
@@ -623,8 +1014,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_POSITION:
       {
-        check_type<coord2>(val, s);
-        coord2 p = open_box<coord2> (val);
+        coord2 p= check_open<coord2> (val, s);
         if (win) {
           win->set_position (p.x1, p.x2);
         }
@@ -632,8 +1022,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_VISIBILITY:
       {
-        check_type<bool> (val, s);
-        bool flag = open_box<bool> (val);
+        bool flag= check_open<bool> (val, s);
         if (win) {
           win->set_visibility (flag);
         }
@@ -650,8 +1039,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_NAME:   // sets window *title* not the name
       {
-        check_type<string> (val, s);
-        string name = open_box<string> (val);
+        string name= check_open<string> (val, s);
         if (win) {
           win->set_name (name);
         }
@@ -659,8 +1047,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_MODIFIED:
       {
-        check_type<bool> (val, s);
-        bool flag = open_box<bool> (val);
+        bool flag = check_open<bool> (val, s);
         if (win) {
           win->set_modified (flag);
         }
@@ -668,8 +1055,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_REFRESH:
       {
-        check_type<string> (val, s);
-        string kind = open_box<string> (val);
+        string kind = check_open<string> (val, s);
         refresh_kind= kind;
       }
       break;
@@ -735,6 +1121,112 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
        << " for widget of type: " << type << LF;
 }
 
+void
+vue_plain_window_widget_rep::do_layout () {
+  concrete(wid)->do_layout ();
+}
+
+//******************************************************************************
+// vue_texmacs_widget
+
+//VUE_WIDGET(texmacs_widget, int, mask, command, quit);
+
+class vue_texmacs_widget_rep : public vue_widget_rep {
+  int mask;
+  command quit;
+  vue_widget main_widget;
+  
+public:
+  vue_texmacs_widget_rep (int _mask, command _quit) : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep") {};
+  
+  void send (slot s, blackbox val);
+//  blackbox query (slot s, int type_id);
+  widget read (slot s, blackbox index);
+  void write (slot s, blackbox index, widget w);
+  void notify (slot s, blackbox new_val);
+  
+  void do_layout ();
+}; // class vue_plain_window_widget_rep
+
+widget texmacs_widget (int mask, command quit) {
+  return abstract (tm_new<vue_texmacs_widget_rep> (mask, quit));
+}
+  
+
+void
+vue_texmacs_widget_rep::send (slot s, blackbox val) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_texmacs_widget_rep::send " << slot_name (s) << LF;
+  
+  switch (s) {
+    default:
+      vue_widget_rep::send(s, val);
+  }
+}
+
+widget
+vue_texmacs_widget_rep::read (slot s, blackbox index) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_texmacs_widget_rep::read " << slot_name(s)
+                  << "\t type: " << type << LF;
+  switch (s) {
+    case SLOT_CANVAS:
+      check_type_void (index, s);
+      return abstract (main_widget);
+
+    default:
+      return vue_widget_rep::read (s, index);
+  }
+}
+
+void
+vue_texmacs_widget_rep::notify (slot s, blackbox new_val) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_texmacs_widget_rep::notify " << slot_name(s) << LF;
+  vue_widget_rep::notify (s, new_val);
+}
+
+void
+vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
+  (void) index; (void) w;
+  cout << "vue_texmacs_widget_rep::write(), unhandled " << slot_name (s)
+       << " for widget of type: " << type << LF;
+  switch (s) {
+    case SLOT_SCROLLABLE:
+      check_type_void (index, s);
+      main_widget= concrete (w);
+      break;
+    default:
+      break;
+  }
+}
+
+void vue_texmacs_widget_rep::do_layout () {
+  // Define an element with 16px of x and y padding
+  CLAY({ .id = CLAY_ID("TeXmacsWidget"),
+      .layout = {
+          .layoutDirection = CLAY_TOP_TO_BOTTOM,
+          .sizing = layoutExpand,
+          .padding = CLAY_PADDING_ALL(16),
+          .childGap = 16
+      }}) {
+      // A nested child element
+      CLAY({ .id = CLAY_ID("MainMenuBar"), .layout = { .childGap = 16 } }) {
+          // Children laid out top to bottom with a 16 px gap between them
+      }
+      // A vertical scrolling container with a colored background
+      CLAY({
+          .layout = { .layoutDirection = CLAY_TOP_TO_BOTTOM, .childGap = 16 },
+          .backgroundColor = { 200, 200, 100, 255 },
+          .cornerRadius = CLAY_CORNER_RADIUS(10),
+          .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() }
+      }) {
+          // child elements
+         if (!is_nil (main_widget)) main_widget->do_layout ();
+      }
+  }
+}
+
 //******************************************************************************
 // vue_window
 
@@ -742,10 +1234,18 @@ int nr_windows= 0;
 
 hashmap<SDL_Window*, pointer> Window_to_window;
 
-
 typedef vue_window_rep* vue_window;
 
 int vue_window_rep::serial= 1; // serial identifier for windows
+
+void HandleClayErrors (Clay_ErrorData errorData) {
+    // See the Clay_ErrorData struct for more information
+    printf ("%s", errorData.errorText.chars);
+    switch (errorData.errorType) {
+      default:
+        // etc
+    }
+}
 
 vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   : content (_content), name (_name), id (serial++)
@@ -773,6 +1273,16 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   set_identifier (abstract (content), id);
   notify_position (abstract (content), 0, 0);
   notify_size (abstract (content), win_w,  win_h);
+  
+  // init Clay
+  uint64_t totalMemorySize = Clay_MinMemorySize ();
+  Clay_Arena clay_arena = (Clay_Arena) {
+      .memory =  (char*) SDL_malloc (totalMemorySize),
+      .capacity = totalMemorySize
+  };
+
+  clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
+  relayout= true;
 }
 
 vue_window_rep::~vue_window_rep () {
@@ -783,6 +1293,7 @@ vue_window_rep::~vue_window_rep () {
   Window_to_window->reset (sdl_win);
   nr_windows--;
 
+  SDL_free (clay_arena.memory);
   SDL_DestroyRenderer (sdl_ren);
   SDL_DestroyWindow (sdl_win);
   delete_renderer (ren);
@@ -878,6 +1389,29 @@ vue_window_rep::set_visibility (bool flag) {
   if (flag) SDL_ShowWindow (sdl_win);
   else SDL_HideWindow (sdl_win);
 }
+ 
+void
+vue_window_rep::process_layout () {
+  
+  Clay_SetCurrentContext (clay_ctx);
+  current_window_widget= content;
+  
+  int win_x, win_y, win_w, win_h;
+  SDL_GetWindowSize (sdl_win, &win_w, &win_h);
+  SDL_GetWindowPosition (sdl_win, &win_w, &win_h);
+  Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
+  
+  // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
+  Clay_BeginLayout ();
+  
+  content->do_layout ();
+  
+  // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
+  Clay_RenderCommandArray renderCommands= Clay_EndLayout ();
+  current_window_widget= NULL;
+  
+  //FIXME: render!
+}
 
 //******************************************************************************
 // vue_gui
@@ -891,6 +1425,10 @@ bool char_clip= true;
 void gui_open (int& argc, char** argv) {
   // start the gui
   
+  if (!TTF_Init()) {
+      return SDL_APP_FAILURE;
+  }
+
   if (!SDL_Init (SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
@@ -996,6 +1534,7 @@ int number_of_servers (); // in texmacs_server.hpp
 
 void process_event(SDL_Event *event);
 void process_messages();
+void process_layout ();
 
 void gui_start_loop () {
   // start the main loop
@@ -1036,6 +1575,9 @@ void gui_start_loop () {
     //time_t t2= texmacs_time ();
     //if (t2 - t1 >= 10) cout << "interpose took " << t2-t1 << "ms\n";
 
+    // process layout
+    process_layout ();
+    
     // Redraw invalid windows
     //time_t t3= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
@@ -1059,6 +1601,15 @@ void gui_start_loop () {
     process_messages ();
   }
 }
+
+void process_layout () {
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy()) { // and then the other windows
+    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+    win->process_layout ();
+  }
+}
+
 
 static vue_window
 get_window_from_ID (Uint32 ID) {
@@ -1114,7 +1665,7 @@ mouse_decode (unsigned int mstate) {
 static string
 lookup_key (SDL_Keycode key, SDL_Keymod mod) {
   const char* str= SDL_GetKeyName (key);
-  string r (str, strlen (str));
+  string r (str, (int)strlen (str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
 //  string s=r;
@@ -1200,8 +1751,9 @@ process_event (SDL_Event *event) {
               event->window.data2);
       win= get_window_from_ID (event->window.windowID);
       if (win) {
-        //win->resize_event (event->window.data1, event->window.data2);
-        //win->invalidate_all ();
+        Clay_SetCurrentContext (win->clay_ctx);
+        Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
+        win->relayout= true;
       }
       break;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
@@ -1289,6 +1841,10 @@ process_event (SDL_Event *event) {
         //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
         //win->mouse_event (action,
         //                 event->button.x, event->button.y, texmacs_time ());
+        
+        Clay_SetCurrentContext (win->clay_ctx);
+        Clay_SetPointerState ((Clay_Vector2) { event->button.x, event->button.y },
+                             event->button.button & SDL_BUTTON_LMASK);
       }
       break;
     } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -1309,6 +1865,9 @@ process_event (SDL_Event *event) {
         } else if (deltaY <= -0.5) {
           //win->mouse_event ("press-down", x, y, texmacs_time ());
         }
+
+        Clay_SetCurrentContext (win->clay_ctx);
+        Clay_UpdateScrollContainers (true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
@@ -1317,6 +1876,10 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       if (win) {
+        Clay_SetCurrentContext (win->clay_ctx);
+        Clay_SetPointerState ((Clay_Vector2) { event->button.x, event->button.y },
+                             event->button.button & SDL_BUTTON_LMASK);
+
         //win->mouse_event ("move",
         //                  event->motion.x, event->motion.y, texmacs_time ());
       }
@@ -1548,6 +2111,7 @@ void process_messages() {
     messages= not_ready;
   }
 }
+
 
 /******************************************************************************
 * Set up keyboard

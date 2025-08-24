@@ -14,6 +14,9 @@
 #include "widget.hpp"
 #include "blackbox.hpp"
 
+typedef quartet<SI,SI,SI,SI> coord4;
+typedef pair<SI,SI> coord2;
+
 class vue_widget_rep : public widget_rep {
 protected:
   string type;
@@ -27,6 +30,8 @@ public:
   virtual widget read (slot s, blackbox index);
   virtual void write (slot s, blackbox index, widget w);
   virtual void notify (slot s, blackbox new_val);
+  
+  virtual void do_layout () {};
 };
 
 template<> void tm_delete<vue_widget_rep>(vue_widget_rep *);
@@ -55,8 +60,29 @@ inline bool operator==(const widget &lhs, const widget &rhs) {
 
 class vue_simple_widget_rep : public vue_widget_rep {
 public:
+  
+  vue_widget win; // the toplevel widget
+
+  // properties set via messages
+  coord2 size;
+  coord4 extents;
+  coord2 scroll_pos;
+  coord2 mouse_cursor;
+  double new_zoom;
+  bool mouse_grab;
+  
+  
   vue_simple_widget_rep ();
   ~vue_simple_widget_rep () {};
+  
+  
+  void send (slot s, blackbox val);
+  blackbox query (slot s, int type_id);  
+  widget read (slot s, blackbox index);
+  
+  void do_layout ();
+  
+  // protocol for simple widgets to be used by the editor
   virtual bool is_editor_widget ();
   virtual bool is_embedded_widget ();
   virtual void handle_get_size_hint (SI& w, SI& h);
@@ -68,6 +94,26 @@ public:
   virtual void handle_set_zoom_factor (double zoom);
   virtual void handle_clear (renderer win, SI x1, SI y1, SI x2, SI y2);
   virtual void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
+  
+  
+  // backing store management
+  
+  static void repaint_all (); // called in the event loop
+  
+protected:
+  static hashset<pointer> all_widgets;
+  
+  renderer     ren;
+  rectangles   invalid_regions;
+  picture      backing_store;
+  coord2       backing_pos;
+  bool         backing_valid;
+  
+  void invalidate_rect (int x1, int y1, int x2, int y2);
+  void invalidate_all ();
+  bool is_invalid ();
+  void repaint_invalid_regions ();
+  void translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy);
 };
 
 typedef vue_simple_widget_rep simple_widget_rep;

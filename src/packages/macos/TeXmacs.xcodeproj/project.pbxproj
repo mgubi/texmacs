@@ -1038,6 +1038,8 @@
 		9C722BED10D2F7C700C41915 /* qt_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */; };
 		9C722C0F10D2F88900C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
 		9C722C1E10D2FBD300C41915 /* unix_sys_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */; };
+		9C7376BE2E59ED9A0036FC6F /* vue_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C7376BD2E59ED9A0036FC6F /* vue_gui.cpp */; };
+		9C7376C22E5B03720036FC6F /* clay.c in Sources */ = {isa = PBXBuildFile; fileRef = 9C7376C12E5B03720036FC6F /* clay.c */; };
 		9C74D95F123BF892008959D1 /* packrat_grammar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C74D95A123BF892008959D1 /* packrat_grammar.cpp */; };
 		9C74D960123BF892008959D1 /* packrat_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C74D95C123BF892008959D1 /* packrat_parser.cpp */; };
 		9C74D962123BF892008959D1 /* packrat_grammar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C74D95A123BF892008959D1 /* packrat_grammar.cpp */; };
@@ -1774,10 +1776,8 @@
 		9CDABC8C2E4F64D4002D3806 /* script_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498810A8CC110097A335 /* script_boxes.cpp */; };
 		9CDABC8D2E4F64D4002D3806 /* stack_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498910A8CC110097A335 /* stack_boxes.cpp */; };
 		9CDABC8E2E4F64D4002D3806 /* operator_parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CACE316242BD54E00D0B7CA /* operator_parser.cpp */; };
-		9CDABC8F2E4F64D4002D3806 /* sdl_gui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD42E4DCC4200607831 /* sdl_gui.cpp */; };
 		9CDABC902E4F64D4002D3806 /* mupdf_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DCF2E4DCC4200607831 /* mupdf_picture.cpp */; };
 		9CDABC912E4F64D4002D3806 /* mupdf_renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD12E4DCC4200607831 /* mupdf_renderer.cpp */; };
-		9CDABC922E4F64D4002D3806 /* sdl_window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEB8DD62E4DCC4200607831 /* sdl_window.cpp */; };
 		9CDABC932E4F64D4002D3806 /* cmdline_link.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C5387922E42B404008BD1D9 /* cmdline_link.cpp */; };
 		9CDABC942E4F64D4002D3806 /* fast_search.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4934A47318C5D01E00BF1E6A /* fast_search.cpp */; };
 		9CDABC952E4F64D4002D3806 /* superpose_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498A10A8CC110097A335 /* superpose_boxes.cpp */; };
@@ -3647,6 +3647,9 @@
 		9C722BEC10D2F7C700C41915 /* qt_sys_utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_sys_utils.hpp; sourceTree = "<group>"; };
 		9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unix_sys_utils.cpp; sourceTree = "<group>"; };
 		9C722C0E10D2F88800C41915 /* unix_sys_utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = unix_sys_utils.hpp; sourceTree = "<group>"; };
+		9C7376BC2E59ED9A0036FC6F /* vue_gui.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = vue_gui.hpp; sourceTree = "<group>"; };
+		9C7376BD2E59ED9A0036FC6F /* vue_gui.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vue_gui.cpp; sourceTree = "<group>"; };
+		9C7376C12E5B03720036FC6F /* clay.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = clay.c; sourceTree = "<group>"; };
 		9C74D95A123BF892008959D1 /* packrat_grammar.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packrat_grammar.cpp; sourceTree = "<group>"; };
 		9C74D95B123BF892008959D1 /* packrat_grammar.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat_grammar.hpp; sourceTree = "<group>"; };
 		9C74D95C123BF892008959D1 /* packrat_parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packrat_parser.cpp; sourceTree = "<group>"; };
@@ -3741,7 +3744,6 @@
 		9CDABB942E4F51B0002D3806 /* vue_widget.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = vue_widget.hpp; sourceTree = "<group>"; };
 		9CDABB952E4F51B0002D3806 /* vue_widget.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vue_widget.cpp; sourceTree = "<group>"; };
 		9CDABD502E4F64D4002D3806 /* TeXmacsVue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsVue.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9CDABD512E4F64D4002D3806 /* TeXmacsSDL copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "TeXmacsSDL copy-Info.plist"; path = "/Users/mgubi/t/lab/wip_other_guis/src/packages/macos/TeXmacsSDL copy-Info.plist"; sourceTree = "<absolute>"; };
 		9CE18E81125E685D00641CFC /* tree_brackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_brackets.cpp; sourceTree = "<group>"; };
 		9CE4F0041238FAF800993AF7 /* packrat.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat.hpp; sourceTree = "<group>"; };
 		9CEB8DCA2E4DCA2800607831 /* TeXmacsSDL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsSDL.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -3857,7 +3859,6 @@
 				9C0B475B10A8CBE40097A335 /* Resources */,
 				29B97315FDCFA39411CA2CEA /* Sources */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
-				9CDABD512E4F64D4002D3806 /* TeXmacsSDL copy-Info.plist */,
 			);
 			indentWidth = 2;
 			name = TeXmacs;
@@ -5969,6 +5970,9 @@
 		9CDABB962E4F51B0002D3806 /* Vue */ = {
 			isa = PBXGroup;
 			children = (
+				9C7376C12E5B03720036FC6F /* clay.c */,
+				9C7376BC2E59ED9A0036FC6F /* vue_gui.hpp */,
+				9C7376BD2E59ED9A0036FC6F /* vue_gui.cpp */,
 				9CDABB942E4F51B0002D3806 /* vue_widget.hpp */,
 				9CDABB952E4F51B0002D3806 /* vue_widget.cpp */,
 			);
@@ -8232,10 +8236,8 @@
 				9CDABC8C2E4F64D4002D3806 /* script_boxes.cpp in Sources */,
 				9CDABC8D2E4F64D4002D3806 /* stack_boxes.cpp in Sources */,
 				9CDABC8E2E4F64D4002D3806 /* operator_parser.cpp in Sources */,
-				9CDABC8F2E4F64D4002D3806 /* sdl_gui.cpp in Sources */,
 				9CDABC902E4F64D4002D3806 /* mupdf_picture.cpp in Sources */,
 				9CDABC912E4F64D4002D3806 /* mupdf_renderer.cpp in Sources */,
-				9CDABC922E4F64D4002D3806 /* sdl_window.cpp in Sources */,
 				9CDABC932E4F64D4002D3806 /* cmdline_link.cpp in Sources */,
 				9CDABC942E4F64D4002D3806 /* fast_search.cpp in Sources */,
 				9CDABC952E4F64D4002D3806 /* superpose_boxes.cpp in Sources */,
@@ -8308,6 +8310,7 @@
 				9CDABCD82E4F64D4002D3806 /* vpenalty.cpp in Sources */,
 				9CDABCD92E4F64D4002D3806 /* stacker.cpp in Sources */,
 				9CDABCDA2E4F64D4002D3806 /* cell.cpp in Sources */,
+				9C7376BE2E59ED9A0036FC6F /* vue_gui.cpp in Sources */,
 				9CDABCDB2E4F64D4002D3806 /* table.cpp in Sources */,
 				9CDABCDC2E4F64D4002D3806 /* fromtex_post.cpp in Sources */,
 				9CDABCDD2E4F64D4002D3806 /* unix_system.cpp in Sources */,
@@ -8406,6 +8409,7 @@
 				9CDABD3A2E4F64D4002D3806 /* locale.cpp in Sources */,
 				9CDABD3B2E4F64D4002D3806 /* colors.cpp in Sources */,
 				9CDABD3C2E4F64D4002D3806 /* rubber_assemble_font.cpp in Sources */,
+				9C7376C22E5B03720036FC6F /* clay.c in Sources */,
 				9CDABD3D2E4F64D4002D3806 /* rubber_stix_font.cpp in Sources */,
 				9CDABD3E2E4F64D4002D3806 /* tm_updater.cpp in Sources */,
 				9CDABD3F2E4F64D4002D3806 /* tm_winsparkle.cpp in Sources */,
