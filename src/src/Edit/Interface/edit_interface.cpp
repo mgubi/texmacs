@@ -854,7 +854,7 @@ edit_interface_rep::apply_changes () {
     SI w, h;
     widget me= ::get_canvas (widget (cvw));
     ::get_size (me, w, h);
-#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS)
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
     w -= 2*PIXEL;
     h -= 2*PIXEL;
 #endif
@@ -864,7 +864,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "automatic")
         ex2= ex1 + w;
       else {
-#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS)
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ex1= (ex1 + ex2 - w) / 2;
         abs_round (ex1);
         ex2= ex1 + w;
@@ -875,7 +875,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "papyrus" || medium == "automatic")
         ey1= ey2 - h;
       else {
-#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS)
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ey1= (ey1 + ey2 - h) / 2;
         abs_round (ey1);
         ey2= ey1 + h;
@@ -985,7 +985,7 @@ edit_interface_rep::apply_changes () {
       table_selection= selection_active_table ();
       selection sel; selection_get (sel);
       rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#if !(defined(QTTEXMACS)||defined(SDLTEXMACS))
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS))
       rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
       selection_rects= rs;
@@ -1007,7 +1007,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (alt_sel[i], alt_sel[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#if !(defined(QTTEXMACS)||defined(SDLTEXMACS))
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS))
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) alt_selection_rects << rs;

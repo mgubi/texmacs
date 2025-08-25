@@ -63,7 +63,7 @@ inline bool operator==(const widget &lhs, const widget &rhs) {
 
 class vue_simple_widget_rep : public vue_widget_rep {
 public:
-  
+  unsigned int id;
   vue_widget win; // the toplevel widget
 
   // properties set via messages
@@ -76,7 +76,7 @@ public:
   
   
   vue_simple_widget_rep ();
-  ~vue_simple_widget_rep () {};
+  ~vue_simple_widget_rep ();
   
   
   void send (slot s, blackbox val);
