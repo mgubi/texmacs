@@ -4,6 +4,9 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
 
+
+void vue_render (SDL_Renderer *, void *, SDL_FRect*);
+
 typedef struct {
     SDL_Renderer *renderer;
     TTF_TextEngine *textEngine;
@@ -143,7 +146,7 @@ static void SDL_Clay_RenderArc(Clay_SDL3RendererData *rendererData, const SDL_FP
 
 SDL_Rect currentClippingRectangle;
 
-static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands)
+void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands)
 {
     for (size_t i = 0; i < rcommands->length; i++) {
         Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get(rcommands, i);
@@ -255,6 +258,12 @@ static void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Cla
                 SDL_Texture *texture = (SDL_Texture *)rcmd->renderData.image.imageData;
                 const SDL_FRect dest = { rect.x, rect.y, rect.w, rect.h };
                 SDL_RenderTexture(rendererData->renderer, texture, NULL, &dest);
+                break;
+            }
+            case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
+                void *data = rcmd->renderData.custom.customData;
+                const SDL_FRect dest = { rect.x, rect.y, rect.w, rect.h };
+                vue_render (rendererData->renderer, data, &dest);
                 break;
             }
             default:

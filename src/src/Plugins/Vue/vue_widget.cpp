@@ -26,16 +26,33 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../MuPDF/mupdf_picture.hpp"
 
+
+/*****************************************************************************/
+// Clay
+
 #include "clay.h"
-
-#define DEBUG_VUE (debug (DEBUG_FLAG_QT))
-#define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
-
 
 Clay_Sizing layoutExpand = {
     .width = CLAY_SIZING_GROW(0),
     .height = CLAY_SIZING_GROW(0)
 };
+
+typedef struct {
+    SDL_Renderer *renderer;
+    TTF_TextEngine *textEngine;
+    TTF_Font **fonts;
+} Clay_SDL3RendererData;
+
+extern "C"  {
+void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands);
+}
+
+/*****************************************************************************/
+
+#define DEBUG_VUE (debug (DEBUG_FLAG_QT))
+#define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
+
+
 
 
 
@@ -359,12 +376,30 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 //******************************************************************************
 
-
 void
 vue_ui_rep::do_layout () {
 }
 
+struct vue_render_data {
+  SDL_Renderer *sdl_ren;
+  SDL_FRect *rect;
+};
+
+void
+vue_widget_rep::render (vue_render_data *data) {
+  // empty
+}
+
 vue_widget current_window_widget; // used during layout to propagate information
+
+extern "C" {
+void
+vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
+  vue_widget w ((vue_widget_rep*)data);
+  vue_render_data args= { sdl_ren, rect };
+  w->render (&args);
+}
+}
 
 /******************************************************************************
 * Besides the widget constructors, any GUI implementation should also provide
@@ -608,7 +643,8 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
   (void) win; (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
-void vue_simple_widget_rep::do_layout () {
+void
+vue_simple_widget_rep::do_layout () {
   win= current_window_widget; // save the info
   CLAY({
     .layout = { .sizing= layoutExpand },
@@ -816,6 +852,10 @@ void draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
 //  SDL_RenderPresent (sdl_ren);
 }
 
+void
+vue_simple_widget_rep::render (vue_render_data *data) {
+  draw_picture (data->sdl_ren, backing_store, data->rect);
+}
 
 /******************************************************************************
 * Message passing
@@ -915,6 +955,7 @@ public:
   int id;
   SDL_Window *sdl_win;
   SDL_Renderer *sdl_ren;
+  TTF_TextEngine *text_engine;
   vue_widget content;
   string name;
   
@@ -1247,6 +1288,9 @@ void HandleClayErrors (Clay_ErrorData errorData) {
     }
 }
 
+static TTF_Font **ttf_fonts= NULL; // fonts cache
+static const Uint32 FONT_ID = 0;
+
 vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   : content (_content), name (_name), id (serial++)
 {
@@ -1283,7 +1327,29 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
 
   clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
   relayout= true;
+  
+  text_engine = TTF_CreateRendererTextEngine (sdl_ren);
+  if (!text_engine) {
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError());
+  }
+
+  if (!ttf_fonts) {
+    ttf_fonts = (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
+    if (!ttf_fonts) {
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
+      return SDL_APP_FAILURE;
+    }
+    
+    TTF_Font *font = TTF_OpenFont("resources/Roboto-Regular.ttf", 24);
+    if (!font) {
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
+      return SDL_APP_FAILURE;
+    }
+    ttf_fonts[FONT_ID] = font;
+  }
 }
+
+
 
 vue_window_rep::~vue_window_rep () {
   cout << "destroy vue_window_rep " << id << LF;
@@ -1293,6 +1359,7 @@ vue_window_rep::~vue_window_rep () {
   Window_to_window->reset (sdl_win);
   nr_windows--;
 
+  TTF_DestroyRendererTextEngine (text_engine);
   SDL_free (clay_arena.memory);
   SDL_DestroyRenderer (sdl_ren);
   SDL_DestroyWindow (sdl_win);
@@ -1407,10 +1474,19 @@ vue_window_rep::process_layout () {
   content->do_layout ();
   
   // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
-  Clay_RenderCommandArray renderCommands= Clay_EndLayout ();
+  Clay_RenderCommandArray render_commands= Clay_EndLayout ();
   current_window_widget= NULL;
   
-  //FIXME: render!
+  // render!
+
+  SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
+  SDL_RenderClear(sdl_ren);
+
+  Clay_SDL3RendererData rd{ sdl_ren, text_engine, ttf_fonts };
+  SDL_Clay_RenderClayCommands (&rd, &render_commands);
+
+  SDL_RenderPresent(sdl_ren);
+
 }
 
 //******************************************************************************
