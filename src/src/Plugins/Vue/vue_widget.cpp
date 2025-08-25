@@ -1279,6 +1279,20 @@ typedef vue_window_rep* vue_window;
 
 int vue_window_rep::serial= 1; // serial identifier for windows
 
+static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
+{
+    TTF_Font **fonts = (TTF_Font **)userData;
+    TTF_Font *font = fonts[config->fontId];
+    int width, height;
+
+    TTF_SetFontSize(font, config->fontSize);
+    if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
+    }
+
+    return (Clay_Dimensions) { (float) width, (float) height };
+}
+
 void HandleClayErrors (Clay_ErrorData errorData) {
     // See the Clay_ErrorData struct for more information
     printf ("%s", errorData.errorText.chars);
@@ -1340,12 +1354,14 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
       return SDL_APP_FAILURE;
     }
     
-    TTF_Font *font = TTF_OpenFont("resources/Roboto-Regular.ttf", 24);
+    TTF_Font *font = TTF_OpenFont("/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf", 24);
     if (!font) {
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
       return SDL_APP_FAILURE;
     }
     ttf_fonts[FONT_ID] = font;
+    Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
+
   }
 }
 
@@ -1465,9 +1481,10 @@ vue_window_rep::process_layout () {
   
   int win_x, win_y, win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
-  SDL_GetWindowPosition (sdl_win, &win_w, &win_h);
+  SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
   
+  Clay_SetDebugModeEnabled (true);
   // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
   Clay_BeginLayout ();
   
