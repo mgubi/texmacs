@@ -1825,8 +1825,10 @@ void gui_interpose (void (*f) (void)) {
 
 int number_of_servers (); // in texmacs_server.hpp
 
-void process_event(SDL_Event *event);
-void process_messages();
+
+void sdl_log_event (const SDL_Event *event);
+void process_event (SDL_Event *event);
+void process_messages ();
 void process_layout ();
 
 void gui_start_loop () {
@@ -1873,7 +1875,7 @@ void gui_start_loop () {
     if (t2 - t1 >= 20) cout << "interpose took " << t2-t1 << "ms\n";
 
 
-    // 5. redraw invalid editors
+    // redraw invalid editors
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
     if (n_events == 0 || request_partial_redraw) {
@@ -1883,7 +1885,7 @@ void gui_start_loop () {
       interrupt_time= texmacs_time () + (100 / (n_events + 1));
 
       // repaint all the editors
-      vue_simple_widget_rep::repaint_all();
+      vue_simple_widget_rep::repaint_all ();
       // note that repaint can be interrupted if events are present
       //FIXME: we should redraw the focused editor first, then the others
 
@@ -2023,23 +2025,8 @@ print_key_info ( SDL_KeyboardEvent *key ) {
 void
 process_event (SDL_Event *event) {
   vue_window win;
+  if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
-    case SDL_EVENT_WINDOW_SHOWN:
-      SDL_Log("Window %d shown", event->window.windowID);
-      win= get_window_from_ID (event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_HIDDEN:
-      SDL_Log("Window %d hidden", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_EXPOSED:
-      SDL_Log("Window %d exposed", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_MOVED:
-      SDL_Log("Window %d moved to %d,%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
-      win= get_window_from_ID (event->window.windowID);
-      break;
     case SDL_EVENT_WINDOW_RESIZED:
       SDL_Log("Window %d resized to %dx%d",
               event->window.windowID, event->window.data1,
@@ -2051,77 +2038,15 @@ process_event (SDL_Event *event) {
         win->relayout= true;
       }
       break;
-    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-      SDL_Log("Window %d pixel size changed to %dx%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
-      break;
-    case SDL_EVENT_WINDOW_MINIMIZED:
-      SDL_Log("Window %d minimized", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_MAXIMIZED:
-      SDL_Log("Window %d maximized", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_RESTORED:
-      SDL_Log("Window %d restored", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_MOUSE_ENTER:
-      SDL_Log("Mouse entered window %d",
-              event->window.windowID);
-        //unmap_balloon ();
-      win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        // FIXME: not quite right
-        float x,y;
-        int ox,oy;
-        update_mouse_state ();
-        SDL_GetGlobalMouseState (&x, &y);
-        SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
-        x -= ox; y -= oy;
-        //win->mouse_event ("enter", x, y, texmacs_time ());
-      }
-        break;
-    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-      SDL_Log("Mouse left window %d", event->window.windowID);
-      //unmap_balloon ();
-      win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        // FIXME: not quite right
-        float x,y;
-        int ox,oy;
-        update_mouse_state ();
-        SDL_GetGlobalMouseState (&x, &y);
-        SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
-        x -= ox; y -= oy;
-        //win->mouse_event ("leave", x, y, texmacs_time ());
-      }
-      break;
-    case SDL_EVENT_WINDOW_FOCUS_GAINED:
-      SDL_Log("Window %d gained keyboard focus",
-              event->window.windowID);
-      win= get_window_from_ID (event->window.windowID);
-      //if (win) win->focus_in_event ();
-      break;
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-      SDL_Log("Window %d lost keyboard focus",
-                event->window.windowID);
-      win= get_window_from_ID (event->window.windowID);
-      //if (win) win->focus_out_event ();
-      break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       SDL_Log("Window %d close requested", event->window.windowID);
       win= get_window_from_ID (event->window.windowID);
       //if (win) win->destroy_event();
       break;
-    case SDL_EVENT_WINDOW_HIT_TEST:
-      SDL_Log("Window %d has a special hit test", event->window.windowID);
-      break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
     {
       update_mouse_state ();
-      // we need to take into account explicitly the current button
-      cout << "new mouse state " << mouse_state << LF;
       win= get_window_from_ID (event->button.windowID);
       if (win) {
         SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
@@ -2132,12 +2057,6 @@ process_event (SDL_Event *event) {
         } else {
           action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
         }
-        //FIXME: this is not yet correct, as we need to take into account modifiers
-        //        action = action * lookup_mouse (event->button.button);
-        cout << ">>>>>" << action << LF;
-        //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
-        //win->mouse_event (action,
-        //                 event->button.x, event->button.y, texmacs_time ());
         mouse_action= action;
         mouse_time= texmacs_time();
         mouse_x= event->button.x;
@@ -2157,25 +2076,14 @@ process_event (SDL_Event *event) {
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
         SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
-
+        mouse_action= "wheel";
         mouse_time= texmacs_time();
         mouse_x= event->wheel.mouse_x;
         mouse_y= event->wheel.mouse_y;
-        
         double deltaX= event->wheel.x;
         double deltaY= event->wheel.y;
         array<double> data; data << deltaX << deltaY;
-        mouse_action= "wheel";
         mouse_data= data;
-#if 0
-        if (deltaY >= 0.5) {
-          mouse_action= "press-up";
-          //win->mouse_event ("press-up", x, y, texmacs_time ());
-        } else if (deltaY <= -0.5) {
-          mouse_action= "press-down";
-          //win->mouse_event ("press-down", x, y, texmacs_time ());
-        }
-#endif
         Clay_SetCurrentContext (win->clay_ctx);
         Clay_UpdateScrollContainers (true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
       }
@@ -2188,15 +2096,12 @@ process_event (SDL_Event *event) {
       if (win) {
         SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
         Clay_SetCurrentContext (win->clay_ctx);
-        Clay_SetPointerState ((Clay_Vector2) { event->button.x, event->button.y },
+        Clay_SetPointerState ((Clay_Vector2) { event->motion.x, event->motion.y },
                              event->button.button & SDL_BUTTON_LMASK);
         mouse_action= "move";
         mouse_time= texmacs_time();
-        mouse_x= event->button.x;
-        mouse_y= event->button.y;
-
-        //win->mouse_event ("move",
-        //                  event->motion.x, event->motion.y, texmacs_time ());
+        mouse_x= event->motion.x;
+        mouse_y= event->motion.y;
       }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
@@ -2914,3 +2819,124 @@ initialize_keyboard () {
   // Miscellaneous
   Map (0x20ac, "euro");
 }
+
+
+
+// SDL3 event logger
+
+void
+sdl_log_event (const SDL_Event *event) {
+    if (!event) return;
+
+    switch (event->type) {
+        // Quit
+        case SDL_EVENT_QUIT:
+            SDL_Log("Event: SDL_QUIT");
+            break;
+
+        // Keyboard
+        case SDL_EVENT_KEY_DOWN:
+        case SDL_EVENT_KEY_UP:
+            SDL_Log("Event: %s - Key: %s (Scancode: %d, Mod: 0x%x, Repeat: %d)",
+                    event->type == SDL_EVENT_KEY_DOWN ? "KEY_DOWN" : "KEY_UP",
+                    SDL_GetKeyName(event->key.key),
+                    event->key.scancode,
+                    event->key.mod,
+                    event->key.repeat);
+            break;
+
+        // Mouse motion
+        case SDL_EVENT_MOUSE_MOTION:
+            SDL_Log("Event: MOUSE_MOTION - x: %f, y: %f, xrel: %f, yrel: %f",
+                    event->motion.x, event->motion.y,
+                    event->motion.xrel, event->motion.yrel);
+            break;
+
+        // Mouse buttons
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            SDL_Log("Event: %s - Button: %d, Clicks: %d, x: %f, y: %f",
+                    event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "MOUSE_BUTTON_DOWN" : "MOUSE_BUTTON_UP",
+                    event->button.button, event->button.clicks,
+                    event->button.x, event->button.y);
+            break;
+
+        // Mouse wheel
+        case SDL_EVENT_MOUSE_WHEEL:
+            SDL_Log("Event: MOUSE_WHEEL - x: %f, y: %f, direction: %d",
+                    event->wheel.x, event->wheel.y,
+                    event->wheel.direction);
+            break;
+
+        // Text input
+        case SDL_EVENT_TEXT_INPUT:
+            SDL_Log("Event: TEXT_INPUT - Text: %s", event->text.text);
+            break;
+
+        case SDL_EVENT_TEXT_EDITING:
+            SDL_Log("Event: TEXT_EDITING - Text: %s, Start: %d, Length: %d",
+                    event->edit.text, event->edit.start, event->edit.length);
+            break;
+
+        // Window events
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            SDL_Log("Event: WINDOW_CLOSE_REQUESTED - Window ID: %u", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_RESIZED:
+            SDL_Log("Event: WINDOW_RESIZED - Window ID: %u, Width: %d, Height: %d",
+                    event->window.windowID, event->window.data1, event->window.data2);
+            break;
+
+        case SDL_EVENT_WINDOW_MINIMIZED:
+            SDL_Log("Event: WINDOW_MINIMIZED - Window ID: %u", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_MAXIMIZED:
+            SDL_Log("Event: WINDOW_MAXIMIZED - Window ID: %u", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_RESTORED:
+            SDL_Log("Event: WINDOW_RESTORED - Window ID: %u", event->window.windowID);
+            break;
+
+        // Game controller (SDL_Gamepad)
+        case SDL_EVENT_GAMEPAD_ADDED:
+            SDL_Log("Event: GAMEPAD_ADDED - Device Index: %d", event->gdevice.which);
+            break;
+
+        case SDL_EVENT_GAMEPAD_REMOVED:
+            SDL_Log("Event: GAMEPAD_REMOVED - Instance ID: %d", event->gdevice.which);
+            break;
+
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+        case SDL_EVENT_GAMEPAD_BUTTON_UP:
+            SDL_Log("Event: %s - Button: %d, Instance ID: %d",
+                    event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? "GAMEPAD_BUTTON_DOWN" : "GAMEPAD_BUTTON_UP",
+                    event->gbutton.button, event->gbutton.which);
+            break;
+
+        case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+            SDL_Log("Event: GAMEPAD_AXIS_MOTION - Axis: %d, Value: %d, Instance ID: %d",
+                    event->gaxis.axis, event->gaxis.value, event->gaxis.which);
+            break;
+
+        // Touch input
+        case SDL_EVENT_FINGER_DOWN:
+        case SDL_EVENT_FINGER_UP:
+        case SDL_EVENT_FINGER_MOTION:
+            SDL_Log("Event: %s - FingerID: %" SDL_PRIs64 ", x: %f, y: %f, dx: %f, dy: %f, pressure: %f",
+                    event->type == SDL_EVENT_FINGER_DOWN ? "FINGER_DOWN" :
+                    event->type == SDL_EVENT_FINGER_UP   ? "FINGER_UP"   : "FINGER_MOTION",
+                    event->tfinger.fingerID,
+                    event->tfinger.x, event->tfinger.y,
+                    event->tfinger.dx, event->tfinger.dy,
+                    event->tfinger.pressure);
+            break;
+
+        default:
+            SDL_Log("Event: Unknown type (%u)", event->type);
+            break;
+    }
+}
+
