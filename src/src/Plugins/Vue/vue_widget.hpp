@@ -71,7 +71,6 @@ public:
   coord4 extents;
   coord2 scroll_pos;
   coord2 mouse_cursor;
-  double new_zoom;
   bool mouse_grab;
   
   

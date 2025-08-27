@@ -1156,6 +1156,39 @@ vue_simple_widget_rep::~vue_simple_widget_rep () {
   paint_list= remove (paint_list, this);
 }
 
+// Message handling
+// ----------------
+// When implementing simple_widget we have to respond to certain messages (via
+// send, query, read, write, notify). They are detailed in `message.hpp` but
+// more concretely one can check tm_frame.cpp to see an intermediate interface
+// that the editor is using, e.g. to manage the properties of the editor's UI
+// 
+// /* canvas */
+// void set_scrollbars (int sb);
+// void get_visible (SI& x1, SI& y1, SI& x2, SI& y2);
+// void scroll_where (SI& x, SI& y);
+// void scroll_to (SI x, SI y);
+// void set_extents (SI x1, SI y1, SI x2, SI y2);
+// void get_extents (SI& x1, SI& y1, SI& x2, SI& y2);
+// void full_screen_mode (bool on, bool edit);
+//
+// a detail on SLOT_SCROLL_POSITION which is given the coordinates of the cursor
+// or of the center of the screen and it actually means to scroll in such a way
+// to make this part visible. SLOT_SCROLL_POSITION is also send while doing
+// mouse scrolling in edit_interface_rep::mouse_scroll, in which case the
+// position is relative to a query to SLOT_SCROLL_POSITION.
+//
+// the editor queries SLOT_IDENTIFIER used to check if the widget is
+// attached to a window (via is_attached in `message.hpp`)
+// and sends to SLOT_INVALIDATE, SLOT_INVALIDATE_ALL to request repaints
+//
+// we will also receive calls to get_position, get_scroll_position used to
+// position popup menus in edit_interface_rep::mouse_adjust.
+//
+// get_size, get_position refers to the window geometry
+//
+// send_keyboard_focus, send_mouse_grab
+
 void
 vue_simple_widget_rep::send (slot s, blackbox val) {
   //save_send_slot (s, val);
@@ -1201,7 +1234,9 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_ZOOM_FACTOR:
       {
-        new_zoom= check_open<double> (val, s);
+        double new_zoom= check_open<double> (val, s);
+        if (DEBUG_EVENTS) debug_events << "New zoom factor :" << new_zoom << LF;
+        handle_set_zoom_factor (new_zoom);
       }
       break;
     case SLOT_MOUSE_GRAB:
@@ -1222,6 +1257,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       }
       break;
     default:
+      cout << "WARNING: simple_widget is not handling this " << slot_name (s) << LF;
       vue_widget_rep::send(s, val);
       return;
   }
