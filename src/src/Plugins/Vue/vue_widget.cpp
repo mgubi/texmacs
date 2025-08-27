@@ -1414,8 +1414,8 @@ vue_simple_widget_rep::do_layout () {
     .custom= { .customData = this } }) {}
   if (Clay_Hovered () && (mouse_action != "")) {
     Clay_ElementData d= Clay_GetElementData (clay_id);
-    SI x= (mouse_x - d.boundingBox.x) * retina_factor;
-    SI y= (mouse_y - d.boundingBox.y) * retina_factor;
+    SI x= mouse_x - d.boundingBox.x;
+    SI y= mouse_y - d.boundingBox.y;
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);
     ren->encode (x,y);
     if (N(mouse_data) == 2) {
@@ -1535,25 +1535,28 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   // viewport size (in TeXmacs units)
   coord2 sz (size.x1 * ren->pixel, size.x2 * ren->pixel);
 
-  // preprocess scroll_pos
-  if (absolute_scroll) {
-    coord2 pt= scroll_pos;
-    scroll_pos= backing_pos;
-    cout << "extents " << extents << LF;
-    cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
-    if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-    else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-    if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-    else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-    cout << "scroll_pos (corrected) " << scroll_pos << LF;
+  if (backing_pos != scroll_pos) {
+    // preprocess scroll_pos
+    if (absolute_scroll) {
+      coord2 pt= scroll_pos;
+      scroll_pos= backing_pos;
+      cout << "extents " << extents << LF;
+      cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
+      if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+      else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+      if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+      else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+      cout << "scroll_pos (corrected) " << scroll_pos << LF;
+      absolute_scroll=false;
+    }
+    
+    // clamp the new position
+    if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
+    else if (scroll_pos.x1 + sz.x1 > extents->x2) scroll_pos.x1= max (extents->x2 - sz.x1, 0);
+    if (scroll_pos.x2 - sz.x2 < extents->y1) scroll_pos.x2= min (extents->y1 + sz.x2, 0);
+    else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
   }
   
-  // clamp the new position
-  if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
-  else if (scroll_pos.x1 + sz.x1 > extents->x2) scroll_pos.x1= max (extents->x2 - sz.x1, 0);
-  if (scroll_pos.x2 - sz.x2 < extents->y1) scroll_pos.x2= min (extents->y1 + sz.x2, 0);
-  else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
-    
   // check if the scroll position has changed. backing_pos is the old position,
   // while scroll_pos is the new one. Instead of repainting the whole backing store,
   // we move the contents of the backing store, and invalidate the regions that
@@ -1828,7 +1831,7 @@ void process_layout ();
 
 void gui_start_loop () {
   // start the main loop
-  bool wait = false;
+  bool wait=  false;
   int  count= 0;
   int  delay= MIN_DELAY;
   request_partial_redraw= true;
@@ -1859,6 +1862,7 @@ void gui_start_loop () {
       process_layout ();
       t1= t2; t2= texmacs_time ();
       if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
+      wait= true;
     }
     
     // interpose
@@ -1884,12 +1888,12 @@ void gui_start_loop () {
       //FIXME: we should redraw the focused editor first, then the others
 
       request_partial_redraw= interrupted;
+      wait= false;
     }
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
     
     process_messages ();
-    wait= true;
   }
 }
 
