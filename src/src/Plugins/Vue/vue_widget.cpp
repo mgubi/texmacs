@@ -516,7 +516,8 @@ public:
   
   string the_name;
   string mod_name;
-  
+  string orig_name;
+
   picture backing_store;
   renderer ren;
   Clay_Context *clay_ctx;
@@ -527,6 +528,7 @@ public:
   
   vue_window_rep (vue_widget w, string name);
   ~vue_window_rep ();
+  void destroy_event ();
   
   void   set_name (string name);
   string get_name ();
@@ -658,6 +660,12 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
         refresh_kind= kind;
       }
       break;
+    case SLOT_DESTROY:
+    {
+      ASSERT (is_nil (val), "type mismatch");
+      if (!is_nil (wid)) wid->send(s, val);
+    }
+      break;
     default:
       vue_widget_rep::send(s, val);
   }
@@ -776,6 +784,11 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_SCROLLBARS_VISIBILITY:
         // ignore this: qt handles scrollbars independently
         //                send_int (THIS, "scrollbars", val);
+      break;
+    case SLOT_DESTROY:
+      ASSERT (is_nil (val), "type mismatch");
+      if (!is_nil (quit)) quit ();
+ //     the_gui->need_update ();
       break;
     default:
       vue_widget_rep::send(s, val);
@@ -913,7 +926,7 @@ static TTF_Font **ttf_fonts= NULL; // fonts cache
 static const Uint32 FONT_ID = 0;
 
 vue_window_rep::vue_window_rep (vue_widget _content, string _name)
-  : content (_content), name (_name), id (serial++)
+ : content (_content), name (_name), id (serial++), orig_name (_name)
 {
   cout << "create vue_window_rep " << id << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
@@ -985,6 +998,13 @@ vue_window_rep::~vue_window_rep () {
   SDL_DestroyWindow (sdl_win);
   delete_renderer (ren);
 }
+
+void
+vue_window_rep::destroy_event () {
+  notify_window_destroy (orig_name);
+  send_destroy (abstract (content));
+}
+
 
 void
 vue_window_rep::get_position (SI& x, SI& y) {
@@ -2044,9 +2064,6 @@ process_event (SDL_Event *event) {
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
     case SDL_EVENT_WINDOW_RESIZED:
-      SDL_Log("Window %d resized to %dx%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
       win= get_window_from_ID (event->window.windowID);
       if (win) {
         Clay_SetCurrentContext (win->clay_ctx);
@@ -2055,9 +2072,8 @@ process_event (SDL_Event *event) {
       }
       break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-      SDL_Log("Window %d close requested", event->window.windowID);
       win= get_window_from_ID (event->window.windowID);
-      //if (win) win->destroy_event();
+      if (win) win->destroy_event();
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -2350,6 +2366,10 @@ void process_messages() {
     messages= not_ready;
   }
 }
+
+//*****************************************************************************
+//*****************************************************************************
+// Boring auxiliary functions
 
 
 /******************************************************************************
@@ -2839,7 +2859,6 @@ initialize_keyboard () {
 
 // SDL3 event logger
 
-// Define the macro list of SDL event types and their names
 #define SDL_EVENT_TYPE_LIST \
     X(SDL_EVENT_FIRST) \
     X(SDL_EVENT_QUIT) \
@@ -2956,8 +2975,8 @@ initialize_keyboard () {
     X(SDL_EVENT_LAST) \
     X(SDL_EVENT_ENUM_PADDING)
 
-// Now implement the function using the macro
-const char* SDL_EventTypeToString(Uint32 type) {
+const char*
+SDL_EventTypeToString (Uint32 type) {
     switch (type) {
 #define X(name) case name: return #name;
         SDL_EVENT_TYPE_LIST
@@ -2966,8 +2985,6 @@ const char* SDL_EventTypeToString(Uint32 type) {
             return "SDL_EVENT_UNKNOWN";
     }
 }
-
-
 
 void
 sdl_log_event (const SDL_Event *event) {
