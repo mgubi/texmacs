@@ -915,8 +915,8 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
 {
   cout << "create vue_window_rep " << id << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
-  int win_w= 600, win_h= 400;
-  int win_x=100, win_y= 100;
+  int win_w= 200, win_h= 200;
+  int win_x=30, win_y= 30;
   c_string buf (name);
   
   if (!SDL_CreateWindowAndRenderer (buf, win_w, win_h, flags, &sdl_win, &sdl_ren)) {
@@ -988,16 +988,16 @@ void
 vue_window_rep::get_position (SI& x, SI& y) {
   int xx, yy;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
-  x=  xx*PIXEL;
-  y= -yy*PIXEL;
+  x=  xx * PIXEL;
+  y= -yy * PIXEL;
 }
 
 void
 vue_window_rep::get_size (SI& ww, SI& hh) {
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
-  ww= win_w*PIXEL;
-  hh= win_h*PIXEL;
+  ww= win_w * PIXEL;
+  hh= win_h * PIXEL;
 }
 
 void
@@ -1150,9 +1150,13 @@ static unsigned int vue_simple_widget_serial_id= 0;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
-  size (coord2 (10, 10)), extents (0,0,0,0),
-  scroll_pos (coord2 (0, 0)), mouse_cursor (coord2 (0, 0)),
-  backing_pos (pair<SI,SI>(0, 0)) {
+  size (coord2 (10 * retina_factor, 10 * retina_factor)),
+  extents (0,0,0,0),
+  scroll_pos (coord2 (0, 0)),
+  mouse_cursor (coord2 (0, 0)),
+  backing_pos (coord2(0, 0)),
+  absolute_scroll (false)
+{
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
   backing_store= native_picture (size.x1, size.x2, 0, 0);
@@ -1225,23 +1229,8 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
     case SLOT_SCROLL_POSITION:
       {
         coord2 pt= check_open<coord2> (val, s);
-        coord2 sz (size.x1*PIXEL*retina_factor, size.x2*PIXEL*retina_factor);
-#if 1
-        scroll_pos= backing_pos;
-        cout << "scroll_to (initial) " << pt << LF;
-        if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-        else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-        if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-        else if (pt.x2 < scroll_pos.x2 + sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-        if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
-        else if (scroll_pos.x1 > extents->x2) scroll_pos.x1= extents->x2;
-        if (scroll_pos.x2 < extents->y1) scroll_pos.x2= extents->y1;
-        else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
-        cout << "scroll_pos (corrected) " << scroll_pos << LF;
-#else
         scroll_pos= pt;
-        cout << "scroll_to " << pt << LF;
-#endif
+        absolute_scroll= true;
       }
       break;
     case SLOT_ZOOM_FACTOR:
@@ -1324,11 +1313,11 @@ vue_simple_widget_rep::query (slot s, int type_id) {
     case SLOT_VISIBLE_PART:
     {
       check_type_id<coord4> (type_id, s);
-      rectangle r (0,0, size.x1*retina_factor, size.x2*retina_factor);
+      rectangle r (0, size.x2, size.x1, 0);
       ren->set_origin (-backing_pos.x1, -backing_pos.x2);
       ren->encode (r->x1, r->y1);
       ren->encode (r->x2, r->y2);
-      //cout << "visible part " << r << LF;
+//      cout << "visible part " << r << LF;
       return close_box<coord4> (coord4 (r->x1, r->y1, r->x2, r->y2));
     }
     default:
@@ -1430,8 +1419,8 @@ vue_simple_widget_rep::do_layout () {
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);
     ren->encode (x,y);
     if (N(mouse_data) == 2) {
-      mouse_data[0] = mouse_data[0] * PIXEL;
-      mouse_data[1] = mouse_data[1] * PIXEL;
+      mouse_data[0] *= ren->pixel * size.x1 * 0.1;
+      mouse_data[1] *= ren->pixel * size.x2 * 0.1;
     }
     if (mouse_action != "move") {
       cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
@@ -1440,7 +1429,15 @@ vue_simple_widget_rep::do_layout () {
       }
       cout << LF;
     }
-    handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
+    if (mouse_action == "wheel") {
+      scroll_pos= backing_pos;
+      scroll_pos.x1 += mouse_data[0];
+      scroll_pos.x2 += mouse_data[1];
+      absolute_scroll= false;
+    } else {
+      handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
+    }
+    // reset
     mouse_action="";
     if (N(mouse_data) > 0) mouse_data= array<double>();
   }
@@ -1462,7 +1459,7 @@ void
 vue_simple_widget_rep::invalidate_all () {
   //cout << "invalidate all " << LF;
   invalid_regions = rectangles();
-  rectangle r (0, 0, size.x1 * retina_factor, size.x2 * retina_factor);
+  rectangle r (0, size.x2, size.x1, 0);
   ren->set_origin (-backing_pos.x1, -backing_pos.x2);
   ren->encode (r->x1, r->y1);
   ren->encode (r->x2, r->y2);
@@ -1522,27 +1519,51 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     Clay_SetCurrentContext (w->win->clay_ctx);
     Clay_ElementData d= Clay_GetElementData (clay_id);
     if (d.found) {
-      size.x1 = d.boundingBox.width;
-      size.x2 = d.boundingBox.height;
+      size.x1 = d.boundingBox.width; // * retina_factor;
+      size.x2 = d.boundingBox.height; // * retina_factor;
     } else {
       cout << "clay_id not found!" << LF;
     }
   }
   
+  // current backing_store size
   int bs_w= backing_store->get_width ();
   int bs_h= backing_store->get_height ();
 
+  // Update the scroll position
 
-  // Look if the scroll position has changed. backing_pos is the old position,
-  // while origin is the new one. Instead of repainting the whole backing store,
+  // viewport size (in TeXmacs units)
+  coord2 sz (size.x1 * ren->pixel, size.x2 * ren->pixel);
+
+  // preprocess scroll_pos
+  if (absolute_scroll) {
+    coord2 pt= scroll_pos;
+    scroll_pos= backing_pos;
+    cout << "extents " << extents << LF;
+    cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
+    if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+    else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+    if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+    else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+    cout << "scroll_pos (corrected) " << scroll_pos << LF;
+  }
+  
+  // clamp the new position
+  if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
+  else if (scroll_pos.x1 + sz.x1 > extents->x2) scroll_pos.x1= max (extents->x2 - sz.x1, 0);
+  if (scroll_pos.x2 - sz.x2 < extents->y1) scroll_pos.x2= min (extents->y1 + sz.x2, 0);
+  else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
+    
+  // check if the scroll position has changed. backing_pos is the old position,
+  // while scroll_pos is the new one. Instead of repainting the whole backing store,
   // we move the contents of the backing store, and invalidate the regions that
   // are not covered by the moved contents.
   
   if (backing_pos != scroll_pos) {
-    int dx =  retina_factor * (scroll_pos.x1 - backing_pos.x1);
-    int dy =  retina_factor * (scroll_pos.x2 - backing_pos.x2);
+    int dx=  retina_factor * (scroll_pos.x1 - backing_pos.x1);
+    int dy=  retina_factor * (scroll_pos.x2 - backing_pos.x2);
 
-    backing_pos = scroll_pos;
+    backing_pos= scroll_pos;
     cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
         
 #if 1
@@ -1562,15 +1583,14 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 #endif
   }
   
-  // Check if the window has been resized. If so, we need to resize the backing
+  // check if the window has been resized. If so, we need to resize the backing
   // store as well. During the resize, the origin remain the same. So we can just
   // crop the backing store if the window is smaller, or fill the new regions with
   // the background color if the window is bigger.
 
-  int new_bs_w, new_bs_h;
-  new_bs_w= retina_factor*size.x1;
-  new_bs_h= retina_factor*size.x2;
-  
+  int new_bs_w= size.x1;
+  int new_bs_h= size.x2;
+
   if ((new_bs_w != bs_w)   || (new_bs_h != bs_h)) {
     // the viewport size changed, reset the backing store
     
@@ -1588,14 +1608,14 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // compute new invalid regions
     // add new exposed regions due to resize
     if (new_bs_w > bs_w) {
-      rectangle r = rectangle (bs_w, 0, new_bs_w, new_bs_h);
+      rectangle r = rectangle (bs_w, new_bs_h, new_bs_w, 0);
       ren->set_origin (-backing_pos.x1, -backing_pos.x2);
       ren->encode (r->x1, r->y1);
       ren->encode (r->x2, r->y2);
       invalid_regions = invalid_regions | rectangles (r);
     }
     if (new_bs_h > bs_h) {
-      rectangle r = rectangle (0, bs_h, new_bs_w, new_bs_h);
+      rectangle r = rectangle (0, new_bs_h, new_bs_w, bs_h);
       ren->set_origin (-backing_pos.x1, -backing_pos.x2);
       ren->encode (r->x1, r->y1);
       ren->encode (r->x2, r->y2);
@@ -1609,8 +1629,6 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     delete_renderer (ren);
     ren= ren2;
   }
-  
-  //invalid_regions= rectangles (rectangle (0,0, bs_w, bs_h));
   
   // repaint invalid rectangles if needed
   if (!is_nil (invalid_regions)) {
@@ -1628,9 +1646,9 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       ren->set_origin (-backing_pos.x1, -backing_pos.x2);
       //ren->encode (r->x1, r->y1);
       //ren->encode (r->x2, r->y2);
-      ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-      handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
-      ren->set_clipping (r->x1, r->y2, r->x2, r->y1, true);
+      ren->set_clipping (r->x1, r->y1, r->x2, r->y2);
+      handle_repaint (ren, r->x1, r->y1, r->x2, r->y2);
+      ren->set_clipping (r->x1, r->y1, r->x2, r->y2, true);
       if (gui_interrupted ())
         new_regions= rectangles (invalid_regions->item, new_regions);
       invalid_regions= invalid_regions->next;
@@ -1723,8 +1741,8 @@ void gui_root_extents (SI& width, SI& height)
   // get the screen size
   SDL_Rect r;
   if (SDL_GetDisplayBounds (1, &r)) {
-    width= r.w*PIXEL;
-    height= r.h*PIXEL;
+    width= r.w * PIXEL;
+    height= r.h * PIXEL;
     //cout << "SCREEN:" << screen_width << "," << screen_height << LF;
   } else {
     SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
@@ -2154,7 +2172,6 @@ process_event (SDL_Event *event) {
           //win->mouse_event ("press-down", x, y, texmacs_time ());
         }
 #endif
-
         Clay_SetCurrentContext (win->clay_ctx);
         Clay_UpdateScrollContainers (true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
       }

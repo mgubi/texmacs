@@ -72,7 +72,7 @@ public:
   coord2 scroll_pos;
   coord2 mouse_cursor;
   bool mouse_grab;
-  
+  bool absolute_scroll;
   
   vue_simple_widget_rep ();
   ~vue_simple_widget_rep ();
