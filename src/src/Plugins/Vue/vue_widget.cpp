@@ -21,6 +21,7 @@
 #include "window.hpp"
 #include "message.hpp"
 #include "font.hpp"
+#include "dictionary.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -59,6 +60,9 @@ void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_Rend
 }
 
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated = true, .length = N(s), .chars = &(s[0]) })
+
+Clay_Color color_background= { 128, 128, 200, 255 };
+Clay_Color color_highlight=  { 200, 200, 200, 255 };
 
 /*****************************************************************************/
 
@@ -127,6 +131,8 @@ tm_delete<vue_widget_rep> (vue_widget_rep* ptr) {
 }
 #endif
 
+unsigned int vue_widget_rep::serial_id= 0;
+
 /******************************************************************************
 * umbrella widget class
 ******************************************************************************/
@@ -194,14 +200,14 @@ template<typename T> widget vue_create (string type, T args) {
   inline bool operator==(const vue_##NAME &lhs, const vue_##NAME &rhs)\
   { return true __VA_OPT__(&& FOR_EACH_PAIR(MAKE_EQ, BOOLAND, __VA_ARGS__)); }\
   inline tm_ostream& operator << (tm_ostream& out, vue_##NAME &bb)\
-  { return out __VA_OPT__(<< FOR_EACH_PAIR(MAKE_OUT, LESSLESS, __VA_ARGS__)); }\
-  string type_vue_##NAME(#NAME);
+  { return out __VA_OPT__(<< FOR_EACH_PAIR(MAKE_OUT, LESSLESS, __VA_ARGS__)); }
 
 #define VUE_WIDGET_HEADER(NAME, ...) \
   widget NAME (VUE_WIDGET_HELPER_PARAMS(__VA_ARGS__))
 
 #define VUE_WIDGET(NAME, ...)\
   VUE_WIDGET_DATA(NAME __VA_OPT__(, __VA_ARGS__))\
+  string type_vue_##NAME(#NAME);\
   widget NAME (VUE_WIDGET_HELPER_PARAMS(__VA_ARGS__))\
   { return vue_create (type_vue_##NAME,\
            vue_##NAME { VUE_WIDGET_HELPER_INIT(__VA_ARGS__) }); }
@@ -387,8 +393,143 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 //******************************************************************************
 
+Clay_ElementId last_id;
+bool debug_clay=false;
+
+VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
+// data for a button w with a lazy pulldown menu pw and a cached value
+
+void
+layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
+  Clay_ElementId button_id= CLAY_IDI("pull_button", id);
+  Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
+  CLAY({
+    .id= button_id,
+    .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= layoutExpand },
+    .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
+  }) {
+    concrete(d.w)->do_layout ();
+    if (Clay_PointerOver(button_id) || Clay_PointerOver(float_id)) {
+      if (is_nil (d.cw)) {
+        d.cw= d.pw->eval (); // eval the promise
+      }
+    } else {
+      // reset
+      d.cw= NULL;
+    }
+    if (!is_nil (d.cw)) {
+      CLAY({ .id = float_id,
+          .floating = {
+            .attachTo = CLAY_ATTACH_TO_PARENT,
+            .attachPoints = {
+              .parent = d.down ? CLAY_ATTACH_POINT_LEFT_BOTTOM : CLAY_ATTACH_POINT_RIGHT_TOP
+            },
+          },
+          .layout = { .padding = { 0, 0, 8, 8 } },
+          .backgroundColor = color_background
+      }) {
+        concrete (d.cw)->do_layout ();
+      }
+    }
+  }
+}
+
+void
+layout_menu (unsigned int id, array<widget> a, bool vert) {
+  CLAY({ .id = CLAY_IDI("hv_menu", id),
+      .layout = {
+        .layoutDirection = vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
+        .sizing = layoutExpand,
+        .childGap = 10,
+      }})
+  {
+    for (int i=0, n=N(a); i< n; i++) {
+      concrete(a[i])->do_layout();
+    }
+  }
+}
+
 void
 vue_ui_rep::do_layout () {
+  if (type == "horizontal_menu") {
+    vue_horizontal_menu d= open_box<vue_horizontal_menu> (data);
+    layout_menu (id, d.a, false);
+    return;
+  }
+  if (type == "vertical_menu") {
+    vue_vertical_menu d= open_box<vue_vertical_menu> (data);
+    layout_menu (id, d.a, true);
+    return;
+  }
+  if (type == "menu_button") {
+    //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
+    vue_menu_button d= open_box<vue_menu_button> (data);
+    Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
+    CLAY({
+      .id= button_id,
+      .layout = { .padding = CLAY_PADDING_ALL(5) },
+      .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
+    }) {
+      last_id= button_id;
+   //   debug_clay= true;
+      concrete(d.w)->do_layout ();
+   // debug_clay= false;
+    }
+    return;
+  }
+  if (type == "pulldown_button") {
+    // add more space in the struct for caching the widget
+    if (type_box (data) == type_helper<vue_pulldown_button>::id) {
+      vue_pulldown_button d= open_box<vue_pulldown_button> (data);
+      widget cw;
+      vue_pull_button_cached cd { d.w, d.pw, cw, true };
+      data= close_box (cd);
+    }
+    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
+    layout_pull_button (id, d);
+    data= close_box (d);
+    return;
+  }
+  if (type == "pullright_button") {
+    // add more space in the struct for caching the widget
+    if (type_box (data) == type_helper<vue_pullright_button>::id) {
+      vue_pullright_button d= open_box<vue_pullright_button> (data);
+      widget cw;
+      vue_pull_button_cached cd { d.w, d.pw, cw, false };
+      data= close_box(cd);
+    }
+    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
+    layout_pull_button (id, d);
+    data= close_box (d);
+    return;
+  }
+  if (type == "text_widget") {
+    //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
+    vue_text_widget d= open_box<vue_text_widget> (data);
+    CLAY_TEXT(CLAY_TM_STRING(d.s), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
+    if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
+    return;
+  }
+  if (type == "menu_separator") {
+    //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
+    static string hrule("------");
+    CLAY_TEXT(CLAY_TM_STRING(hrule), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
+    return;
+  }
+  if (type == "menu_group") {
+    //VUE_WIDGET(menu_group, string, name, int, style);
+    vue_menu_group d= open_box<vue_menu_group> (data);
+    CLAY_TEXT(CLAY_TM_STRING(d.name), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {150, 150, 150, 255} }));
+    return;
+  }
+  if (type == "balloon_widget") {
+    //VUE_WIDGET(balloon_widget, widget, w, widget, help);
+    vue_balloon_widget d= open_box<vue_balloon_widget> (data);
+    concrete(d.w)->do_layout ();
+    //FIXME: implement help
+    return;
+  }
+  cout << "Need do_layout for widget " << type << LF;
 }
 
 struct vue_render_data {
@@ -744,8 +885,23 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget main_widget;
   string left_footer, right_footer;
   
+  
+  bool visibility [10];
+  vue_widget main_menu;
+  vue_widget main_icons;
+  vue_widget mode_icons;
+  vue_widget focus_icons;
+  vue_widget user_icons;
+  vue_widget side_tools;
+  vue_widget left_tools;
+  vue_widget bottom_tools;
+  vue_widget extra_tools;
+  
+  vue_widget interactive_prompt;
+  vue_widget interactive_input;
+
 public:
-  vue_texmacs_widget_rep (int _mask, command _quit) : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep") {};
+  vue_texmacs_widget_rep (int _mask, command _quit);
   
   void send (slot s, blackbox val);
   blackbox query (slot s, int type_id);
@@ -760,6 +916,26 @@ widget texmacs_widget (int mask, command quit) {
   return abstract (tm_new<vue_texmacs_widget_rep> (mask, quit));
 }
   
+
+vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
+  : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep")
+{
+  // decode mask
+  visibility[0] = (mask & 1)   == 1;   // header
+  visibility[1] = (mask & 2)   == 2;   // main
+  visibility[2] = (mask & 4)   == 4;   // mode
+  visibility[3] = (mask & 8)   == 8;   // focus
+  visibility[4] = (mask & 16)  == 16;  // user
+  visibility[5] = (mask & 32)  == 32;  // footer
+  visibility[6] = (mask & 64)  == 64;  // right side tools
+  visibility[7] = (mask & 128) == 128; // left side tools
+  visibility[8] = (mask & 256) == 256; // bottom tools
+  visibility[9] = (mask & 512) == 512; // extra bottom tools
+  
+  left_footer= translate ("Welcome to TeXmacs");
+  right_footer= translate ("Booting");
+};
+
 
 void
 vue_texmacs_widget_rep::send (slot s, blackbox val) {
@@ -784,6 +960,22 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_SCROLLBARS_VISIBILITY:
         // ignore this: qt handles scrollbars independently
         //                send_int (THIS, "scrollbars", val);
+      break;
+    case SLOT_HEADER_VISIBILITY:
+    case SLOT_MAIN_ICONS_VISIBILITY:
+    case SLOT_MODE_ICONS_VISIBILITY:
+    case SLOT_FOCUS_ICONS_VISIBILITY:
+    case SLOT_USER_ICONS_VISIBILITY:
+    case SLOT_FOOTER_VISIBILITY:
+    case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_LEFT_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    case SLOT_EXTRA_TOOLS_VISIBILITY:
+      {
+        int index = ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
+        visibility [index] = check_open<bool> (val, s);
+        // update_visibility();
+      }
       break;
     case SLOT_DESTROY:
       ASSERT (is_nil (val), "type mismatch");
@@ -820,14 +1012,72 @@ vue_texmacs_widget_rep::notify (slot s, blackbox new_val) {
 void
 vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
   (void) index; (void) w;
-  cout << "vue_texmacs_widget_rep::write(), unhandled " << slot_name (s)
-       << " for widget of type: " << type << LF;
   switch (s) {
     case SLOT_SCROLLABLE:
       check_type_void (index, s);
       main_widget= concrete (w);
+      send_keyboard_focus (abstract (main_widget));
       break;
+      
+    case SLOT_MAIN_MENU:
+      check_type_void (index, s);
+      main_menu= concrete (w);
+      break;
+
+    case SLOT_MAIN_ICONS:
+      check_type_void (index, s);
+      main_icons= concrete (w);
+      break;
+
+    case SLOT_MODE_ICONS:
+      check_type_void (index, s);
+      mode_icons= concrete (w);
+      break;
+ 
+    case SLOT_FOCUS_ICONS:
+      check_type_void (index, s);
+      focus_icons= concrete (w);
+      break;
+ 
+    case SLOT_USER_ICONS:
+      check_type_void (index, s);
+      user_icons= concrete (w);
+      break;
+ 
+    case SLOT_SIDE_TOOLS:
+      check_type_void (index, s);
+      side_tools= concrete (w);
+      break;
+ 
+    case SLOT_LEFT_TOOLS:
+      check_type_void (index, s);
+      left_tools= concrete (w);
+      break;
+ 
+    case SLOT_BOTTOM_TOOLS:
+      check_type_void (index, s);
+      bottom_tools= concrete (w);
+      break;
+ 
+    case SLOT_EXTRA_TOOLS:
+      check_type_void (index, s);
+      extra_tools= concrete (w);
+      break;
+ 
+
+    case SLOT_INTERACTIVE_PROMPT:
+      check_type_void (index, s);
+      interactive_prompt= concrete (w);
+      break;
+ 
+    case SLOT_INTERACTIVE_INPUT:
+      check_type_void (index, s);
+      interactive_input= concrete (w);
+      break;
+
     default:
+      cout << "vue_texmacs_widget_rep::write(), unhandled " << slot_name (s)
+           << " for widget of type: " << type << LF;
       break;
   }
 }
@@ -844,40 +1094,46 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
       return main_widget->query (s, type_id);
+    case SLOT_HEADER_VISIBILITY:
+    case SLOT_MAIN_ICONS_VISIBILITY:
+    case SLOT_MODE_ICONS_VISIBILITY:
+    case SLOT_FOCUS_ICONS_VISIBILITY:
+    case SLOT_USER_ICONS_VISIBILITY:
+    case SLOT_FOOTER_VISIBILITY:
+    case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_LEFT_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    case SLOT_EXTRA_TOOLS_VISIBILITY:
+      {
+        int index = ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
+        check_type_id<bool> (type_id, s);
+        return close_box<bool> (visibility [index]);
+      }
+      break;
     default:
       return vue_widget_rep::query(s, type_id);
   }
 }
 
+
 void vue_texmacs_widget_rep::do_layout () {
-  // Define an element with 16px of x and y padding
   CLAY({ .id = CLAY_ID("TeXmacsWidget"),
-         .backgroundColor = { 200, 200, 100, 255 },
+         .backgroundColor = color_background,
          .layout = {
           .layoutDirection = CLAY_TOP_TO_BOTTOM,
           .sizing = layoutExpand,
           .padding = CLAY_PADDING_ALL(16),
           .childGap = 16,
         }}) {
-      // A nested child element
       CLAY({ .id = CLAY_ID("MainMenuBar"),
              .layout = { .childGap = 16, .sizing= {
                .width = CLAY_SIZING_GROW(0),
-               .height = CLAY_SIZING_FIXED(40) }}}) {
-          // Children laid out top to bottom with a 16 px gap between them
+               .height = CLAY_SIZING_FIT(.min= 20) }}}) {
+                 if (!is_nil (main_menu)) {
+                   main_menu->do_layout ();
+                 }
       }
-      // A vertical scrolling container with a colored background
-#if 0
-      CLAY({
-          .layout = { .layoutDirection = CLAY_TOP_TO_BOTTOM, .childGap = 16, .sizing= layoutExpand },
-          .backgroundColor = { 200, 200, 100, 255 },
-          .cornerRadius = CLAY_CORNER_RADIUS(10),
-          .clip = { .vertical = true, .childOffset = Clay_GetScrollOffset() }})
-#endif
-      {
-          // child elements
-         if (!is_nil (main_widget)) main_widget->do_layout ();
-      }
+      if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id = CLAY_ID("Footer"),
              .layout = { .childGap = 16, .sizing= {
                 .width = CLAY_SIZING_GROW(0),
@@ -1108,7 +1364,7 @@ vue_window_rep::process_layout () {
   SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
   
-  Clay_SetDebugModeEnabled (true);
+  //Clay_SetDebugModeEnabled (true);
   // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
   Clay_BeginLayout ();
   
@@ -1942,7 +2198,6 @@ void process_redraw () {
     win->process_redraw ();
   }
 }
-
 
 static vue_window
 get_window_from_ID (Uint32 ID) {

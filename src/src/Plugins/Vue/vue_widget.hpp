@@ -22,9 +22,11 @@ struct vue_render_data;
 class vue_widget_rep : public widget_rep {
 protected:
   string type;
+  unsigned int id;
+  static unsigned int serial_id;
   
 public:
-  vue_widget_rep (string _type) : type (_type) {};
+  vue_widget_rep (string _type) : type (_type), id (serial_id++) {};
   virtual ~vue_widget_rep () {};
   
   virtual void send (slot s, blackbox val);
