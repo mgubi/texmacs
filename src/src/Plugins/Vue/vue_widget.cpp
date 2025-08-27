@@ -26,6 +26,17 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../MuPDF/mupdf_picture.hpp"
 
+// A note on TeXmacs' coordinates.
+//
+// TeXmacs uses a cartesian coordinate system oriended upwards and rightwards,
+// rectangles are defined in such way that the second point towards larger
+// coordinates than the left. this is assumed in all operations in rectangle.cpp
+// (mg: it seems to me)
+// graphics API instead uses a downward oriented system, so this has to be
+// taken into account when calling APIs. In Vue we stick to TeXmacs' conventions
+// and convert right before calling APIs.
+
+// TODO: check what the MuPDF is doing
 
 /*****************************************************************************/
 // Clay
@@ -54,13 +65,11 @@ void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_Rend
 #define DEBUG_VUE (debug (DEBUG_FLAG_QT))
 #define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
 
-
-
-
-
 /******************************************************************************
  * Type checking
  ******************************************************************************/
+
+// TODO: refactor, this is used by many files
 
 inline void
 check_type_void (blackbox bb, slot s) {
@@ -894,10 +903,8 @@ static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextEl
 void HandleClayErrors (Clay_ErrorData errorData) {
     // See the Clay_ErrorData struct for more information
     printf ("%s", errorData.errorText.chars);
-    switch (errorData.errorType) {
-      default:
-        // etc
-    }
+    // FIXME: properly handle Clay's errors
+    exit (-1);
 }
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
@@ -1101,10 +1108,12 @@ vue_window_rep::process_layout () {
 
 }
 
-/******************************************************************************
-* Besides the widget constructors, any GUI implementation should also provide
-* a simple_widget_rep class with the following virtual methods:
-******************************************************************************/
+//*****************************************************************************
+// vue_simple_widget
+
+// Besides the widget constructors, any GUI implementation should also provide
+// a simple_widget_rep class with the following virtual methods:
+//
 // bool simple_widget_rep::is_editor_widget ();
 //   should return true for editor widgets only
 // bool simple_widget_rep::is_embedded_widget ();
@@ -1141,7 +1150,7 @@ static unsigned int vue_simple_widget_serial_id= 0;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
-  size (coord2 (10, 10)), extents (coord4 (0,0,0,0)),
+  size (coord2 (10, 10)), extents (0,0,0,0),
   scroll_pos (coord2 (0, 0)), mouse_cursor (coord2 (0, 0)),
   backing_pos (pair<SI,SI>(0, 0)) {
   // note that size is set to an arbitrary value to init the backing_store
@@ -1195,15 +1204,9 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_INVALIDATE:
       {
-        coord4 p= check_open<coord4> (val, s);
-        SI ox = backing_pos.x1;
-        SI oy = backing_pos.x2;
-        ren->set_origin (ox,oy);
-        SI x1 = p.x1, y1 = p.x2, x2 = p.x3, y2 = p.x4;
-        ren->outer_round (x1, y1, x2, y2);
-        ren->decode (x1, y1);
-        ren->decode (x2, y2);
-        invalidate_rect (x1, y2, x2, y1);
+        coord4 r= check_open<coord4> (val, s);
+        SI x1 = r.x1, y1 = r.x2, x2 = r.x3, y2 = r.x4;
+        invalidate_rect (x1, y1, x2, y2);
       }
       break;
     case SLOT_INVALIDATE_ALL:
@@ -1214,22 +1217,31 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_EXTENTS:
       {
-        extents= check_open<coord4> (val, s);
+        coord4 r= check_open<coord4> (val, s);
+        extents= rectangle (r.x1, r.x2, r.x3, r.x4);
         cout << "extents " << extents << LF;
       }
       break;
     case SLOT_SCROLL_POSITION:
       {
-        scroll_pos= check_open<coord2> (val, s);
-        coord2 ext (extents.x3, -extents.x2);
-        coord2 sz (size.x1*PIXEL, size.x2*PIXEL);
-        cout << "scroll_pos (initial) " << scroll_pos << LF;
-        if (scroll_pos.x1 < sz.x1) scroll_pos.x1=sz.x1/2;
-        else if (scroll_pos.x1 > ext.x1-sz.x1/2) scroll_pos.x1=ext.x1-sz.x1/2;
-        if (scroll_pos.x2 > -sz.x2) scroll_pos.x2=-sz.x2/2;
-        else if (scroll_pos.x2 < -(ext.x2-sz.x2/2)) scroll_pos.x2=-(ext.x2-sz.x2/2);
-        //scroll_pos.x1 += sz.x1/2; scroll_pos.x2 += -sz.x2/2;
+        coord2 pt= check_open<coord2> (val, s);
+        coord2 sz (size.x1*PIXEL*retina_factor, size.x2*PIXEL*retina_factor);
+#if 1
+        scroll_pos= backing_pos;
+        cout << "scroll_to (initial) " << pt << LF;
+        if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+        else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
+        if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+        else if (pt.x2 < scroll_pos.x2 + sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
+        if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
+        else if (scroll_pos.x1 > extents->x2) scroll_pos.x1= extents->x2;
+        if (scroll_pos.x2 < extents->y1) scroll_pos.x2= extents->y1;
+        else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
         cout << "scroll_pos (corrected) " << scroll_pos << LF;
+#else
+        scroll_pos= pt;
+        cout << "scroll_to " << pt << LF;
+#endif
       }
       break;
     case SLOT_ZOOM_FACTOR:
@@ -1294,28 +1306,30 @@ vue_simple_widget_rep::query (slot s, int type_id) {
     case SLOT_SIZE:
     {
       check_type_id<coord2> (type_id, s);
+      //FIXME: is ok?
       return close_box<coord2> (size);
     }
     case SLOT_SCROLL_POSITION:
     {
+      cout << "scroll_where " << backing_pos << LF;
       check_type_id<coord2> (type_id, s);
-      
       return close_box<coord2> ( coord2 (backing_pos.x1, backing_pos.x2) );
     }
     case SLOT_EXTENTS:
     {
       check_type_id<coord4> (type_id, s);
-      return close_box<coord4> (extents);
+      return close_box<coord4> (coord4 (extents->x1, extents->y1,
+                                        extents->x2, extents->y2));
     }
     case SLOT_VISIBLE_PART:
     {
       check_type_id<coord4> (type_id, s);
-      coord4 visible (backing_pos.x1 - size.x1*PIXEL/2,
-                      backing_pos.x2 + size.x2*PIXEL/2,
-                      backing_pos.x1 + size.x1*PIXEL/2,
-                      backing_pos.x2 - size.x2*PIXEL/2);
-      //cout << "visible part " << visible << LF;
-      return close_box<coord4> (visible);
+      rectangle r (0,0, size.x1*retina_factor, size.x2*retina_factor);
+      ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+      ren->encode (r->x1, r->y1);
+      ren->encode (r->x2, r->y2);
+      //cout << "visible part " << r << LF;
+      return close_box<coord4> (coord4 (r->x1, r->y1, r->x2, r->y2));
     }
     default:
       return vue_widget_rep::query(s, type_id);
@@ -1399,6 +1413,7 @@ static time_t mouse_time;
 static unsigned int mouse_x;
 static unsigned int mouse_y;
 static unsigned int mouse_state= 0;
+static array<double> mouse_data;
 
 void
 vue_simple_widget_rep::do_layout () {
@@ -1410,11 +1425,24 @@ vue_simple_widget_rep::do_layout () {
     .custom= { .customData = this } }) {}
   if (Clay_Hovered () && (mouse_action != "")) {
     Clay_ElementData d= Clay_GetElementData (clay_id);
-    SI x=  PIXEL * (mouse_x - d.boundingBox.x) - backing_pos.x1;
-    SI y= - PIXEL * (mouse_y - d.boundingBox.y) + backing_pos.x2;
-    cout << "handling " << mouse_action << " at " << mouse_time << LF;
-    handle_mouse (mouse_action, x, y, mouse_state, mouse_time);
+    SI x= (mouse_x - d.boundingBox.x) * retina_factor;
+    SI y= (mouse_y - d.boundingBox.y) * retina_factor;
+    ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+    ren->encode (x,y);
+    if (N(mouse_data) == 2) {
+      mouse_data[0] = mouse_data[0] * PIXEL;
+      mouse_data[1] = mouse_data[1] * PIXEL;
+    }
+    if (mouse_action != "move") {
+      cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
+      if (N(mouse_data) == 2) {
+        cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
+      }
+      cout << LF;
+    }
+    handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
     mouse_action="";
+    if (N(mouse_data) > 0) mouse_data= array<double>();
   }
 }
 
@@ -1434,8 +1462,11 @@ void
 vue_simple_widget_rep::invalidate_all () {
   //cout << "invalidate all " << LF;
   invalid_regions = rectangles();
-  invalidate_rect (0, 0, retina_factor * size.x1,
-                   retina_factor * size.x2);
+  rectangle r (0, 0, size.x1 * retina_factor, size.x2 * retina_factor);
+  ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+  ren->encode (r->x1, r->y1);
+  ren->encode (r->x2, r->y2);
+  invalidate_rect (r->x1, r->y1, r->x2, r->y2);
 }
 
 bool
@@ -1512,32 +1543,23 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     int dy =  retina_factor * (scroll_pos.x2 - backing_pos.x2);
 
     backing_pos = scroll_pos;
-    translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
     cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
         
-    rectangles invalid;
-    while (!is_nil (invalid_regions)) {
-      rectangle r = invalid_regions->item ;
-      rectangle q = rectangle (r->x1-dx,r->y1-dy,r->x2-dx,r->y2-dy);
-      invalid = rectangles (q, invalid);
-      //cout << r << " ---> " << q << LF;
-      invalid_regions = invalid_regions->next;
-    }
-    invalid_regions= invalid & rectangles (rectangle (0,0, bs_w, bs_h));
-
-    if (!backing_valid) {
-      invalidate_rect (0, 0, bs_w, bs_h);
-    } else {
-      if (dy<0)
-  invalidate_rect (0, 0, bs_w, min (bs_h,-dy));
-      else if (dy>0)
-  invalidate_rect (0, max (0,bs_h-dy), bs_w, bs_h);
+#if 1
+    //FIXME: complete this part
+    if (backing_valid) {
+      translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
+      if (dy<0) invalidate_rect (0, 0, bs_w, min (bs_h,-dy));
+      else if (dy>0) invalidate_rect (0, max (0,bs_h-dy), bs_w, bs_h);
       
-      if (dx<0)
-  invalidate_rect (0, 0, min (-dx, bs_w), bs_h);
-      else if (dx>0)
-  invalidate_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
+      if (dx<0) invalidate_rect (0, 0, min (-dx, bs_w), bs_h);
+      else if (dx>0) invalidate_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
+    } else {
+      invalidate_all ();
     }
+#else
+    invalidate_all ();
+#endif
   }
   
   // Check if the window has been resized. If so, we need to resize the backing
@@ -1558,6 +1580,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     
     // copy the old backingstore
     SI x1=0, y1=0, x2=bs_w, y2=bs_h;
+    ren->set_origin (0,0); // we just want to copy bitmaps
     ren->encode (x1, y1);
     ren->encode (x2, y2);
     ren2->fetch (x1, y2, x2, y1, ren, x1, y2);
@@ -1566,10 +1589,16 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // add new exposed regions due to resize
     if (new_bs_w > bs_w) {
       rectangle r = rectangle (bs_w, 0, new_bs_w, new_bs_h);
+      ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+      ren->encode (r->x1, r->y1);
+      ren->encode (r->x2, r->y2);
       invalid_regions = invalid_regions | rectangles (r);
     }
     if (new_bs_h > bs_h) {
       rectangle r = rectangle (0, bs_h, new_bs_w, new_bs_h);
+      ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+      ren->encode (r->x1, r->y1);
+      ren->encode (r->x2, r->y2);
       invalid_regions = invalid_regions | rectangles (r);
     }
     
@@ -1593,17 +1622,12 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       invalid_regions= rectangles (lub);
     
     while (!is_nil (invalid_regions)) {
-      coord2 pt_or = backing_pos;
-      SI ox = size.x1*PIXEL/2-pt_or.x1;
-      SI oy = -size.x2*PIXEL/2-pt_or.x2;
-//      SI ox = -pt_or.x1;
-//      SI oy = -pt_or.x2;
-      ren->set_origin (ox, oy);
       rectangle r= copy (invalid_regions->item);
       // cout << "repaint " << r << LF;
       r= thicken (r, 1, 1);
-      ren->encode (r->x1, r->y1);
-      ren->encode (r->x2, r->y2);
+      ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+      //ren->encode (r->x1, r->y1);
+      //ren->encode (r->x2, r->y2);
       ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
       handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
       ren->set_clipping (r->x1, r->y2, r->x2, r->y1, true);
@@ -1786,15 +1810,15 @@ void process_layout ();
 
 void gui_start_loop () {
   // start the main loop
-  bool wait = true;
+  bool wait = false;
   int  count= 0;
   int  delay= MIN_DELAY;
   request_partial_redraw= true;
+  time_t t1, t2;
 
   while (nr_windows > 0 || number_of_servers () > 0) {
-    wait= true;
     
-    // 1. process events
+    // process events
     SDL_Event event;
     if (SDL_PollEvent (&event)) {
       process_event (&event);
@@ -1807,20 +1831,20 @@ void gui_start_loop () {
     // FIXME: Don't typeset when resizing window
 
     // 2. wait for events on all channels
-    time_t t1, t2;
-    t2= texmacs_time ();
     if (wait) {
       SDL_Delay (delay);
       count += delay;
       if (count >= SLEEP_AFTER) delay= MAX_DELAY;
+    } else {
+      // process layout, draw UI and handle events
+      t2= texmacs_time ();
+      process_layout ();
+      t1= t2; t2= texmacs_time ();
+      if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
     }
     
-    // process layout and draw UI
-    process_layout ();
-    t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
-
     // interpose
+    t2= texmacs_time ();
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
     t1= t2; t2= texmacs_time ();
@@ -1828,7 +1852,7 @@ void gui_start_loop () {
 
 
     // 5. redraw invalid editors
-
+    t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
     if (n_events == 0 || request_partial_redraw) {
       request_partial_redraw= false;
@@ -1847,6 +1871,7 @@ void gui_start_loop () {
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
     
     process_messages ();
+    wait= true;
   }
 }
 
@@ -2115,8 +2140,12 @@ process_event (SDL_Event *event) {
         mouse_x= event->wheel.mouse_x;
         mouse_y= event->wheel.mouse_y;
         
-        //float deltaX= event->wheel.x;
-        float deltaY= event->wheel.y;
+        double deltaX= event->wheel.x;
+        double deltaY= event->wheel.y;
+        array<double> data; data << deltaX << deltaY;
+        mouse_action= "wheel";
+        mouse_data= data;
+#if 0
         if (deltaY >= 0.5) {
           mouse_action= "press-up";
           //win->mouse_event ("press-up", x, y, texmacs_time ());
@@ -2124,6 +2153,7 @@ process_event (SDL_Event *event) {
           mouse_action= "press-down";
           //win->mouse_event ("press-down", x, y, texmacs_time ());
         }
+#endif
 
         Clay_SetCurrentContext (win->clay_ctx);
         Clay_UpdateScrollContainers (true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);

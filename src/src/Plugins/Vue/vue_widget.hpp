@@ -68,7 +68,7 @@ public:
 
   // properties set via messages
   coord2 size;
-  coord4 extents;
+  rectangle extents;
   coord2 scroll_pos;
   coord2 mouse_cursor;
   bool mouse_grab;
