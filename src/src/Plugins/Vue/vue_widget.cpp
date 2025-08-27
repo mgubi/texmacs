@@ -521,6 +521,7 @@ public:
   renderer ren;
   Clay_Context *clay_ctx;
   Clay_Arena clay_arena;
+  Clay_RenderCommandArray render_commands;
   
   bool relayout;
   
@@ -539,6 +540,7 @@ public:
   void   get_position (SI& x, SI& y);
   
   void process_layout ();
+  void process_redraw ();
 };
 
 typedef vue_window_rep* vue_window;
@@ -1093,11 +1095,13 @@ vue_window_rep::process_layout () {
   content->do_layout ();
   
   // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
-  Clay_RenderCommandArray render_commands= Clay_EndLayout ();
+  render_commands= Clay_EndLayout ();
   current_window_widget= NULL;
-  
-  // render!
+}
 
+void
+vue_window_rep::process_redraw () {
+  // render!
   SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
   SDL_RenderClear(sdl_ren);
 
@@ -1105,7 +1109,6 @@ vue_window_rep::process_layout () {
   SDL_Clay_RenderClayCommands (&rd, &render_commands);
 
   SDL_RenderPresent(sdl_ren);
-
 }
 
 //*****************************************************************************
@@ -1830,6 +1833,7 @@ void sdl_log_event (const SDL_Event *event);
 void process_event (SDL_Event *event);
 void process_messages ();
 void process_layout ();
+void process_redraw ();
 
 void gui_start_loop () {
   // start the main loop
@@ -1838,6 +1842,8 @@ void gui_start_loop () {
   int  delay= MIN_DELAY;
   request_partial_redraw= true;
   time_t t1, t2;
+
+  // FIXME: Don't typeset when resizing window
 
   while (nr_windows > 0 || number_of_servers () > 0) {
     
@@ -1859,12 +1865,11 @@ void gui_start_loop () {
       count += delay;
       if (count >= SLEEP_AFTER) delay= MAX_DELAY;
     } else {
-      // process layout, draw UI and handle events
+      // process layout and handle events
       t2= texmacs_time ();
       process_layout ();
       t1= t2; t2= texmacs_time ();
       if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
-      wait= true;
     }
     
     // interpose
@@ -1875,7 +1880,7 @@ void gui_start_loop () {
     if (t2 - t1 >= 20) cout << "interpose took " << t2-t1 << "ms\n";
 
 
-    // redraw invalid editors
+    // redraw
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
     if (n_events == 0 || request_partial_redraw) {
@@ -1890,7 +1895,10 @@ void gui_start_loop () {
       //FIXME: we should redraw the focused editor first, then the others
 
       request_partial_redraw= interrupted;
-      wait= false;
+    }
+    if (!wait) {
+      process_redraw (); // redraw the UI
+      wait= true;
     }
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
@@ -1904,6 +1912,14 @@ void process_layout () {
   while (it->busy()) { // and then the other windows
     vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
     win->process_layout ();
+  }
+}
+
+void process_redraw () {
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy()) { // and then the other windows
+    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+    win->process_redraw ();
   }
 }
 
@@ -2821,8 +2837,137 @@ initialize_keyboard () {
 }
 
 
-
 // SDL3 event logger
+
+// Define the macro list of SDL event types and their names
+#define SDL_EVENT_TYPE_LIST \
+    X(SDL_EVENT_FIRST) \
+    X(SDL_EVENT_QUIT) \
+    X(SDL_EVENT_TERMINATING) \
+    X(SDL_EVENT_LOW_MEMORY) \
+    X(SDL_EVENT_WILL_ENTER_BACKGROUND) \
+    X(SDL_EVENT_DID_ENTER_BACKGROUND) \
+    X(SDL_EVENT_WILL_ENTER_FOREGROUND) \
+    X(SDL_EVENT_DID_ENTER_FOREGROUND) \
+    X(SDL_EVENT_LOCALE_CHANGED) \
+    X(SDL_EVENT_SYSTEM_THEME_CHANGED) \
+    X(SDL_EVENT_DISPLAY_ORIENTATION) \
+    X(SDL_EVENT_DISPLAY_ADDED) \
+    X(SDL_EVENT_DISPLAY_REMOVED) \
+    X(SDL_EVENT_DISPLAY_MOVED) \
+    X(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) \
+    X(SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED) \
+    X(SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED) \
+    X(SDL_EVENT_WINDOW_SHOWN) \
+    X(SDL_EVENT_WINDOW_HIDDEN) \
+    X(SDL_EVENT_WINDOW_EXPOSED) \
+    X(SDL_EVENT_WINDOW_MOVED) \
+    X(SDL_EVENT_WINDOW_RESIZED) \
+    X(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) \
+    X(SDL_EVENT_WINDOW_METAL_VIEW_RESIZED) \
+    X(SDL_EVENT_WINDOW_MINIMIZED) \
+    X(SDL_EVENT_WINDOW_MAXIMIZED) \
+    X(SDL_EVENT_WINDOW_RESTORED) \
+    X(SDL_EVENT_WINDOW_MOUSE_ENTER) \
+    X(SDL_EVENT_WINDOW_MOUSE_LEAVE) \
+    X(SDL_EVENT_WINDOW_FOCUS_GAINED) \
+    X(SDL_EVENT_WINDOW_FOCUS_LOST) \
+    X(SDL_EVENT_WINDOW_CLOSE_REQUESTED) \
+    X(SDL_EVENT_WINDOW_HIT_TEST) \
+    X(SDL_EVENT_WINDOW_ICCPROF_CHANGED) \
+    X(SDL_EVENT_WINDOW_DISPLAY_CHANGED) \
+    X(SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) \
+    X(SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) \
+    X(SDL_EVENT_WINDOW_OCCLUDED) \
+    X(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) \
+    X(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) \
+    X(SDL_EVENT_WINDOW_DESTROYED) \
+    X(SDL_EVENT_WINDOW_HDR_STATE_CHANGED) \
+    X(SDL_EVENT_KEY_DOWN) \
+    X(SDL_EVENT_KEY_UP) \
+    X(SDL_EVENT_TEXT_EDITING) \
+    X(SDL_EVENT_TEXT_INPUT) \
+    X(SDL_EVENT_KEYMAP_CHANGED) \
+    X(SDL_EVENT_KEYBOARD_ADDED) \
+    X(SDL_EVENT_KEYBOARD_REMOVED) \
+    X(SDL_EVENT_TEXT_EDITING_CANDIDATES) \
+    X(SDL_EVENT_MOUSE_MOTION) \
+    X(SDL_EVENT_MOUSE_BUTTON_DOWN) \
+    X(SDL_EVENT_MOUSE_BUTTON_UP) \
+    X(SDL_EVENT_MOUSE_WHEEL) \
+    X(SDL_EVENT_MOUSE_ADDED) \
+    X(SDL_EVENT_MOUSE_REMOVED) \
+    X(SDL_EVENT_JOYSTICK_AXIS_MOTION) \
+    X(SDL_EVENT_JOYSTICK_BALL_MOTION) \
+    X(SDL_EVENT_JOYSTICK_HAT_MOTION) \
+    X(SDL_EVENT_JOYSTICK_BUTTON_DOWN) \
+    X(SDL_EVENT_JOYSTICK_BUTTON_UP) \
+    X(SDL_EVENT_JOYSTICK_ADDED) \
+    X(SDL_EVENT_JOYSTICK_REMOVED) \
+    X(SDL_EVENT_JOYSTICK_BATTERY_UPDATED) \
+    X(SDL_EVENT_JOYSTICK_UPDATE_COMPLETE) \
+    X(SDL_EVENT_GAMEPAD_AXIS_MOTION) \
+    X(SDL_EVENT_GAMEPAD_BUTTON_DOWN) \
+    X(SDL_EVENT_GAMEPAD_BUTTON_UP) \
+    X(SDL_EVENT_GAMEPAD_ADDED) \
+    X(SDL_EVENT_GAMEPAD_REMOVED) \
+    X(SDL_EVENT_GAMEPAD_REMAPPED) \
+    X(SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN) \
+    X(SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION) \
+    X(SDL_EVENT_GAMEPAD_TOUCHPAD_UP) \
+    X(SDL_EVENT_GAMEPAD_SENSOR_UPDATE) \
+    X(SDL_EVENT_GAMEPAD_UPDATE_COMPLETE) \
+    X(SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) \
+    X(SDL_EVENT_FINGER_DOWN) \
+    X(SDL_EVENT_FINGER_UP) \
+    X(SDL_EVENT_FINGER_MOTION) \
+    X(SDL_EVENT_FINGER_CANCELED) \
+    X(SDL_EVENT_CLIPBOARD_UPDATE) \
+    X(SDL_EVENT_DROP_FILE) \
+    X(SDL_EVENT_DROP_TEXT) \
+    X(SDL_EVENT_DROP_BEGIN) \
+    X(SDL_EVENT_DROP_COMPLETE) \
+    X(SDL_EVENT_DROP_POSITION) \
+    X(SDL_EVENT_AUDIO_DEVICE_ADDED) \
+    X(SDL_EVENT_AUDIO_DEVICE_REMOVED) \
+    X(SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) \
+    X(SDL_EVENT_SENSOR_UPDATE) \
+    X(SDL_EVENT_PEN_PROXIMITY_IN) \
+    X(SDL_EVENT_PEN_PROXIMITY_OUT) \
+    X(SDL_EVENT_PEN_DOWN) \
+    X(SDL_EVENT_PEN_UP) \
+    X(SDL_EVENT_PEN_BUTTON_DOWN) \
+    X(SDL_EVENT_PEN_BUTTON_UP) \
+    X(SDL_EVENT_PEN_MOTION) \
+    X(SDL_EVENT_PEN_AXIS) \
+    X(SDL_EVENT_CAMERA_DEVICE_ADDED) \
+    X(SDL_EVENT_CAMERA_DEVICE_REMOVED) \
+    X(SDL_EVENT_CAMERA_DEVICE_APPROVED) \
+    X(SDL_EVENT_CAMERA_DEVICE_DENIED) \
+    X(SDL_EVENT_RENDER_TARGETS_RESET) \
+    X(SDL_EVENT_RENDER_DEVICE_RESET) \
+    X(SDL_EVENT_RENDER_DEVICE_LOST) \
+    X(SDL_EVENT_PRIVATE0) \
+    X(SDL_EVENT_PRIVATE1) \
+    X(SDL_EVENT_PRIVATE2) \
+    X(SDL_EVENT_PRIVATE3) \
+    X(SDL_EVENT_POLL_SENTINEL) \
+    X(SDL_EVENT_USER) \
+    X(SDL_EVENT_LAST) \
+    X(SDL_EVENT_ENUM_PADDING)
+
+// Now implement the function using the macro
+const char* SDL_EventTypeToString(Uint32 type) {
+    switch (type) {
+#define X(name) case name: return #name;
+        SDL_EVENT_TYPE_LIST
+#undef X
+        default:
+            return "SDL_EVENT_UNKNOWN";
+    }
+}
+
+
 
 void
 sdl_log_event (const SDL_Event *event) {
@@ -2879,25 +3024,110 @@ sdl_log_event (const SDL_Event *event) {
             break;
 
         // Window events
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            SDL_Log("Event: WINDOW_CLOSE_REQUESTED - Window ID: %u", event->window.windowID);
-            break;
 
+        case SDL_EVENT_WINDOW_SHOWN:
+            SDL_Log("Window %u shown", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_HIDDEN:
+            SDL_Log("Window %u hidden", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_EXPOSED:
+            SDL_Log("Window %u exposed", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_MOVED:
+            SDL_Log("Window %u moved to (%d, %d)",
+                    event->window.windowID,
+                    event->window.data1,
+                    event->window.data2);
+            break;
+        
         case SDL_EVENT_WINDOW_RESIZED:
-            SDL_Log("Event: WINDOW_RESIZED - Window ID: %u, Width: %d, Height: %d",
-                    event->window.windowID, event->window.data1, event->window.data2);
+            SDL_Log("Window %u resized to %dx%d",
+                    event->window.windowID,
+                    event->window.data1,
+                    event->window.data2);
             break;
-
+        
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            SDL_Log("Window %u pixel size changed to %dx%d",
+                    event->window.windowID,
+                    event->window.data1,
+                    event->window.data2);
+            break;
+        
         case SDL_EVENT_WINDOW_MINIMIZED:
-            SDL_Log("Event: WINDOW_MINIMIZED - Window ID: %u", event->window.windowID);
+            SDL_Log("Window %u minimized", event->window.windowID);
             break;
-
+        
         case SDL_EVENT_WINDOW_MAXIMIZED:
-            SDL_Log("Event: WINDOW_MAXIMIZED - Window ID: %u", event->window.windowID);
+            SDL_Log("Window %u maximized", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_RESTORED:
+            SDL_Log("Window %u restored", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_MOUSE_ENTER:
+            SDL_Log("Mouse entered window %u", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+            SDL_Log("Mouse left window %u", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            SDL_Log("Window %u gained keyboard focus", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+            SDL_Log("Window %u lost keyboard focus", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            SDL_Log("Window %u close requested", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_HIT_TEST:
+            SDL_Log("Window %u hit test event", event->window.windowID);
+            break;
+        
+        case SDL_EVENT_WINDOW_ICCPROF_CHANGED:
+            SDL_Log("Window %u ICC profile changed", event->window.windowID);
             break;
 
-        case SDL_EVENT_WINDOW_RESTORED:
-            SDL_Log("Event: WINDOW_RESTORED - Window ID: %u", event->window.windowID);
+        case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+            SDL_Log("Window %u moved to display %d", event->window.windowID, event->window.data1);
+            break;
+
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+            SDL_Log("Window %u display scale changed to %d", event->window.windowID, event->window.data1);
+            break;
+
+        case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
+            SDL_Log("Window %u safe area changed", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_OCCLUDED:
+            SDL_Log("Window %u occluded", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+            SDL_Log("Window %u entered fullscreen", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+            SDL_Log("Window %u left fullscreen", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_DESTROYED:
+            SDL_Log("Window %u destroyed", event->window.windowID);
+            break;
+
+        case SDL_EVENT_WINDOW_HDR_STATE_CHANGED:
+            SDL_Log("Window %u HDR state changed", event->window.windowID);
             break;
 
         // Game controller (SDL_Gamepad)
@@ -2935,8 +3165,7 @@ sdl_log_event (const SDL_Event *event) {
             break;
 
         default:
-            SDL_Log("Event: Unknown type (%u)", event->type);
+            SDL_Log("Event: %s", SDL_EventTypeToString (event->type));
             break;
     }
 }
-
