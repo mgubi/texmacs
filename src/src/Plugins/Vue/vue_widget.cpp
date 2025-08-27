@@ -65,6 +65,21 @@ Clay_Color color_background= { 128, 128, 200, 255 };
 Clay_Color color_highlight=  { 200, 200, 200, 255 };
 
 /*****************************************************************************/
+// UI state (maybe refactor in a structure)
+
+// pointer info
+string mouse_action;
+time_t mouse_time;
+unsigned int mouse_x;
+unsigned int mouse_y;
+unsigned int mouse_state= 0;
+array<double> mouse_data;
+
+// stack to handle nested pull(down/right) menus
+uint32_t menu_stack [100];
+unsigned int n_menu_stack=0;
+
+/*****************************************************************************/
 
 #define DEBUG_VUE (debug (DEBUG_FLAG_QT))
 #define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
@@ -409,13 +424,21 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
     .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
   }) {
     concrete(d.w)->do_layout ();
-    if (Clay_PointerOver(button_id) || Clay_PointerOver(float_id)) {
+    if (Clay_PointerOver (button_id) && (mouse_state & 1)) {
       if (is_nil (d.cw)) {
         d.cw= d.pw->eval (); // eval the promise
+        menu_stack[n_menu_stack]= float_id.id;
       }
     } else {
-      // reset
-      d.cw= NULL;
+      if ((menu_stack[n_menu_stack] == float_id.id) &&
+          (menu_stack[n_menu_stack + 1] == 0) &&
+          !(Clay_PointerOver (float_id) || Clay_PointerOver (button_id)))  {
+        d.cw= NULL;
+        menu_stack[n_menu_stack]= 0;
+      }
+      if (menu_stack[n_menu_stack] != float_id.id) {
+        d.cw= NULL;
+      }
     }
     if (!is_nil (d.cw)) {
       CLAY({ .id = float_id,
@@ -428,7 +451,9 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
           .layout = { .padding = { 0, 0, 8, 8 } },
           .backgroundColor = color_background
       }) {
+        n_menu_stack++;
         concrete (d.cw)->do_layout ();
+        n_menu_stack--;
       }
     }
   }
@@ -467,12 +492,14 @@ vue_ui_rep::do_layout () {
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
     CLAY({
       .id= button_id,
-      .layout = { .padding = CLAY_PADDING_ALL(5) },
+      .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= layoutExpand  },
       .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
     }) {
       last_id= button_id;
    //   debug_clay= true;
       concrete(d.w)->do_layout ();
+      CLAY({ .layout= { .sizing= layoutExpand }}) {}
+      CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
    // debug_clay= false;
     }
     return;
@@ -871,6 +898,8 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 
 void
 vue_plain_window_widget_rep::do_layout () {
+  // reset the menu stack
+  while (n_menu_stack > 0) { menu_stack[n_menu_stack]= 0;  n_menu_stack--; }
   concrete(wid)->do_layout ();
 }
 
@@ -1674,14 +1703,6 @@ void
 vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
   (void) win; (void) x1; (void) y1; (void) x2; (void) y2;
 }
-
-// pointer info
-static string mouse_action;
-static time_t mouse_time;
-static unsigned int mouse_x;
-static unsigned int mouse_y;
-static unsigned int mouse_state= 0;
-static array<double> mouse_data;
 
 void
 vue_simple_widget_rep::do_layout () {
