@@ -65,6 +65,7 @@ Clay_Color palette[4]= { {160, 160, 160, 255}, {192, 192, 192, 255},{224, 224, 2
 
 Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
+Clay_Color color_text= {0, 0, 0, 255};
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -87,6 +88,9 @@ bool debug_clay=false;
 
 // ask the buttons to fit all horizontal space
 bool button_grow= false;
+
+// list of commands
+list<command> cmd_list;
 
 /*****************************************************************************/
 
@@ -531,12 +535,19 @@ vue_ui_rep::do_layout () {
     }) {
       last_id= button_id;
       concrete(d.w)->do_layout ();
-      CLAY({ .layout= { .sizing= layoutExpand }}) {}
-      CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
+      if (N(d.ks) > 0) {
+        // add shortcut
+        CLAY({ .layout= { .sizing= layoutExpand }}) {}
+        CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = color_text }));
+      }
       if (Clay_Hovered() && (mouse_state & 1)) {
+        if (n_menu_stack > 0) {
+          // we are in an active menu chain,
+          // by hacking the last frame we force all the menus to close
+          menu_stack[n_menu_stack-1]=0;
+        }
         cout << "Click!! " << id << LF;
-        int k= n_menu_stack+1;
-        while (k > 0) { menu_stack[k]= 0;  k--; }
+        cmd_list= list(d.cmd, cmd_list);
       }
     }
     return;
@@ -579,7 +590,7 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
-    CLAY_TEXT(CLAY_TM_STRING(d.s), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
+    CLAY_TEXT(CLAY_TM_STRING(d.s), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = color_text }));
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -1382,9 +1393,9 @@ void vue_texmacs_widget_rep::do_layout () {
                 .width = CLAY_SIZING_GROW(0),
                 .height = CLAY_SIZING_FIXED(40) }}})
       {
-          CLAY_TEXT(CLAY_TM_STRING(left_footer), CLAY_TEXT_CONFIG({ .fontSize = 24, .textColor = {0, 0, 0, 255} }));
+          CLAY_TEXT(CLAY_TM_STRING(left_footer), CLAY_TEXT_CONFIG({ .fontSize = 24, .textColor = color_text }));
         CLAY({ .layout = { .sizing= { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIXED(0) }} }) {} // spacer
-          CLAY_TEXT(CLAY_TM_STRING(right_footer), CLAY_TEXT_CONFIG({ .fontSize = 24, .textColor = {0, 0, 0, 255} }));
+          CLAY_TEXT(CLAY_TM_STRING(right_footer), CLAY_TEXT_CONFIG({ .fontSize = 24, .textColor = color_text }));
       }
   }
 }
@@ -1927,36 +1938,37 @@ vue_simple_widget_rep::do_layout () {
   CLAY({
     .id= clay_id,
     .layout= { .sizing= layoutExpand },
-    .custom= { .customData = this } }) {}
-  if (Clay_Hovered () && (mouse_action != "")) {
-    Clay_ElementData d= Clay_GetElementData (clay_id);
-    SI x= mouse_x - d.boundingBox.x;
-    SI y= mouse_y - d.boundingBox.y;
-    ren->set_origin (-backing_pos.x1, -backing_pos.x2);
-    ren->encode (x,y);
-    if (N(mouse_data) == 2) {
-      mouse_data[0] *= ren->pixel * size.x1 * 0.1;
-      mouse_data[1] *= ren->pixel * size.x2 * 0.1;
-    }
-    if (mouse_action != "move") {
-      cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
-      if (N(mouse_data) == 2) {
-        cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
+    .custom= { .customData = this } }) {
+      if (Clay_Hovered () && (mouse_action != "")) {
+        Clay_ElementData d= Clay_GetElementData (clay_id);
+        SI x= mouse_x - d.boundingBox.x;
+        SI y= mouse_y - d.boundingBox.y;
+        ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+        ren->encode (x,y);
+        if (N(mouse_data) == 2) {
+          mouse_data[0] *= ren->pixel * size.x1 * 0.1;
+          mouse_data[1] *= ren->pixel * size.x2 * 0.1;
+        }
+        if (mouse_action != "move") {
+          cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
+          if (N(mouse_data) == 2) {
+            cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
+          }
+          cout << LF;
+        }
+        if (mouse_action == "wheel") {
+          scroll_pos= backing_pos;
+          scroll_pos.x1 += mouse_data[0];
+          scroll_pos.x2 += mouse_data[1];
+          absolute_scroll= false;
+        } else {
+          handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
+        }
+        // reset
+        mouse_action="";
+        if (N(mouse_data) > 0) mouse_data= array<double>();
       }
-      cout << LF;
     }
-    if (mouse_action == "wheel") {
-      scroll_pos= backing_pos;
-      scroll_pos.x1 += mouse_data[0];
-      scroll_pos.x2 += mouse_data[1];
-      absolute_scroll= false;
-    } else {
-      handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
-    }
-    // reset
-    mouse_action="";
-    if (N(mouse_data) > 0) mouse_data= array<double>();
-  }
 }
 
 /******************************************************************************
@@ -2383,6 +2395,17 @@ void gui_start_loop () {
       process_layout ();
       t1= t2; t2= texmacs_time ();
       if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
+    }
+    
+    // exec commands if present
+    if (!is_nil (cmd_list)) {
+      list<command> l= reverse(cmd_list);
+      cmd_list= list<command>();
+      while (!is_nil(l)) {
+        cout << "run command " << l->item << LF;
+        l->item->apply();
+        l= l->next;
+      }
     }
     
     // interpose
