@@ -61,8 +61,10 @@ void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_Rend
 
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated = true, .length = N(s), .chars = &(s[0]) })
 
-Clay_Color color_background= { 128, 128, 200, 255 };
-Clay_Color color_highlight=  { 200, 200, 255, 255 };
+Clay_Color palette[4]= { {160, 160, 160, 255}, {192, 192, 192, 255},{224, 224, 224, 255},{240, 240, 240, 255} };
+
+Clay_Color color_background= palette[1];
+Clay_Color color_highlight=  palette[3];
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -580,12 +582,12 @@ vue_ui_rep::do_layout () {
       CLAY({ .layout = { .sizing= { .height = CLAY_SIZING_GROW(0) },
                          .padding = {5,5,5,5} },
              .border = {  .width = { .left = 2 },
-             .color =  {100, 100, 200, 255} } });
+             .color =  color_highlight } });
     } else {
       CLAY({ .layout = { .sizing= { .width = CLAY_SIZING_GROW(0) },
                          .padding = {5,5,5,5} },
              .border = {  .width = { .top = 2 } ,
-             .color =  {100, 100, 200, 255} } });
+             .color =  color_highlight } });
     }
     return;
   }
