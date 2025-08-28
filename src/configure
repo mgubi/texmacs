@@ -666,6 +666,8 @@ PDF_CFLAGS
 PDF_CPP
 PDF_CXX
 CONFIG_PDF
+VUE_LDFLAGS
+VUE_CFLAGS
 SDL_LDFLAGS
 SDL_CFLAGS
 COCOA_LDFLAGS
@@ -675,6 +677,7 @@ QT_PLUGINS_PATH
 QT_FRAMEWORKS_PATH
 CONFIG_GUI_DEFINE
 CONFIG_GUI
+CONFIG_VUE
 CONFIG_SDL
 CONFIG_QT
 CONFIG_COCOA
@@ -1649,7 +1652,7 @@ Optional Packages:
   --with-mupdf=DIR        Path to MuPDF installation prefix (optional)
   --with-sdk[=none]       Apple SDK level (i.e 10.6)
   --with-osx[=none]       targeted configuration (i.e 10.6)
-  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl
+  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl, vue
   --with-qt-find-method=METHOD
                           Method to find Qt (autotroll, autotrollstatic,
                           pkgconfig)
@@ -35575,6 +35578,112 @@ printf "%s\n" "SDL3_LIBS=$SDL3_LIBS" >&6; }
          SDL_LIBS="$SDL3_LIBS"
          CONFIG_GUI="SDL"
          ;;
+      vue)
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: enabling experimental Vue/SDL immediate mode GUI" >&5
+printf "%s\n" "enabling experimental Vue/SDL immediate mode GUI" >&6; }
+
+
+# Check whether --with-sdl3 was given.
+if test ${with_sdl3+y}
+then :
+  withval=$with_sdl3;
+fi
+
+
+  SAVE_CPPFLAGS="$CPPFLAGS"
+  SAVE_LDFLAGS="$LDFLAGS"
+  SAVE_LIBS="$LIBS"
+  if test "$with_sdl3" = "no" -o "$with_sdl3" = "" ; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabling sdl3 support" >&5
+printf "%s\n" "disabling sdl3 support" >&6; }
+  else
+      CPPFLAGS=`pkg-config --cflags sdl3`
+      LIBS=`pkg-config --libs sdl3`
+      ac_fn_cxx_check_header_compile "$LINENO" "SDL3/SDL.h" "ac_cv_header_SDL3_SDL_h" "$ac_includes_default"
+if test "x$ac_cv_header_SDL3_SDL_h" = xyes
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for sdl3" >&5
+printf %s "checking for sdl3... " >&6; }
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <SDL3/SDL.h>
+
+int
+main (void)
+{
+
+SDL_Init(SDL_INIT_VIDEO);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"
+then :
+
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+printf "%s\n" "#define USE_SDL3 1" >>confdefs.h
+
+      SDL3_CPPFLAGS="$CPPFLAGS"
+      SDL3_LDFLAGS="$LIBS"
+
+else case e in #(
+  e)
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; } ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+
+  fi
+
+  CPPFLAGS="$SAVE_CPPFLAGS"
+  LDFLAGS="$SAVE_LDFLAGS"
+  LIBS="$SAVE_LIBS"
+
+
+  SDL3_CXX=$SDL3_CXXFLAGS
+
+  SDL3_CPP=$SDL3_CPPFLAGS
+
+  if [[ $enable_dumpflags =~ $(echo "(^|[[:space:]])(SDL3|ALL)($|[[:space:]])") ]]
+  then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CFLAGS:$SDL3_CFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CFLAGS:$SDL3_CFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CXXFLAGS:$SDL3_CXXFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CXXFLAGS:$SDL3_CXXFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_CPPFLAGS:$SDL3_CPPFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_CPPFLAGS:$SDL3_CPPFLAGS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_LIBS:$SDL3_LIBS" >&5
+printf "%s\n" "$as_me: SDL3_LIBS:$SDL3_LIBS" >&6;}
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: SDL3_LDFLAGS:$SDL3_LDFLAGS" >&5
+printf "%s\n" "$as_me: SDL3_LDFLAGS:$SDL3_LDFLAGS" >&6;}
+
+
+  fi
+# adaptation layer remove when finished
+  SDL3_CFLAGS="$SDL3_CXXFLAGS $SDL3_CPPFLAGS"
+
+
+
+
+
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_CFLAGS=$SDL3_CFLAGS" >&5
+printf "%s\n" "SDL3_CFLAGS=$SDL3_CFLAGS" >&6; }
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_LDFLAGS=$SDL3_LDFLAGS" >&5
+printf "%s\n" "SDL3_LDFLAGS=$SDL3_LDFLAGS" >&6; }
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_LIBS=$SDL3_LIBS" >&5
+printf "%s\n" "SDL3_LIBS=$SDL3_LIBS" >&6; }
+         VUE_CFLAGS="-std=c++20 $SDL3_CFLAGS"
+         VUE_LDFLAGS="$SDL3_LDFLAGS"
+         VUE_LIBS="$SDL3_LIBS"
+         CONFIG_GUI="VUE"
+         ;;
       *)
          as_fn_error $? "bad option --with-gui=$gui_selector" "$LINENO" 5
          ;;
@@ -35660,7 +35769,18 @@ printf "%s\n" "#define QTWKTEXMACS 1" >>confdefs.h
 printf "%s\n" "#define SDLTEXMACS 1" >>confdefs.h
 
          ;;
+      VUE)
+         CONFIG_VUE="Vue"
+         CONFIG_GUI_DEFINE="VUETEXMACS"
+
+printf "%s\n" "#define VUETEXMACS 1" >>confdefs.h
+
+         ;;
   esac
+
+
+
+
 
 
 

@@ -290,6 +290,9 @@
 /* Use C++ stack backtraces */
 #undef USE_STACK_TRACE
 
+/* Enable experimental Vue port */
+#undef VUETEXMACS
+
 /* Pointer size */
 #undef WORD_LENGTH
 

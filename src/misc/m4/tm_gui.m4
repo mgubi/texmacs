@@ -18,7 +18,7 @@ AC_DEFUN([TM_GUI],[
   CONFIG_GUI="X11"
   CONFIG_QTPIPES="no"
 
-  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl],
+  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl, vue],
             gui_selector="$withval", gui_selector="qt")
 
   case "$gui_selector" in
@@ -69,6 +69,17 @@ AC_DEFUN([TM_GUI],[
          SDL_LDFLAGS="$SDL3_LDFLAGS"
          SDL_LIBS="$SDL3_LIBS"
          CONFIG_GUI="SDL"
+         ;;
+      vue) 
+         AC_MSG_RESULT([enabling experimental Vue/SDL immediate mode GUI])
+         LC_SDL3
+         AC_MSG_RESULT([SDL3_CFLAGS=$SDL3_CFLAGS])
+         AC_MSG_RESULT([SDL3_LDFLAGS=$SDL3_LDFLAGS])
+         AC_MSG_RESULT([SDL3_LIBS=$SDL3_LIBS])
+         VUE_CFLAGS="-std=c++20 $SDL3_CFLAGS"
+         VUE_LDFLAGS="$SDL3_LDFLAGS"
+         VUE_LIBS="$SDL3_LIBS"
+         CONFIG_GUI="VUE"
          ;;
       *)
          AC_MSG_ERROR([bad option --with-gui=$gui_selector])
@@ -133,12 +144,18 @@ AC_DEFUN([TM_GUI],[
          CONFIG_GUI_DEFINE="SDLTEXMACS"
          AC_DEFINE(SDLTEXMACS, 1, [Enable experimental SDL port])
          ;;
+      VUE)
+         CONFIG_VUE="Vue"
+         CONFIG_GUI_DEFINE="VUETEXMACS"
+         AC_DEFINE(VUETEXMACS, 1, [Enable experimental Vue port])
+         ;;
   esac
 
   AC_SUBST(CONFIG_X11)
   AC_SUBST(CONFIG_COCOA)
   AC_SUBST(CONFIG_QT)
   AC_SUBST(CONFIG_SDL)
+  AC_SUBST(CONFIG_VUE)
   AC_SUBST(CONFIG_GUI)
   AC_SUBST(CONFIG_GUI_DEFINE)
 
@@ -151,4 +168,7 @@ AC_DEFUN([TM_GUI],[
 
   AC_SUBST(SDL_CFLAGS)
   AC_SUBST(SDL_LDFLAGS)
+
+  AC_SUBST(VUE_CFLAGS)
+  AC_SUBST(VUE_LDFLAGS)
 ])
