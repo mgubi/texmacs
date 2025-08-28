@@ -65,7 +65,7 @@ Clay_Color color_background= { 128, 128, 200, 255 };
 Clay_Color color_highlight=  { 200, 200, 255, 255 };
 
 /*****************************************************************************/
-// UI state (maybe refactor in a structure)
+// UI layout context (maybe refactor in a structure)
 
 // pointer info
 string mouse_action;
@@ -78,6 +78,13 @@ array<double> mouse_data;
 // stack to handle nested pull(down/right) menus
 uint32_t menu_stack [100];
 unsigned int n_menu_stack=0;
+
+// some more context during layout
+Clay_ElementId last_id;
+bool debug_clay=false;
+
+// ask the buttons to fit all horizontal space
+bool button_grow= false;
 
 /*****************************************************************************/
 
@@ -415,15 +422,13 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 //******************************************************************************
 
-Clay_ElementId last_id;
-bool debug_clay=false;
-
-bool button_grow= false;
-
 VUE_WIDGET_DATA(picture_widget, picture, p);
 
 VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
 // data for a button w with a lazy pulldown menu pw and a cached value
+
+VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
+
 
 void
 layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
@@ -612,9 +617,6 @@ vue_ui_rep::do_layout () {
   if (type == "xpm_widget") {
     //VUE_WIDGET(xpm_widget, url, file_name);
     vue_xpm_widget d= open_box<vue_xpm_widget> (data);
-    
-//    type= "text_widget";
-  //  vue_text_widget dd= vue_text_widget { .s = d.file_name->t->label };
     vue_picture_widget dd { .p= load_xpm (d.file_name) };
     data= close_box(dd);
     type= "picture_widget";
@@ -625,13 +627,50 @@ vue_ui_rep::do_layout () {
    //VUE_WIDGET(glue_widget, bool, hx, bool, vx, SI, w, SI, h);
     vue_glue_widget d= open_box<vue_glue_widget> (data);
     CLAY({
-      .id= CLAY_IDI("glue_widget", id),
+      //.id= CLAY_IDI("glue_widget", id),
       .layout= {
         .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.w/PIXEL),
           .height= d.vx ? CLAY_SIZING_GROW( .min= (float)d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.h/PIXEL) }}}) {};
     return;
   }
-  
+  if (type == "cached_glue_widget") {
+    //VUE_WIDGET(colored_glue_widget, tree, col, bool, hx, bool, vx, SI, w, SI, h);
+    vue_cached_glue_widget d= open_box<vue_cached_glue_widget> (data);
+    CLAY({
+      //.id= CLAY_IDI("colored_glue_widget", id),
+      .custom= { .customData= this },
+      .layout= {
+        .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.w/PIXEL),
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.h/PIXEL) }}}) {};
+    return;
+  }
+  if (type == "colored_glue_widget") {
+    vue_colored_glue_widget d= open_box<vue_colored_glue_widget> (data);
+    picture p= native_picture (0,0, 0, 0); // empty cache
+    type= "cached_glue_widget";
+    data= close_box (vue_cached_glue_widget { .pic=p, .col= d.col, .w= d.w, .h= d.h, .vx= d.vx, .hx= d.hx});
+    do_layout ();
+    return;
+
+  }
+  if (type == "tile_menu") {
+    //VUE_WIDGET(tile_menu, array<widget>, a, int, cols);
+    // a menu rendered as a table of cols columns wide & made up of widgets in a
+    vue_tile_menu d= open_box<vue_tile_menu> (data);
+    int c=0, n= N(d.a);
+    CLAY({ .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM, .childGap= 5 }}){
+      while (c < n) {
+        CLAY({ .layout= { .layoutDirection= CLAY_LEFT_TO_RIGHT, .childGap= 5 }}){
+          for (int i=0; i< d.cols; i++) {
+            if (c == n) break;
+            concrete (d.a[c])-> do_layout ();
+            c++;
+          }
+        }
+      }
+    }
+    return;
+  }
   
   cout << "Need do_layout for widget " << type << LF;
 }
@@ -650,13 +689,59 @@ void
 draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest);
 
 
+picture
+print_glue (int w, int h, tree col)
+{
+  picture pic= native_picture (w, h, 0, 0);
+  renderer ren= picture_renderer (pic, std_shrinkf * retina_factor);
+  ren->set_shrinking_factor (1);
+  rectangle r = rectangle (0, 0, pic->get_width(), pic->get_height());
+  ren->set_origin (0,0);
+  ren->encode (r->x1, r->y1);
+  ren->encode (r->x2, r->y2);
+  ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
+  if (col == "") {
+    // do nothing
+  } else {
+    if (is_atomic (col)) {
+      color c = named_color (col->label);
+      ren->set_background (c);
+      ren->set_pencil (c);
+      ren->fill (r->x1, r->y2, r->x2, r->y1);
+    } else {
+      ren->set_shrinking_factor (std_shrinkf);
+      ren->set_background (col);
+      ren->clear_pattern (5*r->x1, 5*r->y2, 5*r->x2, 5*r->y1);
+    }
+  }
+  return pic;
+}
+
 void
 vue_ui_rep::render (vue_render_data *render_data) {
   if (type == "picture_widget") {
     vue_picture_widget d= open_box<vue_picture_widget> (data);
     draw_picture (render_data->sdl_ren, d.p, render_data->rect);
+    return;
   }
+  if (type == "cached_glue_widget") {
+    vue_cached_glue_widget d= open_box<vue_cached_glue_widget> (data);
+    int nw= (int)render_data->rect->w;
+    int nh= (int)render_data->rect->h;
+    int pw= d.pic->get_width ();
+    int ph= d.pic->get_height ();
+    if ((nw != pw) || (nh != ph)) {
+      d.pic= print_glue (nw, nh, d.col);
+      data= close_box (d);
+    }
+    draw_picture (render_data->sdl_ren, d.pic, render_data->rect);
+    return;
+  }
+  cout << "WARNING: empty rendering of widget of type " << type << LF;
 }
+
+
+
 
 vue_widget current_window_widget; // used during layout to propagate information
 
@@ -1002,6 +1087,7 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   command quit;
   vue_widget main_widget;
   string left_footer, right_footer;
+  vue_widget_rep *win; // weak ref
   
   
   bool visibility [10];
@@ -1099,6 +1185,10 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit)) quit ();
  //     the_gui->need_update ();
+      break;
+    case SLOT_MODIFIED:
+      if (win) win->send (s, val);
+//      cout << "MODIFIED!" << LF;
       break;
     default:
       vue_widget_rep::send(s, val);
@@ -1235,6 +1325,7 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 
 void vue_texmacs_widget_rep::do_layout () {
+  win= current_window_widget.rep; // save the info
   CLAY({ .id = CLAY_ID("TeXmacsWidget"),
          .backgroundColor = color_background,
          .layout = {
@@ -1700,7 +1791,7 @@ vue_simple_widget_rep::query (slot s, int type_id) {
   switch (s) {
     case SLOT_IDENTIFIER:
     {
-      if (is_nil(win))
+      if (win)
         return close_box<int>(0);
       else
         return win->query(s, type_id);
@@ -1821,7 +1912,7 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 
 void
 vue_simple_widget_rep::do_layout () {
-  win= current_window_widget; // save the info
+  win= current_window_widget.rep; // save the info
   Clay_ElementId clay_id= CLAY_IDI("SimpleWidget", id);
   CLAY({
     .id= clay_id,
@@ -1926,7 +2017,7 @@ vue_simple_widget_rep::translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI d
 void
 vue_simple_widget_rep::repaint_invalid_regions () {
 
-  vue_plain_window_widget_rep *w= dynamic_cast<vue_plain_window_widget_rep*>(win.rep);
+  vue_plain_window_widget_rep *w= dynamic_cast<vue_plain_window_widget_rep*>(win);
 
   // retrieve current geometry
   if (w) {

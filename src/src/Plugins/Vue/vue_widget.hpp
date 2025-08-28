@@ -66,7 +66,7 @@ inline bool operator==(const widget &lhs, const widget &rhs) {
 class vue_simple_widget_rep : public vue_widget_rep {
 public:
   unsigned int id;
-  vue_widget win; // the toplevel widget
+  vue_widget_rep *win; // the toplevel widget, weak ref
 
   // properties set via messages
   coord2 size;
