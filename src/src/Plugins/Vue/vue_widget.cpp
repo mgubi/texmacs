@@ -17,7 +17,7 @@
 #include "message.hpp"
 #include "promise.hpp"
 #include "iterator.hpp"
-#include "object.hpp"
+#include "scheme.hpp"
 #include "window.hpp"
 #include "message.hpp"
 #include "font.hpp"
