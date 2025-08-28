@@ -424,13 +424,11 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 //******************************************************************************
 
+// additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
-
 VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
 // data for a button w with a lazy pulldown menu pw and a cached value
-
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
-
 
 void
 layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
@@ -447,10 +445,16 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
     concrete(d.w)->do_layout ();
     if (Clay_PointerOver (button_id) && (mouse_state & 1)) {
       if (is_nil (d.cw)) {
-        d.cw= d.pw->eval (); // eval the promise
+        // we clicked an inactive button, we evalutate the promise
+        d.cw= d.pw->eval ();
         menu_stack[n_menu_stack]= float_id.id;
+      } else {
+        // we clicked an active button, we go back to an inactive state
+        d.cw= NULL;
       }
     } else {
+      // if we are the last widget of an active sequence of
+      // pull menus and the mouse is not on us, then we go inactive
       if ((menu_stack[n_menu_stack] == float_id.id) &&
           (menu_stack[n_menu_stack + 1] == 0) &&
           !(Clay_PointerOver (float_id) ||
@@ -458,10 +462,12 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
         d.cw= NULL;
         menu_stack[n_menu_stack]= 0;
       }
+      // if the active menu at this level is not us, we go inactive
       if (menu_stack[n_menu_stack] != float_id.id) {
         d.cw= NULL;
       }
     }
+    // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
       CLAY({ .id = float_id,
           .floating = {
@@ -527,9 +533,11 @@ vue_ui_rep::do_layout () {
       concrete(d.w)->do_layout ();
       CLAY({ .layout= { .sizing= layoutExpand }}) {}
       CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
-    }
-    if (Clay_Hovered() && (mouse_state & 1)) {
-      cout << "Click!!" << LF;
+      if (Clay_Hovered() && (mouse_state & 1)) {
+        cout << "Click!! " << id << LF;
+        int k= n_menu_stack+1;
+        while (k > 0) { menu_stack[k]= 0;  k--; }
+      }
     }
     return;
   }
