@@ -418,6 +418,8 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 Clay_ElementId last_id;
 bool debug_clay=false;
 
+bool button_grow= false;
+
 VUE_WIDGET_DATA(picture_widget, picture, p);
 
 VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
@@ -427,9 +429,11 @@ void
 layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
   Clay_ElementId button_id= CLAY_IDI("pull_button", id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
+  Clay_Sizing s= layoutExpand;
+  if (!button_grow) s= { CLAY_SIZING_FIT(.min=20) };
   CLAY({
     .id= button_id,
-    .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= layoutExpand },
+    .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= s },
     .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
   }) {
     concrete(d.w)->do_layout ();
@@ -477,9 +481,12 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
         .childGap = 10,
       }})
   {
+    bool save= button_grow;
+    button_grow= vert ? true : false;
     for (int i=0, n=N(a); i< n; i++) {
       concrete(a[i])->do_layout();
     }
+    button_grow= save;
   }
 }
 
@@ -499,9 +506,11 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
+    Clay_Sizing s= layoutExpand;
+    if (!button_grow) s= { CLAY_SIZING_FIT(.min=20) };
     CLAY({
       .id= button_id,
-      .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= layoutExpand  },
+      .layout = { .padding = CLAY_PADDING_ALL(5), .sizing= s  },
       .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
     }) {
       last_id= button_id;
@@ -565,11 +574,13 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_separator, bool, vertical);
     vue_menu_separator d= open_box<vue_menu_separator> (data);
     if (d.vertical) {
-      CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
+      CLAY({ .layout = { .sizing= { .height = CLAY_SIZING_GROW(0) },
+                         .padding = {5,5,5,5} },
              .border = {  .width = { .left = 2 },
              .color =  {100, 100, 200, 255} } });
     } else {
-      CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
+      CLAY({ .layout = { .sizing= { .width = CLAY_SIZING_GROW(0) },
+                         .padding = {5,5,5,5} },
              .border = {  .width = { .top = 2 } ,
              .color =  {100, 100, 200, 255} } });
     }
@@ -1241,6 +1252,22 @@ void vue_texmacs_widget_rep::do_layout () {
                        main_icons->do_layout ();
                      }
           }
+          CLAY({ .id = CLAY_ID("ModeToolbar"),
+                     .layout = { .childGap = 16, .sizing= {
+                       .width = CLAY_SIZING_GROW(0),
+                       .height = CLAY_SIZING_FIT(.min= 20) }}}) {
+                         if (!is_nil (mode_icons)) {
+                           mode_icons->do_layout ();
+                         }
+              }
+          CLAY({ .id = CLAY_ID("FocusToolbar"),
+                     .layout = { .childGap = 16, .sizing= {
+                       .width = CLAY_SIZING_GROW(0),
+                       .height = CLAY_SIZING_FIT(.min= 20) }}}) {
+                         if (!is_nil (focus_icons)) {
+                           focus_icons->do_layout ();
+                         }
+              }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id = CLAY_ID("Footer"),
              .layout = { .childGap = 16, .sizing= {
