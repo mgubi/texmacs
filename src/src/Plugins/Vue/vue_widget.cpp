@@ -62,7 +62,7 @@ void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_Rend
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated = true, .length = N(s), .chars = &(s[0]) })
 
 Clay_Color color_background= { 128, 128, 200, 255 };
-Clay_Color color_highlight=  { 200, 200, 200, 255 };
+Clay_Color color_highlight=  { 200, 200, 255, 255 };
 
 /*****************************************************************************/
 // UI state (maybe refactor in a structure)
@@ -486,7 +486,7 @@ vue_ui_rep::do_layout () {
     layout_menu (id, d.a, true);
     return;
   }
-  if (type == "menu_button") {
+  if (type == "menu_button*") {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
@@ -496,38 +496,53 @@ vue_ui_rep::do_layout () {
       .backgroundColor = Clay_Hovered() ?  color_highlight : color_background
     }) {
       last_id= button_id;
+      if (N(d.ks)>0) {
+        cout << d.ks << LF;
+      }
    //   debug_clay= true;
       concrete(d.w)->do_layout ();
       CLAY({ .layout= { .sizing= layoutExpand }}) {}
       CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
    // debug_clay= false;
     }
+    if (Clay_Hovered() && (mouse_state & 1)) {
+      cout << "Click!!" << LF;
+    }
+    return;
+  }
+  if (type == "menu_button") {
+    // we cache the conversion, to flag it we mark the type
+    vue_menu_button d= open_box<vue_menu_button> (data);
+    d.ks= cork_to_utf8 (d.ks);
+    data= close_box (d);
+    type = "menu_button*";
+    do_layout ();
+    return;
+  }
+  if (type == "pull_button") {
+    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
+    layout_pull_button (id, d);
+    data= close_box (d);
     return;
   }
   if (type == "pulldown_button") {
     // add more space in the struct for caching the widget
-    if (type_box (data) == type_helper<vue_pulldown_button>::id) {
-      vue_pulldown_button d= open_box<vue_pulldown_button> (data);
-      widget cw;
-      vue_pull_button_cached cd { d.w, d.pw, cw, true };
-      data= close_box (cd);
-    }
-    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
-    layout_pull_button (id, d);
-    data= close_box (d);
+    vue_pulldown_button d= open_box<vue_pulldown_button> (data);
+    widget cw;
+    vue_pull_button_cached cd { d.w, d.pw, cw, true };
+    type= "pull_button";
+    data= close_box (cd);
+    do_layout ();
     return;
   }
   if (type == "pullright_button") {
     // add more space in the struct for caching the widget
-    if (type_box (data) == type_helper<vue_pullright_button>::id) {
-      vue_pullright_button d= open_box<vue_pullright_button> (data);
-      widget cw;
-      vue_pull_button_cached cd { d.w, d.pw, cw, false };
-      data= close_box(cd);
-    }
-    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
-    layout_pull_button (id, d);
-    data= close_box (d);
+    vue_pullright_button d= open_box<vue_pullright_button> (data);
+    widget cw;
+    vue_pull_button_cached cd { d.w, d.pw, cw, false };
+    type= "pull_button";
+    data= close_box(cd);
+    do_layout ();
     return;
   }
   if (type == "text_widget") {
@@ -538,9 +553,10 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "menu_separator") {
-    //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
-    static string hrule("------");
-    CLAY_TEXT(CLAY_TM_STRING(hrule), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = {0, 0, 0, 255} }));
+    //VUE_WIDGET(menu_separator, bool, vertical);
+    CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
+           .border = {  .width = { .top = 2 },
+           .color = {100, 100, 200, 255} } });
     return;
   }
   if (type == "menu_group") {
@@ -1259,7 +1275,9 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
       return SDL_APP_FAILURE;
     }
     
-    TTF_Font *font = TTF_OpenFont("/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf", 24);
+    TTF_Font *font = TTF_OpenFont( //"/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf"
+          "/Users/mgubi/.TeXmacs/fonts/unpacked/LucidaGrande.0.ttf",
+        24);
     if (!font) {
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
       return SDL_APP_FAILURE;
