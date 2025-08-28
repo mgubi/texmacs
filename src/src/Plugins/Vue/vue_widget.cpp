@@ -162,11 +162,18 @@ public:
   virtual ~vue_ui_rep () {};
   
   void do_layout ();
+  void render (vue_render_data *data);
 };
 
 template<typename T> widget vue_create (string type, T args) {
   return abstract (tm_new<vue_ui_rep> (type, close_box (args)));
 }
+
+// for blackbox
+inline bool operator==(const picture &lhs, const picture &rhs)
+{ return false; }
+inline tm_ostream& operator << (tm_ostream& out, picture &bb)
+{ return out << "picture"; }
 
 //******************************************************************************
 // FOR_EACH-ish macro
@@ -411,6 +418,8 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 Clay_ElementId last_id;
 bool debug_clay=false;
 
+VUE_WIDGET_DATA(picture_widget, picture, p);
+
 VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
 // data for a button w with a lazy pulldown menu pw and a cached value
 
@@ -554,9 +563,16 @@ vue_ui_rep::do_layout () {
   }
   if (type == "menu_separator") {
     //VUE_WIDGET(menu_separator, bool, vertical);
-    CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
-           .border = {  .width = { .top = 2 },
-           .color = {100, 100, 200, 255} } });
+    vue_menu_separator d= open_box<vue_menu_separator> (data);
+    if (d.vertical) {
+      CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
+             .border = {  .width = { .left = 2 },
+             .color =  {100, 100, 200, 255} } });
+    } else {
+      CLAY({ .layout = { .sizing=layoutExpand, .padding = {5,5,5,5} },
+             .border = {  .width = { .top = 2 } ,
+             .color =  {100, 100, 200, 255} } });
+    }
     return;
   }
   if (type == "menu_group") {
@@ -572,6 +588,33 @@ vue_ui_rep::do_layout () {
     //FIXME: implement help
     return;
   }
+  if (type == "picture_widget") {
+    //VUE_WIDGET(xpm_widget, url, file_name);
+    vue_picture_widget d= open_box<vue_picture_widget> (data);
+    SI w= d.p->get_width ();
+    SI h= d.p->get_height ();
+    CLAY({
+      .backgroundColor= color_background,
+      .layout= {
+        .sizing= { CLAY_SIZING_FIXED( (float)w), CLAY_SIZING_FIXED( (float)h) } },
+      .custom= { .customData = this } }) {}
+    return;
+  }
+  if (type == "xpm_widget") {
+    //VUE_WIDGET(xpm_widget, url, file_name);
+    vue_xpm_widget d= open_box<vue_xpm_widget> (data);
+    
+//    type= "text_widget";
+  //  vue_text_widget dd= vue_text_widget { .s = d.file_name->t->label };
+    vue_picture_widget dd { .p= load_xpm (d.file_name) };
+    data= close_box(dd);
+    type= "picture_widget";
+    do_layout ();
+    return;
+  }
+
+  
+  
   cout << "Need do_layout for widget " << type << LF;
 }
 
@@ -583,6 +626,18 @@ struct vue_render_data {
 void
 vue_widget_rep::render (vue_render_data *data) {
   // empty
+}
+
+void
+draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest);
+
+
+void
+vue_ui_rep::render (vue_render_data *render_data) {
+  if (type == "picture_widget") {
+    vue_picture_widget d= open_box<vue_picture_widget> (data);
+    draw_picture (render_data->sdl_ren, d.p, render_data->rect);
+  }
 }
 
 vue_widget current_window_widget; // used during layout to propagate information
@@ -1178,6 +1233,14 @@ void vue_texmacs_widget_rep::do_layout () {
                    main_menu->do_layout ();
                  }
       }
+      CLAY({ .id = CLAY_ID("MainToolbar"),
+                 .layout = { .childGap = 16, .sizing= {
+                   .width = CLAY_SIZING_GROW(0),
+                   .height = CLAY_SIZING_FIT(.min= 20) }}}) {
+                     if (!is_nil (main_icons)) {
+                       main_icons->do_layout ();
+                     }
+          }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id = CLAY_ID("Footer"),
              .layout = { .childGap = 16, .sizing= {
@@ -1411,7 +1474,7 @@ vue_window_rep::process_layout () {
   SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
   
-  //Clay_SetDebugModeEnabled (true);
+  Clay_SetDebugModeEnabled (true);
   // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
   Clay_BeginLayout ();
   
@@ -2005,10 +2068,10 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
   // FIXME: premultiplied?
   SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
-  SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor (sdl_ren, 0, 255, 0,  SDL_ALPHA_OPAQUE);
+  SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_BLEND);
+  //SDL_SetRenderDrawColor (sdl_ren, 0, 255, 0,  SDL_ALPHA_OPAQUE);
   SDL_FRect src= { 0, 0, (float)w, (float)h };
-  SDL_RenderFillRect (sdl_ren, dest);
+  //SDL_RenderFillRect (sdl_ren, dest);
   SDL_RenderTexture (sdl_ren, tex, &src, dest);
   SDL_DestroyTexture (tex);
   SDL_DestroySurface (surf);
