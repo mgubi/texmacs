@@ -1695,7 +1695,6 @@ vue_window_rep::process_redraw () {
 string vue_type_simple_widget("simple_widget");
 
 list<vue_simple_widget_rep*> paint_list;
-static unsigned int vue_simple_widget_serial_id= 0;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
@@ -1705,14 +1704,14 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   scroll_pos (coord2 (0, 0)),
   mouse_cursor (coord2 (0, 0)),
   backing_pos (coord2(0, 0)),
-  absolute_scroll (false)
+  absolute_scroll (false),
+  backing_valid (false)
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
   backing_store= native_picture (size.x1, size.x2, 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   paint_list= list<vue_simple_widget_rep*>(this, paint_list);
-  id= vue_simple_widget_serial_id++;
 };
 
 vue_simple_widget_rep::~vue_simple_widget_rep () {
@@ -2118,7 +2117,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     backing_pos= scroll_pos;
     cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
         
-#if 1
+#if 0
     //FIXME: complete this part
     if (backing_valid) {
       translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
@@ -2205,6 +2204,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     }
     invalid_regions= new_regions;
   } // if (!is_nil (invalid_regions))
+  backing_valid= true;
 }
 
 void
@@ -2223,11 +2223,9 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
   //snapshot_pixmap (pix);
-  unsigned char *samples= fz_pixmap_samples (mupdf_context (), pix);
+  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
   int w= fz_pixmap_width (mupdf_context (), pix);
   int h= fz_pixmap_height (mupdf_context (), pix);
-  unsigned char *pixels= samples;
-  // the SDL pixel data is not copied so we need to ensure that the pixmap stays alive.
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
   // FIXME: premultiplied?
   SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
@@ -2244,8 +2242,6 @@ void
 vue_simple_widget_rep::render (vue_render_data *data) {
   draw_picture (data->sdl_ren, backing_store, data->rect);
 }
-
-
 
 //******************************************************************************
 // vue_gui
