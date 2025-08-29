@@ -508,7 +508,8 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
-    if (Clay_PointerOver (button_id) && (mouse_state & 1)) {
+    if (Clay_PointerOver (button_id) && (mouse_action == "press-left")) {
+      mouse_action= ""; // reset
       if (is_nil (d.cw)) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
