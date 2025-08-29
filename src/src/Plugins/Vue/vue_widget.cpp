@@ -2341,10 +2341,6 @@ remote_time (Uint32 t) {
 * Event loop
 ******************************************************************************/
 
-#define MIN_DELAY   10
-#define MAX_DELAY   1000
-#define SLEEP_AFTER 120000
-
 extern int nr_windows;
 static void (*the_interpose_handler) (void)= NULL;
 
@@ -2375,11 +2371,12 @@ void process_messages ();
 void process_layout ();
 void process_redraw ();
 
+bool gui_wait=  false;
+bool gui_needs_update= true;
+
 void gui_start_loop () {
   // start the main loop
-  bool wait=  false;
-  int  count= 0;
-  int  delay= MIN_DELAY;
+  int  delay= 10;
   request_partial_redraw= true;
   time_t t1, t2;
 
@@ -2387,32 +2384,37 @@ void gui_start_loop () {
 
   while (nr_windows > 0 || number_of_servers () > 0) {
     
-    // process events
+    // 1. process events
     SDL_Event event;
     if (SDL_PollEvent (&event)) {
       process_event (&event);
-      count= 0;
-      delay= MIN_DELAY;
-      wait= false;
+      gui_needs_update= true;
     }
     if (nr_windows == 0) continue;
 
-    // FIXME: Don't typeset when resizing window
-
+    if (gui_needs_update) {
+      delay= 10;
+      gui_wait= false;
+      gui_needs_update= false;
+    }
+        
     // 2. wait for events on all channels
-    if (wait) {
+    if (gui_wait) {
+      cout << "delay " << delay << LF;
       SDL_Delay (delay);
-      count += delay;
-      if (count >= SLEEP_AFTER) delay= MAX_DELAY;
-    } else {
-      // process layout and handle events
+      delay += (delay/5);
+      if (delay > 500) delay= 500;
+    }
+
+    // 3. process layout and handle events
+    {
       t2= texmacs_time ();
       process_layout ();
       t1= t2; t2= texmacs_time ();
       if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
     }
     
-    // exec commands if present
+    // 4. exec commands if present
     if (!is_nil (cmd_list)) {
       list<command> l= reverse(cmd_list);
       cmd_list= list<command>();
@@ -2423,15 +2425,14 @@ void gui_start_loop () {
       }
     }
     
-    // interpose
+    // 5. interpose
     t2= texmacs_time ();
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "interpose took " << t2-t1 << "ms\n";
 
-
-    // redraw
+    // 6. repaint all the editors
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
     if (n_events == 0 || request_partial_redraw) {
@@ -2440,16 +2441,17 @@ void gui_start_loop () {
       interrupted= false;
       interrupt_time= texmacs_time () + (100 / (n_events + 1));
 
-      // repaint all the editors
       vue_simple_widget_rep::repaint_all ();
       // note that repaint can be interrupted if events are present
       //FIXME: we should redraw the focused editor first, then the others
 
       request_partial_redraw= interrupted;
     }
-    if (!wait) {
-      process_redraw (); // redraw the UI
-      wait= true;
+    
+    // 7. redraw the UI
+    {
+      process_redraw ();
+      gui_wait= true;
     }
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
@@ -2761,6 +2763,8 @@ void needs_update () {
   // Inform the gui that the editor needs to update itself
   // before repainting can start
   //FIXME: implement
+  cout << "needs_update" << LF;
+  gui_needs_update= false;
 }
 
 bool check_event (int type) {
