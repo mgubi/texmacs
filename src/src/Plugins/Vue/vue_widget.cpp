@@ -1934,10 +1934,14 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 void
 vue_simple_widget_rep::do_layout () {
   win= current_window_widget.rep; // save the info
-  Clay_ElementId clay_id= CLAY_IDI("SimpleWidget", id);
+  SI w, h;
+  handle_get_size_hint (w, h);
+  Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   CLAY({
     .id= clay_id,
-    .layout= { .sizing= layoutExpand },
+    .layout= { .sizing= {
+        .width=CLAY_SIZING_GROW(.min= (float)2*w/PIXEL),
+        .height=CLAY_SIZING_GROW(.min= (float)2*h/PIXEL) }},
     .custom= { .customData = this } }) {
       if (Clay_Hovered () && (mouse_action != "")) {
         Clay_ElementData d= Clay_GetElementData (clay_id);
@@ -2043,7 +2047,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 
   // retrieve current geometry
   if (w) {
-    Clay_ElementId clay_id= CLAY_IDI("SimpleWidget", id);
+    Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
     Clay_SetCurrentContext (w->win->clay_ctx);
     Clay_ElementData d= Clay_GetElementData (clay_id);
     if (d.found) {
