@@ -44,7 +44,7 @@
 
 #include "clay.h"
 
-Clay_Sizing layoutExpand = {
+Clay_Sizing layoutExpand= {
     .width= CLAY_SIZING_GROW(0),
     .height= CLAY_SIZING_GROW(0)
 };
@@ -628,15 +628,15 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_separator, bool, vertical);
     vue_menu_separator d= open_box<vue_menu_separator> (data);
     if (d.vertical) {
-      CLAY({ .layout = { .sizing= { .height= CLAY_SIZING_GROW(0) },
-                         .padding = {5,5,5,5} },
-             .border = {  .width = { .left= 2 },
-             .color =  color_highlight } });
+      CLAY({ .layout= { .sizing= { .height= CLAY_SIZING_GROW(0) },
+                         .padding= {5,5,5,5} },
+             .border= {  .width= { .left= 2 },
+             .color=  color_highlight } });
     } else {
-      CLAY({ .layout = { .sizing= { .width= CLAY_SIZING_GROW(0) },
-                         .padding = {5,5,5,5} },
-             .border = {  .width = { .top= 2 } ,
-             .color =  color_highlight } });
+      CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) },
+                         .padding= {5,5,5,5} },
+             .border= {  .width= { .top= 2 } ,
+             .color=  color_highlight } });
     }
     return;
   }
@@ -1153,16 +1153,16 @@ vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep")
 {
   // decode mask
-  visibility[0] = (mask & 1)   == 1;   // header
-  visibility[1] = (mask & 2)   == 2;   // main
-  visibility[2] = (mask & 4)   == 4;   // mode
-  visibility[3] = (mask & 8)   == 8;   // focus
-  visibility[4] = (mask & 16)  == 16;  // user
-  visibility[5] = (mask & 32)  == 32;  // footer
-  visibility[6] = (mask & 64)  == 64;  // right side tools
-  visibility[7] = (mask & 128) == 128; // left side tools
-  visibility[8] = (mask & 256) == 256; // bottom tools
-  visibility[9] = (mask & 512) == 512; // extra bottom tools
+  visibility[0]= (mask & 1)   == 1;   // header
+  visibility[1]= (mask & 2)   == 2;   // main
+  visibility[2]= (mask & 4)   == 4;   // mode
+  visibility[3]= (mask & 8)   == 8;   // focus
+  visibility[4]= (mask & 16)  == 16;  // user
+  visibility[5]= (mask & 32)  == 32;  // footer
+  visibility[6]= (mask & 64)  == 64;  // right side tools
+  visibility[7]= (mask & 128) == 128; // left side tools
+  visibility[8]= (mask & 256) == 256; // bottom tools
+  visibility[9]= (mask & 512) == 512; // extra bottom tools
   
   left_footer= translate ("Welcome to TeXmacs");
   right_footer= translate ("Booting");
@@ -1208,8 +1208,8 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_BOTTOM_TOOLS_VISIBILITY:
     case SLOT_EXTRA_TOOLS_VISIBILITY:
       {
-        int index = ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
-        visibility [index] = check_open<bool> (val, s);
+        int index= ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
+        visibility [index]= check_open<bool> (val, s);
         // update_visibility();
       }
       break;
@@ -1348,7 +1348,7 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_BOTTOM_TOOLS_VISIBILITY:
     case SLOT_EXTRA_TOOLS_VISIBILITY:
       {
-        int index = ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
+        int index= ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
         check_type_id<bool> (type_id, s);
         return close_box<bool> (visibility [index]);
       }
@@ -1364,13 +1364,13 @@ void vue_texmacs_widget_rep::do_layout () {
   win= current_window_widget.rep; // save the info
   CLAY({ .id= CLAY_ID("TeXmacsWidget"),
          .backgroundColor= color_background,
-         .layout = {
+         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= layoutExpand,
           .padding= CLAY_PADDING_ALL(16),
           .childGap= 16  }}) {
       CLAY({ .id= CLAY_ID("MainMenuBar"),
-             .layout = { .childGap= 16, .sizing= {
+             .layout= { .childGap= 16, .sizing= {
                .width= CLAY_SIZING_GROW(0),
                .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_menu)) {
@@ -1378,7 +1378,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("MainToolbar"),
-                 .layout = { .childGap= 16, .sizing= {
+                 .layout= { .childGap= 16, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_icons)) {
@@ -1386,7 +1386,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("ModeToolbar"),
-                 .layout = { .childGap= 16, .sizing= {
+                 .layout= { .childGap= 16, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (mode_icons)) {
@@ -1394,7 +1394,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("FocusToolbar"),
-                 .layout = { .childGap= 16, .sizing= {
+                 .layout= { .childGap= 16, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (focus_icons)) {
@@ -1403,12 +1403,12 @@ void vue_texmacs_widget_rep::do_layout () {
       }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id= CLAY_ID("Footer"),
-             .layout = { .childGap= 16, .sizing= {
+             .layout= { .childGap= 16, .sizing= {
                 .width= CLAY_SIZING_GROW(0),
                 .height= CLAY_SIZING_FIXED(40) }}})
       {
         CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
-        CLAY({ .layout = { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
+        CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
         CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
       }
   }
@@ -1427,7 +1427,7 @@ int vue_window_rep::serial= 1; // serial identifier for windows
 
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
 {
-  TTF_Font **fonts = (TTF_Font **)userData;
+  TTF_Font **fonts= (TTF_Font **)userData;
   TTF_Font *font= fonts[config->fontId];
   int width, height;
 
@@ -1478,8 +1478,8 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   
   // init Clay
   uint64_t totalMemorySize= Clay_MinMemorySize ();
-  Clay_Arena clay_arena = (Clay_Arena) {
-      .memory =  (char*) SDL_malloc (totalMemorySize),
+  Clay_Arena clay_arena= (Clay_Arena) {
+      .memory=  (char*) SDL_malloc (totalMemorySize),
       .capacity= totalMemorySize
   };
 
@@ -1492,7 +1492,7 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   }
 
   if (!ttf_fonts) {
-    ttf_fonts = (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
+    ttf_fonts= (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
     if (!ttf_fonts) {
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
       return SDL_APP_FAILURE;
@@ -1505,7 +1505,7 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
       return SDL_APP_FAILURE;
     }
-    ttf_fonts[FONT_ID] = font;
+    ttf_fonts[FONT_ID]= font;
   }
   Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
 }
@@ -2034,7 +2034,7 @@ vue_simple_widget_rep::translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI d
   rectangles region (rectangle (x1, y2, x2, y1));
   rectangles invalid_intern= invalid_regions & region;
   rectangles invalid_extern= invalid_regions - invalid_intern;
-  invalid_intern = ::translate (invalid_intern, dx, dy) & region;
+  invalid_intern= ::translate (invalid_intern, dx, dy) & region;
   invalid_regions= invalid_extern | invalid_intern;
 
   rectangles extra= thicken (region - ::translate (region, dx, dy), 1, 1);
@@ -2346,7 +2346,7 @@ remote_time (Uint32 t) {
 #define SLEEP_AFTER 120000
 
 extern int nr_windows;
-static void (*the_interpose_handler) (void) = NULL;
+static void (*the_interpose_handler) (void)= NULL;
 
 ///////// Gui state
 
