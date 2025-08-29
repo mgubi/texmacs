@@ -1,0 +1,6 @@
+
+
+* Handle focus properly for simple_widgets
+* Think to the redrawing sequence, in particular when redraw simple_widgets
+* Implement copy & paste
+* Investigate random crashes of the debug view (probably because of invalid pointers)
