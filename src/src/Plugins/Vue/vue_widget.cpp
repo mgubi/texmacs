@@ -1685,6 +1685,7 @@ static unsigned int vue_simple_widget_serial_id= 0;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
+  win (NULL), ren (NULL),
   size (coord2 (0, 0)),
   extents (0,0,0,0),
   scroll_pos (coord2 (0, 0)),
