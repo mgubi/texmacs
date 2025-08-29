@@ -764,6 +764,7 @@ vue_ui_rep::render (vue_render_data *render_data) {
     int pw= d.pic->get_width ();
     int ph= d.pic->get_height ();
     if ((nw != pw) || (nh != ph)) {
+      // the size of the widget has changed, regenerate the picture
       d.pic= print_glue (nw, nh, d.col);
       data= close_box (d);
     }
@@ -772,9 +773,6 @@ vue_ui_rep::render (vue_render_data *render_data) {
   }
   cout << "WARNING: empty rendering of widget of type " << type << LF;
 }
-
-
-
 
 vue_widget current_window_widget; // used during layout to propagate information
 
@@ -1006,8 +1004,8 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_MOUSE_GRAB:
       {
-        check_type<bool> (val, s);
-        bool flag= open_box<bool> (val);  // true= get grab, false= release grab
+        bool flag= check_open<bool> (val, s);
+        // true= get grab, false= release grab
         if (win) {
           //win->set_mouse_grab (this, flag);
         }
@@ -1058,15 +1056,15 @@ vue_plain_window_widget_rep::query (slot s, int type_id) {
     }
     case SLOT_POSITION:
     {
-      check_type_id<coord2> (type_id, s);
       SI x, y;
+      check_type_id<coord2> (type_id, s);
       if (win) win->get_position (x, y);
       return close_box<coord2> (coord2 (x, y));
     }
     case SLOT_SIZE:
     {
-      check_type_id<coord2> (type_id, s);
       SI w, h;
+      check_type_id<coord2> (type_id, s);
       if (win) win->get_size (w, h);
       return close_box<coord2> (coord2 (w, h));
     }
@@ -1120,8 +1118,8 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   string left_footer, right_footer;
   vue_widget_rep *win; // weak ref
   
-  
   bool visibility [10];
+  
   vue_widget main_menu;
   vue_widget main_icons;
   vue_widget mode_icons;
@@ -1151,7 +1149,6 @@ widget texmacs_widget (int mask, command quit) {
   return abstract (tm_new<vue_texmacs_widget_rep> (mask, quit));
 }
   
-
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep")
 {
@@ -1186,16 +1183,20 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_MOUSE_GRAB:
       main_widget->send(s, val);
       return;
+      
     case SLOT_LEFT_FOOTER:
       left_footer= cork_to_utf8 (check_open<string> (val, s));
       break;
+      
     case SLOT_RIGHT_FOOTER:
       right_footer= cork_to_utf8 (check_open<string> (val, s));
       break;
+      
     case SLOT_SCROLLBARS_VISIBILITY:
         // ignore this: qt handles scrollbars independently
         //                send_int (THIS, "scrollbars", val);
       break;
+      
     case SLOT_HEADER_VISIBILITY:
     case SLOT_MAIN_ICONS_VISIBILITY:
     case SLOT_MODE_ICONS_VISIBILITY:
@@ -1212,15 +1213,18 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
         // update_visibility();
       }
       break;
+      
     case SLOT_DESTROY:
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit)) quit ();
  //     the_gui->need_update ();
       break;
+      
     case SLOT_MODIFIED:
       if (win) win->send (s, val);
 //      cout << "MODIFIED!" << LF;
       break;
+      
     default:
       vue_widget_rep::send(s, val);
   }
@@ -1303,7 +1307,6 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
       extra_tools= concrete (w);
       break;
  
-
     case SLOT_INTERACTIVE_PROMPT:
       check_type_void (index, s);
       interactive_prompt= concrete (w);
@@ -1333,6 +1336,7 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
       return main_widget->query (s, type_id);
+      
     case SLOT_HEADER_VISIBILITY:
     case SLOT_MAIN_ICONS_VISIBILITY:
     case SLOT_MODE_ICONS_VISIBILITY:
@@ -1349,6 +1353,7 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
         return close_box<bool> (visibility [index]);
       }
       break;
+      
     default:
       return vue_widget_rep::query(s, type_id);
   }
@@ -2193,8 +2198,6 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       // cout << "repaint " << r << LF;
       r= thicken (r, 1, 1);
       ren->set_origin (-backing_pos.x1, -backing_pos.x2);
-      //ren->encode (r->x1, r->y1);
-      //ren->encode (r->x2, r->y2);
       ren->set_clipping (r->x1, r->y1, r->x2, r->y2);
       handle_repaint (ren, r->x1, r->y1, r->x2, r->y2);
       ren->set_clipping (r->x1, r->y1, r->x2, r->y2, true);
@@ -2225,9 +2228,6 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   unsigned char *samples= fz_pixmap_samples (mupdf_context (), pix);
   int w= fz_pixmap_width (mupdf_context (), pix);
   int h= fz_pixmap_height (mupdf_context (), pix);
-  //  fz_keep_pixmap (mupdf_context (), pix);
-  //unsigned char *pixels= tm_new_array<unsigned char>(w*h*4);
-  //memcpy (pixels, samples, w*h*4);
   unsigned char *pixels= samples;
   // the SDL pixel data is not copied so we need to ensure that the pixmap stays alive.
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
@@ -2240,7 +2240,6 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   SDL_RenderTexture (sdl_ren, tex, &src, dest);
   SDL_DestroyTexture (tex);
   SDL_DestroySurface (surf);
-  //tm_delete_array (pixels);
 }
 
 void
