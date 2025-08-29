@@ -2614,7 +2614,7 @@ process_event (SDL_Event *event) {
 
         string action;
         if (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-          action= "press-" * mouse_decode (mouse_state);
+          action= "press-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
         } else {
           action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
         }
