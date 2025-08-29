@@ -1788,6 +1788,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
         double new_zoom= check_open<double> (val, s);
         if (DEBUG_EVENTS) debug_events << "New zoom factor :" << new_zoom << LF;
         handle_set_zoom_factor (new_zoom);
+        invalidate_all ();
       }
       break;
     case SLOT_MOUSE_GRAB:
@@ -1960,6 +1961,18 @@ vue_simple_widget_rep::do_layout () {
         .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
         .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) }},
     .custom= { .customData= this } }) {
+      CLAY({
+        .backgroundColor = { 80, 80, 80, 80 },
+        .layout= { .padding= { 18, 18, 18, 18 } },
+        .floating= { .attachTo = CLAY_ATTACH_TO_PARENT }
+      }){
+        debug_text= "";
+        tm_ostream out= string_ostream (debug_text);
+        out << " extents:  " << extents << LF;
+        out << " viewport: " << rectangle(backing_pos.x1, backing_pos.x2);
+        CLAY_TEXT(CLAY_TM_STRING(debug_text),
+                  CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = { 0, 0, 200, 255} }));
+      }
       if (Clay_Hovered () && (mouse_action != "")) {
         Clay_ElementData d= Clay_GetElementData (clay_id);
         SI x= mouse_x - d.boundingBox.x;
@@ -2641,12 +2654,9 @@ process_event (SDL_Event *event) {
         mouse_time= texmacs_time();
         mouse_x= event->wheel.mouse_x;
         mouse_y= event->wheel.mouse_y;
-        double deltaX= event->wheel.x;
-        double deltaY= event->wheel.y;
-        array<double> data; data << deltaX << deltaY;
-        mouse_data= data;
+        mouse_data= array<double> (event->wheel.x, event->wheel.y);
         Clay_SetCurrentContext (win->clay_ctx);
-        Clay_UpdateScrollContainers (true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
+        Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x, event->wheel.y }, 0.01f);
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
