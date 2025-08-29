@@ -67,6 +67,9 @@ Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
 Clay_Color color_text= {0, 0, 0, 255};
 
+Clay_TextElementConfig *text_config_ui;
+Clay_TextElementConfig *text_config_ui_grayed;
+
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
 
@@ -90,6 +93,13 @@ bool button_grow= false;
 
 // list of commands
 list<command> cmd_list;
+
+void
+gui_init_context() {
+  current_popup= false;
+  text_config_ui= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= color_text });
+  text_config_ui_grayed= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= {150, 150, 150, 255} });
+}
 
 /*****************************************************************************/
 
@@ -535,7 +545,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize= 30, .textColor= color_text }));
+        CLAY_TEXT(CLAY_TM_STRING(d.ks), text_config_ui);
       }
       if (Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
@@ -584,7 +594,7 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
-    CLAY_TEXT(CLAY_TM_STRING(d.s), CLAY_TEXT_CONFIG({ .fontSize= 30, .textColor= color_text }));
+    CLAY_TEXT(CLAY_TM_STRING(d.s), text_config_ui);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -607,7 +617,7 @@ vue_ui_rep::do_layout () {
   if (type == "menu_group") {
     //VUE_WIDGET(menu_group, string, name, int, style);
     vue_menu_group d= open_box<vue_menu_group> (data);
-    CLAY_TEXT(CLAY_TM_STRING(d.name), CLAY_TEXT_CONFIG({ .fontSize= 30, .textColor = {150, 150, 150, 255} }));
+    CLAY_TEXT(CLAY_TM_STRING(d.name), text_config_ui_grayed);
     return;
   }
   if (type == "balloon_widget") {
@@ -1087,9 +1097,7 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 
 void
 vue_plain_window_widget_rep::do_layout () {
-  // reset the menu stack
-  current_popup= false;
-  concrete(wid)->do_layout ();
+  concrete (wid)->do_layout ();
 }
 
 //******************************************************************************
@@ -1347,49 +1355,50 @@ void vue_texmacs_widget_rep::do_layout () {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= layoutExpand,
           .padding= CLAY_PADDING_ALL(16),
-          .childGap= 16,
-        }}) {
+          .childGap= 16  }}) {
       CLAY({ .id= CLAY_ID("MainMenuBar"),
              .layout = { .childGap= 16, .sizing= {
                .width= CLAY_SIZING_GROW(0),
                .height= CLAY_SIZING_FIT(.min= 20) }}}) {
-                 if (!is_nil (main_menu)) {
-                   main_menu->do_layout ();
-                 }
+        if (!is_nil (main_menu)) {
+          main_menu->do_layout ();
+        }
       }
       CLAY({ .id= CLAY_ID("MainToolbar"),
                  .layout = { .childGap= 16, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
-                     if (!is_nil (main_icons)) {
-                       main_icons->do_layout ();
-                     }
-          }
-          CLAY({ .id= CLAY_ID("ModeToolbar"),
-                     .layout = { .childGap= 16, .sizing= {
-                       .width= CLAY_SIZING_GROW(0),
-                       .height= CLAY_SIZING_FIT(.min= 20) }}}) {
-                         if (!is_nil (mode_icons)) {
-                           mode_icons->do_layout ();
-                         }
-              }
-          CLAY({ .id= CLAY_ID("FocusToolbar"),
-                     .layout = { .childGap= 16, .sizing= {
-                       .width= CLAY_SIZING_GROW(0),
-                       .height= CLAY_SIZING_FIT(.min= 20) }}}) {
-                         if (!is_nil (focus_icons)) {
-                           focus_icons->do_layout ();
-                         }
-              }
+        if (!is_nil (main_icons)) {
+          main_icons->do_layout ();
+        }
+      }
+      CLAY({ .id= CLAY_ID("ModeToolbar"),
+                 .layout = { .childGap= 16, .sizing= {
+                   .width= CLAY_SIZING_GROW(0),
+                   .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+        if (!is_nil (mode_icons)) {
+          mode_icons->do_layout ();
+        }
+      }
+      CLAY({ .id= CLAY_ID("FocusToolbar"),
+                 .layout = { .childGap= 16, .sizing= {
+                   .width= CLAY_SIZING_GROW(0),
+                   .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+        if (!is_nil (focus_icons)) {
+          focus_icons->do_layout ();
+        }
+      }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id= CLAY_ID("Footer"),
              .layout = { .childGap= 16, .sizing= {
                 .width= CLAY_SIZING_GROW(0),
                 .height= CLAY_SIZING_FIXED(40) }}})
       {
-          CLAY_TEXT(CLAY_TM_STRING(left_footer), CLAY_TEXT_CONFIG({ .fontSize= 24, .textColor= color_text }));
+        //cout << left_footer << LF;
+        //cout << right_footer << LF;
+        CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
         CLAY({ .layout = { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
-          CLAY_TEXT(CLAY_TM_STRING(right_footer), CLAY_TEXT_CONFIG({ .fontSize= 24, .textColor= color_text }));
+        CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
       }
   }
 }
@@ -1606,22 +1615,22 @@ vue_window_rep::set_visibility (bool flag) {
 void
 vue_window_rep::process_layout () {
   
+  // init the current GUI context
   Clay_SetCurrentContext (clay_ctx);
   current_window_widget= content;
-  
+  gui_init_context ();
+
   int win_x, win_y, win_w, win_h;
   SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
   SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
   
-  Clay_SetDebugModeEnabled (true);
-  // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
+  // layout the top widget
+  //Clay_SetDebugModeEnabled (true);
   Clay_BeginLayout ();
-  
   content->do_layout ();
-  
-  // All clay layouts are declared between Clay_BeginLayout and Clay_EndLayout
   render_commands= Clay_EndLayout ();
+  
   current_window_widget= NULL;
 }
 
