@@ -83,6 +83,7 @@ array<double> mouse_data;
 
 // is there an active popup?
 bool current_popup;
+bool cancel_popup;
 
 // some more context during layout
 Clay_ElementId last_id;
@@ -97,6 +98,7 @@ list<command> cmd_list;
 void
 gui_init_context() {
   current_popup= false;
+  cancel_popup= false;
   text_config_ui= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= color_text });
   text_config_ui_grayed= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= {150, 150, 150, 255} });
 }
@@ -179,8 +181,7 @@ protected:
   blackbox data;
   
 public:
-  vue_ui_rep (string _type, blackbox _data= NULL)
-    : vue_widget_rep (_type), data (_data) {};
+  vue_ui_rep (string _type, blackbox _data= NULL);
   virtual ~vue_ui_rep () {};
   
   void do_layout ();
@@ -443,6 +444,51 @@ VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, 
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
+vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
+  : vue_widget_rep (_type), data (_data)
+{
+  if (type == "menu_button") {
+    // we cache the conversion, to flag it we mark the type
+    vue_menu_button d= open_box<vue_menu_button> (data);
+    d.ks= cork_to_utf8 (d.ks);
+    data= close_box (d);
+    return;
+  }
+  if (type == "pulldown_button") {
+    // add more space in the struct for caching the widget
+    vue_pulldown_button d= open_box<vue_pulldown_button> (data);
+    widget cw;
+    vue_pull_button_cached cd { d.w, d.pw, cw, true };
+    type= "pull_button";
+    data= close_box (cd);
+    return;
+  }
+  if (type == "pullright_button") {
+    // add more space in the struct for caching the widget
+    vue_pullright_button d= open_box<vue_pullright_button> (data);
+    widget cw;
+    vue_pull_button_cached cd { d.w, d.pw, cw, false };
+    type= "pull_button";
+    data= close_box(cd);
+    return;
+  }
+  if (type == "xpm_widget") {
+    //VUE_WIDGET(xpm_widget, url, file_name);
+    vue_xpm_widget d= open_box<vue_xpm_widget> (data);
+    vue_picture_widget dd { .p= load_xpm (d.file_name) };
+    data= close_box(dd);
+    type= "picture_widget";
+    return;
+  }
+  if (type == "colored_glue_widget") {
+    vue_colored_glue_widget d= open_box<vue_colored_glue_widget> (data);
+    picture p= native_picture (0,0, 0, 0); // empty cache
+    type= "cached_glue_widget";
+    data= close_box (vue_cached_glue_widget { .pic=p, .col= d.col, .w= d.w, .h= d.h, .vx= d.vx, .hx= d.hx});
+    return;
+  }
+};
+
 void
 layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
   Clay_ElementId button_id= CLAY_IDI("pull_button", id);
@@ -485,9 +531,12 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
       {
         current_popup= false;
         concrete (d.cw)->do_layout ();
-        if (!current_popup && !(Clay_PointerOver (float_id) || Clay_PointerOver (button_id))) {
-          // we are the last popup of the chain, so if we are not hovered
-          // we need to deactivate
+        if (cancel_popup ||
+            (!current_popup &&
+             !(Clay_PointerOver (float_id) || Clay_PointerOver (button_id)))) {
+          // we are requested to cancel or
+          // we are the last popup of the chain and we are not hovered:
+          // then we need to deactivate
           d.cw= NULL;
           current_popup= false; // well, noop, but keep for clarity
         } else {
@@ -529,7 +578,7 @@ vue_ui_rep::do_layout () {
     layout_menu (id, d.a, true);
     return;
   }
-  if (type == "menu_button*") {
+  if (type == "menu_button") {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
@@ -549,46 +598,17 @@ vue_ui_rep::do_layout () {
       }
       if (Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
-        current_popup= false;
+        cancel_popup= true;
         cout << "Click!! " << id << LF;
         cmd_list= list(d.cmd, cmd_list);
       }
     }
     return;
   }
-  if (type == "menu_button") {
-    // we cache the conversion, to flag it we mark the type
-    vue_menu_button d= open_box<vue_menu_button> (data);
-    d.ks= cork_to_utf8 (d.ks);
-    data= close_box (d);
-    type = "menu_button*";
-    do_layout ();
-    return;
-  }
   if (type == "pull_button") {
     vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
     layout_pull_button (id, d);
     data= close_box (d);
-    return;
-  }
-  if (type == "pulldown_button") {
-    // add more space in the struct for caching the widget
-    vue_pulldown_button d= open_box<vue_pulldown_button> (data);
-    widget cw;
-    vue_pull_button_cached cd { d.w, d.pw, cw, true };
-    type= "pull_button";
-    data= close_box (cd);
-    do_layout ();
-    return;
-  }
-  if (type == "pullright_button") {
-    // add more space in the struct for caching the widget
-    vue_pullright_button d= open_box<vue_pullright_button> (data);
-    widget cw;
-    vue_pull_button_cached cd { d.w, d.pw, cw, false };
-    type= "pull_button";
-    data= close_box(cd);
-    do_layout ();
     return;
   }
   if (type == "text_widget") {
@@ -639,15 +659,6 @@ vue_ui_rep::do_layout () {
       .custom= { .customData= this } }) {}
     return;
   }
-  if (type == "xpm_widget") {
-    //VUE_WIDGET(xpm_widget, url, file_name);
-    vue_xpm_widget d= open_box<vue_xpm_widget> (data);
-    vue_picture_widget dd { .p= load_xpm (d.file_name) };
-    data= close_box(dd);
-    type= "picture_widget";
-    do_layout ();
-    return;
-  }
   if (type == "glue_widget") {
    //VUE_WIDGET(glue_widget, bool, hx, bool, vx, SI, w, SI, h);
     vue_glue_widget d= open_box<vue_glue_widget> (data);
@@ -655,7 +666,7 @@ vue_ui_rep::do_layout () {
       //.id= CLAY_IDI("glue_widget", id),
       .layout= {
         .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.w/PIXEL),
-          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.h/PIXEL) }}}) {};
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)2*d.h/PIXEL) }}}) {};
     return;
   }
   if (type == "cached_glue_widget") {
@@ -665,18 +676,9 @@ vue_ui_rep::do_layout () {
       //.id= CLAY_IDI("colored_glue_widget", id),
       .custom= { .customData= this },
       .layout= {
-        .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.w/PIXEL),
-          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.h/PIXEL) }}}) {};
+        .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)2*d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)2*d.w/PIXEL),
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)2*d.h/PIXEL) }}}) {};
     return;
-  }
-  if (type == "colored_glue_widget") {
-    vue_colored_glue_widget d= open_box<vue_colored_glue_widget> (data);
-    picture p= native_picture (0,0, 0, 0); // empty cache
-    type= "cached_glue_widget";
-    data= close_box (vue_cached_glue_widget { .pic=p, .col= d.col, .w= d.w, .h= d.h, .vx= d.vx, .hx= d.hx});
-    do_layout ();
-    return;
-
   }
   if (type == "tile_menu") {
     //VUE_WIDGET(tile_menu, array<widget>, a, int, cols);
