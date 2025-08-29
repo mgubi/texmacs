@@ -899,6 +899,7 @@ public:
   Clay_RenderCommandArray render_commands;
   
   bool relayout;
+  bool clay_debug;
   
   vue_window_rep (vue_widget w, string name);
   ~vue_window_rep ();
@@ -1638,7 +1639,7 @@ vue_window_rep::process_layout () {
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
   
   // layout the top widget
-  //Clay_SetDebugModeEnabled (true);
+  Clay_SetDebugModeEnabled (clay_debug);
   Clay_BeginLayout ();
   content->do_layout ();
   render_commands= Clay_EndLayout ();
@@ -2685,13 +2686,18 @@ process_event (SDL_Event *event) {
       }
       win= get_window_from_ID (event->key.windowID);
       if (win) {
+        if (keycode == SDLK_F1) {
+          // toggle the debug mode for the current window
+          win->clay_debug = !win->clay_debug;
+          break;
+        }
         string key= lookup_key(keycode, event->key.mod);
         //cout << "Press " << key << " at " << (time_t) ev->xkey.time
         //<< " (" << texmacs_time() << ")\n";
         kbd_count++;
         //FIXME: conversion below loses precision from UInt64 to UInt32
-        synchronize_time (event->key.timestamp);
-        if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
+        synchronize_time ((Uint32)event->key.timestamp);
+        if (texmacs_time () - remote_time ((Uint32)event->key.timestamp) < 100 ||
             (kbd_count & 15) == 0)
           request_partial_redraw= true;
         //cout << "key   : " << key << "\n";
