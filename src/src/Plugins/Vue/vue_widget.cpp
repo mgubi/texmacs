@@ -78,9 +78,8 @@ unsigned int mouse_y;
 unsigned int mouse_state= 0;
 array<double> mouse_data;
 
-// stack to handle nested pull(down/right) menus
-uint32_t menu_stack [100];
-unsigned int n_menu_stack=0;
+// is there an active popup?
+bool current_popup;
 
 // some more context during layout
 Clay_ElementId last_id;
@@ -451,25 +450,15 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
       if (is_nil (d.cw)) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
-        menu_stack[n_menu_stack]= float_id.id;
+        current_popup= true;
       } else {
         // we clicked an active button, we go back to an inactive state
         d.cw= NULL;
+        current_popup= false;
       }
-    } else {
-      // if we are the last widget of an active sequence of
-      // pull menus and the mouse is not on us, then we go inactive
-      if ((menu_stack[n_menu_stack] == float_id.id) &&
-          (menu_stack[n_menu_stack + 1] == 0) &&
-          !(Clay_PointerOver (float_id) ||
-            Clay_PointerOver (button_id)))  {
-        d.cw= NULL;
-        menu_stack[n_menu_stack]= 0;
-      }
-      // if the active menu at this level is not us, we go inactive
-      if (menu_stack[n_menu_stack] != float_id.id) {
-        d.cw= NULL;
-      }
+    } else if (current_popup) {
+      // some other popup is active, we should be inactive
+      d.cw= NULL;
     }
     // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
@@ -484,9 +473,17 @@ layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
              .sizing = { .width= CLAY_SIZING_FIT(.min= 300) }},
           .backgroundColor = color_background })
       {
-        n_menu_stack++;
+        current_popup= false;
         concrete (d.cw)->do_layout ();
-        n_menu_stack--;
+        if (!current_popup && !(Clay_PointerOver (float_id) || Clay_PointerOver (button_id))) {
+          // we are the last popup of the chain, so if we are not hovered
+          // we need to deactivate
+          d.cw= NULL;
+          current_popup = false; // well, noop, but keep for clarity
+        } else {
+          // ok, we are the current popup now in this layout cycle
+          current_popup = true;
+        }
       }
     }
   }
@@ -541,11 +538,8 @@ vue_ui_rep::do_layout () {
         CLAY_TEXT(CLAY_TM_STRING(d.ks), CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = color_text }));
       }
       if (Clay_Hovered() && (mouse_state & 1)) {
-        if (n_menu_stack > 0) {
-          // we are in an active menu chain,
-          // by hacking the last frame we force all the menus to close
-          menu_stack[n_menu_stack-1]=0;
-        }
+        // close any active popup chain (see pull_widget)
+        current_popup= false;
         cout << "Click!! " << id << LF;
         cmd_list= list(d.cmd, cmd_list);
       }
@@ -1094,7 +1088,7 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 void
 vue_plain_window_widget_rep::do_layout () {
   // reset the menu stack
-  while (n_menu_stack > 0) { menu_stack[n_menu_stack]= 0;  n_menu_stack--; }
+  current_popup= false;
   concrete(wid)->do_layout ();
 }
 
