@@ -1701,9 +1701,9 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   win (NULL), ren (NULL),
   size (coord2 (0, 0)),
   extents (0,0,0,0),
-  scroll_pos (coord2 (0, 0)),
   mouse_cursor (coord2 (0, 0)),
   backing_pos (coord2(0, 0)),
+  scroll_pos (coord2 (0, 0)),
   absolute_scroll (false),
   backing_valid (false)
 {
@@ -2004,14 +2004,18 @@ vue_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
 }
 
 void
+vue_simple_widget_rep::invalidate_viewport_rect (int x1, int y1, int x2, int y2) {
+  ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+  ren->encode (x1, y1);
+  ren->encode (x2, y2);
+  invalidate_rect (x1, y2, x2, y1);
+}
+
+void
 vue_simple_widget_rep::invalidate_all () {
   //cout << "invalidate all " << LF;
   invalid_regions= rectangles();
-  rectangle r (0, size.x2, size.x1, 0);
-  ren->set_origin (-backing_pos.x1, -backing_pos.x2);
-  ren->encode (r->x1, r->y1);
-  ren->encode (r->x2, r->y2);
-  invalidate_rect (r->x1, r->y1, r->x2, r->y2);
+  invalidate_viewport_rect (0, 0, size.x1, size.x2);
 }
 
 bool
@@ -2061,17 +2065,18 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 
   vue_plain_window_widget_rep *w= dynamic_cast<vue_plain_window_widget_rep*>(win);
 
+  if (!w) return; // we are not in a layout yet
+  
   // retrieve current geometry
-  if (w) {
-    Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
-    Clay_SetCurrentContext (w->win->clay_ctx);
-    Clay_ElementData d= Clay_GetElementData (clay_id);
-    if (d.found) {
-      size.x1= d.boundingBox.width; // * retina_factor;
-      size.x2= d.boundingBox.height; // * retina_factor;
-    } else {
-      cout << "clay_id not found!" << LF;
-    }
+  Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
+  Clay_SetCurrentContext (w->win->clay_ctx);
+  Clay_ElementData d= Clay_GetElementData (clay_id);
+  if (d.found) {
+    // cache the current viewport size
+    size.x1= d.boundingBox.width; // * retina_factor;
+    size.x2= d.boundingBox.height; // * retina_factor;
+  } else {
+    cout << "clay_id not found!" << LF;
   }
   
   // current backing_store size
@@ -2121,11 +2126,10 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     //FIXME: complete this part
     if (backing_valid) {
       translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
-      if (dy<0) invalidate_rect (0, 0, bs_w, min (bs_h,-dy));
-      else if (dy>0) invalidate_rect (0, max (0,bs_h-dy), bs_w, bs_h);
-      
-      if (dx<0) invalidate_rect (0, 0, min (-dx, bs_w), bs_h);
-      else if (dx>0) invalidate_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
+      if (dy<0) invalidate_viewport_rect (0, 0, bs_w, min (bs_h,-dy));
+      else if (dy>0) invalidate_viewport_rect (0, max (0,bs_h-dy), bs_w, bs_h);
+      if (dx<0) invalidate_viewport_rect (0, 0, min (-dx, bs_w), bs_h);
+      else if (dx>0) invalidate_viewport_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
     } else {
       invalidate_all ();
     }
