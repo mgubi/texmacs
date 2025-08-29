@@ -1407,8 +1407,6 @@ void vue_texmacs_widget_rep::do_layout () {
                 .width= CLAY_SIZING_GROW(0),
                 .height= CLAY_SIZING_FIXED(40) }}})
       {
-        //cout << left_footer << LF;
-        //cout << right_footer << LF;
         CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
         CLAY({ .layout = { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
         CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
@@ -1429,23 +1427,23 @@ int vue_window_rep::serial= 1; // serial identifier for windows
 
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
 {
-    TTF_Font **fonts = (TTF_Font **)userData;
-    TTF_Font *font= fonts[config->fontId];
-    int width, height;
+  TTF_Font **fonts = (TTF_Font **)userData;
+  TTF_Font *font= fonts[config->fontId];
+  int width, height;
 
-    TTF_SetFontSize(font, config->fontSize);
-    if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
-    }
+  TTF_SetFontSize(font, config->fontSize);
+  if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
+  }
 
-    return (Clay_Dimensions) { (float) width, (float) height };
+  return (Clay_Dimensions) { (float) width, (float) height };
 }
 
 void HandleClayErrors (Clay_ErrorData errorData) {
-    // See the Clay_ErrorData struct for more information
-    printf ("%s", errorData.errorText.chars);
-    // FIXME: properly handle Clay's errors
-    exit (-1);
+  // See the Clay_ErrorData struct for more information
+  printf ("%s", errorData.errorText.chars);
+  // FIXME: properly handle Clay's errors
+  FAILED ("Clay error");
 }
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
