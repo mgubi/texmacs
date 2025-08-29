@@ -2837,33 +2837,6 @@ void external_event (string type, time_t t) {
   //FIXME: implement
 }
 
-/******************************************************************************
-* Delayed messages (NOT NEEDED YET)
-******************************************************************************/
-
-struct message_rep: concrete_struct {
-  widget wid;
-  string s;
-  time_t t;
-  message_rep (widget wid2, string s2, time_t t2):
-    wid (wid2), s (s2), t (t2) {}
-  friend class message;
-};
-
-class message {
-  CONCRETE(message);
-  message (widget wid, string s, time_t t):
-    rep (tm_new<message_rep> (wid, s, t)) {}
-
-};
-CONCRETE_CODE(message);
-
-tm_ostream&
-operator << (tm_ostream& out, message m) {
-  return out << "message " << m->s << " to " << m->wid
-       << "at time " << m->t << "\n";
-}
-
 //*****************************************************************************
 //*****************************************************************************
 // Boring auxiliary functions
