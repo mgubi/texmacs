@@ -1362,15 +1362,15 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window_widget.rep; // save the info
-  CLAY({ .id= CLAY_ID("TeXmacsWidget"),
+  CLAY({ .id= CLAY_ID("texmacs_widget"),
          .backgroundColor= color_background,
          .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= layoutExpand,
-          .padding= CLAY_PADDING_ALL(16),
+          .padding= { 0, 0, 16, 16 },
           .childGap= 16  }}) {
       CLAY({ .id= CLAY_ID("MainMenuBar"),
-             .layout= { .childGap= 16, .sizing= {
+             .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
                .width= CLAY_SIZING_GROW(0),
                .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_menu)) {
@@ -1378,7 +1378,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("MainToolbar"),
-                 .layout= { .childGap= 16, .sizing= {
+                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_icons)) {
@@ -1386,7 +1386,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("ModeToolbar"),
-                 .layout= { .childGap= 16, .sizing= {
+                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (mode_icons)) {
@@ -1394,7 +1394,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       CLAY({ .id= CLAY_ID("FocusToolbar"),
-                 .layout= { .childGap= 16, .sizing= {
+                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
                    .width= CLAY_SIZING_GROW(0),
                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (focus_icons)) {
@@ -1403,7 +1403,7 @@ void vue_texmacs_widget_rep::do_layout () {
       }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id= CLAY_ID("Footer"),
-             .layout= { .childGap= 16, .sizing= {
+             .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
                 .width= CLAY_SIZING_GROW(0),
                 .height= CLAY_SIZING_FIXED(40) }}})
       {
@@ -2390,7 +2390,6 @@ void gui_start_loop () {
       process_event (&event);
       gui_needs_update= true;
     }
-    if (nr_windows == 0) continue;
 
     if (gui_needs_update) {
       delay= 10;
@@ -2400,7 +2399,6 @@ void gui_start_loop () {
         
     // 2. wait for events on all channels
     if (gui_wait) {
-      cout << "delay " << delay << LF;
       SDL_Delay (delay);
       delay += (delay/5);
       if (delay > 500) delay= 500;
@@ -2432,6 +2430,8 @@ void gui_start_loop () {
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "interpose took " << t2-t1 << "ms\n";
 
+    if (nr_windows == 0) continue;
+
     // 6. repaint all the editors
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
@@ -2449,12 +2449,10 @@ void gui_start_loop () {
     }
     
     // 7. redraw the UI
-    {
-      process_redraw ();
-      gui_wait= true;
-    }
+    process_redraw ();
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
+    gui_wait= true;
   }
 }
 
