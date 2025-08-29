@@ -1685,7 +1685,7 @@ static unsigned int vue_simple_widget_serial_id= 0;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
-  size (coord2 (10 * retina_factor, 10 * retina_factor)),
+  size (coord2 (0, 0)),
   extents (0,0,0,0),
   scroll_pos (coord2 (0, 0)),
   mouse_cursor (coord2 (0, 0)),
@@ -1934,14 +1934,16 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 void
 vue_simple_widget_rep::do_layout () {
   win= current_window_widget.rep; // save the info
-  SI w, h;
-  handle_get_size_hint (w, h);
+  SI w= 0, h= 0;
+  if (is_embedded_widget ()) {
+    handle_get_size_hint (w, h);
+  }
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   CLAY({
     .id= clay_id,
     .layout= { .sizing= {
-        .width=CLAY_SIZING_GROW(.min= (float)2*w/PIXEL),
-        .height=CLAY_SIZING_GROW(.min= (float)2*h/PIXEL) }},
+        .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
+        .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) }},
     .custom= { .customData = this } }) {
       if (Clay_Hovered () && (mouse_action != "")) {
         Clay_ElementData d= Clay_GetElementData (clay_id);
@@ -2128,7 +2130,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 
   if ((new_bs_w != bs_w)   || (new_bs_h != bs_h)) {
     // the viewport size changed, reset the backing store
-    
+    cout << "viewport changed (" << bs_w << "," << bs_h << ") (" << new_bs_w << "," << new_bs_h << ")" << LF;
     // create a new backing store with updated viewport and the renderer
     picture new_backing_store= native_picture (new_bs_w, new_bs_h, 0, 0);
     renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
