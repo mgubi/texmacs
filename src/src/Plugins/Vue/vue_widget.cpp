@@ -2760,8 +2760,6 @@ void beep () {
 void needs_update () {
   // Inform the gui that the editor needs to update itself
   // before repainting can start
-  //FIXME: implement
-  cout << "needs_update" << LF;
   gui_needs_update= false;
 }
 
