@@ -447,6 +447,12 @@ VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx,
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
 {
+  if (type == "text_widget") {
+    vue_text_widget d= open_box<vue_text_widget> (data);
+    d.s= cork_to_utf8 (d.s);
+    data= close_box (d);
+    return;
+  }
   if (type == "menu_button") {
     // we cache the conversion, to flag it we mark the type
     vue_menu_button d= open_box<vue_menu_button> (data);
@@ -1181,10 +1187,10 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       main_widget->send(s, val);
       return;
     case SLOT_LEFT_FOOTER:
-      left_footer= check_open<string> (val, s);
+      left_footer= cork_to_utf8 (check_open<string> (val, s));
       break;
     case SLOT_RIGHT_FOOTER:
-      right_footer= check_open<string> (val, s);
+      right_footer= cork_to_utf8 (check_open<string> (val, s));
       break;
     case SLOT_SCROLLBARS_VISIBILITY:
         // ignore this: qt handles scrollbars independently
