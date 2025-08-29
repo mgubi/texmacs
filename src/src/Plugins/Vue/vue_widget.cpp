@@ -440,7 +440,7 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 // additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
-VUE_WIDGET_DATA(pull_button_cached, widget, w, promise<widget>, pw, widget, cw, bool, down);
+VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, bool, down);
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -464,7 +464,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
     widget cw;
-    vue_pull_button_cached cd { d.w, d.pw, cw, true };
+    vue_cached_pull_button cd { d.w, d.pw, cw, true };
     type= "pull_button";
     data= close_box (cd);
     return;
@@ -473,7 +473,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pullright_button d= open_box<vue_pullright_button> (data);
     widget cw;
-    vue_pull_button_cached cd { d.w, d.pw, cw, false };
+    vue_cached_pull_button cd { d.w, d.pw, cw, false };
     type= "pull_button";
     data= close_box(cd);
     return;
@@ -496,7 +496,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
 };
 
 void
-layout_pull_button (unsigned int id, vue_pull_button_cached &d) {
+layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
   Clay_ElementId button_id= CLAY_IDI("pull_button", id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
   Clay_Sizing s= layoutExpand;
@@ -612,7 +612,7 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "pull_button") {
-    vue_pull_button_cached d= open_box<vue_pull_button_cached> (data);
+    vue_cached_pull_button d= open_box<vue_cached_pull_button> (data);
     layout_pull_button (id, d);
     data= close_box (d);
     return;
