@@ -2453,8 +2453,6 @@ void gui_start_loop () {
     }
     t1= t2; t2= texmacs_time ();
     if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
-    
-    process_messages ();
   }
 }
 
@@ -2866,41 +2864,9 @@ operator << (tm_ostream& out, message m) {
        << "at time " << m->t << "\n";
 }
 
-list<message> messages;
-
-static list<message>
-insert_message (list<message> l, widget wid, string s, time_t cur, time_t t) {
-  if (is_nil (l)) return list<message> (message (wid, s, t));
-  time_t ref= l->item->t;
-  if ((t-cur) <= (ref-cur)) return list<message> (message (wid, s, t), l);
-  return list<message> (l->item, insert_message (l->next, wid, s, cur, t));
-}
-
-void
-delayed_message (widget wid, string s, time_t delay) {
-  time_t ct= texmacs_time ();
-  messages= insert_message (messages, wid, s, ct, ct+ delay);
-}
-
-void process_messages() {
-  // Handle alarm messages
-  if (!is_nil (messages)) {
-    list<message> not_ready;
-    while (!is_nil (messages)) {
-      time_t ct= texmacs_time ();
-      message m= messages->item;
-      if ((m->t - ct) <= 0) send_delayed_message (m->wid, m->s, m->t);
-      else not_ready= list<message> (m, not_ready);
-      messages= messages->next;
-    }
-    messages= not_ready;
-  }
-}
-
 //*****************************************************************************
 //*****************************************************************************
 // Boring auxiliary functions
-
 
 /******************************************************************************
 * Set up keyboard
