@@ -2405,6 +2405,7 @@
 		9CEDAA381264FF88009630CC /* unicode_math_font.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CEDAA351264FF88009630CC /* unicode_math_font.cpp */; };
 		9CEEC6392E58D14A00D0B5C3 /* TeXmacsVue.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */; };
 		9CF1389612A9B65F009F02C9 /* qt_ui_element.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF1389512A9B65F009F02C9 /* qt_ui_element.cpp */; };
+		9CF385312E61341F00387CFB /* TODO in Resources */ = {isa = PBXBuildFile; fileRef = 9CF385302E61341C00387CFB /* TODO */; };
 		9CF5BC73128A13CB00F691BF /* qt_tm_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5BC6B128A13CB00F691BF /* qt_tm_widget.cpp */; };
 		9CF5BC75128A13CB00F691BF /* qt_window_widget.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5BC6F128A13CB00F691BF /* qt_window_widget.cpp */; };
 		9CF5BC76128A13CB00F691BF /* QTMGuiHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5BC71128A13CB00F691BF /* QTMGuiHelper.cpp */; };
@@ -3650,6 +3651,8 @@
 		9C7376BC2E59ED9A0036FC6F /* vue_gui.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = vue_gui.hpp; sourceTree = "<group>"; };
 		9C7376BD2E59ED9A0036FC6F /* vue_gui.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = vue_gui.cpp; sourceTree = "<group>"; };
 		9C7376C12E5B03720036FC6F /* clay.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = clay.c; sourceTree = "<group>"; };
+		9C7376C32E5BDBC50036FC6F /* clay.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = clay.h; sourceTree = "<group>"; };
+		9C7376C42E5BDBC50036FC6F /* clay_renderer_SDL3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = clay_renderer_SDL3.c; sourceTree = "<group>"; };
 		9C74D95A123BF892008959D1 /* packrat_grammar.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packrat_grammar.cpp; sourceTree = "<group>"; };
 		9C74D95B123BF892008959D1 /* packrat_grammar.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = packrat_grammar.hpp; sourceTree = "<group>"; };
 		9C74D95C123BF892008959D1 /* packrat_parser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packrat_parser.cpp; sourceTree = "<group>"; };
@@ -3762,6 +3765,7 @@
 		9CEEC6382E58D14A00D0B5C3 /* TeXmacsVue.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = TeXmacsVue.xcconfig; sourceTree = "<group>"; };
 		9CF1389412A9B65F009F02C9 /* qt_ui_element.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_ui_element.hpp; sourceTree = "<group>"; };
 		9CF1389512A9B65F009F02C9 /* qt_ui_element.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_ui_element.cpp; sourceTree = "<group>"; };
+		9CF385302E61341C00387CFB /* TODO */ = {isa = PBXFileReference; lastKnownFileType = text; path = TODO; sourceTree = "<group>"; };
 		9CF5BC6B128A13CB00F691BF /* qt_tm_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.cpp; path = qt_tm_widget.cpp; sourceTree = "<group>"; tabWidth = 2; };
 		9CF5BC6C128A13CB00F691BF /* qt_tm_widget.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_tm_widget.hpp; sourceTree = "<group>"; };
 		9CF5BC6F128A13CB00F691BF /* qt_window_widget.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_window_widget.cpp; sourceTree = "<group>"; };
@@ -5970,6 +5974,9 @@
 		9CDABB962E4F51B0002D3806 /* Vue */ = {
 			isa = PBXGroup;
 			children = (
+				9CF385302E61341C00387CFB /* TODO */,
+				9C7376C32E5BDBC50036FC6F /* clay.h */,
+				9C7376C42E5BDBC50036FC6F /* clay_renderer_SDL3.c */,
 				9C7376C12E5B03720036FC6F /* clay.c */,
 				9C7376BC2E59ED9A0036FC6F /* vue_gui.hpp */,
 				9C7376BD2E59ED9A0036FC6F /* vue_gui.cpp */,
@@ -6446,6 +6453,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CF385312E61341F00387CFB /* TODO in Resources */,
 				9CDABB9A2E4F64D4002D3806 /* TeXmacsSDL.xcconfig in Resources */,
 				9CDABB9B2E4F64D4002D3806 /* build-glue.scm in Resources */,
 				9CDABB9C2E4F64D4002D3806 /* Info-Xcode.plist in Resources */,
