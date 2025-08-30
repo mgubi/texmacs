@@ -23,6 +23,9 @@
 #include "font.hpp"
 #include "dictionary.hpp"
 
+#include "file.hpp" // for file_completions
+#include "url.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../MuPDF/mupdf_picture.hpp"
@@ -72,6 +75,10 @@ Clay_TextElementConfig *text_config_ui_grayed;
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
+
+// keyboard events
+string key_event;
+time_t key_time;
 
 // pointer info
 string mouse_action;
@@ -344,8 +351,8 @@ VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
   // a text widget with a given style, color and transparency
 VUE_WIDGET(xpm_widget, url, file_name);
   // a widget with an X pixmap icon
-VUE_WIDGET(input_text_widget, command, call_back, string, type, array<string>, def,
-        int, style, string, width);
+//VUE_WIDGET(input_text_widget, command, call_back, string, type, array<string>, def,
+//        int, style, string, width);
   // a textual input widget for input of a given type and a list of suggested
   // default inputs (the first one should be displayed, if there is one)
   // an optional width may be specified for the input field
@@ -814,6 +821,249 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 
 /******************************************************************************
+* input_text_widget
+******************************************************************************/
+
+//VUE_WIDGET(input_text_widget, command, call_back, string, type, array<string>, def,
+//        int, style, string, width);
+  // a textual input widget for input of a given type and a list of suggested
+  // default inputs (the first one should be displayed, if there is one)
+  // an optional width may be specified for the input field
+  // the width is specified in TeXmacs length format with units em, px or w
+
+
+class vue_input_text_widget_rep : public vue_widget_rep {
+public:
+  string  s;           // the string being entered
+  string  draw_s;      // the string being displayed
+  SI      text_h;      // text height
+  string  type;        // expected type of string
+  string  name;        // optional name of the input field
+  string  serial;      // optional serial number of the input field
+  array<string> def;   // default possible input values
+  command call_back;   // routine called on <return> or <escape>
+  int     style;       // style of widget
+  bool    greyed;      // greyed input
+  string  width;       // width of input field
+  bool    persistent;  // don't complete after loss of focus
+  bool    ok;          // input not canceled
+  bool    done;        // call back has been called
+  int     def_cur;     // current choice between default possible values
+  SI      dw, dh;      // border width and height
+  int     pos;         // cursor position
+  SI      scroll;      // how much scrolled to the left
+  bool    got_focus;   // got keyboard focus
+  bool    hilit;       // hilit on keyboard focus
+  array<string> tabs;  // tab completions
+  int     tab_nr;      // currently visible tab-completion
+  int     tab_pos;     // cursor position where tab was pressed
+
+  vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
+                             int _style, string _width);
+  void do_layout ();
+//  void render (vue_render_data *data);
+  bool process_key (string);
+};
+
+vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
+          string _type, array<string> _def, int _style, string _width)
+  : call_back (_call_back), type (_type),
+    def (_def), style (_style), width (_width),
+    greyed ((style & WIDGET_STYLE_INERT) != 0),
+    vue_widget_rep ("input_text_widget")
+{
+  if (N(def) > 0) {
+    s= copy (def[0]);
+  }
+}
+
+#ifdef OS_WIN32
+#define URL_CONCATER  '\\'
+#else
+#define URL_CONCATER  '/'
+#endif
+
+class applied_command_rep: public command_rep {
+  command cmd;
+  object arg;
+public:
+  applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
+  void apply () { cmd->apply (arg); }
+  void apply (object arg2) { cmd->apply (arg2); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<applied_command " << cmd << " " << arg << ">"; }
+};
+
+bool
+vue_input_text_widget_rep::process_key (string key) {
+  bool continuous=
+  starts (type, "search") ||
+  starts (type, "replace-") ||
+  starts (type, "spell") ||
+  starts (serial, "form-");
+  
+  while ((N(key) >= 5) && (key(0,3) == "Mod") && (key[4] == '-') &&
+         (key[3] >= '1') && (key[3] <= '5')) key= key (5, N(key));
+  if (key == "space") key= " ";
+  if (key == "<") key= "<less>";
+  if (key == ">") key= "<gtr>";
+  
+  /* tab-completion */
+  if (continuous);
+  else if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
+    int d = (key == "tab"? 1: N(tabs)-1);
+    tab_nr= (tab_nr + d) % N(tabs);
+    s     = s (0, tab_pos) * tabs[tab_nr];
+    pos   = N(s);
+    return true;
+  }
+  else if (key == "tab" || key == "S-tab") {
+    if (pos != N(s)) return;
+    tabs= copy (def);
+    if (ends (type, "file") || type == "directory") {
+      url search= url_here ();
+      url dir= (ends (s, string (URL_CONCATER))? url (s): head (url (s)));
+      if (type == "smart-file") search= url ("$TEXMACS_FILE_PATH");
+      if (is_rooted (dir)) search= url_here ();
+      if (is_none (dir)) dir= url_here ();
+      tabs= file_completions (search, dir);
+    }
+    tabs= strip_completions (tabs, s);
+    tabs= close_completions (tabs);
+    if (N (tabs) == 0);
+    else if (N (tabs) == 1) {
+      s   = s * tabs[0];
+      pos = N(s);
+      tabs= array<string> (0);
+    }
+    else {
+      tab_nr = 0;
+      tab_pos= N(s);
+      s      = s * tabs[0];
+      pos    = N(s);
+      beep ();
+    }
+    return true;
+  }
+  else {
+    tabs   = array<string> (0);
+    tab_nr = 0;
+    tab_pos= 0;
+  }
+  
+  /* other actions */
+  if (continuous &&
+      (key == "return" ||
+       key == "S-return" ||
+       key == "home" ||
+       key == "end" ||
+       key == "up" ||
+       key == "down" ||
+       key == "pageup" ||
+       key == "pagedown" ||
+       key == "tab" ||
+       key == "S-tab" ||
+       key == "escape" ||
+       (starts (type, "spell") && string ("1") <= key && key <= string ("9")) ||
+       (starts (type, "spell") && key == "+")));
+  else if (key == "return") {
+    // commit
+    if (!continuous) {
+      ok= true;
+      done= true;
+      command cmd= tm_new<applied_command_rep>(call_back, list_object (list_object (object (s), object (key))));
+      cmd_list= list(cmd, cmd_list);
+      return true;
+    }
+  }
+  else if ((key == "escape") || (key == "C-c") ||
+           (key == "C-g")) {
+    // cancel
+    ok= false;
+    done= true;
+    call_back (list_object (object (false)));
+    command cmd= tm_new<applied_command_rep>(call_back, list_object (object (false)));
+    cmd_list= list(cmd, cmd_list);
+    return true;
+  }
+  else if ((key == "left") || (key == "C-b")) {
+    if (pos>0) tm_char_backwards (s, pos); }
+  else if ((key == "right") || (key == "C-f")) {
+    if (pos<N(s)) tm_char_forwards (s, pos); }
+  else if ((key == "home") || (key == "C-a")) pos=0;
+  else if ((key == "end") || (key == "C-e")) pos=N(s);
+  else if ((key == "up") || (key == "C-p")) {
+    if (N(def) > 0) {
+      def_cur= (def_cur+1) % N(def);
+      s      = copy (def[def_cur]);
+      pos    = N(s);
+    }
+  }
+  else if ((key == "down") || (key == "C-n")) {
+    if (N(def) > 0) {
+      def_cur= (def_cur+N(def)-1) % N(def);
+      s      = copy (def[def_cur]);
+      pos    = N(s);
+    }
+  }
+  else if (key == "C-k") s= s (0, pos);
+  else if ((key == "C-d") || (key == "delete")) {
+    if ((pos<N(s)) && (N(s)>0)) {
+      int end= pos;
+      tm_char_forwards (s, end);
+      s= s (0, pos) * s (end, N(s));
+    }
+  }
+  else if (key == "backspace" || key == "S-backspace") {
+    if (pos>0) {
+      int end= pos;
+      tm_char_backwards (s, pos);
+      s= s (0, pos) * s (end, N(s));
+    }
+  }
+  else if (key == "C-backspace") {
+    s= "";
+    pos= 0;
+  }
+  else {
+    if (starts (key, "<#"));
+    else if (key == "<less>" || key == "<gtr>");
+    else {
+      if (N(key)!=1) return false;
+      int i (key[0]);
+      if ((i>=0) && (i<32)) return false;
+    }
+    s= s (0, pos) * key * s(pos, N(s));
+    pos += N(key);
+  }
+  if (continuous) {
+    command cmd= tm_new<applied_command_rep>(call_back, list_object (list_object (object (s), object (key))));
+    cmd_list= list(cmd, cmd_list);
+  }
+  return true;
+}
+
+void
+vue_input_text_widget_rep::do_layout () {
+  CLAY({
+    .backgroundColor = { 228, 228, 220, 255 },
+    .layout= { .padding= { 8, 8, 4, 4 } }})
+  {
+    if (N(key_event) > 0) {
+      //FIXME: handle focus correctly!!
+      process_key (key_event);
+    }
+    CLAY_TEXT(CLAY_TM_STRING(s), text_config_ui);
+  }
+}
+
+widget
+input_text_widget (command call_back, string type, array<string> def,
+                          int style, string width) {
+  return abstract (tm_new<vue_input_text_widget_rep> (call_back, type, def, style, width));
+}
+
+/******************************************************************************
 * Message passing
 ******************************************************************************/
 
@@ -912,12 +1162,14 @@ public:
   SDL_Window *sdl_win;
   SDL_Renderer *sdl_ren;
   TTF_TextEngine *text_engine;
-  vue_widget content;
   string name;
   
   string the_name;
   string mod_name;
   string orig_name;
+
+  vue_widget content;
+  vue_widget kbd_focus;
 
   picture backing_store;
   renderer ren;
@@ -956,7 +1208,7 @@ public:
   command quit;
   
   vue_window win;
-  
+
   bool visible;
   bool mouse_grab;
   bool modified;
@@ -2034,6 +2286,10 @@ vue_simple_widget_rep::do_layout () {
         if (N(mouse_data) > 0) mouse_data= array<double>();
       }
     }
+  if (N(key_event)>0) {
+    handle_keypress (key_event, key_time);
+//    key_event= "";
+  }
 }
 
 /******************************************************************************
@@ -2635,6 +2891,9 @@ print_key_info ( SDL_KeyboardEvent *key ) {
 
 void
 process_event (SDL_Event *event) {
+  // reset events
+  mouse_action="";
+  key_event="";
   vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
@@ -2736,9 +2995,10 @@ process_event (SDL_Event *event) {
         //cout << "key   : " << key << "\n";
         //cout << "redraw: " << request_partial_redraw << "\n";
         //if (N(key)>0) win->key_event (key);
-        widget kbd_focus= paint_list->item; //FIXME: do it right!
-        //send_keyboard (kbd_focus, key);
-        dynamic_cast<vue_simple_widget_rep*>(kbd_focus.rep)->handle_keypress (key, texmacs_time ());
+        if (N(key)>0) {
+          key_event= key;
+          key_time= texmacs_time();
+        }
       }
       break;
     } // case SDL_EVENT_KEY_DOWN:
