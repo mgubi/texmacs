@@ -501,7 +501,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
   Clay_ElementId button_id= CLAY_IDI("pull_button", id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
   Clay_Sizing s= layoutExpand;
-  if (!button_grow) s= { CLAY_SIZING_FIT(.min=20) };
+  if (d.down) s= { CLAY_SIZING_FIT(.min=20) };
   CLAY({
     .id= button_id,
     .layout = {
@@ -509,7 +509,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
-    if (button_grow) {
+    if (!d.down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
        // "\xE2\x96\xB8" "\xE2\x80\xBA"
       CLAY_TEXT(CLAY_STRING("\xE2\x96\xB8"), text_config_ui);
