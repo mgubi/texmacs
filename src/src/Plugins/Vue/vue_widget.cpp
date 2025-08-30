@@ -81,9 +81,10 @@ unsigned int mouse_y;
 unsigned int mouse_state= 0;
 array<double> mouse_data;
 
-// is there an active popup?
-bool current_popup;
-bool cancel_popup;
+
+bool current_popup; // is there an active popup?
+bool cancel_popup;  // should we cancel popups?
+time_t away_time;   // tolerance for mouse motion
 
 // some more context during layout
 Clay_ElementId last_id;
@@ -517,6 +518,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
         current_popup= true;
+        away_time= 0;
       } else {
         // we clicked an active button, we go back to an inactive state
         d.cw= NULL;
@@ -541,9 +543,12 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
       {
         current_popup= false;
         concrete (d.cw)->do_layout ();
-        if (cancel_popup ||
-            (!current_popup &&
-             !(Clay_PointerOver (float_id) || Clay_PointerOver (button_id)))) {
+        bool away= false;
+        if (!(Clay_PointerOver (float_id) || Clay_PointerOver (button_id))) {
+          if (away_time == 0) away_time= texmacs_time ();
+          else if (texmacs_time () - away_time > 500) away= true;
+        }
+        if (cancel_popup || (!current_popup && away)) {
           // we are requested to cancel or
           // we are the last popup of the chain and we are not hovered:
           // then we need to deactivate
