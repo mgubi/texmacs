@@ -946,8 +946,8 @@ class applied_command_rep: public command_rep {
   object arg;
 public:
   applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
-  void apply () { cmd->apply (arg); }
-  void apply (object arg2) { cmd->apply (arg2); }
+  void apply () { cmd (arg); }
+  void apply (object arg2) { cmd (arg2); }
   tm_ostream& print (tm_ostream& out) {
     return out << "<applied_command " << cmd << " " << arg << ">"; }
 };
@@ -1025,7 +1025,7 @@ vue_input_text_widget_rep::process_key (string key) {
       ok= true;
       done= true;
       command cmd= tm_new<applied_command_rep>(call_back,
-                    list_object (list_object (object (s), object (key))));
+                    list_object (object (s)));
       cmd_list= list(cmd, cmd_list);
       return true;
     }
@@ -1101,17 +1101,30 @@ vue_input_text_widget_rep::process_key (string key) {
 
 void
 vue_input_text_widget_rep::do_layout () {
+  bool is_focused= current_window->kbd_focus == this;
+  Clay_Color bg;
+  if (is_focused) {
+    buffer= copy (cork_to_utf8 (s (0, pos) * "<#007c>" * s(pos, N(s))));
+    bg=  { 228, 228, 220, 255 };
+  }
+  else {
+    buffer= copy (s);
+    bg= { 208, 208, 210, 255 };
+  }
   CLAY({
-    .backgroundColor = { 228, 228, 220, 255 },
+    .backgroundColor = bg,
     .layout= { .padding= { 8, 8, 4, 4 } }})
   {
-    if (N(key_event) > 0) {
+    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
+    if ((N(key_event) > 0) && (is_focused)) {
       //FIXME: handle focus correctly!!
       process_key (key_event);
+      key_event= "";
     }
-    buffer= cork_to_utf8 (s (0, pos) * "<#007c>" * s(pos, N(s)));
-    cout << "text_input " << id << " buffer : " << buffer << LF;
-    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
+    if (Clay_Hovered () && (mouse_action == "press-left")) {
+      mouse_action= "";
+      current_window->kbd_focus= this;
+    }
   }
 }
 
@@ -1570,6 +1583,9 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
+  if (win->kbd_focus == NULL) {
+    win->kbd_focus= main_widget;
+  }
   CLAY({ .id= CLAY_ID("texmacs_widget"),
          .backgroundColor= color_background,
          .layout= {
@@ -1963,6 +1979,11 @@ vue_simple_widget_rep::do_layout () {
           scroll_pos.x2 += mouse_data[1];
           absolute_scroll= false;
         } else {
+          if (starts (mouse_action, "press-")) {
+            if (current_window->kbd_focus != this) {
+              current_window->kbd_focus= this;
+            }
+          }
           handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
         }
         // reset
@@ -1970,9 +1991,9 @@ vue_simple_widget_rep::do_layout () {
         if (N(mouse_data) > 0) mouse_data= array<double>();
       }
     }
-  if (N(key_event)>0) {
+  if ((current_window->kbd_focus == this) && N(key_event)>0) {
     handle_keypress (key_event, key_time);
-//    key_event= "";
+    key_event= "";
   }
 }
 
