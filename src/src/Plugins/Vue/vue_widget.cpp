@@ -1497,7 +1497,7 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
     ttf_fonts= (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
     if (!ttf_fonts) {
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
-      return SDL_APP_FAILURE;
+      return;
     }
     
     TTF_Font *font= TTF_OpenFont( //"/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf"
@@ -1505,7 +1505,7 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
         24);
     if (!font) {
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
-      return SDL_APP_FAILURE;
+      return;
     }
     ttf_fonts[FONT_ID]= font;
   }
