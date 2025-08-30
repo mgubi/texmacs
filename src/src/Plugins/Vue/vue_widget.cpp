@@ -92,6 +92,9 @@ bool debug_clay=false;
 // ask the buttons to fit all horizontal space
 bool button_grow= false;
 
+uint32_t current_balloon;
+time_t balloon_time;
+
 // list of commands
 list<command> cmd_list;
 
@@ -650,8 +653,29 @@ vue_ui_rep::do_layout () {
   if (type == "balloon_widget") {
     //VUE_WIDGET(balloon_widget, widget, w, widget, help);
     vue_balloon_widget d= open_box<vue_balloon_widget> (data);
-    concrete(d.w)->do_layout ();
-    //FIXME: implement help
+    CLAY({}){
+      concrete(d.w)->do_layout ();
+      if (Clay_Hovered ()) {
+        if (current_balloon != id) {
+          balloon_time= texmacs_time ();
+          current_balloon= id;
+        }
+        if ((current_balloon == id) && (texmacs_time () - balloon_time > 1000)) {
+          CLAY({
+            .backgroundColor = { 240, 240, 0, 255 },
+            .layout= { .padding= { 10, 10, 10, 10 } },
+            .floating= {
+              .zIndex= 10,
+              .offset= { 10, 10 },
+              .attachTo= CLAY_ATTACH_TO_PARENT,
+              .attachPoints= {
+                .parent= CLAY_ATTACH_POINT_RIGHT_BOTTOM }}
+          }){
+            concrete(d.help)->do_layout ();
+          }
+        }
+      }
+    }
     return;
   }
   if (type == "picture_widget") {
@@ -705,7 +729,6 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  
   cout << "Need do_layout for widget " << type << LF;
 }
 
@@ -1965,7 +1988,9 @@ vue_simple_widget_rep::do_layout () {
       CLAY({
         .backgroundColor = { 80, 80, 80, 80 },
         .layout= { .padding= { 18, 18, 18, 18 } },
-        .floating= { .attachTo = CLAY_ATTACH_TO_PARENT }
+        .floating= {
+          .attachTo= CLAY_ATTACH_TO_PARENT,
+          .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }
       }){
         debug_text= "";
         tm_ostream out= string_ostream (debug_text);
