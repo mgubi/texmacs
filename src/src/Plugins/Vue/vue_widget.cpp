@@ -1510,6 +1510,7 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
 
   clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
   relayout= true;
+  clay_debug= false;
   
   text_engine= TTF_CreateRendererTextEngine (sdl_ren);
   if (!text_engine) {
@@ -2487,7 +2488,9 @@ void gui_start_loop () {
 
       request_partial_redraw= interrupted;
     }
-    
+    t1= t2; t2= texmacs_time ();
+    if (t2 - t1 >= 20) cout << "repaint took " << t2 - t1 << "ms\n";
+
     // 7. redraw the UI
     process_redraw ();
     t1= t2; t2= texmacs_time ();
@@ -2714,6 +2717,7 @@ process_event (SDL_Event *event) {
         if (keycode == SDLK_F1) {
           // toggle the debug mode for the current window
           win->clay_debug = !win->clay_debug;
+          cout << "TOGGLE debug mode " << (win->clay_debug ? "true" : "false") << LF;
           break;
         }
         string key= lookup_key(keycode, event->key.mod);
