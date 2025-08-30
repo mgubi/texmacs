@@ -65,7 +65,6 @@ inline bool operator==(const widget &lhs, const widget &rhs) {
 
 class vue_simple_widget_rep : public vue_widget_rep {
 public:
-  unsigned int id;
   vue_widget_rep *win; // the toplevel widget, weak ref
 
   // properties set via messages
@@ -76,6 +75,8 @@ public:
   bool mouse_grab;
   bool absolute_scroll;
   
+  string debug_text; // debug view
+
   vue_simple_widget_rep ();
   ~vue_simple_widget_rep ();
   
@@ -115,6 +116,7 @@ protected:
   bool         backing_valid;
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
+  void invalidate_viewport_rect (int x1, int y1, int x2, int y2);
   void invalidate_all ();
   bool is_invalid ();
   void repaint_invalid_regions ();
