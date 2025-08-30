@@ -94,7 +94,7 @@ time_t balloon_time;
 // list of commands
 list<command> cmd_list;
 
-vue_widget current_window_widget; // used during layout to propagate information
+vue_window current_window; // used during layout to propagate information
 
 void
 gui_init_context() {
@@ -1324,7 +1324,7 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   command quit;
   vue_widget main_widget;
   string left_footer, right_footer;
-  vue_widget_rep *win; // weak ref
+  vue_window win; // weak ref
   
   bool visibility [10];
   
@@ -1429,7 +1429,7 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       break;
       
     case SLOT_MODIFIED:
-      if (win) win->send (s, val);
+      if (win) win->content->send (s, val);
 //      cout << "MODIFIED!" << LF;
       break;
       
@@ -1569,7 +1569,7 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 
 void vue_texmacs_widget_rep::do_layout () {
-  win= current_window_widget.rep; // save the info
+  win= current_window; // save the info
   CLAY({ .id= CLAY_ID("texmacs_widget"),
          .backgroundColor= color_background,
          .layout= {
@@ -1793,10 +1793,10 @@ vue_simple_widget_rep::query (slot s, int type_id) {
   switch (s) {
     case SLOT_IDENTIFIER:
     {
-      if (win)
-        return close_box<int>(0);
+      if (win && !is_nil (win->content))
+        return win->content->query(s, type_id);
       else
-        return win->query(s, type_id);
+        return close_box<int>(0);
     }
     case SLOT_INVALID:
     {
@@ -1850,7 +1850,7 @@ vue_simple_widget_rep::read (slot s, blackbox index) {
   switch (s) {
     case SLOT_WINDOW:
       check_type_void (index, s);
-      return abstract (win);
+      return win ? abstract (win->content) : abstract(NULL);
     default:
       return vue_widget_rep::read (s, index);
   }
@@ -1914,7 +1914,7 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 
 void
 vue_simple_widget_rep::do_layout () {
-  win= current_window_widget.rep; // save the info
+  win= current_window; // save the info
   SI w= 0, h= 0;
   if (is_embedded_widget ()) {
     handle_get_size_hint (w, h);
@@ -2048,7 +2048,9 @@ vue_simple_widget_rep::translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI d
 void
 vue_simple_widget_rep::repaint_invalid_regions () {
 
-  vue_plain_window_widget_rep *w= dynamic_cast<vue_plain_window_widget_rep*>(win);
+  vue_plain_window_widget_rep *w=
+      win ? dynamic_cast<vue_plain_window_widget_rep*>(win->content.rep)
+          : NULL;
 
   if (!w) return; // we are not in a layout yet
   

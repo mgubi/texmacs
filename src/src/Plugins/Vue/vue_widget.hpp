@@ -18,6 +18,8 @@ typedef quartet<SI,SI,SI,SI> coord4;
 typedef pair<SI,SI> coord2;
 
 struct vue_render_data;
+class vue_window_rep;
+typedef vue_window_rep *vue_window;
 
 class vue_widget_rep : public widget_rep {
 protected:
@@ -65,7 +67,7 @@ inline bool operator==(const widget &lhs, const widget &rhs) {
 
 class vue_simple_widget_rep : public vue_widget_rep {
 public:
-  vue_widget_rep *win; // the toplevel widget, weak ref
+  vue_window win; // the window, weak ref
 
   // properties set via messages
   coord2 size;

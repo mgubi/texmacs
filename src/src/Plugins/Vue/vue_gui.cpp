@@ -70,7 +70,7 @@ extern bool debug_clay;
 // list of commands
 extern list<command> cmd_list;
 
-extern vue_widget current_window_widget; // used during layout to propagate information
+extern vue_window current_window; // used during layout to propagate information
 
 void gui_init_context();
 
@@ -347,7 +347,7 @@ vue_sdl_window_rep::process_layout () {
   
   // init the current GUI context
   Clay_SetCurrentContext (clay_ctx);
-  current_window_widget= content;
+  current_window= this;
   gui_init_context ();
 
   int win_x, win_y, win_w, win_h;
@@ -361,7 +361,7 @@ vue_sdl_window_rep::process_layout () {
   content->do_layout ();
   render_commands= Clay_EndLayout ();
   
-  current_window_widget= NULL;
+  current_window= NULL;
 }
 
 void
