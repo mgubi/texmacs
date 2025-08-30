@@ -1,5 +1,5 @@
 /******************************************************************************
-* MODULE     : vuw_widget.hpp
+* MODULE     : vue_widget.hpp
 * DESCRIPTION: Definition of Vue widgets
 * COPYRIGHT  : (C) 2025  Masssimiliano Gubinelli
 *******************************************************************************
