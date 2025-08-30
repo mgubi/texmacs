@@ -529,14 +529,14 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
       CLAY({ .id= float_id,
-          .floating = {
+          .floating= {
             .attachTo= CLAY_ATTACH_TO_PARENT,
-            .attachPoints = {
+            .attachPoints= {
               .parent= d.down ? CLAY_ATTACH_POINT_LEFT_BOTTOM : CLAY_ATTACH_POINT_RIGHT_TOP
             }},
-          .layout = {
-             .padding = { 8, 8, 8, 8 },
-             .sizing = { .width= CLAY_SIZING_FIT(.min= 300) }},
+          .layout= {
+             .padding= { 8, 8, 8, 8 },
+             .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
           .backgroundColor= color_background })
       {
         current_popup= false;
@@ -744,7 +744,6 @@ vue_widget_rep::render (vue_render_data *data) {
 
 void
 draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest);
-
 
 picture
 print_glue (int w, int h, tree col)
