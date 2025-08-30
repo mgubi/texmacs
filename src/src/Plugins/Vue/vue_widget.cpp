@@ -509,6 +509,11 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
+    if (button_grow) {
+      CLAY({ .layout= { .sizing= layoutExpand }}){};
+       // "\xE2\x96\xB8" "\xE2\x80\xBA"
+      CLAY_TEXT(CLAY_STRING("\xE2\x96\xB8"), text_config_ui);
+    }
     if (Clay_PointerOver (button_id) && (mouse_action == "press-left")) {
       mouse_action= ""; // reset
       if (is_nil (d.cw)) {
@@ -1371,7 +1376,7 @@ widget texmacs_widget (int mask, command quit) {
 }
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
-  : mask(_mask), quit(_quit), vue_widget_rep ("vue_texmacs_widget_rep")
+  : mask (_mask), quit (_quit), win (NULL), vue_widget_rep ("vue_texmacs_widget_rep")
 {
   // decode mask
   visibility[0]= (mask & 1)   == 1;   // header
