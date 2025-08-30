@@ -536,7 +536,7 @@ void gui_start_loop () {
       t2= texmacs_time ();
       process_layout ();
       t1= t2; t2= texmacs_time ();
-      if (t2 - t1 >= 25) cout << "layout took " << t2 - t1 << "ms\n";
+      if (t2 - t1 >= 30) cout << "layout took " << t2 - t1 << "ms\n";
     }
     
     // 4. exec commands if present
@@ -555,7 +555,7 @@ void gui_start_loop () {
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 20) cout << "interpose took " << t2-t1 << "ms\n";
+    if (t2 - t1 >= 30) cout << "interpose took " << t2-t1 << "ms\n";
 
     if (nr_windows == 0) continue;
 
@@ -575,12 +575,12 @@ void gui_start_loop () {
       request_partial_redraw= interrupted;
     }
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 20) cout << "repaint took " << t2 - t1 << "ms\n";
+    if (t2 - t1 >= 30) cout << "repaint took " << t2 - t1 << "ms\n";
 
     // 7. redraw the UI
     process_redraw ();
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 20) cout << "redraw took " << t2 - t1 << "ms\n";
+    if (t2 - t1 >= 30) cout << "redraw took " << t2 - t1 << "ms\n";
     gui_wait= true;
   }
 }

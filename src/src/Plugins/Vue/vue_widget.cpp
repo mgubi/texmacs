@@ -1480,7 +1480,7 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
     case SLOT_SCROLLABLE:
       check_type_void (index, s);
       main_widget= concrete (w);
-      send_keyboard_focus (abstract (main_widget));
+      if (win) win->kbd_focus= main_widget;
       break;
       
     case SLOT_MAIN_MENU:
@@ -1594,45 +1594,58 @@ void vue_texmacs_widget_rep::do_layout () {
           .padding= { 0, 0, 16, 16 },
           .childGap= 16  }}) {
       CLAY({ .id= CLAY_ID("MainMenuBar"),
-             .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
-               .width= CLAY_SIZING_GROW(0),
-               .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+             .layout= {
+               .padding= { 8, 8, 0, 0 },
+               .sizing= {
+                .width=  CLAY_SIZING_GROW(0),
+                .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_menu)) {
           main_menu->do_layout ();
         }
       }
       CLAY({ .id= CLAY_ID("MainToolbar"),
-                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
-                   .width= CLAY_SIZING_GROW(0),
-                   .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+                 .layout= {
+                   .padding= { 8, 8, 0, 0 },
+                   .sizing= {
+                    .width=  CLAY_SIZING_GROW(0),
+                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (main_icons)) {
           main_icons->do_layout ();
         }
       }
       CLAY({ .id= CLAY_ID("ModeToolbar"),
-                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
-                   .width= CLAY_SIZING_GROW(0),
-                   .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+                 .layout= {
+                   .padding= { 8, 8, 0, 0 },
+                   .sizing= {
+                    .width=  CLAY_SIZING_GROW(0),
+                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (mode_icons)) {
           mode_icons->do_layout ();
         }
       }
       CLAY({ .id= CLAY_ID("FocusToolbar"),
-                 .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
-                   .width= CLAY_SIZING_GROW(0),
-                   .height= CLAY_SIZING_FIT(.min= 20) }}}) {
+                 .layout= {
+                   .padding= { 8, 8, 0, 0 },
+                   .sizing= {
+                    .width=  CLAY_SIZING_GROW(0),
+                    .height= CLAY_SIZING_FIT(.min= 20) }}}) {
         if (!is_nil (focus_icons)) {
           focus_icons->do_layout ();
         }
       }
       if (!is_nil (main_widget)) main_widget->do_layout ();
       CLAY({ .id= CLAY_ID("Footer"),
-             .layout= { .padding= { 8, 8, 0, 0 }, .sizing= {
-                .width= CLAY_SIZING_GROW(0),
-                .height= CLAY_SIZING_FIXED(40) }}})
+             .layout= {
+               .padding= { 8, 8, 0, 0 },
+               .sizing= {
+                 .width=  CLAY_SIZING_GROW(0),
+                 .height= CLAY_SIZING_FIXED(40) }}})
       {
         CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
-        CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
+        CLAY({ .layout= {
+                 .sizing= {
+                   .width=  CLAY_SIZING_GROW(0),
+                   .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
         CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
       }
   }
