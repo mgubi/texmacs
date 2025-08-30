@@ -913,6 +913,8 @@ public:
   int     tab_nr;      // currently visible tab-completion
   int     tab_pos;     // cursor position where tab was pressed
 
+  string buffer; // cache
+  
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
   void do_layout ();
@@ -925,6 +927,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
   : call_back (_call_back), type (_type),
     def (_def), style (_style), width (_width),
     greyed ((style & WIDGET_STYLE_INERT) != 0),
+    pos (0),
     vue_widget_rep ("input_text_widget")
 {
   if (N(def) > 0) {
@@ -1106,7 +1109,9 @@ vue_input_text_widget_rep::do_layout () {
       //FIXME: handle focus correctly!!
       process_key (key_event);
     }
-    CLAY_TEXT(CLAY_TM_STRING(s), text_config_ui);
+    buffer= cork_to_utf8 (s (0, pos) * "<#007c>" * s(pos, N(s)));
+    cout << "text_input " << id << " buffer : " << buffer << LF;
+    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
   }
 }
 
