@@ -131,6 +131,7 @@ gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
 mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
 sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
 vue_src    	 := $(call findsrc_in,Plugins,@CONFIG_VUE@)
+vue_c_src    := clay.c
 
 # Each makefile will have its own Deps directory. Okay that is a bit
 # inefficient, but that is much simpler to maintain.
@@ -328,6 +329,7 @@ gnutls_obj   := $(call makeobj,$(gnutls_src))
 mupdf_obj    := $(call makeobj,$(mupdf_src))
 sdl_obj      := $(call makeobj,$(sdl_src))
 vue_obj      := $(call makeobj,$(vue_src))
+vue_c_obj    := $(call makeobj_c,$(vue_c_src))
 
 # To enforce some degree of modularity, each object file must be
 # compiled with only a specific set of include flags. To achieve that,
@@ -405,7 +407,9 @@ $(mupdf_obj): Objects/%.o: %.cpp
 $(sdl_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(sdl_incl) $(CXXMUPDF) $(CXXSDL))
 $(vue_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(vue_incl) $(CXXMUPDF) $(CXXVUE))
+	$(call cxx_incl,-std=c++20 $(vue_incl) $(CXXMUPDF) $(CXXVUE))
+$(vue_c_obj): Objects/%.o: %.c
+	$(call cc_flags,$(vue_incl) $(CXXMUPDF) $(CXXVUE))
 $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
@@ -471,7 +475,7 @@ uses_freetype := $(freetype_obj)
 uses_gnutls   := $(gnutls_obj)
 uses_mupdf    := $(mupdf_obj)
 uses_sdl      := $(sdl_obj)
-uses_vue      := $(vue_obj)
+uses_vue      := $(vue_obj) $(vue_c_obj)
 #"uses_windowsres" is defined above
 
 # Compilation rules

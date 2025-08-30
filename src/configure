@@ -35679,7 +35679,7 @@ printf "%s\n" "SDL3_CFLAGS=$SDL3_CFLAGS" >&6; }
 printf "%s\n" "SDL3_LDFLAGS=$SDL3_LDFLAGS" >&6; }
          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: SDL3_LIBS=$SDL3_LIBS" >&5
 printf "%s\n" "SDL3_LIBS=$SDL3_LIBS" >&6; }
-         VUE_CFLAGS="-std=c++20 $SDL3_CFLAGS"
+         VUE_CFLAGS="$SDL3_CFLAGS"
          VUE_LDFLAGS="$SDL3_LDFLAGS"
          VUE_LIBS="$SDL3_LIBS"
          CONFIG_GUI="VUE"
