@@ -821,6 +821,90 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 
 /******************************************************************************
+* Message passing
+******************************************************************************/
+
+void
+vue_widget_rep::send (slot s, blackbox val) {
+  (void) val;
+  cout << "vue_widget_rep::send(), unhandled " << slot_name (s)
+             << " for widget of type: " << type << LF;
+  //FAILED ("no default implementation");
+}
+
+blackbox fake_query (slot s, int type_id) {
+  static int id= 1;
+  switch (s) {
+  case SLOT_IDENTIFIER:
+    {
+      check_type_id<int> (type_id, s);
+      return close_box<int> (id++);
+    }
+  case SLOT_SCROLL_POSITION:
+    return close_box<coord2> (coord2 (0, 0));
+  case SLOT_EXTENTS:
+  case SLOT_VISIBLE_PART:
+    return close_box<coord4> (coord4 (0, 0, 640, 400));
+  case SLOT_ZOOM_FACTOR:
+    return close_box<double> (1.0);
+  case SLOT_POSITION:
+    return close_box<coord2> (coord2 (0, 0));
+  case SLOT_SIZE:
+    return close_box<coord2> (coord2 (640, 400));
+  case SLOT_HEADER_VISIBILITY:
+  case SLOT_MAIN_ICONS_VISIBILITY:
+  case SLOT_MODE_ICONS_VISIBILITY:
+  case SLOT_FOCUS_ICONS_VISIBILITY:
+  case SLOT_USER_ICONS_VISIBILITY:
+  case SLOT_FOOTER_VISIBILITY:
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+  case SLOT_LEFT_TOOLS_VISIBILITY:
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+  case SLOT_EXTRA_TOOLS_VISIBILITY:
+    check_type_id<bool> (type_id, s);
+    return close_box<bool> (false);
+  case SLOT_INVALID:
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (false);
+  default:
+      return blackbox ();
+  }
+}
+
+blackbox
+vue_widget_rep::query (slot s, int type_id)  {
+  (void) type_id;
+  if ((slot_id(s) != SLOT_INVALID) && (slot_id(s) != SLOT_VISIBLE_PART)) {
+    cout << "vue_widget_rep::query(), unhandled " << slot_name (s)
+    << " for widget of type: " << type << LF;
+  }
+  return fake_query (s, type_id);
+}
+
+widget
+vue_widget_rep::read (slot s, blackbox index)  {
+  (void) index;
+  cout << "vue_widget_rep::read(), unhandled " << slot_name (s)
+       << " for widget of type: " << type << LF;
+  return empty_widget ();
+}
+
+void
+vue_widget_rep::write (slot s, blackbox index, widget w)  {
+  (void) index; (void) w;
+  cout << "vue_widget_rep::write(), unhandled " << slot_name (s)
+       << " for widget of type: " << type << LF;
+}
+
+void
+vue_widget_rep::notify (slot s, blackbox new_val) {
+  cout << "vue_widget_rep::notify(), unhandled " << slot_name (s)
+           << " for widget of type: " << type << LF;
+  widget_rep::notify (s, new_val);
+}
+
+
+/******************************************************************************
 * input_text_widget
 ******************************************************************************/
 
@@ -953,16 +1037,11 @@ vue_input_text_widget_rep::process_key (string key) {
   
   /* other actions */
   if (continuous &&
-      (key == "return" ||
-       key == "S-return" ||
-       key == "home" ||
-       key == "end" ||
-       key == "up" ||
-       key == "down" ||
-       key == "pageup" ||
-       key == "pagedown" ||
-       key == "tab" ||
-       key == "S-tab" ||
+      (key == "return" || key == "S-return" ||
+       key == "home"   || key == "end" ||
+       key == "up"     || key == "down" ||
+       key == "pageup" || key == "pagedown" ||
+       key == "tab"    || key == "S-tab" ||
        key == "escape" ||
        (starts (type, "spell") && string ("1") <= key && key <= string ("9")) ||
        (starts (type, "spell") && key == "+")));
@@ -971,7 +1050,8 @@ vue_input_text_widget_rep::process_key (string key) {
     if (!continuous) {
       ok= true;
       done= true;
-      command cmd= tm_new<applied_command_rep>(call_back, list_object (list_object (object (s), object (key))));
+      command cmd= tm_new<applied_command_rep>(call_back,
+                    list_object (list_object (object (s), object (key))));
       cmd_list= list(cmd, cmd_list);
       return true;
     }
@@ -982,7 +1062,8 @@ vue_input_text_widget_rep::process_key (string key) {
     ok= false;
     done= true;
     call_back (list_object (object (false)));
-    command cmd= tm_new<applied_command_rep>(call_back, list_object (object (false)));
+    command cmd= tm_new<applied_command_rep>(call_back,
+                  list_object (object (false)));
     cmd_list= list(cmd, cmd_list);
     return true;
   }
@@ -1037,7 +1118,8 @@ vue_input_text_widget_rep::process_key (string key) {
     pos += N(key);
   }
   if (continuous) {
-    command cmd= tm_new<applied_command_rep>(call_back, list_object (list_object (object (s), object (key))));
+    command cmd= tm_new<applied_command_rep>(call_back,
+                      list_object (list_object (object (s), object (key))));
     cmd_list= list(cmd, cmd_list);
   }
   return true;
@@ -1060,97 +1142,15 @@ vue_input_text_widget_rep::do_layout () {
 widget
 input_text_widget (command call_back, string type, array<string> def,
                           int style, string width) {
-  return abstract (tm_new<vue_input_text_widget_rep> (call_back, type, def, style, width));
-}
-
-/******************************************************************************
-* Message passing
-******************************************************************************/
-
-void
-vue_widget_rep::send (slot s, blackbox val) {
-  (void) val;
-  cout << "vue_widget_rep::send(), unhandled " << slot_name (s)
-             << " for widget of type: " << type << LF;
-  //FAILED ("no default implementation");
-}
-
-blackbox fake_query (slot s, int type_id) {
-  static int id= 1;
-  switch (s) {
-  case SLOT_IDENTIFIER:
-    {
-      check_type_id<int> (type_id, s);
-      return close_box<int> (id++);
-    }
-  case SLOT_SCROLL_POSITION:
-    return close_box<coord2> (coord2 (0, 0));
-  case SLOT_EXTENTS:
-  case SLOT_VISIBLE_PART:
-    return close_box<coord4> (coord4 (0, 0, 640, 400));
-  case SLOT_ZOOM_FACTOR:
-    return close_box<double> (1.0);
-  case SLOT_POSITION:
-    return close_box<coord2> (coord2 (0, 0));
-  case SLOT_SIZE:
-    return close_box<coord2> (coord2 (640, 400));
-  case SLOT_HEADER_VISIBILITY:
-  case SLOT_MAIN_ICONS_VISIBILITY:
-  case SLOT_MODE_ICONS_VISIBILITY:
-  case SLOT_FOCUS_ICONS_VISIBILITY:
-  case SLOT_USER_ICONS_VISIBILITY:
-  case SLOT_FOOTER_VISIBILITY:
-  case SLOT_SIDE_TOOLS_VISIBILITY:
-  case SLOT_LEFT_TOOLS_VISIBILITY:
-  case SLOT_BOTTOM_TOOLS_VISIBILITY:
-  case SLOT_EXTRA_TOOLS_VISIBILITY:
-    check_type_id<bool> (type_id, s);
-    return close_box<bool> (false);
-  case SLOT_INVALID:
-      check_type_id<bool> (type_id, s);
-      return close_box<bool> (false);
-  default:
-      return blackbox ();
-  }
-}
-
-blackbox
-vue_widget_rep::query (slot s, int type_id)  {
-  (void) type_id;
-  if ((slot_id(s) != SLOT_INVALID) && (slot_id(s) != SLOT_VISIBLE_PART)) {
-    cout << "vue_widget_rep::query(), unhandled " << slot_name (s)
-    << " for widget of type: " << type << LF;
-  }
-  return fake_query (s, type_id);
-}
-
-widget
-vue_widget_rep::read (slot s, blackbox index)  {
-  (void) index;
-  cout << "vue_widget_rep::read(), unhandled " << slot_name (s)
-       << " for widget of type: " << type << LF;
-  return empty_widget ();
-}
-
-void
-vue_widget_rep::write (slot s, blackbox index, widget w)  {
-  (void) index; (void) w;
-  cout << "vue_widget_rep::write(), unhandled " << slot_name (s)
-       << " for widget of type: " << type << LF;
-}
-
-void
-vue_widget_rep::notify (slot s, blackbox new_val) {
-  cout << "vue_widget_rep::notify(), unhandled " << slot_name (s)
-           << " for widget of type: " << type << LF;
-  widget_rep::notify (s, new_val);
+  return abstract (tm_new<vue_input_text_widget_rep> (call_back, type,
+                                                      def, style, width));
 }
 
 /******************************************************************************
 * plain windows
 ******************************************************************************/
 
-string type_vue_plain_window_widget("vue_plain_window_widget");
+string type_vue_plain_window_widget ("vue_plain_window_widget");
 
 hashmap<int, pointer> id_to_window;
 
