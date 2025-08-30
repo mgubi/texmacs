@@ -40,8 +40,8 @@ public:
   vue_window_rep (vue_widget w, string _name)
   : content (w), name (_name), id (serial++), orig_name (_name) {}
   virtual ~vue_window_rep () {};
-  virtual void destroy_event () = 0;
   
+  virtual void   destroy_event () = 0;
   virtual void   set_name (string name) = 0;
   virtual string get_name () = 0;
   virtual void   set_modified (bool flag) = 0;

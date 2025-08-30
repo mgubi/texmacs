@@ -15,6 +15,7 @@
 #include "window.hpp"
 #include "iterator.hpp"
 #include "font.hpp"
+#include "dictionary.hpp" // get_output_language
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -75,7 +76,6 @@ void gui_init_context();
 
 //******************************************************************************
 
-
 void snapshot_pixmap (fz_pixmap *pix);
 
 void
@@ -98,7 +98,6 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   SDL_DestroySurface (surf);
 }
 
-
 void
 draw_picture (vue_render_data *data, picture pic) {
   draw_picture(data->sdl_ren, pic, data->rect);
@@ -119,8 +118,8 @@ public:
   
   vue_sdl_window_rep (vue_widget w, string name);
   ~vue_sdl_window_rep ();
-  void destroy_event ();
   
+  void   destroy_event ();
   void   set_name (string name);
   string get_name ();
   void   set_modified (bool flag);
@@ -167,7 +166,6 @@ void HandleClayErrors (Clay_ErrorData errorData) {
 }
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
-static const Uint32 FONT_ID= 0;
 
 vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
 : vue_window_rep (_content, _name)
@@ -226,7 +224,7 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
       SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
       return;
     }
-    ttf_fonts[FONT_ID]= font;
+    ttf_fonts[0]= font;
   }
   Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
 }
@@ -473,7 +471,6 @@ remote_time (Uint32 t) {
 * Event loop
 ******************************************************************************/
 
-extern int nr_windows;
 static void (*the_interpose_handler) (void)= NULL;
 
 ///////// Gui state
@@ -482,7 +479,6 @@ static int  kbd_count= 0;
 static bool request_partial_redraw= false;
 static bool interrupted= false;
 static time_t interrupt_time=0;
-
 
 hashmap<int,string> lower_key;
 hashmap<int,string> upper_key;
@@ -495,7 +491,6 @@ void gui_interpose (void (*f) (void)) {
 }
 
 int number_of_servers (); // in texmacs_server.hpp
-
 
 void sdl_log_event (const SDL_Event *event);
 void process_event (SDL_Event *event);
@@ -848,7 +843,58 @@ void set_default_font (string name) {
 font get_default_font (bool tt, bool mini, bool bold) {
   // get the default font, depending on desired characteristics:
   // tt for a monospaced font, mini for a smaller font and bold for a bold font
-  FAILED("this should not be called");
+  string s= "";
+  string series= (bold? string ("bold"): string ("medium"));
+  if (s == "") s= "ecrm11@300";
+  int i, j, n= N(s);
+  for (j=0; j<n; j++) if (is_digit (s[j])) break;
+  string fam= s (0, j);
+  if (mini && fam == "ecrm") fam= "ecss";
+  if (bold && fam == "ecrm") fam= "ecbx";
+  if (bold && fam == "ecss") fam= "ecsx";
+  for (i=j; j<n; j++) if (s[j] == '@') break;
+  int sz= (j<n? as_int (s (i, j)): 10);
+  if (j<n) j++;
+  int dpi= (j<n? as_int (s (j, n)): 300);
+  if (mini) { sz= (int) (0.6 * sz); dpi= (int) (1.3333333 * dpi); }
+  if (use_macos_fonts ()) {
+    tree lucida_fn= tuple ("apple-lucida", "ss", series, "right");
+    lucida_fn << as_string (sz) << as_string ((int) (0.95 * dpi));
+    return find_font (lucida_fn);
+  }
+  if (N(fam) >= 2) {
+    string ff= fam (0, 2);
+    string out_lan= get_output_language ();
+    if (((out_lan == "bulgarian") || (out_lan == "russian") ||
+   (out_lan == "ukrainian")) &&
+  ((ff == "cm") || (ff == "ec"))) {
+      fam= "la" * fam (2, N(fam)); ff= "la"; if (sz<100) sz *= 100; }
+    if (out_lan == "japanese" || out_lan == "korean") {
+      tree modern_fn= tuple ("modern", "ss", series, "right");
+      modern_fn << as_string (sz) << as_string (dpi);
+      return find_font (modern_fn);
+    }
+    if (out_lan == "chinese" || out_lan == "taiwanese")
+      return unicode_font ("fireflysung", sz, dpi);
+    if (out_lan == "greek")
+      return unicode_font ("Stix", sz, dpi);
+    //if (out_lan == "japanese")
+    //return unicode_font ("ipagui", sz, dpi);
+    //if (out_lan == "korean")
+    //return unicode_font ("UnDotum", sz, dpi);
+    if (ff == "ec")
+      return tex_ec_font (tt? ff * "tt": fam, sz, dpi);
+    if (ff == "la")
+      return tex_la_font (tt? ff * "tt": fam, sz, dpi, 1000);
+    if (ff == "pu") tt= false;
+    if ((ff == "cm") || (ff == "pn") || (ff == "pu"))
+      return tex_cm_font (tt? ff * "tt": fam, sz, dpi);
+  }
+  return tex_font (fam, sz, dpi);
+  // if (out_lan == "german") return tex_font ("ygoth", 14, 300, 0);
+  // return tex_font ("rpagk", 10, 300, 0);
+  // return tex_font ("rphvr", 10, 300, 0);
+  // return ps_font ("b&h-lucidabright-medium-r-normal", 11, 300);
   return NULL;
 }
 
