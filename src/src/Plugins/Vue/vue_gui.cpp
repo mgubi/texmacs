@@ -16,7 +16,8 @@
 #include "iterator.hpp"
 #include "font.hpp"
 
-
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include "../MuPDF/mupdf_picture.hpp"
 
 #include "clay.h"
@@ -110,7 +111,37 @@ int nr_windows= 0;
 hashmap<SDL_Window*, pointer> Window_to_window;
 hashmap<int, pointer> id_to_window;
 
-typedef vue_window_rep* vue_window;
+class vue_sdl_window_rep : public vue_window_rep {
+public:
+  SDL_Window *sdl_win;
+  SDL_Renderer *sdl_ren;
+  TTF_TextEngine *text_engine;
+  
+  vue_sdl_window_rep (vue_widget w, string name);
+  ~vue_sdl_window_rep ();
+  void destroy_event ();
+  
+  void   set_name (string name);
+  string get_name ();
+  void   set_modified (bool flag);
+  void   set_visibility (bool flag);
+  void   set_size (SI w, SI h);
+  void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
+  void   get_size (SI& w, SI& h);
+  void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h);
+  void   set_position (SI x, SI y);
+  void   get_position (SI& x, SI& y);
+  
+  void process_layout ();
+  void process_redraw ();
+};
+
+typedef vue_sdl_window_rep* vue_sdl_window;
+
+vue_window
+plain_window (vue_widget wwid, string name) {
+ return tm_new<vue_sdl_window_rep> (wwid, name);
+}
 
 int vue_window_rep::serial= 1; // serial identifier for windows
 
@@ -138,10 +169,10 @@ void HandleClayErrors (Clay_ErrorData errorData) {
 static TTF_Font **ttf_fonts= NULL; // fonts cache
 static const Uint32 FONT_ID= 0;
 
-vue_window_rep::vue_window_rep (vue_widget _content, string _name)
- : content (_content), name (_name), id (serial++), orig_name (_name)
+vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
+: vue_window_rep (_content, _name)
 {
-  cout << "create vue_window_rep " << id << LF;
+  cout << "create vue_sdl_window_rep " << id << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
@@ -200,8 +231,8 @@ vue_window_rep::vue_window_rep (vue_widget _content, string _name)
   Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
 }
 
-vue_window_rep::~vue_window_rep () {
-  cout << "destroy vue_window_rep " << id << LF;
+vue_sdl_window_rep::~vue_sdl_window_rep () {
+  cout << "destroy vue_sdl_window_rep " << id << LF;
   id_to_window->reset (id);
   id= 0;
   set_identifier (abstract (content), 0); // FIXME: is this ok?
@@ -216,14 +247,14 @@ vue_window_rep::~vue_window_rep () {
 }
 
 void
-vue_window_rep::destroy_event () {
+vue_sdl_window_rep::destroy_event () {
   notify_window_destroy (orig_name);
   send_destroy (abstract (content));
 }
 
 
 void
-vue_window_rep::get_position (SI& x, SI& y) {
+vue_sdl_window_rep::get_position (SI& x, SI& y) {
   int xx, yy;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
   x=  xx * PIXEL;
@@ -231,7 +262,7 @@ vue_window_rep::get_position (SI& x, SI& y) {
 }
 
 void
-vue_window_rep::get_size (SI& ww, SI& hh) {
+vue_sdl_window_rep::get_size (SI& ww, SI& hh) {
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
   ww= win_w * PIXEL;
@@ -239,12 +270,12 @@ vue_window_rep::get_size (SI& ww, SI& hh) {
 }
 
 void
-vue_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
+vue_sdl_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
   //min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
 }
 
 void
-vue_window_rep::set_position (SI x, SI y) {
+vue_sdl_window_rep::set_position (SI x, SI y) {
   SI screen_w, screen_h;
   gui_root_extents (screen_w, screen_h);
   screen_w /= PIXEL; screen_h /= PIXEL;
@@ -263,14 +294,14 @@ vue_window_rep::set_position (SI x, SI y) {
 }
 
 void
-vue_window_rep::set_size (SI w, SI h) {
+vue_sdl_window_rep::set_size (SI w, SI h) {
   w= w/PIXEL; h= h/PIXEL;
   //h=-h; ren->decode (w, h);
   SDL_SetWindowSize (sdl_win, w, h);
 }
 
 void
-vue_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
+vue_sdl_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 #if 0
   if (min_w == Min_w && min_h == Min_h && max_w == Max_w && max_h == Max_h)
     return;
@@ -283,7 +314,7 @@ vue_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 }
 
 void
-vue_window_rep::set_name (string name) {
+vue_sdl_window_rep::set_name (string name) {
   if (the_name != name) {
     c_string s (name);
     SDL_SetWindowTitle (sdl_win, s);
@@ -293,12 +324,12 @@ vue_window_rep::set_name (string name) {
 }
 
 string
-vue_window_rep::get_name () {
+vue_sdl_window_rep::get_name () {
   return the_name;
 }
 
 void
-vue_window_rep::set_modified (bool flag) {
+vue_sdl_window_rep::set_modified (bool flag) {
   string name= (flag? (the_name * " *"): the_name);
   if (mod_name != name) {
     c_string s (name);
@@ -308,13 +339,13 @@ vue_window_rep::set_modified (bool flag) {
 }
 
 void
-vue_window_rep::set_visibility (bool flag) {
+vue_sdl_window_rep::set_visibility (bool flag) {
   if (flag) SDL_ShowWindow (sdl_win);
   else SDL_HideWindow (sdl_win);
 }
  
 void
-vue_window_rep::process_layout () {
+vue_sdl_window_rep::process_layout () {
   
   // init the current GUI context
   Clay_SetCurrentContext (clay_ctx);
@@ -336,7 +367,7 @@ vue_window_rep::process_layout () {
 }
 
 void
-vue_window_rep::process_redraw () {
+vue_sdl_window_rep::process_redraw () {
   // render!
   SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
   SDL_RenderClear(sdl_ren);
@@ -562,7 +593,7 @@ void gui_start_loop () {
 void process_layout () {
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
-    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+    vue_sdl_window_rep *win= (vue_sdl_window_rep*) Window_to_window [it->next()];
     win->process_layout ();
   }
 }
@@ -570,16 +601,16 @@ void process_layout () {
 void process_redraw () {
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
-    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+    vue_sdl_window_rep *win= (vue_sdl_window_rep*) Window_to_window [it->next()];
     win->process_redraw ();
   }
 }
 
-static vue_window
+static vue_sdl_window
 get_window_from_ID (Uint32 ID) {
   SDL_Window *w= SDL_GetWindowFromID (ID);
   if (w == NULL) return NULL;
-  vue_window win= (vue_window) Window_to_window [w];
+  vue_sdl_window win= (vue_sdl_window) Window_to_window [w];
   return win;
 }
 
@@ -694,7 +725,7 @@ process_event (SDL_Event *event) {
   // reset events
   mouse_action="";
   key_event="";
-  vue_window win;
+  vue_sdl_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
     case SDL_EVENT_WINDOW_RESIZED:

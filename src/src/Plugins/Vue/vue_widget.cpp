@@ -1159,7 +1159,7 @@ widget plain_window_widget (widget wid, string s, command quit) {
   
   vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
   //wwid->win=
-  tm_new<vue_window_rep> (wwid, s);
+  plain_window (wwid, s);
 //  plain_window (wwid, s, min_w, min_h, def_w, def_h, max_w, max_h);
   return abstract (wwid);
 }

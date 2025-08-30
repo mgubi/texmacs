@@ -15,17 +15,10 @@
 #include "vue_widget.hpp"
 #include "clay.h"
 
-#include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
-
 class vue_window_rep {
 public:
   static int serial;
-  
   int id;
-  SDL_Window *sdl_win;
-  SDL_Renderer *sdl_ren;
-  TTF_TextEngine *text_engine;
   string name;
   
   string the_name;
@@ -44,23 +37,21 @@ public:
   bool relayout;
   bool clay_debug;
   
-  vue_window_rep (vue_widget w, string name);
-  ~vue_window_rep ();
-  void destroy_event ();
+  vue_window_rep (vue_widget w, string _name)
+  : content (w), name (_name), id (serial++), orig_name (_name) {}
+  virtual ~vue_window_rep () {};
+  virtual void destroy_event () = 0;
   
-  void   set_name (string name);
-  string get_name ();
-  void   set_modified (bool flag);
-  void   set_visibility (bool flag);
-  void   set_size (SI w, SI h);
-  void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
-  void   get_size (SI& w, SI& h);
-  void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h);
-  void   set_position (SI x, SI y);
-  void   get_position (SI& x, SI& y);
-  
-  void process_layout ();
-  void process_redraw ();
+  virtual void   set_name (string name) = 0;
+  virtual string get_name () = 0;
+  virtual void   set_modified (bool flag) = 0;
+  virtual void   set_visibility (bool flag) = 0;
+  virtual void   set_size (SI w, SI h) = 0;
+  virtual void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) = 0;
+  virtual void   get_size (SI& w, SI& h) = 0;
+  virtual void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) = 0;
+  virtual void   set_position (SI x, SI y) = 0;
+  virtual void   get_position (SI& x, SI& y) = 0;
 };
 
 typedef vue_window_rep* vue_window;
@@ -68,6 +59,8 @@ typedef vue_window_rep* vue_window;
 extern hashmap<int, pointer> id_to_window;
 void draw_picture (vue_render_data *data, picture pic);
 void get_viewport_size (vue_render_data *data, int& w, int& h);
+vue_window plain_window (vue_widget wwid, string name);
+
 #endif
 
 
