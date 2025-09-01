@@ -330,7 +330,6 @@ VUE_WIDGET(menu_separator, bool, vertical);
   // a horizontal or vertical menu separator
 VUE_WIDGET(menu_group, string, name, int, style);
   // a menu group of a given style; the name should be greyed and centered
-
 VUE_WIDGET(pulldown_button, widget, w, promise<widget>, pw);
   // a button w with a lazy pulldown menu pw
 VUE_WIDGET(pullright_button, widget, w, promise<widget>, pw);
@@ -343,7 +342,6 @@ VUE_WIDGET(menu_button, widget, w, command, cmd,
 VUE_WIDGET(balloon_widget, widget, w, widget, help);
   // given a button widget w, specify a help balloon which should be displayed
   // when the user leaves the mouse pointer on the button for a small while
-
 VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
   // a text widget with a given style, color and transparency
 VUE_WIDGET(xpm_widget, url, file_name);
@@ -914,6 +912,15 @@ vue_ui_rep::do_layout () {
         cout << "Clicked enum_widget!" << LF;
       }
     }
+    return;
+  }
+  if (type == "resize_widget") {
+    //VUE_WIDGET(resize_widget, widget, w, int, style, string, w1, string, h1,
+    //string, w2, string, h2, string, w3, string, h3,
+    //string, hpos, string, vpos);
+    //FIXME: implement
+    vue_resize_widget d= open_box<vue_resize_widget> (data);
+    concrete(d.w)->do_layout ();
     return;
   }
   cout << "Need do_layout for widget " << type << LF;
