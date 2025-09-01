@@ -17,6 +17,17 @@
 #include "font.hpp"
 #include "dictionary.hpp" // get_output_language
 
+
+#include "analyze.hpp"
+#include "convert.hpp"
+#include "converter.hpp"
+#include "scheme.hpp"
+#include "dictionary.hpp"
+#include "editor.hpp"
+#include "new_view.hpp"      // get_current_editor()
+#include "image_files.hpp"
+#include "tm_window.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../MuPDF/mupdf_picture.hpp"
@@ -119,6 +130,8 @@ public:
   vue_sdl_window_rep (vue_widget w, string name);
   ~vue_sdl_window_rep ();
   
+  void *platform_window () { return (void*)sdl_win; }
+
   void   destroy_event ();
   void   set_name (string name);
   string get_name ();
@@ -1023,6 +1036,101 @@ void external_event (string type, time_t t) {
   // External events, such as pushing a button of a remote infrared commander
   //FIXME: implement
 }
+
+//*****************************************************************************
+// chooser_widget platform dependent dialog code
+
+// Callback invoked when dialog is closed
+static void SDLCALL
+file_dialog_callback (void* userdata, const char* const* filelist,
+                     int filter_index)
+{
+  vue_chooser_widget_rep *w= (vue_chooser_widget_rep *)userdata;
+  
+  if (!filelist) {
+    SDL_Log("Error: %s", SDL_GetError());
+    return;
+  } else if (!*filelist) {
+    SDL_Log("Dialog canceled or no selection.");
+    w->callback (NULL);
+    return;
+  }
+
+  for (const char* const* ptr = filelist; *ptr; ++ptr) {
+    SDL_Log ("Selected: %s", *ptr);
+    w->callback ((char*)*ptr);
+    return;
+  }
+
+  if (filter_index >= 0) {
+    SDL_Log("Selected filter index: %d", filter_index);
+  } else {
+    SDL_Log("Filter not reported by platform.");
+  }
+}
+
+void
+vue_chooser_widget_rep::perform_dialog (vue_window win) {
+ 
+  c_string caption (win_title);
+  c_string tmp1 (directory);
+  c_string tmp2 (file);
+
+  string filter;
+  // Define file filters
+  static const SDL_DialogFileFilter all_filters[] = {
+      { "PNG Images",  "png" },
+      { "JPEG Images", "jpg;jpeg" },
+      { "PDF Images", "pdf" },
+      { "All Files",   "*" }
+  };
+
+  void *sdl_filters;
+  int sdl_n_filters= 0;
+  SDL_FileDialogType sdl_type;
+  
+  if (prompt != "")
+    sdl_type= SDL_FILEDIALOG_SAVEFILE;
+  else if (type == "directory")
+    sdl_type= SDL_FILEDIALOG_OPENFOLDER;
+  else
+    sdl_type= SDL_FILEDIALOG_OPENFILE;
+
+  if (type == "image") {
+    sdl_n_filters= 4;
+    sdl_filters= (void*)all_filters;
+  } else if (type == "directory") {
+    sdl_n_filters= 0;
+  } else if (type == "generic") {
+    sdl_n_filters= 0;
+  } else {
+    sdl_n_filters= 1;
+    filter= as_string (call ("format-get-name", type));
+  }
+ 
+  // Create and set dialog properties
+  SDL_PropertiesID props = SDL_CreateProperties();
+  if (sdl_n_filters > 0) {
+    SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, sdl_filters);
+    SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, sdl_n_filters);
+  }
+  if (win) {
+    SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, win->platform_window ());
+  }
+  SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false); // single file
+  SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, caption);
+  SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_ACCEPT_STRING, sdl_type == SDL_FILEDIALOG_SAVEFILE ? "Save" : "Open");
+  SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_CANCEL_STRING, "Cancel");
+  SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, SDL_GetPrefPath (tmp1, tmp2));
+
+  // Show the dialog (non-blocking)
+  SDL_ShowFileDialogWithProperties (sdl_type,
+                                    file_dialog_callback,
+                                    (void*)this,  // userdata
+                                    props);
+  SDL_DestroyProperties(props);
+}
+
 
 //*****************************************************************************
 //*****************************************************************************

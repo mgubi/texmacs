@@ -25,6 +25,7 @@
 
 #include "file.hpp" // for file_completions
 #include "url.hpp"
+#include "tm_window.hpp"
 
 #include "../MuPDF/mupdf_picture.hpp"
 
@@ -286,7 +287,7 @@ VUE_WIDGET(tooltip_window_widget, widget, w, string, s);
 // the main TeXmacs widget and a command which is called on exit
 // the mask variable indicates whether the menu, icon bars, status bar, etc.
 // are visible or not
-VUE_WIDGET(file_chooser_widget, command, cmd, string, type, string, prompt);
+//VUE_WIDGET(file_chooser_widget, command, cmd, string, type, string, prompt);
 // file chooser widget for files of a given 'type';
 // for files of type "image", the widget includes a previsualizer for images
 // 'prompt' contains a prompt if we intend to save the file
@@ -1174,19 +1175,6 @@ public:
   void do_layout ();
 }; // class vue_plain_window_widget_rep
 
-widget plain_window_widget (widget wid, string s, command quit) {
-  SI root_w, root_h;
-  gui_root_extents (root_w, root_h);
-  SI min_w= 0, min_h= 0, def_w= root_w, def_h= root_h,
-     max_w= root_w, max_h= root_h;
-  
-  vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
-  //wwid->win=
-  plain_window (wwid, s);
-//  plain_window (wwid, s, min_w, min_h, def_w, def_h, max_w, max_h);
-  return abstract (wwid);
-}
-  
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name, command _quit)
 : vue_widget_rep (type_vue_plain_window_widget), wid(_wid), name(_name), quit(_quit), visible (false) {
   cout << "Creating vue_plain_window_widget" << LF;
@@ -2250,3 +2238,175 @@ void
 vue_simple_widget_rep::render (vue_render_data *data) {
   draw_picture (data, backing_store);
 }
+
+//-----------------------------------------------------------------------------
+//vue_chooser_widget
+
+
+/*!
+  \param _cmd  Scheme closure to execute after the dialog is closed.
+  \param _type What kind of dialog to show. Can be one of "image", "directory",
+               or any of the supported file formats: "texmacs", "tmml",
+               "postscript", etc. See perform_dialog()
+ */
+vue_chooser_widget_rep::vue_chooser_widget_rep (command _cmd, string _type, string _prompt)
+ : vue_widget_rep ("file_chooser"), cmd (_cmd), prompt (_prompt),
+   position (coord2 (0, 0)), size (coord2 (100, 100)), file ("")
+{
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_chooser_widget_rep::vue_chooser_widget_rep type=\""
+                  << type << "\" prompt=\"" << prompt << "\"" << LF;
+  if (N(_type) > 0)
+    type= _type;
+  else type= "generic";
+}
+
+void
+vue_chooser_widget_rep::send (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_VISIBILITY:
+    {
+      bool flag = check_open<bool> (val, s);
+      (void) flag;
+      FAILED("vue_chooser_widget::SLOT_VISIBILITY not implemented");
+    }
+      break;
+    case SLOT_SIZE:
+      size = check_open<coord2> (val,s );
+      break;
+    case SLOT_POSITION:
+      position = check_open<coord2> (val, s);
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      {
+        check_type<bool>(val, s);
+        tm_window win= concrete_window ();
+        vue_window platform_win= 0;
+        if (win) {
+          vue_plain_window_widget_rep *vw= dynamic_cast<vue_plain_window_widget_rep*> (win->win.rep);
+          if (vw) platform_win= vw->win;
+        }
+        perform_dialog (platform_win);
+      }
+      break;
+    case SLOT_STRING_INPUT:
+      check_type<string>(val, s);
+      if (DEBUG_QT_WIDGETS)
+        debug_widgets << "\tString input: " << open_box<string> (val) << LF;
+      FAILED ("vue_chooser_widget::SLOT_STRING_INPUT not implemented");
+      break;
+    case SLOT_INPUT_TYPE:
+      type= check_open<string> (val, s);
+      break;
+    case SLOT_FILE:
+        //send_string (THIS, "file", val);
+      file = check_open<string> (val, s);
+      if (DEBUG_QT_WIDGETS)
+        debug_widgets << "\tFile: " << file << LF;
+      break;
+    case SLOT_DIRECTORY:
+      directory = check_open<string> (val, s);
+      directory = as_string (url_pwd () * url_system (directory));
+      break;
+      
+    default:
+      vue_widget_rep::send (s, val);
+  }
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_chooser_widget_rep: sent " << slot_name (s)
+                  << "\t\tto widget\t"      << type << LF;
+}
+
+blackbox
+vue_chooser_widget_rep::query (slot s, int type_id) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_chooser_widget_rep::query " << slot_name(s) << LF;
+  switch (s) {
+    case SLOT_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (position);
+    }
+    case SLOT_SIZE:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (size);
+    }
+    case SLOT_STRING_INPUT:
+    {
+      check_type_id<string> (type_id, s);
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "\tString: " << file << LF;
+      return close_box<string> (file);
+    }
+    default:
+      return vue_widget_rep::query (s, type_id);
+  }
+}
+
+widget
+vue_chooser_widget_rep::read (slot s, blackbox index) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_chooser_widget_rep::read " << slot_name(s) << LF;
+  switch (s) {
+    case SLOT_WINDOW:
+    case SLOT_FORM_FIELD:
+    case SLOT_FILE:
+    case SLOT_DIRECTORY:
+      check_type_void (index, s);
+      return this;
+    default:
+      return vue_widget_rep::read (s,index);
+  }
+}
+
+void
+vue_chooser_widget_rep::callback (char* res) {
+  if (!res) {
+    file= "#f";
+  } else {
+    string name (res, strlen (res));
+    file = "(system->url " * scm_quote (name) * ")";
+    if (type == "image") {
+      url u= url_system (name);
+      string w, h;
+      //qt_pretty_image_size (u, w, h);
+      string params;
+      params << "\"" << w << "\" "
+      << "\"" << h << "\" "
+      << "\"" << "" << "\" "  // xps ??
+      << "\"" << "" << "\"";   // yps ??
+      file = "(list " * file * " " * params * ")";
+    }
+    cmd ();
+    if (!is_nil (quit)) quit ();
+  }
+}
+
+
+widget
+file_chooser_widget (command cmd, string type, string prompt) {
+  return abstract (tm_new<vue_chooser_widget_rep> (cmd, type, prompt));
+}
+
+// toplevel window constructor
+
+widget plain_window_widget (widget wid, string s, command quit) {
+  if (concrete (wid)->type == "chooser_widget") {
+    vue_chooser_widget_rep* cw= dynamic_cast<vue_chooser_widget_rep*> (wid.rep);
+    cw->win_title= s;
+    cw->quit= quit;
+    return wid;
+  } else {
+    SI root_w, root_h;
+    gui_root_extents (root_w, root_h);
+    SI min_w= 0, min_h= 0, def_w= root_w, def_h= root_h,
+    max_w= root_w, max_h= root_h;
+    
+    vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
+    //wwid->win=
+    plain_window (wwid, s);
+    //  plain_window (wwid, s, min_w, min_h, def_w, def_h, max_w, max_h);
+    return abstract (wwid);
+  }
+}
+  

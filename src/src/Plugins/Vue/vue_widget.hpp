@@ -22,7 +22,7 @@ class vue_window_rep;
 typedef vue_window_rep *vue_window;
 
 class vue_widget_rep : public widget_rep {
-protected:
+public:
   string type;
   unsigned int id;
   static unsigned int serial_id;
@@ -126,5 +126,37 @@ protected:
 };
 
 typedef vue_simple_widget_rep simple_widget_rep;
+
+/*!
+  A file/directory chooser dialog, using native dialogs where available.
+  See @link widget.cpp @endlink for an explanation of send(), query(),
+  read(), etc.
+ */
+class vue_chooser_widget_rep: public vue_widget_rep {
+public:
+  command cmd;           //!< Scheme closure to execute when the file is chosen
+  command quit;          //!< Execute when the dialog closes.
+  string type;           //!< File types to filter in the dialog
+  string prompt;         //!< Is this a "Save" dialog?
+  string win_title;      //!< Set by plain_window_widget()
+  
+  string directory; //!< Set this property sending SLOT_DIRECTORY to this widget
+  coord2 position;  //!< Set this property sending SLOT_POSITION to this widget
+  coord2 size;      //!< Set this property sending SLOT_SIZE to this widget
+  string file;      //!< Set this property sending SLOT_FILE to this widget
+
+public:
+  vue_chooser_widget_rep (command, string, string);
+  
+  virtual void send (slot s, blackbox val);
+  virtual blackbox query (slot s, int type_id);
+  virtual widget read (slot s, blackbox index);
+  
+  void perform_dialog (vue_window win);
+  void callback (char *res);
+  
+//  friend widget plain_window_widget (widget wid, string s, command quit);
+};
+
 #endif
 

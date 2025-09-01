@@ -41,6 +41,8 @@ public:
   : content (w), name (_name), id (serial++), orig_name (_name) {}
   virtual ~vue_window_rep () {};
   
+  virtual void *platform_window () = 0;
+  
   virtual void   destroy_event () = 0;
   virtual void   set_name (string name) = 0;
   virtual string get_name () = 0;
