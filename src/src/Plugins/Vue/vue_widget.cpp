@@ -307,7 +307,7 @@ VUE_WIDGET(color_picker_widget, command, cmd, bool, bg, array<tree>, proposals);
 // encoded by a tree. On input, we give a list of recently used proposals
 // on termination the command is called with the selected color as argument
 // the bg flag specifies whether we are picking a background color or fill
-VUE_WIDGET(inputs_list_widget, command, call_back, array<string>, prompts);
+//VUE_WIDGET(inputs_list_widget, command, call_back, array<string>, prompts);
 // a dialogue widget with Ok and Cancel buttons and a series of textual
 // input widgets with specified prompts
 VUE_WIDGET(popup_widget, widget, w);
@@ -651,7 +651,7 @@ vue_ui_rep::do_layout () {
     concrete (d.w)->do_layout ();
     return;
   }
-  if (type == "aligned_widget_old") {
+  if (type == "aligned_widget") {
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
     CLAY({ .id= CLAY_IDI("aligned_widget", id),
            .layout= {
@@ -676,7 +676,7 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  if (type == "aligned_widget") {
+  if (type == "aligned_widget_grid") {
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
     CLAY({ .id= CLAY_IDI("aligned_widget", id),
            .layout= {
@@ -904,9 +904,15 @@ vue_ui_rep::do_layout () {
   }
   if (type == "enum_widget") {
     //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
+    //FIXME: implement
     vue_enum_widget d= open_box<vue_enum_widget> (data);
     CLAY({ .layout= layoutExpand }){
       CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
+      if (Clay_Hovered () && (mouse_action == "press-left")) {
+        mouse_action= "";
+        //FIXME: implement
+        cout << "Clicked enum_widget!" << LF;
+      }
     }
     return;
   }
@@ -2685,10 +2691,9 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
   switch (s) {
   case SLOT_VISIBILITY:
     {
-      check_type<bool> (val, s);
-      bool flag = open_box<bool> (val);
+      bool flag = check_open<bool> (val, s);
       (void) flag;
-      FAILED("vue_inputs_list_widget::SLOT_VISIBILITY not implemented")
+      cout << "vue_inputs_list_widget::SLOT_VISIBILITY not implemented" << LF;
     }
     break;
   case SLOT_SIZE:
@@ -2698,8 +2703,7 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
     position = check_open<coord2> (val, s);
     break;
   case SLOT_KEYBOARD_FOCUS:
-    check_type<bool> (val, s);
-    perform_dialog ();
+    if (check_open<bool> (val, s)) perform_dialog ();
     break;
   default:
     vue_widget_rep::send (s, val);
@@ -2750,9 +2754,32 @@ vue_inputs_list_widget_rep::read (slot s, blackbox val) {
 
 void
 vue_inputs_list_widget_rep::perform_dialog () {
-  //FIXME: implement
+  //FIXME: implement correct commands
   //maybe just create the window ahead and pass focus
+  array<widget> lhs, rhs;
+  for (int i=0; i< N(fields); i++) {
+    vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[i].rep);
+    if (f) {
+      lhs << text_widget (f->prompt, 0, black);
+      rhs << input_text_widget (command (), f->input, f->proposals, 0, "1w");
+    }
+  }
+  widget w= vertical_list (array (
+    aligned_widget (lhs, rhs),
+    horizontal_list (array (
+      menu_button (text_widget ("Cancel", 0, black), command ()),
+      menu_button (text_widget ("Ok", 0, black), command ())))));
+  plain_window_widget (w, win_title, command ());
 }
+
+//VUE_WIDGET(inputs_list_widget, command, call_back, array<string>, prompts);
+
+
+widget
+inputs_list_widget (command call_back, array<string> prompts) {
+  return abstract (tm_new<vue_inputs_list_widget_rep> (call_back, prompts));
+}
+
 
 //-----------------------------------------------------------------------------
 
