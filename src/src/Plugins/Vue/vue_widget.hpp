@@ -154,8 +154,6 @@ public:
   
   void perform_dialog (vue_window win);
   void callback (char *res);
-  
-//  friend widget plain_window_widget (widget wid, string s, command quit);
 };
 
 #endif

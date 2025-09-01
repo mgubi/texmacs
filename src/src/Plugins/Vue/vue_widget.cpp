@@ -446,9 +446,17 @@ VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, 
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
+VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, bodies, int, current);
+
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
 {
+  if (type == "tabs_widget") {
+    vue_tabs_widget d= open_box<vue_tabs_widget> (data);
+    vue_tabs_widget_star dd { .tabs= d.tabs, .bodies= d.bodies, .current= 0 };
+    data= close_box (dd);
+    return;
+  }
   if (type == "text_widget") {
     vue_text_widget d= open_box<vue_text_widget> (data);
     d.s= cork_to_utf8 (d.s);
@@ -578,9 +586,23 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
     bool save= button_grow;
     button_grow= vert ? true : false;
     for (int i=0, n=N(a); i< n; i++) {
-      concrete(a[i])->do_layout();
+      concrete (a[i])->do_layout ();
     }
     button_grow= save;
+  }
+}
+
+void
+layout_list (unsigned int id, array<widget> a, bool vert) {
+  CLAY({ .id= CLAY_IDI("hv_list", id),
+      .layout = {
+        .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
+        .sizing= layoutExpand
+      }})
+  {
+    for (int i=0, n=N(a); i< n; i++) {
+      concrete (a[i])->do_layout ();
+    }
   }
 }
 
@@ -594,6 +616,69 @@ vue_ui_rep::do_layout () {
   if (type == "vertical_menu") {
     vue_vertical_menu d= open_box<vue_vertical_menu> (data);
     layout_menu (id, d.a, true);
+    return;
+  }
+  if (type == "horizontal_list") {
+    vue_horizontal_list d= open_box<vue_horizontal_list> (data);
+    layout_list (id, d.a, false);
+    return;
+  }
+  if (type == "vertical_list") {
+    vue_vertical_list d= open_box<vue_vertical_list> (data);
+    layout_list (id, d.a, true);
+    return;
+  }
+  if (type == "division_widget") {
+    vue_division_widget d= open_box<vue_division_widget> (data);
+    cout << "division_widget, ignoring " << d.name << LF;
+    concrete (d.w)->do_layout ();
+    return;
+  }
+  if (type == "aligned_widget") {
+    vue_aligned_widget d= open_box<vue_aligned_widget> (data);
+    CLAY({ .id= CLAY_IDI("aligned_widget", id),
+           .layout= {
+               .layoutDirection= CLAY_TOP_TO_BOTTOM,
+               .sizing= layoutExpand }})
+    {
+      //FIXME: size correctly
+      for (int i=0, n=N(d.lhs); i< n; i++) {
+        CLAY({ .layout= { .layoutDirection= CLAY_LEFT_TO_RIGHT }}) {
+          concrete (d.lhs[i])->do_layout ();
+          concrete (d.rhs[i])->do_layout ();
+        }
+      }
+    }
+    return;
+  }
+  if (type == "tabs_widget") {
+    vue_tabs_widget_star d= open_box<vue_tabs_widget_star> (data);
+    int next= d.current;
+    CLAY({ .id= CLAY_IDI("tabs_widget", id),
+           .layout= {
+               .layoutDirection= CLAY_TOP_TO_BOTTOM,
+               .sizing= layoutExpand }})
+    {
+      CLAY({ .layout= {
+                 .layoutDirection= CLAY_LEFT_TO_RIGHT,
+                 .sizing= layoutExpand }})
+      {
+        for (int i= 0, n= N(d.tabs); i< n; i++) {
+          CLAY({.id = CLAY_IDI_LOCAL("tab", i)}) {
+            concrete (d.tabs[i]) ->do_layout ();
+            if (Clay_Hovered () && (mouse_action == "press-left")) {
+              mouse_action= "";
+              next= i;
+            }
+          }
+        }
+      }
+      CLAY({}) {
+        concrete (d.bodies[d.current]) -> do_layout ();
+      }
+    }
+    d.current= next;
+    data= close_box(d);
     return;
   }
   if (type == "menu_button") {
