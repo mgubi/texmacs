@@ -672,6 +672,7 @@ lookup_key (SDL_Keycode key, SDL_Keymod mod) {
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
 //  string s=r;
+  if ((key >= 'A') && (key <= 'Z')) key= key - 'A' + 'a';
   string s= ((mod & SDL_KMOD_SHIFT) ? upper_key [key] : lower_key [key]);
   if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
 
@@ -809,20 +810,22 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:
     {
-      SDL_Keycode keycode= SDL_GetKeyFromScancode(event->key.scancode, event->key.mod, false);
       {
         c_string buf (print_key_info (&(event->key)));
         SDL_Log("Keydown: %s ", (char*)buf);
       }
       win= get_window_from_ID (event->key.windowID);
       if (win) {
-        if (keycode == SDLK_F1) {
+        if (event->key.scancode == SDL_SCANCODE_F1) {
           // toggle the debug mode for the current window
           win->clay_debug = !win->clay_debug;
           cout << "TOGGLE debug mode " << (win->clay_debug ? "true" : "false") << LF;
           break;
         }
-        string key= lookup_key(keycode, event->key.mod);
+        if (event->key.scancode == SDL_SCANCODE_LSHIFT) break;
+        SDL_Keymod m= event->key.mod;
+        SDL_Keycode keycode= SDL_GetKeyFromScancode (event->key.scancode, event->key.mod, false);
+        string key= lookup_key (keycode, event->key.mod);
         //cout << "Press " << key << " at " << (time_t) ev->xkey.time
         //<< " (" << texmacs_time() << ")\n";
         kbd_count++;
