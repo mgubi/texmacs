@@ -1413,7 +1413,8 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_DESTROY:
     {
       ASSERT (is_nil (val), "type mismatch");
-      cmd_list= list (quit, cmd_list);
+      if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
+      wid->send (s, val); // forward to the content
     }
       break;
     default:
@@ -2558,6 +2559,203 @@ file_chooser_widget (command cmd, string type, string prompt) {
   return abstract (tm_new<vue_chooser_widget_rep> (cmd, type, prompt));
 }
 
+
+
+
+//-----------------------------------------------------------------------------
+// vue_field_widget_rep
+
+
+
+//-----------------------------------------------------------------------------
+// vue_inputs_list_widget
+
+/*! A dialog with a list of inputs and ok and cancel buttons.
+ 
+ In the general case each input is a vue_field_widget_rep which we lay out in a
+ vertical table. However, for simple yes/no/cancel questions we try to use a
+ system default dialog
+ 
+ TODO?
+ We try to use OS dialogs whenever possible, but this still needs improvement.
+ We should also use a custom Qt widget and then bundle it in a modal window if
+ required, so as to eventually be able to return something embeddable in
+ as_qwidget(), in case we want to reuse this.
+ */
+class vue_inputs_list_widget_rep: public vue_widget_rep {
+public:
+  command cmd;
+  coord2 size, position;
+  string win_title;
+  int style;
+  array<vue_widget> fields;
+
+  vue_inputs_list_widget_rep (command, array<string>);
+
+  virtual void      send (slot s, blackbox val);
+  virtual blackbox query (slot s, int type_id);
+  virtual widget    read (slot s, blackbox index);
+  
+  void perform_dialog();
+//  vue_field_widget_rep* field (int i);
+};
+
+
+
+
+/*! Each of the fields in a vue_inputs_list_widget_rep.
+ 
+ Each field is composed of a prompt (a label) and an input (a QTMComboBox).
+ */
+
+class vue_field_widget_rep: public vue_widget_rep {
+  string           prompt;
+  string            input;
+  string             type;
+  array<string> proposals;
+  vue_inputs_list_widget_rep* parent;
+
+public:
+  vue_field_widget_rep (vue_inputs_list_widget_rep* _parent, string _prompt);
+
+  virtual void      send (slot s, blackbox val);
+  virtual blackbox query (slot s, int type_id);
+
+  friend class vue_inputs_list_widget_rep;
+};
+
+
+vue_field_widget_rep::vue_field_widget_rep (vue_inputs_list_widget_rep* _parent,
+                                          string _prompt)
+  : vue_widget_rep ("field_widget"),
+    prompt (_prompt), input (""), proposals (), parent (_parent)
+{ }
+
+void
+vue_field_widget_rep::send (slot s, blackbox val) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_field_widget_rep::send " << slot_name(s) << LF;
+  switch (s) {
+  case SLOT_STRING_INPUT:
+    input= scm_quote (check_open<string> (val, s));
+    break;
+  case SLOT_INPUT_TYPE:
+    type= check_open<string> (val, s);
+    break;
+  case SLOT_INPUT_PROPOSAL:
+    proposals << check_open<string> (val, s);
+    break;
+  case SLOT_KEYBOARD_FOCUS:
+    parent->send (s, val);
+    break;
+  default:
+    vue_widget_rep::send (s, val);
+  }
+}
+
+blackbox
+vue_field_widget_rep::query (slot s, int type_id) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_field_widget_rep::query " << slot_name(s) << LF;
+  switch (s) {
+  case SLOT_STRING_INPUT:
+    check_type_id<string> (type_id, s);
+    return close_box<string> (input);
+  default:
+    return vue_widget_rep::query (s, type_id);
+  }
+}
+
+vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
+                                                      array<string> _prompts)
+: vue_widget_rep ("inputs_list_widget"),
+  cmd (_cmd), size (coord2 (100, 100)),
+  position (coord2 (0, 0)),
+  win_title (""), style (0)
+{
+  for (int i = 0; i < N(_prompts); i++)
+    fields << concrete (tm_new<vue_field_widget_rep> ((vue_inputs_list_widget_rep*)this, _prompts[i]));
+}
+
+void
+vue_inputs_list_widget_rep::send (slot s, blackbox val) {
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "vue_inputs_list_widget_rep::send " << slot_name(s) << LF;
+
+  switch (s) {
+  case SLOT_VISIBILITY:
+    {
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);
+      (void) flag;
+      FAILED("vue_inputs_list_widget::SLOT_VISIBILITY not implemented")
+    }
+    break;
+  case SLOT_SIZE:
+    size = check_open<coord2> (val, s);
+    break;
+  case SLOT_POSITION:
+    position = check_open<coord2> (val, s);
+    break;
+  case SLOT_KEYBOARD_FOCUS:
+    check_type<bool> (val, s);
+    perform_dialog ();
+    break;
+  default:
+    vue_widget_rep::send (s, val);
+  }
+}
+
+blackbox
+vue_inputs_list_widget_rep::query (slot s, int type_id) {
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "vue_inputs_list_widget_rep::query " << slot_name(s) << LF;
+  switch (s) {
+  case SLOT_POSITION:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (position);
+    }
+  case SLOT_SIZE:
+    {
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (size);
+    }
+  case SLOT_STRING_INPUT:
+    if (N(fields) > 0) return fields[0]->query (s, type_id);
+      
+  default:
+    return vue_widget_rep::query (s, type_id);
+  }
+}
+
+widget
+vue_inputs_list_widget_rep::read (slot s, blackbox val) {
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "vue_inputs_list_widget_rep::read " << slot_name(s) << LF;
+  switch (s) {
+  case SLOT_WINDOW:
+    check_type_void (val, s);
+    return this;
+  case SLOT_FORM_FIELD:
+  {
+    int index = check_open<int> (val, s);
+    if (N(fields) > index)
+      return static_cast<widget_rep*> (fields[index].rep);
+  }
+  default:
+    return vue_widget_rep::read (s, val);
+  }
+}
+
+void
+vue_inputs_list_widget_rep::perform_dialog () {
+  //FIXME: implement
+  //maybe just create the window ahead and pass focus
+}
+
+//-----------------------------------------------------------------------------
+
 // toplevel window constructor
 
 widget plain_window_widget (widget wid, string s, command quit) {
@@ -2565,6 +2763,11 @@ widget plain_window_widget (widget wid, string s, command quit) {
     vue_chooser_widget_rep* cw= dynamic_cast<vue_chooser_widget_rep*> (wid.rep);
     cw->win_title= s;
     cw->quit= quit;
+    return wid;
+  } else if (concrete (wid)->type == "inputs_list_widget") {
+    vue_inputs_list_widget_rep* cw= dynamic_cast<vue_inputs_list_widget_rep*> (wid.rep);
+    cw->win_title= s;
+//    cw->quit= quit;  // we already have a command
     return wid;
   } else {
     SI root_w, root_h;
