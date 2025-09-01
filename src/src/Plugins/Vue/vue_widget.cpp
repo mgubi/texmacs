@@ -45,10 +45,16 @@
 // Clay
 
 #include "clay.h"
+#include "clay_grid.h"
 
 Clay_Sizing layoutExpand= {
     .width= CLAY_SIZING_GROW(0),
     .height= CLAY_SIZING_GROW(0)
+};
+
+Clay_Sizing layoutFit= {
+    .width= CLAY_SIZING_FIT(),
+    .height= CLAY_SIZING_FIT()
 };
 
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars = &(s[0]) })
@@ -606,6 +612,17 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
   }
 }
 
+class applied_command_rep: public command_rep {
+  command cmd;
+  object arg;
+public:
+  applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
+  void apply () { cmd (arg); }
+  void apply (object arg2) { cmd (arg2); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<applied_command " << cmd << " " << arg << ">"; }
+};
+
 void
 vue_ui_rep::do_layout () {
   if (type == "horizontal_menu") {
@@ -634,18 +651,53 @@ vue_ui_rep::do_layout () {
     concrete (d.w)->do_layout ();
     return;
   }
+  if (type == "aligned_widget_old") {
+    vue_aligned_widget d= open_box<vue_aligned_widget> (data);
+    CLAY({ .id= CLAY_IDI("aligned_widget", id),
+           .layout= {
+               .layoutDirection= CLAY_LEFT_TO_RIGHT,
+               .sizing= layoutFit }})
+    {
+      //FIXME: size correctly
+      CLAY({ .layout= {
+               .layoutDirection= CLAY_TOP_TO_BOTTOM,
+               .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}}) {
+        for (int i=0, n= N(d.lhs); i< n; i++) {
+          concrete (d.lhs[i])->do_layout ();
+        }
+      }
+      CLAY({ .layout= {
+               .layoutDirection= CLAY_TOP_TO_BOTTOM,
+               .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}}) {
+        for (int i=0, n= N(d.lhs); i< n; i++) {
+          concrete (d.rhs[i])->do_layout ();
+        }
+      }
+    }
+    return;
+  }
   if (type == "aligned_widget") {
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
     CLAY({ .id= CLAY_IDI("aligned_widget", id),
            .layout= {
-               .layoutDirection= CLAY_TOP_TO_BOTTOM,
-               .sizing= layoutExpand }})
+               .layoutDirection= CLAY_LEFT_TO_RIGHT,
+               .sizing= layoutFit }})
     {
       //FIXME: size correctly
-      for (int i=0, n=N(d.lhs); i< n; i++) {
-        CLAY({ .layout= { .layoutDirection= CLAY_LEFT_TO_RIGHT }}) {
-          concrete (d.lhs[i])->do_layout ();
-          concrete (d.rhs[i])->do_layout ();
+      GRID(2 /* Two columns */ ) {
+        for (int i=0, n= N(d.lhs); i< n; i++) {
+          GRID_ELEMENT() {
+            CLAY({ .layout= {
+              .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}}) {
+                concrete (d.lhs[i])->do_layout ();
+              }
+          }
+          GRID_ELEMENT() {
+            CLAY({ .layout= {
+              .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}}) {
+                concrete (d.rhs[i])->do_layout ();
+              }
+          }
         }
       }
     }
@@ -809,9 +861,13 @@ vue_ui_rep::do_layout () {
     // a menu rendered as a table of cols columns wide & made up of widgets in a
     vue_tile_menu d= open_box<vue_tile_menu> (data);
     int c=0, n= N(d.a);
-    CLAY({ .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM, .childGap= 5 }}){
+    CLAY({ .layout= {
+             .layoutDirection= CLAY_TOP_TO_BOTTOM,
+             .childGap= 5 }}){
       while (c < n) {
-        CLAY({ .layout= { .layoutDirection= CLAY_LEFT_TO_RIGHT, .childGap= 5 }}){
+        CLAY({ .layout= {
+                 .layoutDirection= CLAY_LEFT_TO_RIGHT,
+                 .childGap= 5 }}){
           for (int i=0; i< d.cols; i++) {
             if (c == n) break;
             concrete (d.a[c])-> do_layout ();
@@ -822,12 +878,45 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
+  if (type == "toggle_widget") {
+   // VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
+    vue_toggle_widget d= open_box<vue_toggle_widget> (data);
+    bool x= d.style & WIDGET_STYLE_INERT;
+    CLAY({ .layout= {
+             .sizing= { CLAY_SIZING_FIT(40),
+                        CLAY_SIZING_FIT(40) }}})
+    {
+      if (d.on) {
+        CLAY_TEXT(CLAY_STRING("[X]"), text_config_ui);
+      } else {
+        CLAY_TEXT(CLAY_STRING("[ ]"), text_config_ui);
+      }
+      if (Clay_Hovered() && (mouse_action == "press-left")) {
+        mouse_action= "";
+        cout << "Click toggle! [" << (d.on ? "X" : " ") << "]" << LF;
+        d.on= !d.on;
+        data= close_box (d);
+        command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
+        cmd_list= list (c, cmd_list);
+      }
+    }
+    return;
+  }
+  if (type == "enum_widget") {
+    //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
+    vue_enum_widget d= open_box<vue_enum_widget> (data);
+    CLAY({ .layout= layoutExpand }){
+      CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
+    }
+    return;
+  }
   cout << "Need do_layout for widget " << type << LF;
 }
 
 void
 vue_widget_rep::render (vue_render_data *data) {
-  // empty
+  // empty VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
+
 }
 
 picture
@@ -1031,17 +1120,6 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
 #else
 #define URL_CONCATER  '/'
 #endif
-
-class applied_command_rep: public command_rep {
-  command cmd;
-  object arg;
-public:
-  applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
-  void apply () { cmd (arg); }
-  void apply (object arg2) { cmd (arg2); }
-  tm_ostream& print (tm_ostream& out) {
-    return out << "<applied_command " << cmd << " " << arg << ">"; }
-};
 
 bool
 vue_input_text_widget_rep::process_key (string key) {
@@ -1335,7 +1413,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_DESTROY:
     {
       ASSERT (is_nil (val), "type mismatch");
-      if (!is_nil (wid)) wid->send(s, val);
+      cmd_list= list (quit, cmd_list);
     }
       break;
     default:
@@ -1402,7 +1480,14 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 
 void
 vue_plain_window_widget_rep::do_layout () {
-  concrete (wid)->do_layout ();
+  CLAY({ .id= CLAY_ID("plain_window_widget"),
+         .backgroundColor= color_background,
+         .layout= {
+          .layoutDirection= CLAY_TOP_TO_BOTTOM,
+          .sizing= layoutExpand }})
+  {
+     concrete (wid)->do_layout ();
+  }
 }
 
 //******************************************************************************
