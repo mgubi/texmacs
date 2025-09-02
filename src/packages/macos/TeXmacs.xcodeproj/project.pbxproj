@@ -3742,6 +3742,7 @@
 		9CD46B10147429F900A7E2FC /* guile_tm.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = guile_tm.hpp; sourceTree = "<group>"; };
 		9CD46B11147429F900A7E2FC /* guile_tm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = guile_tm.cpp; sourceTree = "<group>"; };
 		9CD4E70410B14AB300E0DD5C /* TeXmacsX11.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeXmacsX11.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9CD8C86F2E65900600CAFAD0 /* clay_grid.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = clay_grid.h; sourceTree = "<group>"; };
 		9CDA725C126CC926006E8028 /* tree_modify.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tree_modify.cpp; sourceTree = "<group>"; };
 		9CDA725D126CC926006E8028 /* tree_modify.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = tree_modify.hpp; sourceTree = "<group>"; };
 		9CDABB942E4F51B0002D3806 /* vue_widget.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = vue_widget.hpp; sourceTree = "<group>"; };
@@ -5976,6 +5977,7 @@
 			children = (
 				9CF385302E61341C00387CFB /* TODO */,
 				9C7376C32E5BDBC50036FC6F /* clay.h */,
+				9CD8C86F2E65900600CAFAD0 /* clay_grid.h */,
 				9C7376C42E5BDBC50036FC6F /* clay_renderer_SDL3.c */,
 				9C7376C12E5B03720036FC6F /* clay.c */,
 				9C7376BC2E59ED9A0036FC6F /* vue_gui.hpp */,
