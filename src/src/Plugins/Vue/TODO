@@ -4,3 +4,5 @@
 * Think to the redrawing sequence, in particular when redraw simple_widgets
 * Implement copy & paste
 * Investigate random crashes of the debug view (probably because of invalid pointers)
+* Decide how to handle caching of structures relevant to the rendering
+
