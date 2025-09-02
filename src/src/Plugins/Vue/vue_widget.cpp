@@ -511,7 +511,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
 
 void
 layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
-  Clay_ElementId button_id= CLAY_IDI("pull_button", id);
+  Clay_ElementId button_id= d.down ? CLAY_IDI("pulldown_button", id) : CLAY_IDI("pullright_button", id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
   Clay_Sizing s= layoutExpand;
   if (d.down) s= { CLAY_SIZING_FIT(.min=20) };
@@ -580,7 +580,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
 
 void
 layout_menu (unsigned int id, array<widget> a, bool vert) {
-  CLAY({ .id= CLAY_IDI("hv_menu", id),
+  CLAY({ .id= vert ? CLAY_IDI("v_menu", id) : CLAY_IDI("h_menu", id),
       .layout = {
         .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
         .sizing= layoutExpand,
@@ -598,7 +598,7 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
 
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
-  CLAY({ .id= CLAY_IDI("hv_list", id),
+  CLAY({ .id= vert ? CLAY_IDI("v_list", id) : CLAY_IDI("h_list", id),
       .layout = {
         .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
         .sizing= layoutExpand
@@ -1763,14 +1763,14 @@ void vue_texmacs_widget_rep::do_layout () {
   if (win->kbd_focus == NULL) {
     win->kbd_focus= main_widget;
   }
-  CLAY({ .id= CLAY_ID("texmacs_widget"),
+  CLAY({ .id= CLAY_IDI("texmacs_widget", id),
          .backgroundColor= color_background,
          .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= layoutExpand,
           .padding= { 0, 0, 16, 16 },
           .childGap= 16  }}) {
-      CLAY({ .id= CLAY_ID("MainMenuBar"),
+      CLAY({ .id= CLAY_ID_LOCAL("MainMenuBar"),
              .layout= {
                .padding= { 8, 8, 0, 0 },
                .sizing= {
@@ -1780,7 +1780,7 @@ void vue_texmacs_widget_rep::do_layout () {
           main_menu->do_layout ();
         }
       }
-      CLAY({ .id= CLAY_ID("MainToolbar"),
+      CLAY({ .id= CLAY_ID_LOCAL("MainToolbar"),
                  .layout= {
                    .padding= { 8, 8, 0, 0 },
                    .sizing= {
@@ -1790,7 +1790,7 @@ void vue_texmacs_widget_rep::do_layout () {
           main_icons->do_layout ();
         }
       }
-      CLAY({ .id= CLAY_ID("ModeToolbar"),
+      CLAY({ .id= CLAY_ID_LOCAL("ModeToolbar"),
                  .layout= {
                    .padding= { 8, 8, 0, 0 },
                    .sizing= {
@@ -1800,7 +1800,7 @@ void vue_texmacs_widget_rep::do_layout () {
           mode_icons->do_layout ();
         }
       }
-      CLAY({ .id= CLAY_ID("FocusToolbar"),
+      CLAY({ .id= CLAY_ID_LOCAL("FocusToolbar"),
                  .layout= {
                    .padding= { 8, 8, 0, 0 },
                    .sizing= {
@@ -1811,7 +1811,7 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
       if (!is_nil (main_widget)) main_widget->do_layout ();
-      CLAY({ .id= CLAY_ID("Footer"),
+      CLAY({ .id= CLAY_ID_LOCAL("Footer"),
              .layout= {
                .padding= { 8, 8, 0, 0 },
                .sizing= {
