@@ -27,6 +27,8 @@ public:
 
   vue_widget content;
   vue_widget kbd_focus;
+  hashset<string> refresh_kinds; // refresh cycle
+  hashset<string> next_refresh_kinds; // refresh cycle
 
   picture backing_store;
   renderer ren;

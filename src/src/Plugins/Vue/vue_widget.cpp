@@ -105,10 +105,22 @@ vue_window current_window; // used during layout to propagate information
 
 void
 gui_init_context() {
+  // popup state initialization
   current_popup= false;
   cancel_popup= false;
-  text_config_ui= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= color_text });
-  text_config_ui_grayed= CLAY_TEXT_CONFIG({ .fontSize= 26, .textColor= {150, 150, 150, 255} });
+  
+  // make refresh messages available to widgets during layout
+  current_window->refresh_kinds= current_window->next_refresh_kinds;
+  current_window->next_refresh_kinds= hashset<string>();
+  
+  // setup text style
+  //FIXME: can we do it only once?
+  text_config_ui= CLAY_TEXT_CONFIG({
+    .fontSize= 26, .textColor= color_text,
+    .wrapMode= CLAY_TEXT_WRAP_NONE });
+  text_config_ui_grayed= CLAY_TEXT_CONFIG ({
+    .fontSize= 26, .textColor= {150, 150, 150, 255},
+    .wrapMode= CLAY_TEXT_WRAP_NONE });
 }
 
 /*****************************************************************************/
@@ -450,14 +462,35 @@ VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, 
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
-VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, bodies, int, current);
+VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, icons, array<widget>, bodies, int, current);
+
+VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, current, object, curobj);
+
 
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
 {
+  if (type == "refreshable_widget") {
+    vue_refreshable_widget d= open_box<vue_refreshable_widget> (data);
+    vue_refreshable_widget_star dd { .prom= d.prom, .kind= d.kind };
+    data= close_box (dd);
+    return;
+  }
   if (type == "tabs_widget") {
     vue_tabs_widget d= open_box<vue_tabs_widget> (data);
     vue_tabs_widget_star dd { .tabs= d.tabs, .bodies= d.bodies, .current= 0 };
+    data= close_box (dd);
+    return;
+  }
+  if (type == "icon_tabs_widget") {
+    vue_icon_tabs_widget d= open_box<vue_icon_tabs_widget> (data);
+    array<widget> icons;
+    for (int i=0; i< N(d.us); i++) {
+      // FIXME: maybe don't use load_xpm
+      vue_picture_widget pd { .p= load_xpm (d.us[i]) };
+      icons << vue_create<vue_picture_widget> ("picture_widget", pd);
+    }
+    vue_tabs_widget_star dd { .icons= icons, .tabs= d.ss, .bodies= d.bs, .current= 0 };
     data= close_box (dd);
     return;
   }
@@ -518,7 +551,8 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
   CLAY({
     .id= button_id,
     .layout = {
-      .padding= CLAY_PADDING_ALL(5), .sizing= s },
+      .padding= CLAY_PADDING_ALL(5),
+      .sizing= s },
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
@@ -583,7 +617,7 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
   CLAY({ .id= vert ? CLAY_IDI("v_menu", id) : CLAY_IDI("h_menu", id),
       .layout = {
         .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
-        .sizing= layoutExpand,
+        .sizing= layoutFit,
         .childGap= 10,
       }})
   {
@@ -598,10 +632,16 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
 
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
+  Clay_Sizing s= layoutExpand;
+  if (vert) {
+    s.width= CLAY_SIZING_GROW(0);
+  } else {
+    s.height= CLAY_SIZING_GROW(0);
+  }
   CLAY({ .id= vert ? CLAY_IDI("v_list", id) : CLAY_IDI("h_list", id),
       .layout = {
         .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
-        .sizing= layoutExpand
+        .sizing= s
       }})
   {
     for (int i=0, n=N(a); i< n; i++) {
@@ -650,36 +690,47 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "aligned_widget") {
+    //VUE_WIDGET(aligned_widget, array<widget>, lhs, array<widget>, rhs,
+    //            SI, hsep, SI, vsep,
+    //            SI, lpad, SI, rpad);
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
     CLAY({ .id= CLAY_IDI("aligned_widget", id),
-           .layout= {
-               .layoutDirection= CLAY_LEFT_TO_RIGHT,
-               .sizing= layoutFit }})
+        .layout= {
+          .padding= { (uint16_t)(d.lpad / PIXEL), (uint16_t)(d.rpad / PIXEL), 0, 0 },
+          .layoutDirection= CLAY_LEFT_TO_RIGHT,
+          .childGap= (uint16_t)(d.hsep / PIXEL),
+          .sizing= CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }})
     {
       //FIXME: size correctly
       CLAY({ .layout= {
-               .layoutDirection= CLAY_TOP_TO_BOTTOM,
-               .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}}) {
-        for (int i=0, n= N(d.lhs); i< n; i++) {
-          concrete (d.lhs[i])->do_layout ();
+        .layoutDirection= CLAY_TOP_TO_BOTTOM,
+        .childGap= (uint16_t)(d.vsep / PIXEL),
+        .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}}) {
+          for (int i=0, n= N(d.lhs); i< n; i++) {
+            CLAY({ .layout= { .sizing = { .height= CLAY_SIZING_FIXED(40) }}}) {
+              concrete (d.lhs[i])->do_layout ();
+            }
+          }
         }
-      }
       CLAY({ .layout= {
-               .layoutDirection= CLAY_TOP_TO_BOTTOM,
-               .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}}) {
-        for (int i=0, n= N(d.lhs); i< n; i++) {
-          concrete (d.rhs[i])->do_layout ();
+        .layoutDirection= CLAY_TOP_TO_BOTTOM,
+        .childGap= (uint16_t)(d.vsep / PIXEL),
+        .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}}) {
+          for (int i=0, n= N(d.lhs); i< n; i++) {
+            CLAY({ .layout= { .sizing = { .height= CLAY_SIZING_FIXED(40) }}}) {
+              concrete (d.rhs[i])->do_layout ();
+            }
+          }
         }
-      }
     }
     return;
   }
   if (type == "aligned_widget_grid") {
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
     CLAY({ .id= CLAY_IDI("aligned_widget", id),
-           .layout= {
-               .layoutDirection= CLAY_LEFT_TO_RIGHT,
-               .sizing= layoutFit }})
+        .layout= {
+          .layoutDirection= CLAY_LEFT_TO_RIGHT,
+          .sizing= layoutFit }})
     {
       //FIXME: size correctly
       GRID(2 /* Two columns */ ) {
@@ -701,35 +752,62 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  if (type == "tabs_widget") {
+  if (type == "tabs_widget" || type == "icon_tabs_widget") {
     vue_tabs_widget_star d= open_box<vue_tabs_widget_star> (data);
     int next= d.current;
-    CLAY({ .id= CLAY_IDI("tabs_widget", id),
-           .layout= {
-               .layoutDirection= CLAY_TOP_TO_BOTTOM,
-               .sizing= layoutExpand }})
+    auto clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    CLAY({ .id= clay_id,
+        .layout= {
+          .layoutDirection= CLAY_TOP_TO_BOTTOM,
+          .sizing= layoutExpand }})
     {
-      CLAY({ .layout= {
-                 .layoutDirection= CLAY_LEFT_TO_RIGHT,
-                 .sizing= layoutExpand }})
+      CLAY({
+          .id= CLAY_ID_LOCAL("tabs_widget_tab_bar"),
+          .backgroundColor= {100, 100, 100, 255},
+          .cornerRadius= { 10, 10, 0, 0, },
+          .layout= {
+            .padding= { 10, 10, 10, 0 },
+            .layoutDirection= CLAY_LEFT_TO_RIGHT,
+            .childGap= 20,
+            .sizing= { .width=  CLAY_SIZING_GROW(0),
+              .height= CLAY_SIZING_FIT(0) } }})
       {
         for (int i= 0, n= N(d.tabs); i< n; i++) {
-          CLAY({.id = CLAY_IDI_LOCAL("tab", i)}) {
-            concrete (d.tabs[i]) ->do_layout ();
-            if (Clay_Hovered () && (mouse_action == "press-left")) {
-              mouse_action= "";
-              next= i;
+          CLAY({
+              .id= CLAY_IDI_LOCAL("tab", i),
+              .backgroundColor= d.current == i ? palette[3] : palette[2],
+              .cornerRadius= { 5, 5, 0, 0, },
+              .layout= { .padding= { 10, 10, 10, 10 } },
+              .border= { .width= { 1, 1, 1, 1 },
+                .color= palette[3] }
+              }) {
+              if (N(d.icons) > i) {
+                concrete (d.icons[i])->do_layout();
+              }
+              concrete (d.tabs[i])->do_layout ();
+              if (Clay_Hovered () && (mouse_action == "press-left")) {
+                mouse_action= "";
+                next= i;
+              }
             }
-          }
         }
       }
-      CLAY({}) {
-        concrete (d.bodies[d.current]) -> do_layout ();
-      }
+      CLAY({
+        .id= CLAY_ID_LOCAL("tab_area"),
+        .layout= layoutExpand,
+        .border= { .width= {1, 1, 1, 1},
+          .color= palette[3] }}){
+            concrete (d.bodies[d.current]) -> do_layout ();
+          }
     }
     d.current= next;
     data= close_box(d);
     return;
+  }
+  if (type == "icon_tabs_widget") {
+    //VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, bs);
+    // a variant of tabs_widget with named icon tabs
+    
   }
   if (type == "menu_button") {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
@@ -775,15 +853,17 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_separator, bool, vertical);
     vue_menu_separator d= open_box<vue_menu_separator> (data);
     if (d.vertical) {
-      CLAY({ .layout= { .sizing= { .height= CLAY_SIZING_GROW(0) },
-                         .padding= {5,5,5,5} },
-             .border= {  .width= { .left= 2 },
-             .color=  color_highlight } });
+      CLAY({ .id= CLAY_IDI("menu_separator (v)", id),
+          .layout= { .sizing= { .height= CLAY_SIZING_GROW(0) },
+            .padding= {5,5,5,5} },
+          .border= {  .width= { .left= 2 },
+            .color=  color_highlight } });
     } else {
-      CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) },
-                         .padding= {5,5,5,5} },
-             .border= {  .width= { .top= 2 } ,
-             .color=  color_highlight } });
+      CLAY({ .id= CLAY_IDI("menu_separator (h)", id),
+          .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) },
+            .padding= {5,5,5,5} },
+          .border= {  .width= { .top= 2 } ,
+            .color=  color_highlight } });
     }
     return;
   }
@@ -834,13 +914,16 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "glue_widget") {
-   //VUE_WIDGET(glue_widget, bool, hx, bool, vx, SI, w, SI, h);
+    //VUE_WIDGET(glue_widget, bool, hx, bool, vx, SI, w, SI, h);
     vue_glue_widget d= open_box<vue_glue_widget> (data);
     CLAY({
-      //.id= CLAY_IDI("glue_widget", id),
+      .id= CLAY_IDI("glue_widget", id),
       .layout= {
-        .sizing= { .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL) : CLAY_SIZING_FIT( .min= (float)d.w/PIXEL),
-          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL) : CLAY_SIZING_FIT( .min= (float)2*d.h/PIXEL) }}}) {};
+        .sizing= {
+          .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL)
+          : CLAY_SIZING_FIXED((float)d.w/PIXEL),
+            .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
+          : CLAY_SIZING_FIXED((float)2*d.h/PIXEL) }}}) {};
     return;
   }
   if (type == "cached_glue_widget") {
@@ -860,29 +943,29 @@ vue_ui_rep::do_layout () {
     vue_tile_menu d= open_box<vue_tile_menu> (data);
     int c=0, n= N(d.a);
     CLAY({ .layout= {
-             .layoutDirection= CLAY_TOP_TO_BOTTOM,
-             .childGap= 5 }}){
-      while (c < n) {
-        CLAY({ .layout= {
-                 .layoutDirection= CLAY_LEFT_TO_RIGHT,
-                 .childGap= 5 }}){
-          for (int i=0; i< d.cols; i++) {
-            if (c == n) break;
-            concrete (d.a[c])-> do_layout ();
-            c++;
-          }
+      .layoutDirection= CLAY_TOP_TO_BOTTOM,
+      .childGap= 5 }}){
+        while (c < n) {
+          CLAY({ .layout= {
+            .layoutDirection= CLAY_LEFT_TO_RIGHT,
+            .childGap= 5 }}){
+              for (int i=0; i< d.cols; i++) {
+                if (c == n) break;
+                concrete (d.a[c])-> do_layout ();
+                c++;
+              }
+            }
         }
       }
-    }
     return;
   }
   if (type == "toggle_widget") {
-   // VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
+    // VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
     vue_toggle_widget d= open_box<vue_toggle_widget> (data);
     bool x= d.style & WIDGET_STYLE_INERT;
     CLAY({ .layout= {
-             .sizing= { CLAY_SIZING_FIT(40),
-                        CLAY_SIZING_FIT(40) }}})
+      .sizing= { CLAY_SIZING_FIT(40),
+        CLAY_SIZING_FIT(40) }}})
     {
       if (d.on) {
         CLAY_TEXT(CLAY_STRING("[X]"), text_config_ui);
@@ -904,7 +987,7 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
     //FIXME: implement
     vue_enum_widget d= open_box<vue_enum_widget> (data);
-    CLAY({ .layout= layoutExpand }){
+    CLAY({ .layout= layoutFit }){
       CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
       if (Clay_Hovered () && (mouse_action == "press-left")) {
         mouse_action= "";
@@ -923,6 +1006,36 @@ vue_ui_rep::do_layout () {
     concrete(d.w)->do_layout ();
     return;
   }
+  if (type == "refreshable_widget") {
+    //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
+    vue_refreshable_widget_star d= open_box<vue_refreshable_widget_star> (data);
+    if (is_nil (d.current) ||
+        current_window->refresh_kinds->contains ("any") ||
+        current_window->refresh_kinds->contains (d.kind) ) {
+      // (re)initialize the widget
+      eval ("(lazy-initialize-force)");
+      object xwid= call (d.prom);
+      if (d.curobj != xwid)  {
+        // cache does not match
+        if (is_widget (xwid)) {
+          d.curobj= xwid;
+          d.current= as_widget (xwid);
+        } else {
+          d.current= glue_widget();
+        }
+      }
+    }
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= layoutExpand
+    }) {
+      if (!is_nil (d.current)) {
+        concrete (d.current)->do_layout ();
+      }
+    }
+    return;
+  }
+
   cout << "Need do_layout for widget " << type << LF;
 }
 
@@ -1349,6 +1462,7 @@ public:
   void notify (slot s, blackbox new_val);
   
   void do_layout ();
+  void post_layout ();
 }; // class vue_plain_window_widget_rep
 
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name, command _quit)
@@ -1420,7 +1534,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_REFRESH:
       {
         string kind= check_open<string> (val, s);
-        refresh_kind= kind;
+        win->next_refresh_kinds << kind;
       }
       break;
     case SLOT_DESTROY:
@@ -1498,9 +1612,22 @@ vue_plain_window_widget_rep::do_layout () {
          .backgroundColor= color_background,
          .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .sizing= layoutExpand }})
+          .sizing= layoutFit }})
   {
      concrete (wid)->do_layout ();
+  }
+}
+
+void
+vue_plain_window_widget_rep::post_layout () {
+  Clay_ElementData el= Clay_GetElementData (CLAY_ID("plain_window_widget"));
+  SI w,h;
+  win->get_size (w, h);
+  SI cw= el.boundingBox.width * PIXEL / 2,
+     ch= el.boundingBox.height * PIXEL / 2;
+  if (!win->clay_debug && ((w != cw) || (h != ch))) {
+    //cout << w << "," << h << " " << cw << "," << ch << LF;
+    win->set_size (cw, ch);
   }
 }
 
@@ -1760,6 +1887,9 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
+  // grow to the size of the window
+  SI w= 300, h= 300;
+  if (win) win->get_size (w, h);
   if (win->kbd_focus == NULL) {
     win->kbd_focus= main_widget;
   }
@@ -1767,7 +1897,9 @@ void vue_texmacs_widget_rep::do_layout () {
          .backgroundColor= color_background,
          .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .sizing= layoutExpand,
+          .sizing= {
+            .width= CLAY_SIZING_FIT ((float) 2*w/PIXEL),
+            .height= CLAY_SIZING_FIT ((float) 2*h/PIXEL)  },
           .padding= { 0, 0, 16, 16 },
           .childGap= 16  }}) {
       CLAY({ .id= CLAY_ID_LOCAL("MainMenuBar"),
@@ -2122,15 +2254,17 @@ void
 vue_simple_widget_rep::do_layout () {
   win= current_window; // save the info
   SI w= 0, h= 0;
+  Clay_Sizing s= layoutExpand;
   if (is_embedded_widget ()) {
     handle_get_size_hint (w, h);
+    s= {
+      .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
+      .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
   }
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   CLAY({
     .id= clay_id,
-    .layout= { .sizing= {
-        .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
-        .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) }},
+    .layout= { .sizing= s },
     .custom= { .customData= this } }) {
       CLAY({
         .backgroundColor = { 80, 80, 80, 80 },

@@ -357,23 +357,25 @@ vue_sdl_window_rep::set_visibility (bool flag) {
  
 void
 vue_sdl_window_rep::process_layout () {
-  
   // init the current GUI context
   Clay_SetCurrentContext (clay_ctx);
-  current_window= this;
-  gui_init_context ();
-
   int win_x, win_y, win_w, win_h;
   SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
   SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
   Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
-  
+  current_window= this;
+  gui_init_context ();
+
   // layout the top widget
   Clay_SetDebugModeEnabled (clay_debug);
   Clay_BeginLayout ();
   content->do_layout ();
   render_commands= Clay_EndLayout ();
   
+  // post layout tweaking
+  content->post_layout ();
+  
+  // reset for safety (should not be used outside layout)
   current_window= NULL;
 }
 

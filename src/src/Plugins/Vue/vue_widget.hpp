@@ -38,6 +38,7 @@ public:
   virtual void notify (slot s, blackbox new_val);
   
   virtual void do_layout () {};
+  virtual void post_layout () {};
   virtual void render (vue_render_data *data);
 };
 
