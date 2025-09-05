@@ -887,24 +887,26 @@ vue_ui_rep::do_layout () {
   if (type == "menu_button") {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
+    bool inert= (d.style & WIDGET_STYLE_INERT) != 0;
     string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
+    if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
-    Clay_Sizing s= layoutExpand;
-    if (!button_grow) s= { CLAY_SIZING_FIT(.min=20) };
+    Clay_Sizing sz= layoutExpand;
+    if (!button_grow) sz= { CLAY_SIZING_FIT(.min=20) };
     CLAY({
       .id= button_id,
-      .layout = { .padding= CLAY_PADDING_ALL(5), .sizing= s  },
-      .backgroundColor= Clay_Hovered() ?  color_highlight : color_background
+      .layout = { .padding= CLAY_PADDING_ALL(5), .sizing= sz  },
+      .backgroundColor= !inert && Clay_Hovered() ?  color_highlight : color_background
     }) {
       last_id= button_id;
       concrete(d.w)->do_layout ();
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        CLAY_TEXT(CLAY_TM_STRING(d.ks), text_config_ui);
+        CLAY_TEXT(CLAY_TM_STRING(d.ks),
+                  inert ? text_config_ui_grayed : text_config_ui);
       }
-      if (Clay_Hovered () && (mouse_state & 1)) {
+      if (!inert && Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
         cancel_popup= true;
         cout << "Click!! " << id << LF;
@@ -923,8 +925,10 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
     string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
-    CLAY_TEXT(CLAY_TM_STRING(d.s), text_config_ui);
+    if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
+    Clay_TextElementConfig *text_config= text_config_ui;
+    if (d.style & WIDGET_STYLE_INERT) text_config= text_config_ui_grayed;
+    CLAY_TEXT(CLAY_TM_STRING(d.s), text_config);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -970,7 +974,8 @@ vue_ui_rep::do_layout () {
           balloon_time= texmacs_time ();
           current_balloon= id;
         }
-        if ((current_balloon == id) && (texmacs_time () - balloon_time > 1000)) {
+        if ((current_balloon == id) &&
+            (texmacs_time () - balloon_time > 1000)) {
           CLAY({
             .backgroundColor = { 240, 240, 0, 255 },
             .layout= { .padding= { 10, 10, 10, 10 } },
@@ -1179,6 +1184,9 @@ vue_ui_rep::do_layout () {
     CLAY({
       .id= my_id,
       .layout= { .sizing= layoutExpand },
+      .border= {
+        .width= { 2, 2, 2, 2 },
+        .color= palette[3] },
       .clip= {
         .horizontal= true, .vertical= true,
         .childOffset = Clay_GetScrollOffset() }})
@@ -1273,6 +1281,29 @@ vue_ui_rep::do_layout () {
             .width=  CLAY_SIZING_GROW(0),
             .height= CLAY_SIZING_FIXED(40)}}}) {};
       concrete (d.b)->do_layout ();
+    }
+    return;
+  }
+  if (type == "choice_widget") {
+    //VUE_WIDGET(choice_widget, command, cb, array<string>, vals, array<string>, chosen, bool, flag);
+    vue_choice_widget d= open_box<vue_choice_widget> (data);
+    CLAY({
+      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .layout= {
+        .layoutDirection=  CLAY_TOP_TO_BOTTOM,
+        .sizing= layoutFit,
+        .childGap= 10 }
+    }) {
+      for (int i=0; i<N(d.vals); i++) {
+        bool active= false;
+        for (int j=0; j<N(d.chosen); j++)
+          if (d.chosen[j] == d.vals[i]) { active= true; break; }
+        Clay_Color bg= color_background;
+        if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
+        CLAY({ .backgroundColor= bg }) {
+          CLAY_TEXT(CLAY_TM_STRING(d.vals[i]), text_config_ui);
+        }
+      }
     }
     return;
   }
