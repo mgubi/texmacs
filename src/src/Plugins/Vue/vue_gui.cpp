@@ -34,31 +34,6 @@
 
 #include "clay.h"
 
-typedef struct {
-    SDL_Renderer *renderer;
-    TTF_TextEngine *textEngine;
-    TTF_Font **fonts;
-} Clay_SDL3RendererData;
-
-struct vue_render_data {
-  SDL_Renderer *sdl_ren;
-  SDL_FRect *rect;
-};
-
-extern "C"  {
-void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands);
-void
-vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
-  vue_widget w ((vue_widget_rep*)data);
-  vue_render_data args= { sdl_ren, rect };
-  w->render (&args);
-}
-}
-
-void get_viewport_size (vue_render_data *data, int& w, int& h) {
-  w= (int)data->rect->w;
-  h= (int)data->rect->h;
-}
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -85,34 +60,6 @@ extern vue_window current_window; // used during layout to propagate information
 
 void gui_init_context();
 
-//******************************************************************************
-
-void snapshot_pixmap (fz_pixmap *pix);
-
-void
-draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
-  // propagate immediately the changes to the screen
-  fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  //snapshot_pixmap (pix);
-  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
-  int w= fz_pixmap_width (mupdf_context (), pix);
-  int h= fz_pixmap_height (mupdf_context (), pix);
-  SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
-  // FIXME: premultiplied?
-  SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
-  SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_BLEND);
-  //SDL_SetRenderDrawColor (sdl_ren, 0, 255, 0,  SDL_ALPHA_OPAQUE);
-  SDL_FRect src= { 0, 0, (float)w, (float)h };
-  //SDL_RenderFillRect (sdl_ren, dest);
-  SDL_RenderTexture (sdl_ren, tex, &src, dest);
-  SDL_DestroyTexture (tex);
-  SDL_DestroySurface (surf);
-}
-
-void
-draw_picture (vue_render_data *data, picture pic) {
-  draw_picture(data->sdl_ren, pic, data->rect);
-}
 
 //******************************************************************************
 // vue_window
@@ -377,6 +324,62 @@ vue_sdl_window_rep::process_layout () {
   
   // reset for safety (should not be used outside layout)
   current_window= NULL;
+}
+
+//******************************************************************************
+// rendering via SDL
+
+typedef struct {
+    SDL_Renderer *renderer;
+    TTF_TextEngine *textEngine;
+    TTF_Font **fonts;
+} Clay_SDL3RendererData;
+
+struct vue_render_data {
+  SDL_Renderer *sdl_ren;
+  SDL_FRect *rect;
+};
+
+extern "C"  {
+void SDL_Clay_RenderClayCommands (Clay_SDL3RendererData *rendererData, Clay_RenderCommandArray *rcommands);
+void
+vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
+  vue_widget w ((vue_widget_rep*)data);
+  vue_render_data args= { sdl_ren, rect };
+  w->render (&args);
+}
+}
+
+void get_viewport_size (vue_render_data *data, int& w, int& h) {
+  w= (int)data->rect->w;
+  h= (int)data->rect->h;
+}
+
+void snapshot_pixmap (fz_pixmap *pix);
+
+void
+draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
+  // propagate immediately the changes to the screen
+  fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
+  //snapshot_pixmap (pix);
+  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
+  int w= fz_pixmap_width (mupdf_context (), pix);
+  int h= fz_pixmap_height (mupdf_context (), pix);
+  SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
+  // FIXME: premultiplied?
+  SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
+  SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_BLEND);
+  //SDL_SetRenderDrawColor (sdl_ren, 0, 255, 0,  SDL_ALPHA_OPAQUE);
+  SDL_FRect src= { 0, 0, (float)w, (float)h };
+  //SDL_RenderFillRect (sdl_ren, dest);
+  SDL_RenderTexture (sdl_ren, tex, &src, dest);
+  SDL_DestroyTexture (tex);
+  SDL_DestroySurface (surf);
+}
+
+void
+draw_picture (vue_render_data *data, picture pic) {
+  draw_picture (data->sdl_ren, pic, data->rect);
 }
 
 void
