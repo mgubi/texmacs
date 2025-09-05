@@ -196,7 +196,8 @@ freetype_incl := $(system_incl)
 gnutls_incl   := $(system_incl)
 mupdf_incl    := $(system_incl)
 sdl_incl      := $(system_incl)
-vue_incl      := $(system_incl)
+vue_incl      := $(system_incl)  \
+	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset Plugins/Gnutls)
 
 ###############################################################################
 # MOC files
