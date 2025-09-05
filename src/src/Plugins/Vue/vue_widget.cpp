@@ -204,6 +204,7 @@ public:
   vue_ui_rep (string _type, blackbox _data= NULL);
   virtual ~vue_ui_rep () {};
   
+  void send (slot s, blackbox val);
   void do_layout ();
   void render (vue_render_data *data);
 };
@@ -456,6 +457,42 @@ VUE_WIDGET(refreshable_widget, object, prom, string, kind);
 
 //******************************************************************************
 
+string debug_style (int style) {
+  string buf;
+  if (style & WIDGET_STYLE_MINI) buf << "mini ";
+  if (style & WIDGET_STYLE_MONOSPACED) buf << "mono ";
+  if (style & WIDGET_STYLE_GREY) buf << "grey ";
+  if (style & WIDGET_STYLE_PRESSED) buf << "pressed ";
+  if (style & WIDGET_STYLE_INERT) buf << "inert ";
+  if (style & WIDGET_STYLE_BUTTON) buf << "button ";
+  if (style & WIDGET_STYLE_CENTERED) buf << "centered ";
+  if (style & WIDGET_STYLE_BOLD) buf << "bold ";
+  return buf (0, N (buf)-1);
+}
+
+#define SHRINK 3
+
+SI
+decode_length (string width, vue_window win, int style) {
+  SI ex, ey;
+  if (win == NULL) gui_maximal_extents (ex, ey);
+  else win->get_size (ex, ey);
+
+  double w_len;
+  string w_unit;
+  parse_length (width, w_len, w_unit);
+  if (w_unit == "w") return (SI) (w_len * ex);
+  else if (w_unit == "h") return (SI) (w_len * ey);
+  else if (w_unit == "px") return (SI) (w_len * PIXEL);
+  // Absolute EM units (temporarily fixed to 14px)
+  else if (w_unit == "em") {
+    return (SI) (w_len * 14 * PIXEL);
+//    font fn= get_default_styled_font (style);
+//    return (SI) ((w_len * fn->wquad) / SHRINK);
+  }
+  else return ex;
+}
+
 // additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
 VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, bool, down);
@@ -543,6 +580,22 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
 };
 
 void
+vue_ui_rep::send (slot s, blackbox val) {
+  if (type == "wrapped_widget") {
+    //VUE_WIDGET(wrapped_widget, widget, w, command, quit);
+    vue_wrapped_widget d= open_box<vue_wrapped_widget> (data);
+    if (s == SLOT_DESTROY) {
+      // queue our quit command
+      cmd_list= list(d.quit, cmd_list);
+    }
+    d.w->send (s, val);
+    return;
+  } else {
+    vue_widget_rep::send (s, val);
+  }
+}
+
+void
 layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
   Clay_ElementId button_id= d.down ? CLAY_IDI("pulldown_button", id) : CLAY_IDI("pullright_button", id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
@@ -619,7 +672,7 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
     .id= vert ? CLAY_IDI("v_menu", id) : CLAY_IDI("h_menu", id),
     .layout = {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
-      .sizing= layoutFit,
+      .sizing= layoutExpand,
       .childGap= 10 }})
   {
     bool save= button_grow;
@@ -633,7 +686,7 @@ layout_menu (unsigned int id, array<widget> a, bool vert) {
 
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
-  Clay_Sizing s= layoutExpand;
+  Clay_Sizing s= layoutFit;
   if (vert) {
     s.width=  CLAY_SIZING_GROW(0);
   } else {
@@ -661,6 +714,16 @@ public:
   tm_ostream& print (tm_ostream& out) {
     return out << "<applied_command " << cmd << " " << arg << ">"; }
 };
+
+
+typedef struct
+{
+    Clay_Vector2 clickOrigin;
+    Clay_Vector2 positionOrigin;
+    bool mouseDown;
+} ScrollbarData;
+
+ScrollbarData scrollbarData = { {0, 0}, {0, 0}, false };
 
 void
 vue_ui_rep::do_layout () {
@@ -698,16 +761,16 @@ vue_ui_rep::do_layout () {
     CLAY({
       .id= CLAY_IDI("aligned_widget", id),
       .layout= {
-        .padding= { (uint16_t)(d.lpad / PIXEL), (uint16_t)(d.rpad / PIXEL), 0, 0 },
+        .padding= { (uint16_t)(2*d.lpad / PIXEL), (uint16_t)(2*d.rpad / PIXEL), 0, 0 },
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
-        .childGap= (uint16_t)(d.hsep / PIXEL),
-        .sizing= CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }})
+        .childGap= (uint16_t)(2*d.hsep / PIXEL),
+        .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }}})
     {
       //FIXME: size correctly
       CLAY({
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .childGap= (uint16_t)(d.vsep / PIXEL),
+          .childGap= (uint16_t)(2*d.vsep / PIXEL),
           .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}})
       {
         for (int i=0, n= N(d.lhs); i< n; i++) {
@@ -721,7 +784,7 @@ vue_ui_rep::do_layout () {
       CLAY({
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .childGap= (uint16_t)(d.vsep / PIXEL),
+          .childGap= (uint16_t)(2*d.vsep / PIXEL),
           .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}})
       {
         for (int i=0, n= N(d.lhs); i< n; i++) {
@@ -810,7 +873,7 @@ vue_ui_rep::do_layout () {
       }
       CLAY({
         .id= CLAY_ID_LOCAL("tab_area"),
-        .layout= layoutExpand,
+        .layout= { .sizing= layoutExpand },
         .border= { .width= {1, 1, 1, 1},
           .color= palette[3] }})
       {
@@ -821,14 +884,11 @@ vue_ui_rep::do_layout () {
     data= close_box(d);
     return;
   }
-  if (type == "icon_tabs_widget") {
-    //VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, bs);
-    // a variant of tabs_widget with named icon tabs
-    
-  }
   if (type == "menu_button") {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
     Clay_Sizing s= layoutExpand;
     if (!button_grow) s= { CLAY_SIZING_FIT(.min=20) };
@@ -862,6 +922,8 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
     CLAY_TEXT(CLAY_TM_STRING(d.s), text_config_ui);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
@@ -893,6 +955,8 @@ vue_ui_rep::do_layout () {
   if (type == "menu_group") {
     //VUE_WIDGET(menu_group, string, name, int, style);
     vue_menu_group d= open_box<vue_menu_group> (data);
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
     CLAY_TEXT(CLAY_TM_STRING(d.name), text_config_ui_grayed);
     return;
   }
@@ -991,6 +1055,8 @@ vue_ui_rep::do_layout () {
   if (type == "toggle_widget") {
     // VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
     vue_toggle_widget d= open_box<vue_toggle_widget> (data);
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
     bool x= d.style & WIDGET_STYLE_INERT;
     CLAY({
       .layout= {
@@ -1017,7 +1083,14 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
     //FIXME: implement
     vue_enum_widget d= open_box<vue_enum_widget> (data);
-    CLAY({ .layout= layoutFit }){
+    SI w= decode_length (d.w, current_window, d.st);
+    CLAY({
+      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .layout= {
+        .sizing= {
+          CLAY_SIZING_FIXED ((float) 2*w/PIXEL),
+          CLAY_SIZING_FIT (0) }}})
+    {
       CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
       if (Clay_Hovered () && (mouse_action == "press-left")) {
         mouse_action= "";
@@ -1033,7 +1106,32 @@ vue_ui_rep::do_layout () {
     //string, hpos, string, vpos);
     //FIXME: implement
     vue_resize_widget d= open_box<vue_resize_widget> (data);
-    concrete(d.w)->do_layout ();
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
+    SI minw, minh, defw, defh, maxw, maxh;
+    minw= decode_length (d.w1, current_window, d.style);
+    minh= decode_length (d.h1, current_window, d.style);
+    defw= decode_length (d.w2, current_window, d.style);
+    defh= decode_length (d.h2, current_window, d.style);
+    maxw= decode_length (d.w3, current_window, d.style);
+    maxh= decode_length (d.h3, current_window, d.style);
+    Clay_Sizing sizing= layoutFit;
+    if (defw == maxw && defw == minw) {
+      sizing.width= CLAY_SIZING_FIXED((float) 2*defw/PIXEL);
+    } else {
+      sizing.width= CLAY_SIZING_FIT(.min= (float) 2*minw/PIXEL, .max=(float) 2*maxw/PIXEL );
+    }
+    if (defh == maxh && defh == minh) {
+      sizing.height= CLAY_SIZING_FIXED((float) 2*defh/PIXEL);
+    } else {
+      sizing.height= CLAY_SIZING_FIT(.min= (float) 2*minh/PIXEL, .max=(float) 2*maxh/PIXEL );
+    }
+    CLAY({
+      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .layout= { .sizing= sizing }})
+    {
+      concrete(d.w)->do_layout ();
+    }
     return;
   }
   if (type == "refreshable_widget") {
@@ -1057,7 +1155,7 @@ vue_ui_rep::do_layout () {
     }
     CLAY({
       .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
-      .layout= layoutExpand })
+      .layout= { .sizing= layoutExpand }})
     {
       if (!is_nil (d.current)) {
         concrete (d.current)->do_layout ();
@@ -1065,7 +1163,119 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-
+  if (type == "wrapped_widget") {
+    //VUE_WIDGET(wrapped_widget, widget, w, command, quit);
+    vue_wrapped_widget d= open_box<vue_wrapped_widget> (data);
+    // we just behave as our content
+    concrete (d.w)->do_layout ();
+    return;
+  }
+  if (type == "user_canvas_widget") {
+    //VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
+    vue_user_canvas_widget d= open_box<vue_user_canvas_widget> (data);
+    string st= debug_style (d.style);
+    if (N(st)>0) cout << type << " " << st << LF;
+    Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING(type), id);
+    CLAY({
+      .id= my_id,
+      .layout= { .sizing= layoutExpand },
+      .clip= {
+        .horizontal= true, .vertical= true,
+        .childOffset = Clay_GetScrollOffset() }})
+    {
+      concrete (d.wid)->do_layout ();
+    }
+    Clay_ScrollContainerData scrollData = Clay_GetScrollContainerData (my_id);
+    if (scrollData.found) {
+      Clay_ElementId sb_id= CLAY_IDI("ScrollBar", id);
+      CLAY({
+        .id= sb_id,
+        .floating = {
+          .attachTo = CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+            .offset = { .y = -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
+            .zIndex = 1,
+            .parentId = my_id.id,
+            .attachPoints = {
+              .element = CLAY_ATTACH_POINT_RIGHT_TOP,
+              .parent = CLAY_ATTACH_POINT_RIGHT_TOP }}})
+      {
+        CLAY({
+          .id = CLAY_IDI("ScrollBarButton", id),
+          .layout = {
+            .sizing = {
+               CLAY_SIZING_FIXED(12),
+               CLAY_SIZING_FIXED((scrollData.scrollContainerDimensions.height / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height) }},
+          .backgroundColor = Clay_PointerOver (sb_id)
+                ? (Clay_Color){100, 100, 140, 150}
+                : (Clay_Color){120, 120, 160, 150} ,
+          .cornerRadius = CLAY_CORNER_RADIUS(6)}) {}
+      }
+      //FIXME: mouse handling still not ok
+      if (!(mouse_state & 1)) {
+          scrollbarData.mouseDown = false;
+      }
+      if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (sb_id)) {
+          mouse_action= "";
+          scrollbarData.clickOrigin = { (float) mouse_x, (float) mouse_y };
+          scrollbarData.positionOrigin = *scrollData.scrollPosition;
+          scrollbarData.mouseDown = true;
+      } else if (scrollbarData.mouseDown) {
+          if (scrollData.contentDimensions.height > 0) {
+              Clay_Vector2 ratio = (Clay_Vector2) {
+                scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
+                scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
+              };
+              if (scrollData.config.vertical) {
+                scrollData.scrollPosition->y = scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
+              }
+              if (scrollData.config.horizontal) {
+                scrollData.scrollPosition->x = scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
+              }
+          }
+      }
+    }
+    return;
+  }
+  if (type == "hsplit_widget") {
+    //VUE_WIDGET(hsplit_widget, widget, l, widget, r);
+    vue_hsplit_widget d= open_box<vue_hsplit_widget> (data);
+    CLAY({
+      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .layout= {
+        .layoutDirection= CLAY_LEFT_TO_RIGHT }})
+    {
+      concrete (d.l)->do_layout ();
+      CLAY({
+        .id= CLAY_IDI("splitter", id),
+        .backgroundColor= palette [3],
+        .layout= {
+          .sizing= {
+            .width=  CLAY_SIZING_FIXED(40),
+            .height= CLAY_SIZING_GROW(0) }}}) {};
+      concrete (d.r)->do_layout ();
+    }
+    return;
+  }
+  if (type == "vsplit_widget") {
+    //VUE_WIDGET(hsplit_widget, widget, l, widget, r);
+    vue_vsplit_widget d= open_box<vue_vsplit_widget> (data);
+    CLAY({
+      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .layout= {
+        .layoutDirection= CLAY_TOP_TO_BOTTOM }})
+    {
+      concrete (d.t)->do_layout ();
+      CLAY({
+        .id= CLAY_IDI("splitter", id),
+        .backgroundColor= palette [3],
+        .layout= {
+          .sizing= {
+            .width=  CLAY_SIZING_GROW(0),
+            .height= CLAY_SIZING_FIXED(40)}}}) {};
+      concrete (d.b)->do_layout ();
+    }
+    return;
+  }
   cout << "Need do_layout for widget " << type << LF;
 }
 
@@ -1427,6 +1637,7 @@ vue_input_text_widget_rep::process_key (string key) {
 void
 vue_input_text_widget_rep::do_layout () {
   bool is_focused= current_window->kbd_focus == this;
+  SI w= decode_length (width, current_window, style);
   Clay_Color bg;
   if (is_focused) {
     buffer= copy (cork_to_utf8 (s (0, pos) * "<#007c>" * s(pos, N(s))));
@@ -1438,7 +1649,11 @@ vue_input_text_widget_rep::do_layout () {
   }
   CLAY({
     .backgroundColor = bg,
-    .layout= { .padding= { 8, 8, 4, 4 } }})
+    .layout= {
+      .sizing= {
+        .width=  CLAY_SIZING_FIXED((float) 2*w/PIXEL),
+        .height= CLAY_SIZING_FIT() },
+      .padding= { 8, 8, 4, 4 } }})
   {
     CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
     if ((N(key_event) > 0) && (is_focused)) {
