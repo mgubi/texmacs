@@ -17,7 +17,6 @@
 typedef quartet<SI,SI,SI,SI> coord4;
 typedef pair<SI,SI> coord2;
 
-struct vue_render_data;
 class vue_window_rep;
 typedef vue_window_rep *vue_window;
 
@@ -39,7 +38,7 @@ public:
   
   virtual void do_layout () {};
   virtual void post_layout () {};
-  virtual void render (vue_render_data *data);
+  virtual void render (void *data);
 };
 
 template<> void tm_delete<vue_widget_rep>(vue_widget_rep *);
@@ -89,7 +88,7 @@ public:
   widget read (slot s, blackbox index);
   
   void do_layout ();
-  void render (vue_render_data *data);
+  void render (void *data);
 
   // protocol for simple widgets to be used by the editor
   virtual bool is_editor_widget ();

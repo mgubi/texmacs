@@ -206,7 +206,7 @@ public:
   
   void send (slot s, blackbox val);
   void do_layout ();
-  void render (vue_render_data *data);
+  void render (void *data);
 };
 
 template<typename T> widget vue_create (string type, T args) {
@@ -1315,7 +1315,7 @@ vue_ui_rep::do_layout () {
 }
 
 void
-vue_widget_rep::render (vue_render_data *data) {
+vue_widget_rep::render (void *data) {
   // empty VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
 
 }
@@ -1349,10 +1349,10 @@ print_glue (int w, int h, tree col)
 }
 
 void
-vue_ui_rep::render (vue_render_data *render_data) {
+vue_ui_rep::render (void *render_data) {
   if (type == "picture_widget") {
     vue_picture_widget d= open_box<vue_picture_widget> (data);
-    draw_picture (render_data, d.p);
+    current_window->draw_picture (render_data, d.p);
     return;
   }
   if (type == "cached_glue_widget") {
@@ -1360,13 +1360,13 @@ vue_ui_rep::render (vue_render_data *render_data) {
     int pw= d.pic->get_width ();
     int ph= d.pic->get_height ();
     int nw= pw, nh= ph;
-    get_viewport_size (render_data, nw, nh);
+    current_window->get_viewport_size (render_data, nw, nh);
     if ((nw != pw) || (nh != ph)) {
       // the size of the widget has changed, regenerate the picture
       d.pic= print_glue (nw, nh, d.col);
       data= close_box (d);
     }
-    draw_picture (render_data, d.pic);
+    current_window->draw_picture (render_data, d.pic);
     return;
   }
   cout << "WARNING: empty rendering of widget of type " << type << LF;
@@ -1499,7 +1499,7 @@ public:
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
   void do_layout ();
-//  void render (vue_render_data *data);
+//  void render (void *data);
   bool process_key (string);
 };
 
@@ -2847,8 +2847,8 @@ vue_simple_widget_rep::repaint_all () {
 }
 
 void
-vue_simple_widget_rep::render (vue_render_data *data) {
-  draw_picture (data, backing_store);
+vue_simple_widget_rep::render (void *data) {
+  current_window->draw_picture (data, backing_store);
 }
 
 //-----------------------------------------------------------------------------

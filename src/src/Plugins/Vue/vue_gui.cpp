@@ -93,14 +93,11 @@ public:
   
   void process_layout ();
   void process_redraw ();
+  void draw_picture (void *data, picture pic);
+  void get_viewport_size (void *data, int& w, int& h);
 };
 
 typedef vue_sdl_window_rep* vue_sdl_window;
-
-vue_window
-plain_window (vue_widget wwid, string name) {
- return tm_new<vue_sdl_window_rep> (wwid, name);
-}
 
 int vue_window_rep::serial= 1; // serial identifier for windows
 
@@ -350,18 +347,13 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 }
 
-void get_viewport_size (vue_render_data *data, int& w, int& h) {
-  w= (int)data->rect->w;
-  h= (int)data->rect->h;
-}
-
 void snapshot_pixmap (fz_pixmap *pix);
 
 void
-draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
+sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  //snapshot_pixmap (pix);
+  snapshot_pixmap (pix);
   unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
   int w= fz_pixmap_width (mupdf_context (), pix);
   int h= fz_pixmap_height (mupdf_context (), pix);
@@ -378,8 +370,15 @@ draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
 }
 
 void
-draw_picture (vue_render_data *data, picture pic) {
-  draw_picture (data->sdl_ren, pic, data->rect);
+vue_sdl_window_rep::draw_picture (void *data, picture pic) {
+  sdl_draw_picture (((vue_render_data*)data)->sdl_ren, pic,
+                    ((vue_render_data*)data)->rect);
+}
+
+void
+vue_sdl_window_rep::get_viewport_size (void *data, int& w, int& h) {
+  w= (int) ((vue_render_data*)data)->rect->w;
+  h= (int) ((vue_render_data*)data)->rect->h;
 }
 
 void
@@ -394,6 +393,199 @@ vue_sdl_window_rep::process_redraw () {
   SDL_RenderPresent(sdl_ren);
 }
 
+//******************************************************************************
+// rendering via MuPDF renderer
+
+class vue_sdl_mupdf_window_rep : public vue_sdl_window_rep {
+public:
+  renderer ren;
+  picture backing_store;
+  
+  vue_sdl_mupdf_window_rep (vue_widget w, string name)
+    : vue_sdl_window_rep (w, name) {};
+    
+  void process_redraw ();
+  void draw_picture (void *data, picture pic);
+  void get_viewport_size (void *data, int& w, int& h);
+};
+
+void render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands);
+
+void
+vue_sdl_mupdf_window_rep::process_redraw () {
+  int win_w, win_h;
+  SDL_GetWindowSize(sdl_win, &win_w, &win_h);
+  if (is_nil (backing_store) ||
+      backing_store->get_width () != win_w * retina_factor  ||
+      backing_store->get_height () != win_h * retina_factor ) {
+    backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
+    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  }
+  
+  time_t t1, t2;
+  t2= texmacs_time ();
+  render_clay_commands (ren, &render_commands);
+  t1= t2; t2= texmacs_time ();
+  if (t2 - t1 > 20) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
+  
+  SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
+  SDL_RenderClear(sdl_ren);
+  SDL_FRect src= {0, 0, (float)win_w, (float)win_h};
+  sdl_draw_picture (sdl_ren, backing_store, &src);
+  SDL_RenderPresent(sdl_ren);
+  t1= t2; t2= texmacs_time ();
+  if (t2 - t1 > 20) cout << "sdl_draw_picture took " << t2 - t1 << "ms" << LF;
+}
+
+struct vue_render_ren_data {
+  renderer ren;
+  rectangle r;
+};
+
+void
+vue_render_ren (renderer ren, vue_widget w, rectangle r) {
+  vue_render_ren_data data { .ren= ren, .r= r };
+  w->render (&data);
+}
+
+void
+vue_sdl_mupdf_window_rep::draw_picture (void *data, picture pic) {
+  vue_render_ren_data* d= (vue_render_ren_data*)data;
+  d->ren->draw_picture (pic, d->r->x1, d->r->y1);
+}
+
+void
+vue_sdl_mupdf_window_rep::get_viewport_size (void *data, int& w, int& h) {
+  vue_render_ren_data* d= (vue_render_ren_data*)data;
+  w= (d->r->x2 - d->r->x1) / d->ren->pixel;
+  h= (d->r->y2 - d->r->y1) / d->ren->pixel;
+}
+
+void
+render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
+{
+  for (int32_t i = 0; i < rcommands->length; i++) {
+      Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
+      const Clay_BoundingBox bounding_box = rcmd->boundingBox;
+      rectangle r (bounding_box.x * ren->pixel,
+                   -bounding_box.y * ren->pixel,
+                   (bounding_box.x + bounding_box.width)  * ren->pixel,
+                   -(bounding_box.y + bounding_box.height) * ren->pixel);
+
+      switch (rcmd->commandType) {
+          case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
+            Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
+//              SDL_SetRenderDrawBlendMode(rendererData->renderer, SDL_BLENDMODE_BLEND);
+            color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g, config->backgroundColor.b, config->backgroundColor.a);
+            ren->set_pencil (c);
+            if (config->cornerRadius.topLeft > 0) {
+              ren->fill (r->x1, r->y1, r->x2, r->y2);
+//              SDL_Clay_RenderFillRoundedRect(rendererData, rect, config->cornerRadius.topLeft, config->backgroundColor);
+            } else {
+              ren->fill (r->x1, r->y1, r->x2, r->y2);
+            }
+          } break;
+          case CLAY_RENDER_COMMAND_TYPE_TEXT: {
+            Clay_TextRenderData *config = &rcmd->renderData.text;
+            // config->fontSize
+            // config->fontId
+            // config->stringContents.chars
+            // config->stringContents.length
+            ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a));
+            //font fn= get_default_styled_font (style);
+            font fn= get_default_styled_font (0);
+            ren->set_shrinking_factor (3);
+            string s (config->stringContents.chars, config->stringContents.length);
+            fn ->var_draw (ren, s, r->x1, r->y1);
+            ren->set_shrinking_factor (1);
+          } break;
+          case CLAY_RENDER_COMMAND_TYPE_BORDER: {
+              Clay_BorderRenderData *config = &rcmd->renderData.border;
+
+              const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
+              const Clay_CornerRadius clampedRadii = {
+                  .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
+                  .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
+                  .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
+                  .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
+              };
+              //edges
+              ren->set_pencil (rgb_color (config->color.r, config->color.g, config->color.b, config->color.a));
+
+              if (config->width.left > 0) {
+                ren->fill (r->x1 - ren->pixel,
+                           r->y1 - clampedRadii.topLeft,
+                           r->x1 + config->width.left * ren->pixel,
+                           r->y2 + clampedRadii.bottomLeft );
+              }
+              if (config->width.right > 0) {
+                ren->fill (r->x2 + ren->pixel - config->width.right * ren->pixel,
+                           r->y1 - clampedRadii.topRight,
+                           r->x2 + ren->pixel,
+                           r->y2 + clampedRadii.bottomRight );
+              }
+              if (config->width.top > 0) {
+                ren->fill (r->x1 + clampedRadii.topLeft,
+                           r->y1 - ren->pixel,
+                           r->x2 - clampedRadii.topRight,
+                           r->y1 + config->width.top * ren->pixel);
+              }
+              if (config->width.bottom > 0) {
+                ren->fill (r->x2 + clampedRadii.bottomLeft,
+                           r->y2 - ren->pixel,
+                           r->x2 - clampedRadii.bottomRight,
+                           r->y2 + config->width.bottom * ren->pixel);
+              }
+              //corners
+              if (config->cornerRadius.topLeft > 0) {
+                ren->fill_arc (r->x1, r->y1, r->x1 + clampedRadii.topLeft, r->y1 - clampedRadii.topLeft, 90, 180);
+              }
+              if (config->cornerRadius.topRight > 0) {
+                ren->fill_arc (r->x2, r->y1, r->x2 - clampedRadii.topRight, r->y1 - clampedRadii.topRight, 0, 90);
+              }
+              if (config->cornerRadius.bottomLeft > 0) {
+                ren->fill_arc (r->x1, r->y2, r->x1 + clampedRadii.bottomLeft, r->y2 - clampedRadii.bottomLeft, 180, 270);
+              }
+              if (config->cornerRadius.bottomRight > 0) {
+                ren->fill_arc (r->x2, r->y2, r->x2 - clampedRadii.bottomRight, r->y2 - clampedRadii.bottomRight, 270, 360);
+              }
+
+          } break;
+          case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+            Clay_BoundingBox boundingBox = rcmd->boundingBox;
+            ren->clip (rcmd->boundingBox.x * ren->pixel,
+                       -rcmd->boundingBox.y * ren->pixel,
+                       (rcmd->boundingBox.x + rcmd->boundingBox.width)  * ren->pixel,
+                       -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel);
+              break;
+          }
+          case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
+            ren->unclip ();
+            break;
+          }
+          case CLAY_RENDER_COMMAND_TYPE_IMAGE: {
+            cout << "CLAY_RENDER_COMMAND_TYPE_IMAGE unsupported" << LF;
+              //SDL_Texture *texture = (SDL_Texture *)rcmd->renderData.image.imageData;
+              break;
+          }
+          case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
+              vue_widget_rep *data = (vue_widget_rep *)rcmd->renderData.custom.customData;
+              vue_render_ren (ren, data, r);
+              break;
+          }
+          default:
+              SDL_Log("Unknown render command type: %d", rcmd->commandType);
+      }
+  }
+}
+
+//******************************************************************************
+// entrypoints for windows
+
+vue_window
+plain_window (vue_widget wwid, string name) {
+ return tm_new<vue_sdl_mupdf_window_rep> (wwid, name);
+}
 
 //******************************************************************************
 // vue_gui
@@ -606,7 +798,7 @@ void gui_start_loop () {
 void process_layout () {
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
-    vue_sdl_window_rep *win= (vue_sdl_window_rep*) Window_to_window [it->next()];
+    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
     win->process_layout ();
   }
 }
@@ -614,8 +806,10 @@ void process_layout () {
 void process_redraw () {
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
-    vue_sdl_window_rep *win= (vue_sdl_window_rep*) Window_to_window [it->next()];
+    vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
+    current_window= win;
     win->process_redraw ();
+    current_window= NULL;
   }
 }
 

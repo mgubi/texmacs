@@ -56,13 +56,18 @@ public:
   virtual void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) = 0;
   virtual void   set_position (SI x, SI y) = 0;
   virtual void   get_position (SI& x, SI& y) = 0;
+  
+  virtual void process_layout () = 0;
+  virtual void process_redraw () = 0;
+  virtual void draw_picture (void *data, picture pic) = 0;
+  virtual void get_viewport_size (void *data, int& w, int& h) = 0;
 };
 
 typedef vue_window_rep* vue_window;
 
 extern hashmap<int, pointer> id_to_window;
-void draw_picture (vue_render_data *data, picture pic);
-void get_viewport_size (vue_render_data *data, int& w, int& h);
+void draw_picture (void *data, picture pic);
+void get_viewport_size (void *data, int& w, int& h);
 vue_window plain_window (vue_widget wwid, string name);
 
 #endif
