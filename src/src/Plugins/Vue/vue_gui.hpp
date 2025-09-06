@@ -30,8 +30,8 @@ public:
   hashset<string> refresh_kinds; // refresh cycle
   hashset<string> next_refresh_kinds; // refresh cycle
 
-  picture backing_store;
-  renderer ren;
+  //picture backing_store;
+  //renderer ren;
   Clay_Context *clay_ctx;
   Clay_Arena clay_arena;
   Clay_RenderCommandArray render_commands;

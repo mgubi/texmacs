@@ -143,8 +143,8 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
   id= serial++;
   id_to_window (id)= this;
   
-  backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
-  ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  //backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
+  //ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   
   // update widget state
   set_identifier (abstract (content), id);
@@ -198,7 +198,7 @@ vue_sdl_window_rep::~vue_sdl_window_rep () {
   SDL_free (clay_arena.memory);
   SDL_DestroyRenderer (sdl_ren);
   SDL_DestroyWindow (sdl_win);
-  delete_renderer (ren);
+  //delete_renderer (ren);
 }
 
 void
@@ -403,7 +403,7 @@ public:
   
   vue_sdl_mupdf_window_rep (vue_widget w, string name)
     : vue_sdl_window_rep (w, name) {};
-    
+  ~vue_sdl_mupdf_window_rep () { delete_renderer (ren); }
   void process_redraw ();
   void draw_picture (void *data, picture pic);
   void get_viewport_size (void *data, int& w, int& h);
@@ -415,24 +415,28 @@ void
 vue_sdl_mupdf_window_rep::process_redraw () {
   int win_w, win_h;
   SDL_GetWindowSize(sdl_win, &win_w, &win_h);
+  win_w *= retina_factor;
+  win_h *= retina_factor;
   if (is_nil (backing_store) ||
-      backing_store->get_width () != win_w * retina_factor  ||
-      backing_store->get_height () != win_h * retina_factor ) {
-    backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
+      backing_store->get_width () != win_w  ||
+      backing_store->get_height () != win_h ) {
+    backing_store= native_picture (win_w, win_h, 0, 0);
     ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   }
   
   time_t t1, t2;
   t2= texmacs_time ();
+  ren->set_pencil (rgb_color (255,0,0));
+  ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
   render_clay_commands (ren, &render_commands);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 20) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
   
-  SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
-  SDL_RenderClear(sdl_ren);
-  SDL_FRect src= {0, 0, (float)win_w, (float)win_h};
+  //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
+  //SDL_RenderClear (sdl_ren);
+  SDL_FRect src= {0, 0, (float) win_w, (float) win_h};
   sdl_draw_picture (sdl_ren, backing_store, &src);
-  SDL_RenderPresent(sdl_ren);
+  SDL_RenderPresent (sdl_ren);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 20) cout << "sdl_draw_picture took " << t2 - t1 << "ms" << LF;
 }
@@ -468,10 +472,9 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
       const Clay_BoundingBox bounding_box = rcmd->boundingBox;
       rectangle r (bounding_box.x * ren->pixel,
-                   -bounding_box.y * ren->pixel,
+                   -(bounding_box.y + bounding_box.height) * ren->pixel,
                    (bounding_box.x + bounding_box.width)  * ren->pixel,
-                   -(bounding_box.y + bounding_box.height) * ren->pixel);
-
+                   -bounding_box.y * ren->pixel);
       switch (rcmd->commandType) {
           case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
             Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
@@ -493,10 +496,11 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
             // config->stringContents.length
             ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a));
             //font fn= get_default_styled_font (style);
-            font fn= get_default_styled_font (0);
+            font fn= get_default_styled_font (0); //FIXME: consider style
             ren->set_shrinking_factor (3);
-            string s (config->stringContents.chars, config->stringContents.length);
-            fn ->var_draw (ren, s, r->x1, r->y1);
+            string s (config->stringContents.chars,
+                      config->stringContents.length);
+            fn ->var_draw (ren, s, r->x1*3, r->y1*3- fn->y1);
             ren->set_shrinking_factor (1);
           } break;
           case CLAY_RENDER_COMMAND_TYPE_BORDER: {
@@ -554,9 +558,9 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
           case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
             Clay_BoundingBox boundingBox = rcmd->boundingBox;
             ren->clip (rcmd->boundingBox.x * ren->pixel,
-                       -rcmd->boundingBox.y * ren->pixel,
+                       -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel,
                        (rcmd->boundingBox.x + rcmd->boundingBox.width)  * ren->pixel,
-                       -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel);
+                       -rcmd->boundingBox.y * ren->pixel);
               break;
           }
           case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
