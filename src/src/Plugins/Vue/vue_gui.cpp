@@ -68,14 +68,12 @@ int nr_windows= 0;
 hashmap<SDL_Window*, pointer> Window_to_window;
 hashmap<int, pointer> id_to_window;
 
-class vue_sdl_window_rep : public vue_window_rep {
+class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
-  SDL_Renderer *sdl_ren;
-  TTF_TextEngine *text_engine;
   
-  vue_sdl_window_rep (vue_widget w, string name);
-  ~vue_sdl_window_rep ();
+  vue_sdl_base_window_rep (vue_widget w, string name);
+  ~vue_sdl_base_window_rep ();
   
   void *platform_window () { return (void*)sdl_win; }
 
@@ -92,12 +90,7 @@ public:
   void   get_position (SI& x, SI& y);
   
   void process_layout ();
-  void process_redraw ();
-  void draw_picture (void *data, picture pic);
-  void get_viewport_size (void *data, int& w, int& h);
 };
-
-typedef vue_sdl_window_rep* vue_sdl_window;
 
 int vue_window_rep::serial= 1; // serial identifier for windows
 
@@ -124,17 +117,18 @@ void HandleClayErrors (Clay_ErrorData errorData) {
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
 
-vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
+vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name)
 : vue_window_rep (_content, _name)
 {
-  cout << "create vue_sdl_window_rep " << id << LF;
+  cout << "create vue_sdl_base_window_rep " << id << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
   c_string buf (name);
   
-  if (!SDL_CreateWindowAndRenderer (buf, win_w, win_h, flags, &sdl_win, &sdl_ren)) {
-    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
+  sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
+  if (!sdl_win) {
+    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError());
   }
   
   nr_windows++;
@@ -142,9 +136,6 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
   id_to_window (id)= this;
-  
-  //backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
-  //ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   
   // update widget state
   set_identifier (abstract (content), id);
@@ -161,55 +152,29 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget _content, string _name)
   clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
   relayout= true;
   clay_debug= false;
-  
-  text_engine= TTF_CreateRendererTextEngine (sdl_ren);
-  if (!text_engine) {
-      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError());
-  }
-
-  if (!ttf_fonts) {
-    ttf_fonts= (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
-    if (!ttf_fonts) {
-      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
-      return;
-    }
-    
-    TTF_Font *font= TTF_OpenFont( //"/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf"
-          "/Users/mgubi/.TeXmacs/fonts/unpacked/LucidaGrande.0.ttf",
-        24);
-    if (!font) {
-      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
-      return;
-    }
-    ttf_fonts[0]= font;
-  }
-  Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
 }
 
-vue_sdl_window_rep::~vue_sdl_window_rep () {
-  cout << "destroy vue_sdl_window_rep " << id << LF;
+vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
+  cout << "destroy vue_sdl_base_window_rep " << id << LF;
   id_to_window->reset (id);
   id= 0;
   set_identifier (abstract (content), 0); // FIXME: is this ok?
   Window_to_window->reset (sdl_win);
   nr_windows--;
 
-  TTF_DestroyRendererTextEngine (text_engine);
   SDL_free (clay_arena.memory);
-  SDL_DestroyRenderer (sdl_ren);
   SDL_DestroyWindow (sdl_win);
-  //delete_renderer (ren);
 }
 
 void
-vue_sdl_window_rep::destroy_event () {
+vue_sdl_base_window_rep::destroy_event () {
   notify_window_destroy (orig_name);
   send_destroy (abstract (content));
 }
 
 
 void
-vue_sdl_window_rep::get_position (SI& x, SI& y) {
+vue_sdl_base_window_rep::get_position (SI& x, SI& y) {
   int xx, yy;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
   x=  xx * PIXEL;
@@ -217,7 +182,7 @@ vue_sdl_window_rep::get_position (SI& x, SI& y) {
 }
 
 void
-vue_sdl_window_rep::get_size (SI& ww, SI& hh) {
+vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
   ww= win_w * PIXEL;
@@ -225,12 +190,12 @@ vue_sdl_window_rep::get_size (SI& ww, SI& hh) {
 }
 
 void
-vue_sdl_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
+vue_sdl_base_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
   //min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
 }
 
 void
-vue_sdl_window_rep::set_position (SI x, SI y) {
+vue_sdl_base_window_rep::set_position (SI x, SI y) {
   SI screen_w, screen_h;
   gui_root_extents (screen_w, screen_h);
   screen_w /= PIXEL; screen_h /= PIXEL;
@@ -249,14 +214,14 @@ vue_sdl_window_rep::set_position (SI x, SI y) {
 }
 
 void
-vue_sdl_window_rep::set_size (SI w, SI h) {
+vue_sdl_base_window_rep::set_size (SI w, SI h) {
   w= w/PIXEL; h= h/PIXEL;
   //h=-h; ren->decode (w, h);
   SDL_SetWindowSize (sdl_win, w, h);
 }
 
 void
-vue_sdl_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
+vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 #if 0
   if (min_w == Min_w && min_h == Min_h && max_w == Max_w && max_h == Max_h)
     return;
@@ -269,7 +234,7 @@ vue_sdl_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
 }
 
 void
-vue_sdl_window_rep::set_name (string name) {
+vue_sdl_base_window_rep::set_name (string name) {
   if (the_name != name) {
     c_string s (name);
     SDL_SetWindowTitle (sdl_win, s);
@@ -279,12 +244,12 @@ vue_sdl_window_rep::set_name (string name) {
 }
 
 string
-vue_sdl_window_rep::get_name () {
+vue_sdl_base_window_rep::get_name () {
   return the_name;
 }
 
 void
-vue_sdl_window_rep::set_modified (bool flag) {
+vue_sdl_base_window_rep::set_modified (bool flag) {
   string name= (flag? (the_name * " *"): the_name);
   if (mod_name != name) {
     c_string s (name);
@@ -294,13 +259,13 @@ vue_sdl_window_rep::set_modified (bool flag) {
 }
 
 void
-vue_sdl_window_rep::set_visibility (bool flag) {
+vue_sdl_base_window_rep::set_visibility (bool flag) {
   if (flag) SDL_ShowWindow (sdl_win);
   else SDL_HideWindow (sdl_win);
 }
  
 void
-vue_sdl_window_rep::process_layout () {
+vue_sdl_base_window_rep::process_layout () {
   // init the current GUI context
   Clay_SetCurrentContext (clay_ctx);
   int win_x, win_y, win_w, win_h;
@@ -324,7 +289,21 @@ vue_sdl_window_rep::process_layout () {
 }
 
 //******************************************************************************
-// rendering via SDL
+// rendering via SDL renderer
+
+class vue_sdl_window_rep : public vue_sdl_base_window_rep {
+public:
+  SDL_Renderer *sdl_ren;
+  TTF_TextEngine *text_engine;
+
+  vue_sdl_window_rep (vue_widget w, string name);
+  ~vue_sdl_window_rep ();
+  
+  void process_redraw ();
+  void draw_picture (void *data, picture pic);
+  void get_viewport_size (void *data, int& w, int& h);
+};
+
 
 typedef struct {
     SDL_Renderer *renderer;
@@ -381,6 +360,48 @@ vue_sdl_window_rep::get_viewport_size (void *data, int& w, int& h) {
   h= (int) ((vue_render_data*)data)->rect->h;
 }
 
+vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
+  : vue_sdl_base_window_rep (w, name)
+{
+  if (!sdl_ren) {
+    sdl_ren= SDL_CreateRenderer(sdl_win, NULL);
+    if (!sdl_ren) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create renderer: %s", SDL_GetError());
+    }
+  }
+  
+  if (!text_engine) {
+    text_engine= TTF_CreateRendererTextEngine (sdl_ren);
+    if (!text_engine) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError());
+    }
+
+    if (!ttf_fonts) {
+      ttf_fonts= (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
+      if (!ttf_fonts) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
+        return;
+      }
+      
+      TTF_Font *font= TTF_OpenFont( //"/Users/mgubi/t/clay/examples/SDL3-simple-demo/resources/Roboto-Regular.ttf"
+            "/Users/mgubi/.TeXmacs/fonts/unpacked/LucidaGrande.0.ttf",
+          24);
+      if (!font) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
+        return;
+      }
+      ttf_fonts[0]= font;
+    }
+    Clay_SetCurrentContext (clay_ctx);
+    Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
+  }
+}
+
+vue_sdl_window_rep::~vue_sdl_window_rep () {
+  TTF_DestroyRendererTextEngine (text_engine);
+  SDL_DestroyRenderer (sdl_ren);
+}
+
 void
 vue_sdl_window_rep::process_redraw () {
   // render!
@@ -396,20 +417,62 @@ vue_sdl_window_rep::process_redraw () {
 //******************************************************************************
 // rendering via MuPDF renderer
 
-class vue_sdl_mupdf_window_rep : public vue_sdl_window_rep {
+class vue_sdl_mupdf_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
   picture backing_store;
   
-  vue_sdl_mupdf_window_rep (vue_widget w, string name)
-    : vue_sdl_window_rep (w, name) {};
+  vue_sdl_mupdf_window_rep (vue_widget w, string name);
   ~vue_sdl_mupdf_window_rep () { delete_renderer (ren); }
+  
   void process_redraw ();
   void draw_picture (void *data, picture pic);
   void get_viewport_size (void *data, int& w, int& h);
 };
 
 void render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands);
+
+Clay_Dimensions
+ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *userData) {
+  vue_sdl_mupdf_window_rep *win= (vue_sdl_mupdf_window_rep*)userData;
+  if (win) {
+    string s(text.chars, text.length);
+//    font fn= (font_rep*)config->userData;
+    static font fn;
+    if (is_nil (fn)) fn= get_default_styled_font (0);
+    metric  ex;
+    fn->var_get_extents (s, ex);
+    SI w = ((ex->x2- ex->x1+ 2)/3);
+    SI h = ((fn->y2- fn->y1+ 2)/3);
+    abs_round (w, h);
+    return (Clay_Dimensions){ .width= (float)2 *w / PIXEL, .height= (float)2*h  / PIXEL };
+  }
+}
+
+vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
+  : vue_sdl_base_window_rep (w, name)
+{
+  Clay_SetCurrentContext (clay_ctx);
+  Clay_SetMeasureTextFunction (ren_measure_text, this);
+};
+
+
+void
+sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
+  // propagate immediately the changes to the screen
+  fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
+  snapshot_pixmap (pix);
+  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
+  int w= fz_pixmap_width (mupdf_context (), pix);
+  int h= fz_pixmap_height (mupdf_context (), pix);
+  SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
+  // FIXME: premultiplied?
+  SDL_FRect src= { 0, 0, (float)w, (float)h };
+  //SDL_RenderFillRect (sdl_ren, dest);
+  SDL_BlitSurface (surf, 0, dest_surf, 0);
+  SDL_DestroySurface (surf);
+}
+
 
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
@@ -435,10 +498,13 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
   SDL_FRect src= {0, 0, (float) win_w, (float) win_h};
-  sdl_draw_picture (sdl_ren, backing_store, &src);
-  SDL_RenderPresent (sdl_ren);
+  sdl_draw_picture (SDL_GetWindowSurface (sdl_win), backing_store, &src);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 20) cout << "sdl_draw_picture took " << t2 - t1 << "ms" << LF;
+  SDL_UpdateWindowSurface (sdl_win);
+  t1= t2; t2= texmacs_time ();
+  if (t2 - t1 > 20) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
+
 }
 
 struct vue_render_ren_data {
@@ -817,11 +883,11 @@ void process_redraw () {
   }
 }
 
-static vue_sdl_window
+static vue_window
 get_window_from_ID (Uint32 ID) {
   SDL_Window *w= SDL_GetWindowFromID (ID);
   if (w == NULL) return NULL;
-  vue_sdl_window win= (vue_sdl_window) Window_to_window [w];
+  vue_window win= (vue_window) Window_to_window [w];
   return win;
 }
 
@@ -937,7 +1003,7 @@ process_event (SDL_Event *event) {
   // reset events
   mouse_action="";
   key_event="";
-  vue_sdl_window win;
+  vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
     case SDL_EVENT_WINDOW_RESIZED:
@@ -958,8 +1024,6 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->button.windowID);
       if (win) {
-        SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
-
         string action;
         if (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
           action= "press-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
@@ -968,10 +1032,10 @@ process_event (SDL_Event *event) {
         }
         mouse_action= action;
         mouse_time= texmacs_time();
-        mouse_x= event->button.x;
-        mouse_y= event->button.y;
+        mouse_x= event->button.x * retina_factor;
+        mouse_y= event->button.y * retina_factor;
         Clay_SetCurrentContext (win->clay_ctx);
-        Clay_SetPointerState ((Clay_Vector2) { event->button.x, event->button.y },
+        Clay_SetPointerState ((Clay_Vector2) { (float) mouse_x, (float) mouse_y },
                              (event->button.button == SDL_BUTTON_LEFT) &&
                              (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN));
       }
@@ -984,14 +1048,13 @@ process_event (SDL_Event *event) {
               event->wheel.windowID, event->wheel.x, event->wheel.y);
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
-        SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
         mouse_action= "wheel";
         mouse_time= texmacs_time();
-        mouse_x= event->wheel.mouse_x;
-        mouse_y= event->wheel.mouse_y;
-        mouse_data= array<double> (event->wheel.x, event->wheel.y);
+        mouse_x= event->wheel.mouse_x * retina_factor;
+        mouse_y= event->wheel.mouse_y * retina_factor;;
+        mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
         Clay_SetCurrentContext (win->clay_ctx);
-        Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x, event->wheel.y }, 0.01f);
+        Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x * retina_factor, event->wheel.y * retina_factor }, 0.01f);
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
@@ -1000,14 +1063,13 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       if (win) {
-        SDL_ConvertEventToRenderCoordinates (win->sdl_ren, event);
         Clay_SetCurrentContext (win->clay_ctx);
-        Clay_SetPointerState ((Clay_Vector2) { event->motion.x, event->motion.y },
+        Clay_SetPointerState ((Clay_Vector2) { event->motion.x * retina_factor, event->motion.y * retina_factor },
                              event->button.button & SDL_BUTTON_LMASK);
         mouse_action= "move";
         mouse_time= texmacs_time();
-        mouse_x= event->motion.x;
-        mouse_y= event->motion.y;
+        mouse_x= event->motion.x * retina_factor;
+        mouse_y= event->motion.y * retina_factor;
       }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
