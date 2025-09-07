@@ -417,15 +417,19 @@ vue_sdl_window_rep::process_redraw () {
 //******************************************************************************
 // rendering via MuPDF renderer
 
+array<styled_string> styled_strings;
+
 class vue_sdl_mupdf_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
   picture backing_store;
-  
+
   vue_sdl_mupdf_window_rep (vue_widget w, string name);
   ~vue_sdl_mupdf_window_rep () { delete_renderer (ren); }
   
   void process_redraw ();
+  void process_layout ();
+  
   void draw_picture (void *data, picture pic);
   void get_viewport_size (void *data, int& w, int& h);
 };
@@ -456,6 +460,11 @@ vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
   Clay_SetMeasureTextFunction (ren_measure_text, this);
 };
 
+
+void
+vue_sdl_mupdf_window_rep::process_layout () {
+  vue_sdl_base_window_rep::process_layout ();
+}
 
 void
 sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
@@ -499,25 +508,31 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
   render_clay_commands (ren, &render_commands);
   t1= t2; t2= texmacs_time ();
-  if (t2 - t1 > 20) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
+  if (t2 - t1 > 30) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
   
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
   SDL_UpdateWindowSurface (sdl_win);
   t1= t2; t2= texmacs_time ();
-  if (t2 - t1 > 20) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
+  if (t2 - t1 > 30) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
 }
+
+
+typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
 
 struct vue_render_ren_data {
   renderer ren;
   rectangle r;
 };
 
+typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
+
 void
-vue_render_ren (renderer ren, vue_widget w, rectangle r) {
+vue_render_widget_fn (renderer ren, void *w, rectangle r) {
   vue_render_ren_data data { .ren= ren, .r= r };
-  w->render (&data);
+  ((vue_widget_rep*)w)->render (&data);
 }
+void *vue_render_widget= (void*)&vue_render_widget_fn;
 
 void
 vue_sdl_mupdf_window_rep::draw_picture (void *data, picture pic) {
@@ -597,15 +612,15 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
               }
               if (config->width.top > 0) {
                 ren->fill (r->x1 + clampedRadii.topLeft,
-                           r->y1 - ren->pixel,
+                           r->y2 - config->width.top * ren->pixel,
                            r->x2 - clampedRadii.topRight,
-                           r->y1 + config->width.top * ren->pixel);
+                           r->y2 + ren->pixel);
               }
               if (config->width.bottom > 0) {
                 ren->fill (r->x2 + clampedRadii.bottomLeft,
-                           r->y2 - ren->pixel,
+                           r->y1 - ren->pixel,
                            r->x2 - clampedRadii.bottomRight,
-                           r->y2 + config->width.bottom * ren->pixel);
+                           r->y1 + config->width.bottom * ren->pixel);
               }
               //corners
               if (config->cornerRadius.topLeft > 0) {
@@ -640,14 +655,45 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
               break;
           }
           case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
-              vue_widget_rep *data = (vue_widget_rep *)rcmd->renderData.custom.customData;
-              vue_render_ren (ren, data, r);
-              break;
+            render_fn fn= (render_fn)rcmd->renderData.custom.customData;
+            fn (ren, rcmd->userData, r);
+            break;
           }
           default:
               SDL_Log("Unknown render command type: %d", rcmd->commandType);
       }
   }
+}
+
+
+void
+vue_render_text_fn (renderer ren, void *w, rectangle r) {
+  styled_string ss= (styled_string_rep *)w;
+  ren->set_pencil (ss->c);
+  ren->set_shrinking_factor (3);
+  ss->fn->var_draw (ren, ss->s, r->x1*3, r->y1*3- ss->fn->y1);
+  ren->set_shrinking_factor (1);
+}
+
+void *vue_render_text= (void*)&vue_render_text_fn;
+
+void layout_text (string s, int style, color c) {
+  font fn= get_default_styled_font (style);
+  metric ex;
+  fn->var_get_extents (s, ex);
+  SI w = ((ex->x2- ex->x1+ 2)/3);
+  SI h = ((fn->y2- fn->y1+ 2)/3);
+  abs_round (w, h);
+  styled_string ss= tm_new<styled_string_rep> (s, fn, c);
+  styled_strings << ss;
+  CLAY({
+    .layout= {
+      .sizing= {
+        CLAY_SIZING_FIXED((float)2*w/PIXEL),
+        CLAY_SIZING_FIXED((float)2*h/PIXEL) }},
+    .custom= { .customData= vue_render_text },
+    .userData= ss.rep
+  }) {};
 }
 
 //******************************************************************************
@@ -867,6 +913,9 @@ void gui_start_loop () {
 }
 
 void process_layout () {
+  // reset memory pools
+  styled_strings= array<styled_string>();
+  
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
     vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];

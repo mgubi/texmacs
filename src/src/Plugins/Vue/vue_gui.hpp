@@ -12,13 +12,9 @@
 #define VUE_GUI_H
 
 #include "gui.hpp"
+#include "font.hpp"
 #include "vue_widget.hpp"
 #include "clay.h"
-
-typedef enum {
-    CUSTOM_ELEMENT_TYPE_STRING,
-    CUSTOM_ELEMENT_TYPE_WIDGET
-} CustomElementType;
 
 class vue_window_rep {
 public:
@@ -75,6 +71,30 @@ void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
 vue_window plain_window (vue_widget wwid, string name);
 
+typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
+
+struct styled_string_rep : public concrete_struct {
+  string s;
+  color c;
+  font fn;
+  styled_string_rep (string _s, font _fn, color _c)
+  : s (_s), fn (_fn), c (_c) {};
+};
+
+class styled_string {
+public:
+  ABSTRACT_NULL(styled_string);
+
+  inline bool operator == (styled_string w) { return rep == w.rep; }
+  inline bool operator != (styled_string w) { return rep != w.rep; }
+};
+ABSTRACT_NULL_CODE(styled_string);
+
+
+extern void* vue_render_widget;
+extern void* vue_render_text;
+
+void layout_text (string s, int style, color c);
 #endif
 
 

@@ -531,19 +531,6 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     data= close_box (dd);
     return;
   }
-  if (type == "text_widget") {
-    vue_text_widget d= open_box<vue_text_widget> (data);
-    d.s= cork_to_utf8 (d.s);
-    data= close_box (d);
-    return;
-  }
-  if (type == "menu_button") {
-    // we cache the conversion, to flag it we mark the type
-    vue_menu_button d= open_box<vue_menu_button> (data);
-    d.ks= cork_to_utf8 (d.ks);
-    data= close_box (d);
-    return;
-  }
   if (type == "pulldown_button") {
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
@@ -612,7 +599,8 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     if (!d.down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
        // "\xE2\x96\xB8" "\xE2\x80\xBA"
-      CLAY_TEXT(CLAY_STRING("\xE2\x96\xB8"), text_config_ui);
+      layout_text("<#25B8>", 0, black);
+//      CLAY_TEXT(CLAY_STRING("\xE2\x96\xB8"), text_config_ui);
     }
     if (Clay_PointerOver (button_id) && (mouse_action == "press-left")) {
       mouse_action= ""; // reset
@@ -642,7 +630,10 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
         .layout= {
           .padding= { 8, 8, 8, 8 },
           .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
-        .backgroundColor= color_background })
+        .backgroundColor= color_background,
+        .border= {
+          .width= { 2, 2, 2, 2 },
+          .color= { 100, 100, 100, 255 }}})
       {
         current_popup= false;
         concrete (d.cw)->do_layout ();
@@ -903,8 +894,9 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        CLAY_TEXT(CLAY_TM_STRING(d.ks),
-                  inert ? text_config_ui_grayed : text_config_ui);
+        layout_text (d.ks, d.style, black);
+//        CLAY_TEXT(CLAY_TM_STRING(d.ks),
+//                  inert ? text_config_ui_grayed : //text_config_ui);
       }
       if (!inert && Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
@@ -928,7 +920,7 @@ vue_ui_rep::do_layout () {
     if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
     Clay_TextElementConfig *text_config= text_config_ui;
     if (d.style & WIDGET_STYLE_INERT) text_config= text_config_ui_grayed;
-    CLAY_TEXT(CLAY_TM_STRING(d.s), text_config);
+    layout_text (d.s, d.style, black);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -961,7 +953,7 @@ vue_ui_rep::do_layout () {
     vue_menu_group d= open_box<vue_menu_group> (data);
     string st= debug_style (d.style);
     if (N(st)>0) cout << type << " " << st << LF;
-    CLAY_TEXT(CLAY_TM_STRING(d.name), text_config_ui_grayed);
+    layout_text (d.name, d.style, grey);
     return;
   }
   if (type == "balloon_widget") {
@@ -977,8 +969,11 @@ vue_ui_rep::do_layout () {
         if ((current_balloon == id) &&
             (texmacs_time () - balloon_time > 1000)) {
           CLAY({
-            .backgroundColor = { 240, 240, 0, 255 },
+            .backgroundColor= { 240, 240, 0, 255 },
             .layout= { .padding= { 10, 10, 10, 10 } },
+            .border= {
+              .width= { 2, 2, 2, 2 },
+              .color= { 200, 200, 0, 255 }},
             .floating= {
               .zIndex= 10,
               .offset= { 10, 10 },
@@ -1002,7 +997,8 @@ vue_ui_rep::do_layout () {
       .backgroundColor= color_background,
       .layout= {
         .sizing= { CLAY_SIZING_FIXED( (float)w), CLAY_SIZING_FIXED( (float)h) } },
-      .custom= { .customData= this } }) {}
+        .custom= { .customData=  vue_render_widget },
+      .userData= this }) {};
     return;
   }
   if (type == "glue_widget") {
@@ -1023,7 +1019,8 @@ vue_ui_rep::do_layout () {
     vue_cached_glue_widget d= open_box<vue_cached_glue_widget> (data);
     CLAY({
       //.id= CLAY_IDI("colored_glue_widget", id),
-      .custom= { .customData= this },
+      .custom= { .customData=  vue_render_widget },
+      .userData= this,
       .layout= {
         .sizing= {
           .width= d.hx  ? CLAY_SIZING_GROW( .min= (float)2*d.w/PIXEL)
@@ -1069,9 +1066,11 @@ vue_ui_rep::do_layout () {
                    CLAY_SIZING_FIT(40) }}})
     {
       if (d.on) {
-        CLAY_TEXT(CLAY_STRING("[X]"), text_config_ui);
+        layout_text ("[X]", d.style, black);
+//        CLAY_TEXT(CLAY_STRING("[X]"), text_config_ui);
       } else {
-        CLAY_TEXT(CLAY_STRING("[ ]"), text_config_ui);
+        layout_text ("[ ]", d.style, black);
+  //      CLAY_TEXT(CLAY_STRING("[ ]"), text_config_ui);
       }
       if (Clay_Hovered() && (mouse_action == "press-left")) {
         mouse_action= "";
@@ -1096,7 +1095,8 @@ vue_ui_rep::do_layout () {
           CLAY_SIZING_FIXED ((float) 2*w/PIXEL),
           CLAY_SIZING_FIT (0) }}})
     {
-      CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
+      layout_text (d.vals [d.st], 0, black);
+//      CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
       if (Clay_Hovered () && (mouse_action == "press-left")) {
         mouse_action= "";
         //FIXME: implement
@@ -1305,7 +1305,8 @@ vue_ui_rep::do_layout () {
         Clay_Color bg= color_background;
         if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
         CLAY({ .backgroundColor= bg }) {
-          CLAY_TEXT(CLAY_TM_STRING(d.vals[i]), text_config_ui);
+          layout_text (d.vals [i], 0, black);
+//          CLAY_TEXT(CLAY_TM_STRING(d.vals[i]), text_config_ui);
         }
       }
     }
@@ -1675,7 +1676,7 @@ vue_input_text_widget_rep::do_layout () {
   SI w= decode_length (width, current_window, style);
   Clay_Color bg;
   if (is_focused) {
-    buffer= copy (cork_to_utf8 (s (0, pos) * "<#007c>" * s(pos, N(s))));
+    buffer= copy ( s (0, pos) * "<#007c>" * s(pos, N(s)));
     bg=  { 228, 228, 220, 255 };
   }
   else {
@@ -1690,7 +1691,8 @@ vue_input_text_widget_rep::do_layout () {
         .height= CLAY_SIZING_FIT() },
       .padding= { 8, 8, 4, 4 } }})
   {
-    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
+    layout_text (buffer, 0, black);
+//    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
     if ((N(key_event) > 0) && (is_focused)) {
       //FIXME: handle focus correctly!!
       process_key (key_event);
@@ -1991,11 +1993,11 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       return;
       
     case SLOT_LEFT_FOOTER:
-      left_footer= cork_to_utf8 (check_open<string> (val, s));
+      left_footer= check_open<string> (val, s);
       break;
       
     case SLOT_RIGHT_FOOTER:
-      right_footer= cork_to_utf8 (check_open<string> (val, s));
+      right_footer= check_open<string> (val, s);
       break;
       
     case SLOT_SCROLLBARS_VISIBILITY:
@@ -2242,13 +2244,16 @@ void vue_texmacs_widget_rep::do_layout () {
           .width=  CLAY_SIZING_GROW(0),
           .height= CLAY_SIZING_FIXED(40) }}})
     {
-      CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
+      layout_text (left_footer, 0, black);
+//      CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
       CLAY({
         .layout= {
            .sizing= {
              .width=  CLAY_SIZING_GROW(0),
              .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
-      CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
+      //CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
+      layout_text (left_footer, 0, black);
+
     }
   }
 }
@@ -2558,21 +2563,25 @@ vue_simple_widget_rep::do_layout () {
   CLAY({
     .id= clay_id,
     .layout= { .sizing= s },
-    .custom= { .customData= this } })
+    .custom= { .customData= vue_render_widget },
+    .userData= this })
   {
-    CLAY({
-      .backgroundColor = { 80, 80, 80, 80 },
-      .layout= { .padding= { 18, 18, 18, 18 } },
-      .floating= {
-        .attachTo= CLAY_ATTACH_TO_PARENT,
-        .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
-    {
-      debug_text= "";
-      tm_ostream out= string_ostream (debug_text);
-      out << " extents:  " << extents << LF;
-      out << " viewport: " << rectangle(backing_pos.x1, backing_pos.x2);
-      CLAY_TEXT(CLAY_TM_STRING(debug_text),
-                CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = { 0, 0, 200, 255} }));
+    if (0) { // debug view
+      CLAY({
+        .backgroundColor = { 80, 80, 80, 80 },
+        .layout= { .padding= { 18, 18, 18, 18 } },
+        .floating= {
+          .attachTo= CLAY_ATTACH_TO_PARENT,
+          .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
+      {
+        debug_text= "";
+        tm_ostream out= string_ostream (debug_text);
+        out << " extents:  " << extents << LF;
+        out << " viewport: " << rectangle(backing_pos.x1, backing_pos.x2);
+        out.flush ();
+        CLAY_TEXT(CLAY_TM_STRING(debug_text),
+                  CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = { 0, 0, 200, 255} }));
+      }
     }
     if (Clay_Hovered () && (mouse_action != "")) {
       Clay_ElementData d= Clay_GetElementData (clay_id);
