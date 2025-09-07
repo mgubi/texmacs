@@ -450,7 +450,7 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
 }
 
 vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
-  : vue_sdl_base_window_rep (w, name)
+  : ren(NULL), vue_sdl_base_window_rep (w, name)
 {
   Clay_SetCurrentContext (clay_ctx);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
@@ -473,20 +473,26 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
   SDL_DestroySurface (surf);
 }
 
+picture
+native_picture_from_SDL_Surface (SDL_Surface *surf) {
+  fz_pixmap *pix= fz_new_pixmap_with_data (mupdf_context (), fz_device_bgr (mupdf_context ()),
+                                           surf->w, surf->h, NULL, 1, 4*surf->w, (unsigned char*)surf->pixels);
+  picture p= mupdf_picture (pix, 0, 0);
+  fz_drop_pixmap (mupdf_context (), pix);
+  return p;
+}
 
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
   int win_w, win_h;
-  SDL_GetWindowSize(sdl_win, &win_w, &win_h);
-  win_w *= retina_factor;
-  win_h *= retina_factor;
-  if (is_nil (backing_store) ||
-      backing_store->get_width () != win_w  ||
-      backing_store->get_height () != win_h ) {
-    backing_store= native_picture (win_w, win_h, 0, 0);
-    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
-  }
-  
+
+  SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
+  backing_store= native_picture_from_SDL_Surface (surf);
+  if (ren) delete_renderer (ren);
+  ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  win_w = surf->w;
+  win_h = surf->h;
+    
   time_t t1, t2;
   t2= texmacs_time ();
   ren->set_pencil (rgb_color (255,0,0));
@@ -497,14 +503,9 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
-  SDL_FRect src= {0, 0, (float) win_w, (float) win_h};
-  sdl_draw_picture (SDL_GetWindowSurface (sdl_win), backing_store, &src);
-  t1= t2; t2= texmacs_time ();
-  if (t2 - t1 > 20) cout << "sdl_draw_picture took " << t2 - t1 << "ms" << LF;
   SDL_UpdateWindowSurface (sdl_win);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 20) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
-
 }
 
 struct vue_render_ren_data {

@@ -15,6 +15,11 @@
 #include "vue_widget.hpp"
 #include "clay.h"
 
+typedef enum {
+    CUSTOM_ELEMENT_TYPE_STRING,
+    CUSTOM_ELEMENT_TYPE_WIDGET
+} CustomElementType;
+
 class vue_window_rep {
 public:
   static int serial;
