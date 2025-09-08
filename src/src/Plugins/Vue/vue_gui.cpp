@@ -586,56 +586,55 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         ren->set_shrinking_factor (1);
       } break;
       case CLAY_RENDER_COMMAND_TYPE_BORDER: {
-          Clay_BorderRenderData *config = &rcmd->renderData.border;
-
-          const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
-          const Clay_CornerRadius clampedRadii = {
-              .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
-              .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
-              .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
-              .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
-          };
-          //edges
-          ren->set_pencil (rgb_color (config->color.r, config->color.g, config->color.b, config->color.a));
-
-          if (config->width.left > 0) {
-            ren->fill (r->x1 - ren->pixel,
-                       r->y1 - clampedRadii.topLeft,
-                       r->x1 + config->width.left * ren->pixel,
-                       r->y2 + clampedRadii.bottomLeft );
-          }
-          if (config->width.right > 0) {
-            ren->fill (r->x2 + ren->pixel - config->width.right * ren->pixel,
-                       r->y1 - clampedRadii.topRight,
-                       r->x2 + ren->pixel,
-                       r->y2 + clampedRadii.bottomRight );
-          }
-          if (config->width.top > 0) {
-            ren->fill (r->x1 + clampedRadii.topLeft,
-                       r->y2 - config->width.top * ren->pixel,
-                       r->x2 - clampedRadii.topRight,
-                       r->y2 + ren->pixel);
-          }
-          if (config->width.bottom > 0) {
-            ren->fill (r->x1 + clampedRadii.bottomLeft,
-                       r->y1 - ren->pixel,
-                       r->x2 - clampedRadii.bottomRight,
-                       r->y1 + config->width.bottom * ren->pixel);
-          }
-          //corners
-          if (config->cornerRadius.topLeft > 0) {
-            ren->fill_arc (r->x1, r->y1, r->x1 + clampedRadii.topLeft, r->y1 - clampedRadii.topLeft, 90, 180);
-          }
-          if (config->cornerRadius.topRight > 0) {
-            ren->fill_arc (r->x2, r->y1, r->x2 - clampedRadii.topRight, r->y1 - clampedRadii.topRight, 0, 90);
-          }
-          if (config->cornerRadius.bottomLeft > 0) {
-            ren->fill_arc (r->x1, r->y2, r->x1 + clampedRadii.bottomLeft, r->y2 - clampedRadii.bottomLeft, 180, 270);
-          }
-          if (config->cornerRadius.bottomRight > 0) {
-            ren->fill_arc (r->x2, r->y2, r->x2 - clampedRadii.bottomRight, r->y2 - clampedRadii.bottomRight, 270, 360);
-          }
-
+        Clay_BorderRenderData *config = &rcmd->renderData.border;
+        color c= rgb_color (config->color.r, config->color.g, config->color.b, config->color.a);
+        pencil p= pencil (c, 2*ren->pixel+((config->width.top-1))*ren->pixel, cap_square);
+        ren->set_pencil (p);
+        const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
+        const Clay_CornerRadius clampedRadii = {
+            .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
+            .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
+            .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
+            .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
+        };
+        //edges
+        if (config->width.left > 0) {
+          ren->fill (r->x1 - ren->pixel,
+                     r->y1 + clampedRadii.topLeft - ren->pixel,
+                     r->x1 + config->width.left * ren->pixel,
+                     r->y2 - clampedRadii.bottomLeft + ren->pixel );
+        }
+        if (config->width.right > 0) {
+          ren->fill (r->x2 - config->width.right * ren->pixel,
+                     r->y1 + clampedRadii.topRight - ren->pixel,
+                     r->x2 + ren->pixel,
+                     r->y2 - clampedRadii.bottomRight + ren->pixel );
+        }
+        if (config->width.top > 0) {
+          ren->fill (r->x1 + clampedRadii.topLeft - ren->pixel,
+                     r->y2 - config->width.top * ren->pixel,
+                     r->x2 - clampedRadii.topRight + ren->pixel,
+                     r->y2 + ren->pixel);
+        }
+        if (config->width.bottom > 0) {
+          ren->fill (r->x1 + clampedRadii.bottomLeft - ren->pixel,
+                     r->y1 - ren->pixel,
+                     r->x2 - clampedRadii.bottomRight + ren->pixel,
+                     r->y1 + config->width.bottom * ren->pixel);
+        }
+        //corners
+        if (config->cornerRadius.topLeft > 0) {
+          ren->arc (r->x1, r->y2 - clampedRadii.topLeft - ren->pixel, r->x1 + clampedRadii.topLeft, r->y2, 90*64, 90*64);
+        }
+        if (config->cornerRadius.topRight > 0) {
+          ren->arc (r->x2 - clampedRadii.topRight, r->y2 - clampedRadii.topRight, r->x2, r->y2, 0, 90*64);
+        }
+        if (config->cornerRadius.bottomLeft > 0) {
+          ren->arc (r->x1, r->y1, r->x1 + clampedRadii.bottomLeft, r->y1 + clampedRadii.bottomLeft, 180*64, 90*64);
+        }
+        if (config->cornerRadius.bottomRight > 0) {
+          ren->arc (r->x2 - clampedRadii.bottomRight, r->y1, r->x2, r->y1 + clampedRadii.bottomRight, 270*64, 90*64);
+        }
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
         Clay_BoundingBox boundingBox = rcmd->boundingBox;
