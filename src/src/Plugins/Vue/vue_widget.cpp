@@ -2609,7 +2609,7 @@ vue_simple_widget_rep::do_layout () {
   }
   if (scroll_momentum.x1 != 0 || scroll_momentum.x2 != 0) {
     cout << "momentum " << scroll_momentum;
-    time_t lapse= 4*(texmacs_time () - momentum_time);
+    time_t lapse= (texmacs_time () - momentum_time);
     momentum_time = texmacs_time();
     absolute_scroll= false;
     scroll_pos= backing_pos;

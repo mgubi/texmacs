@@ -338,7 +338,7 @@ void
 sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  snapshot_pixmap (pix);
+  //snapshot_pixmap (pix);
   unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
   int w= fz_pixmap_width (mupdf_context (), pix);
   int h= fz_pixmap_height (mupdf_context (), pix);
@@ -475,7 +475,7 @@ void
 sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  snapshot_pixmap (pix);
+  //snapshot_pixmap (pix);
   unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
   int w= fz_pixmap_width (mupdf_context (), pix);
   int h= fz_pixmap_height (mupdf_context (), pix);
