@@ -57,7 +57,7 @@ Clay_Sizing layoutFit= {
     .height= CLAY_SIZING_FIT()
 };
 
-#define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars = &(s[0]) })
+#define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars= &(s[0]) })
 
 Clay_Color palette[4]= { {160, 160, 160, 255}, {192, 192, 192, 255},{224, 224, 224, 255},{240, 240, 240, 255} };
 
@@ -82,7 +82,6 @@ unsigned int mouse_x;
 unsigned int mouse_y;
 unsigned int mouse_state= 0;
 array<double> mouse_data;
-
 
 bool current_popup; // is there an active popup?
 bool cancel_popup;  // should we cancel popups?
@@ -590,7 +589,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
   if (d.down) s= { CLAY_SIZING_FIT(.min=20) };
   CLAY({
     .id= button_id,
-    .layout = {
+    .layout= {
       .padding= CLAY_PADDING_ALL(5),
       .sizing= s },
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
@@ -598,9 +597,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     concrete(d.w)->do_layout ();
     if (!d.down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
-       // "\xE2\x96\xB8" "\xE2\x80\xBA"
-      layout_text("<#25B8>", 0, black);
-//      CLAY_TEXT(CLAY_STRING("\xE2\x96\xB8"), text_config_ui);
+      layout_text("<#25B8>", 0, black); // right arrow
     }
     if (Clay_PointerOver (button_id) && (mouse_action == "press-left")) {
       mouse_action= ""; // reset
@@ -661,7 +658,7 @@ void
 layout_menu (unsigned int id, array<widget> a, bool vert) {
   CLAY({
     .id= vert ? CLAY_IDI("v_menu", id) : CLAY_IDI("h_menu", id),
-    .layout = {
+    .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= layoutExpand,
       .childGap= 10 }})
@@ -685,7 +682,7 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
   }
   CLAY({
      .id= vert ? CLAY_IDI("v_list", id) : CLAY_IDI("h_list", id),
-     .layout = {
+     .layout= {
        .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
        .sizing= s }})
   {
@@ -714,7 +711,7 @@ typedef struct
     bool mouseDown;
 } ScrollbarData;
 
-ScrollbarData scrollbarData = { {0, 0}, {0, 0}, false };
+ScrollbarData scrollbarData= { {0, 0}, {0, 0}, false };
 
 void
 vue_ui_rep::do_layout () {
@@ -762,11 +759,11 @@ vue_ui_rep::do_layout () {
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .childGap= (uint16_t)(2*d.vsep / PIXEL),
-          .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}})
+          .childAlignment= { .x= CLAY_ALIGN_X_RIGHT }}})
       {
         for (int i=0, n= N(d.lhs); i< n; i++) {
           CLAY({
-            .layout= { .sizing = { .height= CLAY_SIZING_FIXED(40) }}})
+            .layout= { .sizing= { .height= CLAY_SIZING_FIXED(40) }}})
           {
             concrete (d.lhs[i])->do_layout ();
           }
@@ -776,11 +773,11 @@ vue_ui_rep::do_layout () {
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .childGap= (uint16_t)(2*d.vsep / PIXEL),
-          .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}})
+          .childAlignment= { .x= CLAY_ALIGN_X_LEFT }}})
       {
         for (int i=0, n= N(d.lhs); i< n; i++) {
           CLAY({
-            .layout= { .sizing = { .height= CLAY_SIZING_FIXED(40) }}})
+            .layout= { .sizing= { .height= CLAY_SIZING_FIXED(40) }}})
           {
             concrete (d.rhs[i])->do_layout ();
           }
@@ -803,7 +800,7 @@ vue_ui_rep::do_layout () {
           GRID_ELEMENT() {
             CLAY({
               .layout= {
-                .childAlignment= { .x = CLAY_ALIGN_X_RIGHT }}})
+                .childAlignment= { .x= CLAY_ALIGN_X_RIGHT }}})
             {
                 concrete (d.lhs[i])->do_layout ();
             }
@@ -811,7 +808,7 @@ vue_ui_rep::do_layout () {
           GRID_ELEMENT() {
             CLAY({
               .layout= {
-                .childAlignment= { .x = CLAY_ALIGN_X_LEFT }}})
+                .childAlignment= { .x= CLAY_ALIGN_X_LEFT }}})
             {
                 concrete (d.rhs[i])->do_layout ();
             }
@@ -886,7 +883,7 @@ vue_ui_rep::do_layout () {
     if (!button_grow) sz= { CLAY_SIZING_FIT(.min=20) };
     CLAY({
       .id= button_id,
-      .layout = { .padding= CLAY_PADDING_ALL(5), .sizing= sz  },
+      .layout= { .padding= CLAY_PADDING_ALL(5), .sizing= sz  },
       .backgroundColor= !inert && Clay_Hovered() ?  color_highlight : color_background
     }) {
       last_id= button_id;
@@ -894,9 +891,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        layout_text (d.ks, d.style, black);
-//        CLAY_TEXT(CLAY_TM_STRING(d.ks),
-//                  inert ? text_config_ui_grayed : //text_config_ui);
+        layout_text (d.ks, d.style, inert ? grey : black);
       }
       if (!inert && Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
@@ -916,11 +911,7 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
-    string st= debug_style (d.style);
-    if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
-    Clay_TextElementConfig *text_config= text_config_ui;
-    if (d.style & WIDGET_STYLE_INERT) text_config= text_config_ui_grayed;
-    layout_text (d.s, d.style, black);
+    layout_text (d.s, d.style, d.style & WIDGET_STYLE_INERT ? grey : black);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -951,8 +942,6 @@ vue_ui_rep::do_layout () {
   if (type == "menu_group") {
     //VUE_WIDGET(menu_group, string, name, int, style);
     vue_menu_group d= open_box<vue_menu_group> (data);
-    string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
     layout_text (d.name, d.style, grey);
     return;
   }
@@ -1067,10 +1056,8 @@ vue_ui_rep::do_layout () {
     {
       if (d.on) {
         layout_text ("[X]", d.style, black);
-//        CLAY_TEXT(CLAY_STRING("[X]"), text_config_ui);
       } else {
         layout_text ("[ ]", d.style, black);
-  //      CLAY_TEXT(CLAY_STRING("[ ]"), text_config_ui);
       }
       if (Clay_Hovered() && (mouse_action == "press-left")) {
         mouse_action= "";
@@ -1096,7 +1083,6 @@ vue_ui_rep::do_layout () {
           CLAY_SIZING_FIT (0) }}})
     {
       layout_text (d.vals [d.st], 0, black);
-//      CLAY_TEXT(CLAY_TM_STRING(d.vals [d.st]), text_config_ui);
       if (Clay_Hovered () && (mouse_action == "press-left")) {
         mouse_action= "";
         //FIXME: implement
@@ -1201,7 +1187,7 @@ vue_ui_rep::do_layout () {
         .id= sb_id,
         .floating= {
           .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-            .offset= { .y = -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
+            .offset= { .y= -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
             .zIndex= 1,
             .parentId= my_id.id,
             .attachPoints= {
@@ -1221,29 +1207,28 @@ vue_ui_rep::do_layout () {
       }
       //FIXME: mouse handling still not ok
       if (!(mouse_state & 1)) {
-          scrollbarData.mouseDown = false;
+          scrollbarData.mouseDown= false;
       }
       if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (sb_id)) {
-          mouse_action= "";
-          scrollbarData.clickOrigin = { (float) mouse_x, (float) mouse_y };
-          scrollbarData.positionOrigin = *scrollData.scrollPosition;
-          scrollbarData.mouseDown = true;
+        mouse_action= "";
+        scrollbarData.clickOrigin= { (float) mouse_x, (float) mouse_y };
+        scrollbarData.positionOrigin= *scrollData.scrollPosition;
+        scrollbarData.mouseDown= true;
       } else if (scrollbarData.mouseDown) {
-          if (scrollData.contentDimensions.height > 0) {
-              Clay_Vector2 ratio = (Clay_Vector2) {
-                scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
-                scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
-              };
-              if (scrollData.config.vertical) {
-                scrollData.scrollPosition->y = scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
-                scrollData.scrollPosition->y = min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - canvas_layout.boundingBox.height, 0.0f))), 0.0f);
-              }
-              if (scrollData.config.horizontal) {
-                scrollData.scrollPosition->x = scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
-                scrollData.scrollPosition->x = min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - canvas_layout.boundingBox.width, 0.0f))), 0.0f);
-
-              }
+        if (scrollData.contentDimensions.height > 0) {
+          Clay_Vector2 ratio= (Clay_Vector2) {
+            scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
+            scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
+          };
+          if (scrollData.config.vertical) {
+            scrollData.scrollPosition->y= scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
+            scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - canvas_layout.boundingBox.height, 0.0f))), 0.0f);
           }
+          if (scrollData.config.horizontal) {
+            scrollData.scrollPosition->x= scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
+            scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - canvas_layout.boundingBox.width, 0.0f))), 0.0f);
+          }
+        }
       }
     }
     return;
@@ -1306,19 +1291,18 @@ vue_ui_rep::do_layout () {
         if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
         CLAY({ .backgroundColor= bg }) {
           layout_text (d.vals [i], 0, black);
-//          CLAY_TEXT(CLAY_TM_STRING(d.vals[i]), text_config_ui);
         }
       }
     }
     return;
   }
-  cout << "Need do_layout for widget " << type << LF;
+  cout << "WARNING: Need do_layout for widget " << type << LF;
 }
 
 void
 vue_widget_rep::render (void *data) {
-  // empty VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
-
+  // empty
+  cout << "WARNING: Called empty vue_widget_rep::render" << LF;
 }
 
 picture
@@ -1370,7 +1354,7 @@ vue_ui_rep::render (void *render_data) {
     current_window->draw_picture (render_data, d.pic);
     return;
   }
-  cout << "WARNING: empty rendering of widget of type " << type << LF;
+  cout << "WARNING: Empty rendering of widget of type " << type << LF;
 }
 
 /******************************************************************************
@@ -1456,7 +1440,6 @@ vue_widget_rep::notify (slot s, blackbox new_val) {
   widget_rep::notify (s, new_val);
 }
 
-
 /******************************************************************************
 * input_text_widget
 ******************************************************************************/
@@ -1540,10 +1523,10 @@ vue_input_text_widget_rep::process_key (string key) {
   /* tab-completion */
   if (continuous);
   else if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
-    int d = (key == "tab"? 1: N(tabs)-1);
+    int d=  (key == "tab"? 1: N(tabs)-1);
     tab_nr= (tab_nr + d) % N(tabs);
-    s     = s (0, tab_pos) * tabs[tab_nr];
-    pos   = N(s);
+    s=      s (0, tab_pos) * tabs[tab_nr];
+    pos=    N(s);
     return true;
   }
   else if (key == "tab" || key == "S-tab") {
@@ -1561,22 +1544,22 @@ vue_input_text_widget_rep::process_key (string key) {
     tabs= close_completions (tabs);
     if (N (tabs) == 0);
     else if (N (tabs) == 1) {
-      s   = s * tabs[0];
-      pos = N(s);
+      s=    s * tabs[0];
+      pos=  N(s);
       tabs= array<string> (0);
     }
     else {
-      tab_nr = 0;
+      tab_nr=  0;
       tab_pos= N(s);
-      s      = s * tabs[0];
-      pos    = N(s);
+      s=       s * tabs[0];
+      pos=     N(s);
       beep ();
     }
     return true;
   }
   else {
-    tabs   = array<string> (0);
-    tab_nr = 0;
+    tabs=    array<string> (0);
+    tab_nr=  0;
     tab_pos= 0;
   }
   
@@ -1621,15 +1604,15 @@ vue_input_text_widget_rep::process_key (string key) {
   else if ((key == "up") || (key == "C-p")) {
     if (N(def) > 0) {
       def_cur= (def_cur+1) % N(def);
-      s      = copy (def[def_cur]);
-      pos    = N(s);
+      s=       copy (def[def_cur]);
+      pos=     N(s);
     }
   }
   else if ((key == "down") || (key == "C-n")) {
     if (N(def) > 0) {
       def_cur= (def_cur+N(def)-1) % N(def);
-      s      = copy (def[def_cur]);
-      pos    = N(s);
+      s=       copy (def[def_cur]);
+      pos=     N(s);
     }
   }
   else if (key == "C-k") s= s (0, pos);
@@ -1684,7 +1667,7 @@ vue_input_text_widget_rep::do_layout () {
     bg= { 208, 208, 210, 255 };
   }
   CLAY({
-    .backgroundColor = bg,
+    .backgroundColor= bg,
     .layout= {
       .sizing= {
         .width=  CLAY_SIZING_FIXED((float) 2*w/PIXEL),
@@ -1692,7 +1675,6 @@ vue_input_text_widget_rep::do_layout () {
       .padding= { 8, 8, 4, 4 } }})
   {
     layout_text (buffer, 0, black);
-//    CLAY_TEXT(CLAY_TM_STRING(buffer), text_config_ui);
     if ((N(key_event) > 0) && (is_focused)) {
       //FIXME: handle focus correctly!!
       process_key (key_event);
@@ -2245,13 +2227,11 @@ void vue_texmacs_widget_rep::do_layout () {
           .height= CLAY_SIZING_FIXED(40) }}})
     {
       layout_text (left_footer, 0, black);
-//      CLAY_TEXT(CLAY_TM_STRING(left_footer), text_config_ui);
       CLAY({
         .layout= {
            .sizing= {
              .width=  CLAY_SIZING_GROW(0),
              .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
-      //CLAY_TEXT(CLAY_TM_STRING(right_footer), text_config_ui);
       layout_text (left_footer, 0, black);
 
     }
@@ -2568,7 +2548,7 @@ vue_simple_widget_rep::do_layout () {
   {
     if (0) { // debug view
       CLAY({
-        .backgroundColor = { 80, 80, 80, 80 },
+        .backgroundColor= { 80, 80, 80, 80 },
         .layout= { .padding= { 18, 18, 18, 18 } },
         .floating= {
           .attachTo= CLAY_ATTACH_TO_PARENT,
@@ -2580,7 +2560,7 @@ vue_simple_widget_rep::do_layout () {
         out << " viewport: " << rectangle(backing_pos.x1, backing_pos.x2);
         out.flush ();
         CLAY_TEXT(CLAY_TM_STRING(debug_text),
-                  CLAY_TEXT_CONFIG({ .fontSize = 30, .textColor = { 0, 0, 200, 255} }));
+                  CLAY_TEXT_CONFIG({ .fontSize= 30, .textColor= { 0, 0, 200, 255} }));
       }
     }
     if (Clay_Hovered () && (mouse_action != "")) {
@@ -2887,16 +2867,16 @@ vue_chooser_widget_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_VISIBILITY:
     {
-      bool flag = check_open<bool> (val, s);
+      bool flag= check_open<bool> (val, s);
       (void) flag;
       FAILED("vue_chooser_widget::SLOT_VISIBILITY not implemented");
     }
       break;
     case SLOT_SIZE:
-      size = check_open<coord2> (val,s );
+      size= check_open<coord2> (val,s );
       break;
     case SLOT_POSITION:
-      position = check_open<coord2> (val, s);
+      position= check_open<coord2> (val, s);
       break;
     case SLOT_KEYBOARD_FOCUS:
       {
@@ -2921,13 +2901,13 @@ vue_chooser_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_FILE:
         //send_string (THIS, "file", val);
-      file = check_open<string> (val, s);
+      file= check_open<string> (val, s);
       if (DEBUG_QT_WIDGETS)
         debug_widgets << "\tFile: " << file << LF;
       break;
     case SLOT_DIRECTORY:
-      directory = check_open<string> (val, s);
-      directory = as_string (url_pwd () * url_system (directory));
+      directory= check_open<string> (val, s);
+      directory= as_string (url_pwd () * url_system (directory));
       break;
       
     default:
@@ -2986,7 +2966,7 @@ vue_chooser_widget_rep::callback (char* res) {
     file= "#f";
   } else {
     string name (res, strlen (res));
-    file = "(system->url " * scm_quote (name) * ")";
+    file= "(system->url " * scm_quote (name) * ")";
     if (type == "image") {
       url u= url_system (name);
       string w, h;
@@ -2996,7 +2976,7 @@ vue_chooser_widget_rep::callback (char* res) {
       << "\"" << h << "\" "
       << "\"" << "" << "\" "  // xps ??
       << "\"" << "" << "\"";   // yps ??
-      file = "(list " * file * " " * params * ")";
+      file= "(list " * file * " " * params * ")";
     }
     cmd ();
     if (!is_nil (quit)) quit ();
@@ -3123,7 +3103,7 @@ vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
   position (coord2 (0, 0)),
   win_title (""), style (0)
 {
-  for (int i = 0; i < N(_prompts); i++)
+  for (int i= 0; i < N(_prompts); i++)
     fields << concrete (tm_new<vue_field_widget_rep> ((vue_inputs_list_widget_rep*)this, _prompts[i]));
 }
 
@@ -3135,16 +3115,16 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
   switch (s) {
   case SLOT_VISIBILITY:
     {
-      bool flag = check_open<bool> (val, s);
+      bool flag= check_open<bool> (val, s);
       (void) flag;
       cout << "vue_inputs_list_widget::SLOT_VISIBILITY not implemented" << LF;
     }
     break;
   case SLOT_SIZE:
-    size = check_open<coord2> (val, s);
+    size= check_open<coord2> (val, s);
     break;
   case SLOT_POSITION:
-    position = check_open<coord2> (val, s);
+    position= check_open<coord2> (val, s);
     break;
   case SLOT_KEYBOARD_FOCUS:
     if (check_open<bool> (val, s)) perform_dialog ();
@@ -3187,7 +3167,7 @@ vue_inputs_list_widget_rep::read (slot s, blackbox val) {
     return this;
   case SLOT_FORM_FIELD:
   {
-    int index = check_open<int> (val, s);
+    int index= check_open<int> (val, s);
     if (N(fields) > index)
       return static_cast<widget_rep*> (fields[index].rep);
   }

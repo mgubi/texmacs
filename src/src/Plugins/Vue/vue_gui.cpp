@@ -697,7 +697,7 @@ void layout_text (string s, int style, color c) {
 }
 
 //******************************************************************************
-// entrypoints for windows
+// entrypoints for top-level windows
 
 vue_window
 plain_window (vue_widget wwid, string name) {
