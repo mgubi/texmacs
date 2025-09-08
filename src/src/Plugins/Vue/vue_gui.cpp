@@ -617,7 +617,7 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
                            r->y2 + ren->pixel);
               }
               if (config->width.bottom > 0) {
-                ren->fill (r->x2 + clampedRadii.bottomLeft,
+                ren->fill (r->x1 + clampedRadii.bottomLeft,
                            r->y1 - ren->pixel,
                            r->x2 - clampedRadii.bottomRight,
                            r->y1 + config->width.bottom * ren->pixel);

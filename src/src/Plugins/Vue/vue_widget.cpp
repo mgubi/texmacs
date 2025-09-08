@@ -632,8 +632,8 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
           .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
         .backgroundColor= color_background,
         .border= {
-          .width= { 2, 2, 2, 2 },
-          .color= { 100, 100, 100, 255 }}})
+          .width= { 1, 1, 1, 1 },
+          .color= { 150, 150, 150, 255 }}})
       {
         current_popup= false;
         concrete (d.cw)->do_layout ();
@@ -935,7 +935,7 @@ vue_ui_rep::do_layout () {
           .padding= {5,5,5,5} },
         .border= {
           .width= { .left= 2 },
-          .color=  color_highlight } });
+          .color=  { 210, 210, 210, 255 } } });
     } else {
       CLAY({
         .id= CLAY_IDI("menu_separator (h)", id),
@@ -944,7 +944,7 @@ vue_ui_rep::do_layout () {
           .padding= {5,5,5,5} },
         .border= {
           .width= { .top= 2 } ,
-          .color=  color_highlight } });
+          .color=  { 210, 210, 210, 255 } } });
     }
     return;
   }
