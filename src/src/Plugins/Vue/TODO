@@ -1,8 +1,17 @@
+TODO
 
+* scrollbars for editors
+* more uniform handling of mouse events and keyboard focus...
+* fix dropdown menu positioning if they go off the viewport
+* fix keyboard handling (Alt+3 should give #)
+* handle focus properly for editors
+* think to the redrawing sequence, in particular when redraw simple_widgets
+* implement copy & paste
+* investigate random crashes of the debug view (probably because of invalid pointers)
+* decide how to handle caching of structures relevant to the rendering
 
-* Handle focus properly for simple_widgets
-* Think to the redrawing sequence, in particular when redraw simple_widgets
-* Implement copy & paste
-* Investigate random crashes of the debug view (probably because of invalid pointers)
-* Decide how to handle caching of structures relevant to the rendering
+DONE
+
+* remove balloons after a while
+
 
