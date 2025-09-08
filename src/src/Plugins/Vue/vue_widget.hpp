@@ -75,6 +75,8 @@ public:
   coord2 size;
   rectangle extents;
   coord2 scroll_pos;
+  coord2 scroll_momentum;
+  time_t momentum_time;
   coord2 mouse_cursor;
   bool mouse_grab;
   bool absolute_scroll;

@@ -2296,6 +2296,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   mouse_cursor (coord2 (0, 0)),
   backing_pos (coord2(0, 0)),
   scroll_pos (coord2 (0, 0)),
+  scroll_momentum (coord2 (0, 0)),
   absolute_scroll (false),
   backing_valid (false)
 {
@@ -2591,10 +2592,8 @@ vue_simple_widget_rep::do_layout () {
         cout << LF;
       }
       if (mouse_action == "wheel") {
-        scroll_pos= backing_pos;
-        scroll_pos.x1 += mouse_data[0];
-        scroll_pos.x2 += mouse_data[1];
-        absolute_scroll= false;
+        scroll_momentum.x1 += mouse_data[0];
+        scroll_momentum.x2 += mouse_data[1];
       } else {
         if (starts (mouse_action, "press-")) {
           if (current_window->kbd_focus != this) {
@@ -2607,6 +2606,21 @@ vue_simple_widget_rep::do_layout () {
       mouse_action="";
       if (N(mouse_data) > 0) mouse_data= array<double>();
     }
+  }
+  if (scroll_momentum.x1 != 0 || scroll_momentum.x2 != 0) {
+    cout << "momentum " << scroll_momentum;
+    time_t lapse= 4*(texmacs_time () - momentum_time);
+    momentum_time = texmacs_time();
+    absolute_scroll= false;
+    scroll_pos= backing_pos;
+    scroll_pos.x1 += scroll_momentum.x1;
+    scroll_pos.x2 += scroll_momentum.x2;
+    while (lapse > 0) {
+      scroll_momentum.x1= 0.97f * scroll_momentum.x1;
+      scroll_momentum.x2= 0.97f * scroll_momentum.x2;
+      lapse -= 1;
+    }
+    cout << "-> " << scroll_momentum << LF;
   }
   if ((current_window->kbd_focus == this) && N(key_event)>0) {
     handle_keypress (key_event, key_time);
