@@ -372,14 +372,14 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
   if (!sdl_ren) {
     sdl_ren= SDL_CreateRenderer (sdl_win, NULL);
     if (!sdl_ren) {
-        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create renderer: %s", SDL_GetError ());
+      SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create renderer: %s", SDL_GetError ());
     }
   }
   
   if (!text_engine) {
     text_engine= TTF_CreateRendererTextEngine (sdl_ren);
     if (!text_engine) {
-        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError ());
+      SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError ());
     }
 
     if (!ttf_fonts) {
@@ -411,13 +411,13 @@ vue_sdl_window_rep::~vue_sdl_window_rep () {
 void
 vue_sdl_window_rep::process_redraw () {
   // render!
-  SDL_SetRenderDrawColor(sdl_ren, 0, 0, 0, 255);
-  SDL_RenderClear(sdl_ren);
+  SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
+  SDL_RenderClear (sdl_ren);
 
-  Clay_SDL3RendererData rd{ sdl_ren, text_engine, ttf_fonts };
+  Clay_SDL3RendererData rd { sdl_ren, text_engine, ttf_fonts };
   SDL_Clay_RenderClayCommands (&rd, &render_commands);
 
-  SDL_RenderPresent(sdl_ren);
+  SDL_RenderPresent (sdl_ren);
 }
 
 //******************************************************************************
@@ -489,8 +489,10 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
 
 picture
 native_picture_from_SDL_Surface (SDL_Surface *surf) {
-  fz_pixmap *pix= fz_new_pixmap_with_data (mupdf_context (), fz_device_bgr (mupdf_context ()),
-                                           surf->w, surf->h, NULL, 1, 4*surf->w, (unsigned char*)surf->pixels);
+  fz_pixmap *pix= fz_new_pixmap_with_data (mupdf_context (),
+                      fz_device_bgr (mupdf_context ()),
+                      surf->w, surf->h, NULL, 1, 4*surf->w,
+                      (unsigned char*)surf->pixels);
   picture p= mupdf_picture (pix, 0, 0);
   fz_drop_pixmap (mupdf_context (), pix);
   return p;
