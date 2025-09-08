@@ -30,15 +30,17 @@ public:
   vue_widget_rep (string _type) : type (_type), id (serial_id++) {};
   virtual ~vue_widget_rep () {};
   
-  virtual void send (slot s, blackbox val);
-  virtual blackbox query (slot s, int type_id);
-  virtual widget read (slot s, blackbox index);
-  virtual void write (slot s, blackbox index, widget w);
-  virtual void notify (slot s, blackbox new_val);
+  // widget messages with TeXmacs
+  void send (slot s, blackbox val);
+  blackbox query (slot s, int type_id);
+  widget read (slot s, blackbox index);
+  void write (slot s, blackbox index, widget w);
+  void notify (slot s, blackbox new_val);
   
-  virtual void do_layout () {};
-  virtual void post_layout () {};
-  virtual void render (void *data);
+  // layout and rendering
+  virtual void do_layout () {};     // layout the widget
+  virtual bool post_layout () {};   // postprocessing, returns true if relayout is needed
+  virtual void render (void *data); // rendering callback
 };
 
 template<> void tm_delete<vue_widget_rep>(vue_widget_rep *);

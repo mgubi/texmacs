@@ -266,24 +266,30 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
  
 void
 vue_sdl_base_window_rep::process_layout () {
-  // init the current GUI context
-  Clay_SetCurrentContext (clay_ctx);
-  int win_x, win_y, win_w, win_h;
-  SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
-  SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
-  Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
-  current_window= this;
-  gui_init_context ();
+  bool relayout= false;
+  do {
+    // init the current GUI context
+    Clay_SetCurrentContext (clay_ctx);
+    int win_x, win_y, win_w, win_h;
+    SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
+    SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
+    Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
+    current_window= this;
+    gui_init_context ();
 
-  // layout the top widget
-  Clay_SetDebugModeEnabled (clay_debug);
-  Clay_BeginLayout ();
-  content->do_layout ();
-  render_commands= Clay_EndLayout ();
+    // layout the top widget
+    Clay_SetDebugModeEnabled (clay_debug);
   
-  // post layout tweaking
-  content->post_layout ();
-  
+    Clay_BeginLayout ();
+    content->do_layout ();
+    render_commands= Clay_EndLayout ();
+    // post layout tweaking
+    relayout= content->post_layout ();
+    if (relayout) {
+      cout << "relayout!" << LF;
+    }
+  } while (relayout);
+
   // reset for safety (should not be used outside layout)
   current_window= NULL;
 }

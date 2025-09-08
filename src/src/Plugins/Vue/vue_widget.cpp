@@ -1726,7 +1726,7 @@ public:
   void notify (slot s, blackbox new_val);
   
   void do_layout ();
-  void post_layout ();
+  bool post_layout ();
 }; // class vue_plain_window_widget_rep
 
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name, command _quit)
@@ -1883,7 +1883,7 @@ vue_plain_window_widget_rep::do_layout () {
   }
 }
 
-void
+bool
 vue_plain_window_widget_rep::post_layout () {
   Clay_ElementData el= Clay_GetElementData (CLAY_ID("plain_window_widget"));
   SI w,h;
@@ -1893,7 +1893,9 @@ vue_plain_window_widget_rep::post_layout () {
   if (!win->clay_debug && ((w != cw) || (h != ch))) {
     //cout << w << "," << h << " " << cw << "," << ch << LF;
     win->set_size (cw, ch);
+    return true;
   }
+  return false; // do not relayout
 }
 
 //******************************************************************************
