@@ -551,117 +551,117 @@ void
 render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
 {
   for (int32_t i = 0; i < rcommands->length; i++) {
-      Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
-      const Clay_BoundingBox bounding_box = rcmd->boundingBox;
-      rectangle r (bounding_box.x * ren->pixel,
-                   -(bounding_box.y + bounding_box.height) * ren->pixel,
-                   (bounding_box.x + bounding_box.width)  * ren->pixel,
-                   -bounding_box.y * ren->pixel);
-      switch (rcmd->commandType) {
-          case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
-            Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
+    Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
+    const Clay_BoundingBox bounding_box = rcmd->boundingBox;
+    rectangle r (bounding_box.x * ren->pixel,
+                 -(bounding_box.y + bounding_box.height) * ren->pixel,
+                 (bounding_box.x + bounding_box.width)  * ren->pixel,
+                 -bounding_box.y * ren->pixel);
+    switch (rcmd->commandType) {
+      case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
+        Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
 //              SDL_SetRenderDrawBlendMode(rendererData->renderer, SDL_BLENDMODE_BLEND);
-            color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g, config->backgroundColor.b, config->backgroundColor.a);
-            ren->set_pencil (c);
-            if (config->cornerRadius.topLeft > 0) {
-              ren->fill (r->x1, r->y1, r->x2, r->y2);
+        color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g, config->backgroundColor.b, config->backgroundColor.a);
+        ren->set_pencil (c);
+        if (config->cornerRadius.topLeft > 0) {
+          ren->fill (r->x1, r->y1, r->x2, r->y2);
 //              SDL_Clay_RenderFillRoundedRect(rendererData, rect, config->cornerRadius.topLeft, config->backgroundColor);
-            } else {
-              ren->fill (r->x1, r->y1, r->x2, r->y2);
-            }
-          } break;
-          case CLAY_RENDER_COMMAND_TYPE_TEXT: {
-            Clay_TextRenderData *config = &rcmd->renderData.text;
-            // config->fontSize
-            // config->fontId
-            // config->stringContents.chars
-            // config->stringContents.length
-            ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a));
-            //font fn= get_default_styled_font (style);
-            font fn= get_default_styled_font (0); //FIXME: consider style
-            ren->set_shrinking_factor (3);
-            string s (config->stringContents.chars,
-                      config->stringContents.length);
-            fn ->var_draw (ren, s, r->x1*3, r->y1*3- fn->y1);
-            ren->set_shrinking_factor (1);
-          } break;
-          case CLAY_RENDER_COMMAND_TYPE_BORDER: {
-              Clay_BorderRenderData *config = &rcmd->renderData.border;
+        } else {
+          ren->fill (r->x1, r->y1, r->x2, r->y2);
+        }
+      } break;
+      case CLAY_RENDER_COMMAND_TYPE_TEXT: {
+        Clay_TextRenderData *config = &rcmd->renderData.text;
+        // config->fontSize
+        // config->fontId
+        // config->stringContents.chars
+        // config->stringContents.length
+        ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a));
+        //font fn= get_default_styled_font (style);
+        font fn= get_default_styled_font (0); //FIXME: consider style
+        ren->set_shrinking_factor (3);
+        string s (config->stringContents.chars,
+                  config->stringContents.length);
+        fn ->var_draw (ren, s, r->x1*3, r->y1*3- fn->y1);
+        ren->set_shrinking_factor (1);
+      } break;
+      case CLAY_RENDER_COMMAND_TYPE_BORDER: {
+          Clay_BorderRenderData *config = &rcmd->renderData.border;
 
-              const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
-              const Clay_CornerRadius clampedRadii = {
-                  .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
-                  .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
-                  .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
-                  .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
-              };
-              //edges
-              ren->set_pencil (rgb_color (config->color.r, config->color.g, config->color.b, config->color.a));
+          const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
+          const Clay_CornerRadius clampedRadii = {
+              .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
+              .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
+              .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
+              .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
+          };
+          //edges
+          ren->set_pencil (rgb_color (config->color.r, config->color.g, config->color.b, config->color.a));
 
-              if (config->width.left > 0) {
-                ren->fill (r->x1 - ren->pixel,
-                           r->y1 - clampedRadii.topLeft,
-                           r->x1 + config->width.left * ren->pixel,
-                           r->y2 + clampedRadii.bottomLeft );
-              }
-              if (config->width.right > 0) {
-                ren->fill (r->x2 + ren->pixel - config->width.right * ren->pixel,
-                           r->y1 - clampedRadii.topRight,
-                           r->x2 + ren->pixel,
-                           r->y2 + clampedRadii.bottomRight );
-              }
-              if (config->width.top > 0) {
-                ren->fill (r->x1 + clampedRadii.topLeft,
-                           r->y2 - config->width.top * ren->pixel,
-                           r->x2 - clampedRadii.topRight,
-                           r->y2 + ren->pixel);
-              }
-              if (config->width.bottom > 0) {
-                ren->fill (r->x1 + clampedRadii.bottomLeft,
-                           r->y1 - ren->pixel,
-                           r->x2 - clampedRadii.bottomRight,
-                           r->y1 + config->width.bottom * ren->pixel);
-              }
-              //corners
-              if (config->cornerRadius.topLeft > 0) {
-                ren->fill_arc (r->x1, r->y1, r->x1 + clampedRadii.topLeft, r->y1 - clampedRadii.topLeft, 90, 180);
-              }
-              if (config->cornerRadius.topRight > 0) {
-                ren->fill_arc (r->x2, r->y1, r->x2 - clampedRadii.topRight, r->y1 - clampedRadii.topRight, 0, 90);
-              }
-              if (config->cornerRadius.bottomLeft > 0) {
-                ren->fill_arc (r->x1, r->y2, r->x1 + clampedRadii.bottomLeft, r->y2 - clampedRadii.bottomLeft, 180, 270);
-              }
-              if (config->cornerRadius.bottomRight > 0) {
-                ren->fill_arc (r->x2, r->y2, r->x2 - clampedRadii.bottomRight, r->y2 - clampedRadii.bottomRight, 270, 360);
-              }
+          if (config->width.left > 0) {
+            ren->fill (r->x1 - ren->pixel,
+                       r->y1 - clampedRadii.topLeft,
+                       r->x1 + config->width.left * ren->pixel,
+                       r->y2 + clampedRadii.bottomLeft );
+          }
+          if (config->width.right > 0) {
+            ren->fill (r->x2 + ren->pixel - config->width.right * ren->pixel,
+                       r->y1 - clampedRadii.topRight,
+                       r->x2 + ren->pixel,
+                       r->y2 + clampedRadii.bottomRight );
+          }
+          if (config->width.top > 0) {
+            ren->fill (r->x1 + clampedRadii.topLeft,
+                       r->y2 - config->width.top * ren->pixel,
+                       r->x2 - clampedRadii.topRight,
+                       r->y2 + ren->pixel);
+          }
+          if (config->width.bottom > 0) {
+            ren->fill (r->x1 + clampedRadii.bottomLeft,
+                       r->y1 - ren->pixel,
+                       r->x2 - clampedRadii.bottomRight,
+                       r->y1 + config->width.bottom * ren->pixel);
+          }
+          //corners
+          if (config->cornerRadius.topLeft > 0) {
+            ren->fill_arc (r->x1, r->y1, r->x1 + clampedRadii.topLeft, r->y1 - clampedRadii.topLeft, 90, 180);
+          }
+          if (config->cornerRadius.topRight > 0) {
+            ren->fill_arc (r->x2, r->y1, r->x2 - clampedRadii.topRight, r->y1 - clampedRadii.topRight, 0, 90);
+          }
+          if (config->cornerRadius.bottomLeft > 0) {
+            ren->fill_arc (r->x1, r->y2, r->x1 + clampedRadii.bottomLeft, r->y2 - clampedRadii.bottomLeft, 180, 270);
+          }
+          if (config->cornerRadius.bottomRight > 0) {
+            ren->fill_arc (r->x2, r->y2, r->x2 - clampedRadii.bottomRight, r->y2 - clampedRadii.bottomRight, 270, 360);
+          }
 
-          } break;
-          case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
-            Clay_BoundingBox boundingBox = rcmd->boundingBox;
-            ren->clip (rcmd->boundingBox.x * ren->pixel,
-                       -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel,
-                       (rcmd->boundingBox.x + rcmd->boundingBox.width)  * ren->pixel,
-                       -rcmd->boundingBox.y * ren->pixel);
-              break;
-          }
-          case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
-            ren->unclip ();
-            break;
-          }
-          case CLAY_RENDER_COMMAND_TYPE_IMAGE: {
-            cout << "CLAY_RENDER_COMMAND_TYPE_IMAGE unsupported" << LF;
-              //SDL_Texture *texture = (SDL_Texture *)rcmd->renderData.image.imageData;
-              break;
-          }
-          case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
-            render_fn fn= (render_fn)rcmd->renderData.custom.customData;
-            fn (ren, rcmd->userData, r);
-            break;
-          }
-          default:
-              SDL_Log("Unknown render command type: %d", rcmd->commandType);
+      } break;
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+        Clay_BoundingBox boundingBox = rcmd->boundingBox;
+        ren->clip (rcmd->boundingBox.x * ren->pixel,
+                   -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel,
+                   (rcmd->boundingBox.x + rcmd->boundingBox.width)  * ren->pixel,
+                   -rcmd->boundingBox.y * ren->pixel);
+          break;
       }
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
+        ren->unclip ();
+        break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_IMAGE: {
+        cout << "CLAY_RENDER_COMMAND_TYPE_IMAGE unsupported" << LF;
+          //SDL_Texture *texture = (SDL_Texture *)rcmd->renderData.image.imageData;
+          break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
+        render_fn fn= (render_fn)rcmd->renderData.custom.customData;
+        fn (ren, rcmd->userData, r);
+        break;
+      }
+      default:
+        SDL_Log("Unknown render command type: %d", rcmd->commandType);
+    }
   }
 }
 
