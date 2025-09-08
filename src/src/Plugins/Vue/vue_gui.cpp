@@ -102,7 +102,7 @@ static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextEl
 
   TTF_SetFontSize(font, config->fontSize);
   if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
-      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError ());
   }
 
   return (Clay_Dimensions) { (float) width, (float) height };
@@ -128,7 +128,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   
   sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
   if (!sdl_win) {
-    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError());
+    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError ());
   }
   
   nr_windows++;
@@ -364,22 +364,22 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
   : vue_sdl_base_window_rep (w, name)
 {
   if (!sdl_ren) {
-    sdl_ren= SDL_CreateRenderer(sdl_win, NULL);
+    sdl_ren= SDL_CreateRenderer (sdl_win, NULL);
     if (!sdl_ren) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create renderer: %s", SDL_GetError());
+        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create renderer: %s", SDL_GetError ());
     }
   }
   
   if (!text_engine) {
     text_engine= TTF_CreateRendererTextEngine (sdl_ren);
     if (!text_engine) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError());
+        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to create text engine from renderer: %s", SDL_GetError ());
     }
 
     if (!ttf_fonts) {
       ttf_fonts= (TTF_Font **)SDL_calloc (1, sizeof(TTF_Font *));
       if (!ttf_fonts) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError());
+        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to allocate memory for the font array: %s", SDL_GetError ());
         return;
       }
       
@@ -387,7 +387,7 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
             "/Users/mgubi/.TeXmacs/fonts/unpacked/LucidaGrande.0.ttf",
           24);
       if (!font) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError());
+        SDL_LogError (SDL_LOG_CATEGORY_ERROR, "Failed to load font: %s", SDL_GetError ());
         return;
       }
       ttf_fonts[0]= font;
@@ -459,7 +459,6 @@ vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
   Clay_SetCurrentContext (clay_ctx);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
 };
-
 
 void
 vue_sdl_mupdf_window_rep::process_layout () {
@@ -560,11 +559,12 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
     switch (rcmd->commandType) {
       case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
         Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
-//              SDL_SetRenderDrawBlendMode(rendererData->renderer, SDL_BLENDMODE_BLEND);
-        color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g, config->backgroundColor.b, config->backgroundColor.a);
+        color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g,
+                            config->backgroundColor.b, config->backgroundColor.a);
         ren->set_pencil (c);
         if (config->cornerRadius.topLeft > 0) {
           ren->fill (r->x1, r->y1, r->x2, r->y2);
+          //FIXME: implement rounded rects
 //              SDL_Clay_RenderFillRoundedRect(rendererData, rect, config->cornerRadius.topLeft, config->backgroundColor);
         } else {
           ren->fill (r->x1, r->y1, r->x2, r->y2);
@@ -576,7 +576,8 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         // config->fontId
         // config->stringContents.chars
         // config->stringContents.length
-        ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a));
+        ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g,
+                                    config->textColor.b, config->textColor.a));
         //font fn= get_default_styled_font (style);
         font fn= get_default_styled_font (0); //FIXME: consider style
         ren->set_shrinking_factor (3);
@@ -588,14 +589,15 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       case CLAY_RENDER_COMMAND_TYPE_BORDER: {
         Clay_BorderRenderData *config = &rcmd->renderData.border;
         color c= rgb_color (config->color.r, config->color.g, config->color.b, config->color.a);
+        // we need a ticker pen, otherwise the corners look blurry (maybe we should use a different method?)
         pencil p= pencil (c, 2*ren->pixel+((config->width.top-1))*ren->pixel, cap_square);
         ren->set_pencil (p);
         const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
         const Clay_CornerRadius clampedRadii = {
-            .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
-            .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
-            .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
-            .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
+          .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
+          .topRight= (float) min (config->cornerRadius.topRight, minRadius) * ren->pixel,
+          .bottomLeft= (float) min (config->cornerRadius.bottomLeft, minRadius) * ren->pixel,
+          .bottomRight= (float) min (config->cornerRadius.bottomRight, minRadius) * ren->pixel
         };
         //edges
         if (config->width.left > 0) {
@@ -624,23 +626,28 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         }
         //corners
         if (config->cornerRadius.topLeft > 0) {
-          ren->arc (r->x1, r->y2 - clampedRadii.topLeft - ren->pixel, r->x1 + clampedRadii.topLeft, r->y2, 90*64, 90*64);
+          ren->arc (r->x1, r->y2 - clampedRadii.topLeft - ren->pixel,
+                    r->x1 + clampedRadii.topLeft, r->y2, 90*64, 90*64);
         }
         if (config->cornerRadius.topRight > 0) {
-          ren->arc (r->x2 - clampedRadii.topRight, r->y2 - clampedRadii.topRight, r->x2, r->y2, 0, 90*64);
+          ren->arc (r->x2 - clampedRadii.topRight, r->y2 - clampedRadii.topRight,
+                    r->x2, r->y2, 0, 90*64);
         }
         if (config->cornerRadius.bottomLeft > 0) {
-          ren->arc (r->x1, r->y1, r->x1 + clampedRadii.bottomLeft, r->y1 + clampedRadii.bottomLeft, 180*64, 90*64);
+          ren->arc (r->x1, r->y1,
+                    r->x1 + clampedRadii.bottomLeft, r->y1 + clampedRadii.bottomLeft,
+                    180*64, 90*64);
         }
         if (config->cornerRadius.bottomRight > 0) {
-          ren->arc (r->x2 - clampedRadii.bottomRight, r->y1, r->x2, r->y1 + clampedRadii.bottomRight, 270*64, 90*64);
+          ren->arc (r->x2 - clampedRadii.bottomRight, r->y1,
+                    r->x2, r->y1 + clampedRadii.bottomRight, 270*64, 90*64);
         }
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
         Clay_BoundingBox boundingBox = rcmd->boundingBox;
         ren->clip (rcmd->boundingBox.x * ren->pixel,
-                   -(rcmd->boundingBox.y + rcmd->boundingBox.height)  * ren->pixel,
-                   (rcmd->boundingBox.x + rcmd->boundingBox.width)  * ren->pixel,
+                   -(rcmd->boundingBox.y + rcmd->boundingBox.height) * ren->pixel,
+                   (rcmd->boundingBox.x + rcmd->boundingBox.width) * ren->pixel,
                    -rcmd->boundingBox.y * ren->pixel);
           break;
       }
@@ -659,11 +666,10 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         break;
       }
       default:
-        SDL_Log("Unknown render command type: %d", rcmd->commandType);
+        SDL_Log ("Unknown render command type: %d", rcmd->commandType);
     }
   }
 }
-
 
 void
 vue_render_text_fn (renderer ren, void *w, rectangle r) {
@@ -1093,7 +1099,7 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_WHEEL:
     {
       update_mouse_state ();
-      SDL_Log("Window %d got wheel event event %f %f",
+      SDL_Log ("Window %d got wheel event event %f %f",
               event->wheel.windowID, event->wheel.x, event->wheel.y);
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
@@ -1126,7 +1132,7 @@ process_event (SDL_Event *event) {
     {
       {
         c_string buf (print_key_info (&(event->key)));
-        SDL_Log("Keydown: %s ", (char*)buf);
+        SDL_Log ("Keydown: %s ", (char*)buf);
       }
       win= get_window_from_ID (event->key.windowID);
       if (win) {
@@ -1365,10 +1371,10 @@ file_dialog_callback (void* userdata, const char* const* filelist,
   vue_chooser_widget_rep *w= (vue_chooser_widget_rep *)userdata;
   
   if (!filelist) {
-    SDL_Log("Error: %s", SDL_GetError());
+    SDL_Log ("Error: %s", SDL_GetError ());
     return;
   } else if (!*filelist) {
-    SDL_Log("Dialog canceled or no selection.");
+    SDL_Log ("Dialog canceled or no selection.");
     w->callback (NULL);
     return;
   }
@@ -1380,9 +1386,9 @@ file_dialog_callback (void* userdata, const char* const* filelist,
   }
 
   if (filter_index >= 0) {
-    SDL_Log("Selected filter index: %d", filter_index);
+    SDL_Log ("Selected filter index: %d", filter_index);
   } else {
-    SDL_Log("Filter not reported by platform.");
+    SDL_Log ("Filter not reported by platform.");
   }
 }
 
@@ -1941,330 +1947,330 @@ initialize_keyboard () {
 // SDL3 event logger
 
 #define SDL_EVENT_TYPE_LIST \
-    X(SDL_EVENT_FIRST) \
-    X(SDL_EVENT_QUIT) \
-    X(SDL_EVENT_TERMINATING) \
-    X(SDL_EVENT_LOW_MEMORY) \
-    X(SDL_EVENT_WILL_ENTER_BACKGROUND) \
-    X(SDL_EVENT_DID_ENTER_BACKGROUND) \
-    X(SDL_EVENT_WILL_ENTER_FOREGROUND) \
-    X(SDL_EVENT_DID_ENTER_FOREGROUND) \
-    X(SDL_EVENT_LOCALE_CHANGED) \
-    X(SDL_EVENT_SYSTEM_THEME_CHANGED) \
-    X(SDL_EVENT_DISPLAY_ORIENTATION) \
-    X(SDL_EVENT_DISPLAY_ADDED) \
-    X(SDL_EVENT_DISPLAY_REMOVED) \
-    X(SDL_EVENT_DISPLAY_MOVED) \
-    X(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) \
-    X(SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED) \
-    X(SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED) \
-    X(SDL_EVENT_WINDOW_SHOWN) \
-    X(SDL_EVENT_WINDOW_HIDDEN) \
-    X(SDL_EVENT_WINDOW_EXPOSED) \
-    X(SDL_EVENT_WINDOW_MOVED) \
-    X(SDL_EVENT_WINDOW_RESIZED) \
-    X(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) \
-    X(SDL_EVENT_WINDOW_METAL_VIEW_RESIZED) \
-    X(SDL_EVENT_WINDOW_MINIMIZED) \
-    X(SDL_EVENT_WINDOW_MAXIMIZED) \
-    X(SDL_EVENT_WINDOW_RESTORED) \
-    X(SDL_EVENT_WINDOW_MOUSE_ENTER) \
-    X(SDL_EVENT_WINDOW_MOUSE_LEAVE) \
-    X(SDL_EVENT_WINDOW_FOCUS_GAINED) \
-    X(SDL_EVENT_WINDOW_FOCUS_LOST) \
-    X(SDL_EVENT_WINDOW_CLOSE_REQUESTED) \
-    X(SDL_EVENT_WINDOW_HIT_TEST) \
-    X(SDL_EVENT_WINDOW_ICCPROF_CHANGED) \
-    X(SDL_EVENT_WINDOW_DISPLAY_CHANGED) \
-    X(SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) \
-    X(SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) \
-    X(SDL_EVENT_WINDOW_OCCLUDED) \
-    X(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) \
-    X(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) \
-    X(SDL_EVENT_WINDOW_DESTROYED) \
-    X(SDL_EVENT_WINDOW_HDR_STATE_CHANGED) \
-    X(SDL_EVENT_KEY_DOWN) \
-    X(SDL_EVENT_KEY_UP) \
-    X(SDL_EVENT_TEXT_EDITING) \
-    X(SDL_EVENT_TEXT_INPUT) \
-    X(SDL_EVENT_KEYMAP_CHANGED) \
-    X(SDL_EVENT_KEYBOARD_ADDED) \
-    X(SDL_EVENT_KEYBOARD_REMOVED) \
-    X(SDL_EVENT_TEXT_EDITING_CANDIDATES) \
-    X(SDL_EVENT_MOUSE_MOTION) \
-    X(SDL_EVENT_MOUSE_BUTTON_DOWN) \
-    X(SDL_EVENT_MOUSE_BUTTON_UP) \
-    X(SDL_EVENT_MOUSE_WHEEL) \
-    X(SDL_EVENT_MOUSE_ADDED) \
-    X(SDL_EVENT_MOUSE_REMOVED) \
-    X(SDL_EVENT_JOYSTICK_AXIS_MOTION) \
-    X(SDL_EVENT_JOYSTICK_BALL_MOTION) \
-    X(SDL_EVENT_JOYSTICK_HAT_MOTION) \
-    X(SDL_EVENT_JOYSTICK_BUTTON_DOWN) \
-    X(SDL_EVENT_JOYSTICK_BUTTON_UP) \
-    X(SDL_EVENT_JOYSTICK_ADDED) \
-    X(SDL_EVENT_JOYSTICK_REMOVED) \
-    X(SDL_EVENT_JOYSTICK_BATTERY_UPDATED) \
-    X(SDL_EVENT_JOYSTICK_UPDATE_COMPLETE) \
-    X(SDL_EVENT_GAMEPAD_AXIS_MOTION) \
-    X(SDL_EVENT_GAMEPAD_BUTTON_DOWN) \
-    X(SDL_EVENT_GAMEPAD_BUTTON_UP) \
-    X(SDL_EVENT_GAMEPAD_ADDED) \
-    X(SDL_EVENT_GAMEPAD_REMOVED) \
-    X(SDL_EVENT_GAMEPAD_REMAPPED) \
-    X(SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN) \
-    X(SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION) \
-    X(SDL_EVENT_GAMEPAD_TOUCHPAD_UP) \
-    X(SDL_EVENT_GAMEPAD_SENSOR_UPDATE) \
-    X(SDL_EVENT_GAMEPAD_UPDATE_COMPLETE) \
-    X(SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) \
-    X(SDL_EVENT_FINGER_DOWN) \
-    X(SDL_EVENT_FINGER_UP) \
-    X(SDL_EVENT_FINGER_MOTION) \
-    X(SDL_EVENT_FINGER_CANCELED) \
-    X(SDL_EVENT_CLIPBOARD_UPDATE) \
-    X(SDL_EVENT_DROP_FILE) \
-    X(SDL_EVENT_DROP_TEXT) \
-    X(SDL_EVENT_DROP_BEGIN) \
-    X(SDL_EVENT_DROP_COMPLETE) \
-    X(SDL_EVENT_DROP_POSITION) \
-    X(SDL_EVENT_AUDIO_DEVICE_ADDED) \
-    X(SDL_EVENT_AUDIO_DEVICE_REMOVED) \
-    X(SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) \
-    X(SDL_EVENT_SENSOR_UPDATE) \
-    X(SDL_EVENT_PEN_PROXIMITY_IN) \
-    X(SDL_EVENT_PEN_PROXIMITY_OUT) \
-    X(SDL_EVENT_PEN_DOWN) \
-    X(SDL_EVENT_PEN_UP) \
-    X(SDL_EVENT_PEN_BUTTON_DOWN) \
-    X(SDL_EVENT_PEN_BUTTON_UP) \
-    X(SDL_EVENT_PEN_MOTION) \
-    X(SDL_EVENT_PEN_AXIS) \
-    X(SDL_EVENT_CAMERA_DEVICE_ADDED) \
-    X(SDL_EVENT_CAMERA_DEVICE_REMOVED) \
-    X(SDL_EVENT_CAMERA_DEVICE_APPROVED) \
-    X(SDL_EVENT_CAMERA_DEVICE_DENIED) \
-    X(SDL_EVENT_RENDER_TARGETS_RESET) \
-    X(SDL_EVENT_RENDER_DEVICE_RESET) \
-    X(SDL_EVENT_RENDER_DEVICE_LOST) \
-    X(SDL_EVENT_PRIVATE0) \
-    X(SDL_EVENT_PRIVATE1) \
-    X(SDL_EVENT_PRIVATE2) \
-    X(SDL_EVENT_PRIVATE3) \
-    X(SDL_EVENT_POLL_SENTINEL) \
-    X(SDL_EVENT_USER) \
-    X(SDL_EVENT_LAST) \
-    X(SDL_EVENT_ENUM_PADDING)
+  X(SDL_EVENT_FIRST) \
+  X(SDL_EVENT_QUIT) \
+  X(SDL_EVENT_TERMINATING) \
+  X(SDL_EVENT_LOW_MEMORY) \
+  X(SDL_EVENT_WILL_ENTER_BACKGROUND) \
+  X(SDL_EVENT_DID_ENTER_BACKGROUND) \
+  X(SDL_EVENT_WILL_ENTER_FOREGROUND) \
+  X(SDL_EVENT_DID_ENTER_FOREGROUND) \
+  X(SDL_EVENT_LOCALE_CHANGED) \
+  X(SDL_EVENT_SYSTEM_THEME_CHANGED) \
+  X(SDL_EVENT_DISPLAY_ORIENTATION) \
+  X(SDL_EVENT_DISPLAY_ADDED) \
+  X(SDL_EVENT_DISPLAY_REMOVED) \
+  X(SDL_EVENT_DISPLAY_MOVED) \
+  X(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) \
+  X(SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED) \
+  X(SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED) \
+  X(SDL_EVENT_WINDOW_SHOWN) \
+  X(SDL_EVENT_WINDOW_HIDDEN) \
+  X(SDL_EVENT_WINDOW_EXPOSED) \
+  X(SDL_EVENT_WINDOW_MOVED) \
+  X(SDL_EVENT_WINDOW_RESIZED) \
+  X(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) \
+  X(SDL_EVENT_WINDOW_METAL_VIEW_RESIZED) \
+  X(SDL_EVENT_WINDOW_MINIMIZED) \
+  X(SDL_EVENT_WINDOW_MAXIMIZED) \
+  X(SDL_EVENT_WINDOW_RESTORED) \
+  X(SDL_EVENT_WINDOW_MOUSE_ENTER) \
+  X(SDL_EVENT_WINDOW_MOUSE_LEAVE) \
+  X(SDL_EVENT_WINDOW_FOCUS_GAINED) \
+  X(SDL_EVENT_WINDOW_FOCUS_LOST) \
+  X(SDL_EVENT_WINDOW_CLOSE_REQUESTED) \
+  X(SDL_EVENT_WINDOW_HIT_TEST) \
+  X(SDL_EVENT_WINDOW_ICCPROF_CHANGED) \
+  X(SDL_EVENT_WINDOW_DISPLAY_CHANGED) \
+  X(SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) \
+  X(SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) \
+  X(SDL_EVENT_WINDOW_OCCLUDED) \
+  X(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) \
+  X(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) \
+  X(SDL_EVENT_WINDOW_DESTROYED) \
+  X(SDL_EVENT_WINDOW_HDR_STATE_CHANGED) \
+  X(SDL_EVENT_KEY_DOWN) \
+  X(SDL_EVENT_KEY_UP) \
+  X(SDL_EVENT_TEXT_EDITING) \
+  X(SDL_EVENT_TEXT_INPUT) \
+  X(SDL_EVENT_KEYMAP_CHANGED) \
+  X(SDL_EVENT_KEYBOARD_ADDED) \
+  X(SDL_EVENT_KEYBOARD_REMOVED) \
+  X(SDL_EVENT_TEXT_EDITING_CANDIDATES) \
+  X(SDL_EVENT_MOUSE_MOTION) \
+  X(SDL_EVENT_MOUSE_BUTTON_DOWN) \
+  X(SDL_EVENT_MOUSE_BUTTON_UP) \
+  X(SDL_EVENT_MOUSE_WHEEL) \
+  X(SDL_EVENT_MOUSE_ADDED) \
+  X(SDL_EVENT_MOUSE_REMOVED) \
+  X(SDL_EVENT_JOYSTICK_AXIS_MOTION) \
+  X(SDL_EVENT_JOYSTICK_BALL_MOTION) \
+  X(SDL_EVENT_JOYSTICK_HAT_MOTION) \
+  X(SDL_EVENT_JOYSTICK_BUTTON_DOWN) \
+  X(SDL_EVENT_JOYSTICK_BUTTON_UP) \
+  X(SDL_EVENT_JOYSTICK_ADDED) \
+  X(SDL_EVENT_JOYSTICK_REMOVED) \
+  X(SDL_EVENT_JOYSTICK_BATTERY_UPDATED) \
+  X(SDL_EVENT_JOYSTICK_UPDATE_COMPLETE) \
+  X(SDL_EVENT_GAMEPAD_AXIS_MOTION) \
+  X(SDL_EVENT_GAMEPAD_BUTTON_DOWN) \
+  X(SDL_EVENT_GAMEPAD_BUTTON_UP) \
+  X(SDL_EVENT_GAMEPAD_ADDED) \
+  X(SDL_EVENT_GAMEPAD_REMOVED) \
+  X(SDL_EVENT_GAMEPAD_REMAPPED) \
+  X(SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN) \
+  X(SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION) \
+  X(SDL_EVENT_GAMEPAD_TOUCHPAD_UP) \
+  X(SDL_EVENT_GAMEPAD_SENSOR_UPDATE) \
+  X(SDL_EVENT_GAMEPAD_UPDATE_COMPLETE) \
+  X(SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED) \
+  X(SDL_EVENT_FINGER_DOWN) \
+  X(SDL_EVENT_FINGER_UP) \
+  X(SDL_EVENT_FINGER_MOTION) \
+  X(SDL_EVENT_FINGER_CANCELED) \
+  X(SDL_EVENT_CLIPBOARD_UPDATE) \
+  X(SDL_EVENT_DROP_FILE) \
+  X(SDL_EVENT_DROP_TEXT) \
+  X(SDL_EVENT_DROP_BEGIN) \
+  X(SDL_EVENT_DROP_COMPLETE) \
+  X(SDL_EVENT_DROP_POSITION) \
+  X(SDL_EVENT_AUDIO_DEVICE_ADDED) \
+  X(SDL_EVENT_AUDIO_DEVICE_REMOVED) \
+  X(SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) \
+  X(SDL_EVENT_SENSOR_UPDATE) \
+  X(SDL_EVENT_PEN_PROXIMITY_IN) \
+  X(SDL_EVENT_PEN_PROXIMITY_OUT) \
+  X(SDL_EVENT_PEN_DOWN) \
+  X(SDL_EVENT_PEN_UP) \
+  X(SDL_EVENT_PEN_BUTTON_DOWN) \
+  X(SDL_EVENT_PEN_BUTTON_UP) \
+  X(SDL_EVENT_PEN_MOTION) \
+  X(SDL_EVENT_PEN_AXIS) \
+  X(SDL_EVENT_CAMERA_DEVICE_ADDED) \
+  X(SDL_EVENT_CAMERA_DEVICE_REMOVED) \
+  X(SDL_EVENT_CAMERA_DEVICE_APPROVED) \
+  X(SDL_EVENT_CAMERA_DEVICE_DENIED) \
+  X(SDL_EVENT_RENDER_TARGETS_RESET) \
+  X(SDL_EVENT_RENDER_DEVICE_RESET) \
+  X(SDL_EVENT_RENDER_DEVICE_LOST) \
+  X(SDL_EVENT_PRIVATE0) \
+  X(SDL_EVENT_PRIVATE1) \
+  X(SDL_EVENT_PRIVATE2) \
+  X(SDL_EVENT_PRIVATE3) \
+  X(SDL_EVENT_POLL_SENTINEL) \
+  X(SDL_EVENT_USER) \
+  X(SDL_EVENT_LAST) \
+  X(SDL_EVENT_ENUM_PADDING)
 
 const char*
 SDL_EventTypeToString (Uint32 type) {
-    switch (type) {
+  switch (type) {
 #define X(name) case name: return #name;
-        SDL_EVENT_TYPE_LIST
+    SDL_EVENT_TYPE_LIST
 #undef X
-        default:
-            return "SDL_EVENT_UNKNOWN";
-    }
+    default:
+      return "SDL_EVENT_UNKNOWN";
+  }
 }
 
 void
 sdl_log_event (const SDL_Event *event) {
-    if (!event) return;
-
-    switch (event->type) {
-        // Quit
-        case SDL_EVENT_QUIT:
-            SDL_Log("Event: SDL_QUIT");
-            break;
-
-        // Keyboard
-        case SDL_EVENT_KEY_DOWN:
-        case SDL_EVENT_KEY_UP:
-            SDL_Log("Event: %s - Key: %s (Scancode: %d, Mod: 0x%x, Repeat: %d)",
-                    event->type == SDL_EVENT_KEY_DOWN ? "KEY_DOWN" : "KEY_UP",
-                    SDL_GetKeyName(event->key.key),
-                    event->key.scancode,
-                    event->key.mod,
-                    event->key.repeat);
-            break;
-
-        // Mouse motion
-        case SDL_EVENT_MOUSE_MOTION:
-            SDL_Log("Event: MOUSE_MOTION - x: %f, y: %f, xrel: %f, yrel: %f",
-                    event->motion.x, event->motion.y,
-                    event->motion.xrel, event->motion.yrel);
-            break;
-
-        // Mouse buttons
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            SDL_Log("Event: %s - Button: %d, Clicks: %d, x: %f, y: %f",
-                    event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "MOUSE_BUTTON_DOWN" : "MOUSE_BUTTON_UP",
-                    event->button.button, event->button.clicks,
-                    event->button.x, event->button.y);
-            break;
-
-        // Mouse wheel
-        case SDL_EVENT_MOUSE_WHEEL:
-            SDL_Log("Event: MOUSE_WHEEL - x: %f, y: %f, direction: %d",
-                    event->wheel.x, event->wheel.y,
-                    event->wheel.direction);
-            break;
-
-        // Text input
-        case SDL_EVENT_TEXT_INPUT:
-            SDL_Log("Event: TEXT_INPUT - Text: %s", event->text.text);
-            break;
-
-        case SDL_EVENT_TEXT_EDITING:
-            SDL_Log("Event: TEXT_EDITING - Text: %s, Start: %d, Length: %d",
-                    event->edit.text, event->edit.start, event->edit.length);
-            break;
-
-        // Window events
-
-        case SDL_EVENT_WINDOW_SHOWN:
-            SDL_Log("Window %u shown", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_HIDDEN:
-            SDL_Log("Window %u hidden", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_EXPOSED:
-            SDL_Log("Window %u exposed", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_MOVED:
-            SDL_Log("Window %u moved to (%d, %d)",
-                    event->window.windowID,
-                    event->window.data1,
-                    event->window.data2);
-            break;
-        
-        case SDL_EVENT_WINDOW_RESIZED:
-            SDL_Log("Window %u resized to %dx%d",
-                    event->window.windowID,
-                    event->window.data1,
-                    event->window.data2);
-            break;
-        
-        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-            SDL_Log("Window %u pixel size changed to %dx%d",
-                    event->window.windowID,
-                    event->window.data1,
-                    event->window.data2);
-            break;
-        
-        case SDL_EVENT_WINDOW_MINIMIZED:
-            SDL_Log("Window %u minimized", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_MAXIMIZED:
-            SDL_Log("Window %u maximized", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_RESTORED:
-            SDL_Log("Window %u restored", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_MOUSE_ENTER:
-            SDL_Log("Mouse entered window %u", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-            SDL_Log("Mouse left window %u", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_FOCUS_GAINED:
-            SDL_Log("Window %u gained keyboard focus", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_FOCUS_LOST:
-            SDL_Log("Window %u lost keyboard focus", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            SDL_Log("Window %u close requested", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_HIT_TEST:
-            SDL_Log("Window %u hit test event", event->window.windowID);
-            break;
-        
-        case SDL_EVENT_WINDOW_ICCPROF_CHANGED:
-            SDL_Log("Window %u ICC profile changed", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
-            SDL_Log("Window %u moved to display %d", event->window.windowID, event->window.data1);
-            break;
-
-        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-            SDL_Log("Window %u display scale changed to %d", event->window.windowID, event->window.data1);
-            break;
-
-        case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
-            SDL_Log("Window %u safe area changed", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_OCCLUDED:
-            SDL_Log("Window %u occluded", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-            SDL_Log("Window %u entered fullscreen", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-            SDL_Log("Window %u left fullscreen", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_DESTROYED:
-            SDL_Log("Window %u destroyed", event->window.windowID);
-            break;
-
-        case SDL_EVENT_WINDOW_HDR_STATE_CHANGED:
-            SDL_Log("Window %u HDR state changed", event->window.windowID);
-            break;
-
-        // Game controller (SDL_Gamepad)
-        case SDL_EVENT_GAMEPAD_ADDED:
-            SDL_Log("Event: GAMEPAD_ADDED - Device Index: %d", event->gdevice.which);
-            break;
-
-        case SDL_EVENT_GAMEPAD_REMOVED:
-            SDL_Log("Event: GAMEPAD_REMOVED - Instance ID: %d", event->gdevice.which);
-            break;
-
-        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-        case SDL_EVENT_GAMEPAD_BUTTON_UP:
-            SDL_Log("Event: %s - Button: %d, Instance ID: %d",
-                    event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? "GAMEPAD_BUTTON_DOWN" : "GAMEPAD_BUTTON_UP",
-                    event->gbutton.button, event->gbutton.which);
-            break;
-
-        case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-            SDL_Log("Event: GAMEPAD_AXIS_MOTION - Axis: %d, Value: %d, Instance ID: %d",
-                    event->gaxis.axis, event->gaxis.value, event->gaxis.which);
-            break;
-
-        // Touch input
-        case SDL_EVENT_FINGER_DOWN:
-        case SDL_EVENT_FINGER_UP:
-        case SDL_EVENT_FINGER_MOTION:
-            SDL_Log("Event: %s - FingerID: %" SDL_PRIs64 ", x: %f, y: %f, dx: %f, dy: %f, pressure: %f",
-                    event->type == SDL_EVENT_FINGER_DOWN ? "FINGER_DOWN" :
-                    event->type == SDL_EVENT_FINGER_UP   ? "FINGER_UP"   : "FINGER_MOTION",
-                    event->tfinger.fingerID,
-                    event->tfinger.x, event->tfinger.y,
-                    event->tfinger.dx, event->tfinger.dy,
-                    event->tfinger.pressure);
-            break;
-
-        default:
-            SDL_Log("Event: %s", SDL_EventTypeToString (event->type));
-            break;
-    }
+  if (!event) return;
+  
+  switch (event->type) {
+      // Quit
+    case SDL_EVENT_QUIT:
+      SDL_Log ("Event: SDL_QUIT");
+      break;
+      
+      // Keyboard
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+      SDL_Log ("Event: %s - Key: %s (Scancode: %d, Mod: 0x%x, Repeat: %d)",
+               event->type == SDL_EVENT_KEY_DOWN ? "KEY_DOWN" : "KEY_UP",
+               SDL_GetKeyName(event->key.key),
+               event->key.scancode,
+               event->key.mod,
+               event->key.repeat);
+      break;
+      
+      // Mouse motion
+    case SDL_EVENT_MOUSE_MOTION:
+      SDL_Log ("Event: MOUSE_MOTION - x: %f, y: %f, xrel: %f, yrel: %f",
+               event->motion.x, event->motion.y,
+               event->motion.xrel, event->motion.yrel);
+      break;
+      
+      // Mouse buttons
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+      SDL_Log ("Event: %s - Button: %d, Clicks: %d, x: %f, y: %f",
+               event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "MOUSE_BUTTON_DOWN" : "MOUSE_BUTTON_UP",
+               event->button.button, event->button.clicks,
+               event->button.x, event->button.y);
+      break;
+      
+      // Mouse wheel
+    case SDL_EVENT_MOUSE_WHEEL:
+      SDL_Log ("Event: MOUSE_WHEEL - x: %f, y: %f, direction: %d",
+               event->wheel.x, event->wheel.y,
+               event->wheel.direction);
+      break;
+      
+      // Text input
+    case SDL_EVENT_TEXT_INPUT:
+      SDL_Log ("Event: TEXT_INPUT - Text: %s", event->text.text);
+      break;
+      
+    case SDL_EVENT_TEXT_EDITING:
+      SDL_Log ("Event: TEXT_EDITING - Text: %s, Start: %d, Length: %d",
+               event->edit.text, event->edit.start, event->edit.length);
+      break;
+      
+      // Window events
+      
+    case SDL_EVENT_WINDOW_SHOWN:
+      SDL_Log ("Window %u shown", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_HIDDEN:
+      SDL_Log ("Window %u hidden", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_EXPOSED:
+      SDL_Log ("Window %u exposed", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_MOVED:
+      SDL_Log ("Window %u moved to (%d, %d)",
+               event->window.windowID,
+               event->window.data1,
+               event->window.data2);
+      break;
+      
+    case SDL_EVENT_WINDOW_RESIZED:
+      SDL_Log ("Window %u resized to %dx%d",
+               event->window.windowID,
+               event->window.data1,
+               event->window.data2);
+      break;
+      
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      SDL_Log ("Window %u pixel size changed to %dx%d",
+               event->window.windowID,
+               event->window.data1,
+               event->window.data2);
+      break;
+      
+    case SDL_EVENT_WINDOW_MINIMIZED:
+      SDL_Log ("Window %u minimized", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_MAXIMIZED:
+      SDL_Log ("Window %u maximized", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_RESTORED:
+      SDL_Log ("Window %u restored", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_MOUSE_ENTER:
+      SDL_Log ("Mouse entered window %u", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+      SDL_Log ("Mouse left window %u", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+      SDL_Log ("Window %u gained keyboard focus", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+      SDL_Log ("Window %u lost keyboard focus", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      SDL_Log ("Window %u close requested", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_HIT_TEST:
+      SDL_Log ("Window %u hit test event", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_ICCPROF_CHANGED:
+      SDL_Log ("Window %u ICC profile changed", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+      SDL_Log ("Window %u moved to display %d", event->window.windowID, event->window.data1);
+      break;
+      
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+      SDL_Log ("Window %u display scale changed to %d", event->window.windowID, event->window.data1);
+      break;
+      
+    case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
+      SDL_Log ("Window %u safe area changed", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_OCCLUDED:
+      SDL_Log ("Window %u occluded", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+      SDL_Log ("Window %u entered fullscreen", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+      SDL_Log ("Window %u left fullscreen", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_DESTROYED:
+      SDL_Log ("Window %u destroyed", event->window.windowID);
+      break;
+      
+    case SDL_EVENT_WINDOW_HDR_STATE_CHANGED:
+      SDL_Log ("Window %u HDR state changed", event->window.windowID);
+      break;
+      
+      // Game controller (SDL_Gamepad)
+    case SDL_EVENT_GAMEPAD_ADDED:
+      SDL_Log ("Event: GAMEPAD_ADDED - Device Index: %d", event->gdevice.which);
+      break;
+      
+    case SDL_EVENT_GAMEPAD_REMOVED:
+      SDL_Log ("Event: GAMEPAD_REMOVED - Instance ID: %d", event->gdevice.which);
+      break;
+      
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+    case SDL_EVENT_GAMEPAD_BUTTON_UP:
+      SDL_Log ("Event: %s - Button: %d, Instance ID: %d",
+               event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ? "GAMEPAD_BUTTON_DOWN" : "GAMEPAD_BUTTON_UP",
+               event->gbutton.button, event->gbutton.which);
+      break;
+      
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+      SDL_Log ("Event: GAMEPAD_AXIS_MOTION - Axis: %d, Value: %d, Instance ID: %d",
+               event->gaxis.axis, event->gaxis.value, event->gaxis.which);
+      break;
+      
+      // Touch input
+    case SDL_EVENT_FINGER_DOWN:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_MOTION:
+      SDL_Log ("Event: %s - FingerID: %" SDL_PRIs64 ", x: %f, y: %f, dx: %f, dy: %f, pressure: %f",
+               event->type == SDL_EVENT_FINGER_DOWN ? "FINGER_DOWN" :
+               event->type == SDL_EVENT_FINGER_UP   ? "FINGER_UP"   : "FINGER_MOTION",
+               event->tfinger.fingerID,
+               event->tfinger.x, event->tfinger.y,
+               event->tfinger.dx, event->tfinger.dy,
+               event->tfinger.pressure);
+      break;
+      
+    default:
+      SDL_Log ("Event: %s", SDL_EventTypeToString (event->type));
+      break;
+  }
 }
 
