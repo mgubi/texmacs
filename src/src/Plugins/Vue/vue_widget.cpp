@@ -948,9 +948,14 @@ vue_ui_rep::do_layout () {
   if (type == "balloon_widget") {
     //VUE_WIDGET(balloon_widget, widget, w, widget, help);
     vue_balloon_widget d= open_box<vue_balloon_widget> (data);
-    CLAY({}){
+//    CLAY({
+//      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+//      .layout= { .sizing= layoutExpand }})
+    {
       concrete(d.w)->do_layout ();
-      if (Clay_Hovered ()) {
+//      if (Clay_Hovered ()) {
+      Clay_ElementId target_id= CLAY_SIDI(CLAY_TM_STRING(concrete (d.w)->type), concrete (d.w)->id);
+      if (Clay_PointerOver (target_id)) {
         if (current_balloon != id) {
           // hovered and not active, then become active and start counting time
           current_balloon= id;
@@ -968,7 +973,8 @@ vue_ui_rep::do_layout () {
             .floating= {
               .zIndex= 10,
               .offset= { 10, 10 },
-              .attachTo= CLAY_ATTACH_TO_PARENT,
+              .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+              .parentId= target_id.id,
               .attachPoints= {
                 .parent= CLAY_ATTACH_POINT_RIGHT_BOTTOM }}})
           {
