@@ -2846,6 +2846,16 @@ vue_simple_widget_rep::repaint_all () {
 }
 
 void
+vue_simple_widget_rep::repaint_all_in_window (vue_window win) {
+  list<vue_simple_widget_rep*> l= paint_list;
+  while (!is_nil(l)) {
+    if (l->item->win == win) l->item->repaint_invalid_regions ();
+    l= l->next;
+  }
+}
+
+
+void
 vue_simple_widget_rep::render (void *data) {
   current_window->draw_picture (data, backing_store);
 }

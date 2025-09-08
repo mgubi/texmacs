@@ -109,6 +109,7 @@ public:
   // backing store management
   
   static void repaint_all (); // called in the event loop
+  static void repaint_all_in_window (vue_window win);
   
 protected:
   static hashset<pointer> all_widgets;

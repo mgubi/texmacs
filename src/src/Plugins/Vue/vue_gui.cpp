@@ -498,6 +498,7 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
 
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
+  current_window= this;
   int win_w, win_h;
 
   SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
@@ -520,6 +521,7 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   SDL_UpdateWindowSurface (sdl_win);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 30) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
+  current_window= NULL;
 }
 
 
@@ -839,6 +841,8 @@ void process_redraw ();
 bool gui_wait=  false;
 bool gui_needs_update= true;
 
+bool event_filter (void *userdata, SDL_Event *event);
+
 void gui_start_loop () {
   // start the main loop
   int  delay= 10;
@@ -846,6 +850,8 @@ void gui_start_loop () {
   time_t t1, t2;
 
   // FIXME: Don't typeset when resizing window
+  
+  SDL_AddEventWatch (&event_filter, NULL);
 
   while (nr_windows > 0 || number_of_servers () > 0) {
     
@@ -938,9 +944,7 @@ void process_redraw () {
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
     vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
-    current_window= win;
     win->process_redraw ();
-    current_window= NULL;
   }
 }
 
@@ -1172,6 +1176,25 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_KEY_DOWN:
   } // switch (event->type)
 }
+
+bool event_filter (void *userdata, SDL_Event *event) {
+  if (event->type == SDL_EVENT_WINDOW_RESIZED) {
+    cout << "resizing window" << LF;
+    vue_window win= get_window_from_ID (event->window.windowID);
+    if (win) {
+      Clay_SetCurrentContext (win->clay_ctx);
+      Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
+      win->relayout= true;
+      win->process_layout();
+      if (the_interpose_handler != NULL) the_interpose_handler ();
+      vue_simple_widget_rep::repaint_all_in_window (win);
+      win->process_redraw();
+      return false;
+    }
+  }
+  return true;
+}
+
 
 /******************************************************************************
 * Font support
