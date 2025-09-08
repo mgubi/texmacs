@@ -952,11 +952,13 @@ vue_ui_rep::do_layout () {
       concrete(d.w)->do_layout ();
       if (Clay_Hovered ()) {
         if (current_balloon != id) {
-          balloon_time= texmacs_time ();
+          // hovered and not active, then become active and start counting time
           current_balloon= id;
+          balloon_time= texmacs_time ();
         }
-        if ((current_balloon == id) &&
-            (texmacs_time () - balloon_time > 1000)) {
+        time_t elapsed= texmacs_time () - balloon_time;
+        if ((elapsed > 1000) && (elapsed < 5000)) {
+          // show the balloon
           CLAY({
             .backgroundColor= { 240, 240, 0, 255 },
             .layout= { .padding= { 10, 10, 10, 10 } },
@@ -972,6 +974,12 @@ vue_ui_rep::do_layout () {
           {
             concrete(d.help)->do_layout ();
           }
+        }
+      } else {
+        // not hovered, reset if we were active
+        if (current_balloon == id) {
+          current_balloon= 0;
+          balloon_time= 0;
         }
       }
     }
