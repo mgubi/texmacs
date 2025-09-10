@@ -953,7 +953,6 @@ vue_ui_rep::do_layout () {
 //      .layout= { .sizing= layoutExpand }})
     {
       concrete(d.w)->do_layout ();
-//      if (Clay_Hovered ()) {
       Clay_ElementId target_id= CLAY_SIDI(CLAY_TM_STRING(concrete (d.w)->type), concrete (d.w)->id);
       if (Clay_PointerOver (target_id)) {
         if (current_balloon != id) {
@@ -972,11 +971,10 @@ vue_ui_rep::do_layout () {
               .color= { 200, 200, 0, 255 }},
             .floating= {
               .zIndex= 10,
-              .offset= { 10, 10 },
-              .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-              .parentId= target_id.id,
+              .offset= { (float)mouse_x + 30, (float)mouse_y + 30 },
+              .attachTo= CLAY_ATTACH_TO_ROOT,
               .attachPoints= {
-                .parent= CLAY_ATTACH_POINT_RIGHT_BOTTOM }}})
+                .parent= CLAY_ATTACH_POINT_LEFT_TOP }}})
           {
             concrete(d.help)->do_layout ();
           }
