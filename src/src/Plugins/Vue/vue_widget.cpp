@@ -284,10 +284,6 @@ inline tm_ostream& operator << (tm_ostream& out, picture &bb)
 ******************************************************************************/
 
 
-void destroy_window_widget (widget w) {
-}
-// destroys a window as created by the above routines
-
 // VUE_WIDGET(plain_window_widget, widget, w, string, s, command, quit);
 // creates a decorated window with name s and contents w
 VUE_WIDGET(popup_window_widget, widget, w, string, s);
@@ -3265,3 +3261,15 @@ widget plain_window_widget (widget wid, string s, command quit) {
   }
 }
   
+void destroy_window_widget (widget w) {
+  vue_widget vw= concrete(w);
+  cout << "destroy_window_widget on " << vw->type << LF;
+  vue_plain_window_widget_rep *ww= dynamic_cast<vue_plain_window_widget_rep*> (vw.rep);
+  if (ww){
+    tm_delete (ww->win);
+  } else {
+    cout << "not a window widget!" << LF;
+  }
+}
+// destroys a window as created by the above routines
+
