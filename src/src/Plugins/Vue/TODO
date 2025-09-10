@@ -1,5 +1,10 @@
 TODO
 
+* decide what to do with win->relayout
+* fix closing windows (why is not working??)
+* handle properly hot vs. active vs. capture of elements by mouse actions
+* introduce animation subsystem for transitions
+* events should go to the appropriate window
 * manage balloons properly (attach them to the widget, don't create layout element for them)
 * handle kinetic wheel properly
 * scrollbars for editors
