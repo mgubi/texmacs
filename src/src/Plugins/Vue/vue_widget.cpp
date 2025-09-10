@@ -948,43 +948,38 @@ vue_ui_rep::do_layout () {
   if (type == "balloon_widget") {
     //VUE_WIDGET(balloon_widget, widget, w, widget, help);
     vue_balloon_widget d= open_box<vue_balloon_widget> (data);
-//    CLAY({
-//      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
-//      .layout= { .sizing= layoutExpand }})
-    {
-      concrete(d.w)->do_layout ();
-      Clay_ElementId target_id= CLAY_SIDI(CLAY_TM_STRING(concrete (d.w)->type), concrete (d.w)->id);
-      if (Clay_PointerOver (target_id)) {
-        if (current_balloon != id) {
-          // hovered and not active, then become active and start counting time
-          current_balloon= id;
-          balloon_time= texmacs_time ();
+    concrete(d.w)->do_layout ();
+    Clay_ElementId target_id= CLAY_SIDI(CLAY_TM_STRING(concrete (d.w)->type), concrete (d.w)->id);
+    if (Clay_PointerOver (target_id)) {
+      if (current_balloon != id) {
+        // hovered and not active, then become active and start counting time
+        current_balloon= id;
+        balloon_time= texmacs_time ();
+      }
+      time_t elapsed= texmacs_time () - balloon_time;
+      if ((elapsed > 1000) && (elapsed < 5000)) {
+        // show the balloon
+        CLAY({
+          .backgroundColor= { 240, 240, 0, 255 },
+          .layout= { .padding= { 10, 10, 10, 10 } },
+          .border= {
+            .width= { 2, 2, 2, 2 },
+            .color= { 200, 200, 0, 255 }},
+          .floating= {
+            .zIndex= 10,
+            .offset= { (float)mouse_x + 30, (float)mouse_y + 30 },
+            .attachTo= CLAY_ATTACH_TO_ROOT,
+            .attachPoints= {
+              .parent= CLAY_ATTACH_POINT_LEFT_TOP }}})
+        {
+          concrete(d.help)->do_layout ();
         }
-        time_t elapsed= texmacs_time () - balloon_time;
-        if ((elapsed > 1000) && (elapsed < 5000)) {
-          // show the balloon
-          CLAY({
-            .backgroundColor= { 240, 240, 0, 255 },
-            .layout= { .padding= { 10, 10, 10, 10 } },
-            .border= {
-              .width= { 2, 2, 2, 2 },
-              .color= { 200, 200, 0, 255 }},
-            .floating= {
-              .zIndex= 10,
-              .offset= { (float)mouse_x + 30, (float)mouse_y + 30 },
-              .attachTo= CLAY_ATTACH_TO_ROOT,
-              .attachPoints= {
-                .parent= CLAY_ATTACH_POINT_LEFT_TOP }}})
-          {
-            concrete(d.help)->do_layout ();
-          }
-        }
-      } else {
-        // not hovered, reset if we were active
-        if (current_balloon == id) {
-          current_balloon= 0;
-          balloon_time= 0;
-        }
+      }
+    } else {
+      // not hovered, reset if we were active
+      if (current_balloon == id) {
+        current_balloon= 0;
+        balloon_time= 0;
       }
     }
     return;
