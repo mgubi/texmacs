@@ -29,6 +29,10 @@
 
 #include "../MuPDF/mupdf_picture.hpp"
 
+widget make_menu_widget (object wid);
+extern bool menu_caching;
+
+
 // A note on TeXmacs' coordinates.
 //
 // TeXmacs uses a cartesian coordinate system oriended upwards and rightwards,
@@ -718,10 +722,6 @@ typedef struct
 
 ScrollbarData scrollbarData= { {0, 0}, {0, 0}, false };
 
-
-widget make_menu_widget (object wid);
-extern bool menu_caching;
-
 void
 vue_ui_rep::do_layout () {
   if (type == "horizontal_menu") {
@@ -1160,7 +1160,7 @@ vue_ui_rep::do_layout () {
     }
     CLAY({
       .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
-      .layout= { .sizing= layoutExpand }})
+      .layout= { .sizing= layoutFit }})
     {
       if (!is_nil (d.current)) {
         concrete (d.current)->do_layout ();
@@ -1194,7 +1194,7 @@ vue_ui_rep::do_layout () {
     }
     CLAY({
       .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
-      .layout= { .sizing= layoutExpand }})
+      .layout= { .sizing= layoutFit }})
     {
       if (!is_nil (d.current)) {
         concrete (d.current)->do_layout ();
