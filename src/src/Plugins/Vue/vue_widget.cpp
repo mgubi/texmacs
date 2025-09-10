@@ -1011,10 +1011,10 @@ vue_ui_rep::do_layout () {
       .id= CLAY_IDI("glue_widget", id),
       .layout= {
         .sizing= {
-          .width= d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL)
-          : CLAY_SIZING_FIXED((float)d.w/PIXEL),
-            .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
-          : CLAY_SIZING_FIXED((float)2*d.h/PIXEL) }}}) {};
+          .width=  d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL)
+                        : CLAY_SIZING_FIXED((float)d.w/PIXEL),
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
+                        : CLAY_SIZING_FIXED((float)2*d.h/PIXEL) }}}) {};
     return;
   }
   if (type == "cached_glue_widget") {
@@ -1042,10 +1042,9 @@ vue_ui_rep::do_layout () {
       .childGap= 5 }})
     {
       while (c < n) {
-        CLAY({
-          .layout= {
-            .layoutDirection= CLAY_LEFT_TO_RIGHT,
-            .childGap= 5 }})
+        CLAY({ .layout= {
+          .layoutDirection= CLAY_LEFT_TO_RIGHT,
+          .childGap= 5 }})
         {
           for (int i=0; i< d.cols; i++) {
             if (c == n) break;

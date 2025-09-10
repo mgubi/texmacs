@@ -1,5 +1,7 @@
 TODO
 
+* manage balloons properly (attach them to the widget, don't create layout element for them)
+* handle kinetic wheel properly
 * scrollbars for editors
 * more uniform handling of mouse events and keyboard focus...
 * fix dropdown menu positioning if they go off the viewport
