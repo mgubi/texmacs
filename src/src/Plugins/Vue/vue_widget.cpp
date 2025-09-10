@@ -1212,8 +1212,6 @@ vue_ui_rep::do_layout () {
   if (type == "user_canvas_widget") {
     //VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
     vue_user_canvas_widget d= open_box<vue_user_canvas_widget> (data);
-    string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING(type), id);
     CLAY({
       .id= my_id,
