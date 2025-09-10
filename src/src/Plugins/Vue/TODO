@@ -7,7 +7,6 @@ TODO
 * events should go to the appropriate window
 * manage balloons properly (attach them to the widget, don't create layout element for them)
 * handle kinetic wheel properly
-* scrollbars for editors
 * more uniform handling of mouse events and keyboard focus...
 * fix dropdown menu positioning if they go off the viewport
 * fix keyboard handling (Alt+3 should give #)
@@ -16,6 +15,10 @@ TODO
 * implement copy & paste
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
+
+WIP
+
+* scrollbars for editors (horizontal not working)
 
 DONE
 
