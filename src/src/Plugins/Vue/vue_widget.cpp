@@ -497,10 +497,18 @@ VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, icons, arr
 
 VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, current, object, curobj);
 
+VUE_WIDGET_DATA(refresh_widget_star, string, tmwid, string, kind, widget, current, object, curobj);
+
 
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
 {
+  if (type == "refresh_widget") {
+    vue_refresh_widget d= open_box<vue_refresh_widget> (data);
+    vue_refresh_widget_star dd { .tmwid= d.tmwid, .kind= d.kind };
+    data= close_box (dd);
+    return;
+  }
   if (type == "refreshable_widget") {
     vue_refreshable_widget d= open_box<vue_refreshable_widget> (data);
     vue_refreshable_widget_star dd { .prom= d.prom, .kind= d.kind };
@@ -709,6 +717,10 @@ typedef struct
 } ScrollbarData;
 
 ScrollbarData scrollbarData= { {0, 0}, {0, 0}, false };
+
+
+widget make_menu_widget (object wid);
+extern bool menu_caching;
 
 void
 vue_ui_rep::do_layout () {
@@ -1144,6 +1156,41 @@ vue_ui_rep::do_layout () {
           d.current= glue_widget();
         }
       }
+      data= close_box (d);
+    }
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= { .sizing= layoutExpand }})
+    {
+      if (!is_nil (d.current)) {
+        concrete (d.current)->do_layout ();
+      }
+    }
+    return;
+  }
+  if (type == "refresh_widget") {
+    //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
+    vue_refresh_widget_star d= open_box<vue_refresh_widget_star> (data);
+    if (is_nil (d.current) ||
+        current_window->refresh_kinds->contains ("any") ||
+        current_window->refresh_kinds->contains (d.kind) ) {
+      // (re)initialize the widget
+      string s = "'(vertical (link " * d.tmwid * "))";
+      eval ("(lazy-initialize-force)");
+      object xwid = call ("menu-expand", eval (s));
+      static hashmap<object, widget> cache;
+      if (cache->contains (xwid)) {
+        if (d.curobj == xwid) return false;
+        d.curobj = xwid;
+        d.current= cache [xwid];
+      } else {
+        d.curobj = xwid;
+        object uwid = eval (s);
+        d.current = make_menu_widget (uwid);
+        //tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
+        if (menu_caching) cache (xwid) = d.current;
+      }
+      data= close_box (d);
     }
     CLAY({
       .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
@@ -1806,7 +1853,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     {
       ASSERT (is_nil (val), "type mismatch");
       if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
-      wid->send (s, val); // forward to the content
+      //wid->send (s, val); // forward to the content (seems unnecessary)
     }
       break;
     default:
@@ -1891,7 +1938,7 @@ vue_plain_window_widget_rep::post_layout () {
   win->get_size (w, h);
   SI cw= el.boundingBox.width * PIXEL / 2,
      ch= el.boundingBox.height * PIXEL / 2;
-  if (!win->clay_debug && ((w != cw) || (h != ch))) {
+  if (false && !win->clay_debug && ((w != cw) || (h != ch))) {
     //cout << w << "," << h << " " << cw << "," << ch << LF;
     win->set_size (cw, ch);
     return true;
