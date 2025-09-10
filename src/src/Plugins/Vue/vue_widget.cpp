@@ -196,10 +196,9 @@ unsigned int vue_widget_rep::serial_id= 0;
 ******************************************************************************/
 
 class vue_ui_rep : public vue_widget_rep {
-protected:
+public:
   blackbox data;
   
-public:
   vue_ui_rep (string _type, blackbox _data= NULL);
   virtual ~vue_ui_rep () {};
   
@@ -494,7 +493,7 @@ decode_length (string width, vue_window win, int style) {
 
 // additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
-VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, bool, down);
+VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw);
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -534,8 +533,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw, true };
-    type= "pull_button";
+    vue_cached_pull_button cd { d.w, d.pw, cw };
     data= close_box (cd);
     return;
   }
@@ -543,8 +541,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pullright_button d= open_box<vue_pullright_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw, false };
-    type= "pull_button";
+    vue_cached_pull_button cd { d.w, d.pw, cw };
     data= close_box(cd);
     return;
   }
@@ -582,11 +579,13 @@ vue_ui_rep::send (slot s, blackbox val) {
 }
 
 void
-layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
-  Clay_ElementId button_id= d.down ? CLAY_IDI("pulldown_button", id) : CLAY_IDI("pullright_button", id);
-  Clay_ElementId float_id=  CLAY_IDI("pull_button_float", id);
+layout_pull_button (vue_ui_rep *w) {
+  vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
+  bool down= w->type == "pulldown_button";
+  Clay_ElementId button_id= CLAY_SIDI(CLAY_TM_STRING(w->type), w->id);
+  Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
   Clay_Sizing s= layoutExpand;
-  if (d.down) s= { CLAY_SIZING_FIT(.min=20) };
+  if (down) s= { CLAY_SIZING_FIT(.min=20) };
   CLAY({
     .id= button_id,
     .layout= {
@@ -595,7 +594,7 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
     .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
-    if (!d.down) {
+    if (!down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
       layout_text("<#25B8>", 0, black); // right arrow
     }
@@ -622,8 +621,8 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
         .floating= {
           .attachTo= CLAY_ATTACH_TO_PARENT,
           .attachPoints= {
-             .parent= d.down ? CLAY_ATTACH_POINT_LEFT_BOTTOM
-                             : CLAY_ATTACH_POINT_RIGHT_TOP }},
+             .parent= down ? CLAY_ATTACH_POINT_LEFT_BOTTOM
+                           : CLAY_ATTACH_POINT_RIGHT_TOP }},
         .layout= {
           .padding= { 8, 8, 8, 8 },
           .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
@@ -652,12 +651,14 @@ layout_pull_button (unsigned int id, vue_cached_pull_button &d) {
       }
     }
   }
+  // store back changes
+  w->data= close_box (d);
 }
 
 void
 layout_menu (unsigned int id, array<widget> a, bool vert) {
   CLAY({
-    .id= vert ? CLAY_IDI("v_menu", id) : CLAY_IDI("h_menu", id),
+    .id= vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id),
     .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= layoutExpand,
@@ -681,7 +682,7 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
     s.height= CLAY_SIZING_GROW(0);
   }
   CLAY({
-     .id= vert ? CLAY_IDI("v_list", id) : CLAY_IDI("h_list", id),
+     .id= vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id),
      .layout= {
        .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
        .sizing= s }})
@@ -902,10 +903,8 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  if (type == "pull_button") {
-    vue_cached_pull_button d= open_box<vue_cached_pull_button> (data);
-    layout_pull_button (id, d);
-    data= close_box (d);
+  if (type == "pulldown_button" || type == "pullright_button") {
+    layout_pull_button (this);
     return;
   }
   if (type == "text_widget") {
