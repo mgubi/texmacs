@@ -2627,37 +2627,14 @@ vue_simple_widget_rep::do_layout () {
       .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
   }
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
+  Clay_ElementData d= Clay_GetElementData (clay_id);
   CLAY({
     .id= clay_id,
     .layout= { .sizing= s },
     .custom= { .customData= vue_render_widget },
     .userData= this })
   {
-    Clay_ElementData canvas_layout= Clay_GetElementData (clay_id);
-    Clay_Vector2 scrollPosition = {
-      .x= -(float)backing_pos.x1 / ren->pixel,
-      .y= (float)backing_pos.x2 / ren->pixel };
-    Clay_ScrollContainerData scrollData= {
-      .scrollPosition= &scrollPosition,
-      .scrollContainerDimensions= {
-        .width=  canvas_layout.boundingBox.width,
-        .height= canvas_layout.boundingBox.height },
-      .contentDimensions= {
-        .width=  ((float)extents->x2 - extents->x1)/ren->pixel,
-        .height= ((float)extents->y2 - extents->y1)/ren->pixel, },
-      .config= {
-        .horizontal= true,
-        .vertical= true,
-        .childOffset= scrollPosition },
-      .found= true
-    };
-    if (scrollData.found && canvas_layout.found) {
-      scroll_bar (clay_id, scrollData);
-      scroll_pos.x1= -scrollPosition.x * ren->pixel;
-      scroll_pos.x2= scrollPosition.y * ren->pixel;
-      absolute_scroll= false;
-    }
-    if (1) { // debug view
+    if (0) { // debug view
       CLAY({
         .backgroundColor= { 80, 80, 80, 80 },
         .layout= { .padding= { 18, 18, 18, 18 } },
@@ -2669,46 +2646,68 @@ vue_simple_widget_rep::do_layout () {
         tm_ostream out= string_ostream (debug_text);
         out << " extents:  " << extents << LF;
         out << " viewport: " << rectangle(backing_pos.x1,
-                                          backing_pos.x2 - canvas_layout.boundingBox.height * ren->pixel,
-                                          backing_pos.x1 + canvas_layout.boundingBox.width * ren->pixel,
+                                          backing_pos.x2 - d.boundingBox.height * ren->pixel,
+                                          backing_pos.x1 + d.boundingBox.width * ren->pixel,
                                           backing_pos.x2);
         out.flush ();
         CLAY_TEXT(CLAY_TM_STRING(debug_text),
                   CLAY_TEXT_CONFIG({ .fontSize= 30, .textColor= { 0, 0, 200, 255} }));
       }
     }
-    if (Clay_Hovered () && (mouse_action != "")) {
-      Clay_ElementData d= Clay_GetElementData (clay_id);
-      SI x= mouse_x - d.boundingBox.x;
-      SI y= mouse_y - d.boundingBox.y;
-      ren->set_origin (-backing_pos.x1, -backing_pos.x2);
-      ren->encode (x,y);
-      if (N(mouse_data) == 2) {
-        mouse_data[0] *= ren->pixel * size.x1 * 0.01;
-        mouse_data[1] *= ren->pixel * size.x2 * 0.01;
-      }
-      if (mouse_action != "move") {
-        cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
-        if (N(mouse_data) == 2) {
-          cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
-        }
-        cout << LF;
-      }
-      if (mouse_action == "wheel") {
-        scroll_momentum.x1 += mouse_data[0];
-        scroll_momentum.x2 += mouse_data[1];
-      } else {
-        if (starts (mouse_action, "press-")) {
-          if (current_window->kbd_focus != this) {
-            current_window->kbd_focus= this;
-          }
-        }
-        handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
-      }
-      // reset
-      mouse_action="";
-      if (N(mouse_data) > 0) mouse_data= array<double>();
+  }
+  if (d.found) {
+    Clay_Vector2 scrollPosition = {
+      .x= -(float)backing_pos.x1 / ren->pixel,
+      .y= (float)backing_pos.x2 / ren->pixel };
+    Clay_ScrollContainerData scrollData= {
+      .scrollPosition= &scrollPosition,
+      .scrollContainerDimensions= {
+        .width=  d.boundingBox.width,
+        .height= d.boundingBox.height },
+      .contentDimensions= {
+        .width=  ((float)extents->x2 - extents->x1)/ren->pixel,
+        .height= ((float)extents->y2 - extents->y1)/ren->pixel, },
+      .config= {
+        .horizontal= true,
+        .vertical= true,
+        .childOffset= scrollPosition },
+      .found= true
+    };
+    scroll_bar (clay_id, scrollData);
+    scroll_pos.x1= -scrollPosition.x * ren->pixel;
+    scroll_pos.x2= scrollPosition.y * ren->pixel;
+    absolute_scroll= false;
+  }
+  if (Clay_Hovered () && (mouse_action != "")) {
+    SI x= mouse_x - d.boundingBox.x;
+    SI y= mouse_y - d.boundingBox.y;
+    ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+    ren->encode (x,y);
+    if (N(mouse_data) == 2) {
+      mouse_data[0] *= ren->pixel * size.x1 * 0.01;
+      mouse_data[1] *= ren->pixel * size.x2 * 0.01;
     }
+    if (mouse_action != "move") {
+      cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
+      if (N(mouse_data) == 2) {
+        cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
+      }
+      cout << LF;
+    }
+    if (mouse_action == "wheel") {
+      scroll_momentum.x1 += mouse_data[0];
+      scroll_momentum.x2 += mouse_data[1];
+    } else {
+      if (starts (mouse_action, "press-")) {
+        if (current_window->kbd_focus != this) {
+          current_window->kbd_focus= this;
+        }
+      }
+      handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
+    }
+    // reset
+    mouse_action="";
+    if (N(mouse_data) > 0) mouse_data= array<double>();
   }
   if (scroll_momentum.x1 != 0 || scroll_momentum.x2 != 0) {
     cout << "momentum " << scroll_momentum;
