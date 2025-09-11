@@ -926,7 +926,7 @@ void gui_start_loop () {
     // 7. redraw the UI
     process_redraw ();
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 30) cout << "redraw took " << t2 - t1 << "ms\n";
+    if (t2 - t1 >= 50) cout << "redraw took " << t2 - t1 << "ms\n";
     gui_wait= true;
   }
 }

@@ -2615,6 +2615,10 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
   (void) win; (void) x1; (void) y1; (void) x2; (void) y2;
 }
 
+/******************************************************************************
+* layout
+******************************************************************************/
+
 void
 vue_simple_widget_rep::do_layout () {
   win= current_window; // save the info
@@ -2834,13 +2838,13 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     if (absolute_scroll) {
       coord2 pt= scroll_pos;
       scroll_pos= backing_pos;
-      cout << "extents " << extents << LF;
-      cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
+      // cout << "extents " << extents << LF;
+      // cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
       if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
       else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
       if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
       else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-      cout << "scroll_pos (corrected) " << scroll_pos << LF;
+      // cout << "scroll_pos (corrected) " << scroll_pos << LF;
       absolute_scroll=false;
     }
     
@@ -2861,7 +2865,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     int dy=  retina_factor * (scroll_pos.x2 - backing_pos.x2);
 
     backing_pos= scroll_pos;
-    cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
+    //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
         
 #if 0
     //FIXME: complete this part
@@ -2889,7 +2893,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 
   if ((new_bs_w != bs_w)   || (new_bs_h != bs_h)) {
     // the viewport size changed, reset the backing store
-    cout << "viewport changed (" << bs_w << "," << bs_h << ") (" << new_bs_w << "," << new_bs_h << ")" << LF;
+    // cout << "viewport changed (" << bs_w << "," << bs_h << ") (" << new_bs_w << "," << new_bs_h << ")" << LF;
     // create a new backing store with updated viewport and the renderer
     picture new_backing_store= native_picture (new_bs_w, new_bs_h, 0, 0);
     renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
