@@ -955,7 +955,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        layout_text (d.ks, d.style, inert ? grey : black);
+        layout_text (d.ks, d.style, inert ? dark_grey : black);
       }
       if (!inert && Clay_Hovered () && (mouse_state & 1)) {
         // close any active popup chain (see pull_widget)
@@ -973,7 +973,7 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
-    layout_text (d.s, d.style, d.style & WIDGET_STYLE_INERT ? grey : black);
+    layout_text (d.s, d.style, d.style & WIDGET_STYLE_INERT ? dark_grey : black);
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -1004,7 +1004,7 @@ vue_ui_rep::do_layout () {
   if (type == "menu_group") {
     //VUE_WIDGET(menu_group, string, name, int, style);
     vue_menu_group d= open_box<vue_menu_group> (data);
-    layout_text (d.name, d.style, grey);
+    layout_text (d.name, d.style, dark_grey);
     return;
   }
   if (type == "balloon_widget") {
