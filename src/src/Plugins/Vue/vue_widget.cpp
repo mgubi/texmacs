@@ -52,13 +52,18 @@ extern bool menu_caching;
 #include "clay_grid.h"
 
 Clay_Sizing layoutExpand= {
-    .width= CLAY_SIZING_GROW(0),
+    .width=  CLAY_SIZING_GROW(0),
     .height= CLAY_SIZING_GROW(0)
 };
 
 Clay_Sizing layoutFit= {
-    .width= CLAY_SIZING_FIT(),
+    .width=  CLAY_SIZING_FIT(),
     .height= CLAY_SIZING_FIT()
+};
+
+Clay_Sizing layoutFull= {
+    .width=  CLAY_SIZING_PERCENT(1.0f),
+    .height= CLAY_SIZING_PERCENT(1.0f)
 };
 
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars= &(s[0]) })
@@ -724,7 +729,7 @@ typedef struct
 ScrollbarData scrollbarData= { 0, 0, false, true };
 
 void
-scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
+scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
   Clay_Vector2 ratio= (Clay_Vector2) {
     scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
     scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
@@ -735,7 +740,7 @@ scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementI
   }
   // vertical scroll bar
   if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
-    Clay_ElementId vsb_id= CLAY_IDI("ScrollBarV", id);
+    Clay_ElementId vsb_id= CLAY_IDI("ScrollBarV", my_id.id);
     CLAY({
       .id= vsb_id,
       .floating= {
@@ -768,7 +773,7 @@ scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementI
   
   // horizontal scroll bar
   if (scrollData.scrollContainerDimensions.width < scrollData.contentDimensions.width) {
-    Clay_ElementId hsb_id= CLAY_IDI("ScrollBarH", id);
+    Clay_ElementId hsb_id= CLAY_IDI("ScrollBarH", my_id.id);
     CLAY({
       .id= hsb_id,
       .floating= {
@@ -1304,9 +1309,9 @@ vue_ui_rep::do_layout () {
       concrete (d.wid)->do_layout ();
     }
     Clay_ScrollContainerData scrollData= Clay_GetScrollContainerData (my_id);
-    Clay_ElementData canvas_layout= Clay_GetElementData (my_id);
-    if (scrollData.found && canvas_layout.found) {
-      scroll_bar (id, scrollData, my_id, canvas_layout);
+    //Clay_ElementData canvas_layout= Clay_GetElementData (my_id);
+    if (scrollData.found) {
+      scroll_bar (my_id, scrollData);
     }
     return;
   }
@@ -1954,7 +1959,7 @@ vue_plain_window_widget_rep::do_layout () {
     .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .sizing= layoutFit }})
+      .sizing= layoutFull }})
   {
      concrete (wid)->do_layout ();
   }
@@ -2242,9 +2247,7 @@ void vue_texmacs_widget_rep::do_layout () {
     .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .sizing= {
-        .width=  CLAY_SIZING_FIT ((float) 2*w/PIXEL),
-        .height= CLAY_SIZING_FIT ((float) 2*h/PIXEL)  },
+      .sizing= layoutFull,
       .padding= { 0, 0, 16, 16 },
       .childGap= 16  }})
   {
@@ -2628,7 +2631,7 @@ vue_simple_widget_rep::do_layout () {
   {
     Clay_ElementData canvas_layout= Clay_GetElementData (clay_id);
     Clay_Vector2 scrollPosition = {
-      .x= (float)backing_pos.x1 / ren->pixel,
+      .x= -(float)backing_pos.x1 / ren->pixel,
       .y= (float)backing_pos.x2 / ren->pixel };
     Clay_ScrollContainerData scrollData= {
       .scrollPosition= &scrollPosition,
@@ -2645,8 +2648,8 @@ vue_simple_widget_rep::do_layout () {
       .found= true
     };
     if (scrollData.found && canvas_layout.found) {
-      scroll_bar (id, scrollData, clay_id, canvas_layout);
-      scroll_pos.x1= scrollPosition.x * ren->pixel;
+      scroll_bar (clay_id, scrollData);
+      scroll_pos.x1= -scrollPosition.x * ren->pixel;
       scroll_pos.x2= scrollPosition.y * ren->pixel;
       absolute_scroll= false;
     }
