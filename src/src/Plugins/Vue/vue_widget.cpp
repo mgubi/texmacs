@@ -715,122 +715,90 @@ public:
 
 typedef struct
 {
-    Clay_Vector2 clickOrigin;
-    Clay_Vector2 positionOrigin;
-    bool mouseDown;
+  float clickOrigin;
+  float positionOrigin;
+  bool mouseDown;
+  bool vertical;
 } ScrollbarData;
 
-ScrollbarData scrollbarData= { {0, 0}, {0, 0}, false };
+ScrollbarData scrollbarData= { 0, 0, false, true };
 
 void
-scroll_bar2 (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
-  Clay_ElementId sb_id= CLAY_IDI("ScrollBarV", id);
-  CLAY({
-    .id= sb_id,
-    .floating= {
-      .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .y= -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
+scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
+  Clay_Vector2 ratio= (Clay_Vector2) {
+    scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
+    scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
+  };
+  //FIXME: mouse handling still not ok
+  if (!(mouse_state & 1)) {
+      scrollbarData.mouseDown= false;
+  }
+  // vertical scroll bar
+  if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
+    Clay_ElementId vsb_id= CLAY_IDI("ScrollBarV", id);
+    CLAY({
+      .id= vsb_id,
+      .floating= {
+        .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+        .offset= { .y= -(scrollData.scrollPosition->y / ratio.y) },
         .zIndex= 1,
         .parentId= my_id.id,
         .attachPoints= {
           .element= CLAY_ATTACH_POINT_RIGHT_TOP,
-          .parent=  CLAY_ATTACH_POINT_RIGHT_TOP }}})
-  {
-    CLAY({
-      .id= CLAY_IDI("ScrollBarButtonV", id),
-      .layout= {
-        .sizing= {
-           CLAY_SIZING_FIXED(24),
-           CLAY_SIZING_FIXED((scrollData.scrollContainerDimensions.height / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height) }},
-      .backgroundColor= Clay_PointerOver (sb_id)
-            ? (Clay_Color){100, 100, 140, 150}
-            : (Clay_Color){120, 120, 160, 150} ,
-      .cornerRadius= CLAY_CORNER_RADIUS(12) }) {}
-  }
-  //FIXME: mouse handling still not ok
-  if (!(mouse_state & 1)) {
-      scrollbarData.mouseDown= false;
-  }
-  if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (sb_id)) {
-    mouse_action= "";
-    scrollbarData.clickOrigin= { (float) mouse_x, (float) mouse_y };
-    scrollbarData.positionOrigin= *scrollData.scrollPosition;
-    scrollbarData.mouseDown= true;
-  } else if (scrollbarData.mouseDown) {
-    if (scrollData.contentDimensions.height > 0) {
-      Clay_Vector2 ratio= (Clay_Vector2) {
-        scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
-        scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
-      };
-      if (scrollData.config.vertical) {
-        scrollData.scrollPosition->y= scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
-        scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - canvas_layout.boundingBox.height, 0.0f))), 0.0f);
-      }
-      if (scrollData.config.horizontal) {
-        scrollData.scrollPosition->x= scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
-        scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - canvas_layout.boundingBox.width, 0.0f))), 0.0f);
-      }
-    }
-  }
-}
-
-
-void
-scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
-  Clay_ElementId sb_id= CLAY_IDI("ScrollBarV", id);
-  CLAY({
-    .id= sb_id,
-    .floating= {
-      .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .y= -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
-      .zIndex= 1,
-      .parentId= my_id.id,
-      .attachPoints= {
-        .element= CLAY_ATTACH_POINT_RIGHT_TOP,
-        .parent=  CLAY_ATTACH_POINT_RIGHT_TOP }}})
-  {
-    if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
-      CLAY({
-        .id= CLAY_IDI("ScrollBarButtonV", id),
+          .parent=  CLAY_ATTACH_POINT_RIGHT_TOP }},
         .layout= {
           .sizing= {
-             CLAY_SIZING_FIXED(24),
-             CLAY_SIZING_FIXED((scrollData.scrollContainerDimensions.height / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height) }},
-        .backgroundColor= Clay_PointerOver (sb_id)
-              ? (Clay_Color){100, 100, 140, 150}
-              : (Clay_Color){120, 120, 160, 150} ,
-        .cornerRadius= CLAY_CORNER_RADIUS(12) }) {}
+            CLAY_SIZING_FIXED(24),
+            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.height / ratio.y) }},
+        .backgroundColor= Clay_PointerOver (vsb_id)
+          ? (Clay_Color){100, 100, 140, 150}
+          : (Clay_Color){120, 120, 160, 150},
+      .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
+    if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (vsb_id)) {
+      mouse_action= "";
+      scrollbarData.mouseDown= true;
+      scrollbarData.vertical= true;
+      scrollbarData.clickOrigin= (float) mouse_y;
+      scrollbarData.positionOrigin= scrollData.scrollPosition->y;
+    } else if (scrollbarData.mouseDown) {
+      scrollData.scrollPosition->y= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_y) * ratio.y;
+      scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - scrollData.scrollContainerDimensions.height, 0.0f))), 0.0f);
     }
   }
-  //FIXME: mouse handling still not ok
-  if (!(mouse_state & 1)) {
-      scrollbarData.mouseDown= false;
-  }
-  if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (sb_id)) {
-    mouse_action= "";
-    scrollbarData.clickOrigin= { (float) mouse_x, (float) mouse_y };
-    scrollbarData.positionOrigin= *scrollData.scrollPosition;
-    scrollbarData.mouseDown= true;
-  } else if (scrollbarData.mouseDown) {
-    if (scrollData.contentDimensions.height > 0) {
-      Clay_Vector2 ratio= (Clay_Vector2) {
-        scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
-        scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
-      };
-      if (scrollData.config.vertical) {
-        scrollData.scrollPosition->y= scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
-        scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - scrollData.scrollContainerDimensions.height, 0.0f))), 0.0f);
-      }
-      if (scrollData.config.horizontal) {
-        scrollData.scrollPosition->x= scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
-        scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - scrollData.scrollContainerDimensions.width, 0.0f))), 0.0f);
-      }
+  
+  // horizontal scroll bar
+  if (scrollData.scrollContainerDimensions.width < scrollData.contentDimensions.width) {
+    Clay_ElementId hsb_id= CLAY_IDI("ScrollBarH", id);
+    CLAY({
+      .id= hsb_id,
+      .floating= {
+        .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+        .offset= { .x= -(scrollData.scrollPosition->x / ratio.x) },
+        .zIndex= 1,
+        .parentId= my_id.id,
+        .attachPoints= {
+          .element= CLAY_ATTACH_POINT_LEFT_BOTTOM,
+          .parent=  CLAY_ATTACH_POINT_LEFT_BOTTOM }},
+        .layout= {
+          .sizing= {
+            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.width / ratio.x),
+            CLAY_SIZING_FIXED(24) }},
+        .backgroundColor= Clay_PointerOver (hsb_id)
+          ? (Clay_Color){100, 100, 140, 150}
+          : (Clay_Color){120, 120, 160, 150},
+      .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
+    if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (hsb_id)) {
+      mouse_action= "";
+      scrollbarData.mouseDown= true;
+      scrollbarData.vertical= false;
+      scrollbarData.clickOrigin= (float) mouse_x;
+      scrollbarData.positionOrigin= scrollData.scrollPosition->x;
+    } else if (scrollbarData.mouseDown) {
+      scrollData.scrollPosition->x= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_x) * ratio.x;
+      scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - scrollData.scrollContainerDimensions.width, 0.0f))), 0.0f);
     }
   }
 }
-
-
-
 
 void
 vue_ui_rep::do_layout () {
