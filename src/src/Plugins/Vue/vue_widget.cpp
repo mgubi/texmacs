@@ -723,7 +723,7 @@ typedef struct
 ScrollbarData scrollbarData= { {0, 0}, {0, 0}, false };
 
 void
-scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
+scroll_bar2 (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
   Clay_ElementId sb_id= CLAY_IDI("ScrollBarV", id);
   CLAY({
     .id= sb_id,
@@ -772,8 +772,63 @@ scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementI
       }
     }
   }
-
 }
+
+
+void
+scroll_bar (unsigned int id, Clay_ScrollContainerData &scrollData, Clay_ElementId &my_id, Clay_ElementData &canvas_layout) {
+  Clay_ElementId sb_id= CLAY_IDI("ScrollBarV", id);
+  CLAY({
+    .id= sb_id,
+    .floating= {
+      .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+        .offset= { .y= -(scrollData.scrollPosition->y / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height },
+      .zIndex= 1,
+      .parentId= my_id.id,
+      .attachPoints= {
+        .element= CLAY_ATTACH_POINT_RIGHT_TOP,
+        .parent=  CLAY_ATTACH_POINT_RIGHT_TOP }}})
+  {
+    if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
+      CLAY({
+        .id= CLAY_IDI("ScrollBarButtonV", id),
+        .layout= {
+          .sizing= {
+             CLAY_SIZING_FIXED(24),
+             CLAY_SIZING_FIXED((scrollData.scrollContainerDimensions.height / scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height) }},
+        .backgroundColor= Clay_PointerOver (sb_id)
+              ? (Clay_Color){100, 100, 140, 150}
+              : (Clay_Color){120, 120, 160, 150} ,
+        .cornerRadius= CLAY_CORNER_RADIUS(12) }) {}
+    }
+  }
+  //FIXME: mouse handling still not ok
+  if (!(mouse_state & 1)) {
+      scrollbarData.mouseDown= false;
+  }
+  if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (sb_id)) {
+    mouse_action= "";
+    scrollbarData.clickOrigin= { (float) mouse_x, (float) mouse_y };
+    scrollbarData.positionOrigin= *scrollData.scrollPosition;
+    scrollbarData.mouseDown= true;
+  } else if (scrollbarData.mouseDown) {
+    if (scrollData.contentDimensions.height > 0) {
+      Clay_Vector2 ratio= (Clay_Vector2) {
+        scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
+        scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
+      };
+      if (scrollData.config.vertical) {
+        scrollData.scrollPosition->y= scrollbarData.positionOrigin.y + (scrollbarData.clickOrigin.y - mouse_y) * ratio.y;
+        scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - scrollData.scrollContainerDimensions.height, 0.0f))), 0.0f);
+      }
+      if (scrollData.config.horizontal) {
+        scrollData.scrollPosition->x= scrollbarData.positionOrigin.x + (scrollbarData.clickOrigin.x - mouse_x) * ratio.x;
+        scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - scrollData.scrollContainerDimensions.width, 0.0f))), 0.0f);
+      }
+    }
+  }
+}
+
 
 
 
