@@ -722,11 +722,11 @@ typedef struct
 {
   float clickOrigin;
   float positionOrigin;
-  bool mouseDown;
   bool vertical;
+  uint32_t active_id;
 } ScrollbarData;
 
-ScrollbarData scrollbarData= { 0, 0, false, true };
+ScrollbarData scrollbarData= { 0, 0, true, 0 };
 
 void
 scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
@@ -736,7 +736,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
   };
   //FIXME: mouse handling still not ok
   if (!(mouse_state & 1)) {
-      scrollbarData.mouseDown= false;
+    scrollbarData.active_id= 0;
   }
   // vertical scroll bar
   if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
@@ -759,13 +759,15 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
           ? (Clay_Color){100, 100, 140, 150}
           : (Clay_Color){120, 120, 160, 150},
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
-    if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (vsb_id)) {
+    if (mouse_action == "press-left" &&
+        scrollbarData.active_id == 0 &&
+        Clay_PointerOver (vsb_id)) {
       mouse_action= "";
-      scrollbarData.mouseDown= true;
+      scrollbarData.active_id= vsb_id.id;
       scrollbarData.vertical= true;
       scrollbarData.clickOrigin= (float) mouse_y;
       scrollbarData.positionOrigin= scrollData.scrollPosition->y;
-    } else if (scrollbarData.mouseDown) {
+    } else if (scrollbarData.active_id == vsb_id.id) {
       scrollData.scrollPosition->y= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_y) * ratio.y;
       scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - scrollData.scrollContainerDimensions.height, 0.0f))), 0.0f);
     }
@@ -792,13 +794,15 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
           ? (Clay_Color){100, 100, 140, 150}
           : (Clay_Color){120, 120, 160, 150},
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
-    if (mouse_action == "press-left" && !scrollbarData.mouseDown && Clay_PointerOver (hsb_id)) {
+    if (mouse_action == "press-left" &&
+        scrollbarData.active_id == 0 &&
+        Clay_PointerOver (hsb_id)) {
       mouse_action= "";
-      scrollbarData.mouseDown= true;
+      scrollbarData.active_id= hsb_id.id;
       scrollbarData.vertical= false;
       scrollbarData.clickOrigin= (float) mouse_x;
       scrollbarData.positionOrigin= scrollData.scrollPosition->x;
-    } else if (scrollbarData.mouseDown) {
+    } else if (scrollbarData.active_id == hsb_id.id) {
       scrollData.scrollPosition->x= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_x) * ratio.x;
       scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - scrollData.scrollContainerDimensions.width, 0.0f))), 0.0f);
     }
