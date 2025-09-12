@@ -269,20 +269,21 @@ vue_sdl_base_window_rep::process_layout () {
   bool relayout= false;
   do {
     // init the current GUI context
-    Clay_SetCurrentContext (clay_ctx);
     int win_x, win_y, win_w, win_h;
     SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
     SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
+
+    Clay_SetCurrentContext (clay_ctx);
     Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
     current_window= this;
     gui_init_context ();
 
     // layout the top widget
     Clay_SetDebugModeEnabled (clay_debug);
-  
     Clay_BeginLayout ();
     content->do_layout ();
     render_commands= Clay_EndLayout ();
+    
     // post layout tweaking
     relayout= content->post_layout ();
     if (relayout) {
@@ -835,6 +836,11 @@ void gui_interpose (void (*f) (void)) {
 int number_of_servers (); // in texmacs_server.hpp
 
 void sdl_log_event (const SDL_Event *event);
+static string lookup_mouse (Uint8 button);
+static string lookup_key (SDL_Keycode key, SDL_Keymod mod);
+static string print_modifiers (SDL_Keymod mod);
+static string print_key_info ( SDL_KeyboardEvent *key );
+
 void process_event (SDL_Event *event);
 void process_messages ();
 void process_layout ();
@@ -981,16 +987,6 @@ static void update_mouse_state () {
 }
 
 static string
-lookup_mouse (Uint8 button) {
-  if (button == SDL_BUTTON_LEFT)   return "left";
-  if (button == SDL_BUTTON_MIDDLE) return "middle";
-  if (button == SDL_BUTTON_RIGHT)  return "right";
-  if (button == SDL_BUTTON_X1)     return "extra1";
-  if (button == SDL_BUTTON_X2)     return "extra2";
-  return "button-error";
-}
-
-static string
 mouse_decode (unsigned int mstate) {
   // we check (mstate & 1) at last since it is usually set
   if (mstate & 2)       return "middle";
@@ -999,70 +995,6 @@ mouse_decode (unsigned int mstate) {
   else if (mstate & 16) return "down";
   else if (mstate & 1)  return "left";
   return "unknown";
-}
-
-static string
-lookup_key (SDL_Keycode key, SDL_Keymod mod) {
-  const char* str= SDL_GetKeyName (key);
-  string r (str, (int)strlen (str));
-  r= utf8_to_cork (r);
-  if (contains_unicode_char (r)) return r;
-//  string s=r;
-  if ((key >= 'A') && (key <= 'Z')) key= key - 'A' + 'a';
-  string s= ((mod & SDL_KMOD_SHIFT) ? upper_key [key] : lower_key [key]);
-  if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
-
-  if (mod & SDL_KMOD_CTRL) s= "C-" * s;
-  if (mod & SDL_KMOD_ALT)  s= "A-" * s;
-  if (mod & SDL_KMOD_GUI)  s= "M-" * s;
-  cout << "key press: " << s << LF;
-  return s;
-}
-
-// Print modifier info
-static string
-print_modifiers (SDL_Keymod mod) {
-  string s;
-  s << " Modifers: [" << as_string (mod) << " ";
-  
-  // If there are none then say so and return.
-  if( mod == SDL_KMOD_NONE ){
-    s << "None ]\n";
-    return s;
-  }
-  
-  // Check for the presence of each SDLMod value
-  if( mod & SDL_KMOD_NUM )    s << "NUMLOCK ";
-  if( mod & SDL_KMOD_CAPS )   s << "CAPSLOCK ";
-  if( mod & SDL_KMOD_LCTRL )  s << "LCTRL ";
-  if( mod & SDL_KMOD_RCTRL )  s << "RCTRL ";
-  if( mod & SDL_KMOD_RSHIFT ) s << "RSHIFT ";
-  if( mod & SDL_KMOD_LSHIFT ) s << "LSHIFT ";
-  if( mod & SDL_KMOD_RALT )   s << "RALT ";
-  if( mod & SDL_KMOD_LALT )   s << "LALT ";
-  if( mod & SDL_KMOD_RGUI )   s << "RGUI ";
-  if( mod & SDL_KMOD_LGUI )   s << "LGUI ";
-  if( mod & SDL_KMOD_CTRL )   s << "CTRL ";
-  if( mod & SDL_KMOD_SHIFT )  s << "SHIFT ";
-  if( mod & SDL_KMOD_ALT )    s << "ALT ";
-  if( mod & SDL_KMOD_GUI )    s << "GUI ";
-  s << "]";
-  return s;
-}
-
-// Print all information about a key event
-static string
-print_key_info ( SDL_KeyboardEvent *key ) {
-  string s;
-  // Is it a release or a press?
-  s <<  (key->type == SDL_EVENT_KEY_UP ? "Release:- " : "Press:- ");
-  // Print the hardware scancode first
-  s << "Scancode: " << as_hexadecimal (key->scancode);
-  // Print the name of the key
-  s << ", Name: " << SDL_GetKeyName (key->key);
-  // Print modifier info
-  s << print_modifiers (key->mod);
-  return s;
 }
 
 void
@@ -1974,8 +1906,85 @@ initialize_keyboard () {
   Map (0x20ac, "euro");
 }
 
+/******************************************************************************
+* SDL3 event logger
+******************************************************************************/
 
-// SDL3 event logger
+static string
+lookup_mouse (Uint8 button) {
+  if (button == SDL_BUTTON_LEFT)   return "left";
+  if (button == SDL_BUTTON_MIDDLE) return "middle";
+  if (button == SDL_BUTTON_RIGHT)  return "right";
+  if (button == SDL_BUTTON_X1)     return "extra1";
+  if (button == SDL_BUTTON_X2)     return "extra2";
+  return "button-error";
+}
+
+static string
+lookup_key (SDL_Keycode key, SDL_Keymod mod) {
+  const char* str= SDL_GetKeyName (key);
+  string r (str, (int)strlen (str));
+  r= utf8_to_cork (r);
+  if (contains_unicode_char (r)) return r;
+//  string s=r;
+  if ((key >= 'A') && (key <= 'Z')) key= key - 'A' + 'a';
+  string s= ((mod & SDL_KMOD_SHIFT) ? upper_key [key] : lower_key [key]);
+  if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
+
+  if (mod & SDL_KMOD_CTRL) s= "C-" * s;
+  if (mod & SDL_KMOD_ALT)  s= "A-" * s;
+  if (mod & SDL_KMOD_GUI)  s= "M-" * s;
+  cout << "key press: " << s << LF;
+  return s;
+}
+
+// Print modifier info
+static string
+print_modifiers (SDL_Keymod mod) {
+  string s;
+  s << " Modifers: [" << as_string (mod) << " ";
+  
+  // If there are none then say so and return.
+  if( mod == SDL_KMOD_NONE ){
+    s << "None ]\n";
+    return s;
+  }
+  
+  // Check for the presence of each SDLMod value
+  if( mod & SDL_KMOD_NUM )    s << "NUMLOCK ";
+  if( mod & SDL_KMOD_CAPS )   s << "CAPSLOCK ";
+  if( mod & SDL_KMOD_LCTRL )  s << "LCTRL ";
+  if( mod & SDL_KMOD_RCTRL )  s << "RCTRL ";
+  if( mod & SDL_KMOD_RSHIFT ) s << "RSHIFT ";
+  if( mod & SDL_KMOD_LSHIFT ) s << "LSHIFT ";
+  if( mod & SDL_KMOD_RALT )   s << "RALT ";
+  if( mod & SDL_KMOD_LALT )   s << "LALT ";
+  if( mod & SDL_KMOD_RGUI )   s << "RGUI ";
+  if( mod & SDL_KMOD_LGUI )   s << "LGUI ";
+  if( mod & SDL_KMOD_CTRL )   s << "CTRL ";
+  if( mod & SDL_KMOD_SHIFT )  s << "SHIFT ";
+  if( mod & SDL_KMOD_ALT )    s << "ALT ";
+  if( mod & SDL_KMOD_GUI )    s << "GUI ";
+  s << "]";
+  return s;
+}
+
+// Print all information about a key event
+static string
+print_key_info ( SDL_KeyboardEvent *key ) {
+  string s;
+  // Is it a release or a press?
+  s <<  (key->type == SDL_EVENT_KEY_UP ? "Release:- " : "Press:- ");
+  // Print the hardware scancode first
+  s << "Scancode: " << as_hexadecimal (key->scancode);
+  // Print the name of the key
+  s << ", Name: " << SDL_GetKeyName (key->key);
+  // Print modifier info
+  s << print_modifiers (key->mod);
+  return s;
+}
+
+
 
 #define SDL_EVENT_TYPE_LIST \
   X(SDL_EVENT_FIRST) \

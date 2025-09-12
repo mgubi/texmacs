@@ -74,9 +74,6 @@ Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
 Clay_Color color_text= {0, 0, 0, 255};
 
-Clay_TextElementConfig *text_config_ui;
-Clay_TextElementConfig *text_config_ui_grayed;
-
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
 
@@ -120,15 +117,6 @@ gui_init_context() {
   // make refresh messages available to widgets during layout
   current_window->refresh_kinds= current_window->next_refresh_kinds;
   current_window->next_refresh_kinds= hashset<string>();
-  
-  // setup text style
-  //FIXME: can we do it only once?
-  text_config_ui= CLAY_TEXT_CONFIG({
-    .fontSize= 26, .textColor= color_text,
-    .wrapMode= CLAY_TEXT_WRAP_NONE });
-  text_config_ui_grayed= CLAY_TEXT_CONFIG ({
-    .fontSize= 26, .textColor= {150, 150, 150, 255},
-    .wrapMode= CLAY_TEXT_WRAP_NONE });
 }
 
 /*****************************************************************************/
