@@ -52,23 +52,22 @@ extern bool menu_caching;
 #include "clay_grid.h"
 
 Clay_Sizing layoutExpand= {
-    .width=  CLAY_SIZING_GROW(0),
-    .height= CLAY_SIZING_GROW(0)
-};
+  .width=  CLAY_SIZING_GROW(0),
+  .height= CLAY_SIZING_GROW(0) };
 
 Clay_Sizing layoutFit= {
-    .width=  CLAY_SIZING_FIT(),
-    .height= CLAY_SIZING_FIT()
-};
+  .width=  CLAY_SIZING_FIT(),
+  .height= CLAY_SIZING_FIT() };
 
 Clay_Sizing layoutFull= {
-    .width=  CLAY_SIZING_PERCENT(1.0f),
-    .height= CLAY_SIZING_PERCENT(1.0f)
-};
+  .width=  CLAY_SIZING_PERCENT(1.0f),
+  .height= CLAY_SIZING_PERCENT(1.0f) };
 
 #define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars= &(s[0]) })
 
-Clay_Color palette[4]= { {160, 160, 160, 255}, {192, 192, 192, 255},{224, 224, 224, 255},{240, 240, 240, 255} };
+Clay_Color palette[4]= {
+   {160, 160, 160, 255}, {192, 192, 192, 255},
+   {224, 224, 224, 255},{240, 240, 240, 255} };
 
 Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
