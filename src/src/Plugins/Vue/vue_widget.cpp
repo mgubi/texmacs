@@ -2801,16 +2801,18 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   
   // retrieve current geometry
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
-  Clay_SetCurrentContext (w->win->clay_ctx);
-  Clay_ElementData d= Clay_GetElementData (clay_id);
-  if (d.found) {
-    // cache the current viewport size
-    size.x1= d.boundingBox.width; // * retina_factor;
-    size.x2= d.boundingBox.height; // * retina_factor;
-  } else {
-    cout << "clay_id not found!" << LF;
+  {
+    with_window frame (w->win);
+    Clay_ElementData d= Clay_GetElementData (clay_id);
+    if (d.found) {
+      // cache the current viewport size
+      size.x1= d.boundingBox.width; // * retina_factor;
+      size.x2= d.boundingBox.height; // * retina_factor;
+    } else {
+      cout << "clay_id not found!" << LF;
+    }
   }
-  
+
   // current backing_store size
   int bs_w= backing_store->get_width ();
   int bs_h= backing_store->get_height ();

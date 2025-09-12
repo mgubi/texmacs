@@ -142,14 +142,20 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   notify_position (abstract (content), 0, 0);
   notify_size (abstract (content), win_w,  win_h);
   
-  // init Clay
-  uint64_t totalMemorySize= Clay_MinMemorySize ();
-  Clay_Arena clay_arena= (Clay_Arena) {
-      .memory=  (char*) SDL_malloc (totalMemorySize),
-      .capacity= totalMemorySize
-  };
-
-  clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
+  {
+    // initialize clay context
+    // note: we need to preserve previous context in case it was present
+    // we may be in the middle of some layout operation for another window
+    Clay_Context *save_ctx= Clay_GetCurrentContext ();
+    uint64_t totalMemorySize= Clay_MinMemorySize ();
+    clay_arena= (Clay_Arena) {
+        .memory=  (char*) SDL_malloc (totalMemorySize),
+        .capacity= totalMemorySize
+    };
+    clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
+    Clay_SetCurrentContext (save_ctx);
+  }
+  
   relayout= true;
   clay_debug= false;
 }
@@ -268,14 +274,14 @@ void
 vue_sdl_base_window_rep::process_layout () {
   bool relayout= false;
   do {
+    with_window frame (this);
     // init the current GUI context
     int win_x, win_y, win_w, win_h;
     SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
     SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
 
-    Clay_SetCurrentContext (clay_ctx);
+//    Clay_SetCurrentContext (clay_ctx);
     Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
-    current_window= this;
     gui_init_context ();
 
     // layout the top widget
@@ -291,8 +297,6 @@ vue_sdl_base_window_rep::process_layout () {
     }
   } while (relayout);
 
-  // reset for safety (should not be used outside layout)
-  current_window= NULL;
 }
 
 //******************************************************************************
@@ -399,8 +403,10 @@ vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
       }
       ttf_fonts[0]= font;
     }
-    Clay_SetCurrentContext (clay_ctx);
-    Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
+    {
+      with_window frame (this);
+      Clay_SetMeasureTextFunction (SDL_MeasureText, ttf_fonts);
+    }
   }
 }
 
@@ -463,7 +469,7 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
 vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
   : ren(NULL), vue_sdl_base_window_rep (w, name)
 {
-  Clay_SetCurrentContext (clay_ctx);
+  with_window frame (this);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
 };
 
@@ -501,7 +507,7 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
 
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
-  current_window= this;
+  with_window frame (this);
   int win_w, win_h;
 
   SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
@@ -524,7 +530,6 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   SDL_UpdateWindowSurface (sdl_win);
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 30) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
-  current_window= NULL;
 }
 
 
@@ -1005,14 +1010,16 @@ process_event (SDL_Event *event) {
   vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
+#if 0
     case SDL_EVENT_WINDOW_RESIZED:
       win= get_window_from_ID (event->window.windowID);
       if (win) {
-        Clay_SetCurrentContext (win->clay_ctx);
+        with_window frame (win);
         Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
         win->relayout= true;
       }
       break;
+#endif
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       win= get_window_from_ID (event->window.windowID);
       if (win) win->destroy_event();
@@ -1033,7 +1040,7 @@ process_event (SDL_Event *event) {
         mouse_time= texmacs_time();
         mouse_x= event->button.x * retina_factor;
         mouse_y= event->button.y * retina_factor;
-        Clay_SetCurrentContext (win->clay_ctx);
+        with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { (float) mouse_x, (float) mouse_y },
                              (event->button.button == SDL_BUTTON_LEFT) &&
                              (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN));
@@ -1052,7 +1059,7 @@ process_event (SDL_Event *event) {
         mouse_x= event->wheel.mouse_x * retina_factor;
         mouse_y= event->wheel.mouse_y * retina_factor;;
         mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
-        Clay_SetCurrentContext (win->clay_ctx);
+        with_window frame (win);
         Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x * retina_factor, event->wheel.y * retina_factor }, 0.01f);
       }
       break;
@@ -1062,7 +1069,7 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       if (win) {
-        Clay_SetCurrentContext (win->clay_ctx);
+        with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { event->motion.x * retina_factor, event->motion.y * retina_factor },
                              event->button.button & SDL_BUTTON_LMASK);
         mouse_action= "move";
@@ -1113,10 +1120,10 @@ process_event (SDL_Event *event) {
 
 bool event_filter (void *userdata, SDL_Event *event) {
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
-    cout << "resizing window" << LF;
+    // cout << "resizing window" << LF;
     vue_window win= get_window_from_ID (event->window.windowID);
     if (win) {
-      Clay_SetCurrentContext (win->clay_ctx);
+      with_window frame (win);
       Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
       win->relayout= true;
       win->process_layout();

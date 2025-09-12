@@ -95,6 +95,16 @@ extern void* vue_render_widget;
 extern void* vue_render_text;
 
 void layout_text (string s, int style, color c);
+
+extern vue_window current_window;
+class with_window {
+public:
+  vue_window saved_win;
+  with_window (vue_window _win)
+  : saved_win (current_window) { if (_win) Clay_SetCurrentContext (_win->clay_ctx); current_window= _win; }
+  ~with_window () { if (saved_win) Clay_SetCurrentContext (saved_win->clay_ctx); current_window= saved_win; }
+};
+
 #endif
 
 
