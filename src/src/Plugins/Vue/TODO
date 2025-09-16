@@ -1,5 +1,6 @@
 TODO
 
+* implement commands in inputs_list_widget
 * decide what to do with win->relayout
 * handle properly hot vs. active vs. capture of elements by mouse actions
 * introduce animation subsystem for transitions
