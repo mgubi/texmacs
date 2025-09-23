@@ -4,5 +4,5 @@
 
 OTHER_CFLAGS = -DSDLTEXMACS $(TM_CPPFLAGS)
 OTHER_CPLUSPLUSFLAGS = $(OTHER_CFLAGS) $(TM_CXXQT) $(TM_CXXFREETYPE) $(TM_CXXSDL)  $(TM_CXXGUILE)  $(TM_CXXSPARKLE) $(TM_CXXPDF)
-OTHER_LDFLAGS = -Wl,-stack_size,0x1000000,-headerpad_max_install_names $(TM_LDFLAGS) $(TM_LIBS) $(TM_LDSDL)
+OTHER_LDFLAGS = -Wl,-stack_size,0x1000000,-headerpad_max_install_names $(TM_LDFLAGS) $(TM_LIBS) $(TM_LDSDL) -lSDL3 -lSDL3_ttf -lmupdf -lmupdf-third
 PRODUCT_NAME = TeXmacsSDL
