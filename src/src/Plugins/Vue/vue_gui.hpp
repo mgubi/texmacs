@@ -41,7 +41,7 @@ public:
   bool clay_debug;
   
   vue_window_rep (vue_widget w, string _name)
-  : content (w), name (_name), id (serial++), orig_name (_name) {}
+  : content (w), name (_name), id (serial++), orig_name (_name) { render_commands.length= 0; }
   virtual ~vue_window_rep () {};
   
   virtual void *platform_window () = 0;
