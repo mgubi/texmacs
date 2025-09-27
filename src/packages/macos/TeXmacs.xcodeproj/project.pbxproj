@@ -632,6 +632,10 @@
 		9C4B87A612AE5BD100F8571A /* packrat_serializer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4B87A512AE5BD100F8571A /* packrat_serializer.cpp */; };
 		9C4B87A712AE5BD100F8571A /* packrat_serializer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4B87A512AE5BD100F8571A /* packrat_serializer.cpp */; };
 		9C4B87A812AE5BD100F8571A /* packrat_serializer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4B87A512AE5BD100F8571A /* packrat_serializer.cpp */; };
+		9C4BFD622E88492400AD070E /* fitz_renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4BFD612E88492400AD070E /* fitz_renderer.cpp */; };
+		9C4BFD632E88492400AD070E /* fitz_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4BFD5F2E88492400AD070E /* fitz_picture.cpp */; };
+		9C4BFD642E88492400AD070E /* fitz_renderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4BFD612E88492400AD070E /* fitz_renderer.cpp */; };
+		9C4BFD652E88492400AD070E /* fitz_picture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4BFD5F2E88492400AD070E /* fitz_picture.cpp */; };
 		9C4FCFF7150F73100087378D /* new_document.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4FCFF5150F73100087378D /* new_document.cpp */; };
 		9C4FCFF8150F73100087378D /* new_document.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4FCFF5150F73100087378D /* new_document.cpp */; };
 		9C4FCFF9150F73100087378D /* new_document.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4FCFF5150F73100087378D /* new_document.cpp */; };
@@ -3584,6 +3588,10 @@
 		9C4A74111D22C38200572468 /* raster_random.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = raster_random.cpp; sourceTree = "<group>"; };
 		9C4A74171D22C3A000572468 /* poor_distorted.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = poor_distorted.cpp; sourceTree = "<group>"; };
 		9C4B87A512AE5BD100F8571A /* packrat_serializer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packrat_serializer.cpp; sourceTree = "<group>"; };
+		9C4BFD5E2E88492400AD070E /* fitz_picture.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = fitz_picture.hpp; sourceTree = "<group>"; };
+		9C4BFD5F2E88492400AD070E /* fitz_picture.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = fitz_picture.cpp; sourceTree = "<group>"; };
+		9C4BFD602E88492400AD070E /* fitz_renderer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = fitz_renderer.hpp; sourceTree = "<group>"; };
+		9C4BFD612E88492400AD070E /* fitz_renderer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = fitz_renderer.cpp; sourceTree = "<group>"; };
 		9C4DE77A1475AA9A00F41E44 /* glue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = glue.cpp; sourceTree = "<group>"; };
 		9C4DE77B1475AA9A00F41E44 /* glue.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = glue.hpp; sourceTree = "<group>"; };
 		9C4FCFF5150F73100087378D /* new_document.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = new_document.cpp; sourceTree = "<group>"; };
@@ -5991,6 +5999,10 @@
 		9CEB8DD22E4DCC4200607831 /* MuPDF */ = {
 			isa = PBXGroup;
 			children = (
+				9C4BFD5E2E88492400AD070E /* fitz_picture.hpp */,
+				9C4BFD5F2E88492400AD070E /* fitz_picture.cpp */,
+				9C4BFD602E88492400AD070E /* fitz_renderer.hpp */,
+				9C4BFD612E88492400AD070E /* fitz_renderer.cpp */,
 				9CEB8DCE2E4DCC4200607831 /* mupdf_picture.hpp */,
 				9CEB8DCF2E4DCC4200607831 /* mupdf_picture.cpp */,
 				9CEB8DD02E4DCC4200607831 /* mupdf_renderer.hpp */,
@@ -8233,6 +8245,8 @@
 				9CDABC7F2E4F64D4002D3806 /* basic_boxes.cpp in Sources */,
 				9CDABC802E4F64D4002D3806 /* boxes.cpp in Sources */,
 				9CDABC812E4F64D4002D3806 /* rubber_boxes.cpp in Sources */,
+				9C4BFD642E88492400AD070E /* fitz_renderer.cpp in Sources */,
+				9C4BFD652E88492400AD070E /* fitz_picture.cpp in Sources */,
 				9CDABC822E4F64D4002D3806 /* stretch_boxes.cpp in Sources */,
 				9CDABC832E4F64D4002D3806 /* text_boxes.cpp in Sources */,
 				9CDABC842E4F64D4002D3806 /* composite_boxes.cpp in Sources */,
@@ -8798,6 +8812,8 @@
 				9CEB8D772E4DCA2800607831 /* case_boxes.cpp in Sources */,
 				9CEB8D782E4DCA2800607831 /* persistent.cpp in Sources */,
 				9CEB8D792E4DCA2800607831 /* new_view.cpp in Sources */,
+				9C4BFD622E88492400AD070E /* fitz_renderer.cpp in Sources */,
+				9C4BFD632E88492400AD070E /* fitz_picture.cpp in Sources */,
 				9CEB8D7A2E4DCA2800607831 /* new_project.cpp in Sources */,
 				9CEB8D7B2E4DCA2800607831 /* adjust_cmr.cpp in Sources */,
 				9CEB8D7C2E4DCA2800607831 /* font_wide.cpp in Sources */,
