@@ -23,6 +23,11 @@
 // Global Fitz context - shared across all renderers
 static fz_context* global_fitz_context = NULL;
 
+// Global shared caches for all Fitz renderers
+hashmap<string, fz_font*> global_fitz_font_cache;
+hashmap<tree, fz_shade*> global_fitz_pattern_cache;
+hashmap<tree, pattern_info> global_fitz_tile_pattern_cache;
+
 fz_context*
 get_fitz_context () {
   if (!global_fitz_context) {
@@ -48,8 +53,7 @@ cleanup_fitz_context () {
 
 static hashmap<basic_character, fz_image*> character_image_cache;
 static hashmap<tree, fz_image*> image_cache;
-static hashmap<string, fz_font*> global_font_cache;
-static hashmap<tree, fz_shade*> pattern_shade_cache;
+// Note: global font and pattern caches now declared above as shared caches
 
 void del_obj_fitz_renderer (void) {
   character_image_cache = hashmap<basic_character, fz_image*> ();
@@ -59,11 +63,11 @@ void del_obj_fitz_renderer (void) {
   fz_context *ctx = get_fitz_context ();
   if (ctx) {
     // Clean up font cache
-    iterator<string> font_it = iterate (global_font_cache);
+    iterator<string> font_it = iterate (global_fitz_font_cache);
     while (font_it->busy ()) {
       string fontname = font_it->next ();
-      if (global_font_cache[fontname]) {
-        fz_drop_font (ctx, global_font_cache[fontname]);
+      if (global_fitz_font_cache[fontname]) {
+        fz_drop_font (ctx, global_fitz_font_cache[fontname]);
       }
     }
 
@@ -85,19 +89,12 @@ void del_obj_fitz_renderer (void) {
       }
     }
 
-    // Clean up pattern shade cache
-    iterator<tree> pattern_it = iterate (pattern_shade_cache);
-    while (pattern_it->busy ()) {
-      tree key = pattern_it->next ();
-      if (pattern_shade_cache[key]) {
-        fz_drop_shade (ctx, pattern_shade_cache[key]);
-      }
-    }
   }
-  global_font_cache = hashmap<string, fz_font*> ();
+  global_fitz_font_cache = hashmap<string, fz_font*> ();
   image_cache = hashmap<tree, fz_image*> ();
   character_image_cache = hashmap<basic_character, fz_image*> ();
-  pattern_shade_cache = hashmap<tree, fz_shade*> ();
+  global_fitz_pattern_cache = hashmap<tree, fz_shade*> ();
+  global_fitz_tile_pattern_cache = hashmap<tree, pattern_info> ();
 
   cleanup_fitz_context ();
 }
@@ -133,15 +130,12 @@ fitz_renderer_rep::get_handle () {
 }
 
 void
-fitz_renderer_rep::get_extents (SI& w, SI& h) {
+fitz_renderer_rep::get_extents (SI& w2, SI& h2) {
   if (pixmap) {
-    // Convert from raw pixel dimensions to TeXmacs scaled pixels
-    w = fz_pixmap_width (ctx, pixmap) * pixel;
-    h = fz_pixmap_height (ctx, pixmap) * pixel;
+    w2 = fz_pixmap_width (ctx, pixmap);
+    h2 = fz_pixmap_height (ctx, pixmap);
   } else {
-    // Use the renderer's dimensions converted to scaled pixels
-    w = this->w * pixel;
-    h = this->h * pixel;
+    w2 = w; h2 = h;
   }
 }
 
@@ -157,13 +151,19 @@ fitz_renderer_rep::begin (void* handle) {
   if (_pixmap && ctx) {
     if (device) end ();
 
-    pixmap = _pixmap;
-    fz_keep_pixmap (ctx, pixmap);
+    fz_try (ctx) {
+      pixmap = _pixmap;
+      fz_keep_pixmap (ctx, pixmap);
 
-    w = fz_pixmap_width (ctx, pixmap);
-    h = fz_pixmap_height (ctx, pixmap);
+      w = fz_pixmap_width (ctx, pixmap);
+      h = fz_pixmap_height (ctx, pixmap);
 
-    device = fz_new_draw_device (ctx, transform, pixmap);
+      device = fz_new_draw_device (ctx, transform, pixmap);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error in begin(): " << error_msg << LF;
+    }
 
     fg = -1;
     bg = -1;
@@ -190,19 +190,18 @@ fitz_renderer_rep::end () {
   end_text ();
   end_path ();
 
-  // Clean up tile pattern cache
-  iterator<tree> it = iterate (tile_pattern_cache);
-  while (it->busy()) {
-    tree key = it->next();
-    pattern_info info = tile_pattern_cache [key];
-    if (info.pixmap) {
-      fz_drop_pixmap (ctx, info.pixmap);
-    }
-  }
-  tile_pattern_cache = hashmap<tree, pattern_info> ();
+  // Note: Global caches are not cleared here since they're shared
+  // They are cleaned up in del_obj_fitz_renderer() when the system shuts down
 
   if (device) {
-    fz_close_device (ctx, device);
+    fz_try (ctx) {
+      fz_close_device (ctx, device);
+    }
+    fz_catch (ctx) {
+      int error_code = fz_caught(ctx);
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error: " << error_msg << LF;
+    }
     fz_drop_device (ctx, device);
     device = NULL;
   }
@@ -257,15 +256,33 @@ fitz_renderer_rep::select_line_width (SI w) {
 void
 fitz_renderer_rep::begin_path () {
   if (current_path) {
-    fz_drop_path (ctx, current_path);
+    fz_try (ctx) {
+      fz_drop_path (ctx, current_path);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error dropping path: " << error_msg << LF;
+    }
   }
-  current_path = fz_new_path (ctx);
+  fz_try (ctx) {
+    current_path = fz_new_path (ctx);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error creating new path: " << error_msg << LF;
+  }
 }
 
 void
 fitz_renderer_rep::end_path () {
   if (current_path) {
-    fz_drop_path (ctx, current_path);
+    fz_try (ctx) {
+      fz_drop_path (ctx, current_path);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error dropping path in end_path: " << error_msg << LF;
+    }
     current_path = NULL;
   }
 }
@@ -284,23 +301,29 @@ fitz_renderer_rep::stroke_current_path () {
   stroke.dash_phase = 0.0f;
   stroke.dash_len = 0;
 
-  if (current_stroke_pattern) {
-    // For pattern strokes, we need to implement custom logic since MuPDF
-    // doesn't directly support pattern strokes. For now, fall back to solid stroke.
-    float fz_color[3];
-    int alpha;
-    fitz_color_from_color (fg, fz_color, &alpha);
-    fz_stroke_path (ctx, device, current_path, &stroke, transform,
-                    colorspace_rgb, fz_color, (float)alpha/255.0f, fz_default_color_params);
-  } else {
-    // Use solid color stroke
-    float fz_color[3];
-    int alpha;
-    fitz_color_from_color (fg, fz_color, &alpha);
+  fz_try (ctx) {
+    if (current_stroke_pattern) {
+      // For pattern strokes, we need to implement custom logic since MuPDF
+      // doesn't directly support pattern strokes. For now, fall back to solid stroke.
+      float fz_color[3];
+      int alpha;
+      fitz_color_from_color (fg, fz_color, &alpha);
+      fz_stroke_path (ctx, device, current_path, &stroke, transform,
+                      colorspace_rgb, fz_color, (float)alpha/255.0f, fz_default_color_params);
+    } else {
+      // Use solid color stroke
+      float fz_color[3];
+      int alpha;
+      fitz_color_from_color (fg, fz_color, &alpha);
 
-    fz_stroke_path (ctx, device, current_path, &stroke, transform,
-                    get_colorspace_for_color (fg), fz_color,
-                    ((float)alpha) / 255.0f, fz_default_color_params);
+      fz_stroke_path (ctx, device, current_path, &stroke, transform,
+                      get_colorspace_for_color (fg), fz_color,
+                      ((float)alpha) / 255.0f, fz_default_color_params);
+    }
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in stroke_current_path: " << error_msg << LF;
   }
 }
 
@@ -318,13 +341,19 @@ fitz_renderer_rep::fill_current_path () {
     }
   } else {
     // Use solid color fill
-    float fz_color[3];
-    int alpha;
-    fitz_color_from_color (fg, fz_color, &alpha);
+    fz_try (ctx) {
+      float fz_color[3];
+      int alpha;
+      fitz_color_from_color (fg, fz_color, &alpha);
 
-    fz_fill_path (ctx, device, current_path, 0, transform,
-                  get_colorspace_for_color (fg), fz_color,
-                  ((float)alpha) / 255.0f, fz_default_color_params);
+      fz_fill_path (ctx, device, current_path, 0, transform,
+                    get_colorspace_for_color (fg), fz_color,
+                    ((float)alpha) / 255.0f, fz_default_color_params);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error in fill_current_path: " << error_msg << LF;
+    }
   }
 }
 
@@ -334,16 +363,27 @@ fitz_renderer_rep::fill_current_path () {
 
 void
 fitz_renderer_rep::begin_text () {
-  if (current_text) {
-    fz_drop_text (ctx, current_text);
+  if (!current_text) {
+    fz_try (ctx) {
+      current_text = fz_new_text (ctx);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error creating text object: " << error_msg << LF;
+    }
   }
-  current_text = fz_new_text (ctx);
 }
 
 void
 fitz_renderer_rep::end_text () {
   if (current_text) {
-    fz_drop_text (ctx, current_text);
+    fz_try (ctx) {
+      fz_drop_text (ctx, current_text);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error dropping text object: " << error_msg << LF;
+    }
     current_text = NULL;
   }
 }
@@ -351,8 +391,8 @@ fitz_renderer_rep::end_text () {
 fz_font*
 fitz_renderer_rep::load_fitz_font (string fontname) {
   // Check global cache first
-  if (global_font_cache->contains (fontname)) {
-    return global_font_cache [fontname];
+  if (global_fitz_font_cache->contains (fontname)) {
+    return global_fitz_font_cache [fontname];
   }
 
   // Extract font family name (before colon if present)
@@ -395,7 +435,7 @@ fitz_renderer_rep::load_fitz_font (string fontname) {
   }
 
   // Cache the result (even if NULL)
-  global_font_cache (fontname) = font;
+  global_fitz_font_cache (fontname) = font;
   return font;
 }
 
@@ -476,6 +516,10 @@ fitz_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
 
   if (!device) return;
 
+  if (restore) {
+    fz_pop_clip(ctx, device);
+  }
+
   // Convert coordinates and set clipping rectangle
   outer_round (x1, y1, x2, y2);
 
@@ -486,13 +530,19 @@ fitz_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   clip_rect.y1 = to_fitz_y (max (y1, y2));
 
   begin_path ();
-  fz_moveto (ctx, current_path, clip_rect.x0, clip_rect.y0);
-  fz_lineto (ctx, current_path, clip_rect.x1, clip_rect.y0);
-  fz_lineto (ctx, current_path, clip_rect.x1, clip_rect.y1);
-  fz_lineto (ctx, current_path, clip_rect.x0, clip_rect.y1);
-  fz_closepath (ctx, current_path);
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, clip_rect.x0, clip_rect.y0);
+    fz_lineto (ctx, current_path, clip_rect.x1, clip_rect.y0);
+    fz_lineto (ctx, current_path, clip_rect.x1, clip_rect.y1);
+    fz_lineto (ctx, current_path, clip_rect.x0, clip_rect.y1);
+    fz_closepath (ctx, current_path);
 
-  fz_clip_path (ctx, device, current_path, 0, transform, clip_rect);
+    fz_clip_path (ctx, device, current_path, 0, transform, clip_rect);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in set_clipping: " << error_msg << LF;
+  }
   end_path ();
 }
 
@@ -537,8 +587,14 @@ fitz_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
   if (!device) return;
 
   begin_path ();
-  fz_moveto (ctx, current_path, to_fitz_x (x1), to_fitz_y (y1));
-  fz_lineto (ctx, current_path, to_fitz_x (x2), to_fitz_y (y2));
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, to_fitz_x (x1), to_fitz_y (y1));
+    fz_lineto (ctx, current_path, to_fitz_x (x2), to_fitz_y (y2));
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in line path operations: " << error_msg << LF;
+  }
   stroke_current_path ();
   end_path ();
 }
@@ -548,9 +604,15 @@ fitz_renderer_rep::lines (array<SI> x, array<SI> y) {
   if (!device || N(x) == 0 || N(y) != N(x)) return;
 
   begin_path ();
-  fz_moveto (ctx, current_path, to_fitz_x (x[0]), to_fitz_y (y[0]));
-  for (int i = 1; i < N(x); i++) {
-    fz_lineto (ctx, current_path, to_fitz_x (x[i]), to_fitz_y (y[i]));
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, to_fitz_x (x[0]), to_fitz_y (y[0]));
+    for (int i = 1; i < N(x); i++) {
+      fz_lineto (ctx, current_path, to_fitz_x (x[i]), to_fitz_y (y[i]));
+    }
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in lines path operations: " << error_msg << LF;
   }
   stroke_current_path ();
   end_path ();
@@ -570,11 +632,17 @@ fitz_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   float xx2 = to_fitz_x (max (x1, x2));
   float yy2 = to_fitz_y (max (y1, y2));
 
-  fz_moveto (ctx, current_path, xx1, yy1);
-  fz_lineto (ctx, current_path, xx2, yy1);
-  fz_lineto (ctx, current_path, xx2, yy2);
-  fz_lineto (ctx, current_path, xx1, yy2);
-  fz_closepath (ctx, current_path);
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, xx1, yy1);
+    fz_lineto (ctx, current_path, xx2, yy1);
+    fz_lineto (ctx, current_path, xx2, yy2);
+    fz_lineto (ctx, current_path, xx1, yy2);
+    fz_closepath (ctx, current_path);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in clear path operations: " << error_msg << LF;
+  }
 
   fill_current_path ();
   end_path ();
@@ -610,9 +678,9 @@ fitz_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
     fz_catch (ctx) {
       convert_warning << "fitz_renderer: Failed to fill rectangle with pattern" << LF;
     }
-  } else if (!is_nil (current_fill_pattern_key) && tile_pattern_cache->contains (current_fill_pattern_key)) {
+  } else if (!is_nil (current_fill_pattern_key) && global_fitz_tile_pattern_cache->contains (current_fill_pattern_key)) {
     // For tiling pattern fills - manual tiling implementation
-    pattern_info info = tile_pattern_cache [current_fill_pattern_key];
+    pattern_info info = global_fitz_tile_pattern_cache [current_fill_pattern_key];
 
     float fill_x0 = to_fitz_x (min (x1, x2));
     float fill_y0 = to_fitz_y (min (y1, y2));
@@ -676,11 +744,17 @@ fitz_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
     float xx2 = to_fitz_x (max (x1, x2));
     float yy2 = to_fitz_y (max (y1, y2));
 
-    fz_moveto (ctx, current_path, xx1, yy1);
-    fz_lineto (ctx, current_path, xx2, yy1);
-    fz_lineto (ctx, current_path, xx2, yy2);
-    fz_lineto (ctx, current_path, xx1, yy2);
-    fz_closepath (ctx, current_path);
+    fz_try (ctx) {
+      fz_moveto (ctx, current_path, xx1, yy1);
+      fz_lineto (ctx, current_path, xx2, yy1);
+      fz_lineto (ctx, current_path, xx2, yy2);
+      fz_lineto (ctx, current_path, xx1, yy2);
+      fz_closepath (ctx, current_path);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error in fill solid path operations: " << error_msg << LF;
+    }
 
     fill_current_path ();
     end_path ();
@@ -704,16 +778,22 @@ fitz_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   float start_angle = (float)alpha * M_PI / (180.0f * 64.0f);
   float end_angle = start_angle + (float)delta * M_PI / (180.0f * 64.0f);
 
-  for (int i = 0; i <= num_segments; i++) {
-    float angle = start_angle + (end_angle - start_angle) * i / num_segments;
-    float x = cx + rx * cos (angle);
-    float y = cy + ry * sin (angle);
+  fz_try (ctx) {
+    for (int i = 0; i <= num_segments; i++) {
+      float angle = start_angle + (end_angle - start_angle) * i / num_segments;
+      float x = cx + rx * cos (angle);
+      float y = cy + ry * sin (angle);
 
-    if (i == 0) {
-      fz_moveto (ctx, current_path, x, y);
-    } else {
-      fz_lineto (ctx, current_path, x, y);
+      if (i == 0) {
+        fz_moveto (ctx, current_path, x, y);
+      } else {
+        fz_lineto (ctx, current_path, x, y);
+      }
     }
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in arc path operations: " << error_msg << LF;
   }
 
   stroke_current_path ();
@@ -735,14 +815,20 @@ fitz_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   float start_angle = (float)alpha * M_PI / (180.0f * 64.0f);
   float end_angle = start_angle + (float)delta * M_PI / (180.0f * 64.0f);
 
-  fz_moveto (ctx, current_path, cx, cy);
-  for (int i = 0; i <= num_segments; i++) {
-    float angle = start_angle + (end_angle - start_angle) * i / num_segments;
-    float x = cx + rx * cos (angle);
-    float y = cy + ry * sin (angle);
-    fz_lineto (ctx, current_path, x, y);
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, cx, cy);
+    for (int i = 0; i <= num_segments; i++) {
+      float angle = start_angle + (end_angle - start_angle) * i / num_segments;
+      float x = cx + rx * cos (angle);
+      float y = cy + ry * sin (angle);
+      fz_lineto (ctx, current_path, x, y);
+    }
+    fz_closepath (ctx, current_path);
   }
-  fz_closepath (ctx, current_path);
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in fill_arc path operations: " << error_msg << LF;
+  }
 
   fill_current_path ();
   end_path ();
@@ -753,11 +839,17 @@ fitz_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   if (!device || N(x) == 0 || N(y) != N(x)) return;
 
   begin_path ();
-  fz_moveto (ctx, current_path, to_fitz_x (x[0]), to_fitz_y (y[0]));
-  for (int i = 1; i < N(x); i++) {
-    fz_lineto (ctx, current_path, to_fitz_x (x[i]), to_fitz_y (y[i]));
+  fz_try (ctx) {
+    fz_moveto (ctx, current_path, to_fitz_x (x[0]), to_fitz_y (y[0]));
+    for (int i = 1; i < N(x); i++) {
+      fz_lineto (ctx, current_path, to_fitz_x (x[i]), to_fitz_y (y[i]));
+    }
+    fz_closepath (ctx, current_path);
   }
-  fz_closepath (ctx, current_path);
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in polygon path operations: " << error_msg << LF;
+  }
 
   fill_current_path ();
   end_path ();
@@ -858,17 +950,29 @@ fitz_renderer_rep::draw (int char_code, font_glyphs fn, SI x, SI y) {
       }
     }
 
-    fz_pixmap* pix = fz_new_pixmap_with_data (ctx, colorspace_rgb,
-                                             gw, gh, NULL, 1, gw * 4, samples);
-    cached_image = fz_new_image_from_pixmap (ctx, pix, NULL);
-    fz_drop_pixmap (ctx, pix);
+    fz_try (ctx) {
+      fz_pixmap* pix = fz_new_pixmap_with_data (ctx, colorspace_rgb,
+                                               gw, gh, NULL, 1, gw * 4, samples);
+      cached_image = fz_new_image_from_pixmap (ctx, pix, NULL);
+      fz_drop_pixmap (ctx, pix);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error creating character pixmap/image: " << error_msg << LF;
+    }
 
     character_image_cache (xc) = cached_image;
   }
 
   if (cached_image) {
-    fz_matrix image_transform = fz_translate (to_fitz_x (x), to_fitz_y (y));
-    fz_fill_image (ctx, device, cached_image, image_transform, 1.0f, fz_default_color_params);
+    fz_try (ctx) {
+      fz_matrix image_transform = fz_translate (to_fitz_x (x), to_fitz_y (y));
+      fz_fill_image (ctx, device, cached_image, image_transform, 1.0f, fz_default_color_params);
+    }
+    fz_catch (ctx) {
+      const char* error_msg = fz_caught_message(ctx);
+      cout << "Fitz error rendering character image: " << error_msg << LF;
+    }
   }
 }
 
@@ -1170,39 +1274,6 @@ the_fitz_renderer () {
 }
 
 /******************************************************************************
-* Shadow and proxy renderers (basic implementations)
-******************************************************************************/
-
-fitz_shadow_renderer_rep::fitz_shadow_renderer_rep (int w, int h)
-  : fitz_renderer_rep (w, h), master (NULL) {
-}
-
-fitz_shadow_renderer_rep::~fitz_shadow_renderer_rep () {
-}
-
-void
-fitz_shadow_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
-  // Basic shadow implementation
-}
-
-fitz_proxy_renderer_rep::fitz_proxy_renderer_rep (fitz_renderer_rep *_base)
-  : fitz_renderer_rep (_base->w, _base->h), base (_base) {
-}
-
-fitz_proxy_renderer_rep::~fitz_proxy_renderer_rep () {
-}
-
-void
-fitz_proxy_renderer_rep::new_shadow (renderer& ren) {
-  base->new_shadow (ren);
-}
-
-void
-fitz_proxy_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
-  base->get_shadow (ren, x1, y1, x2, y2);
-}
-
-/******************************************************************************
 * Pattern support implementation
 ******************************************************************************/
 
@@ -1230,7 +1301,7 @@ fitz_renderer_rep::create_pattern_shade (url u, SI w, SI h, tree eff, SI pixel) 
       info.height = h;
       info.source_url = u;
 
-      tile_pattern_cache (pattern_key) = info;
+      global_fitz_tile_pattern_cache (pattern_key) = info;
       convert_warning << "fitz_renderer: Pattern stored for manual tiling: " << u << LF;
 
       fz_drop_pixmap (ctx, pattern_pixmap);
@@ -1257,7 +1328,7 @@ fitz_renderer_rep::register_pattern (brush br, SI pixel) {
   }
 
   tree p = br->get_pattern ();
-  if (pattern_cache->contains (p)) return; // Already registered
+  if (global_fitz_pattern_cache->contains (p)) return; // Already registered
 
   // Get pattern data using TeXmacs utility
   url u;
@@ -1268,7 +1339,7 @@ fitz_renderer_rep::register_pattern (brush br, SI pixel) {
   // Create a shade for the pattern
   fz_shade* shade = create_pattern_shade (u, w, h, eff, pixel);
   if (shade) {
-    pattern_cache (p) = shade;
+    global_fitz_pattern_cache (p) = shade;
   } else {
     convert_warning << "fitz_renderer: Failed to register pattern" << LF;
   }
@@ -1286,8 +1357,8 @@ fitz_renderer_rep::select_fill_pattern (brush br) {
   register_pattern (br, pixel);
 
   // Try shade-based pattern first
-  if (pattern_cache->contains (p_tree)) {
-    current_fill_pattern = pattern_cache [p_tree];
+  if (global_fitz_pattern_cache->contains (p_tree)) {
+    current_fill_pattern = global_fitz_pattern_cache [p_tree];
   } else {
     current_fill_pattern = NULL;
   }
@@ -1299,7 +1370,7 @@ fitz_renderer_rep::select_fill_pattern (brush br) {
   get_pattern_data (u, w, h, eff, br, pixel);
   tree pattern_key = tuple ("pattern", as_string (u), as_string (w), as_string (h));
 
-  if (tile_pattern_cache->contains (pattern_key)) {
+  if (global_fitz_tile_pattern_cache->contains (pattern_key)) {
     current_fill_pattern_key = pattern_key;
   } else {
     current_fill_pattern_key = tree ();
@@ -1316,8 +1387,8 @@ fitz_renderer_rep::select_stroke_pattern (brush br) {
   tree p_tree = br->get_pattern ();
   register_pattern (br, pixel);
 
-  if (pattern_cache->contains (p_tree)) {
-    current_stroke_pattern = pattern_cache [p_tree];
+  if (global_fitz_pattern_cache->contains (p_tree)) {
+    current_stroke_pattern = global_fitz_pattern_cache [p_tree];
   } else {
     convert_warning << "fitz_renderer: Pattern not found for stroke" << LF;
     current_stroke_pattern = NULL;

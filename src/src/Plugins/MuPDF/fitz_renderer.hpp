@@ -22,6 +22,22 @@
 fz_context* get_fitz_context ();
 
 /******************************************************************************
+* Shared caches for all Fitz renderers
+******************************************************************************/
+
+// Pattern info structure for tiling patterns
+struct pattern_info {
+  fz_pixmap *pixmap;
+  SI width, height;
+  url source_url;
+};
+
+// Global shared caches
+extern hashmap<string, fz_font*> global_fitz_font_cache;
+extern hashmap<tree, fz_shade*> global_fitz_pattern_cache;
+extern hashmap<tree, pattern_info> global_fitz_tile_pattern_cache;
+
+/******************************************************************************
 * Fitz device renderer - uses MuPDF's core Fitz device API directly
 ******************************************************************************/
 
@@ -49,21 +65,9 @@ protected:
   float         font_size;
   string        current_font_name;
 
-  // Native font cache
-  hashmap<string, fz_font*> native_fonts;
-
-  // Pattern support
-  hashmap<tree, fz_shade*> pattern_cache;
+  // Pattern support (using global shared caches)
   fz_shade *current_fill_pattern;
   fz_shade *current_stroke_pattern;
-
-  // Tiling pattern support (for manual pattern implementation)
-  struct pattern_info {
-    fz_pixmap *pixmap;
-    SI width, height;
-    url source_url;
-  };
-  hashmap<tree, pattern_info> tile_pattern_cache;
   tree current_fill_pattern_key;
   tree current_stroke_pattern_key;
 
@@ -177,25 +181,5 @@ picture load_picture (url u, int w, int h, tree eff, int pixel);
 void save_picture (url dest, picture p);
 #endif
 
-class fitz_shadow_renderer_rep: public fitz_renderer_rep {
-public:
-  fitz_renderer_rep *master;
-
-public:
-  fitz_shadow_renderer_rep (int w, int h);
-  ~fitz_shadow_renderer_rep ();
-  void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
-};
-
-class fitz_proxy_renderer_rep: public fitz_renderer_rep {
-public:
-  fitz_renderer_rep *base;
-
-public:
-  fitz_proxy_renderer_rep (fitz_renderer_rep *_base);
-  ~fitz_proxy_renderer_rep ();
-  void new_shadow (renderer& ren);
-  void get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2);
-};
 
 #endif // defined FITZ_RENDERER_HPP

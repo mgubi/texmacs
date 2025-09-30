@@ -47,16 +47,31 @@ mupdf_document () {
 
 
 void
-snapshot_pixmap (fz_pixmap *pix) {
+snapshot_pixmap (fz_context *ctx, fz_pixmap *pix) {
   static int i=0;
   string str = "/Users/mgubi/snapshot-";
   str << as_string (i) << ".png";
   i = (i+1) % 1000;
   c_string cstr (str);
-  fz_output *out= fz_new_output_with_path (mupdf_context(), cstr, 0);
-  fz_write_pixmap_as_png (mupdf_context (), out, pix);
-  fz_close_output (mupdf_context(), out);
-  fz_drop_output (mupdf_context(), out);
+  fz_output *out;
+  fz_pixmap *rgb_pix;
+  fz_var (out);
+  fz_var (rgb_pix);
+  fz_try (ctx) {
+    rgb_pix = fz_convert_pixmap(ctx, pix, fz_device_rgb (ctx),
+                                                NULL, NULL, fz_default_color_params, 1);
+    out= fz_new_output_with_path (ctx, cstr, 0);
+    fz_write_pixmap_as_png (ctx, out, rgb_pix);
+  }
+  fz_always (ctx) {
+    fz_drop_pixmap (ctx, rgb_pix);
+    fz_close_output (ctx, out);
+    fz_drop_output (ctx, out);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in snapshot_pixmap: " << error_msg << LF;
+  }
 }
 
 /******************************************************************************

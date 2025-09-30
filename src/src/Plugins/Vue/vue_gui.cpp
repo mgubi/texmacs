@@ -30,7 +30,12 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
+
+#if MUPDF_RENDERER
 #include "../MuPDF/mupdf_picture.hpp"
+#else
+#include "../MuPDF/fitz_picture.hpp"
+#endif
 
 #include "clay.h"
 
@@ -337,16 +342,23 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 }
 
-void snapshot_pixmap (fz_pixmap *pix);
+void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
 
 void
 sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
-  fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  //snapshot_pixmap (pix);
-  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
-  int w= fz_pixmap_width (mupdf_context (), pix);
-  int h= fz_pixmap_height (mupdf_context (), pix);
+#if MUPDF_RENDERER
+  fz_pixmap *pix=  ((mupdf_picture_rep*)pic->get_handle())->pix;
+  fz_context *ctx= mupdf_context ();
+#else
+  fz_pixmap *pix=  ((fitz_picture_rep*)pic->get_handle())->pix;
+  fz_context *ctx= get_fitz_context ();
+#endif
+
+  snapshot_pixmap (ctx, pix);
+  unsigned char *pixels= fz_pixmap_samples (ctx, pix);
+  int w= fz_pixmap_width (ctx, pix);
+  int h= fz_pixmap_height (ctx, pix);
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
   // FIXME: premultiplied?
   SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
@@ -481,11 +493,17 @@ vue_sdl_mupdf_window_rep::process_layout () {
 void
 sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
+#if MUPDF_RENDERER
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
-  //snapshot_pixmap (pix);
-  unsigned char *pixels= fz_pixmap_samples (mupdf_context (), pix);
-  int w= fz_pixmap_width (mupdf_context (), pix);
-  int h= fz_pixmap_height (mupdf_context (), pix);
+  fz_context *ctx= mupdf_context ();
+#else
+  fz_pixmap *pix= ((fitz_picture_rep*)pic->get_handle())->pix;
+  fz_context *ctx= get_fitz_context ();
+#endif
+  snapshot_pixmap (ctx, pix);
+  unsigned char *pixels= fz_pixmap_samples (ctx, pix);
+  int w= fz_pixmap_width (ctx, pix);
+  int h= fz_pixmap_height (ctx, pix);
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
   // FIXME: premultiplied?
   SDL_FRect src= { 0, 0, (float)w, (float)h };
@@ -496,12 +514,21 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
 
 picture
 native_picture_from_SDL_Surface (SDL_Surface *surf) {
-  fz_pixmap *pix= fz_new_pixmap_with_data (mupdf_context (),
-                      fz_device_bgr (mupdf_context ()),
+#if MUPDF_RENDERER
+  fz_context *ctx= mupdf_context ();
+#else
+  fz_context *ctx= get_fitz_context ();
+#endif
+  fz_pixmap *pix= fz_new_pixmap_with_data (ctx,
+                      fz_device_bgr (ctx),
                       surf->w, surf->h, NULL, 1, 4*surf->w,
                       (unsigned char*)surf->pixels);
+#if MUPDF_RENDERER
   picture p= mupdf_picture (pix, 0, 0);
-  fz_drop_pixmap (mupdf_context (), pix);
+#else
+  picture p= fitz_picture (pix, 0, 0);
+#endif
+  fz_drop_pixmap (ctx, pix);
   return p;
 }
 
@@ -512,8 +539,24 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 
   SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
   backing_store= native_picture_from_SDL_Surface (surf);
-  if (ren) delete_renderer (ren);
-  ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+#if MUPDF_RENDERER
+  fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
+  fz_context *ctx= mupdf_context ();
+#else
+  fz_pixmap *pix= ((fitz_picture_rep*)backing_store->get_handle())->pix;
+  fz_context *ctx= get_fitz_context ();
+#endif
+
+  if (!ren) {
+    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  } else {
+#if MUPDF_RENDERER
+    static_cast<mupdf_renderer_rep*>(ren)->begin (pix);
+#else
+    static_cast<fitz_renderer_rep*>(ren)->begin (pix);
+#endif
+  }
+  
   win_w = surf->w;
   win_h = surf->h;
     
@@ -522,9 +565,18 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   ren->set_pencil (rgb_color (255,0,0));
   ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
   render_clay_commands (ren, &render_commands);
+
+#if MUPDF_RENDERER
+    static_cast<mupdf_renderer_rep*>(ren)->end ();
+#else
+    static_cast<fitz_renderer_rep*>(ren)->end ();
+#endif
+
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 30) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
   
+  //snapshot_pixmap (ctx, pix);
+
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
   SDL_UpdateWindowSurface (sdl_win);
