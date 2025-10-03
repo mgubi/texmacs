@@ -45,6 +45,7 @@
 
 // keyboard events
 extern string key_event;
+extern string last_key;
 extern time_t key_time;
 
 // pointer info
@@ -142,6 +143,8 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   id= serial++;
   id_to_window (id)= this;
   
+  SDL_StartTextInput (sdl_win);
+  
   // update widget state
   set_identifier (abstract (content), id);
   notify_position (abstract (content), 0, 0);
@@ -172,6 +175,8 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   set_identifier (abstract (content), 0); // FIXME: is this ok?
   Window_to_window->reset (sdl_win);
   nr_windows--;
+
+  SDL_StopTextInput (sdl_win);
 
   SDL_free (clay_arena.memory);
   SDL_DestroyWindow (sdl_win);
@@ -1054,8 +1059,6 @@ mouse_decode (unsigned int mstate) {
   return "unknown";
 }
 
-
-
 SDL_Keycode 
 postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod, bool is_key_event) {
   SDL_Keycode out_key;
@@ -1193,11 +1196,12 @@ process_event (SDL_Event *event) {
           cout << "TOGGLE debug mode " << (win->clay_debug ? "true" : "false") << LF;
           break;
         }
-        if (event->key.scancode == SDL_SCANCODE_LSHIFT) break;
         SDL_Keymod m= event->key.mod;
         SDL_Keycode keycode= postprocess_key_event (event->key.scancode, &m, false);
 
-        cout << SDL_GetKeyName (keycode) << " " << print_modifiers (event->key.mod) << LF;
+        if (keycode == SDLK_UNKNOWN) break; // it is only a modifier, we ignore it
+
+        cout << "postprocessed key:" << SDL_GetKeyName (keycode) << " " << print_modifiers (event->key.mod) << LF;
 
         string key= lookup_key (keycode, m);
         //cout << "Press " << key << " at " << (time_t) ev->xkey.time
@@ -1214,10 +1218,30 @@ process_event (SDL_Event *event) {
         if (N(key)>0) {
           key_event= key;
           key_time= texmacs_time();
+          last_key= key;
         }
       }
       break;
     } // case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_TEXT_INPUT:
+        if (event->text.text == last_key) {
+            printf("Text input (matches last key, ignore): '%s'\n", event->text.text);
+        } else {
+            printf("Text input (no match): '%s'\n", event->text.text);
+          win= get_window_from_ID (event->key.windowID);
+          if (win) {
+            //FIXME: it is the right way to do it?
+            key_event= utf8_to_cork (event->text.text);
+            key_time= texmacs_time();
+          }
+        }
+        last_key = ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
+        break;
+
+    case SDL_EVENT_TEXT_EDITING:
+        printf("Text editing: '%s' (cursor: %d, selection: %d)\n",
+               event->edit.text, event->edit.start, event->edit.length);
+        break;
   } // switch (event->type)
 }
 
@@ -1536,10 +1560,6 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
 * Set up keyboard
 ******************************************************************************/
 
-#ifndef SDLK_ISO_Left_Tab
-#define SDLK_ISO_Left_Tab 0xFE20
-#endif
-
 void
 map (int key, string s) {
   lower_key (key)= s;
@@ -1591,34 +1611,7 @@ initialize_keyboard () {
   MMap (SDLK_X, "x", "X");
   MMap (SDLK_Y, "y", "Y");
   MMap (SDLK_Z, "z", "Z");
-#if 0
-  Map (SDLK_A, "A");
-  Map (SDLK_B, "B");
-  Map (SDLK_C, "C");
-  Map (SDLK_D, "D");
-  Map (SDLK_E, "E");
-  Map (SDLK_F, "F");
-  Map (SDLK_G, "G");
-  Map (SDLK_H, "H");
-  Map (SDLK_I, "I");
-  Map (SDLK_J, "J");
-  Map (SDLK_K, "K");
-  Map (SDLK_L, "L");
-  Map (SDLK_M, "M");
-  Map (SDLK_N, "N");
-  Map (SDLK_O, "O");
-  Map (SDLK_P, "P");
-  Map (SDLK_Q, "Q");
-  Map (SDLK_R, "R");
-  Map (SDLK_S, "S");
-  Map (SDLK_T, "T");
-  Map (SDLK_U, "U");
-  Map (SDLK_V, "V");
-  Map (SDLK_W, "W");
-  Map (SDLK_X, "X");
-  Map (SDLK_Y, "Y");
-  Map (SDLK_Z, "Z");
-#endif
+
   Map (SDLK_0, "0");
   Map (SDLK_1, "1");
   Map (SDLK_2, "2");
@@ -1630,88 +1623,6 @@ initialize_keyboard () {
   Map (SDLK_8, "8");
   Map (SDLK_9, "9");
 
-#if 0
-  // Cyrillic letters
-  Map (SDLK_Cyrillic_a,   "\xe0");
-  Map (SDLK_Cyrillic_be,  "\xe1");
-  Map (SDLK_Cyrillic_ve,  "\xe2");
-  Map (SDLK_Cyrillic_ghe, "\xe3");
-  Map (SDLK_Cyrillic_de,  "\xe4");
-  Map (SDLK_Cyrillic_ie,  "\xe5");
-  Map (SDLK_Cyrillic_io,  "\xbc");
-  Map (SDLK_Cyrillic_zhe, "\xe6");
-  Map (SDLK_Cyrillic_ze,  "\xe7");
-  Map (SDLK_Cyrillic_i,   "\xe8");
-  Map (SDLK_Cyrillic_shorti,   "\xe9");
-  Map (SDLK_Cyrillic_ka,  "\xea");
-  Map (SDLK_Cyrillic_el,  "\xeb");
-  Map (SDLK_Cyrillic_em,  "\xec");
-  Map (SDLK_Cyrillic_en,  "\xed");
-  Map (SDLK_Cyrillic_o,   "\xee");
-  Map (SDLK_Cyrillic_pe,  "\xef");
-  Map (SDLK_Cyrillic_er,  "\xf0");
-  Map (SDLK_Cyrillic_es,  "\xf1");
-  Map (SDLK_Cyrillic_te,  "\xf2");
-  Map (SDLK_Cyrillic_u,   "\xf3");
-  Map (SDLK_Cyrillic_ef,  "\xf4");
-  Map (SDLK_Cyrillic_ha,  "\xf5");
-  Map (SDLK_Cyrillic_tse, "\xf6");
-  Map (SDLK_Cyrillic_che, "\xf7");
-  Map (SDLK_Cyrillic_sha, "\xf8");
-  Map (SDLK_Cyrillic_shcha,    "\xf9");
-  Map (SDLK_Cyrillic_hardsign, "\xfa");
-  Map (SDLK_Cyrillic_yeru,     "\xfb");
-  Map (SDLK_Cyrillic_softsign, "\xfc");
-  Map (SDLK_Cyrillic_e,   "\xfd");
-  Map (SDLK_Cyrillic_yu,  "\xfe");
-  Map (SDLK_Cyrillic_ya,  "\xff");
-  Map (SDLK_Cyrillic_A,   "\xc0");
-  Map (SDLK_Cyrillic_BE,  "\xc1");
-  Map (SDLK_Cyrillic_VE,  "\xc2");
-  Map (SDLK_Cyrillic_GHE, "\xc3");
-  Map (SDLK_Cyrillic_DE,  "\xc4");
-  Map (SDLK_Cyrillic_IE,  "\xc5");
-  Map (SDLK_Cyrillic_IO,  "\x9c");
-  Map (SDLK_Cyrillic_ZHE, "\xc6");
-  Map (SDLK_Cyrillic_ZE,  "\xc7");
-  Map (SDLK_Cyrillic_I,   "\xc8");
-  Map (SDLK_Cyrillic_SHORTI,   "\xc9");
-  Map (SDLK_Cyrillic_KA,  "\xca");
-  Map (SDLK_Cyrillic_EL,  "\xcb");
-  Map (SDLK_Cyrillic_EM,  "\xcc");
-  Map (SDLK_Cyrillic_EN,  "\xcd");
-  Map (SDLK_Cyrillic_O,   "\xce");
-  Map (SDLK_Cyrillic_PE,  "\xcf");
-  Map (SDLK_Cyrillic_ER,  "\xd0");
-  Map (SDLK_Cyrillic_ES,  "\xd1");
-  Map (SDLK_Cyrillic_TE,  "\xd2");
-  Map (SDLK_Cyrillic_U,   "\xd3");
-  Map (SDLK_Cyrillic_EF,  "\xd4");
-  Map (SDLK_Cyrillic_HA,  "\xd5");
-  Map (SDLK_Cyrillic_TSE, "\xd6");
-  Map (SDLK_Cyrillic_CHE, "\xd7");
-  Map (SDLK_Cyrillic_SHA, "\xd8");
-  Map (SDLK_Cyrillic_SHCHA,    "\xd9");
-  Map (SDLK_Cyrillic_HARDSIGN, "\xda");
-  Map (SDLK_Cyrillic_YERU,     "\xdb");
-  Map (SDLK_Cyrillic_SOFTSIGN, "\xdc");
-  Map (SDLK_Cyrillic_E,   "\xdd");
-  Map (SDLK_Cyrillic_YU,  "\xde");
-  Map (SDLK_Cyrillic_YA,  "\xdf");
-
-  //Ukrainian letters in T2A encoding
-  Map (SDLK_Ukrainian_i,   "i"); // Fall back!
-  Map (SDLK_Ukrainian_I,   "I"); // Fall back!
-  Map (SDLK_Ukrainian_yi,   "\xa8");
-  Map (SDLK_Ukrainian_YI,   "\x88");
-  Map (SDLK_Ukrainian_ie,   "\xb9");
-  Map (SDLK_Ukrainian_IE,   "\x99");
-  // Map (SDLK_Ukrainian_ghe_with_upturn,   "\xa0");
-  // Map (SDLK_Ukrainian_GHE_WITH_UPTURN,   "\x80");
-  Map (0x6ad,   "\xa0");
-  Map (0x6bd,   "\x80");
-#endif
-  
   // Standard ASCII Symbols
   Map (SDLK_EXCLAIM, "!");
   Map (SDLK_DBLAPOSTROPHE, "\x22");
@@ -1764,170 +1675,6 @@ initialize_keyboard () {
   Map (0xFE5E, "voicedsound");
   Map (0xFE5F, "semivoicedsound");
   Map (0xFE60, "belowdot");
-
-#if 0
-  // Extended symbols and accented characters
-  Map (SDLK_nobreakspace, "varspace");
-  Map (SDLK_exclamdown, "exclamdown");
-  Map (SDLK_cent, "cent");
-  Map (SDLK_sterling, "sterling");
-  Map (SDLK_currency, "currency");
-  Map (SDLK_yen, "yen");
-  Map (SDLK_brokenbar, "brokenbar");
-  Map (SDLK_section, "section");
-  Map (SDLK_diaeresis, "umlaut");
-  Map (SDLK_copyright, "copyright");
-  Map (SDLK_ordfeminine, "ordfeminine");
-  Map (SDLK_guillemotleft, "guillemotleft");
-  Map (SDLK_notsign, "notsign");
-  Map (SDLK_hyphen, "hyphen");
-  Map (SDLK_registered, "registered");
-  Map (SDLK_macron, "macron");
-  Map (SDLK_degree, "degree");
-  Map (SDLK_plusminus, "plusminus");
-  Map (SDLK_twosuperior, "twosuperior");
-  Map (SDLK_threesuperior, "threesuperior");
-  Map (SDLK_acute, "acute");
-  Map (SDLK_mu, "mu");
-  Map (SDLK_paragraph, "paragraph");
-  Map (SDLK_periodcentered, "periodcentered");
-  Map (SDLK_cedilla, "cedilla");
-  Map (SDLK_onesuperior, "onesuperior");
-  Map (SDLK_masculine, "masculine");
-  Map (SDLK_guillemotright, "guillemotright");
-  Map (SDLK_onequarter, "onequarter");
-  Map (SDLK_onehalf, "onehalf");
-  Map (SDLK_threequarters, "threequarters");
-  Map (SDLK_questiondown, "questiondown");
-  Map (SDLK_multiply, "times");
-  Map (SDLK_division, "div");
-
-  Map (SDLK_Agrave, "\xc0");
-  Map (SDLK_Aacute, "\xc1");
-  Map (SDLK_Acircumflex, "\xc2");
-  Map (SDLK_Atilde, "\xc3");
-  Map (SDLK_Adiaeresis, "\xc4");
-  Map (SDLK_Aring, "\xc5");
-  Map (SDLK_AE, "\xc6");
-  Map (SDLK_Ccedilla, "\xc7");
-  Map (SDLK_Egrave, "\xc8");
-  Map (SDLK_Eacute, "\xc9");
-  Map (SDLK_Ecircumflex, "\xca");
-  Map (SDLK_Ediaeresis, "\xcb");
-  Map (SDLK_Igrave, "\xcc");
-  Map (SDLK_Iacute, "\xcd");
-  Map (SDLK_Icircumflex, "\xce");
-  Map (SDLK_Idiaeresis, "\xcf");
-  Map (SDLK_ETH, "\xd0");
-  Map (SDLK_Eth, "\xd0");
-  Map (SDLK_Ntilde, "\xd1");
-  Map (SDLK_Ograve, "\xd2");
-  Map (SDLK_Oacute, "\xd3");
-  Map (SDLK_Ocircumflex, "\xd4");
-  Map (SDLK_Otilde, "\xd5");
-  Map (SDLK_Odiaeresis, "\xd6");
-  Map (SDLK_OE, "\xd7");
-  Map (SDLK_Ooblique, "\xd8");
-  Map (SDLK_Ugrave, "\xd9");
-  Map (SDLK_Uacute, "\xda");
-  Map (SDLK_Ucircumflex, "\xdb");
-  Map (SDLK_Udiaeresis, "\xdc");
-  Map (SDLK_Yacute, "\xdd");
-  Map (SDLK_THORN, "\xde");
-  Map (SDLK_Thorn, "\xde");
-  Map (SDLK_ssharp, "sz");
-  Map (SDLK_agrave, "\xe0");
-  Map (SDLK_aacute, "\xe1");
-  Map (SDLK_acircumflex, "\xe2");
-  Map (SDLK_atilde, "\xe3");
-  Map (SDLK_adiaeresis, "\xe4");
-  Map (SDLK_aring, "\xe5");
-  Map (SDLK_ae, "\xe6");
-  Map (SDLK_ccedilla, "\xe7");
-  Map (SDLK_egrave, "\xe8");
-  Map (SDLK_eacute, "\xe9");
-  Map (SDLK_ecircumflex, "\xea");
-  Map (SDLK_ediaeresis, "\xeb");
-  Map (SDLK_igrave, "\xec");
-  Map (SDLK_iacute, "\xed");
-  Map (SDLK_icircumflex, "\xee");
-  Map (SDLK_idiaeresis, "\xef");
-  Map (SDLK_eth, "\xf0");
-  Map (SDLK_ntilde, "\xf1");
-  Map (SDLK_ograve, "\xf2");
-  Map (SDLK_oacute, "\xf3");
-  Map (SDLK_ocircumflex, "\xf4");
-  Map (SDLK_otilde, "\xf5");
-  Map (SDLK_odiaeresis, "\xf6");
-  Map (SDLK_oe, "\xf7");
-  Map (SDLK_oslash, "\xf8");
-  Map (SDLK_ugrave, "\xf9");
-  Map (SDLK_uacute, "\xfa");
-  Map (SDLK_ucircumflex, "\xfb");
-  Map (SDLK_udiaeresis, "\xfc");
-  Map (SDLK_yacute, "\xfd");
-  Map (SDLK_thorn, "\xfe");
-  Map (SDLK_ydiaeresis, "\xff");
-
-  // Symbols from iso-latin-2
-  Map (SDLK_Aogonek, "\x81");
-  Map (SDLK_breve, "breve");
-  Map (SDLK_Lstroke, "\x8a");
-  Map (SDLK_Lcaron, "\x89");
-  Map (SDLK_Sacute, "\x91");
-  Map (SDLK_Scaron, "\x92");
-  Map (SDLK_Scedilla, "\x93");
-  Map (SDLK_Tcaron, "\x94");
-  Map (SDLK_Zacute, "\x99");
-  Map (SDLK_Zcaron, "\x9a");
-  Map (SDLK_Zabovedot, "\x9b");
-  Map (SDLK_aogonek, "\xa1");
-  Map (SDLK_ogonek, "ogonek");
-  Map (SDLK_lstroke, "\xaa");
-  Map (SDLK_lcaron, "\xa9");
-  Map (SDLK_sacute, "\xb1");
-  Map (SDLK_caron, "caron");
-  Map (SDLK_scaron, "\xb2");
-  Map (SDLK_scedilla, "\xb3");
-  Map (SDLK_tcaron, "\xb4");
-  Map (SDLK_zacute, "\xb9");
-  Map (SDLK_doubleacute, "doubleacute");
-  Map (SDLK_zcaron, "\xba");
-  Map (SDLK_zabovedot, "\xbb");
-  Map (SDLK_Racute, "\x8f");
-  Map (SDLK_Abreve, "\x80");
-  Map (SDLK_Lacute, "\x88");
-  Map (SDLK_Cacute, "\x82");
-  Map (SDLK_Ccaron, "\x83");
-  Map (SDLK_Eogonek, "\x86");
-  Map (SDLK_Ecaron, "\x85");
-  Map (SDLK_Dcaron, "\x84");
-  Map (SDLK_Dstroke, "\xd0");
-  Map (SDLK_Nacute, "\x8b");
-  Map (SDLK_Ncaron, "\x8c");
-  Map (SDLK_Odoubleacute, "\x8e");
-  Map (SDLK_Rcaron, "\x90");
-  Map (SDLK_Uring, "\x97");
-  Map (SDLK_Udoubleacute, "\x96");
-  Map (SDLK_Tcedilla, "\x95");
-  Map (SDLK_racute, "\xaf");
-  Map (SDLK_abreve, "\xa0");
-  Map (SDLK_lacute, "\xa8");
-  Map (SDLK_cacute, "\xa2");
-  Map (SDLK_ccaron, "\xa3");
-  Map (SDLK_eogonek, "\xa6");
-  Map (SDLK_ecaron, "\xa5");
-  Map (SDLK_dcaron, "\xa4");
-  Map (SDLK_dstroke, "\x9e");
-  Map (SDLK_nacute, "\xab");
-  Map (SDLK_ncaron, "\xac");
-  Map (SDLK_odoubleacute, "\xae");
-  Map (SDLK_udoubleacute, "\xb6");
-  Map (SDLK_rcaron, "\xb0");
-  Map (SDLK_uring, "\xb7");
-  Map (SDLK_tcedilla, "\xb5");
-  Map (SDLK_abovedot, "abovedot");
-#endif
   
   // Special control keys
   Map (SDLK_PAGEUP, "pageup");
@@ -1943,7 +1690,7 @@ initialize_keyboard () {
   map (SDLK_DELETE, "delete");
   map (SDLK_INSERT, "insert");
   map (SDLK_TAB, "tab");
-  map (SDLK_ISO_Left_Tab, "tab");
+  map (SDLK_LEFT_TAB, "tab");
   map (SDLK_ESCAPE, "escape");
   map (SDLK_LEFT, "left");
   map (SDLK_RIGHT, "right");

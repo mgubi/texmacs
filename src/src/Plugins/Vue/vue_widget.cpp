@@ -82,6 +82,7 @@ Clay_Color color_text= {0, 0, 0, 255};
 
 // keyboard events
 string key_event;
+string last_key;
 time_t key_time;
 
 // pointer info
