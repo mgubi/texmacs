@@ -2361,7 +2361,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   win (NULL), ren (NULL),
   size (coord2 (0, 0)),
   extents (0,0,0,0),
-  mouse_cursor (coord2 (0, 0)),
+  cursor_pos (coord2 (0, 0)),
   backing_pos (coord2(0, 0)),
   scroll_pos (coord2 (0, 0)),
   scroll_momentum (coord2 (0, 0)),
@@ -2465,7 +2465,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_CURSOR:
       {
-        mouse_cursor= check_open <coord2> (val, s);
+        cursor_pos= check_open <coord2> (val, s);
       }
       break;
     default:

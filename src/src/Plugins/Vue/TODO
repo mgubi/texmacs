@@ -9,7 +9,6 @@ TODO
 * handle kinetic wheel properly
 * more uniform handling of mouse events and keyboard focus...
 * fix dropdown menu positioning if they go off the viewport
-* fix keyboard handling (Alt+3 should give #)
 * handle focus properly for editors
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * implement copy & paste
@@ -18,9 +17,11 @@ TODO
 
 WIP
 
+* improve text input and text editing events
 
 DONE
 
+* fix keyboard handling (Alt+3 should give #)
 * remove balloons after a while
 * fix closing windows (why is not working??)
 * scrollbars for editors 
