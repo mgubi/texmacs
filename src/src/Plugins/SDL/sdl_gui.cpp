@@ -823,19 +823,71 @@ mouse_decode (unsigned int mstate) {
   return "unknown";
 }
 
+static SDL_Keycode
+postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod, bool is_key_event) {
+  SDL_Keycode out_key;
+
+  // Test all combinations of shift and alt
+  static SDL_Keymod combinations[4]= {
+    SDL_KMOD_NONE,
+    SDL_KMOD_SHIFT,
+    SDL_KMOD_ALT,
+    SDL_KMOD_SHIFT | SDL_KMOD_ALT
+  };
+
+  SDL_Keycode results[4];
+  for (int i = 0; i < 4; i++) {
+    results[i]= SDL_GetKeyFromScancode (scancode, combinations[i], is_key_event);
+  }
+
+  // Check if the base key (results[0]) is a modifier
+  bool is_modifier = (results[0] == SDLK_LSHIFT   || results[0] == SDLK_RSHIFT ||
+                      results[0] == SDLK_LCTRL    || results[0] == SDLK_RCTRL ||
+                      results[0] == SDLK_LALT     || results[0] == SDLK_RALT ||
+                      results[0] == SDLK_LGUI     || results[0] == SDLK_RGUI ||
+                      results[0] == SDLK_LMETA    || results[0] == SDLK_RMETA ||
+                      results[0] == SDLK_CAPSLOCK || results[0] == SDLK_NUMLOCKCLEAR ||
+                      results[0] == SDLK_SCROLLLOCK);
+
+  if (is_modifier) {
+    return SDLK_UNKNOWN;
+  }
+
+  // Remove modifiers in current event are already used to compose key
+  if ( (*current_mod & SDL_KMOD_SHIFT) && (*current_mod & SDL_KMOD_ALT) && (results[3] != results[0])) {
+    *current_mod&= ~(SDL_KMOD_SHIFT | SDL_KMOD_ALT);
+    out_key= results[3];
+  } else if ( (*current_mod & SDL_KMOD_ALT) && (results[2] != results[0])) {
+    *current_mod&= ~SDL_KMOD_ALT;
+    out_key= results[2];
+  } else if ( (*current_mod & SDL_KMOD_SHIFT) && (results[1] != results[0])) {
+    *current_mod&= ~SDL_KMOD_SHIFT;
+    out_key= results[1];
+  } else {
+    out_key= results[0];
+  }
+  return out_key;
+}
+
 static string
-lookup_key (SDL_Keycode key, SDL_Keymod mod) {
+lookup_key (SDL_Scancode scancode, SDL_Keymod mod) {
+  SDL_Keycode key= postprocess_key_event (scancode, &mod, false);
+  if (key == SDLK_UNKNOWN) return ""; // it is only a modifier, we ignore it
+
   const char* str= SDL_GetKeyName (key);
-  string r (str, strlen (str));
+  string r (str, (int)strlen (str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
-//  string s=r;
-  string s= ((mod & SDL_KMOD_SHIFT) ? upper_key [key] : lower_key [key]);
+  string s=r;
+  if ((key >= 'A') && (key <= 'Z')) s= upper_key[key - 'A' + 'a'];
+  else if ((key >= 'a') && (key <= 'z')) s= lower_key[key];
+  else if (lower_key->contains (key)) s= lower_key [key];
   if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
 
-  if (mod & SDL_KMOD_CTRL) s= "C-" * s;
-  if (mod & SDL_KMOD_ALT)  s= "A-" * s;
-  if (mod & SDL_KMOD_GUI)  s= "M-" * s;
+  if (mod & SDL_KMOD_SHIFT) s= "S-" * s;
+  if (mod & SDL_KMOD_CTRL)  s= "C-" * s;
+  if (mod & SDL_KMOD_ALT)   s= "A-" * s;
+  if (mod & SDL_KMOD_GUI)   s= "M-" * s;
   cout << "key press: " << s << LF;
   return s;
 }
@@ -885,7 +937,6 @@ print_key_info ( SDL_KeyboardEvent *key ) {
   s << print_modifiers (key->mod);
   return s;
 }
-
 
 void
 sdl_gui_rep::process_event (SDL_Event *event) {
@@ -1053,18 +1104,21 @@ sdl_gui_rep::process_event (SDL_Event *event) {
       unmap_balloon ();
       win= get_window_from_ID (event->key.windowID);
       if (win) {
-        string key= lookup_key(keycode, event->key.mod);
-        //cout << "Press " << key << " at " << (time_t) ev->xkey.time
-        //<< " (" << texmacs_time() << ")\n";
-        kbd_count++;
-        //FIXME: conversion below loses precision from UInt64 to UInt32
-        synchronize_time (event->key.timestamp);
-        if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
-            (kbd_count & 15) == 0)
-          request_partial_redraw= true;
-        //cout << "key   : " << key << "\n";
-        //cout << "redraw: " << request_partial_redraw << "\n";
-        if (N(key)>0) win->key_event (key);
+        string key= lookup_key(event->key.scancode, event->key.mod);
+        
+        if (N(key)>0) {
+          //cout << "Press " << key << " at " << (time_t) ev->xkey.time
+          //<< " (" << texmacs_time() << ")\n";
+          kbd_count++;
+          //FIXME: conversion below loses precision from UInt64 to UInt32
+          synchronize_time (event->key.timestamp);
+          if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
+              (kbd_count & 15) == 0)
+            request_partial_redraw= true;
+          //cout << "key   : " << key << "\n";
+          //cout << "redraw: " << request_partial_redraw << "\n";
+          win->key_event (key);
+        }
       }
       break;
     } // case SDL_EVENT_KEY_DOWN:

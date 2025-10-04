@@ -899,7 +899,7 @@ int number_of_servers (); // in texmacs_server.hpp
 
 void sdl_log_event (const SDL_Event *event);
 static string lookup_mouse (Uint8 button);
-static string lookup_key (SDL_Keycode key, SDL_Keymod mod);
+static string lookup_key (SDL_Scancode scancode, SDL_Keymod mod);
 static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
 
@@ -1196,26 +1196,22 @@ process_event (SDL_Event *event) {
           cout << "TOGGLE debug mode " << (win->clay_debug ? "true" : "false") << LF;
           break;
         }
-        SDL_Keymod m= event->key.mod;
-        SDL_Keycode keycode= postprocess_key_event (event->key.scancode, &m, false);
 
-        if (keycode == SDLK_UNKNOWN) break; // it is only a modifier, we ignore it
-
-        cout << "postprocessed key:" << SDL_GetKeyName (keycode) << " " << print_modifiers (event->key.mod) << LF;
-
-        string key= lookup_key (keycode, m);
-        //cout << "Press " << key << " at " << (time_t) ev->xkey.time
-        //<< " (" << texmacs_time() << ")\n";
-        kbd_count++;
-        //FIXME: conversion below loses precision from UInt64 to UInt32
-        synchronize_time ((Uint32)event->key.timestamp);
-        if (texmacs_time () - remote_time ((Uint32)event->key.timestamp) < 100 ||
-            (kbd_count & 15) == 0)
-          request_partial_redraw= true;
-        //cout << "key   : " << key << "\n";
-        //cout << "redraw: " << request_partial_redraw << "\n";
-        //if (N(key)>0) win->key_event (key);
+        string key= lookup_key (event->key.scancode, event->key.mod);
+        
         if (N(key)>0) {
+          //cout << "Press " << key << " at " << (time_t) ev->xkey.time
+          //<< " (" << texmacs_time() << ")\n";
+          kbd_count++;
+          //FIXME: conversion below loses precision from UInt64 to UInt32
+          synchronize_time ((Uint32)event->key.timestamp);
+          if (texmacs_time () - remote_time ((Uint32)event->key.timestamp) < 100 ||
+              (kbd_count & 15) == 0)
+            request_partial_redraw= true;
+          //cout << "key   : " << key << "\n";
+          //cout << "redraw: " << request_partial_redraw << "\n";
+          //if (N(key)>0) win->key_event (key);
+
           key_event= key;
           key_time= texmacs_time();
           last_key= key;
@@ -1224,19 +1220,23 @@ process_event (SDL_Event *event) {
       break;
     } // case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_TEXT_INPUT:
-        if (event->text.text == last_key) {
-            printf("Text input (matches last key, ignore): '%s'\n", event->text.text);
-        } else {
-            printf("Text input (no match): '%s'\n", event->text.text);
-          win= get_window_from_ID (event->key.windowID);
-          if (win) {
-            //FIXME: it is the right way to do it?
-            key_event= utf8_to_cork (event->text.text);
-            key_time= texmacs_time();
-          }
+    {
+      string r= utf8_to_cork (event->text.text);
+      if (r == last_key) {
+          printf("Text input (matches last key, ignore): '%s'\n", event->text.text);
+      } else {
+          printf("Text input (no match): '%s'\n", event->text.text);
+        win= get_window_from_ID (event->key.windowID);
+        if (win) {
+          //FIXME: it is the right way to do it?
+          key_event= r;
+          key_time= texmacs_time();
         }
-        last_key = ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
-        break;
+      }
+      last_key = ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
+      break;
+    } //case SDL_EVENT_TEXT_INPUT
+
 
     case SDL_EVENT_TEXT_EDITING:
         printf("Text editing: '%s' (cursor: %d, selection: %d)\n",
@@ -1778,16 +1778,20 @@ lookup_mouse (Uint8 button) {
 }
 
 static string
-lookup_key (SDL_Keycode key, SDL_Keymod mod) {
+lookup_key (SDL_Scancode scancode, SDL_Keymod mod) {
+  SDL_Keycode key= postprocess_key_event (scancode, &mod, false);
+  if (key == SDLK_UNKNOWN) return ""; // it is only a modifier, we ignore it
+
+  cout << "postprocessed key:" << SDL_GetKeyName (key) << " " << print_modifiers (mod) << LF;
+
   const char* str= SDL_GetKeyName (key);
   string r (str, (int)strlen (str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
-//  string s=r;
-  string s;
+  string s=r;
   if ((key >= 'A') && (key <= 'Z')) s= upper_key[key - 'A' + 'a'];
   else if ((key >= 'a') && (key <= 'z')) s= lower_key[key];
-  else s= lower_key [key];
+  else if (lower_key->contains(key))  s= lower_key [key];
   if ((N(s)>=2) && (s[0]=='K') && (s[1]=='-')) s= s (2, N(s));
 
   if (mod & SDL_KMOD_SHIFT) s= "S-" * s;
