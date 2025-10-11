@@ -955,7 +955,7 @@ void gui_start_loop () {
     if (gui_wait) {
       SDL_Delay (delay);
       delay += (delay/5);
-      if (delay > 500) delay= 500;
+      if (delay > 1000) delay= 1000;
     }
 
     // 3. process layout and handle events
