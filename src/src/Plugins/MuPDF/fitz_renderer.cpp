@@ -855,6 +855,103 @@ fitz_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   end_path ();
 }
 
+void
+fitz_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                      SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                      bool filled) {
+  if (!device) return;
+
+  // Convert coordinates to Fitz space
+  float xx1 = to_fitz_x (min (x1, x2));
+  float yy1 = to_fitz_y (min (y1, y2));
+  float xx2 = to_fitz_x (max (x1, x2));
+  float yy2 = to_fitz_y (max (y1, y2));
+
+  // Convert radii to Fitz coordinates
+  float rtl = (float) r_tl / pixel;
+  float rtr = (float) r_tr / pixel;
+  float rbr = (float) r_br / pixel;
+  float rbl = (float) r_bl / pixel;
+
+  // Clamp radii to half the rectangle dimensions
+  float max_rx = (xx2 - xx1) / 2.0f;
+  float max_ry = (yy2 - yy1) / 2.0f;
+  float max_r = (max_rx < max_ry) ? max_rx : max_ry;
+  if (rtl > max_r) rtl = max_r;
+  if (rtr > max_r) rtr = max_r;
+  if (rbr > max_r) rbr = max_r;
+  if (rbl > max_r) rbl = max_r;
+
+  // Bézier control point distance for circular arc approximation
+  float kappa = 0.5522847498f;
+
+  begin_path ();
+  fz_try (ctx) {
+    // Start at top-left corner (moving right from the rounded corner)
+    fz_moveto (ctx, current_path, xx1 + rtl, yy1);
+
+    // Top edge
+    fz_lineto (ctx, current_path, xx2 - rtr, yy1);
+
+    // Top-right corner
+    if (rtr > 0) {
+      float cx = rtr * kappa;
+      fz_curveto (ctx, current_path,
+                  xx2 - rtr + cx, yy1,
+                  xx2, yy1 + rtr - cx,
+                  xx2, yy1 + rtr);
+    }
+
+    // Right edge
+    fz_lineto (ctx, current_path, xx2, yy2 - rbr);
+
+    // Bottom-right corner
+    if (rbr > 0) {
+      float cx = rbr * kappa;
+      fz_curveto (ctx, current_path,
+                  xx2, yy2 - rbr + cx,
+                  xx2 - rbr + cx, yy2,
+                  xx2 - rbr, yy2);
+    }
+
+    // Bottom edge
+    fz_lineto (ctx, current_path, xx1 + rbl, yy2);
+
+    // Bottom-left corner
+    if (rbl > 0) {
+      float cx = rbl * kappa;
+      fz_curveto (ctx, current_path,
+                  xx1 + rbl - cx, yy2,
+                  xx1, yy2 - rbl + cx,
+                  xx1, yy2 - rbl);
+    }
+
+    // Left edge
+    fz_lineto (ctx, current_path, xx1, yy1 + rtl);
+
+    // Top-left corner (closing the path)
+    if (rtl > 0) {
+      float cx = rtl * kappa;
+      fz_curveto (ctx, current_path,
+                  xx1, yy1 + rtl - cx,
+                  xx1 + rtl - cx, yy1,
+                  xx1 + rtl, yy1);
+    }
+
+    fz_closepath (ctx, current_path);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in rounded_rectangle path operations: " << error_msg << LF;
+  }
+
+  if (filled)
+    fill_current_path ();
+  else
+    stroke_current_path ();
+  end_path ();
+}
+
 /******************************************************************************
 * Text rendering
 ******************************************************************************/
