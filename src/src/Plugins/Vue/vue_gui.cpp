@@ -635,10 +635,14 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         color c= rgb_color (config->backgroundColor.r, config->backgroundColor.g,
                             config->backgroundColor.b, config->backgroundColor.a);
         ren->set_pencil (c);
-        if (config->cornerRadius.topLeft > 0) {
-          ren->fill (r->x1, r->y1, r->x2, r->y2);
-          //FIXME: implement rounded rects
-//              SDL_Clay_RenderFillRoundedRect(rendererData, rect, config->cornerRadius.topLeft, config->backgroundColor);
+        if (config->cornerRadius.topLeft > 0    || config->cornerRadius.topRight > 0 ||
+            config->cornerRadius.bottomLeft > 0 || config->cornerRadius.bottomRight > 0) {
+          // Draw rounded rectangle
+          SI r_tl= (SI) (config->cornerRadius.topLeft * ren->pixel);
+          SI r_tr= (SI) (config->cornerRadius.topRight * ren->pixel);
+          SI r_br= (SI) (config->cornerRadius.bottomRight * ren->pixel);
+          SI r_bl= (SI) (config->cornerRadius.bottomLeft * ren->pixel);
+          ren->rounded_rectangle (r->x1, r->y1, r->x2, r->y2, r_tl, r_tr, r_br, r_bl, true);
         } else {
           ren->fill (r->x1, r->y1, r->x2, r->y2);
         }
@@ -665,6 +669,7 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         // we need a ticker pen, otherwise the corners look blurry (maybe we should use a different method?)
         pencil p= pencil (c, 2*ren->pixel+((config->width.top-1))*ren->pixel, cap_square);
         ren->set_pencil (p);
+#ifdef USE_OLD_BORDER_RENDERING
         const float minRadius = min (bounding_box.width, bounding_box.height) / 2.0f;
         const Clay_CornerRadius clampedRadii = {
           .topLeft= (float) min (config->cornerRadius.topLeft, minRadius) * ren->pixel,
@@ -715,6 +720,14 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
           ren->arc (r->x2 - clampedRadii.bottomRight, r->y1,
                     r->x2, r->y1 + clampedRadii.bottomRight, 270*64, 90*64);
         }
+#else
+        // Use rounded_rectangle for borders
+        SI r_tl= (SI) (config->cornerRadius.topLeft * ren->pixel);
+        SI r_tr= (SI) (config->cornerRadius.topRight * ren->pixel);
+        SI r_br= (SI) (config->cornerRadius.bottomRight * ren->pixel);
+        SI r_bl= (SI) (config->cornerRadius.bottomLeft * ren->pixel);
+        ren->rounded_rectangle (r->x1, r->y1, r->x2, r->y2, r_tl, r_tr, r_br, r_bl, false);
+#endif
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
         Clay_BoundingBox boundingBox = rcmd->boundingBox;

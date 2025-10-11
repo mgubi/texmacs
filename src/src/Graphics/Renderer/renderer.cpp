@@ -339,6 +339,26 @@ renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
 }
 
 void
+renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                 SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                 bool filled) {
+  // Fallback implementation: draw a plain rectangle without rounded corners
+  (void) r_tl; (void) r_tr; (void) r_br; (void) r_bl;
+  if (filled)
+    fill (x1, y1, x2, y2);
+  else {
+    // Draw the outline using lines
+    array<SI> x (5), y (5);
+    x[0]= x1; y[0]= y1;
+    x[1]= x2; y[1]= y1;
+    x[2]= x2; y[2]= y2;
+    x[3]= x1; y[3]= y2;
+    x[4]= x1; y[4]= y1;
+    lines (x, y);
+  }
+}
+
+void
 renderer_rep::draw_spacial (spacial obj) {
   obj->draw (this);
 }

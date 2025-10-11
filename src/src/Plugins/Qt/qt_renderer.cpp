@@ -445,6 +445,87 @@ qt_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
 }
 
 void
+qt_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                    SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                    bool filled) {
+  // Draw a rectangle with rounded corners
+  // r_tl, r_tr, r_br, r_bl are the radii for top-left, top-right,
+  // bottom-right, and bottom-left corners respectively
+
+  double rx1, ry1, rx2, ry2;
+  decode (x1, y1, rx1, ry1);
+  decode (x2, y2, rx2, ry2);
+
+  // Ensure coordinates are ordered correctly
+  double xx1 = (rx1 < rx2) ? rx1 : rx2;
+  double yy1 = (ry1 < ry2) ? ry1 : ry2;
+  double xx2 = (rx1 < rx2) ? rx2 : rx1;
+  double yy2 = (ry1 < ry2) ? ry2 : ry1;
+
+  // Convert radii to Qt coordinates
+  double rtl = (double) r_tl / pixel;
+  double rtr = (double) r_tr / pixel;
+  double rbr = (double) r_br / pixel;
+  double rbl = (double) r_bl / pixel;
+
+  // Clamp radii to half the rectangle dimensions
+  double max_rx = (xx2 - xx1) / 2.0;
+  double max_ry = (yy2 - yy1) / 2.0;
+  double max_r = (max_rx < max_ry) ? max_rx : max_ry;
+  if (rtl > max_r) rtl = max_r;
+  if (rtr > max_r) rtr = max_r;
+  if (rbr > max_r) rbr = max_r;
+  if (rbl > max_r) rbl = max_r;
+
+  // Build the path
+  QPainterPath pp;
+
+  // Start at top-left corner (moving right from the rounded corner)
+  pp.moveTo (xx1 + rtl, yy1);
+
+  // Top edge
+  pp.lineTo (xx2 - rtr, yy1);
+
+  // Top-right corner
+  if (rtr > 0)
+    pp.arcTo (QRectF (xx2 - 2*rtr, yy1, 2*rtr, 2*rtr), 90, -90);
+
+  // Right edge
+  pp.lineTo (xx2, yy2 - rbr);
+
+  // Bottom-right corner
+  if (rbr > 0)
+    pp.arcTo (QRectF (xx2 - 2*rbr, yy2 - 2*rbr, 2*rbr, 2*rbr), 0, -90);
+
+  // Bottom edge
+  pp.lineTo (xx1 + rbl, yy2);
+
+  // Bottom-left corner
+  if (rbl > 0)
+    pp.arcTo (QRectF (xx1, yy2 - 2*rbl, 2*rbl, 2*rbl), 270, -90);
+
+  // Left edge
+  pp.lineTo (xx1, yy1 + rtl);
+
+  // Top-left corner
+  if (rtl > 0)
+    pp.arcTo (QRectF (xx1, yy1, 2*rtl, 2*rtl), 180, -90);
+
+  pp.closeSubpath ();
+
+  painter->setRenderHints (QPainter::Antialiasing);
+
+  if (filled) {
+    QBrush br= painter->brush ();
+    if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+      br= QBrush (to_qcolor (pen->get_color ()));
+    painter->fillPath (pp, br);
+  } else {
+    painter->drawPath (pp);
+  }
+}
+
+void
 qt_renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
   array<SI> x (3), y (3);
   x[0]= x1; y[0]= y1;

@@ -107,6 +107,9 @@ public:
   virtual void arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) = 0;
   virtual void fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) = 0;
   virtual void polygon (array<SI> x, array<SI> y, bool convex=true) = 0;
+  virtual void rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                  SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                  bool filled);
   virtual void draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3);
   virtual void draw_spacial (spacial obj);
   virtual void draw_rectangles (rectangles rs);
