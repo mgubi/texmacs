@@ -112,6 +112,18 @@ list<command> cmd_list;
 
 vue_window current_window; // used during layout to propagate information
 
+// signalling
+
+typedef struct ui_signal {
+  int clicked; // none, left, middle, right
+} ui_signal;
+
+uint32_t active_id;
+int active_button; // none, left, middle, right
+uint32_t hot_id;
+
+
+
 void
 gui_init_context() {
   // popup state initialization
@@ -121,6 +133,44 @@ gui_init_context() {
   // make refresh messages available to widgets during layout
   current_window->refresh_kinds= current_window->next_refresh_kinds;
   current_window->next_refresh_kinds= hashset<string>();
+}
+
+void
+gui_finalize_context() {
+  if (starts (mouse_action, "release-")) {
+    // deactivate elements, probably we released a button away from the active element
+    active_button= 0;
+    active_id= 0;
+    mouse_action= "";
+  }
+}
+
+
+ui_signal
+button_logic (Clay_ElementId id) {
+  static char const* p[4]= {"press-none",   "press-left",   "press-middle",   "press-right"};
+  static char const* r[4]= {"release-none", "release-left", "release-middle", "release-right"};
+  ui_signal res { .clicked= 0 };
+  if (Clay_PointerOver (id)) {
+    if (active_id == 0) {
+      hot_id= id.id;
+    }
+    for (int i=0; i<4; i++) {
+      if (mouse_action == p[i]) {
+        active_id= id.id;
+        active_button= i;
+        break;
+      }
+      if ((mouse_action == r[i]) && (active_id == id.id) && (active_button == i)) {
+        res.clicked= i;
+        mouse_action= "";
+        active_id= 0;
+        active_button= 0;
+        break;
+      }
+    }
+  }
+  return res;
 }
 
 /*****************************************************************************/
@@ -591,20 +641,20 @@ layout_pull_button (vue_ui_rep *w) {
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
   Clay_Sizing s= layoutExpand;
   if (down) s= { CLAY_SIZING_FIT(.min=20) };
+  ui_signal sig= button_logic (button_id);
   CLAY({
     .id= button_id,
     .layout= {
       .padding= CLAY_PADDING_ALL(5),
       .sizing= s },
-    .backgroundColor= Clay_Hovered() ?  color_highlight : color_background })
+    .backgroundColor= hot_id == button_id.id ?  color_highlight : color_background })
   {
     concrete(d.w)->do_layout ();
     if (!down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
       layout_text("<#25B8>", 0, black); // right arrow
     }
-    if (Clay_PointerOver (button_id) && (mouse_action == "press-left")) {
-      mouse_action= ""; // reset
+    if (sig.clicked == 1) {
       if (is_nil (d.cw)) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
@@ -928,8 +978,12 @@ vue_ui_rep::do_layout () {
             .height= CLAY_SIZING_FIT(0) } }})
       {
         for (int i= 0, n= N(d.tabs); i< n; i++) {
+          Clay_ElementId tab_id= CLAY_IDI_LOCAL("tab", i);
+          if (button_logic (tab_id).clicked == 1) {
+            next= i;
+          }
           CLAY({
-            .id= CLAY_IDI_LOCAL("tab", i),
+            .id= tab_id,
             .backgroundColor= d.current == i ? palette[3] : palette[2],
             .cornerRadius= { 5, 5, 0, 0, },
             .layout= { .padding= { 10, 10, 10, 10 } },
@@ -940,10 +994,6 @@ vue_ui_rep::do_layout () {
               concrete (d.icons[i])->do_layout();
             }
             concrete (d.tabs[i])->do_layout ();
-            if (Clay_Hovered () && (mouse_action == "press-left")) {
-              mouse_action= "";
-              next= i;
-            }
           }
         }
       }
@@ -967,12 +1017,14 @@ vue_ui_rep::do_layout () {
     string st= debug_style (d.style);
     if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
+    ui_signal sig;
+    if (!inert) sig= button_logic (button_id);
     Clay_Sizing sz= layoutExpand;
     if (!button_grow) sz= { CLAY_SIZING_FIT(.min=20) };
     CLAY({
       .id= button_id,
       .layout= { .padding= CLAY_PADDING_ALL(5), .sizing= sz  },
-      .backgroundColor= !inert && Clay_Hovered() ?  color_highlight : color_background
+      .backgroundColor= !inert && (hot_id == button_id.id) ?  color_highlight : color_background
     }) {
       last_id= button_id;
       concrete(d.w)->do_layout ();
@@ -981,12 +1033,12 @@ vue_ui_rep::do_layout () {
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
         layout_text (d.ks, d.style, inert ? dark_grey : black);
       }
-      if (!inert && Clay_Hovered () && (mouse_state & 1)) {
-        // close any active popup chain (see pull_widget)
-        cancel_popup= true;
-        cout << "Click!! " << id << LF;
-        cmd_list= list(d.cmd, cmd_list);
-      }
+    }
+    if (sig.clicked == 1) {
+      // close any active popup chain (see pull_widget)
+      cancel_popup= true;
+      cout << "Click!! " << id << LF;
+      cmd_list= list(d.cmd, cmd_list);
     }
     return;
   }
@@ -1138,9 +1190,17 @@ vue_ui_rep::do_layout () {
   if (type == "toggle_widget") {
     // VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
     vue_toggle_widget d= open_box<vue_toggle_widget> (data);
+    Clay_ElementId toggle_id= CLAY_IDI ("toggle_widget", id);
+    bool inert= d.style & WIDGET_STYLE_INERT;
+    if (!inert && (button_logic (toggle_id).clicked == 1)) {
+      cout << "Click toggle! [" << (d.on ? "X" : " ") << "]" << LF;
+      d.on= !d.on;
+      data= close_box (d);
+      command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
+      cmd_list= list (c, cmd_list);
+    }
     string st= debug_style (d.style);
     if (N(st)>0) cout << type << " " << st << LF;
-    bool x= d.style & WIDGET_STYLE_INERT;
     CLAY({
       .layout= {
         .sizing= { CLAY_SIZING_FIT(40),
@@ -1150,14 +1210,6 @@ vue_ui_rep::do_layout () {
         layout_text ("[X]", d.style, black);
       } else {
         layout_text ("[ ]", d.style, black);
-      }
-      if (Clay_Hovered() && (mouse_action == "press-left")) {
-        mouse_action= "";
-        cout << "Click toggle! [" << (d.on ? "X" : " ") << "]" << LF;
-        d.on= !d.on;
-        data= close_box (d);
-        command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
-        cmd_list= list (c, cmd_list);
       }
     }
     return;

@@ -65,6 +65,7 @@ extern list<command> cmd_list;
 extern vue_window current_window; // used during layout to propagate information
 
 void gui_init_context();
+void gui_finalize_context();
 
 
 //******************************************************************************
@@ -299,7 +300,8 @@ vue_sdl_base_window_rep::process_layout () {
     Clay_BeginLayout ();
     content->do_layout ();
     render_commands= Clay_EndLayout ();
-    
+    gui_finalize_context ();
+
     // post layout tweaking
     relayout= content->post_layout ();
     if (relayout) {
