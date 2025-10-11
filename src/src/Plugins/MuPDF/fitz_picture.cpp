@@ -1,7 +1,7 @@
 /******************************************************************************
 * MODULE     : fitz_picture.cpp
 * DESCRIPTION: Picture objects for Fitz renderer
-* COPYRIGHT  : (C) 2025
+* COPYRIGHT  : (C) 2025 Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
