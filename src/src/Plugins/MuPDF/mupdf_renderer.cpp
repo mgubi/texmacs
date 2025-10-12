@@ -826,55 +826,58 @@ mupdf_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
   // For a 90° arc, the magic number is 4/3 * tan(π/8) ≈ 0.5522847498
   float kappa = 0.5522847498;
 
-  // Start at top-left corner (moving right from the rounded corner)
-  proc->op_m (mupdf_context (), proc, xx1 + rtl, yy1);
+  // Note: In PDF coordinates y increases downward, so yy1 is visually bottom, yy2 is top
+  // Therefore: r_bl -> yy1 left, r_br -> yy1 right, r_tl -> yy2 left, r_tr -> yy2 right
 
-  // Top edge
-  proc->op_l (mupdf_context (), proc, xx2 - rtr, yy1);
+  // Start at bottom-left corner (moving right from the rounded corner)
+  proc->op_m (mupdf_context (), proc, xx1 + rbl, yy1);
 
-  // Top-right corner
-  if (rtr > 0) {
-    float cx = rtr * kappa;
-    proc->op_c (mupdf_context (), proc,
-                xx2 - rtr + cx, yy1,
-                xx2, yy1 + rtr - cx,
-                xx2, yy1 + rtr);
-  }
-
-  // Right edge
-  proc->op_l (mupdf_context (), proc, xx2, yy2 - rbr);
+  // Bottom edge
+  proc->op_l (mupdf_context (), proc, xx2 - rbr, yy1);
 
   // Bottom-right corner
   if (rbr > 0) {
     float cx = rbr * kappa;
     proc->op_c (mupdf_context (), proc,
-                xx2, yy2 - rbr + cx,
-                xx2 - rbr + cx, yy2,
-                xx2 - rbr, yy2);
+                xx2 - rbr + cx, yy1,
+                xx2, yy1 + rbr - cx,
+                xx2, yy1 + rbr);
   }
 
-  // Bottom edge
-  proc->op_l (mupdf_context (), proc, xx1 + rbl, yy2);
+  // Right edge
+  proc->op_l (mupdf_context (), proc, xx2, yy2 - rtr);
 
-  // Bottom-left corner
-  if (rbl > 0) {
-    float cx = rbl * kappa;
+  // Top-right corner
+  if (rtr > 0) {
+    float cx = rtr * kappa;
     proc->op_c (mupdf_context (), proc,
-                xx1 + rbl - cx, yy2,
-                xx1, yy2 - rbl + cx,
-                xx1, yy2 - rbl);
+                xx2, yy2 - rtr + cx,
+                xx2 - rtr + cx, yy2,
+                xx2 - rtr, yy2);
   }
 
-  // Left edge
-  proc->op_l (mupdf_context (), proc, xx1, yy1 + rtl);
+  // Top edge
+  proc->op_l (mupdf_context (), proc, xx1 + rtl, yy2);
 
-  // Top-left corner (closing the path)
+  // Top-left corner
   if (rtl > 0) {
     float cx = rtl * kappa;
     proc->op_c (mupdf_context (), proc,
-                xx1, yy1 + rtl - cx,
-                xx1 + rtl - cx, yy1,
-                xx1 + rtl, yy1);
+                xx1 + rtl - cx, yy2,
+                xx1, yy2 - rtl + cx,
+                xx1, yy2 - rtl);
+  }
+
+  // Left edge
+  proc->op_l (mupdf_context (), proc, xx1, yy1 + rbl);
+
+  // Bottom-left corner (closing the path)
+  if (rbl > 0) {
+    float cx = rbl * kappa;
+    proc->op_c (mupdf_context (), proc,
+                xx1, yy1 + rbl - cx,
+                xx1 + rbl - cx, yy1,
+                xx1 + rbl, yy1);
   }
 
   // Close and paint the path
