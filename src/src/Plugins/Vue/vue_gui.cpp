@@ -301,6 +301,7 @@ vue_sdl_base_window_rep::process_layout () {
 
     // layout the top widget
     Clay_SetDebugModeEnabled (clay_debug);
+    Clay__debugViewWidth= 600; // redefine to have more space
     Clay_BeginLayout ();
     content->do_layout ();
     render_commands= Clay_EndLayout ();
