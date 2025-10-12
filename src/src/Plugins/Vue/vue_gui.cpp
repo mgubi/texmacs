@@ -11,18 +11,22 @@
 #include "vue_gui.hpp"
 #include "vue_widget.hpp"
 
-#include "message.hpp"
-#include "window.hpp"
+#include "array.hpp"
+#include "hashmap.hpp"
 #include "iterator.hpp"
-#include "font.hpp"
+
 #include "dictionary.hpp" // get_output_language
 
+#include "message.hpp"
+#include "window.hpp"
+#include "font.hpp"
 
 #include "analyze.hpp"
 #include "convert.hpp"
 #include "converter.hpp"
 #include "scheme.hpp"
 #include "dictionary.hpp"
+#include "locale.hpp"
 #include "editor.hpp"
 #include "new_view.hpp"      // get_current_editor()
 #include "image_files.hpp"
@@ -1357,30 +1361,313 @@ void load_system_font (string family, int size, int dpi,
 * Clipboard support
 ******************************************************************************/
 
-bool set_selection (string cb, tree t,
+// Internal storage for selections (for primary/mouse selections not supported by SDL)
+static hashmap<string,tree> selection_t ("none");
+static hashmap<string,string> selection_s ("");
+
+// Structure to hold clipboard data for the callback
+struct clipboard_data {
+  string texmacs_data;    // TeXmacs native format
+  string plain_text;      // Plain text (verbatim)
+  string html_text;       // HTML format
+  string format_type;     // Format type (default, verbatim, html, latex)
+
+  // C string versions (owned by this structure, must persist until cleanup)
+  c_string c_texmacs_data;
+  c_string c_plain_text;
+  c_string c_html_text;
+
+  clipboard_data() : format_type("default"),
+                     c_texmacs_data(NULL),
+                     c_plain_text(NULL),
+                     c_html_text(NULL) {}
+};
+
+// Clipboard data callback - called when the OS requests clipboard data
+static const void* SDLCALL
+clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
+  clipboard_data* data = static_cast<clipboard_data*>(userdata);
+  if (!data || !mime_type) {
+    *size = 0;
+    return NULL;
+  }
+
+  string mime_str (mime_type);
+
+  // TeXmacs native format
+  if (mime_str == "application/x-texmacs-clipboard") {
+    *size = N(data->texmacs_data);
+    return (const void*) data->c_texmacs_data;
+  }
+  // HTML format
+  else if (mime_str == "text/html") {
+    if (N(data->html_text) > 0) {
+      *size = N(data->html_text);
+      return (const void*) data->c_html_text;
+    }
+  }
+  // Plain text (UTF-8)
+  else if (mime_str == "text/plain" || mime_str == "text/plain;charset=utf-8") {
+    if (N(data->plain_text) > 0) {
+      *size = N(data->plain_text);
+      return (const void*) data->c_plain_text;
+    } else {
+      *size = N(data->texmacs_data);
+      return (const void*) data->c_texmacs_data;
+    }
+  }
+
+  // Default: return texmacs data
+  *size = N(data->texmacs_data);
+  return (const void*) data->c_texmacs_data;
+}
+
+// Clipboard cleanup callback - called when clipboard is cleared or replaced
+static void SDLCALL
+clipboard_cleanup_callback (void *userdata) {
+  clipboard_data* data = static_cast<clipboard_data*>(userdata);
+  if (data) {
+    delete data;
+  }
+}
+
+bool set_selection (string key, tree t,
                     string s, string sv, string sh, string format) {
-  
+
   // Copy a selection 't' of a given 'format' to the clipboard 'cb',
   // where 's' contains the string serialization of t according to the format
   // and possibly the variants 'sv' and 'sh' for verbatim and html
   // Returns true on success
-  
-  //FIXME: implement
+
+  // Store selection internally
+  selection_t (key)= copy (t);
+  selection_s (key)= copy (s);
+
+  // SDL3 only supports the system clipboard, not primary/mouse selections
+  // So we only set the system clipboard for "primary" key
+  if (key != "primary") return true;
+
+  // Prepare clipboard data structure
+  clipboard_data* clip_data = new clipboard_data();
+  clip_data->texmacs_data = s;
+  clip_data->format_type = format;
+
+  // Handle encoding for plain text
+  string plain_text = sv;
+  if (format == "verbatim" || format == "default") {
+    if (format == "default" && N(sv) > 0) {
+      plain_text = sv;
+    } else if (N(sv) == 0) {
+      plain_text = s;
+    }
+
+    // Handle encoding preferences
+    string enc = get_preference ("texmacs->verbatim:encoding");
+    if (enc == "auto")
+      enc = get_locale_charset ();
+
+    // SDL3 clipboard uses UTF-8, so ensure proper encoding
+    // (assuming text is already UTF-8 compatible or needs conversion)
+    clip_data->plain_text = plain_text;
+  }
+  else if (format == "html") {
+    clip_data->html_text = s;
+    clip_data->plain_text = s; // Also provide as plain text fallback
+  }
+  else if (format == "latex") {
+    string enc = get_preference ("texmacs->latex:encoding");
+    // SDL3 uses UTF-8
+    clip_data->plain_text = s;
+  }
+  else {
+    clip_data->plain_text = s;
+  }
+
+  if (N(sh) > 0) {
+    clip_data->html_text = sh;
+  }
+
+  // Initialize c_string versions (these will persist until cleanup callback)
+  clip_data->c_texmacs_data = c_string (clip_data->texmacs_data);
+  if (N(clip_data->plain_text) > 0) {
+    clip_data->c_plain_text = c_string (clip_data->plain_text);
+  }
+  if (N(clip_data->html_text) > 0) {
+    clip_data->c_html_text = c_string (clip_data->html_text);
+  }
+
+  // Build list of MIME types to offer
+  const char* mime_types[4];
+  size_t num_mime_types = 0;
+
+  // Always offer TeXmacs native format
+  mime_types[num_mime_types++] = "application/x-texmacs-clipboard";
+
+  // Offer HTML if available
+  if (N(clip_data->html_text) > 0) {
+    mime_types[num_mime_types++] = "text/html";
+  }
+
+  // Always offer plain text (UTF-8)
+  mime_types[num_mime_types++] = "text/plain;charset=utf-8";
+  mime_types[num_mime_types++] = "text/plain";
+
+  // Set clipboard data with callbacks
+  if (!SDL_SetClipboardData (clipboard_data_callback,
+                              clipboard_cleanup_callback,
+                              clip_data,
+                              mime_types,
+                              num_mime_types)) {
+    SDL_Log ("Failed to set clipboard data: %s", SDL_GetError ());
+    delete clip_data;
+    return false;
+  }
+
   return true;
 }
 
-bool get_selection (string cb, tree& t, string& s, string format) {
+bool get_selection (string key, tree& t, string& s, string format) {
   // Retrieve the selection 't' of a given 'format' from the clipboard 'cb',
   // where 's' is the string serialization of t according to the format
   // Returns true on success; sets t to (extern s) for external selections
-  
-  //FIXME: implement
+
+  bool direct_selection = (key == "extern");
+  if (direct_selection) key = "primary";
+
+  // SDL3 doesn't support mouse/selection clipboard, only primary
+  if (key != "primary") return false;
+
+  s = "";
+  t = "none";
+
+  // Check if we own the clipboard content
+  bool owns = (format != "temp" && format != "wrapbuf" && key != "primary");
+
+  // First check if we own this selection internally
+  if (owns && (selection_t->contains (key))) {
+    t = copy (selection_t [key]);
+    s = copy (selection_s [key]);
+    return true;
+  }
+
+  // Try to get clipboard data from SDL
+  string input_format = "";
+  size_t data_size = 0;
+  void* data_ptr = NULL;
+
+  // Try different formats based on what's requested and available
+  if (format == "default") {
+    // Try TeXmacs native format first
+    if (SDL_HasClipboardData ("application/x-texmacs-clipboard")) {
+      data_ptr = SDL_GetClipboardData ("application/x-texmacs-clipboard", &data_size);
+      if (data_ptr) {
+        s = string ((char*)data_ptr, data_size);
+        SDL_free (data_ptr);
+        input_format = "texmacs-snippet";
+      }
+    }
+    // Try HTML format
+    else if (SDL_HasClipboardData ("text/html")) {
+      data_ptr = SDL_GetClipboardData ("text/html", &data_size);
+      if (data_ptr) {
+        s = string ((char*)data_ptr, data_size);
+        SDL_free (data_ptr);
+        input_format = "html-snippet";
+      }
+    }
+    // Try UTF-8 plain text
+    else if (SDL_HasClipboardData ("text/plain;charset=utf-8")) {
+      data_ptr = SDL_GetClipboardData ("text/plain;charset=utf-8", &data_size);
+      if (data_ptr) {
+        s = string ((char*)data_ptr, data_size);
+        SDL_free (data_ptr);
+        input_format = "verbatim-snippet";
+      }
+    }
+    // Fall back to plain text
+    else if (SDL_HasClipboardData ("text/plain")) {
+      data_ptr = SDL_GetClipboardData ("text/plain", &data_size);
+      if (data_ptr) {
+        s = string ((char*)data_ptr, data_size);
+        SDL_free (data_ptr);
+        input_format = "verbatim-snippet";
+      }
+    }
+    // Last resort: use simple text
+    else {
+      char* text = SDL_GetClipboardText ();
+      if (text) {
+        s = string (text);
+        SDL_free (text);
+        input_format = "verbatim-snippet";
+      }
+    }
+  }
+  else if (format == "verbatim") {
+    // For verbatim, always get plain text
+    if (get_preference ("verbatim->texmacs:encoding") == "utf-8" ||
+        get_preference ("verbatim->texmacs:encoding") == "auto") {
+      char* text = SDL_GetClipboardText ();
+      if (text) {
+        s = string (text);
+        SDL_free (text);
+      }
+    }
+    else {
+      // Try to get with specific encoding if needed
+      data_ptr = SDL_GetClipboardData ("text/plain", &data_size);
+      if (data_ptr) {
+        s = string ((char*)data_ptr, data_size);
+        SDL_free (data_ptr);
+      }
+    }
+  }
+  else {
+    // For other formats, get plain text
+    char* text = SDL_GetClipboardText ();
+    if (text) {
+      s = string (text);
+      SDL_free (text);
+    }
+  }
+
+  // If no data was retrieved, return false
+  if (N(s) == 0) return false;
+
+  // Apply buggy paste corrections if needed
+  if (input_format == "html-snippet" && seems_buggy_html_paste (s))
+    s = correct_buggy_html_paste (s);
+  if (input_format != "picture" && seems_buggy_paste (s))
+    s = correct_buggy_paste (s);
+
+  // Convert to TeXmacs format if needed
+  if (input_format != "" && !direct_selection) {
+    s = as_string (call ("convert", s, input_format, "texmacs-snippet"));
+  }
+
+  if (input_format == "html-snippet") {
+    tree t_temp = as_tree (call ("convert", s, "texmacs-snippet", "texmacs-tree"));
+    t_temp = default_with_simplify (t_temp);
+    s = as_string (call ("convert", t_temp, "texmacs-tree", "texmacs-snippet"));
+  }
+
+  t = tuple ("extern", s);
+
   return true;
 }
 
-void clear_selection (string cb) {
+void clear_selection (string key) {
   // Clear the selection on clipboard 'cb'
-  //FIXME: implement
+
+  // Clear internal storage
+  selection_t->reset (key);
+  selection_s->reset (key);
+
+  // SDL3 only supports system clipboard, not primary/mouse selections
+  if (key != "primary") return;
+
+  // Clear the SDL clipboard
+  SDL_ClearClipboardData ();
 }
 
 /******************************************************************************

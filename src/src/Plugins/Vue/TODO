@@ -2,7 +2,6 @@ TODO
 
 * implement commands in inputs_list_widget
 * decide what to do with win->relayout
-* handle properly hot vs. active vs. capture of elements by mouse actions
 * introduce animation subsystem for transitions
 * events should go to the appropriate window
 * manage balloons properly (attach them to the widget, don't create layout element for them)
@@ -11,16 +10,17 @@ TODO
 * fix dropdown menu positioning if they go off the viewport
 * handle focus properly for editors
 * think to the redrawing sequence, in particular when redraw simple_widgets
-* implement copy & paste
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
 
 WIP
 
 * improve text input and text editing events
+* handle properly hot vs. active vs. capture of elements by mouse actions
 
 DONE
 
+* implement copy & paste
 * fix keyboard handling (Alt+3 should give #)
 * remove balloons after a while
 * fix closing windows (why is not working??)
