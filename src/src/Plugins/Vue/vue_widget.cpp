@@ -1219,19 +1219,19 @@ vue_ui_rep::do_layout () {
     //FIXME: implement
     vue_enum_widget d= open_box<vue_enum_widget> (data);
     SI w= decode_length (d.w, current_window, d.st);
+    Clay_ElementId enum_id= CLAY_SIDI(CLAY_TM_STRING(type), id);
+    if (button_logic (enum_id).clicked == 1) {
+      //FIXME: implement
+      cout << "Clicked enum_widget!" << LF;
+    }
     CLAY({
-      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .id= enum_id,
       .layout= {
         .sizing= {
           CLAY_SIZING_FIXED ((float) 2*w/PIXEL),
           CLAY_SIZING_FIT (0) }}})
     {
       layout_text (d.vals [d.st], 0, black);
-      if (Clay_Hovered () && (mouse_action == "press-left")) {
-        mouse_action= "";
-        //FIXME: implement
-        cout << "Clicked enum_widget!" << LF;
-      }
     }
     return;
   }
