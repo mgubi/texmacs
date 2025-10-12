@@ -126,6 +126,8 @@ uint32_t hot_id;
 
 void
 gui_init_context() {
+  hot_id= 0;
+  
   // popup state initialization
   current_popup= false;
   cancel_popup= false;
