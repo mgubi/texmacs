@@ -1,0 +1,13 @@
+https://ftp.texmacs.org/TeXmacs/misc/freetype-2.13.3.tar.xz
+https://ftp.texmacs.org/TeXmacs/misc/gmp-6.3.0.tar.xz
+https://ftp.texmacs.org/TeXmacs/misc/libpng-1.6.47.tar.xz
+https://ftp.texmacs.org/TeXmacs/misc/libtool-2.5.4.tar.gz
+https://ftp.texmacs.org/TeXmacs/misc/ghostscript-liza-9.54.0.zip
+https://ftp.texmacs.org/TeXmacs/misc/libiconv-1.18.tar.gz
+https://ftp.texmacs.org/TeXmacs/misc/gettext-0.24.tar.gz
+https://download.qt.io/archive/qt/5.15/5.15.18/single/qt-everywhere-opensource-src-5.15.18.zip
+https://ftp.texmacs.org/TeXmacs/misc/nettle-3.10.2.tar.gz
+https://ftp.texmacs.org/TeXmacs/misc/gnutls-3.7.11.tar.xz
+https://ftp.texmacs.org/TeXmacs/misc/aspell-0.60.8.1.tar.gz
+svn://svn.savannah.gnu.org/texmacs/trunk/src texmacs/src
+svn://svn.savannah.gnu.org/texmacs/trunk/guile-texmacs texmacs/src/tm-guile188
