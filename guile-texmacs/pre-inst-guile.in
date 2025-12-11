@@ -97,10 +97,5 @@ esac
 GUILE=${top_builddir}/libguile/guile
 export GUILE
 
-# do it
-exec $GUILE "$@"
-
-# never reached
-exit 1
-
-# pre-inst-guile ends here
+# do it but always return 0
+$GUILE "$@" || exit 0
