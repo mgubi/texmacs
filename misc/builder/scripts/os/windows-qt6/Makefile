@@ -144,6 +144,7 @@ aspell/aspell.exe: aspell/Makefile
 
 local/windows/aspell/bin/aspell.exe: aspell/aspell.exe
 	cd aspell; $(MAKE) install
+	python3 download_dictionaries.py
 
 texmacs: check
 	cd texmacs/src; autoreconf; CFLAGS="$$CFLAGS -std=c99" PKG_CONFIG_PATH=$$WORKING_DIR/local/lib/pkgconfig ./configure --with-texmacs-builder=$$WORKING_DIR/local --prefix=$$WORKING_DIR/local --with-guile=embedded18 --with-qt-find-method=pkgconfig --with-gnutls=yes; mingw32-make; mingw32-make WINDOWS_APPX

@@ -15,3 +15,5 @@ export PATH=$PATH:"/c/Program Files (x86)/Inno Setup 6/"
 
 export MAKE=mingw32-make
 export PKG_CONFIG_PATH=$WORKING_DIR/local/lib/pkgconfig
+
+export ASPELL_CONF="dict-dir $(cygpath -m $WORKING_DIR/local/windows/aspell/lib/aspell-0.60); data-dir $(cygpath -m $WORKING_DIR/local/windows/aspell/lib/aspell-0.60)"
