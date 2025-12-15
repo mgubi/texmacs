@@ -1,4 +1,4 @@
-all: check local/lib/libltdl.a local/lib/libiconv.a local/lib/libpng16.a local/lib/libfreetype.a local/lib/libgmp.a local/bin/qmake local/windows/aspell/bin/aspell.exe ghostscript gnutls/lib/.libs/libgnutls.a texmacs
+all: check local/lib/libltdl.a local/lib/libiconv.a local/lib/libpng16.a local/lib/libfreetype.a local/lib/libgmp.a local/bin/qmake local/bin/aspell.exe ghostscript gnutls/lib/.libs/libgnutls.a texmacs
 
 .PHONY: check texmacs
 
@@ -137,17 +137,17 @@ aspell/Makefile:
 	cp patched/ostream.hpp aspell/common/ostream.hpp
 	cp patched/language.cpp aspell/modules/speller/default/language.cpp
 	cp patched/vector_hash-t.hpp aspell/modules/speller/default/vector_hash-t.hpp
-	cd aspell; ./configure --prefix=$$WORKING_DIR/local/windows/aspell --enable-static --disable-shared
+	cd aspell; ./configure --prefix=$$WORKING_DIR/local --enable-static --disable-shared
 
 aspell/aspell.exe: aspell/Makefile
 	cd aspell; $(MAKE)
 
-local/windows/aspell/bin/aspell.exe: aspell/aspell.exe
+local/bin/aspell.exe: aspell/aspell.exe
 	cd aspell; $(MAKE) install
 	python3 download_dictionaries.py
 
 texmacs: check
-	cd texmacs/src; autoreconf; CFLAGS="$$CFLAGS -std=c99" PKG_CONFIG_PATH=$$WORKING_DIR/local/lib/pkgconfig ./configure --with-texmacs-builder=$$WORKING_DIR/local --prefix=$$WORKING_DIR/local --with-guile=embedded18 --with-qt-find-method=pkgconfig --with-gnutls=yes; mingw32-make; mingw32-make WINDOWS_APPX
+	cd texmacs/src; autoreconf; CFLAGS="$$CFLAGS -std=c99" PKG_CONFIG_PATH=$$WORKING_DIR/local/lib/pkgconfig ./configure --with-texmacs-builder=$$WORKING_DIR/local --prefix=$$WORKING_DIR/local --with-guile=embedded18 --with-qt-find-method=pkgconfig --with-gnutls=no --enable-debug; mingw32-make; mingw32-make WINDOWS_APPX
 
 texmacs-server: check
 	cd texmacs-server; autoreconf; CFLAGS="$$CFLAGS -std=c99" PKG_CONFIG_PATH=$$WORKING_DIR/local/lib/pkgconfig ./configure --with-texmacs-builder=$$WORKING_DIR/local --with-gnutls=yes --prefix=$$WORKING_DIR/local --with-guile=embedded18 --with-qt-find-method=pkgconfig; mingw32-make; mingw32-make WINDOWS_APPX

@@ -5,7 +5,7 @@ https://ftp.texmacs.org/TeXmacs/misc/libtool-2.5.4.tar.gz
 https://ftp.texmacs.org/TeXmacs/misc/ghostscript-liza-9.54.0.zip
 https://ftp.texmacs.org/TeXmacs/misc/libiconv-1.18.tar.gz
 https://ftp.texmacs.org/TeXmacs/misc/gettext-0.24.tar.gz
-https://ftp.texmacs.org/TeXmacs/misc/qt-everywhere-src-6.9.0.tar.xz
+https://download.qt.io/archive/qt/6.10/6.10.1/single/qt-everywhere-src-6.10.1.zip
 https://ftp.texmacs.org/TeXmacs/misc/nettle-3.10.2.tar.gz
 https://ftp.texmacs.org/TeXmacs/misc/gnutls-3.7.11.tar.xz
 https://ftp.texmacs.org/TeXmacs/misc/aspell-0.60.8.1.tar.gz
