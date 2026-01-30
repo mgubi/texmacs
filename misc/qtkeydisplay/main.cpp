@@ -9,7 +9,6 @@ class KeyWidget : public QWidget {
 public:
     KeyWidget(QWidget *parent = nullptr) : QWidget(parent) {
         QVBoxLayout *layout = new QVBoxLayout(this);
-        
         infoLabel = new QLabel("Press any key...", this);
         infoLabel->setAlignment(Qt::AlignCenter);
         
@@ -20,19 +19,27 @@ public:
 
         layout->addWidget(infoLabel);
         setLayout(layout);
-        
         setWindowTitle("Qt6 Key Event Example");
-        resize(400, 300);
-
-        setFocusPolicy(Qt::StrongFocus);
+        resize(500, 300);
     }
 
 protected:
-    bool focusNextPrevChild(bool next) override {
-        return false;
+    bool event(QEvent *event) override {
+        if (event->type() == QEvent::ShortcutOverride) {
+            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+            handleKeyPress(keyEvent);
+            return true;
+        }
+        return QWidget::event(event);
     }
 
     void keyPressEvent(QKeyEvent *event) override {
+        handleKeyPress(event);
+        QWidget::keyPressEvent(event);
+    }
+
+private:
+    void handleKeyPress(QKeyEvent *event) {
         int key = event->key();
         Qt::KeyboardModifiers modifiers = event->modifiers();
 
@@ -46,20 +53,11 @@ protected:
             text = QKeySequence(modifiers | key).toString();
         }
 
-        if (key == Qt::Key_Backtab) {
-             text = "HACK : Shift+Tab";
-        }
-
-        if (text.isEmpty()) {
-            text = QString("Unknown Key (%1)").arg(key);
-        }
+        if (text.isEmpty()) text = QString("Unknown Key (%1)").arg(key);
 
         infoLabel->setText("Pressed: " + text);
-
-        event->accept();
     }
-    
-private:
+
     QLabel *infoLabel;
 };
 
