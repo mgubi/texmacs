@@ -20,12 +20,18 @@ public:
 
         layout->addWidget(infoLabel);
         setLayout(layout);
-
+        
         setWindowTitle("Qt6 Key Event Example");
         resize(400, 300);
+
+        setFocusPolicy(Qt::StrongFocus);
     }
 
 protected:
+    bool focusNextPrevChild(bool next) override {
+        return false;
+    }
+
     void keyPressEvent(QKeyEvent *event) override {
         int key = event->key();
         Qt::KeyboardModifiers modifiers = event->modifiers();
@@ -40,24 +46,26 @@ protected:
             text = QKeySequence(modifiers | key).toString();
         }
 
+        if (key == Qt::Key_Backtab) {
+             text = "HACK : Shift+Tab";
+        }
+
         if (text.isEmpty()) {
             text = QString("Unknown Key (%1)").arg(key);
         }
 
         infoLabel->setText("Pressed: " + text);
 
-        QWidget::keyPressEvent(event);
+        event->accept();
     }
-
+    
 private:
     QLabel *infoLabel;
 };
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-
     KeyWidget window;
     window.show();
-
     return app.exec();
 }
