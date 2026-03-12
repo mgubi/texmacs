@@ -1,6 +1,6 @@
-<TeXmacs|1.99.10>
+<TeXmacs|2.1.5>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Download|Windows><tmweb-title|Installing <TeXmacs> for
@@ -13,8 +13,17 @@
       <strong|Downloading <TeXmacs>>
 
       <\itemize>
-        <item>Download the installer <hlink|<verbatim|<merge|<TeXmacs-version-release|devel>|-installer.exe>>|<merge|https://www.texmacs.org/Download/ftp/tmftp/windows/|<TeXmacs-version-release|devel>|-installer.exe>>
-        (for <name|Windows 7> and later).
+        <item>For Windows 11 (Intel/ARM), <hlink|download <TeXmacs> 2.1.5
+        from the Microsoft Store|https://apps.microsoft.com/detail/9PLP2SK8ZRGQ>.
+
+        <em|The Microsoft Store version updates automatically. If you have a
+        previous version installed, we recommend uninstalling it first.>
+
+        <item>For Windows 10/11 (Intel Only), <hlink|download the installer
+        for <TeXmacs> 2.1.5|http://www.texmacs.org/Download/ftp/tmftp/windows/TeXmacs-2.1.5-x86_64.exe>.
+
+        <item>For Windows 7/8, \ <hlink|download the installer for <TeXmacs>
+        2.1.4|https://www.texmacs.org/Download/ftp/tmftp/windows/TeXmacs-2.1.4.exe>.
       </itemize>
     </cell>>|<row|<cell|<item-pic|../images/TeXmacs.png>>|<\cell>
       <strong|Installing and running <TeXmacs>>
@@ -59,7 +68,7 @@
     </cell>>>>>
   </tmweb-split>
 
-  <tmdoc-copyright|1999--2019|Joris van der Hoeven|David Michel|Denis Raux>
+  <tmdoc-copyright|1999\U2019|Joris van der Hoeven|David Michel|Denis Raux>
 
   <tmweb-license>
 </body>
