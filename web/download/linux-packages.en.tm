@@ -22,7 +22,7 @@
 
     <item><hlink|Ubuntu|#ubuntu>.
 
-    <item><hlink|Ubuntu|#raspbian>.
+    <item><hlink|Raspbian|#raspbian>.
   </itemize>
 
   Further distributions may be added progressively
