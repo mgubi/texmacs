@@ -21,6 +21,8 @@
     <item><hlink|Open Suse|#suse>.
 
     <item><hlink|Ubuntu|#ubuntu>.
+
+    <item><hlink|Ubuntu|#ubuntu>.
   </itemize>
 
   Further distributions may be added progressively
@@ -343,7 +345,7 @@
     </shell-code>
   </enumerate>
 
-  <section*|Raspbian><label|debian>
+  <section*|Raspbian><label|raspbian>
 
   For Raspbian-based systems, we recommend using our <hlink|official APT
   repository|linux-repos.en.tm#debian>. To install TeXmacs manually using
