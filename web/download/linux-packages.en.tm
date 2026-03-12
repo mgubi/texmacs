@@ -22,7 +22,7 @@
 
     <item><hlink|Ubuntu|#ubuntu>.
 
-    <item><hlink|Ubuntu|#ubuntu>.
+    <item><hlink|Ubuntu|#raspbian>.
   </itemize>
 
   Further distributions may be added progressively
@@ -313,21 +313,21 @@
       bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_20.04/TeXmacs-2.1.5.i386.deb>,
       <hlink|64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_20.04/TeXmacs-2.1.5.amd64.deb>
 
-      <item><TeXmacs> 2.1.5 (Qt5) for Ubuntu 18.04 : <hlink|<hlink|32
+      <item><TeXmacs> 2.1.5 (Qt5) for Ubuntu 18.04 : <hlink|32
       bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_18.04/TeXmacs-2.1.5.i386.deb>,
-      64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_18.04/TeXmacs-2.1.5.amd64.deb>
+      <hlink|64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_18.04/TeXmacs-2.1.5.amd64.deb>
 
-      <item><TeXmacs> 2.1.5 (Qt4) for Ubuntu 16.04 : <hlink|<hlink|32
+      <item><TeXmacs> 2.1.5 (Qt4) for Ubuntu 16.04 : <hlink|32
       bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_16.04/TeXmacs-2.1.5.i386.deb>,
-      64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_16.04/TeXmacs-2.1.5.amd64.deb>
+      <hlink|64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_16.04/TeXmacs-2.1.5.amd64.deb>
 
-      <item><TeXmacs> 2.1.5 (Qt4) for Ubuntu 14.04 : <hlink|<hlink|32
+      <item><TeXmacs> 2.1.5 (Qt4) for Ubuntu 14.04 : <hlink|32
       bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_14.04/TeXmacs-2.1.5.i386.deb>,
-      64 bits| http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_14.04/TeXmacs-2.1.5.amd64.deb>
+      <hlink|64 bits|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_14.04/TeXmacs-2.1.5.amd64.deb>
 
       <item><TeXmacs> 2.1.1 (Qt4) for Ubuntu 12.04 : <hlink|32
       bits|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_12.04/|TeXmacs-2.1.1.i386.deb>>,
-      \ <hlink|64 bits|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_12.04/|TeXmacs-2.1.1.amd64.deb>>
+      <hlink|64 bits|<merge|http://www.texmacs.org/Download/ftp/tmftp/Linux/xUbuntu_12.04/|TeXmacs-2.1.1.amd64.deb>>
 
       <item><hlink|Other versions|https://www.texmacs.org/Download/ftp/tmftp/Linux/>
     </itemize>
