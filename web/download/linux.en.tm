@@ -44,10 +44,6 @@
     the following installation methods:
 
     <\itemize>
-      <item>Some distributions (such as <hlink|Gentoo|http://www.gentoo.org/>)
-      actively support <TeXmacs>, in which case you may directly install
-      <TeXmacs> using the standard tools of your system.
-
       <item>For Debian, Ubuntu and Raspbian, we recommend installing TeXmacs
       <hlink|from our official APT repository|linux-repos.en.tm#debian>. This
       ensures TeXmacs updates automatically alongside your system.
@@ -57,7 +53,12 @@
       <hlink|Debian|linux-packages.en.tm#debian>,
       <hlink|Fedora|linux-packages.en.tm#fedora>, <hlink|Scientific
       Linux|linux-packages.en.tm#scientificlinux>, <hlink|Open
-      Suse|linux-packages.en.tm#suse>, <hlink|Ubuntu|linux-packages.en.tm#ubuntu>.
+      Suse|linux-packages.en.tm#suse>, <hlink|Ubuntu|linux-packages.en.tm#ubuntu>,
+      <hlink|Raspbian|linux-packages.en.tm#raspbian>.
+
+      <item>Some distributions (such as <hlink|Gentoo|http://www.gentoo.org/>)
+      actively support <TeXmacs>, in which case you may directly install
+      <TeXmacs> using the standard tools of your system.
     </itemize>
   </cell>>|<row|<cell|<item-pic|../images/Book_icon_1.png>>|<\cell>
     <strong|Learning <TeXmacs>>

@@ -272,7 +272,9 @@
 
   <section*|Ubuntu><label|ubuntu>
 
-  In order to install <TeXmacs>, please follow the steps below:
+  For Ubuntu-based systems, we recommend using our <hlink|official APT
+  repository|linux-repos.en.tm#debian>. To install TeXmacs manually using
+  .deb packages, please follow the steps below:
 
   <\enumerate>
     <item>Download the latest version that corresponds to your version of
