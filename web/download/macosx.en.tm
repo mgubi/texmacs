@@ -14,16 +14,16 @@
 
       <\itemize>
         <item>For MacOS 12 (Intel and ARM) and later, <hlink|download
-        <TeXmacs> 2.1.5 based on Qt6|http://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.5-universal-os12.0.dmg>.
+        <TeXmacs> 2.1.5 (Qt6)|http://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.5-universal-os12.0.dmg>.
 
         <item>For MacOS 11 (Intel and ARM), <hlink|download <TeXmacs> 2.1.5
-        based on Qt5|http://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.5-universal-os11.0.dmg>.
+        (Qt5|http://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.5-universal-os11.0.dmg>).
 
-        <item>For MacOS 10.10, <hlink|download <TeXmacs> 2.1.4 based on
-        Qt5|https://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.4.dmg>.
+        <item>For MacOS 10.10, <hlink|download <TeXmacs> 2.1.4
+        (Qt5|https://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.4.signed.dmg>).
 
         <item>For MacOS 10.5 until 10.9, <hlink|download <TeXmacs> 2.1.4
-        based on Qt4|https://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.4-os10.6.dmg>.
+        (Qt4)|https://www.texmacs.org/Download/ftp/tmftp/macos/TeXmacs-2.1.4-os10.6.signed.dmg>.
       </itemize>
     </cell>>|<row|<cell|<item-pic|../images/TeXmacs.png>>|<\cell>
       <strong|Installing and running <TeXmacs>>
@@ -33,10 +33,6 @@
         applications folder.
 
         <item>Launch <TeXmacs> from your applications folder.
-
-        <item>When opening <TeXmacs> 2.1.4 or older for the first time, you
-        may need to go to \PSecurity & Privacy\Q in the system preferences
-        and allow the program to be executed.
       </itemize>
     </cell>>|<row|<cell|<item-pic|../images/Book_icon_1.png>>|<\cell>
       <strong|Learning <TeXmacs>>
