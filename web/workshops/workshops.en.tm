@@ -1,4 +1,4 @@
-<TeXmacs|2.1.4>
+<TeXmacs|2.1.5>
 
 <style|<tuple|tmweb2|old-spacing|old-dots|old-lengths>>
 
@@ -27,7 +27,7 @@
   \;
 
   <\center>
-    <tabular*|<tformat|<table|<row|<cell|<hlink|<image|missenden.jpg||150px||>|>>|<cell|<hlink|<image|falesia.jpg||150px||>|http://www.falesia.com/en/hotel-overview.html><hlink||team-francois.en.tm>>>|<row|<cell|<hlink|Great
+    <tabular*|<tformat|<table|<row|<cell|<hlink|<image|missenden.jpg||150px||>|>>|<cell|<hlink|<image|falesia.jpg||150px||>|http://www.falesia.com/en/hotel-overview.html>>>|<row|<cell|<hlink|Great
     Missenden, England, 2025|missenden2025.en.tm>>|<cell|<hlink|Albufeira,
     Portugal, 2012|https://magix.lix.polytechnique.fr/magix/workshop/workshop.en.html>>>>>>
   </center>
