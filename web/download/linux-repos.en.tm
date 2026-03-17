@@ -11,13 +11,7 @@
   <TeXmacs> in the same way as any other packages on your system. In
   particular, you can automatically check for updates and install new
   versions as soon as they become available. We implemented <TeXmacs>
-  repositories for the following distributions:
-
-  <\itemize>
-    <item><hlink|Debian and Raspbian|#debian>.
-
-    <item><hlink|Ubuntu|#ubuntu>.
-  </itemize>
+  repositories for Debian, Raspbian, and Ubuntu.
 
   <section*|Instructions><label|debian>
 
@@ -25,13 +19,14 @@
 
   <\shell-code>
     wget -qO- --no-check-certificate https://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/apt-texmacs.asc
-    \| sudo tee /usr/share/keyrings/texmacs-keyring.asc \<gtr\> /dev/null
+    \| gpg --dearmor \| sudo tee /usr/share/keyrings/texmacs-keyring.gpg
+    \<gtr\> /dev/null
   </shell-code>
 
   Add the texmacs repository:
 
   <\shell-code>
-    echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.asc]
+    echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.gpg]
     http://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/ $(lsb_release -cs) main"
     \| sudo tee /etc/apt/sources.list.d/texmacs.list \<gtr\> /dev/null
   </shell-code>

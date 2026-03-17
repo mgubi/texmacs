@@ -45,7 +45,7 @@
 
     <\itemize>
       <item>For Debian, Ubuntu and Raspbian, we recommend installing TeXmacs
-      <hlink|from our official APT repository|linux-repos.en.tm#debian>. This
+      <hlink|from our official APT repository|linux-repos.en.tm>. This
       ensures TeXmacs updates automatically alongside your system.
 
       <item>We provide ready-to-install packages for
