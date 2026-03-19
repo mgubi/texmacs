@@ -495,13 +495,15 @@
 (with-test-prefix "substring/shared"
 
   (pass-if "empty string"
-    (eq? "" (substring/shared "" 0)))
-
-  (pass-if "non-empty string"
-    (string=? "foo" (substring/shared "foo-bar" 0 3)))
+    (let ((s ""))
+      (eq? s (substring/shared s 0))))
 
   (pass-if "non-empty string, not eq?"
-    (string=? "foo-bar" (substring/shared "foo-bar" 0 7))))
+    (string=? "foo" (substring/shared "foo-bar" 0 3)))
+
+  (pass-if "shared copy of non-empty string is eq?"
+    (let ((s "foo-bar"))
+      (eq? s (substring/shared s 0 7)))))
 
 (with-test-prefix "string-copy!"
 

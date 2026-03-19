@@ -410,7 +410,7 @@ scm_read_string (int chr, SCM port)
   /* For strings smaller than C_STR, this function creates only one Scheme
      object (the string returned).  */
 
-  SCM str = SCM_BOOL_F;
+  SCM str = SCM_EOL;
   char c_str[READER_STRING_BUFFER_SIZE];
   unsigned c_str_len = 0;
   int c;
@@ -422,17 +422,11 @@ scm_read_string (int chr, SCM port)
 				    "end of file in string constant",
 				    SCM_EOL);
 
-      if (c_str_len + 1 >= sizeof (c_str))
+      if (c_str_len + 1 >= READER_STRING_BUFFER_SIZE)
 	{
-	  /* Flush the C buffer onto a Scheme string.  */
-	  SCM addy;
-
-	  if (str == SCM_BOOL_F)
-	    str = scm_c_make_string (0, SCM_MAKE_CHAR ('X'));
-
-	  addy = scm_from_locale_stringn (c_str, c_str_len);
-	  str = scm_string_append_shared (scm_list_2 (str, addy));
-
+	  /* Flush the C buffer onto the chunk list.  */
+	  str = scm_cons (scm_from_locale_stringn (c_str, c_str_len),
+			     str);
 	  c_str_len = 0;
 	}
 
@@ -501,18 +495,16 @@ scm_read_string (int chr, SCM port)
       c_str[c_str_len++] = c;
     }
 
-  if (c_str_len > 0)
-    {
-      SCM addy;
-
-      addy = scm_from_locale_stringn (c_str, c_str_len);
-      if (str == SCM_BOOL_F)
-	str = addy;
-      else
-	str = scm_string_append_shared (scm_list_2 (str, addy));
-    }
+  if (scm_is_null (str))
+    /* Fast path: we got a string that fits in C_STR.  */
+    str = scm_from_locale_stringn (c_str, c_str_len);
   else
-    str = (str == SCM_BOOL_F) ? scm_nullstr : str;
+    {
+      if (c_str_len > 0)
+	str = scm_cons (scm_from_locale_stringn (c_str, c_str_len), str);
+
+      str = scm_string_concatenate_reverse (str, SCM_UNDEFINED, SCM_UNDEFINED);
+    }
 
   return str;
 }
