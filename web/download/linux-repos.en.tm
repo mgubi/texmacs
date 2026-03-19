@@ -37,7 +37,7 @@
     apt-get update
   </shell-code>
 
-  Install TeXmacs:
+  Install <TeXmacs>:
 
   <\shell-code>
     apt-get install texmacs
@@ -71,7 +71,7 @@
     apt-get update
   </shell-code>
 
-  Install TeXmacs:
+  Install <TeXmacs>:
 
   <\shell-code>
     apt-get install texmacs
@@ -79,7 +79,7 @@
 
   <section*|Troubleshooting><label|debian>
 
-  <subsection*|How to force Ubuntu to prioritize the official TeXmacs
+  <subsection*|How to force Ubuntu to prioritize the official <TeXmacs>
   repository>
 
   Run this if Ubuntu keeps trying to install an older version from its own
