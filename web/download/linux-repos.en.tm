@@ -77,7 +77,18 @@
     apt-get install texmacs
   </shell-code>
 
-  \;
+  <section*|Troubleshooting><label|debian>
+
+  <subsection*|How to force Ubuntu to prioritize the official TeXmacs
+  repository>
+
+  Run this if Ubuntu keeps trying to install an older version from its own
+  repositories:
+
+  <\shell-code>
+    echo -e "Package: texmacs\\nPin: origin ftp.texmacs.org\\nPin-Priority:
+    1001" \| sudo tee /etc/apt/preferences.d/texmacs \<gtr\> /dev/null
+  </shell-code>
 
   <tmdoc-copyright|1999\U2018|Denis Raux|Joris van der Hoeven, Liza Belos>
 
