@@ -23,7 +23,7 @@
     \<gtr\> /dev/null
   </shell-code>
 
-  Add the texmacs repository:
+  Add the <TeXmacs> repository:
 
   <\shell-code>
     echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.gpg]
@@ -56,7 +56,7 @@
     \<gtr\> /dev/null
   </shell-code>
 
-  Add the texmacs repository :
+  Add the <TeXmacs> repository :
 
   <\shell-code>
     echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.gpg]
