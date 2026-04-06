@@ -1,6 +1,6 @@
-<TeXmacs|1.99.6>
+<TeXmacs|2.1.5>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Contribute|Contributing><tmweb-title|Contributing to
@@ -107,10 +107,9 @@
   <subsection|Documentation tasks>
 
   <\description>
-    <item*|<hlink|Videos|task-videos.en.tm>>Short video clips are highly
-    efficient for learning different aspects of the program. This task
-    consist of selecting, editing, converting and distributing contributed
-    videos.
+    <item*|Videos>Short video clips are highly efficient for learning
+    different aspects of the program. This task consist of selecting,
+    editing, converting and distributing contributed videos.
 
     <item*|Tutorials>We often receive <TeXmacs> tutorials in various lengths,
     languages and for various target publics. We need someone to collect this
@@ -149,7 +148,7 @@
     etc.
   </description>
 
-  <tmdoc-copyright|1999--2012|Joris van der Hoeven>
+  <tmdoc-copyright|1999\U2012|Joris van der Hoeven>
 
   <tmweb-license>
 </body>
