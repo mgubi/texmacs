@@ -76,6 +76,10 @@
 # include <sys/timeb.h>
 #endif
 
+#ifdef HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
+
 #if HAVE_CRT_EXTERNS_H
 #include <crt_externs.h>  /* for Darwin _NSGetEnviron */
 #endif
@@ -142,7 +146,14 @@ SCM_DEFINE (scm_get_internal_real_time, "get-internal-real-time", 0, 0, 0,
   struct timeb time_buffer;
 
   SCM tmp;
+#ifdef HAVE_SYS_TIME_H
+  struct timeval time_val;
+  gettimeofday (&time_val, NULL);
+  time_buffer.time = time_val.tv_sec;
+  time_buffer.millitm = time_val.tv_usec / 1000;
+#else
   ftime (&time_buffer);
+#endif
   time_buffer.time -= scm_your_base.time;
   tmp = scm_from_ent (time_buffer.millitm - scm_your_base.millitm);
   tmp = scm_sum (tmp,
@@ -849,7 +860,16 @@ scm_init_stime()
 		scm_from_ent (SCM_TIME_UNITS_PER_SECOND));
 
 #ifdef HAVE_FTIME
-  if (!scm_your_base.time) ftime(&scm_your_base);
+  if (!scm_your_base.time) {
+#ifdef HAVE_SYS_TIME_H
+    struct timeval time_val;
+    gettimeofday (&time_val, NULL);
+    scm_your_base.time = time_val.tv_sec;
+    scm_your_base.millitm = time_val.tv_usec / 1000;
+#else
+    ftime (&scm_your_base);
+#endif
+  }
 #else
   if (!scm_your_base) time(&scm_your_base);
 #endif

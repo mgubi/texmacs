@@ -93,11 +93,16 @@ guile_dirent_t *guile_default_readdir(DIR *dirp) {
 
 #if HAVE_READDIR_R
 int guile_default_readdir_r(DIR *dirp, guile_dirent_t *entry, guile_dirent_t **result) {
-    int res = readdir_r_or_readdir64_r(dirp, entry, result);
-    if (res == 0 && *result) {
+    /* Use readdir() instead of deprecated readdir_r/readdir64_r.
+       Modern libc implementations make readdir() thread-safe. */
+    errno = 0;
+    *result = readdir_or_readdir64(dirp);
+    if (*result) {
         guile_utf8_string_to_system_string_path((*result)->d_name);
+        return 0;
     }
-    return res;
+    /* Return errno if set, otherwise 0 for end of directory */
+    return errno;
 }
 #endif
 
