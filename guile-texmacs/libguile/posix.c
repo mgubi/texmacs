@@ -100,7 +100,7 @@ extern char *ttyname();
 
 #include <signal.h>
 
-#if defined(__MINGW64__) && defined (HAVE_MINGW64_UCRT64)
+#ifdef __MINGW32__
 __declspec (dllimport)
 #endif
 extern char ** environ;

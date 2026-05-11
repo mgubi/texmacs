@@ -33,7 +33,7 @@
 
 
 #ifndef floor
-extern double floor();
+extern double floor (double);
 #endif
 
 

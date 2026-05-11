@@ -41,7 +41,28 @@ AC_CONFIG_SRCDIR([GUILE-VERSION])
 . $srcdir/GUILE-VERSION
 
 AC_CONFIG_HEADERS([config.h])
-AH_TOP(/*GUILE_CONFIGURE_COPYRIGHT*/)
+AH_TOP([
+/*GUILE_CONFIGURE_COPYRIGHT*/
+
+/*
+  TeXmacs may include another generated config header before this one,
+  which can predefine autoconf PACKAGE_* names. Undefine them here so
+  the defines emitted by this config header do not trigger redefinition
+  warnings.
+*/
+#ifdef PACKAGE_BUGREPORT
+# undef PACKAGE_BUGREPORT
+#endif
+#ifdef PACKAGE_NAME
+# undef PACKAGE_NAME
+#endif
+#ifdef PACKAGE_STRING
+# undef PACKAGE_STRING
+#endif
+#ifdef PACKAGE_TARNAME
+# undef PACKAGE_TARNAME
+#endif
+])
 
 #--------------------------------------------------------------------
 

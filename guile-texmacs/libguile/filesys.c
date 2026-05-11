@@ -1327,7 +1327,7 @@ SCM_DEFINE (scm_select, "select", 3, 2, 0,
 
 	  if (!SCM_UNBNDP (usecs))
 	    SCM_WRONG_TYPE_ARG (4, secs);
-	  if (fl > ENT_MAX)
+    if (fl > (double) ENT_MAX)
 	    SCM_OUT_OF_RANGE (4, secs);
 	  timeout.tv_sec = (ent) fl;
 	  timeout.tv_usec = (ent) ((fl - timeout.tv_sec) * 1000000);

@@ -23,6 +23,24 @@ Boston, MA 02110-1301, USA.
 
 */
 
+/*
+   TeXmacs may include another generated config header before this one,
+   which can predefine autoconf PACKAGE_* names. Undefine them here so
+   the defines in this config header do not trigger redefinition warnings.
+*/
+#ifdef PACKAGE_BUGREPORT
+# undef PACKAGE_BUGREPORT
+#endif
+#ifdef PACKAGE_NAME
+# undef PACKAGE_NAME
+#endif
+#ifdef PACKAGE_STRING
+# undef PACKAGE_STRING
+#endif
+#ifdef PACKAGE_TARNAME
+# undef PACKAGE_TARNAME
+#endif
+
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 

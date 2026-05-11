@@ -152,7 +152,7 @@ SCM_DEFINE (scm_ntohl, "ntohl", 1, 0, 0,
 
 #ifndef HAVE_INET_ATON
 /* for our definition in inet_aton.c, not usually needed.  */
-extern int inet_aton ();
+extern int inet_aton (const char *, struct in_addr *);
 #endif
 
 SCM_DEFINE (scm_inet_aton, "inet-aton", 1, 0, 0, 
