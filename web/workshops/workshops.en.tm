@@ -13,14 +13,7 @@
 
   <section*|Upcoming Workshops>
 
-  The next workshop will take place from June 21 to June 27, 2026, at
-  <hlink|Villa Clythia|https://www.caes.cnrs.fr/sejours/la-villa-clythia/>
-  \ in Fréjus, France.
-
-  <\center>
-    <tabular*|<tformat|<twith|table-width|1par>|<twith|table-hmode|exact>|<table|<row|<cell|<hlink|<image|esterel.jpg||150px||>|https://www.caes.cnrs.fr/sejours/la-villa-clythia/>>>|<row|<cell|<hlink|Fréjus,
-    France, 2026|frejus2026.en.tm>>>>>>
-  </center>
+  No upcoming workshops for the time being.
 
   <section*|Past Workshops>
 
