@@ -24,11 +24,7 @@
 #
 AUTOMAKE_OPTIONS = 1.10
 
-if ENABLE_READLINE
-   GUILE_READLINE_OPT = guile-readline
-endif
-
-SUBDIRS = oop libguile ice-9 guile-config $(GUILE_READLINE_OPT) emacs scripts srfi doc examples test-suite benchmark-suite lang am
+SUBDIRS = oop libguile ice-9 guile-config emacs scripts srfi doc examples test-suite benchmark-suite lang am
 
 DIST_SUBDIRS = $(SUBDIRS)
 
@@ -50,7 +46,6 @@ pkgconfig_DATA = guile-1.8.pc
 distclean-local:
 	rm -f *~ */*~
 	rm -rf libguile/.deps
-	rm -rf guile-readline/autom4te.cache/
 	rm -rf autom4te.cache/
 	rm -f check-guile.log doc/ref/guile.info-7 guile-procedures.txt
 # Makefile.am ends here

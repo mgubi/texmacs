@@ -1594,31 +1594,11 @@ AC_SUBST(LIBGUILE_SRFI_SRFI_60_INTERFACE)
 #######################################################################
 # Final tuning
 
-AC_ARG_ENABLE(readline,
-  [  --disable-readline      do not use the readline library],,
-  enable_readline=yes)
-
 case $host in
   x86_64-w64-mingw32)
     CFLAGS="$CFLAGS -Wno-error=use-after-free"
-    # Sometimes useful for using gdb
-    # LDFLAGS="-Wl,--stack,0x1000000 $LDFLAGS"
-    enable_readline=no
-    ;;
-  *android*)
-    enable_readline=no
-    ;;
-  *ios*)
-    enable_readline=no
     ;;
 esac
-
-AC_SUBST(enable_readline)
-AM_CONDITIONAL([ENABLE_READLINE], [test $enable_readline = "yes"])
-
-if test "$enable_readline" = "yes"; then
-  AC_CONFIG_SUBDIRS(guile-readline)
-fi
 
 case "$MINGW_PACKAGE_PREFIX" in
   *ucrt*)

@@ -442,7 +442,6 @@ datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
-enable_readline = @enable_readline@
 exec_prefix = @exec_prefix@
 have_makeinfo = @have_makeinfo@
 host = @host@
@@ -471,7 +470,6 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sitedir = @sitedir@
 srcdir = @srcdir@
-subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
@@ -484,8 +482,7 @@ top_srcdir_absolute = @top_srcdir_absolute@
 # config.rpath is needed
 #
 AUTOMAKE_OPTIONS = 1.10
-@ENABLE_READLINE_TRUE@GUILE_READLINE_OPT = guile-readline
-SUBDIRS = oop libguile ice-9 guile-config $(GUILE_READLINE_OPT) emacs scripts srfi doc examples test-suite benchmark-suite lang am
+SUBDIRS = oop libguile ice-9 guile-config emacs scripts srfi doc examples test-suite benchmark-suite lang am
 DIST_SUBDIRS = $(SUBDIRS)
 bin_SCRIPTS = guile-tools
 include_HEADERS = libguile.h
@@ -1089,7 +1086,6 @@ check-local:
 distclean-local:
 	rm -f *~ */*~
 	rm -rf libguile/.deps
-	rm -rf guile-readline/autom4te.cache/
 	rm -rf autom4te.cache/
 	rm -f check-guile.log doc/ref/guile.info-7 guile-procedures.txt
 # Makefile.am ends here

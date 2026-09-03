@@ -43,7 +43,7 @@
 # Code:
 
 # config
-subdirs_with_ltlibs="srfi guile-readline"       # maintain me
+subdirs_with_ltlibs="srfi"       # maintain me
 
 # env (set by configure)
 top_srcdir="@top_srcdir_absolute@"
@@ -60,9 +60,9 @@ top_builddir="@top_builddir_absolute@"
 # handle GUILE_LOAD_PATH (no clobber)
 if [ x"$GUILE_LOAD_PATH" = x ]
 then
-    GUILE_LOAD_PATH="${top_srcdir}/guile-readline:${top_srcdir}"
+    GUILE_LOAD_PATH="${top_srcdir}"
 else
-  for d in "${top_srcdir}" "${top_srcdir}/guile-readline"
+  for d in "${top_srcdir}"
   do
     # This hair prevents double inclusion.
     # The ":" prevents prefix aliasing.

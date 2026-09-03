@@ -3,8 +3,7 @@ import os, glob, re
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 c_files = (
     sorted(glob.glob(os.path.join(root, 'libguile', '*.c'))) +
-    sorted(glob.glob(os.path.join(root, 'srfi', '*.c'))) +
-    sorted(glob.glob(os.path.join(root, 'guile-readline', '*.c')))
+    sorted(glob.glob(os.path.join(root, 'srfi', '*.c')))
 )
 
 str_lit = r'"(?:[^"\\]|\\.)*"'
