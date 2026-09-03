@@ -1,4 +1,4 @@
-This is guile.info, produced by makeinfo version 7.1 from guile.texi.
+This is guile.info, produced by makeinfo version 7.2 from guile.texi.
 
 This reference manual documents Guile, GNU's Ubiquitous Intelligent
 Language for Extensions.  This is edition 1.1 corresponding to Guile
@@ -3894,78 +3894,6 @@ prints an error and exits if Guile was not found:
 information, installed as ‘PREFIX/share/aclocal/guile.m4’.  Their names
 all begin with ‘GUILE_’.
 
- -- Autoconf Macro: GUILE_PROGS
-
-     This macro looks for programs ‘guile’, ‘guile-config’ and
-     ‘guile-tools’, and sets variables GUILE, GUILE_CONFIG and
-     GUILE_TOOLS, to their paths, respectively.  If either of the first
-     two is not found, signal error.
-
-     The variables are marked for substitution, as by ‘AC_SUBST’.
-
- -- Autoconf Macro: GUILE_FLAGS
-
-     This macro runs the ‘guile-config’ script, installed with Guile, to
-     find out where Guile's header files and libraries are installed.
-     It sets two variables, GUILE_CFLAGS and GUILE_LDFLAGS.
-
-     GUILE_CFLAGS: flags to pass to a C or C++ compiler to build code
-     that uses Guile header files.  This is almost always just a ‘-I’
-     flag.
-
-     GUILE_LDFLAGS: flags to pass to the linker to link a program
-     against Guile.  This includes ‘-lguile’ for the Guile library
-     itself, any libraries that Guile itself requires (like -lqthreads),
-     and so on.  It may also include a ‘-L’ flag to tell the compiler
-     where to find the libraries.
-
-     The variables are marked for substitution, as by ‘AC_SUBST’.
-
- -- Autoconf Macro: GUILE_SITE_DIR
-
-     This looks for Guile's "site" directory, usually something like
-     PREFIX/share/guile/site, and sets var GUILE_SITE to the path.  Note
-     that the var name is different from the macro name.
-
-     The variable is marked for substitution, as by ‘AC_SUBST’.
-
- -- Autoconf Macro: GUILE_CHECK_RETVAL var check
-
-     VAR is a shell variable name to be set to the return value.  CHECK
-     is a Guile Scheme expression, evaluated with "$GUILE -c", and
-     returning either 0 or non-#f to indicate the check passed.  Non-0
-     number or #f indicates failure.  Avoid using the character "#"
-     since that confuses autoconf.
-
- -- Autoconf Macro: GUILE_MODULE_CHECK var module featuretest
-          description
-
-     VAR is a shell variable name to be set to "yes" or "no".  MODULE is
-     a list of symbols, like: (ice-9 common-list).  FEATURETEST is an
-     expression acceptable to GUILE_CHECK, q.v.  DESCRIPTION is a
-     present-tense verb phrase (passed to AC_MSG_CHECKING).
-
- -- Autoconf Macro: GUILE_MODULE_AVAILABLE var module
-
-     VAR is a shell variable name to be set to "yes" or "no".  MODULE is
-     a list of symbols, like: (ice-9 common-list).
-
- -- Autoconf Macro: GUILE_MODULE_REQUIRED symlist
-
-     SYMLIST is a list of symbols, WITHOUT surrounding parens, like:
-     ice-9 common-list.
-
- -- Autoconf Macro: GUILE_MODULE_EXPORTS var module modvar
-
-     VAR is a shell variable to be set to "yes" or "no".  MODULE is a
-     list of symbols, like: (ice-9 common-list).  MODVAR is the Guile
-     Scheme variable to check.
-
- -- Autoconf Macro: GUILE_MODULE_REQUIRED_EXPORT module modvar
-
-     MODULE is a list of symbols, like: (ice-9 common-list).  MODVAR is
-     the Guile Scheme variable to check.
-
 
 File: guile.info,  Node: Using Autoconf Macros,  Next: Autofrisk,  Prev: Autoconf Macros,  Up: Autoconf Support
 
@@ -7252,15 +7180,6 @@ the Scheme names by a simple transformation described in the section
 * group:mem:                             User Information.    (line  68)
 * group:name:                            User Information.    (line  62)
 * group:passwd:                          User Information.    (line  64)
-* GUILE_CHECK_RETVAL:                    Autoconf Macros.     (line  65)
-* GUILE_FLAGS:                           Autoconf Macros.     (line  39)
-* GUILE_MODULE_AVAILABLE:                Autoconf Macros.     (line  81)
-* GUILE_MODULE_CHECK:                    Autoconf Macros.     (line  73)
-* GUILE_MODULE_EXPORTS:                  Autoconf Macros.     (line  91)
-* GUILE_MODULE_REQUIRED:                 Autoconf Macros.     (line  86)
-* GUILE_MODULE_REQUIRED_EXPORT:          Autoconf Macros.     (line  97)
-* GUILE_PROGS:                           Autoconf Macros.     (line  30)
-* GUILE_SITE_DIR:                        Autoconf Macros.     (line  57)
 * hash:                                  Hash Table Reference.
                                                               (line 116)
 * hash <1>:                              SRFI-69 Hash table algorithms.

@@ -241,6 +241,6 @@ scm_debug_malloc_prehistory ()
 void
 scm_init_debug_malloc ()
 {
-#include "libguile/debug-malloc.x"
+  scm_c_define_gsubr (s_scm_malloc_stats, 0, 0, 0, (SCM (*)()) scm_malloc_stats);
 }
 

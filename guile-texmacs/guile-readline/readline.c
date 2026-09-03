@@ -541,7 +541,14 @@ void
 scm_init_readline ()
 {
 #ifdef HAVE_RL_GETC_FUNCTION
-#include "guile-readline/readline.x"
+ scm_c_define_gsubr (s_scm_readline_options, 0, 1, 0, (SCM (*)()) scm_readline_options); ;
+ scm_c_define_gsubr (s_scm_readline, 0, 4, 0, (SCM (*)()) scm_readline); ;
+ scm_c_define_gsubr (s_scm_add_history, 1, 0, 0, (SCM (*)()) scm_add_history); ;
+ scm_c_define_gsubr (s_scm_read_history, 1, 0, 0, (SCM (*)()) scm_read_history); ;
+ scm_c_define_gsubr (s_scm_write_history, 1, 0, 0, (SCM (*)()) scm_write_history); ;
+ scm_c_define_gsubr (s_scm_clear_history, 0, 0, 0, (SCM (*)()) scm_clear_history); ;
+ scm_c_define_gsubr (s_scm_filename_completion_function, 2, 0, 0, (SCM (*)()) scm_filename_completion_function); ;
+
   scm_readline_completion_function_var
     = scm_c_define ("*readline-completion-function*", SCM_BOOL_F);
 #ifndef __MINGW32__

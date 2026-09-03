@@ -191,7 +191,9 @@ scm_apply_with_dynamic_root (SCM proc, SCM a1, SCM args, SCM handler)
 void
 scm_init_root ()
 {
-#include "libguile/root.x"
+ scm_c_define_gsubr (s_scm_call_with_dynamic_root, 2, 0, 0, (SCM (*)()) scm_call_with_dynamic_root); ;
+ scm_c_define_gsubr (s_scm_dynamic_root, 0, 0, 0, (SCM (*)()) scm_dynamic_root); ;
+
 }
 
 /*

@@ -1813,7 +1813,29 @@ scm_init_socket ()
 
   scm_add_feature ("socket");
 
-#include "libguile/socket.x"
+ scm_c_define_gsubr (s_scm_htons, 1, 0, 0, (SCM (*)()) scm_htons); ;
+ scm_c_define_gsubr (s_scm_ntohs, 1, 0, 0, (SCM (*)()) scm_ntohs); ;
+ scm_c_define_gsubr (s_scm_htonl, 1, 0, 0, (SCM (*)()) scm_htonl); ;
+ scm_c_define_gsubr (s_scm_ntohl, 1, 0, 0, (SCM (*)()) scm_ntohl); ;
+ scm_c_define_gsubr (s_scm_inet_aton, 1, 0, 0, (SCM (*)()) scm_inet_aton); ;
+ scm_c_define_gsubr (s_scm_inet_ntoa, 1, 0, 0, (SCM (*)()) scm_inet_ntoa); ;
+ sym_socket = scm_permanent_object (scm_from_locale_symbol ("socket")) ;
+ scm_c_define_gsubr (s_scm_socket, 3, 0, 0, (SCM (*)()) scm_socket); ;
+ scm_c_define_gsubr (s_scm_getsockopt, 3, 0, 0, (SCM (*)()) scm_getsockopt); ;
+ scm_c_define_gsubr (s_scm_setsockopt, 4, 0, 0, (SCM (*)()) scm_setsockopt); ;
+ scm_c_define_gsubr (s_scm_shutdown, 2, 0, 0, (SCM (*)()) scm_shutdown); ;
+ scm_c_define_gsubr (s_scm_connect, 2, 1, 1, (SCM (*)()) scm_connect); ;
+ scm_c_define_gsubr (s_scm_bind, 2, 1, 1, (SCM (*)()) scm_bind); ;
+ scm_c_define_gsubr (s_scm_listen, 2, 0, 0, (SCM (*)()) scm_listen); ;
+ scm_c_define_gsubr (s_scm_make_socket_address, 2, 0, 1, (SCM (*)()) scm_make_socket_address); ;
+ scm_c_define_gsubr (s_scm_accept, 1, 0, 0, (SCM (*)()) scm_accept); ;
+ scm_c_define_gsubr (s_scm_getsockname, 1, 0, 0, (SCM (*)()) scm_getsockname); ;
+ scm_c_define_gsubr (s_scm_getpeername, 1, 0, 0, (SCM (*)()) scm_getpeername); ;
+ scm_c_define_gsubr (s_scm_recv, 2, 1, 0, (SCM (*)()) scm_recv); ;
+ scm_c_define_gsubr (s_scm_send, 2, 1, 0, (SCM (*)()) scm_send); ;
+ scm_c_define_gsubr (s_scm_recvfrom, 2, 3, 0, (SCM (*)()) scm_recvfrom); ;
+ scm_c_define_gsubr (s_scm_sendto, 3, 1, 1, (SCM (*)()) scm_sendto); ;
+
 }
 
 

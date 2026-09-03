@@ -95,9 +95,6 @@ AC_CHECK_HEADER([ltdl.h], [],
 
 AC_CHECK_PROG(have_makeinfo, makeinfo, yes, no)
 AM_CONDITIONAL(HAVE_MAKEINFO, test "$have_makeinfo" = yes)
-if test "$have_makeinfo" != yes; then
-  AC_MSG_ERROR([makeinfo not found.])
-fi
 
 AM_PATH_LISPDIR
 
@@ -1556,10 +1553,6 @@ esac
 ## given in LIBOBJS.  We'll call it LIBLOBJS.
 LIBLOBJS="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.lo ,g;s,\.[[^.]]*$,.lo,'`"
 
-## We also need to create corresponding .doc and .x files
-EXTRA_DOT_DOC_FILES="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.doc ,g;s,\.[[^.]]*$,.doc,'`"
-EXTRA_DOT_X_FILES="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.x ,g;s,\.[[^.]]*$,.x,'`"
-
 AC_SUBST(GUILE_MAJOR_VERSION)
 AC_SUBST(GUILE_MINOR_VERSION)
 AC_SUBST(GUILE_MICRO_VERSION)
@@ -1643,8 +1636,6 @@ AC_SUBST(GUILE_CFLAGS)
 
 AC_SUBST(AWK)
 AC_SUBST(LIBLOBJS)
-AC_SUBST(EXTRA_DOT_DOC_FILES)
-AC_SUBST(EXTRA_DOT_X_FILES)
 
 # See also top_builddir in info node: (libtool)LT_INIT
 top_builddir_absolute=`pwd`
@@ -1697,14 +1688,6 @@ AC_CONFIG_FILES([benchmark-guile], [chmod +x benchmark-guile])
 AC_CONFIG_FILES([guile-tools], [chmod +x guile-tools])
 AC_CONFIG_FILES([pre-inst-guile], [chmod +x pre-inst-guile])
 AC_CONFIG_FILES([pre-inst-guile-env], [chmod +x pre-inst-guile-env])
-AC_CONFIG_FILES([libguile/guile-snarf],
-                [chmod +x libguile/guile-snarf])
-AC_CONFIG_FILES([libguile/guile-doc-snarf],
-                [chmod +x libguile/guile-doc-snarf])
-AC_CONFIG_FILES([libguile/guile-func-name-check],
-                [chmod +x libguile/guile-func-name-check])
-AC_CONFIG_FILES([libguile/guile-snarf-docs],
-                [chmod +x libguile/guile-snarf-docs])
 AC_CONFIG_FILES([test-suite/standalone/test-use-srfi],
                 [chmod +x test-suite/standalone/test-use-srfi])
 AC_CONFIG_FILES([test-suite/standalone/test-fast-slot-ref],

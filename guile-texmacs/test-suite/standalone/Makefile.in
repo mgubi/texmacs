@@ -541,8 +541,6 @@ EMACSLOADPATH = @EMACSLOADPATH@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 EXTRA_DEFS = @EXTRA_DEFS@
-EXTRA_DOT_DOC_FILES = @EXTRA_DOT_DOC_FILES@
-EXTRA_DOT_X_FILES = @EXTRA_DOT_X_FILES@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
 GETTEXT_MACRO_VERSION = @GETTEXT_MACRO_VERSION@
@@ -737,7 +735,7 @@ noinst_LTLIBRARIES = libtest-asmobs.la
 check_SCRIPTS = test-system-cmds test-require-extension \
 	test-bad-identifiers test-asmobs test-fast-slot-ref \
 	test-use-srfi
-BUILT_SOURCES = test-asmobs-lib.x
+BUILT_SOURCES = 
 EXTRA_DIST = $(am__append_3) ${check_SCRIPTS}
 TESTS_ENVIRONMENT = \
   builddir="$(builddir)"					\
@@ -749,12 +747,6 @@ test_cflags = \
   $(EXTRA_DEFS) $(GUILE_CFLAGS)
 
 AM_LDFLAGS = $(GUILE_CFLAGS)
-snarfcppopts = \
-  $(DEFS) $(DEFAULT_INCLUDES) $(CPPFLAGS) $(CFLAGS)	\
-  -I$(top_srcdir) -I$(top_builddir)
-
-SUFFIXES = .x
-CLEANFILES = *.x
 
 # test-num2integral
 test_num2integral_SOURCES = test-num2integral.c
@@ -769,7 +761,7 @@ test_round_LDADD = ${top_builddir}/libguile/libguile.la
 test_gh_SOURCES = test-gh.c
 test_gh_CFLAGS = ${test_cflags}
 test_gh_LDADD = ${top_builddir}/libguile/libguile.la
-libtest_asmobs_la_SOURCES = test-asmobs-lib.c test-asmobs-lib.x
+libtest_asmobs_la_SOURCES = test-asmobs-lib.c
 libtest_asmobs_la_CFLAGS = ${test_cflags}
 libtest_asmobs_la_LDFLAGS = -no-undefined -rpath `pwd` # so libtool will really build an .so
 libtest_asmobs_la_LIBADD = ${top_builddir}/libguile/libguile.la
@@ -808,7 +800,7 @@ all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .x .c .lo .log .o .obj .test .test$(EXEEXT) .trs
+.SUFFIXES: .c .lo .log .o .obj .test .test$(EXEEXT) .trs
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -1508,7 +1500,6 @@ mostlyclean-generic:
 	-$(am__rm_f) $(TEST_SUITE_LOG)
 
 clean-generic:
-	-$(am__rm_f) $(CLEANFILES)
 
 distclean-generic:
 	-$(am__rm_f) $(CONFIG_CLEAN_FILES)
@@ -1629,8 +1620,6 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
-.c.x:
-	${top_builddir}/libguile/guile-snarf -o $@ $< $(snarfcppopts)
 
 .DELETE_ON_ERROR:
 

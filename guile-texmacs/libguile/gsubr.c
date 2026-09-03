@@ -272,7 +272,8 @@ scm_init_gsubr()
   scm_c_define_gsubr ("gsubr-2-1-l", 2, 1, 1, gsubr_21l); /* example */
 #endif
 
-#include "libguile/gsubr.x"
+ scm_sym_name = scm_permanent_object (scm_from_locale_symbol ("name")) ;
+
 }
 
 /*

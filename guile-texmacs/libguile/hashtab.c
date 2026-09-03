@@ -1097,7 +1097,40 @@ scm_hashtab_prehistory ()
 void
 scm_init_hashtab ()
 {
-#include "libguile/hashtab.x"
+ scm_c_define_gsubr (s_scm_make_hash_table, 0, 1, 0, (SCM (*)()) scm_make_hash_table); ;
+ scm_c_define_gsubr (s_scm_make_weak_key_hash_table, 0, 1, 0, (SCM (*)()) scm_make_weak_key_hash_table); ;
+ scm_c_define_gsubr (s_scm_make_weak_value_hash_table, 0, 1, 0, (SCM (*)()) scm_make_weak_value_hash_table); ;
+ scm_c_define_gsubr (s_scm_make_doubly_weak_hash_table, 1, 0, 0, (SCM (*)()) scm_make_doubly_weak_hash_table); ;
+ scm_c_define_gsubr (s_scm_hash_table_p, 1, 0, 0, (SCM (*)()) scm_hash_table_p); ;
+ scm_c_define_gsubr (s_scm_weak_key_hash_table_p, 1, 0, 0, (SCM (*)()) scm_weak_key_hash_table_p); ;
+ scm_c_define_gsubr (s_scm_weak_value_hash_table_p, 1, 0, 0, (SCM (*)()) scm_weak_value_hash_table_p); ;
+ scm_c_define_gsubr (s_scm_doubly_weak_hash_table_p, 1, 0, 0, (SCM (*)()) scm_doubly_weak_hash_table_p); ;
+ scm_c_define_gsubr (s_scm_hash_clear_x, 1, 0, 0, (SCM (*)()) scm_hash_clear_x); ;
+ scm_c_define_gsubr (s_scm_hashq_get_handle, 2, 0, 0, (SCM (*)()) scm_hashq_get_handle); ;
+ scm_c_define_gsubr (s_scm_hashq_create_handle_x, 3, 0, 0, (SCM (*)()) scm_hashq_create_handle_x); ;
+ scm_c_define_gsubr (s_scm_hashq_ref, 2, 1, 0, (SCM (*)()) scm_hashq_ref); ;
+ scm_c_define_gsubr (s_scm_hashq_set_x, 3, 0, 0, (SCM (*)()) scm_hashq_set_x); ;
+ scm_c_define_gsubr (s_scm_hashq_remove_x, 2, 0, 0, (SCM (*)()) scm_hashq_remove_x); ;
+ scm_c_define_gsubr (s_scm_hashv_get_handle, 2, 0, 0, (SCM (*)()) scm_hashv_get_handle); ;
+ scm_c_define_gsubr (s_scm_hashv_create_handle_x, 3, 0, 0, (SCM (*)()) scm_hashv_create_handle_x); ;
+ scm_c_define_gsubr (s_scm_hashv_ref, 2, 1, 0, (SCM (*)()) scm_hashv_ref); ;
+ scm_c_define_gsubr (s_scm_hashv_set_x, 3, 0, 0, (SCM (*)()) scm_hashv_set_x); ;
+ scm_c_define_gsubr (s_scm_hashv_remove_x, 2, 0, 0, (SCM (*)()) scm_hashv_remove_x); ;
+ scm_c_define_gsubr (s_scm_hash_get_handle, 2, 0, 0, (SCM (*)()) scm_hash_get_handle); ;
+ scm_c_define_gsubr (s_scm_hash_create_handle_x, 3, 0, 0, (SCM (*)()) scm_hash_create_handle_x); ;
+ scm_c_define_gsubr (s_scm_hash_ref, 2, 1, 0, (SCM (*)()) scm_hash_ref); ;
+ scm_c_define_gsubr (s_scm_hash_set_x, 3, 0, 0, (SCM (*)()) scm_hash_set_x); ;
+ scm_c_define_gsubr (s_scm_hash_remove_x, 2, 0, 0, (SCM (*)()) scm_hash_remove_x); ;
+ scm_c_define_gsubr (s_scm_hashx_get_handle, 4, 0, 0, (SCM (*)()) scm_hashx_get_handle); ;
+ scm_c_define_gsubr (s_scm_hashx_create_handle_x, 5, 0, 0, (SCM (*)()) scm_hashx_create_handle_x); ;
+ scm_c_define_gsubr (s_scm_hashx_ref, 4, 1, 0, (SCM (*)()) scm_hashx_ref); ;
+ scm_c_define_gsubr (s_scm_hashx_set_x, 5, 0, 0, (SCM (*)()) scm_hashx_set_x); ;
+ scm_c_define_gsubr (s_scm_hashx_remove_x, 4, 0, 0, (SCM (*)()) scm_hashx_remove_x); ;
+ scm_c_define_gsubr (s_scm_hash_fold, 3, 0, 0, (SCM (*)()) scm_hash_fold); ;
+ scm_c_define_gsubr (s_scm_hash_for_each, 2, 0, 0, (SCM (*)()) scm_hash_for_each); ;
+ scm_c_define_gsubr (s_scm_hash_for_each_handle, 2, 0, 0, (SCM (*)()) scm_hash_for_each_handle); ;
+ scm_c_define_gsubr (s_scm_hash_map_to_list, 2, 0, 0, (SCM (*)()) scm_hash_map_to_list); ;
+
 }
 
 /*

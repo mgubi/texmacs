@@ -28,35 +28,20 @@ DEFS = @DEFS@ @EXTRA_DEFS@
 ## building.
 AM_CPPFLAGS = -I. -I.. -I$(srcdir)/..
 
-GUILE_SNARF = ../libguile/guile-snarf
-
 lib_LTLIBRARIES = libguilereadline-v-@LIBGUILEREADLINE_MAJOR@.la
 
 libguilereadline_v_@LIBGUILEREADLINE_MAJOR@_la_SOURCES = readline.c
 libguilereadline_v_@LIBGUILEREADLINE_MAJOR@_la_LIBADD = ../libguile/libguile.la
 libguilereadline_v_@LIBGUILEREADLINE_MAJOR@_la_LDFLAGS = -version-info @LIBGUILEREADLINE_INTERFACE@ -export-dynamic -no-undefined
 
-
-BUILT_SOURCES = readline.x
-
 pkginclude_HEADERS = readline.h
 
-snarfcppopts = $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) $(CFLAGS)
-SUFFIXES = .x
-.c.x:
-	$(GUILE_SNARF) -o $@ $< $(snarfcppopts)
-
 EXTRA_DIST = LIBGUILEREADLINE-VERSION ChangeLog-2008
-
-MKDEP = gcc -M -MG $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) $(CFLAGS)
-
-CLEANFILES = *.x
 
 dist-hook:
 	(temp="/tmp/mangle-deps.$$$$"; \
 	 trap "rm -f $$temp" 0 1 2 15; \
 	 sed -e 's|\([ 	]\)\(\.\./\(\|libguile/\|guile-readline/\)[a-z_-]*\.h\)|\1$$(srcdir)/\2|g' $(distdir)/Makefile.in \
-	 | sed -e 's|\$$(srcdir)/\(\.\./libguile/\(libpath\|scmconfig\|versiondat\)\)|\1|g' \
-	 | sed -e 's|\.\./guile-readline/\([a-z_-]*\.x\)|\1|g' > $$temp \
+	 | sed -e 's|\$$(srcdir)/\(\.\./libguile/\(libpath\|scmconfig\|versiondat\)\)|\1|g' > $$temp \
 	 && chmod u+w $(distdir)/Makefile.in && cp -p $$temp $(distdir)/Makefile.in)
 

@@ -17,7 +17,6 @@
 
 
 
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -95,8 +94,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = guile$(EXEEXT)
-noinst_PROGRAMS = guile_filter_doc_snarfage$(EXEEXT) \
-	gen-scmconfig$(EXEEXT)
+noinst_PROGRAMS = gen-scmconfig$(EXEEXT)
 subdir = libguile
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/autobuild.m4 \
@@ -115,13 +113,11 @@ DIST_COMMON = $(srcdir)/Makefile.am $(modinclude_HEADERS) \
 	$(noinst_HEADERS) $(pkginclude_HEADERS) $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = gen-scmconfig.h guile-snarf guile-doc-snarf \
-	guile-func-name-check guile-snarf-docs
+CONFIG_CLEAN_FILES = gen-scmconfig.h
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" \
-	"$(DESTDIR)$(bindir)" "$(DESTDIR)$(schemelibdir)" \
-	"$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(modincludedir)" \
-	"$(DESTDIR)$(pkgincludedir)"
+	"$(DESTDIR)$(schemelibdir)" "$(DESTDIR)$(modincludedir)" \
+	"$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(pkgincludedir)"
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -195,7 +191,7 @@ am_libguile_la_OBJECTS = libguile_la-alist.lo libguile_la-arbiters.lo \
 	libguile_la-variable.lo libguile_la-vectors.lo \
 	libguile_la-version.lo libguile_la-vports.lo \
 	libguile_la-weaks.lo libguile_la-ramap.lo libguile_la-unif.lo \
-	libguile_la-system.lo libguile_la-c-tokenize.lo
+	libguile_la-system.lo
 libguile_la_OBJECTS = $(am_libguile_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -213,11 +209,6 @@ guile_DEPENDENCIES = libguile.la
 guile_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(guile_CFLAGS) $(CFLAGS) \
 	$(guile_LDFLAGS) $(LDFLAGS) -o $@
-am_guile_filter_doc_snarfage_OBJECTS = c-tokenize.$(OBJEXT)
-guile_filter_doc_snarfage_OBJECTS =  \
-	$(am_guile_filter_doc_snarfage_OBJECTS)
-guile_filter_doc_snarfage_LDADD = $(LDADD)
-SCRIPTS = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -232,14 +223,12 @@ am__v_at_0 = @
 am__v_at_1 = 
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/c-tokenize.Po \
-	./$(DEPDIR)/gen-scmconfig.Po ./$(DEPDIR)/guile-guile.Po \
-	./$(DEPDIR)/libguile_la-alist.Plo \
+am__depfiles_remade = ./$(DEPDIR)/gen-scmconfig.Po \
+	./$(DEPDIR)/guile-guile.Po ./$(DEPDIR)/libguile_la-alist.Plo \
 	./$(DEPDIR)/libguile_la-arbiters.Plo \
 	./$(DEPDIR)/libguile_la-async.Plo \
 	./$(DEPDIR)/libguile_la-backtrace.Plo \
 	./$(DEPDIR)/libguile_la-boolean.Plo \
-	./$(DEPDIR)/libguile_la-c-tokenize.Plo \
 	./$(DEPDIR)/libguile_la-chars.Plo \
 	./$(DEPDIR)/libguile_la-continuations.Plo \
 	./$(DEPDIR)/libguile_la-convert.Plo \
@@ -368,11 +357,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libguile_la_SOURCES) $(EXTRA_libguile_la_SOURCES) \
-	$(gen_scmconfig_SOURCES) $(guile_SOURCES) \
-	$(guile_filter_doc_snarfage_SOURCES)
+	$(gen_scmconfig_SOURCES) $(guile_SOURCES)
 DIST_SOURCES = $(libguile_la_SOURCES) $(EXTRA_libguile_la_SOURCES) \
-	$(gen_scmconfig_SOURCES) $(guile_SOURCES) \
-	$(guile_filter_doc_snarfage_SOURCES)
+	$(gen_scmconfig_SOURCES) $(guile_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -399,9 +386,6 @@ am__define_uniq_tagged_files = \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/gen-scmconfig.h.in \
-	$(srcdir)/guile-doc-snarf.in \
-	$(srcdir)/guile-func-name-check.in \
-	$(srcdir)/guile-snarf-docs.in $(srcdir)/guile-snarf.in \
 	$(top_srcdir)/am/pre-inst-guile \
 	$(top_srcdir)/build-aux/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -439,8 +423,6 @@ EMACSLOADPATH = @EMACSLOADPATH@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 EXTRA_DEFS = @EXTRA_DEFS@
-EXTRA_DOT_DOC_FILES = @EXTRA_DOT_DOC_FILES@
-EXTRA_DOT_X_FILES = @EXTRA_DOT_X_FILES@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
 GETTEXT_MACRO_VERSION = @GETTEXT_MACRO_VERSION@
@@ -637,7 +619,6 @@ ETAGS_ARGS = --regex='/SCM_\(GLOBAL_\)?\(G?PROC\|G?PROC1\|SYMBOL\|VCELL\|CONST_L
 
 lib_LTLIBRARIES = libguile.la
 gen_scmconfig_SOURCES = gen-scmconfig.c
-guile_filter_doc_snarfage_SOURCES = c-tokenize.c
 guile_SOURCES = guile.c
 guile_CFLAGS = $(GUILE_CFLAGS)
 guile_LDADD = libguile.la
@@ -658,43 +639,10 @@ libguile_la_SOURCES = alist.c arbiters.c async.c backtrace.c boolean.c	\
     stackchk.c stacks.c stime.c strings.c srfi-4.c srfi-13.c srfi-14.c	\
     strorder.c strports.c struct.c symbols.c threads.c null-threads.c	\
     throw.c values.c variable.c vectors.c version.c vports.c weaks.c	\
-    ramap.c unif.c system.c c-tokenize.c
-
-DOT_X_FILES = alist.x arbiters.x async.x backtrace.x boolean.x chars.x	\
-    continuations.x debug.x deprecation.x deprecated.x discouraged.x	\
-    dynl.x dynwind.x environments.x eq.x error.x eval.x evalext.x	\
-    extensions.x feature.x fluids.x fports.x futures.x gc.x gc-mark.x	\
-    gc-segment.x gc-malloc.x gc-card.x goops.x gsubr.x guardians.x	\
-    hash.x hashtab.x hooks.x i18n.x init.x ioext.x keywords.x lang.x	\
-    list.x load.x macros.x mallocs.x modules.x numbers.x objects.x	\
-    objprop.x options.x pairs.x ports.x print.x procprop.x procs.x	\
-    properties.x random.x rdelim.x read.x root.x rw.x scmsigs.x		\
-    script.x simpos.x smob.x sort.x srcprop.x stackchk.x stacks.x	\
-    stime.x strings.x srfi-4.x srfi-13.x srfi-14.x strorder.x		\
-    strports.x struct.x symbols.x threads.x throw.x values.x		\
-    variable.x vectors.x version.x vports.x weaks.x ramap.x unif.x
-
-DOT_DOC_FILES = alist.doc arbiters.doc async.doc backtrace.doc		\
-    boolean.doc chars.doc continuations.doc debug.doc deprecation.doc	\
-    deprecated.doc discouraged.doc dynl.doc dynwind.doc			\
-    environments.doc eq.doc error.doc eval.doc evalext.doc		\
-    extensions.doc feature.doc fluids.doc fports.doc futures.doc	\
-    gc.doc goops.doc gsubr.doc gc-mark.doc gc-segment.doc		\
-    gc-malloc.doc gc-card.doc guardians.doc hash.doc hashtab.doc	\
-    hooks.doc i18n.doc init.doc ioext.doc keywords.doc lang.doc		\
-    list.doc load.doc macros.doc mallocs.doc modules.doc numbers.doc	\
-    objects.doc objprop.doc options.doc pairs.doc ports.doc print.doc	\
-    procprop.doc procs.doc properties.doc random.doc rdelim.doc		\
-    read.doc root.doc rw.doc scmsigs.doc script.doc simpos.doc		\
-    smob.doc sort.doc srcprop.doc stackchk.doc stacks.doc stime.doc	\
-    strings.doc srfi-4.doc srfi-13.doc srfi-14.doc strorder.doc		\
-    strports.doc struct.doc symbols.doc threads.doc throw.doc		\
-    values.doc variable.doc vectors.doc version.doc vports.doc		\
-    weaks.doc ramap.doc unif.doc
+    ramap.c unif.c system.c
 
 BUILT_SOURCES = cpp_err_symbols.c cpp_sig_symbols.c libpath.h \
-    version.h scmconfig.h \
-    $(DOT_X_FILES) $(EXTRA_DOT_X_FILES)
+    version.h scmconfig.h
 
 EXTRA_libguile_la_SOURCES = _scm.h		\
     inet_aton.c memmove.c putenv.c strerror.c	\
@@ -737,42 +685,31 @@ modinclude_HEADERS = __scm.h alist.h arbiters.h async.h backtrace.h	\
     variable.h vectors.h vports.h weaks.h system.h
 
 nodist_modinclude_HEADERS = version.h scmconfig.h
-bin_SCRIPTS = guile-snarf
-
-# We can re-enable install for some of these if/when they are documented
-# and people feel like maintaining them.  For now, this is not the case.
-noinst_SCRIPTS = guile-doc-snarf guile-snarf-docs guile-func-name-check
 EXTRA_DIST = ChangeLog-gh ChangeLog-scm ChangeLog-threads		\
     ChangeLog-1996-1999 ChangeLog-2000 ChangeLog-2008 cpp_signal.c	\
     cpp_errno.c cpp_err_symbols.in cpp_err_symbols.c			\
     cpp_sig_symbols.c cpp_sig_symbols.in cpp_cnvt.awk			\
-    c-tokenize.lex version.h.in						\
-    scmconfig.h.top gettext.h measure-hwm.scm
+    version.h.in scmconfig.h.top gettext.h measure-hwm.scm		\
+    guile-procedures.txt
 
-snarfcppopts = $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) $(CFLAGS)
-SUFFIXES = .x .doc
 preinstguile = $(top_builddir_absolute)/pre-inst-guile
 preinstguiletool = GUILE="$(preinstguile)" $(top_srcdir)/scripts
-alldotdocfiles = $(DOT_DOC_FILES) $(EXTRA_DOT_DOC_FILES)
-snarf2checkedtexi = GUILE="$(GUILE_FOR_BUILD)" $(top_srcdir)/scripts/snarf-check-and-output-texi
-dotdoc2texi = $(snarf2checkedtexi) all.doc
 schemelibdir = $(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)
 schemelib_DATA = guile-procedures.txt
-MKDEP = gcc -M -MG $(DEFS) $(AM_CPPFLAGS) $(CPPFLAGS) $(CFLAGS)
 MOSTLYCLEANFILES = \
 	cpp_err_symbols_here cpp_err_symbols_diff cpp_err_symbols_new \
 	cpp_sig_symbols_here cpp_sig_symbols_diff cpp_sig_symbols_new \
 	version.h version.h.tmp \
 	scmconfig.h scmconfig.h.tmp stack-limit-calibration.scm
 
-CLEANFILES = libpath.h *.x *.doc guile-procedures.txt guile-procedures.texi guile.texi \
+CLEANFILES = libpath.h \
 	stack-limit-calibration.scm.trs stack-limit-calibration.scm.log
 
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .x .doc .c .lo .o .obj
+.SUFFIXES: .c .lo .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/am/pre-inst-guile $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -804,14 +741,6 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
 gen-scmconfig.h: $(top_builddir)/config.status $(srcdir)/gen-scmconfig.h.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-guile-snarf: $(top_builddir)/config.status $(srcdir)/guile-snarf.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-guile-doc-snarf: $(top_builddir)/config.status $(srcdir)/guile-doc-snarf.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-guile-func-name-check: $(top_builddir)/config.status $(srcdir)/guile-func-name-check.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-guile-snarf-docs: $(top_builddir)/config.status $(srcdir)/guile-snarf-docs.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
@@ -901,41 +830,6 @@ libguile.la: $(libguile_la_OBJECTS) $(libguile_la_DEPENDENCIES) $(EXTRA_libguile
 guile$(EXEEXT): $(guile_OBJECTS) $(guile_DEPENDENCIES) $(EXTRA_guile_DEPENDENCIES) 
 	@rm -f guile$(EXEEXT)
 	$(AM_V_CCLD)$(guile_LINK) $(guile_OBJECTS) $(guile_LDADD) $(LIBS)
-install-binSCRIPTS: $(bin_SCRIPTS)
-	@$(NORMAL_INSTALL)
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
-	done | \
-	sed -e 'p;s,.*/,,;n' \
-	    -e 'h;s|.*|.|' \
-	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
-	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
-	      if (++n[d] == $(am__install_max)) { \
-		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
-	    else { print "f", d "/" $$4, $$1 } } \
-	  END { for (d in files) print "f", d, files[d] }' | \
-	while read type dir files; do \
-	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
-	     } \
-	; done
-
-uninstall-binSCRIPTS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
-	files=`for p in $$list; do echo "$$p"; done | \
-	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -943,7 +837,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c-tokenize.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gen-scmconfig.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/guile-guile.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-alist.Plo@am__quote@ # am--include-marker
@@ -951,7 +844,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-async.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-backtrace.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-boolean.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-c-tokenize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-chars.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-continuations.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-convert.Plo@am__quote@ # am--include-marker
@@ -1781,13 +1673,6 @@ libguile_la-system.lo: system.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libguile_la_CFLAGS) $(CFLAGS) -c -o libguile_la-system.lo `test -f 'system.c' || echo '$(srcdir)/'`system.c
 
-libguile_la-c-tokenize.lo: c-tokenize.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libguile_la_CFLAGS) $(CFLAGS) -MT libguile_la-c-tokenize.lo -MD -MP -MF $(DEPDIR)/libguile_la-c-tokenize.Tpo -c -o libguile_la-c-tokenize.lo `test -f 'c-tokenize.c' || echo '$(srcdir)/'`c-tokenize.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libguile_la-c-tokenize.Tpo $(DEPDIR)/libguile_la-c-tokenize.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='c-tokenize.c' object='libguile_la-c-tokenize.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libguile_la_CFLAGS) $(CFLAGS) -c -o libguile_la-c-tokenize.lo `test -f 'c-tokenize.c' || echo '$(srcdir)/'`c-tokenize.c
-
 libguile_la-inet_aton.lo: inet_aton.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libguile_la_CFLAGS) $(CFLAGS) -MT libguile_la-inet_aton.lo -MD -MP -MF $(DEPDIR)/libguile_la-inet_aton.Tpo -c -o libguile_la-inet_aton.lo `test -f 'inet_aton.c' || echo '$(srcdir)/'`inet_aton.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libguile_la-inet_aton.Tpo $(DEPDIR)/libguile_la-inet_aton.Plo
@@ -2078,12 +1963,11 @@ check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) check-local
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
-all-am: Makefile $(PROGRAMS) $(LTLIBRARIES) $(SCRIPTS) $(DATA) \
-		$(HEADERS)
+all-am: Makefile $(PROGRAMS) $(LTLIBRARIES) $(DATA) $(HEADERS)
 install-binPROGRAMS: install-libLTLIBRARIES
 
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(schemelibdir)" "$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(pkgincludedir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" "$(DESTDIR)$(schemelibdir)" "$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -2127,7 +2011,6 @@ clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool clean-noinstPROGRAMS mostlyclean-am
 
 distclean: distclean-am
-	-rm -f ./$(DEPDIR)/c-tokenize.Po
 	-rm -f ./$(DEPDIR)/gen-scmconfig.Po
 	-rm -f ./$(DEPDIR)/guile-guile.Po
 	-rm -f ./$(DEPDIR)/libguile_la-alist.Plo
@@ -2135,7 +2018,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libguile_la-async.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-backtrace.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-boolean.Plo
-	-rm -f ./$(DEPDIR)/libguile_la-c-tokenize.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-chars.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-continuations.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-convert.Plo
@@ -2268,8 +2150,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS install-binSCRIPTS \
-	install-libLTLIBRARIES
+install-exec-am: install-binPROGRAMS install-libLTLIBRARIES
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
 install-html: install-html-am
@@ -2293,7 +2174,6 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -f ./$(DEPDIR)/c-tokenize.Po
 	-rm -f ./$(DEPDIR)/gen-scmconfig.Po
 	-rm -f ./$(DEPDIR)/guile-guile.Po
 	-rm -f ./$(DEPDIR)/libguile_la-alist.Plo
@@ -2301,7 +2181,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libguile_la-async.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-backtrace.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-boolean.Plo
-	-rm -f ./$(DEPDIR)/libguile_la-c-tokenize.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-chars.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-continuations.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-convert.Plo
@@ -2426,10 +2305,9 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
-	uninstall-libLTLIBRARIES uninstall-modincludeHEADERS \
-	uninstall-nodist_modincludeHEADERS uninstall-pkgincludeHEADERS \
-	uninstall-schemelibDATA
+uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES \
+	uninstall-modincludeHEADERS uninstall-nodist_modincludeHEADERS \
+	uninstall-pkgincludeHEADERS uninstall-schemelibDATA
 
 .MAKE: all check check-am install install-am install-exec \
 	install-exec-am install-strip
@@ -2440,11 +2318,10 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	cscopelist-am ctags ctags-am distclean distclean-compile \
 	distclean-generic distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-binSCRIPTS install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-exec-hook install-html install-html-am \
-	install-info install-info-am install-libLTLIBRARIES \
-	install-man install-modincludeHEADERS \
+	install-binPROGRAMS install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-exec-hook \
+	install-html install-html-am install-info install-info-am \
+	install-libLTLIBRARIES install-man install-modincludeHEADERS \
 	install-nodist_modincludeHEADERS install-pdf install-pdf-am \
 	install-pkgincludeHEADERS install-ps install-ps-am \
 	install-schemelibDATA install-strip installcheck \
@@ -2452,9 +2329,9 @@ uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
-	uninstall-binSCRIPTS uninstall-libLTLIBRARIES \
-	uninstall-modincludeHEADERS uninstall-nodist_modincludeHEADERS \
-	uninstall-pkgincludeHEADERS uninstall-schemelibDATA
+	uninstall-libLTLIBRARIES uninstall-modincludeHEADERS \
+	uninstall-nodist_modincludeHEADERS uninstall-pkgincludeHEADERS \
+	uninstall-schemelibDATA
 
 .PRECIOUS: Makefile
 
@@ -2482,18 +2359,8 @@ scmconfig.h: ${top_builddir}/config.h gen-scmconfig$(EXEEXT)
 	rm -f scmconfig.h
 	mv scmconfig.h.tmp scmconfig.h
 
-guile_filter_doc_snarfage$(EXEEXT): $(guile_filter_doc_snarfage_OBJECTS) $(guile_filter_doc_snarfage_DEPENDENCIES) 
-	@rm -f guile_filter_doc_snarfage$(EXEEXT)
-	if [ "$(cross_compiling)" = "yes" ]; then \
-		$(CCLD_FOR_BUILD) -o $@ $(guile_filter_doc_snarfage_SOURCES); \
-	else \
-		$(LINK) $(guile_filter_doc_snarfage_OBJECTS) $(LDADD) $(LIBS); \
-	fi
-
 install-exec-hook:
 	rm -f $(DESTDIR)$(bindir)/guile-snarf.awk
-#    $(DOT_DOC_FILES) $(EXTRA_DOT_DOC_FILES) \
-#    guile-procedures.txt guile.texi
 
 version.h: version.h.in
 	sed < $(srcdir)/version.h.in > $@.tmp \
@@ -2537,36 +2404,6 @@ libpath.h: $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	@echo '	{ "buildstamp",    "'"`date`"'" }, \' >> libpath.tmp
 	@echo '}' >> libpath.tmp
 	@mv libpath.tmp libpath.h
-.c.x:
-	./guile-snarf -o $@ $< $(snarfcppopts)
-.c.doc:
-	-$(AWK) -f ./guile-func-name-check $<
-	(./guile-snarf-docs $(snarfcppopts) $< | \
-	./guile_filter_doc_snarfage$(EXEEXT) --filter-snarfage) > $@ || { rm $@; false; }
-
-$(DOT_X_FILES) $(EXTRA_DOT_X_FILES): scmconfig.h snarf.h guile-snarf.in
-
-$(DOT_DOC_FILES) $(EXTRA_DOT_DOC_FILES): scmconfig.h snarf.h guile-snarf-docs.in guile_filter_doc_snarfage$(EXEEXT)
-
-error.x: cpp_err_symbols.c
-posix.x: cpp_sig_symbols.c
-load.x: libpath.h
-
-all.doc: $(alldotdocfiles)
-	cat $(alldotdocfiles) > all.doc
-
-guile.texi: all.doc guile$(EXEEXT)
-	$(dotdoc2texi) --manual > $@ || { rm $@; false; }
-
-guile-procedures.texi: all.doc guile$(EXEEXT)
-	$(dotdoc2texi)          > $@ || { rm $@; false; }
-
-@HAVE_MAKEINFO_TRUE@guile-procedures.txt: guile-procedures.texi
-@HAVE_MAKEINFO_TRUE@	rm -f $@
-@HAVE_MAKEINFO_TRUE@	makeinfo --force --no-warn --no-validate --paragraph-indent=asis -o $@ guile-procedures.texi || test -f $@
-
-@HAVE_MAKEINFO_FALSE@guile-procedures.txt: guile-procedures.texi
-@HAVE_MAKEINFO_FALSE@	cp guile-procedures.texi $@
 
 # Stack limit calibration for `make check'.  (For why we do this, see
 # the comments in measure-hwm.scm.)  We're relying here on a couple of
@@ -2591,9 +2428,6 @@ stack-limit-calibration.scm: measure-hwm.scm guile$(EXEEXT)
 	$(preinstguile) -s $(srcdir)/measure-hwm.scm > $@
 
 check-local: stack-limit-calibration.scm
-
-c-tokenize.c: c-tokenize.lex
-	flex -t $(srcdir)/c-tokenize.lex > $@ || { rm $@; false; }
 
 cpp_err_symbols.c: cpp_err_symbols.in cpp_cnvt.awk
 	$(AWK) -f $(srcdir)/cpp_cnvt.awk < $(srcdir)/cpp_err_symbols.in > \

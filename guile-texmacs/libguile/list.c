@@ -935,7 +935,39 @@ SCM_DEFINE (scm_filter_x, "filter!", 2, 0, 0,
 void
 scm_init_list ()
 {
-#include "libguile/list.x"
+ scm_c_define_gsubr (s_scm_make_list, 1, 1, 0, (SCM (*)()) scm_make_list); ;
+ scm_c_define_gsubr (s_scm_cons_star, 1, 0, 1, (SCM (*)()) scm_cons_star); ;
+ scm_c_define_gsubr (s_scm_null_p, 1, 0, 0, (SCM (*)()) scm_null_p); ;
+ scm_c_define_gsubr (s_scm_list_p, 1, 0, 0, (SCM (*)()) scm_list_p); ;
+ scm_c_define_gsubr (s_scm_length, 1, 0, 0, (SCM (*)()) scm_length); ;
+ scm_c_define_gsubr (s_scm_append, 0, 0, 1, (SCM (*)()) scm_append); ;
+ scm_c_define_gsubr (s_scm_append_x, 0, 0, 1, (SCM (*)()) scm_append_x); ;
+ scm_c_define_gsubr (s_scm_last_pair, 1, 0, 0, (SCM (*)()) scm_last_pair); ;
+ scm_c_define_gsubr (s_scm_reverse, 1, 0, 0, (SCM (*)()) scm_reverse); ;
+ scm_c_define_gsubr (s_scm_reverse_x, 1, 1, 0, (SCM (*)()) scm_reverse_x); ;
+ scm_c_define_gsubr (s_scm_list_ref, 2, 0, 0, (SCM (*)()) scm_list_ref); ;
+ scm_c_define_gsubr (s_scm_list_set_x, 3, 0, 0, (SCM (*)()) scm_list_set_x); ;
+ scm_c_define_gsubr (s_list_cdr_ref, 2, 0, 0, (SCM (*)()) scm_list_tail); ;
+ scm_c_define_gsubr (s_scm_list_tail, 2, 0, 0, (SCM (*)()) scm_list_tail); ;
+ scm_c_define_gsubr (s_scm_list_cdr_set_x, 3, 0, 0, (SCM (*)()) scm_list_cdr_set_x); ;
+ scm_c_define_gsubr (s_scm_list_head, 2, 0, 0, (SCM (*)()) scm_list_head); ;
+ scm_c_define_gsubr (s_scm_list_copy, 1, 0, 0, (SCM (*)()) scm_list_copy); ;
+ scm_c_define_gsubr (s_list, 0, 0, 1, (SCM (*)()) scm_list_copy) ;
+ scm_c_define_gsubr (s_scm_memq, 2, 0, 0, (SCM (*)()) scm_memq); ;
+ scm_c_define_gsubr (s_scm_memv, 2, 0, 0, (SCM (*)()) scm_memv); ;
+ scm_c_define_gsubr (s_scm_member, 2, 0, 0, (SCM (*)()) scm_member); ;
+ scm_c_define_gsubr (s_scm_delq_x, 2, 0, 0, (SCM (*)()) scm_delq_x); ;
+ scm_c_define_gsubr (s_scm_delv_x, 2, 0, 0, (SCM (*)()) scm_delv_x); ;
+ scm_c_define_gsubr (s_scm_delete_x, 2, 0, 0, (SCM (*)()) scm_delete_x); ;
+ scm_c_define_gsubr (s_scm_delq, 2, 0, 0, (SCM (*)()) scm_delq); ;
+ scm_c_define_gsubr (s_scm_delv, 2, 0, 0, (SCM (*)()) scm_delv); ;
+ scm_c_define_gsubr (s_scm_delete, 2, 0, 0, (SCM (*)()) scm_delete); ;
+ scm_c_define_gsubr (s_scm_delq1_x, 2, 0, 0, (SCM (*)()) scm_delq1_x); ;
+ scm_c_define_gsubr (s_scm_delv1_x, 2, 0, 0, (SCM (*)()) scm_delv1_x); ;
+ scm_c_define_gsubr (s_scm_delete1_x, 2, 0, 0, (SCM (*)()) scm_delete1_x); ;
+ scm_c_define_gsubr (s_scm_filter, 2, 0, 0, (SCM (*)()) scm_filter); ;
+ scm_c_define_gsubr (s_scm_filter_x, 2, 0, 0, (SCM (*)()) scm_filter_x); ;
+
 }
 
 /*

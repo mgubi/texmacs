@@ -204,5 +204,20 @@ libtest_asmobs_init ()
   scm_set_smob_apply (asmob021, apply3, 0, 2, 1);
   asmob111 = scm_make_smob_type ("asmob111", 0);
   scm_set_smob_apply (asmob111, apply3, 1, 1, 1);
-# include "test-asmobs-lib.x"
+  scm_c_define_gsubr (s_scm_make_asmob000, 0, 0, 0, (SCM (*)()) scm_make_asmob000);
+  scm_c_define_gsubr (s_scm_make_asmob100, 0, 0, 0, (SCM (*)()) scm_make_asmob100);
+  scm_c_define_gsubr (s_scm_make_asmob010, 0, 0, 0, (SCM (*)()) scm_make_asmob010);
+  scm_c_define_gsubr (s_scm_make_asmob001, 0, 0, 0, (SCM (*)()) scm_make_asmob001);
+  scm_c_define_gsubr (s_scm_make_asmob200, 0, 0, 0, (SCM (*)()) scm_make_asmob200);
+  scm_c_define_gsubr (s_scm_make_asmob110, 0, 0, 0, (SCM (*)()) scm_make_asmob110);
+  scm_c_define_gsubr (s_scm_make_asmob020, 0, 0, 0, (SCM (*)()) scm_make_asmob020);
+  scm_c_define_gsubr (s_scm_make_asmob101, 0, 0, 0, (SCM (*)()) scm_make_asmob101);
+  scm_c_define_gsubr (s_scm_make_asmob011, 0, 0, 0, (SCM (*)()) scm_make_asmob011);
+  scm_c_define_gsubr (s_scm_make_asmob300, 0, 0, 0, (SCM (*)()) scm_make_asmob300);
+  scm_c_define_gsubr (s_scm_make_asmob210, 0, 0, 0, (SCM (*)()) scm_make_asmob210);
+  scm_c_define_gsubr (s_scm_make_asmob120, 0, 0, 0, (SCM (*)()) scm_make_asmob120);
+  scm_c_define_gsubr (s_scm_make_asmob030, 0, 0, 0, (SCM (*)()) scm_make_asmob030);
+  scm_c_define_gsubr (s_scm_make_asmob201, 0, 0, 0, (SCM (*)()) scm_make_asmob201);
+  scm_c_define_gsubr (s_scm_make_asmob021, 0, 0, 0, (SCM (*)()) scm_make_asmob021);
+  scm_c_define_gsubr (s_scm_make_asmob111, 0, 0, 0, (SCM (*)()) scm_make_asmob111);
 }
