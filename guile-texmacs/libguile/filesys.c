@@ -1772,7 +1772,9 @@ scm_init_filesys ()
  scm_c_define_gsubr (s_scm_closedir, 1, 0, 0, (SCM (*)()) scm_closedir); ;
  scm_c_define_gsubr (s_scm_chdir, 1, 0, 0, (SCM (*)()) scm_chdir); ;
  scm_c_define_gsubr (s_scm_getcwd, 0, 0, 0, (SCM (*)()) scm_getcwd); ;
+#ifdef HAVE_SELECT
  scm_c_define_gsubr (s_scm_select, 3, 2, 0, (SCM (*)()) scm_select); ;
+#endif
  scm_c_define_gsubr (s_scm_fsync, 1, 0, 0, (SCM (*)()) scm_fsync); ;
  scm_c_define_gsubr (s_scm_copy_file, 2, 0, 0, (SCM (*)()) scm_copy_file); ;
  scm_c_define_gsubr (s_scm_dirname, 1, 0, 0, (SCM (*)()) scm_dirname); ;

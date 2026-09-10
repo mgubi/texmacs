@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+include(CMakeFindDependencyMacro)
+find_dependency(GMP REQUIRED)
+find_dependency(Math REQUIRED)
+find_dependency(Threads REQUIRED)
+if(@LTDL_FOUND@)
+    find_dependency(LTDL REQUIRED)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/guileTargets.cmake")
+check_required_components(guile)
+

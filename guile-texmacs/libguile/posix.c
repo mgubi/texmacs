@@ -2141,7 +2141,9 @@ scm_init_posix ()
  scm_c_define_gsubr (s_scm_setlocale, 1, 1, 0, (SCM (*)()) scm_setlocale); ;
  scm_c_define_gsubr (s_scm_getlogin, 0, 0, 0, (SCM (*)()) scm_getlogin); ;
  scm_c_define_gsubr (s_scm_flock, 2, 0, 0, (SCM (*)()) scm_flock); ;
+#if HAVE_GETHOSTNAME
  scm_c_define_gsubr (s_scm_gethostname, 0, 0, 0, (SCM (*)()) scm_gethostname); ;
+#endif
 
 }
 
