@@ -26,13 +26,13 @@ Boston, MA 02110-1301, USA.
 ]])
 
 AC_PREREQ([2.71])
-# Modified from version 1.8.8, see ChangeLog file
+# Modified from version 1.8.8.
 AC_INIT([guile-texmacs],[1.8.8],[bugs@texmacs.org])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(GUILE-VERSION)
 
-AM_INIT_AUTOMAKE([gnu no-define -Wall -Wno-override])
+AM_INIT_AUTOMAKE([foreign no-define -Wall -Wno-override])
 AM_MAINTAINER_MODE
 
 AC_COPYRIGHT(GUILE_CONFIGURE_COPYRIGHT)
@@ -947,17 +947,6 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]],
   [],
   [AC_MSG_ERROR([At least GNU MP 4.1 is required, see README])])
 
-# i18n tests
-#AC_CHECK_HEADERS([libintl.h])
-#AC_CHECK_FUNCS(gettext)
-#if test $ac_cv_func_gettext = no; then
-#   AC_CHECK_LIB(intl, gettext)
-#fi
-#AC_CHECK_FUNCS([bindtextdomain textdomain])
-AM_GNU_GETTEXT([external], [need-ngettext])
-AM_GNU_GETTEXT_VERSION([0.20])
-LIBS="$LIBINTL $LIBS"
-
 ### Some systems don't declare some functions.  On such systems, we
 ### need to at least provide our own K&R-style declarations.
 
@@ -1820,14 +1809,11 @@ AC_CONFIG_FILES([libguile/scmconfig.h])
 AC_CONFIG_FILES([
   Makefile
   am/Makefile
-  benchmark-suite/Makefile
   doc/Makefile
   doc/goops/Makefile
   doc/r5rs/Makefile
   doc/ref/Makefile
   doc/tutorial/Makefile
-  emacs/Makefile
-  examples/Makefile
   guile-config/Makefile
   ice-9/Makefile
   lang/Makefile
@@ -1836,20 +1822,12 @@ AC_CONFIG_FILES([
   oop/goops/Makefile
   scripts/Makefile
   srfi/Makefile
-  test-suite/Makefile
-  test-suite/standalone/Makefile
 ])
 
 AC_CONFIG_FILES([guile-1.8.pc])
-AC_CONFIG_FILES([check-guile], [chmod +x check-guile])
-AC_CONFIG_FILES([benchmark-guile], [chmod +x benchmark-guile])
 AC_CONFIG_FILES([guile-tools], [chmod +x guile-tools])
 AC_CONFIG_FILES([pre-inst-guile], [chmod +x pre-inst-guile])
 AC_CONFIG_FILES([pre-inst-guile-env], [chmod +x pre-inst-guile-env])
-AC_CONFIG_FILES([test-suite/standalone/test-use-srfi],
-                [chmod +x test-suite/standalone/test-use-srfi])
-AC_CONFIG_FILES([test-suite/standalone/test-fast-slot-ref],
-                [chmod +x test-suite/standalone/test-fast-slot-ref])
 
 AC_OUTPUT
 

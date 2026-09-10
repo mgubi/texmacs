@@ -175,30 +175,6 @@ libpath.h: $(srcdir)/Makefile.in  $(top_builddir)/config.status
 
 include $(top_srcdir)/am/pre-inst-guile
 
-# Stack limit calibration for `make check'.  (For why we do this, see
-# the comments in measure-hwm.scm.)  We're relying here on a couple of
-# bits of Automake magic.
-#
-# 1. The fact that "libguile" comes before "test-suite" in SUBDIRS in
-# our toplevel Makefile.am.  This ensures that the
-# stack-limit-calibration.scm "test" will be run before any of the
-# tests under test-suite.
-#
-# 2. The fact that each test is invoked as $TESTS_ENVIRONMENT $test.
-# This allows us to ensure that the test will be considered to have
-# passed, by using `true' as TESTS_ENVIRONMENT.
-#
-# Why don't we care about the test "actually passing"?  Because the
-# important thing about stack-limit-calibration.scm is just that it is
-# generated in the first place, so that other tests under test-suite
-# can use it.
-
-stack-limit-calibration.scm: measure-hwm.scm guile$(EXEEXT)
-	rm -f stack-limit-calibration.scm
-	$(preinstguile) -s $(srcdir)/measure-hwm.scm > $@
-
-check-local: stack-limit-calibration.scm
-
 schemelibdir = $(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)
 schemelib_DATA = guile-procedures.txt
 
@@ -246,10 +222,8 @@ check_errnos:
 MOSTLYCLEANFILES = \
 	cpp_err_symbols_here cpp_err_symbols_diff cpp_err_symbols_new \
 	cpp_sig_symbols_here cpp_sig_symbols_diff cpp_sig_symbols_new \
-	version.h version.h.tmp \
-	stack-limit-calibration.scm
+	version.h version.h.tmp
 
-CLEANFILES = libpath.h \
-	stack-limit-calibration.scm.trs stack-limit-calibration.scm.log
+CLEANFILES = libpath.h
 
 
