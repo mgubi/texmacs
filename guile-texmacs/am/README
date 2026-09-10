@@ -1,3 +1,0 @@
-data directory: automake frags
-
-do not name files using extension ".am", as automake is overzealous sometimes.

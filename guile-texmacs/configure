@@ -743,7 +743,6 @@ GUILE_EFFECTIVE_VERSION
 GUILE_MICRO_VERSION
 GUILE_MINOR_VERSION
 GUILE_MAJOR_VERSION
-GUILE_FOR_BUILD
 HOST_CC
 CCLD_FOR_BUILD
 CC_FOR_BUILD
@@ -966,8 +965,7 @@ CPP
 LT_SYS_LIBRARY_PATH
 EMACS
 EMACSLOADPATH
-CC_FOR_BUILD
-GUILE_FOR_BUILD'
+CC_FOR_BUILD'
 
 
 # Initialize some variables set by options.
@@ -1653,8 +1651,6 @@ Some influential environment variables:
               the Emacs library search path
   CC_FOR_BUILD
               build system C compiler
-  GUILE_FOR_BUILD
-              guile for build system
 
 Use these variables to override the choices made by 'configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -22130,23 +22126,6 @@ CCLD_FOR_BUILD="$CC_FOR_BUILD"
 HOST_CC="$CC_FOR_BUILD"
 
 
-if test "$cross_compiling" = "yes"; then
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking guile for build" >&5
-printf %s "checking guile for build... " >&6; }
-  GUILE_FOR_BUILD="${GUILE_FOR_BUILD-guile}"
-else
-  GUILE_FOR_BUILD='$(preinstguile)'
-fi
-
-## AC_MSG_CHECKING("if we are cross compiling")
-## AC_MSG_RESULT($cross_compiling)
-if test "$cross_compiling" = "yes"; then
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $GUILE_FOR_BUILD" >&5
-printf "%s\n" "$GUILE_FOR_BUILD" >&6; }
-fi
-
-
-
 ## If we're using GCC, ask for aggressive warnings.
 case "$GCC" in
   yes )
@@ -22418,16 +22397,12 @@ fi
 ac_config_files="$ac_config_files libguile/scmconfig.h"
 
 
-ac_config_files="$ac_config_files Makefile am/Makefile doc/Makefile doc/goops/Makefile doc/r5rs/Makefile doc/ref/Makefile doc/tutorial/Makefile guile-config/Makefile ice-9/Makefile lang/Makefile libguile/Makefile oop/Makefile oop/goops/Makefile scripts/Makefile srfi/Makefile"
+ac_config_files="$ac_config_files Makefile doc/Makefile doc/goops/Makefile doc/r5rs/Makefile doc/ref/Makefile doc/tutorial/Makefile guile-config/Makefile ice-9/Makefile lang/Makefile libguile/Makefile oop/Makefile oop/goops/Makefile scripts/Makefile srfi/Makefile"
 
 
 ac_config_files="$ac_config_files guile-1.8.pc"
 
 ac_config_files="$ac_config_files guile-tools"
-
-ac_config_files="$ac_config_files pre-inst-guile"
-
-ac_config_files="$ac_config_files pre-inst-guile-env"
 
 
 cat >confcache <<\_ACEOF
@@ -23470,7 +23445,6 @@ do
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "libguile/scmconfig.h") CONFIG_FILES="$CONFIG_FILES libguile/scmconfig.h" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "am/Makefile") CONFIG_FILES="$CONFIG_FILES am/Makefile" ;;
     "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
     "doc/goops/Makefile") CONFIG_FILES="$CONFIG_FILES doc/goops/Makefile" ;;
     "doc/r5rs/Makefile") CONFIG_FILES="$CONFIG_FILES doc/r5rs/Makefile" ;;
@@ -23486,8 +23460,6 @@ do
     "srfi/Makefile") CONFIG_FILES="$CONFIG_FILES srfi/Makefile" ;;
     "guile-1.8.pc") CONFIG_FILES="$CONFIG_FILES guile-1.8.pc" ;;
     "guile-tools") CONFIG_FILES="$CONFIG_FILES guile-tools" ;;
-    "pre-inst-guile") CONFIG_FILES="$CONFIG_FILES pre-inst-guile" ;;
-    "pre-inst-guile-env") CONFIG_FILES="$CONFIG_FILES pre-inst-guile-env" ;;
 
   *) as_fn_error $? "invalid argument: '$ac_config_target'" "$LINENO" 5;;
   esac
@@ -24732,8 +24704,6 @@ ltmain=$ac_aux_dir/ltmain.sh
 
  ;;
     "guile-tools":F) chmod +x guile-tools ;;
-    "pre-inst-guile":F) chmod +x pre-inst-guile ;;
-    "pre-inst-guile-env":F) chmod +x pre-inst-guile-env ;;
 
   esac
 done # for ac_tag

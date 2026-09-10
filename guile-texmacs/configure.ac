@@ -1522,21 +1522,6 @@ AC_SUBST(CCLD_FOR_BUILD)
 HOST_CC="$CC_FOR_BUILD"
 AC_SUBST(HOST_CC)
 
-if test "$cross_compiling" = "yes"; then
-  AC_MSG_CHECKING(guile for build)
-  GUILE_FOR_BUILD="${GUILE_FOR_BUILD-guile}"
-else
-  GUILE_FOR_BUILD='$(preinstguile)'
-fi   
-
-## AC_MSG_CHECKING("if we are cross compiling")
-## AC_MSG_RESULT($cross_compiling)
-if test "$cross_compiling" = "yes"; then
-   AC_MSG_RESULT($GUILE_FOR_BUILD)
-fi
-AC_ARG_VAR(GUILE_FOR_BUILD,[guile for build system])
-AC_SUBST(GUILE_FOR_BUILD)
-  			
 ## If we're using GCC, ask for aggressive warnings.
 case "$GCC" in
   yes )
@@ -1808,7 +1793,6 @@ AC_CONFIG_FILES([libguile/scmconfig.h])
 
 AC_CONFIG_FILES([
   Makefile
-  am/Makefile
   doc/Makefile
   doc/goops/Makefile
   doc/r5rs/Makefile
@@ -1826,8 +1810,6 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_FILES([guile-1.8.pc])
 AC_CONFIG_FILES([guile-tools], [chmod +x guile-tools])
-AC_CONFIG_FILES([pre-inst-guile], [chmod +x pre-inst-guile])
-AC_CONFIG_FILES([pre-inst-guile-env], [chmod +x pre-inst-guile-env])
 
 AC_OUTPUT
 

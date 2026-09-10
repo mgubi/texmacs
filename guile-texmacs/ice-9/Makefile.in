@@ -168,8 +168,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(top_srcdir)/am/pre-inst-guile README
+am__DIST_COMMON = $(srcdir)/Makefile.in README
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 ALLOCA = @ALLOCA@
@@ -210,7 +209,6 @@ FILECMD = @FILECMD@
 GREP = @GREP@
 GUILE_CFLAGS = @GUILE_CFLAGS@
 GUILE_EFFECTIVE_VERSION = @GUILE_EFFECTIVE_VERSION@
-GUILE_FOR_BUILD = @GUILE_FOR_BUILD@
 GUILE_LIBS = @GUILE_LIBS@
 GUILE_MAJOR_VERSION = @GUILE_MAJOR_VERSION@
 GUILE_MICRO_VERSION = @GUILE_MICRO_VERSION@
@@ -442,15 +440,13 @@ nobase_subpkgdata_DATA = \
   $(ice9_sources) $(ice9_debugger_sources) $(ice9_debugging_sources)
 
 TAGS_FILES = $(nobase_subpkgdata_DATA)
-EXTRA_DIST = test.scm compile-psyntax.scm ChangeLog-2008		\
+EXTRA_DIST = test.scm ChangeLog-2008		\
   $(ice9_sources) $(ice9_debugger_sources) $(ice9_debugging_sources)
 
-preinstguile = $(top_builddir_absolute)/pre-inst-guile
-preinstguiletool = GUILE="$(preinstguile)" $(top_srcdir)/scripts
 all: all-am
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/am/pre-inst-guile $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -470,7 +466,6 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles);; \
 	esac;
-$(top_srcdir)/am/pre-inst-guile $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -716,15 +711,6 @@ uninstall-am: uninstall-nobase_subpkgdataDATA
 
 .PRECIOUS: Makefile
 
-
-# We expect this to never be invoked when there is not already
-# ice-9/psyntax.pp in %load-path, since compile-psyntax.scm depends
-# on ice-9/syncase.scm, which does `(load-from-path "ice-9/psyntax.pp")'.
-# In other words, to bootstrap this file, you need to do something like:
-#    GUILE_LOAD_PATH=/usr/local/share/guile/1.5.4 make psyntax.pp
-psyntax.pp: psyntax.ss
-	$(preinstguile) -s $(srcdir)/compile-psyntax.scm \
-		$(srcdir)/psyntax.ss $(srcdir)/psyntax.pp
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

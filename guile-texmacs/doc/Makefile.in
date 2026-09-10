@@ -186,8 +186,8 @@ am__define_uniq_tagged_files = \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
 DIST_SUBDIRS = $(SUBDIRS)
-am__DIST_COMMON = $(dist_man1_MANS) $(srcdir)/Makefile.in \
-	$(top_srcdir)/am/maintainer-dirs NEWS README THANKS
+am__DIST_COMMON = $(dist_man1_MANS) $(srcdir)/Makefile.in NEWS README \
+	THANKS
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -253,7 +253,6 @@ FILECMD = @FILECMD@
 GREP = @GREP@
 GUILE_CFLAGS = @GUILE_CFLAGS@
 GUILE_EFFECTIVE_VERSION = @GUILE_EFFECTIVE_VERSION@
-GUILE_FOR_BUILD = @GUILE_FOR_BUILD@
 GUILE_LIBS = @GUILE_LIBS@
 GUILE_MAJOR_VERSION = @GUILE_MAJOR_VERSION@
 GUILE_MICRO_VERSION = @GUILE_MICRO_VERSION@
@@ -461,12 +460,10 @@ EXAMPLE_SMOB_FILES = \
 
 OLDFMT = oldfmt.c
 EXTRA_DIST = groupings.alist ChangeLog-2008 # guile-api.alist
-workbook = $(top_srcdir_absolute)/../workbook
-mscripts = $(top_srcdir_absolute)/../scripts
 all: all-recursive
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/am/maintainer-dirs $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -486,7 +483,6 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles);; \
 	esac;
-$(top_srcdir)/am/maintainer-dirs $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh

@@ -21,7 +21,7 @@
 
 AUTOMAKE_OPTIONS = 1.10 foreign
 
-SUBDIRS = oop libguile ice-9 guile-config scripts srfi doc lang am
+SUBDIRS = oop libguile ice-9 guile-config scripts srfi doc lang
 
 DIST_SUBDIRS = $(SUBDIRS)
 

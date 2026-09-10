@@ -53,16 +53,7 @@ nobase_subpkgdata_DATA =						\
 TAGS_FILES = $(nobase_subpkgdata_DATA)
 
 ## test.scm is not currently installed.
-EXTRA_DIST = test.scm compile-psyntax.scm ChangeLog-2008		\
+EXTRA_DIST = test.scm ChangeLog-2008		\
   $(ice9_sources) $(ice9_debugger_sources) $(ice9_debugging_sources)
 
-# We expect this to never be invoked when there is not already
-# ice-9/psyntax.pp in %load-path, since compile-psyntax.scm depends
-# on ice-9/syncase.scm, which does `(load-from-path "ice-9/psyntax.pp")'.
-# In other words, to bootstrap this file, you need to do something like:
-#    GUILE_LOAD_PATH=/usr/local/share/guile/1.5.4 make psyntax.pp
-include $(top_srcdir)/am/pre-inst-guile
-psyntax.pp: psyntax.ss
-	$(preinstguile) -s $(srcdir)/compile-psyntax.scm \
-		$(srcdir)/psyntax.ss $(srcdir)/psyntax.pp
 

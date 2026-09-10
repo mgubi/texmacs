@@ -93,7 +93,7 @@ noinst_HEADERS = convert.i.c					\
 
 libguile_la_DEPENDENCIES = @LIBLOBJS@
 libguile_la_LIBADD = @LIBLOBJS@
-libguile_la_LDFLAGS = @LTLIBINTL@ -version-info @LIBGUILE_INTERFACE_CURRENT@:@LIBGUILE_INTERFACE_REVISION@:@LIBGUILE_INTERFACE_AGE@ -export-dynamic -no-undefined
+libguile_la_LDFLAGS = -version-info @LIBGUILE_INTERFACE_CURRENT@:@LIBGUILE_INTERFACE_REVISION@:@LIBGUILE_INTERFACE_AGE@ -export-dynamic -no-undefined
 
 # These are headers visible as <guile/mumble.h>
 pkginclude_HEADERS = gh.h
@@ -173,7 +173,6 @@ libpath.h: $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	@echo '}' >> libpath.tmp
 	@mv libpath.tmp libpath.h
 
-include $(top_srcdir)/am/pre-inst-guile
 
 schemelibdir = $(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)
 schemelib_DATA = guile-procedures.txt

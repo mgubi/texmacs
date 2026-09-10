@@ -152,8 +152,7 @@ am__can_run_installinfo = \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
-am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(top_srcdir)/am/pre-inst-guile README
+am__DIST_COMMON = $(srcdir)/Makefile.in README
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 ALLOCA = @ALLOCA@
@@ -194,7 +193,6 @@ FILECMD = @FILECMD@
 GREP = @GREP@
 GUILE_CFLAGS = @GUILE_CFLAGS@
 GUILE_EFFECTIVE_VERSION = @GUILE_EFFECTIVE_VERSION@
-GUILE_FOR_BUILD = @GUILE_FOR_BUILD@
 GUILE_LIBS = @GUILE_LIBS@
 GUILE_MAJOR_VERSION = @GUILE_MAJOR_VERSION@
 GUILE_MICRO_VERSION = @GUILE_MICRO_VERSION@
@@ -413,18 +411,15 @@ scripts_sources = \
 	summarize-guile-TODO			\
 	scan-api				\
 	api-diff				\
-	read-rfc822				\
-	snarf-guile-m4-docs
+	read-rfc822
 
 subpkgdatadir = $(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)/scripts
 subpkgdata_SCRIPTS = $(scripts_sources)
 EXTRA_DIST = $(scripts_sources) ChangeLog-2008
-preinstguile = $(top_builddir_absolute)/pre-inst-guile
-preinstguiletool = GUILE="$(preinstguile)" $(top_srcdir)/scripts
 all: all-am
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/am/pre-inst-guile $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -444,7 +439,6 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles);; \
 	esac;
-$(top_srcdir)/am/pre-inst-guile $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -657,20 +651,6 @@ uninstall-am: uninstall-subpkgdataSCRIPTS
 
 list:
 	@echo $(scripts_sources)
-
-overview: $(scripts_sources)
-	@echo '----------------------------'
-	@echo Overview
-	@echo I. Commentaries
-	@echo II. Module Interfaces
-	@echo '----------------------------'
-	@echo I. Commentaries
-	@echo '----------------------------'
-	$(preinstguiletool)/display-commentary $^
-	@echo '----------------------------'
-	@echo II. Module Interfaces
-	@echo '----------------------------'
-	$(preinstguiletool)/frisk $^
 
 # Makefile.am ends here
 

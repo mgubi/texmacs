@@ -209,7 +209,6 @@ am__define_uniq_tagged_files = \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
 am__DIST_COMMON = $(guile_TEXINFOS) $(srcdir)/Makefile.in \
-	$(top_srcdir)/am/pre-inst-guile \
 	$(top_srcdir)/build-aux/mdate-sh \
 	$(top_srcdir)/build-aux/texinfo.tex texinfo.tex
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -252,7 +251,6 @@ FILECMD = @FILECMD@
 GREP = @GREP@
 GUILE_CFLAGS = @GUILE_CFLAGS@
 GUILE_EFFECTIVE_VERSION = @GUILE_EFFECTIVE_VERSION@
-GUILE_FOR_BUILD = @GUILE_FOR_BUILD@
 GUILE_LIBS = @GUILE_LIBS@
 GUILE_MAJOR_VERSION = @GUILE_MAJOR_VERSION@
 GUILE_MICRO_VERSION = @GUILE_MICRO_VERSION@
@@ -509,14 +507,11 @@ guile_TEXINFOS = preface.texi			\
 
 ETAGS_ARGS = $(info_TEXINFOS) $(guile_TEXINFOS)
 EXTRA_DIST = ChangeLog-2008
-preinstguile = $(top_builddir_absolute)/pre-inst-guile
-preinstguiletool = GUILE="$(preinstguile)" $(top_srcdir)/scripts
-MAINTAINERCLEANFILES = autoconf-macros.texi
 all: all-am
 
 .SUFFIXES:
 .SUFFIXES: .dvi .html .info .pdf .ps .texi
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/am/pre-inst-guile $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -536,7 +531,6 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__maybe_remake_depfiles);; \
 	esac;
-$(top_srcdir)/am/pre-inst-guile $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -837,7 +831,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-	-$(am__rm_f) $(MAINTAINERCLEANFILES)
 clean: clean-am
 
 clean-am: clean-aminfo clean-generic clean-libtool mostlyclean-am
@@ -1018,13 +1011,6 @@ uninstall-am: uninstall-dvi-am uninstall-html-am uninstall-info-am \
 
 .PRECIOUS: Makefile
 
-
-# Automated snarfing
-
-autoconf.texi: autoconf-macros.texi
-autoconf-macros.texi: $(top_srcdir)/guile-config/guile.m4
-	GUILE="$(GUILE_FOR_BUILD)" $(top_srcdir)/scripts/snarf-guile-m4-docs $(top_srcdir)/guile-config/guile.m4 \
-	  > $(srcdir)/$@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -107,8 +107,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = guile-1.8.pc guile-tools pre-inst-guile \
-	pre-inst-guile-env
+CONFIG_CLEAN_FILES = guile-1.8.pc guile-tools
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -196,7 +195,6 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/guile-1.8.pc.in $(srcdir)/guile-tools.in \
-	$(srcdir)/pre-inst-guile-env.in $(srcdir)/pre-inst-guile.in \
 	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
 	$(top_srcdir)/build-aux/config.sub \
@@ -293,7 +291,6 @@ FILECMD = @FILECMD@
 GREP = @GREP@
 GUILE_CFLAGS = @GUILE_CFLAGS@
 GUILE_EFFECTIVE_VERSION = @GUILE_EFFECTIVE_VERSION@
-GUILE_FOR_BUILD = @GUILE_FOR_BUILD@
 GUILE_LIBS = @GUILE_LIBS@
 GUILE_MAJOR_VERSION = @GUILE_MAJOR_VERSION@
 GUILE_MICRO_VERSION = @GUILE_MICRO_VERSION@
@@ -494,7 +491,7 @@ top_builddir_absolute = @top_builddir_absolute@
 top_srcdir = @top_srcdir@
 top_srcdir_absolute = @top_srcdir_absolute@
 AUTOMAKE_OPTIONS = 1.10 foreign
-SUBDIRS = oop libguile ice-9 guile-config scripts srfi doc lang am
+SUBDIRS = oop libguile ice-9 guile-config scripts srfi doc lang
 DIST_SUBDIRS = $(SUBDIRS)
 bin_SCRIPTS = guile-tools
 include_HEADERS = libguile.h
@@ -559,10 +556,6 @@ distclean-hdr:
 guile-1.8.pc: $(top_builddir)/config.status $(srcdir)/guile-1.8.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 guile-tools: $(top_builddir)/config.status $(srcdir)/guile-tools.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-pre-inst-guile: $(top_builddir)/config.status $(srcdir)/pre-inst-guile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-pre-inst-guile-env: $(top_builddir)/config.status $(srcdir)/pre-inst-guile-env.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-binSCRIPTS: $(bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
