@@ -31,7 +31,7 @@
 
 /* Define to the type of elements in the array argument to 'getgroups'.
    Usually this is either 'int' or 'gid_t'. */
-#define GETGROUPS_T int
+#cmakedefine GETGROUPS_T @GETGROUPS_T@
 
 /* Define this if you want to debug scm_must_malloc/realloc/free calls. */
 #undef GUILE_DEBUG_MALLOC
@@ -897,8 +897,16 @@
 #endif
 /* Enable GNU extensions on systems that have them.  */
 #ifndef _GNU_SOURCE
-# undef _GNU_SOURCE
+#cmakedefine _GNU_SOURCE 1
 #endif
+
+/* Enable large inode numbers and 64-bit calls on systems that have them.  */
+#ifndef _LARGEFILE64_SOURCE
+#cmakedefine _LARGEFILE64_SOURCE 1
+#endif
+
+/* Define to 1 if you have the 'off64_t' type. */
+#cmakedefine HAVE_OFF64_T 1
 /* Enable X/Open compliant socket functions that do not require linking
    with -lxnet on HP-UX 11.11.  */
 #ifndef _HPUX_ALT_XOPEN_SOCKET_API

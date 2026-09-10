@@ -39,8 +39,8 @@ typedef struct dirent64 guile_dirent_t;
 #else
 typedef struct dirent guile_dirent_t;
 #endif
-// if this is mac, off64_t is off_t
-#if defined(__APPLE__) || defined(_M_ARM64)
+// if this is mac, or if off64_t is not available, off64_t is off_t
+#if defined(__APPLE__) || defined(_M_ARM64) || (defined(HAVE_CONFIG_H) && !defined(HAVE_OFF64_T))
 typedef off_t guile_off_t;
 #else
 typedef off64_t guile_off_t;

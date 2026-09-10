@@ -129,6 +129,7 @@ include_directories(
 )
 
 add_definitions(-DHAVE_CONFIG_H)
+add_compile_definitions(_GNU_SOURCE)
 
 # Core libguile sources
 set(LIBGUILE_SOURCES

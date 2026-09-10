@@ -14,6 +14,10 @@ set(PACKAGE_TARNAME "guile-texmacs")
 set(PACKAGE_URL "")
 set(PACKAGE_VERSION "1.8.8")
 
+set(_GNU_SOURCE 1)
+set(_LARGEFILE64_SOURCE 1)
+list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+
 if(WIN32)
     list(APPEND CMAKE_REQUIRED_LIBRARIES ws2_32)
 endif()
@@ -53,6 +57,11 @@ check_type_size("intmax_t" SIZEOF_INTMAX_T)
 check_type_size("intptr_t" SIZEOF_INTPTR_T)
 check_type_size("uintptr_t" SIZEOF_UINTPTR_T)
 check_type_size("float" SIZEOF_FLOAT)
+check_type_size("gid_t" SIZEOF_GID_T)
+check_type_size("uid_t" SIZEOF_UID_T)
+check_type_size("mode_t" SIZEOF_MODE_T)
+check_type_size("pid_t" SIZEOF_PID_T)
+check_type_size("off64_t" SIZEOF_OFF64_T)
 
 # Set corresponding autoconf-named variables for scmconfig.h.in
 macro(SET_SCM_SIZE var val)
@@ -400,15 +409,32 @@ set(HAVE_NETWORKING 1)
 set(HAVE_POSIX 1)
 
 # Platform fallback typedefs in config.h if needed
-if(NOT HAVE_GETGROUPS)
-    set(GETGROUPS_T int)
+if(HAVE_SIZEOF_OFF64_T)
+    set(HAVE_OFF64_T 1)
 endif()
-if(NOT HAVE_GID_T)
+
+if(NOT HAVE_SIZEOF_GID_T)
     set(gid_t int)
 endif()
-if(NOT HAVE_UID_T)
+
+if(NOT HAVE_SIZEOF_UID_T)
     set(uid_t int)
 endif()
+
+if(NOT HAVE_SIZEOF_MODE_T)
+    set(mode_t int)
+endif()
+
+if(NOT HAVE_SIZEOF_PID_T)
+    set(pid_t int)
+endif()
+
+if(HAVE_GETGROUPS AND HAVE_SIZEOF_GID_T)
+    set(GETGROUPS_T gid_t)
+else()
+    set(GETGROUPS_T int)
+endif()
+
 if(WIN32)
     set(socklen_t int)
 endif()
