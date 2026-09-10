@@ -941,6 +941,10 @@ scm_get_stack_base ()
 #   endif
 #   ifdef MSWIN32
 #	define OS_TYPE "MSWIN32"
+#	if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__aarch64__) || defined(_M_ARM64)
+#	  define CPP_WORDSZ 64
+#	  define ALIGNMENT 8
+#	endif
 		/* STACKBOTTOM and DATASTART are handled specially in 	*/
 		/* os_dep.c.						*/
 #       ifndef __WATCOMC__

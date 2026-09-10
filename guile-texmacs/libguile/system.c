@@ -19,12 +19,34 @@
 
 #include <stdarg.h>
 
+#ifdef _WIN32
+# include <io.h>
+static int win_ftruncate(int fd, guile_off_t length) {
+    return _chsize_s(fd, length) == 0 ? 0 : -1;
+}
+static int win_truncate(const char *path, guile_off_t length) {
+    int fd = _open(path, _O_RDWR | _O_BINARY);
+    if (fd < 0) return -1;
+    int res = _chsize_s(fd, length) == 0 ? 0 : -1;
+    _close(fd);
+    return res;
+}
+# define fstat_or_fstat64                _fstat64
+# define ftruncate_or_ftruncate64        win_ftruncate
+# define lseek_or_lseek64                _lseeki64
+# define lstat_or_lstat64                _stat64
+# define stat_or_stat64                  _stat64
+# define open_or_open64                  open
+# define truncate_or_truncate64          win_truncate
+#else
 #define fstat_or_fstat64                CHOOSE_LARGEFILE(fstat,fstat64,_fstat64)
 #define ftruncate_or_ftruncate64        CHOOSE_LARGEFILE(ftruncate,ftruncate64,ftruncate64)
 #define lseek_or_lseek64                CHOOSE_LARGEFILE(lseek,lseek64,lseek64)
 #define lstat_or_lstat64                CHOOSE_LARGEFILE(lstat,lstat64,_stat64)
 #define stat_or_stat64                  CHOOSE_LARGEFILE(stat,stat64,_stat64)
 #define open_or_open64                  CHOOSE_LARGEFILE(open,open64,open)
+#endif
+
 #if SCM_HAVE_STRUCT_DIRENT64 == 1
 #define readdir_or_readdir64            CHOOSE_LARGEFILE(readdir,readdir64,readdir)
 #else
@@ -35,7 +57,6 @@
 #else
 #define readdir_r_or_readdir64_r        readdir_r
 #endif
-#define truncate_or_truncate64          CHOOSE_LARGEFILE(truncate,truncate64,truncate64)
 
 
 char *guile_default_utf8_string_to_system_string(const char *utf8_string) {

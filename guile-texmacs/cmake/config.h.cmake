@@ -43,6 +43,13 @@
    calls. */
 #cmakedefine GUILE_USE_64_CALLS 1
 
+#if defined(_MSC_VER) && !defined(_SSIZE_T_DEFINED)
+# include <basetsd.h>
+typedef SSIZE_T ssize_t;
+# define _SSIZE_T_DEFINED
+# define HAVE_SSIZE_T 1
+#endif
+
 /* Define to 1 if you have the 'acosh' function. */
 #cmakedefine HAVE_ACOSH 1
 

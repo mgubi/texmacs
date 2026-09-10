@@ -88,6 +88,18 @@ extern char *ttyname();
 # define pipe(fd) _pipe (fd, 256, O_BINARY)
 #endif /* __MINGW32__ */
 
+#ifdef HAVE_SYS_UTIME_H
+# include <sys/utime.h>
+#endif
+#ifdef HAVE_UTIME_H
+# include <utime.h>
+#endif
+#ifdef _MSC_VER
+# include <sys/utime.h>
+# define utimbuf _utimbuf
+# define utime _utime
+#endif
+
 #if HAVE_SYS_WAIT_H
 # include <sys/wait.h>
 #endif
@@ -568,7 +580,7 @@ SCM_DEFINE (scm_waitpid, "waitpid", 1, 1, 0,
 #undef FUNC_NAME
 #endif /* HAVE_WAITPID */
 
-#if !defined(__MINGW32__) || defined(__MINGW64__)
+#if !defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
 SCM_DEFINE (scm_status_exit_val, "status:exit-val", 1, 0, 0, 
             (SCM status),
 	    "Return the exit status value, as would be set if a process\n"
@@ -2126,7 +2138,9 @@ scm_init_posix ()
  sym_write_pipe = scm_permanent_object (scm_from_locale_symbol ("write pipe")) ;
  scm_c_define_gsubr (s_scm_pipe, 0, 0, 0, (SCM (*)()) scm_pipe); ;
  scm_c_define_gsubr (s_scm_kill, 2, 0, 0, (SCM (*)()) scm_kill); ;
- scm_c_define_gsubr (s_scm_status_exit_val, 1, 0, 0, (SCM (*)()) scm_status_exit_val); ;
+#if !defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
+  scm_c_define_gsubr (s_scm_status_exit_val, 1, 0, 0, (SCM (*)()) scm_status_exit_val); ;
+#endif
  scm_c_define_gsubr (s_scm_execl, 1, 0, 1, (SCM (*)()) scm_execl); ;
  scm_c_define_gsubr (s_scm_execlp, 1, 0, 1, (SCM (*)()) scm_execlp); ;
  scm_c_define_gsubr (s_scm_execle, 2, 0, 1, (SCM (*)()) scm_execle); ;

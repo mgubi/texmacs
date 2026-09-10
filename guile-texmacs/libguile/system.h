@@ -14,9 +14,20 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef _MSC_VER
+#include <io.h>
+#include <process.h>
+#endif
 #include <stdint.h>
 #include <fcntl.h>
+
+#if defined(_MSC_VER) && !defined(_MODE_T_DEFINED)
+typedef int mode_t;
+#define _MODE_T_DEFINED
+#endif
 
 #if SCM_USE_64_CALLS
 #ifdef __MINGW32__

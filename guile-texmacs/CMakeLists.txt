@@ -31,6 +31,8 @@ option(GUILE_ENABLE_REGEX "Enable regex support" ON)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-fno-strict-aliasing -fwrapv)
+elseif(MSVC)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE __MINGW32__)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -247,7 +249,7 @@ if(GUILE_ENABLE_NETWORKING)
     list(APPEND LIBGUILE_SOURCES libguile/net_db.c libguile/socket.c)
 endif()
 
-if(GUILE_ENABLE_REGEX AND HAVE_REGCOMP)
+if(GUILE_ENABLE_REGEX AND HAVE_REGCOMP AND HAVE_REGEX_H)
     list(APPEND LIBGUILE_SOURCES libguile/regex-posix.c)
 endif()
 

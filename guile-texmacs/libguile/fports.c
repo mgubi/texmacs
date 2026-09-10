@@ -700,7 +700,7 @@ fport_truncate (SCM port, off_t length)
 {
   scm_t_fport *fp = SCM_FSTREAM (port);
 
-  if (ftruncate (fp->fdes, length) == -1)
+  if (guile_ftruncate (fp->fdes, length) == -1)
     scm_syserror ("ftruncate");
 }
 

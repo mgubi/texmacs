@@ -79,7 +79,7 @@ SCM_DEFINE (scm_system, "system", 0, 1, 0,
   eno = errno; free (c_cmd); errno = eno;
   if (rv == -1 || (rv == 127 && errno != 0))
     SCM_SYSERROR;
-#ifndef __MINGW64__
+#if !defined(__MINGW64__) && !defined(_WIN32)
   rv = WEXITSTATUS (rv);
 #endif
   return scm_from_int (rv);
