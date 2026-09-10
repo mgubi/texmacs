@@ -213,6 +213,9 @@ typedef SSIZE_T ssize_t;
 /* Define to 1 if you have the 'ftruncate' function. */
 #cmakedefine HAVE_FTRUNCATE 1
 
+/* Define to 1 if you have the 'ftruncate64' function. */
+#cmakedefine HAVE_FTRUNCATE64 1
+
 /* Define to 1 if you have the 'getcwd' function. */
 #cmakedefine HAVE_GETCWD 1
 
@@ -699,6 +702,9 @@ typedef SSIZE_T ssize_t;
 
 /* Define to 1 if you have the 'truncate' function. */
 #cmakedefine HAVE_TRUNCATE 1
+
+/* Define to 1 if you have the 'truncate64' function. */
+#cmakedefine HAVE_TRUNCATE64 1
 
 /* Define to 1 if you have the 'ttyname' function. */
 #cmakedefine HAVE_TTYNAME 1

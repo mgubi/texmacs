@@ -39,12 +39,24 @@ static int win_truncate(const char *path, guile_off_t length) {
 # define open_or_open64                  open
 # define truncate_or_truncate64          win_truncate
 #else
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 #define fstat_or_fstat64                CHOOSE_LARGEFILE(fstat,fstat64,_fstat64)
+#if defined(HAVE_FTRUNCATE64)
 #define ftruncate_or_ftruncate64        CHOOSE_LARGEFILE(ftruncate,ftruncate64,ftruncate64)
+#else
+#define ftruncate_or_ftruncate64        ftruncate
+#endif
 #define lseek_or_lseek64                CHOOSE_LARGEFILE(lseek,lseek64,lseek64)
 #define lstat_or_lstat64                CHOOSE_LARGEFILE(lstat,lstat64,_stat64)
 #define stat_or_stat64                  CHOOSE_LARGEFILE(stat,stat64,_stat64)
 #define open_or_open64                  CHOOSE_LARGEFILE(open,open64,open)
+#if defined(HAVE_TRUNCATE64)
+#define truncate_or_truncate64          CHOOSE_LARGEFILE(truncate,truncate64,truncate64)
+#else
+#define truncate_or_truncate64          truncate
+#endif
 #endif
 
 #if SCM_HAVE_STRUCT_DIRENT64 == 1
