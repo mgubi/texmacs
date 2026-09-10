@@ -319,9 +319,9 @@ AC_C_VOLATILE
 
 AC_C_INLINE
 if test "$ac_cv_c_inline" != no; then
-  SCM_I_GSC_C_INLINE="\"${ac_cv_c_inline}\""
+  SCM_I_GSC_C_INLINE="${ac_cv_c_inline}"
 else
-  SCM_I_GSC_C_INLINE=NULL
+  SCM_I_GSC_C_INLINE=
 fi
 AC_CHECK_LIB(uca, __uc_get_ar_bsp)
 
@@ -347,14 +347,32 @@ AC_CHECK_SIZEOF(ptrdiff_t)
 AC_CHECK_SIZEOF(size_t)
 AC_CHECK_SIZEOF(off_t)
 
+AC_SUBST([ac_cv_sizeof_char])
+AC_SUBST([ac_cv_sizeof_unsigned_char])
+AC_SUBST([ac_cv_sizeof_short])
+AC_SUBST([ac_cv_sizeof_unsigned_short])
+AC_SUBST([ac_cv_sizeof_long])
+AC_SUBST([ac_cv_sizeof_unsigned_long])
+AC_SUBST([ac_cv_sizeof_int])
+AC_SUBST([ac_cv_sizeof_unsigned_int])
+AC_SUBST([ac_cv_sizeof_size_t])
+AC_SUBST([ac_cv_sizeof_long_long])
+AC_SUBST([ac_cv_sizeof_unsigned_long_long])
+AC_SUBST([ac_cv_sizeof___int64])
+AC_SUBST([ac_cv_sizeof_unsigned___int64])
+AC_SUBST([ac_cv_sizeof_void_p])
+AC_SUBST([ac_cv_sizeof_intptr_t])
+AC_SUBST([ac_cv_sizeof_uintptr_t])
+AC_SUBST([ac_cv_sizeof_ptrdiff_t])
+
 if test "$ac_cv_sizeof_long" -ne "$ac_cv_sizeof_void_p" && test "$ac_cv_sizeof_long_long" -ne "$ac_cv_sizeof_void_p"; then
   AC_MSG_ERROR(cannot find an integer type with the same size as void*)
 fi
 
 if test "$ac_cv_sizeof_ptrdiff_t" -ne 0; then
-  SCM_I_GSC_T_PTRDIFF='"ptrdiff_t"'
+  SCM_I_GSC_T_PTRDIFF='ptrdiff_t'
 else
-  SCM_I_GSC_T_PTRDIFF='"long"'
+  SCM_I_GSC_T_PTRDIFF='long'
 fi
 AC_SUBST([SCM_I_GSC_T_PTRDIFF])
 
@@ -362,6 +380,7 @@ AC_CHECK_HEADERS([stdint.h])
 AC_CHECK_HEADERS([inttypes.h])
 
 AC_CHECK_SIZEOF(intmax_t)
+AC_SUBST([ac_cv_sizeof_intmax_t])
 
 SCM_I_GSC_NEEDS_STDINT_H=0
 SCM_I_GSC_NEEDS_INTTYPES_H=0
@@ -430,13 +449,13 @@ fi
 
 ### Required type scm_t_int8
 if test "$scm_stdint_has_int8"; then
-  SCM_I_GSC_T_INT8='"int8_t"'
+  SCM_I_GSC_T_INT8='int8_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int8"; then
-  SCM_I_GSC_T_INT8='"int8_t"'
+  SCM_I_GSC_T_INT8='int8_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_char" -eq 1; then
-  SCM_I_GSC_T_INT8='"signed char"'
+  SCM_I_GSC_T_INT8='signed char'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int8.])
 fi
@@ -444,13 +463,13 @@ AC_SUBST([SCM_I_GSC_T_INT8])
 
 ### Required type scm_t_uint8
 if test "$scm_stdint_has_uint8"; then
-  SCM_I_GSC_T_UINT8='"uint8_t"'
+  SCM_I_GSC_T_UINT8='uint8_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint8"; then
-  SCM_I_GSC_T_UINT8='"uint8_t"'
+  SCM_I_GSC_T_UINT8='uint8_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_char" -eq 1; then
-  SCM_I_GSC_T_UINT8='"unsigned char"'
+  SCM_I_GSC_T_UINT8='unsigned char'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint8.])
 fi
@@ -458,15 +477,15 @@ AC_SUBST([SCM_I_GSC_T_UINT8])
 
 ### Required type scm_t_int16 (ANSI C says int or short might work)
 if test "$scm_stdint_has_int16"; then
-  SCM_I_GSC_T_INT16='"int16_t"'
+  SCM_I_GSC_T_INT16='int16_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int16"; then
-  SCM_I_GSC_T_INT16='"int16_t"'
+  SCM_I_GSC_T_INT16='int16_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 2; then
-  SCM_I_GSC_T_INT16='"int"'
+  SCM_I_GSC_T_INT16='int'
 elif test "$ac_cv_sizeof_short" -eq 2; then
-  SCM_I_GSC_T_INT16='"short"'
+  SCM_I_GSC_T_INT16='short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int16.])
 fi
@@ -474,15 +493,15 @@ AC_SUBST([SCM_I_GSC_T_INT16])
 
 ### Required type scm_t_uint16 (ANSI C says int or short might work)
 if test "$scm_stdint_has_uint16"; then
-  SCM_I_GSC_T_UINT16='"uint16_t"'
+  SCM_I_GSC_T_UINT16='uint16_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint16"; then
-  SCM_I_GSC_T_UINT16='"uint16_t"'
+  SCM_I_GSC_T_UINT16='uint16_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 2; then
-  SCM_I_GSC_T_UINT16='"unsigned int"'
+  SCM_I_GSC_T_UINT16='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 2; then
-  SCM_I_GSC_T_UINT16='"unsigned short"'
+  SCM_I_GSC_T_UINT16='unsigned short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint16.])
 fi
@@ -491,17 +510,17 @@ AC_SUBST([SCM_I_GSC_T_UINT16])
 
 ### Required type scm_t_int32 (ANSI C says int, short, or long might work)
 if test "$scm_stdint_has_int32"; then
-  SCM_I_GSC_T_INT32='"int32_t"'
+  SCM_I_GSC_T_INT32='int32_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int32"; then
-  SCM_I_GSC_T_INT32='"int32_t"'
+  SCM_I_GSC_T_INT32='int32_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 4; then
-  SCM_I_GSC_T_INT32='"int"'
+  SCM_I_GSC_T_INT32='int'
 elif test "$ac_cv_sizeof_long" -eq 4; then
-  SCM_I_GSC_T_INT32='"long"'
+  SCM_I_GSC_T_INT32='long'
 elif test "$ac_cv_sizeof_short" -eq 4; then
-  SCM_I_GSC_T_INT32='"short"'
+  SCM_I_GSC_T_INT32='short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int32.])
 fi
@@ -509,17 +528,17 @@ AC_SUBST([SCM_I_GSC_T_INT32])
 
 ### Required type scm_t_uint32 (ANSI C says int, short, or long might work)
 if test "$scm_stdint_has_uint32"; then
-  SCM_I_GSC_T_UINT32='"uint32_t"'
+  SCM_I_GSC_T_UINT32='uint32_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint32"; then
-  SCM_I_GSC_T_UINT32='"uint32_t"'
+  SCM_I_GSC_T_UINT32='uint32_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned int"'
+  SCM_I_GSC_T_UINT32='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_long" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned long"'
+  SCM_I_GSC_T_UINT32='unsigned long'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned short"'
+  SCM_I_GSC_T_UINT32='unsigned short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint32.])
 fi
@@ -529,21 +548,21 @@ AC_SUBST([SCM_I_GSC_T_UINT32])
 ### Also try 'long long' and '__int64' if we have it.
 SCM_I_GSC_T_INT64=0
 if test "$scm_stdint_has_int64"; then
-  SCM_I_GSC_T_INT64='"int64_t"'
+  SCM_I_GSC_T_INT64='int64_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int64"; then
-  SCM_I_GSC_T_INT64='"int64_t"'
+  SCM_I_GSC_T_INT64='int64_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 8; then
-  SCM_I_GSC_T_INT64='"int"'
+  SCM_I_GSC_T_INT64='int'
 elif test "$ac_cv_sizeof_long" -eq 8; then
-  SCM_I_GSC_T_INT64='"long"'
+  SCM_I_GSC_T_INT64='long'
 elif test "$ac_cv_sizeof_short" -eq 8; then
-  SCM_I_GSC_T_INT64='"short"'
+  SCM_I_GSC_T_INT64='short'
 elif test "$ac_cv_sizeof_long_long" -eq 8; then
-  SCM_I_GSC_T_INT64='"long long"'
+  SCM_I_GSC_T_INT64='long long'
 elif test "$ac_cv_sizeof___int64" -eq 8; then
-  SCM_I_GSC_T_INT64='"__int64"'
+  SCM_I_GSC_T_INT64='__int64'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int64.])
 fi
@@ -554,21 +573,21 @@ AC_SUBST([SCM_I_GSC_T_INT64])
 ### Also try 'long long' and '__int64' if we have it.
 SCM_I_GSC_T_UINT64=0
 if test "$scm_stdint_has_uint64"; then
-  SCM_I_GSC_T_UINT64='"uint64_t"'
+  SCM_I_GSC_T_UINT64='uint64_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint64"; then
-  SCM_I_GSC_T_UINT64='"uint64_t"'
+  SCM_I_GSC_T_UINT64='uint64_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned int"'
+  SCM_I_GSC_T_UINT64='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_long" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned long"'
+  SCM_I_GSC_T_UINT64='unsigned long'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned short"'
+  SCM_I_GSC_T_UINT64='unsigned short'
 elif test "$ac_cv_sizeof_unsigned_long_long" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned long long"'
+  SCM_I_GSC_T_UINT64='unsigned long long'
 elif test "$ac_cv_sizeof_unsigned___int64" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned __int64"'
+  SCM_I_GSC_T_UINT64='unsigned __int64'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint64.])
 fi
@@ -581,17 +600,17 @@ AC_SUBST([SCM_I_GSC_T_UINT64])
 ###
 SCM_I_GSC_T_INTMAX=0
 if test "$scm_stdint_has_intmax"; then
-  SCM_I_GSC_T_INTMAX='"intmax_t"'
+  SCM_I_GSC_T_INTMAX='intmax_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_intmax"; then
-  SCM_I_GSC_T_INTMAX='"intmax_t"'
+  SCM_I_GSC_T_INTMAX='intmax_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof___int64" -ne 0; then
-  SCM_I_GSC_T_INTMAX='"__int64"'
+  SCM_I_GSC_T_INTMAX='__int64'
 elif test "$ac_cv_sizeof_long_long" -ne 0; then
-  SCM_I_GSC_T_INTMAX='"long long"'
+  SCM_I_GSC_T_INTMAX='long long'
 else
-  SCM_I_GSC_T_INTMAX='"long"'
+  SCM_I_GSC_T_INTMAX='long'
 fi
 AC_SUBST([SCM_I_GSC_T_INTMAX])
 
@@ -602,17 +621,17 @@ AC_SUBST([SCM_I_GSC_T_INTMAX])
 ###
 SCM_I_GSC_T_UINTMAX=0
 if test "$scm_stdint_has_uintmax"; then
-  SCM_I_GSC_T_UINTMAX='"uintmax_t"'
+  SCM_I_GSC_T_UINTMAX='uintmax_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uintmax"; then
-  SCM_I_GSC_T_UINTMAX='"uintmax_t"'
+  SCM_I_GSC_T_UINTMAX='uintmax_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned___int64" -ne 0; then
-  SCM_I_GSC_T_UINTMAX='"unsigned __int64"'
+  SCM_I_GSC_T_UINTMAX='unsigned __int64'
 elif test "$ac_cv_sizeof_unsigned_long_long" -ne 0; then
-  SCM_I_GSC_T_UINTMAX='"unsigned long long"'
+  SCM_I_GSC_T_UINTMAX='unsigned long long'
 else
-  SCM_I_GSC_T_UINTMAX='"unsigned long"'
+  SCM_I_GSC_T_UINTMAX='unsigned long'
 fi
 AC_SUBST([SCM_I_GSC_T_UINTMAX])
 
@@ -1637,7 +1656,166 @@ AC_SUBST([SCM_I_GSC_ENABLE_DEPRECATED])
 AC_SUBST([SCM_I_GSC_ENABLE_ELISP])
 AC_SUBST([SCM_I_GSC_STACK_GROWS_UP])
 AC_SUBST([SCM_I_GSC_C_INLINE])
-AC_CONFIG_FILES([libguile/gen-scmconfig.h])
+
+#--------------------------------------------------------------------
+# Definitions for public scmconfig.h
+#--------------------------------------------------------------------
+
+if test "$ac_cv_header_stdc" = yes || test "$ac_cv_header_stdlib_h" = yes; then
+  SCM_I_GSC_HAVE_STDC_HEADERS=1
+else
+  SCM_I_GSC_HAVE_STDC_HEADERS=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STDC_HEADERS])
+
+if test "$ac_cv_header_sys_select_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_SELECT_H=1
+else
+  SCM_I_GSC_HAVE_SYS_SELECT_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_SELECT_H])
+
+if test "$ac_cv_header_floatingpoint_h" = yes; then
+  SCM_I_GSC_HAVE_FLOATINGPOINT_H=1
+else
+  SCM_I_GSC_HAVE_FLOATINGPOINT_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_FLOATINGPOINT_H])
+
+if test "$ac_cv_header_ieeefp_h" = yes; then
+  SCM_I_GSC_HAVE_IEEEFP_H=1
+else
+  SCM_I_GSC_HAVE_IEEEFP_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_IEEEFP_H])
+
+if test "$ac_cv_header_nan_h" = yes; then
+  SCM_I_GSC_HAVE_NAN_H=1
+else
+  SCM_I_GSC_HAVE_NAN_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_NAN_H])
+
+if test "$ac_cv_header_winsock2_h" = yes; then
+  SCM_I_GSC_HAVE_WINSOCK2_H=1
+else
+  SCM_I_GSC_HAVE_WINSOCK2_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_WINSOCK2_H])
+
+if test "$ac_cv_header_limits_h" = yes; then
+  SCM_I_GSC_HAVE_LIMITS_H=1
+else
+  SCM_I_GSC_HAVE_LIMITS_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_LIMITS_H])
+
+if test "$ac_cv_header_sys_time_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_TIME_H=1
+else
+  SCM_I_GSC_HAVE_SYS_TIME_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_TIME_H])
+
+if test "$ac_cv_header_time_h" = yes; then
+  SCM_I_GSC_HAVE_TIME_H=1
+else
+  SCM_I_GSC_HAVE_TIME_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_TIME_H])
+
+if test "$ac_cv_header_sys_types_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_TYPES_H=1
+else
+  SCM_I_GSC_HAVE_SYS_TYPES_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_TYPES_H])
+
+if test "$ac_cv_header_sys_stdtypes_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_STDTYPES_H=1
+else
+  SCM_I_GSC_HAVE_SYS_STDTYPES_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_STDTYPES_H])
+
+if test "$ac_cv_func_readdir64_r" = yes; then
+  SCM_I_GSC_HAVE_READDIR64_R=1
+else
+  SCM_I_GSC_HAVE_READDIR64_R=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_READDIR64_R])
+
+if test "$ac_cv_func_stat64" = yes; then
+  SCM_I_GSC_HAVE_STAT64=1
+else
+  SCM_I_GSC_HAVE_STAT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STAT64])
+
+if test "$use_64_calls" = yes || test "$use_64_calls" = y; then
+  SCM_I_GSC_USE_64_CALLS=1
+else
+  SCM_I_GSC_USE_64_CALLS=0
+fi
+AC_SUBST([SCM_I_GSC_USE_64_CALLS])
+
+SCM_I_GSC_HAVE_ARRAYS=1
+AC_SUBST([SCM_I_GSC_HAVE_ARRAYS])
+
+SCM_I_GSC_HAVE_HOOKS=1
+AC_SUBST([SCM_I_GSC_HAVE_HOOKS])
+
+if test "$SCM_I_GSC_T_INT64" != 0; then
+  SCM_I_GSC_HAVE_T_INT64=1
+else
+  SCM_I_GSC_HAVE_T_INT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_T_INT64])
+
+if test "$SCM_I_GSC_T_UINT64" != 0; then
+  SCM_I_GSC_HAVE_T_UINT64=1
+else
+  SCM_I_GSC_HAVE_T_UINT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_T_UINT64])
+
+if test "$SCM_I_GSC_T_PTRDIFF" = 'long'; then
+  SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF="$ac_cv_sizeof_long"
+else
+  SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF="$ac_cv_sizeof_ptrdiff_t"
+fi
+AC_SUBST([SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF])
+
+case "$SCM_I_GSC_T_INTMAX" in
+  *intmax_t*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_intmax_t" ;;
+  *long\ long*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_long_long" ;;
+  *__int64*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof___int64" ;;
+  *) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_long" ;;
+esac
+AC_SUBST([SCM_I_GSC_SIZEOF_INTMAX])
+
+if test "$enable_shared" = yes; then
+  case $host in
+    *-*-mingw*)
+      SCM_I_GSC_USE_DLL_IMPORT=1
+      ;;
+    *)
+      SCM_I_GSC_USE_DLL_IMPORT=0
+      ;;
+  esac
+else
+  SCM_I_GSC_USE_DLL_IMPORT=0
+fi
+AC_SUBST([SCM_I_GSC_USE_DLL_IMPORT])
+
+if test "$scm_cv_struct_timespec" = yes; then
+  SCM_I_GSC_HAVE_STRUCT_TIMESPEC=1
+else
+  SCM_I_GSC_HAVE_STRUCT_TIMESPEC=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STRUCT_TIMESPEC])
+
+AC_CONFIG_FILES([libguile/scmconfig.h])
 
 AC_CONFIG_FILES([
   Makefile

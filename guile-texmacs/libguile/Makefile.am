@@ -40,36 +40,6 @@ ETAGS_ARGS = --regex='/SCM_\(GLOBAL_\)?\(G?PROC\|G?PROC1\|SYMBOL\|VCELL\|CONST_L
 lib_LTLIBRARIES = libguile.la
 bin_PROGRAMS = guile
 
-noinst_PROGRAMS = gen-scmconfig
-
-gen_scmconfig_SOURCES = gen-scmconfig.c
-
-## Override default rule; this should be compiled for BUILD host.
-## For some reason, OBJEXT does not include the dot
-gen-scmconfig.$(OBJEXT): gen-scmconfig.c
-	if [ "$(cross_compiling)" = "yes" ]; then \
-		$(CC_FOR_BUILD) $(DEFS) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) -c -o $@ $<; \
-	else \
-		$(COMPILE) -c -o $@ $<; \
-	fi
-
-## Override default rule; this should run on BUILD host.
-gen-scmconfig$(EXEEXT): $(gen_scmconfig_OBJECTS) $(gen_scmconfig_DEPENDENCIES) 
-	@rm -f gen-scmconfig$(EXEEXT)
-	if [ "$(cross_compiling)" = "yes" ]; then \
-		$(CCLD_FOR_BUILD) -o $@ $(gen_scmconfig_OBJECTS); \
-	else \
-		$(LINK) $(gen_scmconfig_OBJECTS) $(LDADD) $(LIBS); \
-	fi
-
-scmconfig.h: ${top_builddir}/config.h gen-scmconfig$(EXEEXT)
-	rm -f scmconfig.h.tmp
-	cat $(srcdir)/scmconfig.h.top > scmconfig.h.tmp
-	./gen-scmconfig$(EXEEXT) >> scmconfig.h.tmp
-	chmod 444 scmconfig.h.tmp
-	rm -f scmconfig.h
-	mv scmconfig.h.tmp scmconfig.h
-
 guile_SOURCES = guile.c
 guile_CFLAGS = $(GUILE_CFLAGS)
 guile_LDADD = libguile.la
@@ -277,7 +247,7 @@ MOSTLYCLEANFILES = \
 	cpp_err_symbols_here cpp_err_symbols_diff cpp_err_symbols_new \
 	cpp_sig_symbols_here cpp_sig_symbols_diff cpp_sig_symbols_new \
 	version.h version.h.tmp \
-	scmconfig.h scmconfig.h.tmp stack-limit-calibration.scm
+	stack-limit-calibration.scm
 
 CLEANFILES = libpath.h \
 	stack-limit-calibration.scm.trs stack-limit-calibration.scm.log

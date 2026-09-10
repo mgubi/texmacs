@@ -94,7 +94,6 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = guile$(EXEEXT)
-noinst_PROGRAMS = gen-scmconfig$(EXEEXT)
 subdir = libguile
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/autobuild.m4 \
@@ -113,12 +112,12 @@ DIST_COMMON = $(srcdir)/Makefile.am $(modinclude_HEADERS) \
 	$(noinst_HEADERS) $(pkginclude_HEADERS) $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = gen-scmconfig.h
+CONFIG_CLEAN_FILES = scmconfig.h
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(schemelibdir)" "$(DESTDIR)$(modincludedir)" \
 	"$(DESTDIR)$(modincludedir)" "$(DESTDIR)$(pkgincludedir)"
-PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
+PROGRAMS = $(bin_PROGRAMS)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -200,9 +199,6 @@ am__v_lt_1 =
 libguile_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libguile_la_CFLAGS) \
 	$(CFLAGS) $(libguile_la_LDFLAGS) $(LDFLAGS) -o $@
-am_gen_scmconfig_OBJECTS = gen-scmconfig.$(OBJEXT)
-gen_scmconfig_OBJECTS = $(am_gen_scmconfig_OBJECTS)
-gen_scmconfig_LDADD = $(LDADD)
 am_guile_OBJECTS = guile-guile.$(OBJEXT)
 guile_OBJECTS = $(am_guile_OBJECTS)
 guile_DEPENDENCIES = libguile.la
@@ -223,8 +219,8 @@ am__v_at_0 = @
 am__v_at_1 = 
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/gen-scmconfig.Po \
-	./$(DEPDIR)/guile-guile.Po ./$(DEPDIR)/libguile_la-alist.Plo \
+am__depfiles_remade = ./$(DEPDIR)/guile-guile.Po \
+	./$(DEPDIR)/libguile_la-alist.Plo \
 	./$(DEPDIR)/libguile_la-arbiters.Plo \
 	./$(DEPDIR)/libguile_la-async.Plo \
 	./$(DEPDIR)/libguile_la-backtrace.Plo \
@@ -357,9 +353,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libguile_la_SOURCES) $(EXTRA_libguile_la_SOURCES) \
-	$(gen_scmconfig_SOURCES) $(guile_SOURCES)
+	$(guile_SOURCES)
 DIST_SOURCES = $(libguile_la_SOURCES) $(EXTRA_libguile_la_SOURCES) \
-	$(gen_scmconfig_SOURCES) $(guile_SOURCES)
+	$(guile_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -385,7 +381,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/gen-scmconfig.h.in \
+am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/scmconfig.h.in \
 	$(top_srcdir)/am/pre-inst-guile \
 	$(top_srcdir)/build-aux/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -515,11 +511,31 @@ SCM_I_GSC_ENABLE_DISCOURAGED = @SCM_I_GSC_ENABLE_DISCOURAGED@
 SCM_I_GSC_ENABLE_ELISP = @SCM_I_GSC_ENABLE_ELISP@
 SCM_I_GSC_GUILE_DEBUG = @SCM_I_GSC_GUILE_DEBUG@
 SCM_I_GSC_GUILE_DEBUG_FREELIST = @SCM_I_GSC_GUILE_DEBUG_FREELIST@
+SCM_I_GSC_HAVE_ARRAYS = @SCM_I_GSC_HAVE_ARRAYS@
+SCM_I_GSC_HAVE_FLOATINGPOINT_H = @SCM_I_GSC_HAVE_FLOATINGPOINT_H@
+SCM_I_GSC_HAVE_HOOKS = @SCM_I_GSC_HAVE_HOOKS@
+SCM_I_GSC_HAVE_IEEEFP_H = @SCM_I_GSC_HAVE_IEEEFP_H@
+SCM_I_GSC_HAVE_LIMITS_H = @SCM_I_GSC_HAVE_LIMITS_H@
+SCM_I_GSC_HAVE_NAN_H = @SCM_I_GSC_HAVE_NAN_H@
+SCM_I_GSC_HAVE_READDIR64_R = @SCM_I_GSC_HAVE_READDIR64_R@
+SCM_I_GSC_HAVE_STAT64 = @SCM_I_GSC_HAVE_STAT64@
+SCM_I_GSC_HAVE_STDC_HEADERS = @SCM_I_GSC_HAVE_STDC_HEADERS@
 SCM_I_GSC_HAVE_STRUCT_DIRENT64 = @SCM_I_GSC_HAVE_STRUCT_DIRENT64@
+SCM_I_GSC_HAVE_STRUCT_TIMESPEC = @SCM_I_GSC_HAVE_STRUCT_TIMESPEC@
+SCM_I_GSC_HAVE_SYS_SELECT_H = @SCM_I_GSC_HAVE_SYS_SELECT_H@
+SCM_I_GSC_HAVE_SYS_STDTYPES_H = @SCM_I_GSC_HAVE_SYS_STDTYPES_H@
+SCM_I_GSC_HAVE_SYS_TIME_H = @SCM_I_GSC_HAVE_SYS_TIME_H@
+SCM_I_GSC_HAVE_SYS_TYPES_H = @SCM_I_GSC_HAVE_SYS_TYPES_H@
+SCM_I_GSC_HAVE_TIME_H = @SCM_I_GSC_HAVE_TIME_H@
+SCM_I_GSC_HAVE_T_INT64 = @SCM_I_GSC_HAVE_T_INT64@
+SCM_I_GSC_HAVE_T_UINT64 = @SCM_I_GSC_HAVE_T_UINT64@
+SCM_I_GSC_HAVE_WINSOCK2_H = @SCM_I_GSC_HAVE_WINSOCK2_H@
 SCM_I_GSC_NEEDS_INTTYPES_H = @SCM_I_GSC_NEEDS_INTTYPES_H@
 SCM_I_GSC_NEEDS_STDINT_H = @SCM_I_GSC_NEEDS_STDINT_H@
 SCM_I_GSC_NEED_BRACES_ON_PTHREAD_MUTEX_INITIALIZER = @SCM_I_GSC_NEED_BRACES_ON_PTHREAD_MUTEX_INITIALIZER@
 SCM_I_GSC_NEED_BRACES_ON_PTHREAD_ONCE_INIT = @SCM_I_GSC_NEED_BRACES_ON_PTHREAD_ONCE_INIT@
+SCM_I_GSC_SIZEOF_INTMAX = @SCM_I_GSC_SIZEOF_INTMAX@
+SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF = @SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF@
 SCM_I_GSC_STACK_GROWS_UP = @SCM_I_GSC_STACK_GROWS_UP@
 SCM_I_GSC_T_INT16 = @SCM_I_GSC_T_INT16@
 SCM_I_GSC_T_INT32 = @SCM_I_GSC_T_INT32@
@@ -532,6 +548,8 @@ SCM_I_GSC_T_UINT32 = @SCM_I_GSC_T_UINT32@
 SCM_I_GSC_T_UINT64 = @SCM_I_GSC_T_UINT64@
 SCM_I_GSC_T_UINT8 = @SCM_I_GSC_T_UINT8@
 SCM_I_GSC_T_UINTMAX = @SCM_I_GSC_T_UINTMAX@
+SCM_I_GSC_USE_64_CALLS = @SCM_I_GSC_USE_64_CALLS@
+SCM_I_GSC_USE_DLL_IMPORT = @SCM_I_GSC_USE_DLL_IMPORT@
 SCM_I_GSC_USE_NULL_THREADS = @SCM_I_GSC_USE_NULL_THREADS@
 SCM_I_GSC_USE_PTHREAD_THREADS = @SCM_I_GSC_USE_PTHREAD_THREADS@
 SED = @SED@
@@ -550,6 +568,24 @@ abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
+ac_cv_sizeof___int64 = @ac_cv_sizeof___int64@
+ac_cv_sizeof_char = @ac_cv_sizeof_char@
+ac_cv_sizeof_int = @ac_cv_sizeof_int@
+ac_cv_sizeof_intmax_t = @ac_cv_sizeof_intmax_t@
+ac_cv_sizeof_intptr_t = @ac_cv_sizeof_intptr_t@
+ac_cv_sizeof_long = @ac_cv_sizeof_long@
+ac_cv_sizeof_long_long = @ac_cv_sizeof_long_long@
+ac_cv_sizeof_ptrdiff_t = @ac_cv_sizeof_ptrdiff_t@
+ac_cv_sizeof_short = @ac_cv_sizeof_short@
+ac_cv_sizeof_size_t = @ac_cv_sizeof_size_t@
+ac_cv_sizeof_uintptr_t = @ac_cv_sizeof_uintptr_t@
+ac_cv_sizeof_unsigned___int64 = @ac_cv_sizeof_unsigned___int64@
+ac_cv_sizeof_unsigned_char = @ac_cv_sizeof_unsigned_char@
+ac_cv_sizeof_unsigned_int = @ac_cv_sizeof_unsigned_int@
+ac_cv_sizeof_unsigned_long = @ac_cv_sizeof_unsigned_long@
+ac_cv_sizeof_unsigned_long_long = @ac_cv_sizeof_unsigned_long_long@
+ac_cv_sizeof_unsigned_short = @ac_cv_sizeof_unsigned_short@
+ac_cv_sizeof_void_p = @ac_cv_sizeof_void_p@
 acx_pthread_config = @acx_pthread_config@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -616,7 +652,6 @@ ETAGS_ARGS = --regex='/SCM_\(GLOBAL_\)?\(G?PROC\|G?PROC1\|SYMBOL\|VCELL\|CONST_L
    --regex='/[ \t]*SCM_[G]?DEFINE1?[ \t]*(\([^,]*\),[^,]*/\1/'
 
 lib_LTLIBRARIES = libguile.la
-gen_scmconfig_SOURCES = gen-scmconfig.c
 guile_SOURCES = guile.c
 guile_CFLAGS = $(GUILE_CFLAGS)
 guile_LDADD = libguile.la
@@ -698,7 +733,7 @@ MOSTLYCLEANFILES = \
 	cpp_err_symbols_here cpp_err_symbols_diff cpp_err_symbols_new \
 	cpp_sig_symbols_here cpp_sig_symbols_diff cpp_sig_symbols_new \
 	version.h version.h.tmp \
-	scmconfig.h scmconfig.h.tmp stack-limit-calibration.scm
+	stack-limit-calibration.scm
 
 CLEANFILES = libpath.h \
 	stack-limit-calibration.scm.trs stack-limit-calibration.scm.log
@@ -738,7 +773,7 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-gen-scmconfig.h: $(top_builddir)/config.status $(srcdir)/gen-scmconfig.h.in
+scmconfig.h: $(top_builddir)/config.status $(srcdir)/scmconfig.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
@@ -784,10 +819,6 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	$(am__rm_f) $(bin_PROGRAMS)
 	test -z "$(EXEEXT)" || $(am__rm_f) $(bin_PROGRAMS:$(EXEEXT)=)
-
-clean-noinstPROGRAMS:
-	$(am__rm_f) $(noinst_PROGRAMS)
-	test -z "$(EXEEXT)" || $(am__rm_f) $(noinst_PROGRAMS:$(EXEEXT)=)
 
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -835,7 +866,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gen-scmconfig.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/guile-guile.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-alist.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libguile_la-arbiters.Plo@am__quote@ # am--include-marker
@@ -2006,10 +2036,9 @@ maintainer-clean-generic:
 clean: clean-am
 
 clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
-	clean-libtool clean-noinstPROGRAMS mostlyclean-am
+	clean-libtool mostlyclean-am
 
 distclean: distclean-am
-	-rm -f ./$(DEPDIR)/gen-scmconfig.Po
 	-rm -f ./$(DEPDIR)/guile-guile.Po
 	-rm -f ./$(DEPDIR)/libguile_la-alist.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-arbiters.Plo
@@ -2172,7 +2201,6 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -f ./$(DEPDIR)/gen-scmconfig.Po
 	-rm -f ./$(DEPDIR)/guile-guile.Po
 	-rm -f ./$(DEPDIR)/libguile_la-alist.Plo
 	-rm -f ./$(DEPDIR)/libguile_la-arbiters.Plo
@@ -2312,13 +2340,13 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES \
 
 .PHONY: CTAGS GTAGS TAGS all all-am am--depfiles check check-am \
 	check-local clean clean-binPROGRAMS clean-generic \
-	clean-libLTLIBRARIES clean-libtool clean-noinstPROGRAMS \
-	cscopelist-am ctags ctags-am distclean distclean-compile \
-	distclean-generic distclean-libtool distclean-tags distdir dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-exec-hook \
-	install-html install-html-am install-info install-info-am \
+	clean-libLTLIBRARIES clean-libtool cscopelist-am ctags \
+	ctags-am distclean distclean-compile distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am html \
+	html-am info info-am install install-am install-binPROGRAMS \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-exec-hook install-html \
+	install-html-am install-info install-info-am \
 	install-libLTLIBRARIES install-man install-modincludeHEADERS \
 	install-nodist_modincludeHEADERS install-pdf install-pdf-am \
 	install-pkgincludeHEADERS install-ps install-ps-am \
@@ -2333,29 +2361,6 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES \
 
 .PRECIOUS: Makefile
 
-
-gen-scmconfig.$(OBJEXT): gen-scmconfig.c
-	if [ "$(cross_compiling)" = "yes" ]; then \
-		$(CC_FOR_BUILD) $(DEFS) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) -c -o $@ $<; \
-	else \
-		$(COMPILE) -c -o $@ $<; \
-	fi
-
-gen-scmconfig$(EXEEXT): $(gen_scmconfig_OBJECTS) $(gen_scmconfig_DEPENDENCIES) 
-	@rm -f gen-scmconfig$(EXEEXT)
-	if [ "$(cross_compiling)" = "yes" ]; then \
-		$(CCLD_FOR_BUILD) -o $@ $(gen_scmconfig_OBJECTS); \
-	else \
-		$(LINK) $(gen_scmconfig_OBJECTS) $(LDADD) $(LIBS); \
-	fi
-
-scmconfig.h: ${top_builddir}/config.h gen-scmconfig$(EXEEXT)
-	rm -f scmconfig.h.tmp
-	cat $(srcdir)/scmconfig.h.top > scmconfig.h.tmp
-	./gen-scmconfig$(EXEEXT) >> scmconfig.h.tmp
-	chmod 444 scmconfig.h.tmp
-	rm -f scmconfig.h
-	mv scmconfig.h.tmp scmconfig.h
 
 install-exec-hook:
 	rm -f $(DESTDIR)$(bindir)/guile-snarf.awk

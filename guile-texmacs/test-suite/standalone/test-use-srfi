@@ -18,14 +18,14 @@
 
 case aarch64-w64-mingw32 in
     x86_64-w64-mingw32)
-    export GUILE_LOAD_PATH="/windows-qt6/texmacs/src/tm-guile188"
-    export PATH="/windows-qt6/texmacs/src/tm-guile188/libguile:$PATH"
-    export PATH="/windows-qt6/texmacs/src/tm-guile188/libguile/.libs:$PATH"
-    export PATH="/windows-qt6/texmacs/src/tm-guile188/srfi/.libs:$PATH"
-    alias cmd="/windows-qt6/texmacs/src/tm-guile188/libguile/guile -q"
+    export GUILE_LOAD_PATH="C:/msys64/windows-qt6/texmacs/src/tm-guile188"
+    export PATH="C:/msys64/windows-qt6/texmacs/src/tm-guile188/libguile:$PATH"
+    export PATH="C:/msys64/windows-qt6/texmacs/src/tm-guile188/libguile/.libs:$PATH"
+    export PATH="C:/msys64/windows-qt6/texmacs/src/tm-guile188/srfi/.libs:$PATH"
+    alias cmd="C:/msys64/windows-qt6/texmacs/src/tm-guile188/libguile/guile -q"
     ;;
   *)
-    alias cmd="/windows-qt6/texmacs/src/tm-guile188/libguile/guile -q -l /windows-qt6/texmacs/src/tm-guile188/libguile/stack-limit-calibration.scm"
+    alias cmd="C:/msys64/windows-qt6/texmacs/src/tm-guile188/libguile/guile -q -l C:/msys64/windows-qt6/texmacs/src/tm-guile188/libguile/stack-limit-calibration.scm"
     ;;
 esac
 
