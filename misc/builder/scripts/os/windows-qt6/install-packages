@@ -35,6 +35,7 @@ pkgs=(
   tools-git
   winpthreads-git
   winstorecompat-git
+  rust
 )
 
 # Install packages if not installed

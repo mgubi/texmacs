@@ -1,4 +1,4 @@
-all: local/lib/libltdl.a local/lib/libiconv.a local/lib/libpng16.a local/lib/libfreetype.a local/lib/libgmp.a local/bin/qmake local/bin/aspell.exe ghostscript gnutls/lib/.libs/libgnutls.a texmacs
+all: local/lib/libltdl.a local/lib/libiconv.a local/lib/libpng16.a local/lib/libfreetype.a local/lib/libgmp.a local/bin/qmake local/bin/aspell.exe ghostscript gnutls/lib/.libs/libgnutls.a local/lib/libresvg.a texmacs
 
 .PHONY: texmacs
 
@@ -82,7 +82,7 @@ local/bin/qmake:
 ghostscript/Makefile: local/bin/qmake local/lib/libfreetype.a
 	chmod +x ghostscript/configure
 	chmod +x ghostscript/base/instcopy
-	cd ghostscript; ./configure --prefix=$$WORKING_DIR_WIN/local --host=x86_64-w64-mingw32 --disable-compile-inits --without-x --without-tesseract
+	cd ghostscript; ./configure --prefix=$$WORKING_DIR_WIN/local --disable-compile-inits --without-x --without-tesseract
 
 ghostscript: ghostscript/Makefile
 	cd ghostscript; make; make install
@@ -101,6 +101,12 @@ aspell/aspell.exe: aspell/Makefile
 local/bin/aspell.exe: aspell/aspell.exe
 	cd aspell; $(MAKE) install
 	python3 download_dictionaries.py
+
+local/lib/libresvg.a:
+	cd resvg && cargo build --release --manifest-path crates/c-api/Cargo.toml
+	cp resvg/crates/c-api/resvg.h local/include/
+	cp resvg/target/release/libresvg.a local/lib/
+	if [ -f "local/lib/libresvg.a" ]; then echo "libresvg.a has been installed"; else echo "error on libresvg"; exit 1; fi;
 
 texmacs:
 	cd texmacs/src; autoreconf; CFLAGS="$$CFLAGS -std=c99" PKG_CONFIG_PATH=$$WORKING_DIR/local/lib/pkgconfig ./configure --with-texmacs-builder=$$WORKING_DIR/local --prefix=$$WORKING_DIR/local --with-guile=embedded18 --with-qt-find-method=pkgconfig --with-gnutls=yes; mingw32-make; mingw32-make WINDOWS_APPX
