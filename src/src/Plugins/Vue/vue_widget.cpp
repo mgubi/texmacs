@@ -1636,7 +1636,7 @@ vue_ui_rep::do_layout () {
     // a check box, drawn by vue_ui_rep::render
     CLAY({
       .id= toggle_id,
-      .layout= { .sizing= { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIXED(24) }},
+      .layout= { .sizing= { CLAY_SIZING_FIXED(30), CLAY_SIZING_FIXED(30) }},
       .custom= { .customData= vue_render_widget },
       .userData= this }) {}
     return;
@@ -2153,7 +2153,7 @@ vue_ui_rep::render (void *render_data) {
     rectangle r= rd->r;
     bool inert= (d.style & WIDGET_STYLE_INERT) != 0;
     bool hot= (hot_id == CLAY_IDI ("toggle_widget", id).id);
-    SI px= ren->pixel, m= 4*px, rad= 3*px;
+    SI px= ren->pixel, m= 4*px, rad= 4*px; // 22px box in a 30px cell
     SI x1= r->x1 + m, y1= r->y1 + m, x2= r->x2 - m, y2= r->y2 - m;
     color fill= d.on ? (inert ? rgb_color (160, 170, 200) : rgb_color (70, 110, 220))
                      : (hot ? rgb_color (255, 255, 255) : rgb_color (248, 248, 248));
@@ -2168,7 +2168,7 @@ vue_ui_rep::render (void *render_data) {
       xs[0]= x1 + (SI) (0.22*w); ys[0]= y1 + (SI) (0.50*h);
       xs[1]= x1 + (SI) (0.42*w); ys[1]= y1 + (SI) (0.27*h);
       xs[2]= x1 + (SI) (0.78*w); ys[2]= y1 + (SI) (0.74*h);
-      ren->set_pencil (pencil (white, 2*px, cap_round));
+      ren->set_pencil (pencil (white, 3*px, cap_round));
       ren->lines (xs, ys);
     }
     return;
