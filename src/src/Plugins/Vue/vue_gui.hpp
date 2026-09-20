@@ -85,10 +85,17 @@ public:
   bool popup; // undecorated popup/tooltip window
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
+  // windows are shown only once their size matches their contents, to avoid
+  // flickering while a new window is sized (see set_visibility/process_layout)
+  bool visible_requested; // set_visibility (true) has been called
+  bool shown;             // the platform window is currently shown
+  bool ready_to_show;     // the contents fit the window (set by post_layout)
+  int  layout_passes;     // passes since creation (bounds the waiting)
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup),
-    layout_w (0), layout_h (0)
+    layout_w (0), layout_h (0),
+    visible_requested (false), shown (false), ready_to_show (false), layout_passes (0)
   { render_commands.length= 0; }
   virtual ~vue_window_rep () {};
   

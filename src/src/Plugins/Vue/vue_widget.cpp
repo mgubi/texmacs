@@ -1426,7 +1426,7 @@ vue_ui_rep::do_layout () {
     string st= debug_style (d.style);
     if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
-    ui_signal sig;
+    ui_signal sig { .clicked= 0 };
     if (!inert) sig= button_logic (button_id);
     // push buttons (dialogs) are framed, the flat buttons of menus and tool
     // bars are only highlighted when hovered or pressed
@@ -2796,8 +2796,7 @@ find_resize_widget (widget w) {
 
 bool
 vue_plain_window_widget_rep::post_layout () {
-  if (!(popup || autosize) || win == NULL) return false;
-  // popups always follow their contents, other windows only initially
+  if (win == NULL) return false;
   Clay_ElementData el= Clay_GetElementData (CLAY_ID("plain_window_widget"));
   if (!el.found) return false;
   SI w, h;
@@ -2805,6 +2804,13 @@ vue_plain_window_widget_rep::post_layout () {
   SI cw= (SI) (el.boundingBox.width  * PIXEL / retina_factor),
      ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
   if (cw <= 0 || ch <= 0) return false;
+  // the window may be shown once its contents fit in it (see vue_window_rep)
+  if (!(popup || autosize)) {
+    win->ready_to_show= true;
+    return false;
+  }
+  if (abs (w - cw) <= PIXEL && abs (h - ch) <= PIXEL) win->ready_to_show= true;
+  // popups always follow their contents, other windows only initially
   if (!popup) {
     // some widgets (tabs, aligned, extend) use measurements of the previous
     // layout pass: wait until the size of the contents is stable

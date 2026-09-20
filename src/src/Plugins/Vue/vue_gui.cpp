@@ -135,7 +135,9 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
 : vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
   cout << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
-  SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+  // windows start hidden and are shown once laid out, see set_visibility
+  SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
+                         SDL_WINDOW_HIDDEN;
   if (popup)
     // popups and tooltips are undecorated, start hidden and stay on top;
     // they are shown via SLOT_VISIBILITY once positioned
@@ -292,8 +294,16 @@ vue_sdl_base_window_rep::set_modified (bool flag) {
 
 void
 vue_sdl_base_window_rep::set_visibility (bool flag) {
-  if (flag) SDL_ShowWindow (sdl_win);
-  else SDL_HideWindow (sdl_win);
+  visible_requested= flag;
+  if (!flag) {
+    if (shown) SDL_HideWindow (sdl_win);
+    shown= false;
+  }
+  else if (ready_to_show && !shown) {
+    SDL_ShowWindow (sdl_win);
+    shown= true;
+  }
+  // otherwise the window is shown by process_layout once it fits its contents
 }
  
 void
@@ -326,6 +336,13 @@ vue_sdl_base_window_rep::process_layout () {
     }
   } while (relayout);
 
+  // show the window once it fits its contents (or after a few passes, in
+  // case the contents never settle)
+  layout_passes++;
+  if (visible_requested && !shown && (ready_to_show || layout_passes > 10)) {
+    SDL_ShowWindow (sdl_win);
+    shown= true;
+  }
 }
 
 //******************************************************************************
@@ -609,7 +626,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     
   time_t t1, t2;
   t2= texmacs_time ();
-  ren->set_pencil (rgb_color (255,0,0));
+  // areas not covered by any element: red in the debug mode (F1) to spot them
+  ren->set_pencil (clay_debug ? rgb_color (255, 0, 0) : rgb_color (192, 192, 192));
   ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
   render_clay_commands (ren, &render_commands);
 
