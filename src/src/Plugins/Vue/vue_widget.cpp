@@ -1022,13 +1022,27 @@ layout_pull_button (vue_ui_rep *w) {
   w->data= close_box (d);
 }
 
+static bool widget_grows (widget w, bool horizontal); // below
+
 void
 layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
+  // a menu fills its parent across its direction; along its direction it
+  // grows only when one of its items does (see layout_list)
+  bool grows= false;
+  for (int i=0; i<N(a) && !grows; i++) grows= widget_grows (a[i], !vert);
+  Clay_Sizing s= layoutFit;
+  if (vert) {
+    s.width=  CLAY_SIZING_GROW(0);
+    if (grows) s.height= CLAY_SIZING_GROW(0);
+  } else {
+    s.height= CLAY_SIZING_GROW(0);
+    if (grows) s.width= CLAY_SIZING_GROW(0);
+  }
   CLAY({
     .id= vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id),
     .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
-      .sizing= layoutExpand,
+      .sizing= s,
       .childGap= gap }})
   {
     bool save= button_grow;
@@ -1087,17 +1101,20 @@ widget_grows (widget w, bool horizontal) {
 
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
-  // a list fills its parent across its direction; along its direction it
-  // grows only when one of its items does
-  bool grows= false;
-  for (int i=0; i<N(a) && !grows; i++) grows= widget_grows (a[i], !vert);
+  // a vertical list fills the width of its parent; otherwise a list grows
+  // along an axis only when one of its items does
+  bool grows_main= false, grows_cross= false;
+  for (int i=0; i<N(a); i++) {
+    grows_main=  grows_main  || widget_grows (a[i], !vert);
+    grows_cross= grows_cross || widget_grows (a[i], vert);
+  }
   Clay_Sizing s= layoutFit;
   if (vert) {
     s.width=  CLAY_SIZING_GROW(0);
-    if (grows) s.height= CLAY_SIZING_GROW(0);
+    if (grows_main) s.height= CLAY_SIZING_GROW(0);
   } else {
-    s.height= CLAY_SIZING_GROW(0);
-    if (grows) s.width= CLAY_SIZING_GROW(0);
+    if (grows_main)  s.width=  CLAY_SIZING_GROW(0);
+    if (grows_cross) s.height= CLAY_SIZING_GROW(0);
   }
   CLAY({
      .id= vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id),
@@ -1432,7 +1449,7 @@ vue_ui_rep::do_layout () {
     bool pressed= (d.style & WIDGET_STYLE_PRESSED) != 0;
     bool hot= !inert && (hot_id == button_id.id);
     bool down= !inert && (active_id == button_id.id);
-    Clay_Sizing sz= layoutExpand;
+    Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
     Clay_Color bg= color_background;
     Clay_Padding padding= CLAY_PADDING_ALL(5);
@@ -2890,6 +2907,26 @@ public:
 widget texmacs_widget (int mask, command quit) {
   return abstract (tm_new<vue_texmacs_widget_rep> (mask, quit));
 }
+
+// index in vue_texmacs_widget_rep::visibility of a visibility slot, in the
+// order of the bits of the mask given to texmacs_widget (the slots are not
+// declared in that order: the footer comes after the tools)
+static int
+visibility_index (slot s) {
+  switch (s) {
+    case SLOT_HEADER_VISIBILITY:       return 0;
+    case SLOT_MAIN_ICONS_VISIBILITY:   return 1;
+    case SLOT_MODE_ICONS_VISIBILITY:   return 2;
+    case SLOT_FOCUS_ICONS_VISIBILITY:  return 3;
+    case SLOT_USER_ICONS_VISIBILITY:   return 4;
+    case SLOT_FOOTER_VISIBILITY:       return 5;
+    case SLOT_SIDE_TOOLS_VISIBILITY:   return 6;
+    case SLOT_LEFT_TOOLS_VISIBILITY:   return 7;
+    case SLOT_BOTTOM_TOOLS_VISIBILITY: return 8;
+    case SLOT_EXTRA_TOOLS_VISIBILITY:  return 9;
+    default: return 0;
+  }
+}
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : mask (_mask), quit (_quit), win (NULL), vue_widget_rep ("vue_texmacs_widget_rep")
@@ -2949,11 +2986,7 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_LEFT_TOOLS_VISIBILITY:
     case SLOT_BOTTOM_TOOLS_VISIBILITY:
     case SLOT_EXTRA_TOOLS_VISIBILITY:
-      {
-        int index= ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
-        visibility [index]= check_open<bool> (val, s);
-        // update_visibility();
-      }
+      visibility [visibility_index (s)]= check_open<bool> (val, s);
       break;
       
     case SLOT_DESTROY:
@@ -3089,18 +3122,41 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_LEFT_TOOLS_VISIBILITY:
     case SLOT_BOTTOM_TOOLS_VISIBILITY:
     case SLOT_EXTRA_TOOLS_VISIBILITY:
-      {
-        int index= ((s - SLOT_HEADER_VISIBILITY) >>1 ) % 10;
-        check_type_id<bool> (type_id, s);
-        return close_box<bool> (visibility [index]);
-      }
-      break;
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (visibility [visibility_index (s)]);
       
     default:
       return vue_widget_rep::query(s, type_id);
   }
 }
 
+
+// A tool area of the main window (side, left, bottom or extra tools): the
+// tools are stacked in a scrollable panel of their natural size, bounded by a
+// fraction of the window so that the editor keeps most of the space
+static void
+layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, float win_h) {
+  Clay_Sizing sizing;
+  if (side) sizing= { CLAY_SIZING_FIT (.min= 150, .max= (float) max (150.0, 0.4 * win_w)),
+                      CLAY_SIZING_GROW(0) };
+  else      sizing= { CLAY_SIZING_GROW(0),
+                      CLAY_SIZING_FIT (.min= 40, .max= (float) max (40.0, 0.4 * win_h)) };
+  Clay_BorderWidth bw= side ? (Clay_BorderWidth) { 1, 1, 0, 0 } : (Clay_BorderWidth) { 0, 0, 1, 1 };
+  CLAY({
+    .id= id,
+    .backgroundColor= palette[2],
+    .layout= {
+      .sizing= sizing,
+      .padding= CLAY_PADDING_ALL(8),
+      .layoutDirection= CLAY_TOP_TO_BOTTOM },
+    .clip= { .horizontal= !side, .vertical= side, .childOffset= Clay_GetScrollOffset () },
+    .border= { .width= bw, .color= palette[0] }})
+  {
+    tools->do_layout ();
+  }
+  Clay_ScrollContainerData sd= Clay_GetScrollContainerData (id);
+  if (sd.found) scroll_bar (id, sd);
+}
 
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
@@ -3165,7 +3221,27 @@ void vue_texmacs_widget_rep::do_layout () {
         focus_icons->do_layout ();
       }
     }
-    if (!is_nil (main_widget)) main_widget->do_layout ();
+    // the middle row: left tools, the editor and the side tools
+    CLAY({
+      .id= CLAY_ID_LOCAL("Middle"),
+      .layout= {
+        .layoutDirection= CLAY_LEFT_TO_RIGHT,
+        .sizing= layoutExpand }})
+    {
+      if (visibility[7] && !is_nil (left_tools))
+        layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
+                           win->layout_w, win->layout_h);
+      if (!is_nil (main_widget)) main_widget->do_layout ();
+      if (visibility[6] && !is_nil (side_tools))
+        layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
+                           win->layout_w, win->layout_h);
+    }
+    if (visibility[8] && !is_nil (bottom_tools))
+      layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
+                         win->layout_w, win->layout_h);
+    if (visibility[9] && !is_nil (extra_tools))
+      layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
+                         win->layout_w, win->layout_h);
     CLAY({
       .id= CLAY_ID_LOCAL("Footer"),
       .layout= {
