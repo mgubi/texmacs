@@ -1423,8 +1423,6 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_button, widget, w, command, cmd, string, pre, string, ks, int, style);
     vue_menu_button d= open_box<vue_menu_button> (data);
     bool inert= (d.style & WIDGET_STYLE_INERT) != 0;
-    string st= debug_style (d.style);
-    if (N(st)>0 && st != "inert") cout << type << " " << st << LF;
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
     ui_signal sig { .clicked= 0 };
     if (!inert) sig= button_logic (button_id);
@@ -1464,7 +1462,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
-        layout_text (d.ks, d.style, inert ? dark_grey : black);
+        layout_text (d.ks, d.style, black);
       }
     }
     if (sig.clicked == 1) {
@@ -1482,7 +1480,7 @@ vue_ui_rep::do_layout () {
   if (type == "text_widget") {
     //VUE_WIDGET(text_widget, string, s, int, style, color, col, bool, tsp);
     vue_text_widget d= open_box<vue_text_widget> (data);
-    layout_text (d.s, d.style, d.style & WIDGET_STYLE_INERT ? dark_grey : black);
+    layout_text (d.s, d.style, d.col); // grey/inert handled by layout_text
     if (debug_clay) cout << "text_widget " << id <<  "  [" << d.s << "] last_id: " << last_id.id << LF;
     return;
   }
@@ -1635,10 +1633,11 @@ vue_ui_rep::do_layout () {
       command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
       cmd_list= list (c, cmd_list);
     }
-    // a check box, drawn by vue_ui_rep::render
+    // a check box, drawn by vue_ui_rep::render (smaller in the mini style)
+    float box= (d.style & WIDGET_STYLE_MINI) ? 24 : 30;
     CLAY({
       .id= toggle_id,
-      .layout= { .sizing= { CLAY_SIZING_FIXED(30), CLAY_SIZING_FIXED(30) }},
+      .layout= { .sizing= { CLAY_SIZING_FIXED(box), CLAY_SIZING_FIXED(box) }},
       .custom= { .customData= vue_render_widget },
       .userData= this }) {}
     return;
@@ -1721,8 +1720,6 @@ vue_ui_rep::do_layout () {
     //string, hpos, string, vpos);
     //FIXME: implement
     vue_resize_widget d= open_box<vue_resize_widget> (data);
-    string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
     SI minw, minh, defw, defh, maxw, maxh;
     minw= decode_length (d.w1, current_window, d.style);
     minh= decode_length (d.h1, current_window, d.style);
@@ -2521,7 +2518,7 @@ vue_input_text_widget_rep::do_layout () {
         .height= CLAY_SIZING_FIT() },
       .padding= { 8, 8, 4, 4 } }})
   {
-    layout_text (buffer, 0, black);
+    layout_text (buffer, style & (WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED), black);
     if ((N(key_event) > 0) && (is_focused)) {
       //FIXME: handle focus correctly!!
       process_key (key_event);

@@ -843,7 +843,8 @@ vue_render_text_fn (renderer ren, void *w, rectangle r) {
 
 void *vue_render_text= (void*)&vue_render_text_fn;
 
-void layout_text (string s, int style, color c) {
+static void
+layout_text_box (string s, int style, color c) {
   font fn= get_default_styled_font (style);
   metric ex;
   fn->var_get_extents (s, ex);
@@ -860,6 +861,22 @@ void layout_text (string s, int style, color c) {
     .custom= { .customData= vue_render_text },
     .userData= ss.rep
   }) {};
+}
+
+void layout_text (string s, int style, color c) {
+  // grey and inert texts are greyed, whatever color was asked for
+  if (style & (WIDGET_STYLE_GREY | WIDGET_STYLE_INERT)) c= dark_grey;
+  if (style & WIDGET_STYLE_CENTERED) {
+    // centered in the space given by the container
+    CLAY({
+      .layout= {
+        .sizing= { .width= CLAY_SIZING_GROW(0) },
+        .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})
+    {
+      layout_text_box (s, style, c);
+    }
+  }
+  else layout_text_box (s, style, c);
 }
 
 //******************************************************************************
@@ -1628,6 +1645,12 @@ font get_default_font (bool tt, bool mini, bool bold) {
   if (j<n) j++;
   int dpi= (j<n? as_int (s (j, n)): 300);
   if (mini) { sz= (int) (0.6 * sz); dpi= (int) (1.3333333 * dpi); }
+  if (tt) {
+    // WIDGET_STYLE_MONOSPACED: a typewriter font, whatever the platform
+    tree tt_fn= tuple ("modern", "tt", series, "right");
+    tt_fn << as_string (sz) << as_string (dpi);
+    return find_font (tt_fn);
+  }
   if (use_macos_fonts ()) {
     tree lucida_fn= tuple ("apple-lucida", "ss", series, "right");
     lucida_fn << as_string (sz) << as_string ((int) (0.95 * dpi));
