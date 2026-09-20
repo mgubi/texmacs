@@ -1376,7 +1376,10 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
     y= sy - py;
     return true;
   }
-  return press;
+  if (!press) return false;
+  // a press outside dismisses the popup and reaches its target
+  pop->set_visibility (false);
+  return true;
 }
 
 void

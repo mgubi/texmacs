@@ -12,3 +12,8 @@ wait 500
 snapshot d1
 key Return
 wait 800
+# keyboard events go to the window they are sent to: type in the editor
+window #2
+text xyz
+wait 800
+snapshot main

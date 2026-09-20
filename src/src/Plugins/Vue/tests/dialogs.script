@@ -1,0 +1,13 @@
+# needs dialogs.scm: color picker, printer dialog and a popup window
+wait 5000
+window Colors
+snapshot c0
+click 16 30
+wait 500
+window Print
+click 32 40
+wait 500
+window Popup
+snapshot c1
+click 40 12
+wait 500
