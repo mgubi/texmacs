@@ -1,0 +1,8 @@
+# pulldown menus of the main window: Help is the rightmost one
+wait 5000
+window #2
+click 390 12
+wait 800
+snapshot m1
+click 700 500
+wait 500

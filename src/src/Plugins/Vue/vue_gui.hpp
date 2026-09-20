@@ -84,9 +84,11 @@ public:
   bool clay_debug;
   bool popup; // undecorated popup/tooltip window
   vue_input_state input; // pending events and interaction state
+  float layout_w, layout_h; // size of the layout area (pixels)
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
-  : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup)
+  : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup),
+    layout_w (0), layout_h (0)
   { render_commands.length= 0; }
   virtual ~vue_window_rep () {};
   

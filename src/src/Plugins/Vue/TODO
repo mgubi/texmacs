@@ -5,8 +5,7 @@ TODO
 * manage balloons properly (attach them to the widget, don't create layout element for them)
 * handle kinetic wheel properly
 * more uniform handling of mouse events and keyboard focus...
-* fix dropdown menu positioning if they go off the viewport
-* handle focus properly for editors
+* keyboard focus: tab order between the inputs of a dialog
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
@@ -22,6 +21,10 @@ WIP
 
 DONE
 
+* editors are told when their window gains/loses the keyboard focus and when
+  the focus moves to another widget (set_kbd_focus)
+* menus and popups stay on the screen (flip, shift, clamp)
+* resize_widget: default size for auto-sized windows, min/max as window limits
 * implement commands in inputs_list_widget
 * events go to the window they belong to (vue_input_state)
 * auto-size dialog windows to their contents

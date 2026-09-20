@@ -132,6 +132,10 @@ protected:
 
 typedef vue_simple_widget_rep simple_widget_rep;
 
+// keyboard focus of a window: editors are told when they gain or lose it
+void set_kbd_focus (vue_window win, vue_widget w);
+void notify_window_focus (vue_window win, bool has_focus);
+
 /*!
   A file/directory chooser dialog, using native dialogs where available.
   See @link widget.cpp @endlink for an explanation of send(), query(),

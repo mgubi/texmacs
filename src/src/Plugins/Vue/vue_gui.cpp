@@ -140,7 +140,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     // popups and tooltips are undecorated, start hidden and stay on top;
     // they are shown via SLOT_VISIBILITY once positioned
     flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_BORDERLESS |
-           SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN;
+           SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN | SDL_WINDOW_NOT_FOCUSABLE;
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
   c_string buf (name);
@@ -307,6 +307,7 @@ vue_sdl_base_window_rep::process_layout () {
 
 //    Clay_SetCurrentContext (clay_ctx);
     Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
+    layout_w= win_w; layout_h= win_h;
     gui_init_context ();
 
     // layout the top widget
@@ -1405,6 +1406,13 @@ process_event (SDL_Event *event) {
       // popup menus are dismissed as soon as the pointer leaves them
       win= get_window_from_ID (event->window.windowID);
       if (win && win->popup) win->set_visibility (false);
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+      // tell the focused widget of the window (e.g. the editor, which hides
+      // its cursor) whether the window has the keyboard focus
+      win= get_window_from_ID (event->window.windowID);
+      if (win) notify_window_focus (win, event->type == SDL_EVENT_WINDOW_FOCUS_GAINED);
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:

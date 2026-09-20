@@ -179,6 +179,24 @@ store_input_state (vue_window win) {
 }
 
 void
+set_kbd_focus (vue_window win, vue_widget w) {
+  if (win == NULL || win->kbd_focus == w) return;
+  time_t t= texmacs_time ();
+  vue_simple_widget_rep* old= dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep);
+  win->kbd_focus= w;
+  if (old != NULL) old->handle_keyboard_focus (false, t);
+  vue_simple_widget_rep* cur= dynamic_cast<vue_simple_widget_rep*> (w.rep);
+  if (cur != NULL) cur->handle_keyboard_focus (true, t);
+}
+
+void
+notify_window_focus (vue_window win, bool has_focus) {
+  if (win == NULL) return;
+  vue_simple_widget_rep* cur= dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep);
+  if (cur != NULL) cur->handle_keyboard_focus (has_focus, texmacs_time ());
+}
+
+void
 gui_init_context() {
   load_input_state (current_window);
   hot_id= 0;
@@ -603,7 +621,9 @@ decode_length (string width, vue_window win, int style) {
 
 // additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
-VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw);
+VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, bool, flip, float, shift);
+// flip: the menu is opened on the other side of the button to stay in the window
+// shift: horizontal shift of a pulldown menu sticking out on the right
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -767,7 +787,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw };
+    vue_cached_pull_button cd { d.w, d.pw, cw, false, 0 };
     data= close_box (cd);
     return;
   }
@@ -775,7 +795,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pullright_button d= open_box<vue_pullright_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw };
+    vue_cached_pull_button cd { d.w, d.pw, cw, false, 0 };
     data= close_box(cd);
     return;
   }
@@ -891,6 +911,8 @@ layout_pull_button (vue_ui_rep *w) {
       if (is_nil (d.cw)) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
+        d.flip= false;
+        d.shift= 0;
         current_popup= true;
         away_time= 0;
       } else {
@@ -904,13 +926,34 @@ layout_pull_button (vue_ui_rep *w) {
     }
     // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
+      // when the menu (as laid out in the previous pass) sticks out of the
+      // window, open it on the other side of the button; the decision is
+      // kept until the menu closes to avoid flickering
+      Clay_Dimensions dims= { current_window->layout_w, current_window->layout_h };
+      Clay_ElementData fd= Clay_GetElementData (float_id);
+      if (fd.found && !d.flip) {
+        if (down && fd.boundingBox.y + fd.boundingBox.height > dims.height) d.flip= true;
+        if (!down && fd.boundingBox.x + fd.boundingBox.width > dims.width) d.flip= true;
+      }
+      if (fd.found && down && d.shift == 0) {
+        float overflow= fd.boundingBox.x + fd.boundingBox.width - dims.width;
+        if (overflow > 0) d.shift= overflow;
+      }
+      Clay_FloatingAttachPoints attach;
+      if (down) attach= d.flip
+        ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_BOTTOM, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
+        : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM };
+      else attach= d.flip
+        ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_RIGHT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
+        : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_RIGHT_TOP };
+      // a pulldown menu sticking out on the right is shifted back in
+      Clay_Vector2 offset= { -d.shift, 0 };
       CLAY({
         .id= float_id,
         .floating= {
+          .offset= offset,
           .attachTo= CLAY_ATTACH_TO_PARENT,
-          .attachPoints= {
-             .parent= down ? CLAY_ATTACH_POINT_LEFT_BOTTOM
-                           : CLAY_ATTACH_POINT_RIGHT_TOP }},
+          .attachPoints= attach },
         .layout= {
           .padding= { 8, 8, 8, 8 },
           .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
@@ -2349,7 +2392,7 @@ vue_input_text_widget_rep::do_layout () {
     }
     if (Clay_Hovered () && (mouse_action == "press-left")) {
       mouse_action= "";
-      current_window->kbd_focus= this;
+      set_kbd_focus (current_window, this);
     }
   }
 }
@@ -2639,7 +2682,15 @@ vue_plain_window_widget_rep::post_layout () {
       }
     }
   }
-  if ((w != cw) || (h != ch)) win->set_size (cw, ch);
+  if ((w != cw) || (h != ch)) {
+    win->set_size (cw, ch);
+    if (popup) {
+      // keep the popup on the screen (set_position clamps with the new size)
+      SI x, y;
+      win->get_position (x, y);
+      win->set_position (x, y);
+    }
+  }
   return false; // the new size is picked up by the next layout pass
 }
 
@@ -2796,7 +2847,7 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
     case SLOT_SCROLLABLE:
       check_type_void (index, s);
       main_widget= concrete (w);
-      if (win) win->kbd_focus= main_widget;
+      if (win) set_kbd_focus (win, main_widget);
       break;
       
     case SLOT_MAIN_MENU:
@@ -2902,9 +2953,7 @@ void vue_texmacs_widget_rep::do_layout () {
   // grow to the size of the window
   SI w= 300, h= 300;
   if (win) win->get_size (w, h);
-  if (win->kbd_focus == NULL) {
-    win->kbd_focus= main_widget;
-  }
+  if (win->kbd_focus == NULL) set_kbd_focus (win, main_widget);
   CLAY({
     .id= CLAY_IDI("texmacs_widget", id),
     .backgroundColor= color_background,
@@ -3363,9 +3412,7 @@ vue_simple_widget_rep::do_layout () {
       scroll_momentum.x2 += mouse_data[1];
     } else {
       if (starts (mouse_action, "press-")) {
-        if (current_window->kbd_focus != this) {
-          current_window->kbd_focus= this;
-        }
+        set_kbd_focus (current_window, this);
       }
       handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
     }
@@ -4079,7 +4126,7 @@ vue_inputs_list_widget_rep::focus_first_input () {
   vue_plain_window_widget_rep* ww=
     dynamic_cast<vue_plain_window_widget_rep*> (win_widget.rep);
   if (ww != NULL && ww->win != NULL && N(inputs) > 0)
-    ww->win->kbd_focus= concrete (inputs[0]);
+    set_kbd_focus (ww->win, concrete (inputs[0]));
 }
 
 void
