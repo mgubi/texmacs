@@ -18,6 +18,8 @@ WIP
 
 DONE
 
+* tabs/icon-tabs fill their container, the page area is as large as the largest
+  page (hidden pages are measured off-screen), so switching tabs is stable
 * menus stay in the window, scroll when taller than it and are drawn above
   the scroll bars of the editors; footer texts are clipped
 * tab/shift-tab move the focus between the inputs of a dialog

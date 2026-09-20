@@ -666,9 +666,17 @@ vue_sdl_mupdf_window_rep::get_viewport_size (void *data, int& w, int& h) {
 void
 render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
 {
+  // Clay culls the commands of elements outside the window (e.g. the widgets
+  // laid out off-screen to be measured) but not always both ends of a clip:
+  // keep track of the clip depth and ignore what is off-screen ourselves
+  int clip_depth= 0;
   for (int32_t i = 0; i < rcommands->length; i++) {
     Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
     const Clay_BoundingBox bounding_box = rcmd->boundingBox;
+    bool offscreen= (bounding_box.x + bounding_box.width < 0) ||
+                    (bounding_box.y + bounding_box.height < 0);
+    if (offscreen && rcmd->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
+        rcmd->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END) continue;
     rectangle r (bounding_box.x * ren->pixel,
                  -(bounding_box.y + bounding_box.height) * ren->pixel,
                  (bounding_box.x + bounding_box.width)  * ren->pixel,
@@ -775,6 +783,7 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
         Clay_BoundingBox boundingBox = rcmd->boundingBox;
+        clip_depth++;
         ren->clip (rcmd->boundingBox.x * ren->pixel,
                    -(rcmd->boundingBox.y + rcmd->boundingBox.height) * ren->pixel,
                    (rcmd->boundingBox.x + rcmd->boundingBox.width) * ren->pixel,
@@ -782,7 +791,10 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
           break;
       }
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
-        ren->unclip ();
+        if (clip_depth > 0) {
+          clip_depth--;
+          ren->unclip ();
+        }
         break;
       }
       case CLAY_RENDER_COMMAND_TYPE_IMAGE: {

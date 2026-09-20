@@ -1,0 +1,17 @@
+# needs tabs.scm: switch tabs and check the layouts
+wait 6000
+window Vue tabs
+snapshot tb0
+click 90 22
+wait 500
+snapshot tb1
+click 135 22
+wait 500
+snapshot tb2
+window Select document style
+snapshot tb3
+click 120 22
+wait 500
+snapshot tb4
+window User preferences
+snapshot tb5

@@ -1311,57 +1311,103 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "tabs_widget" || type == "icon_tabs_widget") {
+    //VUE_WIDGET(tabs_widget, array<widget>, tabs, array<widget>, bodies);
+    //VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, bs);
+    // A tab bar above the page of the current tab. The widget fills the space
+    // given by its container and its page area is never smaller than the
+    // largest page, so that switching tabs does not change the layout (as in
+    // the Widkit version): the hidden pages are laid out off-screen to be
+    // measured, the current one contributes its natural size.
     vue_tabs_widget_star d= open_box<vue_tabs_widget_star> (data);
+    int n= min (N(d.tabs), N(d.bodies));
+    if (n == 0) return;
+    if (d.current < 0 || d.current >= n) d.current= 0;
     int next= d.current;
-    auto clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    Clay_ElementId clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    string probe= "tabs_widget_page_" * as_string (id);
+    const float pad= 8;
+    float page_w= 0, page_h= 0;
+    for (int i=0; i<n; i++) {
+      Clay_ElementData ed= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), i));
+      if (ed.found) {
+        page_w= max (page_w, ed.boundingBox.width);
+        page_h= max (page_h, ed.boundingBox.height);
+      }
+    }
     CLAY({
       .id= clay_id,
       .layout= {
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
-        .sizing= layoutExpand }})
+        .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
     {
+      // the tab bar; the current tab is drawn connected to the page frame
       CLAY({
-        .id= CLAY_ID_LOCAL("tabs_widget_tab_bar"),
-        .backgroundColor= {100, 100, 100, 255},
-        .cornerRadius= { 10, 10, 0, 0, },
+        .id= CLAY_ID_LOCAL("tab_bar"),
         .layout= {
-          .padding= { 10, 10, 10, 0 },
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
-          .childGap= 20,
-          .sizing= { .width=  CLAY_SIZING_GROW(0),
-            .height= CLAY_SIZING_FIT(0) } }})
+          .padding= { 6, 6, 4, 0 },
+          .childGap= 2,
+          .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM },
+          .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) }}})
       {
-        for (int i= 0, n= N(d.tabs); i< n; i++) {
+        for (int i= 0; i< n; i++) {
           Clay_ElementId tab_id= CLAY_IDI_LOCAL("tab", i);
-          if (button_logic (tab_id).clicked == 1) {
-            next= i;
-          }
+          if (button_logic (tab_id).clicked == 1) next= i;
+          bool cur= (d.current == i);
+          Clay_Color bg= cur ? color_background
+                       : ((hot_id == tab_id.id) ? color_highlight : palette[0]);
           CLAY({
             .id= tab_id,
-            .backgroundColor= d.current == i ? palette[3] : palette[2],
-            .cornerRadius= { 5, 5, 0, 0, },
-            .layout= { .padding= { 10, 10, 10, 10 } },
-            .border= { .width= { 1, 1, 1, 1 },
-              .color= palette[3] }})
+            .backgroundColor= bg,
+            .cornerRadius= { 5, 5, 0, 0 },
+            .layout= {
+              .padding= { 10, 10, (uint16_t) (cur ? 8 : 5), (uint16_t) (cur ? 6 : 4) },
+              .childGap= 6,
+              .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+            .border= { .width= { 1, 1, 1, 0 }, .color= palette[0] }})
           {
-            if (N(d.icons) > i) {
-              concrete (d.icons[i])->do_layout();
-            }
+            if (i < N(d.icons)) concrete (d.icons[i])->do_layout ();
             concrete (d.tabs[i])->do_layout ();
           }
         }
       }
+      // the page of the current tab
       CLAY({
         .id= CLAY_ID_LOCAL("tab_area"),
-        .layout= { .sizing= layoutExpand },
-        .border= { .width= {1, 1, 1, 1},
-          .color= palette[3] }})
+        .backgroundColor= color_background,
+        .layout= {
+          .padding= CLAY_PADDING_ALL((uint16_t) pad),
+          .sizing= { .width=  CLAY_SIZING_GROW(.min= page_w + 2*pad),
+                     .height= CLAY_SIZING_GROW(.min= page_h + 2*pad) }},
+        .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
       {
-        concrete (d.bodies[d.current]) -> do_layout ();
+        CLAY({
+          .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
+        {
+          concrete (d.bodies[d.current])->do_layout ();
+        }
+      }
+      // the hidden pages, laid out off-screen only to be measured
+      CLAY({
+        .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM },
+        .floating= {
+          .offset= { -100000, -100000 },
+          .attachTo= CLAY_ATTACH_TO_ROOT,
+          .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
+      {
+        for (int i=0; i<n; i++) {
+          if (i == d.current) continue;
+          CLAY({
+            .id= CLAY_SIDI (CLAY_TM_STRING (probe), i),
+            .layout= { .sizing= layoutFit }})
+          {
+            concrete (d.bodies[i])->do_layout ();
+          }
+        }
       }
     }
     d.current= next;
-    data= close_box(d);
+    data= close_box (d);
     return;
   }
   if (type == "menu_button") {
@@ -2467,6 +2513,7 @@ public:
   bool refresh;
   bool popup;    // undecorated popup or tooltip window, sized to its contents
   bool autosize; // size the window to its contents at the next layout pass
+  SI last_cw, last_ch; // contents size measured in the previous layout pass
   string title;
   string refresh_kind;
   
@@ -2493,6 +2540,7 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   // dialogs get their initial size from their contents, the main TeXmacs
   // window and popups are handled differently (see do_layout/post_layout)
   autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
+  last_cw= last_ch= -1;
 }
 
 void
@@ -2697,6 +2745,12 @@ vue_plain_window_widget_rep::post_layout () {
      ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
   if (cw <= 0 || ch <= 0) return false;
   if (!popup) {
+    // some widgets (tabs, aligned, extend) use measurements of the previous
+    // layout pass: wait until the size of the contents is stable
+    if (cw != last_cw || ch != last_ch) {
+      last_cw= cw; last_ch= ch;
+      return false;
+    }
     // leave some room for the window decorations and the screen borders
     SI sw, sh;
     gui_root_extents (sw, sh);
