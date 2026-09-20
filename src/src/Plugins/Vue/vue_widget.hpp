@@ -110,6 +110,7 @@ public:
   
   static void repaint_all (); // called in the event loop
   static void repaint_all_in_window (vue_window win);
+  static void notify_resizes (); // called before the interpose handler
   static void forget_window (vue_window win); // the window is being destroyed
   
 protected:
@@ -120,6 +121,7 @@ protected:
   picture      backing_store;
   coord2       backing_pos;
   bool         backing_valid;
+  bool         resize_pending; // the viewport changed since the last notification
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_viewport_rect (int x1, int y1, int x2, int y2);
@@ -130,6 +132,10 @@ protected:
 };
 
 typedef vue_simple_widget_rep simple_widget_rep;
+
+// set by a widget whose layout used measurements of the previous pass which
+// were not available: the window is laid out again right away
+extern bool layout_again;
 
 // keyboard focus of a window: editors are told when they gain or lose it
 void set_kbd_focus (vue_window win, vue_widget w);

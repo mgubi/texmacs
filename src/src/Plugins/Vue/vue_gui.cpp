@@ -309,8 +309,10 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
 void
 vue_sdl_base_window_rep::process_layout () {
   bool relayout= false;
+  int passes= 0;
   do {
     with_window frame (this);
+    layout_again= false;
     // init the current GUI context
     int win_x, win_y, win_w, win_h;
     SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
@@ -330,11 +332,8 @@ vue_sdl_base_window_rep::process_layout () {
     gui_finalize_context ();
 
     // post layout tweaking
-    relayout= content->post_layout ();
-    if (relayout) {
-      cout << "relayout!" << LF;
-    }
-  } while (relayout);
+    relayout= content->post_layout () || layout_again;
+  } while (relayout && ++passes < 5);
 
   // show the window once it fits its contents (or after a few passes, in
   // case the contents never settle)
@@ -1076,6 +1075,7 @@ void gui_start_loop () {
     
     // 5. interpose
     t2= texmacs_time ();
+    vue_simple_widget_rep::notify_resizes ();
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
     t1= t2; t2= texmacs_time ();
@@ -1612,6 +1612,7 @@ bool event_filter (void *userdata, SDL_Event *event) {
       Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
       win->relayout= true;
       win->process_layout();
+      vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
       vue_simple_widget_rep::repaint_all_in_window (win);
       win->process_redraw();

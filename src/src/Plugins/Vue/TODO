@@ -18,6 +18,12 @@ WIP
 
 DONE
 
+* the editor is told when its viewport changes (notify_resizes) and centers
+  the paper in a wider canvas; the paper follows the side tools
+* section bars of the tools ("sections", "section-tabs") drawn as segmented
+  bars and tabs; flat buttons are transparent
+* widgets measured from the previous pass ask for another pass when new
+  (layout_again), no misaligned first frame
 * tabs/icon-tabs fill their container, the page area is as large as the largest
   page (hidden pages are measured off-screen), so switching tabs is stable
 * menus stay in the window, scroll when taller than it and are drawn above

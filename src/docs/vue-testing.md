@@ -55,6 +55,11 @@ grep -n 'choice:\|Error message\|vue script: done' /tmp/run.log
 
 Boot takes 5–15 s (more under load): scripts start with `wait 5000` or more,
 and a missing `vue script: done` usually means the run was killed too early.
+Leave a few seconds between two runs and kill only the test process (`$!`),
+not every `texmacs.bin` (the user may be running one). If the log says
+`Installation completed successfully`, the settings file could not be read
+and a Welcome window opened: tools then go to that window (`current-window`)
+and the snapshots of window `#2` are meaningless — rerun.
 `Error message:` in the log is a crash report with a C++ backtrace
 (`get_crash_report`); addresses without symbols can be located with
 `objdump -d --disassemble-symbols=<mangled>` on `texmacs.bin`.
@@ -64,7 +69,10 @@ Tests: `widgets` (choice, enum, toggle, filtered choice, tree, ink), `dialog`
 printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
 `resize`, `styles`, `font` (open and close the font selector), `popup` and
 `menus` (context menu and pull-down menus, flipping/scrolling), `checks`
-(menu check marks), `tools` (side and bottom tools).
+(menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
+section tabs of the preferences tool react to clicks), `two-tools` (tools at
+the top and bottom of both sides), `tools-close` (replacing a tool, adding a
+bottom one, closing the top one; the paper follows the canvas).
 
 ## Writing a test
 

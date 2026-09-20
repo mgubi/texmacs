@@ -129,6 +129,12 @@ vue_window current_window; // used during layout to propagate information
 bool window_autosizing= false; // the window is being sized to its contents
 int context_style= 0; // style flags (bold, grey) added by the enclosing divisions
 bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a close button)
+// laying out the buttons of a "sections" or "section-tabs" bar of a tool:
+// 0 not in a bar, 1 in a bar of buttons, 2 in a bar of tabs; the selected
+// entry is wrapped in an "active-section"/"section-active-tab" division
+int  section_bar= 0;
+bool section_active= false;
+bool layout_again= false; // see vue_widget.hpp
 
 // signalling
 
@@ -1339,31 +1345,54 @@ vue_ui_rep::do_layout () {
       }
     }
     else if (d.name == "sections" || d.name == "section-tabs") {
-      // horizontal bars of section buttons, the second one looks like tabs
+      // horizontal bars of section buttons: "sections" is a segmented bar of
+      // buttons, "section-tabs" a row of tabs sitting on a line; the buttons
+      // draw themselves according to section_bar (see menu_button)
       bool tabs= (d.name == "section-tabs");
-      CLAY({
-        .id= div_id,
-        .backgroundColor= tabs ? (Clay_Color) { 176, 176, 176, 255 } : palette[0],
-        .cornerRadius= tabs ? (Clay_CornerRadius) {} : (Clay_CornerRadius) { 6, 6, 6, 6 },
-        .layout= {
-          .padding= { 6, 6, 4, (uint16_t) (tabs ? 0 : 4) },
-          .sizing= { .width= CLAY_SIZING_GROW(0) },
-          .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM }},
-        .border= { .width= { 0, 0, 0, (uint16_t) (tabs ? 1 : 0) }, .color= color_border }})
-      {
-        concrete (d.w)->do_layout ();
+      int saved_bar= section_bar;
+      bool saved_active= section_active;
+      section_bar= tabs ? 2 : 1;
+      section_active= false;
+      if (tabs) {
+        context_style |= WIDGET_STYLE_GREY; // inactive tabs are dimmed
+        CLAY({
+          .id= div_id,
+          .layout= {
+            .padding= { 8, 8, 4, 0 },
+            .sizing= { .width= CLAY_SIZING_GROW(0) },
+            .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM }},
+          .border= { .width= { .bottom= 1 }, .color= color_border }})
+        {
+          concrete (d.w)->do_layout ();
+        }
       }
+      else {
+        CLAY({
+          .id= div_id,
+          .backgroundColor= { 204, 204, 204, 255 },
+          .cornerRadius= CLAY_CORNER_RADIUS(7),
+          .layout= {
+            .padding= CLAY_PADDING_ALL(2),
+            .sizing= { .width= CLAY_SIZING_FIT(0) },
+            .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+        {
+          concrete (d.w)->do_layout ();
+        }
+      }
+      section_bar= saved_bar;
+      section_active= saved_active;
     }
     else if (d.name == "active-section" || d.name == "section-active-tab") {
-      // the selected entry of the bars above
-      CLAY({
-        .id= div_id,
-        .backgroundColor= color_background,
-        .cornerRadius= { 6, 6, 0, 0 },
-        .border= { .width= { 1, 1, 1, 0 }, .color= color_border }})
-      {
+      // the selected entry of the bars above: a transparent wrapper, the
+      // button inside draws itself as active
+      bool saved_active= section_active;
+      section_active= true;
+      context_style &= ~WIDGET_STYLE_GREY;
+      CLAY({ .id= div_id }) {
         concrete (d.w)->do_layout ();
       }
+      section_active= saved_active;
     }
     else concrete (d.w)->do_layout (); // "plain" and others
     context_style= saved_style;
@@ -1386,6 +1415,8 @@ vue_ui_rep::do_layout () {
       Clay_ElementData r= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), 2*i+1));
       row_h[i]= max (l.found ? l.boundingBox.height : 0.0f,
                      r.found ? r.boundingBox.height : 0.0f);
+      // a new widget: this pass is not aligned yet, ask for another one
+      if (!l.found || !r.found) layout_again= true;
     }
     CLAY({
       .id= CLAY_IDI("aligned_widget", id),
@@ -1604,18 +1635,44 @@ vue_ui_rep::do_layout () {
     }
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
-    Clay_Color bg= color_background;
+    Clay_Color bg= { 0, 0, 0, 0 }; // flat buttons show their container
     Clay_Padding padding= CLAY_PADDING_ALL(5);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(4);
     Clay_BorderElementConfig border= {};
+    bool tab_strip= false;
     if (push) {
       bg= down ? color_button_down : (hot ? color_button_hover : color_button);
       padding= { 14, 14, 6, 6 };
       radius= CLAY_CORNER_RADIUS(6);
       border= { .width= { 1, 1, 1, 1 }, .color= color_border };
     }
+    else if (section_bar == 2) {
+      // a tab of a "section-tabs" bar: the active one is framed and merges
+      // with the area below (the line of the bar is covered by a strip)
+      padding= { 12, 12, 6, 6 };
+      radius= { 6, 6, 0, 0 };
+      if (section_active) {
+        bg= palette[3];
+        border= { .width= { 1, 1, 1, 0 }, .color= color_border };
+        tab_strip= true;
+      }
+      else if (down) bg= color_pressed;
+      else if (hot) bg= { 236, 236, 236, 255 };
+    }
+    else if (section_bar == 1) {
+      // a segment of a "sections" bar
+      padding= { 12, 12, 4, 4 };
+      radius= CLAY_CORNER_RADIUS(5);
+      if (section_active) {
+        bg= palette[3];
+        border= { .width= { 1, 1, 1, 1 }, .color= color_border };
+      }
+      else if (down) bg= color_pressed;
+      else if (hot) bg= { 220, 220, 220, 255 };
+    }
     else if (down || pressed) bg= color_pressed;
     else if (hot) bg= color_highlight;
+    Clay_ElementData bd= Clay_GetElementData (button_id);
     CLAY({
       .id= button_id,
       .layout= {
@@ -1643,6 +1700,21 @@ vue_ui_rep::do_layout () {
         // add shortcut
         CLAY({ .layout= { .sizing= layoutExpand }}) {}
         layout_text (d.ks, d.style, black);
+      }
+      if (tab_strip && bd.found) {
+        // cover the bottom line of the bar under the active tab (the border
+        // of the bar is drawn after its children, hence the z index)
+        CLAY({
+          .backgroundColor= bg,
+          .layout= { .sizing= { CLAY_SIZING_FIXED (bd.boundingBox.width - 2),
+                                CLAY_SIZING_FIXED (1) }},
+          .floating= {
+            .offset= { 1, -1 },
+            .zIndex= 1,
+            .attachTo= CLAY_ATTACH_TO_PARENT,
+            .attachPoints= { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                             .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM },
+            .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
       }
     }
     if (sig.clicked == 1) {
@@ -3274,6 +3346,16 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
       return main_widget->query (s, type_id);
+
+    case SLOT_SIZE:
+    {
+      // the size of the window (the editor sizes the "automatic" paper
+      // from it, as with the Qt main window)
+      check_type_id<coord2> (type_id, s);
+      SI w= 0, h= 0;
+      if (win) win->get_size (w, h);
+      return close_box<coord2> (coord2 (w, h));
+    }
       
     case SLOT_HEADER_VISIBILITY:
     case SLOT_MAIN_ICONS_VISIBILITY:
@@ -3475,7 +3557,8 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   backing_pos (coord2(0, 0)),
   scroll_pos (coord2 (0, 0)),
   absolute_scroll (false),
-  backing_valid (false)
+  backing_valid (false),
+  resize_pending (false)
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
@@ -3614,9 +3697,10 @@ vue_simple_widget_rep::query (slot s, int type_id) {
     }
     case SLOT_SIZE:
     {
+      // the size of the viewport in TeXmacs units (size is in pixels of the
+      // backing store); the editor derives the width of the paper from it
       check_type_id<coord2> (type_id, s);
-      //FIXME: is ok?
-      return close_box<coord2> (size);
+      return close_box<coord2> (coord2 (size.x1 * ren->pixel, size.x2 * ren->pixel));
     }
     case SLOT_SCROLL_POSITION:
     {
@@ -3930,7 +4014,9 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   // viewport size (in TeXmacs units)
   coord2 sz (size.x1 * ren->pixel, size.x2 * ren->pixel);
 
-  if (backing_pos != scroll_pos) {
+  // the extents may have changed since the last repaint (e.g. the paper is
+  // centered in a wider viewport): the position is clamped in any case
+  {
     // preprocess scroll_pos
     if (absolute_scroll) {
       coord2 pt= scroll_pos;
@@ -3947,8 +4033,10 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     
     // clamp the new position
     if (scroll_pos.x1 < extents->x1) scroll_pos.x1= extents->x1;
-    else if (scroll_pos.x1 + sz.x1 > extents->x2) scroll_pos.x1= max (extents->x2 - sz.x1, 0);
-    if (scroll_pos.x2 - sz.x2 < extents->y1) scroll_pos.x2= min (extents->y1 + sz.x2, 0);
+    else if (scroll_pos.x1 + sz.x1 > extents->x2)
+      scroll_pos.x1= max (extents->x2 - sz.x1, extents->x1);
+    if (scroll_pos.x2 - sz.x2 < extents->y1)
+      scroll_pos.x2= min (extents->y1 + sz.x2, extents->y2);
     else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
   }
   
@@ -4025,6 +4113,9 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     backing_store= new_backing_store;
     delete_renderer (ren);
     ren= ren2;
+    // the editor must be told (see notify_resizes), but not while we are
+    // repainting: it would re-typeset in the middle of a repaint
+    resize_pending= true;
   }
   
   // repaint invalid rectangles if needed
@@ -4067,6 +4158,22 @@ vue_simple_widget_rep::repaint_all_in_window (vue_window win) {
   list<vue_simple_widget_rep*> l= paint_list;
   while (!is_nil(l)) {
     if (l->item->win == win) l->item->repaint_invalid_regions ();
+    l= l->next;
+  }
+}
+
+void
+vue_simple_widget_rep::notify_resizes () {
+  // the editor re-typesets for a new viewport (e.g. the width of the paper
+  // in papyrus mode follows the window); this must happen before its
+  // pending changes are applied by the interpose handler
+  list<vue_simple_widget_rep*> l= paint_list;
+  while (!is_nil(l)) {
+    vue_simple_widget_rep* w= l->item;
+    if (w->resize_pending) {
+      w->resize_pending= false;
+      w->handle_notify_resize (w->size.x1 * w->ren->pixel, w->size.x2 * w->ren->pixel);
+    }
     l= l->next;
   }
 }

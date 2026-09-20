@@ -12,11 +12,12 @@ The worktree `wip_other_guis/src` is configured with
 
 Header dependencies are recorded while compiling (`-MMD -MP -MF Deps/$*.d`,
 included at the end of the makefile), so a header change rebuilds the objects
-which include it. Before this was added, objects compiled before a header
-change (e.g. a virtual method added to `renderer.hpp`) were silently kept and
-the mixed vtables crashed at startup (SIGSEGV in
-`mupdf_renderer_rep::new_shadow`): if that ever recurs,
-`find src/Objects -name '*.o' -not -newer <header> -delete && make`.
+which include it — but only objects compiled since a `.d` file exists for
+them. Stale objects after a change of a class layout or vtable (a member
+added to `vue_simple_widget_rep`, a virtual method in `renderer.hpp`) crash
+at startup in unrelated places (SIGSEGV in `edit_interface_rep`'s constructor
+or in `mupdf_renderer_rep::new_shadow`). When in doubt rebuild everything: 
+`rm -f src/Objects/*.o && make -j8` takes about 25 s.
 
 Vue-specific objects: `vue_gui.cpp`, `vue_widget.cpp` (C++20), `clay.c`
 (the Clay implementation, compiled once).

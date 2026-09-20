@@ -30,7 +30,7 @@ command (a nil command must never be invoked).
 | `horizontal_menu`, `vertical_menu`, `minibar_menu` | `layout_menu`: vertical menus fit their items, items fill the width (`button_grow`), check-mark column reserved when an item has a mark | |
 | `horizontal_list`, `vertical_list` | `layout_list` with the grow policy | |
 | `tile_menu` | rows of `cols` items | |
-| `menu_button (w, cmd, pre, ks, style)` | flat (menus, tool bars) or framed push button (`WIDGET_STYLE_BUTTON`); `pre` = `"v"`/`"*"`/`"o"` drawn as check/bullet/circle; `ks` shortcut right-aligned | queues `cmd`; sets `cancel_popup` |
+| `menu_button (w, cmd, pre, ks, style)` | flat (menus, tool bars; transparent until hovered) or framed push button (`WIDGET_STYLE_BUTTON`); `pre` = `"v"`/`"*"`/`"o"` drawn as check/bullet/circle; `ks` shortcut right-aligned; in a tool title bar the `"x"` label becomes a round close button; inside a `sections`/`section-tabs` division it draws as a segment/tab (`section_bar`, `section_active`) | queues `cmd`; sets `cancel_popup` |
 | `pulldown_button`, `pullright_button` | `layout_pull_button`: floating menu attached to the button, flipped/shifted to stay in the window, scrollable, `zIndex` 5 | evaluates the `promise<widget>` when opened, cached in `cw` |
 | `menu_separator`, `menu_group` | rule / greyed group title | |
 | `balloon_widget (w, help)` | floating help below `w` after 1 s of hovering, hidden after 5 s | |
@@ -45,7 +45,7 @@ command (a nil command must never be invoked).
 | `glue_widget`, colored glue | fixed or growing spacer; colored glue caches a picture | |
 | `empty_widget` | 0×0 | |
 | `extend_widget (w, a)` | `w` with the size of the largest of `a` (measured off-screen) | |
-| `division_widget (name, w)` | CSS class names: `title`, `subtitle`, `discrete`, `sections`, `section-tabs`, `active-section`, `section-active-tab`; `plain`/others transparent; bold/grey inherited via `context_style` | |
+| `division_widget (name, w)` | CSS class names (see the Qt themes in `misc/themes`): `title` (framed bold bar, rounded top), `subtitle`, `discrete` (grey), `sections` (segmented bar of buttons), `section-tabs` (row of tabs on a line, inactive tabs grey), `active-section`/`section-active-tab` (transparent wrappers marking the selected entry, which the button draws framed); `plain`/others transparent; bold/grey inherited via `context_style` | |
 | `aligned_widget (lhs, rhs, ...)` | two columns, rows sized from the measured heights of both cells | |
 | `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
@@ -87,4 +87,9 @@ etc. through `SLOT_SIDE_TOOLS`, `SLOT_LEFT_TOOLS`, `SLOT_BOTTOM_TOOLS`,
 as scrollable framed panels (side panels at most 40% of the width, bottom rows
 at most 40% of the height). A tool is `(division "title" (hlist (text name)
 >> (division "plain" ("x" close))))` followed by its body (`tm-tool` macro in
-`kernel/gui/menu-widget.scm`).
+`kernel/gui/menu-widget.scm`). A side holds one tool per position
+(`:right`, `:transient-right`, `:bottom-right`, ...): `tool-select` replaces
+the tool of its position, and `texmacs-side-tools` stacks the top ones, a
+growing glue and the bottom ones. `section-tabs` (`menu-define.scm`) is a
+`refreshable` whose tabs are plain menu buttons, the active one wrapped in
+`(class "section-active-tab" ...)`.

@@ -104,7 +104,20 @@ Window resizes are handled synchronously in an SDL event watch
   `enum_widget`. Hidden things to measure are laid out inside a floating
   element attached to the root with a huge negative offset (culled by Clay).
   Because of this, a decision taken from the previous pass must be *sticky*
-  (menu flipping, auto-size stability) to avoid flickering.
+  (menu flipping, auto-size stability) to avoid flickering. A widget which
+  finds no previous data (it was just created by a refresh) sets
+  `layout_again`: `process_layout` then runs another pass immediately (at
+  most 5), so the first frame shown is already correct.
+* **Editor viewport**: `vue_simple_widget_rep` reads its Clay box in
+  `repaint_invalid_regions`; when it changes, the backing store is resized
+  and `resize_pending` is set. `notify_resizes ()` runs right before the
+  interpose handler (never during a repaint, the editor would warn about an
+  "invalid situation") and calls `handle_notify_resize`, so the editor
+  re-typesets and recomputes its extents: `edit_interface.cpp` centers the
+  paper in a wider canvas for `VUETEXMACS` as for X11, and the scroll
+  position is clamped to the extents at every repaint. The `SLOT_SIZE` query
+  of an editor returns its viewport in SI (`size * ren->pixel`), the one of
+  the main widget the window size (as the Qt main window).
 * **Size policy** (`widget_grows` in `vue_widget.cpp`): a container grows
   along an axis only when one of its descendants does (`resize_widget` with
   min≠max, `user_canvas`, editors, splitters, tabs, growing glue). Lists grow
@@ -125,7 +138,8 @@ Window resizes are handled synchronously in an SDL event watch
   `color_background` (192, dialogs), `color_field` (250, lists, scrollable
   areas, embedded editors), `color_border` (150), push button shades,
   `color_pressed`, selection blue `{100,100,255}` and the accent
-  `{70,110,220}` of check boxes. `texmacs_output_widget` in the core uses the
+  `{70,110,220}` of check boxes. Flat buttons are transparent (they show
+  their container: dialog, tool panel or menu) until hovered or pressed. `texmacs_output_widget` in the core uses the
   field color for the Vue build (`tm_button.cpp`).
 * **Z order**: editors' scroll bars 1, menus 5 (their scroll bars 6), enum
   dropdowns and balloons 10.
