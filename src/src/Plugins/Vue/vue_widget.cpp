@@ -26,6 +26,9 @@
 #include "file.hpp" // for file_completions
 #include "url.hpp"
 #include "tm_window.hpp"
+#include "sys_utils.hpp" // for system (printer widget)
+#include "analyze.hpp"   // for occurs (filtered choice)
+#include "poly_line.hpp" // for ink widget
 
 #if MUPDF_RENDERER
 #include "../MuPDF/mupdf_picture.hpp"
@@ -339,10 +342,11 @@ inline tm_ostream& operator << (tm_ostream& out, picture &bb)
 
 // VUE_WIDGET(plain_window_widget, widget, w, string, s, command, quit);
 // creates a decorated window with name s and contents w
-VUE_WIDGET(popup_window_widget, widget, w, string, s);
+// VUE_WIDGET(popup_window_widget, widget, w, string, s);
 // creates an undecorated popup window with name s and contents w
-VUE_WIDGET(tooltip_window_widget, widget, w, string, s);
+// VUE_WIDGET(tooltip_window_widget, widget, w, string, s);
 // creates an undecorated tooltip window with name s and contents w
+// (both are implemented at the end of this file using vue_plain_window_widget_rep)
 
 /******************************************************************************
 * Top-level widgets, typically given as an argument to plain_window_widget
@@ -431,8 +435,9 @@ widget choice_widget (command cmd, array<string> vals, string cur, string filter
   return filtered_choice_widget(cmd, vals, cur, filter);
 }
   // select a value from a long list with scrollbars and an input to filter
-VUE_WIDGET(tree_view_widget, command, cmd, tree, data, tree, data_roles);
+// VUE_WIDGET(tree_view_widget, command, cmd, tree, data, tree, data_roles);
   // A widget with a tree view which observes the data and updates automatically
+  // (see vue_tree_view_widget_rep below)
 
 /******************************************************************************
 * Other widgets
@@ -487,10 +492,10 @@ VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
 VUE_WIDGET(wait_widget, SI, width, SI, height, string, message);
   // a widget of a specified width and height, displaying a wait message
   // this widget is only needed when using the X11 plugin
-VUE_WIDGET(ink_widget, command, cb);
+// VUE_WIDGET(ink_widget, command, cb);
   // widget for inking a sketch. The input may later be passed to
   // an external program for handwriting recognition,
-  // using the callback routine
+  // using the callback routine (see vue_ink_widget_rep below)
 VUE_WIDGET(refresh_widget, string, tmwid, string, kind);
   // a widget which is automatically constructed from the a dynamic
   // scheme widget tmwid. When receiving the send_refresh event,
@@ -551,6 +556,119 @@ VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, icons, arr
 VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, current, object, curobj);
 
 VUE_WIDGET_DATA(refresh_widget_star, string, tmwid, string, kind, widget, current, object, curobj);
+
+VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val, int, st, string, w, bool, open);
+// an enum widget with the state of its dropdown list
+
+VUE_WIDGET_DATA(filtered_choice_widget_star, command, cb, array<string>, vals, string, val, widget, input);
+// a filtered choice widget with the input field used for the filter
+
+VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content);
+// a printer widget with the prebuilt dialog contents
+
+VUE_WIDGET_DATA(color_picker_widget_star, command, cmd, bool, bg, array<tree>, proposals, widget, content);
+// a color picker with the prebuilt dialog contents
+
+/******************************************************************************
+* Helper commands
+******************************************************************************/
+
+class applied_command_rep: public command_rep {
+  command cmd;
+  object arg;
+public:
+  applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
+  void apply () { cmd (arg); }
+  void apply (object arg2) { cmd (arg2); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<applied_command " << cmd << " " << arg << ">"; }
+};
+
+inline command
+applied_command (command cmd, object arg) {
+  return tm_new<applied_command_rep> (cmd, arg);
+}
+
+class noop_command_rep: public command_rep {
+public:
+  noop_command_rep () {}
+  void apply () {}
+  void apply (object arg) { (void) arg; }
+  tm_ostream& print (tm_ostream& out) { return out << "<noop_command>"; }
+};
+
+inline command
+noop_command () {
+  return tm_new<noop_command_rep> ();
+}
+
+// print a file using the system print spooler and then run 'after'
+class print_command_rep: public command_rep {
+  url file;
+  command after;
+public:
+  print_command_rep (url _file, command _after): file (_file), after (_after) {}
+  void apply () {
+    string cmd= "lpr " * escape_sh (concretize (file));
+    if (DEBUG_VUE_WIDGETS) debug_widgets << "Running print command: " << cmd << LF;
+    system (cmd);
+    if (!is_nil (after)) after ();
+  }
+  tm_ostream& print (tm_ostream& out) { return out << "<print_command " << file << ">"; }
+};
+
+widget input_text_widget (command call_back, string type, array<string> def,
+                          int style, string width);
+
+// contents of the dialog shown by printer_widget
+static widget
+make_printer_dialog (command cmd, url ps_pdf_file) {
+  array<widget> buttons;
+  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", 0)
+          << menu_button (text_widget (translate ("Print"), 0, black),
+                          tm_new<print_command_rep> (ps_pdf_file, cmd), "", "", 0);
+  array<widget> rows;
+  rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
+       << glue_widget (false, false, 0, 10*PIXEL)
+       << horizontal_list (buttons);
+  return vertical_list (rows);
+}
+
+// contents of the dialog shown by color_picker_widget
+static widget
+make_color_picker_dialog (command cmd, bool bg, array<tree> proposals) {
+  (void) bg;
+  static const char* standard[]= {
+    "black", "dark grey", "grey", "light grey", "white",
+    "red", "green", "blue", "yellow", "cyan", "magenta",
+    "dark red", "dark green", "dark blue", "dark yellow", "dark cyan", "dark magenta",
+    "orange", "brown", "pink", "pastel red", "pastel green", "pastel blue",
+    "pastel yellow", "pastel cyan", "pastel magenta", "pastel orange", "pastel brown",
+    NULL };
+  array<widget> rows;
+  if (N(proposals) > 0) {
+    array<widget> swatches;
+    for (int i=0; i<N(proposals); i++)
+      swatches << menu_button (glue_widget (proposals[i], false, false, 12*PIXEL, 12*PIXEL),
+                               applied_command (cmd, list_object (object (proposals[i]))),
+                               "", "", 0);
+    rows << text_widget (translate ("Recent colors"), 0, black)
+         << tile_menu (swatches, 8);
+  }
+  array<widget> swatches;
+  for (int i=0; standard[i] != NULL; i++) {
+    tree col (standard[i]);
+    swatches << menu_button (glue_widget (col, false, false, 12*PIXEL, 12*PIXEL),
+                             applied_command (cmd, list_object (object (col))),
+                             "", "", 0);
+  }
+  rows << text_widget (translate ("Colors"), 0, black)
+       << tile_menu (swatches, 8)
+       << glue_widget (false, false, 0, 10*PIXEL)
+       << menu_button (text_widget (translate ("Cancel"), 0, black),
+                       applied_command (cmd, list_object (object (false))), "", "", 0);
+  return vertical_list (rows);
+}
 
 
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
@@ -617,6 +735,36 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     data= close_box (vue_cached_glue_widget { .pic=p, .col= d.col, .w= d.w, .h= d.h, .vx= d.vx, .hx= d.hx});
     return;
   }
+  if (type == "enum_widget") {
+    vue_enum_widget d= open_box<vue_enum_widget> (data);
+    vue_enum_widget_star dd { .cb= d.cb, .vals= d.vals, .val= d.val, .st= d.st, .w= d.w, .open= false };
+    data= close_box (dd);
+    return;
+  }
+  if (type == "filtered_choice_widget") {
+    vue_filtered_choice_widget d= open_box<vue_filtered_choice_widget> (data);
+    // the filter is edited in a text input, we read its contents directly during layout
+    array<string> def (1);
+    def[0]= d.filter;
+    widget input= input_text_widget (noop_command (), "search-filter", def, 0, "24em");
+    vue_filtered_choice_widget_star dd { .cb= d.cb, .vals= d.vals, .val= d.val, .input= input };
+    data= close_box (dd);
+    return;
+  }
+  if (type == "printer_widget") {
+    vue_printer_widget d= open_box<vue_printer_widget> (data);
+    vue_printer_widget_star dd { .cmd= d.cmd, .ps_pdf_file= d.ps_pdf_file,
+                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file) };
+    data= close_box (dd);
+    return;
+  }
+  if (type == "color_picker_widget") {
+    vue_color_picker_widget d= open_box<vue_color_picker_widget> (data);
+    vue_color_picker_widget_star dd { .cmd= d.cmd, .bg= d.bg, .proposals= d.proposals,
+                                      .content= make_color_picker_dialog (d.cmd, d.bg, d.proposals) };
+    data= close_box (dd);
+    return;
+  }
 };
 
 void
@@ -630,9 +778,23 @@ vue_ui_rep::send (slot s, blackbox val) {
     }
     d.w->send (s, val);
     return;
-  } else {
-    vue_widget_rep::send (s, val);
   }
+  if (type == "popup_widget") {
+    //VUE_WIDGET(popup_widget, widget, w);
+    vue_popup_widget d= open_box<vue_popup_widget> (data);
+    if (s == SLOT_MOUSE_GRAB) {
+      // the grab is implicit: our window is dismissed when the pointer leaves
+      // (see SDL_EVENT_WINDOW_MOUSE_LEAVE in vue_gui.cpp)
+      return;
+    }
+    d.w->send (s, val);
+    return;
+  }
+  if (type == "printer_widget" || type == "color_picker_widget") {
+    // these dialogs are windows created by the scheme side, nothing to do
+    if (s == SLOT_VISIBILITY || s == SLOT_KEYBOARD_FOCUS) return;
+  }
+  vue_widget_rep::send (s, val);
 }
 
 void
@@ -713,13 +875,13 @@ layout_pull_button (vue_ui_rep *w) {
 }
 
 void
-layout_menu (unsigned int id, array<widget> a, bool vert) {
+layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
   CLAY({
     .id= vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id),
     .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= layoutExpand,
-      .childGap= 10 }})
+      .childGap= gap }})
   {
     bool save= button_grow;
     button_grow= vert ? true : false;
@@ -749,18 +911,6 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
     }
   }
 }
-
-class applied_command_rep: public command_rep {
-  command cmd;
-  object arg;
-public:
-  applied_command_rep (command _cmd, object _arg): cmd (_cmd), arg (_arg) {}
-  void apply () { cmd (arg); }
-  void apply (object arg2) { cmd (arg2); }
-  tm_ostream& print (tm_ostream& out) {
-    return out << "<applied_command " << cmd << " " << arg << ">"; }
-};
-
 
 typedef struct
 {
@@ -853,6 +1003,8 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
   }
 }
 
+string input_text_widget_string (widget w); // defined below
+
 void
 vue_ui_rep::do_layout () {
   if (type == "horizontal_menu") {
@@ -876,9 +1028,23 @@ vue_ui_rep::do_layout () {
     return;
   }
   if (type == "division_widget") {
+    //VUE_WIDGET(division_widget, string, name, widget, w);
     vue_division_widget d= open_box<vue_division_widget> (data);
-    cout << "division_widget, ignoring " << d.name << LF;
-    concrete (d.w)->do_layout ();
+    // only some of the CSS class names used by the scheme code get a look
+    if (d.name == "title-bar") {
+      CLAY({
+        .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+        .backgroundColor= palette[0],
+        .layout= {
+          .padding= { 8, 8, 4, 4 },
+          .sizing= { .width= CLAY_SIZING_GROW(0) },
+          .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    } else {
+      concrete (d.w)->do_layout ();
+    }
     return;
   }
   if (type == "aligned_widget") {
@@ -1218,23 +1384,74 @@ vue_ui_rep::do_layout () {
   }
   if (type == "enum_widget") {
     //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
-    //FIXME: implement
-    vue_enum_widget d= open_box<vue_enum_widget> (data);
-    SI w= decode_length (d.w, current_window, d.st);
-    Clay_ElementId enum_id= CLAY_SIDI(CLAY_TM_STRING(type), id);
-    if (button_logic (enum_id).clicked == 1) {
-      //FIXME: implement
-      cout << "Clicked enum_widget!" << LF;
+    // a button showing the current value, with a dropdown list of the choices
+    vue_enum_widget_star d= open_box<vue_enum_widget_star> (data);
+    bool inert= (d.st & WIDGET_STYLE_INERT) != 0;
+    Clay_ElementId enum_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    Clay_ElementId list_id= CLAY_IDI ("enum_widget_list", id);
+    ui_signal sig { .clicked= 0 };
+    if (!inert) sig= button_logic (enum_id);
+    bool changed= false;
+    if (sig.clicked == 1) { d.open= !d.open; changed= true; }
+    Clay_Sizing sz= { CLAY_SIZING_FIT (.min= 40), CLAY_SIZING_FIT (0) };
+    if (N(d.w) > 0) {
+      SI w= decode_length (d.w, current_window, d.st);
+      sz.width= CLAY_SIZING_FIXED ((float) 2*w/PIXEL);
     }
+    Clay_ElementData ed= Clay_GetElementData (enum_id);
     CLAY({
       .id= enum_id,
-      .layout= {
-        .sizing= {
-          CLAY_SIZING_FIXED ((float) 2*w/PIXEL),
-          CLAY_SIZING_FIT (0) }}})
+      .layout= { .sizing= sz, .padding= { 8, 8, 4, 4 }, .childGap= 4 },
+      .backgroundColor= (!inert && hot_id == enum_id.id) ? color_highlight
+                                                          : (Clay_Color) { 208, 208, 210, 255 },
+      .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
     {
-      layout_text (d.vals [d.st], 0, black);
+      layout_text (d.val, d.st, inert ? dark_grey : black);
+      CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
+      layout_text ("<#25BE>", 0, inert ? dark_grey : black); // down arrow
+      if (d.open) {
+        CLAY({
+          .id= list_id,
+          .floating= {
+            .zIndex= 10,
+            .attachTo= CLAY_ATTACH_TO_PARENT,
+            .attachPoints= { .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM }},
+          .layout= {
+            .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .padding= CLAY_PADDING_ALL(4),
+            .sizing= { .width= CLAY_SIZING_FIT (.min= ed.found ? ed.boundingBox.width : 0) }},
+          .backgroundColor= color_background,
+          .border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 }}})
+        {
+          for (int i=0; i<N(d.vals); i++) {
+            Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
+            ui_signal isig= button_logic (item_id);
+            bool active= (d.vals[i] == d.val);
+            CLAY({
+              .id= item_id,
+              .layout= { .padding= { 8, 8, 4, 4 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
+              .backgroundColor= (hot_id == item_id.id) ? color_highlight
+                                : (active ? palette[2] : color_background) })
+            {
+              layout_text (d.vals[i], d.st, black);
+            }
+            if (isig.clicked == 1) {
+              d.val= d.vals[i];
+              d.open= false;
+              changed= true;
+              cmd_list= list (applied_command (d.cb, list_object (object (d.val))), cmd_list);
+            }
+          }
+        }
+        // dismiss the list when clicking somewhere else
+        if (starts (mouse_action, "press-") &&
+            !Clay_PointerOver (list_id) && !Clay_PointerOver (enum_id)) {
+          d.open= false;
+          changed= true;
+        }
+      }
     }
+    if (changed) data= close_box (d);
     return;
   }
   if (type == "resize_widget") {
@@ -1407,24 +1624,212 @@ vue_ui_rep::do_layout () {
   }
   if (type == "choice_widget") {
     //VUE_WIDGET(choice_widget, command, cb, array<string>, vals, array<string>, chosen, bool, flag);
+    // flag is true when multiple selections are allowed
     vue_choice_widget d= open_box<vue_choice_widget> (data);
+    bool changed= false;
     CLAY({
       .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
       .layout= {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
-        .sizing= layoutFit,
-        .childGap= 10 }
+        .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) },
+        .childGap= 2 }
     }) {
       for (int i=0; i<N(d.vals); i++) {
-        bool active= false;
-        for (int j=0; j<N(d.chosen); j++)
-          if (d.chosen[j] == d.vals[i]) { active= true; break; }
+        int j, n= N(d.chosen);
+        for (j=0; j<n; j++)
+          if (d.chosen[j] == d.vals[i]) break;
+        bool active= (j < n);
+        Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
+        if (button_logic (item_id).clicked == 1) {
+          if (d.flag) {
+            // toggle the selection of this item
+            if (active) d.chosen= append (range (d.chosen, 0, j), range (d.chosen, j+1, n));
+            else d.chosen << d.vals[i];
+          } else {
+            d.chosen= array<string> (1);
+            d.chosen[0]= d.vals[i];
+          }
+          active= !active || !d.flag;
+          changed= true;
+        }
         Clay_Color bg= color_background;
         if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
-        CLAY({ .backgroundColor= bg }) {
-          layout_text (d.vals [i], 0, black);
+        else if (hot_id == item_id.id) bg= color_highlight;
+        CLAY({
+          .id= item_id,
+          .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
+          .backgroundColor= bg })
+        {
+          layout_text (d.vals [i], 0, active ? white : black);
         }
       }
+    }
+    if (changed) {
+      data= close_box (d);
+      object l;
+      if (d.flag) {
+        l= null_object ();
+        for (int i= N(d.chosen)-1; i>=0; i--) l= cons (object (d.chosen[i]), l);
+      }
+      else l= object (N(d.chosen) > 0 ? d.chosen[0] : string (""));
+      cmd_list= list (applied_command (d.cb, list_object (l)), cmd_list);
+    }
+    return;
+  }
+  if (type == "filtered_choice_widget") {
+    //VUE_WIDGET(filtered_choice_widget, command, cb, array<string>, vals, string, val, string, filter);
+    // a text input for the filter above a scrollable list of the matching values
+    vue_filtered_choice_widget_star d= open_box<vue_filtered_choice_widget_star> (data);
+    string filter= input_text_widget_string (d.input);
+    Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    Clay_ElementId list_id= CLAY_IDI ("filtered_choice_list", id);
+    bool changed= false;
+    CLAY({
+      .id= my_id,
+      .layout= {
+        .layoutDirection= CLAY_TOP_TO_BOTTOM,
+        .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) },
+        .childGap= 4 }})
+    {
+      concrete (d.input)->do_layout ();
+      CLAY({
+        .id= list_id,
+        .layout= {
+          .layoutDirection= CLAY_TOP_TO_BOTTOM,
+          .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(.min= 100) }},
+        .backgroundColor= { 240, 240, 240, 255 },
+        .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] },
+        .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () }})
+      {
+        for (int i=0; i<N(d.vals); i++) {
+          if (N(filter) > 0 && !occurs (filter, d.vals[i])) continue;
+          Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
+          bool active= (d.vals[i] == d.val);
+          if (button_logic (item_id).clicked == 1) {
+            d.val= d.vals[i];
+            active= true;
+            changed= true;
+          }
+          Clay_Color bg= { 240, 240, 240, 255 };
+          if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
+          else if (hot_id == item_id.id) bg= color_highlight;
+          CLAY({
+            .id= item_id,
+            .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
+            .backgroundColor= bg })
+          {
+            layout_text (d.vals[i], 0, active ? white : black);
+          }
+        }
+      }
+    }
+    Clay_ScrollContainerData scrollData= Clay_GetScrollContainerData (list_id);
+    if (scrollData.found) scroll_bar (list_id, scrollData);
+    if (changed) {
+      data= close_box (d);
+      cmd_list= list (applied_command (d.cb, list_object (object (d.val), object (filter))),
+                      cmd_list);
+    }
+    return;
+  }
+  if (type == "popup_widget") {
+    //VUE_WIDGET(popup_widget, widget, w);
+    // the unmapping is handled by the popup window containing us
+    vue_popup_widget d= open_box<vue_popup_widget> (data);
+    concrete (d.w)->do_layout ();
+    return;
+  }
+  if (type == "minibar_menu") {
+    //VUE_WIDGET(minibar_menu, array<widget>, a);
+    vue_minibar_menu d= open_box<vue_minibar_menu> (data);
+    layout_menu (id, d.a, false, 2);
+    return;
+  }
+  if (type == "empty_widget") {
+    //VUE_WIDGET(empty_widget);
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= { .sizing= { CLAY_SIZING_FIXED(0), CLAY_SIZING_FIXED(0) }}}) {};
+    return;
+  }
+  if (type == "extend_widget") {
+    //VUE_WIDGET(extend_widget, widget, w, array<widget>, a);
+    // the widgets in a are laid out off-screen (so that Clay culls them) and
+    // their sizes, as measured in the previous layout pass, are used as
+    // minimal size for w
+    vue_extend_widget d= open_box<vue_extend_widget> (data);
+    Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    string probe= "extend_widget_probe_" * as_string (id);
+    float min_w= 0, min_h= 0;
+    for (int i=0; i<N(d.a); i++) {
+      Clay_ElementData ed= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), i));
+      if (ed.found) {
+        min_w= max (min_w, ed.boundingBox.width);
+        min_h= max (min_h, ed.boundingBox.height);
+      }
+    }
+    CLAY({
+      .id= my_id,
+      .layout= { .sizing= { CLAY_SIZING_FIT (.min= min_w), CLAY_SIZING_FIT (.min= min_h) }}})
+    {
+      concrete (d.w)->do_layout ();
+      CLAY({
+        .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM },
+        .floating= {
+          .offset= { -100000, -100000 },
+          .attachTo= CLAY_ATTACH_TO_ROOT,
+          .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
+      {
+        for (int i=0; i<N(d.a); i++) {
+          CLAY({
+            .id= CLAY_SIDI (CLAY_TM_STRING (probe), i),
+            .layout= { .sizing= layoutFit }})
+          {
+            concrete (d.a[i])->do_layout ();
+          }
+        }
+      }
+    }
+    return;
+  }
+  if (type == "wait_widget") {
+    //VUE_WIDGET(wait_widget, SI, width, SI, height, string, message);
+    vue_wait_widget d= open_box<vue_wait_widget> (data);
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= {
+        .sizing= { CLAY_SIZING_FIXED ((float) 2*d.width/PIXEL),
+                   CLAY_SIZING_FIXED ((float) 2*d.height/PIXEL) },
+        .layoutDirection= CLAY_TOP_TO_BOTTOM,
+        .childGap= 8,
+        .childAlignment= { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }},
+      .backgroundColor= { 255, 255, 160, 255 },
+      .border= { .width= { 1, 1, 1, 1 }, .color= { 0, 0, 0, 255 }}})
+    {
+      layout_text (upcase_all (translate ("please wait")), WIDGET_STYLE_BOLD, black);
+      if (N(d.message) > 0) layout_text (d.message, 0, black);
+    }
+    return;
+  }
+  if (type == "printer_widget") {
+    //VUE_WIDGET(printer_widget, command, cmd, url, ps_pdf_file);
+    vue_printer_widget_star d= open_box<vue_printer_widget_star> (data);
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= { .padding= CLAY_PADDING_ALL(16), .sizing= layoutFit }})
+    {
+      concrete (d.content)->do_layout ();
+    }
+    return;
+  }
+  if (type == "color_picker_widget") {
+    //VUE_WIDGET(color_picker_widget, command, cmd, bool, bg, array<tree>, proposals);
+    vue_color_picker_widget_star d= open_box<vue_color_picker_widget_star> (data);
+    CLAY({
+      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+      .layout= { .padding= CLAY_PADDING_ALL(16), .sizing= layoutFit }})
+    {
+      concrete (d.content)->do_layout ();
     }
     return;
   }
@@ -1826,6 +2231,13 @@ input_text_widget (command call_back, string type, array<string> def,
                                                       def, style, width));
 }
 
+// the string currently entered in an input_text_widget
+string
+input_text_widget_string (widget w) {
+  vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
+  return (in != NULL) ? in->s : string ("");
+}
+
 /******************************************************************************
 * plain windows
 ******************************************************************************/
@@ -1844,11 +2256,13 @@ public:
   bool mouse_grab;
   bool modified;
   bool refresh;
+  bool popup; // undecorated popup or tooltip window, sized to its contents
   string title;
   string refresh_kind;
   
 public:
-  vue_plain_window_widget_rep (widget _wid, string _name, command _quit);
+  vue_plain_window_widget_rep (widget _wid, string _name, command _quit,
+                               bool _popup= false);
   ~vue_plain_window_widget_rep() {}
   
   void send (slot s, blackbox val);
@@ -1861,9 +2275,11 @@ public:
   bool post_layout ();
 }; // class vue_plain_window_widget_rep
 
-vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name, command _quit)
-: vue_widget_rep (type_vue_plain_window_widget), wid(_wid), name(_name), quit(_quit), visible (false) {
-  cout << "Creating vue_plain_window_widget" << LF;
+vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name,
+                                                          command _quit, bool _popup)
+: vue_widget_rep (type_vue_plain_window_widget), wid(_wid), name(_name), quit(_quit),
+  win (NULL), visible (false), popup (_popup) {
+  cout << "Creating vue_plain_window_widget" << (popup ? " (popup)" : "") << LF;
 }
 
 void
@@ -2004,30 +2420,34 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 
 void
 vue_plain_window_widget_rep::do_layout () {
+  Clay_BorderElementConfig border= {};
+  if (popup) border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
   CLAY({
     .id= CLAY_ID("plain_window_widget"),
     .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .sizing= layoutFull }})
+      .sizing= popup ? layoutFit : layoutFull },
+    .border= border })
   {
      concrete (wid)->do_layout ();
   }
+  // popup menus are dismissed once one of their buttons has been activated
+  if (popup && cancel_popup && win) win->set_visibility (false);
 }
 
 bool
 vue_plain_window_widget_rep::post_layout () {
+  if (!popup || win == NULL) return false;
+  // popups are sized to their contents
   Clay_ElementData el= Clay_GetElementData (CLAY_ID("plain_window_widget"));
-  SI w,h;
+  if (!el.found) return false;
+  SI w, h;
   win->get_size (w, h);
-  SI cw= el.boundingBox.width * PIXEL / 2,
-     ch= el.boundingBox.height * PIXEL / 2;
-  if (false && !win->clay_debug && ((w != cw) || (h != ch))) {
-    //cout << w << "," << h << " " << cw << "," << ch << LF;
-    win->set_size (cw, ch);
-    return true;
-  }
-  return false; // do not relayout
+  SI cw= (SI) (el.boundingBox.width  * PIXEL / retina_factor),
+     ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
+  if (cw > 0 && ch > 0 && ((w != cw) || (h != ch))) win->set_size (cw, ch);
+  return false; // the new size is picked up by the next layout pass
 }
 
 //******************************************************************************
@@ -3402,6 +3822,277 @@ inputs_list_widget (command call_back, array<string> prompts) {
 }
 
 
+/******************************************************************************
+* ink_widget
+******************************************************************************/
+
+class vue_ink_widget_rep: public vue_widget_rep {
+  command  cb;
+  contours shs;      // the strokes, in pixels from the top-left corner (y downwards)
+  bool     dragging; // are we in the middle of a stroke?
+  int      w, h;     // size in pixels
+
+public:
+  vue_ink_widget_rep (command _cb)
+    : vue_widget_rep ("ink_widget"), cb (_cb), shs (), dragging (false),
+      w (600), h (400) {}
+  void do_layout ();
+  void render (void *data);
+  void commit ();
+};
+
+void
+vue_ink_widget_rep::commit () {
+  // the strokes are passed to the callback as a list of lists of points
+  // (in pixels, y axis upwards, as in the X11 implementation)
+  object l= null_object ();
+  for (int k= N(shs)-1; k>=0; k--) {
+    poly_line sh= shs[k];
+    object obj= null_object ();
+    for (int i= N(sh)-1; i>=0; i--) {
+      object p= list_object (object (sh[i][0]), object (-sh[i][1]));
+      obj= cons (p, obj);
+    }
+    l= cons (obj, l);
+  }
+  cmd_list= list (applied_command (cb, list_object (l)), cmd_list);
+}
+
+void
+vue_ink_widget_rep::do_layout () {
+  Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+  Clay_ElementData ed= Clay_GetElementData (my_id);
+  CLAY({
+    .id= my_id,
+    .layout= { .sizing= { CLAY_SIZING_FIXED ((float) w), CLAY_SIZING_FIXED ((float) h) }},
+    .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] },
+    .custom= { .customData= vue_render_widget },
+    .userData= this }) {};
+
+  if (!ed.found || mouse_action == "") return;
+  bool over= Clay_PointerOver (my_id);
+  if (!over && !dragging) return;
+  double x= mouse_x - ed.boundingBox.x;
+  double y= mouse_y - ed.boundingBox.y;
+  point p (x, y);
+  if (mouse_action == "press-right" && over) {
+    // erase the strokes near the pointer
+    int n= N(shs);
+    contours nshs;
+    for (int i=0; i<n; i++)
+      if (!nearby (p, shs[i])) nshs << shs[i];
+    shs= nshs;
+    if (N(shs) != n) commit ();
+    mouse_action= "";
+  }
+  else if (mouse_action == "press-left" && over) {
+    poly_line sh (0);
+    sh << p;
+    shs << sh;
+    dragging= true;
+    mouse_action= "";
+  }
+  else if (dragging && (mouse_action == "move" || mouse_action == "release-left")) {
+    poly_line& sh= shs [N(shs)-1];
+    point q= sh [N(sh)-1];
+    if (q[0] != x || q[1] != y) sh << p;
+    if (mouse_action == "release-left") {
+      dragging= false;
+      commit ();
+    }
+    mouse_action= "";
+  }
+}
+
+void
+vue_ink_widget_rep::render (void *data) {
+  vue_render_ren_data* d= (vue_render_ren_data*) data;
+  renderer ren= d->ren;
+  rectangle r= d->r;
+  ren->set_background (rgb_color (255, 255, 240));
+  ren->clear (r->x1, r->y1, r->x2, r->y2);
+  ren->set_pencil (pencil (black, 2*ren->pixel));
+  for (int i=0; i<N(shs); i++) {
+    poly_line sh= shs[i];
+    int n= N(sh);
+    if (n == 0) continue;
+    array<SI> x (max (n, 2)), y (max (n, 2));
+    for (int j=0; j<n; j++) {
+      x[j]= r->x1 + (SI) (sh[j][0] * ren->pixel);
+      y[j]= r->y2 - (SI) (sh[j][1] * ren->pixel);
+    }
+    if (n == 1) { x[1]= x[0]; y[1]= y[0]; } // a single point is drawn as a dot
+    ren->lines (x, y);
+  }
+}
+
+widget
+ink_widget (command cb) {
+  return abstract (tm_new<vue_ink_widget_rep> (cb));
+}
+
+/******************************************************************************
+* tree_view_widget
+******************************************************************************/
+
+// The data tree is displayed with one row per node, the children of the root
+// being the top-level rows. The roles tree describes, for each tree label,
+// which of the first children of a node hold the display string, the command
+// string and the user data (same format as QTMTreeModel):
+//   (tuple (label "DisplayRole" "CommandRole" "UserRole:1" ...) ...)
+// the children of a node start after these role arguments.
+
+class vue_tree_view_widget_rep: public vue_widget_rep {
+  command cmd;
+  tree    data;
+  hashmap<int,int> nargs;             // number of role arguments per label
+  hashmap<int,int> display_pos;       // position of the display string per label
+  hashmap<int,int> command_pos;       // position of the command string per label
+  hashmap<int,array<int> > user_pos;  // positions of the user data per label
+  hashset<pointer> expanded;          // the expanded nodes
+
+public:
+  vue_tree_view_widget_rep (command _cmd, tree _data, tree roles);
+  void do_layout ();
+
+private:
+  int    row_offset (tree t);
+  bool   has_children (tree t);
+  string node_label (tree t);
+  void   layout_node (tree t, int depth);
+  void   activate (tree t, int buttons);
+};
+
+vue_tree_view_widget_rep::vue_tree_view_widget_rep (command _cmd, tree _data, tree roles)
+  : vue_widget_rep ("tree_view_widget"), cmd (_cmd), data (_data),
+    nargs (0), display_pos (-1), command_pos (-1), user_pos (array<int> ())
+{
+  if (is_compound (roles))
+    for (int i=0; i<N(roles); i++) {
+      if (!is_compound (roles[i])) continue;
+      int tag= (int) L(roles[i]);
+      nargs (tag)= N(roles[i]);
+      for (int j=0; j<N(roles[i]); j++) {
+        if (!is_atomic (roles[i][j])) continue;
+        string role= roles[i][j]->label;
+        if (role == "DisplayRole") display_pos (tag)= j;
+        else if (role == "CommandRole") command_pos (tag)= j;
+        else if (starts (role, "UserRole:")) {
+          int num= max (0, min (9, as_int (role (9, N(role))) - 1));
+          array<int> a= user_pos [tag];
+          while (N(a) <= num) a << -1;
+          a[num]= j;
+          user_pos (tag)= a;
+        }
+      }
+    }
+  expanded->insert ((pointer) data.operator-> ());
+}
+
+int
+vue_tree_view_widget_rep::row_offset (tree t) {
+  return is_compound (t) ? nargs [(int) L(t)] : 0;
+}
+
+bool
+vue_tree_view_widget_rep::has_children (tree t) {
+  return is_compound (t) && N(t) > row_offset (t);
+}
+
+string
+vue_tree_view_widget_rep::node_label (tree t) {
+  if (is_atomic (t)) return t->label;
+  int pos= display_pos [(int) L(t)];
+  if (pos >= 0 && pos < N(t) && is_atomic (t[pos])) return t[pos]->label;
+  return as_string (L(t));
+}
+
+void
+vue_tree_view_widget_rep::activate (tree t, int buttons) {
+  // same arguments as the Qt implementation:
+  // (user-data-n ... user-data-1 command-or-subtree mouse-buttons)
+  object args= list_object (object (buttons));
+  int pos= is_compound (t) ? command_pos [(int) L(t)] : -1;
+  if (pos >= 0 && pos < N(t) && is_atomic (t[pos]))
+    args= cons (object (t[pos]->label), args);
+  else
+    args= cons (object (t), args);
+  if (is_compound (t)) {
+    array<int> a= user_pos [(int) L(t)];
+    for (int i=0; i<N(a); i++)
+      if (a[i] >= 0 && a[i] < N(t) && is_atomic (t[a[i]]))
+        args= cons (object (t[a[i]]->label), args);
+  }
+  cmd_list= list (applied_command (cmd, args), cmd_list);
+}
+
+void
+vue_tree_view_widget_rep::layout_node (tree t, int depth) {
+  pointer key= (pointer) t.operator-> ();
+  uint32_t hash= (uint32_t) (((uintptr_t) key) >> 4);
+  bool kids= has_children (t);
+  bool open= expanded->contains (key);
+  Clay_ElementId toggle_id= CLAY_IDI ("tree_view_toggle", hash);
+  Clay_ElementId label_id=  CLAY_IDI ("tree_view_label", hash);
+  ui_signal tsig { .clicked= 0 };
+  if (kids) tsig= button_logic (toggle_id);
+  ui_signal lsig= button_logic (label_id);
+  CLAY({
+    .layout= {
+      .layoutDirection= CLAY_LEFT_TO_RIGHT,
+      .padding= { (uint16_t) (16*depth), 0, 0, 0 },
+      .sizing= { .width= CLAY_SIZING_GROW(0) },
+      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+  {
+    CLAY({
+      .id= toggle_id,
+      .layout= {
+        .sizing= { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIT(0) },
+        .padding= { 4, 4, 2, 2 }}})
+    {
+      if (kids) layout_text (open ? "<#25BE>" : "<#25B8>", 0, dark_grey);
+    }
+    CLAY({
+      .id= label_id,
+      .layout= { .padding= { 4, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
+      .backgroundColor= (hot_id == label_id.id) ? color_highlight : color_background })
+    {
+      layout_text (node_label (t), 0, black);
+    }
+  }
+  if (tsig.clicked == 1) {
+    if (open) expanded->remove (key);
+    else expanded->insert (key);
+    open= !open;
+  }
+  if (lsig.clicked != 0) {
+    static const int buttons[4]= { 0, 1, 4, 2 }; // none, left, middle, right (Qt encoding)
+    activate (t, buttons[lsig.clicked]);
+  }
+  if (kids && open)
+    for (int i= row_offset (t); i<N(t); i++)
+      layout_node (t[i], depth+1);
+}
+
+void
+vue_tree_view_widget_rep::do_layout () {
+  CLAY({
+    .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    .layout= {
+      .layoutDirection= CLAY_TOP_TO_BOTTOM,
+      .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) }}})
+  {
+    // the root itself is not displayed
+    for (int i= row_offset (data); i<N(data); i++)
+      layout_node (data[i], 0);
+  }
+}
+
+widget
+tree_view_widget (command cmd, tree data, tree data_roles) {
+  return abstract (tm_new<vue_tree_view_widget_rep> (cmd, data, data_roles));
+}
+
 //-----------------------------------------------------------------------------
 
 // toplevel window constructor
@@ -3431,6 +4122,22 @@ widget plain_window_widget (widget wid, string s, command quit) {
   }
 }
   
+// undecorated windows for popup menus and tooltips; they are sized to their
+// contents (see vue_plain_window_widget_rep::post_layout) and dismissed when
+// the pointer leaves them (see SDL_EVENT_WINDOW_MOUSE_LEAVE in vue_gui.cpp)
+widget
+popup_window_widget (widget w, string s) {
+  vue_plain_window_widget_rep *wwid=
+    tm_new<vue_plain_window_widget_rep> (w, s, command (), true);
+  plain_window (wwid, s, true);
+  return abstract (wwid);
+}
+
+widget
+tooltip_window_widget (widget w, string s) {
+  return popup_window_widget (w, s);
+}
+
 void destroy_window_widget (widget w) {
   vue_widget vw= concrete(w);
   cout << "destroy_window_widget on " << vw->type << LF;

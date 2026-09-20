@@ -12,6 +12,10 @@ TODO
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
+* auto-size plain windows to their contents (popups already do, see post_layout)
+* test interactively the new widgets (enum dropdown, choice lists, tree view, ink,
+  color picker, printer dialog, popup windows)
+* printer_widget just spools the file with lpr, no printer settings
 
 WIP
 
@@ -20,6 +24,10 @@ WIP
 
 DONE
 
+* implement the missing widgets: popup/tooltip windows, popup_widget, tree view,
+  ink, enum dropdown, (filtered) choice lists, extend, wait, empty, minibar,
+  division, printer and color picker dialogs
+* TEXMACS_VUE_SNAPSHOT=<dir> saves the rendering of each window as PNG (debugging)
 * implement copy & paste
 * fix keyboard handling (Alt+3 should give #)
 * remove balloons after a while

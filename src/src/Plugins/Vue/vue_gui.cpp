@@ -31,6 +31,7 @@
 #include "new_view.hpp"      // get_current_editor()
 #include "image_files.hpp"
 #include "tm_window.hpp"
+#include "sys_utils.hpp"     // get_env
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -83,7 +84,7 @@ class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
   
-  vue_sdl_base_window_rep (vue_widget w, string name);
+  vue_sdl_base_window_rep (vue_widget w, string name, bool popup= false);
   ~vue_sdl_base_window_rep ();
   
   void *platform_window () { return (void*)sdl_win; }
@@ -128,11 +129,16 @@ void HandleClayErrors (Clay_ErrorData errorData) {
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
 
-vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name)
-: vue_window_rep (_content, _name)
+vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup)
+: vue_window_rep (_content, _name, _popup)
 {
-  cout << "create vue_sdl_base_window_rep " << id << LF;
+  cout << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+  if (popup)
+    // popups and tooltips are undecorated, start hidden and stay on top;
+    // they are shown via SLOT_VISIBILITY once positioned
+    flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_BORDERLESS |
+           SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN;
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
   c_string buf (name);
@@ -324,7 +330,7 @@ public:
   SDL_Renderer *sdl_ren;
   TTF_TextEngine *text_engine;
 
-  vue_sdl_window_rep (vue_widget w, string name);
+  vue_sdl_window_rep (vue_widget w, string name, bool popup= false);
   ~vue_sdl_window_rep ();
   
   void process_redraw ();
@@ -355,6 +361,29 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 
 void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
+
+static void
+save_pixmap_as_png (fz_context *ctx, fz_pixmap *pix, string path) {
+  c_string cpath (path);
+  fz_output *out= NULL;
+  fz_pixmap *rgb_pix= NULL;
+  fz_var (out);
+  fz_var (rgb_pix);
+  fz_try (ctx) {
+    rgb_pix= fz_convert_pixmap (ctx, pix, fz_device_rgb (ctx),
+                                NULL, NULL, fz_default_color_params, 1);
+    out= fz_new_output_with_path (ctx, cpath, 0);
+    fz_write_pixmap_as_png (ctx, out, rgb_pix);
+  }
+  fz_always (ctx) {
+    fz_drop_pixmap (ctx, rgb_pix);
+    fz_close_output (ctx, out);
+    fz_drop_output (ctx, out);
+  }
+  fz_catch (ctx) {
+    cout << "Fitz error in save_pixmap_as_png: " << fz_caught_message (ctx) << LF;
+  }
+}
 
 void
 sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
@@ -395,8 +424,8 @@ vue_sdl_window_rep::get_viewport_size (void *data, int& w, int& h) {
   h= (int) ((vue_render_data*)data)->rect->h;
 }
 
-vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name)
-  : vue_sdl_base_window_rep (w, name)
+vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name, bool popup)
+  : vue_sdl_base_window_rep (w, name, popup)
 {
   if (!sdl_ren) {
     sdl_ren= SDL_CreateRenderer (sdl_win, NULL);
@@ -461,7 +490,7 @@ public:
   renderer ren;
   picture backing_store;
 
-  vue_sdl_mupdf_window_rep (vue_widget w, string name);
+  vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup= false);
   ~vue_sdl_mupdf_window_rep () { delete_renderer (ren); }
   
   void process_redraw ();
@@ -490,8 +519,8 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
   }
 }
 
-vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name)
-  : ren(NULL), vue_sdl_base_window_rep (w, name)
+vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup)
+  : ren(NULL), vue_sdl_base_window_rep (w, name, popup)
 {
   with_window frame (this);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
@@ -587,7 +616,11 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 30) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
   
-  //snapshot_pixmap (ctx, pix);
+  // development aid: when TEXMACS_VUE_SNAPSHOT is set to a directory, the
+  // rendering of every window is saved there as window-<id>.png at each redraw
+  static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
+  if (N(snapshot_dir) > 0)
+    save_pixmap_as_png (ctx, pix, snapshot_dir * "/window-" * as_string (id) * ".png");
 
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
@@ -597,14 +630,7 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 }
 
 
-typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
-
-struct vue_render_ren_data {
-  renderer ren;
-  rectangle r;
-};
-
-typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
+// see vue_gui.hpp for vue_render_ren_data
 
 void
 vue_render_widget_fn (renderer ren, void *w, rectangle r) {
@@ -798,8 +824,8 @@ void layout_text (string s, int style, color c) {
 // entrypoints for top-level windows
 
 vue_window
-plain_window (vue_widget wwid, string name) {
- return tm_new<vue_sdl_mupdf_window_rep> (wwid, name);
+plain_window (vue_widget wwid, string name, bool popup) {
+ return tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
 }
 
 //******************************************************************************
@@ -1146,6 +1172,11 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       win= get_window_from_ID (event->window.windowID);
       if (win) win->destroy_event();
+      break;
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+      // popup menus are dismissed as soon as the pointer leaves them
+      win= get_window_from_ID (event->window.windowID);
+      if (win && win->popup) win->set_visibility (false);
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:

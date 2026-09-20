@@ -39,9 +39,11 @@ public:
   
   bool relayout;
   bool clay_debug;
+  bool popup; // undecorated popup/tooltip window
   
-  vue_window_rep (vue_widget w, string _name)
-  : content (w), name (_name), id (serial++), orig_name (_name) { render_commands.length= 0; }
+  vue_window_rep (vue_widget w, string _name, bool _popup= false)
+  : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup)
+  { render_commands.length= 0; }
   virtual ~vue_window_rep () {};
   
   virtual void *platform_window () = 0;
@@ -69,9 +71,15 @@ typedef vue_window_rep* vue_window;
 extern hashmap<int, pointer> id_to_window;
 void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
-vue_window plain_window (vue_widget wwid, string name);
+vue_window plain_window (vue_widget wwid, string name, bool popup= false);
 
 typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
+
+// data passed to vue_widget_rep::render when drawing with a TeXmacs renderer
+struct vue_render_ren_data {
+  renderer ren;
+  rectangle r;
+};
 
 struct styled_string_rep : public concrete_struct {
   string s;

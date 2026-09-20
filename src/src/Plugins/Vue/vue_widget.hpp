@@ -39,7 +39,7 @@ public:
   
   // layout and rendering
   virtual void do_layout () {};     // layout the widget
-  virtual bool post_layout () {};   // postprocessing, returns true if relayout is needed
+  virtual bool post_layout () { return false; } // postprocessing, returns true if relayout is needed
   virtual void render (void *data); // rendering callback
 };
 
