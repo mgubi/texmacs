@@ -2156,7 +2156,6 @@ vue_input_text_widget_rep::process_key (string key) {
     // cancel
     ok= false;
     done= true;
-    call_back (list_object (object (false)));
     command cmd= tm_new<applied_command_rep>(call_back,
                   list_object (object (false)));
     cmd_list= list(cmd, cmd_list);
@@ -3680,7 +3679,10 @@ public:
   coord2 size, position;
   string win_title;
   int style;
+  bool done;                //!< the answers have been reported to cmd
   array<vue_widget> fields;
+  array<widget> inputs;     //!< the text inputs of the dialog, one per field
+  widget win_widget;        //!< the plain window showing the dialog
 
   vue_inputs_list_widget_rep (command, array<string>);
 
@@ -3688,8 +3690,10 @@ public:
   virtual blackbox query (slot s, int type_id);
   virtual widget    read (slot s, blackbox index);
   
-  void perform_dialog();
-//  vue_field_widget_rep* field (int i);
+  void perform_dialog ();
+  void focus_first_input ();
+  void finish (bool ok);          //!< store the answers ("#f" if canceled) and call cmd
+  void answer (string s);         //!< question dialogs: one of the proposals was chosen
 };
 
 
@@ -3763,7 +3767,7 @@ vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
 : vue_widget_rep ("inputs_list_widget"),
   cmd (_cmd), size (coord2 (100, 100)),
   position (coord2 (0, 0)),
-  win_title (""), style (0)
+  win_title (""), style (0), done (false)
 {
   for (int i= 0; i < N(_prompts); i++)
     fields << concrete (tm_new<vue_field_widget_rep> ((vue_inputs_list_widget_rep*)this, _prompts[i]));
@@ -3778,8 +3782,8 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
   case SLOT_VISIBILITY:
     {
       bool flag= check_open<bool> (val, s);
-      (void) flag;
-      cout << "vue_inputs_list_widget::SLOT_VISIBILITY not implemented" << LF;
+      if (flag && is_nil (win_widget)) perform_dialog ();
+      else if (!is_nil (win_widget)) set_visibility (win_widget, flag);
     }
     break;
   case SLOT_SIZE:
@@ -3789,7 +3793,10 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
     position= check_open<coord2> (val, s);
     break;
   case SLOT_KEYBOARD_FOCUS:
-    if (check_open<bool> (val, s)) perform_dialog ();
+    if (check_open<bool> (val, s)) {
+      if (is_nil (win_widget)) perform_dialog ();
+      focus_first_input ();
+    }
     break;
   default:
     vue_widget_rep::send (s, val);
@@ -3838,24 +3845,114 @@ vue_inputs_list_widget_rep::read (slot s, blackbox val) {
   }
 }
 
+// Ok/Cancel of an inputs list dialog. Also used as callback of its text
+// inputs, which call us with (#f) on escape and (string) on return.
+class inputs_list_command_rep: public command_rep {
+  vue_inputs_list_widget_rep* dlg;
+  bool ok;
+public:
+  inputs_list_command_rep (vue_inputs_list_widget_rep* _dlg, bool _ok)
+    : dlg (_dlg), ok (_ok) {}
+  void apply () { dlg->finish (ok); }
+  void apply (object args) {
+    bool canceled= is_list (args) && !is_null (args) &&
+                   is_bool (car (args)) && !as_bool (car (args));
+    dlg->finish (ok && !canceled);
+  }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<inputs_list_command " << (ok ? "ok" : "cancel") << ">"; }
+};
+
+// one of the proposals of a question dialog
+class inputs_list_answer_rep: public command_rep {
+  vue_inputs_list_widget_rep* dlg;
+  string s;
+public:
+  inputs_list_answer_rep (vue_inputs_list_widget_rep* _dlg, string _s)
+    : dlg (_dlg), s (_s) {}
+  void apply () { dlg->answer (s); }
+  tm_ostream& print (tm_ostream& out) {
+    return out << "<inputs_list_answer " << s << ">"; }
+};
+
 void
 vue_inputs_list_widget_rep::perform_dialog () {
-  //FIXME: implement correct commands
-  //maybe just create the window ahead and pass focus
-  array<widget> lhs, rhs;
+  if (!is_nil (win_widget)) return;
+  command ok_cmd= tm_new<inputs_list_command_rep> (this, true);
+  command cancel_cmd= tm_new<inputs_list_command_rep> (this, false);
+  vue_field_widget_rep* f0=
+    (N(fields) > 0) ? dynamic_cast<vue_field_widget_rep*> (fields[0].rep) : NULL;
+  array<widget> rows;
+  array<widget> buttons;
+  if (N(fields) == 1 && f0 != NULL && f0->type == "question") {
+    // a question: one button per proposed answer
+    rows << text_widget (f0->prompt, 0, black);
+    for (int i=0; i<N(f0->proposals); i++)
+      buttons << menu_button (text_widget (upcase_first (f0->proposals[i]), 0, black),
+                              tm_new<inputs_list_answer_rep> (this, f0->proposals[i]),
+                              "", "", 0);
+  }
+  else {
+    // the usual layout: prompts with their inputs, then Ok and Cancel
+    array<widget> lhs, rhs;
+    inputs= array<widget> ();
+    for (int i=0; i< N(fields); i++) {
+      vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[i].rep);
+      if (f == NULL) continue;
+      widget in= input_text_widget (ok_cmd, f->type, f->proposals, 0, "20em");
+      inputs << in;
+      lhs << text_widget (f->prompt, 0, black);
+      rhs << in;
+    }
+    rows << aligned_widget (lhs, rhs, 6*PIXEL, 6*PIXEL, 0, 0);
+    buttons << menu_button (text_widget (translate ("Ok"), 0, black), ok_cmd, "", "", 0);
+  }
+  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cancel_cmd, "", "", 0);
+  rows << glue_widget (false, false, 0, 8*PIXEL)
+       << horizontal_list (buttons);
+  // some padding around the contents
+  array<widget> padded;
+  padded << glue_widget (false, false, 8*PIXEL, 0)
+         << vertical_list (array<widget> (glue_widget (false, false, 0, 8*PIXEL),
+                                          vertical_list (rows),
+                                          glue_widget (false, false, 0, 8*PIXEL)))
+         << glue_widget (false, false, 8*PIXEL, 0);
+  widget content= horizontal_list (padded);
+  // closing the window from its title bar cancels the dialog
+  win_widget= plain_window_widget (content, win_title, cancel_cmd);
+  set_position (win_widget, position.x1, position.x2);
+  set_visibility (win_widget, true);
+  focus_first_input ();
+}
+
+void
+vue_inputs_list_widget_rep::focus_first_input () {
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (win_widget.rep);
+  if (ww != NULL && ww->win != NULL && N(inputs) > 0)
+    ww->win->kbd_focus= concrete (inputs[0]);
+}
+
+void
+vue_inputs_list_widget_rep::finish (bool ok) {
+  if (done) return;
+  done= true;
   for (int i=0; i< N(fields); i++) {
     vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[i].rep);
-    if (f) {
-      lhs << text_widget (f->prompt, 0, black);
-      rhs << input_text_widget (command (), f->input, f->proposals, 0, "1w");
-    }
+    if (f == NULL) continue;
+    if (ok && i < N(inputs)) f->input= scm_quote (input_text_widget_string (inputs[i]));
+    else f->input= "#f";
   }
-  widget w= vertical_list (array (
-    aligned_widget (lhs, rhs),
-    horizontal_list (array (
-      menu_button (text_widget ("Cancel", 0, black), command ()),
-      menu_button (text_widget ("Ok", 0, black), command ())))));
-  plain_window_widget (w, win_title, command ());
+  if (!is_nil (cmd)) cmd ();
+}
+
+void
+vue_inputs_list_widget_rep::answer (string s) {
+  if (done || N(fields) == 0) return;
+  done= true;
+  vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[0].rep);
+  if (f != NULL) f->input= scm_quote (s);
+  if (!is_nil (cmd)) cmd ();
 }
 
 //VUE_WIDGET(inputs_list_widget, command, call_back, array<string>, prompts);
@@ -4187,8 +4284,13 @@ void destroy_window_widget (widget w) {
   vue_widget vw= concrete(w);
   cout << "destroy_window_widget on " << vw->type << LF;
   vue_plain_window_widget_rep *ww= dynamic_cast<vue_plain_window_widget_rep*> (vw.rep);
-  if (ww){
+  vue_inputs_list_widget_rep *il= dynamic_cast<vue_inputs_list_widget_rep*> (vw.rep);
+  if (ww) {
     tm_delete (ww->win);
+  } else if (il) {
+    // the dialog is shown in a window of its own
+    if (!is_nil (il->win_widget)) destroy_window_widget (il->win_widget);
+    il->win_widget= widget ();
   } else {
     cout << "not a window widget!" << LF;
   }
