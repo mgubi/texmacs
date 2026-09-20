@@ -1379,7 +1379,7 @@ vue_ui_rep::do_layout () {
     int next= d.current;
     Clay_ElementId clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     string probe= "tabs_widget_page_" * as_string (id);
-    const float pad= 8;
+    const float pad= 14; // around the page
     float page_w= 0, page_h= 0;
     for (int i=0; i<n; i++) {
       Clay_ElementData ed= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), i));
@@ -1399,8 +1399,8 @@ vue_ui_rep::do_layout () {
         .id= CLAY_ID_LOCAL("tab_bar"),
         .layout= {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
-          .padding= { 6, 6, 4, 0 },
-          .childGap= 3,
+          .padding= { 10, 10, 6, 0 },
+          .childGap= 4,
           .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM },
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) }}})
       {
@@ -1408,20 +1408,37 @@ vue_ui_rep::do_layout () {
           Clay_ElementId tab_id= CLAY_IDI_LOCAL("tab", i);
           if (button_logic (tab_id).clicked == 1) next= i;
           bool cur= (d.current == i);
+          // the current tab is open at the bottom and merges with the page,
+          // the other ones are framed and slightly lower
           Clay_Color bg= cur ? color_background
-                       : ((hot_id == tab_id.id) ? color_highlight : palette[0]);
+                       : ((hot_id == tab_id.id) ? color_highlight : (Clay_Color) { 176, 176, 176, 255 });
+          Clay_ElementData td= Clay_GetElementData (tab_id);
           CLAY({
             .id= tab_id,
             .backgroundColor= bg,
-            .cornerRadius= { 5, 5, 0, 0 },
+            .cornerRadius= { 6, 6, 0, 0 },
             .layout= {
-              .padding= { 16, 16, (uint16_t) (cur ? 9 : 7), (uint16_t) (cur ? 8 : 6) },
-              .childGap= 8,
+              .padding= { 20, 20, (uint16_t) (cur ? 10 : 8), (uint16_t) (cur ? 10 : 7) },
+              .childGap= 10,
               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
-            .border= { .width= { 1, 1, 1, 0 }, .color= palette[0] }})
+            .border= { .width= { 1, 1, 1, (uint16_t) (cur ? 0 : 1) }, .color= color_border }})
           {
             if (i < N(d.icons)) concrete (d.icons[i])->do_layout ();
             concrete (d.tabs[i])->do_layout ();
+            if (cur && td.found) {
+              // cover the top border of the page under the current tab
+              CLAY({
+                .backgroundColor= color_background,
+                .layout= { .sizing= { CLAY_SIZING_FIXED (td.boundingBox.width - 2),
+                                      CLAY_SIZING_FIXED (2) }},
+                .floating= {
+                  .offset= { 1, -1 },
+                  .zIndex= 1,
+                  .attachTo= CLAY_ATTACH_TO_PARENT,
+                  .attachPoints= { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                                   .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM },
+                  .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
+            }
           }
         }
       }
@@ -1429,11 +1446,12 @@ vue_ui_rep::do_layout () {
       CLAY({
         .id= CLAY_ID_LOCAL("tab_area"),
         .backgroundColor= color_background,
+        .cornerRadius= { 0, 6, 6, 6 },
         .layout= {
           .padding= CLAY_PADDING_ALL((uint16_t) pad),
           .sizing= { .width=  CLAY_SIZING_GROW(.min= page_w + 2*pad),
                      .height= CLAY_SIZING_GROW(.min= page_h + 2*pad) }},
-        .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
+        .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
       {
         CLAY({
           .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
