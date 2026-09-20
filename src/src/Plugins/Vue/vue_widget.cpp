@@ -621,9 +621,11 @@ decode_length (string width, vue_window win, int style) {
 
 // additional widgets for caching and drawing
 VUE_WIDGET_DATA(picture_widget, picture, p);
-VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw, bool, flip, float, shift);
+VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw,
+                bool, placed, bool, flip, float, shift_x, float, shift_y);
+// placed: the position of the open menu has been decided (see layout_pull_button)
 // flip: the menu is opened on the other side of the button to stay in the window
-// shift: horizontal shift of a pulldown menu sticking out on the right
+// shift_x, shift_y: shift of the menu to keep it inside the window
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -787,7 +789,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw, false, 0 };
+    vue_cached_pull_button cd { d.w, d.pw, cw, false, false, 0, 0 };
     data= close_box (cd);
     return;
   }
@@ -795,7 +797,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     // add more space in the struct for caching the widget
     vue_pullright_button d= open_box<vue_pullright_button> (data);
     widget cw;
-    vue_cached_pull_button cd { d.w, d.pw, cw, false, 0 };
+    vue_cached_pull_button cd { d.w, d.pw, cw, false, false, 0, 0 };
     data= close_box(cd);
     return;
   }
@@ -911,8 +913,9 @@ layout_pull_button (vue_ui_rep *w) {
       if (is_nil (d.cw)) {
         // we clicked an inactive button, we evalutate the promise
         d.cw= d.pw->eval ();
+        d.placed= false;
         d.flip= false;
-        d.shift= 0;
+        d.shift_x= d.shift_y= 0;
         current_popup= true;
         away_time= 0;
       } else {
@@ -927,17 +930,30 @@ layout_pull_button (vue_ui_rep *w) {
     // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
       // when the menu (as laid out in the previous pass) sticks out of the
-      // window, open it on the other side of the button; the decision is
-      // kept until the menu closes to avoid flickering
+      // window, open it on the other side of the button if there is more
+      // room there, otherwise shift it back inside; the decision is kept
+      // until the menu closes to avoid flickering
       Clay_Dimensions dims= { current_window->layout_w, current_window->layout_h };
       Clay_ElementData fd= Clay_GetElementData (float_id);
-      if (fd.found && !d.flip) {
-        if (down && fd.boundingBox.y + fd.boundingBox.height > dims.height) d.flip= true;
-        if (!down && fd.boundingBox.x + fd.boundingBox.width > dims.width) d.flip= true;
-      }
-      if (fd.found && down && d.shift == 0) {
-        float overflow= fd.boundingBox.x + fd.boundingBox.width - dims.width;
-        if (overflow > 0) d.shift= overflow;
+      Clay_ElementData bd= Clay_GetElementData (button_id);
+      if (fd.found && bd.found && !d.placed) {
+        d.placed= true;
+        Clay_BoundingBox f= fd.boundingBox, b= bd.boundingBox;
+        float over_x= f.x + f.width  - dims.width;
+        float over_y= f.y + f.height - dims.height;
+        if (down) {
+          if (over_y > 0) {
+            if (b.y > dims.height - (b.y + b.height)) d.flip= true;
+            else d.shift_y= -min (over_y, f.y);
+          }
+          if (over_x > 0) d.shift_x= -min (over_x, f.x);
+        } else {
+          if (over_x > 0) {
+            if (b.x > dims.width - (b.x + b.width)) d.flip= true;
+            else d.shift_x= -min (over_x, f.x);
+          }
+          if (over_y > 0) d.shift_y= -min (over_y, f.y);
+        }
       }
       Clay_FloatingAttachPoints attach;
       if (down) attach= d.flip
@@ -946,8 +962,7 @@ layout_pull_button (vue_ui_rep *w) {
       else attach= d.flip
         ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_RIGHT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
         : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_RIGHT_TOP };
-      // a pulldown menu sticking out on the right is shifted back in
-      Clay_Vector2 offset= { -d.shift, 0 };
+      Clay_Vector2 offset= { d.shift_x, d.shift_y };
       CLAY({
         .id= float_id,
         .floating= {
@@ -1430,11 +1445,14 @@ vue_ui_rep::do_layout () {
             .width= { 2, 2, 2, 2 },
             .color= { 200, 200, 0, 255 }},
           .floating= {
+            .offset= { 0, 4 },
             .zIndex= 10,
-            .offset= { (float)mouse_x + 30, (float)mouse_y + 30 },
-            .attachTo= CLAY_ATTACH_TO_ROOT,
+            .parentId= target_id.id,
             .attachPoints= {
-              .parent= CLAY_ATTACH_POINT_LEFT_TOP }}})
+              .element= CLAY_ATTACH_POINT_LEFT_TOP,
+              .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM },
+            .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+            .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID }})
         {
           concrete(d.help)->do_layout ();
         }
@@ -2189,6 +2207,7 @@ public:
   int     tab_pos;     // cursor position where tab was pressed
 
   string buffer; // cache
+  command tab_cb; // called with #t/#f on tab/shift-tab (moves the focus in dialogs)
   
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
@@ -2231,7 +2250,11 @@ vue_input_text_widget_rep::process_key (string key) {
   if (key == "<") key= "<less>";
   if (key == ">") key= "<gtr>";
   
-  /* tab-completion */
+  /* tab order (in dialogs) or tab-completion */
+  if ((key == "tab" || key == "S-tab") && !is_nil (tab_cb)) {
+    cmd_list= list (applied_command (tab_cb, list_object (object (key == "tab"))), cmd_list);
+    return true;
+  }
   if (continuous);
   else if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
     int d=  (key == "tab"? 1: N(tabs)-1);
@@ -2241,7 +2264,7 @@ vue_input_text_widget_rep::process_key (string key) {
     return true;
   }
   else if (key == "tab" || key == "S-tab") {
-    if (pos != N(s)) return;
+    if (pos != N(s)) return false;
     tabs= copy (def);
     if (ends (type, "file") || type == "directory") {
       url search= url_here ();
@@ -3080,8 +3103,6 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   cursor_pos (coord2 (0, 0)),
   backing_pos (coord2(0, 0)),
   scroll_pos (coord2 (0, 0)),
-  scroll_momentum (coord2 (0, 0)),
-  momentum_time (0),
   absolute_scroll (false),
   backing_valid (false)
 {
@@ -3408,8 +3429,12 @@ vue_simple_widget_rep::do_layout () {
       cout << LF;
     }
     if (mouse_action == "wheel") {
-      scroll_momentum.x1 += mouse_data[0];
-      scroll_momentum.x2 += mouse_data[1];
+      // scroll right away: the trackpad/mouse driver already provides the
+      // kinetic behaviour through the stream of wheel events
+      absolute_scroll= false;
+      scroll_pos= backing_pos;
+      scroll_pos.x1 += (SI) (4*mouse_data[0]);
+      scroll_pos.x2 += (SI) (4*mouse_data[1]);
     } else {
       if (starts (mouse_action, "press-")) {
         set_kbd_focus (current_window, this);
@@ -3419,23 +3444,6 @@ vue_simple_widget_rep::do_layout () {
     // reset
     mouse_action="";
     if (N(mouse_data) > 0) mouse_data= array<double>();
-  }
-  if (scroll_momentum.x1 != 0 || scroll_momentum.x2 != 0) {
-    cout << "momentum " << scroll_momentum;
-    absolute_scroll= false;
-    scroll_pos= backing_pos;
-    scroll_pos.x1 += 4*scroll_momentum.x1;
-    scroll_pos.x2 += 4*scroll_momentum.x2;
-    if (momentum_time != 0) {
-      time_t lapse= (texmacs_time () - momentum_time);
-      while (lapse > 0) {
-        scroll_momentum.x1= 0.99f * scroll_momentum.x1;
-        scroll_momentum.x2= 0.99f * scroll_momentum.x2;
-        lapse -= 1;
-      }
-    }
-    momentum_time = texmacs_time();
-    cout << "-> " << scroll_momentum << LF;
   }
   if ((current_window->kbd_focus == this) && N(key_event)>0) {
     handle_keypress (key_event, key_time);
@@ -3888,6 +3896,7 @@ public:
   
   void perform_dialog ();
   void focus_first_input ();
+  void focus_input (int i);       //!< give the keyboard focus to the i-th input
   void finish (bool ok);          //!< store the answers ("#f" if canceled) and call cmd
   void answer (string s);         //!< question dialogs: one of the proposals was chosen
 };
@@ -4059,6 +4068,21 @@ public:
     return out << "<inputs_list_command " << (ok ? "ok" : "cancel") << ">"; }
 };
 
+// tab/shift-tab in the i-th input of a dialog moves the focus
+class inputs_list_tab_rep: public command_rep {
+  vue_inputs_list_widget_rep* dlg;
+  int i;
+public:
+  inputs_list_tab_rep (vue_inputs_list_widget_rep* _dlg, int _i): dlg (_dlg), i (_i) {}
+  void apply () { dlg->focus_input (i+1); }
+  void apply (object args) {
+    bool forward= !(is_list (args) && !is_null (args) &&
+                    is_bool (car (args)) && !as_bool (car (args)));
+    dlg->focus_input (forward ? i+1 : i-1);
+  }
+  tm_ostream& print (tm_ostream& out) { return out << "<inputs_list_tab " << i << ">"; }
+};
+
 // one of the proposals of a question dialog
 class inputs_list_answer_rep: public command_rep {
   vue_inputs_list_widget_rep* dlg;
@@ -4096,6 +4120,8 @@ vue_inputs_list_widget_rep::perform_dialog () {
       vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[i].rep);
       if (f == NULL) continue;
       widget in= input_text_widget (ok_cmd, f->type, f->proposals, 0, "20em");
+      vue_input_text_widget_rep* ir= dynamic_cast<vue_input_text_widget_rep*> (in.rep);
+      if (ir != NULL) ir->tab_cb= tm_new<inputs_list_tab_rep> (this, N(inputs));
       inputs << in;
       lhs << text_widget (f->prompt, 0, black);
       rhs << in;
@@ -4122,11 +4148,18 @@ vue_inputs_list_widget_rep::perform_dialog () {
 }
 
 void
-vue_inputs_list_widget_rep::focus_first_input () {
+vue_inputs_list_widget_rep::focus_input (int i) {
   vue_plain_window_widget_rep* ww=
     dynamic_cast<vue_plain_window_widget_rep*> (win_widget.rep);
-  if (ww != NULL && ww->win != NULL && N(inputs) > 0)
-    set_kbd_focus (ww->win, concrete (inputs[0]));
+  int n= N(inputs);
+  if (ww == NULL || ww->win == NULL || n == 0) return;
+  i= ((i % n) + n) % n; // cyclic
+  set_kbd_focus (ww->win, concrete (inputs[i]));
+}
+
+void
+vue_inputs_list_widget_rep::focus_first_input () {
+  focus_input (0);
 }
 
 void

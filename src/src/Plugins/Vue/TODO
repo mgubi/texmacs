@@ -2,10 +2,9 @@ TODO
 
 * decide what to do with win->relayout
 * introduce animation subsystem for transitions
-* manage balloons properly (attach them to the widget, don't create layout element for them)
-* handle kinetic wheel properly
 * more uniform handling of mouse events and keyboard focus...
-* keyboard focus: tab order between the inputs of a dialog
+* menus taller than the window should scroll
+* clip the footer texts when the window is narrow
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
@@ -21,6 +20,9 @@ WIP
 
 DONE
 
+* tab/shift-tab move the focus between the inputs of a dialog
+* balloons are attached below their widget
+* wheel events scroll the editor directly (no synthetic momentum)
 * editors are told when their window gains/loses the keyboard focus and when
   the focus moves to another widget (set_kbd_focus)
 * menus and popups stay on the screen (flip, shift, clamp)

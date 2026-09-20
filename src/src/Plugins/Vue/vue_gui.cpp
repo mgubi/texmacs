@@ -1104,6 +1104,7 @@ get_window_from_ID (Uint32 ID) {
 *   key <SDL key name>              key press, e.g. Return, Escape, Tab, Down
 *   text <string>                   text input
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
+*   resize w h                      resize the target window (points)
 ******************************************************************************/
 
 static array<string> script_lines;
@@ -1258,6 +1259,8 @@ script_step () {
       snapshot_win= win;
       snapshot_name= a[1];
     }
+    else if (cmd == "resize" && N(a) > 2)
+      win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
     else cout << "vue script: unknown command " << line << LF;
     return; // one command per loop iteration
   }

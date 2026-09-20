@@ -1,3 +1,4 @@
+# needs dialog.scm: fill the two fields of an interactive prompt
 wait 5000
 window Enter data
 key Backspace
@@ -5,7 +6,7 @@ key Backspace
 key Backspace
 text Bob
 wait 300
-click 190 37
+key Tab
 wait 300
 text 42
 wait 500

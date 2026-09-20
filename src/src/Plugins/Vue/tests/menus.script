@@ -1,8 +1,14 @@
-# pulldown menus of the main window: Help is the rightmost one
+# pulldown menus of the main window; in a small window the Help menu must
+# be shifted back into the window
 wait 5000
 window #2
-click 390 12
+click 409 12
 wait 800
 snapshot m1
 click 700 500
 wait 500
+resize 640 300
+wait 800
+click 557 12
+wait 800
+snapshot m2
