@@ -1,0 +1,19 @@
+Scripted tests for the Vue GUI
+==============================
+
+The .scm files build test widgets (they are loaded with -x) and the .script
+files drive them with synthetic events, see the "Scripted events" section
+of vue_gui.cpp for the commands. Coordinates are window points relative to
+the content area of the target window; they match the layouts of the .scm
+files in this directory.
+
+Run from the source directory, e.g.
+
+  export TEXMACS_PATH=$PWD/TeXmacs
+  export TEXMACS_VUE_SNAPSHOT=/tmp/vue-snapshots      # PNG of every window redraw
+  export TEXMACS_VUE_SCRIPT=src/Plugins/Vue/tests/widgets.script
+  TeXmacs/bin/texmacs.bin -x '(load "src/Plugins/Vue/tests/widgets.scm")'
+
+and check the standard output for the callbacks (choice:, enum:, got: ...)
+and the named snapshots (t0.png, t1-enum-open.png, ...). popup.script needs
+no .scm file: it opens the context menu of the editor.

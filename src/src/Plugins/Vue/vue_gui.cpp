@@ -32,6 +32,7 @@
 #include "image_files.hpp"
 #include "tm_window.hpp"
 #include "sys_utils.hpp"     // get_env
+#include "file.hpp"          // load_string (scripted events)
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -50,6 +51,16 @@
 
 // pointer info (the per-window events are stored in vue_window_rep::input)
 extern unsigned int mouse_state;
+
+// scripted events (development aid, see TEXMACS_VUE_SCRIPT below)
+static bool script_active= false;
+static unsigned int script_buttons= 0;  // buttons held down by the script
+static vue_window last_created_window= NULL;
+static vue_window script_win= NULL;     // target window of the script
+static vue_window snapshot_win= NULL;   // window whose next redraw is saved as
+static string snapshot_name;            // <snapshot dir>/<snapshot_name>.png
+static void script_init ();
+static void script_step ();
 
 
 extern bool debug_clay;
@@ -139,6 +150,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   }
   
   nr_windows++;
+  last_created_window= this;
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
@@ -171,6 +183,10 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   cout << "destroy vue_sdl_base_window_rep " << id << LF;
+  // forget the weak references of the scripting aid
+  if (last_created_window == this) last_created_window= NULL;
+  if (script_win == this) script_win= NULL;
+  if (snapshot_win == this) snapshot_win= NULL;
   id_to_window->reset (id);
   id= 0;
   set_identifier (abstract (content), 0); // FIXME: is this ok?
@@ -609,8 +625,14 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   // development aid: when TEXMACS_VUE_SNAPSHOT is set to a directory, the
   // rendering of every window is saved there as window-<id>.png at each redraw
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
-  if (N(snapshot_dir) > 0)
+  if (N(snapshot_dir) > 0) {
     save_pixmap_as_png (ctx, pix, snapshot_dir * "/window-" * as_string (id) * ".png");
+    if (snapshot_win == this && N(snapshot_name) > 0) {
+      // named snapshot requested by a script
+      save_pixmap_as_png (ctx, pix, snapshot_dir * "/" * snapshot_name * ".png");
+      snapshot_name= "";
+    }
+  }
 
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
@@ -958,10 +980,12 @@ void gui_start_loop () {
   // FIXME: Don't typeset when resizing window
   
   SDL_AddEventWatch (&event_filter, NULL);
+  script_init ();
 
   while (nr_windows > 0 || number_of_servers () > 0) {
     
     // 1. process events
+    script_step (); // may push synthetic events
     SDL_Event event;
     if (SDL_PollEvent (&event)) {
       process_event (&event);
@@ -1062,12 +1086,193 @@ get_window_from_ID (Uint32 ID) {
   return win;
 }
 
+/******************************************************************************
+* Scripted events (development aid)
+*
+* When TEXMACS_VUE_SCRIPT names a file, its lines are executed one by one
+* (a line is executed only when no SDL event is pending). Coordinates are in
+* window points, relative to the content area of the target window:
+*
+*   # comment
+*   wait <ms>                       pause
+*   window <substring of title>     select the target window (default: last created)
+*   window #<id>                    select the target window by its id
+*   move x y                        pointer motion
+*   press x y [left|right|middle]   button down
+*   release x y [left|right|middle] button up
+*   click x y [left|right|middle]   press followed by release
+*   wheel x y dx dy                 wheel event at (x, y)
+*   key <SDL key name>              key press, e.g. Return, Escape, Tab, Down
+*   text <string>                   text input
+*   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
+******************************************************************************/
+
+static array<string> script_lines;
+static int script_pos= 0;
+static time_t script_next= 0;
+
+static void
+script_init () {
+  string file= get_env ("TEXMACS_VUE_SCRIPT");
+  if (N(file) == 0) return;
+  string s;
+  if (load_string (url_system (file), s, false)) {
+    cout << "vue script: cannot read " << file << LF;
+    return;
+  }
+  script_lines= tokenize (s, "\n");
+  script_active= true;
+  cout << "vue script: " << N(script_lines) << " lines" << LF;
+}
+
+static vue_window
+script_target () {
+  if (script_win != NULL && Window_to_window->contains ((SDL_Window*) script_win->platform_window ()))
+    return script_win;
+  return last_created_window;
+}
+
+static Uint8
+script_button (array<string> a, int i) {
+  if (N(a) > i && a[i] == "right") return SDL_BUTTON_RIGHT;
+  if (N(a) > i && a[i] == "middle") return SDL_BUTTON_MIDDLE;
+  return SDL_BUTTON_LEFT;
+}
+
+static void
+script_push_button (vue_window win, float x, float y, Uint8 button, bool down) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+  ev.button.timestamp= SDL_GetTicksNS ();
+  ev.button.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+  ev.button.button= button;
+  ev.button.down= down;
+  ev.button.clicks= 1;
+  ev.button.x= x;
+  ev.button.y= y;
+  if (down) script_buttons |= SDL_BUTTON_MASK (button);
+  else script_buttons &= ~SDL_BUTTON_MASK (button);
+  SDL_PushEvent (&ev);
+}
+
+static void
+script_push_motion (vue_window win, float x, float y) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= SDL_EVENT_MOUSE_MOTION;
+  ev.motion.timestamp= SDL_GetTicksNS ();
+  ev.motion.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+  ev.motion.state= script_buttons;
+  ev.motion.x= x;
+  ev.motion.y= y;
+  SDL_PushEvent (&ev);
+}
+
+static void
+script_step () {
+  if (!script_active) return;
+  if (SDL_PollEvent (NULL)) return; // let pending events be processed first
+  time_t now= texmacs_time ();
+  if (now < script_next) return;
+  while (script_pos < N(script_lines)) {
+    string line= trim_spaces (script_lines[script_pos++]);
+    if (N(line) == 0 || line[0] == '#') continue;
+    array<string> a= tokenize (line, " ");
+    string cmd= a[0];
+    vue_window win= script_target ();
+    cout << "vue script: " << line << LF;
+    if (cmd == "wait" && N(a) > 1) {
+      script_next= now + as_int (a[1]);
+      return;
+    }
+    else if (cmd == "window" && N(a) > 1) {
+      string title= line (N(cmd)+1, N(line));
+      iterator<SDL_Window*> it= iterate (Window_to_window);
+      while (it->busy ()) {
+        vue_window w= (vue_window) Window_to_window [it->next ()];
+        if (title == "#" * as_string (w->id) ||
+            occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
+      }
+      continue;
+    }
+    if (win == NULL) continue;
+    if (cmd == "move" && N(a) > 2)
+      script_push_motion (win, as_double (a[1]), as_double (a[2]));
+    else if (cmd == "press" && N(a) > 2)
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+    else if (cmd == "release" && N(a) > 2)
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+    else if (cmd == "click" && N(a) > 2) {
+      script_push_motion (win, as_double (a[1]), as_double (a[2]));
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+    }
+    else if (cmd == "wheel" && N(a) > 4) {
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_MOUSE_WHEEL;
+      ev.wheel.timestamp= SDL_GetTicksNS ();
+      ev.wheel.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.wheel.mouse_x= as_double (a[1]);
+      ev.wheel.mouse_y= as_double (a[2]);
+      ev.wheel.x= as_double (a[3]);
+      ev.wheel.y= as_double (a[4]);
+      SDL_PushEvent (&ev);
+    }
+    else if (cmd == "key" && N(a) > 1) {
+      SDL_Event ev;
+      SDL_zero (ev);
+      c_string name (a[1]);
+      ev.type= SDL_EVENT_KEY_DOWN;
+      ev.key.timestamp= SDL_GetTicksNS ();
+      ev.key.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.key.scancode= SDL_GetScancodeFromName (name);
+      ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
+      ev.key.down= true;
+      SDL_PushEvent (&ev);
+    }
+    else if (cmd == "text" && N(a) > 1) {
+      // one text input event per (utf8) character, as SDL does
+      static char buffers[64][8]; // the events keep pointers to the text
+      static int next= 0;
+      string txt= line (N(cmd)+1, N(line));
+      int i= 0;
+      while (i < N(txt)) {
+        int start= i;
+        tm_char_forwards (txt, i);
+        if (i == start) i++;
+        char* buf= buffers[next++ % 64];
+        int n= min (i - start, 7);
+        for (int j=0; j<n; j++) buf[j]= txt[start+j];
+        buf[n]= 0;
+        SDL_Event ev;
+        SDL_zero (ev);
+        ev.type= SDL_EVENT_TEXT_INPUT;
+        ev.text.timestamp= SDL_GetTicksNS ();
+        ev.text.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+        ev.text.text= buf;
+        SDL_PushEvent (&ev);
+      }
+    }
+    else if (cmd == "snapshot" && N(a) > 1) {
+      snapshot_win= win;
+      snapshot_name= a[1];
+    }
+    else cout << "vue script: unknown command " << line << LF;
+    return; // one command per loop iteration
+  }
+  cout << "vue script: done" << LF;
+  script_active= false;
+}
+
 static void update_mouse_state () {
   unsigned int state= 0;
 
   float x, y;
 
   Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
+  if (script_active) buttons= script_buttons; // synthetic events
   SDL_Keymod mods= SDL_GetModState();
 
   // compute state
@@ -1141,6 +1346,39 @@ postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod, bool is_k
   return out_key;
 }
 
+// While a popup window is visible it grabs the pointer: mouse events sent to
+// other windows are redirected to the popup when the pointer is over it, and
+// dropped otherwise (except for a button press, which dismisses the popup by
+// reaching its target). This mimics the X11 grab which edit_mouse relies on.
+static vue_window
+visible_popup () {
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    SDL_Window* sw= it->next ();
+    vue_window w= (vue_window) Window_to_window [sw];
+    if (w->popup && !(SDL_GetWindowFlags (sw) & SDL_WINDOW_HIDDEN)) return w;
+  }
+  return NULL;
+}
+
+static bool
+popup_grab (vue_window& win, float& x, float& y, bool press) {
+  vue_window pop= visible_popup ();
+  if (pop == NULL || win == NULL || win == pop) return true;
+  int wx, wy, px, py, pw, ph;
+  SDL_GetWindowPosition ((SDL_Window*) win->platform_window (), &wx, &wy);
+  SDL_GetWindowPosition ((SDL_Window*) pop->platform_window (), &px, &py);
+  SDL_GetWindowSize ((SDL_Window*) pop->platform_window (), &pw, &ph);
+  float sx= wx + x, sy= wy + y; // screen coordinates
+  if (sx >= px && sx < px + pw && sy >= py && sy < py + ph) {
+    win= pop;
+    x= sx - px;
+    y= sy - py;
+    return true;
+  }
+  return press;
+}
+
 void
 process_event (SDL_Event *event) {
   // note: events are stored in the input state of their window and cleared
@@ -1172,9 +1410,11 @@ process_event (SDL_Event *event) {
     {
       update_mouse_state ();
       win= get_window_from_ID (event->button.windowID);
-      if (win) {
+      float bx= event->button.x, by= event->button.y;
+      bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+      if (win && popup_grab (win, bx, by, down)) {
         string action;
-        if (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        if (down) {
           action= "press-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
         } else {
           action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
@@ -1182,8 +1422,8 @@ process_event (SDL_Event *event) {
         vue_input_state& in= win->input;
         in.mouse_action= action;
         in.mouse_time= texmacs_time();
-        in.mouse_x= event->button.x * retina_factor;
-        in.mouse_y= event->button.y * retina_factor;
+        in.mouse_x= bx * retina_factor;
+        in.mouse_y= by * retina_factor;
         with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y },
                              (event->button.button == SDL_BUTTON_LEFT) &&
@@ -1213,15 +1453,16 @@ process_event (SDL_Event *event) {
     {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
-      if (win) {
+      float mx= event->motion.x, my= event->motion.y;
+      if (win && popup_grab (win, mx, my, false)) {
         with_window frame (win);
-        Clay_SetPointerState ((Clay_Vector2) { event->motion.x * retina_factor, event->motion.y * retina_factor },
-                             event->button.button & SDL_BUTTON_LMASK);
+        Clay_SetPointerState ((Clay_Vector2) { mx * retina_factor, my * retina_factor },
+                             (event->motion.state & SDL_BUTTON_LMASK) != 0);
         vue_input_state& in= win->input;
         in.mouse_action= "move";
         in.mouse_time= texmacs_time();
-        in.mouse_x= event->motion.x * retina_factor;
-        in.mouse_y= event->motion.y * retina_factor;
+        in.mouse_x= mx * retina_factor;
+        in.mouse_y= my * retina_factor;
       }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:

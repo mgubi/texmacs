@@ -10,8 +10,8 @@ TODO
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
-* test interactively the new widgets (enum dropdown, choice lists, tree view, ink,
-  color picker, printer dialog, popup windows, inputs_list dialog, splitters)
+* extend the scripted tests (tests/) to the color picker, printer dialog, splitters
+  and the keyboard focus between windows
 * honour resize_widget min/max sizes via set_size_limits (currently #if 0)
 * printer_widget just spools the file with lpr, no printer settings
 
@@ -30,6 +30,8 @@ DONE
   ink, enum dropdown, (filtered) choice lists, extend, wait, empty, minibar,
   division, printer and color picker dialogs
 * TEXMACS_VUE_SNAPSHOT=<dir> saves the rendering of each window as PNG (debugging)
+* TEXMACS_VUE_SCRIPT=<file> drives the GUI with synthetic events (see tests/)
+* popup windows grab the pointer (edit_mouse relies on the X11 grab semantics)
 * implement copy & paste
 * fix keyboard handling (Alt+3 should give #)
 * remove balloons after a while

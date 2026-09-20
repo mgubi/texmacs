@@ -1,0 +1,14 @@
+wait 5000
+window Enter data
+key Backspace
+key Backspace
+key Backspace
+text Bob
+wait 300
+click 190 37
+wait 300
+text 42
+wait 500
+snapshot d1
+key Return
+wait 800

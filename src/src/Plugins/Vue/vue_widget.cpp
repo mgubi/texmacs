@@ -1433,6 +1433,7 @@ vue_ui_rep::do_layout () {
     string st= debug_style (d.style);
     if (N(st)>0) cout << type << " " << st << LF;
     CLAY({
+      .id= toggle_id,
       .layout= {
         .sizing= { CLAY_SIZING_FIT(40),
                    CLAY_SIZING_FIT(40) }}})
@@ -2111,6 +2112,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
 {
   if (N(def) > 0) {
     s= copy (def[0]);
+    pos= N(s); // the cursor starts at the end of the default input
   }
 }
 
@@ -3990,7 +3992,10 @@ vue_inputs_list_widget_rep::finish (bool ok) {
     if (ok && i < N(inputs)) f->input= scm_quote (input_text_widget_string (inputs[i]));
     else f->input= "#f";
   }
-  if (!is_nil (cmd)) cmd ();
+  // the command may end the dialogue, which destroys this widget and drops
+  // its reference to the command: keep our own reference while it runs
+  command c= cmd;
+  if (!is_nil (c)) c ();
 }
 
 void
@@ -3999,7 +4004,8 @@ vue_inputs_list_widget_rep::answer (string s) {
   done= true;
   vue_field_widget_rep* f= dynamic_cast<vue_field_widget_rep*> (fields[0].rep);
   if (f != NULL) f->input= scm_quote (s);
-  if (!is_nil (cmd)) cmd ();
+  command c= cmd; // see finish
+  if (!is_nil (c)) c ();
 }
 
 //VUE_WIDGET(inputs_list_widget, command, call_back, array<string>, prompts);
