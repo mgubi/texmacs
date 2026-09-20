@@ -912,9 +912,13 @@ layout_pull_button (vue_ui_rep *w) {
     .id= button_id,
     .layout= {
       .padding= CLAY_PADDING_ALL(5),
-      .sizing= s },
+      .childGap= 4,
+      .sizing= s,
+      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
     .backgroundColor= hot_id == button_id.id ?  color_highlight : color_background })
   {
+    // items of vertical menus reserve the column of the check marks
+    if (!down) CLAY({ .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }}}) {}
     concrete(d.w)->do_layout ();
     if (!down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
@@ -1214,6 +1218,30 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
 
 string input_text_widget_string (widget w); // defined below
 
+// the mark in front of a menu item, from the 'pre' of menu_button:
+// 1= check ("v"), 2= bullet ("*"), 3= circle ("o")
+static void
+render_menu_mark_fn (renderer ren, void* data, rectangle r) {
+  int kind= (int) (intptr_t) data;
+  SI px= ren->pixel;
+  SI w= r->x2 - r->x1, h= r->y2 - r->y1;
+  SI cx= (r->x1 + r->x2) / 2, cy= (r->y1 + r->y2) / 2;
+  if (kind == 1) {
+    array<SI> xs (3), ys (3);
+    xs[0]= r->x1 + (SI) (0.22*w); ys[0]= r->y1 + (SI) (0.50*h);
+    xs[1]= r->x1 + (SI) (0.42*w); ys[1]= r->y1 + (SI) (0.28*h);
+    xs[2]= r->x1 + (SI) (0.78*w); ys[2]= r->y1 + (SI) (0.74*h);
+    ren->set_pencil (pencil (black, 2*px, cap_round));
+    ren->lines (xs, ys);
+  }
+  else {
+    SI rad= min (w, h) / 5;
+    ren->set_pencil (pencil (black, px));
+    if (kind == 2) ren->fill_arc (cx-rad, cy-rad, cx+rad, cy+rad, 0, 360*64);
+    else ren->arc (cx-rad, cy-rad, cx+rad, cy+rad, 0, 360*64);
+  }
+}
+
 void
 vue_ui_rep::do_layout () {
   if (type == "horizontal_menu") {
@@ -1467,6 +1495,7 @@ vue_ui_rep::do_layout () {
       .id= button_id,
       .layout= {
         .padding= padding,
+        .childGap= 4,
         .sizing= sz,
         .childAlignment= { .x= push ? CLAY_ALIGN_X_CENTER : CLAY_ALIGN_X_LEFT,
                            .y= CLAY_ALIGN_Y_CENTER }},
@@ -1475,6 +1504,15 @@ vue_ui_rep::do_layout () {
       .border= border
     }) {
       last_id= button_id;
+      if (button_grow || N(d.pre) > 0) {
+        // the column for the mark of the item: "v" (check), "*" or "o";
+        // items of vertical menus always reserve it so that labels align
+        int kind= (d.pre == "v") ? 1 : (d.pre == "*") ? 2 : (d.pre == "o") ? 3 : 0;
+        CLAY({
+          .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }},
+          .custom= { .customData= (kind != 0) ? (void*) &render_menu_mark_fn : NULL },
+          .userData= (void*) (intptr_t) kind }) {}
+      }
       concrete(d.w)->do_layout ();
       if (N(d.ks) > 0) {
         // add shortcut
