@@ -84,6 +84,7 @@ hashmap<int, pointer> id_to_window;
 class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
+  SI Min_w, Min_h, Max_w, Max_h; // size limits, 0 if unset
   
   vue_sdl_base_window_rep (vue_widget w, string name, bool popup= false);
   ~vue_sdl_base_window_rep ();
@@ -131,7 +132,7 @@ void HandleClayErrors (Clay_ErrorData errorData) {
 static TTF_Font **ttf_fonts= NULL; // fonts cache
 
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup)
-: vue_window_rep (_content, _name, _popup)
+: vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
   cout << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
@@ -224,7 +225,7 @@ vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
 
 void
 vue_sdl_base_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
-  //min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
+  min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
 }
 
 void
@@ -255,15 +256,12 @@ vue_sdl_base_window_rep::set_size (SI w, SI h) {
 
 void
 vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
-#if 0
   if (min_w == Min_w && min_h == Min_h && max_w == Max_w && max_h == Max_h)
     return;
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
-  min_w= min_w/PIXEL; min_h= min_h/PIXEL;
-  max_w= max_w/PIXEL; max_h= max_h/PIXEL;
-  SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
-  SDL_SetWindowMinimumSize (sdl_win, min_w, min_h);
-#endif
+  // a limit of 0 means no limit for SDL
+  SDL_SetWindowMinimumSize (sdl_win, max (min_w/PIXEL, 0), max (min_h/PIXEL, 0));
+  SDL_SetWindowMaximumSize (sdl_win, max (max_w/PIXEL, 0), max (max_h/PIXEL, 0));
 }
 
 void

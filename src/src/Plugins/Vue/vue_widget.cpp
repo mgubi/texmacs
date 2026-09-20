@@ -114,6 +114,7 @@ time_t balloon_time;
 list<command> cmd_list;
 
 vue_window current_window; // used during layout to propagate information
+bool window_autosizing= false; // the window is being sized to its contents
 
 // signalling
 
@@ -960,13 +961,64 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
   }
 }
 
+// Size policy: does the widget want the extra space along an axis?
+// Containers grow along an axis only when one of their children does,
+// so that lists of labels keep their size while lists with a resizable
+// widget follow the window.
+static bool
+widget_grows (widget w, bool horizontal) {
+  vue_widget_rep* r= concrete (w).rep;
+  if (r == NULL) return false;
+  string t= r->type;
+  if (t == "simple_widget" || t == "user_canvas_widget" ||
+      t == "hsplit_widget" || t == "vsplit_widget" ||
+      t == "tabs_widget" || t == "icon_tabs_widget") return true;
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (r);
+  if (u == NULL) return false;
+  array<widget> children;
+  if (t == "resize_widget") {
+    if (window_autosizing) return false; // fixed to the default size
+    vue_resize_widget d= open_box<vue_resize_widget> (u->data);
+    return horizontal ? d.w1 != d.w3 : d.h1 != d.h3;
+  }
+  else if (t == "glue_widget") {
+    vue_glue_widget d= open_box<vue_glue_widget> (u->data);
+    return horizontal ? d.hx : d.vx;
+  }
+  else if (t == "cached_glue_widget") {
+    vue_cached_glue_widget d= open_box<vue_cached_glue_widget> (u->data);
+    return horizontal ? d.hx : d.vx;
+  }
+  else if (t == "vertical_list")   children= open_box<vue_vertical_list> (u->data).a;
+  else if (t == "horizontal_list") children= open_box<vue_horizontal_list> (u->data).a;
+  else if (t == "vertical_menu")   children= open_box<vue_vertical_menu> (u->data).a;
+  else if (t == "horizontal_menu") children= open_box<vue_horizontal_menu> (u->data).a;
+  else if (t == "wrapped_widget")  children << open_box<vue_wrapped_widget> (u->data).w;
+  else if (t == "division_widget") children << open_box<vue_division_widget> (u->data).w;
+  else if (t == "extend_widget")   children << open_box<vue_extend_widget> (u->data).w;
+  else if (t == "refreshable_widget")
+    children << open_box<vue_refreshable_widget_star> (u->data).current;
+  else if (t == "refresh_widget")
+    children << open_box<vue_refresh_widget_star> (u->data).current;
+  else return false;
+  for (int i=0; i<N(children); i++)
+    if (!is_nil (children[i]) && widget_grows (children[i], horizontal)) return true;
+  return false;
+}
+
 void
 layout_list (unsigned int id, array<widget> a, bool vert) {
+  // a list fills its parent across its direction; along its direction it
+  // grows only when one of its items does
+  bool grows= false;
+  for (int i=0; i<N(a) && !grows; i++) grows= widget_grows (a[i], !vert);
   Clay_Sizing s= layoutFit;
   if (vert) {
     s.width=  CLAY_SIZING_GROW(0);
+    if (grows) s.height= CLAY_SIZING_GROW(0);
   } else {
     s.height= CLAY_SIZING_GROW(0);
+    if (grows) s.width= CLAY_SIZING_GROW(0);
   }
   CLAY({
      .id= vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id),
@@ -1533,16 +1585,16 @@ vue_ui_rep::do_layout () {
     defh= decode_length (d.h2, current_window, d.style);
     maxw= decode_length (d.w3, current_window, d.style);
     maxh= decode_length (d.h3, current_window, d.style);
-    Clay_Sizing sizing= layoutFit;
-    if (defw == maxw && defw == minw) {
-      sizing.width= CLAY_SIZING_FIXED((float) 2*defw/PIXEL);
+    // the default size is used while the window is sized to its contents,
+    // afterwards the widget follows the size of the window within its limits
+    // (the limits of the window itself are set in vue_plain_window_widget_rep)
+    Clay_Sizing sizing;
+    if (window_autosizing) {
+      sizing.width=  CLAY_SIZING_FIXED ((float) 2*defw/PIXEL);
+      sizing.height= CLAY_SIZING_FIXED ((float) 2*defh/PIXEL);
     } else {
-      sizing.width= CLAY_SIZING_FIT(.min= (float) 2*minw/PIXEL, .max=(float) 2*maxw/PIXEL );
-    }
-    if (defh == maxh && defh == minh) {
-      sizing.height= CLAY_SIZING_FIXED((float) 2*defh/PIXEL);
-    } else {
-      sizing.height= CLAY_SIZING_FIT(.min= (float) 2*minh/PIXEL, .max=(float) 2*maxh/PIXEL );
+      sizing.width=  CLAY_SIZING_GROW (.min= (float) 2*minw/PIXEL, .max= (float) 2*maxw/PIXEL);
+      sizing.height= CLAY_SIZING_GROW (.min= (float) 2*minh/PIXEL, .max= (float) 2*maxh/PIXEL);
     }
     CLAY({
       .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
@@ -2514,10 +2566,44 @@ vue_plain_window_widget_rep::do_layout () {
       .sizing= (popup || autosize) ? layoutFit : layoutFull },
     .border= border })
   {
+     window_autosizing= autosize;
      concrete (wid)->do_layout ();
+     window_autosizing= false;
   }
   // popup menus are dismissed once one of their buttons has been activated
   if (popup && cancel_popup && win) win->set_visibility (false);
+}
+
+// the resize_widget which determines the size limits of a window, if any:
+// the first one found below the pass-through containers of the contents
+static vue_ui_rep*
+find_resize_widget (widget w) {
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (w.rep);
+  if (u == NULL) return NULL;
+  if (u->type == "resize_widget") return u;
+  array<widget> children;
+  if (u->type == "vertical_list")
+    children= open_box<vue_vertical_list> (u->data).a;
+  else if (u->type == "horizontal_list")
+    children= open_box<vue_horizontal_list> (u->data).a;
+  else if (u->type == "vertical_menu")
+    children= open_box<vue_vertical_menu> (u->data).a;
+  else if (u->type == "horizontal_menu")
+    children= open_box<vue_horizontal_menu> (u->data).a;
+  else if (u->type == "wrapped_widget")
+    children << open_box<vue_wrapped_widget> (u->data).w;
+  else if (u->type == "division_widget")
+    children << open_box<vue_division_widget> (u->data).w;
+  else if (u->type == "refreshable_widget")
+    children << open_box<vue_refreshable_widget_star> (u->data).current;
+  else if (u->type == "refresh_widget")
+    children << open_box<vue_refresh_widget_star> (u->data).current;
+  for (int i=0; i<N(children); i++) {
+    if (is_nil (children[i])) continue;
+    vue_ui_rep* r= find_resize_widget (children[i]);
+    if (r != NULL) return r;
+  }
+  return NULL;
 }
 
 bool
@@ -2538,6 +2624,20 @@ vue_plain_window_widget_rep::post_layout () {
     cw= min (cw, sw - 100*PIXEL);
     ch= min (ch, sh - 150*PIXEL);
     autosize= false;
+    // the limits of a resize_widget in the contents become those of the
+    // window, corrected by the space taken by everything around it
+    vue_ui_rep* rw= find_resize_widget (wid);
+    if (rw != NULL) {
+      vue_resize_widget d= open_box<vue_resize_widget> (rw->data);
+      Clay_ElementData re= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (rw->type), rw->id));
+      if (re.found) {
+        SI dw= cw - (SI) (re.boundingBox.width  * PIXEL / retina_factor);
+        SI dh= ch - (SI) (re.boundingBox.height * PIXEL / retina_factor);
+        SI minw= decode_length (d.w1, win, d.style), minh= decode_length (d.h1, win, d.style);
+        SI maxw= decode_length (d.w3, win, d.style), maxh= decode_length (d.h3, win, d.style);
+        win->set_size_limits (minw + dw, minh + dh, maxw + dw, maxh + dh);
+      }
+    }
   }
   if ((w != cw) || (h != ch)) win->set_size (cw, ch);
   return false; // the new size is picked up by the next layout pass
