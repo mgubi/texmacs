@@ -888,6 +888,8 @@ vue_ui_rep::send (slot s, blackbox val) {
   vue_widget_rep::send (s, val);
 }
 
+void scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z= 1); // below
+
 void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
@@ -963,16 +965,22 @@ layout_pull_button (vue_ui_rep *w) {
         ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_RIGHT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
         : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_RIGHT_TOP };
       Clay_Vector2 offset= { d.shift_x, d.shift_y };
+      // the menu is at most as tall as the window and scrolls (wheel or
+      // scroll bar) when its contents are taller; it is drawn above the
+      // scroll bars of the editors (zIndex 1)
       CLAY({
         .id= float_id,
         .floating= {
           .offset= offset,
+          .zIndex= 5,
           .attachTo= CLAY_ATTACH_TO_PARENT,
           .attachPoints= attach },
         .layout= {
           .padding= { 8, 8, 8, 8 },
-          .sizing= { .width= CLAY_SIZING_FIT(.min= 300) }},
+          .sizing= { .width= CLAY_SIZING_FIT(.min= 300),
+                     .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
+        .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
         .border= {
           .width= { 1, 1, 1, 1 },
           .color= { 150, 150, 150, 255 }}})
@@ -996,6 +1004,10 @@ layout_pull_button (vue_ui_rep *w) {
         }
       }
     }
+  }
+  if (!is_nil (d.cw)) {
+    Clay_ScrollContainerData sd= Clay_GetScrollContainerData (float_id);
+    if (sd.found) scroll_bar (float_id, sd, 6);
   }
   // store back changes
   w->data= close_box (d);
@@ -1093,7 +1105,8 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
 // see ScrollbarData in vue_gui.hpp and scrollbarData above
 
 void
-scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
+scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z) {
+  // z: the bars are drawn above their container (which may itself float)
   Clay_Vector2 ratio= (Clay_Vector2) {
     scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
     scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
@@ -1110,7 +1123,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
         .offset= { .y= -(scrollData.scrollPosition->y / ratio.y) },
-        .zIndex= 1,
+        .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
           .element= CLAY_ATTACH_POINT_RIGHT_TOP,
@@ -1145,7 +1158,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
         .offset= { .x= -(scrollData.scrollPosition->x / ratio.x) },
-        .zIndex= 1,
+        .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
           .element= CLAY_ATTACH_POINT_LEFT_BOTTOM,
@@ -3043,14 +3056,14 @@ void vue_texmacs_widget_rep::do_layout () {
           .width=  CLAY_SIZING_GROW(0),
           .height= CLAY_SIZING_FIXED(40) }}})
     {
-      layout_text (left_footer, 0, black);
+      // the left text takes the remaining space and is clipped
       CLAY({
-        .layout= {
-           .sizing= {
-             .width=  CLAY_SIZING_GROW(0),
-             .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
+        .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
+        .clip= { .horizontal= true }})
+      {
+        layout_text (left_footer, 0, black);
+      }
       layout_text (right_footer, 0, black);
-
     }
   }
 }

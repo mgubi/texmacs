@@ -3,8 +3,6 @@ TODO
 * decide what to do with win->relayout
 * introduce animation subsystem for transitions
 * more uniform handling of mouse events and keyboard focus...
-* menus taller than the window should scroll
-* clip the footer texts when the window is narrow
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
@@ -20,6 +18,8 @@ WIP
 
 DONE
 
+* menus stay in the window, scroll when taller than it and are drawn above
+  the scroll bars of the editors; footer texts are clipped
 * tab/shift-tab move the focus between the inputs of a dialog
 * balloons are attached below their widget
 * wheel events scroll the editor directly (no synthetic momentum)

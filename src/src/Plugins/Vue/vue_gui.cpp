@@ -1457,6 +1457,8 @@ process_event (SDL_Event *event) {
         in.mouse_y= event->wheel.mouse_y * retina_factor;
         in.mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
         with_window frame (win);
+        // the scroll container under the pointer is the one that scrolls
+        Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
         Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x * retina_factor, event->wheel.y * retina_factor }, 0.01f);
       }
       break;
