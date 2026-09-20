@@ -110,6 +110,7 @@ public:
   
   static void repaint_all (); // called in the event loop
   static void repaint_all_in_window (vue_window win);
+  static void forget_window (vue_window win); // the window is being destroyed
   
 protected:
   static hashset<pointer> all_widgets;

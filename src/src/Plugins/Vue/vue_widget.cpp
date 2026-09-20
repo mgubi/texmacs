@@ -2568,6 +2568,7 @@ public:
   bool refresh;
   bool popup;    // undecorated popup or tooltip window, sized to its contents
   bool autosize; // size the window to its contents at the next layout pass
+  bool quit_sent; // the quit command has been queued
   SI last_cw, last_ch; // contents size measured in the previous layout pass
   string title;
   string refresh_kind;
@@ -2596,6 +2597,7 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   // window and popups are handled differently (see do_layout/post_layout)
   autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
   last_cw= last_ch= -1;
+  quit_sent= false;
 }
 
 void
@@ -2669,8 +2671,12 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_DESTROY:
     {
       ASSERT (is_nil (val), "type mismatch");
-      if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
-      //wid->send (s, val); // forward to the content (seems unnecessary)
+      // the quit command usually deletes the window, which sends us
+      // SLOT_DESTROY again: run it only once
+      if (!is_nil (quit) && !quit_sent) {
+        quit_sent= true;
+        cmd_list= list (quit, cmd_list);
+      }
     }
       break;
     default:
@@ -3817,6 +3823,17 @@ vue_simple_widget_rep::repaint_all_in_window (vue_window win) {
   list<vue_simple_widget_rep*> l= paint_list;
   while (!is_nil(l)) {
     if (l->item->win == win) l->item->repaint_invalid_regions ();
+    l= l->next;
+  }
+}
+
+void
+vue_simple_widget_rep::forget_window (vue_window win) {
+  // widgets may outlive their window (e.g. the contents of a dialog which
+  // are still referenced from scheme): drop the dangling reference
+  list<vue_simple_widget_rep*> l= paint_list;
+  while (!is_nil(l)) {
+    if (l->item->win == win) l->item->win= NULL;
     l= l->next;
   }
 }

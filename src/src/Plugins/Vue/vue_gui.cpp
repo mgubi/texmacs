@@ -184,6 +184,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   cout << "destroy vue_sdl_base_window_rep " << id << LF;
+  vue_simple_widget_rep::forget_window (this);
   // forget the weak references of the scripting aid
   if (last_created_window == this) last_created_window= NULL;
   if (script_win == this) script_win= NULL;
@@ -1117,6 +1118,7 @@ get_window_from_ID (Uint32 ID) {
 *   text <string>                   text input
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
+*   close                           ask to close the target window
 ******************************************************************************/
 
 static array<string> script_lines;
@@ -1273,6 +1275,14 @@ script_step () {
     }
     else if (cmd == "resize" && N(a) > 2)
       win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
+    else if (cmd == "close") {
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+      ev.window.timestamp= SDL_GetTicksNS ();
+      ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      SDL_PushEvent (&ev);
+    }
     else cout << "vue script: unknown command " << line << LF;
     return; // one command per loop iteration
   }
