@@ -1,9 +1,7 @@
 TODO
 
-* implement commands in inputs_list_widget
 * decide what to do with win->relayout
 * introduce animation subsystem for transitions
-* events should go to the appropriate window
 * manage balloons properly (attach them to the widget, don't create layout element for them)
 * handle kinetic wheel properly
 * more uniform handling of mouse events and keyboard focus...
@@ -12,9 +10,9 @@ TODO
 * think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
-* auto-size plain windows to their contents (popups already do, see post_layout)
 * test interactively the new widgets (enum dropdown, choice lists, tree view, ink,
-  color picker, printer dialog, popup windows)
+  color picker, printer dialog, popup windows, inputs_list dialog, splitters)
+* honour resize_widget min/max sizes via set_size_limits (currently #if 0)
 * printer_widget just spools the file with lpr, no printer settings
 
 WIP
@@ -24,6 +22,10 @@ WIP
 
 DONE
 
+* implement commands in inputs_list_widget
+* events go to the window they belong to (vue_input_state)
+* auto-size dialog windows to their contents
+* header dependencies in the makefile (-MMD)
 * implement the missing widgets: popup/tooltip windows, popup_widget, tree view,
   ink, enum dropdown, (filtered) choice lists, extend, wait, empty, minibar,
   division, printer and color picker dialogs
