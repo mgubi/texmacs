@@ -79,6 +79,13 @@ Clay_Color palette[4]= {
 Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
 Clay_Color color_text= {0, 0, 0, 255};
+Clay_Color color_border= {150, 150, 150, 255};
+// push buttons (WIDGET_STYLE_BUTTON)
+Clay_Color color_button=       {236, 236, 236, 255};
+Clay_Color color_button_hover= {248, 248, 248, 255};
+Clay_Color color_button_down=  {205, 205, 205, 255};
+// flat buttons of menus and tool bars when pressed (WIDGET_STYLE_PRESSED)
+Clay_Color color_pressed=      {200, 200, 200, 255};
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -705,9 +712,9 @@ widget input_text_widget (command call_back, string type, array<string> def,
 static widget
 make_printer_dialog (command cmd, url ps_pdf_file) {
   array<widget> buttons;
-  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", 0)
+  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", WIDGET_STYLE_BUTTON)
           << menu_button (text_widget (translate ("Print"), 0, black),
-                          tm_new<print_command_rep> (ps_pdf_file, cmd), "", "", 0);
+                          tm_new<print_command_rep> (ps_pdf_file, cmd), "", "", WIDGET_STYLE_BUTTON);
   array<widget> rows;
   rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
        << glue_widget (false, false, 0, 10*PIXEL)
@@ -747,7 +754,7 @@ make_color_picker_dialog (command cmd, bool bg, array<tree> proposals) {
        << tile_menu (swatches, 8)
        << glue_widget (false, false, 0, 10*PIXEL)
        << menu_button (text_widget (translate ("Cancel"), 0, black),
-                       applied_command (cmd, list_object (object (false))), "", "", 0);
+                       applied_command (cmd, list_object (object (false))), "", "", WIDGET_STYLE_BUTTON);
   return vertical_list (rows);
 }
 
@@ -1346,7 +1353,7 @@ vue_ui_rep::do_layout () {
         .layout= {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
           .padding= { 6, 6, 4, 0 },
-          .childGap= 2,
+          .childGap= 3,
           .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM },
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) }}})
       {
@@ -1361,8 +1368,8 @@ vue_ui_rep::do_layout () {
             .backgroundColor= bg,
             .cornerRadius= { 5, 5, 0, 0 },
             .layout= {
-              .padding= { 10, 10, (uint16_t) (cur ? 8 : 5), (uint16_t) (cur ? 6 : 4) },
-              .childGap= 6,
+              .padding= { 16, 16, (uint16_t) (cur ? 9 : 7), (uint16_t) (cur ? 8 : 6) },
+              .childGap= 8,
               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
             .border= { .width= { 1, 1, 1, 0 }, .color= palette[0] }})
           {
@@ -1419,12 +1426,36 @@ vue_ui_rep::do_layout () {
     Clay_ElementId button_id= CLAY_IDI ("menu_button", id);
     ui_signal sig;
     if (!inert) sig= button_logic (button_id);
+    // push buttons (dialogs) are framed, the flat buttons of menus and tool
+    // bars are only highlighted when hovered or pressed
+    bool push= (d.style & WIDGET_STYLE_BUTTON) != 0;
+    bool pressed= (d.style & WIDGET_STYLE_PRESSED) != 0;
+    bool hot= !inert && (hot_id == button_id.id);
+    bool down= !inert && (active_id == button_id.id);
     Clay_Sizing sz= layoutExpand;
-    if (!button_grow) sz= { CLAY_SIZING_FIT(.min=20) };
+    if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
+    Clay_Color bg= color_background;
+    Clay_Padding padding= CLAY_PADDING_ALL(5);
+    Clay_CornerRadius radius= CLAY_CORNER_RADIUS(4);
+    Clay_BorderElementConfig border= {};
+    if (push) {
+      bg= down ? color_button_down : (hot ? color_button_hover : color_button);
+      padding= { 14, 14, 6, 6 };
+      radius= CLAY_CORNER_RADIUS(6);
+      border= { .width= { 1, 1, 1, 1 }, .color= color_border };
+    }
+    else if (down || pressed) bg= color_pressed;
+    else if (hot) bg= color_highlight;
     CLAY({
       .id= button_id,
-      .layout= { .padding= CLAY_PADDING_ALL(5), .sizing= sz  },
-      .backgroundColor= !inert && (hot_id == button_id.id) ?  color_highlight : color_background
+      .layout= {
+        .padding= padding,
+        .sizing= sz,
+        .childAlignment= { .x= push ? CLAY_ALIGN_X_CENTER : CLAY_ALIGN_X_LEFT,
+                           .y= CLAY_ALIGN_Y_CENTER }},
+      .backgroundColor= bg,
+      .cornerRadius= radius,
+      .border= border
     }) {
       last_id= button_id;
       concrete(d.w)->do_layout ();
@@ -1602,20 +1633,12 @@ vue_ui_rep::do_layout () {
       command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
       cmd_list= list (c, cmd_list);
     }
-    string st= debug_style (d.style);
-    if (N(st)>0) cout << type << " " << st << LF;
+    // a check box, drawn by vue_ui_rep::render
     CLAY({
       .id= toggle_id,
-      .layout= {
-        .sizing= { CLAY_SIZING_FIT(40),
-                   CLAY_SIZING_FIT(40) }}})
-    {
-      if (d.on) {
-        layout_text ("[X]", d.style, black);
-      } else {
-        layout_text ("[ ]", d.style, black);
-      }
-    }
+      .layout= { .sizing= { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIXED(24) }},
+      .custom= { .customData= vue_render_widget },
+      .userData= this }) {}
     return;
   }
   if (type == "enum_widget") {
@@ -2122,6 +2145,34 @@ print_glue (int w, int h, tree col)
 
 void
 vue_ui_rep::render (void *render_data) {
+  if (type == "toggle_widget") {
+    // a rounded box, filled with the accent color and a check mark when on
+    vue_toggle_widget d= open_box<vue_toggle_widget> (data);
+    vue_render_ren_data* rd= (vue_render_ren_data*) render_data;
+    renderer ren= rd->ren;
+    rectangle r= rd->r;
+    bool inert= (d.style & WIDGET_STYLE_INERT) != 0;
+    bool hot= (hot_id == CLAY_IDI ("toggle_widget", id).id);
+    SI px= ren->pixel, m= 4*px, rad= 3*px;
+    SI x1= r->x1 + m, y1= r->y1 + m, x2= r->x2 - m, y2= r->y2 - m;
+    color fill= d.on ? (inert ? rgb_color (160, 170, 200) : rgb_color (70, 110, 220))
+                     : (hot ? rgb_color (255, 255, 255) : rgb_color (248, 248, 248));
+    color edge= d.on ? fill : rgb_color (inert ? 190 : 150, inert ? 190 : 150, inert ? 190 : 150);
+    ren->set_pencil (pencil (fill, px));
+    ren->rounded_rectangle (x1, y1, x2, y2, rad, rad, rad, rad, true);
+    ren->set_pencil (pencil (edge, px));
+    ren->rounded_rectangle (x1, y1, x2, y2, rad, rad, rad, rad, false);
+    if (d.on) {
+      SI w= x2 - x1, h= y2 - y1;
+      array<SI> xs (3), ys (3);
+      xs[0]= x1 + (SI) (0.22*w); ys[0]= y1 + (SI) (0.50*h);
+      xs[1]= x1 + (SI) (0.42*w); ys[1]= y1 + (SI) (0.27*h);
+      xs[2]= x1 + (SI) (0.78*w); ys[2]= y1 + (SI) (0.74*h);
+      ren->set_pencil (pencil (white, 2*px, cap_round));
+      ren->lines (xs, ys);
+    }
+    return;
+  }
   if (type == "picture_widget") {
     vue_picture_widget d= open_box<vue_picture_widget> (data);
     current_window->draw_picture (render_data, d.p);
@@ -4177,7 +4228,7 @@ vue_inputs_list_widget_rep::perform_dialog () {
     for (int i=0; i<N(f0->proposals); i++)
       buttons << menu_button (text_widget (upcase_first (f0->proposals[i]), 0, black),
                               tm_new<inputs_list_answer_rep> (this, f0->proposals[i]),
-                              "", "", 0);
+                              "", "", WIDGET_STYLE_BUTTON);
   }
   else {
     // the usual layout: prompts with their inputs, then Ok and Cancel
@@ -4194,9 +4245,9 @@ vue_inputs_list_widget_rep::perform_dialog () {
       rhs << in;
     }
     rows << aligned_widget (lhs, rhs, 6*PIXEL, 6*PIXEL, 0, 0);
-    buttons << menu_button (text_widget (translate ("Ok"), 0, black), ok_cmd, "", "", 0);
+    buttons << menu_button (text_widget (translate ("Ok"), 0, black), ok_cmd, "", "", WIDGET_STYLE_BUTTON);
   }
-  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cancel_cmd, "", "", 0);
+  buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cancel_cmd, "", "", WIDGET_STYLE_BUTTON);
   rows << glue_widget (false, false, 0, 8*PIXEL)
        << horizontal_list (buttons);
   // some padding around the contents
