@@ -80,6 +80,8 @@ Clay_Color color_background= palette[1];
 Clay_Color color_highlight=  palette[3];
 Clay_Color color_text= {0, 0, 0, 255};
 Clay_Color color_border= {150, 150, 150, 255};
+// lists, scrollable areas and other "fields" are lighter than the dialogs
+Clay_Color color_field= {250, 250, 250, 255};
 // push buttons (WIDGET_STYLE_BUTTON)
 Clay_Color color_button=       {236, 236, 236, 255};
 Clay_Color color_button_hover= {248, 248, 248, 255};
@@ -1825,9 +1827,10 @@ vue_ui_rep::do_layout () {
     CLAY({
       .id= my_id,
       .layout= { .sizing= layoutExpand },
+      .backgroundColor= color_field,
       .border= {
-        .width= { 2, 2, 2, 2 },
-        .color= palette[3] },
+        .width= { 1, 1, 1, 1 },
+        .color= color_border },
       .clip= {
         .horizontal= true, .vertical= true,
         .childOffset= Clay_GetScrollOffset () }})
@@ -1902,6 +1905,7 @@ vue_ui_rep::do_layout () {
     bool changed= false;
     CLAY({
       .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .backgroundColor= color_field,
       .layout= {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
         .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) },
@@ -1925,7 +1929,7 @@ vue_ui_rep::do_layout () {
           active= !active || !d.flag;
           changed= true;
         }
-        Clay_Color bg= color_background;
+        Clay_Color bg= color_field;
         if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
         else if (hot_id == item_id.id) bg= color_highlight;
         CLAY({
@@ -1970,8 +1974,8 @@ vue_ui_rep::do_layout () {
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(.min= 100) }},
-        .backgroundColor= { 240, 240, 240, 255 },
-        .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] },
+        .backgroundColor= color_field,
+        .border= { .width= { 1, 1, 1, 1 }, .color= color_border },
         .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () }})
       {
         for (int i=0; i<N(d.vals); i++) {
@@ -1983,7 +1987,7 @@ vue_ui_rep::do_layout () {
             active= true;
             changed= true;
           }
-          Clay_Color bg= { 240, 240, 240, 255 };
+          Clay_Color bg= color_field;
           if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
           else if (hot_id == item_id.id) bg= color_highlight;
           CLAY({
@@ -4548,7 +4552,7 @@ vue_tree_view_widget_rep::layout_node (tree t, int depth) {
     CLAY({
       .id= label_id,
       .layout= { .padding= { 4, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
-      .backgroundColor= (hot_id == label_id.id) ? color_highlight : color_background })
+      .backgroundColor= (hot_id == label_id.id) ? color_highlight : color_field })
     {
       layout_text (node_label (t), 0, black);
     }
@@ -4571,6 +4575,7 @@ void
 vue_tree_view_widget_rep::do_layout () {
   CLAY({
     .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    .backgroundColor= color_field,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) }}})

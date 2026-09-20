@@ -319,6 +319,8 @@ texmacs_output_widget (tree doc, tree style) {
       is_transparent (extract (doc, "body")))
 #ifdef QTTEXMACS
     col= rgb_color (236, 236, 236);
+#elif defined(VUETEXMACS)
+    col= rgb_color (250, 250, 250); // the "field" background of the Vue widgets
 #else
     col= light_grey;
 #endif
