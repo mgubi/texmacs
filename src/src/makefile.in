@@ -341,8 +341,12 @@ vue_c_obj    := $(call makeobj_c,$(vue_c_src))
 %.o: %.cpp # Disable implicit compilation rule
 %.o: %.c # Disable implicit compilation rule
 
+# Header dependencies are recorded in Deps/<stem>.d while compiling, so that
+# objects are rebuilt when one of the headers they include changes
+dep_flags = -MMD -MP -MF Deps/$*.d
+
 ifneq "@PREPROC@" "yes"
-cxx_flags = $(strip $(CXX) $(1) -c $< -o $@)
+cxx_flags = $(strip $(CXX) $(1) $(dep_flags) -c $< -o $@)
 else
 define cxx_flags
 $(strip $(CXX) $(1) -E $< -o $@.lst)
@@ -351,13 +355,13 @@ endef
 endif
 cxx_incl     = $(call cxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS)) 
-objcxx_flags = $(strip $(OBJCXX) $(1) -c $< -o $@)
+objcxx_flags = $(strip $(OBJCXX) $(1) $(dep_flags) -c $< -o $@)
 objcxx_incl  = $(call objcxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS))
-cc_flags    = $(strip $(CC) $(1) -c $< -o $@)
+cc_flags    = $(strip $(CC) $(1) $(dep_flags) -c $< -o $@)
 cc_incl     = $(call cc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS)) 
-objc_flags = $(strip $(OBJC) $(1) -c $< -o $@)
+objc_flags = $(strip $(OBJC) $(1) $(dep_flags) -c $< -o $@)
 objc_incl  = $(call objc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS))
 
@@ -557,3 +561,5 @@ maintainer-clean: CLEAN
 	$(RM) Objects/*.*
 
 PHONY: DISTR CLEAN clean maintainer-clean
+
+-include $(wildcard Deps/*.d)

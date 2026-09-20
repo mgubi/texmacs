@@ -557,6 +557,9 @@ VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, cur
 
 VUE_WIDGET_DATA(refresh_widget_star, string, tmwid, string, kind, widget, current, object, curobj);
 
+VUE_WIDGET_DATA(split_widget_star, widget, a, widget, b, float, pos, bool, dragging);
+// hsplit/vsplit widgets with the position of the divider (in pixels, <0 if unset)
+
 VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val, int, st, string, w, bool, open);
 // an enum widget with the state of its dropdown list
 
@@ -739,6 +742,16 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     vue_enum_widget d= open_box<vue_enum_widget> (data);
     vue_enum_widget_star dd { .cb= d.cb, .vals= d.vals, .val= d.val, .st= d.st, .w= d.w, .open= false };
     data= close_box (dd);
+    return;
+  }
+  if (type == "hsplit_widget") {
+    vue_hsplit_widget d= open_box<vue_hsplit_widget> (data);
+    data= close_box (vue_split_widget_star { .a= d.l, .b= d.r, .pos= -1, .dragging= false });
+    return;
+  }
+  if (type == "vsplit_widget") {
+    vue_vsplit_widget d= open_box<vue_vsplit_widget> (data);
+    data= close_box (vue_split_widget_star { .a= d.t, .b= d.b, .pos= -1, .dragging= false });
     return;
   }
   if (type == "filtered_choice_widget") {
@@ -1052,6 +1065,18 @@ vue_ui_rep::do_layout () {
     //            SI, hsep, SI, vsep,
     //            SI, lpad, SI, rpad);
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
+    // the two columns are independent Clay elements; to keep the rows aligned
+    // each cell gets as minimal height the height of both cells of its row,
+    // as measured in the previous layout pass
+    string probe= "aligned_widget_cell_" * as_string (id);
+    int n= min (N(d.lhs), N(d.rhs));
+    array<float> row_h (n);
+    for (int i=0; i<n; i++) {
+      Clay_ElementData l= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), 2*i));
+      Clay_ElementData r= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), 2*i+1));
+      row_h[i]= max (l.found ? l.boundingBox.height : 0.0f,
+                     r.found ? r.boundingBox.height : 0.0f);
+    }
     CLAY({
       .id= CLAY_IDI("aligned_widget", id),
       .layout= {
@@ -1060,32 +1085,23 @@ vue_ui_rep::do_layout () {
         .childGap= (uint16_t)(2*d.hsep / PIXEL),
         .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }}})
     {
-      //FIXME: size correctly
-      CLAY({
-        .layout= {
-          .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .childGap= (uint16_t)(2*d.vsep / PIXEL),
-          .childAlignment= { .x= CLAY_ALIGN_X_RIGHT }}})
-      {
-        for (int i=0, n= N(d.lhs); i< n; i++) {
-          CLAY({
-            .layout= { .sizing= { .height= CLAY_SIZING_FIXED(40) }}})
-          {
-            concrete (d.lhs[i])->do_layout ();
-          }
-        }
-      }
-      CLAY({
-        .layout= {
-          .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .childGap= (uint16_t)(2*d.vsep / PIXEL),
-          .childAlignment= { .x= CLAY_ALIGN_X_LEFT }}})
-      {
-        for (int i=0, n= N(d.lhs); i< n; i++) {
-          CLAY({
-            .layout= { .sizing= { .height= CLAY_SIZING_FIXED(40) }}})
-          {
-            concrete (d.rhs[i])->do_layout ();
+      for (int col=0; col<2; col++) {
+        array<widget>& cells= (col == 0) ? d.lhs : d.rhs;
+        CLAY({
+          .layout= {
+            .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .childGap= (uint16_t)(2*d.vsep / PIXEL),
+            .childAlignment= { .x= (col == 0) ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT }}})
+        {
+          for (int i=0; i<n; i++) {
+            CLAY({
+              .id= CLAY_SIDI (CLAY_TM_STRING (probe), 2*i + col),
+              .layout= {
+                .sizing= { .height= CLAY_SIZING_FIT (.min= row_h[i]) },
+                .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+            {
+              concrete (cells[i])->do_layout ();
+            }
           }
         }
       }
@@ -1582,44 +1598,58 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  if (type == "hsplit_widget") {
+  if (type == "hsplit_widget" || type == "vsplit_widget") {
     //VUE_WIDGET(hsplit_widget, widget, l, widget, r);
-    vue_hsplit_widget d= open_box<vue_hsplit_widget> (data);
+    //VUE_WIDGET(vsplit_widget, widget, t, widget, b);
+    // two panes with a draggable divider; until the divider has been moved
+    // both panes share the space equally
+    vue_split_widget_star d= open_box<vue_split_widget_star> (data);
+    bool horiz= (type == "hsplit_widget");
+    const float bar= 8;
+    Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    Clay_ElementId bar_id= CLAY_IDI ("splitter", id);
+    Clay_ElementData ed= Clay_GetElementData (my_id);
+    bool changed= false;
+    if (!d.dragging && mouse_action == "press-left" && Clay_PointerOver (bar_id)) {
+      d.dragging= true;
+      mouse_action= "";
+      changed= true;
+    }
+    if (d.dragging) {
+      if (!(mouse_state & 1)) d.dragging= false;
+      else if (ed.found) {
+        float total= horiz ? ed.boundingBox.width : ed.boundingBox.height;
+        float p= horiz ? mouse_x - ed.boundingBox.x : mouse_y - ed.boundingBox.y;
+        d.pos= max (bar, min (p - bar/2, total - 2*bar));
+      }
+      changed= true;
+    }
+    Clay_Sizing first= layoutExpand, second= layoutExpand;
+    if (d.pos >= 0) {
+      if (horiz) first.width=  CLAY_SIZING_FIXED (d.pos);
+      else       first.height= CLAY_SIZING_FIXED (d.pos);
+    }
     CLAY({
-      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+      .id= my_id,
       .layout= {
-        .layoutDirection= CLAY_LEFT_TO_RIGHT }})
+        .sizing= layoutExpand,
+        .layoutDirection= horiz ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM }})
     {
-      concrete (d.l)->do_layout ();
+      CLAY({ .layout= { .sizing= first }}) {
+        concrete (d.a)->do_layout ();
+      }
       CLAY({
-        .id= CLAY_IDI("splitter", id),
-        .backgroundColor= palette [3],
+        .id= bar_id,
+        .backgroundColor= (d.dragging || Clay_PointerOver (bar_id)) ? palette[0] : palette[3],
         .layout= {
           .sizing= {
-            .width=  CLAY_SIZING_FIXED(40),
-            .height= CLAY_SIZING_GROW(0) }}}) {};
-      concrete (d.r)->do_layout ();
+            .width=  horiz ? CLAY_SIZING_FIXED (bar) : CLAY_SIZING_GROW(0),
+            .height= horiz ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIXED (bar) }}}) {};
+      CLAY({ .layout= { .sizing= second }}) {
+        concrete (d.b)->do_layout ();
+      }
     }
-    return;
-  }
-  if (type == "vsplit_widget") {
-    //VUE_WIDGET(hsplit_widget, widget, l, widget, r);
-    vue_vsplit_widget d= open_box<vue_vsplit_widget> (data);
-    CLAY({
-      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
-      .layout= {
-        .layoutDirection= CLAY_TOP_TO_BOTTOM }})
-    {
-      concrete (d.t)->do_layout ();
-      CLAY({
-        .id= CLAY_IDI("splitter", id),
-        .backgroundColor= palette [3],
-        .layout= {
-          .sizing= {
-            .width=  CLAY_SIZING_GROW(0),
-            .height= CLAY_SIZING_FIXED(40)}}}) {};
-      concrete (d.b)->do_layout ();
-    }
+    if (changed) data= close_box (d);
     return;
   }
   if (type == "choice_widget") {
@@ -2784,7 +2814,7 @@ void vue_texmacs_widget_rep::do_layout () {
            .sizing= {
              .width=  CLAY_SIZING_GROW(0),
              .height= CLAY_SIZING_FIXED(0) }} }) {} // spacer
-      layout_text (left_footer, 0, black);
+      layout_text (right_footer, 0, black);
 
     }
   }
