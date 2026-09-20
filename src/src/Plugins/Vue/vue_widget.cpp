@@ -128,6 +128,7 @@ list<command> cmd_list;
 vue_window current_window; // used during layout to propagate information
 bool window_autosizing= false; // the window is being sized to its contents
 int context_style= 0; // style flags (bold, grey) added by the enclosing divisions
+bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a close button)
 
 // signalling
 
@@ -1232,6 +1233,19 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
 
 string input_text_widget_string (widget w); // defined below
 
+// the cross of the close buttons of the tools
+static void
+render_close_mark_fn (renderer ren, void* data, rectangle r) {
+  (void) data;
+  SI px= ren->pixel;
+  SI w= r->x2 - r->x1, h= r->y2 - r->y1;
+  SI x1= r->x1 + (SI) (0.32*w), x2= r->x1 + (SI) (0.68*w);
+  SI y1= r->y1 + (SI) (0.32*h), y2= r->y1 + (SI) (0.68*h);
+  ren->set_pencil (pencil (rgb_color (60, 60, 60), 2*px, cap_round));
+  ren->line (x1, y1, x2, y2);
+  ren->line (x1, y2, x2, y1);
+}
+
 // the mark in front of a menu item, from the 'pre' of menu_button:
 // 1= check ("v"), 2= bullet ("*"), 3= circle ("o")
 static void
@@ -1286,9 +1300,11 @@ vue_ui_rep::do_layout () {
     vue_division_widget d= open_box<vue_division_widget> (data);
     Clay_ElementId div_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     int saved_style= context_style;
+    bool saved_title= in_title_bar;
     if (d.name == "title" || d.name == "title-bar") {
       // the header of a tool: a bold title on a framed bar, rounded on top
       context_style |= WIDGET_STYLE_BOLD;
+      in_title_bar= true;
       CLAY({
         .id= div_id,
         .backgroundColor= { 208, 208, 208, 255 },
@@ -1351,6 +1367,7 @@ vue_ui_rep::do_layout () {
     }
     else concrete (d.w)->do_layout (); // "plain" and others
     context_style= saved_style;
+    in_title_bar= saved_title;
     return;
   }
   if (type == "aligned_widget") {
@@ -1485,7 +1502,7 @@ vue_ui_rep::do_layout () {
           CLAY({
             .id= tab_id,
             .backgroundColor= bg,
-            .cornerRadius= { 6, 6, 0, 0 },
+            .cornerRadius= { 10, 10, 0, 0 },
             .layout= {
               .padding= { 20, 20, (uint16_t) (cur ? 10 : 8), (uint16_t) (cur ? 10 : 7) },
               .childGap= 10,
@@ -1515,7 +1532,7 @@ vue_ui_rep::do_layout () {
       CLAY({
         .id= CLAY_ID_LOCAL("tab_area"),
         .backgroundColor= color_background,
-        .cornerRadius= { 0, 6, 6, 6 },
+        .cornerRadius= { 0, 8, 8, 8 },
         .layout= {
           .padding= CLAY_PADDING_ALL((uint16_t) pad),
           .sizing= { .width=  CLAY_SIZING_GROW(.min= page_w + 2*pad),
@@ -1564,6 +1581,27 @@ vue_ui_rep::do_layout () {
     bool pressed= (d.style & WIDGET_STYLE_PRESSED) != 0;
     bool hot= !inert && (hot_id == button_id.id);
     bool down= !inert && (active_id == button_id.id);
+    if (in_title_bar) {
+      // the "x" of the title bar of a tool: a round close button
+      vue_ui_rep* lab= dynamic_cast<vue_ui_rep*> (concrete (d.w).rep);
+      if (lab != NULL && lab->type == "text_widget" &&
+          open_box<vue_text_widget> (lab->data).s == "x") {
+        Clay_Color cbg= down ? color_button_down : (hot ? color_button_hover : (Clay_Color) { 196, 196, 196, 255 });
+        CLAY({
+          .id= button_id,
+          .backgroundColor= cbg,
+          .cornerRadius= CLAY_CORNER_RADIUS(13),
+          .layout= { .sizing= { CLAY_SIZING_FIXED(26), CLAY_SIZING_FIXED(26) }},
+          .custom= { .customData= (void*) &render_close_mark_fn },
+          .userData= this,
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }}) {}
+        if (sig.clicked == 1) {
+          cancel_popup= true;
+          cmd_list= list (d.cmd, cmd_list);
+        }
+        return;
+      }
+    }
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
     Clay_Color bg= color_background;
@@ -3745,7 +3783,8 @@ vue_simple_widget_rep::do_layout () {
     scroll_pos.x2= scrollPosition.y * ren->pixel;
     absolute_scroll= false;
   }
-  if (Clay_Hovered () && (mouse_action != "")) {
+  // note: our CLAY block is closed here, Clay_Hovered () would test the parent
+  if (Clay_PointerOver (clay_id) && (mouse_action != "")) {
     SI x= mouse_x - d.boundingBox.x;
     SI y= mouse_y - d.boundingBox.y;
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);

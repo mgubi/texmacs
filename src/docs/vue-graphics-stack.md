@@ -142,6 +142,11 @@ used by the widgets around the layout pass of each window and clear the
 one-shot events afterwards: an event lives for exactly one layout pass of its
 window.
 
+Hit testing uses `Clay_PointerOver (id)` on the element's own id. Do not use
+`Clay_Hovered ()` after the element's `CLAY` block has closed: it then tests
+the *parent*, and a widget laid out before its siblings (the editor before the
+side tools) would swallow their events.
+
 `button_logic (id)` implements hot/active/click over `Clay_PointerOver`: the
 press makes the element active, the release over the same element yields
 `clicked` (1 left, 2 middle, 3 right). Every `ui_signal` must be initialized
