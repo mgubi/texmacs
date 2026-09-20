@@ -2286,7 +2286,8 @@ public:
   bool mouse_grab;
   bool modified;
   bool refresh;
-  bool popup; // undecorated popup or tooltip window, sized to its contents
+  bool popup;    // undecorated popup or tooltip window, sized to its contents
+  bool autosize; // size the window to its contents at the next layout pass
   string title;
   string refresh_kind;
   
@@ -2310,6 +2311,9 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
 : vue_widget_rep (type_vue_plain_window_widget), wid(_wid), name(_name), quit(_quit),
   win (NULL), visible (false), popup (_popup) {
   cout << "Creating vue_plain_window_widget" << (popup ? " (popup)" : "") << LF;
+  // dialogs get their initial size from their contents, the main TeXmacs
+  // window and popups are handled differently (see do_layout/post_layout)
+  autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
 }
 
 void
@@ -2327,6 +2331,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_SIZE:
       {
         coord2 p= check_open<coord2> (val, s);
+        autosize= false; // an explicit size wins over the contents
         if (win) {
           win->set_size (p.x1, p.x2);
         }
@@ -2457,7 +2462,8 @@ vue_plain_window_widget_rep::do_layout () {
     .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .sizing= popup ? layoutFit : layoutFull },
+      // while sizing to the contents the root must not be bound by the window
+      .sizing= (popup || autosize) ? layoutFit : layoutFull },
     .border= border })
   {
      concrete (wid)->do_layout ();
@@ -2468,15 +2474,24 @@ vue_plain_window_widget_rep::do_layout () {
 
 bool
 vue_plain_window_widget_rep::post_layout () {
-  if (!popup || win == NULL) return false;
-  // popups are sized to their contents
+  if (!(popup || autosize) || win == NULL) return false;
+  // popups always follow their contents, other windows only initially
   Clay_ElementData el= Clay_GetElementData (CLAY_ID("plain_window_widget"));
   if (!el.found) return false;
   SI w, h;
   win->get_size (w, h);
   SI cw= (SI) (el.boundingBox.width  * PIXEL / retina_factor),
      ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
-  if (cw > 0 && ch > 0 && ((w != cw) || (h != ch))) win->set_size (cw, ch);
+  if (cw <= 0 || ch <= 0) return false;
+  if (!popup) {
+    // leave some room for the window decorations and the screen borders
+    SI sw, sh;
+    gui_root_extents (sw, sh);
+    cw= min (cw, sw - 100*PIXEL);
+    ch= min (ch, sh - 150*PIXEL);
+    autosize= false;
+  }
+  if ((w != cw) || (h != ch)) win->set_size (cw, ch);
   return false; // the new size is picked up by the next layout pass
 }
 
