@@ -16,6 +16,49 @@
 #include "vue_widget.hpp"
 #include "clay.h"
 
+// drag state of a scroll bar
+typedef struct {
+  float clickOrigin;
+  float positionOrigin;
+  bool vertical;
+  uint32_t active_id;
+} ScrollbarData;
+
+// Pending input events and interaction state of a window. The widgets read
+// and update this state through the globals of vue_widget.cpp, which are
+// loaded from (and stored back to) the window being laid out, see
+// gui_init_context / gui_finalize_context.
+struct vue_input_state {
+  // keyboard events (window relative, consumed by the focused widget)
+  string key_event;
+  string last_key;
+  time_t key_time;
+  // pointer events (coordinates are relative to the window)
+  string mouse_action;
+  time_t mouse_time;
+  unsigned int mouse_x, mouse_y;
+  array<double> mouse_data;
+  // popups and balloons
+  bool current_popup;      // is there an active popup?
+  bool cancel_popup;       // should we cancel popups?
+  time_t away_time;        // tolerance for mouse motion
+  uint32_t current_balloon;
+  time_t balloon_time;
+  // hot and active elements
+  uint32_t hot_id;
+  uint32_t active_id;
+  int active_button;       // none, left, middle, right
+  Clay_ElementId last_id;
+  ScrollbarData scrollbar;
+
+  vue_input_state ()
+    : key_time (0), mouse_time (0), mouse_x (0), mouse_y (0),
+      current_popup (false), cancel_popup (false), away_time (0),
+      current_balloon (0), balloon_time (0),
+      hot_id (0), active_id (0), active_button (0), last_id {},
+      scrollbar { 0, 0, true, 0 } {}
+};
+
 class vue_window_rep {
 public:
   static int serial;
@@ -40,6 +83,7 @@ public:
   bool relayout;
   bool clay_debug;
   bool popup; // undecorated popup/tooltip window
+  vue_input_state input; // pending events and interaction state
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup)

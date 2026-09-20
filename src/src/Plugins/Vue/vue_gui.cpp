@@ -48,18 +48,8 @@
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
 
-// keyboard events
-extern string key_event;
-extern string last_key;
-extern time_t key_time;
-
-// pointer info
-extern string mouse_action;
-extern time_t mouse_time;
-extern unsigned int mouse_x;
-extern unsigned int mouse_y;
+// pointer info (the per-window events are stored in vue_window_rep::input)
 extern unsigned int mouse_state;
-extern array<double> mouse_data;
 
 
 extern bool debug_clay;
@@ -1153,9 +1143,8 @@ postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod, bool is_k
 
 void
 process_event (SDL_Event *event) {
-  // reset events
-  mouse_action="";
-  key_event="";
+  // note: events are stored in the input state of their window and cleared
+  // once that window has been laid out (see gui_finalize_context)
   vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
@@ -1190,12 +1179,13 @@ process_event (SDL_Event *event) {
         } else {
           action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
         }
-        mouse_action= action;
-        mouse_time= texmacs_time();
-        mouse_x= event->button.x * retina_factor;
-        mouse_y= event->button.y * retina_factor;
+        vue_input_state& in= win->input;
+        in.mouse_action= action;
+        in.mouse_time= texmacs_time();
+        in.mouse_x= event->button.x * retina_factor;
+        in.mouse_y= event->button.y * retina_factor;
         with_window frame (win);
-        Clay_SetPointerState ((Clay_Vector2) { (float) mouse_x, (float) mouse_y },
+        Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y },
                              (event->button.button == SDL_BUTTON_LEFT) &&
                              (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN));
       }
@@ -1208,11 +1198,12 @@ process_event (SDL_Event *event) {
               event->wheel.windowID, event->wheel.x, event->wheel.y);
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
-        mouse_action= "wheel";
-        mouse_time= texmacs_time();
-        mouse_x= event->wheel.mouse_x * retina_factor;
-        mouse_y= event->wheel.mouse_y * retina_factor;;
-        mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
+        vue_input_state& in= win->input;
+        in.mouse_action= "wheel";
+        in.mouse_time= texmacs_time();
+        in.mouse_x= event->wheel.mouse_x * retina_factor;
+        in.mouse_y= event->wheel.mouse_y * retina_factor;
+        in.mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
         with_window frame (win);
         Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x * retina_factor, event->wheel.y * retina_factor }, 0.01f);
       }
@@ -1226,10 +1217,11 @@ process_event (SDL_Event *event) {
         with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { event->motion.x * retina_factor, event->motion.y * retina_factor },
                              event->button.button & SDL_BUTTON_LMASK);
-        mouse_action= "move";
-        mouse_time= texmacs_time();
-        mouse_x= event->motion.x * retina_factor;
-        mouse_y= event->motion.y * retina_factor;
+        vue_input_state& in= win->input;
+        in.mouse_action= "move";
+        in.mouse_time= texmacs_time();
+        in.mouse_x= event->motion.x * retina_factor;
+        in.mouse_y= event->motion.y * retina_factor;
       }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
@@ -1263,9 +1255,9 @@ process_event (SDL_Event *event) {
           //cout << "redraw: " << request_partial_redraw << "\n";
           //if (N(key)>0) win->key_event (key);
 
-          key_event= key;
-          key_time= texmacs_time();
-          last_key= key;
+          win->input.key_event= key;
+          win->input.key_time= texmacs_time();
+          win->input.last_key= key;
         }
       }
       break;
@@ -1273,18 +1265,18 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_TEXT_INPUT:
     {
       string r= utf8_to_cork (event->text.text);
-      if (r == last_key) {
+      win= get_window_from_ID (event->text.windowID);
+      if (win) {
+        if (r == win->input.last_key) {
           printf("Text input (matches last key, ignore): '%s'\n", event->text.text);
-      } else {
+        } else {
           printf("Text input (no match): '%s'\n", event->text.text);
-        win= get_window_from_ID (event->key.windowID);
-        if (win) {
           //FIXME: it is the right way to do it?
-          key_event= r;
-          key_time= texmacs_time();
+          win->input.key_event= r;
+          win->input.key_time= texmacs_time();
         }
+        win->input.last_key= ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
       }
-      last_key = ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
       break;
     } //case SDL_EVENT_TEXT_INPUT
 

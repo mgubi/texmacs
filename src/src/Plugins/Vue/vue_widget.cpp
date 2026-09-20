@@ -125,10 +125,61 @@ uint32_t active_id;
 int active_button; // none, left, middle, right
 uint32_t hot_id;
 
+ScrollbarData scrollbarData= { 0, 0, true, 0 };
 
+// The globals above describe the window currently being laid out; they are
+// loaded from and stored back to the vue_input_state of that window so that
+// every window only sees its own events.
+
+static void
+load_input_state (vue_window win) {
+  vue_input_state& in= win->input;
+  key_event= in.key_event;
+  last_key= in.last_key;
+  key_time= in.key_time;
+  mouse_action= in.mouse_action;
+  mouse_time= in.mouse_time;
+  mouse_x= in.mouse_x;
+  mouse_y= in.mouse_y;
+  mouse_data= in.mouse_data;
+  current_popup= in.current_popup;
+  cancel_popup= in.cancel_popup;
+  away_time= in.away_time;
+  current_balloon= in.current_balloon;
+  balloon_time= in.balloon_time;
+  hot_id= in.hot_id;
+  active_id= in.active_id;
+  active_button= in.active_button;
+  last_id= in.last_id;
+  scrollbarData= in.scrollbar;
+}
+
+static void
+store_input_state (vue_window win) {
+  vue_input_state& in= win->input;
+  in.key_event= key_event;
+  in.last_key= last_key;
+  in.key_time= key_time;
+  in.mouse_action= mouse_action;
+  in.mouse_time= mouse_time;
+  in.mouse_x= mouse_x;
+  in.mouse_y= mouse_y;
+  in.mouse_data= mouse_data;
+  in.current_popup= current_popup;
+  in.cancel_popup= cancel_popup;
+  in.away_time= away_time;
+  in.current_balloon= current_balloon;
+  in.balloon_time= balloon_time;
+  in.hot_id= hot_id;
+  in.active_id= active_id;
+  in.active_button= active_button;
+  in.last_id= last_id;
+  in.scrollbar= scrollbarData;
+}
 
 void
 gui_init_context() {
+  load_input_state (current_window);
   hot_id= 0;
   
   // popup state initialization
@@ -146,8 +197,12 @@ gui_finalize_context() {
     // deactivate elements, probably we released a button away from the active element
     active_button= 0;
     active_id= 0;
-    mouse_action= "";
   }
+  // events live for exactly one layout pass of their window
+  mouse_action= "";
+  key_event= "";
+  mouse_data= array<double> ();
+  store_input_state (current_window);
 }
 
 
@@ -925,15 +980,7 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
   }
 }
 
-typedef struct
-{
-  float clickOrigin;
-  float positionOrigin;
-  bool vertical;
-  uint32_t active_id;
-} ScrollbarData;
-
-ScrollbarData scrollbarData= { 0, 0, true, 0 };
+// see ScrollbarData in vue_gui.hpp and scrollbarData above
 
 void
 scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData) {
