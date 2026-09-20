@@ -863,7 +863,10 @@ layout_text_box (string s, int style, color c) {
   }) {};
 }
 
+extern int context_style; // style flags added by the enclosing divisions
+
 void layout_text (string s, int style, color c) {
+  style |= context_style;
   // grey and inert texts are greyed, whatever color was asked for
   if (style & (WIDGET_STYLE_GREY | WIDGET_STYLE_INERT)) c= dark_grey;
   if (style & WIDGET_STYLE_CENTERED) {

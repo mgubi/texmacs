@@ -113,8 +113,11 @@ time_t away_time;   // tolerance for mouse motion
 Clay_ElementId last_id;
 bool debug_clay=false;
 
-// ask the buttons to fit all horizontal space
+// ask the buttons to fit all horizontal space (items of vertical menus)
 bool button_grow= false;
+// the vertical menu being laid out has items with check marks: all its items
+// reserve the column of the marks so that the labels align
+bool menu_has_marks= false;
 
 uint32_t current_balloon;
 time_t balloon_time;
@@ -124,6 +127,7 @@ list<command> cmd_list;
 
 vue_window current_window; // used during layout to propagate information
 bool window_autosizing= false; // the window is being sized to its contents
+int context_style= 0; // style flags (bold, grey) added by the enclosing divisions
 
 // signalling
 
@@ -917,8 +921,9 @@ layout_pull_button (vue_ui_rep *w) {
       .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
     .backgroundColor= hot_id == button_id.id ?  color_highlight : color_background })
   {
-    // items of vertical menus reserve the column of the check marks
-    if (!down) CLAY({ .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }}}) {}
+    // items of vertical menus with check marks reserve their column
+    if (!down && menu_has_marks)
+      CLAY({ .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }}}) {}
     concrete(d.w)->do_layout ();
     if (!down) {
       CLAY({ .layout= { .sizing= layoutExpand }}){};
@@ -990,7 +995,7 @@ layout_pull_button (vue_ui_rep *w) {
           .attachPoints= attach },
         .layout= {
           .padding= { 8, 8, 8, 8 },
-          .sizing= { .width= CLAY_SIZING_FIT(.min= 300),
+          .sizing= { .width= CLAY_SIZING_FIT(.min= 120),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
         .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
@@ -1030,17 +1035,24 @@ static bool widget_grows (widget w, bool horizontal); // below
 
 void
 layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
-  // a menu fills its parent across its direction; along its direction it
-  // grows only when one of its items does (see layout_list)
-  bool grows= false;
-  for (int i=0; i<N(a) && !grows; i++) grows= widget_grows (a[i], !vert);
+  // a menu fits its items and grows along an axis only when one of its items
+  // does (a horizontal menu bar fills the height of its row); the items of a
+  // vertical menu fill the width of the menu
+  bool grows_main= false, grows_cross= false, marks= false;
+  for (int i=0; i<N(a); i++) {
+    grows_main=  grows_main  || widget_grows (a[i], !vert);
+    grows_cross= grows_cross || widget_grows (a[i], vert);
+    vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (concrete (a[i]).rep);
+    if (u != NULL && u->type == "menu_button" &&
+        N(open_box<vue_menu_button> (u->data).pre) > 0) marks= true;
+  }
   Clay_Sizing s= layoutFit;
   if (vert) {
-    s.width=  CLAY_SIZING_GROW(0);
-    if (grows) s.height= CLAY_SIZING_GROW(0);
+    if (grows_cross) s.width=  CLAY_SIZING_GROW(0);
+    if (grows_main)  s.height= CLAY_SIZING_GROW(0);
   } else {
+    if (grows_main)  s.width=  CLAY_SIZING_GROW(0);
     s.height= CLAY_SIZING_GROW(0);
-    if (grows) s.width= CLAY_SIZING_GROW(0);
   }
   CLAY({
     .id= vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id),
@@ -1049,12 +1061,14 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
       .sizing= s,
       .childGap= gap }})
   {
-    bool save= button_grow;
-    button_grow= vert ? true : false;
+    bool save_grow= button_grow, save_marks= menu_has_marks;
+    button_grow= vert;
+    menu_has_marks= vert && marks;
     for (int i=0, n=N(a); i< n; i++) {
       concrete (a[i])->do_layout ();
     }
-    button_grow= save;
+    button_grow= save_grow;
+    menu_has_marks= save_marks;
   }
 }
 
@@ -1266,22 +1280,77 @@ vue_ui_rep::do_layout () {
   }
   if (type == "division_widget") {
     //VUE_WIDGET(division_widget, string, name, widget, w);
+    // the CSS class names used by the scheme code (see the Qt themes in
+    // misc/themes): title and subtitle bars of the tools, discrete texts,
+    // section bars; "plain" and unknown names are transparent containers
     vue_division_widget d= open_box<vue_division_widget> (data);
-    // only some of the CSS class names used by the scheme code get a look
-    if (d.name == "title-bar") {
+    Clay_ElementId div_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    int saved_style= context_style;
+    if (d.name == "title" || d.name == "title-bar") {
+      // the header of a tool: a bold title on a framed bar, rounded on top
+      context_style |= WIDGET_STYLE_BOLD;
       CLAY({
-        .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
-        .backgroundColor= palette[0],
+        .id= div_id,
+        .backgroundColor= { 208, 208, 208, 255 },
+        .cornerRadius= { 6, 6, 0, 0 },
         .layout= {
-          .padding= { 8, 8, 4, 4 },
+          .padding= { 12, 8, 8, 8 },
+          .childGap= 8,
           .sizing= { .width= CLAY_SIZING_GROW(0) },
-          .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})
+          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+        .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
       {
         concrete (d.w)->do_layout ();
       }
-    } else {
-      concrete (d.w)->do_layout ();
     }
+    else if (d.name == "subtitle") {
+      context_style |= WIDGET_STYLE_BOLD;
+      CLAY({
+        .id= div_id,
+        .layout= {
+          .padding= { 8, 8, 8, 4 },
+          .sizing= { .width= CLAY_SIZING_GROW(0) }},
+        .border= { .width= { .bottom= 1 }, .color= color_border }})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
+    else if (d.name == "discrete") {
+      context_style |= WIDGET_STYLE_GREY;
+      CLAY({ .id= div_id, .layout= { .padding= { 4, 4, 2, 2 } }})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
+    else if (d.name == "sections" || d.name == "section-tabs") {
+      // horizontal bars of section buttons, the second one looks like tabs
+      bool tabs= (d.name == "section-tabs");
+      CLAY({
+        .id= div_id,
+        .backgroundColor= tabs ? (Clay_Color) { 176, 176, 176, 255 } : palette[0],
+        .cornerRadius= tabs ? (Clay_CornerRadius) {} : (Clay_CornerRadius) { 6, 6, 6, 6 },
+        .layout= {
+          .padding= { 6, 6, 4, (uint16_t) (tabs ? 0 : 4) },
+          .sizing= { .width= CLAY_SIZING_GROW(0) },
+          .childAlignment= { .y= CLAY_ALIGN_Y_BOTTOM }},
+        .border= { .width= { 0, 0, 0, (uint16_t) (tabs ? 1 : 0) }, .color= color_border }})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
+    else if (d.name == "active-section" || d.name == "section-active-tab") {
+      // the selected entry of the bars above
+      CLAY({
+        .id= div_id,
+        .backgroundColor= color_background,
+        .cornerRadius= { 6, 6, 0, 0 },
+        .border= { .width= { 1, 1, 1, 0 }, .color= color_border }})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
+    else concrete (d.w)->do_layout (); // "plain" and others
+    context_style= saved_style;
     return;
   }
   if (type == "aligned_widget") {
@@ -1522,9 +1591,9 @@ vue_ui_rep::do_layout () {
       .border= border
     }) {
       last_id= button_id;
-      if (button_grow || N(d.pre) > 0) {
+      if (menu_has_marks || N(d.pre) > 0) {
         // the column for the mark of the item: "v" (check), "*" or "o";
-        // items of vertical menus always reserve it so that labels align
+        // all items of a menu with marks reserve it so that labels align
         int kind= (d.pre == "v") ? 1 : (d.pre == "*") ? 2 : (d.pre == "o") ? 3 : 0;
         CLAY({
           .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }},
@@ -3203,10 +3272,11 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
     .backgroundColor= palette[2],
     .layout= {
       .sizing= sizing,
-      .padding= CLAY_PADDING_ALL(8),
+      .padding= CLAY_PADDING_ALL(10),
+      .childGap= 10,
       .layoutDirection= CLAY_TOP_TO_BOTTOM },
     .clip= { .horizontal= !side, .vertical= side, .childOffset= Clay_GetScrollOffset () },
-    .border= { .width= bw, .color= palette[0] }})
+    .border= { .width= bw, .color= color_border }})
   {
     tools->do_layout ();
   }
