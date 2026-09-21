@@ -1125,7 +1125,9 @@ layout_pull_button (vue_ui_rep *w) {
       .childGap= 4,
       .sizing= s,
       .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
-    .backgroundColor= hot_id == button_id.id ?  color_highlight : color_background })
+    // flat: the bar or menu behind shows through unless hovered (the bars
+    // of the main window have different greys)
+    .backgroundColor= hot_id == button_id.id ? color_highlight : (Clay_Color) { 0, 0, 0, 0 } })
   {
     // items of vertical menus with check marks reserve their column
     if (!down && menu_has_marks)
@@ -1947,7 +1949,7 @@ vue_ui_rep::do_layout () {
           .padding= {5,5,5,5} },
         .border= {
           .width= { .left= 2 },
-          .color=  { 210, 210, 210, 255 } } });
+          .color=  { 150, 150, 150, 255 } } });
     } else {
       CLAY(CLAY_IDI("menu_separator (h)", id), {
         .layout= {
@@ -3633,6 +3635,18 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
   if (sd.found) scroll_bar (id, sd);
 }
 
+// The bars of the main window look as in the Qt port: a menu bar and a
+// main tool bar in the window grey, a lighter mode bar and a lighter still
+// focus bar, separated by 2 px lines slightly darker than the window grey,
+// no gaps; the footer in the window grey right below the canvas. Sizes in
+// pixels (the bars are as tall as their contents, at least these heights).
+static const uint16_t bar_hpad= 24;   // contents clear of the window edges
+static const Clay_Color bar_line= { 176, 176, 176, 255 };
+static const Clay_Color bar_mode_bg=  { 212, 212, 212, 255 };
+static const Clay_Color bar_focus_bg= { 232, 232, 232, 255 };
+static const float bar_menu_h= 62, bar_main_h= 88, bar_mode_h= 72, bar_focus_h= 64,
+                   bar_footer_h= 56;
+
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
   // grow to the size of the window
@@ -3649,15 +3663,18 @@ void vue_texmacs_widget_rep::do_layout () {
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       .sizing= layoutFull, // fills the window, or the box of an embedded editor
-      .padding= { 0, 0, (uint16_t) (bars ? 16 : 0), (uint16_t) (bars ? 16 : 0) },
-      .childGap= (uint16_t) (bars ? 16 : 0) }})
+      .padding= { 0, 0, 0, 0 },
+      .childGap= 0 }})
   {
     if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
       .layout= {
-        .padding= { 8, 8, 0, 0 },
+        .padding= { bar_hpad, bar_hpad, 0, 0 },
+        .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
         .sizing= {
           .width=  CLAY_SIZING_GROW(0),
-          .height= CLAY_SIZING_FIT(.min= 20) }}})
+          .height= CLAY_SIZING_FIT(.min= bar_menu_h) }},
+      .backgroundColor= color_background,
+      .border= { .width= { .bottom= 2 }, .color= bar_line }})
     {
       if (!is_nil (main_menu)) {
         main_menu->do_layout ();
@@ -3665,10 +3682,13 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     if (visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
-         .padding= { 8, 8, 0, 0 },
+         .padding= { bar_hpad, bar_hpad, 0, 0 },
+         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
          .sizing= {
            .width=  CLAY_SIZING_GROW(0),
-           .height= CLAY_SIZING_FIT(.min= 20) }}})
+           .height= CLAY_SIZING_FIT(.min= bar_main_h) }},
+      .backgroundColor= color_background,
+      .border= { .width= { .bottom= 2 }, .color= bar_line }})
     {
       if (!is_nil (main_icons)) {
         main_icons->do_layout ();
@@ -3676,10 +3696,13 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     if (visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
-         .padding= { 8, 8, 0, 0 },
+         .padding= { bar_hpad, bar_hpad, 0, 0 },
+         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
          .sizing= {
            .width=  CLAY_SIZING_GROW(0),
-           .height= CLAY_SIZING_FIT(.min= 20) }}})
+           .height= CLAY_SIZING_FIT(.min= bar_mode_h) }},
+      .backgroundColor= bar_mode_bg,
+      .border= { .width= { .bottom= 2 }, .color= bar_line }})
     {
       if (!is_nil (mode_icons)) {
         mode_icons->do_layout ();
@@ -3687,10 +3710,13 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     if (visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
       .layout= {
-         .padding= { 8, 8, 0, 0 },
+         .padding= { bar_hpad, bar_hpad, 0, 0 },
+         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
          .sizing= {
             .width=  CLAY_SIZING_GROW(0),
-            .height= CLAY_SIZING_FIT(.min= 20) }}})
+            .height= CLAY_SIZING_FIT(.min= bar_focus_h) }},
+      .backgroundColor= bar_focus_bg,
+      .border= { .width= { .bottom= 2 }, .color= bar_line }})
     {
       if (!is_nil (focus_icons)) {
         focus_icons->do_layout ();
@@ -3718,10 +3744,12 @@ void vue_texmacs_widget_rep::do_layout () {
                          win->layout_w, win->layout_h, 2);
     if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {
       .layout= {
-        .padding= { 8, 8, 0, 0 },
+        .padding= { bar_hpad, bar_hpad, 0, 0 },
+        .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
         .sizing= {
           .width=  CLAY_SIZING_GROW(0),
-          .height= CLAY_SIZING_FIXED(40) }}})
+          .height= CLAY_SIZING_FIXED(bar_footer_h) }},
+      .backgroundColor= color_background })
     {
       // the left text takes the remaining space and is clipped
       CLAY_AUTO_ID({
