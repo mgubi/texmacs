@@ -179,7 +179,15 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     // note: we need to preserve previous context in case it was present
     // we may be in the middle of some layout operation for another window
     Clay_Context *save_ctx= Clay_GetCurrentContext ();
+    // the element hash map must hold the ids of the previous frame and of
+    // the current one together (the stale ones go at the next layout), so
+    // a window whose widgets are rebuilt (a tool with a long list) needs
+    // twice its largest frame; the default 8192 was exceeded by the macros
+    // editor
+    Clay_SetMaxElementCount (32768);
     uint64_t totalMemorySize= Clay_MinMemorySize ();
+    static bool reported= false;
+    if (!reported) { cout << "Vue: Clay arena " << (totalMemorySize >> 20) << " MB per window" << LF; reported= true; }
     clay_arena= (Clay_Arena) {
         .memory=  (char*) SDL_malloc (totalMemorySize),
         .capacity= totalMemorySize

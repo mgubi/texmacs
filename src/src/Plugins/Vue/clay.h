@@ -789,6 +789,8 @@ typedef CLAY_PACKED_ENUM {
     CLAY_ERROR_TYPE_PERCENTAGE_OVER_1,
     // Clay encountered an internal error. It would be wonderful if you could report this so we can fix it!
     CLAY_ERROR_TYPE_INTERNAL_ERROR,
+    // TeXmacs: the element hash map is full (backported from later Clay versions)
+    CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED,
 } Clay_ErrorType;
 
 // Data to identify the error that clay has encountered.
@@ -1712,6 +1714,11 @@ bool Clay__PointIsInsideRect(Clay_Vector2 point, Clay_BoundingBox rect) {
 Clay_LayoutElementHashMapItem* Clay__AddHashMapItem(Clay_ElementId elementId, Clay_LayoutElement* layoutElement, uint32_t idAlias) {
     Clay_Context* context = Clay_GetCurrentContext();
     if (context->layoutElementsHashMapInternal.length == context->layoutElementsHashMapInternal.capacity - 1) {
+        // TeXmacs: say so (as later Clay versions do) instead of failing silently
+        context->errorHandler.errorHandlerFunction(CLAY__INIT(Clay_ErrorData) {
+            .errorType = CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED,
+            .errorText = CLAY_STRING("Clay has run out of space in its internal element ID hashmap. Try Clay_SetMaxElementCount() with a higher value."),
+            .userData = context->errorHandler.userData });
         return NULL;
     }
     Clay_LayoutElementHashMapItem item = { .elementId = elementId, .layoutElement = layoutElement, .nextIndex = -1, .generation = context->generation + 1, .idAlias = idAlias };
@@ -2212,7 +2219,7 @@ void Clay__InitializePersistentMemory(Clay_Context* context) {
     int32_t maxMeasureTextCacheWordCount = context->maxMeasureTextCacheWordCount;
     Clay_Arena *arena = &context->internalArena;
 
-    context->scrollContainerDatas = Clay__ScrollContainerDataInternalArray_Allocate_Arena(10, arena);
+    context->scrollContainerDatas = Clay__ScrollContainerDataInternalArray_Allocate_Arena(100, arena); // TeXmacs: 10 upstream 0.14, 100 in later versions
     context->layoutElementsHashMapInternal = Clay__LayoutElementHashMapItemArray_Allocate_Arena(maxElementCount, arena);
     context->layoutElementsHashMap = Clay__int32_tArray_Allocate_Arena(maxElementCount, arena);
     context->measureTextHashMapInternal = Clay__MeasureTextCacheItemArray_Allocate_Arena(maxElementCount, arena);

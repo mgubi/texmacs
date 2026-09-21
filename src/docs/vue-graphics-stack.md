@@ -235,7 +235,24 @@ the window, are at most as tall as the window and scroll.
   their layout is wrong (borders drawn around bare texts, enums collapsed to
   their arrow). `Clay__CompactLayoutElementHashMap`, called from
   `Clay_BeginLayout`, drops the items not declared in the previous frame and
-  rebuilds the buckets. Keep it when updating Clay.
+  rebuilds the buckets; a full map is now reported
+  (`CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED`, "Clay error (8)"). Since the
+  map holds the ids of the previous *and* of the current frame right after a
+  rebuild, the capacity is set to 32768 elements (`Clay_SetMaxElementCount`,
+  arena of 23 MB per window): the macros editor exceeded the default 8192.
+  **Provenance of `clay.h`**: a snapshot of Clay's `main` between July and
+  August 2025 (it has the `Clay__HashStringWithOffset` id scheme of 2025-07
+  but not the 100 scroll containers of 2025-08-14), i.e. v0.14 plus a few
+  post-release commits, with local patches marked `TeXmacs:` (hash map
+  compaction and error, 100 scroll containers). Upstream `main` (checked
+  2026-09-21: still no v0.15 tag, ~100 commits since) later added its own
+  hash map pruning (#611), a transitions/animation API, a fix for
+  `Clay_Hovered` with several floating children (#461) and, from 2025-09-16,
+  a **breaking change**: `.id` left the declaration struct and the macro
+  became `CLAY(id, {...})` / `CLAY_AUTO_ID({...})`, `CLAY_TEXT (text, {...})`,
+  `Clay_GetOpenElementId` replaces `Clay__GetParentElementId`. Updating means
+  rewriting the ~90 `CLAY({ .id= ...})` sites; not worth it before a tagged
+  release. Keep the local patches when updating.
 * **SDL3** functions return `NULL`/`false` and set `SDL_GetError`. Checked:
   window creation (fatal), the layout arena, the window surface (the frame
   is skipped), surface creation and blits, `SDL_UpdateWindowSurface`, the
