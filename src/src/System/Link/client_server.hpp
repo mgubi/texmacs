@@ -18,7 +18,22 @@
 #include "server_log.hpp"
 #include <Gnutls/gnutls.hpp>
 
+// Error codes
+const int TM_NET_SUCCESS = 0;
+const int TM_NET_WRONG_ARGUMENTS = -1;
+const int TM_NET_INVALID_HOST = -10;
+const int TM_NET_INVALID_PORT = -11;
+const int TM_NET_INTERNAL_ERROR = -20;
+const int TM_NET_CONTACT_DEAD = -60;
+const int TM_NET_WRONG_PROTOCOL = -70;
+const int TM_NET_NO_GNUTLS = -100;
+const int TM_NET_CONNECTION_FAILED = -120;
+const int TM_NET_SESSION_INACTIVE = -1024;
+
 // TeXmacs server and client
+
+void   server_define_error_codes ();
+bool   server_can_start ();
 void   server_start ();
 void   server_stop ();
 string server_read (int fd);
@@ -26,17 +41,14 @@ void   server_write (int fd, string s);
 bool   server_started ();
 void   server_listen_connections (int msecs);
 
-int        legacy_client_start (string host, int port);
-inline int legacy_client_start (string host) {
-  return legacy_client_start(host, 6561);
-}
-
+int    legacy_client_start (string host, int port);
 int    tls_client_start (string host, int port, scheme_tree args);
 void   client_stop (int fd);
 string client_read (int fd);
 int    client_write (int fd, string s);
 string server_client_address (int fd);
 void   client_listen_connections (int msecs);
+int    client_protocol_version ();
 
 void   enter_secure_mode (int fd);
 
@@ -47,5 +59,10 @@ void unset_server ();
 int get_server_port ();
 void set_server_port (int port);
 int  server_port_in_use ();
+
+bool should_reset_preferences ();
+bool should_reset_admin_password ();
+void set_reset_preferences (bool value);
+void set_reset_admin_password (bool value);
 
 #endif // defined CLIENT_SERVER_H

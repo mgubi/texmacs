@@ -104,7 +104,7 @@ void del_obj_fitz_renderer (void) {
 ******************************************************************************/
 
 fitz_renderer_rep::fitz_renderer_rep (int w2, int h2)
-  : basic_renderer_rep (true, w2, h2),
+  : basic_renderer_rep (true, 1.0, w2, h2),
     ctx (NULL), pixmap (NULL), device (NULL),
     fg (-1), bg (-1), lw (-1), current_width (-1.0),
     current_path (NULL), colorspace_rgb (NULL), colorspace_gray (NULL),
@@ -140,8 +140,11 @@ fitz_renderer_rep::get_extents (SI& w2, SI& h2) {
 }
 
 void
-fitz_renderer_rep::set_zoom_factor (double zoom) {
-  renderer_rep::set_zoom_factor (retina_factor * zoom);
+fitz_renderer_rep::set_zoom_factor (double zoom, bool safe) {
+  // the retina factor is applied here, not through pixel_ratio: the
+  // consistency check of the base class does not apply
+  (void) safe;
+  renderer_rep::set_zoom_factor (retina_factor * zoom, false);
   retina_pixel = pixel * retina_factor;
 }
 
@@ -1022,7 +1025,7 @@ fitz_renderer_rep::draw (int char_code, font_glyphs fn, SI x, SI y) {
     glyph pre_gl = fn->get (char_code);
     if (is_nil (pre_gl)) return;
 
-    glyph gl = shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+    glyph gl = shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int gw = gl->width, gh = gl->height;
 
     if (gw == 0 || gh == 0) return; // Empty glyph

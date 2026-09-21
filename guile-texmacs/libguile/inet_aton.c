@@ -42,8 +42,8 @@ static char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
 
 #include <ctype.h>
 
-#ifdef __MINGW32__
-/* Include for MinGW only.  Cygwin will have the latter. */
+#if defined(__MINGW32__) || defined(_WIN32)
+/* Include for MinGW and MSVC on Windows. Cygwin will have the latter. */
 #include <winsock2.h>
 #else
 #include <sys/param.h>

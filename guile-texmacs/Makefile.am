@@ -19,16 +19,9 @@
 ##   to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
 ##   Floor, Boston, MA 02110-1301 USA
 
-# want automake 1.10 or higher so that AM_GNU_GETTEXT can tell automake that
-# config.rpath is needed
-#
-AUTOMAKE_OPTIONS = 1.10
+AUTOMAKE_OPTIONS = 1.10 foreign
 
-if ENABLE_READLINE
-   GUILE_READLINE_OPT = guile-readline
-endif
-
-SUBDIRS = oop libguile ice-9 guile-config $(GUILE_READLINE_OPT) emacs scripts srfi doc examples test-suite benchmark-suite lang am
+SUBDIRS = oop libguile ice-9 guile-config scripts srfi doc lang
 
 DIST_SUBDIRS = $(SUBDIRS)
 
@@ -39,9 +32,6 @@ include_HEADERS = libguile.h
 EXTRA_DIST = LICENSE HACKING GUILE-VERSION guile-1.8.pc.in	\
 	     ChangeLog-2008 m4/autobuild.m4
 
-check-local:
-	$(top_srcdir_absolute)/check-guile
-
 ACLOCAL_AMFLAGS = -I m4
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -50,7 +40,6 @@ pkgconfig_DATA = guile-1.8.pc
 distclean-local:
 	rm -f *~ */*~
 	rm -rf libguile/.deps
-	rm -rf guile-readline/autom4te.cache/
 	rm -rf autom4te.cache/
-	rm -f check-guile.log doc/ref/guile.info-7 guile-procedures.txt
+	rm -f doc/ref/guile.info-7 guile-procedures.txt
 # Makefile.am ends here

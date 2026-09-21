@@ -16,15 +16,15 @@
 #include <QIcon>
 #include <QStyle>
 #include <QStyleFactory>
+#include <QFileSystemWatcher>
 #include "string.hpp"
 #include "sys_utils.hpp"
 #include "url.hpp"
 #include "boot.hpp"
 #include "gui.hpp"
 #include "QTMKeyboard.hpp"
+#include "QTMOnscreenKeyboard.hpp"
 #include "QTMIconManager.hpp"
-#include "QTMMainTabWindow.hpp"
-#include "QTMWaitDialog.hpp"
 
 void init_palette (QApplication* app);
 void init_style_sheet (QApplication* app);
@@ -33,6 +33,37 @@ void set_standard_style_sheet (QWidget *w);
 #if defined(Q_OS_MAC) && QT_VERSION < 0x060000 
 #include "QTMMacPasteboardMimePDF.hpp"
 #endif
+
+/******************************************************************************
+* Local server to receive basic commands (e.g. open files and urls)
+******************************************************************************/
+
+#include <QObject>
+#include <QLocalServer>
+#include <QLocalSocket>
+
+class QTMLocalServer: public QObject {
+  Q_OBJECT
+  QLocalServer* server;
+  bool alive;
+  QHash<QLocalSocket*,QString> received;
+  FILE* lock_file;
+public:
+  QTMLocalServer ();
+  ~QTMLocalServer ();
+  bool is_alive ();
+
+private slots:
+  void onNewConnection ();
+  void readClientData ();
+  void onClientDisconnected ();
+};
+
+bool send_to_single_instance (string s);
+
+/******************************************************************************
+* QApplication
+******************************************************************************/
 
 class QTMApplication: public QApplication {
   Q_OBJECT
@@ -63,19 +94,19 @@ public:
     return mKeyboard;
   }
 
-  inline QTMWaitDialog &waitDialog() {
-    return *mWaitDialog;
+  inline bool useNewToolbar() {
+    return mUseNewToolbar;
   }
 
-  inline bool useTabWindow() {
-    return mUseTabWindow;
-  }
+  void toggleOnScreenKeyboardVisibility();
 
-  inline QTMMainTabWindow &mainTabWindow() {
-    return *QTMMainTabWindow::topTabWindow();
-  }
+  void notify_preference (string var);
 
-  void installWaitHandler();
+public slots:
+    void onCssFileChanged(const QString &path);
+
+signals:
+  void themeChanged();
 
 private:
 #if QT_VERSION >= 0x060000
@@ -83,14 +114,19 @@ private:
   QTMIconManager mIconManager;
 #endif
   QTMKeyboard mKeyboard;
-  QTMWaitDialog *mWaitDialog;
-  bool mUseTabWindow;
+  QTMOnscreenKeyboard *mOnscreenKeyboard;
+  bool mUseNewToolbar;
+  QFileSystemWatcher* mCssWatcher = nullptr;
+  QString mCurrentCssPath;
+  QTMLocalServer mLocalServer;
 };
 
 inline QTMApplication *tmapp() {
   ASSERT (!headless_mode, "invalid call of tmapp() in headless mode");
   return dynamic_cast<QTMApplication *>(qApp);
 }
+
+void qt_notify_preference (string var);
 
 class QTMCoreApplication: public QCoreApplication {
   Q_OBJECT

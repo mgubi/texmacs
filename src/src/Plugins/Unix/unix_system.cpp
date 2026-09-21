@@ -12,17 +12,22 @@
 #include "unix_system.hpp"
 #include "config.h"
 
+#include <chrono>
+
 #include "Guile/guile_tm.hpp"
 #ifdef SCM_HAVE_HOOKS
 #include "libguile/system.h"
 #endif
 
 #ifdef QTTEXMACS
-#include <QGuiApplication>
 #include <QApplication>
-#include <QStyleHints>
-#include <QCursor>
 #include <QWidget>
+#endif
+
+#if QT_VERSION >= 0x050000
+#include <QGuiApplication>
+#include <QCursor>
+#include <QStyleHints>
 #endif
 
 #ifdef OS_MACOS
@@ -42,9 +47,23 @@ inline string texmacs_ainsi_to_utf8(const std::string &local_string) {
   );
 }
 
-void texmacs_lock_file(FILE *&file) {
+void texmacs_reset_last_error() {
+  errno = 0;
+}
+
+int64_t texmacs_get_last_error() {
+  return errno;
+}
+
+string texmacs_get_last_error_str() {
+  return strerror(errno);
+}
+
+void texmacs_lock_file(FILE *&file, bool nonblock) {
   int file_descriptor = fileno(file);
-  if (flock(file_descriptor, LOCK_EX) == -1) {
+  int flags = LOCK_EX;
+  if (nonblock) flags |= LOCK_NB;
+  if (flock(file_descriptor, flags) == -1) {
     fclose(file);
     file = nullptr;
   }
@@ -189,6 +208,10 @@ string get_default_theme () {
 }
 
 url texmacs_get_application_directory () {
+  // sometimes, the bin path is set in TEXMACS_BIN_PATH
+  string bin_path;
+  if (texmacs_getenv ("TEXMACS_BIN_PATH", bin_path))
+    return url (bin_path) * "..";
 #ifdef OS_GNU_LINUX
   // use proc self exe to get the path of the executable
   char path[PATH_MAX+1];
@@ -206,43 +229,8 @@ url texmacs_get_application_directory () {
 #endif
 }
 
-bool is_doing_long_task = false;
-using time_point = std::chrono::time_point<std::chrono::system_clock>;
-using duration = std::chrono::duration<double>;
-
-void texmacs_system_start_long_task() {
-  if (is_doing_long_task) return;
-  is_doing_long_task = true;
-#ifdef QTTEXMACS
-  QGuiApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-#endif
-}
-void texmacs_system_end_long_task() {
-  if (!is_doing_long_task) return;
-  is_doing_long_task = false;
-#ifdef QTTEXMACS
-  
-  QGuiApplication::restoreOverrideCursor();  
-  QApplication::alert(QApplication::topLevelWidgets().first());
-#endif
-}
-
-void texmacs_process_event() {
-  if (!is_doing_long_task) return;
-  static time_point last_time = std::chrono::system_clock::now();
-  time_point current_time = std::chrono::system_clock::now();
-  duration elapsed_seconds = current_time - last_time;
-  if (elapsed_seconds.count() < 0.1) return;
-  last_time = current_time;
-#ifdef QTTEXMACS
-  QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-#endif
-}
-
 void texmacs_init_guile_hooks() {
-#ifdef SCM_HAVE_HOOKS
-  guile_process_event = texmacs_process_event;
-#else
+#ifndef SCM_HAVE_HOOKS
   cout << "warning: guile hooks are not available" << LF;
 #endif
 }

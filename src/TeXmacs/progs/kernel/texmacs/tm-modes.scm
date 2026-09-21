@@ -118,9 +118,9 @@
 
 (define-public (has-chatgpt?) #f)
 (define-public (has-gemini?) #f)
-(define-public (has-llama3?) #f)
-(define-public (has-llama4?) #f)
+(define-public (has-llama?) #f)
 (define-public (has-mistral-7b?) #f)
+(define-public (has-albert?) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mode related

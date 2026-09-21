@@ -266,7 +266,9 @@ scm_init_options ()
 {
   scm_gc_register_root (&protected_objects);
 
-#include "libguile/options.x"
+ scm_yes_sym = scm_permanent_object (scm_from_locale_symbol ("yes")) ;
+ scm_no_sym = scm_permanent_object (scm_from_locale_symbol ("no")) ;
+
 }
 
 /*

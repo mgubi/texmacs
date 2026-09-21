@@ -13,54 +13,110 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Ollama command line tools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (ollama-models)
+  (let* ((ret (eval-system "ollama list"))
+         (lines** (string-decompose ret "\n"))
+         (lines* (if (null? lines**) lines** (cdr lines**)))
+         (lines (if (and (nnull? lines*) (== (cAr lines*) ""))
+                    (cDr lines*) lines*))
+         (models (map (lambda (l) (car (string-decompose l " "))) lines)))
+    (sort models string<=?)))
+
+(tm-define (ollama-model-variants model)
+  (with models (ollama-models)
+    (append-map (lambda (m)
+                  (if (string-starts? m model) (list m) (list)))
+                models)))
+
+(tm-define (ollama-default-model)
+  (let* ((l (ollama-models))
+         (llama (ollama-model-variants "llama")))
+    (cond ((nnull? llama) (car llama))
+          ((nnull? l) (car l))
+          (else "llama3"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preferences
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-preferences
   ("ollama server" "localhost" noop)
   ("ollama port" "11434" noop)
-  ("llama3 model" "llama3" noop)
-  ("llama4 model" "llama4" noop)
+  ("ollama model" "default" noop)
+  ("ollama-text-input" "on" noop)
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
-  ("llama3-text-input" "on" noop)
-  ("llama4-text-input" "on" noop)
-  ("open-mistral-7b-text-input" "on" noop))
+  ("open-mistral-7b-text-input" "on" noop)
+  ("albert api key" "" noop)
+  ("albert-text-input" "on" noop)
+  ("albert ai-agents corrector" "default" noop)
+  ("albert ai-agents interlocutor" "default" noop)
+  ("albert ai-agents translator" "default" noop)
+  ("albert model" "openweight-large" noop))
 
-(tm-define (ollama-models)
-  (list "llama3" "llama4"))
+(with key (getenv "ALBERT_API_KEY")
+  (when key (set-preference "albert api key" key)))
 
-(tm-define (ia-models)
-  (append (ollama-models) (list "chatgpt" "gemini" "open-mistral-7b")))
+(tm-define (ai-models)
+  (list "chatgpt" "gemini" "open-mistral-7b" "albert" "ollama"))
 
-(tm-define (ollama-variants model)
-  (cond ((== model "llama3")
-         (list "llama3" "llama3.1" "llama3.1" "llama3.1:405b"
-               "llama3.2" "llama3.2:1b" "llama3.3" ""))
-        ((== model "llama4")
-         (list "llama4" "llama4:scout" "llama4:maverick" ""))
-        (else (list model ""))))
+(tm-define (albert-variants)
+  (list "openweight-large" "openweight-medium" "openweight-small" ""))
 
 (tm-widget (plugin-preferences-widget name)
-  (:require (in? name (ia-models)))
-  (assuming (in? name (ollama-models))
+  (:require (in? name (ai-models)))
+  (assuming (== name "ollama")
+    (aligned
+      (item (text "Ollama server")
+        (enum (set-preference "ollama server" answer) '("localhost" "")
+              (get-preference "ollama server") "16em"))
+      (item (text "Ollama port")
+        (enum (set-preference "ollama port" answer) '("11434" "")
+              (get-preference "ollama port") "16em"))
+      (item (text "Ollama model")
+        (enum (set-preference "ollama model" answer) (ollama-models)
+              (get-preference "ollama model") "16em")))
+    === === ===)
+  (assuming (== name "albert")
     (with model (string-append name " model")
       (aligned
-        (item (text "Ollama server")
-          (enum (set-preference "ollama server" answer) '("localhost" "")
-                (get-preference "ollama server") "8em"))
-        (item (text "Ollama port")
-          (enum (set-preference "ollama port" answer) '("11434" "")
-                (get-preference "ollama port") "8em"))
-        (item (text (upcase-first model))
-          (enum (set-preference model answer) (ollama-variants name)
-                (get-preference model) "8em"))))
+	(item (text "API key")
+          (enum (set-preference "albert api key" answer)
+                (list (get-preference "albert api key")
+		      (or (getenv "ALBERT_API_KEY") ""))
+		(get-preference "albert api key") "11em"))
+        (item (text model)
+          (enum (set-preference model answer)
+		(albert-variants)
+                (get-preference model) "11em"))
+        (assuming (nnull? (ai-agents-correctors))
+	  (item (text "Corrector agent")
+	    (enum (set-preference "albert ai-agents corrector" answer)
+		  (cons "default" (ai-agents-correctors))
+		  (get-preference "albert ai-agents corrector") "11em")))
+        (assuming (nnull? (ai-agents-interlocutors))
+	  (item (text "Interlocutor agent")
+	    (enum (set-preference "albert ai-agents interlocutor" answer)
+		  (cons "default" (ai-agents-interlocutors))
+		  (get-preference "albert ai-agents interlocutor") "11em")))
+	(assuming (nnull? (ai-agents-translators))
+	  (item (text "Translator agent")
+	    (enum (set-preference "albert ai-agents translator" answer)
+		  (cons "default" (ai-agents-translators))
+		  (get-preference "albert ai-agents translator") "11em")))
+	(item (text "Chat history size")
+	  (enum (set-preference "albert chat history size" answer)
+		'("10" "5" "4" "3" "2" "1" "0" "")
+		(get-preference "albert chat history size") "6em"))))
     === === ===)
   (with textual-input (string-append name "-text-input")
     (aligned
       (meti (hlist // (text "Textual input"))
-        (toggle (set-boolean-preference textual-input answer)
-                (get-boolean-preference textual-input))))))
+	(toggle (set-boolean-preference textual-input answer)
+		(get-boolean-preference textual-input))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ChatGPT
@@ -76,7 +132,7 @@
   (:cmdline ,ai-cmdline ,ai-result)
   (:preferences #t)
   (:session "ChatGPT")
-  (:serializer ,ia-serialize))
+  (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Gemini
@@ -91,33 +147,21 @@
   (:cmdline ,ai-cmdline ,ai-result)
   (:preferences #t)
   (:session "Gemini")
-  (:serializer ,ia-serialize))
+  (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Llama
+;; Ollama
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (has-llama? model)
-  (and (url-exists-in-path? "ollama")
-       (with val (eval-system "ollama list")
-         (string-occurs? (string-append "\n" model) val))))
-
-(plugin-configure llama3
-  (:require (has-llama? "llama3"))
-  (:cmdline ,ai-cmdline ,ai-result)
-  (:preferences #t)
-  (:session "Llama 3")
-  (:serializer ,ia-serialize))
-
-(tm-define (has-llama4?)
+(tm-define (has-ollama?)
   (url-exists-in-path? "ollama"))
 
-(plugin-configure llama4
-  (:require (has-llama? "llama4"))
+(plugin-configure ollama
+  (:require (has-ollama?))
   (:cmdline ,ai-cmdline ,ai-result)
   (:preferences #t)
-  (:session "Llama 4")
-  (:serializer ,ia-serialize))
+  (:session "Ollama")
+  (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mistral
@@ -132,4 +176,18 @@
   (:cmdline ,ai-cmdline ,ai-result)
   (:preferences #t)
   (:session "Mistral 7B")
-  (:serializer ,ia-serialize))
+  (:serializer ,ai-serialize))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Albert
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (has-albert?)
+  (!= (get-preference "albert api key") ""))
+
+(plugin-configure albert
+  (:require (has-albert?))
+  (:request ,ai-request ,ai-result)
+  (:preferences #t)
+  (:session "Albert")
+  (:serializer ,ai-serialize))

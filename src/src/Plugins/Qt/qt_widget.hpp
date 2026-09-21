@@ -17,6 +17,9 @@
 #include "message.hpp"
 #include "qt_utilities.hpp"
 #include <QPointer>
+#if QT_VERSION >= 0x060000
+#  include <QWidget>
+#endif
 
 class QWidget;
 class QLayoutItem;
@@ -106,10 +109,12 @@ public:
     pulldown_button, pullright_button,   menu_button,        balloon_widget,
     text_widget,     xpm_widget,         toggle_widget,      enum_widget,
     choice_widget,   scrollable_widget,  hsplit_widget,      vsplit_widget,
-    aligned_widget,  tabs_widget,        icon_tabs_widget,   wrapped_widget,
-    refresh_widget,  refreshable_widget, glue_widget,        resize_widget,
-    texmacs_widget,  simple_widget,      embedded_tm_widget, popup_widget,
-    field_widget, filtered_choice_widget,tree_view_widget,   division_widget
+    aligned_widget,  tabs_widget,        icon_tabs_widget,   responsive_tabs_widget, 
+    responsive_icon_tabs_widget, wrapped_widget, refresh_widget,  refreshable_widget, 
+    glue_widget,        resize_widget, texmacs_widget,  simple_widget, 
+    embedded_tm_widget, popup_widget, field_widget, filtered_choice_widget, 
+    tree_view_widget,   division_widget, setting_toggle_widget, setting_enum_widget,
+    setting_group_widget
   } ;
   
   types type;
@@ -117,24 +122,29 @@ public:
   qt_widget_rep (types _type=none, QWidget* _qwid=0);
   virtual ~qt_widget_rep ();
   virtual inline string get_nickname () { return "popup"; }
-  
-  virtual widget plain_window_widget (string name, command quit, int b= 3);
+  double device_pixel_ratio () {
+#if QT_VERSION >= 0x060000
+    if (qwid.isNull ()) return retina_factor;
+    return qwid->devicePixelRatio ();
+#else
+    return retina_factor;
+#endif
+  }
+  virtual widget plain_window_widget (string name, command quit, int b= 0);
   virtual widget make_popup_widget ();
   virtual widget popup_window_widget (string s);
   virtual widget tooltip_window_widget (string s);
 
   void add_child (widget a);
+  void remove_child (widget a);
   void add_children (array<widget> a);
   
   ////////////////////// Qt semantics of abstract texmacs widgets  
   
   virtual QAction*         as_qaction ();
-  virtual QWidget*         as_qwidget ();
-  virtual QLayoutItem*     as_qlayoutitem ();
+  virtual QWidget*         as_qwidget (QWidget* parent_widget);
+  virtual QLayoutItem*     as_qlayoutitem (QWidget* parent_widget);
   virtual QList<QAction*>* get_qactionlist();
-#if QT_VERSION >= 0x060000
-  double get_dpr ();
-#endif
 
   ////////////////////// Debugging
   
@@ -150,13 +160,22 @@ public:
       "toggle_widget",      "enum_widget",        "choice_widget",
       "scrollable_widget",  "hsplit_widget",      "vsplit_widget",
       "aligned_widget",     "tabs_widget",        "icon_tabs_widget",
+      "responsive_tabs_widget", "responsive_icon_tabs_widget",
       "wrapped_widget",     "refresh_widget",     "refreshable_widget",
       "glue_widget",        "resize_widget",      "texmacs_widget",
       "simple_widget",      "embedded_tm_widget", "popup_widget",
       "field_widget",   "filtered_choice_widget", "tree_view_widget",
-      "division_widget"
+      "division_widget", "setting_toggle_widget", "setting_enum_widget",
+      "setting_group_widget"
     };
-    return string (qt_widget_type_strings[type]) * "\t id: " * as_string (id);
+    int type_index = static_cast<int> (type);
+    int type_count = static_cast<int> (sizeof (qt_widget_type_strings) /
+                                       sizeof (qt_widget_type_strings[0]));
+    if (type_index < 0 || type_index >= type_count) {
+      cout << "qt_widget_rep::type_as_string(), unknown type: " << type << LF;
+      return "unknown";
+    }
+    return string (qt_widget_type_strings[type_index]) * "\t id: " * as_string (id);
   }
   
   ////////////////////// Handling of TeXmacs' messages
@@ -171,7 +190,37 @@ public:
     if (DEBUG_QT)
       debug_qt << "qt_widget_rep::query(), unhandled " << slot_name (s) 
                << " for widget of type: " << type_as_string() << LF;
-    return blackbox ();
+    switch (s) {
+    case SLOT_IDENTIFIER:
+      check_type_id<int> (type_id, s);
+      return close_box<int> (0);
+    case SLOT_SCROLL_POSITION:
+      return close_box<coord2> (coord2 (0, 0));
+    case SLOT_EXTENTS:
+    case SLOT_VISIBLE_PART:
+      return close_box<coord4> (coord4 (0, 0, 640, 400));
+    case SLOT_ZOOM_FACTOR:
+      return close_box<double> (1.0);
+    case SLOT_POSITION:
+      return close_box<coord2> (coord2 (0, 0));
+    case SLOT_SIZE:
+      return close_box<coord2> (coord2 (640, 400));
+    case SLOT_HEADER_VISIBILITY:
+    case SLOT_MAIN_ICONS_VISIBILITY:
+    case SLOT_MODE_ICONS_VISIBILITY:
+    case SLOT_FOCUS_ICONS_VISIBILITY:
+    case SLOT_USER_ICONS_VISIBILITY:
+    case SLOT_FOOTER_VISIBILITY:
+    case SLOT_SIDE_TOOLS_VISIBILITY:
+    case SLOT_LEFT_TOOLS_VISIBILITY:
+    case SLOT_BOTTOM_TOOLS_VISIBILITY:
+    case SLOT_EXTRA_TOOLS_VISIBILITY:
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (false);
+    default:
+      FAILED ("Unknown SLOT in qt_widget_rep");
+      return blackbox ();
+    }
   }
   
   virtual widget read (slot s, blackbox index) {
@@ -256,9 +305,15 @@ public:
     return headless_widget ();
   }
 
-  virtual QAction*         as_qaction () { return NULL; }
-  virtual QWidget*         as_qwidget () { return NULL; }
-  virtual QLayoutItem*     as_qlayoutitem () { return NULL; }
+  virtual QAction* as_qaction () { return NULL; }
+  virtual QWidget* as_qwidget (QWidget* parent_widget) {
+    (void) parent_widget;
+    return NULL;
+  }
+  virtual QLayoutItem* as_qlayoutitem (QWidget* parent_widget) {
+    (void) parent_widget;
+    return NULL;
+  }
   virtual QList<QAction*>* get_qactionlist() { return NULL; }
 
   virtual void send (slot s, blackbox val) {

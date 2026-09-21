@@ -417,7 +417,8 @@ scm_init_continuations ()
   scm_set_smob_free (scm_tc16_continuation, continuation_free);
   scm_set_smob_print (scm_tc16_continuation, continuation_print);
   scm_set_smob_apply (scm_tc16_continuation, continuation_apply, 0, 0, 1);
-#include "libguile/continuations.x"
+ scm_c_define_gsubr (s_scm_with_continuation_barrier, 1, 0, 0, (SCM (*)()) scm_with_continuation_barrier); ;
+
 }
 
 /*

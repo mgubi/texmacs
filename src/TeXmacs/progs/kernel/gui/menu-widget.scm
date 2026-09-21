@@ -52,12 +52,15 @@
     (texmacs-input :%3)
     (input :%1 :string? :%1 :string?)
     (enum :%3 :string?)
+    (setting-enum :%5)
+    (setting-group :%1 :menu-item-list)
     (choice :%3)
     (choices :%3)
     (filtered-choice :%4)
     (color-input :%3)
     (tree-view :%3)
     (toggle :%2)
+    (setting-toggle :%3)
     (horizontal :menu-item-list)
     (vertical :menu-item-list)
     (hlist :menu-item-list)
@@ -70,6 +73,10 @@
     (tab :menu-item-list)
     (icon-tabs :menu-item-list)
     (icon-tab :menu-item-list)
+    (responsive-icon-tabs :menu-item-list)
+    (responsive-icon-tab :menu-item-list)
+    (responsive-tabs :menu-item-list)
+    (responsive-tab :menu-item-list)
     (minibar :menu-item-list)
     (extend :menu-item :menu-item-list)
     (style :integer? :menu-item-list)
@@ -102,7 +109,7 @@
   (widget-text "Error" 0 (color "black") #t))
 
 (define (make-menu-bad-format p style)
-  (make-menu-error "menu has bad format in " (object->string p)))
+  (make-menu-error "menu has bad format (make-menu) in " (object->string p)))
 
 (define (make-menu-empty) (widget-hmenu '()))
 
@@ -296,15 +303,36 @@
       (widget-enum (object->command (menu-protect cmd*))
                    tvals tval style width))))
 
+(define (make-setting-enum p style)
+  "Make @(setting-enum :%5) item."
+  (with (tag cmd setting vals val width) p
+    (let* ((translate* (if (verb? style) identity translate))
+           (xval (val))
+           (xvals (vals))
+           (nvals (if (and (nnull? xvals) (== (cAr xvals) ""))
+                      `(,@(cDr xvals) ,xval "") `(,@xvals ,xval)))
+           (xvals* (list-remove-duplicates nvals))
+           (tval (translate* xval))
+           (tvals (map translate* xvals*))
+           (dec (map (lambda (v) (cons (translate* v) v)) xvals*))
+           (cmd* (lambda (r) (cmd (or (assoc-ref dec r) r)))))
+      (widget-setting-enum (object->command (menu-protect cmd*))
+                           setting tvals tval style width))))
+
+(define (make-setting-group p style)
+  "Make @(setting-group :%1 :menu-item-list) item."
+  (with (tag name . items) p
+    (widget-setting-group (name) (make-menu-items items style #f) style)))
+
 (define (make-choice p style)
   "Make @(choice :%3) item."
   (with (tag cmd vals val) p
-    (widget-choice (object->command (menu-protect cmd)) (vals) (val))))
+    (widget-choice (object->command (menu-protect cmd)) (vals) (val) style)))
 
 (define (make-choices p style)
   "Make @(choices :%3) item."
   (with (tag cmd vals mc) p
-    (widget-choices (object->command (menu-protect cmd)) (vals) (mc))))
+    (widget-choices (object->command (menu-protect cmd)) (vals) (mc) style)))
 
 (define (make-filtered-choice p style)
   "Make @(filtered-choice :%4) item."
@@ -327,6 +355,11 @@
   "Make @(toggle :%2) item."
   (with (tag cmd on) p
     (widget-toggle (object->command cmd) (on) style)))
+
+(define (make-setting-toggle p style)
+  "Make @(setting-toggle :%3) item."
+  (with (tag cmd setting on) p
+    (widget-setting-toggle (object->command cmd) setting (on) style)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menu entries
@@ -569,6 +602,29 @@
   (display* "Error 'make-menu-icon-tab', " p ", " style "\n")
   (list 'vlist))
 
+(define (make-menu-responsive-tabs p style)
+  "Make @(responsive-tabs :menu-item-list) menu item."
+  (with style* (logior style widget-style-mini)
+    (widget-responsive-tabs (make-menu-items (map tab-key (cdr p)) style* #f)
+                            (make-menu-items (map tab-value (cdr p)) style #f))))
+
+(define (make-menu-responsive-tab p style)
+  "Make @(responsive-tab :menu-item-list) menu item."
+  (display* "Error 'make-menu-responsive-tab', " p ", " style "\n")
+  (list 'vlist))
+
+(define (make-menu-responsive-icon-tabs p style)
+  "Make @(responsive-icon-tabs :menu-item-list) menu item."
+  (with style* (logior style widget-style-mini)
+    (widget-responsive-icon-tabs (map icon-tab-icon (cdr p))
+                                (make-menu-items (map icon-tab-key (cdr p)) style* #f)
+                                (make-menu-items (map icon-tab-value (cdr p)) style #f))))
+
+(define (make-menu-responsive-icon-tab p style)
+  "Make @(responsive-icon-tab :menu-item-list) menu item."
+  (display* "Error 'make-menu-responsive-icon-tab', " p ", " style "\n")
+  (list 'vlist))
+
 (define (make-menu-extend p style bar?)
   "Make @(extend :menu-item :menu-item-list) menu item."
   (with l (make-menu-items (cdr p) style bar?)
@@ -788,6 +844,10 @@
          ,(lambda (p style bar?) (list (make-menu-input p style))))
   (enum (:%3 :string?)
         ,(lambda (p style bar?) (list (make-enum p style))))
+  (setting-enum (:%5)
+        ,(lambda (p style bar?) (list (make-setting-enum p style))))
+    (setting-group (:%1 :*)
+      ,(lambda (p style bar?) (list (make-setting-group p style))))
   (choice (:%3)
           ,(lambda (p style bar?) (list (make-choice p style))))
   (choices (:%3)
@@ -800,6 +860,8 @@
              ,(lambda (p style bar?) (list (make-tree-view p style))))
   (toggle (:%2)
           ,(lambda (p style bar?) (list (make-toggle p style))))
+  (setting-toggle (:%3)
+          ,(lambda (p style bar?) (list (make-setting-toggle p style))))
   (link (:%1)
         ,(lambda (p style bar?) (make-menu-link p style bar?)))
   (dynamic (:%1)
@@ -828,6 +890,14 @@
         ,(lambda (p style bar?) (list (make-menu-icon-tabs p style))))
   (icon-tab (:*)
         ,(lambda (p style bar?) (list (make-menu-icon-tab p style))))
+  (responsive-icon-tabs (:*)
+        ,(lambda (p style bar?) (list (make-menu-responsive-icon-tabs p style))))
+  (responsive-icon-tab (:*)
+        ,(lambda (p style bar?) (list (make-menu-responsive-icon-tab p style))))
+  (responsive-tabs (:*)
+        ,(lambda (p style bar?) (list (make-menu-responsive-tabs p style))))
+  (responsive-tab (:*)
+        ,(lambda (p style bar?) (list (make-menu-responsive-tab p style))))
   (minibar (:*)
             ,(lambda (p style bar?) (list (make-menu-minibar p style))))
   (extend (:%1 :*)
@@ -942,6 +1012,19 @@
          ,((cadddr p))
          ,(fifth p)))
 
+(define (menu-expand-setting-enum p)
+  "Expand setting-enum item @p."
+  `(setting-enum ,(replace-procedures (cadr p))   ;; 1. cmd 
+                 ,(caddr p)                       ;; 2. setting (just a string, no replace needed)
+                 ,(replace-procedures (cadddr p)) ;; 3. vals (leave as procedure for later)
+                 ,((fifth p))                     ;; 4. val (evaluate the promise for current state)
+                 ,(sixth p)))                     ;; 5. width
+
+(define (menu-expand-setting-group p)
+  "Expand setting-group item @p."
+  `(setting-group ,((cadr p))
+                  ,@(menu-expand-list (cddr p))))
+
 (define (menu-expand-choice p)
   "Expand choice item @p."
   `(,(car p) ,(replace-procedures (cadr p))
@@ -973,6 +1056,12 @@
   "Expand toggle item @p."
   `(toggle ,(replace-procedures (cadr p))
            ,((caddr p))))
+
+(define (menu-expand-setting-toggle p)
+  "Expand setting-toggle item @p."
+  `(setting-toggle ,(replace-procedures (cadr p))
+                   ,(caddr p)        ;; The setting name (do not evaluate)
+                   ,((cadddr p))))   ;; The 'on' state (evaluate the promise)
 
 (define (menu-expand-list l)
   "Expand links and conditional menus in list of menus @l."
@@ -1035,12 +1124,15 @@
   (texmacs-output ,menu-expand-texmacs-output)
   (input ,menu-expand-input)
   (enum ,menu-expand-enum)
+  (setting-enum ,menu-expand-setting-enum)
+  (setting-group ,menu-expand-setting-group)
   (choice ,menu-expand-choice)
   (choices ,menu-expand-choice)
   (filtered-choice ,menu-expand-filtered-choice)
   (color-input ,menu-expand-color-input)
   (tree-view ,menu-expand-tree-view)
   (toggle ,menu-expand-toggle)
+  (setting-toggle ,menu-expand-setting-toggle)
   (link ,menu-expand-link p)
   (dynamic ,menu-expand-dynamic p)
   (horizontal ,(lambda (p) `(horizontal ,@(menu-expand-list (cdr p)))))
@@ -1055,6 +1147,10 @@
   (tab ,(lambda (p) `(tab ,@(menu-expand-list (cdr p)))))
   (icon-tabs ,(lambda (p) `(icon-tabs ,@(menu-expand-list (cdr p)))))
   (icon-tab ,(lambda (p) `(icon-tab ,@(menu-expand-list (cdr p)))))
+  (responsive-icon-tabs ,(lambda (p) `(responsive-icon-tabs ,@(menu-expand-list (cdr p)))))
+  (responsive-icon-tab ,(lambda (p) `(responsive-icon-tab ,@(menu-expand-list (cdr p)))))
+  (responsive-tabs ,(lambda (p) `(responsive-tabs ,@(menu-expand-list (cdr p)))))
+  (responsive-tab ,(lambda (p) `(responsive-tab ,@(menu-expand-list (cdr p)))))
   (minibar ,(lambda (p) `(minibar ,@(menu-expand-list (cdr p)))))
   (extend ,(lambda (p) `(extend ,(cadr p) ,@(menu-expand-list (cddr p)))))
   (style ,(lambda (p) `(style ,(cadr p) ,@(menu-expand-list (cddr p)))))

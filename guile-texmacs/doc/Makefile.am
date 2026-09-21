@@ -39,7 +39,6 @@ dist-hook:
 
 EXTRA_DIST = groupings.alist ChangeLog-2008 # guile-api.alist
 
-include $(top_srcdir)/am/maintainer-dirs
 guile-api.alist: guile-api.alist-FORCE
 	( cd $(top_builddir) ; $(mscripts)/update-guile-api.alist )
 guile-api.alist-FORCE:

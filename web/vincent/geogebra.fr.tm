@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|2.1.5>
 
-<style|<tuple|tmweb2|maxima|giac>>
+<style|<tuple|tmweb2|maxima|giac|french|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Contribute|Contributing><tmweb-title|GeoGebra|<hlink| Idées
@@ -24,7 +24,7 @@
   La taille est faible. Le fichier .ggb de cette figure pèse 8 Ko (taille
   générique des fichiers \<less\>8Ko sous mac os X).
 
-  Voici son <hlink|code source|vinz_documents/codegg.txt>.
+  Voici son <hlink|code source|codegg.txt>.
 
   <section|Quelle est la position de la GeoGebra team>
 
@@ -149,6 +149,5 @@
 <\initial>
   <\collection>
     <associate|info-flag|detailed>
-    <associate|language|french>
   </collection>
 </initial>

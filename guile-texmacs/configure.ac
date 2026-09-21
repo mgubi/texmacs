@@ -26,13 +26,13 @@ Boston, MA 02110-1301, USA.
 ]])
 
 AC_PREREQ([2.71])
-# Modified from version 1.8.8, see ChangeLog file
+# Modified from version 1.8.8.
 AC_INIT([guile-texmacs],[1.8.8],[bugs@texmacs.org])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(GUILE-VERSION)
 
-AM_INIT_AUTOMAKE([gnu no-define -Wall -Wno-override])
+AM_INIT_AUTOMAKE([foreign no-define -Wall -Wno-override])
 AM_MAINTAINER_MODE
 
 AC_COPYRIGHT(GUILE_CONFIGURE_COPYRIGHT)
@@ -41,7 +41,28 @@ AC_CONFIG_SRCDIR([GUILE-VERSION])
 . $srcdir/GUILE-VERSION
 
 AC_CONFIG_HEADERS([config.h])
-AH_TOP(/*GUILE_CONFIGURE_COPYRIGHT*/)
+AH_TOP([
+/*GUILE_CONFIGURE_COPYRIGHT*/
+
+/*
+  TeXmacs may include another generated config header before this one,
+  which can predefine autoconf PACKAGE_* names. Undefine them here so
+  the defines emitted by this config header do not trigger redefinition
+  warnings.
+*/
+#ifdef PACKAGE_BUGREPORT
+# undef PACKAGE_BUGREPORT
+#endif
+#ifdef PACKAGE_NAME
+# undef PACKAGE_NAME
+#endif
+#ifdef PACKAGE_STRING
+# undef PACKAGE_STRING
+#endif
+#ifdef PACKAGE_TARNAME
+# undef PACKAGE_TARNAME
+#endif
+])
 
 #--------------------------------------------------------------------
 
@@ -74,9 +95,6 @@ AC_CHECK_HEADER([ltdl.h], [],
 
 AC_CHECK_PROG(have_makeinfo, makeinfo, yes, no)
 AM_CONDITIONAL(HAVE_MAKEINFO, test "$have_makeinfo" = yes)
-if test "$have_makeinfo" != yes; then
-  AC_MSG_ERROR([makeinfo not found.])
-fi
 
 AM_PATH_LISPDIR
 
@@ -301,9 +319,9 @@ AC_C_VOLATILE
 
 AC_C_INLINE
 if test "$ac_cv_c_inline" != no; then
-  SCM_I_GSC_C_INLINE="\"${ac_cv_c_inline}\""
+  SCM_I_GSC_C_INLINE="${ac_cv_c_inline}"
 else
-  SCM_I_GSC_C_INLINE=NULL
+  SCM_I_GSC_C_INLINE=
 fi
 AC_CHECK_LIB(uca, __uc_get_ar_bsp)
 
@@ -329,14 +347,32 @@ AC_CHECK_SIZEOF(ptrdiff_t)
 AC_CHECK_SIZEOF(size_t)
 AC_CHECK_SIZEOF(off_t)
 
+AC_SUBST([ac_cv_sizeof_char])
+AC_SUBST([ac_cv_sizeof_unsigned_char])
+AC_SUBST([ac_cv_sizeof_short])
+AC_SUBST([ac_cv_sizeof_unsigned_short])
+AC_SUBST([ac_cv_sizeof_long])
+AC_SUBST([ac_cv_sizeof_unsigned_long])
+AC_SUBST([ac_cv_sizeof_int])
+AC_SUBST([ac_cv_sizeof_unsigned_int])
+AC_SUBST([ac_cv_sizeof_size_t])
+AC_SUBST([ac_cv_sizeof_long_long])
+AC_SUBST([ac_cv_sizeof_unsigned_long_long])
+AC_SUBST([ac_cv_sizeof___int64])
+AC_SUBST([ac_cv_sizeof_unsigned___int64])
+AC_SUBST([ac_cv_sizeof_void_p])
+AC_SUBST([ac_cv_sizeof_intptr_t])
+AC_SUBST([ac_cv_sizeof_uintptr_t])
+AC_SUBST([ac_cv_sizeof_ptrdiff_t])
+
 if test "$ac_cv_sizeof_long" -ne "$ac_cv_sizeof_void_p" && test "$ac_cv_sizeof_long_long" -ne "$ac_cv_sizeof_void_p"; then
   AC_MSG_ERROR(cannot find an integer type with the same size as void*)
 fi
 
 if test "$ac_cv_sizeof_ptrdiff_t" -ne 0; then
-  SCM_I_GSC_T_PTRDIFF='"ptrdiff_t"'
+  SCM_I_GSC_T_PTRDIFF='ptrdiff_t'
 else
-  SCM_I_GSC_T_PTRDIFF='"long"'
+  SCM_I_GSC_T_PTRDIFF='long'
 fi
 AC_SUBST([SCM_I_GSC_T_PTRDIFF])
 
@@ -344,6 +380,7 @@ AC_CHECK_HEADERS([stdint.h])
 AC_CHECK_HEADERS([inttypes.h])
 
 AC_CHECK_SIZEOF(intmax_t)
+AC_SUBST([ac_cv_sizeof_intmax_t])
 
 SCM_I_GSC_NEEDS_STDINT_H=0
 SCM_I_GSC_NEEDS_INTTYPES_H=0
@@ -412,13 +449,13 @@ fi
 
 ### Required type scm_t_int8
 if test "$scm_stdint_has_int8"; then
-  SCM_I_GSC_T_INT8='"int8_t"'
+  SCM_I_GSC_T_INT8='int8_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int8"; then
-  SCM_I_GSC_T_INT8='"int8_t"'
+  SCM_I_GSC_T_INT8='int8_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_char" -eq 1; then
-  SCM_I_GSC_T_INT8='"signed char"'
+  SCM_I_GSC_T_INT8='signed char'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int8.])
 fi
@@ -426,13 +463,13 @@ AC_SUBST([SCM_I_GSC_T_INT8])
 
 ### Required type scm_t_uint8
 if test "$scm_stdint_has_uint8"; then
-  SCM_I_GSC_T_UINT8='"uint8_t"'
+  SCM_I_GSC_T_UINT8='uint8_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint8"; then
-  SCM_I_GSC_T_UINT8='"uint8_t"'
+  SCM_I_GSC_T_UINT8='uint8_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_char" -eq 1; then
-  SCM_I_GSC_T_UINT8='"unsigned char"'
+  SCM_I_GSC_T_UINT8='unsigned char'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint8.])
 fi
@@ -440,15 +477,15 @@ AC_SUBST([SCM_I_GSC_T_UINT8])
 
 ### Required type scm_t_int16 (ANSI C says int or short might work)
 if test "$scm_stdint_has_int16"; then
-  SCM_I_GSC_T_INT16='"int16_t"'
+  SCM_I_GSC_T_INT16='int16_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int16"; then
-  SCM_I_GSC_T_INT16='"int16_t"'
+  SCM_I_GSC_T_INT16='int16_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 2; then
-  SCM_I_GSC_T_INT16='"int"'
+  SCM_I_GSC_T_INT16='int'
 elif test "$ac_cv_sizeof_short" -eq 2; then
-  SCM_I_GSC_T_INT16='"short"'
+  SCM_I_GSC_T_INT16='short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int16.])
 fi
@@ -456,15 +493,15 @@ AC_SUBST([SCM_I_GSC_T_INT16])
 
 ### Required type scm_t_uint16 (ANSI C says int or short might work)
 if test "$scm_stdint_has_uint16"; then
-  SCM_I_GSC_T_UINT16='"uint16_t"'
+  SCM_I_GSC_T_UINT16='uint16_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint16"; then
-  SCM_I_GSC_T_UINT16='"uint16_t"'
+  SCM_I_GSC_T_UINT16='uint16_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 2; then
-  SCM_I_GSC_T_UINT16='"unsigned int"'
+  SCM_I_GSC_T_UINT16='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 2; then
-  SCM_I_GSC_T_UINT16='"unsigned short"'
+  SCM_I_GSC_T_UINT16='unsigned short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint16.])
 fi
@@ -473,17 +510,17 @@ AC_SUBST([SCM_I_GSC_T_UINT16])
 
 ### Required type scm_t_int32 (ANSI C says int, short, or long might work)
 if test "$scm_stdint_has_int32"; then
-  SCM_I_GSC_T_INT32='"int32_t"'
+  SCM_I_GSC_T_INT32='int32_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int32"; then
-  SCM_I_GSC_T_INT32='"int32_t"'
+  SCM_I_GSC_T_INT32='int32_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 4; then
-  SCM_I_GSC_T_INT32='"int"'
+  SCM_I_GSC_T_INT32='int'
 elif test "$ac_cv_sizeof_long" -eq 4; then
-  SCM_I_GSC_T_INT32='"long"'
+  SCM_I_GSC_T_INT32='long'
 elif test "$ac_cv_sizeof_short" -eq 4; then
-  SCM_I_GSC_T_INT32='"short"'
+  SCM_I_GSC_T_INT32='short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int32.])
 fi
@@ -491,17 +528,17 @@ AC_SUBST([SCM_I_GSC_T_INT32])
 
 ### Required type scm_t_uint32 (ANSI C says int, short, or long might work)
 if test "$scm_stdint_has_uint32"; then
-  SCM_I_GSC_T_UINT32='"uint32_t"'
+  SCM_I_GSC_T_UINT32='uint32_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint32"; then
-  SCM_I_GSC_T_UINT32='"uint32_t"'
+  SCM_I_GSC_T_UINT32='uint32_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned int"'
+  SCM_I_GSC_T_UINT32='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_long" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned long"'
+  SCM_I_GSC_T_UINT32='unsigned long'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 4; then
-  SCM_I_GSC_T_UINT32='"unsigned short"'
+  SCM_I_GSC_T_UINT32='unsigned short'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint32.])
 fi
@@ -511,21 +548,21 @@ AC_SUBST([SCM_I_GSC_T_UINT32])
 ### Also try 'long long' and '__int64' if we have it.
 SCM_I_GSC_T_INT64=0
 if test "$scm_stdint_has_int64"; then
-  SCM_I_GSC_T_INT64='"int64_t"'
+  SCM_I_GSC_T_INT64='int64_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_int64"; then
-  SCM_I_GSC_T_INT64='"int64_t"'
+  SCM_I_GSC_T_INT64='int64_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_int" -eq 8; then
-  SCM_I_GSC_T_INT64='"int"'
+  SCM_I_GSC_T_INT64='int'
 elif test "$ac_cv_sizeof_long" -eq 8; then
-  SCM_I_GSC_T_INT64='"long"'
+  SCM_I_GSC_T_INT64='long'
 elif test "$ac_cv_sizeof_short" -eq 8; then
-  SCM_I_GSC_T_INT64='"short"'
+  SCM_I_GSC_T_INT64='short'
 elif test "$ac_cv_sizeof_long_long" -eq 8; then
-  SCM_I_GSC_T_INT64='"long long"'
+  SCM_I_GSC_T_INT64='long long'
 elif test "$ac_cv_sizeof___int64" -eq 8; then
-  SCM_I_GSC_T_INT64='"__int64"'
+  SCM_I_GSC_T_INT64='__int64'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_int64.])
 fi
@@ -536,21 +573,21 @@ AC_SUBST([SCM_I_GSC_T_INT64])
 ### Also try 'long long' and '__int64' if we have it.
 SCM_I_GSC_T_UINT64=0
 if test "$scm_stdint_has_uint64"; then
-  SCM_I_GSC_T_UINT64='"uint64_t"'
+  SCM_I_GSC_T_UINT64='uint64_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uint64"; then
-  SCM_I_GSC_T_UINT64='"uint64_t"'
+  SCM_I_GSC_T_UINT64='uint64_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned_int" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned int"'
+  SCM_I_GSC_T_UINT64='unsigned int'
 elif test "$ac_cv_sizeof_unsigned_long" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned long"'
+  SCM_I_GSC_T_UINT64='unsigned long'
 elif test "$ac_cv_sizeof_unsigned_short" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned short"'
+  SCM_I_GSC_T_UINT64='unsigned short'
 elif test "$ac_cv_sizeof_unsigned_long_long" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned long long"'
+  SCM_I_GSC_T_UINT64='unsigned long long'
 elif test "$ac_cv_sizeof_unsigned___int64" -eq 8; then
-  SCM_I_GSC_T_UINT64='"unsigned __int64"'
+  SCM_I_GSC_T_UINT64='unsigned __int64'
 else
   AC_MSG_ERROR([Can't find appropriate type for scm_t_uint64.])
 fi
@@ -563,17 +600,17 @@ AC_SUBST([SCM_I_GSC_T_UINT64])
 ###
 SCM_I_GSC_T_INTMAX=0
 if test "$scm_stdint_has_intmax"; then
-  SCM_I_GSC_T_INTMAX='"intmax_t"'
+  SCM_I_GSC_T_INTMAX='intmax_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_intmax"; then
-  SCM_I_GSC_T_INTMAX='"intmax_t"'
+  SCM_I_GSC_T_INTMAX='intmax_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof___int64" -ne 0; then
-  SCM_I_GSC_T_INTMAX='"__int64"'
+  SCM_I_GSC_T_INTMAX='__int64'
 elif test "$ac_cv_sizeof_long_long" -ne 0; then
-  SCM_I_GSC_T_INTMAX='"long long"'
+  SCM_I_GSC_T_INTMAX='long long'
 else
-  SCM_I_GSC_T_INTMAX='"long"'
+  SCM_I_GSC_T_INTMAX='long'
 fi
 AC_SUBST([SCM_I_GSC_T_INTMAX])
 
@@ -584,17 +621,17 @@ AC_SUBST([SCM_I_GSC_T_INTMAX])
 ###
 SCM_I_GSC_T_UINTMAX=0
 if test "$scm_stdint_has_uintmax"; then
-  SCM_I_GSC_T_UINTMAX='"uintmax_t"'
+  SCM_I_GSC_T_UINTMAX='uintmax_t'
   SCM_I_GSC_NEEDS_STDINT_H=1
 elif test "$scm_inttypes_has_uintmax"; then
-  SCM_I_GSC_T_UINTMAX='"uintmax_t"'
+  SCM_I_GSC_T_UINTMAX='uintmax_t'
   SCM_I_GSC_NEEDS_INTTYPES_H=1
 elif test "$ac_cv_sizeof_unsigned___int64" -ne 0; then
-  SCM_I_GSC_T_UINTMAX='"unsigned __int64"'
+  SCM_I_GSC_T_UINTMAX='unsigned __int64'
 elif test "$ac_cv_sizeof_unsigned_long_long" -ne 0; then
-  SCM_I_GSC_T_UINTMAX='"unsigned long long"'
+  SCM_I_GSC_T_UINTMAX='unsigned long long'
 else
-  SCM_I_GSC_T_UINTMAX='"unsigned long"'
+  SCM_I_GSC_T_UINTMAX='unsigned long'
 fi
 AC_SUBST([SCM_I_GSC_T_UINTMAX])
 
@@ -909,17 +946,6 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]],
  			        [[mpz_import (0, 0, 0, 0, 0, 0, 0); ]])],
   [],
   [AC_MSG_ERROR([At least GNU MP 4.1 is required, see README])])
-
-# i18n tests
-#AC_CHECK_HEADERS([libintl.h])
-#AC_CHECK_FUNCS(gettext)
-#if test $ac_cv_func_gettext = no; then
-#   AC_CHECK_LIB(intl, gettext)
-#fi
-#AC_CHECK_FUNCS([bindtextdomain textdomain])
-AM_GNU_GETTEXT([external], [need-ngettext])
-AM_GNU_GETTEXT_VERSION([0.20])
-LIBS="$LIBINTL $LIBS"
 
 ### Some systems don't declare some functions.  On such systems, we
 ### need to at least provide our own K&R-style declarations.
@@ -1496,21 +1522,6 @@ AC_SUBST(CCLD_FOR_BUILD)
 HOST_CC="$CC_FOR_BUILD"
 AC_SUBST(HOST_CC)
 
-if test "$cross_compiling" = "yes"; then
-  AC_MSG_CHECKING(guile for build)
-  GUILE_FOR_BUILD="${GUILE_FOR_BUILD-guile}"
-else
-  GUILE_FOR_BUILD='$(preinstguile)'
-fi   
-
-## AC_MSG_CHECKING("if we are cross compiling")
-## AC_MSG_RESULT($cross_compiling)
-if test "$cross_compiling" = "yes"; then
-   AC_MSG_RESULT($GUILE_FOR_BUILD)
-fi
-AC_ARG_VAR(GUILE_FOR_BUILD,[guile for build system])
-AC_SUBST(GUILE_FOR_BUILD)
-  			
 ## If we're using GCC, ask for aggressive warnings.
 case "$GCC" in
   yes )
@@ -1534,10 +1545,6 @@ esac
 ## need to generate a list of .lo files corresponding to the .o files
 ## given in LIBOBJS.  We'll call it LIBLOBJS.
 LIBLOBJS="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.lo ,g;s,\.[[^.]]*$,.lo,'`"
-
-## We also need to create corresponding .doc and .x files
-EXTRA_DOT_DOC_FILES="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.doc ,g;s,\.[[^.]]*$,.doc,'`"
-EXTRA_DOT_X_FILES="`echo ${LIB@&t@OBJS} | sed 's,\.[[^.]]* ,.x ,g;s,\.[[^.]]*$,.x,'`"
 
 AC_SUBST(GUILE_MAJOR_VERSION)
 AC_SUBST(GUILE_MINOR_VERSION)
@@ -1580,31 +1587,11 @@ AC_SUBST(LIBGUILE_SRFI_SRFI_60_INTERFACE)
 #######################################################################
 # Final tuning
 
-AC_ARG_ENABLE(readline,
-  [  --disable-readline      do not use the readline library],,
-  enable_readline=yes)
-
 case $host in
   x86_64-w64-mingw32)
     CFLAGS="$CFLAGS -Wno-error=use-after-free"
-    # Sometimes useful for using gdb
-    # LDFLAGS="-Wl,--stack,0x1000000 $LDFLAGS"
-    enable_readline=no
-    ;;
-  *android*)
-    enable_readline=no
-    ;;
-  *ios*)
-    enable_readline=no
     ;;
 esac
-
-AC_SUBST(enable_readline)
-AM_CONDITIONAL([ENABLE_READLINE], [test $enable_readline = "yes"])
-
-if test "$enable_readline" = "yes"; then
-  AC_CONFIG_SUBDIRS(guile-readline)
-fi
 
 case "$MINGW_PACKAGE_PREFIX" in
   *ucrt*)
@@ -1622,8 +1609,6 @@ AC_SUBST(GUILE_CFLAGS)
 
 AC_SUBST(AWK)
 AC_SUBST(LIBLOBJS)
-AC_SUBST(EXTRA_DOT_DOC_FILES)
-AC_SUBST(EXTRA_DOT_X_FILES)
 
 # See also top_builddir in info node: (libtool)LT_INIT
 top_builddir_absolute=`pwd`
@@ -1645,19 +1630,174 @@ AC_SUBST([SCM_I_GSC_ENABLE_DEPRECATED])
 AC_SUBST([SCM_I_GSC_ENABLE_ELISP])
 AC_SUBST([SCM_I_GSC_STACK_GROWS_UP])
 AC_SUBST([SCM_I_GSC_C_INLINE])
-AC_CONFIG_FILES([libguile/gen-scmconfig.h])
+
+#--------------------------------------------------------------------
+# Definitions for public scmconfig.h
+#--------------------------------------------------------------------
+
+if test "$ac_cv_header_stdc" = yes || test "$ac_cv_header_stdlib_h" = yes; then
+  SCM_I_GSC_HAVE_STDC_HEADERS=1
+else
+  SCM_I_GSC_HAVE_STDC_HEADERS=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STDC_HEADERS])
+
+if test "$ac_cv_header_sys_select_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_SELECT_H=1
+else
+  SCM_I_GSC_HAVE_SYS_SELECT_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_SELECT_H])
+
+if test "$ac_cv_header_floatingpoint_h" = yes; then
+  SCM_I_GSC_HAVE_FLOATINGPOINT_H=1
+else
+  SCM_I_GSC_HAVE_FLOATINGPOINT_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_FLOATINGPOINT_H])
+
+if test "$ac_cv_header_ieeefp_h" = yes; then
+  SCM_I_GSC_HAVE_IEEEFP_H=1
+else
+  SCM_I_GSC_HAVE_IEEEFP_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_IEEEFP_H])
+
+if test "$ac_cv_header_nan_h" = yes; then
+  SCM_I_GSC_HAVE_NAN_H=1
+else
+  SCM_I_GSC_HAVE_NAN_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_NAN_H])
+
+if test "$ac_cv_header_winsock2_h" = yes; then
+  SCM_I_GSC_HAVE_WINSOCK2_H=1
+else
+  SCM_I_GSC_HAVE_WINSOCK2_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_WINSOCK2_H])
+
+if test "$ac_cv_header_limits_h" = yes; then
+  SCM_I_GSC_HAVE_LIMITS_H=1
+else
+  SCM_I_GSC_HAVE_LIMITS_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_LIMITS_H])
+
+if test "$ac_cv_header_sys_time_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_TIME_H=1
+else
+  SCM_I_GSC_HAVE_SYS_TIME_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_TIME_H])
+
+if test "$ac_cv_header_time_h" = yes; then
+  SCM_I_GSC_HAVE_TIME_H=1
+else
+  SCM_I_GSC_HAVE_TIME_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_TIME_H])
+
+if test "$ac_cv_header_sys_types_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_TYPES_H=1
+else
+  SCM_I_GSC_HAVE_SYS_TYPES_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_TYPES_H])
+
+if test "$ac_cv_header_sys_stdtypes_h" = yes; then
+  SCM_I_GSC_HAVE_SYS_STDTYPES_H=1
+else
+  SCM_I_GSC_HAVE_SYS_STDTYPES_H=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_SYS_STDTYPES_H])
+
+if test "$ac_cv_func_readdir64_r" = yes; then
+  SCM_I_GSC_HAVE_READDIR64_R=1
+else
+  SCM_I_GSC_HAVE_READDIR64_R=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_READDIR64_R])
+
+if test "$ac_cv_func_stat64" = yes; then
+  SCM_I_GSC_HAVE_STAT64=1
+else
+  SCM_I_GSC_HAVE_STAT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STAT64])
+
+if test "$use_64_calls" = yes || test "$use_64_calls" = y; then
+  SCM_I_GSC_USE_64_CALLS=1
+else
+  SCM_I_GSC_USE_64_CALLS=0
+fi
+AC_SUBST([SCM_I_GSC_USE_64_CALLS])
+
+SCM_I_GSC_HAVE_ARRAYS=1
+AC_SUBST([SCM_I_GSC_HAVE_ARRAYS])
+
+SCM_I_GSC_HAVE_HOOKS=1
+AC_SUBST([SCM_I_GSC_HAVE_HOOKS])
+
+if test "$SCM_I_GSC_T_INT64" != 0; then
+  SCM_I_GSC_HAVE_T_INT64=1
+else
+  SCM_I_GSC_HAVE_T_INT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_T_INT64])
+
+if test "$SCM_I_GSC_T_UINT64" != 0; then
+  SCM_I_GSC_HAVE_T_UINT64=1
+else
+  SCM_I_GSC_HAVE_T_UINT64=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_T_UINT64])
+
+if test "$SCM_I_GSC_T_PTRDIFF" = 'long'; then
+  SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF="$ac_cv_sizeof_long"
+else
+  SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF="$ac_cv_sizeof_ptrdiff_t"
+fi
+AC_SUBST([SCM_I_GSC_SIZEOF_SCM_T_PTRDIFF])
+
+case "$SCM_I_GSC_T_INTMAX" in
+  *intmax_t*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_intmax_t" ;;
+  *long\ long*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_long_long" ;;
+  *__int64*) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof___int64" ;;
+  *) SCM_I_GSC_SIZEOF_INTMAX="$ac_cv_sizeof_long" ;;
+esac
+AC_SUBST([SCM_I_GSC_SIZEOF_INTMAX])
+
+if test "$enable_shared" = yes; then
+  case $host in
+    *-*-mingw*)
+      SCM_I_GSC_USE_DLL_IMPORT=1
+      ;;
+    *)
+      SCM_I_GSC_USE_DLL_IMPORT=0
+      ;;
+  esac
+else
+  SCM_I_GSC_USE_DLL_IMPORT=0
+fi
+AC_SUBST([SCM_I_GSC_USE_DLL_IMPORT])
+
+if test "$scm_cv_struct_timespec" = yes; then
+  SCM_I_GSC_HAVE_STRUCT_TIMESPEC=1
+else
+  SCM_I_GSC_HAVE_STRUCT_TIMESPEC=0
+fi
+AC_SUBST([SCM_I_GSC_HAVE_STRUCT_TIMESPEC])
+
+AC_CONFIG_FILES([libguile/scmconfig.h])
 
 AC_CONFIG_FILES([
   Makefile
-  am/Makefile
-  benchmark-suite/Makefile
   doc/Makefile
   doc/goops/Makefile
   doc/r5rs/Makefile
   doc/ref/Makefile
   doc/tutorial/Makefile
-  emacs/Makefile
-  examples/Makefile
   guile-config/Makefile
   ice-9/Makefile
   lang/Makefile
@@ -1666,28 +1806,10 @@ AC_CONFIG_FILES([
   oop/goops/Makefile
   scripts/Makefile
   srfi/Makefile
-  test-suite/Makefile
-  test-suite/standalone/Makefile
 ])
 
 AC_CONFIG_FILES([guile-1.8.pc])
-AC_CONFIG_FILES([check-guile], [chmod +x check-guile])
-AC_CONFIG_FILES([benchmark-guile], [chmod +x benchmark-guile])
 AC_CONFIG_FILES([guile-tools], [chmod +x guile-tools])
-AC_CONFIG_FILES([pre-inst-guile], [chmod +x pre-inst-guile])
-AC_CONFIG_FILES([pre-inst-guile-env], [chmod +x pre-inst-guile-env])
-AC_CONFIG_FILES([libguile/guile-snarf],
-                [chmod +x libguile/guile-snarf])
-AC_CONFIG_FILES([libguile/guile-doc-snarf],
-                [chmod +x libguile/guile-doc-snarf])
-AC_CONFIG_FILES([libguile/guile-func-name-check],
-                [chmod +x libguile/guile-func-name-check])
-AC_CONFIG_FILES([libguile/guile-snarf-docs],
-                [chmod +x libguile/guile-snarf-docs])
-AC_CONFIG_FILES([test-suite/standalone/test-use-srfi],
-                [chmod +x test-suite/standalone/test-use-srfi])
-AC_CONFIG_FILES([test-suite/standalone/test-fast-slot-ref],
-                [chmod +x test-suite/standalone/test-fast-slot-ref])
 
 AC_OUTPUT
 

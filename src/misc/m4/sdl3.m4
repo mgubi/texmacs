@@ -9,8 +9,9 @@ AC_DEFUN([LC_SDL3],[
   if test "$with_sdl3" = "no" -o "$with_sdl3" = "" ; then
       AC_MSG_RESULT([disabling sdl3 support])
   else
-      CPPFLAGS=`pkg-config --cflags sdl3`
-      LIBS=`pkg-config --libs sdl3`
+      # SDL3_ttf is used for the text of the SDL (non MuPDF) renderer
+      CPPFLAGS=`pkg-config --cflags sdl3 sdl3-ttf`
+      LIBS=`pkg-config --libs sdl3 sdl3-ttf`
       AC_CHECK_HEADER(SDL3/SDL.h,
       AC_MSG_CHECKING(for sdl3)
       AC_LINK_IFELSE([AC_LANG_PROGRAM([[

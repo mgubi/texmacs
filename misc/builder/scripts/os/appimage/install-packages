@@ -30,55 +30,124 @@ case "$OSTYPE" in
                 libgmp-dev \
                 flex \
                 ninja-build \
-		bison \
-		pipx \
-		graphviz \
-		xsltproc \
-		xmlto \
-		doxygen \
-		libxcb1-dev \
-		libwayland-dev \
-		libx11-xcb-dev \
-		xdg-utils \
-		perl \
-		python3 \
-		libx11-dev \
-		libxext-dev \
-		libxfixes-dev \
-		libxi-dev \
-		libxrender-dev \
-		libxcb-glx0-dev \
-		libxcb-keysyms1-dev \
-		libxcb-image0-dev \
-		libxcb-shm0-dev \
-		libxcb-icccm4-dev \
-		libxcb-sync-dev \
-		libxcb-xfixes0-dev \
-		libxcb-shape0-dev \
-		libxcb-randr0-dev \
-		libxcb-render-util0-dev \
-		libxcb-util-dev \
-		libxcb-xinerama0-dev \
-		libxkbcommon-dev \
-		libxkbcommon-x11-dev \
-		zlib1g-dev \
-		libglib2.0-dev \
-		libpng-dev \
-		libjpeg-dev \
-		libfreetype6-dev \
-		libssl-dev \
-		libsqlite3-dev \
-		libdouble-conversion-dev \
-		libicu-dev \
-		libinput-dev \
-		libwayland-egl1-mesa \
-		libxcomposite-dev \
-		libxrandr-dev \
-		libfontconfig1-dev \
-		libdbus-1-dev \
-		libudev-dev \
-		patchelf
-        else
+				bison \
+				pipx \
+				graphviz \
+				xsltproc \
+				xmlto \
+				doxygen \
+				libxcb1-dev \
+				libwayland-dev \
+				libx11-xcb-dev \
+				xdg-utils \
+				perl \
+				python3 \
+				libx11-dev \
+				libxext-dev \
+				libxfixes-dev \
+				libxi-dev \
+				libxrender-dev \
+				libxcb-glx0-dev \
+				libxcb-keysyms1-dev \
+				libxcb-image0-dev \
+				libxcb-shm0-dev \
+				libxcb-icccm4-dev \
+				libxcb-sync-dev \
+				libxcb-xfixes0-dev \
+				libxcb-shape0-dev \
+				libxcb-randr0-dev \
+				libxcb-render-util0-dev \
+				libxcb-util-dev \
+				libxcb-xinerama0-dev \
+				libxkbcommon-dev \
+				libxkbcommon-x11-dev \
+				zlib1g-dev \
+				libglib2.0-dev \
+				libpng-dev \
+				libjpeg-dev \
+				libfreetype6-dev \
+				libssl-dev \
+				libsqlite3-dev \
+				libdouble-conversion-dev \
+				libicu-dev \
+				libinput-dev \
+				libwayland-egl1-mesa \
+				libxcomposite-dev \
+				libxrandr-dev \
+				libfontconfig1-dev \
+				libdbus-1-dev \
+				libudev-dev \
+				patchelf
+        # dnf
+		elif command -v dnf &>/dev/null; then
+			sudo dnf groupinstall -y "Development Tools"
+			sudo dnf install -y \
+				cmake \
+				libtool \
+				rsync \
+				subversion \
+				texinfo \
+				unzip \
+				binutils \
+				glew-devel \
+				mesa-libGL-devel \
+				mesa-libEGL-devel \
+				mesa-libGLES-devel \
+				glm-devel \
+				libglvnd-devel \
+				java-17-openjdk-devel \
+				gmp-devel \
+				ninja-build \
+				graphviz \
+				libxslt \
+				xmlto \
+				doxygen \
+				libxcb-devel \
+				xcb-util-devel \
+				xcb-util-image-devel \
+				xcb-util-keysyms-devel \
+				xcb-util-wm-devel \
+				xcb-util-renderutil-devel \
+				wayland-devel \
+				wayland-protocols-devel \
+				libxkbcommon-devel \
+				libxkbcommon-x11-devel \
+				xdg-utils \
+				perl \
+				python3 \
+				python3-pip \
+				libX11-devel \
+				libXext-devel \
+				libXfixes-devel \
+				libXi-devel \
+				libXrender-devel \
+				libXcomposite-devel \
+				libXrandr-devel \
+				libXinerama-devel \
+				libXcursor-devel \
+				zlib-devel \
+				glib2-devel \
+				libpng-devel \
+				libjpeg-turbo-devel \
+				freetype-devel \
+				openssl-devel \
+				sqlite-devel \
+				double-conversion-devel \
+				libicu-devel \
+				libinput-devel \
+				fontconfig-devel \
+				dbus-devel \
+				systemd-devel \
+				patchelf
+			# check if pipx is installed, if not install it
+			if ! command -v pipx &>/dev/null; then
+				python3 -m pip install --user pipx
+				python3 -m pipx ensurepath
+				# we should reboot the shell after this, ask the user to do so
+				echo "Please restart your computer"
+				exit 1
+			fi
+		else
             echo "Unsupported Linux distribution."
             exit 1
         fi

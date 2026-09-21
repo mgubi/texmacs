@@ -1,0 +1,538 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import re
+import shutil
+import tarfile
+import zipfile
+import lzma
+import subprocess
+import platform
+import concurrent.futures
+import time
+import threading
+
+try:
+    import requests
+    from rich.progress import (
+        Progress, SpinnerColumn, TextColumn, BarColumn, 
+        TimeElapsedColumn, DownloadColumn, TransferSpeedColumn
+    )
+    from rich.console import Console
+    from rich.panel import Panel
+except ImportError:
+    print("Erreur : Ce script nécessite 'requests' et 'rich'.")
+    print("Installe-les avec : pip install requests rich")
+    sys.exit(1)
+
+console = Console()
+extraction_lock = threading.Lock()
+
+# ==========================================
+# MODULE : FILTRES ET SÉCURITÉS
+# ==========================================
+
+def is_url_ignored(url):
+    """Détermine si une URL doit être ignorée lors de la recherche de mise à jour."""
+    if not url: 
+        return True
+    url_lower = url.lower()
+    if url_lower.startswith('svn://'): return True
+    if url_lower.endswith('.git'): return True
+    if 'sourceforge' in url_lower: return True
+    if 'texmacs.org' in url_lower: return True # Ignore les fichiers spécifiques
+    return False
+
+# ==========================================
+# MODULE : UPGRADE
+# ==========================================
+
+def parse_version(v_str):
+    return tuple(int(x) for x in re.findall(r'\d+', v_str))
+
+def check_url(session, url):
+    try:
+        response = session.head(url, allow_redirects=True, timeout=(3, 3))
+        return response.status_code in (200, 302)
+    except requests.RequestException:
+        return False
+
+def scrape_directory_index(session, url, current_v_str, prefix, suffix):
+    base_url = url.rsplit('/', 1)[0] + '/'
+    try:
+        resp = session.get(base_url, timeout=(3, 5))
+        if resp.status_code != 200:
+            return None
+            
+        hrefs = re.findall(r'href="([^"]+)"', resp.text)
+        best_v_tuple = parse_version(current_v_str)
+        best_url = None
+        
+        for href in hrefs:
+            clean_href = href.split('#')[0].split('?')[0]
+            if clean_href.startswith(prefix) and clean_href.endswith(suffix):
+                v_match = re.search(r'(\d+\.\d+(?:\.\d+)*)', clean_href)
+                if v_match:
+                    test_v_str = v_match.group(1)
+                    test_v_tuple = parse_version(test_v_str)
+                    if test_v_tuple > best_v_tuple:
+                        best_v_tuple = test_v_tuple
+                        best_url = base_url + clean_href if not clean_href.startswith('http') else clean_href
+                        
+        return best_url
+    except requests.RequestException:
+        return None
+
+def heuristic_climb(session, best_url, current_v_str):
+    parts = list(parse_version(current_v_str))
+    found_newer = True
+    
+    def generate_candidates(p):
+        if len(p) >= 3:
+            return [[p[0], p[1], p[2] + 1], [p[0], p[1] + 1, 0], [p[0] + 1, 0, 0]]
+        elif len(p) == 2:
+            return [[p[0], p[1] + 1], [p[0] + 1, 0]]
+        return []
+
+    while found_newer:
+        found_newer = False
+        for candidate_parts in generate_candidates(parts):
+            new_v_str = ".".join(map(str, candidate_parts))
+            test_url = best_url.replace(current_v_str, new_v_str)
+            
+            if len(candidate_parts) >= 2 and len(parts) >= 2:
+                old_dir = f"/{parts[0]}.{parts[1]}/"
+                new_dir = f"/{candidate_parts[0]}.{candidate_parts[1]}/"
+                test_url = test_url.replace(old_dir, new_dir)
+                
+            squashed_old = current_v_str.replace('.', '')
+            squashed_new = new_v_str.replace('.', '')
+            if f"gs{squashed_old}" in test_url:
+                test_url = test_url.replace(f"gs{squashed_old}", f"gs{squashed_new}")
+
+            if check_url(session, test_url):
+                best_url = test_url
+                parts = candidate_parts
+                current_v_str = new_v_str
+                found_newer = True
+                break
+                
+    return best_url
+
+def upgrade_url(session, line):
+    original_line = line.strip()
+    parts = original_line.split()
+    if not parts:
+        return original_line
+        
+    url = parts[0]
+    target_dir = parts[1] if len(parts) > 1 else ""
+
+    if is_url_ignored(url):
+        return original_line
+
+    filename = url.rsplit('/', 1)[-1]
+    match = re.search(r'(\d+\.\d+(?:\.\d+)*)', filename)
+    if not match:
+        return original_line
+        
+    current_v_str = match.group(1)
+    prefix = filename[:match.start()]
+    suffix = filename[match.end():]
+    
+    scraped_url = scrape_directory_index(session, url, current_v_str, prefix, suffix)
+    if scraped_url:
+        url = scraped_url
+        match = re.search(r'(\d+\.\d+(?:\.\d+)*)', url.rsplit('/', 1)[-1])
+        if match:
+            current_v_str = match.group(1)
+        
+    final_url = heuristic_climb(session, url, current_v_str)
+    
+    if target_dir:
+        return f"{final_url} {target_dir}"
+    return final_url
+
+def run_upgrade(filepath):
+    session = requests.Session()
+    session.headers.update({'User-Agent': 'Mozilla/5.0 (Maintainer update script)'})
+
+    with open(filepath, 'r') as f:
+        urls = [line.strip() for line in f.readlines() if line.strip() and not line.startswith('#')]
+
+    updated_urls = [None] * len(urls)
+    console.print(Panel("[bold cyan]Recherche de mises à jour des paquets...[/bold cyan]"))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False
+    ) as progress:
+        
+        overall_task = progress.add_task("[bold blue]Progression globale", total=len(urls))
+        
+        def process_url_with_ui(idx, line):
+            original_line = line.strip()
+            parts = original_line.split()
+            url = parts[0] if parts else ""
+            filename = url.rsplit('/', 1)[-1]
+            
+            if is_url_ignored(url):
+                return idx, original_line, original_line, True
+
+            task_id = progress.add_task(f"[yellow]Analyse : {filename}", total=None)
+            try:
+                result = upgrade_url(session, original_line)
+            except Exception:
+                result = original_line
+            finally:
+                progress.remove_task(task_id)
+            return idx, original_line, result, False
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(process_url_with_ui, i, line) for i, line in enumerate(urls)]
+            for future in concurrent.futures.as_completed(futures):
+                idx, original, updated, is_ignored = future.result()
+                updated_urls[idx] = updated
+                
+                parts = original.split()
+                url = parts[0] if parts else ""
+                filename = url.rsplit('/', 1)[-1]
+                
+                if is_ignored:
+                    progress.console.print(f"[dim]• Ignoré (VCS/SF/TeXmacs) : {filename}[/dim]")
+                elif original != updated:
+                    new_parts = updated.split()
+                    new_url = new_parts[0] if new_parts else ""
+                    new_filename = new_url.rsplit('/', 1)[-1]
+                    progress.console.print(f"[bold green]✓ MIS À JOUR[/bold green] : {filename} ➔ [bold white]{new_filename}[/bold white]")
+                else:
+                    progress.console.print(f"[dim]• À JOUR[/dim] : {filename}")
+                    
+                progress.advance(overall_task)
+
+    with open(filepath, 'w') as f:
+        for url in updated_urls:
+            if url: f.write(f"{url}\n")
+
+
+# ==========================================
+# MODULE : PIPELINE (DOWNLOAD -> EXTRACTION)
+# ==========================================
+
+def download_file_with_retry(line, progress, task_id, overall_task, cache_dir):
+    parts = line.strip().split()
+    url = parts[0]
+    target_dir = parts[1] if len(parts) > 1 else None
+    
+    filename = url.split('/')[-1].split('?')[0].split('#')[0]
+    filename_without_extension = filename.split('.')[0]
+    
+    display_name = target_dir if target_dir else filename
+    is_vcs = url.endswith('.git') or url.startswith('svn') or url.startswith('http://harry.medicis.polytechnique.fr/texmacs/')
+    
+    # Stratégie de cache : les archives vont dans archives_cache à la racine du projet
+    target_path = display_name if is_vcs else os.path.join(cache_dir, filename)
+    extracted_dir_check = target_dir if target_dir else filename_without_extension
+
+    # 1. Le dossier source existe-t-il déjà dans le dossier de compilation actuel ?
+    if os.path.isdir(extracted_dir_check):
+        progress.update(task_id, description=f"[dim]Code source déjà présent: {extracted_dir_check}[/dim]", completed=1, total=1)
+        progress.advance(overall_task)
+        return target_path
+    
+    # 2. L'archive existe-t-elle déjà dans le cache global ?
+    if not is_vcs and os.path.isfile(target_path):
+        progress.update(task_id, description=f"[cyan]Trouvé en cache: {filename}[/cyan]", completed=1, total=1)
+        progress.advance(overall_task)
+        return target_path
+
+    while True:
+        try:
+            if is_vcs:
+                progress.update(task_id, description=f"[cyan]Clonage de {display_name}...[/cyan]")
+                if url.endswith('.git'):
+                    cmd = ["git", "clone"] + parts
+                    res = subprocess.run(cmd, capture_output=True, text=True)
+                    if res.returncode != 0:
+                        raise Exception(f"Git: {res.stderr.strip()}")
+                else:
+                    cmd = ["svn", "co", "--non-interactive", "--trust-server-cert"] + parts
+                    res = subprocess.run(cmd, capture_output=True, text=True)
+                    if res.returncode != 0:
+                        raise Exception(f"SVN: {res.stderr.strip()}")
+                
+                progress.update(task_id, description=f"[green]✓ Cloné: {display_name}[/green]", total=1, completed=1)
+                break
+            
+            else:
+                target_url = url
+                tmserver_url = "https://ftp.texmacs.org/TeXmacs/misc/" + filename
+                try:
+                    head = requests.head(tmserver_url, timeout=5)
+                    if head.status_code == 200:
+                        target_url = tmserver_url
+                except requests.RequestException:
+                    pass
+
+                progress.update(task_id, description=f"[cyan]Téléchargement: {display_name}...[/cyan]")
+                
+                with requests.get(target_url, stream=True, timeout=(5, 15)) as response:
+                    response.raise_for_status()
+                    total_size = int(response.headers.get('content-length', 0))
+                    
+                    progress.update(task_id, description=f"[cyan]Téléchargement: {display_name}[/cyan]", total=total_size, completed=0)
+                    
+                    with open(target_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            progress.update(task_id, advance=len(chunk))
+                            
+                progress.update(task_id, description=f"[green]✓ Téléchargé (mis en cache): {display_name}[/green]")
+                break
+
+        except Exception as e:
+            error_msg = str(e).split('\n')[0][:80] + "..."
+            for remaining in range(60, 0, -1):
+                progress.update(task_id, description=f"[red]Erreur ({error_msg}) sur {display_name} - Essai dans {remaining}s[/red]")
+                time.sleep(1)
+                
+    progress.advance(overall_task)
+    return target_path
+
+def extract_archive_with_ui(archive_path, progress, task_id, overall_task):
+    filename = os.path.basename(archive_path)
+    filename_without_extension = filename.split('.')[0]
+    
+    if os.path.isdir(filename_without_extension):
+        progress.update(task_id, description=f"[green]✓ Déjà extrait: {filename}[/green]", total=1, completed=1)
+        progress.advance(overall_task)
+        return
+        
+    progress.update(task_id, description=f"[dim magenta]Attente extraction: {filename}...[/dim magenta]")
+    
+    try:
+        with extraction_lock:
+            progress.update(task_id, description=f"[bold magenta]Extraction: {filename}...[/bold magenta]")
+            with open(archive_path, 'rb') as f:
+                first_bytes = f.read(5)
+                f.seek(0)
+
+                if first_bytes.startswith(b'\x1f\x8b\x08\x00'):  # tar.gz
+                    with tarfile.open(archive_path, 'r:gz') as tar:
+                        tar.extractall()
+                elif first_bytes.startswith(b'\xfd7zXZ\x00'):  # tar.xz
+                    with tarfile.open(archive_path, 'r:xz') as tar:
+                        tar.extractall()
+                elif first_bytes.startswith(b'PK\x03\x04'):  # zip
+                    with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                        zip_ref.extractall()
+                elif first_bytes.startswith(b'\xfd7zXZ'):  # tar.xz (without null byte)
+                    with lzma.open(archive_path, 'rb') as lzma_file:
+                        with tarfile.open(fileobj=lzma_file, mode='r') as tar:
+                            tar.extractall()
+                elif first_bytes.startswith(b'\x5d\x00\x00\x00'):  # tar.lz
+                    with lzma.open(archive_path, 'rb') as lzma_file:
+                        with tarfile.open(fileobj=lzma_file, mode='r') as tar:
+                            tar.extractall()
+                else:
+                    subprocess.run(["tar", "-xvf", archive_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # L'archive reste sagement dans archives_cache. On a extrait son contenu dans le dossier de compilation courant.
+            progress.update(task_id, description=f"[bold green]✓ Terminé: {filename}[/bold green]", total=1, completed=1)
+    except Exception as e:
+        progress.update(task_id, description=f"[red]Erreur extraction {filename}: {e}[/red]", total=1, completed=1)
+    finally:
+        progress.advance(overall_task)
+
+def process_package(line, progress, overall_dl, overall_ext, cache_dir):
+    parts = line.strip().split()
+    target_dir = parts[1] if len(parts) > 1 else parts[0].split('/')[-1].split('?')[0].split('#')[0]
+    url = parts[0]
+    is_vcs = url.endswith('.git') or url.startswith('svn') or url.startswith('http://harry.medicis.polytechnique.fr/texmacs/')
+    
+    task_id = progress.add_task(f"[cyan]Préparation: {target_dir}[/cyan]", total=None)
+    
+    downloaded_path = download_file_with_retry(line, progress, task_id, overall_dl, cache_dir)
+    
+    if not is_vcs and downloaded_path and os.path.isfile(downloaded_path):
+        extract_archive_with_ui(downloaded_path, progress, task_id, overall_ext)
+    else:
+        progress.advance(overall_ext)
+
+
+# ==========================================
+# MODULE : RENAME
+# ==========================================
+
+def rename_folders():
+    console.print(Panel("[bold yellow]Renommage des dossiers...[/bold yellow]"))
+    folders = [f for f in os.listdir('.') if os.path.isdir(f)]
+    
+    for folder in folders:
+        mapping = {
+            "wayland-protocols": "wayland-protocols",
+            "xcb-proto": "xcbproto",
+            "xcb-util-image": "xcb-util-image",
+            "xcb-util-keysyms": "xcb-util-keysyms",
+            "xcb-util-wm": "xcb-util-wm",
+            "xcb-util-renderutil": "xcb-util-renderutil",
+            "xcb-util-cursor": "xcb-util-cursor",
+            "libxcb-": "libxcb", 
+            "libxml2-": "libxml2",
+            "qt-everywhere-src": "qt"
+        }
+
+        renamed = False
+        for key, target in mapping.items():
+            if folder.startswith(key):
+                if folder == target:
+                    renamed = True
+                    break
+                shutil.move(folder, target)
+                console.print(f"[dim]Renommé :[/dim] {folder} -> [bold]{target}[/bold]")
+                renamed = True
+                break
+        
+        if renamed:
+            continue
+
+        if '-' in folder and not folder.startswith("qt"):
+            new_folder_name = re.sub(r'-[0-9].*', '', folder)
+            if new_folder_name != folder:
+                if os.path.exists(new_folder_name):
+                    pass 
+                else:
+                    shutil.move(folder, new_folder_name)
+                    console.print(f"[dim]Renommé :[/dim] {folder} -> [bold]{new_folder_name}[/bold]")
+
+
+# ==========================================
+# MODULE : ORCHESTRATEUR
+# ==========================================
+
+def get_ostype():
+    plat = sys.platform.lower()
+    if 'win' in plat or 'cygwin' in plat or 'msys' in os.getenv('OSTYPE', '').lower():
+        return 'msys'
+    return 'linux' if 'linux' in plat else 'macos' if 'darwin' in plat else 'unknown'
+
+def main():
+    parser = argparse.ArgumentParser(description='Build script pour TeXmacs.')
+    parser.add_argument('--os', dest='target_os', help='Cible OS (ex: windows-qt6, macos-qt6...)')
+    parser.add_argument('--no-upgrade', action='store_true', help='Désactive la vérification des mises à jour des archives')
+    args = parser.parse_args()
+
+    ostype = get_ostype()
+    target_os = args.target_os
+
+    if not target_os:
+        if ostype == "msys":
+            target_os = "windows-qt6"
+        else:
+            console.print("[red]Erreur : L'option --os=??? est requise.[/red]")
+            os_dir = os.path.join(os.path.dirname(__file__), 'os')
+            if os.path.exists(os_dir):
+                console.print("OS disponibles : " + ", ".join(os.listdir(os_dir)))
+            sys.exit(1)
+
+    original_cwd = os.getcwd()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os_path = os.path.join(script_dir, 'os', target_os)
+    
+    # Définition du cache à la racine du projet
+    cache_dir = os.path.join(original_cwd, 'archives_cache')
+
+    for req_file in ['Makefile', 'set-devel-paths', 'archives-urls.txt']:
+        if not os.path.isfile(os.path.join(os_path, req_file)):
+            console.print(f"[red]Erreur : Le fichier {req_file} n'existe pas dans {os_path}[/red]")
+            sys.exit(1)
+
+    if ostype == "msys":
+        try:
+            work_dir_bytes = subprocess.check_output(["cygpath", "-m", f"/{target_os}"])
+            work_dir = work_dir_bytes.decode('utf-8').strip()
+        except FileNotFoundError:
+            console.print("[red]Erreur : L'utilitaire cygpath est introuvable. Es-tu bien dans un terminal MSYS2 ?[/red]")
+            sys.exit(1)
+    else:
+        arch = platform.machine()
+        work_dir = os.path.join(original_cwd, f"{target_os}-{arch}")
+
+    if os.path.exists(work_dir):
+        chemin_absolu = os.path.abspath(work_dir)
+        console.print(f"[bold red]Le dossier {chemin_absolu} existe déjà. Merci de le supprimer avant de relancer le script.[/bold red]")
+        sys.exit(1)
+
+    console.print(f"Copie de l'environnement vers [bold]{work_dir}[/bold]...")
+    shutil.copytree(os_path, work_dir)
+    os.chdir(work_dir)
+    
+    # Création du cache (s'il n'existe pas)
+    os.makedirs(cache_dir, exist_ok=True)
+    os.makedirs('texmacs', exist_ok=True)
+
+    install_pkg_script = os.path.join(work_dir, 'install-packages')
+    if os.path.isfile(install_pkg_script):
+        if not os.access(install_pkg_script, os.X_OK):
+            console.print(f"[red]Erreur : {install_pkg_script} n'est pas exécutable.[/red]")
+            sys.exit(1)
+        console.print("[cyan]Exécution de install-packages...[/cyan]")
+        subprocess.run(["bash", "./install-packages"], check=True)
+
+    archives_file = os.path.join(work_dir, 'archives-urls.txt')
+    
+    if not args.no_upgrade:
+        run_upgrade(archives_file)
+    else:
+        console.print("[dim]Vérification des mises à jour ignorée (--no-upgrade).[/dim]")
+
+    # -------------------------------------------------------------------------
+    # DÉMARRAGE DU PIPELINE (TÉLÉCHARGEMENT/CACHE -> EXTRACTION)
+    # -------------------------------------------------------------------------
+    with open(archives_file, 'r') as f:
+        urls = [line.strip() for line in f.readlines() if line.strip() and not line.startswith('#')]
+
+    console.print(Panel("[bold cyan]Préparation des sources et dépendances...[/bold cyan]"))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeElapsedColumn(),
+        console=console
+    ) as progress:
+        
+        overall_dl = progress.add_task("[bold blue]Progression Téléchargements/Cache", total=len(urls))
+        overall_ext = progress.add_task("[bold magenta]Progression Extractions", total=len(urls))
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(process_package, url, progress, overall_dl, overall_ext, cache_dir) for url in urls]
+            for future in concurrent.futures.as_completed(futures):
+                future.result() 
+
+    # -------------------------------------------------------------------------
+    
+    rename_folders()
+
+    make_cmd = "mingw32-make" if ostype == "msys" else "make"
+    console.print(Panel(f"[bold green]Démarrage de la compilation avec {make_cmd}...[/bold green]"))
+    
+    build_command = f"source set-devel-paths && {make_cmd}"
+    try:
+        subprocess.run(["bash", "-c", build_command], check=True)
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]Erreur lors de la compilation : {e}[/bold red]")
+        sys.exit(1)
+
+    console.print("[bold green]✨ Pipeline de compilation terminé avec succès ! ✨[/bold green]")
+
+if __name__ == '__main__':
+    main()

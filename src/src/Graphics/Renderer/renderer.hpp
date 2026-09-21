@@ -40,6 +40,7 @@ public:
   SI  ox, oy;               // origin
   SI  cx1, cy1, cx2, cy2;   // visible region (clipping)
   bool is_screen;           // flag for renderers on screen
+  double pixel_ratio;       // device pixel ratio
   double zoomf;             // zoom factor
   int shrinkf;              // shrinking factor
   int pixel;                // size of a pixel on the screen
@@ -51,7 +52,7 @@ public:
   int cur_page;             // current page number
 
 public:
-  renderer_rep (bool screen_flag);
+  renderer_rep (bool screen_flag, double pixel_ratio= 1);
   virtual ~renderer_rep ();
   virtual bool is_started ();
   virtual void* get_handle ();
@@ -60,7 +61,7 @@ public:
   /* coordinate system */
   void set_origin (SI x, SI y);
   void move_origin (SI dx, SI dy);
-  virtual void set_zoom_factor (double zoom);
+  virtual void set_zoom_factor (double zoom, bool safe= true);
   void reset_zoom_factor ();
   void set_shrinking_factor (int sf);
   virtual void set_transformation (frame fr);
@@ -96,6 +97,7 @@ public:
   virtual void set_background (brush b) = 0;
 
   /* drawing */
+  virtual void clear_device (SI x1, SI y1, SI x2, SI y2) = 0; // device background
   virtual void draw (int char_code, font_glyphs fn, SI x, SI y) = 0;
   virtual void line (SI x1, SI y1, SI x2, SI y2) = 0;
   virtual void lines (array<SI> x, array<SI> y) = 0;
@@ -154,7 +156,14 @@ void abs_outer_round (SI& x1, SI& y1, SI& x2, SI& y2);
 extern bool reverse_colors;
 void reverse (int& r, int& g, int& b);
 
-#if QT_VERSION < 0x060000
+#if QT_VERSION >= 0x060000
+const bool   retina_manual= false;
+const bool   retina_iman  = false;
+const int    retina_factor= 1;
+const int    retina_zoom  = 1;
+const int    retina_icons = 1;
+const double retina_scale = 1.0;
+#else
 extern bool   retina_manual;
 extern bool   retina_iman;
 extern int    retina_factor;

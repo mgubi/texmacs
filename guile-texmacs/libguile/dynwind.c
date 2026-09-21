@@ -377,7 +377,8 @@ scm_init_dynwind ()
   tc16_winder = scm_make_smob_type ("winder", 0);
   scm_set_smob_mark (tc16_winder, winder_mark);
 
-#include "libguile/dynwind.x"
+ scm_c_define_gsubr (s_scm_dynamic_wind, 3, 0, 0, (SCM (*)()) scm_dynamic_wind); ;
+
 }
 
 /*

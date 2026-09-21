@@ -320,7 +320,13 @@ scm_init_dynamic_linking ()
   scm_set_smob_mark (scm_tc16_dynamic_obj, dynl_obj_mark);
   scm_set_smob_print (scm_tc16_dynamic_obj, dynl_obj_print);
   sysdep_dynl_init ();
-#include "libguile/dynl.x"
+ scm_c_define_gsubr (s_scm_dynamic_link, 1, 0, 0, (SCM (*)()) scm_dynamic_link); ;
+ scm_c_define_gsubr (s_scm_dynamic_object_p, 1, 0, 0, (SCM (*)()) scm_dynamic_object_p); ;
+ scm_c_define_gsubr (s_scm_dynamic_unlink, 1, 0, 0, (SCM (*)()) scm_dynamic_unlink); ;
+ scm_c_define_gsubr (s_scm_dynamic_func, 2, 0, 0, (SCM (*)()) scm_dynamic_func); ;
+ scm_c_define_gsubr (s_scm_dynamic_call, 2, 0, 0, (SCM (*)()) scm_dynamic_call); ;
+ scm_c_define_gsubr (s_scm_dynamic_args_call, 3, 0, 0, (SCM (*)()) scm_dynamic_args_call); ;
+
 }
 
 /*

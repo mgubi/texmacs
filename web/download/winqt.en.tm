@@ -1,98 +1,104 @@
-<TeXmacs|1.0.7.20>
+<TeXmacs|2.1.5>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|old-spacing|old-dots|old-lengths>>
 
 <\body>
-  <tmweb-current|Download|Windows><tmweb-title|Compiling Qt-<TeXmacs> under
+  <tmweb-current|Download|Windows><tmweb-title|Compiling <TeXmacs> under
   <name|Windows>|<tmweb-download-links>>
 
-  <section|Download and install the build environment><label|install>
+  <section|Download and build the environment><label|install>
 
-  In order to compile <TeXmacs> under <name|Windows>, you need <name|Qt>,
-  <name|MinGW> and a certain number of libraries. We have simplified the
-  installation procedure for these dependencies by creating a single zip-file
-  which contains all necessary stuff. Thus, you first have to download (195
-  Mb)
+  <\itemize-dot>
+    <item>In order to compile <TeXmacs> under <name|Windows>, you need to
+    <hlink|install MSYS2|https://www.msys2.org/>.
 
-  <\verbatim>
-    \ \ \ \ <hlink|<verbatim|TmBuildEnv.zip>|http://ftp.texmacs.org/TeXmacs/windows/qt/TmBuildEnv.zip>
-  </verbatim>
+    <item>On Windows Intel/AMD, open the terminal named \QMSYS2 MINGW64\Q. On
+    Windows ARM, open the terminal named \PMSYS2 CLANGARM64\Q.
 
-  or older versions <hlink|here|http://ftp.texmacs.org/TeXmacs/windows/qt>.
-  This file must be uncompressed in the directory of your choice as long as
-  the path does not contain white space (i.e Documents directory). To open a
-  command shell you have to run the <verbatim|msys.bat> windows command file.
-  It is located in the subdirectory <verbatim|MINGW/msys/1.0/>. The best way
-  is to create a shortcut to this file from your desktop.
+    <item>Update MSYS2 :\ 
 
-  At the first run, the <verbatim|msys> command creates the file
-  <verbatim|/etc/fstab> with a table of mounted devices. If you want to
-  relocate the whole MINGW environment, it is mandatory to delete the
-  <verbatim|fstab> file in order to rebuild the correct mounting paths.
+    <\shell-code>
+      pacman -Syu
+    </shell-code>
 
-  <section|Download <TeXmacs>>
+    <em|<item>Note: You may need to relaunch the terminal after the update.>
 
-  Click on the <verbatim|MSYS> icon on your desktop in order to launch a Unix
-  terminal and fetch the latest <name|Svn> version of <TeXmacs> as follows:
+    <item>Install subversion :\ 
 
-  <\shell-code>
-    mkdir ~/texmacs
+    <\shell-code>
+      pacman -S subversion
+    </shell-code>
 
-    cd ~/texmacs
+    <item>Download the builder :\ 
 
-    svn co svn://svn.savannah.gnu.org/texmacs/trunk/src
-  </shell-code>
+    <\shell-code>
+      svn co svn://svn.savannah.gnu.org/texmacs/trunk/misc/builder
+    </shell-code>
 
-  \;
+    <item>Run the builder (this may take a few hours) :\ 
 
-  <section|Compile <TeXmacs>>
+    <\shell-code>
+      cd builder
 
-  Go to the directory with the <TeXmacs> sources
+      ./script/build
+    </shell-code>
 
-  <\shell-code>
-    cd ~/texmacs/src
-  </shell-code>
+    <item>The builder will create a /windows-qt6 directory with all the built
+    dependencies.
+  </itemize-dot>
 
-  Configure the environment using. You can use -h parameter to view
-  configuration options
+  <section|Build and run <TeXmacs>>
 
-  <\shell-code>
-    ./configure
-  </shell-code>
+  <\itemize-dot>
+    <item>Source the environment
 
-  Build <TeXmacs>
+    <\shell-code>
+      cd /windows-qt6
 
-  <\shell-code>
-    make WINDOWS_BUNDLE
-  </shell-code>
+      source set-devel-paths
+    </shell-code>
 
-  Run <TeXmacs>
+    <item>If you wish to reconfigure, rebuild <TeXmacs> entierly, and make a
+    package, run :\ 
 
-  <\shell-code>
-    ~/texmacs/distr/TeXmacs-Windeows/bin/texmacs.exe
-  </shell-code>
+    <\shell-code>
+      mingw32-make texmacs
+    </shell-code>
 
-  The first time you run <TeXmacs>, the program may crash. This can appear if
-  a previous version has had a configuration file with a different format.
-  You have to remove the <TeXmacs> directory located in AppData\\Roaming
-  (AppData is a hidden directory in your Windows home). Subsequent runs
-  should w<abbr|>ork fine.
+    <\itemize-minus>
+      <item><name|texmacs/distr> contains all the final installers and
+      binaries
 
-  <section|Creation of an installer>
+      <item><name|texmacs/src> contains the sources
+    </itemize-minus>
 
-  After building <TeXmacs>, you can create an installer using the
-  WINDOWS_PACKAGE target
+    <item>If you edited some sources, and want to build texmacs, go to the
+    source directory and run a make :\ 
 
-  <\shell-code>
-    make WINDOWS_PACKAGE
-  </shell-code>
+    <\shell-code>
+      cd texmacs/src
 
-  The installer can be found in the directory <em|~/texmacs/distr/windows/>.
-  This installer is a standalone package, so you don't need anything else to
-  enjoy <TeXmacs>. The MinGW environment is no longer useful.
+      mingw32-make
+    </shell-code>
 
-  <tmdoc-copyright|2013|David Michel|Massimiliano Gubinelli|Joris van der
-  Hoeven, Denis Raux>
+    <item>Inside the source directory, you can also get and build the latest
+    commit using :\ 
+
+    <\shell-code>
+      svn up
+
+      mingw32-make
+    </shell-code>
+
+    <item>You can test the compiled binaries by runnig :
+
+    <\shell-code>
+      ./TeXmacs/bin/texmacs.bin
+    </shell-code>
+  </itemize-dot>
+
+  <tmdoc-copyright|2026|Liza Belos, David Michel|Massimiliano Gubinelli|Joris
+  van der Hoeven, Denis Raux>
 
   <tmweb-license>
 </body>

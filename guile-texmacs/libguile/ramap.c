@@ -1230,7 +1230,15 @@ scm_init_ramap ()
   init_raprocs (ra_asubrs);
   scm_c_define_subr (s_array_equal_p, scm_tc7_rpsubr, scm_array_equal_p);
   scm_smobs[SCM_TC2SMOBNUM (scm_i_tc16_array)].equalp = scm_raequal;
-#include "libguile/ramap.x"
+ scm_c_define_gsubr (s_scm_array_fill_x, 2, 0, 0, (SCM (*)()) scm_array_fill_x); ;
+ scm_c_define_gsubr (s_array_copy_in_order_x, 2, 0, 0, (SCM (*)()) scm_array_copy_x); ;
+ scm_c_define_gsubr (s_scm_array_copy_x, 2, 0, 0, (SCM (*)()) scm_array_copy_x); ;
+ scm_c_define_gsubr (s_array_map_in_order_x, 2, 0, 1, (SCM (*)()) scm_array_map_x); ;
+ sym_b = scm_permanent_object (scm_from_locale_symbol ("b")) ;
+ scm_c_define_gsubr (s_scm_array_map_x, 2, 0, 1, (SCM (*)()) scm_array_map_x); ;
+ scm_c_define_gsubr (s_scm_array_for_each, 2, 0, 1, (SCM (*)()) scm_array_for_each); ;
+ scm_c_define_gsubr (s_scm_array_index_map_x, 2, 0, 0, (SCM (*)()) scm_array_index_map_x); ;
+
   scm_add_feature (s_scm_array_for_each);
 }
 

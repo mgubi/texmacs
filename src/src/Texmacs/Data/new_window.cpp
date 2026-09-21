@@ -152,13 +152,14 @@ has_current_window () {
 
 tm_window
 concrete_window () {
-  tm_view vw= concrete_view (get_current_view ());
+  tm_view vw= concrete_view (get_current_view_safe ());
   ASSERT (vw->win != NULL, "no window attached to view");
   return vw->win;
 }
 
 url
 get_current_window () {
+  if (!has_current_window ()) return url ("");
   tm_window win= concrete_window ();
   return abstract_window (win);
 }

@@ -54,12 +54,14 @@ protected:
   time_t        last_t;
   SI            start_x, start_y;
   SI            end_x, end_y;
+  SI            last_scx, last_scy;
   int           tremble_count;
   bool          tremble_right;
   bool          table_selection;
   int           mouse_adjusting;  // mask with active key modifiers upon click
   rectangles    selection_rects;
   array<rectangles> alt_selection_rects;
+  array<rectangles> spell_error_rects;
   rectangle     last_visible;
   rectangles    env_rects;
   rectangles    foc_rects;
@@ -152,6 +154,7 @@ public:
   rectangle get_window_extents ();
 
   /* keyboard handling */
+  bool keyboard_message (string message);
   int  get_input_mode ();
   void set_input_mode (int mode);
   void set_input_normal ();

@@ -48,7 +48,6 @@
 #include <QUrl>
 #include <QFileInfo>
 
-
 static long int QTMWcounter = 0; // debugging hack
 
 /*! Constructor.
@@ -120,6 +119,9 @@ QTMWidget::scrollContentsBy (int dx, int dy) {
 void 
 QTMWidget::resizeEvent (QResizeEvent* event) {
   (void) event;
+#if QT_VERSION >= 0x060000
+  checkDprChange();
+#endif
   // Is this ok?
   //coord2 s = from_qsize (event->size());
   //the_gui -> process_resize (tm_widget(), s.x1, s.x2);
@@ -136,8 +138,8 @@ QTMWidget::resizeEvent (QResizeEvent* event) {
 }
 
 void
-QTMWidget::resizeEventBis (QResizeEvent *event) {
-  coord2 s = from_qsize (event->size());
+QTMWidget::resizeEventBis () {
+  coord2 s = from_qsize (surface()->size());
   the_gui -> process_resize (tm_widget(), s.x1, s.x2);
 }
 
@@ -149,37 +151,89 @@ QTMWidget::resizeEventBis (QResizeEvent *event) {
  CHECK: Maybe just putting onscreen all the region bounding rectangles might 
  be less expensive.
 */
+#if QT_VERSION >= 0x060000
 void
 QTMWidget::surfacePaintEvent (QPaintEvent *event, QWidget *surfaceWidget) {
   (void) surfaceWidget;
+  if (checkDprChange()) return;
   QPainter p (surface());
-#if QT_VERSION >= 0x060000
-  qreal dpr = surface()->devicePixelRatio();
-  if (dpr != tm_widget()->backingPixmap->devicePixelRatio()) {
-    QMetaObject::invokeMethod (this, "surfaceDprChanged", Qt::QueuedConnection);
-    return;
-  }
-#else
-  qreal dpr= retina_factor;
-#endif
+  qreal pixel_ratio= lastPixelRatio;
   QRegion reg= event->region();
   QRegion::const_iterator it;
-  QRect qr;
+  QRectF qr;
   for (it= reg.begin (); it != reg.end (); ++it) {
     qr= *it;
-    p.drawPixmap (QRect (qr.x(), qr.y(), qr.width(), qr.height()),
-                  *(tm_widget()->backingPixmap),
-		  QRect (dpr * qr.x(), dpr * qr.y(),
-			 dpr * qr.width(), dpr * qr.height()));
+    p.drawPixmap (qr, *(tm_widget()->backingPixmap),
+		  QRectF (pixel_ratio * qr.x(),
+			  pixel_ratio * qr.y(),
+			  pixel_ratio * qr.width(),
+			  pixel_ratio * qr.height()));
   }
 }
 
-#if QT_VERSION >= 0x060000
-void
-QTMWidget::surfaceDprChanged () {
-  tm_widget()->invalidate_all();
-  the_gui->force_update();
+bool
+QTMWidget::checkDprChange() {
+  double currentPixelRatio= surface()->devicePixelRatio();
+  if (lastPixelRatio == 0.0) {
+    lastPixelRatio = currentPixelRatio;;
+    return false;
+  }
+  if (lastPixelRatio == currentPixelRatio) {
+    return false;
+  }
+  lastPixelRatio = currentPixelRatio;
+  //cout << "QTMWidget " << (long) this
+  //     << ", device pixel ratio changed to " << lastPixelRatio << LF;
+  devicePixelRatioChanged();
+  return true;
 }
+
+void
+QTMWidget::devicePixelRatioChanged () {
+  array<url> v= get_all_views ();
+  for (int i= 0; i < N(v); i++) {
+    editor ed= view_to_editor (v[i]);
+    if (!is_nil (ed) &&
+	(qt_simple_widget_rep*) (ed.operator->()) == tm_widget()) {
+      ed->suspend ();
+      tm_widget()->invalidate_all();
+      ed->resume ();
+      needs_update();
+      break;
+    }
+  }
+}
+
+#else
+
+#define REDRAW_EVERYTHING 1
+
+#if REDRAW_EVERYTHING
+void
+QTMWidget::paintEvent (QPaintEvent* event) {
+  QPainter p (surface());
+  p.drawPixmap (QRect (0, 0, surface()->width(), surface()->height()),
+                *(tm_widget()->backingPixmap),
+                QRect (0, 0, surface()->width()  * retina_factor,
+                             surface()->height() * retina_factor));
+}
+#else
+void
+QTMWidget::paintEvent (QPaintEvent* event) {
+  QPainter p (surface());
+  QVector<QRect> rects = event->region().rects();
+  for (int i = 0; i < rects.count(); ++i) {
+    QRect qr = rects.at (i);
+    p.drawPixmap (QRect (qr.x(), qr.y(), qr.width(), qr.height()),
+                  *(tm_widget()->backingPixmap),
+                  QRect (retina_factor * qr.x(),
+                         retina_factor * qr.y(),
+                         retina_factor * qr.width(),
+                         retina_factor * qr.height()));
+  }
+}
+#endif
+
 #endif
 
 void
@@ -451,6 +505,10 @@ QTMWidget::tabletEvent (QTabletEvent* event) {
     QPoint point = event->position().toPoint() + origin() - surface()->pos();
     double x= point.x();
     double y= point.y();
+#elif QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    QPoint point = event->pos() + origin() - surface()->pos();
+    double x= point.x() + event->globalPosF().x() - event->globalX();
+    double y= point.y() + event->globalPosF().y() - event->globalY();
 #else
     QPoint point = event->pos() + origin() - surface()->pos();
     double x= point.x() + event->hiResGlobalX() - event->globalX();
@@ -722,18 +780,35 @@ QTMWidget::event (QEvent* event) {
   }
 #endif
 
+  if (get_user_preference("use experimental keyboard patches") == "on") {
+    if (event->type() == QEvent::KeyPress) {
+      return true;
+    }
+    if (event->type() == QEvent::ShortcutOverride) {
+      cout << "ShortcutOverride event caught" << LF;
+      QKeyEvent *ke = static_cast<QKeyEvent*> (event);
+      QString key_combination = QKeySequence(ke->modifiers() | ke->key()).toString();
+      string key_combination_str = from_qstring(key_combination);
+      cout << "Experimental keyboard receive: " << key_combination_str << LF;
+      keyPressEvent (ke);
+      event->accept();
+      return true;
+    }
+  } else {
     // Catch Keypresses to avoid default handling of (Shift+)Tab keys
-  if (event->type() == QEvent::KeyPress) {
-    QKeyEvent *ke = static_cast<QKeyEvent*> (event);
-    keyPressEvent (ke);
-    return true;
-  } 
-  /* NOTE: we catch ShortcutOverride in order to disable the QKeySequences we
-   assigned to QActions while building menus, etc. In doing this, we keep the
-   shortcut text in the menus while relaying all keypresses through the editor*/
-  if (event->type() == QEvent::ShortcutOverride) {
-    event->accept();
-    return true;
+    if (event->type() == QEvent::KeyPress) {
+      QKeyEvent *ke = static_cast<QKeyEvent*> (event);
+      keyPressEvent (ke);
+      return true;
+    } 
+    /* NOTE: we catch ShortcutOverride in order to disable the QKeySequences we
+    assigned to QActions while building menus, etc. In doing this, we keep the
+    shortcut text in the menus while relaying all keypresses through the editor*/
+    if (event->type() == QEvent::ShortcutOverride) {
+      //cout << "Ignoring ShortcutOverride event" << LF;
+      event->accept();
+      return true;
+    }
   }
   if (event->type() == QEvent::Gesture) {
     gestureEvent(static_cast<QGestureEvent*>(event));
@@ -742,8 +817,37 @@ QTMWidget::event (QEvent* event) {
   return QTMScrollView::event (event);
 }
 
+#if QT_VERSION >= 0x050000
+QTMWidget *last_focused_widget = nullptr;
+
+QTMWidget *QTMWidget::getLastFocusedWidget() {
+  return last_focused_widget;
+}
+
+void QTMWidget::setFocusToLast() {
+  if (!last_focused_widget) return;
+
+  last_focused_widget->setFocus();
+  
+  if (is_nil (last_focused_widget->tmwid)) return;
+
+  if (DEBUG_QT)
+    debug_qt << "FOCUSIN: " 
+             << last_focused_widget->tm_widget()->type_as_string() 
+             << LF;
+
+  the_gui->process_keyboard_focus (last_focused_widget->tm_widget(),
+                                   true, texmacs_time());
+}
+#endif
+
 void
 QTMWidget::focusInEvent (QFocusEvent * event) {
+#if QT_VERSION >= 0x050000
+  if (!is_nil (tmwid)) {
+    last_focused_widget = this;
+  }
+#endif
   if (!is_nil (tmwid)) {
     if (DEBUG_QT) debug_qt << "FOCUSIN: " << tm_widget()->type_as_string() << LF;
     the_gui->process_keyboard_focus (tm_widget(), true, texmacs_time());
@@ -760,10 +864,13 @@ QTMWidget::focusInEvent (QFocusEvent * event) {
 
 void
 QTMWidget::focusOutEvent (QFocusEvent * event) {
-  if (!is_nil (tmwid)) {
-    if (DEBUG_QT) debug_qt << "FOCUSOUT: " << tm_widget()->type_as_string() << LF;
-    the_gui -> process_keyboard_focus (tm_widget(), false, texmacs_time());
-  }
+  if (is_nil (tmwid)) return;
+  
+  if (DEBUG_QT)
+    debug_qt << "FOCUSOUT: " << tm_widget()->type_as_string() << LF;
+
+  the_gui -> process_keyboard_focus (tm_widget(), false, texmacs_time());
+  
   QTMScrollView::focusOutEvent (event);
 }
 
@@ -941,7 +1048,7 @@ void
 QTMWidget::wheelEvent(QWheelEvent *event) {
   if (is_nil (tmwid)) return; 
   if (as_bool (call ("wheel-capture?"))) {
-#if (QT_VERSION >= 0x060000)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     QPointF pos  = event->position();
     QPoint  point= QPointF (pos.x(), pos.y()).toPoint () + origin();
 #else
@@ -1004,6 +1111,6 @@ void QTMWidget::showEvent (QShowEvent *event) {
 
 #if defined(OS_ANDROID) && QT_VERSION >= 0x060000
 void QTMWidget::showKeyboard() {
-  qApp->inputMethod()->show();
+  // qApp->inputMethod()->show();
 }
 #endif

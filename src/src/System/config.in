@@ -6,11 +6,11 @@
 /* The normal alignment of 'void *', in bytes. */
 #undef ALIGNOF_VOID_P
 
+/* Alternative version number */
+#undef ALTERNATIVE_VERSION
+
 /* Enable experimental Cocoa port */
 #undef AQUATEXMACS
-
-/* embedded aspell location */
-#undef ASPELL
 
 /* If there is a static plugin Cocoa */
 #undef CocoaPlugin
@@ -138,6 +138,9 @@
 /* makeappx location */
 #undef MAKEAPPX
 
+/* makepri location */
+#undef MAKEPRI
+
 /* Max fast alloc // WORD_LENGTH more than power of 2 */
 #undef MAX_FAST
 
@@ -225,6 +228,9 @@
 /* Enable experimental Qt port with Widkit */
 #undef QTWKTEXMACS
 
+/* sanitizers linked */
+#undef SANITIZERS_ON
+
 /* Enable checks style rewriting code */
 #undef SANITY_CHECKS
 
@@ -233,6 +239,18 @@
 
 /* signtool location */
 #undef SIGNTOOL
+
+/* The size of 'int', as computed by sizeof. */
+#undef SIZEOF_INT
+
+/* The size of 'long', as computed by sizeof. */
+#undef SIZEOF_LONG
+
+/* The size of 'long long', as computed by sizeof. */
+#undef SIZEOF_LONG_LONG
+
+/* The size of 'short', as computed by sizeof. */
+#undef SIZEOF_SHORT
 
 /* The size of 'void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
@@ -253,6 +271,9 @@
 
 /* Dynamic linking function name */
 #undef TM_DYNAMIC_LINKING
+
+/* Use aspell library */
+#undef USE_ASPELL
 
 /* Use axel library */
 #undef USE_AXEL
@@ -275,8 +296,17 @@
 /* Use imlib2 library */
 #undef USE_IMLIB2
 
+/* Use intl library */
+#undef USE_INTL
+
 /* Use MuPDF library */
 #undef USE_MUPDF
+
+/* Use Qt SVG library */
+#undef USE_QTSVG
+
+/* Use resvg library for SVG rendering */
+#undef USE_RESVG
 
 /* Use SDL3 library */
 #undef USE_SDL3

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+
+  <Identity Name="LizaBelos.GNUTeXmacs"
+            ProcessorArchitecture="@WIN_ARCH@"
+            Publisher="CN=501DD98C-BA15-4652-84D9-828AD8F1F714"
+            Version="@ALTERNATIVE_VERSION@.0" />
+
+  <Properties>
+    <DisplayName>GNU TeXmacs</DisplayName>
+    <Description>TeXmacs is a free scientific text editor and typesetting system.</Description>
+    <PublisherDisplayName>Liza Belos</PublisherDisplayName>
+    <Logo>misc/images/windows/StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0"/>
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="TeXmacs"
+                 Executable="bin/texmacs.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements DisplayName="GNU TeXmacs"
+                          Description="A free scientific text editor and typesetting system."
+                          BackgroundColor="transparent"
+                          Square150x150Logo="misc/images/windows/Square150x150Logo.png"
+                          Square44x44Logo="misc/images/windows/Square44x44Logo.png">
+      <uap:SplashScreen Image="misc/images/windows/SplashScreen.png"/>
+      <uap:DefaultTile Wide310x150Logo="misc/images/windows/Wide310x150Logo.png"
+                       Square310x310Logo="misc/images/windows/LargeTile.png"/>
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="texmacsfile">
+            <uap:DisplayName>TeXmacs File</uap:DisplayName>
+            <uap:Logo>misc/images/windows/Square150x150Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.tm</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+
+</Package>

@@ -40,7 +40,8 @@
 void
 scm_init_lang ()
 {
-#include "libguile/lang.x"
+
+
 
   scm_c_define ("%nil", SCM_ELISP_NIL);
 }

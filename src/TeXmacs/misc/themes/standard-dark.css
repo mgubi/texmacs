@@ -4,7 +4,7 @@
 ****************************************************************************/
 
 QWidget {
-    background: #404040;
+    /* background: #404040; */
     color: #e0e0e0;
     font-size: 14px;
     icon-size: 16px;
@@ -34,11 +34,11 @@ QToolTip {
 * Toolbars
 ****************************************************************************/
 
-QMenuBar, QMenuBar QWidget {
+QMenuBar, QMenuBar QWidget, #menuToolBar, #menuToolBar QWidget {
     background: #2C2C2C;
 }
 
-QMenuBar {
+QMenuBar, #menuToolBar {
     padding-top: 5px;
     spacing: 10px;
 }
@@ -57,23 +57,27 @@ QMenuBar::item:selected {
 
 }
 
-QToolBar {
+#mainToolBar, #modeToolBar, #focusToolBar, #userToolBar, #menuToolBar {
     border-bottom: 1px solid #505050;
 }
 
-QToolBar, QToolBar#mainToolBar QWidget {
+#toolbarSeparator {
+    border-left: 1px solid #505050;
+}
+
+QToolBar, #mainToolBar QWidget, #mainToolBar QToolButton {
     background: #2C2C2C;
 }
 
-QToolBar#modeToolBar, QToolBar#modeToolBar QWidget {
+#modeToolBar, #modeToolBar QWidget, #modeToolBar QToolButton {
     background: #363636;
 }
 
-QToolBar#focusToolBar, QToolBar#focusToolbar QWidget {
+#focusToolBar, #focusToolBar QWidget, #focusToolBar QToolButton {
     background: #404040;
 }
 
-QToolBar#userToolBar, QToolBar#userToolbar QWidget {
+#userToolBar, #userToolBar QWidget, #userToolBar QToolButton {
     background: #4A4A4A;
 }
 
@@ -147,17 +151,19 @@ QMenu::separator {
 * Line edit
 ****************************************************************************/
 
-QLineEdit, QStatusBar QWidget QLineEdit, QToolBar#focusToolbar QWidget QLineEdit, QToolBar#userToolbar QWidget QLineEdit {
+QLineEdit, QStatusBar QWidget QLineEdit, #focusToolBar QWidget QLineEdit, #userToolBar QWidget QLineEdit {
     background: #606060;
     selection-color: #E0E0E0;
     selection-background-color: #004080;
     min-height: 16px;
     padding-left: 2px;
     padding-right: 2px;
+    border-radius: 5px;
 }
 
-QLineEdit:focus, QStatusBar QWidget QLineEdit:focus, QToolBar#focusToolbar QWidget QLineEdit:focus, QToolBar#userToolbar QWidget QLineEdit:focus {
+QLineEdit:focus, QStatusBar QWidget QLineEdit:focus, #focusToolBar QWidget QLineEdit:focus, #userToolBar QWidget QLineEdit:focus {
     border: 1px solid #A0C0E0;
+    border-radius: 5px;
 }
 
 /****************************************************************************
@@ -311,9 +317,8 @@ QPushButton:focus {
 }
 
 QToolButton,
-QToolBar#mainToolBar QToolButton,
-QToolBar#modeToolBar QToolButton {
-    background: none;
+#mainToolBar QToolButton,
+#modeToolBar QToolButton {
     padding-left: 0px;
     padding-right: 0px;
 }
@@ -323,21 +328,10 @@ Qt4QToolButton {
 }
 
 QToolButton:hover,
-QToolBar#mainToolBar QToolButton:hover,
-QToolBar#modeToolBar QToolButton:hover,
-QToolBar#focusToolBar QToolButton:hover {
-    background: none;
-    /* FIXME: bug under MacOS when using a color */
-}
-
-Qt4QToolButton:hover,
-Qt4QToolBar#mainToolBar QToolButton:hover,
-Qt4QToolBar#modeToolBar QToolButton:hover,
-Qt4QToolBar#focusToolBar QToolButton:hover,
-NomacQToolButton:hover,
-NomacQToolBar#mainToolBar QToolButton:hover,
-NomacQToolBar#modeToolBar QToolButton:hover,
-NomacQToolBar#focusToolBar QToolButton:hover {
+#mainToolBar QToolButton:hover,
+#modeToolBar QToolButton:hover,
+#focusToolBar QToolButton:hover,
+#menuToolBar QToolButton:hover {
     background: #585858;
     border: 0px;
     border-radius: 3px;
@@ -345,28 +339,31 @@ NomacQToolBar#focusToolBar QToolButton:hover {
 
 QToolButton:pressed,
 QToolButton:checked,
-QToolBar#mainToolBar QToolButton:pressed,
-QToolBar#mainToolBar QToolButton:checked,
-QToolBar#modeToolBar QToolButton:pressed,
-QToolBar#modeToolBar QToolButton:checked,
-QToolBar#focusToolBar QToolButton:pressed,
-QToolBar#focusToolBar QToolButton:checked {
+#mainToolBar QToolButton:pressed,
+#mainToolBar QToolButton:checked,
+#modeToolBar QToolButton:pressed,
+#modeToolBar QToolButton:checked,
+#focusToolBar QToolButton:pressed,
+#focusToolBar QToolButton:checked,
+#menuToolBar QToolButton:pressed,
+#menuToolBar QToolButton:checked
+{
     background: #808080;
     border: 0px;
     border-radius: 3px;
 }
 
 QToolButton::menu-indicator,
-QToolBar#mainToolBar QToolButton::menu-indicator,
-QToolBar#modeToolBar QToolButton::menu-indicator {
+#mainToolBar QToolButton::menu-indicator,
+#modeToolBar QToolButton::menu-indicator {
     border: none;
     background: none;
     image: none;
 }
 
 QToolButton::disabled,
-QToolBar#mainToolBar QToolButton:disabled,
-QToolBar#modeToolBar QToolButton:disabled {
+#mainToolBar QToolButton:disabled,
+#modeToolBar QToolButton:disabled {
     color: #909090;
 }
 
@@ -673,4 +670,387 @@ QDockWidget#sideTools QWidget#section-tabs QWidget#section-active-tab QPushButto
     border-top-right-radius: 5px;
     padding: 5px 8px;
     margin: 0px;
+}
+
+/****************************************************************************
+* Responsive Tab Widget
+****************************************************************************/
+QTMResponsiveTabWidget { 
+    font-family: 'Segoe UI', 'Roboto', sans-serif; 
+    font-size: 14px; 
+}
+
+QPushButton#AddTabBtn, QPushButton#BackButton {
+    background-color: #383838;
+    color: #E0E0E0;
+    border-radius: 6px; 
+    padding: 6px 12px;
+    font-weight: bold;
+    border: 1px solid #505050;
+    margin: 0px;
+}
+
+QPushButton#AddTabBtn:hover, QPushButton#BackButton:hover { 
+    background-color: #4C4C4C; 
+}
+
+QPushButton#WinMinBtn, QPushButton#WinMaxBtn, QPushButton#WinCloseBtn {
+    background: transparent;
+    color: #909090;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    padding: 4px 12px;
+    margin: 0px;
+    min-width: 0px;
+    min-height: 0px;
+}
+
+QPushButton#WinMinBtn:hover, QPushButton#WinMaxBtn:hover { 
+    background: #404040;
+    color: white; 
+}
+
+QPushButton#WinCloseBtn:hover { 
+    background: #E81123;
+    color: white; 
+}
+
+QTabBar#ResponsiveTabWidgetBar { 
+    background: transparent;
+    border: none;
+    qproperty-drawBase: 0; 
+}
+
+QTabBar#ResponsiveTabWidgetBar::tab {
+    background: transparent;
+    padding: 0px;
+    margin: 0px;
+    border: none;
+    border-radius: 0px;
+}
+
+QTabBar#ResponsiveTabWidgetBar::tab:selected { 
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    border-radius: 0px;
+}
+
+QTabBar#ResponsiveTabWidgetBar::tab:hover:!selected {
+    background: #404040;
+}
+
+QListWidget#ResponsiveTabWidgetList {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+QListWidget#ResponsiveTabWidgetList::item {
+    border-radius: 8px 8px 0px 0px;
+    margin: 6px 20px; 
+    padding: 15px;
+    border: 1px solid #404040;
+    color: #E0E0E0;
+    font-weight: bold;
+}
+QListWidget#ResponsiveTabWidgetList::item:selected { 
+    color: white; 
+}
+QListWidget#ResponsiveTabWidgetList::item:hover:!selected {
+    background: #383838;
+}
+
+/* --- DEPTH 0 --- */
+#QTMResponsiveTabWidgetDepth0 { 
+    background-color: #202020; 
+    border: 1px solid #404040; 
+}
+#QTMResponsiveTabWidgetDepth0 > #TopBar { 
+    background-color: #2c2c2c; 
+}
+#QTMResponsiveTabWidgetDepth0 #ContentStack, 
+#QTMResponsiveTabWidgetDepth0 #GridContainer {
+    background-color: #303030;
+}
+#QTMResponsiveTabWidgetDepth0 QTabBar::tab:selected { 
+    background: #303030; 
+}
+#QTMResponsiveTabWidgetDepth0 QListWidget::item {
+    background: #2c2c2c;
+}
+#QTMResponsiveTabWidgetDepth0 QListWidget::item:selected { 
+    border: 2px solid #303030; 
+    background: #303030;
+}
+
+/* --- DEPTH 1 --- */
+#QTMResponsiveTabWidgetDepth1 { 
+    background-color: #2f2f2f; 
+    border: 0px solid #404040; 
+}
+#QTMResponsiveTabWidgetDepth1 > #TopBar { 
+    background-color: #363636; 
+}
+#QTMResponsiveTabWidgetDepth1 #ContentStack, 
+#QTMResponsiveTabWidgetDepth1 #GridContainer {
+    background-color: #3f3f3f;
+}
+#QTMResponsiveTabWidgetDepth1 QTabBar::tab:selected { 
+    background: #3f3f3f; 
+}
+#QTMResponsiveTabWidgetDepth1 QListWidget::item {
+    background: #363636;
+}
+#QTMResponsiveTabWidgetDepth1 QListWidget::item:selected { 
+    border: 2px solid #3f3f3f; 
+    background: #3f3f3f;
+}
+
+/* --- DEPTH 2 --- */
+#QTMResponsiveTabWidgetDepth2 { 
+    background-color: #3e3e3e; 
+    border: 0px solid #404040; 
+}
+#QTMResponsiveTabWidgetDepth2 > #TopBar { 
+    background-color: #404040; 
+}
+#QTMResponsiveTabWidgetDepth2 #ContentStack, 
+#QTMResponsiveTabWidgetDepth2 #GridContainer {
+    background-color: #4e4e4e;
+}
+#QTMResponsiveTabWidgetDepth2 QTabBar::tab:selected { 
+    background: #4e4e4e; 
+}
+#QTMResponsiveTabWidgetDepth2 QListWidget::item {
+    background: #404040;
+}
+#QTMResponsiveTabWidgetDepth2 QListWidget::item:selected { 
+    border: 2px solid #4e4e4e; 
+    background: #4e4e4e;
+}
+
+/* --- DEPTH 3 --- */
+#QTMResponsiveTabWidgetDepth3 { 
+    background-color: #4d4d4d; 
+    border: 0px solid #404040; 
+}
+#QTMResponsiveTabWidgetDepth3 > #TopBar { 
+    background-color: #4a4a4a; 
+}
+#QTMResponsiveTabWidgetDepth3 #ContentStack, 
+#QTMResponsiveTabWidgetDepth3 #GridContainer {
+    background-color: #5d5d5d;
+}
+#QTMResponsiveTabWidgetDepth3 QTabBar::tab:selected { 
+    background: #5d5d5d; 
+}
+#QTMResponsiveTabWidgetDepth3 QListWidget::item {
+    background: #4a4a4a;
+}
+#QTMResponsiveTabWidgetDepth3 QListWidget::item:selected { 
+    border: 2px solid #5d5d5d; 
+    background: #5d5d5d;
+}
+
+/* Custom Internal Tab Bar Items */
+QWidget#ResponsiveTabContainer, 
+QWidget#ResponsiveTabInnerContainer, 
+QLabel#ResponsiveTabIcon {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+}
+
+QLabel#ResponsiveTabLabel {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QLabel#ResponsiveTabLabel[activeTab="true"] {
+    color: #FFFFFF;
+}
+
+QLabel#ResponsiveTabLabel[activeTab="false"] {
+    color: #909090;
+}
+
+QSizeGrip#ResponsiveTabSizeGrip {
+    background: transparent;
+}
+
+/****************************************************************************
+* QTM Setting Widgets
+****************************************************************************/
+
+QTMSettingCheckbox QLabel, QTMSettingSelect QLabel {
+    color: #E0E0E0;
+    border: none;
+    background: transparent;
+}
+
+QTMSettingSelect QComboBox {
+    background: #606060;
+    color: #E0E0E0;
+    selection-background-color: #004080;
+    selection-color: #E0E0E0;
+    padding: 3px 5px;
+    border: 0px;
+    border-radius: 5px;
+    min-height: 18px;
+}
+
+QTMSettingSelect QComboBox:focus { 
+    border: 1px solid #A0C0E0; 
+}
+
+QTMSettingSelect QComboBox::drop-down { 
+    background: transparent; 
+    border: 0px; 
+}
+
+QTMSettingSelect QComboBox::down-arrow { 
+    image: none; 
+}
+
+QTMSettingSelect QComboBox QAbstractItemView {
+    background: #404040;
+    color: #E0E0E0;
+    selection-background-color: #2C6080;
+    border: 1px solid #505050;
+    outline: 0px;
+}
+
+QTMSettingSelect QComboBox QAbstractItemView::item { 
+    padding: 8px; 
+}
+
+QTMSettingGroup {
+    background: transparent;
+    qproperty-outerMargin: 3;
+}
+
+QTMSettingGroup QWidget#setting-group-wrap {
+    border: 1px solid #505050;
+    border-radius: 10px;
+    padding: 8px;
+}
+
+QTMSettingGroup QTMRefreshableWidget {
+     background: transparent;
+}
+
+QTMSettingGroup QWidget#setting-group-refreshable-root {
+    background: transparent;
+}
+
+QTMSettingTitle QLabel {
+    background: transparent;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+QTMSettingGroup QTMSettingTitle {
+    background: transparent;
+    margin: 0px;
+}
+
+QTMSettingGroup QTMSettingCheckbox,
+QTMSettingGroup QTMSettingSelect,
+QTMSettingGroup QTMSettingWrapper
+{
+    background: transparent;
+    margin: 0px;
+}
+
+QTMSettingGroup QTMSettingSelect QComboBox {
+    background: #585858;
+}
+
+
+/****************************************************************************
+* QTMMainTabWindow
+****************************************************************************/
+
+QTabWidget#mainTabWindowTabs QTabBar::tab {
+    height: 30px;
+    max-width: 200px;
+    border-radius: 0px;
+    padding: 0px 16px;
+    text-align: left;
+    border: 0px solid transparent;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+QTabWidget#mainTabWindowTabs[tmIsAndroid="true"] QTabBar::tab {
+    height: 45px;
+}
+
+QTabWidget#mainTabWindowTabs[tmTabDragHover="true"] QTabBar::tab {
+    background-color: rgba(255, 0, 0, 0.5);
+}
+
+QTabWidget#mainTabWindowTabs::pane {
+    border: 0px;
+    padding: 0px;
+}
+
+
+#mainTabWindowControls {
+    background: transparent;
+}
+
+QPushButton#mainTabWindowMinButton[tmWindowControlStyle="win"],
+QPushButton#mainTabWindowMaxButton[tmWindowControlStyle="win"],
+QPushButton#mainTabWindowCloseButton[tmWindowControlStyle="win"] {
+    background-color: transparent;
+    border: none;
+    color: palette(window-text);
+    font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+    font-size: 8pt;
+}
+
+QPushButton#mainTabWindowMinButton[tmWindowControlStyle="win"]:hover,
+QPushButton#mainTabWindowMaxButton[tmWindowControlStyle="win"]:hover {
+    background-color: rgba(128, 128, 128, 0.2);
+}
+
+QPushButton#mainTabWindowCloseButton[tmWindowControlStyle="win"]:hover {
+    background-color: #e81123;
+    color: white;
+}
+
+QPushButton#mainTabWindowCloseButton[tmWindowControlStyle="mac"] {
+    background-color: #ff5f56;
+    border-radius: 6px;
+    border: 1px solid #e0443e;
+}
+
+QPushButton#mainTabWindowCloseButton[tmWindowControlStyle="mac"]:hover {
+    background-color: #ff3b30;
+}
+
+QPushButton#mainTabWindowMinButton[tmWindowControlStyle="mac"] {
+    background-color: #ffbd2e;
+    border-radius: 6px;
+    border: 1px solid #dea123;
+}
+
+QPushButton#mainTabWindowMinButton[tmWindowControlStyle="mac"]:hover {
+    background-color: #e0a82e;
+}
+
+QPushButton#mainTabWindowMaxButton[tmWindowControlStyle="mac"] {
+    background-color: #27c93f;
+    border-radius: 6px;
+    border: 1px solid #1aab29;
+}
+
+QPushButton#mainTabWindowMaxButton[tmWindowControlStyle="mac"]:hover {
+    background-color: #1fac33;
 }

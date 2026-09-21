@@ -1,4 +1,4 @@
-<TeXmacs|1.99.21>
+<TeXmacs|2.1.5>
 
 <style|<tuple|tmweb2|old-dots|old-lengths>>
 
@@ -14,7 +14,7 @@
     <TeXmacs>, follow the link that corresponds to your system.
 
     <\description>
-      <item*|<hlink|GNU/Linux|unix.en.tm>>For users of <name|Linux> on Intel
+      <item*|<hlink|GNU/Linux|linux.en.tm>>For users of <name|Linux> on Intel
       compatible architectures.
 
       <item*|<hlink|BSD|bsd.en.tm>>For users of BSD <name|Unix>.
@@ -26,8 +26,8 @@
       <TeXmacs>.
 
       <item*|<hlink|Old|http://ftp.texmacs.org/TeXmacs/tmftp/>>Browse
-      <hlink|our repository|http://ftp.texmacs.org/TeXmacs/tmftp/> for
-      older versions of <TeXmacs>.
+      <hlink|our repository|http://ftp.texmacs.org/TeXmacs/tmftp/> for older
+      versions of <TeXmacs>.
     </description>
 
     On more exotic systems, you need to <hlink|compile <TeXmacs> yourself

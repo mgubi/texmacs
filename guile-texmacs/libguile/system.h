@@ -14,9 +14,20 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef _MSC_VER
+#include <io.h>
+#include <process.h>
+#endif
 #include <stdint.h>
 #include <fcntl.h>
+
+#if defined(_MSC_VER) && !defined(_MODE_T_DEFINED)
+typedef int mode_t;
+#define _MODE_T_DEFINED
+#endif
 
 #if SCM_USE_64_CALLS
 #ifdef __MINGW32__
@@ -39,8 +50,8 @@ typedef struct dirent64 guile_dirent_t;
 #else
 typedef struct dirent guile_dirent_t;
 #endif
-// if this is mac, off64_t is off_t
-#if defined(__APPLE__) || defined(_M_ARM64)
+// if this is mac, or if off64_t is not available, off64_t is off_t
+#if defined(__APPLE__) || defined(_M_ARM64) || (defined(HAVE_CONFIG_H) && !defined(HAVE_OFF64_T))
 typedef off_t guile_off_t;
 #else
 typedef off64_t guile_off_t;
@@ -56,6 +67,26 @@ typedef off_t guile_off_t;
 #define scm_from_blkcnt_t_or_blkcnt64_t CHOOSE_LARGEFILE(scm_from_nat,scm_from_uint64,scm_from_uint64)
 #define scm_to_off_t_or_off64_t         CHOOSE_LARGEFILE(scm_to_off_t,scm_to_int64,scm_to_int64)
 
+
+char *guile_default_utf8_string_to_system_string(const char *utf8_string);
+char *guile_default_system_string_to_utf8_string(const char *system_string);
+void guile_default_utf8_string_to_system_string_path(char *utf8_string);
+int guile_default_fstat(int fd, guile_stat_t *buf);
+int guile_default_ftruncate(int fd, guile_off_t length);
+guile_off_t guile_default_lseek(int fd, guile_off_t offset, int whence);
+int guile_default_stat(const char *path, guile_stat_t *buf);
+int guile_default_lstat(const char *path, guile_stat_t *buf);
+int guile_default_open(const char *pathname, int flags, mode_t mode);
+DIR *guile_default_opendir(const char *name);
+guile_dirent_t *guile_default_readdir(DIR *dirp);
+#if HAVE_READDIR_R
+int guile_default_readdir_r(DIR *dirp, guile_dirent_t *entry, guile_dirent_t **result);
+#endif
+int guile_default_truncate(const char *path, guile_off_t length);
+char *guile_default_getenv(const char *name);
+int guile_default_printf(const char *format, ...);
+int guile_default_fprintf(FILE *stream, const char *format, ...);
+void guile_default_process_event(void);
 
 extern char *(*guile_utf8_string_to_system_string)(const char *utf8_string);
 extern char *(*guile_system_string_to_utf8_string)(const char *system_string);

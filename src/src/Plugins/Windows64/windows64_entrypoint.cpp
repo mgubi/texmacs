@@ -26,12 +26,6 @@
 #include <fcntl.h>
 #include <io.h>
 
-#ifdef PACKAGE_VERSION
-#undef PACKAGE_VERSION
-#endif
-#include <appmodel.h>
-#include <shlobj.h>
-
 #include <QApplication>
 #include <QDebug>
 #include <iostream>
@@ -55,9 +49,15 @@
 void setup_texmacs_path () {
   string environment_texmacs_path;
   if (texmacs_getenv ("TEXMACS_PATH", environment_texmacs_path)) {
-    cout << "TEXMACS_PATH is set to: " 
-         << environment_texmacs_path << LF;
-    return;
+    if (test_texmacs_path (url_system (environment_texmacs_path), false)) {
+       cout << "TEXMACS_PATH is set to: " 
+            << environment_texmacs_path << LF;
+       return;
+    } else {
+      cout << "The environment variable TEXMACS_PATH is set to: " 
+           << environment_texmacs_path << LF;
+      cout << "but it does not contain a valid TeXmacs installation.\n";
+    }
   }
   url exedir = texmacs_get_application_directory ();
   cout << "Executable directory is: " 
@@ -72,23 +72,24 @@ void setup_texmacs_path () {
          << exedir * ".." << LF;
     return;
   }
-  cout << "TEXMACS_PATH is not set" << LF;
+  tm_throw("TeXmacs could not be found in the executable directory or its parent.");
 }
 
-bool is_running_in_msix() {
-    UINT32 length = 0;
-    LONG result = GetCurrentPackageFullName(&length, NULL);
-    return result != APPMODEL_ERROR_NO_PACKAGE;
+void setup_texmacs_home_path () {
+  url appdata_path = url_system(get_local_appdata_path());
+  url texmacs_home_path = appdata_path * "TeXmacs";
+  cout << "TEXMACS_HOME_PATH is autoset to: " 
+       << texmacs_home_path << LF;
+  texmacs_setenv("TEXMACS_HOME_PATH", concretize(texmacs_home_path));
 }
 
-/*
- * @brief The entry point of the program that will make sure that texmacs 
- * run seemlessly on Windows.
- */
 int WINAPI CommonMain() {
   texmacs_attach_console();
   texmacs_initialize_displayname();
   setup_texmacs_path();
+  //if (is_running_in_msix()) {
+  //  setup_texmacs_home_path();
+  //}
   texmacs_init_guile_hooks();
 
   int argc = 0;

@@ -107,13 +107,9 @@ void image_gc (string name= "*");
 array<SI> get_widget_size (widget w);
   // Get size of a widget w
 void show_help_balloon (widget balloon, SI x, SI y);
-
-#ifndef QTTEXMACS
   // Display a help balloon at position (x, y); the help balloon should
   // disappear as soon as the user presses a key or moves the mouse
 void show_wait_indicator (widget base, string message, string argument);
-#endif
-
   // Display a wait indicator with a message and an optional argument
   // The indicator might for instance be displayed at the center of
   // the base widget which triggered the lengthy operation;
@@ -126,10 +122,10 @@ bool gui_interrupted (bool check = false);
 
 extern bool use_native_menubar;
   // MacOS native menubar option
-extern bool use_unified_toolbar;
-  // MacOS toolbar style option
 extern string tm_style_sheet;
   // Qt style sheet (or "" for no style sheet)
+extern string tm_style_density;
+  // Qt style density (compact, normal, large)
 extern bool use_mini_bars;
   // Old style mini bars
 

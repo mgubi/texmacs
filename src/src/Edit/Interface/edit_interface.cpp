@@ -20,6 +20,7 @@
 #include "drd_mode.hpp"
 #include "message.hpp"
 #include "tree_traverse.hpp"
+#include "tree_search.hpp"
 #include "boot.hpp"
 #ifdef EXPERIMENTAL
 #include "../../Style/Evaluate/evaluate_main.hpp"
@@ -46,9 +47,6 @@ MODE_LANGUAGE (string mode) {
 
 static double
 get_zoom (editor_rep* ed, tm_buffer buf) {
-#if QT_VERSION >= 0x060000
-  double retina_zoom = 1.0;
-#endif
   if (!is_nil (buf) && buf->data->init->contains ("no-zoom"))
     return as_double (buf->data->init [ZOOM_FACTOR]);
   else return retina_zoom * ed->sv->get_default_zoom_factor ();
@@ -71,6 +69,7 @@ edit_interface_rep::edit_interface_rep ():
   zpixel (max ((SI) tm_round (std_shrinkf * PIXEL), pixel)),
   copy_always (),
   last_x (0), last_y (0), last_t (0),
+  last_scx (0), last_scy (0),
   tremble_count (0), tremble_right (false),
   table_selection (false), mouse_adjusting (false),
   oc (0, 0), temp_invalid_cursor (false),
@@ -140,7 +139,8 @@ edit_interface_rep::resume () {
     tp= new_tp;
   }
   the_drd= old_drd;
-  invalidate_all ();
+  if (!headless_mode)
+    invalidate_all ();
 }
 
 void
@@ -676,7 +676,7 @@ edit_interface_rep::find_alt_selection_index
   if (e - b <= 2) return b;
   int half= ((b + e) >> 2) << 1;
   int h= half;
-  SI sy;
+  SI sy= 0;
   while (h < e) {
     range_set sub_sel= simple_range (alt_sel[h], alt_sel[h+1]);
     selection sel= compute_selection (sub_sel);
@@ -734,7 +734,7 @@ edit_interface_rep::apply_changes () {
     }
     //cout << "Tremble- " << tremble_count << LF;
   }
-  
+
   if (env_change == 0) {
     if (last_change-last_update > 0 &&
         idle_time (INTERRUPTED_EVENT) >= 1000/6)
@@ -794,9 +794,10 @@ edit_interface_rep::apply_changes () {
       }
     }
   }
-  
+
   // cout << "Handling selection\n";
-  if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_SELECTION)) {
+  if (env_change & (THE_TREE + THE_ENVIRONMENT +
+                    THE_SELECTION + THE_SPELL_ERRORS)) {
     if (!is_nil (selection_rects)) {
       invalidate (selection_rects);
       if (!selection_active_any ()) {
@@ -813,8 +814,16 @@ edit_interface_rep::apply_changes () {
       if (is_empty (alt_sel))
         alt_selection_rects= array<rectangles> ();
     }
+    if (N (spell_error_rects) != 0) {
+      rectangles visible (rectangle (vx1, vy1, vx2, vy2));
+      for (int i=0; i<N(spell_error_rects); i++)
+        invalidate (spell_error_rects[i] & visible);
+      range_set errs= get_alt_selection ("spell_errors");
+      if (is_empty (errs))
+        spell_error_rects= array<rectangles> ();
+    }
   }
-  
+
   // cout << "Handling environment\n";
   if (env_change & THE_ENVIRONMENT)
     typeset_invalidate_all ();
@@ -1017,7 +1026,42 @@ edit_interface_rep::apply_changes () {
         invalidate (alt_selection_rects[i] & visible);
     }
   }
-  
+
+  // cout << "Handling continuous spell errors";
+  if (env_change & (THE_TREE + THE_ENVIRONMENT)) {
+    if (get_preference ("continuous spell checking", "off") != "off")
+      call ("continuous-spell-check");
+    else set_alt_selection ("spell-errors", range_set ());
+  }
+  if (env_change & (THE_CURSOR + THE_FOCUS + THE_TREE +
+                    THE_ENVIRONMENT + THE_SELECTION + THE_SPELL_ERRORS)) {
+    range_set errs= get_alt_selection ("spell-errors");
+    if (!is_empty (errs)) {
+      spell_error_rects= array<rectangles> (); int b= 0, e= N(errs);
+      if (e - b >= 200) {
+        b= max (find_alt_selection_index (errs, vy2, b, e) - 100, b);
+        e= min (find_alt_selection_index (errs, vy1, b, e) + 100, e);
+      }
+      for (int i=b; i+1<e; i+=2) {
+        range_set sub_sel= simple_range (errs[i], errs[i+1]);
+        selection sel= compute_selection (sub_sel);
+        rectangles rs= thicken (sel->rs, pixel, 3*pixel);
+#ifndef QTTEXMACS
+        rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
+#endif
+        if (N(rs) != 0) spell_error_rects << rs;
+      }
+      rectangles visible (new_visible);
+      for (int i=0; i<N(spell_error_rects); i++)
+        invalidate (spell_error_rects[i] & visible);
+    }
+  }
+
+  SI ser_scx, ser_scy;
+  SERVER (scroll_where (ser_scx, ser_scy));
+  bool sc_changed= ser_scx != last_scx || ser_scy != last_scy;
+  last_scx= ser_scx; last_scy= ser_scy;
+
   // cout << "Handling locus highlighting\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
     update_mouse_loci ();
@@ -1025,9 +1069,11 @@ edit_interface_rep::apply_changes () {
     if (!is_nil (focus_ids) && got_focus)
       call ("link-follow-ids", object (focus_ids), object ("focus"));
   }
-  else if (env_change & THE_SELECTION) {
+  else if ((env_change & (THE_CURSOR+THE_FOCUS+THE_SELECTION+
+                          THE_LOCUS+THE_TOOLTIP)) ||
+           sc_changed) {
     update_focus_loci ();
-    call ("close-tooltip");
+    call ("close-tooltips");
     if (!is_nil (focus_ids) && got_focus)
       call ("link-follow-ids", object (focus_ids), object ("focus"));
   }

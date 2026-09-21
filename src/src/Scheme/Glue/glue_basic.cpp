@@ -179,6 +179,28 @@ tmg_qt_guiP () {
 }
 
 tmscm
+tmg_gui_set_next_window_as_popup () {
+  // TMSCM_DEFER_INTS;
+  gui_set_next_window_as_popup ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_support_functionalityP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= support_functionality (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_gui_version () {
   // TMSCM_DEFER_INTS;
   string out= gui_version ();
@@ -494,6 +516,93 @@ tmg_evaluate_system (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
 }
 
 tmscm
+tmg_async_eval_system (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-eval-system");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "async-eval-system");
+
+  string in1= tmscm_to_string (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= async_eval_system (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_http_post (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-post");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-post");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "http-post");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  string in3= tmscm_to_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  string out= http_post (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_http_post_query (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-post-query");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-post-query");
+  TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "http-post-query");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  array_string in3= tmscm_to_array_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  string out= http_post_query (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_async_http_post (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-http-post");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "async-http-post");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "async-http-post");
+  TMSCM_ASSERT_OBJECT (arg4, TMSCM_ARG4, "async-http-post");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  object in4= tmscm_to_object (arg4);
+
+  // TMSCM_DEFER_INTS;
+  bool out= async_http_post (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_async_http_post_query (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "async-http-post-query");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "async-http-post-query");
+  TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "async-http-post-query");
+  TMSCM_ASSERT_OBJECT (arg4, TMSCM_ARG4, "async-http-post-query");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  array_string in3= tmscm_to_array_string (arg3);
+  object in4= tmscm_to_object (arg4);
+
+  // TMSCM_DEFER_INTS;
+  bool out= async_http_post_query (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_get_locale_language () {
   // TMSCM_DEFER_INTS;
   string out= get_locale_language ();
@@ -554,6 +663,30 @@ tmg_pretty_time (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   string out= pretty_time (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpu_idle_time () {
+  // TMSCM_DEFER_INTS;
+  int out= cpu_idle_time ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_pretty_date (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "pretty-date");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "pretty-date");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= pretty_date (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -1324,6 +1457,15 @@ tmg_apply_effect (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_headlessP () {
+  // TMSCM_DEFER_INTS;
+  bool out= is_headless ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
 }
 
 tmscm
@@ -2742,6 +2884,25 @@ tmg_tree_spell (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
 }
 
 tmscm
+tmg_tree_spell_dot (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-spell*");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-spell*");
+  TMSCM_ASSERT_PATH (arg3, TMSCM_ARG3, "tree-spell*");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "tree-spell*");
+
+  string in1= tmscm_to_string (arg1);
+  content in2= tmscm_to_content (arg2);
+  path in3= tmscm_to_path (arg3);
+  int in4= tmscm_to_int (arg4);
+
+  // TMSCM_DEFER_INTS;
+  array_path out= spell_with_cache (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return array_path_to_tmscm (out);
+}
+
+tmscm
 tmg_tree_spell_at (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-spell-at");
   TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "tree-spell-at");
@@ -3027,6 +3188,194 @@ tmg_tree_remove_node (tmscm arg1, tmscm arg2) {
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_hash (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tree-hash");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_hash (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_clear (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-clear");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_cache_clear (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_clear_all () {
+  // TMSCM_DEFER_INTS;
+  tree_cache_clear_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_containsP (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-contains?");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-cache-contains?");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= tree_cache_contains (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_put (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-put");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-cache-put");
+  TMSCM_ASSERT_TREE (arg3, TMSCM_ARG3, "tree-cache-put");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  tree in3= tmscm_to_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  tree_cache_put (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_get (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-get");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-cache-get");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= tree_cache_get (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_get_any (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-get-any");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= tree_cache_get_any (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_update (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-update");
+  TMSCM_ASSERT_TREE (arg2, TMSCM_ARG2, "tree-cache-update");
+
+  string in1= tmscm_to_string (arg1);
+  tree in2= tmscm_to_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= tree_cache_update (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_update_tmdoc (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-update-tmdoc");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "tree-cache-update-tmdoc");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_cache_update_tmdoc (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_cache_janitor (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-janitor");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_cache_janitor (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_janitor_all () {
+  // TMSCM_DEFER_INTS;
+  tree_cache_janitor_all ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_set_max_size (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-set-max-size");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tree-cache-set-max-size");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree_cache_set_max_size (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_tree_cache_size (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tree-cache-size");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= tree_cache_size (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_hash_set_limit (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "tree-hash-set-limit");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree_hash_set_limit (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -5776,6 +6125,21 @@ tmg_spell_insert (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_spell_notify_insert (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "spell-notify-insert");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "spell-notify-insert");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  spell_notify_insert (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_packrat_define (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "packrat-define");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "packrat-define");
@@ -6474,6 +6838,34 @@ tmg_decompress_tree (tmscm arg1) {
 }
 
 tmscm
+tmg_compressed_contains_textP (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compressed-contains-text?");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= compressed_contains_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_compressed_2html (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compressed->html");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "compressed->html");
+
+  content in1= tmscm_to_content (arg1);
+  int in2= tmscm_to_int (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= compressed_to_html (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_compress_html (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "compress-html");
   TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "compress-html");
@@ -6504,18 +6896,48 @@ tmg_decompress_html (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
-tmg_cpp_ai_command (tmscm arg1, tmscm arg2) {
+tmg_cpp_ai_command (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-command");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-command");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-ai-command");
 
   string in1= tmscm_to_string (arg1);
   string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
 
   // TMSCM_DEFER_INTS;
-  string out= ai_command (in1, in2);
+  tree out= ai_command (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_eval_command (tmscm arg1) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-ai-eval-command");
+
+  tree in1= tmscm_to_tree (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_eval_command (in1);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_async_eval_command (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "cpp-ai-async-eval-command");
+  TMSCM_ASSERT_OBJECT (arg2, TMSCM_ARG2, "cpp-ai-async-eval-command");
+
+  tree in1= tmscm_to_tree (arg1);
+  object in2= tmscm_to_object (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= ai_async_eval_command (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
 }
 
 tmscm
@@ -6534,6 +6956,19 @@ tmg_cpp_ai_output (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_cpp_ai_get_body (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-get-body");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= ai_get_body (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
 tmg_cpp_ai_latex_command (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-latex-command");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-latex-command");
@@ -6545,6 +6980,23 @@ tmg_cpp_ai_latex_command (tmscm arg1, tmscm arg2, tmscm arg3) {
 
   // TMSCM_DEFER_INTS;
   string out= ai_latex_command (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_cpp_ai_latex_request (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-latex-request");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-latex-request");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-ai-latex-request");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  string out= ai_latex_request (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -6568,15 +7020,17 @@ tmg_cpp_ai_latex_output (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
-tmg_cpp_ai_chat (tmscm arg1, tmscm arg2) {
+tmg_cpp_ai_chat (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cpp-ai-chat");
   TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "cpp-ai-chat");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "cpp-ai-chat");
 
   string in1= tmscm_to_string (arg1);
   string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
 
   // TMSCM_DEFER_INTS;
-  string out= ai_chat (in1, in2);
+  string out= ai_chat (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
@@ -6616,6 +7070,47 @@ tmg_cpp_ai_translate (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_json_2tree (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "json->tree");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= json_to_tree (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_2json (tmscm arg1) {
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "tree->json");
+
+  content in1= tmscm_to_content (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= tree_to_json (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_lantool_correct (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "lantool-correct");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "lantool-correct");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= lantool_correct (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
 }
 
 tmscm
@@ -7472,6 +7967,32 @@ tmg_url_scratchP (tmscm arg1) {
 }
 
 tmscm
+tmg_url_backup (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-backup");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  url out= url_backup (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return url_to_tmscm (out);
+}
+
+tmscm
+tmg_url_backupP (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-backup?");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= is_backup (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_url_cache_invalidate (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "url-cache-invalidate");
 
@@ -7591,6 +8112,19 @@ tmg_system_rmdir (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   rmdir (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_system_rmdir_recursive (tmscm arg1) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-rmdir-recursive");
+
+  url in1= tmscm_to_url (arg1);
+
+  // TMSCM_DEFER_INTS;
+  rmdir_recursive (in1);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -7956,19 +8490,21 @@ tmg_tmdb_remove_entry (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
-tmg_tmdb_query (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+tmg_tmdb_query (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "tmdb-query");
   TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "tmdb-query");
   TMSCM_ASSERT_DOUBLE (arg3, TMSCM_ARG3, "tmdb-query");
   TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "tmdb-query");
+  TMSCM_ASSERT_INT (arg5, TMSCM_ARG5, "tmdb-query");
 
   url in1= tmscm_to_url (arg1);
   scheme_tree in2= tmscm_to_scheme_tree (arg2);
   double in3= tmscm_to_double (arg3);
   int in4= tmscm_to_int (arg4);
+  int in5= tmscm_to_int (arg5);
 
   // TMSCM_DEFER_INTS;
-  array_string out= query (in1, in2, in3, in4);
+  array_string out= query (in1, in2, in3, in4, in5);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -8057,6 +8593,15 @@ tmg_sql_quote (tmscm arg1) {
 }
 
 tmscm
+tmg_server_define_error_codes () {
+  // TMSCM_DEFER_INTS;
+  server_define_error_codes ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_server_start () {
   // TMSCM_DEFER_INTS;
   server_start ();
@@ -8112,13 +8657,24 @@ tmg_server_startedP () {
 }
 
 tmscm
-tmg_client_start (tmscm arg1) {
-  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "client-start");
+tmg_server_port_in_use () {
+  // TMSCM_DEFER_INTS;
+  int out= server_port_in_use ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_legacy_client_start (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "legacy-client-start");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "legacy-client-start");
 
   string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
 
   // TMSCM_DEFER_INTS;
-  int out= legacy_client_start (in1);
+  int out= legacy_client_start (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return int_to_tmscm (out);
@@ -8159,10 +8715,19 @@ tmg_client_write (tmscm arg1, tmscm arg2) {
   string in2= tmscm_to_string (arg2);
 
   // TMSCM_DEFER_INTS;
-  client_write (in1, in2);
+  int out= client_write (in1, in2);
   // TMSCM_ALLOW_INTS;
 
-  return TMSCM_UNSPECIFIED;
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_client_protocol_version () {
+  // TMSCM_DEFER_INTS;
+  int out= client_protocol_version ();
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
 }
 
 tmscm
@@ -8173,6 +8738,149 @@ tmg_enter_secure_mode (tmscm arg1) {
 
   // TMSCM_DEFER_INTS;
   enter_secure_mode (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_server_client_address (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "server-client-address");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= server_client_address (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_server_log_write_int (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "server-log-write-int");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "server-log-write-int");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  server_log_write (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_supports_gnutlsP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gnutls_present ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gnutls_random_number (tmscm arg1) {
+  TMSCM_ASSERT_UINT (arg1, TMSCM_ARG1, "gnutls-random-number");
+
+  uint in1= tmscm_to_uint (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gnutls_random_int (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_tls_client_start (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "tls-client-start");
+  TMSCM_ASSERT_INT (arg2, TMSCM_ARG2, "tls-client-start");
+  TMSCM_ASSERT_SCHEME_TREE (arg3, TMSCM_ARG3, "tls-client-start");
+
+  string in1= tmscm_to_string (arg1);
+  int in2= tmscm_to_int (arg2);
+  scheme_tree in3= tmscm_to_scheme_tree (arg3);
+
+  // TMSCM_DEFER_INTS;
+  int out= tls_client_start (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gnutls_generate_salt () {
+  // TMSCM_DEFER_INTS;
+  string out= gnutls_generate_salt ();
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_hash_password_pbkdf2 (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "hash-password-pbkdf2");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "hash-password-pbkdf2");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= hash_password_pbkdf2 (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_generate_self_signed_certificate (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "generate-self-signed-certificate");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "generate-self-signed-certificate");
+  TMSCM_ASSERT_URL (arg3, TMSCM_ARG3, "generate-self-signed-certificate");
+
+  scheme_tree in1= tmscm_to_scheme_tree (arg1);
+  url in2= tmscm_to_url (arg2);
+  url in3= tmscm_to_url (arg3);
+
+  // TMSCM_DEFER_INTS;
+  bool out= generate_self_signed (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_trust_certificate (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "trust-certificate");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= trust_certificate (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_disable_certificate_time_checks () {
+  // TMSCM_DEFER_INTS;
+  disable_certificate_time_checks ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_quit_TeXmacs_code (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "quit-TeXmacs-code");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  quit_TeXmacs_code (in1);
   // TMSCM_ALLOW_INTS;
 
   return TMSCM_UNSPECIFIED;
@@ -8504,6 +9212,42 @@ tmg_widget_toggle (tmscm arg1, tmscm arg2, tmscm arg3) {
 }
 
 tmscm
+tmg_widget_setting_toggle (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-setting-toggle");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-setting-toggle");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "widget-setting-toggle");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "widget-setting-toggle");
+
+  command in1= tmscm_to_command (arg1);
+  string in2= tmscm_to_string (arg2);
+  bool in3= tmscm_to_bool (arg3);
+  int in4= tmscm_to_int (arg4);
+
+  // TMSCM_DEFER_INTS;
+  widget out= setting_toggle_widget (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
+tmg_widget_setting_group (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "widget-setting-group");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-setting-group");
+  TMSCM_ASSERT_INT (arg3, TMSCM_ARG3, "widget-setting-group");
+
+  string in1= tmscm_to_string (arg1);
+  array_widget in2= tmscm_to_array_widget (arg2);
+  int in3= tmscm_to_int (arg3);
+
+  // TMSCM_DEFER_INTS;
+  widget out= setting_group_widget (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
 tmg_widget_balloon (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_WIDGET (arg1, TMSCM_ARG1, "widget-balloon");
   TMSCM_ASSERT_WIDGET (arg2, TMSCM_ARG2, "widget-balloon");
@@ -8589,34 +9333,61 @@ tmg_widget_enum (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5) {
 }
 
 tmscm
-tmg_widget_choice (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-choice");
-  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-choice");
-  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-choice");
+tmg_widget_setting_enum (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4, tmscm arg5, tmscm arg6) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-setting-enum");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "widget-setting-enum");
+  TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "widget-setting-enum");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "widget-setting-enum");
+  TMSCM_ASSERT_INT (arg5, TMSCM_ARG5, "widget-setting-enum");
+  TMSCM_ASSERT_STRING (arg6, TMSCM_ARG6, "widget-setting-enum");
 
   command in1= tmscm_to_command (arg1);
-  array_string in2= tmscm_to_array_string (arg2);
-  string in3= tmscm_to_string (arg3);
+  string in2= tmscm_to_string (arg2);
+  array_string in3= tmscm_to_array_string (arg3);
+  string in4= tmscm_to_string (arg4);
+  int in5= tmscm_to_int (arg5);
+  string in6= tmscm_to_string (arg6);
 
   // TMSCM_DEFER_INTS;
-  widget out= choice_widget (in1, in2, in3);
+  widget out= setting_enum_widget (in1, in2, in3, in4, in5, in6);
   // TMSCM_ALLOW_INTS;
 
   return widget_to_tmscm (out);
 }
 
 tmscm
-tmg_widget_choices (tmscm arg1, tmscm arg2, tmscm arg3) {
+tmg_widget_choice (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-choice");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-choice");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "widget-choice");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "widget-choice");
+
+  command in1= tmscm_to_command (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  int in4= tmscm_to_int (arg4);
+
+  // TMSCM_DEFER_INTS;
+  widget out= choice_widget (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
+tmg_widget_choices (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
   TMSCM_ASSERT_COMMAND (arg1, TMSCM_ARG1, "widget-choices");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "widget-choices");
   TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "widget-choices");
+  TMSCM_ASSERT_INT (arg4, TMSCM_ARG4, "widget-choices");
 
   command in1= tmscm_to_command (arg1);
   array_string in2= tmscm_to_array_string (arg2);
   array_string in3= tmscm_to_array_string (arg3);
+  int in4= tmscm_to_int (arg4);
 
   // TMSCM_DEFER_INTS;
-  widget out= choice_widget (in1, in2, in3);
+  widget out= choice_widget (in1, in2, in3, in4);
   // TMSCM_ALLOW_INTS;
 
   return widget_to_tmscm (out);
@@ -8815,6 +9586,38 @@ tmg_widget_icon_tabs (tmscm arg1, tmscm arg2, tmscm arg3) {
 
   // TMSCM_DEFER_INTS;
   widget out= icon_tabs_widget (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
+tmg_widget_responsive_tabs (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_WIDGET (arg1, TMSCM_ARG1, "widget-responsive-tabs");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-responsive-tabs");
+
+  array_widget in1= tmscm_to_array_widget (arg1);
+  array_widget in2= tmscm_to_array_widget (arg2);
+
+  // TMSCM_DEFER_INTS;
+  widget out= responsive_tabs_widget (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return widget_to_tmscm (out);
+}
+
+tmscm
+tmg_widget_responsive_icon_tabs (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_ARRAY_URL (arg1, TMSCM_ARG1, "widget-responsive-icon-tabs");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg2, TMSCM_ARG2, "widget-responsive-icon-tabs");
+  TMSCM_ASSERT_ARRAY_WIDGET (arg3, TMSCM_ARG3, "widget-responsive-icon-tabs");
+
+  array_url in1= tmscm_to_array_url (arg1);
+  array_widget in2= tmscm_to_array_widget (arg2);
+  array_widget in3= tmscm_to_array_widget (arg3);
+
+  // TMSCM_DEFER_INTS;
+  widget out= responsive_icon_tabs_widget (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
   return widget_to_tmscm (out);
@@ -9493,6 +10296,21 @@ tmg_tree_import_loaded (tmscm arg1, tmscm arg2, tmscm arg3) {
 
   // TMSCM_DEFER_INTS;
   tree out= import_loaded_tree (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_tree_import_loaded_from_object (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_OBJECT (arg1, TMSCM_ARG1, "tree-import-loaded-from-object");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "tree-import-loaded-from-object");
+
+  object in1= tmscm_to_object (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= import_loaded_tree_from_object (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return tree_to_tmscm (out);
@@ -10478,6 +11296,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("has-printing-cmd?",  tmg_has_printing_cmdP, 0, 0, 0);
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
+  tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);
   tmscm_install_procedure ("default-chinese-font",  tmg_default_chinese_font, 0, 0, 0);
@@ -10507,12 +11327,19 @@ initialize_glue_basic () {
   tmscm_install_procedure ("eval-system",  tmg_eval_system, 1, 0, 0);
   tmscm_install_procedure ("var-eval-system",  tmg_var_eval_system, 1, 0, 0);
   tmscm_install_procedure ("evaluate-system",  tmg_evaluate_system, 4, 0, 0);
+  tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
+  tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
+  tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);
+  tmscm_install_procedure ("async-http-post",  tmg_async_http_post, 4, 0, 0);
+  tmscm_install_procedure ("async-http-post-query",  tmg_async_http_post_query, 4, 0, 0);
   tmscm_install_procedure ("get-locale-language",  tmg_get_locale_language, 0, 0, 0);
   tmscm_install_procedure ("get-locale-charset",  tmg_get_locale_charset, 0, 0, 0);
   tmscm_install_procedure ("locale-to-language",  tmg_locale_to_language, 1, 0, 0);
   tmscm_install_procedure ("language-to-locale",  tmg_language_to_locale, 1, 0, 0);
   tmscm_install_procedure ("texmacs-time",  tmg_texmacs_time, 0, 0, 0);
   tmscm_install_procedure ("pretty-time",  tmg_pretty_time, 1, 0, 0);
+  tmscm_install_procedure ("cpu-idle-time",  tmg_cpu_idle_time, 0, 0, 0);
+  tmscm_install_procedure ("pretty-date",  tmg_pretty_date, 2, 0, 0);
   tmscm_install_procedure ("texmacs-memory",  tmg_texmacs_memory, 0, 0, 0);
   tmscm_install_procedure ("bench-print",  tmg_bench_print, 1, 0, 0);
   tmscm_install_procedure ("bench-print-all",  tmg_bench_print_all, 0, 0, 0);
@@ -10574,6 +11401,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("players-set-elapsed",  tmg_players_set_elapsed, 2, 0, 0);
   tmscm_install_procedure ("players-set-speed",  tmg_players_set_speed, 2, 0, 0);
   tmscm_install_procedure ("apply-effect",  tmg_apply_effect, 5, 0, 0);
+  tmscm_install_procedure ("headless?",  tmg_headlessP, 0, 0, 0);
   tmscm_install_procedure ("tt-exists?",  tmg_tt_existsP, 1, 0, 0);
   tmscm_install_procedure ("tt-dump",  tmg_tt_dump, 1, 0, 0);
   tmscm_install_procedure ("tt-font-name",  tmg_tt_font_name, 1, 0, 0);
@@ -10677,6 +11505,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-search-tree",  tmg_tree_search_tree, 4, 0, 0);
   tmscm_install_procedure ("tree-search-tree-at",  tmg_tree_search_tree_at, 5, 0, 0);
   tmscm_install_procedure ("tree-spell",  tmg_tree_spell, 4, 0, 0);
+  tmscm_install_procedure ("tree-spell*",  tmg_tree_spell_dot, 4, 0, 0);
   tmscm_install_procedure ("tree-spell-at",  tmg_tree_spell_at, 5, 0, 0);
   tmscm_install_procedure ("tree-spell-selection",  tmg_tree_spell_selection, 6, 0, 0);
   tmscm_install_procedure ("previous-search-hit",  tmg_previous_search_hit, 3, 0, 0);
@@ -10695,6 +11524,20 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tree-assign-node",  tmg_tree_assign_node, 2, 0, 0);
   tmscm_install_procedure ("tree-insert-node",  tmg_tree_insert_node, 3, 0, 0);
   tmscm_install_procedure ("tree-remove-node",  tmg_tree_remove_node, 2, 0, 0);
+  tmscm_install_procedure ("tree-hash",  tmg_tree_hash, 1, 0, 0);
+  tmscm_install_procedure ("tree-cache-clear",  tmg_tree_cache_clear, 1, 0, 0);
+  tmscm_install_procedure ("tree-cache-clear-all",  tmg_tree_cache_clear_all, 0, 0, 0);
+  tmscm_install_procedure ("tree-cache-contains?",  tmg_tree_cache_containsP, 2, 0, 0);
+  tmscm_install_procedure ("tree-cache-put",  tmg_tree_cache_put, 3, 0, 0);
+  tmscm_install_procedure ("tree-cache-get",  tmg_tree_cache_get, 2, 0, 0);
+  tmscm_install_procedure ("tree-cache-get-any",  tmg_tree_cache_get_any, 1, 0, 0);
+  tmscm_install_procedure ("tree-cache-update",  tmg_tree_cache_update, 2, 0, 0);
+  tmscm_install_procedure ("tree-cache-update-tmdoc",  tmg_tree_cache_update_tmdoc, 2, 0, 0);
+  tmscm_install_procedure ("tree-cache-janitor",  tmg_tree_cache_janitor, 1, 0, 0);
+  tmscm_install_procedure ("tree-cache-janitor-all",  tmg_tree_cache_janitor_all, 0, 0, 0);
+  tmscm_install_procedure ("tree-cache-set-max-size",  tmg_tree_cache_set_max_size, 2, 0, 0);
+  tmscm_install_procedure ("tree-cache-size",  tmg_tree_cache_size, 1, 0, 0);
+  tmscm_install_procedure ("tree-hash-set-limit",  tmg_tree_hash_set_limit, 1, 0, 0);
   tmscm_install_procedure ("cpp-tree-correct-node",  tmg_cpp_tree_correct_node, 1, 0, 0);
   tmscm_install_procedure ("cpp-tree-correct-downwards",  tmg_cpp_tree_correct_downwards, 1, 0, 0);
   tmscm_install_procedure ("cpp-tree-correct-upwards",  tmg_cpp_tree_correct_upwards, 1, 0, 0);
@@ -10891,6 +11734,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("spell-accept",  tmg_spell_accept, 2, 0, 0);
   tmscm_install_procedure ("spell-var-accept",  tmg_spell_var_accept, 3, 0, 0);
   tmscm_install_procedure ("spell-insert",  tmg_spell_insert, 2, 0, 0);
+  tmscm_install_procedure ("spell-notify-insert",  tmg_spell_notify_insert, 2, 0, 0);
   tmscm_install_procedure ("packrat-define",  tmg_packrat_define, 3, 0, 0);
   tmscm_install_procedure ("packrat-property",  tmg_packrat_property, 4, 0, 0);
   tmscm_install_procedure ("packrat-inherit",  tmg_packrat_inherit, 2, 0, 0);
@@ -10939,15 +11783,24 @@ initialize_glue_basic () {
   tmscm_install_procedure ("compute-index-url",  tmg_compute_index_url, 1, 0, 0);
   tmscm_install_procedure ("compress-tree",  tmg_compress_tree, 1, 0, 0);
   tmscm_install_procedure ("decompress-tree",  tmg_decompress_tree, 1, 0, 0);
+  tmscm_install_procedure ("compressed-contains-text?",  tmg_compressed_contains_textP, 1, 0, 0);
+  tmscm_install_procedure ("compressed->html",  tmg_compressed_2html, 2, 0, 0);
   tmscm_install_procedure ("compress-html",  tmg_compress_html, 2, 0, 0);
   tmscm_install_procedure ("decompress-html",  tmg_decompress_html, 2, 0, 0);
-  tmscm_install_procedure ("cpp-ai-command",  tmg_cpp_ai_command, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-command",  tmg_cpp_ai_command, 3, 0, 0);
+  tmscm_install_procedure ("cpp-ai-eval-command",  tmg_cpp_ai_eval_command, 1, 0, 0);
+  tmscm_install_procedure ("cpp-ai-async-eval-command",  tmg_cpp_ai_async_eval_command, 2, 0, 0);
   tmscm_install_procedure ("cpp-ai-output",  tmg_cpp_ai_output, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-get-body",  tmg_cpp_ai_get_body, 1, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-command",  tmg_cpp_ai_latex_command, 3, 0, 0);
+  tmscm_install_procedure ("cpp-ai-latex-request",  tmg_cpp_ai_latex_request, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-latex-output",  tmg_cpp_ai_latex_output, 3, 0, 0);
-  tmscm_install_procedure ("cpp-ai-chat",  tmg_cpp_ai_chat, 2, 0, 0);
+  tmscm_install_procedure ("cpp-ai-chat",  tmg_cpp_ai_chat, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-correct",  tmg_cpp_ai_correct, 3, 0, 0);
   tmscm_install_procedure ("cpp-ai-translate",  tmg_cpp_ai_translate, 4, 0, 0);
+  tmscm_install_procedure ("json->tree",  tmg_json_2tree, 1, 0, 0);
+  tmscm_install_procedure ("tree->json",  tmg_tree_2json, 1, 0, 0);
+  tmscm_install_procedure ("lantool-correct",  tmg_lantool_correct, 2, 0, 0);
   tmscm_install_procedure ("url->url",  tmg_url_2url, 1, 0, 0);
   tmscm_install_procedure ("root->url",  tmg_root_2url, 1, 0, 0);
   tmscm_install_procedure ("string->url",  tmg_string_2url, 1, 0, 0);
@@ -11013,6 +11866,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("url-temp-dir",  tmg_url_temp_dir, 0, 0, 0);
   tmscm_install_procedure ("url-scratch",  tmg_url_scratch, 3, 0, 0);
   tmscm_install_procedure ("url-scratch?",  tmg_url_scratchP, 1, 0, 0);
+  tmscm_install_procedure ("url-backup",  tmg_url_backup, 1, 0, 0);
+  tmscm_install_procedure ("url-backup?",  tmg_url_backupP, 1, 0, 0);
   tmscm_install_procedure ("url-cache-invalidate",  tmg_url_cache_invalidate, 1, 0, 0);
   tmscm_install_procedure ("string-save",  tmg_string_save, 2, 0, 0);
   tmscm_install_procedure ("string-load",  tmg_string_load, 1, 0, 0);
@@ -11022,6 +11877,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("system-remove",  tmg_system_remove, 1, 0, 0);
   tmscm_install_procedure ("system-mkdir",  tmg_system_mkdir, 1, 0, 0);
   tmscm_install_procedure ("system-rmdir",  tmg_system_rmdir, 1, 0, 0);
+  tmscm_install_procedure ("system-rmdir-recursive",  tmg_system_rmdir_recursive, 1, 0, 0);
   tmscm_install_procedure ("system-setenv",  tmg_system_setenv, 2, 0, 0);
   tmscm_install_procedure ("system-search-score",  tmg_system_search_score, 2, 0, 0);
   tmscm_install_procedure ("system-1",  tmg_system_1, 2, 0, 0);
@@ -11045,23 +11901,37 @@ initialize_glue_basic () {
   tmscm_install_procedure ("tmdb-set-entry",  tmg_tmdb_set_entry, 4, 0, 0);
   tmscm_install_procedure ("tmdb-get-entry",  tmg_tmdb_get_entry, 3, 0, 0);
   tmscm_install_procedure ("tmdb-remove-entry",  tmg_tmdb_remove_entry, 3, 0, 0);
-  tmscm_install_procedure ("tmdb-query",  tmg_tmdb_query, 4, 0, 0);
+  tmscm_install_procedure ("tmdb-query",  tmg_tmdb_query, 5, 0, 0);
   tmscm_install_procedure ("tmdb-inspect-history",  tmg_tmdb_inspect_history, 2, 0, 0);
   tmscm_install_procedure ("tmdb-get-completions",  tmg_tmdb_get_completions, 2, 0, 0);
   tmscm_install_procedure ("tmdb-get-name-completions",  tmg_tmdb_get_name_completions, 2, 0, 0);
   tmscm_install_procedure ("supports-sql?",  tmg_supports_sqlP, 0, 0, 0);
   tmscm_install_procedure ("sql-exec",  tmg_sql_exec, 2, 0, 0);
   tmscm_install_procedure ("sql-quote",  tmg_sql_quote, 1, 0, 0);
+  tmscm_install_procedure ("server-define-error-codes",  tmg_server_define_error_codes, 0, 0, 0);
   tmscm_install_procedure ("server-start",  tmg_server_start, 0, 0, 0);
   tmscm_install_procedure ("server-stop",  tmg_server_stop, 0, 0, 0);
   tmscm_install_procedure ("server-read",  tmg_server_read, 1, 0, 0);
   tmscm_install_procedure ("server-write",  tmg_server_write, 2, 0, 0);
   tmscm_install_procedure ("server-started?",  tmg_server_startedP, 0, 0, 0);
-  tmscm_install_procedure ("client-start",  tmg_client_start, 1, 0, 0);
+  tmscm_install_procedure ("server-port-in-use",  tmg_server_port_in_use, 0, 0, 0);
+  tmscm_install_procedure ("legacy-client-start",  tmg_legacy_client_start, 2, 0, 0);
   tmscm_install_procedure ("client-stop",  tmg_client_stop, 1, 0, 0);
   tmscm_install_procedure ("client-read",  tmg_client_read, 1, 0, 0);
   tmscm_install_procedure ("client-write",  tmg_client_write, 2, 0, 0);
+  tmscm_install_procedure ("client-protocol-version",  tmg_client_protocol_version, 0, 0, 0);
   tmscm_install_procedure ("enter-secure-mode",  tmg_enter_secure_mode, 1, 0, 0);
+  tmscm_install_procedure ("server-client-address",  tmg_server_client_address, 1, 0, 0);
+  tmscm_install_procedure ("server-log-write-int",  tmg_server_log_write_int, 2, 0, 0);
+  tmscm_install_procedure ("supports-gnutls?",  tmg_supports_gnutlsP, 0, 0, 0);
+  tmscm_install_procedure ("gnutls-random-number",  tmg_gnutls_random_number, 1, 0, 0);
+  tmscm_install_procedure ("tls-client-start",  tmg_tls_client_start, 3, 0, 0);
+  tmscm_install_procedure ("gnutls-generate-salt",  tmg_gnutls_generate_salt, 0, 0, 0);
+  tmscm_install_procedure ("hash-password-pbkdf2",  tmg_hash_password_pbkdf2, 2, 0, 0);
+  tmscm_install_procedure ("generate-self-signed-certificate",  tmg_generate_self_signed_certificate, 3, 0, 0);
+  tmscm_install_procedure ("trust-certificate",  tmg_trust_certificate, 1, 0, 0);
+  tmscm_install_procedure ("disable-certificate-time-checks",  tmg_disable_certificate_time_checks, 0, 0, 0);
+  tmscm_install_procedure ("quit-TeXmacs-code",  tmg_quit_TeXmacs_code, 1, 0, 0);
   tmscm_install_procedure ("connection-start",  tmg_connection_start, 2, 0, 0);
   tmscm_install_procedure ("connection-status",  tmg_connection_status, 2, 0, 0);
   tmscm_install_procedure ("connection-write-string",  tmg_connection_write_string, 3, 0, 0);
@@ -11083,13 +11953,16 @@ initialize_glue_basic () {
   tmscm_install_procedure ("widget-pullright-button",  tmg_widget_pullright_button, 2, 0, 0);
   tmscm_install_procedure ("widget-menu-button",  tmg_widget_menu_button, 5, 0, 0);
   tmscm_install_procedure ("widget-toggle",  tmg_widget_toggle, 3, 0, 0);
+  tmscm_install_procedure ("widget-setting-toggle",  tmg_widget_setting_toggle, 4, 0, 0);
+  tmscm_install_procedure ("widget-setting-group",  tmg_widget_setting_group, 3, 0, 0);
   tmscm_install_procedure ("widget-balloon",  tmg_widget_balloon, 2, 0, 0);
   tmscm_install_procedure ("widget-empty",  tmg_widget_empty, 0, 0, 0);
   tmscm_install_procedure ("widget-text",  tmg_widget_text, 4, 0, 0);
   tmscm_install_procedure ("widget-input",  tmg_widget_input, 5, 0, 0);
   tmscm_install_procedure ("widget-enum",  tmg_widget_enum, 5, 0, 0);
-  tmscm_install_procedure ("widget-choice",  tmg_widget_choice, 3, 0, 0);
-  tmscm_install_procedure ("widget-choices",  tmg_widget_choices, 3, 0, 0);
+  tmscm_install_procedure ("widget-setting-enum",  tmg_widget_setting_enum, 6, 0, 0);
+  tmscm_install_procedure ("widget-choice",  tmg_widget_choice, 4, 0, 0);
+  tmscm_install_procedure ("widget-choices",  tmg_widget_choices, 4, 0, 0);
   tmscm_install_procedure ("widget-filtered-choice",  tmg_widget_filtered_choice, 4, 0, 0);
   tmscm_install_procedure ("widget-tree-view",  tmg_widget_tree_view, 3, 0, 0);
   tmscm_install_procedure ("widget-xpm",  tmg_widget_xpm, 1, 0, 0);
@@ -11102,6 +11975,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("widget-aligned",  tmg_widget_aligned, 2, 0, 0);
   tmscm_install_procedure ("widget-tabs",  tmg_widget_tabs, 2, 0, 0);
   tmscm_install_procedure ("widget-icon-tabs",  tmg_widget_icon_tabs, 3, 0, 0);
+  tmscm_install_procedure ("widget-responsive-tabs",  tmg_widget_responsive_tabs, 2, 0, 0);
+  tmscm_install_procedure ("widget-responsive-icon-tabs",  tmg_widget_responsive_icon_tabs, 3, 0, 0);
   tmscm_install_procedure ("widget-scrollable",  tmg_widget_scrollable, 2, 0, 0);
   tmscm_install_procedure ("widget-resize",  tmg_widget_resize, 10, 0, 0);
   tmscm_install_procedure ("widget-hsplit",  tmg_widget_hsplit, 2, 0, 0);
@@ -11152,6 +12027,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("buffer-export",  tmg_buffer_export, 3, 0, 0);
   tmscm_install_procedure ("buffer-save",  tmg_buffer_save, 1, 0, 0);
   tmscm_install_procedure ("tree-import-loaded",  tmg_tree_import_loaded, 3, 0, 0);
+  tmscm_install_procedure ("tree-import-loaded-from-object",  tmg_tree_import_loaded_from_object, 2, 0, 0);
   tmscm_install_procedure ("tree-import",  tmg_tree_import, 2, 0, 0);
   tmscm_install_procedure ("tree-inclusion",  tmg_tree_inclusion, 1, 0, 0);
   tmscm_install_procedure ("tree-export",  tmg_tree_export, 3, 0, 0);

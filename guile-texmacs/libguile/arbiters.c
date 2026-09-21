@@ -160,7 +160,10 @@ scm_init_arbiters ()
   scm_tc16_arbiter = scm_make_smob_type ("arbiter", 0);
   scm_set_smob_mark (scm_tc16_arbiter, scm_markcdr);
   scm_set_smob_print (scm_tc16_arbiter, arbiter_print);
-#include "libguile/arbiters.x"
+ scm_c_define_gsubr (s_scm_make_arbiter, 1, 0, 0, (SCM (*)()) scm_make_arbiter); ;
+ scm_c_define_gsubr (s_scm_try_arbiter, 1, 0, 0, (SCM (*)()) scm_try_arbiter); ;
+ scm_c_define_gsubr (s_scm_release_arbiter, 1, 0, 0, (SCM (*)()) scm_release_arbiter); ;
+
 }
 
 /*

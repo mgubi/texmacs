@@ -120,6 +120,7 @@
       ("Preferences" (open-plugins-preferences)))
     (assuming (or (os-mingw?) (os-win32?) (os-macos?))
       ("Manual path" (interactive set-manual-path)))
+    ("Manual key" (interactive set-manual-key))
     ("Redetect" (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -127,7 +128,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind session-input-menu
-  (when (connection-cmdline? (get-env "prog-language"))
+  (when (or (connection-cmdline? (get-env "prog-language"))
+	    (connection-request? (get-env "prog-language")))
     ("Textual input" (toggle-session-text-input)))
   (when (in-plugin-with-converters?)
     ("Mathematical input" (toggle-session-math-input)))

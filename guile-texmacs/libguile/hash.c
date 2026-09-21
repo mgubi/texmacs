@@ -33,7 +33,7 @@
 
 
 #ifndef floor
-extern double floor();
+extern double floor (double);
 #endif
 
 
@@ -258,7 +258,10 @@ SCM_DEFINE (scm_hash, "hash", 2, 0, 0,
 void
 scm_init_hash ()
 {
-#include "libguile/hash.x"
+ scm_c_define_gsubr (s_scm_hashq, 2, 0, 0, (SCM (*)()) scm_hashq); ;
+ scm_c_define_gsubr (s_scm_hashv, 2, 0, 0, (SCM (*)()) scm_hashv); ;
+ scm_c_define_gsubr (s_scm_hash, 2, 0, 0, (SCM (*)()) scm_hash); ;
+
 }
 
 

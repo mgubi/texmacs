@@ -74,12 +74,10 @@ initialize_environment (edit_env& env, tree doc, drd_info& drd) {
   // env->write (DPI, "720");
   // env->write (ZOOM_FACTOR, "1.2");
   // env->write (PAGE_TYPE, "a5");
-#if QT_VERSION < 0x060000
   if (retina_zoom == 2) {
     double mag= 2.0 * env->get_double (MAGNIFICATION);
     env->write (MAGNIFICATION, as_string (mag));
   }
-#endif
   env->update ();
 }
 
@@ -293,7 +291,8 @@ texmacs_output_widget (tree doc, tree style) {
   hashmap<string,tree> h3 (UNINIT), h4 (UNINIT);
   hashmap<string,tree> h5 (UNINIT), h6 (UNINIT);
   tree prj= extract (doc, "project");
-  if (is_atomic (prj) && exists (url_system (prj->label))) {
+  if (is_atomic (prj) && N(prj->label) > 0 &&
+      exists (url_system (prj->label))) {
     tm_buffer buf= concrete_buffer_insist (url_system (prj->label));
     if (!is_nil (buf)) {
       h1= copy (buf->data->ref);

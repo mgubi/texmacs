@@ -514,11 +514,13 @@ VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val,
                     int, st, string, w);
   // select a value from a list of possible values
 VUE_WIDGET(choice_widget, command, cb, array<string>, vals, array<string>, chosen, bool, flag);
-widget choice_widget (command cmd, array<string> vals, array<string> chosen) {
+widget choice_widget (command cmd, array<string> vals, array<string> chosen, int style) {
+  (void) style; // FIXME: not implemented
   return choice_widget(cmd, vals, chosen, true);
 }
   // select a value from a long list of possible values
-widget choice_widget (command cmd, array<string> vals, string cur) {
+widget choice_widget (command cmd, array<string> vals, string cur, int style) {
+  (void) style; // FIXME: not implemented
   array<string> chosen (1);
   chosen[0]= cur;
   return choice_widget(cmd, vals, chosen, false);
@@ -582,6 +584,40 @@ VUE_WIDGET(extend_widget, widget, w, array<widget>, a);
   // extend the size of w to the maximum of the sizes of
   // the widgets in the list a
 VUE_WIDGET(toggle_widget, command, cmd, bool, on, int, style);
+
+// The "setting" widgets of the preference tools (a control with its
+// description) and the responsive tabs are composed from simpler widgets
+widget setting_toggle_widget (command cmd, string text, bool on, int style) {
+  array<widget> a;
+  a << toggle_widget (cmd, on, style)
+    << glue_widget (false, false, 6*PIXEL, 0)
+    << text_widget (text, style, black, false);
+  return horizontal_list (a);
+}
+  // a check box followed by its description
+widget setting_enum_widget (command cb, string text, array<string> vals,
+                            string val, int st, string w) {
+  array<widget> a;
+  a << text_widget (text, st, black, false)
+    << glue_widget (true, false, 6*PIXEL, 0)
+    << enum_widget (cb, vals, val, st, w);
+  return horizontal_list (a);
+}
+  // a description followed by a drop-down list
+widget setting_group_widget (string text, array<widget> vals, int style) {
+  array<widget> a;
+  a << division_widget ("subtitle", text_widget (text, style, black, false))
+    << vertical_list (vals);
+  return vertical_list (a);
+}
+  // a titled group of settings
+widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
+  return tabs_widget (tabs, bodies);
+}
+widget responsive_icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs) {
+  return icon_tabs_widget (us, ss, bs);
+}
+  // tabs which adapt to the available space: plain tabs here
   // an input toggle
 VUE_WIDGET(wait_widget, SI, width, SI, height, string, message);
   // a widget of a specified width and height, displaying a wait message
@@ -3921,10 +3957,11 @@ vue_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
 
 void
 vue_simple_widget_rep::invalidate_viewport_rect (int x1, int y1, int x2, int y2) {
+  SI X1= x1, Y1= y1, X2= x2, Y2= y2;
   ren->set_origin (-backing_pos.x1, -backing_pos.x2);
-  ren->encode (x1, y1);
-  ren->encode (x2, y2);
-  invalidate_rect (x1, y2, x2, y1);
+  ren->encode (X1, Y1);
+  ren->encode (X2, Y2);
+  invalidate_rect (X1, Y2, X2, Y1);
 }
 
 void

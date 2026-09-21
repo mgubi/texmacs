@@ -179,6 +179,8 @@ TMSCM_ASSERT (tmscm_is_string (s), s, arg, rout)
 TMSCM_ASSERT (tmscm_is_bool (flag), flag, arg, rout)
 #define TMSCM_ASSERT_INT(i,arg,rout) \
 TMSCM_ASSERT (tmscm_is_int (i), i, arg, rout);
+#define TMSCM_ASSERT_UINT(i,arg,rout) \
+TMSCM_ASSERT (tmscm_is_int (i) && scm_positive_p (i), i, arg, rout);
 #define TMSCM_ASSERT_DOUBLE(i,arg,rout) \
   TMSCM_ASSERT (tmscm_is_double (i), i, arg, rout);
 //TMSCM_ASSERT (SCM_REALP (i), i, arg, rout);
@@ -880,7 +882,7 @@ tmscm_to_array_SI (tmscm p) {
   return a;
 }
 
-static bool
+/* static */ bool
 tmscm_is_array_string (tmscm p) {
   if (tmscm_is_null (p)) return true;
   else return tmscm_is_pair (p) && 
@@ -1227,6 +1229,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "tree_traverse.hpp"
 #include "tree_analyze.hpp"
 #include "tree_correct.hpp"
+#include "tree_cache.hpp"
 #include "tree_modify.hpp"
 #include "tree_math_stats.hpp"
 #include "tm_frame.hpp"

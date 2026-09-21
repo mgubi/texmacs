@@ -95,9 +95,21 @@
 
 (define db-the-default-user #f)
 
+(define (gecos:name gecos)
+  (first (string-split gecos #\,)))
+
+(define (gecos:office gecos)
+  (second (string-split gecos #\,)))
+
+(define (gecos:wphone gecos)
+  (third (string-split gecos #\,)))
+
+(define (gecos:hphone gecos)
+  (fourth (string-split gecos #\,)))
+
 (define (safe-getpwnam id)
   (catch #t
-	 (lambda () (passwd:gecos (getpwnam id)))
+	 (lambda () (gecos:name (passwd:gecos (getpwnam id))))
 	 (lambda err
 	   (display* "Error in getpwnam: " err "\n")
 	   "")))
@@ -119,7 +131,8 @@
      (safe-getpwnam user))))
 
 (define (create-default-user)
-  (let* ((pseudo (or (getlogin) (safe-getpwuid (getuid))))
+  (let* ((pseudo (or (if (os-macos?) (getenv "USER") (getlogin))
+		     (safe-getpwuid (getuid))))
          (name (get-full-name pseudo)))
     ;;(display* "pseudo= " pseudo "\n")
     ;;(display* "name= " name "\n")

@@ -4,11 +4,16 @@
 
 The worktree `wip_other_guis/src` is configured with
 
-    ./configure --with-gui=vue --with-mupdf=/opt/homebrew --with-sdl3
+    ./configure --with-gui=vue --with-mupdf=/opt/homebrew --with-sdl3 \
+      --with-guile=/Users/mgubi/t/guile-1.8.7/usr/bin/guile-config
 
-(see the first lines of `config.log`). `make` at the root builds
+(see the first lines of `config.log`; the Guile 1.8 in `~/t/guile-1.8.7` is
+used, the Homebrew Guile 3 is rejected). `make` at the root builds
 `TeXmacs/bin/texmacs.bin`; `src/makefile` is generated from
-`src/makefile.in`, so permanent changes go to `makefile.in`.
+`src/makefile.in`, so permanent changes go to `makefile.in`. `configure`
+and `src/System/config.in` are generated from `configure.in` and the
+`misc/m4/*.m4` macros with `autoconf` and `autoheader` (Homebrew autoconf);
+`misc/m4/sdl3.m4` also pulls in `sdl3-ttf`.
 
 Header dependencies are recorded while compiling (`-MMD -MP -MF Deps/$*.d`,
 included at the end of the makefile), so a header change rebuilds the objects

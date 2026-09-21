@@ -24,7 +24,9 @@
 
 #include "libguile/__scm.h"
 
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>  /* for sysconf */
+#endif
 
 
 

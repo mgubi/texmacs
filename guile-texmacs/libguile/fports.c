@@ -700,7 +700,7 @@ fport_truncate (SCM port, off_t length)
 {
   scm_t_fport *fp = SCM_FSTREAM (port);
 
-  if (ftruncate (fp->fdes, length) == -1)
+  if (guile_ftruncate (fp->fdes, length) == -1)
     scm_syserror ("ftruncate");
 }
 
@@ -933,7 +933,10 @@ scm_init_fports ()
   scm_c_define ("_IOLBF", scm_from_int (_IOLBF));
   scm_c_define ("_IONBF", scm_from_int (_IONBF));
 
-#include "libguile/fports.x"
+ scm_c_define_gsubr (s_scm_setvbuf, 2, 1, 0, (SCM (*)()) scm_setvbuf); ;
+ scm_c_define_gsubr (s_scm_file_port_p, 1, 0, 0, (SCM (*)()) scm_file_port_p); ;
+ scm_c_define_gsubr (s_scm_open_file, 2, 0, 0, (SCM (*)()) scm_open_file); ;
+
 }
 
 void (*scm_fport_log_function) (const char *, int) = NULL;

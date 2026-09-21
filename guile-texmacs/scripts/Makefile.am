@@ -38,8 +38,7 @@ scripts_sources =				\
 	summarize-guile-TODO			\
 	scan-api				\
 	api-diff				\
-	read-rfc822				\
-	snarf-guile-m4-docs
+	read-rfc822
 
 subpkgdatadir = $(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)/scripts
 subpkgdata_SCRIPTS = $(scripts_sources)
@@ -48,21 +47,5 @@ EXTRA_DIST = $(scripts_sources) ChangeLog-2008
 
 list:
 	@echo $(scripts_sources)
-
-include $(top_srcdir)/am/pre-inst-guile
-
-overview: $(scripts_sources)
-	@echo '----------------------------'
-	@echo Overview
-	@echo I. Commentaries
-	@echo II. Module Interfaces
-	@echo '----------------------------'
-	@echo I. Commentaries
-	@echo '----------------------------'
-	$(preinstguiletool)/display-commentary $^
-	@echo '----------------------------'
-	@echo II. Module Interfaces
-	@echo '----------------------------'
-	$(preinstguiletool)/frisk $^
 
 # Makefile.am ends here

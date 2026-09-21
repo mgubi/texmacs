@@ -22,7 +22,6 @@
 #include "QTMStyle.hpp"
 #include "QTMTreeModel.hpp"
 #include "QTMApplication.hpp"
-#include "QTMMainTabWindow.hpp"
 
 #include <QToolTip>
 #include <QCompleter>
@@ -84,7 +83,7 @@ QTMAction::QTMAction (QObject *parent) : QAction (parent) {
 }
 
 QTMAction::~QTMAction() { 
-  if (menu() && !menu()->parent()) delete menu();
+  if (menu() && !menu()->parent()) menu()->deleteLater();
 }
 
 void
@@ -158,8 +157,7 @@ QTMWidgetAction::QTMWidgetAction (widget _wid, QObject *parent)
 
 QWidget *
 QTMWidgetAction::createWidget (QWidget * parent) {
-  QWidget* qw = concrete (wid)->as_qwidget();
-  qw->setParent (parent);
+  QWidget* qw = concrete (wid)->as_qwidget(parent);
   return qw;
 }
 
@@ -286,14 +284,7 @@ QTMMinibarAction::createWidget (QWidget* parent) {
  ******************************************************************************/
 
 QTMMenuButton::QTMMenuButton (QWidget* parent) : QToolButton (parent) {
-#if QT_VERSION >= 0x060000
-  setIconSize (QSize (28, 28));
-  setToolButtonStyle (Qt::ToolButtonIconOnly);
-  setStyleSheet ("QToolButton { border: none; }"
-                 "QToolButton:hover { background-color: transparent; }");
-#else
   setAttribute (Qt::WA_Hover);
-#endif
 }
 
 void
@@ -317,7 +308,6 @@ QTMMenuButton::mouseReleaseEvent (QMouseEvent* e) {
 void
 QTMMenuButton::paintEvent (QPaintEvent* e) {
   (void) e;
-  
     // initialize the options
   QStyleOptionToolButton opt;
   initStyleOption (&opt);
@@ -332,12 +322,8 @@ QTMMenuButton::paintEvent (QPaintEvent* e) {
     // draw the control background as a menu item
   style()->drawControl (QStyle::CE_MenuItem, &option, &p, this);
     // draw the icon with a bit of inset.
-#if QT_VERSION >= 0x060000
-  QToolButton::paintEvent (e);
-#else
-  r.adjust (2, 2, -2, -2);
+  r.adjust (2, 2, -2, -2);  
   defaultAction()->icon().paint (&p, r);
-#endif
 }
 
 /******************************************************************************
@@ -578,11 +564,15 @@ void initkeymap ();
 void
 QTMLineEdit::keyPressEvent (QKeyEvent* ev)
 {
+#if QT_VERSION >= 0x050000
   if (ev == QKeySequence::Copy ||
       ev == QKeySequence::Paste ||
       ev == QKeySequence::Cut) {
-    QLineEdit::keyPressEvent (ev);
+        if (continuous ()) {
+          QLineEdit::keyPressEvent (ev);
+      }
   }
+#endif
  
   QCompleter* c = completer();
   
@@ -846,9 +836,6 @@ QTMTabWidget::QTMTabWidget (QWidget *p) : QTabWidget(p) {
 void
 QTMTabWidget::resizeOthers (int current) {
 BEGIN_SLOT
-  if (qobject_cast<QTMMainTabWindow*>(window())) {
-    return;
-  }
 
   for (int i = 0; i < count(); ++i) {
     if (i != current)
@@ -905,20 +892,22 @@ QTMRefreshWidget::recompute (string what) {
   string s = "'(vertical (link " * strwid * "))";
   eval ("(lazy-initialize-force)");
   object xwid = call ("menu-expand", eval (s));
+  widget previous = cur;
   
   if (cache->contains (xwid)) {
     if (curobj == xwid) return false;
     curobj = xwid;
     cur    = cache [xwid];
-    return true;
   } else {
     curobj = xwid;
     object uwid = eval (s);
     cur = make_menu_widget (uwid);
-    tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
     if (menu_caching) cache (xwid) = cur;
-    return true;
   }
+  if (!is_nil (previous) && previous != cur)
+    tmwid->remove_child (previous);
+  tmwid->add_child (cur);
+  return true;
 }
 
 /*
@@ -949,10 +938,12 @@ void
 QTMRefreshWidget::doRefresh (string kind) {
 BEGIN_SLOT
   if (recompute (kind)) {
-    if (qwid) qwid->setParent (NULL);
-    delete qwid;
-    qwid = concrete (cur)->as_qwidget();
-    qwid->setParent (this);
+    if (qwid) {
+      qwid->hide();
+      qwid->setParent (NULL);
+      qwid->deleteLater();
+    }
+    qwid = concrete (cur)->as_qwidget(this);
 
     delete layout()->takeAt(0);
     layout()->addWidget (qwid);
@@ -1001,9 +992,12 @@ QTMRefreshableWidget::recompute (string what) {
   object xwid = call (prom);
   if (curobj == xwid) return false;
   if (!is_widget (xwid)) return false;
+  widget previous = cur;
   curobj= xwid;
   cur= as_widget (xwid);
-  tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
+  if (!is_nil (previous) && previous != cur)
+    tmwid->remove_child (previous);
+  tmwid->add_child (cur);
   return true;
 }
 
@@ -1035,10 +1029,12 @@ void
 QTMRefreshableWidget::doRefresh (string kind) {
 BEGIN_SLOT
   if (recompute (kind)) {
-    if (qwid) qwid->setParent (NULL);
-    delete qwid;
-    qwid = concrete (cur)->as_qwidget();
-    qwid->setParent (this);
+    if (qwid) {
+      qwid->hide();
+      qwid->setParent (NULL);
+      qwid->deleteLater();
+    }
+    qwid = concrete (cur)->as_qwidget(this);
 
     delete layout()->takeAt(0);
     layout()->addWidget (qwid);
@@ -1072,9 +1068,6 @@ QTMComboBox::QTMComboBox (QWidget* parent) : QComboBox (parent) {
   opt.activeSubControls = QStyle::SC_ComboBoxArrow;
   QRect r = style()->subControlRect (QStyle::CC_ComboBox, &opt,
                                      QStyle::SC_ComboBoxArrow, &cb);
-#if QT_VERSION >= 0x060000
-  int retina_scale = 1;
-#endif
   int max_w= (int) floor (40 * retina_scale);
   minSize.setWidth (min (r.width(), max_w));
 }
@@ -1147,20 +1140,26 @@ QTMComboBox::event (QEvent* ev) {
  the keys through items in a QListView contained in the QTMScrollArea.
  It also scrolls the viewport to the position of selected items in QListWidgets.
  */
-void
-QTMScrollArea::setWidgetAndConnect (QWidget* w) {
+void QTMScrollArea::setWidgetAndConnect (QWidget* w) {
   setWidget (w);
  
   listViews = w->findChildren<QTMListView*>();
-  for (ListViewsIterator it = listViews.begin(); it != listViews.end(); ++it) {
-    if (! (*it)->isScrollable())
+  
+  for (QTMListView* listView : listViews) {
+    
+    connect(listView, &QObject::destroyed, this, [this, listView]() {
+        listViews.removeAll(listView);
+    });
+
+    if (!listView->isScrollable()) {
 #if QT_VERSION < 0x060000
-      QObject::connect (*it, SIGNAL (selectionHasChanged (const QItemSelection&)),
+      QObject::connect (listView, SIGNAL (selectionHasChanged (const QItemSelection&)),
                         this,  SLOT (scrollToSelection (const QItemSelection&)));
 #else
-      QObject::connect (*it, &QTMListView::selectionHasChanged,
+      QObject::connect (listView, &QTMListView::selectionHasChanged,
                         this, &QTMScrollArea::scrollToSelection);
 #endif
+    }
   }
 }
 
@@ -1208,8 +1207,9 @@ QTMListView::QTMListView (const command& cmd,
                           bool multiple,
                           bool scroll,
                           bool filtered,
+			  int style2,
                           QWidget* parent)
-: QListView (parent) {
+: QListView (parent), style (style2) {
   
   stringModel = new QStringListModel (strings, this);
   filterModel = new QSortFilterProxyModel (this);
@@ -1220,7 +1220,10 @@ QTMListView::QTMListView (const command& cmd,
   
   setModel (filterModel);
   
-  setSelectionMode (multiple ? ExtendedSelection : SingleSelection);
+  if (style & WIDGET_STYLE_INERT)
+    setSelectionMode (QAbstractItemView::NoSelection);
+  else
+    setSelectionMode (multiple ? ExtendedSelection : SingleSelection);
   setEditTriggers (NoEditTriggers);
 
     // NOTE: using selectionModel()->select(item, QItemSelection::SelectCurrent)

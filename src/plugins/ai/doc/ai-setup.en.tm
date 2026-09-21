@@ -1,4 +1,4 @@
-<TeXmacs|2.1.4>
+<TeXmacs|2.1.5>
 
 <style|tmdoc>
 
@@ -117,6 +117,29 @@
 
     <item>When launching <TeXmacs>, you should now be able to use
     <name|Mistral>.
+  </itemize>
+
+  <subsection*|Albert (by DINUM, for French administrations only)>
+
+  Please follow the following instructions for setting up <name|Albert> for
+  use inside <TeXmacs>.
+
+  <\itemize>
+    <item>Create an account for <name|Albert> and obtain a key at
+    <slink|https://albert.playground.etalab.gouv.fr>
+
+    <item>Go to menu <menu|Insert|Session|Manual key>. Enter \Palbert\Q
+    (without the quotes) for the key name and then copy the key.
+
+    <item>Alternatively, in your terminal, set the <verbatim|ALBERT_API_KEY>
+    environment variables with your key
+
+    <\shell-code>
+      export ALBERT_API_KEY=<text|<verbatim|<with|color|dark
+      green|<em|your_key>>>>
+    </shell-code>
+
+    When launching <TeXmacs>, you should now be able to use <name|Albert>.
   </itemize>
 
   <tmdoc-copyright|2025|Joris van der Hoeven|Marc Lalaude-Labayle|Robin Wils>

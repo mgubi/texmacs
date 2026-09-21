@@ -189,9 +189,15 @@ edit_main_rep::get_metadata (string kind) {
   if (kind == "title") return utf8_to_cork (as_string (tail (get_name ())));
 #ifndef OS_MINGW
   if (kind == "author" &&
+      !is_none (resolve_in_path ("whoami")) &&
       !is_none (resolve_in_path ("finger")) &&
       !is_none (resolve_in_path ("sed"))) {
     string val= var_eval_system ("finger `whoami` | sed -e '/Name/!d' -e 's/.*Name: //'");
+    if (N(val) > 1) return utf8_to_cork (val);
+  }
+  if (kind == "pseudo" &&
+      !is_none (resolve_in_path ("whoami"))) {
+    string val= var_eval_system ("whoami");
     if (N(val) > 1) return utf8_to_cork (val);
   }
 #endif
@@ -328,10 +334,13 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   if (ps || pdf)
     if (get_preference ("texmacs->pdf:check", "off") == "on") {
 # if QT_VERSION >= 0x060000
-      system_wait ("Checking exported file for correctness", "please wait");
-      // FIXME: the wait message often causes a crash, otherwise
+      system_wait ("Checking exported file '" *
+		   as_string (tail (orig)) * "' for correctness");
 # endif
       gs_check (orig);
+# if QT_VERSION >= 0x060000
+      system_wait ("");
+# endif
     }
 #endif
 }
@@ -493,6 +502,11 @@ edit_main_rep::the_path () {
 path
 edit_main_rep::the_shifted_path () {
   return shift (et, tp, 1);
+}
+
+path
+the_editor_path () {
+  return get_current_editor()->the_path ();
 }
 
 /******************************************************************************

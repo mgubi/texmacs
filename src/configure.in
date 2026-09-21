@@ -65,6 +65,16 @@ esac
 AC_CPLUSPLUS_STACK
 
 #--------------------------------------------------------------------
+# Checks 64-bit or 32-bit system
+#--------------------------------------------------------------------
+
+AC_CHECK_SIZEOF([void *])
+AC_CHECK_SIZEOF([short])
+AC_CHECK_SIZEOF([int])
+AC_CHECK_SIZEOF([long])
+AC_CHECK_SIZEOF([long long])
+
+#--------------------------------------------------------------------
 # Checks for standard functionality
 #--------------------------------------------------------------------
 
@@ -102,10 +112,13 @@ TM_STATIC
 # External libraries, functions and binaries
 #--------------------------------------------------------------------
 
+LC_PTHREAD
+LC_INTL
 LC_GUILE
 LC_DLOPEN
 LC_ICONV
 LC_FREETYPE
+LC_ASPELL
 LC_CAIRO
 LC_IMLIB2
 LC_AXEL
@@ -114,6 +127,8 @@ LC_SQL
 LC_GNUTLS
 LC_SPARKLE
 LC_MUPDF
+LC_RESVG
+
 
 #--------------------------------------------------------------------
 # Further TeXmacs settings
@@ -175,7 +190,9 @@ packages/fedora/TeXmacs.spec:packages/fedora/TeXmacs.spec.in
 packages/mandriva/TeXmacs.spec:packages/mandriva/TeXmacs.spec.in 
 packages/centos/TeXmacs.spec:packages/centos/TeXmacs.spec.in 
 packages/windows/TeXmacs.iss:packages/windows/TeXmacs.iss.in 
-packages/windows/resource.rc:packages/windows/resource.rc.in 
+packages/windows/resource.rc:packages/windows/resource.rc.in
+packages/msix/AppxManifest.xml:packages/msix/AppxManifest.xml.in
+packages/msix/AppxManifestStore.xml:packages/msix/AppxManifestStore.xml.in
 packages/debian/changelog:packages/debian/changelog.in 
 packages/debian/control:packages/debian/control.in
 packages/android/res/values/libs.xml:packages/android/libs.xml.in

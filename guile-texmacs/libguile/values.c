@@ -88,7 +88,8 @@ scm_init_values (void)
 
   scm_add_feature ("values");
 
-#include "libguile/values.x"
+ scm_c_define_gsubr (s_scm_values, 0, 0, 1, (SCM (*)()) scm_values); ;
+
 }
 
 /*

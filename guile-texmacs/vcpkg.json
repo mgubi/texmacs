@@ -1,0 +1,11 @@
+﻿{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "tm-guile",
+  "version-string": "1.8.8",
+  "builtin-baseline": "3d33b7f7a8121da6e4fa80b35618fc8e960be686",
+  "dependencies": [
+    "gmp",
+    "libltdl",
+    "dirent"
+  ]
+}

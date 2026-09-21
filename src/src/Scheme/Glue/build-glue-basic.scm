@@ -34,6 +34,8 @@
   (has-printing-cmd? has_printing_cmd (bool))
   (x-gui? gui_is_x (bool))
   (qt-gui? gui_is_qt (bool))
+  (gui-set-next-window-as-popup gui_set_next_window_as_popup (void))
+  (support-functionality? support_functionality (bool string))
   (gui-version gui_version (string))
   (default-look-and-feel default_look_and_feel (string))
   (default-chinese-font default_chinese_font_name (string))
@@ -64,12 +66,20 @@
   (var-eval-system var_eval_system (string string))
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
+  (async-eval-system async_eval_system (bool string object))
+  (http-post http_post (string string array_string string))
+  (http-post-query http_post_query (string string array_string array_string))
+  (async-http-post async_http_post (bool string array_string string object))
+  (async-http-post-query async_http_post_query (bool string array_string
+    array_string object))
   (get-locale-language get_locale_language (string))
   (get-locale-charset get_locale_charset (string))
   (locale-to-language locale_to_language (string string))
   (language-to-locale language_to_locale (string string))
   (texmacs-time texmacs_time (int))
   (pretty-time pretty_time (string int))
+  (cpu-idle-time cpu_idle_time (int))
+  (pretty-date pretty_date (string int string))
   (texmacs-memory mem_used (int))
   (bench-print bench_print (void string))
   (bench-print-all bench_print (void))
@@ -131,6 +141,7 @@
   (players-set-elapsed players_set_elapsed (void tree double))
   (players-set-speed players_set_speed (void tree double))
   (apply-effect apply_effect (void content array_url url int int))
+  (headless? is_headless (bool))
   
   ;; routines for the font database
   (tt-exists? tt_font_exists (bool string))
@@ -245,6 +256,7 @@
   (tree-search-tree search (array_path content content path int))
   (tree-search-tree-at search (array_path content content path path int))
   (tree-spell spell (array_path string content path int))
+  (tree-spell* spell_with_cache (array_path string content path int))
   (tree-spell-at spell (array_path string content path path int))
   (tree-spell-selection spell (array_path string content path path path int))
   (previous-search-hit previous_search_hit (array_path array_path path bool))
@@ -264,6 +276,23 @@
   (tree-assign-node tree_assign_node (tree tree tree_label))
   (tree-insert-node tree_insert_node (tree tree int content))
   (tree-remove-node tree_remove_node (tree tree int))
+
+  ;; tree caching for server/client communication
+  (tree-hash tree_hash (string tree))
+  (tree-cache-clear tree_cache_clear (void string))
+  (tree-cache-clear-all tree_cache_clear_all (void))
+  (tree-cache-contains? tree_cache_contains (bool string string))
+  (tree-cache-put tree_cache_put (void string string tree))
+  (tree-cache-get tree_cache_get (tree string string))
+  (tree-cache-get-any tree_cache_get_any (tree string))
+  (tree-cache-update tree_cache_update (tree string tree))
+  (tree-cache-update-tmdoc tree_cache_update_tmdoc (string string string))
+  (tree-cache-janitor tree_cache_janitor (void string))
+  (tree-cache-janitor-all tree_cache_janitor_all (void))
+  (tree-cache-set-max-size tree_cache_set_max_size (void string int))
+  (tree-cache-size tree_cache_size (int string))
+
+  (tree-hash-set-limit tree_hash_set_limit (void int))
 
   (cpp-tree-correct-node correct_node (void tree))
   (cpp-tree-correct-downwards correct_downwards (void tree))
@@ -485,6 +514,7 @@
   (spell-accept spell_accept (void string string))
   (spell-var-accept spell_accept (void string string bool))
   (spell-insert spell_insert (void string string))
+  (spell-notify-insert spell_notify_insert (void string string))
 
   ;; Packrat grammar and parsing tools
   (packrat-define packrat_define (void string string tree))
@@ -540,15 +570,24 @@
   (compute-index-url compute_index (scheme_tree url))
   (compress-tree compress_tree (tree content))
   (decompress-tree decompress_tree (tree content))
+  (compressed-contains-text? compressed_contains_text (bool content))
+  (compressed->html compressed_to_html (string content int))
   (compress-html compress_html (string content int))
   (decompress-html decompress_html (tree string int))
-  (cpp-ai-command ai_command (string string string))
+  (cpp-ai-command ai_command (tree string string string))
+  (cpp-ai-eval-command ai_eval_command (string tree))
+  (cpp-ai-async-eval-command ai_async_eval_command (bool tree object))
   (cpp-ai-output ai_output (string string string))
+  (cpp-ai-get-body ai_get_body (array_string string))
   (cpp-ai-latex-command ai_latex_command (string string string string))
+  (cpp-ai-latex-request ai_latex_request (string string string string))
   (cpp-ai-latex-output ai_latex_output (tree string string string))
-  (cpp-ai-chat ai_chat (string string string))
+  (cpp-ai-chat ai_chat (string string string string))
   (cpp-ai-correct ai_correct (tree content string string))
   (cpp-ai-translate ai_translate (tree content string string string))
+  (json->tree json_to_tree (tree string))
+  (tree->json tree_to_json (string content))
+  (lantool-correct lantool_correct (string string string))
 
   ;; routines for urls
   (url->url url (url url))
@@ -617,6 +656,8 @@
   (url-temp-dir url_temp_dir (url))
   (url-scratch url_scratch (url string string int))
   (url-scratch? is_scratch (bool url))
+  (url-backup url_backup (url url))
+  (url-backup? is_backup (bool url))
   (url-cache-invalidate web_cache_invalidate (void url))
   (string-save string_save (void string url))
   (string-load string_load (string url))
@@ -626,6 +667,7 @@
   (system-remove remove (void url))
   (system-mkdir mkdir (void url))
   (system-rmdir rmdir (void url))
+  (system-rmdir-recursive rmdir_recursive (void url))
   (system-setenv set_env (void string string))
   (system-search-score search_score (int url array_string))
   (system-1 system (void string url))
@@ -653,7 +695,7 @@
   (tmdb-set-entry set_entry (void url string scheme_tree double))
   (tmdb-get-entry get_entry (scheme_tree url string double))
   (tmdb-remove-entry remove_entry (void url string double))
-  (tmdb-query query (array_string url scheme_tree double int))
+  (tmdb-query query (array_string url scheme_tree double int int))
   (tmdb-inspect-history inspect_history (void url string))
   (tmdb-get-completions get_completions (array_string url string))
   (tmdb-get-name-completions get_name_completions (array_string url string))
@@ -664,16 +706,40 @@
   (sql-quote sql_quote (string string))
 
   ;; TeXmacs servers and clients
+  (server-define-error-codes server_define_error_codes (void))
   (server-start server_start (void))
   (server-stop server_stop (void))
   (server-read server_read (string int))
   (server-write server_write (void int string))
   (server-started? server_started (bool))
-  (client-start legacy_client_start (int string))
+  (server-port-in-use server_port_in_use (int))
+  (legacy-client-start legacy_client_start (int string int))
   (client-stop client_stop (void int))
   (client-read client_read (string int))
-  (client-write client_write (void int string))
+  (client-write client_write (int int string))
+  (client-protocol-version client_protocol_version (int))
   (enter-secure-mode enter_secure_mode (void int))
+  (server-client-address server_client_address (string int))
+
+  ;; TeXmacs servers logs
+  (server-log-write-int server_log_write (void int string))
+
+  ;; TeXmacs secure clients
+  (supports-gnutls? gnutls_present (bool))
+  (gnutls-random-number gnutls_random_int (int uint))
+  (tls-client-start tls_client_start (int string int scheme_tree))
+  (gnutls-generate-salt gnutls_generate_salt (string))
+  (hash-password-pbkdf2 hash_password_pbkdf2 (string string string))
+
+  ;; Certificates
+  (generate-self-signed-certificate generate_self_signed
+                                    (bool scheme_tree url url))
+  (trust-certificate trust_certificate (bool string))
+  (disable-certificate-time-checks
+    disable_certificate_time_checks (void))
+
+  ;; quit with exit code
+  (quit-TeXmacs-code quit_TeXmacs_code (void int))
 
   ;; connections to extern systems
   (connection-start connection_start (string string string))
@@ -699,14 +765,17 @@
   (widget-pullright-button pullright_button (widget widget promise_widget))
   (widget-menu-button menu_button (widget widget command string string int))
   (widget-toggle toggle_widget (widget command bool int))
+  (widget-setting-toggle setting_toggle_widget (widget command string bool int))
+  (widget-setting-group setting_group_widget (widget string array_widget int))
   (widget-balloon balloon_widget (widget widget widget))
   (widget-empty empty_widget (widget))
   (widget-text text_widget (widget string int int bool))
   (widget-input input_text_widget
 		(widget command string array_string int string))
   (widget-enum enum_widget (widget command array_string string int string))
-  (widget-choice choice_widget (widget command array_string string))
-  (widget-choices choice_widget (widget command array_string array_string))
+  (widget-setting-enum setting_enum_widget (widget command string array_string string int string))
+  (widget-choice choice_widget (widget command array_string string int))
+  (widget-choices choice_widget (widget command array_string array_string int))
   (widget-filtered-choice choice_widget
     (widget command array_string string string))
   (widget-tree-view tree_view_widget (widget command tree tree))
@@ -720,6 +789,9 @@
   (widget-aligned aligned_widget (widget array_widget array_widget))
   (widget-tabs tabs_widget (widget array_widget array_widget))
   (widget-icon-tabs icon_tabs_widget (widget array_url array_widget
+                                             array_widget))
+  (widget-responsive-tabs responsive_tabs_widget (widget array_widget array_widget))
+  (widget-responsive-icon-tabs responsive_icon_tabs_widget (widget array_url array_widget
                                              array_widget))
   (widget-scrollable user_canvas_widget (widget widget int))
   (widget-resize resize_widget (widget widget int string string string string
@@ -774,6 +846,7 @@
   (buffer-export buffer_export (bool url url string))
   (buffer-save buffer_save (bool url))
   (tree-import-loaded import_loaded_tree (tree string url string))
+  (tree-import-loaded-from-object import_loaded_tree_from_object (tree object url))
   (tree-import import_tree (tree url string))
   (tree-inclusion load_inclusion (tree url))
   (tree-export export_tree (bool tree url string))

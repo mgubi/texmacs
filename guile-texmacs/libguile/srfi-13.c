@@ -3579,7 +3579,93 @@ SCM_DEFINE (scm_string_delete, "string-delete", 2, 2, 0,
 void
 scm_init_srfi_13 (void)
 {
-#include "libguile/srfi-13.x"
+ scm_c_define_gsubr (s_scm_string_null_p, 1, 0, 0, (SCM (*)()) scm_string_null_p); ;
+ scm_c_define_gsubr (s_scm_string_any, 2, 2, 0, (SCM (*)()) scm_string_any); ;
+ scm_c_define_gsubr (s_scm_string_every, 2, 2, 0, (SCM (*)()) scm_string_every); ;
+ scm_c_define_gsubr (s_scm_string_tabulate, 2, 0, 0, (SCM (*)()) scm_string_tabulate); ;
+ scm_c_define_gsubr (s_scm_substring_to_list, 1, 2, 0, (SCM (*)()) scm_substring_to_list); ;
+ scm_c_define_gsubr (s_scm_reverse_list_to_string, 1, 0, 0, (SCM (*)()) scm_reverse_list_to_string); ;
+ scm_sym_infix = scm_permanent_object (scm_from_locale_symbol ("infix")) ;
+ scm_sym_strict_infix = scm_permanent_object (scm_from_locale_symbol ("strict-infix")) ;
+ scm_sym_suffix = scm_permanent_object (scm_from_locale_symbol ("suffix")) ;
+ scm_sym_prefix = scm_permanent_object (scm_from_locale_symbol ("prefix")) ;
+ scm_c_define_gsubr (s_scm_string_join, 1, 2, 0, (SCM (*)()) scm_string_join); ;
+ scm_c_define_gsubr (s_scm_srfi13_substring_copy, 1, 2, 0, (SCM (*)()) scm_srfi13_substring_copy); ;
+ scm_c_define_gsubr (s_scm_string_copy_x, 3, 2, 0, (SCM (*)()) scm_string_copy_x); ;
+ scm_c_define_gsubr (s_scm_substring_move_x, 5, 0, 0, (SCM (*)()) scm_substring_move_x); ;
+ scm_c_define_gsubr (s_scm_string_take, 2, 0, 0, (SCM (*)()) scm_string_take); ;
+ scm_c_define_gsubr (s_scm_string_drop, 2, 0, 0, (SCM (*)()) scm_string_drop); ;
+ scm_c_define_gsubr (s_scm_string_take_right, 2, 0, 0, (SCM (*)()) scm_string_take_right); ;
+ scm_c_define_gsubr (s_scm_string_drop_right, 2, 0, 0, (SCM (*)()) scm_string_drop_right); ;
+ scm_c_define_gsubr (s_scm_string_pad, 2, 3, 0, (SCM (*)()) scm_string_pad); ;
+ scm_c_define_gsubr (s_scm_string_pad_right, 2, 3, 0, (SCM (*)()) scm_string_pad_right); ;
+ scm_c_define_gsubr (s_scm_string_trim, 1, 3, 0, (SCM (*)()) scm_string_trim); ;
+ scm_c_define_gsubr (s_scm_string_trim_right, 1, 3, 0, (SCM (*)()) scm_string_trim_right); ;
+ scm_c_define_gsubr (s_scm_string_trim_both, 1, 3, 0, (SCM (*)()) scm_string_trim_both); ;
+ scm_c_define_gsubr (s_scm_substring_fill_x, 2, 2, 0, (SCM (*)()) scm_substring_fill_x); ;
+ scm_c_define_gsubr (s_scm_string_compare, 5, 4, 0, (SCM (*)()) scm_string_compare); ;
+ scm_c_define_gsubr (s_scm_string_compare_ci, 5, 4, 0, (SCM (*)()) scm_string_compare_ci); ;
+ scm_c_define_gsubr (s_scm_string_eq, 2, 4, 0, (SCM (*)()) scm_string_eq); ;
+ scm_c_define_gsubr (s_scm_string_neq, 2, 4, 0, (SCM (*)()) scm_string_neq); ;
+ scm_c_define_gsubr (s_scm_string_lt, 2, 4, 0, (SCM (*)()) scm_string_lt); ;
+ scm_c_define_gsubr (s_scm_string_gt, 2, 4, 0, (SCM (*)()) scm_string_gt); ;
+ scm_c_define_gsubr (s_scm_string_le, 2, 4, 0, (SCM (*)()) scm_string_le); ;
+ scm_c_define_gsubr (s_scm_string_ge, 2, 4, 0, (SCM (*)()) scm_string_ge); ;
+ scm_c_define_gsubr (s_scm_string_ci_eq, 2, 4, 0, (SCM (*)()) scm_string_ci_eq); ;
+ scm_c_define_gsubr (s_scm_string_ci_neq, 2, 4, 0, (SCM (*)()) scm_string_ci_neq); ;
+ scm_c_define_gsubr (s_scm_string_ci_lt, 2, 4, 0, (SCM (*)()) scm_string_ci_lt); ;
+ scm_c_define_gsubr (s_scm_string_ci_gt, 2, 4, 0, (SCM (*)()) scm_string_ci_gt); ;
+ scm_c_define_gsubr (s_scm_string_ci_le, 2, 4, 0, (SCM (*)()) scm_string_ci_le); ;
+ scm_c_define_gsubr (s_scm_string_ci_ge, 2, 4, 0, (SCM (*)()) scm_string_ci_ge); ;
+ scm_c_define_gsubr (s_scm_substring_hash, 1, 3, 0, (SCM (*)()) scm_substring_hash); ;
+ scm_c_define_gsubr (s_scm_substring_hash_ci, 1, 3, 0, (SCM (*)()) scm_substring_hash_ci); ;
+ scm_c_define_gsubr (s_scm_string_prefix_length, 2, 4, 0, (SCM (*)()) scm_string_prefix_length); ;
+ scm_c_define_gsubr (s_scm_string_prefix_length_ci, 2, 4, 0, (SCM (*)()) scm_string_prefix_length_ci); ;
+ scm_c_define_gsubr (s_scm_string_suffix_length, 2, 4, 0, (SCM (*)()) scm_string_suffix_length); ;
+ scm_c_define_gsubr (s_scm_string_suffix_length_ci, 2, 4, 0, (SCM (*)()) scm_string_suffix_length_ci); ;
+ scm_c_define_gsubr (s_scm_string_prefix_p, 2, 4, 0, (SCM (*)()) scm_string_prefix_p); ;
+ scm_c_define_gsubr (s_scm_string_prefix_ci_p, 2, 4, 0, (SCM (*)()) scm_string_prefix_ci_p); ;
+ scm_c_define_gsubr (s_scm_string_suffix_p, 2, 4, 0, (SCM (*)()) scm_string_suffix_p); ;
+ scm_c_define_gsubr (s_scm_string_suffix_ci_p, 2, 4, 0, (SCM (*)()) scm_string_suffix_ci_p); ;
+ scm_c_define_gsubr (s_scm_string_index, 2, 2, 0, (SCM (*)()) scm_string_index); ;
+ scm_c_define_gsubr (s_scm_string_index_right, 2, 2, 0, (SCM (*)()) scm_string_index_right); ;
+ scm_c_define_gsubr (s_scm_string_rindex, 2, 2, 0, (SCM (*)()) scm_string_rindex); ;
+ scm_c_define_gsubr (s_scm_string_skip, 2, 2, 0, (SCM (*)()) scm_string_skip); ;
+ scm_c_define_gsubr (s_scm_string_skip_right, 2, 2, 0, (SCM (*)()) scm_string_skip_right); ;
+ scm_c_define_gsubr (s_scm_string_count, 2, 2, 0, (SCM (*)()) scm_string_count); ;
+ scm_c_define_gsubr (s_scm_string_contains, 2, 4, 0, (SCM (*)()) scm_string_contains); ;
+ scm_c_define_gsubr (s_scm_string_contains_ci, 2, 4, 0, (SCM (*)()) scm_string_contains_ci); ;
+ scm_c_define_gsubr (s_scm_substring_upcase_x, 1, 2, 0, (SCM (*)()) scm_substring_upcase_x); ;
+ scm_c_define_gsubr (s_scm_substring_upcase, 1, 2, 0, (SCM (*)()) scm_substring_upcase); ;
+ scm_c_define_gsubr (s_scm_substring_downcase_x, 1, 2, 0, (SCM (*)()) scm_substring_downcase_x); ;
+ scm_c_define_gsubr (s_scm_substring_downcase, 1, 2, 0, (SCM (*)()) scm_substring_downcase); ;
+ scm_c_define_gsubr (s_scm_string_titlecase_x, 1, 2, 0, (SCM (*)()) scm_string_titlecase_x); ;
+ scm_c_define_gsubr (s_scm_string_titlecase, 1, 2, 0, (SCM (*)()) scm_string_titlecase); ;
+ scm_c_define_gsubr (s_scm_string_capitalize_x, 1, 0, 0, (SCM (*)()) scm_string_capitalize_x); ;
+ scm_c_define_gsubr (s_scm_string_capitalize, 1, 0, 0, (SCM (*)()) scm_string_capitalize); ;
+ scm_c_define_gsubr (s_scm_string_reverse, 1, 2, 0, (SCM (*)()) scm_string_reverse); ;
+ scm_c_define_gsubr (s_scm_string_reverse_x, 1, 2, 0, (SCM (*)()) scm_string_reverse_x); ;
+ scm_c_define_gsubr (s_scm_string_append_shared, 0, 0, 1, (SCM (*)()) scm_string_append_shared); ;
+ scm_c_define_gsubr (s_scm_string_concatenate, 1, 0, 0, (SCM (*)()) scm_string_concatenate); ;
+ scm_c_define_gsubr (s_scm_string_concatenate_reverse, 1, 2, 0, (SCM (*)()) scm_string_concatenate_reverse); ;
+ scm_c_define_gsubr (s_scm_string_concatenate_shared, 1, 0, 0, (SCM (*)()) scm_string_concatenate_shared); ;
+ scm_c_define_gsubr (s_scm_string_concatenate_reverse_shared, 1, 2, 0, (SCM (*)()) scm_string_concatenate_reverse_shared); ;
+ scm_c_define_gsubr (s_scm_string_map, 2, 2, 0, (SCM (*)()) scm_string_map); ;
+ scm_c_define_gsubr (s_scm_string_map_x, 2, 2, 0, (SCM (*)()) scm_string_map_x); ;
+ scm_c_define_gsubr (s_scm_string_fold, 3, 2, 0, (SCM (*)()) scm_string_fold); ;
+ scm_c_define_gsubr (s_scm_string_fold_right, 3, 2, 0, (SCM (*)()) scm_string_fold_right); ;
+ scm_c_define_gsubr (s_scm_string_unfold, 4, 2, 0, (SCM (*)()) scm_string_unfold); ;
+ scm_c_define_gsubr (s_scm_string_unfold_right, 4, 2, 0, (SCM (*)()) scm_string_unfold_right); ;
+ scm_c_define_gsubr (s_scm_string_for_each, 2, 2, 0, (SCM (*)()) scm_string_for_each); ;
+ scm_c_define_gsubr (s_scm_string_for_each_index, 2, 2, 0, (SCM (*)()) scm_string_for_each_index); ;
+ scm_c_define_gsubr (s_scm_xsubstring, 2, 3, 0, (SCM (*)()) scm_xsubstring); ;
+ scm_c_define_gsubr (s_scm_string_xcopy_x, 4, 3, 0, (SCM (*)()) scm_string_xcopy_x); ;
+ scm_c_define_gsubr (s_scm_string_replace, 2, 4, 0, (SCM (*)()) scm_string_replace); ;
+ scm_c_define_gsubr (s_scm_string_tokenize, 1, 3, 0, (SCM (*)()) scm_string_tokenize); ;
+ scm_c_define_gsubr (s_scm_string_split, 2, 0, 0, (SCM (*)()) scm_string_split); ;
+ scm_c_define_gsubr (s_scm_string_filter, 2, 2, 0, (SCM (*)()) scm_string_filter); ;
+ scm_c_define_gsubr (s_scm_string_delete, 2, 2, 0, (SCM (*)()) scm_string_delete); ;
+
 }
 
 /* End of srfi-13.c.  */

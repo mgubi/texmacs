@@ -18,6 +18,14 @@
 #include "QTMMenuHelper.hpp"
 #include "QTMApplication.hpp"
 
+// Global flag: the next qt_window_widget_rep will be shown as a floating popup
+// instead of being added to the tab bar. Reset to false after each use.
+static bool g_next_window_as_popup = false;
+
+void gui_set_next_window_as_popup () {
+  g_next_window_as_popup = true;
+}
+
 #include "message.hpp"
 #include "analyze.hpp"
 #include "window.hpp"
@@ -48,13 +56,6 @@ ensure_visible_position (const QPoint& p,
   //	    << "within" << g << "returns" << r;
   return r.topLeft ();
 }
-#else
-static inline QPoint
-ensure_visible_position (const QPoint& p,
-			 const QScreen* screen, const QSize& s) {
-  (void) screen; (void) s;
-  return p;
-}
 #endif
 
 /*! Construct a qt_window_widget_rep around an already compiled widget.
@@ -72,6 +73,11 @@ qt_window_widget_rep::qt_window_widget_rep (QWidget* _wid, string name,
 {
   qwid->setProperty ("texmacs_window_widget",
                      QVariant::fromValue ((void*) this));
+
+  if (g_next_window_as_popup) {
+    qwid->setProperty ("tmWindowMode", QString ("popup"));
+    g_next_window_as_popup = false;
+  }
   
     // Try to connect only if the QWidget has a closed() signal
     // We need this for the QDockWidgets we use in side tools (see qt_tm_widget_rep)
@@ -185,6 +191,9 @@ qt_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_POSITION:
     {
       check_type<coord2>(val, s);
+      if (get_user_preference("disable texmacs window positioning") == "on") {
+        break;
+      }
       coord2 p = open_box<coord2> (val);
       if (qwid) {
         QPoint pt = to_qpoint (p);
@@ -192,7 +201,9 @@ qt_window_widget_rep::send (slot s, blackbox val) {
 	// to avoid window under menu bar on MAC when moving at (0,0)
         pt.ry() = (pt.y() <= 40) ? 40 : pt.y();
 #endif
+#if QT_VERSION >= 0x060000
 	pt= ensure_visible_position (pt, qwid->screen (), qwid->size ());
+#endif
         qwid->move (pt);
       }
     }
@@ -202,24 +213,16 @@ qt_window_widget_rep::send (slot s, blackbox val) {
       check_type<bool> (val, s);
       bool flag = open_box<bool> (val);
       if (qwid) {
-        if (!tmapp()->useTabWindow()) {
-          if (flag) {
-            //QWidget* master = QApplication::activeWindow ();
-            qwid->show();
-            //qwid->activateWindow();
-            //WEIRD: in Ubuntu uncommenting the above line causes the main window 
-            //to be opened in the background.
-            qwid->raise();
-            //QApplication::setActiveWindow (master);
-          }
-          else qwid->hide();
-        } else {
-          if (flag) {
-            tmapp()->mainTabWindow().showWidget(qwid);
-          } else {
-            tmapp()->mainTabWindow().removeWidget(qwid);
-          }
+        if (flag) {
+          //QWidget* master = QApplication::activeWindow ();
+          qwid->show();
+          //qwid->activateWindow();
+          //WEIRD: in Ubuntu uncommenting the above line causes the main window 
+          //to be opened in the background.
+          qwid->raise();
+          //QApplication::setActiveWindow (master);
         }
+        else qwid->hide();
       }
     }
       break;
@@ -239,11 +242,7 @@ qt_window_widget_rep::send (slot s, blackbox val) {
       check_type<string> (val, s);
       string name = open_box<string> (val);
         // The [*] is for QWidget::setWindowModified()
-      if (!tmapp()->useTabWindow()) {
-        if (qwid) qwid->setWindowTitle (to_qstring (name * "[*]"));
-      } else {
-        if (qwid) tmapp()->mainTabWindow().tabTitleChanged (qwid, to_qstring (name));
-      }
+      if (qwid) qwid->setWindowTitle (to_qstring (name * "[*]"));
     }
       break;
     case SLOT_MODIFIED:
@@ -332,7 +331,7 @@ qt_window_widget_rep::notify (slot s, blackbox new_val) {
 qt_popup_widget_rep::qt_popup_widget_rep (widget wid, command _quit)
 : qt_widget_rep(qt_widget_rep::popup_widget, 0), quit(_quit) {
   
-  qwid = new QTMPopupWidget(concrete(wid)->as_qwidget());
+  qwid = new QTMPopupWidget(concrete(wid)->as_qwidget(nullptr));
 
   if (qwid->metaObject() ->
       indexOfSignal (QMetaObject::normalizedSignature ("closed()").constData ()) != -1) {
@@ -383,8 +382,13 @@ qt_popup_widget_rep::send (slot s, blackbox val) {
     case SLOT_POSITION:
     {
       check_type<coord2>(val, s);
+      if (get_user_preference("disable texmacs window positioning") == "on") {
+        break;
+      }
       QPoint pos= to_qpoint (open_box<coord2> (val));
+#if QT_VERSION >= 0x060000
       pos= ensure_visible_position (pos, qwid->screen (), qwid->size());
+#endif
       qwid->move (pos);
     }
       break;

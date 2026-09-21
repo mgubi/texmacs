@@ -1,6 +1,6 @@
-<TeXmacs|1.99.11>
+<TeXmacs|2.1.5>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Download|Linux><tmweb-title|GNU/<name|Linux> repositories
@@ -11,53 +11,24 @@
   <TeXmacs> in the same way as any other packages on your system. In
   particular, you can automatically check for updates and install new
   versions as soon as they become available. We implemented <TeXmacs>
-  repositories for the following distributions:
+  repositories for Debian, Raspbian, and Ubuntu.
 
-  <\itemize>
-    <item><hlink|Debian|#debian>.
+  <section*|Instructions for Debian, Raspbian and Ubuntu><label|debian>
 
-    <item><hlink|Ubuntu|#ubuntu>.
-  </itemize>
-
-  <section*|Debian><label|debian>
-
-  Retrieve your distribution name (<abbr|e.g.> <name|stretch>) using
+  Download and import the <TeXmacs> public key :
 
   <\shell-code>
-    lsb_release -cs
+    wget -qO- --no-check-certificate https://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/apt-texmacs.asc
+    \| gpg --dearmor \| sudo tee /usr/share/keyrings/texmacs-keyring.gpg
+    \<gtr\> /dev/null
   </shell-code>
 
-  Download the <TeXmacs> public key (into the auxiliary file
-  <verbatim|apt-texmacs.asc>):
+  Add the <TeXmacs> repository:
 
   <\shell-code>
-    curl --insecure https://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/apt-texmacs.asc
-    --output apt-texmacs.asc
-  </shell-code>
-
-  Obtain root privileges:
-
-  <\shell-code>
-    sudo bash
-  </shell-code>
-
-  Import the key in the <name|apt> keyring using
-
-  <\shell-code>
-    apt-key add apt-texmacs.asc
-  </shell-code>
-
-  Remove the temporary key file:
-
-  <\shell-code>
-    rm apt-texmacs.asc
-  </shell-code>
-
-  Add the texmacs repository in
-
-  <\shell-code>
-    add-apt-repository "deb http://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/
-    stretch universe"
+    echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.gpg]
+    http://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/ $(lsb_release -cs) main"
+    \| sudo tee /etc/apt/sources.list.d/texmacs.list \<gtr\> /dev/null
   </shell-code>
 
   Update the package list:
@@ -66,57 +37,32 @@
     apt-get update
   </shell-code>
 
-  Install TeXmacs:
+  Install <TeXmacs>:
 
   <\shell-code>
     apt-get install texmacs
   </shell-code>
 
-  Return to your regular account:
+  <section*|Instructions for Ubuntu-based distributions><label|debian>
+
+  Distributions that are Ubuntu-based (like Linux Mint) are compatible with
+  the <TeXmacs> apt repository.
+
+  Download and import the <TeXmacs> public key :
 
   <\shell-code>
-    exit
+    wget -qO- --no-check-certificate https://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/apt-texmacs.asc
+    \| gpg --dearmor \| sudo tee /usr/share/keyrings/texmacs-keyring.gpg
+    \<gtr\> /dev/null
   </shell-code>
 
-  <section*|Ubuntu><label|ubuntu>
-
-  Retrieve your distribution name (<abbr|e.g.> <name|yakkety>) using
+  Add the <TeXmacs> repository :
 
   <\shell-code>
-    lsb_release -cs
-  </shell-code>
-
-  Download the <TeXmacs> public key (into the auxiliary file
-  <verbatim|apt-texmacs.asc>):
-
-  <\shell-code>
-    curl --insecure https://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/apt-texmacs.asc
-    --output apt-texmacs.asc
-  </shell-code>
-
-  Obtain root privileges:
-
-  <\shell-code>
-    sudo bash
-  </shell-code>
-
-  Import the key in the <name|apt> keyring using
-
-  <\shell-code>
-    apt-key add apt-texmacs.asc
-  </shell-code>
-
-  Remove the temporary key file:
-
-  <\shell-code>
-    rm apt-texmacs.asc
-  </shell-code>
-
-  Add the texmacs repository in
-
-  <\shell-code>
-    add-apt-repository "deb http://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/
-    yakkety universe"
+    echo "deb [signed-by=/usr/share/keyrings/texmacs-keyring.gpg]
+    http://ftp.texmacs.org/TeXmacs/tmftp/repos/apt/ $(cat /etc/os-release \|
+    grep UBUNTU_CODENAME \| cut -d"=" -f2) main" \| sudo tee
+    /etc/apt/sources.list.d/texmacs.list \<gtr\> /dev/null
   </shell-code>
 
   Update the package list:
@@ -125,19 +71,26 @@
     apt-get update
   </shell-code>
 
-  Install TeXmacs:
+  Install <TeXmacs>:
 
   <\shell-code>
     apt-get install texmacs
   </shell-code>
 
-  Return to your regular account:
+  <section*|Troubleshooting><label|debian>
+
+  <subsection*|How to force Ubuntu to prioritize the official <TeXmacs>
+  repository>
+
+  Run this if Ubuntu keeps trying to install an older version from its own
+  repositories:
 
   <\shell-code>
-    exit
+    echo -e "Package: texmacs\\nPin: origin ftp.texmacs.org\\nPin-Priority:
+    1001" \| sudo tee /etc/apt/preferences.d/texmacs \<gtr\> /dev/null
   </shell-code>
 
-  <tmdoc-copyright|1999--2018|Denis Raux|Joris van der Hoeven>
+  <tmdoc-copyright|1999\U2018|Denis Raux|Joris van der Hoeven, Liza Belos>
 
   <tmweb-license>
 </body>

@@ -1,0 +1,43 @@
+QTabBar#mainTabWindowTabs::tab {
+    height: 28px;
+    margin: 2px 0px -2px 2px;
+    padding: 0px;
+    border-radius: 2px;
+}
+
+#mainToolBar, #modeToolBar, #focusToolBar {
+    qproperty-toolbarMargin: 6;
+}
+
+#mainToolBar {
+    qproperty-iconWidth: 26;
+    qproperty-iconHeight: 32;
+}
+
+#modeToolBar {
+    qproperty-iconWidth: 21;
+    qproperty-iconHeight: 24;
+}
+
+#focusToolBar {
+    qproperty-iconWidth: 16;
+    qproperty-iconHeight: 20;
+}
+
+QMainWindow::separator {
+    height: 10px;
+    width: 10px;
+}
+
+#statusBar > * {
+    padding: 4px;
+}
+
+QTMSettingGroup {
+    qproperty-outerMargin: 3;
+}
+
+QTMSettingSelect QComboBox {
+    padding: 3px 5px;
+    min-height: 18px;
+}

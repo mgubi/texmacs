@@ -5,16 +5,24 @@ https://ftp.gnu.org/gnu/libtool/libtool-2.5.4.tar.gz
 https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs9540/ghostscript-9.54.0.tar.gz
 https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz
 https://ftp.gnu.org/pub/gnu/gettext/gettext-0.24.tar.gz
-https://download.qt.io/archive/qt/6.6/6.6.3/single/qt-everywhere-src-6.6.3.tar.xz
+https://download.qt.io/archive/qt/6.9/6.9.0/single/qt-everywhere-src-6.9.0.tar.xz
 svn://svn.savannah.gnu.org/texmacs/trunk/src texmacs/src
 svn://svn.savannah.gnu.org/texmacs/trunk/guile-texmacs texmacs/src/tm-guile188
 https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz
-https://gitlab.freedesktop.org/xorg/proto/xcbproto.git
-https://github.com/xkbcommon/libxkbcommon.git
-https://gitlab.gnome.org/GNOME/libxml2.git
-https://gitlab.freedesktop.org/wayland/wayland.git
-https://gitlab.freedesktop.org/wayland/wayland-protocols.git
-https://gitlab.freedesktop.org/fontconfig/fontconfig.git
-https://github.com/besser82/libxcrypt.git
-https://ftp.texmacs.org/TeXmacs/misc/nettle-3.10.2.tar.gz
-https://ftp.texmacs.org/TeXmacs/misc/gnutls-3.7.11.tar.xz
+https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-1.17.0.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/libxkbcommon-1.7.0.tar.xz
+https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.4.tar.xz
+https://gitlab.freedesktop.org/wayland/wayland/-/releases/1.23.0/downloads/wayland-1.23.0.tar.xz
+https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/1.37/downloads/wayland-protocols-1.37.tar.xz
+https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
+https://github.com/besser82/libxcrypt/releases/download/v4.4.36/libxcrypt-4.4.36.tar.xz
+https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.7.tar.xz
+https://github.com/mikutter/execso.git
+https://github.com/unicode-org/icu/releases/download/release-60-3/icu4c-60_3-src.tgz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-0.4.1.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-wm-0.4.2.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-image-0.4.1.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-keysyms-0.4.1.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-renderutil-0.3.10.tar.xz
+https://xorg.freedesktop.org/archive/individual/lib/xcb-util-cursor-0.1.5.tar.xz

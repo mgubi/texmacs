@@ -1,8 +1,9 @@
 #!/bin/sh
 export WORKING_DIR=`pwd`
+export WORKING_DIR_WIN=`pwd -W`
 
 export CFLAGS="-O3 -I$WORKING_DIR/local/include"
-export CPPFLAGS=-I$WORKING_DIR/local/include
+export CPPFLAGS="-O3 -I$WORKING_DIR/local/include"
 export CXXFLAGS="-O3 -I$WORKING_DIR/local/include"
 export LDFLAGS=-L$WORKING_DIR/local/lib
 export PATH=$WORKING_DIR/local/bin:$PATH
@@ -11,7 +12,10 @@ export TEXMACS_PATH=$WORKING_DIR/texmacs/src/TeXmacs
 
 export PATH=$(echo "$PATH" | sed 's/c:/\/c/g')
 export PATH=$(echo "$PATH" | sed 's/\\/\//g')
+export PATH=$PATH:"$WORKING_DIR/local/windows/aspell/bin/"
 export PATH=$PATH:"/c/Program Files (x86)/Inno Setup 6/"
 
 export MAKE=mingw32-make
 export PKG_CONFIG_PATH=$WORKING_DIR/local/lib/pkgconfig
+
+export ASPELL_CONF="dict-dir $(cygpath -m $WORKING_DIR/local/lib/aspell-0.60); data-dir $(cygpath -m $WORKING_DIR/local/lib/aspell-0.60)"

@@ -29,9 +29,10 @@ CXXWARNING = @CONFIG_CXXWARNING@
 CXXTEMPLATE = @CONFIG_CXXTEMPLATE@
 CXXOPTIMIZE = @CONFIG_CXXOPTIMIZE@ @CONFIG_CXXDIALECT@
 CXXDEBUG = @CONFIG_CXXDEBUG@ 
+CXXSANITIZERS = @CONFIG_CXXSANITIZERS@
 CXXPROFILE = @CONFIG_CXXPROFILE@
 CFLAGS = @CFLAGS@
-CXXFLAGS = $(CXXWARNING) $(CXXTEMPLATE) $(CXXOPTIMIZE) $(CXXDEBUG) $(CXXPROFILE) @CONFIG_CXXFLAGS@ @CXXFLAGS@
+CXXFLAGS = $(CXXWARNING) $(CXXTEMPLATE) $(CXXOPTIMIZE) $(CXXDEBUG) $(CXXPROFILE) $(CXXSANITIZERS) @CONFIG_CXXFLAGS@ @CXXFLAGS@
 CPPFLAGS = @CPPFLAGS@ @QT_CPPFLAGS@ -D@CONFIG_GUI_DEFINE@
 CXXX11 = @X11_CXX@
 CXXCOCOA = @COCOA_CFLAGS@
@@ -50,9 +51,10 @@ CXXPDF = @PDF_CFLAGS@
 CXXMUPDF = @MUPDF_CFLAGS@
 CXXSDL = @SDL_CFLAGS@
 CXXVUE = @VUE_CFLAGS@
+CXXRESVG = @RESVG_CFLAGS@
 
 LD = @CXX@
-LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE)
+LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE) $(CXXSANITIZERS)
 LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ 
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
@@ -64,15 +66,18 @@ LDSDL = @SDL_LDFLAGS@
 LDVUE = @VUE_LDFLAGS@
 LDGUI = $(LD@CONFIG_GUI@)
 LDGNUTLS= @GNUTLS_LDFLAGS@
+LDRESVG = @RESVG_LDFLAGS@ @RESVG_LIBS@
 
 AR = ar
 ARFLAGS = -r
 RM = rm -f
 CP = @CONFIG_CP@
+GUILE_BIN = @GUILE_BIN@
 GLUE = cd Scheme/Glue; ./build-glue
 TOUCH = touch
 MOC = @MOC@
 MOCFLAGS = @QT_CPPFLAGS@
+QT_PLUGIN_DIR = @QT_PLUGIN_DIR@
 
 ###############################################################################
 # Source files
@@ -113,12 +118,20 @@ x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
-qt_src       := $(call findsrc_in,Plugins,@CONFIG_QT@)
 ifeq "@CONFIG_QT@" "Qtwk Widkit"
-qt_src :=  $(qt_src) qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
-           QTMPipeLink.cpp QTMSockets.cpp 
+# the Widkit-on-Qt port takes the few Qt sources it needs from Plugins/Qt
+# (Plugins/Qt6 has the same file names, so the directory is explicit)
+QT_SRC_DIR   := Qt
+qtwk_src     := $(call findsrc_in,Plugins,Qtwk Widkit)
+qt_src       := qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
+                QTMPipeLink.cpp QTMSockets.cpp
+else
+QT_SRC_DIR   := $(QT_PLUGIN_DIR)
+qtwk_src     :=
+qt_src       := $(call findsrc_in,Plugins,$(QT_PLUGIN_DIR))
 endif
 gs_src       := $(call findsrc_in,Plugins,@CONFIG_GS@)
+resvg_src    := $(call findsrc_in,Plugins,Resvg)
 style_src    := $(call findsrc_in,Style,@CONFIG_EXPERIMENTAL@)
 typeset_src  := $(call findsrc,Typeset)
 edit_src     := $(call findsrc,Edit)
@@ -148,7 +161,7 @@ make_mm_deps = $(patsubst %.mm,Deps/%.d,$(notdir $(1)))
 texmacs_cpp_deps := $(call make_cpp_deps,$(system_src) $(kernel_src) $(data_src)\
  $(edit_src) $(scheme_src) $(graphics_src)\
  $(plugins_src) $(x11_src) $(texmacs_src)\
- $(typeset_src) $(style_src) $(qt_src) $(gs_src) $(os_src)\
+ $(typeset_src) $(style_src) $(qt_src) $(qtwk_src) $(gs_src) $(resvg_src) $(os_src)\
  $(pdf_src) $(freetype_src) $(mupdf_src) $(sdl_src) $(gnutls_src))
 texmacs_m_deps += $(call make_m_deps,$(cocoa_m_src))
 texmacs_mm_deps += $(call make_mm_deps,$(cocoa_mm_src))
@@ -204,28 +217,23 @@ vue_incl      := $(system_incl)  \
 ###############################################################################
 
 # moc source files are generated for each header present in $(qt_moc) and
-# put in the Plugins/Qt directory
+# put in the Plugins/$(QT_PLUGIN_DIR) directory
 
-ifeq "@CONFIG_QT@" "Qt"
-qt_moc := QTMStyle.hpp QTMGuiHelper.hpp QTMInteractiveInputHelper.hpp \
-  QTMMenuHelper.hpp QTMWidget.hpp  QTMWindow.hpp QTMScrollView.hpp \
-  QTMPipeLink.hpp QTMInteractivePrompt.hpp QTMFileDialog.hpp \
-  QTMPrintDialog.hpp QTMPrinterSettings.hpp QTMApplication.hpp \
-  QTMTreeModel.hpp QTMSockets.hpp QTMMainTabWindow.hpp QTMWaitDialog.hpp \
-  QTMToolbar.hpp
+ifeq "@CONFIG_QT@" ""
+qt_moc := 
 qtwk_moc :=
 else ifeq "@CONFIG_QT@" "Qtwk Widkit"
 qt_moc :=  QTMSockets.hpp QTMPipeLink.hpp 
 qtwk_moc :=  QTWKGuiHelper.hpp QTWKWindow.hpp QTWKApplication.hpp
 else
-qt_moc := 
+qt_moc := $(notdir $(wildcard ./Plugins/$(QT_PLUGIN_DIR)/*.hpp))
 qtwk_moc :=
 endif
 
 qt_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qt_moc))
-qt_moc_paths = $(patsubst %,./Plugins/Qt/%,$(qt_moc_src))
+qt_moc_paths = $(patsubst %,./Plugins/$(QT_SRC_DIR)/%,$(qt_moc_src))
 
-$(qt_moc_paths): ./Plugins/Qt/moc_%.cpp: ./Plugins/Qt/%.hpp
+$(qt_moc_paths): ./Plugins/$(QT_SRC_DIR)/moc_%.cpp: ./Plugins/$(QT_SRC_DIR)/%.hpp
 	$(MOC) $(MOCFLAGS) $< -o $@
 
 qtwk_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qtwk_moc))
@@ -260,7 +268,7 @@ deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
   Kernel/Containers Kernel/Types Data/Convert \
   Data/Document Data/Drd Data/History Data/Parser \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree Graphics \
-  Plugins Plugins/Pdf/LibAesgm Plugins/Qt \
+  Plugins Plugins/Pdf/LibAesgm Plugins/$(QT_PLUGIN_DIR) \
   Style/Environment Style/Evaluate Style/Memorizer \
   Typeset Edit Texmacs Texmacs/Data Scheme Graphics/Bitmap_fonts \
   Graphics/Colors Graphics/Fonts \
@@ -269,7 +277,7 @@ deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
 
 deps_flags = $(deps_incl) \
  $(CPPFLAGS) $(CXXAXEL) $(CXXCAIRO) $(CXXIMLIB2) $(CXXSQLITE3) $(CXXFREETYPE) \
- $(CXXICONV) $(CXXGUILE) $(CXXGNUTLS) -I$(tmsrc)/include $(CXXGUI)
+ $(CXXICONV) $(CXXGUILE) $(CXXGNUTLS) $(CXXRESVG) -I$(tmsrc)/include $(CXXGUI)
 # we should use -I- to separate local includes from system includes, but
 # headers of guile 1.6.0 use includes in quotes with names relative to the
 # current directory, and that feature is disable by -I-.
@@ -319,9 +327,12 @@ os_obj       := $(call makeobj,$(os_src))
 moc_obj	     := $(call makeobj,$(qt_moc_src))
 moc_obj_2	 := $(call makeobj,$(qtwk_moc_src))
 qt_obj 	     := $(filter-out $(moc_obj), $(call makeobj,$(qt_src)))
+qtwk_obj     := $(call makeobj,$(qtwk_src))
 gs_obj       := $(call makeobj,$(gs_src))
+resvg_obj    := $(call makeobj,$(resvg_src))
 plugins_obj  := $(call makeobj,$(plugins_src))
 texmacs_obj  := $(call makeobj,$(texmacs_src))
+texmacs_open_obj := Objects/texmacs_open_main.o
 typeset_obj  := $(call makeobj,$(typeset_src))
 style_obj    := $(call makeobj,$(style_src))
 pdf_obj      := $(call makeobj,$(pdf_src))
@@ -385,19 +396,25 @@ $(x11_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(x11_incl) $(CXXX11) $(CXXGUILE))
 $(os_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(os_incl) $(CXXQT) $(CXXGUILE))
-$(qt_obj): Objects/%.o: %.cpp
+$(qt_obj): Objects/%.o: ./Plugins/$(QT_SRC_DIR)/%.cpp
+	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE) $(CXXRESVG))
+$(qtwk_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
-$(moc_obj): Objects/%.o: ./Plugins/Qt/%.cpp
-	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
+$(moc_obj): Objects/%.o: ./Plugins/$(QT_SRC_DIR)/%.cpp
+	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE) $(CXXRESVG))
 $(moc_obj_2): Objects/%.o: ./Plugins/Qtwk/%.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
 $(gs_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gs_incl)  $(CXXX11))
+$(resvg_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(plugins_incl) $(CXXRESVG))
 $(cocoa_m_obj): Objects/%.o: %.m
 	$(call objc_incl,$(cocoa_incl) $(CXXCOCOA))
 $(cocoa_mm_obj): Objects/%.o: %.mm
 	$(call objcxx_incl,$(cocoa_incl) $(CXXCOCOA) $(CXXSPARKLE) $(CXXGUI))
 $(texmacs_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(texmacs_incl) $(CXXGUI))
+$(texmacs_open_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(texmacs_incl) $(CXXGUI))
 $(typeset_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(typeset_incl))
@@ -468,7 +485,9 @@ uses_plugins  := $(plugins_obj) $(plugins_c_obj)
 uses_x11      := $(x11_obj)
 uses_os       := $(os_obj)
 uses_qt       := $(qt_obj) $(moc_obj) $(moc_obj_2)
+uses_qtwk     := $(qtwk_obj)
 uses_gs       := $(gs_obj)
+uses_resvg    := $(resvg_obj)
 uses_cocoa    := $(cocoa_m_obj) $(cocoa_mm_obj)
 uses_typeset  := $(typeset_obj)
 uses_style    := $(style_obj)
@@ -486,17 +505,26 @@ uses_vue      := $(vue_obj) $(vue_c_obj)
 # Compilation rules
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
- plugins x11 os qt gs cocoa style typeset edit scheme texmacs pdf\
+ plugins x11 os qt qtwk gs resvg cocoa style typeset edit scheme texmacs pdf\
  freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps)
 
+TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o \
+	$(filter-out Objects/windows64_entrypoint.o Objects/Plugins/Windows64/windows64_entrypoint.o,$(TEXMACS_objects))
+
 link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
-   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) @SPARKLE_LDFLAGS@
+   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) $(LDRESVG) @SPARKLE_LDFLAGS@
 
 
 $(tmsrc)/bin/texmacs.bin: Objects/texmacs.bin
 	$(CP) $^ $@
 
+$(tmsrc)/bin/texmacs-open.bin: Objects/texmacs-open.bin
+	$(CP) $^ $@
+
 Objects/texmacs.bin: Objects/texmacs.o Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o $(TEXMACS_objects)
+	$(call link_bin,$(link_options))
+
+Objects/texmacs-open.bin: $(TEXMACS_OPEN_objects)
 	$(call link_bin,$(link_options))
 
 all: $(tmsrc)/bin/texmacs.bin
@@ -507,7 +535,7 @@ Objects/libtexmacs.$(SO_SUFFIX): Objects/texmacs.o Objects/tm_ostream.o Objects/
 Objects/libtexmacs.a: Objects/texmacs.o Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o $(TEXMACS_objects)
 	$(AR) $(ARFLAGS) $@ $^
 
-.PHONY: all liball $(tmsrc)/bin/texmacs.bin
+.PHONY: all liball $(tmsrc)/bin/texmacs.bin $(tmsrc)/bin/texmacs-open.bin
 
 ###############################################################################
 # Interface for Guile
@@ -527,20 +555,20 @@ gluesrc = Scheme/Glue
 GLUE: $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp
 	$(RM) Objects/glue.o
 
-.PHONY: GLUE
+.PHONY: GLUE Scheme/Glue/glue_%.cpp $(gluesrc)/glue_basic.cpp $(gluesrc)/glue_editor.cpp $(gluesrc)/glue_server.cpp
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue.scm
 $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue.scm 
 $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue.scm
 
 $(gluesrc)/glue_basic.cpp: $(gluesrc)/build-glue-basic.scm
-	$(GLUE) build-glue-basic.scm glue_basic.cpp
+	$(GLUE) build-glue-basic.scm glue_basic.cpp "$(GUILE_BIN)"
 
 $(gluesrc)/glue_editor.cpp: $(gluesrc)/build-glue-editor.scm
-	$(GLUE) build-glue-editor.scm glue_editor.cpp
+	$(GLUE) build-glue-editor.scm glue_editor.cpp "$(GUILE_BIN)"
 
 $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue-server.scm
-	$(GLUE) build-glue-server.scm glue_server.cpp
+	$(GLUE) build-glue-server.scm glue_server.cpp "$(GUILE_BIN)"
 
 ###############################################################################
 # Cleaning and backup
@@ -553,7 +581,7 @@ DISTR:
 CLEAN: DISTR
 	$(RM) Objects/*.o
 	$(RM) Objects/*.lst
-	$(RM) Plugins/Qt/moc_*.cpp
+	$(RM) Plugins/$(QT_PLUGIN_DIR)/moc_*.cpp
 
 clean: CLEAN
 

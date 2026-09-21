@@ -31,6 +31,8 @@
 #include "QTMStyle.hpp"
 #include "QTMTreeModel.hpp"
 #include "QTMIconManager.hpp"
+#include "QTMResponsiveTabWidget.hpp"
+#include "QTMSettingWidgets.hpp"
 
 #include <QCheckBox>
 #include <QPushButton>
@@ -55,18 +57,34 @@ public:
   qt_key_command_rep(string ks_) : ks(ks_) { }
   
   void apply () {
-    if (N(ks)) { 
-      QTMWidget *w = qobject_cast<QTMWidget*>(qApp->focusWidget());
-      if (w && w->tm_widget()) {
-        if (DEBUG_QT) debug_qt << "shortcut: " << ks << LF;
+    if (!N(ks)) {
+      std_warning << "qt_key_command_rep::apply(): empty key sequence" << LF;
+      return;
+    }
+#if QT_VERSION >= 0x050000
+    QTMWidget *w = QTMWidget::getLastFocusedWidget();
+#else
+    QTMWidget *w = qobject_cast<QTMWidget*>(qApp->focusWidget());
+#endif
+    if (!w) {
+      std_warning << "qt_key_command_rep::apply(): no focus widget" << LF;
+      return;
+    }
+    if (!w->tm_widget()) {
+      std_warning << "qt_key_command_rep::apply(): focus widget has no tm_widget" << LF;
+      return;
+    }
+    if (DEBUG_QT) debug_qt << "shortcut: " << ks << LF;
+#if QT_VERSION >= 0x060000
 	array<string> v= tokenize (ks, " ");
 	for (int i= 0; i < N(v); i++) {
 	  string tmp= trim_spaces (v[i]);
 	  if (N(tmp) > 0)
 	    the_gui->process_keypress (w->tm_widget(), tmp, texmacs_time());
 	}
-      }
-    }
+#else
+    the_gui->process_keypress (w->tm_widget(), ks, texmacs_time());
+#endif    
   }
   
   tm_ostream& print (tm_ostream& out) { return out << "<command qt_key>"; }
@@ -93,6 +111,17 @@ public:
   tm_ostream& print (tm_ostream& out) { return out << "<command qt_toggle>"; }
 };
 
+class qt_setting_toggle_command_rep: public command_rep {
+  QPointer<QTMSettingCheckbox> qwid;
+  command cmd;
+
+public:
+  qt_setting_toggle_command_rep(QTMSettingCheckbox* w, command c) : qwid(w), cmd(c) { }
+  void apply () { if (qwid) cmd (list_object (object (qwid->isChecked()))); }
+
+  tm_ostream& print (tm_ostream& out) { return out << "<command qt_setting_toggle>"; }
+};
+
 /*! Ad-hoc command to be used with enum widgets.
  
  The command associated with a qt_ui_element::enum_widget has one parameter. For the
@@ -113,24 +142,31 @@ public:
   tm_ostream& print (tm_ostream& out) { return out << "<command qt_enum>"; }
 };
 
+class qt_setting_enum_command_rep: public command_rep {
+  QPointer<QTMSettingSelect> qwid;
+  command cmd;
+
+public:
+  qt_setting_enum_command_rep(QTMSettingSelect* w, command c) : qwid(w), cmd(c) {}
+  void apply () {
+    if (qwid)
+      cmd (list_object (object (from_qstring(qwid->currentText()))));
+  }
+
+  tm_ostream& print (tm_ostream& out) { return out << "<command qt_setting_enum>"; }
+};
+
 
 /******************************************************************************
  * glue widget
  ******************************************************************************/
 
 QTMPixmapOrImage 
-qt_glue_widget_rep::render () {
+qt_glue_widget_rep::render (double pixel_ratio) {
   static QPainter painter;
-  static qt_renderer_rep ren (&painter);
-#if QT_VERSION >= 0x060000
-  double dpr = get_dpr ();
-  QSize s = to_qsize (dpr*w, dpr*h);
+  static qt_renderer_rep ren (&painter, pixel_ratio);
+  QSize s = to_qsize (pixel_ratio*w, pixel_ratio*h);
   QPixmap pxm (s);
-  pxm.setDevicePixelRatio (dpr);
-#else
-  QSize s = to_qsize (w, h);
-  QPixmap pxm (s);
-#endif
   //cout << "glue (" << s.width() << "," << s.height() << ")\n";
   pxm.fill (Qt::transparent);
   QPaintDevice *pd = static_cast<QPaintDevice*>(&pxm);
@@ -162,62 +198,27 @@ qt_glue_widget_rep::render () {
 QAction *
 qt_glue_widget_rep::as_qaction() {
   QAction* a = new QTMAction();
+  double pixel_ratio= device_pixel_ratio ();
   a->setText (to_qstring (as_string (col)));
   QIcon icon;
-#if 0
-  tree old_col = col;
-  icon.addPixmap (render(), QIcon::Active, QIcon::On);
-  col = "";
-  icon.addPixmap (render(), QIcon::Normal, QIcon::On);
-  col = old_col;
-#else
   if (!headless_mode)
-    icon.addPixmap (*(render ().QPixmap_ptr ()));
-#endif
+    icon.addPixmap (*(render (pixel_ratio).QPixmap_ptr ()));
   a->setIcon (icon);  
   a->setEnabled (false);
   return a;
 }
 
 QWidget *
-qt_glue_widget_rep::as_qwidget() {
-  QLabel* qw = new QLabel();
+qt_glue_widget_rep::as_qwidget(QWidget* parent_widget) {
+  QLabel* qw = new QLabel(parent_widget);
+  double pixel_ratio= device_pixel_ratio ();
   qw->setText (to_qstring (as_string (col)));
   if (!headless_mode)
-    qw->setPixmap (*(render ().QPixmap_ptr ()));
+    qw->setPixmap (*(render (pixel_ratio).QPixmap_ptr ()));
   qw->setMinimumSize (to_qsize (w, h));
     //  w->setEnabled(false);
   qwid = qw;
   return qwid;
-}
-
-
-/******************************************************************************
- * The following hack has been implemented by Joris in order to avoid
- * a focus bug when a menu contains a text input field.  To provoke
- * this bug without the hack, put your cursor behind a citation,
- * open the right-most (search) popup menu just at the left of
- * the 'Identifier' text field and then close it again by re-clicking
- * on the magnifying glass
- ******************************************************************************/
-
-static list<QAction*> to_be_destroyed;
-static time_t last_addition;
-
-void
-schedule_destruction (QAction* a) {
-  time_t now= texmacs_time ();
-  if (!is_nil (to_be_destroyed) && last_addition + 3000 < now) {
-    to_be_destroyed= reverse (to_be_destroyed);
-    while (!is_nil (to_be_destroyed)) {
-      //cout << "Destroy\n";
-      delete to_be_destroyed->item;
-      to_be_destroyed= to_be_destroyed->next;
-    }
-  }
-  //cout << "Postpone\n";
-  last_addition= now;
-  to_be_destroyed= list<QAction*> (a, to_be_destroyed);
 }
 
 /******************************************************************************
@@ -232,7 +233,7 @@ qt_ui_element_rep::~qt_ui_element_rep() {
     while (!cachedActionList->empty()) {
       QAction *a = cachedActionList->takeFirst();
       //if (a) delete a;
-      if (a) schedule_destruction (a);
+      if (a) a->deleteLater();
     }
     delete cachedActionList;
   }
@@ -251,9 +252,11 @@ qt_ui_element_rep::get_payload (qt_widget qtw, types check_type) {
     case text_widget:       case xpm_widget:       case toggle_widget:
     case enum_widget:       case choice_widget:    case filtered_choice_widget:
     case scrollable_widget: case hsplit_widget:    case vsplit_widget:
-    case tabs_widget:       case icon_tabs_widget: case resize_widget:
-    case refresh_widget:    case refreshable_widget:  case balloon_widget:
-    case glue_widget:       case division_widget:
+    case tabs_widget:       case icon_tabs_widget: case responsive_tabs_widget: 
+    case responsive_icon_tabs_widget: case resize_widget: case refresh_widget: 
+    case refreshable_widget:  case balloon_widget: case glue_widget: 
+    case division_widget:   case setting_toggle_widget: case setting_enum_widget:
+    case setting_group_widget:
     {
       qt_ui_element_rep* rep = static_cast<qt_ui_element_rep*> (qtw.rep);
       return rep->load;
@@ -456,7 +459,52 @@ qt_ui_element_rep::as_qaction () {
     case menu_button:
         // a command button with an optional prefix (o, * or v) and
         // keyboard shortcut; if ok does not hold, then the button is greyed
-    {
+    if (get_user_preference("use experimental keyboard patches") == "on") {
+      typedef quintuple<widget, command, string, string, int> T;
+      T x = open_box<T> (load);
+
+      qt_widget qtw = concrete (x.x1);
+      command   cmd = x.x2;
+      string   pre  = x.x3;
+      string   ks   = x.x4;
+      int   style   = x.x5;
+      
+      QTMCommand* c;
+      act = qtw->as_qaction();
+
+      QString left_text = act->text();
+      const QKeySequence& qks = to_qkeysequence (ks);
+      if (!qks.isEmpty()) {
+        QString shortcut_text = qks.toString(QKeySequence::NativeText);
+        // on windows, replace Meta with Win
+#if defined (Q_OS_WIN)
+        shortcut_text.replace (u8"Meta", u8"Win");
+#endif
+        QString full_text = left_text + u8" \t" + shortcut_text;
+        act->setText(full_text);
+      }
+
+
+      c= new QTMCommand (act, cmd);
+#if QT_VERSION < 0x060000
+      QObject::connect (act, SIGNAL (triggered()), c, SLOT (apply()));
+#else
+      QObject::connect (act, &QAction::triggered, c, &QTMCommand::apply);
+#endif   
+
+
+      bool ok = (style & WIDGET_STYLE_INERT) == 0;
+      act->setEnabled (ok? true: false);
+      
+        // FIXME: implement complete prefix handling
+      bool check = (pre != "") || (style & WIDGET_STYLE_PRESSED);
+      act->setCheckable (check? true: false);
+      act->setChecked (check? true: false);
+      if (pre == "v") {}
+      else if (pre == "*") {}
+      // [mi setOnStateImage:[NSImage imageNamed:@"TMStarMenuBullet"]];
+      else if (pre == "o") {}
+    } else { // if "use experimental keyboard patches"
       typedef quintuple<widget, command, string, string, int> T;
       T x = open_box<T> (load);
 
@@ -475,13 +523,12 @@ qt_ui_element_rep::as_qaction () {
          */
       const QKeySequence& qks = to_qkeysequence (ks);
       if (!qks.isEmpty()) {
+#if QT_VERSION >= 0x060000 and !defined(OS_ANDROID)
+	act->setShortcutVisibleInContextMenu(true);
+#endif
 #if defined (Q_OS_MAC) && QT_VERSION >= 0x060000
 	if (use_native_menubar &&
-#  if QT_VERSION >= 0x060600
 	    QApplication::inputMethod()->locale().territory()
-#  else
-	    QApplication::inputMethod()->locale().country()
-#  endif
 	    != QLocale::UnitedStates) {
 	  QString tmp= act->text () + u8" ┊ "
 	    + qks.toString(QKeySequence::NativeText).replace (", ", " ");
@@ -538,10 +585,8 @@ qt_ui_element_rep::as_qaction () {
         T1 y = open_box<T1> (get_payload (help, text_widget));
         act->setToolTip (to_qstring (y.x1));
         // HACK: force displaying of the tooltip (needed for items in the QMenuBar)
-#if QT_VERSION < 0x060000
         QObject::connect (act, SIGNAL(hovered()),
                           (QTMAction*)act, SLOT(showToolTip()));
-#endif
       }
     }
       break;
@@ -581,12 +626,23 @@ qt_ui_element_rep::as_qaction () {
                         * type_as_string()));
   }
 
+#ifdef OS_MACOS
+  if (get_env("__CFBundleIdentifier") == "com.apple.Terminal" && act) {
+    static bool has_displayed_warning = false;
+    if (!has_displayed_warning) {
+      cout << "Warning: Adding thin space to menu items to workaround a focus bug in Terminal.app." << LF;
+      has_displayed_warning = true;
+    }
+    QChar thin_space(0x2009);
+    act->setText(thin_space + act->text());
+  }
+#endif
   return act;
 }
 
 
 QLayoutItem *
-qt_ui_element_rep::as_qlayoutitem () {
+qt_ui_element_rep::as_qlayoutitem (QWidget* parent_widget) {
   if (DEBUG_QT_WIDGETS)
     debug_widgets << "as_qlayoutitem: " << type_as_string() << LF;
 
@@ -608,15 +664,14 @@ qt_ui_element_rep::as_qlayoutitem () {
       l->setSpacing(0);
 
       if (N(arr) > 0 && concrete(arr[0]).rep &&
-          (concrete(arr[0]).rep->type == tabs_widget ||
-           concrete(arr[0]).rep->type == icon_tabs_widget))  // HACK!
+          (concrete(arr[0]).rep->type == tabs_widget))  // HACK!
         l->setContentsMargins(0, 6, 0, 0);
       else
         l->setContentsMargins(0, 0, 0, 0);
 
       for (int i = 0; i < N(arr); i++) {
         if (is_nil (arr[i])) break;
-        QLayoutItem* li = concrete (arr[i])->as_qlayoutitem ();
+        QLayoutItem* li = concrete (arr[i])->as_qlayoutitem (parent_widget);
         if (li) l->addItem(li); // ownership transferred
       }
 
@@ -638,7 +693,7 @@ qt_ui_element_rep::as_qlayoutitem () {
       l->setContentsMargins (4, 0, 4, 0);
       int row= 0, col= 0;
       for (int i=0; i < N(a); i++) {
-        QLayoutItem* li = concrete(a[i])->as_qlayoutitem();
+        QLayoutItem* li = concrete(a[i])->as_qlayoutitem(parent_widget);
         l->addItem(li, row, col);
         col++;
         if (col >= cols) { col = 0; row++; }
@@ -659,9 +714,6 @@ qt_ui_element_rep::as_qlayoutitem () {
       // FIXME: lpad and rpad ignored.
       SI hsep = y.x1; SI vsep = y.x2; SI lpad = y.x3; SI rpad = y.x4;
       if (tm_style_sheet != "") {
-#if QT_VERSION >= 0x060000
-        int retina_scale = 1;
-#endif
         hsep= (SI) (floor (retina_scale * hsep / 256.0 + 0.5) * PIXEL);
         vsep= (SI) (floor (retina_scale * vsep / 256.0 + 0.5) * PIXEL);
         lpad= (SI) (floor (retina_scale * lpad / 256.0 + 0.5) * PIXEL);
@@ -682,8 +734,8 @@ qt_ui_element_rep::as_qlayoutitem () {
       l->setHorizontalSpacing (6+hsep/PIXEL);
       l->setVerticalSpacing (6+vsep/PIXEL);
       for (int i=0; i < N(lhs); i++) {
-        QLayoutItem* lli = concrete(lhs[i])->as_qlayoutitem();
-        QLayoutItem* rli = concrete(rhs[i])->as_qlayoutitem();
+        QLayoutItem* lli = concrete(lhs[i])->as_qlayoutitem(parent_widget);
+        QLayoutItem* rli = concrete(rhs[i])->as_qlayoutitem(parent_widget);
         if (lli) l->addItem (lli, i, 0, 1, 1, Qt::AlignRight | Qt::AlignVCenter);
         if (rli) l->addItem (rli, i, 1, 1, 1, Qt::AlignLeft | Qt::AlignVCenter);
       }
@@ -698,7 +750,7 @@ qt_ui_element_rep::as_qlayoutitem () {
       l->setContentsMargins (0, 0, 0, 0);
       l->setSpacing (0);
       for (int i = 0; i < N(arr); i++) {
-        QLayoutItem* li = concrete(arr[i])->as_qlayoutitem();
+        QLayoutItem* li = concrete(arr[i])->as_qlayoutitem(parent_widget);
         l->addItem(li);
       }
       return l;
@@ -735,13 +787,18 @@ qt_ui_element_rep::as_qlayoutitem () {
     case vsplit_widget:
     case tabs_widget:
     case icon_tabs_widget:
+    case responsive_tabs_widget:
+    case responsive_icon_tabs_widget:
     case resize_widget:
     case refresh_widget:
     case refreshable_widget:
     case balloon_widget:
     case division_widget:
+    case setting_toggle_widget:
+    case setting_enum_widget:
+    case setting_group_widget:
     {
-      QWidgetItem* wi = new QWidgetItem (this->as_qwidget());
+      QWidgetItem* wi = new QWidgetItem (this->as_qwidget(parent_widget));
       return wi;
     }
       break;
@@ -752,12 +809,10 @@ qt_ui_element_rep::as_qlayoutitem () {
       typedef quartet<bool, bool, SI, SI> T;
       T x = open_box<T> (load);
       SI w= x.x3, h= x.x4;
-#if QT_VERSION < 0x060000
       if (tm_style_sheet != "") {
         w= (SI) floor (retina_scale * w + 0.5);
         h= (SI) floor (retina_scale * h + 0.5);
       }
-#endif
       QSize sz = QSize (w, h);
       QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
@@ -780,7 +835,7 @@ qt_ui_element_rep::as_qlayoutitem () {
  QWidget as parent.
 */
 QWidget *
-qt_ui_element_rep::as_qwidget () {
+qt_ui_element_rep::as_qwidget (QWidget* parent_widget) {
   if (DEBUG_QT_WIDGETS)
     debug_widgets << "as_qwidget: " << type_as_string() << LF;
 
@@ -799,8 +854,8 @@ qt_ui_element_rep::as_qwidget () {
     {
         // note that the QLayout is the same object as the QLayoutItem 
         // so no need to free the layoutitem
-      QLayout* l = this->as_qlayoutitem()->layout();
-      QWidget* w = new QWidget();
+      QLayout* l = this->as_qlayoutitem(parent_widget)->layout();
+      QWidget* w = new QWidget(parent_widget);
       if (l)
         w->setLayout(l);
       else if (DEBUG_QT_WIDGETS)
@@ -822,7 +877,7 @@ qt_ui_element_rep::as_qwidget () {
       T1     widths = x.x3;
       T1    heights = x.x4;
       
-      qwid = wid->as_qwidget();
+      qwid = wid->as_qwidget(parent_widget);
       qt_apply_tm_style (qwid, style);
       
       QSize minSize = qt_decode_length (widths.x1, heights.x1,
@@ -850,7 +905,7 @@ qt_ui_element_rep::as_qwidget () {
     case menu_separator: 
     case menu_group:
     {
-      qwid = new QWidget();
+      qwid = new QWidget(parent_widget);
     }
       break;
       
@@ -860,18 +915,16 @@ qt_ui_element_rep::as_qwidget () {
       typedef quartet<bool, bool, SI, SI> T;
       T x = open_box<T>(load);
       SI w= x.x3, h= x.x4;
-#if QT_VERSION < 0x060000
       if (tm_style_sheet != "") {
         w= (SI) floor (retina_scale * w + 0.5);
         h= (SI) floor (retina_scale * h + 0.5);
       }
-#endif
       QSize sz = QSize (w, h);
       QSizePolicy::Policy hpolicy = x.x1 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
       QSizePolicy::Policy vpolicy = x.x2 ? QSizePolicy::MinimumExpanding
                                          : QSizePolicy::Minimum;
-      qwid = new QWidget();
+      qwid = new QWidget(parent_widget);
       qwid->setMinimumSize (sz);
       qwid->setSizePolicy (hpolicy, vpolicy);
     }
@@ -888,7 +941,7 @@ qt_ui_element_rep::as_qwidget () {
       
       if (qtw->type == xpm_widget) {
         url image = open_box<url> (get_payload (qtw));
-        QToolButton* b = new QToolButton();
+        QToolButton* b = new QToolButton(parent_widget);
         
         QTMLazyMenu* lm = new QTMLazyMenu (pw, b, type == pullright_button);
 #if QT_VERSION >= 0x060000
@@ -903,7 +956,7 @@ qt_ui_element_rep::as_qwidget () {
       } else if (qtw->type == text_widget) {
         typedef quartet<string, int, color, bool> T1;
         T1 y = open_box<T1> (get_payload (qtw));
-        QPushButton* b  = new QPushButton();
+        QPushButton* b  = new QPushButton(parent_widget);
         QTMLazyMenu* lm = new QTMLazyMenu (pw, b, type == pullright_button);
         b->setMenu (lm);
         b->setAutoDefault (false);
@@ -931,7 +984,7 @@ qt_ui_element_rep::as_qwidget () {
       
       if (qtw->type == xpm_widget) {  // Toolbar button
         QAction*     a = as_qaction();        // Create key shortcuts and actions
-        QToolButton* b = new QToolButton ();
+        QToolButton* b = new QToolButton (parent_widget);
         b->setIcon (a->icon());
         b->setPopupMode (QToolButton::InstantPopup);
         b->setAutoRaise (true);
@@ -939,7 +992,7 @@ qt_ui_element_rep::as_qwidget () {
         a->setParent (b);
         qwid = b;
       } else { // text_widget
-        QPushButton*     b = new QPushButton();
+        QPushButton*     b = new QPushButton(parent_widget);
         QTMCommand* qtmcmd = new QTMCommand (b, cmd);
 #if QT_VERSION < 0x060000
         QObject::connect (b, SIGNAL (clicked ()), qtmcmd, SLOT (apply ()));
@@ -971,7 +1024,7 @@ qt_ui_element_rep::as_qwidget () {
       
       typedef quartet<string, int, color, bool> T1;
       T1 y = open_box<T1>(get_payload (help, text_widget));
-      QWidget* w = qtw->as_qwidget();
+      QWidget* w = qtw->as_qwidget(parent_widget);
       w->setToolTip (to_qstring (y.x1));
       qwid = w;
     }
@@ -987,7 +1040,7 @@ qt_ui_element_rep::as_qwidget () {
       color    c = x.x3;
         //bool      tsp = x.x4;  // FIXME: add transparency support
       
-      QLabel* w = new QLabel();
+      QLabel* w = new QLabel(parent_widget);
       /*
       //FIXME: implement refresh when changing language
       QTMAction* a= new QTMAction (NULL);
@@ -1008,7 +1061,7 @@ qt_ui_element_rep::as_qwidget () {
     case xpm_widget:
     {
       url image = open_box<url>(load);
-      QLabel* l = new QLabel (NULL);
+      QLabel* l = new QLabel (parent_widget);
 #if QT_VERSION >= 0x060000
       QIcon tmp= tmapp()->icon_manager().getIcon(image);
       l->setPixmap (tmp.pixmap(tmp.availableSizes().last()));
@@ -1027,7 +1080,7 @@ qt_ui_element_rep::as_qwidget () {
       bool  check = x.x2;
       int   style = x.x3;
       
-      QCheckBox* w  = new QCheckBox (NULL);  
+      QCheckBox* w  = new QCheckBox (parent_widget);  
       w->setCheckState (check ? Qt::Checked : Qt::Unchecked);
       qt_apply_tm_style (w, style);
       w->setFocusPolicy (Qt::StrongFocus);
@@ -1036,6 +1089,8 @@ qt_ui_element_rep::as_qwidget () {
       QTMCommand* c = new QTMCommand (w, tcmd);
 #if QT_VERSION < 0x060000
       QObject::connect (w, SIGNAL (stateChanged(int)), c, SLOT (apply()));
+#elif QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+      QObject::connect (w, &QCheckBox::checkStateChanged, c, &QTMCommand::apply);
 #else
       QObject::connect (w, &QCheckBox::stateChanged, c, &QTMCommand::apply);
 #endif
@@ -1053,7 +1108,7 @@ qt_ui_element_rep::as_qwidget () {
       QString      value = to_qstring (x.x3);
       int          style = x.x4;
             
-      QTMComboBox* w = new QTMComboBox (NULL);
+      QTMComboBox* w = new QTMComboBox (parent_widget);
       if (values.isEmpty())
         values << QString("");  // safeguard
 
@@ -1081,14 +1136,96 @@ qt_ui_element_rep::as_qwidget () {
       qwid = w;
     }
       break;
+
+    case setting_toggle_widget:
+    {
+      typedef quartet<command, string, bool, int> T;
+      T         x = open_box<T>(load);
+      command cmd = x.x1;
+      string  txt = x.x2;
+      bool   check = x.x3;
+      int    style = x.x4;
+      // todo
+
+      QTMSettingCheckbox* w  = new QTMSettingCheckbox (parent_widget);
+      w->setDescriptionText (to_qstring (txt));
+      w->setCheckState (check ? Qt::Checked : Qt::Unchecked);
+      qt_apply_tm_style (w, style);
+      w->setFocusPolicy (Qt::StrongFocus);
+
+      command tcmd = tm_new<qt_setting_toggle_command_rep> (w, cmd);
+      QTMCommand* c = new QTMCommand (w, tcmd);
+      QObject::connect(w, &QTMSettingCheckbox::toggled, c, &QTMCommand::apply);
+
+      qwid = w;
+    }
+      break;
+
+    case setting_enum_widget:
+    {
+      typedef sextuple<command, string, array<string>, string, int, string> T;
+      T                x = open_box<T>(load);
+      command        cmd = x.x1;
+      QString       txt = to_qstring (x.x2);
+      QStringList values = to_qstringlist (x.x3);
+      QString      value = to_qstring (x.x4);
+      int          style = x.x5;
+
+      QTMSettingSelect * w = new QTMSettingSelect (parent_widget);
+      w->setDescriptionText (txt);
+      if (values.isEmpty())
+        values << QString("");  // safeguard
+
+      w->setEditable (value.isEmpty() || values.last().isEmpty());  // weird convention?!
+      if (values.last().isEmpty())
+        values.removeLast();
+
+      w->addItemsAndResize (values, x.x6, "");
+      int index = w->findText (value, Qt::MatchFixedString | Qt::MatchCaseSensitive);
+      if (index != -1)
+        w->setCurrentIndex (index);
+
+      qt_apply_tm_style (w, style);
+
+      command  ecmd = tm_new<qt_setting_enum_command_rep> (w, cmd);
+      QTMCommand* c = new QTMCommand (w, ecmd);
+      // NOTE: with QueuedConnections, the slots are sometimes not invoked.
+#if QT_VERSION < 0x060000
+      QObject::connect (w, SIGNAL (currentIndexChanged(int)), c, SLOT (apply()));
+#else
+      QObject::connect (w, &QTMSettingSelect::currentIndexChanged, c, &QTMCommand::apply);
+#endif
+      qwid = w;
+    }
+      break;
+
+    case setting_group_widget:
+    {
+      typedef triple<string, array<widget>, int> T;
+      T x = open_box<T>(load);
+
+      QTMSettingGroup* box = new QTMSettingGroup (parent_widget);
+      box->setTitleText (to_qstring (x.x1));
+
+      array<widget> kids = x.x2;
+      for (int i = 0; i < N(kids); ++i) {
+        if (is_nil (kids[i])) break;
+        QLayoutItem* li = concrete (kids[i])->as_qlayoutitem (box->contentWidget());
+        if (li) box->addItem (li);
+      }
+
+      qt_apply_tm_style (box, x.x3);
+      qwid = box;
+    }
+      break;
       
       // select one or multiple values from a list
     case choice_widget:
     {
-      typedef quartet<command, array<string>, array<string>, bool> T;
+      typedef quintuple<command, array<string>, array<string>, bool, int> T;
       T  x = open_box<T>(load);
       qwid = new QTMListView (x.x1, to_qstringlist(x.x2), to_qstringlist(x.x3),
-                              x.x4);
+                              x.x4, true, false, x.x5, parent_widget);
     }
       break;
 
@@ -1097,11 +1234,16 @@ qt_ui_element_rep::as_qwidget () {
       typedef quartet<command, array<string>, string, string> T;
       T           x = open_box<T>(load);
       string filter = x.x4;
+
+      qwid = new QWidget(parent_widget);
+      QVBoxLayout* layout = new QVBoxLayout ();
+      qwid->setLayout (layout);
+
       QTMListView* choiceWidget = new QTMListView (x.x1, to_qstringlist (x.x2),
                                                    QStringList (to_qstring (x.x3)),
-                                                   false, true, true);
+                                                   false, true, true, 0, qwid);
 
-      QTMLineEdit* lineEdit = new QTMLineEdit (0, "string", "1w");
+      QTMLineEdit* lineEdit = new QTMLineEdit (qwid, "string", "1w");
 #if QT_VERSION < 0x060000
       QObject::connect (lineEdit, SIGNAL (textChanged (const QString&)),
                         choiceWidget, SLOT (setFilterRegularExpression (const QString&)));
@@ -1112,14 +1254,12 @@ qt_ui_element_rep::as_qwidget () {
       lineEdit->setText (to_qstring (filter));
       lineEdit->setFocusPolicy (Qt::StrongFocus);
 
-      QVBoxLayout* layout = new QVBoxLayout ();
       layout->addWidget (lineEdit);
       layout->addWidget (choiceWidget);
       layout->setSpacing (0);
       layout->setContentsMargins (0, 0, 0, 0);
       
-      qwid = new QWidget();
-      qwid->setLayout (layout);
+      
     }
       break;
       
@@ -1139,7 +1279,7 @@ qt_ui_element_rep::as_qwidget () {
       int     style = x.x2;
       
       QTMScrollArea* w = new QTMScrollArea();
-      w->setWidgetAndConnect (wid->as_qwidget());
+      w->setWidgetAndConnect (wid->as_qwidget(parent_widget));
       w->setWidgetResizable (true);
 
       qt_apply_tm_style (w, style);
@@ -1161,9 +1301,9 @@ qt_ui_element_rep::as_qwidget () {
       qt_widget w1 = concrete(x.x1);
       qt_widget w2 = concrete(x.x2);
       
-      QWidget* qw1 = w1->as_qwidget();
-      QWidget* qw2 = w2->as_qwidget();
-      QSplitter* split = new QSplitter();
+      QSplitter* split = new QSplitter(parent_widget);
+      QWidget* qw1 = w1->as_qwidget(split);
+      QWidget* qw2 = w2->as_qwidget(split);
       split->setOrientation(type == hsplit_widget ? Qt::Horizontal 
                                                   : Qt::Vertical);
       split->addWidget (qw1);
@@ -1194,7 +1334,7 @@ qt_ui_element_rep::as_qwidget () {
       qwid->setObjectName (to_qstring (name));
       */
 
-      QWidget* qw = w->as_qwidget();
+      QWidget* qw = w->as_qwidget(parent_widget);
       qwid = qw;
       qwid->setObjectName (to_qstring (name));
     }
@@ -1208,14 +1348,14 @@ qt_ui_element_rep::as_qwidget () {
       T1   tabs = x.x1;
       T1 bodies = x.x2;
       
-      QTMTabWidget* tw = new QTMTabWidget ();
+      QTMTabWidget* tw = new QTMTabWidget (parent_widget);
       
       int i;
       for (i = 0; i < N(tabs); i++) {
         if (is_nil (tabs[i])) break;
-        QWidget* prelabel = concrete (tabs[i])->as_qwidget();
+        QWidget* prelabel = concrete (tabs[i])->as_qwidget(tw);
         QLabel*     label = qobject_cast<QLabel*> (prelabel);
-        QWidget*     body = concrete (bodies[i])->as_qwidget();
+        QWidget*     body = concrete (bodies[i])->as_qwidget(tw);
         tw->addTab (body, label ? label->text() : "");
         delete prelabel;
       }
@@ -1236,18 +1376,18 @@ qt_ui_element_rep::as_qwidget () {
       T1   tabs = x.x2;
       T1 bodies = x.x3;
 
-      QTMTabWidget* tw = new QTMTabWidget ();
+      QTMTabWidget* tw = new QTMTabWidget (parent_widget);
       int i;
       for (i = 0; i < N(tabs); i++) {
         if (is_nil (tabs[i])) break;
         QImage*       img = xpm_image (icons[i]);
-        QWidget* prelabel = concrete (tabs[i])->as_qwidget();
+        QWidget* prelabel = concrete (tabs[i])->as_qwidget(tw);
         QLabel*     label = qobject_cast<QLabel*> (prelabel);
-        QWidget*     body = concrete (bodies[i])->as_qwidget();
-        tw->addTab(body, QIcon(), label ? label->text() : "");
+        QWidget*     body = concrete (bodies[i])->as_qwidget(tw);
 #if QT_VERSION >= 0x060000
-	(void) img;
-	tw->setTabIcon(i, tmapp()->icon_manager().getIcon (icons[i]));
+        tw->addTab(body, QIcon(), label ? label->text() : "");
+	      (void) img;
+	      tw->setTabIcon(i, tmapp()->icon_manager().getIcon (icons[i]));
 #else
         tw->addTab (body, QIcon (as_pixmap (*img)), label ? label->text() : "");
 #endif
@@ -1257,6 +1397,59 @@ qt_ui_element_rep::as_qwidget () {
       if (i>0) tw->resizeOthers(0);   // Force the automatic resizing
 
       qwid = tw;
+    }
+      break;
+
+    case responsive_tabs_widget:
+    {
+      typedef array<widget> T1;
+      typedef pair<T1, T1> T;
+      T       x = open_box<T>(load);
+      T1   tabs = x.x1;
+      T1 bodies = x.x2;
+
+      QTMResponsiveTabWidget* tw = new QTMResponsiveTabWidget (parent_widget);
+      
+      int i;
+      for (i = 0; i < N(tabs); i++) {
+        if (is_nil (tabs[i])) break;
+        QWidget* prelabel = concrete (tabs[i])->as_qwidget(tw);
+        QLabel*     label = qobject_cast<QLabel*> (prelabel);
+        QWidget*     body = concrete (bodies[i])->as_qwidget(tw);
+        tw->addTab (body, label ? label->text() : "", QIcon());
+        delete prelabel;
+      }
+
+      qwid = tw;
+    }
+      break;
+
+    case responsive_icon_tabs_widget:
+    {
+      typedef array<url> U1;
+      typedef array<widget> T1;
+      typedef triple<U1, T1, T1> T;
+      T       x = open_box<T>(load);
+      U1  icons = x.x1;
+      T1   tabs = x.x2;
+      T1 bodies = x.x3;
+
+      QTMResponsiveTabWidget* tw = new QTMResponsiveTabWidget (parent_widget);
+      int i;
+      for (i = 0; i < N(tabs); i++) {
+        if (is_nil (tabs[i])) break;
+        QWidget* prelabel = concrete (tabs[i])->as_qwidget(tw);
+        QLabel*     label = qobject_cast<QLabel*> (prelabel);
+        QWidget*     body = concrete (bodies[i])->as_qwidget(tw);
+#if QT_VERSION >= 0x060000
+        tw->addTab(body, label ? label->text() : "", tmapp()->icon_manager().getIcon (icons[i]));
+#else
+        tw->addTab (body, label ? label->text() : "", QIcon (as_pixmap (*xpm_image (icons[i]))));
+#endif
+        delete prelabel;
+      }
+
+        qwid = tw;
     }
       break;
       

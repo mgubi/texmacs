@@ -92,7 +92,44 @@ gui_set_output_language (string lan) {
 server_rep::server_rep () {}
 server_rep::~server_rep () {}
 
-tm_server_rep::tm_server_rep (): def_zoomf (1.0) {
+static void
+server_dec_count (server_rep* r) {
+  if (0 == --(r->ref_count)) {
+    tm_server_rep* concrete= dynamic_cast<tm_server_rep*> (r);
+    ASSERT (concrete != NULL, "invalid server representation");
+    cout << "destructing server" << LF;
+    tm_delete (concrete);
+  }
+}
+
+server::server (const server& x): rep (x.rep) {
+  INC_COUNT (this->rep);
+}
+
+server::~server () {
+  server_dec_count (this->rep);
+}
+
+server_rep*
+server::operator -> () {
+  return rep;
+}
+
+server&
+server::operator = (server x) {
+  INC_COUNT (x.rep);
+  server_dec_count (this->rep);
+  this->rep= x.rep;
+  return *this;
+}
+
+server::server (server_rep* rep2): rep (rep2) {
+  INC_COUNT (this->rep);
+}
+
+tm_server_rep::tm_server_rep ()
+  : def_zoomf (1.0),
+    idle_last_cpu_ms (0), idle_last_check_ms (0), idle_acc (0) {
   the_server= tm_new<server> (this);
   initialize_scheme ();
   gui_interpose (texmacs_interpose_handler);
@@ -117,6 +154,7 @@ tm_server_rep::tm_server_rep (): def_zoomf (1.0) {
 }
 
 tm_server_rep::~tm_server_rep () {}
+
 server::server (): rep (tm_new<tm_server_rep> ()) {}
 server_rep* tm_server_rep::get_server () { return this; }
 
@@ -142,11 +180,35 @@ tm_server_rep::refresh () {
   }
 }
 
+static const long   IDLE_CPU_THRESHOLD_MS   = 500;
+static const time_t IDLE_CHECK_INTERVAL_MS  = 1000;
+
+void
+tm_server_rep::idle_monitor_tick () {
+  time_t now_wall = texmacs_time ();
+  if ((now_wall - idle_last_check_ms) < IDLE_CHECK_INTERVAL_MS) return;
+  long   now_cpu  = cpu_time_ms ();
+  time_t dt_wall  = now_wall - idle_last_check_ms;
+  long   dt_cpu   = now_cpu  - idle_last_cpu_ms;
+  long   cpu_rate = (dt_wall > 0) ? (dt_cpu * 1000L / dt_wall) : dt_cpu;
+
+  idle_last_cpu_ms   = now_cpu;
+  idle_last_check_ms = now_wall;
+  idle_acc = cpu_rate < IDLE_CPU_THRESHOLD_MS ? idle_acc+1 : 0;
+}
+
+int
+tm_server_rep::cpu_idle_time () {
+  return idle_acc * IDLE_CHECK_INTERVAL_MS;
+}
+
 void
 tm_server_rep::interpose_handler () {
 #ifdef QTTEXMACS
   // TeXmacs/Qt handles delayed messages and socket notification
   // in its own runloop
+  //server_listen_connections (0);
+  //client_listen_connections (0);
 #ifndef QTPIPES
   perform_select ();
 #endif
@@ -155,17 +217,18 @@ tm_server_rep::interpose_handler () {
   perform_select ();
   exec_pending_commands ();
 #endif
+  async_eval_pending ();
 
   if (!headless_mode) {
     int i, j;
     for (i=0; i<N(bufs); i++) {
       tm_buffer buf= (tm_buffer) bufs[i];
-      
+
       for (j=0; j<N(buf->vws); j++) {
 	tm_view vw= (tm_view) buf->vws[j];
 	if (vw->win != NULL) vw->ed->apply_changes ();
       }
-      
+
       for (j=0; j<N(buf->vws); j++) {
 	tm_view vw= (tm_view) buf->vws[j];
 	if (vw->win != NULL) vw->ed->animate ();
@@ -174,15 +237,14 @@ tm_server_rep::interpose_handler () {
     windows_refresh ();
   }
   sync_databases ();
+  idle_monitor_tick ();
 }
 
 void
 tm_server_rep::wait_handler (string message, string arg) {
-#ifndef QTTEXMACS
   if (has_current_window ())
     show_wait_indicator (concrete_window () -> win, translate (message), arg);
   else
-#endif
     cout << "TeXmacs] Please wait: " << message << " " << arg << "\n";
 }
 
@@ -235,14 +297,16 @@ void
 tm_server_rep::typeset_update (path p) {
   array<url> vs= get_all_views ();
   for (int i=0; i<N(vs); i++)
-    view_to_editor (vs[i]) -> typeset_invalidate (p);
+    if (view_to_editor (vs[i]) != NULL)
+      view_to_editor (vs[i]) -> typeset_invalidate (p);
 }
 
 void
 tm_server_rep::typeset_update_all () {
   array<url> vs= get_all_views ();
   for (int i=0; i<N(vs); i++)
-    view_to_editor (vs[i]) -> typeset_invalidate_all ();
+    if (view_to_editor (vs[i]) != NULL)
+      view_to_editor (vs[i]) -> typeset_invalidate_all ();
 }
 
 bool
@@ -252,8 +316,8 @@ tm_server_rep::is_yes (string s) {
   return tm_forward_access (s, 0) == tm_forward_access (st, 0) || s == st;
 }
 
-void
-tm_server_rep::quit () {
+static void
+quit_texmacs_internal (int code) {
   close_all_pipes ();
   call ("quit-TeXmacs-scheme");
   clear_pending_commands ();
@@ -267,10 +331,26 @@ tm_server_rep::quit () {
   // An example where it crashes with macOS SDK 14 and qt-6.8.2:
   //   open texmacs, write something in the buffer, close texmacs,
   //   and confirm exit in the lower status bar.
-  exit (0);
+  exit (code);
 #else
-  _exit (0);
+  _exit (code);
 #endif
+}
+
+void
+tm_server_rep::quit () {
+  quit_texmacs_internal (0);
+}
+
+int
+cpu_idle_time () {
+  return get_server () -> cpu_idle_time ();
+}
+
+
+void
+quit_TeXmacs_code (int code) {
+  quit_texmacs_internal (code);
 }
 
 /******************************************************************************

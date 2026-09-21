@@ -55,7 +55,7 @@ SIGN = misc/admin/sign_update
 # Main makes
 ###############################################################################
 
-TEXMACS: EMPTY_DIRS @MKGUILE@
+TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
 	if test "$(TEXMACS_DEPS)" != "no"; then \
 		cd src; $(MAKE) -f makefile deps; \
 	fi
@@ -72,7 +72,7 @@ TEXMACS: EMPTY_DIRS @MKGUILE@
 	@echo ----------------------------------------------------
 	@echo dynamic TeXmacs has been successfully compiled
 
-STATIC_TEXMACS: EMPTY_DIRS 
+STATIC_TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS 
 	if test "$(TEXMACS_DEPS)" != "no"; then \
 		cd src; $(MAKE) -f makefile deps; \
 	fi
@@ -103,6 +103,9 @@ EMPTY_DIRS:
 
 GLUE:
 	cd src; $(MAKE) -f makefile GLUE
+
+SAFE_TEXMACS_REV:
+	@echo "@ALTERNATIVE_VERSION@" > "$(tmdir)/SVNREV"
 
 .PHONY: TEXMACS STATIC_TEXMACS DEPS GLUE EXPERIMENTAL
 
@@ -176,6 +179,7 @@ INSTALL_DATA:
 	$(CP) $(tmdir)/progs $(DESTDIR)
 	$(CP) $(tmdir)/styles $(DESTDIR)
 	$(CP) $(tmdir)/texts $(DESTDIR)
+	$(CP) $(tmdir)/SVNREV $(DESTDIR)
 	$(CHMOD) -R go=rX $(DESTDIR)
 	@echo installed TeXmacs data in $(DESTDIR)
 
@@ -219,13 +223,13 @@ INSTALL_MANUALS:
 	@echo installed TeXmacs manual pages in $(DESTDIR)
 
 INSTALL:
-	make INSTALL_EXECUTABLES DESTDIR=$(DESTDIR)$(tmbin)
-	make INSTALL_DATA DESTDIR=$(DESTDIR)$(tmdata)
-	make INSTALL_PLUGINS DESTDIR=$(DESTDIR)$(tmdata)
-	make INSTALL_ICONS DESTDIR=$(DESTDIR)$(datadir)
-	make INSTALL_STARTUP DESTDIR=$(DESTDIR)$(bindir)
-	make INSTALL_INCLUDE DESTDIR=$(DESTDIR)$(includedir)
-	make INSTALL_MANUALS DESTDIR=$(DESTDIR)$(mandir)
+	$(MAKE) INSTALL_EXECUTABLES DESTDIR=$(DESTDIR)$(tmbin)
+	$(MAKE) INSTALL_DATA DESTDIR=$(DESTDIR)$(tmdata)
+	$(MAKE) INSTALL_PLUGINS DESTDIR=$(DESTDIR)$(tmdata)
+	$(MAKE) INSTALL_ICONS DESTDIR=$(DESTDIR)$(datadir)
+	$(MAKE) INSTALL_STARTUP DESTDIR=$(DESTDIR)$(bindir)
+	$(MAKE) INSTALL_INCLUDE DESTDIR=$(DESTDIR)$(includedir)
+	$(MAKE) INSTALL_MANUALS DESTDIR=$(DESTDIR)$(mandir)
 	@echo ----------------------------------------------------
 	@echo TeXmacs has been successfully installed
 
@@ -267,8 +271,8 @@ COPY_SOURCES:
 	$(MKDIR) ../distr/build
 	$(MKDIR) $(BUILD_DIR)
 	$(CP) * $(BUILD_DIR)/.
-	cd $(BUILD_DIR); make ACCESS_FLAGS
-	cd $(BUILD_DIR); make DISTR_CLEAN
+	cd $(BUILD_DIR); $(MAKE) ACCESS_FLAGS
+	cd $(BUILD_DIR); $(MAKE) DISTR_CLEAN
 
 COPY_SOURCES_TGZ: COPY_SOURCES COPY_GUILE
 	cd ../distr/build; tar -czf $(tm_devel).tar.gz $(tm_devel) 
@@ -318,8 +322,8 @@ GENERIC_PACKAGE: TEXMACS STRIP
 
 GENERIC_X11_PACKAGE: COPY_SOURCES COPY_GUILE
 	cd $(BUILD_DIR); ./configure --disable-qt --disable-pdf-renderer
-	cd $(BUILD_DIR); make STATIC_TEXMACS
-	cd $(BUILD_DIR); make ACCESS_FLAGS
+	cd $(BUILD_DIR); $(MAKE) STATIC_TEXMACS
+	cd $(BUILD_DIR); $(MAKE) ACCESS_FLAGS
 	$(MV) $(BUILD_DIR)/TeXmacs $(BUILD_DIR)/$(STATIC_X11)
 	cd $(BUILD_DIR); tar -czf $(STATIC_X11).tar.gz $(STATIC_X11)
 	$(MKDIR) $(GENERIC_PACKAGE_DIR)
@@ -477,7 +481,9 @@ MACOS_BUNDLE: TEXMACS
 	$(CP) $(MACOS_PACKAGE_SRC)/Info.plist $(MACOS_PACKAGE_CONTENTS)
 	$(CP) $(MACOS_PACKAGE_SRC)/PkgInfo $(MACOS_PACKAGE_CONTENTS)
 	$(CP) TeXmacs/bin/texmacs.bin $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
-	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs.icns $(MACOS_PACKAGE_RESOURCES)
+		
+	$(CP) $(MACOS_PACKAGE_SRC)/Assets.car $(MACOS_PACKAGE_RESOURCES)
+
 	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs-document.icns \
 				$(MACOS_PACKAGE_RESOURCES)
 	$(CP) src/Plugins/Cocoa/English.lproj $(MACOS_PACKAGE_RESOURCES)
@@ -528,10 +534,10 @@ WINDOWS_BUILD_DIR = ../distr/TeXmacs-Windows
 WINDOWS_BUILD_BIN_DIR = $(WINDOWS_BUILD_DIR)/bin
 UN_QT_P = $(shell cygpath -u $(QT_PLUGINS_PATH))
 
-WINDOWS_PBD: TEXMACS
-	if [test -n "@CV2PDB@"]; then @CV2PDB@ $(WINDOWS_BUILD_BIN_DIR)/texmacs.exe; fi
+WINDOWS_PDB: TEXMACS
+	@if [ -n "@CV2PDB@" ]; then "@CV2PDB@" "$(WINDOWS_BUILD_BIN_DIR)/texmacs.exe"; fi
 
-WINDOWS_BUNDLE: TEXMACS WINDOWS_PBD
+WINDOWS_BUNDLE: TEXMACS WINDOWS_PDB
 	$(MKDIR) ../distr
 	$(MKDIR) $(WINDOWS_BUILD_DIR)
 	$(RM) -r $(WINDOWS_BUILD_BIN_DIR)/{texmacs,texmacs.bin,texmacs.exe}
@@ -540,7 +546,9 @@ WINDOWS_BUNDLE: TEXMACS WINDOWS_PBD
 	$(MV) $(WINDOWS_BUILD_BIN_DIR)/texmacs.bin $(WINDOWS_BUILD_BIN_DIR)/texmacs.exe
 	if test -n "@SIGNID@"; then @SIGNID@ $(WINDOWS_BUILD_BIN_DIR)/texmacs.exe; fi
 	if test "@XTRA_CMD@" != @'XTRA_CMD'@; then $(CP) -u "@XTRA_CMD@/"* $(WINDOWS_BUILD_BIN_DIR)/; fi
-	if test "@ASPELL_CMD@" != @'ASPELL_CMD'@; then $(CP) -u "@ASPELL_CMD@" $(WINDOWS_BUILD_DIR)/plugins; fi
+	if [ -d "$(TMREPO)" ]; then \
+		$(CP) -r $(TMREPO)/lib/aspell-* $(WINDOWS_BUILD_DIR); \
+	fi
 	if test -x "@GS_EXE@"; then $(CP) @GS_EXE@ $(WINDOWS_BUILD_BIN_DIR)/;fi
 	for f in $(WINDOWS_BUILD_BIN_DIR)/*.exe;do $(WINDOWS_PACKAGE_SRC)/copydll.sh $$f;done
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(WINDOWS_BUILD_DIR)/bin
@@ -552,9 +560,33 @@ WINDOWS_PACKAGE: WINDOWS_BUNDLE
 	iscc $(WINDOWS_PACKAGE_SRC)/TeXmacs.iss
 	if test -n "@SIGNID@"; then @SIGNID@ $(WINDOWS_PACKAGE_DIR)/*-installer.exe; fi
 
-WINDOWS_APPX: WINDOWS_BUNDLE
-	$(CP) packages/msix/AppxManifest.xml $(WINDOWS_BUILD_DIR)/AppxManifest.xml
-	cd $(WINDOWS_BUILD_DIR); powershell.exe -Command "& '@MAKEAPPX@' pack /d . /p TeXmacs.msix"
+WINDOWS_APPX_CNRS: WINDOWS_BUNDLE
+	@if [ -z "@MAKEAPPX@" ]; then \
+		echo "MAKEAPPX not found, skipping Windows AppX CNRS package creation."; \
+	else { \
+		$(MKDIR) $(WINDOWS_BUILD_DIR); \
+		$(RM) $(WINDOWS_BUILD_DIR)/AppxManifest.xml; \
+		$(RM) $(WINDOWS_BUILD_DIR)/TeXmacs.msix; \
+		$(CP) packages/msix/AppxManifest.xml $(WINDOWS_BUILD_DIR)/AppxManifest.xml; \
+		cd $(WINDOWS_BUILD_DIR); powershell.exe -Command "& '@MAKEAPPX@' pack /d . /p ../windows/TeXmacs.msix"; \
+	}; fi
+
+WINDOWS_APPX_STORE:
+	@if [ -z "@MAKEAPPX@" ]; then \
+		echo "MAKEAPPX not found, skipping Windows AppX Store package creation."; \
+	else { \
+		$(MKDIR) $(WINDOWS_BUILD_DIR); \
+		$(RM) $(WINDOWS_BUILD_DIR)/AppxManifest.xml; \
+		$(RM) $(WINDOWS_BUILD_DIR)/TeXmacsStore.msix; \
+		$(CP) packages/msix/AppxManifestStore.xml $(WINDOWS_BUILD_DIR)/AppxManifest.xml; \
+		cd $(WINDOWS_BUILD_DIR); \
+		powershell.exe -Command "& '@MAKEPRI@' createconfig /cf priconfig.xml /dq en-US"; \
+		powershell.exe -Command "& '@MAKEPRI@' new /pr . /cf priconfig.xml"; \
+		powershell.exe -Command "& '@MAKEAPPX@' pack /d . /p ../windows/TeXmacsStore.msix"; \
+	}; fi
+
+WINDOWS_APPX: WINDOWS_BUNDLE WINDOWS_PACKAGE WINDOWS_APPX_CNRS WINDOWS_APPX_STORE
+	echo Windows AppX packages have been created in $(WINDOWS_BUILD_DIR)
 
 .PHONY: WINDOWS_BUNDLE WINDOWS_PACKAGE
 
@@ -601,12 +633,12 @@ ANDROID_AAB: ANDROID_BUNDLE
 										 -DANDROID_ABI:STRING=@ANDROID_ABI@ \
 										 -DQT_HOST_PATH:PATH=@QT_HOST_PATH@ \
 										 -DCMAKE_BUILD_TYPE:STRING=Release \
-										 -DANDROID_PLATFORM:STRING=android-34 \
+										 -DANDROID_PLATFORM:STRING=android-35 \
 										 -DQT_USE_TARGET_ANDROID_BUILD_DIR:BOOL=ON \
 										 -DQT_NO_GLOBAL_APK_TARGET_PART_OF_ALL:BOOL=ON \
 										 -DCMAKE_TOOLCHAIN_FILE:FILEPATH=@NDK@/build/cmake/android.toolchain.cmake \
 										 -DANDROID_USE_LEGACY_TOOLCHAIN_FILE:BOOL=OFF \
-										 -DANDROID_TARGET_SDK_VERSION=34 \
+										 -DANDROID_TARGET_SDK_VERSION=35 \
 										 -DCMAKE_FIND_ROOT_PATH=@QT_PATH@ \
 										 -DCMAKE_PREFIX_PATH=@QT_PATH@ \
 										 -DTEXMACS_LIBS:STRING="@LIBS@" \
@@ -619,7 +651,8 @@ ANDROID_AAB: ANDROID_BUNDLE
 										 -DQt6WidgetsTools_DIR=@QT_HOST_PATH@/qtbase/lib/cmake/Qt6WidgetsTools \
 										 -DQt6Svg_DIR=@QT_PATH@/lib/cmake/Qt6Svg \
 										 -DQt6PrintSupport_DIR=@QT_PATH@/lib/cmake/Qt6PrintSupport \
-										 -DQt6Concurrent_DIR=@QT_PATH@/lib/cmake/Qt6Concurrent
+										 -DQt6Concurrent_DIR=@QT_PATH@/lib/cmake/Qt6Concurrent \
+										 -DQt6Network_DIR=@QT_PATH@/lib/cmake/Qt6Network
 	cd $(ANDROID_BUILD_DIR)/build; cmake --build . --config Release --target aab
 
 ANDROID_DEV_APK: ANDROID_BUNDLE
@@ -631,22 +664,26 @@ ANDROID_DEV_APK: ANDROID_BUNDLE
 										 -DANDROID_ABI:STRING=@ANDROID_ABI@ \
 										 -DQT_HOST_PATH:PATH=@QT_HOST_PATH@ \
 										 -DCMAKE_BUILD_TYPE:STRING=Debug \
-										 -DANDROID_PLATFORM:STRING=android-34 \
+										 -DANDROID_PLATFORM:STRING=android-35 \
 										 -DQT_USE_TARGET_ANDROID_BUILD_DIR:BOOL=ON \
 										 -DQT_NO_GLOBAL_APK_TARGET_PART_OF_ALL:BOOL=ON \
 										 -DCMAKE_TOOLCHAIN_FILE:FILEPATH=@NDK@/build/cmake/android.toolchain.cmake \
 										 -DANDROID_USE_LEGACY_TOOLCHAIN_FILE:BOOL=OFF \
-										 -DANDROID_TARGET_SDK_VERSION=34 \
+										 -DANDROID_TARGET_SDK_VERSION=35 \
 										 -DCMAKE_FIND_ROOT_PATH=@QT_PATH@ \
 										 -DCMAKE_PREFIX_PATH=@QT_PATH@ \
 										 -DTEXMACS_LIBS:STRING="@LIBS@" \
 										 -DQT_DIR=@QT_PATH@/lib/cmake/Qt6 ../sources \
 										 -DQt6Core_DIR=@QT_PATH@/lib/cmake/Qt6Core \
+										 -DQt6CoreTools_DIR=@QT_HOST_PATH@/qtbase/lib/cmake/Qt6CoreTools \
 										 -DQt6Gui_DIR=@QT_PATH@/lib/cmake/Qt6Gui \
+										 -DQt6GuiTools_DIR=@QT_HOST_PATH@/qtbase/lib/cmake/Qt6GuiTools \
 										 -DQt6Widgets_DIR=@QT_PATH@/lib/cmake/Qt6Widgets \
+										 -DQt6WidgetsTools_DIR=@QT_HOST_PATH@/qtbase/lib/cmake/Qt6WidgetsTools \
 										 -DQt6Svg_DIR=@QT_PATH@/lib/cmake/Qt6Svg \
 										 -DQt6PrintSupport_DIR=@QT_PATH@/lib/cmake/Qt6PrintSupport \
-										 -DQt6Concurrent_DIR=@QT_PATH@/lib/cmake/Qt6Concurrent
+										 -DQt6Concurrent_DIR=@QT_PATH@/lib/cmake/Qt6Concurrent \
+										 -DQt6Network_DIR=@QT_PATH@/lib/cmake/Qt6Network
 	cd $(ANDROID_BUILD_DIR)/build; cmake --build . --config Debug --target apk
 
 ANDROID_ALL: ANDROID_DEV_APK ANDROID_AAB
@@ -691,7 +728,7 @@ APPIMAGE: TEXMACS
 	$(CP) -r `find @GUILE_DATA_PATH@ -type d | grep ice-9` ../distr/TeXmacs.AppDir/usr/share/TeXmacs/progs
 	
 	# Copy the AppImage specific files
-	$(CP) packages/appimage/org.texmacs.texmacs.metainfo.xml ../distr/TeXmacs.AppDir/usr/share/metainfo/org.texmacs.texmacs.metainfo.xml
+	$(CP) TeXmacs/misc/mime/metainfo.xml ../distr/TeXmacs.AppDir/usr/share/metainfo/org.texmacs.texmacs.metainfo.xml
 	$(CP) packages/appimage/org.texmacs.texmacs.desktop ../distr/TeXmacs.AppDir/usr/share/applications/org.texmacs.texmacs.desktop
 	$(CP) packages/appimage/org.texmacs.texmacs.desktop ../distr/TeXmacs.AppDir/org.texmacs.texmacs.desktop	
 	$(CP) ../distr/TeXmacs.AppDir/usr/share/TeXmacs/misc/images/texmacs.svg ../distr/TeXmacs.AppDir/texmacs.svg
@@ -701,15 +738,18 @@ APPIMAGE: TEXMACS
 	$(RM) ../distr/TeXmacs.AppDir/usr/bin/texmacs
 
 	# Move the texmacs binary to AppRun
-	$(MV) ../distr/TeXmacs.AppDir/usr/bin/texmacs.bin ../distr/TeXmacs.AppDir/AppRun
+	# $(MV) ../distr/TeXmacs.AppDir/usr/bin/texmacs.bin ../distr/TeXmacs.AppDir/AppRun
+	$(CP) packages/appimage/AppRun ../distr/TeXmacs.AppDir/AppRun
+	chmod +x ../distr/TeXmacs.AppDir/AppRun
 
 	# Use patchelf to fix the rpath
-	patchelf --force-rpath --set-rpath '$$ORIGIN:$$ORIGIN/../lib:$$ORIGIN/usr/lib:../lib:usr/lib' ../distr/TeXmacs.AppDir/AppRun
+	patchelf --force-rpath --set-rpath '$$ORIGIN:$$ORIGIN/../lib:$$ORIGIN/usr/lib:../lib:usr/lib' ../distr/TeXmacs.AppDir/usr/bin/texmacs.bin
 
 	# Install dependencies from the TeXmacs builder
 	$(CP) -Lr $(TMREPO)/lib/*.so* ../distr/TeXmacs.AppDir/usr/lib
 	$(CP) -Lr $(TMREPO)/plugins ../distr/TeXmacs.AppDir/usr
 	$(CP) -Lr $(TMREPO)/translations ../distr/TeXmacs.AppDir/usr
+	$(CP) -Lr $(TMREPO)/usr/optional ../distr/TeXmacs.AppDir/usr
 
 	# Pack the AppImage (offline if APPIMAGE_RUNTIME is provided)
 	@if [ -n "$$APPIMAGE_RUNTIME" ]; then \
@@ -779,8 +819,8 @@ DISTR_CLEAN: DISTCLEAN SVN_CLEAN
 .PHONY: CLEAN_DOC RDISTR DISTR RCLEAN SCLEAN DISTCLEAN SVN_CLEAN DISTR_CLEAN
 
 CLNGUILE:
-	-cd @DIRGUILE@ && make uninstall
-	-cd @DIRGUILE@ && make distclean
+	-cd @DIRGUILE@ && $(MAKE) uninstall
+	-cd @DIRGUILE@ && $(MAKE) distclean
 	-cd @DIRGUILE@ && rm -rf build
 
 ###############################################################################

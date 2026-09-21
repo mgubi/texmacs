@@ -15,11 +15,25 @@
 #include "tm_link.hpp"
 #include "sys_utils.hpp"
 
+#include <ctime>
+
 bool rescue_mode= false;
 
 /******************************************************************************
 * Status reports
 ******************************************************************************/
+
+string get_system_date () {
+  std::time_t now= std::time (nullptr);
+  std::tm* local_time= std::localtime (&now);
+  char buffer[1024];
+  size_t len = std::strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Z %Y", local_time);
+  if (len > 0) {
+    return string(buffer, len);
+  } else {
+    return "Unknown date";
+  }
+}
 
 string
 get_system_information () {
@@ -38,7 +52,7 @@ get_system_information () {
   r << "  Processor        : "
     << HOST_CPU << "\n";
   r << "  Crash date       : "
-    << var_eval_system ("date") << "\n";
+    << get_system_date() << "\n";
   return r;
 }
 

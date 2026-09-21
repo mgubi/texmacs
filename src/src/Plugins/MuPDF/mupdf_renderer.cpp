@@ -198,7 +198,7 @@ void del_obj_mupdf_renderer (void)  {
 ******************************************************************************/
 
 mupdf_renderer_rep::mupdf_renderer_rep (int w2, int h2)
-  : basic_renderer_rep (true, w2, h2),
+  : basic_renderer_rep (true, 1.0, w2, h2),
     pixmap (NULL), dev (NULL), proc (NULL),
     fg (-1), bg (-1),
     lw (-1),
@@ -217,7 +217,7 @@ mupdf_renderer_rep::get_handle () {
 }
 
 void
-mupdf_renderer_rep::get_extents (int& w2, int& h2) {
+mupdf_renderer_rep::get_extents (SI& w2, SI& h2) {
   if (pixmap) {
     w2= fz_pixmap_width (mupdf_context (), pixmap);
     h2= fz_pixmap_height (mupdf_context (), pixmap);
@@ -227,8 +227,11 @@ mupdf_renderer_rep::get_extents (int& w2, int& h2) {
 }
 
 void
-mupdf_renderer_rep::set_zoom_factor (double zoom) {
-  renderer_rep::set_zoom_factor (retina_factor * zoom);
+mupdf_renderer_rep::set_zoom_factor (double zoom, bool safe) {
+  // the retina factor is applied here, not through pixel_ratio: the
+  // consistency check of the base class does not apply
+  (void) safe;
+  renderer_rep::set_zoom_factor (retina_factor * zoom, false);
   retina_pixel= pixel * retina_factor;
 }
 
@@ -1028,7 +1031,7 @@ mupdf_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
   // draw with background pattern
   SI xo, yo;
   glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
   int w= gl->width, h= gl->height;
   QImage *im= new QImage (w, h, QImage::Format_ARGB32);
   im->fill (Qt::transparent);
@@ -1208,7 +1211,7 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     if (get_reverse_colors ()) reverse (r, g, b);
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int w= gl->width, h= gl->height;
 
     unsigned char *samples = (unsigned char *)

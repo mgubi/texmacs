@@ -63,7 +63,18 @@ AC_DEFUN([LC_WITH_QT],[
                     [Method to find Qt (autotroll, autotrollstatic, pkgconfig)])],
     [qt_find_method=$withval],
     [qt_find_method=autotroll])
+
+  # an argument to use the new qt implementation
+  AC_ARG_ENABLE([qt-new], [AS_HELP_STRING([--enable-qt-new],
+                    [Use the new Qt implementation])],
+    [qt_new=$enableval], [AS_IF([test "x$CONFIG_OS" = "xANDROID"],[qt_new=yes],[qt_new=no])])
   
+  AC_ARG_WITH([qtsvg],
+    [AS_HELP_STRING([--with-qtsvg],
+      [enable Qt SVG support (default: auto; optional if resvg is present)])],
+    [with_qtsvg=$withval],
+    [with_qtsvg=auto])
+
   case $qt_find_method in
     autotroll)
       AC_MSG_NOTICE([Searching for Qt using autotroll])
@@ -83,25 +94,46 @@ AC_DEFUN([LC_WITH_QT],[
   if test "x$QMAKE" = "xmissing"; then
     AC_MSG_ERROR([Cannot find qmake, qmake-qt4, qmake-qt5, qmake-qt6, or qmake6, for using a Qt library])
   fi
+  xtraSvg=""
+  xtraSvgPlug=""
+  use_qtsvg="no"
+  if test "$with_qtsvg" != "no"; then
+    if test "x$HAS_RESVG" != "xyes"; then
+      xtraSvg="+svg"
+      xtraSvgPlug="qsvg"
+      use_qtsvg="yes"
+    else
+      # Check if QtSvg is available
+      if test -d "$($QMAKE -query QT_INSTALL_HEADERS 2>/dev/null)/QtSvg" || \
+         test -f "$($QMAKE -query QT_INSTALL_LIBS 2>/dev/null)/libQtSvg.a" || \
+         test -f "$($QMAKE -query QT_INSTALL_LIBS 2>/dev/null)/QtSvg.lib"; then
+        xtraSvg="+svg"
+        xtraSvgPlug="qsvg"
+        use_qtsvg="yes"
+      elif test "$with_qtsvg" = "yes"; then
+        AC_MSG_ERROR([Qt SVG was requested with --with-qtsvg, but QtSvg was not found])
+      fi
+    fi
+  fi
   case $qt_find_method.$($QMAKE -query QT_VERSION 2>/dev/null) in
   autotroll.4.* | autotrollstatic.4.*)
     AC_MSG_NOTICE([Qt4 found])
-    AT_WITH_QT([$xtralibs +printsupport +svg],[+exceptions],[LIBS += $LDFLAGS],AC_MSG_ERROR([Cannot find a working Qt library]))
+    AT_WITH_QT([$xtralibs +printsupport $xtraSvg],[+exceptions],[LIBS += $LDFLAGS],AC_MSG_ERROR([Cannot find a working Qt library]))
     ;;
   autotroll.5.*)
     AC_MSG_NOTICE([Qt5 found])
     AS_IF([test "x$CONFIG_OS" = "xMACOS"],[xtraPlug=+macextras],[unset xtraPlug])
-    AT_WITH_QT([$xtralibs +printsupport +svg +network $xtraPlug],[+exceptions],[
+    AT_WITH_QT([$xtralibs +printsupport $xtraSvg +network $xtraPlug],[+exceptions],[
       LIBS += $LDFLAGS
-      QTPLUGIN = qjpeg qgif qico qsvg
+      QTPLUGIN = qjpeg qgif qico $xtraSvgPlug
     ],AC_MSG_ERROR([Cannot find a working Qt library]))
     ;;
   autotrollstatic.5.*)
     AC_MSG_NOTICE([Qt5 found])
     AS_IF([test "x$CONFIG_OS" = "xMACOS"],[xtraPlug=+macextras],[unset xtraPlug])
-    AT_WITH_QT([$xtralibs +core +gui +printsupport +svg +network $xtraPlug],[+exceptions],[
+    AT_WITH_QT([$xtralibs +core +gui +printsupport $xtraSvg +network $xtraPlug],[+exceptions],[
       LIBS += $LDFLAGS
-      QTPLUGIN += qjpeg qgif qico qsvg qxcb
+      QTPLUGIN += qjpeg qgif qico $xtraSvgPlug qxcb
       QTPLUGIN.platforms += qminimal qxcb
       CONFIG += import_plugins
       CONFIG += static
@@ -114,9 +146,9 @@ AC_DEFUN([LC_WITH_QT],[
     QT_LIBEXECS=`$QMAKE -query QT_INSTALL_LIBEXECS`
     PATH="$QT_LIBEXECS:$PATH"
     AS_IF([test $CONFIG_OS == MACOS],[],[unset xtraPlug])
-    AT_WITH_QT([$xtralibs +printsupport +svg +concurrent +network $xtraPlug],[+exceptions],[
+    AT_WITH_QT([$xtralibs +printsupport $xtraSvg +concurrent +network $xtraPlug],[+exceptions],[
       LIBS += $LDFLAGS
-      QTPLUGIN = qjpeg qgif qico qsvg
+      QTPLUGIN = qjpeg qgif qico $xtraSvgPlug
     ],AC_MSG_ERROR([Cannot find a working Qt library]))
     ;;
   pkgconfig.*) 
@@ -198,7 +230,22 @@ AC_DEFUN([LC_WITH_QT],[
     QT_PACKAGES="Qt${QT_MAJOR}Core$QT_PKGCONFIG_SUFFIX "
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Gui$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Widgets$QT_PKGCONFIG_SUFFIX"
-    QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Svg$QT_PKGCONFIG_SUFFIX"
+    use_qtsvg="no"
+    if test "$with_qtsvg" != "no"; then
+      if $PKG_CONFIG --exists Qt${QT_MAJOR}Svg$QT_PKGCONFIG_SUFFIX 2>/dev/null; then
+        use_qtsvg="yes"
+      elif test "$with_qtsvg" = "yes"; then
+        AC_MSG_ERROR([Qt SVG was requested with --with-qtsvg, but Qt${QT_MAJOR}Svg was not found])
+      elif test "x$HAS_RESVG" != "xyes"; then
+        AC_MSG_ERROR([Qt SVG was not found, and resvg is not available. At least one SVG library is required.])
+      else
+        AC_MSG_NOTICE([Qt SVG not found, but resvg is available (Qt SVG is optional)])
+      fi
+    fi
+
+    if test "$use_qtsvg" = "yes"; then
+      QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Svg$QT_PKGCONFIG_SUFFIX"
+    fi
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}PrintSupport$QT_PKGCONFIG_SUFFIX"
     QT_PACKAGES="$QT_PACKAGES Qt${QT_MAJOR}Network$QT_PKGCONFIG_SUFFIX"
     # if CONFIG_OS is GNU_LINUX and QT_VERSION is higher than 6, use wayland
@@ -217,6 +264,13 @@ AC_DEFUN([LC_WITH_QT],[
     QT_INCPATH=`$PKG_CONFIG --variable=includedir $QT_PACKAGES`
     QT_LIBS=`$PKG_CONFIG --libs $QT_PACKAGES`
     QT_LDFLAGS=`$PKG_CONFIG --libs-only-L $QT_PACKAGES`
+
+    #QT_CXXFLAGS=`printf '%s\n' "$QT_CXXFLAGS" | sed -E 's/(^|[ \t])-I([^ \t]+)/\1-isystem \2/g'`
+    #QT_DEFINES=`printf '%s\n' "$QT_DEFINES" | sed -E 's/(^|[ \t])-I([^ \t]+)/\1-isystem \2/g'`
+
+    # out=`printf '%s\n' "$out" | sed -e 's/ -I/ -isystem /g'`
+    QT_CXXFLAGS=`printf '%s\n' "$QT_CXXFLAGS" | sed -e 's/ -I/ -isystem /g'`
+    QT_DEFINES=`printf '%s\n' "$QT_DEFINES" | sed -e 's/ -I/ -isystem /g'`
 
     QT_VERSION=`$PKG_CONFIG --modversion $QT_PACKAGES`
     AS_IF([test -z "$QT_VERSION"],[AC_MSG_ERROR([Cannot find a working Qt library])])
@@ -248,8 +302,48 @@ AC_DEFUN([LC_WITH_QT],[
   QT_MAJOR=${QT_VERSION%%.*}
   AC_DEFINE_UNQUOTED([AC_QT_MAJOR_VERSION], [$QT_MAJOR], [Qt major version number])
 
-  test "0$QT_MAJOR" -eq 5 && LC_APPEND_FLAG([-std=c++11],[QT_CXXFLAGS])
-  test "0$QT_MAJOR" -eq 6 && LC_APPEND_FLAG([-std=c++17],[QT_CXXFLAGS])
+  case $QT_MAJOR in
+    4)
+      if test $qt_new = yes; then
+         # error and exit if the new qt implementation is requested but qt version is 4
+         AC_MSG_ERROR([The new Qt implementation requires Qt 6.10 or later. Please upgrade your Qt version or disable the new Qt implementation with --disable-qt-new.])
+      fi
+      LC_APPEND_FLAG([-std=c++0x],[CXXFLAGS])
+      ;;
+    5)
+      if test $qt_new = yes; then
+         # error and exit if the new qt implementation is requested but qt version is 5
+         AC_MSG_ERROR([The new Qt implementation requires Qt 6.10 or later. Please upgrade your Qt version or disable the new Qt implementation with --disable-qt-new.])
+      fi
+      LC_APPEND_FLAG([-std=c++11],[QT_CXXFLAGS])
+      ;;
+    6)
+      if test $qt_new = yes; then
+        QT_MINOR=${QT_VERSION#*.}
+        QT_MINOR=${QT_MINOR%%.*}
+        if test $QT_MINOR -lt 10; then
+          AC_MSG_ERROR([The new Qt implementation requires Qt 6.10 or later. Please upgrade your Qt version or disable the new Qt implementation with --disable-qt-new.])
+        fi
+      fi
+      LC_APPEND_FLAG([-std=c++17],[QT_CXXFLAGS])
+      ;;
+  esac
+
+  if test $qt_new = yes; then
+    QT_PLUGIN_DIR=Qt6
+  else
+    QT_PLUGIN_DIR=Qt
+  fi
+  AC_SUBST([QT_PLUGIN_DIR])
+
+  # add Plugins/QT_PLUGIN_DIR from TeXmacs source tree to the C++ include path
+  LC_APPEND_FLAG([-IPlugins/$QT_PLUGIN_DIR],[QT_CXXFLAGS])
+
+  case "${host}" in
+    *mingw*)
+      LC_APPEND_FLAG([-Wl,-subsystem,windows],[QT_LDFLAGS])      
+      ;;
+  esac
 
   LC_GET_ARG_VALUE([CXXFLAGS], [-mmacosx-version-min], [CXXMACOSX_VERSION_MIN])
   AS_IF([test -n "$CXXMACOSX_VERSION_MIN"],[
@@ -281,12 +375,18 @@ AC_DEFUN([LC_WITH_QT],[
     [AC_MSG_WARN([No static qgif plugin])])
   AC_RUN_IFELSE([LM_QT_ICO], [AC_DEFINE([qt_static_plugin_qico],[qt_static_plugin_QICOPlugin],[If there is a static plugin qico])],
     [AC_MSG_WARN([No static qico plugin])])
-  AC_RUN_IFELSE([LM_QT_SVG], [AC_DEFINE([qt_static_plugin_qsvg],[qt_static_plugin_QSvgPlugin],[If there is a static plugin qsvg])],
-    [AC_MSG_WARN([No static qsvg plugin])])
+  AS_IF([test "x$use_qtsvg" = "xyes"],[
+    AC_DEFINE([USE_QTSVG],[1],[Use Qt SVG library])
+    AC_RUN_IFELSE([LM_QT_SVG], [AC_DEFINE([qt_static_plugin_qsvg],[qt_static_plugin_QSvgPlugin],[If there is a static plugin qsvg])],
+      [AC_MSG_WARN([No static qsvg plugin])])
+  ])
   AC_RUN_IFELSE([LM_QT_COCOA], [AC_DEFINE([CocoaPlugin],[1],[If there is a static plugin Cocoa])],
     [AC_MSG_WARN([No static Cocoa plugin])])
       ;;
     pkgconfig)
+  AS_IF([test "x$use_qtsvg" = "xyes"],[
+    AC_DEFINE([USE_QTSVG],[1],[Use Qt SVG library])
+  ])
       ;;
   esac
   AX_RESTORE_FLAGS

@@ -93,7 +93,9 @@ SCM_DEFINE (scm_sys_get_stack_size, "%get-stack-size", 0, 0, 0,
 void
 scm_init_stackchk ()
 {
-#include "libguile/stackchk.x"
+ scm_stack_overflow_key = scm_permanent_object (scm_from_locale_symbol ("stack-overflow")) ;
+ scm_c_define_gsubr (s_scm_sys_get_stack_size, 0, 0, 0, (SCM (*)()) scm_sys_get_stack_size); ;
+
 }
 
 /*

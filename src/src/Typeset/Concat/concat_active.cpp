@@ -18,6 +18,7 @@
 #include "packrat.hpp"
 #include "convert.hpp"
 #include "converter.hpp"
+#include "tree_cache.hpp"
 
 /******************************************************************************
 * Typesetting executable markup
@@ -323,6 +324,27 @@ concater_rep::typeset_toc_notify (tree t, path ip) {
   marker (descend (ip, 0));
   print (b);
   marker (descend (ip, 1));  
+}
+
+void
+concater_rep::typeset_cache_ref (tree t, path ip) {
+  if (N(t) < 2 || !is_atomic (t[1])) { typeset_error (t, ip); return; }
+  string kind = t[1]->label;
+  if (kind == "image") {
+    tree width_hint = (N(t) >= 3) ? t[2] : tree ("");
+    tree height_hint= (N(t) >= 4) ? t[3] : tree ("");
+    tree ww= (width_hint == "")? tree ("3cm") : width_hint;
+    tree hh= (height_hint == "")? tree ("3cm") : height_hint;
+    tree t (IMAGE, "$TEXMACS_PATH/misc/pixmaps/unknown.png", ww, hh, "", "");
+
+    typeset_dynamic (t , ip);
+  }
+  else if (kind == "graphics")
+    typeset_dynamic (tree (GRAPHICS, ""), ip);
+  else {
+    tree t (WITH, "color", "dark grey", "[loading...]");
+    typeset_dynamic (t, ip);
+  }
 }
 
 void

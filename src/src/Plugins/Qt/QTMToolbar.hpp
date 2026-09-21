@@ -12,11 +12,15 @@
 #define QTMTOOLBAR_HPP
 
 #include "basic.hpp"
+#include "QTMApplication.hpp"
 
 #include <QToolBar>
 #include <QAction>
 #include <QScrollArea>
 #include <QHBoxLayout>
+#include <QToolButton>
+#include <QList>
+#include <QPointer>
 
 class QTMToolbar : public QToolBar {
   Q_OBJECT
@@ -29,17 +33,38 @@ public:
   void replaceButtons (QList<QAction*>* src);
 
   void addAction (QAction* action);
-#ifdef OS_ANDROID
   void removeAction (QAction* action);
   void clear ();
-#endif
+  void addSeparator ();
+  void addSmallSeparator ();
+  void addRightSpacer ();
+
+  QList<QTMToolbar*> getAllToolbarsFromMainWindow () const;
+  QList<QToolButton*> getAllButtonsFromAllToolbars () const;
+  void resetAllButtons(QToolButton* except = nullptr);
+  void resetButton(QToolButton* button);
+
+protected:
+  bool eventFilter (QObject* watched, QEvent* event) override;
+  void setRightActVisible (bool v);
+  void setLeftActVisible (bool v);
+
+private slots:
+  void resetPendingButton();
 
 private:
-#ifdef OS_ANDROID
-  QScrollArea* mScrollArea;
-  QHBoxLayout* mLayout;
-#endif
+  QPointer<QScrollArea> mScrollArea;
+  QPointer<QHBoxLayout> mLayout;
+  QPointer<QToolButton> mLeftBtn;
+  QPointer<QToolButton> mRightBtn;
+  QPointer<QAction>     mLeftAct;
+  QPointer<QAction>     mRightAct;
+  QPointer<QMenu>       mCurrentMenu;
+  QPointer<QToolButton> mPendingResetButton;
 
+  void scrollBy (int dx);
+  void updateNavButtons ();
+  int scrollStep () const;
 };
 
 #endif // QTMTOOLBAR_HPP

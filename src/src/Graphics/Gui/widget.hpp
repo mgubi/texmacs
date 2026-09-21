@@ -184,10 +184,13 @@ widget input_text_widget (command call_back, string type, array<string> def,
   // the width is specified in TeXmacs length format with units em, px or w
 widget enum_widget (command cb, array<string> vals, string val,
                     int st= 0, string w= "1w");
+widget setting_enum_widget (command cb, string text, array<string> vals, string val,
+                    int st= 0, string w= "1w");
+widget setting_group_widget (string text, array<widget> vals, int style= 0);
   // select a value from a list of possible values
-widget choice_widget (command cb, array<string> vals, string val);
+widget choice_widget (command cb, array<string> vals, string val, int style= 0);
   // select a value from a long list of possible values
-widget choice_widget (command cb, array<string> vals, array<string> mc);
+widget choice_widget (command cb, array<string> vals, array<string> mc, int style= 0);
   // select multiple values from a long list
 widget choice_widget (command cb, array<string> vals, string val, string filt);
   // select a value from a long list with scrollbars and an input to filter
@@ -220,6 +223,8 @@ widget tabs_widget (array<widget> tabs, array<widget> bodies);
   // a tab bar where one and only of the bodies can be selected
 widget icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs);
   // a variant of tabs_widget with named icon tabs
+widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies);
+widget responsive_icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs);
 widget wrapped_widget (widget w, command quit);
   // copy of w, but with a separate reference counter,
   // and with a command to be called upon destruction
@@ -240,6 +245,7 @@ widget extend_widget (widget w, array<widget> a);
   // extend the size of w to the maximum of the sizes of
   // the widgets in the list a
 widget toggle_widget (command cmd, bool on= false, int style= 0);
+widget setting_toggle_widget (command cmd, string text, bool on= false, int style= 0);
   // an input toggle
 widget wait_widget (SI width, SI height, string message);
   // a widget of a specified width and height, displaying a wait message
