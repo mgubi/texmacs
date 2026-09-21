@@ -252,8 +252,11 @@ void
 gui_init_context() {
   load_input_state (current_window);
   hot_id= 0;
-  // a release which never reached us (outside the window) ends the capture
-  if (active_id != 0 && (mouse_state & 7) == 0 && !starts (mouse_action, "press-")) {
+  // a release which never reached us (outside the window) ends the capture;
+  // the release event itself comes with the buttons already up and must
+  // still find the active element (it is the click)
+  if (active_id != 0 && (mouse_state & 7) == 0 &&
+      !starts (mouse_action, "press-") && !starts (mouse_action, "release-")) {
     active_id= 0;
     active_button= 0;
   }
@@ -786,15 +789,32 @@ noop_command () {
   return tm_new<noop_command_rep> ();
 }
 
-// print a file using the system print spooler and then run 'after'
+string input_text_widget_string (widget w); // defined below
+string enum_widget_value (widget w);         // defined below
+
+// print a file with the system spooler (lpr) with the settings chosen in
+// the printer dialog, then run 'after'
 class print_command_rep: public command_rep {
   url file;
   command after;
+  widget printer, copies, pages;
 public:
-  print_command_rep (url _file, command _after): file (_file), after (_after) {}
+  print_command_rep (url _file, command _after, widget _printer, widget _copies, widget _pages):
+    file (_file), after (_after), printer (_printer), copies (_copies), pages (_pages) {}
   void apply () {
-    string cmd= "lpr " * escape_sh (concretize (file));
+    string cmd= "lpr";
+    string pr= enum_widget_value (printer);
+    if (N(pr) > 0 && pr != translate ("Default printer")) cmd << " -P " << escape_sh (pr);
+    int n= as_int (input_text_widget_string (copies));
+    if (n > 1) cmd << " -# " << as_string (min (n, 99));
+    string rg= input_text_widget_string (pages);
+    string clean;
+    for (int i= 0; i < N(rg); i++) // digits, commas and dashes only
+      if ((rg[i] >= '0' && rg[i] <= '9') || rg[i] == ',' || rg[i] == '-') clean << rg[i];
+    if (N(clean) > 0) cmd << " -o page-ranges=" << clean;
+    cmd << " " << escape_sh (concretize (file));
     if (DEBUG_VUE_WIDGETS) debug_widgets << "Running print command: " << cmd << LF;
+    cout << "print: " << cmd << LF;
     system (cmd);
     if (!is_nil (after)) after ();
   }
@@ -804,15 +824,47 @@ public:
 widget input_text_widget (command call_back, string type, array<string> def,
                           int style, string width);
 
-// contents of the dialog shown by printer_widget
+// the printers known to the spooler (lpstat), after the default choice
+static array<string>
+system_printers () {
+  array<string> ps;
+  ps << translate ("Default printer");
+  string out= var_eval_system ("lpstat -a 2>/dev/null");
+  array<string> lines= tokenize (out, "\n");
+  for (int i= 0; i < N(lines); i++) {
+    array<string> a= tokenize (trim_spaces (lines[i]), " ");
+    if (N(a) > 0 && N(a[0]) > 0 && a[0] != "lpstat:") ps << a[0];
+  }
+  return ps;
+}
+
+// contents of the dialog shown by printer_widget: the printer, the number
+// of copies and the pages (as lpr's page-ranges: "1-3,7"), Cancel/Print
 static widget
 make_printer_dialog (command cmd, url ps_pdf_file) {
+  array<string> printers= system_printers ();
+  widget printer= enum_widget (noop_command (), printers, printers[0], 0, "14em");
+  array<string> one; one << string ("1");
+  array<string> none; none << string ("");
+  widget copies= input_text_widget (noop_command (), "copies", one, 0, "3em");
+  widget pages= input_text_widget (noop_command (), "pages", none, 0, "8em");
+  array<widget> lhs, rhs;
+  lhs << text_widget (translate ("Printer") * ":", 0, black)
+      << text_widget (translate ("Copies") * ":", 0, black)
+      << text_widget (translate ("Pages") * ":", 0, black);
+  rhs << printer << copies
+      << horizontal_list (array<widget> (pages, glue_widget (false, false, 8*PIXEL, 0),
+                                         text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)));
   array<widget> buttons;
   buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", WIDGET_STYLE_BUTTON)
+          << glue_widget (false, false, 8*PIXEL, 0)
           << menu_button (text_widget (translate ("Print"), 0, black),
-                          tm_new<print_command_rep> (ps_pdf_file, cmd), "", "", WIDGET_STYLE_BUTTON);
+                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages),
+                          "", "", WIDGET_STYLE_BUTTON);
   array<widget> rows;
   rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
+       << glue_widget (false, false, 0, 8*PIXEL)
+       << aligned_widget (lhs, rhs, 3*PIXEL, 3*PIXEL, 0, 0)
        << glue_widget (false, false, 0, 10*PIXEL)
        << horizontal_list (buttons);
   return vertical_list (rows);
@@ -1764,7 +1816,10 @@ vue_ui_rep::do_layout () {
                            .y= CLAY_ALIGN_Y_CENTER }},
       .backgroundColor= bg,
       .cornerRadius= radius,
-      .border= border
+      .border= border,
+      // the highlight fades in and out (Clay animates the color change)
+      .transition= { .handler= Clay_EaseOut, .duration= 0.12f,
+                     .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR }
     }) {
       last_id= button_id;
       if (menu_has_marks || N(d.pre) > 0) {
@@ -2859,6 +2914,14 @@ string
 input_text_widget_string (widget w) {
   vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
   return (in != NULL) ? in->s : string ("");
+}
+
+// the value currently selected in an enum_widget
+string
+enum_widget_value (widget w) {
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (w.rep);
+  if (u == NULL || u->type != "enum_widget") return "";
+  return open_box<vue_enum_widget_star> (u->data).val;
 }
 
 /******************************************************************************

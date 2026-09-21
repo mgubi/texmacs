@@ -60,3 +60,14 @@ GridComponent (GridState coState) {
         CO_ASSERT_UNREACHABLE();
     }
 }
+
+// does the current Clay context have a transition in progress? (the
+// context structure is only visible here, where Clay is implemented)
+bool vue_clay_transitions_active (void) {
+  Clay_Context* ctx= Clay_GetCurrentContext ();
+  if (ctx == NULL) return false;
+  for (int32_t i= 0; i < ctx->transitionDatas.length; i++)
+    if (Clay__TransitionDataInternalArray_Get (&ctx->transitionDatas, i)->state != CLAY_TRANSITION_STATE_IDLE)
+      return true;
+  return false;
+}

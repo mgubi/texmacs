@@ -5,7 +5,7 @@ snapshot c0
 click 16 30
 wait 500
 window Print
-click 32 40
+click 95 110
 wait 500
 window Popup
 snapshot c1

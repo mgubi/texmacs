@@ -32,6 +32,8 @@ struct vue_input_state {
   string key_event;
   string last_key;
   time_t key_time;
+  uint64_t key_stamp;      // SDL timestamp of the last key delivered as a key
+                           // (a text event right after it is the same keystroke)
   // pointer events (coordinates are relative to the window)
   string mouse_action;
   time_t mouse_time;
@@ -59,7 +61,7 @@ struct vue_input_state {
   ScrollbarData scrollbar;
 
   vue_input_state ()
-    : key_time (0), mouse_time (0), mouse_x (0), mouse_y (0),
+    : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
       wheel_time (0), wheel_event_time (0), wheel_precise (false),
       current_popup (false), cancel_popup (false), away_time (0),
@@ -99,6 +101,8 @@ public:
   bool shown;             // the platform window is currently shown
   bool ready_to_show;     // the contents fit the window (set by post_layout)
   int  layout_passes;     // passes since creation (bounds the waiting)
+  time_t last_layout_time; // for the frame time of the Clay transitions
+  bool transitions_active; // Clay reported running transitions (keep drawing)
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup),

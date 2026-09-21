@@ -91,7 +91,9 @@ filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
 editor), `macros-editor` (the macros editor dialog: selecting a macro in the
 list updates the embedded editor), `macro-tool` (the macro editor as a side
 tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
-list inside its box, selection rebuilds the tool without misdrawn widgets), `scroll-shift` (scrolling
+list inside its box, selection rebuilds the tool without misdrawn widgets), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
+and click while it is shown), `focus-windows` (the keyboard focus moves
+from a prompt to the editor and back: `got: BobBy / 42`), `scroll-shift` (scrolling
 shifts the backing store: the snapshots before and after a `repaint` must
 be identical in the editor area — the footer may show another welcome
 message), `wheel-inertia` (a single wheel step

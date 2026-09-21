@@ -44,6 +44,7 @@
 #endif
 
 #include "clay.h"
+extern "C" bool vue_clay_transitions_active (void); // clay.c
 
 
 
@@ -199,6 +200,8 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   }
   
   clay_debug= false;
+  last_layout_time= 0;
+  transitions_active= false;
 }
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
@@ -345,7 +348,13 @@ vue_sdl_base_window_rep::process_layout () {
     Clay__debugViewWidth= 600; // redefine to have more space
     Clay_BeginLayout ();
     content->do_layout ();
-    render_commands= Clay_EndLayout (0.0f); // no transitions in use: no frame time needed
+    // the frame time drives the transitions declared by the elements
+    // (.transition, see the notes on animation in vue-graphics-stack.md)
+    time_t now= texmacs_time ();
+    float dt= (last_layout_time == 0) ? 0.0f : (float) (now - last_layout_time) / 1000.0f;
+    last_layout_time= now;
+    render_commands= Clay_EndLayout (min (dt, 0.1f));
+    transitions_active= vue_clay_transitions_active (); // clay.c
     gui_finalize_context ();
 
     // post layout tweaking
@@ -1080,7 +1089,7 @@ int number_of_servers (); // in texmacs_server.hpp
 
 void sdl_log_event (const SDL_Event *event);
 static string lookup_mouse (Uint8 button);
-static string lookup_key (SDL_Scancode scancode, SDL_Keymod mod);
+static string lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text= NULL);
 static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
 
@@ -1202,6 +1211,17 @@ wheel_inertia_step () {
   }
   return busy;
 }
+// does a window have a Clay transition in progress? (see process_layout)
+static bool
+transitions_running () {
+  iterator<int> it= iterate (id_to_window);
+  while (it->busy ()) {
+    vue_window win= (vue_window) id_to_window[it->next ()];
+    if (win != NULL && win->transitions_active) return true;
+  }
+  return false;
+}
+
 bool gui_needs_update= true;
 
 bool event_filter (void *userdata, SDL_Event *event);
@@ -1236,6 +1256,11 @@ void gui_start_loop () {
              SDL_PollEvent (&event)) {
         process_event (&event);
       }
+    }
+    if (transitions_running ()) {
+      // a transition animates: keep the frames coming (paced, woken by events)
+      gui_needs_update= true;
+      if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 8);
     }
     if (wheel_inertia_step ()) {
       // keep the frames coming while the view glides (or while a stream of
@@ -1776,7 +1801,13 @@ process_event (SDL_Event *event) {
           break;
         }
 
-        string key= lookup_key (event->key.scancode, event->key.mod);
+        bool produces_text= false;
+        string key= lookup_key (event->key.scancode, event->key.mod, &produces_text);
+        if (produces_text) {
+          // the text event of this keystroke follows (or not: a dead key)
+          if (N(key) > 0) request_partial_redraw= true;
+          break;
+        }
         
         if (N(key)>0) {
           //cout << "Press " << key << " at " << (time_t) ev->xkey.time
@@ -1794,24 +1825,32 @@ process_event (SDL_Event *event) {
           win->input.key_event= key;
           win->input.key_time= texmacs_time();
           win->input.last_key= key;
+          win->input.key_stamp= event->key.timestamp;
         }
       }
       break;
     } // case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_TEXT_INPUT:
     {
+      // the text typed by a keystroke (see SDL_EVENT_KEY_DOWN): the key
+      // names of TeXmacs for the characters which have one
       string r= utf8_to_cork (event->text.text);
+      if (r == " ") r= "space";
+      else if (r == "<") r= "<less>";
+      else if (r == ">") r= "<gtr>";
       win= get_window_from_ID (event->text.windowID);
       if (win) {
-        if (r == win->input.last_key) {
-          printf("Text input (matches last key, ignore): '%s'\n", event->text.text);
+        // a text event right after a key delivered as a key (a command
+        // modifier, an unconsumed alt) belongs to that keystroke
+        if (win->input.key_stamp != 0 &&
+            event->text.timestamp - win->input.key_stamp < 30000000ull) {
+          c_string lk (win->input.last_key);
+          SDL_Log ("Text input '%s' follows the key %s: ignored", event->text.text, (char*) lk);
         } else {
-          printf("Text input (no match): '%s'\n", event->text.text);
-          //FIXME: it is the right way to do it?
           win->input.key_event= r;
           win->input.key_time= texmacs_time();
+          win->input.last_key= r;
         }
-        win->input.last_key= ""; // prevent duplicates (see SDL_EVENT_KEY_DOWN)
       }
       break;
     } //case SDL_EVENT_TEXT_INPUT
@@ -2647,9 +2686,15 @@ lookup_mouse (Uint8 button) {
 }
 
 static string
-lookup_key (SDL_Scancode scancode, SDL_Keymod mod) {
+lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
   SDL_Keycode key= postprocess_key_event (scancode, &mod, false);
   if (key == SDLK_UNKNOWN) return ""; // it is only a modifier, we ignore it
+  // a character key without a command modifier types text: the system
+  // sends the text (composed with the dead keys and the input method) in a
+  // text event, which is delivered instead of the key
+  if (produces_text != NULL)
+    *produces_text= (key >= 0x20 && key != 0x7f && (key & SDLK_SCANCODE_MASK) == 0 &&
+                     (mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) == 0);
 
   cout << "postprocessed key:" << SDL_GetKeyName (key) << " " << print_modifiers (mod) << LF;
 

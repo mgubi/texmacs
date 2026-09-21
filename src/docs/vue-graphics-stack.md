@@ -183,17 +183,37 @@ Hit testing uses `Clay_PointerOver (id)` on the element's own id. Do not use
 the *parent*, and a widget laid out before its siblings (the editor before the
 side tools) would swallow their events.
 
-`button_logic (id)` implements hot/active/click over `Clay_PointerOver`: the
-press makes the element active, the release over the same element yields
-`clicked` (1 left, 2 middle, 3 right). Every `ui_signal` must be initialized
-(`{ .clicked= 0 }`): an uninitialized one fired commands every frame.
+`button_logic (id)` is the common mouse protocol of the elements, over
+`Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless
+another one is *active*; a press over an element makes it active and
+reports `pressed`; it stays active — `held`, the capture — until the button
+is released wherever the pointer went (a scroll bar thumb is dragged this
+way: `scroll_bar` uses `pressed`/`held` and only remembers the click and
+position origins); a release over the active element yields `clicked` (1
+left, 2 middle, 3 right), a release elsewhere just deactivates it
+(`gui_finalize_context`), and so does a release lost outside the window
+(`gui_init_context` checks the button state, but not on the release event
+itself, which is the click). When the pointer leaves a window its pointer
+position is set off-window, so that nothing stays hovered. Every
+`ui_signal` must be initialized (`{ .clicked= 0 }`): an uninitialized one
+fired commands every frame. Elements which must not be captured by the
+element behind them consume the press (`mouse_action= ""`, the thumbs).
 
 Keyboard focus is per window (`win->kbd_focus`); change it with
 `set_kbd_focus`, which notifies editors (`handle_keyboard_focus`), and
 `notify_window_focus` forwards SDL focus changes. Text inputs and editors
 consume `key_event` when focused. Key names follow TeXmacs conventions
-(`lookup_key`, `initialize_keyboard`); `SDL_EVENT_TEXT_INPUT` is deduplicated
-against the last key.
+(`lookup_key`, `initialize_keyboard`). **Typing**: a key which produces a
+character (printable keycode, no control/alt/command modifier left after
+`postprocess_key_event`, which folds shift and option into the keycode) is
+not delivered as a key: the system sends the resulting text — composed
+with the dead keys and the input method — as `SDL_EVENT_TEXT_INPUT`, which
+is delivered instead (" ", "<", ">" become `space`, `<less>`, `<gtr>`); a
+dead key alone types nothing. Every other key (return, arrows, function
+keys, C-/M-/A- combinations) is delivered as a key and a text event which
+follows it within 30 ms (`key_stamp`) belongs to the same keystroke and is
+dropped. The scripted `key` command therefore drives control keys and
+`text` the characters.
 
 Popup menus (`layout_pull_button`) form a chain through `current_popup`; a
 click on a `menu_button` sets `cancel_popup` which closes the chain (and popup
@@ -287,6 +307,39 @@ the window, are at most as tall as the window and scroll.
   is skipped), surface creation and blits, `SDL_UpdateWindowSurface`, the
   primary display bounds (`SDL_GetPrimaryDisplay`, with a 1440×900 fallback),
   clipboard get/set. `SDL_Init`/`TTF_Init` failures exit at startup.
+
+## Animation (Clay transitions)
+
+Clay `main` animates elements whose declaration has a `.transition`
+(handler such as `Clay_EaseOut`, duration in seconds, the properties among
+position, dimensions, background/overlay/border colors, corner radius):
+when the declared value changes between two layouts, Clay interpolates from
+the previous state over the duration, driven by the frame time passed to
+`Clay_EndLayout` (`process_layout` measures it, capped at 100 ms). While a
+context has a transition in progress (`vue_clay_transitions_active` in
+`clay.c`, the only place where the context structure is visible)
+`transitions_running` keeps the loop drawing, paced at 8 ms and woken by
+events. The buttons (`menu_button`) fade their hover and press highlight in
+120 ms; anything else animated should use the same mechanism, and tests
+which snapshot after a click must wait for it to settle (they do, 300 ms
+and more). The elements' ids must be stable for this to work (see the
+notes on `clay_tm_string`).
+
+## Design decisions recorded
+
+* **Relayout flag**: every window is laid out on every iteration of the
+  loop (immediate mode: the layout *is* the event dispatch), so there is no
+  per-window "needs relayout" flag; the former `vue_window_rep::relayout`
+  was never read and is gone. Passes are repeated within an iteration only
+  through `layout_again`/`post_layout` (widgets measured from the previous
+  pass) and `gui_needs_relayout` (widgets replaced by commands).
+* **Caching of rendering structures**: the per-frame objects are cheap
+  (`styled_strings` is rebuilt each layout, the pictures of the icons are
+  loaded once in the widget constructors, the fonts come from TeXmacs'
+  font cache, the glyphs from MuPDF's) and the profile of a frame is now
+  dominated by the editors' repaint and the surface upload, so no further
+  cache is kept; the Clay element ids are the one structure which must be
+  stable across frames (interned strings).
 
 ## Rendering details
 

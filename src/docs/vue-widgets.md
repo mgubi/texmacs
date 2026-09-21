@@ -59,7 +59,7 @@ command (a nil command must never be invoked).
 | `wait_widget` | yellow "please wait" box | |
 | `ink_widget (cb)` | 600×400 canvas, left drag draws, right click erases | `cb (list of strokes)`, points in pixels y-up (X11 protocol) |
 | `refresh_widget`, `refreshable_widget` | re-evaluate their Scheme promise on `SLOT_REFRESH` with a matching kind (or "any") | |
-| `printer_widget (cmd, file)` | Print (via `lpr`) / Cancel dialog | `cmd ()` |
+| `printer_widget (cmd, file)` | printer (the spooler's list from `lpstat -a`, or the default), copies, pages (`lpr -P -# -o page-ranges`), Print / Cancel | `cmd ()` after printing or cancelling |
 | `color_picker_widget (cmd, bg, proposals)` | swatch grids (proposals, standard colors) | `cmd (tree color)`, Cancel `cmd (#f)` |
 | `popup_widget (w)` | transparent container; ignores `SLOT_MOUSE_GRAB` | |
 | `plain_window_widget`, `popup_window_widget`, `tooltip_window_widget` | real windows (see the graphics stack document) | |
