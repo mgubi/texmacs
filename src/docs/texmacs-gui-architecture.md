@@ -105,10 +105,33 @@ the conversion to C++ widgets (`make-menu-*`, calling `widget-*` glue from
   Check marks come from `:check-mark` properties of the commands and reach
   `menu_button` as the `pre` argument (`"v"`, `"*"`, `"o"`).
 
+* settings (2.1.5, used by the preference tools): `(setting-toggle cmd
+  "Description" on)`, `(setting-enum cmd "Description" vals val width)`,
+  `(setting-group "Title" items...)` → `setting_*_widget`; `choice`/`choices`
+  now pass the style; `tabs`/`icon-tabs` become `responsive_*_tabs_widget`
+  when the "responsive tabs default mode" preference asks for it.
+
 Tools: `tm-tool`/`tm-tool*` define a tool (`:name`, body) and its wrapper
 `texmacs-side-tool`; `tool-select pos tool` (`:right`, `:left`, `:bottom`,
 `:transient-*`) installs it in a window; `side-tools?` requires the "side
-tools" and "developer tool" preferences.
+tools" and "developer tool" preferences. A side holds **one tool per
+position** (`set-window-tool` replaces the list of the position, upstream
+semantics since "Improved tool management", 2023): Edit > Preferences and
+the Document tools all use `:right` and replace each other; only
+`tool-toggle` (Developer > Experimental side tools) adds to a position, and
+tools at different positions (`:right` + `:bottom-right`, `:left`) are
+stacked by `texmacs-side-tools` (`main-menu.scm`) with a growing glue between
+the top and bottom groups. `tool-close` removes one tool (the "x" of the
+title bar).
+
+## Client/server and sockets
+
+Since 2.1.5 the TeXmacs server/client (`System/Link/texmacs_server.cpp`,
+`texmacs_client.cpp`, `client_server.hpp`) is implemented on Qt sockets
+(`QTMSockets`) only; the former `socket_server.cpp`/`socket_link` are gone.
+Non-Qt builds compile the `#else` stubs of those files ("sockets are not
+implemented"): `server_can_start` returns false, `client_protocol_version`
+the protocol constant, and `connection_start` has no `socket` link type.
 
 ## Fonts and colors in the UI
 

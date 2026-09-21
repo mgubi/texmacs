@@ -201,3 +201,15 @@ Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`,
 `translate_backing_store` when scrolling) and blitted by their custom render
 callback. `TEXMACS_VUE_SNAPSHOT=<dir>` writes every redraw as PNG.
+
+The renderers of the MuPDF plugin (`mupdf_renderer_rep`, used by the Vue
+windows and pictures, and `fitz_renderer_rep`) derive from
+`basic_renderer_rep`. Since TeXmacs 2.1.5 `renderer_rep` carries a
+`pixel_ratio` (device pixels per point, used by the Qt6 port) which enters
+`zoomf`, `retina_pixel` and `shrink (glyph, ..., pixel_ratio)`, plus a pure
+virtual `clear_device` (the neutral pattern behind the pages) and a `safe`
+flag of `set_zoom_factor` checking the consistency of `shrinkf`. The MuPDF
+renderers keep the older scheme instead: `pixel_ratio= 1`, the retina factor
+is multiplied into the zoom by their own `set_zoom_factor` (hence
+`safe= false`), `shrink` is called with ratio 1 and `clear_device` is a no-op
+(the editor clears the background itself).

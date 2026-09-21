@@ -27,6 +27,29 @@ or in `mupdf_renderer_rep::new_shadow`). When in doubt rebuild everything:
 Vue-specific objects: `vue_gui.cpp`, `vue_widget.cpp` (C++20), `clay.c`
 (the Clay implementation, compiled once).
 
+## Syncing with upstream
+
+Upstream TeXmacs (the SVN trunk) is mirrored in the `svn_sync` branch of the
+main checkout (`~/t/git/texmacs`); the Vue work was merged with it on
+2026-09-21 (TeXmacs 2.1.5, 791 commits). What conflicts and what to check:
+
+* the generated `configure` and `src/System/config.in`: do not merge them,
+  regenerate (`autoconf`, `autoheader`) after resolving `configure.in` and
+  `aclocal.m4` (which list `LC_MUPDF`, `mupdf.m4`, `sdl3.m4` next to the
+  upstream macros);
+* `src/makefile.in`: the MuPDF/SDL/Vue variables, sources and object rules
+  live next to the upstream ones; upstream selects the Qt plugin directory
+  with `QT_PLUGIN_DIR` (`Qt` or `Qt6`), the Widkit-on-Qt port uses
+  `QT_SRC_DIR= Qt`;
+* `System/Link`: Qt-only sockets, keep the non-Qt stubs in sync with
+  `client_server.hpp`;
+* API changes of `renderer.hpp` and `widget.hpp` surface as abstract-class
+  or link errors in `Plugins/MuPDF` and `Plugins/Vue` (see the notes in
+  `vue-graphics-stack.md` and `vue-widgets.md`);
+* upstream Qt-only code paths (a brace inside `#ifdef QTTEXMACS` in
+  `texmacs.cpp` once) break the non-Qt build: build and run the tests after
+  the merge.
+
 ## Running
 
     TEXMACS_PATH=$PWD/TeXmacs TeXmacs/bin/texmacs.bin [-x "(scheme code)"]

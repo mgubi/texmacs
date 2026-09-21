@@ -38,10 +38,12 @@ command (a nil command must never be invoked).
 | `xpm_widget`, `picture_widget` | picture drawn by a custom render callback | |
 | `input_text_widget (cb, type, def, style, width)` | editable field with cursor, tab completion for files, `tab_cb` for the tab order in dialogs | `cb (string)` on return, `cb (#f)` on escape; "search"/"replace-"/"spell" types call `cb (s key)` on every key |
 | `enum_widget (cb, vals, val, style, width)` | button showing `val` + dropdown list | `cb (val)` |
-| `choice_widget (cb, vals, chosen, multiple)` | list on the field background, click selects/toggles | single: `cb (val)`; multiple: `cb (list)` (Qt protocol) |
+| `choice_widget (cb, vals, chosen, multiple)` | list on the field background, click selects/toggles; the `style` argument of the public factories is ignored | single: `cb (val)`; multiple: `cb (list)` (Qt protocol) |
 | `filtered_choice_widget (cb, vals, val, filter)` | text input + scrollable filtered list (substring) | `cb (val filter)` |
 | `tree_view_widget (cmd, data, roles)` | expandable rows; roles parsed like `QTMTreeModel` (`DisplayRole`, `CommandRole`, `UserRole:n` positions per tree label, children after the role arguments) | `cmd (user-n ... user-1 command-or-subtree buttons)`, buttons in Qt encoding (1 left, 2 right, 4 middle) |
 | `toggle_widget (cmd, on, style)` | check box drawn by `render` (smaller in mini style) | `cmd (on)` |
+| `setting_toggle_widget (cmd, text, on, style)`, `setting_enum_widget (cb, text, vals, val, style, width)`, `setting_group_widget (text, widgets, style)` | the "setting" widgets of the 2.1.5 preference tools (`setting-toggle`, `setting-enum`, `setting-group` markup), composed here from `toggle`/`enum` + `text_widget` in a `horizontal_list`, and a `subtitle` division over a `vertical_list` | as the underlying toggle/enum |
+| `responsive_tabs_widget`, `responsive_icon_tabs_widget` | upstream tabs which adapt to the available space (`QTMResponsiveTabWidget`); plain `tabs_widget`/`icon_tabs_widget` here | |
 | `glue_widget`, colored glue | fixed or growing spacer; colored glue caches a picture | |
 | `empty_widget` | 0×0 | |
 | `extend_widget (w, a)` | `w` with the size of the largest of `a` (measured off-screen) | |
