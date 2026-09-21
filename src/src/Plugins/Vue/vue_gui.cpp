@@ -1117,9 +1117,9 @@ static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
 // SDL reports the deltas in "lines": a trackpad (precise deltas) gives a
 // tenth of the finger's displacement in points, so 10 points per unit make
 // the page follow the finger exactly, as a dragged scroll bar follows the
-// pointer; a notch of a mouse wheel is one unit and scrolls three lines
+// pointer; a notch of a mouse wheel is one unit and scrolls about six lines
 static const double wheel_precise_step= 10.0;  // points per unit
-static const double wheel_notch_step= 40.0;    // points per notch
+static const double wheel_notch_step= 80.0;    // points per notch
 #ifdef OS_MACOS
 static const bool wheel_system_momentum= true; // the system glides for us
 #else

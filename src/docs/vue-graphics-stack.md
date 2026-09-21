@@ -208,7 +208,7 @@ the window, are at most as tall as the window and scroll.
   to device pixels — 10 points per unit for a precise (trackpad) stream,
   which is a tenth of the finger's displacement on macOS, so the page
   follows the finger exactly as a dragged scroll bar follows the pointer,
-  and 40 points (three lines) per notch of a mouse wheel — and `push_wheel`
+  and 80 points (about six lines) per notch of a mouse wheel — and `push_wheel`
   hands them to the editors (`mouse_data`, turned into SI with
   `ren->pixel`, the fractions carried in `scroll_rest_x/y`) and to Clay
   (`Clay_UpdateScrollContainers`, which scrolls ten pixels per unit, hence
