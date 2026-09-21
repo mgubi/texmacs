@@ -1111,17 +1111,23 @@ bool gui_wait=  false;
 ******************************************************************************/
 
 static const double wheel_tau= 350.0;          // ms
-static const double wheel_launch_speed= 0.02;  // wheel units per ms
+static const double wheel_launch_speed= 1.0;   // device pixels per ms
 static const time_t wheel_stream_dt= 30;       // ms: the events have stopped
 static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
+// SDL reports the deltas in "lines": a trackpad (precise deltas) gives a
+// tenth of the finger's displacement in points, so 10 points per unit make
+// the page follow the finger exactly, as a dragged scroll bar follows the
+// pointer; a notch of a mouse wheel is one unit and scrolls three lines
+static const double wheel_precise_step= 10.0;  // points per unit
+static const double wheel_notch_step= 40.0;    // points per notch
 #ifdef OS_MACOS
 static const bool wheel_system_momentum= true; // the system glides for us
 #else
 static const bool wheel_system_momentum= false;
 #endif
 
-// deliver a wheel delta to the window: to the widgets (mouse_action) and to
-// the Clay scroll container under the pointer
+// deliver a wheel delta (device pixels) to the window: to the widgets
+// (mouse_action) and to the Clay scroll container under the pointer
 static void
 push_wheel (vue_window win, double dx, double dy) {
   vue_input_state& in= win->input;
@@ -1135,18 +1141,21 @@ push_wheel (vue_window win, double dx, double dy) {
   }
   with_window frame (win);
   Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
-  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx, (float) dy }, 0.01f);
+  // Clay scrolls its containers by ten pixels per unit of delta
+  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx / 10, (float) dy / 10 }, 0.01f);
 }
 
 // a wheel event: scroll now and update the estimated speed of the wheel
-// (dx, dy are the deltas as reported by SDL, in points)
+// (x, y are the deltas as reported by SDL, in wheel units)
 static void
-wheel_event (vue_window win, double dx, double dy, time_t now) {
+wheel_event (vue_window win, double x, double y, time_t now) {
   vue_input_state& in= win->input;
   in.wheel_vx= in.wheel_vy= 0; // the user took over from a glide
   time_t dt= (in.wheel_event_time == 0) ? wheel_slow_dt : now - in.wheel_event_time;
   if (dt >= wheel_slow_dt) in.wheel_precise= false; // a new stream of events
-  if (dx != floor (dx) || dy != floor (dy)) in.wheel_precise= true;
+  if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
+  double step= retina_factor * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
+  double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
   in.wheel_est_y= 0.5 * (in.wheel_est_y + dy / dt);
@@ -1727,9 +1736,7 @@ process_event (SDL_Event *event) {
         in.mouse_time= texmacs_time();
         in.mouse_x= event->wheel.mouse_x * retina_factor;
         in.mouse_y= event->wheel.mouse_y * retina_factor;
-        double dx= event->wheel.x * retina_factor;
-        double dy= event->wheel.y * retina_factor;
-        wheel_event (win, dx, dy, in.mouse_time); // kinetic scrolling, see above
+        wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time); // kinetic scrolling, see above
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:

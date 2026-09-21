@@ -3907,8 +3907,10 @@ vue_simple_widget_rep::do_layout () {
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);
     ren->encode (x,y);
     if (N(mouse_data) == 2) {
-      mouse_data[0] *= ren->pixel * size.x1 * 0.01;
-      mouse_data[1] *= ren->pixel * size.x2 * 0.01;
+      // the wheel deltas come in device pixels (see push_wheel in
+      // vue_gui.cpp): the same displacement as a dragged scroll bar gives
+      mouse_data[0] *= ren->pixel;
+      mouse_data[1] *= ren->pixel;
     }
     if (mouse_action != "move") {
       cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
@@ -3922,8 +3924,8 @@ vue_simple_widget_rep::do_layout () {
       // the fractions of SI are carried over to the next step
       absolute_scroll= false;
       scroll_pos= backing_pos;
-      scroll_rest_x += 4*mouse_data[0];
-      scroll_rest_y += 4*mouse_data[1];
+      scroll_rest_x += mouse_data[0];
+      scroll_rest_y += mouse_data[1];
       SI dx= (SI) scroll_rest_x, dy= (SI) scroll_rest_y;
       scroll_rest_x -= dx; scroll_rest_y -= dy;
       scroll_pos.x1 += dx;

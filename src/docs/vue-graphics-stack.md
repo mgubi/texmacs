@@ -203,9 +203,20 @@ the window, are at most as tall as the window and scroll.
 * **Kinetic scrolling** (`vue_gui.cpp`, `wheel_event`,
   `wheel_inertia_step`): wheel events scroll at once (a slowly turned wheel
   moves the view in sync) while the speed of the wheel is estimated from
-  them (`vue_input_state::wheel_est_x/y`, wheel units per ms, smoothed).
+  them (`vue_input_state::wheel_est_x/y`, device pixels per ms, smoothed).
+  **Units**: SDL reports the deltas in "lines"; `wheel_event` converts them
+  to device pixels — 10 points per unit for a precise (trackpad) stream,
+  which is a tenth of the finger's displacement on macOS, so the page
+  follows the finger exactly as a dragged scroll bar follows the pointer,
+  and 40 points (three lines) per notch of a mouse wheel — and `push_wheel`
+  hands them to the editors (`mouse_data`, turned into SI with
+  `ren->pixel`, the fractions carried in `scroll_rest_x/y`) and to Clay
+  (`Clay_UpdateScrollContainers`, which scrolls ten pixels per unit, hence
+  `/10`). The former mapping scaled a unit to a percentage of the viewport,
+  so the page moved faster or slower than the finger depending on the
+  window size.
   When no event has come for `wheel_stream_dt` (30 ms) and the speed is
-  above `wheel_launch_speed`, the view goes on with that velocity
+  above `wheel_launch_speed` (1 px/ms), the view goes on with that velocity
   (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
   deltas every frame (`push_wheel`: `mouse_action= "wheel"` for the widgets
   plus `Clay_UpdateScrollContainers` for the Clay container under the
