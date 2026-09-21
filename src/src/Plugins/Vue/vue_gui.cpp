@@ -1020,15 +1020,18 @@ bool gui_wait=  false;
 /******************************************************************************
 * Kinetic scrolling
 *
-* A wheel event scrolls by wheel_immediate of its delta at once; the rest
-* becomes a velocity which decays exponentially with time constant wheel_tau
-* and is turned into synthetic wheel deltas frame by frame (the total
-* distance is the one of the events). Discrete wheel notches thus scroll
-* smoothly and the view glides after a trackpad gesture.
+* An isolated wheel event (a notch of a mouse wheel) scrolls by
+* wheel_immediate of its delta at once; the rest becomes a velocity which
+* decays exponentially with time constant wheel_tau and is turned into
+* synthetic wheel deltas frame by frame, so that the view glides (the total
+* distance is the one of the event). Events which follow each other closely
+* (a trackpad gesture, whose momentum phase is already provided by the
+* system) scroll at once, without lag: any pending glide is flushed.
 ******************************************************************************/
 
-static const double wheel_tau= 100.0;     // ms
-static const double wheel_immediate= 0.4;
+static const double wheel_tau= 250.0;     // ms
+static const double wheel_immediate= 0.25;
+static const time_t wheel_stream_dt= 30;  // ms between the events of a stream
 
 // deliver a wheel delta to the window: to the widgets (mouse_action) and to
 // the Clay scroll container under the pointer
@@ -1579,12 +1582,23 @@ process_event (SDL_Event *event) {
         in.mouse_y= event->wheel.mouse_y * retina_factor;
         double dx= event->wheel.x * retina_factor;
         double dy= event->wheel.y * retina_factor;
-        // part of the delta scrolls at once, the rest is spread over the
-        // following frames by wheel_inertia_step (kinetic scrolling)
-        push_wheel (win, wheel_immediate * dx, wheel_immediate * dy);
-        in.wheel_vx += (1.0 - wheel_immediate) * dx / wheel_tau;
-        in.wheel_vy += (1.0 - wheel_immediate) * dy / wheel_tau;
-        if (in.wheel_time == 0) in.wheel_time= in.mouse_time;
+        bool stream= (in.wheel_event_time != 0 &&
+                      in.mouse_time - in.wheel_event_time < wheel_stream_dt);
+        in.wheel_event_time= in.mouse_time;
+        if (stream) {
+          // a gesture: scroll at once, together with what a previous glide
+          // still had to deliver (the integral of the decaying velocity)
+          push_wheel (win, dx + in.wheel_vx * wheel_tau, dy + in.wheel_vy * wheel_tau);
+          in.wheel_vx= in.wheel_vy= 0;
+        }
+        else {
+          // a notch: part of the delta scrolls at once, the rest is spread
+          // over the following frames by wheel_inertia_step
+          push_wheel (win, wheel_immediate * dx, wheel_immediate * dy);
+          in.wheel_vx += (1.0 - wheel_immediate) * dx / wheel_tau;
+          in.wheel_vy += (1.0 - wheel_immediate) * dy / wheel_tau;
+          if (in.wheel_time == 0) in.wheel_time= in.mouse_time;
+        }
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
