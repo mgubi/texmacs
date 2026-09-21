@@ -1265,7 +1265,10 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
     .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= s,
-      .childGap= gap }})
+      .childGap= gap,
+      // a horizontal menu fills the height of its bar: its items (icons of
+      // several sizes, texts, separators) are centered in it
+      .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
     bool save_grow= button_grow, save_marks= menu_has_marks;
     button_grow= vert;
@@ -1344,7 +1347,8 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
   CLAY(vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id), {
      .layout= {
        .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
-       .sizing= s }})
+       .sizing= s,
+       .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
     for (int i=0, n=N(a); i< n; i++) {
       concrete (a[i])->do_layout ();
