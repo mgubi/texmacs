@@ -359,6 +359,8 @@ void
 socket_link_rep::write_callback (void* obj, void* info) {
   (void) info;
   socket_link_rep* l= (socket_link_rep*) obj;
+  DEBUG_SOCKET ("'socket_link_rep::write_callback', socket " << l->socket_id
+                << " exists " << (int) exists (l) << " handshake " << (int) l->handshake);
   if (!exists (l)) return;
   if (l->handshake) l->resume_start (l->socket_id);
   else l->ready_to_send (l->socket_id);
@@ -533,6 +535,8 @@ socket_link_rep::retry (int err) {
 void
 socket_link_rep::resume_start (int s) {
   if (!exists (this)) return;
+  DEBUG_SOCKET ("'socket_link_rep::resume_start', socket " << s
+                << " alive " << (int) is_alive (contact) << " active " << (int) is_active (contact));
   if (!is_alive (contact)) {
     DEBUG_SOCKET ("contact is dead for socket " * as_string (s));
     stop ();

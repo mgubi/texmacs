@@ -18,7 +18,8 @@ WIP
 DONE
 
 * the TeXmacs client/server works without Qt (System/Link/tm_sockets.cpp on
-  the socket notifiers; legacy protocol tested, test sockets)
+  the socket notifiers; both protocols tested: tests sockets, sockets-tls;
+  the build has --with-gnutls)
 * scroll bar thumbs, buttons and every element share button_logic
   (hot/active/capture: pressed, held, clicked); nothing stays hovered when
   the pointer leaves the window

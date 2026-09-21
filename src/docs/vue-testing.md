@@ -103,7 +103,12 @@ tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
 list inside its box, selection rebuilds the tool without misdrawn widgets), `sockets` (the TeXmacs server and an anonymous legacy client in the same
 instance: `SOCKETS roundtrip: ((server license ...` in the log; it creates
 the server database `~/.TeXmacs/server` with an admin account and switches
-the `tls-server` preference off for its duration), `input-edit` (editing in a text input: select all and
+the `tls-server` preference off for its duration), `sockets-tls` (the same
+over TLS, run by hand: `TEXMACS_SERVER_CERT_DIR=<scratch dir>
+texmacs.bin -tls-no-verify -x '(load ".../sockets-tls.scm")'` generates a
+self-signed certificate there and expects `SOCKETS-TLS roundtrip:`; the
+`GnuTLS ERROR (-110)` for one client is the losing half of the dual
+IPv4/IPv6 connection attempt), `input-edit` (editing in a text input: select all and
 replace, word selection, cut and paste, `got: Bob Smith / 42`), `pre-edit` (the composition of an input method — a dead key, a letter — is
 shown in a pre-edit box and the committed text replaces it), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
 and click while it is shown), `focus-windows` (the keyboard focus moves

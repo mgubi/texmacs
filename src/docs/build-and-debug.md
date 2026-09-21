@@ -5,10 +5,12 @@
 The worktree `wip_other_guis/src` is configured with
 
     ./configure --with-gui=vue --with-mupdf=/opt/homebrew --with-sdl3 \
-      --with-guile=/Users/mgubi/t/guile-1.8.7/usr/bin/guile-config
+      --with-guile=/Users/mgubi/t/guile-1.8.7/usr/bin/guile-config --with-gnutls
 
 (see the first lines of `config.log`; the Guile 1.8 in `~/t/guile-1.8.7` is
-used, the Homebrew Guile 3 is rejected). `make` at the root builds
+used, the Homebrew Guile 3 is rejected; `--with-gnutls`, added on
+2026-09-21, enables the TLS protocol of the TeXmacs client/server through
+the Homebrew GnuTLS and needs a full rebuild since it changes `config.h`). `make` at the root builds
 `TeXmacs/bin/texmacs.bin`; `src/makefile` is generated from
 `src/makefile.in`, so permanent changes go to `makefile.in`. `configure`
 and `src/System/config.in` are generated from `configure.in` and the

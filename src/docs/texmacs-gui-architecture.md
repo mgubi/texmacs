@@ -163,9 +163,12 @@ Both protocols are available: TLS through `Plugins/Gnutls` when the build
 has `--with-gnutls`, and the legacy one, whose RSA/AES steps shell out to
 the `openssl` command (`Plugins/Openssl`): with LibreSSL, the openssl of
 macOS, `pkeyutl` needs the operation before `-inkey` (fixed here, it made
-the legacy handshake fail for every GUI on macOS). The `sockets` test
-starts the server and an anonymous legacy client in one instance and
-evaluates `remote-public-preferences` remotely.
+the legacy handshake fail for every GUI on macOS). The `sockets` and
+`sockets-tls` tests start the server and an anonymous client in one
+instance and evaluate `remote-public-preferences` remotely, over each
+protocol. Note that the C++ side reads the `tls-server` preference, whose
+default ("on") exists only once the server modules are loaded: a test
+sets it explicitly.
 
 ## Fonts and colors in the UI
 
