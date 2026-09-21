@@ -106,6 +106,7 @@ public:
   void   set_visibility (bool flag);
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
+  void   update_density (); // the pixel density of its display (override)
   void   get_size (SI& w, SI& h);
   void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h);
   void   set_position (SI x, SI y);
@@ -208,6 +209,26 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   clay_debug= false;
   last_layout_time= 0;
   transitions_active= false;
+  update_density ();
+}
+
+// The pixel density of the display this window is on. The layout works in
+// device pixels and the pointer comes in points, so the two are related by
+// this factor; the renderers draw at 'retina' pixels per point.
+void
+vue_sdl_base_window_rep::update_density () {
+  float d= SDL_GetWindowPixelDensity (sdl_win);
+  if (d <= 0.0f) d= 1.0f;
+  // TEXMACS_VUE_DENSITY overrides it: to draw at 1x on a HiDPI display,
+  // and to exercise the other path while testing
+  static string forced= get_env ("TEXMACS_VUE_DENSITY");
+  if (N(forced) > 0 && is_double (forced)) d= (float) as_double (forced);
+  int r= max (1, (int) (d + 0.5f));
+  if (d == density && r == retina) return;
+  density= d;
+  retina= r;
+  if (DEBUG_VUE)
+    SDL_Log ("Window %d: pixel density %.2f, drawing at %dx", id, d, r);
 }
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
@@ -985,8 +1006,8 @@ layout_text_box (string s, int style, color c) {
   CLAY_AUTO_ID({
     .layout= {
       .sizing= {
-        CLAY_SIZING_FIXED((float)2*w/PIXEL),
-        CLAY_SIZING_FIXED((float)2*h/PIXEL) }},
+        CLAY_SIZING_FIXED((float) retina_factor*w/PIXEL),
+        CLAY_SIZING_FIXED((float) retina_factor*h/PIXEL) }},
     .custom= { .customData= vue_render_text },
     .userData= ss.rep
   }) {};
@@ -1061,6 +1082,8 @@ void gui_open (int& argc, char** argv) {
     float density= 0.0f;
     const SDL_DisplayMode* mode= SDL_GetDesktopDisplayMode (SDL_GetPrimaryDisplay ());
     if (mode != NULL) density= mode->pixel_density;
+    string forced= get_env ("TEXMACS_VUE_DENSITY"); // see update_density
+    if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
     int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
     if (density <= 0.0f) factor= 2; // unknown: the previous default
     set_retina_factor (factor);
@@ -1262,7 +1285,7 @@ wheel_event (vue_window win, double x, double y, time_t now) {
   time_t dt= (in.wheel_event_time == 0) ? wheel_slow_dt : now - in.wheel_event_time;
   if (dt >= wheel_slow_dt) in.wheel_precise= false; // a new stream of events
   if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
-  double step= retina_factor * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
+  double step= win->density * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
@@ -1920,6 +1943,22 @@ process_event (SDL_Event *event) {
         win->input.mouse_time= texmacs_time ();
       }
       break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+      // the window moved to a display of another density: the layout and
+      // the backing stores of its editors follow (their pixel size changes
+      // with the density, which the repaint notices)
+      win= get_window_from_ID (event->window.windowID);
+      if (win) {
+        int was= win->retina;
+        win->update_density ();
+        if (win->retina != was) {
+          with_window frame (win);
+          vue_simple_widget_rep::invalidate_all_editors ();
+          gui_needs_relayout= true;
+        }
+      }
+      break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
     case SDL_EVENT_WINDOW_FOCUS_LOST:
       // tell the focused widget of the window (e.g. the editor, which hides
@@ -1944,8 +1983,8 @@ process_event (SDL_Event *event) {
         vue_input_state& in= win->input;
         in.mouse_action= action;
         in.mouse_time= texmacs_time();
-        in.mouse_x= bx * retina_factor;
-        in.mouse_y= by * retina_factor;
+        in.mouse_x= (int) (bx * win->density);
+        in.mouse_y= (int) (by * win->density);
         with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y },
                              (event->button.button == SDL_BUTTON_LEFT) &&
@@ -1964,8 +2003,8 @@ process_event (SDL_Event *event) {
       if (win) {
         vue_input_state& in= win->input;
         in.mouse_time= texmacs_time();
-        in.mouse_x= event->wheel.mouse_x * retina_factor;
-        in.mouse_y= event->wheel.mouse_y * retina_factor;
+        in.mouse_x= (int) (event->wheel.mouse_x * win->density);
+        in.mouse_y= (int) (event->wheel.mouse_y * win->density);
         wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time); // kinetic scrolling, see above
       }
       break;
@@ -1978,13 +2017,13 @@ process_event (SDL_Event *event) {
       float mx= event->motion.x, my= event->motion.y;
       if (win && popup_grab (win, mx, my, false)) {
         with_window frame (win);
-        Clay_SetPointerState ((Clay_Vector2) { mx * retina_factor, my * retina_factor },
+        Clay_SetPointerState ((Clay_Vector2) { mx * win->density, my * win->density },
                              (event->motion.state & SDL_BUTTON_LMASK) != 0);
         vue_input_state& in= win->input;
         in.mouse_action= "move";
         in.mouse_time= texmacs_time();
-        in.mouse_x= mx * retina_factor;
-        in.mouse_y= my * retina_factor;
+        in.mouse_x= (int) (mx * win->density);
+        in.mouse_y= (int) (my * win->density);
       }
       break;
     } // case SDL_EVENT_MOUSE_MOTION:
@@ -2099,8 +2138,8 @@ process_event (SDL_Event *event) {
       vue_input_state& in= win->input;
       in.mouse_action= "drop";
       in.mouse_time= texmacs_time ();
-      in.mouse_x= (int) (event->drop.x * retina_factor);
-      in.mouse_y= (int) (event->drop.y * retina_factor);
+      in.mouse_x= (int) (event->drop.x * win->density);
+      in.mouse_y= (int) (event->drop.y * win->density);
       in.mouse_ticket= ++drop_serial;
       payloads (in.mouse_ticket)= drop_doc;
       if (DEBUG_VUE_EVENTS)

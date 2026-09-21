@@ -12,6 +12,7 @@
 #define VUE_GUI_H
 
 #include "gui.hpp"
+#include "renderer.hpp" // retina_factor, set_retina_factor
 #include "font.hpp"
 #include "vue_widget.hpp"
 #include "clay.h"
@@ -99,6 +100,14 @@ public:
   bool popup; // undecorated popup/tooltip window
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
+  // Device pixels per point on the display this window is on
+  // (SDL_GetWindowPixelDensity, refreshed when the window moves to another
+  // display). The layout works in device pixels while the pointer comes in
+  // points, and the renderers draw at retina_factor pixels per point: the
+  // factor of the window is made current by with_window.
+  float density;
+  int   retina;  // the density rounded, at least 1
+  virtual void update_density () {} // the platform window knows it
   // windows are shown only once their size matches their contents, to avoid
   // flickering while a new window is sized (see set_visibility/process_layout)
   bool visible_requested; // set_visibility (true) has been called
@@ -111,6 +120,7 @@ public:
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : id (serial++), name (_name), orig_name (_name), content (w),
     clay_debug (false), popup (_popup), layout_w (0), layout_h (0),
+    density (1.0f), retina (1),
     visible_requested (false), shown (false), ready_to_show (false),
     layout_passes (0), last_layout_time (0), transitions_active (false)
   { render_commands.length= 0; }
@@ -178,12 +188,22 @@ extern vue_window current_window;
 class with_window {
 public:
   vue_window saved_win;
+  // the renderers of TeXmacs read one global factor: while a window is
+  // current, it is the factor of that window (so several displays of
+  // different densities each draw at their own resolution)
+  int saved_retina;
   with_window (vue_window _win)
-  : saved_win (current_window) { if (_win) Clay_SetCurrentContext (_win->clay_ctx); current_window= _win; }
+  : saved_win (current_window), saved_retina (retina_factor) {
+    if (_win) {
+      Clay_SetCurrentContext (_win->clay_ctx);
+      if (_win->retina != retina_factor) set_retina_factor (_win->retina);
+    }
+    current_window= _win; }
   // the context is restored unconditionally: leaving it on a window whose
   // arena is freed later left Clay pointing into freed memory
   ~with_window () {
     Clay_SetCurrentContext (saved_win ? saved_win->clay_ctx : NULL);
+    if (retina_factor != saved_retina) set_retina_factor (saved_retina);
     current_window= saved_win; }
 };
 

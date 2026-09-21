@@ -17,6 +17,12 @@ WIP
 
 DONE
 
+* retina: each window follows the density of its display (with_window makes
+  its factor current), the sizes are converted with retina_factor instead
+  of a hardcoded 2, TEXMACS_VUE_DENSITY overrides it for testing
+* drag and drop of files and text (test drop)
+* the GUI entry points which were stubs: beep, image_gc,
+  show_help_balloon, show_wait_indicator, external_event (test entrypoints)
 * audit of the plugin (2026-09-21): lost clicks after the event batching,
   the renderer leak of every destroyed editor, dangling window pointers,
   the scroll requests dropped by a second layout pass, the file dialog

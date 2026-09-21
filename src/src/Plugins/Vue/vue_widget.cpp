@@ -1628,9 +1628,9 @@ vue_ui_rep::do_layout () {
     }
     CLAY(CLAY_IDI("aligned_widget", id), {
       .layout= {
-        .padding= { (uint16_t)(2*d.lpad / PIXEL), (uint16_t)(2*d.rpad / PIXEL), 0, 0 },
+        .padding= { (uint16_t) (retina_factor*d.lpad / PIXEL), (uint16_t) (retina_factor*d.rpad / PIXEL), 0, 0 },
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
-        .childGap= (uint16_t)(2*d.hsep / PIXEL),
+        .childGap= (uint16_t) (retina_factor*d.hsep / PIXEL),
         .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }}})
     {
       for (int col=0; col<2; col++) {
@@ -1638,7 +1638,7 @@ vue_ui_rep::do_layout () {
         CLAY_AUTO_ID({
           .layout= {
             .layoutDirection= CLAY_TOP_TO_BOTTOM,
-            .childGap= (uint16_t)(2*d.vsep / PIXEL),
+            .childGap= (uint16_t) (retina_factor*d.vsep / PIXEL),
             .childAlignment= { .x= (col == 0) ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT }}})
         {
           for (int i=0; i<n; i++) {
@@ -2018,10 +2018,10 @@ vue_ui_rep::do_layout () {
     CLAY(CLAY_IDI("glue_widget", id), {
       .layout= {
         .sizing= {
-          .width=  d.hx ? CLAY_SIZING_GROW( .min= (float)2*d.w/PIXEL)
-                        : CLAY_SIZING_FIXED((float)2*d.w/PIXEL),
-          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
-                        : CLAY_SIZING_FIXED((float)2*d.h/PIXEL) }}}) {};
+          .width=  d.hx ? CLAY_SIZING_GROW( .min= (float) retina_factor*d.w/PIXEL)
+                        : CLAY_SIZING_FIXED((float) retina_factor*d.w/PIXEL),
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float) retina_factor*d.h/PIXEL)
+                        : CLAY_SIZING_FIXED((float) retina_factor*d.h/PIXEL) }}}) {};
     return;
   }
   if (type == "cached_glue_widget") {
@@ -2033,10 +2033,10 @@ vue_ui_rep::do_layout () {
       .userData= this,
       .layout= {
         .sizing= {
-          .width= d.hx  ? CLAY_SIZING_GROW( .min= (float)2*d.w/PIXEL)
-                        : CLAY_SIZING_FIT( .min= (float)2*d.w/PIXEL),
-          .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
-                        : CLAY_SIZING_FIT( .min= (float)2*d.h/PIXEL) }}}) {};
+          .width= d.hx  ? CLAY_SIZING_GROW( .min= (float) retina_factor*d.w/PIXEL)
+                        : CLAY_SIZING_FIT( .min= (float) retina_factor*d.w/PIXEL),
+          .height= d.vx ? CLAY_SIZING_GROW( .min= (float) retina_factor*d.h/PIXEL)
+                        : CLAY_SIZING_FIT( .min= (float) retina_factor*d.h/PIXEL) }}}) {};
     return;
   }
   if (type == "tile_menu") {
@@ -2097,7 +2097,7 @@ vue_ui_rep::do_layout () {
     Clay_Sizing sz= { CLAY_SIZING_FIT (.min= 40), CLAY_SIZING_FIT (0) };
     if (N(d.w) > 0) {
       SI w= decode_length (d.w, current_window, d.st);
-      sz.width= CLAY_SIZING_FIXED ((float) 2*w/PIXEL);
+      sz.width= CLAY_SIZING_FIXED ((float) retina_factor*w/PIXEL);
     }
     Clay_ElementData ed= Clay_GetElementData (enum_id);
     CLAY(enum_id, {
@@ -2170,11 +2170,11 @@ vue_ui_rep::do_layout () {
     // (the limits of the window itself are set in vue_plain_window_widget_rep)
     Clay_Sizing sizing;
     if (window_autosizing) {
-      sizing.width=  CLAY_SIZING_FIXED ((float) 2*defw/PIXEL);
-      sizing.height= CLAY_SIZING_FIXED ((float) 2*defh/PIXEL);
+      sizing.width=  CLAY_SIZING_FIXED ((float) retina_factor*defw/PIXEL);
+      sizing.height= CLAY_SIZING_FIXED ((float) retina_factor*defh/PIXEL);
     } else {
-      sizing.width=  CLAY_SIZING_GROW (.min= (float) 2*minw/PIXEL, .max= (float) 2*maxw/PIXEL);
-      sizing.height= CLAY_SIZING_GROW (.min= (float) 2*minh/PIXEL, .max= (float) 2*maxh/PIXEL);
+      sizing.width=  CLAY_SIZING_GROW (.min= (float) retina_factor*minw/PIXEL, .max= (float) retina_factor*maxw/PIXEL);
+      sizing.height= CLAY_SIZING_GROW (.min= (float) retina_factor*minh/PIXEL, .max= (float) retina_factor*maxh/PIXEL);
     }
     CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
       .layout= { .sizing= sizing }})
@@ -2503,8 +2503,8 @@ vue_ui_rep::do_layout () {
     vue_wait_widget d= open_box<vue_wait_widget> (data);
     CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= {
-        .sizing= { CLAY_SIZING_FIXED ((float) 2*d.width/PIXEL),
-                   CLAY_SIZING_FIXED ((float) 2*d.height/PIXEL) },
+        .sizing= { CLAY_SIZING_FIXED ((float) retina_factor*d.width/PIXEL),
+                   CLAY_SIZING_FIXED ((float) retina_factor*d.height/PIXEL) },
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
         .childGap= 8,
         .childAlignment= { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }},
@@ -3189,9 +3189,9 @@ vue_input_text_widget_rep::do_layout () {
   SI w= decode_length (width, current_window, style);
   font fn= get_font ();
   SI h_text= (fn->y2 - fn->y1 + 2) / 3;
-  // device pixels: 2 per PIXEL/2 SI (see layout_text_box)
-  float w_px= (float) 2*w/PIXEL + 2*input_pad_x;
-  float h_px= (float) 2*h_text/PIXEL + 2*input_pad_y;
+  // the layout is in device pixels, retina_factor of them per point
+  float w_px= (float) retina_factor*w/PIXEL + 2*input_pad_x;
+  float h_px= (float) retina_factor*h_text/PIXEL + 2*input_pad_y;
   Clay_ElementId cid= CLAY_IDI ("input_text_widget", id);
   ui_signal sig { .clicked= 0 };
   if (!greyed) sig= button_logic (cid);
@@ -3202,7 +3202,8 @@ vue_input_text_widget_rep::do_layout () {
     .userData= this }) {}
   if (ed.found && (sig.pressed == 1 || (sig.held && (mouse_state & 1)))) {
     // the mouse places the cursor and, dragged, selects
-    SI x= (SI) ((mouse_x - ed.boundingBox.x - input_pad_x) * (PIXEL / 2)) + scroll;
+    SI x= (SI) ((mouse_x - ed.boundingBox.x - input_pad_x)
+                * (PIXEL / retina_factor)) + scroll;
     int p= position_at (x);
     if (sig.pressed == 1) {
       mouse_action= "";
@@ -4044,13 +4045,15 @@ list<vue_simple_widget_rep*> paint_list;
 
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
-  win (NULL), ren (NULL),
+  win (NULL),
   size (coord2 (0, 0)),
   extents (0,0,0,0),
-  cursor_pos (coord2 (0, 0)),
-  backing_pos (coord2(0, 0)), origin (coord2 (0, 0)),
   scroll_pos (coord2 (0, 0)),
+  cursor_pos (coord2 (0, 0)),
+  mouse_grab (false),
   absolute_scroll (false),
+  ren (NULL),
+  backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
   backing_valid (false),
   resize_pending (false),
   scroll_rest_x (0), scroll_rest_y (0)

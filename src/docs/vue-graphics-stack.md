@@ -188,11 +188,26 @@ side tools) would swallow their events.
 The pointer coordinates are **signed**: a drag may continue outside the
 window, where SDL reports negative positions, and when the pointer leaves
 the window the last position inside it is kept, so that a dragged element
-freezes instead of jumping to an extreme. The **pixel density** comes from
-the desktop display mode (`SDL_GetDesktopDisplayMode`, not the content
-scale, which macOS reports as 1 while drawing at 2 pixels per point);
-TeXmacs keeps one global `retina_factor`, so a mixed-density setup follows
-the primary display.
+freezes instead of jumping to an extreme.
+
+**Pixel density.** The layout works in device pixels
+(`SDL_GetWindowSizeInPixels`) while the pointer comes in points, and the
+renderers draw `retina_factor` pixels per point: everywhere the two meet,
+the factor is the density of the display the window is on. Each window
+keeps its own (`density`, `retina`, from `SDL_GetWindowPixelDensity`,
+refreshed on `PIXEL_SIZE_CHANGED` and `DISPLAY_SCALE_CHANGED`, which also
+invalidate the editors so their backing stores are rebuilt at the new
+size). TeXmacs reads one global `retina_factor`, so `with_window` makes
+the factor of the current window current too and restores it afterwards:
+windows on displays of different densities each draw at their own
+resolution. The startup value, before any window exists, comes from the
+desktop display mode (the *content scale* is the wrong query, macOS
+reports 1 there while drawing at 2 pixels per point). Sizes coming from
+TeXmacs are in SI, `PIXEL` per point, so a length becomes
+`retina_factor*x/PIXEL` device pixels; writing 2 there, as the code did
+throughout, made every widget twice its size on a display without HiDPI.
+`TEXMACS_VUE_DENSITY=<x>` overrides the density, to draw at 1x on a HiDPI
+display and to exercise the other path in the tests.
 
 `button_logic (id)` is the common mouse protocol of the elements, over
 `Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless
