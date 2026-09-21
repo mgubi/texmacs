@@ -213,7 +213,11 @@ dead key alone types nothing. Every other key (return, arrows, function
 keys, C-/M-/A- combinations) is delivered as a key and a text event which
 follows it within 30 ms (`key_stamp`) belongs to the same keystroke and is
 dropped. The scripted `key` command therefore drives control keys and
-`text` the characters.
+`text` the characters. The composition of an input method
+(`SDL_EVENT_TEXT_EDITING`: dead keys, CJK) is shown by the editor as a
+pre-edit: it receives the key `pre-edit:<cursor>:<text>` as with Qt (an
+empty text ends it) and the committed text arrives as a text event; the
+text inputs ignore the pre-edit keys.
 
 Popup menus (`layout_pull_button`) form a chain through `current_popup`; a
 click on a `menu_button` sets `cancel_popup` which closes the chain (and popup
@@ -320,10 +324,15 @@ context has a transition in progress (`vue_clay_transitions_active` in
 `clay.c`, the only place where the context structure is visible)
 `transitions_running` keeps the loop drawing, paced at 8 ms and woken by
 events. The buttons (`menu_button`) fade their hover and press highlight in
-120 ms; anything else animated should use the same mechanism, and tests
-which snapshot after a click must wait for it to settle (they do, 300 ms
-and more). The elements' ids must be stable for this to work (see the
-notes on `clay_tm_string`).
+120 ms, and a tool panel which appears slides in from its edge in 150 ms
+(`layout_tool_panel`: an *enter* transition on the position only, with
+`enter.setInitialState` placing the panel beyond the edge, so that the
+sizes the tools measure are final at once; the sizes are not animated on
+purpose, since the editors read their Clay box as their viewport). Anything
+else animated should use the same mechanism, and tests which snapshot
+after a click must wait for it to settle (they do, 300 ms and more). The
+elements' ids must be stable for this to work (see the notes on
+`clay_tm_string`).
 
 ## Design decisions recorded
 

@@ -750,7 +750,7 @@ VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val,
 VUE_WIDGET_DATA(filtered_choice_widget_star, command, cb, array<string>, vals, string, val, widget, input);
 // a filtered choice widget with the input field used for the filter
 
-VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content);
+VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content, widget, printer, widget, copies, widget, pages, string, options_for);
 // a printer widget with the prebuilt dialog contents
 
 VUE_WIDGET_DATA(color_picker_widget_star, command, cmd, bool, bg, array<tree>, proposals, widget, content);
@@ -792,15 +792,57 @@ noop_command () {
 string input_text_widget_string (widget w); // defined below
 string enum_widget_value (widget w);         // defined below
 
+// an option of a printer as listed by lpoptions -l: "Key/Label: v1 *v2 v3"
+// (the default is starred); the dialog shows it as an enum
+struct printer_option {
+  string key, label, def;
+  array<string> values;
+  widget choice; // the enum_widget of the dialog
+};
+
+// the options of a printer worth a choice: paper size, two-sided, color
+static array<printer_option>
+printer_options (string printer) {
+  array<printer_option> opts;
+  string cmd= "lpoptions -l 2>/dev/null";
+  if (N(printer) > 0) cmd= "lpoptions -p " * escape_sh (printer) * " -l 2>/dev/null";
+  array<string> lines= tokenize (var_eval_system (cmd), "\n");
+  for (int i= 0; i < N(lines); i++) {
+    int c= search_forwards (": ", lines[i]);
+    int sl= search_forwards ("/", lines[i]);
+    if (c < 0 || sl < 0 || sl > c) continue;
+    printer_option o;
+    o.key= lines[i] (0, sl);
+    o.label= lines[i] (sl+1, c);
+    if (o.key != "PageSize" && o.key != "Duplex" && o.key != "ColorModel") continue;
+    array<string> vs= tokenize (trim_spaces (lines[i] (c+2, N(lines[i]))), " ");
+    for (int j= 0; j < N(vs); j++) {
+      string v= vs[j];
+      if (N(v) == 0) continue;
+      bool def= (v[0] == '*');
+      if (def) v= v (1, N(v));
+      // the paper sizes: the named ones only (not 209.9x329.49mm, Custom...)
+      if (o.key == "PageSize" && (occurs (".", v) || occurs ("x", v) || v == "Custom")) continue;
+      o.values << v;
+      if (def) o.def= v;
+    }
+    if (N(o.values) > 1) opts << o;
+  }
+  return opts;
+}
+
 // print a file with the system spooler (lpr) with the settings chosen in
 // the printer dialog, then run 'after'
 class print_command_rep: public command_rep {
   url file;
   command after;
   widget printer, copies, pages;
+  array<printer_option> options;
 public:
-  print_command_rep (url _file, command _after, widget _printer, widget _copies, widget _pages):
-    file (_file), after (_after), printer (_printer), copies (_copies), pages (_pages) {}
+  print_command_rep (url _file, command _after, widget _printer, widget _copies, widget _pages,
+                     array<printer_option> _options):
+    file (_file), after (_after), printer (_printer), copies (_copies), pages (_pages),
+    options (_options) {}
   void apply () {
     string cmd= "lpr";
     string pr= enum_widget_value (printer);
@@ -812,6 +854,10 @@ public:
     for (int i= 0; i < N(rg); i++) // digits, commas and dashes only
       if ((rg[i] >= '0' && rg[i] <= '9') || rg[i] == ',' || rg[i] == '-') clean << rg[i];
     if (N(clean) > 0) cmd << " -o page-ranges=" << clean;
+    for (int i= 0; i < N(options); i++) {
+      string v= enum_widget_value (options[i].choice);
+      if (N(v) > 0 && v != options[i].def) cmd << " -o " << options[i].key << "=" << escape_sh (v);
+    }
     cmd << " " << escape_sh (concretize (file));
     if (DEBUG_VUE_WIDGETS) debug_widgets << "Running print command: " << cmd << LF;
     cout << "print: " << cmd << LF;
@@ -838,16 +884,26 @@ system_printers () {
   return ps;
 }
 
-// contents of the dialog shown by printer_widget: the printer, the number
-// of copies and the pages (as lpr's page-ranges: "1-3,7"), Cancel/Print
-static widget
-make_printer_dialog (command cmd, url ps_pdf_file) {
+// the persistent inputs of the printer dialog (kept across the rebuilds of
+// its contents when another printer is chosen)
+static void
+make_printer_inputs (widget& printer, widget& copies, widget& pages) {
   array<string> printers= system_printers ();
-  widget printer= enum_widget (noop_command (), printers, printers[0], 0, "14em");
+  printer= enum_widget (noop_command (), printers, printers[0], 0, "14em");
   array<string> one; one << string ("1");
   array<string> none; none << string ("");
-  widget copies= input_text_widget (noop_command (), "copies", one, 0, "3em");
-  widget pages= input_text_widget (noop_command (), "pages", none, 0, "8em");
+  copies= input_text_widget (noop_command (), "copies", one, 0, "3em");
+  pages= input_text_widget (noop_command (), "pages", none, 0, "8em");
+}
+
+// contents of the dialog shown by printer_widget: the printer, the number
+// of copies, the pages (as lpr's page-ranges: "1-3,7"), the options of the
+// chosen printer (lpoptions), Cancel/Print
+static widget
+make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies, widget pages) {
+  string pr= enum_widget_value (printer);
+  if (pr == translate ("Default printer")) pr= "";
+  array<printer_option> options= printer_options (pr);
   array<widget> lhs, rhs;
   lhs << text_widget (translate ("Printer") * ":", 0, black)
       << text_widget (translate ("Copies") * ":", 0, black)
@@ -855,11 +911,16 @@ make_printer_dialog (command cmd, url ps_pdf_file) {
   rhs << printer << copies
       << horizontal_list (array<widget> (pages, glue_widget (false, false, 8*PIXEL, 0),
                                          text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)));
+  for (int i= 0; i < N(options); i++) {
+    options[i].choice= enum_widget (noop_command (), options[i].values, options[i].def, 0, "14em");
+    lhs << text_widget (translate (options[i].label) * ":", 0, black);
+    rhs << options[i].choice;
+  }
   array<widget> buttons;
   buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", WIDGET_STYLE_BUTTON)
           << glue_widget (false, false, 8*PIXEL, 0)
           << menu_button (text_widget (translate ("Print"), 0, black),
-                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages),
+                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages, options),
                           "", "", WIDGET_STYLE_BUTTON);
   array<widget> rows;
   rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
@@ -999,8 +1060,12 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   }
   if (type == "printer_widget") {
     vue_printer_widget d= open_box<vue_printer_widget> (data);
+    widget printer, copies, pages;
+    make_printer_inputs (printer, copies, pages);
     vue_printer_widget_star dd { .cmd= d.cmd, .ps_pdf_file= d.ps_pdf_file,
-                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file) };
+                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file, printer, copies, pages),
+                                 .printer= printer, .copies= copies, .pages= pages,
+                                 .options_for= enum_widget_value (printer) };
     data= close_box (dd);
     return;
   }
@@ -2461,6 +2526,14 @@ vue_ui_rep::do_layout () {
   if (type == "printer_widget") {
     //VUE_WIDGET(printer_widget, command, cmd, url, ps_pdf_file);
     vue_printer_widget_star d= open_box<vue_printer_widget_star> (data);
+    if (enum_widget_value (d.printer) != d.options_for) {
+      // another printer: its options replace the previous ones (the inputs
+      // for the printer, the copies and the pages are kept)
+      d.options_for= enum_widget_value (d.printer);
+      d.content= make_printer_dialog (d.cmd, d.ps_pdf_file, d.printer, d.copies, d.pages);
+      data= close_box (d);
+      layout_again= true; // the window is sized to the new contents
+    }
     CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .padding= CLAY_PADDING_ALL(16), .sizing= layoutFit }})
     {
@@ -2720,6 +2793,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
 
 bool
 vue_input_text_widget_rep::process_key (string key) {
+  if (starts (key, "pre-edit:")) return; // the input method composes; the text comes later
   bool continuous=
   starts (type, "search") ||
   starts (type, "replace-") ||
@@ -3510,10 +3584,27 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
 
 
 // A tool area of the main window (side, left, bottom or extra tools): the
+// the initial states of the slide-in transitions of the tool panels: from
+// beyond the right, left or bottom edge of their final position
+static Clay_TransitionData
+slide_from_right (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.boundingBox.x += target.boundingBox.width; return target;
+}
+static Clay_TransitionData
+slide_from_left (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.boundingBox.x -= target.boundingBox.width; return target;
+}
+static Clay_TransitionData
+slide_from_bottom (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.boundingBox.y += target.boundingBox.height; return target;
+}
+
 // tools are stacked in a scrollable panel of their natural size, bounded by a
-// fraction of the window so that the editor keeps most of the space
+// fraction of the window so that the editor keeps most of the space; a panel
+// which appears slides in from its edge (from: 0 right, 1 left, 2 bottom;
+// position only, so that the sizes the tools measure are final at once)
 static void
-layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, float win_h) {
+layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, float win_h, int from= 0) {
   Clay_Sizing sizing;
   if (side) sizing= { CLAY_SIZING_FIT (.min= 150, .max= (float) max (150.0, 0.4 * win_w)),
                       CLAY_SIZING_GROW(0) };
@@ -3528,7 +3619,13 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
       .childGap= 10,
       .layoutDirection= CLAY_TOP_TO_BOTTOM },
     .clip= { .horizontal= !side, .vertical= side, .childOffset= Clay_GetScrollOffset () },
-    .border= { .width= bw, .color= color_border }})
+    .border= { .width= bw, .color= color_border },
+    .transition= {
+      .handler= Clay_EaseOut, .duration= 0.15f,
+      .properties= side ? CLAY_TRANSITION_PROPERTY_X : CLAY_TRANSITION_PROPERTY_Y,
+      .enter= { .setInitialState= (from == 1) ? slide_from_left
+                                : (from == 2) ? slide_from_bottom : slide_from_right,
+                .trigger= CLAY_TRANSITION_ENTER_SKIP_ON_FIRST_PARENT_FRAME }}})
   {
     tools->do_layout ();
   }
@@ -3607,7 +3704,7 @@ void vue_texmacs_widget_rep::do_layout () {
     {
       if (visibility[7] && !is_nil (left_tools))
         layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
-                           win->layout_w, win->layout_h);
+                           win->layout_w, win->layout_h, 1);
       if (!is_nil (main_widget)) main_widget->do_layout ();
       if (visibility[6] && !is_nil (side_tools))
         layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
@@ -3615,10 +3712,10 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     if (visibility[8] && !is_nil (bottom_tools))
       layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
-                         win->layout_w, win->layout_h);
+                         win->layout_w, win->layout_h, 2);
     if (visibility[9] && !is_nil (extra_tools))
       layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
-                         win->layout_w, win->layout_h);
+                         win->layout_w, win->layout_h, 2);
     if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {
       .layout= {
         .padding= { 8, 8, 0, 0 },

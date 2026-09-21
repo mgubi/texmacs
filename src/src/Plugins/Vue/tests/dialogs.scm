@@ -48,5 +48,5 @@
             "Colors" 500 400)
   (show-raw (widget-printer (object->command (lambda x (display* "print done\n")))
                             (string->url "/tmp/document.pdf"))
-            "Print" 400 150)
+            "Print" 400 300)
   (show-popup vue-popup "Popup" 700 -300))

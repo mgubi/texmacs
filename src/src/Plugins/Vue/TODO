@@ -1,17 +1,17 @@
 TODO
 
 * the animation subsystem is Clay's transitions (see "Animation" in
-  docs/vue-graphics-stack.md): only the button highlights use it so far;
-  candidates: menus and popups appearing, tools sliding in
-* the printer dialog offers printer/copies/pages; orientation, paper size
-  and duplex would need the printer's options (lpoptions -l)
+  docs/vue-graphics-stack.md): the button highlights and the tool panels
+  use it; popup windows (menus) cannot, they are separate SDL windows
+* the printer dialog offers the options lpoptions reports (paper size,
+  two-sided, color); orientation would need a rotation of the PDF
 * the debug view (F1) shows the element tree; its own scroll bars and
   toggles are Clay's and are not styled like ours
 
 WIP
 
-* text input: dead keys and input methods now work through the text
-  events; the pre-edit (SDL_EVENT_TEXT_EDITING) is not displayed
+* text input: the pre-edit of the input methods is shown in the editor;
+  the text inputs of the dialogs ignore it
 
 DONE
 
@@ -23,7 +23,8 @@ DONE
 * Clay transitions are driven by the frame time; button highlights fade
 * typing goes through the text events (dead keys, input methods): a key
   which produces a character waits for its text
-* printer dialog: printer, copies and pages
+* printer dialog: printer, copies, pages and the printer's options
+* tool panels slide in; the pre-edit of the input methods reaches the editor
 * tests: color picker and printer (dialogs), splitters (aligned), keyboard
   focus between windows (focus-windows), debug view
 * win->relayout removed (every window is laid out each iteration)

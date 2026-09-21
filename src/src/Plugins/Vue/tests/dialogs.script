@@ -4,8 +4,11 @@ window Colors
 snapshot c0
 click 16 30
 wait 500
+# the Print button; its row depends on the options of the default printer
+# (three rows here: color, two-sided, paper size)
 window Print
-click 95 110
+snapshot p0
+click 95 172
 wait 500
 window Popup
 snapshot c1

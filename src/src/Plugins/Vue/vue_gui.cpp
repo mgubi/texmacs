@@ -1857,9 +1857,22 @@ process_event (SDL_Event *event) {
 
 
     case SDL_EVENT_TEXT_EDITING:
-        printf("Text editing: '%s' (cursor: %d, selection: %d)\n",
-               event->edit.text, event->edit.start, event->edit.length);
-        break;
+    {
+      // the composition of an input method (dead keys, CJK...): the editor
+      // shows it as a pre-edit ("pre-edit:<cursor>:<text>", an empty text
+      // ends it), as the Qt port does; the committed text comes as a text
+      // input event
+      win= get_window_from_ID (event->edit.windowID);
+      if (win) {
+        string t= (event->edit.text != NULL) ? utf8_to_cork (string (event->edit.text)) : string ("");
+        string k= "pre-edit:";
+        if (N(t) > 0) k << as_string (max (0, (int) event->edit.start)) << ":" << t;
+        win->input.key_event= k;
+        win->input.key_time= texmacs_time ();
+        win->input.key_stamp= 0;
+      }
+      break;
+    }
   } // switch (event->type)
 }
 
