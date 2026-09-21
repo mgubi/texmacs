@@ -201,11 +201,22 @@ the window, are at most as tall as the window and scroll.
   (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
   deltas every frame (`push_wheel`: `mouse_action= "wheel"` for the widgets
   plus `Clay_UpdateScrollContainers` for the Clay container under the
-  pointer); a new event stops the glide. A trackpad gesture is a stream of
-  events with its own (system) momentum phase which ends slowly, so it starts
-  no glide. The editor keeps the fractional SI remainder of the small steps
-  (`scroll_rest_x/y`). While a view glides the loop does not sleep (5 ms
-  pacing).
+  pointer); a new event stops the glide. **Trackpad gestures** (macOS): SDL
+  reports them as wheel events without their phase, so
+  `Plugins/MacOS/mac_scroll_phase.mm` installs a local `NSEvent` monitor
+  which sees every scroll event before SDL and queues its phase (fingers,
+  release, system momentum, plain wheel), matched on the deltas when the SDL
+  event is processed (`mac_scroll_phase_pop`; the zero-delta events SDL
+  drops only update the finger state). While the fingers are down the view
+  follows them exactly and never glides (`wheel_gesture`); when they are
+  lifted (`mac_scroll_take_release`, once every queued event is processed)
+  the glide starts at once with the estimated speed, or not at all if the
+  fingers had stopped for more than `wheel_lift_dt` (80 ms); the momentum
+  events of the system, when it sends any, are followed and cancel our
+  glide; a finger touching the pad stops a glide. Other platforms see
+  `MAC_SCROLL_UNKNOWN` and use the wheel model. The editor keeps the
+  fractional SI remainder of the small steps (`scroll_rest_x/y`). While a
+  view glides the loop does not sleep (5 ms pacing).
 
 ## Error handling of the libraries
 

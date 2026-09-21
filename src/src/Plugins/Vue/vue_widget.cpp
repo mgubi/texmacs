@@ -1532,6 +1532,17 @@ vue_ui_rep::do_layout () {
         page_h= max (page_h, ed.boundingBox.height);
       }
     }
+    // the icons of the tabs come in several sizes (20 and 32 pixels in the
+    // preferences): they are centered in boxes of the largest size, so that
+    // all the tabs have the same height
+    float icon_w= 0, icon_h= 0;
+    for (int i= 0; i < N(d.icons); i++) {
+      vue_ui_rep* ir= dynamic_cast<vue_ui_rep*> (concrete (d.icons[i]).rep);
+      if (ir == NULL || ir->type != "picture_widget") continue;
+      vue_picture_widget pd= open_box<vue_picture_widget> (ir->data);
+      icon_w= max (icon_w, (float) pd.p->get_width ());
+      icon_h= max (icon_h, (float) pd.p->get_height ());
+    }
     CLAY(clay_id, {
       .layout= {
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
@@ -1564,7 +1575,15 @@ vue_ui_rep::do_layout () {
               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
             .border= { .width= { 1, 1, 1, (uint16_t) (cur ? 0 : 1) }, .color= color_border }})
           {
-            if (i < N(d.icons)) concrete (d.icons[i])->do_layout ();
+            if (i < N(d.icons)) {
+              CLAY_AUTO_ID({
+                .layout= {
+                  .sizing= { CLAY_SIZING_FIXED (icon_w), CLAY_SIZING_FIXED (icon_h) },
+                  .childAlignment= { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_CENTER }}})
+              {
+                concrete (d.icons[i])->do_layout ();
+              }
+            }
             concrete (d.tabs[i])->do_layout ();
             if (cur && td.found) {
               // cover the top border of the page under the current tab

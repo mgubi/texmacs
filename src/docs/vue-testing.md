@@ -78,7 +78,8 @@ printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
 is on, so the test calls `open-font-selector-window`), `popup` and
 `menus` (context menu and pull-down menus, flipping/scrolling), `checks`
 (menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
-section tabs of the preferences tool react to clicks), `two-tools` (tools at
+section tabs of the preferences tool react to clicks), `prefs-dialog` (the
+preferences window with icon tabs: tabs of equal height), `two-tools` (tools at
 the top and bottom of both sides), `tools-close` (replacing a tool, adding a
 bottom one, closing the top one; the paper follows the canvas),
 `tool-replace` (replacing the font tool, whose sample text is an editor, by

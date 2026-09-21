@@ -49,7 +49,7 @@ command (a nil command must never be invoked).
 | `extend_widget (w, a)` | `w` with the size of the largest of `a` (measured off-screen) | |
 | `division_widget (name, w)` | CSS class names (see the Qt themes in `misc/themes`): `title` (framed bold bar, rounded top), `subtitle`, `discrete` (grey), `sections` (segmented bar of buttons), `section-tabs` (row of tabs on a line, inactive tabs grey), `active-section`/`section-active-tab` (transparent wrappers marking the selected entry, which the button draws framed); `plain`/others transparent; bold/grey inherited via `context_style` | |
 | `aligned_widget (lhs, rhs, ...)` | two columns, rows sized from the measured heights of both cells | |
-| `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look | |
+| `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look; the icons (20 or 32 px in the preferences) sit in boxes of the largest icon so that all tabs have the same height | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
 | `user_canvas_widget` (scrollable) | clip container with scroll bars, field background | |
 | `texmacs_widget (mask, quit)` | the main window contents (menu bar, icon bars, editor between the tool panels, footer); every bar follows its bit of `mask` and the `SLOT_*_VISIBILITY` slots. With `mask` 0 it is an **embedded editor** (`texmacs-input` of the macro editor, search tool...): no bars, no background, `SLOT_SIZE` is the canvas; it fills its container (`widget_grows`), typically a `resize` | the editor's own commands |

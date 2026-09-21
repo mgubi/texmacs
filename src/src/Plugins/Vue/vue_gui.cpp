@@ -45,6 +45,17 @@
 
 #include "clay.h"
 
+#ifdef OS_MACOS
+#include "../MacOS/mac_scroll_phase.h"
+#else
+enum mac_scroll_phase { MAC_SCROLL_UNKNOWN= -1, MAC_SCROLL_WHEEL= 0,
+  MAC_SCROLL_FINGERS= 1, MAC_SCROLL_RELEASE= 2, MAC_SCROLL_MOMENTUM= 3 };
+static inline void mac_scroll_monitor_start () {}
+static inline int  mac_scroll_phase_pop (double, double) { return MAC_SCROLL_UNKNOWN; }
+static inline bool mac_scroll_fingers_down () { return false; }
+static inline bool mac_scroll_take_release () { return false; }
+#endif
+
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -1095,15 +1106,21 @@ bool gui_wait=  false;
 * the view in sync. Meanwhile the speed of the wheel is estimated from the
 * events; when they stop while the wheel was "launched" (speed above
 * wheel_launch_speed), the view goes on with that velocity, decaying
-* exponentially with time constant wheel_tau, through synthetic wheel deltas
-* (the momentum phase of a trackpad gesture is a stream of events provided
-* by the system: it ends slowly and starts no glide of ours).
+* exponentially with time constant wheel_tau, through synthetic wheel deltas.
+*
+* On macOS the phase of the trackpad gestures is known (mac_scroll_phase):
+* while the fingers are down the view follows them exactly and never
+* glides; when they are lifted the glide starts at once with the estimated
+* speed of the last events (nothing if the fingers had stopped); the
+* momentum events of the system, when it sends some, take over from our
+* glide. A finger touching the trackpad stops a glide.
 ******************************************************************************/
 
 static const double wheel_tau= 350.0;          // ms
 static const double wheel_launch_speed= 0.02;  // wheel units per ms
 static const time_t wheel_stream_dt= 30;       // ms: the events have stopped
 static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
+static const time_t wheel_lift_dt= 80;         // ms: the fingers had stopped
 
 // deliver a wheel delta to the window: to the widgets (mouse_action) and to
 // the Clay scroll container under the pointer
@@ -1125,9 +1142,17 @@ push_wheel (vue_window win, double dx, double dy) {
 
 // a wheel event: scroll now and update the estimated speed of the wheel
 static void
-wheel_event (vue_window win, double dx, double dy, time_t now) {
+wheel_event (vue_window win, double dx, double dy, time_t now, int phase) {
   vue_input_state& in= win->input;
-  in.wheel_vx= in.wheel_vy= 0; // the user took over from a glide
+  in.wheel_vx= in.wheel_vy= 0; // the user (or the system) took over from a glide
+  if (phase == MAC_SCROLL_MOMENTUM) {
+    // the system glides for us: follow, no launch of ours
+    in.wheel_est_x= in.wheel_est_y= 0;
+    in.wheel_gesture= false;
+    push_wheel (win, dx, dy);
+    return;
+  }
+  in.wheel_gesture= (phase == MAC_SCROLL_FINGERS || phase == MAC_SCROLL_RELEASE);
   time_t dt= (in.wheel_event_time == 0) ? wheel_slow_dt : now - in.wheel_event_time;
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
@@ -1136,28 +1161,47 @@ wheel_event (vue_window win, double dx, double dy, time_t now) {
   push_wheel (win, dx, dy);
 }
 
+// start a glide with the estimated speed, if it is worth it
+static void
+wheel_launch (vue_input_state& in, time_t now) {
+  if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed) {
+    in.wheel_vx= in.wheel_est_x;
+    in.wheel_vy= in.wheel_est_y;
+    in.wheel_time= now;
+  }
+  in.wheel_est_x= in.wheel_est_y= 0;
+}
+
 // advance the kinetic scrolling of all windows; returns true if the loop
 // must come back soon (a view glides or a glide may start)
 static bool
 wheel_inertia_step () {
   bool busy= false;
   time_t now= texmacs_time ();
+  bool fingers= mac_scroll_fingers_down ();
+  bool release= mac_scroll_take_release ();
   iterator<int> it= iterate (id_to_window);
   while (it->busy ()) {
     vue_window win= (vue_window) id_to_window[it->next ()];
     if (win == NULL) continue;
     vue_input_state& in= win->input;
+    if (fingers) in.wheel_vx= in.wheel_vy= 0; // a finger on the pad holds the view
     if (in.wheel_vx == 0 && in.wheel_vy == 0) {
       // no glide: did the events just stop with a launched wheel?
       if (in.wheel_est_x == 0 && in.wheel_est_y == 0) continue;
       busy= true;
-      if (now - in.wheel_event_time < wheel_stream_dt) continue;
-      if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed) {
-        in.wheel_vx= in.wheel_est_x;
-        in.wheel_vy= in.wheel_est_y;
-        in.wheel_time= now;
+      if (in.wheel_gesture) {
+        // fingers: the glide starts when they are lifted, unless they had
+        // stopped moving before
+        if (!release) continue;
+        in.wheel_gesture= false;
+        if (now - in.wheel_event_time > wheel_lift_dt)
+          in.wheel_est_x= in.wheel_est_y= 0;
+        wheel_launch (in, now);
+        continue;
       }
-      in.wheel_est_x= in.wheel_est_y= 0;
+      if (now - in.wheel_event_time < wheel_stream_dt) continue;
+      wheel_launch (in, now);
       continue;
     }
     busy= true;
@@ -1188,6 +1232,7 @@ void gui_start_loop () {
   // FIXME: Don't typeset when resizing window
   
   SDL_AddEventWatch (&event_filter, NULL);
+  mac_scroll_monitor_start (); // phases of the trackpad gestures (macOS)
   script_init ();
 
   while (nr_windows > 0 || number_of_servers () > 0) {
@@ -1680,8 +1725,9 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_WHEEL:
     {
       update_mouse_state ();
-      SDL_Log ("Window %d got wheel event event %f %f",
-              event->wheel.windowID, event->wheel.x, event->wheel.y);
+      int phase= mac_scroll_phase_pop (event->wheel.x, event->wheel.y);
+      SDL_Log ("Window %d got wheel event event %f %f phase %d",
+              event->wheel.windowID, event->wheel.x, event->wheel.y, phase);
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
         vue_input_state& in= win->input;
@@ -1690,7 +1736,7 @@ process_event (SDL_Event *event) {
         in.mouse_y= event->wheel.mouse_y * retina_factor;
         double dx= event->wheel.x * retina_factor;
         double dy= event->wheel.y * retina_factor;
-        wheel_event (win, dx, dy, in.mouse_time); // kinetic scrolling, see above
+        wheel_event (win, dx, dy, in.mouse_time, phase); // kinetic scrolling, see above
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:

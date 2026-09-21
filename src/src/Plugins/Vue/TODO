@@ -39,7 +39,9 @@ DONE
 * tab/shift-tab move the focus between the inputs of a dialog
 * balloons are attached below their widget
 * kinetic scrolling: wheel events scroll in sync, a launched wheel makes the
-  view glide with a decaying velocity (editors and Clay containers)
+  view glide with a decaying velocity (editors and Clay containers); on
+  macOS the trackpad gestures drag while the fingers are down and glide
+  when they are lifted (NSEvent monitor for the gesture phases)
 * editors are told when their window gains/loses the keyboard focus and when
   the focus moves to another widget (set_kbd_focus)
 * menus and popups stay on the screen (flip, shift, clamp)
