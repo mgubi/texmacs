@@ -1535,14 +1535,27 @@ script_step () {
       SDL_PushEvent (&ev);
     }
     else if (cmd == "key" && N(a) > 1) {
+      // "key [S-][C-][A-][M-]<SDL key name>": the prefixes are the shift,
+      // control, option and command modifiers
       SDL_Event ev;
       SDL_zero (ev);
-      c_string name (a[1]);
+      string kn= a[1];
+      SDL_Keymod mod= SDL_KMOD_NONE;
+      while (N(kn) > 2 && kn[1] == '-') {
+        if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
+        else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
+        else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
+        else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
+        else break;
+        kn= kn (2, N(kn));
+      }
+      c_string name (kn);
       ev.type= SDL_EVENT_KEY_DOWN;
       ev.key.timestamp= SDL_GetTicksNS ();
       ev.key.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
       ev.key.scancode= SDL_GetScancodeFromName (name);
       ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
+      ev.key.mod= mod;
       ev.key.down= true;
       SDL_PushEvent (&ev);
     }

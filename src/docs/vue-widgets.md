@@ -36,7 +36,7 @@ command (a nil command must never be invoked).
 | `balloon_widget (w, help)` | floating help below `w` after 1 s of hovering, hidden after 5 s | |
 | `text_widget (s, style, col, tsp)` | `layout_text`: TeXmacs font from the style (mini, mono, bold), grey/inert greyed, centered when `WIDGET_STYLE_CENTERED` | |
 | `xpm_widget`, `picture_widget` | picture drawn by a custom render callback | |
-| `input_text_widget (cb, type, def, style, width)` | editable field with cursor, tab completion for files, `tab_cb` for the tab order in dialogs | `cb (string)` on return, `cb (#f)` on escape; "search"/"replace-"/"spell" types call `cb (s key)` on every key |
+| `input_text_widget (cb, type, def, style, width)` | a Clay custom element drawn by `render` as the Widkit input: lowered box, pastel when focused, red cursor with serifs, the text scrolled to keep the cursor visible; selection (shift+arrows/home/end, mouse drag, M-a), clipboard (M-c, M-x, M-v or C-y), word moves (A-/C- arrows, A-backspace), history of the proposals (up/down), tab completion, `type` parsed as `name#serial:type` (password hidden, `form-` serials continuous) | `cb (string)` on return, `cb (#f)` on escape; continuous types get `cb (string key)` at every change |
 | `enum_widget (cb, vals, val, style, width)` | button showing `val` + dropdown list | `cb (val)` |
 | `choice_widget (cb, vals, chosen, multiple)` | list on the field background, click selects/toggles; the `style` argument of the public factories is ignored | single: `cb (val)`; multiple: `cb (list)` (Qt protocol) |
 | `filtered_choice_widget (cb, vals, val, filter)` | text input + scrollable filtered list (substring) | `cb (val filter)` |

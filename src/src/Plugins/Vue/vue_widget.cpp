@@ -2744,8 +2744,6 @@ vue_widget_rep::notify (slot s, blackbox new_val) {
 class vue_input_text_widget_rep : public vue_widget_rep {
 public:
   string  s;           // the string being entered
-  string  draw_s;      // the string being displayed
-  SI      text_h;      // text height
   string  type;        // expected type of string
   string  name;        // optional name of the input field
   string  serial;      // optional serial number of the input field
@@ -2754,41 +2752,193 @@ public:
   int     style;       // style of widget
   bool    greyed;      // greyed input
   string  width;       // width of input field
-  bool    persistent;  // don't complete after loss of focus
   bool    ok;          // input not canceled
   bool    done;        // call back has been called
   int     def_cur;     // current choice between default possible values
-  SI      dw, dh;      // border width and height
-  int     pos;         // cursor position
-  SI      scroll;      // how much scrolled to the left
-  bool    got_focus;   // got keyboard focus
-  bool    hilit;       // hilit on keyboard focus
+  int     pos;         // cursor position (index in s)
+  int     sel;         // anchor of the selection (index in s), -1 for none
+  SI      scroll;      // how much the text is scrolled to the left (SI)
   array<string> tabs;  // tab completions
   int     tab_nr;      // currently visible tab-completion
   int     tab_pos;     // cursor position where tab was pressed
 
-  string buffer; // cache
   command tab_cb; // called with #t/#f on tab/shift-tab (moves the focus in dialogs)
   
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
+  void set_type (string t);
+  bool continuous ();
+  string display ();
+  font  get_font ();
+  SI    prefix_width (string ds, int n);
+  int   position_at (SI x);
+  bool  selection (int& b, int& e);
+  void  delete_selection ();
+  void  insert (string ins);
+  void  copy_selection (bool cut);
+  void  paste ();
+  void  word_left ();
+  void  word_right ();
   void do_layout ();
-//  void render (void *data);
+  void render (void *data);
   bool process_key (string);
 };
 
+// The input field of the dialogs (as the Widkit one): a lowered box, pastel
+// when it has the focus, with the text scrolled so that the red cursor stays
+// visible, a selection (shift+arrows, the mouse), the clipboard (M-c/M-x/M-v
+// or C-y), word moves (A-/C- arrows, A-backspace), the history of the
+// proposals (up/down), tab completion, return commits and escape cancels.
+// It is drawn by render (a Clay custom element).
+
+static const int input_pad_x= 6, input_pad_y= 3; // in device pixels
+
 vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
           string _type, array<string> _def, int _style, string _width)
-  : call_back (_call_back), type (_type),
+  : call_back (_call_back), type ("default"), name ("default"), serial ("default"),
     def (_def), style (_style), width (_width),
     greyed ((style & WIDGET_STYLE_INERT) != 0),
-    pos (0),
+    ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
+    tab_nr (0), tab_pos (0),
     vue_widget_rep ("input_text_widget")
 {
+  set_type (_type);
   if (N(def) > 0) {
     s= copy (def[0]);
     pos= N(s); // the cursor starts at the end of the default input
   }
+}
+
+// "name#serial:type" as the Widkit and Qt inputs understand it
+void
+vue_input_text_widget_rep::set_type (string t) {
+  int i= search_forwards (":", 0, t);
+  if (i >= 0) {
+    type= t (i+1, N(t));
+    name= t (0, i);
+    int j= search_forwards ("#", 0, name);
+    if (j >= 0) {
+      serial= name (j+1, N(name));
+      name  = name (0, j);
+    }
+  }
+  else type= t;
+}
+
+bool
+vue_input_text_widget_rep::continuous () {
+  return
+    starts (type, "search") ||
+    starts (type, "replace-") ||
+    starts (type, "spell") ||
+    starts (serial, "form-");
+}
+
+// the string as displayed (passwords are hidden)
+string
+vue_input_text_widget_rep::display () {
+  if (type != "password") return s;
+  string ds= copy (s);
+  for (int i=0; i<N(ds); i++) ds[i]= '*';
+  return ds;
+}
+
+font
+vue_input_text_widget_rep::get_font () {
+  return get_default_styled_font (style & (WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED));
+}
+
+// the width (SI of the window renderer) of the first n bytes of ds; the
+// fonts are measured at three times the resolution (see layout_text_box)
+SI
+vue_input_text_widget_rep::prefix_width (string ds, int n) {
+  if (n <= 0) return 0;
+  metric ex;
+  get_font ()->var_get_extents (ds (0, n), ex);
+  return (ex->x2 - ex->x1) / 3;
+}
+
+// the position in s of the character boundary nearest to x (SI, relative
+// to the start of the text, scroll included)
+int
+vue_input_text_widget_rep::position_at (SI x) {
+  string ds= display ();
+  int p= 0, prev= 0;
+  SI old= 0;
+  while (p < N(ds)) {
+    prev= p;
+    tm_char_forwards (ds, p);
+    SI w= prefix_width (ds, p);
+    if ((old + w) / 2 > x) return prev;
+    old= w;
+  }
+  return N(ds);
+}
+
+bool
+vue_input_text_widget_rep::selection (int& b, int& e) {
+  if (sel < 0 || sel == pos || sel > N(s)) return false;
+  b= min (sel, pos); e= max (sel, pos);
+  return true;
+}
+
+void
+vue_input_text_widget_rep::delete_selection () {
+  int b, e;
+  if (!selection (b, e)) { sel= -1; return; }
+  s= s (0, b) * s (e, N(s));
+  pos= b;
+  sel= -1;
+}
+
+void
+vue_input_text_widget_rep::insert (string ins) {
+  delete_selection ();
+  s= s (0, pos) * ins * s (pos, N(s));
+  pos += N(ins);
+}
+
+void
+vue_input_text_widget_rep::copy_selection (bool cut) {
+  int b, e;
+  if (!selection (b, e)) return;
+  string t= tm_decode (s (b, e));
+  // "primary" is the system clipboard of the Vue GUI (see vue_gui.cpp)
+  set_selection ("primary", tuple ("extern", t), t, t, "", "verbatim");
+  if (cut) delete_selection ();
+}
+
+void
+vue_input_text_widget_rep::paste () {
+  tree t; string str;
+  (void) get_selection ("primary", t, str, "verbatim");
+  string ins;
+  if (is_tuple (t, "extern", 1)) ins= tm_encode (as_string (t[1]));
+  else if (N(str) > 0) ins= tm_encode (str);
+  if (N(ins) == 0) return;
+  // a single line: the newlines of the clipboard become spaces
+  ins= replace (ins, "\n", " ");
+  insert (ins);
+}
+
+static bool
+is_word_char (string s, int i) {
+  if (i < 0 || i >= N(s)) return false;
+  unsigned char c= (unsigned char) s[i];
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+         c == '_' || c >= 128 || c == '<' || c == '>';
+}
+
+void
+vue_input_text_widget_rep::word_left () {
+  while (pos > 0 && !is_word_char (s, pos-1)) tm_char_backwards (s, pos);
+  while (pos > 0 && is_word_char (s, pos-1)) tm_char_backwards (s, pos);
+}
+
+void
+vue_input_text_widget_rep::word_right () {
+  while (pos < N(s) && !is_word_char (s, pos)) tm_char_forwards (s, pos);
+  while (pos < N(s) && is_word_char (s, pos)) tm_char_forwards (s, pos);
 }
 
 #ifdef OS_WIN32
@@ -2799,30 +2949,60 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
 
 bool
 vue_input_text_widget_rep::process_key (string key) {
-  if (starts (key, "pre-edit:")) return; // the input method composes; the text comes later
-  bool continuous=
-  starts (type, "search") ||
-  starts (type, "replace-") ||
-  starts (type, "spell") ||
-  starts (serial, "form-");
-  
+  if (greyed) return false;
+  if (starts (key, "pre-edit:")) return false; // the input method composes; the text comes later
+
   while ((N(key) >= 5) && (key(0,3) == "Mod") && (key[4] == '-') &&
          (key[3] >= '1') && (key[3] <= '5')) key= key (5, N(key));
   if (key == "space") key= " ";
   if (key == "<") key= "<less>";
   if (key == ">") key= "<gtr>";
+
+  // the modifiers of the movement keys: S- extends the selection, A-/C-
+  // move by words (the prefixes come in the order M- A- C- S-, see lookup_key)
+  bool shift= false, word= false, cmd= false;
+  string base= key;
+  while (true) {
+    if (starts (base, "M-")) { cmd= true; base= base (2, N(base)); }
+    else if (starts (base, "A-")) { word= true; base= base (2, N(base)); }
+    else if (starts (base, "C-") && (ends (base, "left") || ends (base, "right"))) { word= true; base= base (2, N(base)); }
+    else if (starts (base, "S-")) { shift= true; base= base (2, N(base)); }
+    else break;
+  }
+  bool movement= (base == "left" || base == "right" || base == "home" || base == "end");
+  if (movement && !cmd) {
+    if (shift) { if (sel < 0) sel= pos; } else sel= -1;
+    if (base == "left")       { if (word) word_left ();  else if (pos > 0) tm_char_backwards (s, pos); }
+    else if (base == "right") { if (word) word_right (); else if (pos < N(s)) tm_char_forwards (s, pos); }
+    else if (base == "home")  pos= 0;
+    else                      pos= N(s);
+    tabs= array<string> (0);
+    return true;
+  }
+  // the clipboard and the selection
+  if (key == "M-a") { sel= 0; pos= N(s); return true; }
+  if (key == "M-c") { copy_selection (false); return true; }
+  if (key == "M-x") { copy_selection (true); goto changed; }
+  if (key == "M-v" || key == "C-y") { paste (); goto changed; }
+  if (key == "A-backspace" || key == "C-w") {
+    int b, e;
+    if (selection (b, e)) delete_selection ();
+    else { int end= pos; word_left (); s= s (0, pos) * s (end, N(s)); }
+    goto changed;
+  }
   
   /* tab order (in dialogs) or tab-completion */
   if ((key == "tab" || key == "S-tab") && !is_nil (tab_cb)) {
     cmd_list= list (applied_command (tab_cb, list_object (object (key == "tab"))), cmd_list);
     return true;
   }
-  if (continuous);
+  if (continuous ());
   else if ((key == "tab" || key == "S-tab") && N(tabs) != 0) {
     int d=  (key == "tab"? 1: N(tabs)-1);
     tab_nr= (tab_nr + d) % N(tabs);
     s=      s (0, tab_pos) * tabs[tab_nr];
     pos=    N(s);
+    sel= -1;
     return true;
   }
   else if (key == "tab" || key == "S-tab") {
@@ -2851,6 +3031,7 @@ vue_input_text_widget_rep::process_key (string key) {
       pos=     N(s);
       beep ();
     }
+    sel= -1;
     return true;
   }
   else {
@@ -2860,7 +3041,7 @@ vue_input_text_widget_rep::process_key (string key) {
   }
   
   /* other actions */
-  if (continuous &&
+  if (continuous () &&
       (key == "return" || key == "S-return" ||
        key == "home"   || key == "end" ||
        key == "up"     || key == "down" ||
@@ -2871,7 +3052,7 @@ vue_input_text_widget_rep::process_key (string key) {
        (starts (type, "spell") && key == "+")));
   else if (key == "return") {
     // commit
-    if (!continuous) {
+    if (!continuous ()) {
       ok= true;
       done= true;
       command cmd= tm_new<applied_command_rep>(call_back,
@@ -2890,17 +3071,16 @@ vue_input_text_widget_rep::process_key (string key) {
     cmd_list= list(cmd, cmd_list);
     return true;
   }
-  else if ((key == "left") || (key == "C-b")) {
-    if (pos>0) tm_char_backwards (s, pos); }
-  else if ((key == "right") || (key == "C-f")) {
-    if (pos<N(s)) tm_char_forwards (s, pos); }
-  else if ((key == "home") || (key == "C-a")) pos=0;
-  else if ((key == "end") || (key == "C-e")) pos=N(s);
+  else if ((key == "C-b")) { sel= -1; if (pos>0) tm_char_backwards (s, pos); }
+  else if ((key == "C-f")) { sel= -1; if (pos<N(s)) tm_char_forwards (s, pos); }
+  else if ((key == "C-a")) { sel= -1; pos=0; }
+  else if ((key == "C-e")) { sel= -1; pos=N(s); }
   else if ((key == "up") || (key == "C-p")) {
     if (N(def) > 0) {
       def_cur= (def_cur+1) % N(def);
       s=       copy (def[def_cur]);
       pos=     N(s);
+      sel= -1;
     }
   }
   else if ((key == "down") || (key == "C-n")) {
@@ -2908,18 +3088,23 @@ vue_input_text_widget_rep::process_key (string key) {
       def_cur= (def_cur+N(def)-1) % N(def);
       s=       copy (def[def_cur]);
       pos=     N(s);
+      sel= -1;
     }
   }
-  else if (key == "C-k") s= s (0, pos);
+  else if (key == "C-k") { sel= -1; s= s (0, pos); }
   else if ((key == "C-d") || (key == "delete")) {
-    if ((pos<N(s)) && (N(s)>0)) {
+    int b, e;
+    if (selection (b, e)) delete_selection ();
+    else if ((pos<N(s)) && (N(s)>0)) {
       int end= pos;
       tm_char_forwards (s, end);
       s= s (0, pos) * s (end, N(s));
     }
   }
   else if (key == "backspace" || key == "S-backspace") {
-    if (pos>0) {
+    int b, e;
+    if (selection (b, e)) delete_selection ();
+    else if (pos>0) {
       int end= pos;
       tm_char_backwards (s, pos);
       s= s (0, pos) * s (end, N(s));
@@ -2928,6 +3113,7 @@ vue_input_text_widget_rep::process_key (string key) {
   else if (key == "C-backspace") {
     s= "";
     pos= 0;
+    sel= -1;
   }
   else {
     if (starts (key, "<#"));
@@ -2937,10 +3123,10 @@ vue_input_text_widget_rep::process_key (string key) {
       int i (key[0]);
       if ((i>=0) && (i<32)) return false;
     }
-    s= s (0, pos) * key * s(pos, N(s));
-    pos += N(key);
+    insert (key);
   }
-  if (continuous) {
+changed:
+  if (continuous ()) {
     command cmd= tm_new<applied_command_rep>(call_back,
                       list_object (list_object (object (s), object (key))));
     cmd_list= list(cmd, cmd_list);
@@ -2949,36 +3135,92 @@ vue_input_text_widget_rep::process_key (string key) {
 }
 
 void
+vue_input_text_widget_rep::render (void *data) {
+  vue_render_ren_data* d= (vue_render_ren_data*) data;
+  renderer ren= d->ren;
+  rectangle r= d->r;
+  SI px= ren->pixel;
+  bool focused= (current_window != NULL && current_window->kbd_focus == this);
+  // the box: pastel when focused, a lowered border
+  color bg= greyed ? rgb_color (200, 200, 200)
+          : focused ? rgb_color (238, 238, 228) : rgb_color (216, 216, 218);
+  ren->set_pencil (pencil (bg));
+  ren->fill (r->x1, r->y1, r->x2, r->y2);
+  ren->set_pencil (pencil (rgb_color (120, 120, 120)));
+  ren->fill (r->x1, r->y2 - px, r->x2, r->y2);
+  ren->fill (r->x1, r->y1, r->x1 + px, r->y2);
+  ren->set_pencil (pencil (rgb_color (245, 245, 245)));
+  ren->fill (r->x1, r->y1, r->x2, r->y1 + px);
+  ren->fill (r->x2 - px, r->y1, r->x2, r->y2);
+  // the text, scrolled so that the cursor stays visible (with a margin)
+  font fn= get_font ();
+  string ds= display ();
+  metric ex;
+  fn->var_get_extents (ds, ex);
+  SI x0= r->x1 + input_pad_x * px, x1= r->x2 - input_pad_x * px;
+  SI inner= x1 - x0;
+  SI text_w= (ex->x2 - ex->x1) / 3;
+  SI cur= prefix_width (ds, pos);
+  SI marge= inner / 4;
+  if (cur - scroll > inner - marge) scroll= cur + marge - inner;
+  if (cur - scroll < marge) scroll= cur - marge;
+  if (scroll > text_w - inner) scroll= text_w - inner;
+  if (scroll < 0) scroll= 0;
+  SI h_text= (fn->y2 - fn->y1) / 3;
+  SI bottom= r->y1 + ((r->y2 - r->y1) - h_text) / 2, top= bottom + h_text;
+  ren->clip (x0, r->y1, x1, r->y2);
+  int b, e;
+  if (focused && selection (b, e)) {
+    SI xb= x0 + prefix_width (ds, b) - scroll, xe= x0 + prefix_width (ds, e) - scroll;
+    ren->set_pencil (pencil (rgb_color (180, 196, 232)));
+    ren->fill (xb, bottom, xe, top);
+  }
+  ren->set_shrinking_factor (3);
+  ren->set_pencil (pencil (greyed ? dark_grey : black));
+  fn->var_draw (ren, ds, 3 * (x0 - scroll) - ex->x1, 3 * bottom - fn->y1);
+  ren->set_shrinking_factor (1);
+  if (focused && !greyed) {
+    SI cx= x0 + cur - scroll;
+    ren->set_pencil (pencil (red, px));
+    ren->line (cx, bottom, cx, top);
+    ren->line (cx - px, bottom, cx + px, bottom);
+    ren->line (cx - px, top, cx + px, top);
+  }
+  ren->unclip ();
+}
+
+void
 vue_input_text_widget_rep::do_layout () {
   bool is_focused= current_window->kbd_focus == this;
   SI w= decode_length (width, current_window, style);
-  Clay_Color bg;
-  if (is_focused) {
-    buffer= copy ( s (0, pos) * "<#007c>" * s(pos, N(s)));
-    bg=  { 228, 228, 220, 255 };
-  }
-  else {
-    buffer= copy (s);
-    bg= { 208, 208, 210, 255 };
-  }
-  CLAY_AUTO_ID({
-    .backgroundColor= bg,
-    .layout= {
-      .sizing= {
-        .width=  CLAY_SIZING_FIXED((float) 2*w/PIXEL),
-        .height= CLAY_SIZING_FIT() },
-      .padding= { 8, 8, 4, 4 } }})
-  {
-    layout_text (buffer, style & (WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED), black);
-    if ((N(key_event) > 0) && (is_focused)) {
-      //FIXME: handle focus correctly!!
-      process_key (key_event);
-      key_event= "";
-    }
-    if (Clay_Hovered () && (mouse_action == "press-left")) {
+  font fn= get_font ();
+  SI h_text= (fn->y2 - fn->y1 + 2) / 3;
+  // device pixels: 2 per PIXEL/2 SI (see layout_text_box)
+  float w_px= (float) 2*w/PIXEL + 2*input_pad_x;
+  float h_px= (float) 2*h_text/PIXEL + 2*input_pad_y;
+  Clay_ElementId cid= CLAY_IDI ("input_text_widget", id);
+  ui_signal sig { .clicked= 0 };
+  if (!greyed) sig= button_logic (cid);
+  Clay_ElementData ed= Clay_GetElementData (cid);
+  CLAY(cid, {
+    .layout= { .sizing= { CLAY_SIZING_FIXED (w_px), CLAY_SIZING_FIXED (h_px) } },
+    .custom= { .customData= vue_render_widget },
+    .userData= this }) {}
+  if (ed.found && (sig.pressed == 1 || (sig.held && (mouse_state & 1)))) {
+    // the mouse places the cursor and, dragged, selects
+    SI x= (SI) ((mouse_x - ed.boundingBox.x - input_pad_x) * (PIXEL / 2)) + scroll;
+    int p= position_at (x);
+    if (sig.pressed == 1) {
       mouse_action= "";
       set_kbd_focus (current_window, this);
+      pos= p; sel= p;
     }
+    else pos= p;
+  }
+  if (sig.clicked == 1 && sel == pos) sel= -1;
+  if ((N(key_event) > 0) && (is_focused)) {
+    process_key (key_event);
+    key_event= "";
   }
 }
 

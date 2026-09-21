@@ -29,7 +29,8 @@ press x y [left|right|middle]
 release x y [left|right|middle]
 click x y [left|right|middle]
 wheel x y dx dy
-key <SDL key name>          e.g. Return, Escape, Tab, Backspace, Down
+key [S-][C-][A-][M-]<name>   an SDL key name (Return, Escape, Tab, Backspace, Down,
+                            Home...) with shift/control/option/command prefixes
 text <string>               one text-input event per character
 resize w h
 repaint                     invalidate every editor (repaint from scratch)
@@ -96,7 +97,8 @@ filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
 editor), `macros-editor` (the macros editor dialog: selecting a macro in the
 list updates the embedded editor), `macro-tool` (the macro editor as a side
 tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
-list inside its box, selection rebuilds the tool without misdrawn widgets), `pre-edit` (the composition of an input method — a dead key, a letter — is
+list inside its box, selection rebuilds the tool without misdrawn widgets), `input-edit` (editing in a text input: select all and
+replace, word selection, cut and paste, `got: Bob Smith / 42`), `pre-edit` (the composition of an input method — a dead key, a letter — is
 shown in a pre-edit box and the committed text replaces it), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
 and click while it is shown), `focus-windows` (the keyboard focus moves
 from a prompt to the editor and back: `got: BobBy / 42`), `scroll-shift` (scrolling
