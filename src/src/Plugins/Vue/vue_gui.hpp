@@ -20,8 +20,7 @@
 typedef struct {
   float clickOrigin;
   float positionOrigin;
-  bool vertical;
-  uint32_t active_id;
+  bool vertical; // which thumb the active element (button_logic) is
 } ScrollbarData;
 
 // Pending input events and interaction state of a window. The widgets read
@@ -66,7 +65,7 @@ struct vue_input_state {
       current_popup (false), cancel_popup (false), away_time (0),
       current_balloon (0), balloon_time (0),
       hot_id (0), active_id (0), active_button (0), last_id {},
-      scrollbar { 0, 0, true, 0 } {}
+      scrollbar { 0, 0, true } {}
 };
 
 class vue_window_rep {
@@ -90,7 +89,6 @@ public:
   Clay_Arena clay_arena;
   Clay_RenderCommandArray render_commands;
   
-  bool relayout;
   bool clay_debug;
   bool popup; // undecorated popup/tooltip window
   vue_input_state input; // pending events and interaction state

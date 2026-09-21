@@ -70,7 +70,35 @@ Clay_Sizing layoutFull= {
   .width=  CLAY_SIZING_PERCENT(1.0f),
   .height= CLAY_SIZING_PERCENT(1.0f) };
 
-#define CLAY_TM_STRING(s) (CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars= &(s[0]) })
+// Clay keeps the pointers to the strings of the element ids (its hash map
+// items, the debug view of F1) beyond the layout pass: the strings must
+// outlive the TeXmacs strings they come from (the debug view crashed on
+// freed memory). They are interned once and never freed (type names, a few
+// dozen); ids derived from a label and numbers use probe_id instead
+static Clay_String
+clay_tm_string (string s) {
+  static hashmap<string,int> index (-1);
+  static array<char*> store;
+  int i= index[s];
+  if (i < 0) {
+    char* c= tm_new_array<char> (N(s) + 1);
+    for (int k= 0; k < N(s); k++) c[k]= s[k];
+    c[N(s)]= 0;
+    i= N(store);
+    store << c;
+    index (s)= i;
+  }
+  return CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= N(s), .chars= store[i] };
+}
+#define CLAY_TM_STRING(s) clay_tm_string (s)
+
+// the id of the k-th probe element of the widget 'id' (an element laid out
+// only to be measured): a static label, the numbers go in the offset
+static inline Clay_ElementId
+probe_id (const char* label, unsigned int id, unsigned int k) {
+  Clay_String cs= CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= (int32_t) strlen (label), .chars= label };
+  return Clay__HashString (cs, id * 4096u + k);
+}
 
 Clay_Color palette[4]= {
    {160, 160, 160, 255}, {192, 192, 192, 255},
@@ -140,14 +168,17 @@ bool gui_needs_relayout= false; // see vue_widget.hpp
 // signalling
 
 typedef struct ui_signal {
-  int clicked; // none, left, middle, right
+  int  clicked; // a click completed on the element: none, left, middle, right
+  int  pressed; // a button went down on the element in this pass (same values)
+  bool held;    // the element is active: a button went down on it and is
+                // still held, wherever the pointer is now (capture)
 } ui_signal;
 
 uint32_t active_id;
 int active_button; // none, left, middle, right
 uint32_t hot_id;
 
-ScrollbarData scrollbarData= { 0, 0, true, 0 };
+ScrollbarData scrollbarData= { 0, 0, true };
 
 // The globals above describe the window currently being laid out; they are
 // loaded from and stored back to the vue_input_state of that window so that
@@ -221,6 +252,11 @@ void
 gui_init_context() {
   load_input_state (current_window);
   hot_id= 0;
+  // a release which never reached us (outside the window) ends the capture
+  if (active_id != 0 && (mouse_state & 7) == 0 && !starts (mouse_action, "press-")) {
+    active_id= 0;
+    active_button= 0;
+  }
   
   // popup state initialization
   current_popup= false;
@@ -246,11 +282,17 @@ gui_finalize_context() {
 }
 
 
+// The common mouse protocol of the elements: the element under the pointer
+// is "hot" (hovered) unless another one is active; a press over an element
+// makes it active until the button is released (the element keeps the
+// pointer: it can be dragged outside, as a scroll bar thumb), a release over
+// the active element is a click, a release elsewhere just deactivates it
+// (gui_finalize_context).
 ui_signal
 button_logic (Clay_ElementId id) {
   static char const* p[4]= {"press-none",   "press-left",   "press-middle",   "press-right"};
   static char const* r[4]= {"release-none", "release-left", "release-middle", "release-right"};
-  ui_signal res { .clicked= 0 };
+  ui_signal res { .clicked= 0, .pressed= 0, .held= (active_id == id.id) };
   if (Clay_PointerOver (id)) {
     if (active_id == 0) {
       hot_id= id.id;
@@ -259,6 +301,8 @@ button_logic (Clay_ElementId id) {
       if (mouse_action == p[i]) {
         active_id= id.id;
         active_button= i;
+        res.pressed= i;
+        res.held= true;
         break;
       }
       if ((mouse_action == r[i]) && (active_id == id.id) && (active_button == i)) {
@@ -1198,10 +1242,9 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
     scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
     scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
   };
-  //FIXME: mouse handling still not ok
-  if (!(mouse_state & 1)) {
-    scrollbarData.active_id= 0;
-  }
+  // the thumbs follow the common mouse protocol (button_logic): pressed
+  // over a thumb, the pointer drags it until the button is released, even
+  // outside the bar
   // vertical scroll bar
   if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
     Clay_ElementId vsb_id= CLAY_IDI("ScrollBarV", my_id.id);
@@ -1222,15 +1265,13 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
           ? (Clay_Color){100, 100, 140, 150}
           : (Clay_Color){120, 120, 160, 150},
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
-    if (mouse_action == "press-left" &&
-        scrollbarData.active_id == 0 &&
-        Clay_PointerOver (vsb_id)) {
-      mouse_action= "";
-      scrollbarData.active_id= vsb_id.id;
+    ui_signal vsig= button_logic (vsb_id);
+    if (vsig.pressed == 1) {
+      mouse_action= ""; // the press is ours, not the container's
       scrollbarData.vertical= true;
       scrollbarData.clickOrigin= (float) mouse_y;
       scrollbarData.positionOrigin= scrollData.scrollPosition->y;
-    } else if (scrollbarData.active_id == vsb_id.id) {
+    } else if (vsig.held && scrollbarData.vertical) {
       scrollData.scrollPosition->y= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_y) * ratio.y;
       scrollData.scrollPosition->y= min ( max (scrollData.scrollPosition->y, -(max(scrollData.contentDimensions.height - scrollData.scrollContainerDimensions.height, 0.0f))), 0.0f);
     }
@@ -1256,15 +1297,13 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
           ? (Clay_Color){100, 100, 140, 150}
           : (Clay_Color){120, 120, 160, 150},
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
-    if (mouse_action == "press-left" &&
-        scrollbarData.active_id == 0 &&
-        Clay_PointerOver (hsb_id)) {
+    ui_signal hsig= button_logic (hsb_id);
+    if (hsig.pressed == 1) {
       mouse_action= "";
-      scrollbarData.active_id= hsb_id.id;
       scrollbarData.vertical= false;
       scrollbarData.clickOrigin= (float) mouse_x;
       scrollbarData.positionOrigin= scrollData.scrollPosition->x;
-    } else if (scrollbarData.active_id == hsb_id.id) {
+    } else if (hsig.held && !scrollbarData.vertical) {
       scrollData.scrollPosition->x= scrollbarData.positionOrigin + (scrollbarData.clickOrigin - mouse_x) * ratio.x;
       scrollData.scrollPosition->x= min ( max (scrollData.scrollPosition->x, -(max(scrollData.contentDimensions.width - scrollData.scrollContainerDimensions.width, 0.0f))), 0.0f);
     }
@@ -1437,12 +1476,11 @@ vue_ui_rep::do_layout () {
     // the two columns are independent Clay elements; to keep the rows aligned
     // each cell gets as minimal height the height of both cells of its row,
     // as measured in the previous layout pass
-    string probe= "aligned_widget_cell_" * as_string (id);
     int n= min (N(d.lhs), N(d.rhs));
     array<float> row_h (n);
     for (int i=0; i<n; i++) {
-      Clay_ElementData l= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), 2*i));
-      Clay_ElementData r= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), 2*i+1));
+      Clay_ElementData l= Clay_GetElementData (probe_id ("aligned_widget_cell", id, 2*i));
+      Clay_ElementData r= Clay_GetElementData (probe_id ("aligned_widget_cell", id, 2*i+1));
       row_h[i]= max (l.found ? l.boundingBox.height : 0.0f,
                      r.found ? r.boundingBox.height : 0.0f);
       // a new widget: this pass is not aligned yet, ask for another one
@@ -1464,7 +1502,7 @@ vue_ui_rep::do_layout () {
             .childAlignment= { .x= (col == 0) ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT }}})
         {
           for (int i=0; i<n; i++) {
-            CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), 2*i + col), {
+            CLAY(probe_id ("aligned_widget_cell", id, 2*i + col), {
               .layout= {
                 .sizing= { .height= CLAY_SIZING_FIT (.min= row_h[i]) },
                 .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
@@ -1522,11 +1560,10 @@ vue_ui_rep::do_layout () {
     if (d.current < 0 || d.current >= n) d.current= 0;
     int next= d.current;
     Clay_ElementId clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
-    string probe= "tabs_widget_page_" * as_string (id);
     const float pad= 14; // around the page
     float page_w= 0, page_h= 0;
     for (int i=0; i<n; i++) {
-      Clay_ElementData ed= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), i));
+      Clay_ElementData ed= Clay_GetElementData (probe_id ("tabs_widget_page", id, i));
       if (ed.found) {
         page_w= max (page_w, ed.boundingBox.width);
         page_h= max (page_h, ed.boundingBox.height);
@@ -1628,7 +1665,7 @@ vue_ui_rep::do_layout () {
       {
         for (int i=0; i<n; i++) {
           if (i == d.current) continue;
-          CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), i), {
+          CLAY(probe_id ("tabs_widget_page", id, i), {
             .layout= { .sizing= layoutFit }})
           {
             concrete (d.bodies[i])->do_layout ();
@@ -2318,10 +2355,9 @@ vue_ui_rep::do_layout () {
     // minimal size for w
     vue_extend_widget d= open_box<vue_extend_widget> (data);
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
-    string probe= "extend_widget_probe_" * as_string (id);
     float min_w= 0, min_h= 0;
     for (int i=0; i<N(d.a); i++) {
-      Clay_ElementData ed= Clay_GetElementData (CLAY_SIDI (CLAY_TM_STRING (probe), i));
+      Clay_ElementData ed= Clay_GetElementData (probe_id ("extend_widget_probe", id, i));
       if (ed.found) {
         min_w= max (min_w, ed.boundingBox.width);
         min_h= max (min_h, ed.boundingBox.height);
@@ -2339,7 +2375,7 @@ vue_ui_rep::do_layout () {
           .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
       {
         for (int i=0; i<N(d.a); i++) {
-          CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), i), {
+          CLAY(probe_id ("extend_widget_probe", id, i), {
             .layout= { .sizing= layoutFit }})
           {
             concrete (d.a[i])->do_layout ();

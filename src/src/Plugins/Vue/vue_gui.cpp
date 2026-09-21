@@ -198,7 +198,6 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     Clay_SetCurrentContext (save_ctx);
   }
   
-  relayout= true;
   clay_debug= false;
 }
 
@@ -1678,16 +1677,6 @@ process_event (SDL_Event *event) {
   vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
   switch (event->type) {
-#if 0
-    case SDL_EVENT_WINDOW_RESIZED:
-      win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        with_window frame (win);
-        Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
-        win->relayout= true;
-      }
-      break;
-#endif
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       win= get_window_from_ID (event->window.windowID);
       if (win) win->destroy_event();
@@ -1696,6 +1685,15 @@ process_event (SDL_Event *event) {
       // popup menus are dismissed as soon as the pointer leaves them
       win= get_window_from_ID (event->window.windowID);
       if (win && win->popup) win->set_visibility (false);
+      else if (win) {
+        // no element is under the pointer any more (no hovered button left
+        // highlighted behind); an element being dragged stays active
+        with_window frame (win);
+        Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
+        win->input.mouse_x= win->input.mouse_y= (unsigned int) -1;
+        win->input.mouse_action= "move";
+        win->input.mouse_time= texmacs_time ();
+      }
       break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
     case SDL_EVENT_WINDOW_FOCUS_LOST:
@@ -1833,7 +1831,6 @@ bool event_filter (void *userdata, SDL_Event *event) {
     if (win) {
       with_window frame (win);
       Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
-      win->relayout= true;
       win->process_layout();
       vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
