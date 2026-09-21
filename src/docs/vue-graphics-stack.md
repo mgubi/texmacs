@@ -242,6 +242,35 @@ own a backing store picture repainted incrementally (`invalid_regions`,
 `translate_backing_store` when scrolling) and blitted by their custom render
 callback. `TEXMACS_VUE_SNAPSHOT=<dir>` writes every redraw as PNG.
 
+### The MuPDF renderer
+
+`mupdf_renderer_rep` (`Plugins/MuPDF/mupdf_renderer.cpp`) draws through a
+PDF *run processor* (`proc->op_*`: the PDF content operators q/Q, cm, re, f,
+Tj...) on a draw device bound to the target pixmap; it mirrors the structure
+of the PDF export renderer (`Plugins/Pdf/pdf_hummus_renderer.cpp`), while the
+Qt renderer (`Plugins/Qt/qt_renderer.cpp`) is the reference for on-screen
+behaviour. Feature status against those two:
+
+* native fonts (`pdf_font_desc` from the TrueType/Type1 file, `op_Tf`/`op_Tj`),
+  bitmap glyphs (`shrink`, glyph cache as images) when no font file exists;
+* **pattern-filled glyphs** (`draw_bis`): the glyph mask modulates the
+  pattern image sampled at the glyph's device position (as Qt);
+  `draw` dispatches there for `pencil_brush` pencils with a pattern;
+* **pattern fills** (`register_pattern`): a PDF tiling pattern whose
+  resources hold the image as an XObject (`/Resources << /XObject << ... >> >>`);
+  pattern images are scaled to their requested size (`fz_scale_pixmap` in
+  `mupdf_load_pixmap`), which the pattern sizes of the style files rely on;
+* **`clear_device`**: white plus the tiled `neutral-pattern.png`, as Qt
+  (visible between pages in paper mode; `draw_surround` covers the sides);
+* polygons: nonzero winding for convex, even-odd otherwise (as the PDF and
+  X11 renderers; Qt uses the winding rule for non-convex ones);
+* lines/arcs/rounded rectangles, clipping, linear transformations
+  (`set_transformation` as pdf_hummus), shadows (`new/get/put/apply_shadow`
+  by pixmap copies), pictures and scalables (`draw_scalable` falls back to
+  the generic conversion when MuPDF cannot load the file);
+* still open: the phase of tiling patterns relative to the page (matrix of
+  `register_pattern`), `set_brush` also resets the pencil width/caps.
+
 The renderers of the MuPDF plugin (`mupdf_renderer_rep`, used by the Vue
 windows and pictures, and `fitz_renderer_rep`) derive from
 `basic_renderer_rep`. Since TeXmacs 2.1.5 `renderer_rep` carries a

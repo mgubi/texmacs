@@ -148,13 +148,16 @@ struct mupdf_image_rep: concrete_struct {
   int w, h, xo, yo;
   fz_image *img;
   mupdf_image_rep (fz_image* img2)
-    : img (img2) {
+    : w (0), h (0), xo (0), yo (0), img (img2) {
+    if (img == NULL) return; // an image which could not be loaded
     fz_keep_image (mupdf_context (), img);
     // get pixmap size
-    fz_pixmap *pix= fz_get_pixmap_from_image (mupdf_context (), img,
-                                              NULL, NULL, &w, &h);
-    fz_drop_pixmap (mupdf_context (), pix);
-    xo = yo = 0;
+    fz_pixmap *pix= mupdf_pixmap_from_image (img);
+    if (pix != NULL) {
+      w= fz_pixmap_width (mupdf_context (), pix);
+      h= fz_pixmap_height (mupdf_context (), pix);
+      fz_drop_pixmap (mupdf_context (), pix);
+    }
   }
   ~mupdf_image_rep() { fz_drop_image (mupdf_context (), img); }
   friend class mupdf_image;
@@ -534,10 +537,14 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
   pdf_obj *contents= NULL;
   fz_buffer *buf= NULL;
   bool ok= mupdf_protected ("mupdf_renderer_rep::register_pattern", [&] () {
-    subres= pdf_new_dict (ctx, doc, 2);
+    // the resources of the pattern: /Resources << /XObject << /pattern-image ref >> >>
+    subres= pdf_new_dict (ctx, doc, 1);
+    pdf_obj *xobjs= pdf_new_dict (ctx, doc, 1);
     pdf_obj *ref= pdf_add_image (ctx, doc, image_pdf->img);
-    pdf_dict_puts (ctx, subres, "pattern-image", ref);
+    pdf_dict_puts (ctx, xobjs, "pattern-image", ref);
+    pdf_dict_puts (ctx, subres, "XObject", xobjs);
     pdf_drop_obj (ctx, ref);
+    pdf_drop_obj (ctx, xobjs);
     buf= fz_new_buffer (ctx, 0);
     pdf_processor *pout= pdf_new_buffer_processor (ctx, buf, 0, 0);
     pout->op_q (ctx, pout);
@@ -688,6 +695,37 @@ mupdf_renderer_rep::set_brush (brush br) {
   }
   //select_alpha (br->get_alpha ());
 }
+void
+mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
+  // the neutral pattern around the pages, as in the Qt port: white, then
+  // the pattern image tiled at its natural size
+  static brush neutral;
+  static bool resolved= false;
+  if (!resolved) {
+    resolved= true;
+    url u= resolve_pattern (url ("neutral-pattern.png"));
+    if (!is_none (u))
+      neutral= brush (compound ("pattern", as_string (u), "", ""), 255);
+  }
+  end_text ();
+  float xx1= to_x (min (x1, x2));
+  float yy1= to_y (min (y1, y2));
+  float xx2= to_x (max (x1, x2));
+  float yy2= to_y (max (y1, y2));
+  proc->op_q (mupdf_context (), proc);
+  select_fill_color (white);
+  proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
+  proc->op_f (mupdf_context (), proc);
+  if (!is_nil (neutral)) {
+    select_fill_pattern (neutral);
+    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
+    proc->op_f (mupdf_context (), proc);
+  }
+  select_fill_color (fg);
+  select_fill_pattern (fg_brush);
+  proc->op_Q (mupdf_context (), proc);
+}
+
 void
 mupdf_renderer_rep::set_background (brush b) {
   // debug_convert << "set_background\n";
@@ -852,10 +890,12 @@ mupdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   for (i=1; i<n; i++)
     proc->op_l (mupdf_context (), proc, to_x (x[i]), to_y (y[i]));
   proc->op_h (mupdf_context (), proc);
+  // as the PDF renderer (and X11): nonzero winding for convex polygons,
+  // even-odd for the others (the Qt port uses the winding rule there)
   if (convex)
-    proc->op_f (mupdf_context (), proc); // odd-even
+    proc->op_f (mupdf_context (), proc); // nonzero winding
   else
-    proc->op_fstar (mupdf_context (), proc); // nonzero winding
+    proc->op_fstar (mupdf_context (), proc); // even-odd
 }
 
 void
@@ -999,6 +1039,7 @@ image (fz_context *ctx, pdf_processor *proc, mupdf_image im, int alpha,
        float a, float b, float c, float d, float e, float f) {
   // debug_convert << "mupdf_renderer_rep::image " << u << ", " << w << " x " << h
   //    << " + (" << x << ", " << y << ")" << LF;
+  if (is_nil (im) || im->img == NULL) return; // nothing to draw
   proc->op_q (ctx, proc);
   set_default_gstate (ctx, proc);
   proc->op_cm (ctx, proc, a, b, c, d, e, f);
@@ -1044,13 +1085,17 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
     if (image_pool->contains (lookup))
       im2= image_pool [lookup];
     else {
-      // FIXME: handle the possibility that the image is not found
       fz_image* fzim= mupdf_load_image (u);
+      if (fzim == NULL) {
+        // not loadable by MuPDF: the generic path converts the file
+        renderer_rep::draw_scalable (im, x, y, alpha);
+        return;
+      }
       im2= mupdf_image (fzim);
       fz_drop_image (mupdf_context (), fzim);
       image_pool (lookup)= im2;
     }
-    if (is_nil (im2)) return;
+    if (is_nil (im2) || im2->img == NULL) return;
     rectangle r= im->get_logical_extents ();
     SI w= r->x2 - r->x1, h= r->y2 - r->y1;
     int ox= r->x1, oy= r->y1;
@@ -1067,73 +1112,103 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
 * Glyph rendering
 ******************************************************************************/
 
-#if 0
-void
-mupdf_renderer_rep::draw_clipped (QImage *im, int w, int h, SI x, SI y) {
-  (void) w; (void) h;
-  int x1= cx1-ox, y1= cy2-oy, x2= cx2-ox, y2= cy1-oy;
-  decode (x , y );
-  decode (x1, y1);
-  decode (x2, y2);
-  y--; // top-left origin to bottom-left origin conversion
-       // clear(x1,y1,x2,y2);
-  painter->setRenderHints (0);
-  painter->drawImage (x, y, *im);
-}
+// Glyphs filled with the pattern of a brush pencil: the glyph mask
+// modulates the pattern image, sampled where the glyph lands on the device
+// (as in the Qt port), and the result is drawn as an image.
 
-void
-mupdf_renderer_rep::draw_clipped (QPixmap *im, int w, int h, SI x, SI y) {
-  decode (x , y );
-  y--; // top-left origin to bottom-left origin conversion
-  // clear(x1,y1,x2,y2);
-  painter->setRenderHints (0);
-  painter->drawPixmap (x, y, w, h, *im);
+// the pattern images decoded as RGB pixmaps, by pattern data
+static hashmap<tree,pointer> pattern_pixmap_pool (NULL);
+
+static fz_pixmap*
+get_pattern_pixmap (brush br, SI pixel) {
+  url u;
+  SI w, h;
+  tree eff;
+  get_pattern_data (u, w, h, eff, br, pixel);
+  tree key= tuple (u->t, as_string (w), as_string (h), eff);
+  if (pattern_pixmap_pool->contains (key))
+    return (fz_pixmap*) pattern_pixmap_pool [key];
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= mupdf_load_pixmap (u, w, h, eff, pixel);
+  fz_pixmap* rgb= NULL;
+  if (pix != NULL) {
+    // RGB with alpha, whatever the file provides
+    mupdf_protected ("pattern pixmap", [&] () {
+      rgb= fz_convert_pixmap (ctx, pix, fz_device_rgb (ctx), NULL, NULL,
+                              fz_default_color_params, 1);
+    });
+    fz_drop_pixmap (ctx, pix);
+  }
+  pattern_pixmap_pool (key)= (pointer) rgb; // NULL too: do not retry
+  return rgb;
 }
 
 void
 mupdf_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
-  // draw with background pattern
+  fz_context* ctx= mupdf_context ();
   SI xo, yo;
   glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
   glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
   int w= gl->width, h= gl->height;
-  QImage *im= new QImage (w, h, QImage::Format_ARGB32);
-  im->fill (Qt::transparent);
-
-  {
-    brush br= pen->get_brush ();
-    QImage* pm= get_pattern_image (br, brushpx==-1? pixel: brushpx);
-    int pattern_alpha= br->get_alpha ();
-    QPainter glim (im);
-    glim.setOpacity (qreal (pattern_alpha) / qreal (255));
-    if (pm != NULL) {
-      SI tx= x- xo*std_shrinkf, ty= y+ yo*std_shrinkf;
-      decode (tx, ty); ty--;
-      QBrush qbr (*pm);
-      QTransform qtf= painter->transform ();
-      qbr.setTransform (qtf.translate (-tx, -ty));
-      glim.setBrush (qbr);
-    }
-    glim.setPen (Qt::NoPen);
-    glim.drawRect (0, 0, w, h);
-
-    int nr_cols= std_shrinkf*std_shrinkf;
-    if (nr_cols >= 64) nr_cols= 64;
-    for (int j=0; j<h; j++)
-      for (int i=0; i<w; i++) {
-        color patcol= im->pixel (i, j);
-        int r, g, b, a;
-        get_rgb (patcol, r, g, b, a);
-        if (get_reverse_colors ()) reverse (r, g, b);
-        int col = gl->get_x (i, j);
-        im->setPixel (i, j, qRgba (r, g, b, (a*col)/nr_cols));
-      }
+  if (w <= 0 || h <= 0) return;
+  brush br= pen->get_brush ();
+  fz_pixmap* pat= get_pattern_pixmap (br, brushpx == -1? pixel: brushpx);
+  if (pat == NULL) { // no pattern: plain glyph in the color of the pencil
+    pencil saved= pen;
+    pen= pencil (pen->get_color (), pen->get_width ());
+    draw (c, fng, x, y);
+    pen= saved;
+    return;
   }
-
-  draw_clipped (im, w, h, x- xo*std_shrinkf, y+ yo*std_shrinkf);
-  delete im;
+  int pattern_alpha= br->get_alpha ();
+  int pw= fz_pixmap_width (ctx, pat), ph= fz_pixmap_height (ctx, pat);
+  int pn= fz_pixmap_components (ctx, pat), stride= fz_pixmap_stride (ctx, pat);
+  unsigned char* ps= fz_pixmap_samples (ctx, pat);
+  // device position of the top left pixel of the glyph (the device y axis
+  // points downwards, see the matrix of begin)
+  int tx= (int) floor (to_x (x - xo*std_shrinkf));
+  int ty= (int) floor (- to_y (y + yo*std_shrinkf));
+  int nr_cols= std_shrinkf*std_shrinkf;
+  if (nr_cols >= 64) nr_cols= 64;
+  unsigned char *samples= (unsigned char *)
+    Memento_label (fz_malloc (ctx, h*w*4), "pattern_glyph_data");
+  unsigned char *d= samples;
+  for (int j=0; j<h; j++) {
+    int py= ((ty + j) % ph + ph) % ph;
+    for (int i=0; i<w; i++) {
+      int px= ((tx + i) % pw + pw) % pw;
+      unsigned char* s= ps + py*stride + px*pn;
+      int r= s[0], g= (pn >= 3? s[1]: s[0]), b= (pn >= 3? s[2]: s[0]);
+      int a= (pn == 4 || pn == 2)? s[pn-1]: 255;
+      if (get_reverse_colors ()) reverse (r, g, b);
+      int cov= (gl->get_x (i, j) * pattern_alpha) / nr_cols; // 0..255
+      // fz pixmaps with alpha are premultiplied, and so is the result
+      d[0]= (r*cov)/255;
+      d[1]= (g*cov)/255;
+      d[2]= (b*cov)/255;
+      d[3]= (a*cov)/255;
+      d+= 4;
+    }
+  }
+  fz_pixmap* pix= NULL;
+  fz_image* im= NULL;
+  mupdf_protected ("pattern glyph image", [&] () {
+    pix= fz_new_pixmap_with_data (ctx, fz_device_rgb (ctx),
+                                  w, h, NULL, 1, w*4, samples);
+    im= fz_new_image_from_pixmap (ctx, pix, NULL);
+  });
+  if (im == NULL) {
+    if (pix != NULL) fz_drop_pixmap (ctx, pix);
+    else fz_free (ctx, samples);
+    return;
+  }
+  mupdf_image mi (im);
+  fz_drop_pixmap (ctx, pix);
+  fz_drop_image (ctx, im);
+  end_text ();
+  image (ctx, proc, mi, 255, w, 0.0, 0.0, h,
+         to_x (x - xo*std_shrinkf), to_y (y + yo*std_shrinkf - h*pixel));
 }
-#endif
 
 static
 pdf_font_desc *load_pdf_font (string fontname) {
@@ -1201,6 +1276,12 @@ decode_index (FT_Face face, int i) {
 
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
+  if (pen->get_type () == pencil_brush &&
+      !is_nil (pen->get_brush ()) &&
+      pen->get_brush ()->get_type () == brush_pattern) {
+    draw_bis (c, fng, x, y); // glyphs filled with a pattern
+    return;
+  }
   string fontname = fng->res_name;
   pdf_font_desc* fontdesc= NULL;
 
@@ -1258,13 +1339,6 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // we use an "immediate" approach, without trying to build a Type3 font
   // this is appropriate for raster rendering, but we need to change it
   // if we want to render to a PDF file
-#if 0
-  // FIXME: implement brushes!
-  if (pen->get_type () == pencil_brush) {
-    draw_bis (c, fng, x, y);
-    return;
-  }
-#endif
   // get the pixmap
   color fgc= pen->get_color ();
   basic_character xc (c, fng, std_shrinkf, fgc, 0);

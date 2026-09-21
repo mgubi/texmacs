@@ -295,19 +295,26 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
   }
 
   // Scaling
-  if (im->w != w || im->h != h) {
-    // FIXME: implement?
-    // we opt to draw natively scalables, so here we do not support rescaling
-    // (*pm)= pm->scaled (w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    cout <<  "TeXmacs] warning: image rescaling not supported "
-         << concretize (u) << "\n";
-  }
-
   fz_pixmap *pix= mupdf_pixmap_from_image (im);
   fz_drop_image (mupdf_context (), im); // we do not need it anymore
   if (pix == NULL) {
     cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
     return NULL;
+  }
+
+  // Scaling to the requested size (patterns are given with a size)
+  fz_context* ctx= mupdf_context ();
+  if (w > 0 && h > 0 &&
+      (fz_pixmap_width (ctx, pix) != w || fz_pixmap_height (ctx, pix) != h)) {
+    fz_pixmap* scaled= NULL;
+    mupdf_protected ("image scaling", [&] () {
+      scaled= fz_scale_pixmap (ctx, pix, 0, 0, w, h, NULL);
+    });
+    if (scaled != NULL) {
+      fz_drop_pixmap (ctx, pix);
+      pix= scaled;
+    }
+    else cout << "TeXmacs] warning: cannot scale " << concretize (u) << "\n";
   }
 
   // Build effect

@@ -77,7 +77,7 @@ public:
 
   void set_zoom_factor (double zoom, bool safe= true);
   // the device background is the pattern/color cleared by the editor itself
-  void clear_device (SI x1, SI y1, SI x2, SI y2) { (void) x1; (void) y1; (void) x2; (void) y2; }
+  void clear_device (SI x1, SI y1, SI x2, SI y2);
 
   void begin (void* handle);
   void end ();

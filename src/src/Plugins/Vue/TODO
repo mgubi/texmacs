@@ -18,6 +18,9 @@ WIP
 
 DONE
 
+* MuPDF renderer: pattern-filled glyphs, tiling patterns (resources fixed,
+  images scaled to the requested size), neutral pattern behind the pages,
+  missing images do not crash
 * the editor is told when its viewport changes (notify_resizes) and centers
   the paper in a wider canvas; the paper follows the side tools
 * section bars of the tools ("sections", "section-tabs") drawn as segmented
