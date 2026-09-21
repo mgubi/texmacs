@@ -810,6 +810,19 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       case CLAY_RENDER_COMMAND_TYPE_BORDER: {
         Clay_BorderRenderData *config = &rcmd->renderData.border;
         color c= rgb_color (config->color.r, config->color.g, config->color.b, config->color.a);
+        Clay_BorderWidth bw= config->width;
+        bool uniform= (bw.left == bw.right && bw.top == bw.bottom && bw.left == bw.top);
+        if (!uniform) {
+          // some sides only (the line under a bar, a separator): each side
+          // is a filled strip of its own width, no outline, no corners
+          SI px= ren->pixel;
+          ren->set_pencil (pencil (c));
+          if (bw.left > 0)   ren->fill (r->x1, r->y1, r->x1 + bw.left * px, r->y2);
+          if (bw.right > 0)  ren->fill (r->x2 - bw.right * px, r->y1, r->x2, r->y2);
+          if (bw.top > 0)    ren->fill (r->x1, r->y2 - bw.top * px, r->x2, r->y2);
+          if (bw.bottom > 0) ren->fill (r->x1, r->y1, r->x2, r->y1 + bw.bottom * px);
+          break;
+        }
         // we need a ticker pen, otherwise the corners look blurry (maybe we should use a different method?)
         pencil p= pencil (c, 2*ren->pixel+((config->width.top-1))*ren->pixel, cap_square);
         ren->set_pencil (p);
