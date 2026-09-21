@@ -122,6 +122,7 @@ protected:
   coord2       backing_pos;
   bool         backing_valid;
   bool         resize_pending; // the viewport changed since the last notification
+  double       scroll_rest_x, scroll_rest_y; // fractions of wheel deltas not yet applied
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_viewport_rect (int x1, int y1, int x2, int y2);

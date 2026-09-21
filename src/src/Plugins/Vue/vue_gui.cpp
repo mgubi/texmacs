@@ -1016,6 +1016,64 @@ void process_layout ();
 void process_redraw ();
 
 bool gui_wait=  false;
+
+/******************************************************************************
+* Kinetic scrolling
+*
+* A wheel event scrolls by wheel_immediate of its delta at once; the rest
+* becomes a velocity which decays exponentially with time constant wheel_tau
+* and is turned into synthetic wheel deltas frame by frame (the total
+* distance is the one of the events). Discrete wheel notches thus scroll
+* smoothly and the view glides after a trackpad gesture.
+******************************************************************************/
+
+static const double wheel_tau= 100.0;     // ms
+static const double wheel_immediate= 0.4;
+
+// deliver a wheel delta to the window: to the widgets (mouse_action) and to
+// the Clay scroll container under the pointer
+static void
+push_wheel (vue_window win, double dx, double dy) {
+  vue_input_state& in= win->input;
+  if (in.mouse_action == "wheel" && N(in.mouse_data) == 2) {
+    in.mouse_data[0] += dx; // several deltas in the same frame add up
+    in.mouse_data[1] += dy;
+  }
+  else {
+    in.mouse_action= "wheel";
+    in.mouse_data= array<double> (dx, dy);
+  }
+  with_window frame (win);
+  Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
+  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx, (float) dy }, 0.01f);
+}
+
+// advance the kinetic scrolling of all windows; returns true if some
+// window scrolled (the loop must then redraw and not sleep)
+static bool
+wheel_inertia_step () {
+  bool moved= false;
+  time_t now= texmacs_time ();
+  iterator<int> it= iterate (id_to_window);
+  while (it->busy ()) {
+    vue_window win= (vue_window) id_to_window[it->next ()];
+    if (win == NULL) continue;
+    vue_input_state& in= win->input;
+    if (in.wheel_vx == 0 && in.wheel_vy == 0) { in.wheel_time= 0; continue; }
+    time_t dt= now - in.wheel_time;
+    if (dt <= 0) { moved= true; continue; }
+    double decay= exp (- (double) dt / wheel_tau);
+    double dx= in.wheel_vx * wheel_tau * (1.0 - decay);
+    double dy= in.wheel_vy * wheel_tau * (1.0 - decay);
+    in.wheel_vx *= decay;
+    in.wheel_vy *= decay;
+    in.wheel_time= now;
+    if (fabs (in.wheel_vx) < 1e-4) in.wheel_vx= 0;
+    if (fabs (in.wheel_vy) < 1e-4) in.wheel_vy= 0;
+    if (dx != 0 || dy != 0) { push_wheel (win, dx, dy); moved= true; }
+  }
+  return moved;
+}
 bool gui_needs_update= true;
 
 bool event_filter (void *userdata, SDL_Event *event);
@@ -1039,6 +1097,11 @@ void gui_start_loop () {
     if (SDL_PollEvent (&event)) {
       process_event (&event);
       gui_needs_update= true;
+    }
+    if (wheel_inertia_step ()) {
+      // keep the frames coming while the view glides, at a moderate rate
+      gui_needs_update= true;
+      if (!SDL_PollEvent (NULL)) SDL_Delay (5);
     }
 
     if (gui_needs_update) {
@@ -1511,15 +1574,17 @@ process_event (SDL_Event *event) {
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
         vue_input_state& in= win->input;
-        in.mouse_action= "wheel";
         in.mouse_time= texmacs_time();
         in.mouse_x= event->wheel.mouse_x * retina_factor;
         in.mouse_y= event->wheel.mouse_y * retina_factor;
-        in.mouse_data= array<double> (event->wheel.x * retina_factor, event->wheel.y * retina_factor);
-        with_window frame (win);
-        // the scroll container under the pointer is the one that scrolls
-        Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
-        Clay_UpdateScrollContainers (true, (Clay_Vector2){ event->wheel.x * retina_factor, event->wheel.y * retina_factor }, 0.01f);
+        double dx= event->wheel.x * retina_factor;
+        double dy= event->wheel.y * retina_factor;
+        // part of the delta scrolls at once, the rest is spread over the
+        // following frames by wheel_inertia_step (kinetic scrolling)
+        push_wheel (win, wheel_immediate * dx, wheel_immediate * dy);
+        in.wheel_vx += (1.0 - wheel_immediate) * dx / wheel_tau;
+        in.wheel_vy += (1.0 - wheel_immediate) * dy / wheel_tau;
+        if (in.wheel_time == 0) in.wheel_time= in.mouse_time;
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:

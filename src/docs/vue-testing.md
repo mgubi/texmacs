@@ -72,7 +72,9 @@ printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
 (menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
 section tabs of the preferences tool react to clicks), `two-tools` (tools at
 the top and bottom of both sides), `tools-close` (replacing a tool, adding a
-bottom one, closing the top one; the paper follows the canvas).
+bottom one, closing the top one; the paper follows the canvas),
+`wheel-inertia` (a wheel step scrolls partly at once and glides on: compare
+the line numbers at the top of the snapshots i0/i1/i2).
 
 ## Writing a test
 

@@ -3594,7 +3594,8 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   scroll_pos (coord2 (0, 0)),
   absolute_scroll (false),
   backing_valid (false),
-  resize_pending (false)
+  resize_pending (false),
+  scroll_rest_x (0), scroll_rest_y (0)
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
@@ -3921,12 +3922,16 @@ vue_simple_widget_rep::do_layout () {
       cout << LF;
     }
     if (mouse_action == "wheel") {
-      // scroll right away: the trackpad/mouse driver already provides the
-      // kinetic behaviour through the stream of wheel events
+      // the deltas come in small steps (kinetic scrolling, see vue_gui.cpp):
+      // the fractions of SI are carried over to the next step
       absolute_scroll= false;
       scroll_pos= backing_pos;
-      scroll_pos.x1 += (SI) (4*mouse_data[0]);
-      scroll_pos.x2 += (SI) (4*mouse_data[1]);
+      scroll_rest_x += 4*mouse_data[0];
+      scroll_rest_y += 4*mouse_data[1];
+      SI dx= (SI) scroll_rest_x, dy= (SI) scroll_rest_y;
+      scroll_rest_x -= dx; scroll_rest_y -= dy;
+      scroll_pos.x1 += dx;
+      scroll_pos.x2 += dy;
     } else {
       if (starts (mouse_action, "press-")) {
         set_kbd_focus (current_window, this);
