@@ -160,6 +160,7 @@ public:
   string type;           //!< File types to filter in the dialog
   string prompt;         //!< Is this a "Save" dialog?
   string win_title;      //!< Set by plain_window_widget()
+  bool   shown;          //!< The native dialog has been opened
   
   string directory; //!< Set this property sending SLOT_DIRECTORY to this widget
   coord2 position;  //!< Set this property sending SLOT_POSITION to this widget

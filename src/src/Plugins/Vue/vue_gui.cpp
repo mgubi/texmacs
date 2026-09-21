@@ -2534,7 +2534,15 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, caption);
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_ACCEPT_STRING, sdl_type == SDL_FILEDIALOG_SAVEFILE ? "Save" : "Open");
   SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_CANCEL_STRING, "Cancel");
-  SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, SDL_GetPrefPath (tmp1, tmp2));
+  // the folder (or file, for the save dialogs) the dialog starts at;
+  // SDL_GetPrefPath was used here by mistake: it creates a preferences
+  // folder named after its arguments under Application Support
+  string location= directory;
+  if (N(file) > 0 && sdl_type == SDL_FILEDIALOG_SAVEFILE)
+    location= as_string (url_system (directory) * url_system (file));
+  c_string tmp3 (location);
+  if (N(location) > 0)
+    SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, tmp3);
 
   // Show the dialog (non-blocking)
   SDL_ShowFileDialogWithProperties (sdl_type,

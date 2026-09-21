@@ -72,7 +72,7 @@ vertical separators of the bars are 2 px, grey 150.
 | `popup_widget (w)` | transparent container; ignores `SLOT_MOUSE_GRAB` | |
 | `plain_window_widget`, `popup_window_widget`, `tooltip_window_widget` | real windows (see the graphics stack document) | |
 | `inputs_list_widget (cb, prompts)` | dialog window built on `SLOT_VISIBILITY`: prompts + inputs (tab order), Ok/Cancel push buttons, question dialogs with one button per proposal | fields store `scm_quote (answer)` or `"#f"`, then `cb ()`; keeps its own reference to `cb` because `dialogue-end` destroys the widget while `cb` runs |
-| `file_chooser_widget` | native SDL file dialog | |
+| `file_chooser_widget (cmd, type, prompt)` | the system file dialog (`SDL_ShowFileDialogWithProperties`, non-blocking): `plain_window_widget` returns the chooser itself instead of a window, the dialog opens once on the first of `SLOT_VISIBILITY`/`SLOT_KEYBOARD_FOCUS` (both are sent by `dialogue_start`), starts in the `SLOT_DIRECTORY` folder, and its callback runs `cmd` then `quit` both on a choice and on cancel (`#f`) | `cmd` reads the choice with `SLOT_STRING_INPUT` |
 | `texmacs_widget (mask, quit)` | menu bar, three icon bars, middle row (left tools, editor, side tools), bottom/extra tool rows, footer | visibility flags indexed by `visibility_index (slot)` |
 
 ## Styles (`WIDGET_STYLE_*`)

@@ -4720,7 +4720,7 @@ vue_simple_widget_rep::render (void *data) {
  */
 vue_chooser_widget_rep::vue_chooser_widget_rep (command _cmd, string _type, string _prompt)
  : vue_widget_rep ("file_chooser"), cmd (_cmd), prompt (_prompt),
-   position (coord2 (0, 0)), size (coord2 (100, 100)), file ("")
+   position (coord2 (0, 0)), size (coord2 (100, 100)), file (""), shown (false)
 {
   if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_chooser_widget_rep::vue_chooser_widget_rep type=\""
@@ -4730,14 +4730,29 @@ vue_chooser_widget_rep::vue_chooser_widget_rep (command _cmd, string _type, stri
   else type= "generic";
 }
 
+// the window the dialog belongs to (the current TeXmacs window)
+static vue_window
+parent_platform_window () {
+  tm_window win= concrete_window ();
+  if (win == NULL) return NULL;
+  vue_plain_window_widget_rep *vw= dynamic_cast<vue_plain_window_widget_rep*> (win->win.rep);
+  return (vw != NULL) ? vw->win : NULL;
+}
+
 void
 vue_chooser_widget_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_VISIBILITY:
     {
+      // the chooser is the system file dialog: shown once, by the first of
+      // SLOT_VISIBILITY and SLOT_KEYBOARD_FOCUS (dialogue_start sends both);
+      // this used to be a FAILED, whose error console was the second
+      // "dialog" opening next to the file panel
       bool flag= check_open<bool> (val, s);
-      (void) flag;
-      FAILED("vue_chooser_widget::SLOT_VISIBILITY not implemented");
+      if (flag && !shown) {
+        shown= true;
+        perform_dialog (parent_platform_window ());
+      }
     }
       break;
     case SLOT_SIZE:
@@ -4749,20 +4764,15 @@ vue_chooser_widget_rep::send (slot s, blackbox val) {
     case SLOT_KEYBOARD_FOCUS:
       {
         check_type<bool>(val, s);
-        tm_window win= concrete_window ();
-        vue_window platform_win= 0;
-        if (win) {
-          vue_plain_window_widget_rep *vw= dynamic_cast<vue_plain_window_widget_rep*> (win->win.rep);
-          if (vw) platform_win= vw->win;
+        if (!shown) {
+          shown= true;
+          perform_dialog (parent_platform_window ());
         }
-        perform_dialog (platform_win);
       }
       break;
     case SLOT_STRING_INPUT:
+      // the file name typed in a TeXmacs chooser: the system dialog has its own
       check_type<string>(val, s);
-      if (DEBUG_QT_WIDGETS)
-        debug_widgets << "\tString input: " << open_box<string> (val) << LF;
-      FAILED ("vue_chooser_widget::SLOT_STRING_INPUT not implemented");
       break;
     case SLOT_INPUT_TYPE:
       type= check_open<string> (val, s);
@@ -4831,7 +4841,11 @@ vue_chooser_widget_rep::read (slot s, blackbox index) {
 void
 vue_chooser_widget_rep::callback (char* res) {
   if (!res) {
+    // cancelled: the dialogue command gets #f and the dialogue ends (as
+    // with the Qt chooser), otherwise the next dialog could not open
     file= "#f";
+    cmd ();
+    if (!is_nil (quit)) quit ();
   } else {
     string name (res, strlen (res));
     file= "(system->url " * scm_quote (name) * ")";
@@ -5473,12 +5487,15 @@ tree_view_widget (command cmd, tree data, tree data_roles) {
 // toplevel window constructor
 
 widget plain_window_widget (widget wid, string s, command quit) {
-  if (concrete (wid)->type == "chooser_widget") {
+  // the file chooser is the system dialog: no window of ours around it
+  // (the type name is the one of its constructor; a mismatch here opened
+  // an empty TeXmacs window next to the file panel)
+  if (dynamic_cast<vue_chooser_widget_rep*> (wid.rep) != NULL) {
     vue_chooser_widget_rep* cw= dynamic_cast<vue_chooser_widget_rep*> (wid.rep);
     cw->win_title= s;
     cw->quit= quit;
     return wid;
-  } else if (concrete (wid)->type == "inputs_list_widget") {
+  } else if (dynamic_cast<vue_inputs_list_widget_rep*> (wid.rep) != NULL) {
     vue_inputs_list_widget_rep* cw= dynamic_cast<vue_inputs_list_widget_rep*> (wid.rep);
     cw->win_title= s;
 //    cw->quit= quit;  // we already have a command
