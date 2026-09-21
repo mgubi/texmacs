@@ -135,7 +135,12 @@ Window resizes are handled synchronously in an SDL event watch
 * **Custom drawing**: an element with `.custom= { .customData=
   vue_render_widget }, .userData= widget` calls `widget->render (data)` with a
   `vue_render_ren_data { renderer ren; rectangle r }`; `layout_text` uses the
-  same mechanism with `vue_render_text`. Small marks (check boxes, menu
+  same mechanism with `vue_render_text`. The render commands thus point to
+  widgets: since the queued commands and the interpose handler run between
+  the layout and the redraw of a frame and may replace widgets (menus, tools,
+  dialogs), `tm_delete<vue_widget_rep>` sets `gui_needs_relayout` and the
+  loop lays the windows out again before redrawing (a freed editor of a
+  replaced tool crashed in `vue_render_widget_fn`). Small marks (check boxes, menu
   marks) are drawn this way with `pencil`, `lines`, `rounded_rectangle`,
   `fill_arc`.
 * **Clipping**: scrollable areas set `.clip` with `Clay_GetScrollOffset ()`;

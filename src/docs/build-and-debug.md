@@ -75,7 +75,9 @@ marker of uncovered areas).
   widgets outliving their window (dangling `win` pointers: windows call
   `vue_simple_widget_rep::forget_window`), commands freed while running
   (`dialogue-end` destroys the widget which owns the command), unbalanced
-  clip commands from culled elements, duplicate Clay ids.
+  clip commands from culled elements, duplicate Clay ids, render commands
+  of a layout pass drawing widgets freed by a command run after that pass
+  (crash in `vue_render_widget_fn`; now avoided by `gui_needs_relayout`).
 * macOS blocks `screencapture` and CGEvent injection for processes without
   the corresponding permissions: use the snapshot and script aids instead
   (see `vue-testing.md`).

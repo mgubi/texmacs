@@ -137,6 +137,10 @@ typedef vue_simple_widget_rep simple_widget_rep;
 // set by a widget whose layout used measurements of the previous pass which
 // were not available: the window is laid out again right away
 extern bool layout_again;
+// set when a widget is deleted: the render commands of the last layout may
+// point to it (custom render callbacks), so the windows are laid out again
+// before the next redraw (see gui_start_loop)
+extern bool gui_needs_relayout;
 
 // keyboard focus of a window: editors are told when they gain or lose it
 void set_kbd_focus (vue_window win, vue_widget w);

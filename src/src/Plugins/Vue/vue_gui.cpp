@@ -1176,6 +1176,11 @@ void gui_start_loop () {
 
     if (nr_windows == 0) continue;
 
+    // the commands and the interpose handler may have replaced widgets
+    // (menus, tools, dialogs): the render commands of the last layout would
+    // draw freed widgets, so lay the windows out again first
+    if (gui_needs_relayout) process_layout ();
+
     // 6. repaint all the editors
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
@@ -1205,6 +1210,7 @@ void gui_start_loop () {
 void process_layout () {
   // reset memory pools
   styled_strings= array<styled_string>();
+  gui_needs_relayout= false; // widgets deleted while laying out are not drawn
   
   iterator<SDL_Window*> it= iterate (Window_to_window);
   while (it->busy()) { // and then the other windows
@@ -1708,6 +1714,7 @@ bool event_filter (void *userdata, SDL_Event *event) {
       win->process_layout();
       vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
+      if (gui_needs_relayout) process_layout ();
       vue_simple_widget_rep::repaint_all_in_window (win);
       win->process_redraw();
       return false;

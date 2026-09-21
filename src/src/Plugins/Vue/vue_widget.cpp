@@ -135,6 +135,7 @@ bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a cl
 int  section_bar= 0;
 bool section_active= false;
 bool layout_again= false; // see vue_widget.hpp
+bool gui_needs_relayout= false; // see vue_widget.hpp
 
 // signalling
 
@@ -327,12 +328,14 @@ check_type (blackbox bb, string s) {
 template<> void
 tm_delete<vue_widget_rep> (vue_widget_rep* ptr) {
   if (ptr == NULL) return;
+  gui_needs_relayout= true;
   delete ptr;
 }
 #else
 template<> void
 tm_delete<vue_widget_rep> (vue_widget_rep* ptr) {
   if (ptr == NULL) return;
+  gui_needs_relayout= true;
   void *mem= ptr->derived_this ();
   ptr -> ~vue_widget_rep ();
   fast_delete (mem);
