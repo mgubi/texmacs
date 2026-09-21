@@ -267,6 +267,7 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
   if ((y+ win_h) > screen_h) y= screen_h- win_h;
   if (y<0) y=0;
   SI win_x= x, win_y= y;
+  SDL_Log ("Window %d set_position %d %d", id, (int) win_x, (int) win_y);
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
@@ -1508,6 +1509,12 @@ script_step () {
       }
       script_no_target= (script_win == NULL);
       if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
+      else {
+        int wx, wy, ww, wh;
+        SDL_GetWindowPosition ((SDL_Window*) script_win->platform_window (), &wx, &wy);
+        SDL_GetWindowSize ((SDL_Window*) script_win->platform_window (), &ww, &wh);
+        cout << "vue script: window at " << wx << "," << wy << " size " << ww << "x" << wh << LF;
+      }
       continue;
     }
     if (win == NULL) continue;

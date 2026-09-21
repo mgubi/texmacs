@@ -121,6 +121,7 @@ protected:
   rectangles   invalid_regions;
   picture      backing_store;
   coord2       backing_pos;
+  coord2       origin;       // position of the canvas in its window (device pixels, y down)
   bool         backing_valid;
   bool         resize_pending; // the viewport changed since the last notification
   double       scroll_rest_x, scroll_rest_y; // fractions of wheel deltas not yet applied

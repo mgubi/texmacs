@@ -4055,7 +4055,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   size (coord2 (0, 0)),
   extents (0,0,0,0),
   cursor_pos (coord2 (0, 0)),
-  backing_pos (coord2(0, 0)),
+  backing_pos (coord2(0, 0)), origin (coord2 (0, 0)),
   scroll_pos (coord2 (0, 0)),
   absolute_scroll (false),
   backing_valid (false),
@@ -4193,9 +4193,12 @@ vue_simple_widget_rep::query (slot s, int type_id) {
     }
     case SLOT_POSITION:
     {
+      // the position of the canvas in its window, in TeXmacs coordinates
+      // (PIXEL per point, y up): the editor adds it to the position of the
+      // window and to a click to place its context menu (edit_mouse.cpp)
       check_type_id<coord2> (type_id, s);
-      //FIXME: implement
-      return close_box<coord2> (coord2 (0, 0));
+      return close_box<coord2> (coord2 (origin.x1 * PIXEL / retina_factor,
+                                        -origin.x2 * PIXEL / retina_factor));
     }
     case SLOT_SIZE:
     {
@@ -4510,6 +4513,8 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       // cache the current viewport size
       size.x1= d.boundingBox.width; // * retina_factor;
       size.x2= d.boundingBox.height; // * retina_factor;
+      origin.x1= (SI) d.boundingBox.x;
+      origin.x2= (SI) d.boundingBox.y;
     } else {
       cout << "clay_id not found!" << LF;
     }

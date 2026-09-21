@@ -84,8 +84,11 @@ around a `texmacs-input`, plus a `texmacs-output` for the documentation.
   with `alt-window-create-quit`/`alt-window-show`; the quit command runs
   `alt-window-delete`, so a plain window must forward `SLOT_DESTROY` only once.
 * Popups: `edit_mouse.cpp` (context menu) uses `popup_widget` +
-  `popup_window_widget`, positions it at the pointer and sends
-  `send_mouse_grab`; tooltips go through `window_create_tooltip`.
+  `popup_window_widget`, positions it at the pointer — the window position
+  (`SLOT_POSITION` of the window, screen coordinates) plus the position of
+  the editor canvas in its window (`SLOT_POSITION` of the editor, which the
+  Vue editor takes from its Clay box) plus the click, minus the scroll — and
+  sends `send_mouse_grab`; tooltips go through `window_create_tooltip`.
 
 ## Scheme widget markup
 

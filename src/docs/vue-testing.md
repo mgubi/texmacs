@@ -23,7 +23,8 @@ SDL event is pending, by pushing synthetic SDL events. Coordinates are window
 ```
 # comment
 wait <ms>
-window <substring of title> | window #<id>    (default: the last created window)
+window <substring of title> | window #<id>    (default: the last created window;
+                            prints its position and size on the screen)
 move x y
 press x y [left|right|middle]
 release x y [left|right|middle]
@@ -83,8 +84,10 @@ Tests: `widgets` (choice, enum, toggle, filtered choice, tree, ink), `dialog`
 printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
 `resize`, `styles`, `font` (open and close the font selector window;
 `open-font-selector` itself uses a side tool when the "side tools" preference
-is on, so the test calls `open-font-selector-window`), `popup` and
-`menus` (context menu and pull-down menus, flipping/scrolling), `checks`
+is on, so the test calls `open-font-selector-window`), `popup` (the context menu of the editor opens with its corner at the pointer:
+compare the `set_position` line with the window position and the click;
+an item runs and closes it; near the screen border it is moved back) and
+`menus` (pull-down menus, flipping/scrolling), `checks`
 (menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
 section tabs of the preferences tool react to clicks), `prefs-dialog` (the
 preferences window with icon tabs: tabs of equal height), `two-tools` (tools at
