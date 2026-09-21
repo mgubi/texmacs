@@ -201,22 +201,23 @@ the window, are at most as tall as the window and scroll.
   (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
   deltas every frame (`push_wheel`: `mouse_action= "wheel"` for the widgets
   plus `Clay_UpdateScrollContainers` for the Clay container under the
-  pointer); a new event stops the glide. **Trackpad gestures** (macOS): SDL
-  reports them as wheel events without their phase, so
-  `Plugins/MacOS/mac_scroll_phase.mm` installs a local `NSEvent` monitor
-  which sees every scroll event before SDL and queues its phase (fingers,
-  release, system momentum, plain wheel), matched on the deltas when the SDL
-  event is processed (`mac_scroll_phase_pop`; the zero-delta events SDL
-  drops only update the finger state). While the fingers are down the view
-  follows them exactly and never glides (`wheel_gesture`); when they are
-  lifted (`mac_scroll_take_release`, once every queued event is processed)
-  the glide starts at once with the estimated speed, or not at all if the
-  fingers had stopped for more than `wheel_lift_dt` (80 ms); the momentum
-  events of the system, when it sends any, are followed and cancel our
-  glide; a finger touching the pad stops a glide. Other platforms see
-  `MAC_SCROLL_UNKNOWN` and use the wheel model. The editor keeps the
-  fractional SI remainder of the small steps (`scroll_rest_x/y`). While a
-  view glides the loop does not sleep (5 ms pacing).
+  pointer); a new event stops the glide. **Trackpads**: SDL reports their
+  gestures as wheel events with fractional ("precise") deltas and no phase,
+  so fingers which pause cannot be told from fingers which are lifted. On
+  macOS the system computes the momentum itself and, with the hint
+  `SDL_HINT_MAC_SCROLL_MOMENTUM` set before `SDL_Init` (SDL drops these
+  events by default), sends it as a stream of wheel events after the fingers
+  are lifted: the view follows the fingers exactly while they are down and
+  the system glide after; a precise stream (`wheel_precise`, sticky for the
+  stream) starts no glide of ours there (`wheel_system_momentum`), only the
+  integer ticks of a mouse wheel do. Elsewhere the wheel model applies to
+  trackpads too. **Pacing**: a frame costs more than the interval between
+  the events of a trackpad, so the loop handles all the wheel and motion
+  events already queued in the same frame (their deltas add up in
+  `push_wheel`) instead of one event per frame, which lagged behind the
+  fingers and made the motion jerky. The editor keeps the fractional SI
+  remainder of the small steps (`scroll_rest_x/y`). While a view glides the
+  loop does not sleep (5 ms pacing).
 
 ## Error handling of the libraries
 
@@ -297,6 +298,21 @@ behaviour. Feature status against those two:
   `mupdf_load_pixmap`), which the pattern sizes of the style files rely on;
 * **`clear_device`**: white plus the tiled `neutral-pattern.png`, as Qt
   (visible between pages in paper mode; `draw_surround` covers the sides);
+* **direct pixel access** (`fill_direct`, `draw_pixmap_direct`,
+  `device_box`): axis-aligned boxes land on integer device pixels (`to_x`/
+  `to_y` divide SI by the pixel size), so plain-color fills (`fill`, `clear`
+  with a color background, the white of `clear_device`) and 1:1 blits of
+  pictures (`draw_picture`: the backing stores of the editors, the icons)
+  are written into the pixmap directly, source-over with premultiplied alpha
+  as MuPDF does, within the clip (`clip_level` > 0) — the same result to
+  one level, but without the path rasterizer and the RGB→BGR conversion
+  (the window surface is BGR, pictures RGB) which took most of a frame
+  while scrolling: the frame interval of a 1400×900 window went from
+  22–35 ms to 13–20 ms (profiles with `sample` during
+  `wheel-inertia.scm` + a script of 300 wheel steps). Pattern fills,
+  rounded corners, arcs and text still go through MuPDF; what remains of a
+  frame is the editor repaint (`clear_device` tiles, glyphs), the blit and
+  `SDL_UpdateWindowSurface`;
 * polygons: nonzero winding for convex, even-odd otherwise (as the PDF and
   X11 renderers; Qt uses the winding rule for non-convex ones);
 * lines/arcs/rounded rectangles, clipping, linear transformations

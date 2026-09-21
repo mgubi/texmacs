@@ -247,7 +247,7 @@ mupdf_renderer_rep::mupdf_renderer_rep (int w2, int h2)
   : basic_renderer_rep (true, 1.0, w2, h2),
     pixmap (NULL), dev (NULL), proc (NULL),
     fg (-1), bg (-1),
-    lw (-1),
+    lw (-1), clip_level (0), fill_is_pattern (false),
     in_text (false), cfn ("")
 {
   reset_zoom_factor();
@@ -315,6 +315,7 @@ mupdf_renderer_rep::begin (void* handle) {
     cfn= "";
     in_text = false;
     clip_level = 0;
+    fill_is_pattern = false;
     
     // outmost save of the graphics state
     proc->op_q (mupdf_context (), proc);
@@ -480,6 +481,7 @@ mupdf_renderer_rep::select_fill_color (color c) {;
   float db= ((float) b) / 1000.0;
   proc->op_rg (mupdf_context (), proc, dr, dg, db); // non-stroking color
   select_alpha (a);
+  fill_is_pattern= false;
 }
 
 static mupdf_image
@@ -626,6 +628,7 @@ mupdf_renderer_rep::select_fill_pattern (brush br) {
     return;
   }
   mupdf_pattern p= pattern_pool [p_tree];
+  fill_is_pattern= true;
   proc->op_CS (mupdf_context (), proc, "Pattern",
                fz_device_rgb (mupdf_context ()));
   proc->op_sc_pattern (mupdf_context (), proc, "*fill-pattern*",
@@ -712,10 +715,13 @@ mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
   float yy1= to_y (min (y1, y2));
   float xx2= to_x (max (x1, x2));
   float yy2= to_y (max (y1, y2));
+  bool cleared= fill_direct (x1, y1, x2, y2, white);
   proc->op_q (mupdf_context (), proc);
-  select_fill_color (white);
-  proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
-  proc->op_f (mupdf_context (), proc);
+  if (!cleared) {
+    select_fill_color (white);
+    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
+    proc->op_f (mupdf_context (), proc);
+  }
   if (!is_nil (neutral)) {
     select_fill_pattern (neutral);
     proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
@@ -770,6 +776,8 @@ mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  if ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern) &&
+      fill_direct (x1, y1, x2, y2, bg)) return; // a plain background color
   end_text ();
   float xx1= to_x (min (x1, x2));
   float yy1= to_y (min (y1, y2));
@@ -786,10 +794,138 @@ mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   proc->op_Q (mupdf_context (), proc);
 }
 
+/******************************************************************************
+ * Direct pixel access
+ *
+ * The filled rectangles of the GUI and the blits of the backing stores of
+ * the editors make up most of a frame of the Vue GUI. Drawn through the PDF
+ * processor they are rasterized as paths and painted as images (with a
+ * colorspace conversion, the window surface being BGR), which took most of
+ * the frame time while scrolling. Axis-aligned boxes land on integer device
+ * pixels (to_x/to_y divide SI by the pixel size), so they are written into
+ * the pixmap directly, with the same result: solid or translucent colors
+ * (source-over, premultiplied alpha as in MuPDF's pixmaps) within the
+ * current clip, as long as the fill is not a pattern. Everything else
+ * (rounded corners, arcs, text, patterns) still goes through MuPDF.
+ ******************************************************************************/
+
+// the device pixels [px1, px2) x [py1, py2) (y down) covered by the SI box,
+// intersected with the current clip and with the pixmap; false if empty
+bool
+mupdf_renderer_rep::device_box (SI x1, SI y1, SI x2, SI y2,
+                                int& px1, int& py1, int& px2, int& py2) {
+  if (pixmap == NULL || pixmap->samples == NULL) return false;
+  if (x1 > x2) { SI t= x1; x1= x2; x2= t; }
+  if (y1 > y2) { SI t= y1; y1= y2; y2= t; }
+  // to_x/to_y map SI (y up) to PDF points at integer positions, the device
+  // is upside down (see the ctm in begin)
+  px1= (int) to_x (x1); px2= (int) to_x (x2);
+  py1= (int) -to_y (y2); py2= (int) -to_y (y1);
+  if (clip_level > 0) {
+    // the clip of the PDF state was set from the same SI coordinates
+    SI ax1, ay1, ax2, ay2;
+    get_clipping (ax1, ay1, ax2, ay2);
+    px1= max (px1, (int) to_x (ax1)); px2= min (px2, (int) to_x (ax2));
+    py1= max (py1, (int) -to_y (ay2)); py2= min (py2, (int) -to_y (ay1));
+  }
+  px1= max (px1, 0); py1= max (py1, 0);
+  px2= min (px2, pixmap->w); py2= min (py2, pixmap->h);
+  return px1 < px2 && py1 < py2;
+}
+
+// fill the box with a plain color; false if MuPDF must do it
+bool
+mupdf_renderer_rep::fill_direct (SI x1, SI y1, SI x2, SI y2, color c) {
+  if (pixmap == NULL) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  fz_context* ctx= mupdf_context ();
+  bool bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  if (!bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  int px1, py1, px2, py2;
+  end_text ();
+  if (!device_box (x1, y1, x2, y2, px1, py1, px2, py2)) return true; // clipped away
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  if (bgr) { int t= r; r= b; b= t; }
+  if (a <= 0) return true;
+  unsigned char* row= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
+  int n= px2 - px1;
+  if (a >= 255) {
+    unsigned char c[4]= { (unsigned char) r, (unsigned char) g, (unsigned char) b, 255 };
+    for (int py= py1; py < py2; py++, row += pixmap->stride) {
+      unsigned char* d= row;
+      for (int i= 0; i < n; i++, d += 4) { d[0]= c[0]; d[1]= c[1]; d[2]= c[2]; d[3]= c[3]; }
+    }
+  }
+  else {
+    // source-over with a premultiplied source color
+    int sr= r*a/255, sg= g*a/255, sb= b*a/255, ia= 255 - a;
+    for (int py= py1; py < py2; py++, row += pixmap->stride) {
+      unsigned char* d= row;
+      for (int i= 0; i < n; i++, d += 4) {
+        d[0]= (unsigned char) (sr + (d[0]*ia)/255);
+        d[1]= (unsigned char) (sg + (d[1]*ia)/255);
+        d[2]= (unsigned char) (sb + (d[2]*ia)/255);
+        d[3]= (unsigned char) (a  + (d[3]*ia)/255);
+      }
+    }
+  }
+  return true;
+}
+
+// blit the pixmap with its bottom left corner at (x, y) (SI), 1 device
+// pixel per pixel of the source, composed with the given alpha; false if
+// MuPDF must do it (other formats)
+bool
+mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha) {
+  if (src == NULL || src->samples == NULL || pixmap == NULL) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  if (src->s != 0 || !(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha))
+    return false;
+  fz_context* ctx= mupdf_context ();
+  bool dst_bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  bool src_bgr= (src->colorspace == fz_device_bgr (ctx));
+  if (!dst_bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  if (!src_bgr && src->colorspace != fz_device_rgb (ctx)) return false;
+  if (alpha <= 0) return true;
+  end_text ();
+  // the box of the image in device pixels, then the visible part of it
+  int ix1= (int) to_x (x), iy2= (int) -to_y (y);
+  int ix2= ix1 + src->w, iy1= iy2 - src->h;
+  int px1, py1, px2, py2;
+  if (!device_box (x, y, x + src->w * pixel, y + src->h * pixel, px1, py1, px2, py2)) return true;
+  px1= max (px1, ix1); px2= min (px2, ix2);
+  py1= max (py1, iy1); py2= min (py2, iy2);
+  if (px1 >= px2 || py1 >= py2) return true;
+  bool swap_rb= (dst_bgr != src_bgr);
+  int sn= src->n, n= px2 - px1;
+  const unsigned char* srow= src->samples + (ptrdiff_t) (py1 - iy1) * src->stride + sn * (px1 - ix1);
+  unsigned char* drow= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
+  for (int py= py1; py < py2; py++, srow += src->stride, drow += pixmap->stride) {
+    const unsigned char* sp= srow;
+    unsigned char* d= drow;
+    for (int i= 0; i < n; i++, sp += sn, d += 4) {
+      int sr= sp[0], sg= sp[1], sb= sp[2], sa= (sn == 4) ? sp[3] : 255;
+      if (swap_rb) { int t= sr; sr= sb; sb= t; }
+      if (alpha < 255) { sr= sr*alpha/255; sg= sg*alpha/255; sb= sb*alpha/255; sa= sa*alpha/255; }
+      if (sa >= 255) { d[0]= sr; d[1]= sg; d[2]= sb; d[3]= 255; }
+      else if (sa > 0) {
+        int ia= 255 - sa;
+        d[0]= (unsigned char) (sr + (d[0]*ia)/255);
+        d[1]= (unsigned char) (sg + (d[1]*ia)/255);
+        d[2]= (unsigned char) (sb + (d[2]*ia)/255);
+        d[3]= (unsigned char) (sa + (d[3]*ia)/255);
+      }
+    }
+  }
+  return true;
+}
+
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   if ((x1<x2) && (y1<y2))
   {
+    if (!fill_is_pattern && fill_direct (x1, y1, x2, y2, fg)) return;
     end_text ();
     float xx1= to_x (min (x1, x2));
     float yy1= to_y (min (y1, y2));
@@ -1056,6 +1192,9 @@ void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  if (draw_pixmap_direct (pict->pix, x - p->get_origin_x () * pixel,
+                          y - p->get_origin_y () * pixel, alpha))
+    return;
   if (!pict->im) {
     // let's cache the image representation of the pixmap
     // it will be dropped by the object

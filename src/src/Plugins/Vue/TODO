@@ -41,7 +41,8 @@ DONE
 * kinetic scrolling: wheel events scroll in sync, a launched wheel makes the
   view glide with a decaying velocity (editors and Clay containers); on
   macOS the trackpad gestures drag while the fingers are down and glide
-  when they are lifted (NSEvent monitor for the gesture phases)
+  with the momentum of the system (SDL_HINT_MAC_SCROLL_MOMENTUM); the
+  queued wheel/motion events of a frame are handled together
 * editors are told when their window gains/loses the keyboard focus and when
   the focus moves to another widget (set_kbd_focus)
 * menus and popups stay on the screen (flip, shift, clamp)

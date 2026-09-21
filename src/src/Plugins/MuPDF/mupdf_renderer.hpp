@@ -35,6 +35,7 @@ protected:
   SI        lw;
   double    current_width;
   int       clip_level;
+  bool      fill_is_pattern; // the PDF fill color is a pattern (no direct fill)
   
 //  pencil    pen;
 //  brush     bgb, fgb;
@@ -69,6 +70,12 @@ protected:
   void select_stroke_pattern (brush br);
   void select_fill_pattern (brush br);
   void register_pattern (brush br, SI pixel);
+
+  // direct access to the pixels of the target pixmap (see the notes there)
+  bool device_box (SI x1, SI y1, SI x2, SI y2,
+                   int& px1, int& py1, int& px2, int& py2);
+  bool fill_direct (SI x1, SI y1, SI x2, SI y2, color c);
+  bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha);
 
 public:
   mupdf_renderer_rep (int w = 0, int h = 0);
