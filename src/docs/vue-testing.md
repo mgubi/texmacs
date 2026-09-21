@@ -33,12 +33,17 @@ key <SDL key name>          e.g. Return, Escape, Tab, Backspace, Down
 text <string>               one text-input event per character
 resize w h
 repaint                     invalidate every editor (repaint from scratch)
+compose <text>              composition of an input method (no text: ends it)
+focus                       pretend the target window got the keyboard focus
 close                       close request on the target window
 snapshot <name>
 ```
 
 `update_mouse_state` returns the buttons held by the script while it is
-active, so drags work. Callbacks print to standard output (`choice: ...`,
+active, so drags work. `text` sends one event per UTF-8 character. A test
+instance launched while another application is in use never gets the
+keyboard focus, and the editor's idle time (hence the pre-edits and the
+`:idle` delayed commands) stays zero without it: `focus` fakes it. Callbacks print to standard output (`choice: ...`,
 `got: ...`, `Click!!`), which is how the tests are checked.
 
 ## Running the tests
@@ -91,7 +96,8 @@ filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
 editor), `macros-editor` (the macros editor dialog: selecting a macro in the
 list updates the embedded editor), `macro-tool` (the macro editor as a side
 tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
-list inside its box, selection rebuilds the tool without misdrawn widgets), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
+list inside its box, selection rebuilds the tool without misdrawn widgets), `pre-edit` (the composition of an input method — a dead key, a letter — is
+shown in a pre-edit box and the committed text replaces it), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
 and click while it is shown), `focus-windows` (the keyboard focus moves
 from a prompt to the editor and back: `got: BobBy / 42`), `scroll-shift` (scrolling
 shifts the backing store: the snapshots before and after a `repaint` must

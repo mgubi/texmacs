@@ -217,7 +217,13 @@ dropped. The scripted `key` command therefore drives control keys and
 (`SDL_EVENT_TEXT_EDITING`: dead keys, CJK) is shown by the editor as a
 pre-edit: it receives the key `pre-edit:<cursor>:<text>` as with Qt (an
 empty text ends it) and the committed text arrives as a text event; the
-text inputs ignore the pre-edit keys.
+text inputs ignore the pre-edit keys. The editor applies a pre-edit through
+`delayed-keyboard-press`, which waits for 100 ms of `idle-time`, and the
+idle time is zero while `check_event (ANY_EVENT)` sees a pending event:
+the Vue `check_event` must not count SDL's poll sentinel, an internal event
+which sits in the queue after every pump (it did, and nothing depending on
+the idle time — the pre-edits, the `:idle` delayed commands — ever ran).
+The idle time is also zero while the window has no keyboard focus.
 
 Popup menus (`layout_pull_button`) form a chain through `current_popup`; a
 click on a `menu_button` sets `cancel_popup` which closes the chain (and popup

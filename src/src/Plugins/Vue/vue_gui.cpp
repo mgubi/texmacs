@@ -1541,8 +1541,10 @@ script_step () {
       int i= 0;
       while (i < N(txt)) {
         int start= i;
-        tm_char_forwards (txt, i);
-        if (i == start) i++;
+        // the length of the utf8 sequence from its lead byte
+        unsigned char c= (unsigned char) txt[i];
+        int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+        i= min (N(txt), start + len);
         char* buf= buffers[next++ % 64];
         int n= min (i - start, 7);
         for (int j=0; j<n; j++) buf[j]= txt[start+j];
@@ -1564,6 +1566,32 @@ script_step () {
       win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
     else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
       vue_simple_widget_rep::invalidate_all_editors ();
+    else if (cmd == "focus") {
+      // pretend the window got the keyboard focus (a test instance launched
+      // while another application is in use never gets it)
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
+      ev.window.timestamp= SDL_GetTicksNS ();
+      ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      SDL_PushEvent (&ev);
+    }
+    else if (cmd == "compose") {
+      // the composition of an input method: "compose <text>" (no text ends it)
+      static string composed; // SDL keeps the pointer: the string must live on
+      composed= (N(a) > 1) ? line (N(cmd)+1, N(line)) : string ("");
+      static c_string ctext ("");
+      ctext= c_string (composed);
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_TEXT_EDITING;
+      ev.edit.timestamp= SDL_GetTicksNS ();
+      ev.edit.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.edit.text= ctext;
+      ev.edit.start= N(composed);
+      ev.edit.length= 0;
+      SDL_PushEvent (&ev);
+    }
     else if (cmd == "close") {
       SDL_Event ev;
       SDL_zero (ev);
@@ -1867,6 +1895,7 @@ process_event (SDL_Event *event) {
         string t= (event->edit.text != NULL) ? utf8_to_cork (string (event->edit.text)) : string ("");
         string k= "pre-edit:";
         if (N(t) > 0) k << as_string (max (0, (int) event->edit.start)) << ":" << t;
+        cout << "key press: " << k << LF;
         win->input.key_event= k;
         win->input.key_time= texmacs_time ();
         win->input.key_stamp= 0;
@@ -2323,7 +2352,12 @@ bool check_event (int type) {
   case INTERRUPTED_EVENT:
     return interrupted;
   case ANY_EVENT:
-    return (SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST) == true);
+    // SDL leaves a poll sentinel in the queue after each pump (it marks the
+    // end of a poll): it is not an event of ours, and counting it made the
+    // editor never idle (idle_time stayed 0: no delayed :idle commands, no
+    // pre-edit of the input methods, which waits for 100 ms of idleness)
+    return SDL_HasEvents (SDL_EVENT_FIRST, SDL_EVENT_POLL_SENTINEL - 1) ||
+           SDL_HasEvents (SDL_EVENT_POLL_SENTINEL + 1, SDL_EVENT_USER - 1);
   case MOTION_EVENT:
     status= (SDL_HasEvent (SDL_EVENT_MOUSE_MOTION) == true);
     return status;
