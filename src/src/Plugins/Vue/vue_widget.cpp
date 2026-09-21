@@ -130,6 +130,7 @@ string mouse_action;
 time_t mouse_time;
 int mouse_x; // signed: see vue_input_state in vue_gui.hpp
 int mouse_y;
+int mouse_ticket= 0; // the payload of a "drop" action
 unsigned int mouse_state= 0;
 array<double> mouse_data;
 
@@ -195,6 +196,7 @@ load_input_state (vue_window win) {
   mouse_time= in.mouse_time;
   mouse_x= in.mouse_x;
   mouse_y= in.mouse_y;
+  mouse_ticket= in.mouse_ticket;
   mouse_data= in.mouse_data;
   current_popup= in.current_popup;
   cancel_popup= in.cancel_popup;
@@ -218,6 +220,7 @@ store_input_state (vue_window win) {
   in.mouse_time= mouse_time;
   in.mouse_x= mouse_x;
   in.mouse_y= mouse_y;
+  in.mouse_ticket= mouse_ticket;
   in.mouse_data= mouse_data;
   in.current_popup= current_popup;
   in.cancel_popup= cancel_popup;
@@ -4411,7 +4414,10 @@ vue_simple_widget_rep::do_layout () {
       if (starts (mouse_action, "press-")) {
         set_kbd_focus (current_window, this);
       }
-      handle_mouse (mouse_action, x, y, mouse_state, mouse_time, mouse_data);
+      // a drop passes the key of its payload where the modifiers usually
+      // are (call_drop_event in edit_mouse.cpp reads it back)
+      int mods= (mouse_action == "drop") ? mouse_ticket : (int) mouse_state;
+      handle_mouse (mouse_action, x, y, mods, mouse_time, mouse_data);
     }
     // reset
     mouse_action="";

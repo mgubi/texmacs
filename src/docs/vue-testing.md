@@ -36,6 +36,7 @@ text <string>               one text-input event per character
 resize w h
 repaint                     invalidate every editor (repaint from scratch)
 compose <text>              composition of an input method (no text: ends it)
+drop x y <path>|text:<text> a drag and drop of one item at that position
 focus                       pretend the target window got the keyboard focus
 close                       close request on the target window
 snapshot <name>
@@ -109,7 +110,10 @@ texmacs.bin -tls-no-verify -x '(load ".../sockets-tls.scm")'` generates a
 self-signed certificate there and expects `SOCKETS-TLS roundtrip:`; the
 `GnuTLS ERROR (-110)` for one client is the losing half of the dual
 IPv4/IPv6 connection attempt), `input-edit` (editing in a text input: select all and
-replace, word selection, cut and paste, `got: Bob Smith / 42`), `pre-edit` (the composition of an input method — a dead key, a letter — is
+replace, word selection, cut and paste, `got: Bob Smith / 42`), `drop` (a dropped file name and a dropped piece of text reach
+mouse-drop-event and are inserted), `entrypoints` (the wait indicator
+appears over the window and is popped by the empty message, the help
+balloon appears and a pointer motion dismisses it), `pre-edit` (the composition of an input method — a dead key, a letter — is
 shown in a pre-edit box and the committed text replaces it), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
 and click while it is shown), `focus-windows` (the keyboard focus moves
 from a prompt to the editor and back: `got: BobBy / 42`), `scroll-shift` (scrolling

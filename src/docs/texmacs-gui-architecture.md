@@ -184,6 +184,15 @@ the second stacking its messages, since the calls nest, and laying itself
 out at once because the operation which asked for it is about to block the
 loop; `external_event` reaches the focused editor as a keypress.
 
+**Drag and drop** goes through the same path as in the Qt port: the GUI
+collects the items of a drop (SDL sends `DROP_BEGIN`, one `DROP_FILE` or
+`DROP_TEXT` per item, then `DROP_COMPLETE`) into a `CONCAT` tree, images
+as `<image>` with a pretty size and everything else by name, stores it in
+`payloads` under a ticket and sends a `"drop"` mouse action carrying that
+ticket where the modifiers usually are; `call_drop_event`
+(`edit_mouse.cpp`, now compiled for Vue too) reads the payload back and
+calls `mouse-drop-event`.
+
 ## Fonts and colors in the UI
 
 `get_default_font (tt, mini, bold)` (plugin) chooses the UI font

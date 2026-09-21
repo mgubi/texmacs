@@ -1169,6 +1169,28 @@ static string print_key_info ( SDL_KeyboardEvent *key );
 
 void process_event (SDL_Event *event);
 void close_help_balloon ();
+
+// The payloads of the drops, read back by call_drop_event (edit_mouse.cpp)
+// through the ticket carried by the "drop" mouse action.
+hashmap<int, tree> payloads;
+static int  drop_serial= 0;
+static tree drop_doc (CONCAT);
+
+// the width and height of a dropped image as a pretty TeXmacs length
+// (the policy of qt_pretty_image_size: a wide image fills the line)
+static void
+vue_pretty_image_size (url image, string& w, string& h) {
+  w= ""; h= "";
+  string ext= locase_all (suffix (image));
+  if (ext == "pdf" || ext == "ps" || ext == "eps") return; // sized by the box
+  picture pic= load_picture (image, -1, -1, tree (""), PIXEL);
+  if (is_nil (pic)) return;
+  int ww= pic->get_width (), hh= pic->get_height ();
+  SI pt= get_current_editor () -> as_length ("1pt");
+  SI par= get_current_editor () -> as_length ("1par");
+  if (ww <= 0 || hh <= 0 || ww * pt > par) { w= "1par"; h= ""; }
+  else { w= as_string (ww) * "pt"; h= as_string (hh) * "pt"; }
+}
 struct vue_dialog_result;
 static void vue_dialog_finish (vue_dialog_result* res);
 extern Uint32 vue_dialog_event;
@@ -1700,6 +1722,40 @@ script_step () {
       ev.edit.length= 0;
       SDL_PushEvent (&ev);
     }
+    else if (cmd == "drop" && N(a) > 3) {
+      // "drop x y <path>" or "drop x y text:<text>": a synthetic drop of
+      // one item, as the system sends it (begin, item, complete)
+      static char buf[1024];
+      string item= line (N(cmd) + N(a[1]) + N(a[2]) + 3, N(line));
+      bool is_text= starts (item, "text:");
+      if (is_text) item= item (5, N(item));
+      c_string citem (item);
+      int n= min ((int) strlen (citem), 1023);
+      for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
+      buf[n]= 0;
+      Uint32 wid= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_DROP_BEGIN;
+      ev.drop.timestamp= SDL_GetTicksNS ();
+      ev.drop.windowID= wid;
+      SDL_PushEvent (&ev);
+      SDL_zero (ev);
+      ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
+      ev.drop.timestamp= SDL_GetTicksNS ();
+      ev.drop.windowID= wid;
+      ev.drop.x= as_double (a[1]);
+      ev.drop.y= as_double (a[2]);
+      ev.drop.data= buf;
+      SDL_PushEvent (&ev);
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_DROP_COMPLETE;
+      ev.drop.timestamp= SDL_GetTicksNS ();
+      ev.drop.windowID= wid;
+      ev.drop.x= as_double (a[1]);
+      ev.drop.y= as_double (a[2]);
+      SDL_PushEvent (&ev);
+    }
     else if (cmd == "close") {
       SDL_Event ev;
       SDL_zero (ev);
@@ -2006,6 +2062,53 @@ process_event (SDL_Event *event) {
     } //case SDL_EVENT_TEXT_INPUT
 
 
+    // Drag and drop: SDL sends DROP_BEGIN, then one DROP_FILE or DROP_TEXT
+    // per item, then DROP_COMPLETE. The items are collected in a tree and
+    // handed to the editor as a "drop" mouse action carrying a ticket; the
+    // editor reads the payload back (call_drop_event in edit_mouse.cpp) and
+    // calls mouse-drop-event.
+    case SDL_EVENT_DROP_BEGIN:
+      drop_doc= tree (CONCAT);
+      break;
+    case SDL_EVENT_DROP_FILE:
+    case SDL_EVENT_DROP_TEXT:
+    {
+      if (event->drop.data == NULL) break;
+      string item= utf8_to_cork (string (event->drop.data,
+                                         (int) strlen (event->drop.data)));
+      if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
+      else {
+        // a file: images are inserted as such, everything else by name
+        url u= url_system (item);
+        string ext= locase_all (suffix (u));
+        if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" ||
+            ext == "tif" || ext == "tiff" || ext == "bmp" || ext == "svg" ||
+            ext == "pdf" || ext == "ps" || ext == "eps") {
+          string iw, ih;
+          vue_pretty_image_size (u, iw, ih);
+          drop_doc << tree (IMAGE, as_string (u), iw, ih, "", "");
+        }
+        else drop_doc << as_string (u);
+      }
+      break;
+    }
+    case SDL_EVENT_DROP_COMPLETE:
+    {
+      win= get_window_from_ID (event->drop.windowID);
+      if (win == NULL || N(drop_doc) == 0) { drop_doc= tree (CONCAT); break; }
+      vue_input_state& in= win->input;
+      in.mouse_action= "drop";
+      in.mouse_time= texmacs_time ();
+      in.mouse_x= (int) (event->drop.x * retina_factor);
+      in.mouse_y= (int) (event->drop.y * retina_factor);
+      in.mouse_ticket= ++drop_serial;
+      payloads (in.mouse_ticket)= drop_doc;
+      if (DEBUG_VUE_EVENTS)
+        debug_events << "drop of " << N(drop_doc) << " item(s) at "
+                     << in.mouse_x << "," << in.mouse_y << LF;
+      drop_doc= tree (CONCAT);
+      break;
+    }
     case SDL_EVENT_TEXT_EDITING:
     {
       // the composition of an input method (dead keys, CJK...): the editor

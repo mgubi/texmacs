@@ -41,6 +41,7 @@ struct vue_input_state {
   // negative coordinates, and a pointer which left has none at all
   int    mouse_x, mouse_y;
   array<double> mouse_data;
+  int    mouse_ticket; // for the "drop" action: the key of its payload
   // kinetic scrolling (see wheel_inertia_step in vue_gui.cpp): the speed
   // of the wheel estimated from its events, the velocity of the glide after
   // they stop (wheel units per ms), the times of the last step and event
@@ -64,6 +65,7 @@ struct vue_input_state {
 
   vue_input_state ()
     : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
+      mouse_ticket (0),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
       wheel_time (0), wheel_event_time (0), wheel_precise (false),
       current_popup (false), cancel_popup (false), away_time (0),
