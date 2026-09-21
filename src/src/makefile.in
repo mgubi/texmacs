@@ -130,6 +130,9 @@ make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
+# all dependency files; the "deps" target below and the include of the
+# dependency files rely on this variable
+deps := $(texmacs_cpp_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
 
 ###############################################################################
 # Include files
