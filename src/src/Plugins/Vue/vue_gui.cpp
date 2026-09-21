@@ -33,6 +33,7 @@
 #include "tm_window.hpp"
 #include "sys_utils.hpp"     // get_env
 #include "file.hpp"          // load_string (scripted events)
+#include "socket_notifier.hpp" // notifiers_active (pause of the loop)
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -1298,7 +1299,11 @@ void gui_start_loop () {
       // pause grows while nothing happens). A plain SDL_Delay here made the
       // first event after a pause wait for the end of the pause: up to 1 s
       // before a scroll started to move
-      SDL_WaitEventTimeout (NULL, delay);
+      // sockets and pipes (plugins, the TeXmacs client/server) are polled
+      // by the interpose handler (perform_select): keep the pause short
+      // while any is open, they have no event of their own to wake us
+      int pause= notifiers_active () ? min (delay, 40) : delay;
+      SDL_WaitEventTimeout (NULL, pause);
       delay += (delay/5);
       if (delay > 1000) delay= 1000;
     }

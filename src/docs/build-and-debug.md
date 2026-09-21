@@ -81,6 +81,9 @@ down a stray element.
   clip commands from culled elements, duplicate Clay ids, render commands
   of a layout pass drawing widgets freed by a command run after that pass
   (crash in `vue_render_widget_fn`; now avoided by `gui_needs_relayout`).
+* `-debug-io -debug-sockets` on the command line trace the client/server
+  sockets (`socket_link_rep::...` lines, the `openssl` commands of the
+  legacy protocol with the size of their output).
 * `aborting process from uncaught error!` as the last line of the log is
   MuPDF exiting after a `fz_throw` outside `fz_try` (see the error handling
   section of `vue-graphics-stack.md`); the `TeXmacs] MuPDF error:` line

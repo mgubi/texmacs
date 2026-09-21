@@ -137,12 +137,35 @@ title bar).
 
 ## Client/server and sockets
 
-Since 2.1.5 the TeXmacs server/client (`System/Link/texmacs_server.cpp`,
-`texmacs_client.cpp`, `client_server.hpp`) is implemented on Qt sockets
-(`QTMSockets`) only; the former `socket_server.cpp`/`socket_link` are gone.
-Non-Qt builds compile the `#else` stubs of those files ("sockets are not
-implemented"): `server_can_start` returns false, `client_protocol_version`
-the protocol constant, and `connection_start` has no `socket` link type.
+The TeXmacs server/client (`System/Link/texmacs_server.cpp`,
+`texmacs_client.cpp`, `client_server.hpp`) sits on `socket_link_rep` (one
+connection, a `tm_link_rep`) and `socket_server_rep`. Upstream 2.1.5 has
+them only in the Qt plugin (`Plugins/Qt/QTMSockets.cpp`, 2015: plain BSD
+sockets woken by `QSocketNotifier`, hence `QObject` bases and moc), after
+the old GUI-independent implementation was removed in November 2025. Here
+`System/Link/tm_sockets.cpp` is the same code without Qt, compiled in the
+non-Qt builds (the Qt build keeps its own): readiness comes from the
+`socket_notifier`s of `socket_notifier.cpp`, which `perform_select` polls
+from the interpose handler (`tm_server.cpp`). For that the notifiers gained
+write readiness (`write` flag; a link keeps its write notifier only while
+its output buffer is not empty, since a writable socket is always ready),
+`perform_select` iterates over a copy and is bounded, and
+`notifiers_active` lets the Vue loop shorten its idle pause to 40 ms while
+sockets or pipes are open (they have no event of their own). A blocking
+`listen` (the legacy handshake waits 10 s for the server's answer) polls
+the sockets and runs the pending Scheme commands meanwhile, checking its
+input right after each poll (the polling loops of `client-base.scm` would
+otherwise take the packet). Links stopped from their own callbacks are
+freed later (`collect_stopped_links`), the server is told of a
+disconnection directly (no signal).
+
+Both protocols are available: TLS through `Plugins/Gnutls` when the build
+has `--with-gnutls`, and the legacy one, whose RSA/AES steps shell out to
+the `openssl` command (`Plugins/Openssl`): with LibreSSL, the openssl of
+macOS, `pkeyutl` needs the operation before `-inkey` (fixed here, it made
+the legacy handshake fail for every GUI on macOS). The `sockets` test
+starts the server and an anonymous legacy client in one instance and
+evaluates `remote-public-preferences` remotely.
 
 ## Fonts and colors in the UI
 

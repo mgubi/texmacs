@@ -19,6 +19,10 @@
 
 #ifdef QTTEXMACS
 #include "Qt/QTMSockets.hpp"
+#else
+#include "tm_sockets.hpp"
+#endif
+#if 1 // the sockets exist in every build now
 
 /******************************************************************************
 * Server mode?
@@ -210,112 +214,5 @@ set_reset_admin_password (bool value) {
   reset_admin_password = value;
 }
 
-#else
-
-/******************************************************************************
-* Server mode?
-******************************************************************************/
-
-bool
-is_server () { return false; }
-
-void
-set_server () {}
-
-void
-unset_server () {}
-
-int
-server_port_in_use () { return 0; }
-
-/******************************************************************************
-* Server side
-******************************************************************************/
-
-void
-server_start () {
-  io_error << "server is not implemented.";
-}
-
-void
-server_stop () {
-  io_error << "server is not implemented.";
-}
-
-bool
-server_started () {
-  return false;
-}
-
-string
-server_read (int fd) {
-  (void) fd;
-  io_error << "server is not implemented.";
-  return "";
-}
-
-void
-server_write (int fd, string s) {
-  io_error << "server is not implemented.";
-  (void) fd; (void) s;
-}
-
-int
-number_of_servers () {
-  return 0;
-}
-
-void
-server_listen_connections (int msecs) {}
-
-int
-get_server_port () {
-  io_error << "server is not implemented.";
-  return 0;
-}
-
-void
-set_server_port (int port) {
-  io_error << "server is not implemented.";
-  (void) port;
-}
-
-bool
-should_reset_preferences () {
-  io_error << "server is not implemented.";
-  return false;
-}
-
-bool
-should_reset_admin_password () {
-  io_error << "server is not implemented.";
-  return false;
-}
-
-void
-set_reset_preferences (bool value) {
-  io_error << "server is not implemented.";
-  (void) value;
-}
-
-void
-set_reset_admin_password (bool value) {
-  io_error << "server is not implemented.";
-  (void) value;
-}
-
-bool
-server_can_start () {
-  return false;
-}
-
-void
-server_define_error_codes () {}
-
-string
-server_client_address (int fd) {
-  (void) fd;
-  return "";
-}
-
 #endif
+
