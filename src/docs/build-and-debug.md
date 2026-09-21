@@ -68,10 +68,17 @@ down a stray element.
 
 ## Debugging
 
-* Standard output carries the widget traces (`unhandled SLOT_...` for slots a
-  widget does not implement, `run command ...`, `Click!!`) and crash reports
-  (`Error message:` + C++ backtrace). Signals are turned into C++ exceptions
-  by `tm_throw`, so a crash prints the report and aborts.
+* Standard output carries only warnings, errors and crash reports
+  (`Error message:` + a C++ backtrace). Signals are turned into C++
+  exceptions by `tm_throw`, so a crash prints the report and aborts. The
+  traces are behind the usual debug flags (`vue_widget.hpp`):
+  `-debug-qt` (`DEBUG_VUE`: windows created and destroyed, the timings of
+  the phases of a frame when they exceed their threshold),
+  `-debug-qt-widgets` (`DEBUG_VUE_WIDGETS`: `unhandled SLOT_...` for slots
+  a widget does not implement, `run command ...`, `Click!!`),
+  `-debug-events` (`DEBUG_VUE_EVENTS`: the SDL events, the keys as they are
+  translated, the mouse actions the editor receives) and `-debug-io`
+  (sockets, the `openssl` calls of the legacy protocol).
 * Backtrace addresses of `static`/inlined functions are attributed to the
   previous exported symbol; check with
   `objdump -d --disassemble-symbols='<mangled name>' TeXmacs/bin/texmacs.bin`

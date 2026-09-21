@@ -143,7 +143,7 @@ static TTF_Font **ttf_fonts= NULL; // fonts cache
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup)
 : vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
-  cout << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
+  if (DEBUG_VUE) debug_widgets << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
   // windows start hidden and are shown once laid out, see set_visibility
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
                          SDL_WINDOW_HIDDEN;
@@ -206,7 +206,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
 }
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
-  cout << "destroy vue_sdl_base_window_rep " << id << LF;
+  if (DEBUG_VUE) debug_widgets << "destroy vue_sdl_base_window_rep " << id << LF;
   vue_simple_widget_rep::forget_window (this);
   // forget the weak references of the scripting aid
   if (last_created_window == this) last_created_window= NULL;
@@ -268,7 +268,7 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
   if ((y+ win_h) > screen_h) y= screen_h- win_h;
   if (y<0) y=0;
   SI win_x= x, win_y= y;
-  SDL_Log ("Window %d set_position %d %d", id, (int) win_x, (int) win_y);
+  if (DEBUG_VUE_EVENTS) SDL_Log ("Window %d set_position %d %d", id, (int) win_x, (int) win_y);
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
@@ -373,7 +373,10 @@ vue_sdl_base_window_rep::process_layout () {
 }
 
 //******************************************************************************
-// rendering via SDL renderer
+// Rendering through SDL's own renderer and the example Clay renderer
+// (clay_renderer_SDL3.c), as an alternative to the MuPDF path below.
+// Unused: plain_window creates a vue_sdl_mupdf_window_rep. Kept as the
+// starting point of a GPU path; the font is a hardcoded personal one.
 
 class vue_sdl_window_rep : public vue_sdl_base_window_rep {
 public:
@@ -475,7 +478,7 @@ vue_sdl_window_rep::get_viewport_size (void *data, int& w, int& h) {
 }
 
 vue_sdl_window_rep::vue_sdl_window_rep (vue_widget w, string name, bool popup)
-  : vue_sdl_base_window_rep (w, name, popup)
+  : vue_sdl_base_window_rep (w, name, popup), sdl_ren (NULL), text_engine (NULL)
 {
   if (!sdl_ren) {
     sdl_ren= SDL_CreateRenderer (sdl_win, NULL);
@@ -571,7 +574,7 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
 }
 
 vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup)
-  : ren(NULL), vue_sdl_base_window_rep (w, name, popup)
+  : vue_sdl_base_window_rep (w, name, popup), ren (NULL)
 {
   with_window frame (this);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
@@ -603,8 +606,6 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
     return;
   }
   // FIXME: premultiplied?
-  SDL_FRect src= { 0, 0, (float)w, (float)h };
-  //SDL_RenderFillRect (sdl_ren, dest);
   if (!SDL_BlitSurface (surf, 0, dest_surf, 0))
     SDL_Log ("SDL_BlitSurface failed: %s", SDL_GetError ());
   SDL_DestroySurface (surf);
@@ -701,7 +702,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 #endif
 
   t1= t2; t2= texmacs_time ();
-  if (t2 - t1 > 30) cout << "render_clay_commands took " << t2 - t1 << "ms" << LF;
+  if (DEBUG_VUE && t2 - t1 > 30)
+    debug_widgets << "render_clay_commands took " << t2 - t1 << "ms" << LF;
   
   // development aid: when TEXMACS_VUE_SNAPSHOT is set to a directory, the
   // rendering of every window is saved there as window-<id>.png at each redraw
@@ -722,7 +724,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     if (reported++ < 3) SDL_Log ("SDL_UpdateWindowSurface failed: %s", SDL_GetError ());
   }
   t1= t2; t2= texmacs_time ();
-  if (t2 - t1 > 30) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
+  if (DEBUG_VUE && t2 - t1 > 30)
+    debug_widgets << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
 }
 
 
@@ -814,8 +817,9 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         // config->stringContents.length
         ren->set_pencil (rgb_color (config->textColor.r, config->textColor.g,
                                     config->textColor.b, config->textColor.a));
-        //font fn= get_default_styled_font (style);
-        font fn= get_default_styled_font (0); //FIXME: consider style
+        //FIXME: consider the style of the text element
+        static font fn; // the same for every command and frame
+        if (is_nil (fn)) fn= get_default_styled_font (0);
         ren->set_shrinking_factor (3);
         string s (config->stringContents.chars,
                   config->stringContents.length);
@@ -902,7 +906,6 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
 #endif
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
-        Clay_BoundingBox boundingBox = rcmd->boundingBox;
         clip_depth++;
         ren->clip (rcmd->boundingBox.x * ren->pixel,
                    -(rcmd->boundingBox.y + rcmd->boundingBox.height) * ren->pixel,
@@ -918,7 +921,8 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         break;
       }
       case CLAY_RENDER_COMMAND_TYPE_IMAGE: {
-        cout << "CLAY_RENDER_COMMAND_TYPE_IMAGE unsupported" << LF;
+        { static bool reported= false; // the widgets draw their own images
+          if (!reported) { reported= true; cout << "TeXmacs] Clay image commands are not supported" << LF; } }
           //SDL_Texture *texture = (SDL_Texture *)rcmd->renderData.image.imageData;
           break;
       }
@@ -947,11 +951,30 @@ void *vue_render_text= (void*)&vue_render_text_fn;
 static void
 layout_text_box (string s, int style, color c) {
   font fn= get_default_styled_font (style);
-  metric ex;
-  fn->var_get_extents (s, ex);
-  SI w = ((ex->x2- ex->x1+ 2)/3);
-  SI h = ((fn->y2- fn->y1+ 2)/3);
-  abs_round (w, h);
+  // the extents are measured once per (font, string): a layout pass runs
+  // several times per frame and a menu bar holds many unchanging labels
+  static hashmap<string,int> extent_cache (-1);
+  static array<SI> extent_w, extent_h;
+  static string cache_font;
+  if (cache_font != fn->res_name) {
+    cache_font= fn->res_name;
+    extent_cache= hashmap<string,int> (-1);
+    extent_w= array<SI> (); extent_h= array<SI> ();
+  }
+  SI w, h;
+  int idx= extent_cache[s];
+  if (idx >= 0) { w= extent_w[idx]; h= extent_h[idx]; }
+  else {
+    metric ex;
+    fn->var_get_extents (s, ex);
+    w= ((ex->x2- ex->x1+ 2)/3);
+    h= ((fn->y2- fn->y1+ 2)/3);
+    abs_round (w, h);
+    if (N(extent_w) < 4096) { // bounded: the texts of a UI are few
+      extent_cache (s)= N(extent_w);
+      extent_w << w; extent_h << h;
+    }
+  }
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
   styled_strings << ss;
   CLAY_AUTO_ID({
@@ -1036,7 +1059,8 @@ void gui_open (int& argc, char** argv) {
     int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
     if (density <= 0.0f) factor= 2; // unknown: the previous default
     set_retina_factor (factor);
-    SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
+      if (DEBUG_VUE || factor != 2)
+      SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
   }
   initialize_colors ();
   initialize_keyboard ();
@@ -1134,7 +1158,6 @@ void gui_interpose (void (*f) (void)) {
 int number_of_servers (); // in texmacs_server.hpp
 
 void sdl_log_event (const SDL_Event *event);
-static string lookup_mouse (Uint8 button);
 static string lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text= NULL);
 static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
@@ -1354,7 +1377,7 @@ void gui_start_loop () {
       t2= texmacs_time ();
       process_layout ();
       t1= t2; t2= texmacs_time ();
-      if (t2 - t1 >= 30) cout << "layout took " << t2 - t1 << "ms\n";
+      if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "layout took " << t2 - t1 << "ms" << LF;
     }
     
     // 4. exec commands if present
@@ -1362,7 +1385,7 @@ void gui_start_loop () {
       list<command> l= reverse(cmd_list);
       cmd_list= list<command>();
       while (!is_nil(l)) {
-        cout << "run command " << l->item << LF;
+        if (DEBUG_VUE_WIDGETS) debug_widgets << "run command " << l->item << LF;
         l->item->apply();
         l= l->next;
       }
@@ -1374,7 +1397,7 @@ void gui_start_loop () {
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 30) cout << "interpose took " << t2-t1 << "ms\n";
+    if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "interpose took " << t2-t1 << "ms" << LF;
 
     if (nr_windows == 0) continue;
 
@@ -1399,12 +1422,12 @@ void gui_start_loop () {
       request_partial_redraw= interrupted;
     }
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 30) cout << "repaint took " << t2 - t1 << "ms\n";
+    if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "repaint took " << t2 - t1 << "ms" << LF;
 
     // 7. redraw the UI
     process_redraw ();
     t1= t2; t2= texmacs_time ();
-    if (t2 - t1 >= 50) cout << "redraw took " << t2 - t1 << "ms\n";
+    if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
     gui_wait= true;
   }
 }
@@ -1807,7 +1830,8 @@ process_event (SDL_Event *event) {
   // note: events are stored in the input state of their window and cleared
   // once that window has been laid out (see gui_finalize_context)
   vue_window win;
-  if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
+  if (DEBUG_VUE_EVENTS && event->type != SDL_EVENT_MOUSE_MOTION)
+    sdl_log_event (event);
   if (vue_dialog_event != 0 && event->type == vue_dialog_event) {
     // the result of a file dialog, pushed by its callback (which may run
     // on another thread): the command runs here, on the main thread
@@ -1870,9 +1894,10 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_WHEEL:
     {
       update_mouse_state ();
-      SDL_Log ("Window %d got wheel event event %f %f (queued for %d ms)",
-              event->wheel.windowID, event->wheel.x, event->wheel.y,
-              (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
+      if (DEBUG_VUE_EVENTS)
+        SDL_Log ("Window %d got wheel event %f %f (queued for %d ms)",
+                 event->wheel.windowID, event->wheel.x, event->wheel.y,
+                 (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
         vue_input_state& in= win->input;
@@ -1902,16 +1927,16 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:
     {
-      {
+      if (DEBUG_VUE_EVENTS) {
         c_string buf (print_key_info (&(event->key)));
-        SDL_Log ("Keydown: %s ", (char*)buf);
+        SDL_Log ("Keydown: %s ", (char*) buf);
       }
       win= get_window_from_ID (event->key.windowID);
       if (win) {
         if (event->key.scancode == SDL_SCANCODE_F1) {
           // toggle the debug mode for the current window
           win->clay_debug = !win->clay_debug;
-          cout << "TOGGLE debug mode " << (win->clay_debug ? "true" : "false") << LF;
+          if (DEBUG_VUE) debug_widgets << "Clay debug view " << (win->clay_debug ? "on" : "off") << LF;
           break;
         }
 
@@ -1984,7 +2009,7 @@ process_event (SDL_Event *event) {
         string t= (event->edit.text != NULL) ? utf8_to_cork (string (event->edit.text)) : string ("");
         string k= "pre-edit:";
         if (N(t) > 0) k << as_string (max (0, (int) event->edit.start)) << ":" << t;
-        cout << "key press: " << k << LF;
+        if (DEBUG_VUE_EVENTS) debug_events << "key press: " << k << LF;
         win->input.key_event= k;
         win->input.key_time= texmacs_time ();
         win->input.key_stamp= 0;
@@ -2588,21 +2613,19 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   
   if (prompt != "")
     sdl_type= SDL_FILEDIALOG_SAVEFILE;
-  else if (type == "directory")
+  else if (file_type == "directory")
     sdl_type= SDL_FILEDIALOG_OPENFOLDER;
   else
     sdl_type= SDL_FILEDIALOG_OPENFILE;
 
-  if (type == "image") {
+  if (file_type == "image") {
     sdl_n_filters= 4;
-    sdl_filters= (void*)all_filters;
-  } else if (type == "directory") {
-    sdl_n_filters= 0;
-  } else if (type == "generic") {
+    sdl_filters= (void*) all_filters;
+  } else if (file_type == "directory" || file_type == "generic") {
     sdl_n_filters= 0;
   } else {
     sdl_n_filters= 1;
-    filter= as_string (call ("format-get-name", type));
+    filter= as_string (call ("format-get-name", file_type));
   }
  
   // Create and set dialog properties
@@ -2854,15 +2877,6 @@ initialize_keyboard () {
 * SDL3 event logger
 ******************************************************************************/
 
-static string
-lookup_mouse (Uint8 button) {
-  if (button == SDL_BUTTON_LEFT)   return "left";
-  if (button == SDL_BUTTON_MIDDLE) return "middle";
-  if (button == SDL_BUTTON_RIGHT)  return "right";
-  if (button == SDL_BUTTON_X1)     return "extra1";
-  if (button == SDL_BUTTON_X2)     return "extra2";
-  return "button-error";
-}
 
 static string
 lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
@@ -2875,7 +2889,8 @@ lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
     *produces_text= (key >= 0x20 && key != 0x7f && (key & SDLK_SCANCODE_MASK) == 0 &&
                      (mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) == 0);
 
-  cout << "postprocessed key:" << SDL_GetKeyName (key) << " " << print_modifiers (mod) << LF;
+  if (DEBUG_VUE_EVENTS)
+    debug_events << "postprocessed key: " << SDL_GetKeyName (key) << " " << print_modifiers (mod) << LF;
 
   const char* str= SDL_GetKeyName (key);
   string r (str, (int)strlen (str));
@@ -2891,7 +2906,7 @@ lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
   if (mod & SDL_KMOD_CTRL)  s= "C-" * s;
   if (mod & SDL_KMOD_ALT)   s= "A-" * s;
   if (mod & SDL_KMOD_GUI)   s= "M-" * s;
-  cout << "key press: " << s << LF;
+  if (DEBUG_VUE_EVENTS) debug_events << "key press: " << s << LF;
   return s;
 }
 

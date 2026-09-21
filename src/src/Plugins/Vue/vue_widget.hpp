@@ -14,6 +14,14 @@
 #include "widget.hpp"
 #include "blackbox.hpp"
 
+// Debug output of the plugin, enabled with the command line flags
+// -debug-qt (traces of the GUI), -debug-qt-widgets (traces of the widgets
+// and of their slots) and -debug-events (input events). Only genuine
+// warnings and errors print unconditionally.
+#define DEBUG_VUE         (debug (DEBUG_FLAG_QT))
+#define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
+#define DEBUG_VUE_EVENTS  (debug (DEBUG_FLAG_EVENTS))
+
 typedef quartet<SI,SI,SI,SI> coord4;
 typedef pair<SI,SI> coord2;
 
@@ -157,7 +165,8 @@ class vue_chooser_widget_rep: public vue_widget_rep {
 public:
   command cmd;           //!< Scheme closure to execute when the file is chosen
   command quit;          //!< Execute when the dialog closes.
-  string type;           //!< File types to filter in the dialog
+  string file_type;      //!< File types to filter in the dialog (the base
+                         //!< class has its own "type", used for dispatch)
   string prompt;         //!< Is this a "Save" dialog?
   string win_title;      //!< Set by plain_window_widget()
   bool   shown;          //!< The native dialog has been opened

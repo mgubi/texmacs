@@ -77,9 +77,11 @@ Each iteration:
 
 1. `script_step` (test driver, see *vue-testing.md*), then **one** SDL event
    is polled and translated by `process_event` into the input state of its
-   window — plus the wheel and motion events already queued behind it
-   (their deltas add up, the last position wins), so that a slow frame does
-   not fall behind a trackpad;
+   window. When that event is itself a motion or a wheel, the ones already
+   queued behind it are handled too (their deltas add up, the last position
+   wins), so that a slow frame does not fall behind a trackpad; the
+   batching must not follow a press or a release, since the motion handler
+   overwrites `mouse_action` and the click would never reach a widget;
 2. `process_layout ()`: every window runs `Clay_BeginLayout`,
    `content->do_layout ()`, `Clay_EndLayout`, then `content->post_layout ()`.
    Layout is also where **input is dispatched**: widgets read the input state
@@ -182,6 +184,15 @@ Hit testing uses `Clay_PointerOver (id)` on the element's own id. Do not use
 `Clay_Hovered ()` after the element's `CLAY` block has closed: it then tests
 the *parent*, and a widget laid out before its siblings (the editor before the
 side tools) would swallow their events.
+
+The pointer coordinates are **signed**: a drag may continue outside the
+window, where SDL reports negative positions, and when the pointer leaves
+the window the last position inside it is kept, so that a dragged element
+freezes instead of jumping to an extreme. The **pixel density** comes from
+the desktop display mode (`SDL_GetDesktopDisplayMode`, not the content
+scale, which macOS reports as 1 while drawing at 2 pixels per point);
+TeXmacs keeps one global `retina_factor`, so a mixed-density setup follows
+the primary display.
 
 `button_logic (id)` is the common mouse protocol of the elements, over
 `Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless

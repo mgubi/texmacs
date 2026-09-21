@@ -17,6 +17,13 @@ WIP
 
 DONE
 
+* audit of the plugin (2026-09-21): lost clicks after the event batching,
+  the renderer leak of every destroyed editor, dangling window pointers,
+  the scroll requests dropped by a second layout pass, the file dialog
+  callback running Scheme off the main thread, the hardcoded pixel
+  density, unsigned pointer coordinates, a frame started re-entrantly
+  from the event pump, two menus open at once; the traces are behind the
+  debug flags and the plugin compiles without warnings
 * the TeXmacs client/server works without Qt (System/Link/tm_sockets.cpp on
   the socket notifiers; both protocols tested: tests sockets, sockets-tls;
   the build has --with-gnutls)

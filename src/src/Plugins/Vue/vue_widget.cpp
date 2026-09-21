@@ -323,8 +323,7 @@ button_logic (Clay_ElementId id) {
 
 /*****************************************************************************/
 
-#define DEBUG_VUE (debug (DEBUG_FLAG_QT))
-#define DEBUG_VUE_WIDGETS (debug (DEBUG_FLAG_QT_WIDGETS))
+// DEBUG_VUE, DEBUG_VUE_WIDGETS and DEBUG_VUE_EVENTS: see vue_widget.hpp
 
 /******************************************************************************
  * Type checking
@@ -703,7 +702,6 @@ string debug_style (int style) {
   return buf (0, N (buf)-1);
 }
 
-#define SHRINK 3
 
 SI
 decode_length (string width, vue_window win, int style) {
@@ -804,6 +802,12 @@ struct printer_option {
 // the options of a printer worth a choice: paper size, two-sided, color
 static array<printer_option>
 printer_options (string printer) {
+  // lpoptions spawns a process: the result is cached per printer, so that
+  // switching back and forth in the dialog does not block the layout again
+  static hashmap<string,int> cached (-1);
+  static array<array<printer_option> > store;
+  int idx= cached[printer];
+  if (idx >= 0) return store[idx];
   array<printer_option> opts;
   string cmd= "lpoptions -l 2>/dev/null";
   if (N(printer) > 0) cmd= "lpoptions -p " * escape_sh (printer) * " -l 2>/dev/null";
@@ -829,6 +833,8 @@ printer_options (string printer) {
     }
     if (N(o.values) > 1) opts << o;
   }
+  cached (printer)= N(store);
+  store << opts;
   return opts;
 }
 
@@ -861,7 +867,7 @@ public:
     }
     cmd << " " << escape_sh (concretize (file));
     if (DEBUG_VUE_WIDGETS) debug_widgets << "Running print command: " << cmd << LF;
-    cout << "print: " << cmd << LF;
+    if (DEBUG_VUE_WIDGETS) debug_widgets << "print: " << cmd << LF;
     system (cmd);
     if (!is_nil (after)) after ();
   }
@@ -1646,37 +1652,6 @@ vue_ui_rep::do_layout () {
     }
     return;
   }
-  if (type == "aligned_widget_grid") {
-    vue_aligned_widget d= open_box<vue_aligned_widget> (data);
-    CLAY(CLAY_IDI("aligned_widget", id), {
-      .layout= {
-        .layoutDirection= CLAY_LEFT_TO_RIGHT,
-        .sizing= layoutFit }})
-    {
-      //FIXME: size correctly
-      GRID(2 /* Two columns */ ) {
-        for (int i=0, n= N(d.lhs); i< n; i++) {
-          GRID_ELEMENT() {
-            CLAY_AUTO_ID({
-              .layout= {
-                .childAlignment= { .x= CLAY_ALIGN_X_RIGHT }}})
-            {
-                concrete (d.lhs[i])->do_layout ();
-            }
-          }
-          GRID_ELEMENT() {
-            CLAY_AUTO_ID({
-              .layout= {
-                .childAlignment= { .x= CLAY_ALIGN_X_LEFT }}})
-            {
-                concrete (d.rhs[i])->do_layout ();
-            }
-          }
-        }
-      }
-    }
-    return;
-  }
   if (type == "tabs_widget" || type == "icon_tabs_widget") {
     //VUE_WIDGET(tabs_widget, array<widget>, tabs, array<widget>, bodies);
     //VUE_WIDGET(icon_tabs_widget, array<url>, us, array<widget>, ss, array<widget>, bs);
@@ -1935,7 +1910,7 @@ vue_ui_rep::do_layout () {
     if (sig.clicked == 1) {
       // close any active popup chain (see pull_widget)
       cancel_popup= true;
-      cout << "Click!! " << id << LF;
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "Click!! " << id << LF;
       cmd_list= list(d.cmd, cmd_list);
     }
     return;
@@ -2091,7 +2066,7 @@ vue_ui_rep::do_layout () {
     Clay_ElementId toggle_id= CLAY_IDI ("toggle_widget", id);
     bool inert= d.style & WIDGET_STYLE_INERT;
     if (!inert && (button_logic (toggle_id).clicked == 1)) {
-      cout << "Click toggle! [" << (d.on ? "X" : " ") << "]" << LF;
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "Click toggle! [" << (d.on ? "X" : " ") << "]" << LF;
       d.on= !d.on;
       data= close_box (d);
       command c (tm_new<applied_command_rep> (d.cmd, list_object (object (d.on))));
@@ -2662,7 +2637,7 @@ vue_ui_rep::render (void *render_data) {
 void
 vue_widget_rep::send (slot s, blackbox val) {
   (void) val;
-  cout << "vue_widget_rep::send(), unhandled " << slot_name (s)
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_widget_rep::send(), unhandled " << slot_name (s)
              << " for widget of type: " << type << LF;
   //FAILED ("no default implementation");
 }
@@ -2710,7 +2685,7 @@ blackbox
 vue_widget_rep::query (slot s, int type_id)  {
   (void) type_id;
   if ((slot_id(s) != SLOT_INVALID) && (slot_id(s) != SLOT_VISIBLE_PART)) {
-    cout << "vue_widget_rep::query(), unhandled " << slot_name (s)
+    if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_widget_rep::query(), unhandled " << slot_name (s)
     << " for widget of type: " << type << LF;
   }
   return fake_query (s, type_id);
@@ -2719,7 +2694,7 @@ vue_widget_rep::query (slot s, int type_id)  {
 widget
 vue_widget_rep::read (slot s, blackbox index)  {
   (void) index;
-  cout << "vue_widget_rep::read(), unhandled " << slot_name (s)
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_widget_rep::read(), unhandled " << slot_name (s)
        << " for widget of type: " << type << LF;
   return empty_widget ();
 }
@@ -2727,13 +2702,13 @@ vue_widget_rep::read (slot s, blackbox index)  {
 void
 vue_widget_rep::write (slot s, blackbox index, widget w)  {
   (void) index; (void) w;
-  cout << "vue_widget_rep::write(), unhandled " << slot_name (s)
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_widget_rep::write(), unhandled " << slot_name (s)
        << " for widget of type: " << type << LF;
 }
 
 void
 vue_widget_rep::notify (slot s, blackbox new_val) {
-  cout << "vue_widget_rep::notify(), unhandled " << slot_name (s)
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_widget_rep::notify(), unhandled " << slot_name (s)
            << " for widget of type: " << type << LF;
   widget_rep::notify (s, new_val);
 }
@@ -2804,12 +2779,12 @@ static const int input_pad_x= 6, input_pad_y= 3; // in device pixels
 
 vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
           string _type, array<string> _def, int _style, string _width)
-  : call_back (_call_back), type ("default"), name ("default"), serial ("default"),
-    def (_def), style (_style), width (_width),
-    greyed ((style & WIDGET_STYLE_INERT) != 0),
+  : vue_widget_rep ("input_text_widget"),
+    type ("default"), name ("default"), serial ("default"),
+    def (_def), call_back (_call_back), style (_style),
+    greyed ((_style & WIDGET_STYLE_INERT) != 0), width (_width),
     ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
-    tab_nr (0), tab_pos (0),
-    vue_widget_rep ("input_text_widget")
+    tab_nr (0), tab_pos (0)
 {
   set_type (_type);
   if (N(def) > 0) {
@@ -3306,7 +3281,7 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
                                                           command _quit, bool _popup)
 : vue_widget_rep (type_vue_plain_window_widget), wid(_wid), name(_name), quit(_quit),
   win (NULL), visible (false), popup (_popup) {
-  cout << "Creating vue_plain_window_widget" << (popup ? " (popup)" : "") << LF;
+  if (DEBUG_VUE) debug_widgets << "Creating vue_plain_window_widget" << (popup ? " (popup)" : "") << LF;
   // dialogs get their initial size from their contents, the main TeXmacs
   // window and popups are handled differently (see do_layout/post_layout)
   autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
@@ -3353,8 +3328,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_MOUSE_GRAB:
       {
-        bool flag= check_open<bool> (val, s);
-        // true= get grab, false= release grab
+        check_type<bool> (val, s); // true= get grab, false= release grab
         if (win) {
           //win->set_mouse_grab (this, flag);
         }
@@ -3404,7 +3378,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
 
 blackbox
 vue_plain_window_widget_rep::query (slot s, int type_id) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_plain_window_widget_rep::query " << slot_name(s) << LF;
   switch (s) {
     case SLOT_IDENTIFIER:
@@ -3433,7 +3407,7 @@ vue_plain_window_widget_rep::query (slot s, int type_id) {
 
 widget
 vue_plain_window_widget_rep::read (slot s, blackbox index) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_plain_window_widget_rep::read " << slot_name(s)
                   << "\t type: " << type << LF;
   switch (s) {
@@ -3447,7 +3421,7 @@ vue_plain_window_widget_rep::read (slot s, blackbox index) {
 
 void
 vue_plain_window_widget_rep::notify (slot s, blackbox new_val) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_plain_window_widget_rep::notify " << slot_name(s) << LF;
   vue_widget_rep::notify (s, new_val);
 }
@@ -3632,7 +3606,7 @@ visibility_index (slot s) {
 }
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
-  : mask (_mask), quit (_quit), win (NULL), vue_widget_rep ("vue_texmacs_widget_rep")
+  : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit), win (NULL)
 {
   // decode mask
   visibility[0]= (mask & 1)   == 1;   // header
@@ -3796,7 +3770,7 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
       break;
 
     default:
-      cout << "vue_texmacs_widget_rep::write(), unhandled " << slot_name (s)
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "vue_texmacs_widget_rep::write(), unhandled " << slot_name (s)
            << " for widget of type: " << type << LF;
       break;
   }
@@ -4146,7 +4120,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       {
         coord4 r= check_open<coord4> (val, s);
         extents= rectangle (r.x1, r.x2, r.x3, r.x4);
-        cout << "extents " << extents << LF;
+        if (DEBUG_VUE_EVENTS) debug_events << "extents " << extents << LF;
       }
       break;
     case SLOT_SCROLL_POSITION:
@@ -4182,7 +4156,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       }
       break;
     default:
-      cout << "WARNING: simple_widget is not handling this " << slot_name (s) << LF;
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "simple_widget does not handle " << slot_name (s) << LF;
       vue_widget_rep::send(s, val);
       return;
   }
@@ -4228,7 +4202,7 @@ vue_simple_widget_rep::query (slot s, int type_id) {
     }
     case SLOT_SCROLL_POSITION:
     {
-      cout << "scroll_where " << backing_pos << LF;
+      if (DEBUG_VUE_EVENTS) debug_events << "scroll_where " << backing_pos << LF;
       check_type_id<coord2> (type_id, s);
       return close_box<coord2> ( coord2 (backing_pos.x1, backing_pos.x2) );
     }
@@ -4411,12 +4385,12 @@ vue_simple_widget_rep::do_layout () {
       mouse_data[0] *= ren->pixel;
       mouse_data[1] *= ren->pixel;
     }
-    if (mouse_action != "move") {
-      cout << "handling " << mouse_action << " at " << mouse_time << " (" << x << "," << y << ")";
-      if (N(mouse_data) == 2) {
-        cout << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
-      }
-      cout << LF;
+    if (DEBUG_VUE_EVENTS && mouse_action != "move") {
+      debug_events << "handling " << mouse_action << " at " << mouse_time
+                   << " (" << x << "," << y << ")";
+      if (N(mouse_data) == 2)
+        debug_events << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
+      debug_events << LF;
     }
     if (mouse_action == "wheel") {
       // the deltas come in small steps (kinetic scrolling, see vue_gui.cpp):
@@ -4542,7 +4516,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       origin.x1= (SI) d.boundingBox.x;
       origin.x2= (SI) d.boundingBox.y;
     } else {
-      cout << "clay_id not found!" << LF;
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "clay_id of a simple widget not found" << LF;
     }
   }
 
@@ -4746,14 +4720,14 @@ vue_simple_widget_rep::render (void *data) {
  */
 vue_chooser_widget_rep::vue_chooser_widget_rep (command _cmd, string _type, string _prompt)
  : vue_widget_rep ("file_chooser"), cmd (_cmd), prompt (_prompt),
-   position (coord2 (0, 0)), size (coord2 (100, 100)), file (""), shown (false)
+   shown (false), position (coord2 (0, 0)), size (coord2 (100, 100)), file ("")
 {
   if (DEBUG_VUE_WIDGETS)
-    debug_widgets << "vue_chooser_widget_rep::vue_chooser_widget_rep type=\""
-                  << type << "\" prompt=\"" << prompt << "\"" << LF;
+    debug_widgets << "vue_chooser_widget_rep::vue_chooser_widget_rep file_type=\""
+                  << file_type << "\" prompt=\"" << prompt << "\"" << LF;
   if (N(_type) > 0)
-    type= _type;
-  else type= "generic";
+    file_type= _type;
+  else file_type= "generic";
 }
 
 // the window the dialog belongs to (the current TeXmacs window)
@@ -4801,12 +4775,12 @@ vue_chooser_widget_rep::send (slot s, blackbox val) {
       check_type<string>(val, s);
       break;
     case SLOT_INPUT_TYPE:
-      type= check_open<string> (val, s);
+      file_type= check_open<string> (val, s);
       break;
     case SLOT_FILE:
         //send_string (THIS, "file", val);
       file= check_open<string> (val, s);
-      if (DEBUG_QT_WIDGETS)
+      if (DEBUG_VUE_WIDGETS)
         debug_widgets << "\tFile: " << file << LF;
       break;
     case SLOT_DIRECTORY:
@@ -4819,7 +4793,7 @@ vue_chooser_widget_rep::send (slot s, blackbox val) {
   }
   if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_chooser_widget_rep: sent " << slot_name (s)
-                  << "\t\tto widget\t"      << type << LF;
+                  << "\t\tto widget\t"      << file_type << LF;
 }
 
 blackbox
@@ -4875,7 +4849,7 @@ vue_chooser_widget_rep::callback (char* res) {
   } else {
     string name (res, strlen (res));
     file= "(system->url " * scm_quote (name) * ")";
-    if (type == "image") {
+    if (file_type == "image") {
       url u= url_system (name);
       string w, h;
       //qt_pretty_image_size (u, w, h);
@@ -5023,7 +4997,7 @@ vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
 
 void
 vue_inputs_list_widget_rep::send (slot s, blackbox val) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_inputs_list_widget_rep::send " << slot_name(s) << LF;
 
   switch (s) {
@@ -5053,7 +5027,7 @@ vue_inputs_list_widget_rep::send (slot s, blackbox val) {
 
 blackbox
 vue_inputs_list_widget_rep::query (slot s, int type_id) {
-  if (DEBUG_QT_WIDGETS)
+  if (DEBUG_VUE_WIDGETS)
     debug_widgets << "vue_inputs_list_widget_rep::query " << slot_name(s) << LF;
   switch (s) {
   case SLOT_POSITION:
@@ -5527,15 +5501,11 @@ widget plain_window_widget (widget wid, string s, command quit) {
 //    cw->quit= quit;  // we already have a command
     return wid;
   } else {
-    SI root_w, root_h;
-    gui_root_extents (root_w, root_h);
-    SI min_w= 0, min_h= 0, def_w= root_w, def_h= root_h,
-    max_w= root_w, max_h= root_h;
-    
+    // the size is chosen by the window itself: dialogs follow their
+    // contents, the main window and the popups have their own rules
+    // (see vue_plain_window_widget_rep::post_layout)
     vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
-    //wwid->win=
     plain_window (wwid, s);
-    //  plain_window (wwid, s, min_w, min_h, def_w, def_h, max_w, max_h);
     return abstract (wwid);
   }
 }
@@ -5558,7 +5528,7 @@ tooltip_window_widget (widget w, string s) {
 
 void destroy_window_widget (widget w) {
   vue_widget vw= concrete(w);
-  cout << "destroy_window_widget on " << vw->type << LF;
+  if (DEBUG_VUE) debug_widgets << "destroy_window_widget on " << vw->type << LF;
   vue_plain_window_widget_rep *ww= dynamic_cast<vue_plain_window_widget_rep*> (vw.rep);
   vue_inputs_list_widget_rep *il= dynamic_cast<vue_inputs_list_widget_rep*> (vw.rep);
   if (ww) {

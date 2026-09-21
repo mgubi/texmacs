@@ -107,9 +107,10 @@ public:
   bool transitions_active; // Clay reported running transitions (keep drawing)
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
-  : content (w), name (_name), id (serial++), orig_name (_name), popup (_popup),
-    layout_w (0), layout_h (0),
-    visible_requested (false), shown (false), ready_to_show (false), layout_passes (0)
+  : id (serial++), name (_name), orig_name (_name), content (w),
+    clay_debug (false), popup (_popup), layout_w (0), layout_h (0),
+    visible_requested (false), shown (false), ready_to_show (false),
+    layout_passes (0), last_layout_time (0), transitions_active (false)
   { render_commands.length= 0; }
   virtual ~vue_window_rep () {};
   
@@ -153,7 +154,7 @@ struct styled_string_rep : public concrete_struct {
   color c;
   font fn;
   styled_string_rep (string _s, font _fn, color _c)
-  : s (_s), fn (_fn), c (_c) {};
+  : s (_s), c (_c), fn (_fn) {};
 };
 
 class styled_string {
