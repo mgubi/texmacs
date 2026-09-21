@@ -135,6 +135,7 @@ array<double> mouse_data;
 
 bool current_popup; // is there an active popup?
 bool cancel_popup;  // should we cancel popups?
+uint32_t open_pull_id= 0; // the pull button whose menu is open (0: none)
 time_t away_time;   // tolerance for mouse motion
 
 // some more context during layout
@@ -997,7 +998,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
       vue_picture_widget pd { .p= load_xpm (d.us[i]) };
       icons << vue_create<vue_picture_widget> ("picture_widget", pd);
     }
-    vue_tabs_widget_star dd { .icons= icons, .tabs= d.ss, .bodies= d.bs, .current= 0 };
+    vue_tabs_widget_star dd { .tabs= d.ss, .icons= icons, .bodies= d.bs, .current= 0 };
     data= close_box (dd);
     return;
   }
@@ -1029,7 +1030,7 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     vue_colored_glue_widget d= open_box<vue_colored_glue_widget> (data);
     picture p= native_picture (0,0, 0, 0); // empty cache
     type= "cached_glue_widget";
-    data= close_box (vue_cached_glue_widget { .pic=p, .col= d.col, .w= d.w, .h= d.h, .vx= d.vx, .hx= d.hx});
+    data= close_box (vue_cached_glue_widget { .pic= p, .col= d.col, .hx= d.hx, .vx= d.vx, .w= d.w, .h= d.h });
     return;
   }
   if (type == "enum_widget") {
@@ -1139,20 +1140,27 @@ layout_pull_button (vue_ui_rep *w) {
     }
     if (sig.clicked == 1) {
       if (is_nil (d.cw)) {
-        // we clicked an inactive button, we evalutate the promise
+        // we clicked an inactive button, we evaluate the promise
         d.cw= d.pw->eval ();
         d.placed= false;
         d.flip= false;
         d.shift_x= d.shift_y= 0;
         current_popup= true;
         away_time= 0;
+        open_pull_id= button_id.id; // the menu of another button must close
       } else {
         // we clicked an active button, we go back to an inactive state
         d.cw= NULL;
         current_popup= false;
+        if (open_pull_id == button_id.id) open_pull_id= 0;
       }
     } else if (current_popup) {
       // some other popup is active, we should be inactive
+      d.cw= NULL;
+    }
+    else if (!is_nil (d.cw) && open_pull_id != 0 && open_pull_id != button_id.id) {
+      // another button opened its menu (it may have been laid out after us,
+      // where neither cancel_popup nor current_popup could reach us)
       d.cw= NULL;
     }
     // if we are active then we draw the float window

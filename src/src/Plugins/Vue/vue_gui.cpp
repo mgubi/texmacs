@@ -554,19 +554,20 @@ void render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands);
 
 Clay_Dimensions
 ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *userData) {
-  vue_sdl_mupdf_window_rep *win= (vue_sdl_mupdf_window_rep*)userData;
-  if (win) {
-    string s(text.chars, text.length);
-//    font fn= (font_rep*)config->userData;
-    static font fn;
-    if (is_nil (fn)) fn= get_default_styled_font (0);
-    metric  ex;
-    fn->var_get_extents (s, ex);
-    SI w = ((ex->x2- ex->x1+ 2)/3);
-    SI h = ((fn->y2- fn->y1+ 2)/3);
-    abs_round (w, h);
-    return (Clay_Dimensions){ .width= (float)2 *w / PIXEL, .height= (float)2*h  / PIXEL };
-  }
+  // the measured text is drawn by CLAY_TEXT elements (the debug view only:
+  // the widgets draw their own text, see layout_text_box); every path must
+  // return, a missing one was undefined behaviour
+  (void) config; (void) userData;
+  string s (text.chars, text.length);
+  static font fn;
+  if (is_nil (fn)) fn= get_default_styled_font (0);
+  metric ex;
+  fn->var_get_extents (s, ex);
+  SI w= ((ex->x2 - ex->x1 + 2)/3);
+  SI h= ((fn->y2 - fn->y1 + 2)/3);
+  abs_round (w, h);
+  return (Clay_Dimensions) { .width= (float) retina_factor*w / PIXEL,
+                             .height= (float) retina_factor*h / PIXEL };
 }
 
 vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup)
@@ -620,11 +621,23 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
 #if MUPDF_RENDERER
   // the window surface is wrapped, not copied; a 1x1 pixmap replaces it if
   // MuPDF refuses (nothing is then drawn in this frame)
-  bool ok= (surf != NULL) && mupdf_protected ("window surface", [&] () {
+  // SDL only promises the format which suits the window best: check that
+  // it is four bytes per pixel and use its own pitch (the rows may be
+  // padded, which sheared the image when 4*w was assumed)
+  bool ok= (surf != NULL) && SDL_BYTESPERPIXEL (surf->format) == 4 &&
+           mupdf_protected ("window surface", [&] () {
     pix= fz_new_pixmap_with_data (ctx, fz_device_bgr (ctx),
-                                  surf->w, surf->h, NULL, 1, 4*surf->w,
+                                  surf->w, surf->h, NULL, 1, surf->pitch,
                                   (unsigned char*) surf->pixels);
   });
+  if (surf != NULL && SDL_BYTESPERPIXEL (surf->format) != 4) {
+    static bool reported= false;
+    if (!reported) {
+      reported= true;
+      SDL_Log ("unsupported window surface format %s (%d bytes per pixel)",
+               SDL_GetPixelFormatName (surf->format), SDL_BYTESPERPIXEL (surf->format));
+    }
+  }
   if (!ok) pix= mupdf_new_pixmap (1, 1);
 #else
   pix= fz_new_pixmap_with_data (ctx,
@@ -988,6 +1001,7 @@ plain_window (vue_widget wwid, string name, bool popup) {
 bool char_clip= true;
 
 void initialize_keyboard ();
+extern Uint32 vue_dialog_event; // the results of the file dialogs (below)
 
 void gui_open (int& argc, char** argv) {
   // start the gui
@@ -995,7 +1009,7 @@ void gui_open (int& argc, char** argv) {
   // trackpads: macOS itself generates the momentum events of a gesture
   // (SDL drops them by default), see the kinetic scrolling notes below
   SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
-  if (!SDL_Init (SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
+  if (!SDL_Init (SDL_INIT_VIDEO)) { // no audio backend is needed
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
   }
@@ -1005,8 +1019,25 @@ void gui_open (int& argc, char** argv) {
   }
 
   SDL_SetHint (SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+  vue_dialog_event= SDL_RegisterEvents (1); // results of the file dialogs
   
-  set_retina_factor (2);
+  // The layout works in device pixels (SDL_GetWindowSizeInPixels) while
+  // the pointer comes in points: the factor between them is the pixel
+  // density of the display. It was hardcoded to 2, so on a display without
+  // HiDPI every pointer position was doubled and nothing could be hit.
+  // TeXmacs keeps one global factor, so a mixed-density setup follows the
+  // primary display.
+  {
+    // the pixel density of the desktop mode, not its content scale, which
+    // macOS reports as 1 while drawing at 2 pixels per point
+    float density= 0.0f;
+    const SDL_DisplayMode* mode= SDL_GetDesktopDisplayMode (SDL_GetPrimaryDisplay ());
+    if (mode != NULL) density= mode->pixel_density;
+    int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
+    if (density <= 0.0f) factor= 2; // unknown: the previous default
+    set_retina_factor (factor);
+    SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
+  }
   initialize_colors ();
   initialize_keyboard ();
 }
@@ -1109,6 +1140,9 @@ static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
 
 void process_event (SDL_Event *event);
+struct vue_dialog_result;
+static void vue_dialog_finish (vue_dialog_result* res);
+extern Uint32 vue_dialog_event;
 void process_messages ();
 void process_layout ();
 void process_redraw ();
@@ -1774,6 +1808,12 @@ process_event (SDL_Event *event) {
   // once that window has been laid out (see gui_finalize_context)
   vue_window win;
   if (event->type != SDL_EVENT_MOUSE_MOTION) sdl_log_event (event);
+  if (vue_dialog_event != 0 && event->type == vue_dialog_event) {
+    // the result of a file dialog, pushed by its callback (which may run
+    // on another thread): the command runs here, on the main thread
+    vue_dialog_finish ((vue_dialog_result*) event->user.data1);
+    return;
+  }
   switch (event->type) {
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       win= get_window_from_ID (event->window.windowID);
@@ -1887,9 +1927,12 @@ process_event (SDL_Event *event) {
           //cout << "Press " << key << " at " << (time_t) ev->xkey.time
           //<< " (" << texmacs_time() << ")\n";
           kbd_count++;
-          //FIXME: conversion below loses precision from UInt64 to UInt32
-          synchronize_time ((Uint32)event->key.timestamp);
-          if (texmacs_time () - remote_time ((Uint32)event->key.timestamp) < 100 ||
+          // SDL3 timestamps are nanoseconds; they were cast to 32 bits and
+          // compared with milliseconds, which wrapped every 4.3 seconds and
+          // set request_partial_redraw at random
+          Uint32 stamp= (Uint32) (event->key.timestamp / 1000000ull);
+          synchronize_time (stamp);
+          if (texmacs_time () - remote_time (stamp) < 100 ||
               (kbd_count & 15) == 0)
             request_partial_redraw= true;
           //cout << "key   : " << key << "\n";
@@ -1953,9 +1996,17 @@ process_event (SDL_Event *event) {
 
 bool event_filter (void *userdata, SDL_Event *event) {
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
-    // cout << "resizing window" << LF;
+    // A resize is handled here, inside SDL's event pump, so that the window
+    // never shows stale content while it is dragged. The pump runs from
+    // every SDL_PollEvent/SDL_WaitEventTimeout/SDL_PushEvent, hence also
+    // from inside a frame: without this guard a whole frame (layout, the
+    // interpose handler with its Scheme, repaint, redraw) could start in
+    // the middle of another one.
+    static bool busy= false;
+    if (busy) return true;
     vue_window win= get_window_from_ID (event->window.windowID);
     if (win) {
+      busy= true;
       with_window frame (win);
       Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
       win->process_layout();
@@ -1964,7 +2015,8 @@ bool event_filter (void *userdata, SDL_Event *event) {
       if (gui_needs_relayout) process_layout ();
       vue_simple_widget_rep::repaint_all_in_window (win);
       win->process_redraw();
-      return false;
+      busy= false;
+      return true; // the return value of a watch is ignored by SDL anyway
     }
   }
   return true;
@@ -2071,10 +2123,9 @@ struct clipboard_data {
   c_string c_plain_text;
   c_string c_html_text;
 
-  clipboard_data() : format_type("default"),
-                     c_texmacs_data(NULL),
-                     c_plain_text(NULL),
-                     c_html_text(NULL) {}
+  // the c_string members start empty (c_string (NULL) resolved to the
+  // length constructor with a zero length by accident)
+  clipboard_data (): format_type ("default") {}
 };
 
 // Clipboard data callback - called when the OS requests clipboard data
@@ -2169,9 +2220,7 @@ bool set_selection (string key, tree t,
     clip_data->plain_text = s; // Also provide as plain text fallback
   }
   else if (format == "latex") {
-    string enc = get_preference ("texmacs->latex:encoding");
-    // SDL3 uses UTF-8
-    clip_data->plain_text = s;
+    clip_data->plain_text= s; // SDL3 uses UTF-8
   }
   else {
     clip_data->plain_text = s;
@@ -2234,10 +2283,11 @@ bool get_selection (string key, tree& t, string& s, string format) {
   s = "";
   t = "none";
 
-  // Check if we own the clipboard content
-  bool owns = (format != "temp" && format != "wrapbuf" && key != "primary");
+  // the keys other than "primary" (the internal buffers of TeXmacs, "temp",
+  // "wrapbuf"...) live in our own storage; the condition also excluded
+  // "primary" and could never hold, so nothing was ever read back
+  bool owns= (key != "primary");
 
-  // First check if we own this selection internally
   if (owns && (selection_t->contains (key))) {
     t = copy (selection_t [key]);
     s = copy (selection_s [key]);
@@ -2461,33 +2511,59 @@ void external_event (string type, time_t t) {
 //*****************************************************************************
 // chooser_widget platform dependent dialog code
 
-// Callback invoked when dialog is closed
+// SDL may invoke the callback of a file dialog from another thread (it
+// does with the portal and zenity backends), where neither Scheme nor the
+// widget tree may be touched. The callback only copies the result and
+// pushes an event; the main loop runs the command (process_event below).
+// The result holds a reference to the chooser, so that a widget released
+// while the panel is open stays alive until we are done with it.
+struct vue_dialog_result {
+  widget wid;
+  string file;
+  bool   chosen;
+};
+
+Uint32 vue_dialog_event= 0; // registered in gui_open
+
 static void SDLCALL
 file_dialog_callback (void* userdata, const char* const* filelist,
                      int filter_index)
 {
-  vue_chooser_widget_rep *w= (vue_chooser_widget_rep *)userdata;
-  
-  if (!filelist) {
-    SDL_Log ("Error: %s", SDL_GetError ());
-    return;
-  } else if (!*filelist) {
-    SDL_Log ("Dialog canceled or no selection.");
-    w->callback (NULL);
-    return;
+  (void) filter_index;
+  vue_dialog_result* res= (vue_dialog_result*) userdata;
+  if (filelist == NULL) {
+    SDL_Log ("File dialog error: %s", SDL_GetError ());
+    res->chosen= false;
   }
+  else if (*filelist == NULL) res->chosen= false; // cancelled
+  else {
+    res->file= string (*filelist, (int) strlen (*filelist));
+    res->chosen= true;
+  }
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= vue_dialog_event;
+  ev.user.data1= res;
+  if (!SDL_PushEvent (&ev)) {
+    SDL_Log ("cannot deliver the result of the file dialog: %s", SDL_GetError ());
+    tm_delete (res);
+  }
+}
 
-  for (const char* const* ptr = filelist; *ptr; ++ptr) {
-    SDL_Log ("Selected: %s", *ptr);
-    w->callback ((char*)*ptr);
-    return;
+// called from the main loop when the event pushed above arrives
+static void
+vue_dialog_finish (vue_dialog_result* res) {
+  if (res == NULL) return;
+  vue_chooser_widget_rep* w=
+    dynamic_cast<vue_chooser_widget_rep*> (res->wid.rep);
+  if (w != NULL) {
+    if (res->chosen) {
+      c_string name (res->file);
+      w->callback ((char*) name);
+    }
+    else w->callback (NULL);
   }
-
-  if (filter_index >= 0) {
-    SDL_Log ("Selected filter index: %d", filter_index);
-  } else {
-    SDL_Log ("Filter not reported by platform.");
-  }
+  tm_delete (res);
 }
 
 void
@@ -2552,10 +2628,13 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   if (N(location) > 0)
     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, tmp3);
 
-  // Show the dialog (non-blocking)
+  // Show the dialog (non-blocking); the result comes back through an event
+  vue_dialog_result* res= tm_new<vue_dialog_result> ();
+  res->wid= abstract (this);
+  res->chosen= false;
   SDL_ShowFileDialogWithProperties (sdl_type,
                                     file_dialog_callback,
-                                    (void*)this,  // userdata
+                                    (void*) res,
                                     props);
   SDL_DestroyProperties(props);
 }
