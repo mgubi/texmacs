@@ -2257,7 +2257,15 @@ vue_ui_rep::do_layout () {
         .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) },
         .childGap= 4 }})
     {
-      concrete (d.input)->do_layout ();
+      // the input has a fixed width (24em): it is clipped to the width of
+      // the list, which is that of the container (a resize box usually)
+      CLAY({
+        .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }},
+        .clip= { .horizontal= true }})
+      {
+        concrete (d.input)->do_layout ();
+      }
+      // long values are clipped too, instead of widening the list
       CLAY({
         .id= list_id,
         .layout= {
@@ -2265,7 +2273,7 @@ vue_ui_rep::do_layout () {
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(.min= 100) }},
         .backgroundColor= color_field,
         .border= { .width= { 1, 1, 1, 1 }, .color= color_border },
-        .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () }})
+        .clip= { .horizontal= true, .vertical= true, .childOffset= Clay_GetScrollOffset () }})
       {
         for (int i=0; i<N(d.vals); i++) {
           if (N(filter) > 0 && !occurs (filter, d.vals[i])) continue;

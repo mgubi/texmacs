@@ -18,6 +18,9 @@ WIP
 
 DONE
 
+* Clay's element hash map is compacted every frame (local patch of clay.h):
+  rebuilt widget trees no longer exhaust it (misdrawn tools after a refresh)
+* the filtered choice list stays inside its box (input and long values clipped)
 * embedded editors (texmacs-input): no bars for mask 0, they fill their
   resize box (the macro editors work)
 * MuPDF renderer: pattern-filled glyphs, tiling patterns (resources fixed,

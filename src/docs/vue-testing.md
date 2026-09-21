@@ -87,7 +87,8 @@ filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
 `macro-editor` (the macro editor dialog: typing goes into the embedded
 editor), `macros-editor` (the macros editor dialog: selecting a macro in the
 list updates the embedded editor), `macro-tool` (the macro editor as a side
-tool, `side-tools?` forced), `wheel-inertia` (a single wheel step
+tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
+list inside its box, selection rebuilds the tool without misdrawn widgets), `wheel-inertia` (a single wheel step
 scrolls in sync — snapshots i0/i1/i2 are
 identical — while three quick steps launch a glide: the `handling wheel`
 lines of the log after i3 are the synthetic decaying deltas).

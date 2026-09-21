@@ -59,7 +59,10 @@ main checkout (`~/t/git/texmacs`); the Vue work was merged with it on
 (`set-preference` saves them: do not change them from tests).
 
 Useful keys: F1 toggles the Clay debug view of the focused window (and the red
-marker of uncovered areas).
+marker of uncovered areas). `TEXMACS_VUE_DUMP=1` prints every Clay render
+command of every frame (`DUMP <type> id <id> box x,y wxh ...`; border
+commands are matched against the usual id patterns) — heavy, for tracking
+down a stray element.
 
 ## Debugging
 

@@ -4211,10 +4211,47 @@ void Clay_UpdateScrollContainers(bool enableDragScrolling, Clay_Vector2 scrollDe
 }
 
 CLAY_WASM_EXPORT("Clay_BeginLayout")
+// TeXmacs: forget the hash map items of the elements which were not declared
+// in the previous layout. Stock Clay keeps every id ever seen (the map is
+// only grown, see Clay__AddHashMapItem), so after enough rebuilds of the
+// widget tree (menus, tools, dialogs) the map is full and new elements
+// silently get no item: Clay_GetElementData does not find them, hover fails
+// and their layout is wrong. Elements laid out in the previous frame carry
+// generation == context->generation once it has been incremented.
+static void Clay__CompactLayoutElementHashMap(Clay_Context* context) {
+    Clay__LayoutElementHashMapItemArray *items = &context->layoutElementsHashMapInternal;
+    Clay__DebugElementDataArray *debug = &context->debugElementData;
+    int32_t kept = 0;
+    for (int32_t i = 0; i < items->length; i++) {
+        Clay_LayoutElementHashMapItem *item = &items->internalArray[i];
+        if (item->generation < context->generation) continue; // stale
+        if (kept != i) {
+            items->internalArray[kept] = *item;
+            debug->internalArray[kept] = debug->internalArray[i];
+        }
+        items->internalArray[kept].debugData = &debug->internalArray[kept];
+        kept++;
+    }
+    if (kept == items->length) return;
+    items->length = kept;
+    debug->length = kept;
+    // rebuild the buckets
+    for (int32_t b = 0; b < context->layoutElementsHashMap.capacity; ++b) {
+        context->layoutElementsHashMap.internalArray[b] = -1;
+    }
+    for (int32_t i = 0; i < kept; i++) {
+        Clay_LayoutElementHashMapItem *item = &items->internalArray[i];
+        uint32_t bucket = item->elementId.id % context->layoutElementsHashMap.capacity;
+        item->nextIndex = context->layoutElementsHashMap.internalArray[bucket];
+        context->layoutElementsHashMap.internalArray[bucket] = i;
+    }
+}
+
 void Clay_BeginLayout(void) {
     Clay_Context* context = Clay_GetCurrentContext();
     Clay__InitializeEphemeralMemory(context);
     context->generation++;
+    Clay__CompactLayoutElementHashMap(context);
     context->dynamicElementIndex = 0;
     // Set up the root container that covers the entire window
     Clay_Dimensions rootDimensions = {context->layoutDimensions.width, context->layoutDimensions.height};

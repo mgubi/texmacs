@@ -227,6 +227,15 @@ the window, are at most as tall as the window and scroll.
   kind of error once (duplicate ids, capacity exceeded, floating parent not
   found...) and Clay skips the offending element. The arena is sized with
   `Clay_MinMemorySize` for the default capacity (8192 elements per window).
+  **Local patch of `clay.h` (0.14)**: stock Clay never removes the hash-map
+  item of an element id once seen (`Clay__AddHashMapItem` only appends), so
+  after enough rebuilds of the widget tree (refreshed tools, menus, dialogs)
+  the map of a window is full and new elements silently get no item:
+  `Clay_GetElementData` does not find them, `Clay_PointerOver` fails and
+  their layout is wrong (borders drawn around bare texts, enums collapsed to
+  their arrow). `Clay__CompactLayoutElementHashMap`, called from
+  `Clay_BeginLayout`, drops the items not declared in the previous frame and
+  rebuilds the buckets. Keep it when updating Clay.
 * **SDL3** functions return `NULL`/`false` and set `SDL_GetError`. Checked:
   window creation (fatal), the layout arena, the window surface (the frame
   is skipped), surface creation and blits, `SDL_UpdateWindowSurface`, the

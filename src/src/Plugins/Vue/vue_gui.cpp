@@ -726,6 +726,28 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
   for (int32_t i = 0; i < rcommands->length; i++) {
     Clay_RenderCommand *rcmd = Clay_RenderCommandArray_Get (rcommands, i);
     const Clay_BoundingBox bounding_box = rcmd->boundingBox;
+    static bool dump= N(get_env ("TEXMACS_VUE_DUMP")) > 0;
+    if (dump) {
+      cout << "DUMP " << (int) rcmd->commandType << " id " << rcmd->id << " box " << bounding_box.x << "," << bounding_box.y << " " << bounding_box.width << "x" << bounding_box.height;
+      if (rcmd->commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE) cout << " color " << (int) rcmd->renderData.rectangle.backgroundColor.r << "," << (int) rcmd->renderData.rectangle.backgroundColor.g << "," << (int) rcmd->renderData.rectangle.backgroundColor.b << "," << (int) rcmd->renderData.rectangle.backgroundColor.a << " radius " << rcmd->renderData.rectangle.cornerRadius.topLeft;
+      if (rcmd->commandType == CLAY_RENDER_COMMAND_TYPE_BORDER) {
+        cout << " border " << (int) rcmd->renderData.border.width.top << " color " << (int) rcmd->renderData.border.color.r;
+        // identify the element: try the known id patterns
+        const char* labels[]= { "menu_button", "division_widget", "enum_widget", "input_text_widget",
+          "toggle_widget", "tabs_widget", "icon_tabs_widget", "filtered_choice_widget", "filtered_choice_list",
+          "choice_widget", "tree_view_widget", "resize_widget", "simple_widget", "texmacs_widget",
+          "pulldown_button", "pullright_button", "user_canvas_widget", "aligned_widget", "hsplit_widget", "vsplit_widget", NULL };
+        for (int l= 0; labels[l] != NULL; l++) {
+          string lab (labels[l]);
+          for (unsigned int k= 0; k < 8000; k++) {
+            Clay_String cs= { .isStaticallyAllocated= true, .length= (int32_t) N(lab), .chars= &(lab[0]) };
+            Clay_ElementId cid= Clay__HashString (cs, k);
+            if (cid.id == rcmd->id) { cout << " <" << lab << " " << k << ">"; break; }
+          }
+        }
+      }
+      cout << LF;
+    }
     bool offscreen= (bounding_box.x + bounding_box.width < 0) ||
                     (bounding_box.y + bounding_box.height < 0);
     if (offscreen && rcmd->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
