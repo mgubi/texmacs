@@ -1,0 +1,13 @@
+# needs entrypoints.scm: the wait indicator appears over the window and is
+# removed by the empty message; the help balloon appears and a motion
+# dismisses it
+wait 5500
+window #2
+snapshot e1
+wait 1600
+snapshot e2
+wait 1400
+snapshot e3
+move 900 700
+wait 600
+snapshot e4

@@ -170,6 +170,20 @@ protocol. Note that the C++ side reads the `tls-server` preference, whose
 default ("on") exists only once the server modules are loaded: a test
 sets it explicitly.
 
+## The other entry points of a GUI
+
+`Graphics/Gui/gui.hpp` also asks for a few services outside the widget
+protocol. In Vue (`vue_gui.cpp`): `beep` uses the system alert sound on
+macOS (`mac_beep`, added to the MacOS plugin) and the console bell
+elsewhere, since SDL has none; `image_gc (name)` drops the cached images,
+patterns and pattern images of the MuPDF renderer whose key mentions the
+name (`mupdf_image_gc`, `"*"` flushes them all); `show_help_balloon` and
+`show_wait_indicator` are popup windows of our own, the first dismissed by
+the next key or pointer motion (`close_help_balloon` in `process_event`),
+the second stacking its messages, since the calls nest, and laying itself
+out at once because the operation which asked for it is about to block the
+loop; `external_event` reaches the focused editor as a keypress.
+
 ## Fonts and colors in the UI
 
 `get_default_font (tt, mini, bold)` (plugin) chooses the UI font

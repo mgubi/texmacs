@@ -580,3 +580,8 @@ void applyMacOSUnifiedBar(QWidget* widget) {
   //[nativeWindow setMovableByWindowBackground:YES];
 }
 #endif
+
+void
+mac_beep () {
+  NSBeep ();
+}

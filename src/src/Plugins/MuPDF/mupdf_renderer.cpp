@@ -11,6 +11,7 @@
 
 #include "mupdf_renderer.hpp"
 #include "analyze.hpp"
+#include "iterator.hpp" // mupdf_image_gc
 #include "image_files.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
@@ -228,6 +229,34 @@ static hashmap<tree, mupdf_image>  image_pool;
 static hashmap<tree, mupdf_pattern> pattern_pool;
 static hashmap<tree, mupdf_image> pattern_image_pool;
 static hashmap<string, mupdf_font> native_fonts;
+
+// Garbage collect the cached images whose name matches (image_gc in
+// gui.hpp; the keys of the pools are tuples whose first element is the
+// name of the file). "*" flushes everything.
+void mupdf_image_gc (string name) {
+  if (name == "*" || name == "") {
+    image_pool= hashmap<tree, mupdf_image> ();
+    pattern_pool= hashmap<tree, mupdf_pattern> ();
+    pattern_image_pool= hashmap<tree, mupdf_image> ();
+    return;
+  }
+  array<tree> gone;
+  iterator<tree> it= iterate (image_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) image_pool->reset (gone[i]);
+  gone= array<tree> ();
+  it= iterate (pattern_image_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) pattern_image_pool->reset (gone[i]);
+}
 
 // flush caches
 void del_obj_mupdf_renderer (void)  {
@@ -880,7 +909,7 @@ bool
 mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha) {
   if (src == NULL || src->samples == NULL || pixmap == NULL) return false;
   if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
-  if (src->s != 0 || !(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha))
+  if (src->s != 0 || (!(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha)))
     return false;
   fz_context* ctx= mupdf_context ();
   bool dst_bgr= (pixmap->colorspace == fz_device_bgr (ctx));

@@ -134,3 +134,4 @@ public:
 mupdf_renderer_rep* the_mupdf_renderer ();
 
 #endif // defined MUPDF_RENDERER_HPP
+void mupdf_image_gc (string name); // see image_gc in gui.hpp

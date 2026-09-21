@@ -30,7 +30,11 @@
 #include "editor.hpp"
 #include "new_view.hpp"      // get_current_editor()
 #include "image_files.hpp"
+#include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
+#ifdef OS_MACOS
+#include "MacOS/mac_utilities.h" // mac_beep
+#endif
 #include "sys_utils.hpp"     // get_env
 #include "file.hpp"          // load_string (scripted events)
 #include "socket_notifier.hpp" // notifiers_active (pause of the loop)
@@ -40,6 +44,7 @@
 
 #if MUPDF_RENDERER
 #include "../MuPDF/mupdf_picture.hpp"
+#include "../MuPDF/mupdf_renderer.hpp" // mupdf_image_gc
 #else
 #include "../MuPDF/fitz_picture.hpp"
 #endif
@@ -1163,6 +1168,7 @@ static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
 
 void process_event (SDL_Event *event);
+void close_help_balloon ();
 struct vue_dialog_result;
 static void vue_dialog_finish (vue_dialog_result* res);
 extern Uint32 vue_dialog_event;
@@ -1910,6 +1916,7 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_WHEEL:
     case SDL_EVENT_MOUSE_MOTION:
     {
+      close_help_balloon (); // it lives until the pointer or a key moves
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       float mx= event->motion.x, my= event->motion.y;
@@ -1927,6 +1934,7 @@ process_event (SDL_Event *event) {
     } // case SDL_EVENT_MOUSE_MOTION:
     case SDL_EVENT_KEY_DOWN:
     {
+      close_help_balloon ();
       if (DEBUG_VUE_EVENTS) {
         c_string buf (print_key_info (&(event->key)));
         SDL_Log ("Keydown: %s ", (char*) buf);
@@ -2444,8 +2452,13 @@ void clear_selection (string key) {
 ******************************************************************************/
 
 void beep () {
-  // Issue a beep
-  //FIXME: implement
+  // Issue a beep: the system alert sound on macOS, the console bell
+  // elsewhere (SDL has no beep of its own)
+#ifdef OS_MACOS
+  mac_beep ();
+#else
+  cerr << "\a" << flush;
+#endif
 }
 
 void needs_update () {
@@ -2509,28 +2522,84 @@ bool check_event (int type) {
 }
 
 void image_gc (string name) {
-  // Garbage collect images of a given name (may use wildcards)
-  // This routine only needs to be implemented if you use your own image cache
-  //FIXME: implement
+  // Garbage collect images of a given name (may use wildcards): the
+  // renderer caches the decoded images, the patterns and their images
+#if MUPDF_RENDERER
+  mupdf_image_gc (name);
+#else
+  (void) name;
+#endif
+}
+
+// the balloon shown by show_help_balloon, and the wait indicator: both are
+// popup windows of our own, dismissed from the main loop
+static widget help_balloon_wid;
+static widget wait_indicator_wid;
+static list<string> wait_messages;
+
+// called from the loop: the balloon goes away at the first key or motion
+void
+close_help_balloon () {
+  if (is_nil (help_balloon_wid)) return;
+  set_visibility (help_balloon_wid, false);
+  destroy_window_widget (help_balloon_wid);
+  help_balloon_wid= widget ();
 }
 
 void show_help_balloon (widget balloon, SI x, SI y) {
-  // Display a help balloon at position (x, y); the help balloon should
-  // disappear as soon as the user presses a key or moves the mouse
-  //FIXME: implement
+  // Display a help balloon at position (x, y), which is relative to the
+  // window of the editor; it disappears as soon as the user presses a key
+  // or moves the mouse (see process_event)
+  close_help_balloon ();
+  if (!has_current_window ()) return;
+  SI wx= 0, wy= 0;
+  get_position (get_window (concrete_window () -> win), wx, wy);
+  help_balloon_wid= popup_window_widget (balloon, "Balloon");
+  set_position (help_balloon_wid, x + wx, y + wy);
+  set_visibility (help_balloon_wid, true);
 }
 
 void show_wait_indicator (widget base, string message, string argument) {
-  // Display a wait indicator with a message and an optional argument
-  // The indicator might for instance be displayed at the center of
-  // the base widget which triggered the lengthy operation;
-  // the indicator should be removed if the message is empty
-  //FIXME: implement
+  // Display a wait indicator with a message and an optional argument, at
+  // the centre of the window which triggered the lengthy operation; an
+  // empty message pops the last one (the calls are nested)
+  (void) base;
+  if (is_headless ()) return;
+  if (N(message) > 0) {
+    string msg= message;
+    if (argument != "") msg= msg * " " * argument * "...";
+    wait_messages= list<string> (msg, wait_messages);
+  }
+  else if (!is_nil (wait_messages)) wait_messages= wait_messages->next;
+
+  if (!is_nil (wait_indicator_wid)) {
+    set_visibility (wait_indicator_wid, false);
+    destroy_window_widget (wait_indicator_wid);
+    wait_indicator_wid= widget ();
+  }
+  if (is_nil (wait_messages) || !has_current_window ()) return;
+
+  widget lab= text_widget (wait_messages->item, 0, black);
+  wait_indicator_wid= popup_window_widget (lab, "Wait");
+  SI wx= 0, wy= 0, ww= 0, wh= 0;
+  widget win= get_window (concrete_window () -> win);
+  get_position (win, wx, wy);
+  get_size (win, ww, wh);
+  set_position (wait_indicator_wid, wx + ww/2, wy - wh/2);
+  set_visibility (wait_indicator_wid, true);
+  // the window must appear now: the operation which asked for it is about
+  // to block the loop
+  process_layout ();
+  process_redraw ();
 }
 
 void external_event (string type, time_t t) {
-  // External events, such as pushing a button of a remote infrared commander
-  //FIXME: implement
+  // External events, such as pushing a button of a remote infrared
+  // commander: they reach the focused editor as a key
+  if (current_window == NULL) return;
+  vue_simple_widget_rep* ed=
+    dynamic_cast<vue_simple_widget_rep*> (current_window->kbd_focus.rep);
+  if (ed != NULL) ed->handle_keypress (type, t);
 }
 
 //*****************************************************************************
