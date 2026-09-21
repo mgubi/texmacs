@@ -54,7 +54,15 @@ pointer). The editor draws its cursor only when `got_focus`.
 Embedded documents (`texmacs-output`, `texmacs-input` markup) are
 `box_widget_rep` / editor widgets created in `Texmacs/Window/tm_button.cpp`,
 which replaces a white document background by a color meant to blend into the
-dialog (per GUI).
+dialog (per GUI). `texmacs_input_widget` (`tm_window.cpp`) creates a buffer
+`tmfs://aux/<name>`, a view and a `tm_window_rep` whose widget is
+`texmacs_widget (0, quit)`: mask 0 means "no bars" (Qt uses a separate
+`qt_tm_embedded_widget_rep` for it; Vue lays the bars out only when their
+visibility bit is set). The editor tells it is embedded through
+`is_embedded_widget` (buffer name under `tmfs://aux/`); its size hint is the
+screen, so the GUI must size embedded editors from their container. The
+macro editors (`source/macro-widgets.scm`) are the main users: a `resize`
+around a `texmacs-input`, plus a `texmacs-output` for the documentation.
 
 ## Windows and dialogs in the core
 

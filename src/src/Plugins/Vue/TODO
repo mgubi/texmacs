@@ -18,6 +18,8 @@ WIP
 
 DONE
 
+* embedded editors (texmacs-input): no bars for mask 0, they fill their
+  resize box (the macro editors work)
 * MuPDF renderer: pattern-filled glyphs, tiling patterns (resources fixed,
   images scaled to the requested size), neutral pattern behind the pages,
   missing images do not crash

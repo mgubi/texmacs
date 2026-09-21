@@ -83,7 +83,11 @@ the top and bottom of both sides), `tools-close` (replacing a tool, adding a
 bottom one, closing the top one; the paper follows the canvas),
 `tool-replace` (replacing the font tool, whose sample text is an editor, by
 another tool must not crash the redraw), `pattern` (paper mode and text
-filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns), `wheel-inertia` (a single wheel step
+filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
+`macro-editor` (the macro editor dialog: typing goes into the embedded
+editor), `macros-editor` (the macros editor dialog: selecting a macro in the
+list updates the embedded editor), `macro-tool` (the macro editor as a side
+tool, `side-tools?` forced), `wheel-inertia` (a single wheel step
 scrolls in sync — snapshots i0/i1/i2 are
 identical — while three quick steps launch a glide: the `handling wheel`
 lines of the log after i3 are the synthetic decaying deltas).

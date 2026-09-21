@@ -52,6 +52,8 @@ command (a nil command must never be invoked).
 | `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
 | `user_canvas_widget` (scrollable) | clip container with scroll bars, field background | |
+| `texmacs_widget (mask, quit)` | the main window contents (menu bar, icon bars, editor between the tool panels, footer); every bar follows its bit of `mask` and the `SLOT_*_VISIBILITY` slots. With `mask` 0 it is an **embedded editor** (`texmacs-input` of the macro editor, search tool...): no bars, no background, `SLOT_SIZE` is the canvas; it fills its container (`widget_grows`), typically a `resize` | the editor's own commands |
+| `texmacs_output_widget` → `box_widget_rep` | a typeset box (`texmacs-output`): natural size from its size hint, drawn by the core (`tm_button.cpp`) on the field color | |
 | `resize_widget (w, style, min, def, max, pos)` | fixed to `def` while the window auto-sizes, then `GROW(min..max)`; min/max become window limits | |
 | `hsplit_widget`, `vsplit_widget` | draggable 8 px divider, equal split until moved | |
 | `wait_widget` | yellow "please wait" box | |

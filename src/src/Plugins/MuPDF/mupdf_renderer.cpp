@@ -1214,6 +1214,10 @@ static
 pdf_font_desc *load_pdf_font (string fontname) {
   int pos= search_forwards (":", fontname);
   string fname= (pos==-1? fontname: fontname (0, pos));
+  // compound and other virtual fonts ("compound-(math ...)") have no file:
+  // do not ask kpsewhich about them (the shell chokes on the name)
+  if (occurs (" ", fname) || occurs ("(", fname) || occurs ("[", fname))
+    return NULL;
   url u = url_none ();
   {
     //debug_convert << " try freetype " << LF;

@@ -1129,7 +1129,8 @@ widget_grows (widget w, bool horizontal) {
   string t= r->type;
   if (t == "simple_widget" || t == "user_canvas_widget" ||
       t == "hsplit_widget" || t == "vsplit_widget" ||
-      t == "tabs_widget" || t == "icon_tabs_widget") return true;
+      t == "tabs_widget" || t == "icon_tabs_widget" ||
+      t == "vue_texmacs_widget_rep") return true; // an embedded editor
   vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (r);
   if (u == NULL) return false;
   array<widget> children;
@@ -3393,8 +3394,11 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_SIZE:
     {
       // the size of the window (the editor sizes the "automatic" paper
-      // from it, as with the Qt main window)
+      // from it, as with the Qt main window); for an embedded editor
+      // (mask 0) the size of its canvas, as the Qt embedded widget
       check_type_id<coord2> (type_id, s);
+      if (mask == 0 && !is_nil (main_widget))
+        return main_widget->query (s, type_id);
       SI w= 0, h= 0;
       if (win) win->get_size (w, h);
       return close_box<coord2> (coord2 (w, h));
@@ -3453,16 +3457,21 @@ void vue_texmacs_widget_rep::do_layout () {
   SI w= 300, h= 300;
   if (win) win->get_size (w, h);
   if (win->kbd_focus == NULL) set_kbd_focus (win, main_widget);
+  // the bars follow the mask given at creation and the visibility slots;
+  // an embedded editor (texmacs-input in a dialog or a tool, mask 0) is
+  // only its canvas, as the Qt embedded widget
+  bool bars= visibility[0] || visibility[1] || visibility[2] ||
+             visibility[3] || visibility[4] || visibility[5];
   CLAY({
     .id= CLAY_IDI("texmacs_widget", id),
-    .backgroundColor= color_background,
+    .backgroundColor= bars ? color_background : (Clay_Color) { 0, 0, 0, 0 },
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .sizing= layoutFull,
-      .padding= { 0, 0, 16, 16 },
-      .childGap= 16  }})
+      .sizing= layoutFull, // fills the window, or the box of an embedded editor
+      .padding= { 0, 0, (uint16_t) (bars ? 16 : 0), (uint16_t) (bars ? 16 : 0) },
+      .childGap= (uint16_t) (bars ? 16 : 0) }})
   {
-    CLAY({
+    if (visibility[0]) CLAY({
       .id= CLAY_ID_LOCAL("MainMenuBar"),
       .layout= {
         .padding= { 8, 8, 0, 0 },
@@ -3474,7 +3483,7 @@ void vue_texmacs_widget_rep::do_layout () {
         main_menu->do_layout ();
       }
     }
-    CLAY({
+    if (visibility[1]) CLAY({
       .id= CLAY_ID_LOCAL("MainToolbar"),
       .layout= {
          .padding= { 8, 8, 0, 0 },
@@ -3486,7 +3495,7 @@ void vue_texmacs_widget_rep::do_layout () {
         main_icons->do_layout ();
       }
     }
-    CLAY({
+    if (visibility[2]) CLAY({
       .id= CLAY_ID_LOCAL("ModeToolbar"),
       .layout= {
          .padding= { 8, 8, 0, 0 },
@@ -3498,7 +3507,7 @@ void vue_texmacs_widget_rep::do_layout () {
         mode_icons->do_layout ();
       }
     }
-    CLAY({
+    if (visibility[3]) CLAY({
       .id= CLAY_ID_LOCAL("FocusToolbar"),
       .layout= {
          .padding= { 8, 8, 0, 0 },
@@ -3531,7 +3540,7 @@ void vue_texmacs_widget_rep::do_layout () {
     if (visibility[9] && !is_nil (extra_tools))
       layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
                          win->layout_w, win->layout_h);
-    CLAY({
+    if (visibility[5]) CLAY({
       .id= CLAY_ID_LOCAL("Footer"),
       .layout= {
         .padding= { 8, 8, 0, 0 },
@@ -3853,7 +3862,9 @@ vue_simple_widget_rep::do_layout () {
   win= current_window; // save the info
   SI w= 0, h= 0;
   Clay_Sizing s= layoutExpand;
-  if (is_embedded_widget ()) {
+  if (is_embedded_widget () && !is_editor_widget ()) {
+    // typeset boxes (texmacs-output) have their natural size; editors,
+    // embedded or not, fill their container (their size hint is the screen)
     handle_get_size_hint (w, h);
     s= {
       .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
