@@ -958,8 +958,7 @@ layout_pull_button (vue_ui_rep *w) {
   Clay_Sizing s= layoutExpand;
   if (down) s= { CLAY_SIZING_FIT(.min=20) };
   ui_signal sig= button_logic (button_id);
-  CLAY({
-    .id= button_id,
+  CLAY(button_id, {
     .layout= {
       .padding= CLAY_PADDING_ALL(5),
       .childGap= 4,
@@ -969,10 +968,10 @@ layout_pull_button (vue_ui_rep *w) {
   {
     // items of vertical menus with check marks reserve their column
     if (!down && menu_has_marks)
-      CLAY({ .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }}}) {}
+      CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }}}) {}
     concrete(d.w)->do_layout ();
     if (!down) {
-      CLAY({ .layout= { .sizing= layoutExpand }}){};
+      CLAY_AUTO_ID({ .layout= { .sizing= layoutExpand }}){};
       layout_text("<#25B8>", 0, black); // right arrow
     }
     if (sig.clicked == 1) {
@@ -1032,8 +1031,7 @@ layout_pull_button (vue_ui_rep *w) {
       // the menu is at most as tall as the window and scrolls (wheel or
       // scroll bar) when its contents are taller; it is drawn above the
       // scroll bars of the editors (zIndex 1)
-      CLAY({
-        .id= float_id,
+      CLAY(float_id, {
         .floating= {
           .offset= offset,
           .zIndex= 5,
@@ -1100,8 +1098,7 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
     if (grows_main)  s.width=  CLAY_SIZING_GROW(0);
     s.height= CLAY_SIZING_GROW(0);
   }
-  CLAY({
-    .id= vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id),
+  CLAY(vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id), {
     .layout= {
       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= s,
@@ -1181,8 +1178,7 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
     if (grows_main)  s.width=  CLAY_SIZING_GROW(0);
     if (grows_cross) s.height= CLAY_SIZING_GROW(0);
   }
-  CLAY({
-     .id= vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id),
+  CLAY(vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id), {
      .layout= {
        .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
        .sizing= s }})
@@ -1209,8 +1205,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
   // vertical scroll bar
   if (scrollData.scrollContainerDimensions.height < scrollData.contentDimensions.height) {
     Clay_ElementId vsb_id= CLAY_IDI("ScrollBarV", my_id.id);
-    CLAY({
-      .id= vsb_id,
+    CLAY(vsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
         .offset= { .y= -(scrollData.scrollPosition->y / ratio.y) },
@@ -1244,8 +1239,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
   // horizontal scroll bar
   if (scrollData.scrollContainerDimensions.width < scrollData.contentDimensions.width) {
     Clay_ElementId hsb_id= CLAY_IDI("ScrollBarH", my_id.id);
-    CLAY({
-      .id= hsb_id,
+    CLAY(hsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
         .offset= { .x= -(scrollData.scrollPosition->x / ratio.x) },
@@ -1351,8 +1345,7 @@ vue_ui_rep::do_layout () {
       // the header of a tool: a bold title on a framed bar, rounded on top
       context_style |= WIDGET_STYLE_BOLD;
       in_title_bar= true;
-      CLAY({
-        .id= div_id,
+      CLAY(div_id, {
         .backgroundColor= { 208, 208, 208, 255 },
         .cornerRadius= { 6, 6, 0, 0 },
         .layout= {
@@ -1367,8 +1360,7 @@ vue_ui_rep::do_layout () {
     }
     else if (d.name == "subtitle") {
       context_style |= WIDGET_STYLE_BOLD;
-      CLAY({
-        .id= div_id,
+      CLAY(div_id, {
         .layout= {
           .padding= { 8, 8, 8, 4 },
           .sizing= { .width= CLAY_SIZING_GROW(0) }},
@@ -1379,7 +1371,7 @@ vue_ui_rep::do_layout () {
     }
     else if (d.name == "discrete") {
       context_style |= WIDGET_STYLE_GREY;
-      CLAY({ .id= div_id, .layout= { .padding= { 4, 4, 2, 2 } }})
+      CLAY(div_id, { .layout= { .padding= { 4, 4, 2, 2 } }})
       {
         concrete (d.w)->do_layout ();
       }
@@ -1395,8 +1387,7 @@ vue_ui_rep::do_layout () {
       section_active= false;
       if (tabs) {
         context_style |= WIDGET_STYLE_GREY; // inactive tabs are dimmed
-        CLAY({
-          .id= div_id,
+        CLAY(div_id, {
           .layout= {
             .padding= { 8, 8, 4, 0 },
             .sizing= { .width= CLAY_SIZING_GROW(0) },
@@ -1407,8 +1398,7 @@ vue_ui_rep::do_layout () {
         }
       }
       else {
-        CLAY({
-          .id= div_id,
+        CLAY(div_id, {
           .backgroundColor= { 204, 204, 204, 255 },
           .cornerRadius= CLAY_CORNER_RADIUS(7),
           .layout= {
@@ -1429,7 +1419,7 @@ vue_ui_rep::do_layout () {
       bool saved_active= section_active;
       section_active= true;
       context_style &= ~WIDGET_STYLE_GREY;
-      CLAY({ .id= div_id }) {
+      CLAY(div_id, {}) {
         concrete (d.w)->do_layout ();
       }
       section_active= saved_active;
@@ -1458,8 +1448,7 @@ vue_ui_rep::do_layout () {
       // a new widget: this pass is not aligned yet, ask for another one
       if (!l.found || !r.found) layout_again= true;
     }
-    CLAY({
-      .id= CLAY_IDI("aligned_widget", id),
+    CLAY(CLAY_IDI("aligned_widget", id), {
       .layout= {
         .padding= { (uint16_t)(2*d.lpad / PIXEL), (uint16_t)(2*d.rpad / PIXEL), 0, 0 },
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
@@ -1468,15 +1457,14 @@ vue_ui_rep::do_layout () {
     {
       for (int col=0; col<2; col++) {
         array<widget>& cells= (col == 0) ? d.lhs : d.rhs;
-        CLAY({
+        CLAY_AUTO_ID({
           .layout= {
             .layoutDirection= CLAY_TOP_TO_BOTTOM,
             .childGap= (uint16_t)(2*d.vsep / PIXEL),
             .childAlignment= { .x= (col == 0) ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT }}})
         {
           for (int i=0; i<n; i++) {
-            CLAY({
-              .id= CLAY_SIDI (CLAY_TM_STRING (probe), 2*i + col),
+            CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), 2*i + col), {
               .layout= {
                 .sizing= { .height= CLAY_SIZING_FIT (.min= row_h[i]) },
                 .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
@@ -1491,8 +1479,7 @@ vue_ui_rep::do_layout () {
   }
   if (type == "aligned_widget_grid") {
     vue_aligned_widget d= open_box<vue_aligned_widget> (data);
-    CLAY({
-      .id= CLAY_IDI("aligned_widget", id),
+    CLAY(CLAY_IDI("aligned_widget", id), {
       .layout= {
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
         .sizing= layoutFit }})
@@ -1501,7 +1488,7 @@ vue_ui_rep::do_layout () {
       GRID(2 /* Two columns */ ) {
         for (int i=0, n= N(d.lhs); i< n; i++) {
           GRID_ELEMENT() {
-            CLAY({
+            CLAY_AUTO_ID({
               .layout= {
                 .childAlignment= { .x= CLAY_ALIGN_X_RIGHT }}})
             {
@@ -1509,7 +1496,7 @@ vue_ui_rep::do_layout () {
             }
           }
           GRID_ELEMENT() {
-            CLAY({
+            CLAY_AUTO_ID({
               .layout= {
                 .childAlignment= { .x= CLAY_ALIGN_X_LEFT }}})
             {
@@ -1545,15 +1532,13 @@ vue_ui_rep::do_layout () {
         page_h= max (page_h, ed.boundingBox.height);
       }
     }
-    CLAY({
-      .id= clay_id,
+    CLAY(clay_id, {
       .layout= {
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
         .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
     {
       // the tab bar; the current tab is drawn connected to the page frame
-      CLAY({
-        .id= CLAY_ID_LOCAL("tab_bar"),
+      CLAY(CLAY_ID_LOCAL("tab_bar"), {
         .layout= {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
           .padding= { 10, 10, 6, 0 },
@@ -1570,8 +1555,7 @@ vue_ui_rep::do_layout () {
           Clay_Color bg= cur ? color_background
                        : ((hot_id == tab_id.id) ? color_highlight : (Clay_Color) { 176, 176, 176, 255 });
           Clay_ElementData td= Clay_GetElementData (tab_id);
-          CLAY({
-            .id= tab_id,
+          CLAY(tab_id, {
             .backgroundColor= bg,
             .cornerRadius= { 10, 10, 0, 0 },
             .layout= {
@@ -1584,7 +1568,7 @@ vue_ui_rep::do_layout () {
             concrete (d.tabs[i])->do_layout ();
             if (cur && td.found) {
               // cover the top border of the page under the current tab
-              CLAY({
+              CLAY_AUTO_ID({
                 .backgroundColor= color_background,
                 .layout= { .sizing= { CLAY_SIZING_FIXED (td.boundingBox.width - 2),
                                       CLAY_SIZING_FIXED (2) }},
@@ -1600,8 +1584,7 @@ vue_ui_rep::do_layout () {
         }
       }
       // the page of the current tab
-      CLAY({
-        .id= CLAY_ID_LOCAL("tab_area"),
+      CLAY(CLAY_ID_LOCAL("tab_area"), {
         .backgroundColor= color_background,
         .cornerRadius= { 0, 8, 8, 8 },
         .layout= {
@@ -1610,14 +1593,14 @@ vue_ui_rep::do_layout () {
                      .height= CLAY_SIZING_GROW(.min= page_h + 2*pad) }},
         .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
       {
-        CLAY({
+        CLAY_AUTO_ID({
           .layout= { .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) }}})
         {
           concrete (d.bodies[d.current])->do_layout ();
         }
       }
       // the hidden pages, laid out off-screen only to be measured
-      CLAY({
+      CLAY_AUTO_ID({
         .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM },
         .floating= {
           .offset= { -100000, -100000 },
@@ -1626,8 +1609,7 @@ vue_ui_rep::do_layout () {
       {
         for (int i=0; i<n; i++) {
           if (i == d.current) continue;
-          CLAY({
-            .id= CLAY_SIDI (CLAY_TM_STRING (probe), i),
+          CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), i), {
             .layout= { .sizing= layoutFit }})
           {
             concrete (d.bodies[i])->do_layout ();
@@ -1658,14 +1640,18 @@ vue_ui_rep::do_layout () {
       if (lab != NULL && lab->type == "text_widget" &&
           open_box<vue_text_widget> (lab->data).s == "x") {
         Clay_Color cbg= down ? color_button_down : (hot ? color_button_hover : (Clay_Color) { 196, 196, 196, 255 });
-        CLAY({
-          .id= button_id,
+        // Clay emits the background rectangle of an element after its custom
+        // command: the mark must be a child of the round button
+        CLAY(button_id, {
           .backgroundColor= cbg,
           .cornerRadius= CLAY_CORNER_RADIUS(13),
           .layout= { .sizing= { CLAY_SIZING_FIXED(26), CLAY_SIZING_FIXED(26) }},
-          .custom= { .customData= (void*) &render_close_mark_fn },
-          .userData= this,
-          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }}) {}
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }}) {
+          CLAY_AUTO_ID({
+            .layout= { .sizing= layoutExpand },
+            .custom= { .customData= (void*) &render_close_mark_fn },
+            .userData= this }) {}
+        }
         if (sig.clicked == 1) {
           cancel_popup= true;
           cmd_list= list (d.cmd, cmd_list);
@@ -1713,8 +1699,7 @@ vue_ui_rep::do_layout () {
     else if (down || pressed) bg= color_pressed;
     else if (hot) bg= color_highlight;
     Clay_ElementData bd= Clay_GetElementData (button_id);
-    CLAY({
-      .id= button_id,
+    CLAY(button_id, {
       .layout= {
         .padding= padding,
         .childGap= 4,
@@ -1730,7 +1715,7 @@ vue_ui_rep::do_layout () {
         // the column for the mark of the item: "v" (check), "*" or "o";
         // all items of a menu with marks reserve it so that labels align
         int kind= (d.pre == "v") ? 1 : (d.pre == "*") ? 2 : (d.pre == "o") ? 3 : 0;
-        CLAY({
+        CLAY_AUTO_ID({
           .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }},
           .custom= { .customData= (kind != 0) ? (void*) &render_menu_mark_fn : NULL },
           .userData= (void*) (intptr_t) kind }) {}
@@ -1738,13 +1723,13 @@ vue_ui_rep::do_layout () {
       concrete(d.w)->do_layout ();
       if (N(d.ks) > 0) {
         // add shortcut
-        CLAY({ .layout= { .sizing= layoutExpand }}) {}
+        CLAY_AUTO_ID({ .layout= { .sizing= layoutExpand }}) {}
         layout_text (d.ks, d.style, black);
       }
       if (tab_strip && bd.found) {
         // cover the bottom line of the bar under the active tab (the border
         // of the bar is drawn after its children, hence the z index)
-        CLAY({
+        CLAY_AUTO_ID({
           .backgroundColor= bg,
           .layout= { .sizing= { CLAY_SIZING_FIXED (bd.boundingBox.width - 2),
                                 CLAY_SIZING_FIXED (1) }},
@@ -1780,8 +1765,7 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(menu_separator, bool, vertical);
     vue_menu_separator d= open_box<vue_menu_separator> (data);
     if (d.vertical) {
-      CLAY({
-        .id= CLAY_IDI("menu_separator (v)", id),
+      CLAY(CLAY_IDI("menu_separator (v)", id), {
         .layout= {
           .sizing= { .height= CLAY_SIZING_GROW(0) },
           .padding= {5,5,5,5} },
@@ -1789,8 +1773,7 @@ vue_ui_rep::do_layout () {
           .width= { .left= 2 },
           .color=  { 210, 210, 210, 255 } } });
     } else {
-      CLAY({
-        .id= CLAY_IDI("menu_separator (h)", id),
+      CLAY(CLAY_IDI("menu_separator (h)", id), {
         .layout= {
           .sizing= { .width= CLAY_SIZING_GROW(0) },
           .padding= {5,5,5,5} },
@@ -1820,7 +1803,7 @@ vue_ui_rep::do_layout () {
       time_t elapsed= texmacs_time () - balloon_time;
       if ((elapsed > 1000) && (elapsed < 5000)) {
         // show the balloon
-        CLAY({
+        CLAY_AUTO_ID({
           .backgroundColor= { 240, 240, 0, 255 },
           .layout= { .padding= { 10, 10, 10, 10 } },
           .border= {
@@ -1853,19 +1836,18 @@ vue_ui_rep::do_layout () {
     vue_picture_widget d= open_box<vue_picture_widget> (data);
     SI w= d.p->get_width ();
     SI h= d.p->get_height ();
-    CLAY({
-      .backgroundColor= color_background,
+    // no background: Clay draws it after the custom command (the picture)
+    CLAY_AUTO_ID({
       .layout= {
         .sizing= { CLAY_SIZING_FIXED( (float)w), CLAY_SIZING_FIXED( (float)h) } },
-        .custom= { .customData=  vue_render_widget },
+      .custom= { .customData=  vue_render_widget },
       .userData= this }) {};
     return;
   }
   if (type == "glue_widget") {
     //VUE_WIDGET(glue_widget, bool, hx, bool, vx, SI, w, SI, h);
     vue_glue_widget d= open_box<vue_glue_widget> (data);
-    CLAY({
-      .id= CLAY_IDI("glue_widget", id),
+    CLAY(CLAY_IDI("glue_widget", id), {
       .layout= {
         .sizing= {
           .width=  d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL)
@@ -1877,7 +1859,7 @@ vue_ui_rep::do_layout () {
   if (type == "cached_glue_widget") {
     //VUE_WIDGET(colored_glue_widget, tree, col, bool, hx, bool, vx, SI, w, SI, h);
     vue_cached_glue_widget d= open_box<vue_cached_glue_widget> (data);
-    CLAY({
+    CLAY_AUTO_ID({
       //.id= CLAY_IDI("colored_glue_widget", id),
       .custom= { .customData=  vue_render_widget },
       .userData= this,
@@ -1894,12 +1876,12 @@ vue_ui_rep::do_layout () {
     // a menu rendered as a table of cols columns wide & made up of widgets in a
     vue_tile_menu d= open_box<vue_tile_menu> (data);
     int c=0, n= N(d.a);
-    CLAY({ .layout= {
+    CLAY_AUTO_ID({ .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       .childGap= 5 }})
     {
       while (c < n) {
-        CLAY({ .layout= {
+        CLAY_AUTO_ID({ .layout= {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
           .childGap= 5 }})
         {
@@ -1927,8 +1909,7 @@ vue_ui_rep::do_layout () {
     }
     // a check box, drawn by vue_ui_rep::render (smaller in the mini style)
     float box= (d.style & WIDGET_STYLE_MINI) ? 24 : 30;
-    CLAY({
-      .id= toggle_id,
+    CLAY(toggle_id, {
       .layout= { .sizing= { CLAY_SIZING_FIXED(box), CLAY_SIZING_FIXED(box) }},
       .custom= { .customData= vue_render_widget },
       .userData= this }) {}
@@ -1951,19 +1932,17 @@ vue_ui_rep::do_layout () {
       sz.width= CLAY_SIZING_FIXED ((float) 2*w/PIXEL);
     }
     Clay_ElementData ed= Clay_GetElementData (enum_id);
-    CLAY({
-      .id= enum_id,
+    CLAY(enum_id, {
       .layout= { .sizing= sz, .padding= { 8, 8, 4, 4 }, .childGap= 4 },
       .backgroundColor= (!inert && hot_id == enum_id.id) ? color_highlight
                                                           : (Clay_Color) { 208, 208, 210, 255 },
       .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
     {
       layout_text (d.val, d.st, inert ? dark_grey : black);
-      CLAY({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
+      CLAY_AUTO_ID({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
       layout_text ("<#25BE>", 0, inert ? dark_grey : black); // down arrow
       if (d.open) {
-        CLAY({
-          .id= list_id,
+        CLAY(list_id, {
           .floating= {
             .zIndex= 10,
             .attachTo= CLAY_ATTACH_TO_PARENT,
@@ -1979,8 +1958,7 @@ vue_ui_rep::do_layout () {
             Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
             ui_signal isig= button_logic (item_id);
             bool active= (d.vals[i] == d.val);
-            CLAY({
-              .id= item_id,
+            CLAY(item_id, {
               .layout= { .padding= { 8, 8, 4, 4 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
               .backgroundColor= (hot_id == item_id.id) ? color_highlight
                                 : (active ? palette[2] : color_background) })
@@ -2030,8 +2008,7 @@ vue_ui_rep::do_layout () {
       sizing.width=  CLAY_SIZING_GROW (.min= (float) 2*minw/PIXEL, .max= (float) 2*maxw/PIXEL);
       sizing.height= CLAY_SIZING_GROW (.min= (float) 2*minh/PIXEL, .max= (float) 2*maxh/PIXEL);
     }
-    CLAY({
-      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+    CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
       .layout= { .sizing= sizing }})
     {
       concrete(d.w)->do_layout ();
@@ -2058,8 +2035,7 @@ vue_ui_rep::do_layout () {
       }
       data= close_box (d);
     }
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .sizing= layoutFit }})
     {
       if (!is_nil (d.current)) {
@@ -2092,8 +2068,7 @@ vue_ui_rep::do_layout () {
       }
       data= close_box (d);
     }
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .sizing= layoutFit }})
     {
       if (!is_nil (d.current)) {
@@ -2113,8 +2088,7 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
     vue_user_canvas_widget d= open_box<vue_user_canvas_widget> (data);
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING(type), id);
-    CLAY({
-      .id= my_id,
+    CLAY(my_id, {
       .layout= { .sizing= layoutExpand },
       .backgroundColor= color_field,
       .border= {
@@ -2164,23 +2138,21 @@ vue_ui_rep::do_layout () {
       if (horiz) first.width=  CLAY_SIZING_FIXED (d.pos);
       else       first.height= CLAY_SIZING_FIXED (d.pos);
     }
-    CLAY({
-      .id= my_id,
+    CLAY(my_id, {
       .layout= {
         .sizing= layoutExpand,
         .layoutDirection= horiz ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM }})
     {
-      CLAY({ .layout= { .sizing= first }}) {
+      CLAY_AUTO_ID({ .layout= { .sizing= first }}) {
         concrete (d.a)->do_layout ();
       }
-      CLAY({
-        .id= bar_id,
+      CLAY(bar_id, {
         .backgroundColor= (d.dragging || Clay_PointerOver (bar_id)) ? palette[0] : palette[3],
         .layout= {
           .sizing= {
             .width=  horiz ? CLAY_SIZING_FIXED (bar) : CLAY_SIZING_GROW(0),
             .height= horiz ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIXED (bar) }}}) {};
-      CLAY({ .layout= { .sizing= second }}) {
+      CLAY_AUTO_ID({ .layout= { .sizing= second }}) {
         concrete (d.b)->do_layout ();
       }
     }
@@ -2192,8 +2164,7 @@ vue_ui_rep::do_layout () {
     // flag is true when multiple selections are allowed
     vue_choice_widget d= open_box<vue_choice_widget> (data);
     bool changed= false;
-    CLAY({
-      .id= CLAY_SIDI(CLAY_TM_STRING(type), id),
+    CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
       .backgroundColor= color_field,
       .layout= {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
@@ -2221,8 +2192,7 @@ vue_ui_rep::do_layout () {
         Clay_Color bg= color_field;
         if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
         else if (hot_id == item_id.id) bg= color_highlight;
-        CLAY({
-          .id= item_id,
+        CLAY(item_id, {
           .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
           .backgroundColor= bg })
         {
@@ -2250,8 +2220,7 @@ vue_ui_rep::do_layout () {
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     Clay_ElementId list_id= CLAY_IDI ("filtered_choice_list", id);
     bool changed= false;
-    CLAY({
-      .id= my_id,
+    CLAY(my_id, {
       .layout= {
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
         .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) },
@@ -2259,15 +2228,14 @@ vue_ui_rep::do_layout () {
     {
       // the input has a fixed width (24em): it is clipped to the width of
       // the list, which is that of the container (a resize box usually)
-      CLAY({
+      CLAY_AUTO_ID({
         .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }},
         .clip= { .horizontal= true }})
       {
         concrete (d.input)->do_layout ();
       }
       // long values are clipped too, instead of widening the list
-      CLAY({
-        .id= list_id,
+      CLAY(list_id, {
         .layout= {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(.min= 100) }},
@@ -2287,8 +2255,7 @@ vue_ui_rep::do_layout () {
           Clay_Color bg= color_field;
           if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
           else if (hot_id == item_id.id) bg= color_highlight;
-          CLAY({
-            .id= item_id,
+          CLAY(item_id, {
             .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
             .backgroundColor= bg })
           {
@@ -2321,8 +2288,7 @@ vue_ui_rep::do_layout () {
   }
   if (type == "empty_widget") {
     //VUE_WIDGET(empty_widget);
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .sizing= { CLAY_SIZING_FIXED(0), CLAY_SIZING_FIXED(0) }}}) {};
     return;
   }
@@ -2342,12 +2308,11 @@ vue_ui_rep::do_layout () {
         min_h= max (min_h, ed.boundingBox.height);
       }
     }
-    CLAY({
-      .id= my_id,
+    CLAY(my_id, {
       .layout= { .sizing= { CLAY_SIZING_FIT (.min= min_w), CLAY_SIZING_FIT (.min= min_h) }}})
     {
       concrete (d.w)->do_layout ();
-      CLAY({
+      CLAY_AUTO_ID({
         .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM },
         .floating= {
           .offset= { -100000, -100000 },
@@ -2355,8 +2320,7 @@ vue_ui_rep::do_layout () {
           .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }})
       {
         for (int i=0; i<N(d.a); i++) {
-          CLAY({
-            .id= CLAY_SIDI (CLAY_TM_STRING (probe), i),
+          CLAY(CLAY_SIDI (CLAY_TM_STRING (probe), i), {
             .layout= { .sizing= layoutFit }})
           {
             concrete (d.a[i])->do_layout ();
@@ -2369,8 +2333,7 @@ vue_ui_rep::do_layout () {
   if (type == "wait_widget") {
     //VUE_WIDGET(wait_widget, SI, width, SI, height, string, message);
     vue_wait_widget d= open_box<vue_wait_widget> (data);
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= {
         .sizing= { CLAY_SIZING_FIXED ((float) 2*d.width/PIXEL),
                    CLAY_SIZING_FIXED ((float) 2*d.height/PIXEL) },
@@ -2388,8 +2351,7 @@ vue_ui_rep::do_layout () {
   if (type == "printer_widget") {
     //VUE_WIDGET(printer_widget, command, cmd, url, ps_pdf_file);
     vue_printer_widget_star d= open_box<vue_printer_widget_star> (data);
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .padding= CLAY_PADDING_ALL(16), .sizing= layoutFit }})
     {
       concrete (d.content)->do_layout ();
@@ -2399,8 +2361,7 @@ vue_ui_rep::do_layout () {
   if (type == "color_picker_widget") {
     //VUE_WIDGET(color_picker_widget, command, cmd, bool, bg, array<tree>, proposals);
     vue_color_picker_widget_star d= open_box<vue_color_picker_widget_star> (data);
-    CLAY({
-      .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+    CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .padding= CLAY_PADDING_ALL(16), .sizing= layoutFit }})
     {
       concrete (d.content)->do_layout ();
@@ -2810,7 +2771,7 @@ vue_input_text_widget_rep::do_layout () {
     buffer= copy (s);
     bg= { 208, 208, 210, 255 };
   }
-  CLAY({
+  CLAY_AUTO_ID({
     .backgroundColor= bg,
     .layout= {
       .sizing= {
@@ -3046,8 +3007,7 @@ void
 vue_plain_window_widget_rep::do_layout () {
   Clay_BorderElementConfig border= {};
   if (popup) border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
-  CLAY({
-    .id= CLAY_ID("plain_window_widget"),
+  CLAY(CLAY_ID("plain_window_widget"), {
     .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
@@ -3442,8 +3402,7 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
   else      sizing= { CLAY_SIZING_GROW(0),
                       CLAY_SIZING_FIT (.min= 40, .max= (float) max (40.0, 0.4 * win_h)) };
   Clay_BorderWidth bw= side ? (Clay_BorderWidth) { 1, 1, 0, 0 } : (Clay_BorderWidth) { 0, 0, 1, 1 };
-  CLAY({
-    .id= id,
+  CLAY(id, {
     .backgroundColor= palette[2],
     .layout= {
       .sizing= sizing,
@@ -3470,8 +3429,7 @@ void vue_texmacs_widget_rep::do_layout () {
   // only its canvas, as the Qt embedded widget
   bool bars= visibility[0] || visibility[1] || visibility[2] ||
              visibility[3] || visibility[4] || visibility[5];
-  CLAY({
-    .id= CLAY_IDI("texmacs_widget", id),
+  CLAY(CLAY_IDI("texmacs_widget", id), {
     .backgroundColor= bars ? color_background : (Clay_Color) { 0, 0, 0, 0 },
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
@@ -3479,8 +3437,7 @@ void vue_texmacs_widget_rep::do_layout () {
       .padding= { 0, 0, (uint16_t) (bars ? 16 : 0), (uint16_t) (bars ? 16 : 0) },
       .childGap= (uint16_t) (bars ? 16 : 0) }})
   {
-    if (visibility[0]) CLAY({
-      .id= CLAY_ID_LOCAL("MainMenuBar"),
+    if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
       .layout= {
         .padding= { 8, 8, 0, 0 },
         .sizing= {
@@ -3491,8 +3448,7 @@ void vue_texmacs_widget_rep::do_layout () {
         main_menu->do_layout ();
       }
     }
-    if (visibility[1]) CLAY({
-      .id= CLAY_ID_LOCAL("MainToolbar"),
+    if (visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
          .padding= { 8, 8, 0, 0 },
          .sizing= {
@@ -3503,8 +3459,7 @@ void vue_texmacs_widget_rep::do_layout () {
         main_icons->do_layout ();
       }
     }
-    if (visibility[2]) CLAY({
-      .id= CLAY_ID_LOCAL("ModeToolbar"),
+    if (visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
          .padding= { 8, 8, 0, 0 },
          .sizing= {
@@ -3515,8 +3470,7 @@ void vue_texmacs_widget_rep::do_layout () {
         mode_icons->do_layout ();
       }
     }
-    if (visibility[3]) CLAY({
-      .id= CLAY_ID_LOCAL("FocusToolbar"),
+    if (visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
       .layout= {
          .padding= { 8, 8, 0, 0 },
          .sizing= {
@@ -3528,8 +3482,7 @@ void vue_texmacs_widget_rep::do_layout () {
       }
     }
     // the middle row: left tools, the editor and the side tools
-    CLAY({
-      .id= CLAY_ID_LOCAL("Middle"),
+    CLAY(CLAY_ID_LOCAL("Middle"), {
       .layout= {
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
         .sizing= layoutExpand }})
@@ -3548,8 +3501,7 @@ void vue_texmacs_widget_rep::do_layout () {
     if (visibility[9] && !is_nil (extra_tools))
       layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
                          win->layout_w, win->layout_h);
-    if (visibility[5]) CLAY({
-      .id= CLAY_ID_LOCAL("Footer"),
+    if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {
       .layout= {
         .padding= { 8, 8, 0, 0 },
         .sizing= {
@@ -3557,7 +3509,7 @@ void vue_texmacs_widget_rep::do_layout () {
           .height= CLAY_SIZING_FIXED(40) }}})
     {
       // the left text takes the remaining space and is clipped
-      CLAY({
+      CLAY_AUTO_ID({
         .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
         .clip= { .horizontal= true }})
       {
@@ -3880,14 +3832,13 @@ vue_simple_widget_rep::do_layout () {
   }
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   Clay_ElementData d= Clay_GetElementData (clay_id);
-  CLAY({
-    .id= clay_id,
+  CLAY(clay_id, {
     .layout= { .sizing= s },
     .custom= { .customData= vue_render_widget },
     .userData= this })
   {
     if (0) { // debug view
-      CLAY({
+      CLAY_AUTO_ID({
         .backgroundColor= { 80, 80, 80, 80 },
         .layout= { .padding= { 18, 18, 18, 18 } },
         .floating= {
@@ -4795,8 +4746,7 @@ void
 vue_ink_widget_rep::do_layout () {
   Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
   Clay_ElementData ed= Clay_GetElementData (my_id);
-  CLAY({
-    .id= my_id,
+  CLAY(my_id, {
     .layout= { .sizing= { CLAY_SIZING_FIXED ((float) w), CLAY_SIZING_FIXED ((float) h) }},
     .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] },
     .custom= { .customData= vue_render_widget },
@@ -4970,23 +4920,21 @@ vue_tree_view_widget_rep::layout_node (tree t, int depth) {
   ui_signal tsig { .clicked= 0 };
   if (kids) tsig= button_logic (toggle_id);
   ui_signal lsig= button_logic (label_id);
-  CLAY({
+  CLAY_AUTO_ID({
     .layout= {
       .layoutDirection= CLAY_LEFT_TO_RIGHT,
       .padding= { (uint16_t) (16*depth), 0, 0, 0 },
       .sizing= { .width= CLAY_SIZING_GROW(0) },
       .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
   {
-    CLAY({
-      .id= toggle_id,
+    CLAY(toggle_id, {
       .layout= {
         .sizing= { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIT(0) },
         .padding= { 4, 4, 2, 2 }}})
     {
       if (kids) layout_text (open ? "<#25BE>" : "<#25B8>", 0, dark_grey);
     }
-    CLAY({
-      .id= label_id,
+    CLAY(label_id, {
       .layout= { .padding= { 4, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
       .backgroundColor= (hot_id == label_id.id) ? color_highlight : color_field })
     {
@@ -5009,8 +4957,7 @@ vue_tree_view_widget_rep::layout_node (tree t, int depth) {
 
 void
 vue_tree_view_widget_rep::do_layout () {
-  CLAY({
-    .id= CLAY_SIDI (CLAY_TM_STRING (type), id),
+  CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
     .backgroundColor= color_field,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,

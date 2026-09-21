@@ -1,11 +1,11 @@
 #include "clay.h"
+
+// TeXmacs: custom elements (editors, pictures) are drawn by the Vue widgets
+void vue_render (SDL_Renderer *, void *, SDL_FRect*);
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
-
-
-void vue_render (SDL_Renderer *, void *, SDL_FRect*);
 
 typedef struct {
     SDL_Renderer *renderer;
@@ -167,9 +167,7 @@ void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_Rende
             case CLAY_RENDER_COMMAND_TYPE_TEXT: {
                 Clay_TextRenderData *config = &rcmd->renderData.text;
                 TTF_Font *font = rendererData->fonts[config->fontId];
-                if (TTF_GetFontSize (font) != config->fontSize) {
-                  TTF_SetFontSize(font, config->fontSize);
-                }
+                TTF_SetFontSize(font, config->fontSize);
                 TTF_Text *text = TTF_CreateText(rendererData->textEngine, font, config->stringContents.chars, config->stringContents.length);
                 TTF_SetTextColor(text, config->textColor.r, config->textColor.g, config->textColor.b, config->textColor.a);
                 TTF_DrawRendererText(text, rect.x, rect.y);

@@ -345,7 +345,7 @@ vue_sdl_base_window_rep::process_layout () {
     Clay__debugViewWidth= 600; // redefine to have more space
     Clay_BeginLayout ();
     content->do_layout ();
-    render_commands= Clay_EndLayout ();
+    render_commands= Clay_EndLayout (0.0f); // no transitions in use: no frame time needed
     gui_finalize_context ();
 
     // post layout tweaking
@@ -917,7 +917,7 @@ layout_text_box (string s, int style, color c) {
   abs_round (w, h);
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
   styled_strings << ss;
-  CLAY({
+  CLAY_AUTO_ID({
     .layout= {
       .sizing= {
         CLAY_SIZING_FIXED((float)2*w/PIXEL),
@@ -935,7 +935,7 @@ void layout_text (string s, int style, color c) {
   if (style & (WIDGET_STYLE_GREY | WIDGET_STYLE_INERT)) c= dark_grey;
   if (style & WIDGET_STYLE_CENTERED) {
     // centered in the space given by the container
-    CLAY({
+    CLAY_AUTO_ID({
       .layout= {
         .sizing= { .width= CLAY_SIZING_GROW(0) },
         .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})

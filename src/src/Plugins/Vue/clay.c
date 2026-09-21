@@ -42,14 +42,12 @@ GridComponent (GridState coState) {
         CO_YIELD();
 
         for (coState.row = 0; coState.row < (coState.elementCount / coState.columnCount); coState.row++) {
-            CLAY({
-                .id = CLAY_IDI_LOCAL("Row", coState.row),
+            CLAY(CLAY_IDI_LOCAL("Row", coState.row), {
                 /* Some other row config stuff */
             }) {
                 for (coState.col = 0; coState.col < coState.columnCount && coState.index < coState.elementCount;
                     coState.col++, coState.index++) {
-                    CLAY({
-                        .id = CLAY_IDI_LOCAL("Col", coState.col),
+                    CLAY(CLAY_IDI_LOCAL("Col", coState.col), {
                         /* Some other column config stuff */
                     }) {
                         CO_YIELD(); // Resume to body.

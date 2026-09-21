@@ -6,7 +6,8 @@ Vue is a GUI plugin for TeXmacs built on three libraries:
   (`vue_gui.cpp`);
 * **Clay** (`clay.h`, single header, compiled once in `clay.c`) for the
   layout: an *immediate mode* layout engine — the whole UI tree is rebuilt
-  every pass by calling `CLAY({...}) { children }` macros;
+  every pass by calling `CLAY(id, {...}) { children }` / `CLAY_AUTO_ID({...})`
+  macros;
 * the TeXmacs **renderer** (MuPDF/fitz backend) for drawing: Clay produces a
   list of render commands, which `render_clay_commands` (`vue_gui.cpp`)
   replays on a `renderer`, into a backing pixmap that is blitted to the SDL
@@ -227,32 +228,29 @@ the window, are at most as tall as the window and scroll.
   kind of error once (duplicate ids, capacity exceeded, floating parent not
   found...) and Clay skips the offending element. The arena is sized with
   `Clay_MinMemorySize` for the default capacity (8192 elements per window).
-  **Local patch of `clay.h` (0.14)**: stock Clay never removes the hash-map
-  item of an element id once seen (`Clay__AddHashMapItem` only appends), so
-  after enough rebuilds of the widget tree (refreshed tools, menus, dialogs)
-  the map of a window is full and new elements silently get no item:
-  `Clay_GetElementData` does not find them, `Clay_PointerOver` fails and
-  their layout is wrong (borders drawn around bare texts, enums collapsed to
-  their arrow). `Clay__CompactLayoutElementHashMap`, called from
-  `Clay_BeginLayout`, drops the items not declared in the previous frame and
-  rebuilds the buckets; a full map is now reported
-  (`CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED`, "Clay error (8)"). Since the
-  map holds the ids of the previous *and* of the current frame right after a
-  rebuild, the capacity is set to 32768 elements (`Clay_SetMaxElementCount`,
-  arena of 23 MB per window): the macros editor exceeded the default 8192.
-  **Provenance of `clay.h`**: a snapshot of Clay's `main` between July and
-  August 2025 (it has the `Clay__HashStringWithOffset` id scheme of 2025-07
-  but not the 100 scroll containers of 2025-08-14), i.e. v0.14 plus a few
-  post-release commits, with local patches marked `TeXmacs:` (hash map
-  compaction and error, 100 scroll containers). Upstream `main` (checked
-  2026-09-21: still no v0.15 tag, ~100 commits since) later added its own
-  hash map pruning (#611), a transitions/animation API, a fix for
-  `Clay_Hovered` with several floating children (#461) and, from 2025-09-16,
-  a **breaking change**: `.id` left the declaration struct and the macro
-  became `CLAY(id, {...})` / `CLAY_AUTO_ID({...})`, `CLAY_TEXT (text, {...})`,
-  `Clay_GetOpenElementId` replaces `Clay__GetParentElementId`. Updating means
-  rewriting the ~90 `CLAY({ .id= ...})` sites; not worth it before a tagged
-  release. Keep the local patches when updating.
+  **Provenance of `clay.h`**: upstream Clay `main` at commit e6cc36941ab2
+  (2026-05-20; the header still says `VERSION: 0.14`, no tag has been made
+  since 0.14), taken verbatim; `clay_renderer_SDL3.c` is the upstream
+  renderer plus the `CLAY_RENDER_COMMAND_TYPE_CUSTOM` case (calls
+  `vue_render`) and a non-static `SDL_Clay_RenderClayCommands`. Compared to
+  the 0.14 snapshot used before (2026-09-21): the element hash map is pruned
+  by Clay itself at `Clay_EndLayout` (our compaction patch is gone) and a
+  full map is reported (`CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED`); since
+  the map holds the ids of the previous *and* of the current frame right
+  after a rebuild of the widget tree, the capacity is set to 32768 elements
+  (`Clay_SetMaxElementCount`, arena of ~21 MB per window): the macros editor
+  exceeded the default 8192. API changes met: `.id` left the declaration
+  struct (`CLAY(id, {...})`, `CLAY_AUTO_ID({...})`), `Clay_EndLayout` takes
+  a `deltaTime` (transitions API, unused, we pass 0), the render command
+  types are renumbered (RECTANGLE=1, BORDER=2, TEXT=3, IMAGE=4,
+  SCISSOR_START/END=5/6, OVERLAY_COLOR_START/END=7/8, CUSTOM=9) and, the one
+  behavioural change which bit: an element's **background rectangle is now
+  emitted after its custom command** (and after its scissor start), so a
+  custom element must not have a `.backgroundColor` (the picture widgets
+  lost theirs, the close mark of the tool title bars became a child of the
+  round button) — the custom render command carries the color in
+  `renderData.custom.backgroundColor` for renderers which want to draw it.
+  100 scroll containers are upstream now.
 * **SDL3** functions return `NULL`/`false` and set `SDL_GetError`. Checked:
   window creation (fatal), the layout arena, the window surface (the frame
   is skipped), surface creation and blits, `SDL_UpdateWindowSurface`, the
