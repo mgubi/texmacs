@@ -1243,7 +1243,12 @@ void gui_start_loop () {
         
     // 2. wait for events on all channels
     if (gui_wait) {
-      SDL_Delay (delay);
+      // sleep until an event arrives, or at most 'delay' (the interpose
+      // handler and the delayed Scheme commands need periodic calls; the
+      // pause grows while nothing happens). A plain SDL_Delay here made the
+      // first event after a pause wait for the end of the pause: up to 1 s
+      // before a scroll started to move
+      SDL_WaitEventTimeout (NULL, delay);
       delay += (delay/5);
       if (delay > 1000) delay= 1000;
     }
@@ -1710,8 +1715,9 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_WHEEL:
     {
       update_mouse_state ();
-      SDL_Log ("Window %d got wheel event event %f %f",
-              event->wheel.windowID, event->wheel.x, event->wheel.y);
+      SDL_Log ("Window %d got wheel event event %f %f (queued for %d ms)",
+              event->wheel.windowID, event->wheel.x, event->wheel.y,
+              (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
       win= get_window_from_ID (event->wheel.windowID);
       if (win) {
         vue_input_state& in= win->input;

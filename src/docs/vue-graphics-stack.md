@@ -77,7 +77,9 @@ Each iteration:
 
 1. `script_step` (test driver, see *vue-testing.md*), then **one** SDL event
    is polled and translated by `process_event` into the input state of its
-   window;
+   window — plus the wheel and motion events already queued behind it
+   (their deltas add up, the last position wins), so that a slow frame does
+   not fall behind a trackpad;
 2. `process_layout ()`: every window runs `Clay_BeginLayout`,
    `content->do_layout ()`, `Clay_EndLayout`, then `content->post_layout ()`.
    Layout is also where **input is dispatched**: widgets read the input state
@@ -89,8 +91,14 @@ Each iteration:
    stores (interruptible);
 6. `process_redraw ()` replays the render commands of every window.
 
-Window resizes are handled synchronously in an SDL event watch
-(`event_filter`) so that the window never shows stale content.
+Between iterations the loop sleeps in `SDL_WaitEventTimeout` for a pause
+which grows while nothing happens (10 ms → 1 s, for the periodic interpose
+calls) and ends as soon as an event arrives; a plain `SDL_Delay` here made
+the first event after a pause wait for the end of the pause (up to 1 s
+before a scroll started to move). The wheel log lines print for how long an
+event was queued (`queued for N ms`). Window resizes are handled
+synchronously in an SDL event watch (`event_filter`) so that the window
+never shows stale content.
 
 ## Layout conventions
 
