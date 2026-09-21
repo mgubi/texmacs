@@ -108,7 +108,8 @@ public:
   
   // backing store management
   
-  static void repaint_all (); // called in the event loop
+  static void repaint_all ();
+  static void invalidate_all_editors (); // test aid (script "repaint") // called in the event loop
   static void repaint_all_in_window (vue_window win);
   static void notify_resizes (); // called before the interpose handler
   static void forget_window (vue_window win); // the window is being destroyed
@@ -129,7 +130,7 @@ protected:
   void invalidate_all ();
   bool is_invalid ();
   void repaint_invalid_regions ();
-  void translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy);
+  void translate_backing_store (int dpx, int dpy); // shift the pixels
 };
 
 typedef vue_simple_widget_rep simple_widget_rep;

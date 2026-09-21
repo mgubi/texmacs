@@ -1394,8 +1394,11 @@ script_init () {
   cout << "vue script: " << N(script_lines) << " lines" << LF;
 }
 
+static bool script_no_target= false; // the last "window" command matched nothing
+
 static vue_window
 script_target () {
+  if (script_no_target) return NULL; // the commands are skipped until a "window" matches
   if (script_win != NULL && Window_to_window->contains ((SDL_Window*) script_win->platform_window ()))
     return script_win;
   return last_created_window;
@@ -1466,6 +1469,7 @@ script_step () {
         if (title == "#" * as_string (w->id) ||
             occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
       }
+      script_no_target= (script_win == NULL);
       if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
       continue;
     }
@@ -1534,6 +1538,8 @@ script_step () {
     }
     else if (cmd == "resize" && N(a) > 2)
       win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
+    else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
+      vue_simple_widget_rep::invalidate_all_editors ();
     else if (cmd == "close") {
       SDL_Event ev;
       SDL_zero (ev);

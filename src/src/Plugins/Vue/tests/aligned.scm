@@ -15,4 +15,4 @@
     (alt-window-create-plain win wid name)
     (alt-window-set-size win w h)
     (alt-window-show win)))
-(delayed (:idle 1500) (top-window vue-test3 "Vue test 3"))
+(delayed (:pause 1500) (top-window vue-test3 "Vue test 3"))

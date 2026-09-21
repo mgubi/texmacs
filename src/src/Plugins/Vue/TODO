@@ -3,7 +3,6 @@ TODO
 * decide what to do with win->relayout
 * introduce animation subsystem for transitions
 * more uniform handling of mouse events and keyboard focus...
-* think to the redrawing sequence, in particular when redraw simple_widgets
 * investigate random crashes of the debug view (probably because of invalid pointers)
 * decide how to handle caching of structures relevant to the rendering
 * extend the scripted tests (tests/) to the color picker, printer dialog, splitters
@@ -18,6 +17,11 @@ WIP
 
 DONE
 
+* scrolling shifts the backing store of the editor and repaints only the
+  exposed strips (scroll positions on the pixel grid)
+* MuPDF renderer: plain fills and 1:1 picture blits write the pixels
+  directly (the frame while scrolling was dominated by path rasterization
+  and colorspace conversion)
 * Clay's element hash map is pruned every frame (upstream Clay main since 2026-09-21):
   rebuilt widget trees no longer exhaust it (misdrawn tools after a refresh)
 * the filtered choice list stays inside its box (input and long values clipped)

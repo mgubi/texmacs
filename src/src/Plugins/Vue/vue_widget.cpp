@@ -3896,8 +3896,8 @@ vue_simple_widget_rep::do_layout () {
       .found= true
     };
     scroll_bar (clay_id, scrollData);
-    scroll_pos.x1= -scrollPosition.x * ren->pixel;
-    scroll_pos.x2= scrollPosition.y * ren->pixel;
+    scroll_pos.x1= -((SI) floor (scrollPosition.x + 0.5)) * ren->pixel;
+    scroll_pos.x2=  ((SI) floor (scrollPosition.y + 0.5)) * ren->pixel;
     absolute_scroll= false;
   }
   // note: our CLAY block is closed here, Clay_Hovered () would test the parent
@@ -3926,7 +3926,11 @@ vue_simple_widget_rep::do_layout () {
       scroll_pos= backing_pos;
       scroll_rest_x += mouse_data[0];
       scroll_rest_y += mouse_data[1];
-      SI dx= (SI) scroll_rest_x, dy= (SI) scroll_rest_y;
+      // whole pixels only (the backing store is shifted, see
+      // repaint_invalid_regions), the remainder waits for the next step
+      SI px= ren->pixel;
+      SI dx= ((SI) floor (scroll_rest_x / px)) * px;
+      SI dy= ((SI) floor (scroll_rest_y / px)) * px;
       scroll_rest_x -= dx; scroll_rest_y -= dy;
       scroll_pos.x1 += dx;
       scroll_pos.x2 += dy;
@@ -3979,47 +3983,43 @@ vue_simple_widget_rep::is_invalid () {
   return !is_nil (invalid_regions);
 }
 
+// shift the pixels of the backing store by (dpx, dpy) (pixmap pixels, y
+// down): the content moved by the scroll, the exposed strips are
+// invalidated by the caller
 void
-vue_simple_widget_rep::translate_backing_store (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
-  ren->set_origin (0,0);
-  SI X1= x1+ dx;
-  SI Y2= y2+ dy;
-  ren->decode (x1, y1);
-  ren->decode (x2, y2);
-  ren->decode (X1, Y2);
-  dx= X1- x1;
-  dy= Y2- y2;
-
-  rectangles region (rectangle (x1, y2, x2, y1));
-  rectangles invalid_intern= invalid_regions & region;
-  rectangles invalid_extern= invalid_regions - invalid_intern;
-  invalid_intern= ::translate (invalid_intern, dx, dy) & region;
-  invalid_regions= invalid_extern | invalid_intern;
-
-  rectangles extra= thicken (region - ::translate (region, dx, dy), 1, 1);
-  invalid_regions= invalid_regions | extra;
-
-  if (x1<x2 && y2<y1) {
-//    cout << "translate " << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ", " << X1 << ", " << Y2  << LF;
+vue_simple_widget_rep::translate_backing_store (int dpx, int dpy) {
 #if MUPDF_RENDERER
-    fz_pixmap *pix=  ((mupdf_picture_rep*)backing_store->get_handle())->pix;
-    fz_context *ctx= mupdf_context ();
+  fz_pixmap *pix=  ((mupdf_picture_rep*)backing_store->get_handle())->pix;
 #else
-    fz_pixmap *pix=  ((fitz_picture_rep*)backing_store->get_handle())->pix;
-    fz_context *ctx= get_fitz_context ();
+  fz_pixmap *pix=  ((fitz_picture_rep*)backing_store->get_handle())->pix;
 #endif
+  if (pix == NULL || pix->samples == NULL) return;
+  int w= pix->w, h= pix->h, n= pix->n;
+  ptrdiff_t stride= pix->stride;
+  if (dpx >= w || -dpx >= w || dpy >= h || -dpy >= h) return; // nothing left
+  int x0= max (0, dpx), x1= min (w, w + dpx); // destination columns
+  int y0= max (0, dpy), y1= min (h, h + dpy); // destination rows
+  size_t len= (size_t) (x1 - x0) * n;
+  if (dpy > 0) // moving down: from the last row up, so as not to overwrite sources
+    for (int y= y1 - 1; y >= y0; y--)
+      memmove (pix->samples + y * stride + x0 * n,
+               pix->samples + (y - dpy) * stride + (x0 - dpx) * n, len);
+  else
+    for (int y= y0; y < y1; y++)
+      memmove (pix->samples + y * stride + x0 * n,
+               pix->samples + (y - dpy) * stride + (x0 - dpx) * n, len);
+}
 
-    int w= fz_pixmap_width (ctx, pix);
-    int h= fz_pixmap_height (ctx, pix);
-    fz_pixmap *area= fz_new_pixmap (ctx, fz_device_rgb (ctx),
-                                   w, h, NULL, 1);
-    fz_irect r= fz_make_irect (x1, y2, x2, y1);
-    fz_copy_pixmap_rect (ctx, area, pix, r, NULL);
-    area->x= dx;
-    area->y= dy;
-    fz_copy_pixmap_rect (ctx, pix, area, r, NULL);
-    fz_drop_pixmap (ctx, area);
-  }
+// a scroll position on the pixel grid of the backing store (floor)
+static SI
+grid_floor (SI v, SI px) {
+  return (v >= 0) ? (v / px) * px : -(((-v) + px - 1) / px) * px;
+}
+
+void
+vue_simple_widget_rep::invalidate_all_editors () {
+  list<vue_simple_widget_rep*> l= paint_list;
+  while (!is_nil (l)) { l->item->invalidate_all (); l= l->next; }
 }
 
 void
@@ -4078,34 +4078,32 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     if (scroll_pos.x2 - sz.x2 < extents->y1)
       scroll_pos.x2= min (extents->y1 + sz.x2, extents->y2);
     else if (scroll_pos.x2 > extents->y2) scroll_pos.x2= extents->y2;
+    // and keep it on the pixel grid, so that the content of the backing
+    // store can be reused after a scroll (a shift by whole pixels)
+    scroll_pos.x1= grid_floor (scroll_pos.x1, ren->pixel);
+    scroll_pos.x2= grid_floor (scroll_pos.x2, ren->pixel);
   }
   
-  // check if the scroll position has changed. backing_pos is the old position,
-  // while scroll_pos is the new one. Instead of repainting the whole backing store,
-  // we move the contents of the backing store, and invalidate the regions that
-  // are not covered by the moved contents.
-  
+  // the scroll position changed: instead of repainting the whole backing
+  // store, shift its content and repaint only the exposed strips (the
+  // pending invalid regions are in document coordinates and stay valid).
+  // The window renderer maps document point P to pixel
+  // ((P.x - pos.x1)/pixel, (pos.x2 - P.y)/pixel), so the content moves by
+  // (-ddx, +ddy) pixels when the position moves by (ddx, ddy)
   if (backing_pos != scroll_pos) {
-    int dx=  retina_factor * (scroll_pos.x1 - backing_pos.x1);
-    int dy=  retina_factor * (scroll_pos.x2 - backing_pos.x2);
-
+    SI ddx= scroll_pos.x1 - backing_pos.x1;
+    SI ddy= scroll_pos.x2 - backing_pos.x2;
     backing_pos= scroll_pos;
-    //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
-        
-#if 0
-    //FIXME: complete this part
-    if (backing_valid) {
-      translate_backing_store (0, 0, bs_w, bs_h, -dx, -dy);
-      if (dy<0) invalidate_viewport_rect (0, 0, bs_w, min (bs_h,-dy));
-      else if (dy>0) invalidate_viewport_rect (0, max (0,bs_h-dy), bs_w, bs_h);
-      if (dx<0) invalidate_viewport_rect (0, 0, min (-dx, bs_w), bs_h);
-      else if (dx>0) invalidate_viewport_rect (max (0, bs_w-dx), 0, bs_w, bs_h);
-    } else {
-      invalidate_all ();
+    if (backing_valid && ddx % ren->pixel == 0 && ddy % ren->pixel == 0 &&
+        (int) size.x1 == bs_w && (int) size.x2 == bs_h) {
+      int dpx= (int) (-ddx / ren->pixel), dpy= (int) (ddy / ren->pixel);
+      translate_backing_store (dpx, dpy);
+      if (dpy > 0) invalidate_viewport_rect (0, 0, bs_w, min (bs_h, dpy));
+      else if (dpy < 0) invalidate_viewport_rect (0, max (0, bs_h + dpy), bs_w, bs_h);
+      if (dpx > 0) invalidate_viewport_rect (0, 0, min (bs_w, dpx), bs_h);
+      else if (dpx < 0) invalidate_viewport_rect (max (0, bs_w + dpx), 0, bs_w, bs_h);
     }
-#else
-    invalidate_all ();
-#endif
+    else invalidate_all ();
   }
   
   // check if the window has been resized. If so, we need to resize the backing

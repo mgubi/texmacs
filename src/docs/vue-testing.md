@@ -32,6 +32,7 @@ wheel x y dx dy
 key <SDL key name>          e.g. Return, Escape, Tab, Backspace, Down
 text <string>               one text-input event per character
 resize w h
+repaint                     invalidate every editor (repaint from scratch)
 close                       close request on the target window
 snapshot <name>
 ```
@@ -64,8 +65,9 @@ boot crashed and **wipes the settings and the cache**, so the next run says
 `Installation completed successfully`, opens a Welcome window (tools then go
 to that window, `current-window`) and the snapshots of window `#2` are
 meaningless — rerun. A `window` command which matches nothing prints
-`vue script: no window matches` and the following commands are skipped (they
-used to go to the previous target, e.g. closing the main window).
+`vue script: no window matches` and the following commands are skipped
+until a `window` command matches (they used to go to the last created
+window, e.g. closing the main window).
 `Error message:` in the log is a crash report with a C++ backtrace
 (`get_crash_report`); addresses without symbols can be located with
 `objdump -d --disassemble-symbols=<mangled>` on `texmacs.bin`.
@@ -89,7 +91,10 @@ filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
 editor), `macros-editor` (the macros editor dialog: selecting a macro in the
 list updates the embedded editor), `macro-tool` (the macro editor as a side
 tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
-list inside its box, selection rebuilds the tool without misdrawn widgets), `wheel-inertia` (a single wheel step
+list inside its box, selection rebuilds the tool without misdrawn widgets), `scroll-shift` (scrolling
+shifts the backing store: the snapshots before and after a `repaint` must
+be identical in the editor area — the footer may show another welcome
+message), `wheel-inertia` (a single wheel step
 scrolls in sync — snapshots i0/i1/i2 are
 identical — while three quick steps launch a glide: the `handling wheel`
 lines of the log after i3 are the synthetic decaying deltas).
@@ -97,9 +102,11 @@ lines of the log after i3 are the synthetic decaying deltas).
 ## Writing a test
 
 1. Build the widget in a `.scm` file with the `tm-widget` markup and open it
-   after boot with `(delayed (:idle 1500) (top-window my-widget "Title"))`;
+   after boot with `(delayed (:pause 1500) (top-window my-widget "Title"))`;
    modules of real dialogs must be imported with `use-modules` since `-x`
-   runs before lazy loading.
+   runs before lazy loading. Use `:pause`, not `:idle`: the idle time of the
+   editor is zero while its window has no keyboard focus, and a test
+   instance launched while another TeXmacs is in use never gets it.
 2. Take a first snapshot, read the pixel positions from the PNG (divide by 2
    for points) and write the clicks.
 3. Print the callback results with `display*` and check them in the log.

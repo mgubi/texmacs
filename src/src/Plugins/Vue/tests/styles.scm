@@ -12,4 +12,4 @@
     (hlist (toggle (noop) #t) // (mono (input (noop) "string" '("mono input") "10em")))
     ===
     (explicit-buttons (hlist ("Normal" (noop)) // (inert ("Inert" (noop)))))))
-(delayed (:idle 1500) (top-window vue-styles "Vue styles"))
+(delayed (:pause 1500) (top-window vue-styles "Vue styles"))

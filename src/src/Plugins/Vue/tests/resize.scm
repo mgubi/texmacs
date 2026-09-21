@@ -9,4 +9,4 @@
         (choice (display* "choice: " answer "\n")
                 '("First" "Second" "Third" "Fourth" "Fifth" "Sixth"
                   "Seventh" "Eighth" "Ninth" "Tenth") "Third")))))
-(delayed (:idle 1500) (top-window vue-resize "Vue resize"))
+(delayed (:pause 1500) (top-window vue-resize "Vue resize"))

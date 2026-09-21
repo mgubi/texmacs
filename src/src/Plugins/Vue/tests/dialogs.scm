@@ -41,7 +41,7 @@
   ---
   ("Third item" (noop)))
 
-(delayed (:idle 1500)
+(delayed (:pause 1500)
   (show-plain vue-test2 "Vue test 2" 500 300)
   (show-raw (widget-color-picker (object->command (lambda (t) (display* "color: " t "\n"))) #f
                                  (list (stree->tree "red") (stree->tree "blue")))

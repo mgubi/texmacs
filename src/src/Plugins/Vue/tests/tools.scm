@@ -1,7 +1,7 @@
 ;; the tool areas of the main window: a tool on the right, one on the left
 ;; and one at the bottom
 (use-modules (generic format-widgets) (generic document-widgets))
-(delayed (:idle 3000)
+(delayed (:pause 3000)
   (tool-select :right 'format-paragraph-tool)
   (tool-select :left 'document-paragraph-tool)
   (tool-select :bottom 'buffer-tool)

@@ -11,7 +11,7 @@
           (text "line 3")
           (input (noop) "string" '("input") "15em")))
       (tab (text "Third") (text "Third page")))))
-(delayed (:idle 1500)
+(delayed (:pause 1500)
   (top-window vue-tabs "Vue tabs")
   (open-style-selector)
   (open-preferences-window))

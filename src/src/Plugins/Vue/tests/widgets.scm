@@ -39,4 +39,4 @@
     (alt-window-set-size win 520 1000)
     (alt-window-show win)))
 
-(delayed (:idle 1500) (show-big vue-test "Vue test"))
+(delayed (:pause 1500) (show-big vue-test "Vue test"))

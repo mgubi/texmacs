@@ -293,9 +293,19 @@ the window, are at most as tall as the window and scroll.
 `vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the UI
 background (red in the F1 debug mode, to spot uncovered areas), replays the
 Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
-own a backing store picture repainted incrementally (`invalid_regions`,
-`translate_backing_store` when scrolling) and blitted by their custom render
-callback. `TEXMACS_VUE_SNAPSHOT=<dir>` writes every redraw as PNG.
+own a backing store picture repainted incrementally (`invalid_regions`, in
+document coordinates) and blitted by their custom render callback.
+**Scrolling** shifts the pixels of the backing store (`translate_backing_store`,
+`memmove` per row) and repaints only the exposed strips, so a scroll step
+costs a strip instead of the whole viewport (the tiled neutral background
+and the glyphs were the bulk of a frame): for that the scroll position is
+kept on the pixel grid (`grid_floor` after the clamps; the wheel path moves
+by whole pixels and carries the remainder in `scroll_rest_x/y`, the scroll
+bars round their position), and a change of the viewport size or a
+position off the grid falls back to a full repaint. The `repaint` script
+command invalidates every editor, so that a test can compare the shifted
+result with a repaint from scratch (`scroll-shift`).
+`TEXMACS_VUE_SNAPSHOT=<dir>` writes every redraw as PNG.
 
 ### The MuPDF renderer
 
