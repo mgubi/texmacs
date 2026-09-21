@@ -1230,9 +1230,12 @@ void gui_start_loop () {
       }
     }
     if (wheel_inertia_step ()) {
-      // keep the frames coming while the view glides, at a moderate rate
+      // keep the frames coming while the view glides (or while a stream of
+      // wheel events is being watched for a launch), paced at 5 ms but
+      // woken up by any event: a plain sleep here added its length to the
+      // latency of every wheel event
       gui_needs_update= true;
-      if (!SDL_PollEvent (NULL)) SDL_Delay (5);
+      if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 5);
     }
 
     if (gui_needs_update) {
