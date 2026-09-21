@@ -128,8 +128,8 @@ time_t key_time;
 // pointer info
 string mouse_action;
 time_t mouse_time;
-unsigned int mouse_x;
-unsigned int mouse_y;
+int mouse_x; // signed: see vue_input_state in vue_gui.hpp
+int mouse_y;
 unsigned int mouse_state= 0;
 array<double> mouse_data;
 
@@ -2032,8 +2032,8 @@ vue_ui_rep::do_layout () {
     CLAY(CLAY_IDI("glue_widget", id), {
       .layout= {
         .sizing= {
-          .width=  d.hx ? CLAY_SIZING_GROW( .min= (float)d.w/PIXEL)
-                        : CLAY_SIZING_FIXED((float)d.w/PIXEL),
+          .width=  d.hx ? CLAY_SIZING_GROW( .min= (float)2*d.w/PIXEL)
+                        : CLAY_SIZING_FIXED((float)2*d.w/PIXEL),
           .height= d.vx ? CLAY_SIZING_GROW( .min= (float)2*d.h/PIXEL)
                         : CLAY_SIZING_FIXED((float)2*d.h/PIXEL) }}}) {};
     return;
@@ -2233,22 +2233,23 @@ vue_ui_rep::do_layout () {
         current_window->refresh_kinds->contains ("any") ||
         current_window->refresh_kinds->contains (d.kind) ) {
       // (re)initialize the widget
-      string s = "'(vertical (link " * d.tmwid * "))";
+      string s= "'(vertical (link " * d.tmwid * "))";
       eval ("(lazy-initialize-force)");
-      object xwid = call ("menu-expand", eval (s));
+      object xwid_expanded= eval (s); // evaluated once, was evaluated twice
+      object xwid= call ("menu-expand", xwid_expanded);
       static hashmap<object, widget> cache;
-      if (cache->contains (xwid)) {
-        if (d.curobj == xwid) return false;
-        d.curobj = xwid;
+      if (d.curobj == xwid); // unchanged: keep the widget we already have
+      else if (cache->contains (xwid)) {
+        d.curobj= xwid;
         d.current= cache [xwid];
-      } else {
-        d.curobj = xwid;
-        object uwid = eval (s);
-        d.current = make_menu_widget (uwid);
-        //tmwid->add_child (cur); // FIXME?! Is this ok? what when we refresh?
-        if (menu_caching) cache (xwid) = d.current;
+        data= close_box (d);
       }
-      data= close_box (d);
+      else {
+        d.curobj= xwid;
+        d.current= make_menu_widget (xwid_expanded);
+        if (menu_caching) cache (xwid)= d.current;
+        data= close_box (d);
+      }
     }
     CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .sizing= layoutFit }})
@@ -2979,6 +2980,13 @@ vue_input_text_widget_rep::process_key (string key) {
     tabs= array<string> (0);
     return true;
   }
+  // any key but tab ends a tab completion (the stored tab_pos and the
+  // proposals belong to the string as it was when tab was pressed)
+  if (key != "tab" && key != "S-tab") {
+    tabs= array<string> (0);
+    tab_nr= 0;
+    tab_pos= 0;
+  }
   // the clipboard and the selection
   if (key == "M-a") { sel= 0; pos= N(s); return true; }
   if (key == "M-c") { copy_selection (false); return true; }
@@ -3363,7 +3371,7 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     case SLOT_REFRESH:
       {
         string kind= check_open<string> (val, s);
-        win->next_refresh_kinds << kind;
+        if (win) win->next_refresh_kinds << kind;
       }
       break;
     case SLOT_DESTROY:
@@ -3394,18 +3402,18 @@ vue_plain_window_widget_rep::query (slot s, int type_id) {
     case SLOT_IDENTIFIER:
     {
       check_type_id<int> (type_id, s);
-      return close_box<int> (win->id);
+      return close_box<int> (win ? win->id : 0);
     }
     case SLOT_POSITION:
     {
-      SI x, y;
+      SI x= 0, y= 0; // the window may already be destroyed
       check_type_id<coord2> (type_id, s);
       if (win) win->get_position (x, y);
       return close_box<coord2> (coord2 (x, y));
     }
     case SLOT_SIZE:
     {
-      SI w, h;
+      SI w= 0, h= 0;
       check_type_id<coord2> (type_id, s);
       if (win) win->get_size (w, h);
       return close_box<coord2> (coord2 (w, h));
@@ -4071,6 +4079,9 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
 
 vue_simple_widget_rep::~vue_simple_widget_rep () {
   paint_list= remove (paint_list, this);
+  // the renderer holds the backing store pixmap, a draw device and a PDF
+  // processor: they were leaked for every destroyed editor
+  if (ren != NULL) { delete_renderer (ren); ren= NULL; }
 }
 
 // Message handling
@@ -4368,10 +4379,17 @@ vue_simple_widget_rep::do_layout () {
         .childOffset= scrollPosition },
       .found= true
     };
+    Clay_Vector2 before= scrollPosition;
     scroll_bar (clay_id, scrollData);
-    scroll_pos.x1= -((SI) floor (scrollPosition.x + 0.5)) * ren->pixel;
-    scroll_pos.x2=  ((SI) floor (scrollPosition.y + 0.5)) * ren->pixel;
-    absolute_scroll= false;
+    // only a dragged thumb changes the position here; assigning it back
+    // unconditionally dropped the scroll requests of the editor (scroll to
+    // the cursor) whenever a second layout pass followed in the same
+    // iteration of the loop
+    if (scrollPosition.x != before.x || scrollPosition.y != before.y) {
+      scroll_pos.x1= -((SI) floor (scrollPosition.x + 0.5)) * ren->pixel;
+      scroll_pos.x2=  ((SI) floor (scrollPosition.y + 0.5)) * ren->pixel;
+      absolute_scroll= false;
+    }
   }
   // note: our CLAY block is closed here, Clay_Hovered () would test the parent
   if (Clay_PointerOver (clay_id) && (mouse_action != "")) {
@@ -5537,6 +5555,7 @@ void destroy_window_widget (widget w) {
   vue_inputs_list_widget_rep *il= dynamic_cast<vue_inputs_list_widget_rep*> (vw.rep);
   if (ww) {
     tm_delete (ww->win);
+    ww->win= NULL; // the widget may outlive its window (Scheme holds it)
   } else if (il) {
     // the dialog is shown in a window of its own
     if (!is_nil (il->win_widget)) destroy_window_widget (il->win_widget);

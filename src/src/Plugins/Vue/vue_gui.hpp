@@ -37,7 +37,9 @@ struct vue_input_state {
   // pointer events (coordinates are relative to the window)
   string mouse_action;
   time_t mouse_time;
-  unsigned int mouse_x, mouse_y;
+  // signed: a drag may continue outside the window, where SDL reports
+  // negative coordinates, and a pointer which left has none at all
+  int    mouse_x, mouse_y;
   array<double> mouse_data;
   // kinetic scrolling (see wheel_inertia_step in vue_gui.cpp): the speed
   // of the wheel estimated from its events, the velocity of the glide after
@@ -175,7 +177,11 @@ public:
   vue_window saved_win;
   with_window (vue_window _win)
   : saved_win (current_window) { if (_win) Clay_SetCurrentContext (_win->clay_ctx); current_window= _win; }
-  ~with_window () { if (saved_win) Clay_SetCurrentContext (saved_win->clay_ctx); current_window= saved_win; }
+  // the context is restored unconditionally: leaving it on a window whose
+  // arena is freed later left Clay pointing into freed memory
+  ~with_window () {
+    Clay_SetCurrentContext (saved_win ? saved_win->clay_ctx : NULL);
+    current_window= saved_win; }
 };
 
 #endif

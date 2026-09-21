@@ -1258,13 +1258,20 @@ void gui_start_loop () {
     script_step (); // may push synthetic events
     SDL_Event event;
     if (SDL_PollEvent (&event)) {
+      bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
+                       event.type == SDL_EVENT_MOUSE_MOTION);
       process_event (&event);
       gui_needs_update= true;
-      // a frame costs more than the interval between the events of a
+      // A frame costs more than the interval between the events of a
       // trackpad or of a fast pointer: handle the wheel and motion events
       // which are already queued in this frame too (their deltas add up,
-      // the last position wins), so that the view keeps up with the fingers
-      while (SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
+      // the last position wins), so that the view keeps up with the
+      // fingers. Only when the first event was itself a motion or a wheel:
+      // the motion handler overwrites mouse_action, so batching after a
+      // press or a release would drop it before any widget sees it (a
+      // click on a trackpad almost always comes with a small motion).
+      while (batchable &&
+             SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
                              SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
              (event.type == SDL_EVENT_MOUSE_WHEEL ||
               event.type == SDL_EVENT_MOUSE_MOTION) &&
@@ -1778,10 +1785,11 @@ process_event (SDL_Event *event) {
       if (win && win->popup) win->set_visibility (false);
       else if (win) {
         // no element is under the pointer any more (no hovered button left
-        // highlighted behind); an element being dragged stays active
+        // highlighted behind); an element being dragged stays active and
+        // keeps the last position inside the window, so that it freezes
+        // there instead of jumping to an extreme
         with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
-        win->input.mouse_x= win->input.mouse_y= (unsigned int) -1;
         win->input.mouse_action= "move";
         win->input.mouse_time= texmacs_time ();
       }
@@ -2653,9 +2661,8 @@ initialize_keyboard () {
   Map (SDLK_CARET, "^");
   Map (SDLK_UNDERSCORE, "_");
   Map (SDLK_GRAVE, "`");
-  Map (SDLK_LEFTBRACKET, "{");
-  Map (SDLK_KP_VERTICALBAR, "|");
-  Map (SDLK_RIGHTBRACKET, "}");
+  // "{", "|" and "}" are typed with a modifier and come as text events;
+  // mapping them here overwrote the "[", "]" entries of the same scancodes
   //Map (SDLK_TILDA, "~");
 
   // dead keys
