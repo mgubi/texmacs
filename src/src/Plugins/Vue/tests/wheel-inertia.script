@@ -1,5 +1,6 @@
-# kinetic scrolling (the cursor is at the end, so scroll up): a wheel step scrolls partly at once and glides on;
-# the log lines "scroll_where" give the positions
+# kinetic scrolling (the cursor is at the end, so scroll up): a single wheel
+# step scrolls in sync (i0 = i1 = i2), three quick steps launch a glide (the
+# "handling wheel" lines of the log show the synthetic deltas after i3)
 wait 7000
 window #2
 # the document is inserted by wheel-inertia.scm

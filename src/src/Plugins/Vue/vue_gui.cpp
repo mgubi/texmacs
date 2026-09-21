@@ -1020,18 +1020,19 @@ bool gui_wait=  false;
 /******************************************************************************
 * Kinetic scrolling
 *
-* An isolated wheel event (a notch of a mouse wheel) scrolls by
-* wheel_immediate of its delta at once; the rest becomes a velocity which
-* decays exponentially with time constant wheel_tau and is turned into
-* synthetic wheel deltas frame by frame, so that the view glides (the total
-* distance is the one of the event). Events which follow each other closely
-* (a trackpad gesture, whose momentum phase is already provided by the
-* system) scroll at once, without lag: any pending glide is flushed.
+* Wheel events scroll at once, so that a wheel which is turned slowly moves
+* the view in sync. Meanwhile the speed of the wheel is estimated from the
+* events; when they stop while the wheel was "launched" (speed above
+* wheel_launch_speed), the view goes on with that velocity, decaying
+* exponentially with time constant wheel_tau, through synthetic wheel deltas
+* (the momentum phase of a trackpad gesture is a stream of events provided
+* by the system: it ends slowly and starts no glide of ours).
 ******************************************************************************/
 
-static const double wheel_tau= 250.0;     // ms
-static const double wheel_immediate= 0.25;
-static const time_t wheel_stream_dt= 30;  // ms between the events of a stream
+static const double wheel_tau= 350.0;          // ms
+static const double wheel_launch_speed= 0.02;  // wheel units per ms
+static const time_t wheel_stream_dt= 30;       // ms: the events have stopped
+static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
 
 // deliver a wheel delta to the window: to the widgets (mouse_action) and to
 // the Clay scroll container under the pointer
@@ -1051,20 +1052,46 @@ push_wheel (vue_window win, double dx, double dy) {
   Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx, (float) dy }, 0.01f);
 }
 
-// advance the kinetic scrolling of all windows; returns true if some
-// window scrolled (the loop must then redraw and not sleep)
+// a wheel event: scroll now and update the estimated speed of the wheel
+static void
+wheel_event (vue_window win, double dx, double dy, time_t now) {
+  vue_input_state& in= win->input;
+  in.wheel_vx= in.wheel_vy= 0; // the user took over from a glide
+  time_t dt= (in.wheel_event_time == 0) ? wheel_slow_dt : now - in.wheel_event_time;
+  dt= max ((time_t) 8, min (dt, wheel_slow_dt));
+  in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
+  in.wheel_est_y= 0.5 * (in.wheel_est_y + dy / dt);
+  in.wheel_event_time= now;
+  push_wheel (win, dx, dy);
+}
+
+// advance the kinetic scrolling of all windows; returns true if the loop
+// must come back soon (a view glides or a glide may start)
 static bool
 wheel_inertia_step () {
-  bool moved= false;
+  bool busy= false;
   time_t now= texmacs_time ();
   iterator<int> it= iterate (id_to_window);
   while (it->busy ()) {
     vue_window win= (vue_window) id_to_window[it->next ()];
     if (win == NULL) continue;
     vue_input_state& in= win->input;
-    if (in.wheel_vx == 0 && in.wheel_vy == 0) { in.wheel_time= 0; continue; }
+    if (in.wheel_vx == 0 && in.wheel_vy == 0) {
+      // no glide: did the events just stop with a launched wheel?
+      if (in.wheel_est_x == 0 && in.wheel_est_y == 0) continue;
+      busy= true;
+      if (now - in.wheel_event_time < wheel_stream_dt) continue;
+      if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed) {
+        in.wheel_vx= in.wheel_est_x;
+        in.wheel_vy= in.wheel_est_y;
+        in.wheel_time= now;
+      }
+      in.wheel_est_x= in.wheel_est_y= 0;
+      continue;
+    }
+    busy= true;
     time_t dt= now - in.wheel_time;
-    if (dt <= 0) { moved= true; continue; }
+    if (dt <= 0) continue;
     double decay= exp (- (double) dt / wheel_tau);
     double dx= in.wheel_vx * wheel_tau * (1.0 - decay);
     double dy= in.wheel_vy * wheel_tau * (1.0 - decay);
@@ -1073,9 +1100,9 @@ wheel_inertia_step () {
     in.wheel_time= now;
     if (fabs (in.wheel_vx) < 1e-4) in.wheel_vx= 0;
     if (fabs (in.wheel_vy) < 1e-4) in.wheel_vy= 0;
-    if (dx != 0 || dy != 0) { push_wheel (win, dx, dy); moved= true; }
+    if (dx != 0 || dy != 0) push_wheel (win, dx, dy);
   }
-  return moved;
+  return busy;
 }
 bool gui_needs_update= true;
 
@@ -1582,23 +1609,7 @@ process_event (SDL_Event *event) {
         in.mouse_y= event->wheel.mouse_y * retina_factor;
         double dx= event->wheel.x * retina_factor;
         double dy= event->wheel.y * retina_factor;
-        bool stream= (in.wheel_event_time != 0 &&
-                      in.mouse_time - in.wheel_event_time < wheel_stream_dt);
-        in.wheel_event_time= in.mouse_time;
-        if (stream) {
-          // a gesture: scroll at once, together with what a previous glide
-          // still had to deliver (the integral of the decaying velocity)
-          push_wheel (win, dx + in.wheel_vx * wheel_tau, dy + in.wheel_vy * wheel_tau);
-          in.wheel_vx= in.wheel_vy= 0;
-        }
-        else {
-          // a notch: part of the delta scrolls at once, the rest is spread
-          // over the following frames by wheel_inertia_step
-          push_wheel (win, wheel_immediate * dx, wheel_immediate * dy);
-          in.wheel_vx += (1.0 - wheel_immediate) * dx / wheel_tau;
-          in.wheel_vy += (1.0 - wheel_immediate) * dy / wheel_tau;
-          if (in.wheel_time == 0) in.wheel_time= in.mouse_time;
-        }
+        wheel_event (win, dx, dy, in.mouse_time); // kinetic scrolling, see above
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:

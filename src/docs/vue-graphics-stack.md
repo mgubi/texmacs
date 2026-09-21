@@ -178,17 +178,18 @@ click on a `menu_button` sets `cancel_popup` which closes the chain (and popup
 windows). Menus flip to the other side of their button or shift to stay in
 the window, are at most as tall as the window and scroll.
 
-* **Kinetic scrolling** (`vue_gui.cpp`, `wheel_inertia_step`): an isolated
-  wheel event (a mouse notch) delivers `wheel_immediate` (25%) of its delta
-  at once; the rest becomes a per-window velocity
-  (`vue_input_state::wheel_vx/vy`) decaying with `wheel_tau` (250 ms),
-  turned into synthetic wheel deltas every frame (`push_wheel`:
-  `mouse_action= "wheel"` for the widgets plus `Clay_UpdateScrollContainers`
-  for the Clay container under the pointer), so the notch glides; the total
-  distance equals the event's. Events less than `wheel_stream_dt` (30 ms)
-  apart form a stream (trackpad gesture, whose momentum the system already
-  provides): they scroll at once, flushing any pending glide, so there is no
-  lag. The editor keeps the fractional SI remainder of the small steps
+* **Kinetic scrolling** (`vue_gui.cpp`, `wheel_event`,
+  `wheel_inertia_step`): wheel events scroll at once (a slowly turned wheel
+  moves the view in sync) while the speed of the wheel is estimated from
+  them (`vue_input_state::wheel_est_x/y`, wheel units per ms, smoothed).
+  When no event has come for `wheel_stream_dt` (30 ms) and the speed is
+  above `wheel_launch_speed`, the view goes on with that velocity
+  (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
+  deltas every frame (`push_wheel`: `mouse_action= "wheel"` for the widgets
+  plus `Clay_UpdateScrollContainers` for the Clay container under the
+  pointer); a new event stops the glide. A trackpad gesture is a stream of
+  events with its own (system) momentum phase which ends slowly, so it starts
+  no glide. The editor keeps the fractional SI remainder of the small steps
   (`scroll_rest_x/y`). While a view glides the loop does not sleep (5 ms
   pacing).
 

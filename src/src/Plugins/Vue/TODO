@@ -30,8 +30,8 @@ DONE
   the scroll bars of the editors; footer texts are clipped
 * tab/shift-tab move the focus between the inputs of a dialog
 * balloons are attached below their widget
-* kinetic scrolling: wheel deltas are partly applied at once, the rest as a
-  decaying velocity (same total distance), for editors and Clay containers
+* kinetic scrolling: wheel events scroll in sync, a launched wheel makes the
+  view glide with a decaying velocity (editors and Clay containers)
 * editors are told when their window gains/loses the keyboard focus and when
   the focus moves to another widget (set_kbd_focus)
 * menus and popups stay on the screen (flip, shift, clamp)

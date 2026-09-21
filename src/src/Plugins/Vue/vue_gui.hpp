@@ -38,11 +38,13 @@ struct vue_input_state {
   time_t mouse_time;
   unsigned int mouse_x, mouse_y;
   array<double> mouse_data;
-  // kinetic scrolling: velocity left by the wheel events (wheel units per
-  // ms, see wheel_inertia_step in vue_gui.cpp) and the time of the last step
+  // kinetic scrolling (see wheel_inertia_step in vue_gui.cpp): the speed
+  // of the wheel estimated from its events, the velocity of the glide after
+  // they stop (wheel units per ms), the times of the last step and event
+  double wheel_est_x, wheel_est_y;
   double wheel_vx, wheel_vy;
   time_t wheel_time;
-  time_t wheel_event_time; // time of the last wheel event (stream detection)
+  time_t wheel_event_time;
   // popups and balloons
   bool current_popup;      // is there an active popup?
   bool cancel_popup;       // should we cancel popups?
@@ -58,7 +60,8 @@ struct vue_input_state {
 
   vue_input_state ()
     : key_time (0), mouse_time (0), mouse_x (0), mouse_y (0),
-      wheel_vx (0), wheel_vy (0), wheel_time (0), wheel_event_time (0),
+      wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
+      wheel_time (0), wheel_event_time (0),
       current_popup (false), cancel_popup (false), away_time (0),
       current_balloon (0), balloon_time (0),
       hot_id (0), active_id (0), active_button (0), last_id {},
