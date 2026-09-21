@@ -78,6 +78,11 @@ marker of uncovered areas).
   clip commands from culled elements, duplicate Clay ids, render commands
   of a layout pass drawing widgets freed by a command run after that pass
   (crash in `vue_render_widget_fn`; now avoided by `gui_needs_relayout`).
+* `aborting process from uncaught error!` as the last line of the log is
+  MuPDF exiting after a `fz_throw` outside `fz_try` (see the error handling
+  section of `vue-graphics-stack.md`); the `TeXmacs] MuPDF error:` line
+  before it names the failing operation. Wrap the call with
+  `mupdf_protected` or one of the `mupdf_*` helpers.
 * macOS blocks `screencapture` and CGEvent injection for processes without
   the corresponding permissions: use the snapshot and script aids instead
   (see `vue-testing.md`).

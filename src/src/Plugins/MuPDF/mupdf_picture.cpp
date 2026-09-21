@@ -15,6 +15,95 @@
 #include "image_files.hpp"
 #include "effect.hpp"
 
+/******************************************************************************
+* Protected MuPDF calls (see mupdf_picture.hpp)
+******************************************************************************/
+
+bool
+mupdf_protected_call (const char* what, void (*f) (void*), void* data) {
+  fz_context* ctx= mupdf_context ();
+  int ok= 1;
+  fz_var (ok);
+  fz_try (ctx) {
+    f (data);
+  }
+  fz_catch (ctx) {
+    ok= 0;
+    cout << "TeXmacs] MuPDF error in " << what << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return ok != 0;
+}
+
+fz_image*
+mupdf_image_from_file (const char* path) {
+  fz_context* ctx= mupdf_context ();
+  fz_image* im= NULL;
+  fz_var (im);
+  fz_try (ctx) {
+    im= fz_new_image_from_file (ctx, path);
+  }
+  fz_catch (ctx) {
+    im= NULL;
+    cout << "TeXmacs] MuPDF cannot load image " << path << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return im;
+}
+
+fz_image*
+mupdf_image_from_pixmap (fz_pixmap* pix) {
+  if (pix == NULL) return NULL;
+  fz_context* ctx= mupdf_context ();
+  fz_image* im= NULL;
+  fz_var (im);
+  fz_try (ctx) {
+    im= fz_new_image_from_pixmap (ctx, pix, NULL);
+  }
+  fz_catch (ctx) {
+    im= NULL;
+    cout << "TeXmacs] MuPDF cannot make an image: "
+         << fz_caught_message (ctx) << LF;
+  }
+  return im;
+}
+
+fz_pixmap*
+mupdf_pixmap_from_image (fz_image* im) {
+  if (im == NULL) return NULL;
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= NULL;
+  fz_var (pix);
+  fz_try (ctx) {
+    pix= fz_get_pixmap_from_image (ctx, im, NULL, NULL, NULL, NULL);
+  }
+  fz_catch (ctx) {
+    pix= NULL;
+    cout << "TeXmacs] MuPDF cannot decode an image: "
+         << fz_caught_message (ctx) << LF;
+  }
+  return pix;
+}
+
+fz_pixmap*
+mupdf_new_pixmap (int w, int h) {
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= NULL;
+  fz_var (pix);
+  fz_try (ctx) {
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w, h, NULL, 1);
+  }
+  fz_catch (ctx) {
+    pix= NULL;
+    cout << "TeXmacs] MuPDF cannot allocate a " << w << "x" << h
+         << " pixmap: " << fz_caught_message (ctx) << LF;
+  }
+  // a 1x1 pixmap stands for what could not be allocated (out of memory
+  // for a 1x1 pixmap would terminate the process, nothing to do then)
+  if (pix == NULL) pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), 1, 1, NULL, 1);
+  fz_clear_pixmap (ctx, pix);
+  return pix;
+}
 
 /******************************************************************************
 * Abstract mupdf pictures
@@ -62,10 +151,7 @@ mupdf_picture (fz_pixmap *_pix, int ox, int oy) {
 picture
 as_mupdf_picture (picture pic) {
   if (pic->get_type () == picture_native) return pic;
-  fz_pixmap *pix= fz_new_pixmap (mupdf_context (),
-                                 fz_device_rgb (mupdf_context ()),
-                                 pic->get_width (), pic->get_height (),
-                                 NULL, 1);
+  fz_pixmap *pix= mupdf_new_pixmap (pic->get_width (), pic->get_height ());
   picture ret= mupdf_picture (pix, pic->get_origin_x (), pic->get_origin_y ());
   fz_drop_pixmap (mupdf_context (), pix);
   ret->copy_from (pic); // FIXME: is this inefficient???
@@ -80,10 +166,7 @@ as_native_picture (picture pict) {
 
 picture
 native_picture (int w, int h, int ox, int oy) {
-  fz_pixmap *pix= fz_new_pixmap (mupdf_context (),
-                                 fz_device_rgb (mupdf_context ()),
-                                 w, h, NULL, 1);
-  fz_clear_pixmap (mupdf_context (), pix);
+  fz_pixmap *pix= mupdf_new_pixmap (w, h);
   picture p= mupdf_picture (pix, ox, oy);
   fz_drop_pixmap (mupdf_context (), pix);
   return p;
@@ -169,7 +252,7 @@ mupdf_load_image (url u) {
       // FIXME: add more supported formats
       c_string path (concretize (u));
       //cout << "path :" << path << LF;
-      im= fz_new_image_from_file (mupdf_context (), path);
+      im= mupdf_image_from_file (path);
     } else if (suf == "xpm") {
       // try to load higher definition png equivalent if available
       url png_equiv= glue (unglue (u, 4), "_x4.png");
@@ -187,7 +270,7 @@ mupdf_load_image (url u) {
       // ok, try to load the xpm finally
       picture xp= as_mupdf_picture (raw_load_xpm (u));
       fz_pixmap *pix= ((mupdf_picture_rep*)xp->get_handle())->pix;
-      im= fz_new_image_from_pixmap (mupdf_context(), pix, NULL);
+      im= mupdf_image_from_pixmap (pix);
     }
   return im;
 }
@@ -201,7 +284,7 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
     url temp= url_temp (".png");
     image_to_png (u, temp, w, h);
     c_string path (as_string (temp));
-    im= fz_new_image_from_file (mupdf_context (), path);
+    im= mupdf_image_from_file (path);
     remove (temp);
   }
   
@@ -220,9 +303,12 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
          << concretize (u) << "\n";
   }
 
-  fz_pixmap *pix= fz_get_pixmap_from_image (mupdf_context (), im,
-                                            NULL, NULL, NULL, NULL);
+  fz_pixmap *pix= mupdf_pixmap_from_image (im);
   fz_drop_image (mupdf_context (), im); // we do not need it anymore
+  if (pix == NULL) {
+    cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
+    return NULL;
+  }
 
   // Build effect
   if (eff != "") {
@@ -243,9 +329,12 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
 picture 
 mupdf_load_picture (url file_name) {
   fz_image* fzim= mupdf_load_image (file_name);  
-  fz_pixmap *pix= fz_get_pixmap_from_image (mupdf_context (), fzim,
-                                            NULL, NULL, NULL, NULL);
-  fz_drop_image (mupdf_context (), fzim); // we do not need it anymore
+  fz_pixmap *pix= mupdf_pixmap_from_image (fzim);
+  if (fzim != NULL) fz_drop_image (mupdf_context (), fzim); // not needed anymore
+  if (pix == NULL) {
+    cout << "TeXmacs] warning: cannot load picture " << file_name << "\n";
+    pix= mupdf_new_pixmap (1, 1);
+  }
 
   picture pic= mupdf_picture (pix, 0, 0);
   fz_drop_pixmap (mupdf_context (), pix);

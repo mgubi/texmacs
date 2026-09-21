@@ -206,6 +206,33 @@ the window, are at most as tall as the window and scroll.
   (`scroll_rest_x/y`). While a view glides the loop does not sleep (5 ms
   pacing).
 
+## Error handling of the libraries
+
+* **MuPDF** reports errors with `fz_throw`, a `longjmp` to the innermost
+  `fz_try`; outside any `fz_try` block it prints "aborting process from
+  uncaught error!" and exits — this was the crash on a help document.
+  Everything which can fail (image decoding, font loading, pixmap and image
+  creation, the draw device and processor of a renderer, the PDF objects of
+  a pattern) goes through the helpers of `mupdf_picture.hpp`:
+  `mupdf_image_from_file/pixmap`, `mupdf_pixmap_from_image`,
+  `mupdf_new_pixmap` (a cleared pixmap, 1×1 if the size cannot be allocated)
+  and `mupdf_protected ("what", lambda)`, which logs `TeXmacs] MuPDF error in
+  what: ...` and returns false. The body of a protected call must not create
+  C++ objects with destructors (skipped by the longjmp). `mupdf_context ()`
+  installs error/warning callbacks so MuPDF's own messages reach the log.
+  The drawing operators themselves (`proc->op_*`, `image ()`) are not
+  wrapped: they run on objects created by protected calls and on a renderer
+  which always has a processor (`begin` falls back to a 1×1 pixmap).
+* **Clay** never aborts: its error handler (`HandleClayErrors`) logs each
+  kind of error once (duplicate ids, capacity exceeded, floating parent not
+  found...) and Clay skips the offending element. The arena is sized with
+  `Clay_MinMemorySize` for the default capacity (8192 elements per window).
+* **SDL3** functions return `NULL`/`false` and set `SDL_GetError`. Checked:
+  window creation (fatal), the layout arena, the window surface (the frame
+  is skipped), surface creation and blits, `SDL_UpdateWindowSurface`, the
+  primary display bounds (`SDL_GetPrimaryDisplay`, with a 1440×900 fallback),
+  clipboard get/set. `SDL_Init`/`TTF_Init` failures exit at startup.
+
 ## Rendering details
 
 `vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the UI

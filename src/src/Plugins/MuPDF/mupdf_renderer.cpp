@@ -25,14 +25,48 @@
 
 #include "mupdf_picture.hpp"
 
+// MuPDF errors and warnings go to the log (an error thrown outside a fz_try
+// block still terminates the process, see mupdf_picture.cpp)
+static void
+mupdf_error_callback (void* user, const char* message) {
+  (void) user;
+  cout << "TeXmacs] MuPDF error: " << message << LF;
+}
+
+static void
+mupdf_warning_callback (void* user, const char* message) {
+  (void) user;
+  cout << "TeXmacs] MuPDF warning: " << message << LF;
+}
+
 // manage a single global context for fitz
 fz_context*
 mupdf_context () {
   static fz_context *ctx= NULL;
   if (!ctx) {
     ctx= fz_new_context (NULL, NULL, FZ_STORE_UNLIMITED);
+    fz_set_error_callback (ctx, mupdf_error_callback, NULL);
+    fz_set_warning_callback (ctx, mupdf_warning_callback, NULL);
   }
   return ctx;
+}
+
+// load a font file, NULL if MuPDF cannot (fz_throw outside fz_try would
+// terminate the process)
+static fz_font*
+mupdf_font_from_file (const char* path) {
+  fz_context* ctx= mupdf_context ();
+  fz_font* font= NULL;
+  fz_var (font);
+  fz_try (ctx) {
+    font= fz_new_font_from_file (ctx, NULL, path, 0, 0);
+  }
+  fz_catch (ctx) {
+    font= NULL;
+    cout << "TeXmacs] MuPDF cannot load font " << path << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return font;
 }
 
 // global auxiliary document needed to invoke some functions
@@ -40,7 +74,16 @@ pdf_document*
 mupdf_document () {
   static pdf_document *doc= NULL;
   if (!doc) {
-    doc= pdf_create_document (mupdf_context ());
+    fz_context *ctx= mupdf_context ();
+    fz_var (doc);
+    fz_try (ctx) {
+      doc= pdf_create_document (ctx);
+    }
+    fz_catch (ctx) {
+      doc= NULL;
+      cout << "TeXmacs] MuPDF cannot create the auxiliary document: "
+           << fz_caught_message (ctx) << LF;
+    }
   }
   return doc;
 }
@@ -245,9 +288,22 @@ mupdf_renderer_rep::begin (void* handle) {
     fz_keep_pixmap (ctx, pixmap);
     w= fz_pixmap_width (ctx, pixmap);
     h= fz_pixmap_height (ctx, pixmap);
-    dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+    dev= NULL; proc= NULL;
     fz_matrix ctm= fz_make_matrix(1, 0, 0, -1, 0, 0);
-    proc=pdf_new_run_processor (ctx, mupdf_document (),  dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    bool ok= mupdf_protected ("mupdf_renderer_rep::begin", [&] () {
+      dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+      proc= pdf_new_run_processor (ctx, mupdf_document (), dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    });
+    if (!ok) {
+      // the drawing operators need a processor: draw into a 1x1 dummy
+      // pixmap instead (if even this fails we are out of memory)
+      if (dev != NULL) { fz_drop_device (ctx, dev); dev= NULL; }
+      fz_drop_pixmap (ctx, pixmap);
+      pixmap= mupdf_new_pixmap (1, 1);
+      w= h= 1;
+      dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+      proc= pdf_new_run_processor (ctx, mupdf_document (), dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    }
     
     fg  = -1;
     bg  = -1;
@@ -428,9 +484,9 @@ get_image (url u, int w, int h, tree eff, SI pixel) {
   mupdf_image mpim= mupdf_image ();
   fz_pixmap *pix= mupdf_load_pixmap (u, w, h, eff, pixel);
   if (pix) {
-    fz_image *im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    fz_image *im= mupdf_image_from_pixmap (pix);
     fz_drop_pixmap (mupdf_context (), pix);
-    mpim= mupdf_image (im);
+    if (im != NULL) mpim= mupdf_image (im);
   }
   return mpim;
 }
@@ -474,23 +530,30 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
 
   fz_context *ctx= mupdf_context ();
   pdf_document *doc= mupdf_document ();
-  pdf_obj *subres= pdf_new_dict (ctx, doc, 2);
-  pdf_obj *ref= pdf_add_image (ctx, doc, image_pdf->img);
-  pdf_dict_puts (ctx, subres, "pattern-image", ref);
-  pdf_drop_obj (ctx, ref);
-  
-  fz_buffer *buf= fz_new_buffer(ctx, 0);
-//  fz_output *out= fz_new_output_with_buffer(ctx, buf);
-  {
+  pdf_obj *subres= NULL;
+  pdf_obj *contents= NULL;
+  fz_buffer *buf= NULL;
+  bool ok= mupdf_protected ("mupdf_renderer_rep::register_pattern", [&] () {
+    subres= pdf_new_dict (ctx, doc, 2);
+    pdf_obj *ref= pdf_add_image (ctx, doc, image_pdf->img);
+    pdf_dict_puts (ctx, subres, "pattern-image", ref);
+    pdf_drop_obj (ctx, ref);
+    buf= fz_new_buffer (ctx, 0);
     pdf_processor *pout= pdf_new_buffer_processor (ctx, buf, 0, 0);
     pout->op_q (ctx, pout);
     pout->op_cm (ctx, pout, w, 0, 0, h, 0, 0);
     pout->op_Do_image (ctx, pout, "pattern-image", NULL);
     pout->op_Q (ctx, pout);
     pdf_close_processor (ctx, pout);
+    pdf_drop_processor (ctx, pout);
+    contents= pdf_add_stream (ctx, doc, buf, NULL /* dict */, 0 /* compress */);
+  });
+  if (buf != NULL) fz_drop_buffer (ctx, buf);
+  if (!ok) {
+    if (subres != NULL) pdf_drop_obj (ctx, subres);
+    if (contents != NULL) pdf_drop_obj (ctx, contents);
+    return; // the pattern stays unregistered: the callers fall back
   }
-  pdf_obj *contents= pdf_add_stream (ctx, doc, buf, NULL /* dict */, 0 /* compress */);
-  fz_drop_buffer (ctx, buf);
   {
     // make a pdf_pattern
     int width= fz_pixmap_width (ctx, pixmap);
@@ -955,7 +1018,8 @@ mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   if (!pict->im) {
     // let's cache the image representation of the pixmap
     // it will be dropped by the object
-    pict->im= fz_new_image_from_pixmap (mupdf_context (), pict->pix, NULL);
+    pict->im= mupdf_image_from_pixmap (pict->pix);
+    if (pict->im == NULL) return;
   }
   int w= p->get_width (), h= p->get_height ();
   int ox= p->get_origin_x (), oy= p->get_origin_y ();
@@ -1088,7 +1152,7 @@ pdf_font_desc *load_pdf_font (string fontname) {
     {
       //debug_convert << "fz_new_font_from_file "  << u  << LF;
       c_string path (concretize (u));
-      fz_font *font= fz_new_font_from_file (mupdf_context (), NULL, path, 0, 0);
+      fz_font *font= mupdf_font_from_file (path);
       if (font) {
         fontdesc= pdf_new_font_desc (mupdf_context ());
         fontdesc->font= font;
@@ -1232,10 +1296,19 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
         d+= 4;
       }
     }
-    fz_pixmap* pix= fz_new_pixmap_with_data (mupdf_context (),
-                                   fz_device_rgb (mupdf_context ()),
-                                   w, h, NULL, 1, w*4, samples);
-    fz_image* im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    fz_pixmap* pix= NULL;
+    fz_image* im= NULL;
+    mupdf_protected ("glyph image", [&] () {
+      pix= fz_new_pixmap_with_data (mupdf_context (),
+                                    fz_device_rgb (mupdf_context ()),
+                                    w, h, NULL, 1, w*4, samples);
+      im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    });
+    if (im == NULL) { // the glyph is not drawn
+      if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
+      else fz_free (mupdf_context (), samples);
+      return;
+    }
     mi= mupdf_image (im);
     mi->xo= xo; mi->yo= yo;
     character_image (xc)= mi;
@@ -1357,9 +1430,7 @@ mupdf_renderer_rep::new_shadow (renderer& ren) {
   }
   if (ren == NULL)  {
     ren= (renderer) tm_new<mupdf_renderer_rep> (mw, mh);
-    fz_pixmap *pix= fz_new_pixmap (mupdf_context (),
-                                   fz_device_rgb (mupdf_context ()), mw, mh,
-                                   NULL, 1);
+    fz_pixmap *pix= mupdf_new_pixmap (mw, mh);
     static_cast<mupdf_renderer_rep*>(ren)->begin(pix);
     fz_drop_pixmap (mupdf_context (), pix);
   }

@@ -122,11 +122,17 @@ static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextEl
   return (Clay_Dimensions) { (float) width, (float) height };
 }
 
+// Clay reports its problems through this handler and goes on (the offending
+// element is skipped): they are logged, once per kind to avoid flooding the
+// log during an animation. Capacity errors would need bigger arenas (see
+// Clay_SetMaxElementCount before Clay_Initialize below).
 void HandleClayErrors (Clay_ErrorData errorData) {
-  // See the Clay_ErrorData struct for more information
-  printf ("%s", errorData.errorText.chars);
-  // FIXME: properly handle Clay's errors
-  FAILED ("Clay error");
+  static int reported[16];
+  int kind= (int) errorData.errorType;
+  if (kind < 0 || kind >= 16) kind= 15;
+  if (reported[kind]++ > 0) return;
+  cout << "TeXmacs] Clay error (" << kind << "): "
+       << string (errorData.errorText.chars, errorData.errorText.length) << LF;
 }
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache
@@ -149,7 +155,9 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   
   sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
   if (!sdl_win) {
+    // nothing sensible can be done without a window
     SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError ());
+    FAILED ("Vue: cannot create a window");
   }
   
   nr_windows++;
@@ -176,6 +184,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
         .memory=  (char*) SDL_malloc (totalMemorySize),
         .capacity= totalMemorySize
     };
+    if (clay_arena.memory == NULL) FAILED ("Vue: cannot allocate the layout arena");
     clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
     Clay_SetCurrentContext (save_ctx);
   }
@@ -567,11 +576,17 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
   unsigned char *pixels= fz_pixmap_samples (ctx, pix);
   int w= fz_pixmap_width (ctx, pix);
   int h= fz_pixmap_height (ctx, pix);
+  if (dest_surf == NULL) return;
   SDL_Surface *surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
+  if (surf == NULL) {
+    SDL_Log ("SDL_CreateSurfaceFrom failed: %s", SDL_GetError ());
+    return;
+  }
   // FIXME: premultiplied?
   SDL_FRect src= { 0, 0, (float)w, (float)h };
   //SDL_RenderFillRect (sdl_ren, dest);
-  SDL_BlitSurface (surf, 0, dest_surf, 0);
+  if (!SDL_BlitSurface (surf, 0, dest_surf, 0))
+    SDL_Log ("SDL_BlitSurface failed: %s", SDL_GetError ());
   SDL_DestroySurface (surf);
 }
 
@@ -582,10 +597,22 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
 #else
   fz_context *ctx= get_fitz_context ();
 #endif
-  fz_pixmap *pix= fz_new_pixmap_with_data (ctx,
+  fz_pixmap *pix= NULL;
+#if MUPDF_RENDERER
+  // the window surface is wrapped, not copied; a 1x1 pixmap replaces it if
+  // MuPDF refuses (nothing is then drawn in this frame)
+  bool ok= (surf != NULL) && mupdf_protected ("window surface", [&] () {
+    pix= fz_new_pixmap_with_data (ctx, fz_device_bgr (ctx),
+                                  surf->w, surf->h, NULL, 1, 4*surf->w,
+                                  (unsigned char*) surf->pixels);
+  });
+  if (!ok) pix= mupdf_new_pixmap (1, 1);
+#else
+  pix= fz_new_pixmap_with_data (ctx,
                       fz_device_bgr (ctx),
                       surf->w, surf->h, NULL, 1, 4*surf->w,
                       (unsigned char*)surf->pixels);
+#endif
 #if MUPDF_RENDERER
   picture p= mupdf_picture (pix, 0, 0);
 #else
@@ -601,6 +628,11 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   int win_w, win_h;
 
   SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
+  if (surf == NULL) {
+    // e.g. a window being destroyed or minimized: nothing to draw on
+    SDL_Log ("SDL_GetWindowSurface failed: %s", SDL_GetError ());
+    return;
+  }
   backing_store= native_picture_from_SDL_Surface (surf);
 #if MUPDF_RENDERER
   fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
@@ -653,7 +685,10 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
-  SDL_UpdateWindowSurface (sdl_win);
+  if (!SDL_UpdateWindowSurface (sdl_win)) {
+    static int reported= 0;
+    if (reported++ < 3) SDL_Log ("SDL_UpdateWindowSurface failed: %s", SDL_GetError ());
+  }
   t1= t2; t2= texmacs_time ();
   if (t2 - t1 > 30) cout << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
 }
@@ -928,12 +963,18 @@ void gui_root_extents (SI& width, SI& height)
 {
   // get the screen size
   SDL_Rect r;
-  if (SDL_GetDisplayBounds (1, &r)) {
+  if (SDL_GetDisplayBounds (SDL_GetPrimaryDisplay (), &r)) {
     width= r.w * PIXEL;
     height= r.h * PIXEL;
     //cout << "SCREEN:" << screen_width << "," << screen_height << LF;
   } else {
-    SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
+    // headless or SDL trouble: pretend a common screen instead of leaving
+    // the sizes undefined
+    static bool reported= false;
+    if (!reported) SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
+    reported= true;
+    width= 1440 * PIXEL;
+    height= 900 * PIXEL;
   }
 }
 
