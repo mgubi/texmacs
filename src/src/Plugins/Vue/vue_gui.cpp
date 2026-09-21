@@ -1333,12 +1333,16 @@ script_step () {
     }
     else if (cmd == "window" && N(a) > 1) {
       string title= line (N(cmd)+1, N(line));
+      // no match: the following commands are skipped rather than sent to
+      // the previous target (e.g. closing the main window by mistake)
+      script_win= NULL;
       iterator<SDL_Window*> it= iterate (Window_to_window);
       while (it->busy ()) {
         vue_window w= (vue_window) Window_to_window [it->next ()];
         if (title == "#" * as_string (w->id) ||
             occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
       }
+      if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
       continue;
     }
     if (win == NULL) continue;

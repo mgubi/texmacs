@@ -56,10 +56,16 @@ grep -n 'choice:\|Error message\|vue script: done' /tmp/run.log
 Boot takes 5–15 s (more under load): scripts start with `wait 5000` or more,
 and a missing `vue script: done` usually means the run was killed too early.
 Leave a few seconds between two runs and kill only the test process (`$!`),
-not every `texmacs.bin` (the user may be running one). If the log says
-`Installation completed successfully`, the settings file could not be read
-and a Welcome window opened: tools then go to that window (`current-window`)
-and the snapshots of window `#2` are meaningless — rerun.
+not every `texmacs.bin` (the user may be running one). Never kill an
+instance while it boots and never boot two at once: since 2.1.5
+`acquire_boot_lock` writes `~/.TeXmacs/system/boot_lock` at boot and removes
+it once the event loop starts; a run which finds the lock assumes the last
+boot crashed and **wipes the settings and the cache**, so the next run says
+`Installation completed successfully`, opens a Welcome window (tools then go
+to that window, `current-window`) and the snapshots of window `#2` are
+meaningless — rerun. A `window` command which matches nothing prints
+`vue script: no window matches` and the following commands are skipped (they
+used to go to the previous target, e.g. closing the main window).
 `Error message:` in the log is a crash report with a C++ backtrace
 (`get_crash_report`); addresses without symbols can be located with
 `objdump -d --disassemble-symbols=<mangled>` on `texmacs.bin`.
@@ -67,7 +73,9 @@ and the snapshots of window `#2` are meaningless — rerun.
 Tests: `widgets` (choice, enum, toggle, filtered choice, tree, ink), `dialog`
 (`interactive` prompt, tab order, keyboard routing), `dialogs` (color picker,
 printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
-`resize`, `styles`, `font` (open and close the font selector), `popup` and
+`resize`, `styles`, `font` (open and close the font selector window;
+`open-font-selector` itself uses a side tool when the "side tools" preference
+is on, so the test calls `open-font-selector-window`), `popup` and
 `menus` (context menu and pull-down menus, flipping/scrolling), `checks`
 (menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
 section tabs of the preferences tool react to clicks), `two-tools` (tools at

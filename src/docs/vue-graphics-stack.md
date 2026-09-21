@@ -47,6 +47,14 @@ of other windows to the popup when the pointer is over it and drops them
 otherwise (`edit_mouse.cpp` relies on this X11 behaviour: it destroys its popup
 menu on any editor mouse event).
 
+**Closing a window.** `SDL_EVENT_WINDOW_CLOSE_REQUESTED` calls
+`destroy_event`, which sends `SLOT_DESTROY` to the plain window widget; that
+queues the window's `quit` command once (`quit_sent`) or, when there is none
+(the main TeXmacs window, `plain_window_widget (wid, name)` without command),
+forwards the slot to its contents as X11 does: the texmacs widget's command
+is `(safely-kill-window url)`, which kills the window or quits TeXmacs when
+it was the last one.
+
 **Showing a window.** Windows are created hidden. `set_visibility (true)` only
 records the request; the window is shown by `process_layout` once
 `ready_to_show` has been set by the content's `post_layout` (the contents fit

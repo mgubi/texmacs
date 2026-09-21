@@ -2957,10 +2957,14 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
     {
       ASSERT (is_nil (val), "type mismatch");
       // the quit command usually deletes the window, which sends us
-      // SLOT_DESTROY again: run it only once
-      if (!is_nil (quit) && !quit_sent) {
+      // SLOT_DESTROY again: run it only once. The main TeXmacs window has
+      // no quit command of its own: the request goes to its contents (the
+      // texmacs widget, whose command kills the window or quits), as the
+      // X11 port does
+      if (!quit_sent) {
         quit_sent= true;
-        cmd_list= list (quit, cmd_list);
+        if (!is_nil (quit)) cmd_list= list (quit, cmd_list);
+        else if (!is_nil (wid)) wid->send (s, val);
       }
     }
       break;
