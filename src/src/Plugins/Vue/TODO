@@ -7,13 +7,23 @@ TODO
   two-sided, color); orientation would need a rotation of the PDF
 * the debug view (F1) shows the element tree; its own scroll bars and
   toggles are Clay's and are not styled like ours
-* the main window receives the user icon bar (mask bit 16) and the
-  interactive query line (prompt and input) and stores them, but
-  vue_texmacs_widget_rep::do_layout never lays them out: neither is visible
 * the colour picker offers named colours only; the bg flag, the patterns
-  and the background images of the Qt picker are not implemented
+  and the background images of the Qt picker are not implemented. The
+  colour menus do not reach it at all: they route on (qt-gui?) and fall
+  back to the Scheme rgb picker, which is richer, so this is not urgent
 * resize_widget ignores the initial scrolling position (hpos, vpos), and
   user_canvas_widget ignores its style
+* no image previsualizer in the file chooser (the native dialog has none)
+* copying a selection as an image to the clipboard is Qt-only
+  (graphics_file_to_clipboard); the menu entry is hidden
+* the tree view does not observe its tree, so a database browser will not
+  refresh by itself (Qt has QTMTreeModel)
+* responsive tabs are plain tabs: the "gui:responsive tab mode" preference
+  does nothing
+* Windows: perform_select and the pipe layer are stubs, so no plugins and
+  no client/server there; printing shells out to CUPS
+* Linux: no X11 PRIMARY selection (SDL has only the system clipboard), and
+  the interface is drawn in the TeX fonts rather than a desktop UI font
 
 WIP
 
@@ -24,6 +34,12 @@ WIP
 
 DONE
 
+* Vue is no longer taken for X11 by the Scheme layer (gui_is_x is false and
+  vue-gui? exists), the query line of the footer works (test interactive),
+  keyboard-focus-on reaches the search and spell fields (test search-focus),
+  full screen works, the user icon bar is drawn, copying to another
+  application pastes readable text, and the image effects are computed
+  without Qt
 * themes: every colour is a field of vue_theme, light and dark ship, the
   "gui theme" preference chooses and "default" follows the system
   (test theme, TEXMACS_VUE_THEME); the help balloons are a sheet of note
