@@ -222,6 +222,23 @@ TM_TEST_FONT_DIR=/path/to/fonts tests/opentype/render-samples.sh
 tests/opentype/render-samples.sh -c reference-dir   # pixel diff with ImageMagick
 ```
 
+`tests/opentype/check.sh` runs the unit tests and both sample renders, tuned
+and untuned, and is the script to run before a commit. When `tests/build/ref`
+exists it diffs the renders against it and prints the number of differing
+pixels; refresh it on purpose, by copying the accepted renders of
+`tests/build/vis` over it under their plain names (`math-overview-1.png`,
+`math-showcase-3.png`, ...).
+
+`tests/opentype/compare-lualatex.sh` typesets the formula pairs of
+`tests/opentype/compare/` twice with the same OpenType math font, once
+through `unicode-math` under LuaLaTeX and once through TeXmacs, and stacks
+the two renders in one PNG so they can be compared line by line:
+
+```
+tests/opentype/compare-lualatex.sh            # all pairs
+tests/opentype/compare-lualatex.sh radicals-bars
+```
+
 The sample `math-overview.tm` typesets the same formulas with TeX fonts,
 the shipped TeX Gyre and STIX fonts, and several OpenType math fonts, so the
 effect of a change on each code path can be compared side by side.
