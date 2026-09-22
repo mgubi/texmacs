@@ -114,7 +114,9 @@ texmacs.bin -tls-no-verify -x '(load ".../sockets-tls.scm")'` generates a
 self-signed certificate there and expects `SOCKETS-TLS roundtrip:`; the
 `GnuTLS ERROR (-110)` for one client is the losing half of the dual
 IPv4/IPv6 connection attempt), `input-edit` (editing in a text input: select all and
-replace, word selection, cut and paste, `got: Bob Smith / 42`), `choice-style` (the four styles of a choice list side by side: a click on
+replace, word selection, cut and paste, `got: Bob Smith / 42`), `submenu` (a menu with a submenu: the submenu opens without closing its
+parent, an item of it runs, and opening another menu of the bar closes the
+first with its submenu), `choice-style` (the four styles of a choice list side by side: a click on
 the inert one neither selects nor calls back), `drop` (a dropped file name and a dropped piece of text reach
 mouse-drop-event and are inserted), `entrypoints` (the wait indicator
 appears over the window and is popped by the empty message, the help

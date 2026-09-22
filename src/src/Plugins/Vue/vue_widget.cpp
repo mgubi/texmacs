@@ -1155,20 +1155,25 @@ layout_pull_button (vue_ui_rep *w) {
         d.shift_x= d.shift_y= 0;
         current_popup= true;
         away_time= 0;
-        open_pull_id= button_id.id; // the menu of another button must close
+        // only the buttons of a bar are mutually exclusive: a submenu
+        // (pullright) belongs to the chain of the menu it is in, and
+        // claiming the slot here would close its own parent
+        if (down) open_pull_id= button_id.id;
       } else {
         // we clicked an active button, we go back to an inactive state
         d.cw= NULL;
         current_popup= false;
-        if (open_pull_id == button_id.id) open_pull_id= 0;
+        if (down && open_pull_id == button_id.id) open_pull_id= 0;
       }
     } else if (current_popup) {
       // some other popup is active, we should be inactive
       d.cw= NULL;
     }
-    else if (!is_nil (d.cw) && open_pull_id != 0 && open_pull_id != button_id.id) {
-      // another button opened its menu (it may have been laid out after us,
-      // where neither cancel_popup nor current_popup could reach us)
+    else if (down && !is_nil (d.cw) &&
+             open_pull_id != 0 && open_pull_id != button_id.id) {
+      // another button of the bar opened its menu (it may have been laid
+      // out after us, where neither cancel_popup nor current_popup reaches
+      // us); our own submenus close with us
       d.cw= NULL;
     }
     // if we are active then we draw the float window

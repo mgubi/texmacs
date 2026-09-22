@@ -260,7 +260,13 @@ The idle time is also zero while the window has no keyboard focus.
 
 Popup menus (`layout_pull_button`) form a chain through `current_popup`; a
 click on a `menu_button` sets `cancel_popup` which closes the chain (and popup
-windows). Menus flip to the other side of their button or shift to stay in
+windows). The buttons of a *bar* (`pulldown_button`) are in addition
+mutually exclusive through `open_pull_id`, which names the one whose menu
+is open: `cancel_popup` and `current_popup` only reach the widgets laid out
+after the click, so a menu opened before another one in the same bar would
+stay open until its own away timer expired. A submenu (`pullright_button`)
+must not claim that slot, since it belongs to the chain of the menu it is
+in and would close its own parent. Menus flip to the other side of their button or shift to stay in
 the window, are at most as tall as the window and scroll.
 
 * **Kinetic scrolling** (`vue_gui.cpp`, `wheel_event`,
