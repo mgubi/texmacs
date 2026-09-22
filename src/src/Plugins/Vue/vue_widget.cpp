@@ -263,6 +263,10 @@ bool debug_clay=false;
 
 // ask the buttons to fit all horizontal space (items of vertical menus)
 bool button_grow= false;
+// the type of the last widget which began to lay itself out: the only clue
+// the Clay error handler has about where an error came from, since Clay
+// says nothing about the element it was working on (see HandleClayErrors)
+string layout_who;
 // set while laying out what a resize widget contains: a widget which would
 // otherwise take the size of its contents fills the box instead
 bool fill_parent= false;
@@ -1652,6 +1656,7 @@ render_menu_mark_fn (renderer ren, void* data, rectangle r) {
 
 void
 vue_ui_rep::do_layout () {
+  layout_who= type;
   if (type == "horizontal_menu") {
     vue_horizontal_menu d= open_box<vue_horizontal_menu> (data);
     layout_menu (id, d.a, false);
@@ -4658,6 +4663,7 @@ vue_simple_widget_rep::handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2)
 
 void
 vue_simple_widget_rep::do_layout () {
+  layout_who= is_editor_widget () ? string ("editor") : string ("typeset box");
   win= current_window; // save the info
   SI w= 0, h= 0;
   Clay_Sizing s= layoutExpand;

@@ -5,7 +5,7 @@
 #include "clay.h"
 #include "clay_grid.h"
 
-//#include <stdio.h>
+#include <stdio.h>  // snprintf, for vue_clay_capacity_report
 
 #include "clay_renderer_SDL3.c"
 #include <assert.h>
@@ -59,6 +59,57 @@ GridComponent (GridState coState) {
         CO_END();
         CO_ASSERT_UNREACHABLE();
     }
+}
+
+// How full are the internal arrays of the current Clay context? Clay
+// reports an array which has run out of room and a genuine out of bounds
+// read with the same error (CLAY_ERROR_TYPE_INTERNAL_ERROR, "out of bounds
+// array access"), so these counts are what tells the two apart: an array at
+// its capacity is the first, none at capacity is the second. Writes at most
+// n bytes and returns the number of arrays which are full.
+int
+vue_clay_capacity_report (char* buf, int n) {
+  Clay_Context* ctx= Clay_GetCurrentContext ();
+  int full= 0, off= 0;
+  if (buf == NULL || n <= 0) return 0;
+  buf[0]= 0;
+  if (ctx == NULL) { snprintf (buf, n, "no current Clay context"); return 0; }
+#define VUE_CLAY_ARRAY(field, name)                                     \
+  do {                                                                  \
+    int len= (int) ctx->field.length, cap= (int) ctx->field.capacity;    \
+    if (len >= cap) {                                                   \
+      full++;                                                           \
+      if (off < n)                                                      \
+        off += snprintf (buf + off, n - off, "%sFULL %s %d/%d",          \
+                         off > 0 ? ", " : "", name, len, cap);           \
+    }                                                                   \
+  } while (0)
+  VUE_CLAY_ARRAY (layoutElements, "elements");
+  VUE_CLAY_ARRAY (renderCommands, "render commands");
+  VUE_CLAY_ARRAY (layoutElementChildren, "element children");
+  VUE_CLAY_ARRAY (layoutElementChildrenBuffer, "children buffer");
+  VUE_CLAY_ARRAY (layoutElementsHashMapInternal, "element hash map");
+  VUE_CLAY_ARRAY (layoutElementIdStrings, "id strings");
+  VUE_CLAY_ARRAY (measureTextHashMapInternal, "text cache");
+  VUE_CLAY_ARRAY (measuredWords, "measured words");
+  VUE_CLAY_ARRAY (wrappedTextLines, "wrapped text lines");
+  VUE_CLAY_ARRAY (scrollContainerDatas, "scroll containers");
+  VUE_CLAY_ARRAY (transitionDatas, "transitions");
+  VUE_CLAY_ARRAY (openLayoutElementStack, "open element stack");
+  VUE_CLAY_ARRAY (openClipElementStack, "open clip stack");
+  VUE_CLAY_ARRAY (layoutElementTreeRoots, "tree roots");
+  VUE_CLAY_ARRAY (layoutElementTreeNodeArray1, "tree nodes");
+  VUE_CLAY_ARRAY (pointerOverIds, "pointer over ids");
+  VUE_CLAY_ARRAY (dynamicStringData, "dynamic strings");
+#undef VUE_CLAY_ARRAY
+  if (off < n)
+    snprintf (buf + off, n - off,
+              "%selements %d/%d, render commands %d/%d, frame %u",
+              off > 0 ? "; " : "",
+              (int) ctx->layoutElements.length, (int) ctx->layoutElements.capacity,
+              (int) ctx->renderCommands.length, (int) ctx->renderCommands.capacity,
+              (unsigned) ctx->generation);
+  return full;
 }
 
 // does the current Clay context have a transition in progress? (the

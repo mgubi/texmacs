@@ -51,6 +51,7 @@
 
 #include "clay.h"
 extern "C" bool vue_clay_transitions_active (void); // clay.c
+extern "C" int  vue_clay_capacity_report (char* buf, int n); // clay.c
 
 
 
@@ -132,17 +133,43 @@ static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextEl
   return (Clay_Dimensions) { (float) width, (float) height };
 }
 
-// Clay reports its problems through this handler and goes on (the offending
-// element is skipped): they are logged, once per kind to avoid flooding the
-// log during an animation. Capacity errors would need bigger arenas (see
-// Clay_SetMaxElementCount before Clay_Initialize below).
+// Clay reports its problems through this handler and goes on, skipping the
+// offending element. Each kind is printed a few times and then suppressed,
+// since a layout which goes wrong goes wrong on every frame.
+//
+// Two of them need more than the message Clay gives. An exhausted internal
+// array and a genuine out of bounds read are both reported as
+// CLAY_ERROR_TYPE_INTERNAL_ERROR with the same text, so the occupancy of
+// the arrays is printed with it: one at its capacity says which to enlarge,
+// none at capacity says the access itself was wrong and is worth reporting
+// upstream. The window and the element being laid out are named too, since
+// a context belongs to one window and an error says nothing about which.
 void HandleClayErrors (Clay_ErrorData errorData) {
   static int reported[16];
+  const int max_reports= 3;
   int kind= (int) errorData.errorType;
   if (kind < 0 || kind >= 16) kind= 15;
-  if (reported[kind]++ > 0) return;
+  int seen= reported[kind]++;
+  if (seen >= max_reports) return;
   cout << "TeXmacs] Clay error (" << kind << "): "
        << string (errorData.errorText.chars, errorData.errorText.length) << LF;
+  char report[512];
+  int full= vue_clay_capacity_report (report, 512);
+  cout << "TeXmacs]   " << string (report) << LF;
+  cout << "TeXmacs]   window " << (current_window != NULL
+                                   ? as_string (current_window->id)
+                                   : string ("none"));
+  if (current_window != NULL && N(current_window->name) > 0)
+    cout << " (" << current_window->name << ")";
+  cout << ", last widget laid out: "
+       << (N(layout_who) > 0 ? layout_who : string ("?")) << LF;
+  if (kind == (int) CLAY_ERROR_TYPE_INTERNAL_ERROR)
+    cout << "TeXmacs]   " << (full > 0
+          ? string ("an internal array is full: raise its capacity")
+          : string ("no array is full: an out of bounds access, report it "
+                    "to Clay with the element above")) << LF;
+  if (seen + 1 == max_reports)
+    cout << "TeXmacs]   (further errors of this kind are not reported)" << LF;
 }
 
 static TTF_Font **ttf_fonts= NULL; // fonts cache

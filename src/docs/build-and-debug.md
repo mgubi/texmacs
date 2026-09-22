@@ -114,6 +114,20 @@ are described in [vue-testing.md](vue-testing.md).
   of a layout pass drawing widgets freed by a command, or by the repaint,
   run after that pass (crash in `vue_render_widget_fn`; the layout now
   holds a reference to every widget its commands name, see `render_ref`).
+* `TeXmacs] Clay error (<n>)` in the log is a problem Clay reported to
+  `HandleClayErrors`; Clay skips the offending element and carries on, so
+  the interface stays up with something missing from it. Each kind is
+  printed three times and then suppressed. Under each message the handler
+  prints any internal array which is at its capacity, the element and
+  render command counts, the frame number, the window, and the type of the
+  last widget which began to lay itself out. That last one is a clue, not a
+  culprit: an error raised while Clay computes the tree, after every widget
+  has run, names whichever widget happened to be last. Error 7 is the one
+  which needs the extra information: Clay reports an array which has run
+  out of room and a genuine out of bounds read with the same text, and a
+  line saying whether an array is full tells them apart. A full array wants
+  a larger capacity (`Clay_SetMaxElementCount` and friends); none full is a
+  bug worth reporting to Clay.
 * `-debug-io -debug-sockets` on the command line trace the client/server
   sockets (`socket_link_rep::...` lines, the `openssl` commands of the
   legacy protocol with the size of their output).

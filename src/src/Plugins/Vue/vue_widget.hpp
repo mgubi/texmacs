@@ -165,6 +165,9 @@ extern bool layout_again;
 // point to it (custom render callbacks), so the windows are laid out again
 // before the next redraw (see gui_start_loop)
 extern bool gui_needs_relayout;
+// the type of the last widget which began to lay itself out, for the Clay
+// error handler: Clay does not say which element an error came from
+extern string layout_who;
 
 // keyboard focus of a window: editors are told when they gain or lose it
 void set_kbd_focus (vue_window win, vue_widget w);
