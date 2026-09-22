@@ -304,7 +304,9 @@ raw_load_xpm (url file_name) {
 picture
 load_xpm (url file_name) {
   static hashmap<string,picture> cache;
-  string name= as_string (file_name);
+  // the variant which is loaded depends on the resolution we draw at
+  // (see mupdf_load_xpm), so the key mentions it
+  string name= as_string (file_name) * "#" * as_string (retina_factor);
   if (cache->contains (name)) return cache[name];
 
 #ifdef QTTEXMACS

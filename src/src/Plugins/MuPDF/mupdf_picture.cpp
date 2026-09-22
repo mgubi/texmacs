@@ -348,15 +348,25 @@ mupdf_load_picture (url file_name) {
   return pic;
 }
 
+// The icons ship in several variants: name.xpm (the legacy 1x format),
+// name.png (1x), name_x2.png (2x) and name_x4.png (4x), all of the same
+// size in points. Pick the one which matches the resolution we draw at
+// (retina_factor device pixels per point), and fall back on the smaller
+// ones, then on the file which was asked for, when a variant is missing.
 picture 
 mupdf_load_xpm (url file_name) {
-  //FIXME: this does not take into accout different device pixel ratios
-//  if (retina_icons > 1 && suffix (file_name) == "xpm") {
-  if (suffix (file_name) == "xpm") {
-    url png_equiv= glue (unglue (file_name, 4), "_x2.png");
-    return mupdf_load_picture (png_equiv);
+  if (suffix (file_name) != "xpm") return mupdf_load_picture (file_name);
+  url base= unglue (file_name, 4); // without ".xpm"
+  array<string> tried;
+  if (retina_factor >= 4) tried << string ("_x4.png");
+  if (retina_factor >= 2) tried << string ("_x2.png");
+  tried << string (".png");
+  for (int i= 0; i < N(tried); i++) {
+    url variant= glue (base, tried[i]);
+    if (exists (resolve ("$TEXMACS_PIXMAP_PATH" * variant)))
+      return mupdf_load_picture (variant);
   }
-  return mupdf_load_picture (file_name);
+  return mupdf_load_picture (file_name); // the xpm itself
 }  
 
 #ifdef MUPDF_RENDERER

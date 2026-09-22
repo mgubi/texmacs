@@ -566,17 +566,16 @@ VUE_WIDGET(xpm_widget, url, file_name);
 VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val,
                     int, st, string, w);
   // select a value from a list of possible values
-VUE_WIDGET(choice_widget, command, cb, array<string>, vals, array<string>, chosen, bool, flag);
+VUE_WIDGET(choice_widget, command, cb, array<string>, vals, array<string>, chosen, bool, flag, int, style);
+  // select one value (flag false) or several (flag true) from a list
 widget choice_widget (command cmd, array<string> vals, array<string> chosen, int style) {
-  (void) style; // FIXME: not implemented
-  return choice_widget(cmd, vals, chosen, true);
+  return choice_widget (cmd, vals, chosen, true, style);
 }
   // select a value from a long list of possible values
 widget choice_widget (command cmd, array<string> vals, string cur, int style) {
-  (void) style; // FIXME: not implemented
   array<string> chosen (1);
   chosen[0]= cur;
-  return choice_widget(cmd, vals, chosen, false);
+  return choice_widget (cmd, vals, chosen, false, style);
 }
   // select multiple values from a long list
 VUE_WIDGET(filtered_choice_widget, command, cb, array<string>, vals, string, val, string, filter);
@@ -2333,8 +2332,13 @@ vue_ui_rep::do_layout () {
     // flag is true when multiple selections are allowed
     vue_choice_widget d= open_box<vue_choice_widget> (data);
     bool changed= false;
+    // an inert or greyed list is shown but does not react (as the Qt one);
+    // the labels follow the mini, monospaced and bold flags
+    bool inert= (d.style & (WIDGET_STYLE_INERT | WIDGET_STYLE_GREY)) != 0;
+    int  lab_style= d.style & (WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED |
+                               WIDGET_STYLE_BOLD | WIDGET_STYLE_CENTERED);
     CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
-      .backgroundColor= color_field,
+      .backgroundColor= inert ? color_background : color_field,
       .layout= {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
         .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) },
@@ -2346,7 +2350,7 @@ vue_ui_rep::do_layout () {
           if (d.chosen[j] == d.vals[i]) break;
         bool active= (j < n);
         Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
-        if (button_logic (item_id).clicked == 1) {
+        if (!inert && button_logic (item_id).clicked == 1) {
           if (d.flag) {
             // toggle the selection of this item
             if (active) d.chosen= append (range (d.chosen, 0, j), range (d.chosen, j+1, n));
@@ -2358,14 +2362,21 @@ vue_ui_rep::do_layout () {
           active= !active || !d.flag;
           changed= true;
         }
-        Clay_Color bg= color_field;
-        if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
-        else if (hot_id == item_id.id) bg= color_highlight;
+        Clay_Color bg= inert ? color_background : color_field;
+        if (active) bg= inert ? (Clay_Color) { 176, 176, 200, 255 }
+                              : (Clay_Color) { 100, 100, 255, 255 };
+        else if (!inert && hot_id == item_id.id) bg= color_highlight;
+        // the items of a mini list are tighter, as in the mini bars
+        uint16_t pad_x= (d.style & WIDGET_STYLE_MINI) ? 4 : 8;
+        uint16_t pad_y= (d.style & WIDGET_STYLE_MINI) ? 1 : 2;
         CLAY(item_id, {
-          .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
+          .layout= { .padding= { pad_x, pad_x, pad_y, pad_y },
+                     .sizing= { .width= CLAY_SIZING_GROW(0) }},
           .backgroundColor= bg })
         {
-          layout_text (d.vals [i], 0, active ? white : black);
+          color col= active ? white : black;
+          if (inert && !active) col= dark_grey;
+          layout_text (d.vals [i], lab_style, col);
         }
       }
     }

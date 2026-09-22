@@ -17,6 +17,9 @@ WIP
 
 DONE
 
+* the choice widgets honour their style (inert, grey, mini, monospaced,
+  bold), test choice-style; the icons are loaded in the variant which
+  matches the resolution instead of always the 2x one
 * retina: each window follows the density of its display (with_window makes
   its factor current), the sizes are converted with retina_factor instead
   of a hardcoded 2, TEXMACS_VUE_DENSITY overrides it for testing

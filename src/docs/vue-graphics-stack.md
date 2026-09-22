@@ -207,7 +207,14 @@ TeXmacs are in SI, `PIXEL` per point, so a length becomes
 `retina_factor*x/PIXEL` device pixels; writing 2 there, as the code did
 throughout, made every widget twice its size on a display without HiDPI.
 `TEXMACS_VUE_DENSITY=<x>` overrides the density, to draw at 1x on a HiDPI
-display and to exercise the other path in the tests.
+display and to exercise the other path in the tests. The **icons** follow
+the same factor: `mupdf_load_xpm` is asked for `name.xpm` and loads the
+variant which matches the resolution (`name_x4.png`, `name_x2.png`,
+`name.png`, falling back on the smaller ones and finally on the xpm
+itself), since all of them are the same size in points; the cache of
+`load_xpm` is keyed by the factor as well, or a change of display would
+serve the wrong one. Loading `_x2.png` unconditionally, as the code did,
+drew every icon at twice its size on a display without HiDPI.
 
 `button_logic (id)` is the common mouse protocol of the elements, over
 `Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless
