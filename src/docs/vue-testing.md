@@ -123,7 +123,9 @@ shown at the cursor, then replaced by the committed text),
 `submenu` (a menu with a submenu: the submenu opens without closing its
 parent, an item of it runs, and opening another menu of the bar closes the
 first with its submenu), `choice-style` (the four styles of a choice list side by side: a click on
-the inert one neither selects nor calls back), `icons` (one row of buttons
+the inert one neither selects nor calls back), `palette` (the colour palette
+of the "Color" menu: its cells are flat, framed only by the highlight of the
+one under the pointer, and a click reports `color: magenta`), `icons` (one row of buttons
 per icon set: the vector icons must be drawn at the size of their set, so
 the flags of `16x16/focus`, whose files declare a width of 1200, must not
 be larger than the rest; run it under both themes), `drop` (a dropped file name and a dropped piece of text reach

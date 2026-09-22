@@ -1938,6 +1938,16 @@ vue_ui_rep::do_layout () {
     // push buttons (dialogs) are framed, the flat buttons of menus and tool
     // bars are only highlighted when hovered or pressed
     bool push= (d.style & WIDGET_STYLE_BUTTON) != 0;
+    // The colour and pattern palettes are tiles of explicit buttons whose
+    // whole content is a coloured rectangle: the tile is the button, and a
+    // push frame around it takes more room and more attention than the
+    // colour it presents. They are drawn flat, highlighted like a menu item.
+    {
+      vue_ui_rep* in= dynamic_cast<vue_ui_rep*> (concrete (d.w).rep);
+      if (push && in != NULL && (in->type == "cached_glue_widget" ||
+                                 in->type == "colored_glue_widget"))
+        push= false;
+    }
     bool pressed= (d.style & WIDGET_STYLE_PRESSED) != 0;
     bool hot= !inert && (hot_id == button_id.id);
     bool down= !inert && (active_id == button_id.id);

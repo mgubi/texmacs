@@ -1,0 +1,10 @@
+# needs palette.scm: the colour palette of the "Color" menu
+wait 6000
+window Palette
+snapshot pal
+# hovering a cell highlights it; the cells are flat otherwise
+move 60 60
+wait 400
+snapshot pal-hover
+click 60 60
+wait 300
