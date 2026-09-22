@@ -1941,12 +1941,14 @@ vue_ui_rep::do_layout () {
     // The colour and pattern palettes are tiles of explicit buttons whose
     // whole content is a coloured rectangle: the tile is the button, and a
     // push frame around it takes more room and more attention than the
-    // colour it presents. They are drawn flat, highlighted like a menu item.
+    // colour it presents. They are drawn flat and close together, with just
+    // enough room around one for the highlight to show when it is hovered.
+    bool swatch= false;
     {
       vue_ui_rep* in= dynamic_cast<vue_ui_rep*> (concrete (d.w).rep);
-      if (push && in != NULL && (in->type == "cached_glue_widget" ||
-                                 in->type == "colored_glue_widget"))
-        push= false;
+      swatch= (in != NULL && (in->type == "cached_glue_widget" ||
+                              in->type == "colored_glue_widget"));
+      if (push && swatch) push= false;
     }
     bool pressed= (d.style & WIDGET_STYLE_PRESSED) != 0;
     bool hot= !inert && (hot_id == button_id.id);
@@ -1980,7 +1982,7 @@ vue_ui_rep::do_layout () {
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
     Clay_Color bg= { 0, 0, 0, 0 }; // flat buttons show their container
-    Clay_Padding padding= CLAY_PADDING_ALL(5);
+    Clay_Padding padding= swatch ? CLAY_PADDING_ALL(2) : CLAY_PADDING_ALL(5);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(4);
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
@@ -2200,12 +2202,12 @@ vue_ui_rep::do_layout () {
     int c=0, n= N(d.a);
     CLAY_AUTO_ID({ .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
-      .childGap= 5 }})
+      .childGap= 2 }})
     {
       while (c < n) {
         CLAY_AUTO_ID({ .layout= {
           .layoutDirection= CLAY_LEFT_TO_RIGHT,
-          .childGap= 5 }})
+          .childGap= 2 }})
         {
           for (int i=0; i< d.cols; i++) {
             if (c == n) break;
