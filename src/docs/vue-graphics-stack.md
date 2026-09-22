@@ -250,7 +250,9 @@ dropped. The scripted `key` command therefore drives control keys and
 (`SDL_EVENT_TEXT_EDITING`: dead keys, CJK) is shown by the editor as a
 pre-edit: it receives the key `pre-edit:<cursor>:<text>` as with Qt (an
 empty text ends it) and the committed text arrives as a text event; the
-text inputs ignore the pre-edit keys. The editor applies a pre-edit through
+text inputs show it too (`vue_input_text_widget_rep::pre_edit`): spliced
+into the string they draw, in a pale box with an underline, with the cursor
+inside it, replaced by the committed text when it arrives. The editor applies a pre-edit through
 `delayed-keyboard-press`, which waits for 100 ms of `idle-time`, and the
 idle time is zero while `check_event (ANY_EVENT)` sees a pending event:
 the Vue `check_event` must not count SDL's poll sentinel, an internal event

@@ -2761,6 +2761,8 @@ public:
   int     pos;         // cursor position (index in s)
   int     sel;         // anchor of the selection (index in s), -1 for none
   SI      scroll;      // how much the text is scrolled to the left (SI)
+  string  pre_edit;     // the text an input method is composing, shown at
+  int     pre_edit_pos; // the cursor inside it (a byte offset)
   array<string> tabs;  // tab completions
   int     tab_nr;      // currently visible tab-completion
   int     tab_pos;     // cursor position where tab was pressed
@@ -2803,7 +2805,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     def (_def), call_back (_call_back), style (_style),
     greyed ((_style & WIDGET_STYLE_INERT) != 0), width (_width),
     ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
-    tab_nr (0), tab_pos (0)
+    pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0)
 {
   set_type (_type);
   if (N(def) > 0) {
@@ -2953,7 +2955,25 @@ vue_input_text_widget_rep::word_right () {
 bool
 vue_input_text_widget_rep::process_key (string key) {
   if (greyed) return false;
-  if (starts (key, "pre-edit:")) return false; // the input method composes; the text comes later
+  if (starts (key, "pre-edit:")) {
+    // An input method is composing (a dead key, a CJK method): the text is
+    // shown at the cursor until it is committed, when it arrives as an
+    // ordinary text event. The key is "pre-edit:<cursor>:<text>", the
+    // cursor counted in characters, and an empty text ends the composition
+    // (the same format the editor receives, see edit_keyboard.cpp).
+    string k= key (9, N(key));
+    int i= 0, n= N(k);
+    while (i < n && k[i] != ':') i++;
+    pre_edit= (i < n) ? k (i+1, n) : string ("");
+    int chars= (i < n && is_int (k (0, i))) ? as_int (k (0, i)) : 0;
+    pre_edit_pos= 0;
+    for (int j= 0; j < chars && pre_edit_pos < N(pre_edit); j++)
+      tm_char_forwards (pre_edit, pre_edit_pos);
+    // what is composed replaces the selection once it is committed
+    if (N(pre_edit) > 0) sel= -1;
+    return true;
+  }
+  pre_edit= ""; pre_edit_pos= 0; // any other key ends a composition
 
   while ((N(key) >= 5) && (key(0,3) == "Mod") && (key[4] == '-') &&
          (key[3] >= '1') && (key[3] <= '5')) key= key (5, N(key));
@@ -3162,15 +3182,19 @@ vue_input_text_widget_rep::render (void *data) {
   ren->set_pencil (pencil (rgb_color (245, 245, 245)));
   ren->fill (r->x1, r->y1, r->x2, r->y1 + px);
   ren->fill (r->x2 - px, r->y1, r->x2, r->y2);
-  // the text, scrolled so that the cursor stays visible (with a margin)
+  // the text, scrolled so that the cursor stays visible (with a margin);
+  // what an input method is composing is shown at the cursor, so it is
+  // spliced into the string which is drawn and measured
   font fn= get_font ();
   string ds= display ();
+  int pre_n= N(pre_edit);
+  if (pre_n > 0) ds= ds (0, pos) * pre_edit * ds (pos, N(ds));
   metric ex;
   fn->var_get_extents (ds, ex);
   SI x0= r->x1 + input_pad_x * px, x1= r->x2 - input_pad_x * px;
   SI inner= x1 - x0;
   SI text_w= (ex->x2 - ex->x1) / 3;
-  SI cur= prefix_width (ds, pos);
+  SI cur= prefix_width (ds, pos + (pre_n > 0 ? pre_edit_pos : 0));
   SI marge= inner / 4;
   if (cur - scroll > inner - marge) scroll= cur + marge - inner;
   if (cur - scroll < marge) scroll= cur - marge;
@@ -3179,8 +3203,18 @@ vue_input_text_widget_rep::render (void *data) {
   SI h_text= (fn->y2 - fn->y1) / 3;
   SI bottom= r->y1 + ((r->y2 - r->y1) - h_text) / 2, top= bottom + h_text;
   ren->clip (x0, r->y1, x1, r->y2);
+  if (pre_n > 0) {
+    // the composition: a pale box with an underline, as the editor's
+    // pre-edit ornament
+    SI xb= x0 + prefix_width (ds, pos) - scroll;
+    SI xe= x0 + prefix_width (ds, pos + pre_n) - scroll;
+    ren->set_pencil (pencil (rgb_color (255, 255, 208)));
+    ren->fill (xb, bottom, xe, top);
+    ren->set_pencil (pencil (rgb_color (120, 120, 180)));
+    ren->fill (xb, bottom, xe, bottom + px);
+  }
   int b, e;
-  if (focused && selection (b, e)) {
+  if (pre_n == 0 && focused && selection (b, e)) {
     SI xb= x0 + prefix_width (ds, b) - scroll, xe= x0 + prefix_width (ds, e) - scroll;
     ren->set_pencil (pencil (rgb_color (180, 196, 232)));
     ren->fill (xb, bottom, xe, top);

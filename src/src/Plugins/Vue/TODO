@@ -11,9 +11,9 @@ TODO
 WIP
 
 * text input: the pre-edit of the input methods is shown in the editor
-  (test pre-edit); the text inputs of the dialogs ignore it; the input
-  widget has a selection, the clipboard and word moves (test input-edit);
-  double-click selection and a context menu are missing
+  (test pre-edit) and in the fields of the dialogs (test pre-edit-input);
+  the input widget has a selection, the clipboard and word moves (test
+  input-edit); double-click selection and a context menu are missing
 
 DONE
 
