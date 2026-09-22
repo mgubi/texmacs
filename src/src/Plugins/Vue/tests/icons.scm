@@ -1,5 +1,5 @@
 ;; the icons: one row of buttons per icon set, to check the vector icons
-;; (misc/pixmaps/light and misc/pixmaps/dark) against the rasters.
+;; (TeXmacs/misc/pixmaps/light and .../dark) against the rasters.
 ;; Run it under TEXMACS_VUE_THEME=light and TEXMACS_VUE_THEME=dark.
 (tm-widget (icons-test)
   (padded

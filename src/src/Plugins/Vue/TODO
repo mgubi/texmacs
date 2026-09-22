@@ -7,6 +7,13 @@ TODO
   two-sided, color); orientation would need a rotation of the PDF
 * the debug view (F1) shows the element tree; its own scroll bars and
   toggles are Clay's and are not styled like ours
+* the main window receives the user icon bar (mask bit 16) and the
+  interactive query line (prompt and input) and stores them, but
+  vue_texmacs_widget_rep::do_layout never lays them out: neither is visible
+* the colour picker offers named colours only; the bg flag, the patterns
+  and the background images of the Qt picker are not implemented
+* resize_widget ignores the initial scrolling position (hpos, vpos), and
+  user_canvas_widget ignores its style
 
 WIP
 

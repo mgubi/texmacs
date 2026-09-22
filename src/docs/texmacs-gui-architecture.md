@@ -1,7 +1,7 @@
 # How TeXmacs talks to a GUI plugin
 
-Notes on the parts of the core a GUI plugin has to serve. File references are
-relative to `src/`.
+Notes on the parts of the core a GUI plugin has to serve. C++ file
+references are relative to `src/`, Scheme ones to `TeXmacs/progs/`.
 
 ## The widget abstraction
 
@@ -43,9 +43,11 @@ Every GUI must provide `simple_widget_rep` (a typedef to its class) with the
 virtual protocol the editor overrides (`Edit/Interface`): `handle_get_size_hint`,
 `handle_notify_resize`, `handle_keypress`, `handle_keyboard_focus`,
 `handle_mouse (kind, x, y, mods, t, data)`, `handle_set_zoom_factor`,
-`handle_clear`, `handle_repaint`. The editor drives scrolling through
-`SLOT_EXTENTS`, `SLOT_SCROLL_POSITION`, `SLOT_VISIBLE_PART`, `SLOT_INVALIDATE*`
-(see the long comment above `vue_simple_widget_rep` in `vue_widget.cpp`).
+`handle_clear`, `handle_repaint`, plus `is_editor_widget` and
+`is_embedded_widget`. The editor drives scrolling through `SLOT_EXTENTS`,
+`SLOT_SCROLL_POSITION`, `SLOT_VISIBLE_PART` and `SLOT_INVALIDATE*`; the
+protocol is listed in `Graphics/Gui/widget.hpp`, and the Vue side of the
+scrolling slots is in `vue_widget.cpp` with no comment to guide you.
 Mouse kinds are strings: `press-left`, `release-right`, `move`,
 `dragging-left`, `enter`, `leave`, ...; `edit_mouse.cpp` destroys its popup
 menu on *any* editor mouse event but `leave` (it assumes the popup grabbed the
@@ -119,8 +121,10 @@ the conversion to C++ widgets (`make-menu-*`, calling `widget-*` glue from
 * settings (2.1.5, used by the preference tools): `(setting-toggle cmd
   "Description" on)`, `(setting-enum cmd "Description" vals val width)`,
   `(setting-group "Title" items...)` → `setting_*_widget`; `choice`/`choices`
-  now pass the style; `tabs`/`icon-tabs` become `responsive_*_tabs_widget`
-  when the "responsive tabs default mode" preference asks for it.
+  now pass the style. `responsive-tabs`/`responsive-icon-tabs` are markup
+  of their own, building `responsive_tabs_widget`/
+  `responsive_icon_tabs_widget`; plain `tabs`/`icon-tabs` never become
+  responsive. The only user in the tree is `debug/debug-widgets.scm`.
 
 Tools: `tm-tool`/`tm-tool*` define a tool (`:name`, body) and its wrapper
 `texmacs-side-tool`; `tool-select pos tool` (`:right`, `:left`, `:bottom`,
@@ -144,9 +148,11 @@ them only in the Qt plugin (`Plugins/Qt/QTMSockets.cpp`, 2015: plain BSD
 sockets woken by `QSocketNotifier`, hence `QObject` bases and moc), after
 the old GUI-independent implementation was removed in November 2025. Here
 `System/Link/tm_sockets.cpp` is the same code without Qt, compiled in the
-non-Qt builds (the Qt build keeps its own): readiness comes from the
+non-Qt builds while the Qt build keeps its own. Readiness comes from the
 `socket_notifier`s of `socket_notifier.cpp`, which `perform_select` polls
-from the interpose handler (`tm_server.cpp`). For that the notifiers gained
+from the interpose handler (`tm_server.cpp`).
+
+For that the notifiers gained
 write readiness (`write` flag; a link keeps its write notifier only while
 its output buffer is not empty, since a writable socket is always ready),
 `perform_select` iterates over a copy and is bounded, and
@@ -175,9 +181,10 @@ sets it explicitly.
 `Graphics/Gui/gui.hpp` also asks for a few services outside the widget
 protocol. In Vue (`vue_gui.cpp`): `beep` uses the system alert sound on
 macOS (`mac_beep`, added to the MacOS plugin) and the console bell
-elsewhere, since SDL has none; `image_gc (name)` drops the cached images,
-patterns and pattern images of the MuPDF renderer whose key mentions the
-name (`mupdf_image_gc`, `"*"` flushes them all); `show_help_balloon` and
+elsewhere, since SDL has none; `image_gc (name)` drops the cached images and
+pattern images of the MuPDF renderer whose key mentions the name
+(`mupdf_image_gc`); `"*"` flushes those two pools and the pattern pool as
+well; `show_help_balloon` and
 `show_wait_indicator` are popup windows of our own, the first dismissed by
 the next key or pointer motion (`close_help_balloon` in `process_event`),
 the second stacking its messages, since the calls nest, and laying itself
@@ -198,5 +205,12 @@ calls `mouse-drop-event`.
 `get_default_font (tt, mini, bold)` (plugin) chooses the UI font
 (`apple-lucida` on macOS, `ecrm`/`ecss` otherwise, `modern/tt` for
 monospaced); `get_default_styled_font (style)` maps the style flags.
-Named colors: `named_color ("dark grey")`, `tm_background` (surround of the
-pages), `light_grey` (208).
+
+Colours are not fixed globals any more, at least in the Vue plugin: every
+colour of the interface is a field of the theme in use, chosen from the
+`gui theme` preference, and the two colours the core and the widgets name
+without knowing about themes, `dark_grey` and `black`, are remapped as the
+text is laid out. `tm_background`, the surround of the pages, is set from
+the theme as well. See *Themes* in
+[vue-graphics-stack.md](vue-graphics-stack.md). `light_grey` (208) is a
+plain named colour of the core.

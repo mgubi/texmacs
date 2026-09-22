@@ -1,9 +1,12 @@
 # Testing the Vue GUI
 
 Neither screenshots (`screencapture`) nor synthetic input (CGEvent) are
-available to a process without the macOS permissions, so the plugin has two
-in-process development aids, both controlled by environment variables and
-inactive otherwise.
+available to a process without the macOS permissions, so the plugin has its
+own in-process development aids. Each is switched on by an environment
+variable and inactive otherwise: `TEXMACS_VUE_SNAPSHOT` and
+`TEXMACS_VUE_SCRIPT` below, `TEXMACS_VUE_THEME` and `TEXMACS_VUE_DENSITY` to
+force the appearance and the resolution, and `TEXMACS_VUE_DUMP` to print
+every Clay render command of every frame (type, id, box, colour, label).
 
 ## Snapshots
 
@@ -33,28 +36,31 @@ wheel x y dx dy
 key [S-][C-][A-][M-]<name>   an SDL key name (Return, Escape, Tab, Backspace, Down,
                             Home...) with shift/control/option/command prefixes
 text <string>               one text-input event per character
-resize w h
+resize w h                  resize the target window (points)
 repaint                     invalidate every editor (repaint from scratch)
 compose <text>              composition of an input method (no text: ends it)
 drop x y <path>|text:<text> a drag and drop of one item at that position
 focus                       pretend the target window got the keyboard focus
+snapshot <name>             save the next redraw of the target window
 close                       close request on the target window
-snapshot <name>
 ```
 
 `update_mouse_state` returns the buttons held by the script while it is
 active, so drags work. `text` sends one event per UTF-8 character. A test
 instance launched while another application is in use never gets the
 keyboard focus, and the editor's idle time (hence the pre-edits and the
-`:idle` delayed commands) stays zero without it: `focus` fakes it. Callbacks print to standard output (`choice: ...`,
-`got: ...`, `Click!!`), which is how the tests are checked.
+`:idle` delayed commands) stays zero without it: `focus` fakes it. The tests
+are checked on what the callbacks print to standard output with `display*`
+(`choice: ...`, `got: ...`), and a few on lines the code logs, which then
+need `-debug-events` on the command line.
 
-`TEXMACS_VUE_THEME=light|dark` forces the theme of the interface, which the
-`theme` test renders side by side and the `icons` test uses to show one row
-of buttons per icon set (the vector icons of `misc/pixmaps/light` and
-`misc/pixmaps/dark`). `TEXMACS_VUE_DENSITY=1` runs at one
-device pixel per point, the layout of a
-display without HiDPI, whatever the screen: worth a pass over the visual
+`TEXMACS_VUE_THEME=light|dark` forces the theme of the interface. The
+`theme` and `icons` tests each render one window under whichever theme is
+forced, so comparing the two means running them twice; `icons` shows one row
+of buttons per icon set, drawn from the vector icons of
+`TeXmacs/misc/pixmaps/light` and `TeXmacs/misc/pixmaps/dark`.
+`TEXMACS_VUE_DENSITY=1` runs at one device pixel per point, the layout of a
+display without HiDPI whatever the screen: worth a pass over the visual
 tests after a change to the sizing of the widgets.
 
 ## Running the tests
@@ -66,82 +72,95 @@ tests after a change to the sizing of the widgets.
 export TEXMACS_PATH=$PWD/TeXmacs
 export TEXMACS_VUE_SNAPSHOT=/tmp/snap TEXMACS_VUE_SCRIPT=src/Plugins/Vue/tests/widgets.script
 TeXmacs/bin/texmacs.bin -x '(load "src/Plugins/Vue/tests/widgets.scm")' > /tmp/run.log 2>&1 &
-sleep 25; pkill -9 -f texmacs.bin
+TEST=$!
+sleep 25; kill -9 $TEST
 grep -n 'choice:\|Error message\|vue script: done' /tmp/run.log
 ```
 
-Boot takes 5–15 s (more under load): scripts start with `wait 5000` or more,
-and a missing `vue script: done` usually means the run was killed too early.
-Leave a few seconds between two runs and kill only the test process (`$!`),
-not every `texmacs.bin` (the user may be running one). Never kill an
-instance while it boots and never boot two at once: since 2.1.5
+Boot takes 5 to 15 s, more under load: scripts start with `wait 5000` or
+more, and a missing `vue script: done` usually means the run was killed too
+early. Leave a few seconds between two runs and kill only the test process,
+as above, not every `texmacs.bin`, since the user may be running one.
+
+**Never boot two instances at once, and never kill one while it boots.**
 `acquire_boot_lock` writes `~/.TeXmacs/system/boot_lock` at boot and removes
-it once the event loop starts; a run which finds the lock assumes the last
-boot crashed and **wipes the settings and the cache**, so the next run says
-`Installation completed successfully`, opens a Welcome window (tools then go
-to that window, `current-window`) and the snapshots of window `#2` are
-meaningless — rerun. A `window` command which matches nothing prints
-`vue script: no window matches` and the following commands are skipped
-until a `window` command matches (they used to go to the last created
-window, e.g. closing the main window).
-`Error message:` in the log is a crash report with a C++ backtrace
+it once the event loop starts. A run which finds the lock assumes the last
+boot crashed and **wipes the settings and the cache**. The next run then
+says `Installation completed successfully`, opens a Welcome window, which
+the tools go to rather than to the window you meant (`current-window`), and
+the snapshots of window `#2` are meaningless. Rerun it.
+
+Two lines in the log are worth grepping for. `vue script: no window matches`
+means a `window` command matched nothing; the commands after it are skipped
+until another `window` command matches, so nothing is sent to the wrong
+window. `Error message:` is a crash report with a C++ backtrace
 (`get_crash_report`); addresses without symbols can be located with
 `objdump -d --disassemble-symbols=<mangled>` on `texmacs.bin`.
 
-Tests: `widgets` (choice, enum, toggle, filtered choice, tree, ink), `dialog`
-(`interactive` prompt, tab order, keyboard routing), `dialogs` (color picker,
-printer, popup window), `aligned` (aligned rows, splitter drags), `tabs`,
-`resize`, `styles`, `font` (open and close the font selector window;
-`open-font-selector` itself uses a side tool when the "side tools" preference
-is on, so the test calls `open-font-selector-window`), `popup` (the context menu of the editor opens with its corner at the pointer:
-compare the `set_position` line with the window position and the click;
-an item runs and closes it; near the screen border it is moved back) and
-`menus` (pull-down menus, flipping/scrolling), `checks`
-(menu check marks), `tools` (side and bottom tools), `prefs-tool` (the
-section tabs of the preferences tool react to clicks), `prefs-dialog` (the
-preferences window with icon tabs: tabs of equal height), `two-tools` (tools at
-the top and bottom of both sides), `tools-close` (replacing a tool, adding a
-bottom one, closing the top one; the paper follows the canvas),
-`tool-replace` (replacing the font tool, whose sample text is an editor, by
-another tool must not crash the redraw), `pattern` (paper mode and text
-filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns),
-`macro-editor` (the macro editor dialog: typing goes into the embedded
-editor), `macros-editor` (the macros editor dialog: selecting a macro in the
-list updates the embedded editor), `macro-tool` (the macro editor as a side
-tool, `side-tools?` forced), `macros-tool` (the macros editor as a side tool:
-list inside its box, selection rebuilds the tool without misdrawn widgets), `sockets` (the TeXmacs server and an anonymous legacy client in the same
-instance: `SOCKETS roundtrip: ((server license ...` in the log; it creates
-the server database `~/.TeXmacs/server` with an admin account and switches
-the `tls-server` preference off for its duration), `sockets-tls` (the same
-over TLS, run by hand: `TEXMACS_SERVER_CERT_DIR=<scratch dir>
-texmacs.bin -tls-no-verify -x '(load ".../sockets-tls.scm")'` generates a
-self-signed certificate there and expects `SOCKETS-TLS roundtrip:`; the
-`GnuTLS ERROR (-110)` for one client is the losing half of the dual
-IPv4/IPv6 connection attempt), `input-edit` (editing in a text input: select all and
-replace, word selection, cut and paste, `got: Bob Smith / 42`), `pre-edit-input` (the composition of an input method inside a dialog field:
-shown at the cursor, then replaced by the committed text),
-`submenu` (a menu with a submenu: the submenu opens without closing its
-parent, an item of it runs, and opening another menu of the bar closes the
-first with its submenu), `choice-style` (the four styles of a choice list side by side: a click on
-the inert one neither selects nor calls back), `palette` (the colour palette of the document "Color" menu, in a popup sized
-to its contents: the cells are flat, framed only by the highlight of the one
-under the pointer, and sit next to each other, the popup being no wider than
-eight cells and their gaps), `icons` (one row of buttons
-per icon set: the vector icons must be drawn at the size of their set, so
-the flags of `16x16/focus`, whose files declare a width of 1200, must not
-be larger than the rest; run it under both themes), `drop` (a dropped file name and a dropped piece of text reach
-mouse-drop-event and are inserted), `entrypoints` (the wait indicator
-appears over the window and is popped by the empty message, the help
-balloon appears and a pointer motion dismisses it), `pre-edit` (the composition of an input method — a dead key, a letter — is
-shown in a pre-edit box and the committed text replaces it), `debug-view` (the Clay debug view of F1 over a window with a tool, hover
-and click while it is shown), `focus-windows` (the keyboard focus moves
-from a prompt to the editor and back: `got: BobBy / 42`), `scroll-shift` (scrolling
-shifts the backing store: the snapshots before and after a `repaint` must
-be identical in the editor area — the footer may show another welcome
-message), `wheel-inertia` (a single wheel step
-scrolls in sync — snapshots i0/i1/i2 are
-identical — while three quick steps launch a glide: the `handling wheel`
-lines of the log after i3 are the synthetic decaying deltas).
+## The tests
+
+Each test is a `<name>.script`, most of them with a `<name>.scm` building the
+widget it drives. Two of the checks need `-debug-events` on the command
+line, as marked, because the lines they look for are traces rather than
+callback output.
+
+| Test | What it checks |
+|---|---|
+| `widgets` | choice, multiple choice, enum, toggle, filtered choice, tree, ink |
+| `dialog` | an `interactive` prompt: tab order, keyboard routing |
+| `dialogs` | colour picker, printer dialog, popup window |
+| `palette` | the colour palette of the document "Color" menu, in a popup sized to its contents: flat cells, framed only by the highlight of the one hovered, sitting next to each other |
+| `choice-style` | the four styles of a choice list side by side; a click on the inert one neither selects nor calls back |
+| `input-edit` | editing in a text input: select all and replace, word selection, cut and paste (`got: Bob Smith / 42`) |
+| `pre-edit` | the composition of an input method in the editor: a dead key then a letter, shown in a pre-edit box and replaced by the committed text |
+| `pre-edit-input` | the same inside a dialog field |
+| `focus-windows` | the keyboard focus moves from a prompt to the editor and back (`got: BobBy / 42`) |
+| `aligned` | aligned rows and splitter drags |
+| `tabs` | switching tabs, and the layout of each page |
+| `prefs-tool` | the section tabs of the preferences tool react to clicks |
+| `prefs-dialog` | the preferences window with icon tabs: tabs of equal height |
+| `menus` | a pull-down menu opens and closes; in a window narrowed to 640x200 the Help menu is shifted back inside |
+| `submenu` | a submenu opens without closing its parent; another menu of the bar closes both |
+| `checks` | the check marks of the View menu |
+| `popup` | the context menu of the editor opens with its corner at the pointer, an item runs and closes it, near the screen border it is moved back. Needs `-debug-events`: the check compares the logged `set_position` with the window position and the click |
+| `icons` | one row of buttons per icon set: a vector icon must be drawn at the size of its set, so the flags of `16x16/focus`, whose files declare widths of 600 to 1500, must not be larger than the rest. Run it under both themes |
+| `theme` | the widgets under the theme forced by `TEXMACS_VUE_THEME` |
+| `font` | open the font selector window and close it from its title bar |
+| `macro-editor` | the macro editor dialog: typing goes into the embedded editor |
+| `macros-editor` | the macros editor dialog: selecting a macro updates the embedded editor |
+| `macro-tool` | the macro editor as a side tool, `side-tools?` forced |
+| `macros-tool` | the macros editor as a side tool: list inside its box, selection rebuilds the tool without misdrawn widgets |
+| `two-tools` | three tools at once: top right, bottom right and left |
+| `tools-close` | replacing a tool, adding a bottom one, closing the top one; the paper follows the canvas |
+| `tool-replace` | replacing the font tool, whose sample text is an editor, must not crash the redraw |
+| `debug-view` | the Clay debug view of F1 over a window with a tool; hover and click while it is shown |
+| `drop` | a dropped file name and a dropped piece of text reach `mouse-drop-event` and are inserted |
+| `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
+| `pattern` | paper mode and glyphs filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns |
+| `wheel` | scrolling with the wheel, then a balloon from a hovered toolbar button |
+| `wheel-inertia` | a single wheel step scrolls in sync (snapshots i0, i1 and i2 identical) while three quick steps launch a glide. Needs `-debug-events`: the `handling wheel` lines after i3 are the synthetic decaying deltas |
+| `scroll-shift` | scrolling shifts the backing store: the snapshots before and after a `repaint` must be identical in the editor area |
+| `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
+
+One more is not run this way. `sockets-tls` repeats the `sockets` exchange
+over TLS and is run by hand:
+
+```sh
+TEXMACS_SERVER_CERT_DIR=<scratch dir> \
+  TeXmacs/bin/texmacs.bin -tls-no-verify \
+  -x '(load "src/Plugins/Vue/tests/sockets-tls.scm")'
+```
+
+It generates a self-signed certificate there and expects `SOCKETS-TLS
+roundtrip:` in the log; the `GnuTLS ERROR (-110)` reported for one client is
+the losing half of the dual IPv4/IPv6 connection attempt. The `sockets` test
+creates the server database `~/.TeXmacs/server` with an admin account and
+switches the `tls-server` preference off for its duration, and its log line
+is `SOCKETS roundtrip: ((server license ...`.
+
+`resize.scm`, `styles.scm` and `tools.scm` have no script: they open a window
+to be looked at (a window sized from a `resize` widget, the widget styles
+side by side, and the three tool areas of the main window).
 
 ## Writing a test
 

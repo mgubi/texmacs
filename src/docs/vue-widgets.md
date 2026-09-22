@@ -23,19 +23,29 @@ Callbacks are never run during layout: widgets queue a `command` in
 event loop after the layout pass. `noop_command ()` is a valid do-nothing
 command (a nil command must never be invoked).
 
+Colours are never literals either: they are fields of the theme in use, see
+*Themes* in [vue-graphics-stack.md](vue-graphics-stack.md). The numbers
+quoted below are the light theme.
+
+A `"drop"` mouse action reaches an editor with the ticket of its payload in
+place of the modifiers (`mouse_ticket`), which `call_drop_event` uses to
+fetch what was dropped; the other half is in
+[texmacs-gui-architecture.md](texmacs-gui-architecture.md), under *The other
+entry points of a GUI*.
+
 ## Catalogue
 
 | Widget | Layout | Callback / notes |
 |---|---|---|
-| `horizontal_menu`, `vertical_menu`, `minibar_menu` | `layout_menu`: vertical menus fit their items, items fill the width (`button_grow`), check-mark column reserved when an item has a mark | |
+| `horizontal_menu`, `vertical_menu`, `minibar_menu` | `layout_menu`: vertical menus fit their items, items fill the width (`button_grow`), check-mark column reserved when an item of the menu has a mark (a colour cell of a tile does not reserve it); `minibar_menu` uses a gap of 2 instead of 10 | |
 | `horizontal_list`, `vertical_list` | `layout_list` with the grow policy | |
-| `tile_menu` | rows of `cols` items | |
-| `menu_button (w, cmd, pre, ks, style)` | flat (menus, tool bars; transparent until hovered) or framed push button (`WIDGET_STYLE_BUTTON`); `pre` = `"v"`/`"*"`/`"o"` drawn as check/bullet/circle; `ks` shortcut right-aligned; in a tool title bar the `"x"` label becomes a round close button; inside a `sections`/`section-tabs` division it draws as a segment/tab (`section_bar`, `section_active`) | queues `cmd`; sets `cancel_popup` |
+| `tile_menu` | rows of `cols` items, gap 2, cells at their natural size (`button_grow` cleared, or a palette in a wider menu would be spread out) | |
+| `menu_button (w, cmd, pre, ks, style)` | flat (menus, tool bars; transparent until hovered) or framed push button (`WIDGET_STYLE_BUTTON`); a button whose whole content is a colour or pattern cell (`swatch`, the palettes) is flat whatever its style, with 2 px of padding, centered, and reserves no mark column; `pre` = `"v"`/`"*"`/`"o"` drawn as check/bullet/circle; `ks` shortcut right-aligned; in a tool title bar the `"x"` label becomes a round close button; inside a `sections`/`section-tabs` division it draws as a segment/tab (`section_bar`, `section_active`) | queues `cmd`; sets `cancel_popup` |
 | `pulldown_button`, `pullright_button` | `layout_pull_button`: floating menu attached to the button, flipped/shifted to stay in the window, scrollable, `zIndex` 5 | evaluates the `promise<widget>` when opened, cached in `cw` |
 | `menu_separator`, `menu_group` | rule / greyed group title | |
 | `balloon_widget (w, help)` | floating help below `w` after 1 s of hovering, hidden after 5 s | |
 | `text_widget (s, style, col, tsp)` | `layout_text`: TeXmacs font from the style (mini, mono, bold), grey/inert greyed, centered when `WIDGET_STYLE_CENTERED` | |
-| `xpm_widget`, `picture_widget` | picture drawn by a custom render callback | |
+| `xpm_widget`, `picture_widget` | picture drawn by a custom render callback; `xpm_widget` becomes a `picture_widget` in the constructor. The picture is loaded with `load_xpm` and loaded again when the icon theme or the resolution has changed since (`icon_picture`, `icon_stamp`, `icon_generation`), since the menus are not necessarily rebuilt | |
 | `input_text_widget (cb, type, def, style, width)` | a Clay custom element drawn by `render` as the Widkit input: lowered box, pastel when focused, red cursor with serifs, the text scrolled to keep the cursor visible; selection (shift+arrows/home/end, mouse drag, M-a), clipboard (M-c, M-x, M-v or C-y), word moves (A-/C- arrows, A-backspace), history of the proposals (up/down), tab completion, `type` parsed as `name#serial:type` (password hidden, `form-` serials continuous) ; the composition of an input method is shown at the cursor in a pale box with an underline, and the committed text replaces it | `cb (string)` on return, `cb (#f)` on escape; continuous types get `cb (string key)` at every change |
 | `enum_widget (cb, vals, val, style, width)` | button showing `val` + dropdown list | `cb (val)` |
 | `choice_widget (cb, vals, chosen, style)`, `choice_widget (cb, vals, cur, style)` | a list of values, one or several selected; the style is honoured: inert and grey show the list on the window background with grey labels and ignore clicks, mini tightens the rows, monospaced and bold pick the font | `cb (list)` or `cb (string)` |
@@ -47,39 +57,48 @@ command (a nil command must never be invoked).
 | `glue_widget`, colored glue | fixed or growing spacer; colored glue caches a picture | |
 | `empty_widget` | 0×0 | |
 | `extend_widget (w, a)` | `w` with the size of the largest of `a` (measured off-screen) | |
-| `division_widget (name, w)` | CSS class names (see the Qt themes in `misc/themes`): `title` (framed bold bar, rounded top), `subtitle`, `discrete` (grey), `sections` (segmented bar of buttons), `section-tabs` (row of tabs on a line, inactive tabs grey), `active-section`/`section-active-tab` (transparent wrappers marking the selected entry, which the button draws framed); `plain`/others transparent; bold/grey inherited via `context_style` | |
+| `division_widget (name, w)` | CSS class names (see the Qt themes in `misc/themes`): `title`/`title-bar` (framed bold bar, rounded top), `subtitle`, `discrete` (grey), `sections` (segmented bar of buttons), `section-tabs` (row of tabs on a line, inactive tabs grey), `active-section`/`section-active-tab` (transparent wrappers marking the selected entry, which the button draws framed); `plain`/others transparent; bold/grey inherited via `context_style` | |
 | `aligned_widget (lhs, rhs, ...)` | two columns, rows sized from the measured heights of both cells | |
 | `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look; the icons (20 or 32 px in the preferences) sit in boxes of the largest icon so that all tabs have the same height | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
-| `user_canvas_widget` (scrollable) | clip container with scroll bars, field background | |
-| `texmacs_widget (mask, quit)` | the main window contents (menu bar, icon bars, editor between the tool panels, footer); every bar follows its bit of `mask` and the `SLOT_*_VISIBILITY` slots. With `mask` 0 it is an **embedded editor** (`texmacs-input` of the macro editor, search tool...): no bars, no background, `SLOT_SIZE` is the canvas; it fills its container (`widget_grows`), typically a `resize` | the editor's own commands |
-
-The main window looks as in the Qt port (`vue_texmacs_widget_rep::do_layout`,
-constants `bar_*`): menu bar and main tool bar in the window grey (192), a
-lighter mode bar (212) and a lighter still focus bar (232), each closed by a
-2 px line (176), no gaps; 24 px of horizontal padding; the footer (56 px)
-in the window grey right below the canvas. The flat buttons and the
-pull-down buttons are transparent, so the bar behind shows through; the
-vertical separators of the bars are 2 px, grey 150.
+| `user_canvas_widget` (scrollable) | clip container with scroll bars, field background; the `style` argument is ignored | |
 | `texmacs_output_widget` → `box_widget_rep` | a typeset box (`texmacs-output`): natural size from its size hint, drawn by the core (`tm_button.cpp`) on the field color | |
-| `resize_widget (w, style, min, def, max, pos)` | fixed to `def` while the window auto-sizes, then `GROW(min..max)`; min/max become window limits | |
+| `resize_widget (w, style, min, def, max, pos)` | fixed to `def` while the window auto-sizes, then `GROW(min..max)`; min/max become window limits; the initial scrolling position (`hpos`, `vpos`) is ignored | |
 | `hsplit_widget`, `vsplit_widget` | draggable 8 px divider, equal split until moved | |
 | `wait_widget` | yellow "please wait" box | |
 | `ink_widget (cb)` | 600×400 canvas, left drag draws, right click erases | `cb (list of strokes)`, points in pixels y-up (X11 protocol) |
-| `refresh_widget`, `refreshable_widget` | re-evaluate their Scheme promise on `SLOT_REFRESH` with a matching kind (or "any") | |
+| `refresh_widget`, `refreshable_widget` | rebuilt on `SLOT_REFRESH` with a matching kind (or `"any"`): `refreshable_widget` calls its `promise<widget>`, `refresh_widget` re-expands the menu named by its widget name, cached in a `hashmap` when `menu_caching` is on. | |
 | `printer_widget (cmd, file)` | printer (the spooler's list from `lpstat -a`, or the default), copies, pages, and the paper size, two-sided and color options of the chosen printer (`lpoptions -l`, rebuilt when the printer changes), assembled into `lpr -P -# -o page-ranges -o Key=value`; Print / Cancel | `cmd ()` after printing or cancelling |
-| `color_picker_widget (cmd, bg, proposals)` | swatch grids (proposals, standard colors) | `cmd (tree color)`, Cancel `cmd (#f)` |
+| `color_picker_widget (cmd, bg, proposals)` | swatch grids of 12x12 px cells, eight per row (the proposals, then 28 named colours); the `bg` flag is ignored and neither patterns nor background images are offered, unlike the Qt picker | `cmd (tree color)`, Cancel `cmd (#f)` |
 | `popup_widget (w)` | transparent container; ignores `SLOT_MOUSE_GRAB` | |
 | `plain_window_widget`, `popup_window_widget`, `tooltip_window_widget` | real windows (see the graphics stack document) | |
-| `inputs_list_widget (cb, prompts)` | dialog window built on `SLOT_VISIBILITY`: prompts + inputs (tab order), Ok/Cancel push buttons, question dialogs with one button per proposal | fields store `scm_quote (answer)` or `"#f"`, then `cb ()`; keeps its own reference to `cb` because `dialogue-end` destroys the widget while `cb` runs |
+| `inputs_list_widget (cb, prompts)` | dialog window opened from `SLOT_VISIBILITY` or `SLOT_KEYBOARD_FOCUS` (both sent by `dialogue_start`): prompts + inputs (tab order), Ok/Cancel push buttons, question dialogs with one button per proposal | fields store `scm_quote (answer)` or `"#f"`, then `cb ()`; keeps its own reference to `cb` because `dialogue-end` destroys the widget while `cb` runs |
 | `file_chooser_widget (cmd, type, prompt)` | the system file dialog (`SDL_ShowFileDialogWithProperties`, non-blocking): `plain_window_widget` returns the chooser itself instead of a window, the dialog opens once on the first of `SLOT_VISIBILITY`/`SLOT_KEYBOARD_FOCUS` (both are sent by `dialogue_start`), starts in the `SLOT_DIRECTORY` folder, and its callback runs `cmd` then `quit` both on a choice and on cancel (`#f`) | `cmd` reads the choice with `SLOT_STRING_INPUT` |
-| `texmacs_widget (mask, quit)` | menu bar, three icon bars, middle row (left tools, editor, side tools), bottom/extra tool rows, footer | visibility flags indexed by `visibility_index (slot)` |
+| `texmacs_widget (mask, quit)` | menu bar, three icon bars, middle row (left tools, editor, side tools), bottom and extra tool rows, footer; each bar follows its bit of `mask` and the `SLOT_*_VISIBILITY` slots. The user icon bar (`mask` bit 16) and the interactive query line are received and stored but never laid out. With `mask` 0 it is an **embedded editor** (`texmacs-input` of the macro editor, search tool...): no bars, no background, `SLOT_SIZE` is the canvas; it fills its container (`widget_grows`), typically a `resize` | the editor's own commands |
+
+## The main window
+
+The main window looks as in the Qt port
+(`vue_texmacs_widget_rep::do_layout`, constants `bar_*`): the menu bar and
+the main tool bar in the window colour, a lighter mode bar and a lighter
+still focus bar, each closed by a 2 px line, no gaps; 24 px of horizontal
+padding; a footer 56 px high in the window colour, below the canvas and
+below the bottom tool rows when there are any. The flat buttons and the
+pull-down buttons are transparent, so the bar behind shows through.
+
+Those colours are fields of the theme (`the_theme.bar_mode`,
+`bar_focus`, `bar_line`, `color_background`; see *Themes* in
+[vue-graphics-stack.md](vue-graphics-stack.md)), not literals: in the light
+theme they are the greys 192, 212, 232 and 176 which the Qt port uses, and
+the dark theme replaces them. The 2 px vertical separators of the bars are
+the one colour still hard-coded (grey 150), so they do not follow the
+theme.
 
 ## Styles (`WIDGET_STYLE_*`)
 
 | Flag | Effect |
 |---|---|
-| `MINI` | smaller font (`get_default_font`), smaller check box |
+| `MINI` | smaller font (`get_default_styled_font`, which decodes the flags for `get_default_font`), smaller check box |
 | `MONOSPACED` | typewriter font |
 | `GREY`, `INERT` | greyed text; inert widgets take no input |
 | `PRESSED` | darker flat button (toggled tool bar buttons) |

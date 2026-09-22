@@ -15,5 +15,9 @@ Run from the source directory, e.g.
   TeXmacs/bin/texmacs.bin -x '(load "src/Plugins/Vue/tests/widgets.scm")'
 
 and check the standard output for the callbacks (choice:, enum:, got: ...)
-and the named snapshots (t0.png, t1-enum-open.png, ...). popup.script needs
-no .scm file: it opens the context menu of the editor.
+and the named snapshots (t0.png, t1-enum-open.png, ...). The catalogue of
+the tests, and what each of them is checking, is in docs/vue-testing.md.
+
+popup.scm and pre-edit.scm are empty ((noop)): those two scripts drive the
+editor of the main window and need no widget of their own, but a .scm is
+loaded for every test so that the -x argument is uniform.

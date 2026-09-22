@@ -19,9 +19,15 @@ defines `VUETEXMACS`; the objects are compiled with `-std=c++20`.
 
 ## Windows
 
-`vue_window_rep` (`vue_gui.hpp`) is the abstract window; the concrete class is
-`vue_sdl_mupdf_window_rep` (`vue_gui.cpp`), created by
-`plain_window (vue_widget content, string name, bool popup)`. Each window owns
+`vue_window_rep` (`vue_gui.hpp`) is the abstract window. Three classes
+implement it in `vue_gui.cpp`: `vue_sdl_base_window_rep` holds everything
+that is SDL and nothing that draws (creation and flags, `update_density`,
+`set_visibility`, `process_layout`, `set_size_limits`, `destroy_event`),
+`vue_sdl_mupdf_window_rep` adds the renderer, `process_redraw` and the text
+measurement, and `vue_sdl_window_rep` is an unused variant drawing through
+SDL's own renderer, kept as a starting point for a GPU backend.
+`plain_window (vue_widget content, string name, bool popup)` creates the
+MuPDF one. Each window owns
 
 * its SDL window and (for the MuPDF variant) a `renderer` on the window
   surface;
@@ -56,8 +62,9 @@ forwards the slot to its contents as X11 does: the texmacs widget's command
 is `(safely-kill-window url)`, which kills the window or quits TeXmacs when
 it was the last one.
 
-**Showing a window.** Windows are created hidden. `set_visibility (true)` only
-records the request; the window is shown by `process_layout` once
+**Showing a window.** Windows are created hidden. `set_visibility (true)`
+shows the window when its contents already fit; otherwise it records the
+request and the window is shown by `process_layout` once
 `ready_to_show` has been set by the content's `post_layout` (the contents fit
 the window), or after 10 passes as a safety net. This avoids the red/gray
 flash and the resize steps of a freshly created dialog.
@@ -88,26 +95,53 @@ Each iteration:
    of the window while they lay themselves out (immediate mode);
 3. the commands queued in `cmd_list` by the widgets are run (widgets never
    run TeXmacs commands during layout, they queue them);
-4. the interpose handler (Scheme delayed commands, TeXmacs housekeeping);
-5. `vue_simple_widget_rep::repaint_all ()` repaints the editors' backing
+4. the interpose handler (Scheme delayed commands, TeXmacs housekeeping,
+   and the polling of the socket notifiers, see below);
+5. if a widget was freed since the layout, every window is laid out again
+   (`gui_needs_relayout`), or the render commands would draw an interface
+   which no longer exists;
+6. `vue_simple_widget_rep::repaint_all ()` repaints the editors' backing
    stores (interruptible);
-6. `process_redraw ()` replays the render commands of every window.
+7. the same check again, up to four times: the repaint runs the typesetter,
+   which executes Scheme and can replace widgets in its turn;
+8. `process_redraw ()` replays the render commands of every window.
 
 Between iterations the loop sleeps in `SDL_WaitEventTimeout` for a pause
 which grows while nothing happens (10 ms → 1 s, for the periodic interpose
 calls) and ends as soon as an event arrives; a plain `SDL_Delay` here made
 the first event after a pause wait for the end of the pause (up to 1 s
 before a scroll started to move). The wheel log lines print for how long an
-event was queued (`queued for N ms`). Window resizes are handled
-synchronously in an SDL event watch (`event_filter`) so that the window
-never shows stale content.
+event was queued (`queued for N ms`).
+
+**Sockets.** A pipe or a socket has no SDL event to wake the loop with, so
+while any notifier is registered the pause is capped at 40 ms
+(`notifiers_active ()`, `src/System/Link/socket_notifier.cpp`), and the
+interpose handler is what polls them (`perform_select`). The loop also
+keeps running with no window at all as long as `number_of_servers () > 0`,
+which is how a headless TeXmacs server stays alive. The socket layer itself
+is GUI-independent and lives in `src/System/Link/tm_sockets.cpp`; see
+*Client/server and sockets* in
+[texmacs-gui-architecture.md](texmacs-gui-architecture.md).
+
+**Resizes.** A window resize is handled inside SDL's event pump, in a watch
+(`event_filter`), so that the window never shows stale content while it is
+dragged. That watch runs a whole frame for the one window: layout, resize
+notifications, the interpose handler, a relayout pass, the repaint of that
+window's editors, up to four more passes and the redraw, all guarded by a
+static `busy` flag against re-entry. It deliberately does not release
+`styled_strings` and `layout_widgets`, since the commands of the other
+windows still name their texts and widgets, so a drag accumulates one
+layout's worth of each per event until the main loop lays everything out
+again.
 
 ## Layout conventions
 
-* **Units**: Clay works in *pixels* of the window surface (retina: 2 pixels
-  per point). TeXmacs lengths are `SI` (`PIXEL` = 1 point); the conversion used
-  throughout is `2*si/PIXEL` pixels (i.e. `retina_factor`), and back
-  `px * PIXEL / retina_factor`. Mouse coordinates are pixels relative to the
+* **Units**: Clay works in *pixels* of the window surface, `retina_factor`
+  of them per point, which is the density of the display that window is on
+  (see *Pixel density* below). TeXmacs lengths are `SI` (`PIXEL` = 1 point);
+  the conversion used throughout is `retina_factor*si/PIXEL` pixels, and
+  back `px * PIXEL / retina_factor`. Writing 2 instead of the factor, as the
+  code once did, doubles the widget on a display without HiDPI. Mouse coordinates are pixels relative to the
   window (`mouse_x/mouse_y`).
 * **Coordinates**: Clay is y-down from the top-left; the TeXmacs renderer is
   y-up. `render_clay_commands` converts (`rectangle (x, -(y+h), x+w, -y)`),
@@ -116,6 +150,8 @@ never shows stale content.
   widget's serial `id`: `CLAY_SIDI (CLAY_TM_STRING (type), id)` for the widget
   itself, `CLAY_IDI ("label", id)` for parts, `CLAY_IDI_LOCAL ("item", i)` for
   children (hashed with the parent id). Ids must be unique in a window.
+  `probe_id (label, id, k)` builds one from an interned string, so that it
+  outlives the pass: the measurement probes below need that.
 * **Measuring from the previous pass**: `Clay_GetElementData (id)` returns the
   bounding box computed in the *previous* layout; it is the standard way to
   size things Clay cannot express directly: `extend_widget`, the rows of
@@ -144,7 +180,7 @@ never shows stale content.
   width. Vertical *menus* fit their contents and their items fill the menu
   width (`button_grow`).
 * **Custom drawing**: an element with `.custom= { .customData=
-  vue_render_widget }, .userData= widget` calls `widget->render (data)` with a
+  vue_render_widget }, .userData= render_ref ()` calls `widget->render (data)` with a
   `vue_render_ren_data { renderer ren; rectangle r }`; `layout_text` uses the
   same mechanism with `vue_render_text`. A command thus names a widget, and
   Clay holds that as a raw pointer in its arena, where nothing can own a
@@ -166,27 +202,36 @@ never shows stale content.
   `scroll_bar (id, data, z)` draws floating scroll bars for any scroll
   container. `render_clay_commands` tracks the clip depth because Clay culls
   the `SCISSOR_START` of off-screen elements but not the matching end.
-* **Colors** (`vue_widget.cpp`): `palette[]` greys (160, 192, 224, 240),
-  `color_background` (192, dialogs), `color_field` (250, lists, scrollable
-  areas, embedded editors), `color_border` (150), push button shades,
-  `color_pressed`, selection blue `{100,100,255}` and the accent
-  `{70,110,220}` of check boxes. Flat buttons are transparent (they show
-  their container: dialog, tool panel or menu) until hovered or pressed. `texmacs_output_widget` in the core uses the
-  field color for the Vue build (`tm_button.cpp`).
+* **Colors** (`vue_widget.cpp`): the globals the widgets name are
+  `palette[]` (four greys), `color_background` (dialogs), `color_field`
+  (lists, scrollable areas, embedded editors), `color_border`, the push
+  button shades and `color_pressed`. They are filled from the theme in use,
+  so the values are not constants: in the light theme the greys are 160,
+  192, 224 and 240, the background 192, the field 250 and the border 150,
+  and the dark theme replaces them (see *Themes*). Flat buttons are
+  transparent, showing their container (dialog, tool panel or menu), until
+  hovered or pressed. `texmacs_output_widget` in the core paints itself the
+  field colour of the light theme, hard-coded (`tm_button.cpp`).
 * **Z order**: editors' scroll bars 1, menus 5 (their scroll bars 6), enum
   dropdowns and balloons 10.
 
 ## Input model
 
-All per-window interaction state lives in `vue_input_state` (`vue_gui.hpp`):
-pending `mouse_action` (`"press-left"`, `"release-right"`, `"move"`,
-`"wheel"`...), pointer position and wheel deltas, pending `key_event`, the hot
-and active element ids, the popup chain flags, the balloon timer and the
-scroll bar drag. `process_event` writes into the window of the SDL event;
-`gui_init_context`/`gui_finalize_context` copy the state into the globals
-used by the widgets around the layout pass of each window and clear the
-one-shot events afterwards: an event lives for exactly one layout pass of its
-window.
+Nearly all per-window interaction state lives in `vue_input_state`
+(`vue_gui.hpp`): pending `mouse_action` (`"press-left"`, `"release-right"`,
+`"move"`, `"wheel"`, `"drop"`...), pointer position and wheel deltas,
+pending `key_event`, the hot and active element ids, the popup chain flags,
+the balloon timer and the scroll bar drag. `process_event` writes into the
+window of the SDL event; `gui_init_context`/`gui_finalize_context` copy the
+state into the globals used by the widgets around the layout pass of each
+window and clear the one-shot events afterwards: an event lives for exactly
+one layout pass of its window.
+
+Four pieces of state are still process globals which those two functions do
+not carry, so they are shared by every window: `mouse_state` (the buttons
+and modifiers held, written by `update_mouse_state`), `open_pull_id` (the
+pull-down being opened this pass) and the two layout flags `button_grow`
+and `menu_has_marks`.
 
 Hit testing uses `Clay_PointerOver (id)` on the element's own id. Do not use
 `Clay_Hovered ()` after the element's `CLAY` block has closed: it then tests
@@ -218,41 +263,15 @@ throughout, made every widget twice its size on a display without HiDPI.
 display and to exercise the other path in the tests. The **icons** follow
 the same factor, see below.
 
-## Icons
-
-`mupdf_load_xpm` is asked for `name.xpm` and decides what to draw. MuPDF
-renders SVG itself (its `source/svg`), so the vector original is preferred:
-`misc/pixmaps/light/name.svg` or `misc/pixmaps/dark/name.svg`, whichever
-the current icon theme is (`mupdf_set_icon_theme`, called from
-`set_vue_theme`), and otherwise the `name.svg` sitting next to the xpm.
-`mupdf_render_svg` draws it in a box of so many points at `retina_factor`
-device pixels per point, so an icon is sharp at every resolution and comes
-recoloured for a dark interface, without the `--with-resvg` build the Qt
-port needs. When there is no SVG the rasters are used as before
-(`name_x4.png`, `name_x2.png`, `name.png`, falling back on the smaller ones
-and finally on the xpm itself), all of them being the same size in points.
-The cache of `load_xpm` is keyed by the resolution and by the icon theme,
-or a change of display or of theme would serve the wrong one; a picture
-widget which was built under another one reloads its file (`icon_picture`
-in `vue_widget.cpp`, `icon_generation`), since the menus are not
-necessarily rebuilt when the theme changes. Loading `_x2.png`
-unconditionally, as the code did, drew every icon at twice its size on a
-display without HiDPI.
-
-Two traps, both found by rendering the whole set:
-
-- MuPDF reads the presentation attributes and the inline `style` attribute
-  only, **not** a `<style>` element with class selectors. The eighteen
-  icons written that way (`tm_cut`, `tm_copy`, `tm_paste`, the accents...)
-  came out as black squares, every fill falling back to the default; their
-  styles are now inline in both `light` and `dark`. `fill: transparent` is
-  not a colour MuPDF knows either, and became black: it is `fill: none`.
-- The size an SVG file declares is not the size of the icon. Thirty-odd
-  files, the flags in particular, declare the drawing they were made from
-  (`width="1200"`) and fifteen declare nothing. The box comes instead from
-  the directory the icon set lives in, which names it: `modern/24x24/main`,
-  `traditional/--x17` where a dash is a free side (`icon_box_size`). The
-  drawing keeps its proportions and is centered in that box.
+**Drag and drop.** SDL delivers a drop in four events: `DROP_BEGIN`, then
+one `DROP_FILE` or `DROP_TEXT` per item, then `DROP_COMPLETE`. The handlers
+build one `CONCAT` tree out of the items, images becoming `IMAGE` trees
+scaled to a sensible size (`vue_pretty_image_size`), and park it in a
+`hashmap<int,tree> payloads` under a ticket. The drop then reaches the
+widget under the pointer as an ordinary mouse action `"drop"` whose ticket
+travels in place of the modifiers (`mouse_ticket`), and `call_drop_event`
+reads the payload back. The core half of this is shared with the Qt port
+(`edit_mouse.cpp`).
 
 `button_logic (id)` is the common mouse protocol of the elements, over
 `Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless
@@ -270,33 +289,38 @@ position is set off-window, so that nothing stays hovered. Every
 fired commands every frame. Elements which must not be captured by the
 element behind them consume the press (`mouse_action= ""`, the thumbs).
 
-Keyboard focus is per window (`win->kbd_focus`); change it with
+**Keyboard focus** is per window (`win->kbd_focus`); change it with
 `set_kbd_focus`, which notifies editors (`handle_keyboard_focus`), and
 `notify_window_focus` forwards SDL focus changes. Text inputs and editors
 consume `key_event` when focused. Key names follow TeXmacs conventions
-(`lookup_key`, `initialize_keyboard`). **Typing**: a key which produces a
-character (printable keycode, no control/alt/command modifier left after
-`postprocess_key_event`, which folds shift and option into the keycode) is
-not delivered as a key: the system sends the resulting text — composed
-with the dead keys and the input method — as `SDL_EVENT_TEXT_INPUT`, which
-is delivered instead (" ", "<", ">" become `space`, `<less>`, `<gtr>`); a
-dead key alone types nothing. Every other key (return, arrows, function
-keys, C-/M-/A- combinations) is delivered as a key and a text event which
-follows it within 30 ms (`key_stamp`) belongs to the same keystroke and is
-dropped. The scripted `key` command therefore drives control keys and
-`text` the characters. The composition of an input method
-(`SDL_EVENT_TEXT_EDITING`: dead keys, CJK) is shown by the editor as a
-pre-edit: it receives the key `pre-edit:<cursor>:<text>` as with Qt (an
-empty text ends it) and the committed text arrives as a text event; the
-text inputs show it too (`vue_input_text_widget_rep::pre_edit`): spliced
-into the string they draw, in a pale box with an underline, with the cursor
-inside it, replaced by the committed text when it arrives. The editor applies a pre-edit through
-`delayed-keyboard-press`, which waits for 100 ms of `idle-time`, and the
-idle time is zero while `check_event (ANY_EVENT)` sees a pending event:
-the Vue `check_event` must not count SDL's poll sentinel, an internal event
-which sits in the queue after every pump (it did, and nothing depending on
-the idle time — the pre-edits, the `:idle` delayed commands — ever ran).
-The idle time is also zero while the window has no keyboard focus.
+(`lookup_key`, `initialize_keyboard`).
+
+**Typing.** A key which produces a character (printable keycode, no
+control, alt or command modifier left after `postprocess_key_event`, which
+folds shift and option into the keycode) is not delivered as a key: the
+system sends the resulting text, composed with the dead keys and the input
+method, as `SDL_EVENT_TEXT_INPUT`, and that is what is delivered (" ", "<"
+and ">" become `space`, `<less>`, `<gtr>`); a dead key alone types nothing.
+Every other key (return, arrows, function keys, C-, M- and A- combinations)
+is delivered as a key, and a text event following it within 30 ms
+(`key_stamp`) belongs to the same keystroke and is dropped. The scripted
+`key` command therefore drives the control keys and `text` the characters.
+
+**Input methods.** A composition (`SDL_EVENT_TEXT_EDITING`: dead keys, CJK)
+is shown by the editor as a pre-edit: it receives the key
+`pre-edit:<cursor>:<text>` as with Qt, an empty text ending it, and the
+committed text arrives as a text event. The text inputs show it too
+(`vue_input_text_widget_rep::pre_edit`), spliced into the string they draw,
+in a pale box with an underline and the cursor inside it, replaced by the
+committed text when it arrives.
+
+The editor applies a pre-edit through `delayed-keyboard-press`, which waits
+for 100 ms of `idle-time`. That idle time is zero while `check_event
+(ANY_EVENT)` sees a pending event, so the Vue `check_event` must not count
+SDL's poll sentinel, an internal event which sits in the queue after every
+pump. It did, and nothing which depends on the idle time — the pre-edits,
+the `:idle` delayed commands — ever ran. The idle time is also zero while
+the window has no keyboard focus.
 
 Popup menus (`layout_pull_button`) form a chain through `current_popup`; a
 click on a `menu_button` sets `cancel_popup` which closes the chain (and popup
@@ -345,7 +369,49 @@ the window, are at most as tall as the window and scroll.
   `push_wheel`) instead of one event per frame, which lagged behind the
   fingers and made the motion jerky. The editor keeps the fractional SI
   remainder of the small steps (`scroll_rest_x/y`). While a view glides the
-  loop does not sleep (5 ms pacing).
+  loop paces itself at 5 ms (`SDL_WaitEventTimeout`), so any event wakes it
+  at once.
+
+## Icons
+
+`mupdf_load_xpm` is asked for `name.xpm` and decides what to draw. MuPDF
+renders SVG itself (its `source/svg`), so the vector original is preferred:
+`misc/pixmaps/light/name.svg` or `misc/pixmaps/dark/name.svg`, whichever
+the current icon theme is (`mupdf_set_icon_theme`, called from
+`set_vue_theme`), and otherwise the `name.svg` sitting next to the xpm.
+`mupdf_render_svg` draws it in a box of so many points at `retina_factor`
+device pixels per point, so an icon is sharp at every resolution and comes
+recoloured for a dark interface, without the `--with-resvg` build the Qt
+port needs. When there is no SVG the rasters are used as before
+(`name_x4.png`, `name_x2.png`, `name.png`, falling back on the smaller ones
+and finally on the xpm itself), all of them being the same size in points.
+The cache of `load_xpm` is keyed by the resolution and by the icon theme,
+or a change of display or of theme would serve the wrong one; a picture
+widget which was built under another one reloads its file (`icon_picture`
+in `vue_widget.cpp`, `icon_generation`), since the menus are not
+necessarily rebuilt when the theme changes. Loading `_x2.png`
+unconditionally, as the code did, drew every icon at twice its size on a
+display without HiDPI.
+
+The same renderer serves document images: `mupdf_load_image` draws any
+`.svg` file at the size it declares and at `retina_factor`, so an SVG
+inserted in or dropped on a document is rendered without `--with-resvg`
+too; `mupdf_load_svg` is the entry point which returns a `picture`.
+
+Two traps, both found by rendering the whole set:
+
+- MuPDF reads the presentation attributes and the inline `style` attribute
+  only, **not** a `<style>` element with class selectors. The eighteen
+  icons written that way (`tm_cut`, `tm_copy`, `tm_paste`, the accents...)
+  came out as black squares, every fill falling back to the default; their
+  styles are now inline in both `light` and `dark`. `fill: transparent` is
+  not a colour MuPDF knows either, and became black: it is `fill: none`.
+- The size an SVG file declares is not the size of the icon. Thirty-odd
+  files, the flags in particular, declare the drawing they were made from
+  (`width="1200"`) and fifteen declare nothing. The box comes instead from
+  the directory the icon set lives in, which names it: `modern/24x24/main`,
+  `traditional/--x17` where a dash is a free side (`icon_box_size`). The
+  drawing keeps its proportions and is centered in that box.
 
 ## Error handling of the libraries
 
@@ -409,7 +475,10 @@ whose `"default"` follows the appearance of the system
 while running). `TEXMACS_VUE_THEME` overrides the preference, which is how
 the tests take both.
 
-Two rules keep a theme complete. A widget which needs a colour gets a
+`gui_refresh ()` re-reads the preference and re-applies the theme, which is
+the path the preferences dialog takes: changing the theme needs no restart.
+
+Two rules keep a theme complete. A widget which needs a colour should get a
 **field**, never a literal, or the theme will not reach it; and the two
 colours the widgets (and the core) ask for without knowing about themes,
 `black` and `dark_grey`, are mapped in `layout_text` to the theme's text
@@ -419,8 +488,15 @@ the pages (`tm_background`) is set from the theme as well, while the
 documents themselves keep their own colours.
 
 Adding a theme is a constant of type `vue_theme` and a case in
-`set_vue_theme`, which also picks the icon set (`misc/pixmaps/light` or
-`misc/pixmaps/dark`, see *Icons* above).
+`set_vue_theme`, which also picks the icon set
+(`TeXmacs/misc/pixmaps/light` or `.../dark`, see *Icons*).
+
+The rule is not yet kept everywhere. These colours are still literals and
+so stay light under the dark theme: the accent and the inert grey of the
+check boxes, the frames of the menus, of the popup windows and of the enum
+dropdowns (grey 150), the two hover greys of the section bars, the
+separators of the tool bars (grey 150), and the background
+`texmacs_output_widget` paints in the core (`tm_button.cpp`).
 
 ## Animation (Clay transitions)
 
@@ -454,16 +530,18 @@ elements' ids must be stable for this to work (see the notes on
   pass) and `gui_needs_relayout` (widgets replaced by commands).
 * **Caching of rendering structures**: the per-frame objects are cheap
   (`styled_strings` and `layout_widgets` are rebuilt each layout, the
-  pictures of the icons are loaded once in the widget constructors, the fonts come from TeXmacs'
-  font cache, the glyphs from MuPDF's) and the profile of a frame is now
+  icons are loaded once per theme and per resolution and kept by the
+  `load_xpm` cache, the fonts come from TeXmacs' font cache, the glyphs from
+  MuPDF's) and the profile of a frame is now
   dominated by the editors' repaint and the surface upload, so no further
   cache is kept; the Clay element ids are the one structure which must be
   stable across frames (interned strings).
 
 ## Rendering details
 
-`vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the UI
-background (red in the F1 debug mode, to spot uncovered areas), replays the
+`vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the
+background of the theme (red in the F1 debug mode, to spot uncovered
+areas), replays the
 Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`, in
 document coordinates) and blitted by their custom render callback.

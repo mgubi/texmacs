@@ -10,7 +10,9 @@ The worktree `wip_other_guis/src` is configured with
 (see the first lines of `config.log`; the Guile 1.8 in `~/t/guile-1.8.7` is
 used, the Homebrew Guile 3 is rejected; `--with-gnutls`, added on
 2026-09-21, enables the TLS protocol of the TeXmacs client/server through
-the Homebrew GnuTLS and needs a full rebuild since it changes `config.h`). `make` at the root builds
+the Homebrew GnuTLS and needs a full rebuild since it changes `config.h`).
+`--with-resvg` is *not* needed: MuPDF draws the SVG icon sets itself, see
+*Icons* in [vue-graphics-stack.md](vue-graphics-stack.md). `make` at the root builds
 `TeXmacs/bin/texmacs.bin`; `src/makefile` is generated from
 `src/makefile.in`, so permanent changes go to `makefile.in`. `configure`
 and `src/System/config.in` are generated from `configure.in` and the
@@ -37,13 +39,18 @@ main checkout (`~/t/git/texmacs`); the Vue work was merged with it on
 
 * the generated `configure` and `src/System/config.in`: do not merge them,
   regenerate (`autoconf`, `autoheader`) after resolving `configure.in` and
-  `aclocal.m4` (which list `LC_MUPDF`, `mupdf.m4`, `sdl3.m4` next to the
-  upstream macros);
+  `aclocal.m4` (which list `mupdf.m4`, `sdl3.m4` and `resvg.m4` next to the
+  upstream macros; `LC_SDL3` is called from `misc/m4/tm_gui.m4`, inside the
+  `sdl` and `vue` cases, so a `--with-gui` conflict and an sdl3 conflict
+  arrive together);
 * `src/makefile.in`: the MuPDF/SDL/Vue variables, sources and object rules
   live next to the upstream ones; upstream selects the Qt plugin directory
   with `QT_PLUGIN_DIR` (`Qt` or `Qt6`), the Widkit-on-Qt port uses
   `QT_SRC_DIR= Qt`;
-* `System/Link`: Qt-only sockets, keep the non-Qt stubs in sync with
+* `System/Link`: the client/server sockets used to be Qt-only; they are now
+  `tm_sockets.cpp` (guarded by `#ifndef QTTEXMACS`) driven by
+  `socket_notifier.*`, and the Qt build keeps `Plugins/Qt/QTMSockets.cpp`.
+  Keep the two implementations in sync with each other and with
   `client_server.hpp`;
 * API changes of `renderer.hpp` and `widget.hpp` surface as abstract-class
   or link errors in `Plugins/MuPDF` and `Plugins/Vue` (see the notes in
@@ -62,9 +69,13 @@ main checkout (`~/t/git/texmacs`); the Vue work was merged with it on
 
 Useful keys: F1 toggles the Clay debug view of the focused window (and the red
 marker of uncovered areas). `TEXMACS_VUE_DUMP=1` prints every Clay render
-command of every frame (`DUMP <type> id <id> box x,y wxh ...`; border
-commands are matched against the usual id patterns) — heavy, for tracking
-down a stray element.
+command of every frame (`DUMP <type> id <id> box x,y wxh ...`, where
+`<type>` is Clay's raw command-type number, not a name; border commands are
+matched against the usual id patterns) — heavy, for tracking down a stray
+element. `TEXMACS_VUE_THEME=light|dark` and `TEXMACS_VUE_DENSITY=<x>` force
+the appearance and the resolution, which is how a theme or a HiDPI bug is
+reproduced on any screen; `TEXMACS_VUE_SNAPSHOT` and `TEXMACS_VUE_SCRIPT`
+are described in [vue-testing.md](vue-testing.md).
 
 ## Debugging
 

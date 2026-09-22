@@ -717,7 +717,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   time_t t1, t2;
   t2= texmacs_time ();
   // areas not covered by any element: red in the debug mode (F1) to spot them
-  ren->set_pencil (clay_debug ? rgb_color (255, 0, 0) : rgb_color (192, 192, 192));
+  ren->set_pencil (clay_debug ? rgb_color (255, 0, 0)
+                              : theme_color (the_theme.background));
   ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
   render_clay_commands (ren, &render_commands);
 
@@ -1552,8 +1553,13 @@ get_window_from_ID (Uint32 ID) {
 *   release x y [left|right|middle] button up
 *   click x y [left|right|middle]   press followed by release
 *   wheel x y dx dy                 wheel event at (x, y)
-*   key <SDL key name>              key press, e.g. Return, Escape, Tab, Down
-*   text <string>                   text input
+*   key [S-][C-][A-][M-]<name>      key press, e.g. Return, Escape, Tab, Down,
+*                                   with shift/control/option/command prefixes
+*   text <string>                   text input, one event per character
+*   compose <text>                  composition of an input method (empty: end it)
+*   focus                           pretend the target window got the keyboard focus
+*   drop x y <path>|text:<text>     drag and drop of one item at that position
+*   repaint                         invalidate every editor (repaint from scratch)
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
