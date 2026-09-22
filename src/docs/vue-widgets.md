@@ -62,7 +62,7 @@ entry points of a GUI*.
 | `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look; the icons (20 or 32 px in the preferences) sit in boxes of the largest icon so that all tabs have the same height | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
 | `user_canvas_widget` (scrollable) | clip container with scroll bars, field background; the `style` argument is ignored | |
-| `texmacs_output_widget` → `box_widget_rep` | a typeset box (`texmacs-output`): natural size from its size hint, drawn by the core (`tm_button.cpp`) on the field color | |
+| `texmacs_output_widget` → `box_widget_rep` | a typeset box which takes the size of what it typesets (`handle_get_size_hint`), unless it sits in a `resize`, whose pane it fills (`fill_parent`); it paints its own background over the whole of its rectangle. A typeset box (`texmacs-output`): natural size from its size hint, drawn by the core (`tm_button.cpp`) on the field color | |
 | `resize_widget (w, style, min, def, max, pos)` | fixed to `def` while the window auto-sizes, then `GROW(min..max)`; min/max become window limits; the initial scrolling position (`hpos`, `vpos`) is ignored | |
 | `hsplit_widget`, `vsplit_widget` | draggable 8 px divider, equal split until moved | |
 | `wait_widget` | yellow "please wait" box | |

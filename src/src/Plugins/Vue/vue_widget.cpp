@@ -263,6 +263,9 @@ bool debug_clay=false;
 
 // ask the buttons to fit all horizontal space (items of vertical menus)
 bool button_grow= false;
+// set while laying out what a resize widget contains: a widget which would
+// otherwise take the size of its contents fills the box instead
+bool fill_parent= false;
 // the vertical menu being laid out has items with check marks: all its items
 // reserve the column of the marks so that the labels align
 bool menu_has_marks= false;
@@ -2363,7 +2366,13 @@ vue_ui_rep::do_layout () {
     CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
       .layout= { .sizing= sizing }})
     {
+      // what a resize contains is meant to fill it: a typeset box would
+      // otherwise keep the size of its contents inside a pane which asked
+      // for a larger one (the documentation pane of the macro editors)
+      bool save_fill= fill_parent;
+      fill_parent= true;
       concrete(d.w)->do_layout ();
+      fill_parent= save_fill;
     }
     return;
   }
@@ -4656,9 +4665,15 @@ vue_simple_widget_rep::do_layout () {
     // typeset boxes (texmacs-output) have their natural size; editors,
     // embedded or not, fill their container (their size hint is the screen)
     handle_get_size_hint (w, h);
-    s= {
-      .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
-      .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
+    // a typeset box has its natural size, unless it was given one: a
+    // "resize" around it is a pane of that size, which it has to fill
+    // (its own background is painted over the whole of its rectangle)
+    if (fill_parent)
+      s= { .width=  CLAY_SIZING_GROW(.min= (float)w/ren->pixel),
+           .height= CLAY_SIZING_GROW(.min= (float)h/ren->pixel) };
+    else
+      s= { .width=  CLAY_SIZING_FIT(.min= (float)w/ren->pixel),
+           .height= CLAY_SIZING_FIT(.min= (float)h/ren->pixel) };
   }
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   Clay_ElementData d= Clay_GetElementData (clay_id);
