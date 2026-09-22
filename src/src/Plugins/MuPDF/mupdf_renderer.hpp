@@ -75,7 +75,8 @@ protected:
   bool device_box (SI x1, SI y1, SI x2, SI y2,
                    int& px1, int& py1, int& px2, int& py2);
   bool fill_direct (SI x1, SI y1, SI x2, SI y2, color c);
-  bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha);
+  bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
+                           bool opaque= false);
 
 public:
   mupdf_renderer_rep (int w = 0, int h = 0);

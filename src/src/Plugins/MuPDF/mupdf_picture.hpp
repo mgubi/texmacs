@@ -51,6 +51,9 @@ public:
   fz_image *im;
   int w, h;
   int ox, oy;
+  // every pixel has an alpha of 255: set for the pictures allocated by
+  // native_screen_picture, which lets a blit copy whole rows
+  bool opaque;
 
 protected:
   color internal_get_pixel (int x, int y);
@@ -102,6 +105,12 @@ fz_image*  mupdf_image_from_file (const char* path);
 fz_image*  mupdf_image_from_pixmap (fz_pixmap* pix);
 fz_pixmap* mupdf_pixmap_from_image (fz_image* im);
 fz_pixmap* mupdf_new_pixmap (int w, int h); // cleared; 1x1 on failure
+
+// The channel order of the window surfaces (the pixmaps which wrap them).
+fz_colorspace* mupdf_screen_colorspace ();
+// A picture which is opaque and stays opaque, so that it can be blitted
+// without a test per pixel: see native_opaque_picture in mupdf_picture.cpp.
+picture native_opaque_picture (int w, int h, int ox, int oy);
 bool mupdf_protected_call (const char* what, void (*f) (void*), void* data);
 
 template<typename F> static void

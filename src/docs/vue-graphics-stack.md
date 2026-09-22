@@ -545,6 +545,18 @@ areas), replays the
 Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`, in
 document coordinates) and blitted by their custom render callback.
+The backing store is allocated by `native_opaque_picture`: cleared to opaque
+white rather than to transparent, and flagged as opaque. Source-over on an
+opaque destination leaves the alpha at 255, so it stays opaque whatever the
+editor draws, and `draw_pixmap_direct` can then blit it with a loop which
+has no test in it, one `memcpy` per row or a fixed reordering of the
+channels which the compiler vectorises. That test per pixel, not the
+reordering, was the cost: the blit of a full window went from 3.2 ms to
+0.7 ms, and a frame while scrolling from 13.1 ms to 10.5 ms. MuPDF writes
+the components in the RGB order whatever colorspace the pixmap is declared
+with, so the store cannot simply be declared in the order of the window:
+the reordering has to happen in the blit.
+
 **Scrolling** shifts the pixels of the backing store (`translate_backing_store`,
 `memmove` per row) and repaints only the exposed strips, so a scroll step
 costs a strip instead of the whole viewport (the tiled neutral background

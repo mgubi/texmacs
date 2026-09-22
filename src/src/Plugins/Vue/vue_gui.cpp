@@ -653,7 +653,7 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
   // padded, which sheared the image when 4*w was assumed)
   bool ok= (surf != NULL) && SDL_BYTESPERPIXEL (surf->format) == 4 &&
            mupdf_protected ("window surface", [&] () {
-    pix= fz_new_pixmap_with_data (ctx, fz_device_bgr (ctx),
+    pix= fz_new_pixmap_with_data (ctx, mupdf_screen_colorspace (),
                                   surf->w, surf->h, NULL, 1, surf->pitch,
                                   (unsigned char*) surf->pixels);
   });

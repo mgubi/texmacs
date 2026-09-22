@@ -904,9 +904,12 @@ mupdf_renderer_rep::fill_direct (SI x1, SI y1, SI x2, SI y2, color c) {
 
 // blit the pixmap with its bottom left corner at (x, y) (SI), 1 device
 // pixel per pixel of the source, composed with the given alpha; false if
-// MuPDF must do it (other formats)
+// MuPDF must do it (other formats). opaque says that every pixel of the
+// source has an alpha of 255, which the caller knows and we cannot afford
+// to check: reading the source to find out costs as much as the blit.
 bool
-mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha) {
+mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
+                                       bool opaque) {
   if (src == NULL || src->samples == NULL || pixmap == NULL) return false;
   if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
   if (src->s != 0 || (!(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha)))
@@ -930,6 +933,25 @@ mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha) {
   int sn= src->n, n= px2 - px1;
   const unsigned char* srow= src->samples + (ptrdiff_t) (py1 - iy1) * src->stride + sn * (px1 - ix1);
   unsigned char* drow= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
+  // Nothing to compose and nothing to decide per pixel: the rows are copied
+  // as they are, or reordered with a loop the compiler can vectorise. This
+  // is the blit of an editor's backing store, which is opaque throughout
+  // (see native_opaque_picture); it is an order of magnitude faster than
+  // the general loop below, whose cost is the test on the alpha rather than
+  // the reordering.
+  if (opaque && alpha >= 255 && sn == 4) {
+    for (int py= py1; py < py2; py++, srow += src->stride, drow += pixmap->stride) {
+      if (!swap_rb) memcpy (drow, srow, (size_t) n * 4);
+      else {
+        const unsigned char* sp= srow;
+        unsigned char* d= drow;
+        for (int i= 0; i < n; i++, sp += 4, d += 4) {
+          d[0]= sp[2]; d[1]= sp[1]; d[2]= sp[0]; d[3]= 255;
+        }
+      }
+    }
+    return true;
+  }
   for (int py= py1; py < py2; py++, srow += src->stride, drow += pixmap->stride) {
     const unsigned char* sp= srow;
     unsigned char* d= drow;
@@ -1222,7 +1244,7 @@ mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
   if (draw_pixmap_direct (pict->pix, x - p->get_origin_x () * pixel,
-                          y - p->get_origin_y () * pixel, alpha))
+                          y - p->get_origin_y () * pixel, alpha, pict->opaque))
     return;
   if (!pict->im) {
     // let's cache the image representation of the pixmap

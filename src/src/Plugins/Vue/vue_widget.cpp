@@ -4289,7 +4289,9 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
-  backing_store= native_picture (size.x1, size.x2, 0, 0);
+  // opaque, so that blitting it into the window needs no test per pixel
+  // (see native_opaque_picture)
+  backing_store= native_opaque_picture (size.x1, size.x2, 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   paint_list= list<vue_simple_widget_rep*>(this, paint_list);
 };
@@ -4831,7 +4833,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // the viewport size changed, reset the backing store
     // cout << "viewport changed (" << bs_w << "," << bs_h << ") (" << new_bs_w << "," << new_bs_h << ")" << LF;
     // create a new backing store with updated viewport and the renderer
-    picture new_backing_store= native_picture (new_bs_w, new_bs_h, 0, 0);
+    picture new_backing_store= native_opaque_picture (new_bs_w, new_bs_h, 0, 0);
     renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
     
     // copy the old backingstore
