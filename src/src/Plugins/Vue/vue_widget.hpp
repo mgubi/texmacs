@@ -28,6 +28,15 @@ typedef pair<SI,SI> coord2;
 class vue_window_rep;
 typedef vue_window_rep *vue_window;
 
+// The render commands of the last layout point at the widgets which drew
+// themselves (the custom callbacks of Clay): a widget freed since would be
+// called back into. The windows are laid out again before a redraw when a
+// widget was freed (gui_needs_relayout), but a stale command crashes the
+// process outright, so the callback checks its pointer against this set as
+// well. An address reused by a new widget passes the check, which costs at
+// most one frame drawn with the wrong widget.
+extern hashset<pointer> live_vue_widgets;
+
 class vue_widget_rep : public widget_rep {
 public:
   string type;
@@ -35,8 +44,9 @@ public:
   static unsigned int serial_id;
   
 public:
-  vue_widget_rep (string _type) : type (_type), id (serial_id++) {};
-  virtual ~vue_widget_rep () {};
+  vue_widget_rep (string _type) : type (_type), id (serial_id++) {
+    live_vue_widgets->insert ((pointer) this); };
+  virtual ~vue_widget_rep () { live_vue_widgets->remove ((pointer) this); };
   
   // widget messages with TeXmacs
   void send (slot s, blackbox val);

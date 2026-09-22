@@ -512,6 +512,8 @@ tm_delete<vue_widget_rep> (vue_widget_rep* ptr) {
 
 unsigned int vue_widget_rep::serial_id= 0;
 
+hashset<pointer> live_vue_widgets; // see vue_widget.hpp
+
 /******************************************************************************
 * umbrella widget class
 ******************************************************************************/

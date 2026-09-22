@@ -759,6 +759,12 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 
 void
 vue_render_widget_fn (renderer ren, void *w, rectangle r) {
+  // a command left by a layout older than the death of the widget it points
+  // at: there is nothing to draw any more (see live_vue_widgets)
+  if (!live_vue_widgets->contains ((pointer) w)) {
+    if (DEBUG_VUE) debug_widgets << "stale render command ignored" << LF;
+    return;
+  }
   vue_render_ren_data data { .ren= ren, .r= r };
   ((vue_widget_rep*)w)->render (&data);
 }
@@ -1489,7 +1495,18 @@ void gui_start_loop () {
     if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "repaint took " << t2 - t1 << "ms" << LF;
 
     // 7. redraw the UI
-    process_redraw ();
+    // the repaint runs the typesetter, which may execute Scheme and replace
+    // widgets (a tool rebuilt from a document change, say): check again, or
+    // the render commands of the layout above would call back into widgets
+    // which have been freed since. A layout which frees a widget itself
+    // asks for another one, hence the loop, bounded in case one never
+    // settles (drawing a stale command crashes, drawing nothing does not).
+    for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
+    if (gui_needs_relayout) {
+      if (DEBUG_VUE)
+        debug_widgets << "the layout does not settle: skipping a redraw" << LF;
+    }
+    else process_redraw ();
     t1= t2; t2= texmacs_time ();
     if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
     gui_wait= true;
@@ -2214,7 +2231,9 @@ bool event_filter (void *userdata, SDL_Event *event) {
       if (the_interpose_handler != NULL) the_interpose_handler ();
       if (gui_needs_relayout) process_layout ();
       vue_simple_widget_rep::repaint_all_in_window (win);
-      win->process_redraw();
+      // the repaint may have replaced widgets, see gui_start_loop
+      for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
+      if (!gui_needs_relayout) win->process_redraw();
       busy= false;
       return true; // the return value of a watch is ignored by SDL anyway
     }
