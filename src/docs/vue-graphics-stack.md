@@ -208,13 +208,43 @@ TeXmacs are in SI, `PIXEL` per point, so a length becomes
 throughout, made every widget twice its size on a display without HiDPI.
 `TEXMACS_VUE_DENSITY=<x>` overrides the density, to draw at 1x on a HiDPI
 display and to exercise the other path in the tests. The **icons** follow
-the same factor: `mupdf_load_xpm` is asked for `name.xpm` and loads the
-variant which matches the resolution (`name_x4.png`, `name_x2.png`,
-`name.png`, falling back on the smaller ones and finally on the xpm
-itself), since all of them are the same size in points; the cache of
-`load_xpm` is keyed by the factor as well, or a change of display would
-serve the wrong one. Loading `_x2.png` unconditionally, as the code did,
-drew every icon at twice its size on a display without HiDPI.
+the same factor, see below.
+
+## Icons
+
+`mupdf_load_xpm` is asked for `name.xpm` and decides what to draw. MuPDF
+renders SVG itself (its `source/svg`), so the vector original is preferred:
+`misc/pixmaps/light/name.svg` or `misc/pixmaps/dark/name.svg`, whichever
+the current icon theme is (`mupdf_set_icon_theme`, called from
+`set_vue_theme`), and otherwise the `name.svg` sitting next to the xpm.
+`mupdf_render_svg` draws it in a box of so many points at `retina_factor`
+device pixels per point, so an icon is sharp at every resolution and comes
+recoloured for a dark interface, without the `--with-resvg` build the Qt
+port needs. When there is no SVG the rasters are used as before
+(`name_x4.png`, `name_x2.png`, `name.png`, falling back on the smaller ones
+and finally on the xpm itself), all of them being the same size in points.
+The cache of `load_xpm` is keyed by the resolution and by the icon theme,
+or a change of display or of theme would serve the wrong one; a picture
+widget which was built under another one reloads its file (`icon_picture`
+in `vue_widget.cpp`, `icon_generation`), since the menus are not
+necessarily rebuilt when the theme changes. Loading `_x2.png`
+unconditionally, as the code did, drew every icon at twice its size on a
+display without HiDPI.
+
+Two traps, both found by rendering the whole set:
+
+- MuPDF reads the presentation attributes and the inline `style` attribute
+  only, **not** a `<style>` element with class selectors. The eighteen
+  icons written that way (`tm_cut`, `tm_copy`, `tm_paste`, the accents...)
+  came out as black squares, every fill falling back to the default; their
+  styles are now inline in both `light` and `dark`. `fill: transparent` is
+  not a colour MuPDF knows either, and became black: it is `fill: none`.
+- The size an SVG file declares is not the size of the icon. Thirty-odd
+  files, the flags in particular, declare the drawing they were made from
+  (`width="1200"`) and fifteen declare nothing. The box comes instead from
+  the directory the icon set lives in, which names it: `modern/24x24/main`,
+  `traditional/--x17` where a dash is a free side (`icon_box_size`). The
+  drawing keeps its proportions and is centered in that box.
 
 `button_logic (id)` is the common mouse protocol of the elements, over
 `Clay_PointerOver`: the element under the pointer is *hot* (hovered) unless
@@ -381,10 +411,8 @@ the pages (`tm_background`) is set from the theme as well, while the
 documents themselves keep their own colours.
 
 Adding a theme is a constant of type `vue_theme` and a case in
-`set_vue_theme`. Not covered yet: the **icons**, which are a raster set
-drawn for a light background; TeXmacs also ships `misc/pixmaps/dark` and
-`light` as SVG, which would need a build with `--with-resvg` and a pixmap
-path chosen per theme.
+`set_vue_theme`, which also picks the icon set (`misc/pixmaps/light` or
+`misc/pixmaps/dark`, see *Icons* above).
 
 ## Animation (Clay transitions)
 

@@ -50,7 +50,9 @@ keyboard focus, and the editor's idle time (hence the pre-edits and the
 `got: ...`, `Click!!`), which is how the tests are checked.
 
 `TEXMACS_VUE_THEME=light|dark` forces the theme of the interface, which the
-`theme` test renders side by side. `TEXMACS_VUE_DENSITY=1` runs at one
+`theme` test renders side by side and the `icons` test uses to show one row
+of buttons per icon set (the vector icons of `misc/pixmaps/light` and
+`misc/pixmaps/dark`). `TEXMACS_VUE_DENSITY=1` runs at one
 device pixel per point, the layout of a
 display without HiDPI, whatever the screen: worth a pass over the visual
 tests after a change to the sizing of the widgets.
@@ -121,7 +123,10 @@ shown at the cursor, then replaced by the committed text),
 `submenu` (a menu with a submenu: the submenu opens without closing its
 parent, an item of it runs, and opening another menu of the bar closes the
 first with its submenu), `choice-style` (the four styles of a choice list side by side: a click on
-the inert one neither selects nor calls back), `drop` (a dropped file name and a dropped piece of text reach
+the inert one neither selects nor calls back), `icons` (one row of buttons
+per icon set: the vector icons must be drawn at the size of their set, so
+the flags of `16x16/focus`, whose files declare a width of 1200, must not
+be larger than the rest; run it under both themes), `drop` (a dropped file name and a dropped piece of text reach
 mouse-drop-event and are inserted), `entrypoints` (the wait indicator
 appears over the window and is popped by the empty message, the help
 balloon appears and a pointer motion dismisses it), `pre-edit` (the composition of an input method — a dead key, a letter — is

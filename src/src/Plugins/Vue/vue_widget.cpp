@@ -205,6 +205,10 @@ vue_apply_theme () {
   color_pressed= the_theme.pressed;
 }
 
+// Counts the changes of the icon theme: a picture widget which holds an
+// icon of an older generation loads it again (see icon_picture).
+static int icon_generation= 0;
+
 // "light", "dark", or anything else (the "default" of the preference) to
 // follow the appearance of the system
 void
@@ -213,11 +217,19 @@ set_vue_theme (string name) {
   // a theme without changing the settings)
   string forced= get_env ("TEXMACS_VUE_THEME");
   if (N(forced) > 0) name= forced;
-  if (name == "dark") the_theme= vue_theme_dark;
-  else if (name == "light") the_theme= vue_theme_light;
-  else the_theme= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK)
-                  ? vue_theme_dark : vue_theme_light;
+  bool dark;
+  if (name == "dark") dark= true;
+  else if (name == "light") dark= false;
+  else dark= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK);
+  the_theme= dark ? vue_theme_dark : vue_theme_light;
   vue_apply_theme ();
+  // the vector icons come in a light and a dark set: the widgets which were
+  // built with the other one load theirs again (see icon_picture)
+  string icons= dark ? string ("dark") : string ("light");
+  if (icons != mupdf_get_icon_theme ()) {
+    mupdf_set_icon_theme (icons);
+    icon_generation++;
+  }
   // the surround of the pages is a colour of TeXmacs, not of the widgets
   tm_background= rgb_color (the_theme.canvas.r, the_theme.canvas.g,
                             the_theme.canvas.b);
@@ -833,7 +845,27 @@ decode_length (string width, vue_window win, int style) {
 }
 
 // additional widgets for caching and drawing
-VUE_WIDGET_DATA(picture_widget, picture, p);
+// file_name is the icon the picture was loaded from (none for a picture
+// which has no file), and stamp the icon theme and the resolution it was
+// loaded for: see icon_picture
+VUE_WIDGET_DATA(picture_widget, picture, p, url, file_name, int, stamp);
+// The icon a picture widget shows depends on the theme (the light or the
+// dark vector set) and on the resolution it is drawn at, both of which may
+// change while the widget is alive: it is loaded again when they do.
+static int
+icon_stamp () { return 8 * icon_generation + retina_factor; }
+
+static picture
+icon_picture (blackbox& data) {
+  vue_picture_widget d= open_box<vue_picture_widget> (data);
+  if (d.stamp != icon_stamp () && !is_none (d.file_name)) {
+    d.p= load_xpm (d.file_name);
+    d.stamp= icon_stamp ();
+    data= close_box (d);
+  }
+  return d.p;
+}
+
 VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw,
                 bool, placed, bool, flip, float, shift_x, float, shift_y);
 // placed: the position of the open menu has been decided (see layout_pull_button)
@@ -1109,7 +1141,8 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     array<widget> icons;
     for (int i=0; i< N(d.us); i++) {
       // FIXME: maybe don't use load_xpm
-      vue_picture_widget pd { .p= load_xpm (d.us[i]) };
+      vue_picture_widget pd { .p= load_xpm (d.us[i]), .file_name= d.us[i],
+                              .stamp= icon_stamp () };
       icons << vue_create<vue_picture_widget> ("picture_widget", pd);
     }
     vue_tabs_widget_star dd { .tabs= d.ss, .icons= icons, .bodies= d.bs, .current= 0 };
@@ -1135,7 +1168,8 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   if (type == "xpm_widget") {
     //VUE_WIDGET(xpm_widget, url, file_name);
     vue_xpm_widget d= open_box<vue_xpm_widget> (data);
-    vue_picture_widget dd { .p= load_xpm (d.file_name) };
+    vue_picture_widget dd { .p= load_xpm (d.file_name), .file_name= d.file_name,
+                            .stamp= icon_stamp () };
     data= close_box(dd);
     type= "picture_widget";
     return;
@@ -1793,9 +1827,9 @@ vue_ui_rep::do_layout () {
     for (int i= 0; i < N(d.icons); i++) {
       vue_ui_rep* ir= dynamic_cast<vue_ui_rep*> (concrete (d.icons[i]).rep);
       if (ir == NULL || ir->type != "picture_widget") continue;
-      vue_picture_widget pd= open_box<vue_picture_widget> (ir->data);
-      icon_w= max (icon_w, (float) pd.p->get_width ());
-      icon_h= max (icon_h, (float) pd.p->get_height ());
+      picture ip= icon_picture (ir->data);
+      icon_w= max (icon_w, (float) ip->get_width ());
+      icon_h= max (icon_h, (float) ip->get_height ());
     }
     CLAY(clay_id, {
       .layout= {
@@ -2111,9 +2145,9 @@ vue_ui_rep::do_layout () {
   }
   if (type == "picture_widget") {
     //VUE_WIDGET(xpm_widget, url, file_name);
-    vue_picture_widget d= open_box<vue_picture_widget> (data);
-    SI w= d.p->get_width ();
-    SI h= d.p->get_height ();
+    picture p= icon_picture (data);
+    SI w= p->get_width ();
+    SI h= p->get_height ();
     // no background: Clay draws it after the custom command (the picture)
     CLAY_AUTO_ID({
       .layout= {
@@ -2735,8 +2769,7 @@ vue_ui_rep::render (void *render_data) {
     return;
   }
   if (type == "picture_widget") {
-    vue_picture_widget d= open_box<vue_picture_widget> (data);
-    current_window->draw_picture (render_data, d.p);
+    current_window->draw_picture (render_data, icon_picture (data));
     return;
   }
   if (type == "cached_glue_widget") {

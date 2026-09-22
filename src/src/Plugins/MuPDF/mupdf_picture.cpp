@@ -234,20 +234,92 @@ picture_renderer (picture p, double zoomf) {
 
 picture raw_load_xpm (url file_name);
 
+/******************************************************************************
+* Vector pictures
+*
+* MuPDF draws SVG itself (its source/svg), so the icons of TeXmacs are
+* rendered from their vector originals instead of from the rasters, sharp at
+* every resolution and available in a light and a dark variant. Its parser
+* reads the presentation attributes and the inline style attribute only, not
+* a <style> element with class selectors: an icon written that way comes out
+* black, so the files of misc/pixmaps carry their styles inline.
+******************************************************************************/
+
+// Draw u in a box of w x h points, at scale device pixels per point. A side
+// given as zero is taken from the size the file declares; the drawing keeps
+// its proportions and is centered in the box. NULL when the file cannot be
+// read or parsed.
+fz_pixmap*
+mupdf_render_svg (url u, int w, int h, int scale) {
+  fz_context* ctx= mupdf_context ();
+  c_string path (concretize (u));
+  fz_buffer* buf= NULL;
+  fz_display_list* list= NULL;
+  fz_device* dev= NULL;
+  fz_pixmap* pix= NULL;
+  float dw= 0.0f, dh= 0.0f;
+  if (scale < 1) scale= 1;
+  fz_var (buf);
+  fz_var (list);
+  fz_var (dev);
+  fz_var (pix);
+  fz_try (ctx) {
+    buf= fz_read_file (ctx, path);
+    list= fz_new_display_list_from_svg (ctx, buf, NULL, NULL, &dw, &dh);
+    if (dw <= 0.0f || dh <= 0.0f) fz_throw (ctx, FZ_ERROR_GENERIC, "empty svg");
+    // the box: what was asked for, completed with what the file declares
+    if (w <= 0 && h <= 0) { w= (int) (dw + 0.5f); h= (int) (dh + 0.5f); }
+    else if (w <= 0) w= (int) ((dw * h) / dh + 0.5f);
+    else if (h <= 0) h= (int) ((dh * w) / dw + 0.5f);
+    if (w < 1) w= 1;
+    if (h < 1) h= 1;
+    float f= ((float) w) / dw;
+    if (((float) h) / dh < f) f= ((float) h) / dh;
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w * scale, h * scale, NULL, 1);
+    fz_clear_pixmap (ctx, pix); // transparent
+    fz_matrix m= fz_concat (fz_scale (f * scale, f * scale),
+                            fz_translate (0.5f * (w - f * dw) * scale,
+                                          0.5f * (h - f * dh) * scale));
+    dev= fz_new_draw_device (ctx, m, pix);
+    fz_run_display_list (ctx, list, dev, fz_identity, fz_infinite_rect, NULL);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_display_list (ctx, list);
+    fz_drop_buffer (ctx, buf);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+    cout << "TeXmacs] MuPDF cannot render " << path << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return pix;
+}
+
+picture
+mupdf_load_svg (url u, int w, int h) {
+  fz_pixmap* pix= mupdf_render_svg (u, w, h, retina_factor);
+  if (pix == NULL) return picture ();
+  picture pic= mupdf_picture (pix, 0, 0);
+  fz_drop_pixmap (mupdf_context (), pix);
+  return pic;
+}
+
 fz_image *
 mupdf_load_image (url u) {
   //cout << "mupdf_load_image " << u << LF;
   fz_image *im = NULL;
   string suf= suffix (u);
   if (suf == "svg") {
-      // FIXME: implement!
-  #if 0
-      QSvgRenderer renderer (utf8_to_qstring (concretize (u)));
-      pm= new QImage (w, h, QImage::Format_ARGB32);
-      pm->fill (Qt::transparent);
-      QPainter painter (pm);
-      renderer.render (&painter);
-  #endif
+      // at the size the file declares, and at the resolution we draw at:
+      // mupdf_load_pixmap scales the result when a size is asked for
+      fz_pixmap* pix= mupdf_render_svg (u, 0, 0, retina_factor);
+      if (pix != NULL) {
+        im= mupdf_image_from_pixmap (pix);
+        fz_drop_pixmap (mupdf_context (), pix);
+      }
     } else if ((suf == "jpg") || (suf == "png")) {
       // FIXME: add more supported formats
       c_string path (concretize (u));
@@ -348,15 +420,63 @@ mupdf_load_picture (url file_name) {
   return pic;
 }
 
-// The icons ship in several variants: name.xpm (the legacy 1x format),
-// name.png (1x), name_x2.png (2x) and name_x4.png (4x), all of the same
-// size in points. Pick the one which matches the resolution we draw at
-// (retina_factor device pixels per point), and fall back on the smaller
-// ones, then on the file which was asked for, when a variant is missing.
+// The theme in which the vector icons are looked up: misc/pixmaps/light and
+// misc/pixmaps/dark hold one recoloured copy of every icon each, and both
+// are on $TEXMACS_PIXMAP_PATH. The GUI sets it from its own theme.
+static string mupdf_icon_theme= "light";
+
+void
+mupdf_set_icon_theme (string theme) {
+  if (theme != "dark") theme= "light";
+  mupdf_icon_theme= theme;
+}
+
+string
+mupdf_get_icon_theme () { return mupdf_icon_theme; }
+
+// The size in points at which an icon set is drawn is the name of the
+// directory it sits in (modern/24x24/main, traditional/--x17, where a dash
+// means that the side is free). The sizes the SVG files declare cannot be
+// used instead: a few dozen of them, the flags in particular, declare the
+// size of the drawing they were made from rather than that of the icon.
+static void
+icon_box_size (url dir, int& w, int& h) {
+  w= h= 0;
+  for (int i= 0; i < 2 && !is_none (dir) && !is_root (dir); i++) {
+    string s= as_string (tail (dir));
+    int k= search_forwards ("x", 0, s);
+    if (k > 0) {
+      string sw= s (0, k), sh= s (k+1, N(s));
+      bool free_w= (sw == "--"), free_h= (sh == "--");
+      if ((free_w || is_int (sw)) && (free_h || is_int (sh))) {
+        w= free_w ? 0 : as_int (sw);
+        h= free_h ? 0 : as_int (sh);
+        return;
+      }
+    }
+    dir= head (dir);
+  }
+}
+
+// The icons ship in several variants: name.svg (vector, in a light and a
+// dark version), name.xpm (the legacy 1x format), name.png (1x),
+// name_x2.png (2x) and name_x4.png (4x), all of the same size in points.
+// Draw the vector one when there is one, and otherwise pick the raster which
+// matches the resolution we draw at (retina_factor device pixels per point),
+// falling back on the smaller ones, then on the file which was asked for.
 picture 
 mupdf_load_xpm (url file_name) {
   if (suffix (file_name) != "xpm") return mupdf_load_picture (file_name);
   url base= unglue (file_name, 4); // without ".xpm"
+  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url (mupdf_icon_theme) *
+                    glue (tail (base), ".svg") |
+                    glue (base, ".svg"));
+  if (!is_none (svg)) {
+    int w= 0, h= 0;
+    icon_box_size (head (file_name), w, h);
+    picture pic= mupdf_load_svg (svg, w, h);
+    if (!is_nil (pic)) return pic;
+  }
   array<string> tried;
   if (retina_factor >= 4) tried << string ("_x4.png");
   if (retina_factor >= 2) tried << string ("_x2.png");

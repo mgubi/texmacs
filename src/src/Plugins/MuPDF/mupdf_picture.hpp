@@ -75,6 +75,18 @@ picture as_mupdf_picture (picture pic);
 fz_image  *mupdf_load_image (url u);
 fz_pixmap *mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel);
 
+// Vector pictures: MuPDF renders SVG itself, so the icons are drawn from
+// their originals. mupdf_render_svg fits the drawing in a box of w x h
+// points (a side given as zero comes from the file) at scale device pixels
+// per point; mupdf_load_svg does the same at the current resolution.
+fz_pixmap *mupdf_render_svg (url u, int w, int h, int scale);
+picture    mupdf_load_svg (url u, int w= 0, int h= 0);
+
+// The icons come in a light and a dark variant (misc/pixmaps/light and
+// misc/pixmaps/dark): the GUI tells which one its theme wants.
+void   mupdf_set_icon_theme (string theme);
+string mupdf_get_icon_theme ();
+
 /******************************************************************************
 * Protected MuPDF calls
 *

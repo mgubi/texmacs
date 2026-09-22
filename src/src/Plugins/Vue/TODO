@@ -1,9 +1,5 @@
 TODO
 
-* themed icons: the raster icons are drawn for a light background, so the
-  dark theme keeps them; the dark and light SVG sets which TeXmacs ships
-  would need a build with --with-resvg and a pixmap path per theme
-
 * the animation subsystem is Clay's transitions (see "Animation" in
   docs/vue-graphics-stack.md): the button highlights and the tool panels
   use it; popup windows (menus) cannot, they are separate SDL windows
@@ -25,6 +21,9 @@ DONE
   "gui theme" preference chooses and "default" follows the system
   (test theme, TEXMACS_VUE_THEME); the help balloons are a sheet of note
   paper instead of pure yellow
+* themed vector icons: MuPDF draws the SVG sets of misc/pixmaps/light and
+  misc/pixmaps/dark itself (no --with-resvg), sharp at every resolution and
+  recoloured for the dark theme (test icons)
 * the choice widgets honour their style (inert, grey, mini, monospaced,
   bold), test choice-style; the icons are loaded in the variant which
   matches the resolution instead of always the 2x one
