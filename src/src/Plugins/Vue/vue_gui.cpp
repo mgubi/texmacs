@@ -2658,18 +2658,15 @@ bool get_selection (string key, tree& t, string& s, string format) {
   bool direct_selection = (key == "extern");
   if (direct_selection) key = "primary";
 
-  // SDL3 doesn't support mouse/selection clipboard, only primary
-  if (key != "primary") return false;
-
   s = "";
   t = "none";
 
-  // the keys other than "primary" (the internal buffers of TeXmacs, "temp",
-  // "wrapbuf"...) live in our own storage; the condition also excluded
-  // "primary" and could never hold, so nothing was ever read back
-  bool owns= (key != "primary");
-
-  if (owns && (selection_t->contains (key))) {
+  // The keys other than "primary" are the internal buffers of TeXmacs
+  // ("secondary", "ternary", "temp", "wrapbuf", the registers): they live
+  // in our own storage, which set_selection fills. This used to sit after
+  // a "return false" for every such key, so nothing was ever read back.
+  if (key != "primary") {
+    if (!selection_t->contains (key)) return false;
     t = copy (selection_t [key]);
     s = copy (selection_s [key]);
     return true;
@@ -2810,9 +2807,9 @@ void beep () {
 }
 
 void needs_update () {
-  // Inform the gui that the editor needs to update itself
-  // before repainting can start
-  gui_needs_update= false;
+  // the editor asks for a frame: wake the loop and shorten its pause, as
+  // an event would (clearing the flag here dropped the request)
+  gui_needs_update= true;
 }
 
 bool check_event (int type) {
@@ -3024,7 +3021,12 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
       { "All Files",   "*" }
   };
 
-  void *sdl_filters;
+  // The filters of the dialog. SDL keeps the pointer until its callback
+  // runs, so what we build lives in static storage; one dialog is open at
+  // a time. The strings are held by c_strings rather than freed at once.
+  static SDL_DialogFileFilter type_filters[2];
+  static c_string filter_name, filter_pattern;
+  void *sdl_filters= NULL;
   int sdl_n_filters= 0;
   SDL_FileDialogType sdl_type;
   
@@ -3041,8 +3043,25 @@ vue_chooser_widget_rep::perform_dialog (vue_window win) {
   } else if (file_type == "directory" || file_type == "generic") {
     sdl_n_filters= 0;
   } else {
-    sdl_n_filters= 1;
+    // the name of the format and the suffixes it is known by, e.g.
+    // "TeXmacs document" and "tm;ts;tp", plus a catch-all
     filter= as_string (call ("format-get-name", file_type));
+    tree sufs= as_tree (call ("format-get-suffixes*", file_type));
+    string pat;
+    if (is_tuple (sufs))
+      for (int i= 0; i < N(sufs); i++) {
+        if (N(pat) > 0) pat << ";";
+        pat << as_string (sufs[i]);
+      }
+    if (N(pat) == 0) pat= "*";
+    filter_name= c_string (filter);
+    filter_pattern= c_string (pat);
+    type_filters[0].name= filter_name;
+    type_filters[0].pattern= filter_pattern;
+    type_filters[1].name= "All Files";
+    type_filters[1].pattern= "*";
+    sdl_filters= (void*) type_filters;
+    sdl_n_filters= 2;
   }
  
   // Create and set dialog properties
