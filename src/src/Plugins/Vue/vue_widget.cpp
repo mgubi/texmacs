@@ -3673,8 +3673,11 @@ void
 vue_plain_window_widget_rep::do_layout () {
   Clay_BorderElementConfig border= {};
   if (popup) border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
+  // no background: process_redraw clears the window with the same colour
+  // before replaying the commands, and painting it again here cost a fill
+  // of the whole window per frame (see "Rendering details" in
+  // docs/vue-graphics-stack.md)
   CLAY(CLAY_ID("plain_window_widget"), {
-    .backgroundColor= color_background,
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       // while sizing to the contents the root must not be bound by the window
@@ -4125,10 +4128,10 @@ void vue_texmacs_widget_rep::do_layout () {
   // the bars follow the mask given at creation and the visibility slots;
   // an embedded editor (texmacs-input in a dialog or a tool, mask 0) is
   // only its canvas, as the Qt embedded widget
-  bool bars= visibility[0] || visibility[1] || visibility[2] ||
-             visibility[3] || visibility[4] || visibility[5];
+  // no background either, for the same reason: with bars this widget fills
+  // the window, which is already cleared with that colour, and an embedded
+  // editor (mask 0) shows the container behind it
   CLAY(CLAY_IDI("texmacs_widget", id), {
-    .backgroundColor= bars ? color_background : (Clay_Color) { 0, 0, 0, 0 },
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       .sizing= layoutFull, // fills the window, or the box of an embedded editor
