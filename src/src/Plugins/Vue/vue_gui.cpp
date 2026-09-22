@@ -681,6 +681,22 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
   return p;
 }
 
+// the two halves of the redraw, summed over the windows of one frame and
+// read by the profiler in gui_start_loop
+bool     vue_profile_on= false; // TEXMACS_VUE_PROFILE is set
+uint64_t vue_clay_ns= 0, vue_upload_ns= 0;
+uint64_t vue_fill_ns= 0;   // the full-window background fill
+int      vue_commands= 0;  // render commands replayed
+// time and count of the replay, by Clay command type (1 rectangle,
+// 2 border, 3 text, 4 image, 5/6 scissor, 7/8 overlay, 9 custom)
+uint64_t vue_cmd_ns[12];
+int      vue_cmd_n[12];
+// the custom commands, split: the texts, the editors' backing stores and
+// the other widgets (icons, check boxes, colour cells...)
+uint64_t vue_text_ns= 0, vue_editor_ns= 0, vue_other_ns= 0;
+int      vue_text_n= 0,  vue_editor_n= 0,  vue_other_n= 0;
+
+
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
   with_window frame (this);
@@ -716,10 +732,15 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     
   time_t t1, t2;
   t2= texmacs_time ();
+  uint64_t t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   // areas not covered by any element: red in the debug mode (F1) to spot them
   ren->set_pencil (clay_debug ? rgb_color (255, 0, 0)
                               : theme_color (the_theme.background));
   ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  if (vue_profile_on) {
+    vue_fill_ns += SDL_GetTicksNS () - t_ns;
+    vue_commands += render_commands.length;
+  }
   render_clay_commands (ren, &render_commands);
 
 #if MUPDF_RENDERER
@@ -728,6 +749,7 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     static_cast<fitz_renderer_rep*>(ren)->end ();
 #endif
 
+  if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
   t1= t2; t2= texmacs_time ();
   if (DEBUG_VUE && t2 - t1 > 30)
     debug_widgets << "render_clay_commands took " << t2 - t1 << "ms" << LF;
@@ -746,10 +768,12 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
+  t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   if (!SDL_UpdateWindowSurface (sdl_win)) {
     static int reported= 0;
     if (reported++ < 3) SDL_Log ("SDL_UpdateWindowSurface failed: %s", SDL_GetError ());
   }
+  if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
   t1= t2; t2= texmacs_time ();
   if (DEBUG_VUE && t2 - t1 > 30)
     debug_widgets << "SDL_UpdateWindowSurface took " << t2 - t1 << "ms" << LF;
@@ -763,7 +787,13 @@ vue_render_widget_fn (renderer ren, void *w, rectangle r) {
   // the widget is alive as long as this command may be drawn: the layout
   // which produced the command holds a reference (see render_ref)
   vue_render_ren_data data { .ren= ren, .r= r };
+  if (!vue_profile_on) { ((vue_widget_rep*)w)->render (&data); return; }
+  uint64_t t= SDL_GetTicksNS ();
+  bool editor= (((vue_widget_rep*)w)->type == "simple_widget");
   ((vue_widget_rep*)w)->render (&data);
+  t= SDL_GetTicksNS () - t;
+  if (editor) { vue_editor_ns += t; vue_editor_n++; }
+  else { vue_other_ns += t; vue_other_n++; }
 }
 void *vue_render_widget= (void*)&vue_render_widget_fn;
 
@@ -820,6 +850,7 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
                  -(bounding_box.y + bounding_box.height) * ren->pixel,
                  (bounding_box.x + bounding_box.width)  * ren->pixel,
                  -bounding_box.y * ren->pixel);
+    uint64_t t_cmd= vue_profile_on ? SDL_GetTicksNS () : 0;
     switch (rcmd->commandType) {
       case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
         Clay_RectangleRenderData *config = &rcmd->renderData.rectangle;
@@ -963,16 +994,23 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
       default:
         SDL_Log ("Unknown render command type: %d", rcmd->commandType);
     }
+    int ty= (int) rcmd->commandType;
+    if (vue_profile_on && ty >= 0 && ty < 12) {
+      vue_cmd_ns[ty] += SDL_GetTicksNS () - t_cmd;
+      vue_cmd_n[ty]++;
+    }
   }
 }
 
 void
 vue_render_text_fn (renderer ren, void *w, rectangle r) {
+  uint64_t t= vue_profile_on ? SDL_GetTicksNS () : 0;
   styled_string ss= (styled_string_rep *)w;
   ren->set_pencil (ss->c);
   ren->set_shrinking_factor (3);
   ss->fn->var_draw (ren, ss->s, r->x1*3, r->y1*3- ss->fn->y1);
   ren->set_shrinking_factor (1);
+  if (vue_profile_on) { vue_text_ns += SDL_GetTicksNS () - t; vue_text_n++; }
 }
 
 void *vue_render_text= (void*)&vue_render_text_fn;
@@ -1365,6 +1403,105 @@ bool gui_needs_update= true;
 
 bool event_filter (void *userdata, SDL_Event *event);
 
+/******************************************************************************
+* Frame profiler
+*
+* TEXMACS_VUE_PROFILE=<n> prints, every n frames of the event loop (300 by
+* default), where the time of a frame went: one line per phase with the
+* share of the total, the mean over the window, the worst frame, and how
+* many frames the phase actually did something in. It measures wall time
+* with SDL_GetTicksNS, so the "wait" phase is the time the loop spent
+* asleep, which is what is left when nothing needs doing.
+******************************************************************************/
+
+enum { VP_WAIT= 0, VP_LAYOUT, VP_COMMANDS, VP_INTERPOSE, VP_REPAINT,
+       VP_REDRAW, VP_CLAY, VP_FILL, VP_UPLOAD, VP_FRAME, VP_N };
+
+static const char* vue_phase_name[VP_N]= {
+  "wait", "layout", "commands", "interpose", "repaint",
+  "redraw", "  of it: clay replay", "    of it: background fill",
+  "  of it: surface upload", "FRAME" };
+
+extern bool vue_profile_on;
+extern uint64_t vue_clay_ns, vue_upload_ns, vue_fill_ns;
+extern int vue_commands;
+extern uint64_t vue_cmd_ns[12];
+extern int vue_cmd_n[12];
+extern uint64_t vue_text_ns, vue_editor_ns, vue_other_ns;
+extern int vue_text_n, vue_editor_n, vue_other_n;
+
+static uint64_t vue_phase_total[VP_N];
+static uint64_t vue_phase_worst[VP_N];
+static int      vue_phase_count[VP_N];
+static int      vue_frames= 0;
+static long     vue_total_commands= 0;
+static int      vue_profile_every= -1; // -1: the variable has not been read
+
+static bool
+vue_profiling () {
+  if (vue_profile_every < 0) {
+    string s= get_env ("TEXMACS_VUE_PROFILE");
+    if (N(s) == 0) vue_profile_every= 0;
+    else if (is_int (s) && as_int (s) > 0) vue_profile_every= as_int (s);
+    else vue_profile_every= 300;
+    vue_profile_on= (vue_profile_every > 0);
+  }
+  return vue_profile_on;
+}
+
+static inline uint64_t
+vue_now () { return vue_profiling () ? SDL_GetTicksNS () : 0; }
+
+static void
+vue_profile_add (int phase, uint64_t ns) {
+  if (!vue_profiling ()) return;
+  vue_phase_total[phase] += ns;
+  if (ns > vue_phase_worst[phase]) vue_phase_worst[phase]= ns;
+  if (ns > 0) vue_phase_count[phase]++;
+}
+
+static void
+vue_profile_frame () {
+  if (!vue_profiling ()) return;
+  if (++vue_frames < vue_profile_every) return;
+  double total= (double) vue_phase_total[VP_FRAME];
+  cout << "\n--- Vue: " << vue_frames << " frames, "
+       << (total / 1e6) << " ms, "
+       << (total > 0 ? (vue_frames * 1e9 / total) : 0.0) << " frames/s, "
+       << (vue_total_commands / vue_frames) << " render commands/frame\n";
+  for (int i= 0; i < VP_N; i++) {
+    double t= (double) vue_phase_total[i];
+    cout << "  " << vue_phase_name[i] << "\t"
+         << (total > 0 ? (100.0 * t / total) : 0.0) << "%\t mean "
+         << (t / 1e6 / vue_frames) << " ms\t worst "
+         << (vue_phase_worst[i] / 1e6) << " ms\t in "
+         << vue_phase_count[i] << " frames\n";
+  }
+  static const char* ty[12]= { "?0", "rectangle", "border", "text", "image",
+    "scissor start", "scissor end", "overlay", "overlay end", "custom",
+    "?10", "?11" };
+  cout << "  replay by command type:\n";
+  for (int i= 0; i < 12; i++)
+    if (vue_cmd_n[i] > 0)
+      cout << "    " << ty[i] << "\t" << (vue_cmd_ns[i] / 1e6 / vue_frames)
+           << " ms/frame\t" << (vue_cmd_n[i] / vue_frames) << " per frame\n";
+  cout << "    custom: text\t" << (vue_text_ns / 1e6 / vue_frames)
+       << " ms/frame\t" << (vue_text_n / vue_frames) << " per frame\n"
+       << "    custom: editors\t" << (vue_editor_ns / 1e6 / vue_frames)
+       << " ms/frame\t" << (vue_editor_n / vue_frames) << " per frame\n"
+       << "    custom: other\t" << (vue_other_ns / 1e6 / vue_frames)
+       << " ms/frame\t" << (vue_other_n / vue_frames) << " per frame\n";
+  vue_text_ns= vue_editor_ns= vue_other_ns= 0;
+  vue_text_n= vue_editor_n= vue_other_n= 0;
+  for (int i= 0; i < 12; i++) { vue_cmd_ns[i]= 0; vue_cmd_n[i]= 0; }
+  cout << LF;
+  for (int i= 0; i < VP_N; i++) {
+    vue_phase_total[i]= 0; vue_phase_worst[i]= 0; vue_phase_count[i]= 0;
+  }
+  vue_frames= 0;
+  vue_total_commands= 0;
+}
+
 void gui_start_loop () {
   // start the main loop
   int  delay= 10;
@@ -1377,6 +1514,7 @@ void gui_start_loop () {
   script_init ();
 
   while (nr_windows > 0 || number_of_servers () > 0) {
+    uint64_t t_frame= vue_now (); // the whole iteration, wait included
     
     // 1. process events
     script_step (); // may push synthetic events
@@ -1434,7 +1572,9 @@ void gui_start_loop () {
       // by the interpose handler (perform_select): keep the pause short
       // while any is open, they have no event of their own to wake us
       int pause= notifiers_active () ? min (delay, 40) : delay;
+      uint64_t t_wait= vue_now ();
       SDL_WaitEventTimeout (NULL, pause);
+      vue_profile_add (VP_WAIT, vue_now () - t_wait);
       delay += (delay/5);
       if (delay > 1000) delay= 1000;
     }
@@ -1442,12 +1582,15 @@ void gui_start_loop () {
     // 3. process layout and handle events
     {
       t2= texmacs_time ();
+      uint64_t t_ns= vue_now ();
       process_layout ();
+      vue_profile_add (VP_LAYOUT, vue_now () - t_ns);
       t1= t2; t2= texmacs_time ();
       if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "layout took " << t2 - t1 << "ms" << LF;
     }
     
     // 4. exec commands if present
+    uint64_t t_cmd= vue_now ();
     if (!is_nil (cmd_list)) {
       list<command> l= reverse(cmd_list);
       cmd_list= list<command>();
@@ -1457,12 +1600,15 @@ void gui_start_loop () {
         l= l->next;
       }
     }
+    vue_profile_add (VP_COMMANDS, vue_now () - t_cmd);
     
     // 5. interpose
+    uint64_t t_int= vue_now ();
     t2= texmacs_time ();
     vue_simple_widget_rep::notify_resizes ();
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
+    vue_profile_add (VP_INTERPOSE, vue_now () - t_int);
     t1= t2; t2= texmacs_time ();
     if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "interpose took " << t2-t1 << "ms" << LF;
 
@@ -1474,6 +1620,7 @@ void gui_start_loop () {
     if (gui_needs_relayout) process_layout ();
 
     // 6. repaint all the editors
+    uint64_t t_rep= vue_now ();
     t2= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
     if (n_events == 0 || request_partial_redraw) {
@@ -1488,6 +1635,7 @@ void gui_start_loop () {
 
       request_partial_redraw= interrupted;
     }
+    vue_profile_add (VP_REPAINT, vue_now () - t_rep);
     t1= t2; t2= texmacs_time ();
     if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "repaint took " << t2 - t1 << "ms" << LF;
 
@@ -1499,9 +1647,18 @@ void gui_start_loop () {
     // case one never settles; drawing commands which are one layout old is
     // safe, they hold their widgets (see render_ref).
     for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
+    uint64_t t_draw= vue_now ();
+    vue_clay_ns= 0; vue_upload_ns= 0; vue_fill_ns= 0; vue_commands= 0;
     process_redraw ();
+    vue_profile_add (VP_REDRAW, vue_now () - t_draw);
+    vue_profile_add (VP_CLAY, vue_clay_ns);
+    vue_profile_add (VP_FILL, vue_fill_ns);
+    vue_profile_add (VP_UPLOAD, vue_upload_ns);
+    vue_total_commands += vue_commands;
     t1= t2; t2= texmacs_time ();
     if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
+    vue_profile_add (VP_FRAME, vue_now () - t_frame);
+    vue_profile_frame ();
     gui_wait= true;
   }
 }

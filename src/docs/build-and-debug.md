@@ -72,7 +72,19 @@ marker of uncovered areas). `TEXMACS_VUE_DUMP=1` prints every Clay render
 command of every frame (`DUMP <type> id <id> box x,y wxh ...`, where
 `<type>` is Clay's raw command-type number, not a name; border commands are
 matched against the usual id patterns) — heavy, for tracking down a stray
-element. `TEXMACS_VUE_THEME=light|dark` and `TEXMACS_VUE_DENSITY=<x>` force
+element.
+
+`TEXMACS_VUE_PROFILE=<n>` prints, every n frames of the event loop (300 by
+default), where the time of a frame went: one line per phase of
+`gui_start_loop` with its share, its mean and the worst frame, then the
+replay of the render commands broken down by Clay command type and, for the
+custom commands, into the texts, the editors' backing stores and the rest.
+It measures wall time with `SDL_GetTicksNS` and costs nothing when the
+variable is unset. Drive it with a script (`TEXMACS_VUE_SCRIPT`) so that a
+measurement can be repeated: a scroll, a series of keystrokes and a pointer
+moving over a tool bar are the three worth watching.
+
+`TEXMACS_VUE_THEME=light|dark` and `TEXMACS_VUE_DENSITY=<x>` force
 the appearance and the resolution, which is how a theme or a HiDPI bug is
 reproduced on any screen; `TEXMACS_VUE_SNAPSHOT` and `TEXMACS_VUE_SCRIPT`
 are described in [vue-testing.md](vue-testing.md).
