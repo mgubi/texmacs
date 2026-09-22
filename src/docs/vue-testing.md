@@ -49,7 +49,9 @@ keyboard focus, and the editor's idle time (hence the pre-edits and the
 `:idle` delayed commands) stays zero without it: `focus` fakes it. Callbacks print to standard output (`choice: ...`,
 `got: ...`, `Click!!`), which is how the tests are checked.
 
-`TEXMACS_VUE_DENSITY=1` runs at one device pixel per point, the layout of a
+`TEXMACS_VUE_THEME=light|dark` forces the theme of the interface, which the
+`theme` test renders side by side. `TEXMACS_VUE_DENSITY=1` runs at one
+device pixel per point, the layout of a
 display without HiDPI, whatever the screen: worth a pass over the visual
 tests after a change to the sizing of the widgets.
 

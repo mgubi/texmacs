@@ -17,6 +17,49 @@
 #include "vue_widget.hpp"
 #include "clay.h"
 
+/******************************************************************************
+* Themes
+*
+* Every colour of the interface is a field of vue_theme, and the globals of
+* vue_widget.cpp (color_background and friends) are its fields, so that the
+* widgets can go on naming them. A theme is chosen with the "gui theme"
+* preference: "light", "dark", or "default", which follows the appearance
+* of the system (SDL_GetSystemTheme and the SYSTEM_THEME_CHANGED event);
+* TEXMACS_VUE_THEME overrides it. Adding a theme means adding a constant of
+* this type in vue_widget.cpp and a case in set_vue_theme; a widget which
+* needs a colour which is not here should be given a new field rather than
+* a literal, or the theme will not cover it.
+******************************************************************************/
+
+struct vue_theme {
+  Clay_Color shade[4];      // four greys, from the darkest to the lightest
+  Clay_Color background;    // dialogs, menus, the surround of the bars
+  Clay_Color highlight;     // the element under the pointer
+  Clay_Color text;
+  Clay_Color text_grey;     // inert and greyed labels
+  Clay_Color border;
+  Clay_Color field;         // lists, inputs, scrollable areas
+  Clay_Color field_focused; // an input which has the keyboard focus
+  Clay_Color selection;     // the selected item of a list
+  Clay_Color selection_text;
+  Clay_Color selection_soft; // ... of an inert list, and a text selection
+  Clay_Color button, button_hover, button_down, pressed;
+  Clay_Color scrollbar, scrollbar_hover;
+  Clay_Color bar_line;      // the lines between the bars of the main window
+  Clay_Color bar_mode, bar_focus; // the two lighter bars
+  Clay_Color tab_inactive;  // a tab which is not the current one
+  Clay_Color canvas;        // around the pages of a document
+  Clay_Color balloon, balloon_border; // the help balloons (their text
+                                      // is the ordinary text colour)
+  Clay_Color pre_edit, pre_edit_line; // the composition of an input method
+  Clay_Color cursor;        // the caret of the text inputs
+};
+
+extern vue_theme the_theme;       // the one in use
+color theme_color (Clay_Color c); // its TeXmacs equivalent
+void  set_vue_theme (string name);
+
+
 // drag state of a scroll bar
 typedef struct {
   float clickOrigin;

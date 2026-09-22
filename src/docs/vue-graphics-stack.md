@@ -359,6 +359,33 @@ the window, are at most as tall as the window and scroll.
   primary display bounds (`SDL_GetPrimaryDisplay`, with a 1440×900 fallback),
   clipboard get/set. `SDL_Init`/`TTF_Init` failures exit at startup.
 
+## Themes
+
+Every colour of the interface is a field of `vue_theme` (`vue_gui.hpp`),
+and the globals the widgets name (`color_background`, `color_field`,
+`palette[]`...) are filled from the theme in use, `the_theme`. Two themes
+ship, `vue_theme_light` (the historical look) and `vue_theme_dark`;
+`set_vue_theme` chooses between them from the `gui theme` preference,
+whose `"default"` follows the appearance of the system
+(`SDL_GetSystemTheme`, and `SDL_EVENT_SYSTEM_THEME_CHANGED` re-applies it
+while running). `TEXMACS_VUE_THEME` overrides the preference, which is how
+the tests take both.
+
+Two rules keep a theme complete. A widget which needs a colour gets a
+**field**, never a literal, or the theme will not reach it; and the two
+colours the widgets (and the core) ask for without knowing about themes,
+`black` and `dark_grey`, are mapped in `layout_text` to the theme's text
+and grey, so that no call site has to change. `theme_color` converts a
+theme colour to a TeXmacs one for the drawing routines. The surround of
+the pages (`tm_background`) is set from the theme as well, while the
+documents themselves keep their own colours.
+
+Adding a theme is a constant of type `vue_theme` and a case in
+`set_vue_theme`. Not covered yet: the **icons**, which are a raster set
+drawn for a light background; TeXmacs also ships `misc/pixmaps/dark` and
+`light` as SVG, which would need a build with `--with-resvg` and a pixmap
+path chosen per theme.
+
 ## Animation (Clay transitions)
 
 Clay `main` animates elements whose declaration has a `.transition`

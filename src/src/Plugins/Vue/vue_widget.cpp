@@ -55,6 +55,7 @@ extern bool menu_caching;
 /*****************************************************************************/
 // Clay
 
+#include <SDL3/SDL.h> // SDL_GetSystemTheme (the themes)
 #include "clay.h"
 #include "clay_grid.h"
 
@@ -100,22 +101,127 @@ probe_id (const char* label, unsigned int id, unsigned int k) {
   return Clay__HashString (cs, id * 4096u + k);
 }
 
-Clay_Color palette[4]= {
-   {160, 160, 160, 255}, {192, 192, 192, 255},
-   {224, 224, 224, 255},{240, 240, 240, 255} };
+/******************************************************************************
+* Themes
+*
+* Every colour of the interface is a field of vue_theme; the globals below
+* are its fields, so that the widgets can go on naming them. A theme is
+* chosen with the "gui theme" preference: "light", "dark", or "default",
+* which follows the appearance of the system (SDL_GetSystemTheme, and the
+* SYSTEM_THEME_CHANGED event). Adding a theme means adding a constant of
+* this type and a line in vue_theme_named; a widget which needs a colour
+* which is not here should get a new field rather than a literal, or the
+* theme will not cover it.
+******************************************************************************/
 
-Clay_Color color_background= palette[1];
-Clay_Color color_highlight=  palette[3];
-Clay_Color color_text= {0, 0, 0, 255};
-Clay_Color color_border= {150, 150, 150, 255};
-// lists, scrollable areas and other "fields" are lighter than the dialogs
-Clay_Color color_field= {250, 250, 250, 255};
-// push buttons (WIDGET_STYLE_BUTTON)
-Clay_Color color_button=       {236, 236, 236, 255};
-Clay_Color color_button_hover= {248, 248, 248, 255};
-Clay_Color color_button_down=  {205, 205, 205, 255};
-// flat buttons of menus and tool bars when pressed (WIDGET_STYLE_PRESSED)
-Clay_Color color_pressed=      {200, 200, 200, 255};
+static const vue_theme vue_theme_light= {
+  .shade= { {160, 160, 160, 255}, {192, 192, 192, 255},
+            {224, 224, 224, 255}, {240, 240, 240, 255} },
+  .background= {192, 192, 192, 255},
+  .highlight= {240, 240, 240, 255},
+  .text= {0, 0, 0, 255},
+  .text_grey= {112, 112, 112, 255},
+  .border= {150, 150, 150, 255},
+  .field= {250, 250, 250, 255},
+  .field_focused= {238, 238, 228, 255},
+  .selection= {100, 100, 255, 255},
+  .selection_text= {255, 255, 255, 255},
+  .selection_soft= {180, 196, 232, 255},
+  .button= {236, 236, 236, 255},
+  .button_hover= {248, 248, 248, 255},
+  .button_down= {205, 205, 205, 255},
+  .pressed= {200, 200, 200, 255},
+  .scrollbar= {120, 120, 160, 150},
+  .scrollbar_hover= {100, 100, 140, 150},
+  .bar_line= {176, 176, 176, 255},
+  .bar_mode= {212, 212, 212, 255},
+  .bar_focus= {232, 232, 232, 255},
+  .tab_inactive= {176, 176, 176, 255},
+  .canvas= {160, 160, 160, 255},
+  // a sheet of note paper rather than a warning sign
+  .balloon= {252, 250, 232, 255},
+  .balloon_border= {186, 180, 148, 255},
+  .pre_edit= {252, 250, 232, 255},
+  .pre_edit_line= {120, 120, 180, 255},
+  .cursor= {224, 0, 0, 255}
+};
+
+static const vue_theme vue_theme_dark= {
+  .shade= { {36, 36, 38, 255}, {52, 52, 55, 255},
+            {68, 68, 72, 255}, {86, 86, 90, 255} },
+  .background= {52, 52, 55, 255},
+  .highlight= {86, 86, 90, 255},
+  .text= {228, 228, 230, 255},
+  .text_grey= {140, 140, 146, 255},
+  .border= {92, 92, 98, 255},
+  .field= {38, 38, 40, 255},
+  .field_focused= {46, 46, 42, 255},
+  .selection= {66, 96, 180, 255},
+  .selection_text= {255, 255, 255, 255},
+  .selection_soft= {64, 78, 120, 255},
+  .button= {70, 70, 74, 255},
+  .button_hover= {88, 88, 94, 255},
+  .button_down= {44, 44, 47, 255},
+  .pressed= {44, 44, 47, 255},
+  .scrollbar= {130, 130, 170, 150},
+  .scrollbar_hover= {154, 154, 194, 150},
+  .bar_line= {34, 34, 36, 255},
+  .bar_mode= {60, 60, 64, 255},
+  .bar_focus= {68, 68, 72, 255},
+  .tab_inactive= {44, 44, 47, 255},
+  .canvas= {30, 30, 32, 255},
+  .balloon= {62, 60, 44, 255},
+  .balloon_border= {120, 116, 86, 255},
+  .pre_edit= {62, 60, 44, 255},
+  .pre_edit_line= {150, 150, 210, 255},
+  .cursor= {255, 96, 96, 255}
+};
+
+vue_theme the_theme= vue_theme_light;
+
+// the TeXmacs colour of a colour of the theme (for the text routines)
+color
+theme_color (Clay_Color c) {
+  return rgb_color ((int) c.r, (int) c.g, (int) c.b, (int) c.a);
+}
+
+// the colours the widgets use; they are the fields of the current theme
+Clay_Color palette[4];
+Clay_Color color_background, color_highlight, color_text, color_border;
+Clay_Color color_field, color_button, color_button_hover, color_button_down;
+Clay_Color color_pressed;
+
+static void
+vue_apply_theme () {
+  for (int i= 0; i < 4; i++) palette[i]= the_theme.shade[i];
+  color_background= the_theme.background;
+  color_highlight= the_theme.highlight;
+  color_text= the_theme.text;
+  color_border= the_theme.border;
+  color_field= the_theme.field;
+  color_button= the_theme.button;
+  color_button_hover= the_theme.button_hover;
+  color_button_down= the_theme.button_down;
+  color_pressed= the_theme.pressed;
+}
+
+// "light", "dark", or anything else (the "default" of the preference) to
+// follow the appearance of the system
+void
+set_vue_theme (string name) {
+  // TEXMACS_VUE_THEME overrides the preference (for the tests, and to try
+  // a theme without changing the settings)
+  string forced= get_env ("TEXMACS_VUE_THEME");
+  if (N(forced) > 0) name= forced;
+  if (name == "dark") the_theme= vue_theme_dark;
+  else if (name == "light") the_theme= vue_theme_light;
+  else the_theme= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK)
+                  ? vue_theme_dark : vue_theme_light;
+  vue_apply_theme ();
+  // the surround of the pages is a colour of TeXmacs, not of the widgets
+  tm_background= rgb_color (the_theme.canvas.r, the_theme.canvas.g,
+                            the_theme.canvas.b);
+}
 
 /*****************************************************************************/
 // UI layout context (maybe refactor in a structure)
@@ -1406,8 +1512,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
             CLAY_SIZING_FIXED(24),
             CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.height / ratio.y) }},
         .backgroundColor= Clay_PointerOver (vsb_id)
-          ? (Clay_Color){100, 100, 140, 150}
-          : (Clay_Color){120, 120, 160, 150},
+          ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
     ui_signal vsig= button_logic (vsb_id);
     if (vsig.pressed == 1) {
@@ -1438,8 +1543,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
             CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.width / ratio.x),
             CLAY_SIZING_FIXED(24) }},
         .backgroundColor= Clay_PointerOver (hsb_id)
-          ? (Clay_Color){100, 100, 140, 150}
-          : (Clay_Color){120, 120, 160, 150},
+          ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(12) }){};
     ui_signal hsig= button_logic (hsb_id);
     if (hsig.pressed == 1) {
@@ -1464,7 +1568,7 @@ render_close_mark_fn (renderer ren, void* data, rectangle r) {
   SI w= r->x2 - r->x1, h= r->y2 - r->y1;
   SI x1= r->x1 + (SI) (0.32*w), x2= r->x1 + (SI) (0.68*w);
   SI y1= r->y1 + (SI) (0.32*h), y2= r->y1 + (SI) (0.68*h);
-  ren->set_pencil (pencil (rgb_color (60, 60, 60), 2*px, cap_round));
+  ren->set_pencil (pencil (theme_color (the_theme.text), 2*px, cap_round));
   ren->line (x1, y1, x2, y2);
   ren->line (x1, y2, x2, y1);
 }
@@ -1714,7 +1818,7 @@ vue_ui_rep::do_layout () {
           // the current tab is open at the bottom and merges with the page,
           // the other ones are framed and slightly lower
           Clay_Color bg= cur ? color_background
-                       : ((hot_id == tab_id.id) ? color_highlight : (Clay_Color) { 176, 176, 176, 255 });
+                       : ((hot_id == tab_id.id) ? color_highlight : the_theme.tab_inactive);
           Clay_ElementData td= Clay_GetElementData (tab_id);
           CLAY(tab_id, {
             .backgroundColor= bg,
@@ -1808,7 +1912,8 @@ vue_ui_rep::do_layout () {
       vue_ui_rep* lab= dynamic_cast<vue_ui_rep*> (concrete (d.w).rep);
       if (lab != NULL && lab->type == "text_widget" &&
           open_box<vue_text_widget> (lab->data).s == "x") {
-        Clay_Color cbg= down ? color_button_down : (hot ? color_button_hover : (Clay_Color) { 196, 196, 196, 255 });
+        Clay_Color cbg= down ? color_button_down
+                     : (hot ? color_button_hover : the_theme.shade[1]);
         // Clay emits the background rectangle of an element after its custom
         // command: the mark must be a child of the round button
         CLAY(button_id, {
@@ -1976,11 +2081,12 @@ vue_ui_rep::do_layout () {
       if ((elapsed > 1000) && (elapsed < 5000)) {
         // show the balloon
         CLAY_AUTO_ID({
-          .backgroundColor= { 240, 240, 0, 255 },
+          .backgroundColor= the_theme.balloon,
           .layout= { .padding= { 10, 10, 10, 10 } },
+          .cornerRadius= CLAY_CORNER_RADIUS(4),
           .border= {
-            .width= { 2, 2, 2, 2 },
-            .color= { 200, 200, 0, 255 }},
+            .width= { 1, 1, 1, 1 },
+            .color= the_theme.balloon_border },
           .floating= {
             .offset= { 0, 4 },
             .zIndex= 10,
@@ -2107,7 +2213,7 @@ vue_ui_rep::do_layout () {
     CLAY(enum_id, {
       .layout= { .sizing= sz, .padding= { 8, 8, 4, 4 }, .childGap= 4 },
       .backgroundColor= (!inert && hot_id == enum_id.id) ? color_highlight
-                                                          : (Clay_Color) { 208, 208, 210, 255 },
+                                                          : the_theme.shade[2],
       .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
     {
       layout_text (d.val, d.st, inert ? dark_grey : black);
@@ -2368,8 +2474,7 @@ vue_ui_rep::do_layout () {
           changed= true;
         }
         Clay_Color bg= inert ? color_background : color_field;
-        if (active) bg= inert ? (Clay_Color) { 176, 176, 200, 255 }
-                              : (Clay_Color) { 100, 100, 255, 255 };
+        if (active) bg= inert ? the_theme.selection_soft : the_theme.selection;
         else if (!inert && hot_id == item_id.id) bg= color_highlight;
         // the items of a mini list are tighter, as in the mini bars
         uint16_t pad_x= (d.style & WIDGET_STYLE_MINI) ? 4 : 8;
@@ -2379,8 +2484,9 @@ vue_ui_rep::do_layout () {
                      .sizing= { .width= CLAY_SIZING_GROW(0) }},
           .backgroundColor= bg })
         {
-          color col= active ? white : black;
-          if (inert && !active) col= dark_grey;
+          color col= active ? theme_color (the_theme.selection_text)
+                            : theme_color (the_theme.text);
+          if (inert && !active) col= theme_color (the_theme.text_grey);
           layout_text (d.vals [i], lab_style, col);
         }
       }
@@ -2438,13 +2544,14 @@ vue_ui_rep::do_layout () {
             changed= true;
           }
           Clay_Color bg= color_field;
-          if (active) bg= (Clay_Color){ 100, 100, 255, 255 };
+          if (active) bg= the_theme.selection;
           else if (hot_id == item_id.id) bg= color_highlight;
           CLAY(item_id, {
             .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
             .backgroundColor= bg })
           {
-            layout_text (d.vals[i], 0, active ? white : black);
+            layout_text (d.vals[i], 0, active ? theme_color (the_theme.selection_text)
+                                              : theme_color (the_theme.text));
           }
         }
       }
@@ -3172,14 +3279,16 @@ vue_input_text_widget_rep::render (void *data) {
   SI px= ren->pixel;
   bool focused= (current_window != NULL && current_window->kbd_focus == this);
   // the box: pastel when focused, a lowered border
-  color bg= greyed ? rgb_color (200, 200, 200)
-          : focused ? rgb_color (238, 238, 228) : rgb_color (216, 216, 218);
+  color bg= greyed ? theme_color (the_theme.shade[1])
+          : focused ? theme_color (the_theme.field_focused)
+                    : theme_color (the_theme.shade[2]);
   ren->set_pencil (pencil (bg));
   ren->fill (r->x1, r->y1, r->x2, r->y2);
-  ren->set_pencil (pencil (rgb_color (120, 120, 120)));
+  // the lowered border: darker above and to the left, lighter below
+  ren->set_pencil (pencil (theme_color (the_theme.border)));
   ren->fill (r->x1, r->y2 - px, r->x2, r->y2);
   ren->fill (r->x1, r->y1, r->x1 + px, r->y2);
-  ren->set_pencil (pencil (rgb_color (245, 245, 245)));
+  ren->set_pencil (pencil (theme_color (the_theme.shade[3])));
   ren->fill (r->x1, r->y1, r->x2, r->y1 + px);
   ren->fill (r->x2 - px, r->y1, r->x2, r->y2);
   // the text, scrolled so that the cursor stays visible (with a margin);
@@ -3208,24 +3317,25 @@ vue_input_text_widget_rep::render (void *data) {
     // pre-edit ornament
     SI xb= x0 + prefix_width (ds, pos) - scroll;
     SI xe= x0 + prefix_width (ds, pos + pre_n) - scroll;
-    ren->set_pencil (pencil (rgb_color (255, 255, 208)));
+    ren->set_pencil (pencil (theme_color (the_theme.pre_edit)));
     ren->fill (xb, bottom, xe, top);
-    ren->set_pencil (pencil (rgb_color (120, 120, 180)));
+    ren->set_pencil (pencil (theme_color (the_theme.pre_edit_line)));
     ren->fill (xb, bottom, xe, bottom + px);
   }
   int b, e;
   if (pre_n == 0 && focused && selection (b, e)) {
     SI xb= x0 + prefix_width (ds, b) - scroll, xe= x0 + prefix_width (ds, e) - scroll;
-    ren->set_pencil (pencil (rgb_color (180, 196, 232)));
+    ren->set_pencil (pencil (theme_color (the_theme.selection_soft)));
     ren->fill (xb, bottom, xe, top);
   }
   ren->set_shrinking_factor (3);
-  ren->set_pencil (pencil (greyed ? dark_grey : black));
+  ren->set_pencil (pencil (theme_color (greyed ? the_theme.text_grey
+                                               : the_theme.text)));
   fn->var_draw (ren, ds, 3 * (x0 - scroll) - ex->x1, 3 * bottom - fn->y1);
   ren->set_shrinking_factor (1);
   if (focused && !greyed) {
     SI cx= x0 + cur - scroll;
-    ren->set_pencil (pencil (red, px));
+    ren->set_pencil (pencil (theme_color (the_theme.cursor), px));
     ren->line (cx, bottom, cx, top);
     ren->line (cx - px, bottom, cx + px, bottom);
     ren->line (cx - px, top, cx + px, top);
@@ -3931,9 +4041,6 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
 // no gaps; the footer in the window grey right below the canvas. Sizes in
 // pixels (the bars are as tall as their contents, at least these heights).
 static const uint16_t bar_hpad= 24;   // contents clear of the window edges
-static const Clay_Color bar_line= { 176, 176, 176, 255 };
-static const Clay_Color bar_mode_bg=  { 212, 212, 212, 255 };
-static const Clay_Color bar_focus_bg= { 232, 232, 232, 255 };
 static const float bar_menu_h= 62, bar_main_h= 88, bar_mode_h= 72, bar_focus_h= 64,
                    bar_footer_h= 56;
 
@@ -3964,7 +4071,7 @@ void vue_texmacs_widget_rep::do_layout () {
           .width=  CLAY_SIZING_GROW(0),
           .height= CLAY_SIZING_FIT(.min= bar_menu_h) }},
       .backgroundColor= color_background,
-      .border= { .width= { .bottom= 2 }, .color= bar_line }})
+      .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (main_menu)) {
         main_menu->do_layout ();
@@ -3978,7 +4085,7 @@ void vue_texmacs_widget_rep::do_layout () {
            .width=  CLAY_SIZING_GROW(0),
            .height= CLAY_SIZING_FIT(.min= bar_main_h) }},
       .backgroundColor= color_background,
-      .border= { .width= { .bottom= 2 }, .color= bar_line }})
+      .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (main_icons)) {
         main_icons->do_layout ();
@@ -3991,8 +4098,8 @@ void vue_texmacs_widget_rep::do_layout () {
          .sizing= {
            .width=  CLAY_SIZING_GROW(0),
            .height= CLAY_SIZING_FIT(.min= bar_mode_h) }},
-      .backgroundColor= bar_mode_bg,
-      .border= { .width= { .bottom= 2 }, .color= bar_line }})
+      .backgroundColor= the_theme.bar_mode,
+      .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (mode_icons)) {
         mode_icons->do_layout ();
@@ -4005,8 +4112,8 @@ void vue_texmacs_widget_rep::do_layout () {
          .sizing= {
             .width=  CLAY_SIZING_GROW(0),
             .height= CLAY_SIZING_FIT(.min= bar_focus_h) }},
-      .backgroundColor= bar_focus_bg,
-      .border= { .width= { .bottom= 2 }, .color= bar_line }})
+      .backgroundColor= the_theme.bar_focus,
+      .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (focus_icons)) {
         focus_icons->do_layout ();

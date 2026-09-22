@@ -1019,6 +1019,11 @@ void layout_text (string s, int style, color c) {
   style |= context_style;
   // grey and inert texts are greyed, whatever color was asked for
   if (style & (WIDGET_STYLE_GREY | WIDGET_STYLE_INERT)) c= dark_grey;
+  // the widgets (and the core) ask for black and dark grey without knowing
+  // about the theme: those two are the text colours of the theme, so that
+  // a dark theme does not need every call site to be changed
+  if (c == black) c= theme_color (the_theme.text);
+  else if (c == dark_grey) c= theme_color (the_theme.text_grey);
   if (style & WIDGET_STYLE_CENTERED) {
     // centered in the space given by the container
     CLAY_AUTO_ID({
@@ -1091,6 +1096,9 @@ void gui_open (int& argc, char** argv) {
       SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
   }
   initialize_colors ();
+  // the interface theme follows the "gui theme" preference, whose
+  // "default" means the appearance of the system
+  set_vue_theme (get_preference ("gui theme", "default"));
   initialize_keyboard ();
 }
 
@@ -1124,7 +1132,12 @@ void gui_maximal_extents (SI& width, SI& height) {
 }
 
 void gui_refresh () {
-  // update and redraw all windows (e.g. on change of output language)
+  // update and redraw all windows (e.g. on a change of output language);
+  // the theme is re-read here too, so that a preference which is applied
+  // through this path takes effect without a restart
+  set_vue_theme (get_preference ("gui theme", "default"));
+  gui_needs_relayout= true;
+  vue_simple_widget_rep::invalidate_all_editors ();
 }
 
 string gui_version () {
@@ -1943,6 +1956,18 @@ process_event (SDL_Event *event) {
         win->input.mouse_time= texmacs_time ();
       }
       break;
+    case SDL_EVENT_SYSTEM_THEME_CHANGED:
+    {
+      // the system switched between its light and dark appearance: the
+      // widgets follow it when the preference does not force a theme
+      string pref= get_preference ("gui theme", "default");
+      if (pref != "light" && pref != "dark") {
+        set_vue_theme (pref);
+        gui_needs_relayout= true;
+        vue_simple_widget_rep::invalidate_all_editors ();
+      }
+      break;
+    }
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
       // the window moved to a display of another density: the layout and
