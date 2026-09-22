@@ -179,6 +179,15 @@ tmg_qt_guiP () {
 }
 
 tmscm
+tmg_vue_guiP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_is_vue ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_gui_set_next_window_as_popup () {
   // TMSCM_DEFER_INTS;
   gui_set_next_window_as_popup ();
@@ -11296,6 +11305,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("has-printing-cmd?",  tmg_has_printing_cmdP, 0, 0, 0);
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
+  tmscm_install_procedure ("vue-gui?",  tmg_vue_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);

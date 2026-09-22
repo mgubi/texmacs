@@ -621,7 +621,9 @@ edit_select_rep::selection_set (string key, tree t, bool persistant) {
       s= tree_to_generic (t, selection_export * "-snippet");
     else {
       s= tree_to_generic (t, "texmacs-snippet");
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (VUETEXMACS)
+      // the verbatim variant is what another application receives: without
+      // it the clipboard carries the TeXmacs serialization
       tree tmp;
       tmp= exec_verbatim (t, tp);
       sv= tree_to_generic (tmp, "verbatim-snippet");

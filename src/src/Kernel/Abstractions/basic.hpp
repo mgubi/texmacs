@@ -208,6 +208,7 @@ tm_ostream& operator << (tm_ostream& out, display_control ctrl);
 
 bool gui_is_x ();
 bool gui_is_qt ();
+bool gui_is_vue ();
 bool os_win32 ();
 bool os_mingw ();
 bool os_mingw64 ();

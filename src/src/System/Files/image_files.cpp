@@ -34,6 +34,9 @@
 #include "analyze.hpp"
 #include "hashmap.hpp"
 #include "scheme.hpp"
+#include "picture.hpp"
+#include "effect.hpp"
+#include "renderer.hpp" // PIXEL
 #include "Imlib2/imlib2.hpp"
 
 #ifdef MACOSX_EXTENSIONS
@@ -754,5 +757,15 @@ void
 apply_effect (tree eff, array<url> src, url dest, int w, int h) {
 #ifdef QTTEXMACS
   qt_apply_effect (eff, src, dest, w, h);
+#else
+  // the effects (blurs, shadows, degradations...) are computed on pictures
+  // by Graphics/Effects, which needs no GUI: load the sources, apply, save.
+  // Without this the whole feature silently did nothing outside Qt.
+  array<picture> a;
+  for (int i= 0; i < N(src); i++)
+    a << load_picture (src[i], w, h, "", PIXEL);
+  effect e= build_effect (eff);
+  if (is_nil (e)) return;
+  save_picture (dest, e->apply (a, PIXEL));
 #endif
 }

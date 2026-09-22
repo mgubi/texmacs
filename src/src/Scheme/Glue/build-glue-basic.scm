@@ -34,6 +34,7 @@
   (has-printing-cmd? has_printing_cmd (bool))
   (x-gui? gui_is_x (bool))
   (qt-gui? gui_is_qt (bool))
+  (vue-gui? gui_is_vue (bool))
   (gui-set-next-window-as-popup gui_set_next_window_as_popup (void))
   (support-functionality? support_functionality (bool string))
   (gui-version gui_version (string))

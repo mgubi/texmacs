@@ -944,6 +944,7 @@ noop_command () {
 }
 
 string input_text_widget_string (widget w); // defined below
+bool focus_on_named_input (vue_window win, string field); // defined below
 string enum_widget_value (widget w);         // defined below
 
 // an option of a printer as listed by lpoptions -l: "Key/Label: v1 *v2 v3"
@@ -2923,6 +2924,12 @@ vue_widget_rep::notify (slot s, blackbox new_val) {
   // the width is specified in TeXmacs length format with units em, px or w
 
 
+// The input fields which exist at the moment. SLOT_KEYBOARD_FOCUS_ON names
+// one of them ("search", "replace-what", "spell"...) and there is no way to
+// walk the widget tree of a window down to it, so they register themselves;
+// Qt looks the widget up by its object name in the same spirit.
+static hashset<pointer> live_inputs;
+
 class vue_input_text_widget_rep : public vue_widget_rep {
 public:
   string  s;           // the string being entered
@@ -2950,6 +2957,7 @@ public:
   
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
+  ~vue_input_text_widget_rep ();
   void set_type (string t);
   bool continuous ();
   string display ();
@@ -2991,6 +2999,11 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     s= copy (def[0]);
     pos= N(s); // the cursor starts at the end of the default input
   }
+  live_inputs->insert ((pointer) this);
+}
+
+vue_input_text_widget_rep::~vue_input_text_widget_rep () {
+  live_inputs->remove ((pointer) this);
 }
 
 // "name#serial:type" as the Widkit and Qt inputs understand it
@@ -3458,6 +3471,30 @@ input_text_widget (command call_back, string type, array<string> def,
                                                       def, style, width));
 }
 
+// Give the keyboard focus to the input field with this name, as
+// SLOT_KEYBOARD_FOCUS_ON asks ("search", "replace-what", "spell"...).
+// False when no such field exists at the moment.
+bool
+focus_on_named_input (vue_window win, string field) {
+  // The field is identified by the string the widget was built with:
+  // "name#serial:type", which we split, or a bare word which lands in the
+  // type ("search", "replace-what"...). Qt matches the same string, which
+  // it keeps whole as the object name, so both halves are tried here.
+  for (int pass= 0; pass < 2; pass++) {
+    iterator<pointer> it= iterate (live_inputs);
+    while (it->busy ()) {
+      vue_input_text_widget_rep* in= (vue_input_text_widget_rep*) it->next ();
+      if (pass == 0 ? (in->name == field) : (in->type == field)) {
+        set_kbd_focus (win, in);
+        return true;
+      }
+    }
+  }
+  if (DEBUG_VUE_WIDGETS)
+    debug_widgets << "no input field named " << field << LF;
+  return false;
+}
+
 // the string currently entered in an input_text_widget
 string
 input_text_widget_string (widget w) {
@@ -3805,8 +3842,11 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget bottom_tools;
   vue_widget extra_tools;
   
+  // the query line of the footer: a prompt and an input field, shown in
+  // place of the footer while the editor waits for an answer
   vue_widget interactive_prompt;
   vue_widget interactive_input;
+  bool interactive_mode;
 
 public:
   vue_texmacs_widget_rep (int _mask, command _quit);
@@ -3845,7 +3885,8 @@ visibility_index (slot s) {
 }
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
-  : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit), win (NULL)
+  : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit),
+    win (NULL), interactive_mode (false)
 {
   // decode mask
   visibility[0]= (mask & 1)   == 1;   // header
@@ -3914,6 +3955,24 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_MODIFIED:
       if (win) win->content->send (s, val);
 //      cout << "MODIFIED!" << LF;
+      break;
+
+    case SLOT_INTERACTIVE_MODE:
+      // the footer becomes a query line; the input takes the keyboard
+      interactive_mode= check_open<bool> (val, s);
+      if (win) {
+        if (interactive_mode && !is_nil (interactive_input))
+          set_kbd_focus (win, interactive_input);
+        else set_kbd_focus (win, main_widget);
+      }
+      break;
+
+    case SLOT_FULL_SCREEN:
+      if (win) win->set_full_screen (check_open<bool> (val, s));
+      break;
+
+    case SLOT_KEYBOARD_FOCUS_ON:
+      if (win) focus_on_named_input (win, check_open<string> (val, s));
       break;
       
     default:
@@ -4027,6 +4086,23 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
       return main_widget->query (s, type_id);
+
+    case SLOT_INTERACTIVE_MODE:
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (interactive_mode);
+
+    case SLOT_INTERACTIVE_INPUT:
+      // what was typed in the query line, quoted as the dialogs quote the
+      // answers of their fields ("#f" when there is nothing to report)
+      check_type_id<string> (type_id, s);
+      if (!is_nil (interactive_input)) {
+        widget iw= abstract (interactive_input);
+        vue_input_text_widget_rep* in=
+          dynamic_cast<vue_input_text_widget_rep*> (iw.rep);
+        if (in != NULL && in->ok)
+          return close_box<string> (scm_quote (in->s));
+      }
+      return close_box<string> (string ("#f"));
 
     case SLOT_SIZE:
     {
@@ -4194,6 +4270,21 @@ void vue_texmacs_widget_rep::do_layout () {
         focus_icons->do_layout ();
       }
     }
+    // the user icon bar, which a document may fill through its style
+    // (the bar was received and stored, and never drawn)
+    if (visibility[4] && !is_nil (user_icons))
+      CLAY(CLAY_ID_LOCAL("UserToolbar"), {
+        .layout= {
+           .padding= { bar_hpad, bar_hpad, 0, 0 },
+           .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
+           .sizing= {
+              .width=  CLAY_SIZING_GROW(0),
+              .height= CLAY_SIZING_FIT(.min= bar_focus_h) }},
+        .backgroundColor= the_theme.bar_focus,
+        .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
+      {
+        user_icons->do_layout ();
+      }
     // the middle row: left tools, the editor and the side tools
     CLAY(CLAY_ID_LOCAL("Middle"), {
       .layout= {
@@ -4223,14 +4314,28 @@ void vue_texmacs_widget_rep::do_layout () {
           .height= CLAY_SIZING_FIXED(bar_footer_h) }},
       .backgroundColor= color_background })
     {
-      // the left text takes the remaining space and is clipped
-      CLAY_AUTO_ID({
-        .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
-        .clip= { .horizontal= true }})
-      {
-        layout_text (left_footer, 0, black);
+      if (interactive_mode && !is_nil (interactive_input)) {
+        // the query line: the footer becomes a prompt and a field, as it
+        // does under Qt when "interactive questions" is set to "footer"
+        if (!is_nil (interactive_prompt)) interactive_prompt->do_layout ();
+        CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED(8) }}}) {}
+        CLAY_AUTO_ID({
+          .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
+          .clip= { .horizontal= true }})
+        {
+          interactive_input->do_layout ();
+        }
       }
-      layout_text (right_footer, 0, black);
+      else {
+        // the left text takes the remaining space and is clipped
+        CLAY_AUTO_ID({
+          .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) } },
+          .clip= { .horizontal= true }})
+        {
+          layout_text (left_footer, 0, black);
+        }
+        layout_text (right_footer, 0, black);
+      }
     }
   }
 }

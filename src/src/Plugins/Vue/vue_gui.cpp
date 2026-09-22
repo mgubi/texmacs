@@ -104,6 +104,7 @@ public:
   string get_name ();
   void   set_modified (bool flag);
   void   set_visibility (bool flag);
+  void   set_full_screen (bool flag);
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   update_density (); // the pixel density of its display (override)
@@ -338,6 +339,13 @@ vue_sdl_base_window_rep::set_modified (bool flag) {
     SDL_SetWindowTitle (sdl_win, s);
     mod_name= name;
   }
+}
+
+void
+vue_sdl_base_window_rep::set_full_screen (bool flag) {
+  // presentation and full screen modes (SLOT_FULL_SCREEN)
+  if (!SDL_SetWindowFullscreen (sdl_win, flag))
+    SDL_Log ("SDL_SetWindowFullscreen failed: %s", SDL_GetError ());
 }
 
 void

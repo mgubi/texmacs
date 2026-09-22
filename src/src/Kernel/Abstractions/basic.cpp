@@ -262,10 +262,22 @@ operator << (tm_ostream& out, display_control ctrl) {
 
 bool
 gui_is_x () {
-#ifdef QTTEXMACS
+  // "x" here means the historical X11 look and feel, which drives a few
+  // choices in the Scheme layer (the confirmation before overwriting a
+  // file, for one). Vue is not it: it has native dialogs of its own.
+#if defined (QTTEXMACS) || defined (VUETEXMACS)
   return false;
 #else
   return true;
+#endif
+}
+
+bool
+gui_is_vue () {
+#ifdef VUETEXMACS
+  return true;
+#else
+  return false;
 #endif
 }
 

@@ -398,7 +398,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   string s= suffix (name);
   bool bitmap=
     (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS)
   bitmap= false;
 #endif
   bool ps= (s == "ps" || s == "eps");

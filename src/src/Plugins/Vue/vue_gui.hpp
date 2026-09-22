@@ -176,6 +176,7 @@ public:
   virtual string get_name () = 0;
   virtual void   set_modified (bool flag) = 0;
   virtual void   set_visibility (bool flag) = 0;
+  virtual void   set_full_screen (bool flag) = 0;
   virtual void   set_size (SI w, SI h) = 0;
   virtual void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) = 0;
   virtual void   get_size (SI& w, SI& h) = 0;
