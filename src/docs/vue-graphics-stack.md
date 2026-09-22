@@ -146,14 +146,22 @@ never shows stale content.
 * **Custom drawing**: an element with `.custom= { .customData=
   vue_render_widget }, .userData= widget` calls `widget->render (data)` with a
   `vue_render_ren_data { renderer ren; rectangle r }`; `layout_text` uses the
-  same mechanism with `vue_render_text`. The render commands thus point to
-  widgets: since the queued commands and the interpose handler run between
-  the layout and the redraw of a frame and may replace widgets (menus, tools,
-  dialogs), `tm_delete<vue_widget_rep>` sets `gui_needs_relayout` and the
-  loop lays the windows out again before redrawing (a freed editor of a
-  replaced tool crashed in `vue_render_widget_fn`). Small marks (check boxes, menu
-  marks) are drawn this way with `pencil`, `lines`, `rounded_rectangle`,
-  `fill_arc`.
+  same mechanism with `vue_render_text`. A command thus names a widget, and
+  Clay holds that as a raw pointer in its arena, where nothing can own a
+  reference. The commands outlive the layout which produced them, while the
+  queued commands, the interpose handler and the repaint of the editors all
+  run before the redraw and may replace widgets (a menu, a tool, a dialog
+  rebuilt by TeXmacs): a widget dropped by the widget tree meanwhile would
+  be drawn after its death, which crashed in `vue_render_widget_fn`. The
+  layout therefore holds a reference to every widget it names
+  (`render_ref`, released by `release_layout_widgets` when the next layout
+  replaces the commands), exactly as it does for the texts
+  (`styled_strings`). `tm_delete<vue_widget_rep>` still sets
+  `gui_needs_relayout`, which is now about drawing the current interface
+  rather than about safety: the loop lays the windows out again before
+  redrawing, and draws the commands it has if the layout does not settle.
+  Small marks (check boxes, menu marks) are drawn this way with `pencil`,
+  `lines`, `rounded_rectangle`, `fill_arc`.
 * **Clipping**: scrollable areas set `.clip` with `Clay_GetScrollOffset ()`;
   `scroll_bar (id, data, z)` draws floating scroll bars for any scroll
   container. `render_clay_commands` tracks the clip depth because Clay culls
@@ -445,8 +453,8 @@ elements' ids must be stable for this to work (see the notes on
   through `layout_again`/`post_layout` (widgets measured from the previous
   pass) and `gui_needs_relayout` (widgets replaced by commands).
 * **Caching of rendering structures**: the per-frame objects are cheap
-  (`styled_strings` is rebuilt each layout, the pictures of the icons are
-  loaded once in the widget constructors, the fonts come from TeXmacs'
+  (`styled_strings` and `layout_widgets` are rebuilt each layout, the
+  pictures of the icons are loaded once in the widget constructors, the fonts come from TeXmacs'
   font cache, the glyphs from MuPDF's) and the profile of a frame is now
   dominated by the editors' repaint and the surface upload, so no further
   cache is kept; the Clay element ids are the one structure which must be

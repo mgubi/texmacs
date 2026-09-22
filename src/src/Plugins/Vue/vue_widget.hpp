@@ -28,14 +28,15 @@ typedef pair<SI,SI> coord2;
 class vue_window_rep;
 typedef vue_window_rep *vue_window;
 
-// The render commands of the last layout point at the widgets which drew
-// themselves (the custom callbacks of Clay): a widget freed since would be
-// called back into. The windows are laid out again before a redraw when a
-// widget was freed (gui_needs_relayout), but a stale command crashes the
-// process outright, so the callback checks its pointer against this set as
-// well. An address reused by a new widget passes the check, which costs at
-// most one frame drawn with the wrong widget.
-extern hashset<pointer> live_vue_widgets;
+// The render commands of a layout outlive it: they are drawn, and drawn
+// again when only the contents of a window change, until the next layout
+// replaces them. Each custom command names the widget which is to draw it,
+// and Clay holds that as a raw pointer in its arena, where nothing can own
+// a reference. A widget which left the widget tree meanwhile (a menu, a
+// tool or a dialog which TeXmacs rebuilt) would be drawn after its death,
+// so the layout keeps a reference to every widget it names, released when
+// the commands are. This is what the texts already do (styled_strings).
+void release_layout_widgets ();
 
 class vue_widget_rep : public widget_rep {
 public:
@@ -44,9 +45,8 @@ public:
   static unsigned int serial_id;
   
 public:
-  vue_widget_rep (string _type) : type (_type), id (serial_id++) {
-    live_vue_widgets->insert ((pointer) this); };
-  virtual ~vue_widget_rep () { live_vue_widgets->remove ((pointer) this); };
+  vue_widget_rep (string _type) : type (_type), id (serial_id++) {};
+  virtual ~vue_widget_rep () {};
   
   // widget messages with TeXmacs
   void send (slot s, blackbox val);
@@ -55,6 +55,10 @@ public:
   void write (slot s, blackbox index, widget w);
   void notify (slot s, blackbox new_val);
   
+  // The userData of a custom element: the widget which draws it, kept
+  // alive until the commands of this layout are replaced (see above).
+  void* render_ref ();
+
   // layout and rendering
   virtual void do_layout () {};     // layout the widget
   virtual bool post_layout () { return false; } // postprocessing, returns true if relayout is needed

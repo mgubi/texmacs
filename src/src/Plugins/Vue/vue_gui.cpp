@@ -759,12 +759,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
 
 void
 vue_render_widget_fn (renderer ren, void *w, rectangle r) {
-  // a command left by a layout older than the death of the widget it points
-  // at: there is nothing to draw any more (see live_vue_widgets)
-  if (!live_vue_widgets->contains ((pointer) w)) {
-    if (DEBUG_VUE) debug_widgets << "stale render command ignored" << LF;
-    return;
-  }
+  // the widget is alive as long as this command may be drawn: the layout
+  // which produced the command holds a reference (see render_ref)
   vue_render_ren_data data { .ren= ren, .r= r };
   ((vue_widget_rep*)w)->render (&data);
 }
@@ -1496,17 +1492,13 @@ void gui_start_loop () {
 
     // 7. redraw the UI
     // the repaint runs the typesetter, which may execute Scheme and replace
-    // widgets (a tool rebuilt from a document change, say): check again, or
-    // the render commands of the layout above would call back into widgets
-    // which have been freed since. A layout which frees a widget itself
-    // asks for another one, hence the loop, bounded in case one never
-    // settles (drawing a stale command crashes, drawing nothing does not).
+    // widgets (a tool rebuilt from a document change, say): lay the windows
+    // out again, or the interface would be drawn as it was before. A layout
+    // which frees a widget asks for another one, hence the loop, bounded in
+    // case one never settles; drawing commands which are one layout old is
+    // safe, they hold their widgets (see render_ref).
     for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
-    if (gui_needs_relayout) {
-      if (DEBUG_VUE)
-        debug_widgets << "the layout does not settle: skipping a redraw" << LF;
-    }
-    else process_redraw ();
+    process_redraw ();
     t1= t2; t2= texmacs_time ();
     if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
     gui_wait= true;
@@ -1514,8 +1506,11 @@ void gui_start_loop () {
 }
 
 void process_layout () {
-  // reset memory pools
+  // reset memory pools: the render commands of the previous layout are
+  // about to be replaced, so what was held for them is released here (a
+  // widget which left the widget tree meanwhile dies at this point)
   styled_strings= array<styled_string>();
+  release_layout_widgets ();
   gui_needs_relayout= false; // widgets deleted while laying out are not drawn
   
   iterator<SDL_Window*> it= iterate (Window_to_window);
@@ -2226,6 +2221,10 @@ bool event_filter (void *userdata, SDL_Event *event) {
       busy= true;
       with_window frame (win);
       Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
+      // one window only, so the pools are not released here: the commands
+      // of the other windows still name their widgets and their texts. A
+      // drag therefore accumulates one layout's worth of each per event,
+      // until the loop runs process_layout again when the drag ends.
       win->process_layout();
       vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
@@ -2233,7 +2232,7 @@ bool event_filter (void *userdata, SDL_Event *event) {
       vue_simple_widget_rep::repaint_all_in_window (win);
       // the repaint may have replaced widgets, see gui_start_loop
       for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
-      if (!gui_needs_relayout) win->process_redraw();
+      win->process_redraw();
       busy= false;
       return true; // the return value of a watch is ignored by SDL anyway
     }

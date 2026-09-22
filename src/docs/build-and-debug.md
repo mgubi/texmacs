@@ -88,8 +88,9 @@ down a stray element.
   `vue_simple_widget_rep::forget_window`), commands freed while running
   (`dialogue-end` destroys the widget which owns the command), unbalanced
   clip commands from culled elements, duplicate Clay ids, render commands
-  of a layout pass drawing widgets freed by a command run after that pass
-  (crash in `vue_render_widget_fn`; now avoided by `gui_needs_relayout`).
+  of a layout pass drawing widgets freed by a command, or by the repaint,
+  run after that pass (crash in `vue_render_widget_fn`; the layout now
+  holds a reference to every widget its commands name, see `render_ref`).
 * `-debug-io -debug-sockets` on the command line trace the client/server
   sockets (`socket_link_rep::...` lines, the `openssl` commands of the
   legacy protocol with the size of their output).

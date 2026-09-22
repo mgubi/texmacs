@@ -512,7 +512,20 @@ tm_delete<vue_widget_rep> (vue_widget_rep* ptr) {
 
 unsigned int vue_widget_rep::serial_id= 0;
 
-hashset<pointer> live_vue_widgets; // see vue_widget.hpp
+// The widgets named by the render commands of the last layout, see
+// vue_widget.hpp. Holding them here is what makes those commands safe to
+// draw: a widget which has left the widget tree is destroyed when the
+// commands which name it are dropped, not before.
+static array<widget> layout_widgets;
+
+void*
+vue_widget_rep::render_ref () {
+  layout_widgets << widget (this);
+  return (void*) this;
+}
+
+void
+release_layout_widgets () { layout_widgets= array<widget> (); }
 
 /******************************************************************************
 * umbrella widget class
@@ -1972,7 +1985,7 @@ vue_ui_rep::do_layout () {
           CLAY_AUTO_ID({
             .layout= { .sizing= layoutExpand },
             .custom= { .customData= (void*) &render_close_mark_fn },
-            .userData= this }) {}
+            .userData= NULL }) {}
         }
         if (sig.clicked == 1) {
           cancel_popup= true;
@@ -2173,7 +2186,7 @@ vue_ui_rep::do_layout () {
       .layout= {
         .sizing= { CLAY_SIZING_FIXED( (float)w), CLAY_SIZING_FIXED( (float)h) } },
       .custom= { .customData=  vue_render_widget },
-      .userData= this }) {};
+      .userData= render_ref () }) {};
     return;
   }
   if (type == "glue_widget") {
@@ -2194,7 +2207,7 @@ vue_ui_rep::do_layout () {
     CLAY_AUTO_ID({
       //.id= CLAY_IDI("colored_glue_widget", id),
       .custom= { .customData=  vue_render_widget },
-      .userData= this,
+      .userData= render_ref (),
       .layout= {
         .sizing= {
           .width= d.hx  ? CLAY_SIZING_GROW( .min= (float) retina_factor*d.w/PIXEL)
@@ -2250,7 +2263,7 @@ vue_ui_rep::do_layout () {
     CLAY(toggle_id, {
       .layout= { .sizing= { CLAY_SIZING_FIXED(box), CLAY_SIZING_FIXED(box) }},
       .custom= { .customData= vue_render_widget },
-      .userData= this }) {}
+      .userData= render_ref () }) {}
     return;
   }
   if (type == "enum_widget") {
@@ -3418,7 +3431,7 @@ vue_input_text_widget_rep::do_layout () {
   CLAY(cid, {
     .layout= { .sizing= { CLAY_SIZING_FIXED (w_px), CLAY_SIZING_FIXED (h_px) } },
     .custom= { .customData= vue_render_widget },
-    .userData= this }) {}
+    .userData= render_ref () }) {}
   if (ed.found && (sig.pressed == 1 || (sig.held && (mouse_state & 1)))) {
     // the mouse places the cursor and, dragged, selects
     SI x= (SI) ((mouse_x - ed.boundingBox.x - input_pad_x)
@@ -4542,7 +4555,7 @@ vue_simple_widget_rep::do_layout () {
   CLAY(clay_id, {
     .layout= { .sizing= s },
     .custom= { .customData= vue_render_widget },
-    .userData= this })
+    .userData= render_ref () })
   {
     if (0) { // debug view
       CLAY_AUTO_ID({
@@ -5483,7 +5496,7 @@ vue_ink_widget_rep::do_layout () {
     .layout= { .sizing= { CLAY_SIZING_FIXED ((float) w), CLAY_SIZING_FIXED ((float) h) }},
     .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] },
     .custom= { .customData= vue_render_widget },
-    .userData= this }) {};
+    .userData= render_ref () }) {};
 
   if (!ed.found || mouse_action == "") return;
   bool over= Clay_PointerOver (my_id);
