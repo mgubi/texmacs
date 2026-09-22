@@ -2024,7 +2024,11 @@ vue_ui_rep::do_layout () {
         .padding= padding,
         .childGap= 4,
         .sizing= sz,
-        .childAlignment= { .x= push ? CLAY_ALIGN_X_CENTER : CLAY_ALIGN_X_LEFT,
+        // the label of a menu item is aligned with the labels above and
+        // below it, a push button and a colour cell are centered (the cells
+        // of a tile are stretched to the width of the menu the tile is in)
+        .childAlignment= { .x= (push || swatch) ? CLAY_ALIGN_X_CENTER
+                                                : CLAY_ALIGN_X_LEFT,
                            .y= CLAY_ALIGN_Y_CENTER }},
       .backgroundColor= bg,
       .cornerRadius= radius,
@@ -2034,9 +2038,11 @@ vue_ui_rep::do_layout () {
                      .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR }
     }) {
       last_id= button_id;
-      if (menu_has_marks || N(d.pre) > 0) {
+      if ((menu_has_marks && !swatch) || N(d.pre) > 0) {
         // the column for the mark of the item: "v" (check), "*" or "o";
-        // all items of a menu with marks reserve it so that labels align
+        // all items of a menu with marks reserve it so that labels align,
+        // but the cells of a colour tile are not labels: reserving it in
+        // each of them spread the palette by the width of a mark per column
         int kind= (d.pre == "v") ? 1 : (d.pre == "*") ? 2 : (d.pre == "o") ? 3 : 0;
         CLAY_AUTO_ID({
           .layout= { .sizing= { CLAY_SIZING_FIXED(22), CLAY_SIZING_FIXED(22) }},
@@ -2200,6 +2206,11 @@ vue_ui_rep::do_layout () {
     // a menu rendered as a table of cols columns wide & made up of widgets in a
     vue_tile_menu d= open_box<vue_tile_menu> (data);
     int c=0, n= N(d.a);
+    // the cells of a tile keep their size: they are not the items of the
+    // vertical menu the tile sits in, which stretch to its width (a palette
+    // in a menu wider than itself would spread its colours apart)
+    bool save_grow= button_grow;
+    button_grow= false;
     CLAY_AUTO_ID({ .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
       .childGap= 2 }})
@@ -2217,6 +2228,7 @@ vue_ui_rep::do_layout () {
         }
       }
     }
+    button_grow= save_grow;
     return;
   }
   if (type == "toggle_widget") {
