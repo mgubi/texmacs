@@ -504,6 +504,7 @@
 (lazy-tmfs-handler (version version-tmfs) history revision)
 (lazy-tmfs-handler (version version-git) git commit)
 (lazy-define (version git-drivers) git-merge-driver)
+(lazy-tool (version git-widgets) git-tool)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

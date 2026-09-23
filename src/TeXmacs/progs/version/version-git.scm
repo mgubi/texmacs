@@ -54,16 +54,17 @@
 
 (tm-define (current-git-root)
   (:synopsis "Root of the working tree for the current buffer or Git page")
-  (with u (current-buffer)
-    (cond ((not u) #f)
-          ((url-rooted-tmfs-protocol? u "git")
-           (with (class name) (tmfs-decompose-name u)
-             (tmfs-string->url (tmfs-cdr name))))
-          ((url-rooted-tmfs-protocol? u "commit")
-           (with (class name) (tmfs-decompose-name u)
-             (tmfs-string->url (tmfs-cdr name))))
-          ((version-revision? u) (git-root (version-head u)))
-          (else (git-root u)))))
+  (git-buffer-root (current-buffer)))
+
+(tm-define (git-buffer-root u)
+  (:synopsis "Root of the working tree for the buffer @u or Git page")
+  (cond ((not u) #f)
+        ((or (url-rooted-tmfs-protocol? u "git")
+             (url-rooted-tmfs-protocol? u "commit"))
+         (with (class name) (tmfs-decompose-name u)
+           (tmfs-string->url (tmfs-cdr name))))
+        ((version-revision? u) (git-root (version-head u)))
+        (else (git-root u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffers of a working tree
@@ -99,7 +100,8 @@
   (git-invalidate root)
   (for (u (buffer-list))
     (when (git-page? u root)
-      (git-reload-buffer u))))
+      (git-reload-buffer u)))
+  (refresh-now "git-tool"))
 
 (define (file-contents u)
   (if (url-exists? u) (string-load u) ""))

@@ -133,6 +133,79 @@
                   "Commit file"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Side tool with the status of the working tree
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (tool-root win)
+  (git-buffer-root (window->buffer win)))
+
+(define (tool-branch root)
+  (let* ((st (git-status root))
+         (head (or (git-status-ref st 'head) "?"))
+         (up (git-status-ref st 'upstream))
+         (ahead (or (git-status-ref st 'ahead) 0))
+         (behind (or (git-status-ref st 'behind) 0)))
+    (string-append "On " (utf8->cork head)
+                   (if (not up) ""
+                       (string-append " (" (number->string ahead) " ahead, "
+                                      (number->string behind) " behind)")))))
+
+(define (tool-code e)
+  (cond ((git-entry-conflicted? e) "C")
+        ((git-entry-untracked? e) "?")
+        ((and (git-entry-staged? e) (git-entry-unstaged? e)) "+~")
+        ((git-entry-staged? e) "+")
+        (else "~")))
+
+(tm-widget (git-tool-entry root e)
+  (with u (git-absolute root (git-entry-path e))
+    (hlist
+      (text (tool-code e)) // //
+      ((eval (utf8->cork (git-entry-path e)))
+       (when (url-exists? u) (load-buffer u)))
+      >>
+      (if (or (git-entry-unstaged? e) (git-entry-untracked? e)
+              (git-entry-conflicted? e))
+          ("Stage" (git-stage u)))
+      (if (git-entry-staged? e)
+          ("Unstage" (git-unstage u))))))
+
+(tm-widget (git-tool-contents win)
+  (let* ((root (tool-root win))
+         (l (if root (git-status-entries root) '()))
+         (remote? (and root (nnull? (git-remotes root))
+                       (not (git-busy? root))))
+         (branch (if root (tool-branch root) "")))
+    (if (not root)
+        (text "The current document is not in a Git working tree"))
+    (if root
+        (text branch)
+        ===
+        (hlist
+          ("Commit..." (git-interactive-commit root)) // //
+          (if remote?
+              ("Pull" (git-pull root)) // //
+              ("Push" (git-push root)) // //)
+          ("Status" (git-show-status root)) // //
+          ("Refresh" (git-refresh root))
+          >>)
+        ===
+        (if (null? l) (text "Nothing to commit"))
+        (division "plain"
+          (for (e l)
+            (dynamic (git-tool-entry root e)))))))
+
+(tm-tool* (git-tool win)
+  (:name "Git")
+  (refreshable "git-tool"
+    (dynamic (git-tool-contents win))))
+
+(tm-define (git-open-tool)
+  (:synopsis "Show the status of the working tree in a side tool")
+  (:interactive #t)
+  (tool-select :right 'git-tool))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simple prompts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
