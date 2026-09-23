@@ -13,7 +13,8 @@
 
 (texmacs-module (version version-menu)
   (:use (version version-compare)
-        (version version-tmfs)))
+        (version version-tmfs)
+        (version git-widgets)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compare with other revision
@@ -48,6 +49,83 @@
    (choose-file compare-with-newer "Compare with newer version" "")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Git menus
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (git-state? . l)
+  (in? (git-file-state (current-buffer)) l))
+
+(tm-define (git-can-init? u)
+  (and (not (url-rooted-tmfs? u))
+       (url-exists? u)
+       (not (versioned? u))
+       (git-available?)))
+
+(menu-bind git-compare-menu
+  ("Last commit" (git-compare-with (current-buffer) "HEAD"))
+  (when (git-state? 'staged 'partial)
+    ("Staged version" (git-compare-with (current-buffer) "INDEX")))
+  (with l (list-filter (git-branches (git-root (current-buffer)))
+                       (lambda (b) (not (git-branch-current? b))))
+    (assuming (nnull? l)
+      ---
+      (for (b l)
+        ((eval (string-append "Branch " (utf8->cork (git-branch-name b))))
+         (git-compare-with (current-buffer) (git-branch-name b)))))))
+
+(menu-bind git-file-menu
+  (group "Git")
+  (assuming (git-state? 'untracked)
+    ("Add to repository" (git-stage (current-buffer))))
+  (assuming (git-state? 'modified 'partial 'conflicted)
+    ((eval (if (git-state? 'conflicted) "Mark as resolved" "Stage changes"))
+     (git-stage (current-buffer))))
+  (assuming (git-state? 'staged 'partial 'added)
+    ("Unstage changes" (git-unstage (current-buffer))))
+  (when (or (not (git-state? 'unmodified)) (buffer-modified? (current-buffer)))
+    ("Commit this file..." (git-interactive-commit-file (current-buffer))))
+  (assuming (git-state? 'modified 'partial)
+    ("Discard changes..." (git-discard (current-buffer))))
+  (assuming (and (git-texmacs-file? (current-buffer))
+                 (not (git-state? 'untracked 'added)))
+    (-> "Compare with" (link git-compare-menu))))
+
+(menu-bind git-repository-menu
+  ("Status" (git-show-status))
+  ("Log" (git-show-log))
+  ("Branches and tags" (git-show-branches))
+  ---
+  ("Commit..." (git-interactive-commit))
+  ("Stage all changes" (git-stage-all (current-git-root)))
+  ---
+  ("New branch..." (git-interactive-create-branch (current-git-root)))
+  (with l (list-filter (git-branches (current-git-root))
+                       (lambda (b) (not (git-branch-current? b))))
+    (when (nnull? l)
+      (-> "Switch to branch"
+          (for (b l)
+            ((eval (utf8->cork (git-branch-name b)))
+             (git-switch-branch (current-git-root) (git-branch-name b)))))
+      (-> "Merge branch"
+          (for (b l)
+            ((eval (utf8->cork (git-branch-name b)))
+             (git-merge-branch (current-git-root) (git-branch-name b)))))))
+  ("Tag this version..." (git-interactive-tag (current-git-root)))
+  ---
+  (with remotes? (nnull? (git-remotes (current-git-root)))
+    (when remotes?
+      ("Fetch" (git-fetch (current-git-root)))
+      ("Pull" (git-pull (current-git-root)))
+      ("Push" (git-push (current-git-root)))))
+  ---
+  ("Stash changes" (git-stash (current-git-root)))
+  (when (nnull? (git-stashes (current-git-root)))
+    ("Restore last stash" (git-stash-pop (current-git-root))))
+  ---
+  ("Git output" (git-show-output))
+  ("Refresh" (begin (version-tool-reset) (git-refresh (current-git-root)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main version menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -74,9 +152,13 @@
       ---))
   (assuming (versioned? (current-buffer))
     (assuming (version-supports-git-style? (current-buffer))
-      ("Global status" (git-show-status)))
-    (assuming (version-supports-git-style? (current-buffer))
-      ("Global log" (git-show-log)))
+      (link git-file-menu)
+      ---))
+  (assuming (current-git-root)
+    (-> "Git" (link git-repository-menu))
+    ---)
+  (assuming (git-can-init? (current-buffer))
+    ("Create Git repository..." (git-interactive-init (current-buffer)))
     ---)
   (assuming (or (versioned? (current-buffer))
                 (version-revision? (current-buffer)))
