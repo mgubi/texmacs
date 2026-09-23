@@ -113,16 +113,17 @@
   ;; NOTE: evaluate-system is not available for the X11 version
   (not (x-gui?)))
 
-(define (shell-quote s)
+(tm-define (git-shell-quote s)
+  (:synopsis "Quote @s for a POSIX shell")
   (string-append "'" (string-replace s "'" "'\\''") "'"))
 
 (define (git-shell-run cmd input)
   ;; Fallback via the shell, when evaluate-system is not available
   (let* ((in (url-temp))
          (err (url-temp))
-         (sh (string-append "(" (string-recompose (map shell-quote cmd) " ")
-                            " < " (shell-quote (url->system in))
-                            " 2> " (shell-quote (url->system err))
+         (sh (string-append "(" (string-recompose (map git-shell-quote cmd) " ")
+                            " < " (git-shell-quote (url->system in))
+                            " 2> " (git-shell-quote (url->system err))
                             "; printf '\\001%d' $?)")))
     (string-save (or input "") in)
     (let* ((out (eval-system sh))

@@ -288,12 +288,9 @@
 (define (revision-body name rev)
   ;; Body of the document @name at the revision @rev, or #f
   (and (!= (version-revision name rev) "")
-       (with t (tree->stree (tree-import (string->url
-                                          (version-revision-url name rev))
-                                         "texmacs"))
-         (and-with b (and (tm-is? t 'document)
-                          (list-find (cdr t) (cut tm-is? <> 'body)))
-           (cadr b)))))
+       (document-body
+        (tree->stree (tree-import (string->url (version-revision-url name rev))
+                                  "texmacs")))))
 
 (tm-define (git-resolve-conflict name)
   (:synopsis "Merge our and their versions of the conflicting file @name")
