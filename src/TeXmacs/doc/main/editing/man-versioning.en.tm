@@ -117,7 +117,7 @@
   control>
 
   If the file you are editing belongs to a directory that is under version
-  control (only <name|Subversion> and <name|Git> is currently supported,
+  control (only <name|Subversion> and <name|Git> are currently supported,
   although other systems might follow), then the first part of the
   <menu|Version> menu will contain some clickable entries.
 
@@ -142,6 +142,51 @@
   repository, then you may merge the result with your current version using
   <menu|Version|Update>. At the moment, no conflict resolution has been
   implemented yet, although this is planned for the future.
+
+  <paragraph*|Working with <name|Git>>
+
+  For documents inside a <name|Git> working tree, the <menu|Version> menu
+  contains entries for the current document, followed by a
+  <menu|Version|Git> submenu with the operations on the whole repository.
+  A document which does not belong to any repository can be put under
+  version control using <menu|Version|Create Git repository>, and an
+  existing repository can be copied using <menu|Version|Clone Git
+  repository>.
+
+  For the current document, <menu|Version|Add to repository>,
+  <menu|Version|Stage changes> and <menu|Version|Unstage changes> control
+  which changes will be part of the next commit, <menu|Version|Commit this
+  file> commits the document on its own, and <menu|Version|Discard
+  changes> restores the version which was last staged. Using
+  <menu|Version|Compare with>, the document can be compared with the last
+  commit, the staged version or the version on another branch; the
+  differences are shown in the same way as when comparing two files.
+
+  The page <menu|Version|Git|Status> lists the staged, modified, untracked
+  and conflicting files, with links for opening, comparing, staging,
+  unstaging or discarding each of them. The same information is shown in a
+  side panel by <menu|Version|Git|Git panel>. <menu|Version|Git|Commit>
+  opens a dialog in which you enter a message and select the files to be
+  committed. <menu|Version|Git|Log> and <menu|Version|Git|Branches and
+  tags> show the history, the branches, the tags and the stashes of the
+  repository. The <menu|Version|Git> menu also allows you to create,
+  switch to and merge branches, to tag the current version, to stash your
+  changes, and to fetch, pull and push changes from and to other
+  repositories; the latter operations run in the background. Documents
+  which are changed on disk by <name|Git> are reloaded automatically.
+
+  When a merge leads to a conflict in a <TeXmacs> document, use
+  <menu|Version|Resolve conflict>. The changes which were made on only one
+  side are merged automatically, even inside a same paragraph; the
+  remaining conflicts are displayed as differences, where the old version
+  is yours and the new version is the other one. After retaining the right
+  version for each of them, use <menu|Version|Mark as resolved> and commit.
+  With <menu|Version|Git|Merge documents structurally>, you may also ask
+  <name|Git> to call <TeXmacs> for merging documents in this repository,
+  also when merging from the command line.
+
+  All commands which were executed can be inspected using
+  <menu|Version|Git|Git output>.
 
   <tmdoc-copyright|2010\U2019|Joris van der Hoeven|Darcy Shen>
 
