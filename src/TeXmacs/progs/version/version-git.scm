@@ -477,6 +477,28 @@
                    (list "push"))))
     (git-remote root "Push" args (and (nnull? opt-done) (car opt-done)))))
 
+(tm-define (git-clone repository dir . opt-done)
+  (:synopsis "Clone @repository into the new directory @dir")
+  (let* ((dest (system->url dir))
+         (parent (url-head dest))
+         (done (and (nnull? opt-done) (car opt-done))))
+    (cond ((url-exists? dest)
+           (set-message (string-append dir " already exists") "Clone"))
+          ((not (url-directory? parent))
+           (set-message (string-append (url->system parent)
+                                       " is not a directory") "Clone"))
+          (else
+            (set-message (string-append "Cloning " repository "...") "Git")
+            (git-run-async parent
+                           (list "clone" repository
+                                 (url->system (url-tail dest)))
+                           #f
+              (lambda (ret)
+                (when (git-report ret "Cloned repository")
+                  (version-tool-reset)
+                  (when (not done) (git-show-status dest)))
+                (when done (done ret))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions for the Git pages (callable from 'action' tags)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
