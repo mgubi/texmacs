@@ -249,6 +249,39 @@
        (not (string-contains? (git-output R "cat-file" "commit" "HEAD")
                               "gpgsig")))
 
+;; Blame, descriptions of changes, projects, snapshots
+(use-modules (version git-blame) (version git-project))
+(define P (system->url (string-append (getenv "GIT_TEST_DIR") "/proj")))
+(define PP (url-append P "paper.tm"))
+(receive (attr oldest)
+    (git-blame PP (document-body (tree->stree (tree-import PP "texmacs"))))
+  (with names (map (lambda (c) (and c (git-commit-subject c))) attr)
+    (check "blame" (== names '("c1" #f "c2" "c1" "c3" "c3")))
+    (check "blame complete history" (not oldest))))
+(check "blame page" (string-contains? (tmfs-load (string-append "tmfs://blame/"
+                                                   (url->tmfs-string PP)))
+                                      "Second Author"))
+(with l (git-describe-changes P (list (git-file-entry P PP)))
+  (check "change description" (== l '("Update paper.tm: Intro"))))
+(define PM (url-append P "main.tm"))
+(check "project files"
+       (== (sort (git-project-files PM) string<?)
+           '("fig.png" "main.tm" "part.tm" "refs.bib")))
+(check "untracked project files"
+       (== (sort (git-project-untracked PM) string<?)
+           '("fig.png" "part.tm" "refs.bib")))
+(git-add-project-files PM)
+(check "project files added" (null? (git-project-untracked PM)))
+(git-run P "reset" "--quiet")
+(git-save-snapshot P "snapshot one")
+(check "snapshot saved" (null? (git-status-entries P)))
+(with rev (git-rev-parse P "HEAD")
+  (string-save "<TeXmacs|2.1>\n\n<\\body>\n  Lost.\n</body>\n" PP)
+  (git-save-snapshot P "snapshot two")
+  (git-restore-snapshot-now P rev)
+  (check "snapshot restored"
+         (string-contains? (string-load PP) "One, not committed.")))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

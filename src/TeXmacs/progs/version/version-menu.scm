@@ -15,6 +15,8 @@
   (:use (version version-compare)
         (version version-tmfs)
         (version git-widgets)
+        (version git-project)
+        (version git-blame)
         (version git-drivers)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -95,6 +97,36 @@
         ((eval (string-append "Branch " (utf8->cork (git-branch-name b))))
          (git-compare-with (current-buffer) (git-branch-name b)))))))
 
+(tm-define (git-short-message msg)
+  (if (<= (string-length msg) 50) msg
+      (string-append (substring msg 0 47) "...")))
+
+(define (sublist* l i j)
+  (sublist l i (min j (length l))))
+
+(menu-bind git-restore-menu
+  (with l (sublist* (or (version-history (current-buffer)) '()) 0 15)
+    (for (x l)
+      (with (rev by date msg) x
+        ((eval (string-append date " " (utf8->cork by) ": "
+                              (utf8->cork (git-short-message msg))))
+         (git-restore-revision (current-buffer)
+                               (car (string-tokenize-by-char rev #\:))))))))
+
+(menu-bind git-simple-file-menu
+  (group "Git")
+  ("Save snapshot..." (git-interactive-save-snapshot (current-git-root)))
+  (assuming (git-state? 'conflicted)
+    (assuming (git-texmacs-file? (current-buffer))
+      ("Resolve conflict..." (git-resolve-conflict (current-buffer))))
+    ("Mark as resolved" (git-mark-resolved (current-buffer))))
+  (assuming (not (git-state? 'untracked 'added))
+    (-> "Restore version" (link git-restore-menu)))
+  (assuming (and (git-texmacs-file? (current-buffer))
+                 (not (git-state? 'untracked 'added 'conflicted)))
+    (-> "Compare with" (link git-compare-menu))
+    ("Who changed what" (git-show-blame (current-buffer)))))
+
 (menu-bind git-file-menu
   (group "Git")
   (assuming (git-state? 'untracked)
@@ -115,9 +147,47 @@
     ("Discard changes..." (git-discard (current-buffer))))
   (assuming (and (git-texmacs-file? (current-buffer))
                  (not (git-state? 'untracked 'added 'conflicted)))
-    (-> "Compare with" (link git-compare-menu))))
+    (-> "Compare with" (link git-compare-menu))
+    ("Who changed what" (git-show-blame (current-buffer))))
+  (assuming (not (git-state? 'untracked 'added))
+    (-> "Restore version" (link git-restore-menu)))
+  (assuming (git-texmacs-file? (current-buffer))
+    (with l (or (git-project-untracked (current-buffer)) '())
+      (assuming (nnull? l)
+        ((eval (string-append "Add " (number->string (length l))
+                              " missing project files"))
+         (git-add-project-files (current-buffer)))))
+    ("Commit project..." (git-interactive-commit-project (current-buffer)))))
+
+(menu-bind git-simple-repository-menu
+  ("Status" (git-show-status))
+  ("Git panel" (git-open-tool))
+  ("History" (git-show-log))
+  ---
+  ("Save snapshot..." (git-interactive-save-snapshot (current-git-root)))
+  (-> "Restore snapshot"
+      (for (c (git-snapshots (current-git-root)))
+        ((eval (string-append (git-commit-date c) " "
+                              (utf8->cork (git-short-message
+                                           (git-commit-subject c)))))
+         (git-restore-snapshot (current-git-root) (git-commit-hash c)))))
+  (with remotes? (nnull? (git-remotes (current-git-root)))
+    (assuming (git-busy? (current-git-root))
+      ("Cancel running command" (git-cancel (current-git-root))))
+    (when (and remotes? (not (git-busy? (current-git-root))))
+      ("Synchronize" (git-sync (current-git-root)))))
+  ---
+  (-> "Preferences"
+      ("Simple mode" (git-toggle-simple-mode)))
+  ("Git output" (git-show-output)))
 
 (menu-bind git-repository-menu
+  (assuming (git-simple-mode?)
+    (link git-simple-repository-menu))
+  (assuming (not (git-simple-mode?))
+    (link git-full-repository-menu)))
+
+(menu-bind git-full-repository-menu
   ("Status" (git-show-status))
   ("Git panel" (git-open-tool))
   ("Log" (git-show-log))
@@ -167,6 +237,7 @@
     ("Restore last stash" (git-stash-pop (current-git-root))))
   ---
   (-> "Preferences"
+      ("Simple mode" (git-toggle-simple-mode))
       ("Sign commits and tags" (git-toggle-signing))
       (-> "Pull"
           ("Fast-forward only" (git-set-pull-mode "fast-forward"))
@@ -205,7 +276,8 @@
       ---))
   (assuming (versioned? (current-buffer))
     (assuming (version-supports-git-style? (current-buffer))
-      (link git-file-menu)
+      (assuming (git-simple-mode?) (link git-simple-file-menu))
+      (assuming (not (git-simple-mode?)) (link git-file-menu))
       ---))
   (assuming (git-revision-of (current-buffer))
     ("Restore this version"
