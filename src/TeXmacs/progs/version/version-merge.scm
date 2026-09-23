@@ -82,6 +82,12 @@
       (lcs-middle v1 v2 p (- n1 s) p (- n2 s) match))
     match))
 
+(tm-define (version-match l1 l2)
+  (:synopsis "Longest common subsequence of the lists @l1 and @l2")
+  ;; Returns a vector which associates to each index of l1 the index
+  ;; of the matching element in l2, or #f
+  (lcs-match (list->vector l1) (list->vector l2)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Three way merging of lists
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -48,6 +48,31 @@ if test $gui = no; then
     tm "The slow brown fox jumps." > paper.tm
     git commit -q -a -m ours
   )
+  # a repository for blame, change descriptions, projects and snapshots
+  rm -rf "$dir/proj" && mkdir -p "$dir/proj" && cd "$dir/proj" || exit 1
+  git init -q -b main
+  git config user.email test@example.com
+  git config user.name "Test User"
+  doc () {
+    printf '<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n'
+    for p in "$@"; do printf '  %s\n\n' "$p"; done
+    printf '</body>\n'
+  }
+  doc "<section|Intro>" "One." "Two." "Three." > paper.tm
+  git add paper.tm && git commit -q -m c1
+  git config user.name "Second Author"
+  doc "<section|Intro>" "One." "Two, revised." "Three." > paper.tm
+  git commit -q -a -m c2
+  git config user.name "Third Author"
+  doc "<section|Intro>" "One." "Two, revised." "Three." "<section|Results>" "Four." > paper.tm
+  git commit -q -a -m c3
+  git config user.name "Test User"
+  doc "<section|Intro>" "One, not committed." "Two, revised." "Three." "<section|Results>" "Four." > paper.tm
+  doc "<include|part.tm>" "<image|fig.png|1par|||>" "<bibliography|bib|tm-plain|refs|<\\bib-list|0>\n  </bib-list>>" > main.tm
+  doc "A part." > part.tm
+  echo png > fig.png
+  echo "@article{a, title={A}}" > refs.bib
+  git add main.tm && git commit -q -m main
   # a fake GnuPG, which signs anything
   cat > "$dir/fake-gpg" <<'GPG'
 #!/bin/sh
@@ -110,6 +135,6 @@ fi
 
 cd "$src" || exit 1
 GIT_TEST_DIR="$dir" TEXMACS_HOME_PATH="$dir/home" TEXMACS_PATH="$src/TeXmacs" \
-  perl -e 'alarm 120; exec @ARGV' TeXmacs/bin/texmacs.bin $opts \
+  perl -e 'alarm 300; exec @ARGV' TeXmacs/bin/texmacs.bin $opts \
   -x "(begin (catch #t (lambda () (load \"$here/$test\")) (lambda args (display* \"TEST-ERROR \" args \"\\n\") (quit-TeXmacs))) (if (headless?) (quit-TeXmacs)))" 2>&1 \
   | grep -E '^(ok|FAIL|FAILURES|TEST-ERROR)'

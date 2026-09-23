@@ -12,7 +12,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (version git-widgets)
-  (:use (version version-git)))
+  (:use (version version-git)
+        (version git-project)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Commit dialog
@@ -42,12 +43,27 @@
   (with t (buffer-get-body u)
     (tm-string-trim-both (cpp-texmacs->verbatim t #f "utf-8"))))
 
-(define (initially-selected entries labels)
-  (list-filter labels
-               (lambda (lab)
-                 (with e (list-ref entries (list-find-index labels
-                                                            (cut == <> lab)))
-                   (git-entry-staged? e)))))
+(define (initially-selected entries labels . opt-paths)
+  ;; The files with staged changes and the files in opt-paths
+  (with paths (if (null? opt-paths) '() (car opt-paths))
+    (list-filter labels
+                 (lambda (lab)
+                   (with e (list-ref entries (list-find-index labels
+                                                              (cut == <> lab)))
+                     (or (git-entry-staged? e)
+                         (in? (git-entry-path e) paths)))))))
+
+(define (selected-entries entries labels selected)
+  (list-filter entries
+               (lambda (e)
+                 (in? (list-ref labels (list-find-index entries
+                                                        (cut == <> e)))
+                      selected))))
+
+(define (suggest-message root u entries labels selected)
+  (with l (git-describe-changes root (selected-entries entries labels
+                                                        selected))
+    (buffer-set-body u `(document ,@(map utf8->cork l)))))
 
 (define (commit-update-index root entries labels selected)
   ;; Stage the selected files without staged changes, unstage the others
@@ -105,10 +121,10 @@
         `(document ,@(map utf8->cork l))
         '(document ""))))
 
-(tm-widget ((git-commit-widget root u) quit)
+(tm-widget ((git-commit-widget root u paths) quit)
   (let* ((entries (commit-candidates root))
          (labels (map commit-label entries))
-         (selected (initially-selected entries labels))
+         (selected (initially-selected entries labels paths))
          (amend? #f)
          (branch (or (git-current-branch root) "(detached)")))
     (padded
@@ -132,11 +148,46 @@
         (toggle (set! amend? answer) amend?) // (text "Amend last commit")
         >>
         (explicit-buttons
+          ("Suggest message"
+           (suggest-message root u entries labels selected))
+          // //
           ("Cancel" (quit))
           // //
           ("Commit"
            (when (commit-now root u entries labels selected amend?)
              (quit))))))))
+
+(define commit-dialogs 0)
+
+(tm-define (git-interactive-commit . opt)
+  (:synopsis "Open a dialog for committing changes in the working tree")
+  ;; Optional arguments: the root and the paths to be selected initially
+  (:interactive #t)
+  (and-with root (if (null? opt) (current-git-root) (car opt))
+    ;; NOTE: each dialog needs its own buffer for the message
+    (set! commit-dialogs (+ commit-dialogs 1))
+    (let* ((u (string->url (string-append "tmfs://aux/git-commit-"
+                                          (number->string commit-dialogs))))
+           (b (current-buffer))
+           (paths (if (or (null? opt) (null? (cdr opt))) '() (cadr opt))))
+      (git-invalidate root)
+      (buffer-set-master u b)
+      (dialogue-window (git-commit-widget root u paths)
+                       (lambda x (noop))
+                       "Git commit" u))))
+
+(tm-define (git-interactive-commit-project name)
+  (:synopsis "Commit the changes to the files used by the document @name")
+  (:interactive #t)
+  (and-with root (git-root name)
+    (git-interactive-commit root (or (git-project-files name) '()))))
+
+(tm-define (git-interactive-save-snapshot root)
+  (:synopsis "Save a snapshot of all files of @root")
+  (:interactive #t)
+  (interactive
+   (lambda (description)
+     (git-save-snapshot root (cork->utf8 description)))))
 
 (tm-define (git-interactive-commit-file name)
   (:synopsis "Commit the changes of the file @name")
