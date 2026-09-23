@@ -205,6 +205,15 @@ vue_apply_theme () {
   color_pressed= the_theme.pressed;
 }
 
+// The background which a flat element shows when it is not highlighted.
+// Clay interpolates the four channels of a colour, so fading a highlight
+// out to a transparent *black* takes it through a dark grey: what is drawn
+// while the animation runs is a shadow of the highlight over the bar, which
+// reads as a flicker. Keeping the colour and dropping only the alpha makes
+// the fade a plain blend from the highlight into the bar behind it.
+static Clay_Color
+faded (Clay_Color c) { return (Clay_Color) { c.r, c.g, c.b, 0 }; }
+
 // Counts the changes of the icon theme: a picture widget which holds an
 // icon of an older generation loads it again (see icon_picture).
 static int icon_generation= 0;
@@ -2005,7 +2014,7 @@ vue_ui_rep::do_layout () {
     }
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
-    Clay_Color bg= { 0, 0, 0, 0 }; // flat buttons show their container
+    Clay_Color bg= faded (color_highlight); // flat buttons show their container
     Clay_Padding padding= swatch ? CLAY_PADDING_ALL(2) : CLAY_PADDING_ALL(5);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(4);
     Clay_BorderElementConfig border= {};

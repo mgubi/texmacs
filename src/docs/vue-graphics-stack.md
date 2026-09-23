@@ -540,7 +540,13 @@ context has a transition in progress (`vue_clay_transitions_active` in
 `clay.c`, the only place where the context structure is visible)
 `transitions_running` keeps the loop drawing, paced at 8 ms and woken by
 events. The buttons (`menu_button`) fade their hover and press highlight in
-120 ms, and a tool panel which appears slides in from its edge in 150 ms
+120 ms. Clay interpolates the four channels of a colour independently, so
+what a flat button shows when it is *not* highlighted is the colour of the
+highlight with a zero alpha (`faded`) and not a transparent black: fading
+to the latter darkened the red, green and blue while the alpha fell, and
+what was drawn halfway was a dark grey wash over the bar, seen as a
+flicker under the pointer both on the way in and on the way out. A tool
+panel which appears slides in from its edge in 150 ms
 (`layout_tool_panel`: an *enter* transition on the position only, with
 `enter.setInitialState` placing the panel beyond the edge, so that the
 sizes the tools measure are final at once; the sizes are not animated on
