@@ -239,4 +239,4 @@ Version menu, **Git** group, for the current buffer:
 | 2026-09-24 | Phase 4: C++ `async-evaluate-system` (argv, stdin, callback with code, stdout and stderr), asynchronous fetch, pull and push with a busy flag and document reloading, shell fallback for X11. Phase 5 (2-way): structured resolution of conflicts in `.tm` files (`OURS`/`THEIRS` stages plus `compare-with-newer`) and mark as resolved. Offscreen GUI test suite. |
 | 2026-09-24 | Phase 5, 3-way: `version-merge.scm` (structured diff3 with `merge-versions`). Conflicts in `.tm` files are merged automatically where only one side changed, and only real conflicts are left for the user. |
 | 2026-09-24 | Git merge driver (`git-drivers.scm`): command-line merges of `.tm` files are structured too, and conflicts are left as `version-both` markup. Installed per repository from the Git menu. |
-| 2026-09-24 | Git side panel (`git-tool`). |
+| 2026-09-24 | Git side panel (`git-tool`). Asynchronous clone. |

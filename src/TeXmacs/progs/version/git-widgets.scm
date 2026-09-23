@@ -218,6 +218,19 @@
   (interactive
    (lambda (tag message) (git-create-tag root tag (cork->utf8 message)))))
 
+(tm-define (git-interactive-clone)
+  (:synopsis "Clone a Git repository")
+  (:interactive #t)
+  (interactive
+   (lambda (repository directory)
+     (let* ((u (system->url directory))
+            (b (current-buffer))
+            (base (if (and b (not (url-rooted-tmfs? b)) (url-exists? b))
+                      (url-head b)
+                      (system->url (getenv "HOME")))))
+       (git-clone repository
+                  (url->system (if (url-rooted? u) u (url-append base u))))))))
+
 (tm-define (git-interactive-init name)
   (:synopsis "Create a Git repository for the document @name")
   (:interactive #t)

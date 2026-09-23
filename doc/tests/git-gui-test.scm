@@ -60,7 +60,19 @@
   (git-open-tool)
   (check "side tool" (in? '(git-tool) (window->tools (current-window) :right)))
   (git-refresh (git-root C2))
-  (finish))
+  (test-clone))
+
+(define (test-clone)
+  (with dest (string-append T "/remote/clone c")
+    (git-clone (string-append T "/remote/origin.git") dest
+      (lambda (r)
+        (check "clone" (git-ok? r))
+        (check "cloned document"
+               (url-exists? (system->url (string-append dest "/doc.tm"))))
+        (check "clone is versioned"
+               (== (version-tool (system->url (string-append dest "/doc.tm")))
+                   "git"))
+        (finish)))))
 
 ;; Asynchronous remote commands and reloading of open documents
 (define (test-remote)

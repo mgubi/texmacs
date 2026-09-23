@@ -226,8 +226,8 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 * The textconv diff driver for readable `git diff` of `.tm` files is still
   to do.
 * A running asynchronous command cannot be cancelled.
-* Clone is not implemented. Init is available from the Version menu for
-  documents outside any repository.
+* Clone asks for the repository and target directory in the footer. There
+  is no dedicated dialog yet.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
 * The panel does not refresh by itself when you switch documents or save;

@@ -197,10 +197,17 @@
   (with ret (apply git-run (cons root args))
     (and (git-ok? ret) (git-out ret))))
 
+(define git-available-cache (make-ahash-table))
+
 (tm-define (git-available?)
-  (with ret (evaluate-system (list (get-preference "git executable")
-                                   "--version") '() '() '(1 2))
-    (== (car ret) "0")))
+  (:synopsis "Can the Git executable be run?")
+  (with exe (get-preference "git executable")
+    (when (not (ahash-ref git-available-cache exe))
+      (ahash-set! git-available-cache exe
+                  (with ret (git-run-with-input (system->url "$HOME") #f
+                                                "--version")
+                    (if (git-ok? ret) 'yes 'no))))
+    (== (ahash-ref git-available-cache exe) 'yes)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Status of the working tree
