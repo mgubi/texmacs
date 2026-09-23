@@ -34,7 +34,7 @@ if test $gui = no; then
   test=git-test.scm
   opts=-headless
 else
-  rm -rf "$dir/remote" "$dir/conflict"
+  rm -rf "$dir/remote" "$dir/conflict" "$dir/conflict2"
   mkdir -p "$dir/remote" "$dir/conflict"
   (
     cd "$dir/remote" || exit 1
@@ -56,6 +56,24 @@ else
     git commit -q -a -m theirs
     git checkout -q main
     tm "First paragraph, as we wrote it." > paper.tm
+    git commit -q -a -m ours
+    git merge theirs > /dev/null 2>&1
+    # a conflict for git, but not for a structured merge
+    mkdir -p "$dir/conflict2" && cd "$dir/conflict2" || exit 1
+    git init -q -b main
+    git config user.email test@example.com
+    git config user.name "Test User"
+    tm2 () {
+      printf '<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n  %s\n\n  %s\n</body>\n' "$1" "$2"
+    }
+    tm2 "The quick brown fox jumps." "Second." > paper.tm
+    git add paper.tm
+    git commit -q -m base
+    git checkout -q -b theirs
+    tm2 "The quick brown fox leaps." "Second." > paper.tm
+    git commit -q -a -m theirs
+    git checkout -q main
+    tm2 "The slow brown fox jumps." "Second." > paper.tm
     git commit -q -a -m ours
     git merge theirs > /dev/null 2>&1
   )

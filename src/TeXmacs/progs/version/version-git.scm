@@ -15,6 +15,7 @@
 (texmacs-module (version version-git)
   (:use (version version-tmfs)
         (version version-compare)
+        (version version-merge)
         (version git-base)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -284,23 +285,46 @@
 (define (version-markup? t)
   (tree-in? t '(version-old version-new version-both)))
 
+(define (revision-body name rev)
+  ;; Body of the document @name at the revision @rev, or #f
+  (and (!= (version-revision name rev) "")
+       (with t (tree->stree (tree-import (string->url
+                                          (version-revision-url name rev))
+                                         "texmacs"))
+         (and-with b (and (tm-is? t 'document)
+                          (list-find (cdr t) (cut tm-is? <> 'body)))
+           (cadr b)))))
+
 (tm-define (git-resolve-conflict name)
-  (:synopsis "Compare our and their versions of the conflicting file @name")
+  (:synopsis "Merge our and their versions of the conflicting file @name")
   (:interactive #t)
+  ;; The changes made on only one side are merged automatically; the
+  ;; others are shown as differences, with our version as the old one
   (if (and (buffer-exists? name) (buffer-modified? name))
       (set-message "Please save or revert the document first"
                    "Resolve conflict")
       (let* ((ours (string->url (version-revision-url name "OURS")))
              (theirs (string->url (version-revision-url name "THEIRS")))
-             (t (tree-import ours "texmacs")))
+             (base (revision-body name "BASE")))
         (when (!= (url->url name) (url->url (current-buffer)))
           (load-buffer name))
-        (buffer-set name t)
-        (compare-with-newer theirs)
-        (set-message (string-append "Old: our version, new: their version. "
-                                    "Retain the right changes, "
-                                    "then mark as resolved")
-                     "Resolve conflict"))))
+        (buffer-set name (tree-import ours "texmacs"))
+        (if (not base)
+            (compare-with-newer theirs)
+            (with m (merge-versions base (tree->stree (buffer-tree))
+                                    (revision-body name "THEIRS"))
+              (tree-set (buffer-tree) (stree->tree m))
+              (version-first-difference)))
+        (with n (length (tree-search (buffer-tree) version-markup?))
+          (set-message (if (== n 0)
+                           (string-append "Merged automatically; "
+                                          "check the result, then mark "
+                                          "as resolved")
+                           (string-append (number->string n)
+                                          " conflicting changes; old: ours, "
+                                          "new: theirs. Retain the right "
+                                          "versions, then mark as resolved"))
+                       "Resolve conflict")))))
 
 (tm-define (git-mark-resolved-now name)
   (when (buffer-exists? name)

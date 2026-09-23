@@ -104,6 +104,36 @@
 (check "conflict" (== (git-file-state (file "c.txt")) 'conflicted))
 (git-run R "merge" "--abort")
 
+;; Structured three way merge
+(use-modules (version version-merge))
+(define (merge-check name o a b expected conflicts)
+  (with m (merge-versions o a b)
+    (check (string-append "merge: " name)
+           (and (or (not expected) (== m expected))
+                (== (merge-conflicts m) conflicts)))))
+(merge-check "disjoint paragraphs"
+             '(document "A." "B." "C.") '(document "A!" "B." "C.")
+             '(document "A." "B." "C!") '(document "A!" "B." "C!") 0)
+(merge-check "different words"
+             '(document "The quick brown fox jumps.")
+             '(document "The slow brown fox jumps.")
+             '(document "The quick brown fox leaps.")
+             '(document "The slow brown fox leaps.") 0)
+(merge-check "same word" '(document "The quick fox.")
+             '(document "The slow fox.") '(document "The lazy fox.") #f 1)
+(merge-check "insertions" '(document "A." "B.") '(document "A." "X." "B.")
+             '(document "A." "B." "Y.") '(document "A." "X." "B." "Y.") 0)
+(merge-check "markup" '(document (section "Intro") "Text.")
+             '(document (section "Introduction") "Text.")
+             '(document (section "Intro") "Text, more.")
+             '(document (section "Introduction") "Text, more.") 0)
+(merge-check "math" '(document (concat "Let " (math "x+y") " be."))
+             '(document (concat "Let " (math "x+z") " be."))
+             '(document (concat "Let " (math "x+y") " be given."))
+             '(document (concat "Let " (math "x+z") " be given.")) 0)
+(merge-check "delete versus edit" '(document "A." "B." "C.")
+             '(document "A." "C.") '(document "A." "B!" "C.") #f 1)
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

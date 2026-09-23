@@ -104,6 +104,14 @@
 (define (list-diff t1 t2)
   (if (== t1 t2) (list) (list (diff t1 t2))))
 
+(tm-define (version-normalize t)
+  (:synopsis "Merge adjacent strings and nested concatenations in @t")
+  (normalize t))
+
+(tm-define (version-denormalize t)
+  (:synopsis "Split the strings in @t into words and spaces")
+  (denormalize t))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Finding a long common subsequence where to break
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

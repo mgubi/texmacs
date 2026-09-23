@@ -16,6 +16,7 @@
 (define DA (url-append A "doc.tm"))
 (define DB (url-append B "doc.tm"))
 (define C (system->url (string-append T "/conflict/paper.tm")))
+(define C2 (system->url (string-append T "/conflict2/paper.tm")))
 
 (define (doc text)
   (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n  "
@@ -39,6 +40,23 @@
   (git-mark-resolved C)
   (check "resolved" (== (git-file-state C) 'staged))
   (check "their text" (string-contains? (string-load C) "as they wrote it"))
+  (test-automatic-merge))
+
+;; Changes to different words of a same line, merged automatically
+(define (test-automatic-merge)
+  (check "line conflict for git" (== (git-file-state C2) 'conflicted))
+  (load-buffer C2)
+  (git-resolve-conflict C2)
+  (check "no remaining difference"
+         (null? (tree-search (buffer-get C2)
+                             (lambda (t) (tree-in? t '(version-old
+                                                       version-new
+                                                       version-both))))))
+  (check "both changes merged"
+         (== (tree->stree (buffer-get-body C2))
+             '(document "The slow brown fox leaps." "Second.")))
+  (git-mark-resolved C2)
+  (check "merge resolved" (== (git-file-state C2) 'staged))
   (finish))
 
 ;; Asynchronous remote commands and reloading of open documents

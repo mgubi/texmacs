@@ -9,6 +9,7 @@ The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2
 | `git-base.scm` | nothing | The process layer and the parsers. It has no GUI code and doesn't touch buffers. |
 | `version-tmfs.scm` | git-base | The generic VCS API. It uses `git-root` for detection (`git-active?`) and adds `version-tool-reset`. |
 | `version-git.scm` | version-tmfs, version-compare, git-base | The git backend (`version-*` overloads), the file and repository actions, the `tmfs://git/...` and `tmfs://commit/...` pages, and the `:secure` page actions. |
+| `version-merge.scm` | version-compare | Structured 3-way merge of documents (`merge-versions`). |
 | `git-widgets.scm` | version-git | The commit dialog and the interactive prompts for branch, tag and init. |
 | `version-menu.scm` | git-widgets | `git-file-menu`, `git-repository-menu`, `git-compare-menu`, and the entry points in `version-menu`. |
 
@@ -136,13 +137,35 @@ callbacks never fire there.
 
 ## Merge conflicts
 
-For a conflicted TeXmacs file, `git-resolve-conflict` loads `OURS` into the
-buffer and calls `compare-with-newer` on `THEIRS`. In the resulting
-structured comparison, *old* is our version and *new* is theirs. The user
-steps through the differences and retains a side for each, with the usual
-Version menu actions and shortcuts. `git-mark-resolved` then warns if any
-`version-*` markup is left, saves the file, and stages it. The comparison is
-2-way; the base version is not used yet.
+`version-merge.scm` provides `merge-versions base ours theirs`, a
+structured 3-way merge of strees. It returns a document in which the
+changes made on one side only are applied, and those made on both sides are
+marked with `version-both` (old = ours, new = theirs), just as in the output
+of `compare-versions`. `merge-conflicts` counts the markup that remains.
+
+The algorithm is the classical diff3, run on lists of children:
+
+* `lcs-match` matches base against each side. It trims the common prefix
+  and suffix first, then runs dynamic programming on the middle if that has
+  at most 4·10⁶ cells.
+* The stable elements are those matched on both sides. The chunks between
+  them are merged by `merge-chunk`: take the side that changed; if both
+  changed the same way, take either; if all three chunks have the same
+  length, merge element by element (a replacement); otherwise fall back to
+  `compare-versions` of ours against theirs.
+* `merge-versions` recurses into `document` (paragraphs), text (via
+  `version-denormalize`, word by word) and any other tag with the same
+  label and arity on all three sides, except `graphics`, `table` and
+  `tformat`, which are compared as a whole.
+
+`git-resolve-conflict` loads `OURS` into the buffer, so the style and
+initial environment come from our side. If the file has a `BASE` stage it
+replaces the body with the merge of the three bodies. Otherwise (the file
+was added on both sides) it falls back to the 2-way `compare-with-newer`
+on `THEIRS`. The user steps through the remaining differences and retains
+a side for each, with the usual Version menu actions and shortcuts.
+`git-mark-resolved` warns if any `version-*` markup is left, saves the
+file, and stages it.
 
 ## Testing
 
@@ -164,9 +187,8 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 
 ## Known gaps
 
-* Conflict resolution is 2-way. A 3-way merge that uses `BASE` to accept
-  one-sided changes automatically is still to do, as are the optional git
-  merge and diff drivers.
+* The git merge and diff drivers, which would do the structured merge from
+  the command line as well, are still to do.
 * A running asynchronous command cannot be cancelled.
 * Clone is not implemented. Init is available from the Version menu for
   documents outside any repository.
