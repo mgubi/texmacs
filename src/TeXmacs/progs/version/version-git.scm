@@ -259,8 +259,11 @@
             (with path (git-relative root name)
               (when (== (git-file-state name) 'untracked)
                 (git-run root "add" "--" path))
-              (with ret (git-run-with-input root (cork->utf8 msg)
-                                            "commit" "--file=-" "--" path)
+              (with ret (apply git-run-with-input
+                               (append (list root (cork->utf8 msg) "commit"
+                                             "--file=-")
+                                       (git-commit-options)
+                                       (list "--" path)))
                 (git-refresh root)
                 (git-message ret)))))))
 
@@ -416,6 +419,14 @@
          (and (git-safe-name? rev) (nin? rev '("INDEX" "BASE" "OURS" "THEIRS"))
               rev))))
 
+(tm-define (git-compare-with-revision name rev)
+  (:synopsis "Compare @name with its version at the Git revision @rev")
+  (with root (git-root name)
+    (with hash (and root (git-rev-parse root (string-append rev "^{commit}")))
+      (if hash
+          (git-compare-with name hash)
+          (set-message (string-append "Unknown revision " rev) "Compare")))))
+
 (tm-define (git-compare-with name rev)
   (:synopsis "Compare the document @name with its revision @rev")
   (with u (string->url (version-revision-url name rev))
@@ -440,7 +451,8 @@
   ;; The message @msg is in the utf8 encoding
   ;; Options: :amend, :all (stage modified files first)
   (let* ((args (append (if (in? :amend opts) (list "--amend") '())
-                       (if (in? :all opts) (list "--all") '())))
+                       (if (in? :all opts) (list "--all") '())
+                       (git-commit-options)))
          (ret (apply git-run-with-input
                      (append (list root msg "commit" "--file=-")
                              args))))
@@ -502,10 +514,12 @@
   (if (not (git-safe-name? tag))
       (bad-name "tag name")
       (begin
-        (git-report (if (== msg "")
-                        (git-run root "tag" tag)
-                        (git-run-with-input root msg "tag" "--annotate"
-                                            "--file=-" tag))
+        (git-report (cond ((git-signing?)
+                           (git-run-with-input root (if (== msg "") tag msg)
+                                               "tag" "--sign" "--file=-" tag))
+                          ((== msg "") (git-run root "tag" tag))
+                          (else (git-run-with-input root msg "tag" "--annotate"
+                                                    "--file=-" tag)))
                     (string-append "Created tag " tag))
         (git-refresh root))))
 
@@ -575,11 +589,49 @@
   (git-remote root "Fetch" (list "fetch" "--all" "--prune")
               (and (nnull? opt-done) (car opt-done))))
 
-(tm-define (git-pull root . opt-done)
+(define (pull-arguments mode)
+  (cond ((== mode "merge") (list "pull" "--no-rebase" "--no-edit"))
+        ((== mode "rebase") (list "pull" "--rebase"))
+        (else (list "pull" "--ff-only"))))
+
+(define (diverged? ret)
+  (with msg (git-err ret)
+    (or (string-contains? msg "fast-forward")
+        (string-contains? msg "divergent")
+        (string-contains? msg "diverged"))))
+
+(define (pull-done root done)
+  (lambda (ret)
+    (when (git-merging? root)
+      (git-show-status root)
+      (set-message "There are conflicts; resolve them, then commit" "Pull"))
+    (when done (done ret))))
+
+(tm-define (git-pull-merge root . opt-done)
+  (:synopsis "Pull and merge the remote changes into the local ones")
   (git-when-saved root
     (lambda ()
-      (git-remote root "Pull" (list "pull" "--ff-only")
-                  (and (nnull? opt-done) (car opt-done))))))
+      (git-remote root "Pull" (pull-arguments "merge")
+                  (pull-done root (and (nnull? opt-done) (car opt-done)))))))
+
+(tm-define (git-pull root . opt-done)
+  ;; If the branches diverged, then propose to merge them
+  (let* ((done (and (nnull? opt-done) (car opt-done)))
+         (mode (get-preference "git pull mode"))
+         (cont (lambda (ret)
+                 (if (and (not (git-ok? ret)) (== mode "fast-forward")
+                          (diverged? ret))
+                     (user-confirm (string-append "Your changes and the remote "
+                                                  "changes diverged. Merge "
+                                                  "them?") #t
+                       (lambda (answ)
+                         (if answ
+                             (git-pull-merge root done)
+                             (when done (done ret)))))
+                     ((pull-done root done) ret)))))
+    (git-when-saved root
+      (lambda ()
+        (git-remote root "Pull" (pull-arguments mode) cont)))))
 
 (tm-define (git-push root . opt-done)
   (with remote (git-push-remote root)
@@ -797,6 +849,7 @@
     `(concat (with "font-size" "0.84"
              (concat ,(git-action "Status" "git-page-show" r "status") " | "
              ,(git-action "Log" "git-page-show" r "log") " | "
+             ,(git-action "Graph" "git-page-show" r "graph") " | "
              ,(git-action "Branches" "git-page-show" r "branches") " | "
              ,(git-action "Output" "git-page-show" r "output") " | "
              ,(git-action "Refresh" "git-page-refresh" r))))))
@@ -959,6 +1012,35 @@
                       (string-append "log." (number->string (+ skip n))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Graph page
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (graph-line root x)
+  (with (prefix c) x
+    (if (not c)
+        `(verbatim ,prefix)
+        (let* ((hash (first c))
+               (refs (if (>= (length c) 6) (sixth c) "")))
+          `(concat (verbatim ,prefix)
+                   (hlink ,(short-hash hash) ,(tmfs-url-commit root hash))
+                   " "
+                   ,(if (== refs "") ""
+                        `(concat (strong ,(utf8->cork (string-append
+                                                       "(" refs ")")))
+                                 " "))
+                   ,(utf8->cork (fifth c))
+                   (with "color" "dark grey"
+                     ,(string-append " - " (utf8->cork (third c)) ", "
+                                     (fourth c))))))))
+
+(define (git-graph-content root)
+  (with l (git-graph root (git-log-length))
+    (git-page root "Git graph"
+      (if (null? l) "No commits."
+          `(with "par-par-sep" "0fn" "par-ver-sep" "0fn"
+             (document ,@(map (cut graph-line root <>) l)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Branches page
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1104,7 +1186,10 @@
         (git-page root "Unknown commit" "")
         (git-page root (string-append "Commit " (short-hash rev))
           `(concat "Author: " ,(utf8->cork (git-commit-author c))
-                   ", " ,(git-commit-date c))
+                   ", " ,(git-commit-date c)
+                   ,(with sig (git-signature root rev)
+                      (if sig (string-append ". Signature: " (utf8->cork sig))
+                          "")))
           `(concat ,(if (<= (length parents) 1) "Parent: " "Parents: ")
                    ,@(if (null? parents) (list "none")
                          (list-intersperse
@@ -1160,6 +1245,7 @@
     (cond ((== which "status") (string-append "Git Status - " short))
           ((string-starts? which "log") (string-append "Git Log - " short))
           ((== which "branches") (string-append "Git Branches - " short))
+          ((== which "graph") (string-append "Git Graph - " short))
           ((== which "output") (string-append "Git Output - " short))
           (else (string-append "Git - " short)))))
 
@@ -1170,5 +1256,6 @@
           ((string-starts? which "log")
            (git-log-content root (page-skip which)))
           ((== which "branches") (git-branches-content root))
+          ((== which "graph") (git-graph-content root))
           ((== which "output") (git-output-content root))
           (else '(document "")))))

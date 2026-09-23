@@ -22,6 +22,8 @@
   ("git executable" "git" noop)
   ("git log length" "250" noop)
   ("git large file size" "10" noop)
+  ("git sign" "off" noop)
+  ("git pull mode" "fast-forward" noop)
   ("git recent repositories" "" noop))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -423,6 +425,26 @@
                            revs)))
     (if out (git-parse-log out) '())))
 
+(tm-define (git-graph root count)
+  (:synopsis "The graph of the @count last commits of all branches")
+  ;; List of lines (graph-prefix commit), where commit is #f for lines
+  ;; which only continue the graph
+  (with out (git-output root "log" "--graph" "--all" "--date-order"
+                        git-date-format
+                        "--format=%x1e%H%x1f%P%x1f%an%x1f%ad%x1f%s%x1f%D"
+                        (string-append "--max-count=" (number->string count)))
+    (if (not out) '()
+        (map (lambda (line)
+               (with pos (string-search-forwards record-sep 0 line)
+                 (if (< pos 0)
+                     (list line #f)
+                     (list (substring line 0 pos)
+                           (with f (git-split (substring line (+ pos 1)
+                                                         (string-length line))
+                                              unit-sep)
+                             (and (>= (length f) 5) f))))))
+             (list-filter (git-split out "\n") (lambda (l) (!= l "")))))))
+
 (tm-define (git-file-log u)
   (:synopsis "The commits which modified @u, following renames")
   ;; The last element of each commit is the list with the name of the file
@@ -554,6 +576,54 @@
           ((in? "origin" l) "origin")
           ((nnull? l) (car l))
           (else #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Signatures
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (git-signing?)
+  (== (get-preference "git sign") "on"))
+
+(tm-define (git-toggle-signing)
+  (:synopsis "Toggle the signature of commits and tags with GnuPG")
+  (:check-mark "v" git-signing?)
+  (set-preference "git sign" (if (git-signing?) "off" "on")))
+
+(tm-define (git-test-pull-mode? m)
+  (== (get-preference "git pull mode") m))
+
+(tm-define (git-set-pull-mode m)
+  (:synopsis "Set the way in which remote changes are pulled")
+  (:check-mark "*" git-test-pull-mode?)
+  (set-preference "git pull mode" m))
+
+(tm-define (git-commit-options)
+  (:synopsis "Additional options for all commits")
+  (if (git-signing?) (list "--gpg-sign") '()))
+
+(tm-define (git-signature root rev)
+  (:synopsis "Description of the signature of the commit @rev, or #f")
+  ;; See the %G? placeholder of git log
+  (and-with out (and (git-safe-name? rev)
+                     (git-output root "show" "--no-patch"
+                                 "--format=%G?%x1f%GS%x1f%GK" rev))
+    (with f (git-split (git-chomp out) unit-sep)
+      (and (== (length f) 3)
+           (with c (car f)
+             (and (!= c "N")
+                  (string-append
+                   (cond ((== c "G") "good signature")
+                         ((== c "U") "good signature, unknown validity")
+                         ((== c "X") "good signature, expired")
+                         ((== c "Y") "good signature, expired key")
+                         ((== c "R") "good signature, revoked key")
+                         ((== c "E") "signature cannot be checked")
+                         ((== c "B") "BAD signature")
+                         (else "signature"))
+                   (if (== (cadr f) "") ""
+                       (string-append " by " (cadr f)))
+                   (if (== (caddr f) "") ""
+                       (string-append " (key " (caddr f) ")")))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Large files and recent repositories

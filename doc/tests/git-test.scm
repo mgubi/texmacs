@@ -223,6 +223,32 @@
 (git-run R "remote" "remove" "upstream")
 (check "menu label" (string-starts? (git-menu-label R) "Git (main"))
 
+;; Graph of the history
+(with l (git-graph R 20)
+  (check "graph lines" (nnull? l))
+  (check "graph commits" (list-find l (lambda (x) (and (cadr x) #t)))))
+(check "graph page" (string-contains? (page "graph") "Git graph"))
+
+;; Signed commits and tags (with a fake GnuPG)
+(git-run R "config" "gpg.program"
+         (string-append (getenv "GIT_TEST_DIR") "/fake-gpg"))
+(git-run R "config" "user.signingkey" "test")
+(set-preference "git sign" "on")
+(string-save "signed\n" (file "s.txt"))
+(git-stage (file "s.txt"))
+(git-commit-staged R "signed commit")
+(check "signed commit"
+       (string-contains? (git-output R "cat-file" "commit" "HEAD") "gpgsig"))
+(git-create-tag R "v-signed" "Signed tag")
+(check "signed tag"
+       (string-contains? (or (git-output R "cat-file" "tag" "v-signed") "")
+                         "BEGIN PGP SIGNATURE"))
+(set-preference "git sign" "off")
+(git-commit-staged R "not signed" :amend)
+(check "unsigned commit"
+       (not (string-contains? (git-output R "cat-file" "commit" "HEAD")
+                              "gpgsig")))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

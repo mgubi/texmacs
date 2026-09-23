@@ -86,7 +86,37 @@
     (check "git menu" (pair? (menu-expand '(link git-repository-menu))))
     (git-interactive-clone)
     (check "clone dialog" #t)
-    (test-cancel)))
+    (git-compare-with-revision u "HEAD~1")
+    (check "compare with revision"
+           (nnull? (tree-search (buffer-get u)
+                                (lambda (t) (tree-in? t '(version-both))))))
+    (check "compare menu" (pair? (menu-expand '(link git-compare-menu))))
+    (revert-buffer-revert u)
+    (test-diverged)))
+
+(define (test-diverged)
+  ;; Pull when the local and remote branches diverged: merge them
+  (let* ((a (system->url (string-append T "/remote/clone a")))
+         (c (system->url (string-append T "/remote/clone c"))))
+    (git-run c "reset" "--quiet" "--hard" "HEAD")
+    (string-save "from a\n" (url-append a "a.txt"))
+    (git-stage (url-append a "a.txt"))
+    (git-commit-staged a "from a")
+    (git-push a
+      (lambda (r)
+        (string-save "from c\n" (url-append c "c.txt"))
+        (git-stage (url-append c "c.txt"))
+        (git-commit-staged c "from c")
+        (git-run c "config" "user.email" "c@example.com")
+        (git-run c "config" "user.name" "User c")
+        (check "ff-only pull fails"
+               (not (git-ok? (git-run c "pull" "--ff-only"))))
+        (git-pull-merge c
+          (lambda (r)
+            (check "diverged pull merged" (git-ok? r))
+            (check "both changes" (and (url-exists? (url-append c "a.txt"))
+                                       (url-exists? (url-append c "c.txt"))))
+            (test-cancel)))))))
 
 (define (test-cancel)
   ;; A fetch from a remote which hangs, then cancelled
