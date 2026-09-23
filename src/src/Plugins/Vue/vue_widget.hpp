@@ -165,6 +165,8 @@ typedef vue_simple_widget_rep simple_widget_rep;
 // set by a widget whose layout used measurements of the previous pass which
 // were not available: the window is laid out again right away
 extern bool layout_again;
+// a wheel over a bar which only scrolls sideways (see vue_wheel_axes)
+void vue_wheel_axes (double& dx, double& dy);
 // set when a widget is deleted: the render commands of the last layout may
 // point to it (custom render callbacks), so the windows are laid out again
 // before the next redraw (see gui_start_loop)

@@ -1381,8 +1381,11 @@ push_wheel (vue_window win, double dx, double dy) {
   }
   with_window frame (win);
   Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
+  // a bar which only scrolls sideways takes the wheel sideways
+  double cx= dx, cy= dy;
+  vue_wheel_axes (cx, cy);
   // Clay scrolls its containers by ten pixels per unit of delta
-  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx / 10, (float) dy / 10 }, 0.01f);
+  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) cx / 10, (float) cy / 10 }, 0.01f);
 }
 
 // a wheel event: scroll and update the estimated speed of the wheel

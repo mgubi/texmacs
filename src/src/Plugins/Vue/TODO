@@ -37,6 +37,12 @@ WIP
 
 DONE
 
+* contents which do not fit are clipped and marked, never given a scroll
+  bar (test bars): the bars of the main window scroll sideways, the
+  pulldown menus both ways; a marker is a fading strip of the colour behind
+  with a chevron in it, and a click on one brings the next screenful in.
+  Menus are at most as large as the window in both directions and are
+  placed before they are first drawn
 * Vue is no longer taken for X11 by the Scheme layer (gui_is_x is false and
   vue-gui? exists), the query line of the footer works (test interactive),
   keyboard-focus-on reaches the search and spell fields (test search-focus),

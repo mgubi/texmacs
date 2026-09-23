@@ -335,8 +335,28 @@ is open: `cancel_popup` and `current_popup` only reach the widgets laid out
 after the click, so a menu opened before another one in the same bar would
 stay open until its own away timer expired. A submenu (`pullright_button`)
 must not claim that slot, since it belongs to the chain of the menu it is
-in and would close its own parent. Menus flip to the other side of their button or shift to stay in
-the window, are at most as tall as the window and scroll.
+in and would close its own parent. Menus flip to the other side of their
+button or shift to stay in the window and are at most as large as it, in
+both directions. A menu which has never been laid out has nothing to be
+placed by, so `layout_again` asks for another pass rather than let it be
+drawn over the edge for a frame; the box it is measured on has the shift of
+the last decision in it, which is taken off before the next one, so that
+placing it twice gives the same answer; and the decision is taken again
+when the window is resized under an open menu.
+
+* **Contents which do not fit** (`scroll_markers`): the bars of the main
+  window (`layout_bar_content`) and the pulldown menus clip their contents
+  and mark what is out of view instead of carrying a scroll bar -- a bar
+  too narrow for its buttons has no room to spare for one, and in a menu it
+  would lie over the labels and the arrows of the submenus. A marker is a
+  strip of the colour behind, opaque at the very edge and fading over the
+  contents in four steps, with a chevron in it (`render_marker_fn`: drawn
+  rather than written, since Lucida Grande has no left-pointing triangle,
+  U+25C2, though it has the other three); a click on one brings the next
+  screenful that way into view. The wheel scrolls them as it scrolls
+  anything else, except that Clay gives each axis its own delta and a mouse
+  has no horizontal wheel: `vue_wheel_axes` turns the vertical delta into a
+  horizontal one over a container which only scrolls sideways.
 
 * **Scrolling with the wheel** (`vue_gui.cpp`, `wheel_event`,
   `wheel_step`): a trackpad and a mouse wheel ask for different things and

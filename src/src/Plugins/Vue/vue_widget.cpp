@@ -944,10 +944,13 @@ icon_picture (blackbox& data) {
 }
 
 VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw,
-                bool, placed, bool, flip, float, shift_x, float, shift_y);
+                bool, placed, bool, flip, float, shift_x, float, shift_y,
+                float, win_w, float, win_h);
 // placed: the position of the open menu has been decided (see layout_pull_button)
 // flip: the menu is opened on the other side of the button to stay in the window
 // shift_x, shift_y: shift of the menu to keep it inside the window
+// win_w, win_h: the window the decision was taken for (it is taken again
+// when the window is resized while the menu is open)
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -1003,6 +1006,137 @@ public:
 inline command
 noop_command () {
   return tm_new<noop_command_rep> ();
+}
+
+// Markers at the ends of a clipped container whose contents do not fit: a
+// strip of the colour behind, opaque at the very edge and fading over the
+// contents, with a chevron in it. A scroll bar would take room a bar which
+// is already too narrow does not have, and would lie over the items of a
+// menu; the markers only say that there is more that way, and a click on
+// one brings it into view. z: drawn above the container, which may itself
+// float (a menu).
+static const float marker_fade[]= { 255, 200, 140, 80, 30 };
+static const float marker_cell[]= { 22, 5, 5, 5, 5 };
+
+// the chevron of a marker, pointing the way the hidden contents are: 0
+// left, 1 right, 2 up, 3 down. It is drawn rather than written because the
+// interface font has no left-pointing triangle (Lucida Grande has U+25B4,
+// U+25B8 and U+25BE but not U+25C2), and a drawn one is sharp at every
+// resolution; y grows upwards here (see the rectangle of a render command)
+static void
+render_marker_fn (renderer ren, void* data, rectangle r) {
+  int dir= (int) (intptr_t) data;
+  SI px= ren->pixel;
+  SI cx= (r->x1 + r->x2) / 2, cy= (r->y1 + r->y2) / 2;
+  SI a= max (2*px, min (r->x2 - r->x1, r->y2 - r->y1) / 5);
+  ren->set_pencil (pencil (theme_color (the_theme.text_grey), 2*px, cap_round));
+  switch (dir) {
+    case 0:
+      ren->line (cx + a, cy + a, cx - a, cy);
+      ren->line (cx - a, cy, cx + a, cy - a); break;
+    case 1:
+      ren->line (cx - a, cy + a, cx + a, cy);
+      ren->line (cx + a, cy, cx - a, cy - a); break;
+    case 2:
+      ren->line (cx - a, cy - a, cx, cy + a);
+      ren->line (cx, cy + a, cx + a, cy - a); break;
+    default:
+      ren->line (cx - a, cy + a, cx, cy - a);
+      ren->line (cx, cy - a, cx + a, cy + a); break;
+  }
+}
+
+static void
+scroll_markers (Clay_ElementId id, Clay_ScrollContainerData& sd,
+                Clay_Color bg, bool horizontal, int16_t z= 1) {
+  float view=    horizontal ? sd.scrollContainerDimensions.width
+                            : sd.scrollContainerDimensions.height;
+  float content= horizontal ? sd.contentDimensions.width
+                            : sd.contentDimensions.height;
+  float cross=   horizontal ? sd.scrollContainerDimensions.height
+                            : sd.scrollContainerDimensions.width;
+  float* pos=    horizontal ? &sd.scrollPosition->x : &sd.scrollPosition->y;
+  if (content <= view + 1 || view <= 0) return;
+  float total= 0;
+  for (int i=0; i<5; i++) total += marker_cell[i];
+  for (int end= 0; end < 2; end++) {
+    // how much is out of view before the first item, and after the last
+    float hidden= (end == 0) ? -*pos : content - view + *pos;
+    if (hidden <= 1) continue;
+    // one id per side and per axis: a menu has markers on both
+    Clay_ElementId m_id=
+      horizontal ? ((end == 0) ? CLAY_IDI ("scroll_marker_left", id.id)
+                               : CLAY_IDI ("scroll_marker_right", id.id))
+                 : ((end == 0) ? CLAY_IDI ("scroll_marker_top", id.id)
+                               : CLAY_IDI ("scroll_marker_bottom", id.id));
+    Clay_FloatingAttachPoints att;
+    if (end == 0)
+      att= (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                                         .parent=  CLAY_ATTACH_POINT_LEFT_TOP };
+    else if (horizontal)
+      att= (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_RIGHT_TOP,
+                                         .parent=  CLAY_ATTACH_POINT_RIGHT_TOP };
+    else
+      att= (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_BOTTOM,
+                                         .parent=  CLAY_ATTACH_POINT_LEFT_BOTTOM };
+    CLAY(m_id, {
+      .floating= {
+        .zIndex= z,
+        .parentId= id.id,
+        .attachPoints= att,
+        .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID },
+      .layout= {
+        .sizing= horizontal
+          ? (Clay_Sizing) { CLAY_SIZING_FIXED(total), CLAY_SIZING_FIXED(cross) }
+          : (Clay_Sizing) { CLAY_SIZING_FIXED(cross), CLAY_SIZING_FIXED(total) },
+        .layoutDirection= horizontal ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM }})
+    {
+      for (int i= 0; i < 5; i++) {
+        int k= (end == 0) ? i : 4 - i; // the opaque cell sits at the edge
+        CLAY_AUTO_ID({
+          .layout= {
+            .sizing= horizontal
+              ? (Clay_Sizing) { CLAY_SIZING_FIXED(marker_cell[k]), CLAY_SIZING_GROW(0) }
+              : (Clay_Sizing) { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(marker_cell[k]) },
+            .childAlignment= { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }},
+          .backgroundColor= { bg.r, bg.g, bg.b, marker_fade[k] }})
+        {
+          if (k == 0) {
+            int dir= horizontal ? (end == 0 ? 0 : 1) : (end == 0 ? 2 : 3);
+            CLAY_AUTO_ID({
+              .layout= { .sizing= { CLAY_SIZING_FIXED(marker_cell[0]),
+                                    CLAY_SIZING_FIXED(marker_cell[0]) }},
+              .custom= { .customData= (void*) &render_marker_fn },
+              .userData= (void*) (intptr_t) dir }) {}
+          }
+        }
+      }
+    }
+    // a click on a marker brings the side it points to into view
+    if (button_logic (m_id).clicked == 1) {
+      float step= min (hidden, 0.8f * view);
+      *pos += (end == 0) ? step : -step;
+      mouse_action= ""; // the click is ours, not the container's
+    }
+  }
+}
+
+// A wheel turned over a container which only scrolls sideways moves it
+// sideways: a mouse has no horizontal wheel, and Clay gives each axis a
+// delta of its own. Called from push_wheel once the pointer state is set,
+// on the deltas which go to Clay (the editors keep theirs as they are).
+void
+vue_wheel_axes (double& dx, double& dy) {
+  if (dy == 0) return;
+  Clay_ElementIdArray ids= Clay_GetPointerOverIds ();
+  // the array is filled as Clay descends the tree: the innermost container
+  // under the pointer is the last one, and it is the one which scrolls
+  for (int32_t i= ids.length - 1; i >= 0; i--) {
+    Clay_ScrollContainerData sd= Clay_GetScrollContainerData (ids.internalArray[i]);
+    if (!sd.found) continue;
+    if (sd.config.horizontal && !sd.config.vertical) { dx += dy; dy= 0; }
+    return;
+  }
 }
 
 string input_text_widget_string (widget w); // defined below
@@ -1372,6 +1506,7 @@ layout_pull_button (vue_ui_rep *w) {
         d.placed= false;
         d.flip= false;
         d.shift_x= d.shift_y= 0;
+        d.win_w= d.win_h= 0;
         current_popup= true;
         away_time= 0;
         // only the buttons of a bar are mutually exclusive: a submenu
@@ -1400,13 +1535,26 @@ layout_pull_button (vue_ui_rep *w) {
       // when the menu (as laid out in the previous pass) sticks out of the
       // window, open it on the other side of the button if there is more
       // room there, otherwise shift it back inside; the decision is kept
-      // until the menu closes to avoid flickering
+      // until the menu closes, or the window is resized, to avoid flickering
       Clay_Dimensions dims= { current_window->layout_w, current_window->layout_h };
       Clay_ElementData fd= Clay_GetElementData (float_id);
       Clay_ElementData bd= Clay_GetElementData (button_id);
+      if (d.placed && (d.win_w != dims.width || d.win_h != dims.height))
+        d.placed= false; // the window was resized under the open menu
+      if (!fd.found)
+        // the menu has never been laid out: there is nothing to place it
+        // by yet, and drawing this pass would show it over the edge of the
+        // window for a frame. Another pass, and it is placed before it is
+        // seen (the loop lays out again while layout_again is set)
+        layout_again= true;
       if (fd.found && bd.found && !d.placed) {
         d.placed= true;
+        d.win_w= dims.width; d.win_h= dims.height;
         Clay_BoundingBox f= fd.boundingBox, b= bd.boundingBox;
+        // the box was measured with the shift of the last decision in it:
+        // take it off, or a decision taken twice would not be the same one
+        f.x -= d.shift_x; f.y -= d.shift_y;
+        d.shift_x= d.shift_y= 0;
         float over_x= f.x + f.width  - dims.width;
         float over_y= f.y + f.height - dims.height;
         if (down) {
@@ -1431,9 +1579,9 @@ layout_pull_button (vue_ui_rep *w) {
         ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_RIGHT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
         : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_RIGHT_TOP };
       Clay_Vector2 offset= { d.shift_x, d.shift_y };
-      // the menu is at most as tall as the window and scrolls (wheel or
-      // scroll bar) when its contents are taller; it is drawn above the
-      // scroll bars of the editors (zIndex 1)
+      // the menu is at most as large as the window and scrolls (wheel or
+      // a click on a marker) when its contents do not fit; it is drawn
+      // above the scroll bars of the editors (zIndex 1)
       CLAY(float_id, {
         .floating= {
           .offset= offset,
@@ -1442,10 +1590,11 @@ layout_pull_button (vue_ui_rep *w) {
           .attachPoints= attach },
         .layout= {
           .padding= { 8, 8, 8, 8 },
-          .sizing= { .width= CLAY_SIZING_FIT(.min= 120),
+          .sizing= { .width= CLAY_SIZING_FIT(.min= 120, .max= dims.width),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
-        .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
+        .clip= { .horizontal= true, .vertical= true,
+                 .childOffset= Clay_GetScrollOffset () },
         .border= {
           .width= { 1, 1, 1, 1 },
           .color= { 150, 150, 150, 255 }}})
@@ -1471,8 +1620,13 @@ layout_pull_button (vue_ui_rep *w) {
     }
   }
   if (!is_nil (d.cw)) {
+    // markers rather than a scroll bar: a bar would lie over the labels of
+    // the items and over the arrows of the submenus
     Clay_ScrollContainerData sd= Clay_GetScrollContainerData (float_id);
-    if (sd.found) scroll_bar (float_id, sd, 6);
+    if (sd.found) {
+      scroll_markers (float_id, sd, color_background, false, 6);
+      scroll_markers (float_id, sd, color_background, true, 6);
+    }
   }
   // store back changes
   w->data= close_box (d);
@@ -4284,6 +4438,27 @@ static const uint16_t bar_hpad= 24;   // contents clear of the window edges
 static const float bar_menu_h= 62, bar_main_h= 88, bar_mode_h= 72, bar_focus_h= 64,
                    bar_footer_h= 56;
 
+// The contents of a bar of the main window, clipped to its width: when
+// they do not fit, the markers at the ends say so and a click on one
+// brings the rest into view. A scroll bar is not an option here: a bar
+// which is too narrow for its buttons has no room to spare for one, and it
+// would cover them. The key is unique per bar and per editor widget.
+static void
+layout_bar_content (int key, vue_widget content, Clay_Color bg) {
+  Clay_ElementId clip_id= CLAY_IDI ("bar_clip", key);
+  CLAY(clip_id, {
+    .layout= {
+      .sizing= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+    .clip= { .horizontal= true, .childOffset= Clay_GetScrollOffset () }})
+  {
+    with_behind b (bg);
+    content->do_layout ();
+  }
+  Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
+  if (sd.found) scroll_markers (clip_id, sd, bg, true, 2);
+}
+
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
   // grow to the size of the window
@@ -4313,9 +4488,8 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= color_background,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (main_menu)) {
-        main_menu->do_layout ();
-      }
+      if (!is_nil (main_menu))
+        layout_bar_content (8*id + 0, main_menu, color_background);
     }
     if (visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
@@ -4327,9 +4501,8 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= color_background,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (main_icons)) {
-        main_icons->do_layout ();
-      }
+      if (!is_nil (main_icons))
+        layout_bar_content (8*id + 1, main_icons, color_background);
     }
     if (visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
@@ -4341,10 +4514,8 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= the_theme.bar_mode,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (mode_icons)) {
-        with_behind b (the_theme.bar_mode);
-        mode_icons->do_layout ();
-      }
+      if (!is_nil (mode_icons))
+        layout_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
     }
     if (visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
       .layout= {
@@ -4356,10 +4527,8 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= the_theme.bar_focus,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (focus_icons)) {
-        with_behind b (the_theme.bar_focus);
-        focus_icons->do_layout ();
-      }
+      if (!is_nil (focus_icons))
+        layout_bar_content (8*id + 3, focus_icons, the_theme.bar_focus);
     }
     // the user icon bar, which a document may fill through its style
     // (the bar was received and stored, and never drawn)
@@ -4374,8 +4543,7 @@ void vue_texmacs_widget_rep::do_layout () {
         .backgroundColor= the_theme.bar_focus,
         .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
       {
-        with_behind b (the_theme.bar_focus);
-        user_icons->do_layout ();
+        layout_bar_content (8*id + 4, user_icons, the_theme.bar_focus);
       }
     // the middle row: left tools, the editor and the side tools
     CLAY(CLAY_ID_LOCAL("Middle"), {
