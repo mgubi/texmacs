@@ -189,6 +189,40 @@
 (check "history of name with quote"
        (== (length (version-history (file "q\"uote.tm"))) 1))
 
+;; Restoring a file from a revision, large files, init, remotes, labels
+(with rev (git-rev-parse R "HEAD~2")
+  (string-save "restore me\n" (file "r.txt"))
+  (git-stage (file "r.txt"))
+  (git-commit-staged R "r one")
+  (with first (git-rev-parse R "HEAD")
+    (string-save "restore me, changed\n" (file "r.txt"))
+    (git-stage (file "r.txt"))
+    (git-commit-staged R "r two")
+    (git-restore-revision-now (file "r.txt") first)
+    (check "restored revision" (== (string-load (file "r.txt"))
+                                   "restore me\n"))
+    (git-run R "checkout" "HEAD" "--" "r.txt")))
+(set-preference "git large file size" "0")
+(check "large file" (git-large-file? (file "renamed.txt")))
+(set-preference "git large file size" "10")
+(check "small file" (not (git-large-file? (file "renamed.txt"))))
+(with dir (system->url (string-append (getenv "GIT_TEST_DIR") "/new repo"))
+  (system-mkdir dir)
+  (git-init dir)
+  (check "init" (git-root (url-append dir "x.tm")))
+  (check "default gitignore" (url-exists? (url-append dir ".gitignore")))
+  (check "recent repository"
+         (in? (url->system dir) (git-recent-repositories))))
+(check "no remote" (not (git-push-remote R)))
+(git-add-remote R "upstream" "/nowhere/repo.git")
+(check "remote added" (== (git-remotes R) '("upstream")))
+(check "remote url" (== (git-remote-url R "upstream") "/nowhere/repo.git"))
+(check "push remote" (== (git-push-remote R) "upstream"))
+(git-add-remote R "-x" "y")
+(check "bad remote refused" (== (git-remotes R) '("upstream")))
+(git-run R "remote" "remove" "upstream")
+(check "menu label" (string-starts? (git-menu-label R) "Git (main"))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

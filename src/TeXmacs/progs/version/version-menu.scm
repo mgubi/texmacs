@@ -126,6 +126,19 @@
       ("Fetch" (git-fetch (current-git-root)))
       ("Pull" (git-pull (current-git-root)))
       ("Push" (git-push (current-git-root)))))
+  (-> "Remotes"
+      ("Add remote..." (git-interactive-add-remote (current-git-root)))
+      (with l (git-remotes (current-git-root))
+        (assuming (nnull? l)
+          ---
+          (-> "Push to"
+              (for (r l)
+                ((eval (utf8->cork r))
+                 (git-push-to (current-git-root) r))))
+          (-> "Remove"
+              (for (r l)
+                ((eval (utf8->cork r))
+                 (git-remove-remote (current-git-root) r)))))))
   ---
   ("Stash changes" (git-stash (current-git-root)))
   (when (nnull? (git-stashes (current-git-root)))
@@ -166,13 +179,24 @@
     (assuming (version-supports-git-style? (current-buffer))
       (link git-file-menu)
       ---))
+  (assuming (git-revision-of (current-buffer))
+    ("Restore this version"
+     (git-restore-revision (version-head (current-buffer))
+                           (git-revision-of (current-buffer))))
+    ---)
   (assuming (current-git-root)
-    (-> "Git" (link git-repository-menu))
+    (-> (eval (git-menu-label (current-git-root)))
+        (link git-repository-menu))
     ---)
   (assuming (git-can-init? (current-buffer))
     ("Create Git repository..." (git-interactive-init (current-buffer))))
   (assuming (git-available?)
     ("Clone Git repository..." (git-interactive-clone))
+    (with l (git-recent-repositories)
+      (assuming (nnull? l)
+        (-> "Recent Git repositories"
+            (for (r l)
+              ((eval (utf8->cork r)) (git-show-status (system->url r)))))))
     ---)
   (assuming (or (versioned? (current-buffer))
                 (version-revision? (current-buffer)))

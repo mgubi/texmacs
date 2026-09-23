@@ -76,6 +76,16 @@
       (git-show-status root)
       (git-page-stage (url->system root) "doc.tm")
       (check "page action from status page" (== (git-file-state u) 'staged)))
+    (test-menus)))
+
+(define (test-menus)
+  ;; The menus and dialogs can be built without errors
+  (with u (system->url (string-append T "/remote/clone c/doc.tm"))
+    (switch-to-buffer u)
+    (check "version menu" (pair? (menu-expand '(link version-menu))))
+    (check "git menu" (pair? (menu-expand '(link git-repository-menu))))
+    (git-interactive-clone)
+    (check "clone dialog" #t)
     (test-cancel)))
 
 (define (test-cancel)

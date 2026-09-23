@@ -234,18 +234,59 @@
    (lambda (tag message)
      (git-create-tag root (cork->utf8 tag) (cork->utf8 message)))))
 
+(define (clone-default-directory)
+  (with b (current-buffer)
+    (url->system (if (and b (not (url-rooted-tmfs? b)) (url-exists? b))
+                     (url-head b)
+                     (system->url "$HOME")))))
+
+(define (clone-destination repository dir)
+  ;; Clone into dir, or into a subdirectory named after the repository
+  ;; if dir already exists
+  (let* ((u (system->url dir))
+         (name (with l (string-tokenize-by-char
+                        (string-replace repository "\\" "/") #\/)
+                 (with last (if (null? l) "" (cAr l))
+                   (if (string-ends? last ".git")
+                       (string-drop-right last 4)
+                       last)))))
+    (url->system (if (and (url-directory? u) (!= name ""))
+                     (url-append u name)
+                     u))))
+
+(tm-widget ((git-clone-widget) quit)
+  (padded
+    (form "git-clone"
+      (aligned
+        (item (text "Repository:")
+          (form-input "repository" "string" (list "") "30em"))
+        (item (text "Into directory:")
+          (form-input "directory" "string"
+                      (list (clone-default-directory)) "30em")))
+      ===
+      (bottom-buttons
+        >>
+        ("Cancel" (quit))
+        // //
+        ("Clone"
+         (with l (form-values)
+           (when (and (== (length l) 2) (string? (car l)) (string? (cadr l))
+                      (!= (car l) ""))
+             (let* ((repository (cork->utf8 (car l)))
+                    (dir (cork->utf8 (cadr l))))
+               (git-clone repository (clone-destination repository dir))
+               (quit)))))))))
+
 (tm-define (git-interactive-clone)
   (:synopsis "Clone a Git repository")
   (:interactive #t)
+  (dialogue-window (git-clone-widget) noop "Clone Git repository"))
+
+(tm-define (git-interactive-add-remote root)
+  (:interactive #t)
   (interactive
-   (lambda (repository directory)
-     (let* ((u (system->url (cork->utf8 directory)))
-            (b (current-buffer))
-            (base (if (and b (not (url-rooted-tmfs? b)) (url-exists? b))
-                      (url-head b)
-                      (system->url (getenv "HOME")))))
-       (git-clone (cork->utf8 repository)
-                  (url->system (if (url-rooted? u) u (url-append base u))))))))
+   (lambda (name url)
+     (git-add-remote root (cork->utf8 name) (cork->utf8 url)))))
 
 (tm-define (git-interactive-init name)
   (:synopsis "Create a Git repository for the document @name")
