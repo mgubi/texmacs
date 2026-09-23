@@ -57,7 +57,8 @@ class object;
 bool async_eval_system (string cmd, object call_back);
 bool async_eval_system (string cmd, int& status, string& outbuf,
 			string& errbuf, bool& kill);
-bool async_evaluate_system (array<string> arg, string in, object call_back);
+int  async_evaluate_system (array<string> arg, string in, object call_back);
+void async_evaluate_cancel (int id);
 void async_eval_pending ();
 
 string get_printing_default ();

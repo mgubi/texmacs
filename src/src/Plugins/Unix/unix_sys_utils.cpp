@@ -19,6 +19,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <signal.h>
 
 int
 unix_system (string s) {
@@ -147,7 +148,8 @@ struct _channel {
   int buffer_size;
   array<char> buffer;
   int status;
-  _channel () : status (0) {}
+  volatile bool finished;
+  _channel () : status (0), finished (false) {}
   void _init_in (int fd2, string data2, int chunk_size) {
     fd= fd2;
     data.copy (&data2[0], N(data2));
@@ -172,6 +174,8 @@ _background_read_task (void* channel_as_void_ptr) {
     if (m > 0) c->data.append (b, m);
     if (m == 0) { if (close (fd) != 0) c->status= -1; }
   } while (m > 0);
+  if (m < 0) close (fd);
+  c->finished= true;
   return (void*) NULL;
 }
 
@@ -183,8 +187,8 @@ _background_write_task (void* channel_as_void_ptr) {
   const char* d= c->data.a;
   int n= c->buffer_size;
   int t= (c->data).n, k= 0, o= 0;
-  if (t == 0) return (void*) NULL;
-  if (n == 0) { c->status= -1; return (void*) NULL; }
+  if (t == 0) { c->finished= true; return (void*) NULL; }
+  if (n == 0) { c->status= -1; c->finished= true; return (void*) NULL; }
   do {
     int m= min (n, t - k);
     // cout << "writting " << m << " bytes / " << t-k << "\n";
@@ -194,6 +198,7 @@ _background_write_task (void* channel_as_void_ptr) {
     if (o < 0) { close (fd); c->status= -1; }
     if (k == t) { if (close (fd) != 0) c->status= -1; }
   } while (o > 0 && k < t);
+  c->finished= true;
   return (void*) NULL;
 }
 
@@ -335,9 +340,20 @@ unix_system (array<string> arg,
 
 struct unix_process_rep {
   pid_t     pid;
+  bool      exited;
+  int       status;
   bool      has_in;
   _channel  in, out, err;
   pthread_t th_in, th_out, th_err;
+};
+
+// exception safe spawn attributes
+struct _spawnattr_t {
+  posix_spawnattr_t rep;
+  int st;
+  inline _spawnattr_t () { st= posix_spawnattr_init (&rep); }
+  inline ~_spawnattr_t () { posix_spawnattr_destroy (&rep); }
+  inline int status () const { return st; }
 };
 
 static void
@@ -366,6 +382,12 @@ unix_system_start (array<string> arg, string input) {
   ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[5], 2) == 0;
   for (int i= 0; i < 6; i++)
     ok= ok && posix_spawn_file_actions_addclose (&file_actions.rep, fd[i]) == 0;
+  // run the command in its own process group, so that it can be killed
+  // together with the processes that it starts
+  _spawnattr_t attr;
+  ok= ok && attr.status () == 0;
+  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETPGROUP) == 0;
+  ok= ok && posix_spawnattr_setpgroup (&attr.rep, 0) == 0;
   if (!ok) { _close_fds (fd, 6); return NULL; }
 
   array<char*> _arg;
@@ -373,7 +395,7 @@ unix_system_start (array<string> arg, string input) {
     _arg << as_charp (arg[j]);
   _arg << (char*) NULL;
   pid_t pid;
-  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, NULL,
+  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, &attr.rep,
 			    A(_arg), environ);
   for (int j= 0; j < N(arg); j++)
     tm_delete_array (_arg[j]);
@@ -389,6 +411,8 @@ unix_system_start (array<string> arg, string input) {
   // the threads close the remaining file descriptors when they are done
   unix_process_rep* rep= tm_new<unix_process_rep> ();
   rep->pid= pid;
+  rep->exited= false;
+  rep->status= 0;
   rep->has_in= N(input) > 0;
   rep->out._init_out (fd[2], 1 << 12);
   rep->err._init_out (fd[4], 1 << 12);
@@ -399,6 +423,7 @@ unix_system_start (array<string> arg, string input) {
       { close (fd[1]); rep->has_in= false; }
   }
   else close (fd[1]);
+  // NOTE: the output threads are always created
   pthread_create (&rep->th_out, NULL, _background_read_task,
 		  (void*) &(rep->out));
   pthread_create (&rep->th_err, NULL, _background_read_task,
@@ -409,24 +434,40 @@ unix_system_start (array<string> arg, string input) {
 bool
 unix_system_finished (unix_process_rep* rep,
 		      int& ret, string& out, string& err) {
-  // Check whether the process has terminated; if so, then retrieve
-  // its exit code and output, and release rep.
-  int status;
-  pid_t wret= waitpid (rep->pid, &status, WNOHANG);
-  if (wret == 0) return false;
+  // Check whether the process has terminated and all its output has been
+  // read; if so, then retrieve its exit code and output, and release rep.
+  // NOTE: processes started by the command may still hold the output
+  // pipes, so we do not wait for the threads before they are finished.
+  if (!rep->exited) {
+    int status;
+    pid_t wret= waitpid (rep->pid, &status, WNOHANG);
+    if (wret == 0) return false;
+    rep->exited= true;
+    if (wret < 0 || WIFEXITED (status) == 0) rep->status= -1;
+    else rep->status= WEXITSTATUS (status);
+  }
+  if ((rep->has_in && !rep->in.finished) ||
+      !rep->out.finished || !rep->err.finished)
+    return false;
   void* exit_status;
   if (rep->has_in) pthread_join (rep->th_in, &exit_status);
   pthread_join (rep->th_out, &exit_status);
   pthread_join (rep->th_err, &exit_status);
   out= string (rep->out.data.a, rep->out.data.n);
   err= string (rep->err.data.a, rep->err.data.n);
-  if (wret < 0 || WIFEXITED (status) == 0) ret= -1;
-  else ret= WEXITSTATUS (status);
+  ret= rep->status;
   if (DEBUG_IO)
     debug_io << "unix_system_finished, pid " << rep->pid
 	     << " exited with " << ret << "\n";
   tm_delete<unix_process_rep> (rep);
   return true;
+}
+
+void
+unix_system_kill (unix_process_rep* rep) {
+  // Terminate the process and the processes which it started
+  if (!rep->exited) kill (-rep->pid, SIGTERM);
+  else kill (-rep->pid, SIGKILL);
 }
 
 #else
@@ -450,6 +491,11 @@ unix_system_finished (unix_process_rep* rep,
 		      int& ret, string& out, string& err) {
   (void) rep; ret= -1; out= ""; err= "";
   return true;
+}
+
+void
+unix_system_kill (unix_process_rep* rep) {
+  (void) rep;
 }
 
 #endif

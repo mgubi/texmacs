@@ -71,7 +71,23 @@
     (buffer-pretend-modified u)
     (save-buffer u)
     (check "modified after save" (== (git-file-state u) 'modified))
-    (finish)))
+    (test-cancel)))
+
+(define (test-cancel)
+  ;; A fetch from a remote which hangs, then cancelled
+  (let* ((root (system->url (string-append T "/remote/clone c")))
+         (t0 (texmacs-time)))
+    (git-run root "remote" "add" "slow" (string-append T "/remote/origin.git"))
+    (git-run root "config" "remote.slow.uploadpack"
+             "sleep 30; git-upload-pack")
+    (git-run-async root (list "fetch" "slow") #f
+      (lambda (r)
+        (check "cancelled fetch failed" (not (git-ok? r)))
+        (check "cancelled quickly" (< (- (texmacs-time) t0) 10000))
+        (check "not busy after cancel" (not (git-busy? root)))
+        (finish)))
+    (check "busy fetching" (git-busy? root))
+    (delayed (:pause 1000) (git-cancel root))))
 
 (define (test-clone)
   (with dest (string-append T "/remote/clone c")

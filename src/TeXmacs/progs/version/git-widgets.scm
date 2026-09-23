@@ -173,8 +173,8 @@
 (tm-widget (git-tool-contents win)
   (let* ((root (tool-root win))
          (l (if root (git-status-entries root) '()))
-         (remote? (and root (nnull? (git-remotes root))
-                       (not (git-busy? root))))
+         (busy? (and root (git-busy? root)))
+         (remote? (and root (nnull? (git-remotes root)) (not busy?)))
          (branch (if root (tool-branch root) "")))
     (if (not root)
         (text "The current document is not in a Git working tree"))
@@ -186,6 +186,8 @@
           (if remote?
               ("Pull" (git-pull root)) // //
               ("Push" (git-push root)) // //)
+          (if busy?
+              ("Cancel" (git-cancel root)) // //)
           ("Status" (git-show-status root)) // //
           ("Refresh" (git-refresh root))
           >>)

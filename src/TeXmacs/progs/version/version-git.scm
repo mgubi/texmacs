@@ -461,7 +461,8 @@
           (lambda (ret)
             (git-report ret what)
             (git-reload root watch)
-            (when done (done ret)))))))
+            (when done (done ret))))
+        (refresh-now "git-tool"))))
 
 (tm-define (git-fetch root . opt-done)
   (git-remote root "Fetch" (list "fetch" "--all" "--prune")

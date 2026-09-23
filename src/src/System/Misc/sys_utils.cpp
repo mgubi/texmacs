@@ -374,6 +374,7 @@ async_eval_system (string c, int& status, string& outbuf,
 ******************************************************************************/
 
 struct async_process {
+  int    id;
   object call_back;
 #if defined (OS_MINGW) || defined (OS_ANDROID)
   array<string> result;
@@ -383,14 +384,16 @@ struct async_process {
 };
 
 static array<async_process*> async_processes;
+static int async_process_counter= 0;
 
-bool
+int
 async_evaluate_system (array<string> arg, string in, object call_back) {
   // Run arg[0] with arguments arg[i], i >= 1, without shell, sending in
   // to its standard input.  When the command terminates, call_back is
   // called with the list (exit-code stdout stderr).
-  // Returns true on failure, like async_eval_system.
+  // Returns an identifier for async_evaluate_cancel, or 0 on failure.
   async_process* p= tm_new<async_process> ();
+  p->id= ++async_process_counter;
   p->call_back= call_back;
 #if defined (OS_MINGW) || defined (OS_ANDROID)
   array<int> fd_in;
@@ -403,11 +406,24 @@ async_evaluate_system (array<string> arg, string in, object call_back) {
   p->rep= unix_system_start (arg, in);
   if (p->rep == NULL) {
     tm_delete<async_process> (p);
-    return true;
+    return 0;
   }
 #endif
   async_processes << p;
-  return false;
+  return p->id;
+}
+
+void
+async_evaluate_cancel (int id) {
+  // Terminate the command with identifier id; its call back will be
+  // called as usual, when it has terminated
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  (void) id;
+#else
+  for (int i=0; i<N(async_processes); i++)
+    if (async_processes[i]->id == id)
+      unix_system_kill (async_processes[i]->rep);
+#endif
 }
 
 static void

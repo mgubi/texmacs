@@ -138,7 +138,17 @@ already in that file. The parent's pipe ends are marked close-on-exec.
 returns the result. On Windows and Android the command runs synchronously
 and only the callback is delayed.
 
-At most one asynchronous command runs per root (`git-busy?`). While one is
+`async-evaluate-system` returns an identifier (0 on failure) which
+`async-evaluate-cancel` accepts. The child runs in its own process group
+(`POSIX_SPAWN_SETPGROUP`), so cancelling sends `SIGTERM` to the whole group,
+which includes helpers such as `ssh` or `git-remote-https`. A command only
+counts as finished when it has exited *and* its reader threads have seen
+end of file. The event loop therefore never blocks in `pthread_join`,
+even if a grandchild keeps the pipes open.
+
+At most one asynchronous command runs per root (`git-busy?`, which holds
+the identifier). "Git → Cancel running command" and the panel's Cancel
+button call `git-cancel`. While one is
 running, the menu hides Fetch, Pull and Push. `git-remote` in
 `version-git.scm` reports the result, reloads the documents that changed,
 and refreshes the pages. Each of `git-fetch`, `git-pull` and `git-push` can
@@ -225,7 +235,6 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 
 * The textconv diff driver for readable `git diff` of `.tm` files is still
   to do.
-* A running asynchronous command cannot be cancelled.
 * Clone asks for the repository and target directory in the footer. There
   is no dedicated dialog yet.
 * The commit dialog has not been exercised by hand in the GUI. Its
