@@ -185,6 +185,21 @@
   <name|Git> to call <TeXmacs> for merging documents in this repository,
   also when merging from the command line.
 
+  <menu|Version|Who changed what> shows the document with, before each
+  paragraph, the commit, the author and the date of its last change.
+  <menu|Version|Restore version> puts back an older version of the document
+  as a new change, so that nothing is lost. For a document which is split
+  into several files, <menu|Version|Commit project> commits all files used
+  by the document (included documents, images, bibliographies and style
+  files), and a menu entry proposes to add those which are not yet under
+  version control. In the commit dialog, <menu|Suggest message> proposes a
+  message which lists the sections that were changed.
+
+  If you prefer not to deal with the details of <name|Git>, then turn on
+  <menu|Version|Git|Preferences|Simple mode>. The <menu|Version> menu then
+  offers to save snapshots of all your files, to restore any snapshot, and
+  to synchronize with the repositories of your coauthors.
+
   All commands which were executed can be inspected using
   <menu|Version|Git|Git output>.
 
