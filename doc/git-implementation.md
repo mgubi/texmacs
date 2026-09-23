@@ -66,7 +66,9 @@ therefore load even before anyone has opened the Version menu.
 * the history form `<hash>:<tmfs-file>`, which `version-revision-url` turns
   into `tmfs://revision/<hash>/<file>`;
 * any git revision, such as `HEAD`, a branch name or a hash;
-* `INDEX`, meaning the staged version (`git show :path`).
+* `INDEX`, meaning the staged version (`git show :path`);
+* `BASE`, `OURS` or `THEIRS`, meaning the index stages 1, 2 and 3 of a
+  file with a merge conflict.
 
 `git-compare-with name rev` opens `name` and runs `compare-with-older` on
 `tmfs://revision/<rev>/<name>`, so the comparison is the structured
@@ -84,8 +86,11 @@ confirmation. After an action, `git-refresh` re-imports every open git page
 for that root in place (`git-reload-buffer`).
 
 Operations that rewrite files (discard, switch, merge, pull, stash) run
-inside `git-with-reload`. It records the mtimes of the open documents under
-the root and re-imports those that changed on disk. A changed document that
+inside `git-with-reload`, or between `git-watch` and `git-reload` for
+asynchronous commands. `git-watch` records the *contents* on disk of the open
+documents under the root, because modification times only have a
+resolution of one second. `git-reload` re-imports the documents whose
+contents changed. A changed document that
 also has unsaved edits is not reloaded; a warning is shown instead.
 `git-when-saved` offers to save modified documents before switch, merge,
 pull and stash.
@@ -101,25 +106,70 @@ changed to hold exactly the selected files (`add --all` for the selected
 ones, `reset` for the others), but only if you changed the selection. Then
 `commit --file=-` runs.
 
+## Asynchronous commands
+
+`fetch`, `pull` and `push` go through `git-run-async root args input cont`,
+which is built on the new C++ `async-evaluate-system argv input callback`.
+The callback receives `(code stdout stderr)` from the event loop
+(`async_eval_pending` in `tm_server.cpp`).
+
+On Unix, `unix_system_start` in `Plugins/Unix/unix_sys_utils.cpp` spawns
+the process with `posix_spawnp` and starts background threads that
+exchange data with it through the thread-safe `_channel` and `_ts_string`
+already in that file. The parent's pipe ends are marked close-on-exec.
+`unix_system_finished` polls `waitpid (WNOHANG)`, joins the threads and
+returns the result. On Windows and Android the command runs synchronously
+and only the callback is delayed.
+
+At most one asynchronous command runs per root (`git-busy?`). While one is
+running, the menu hides Fetch, Pull and Push. `git-remote` in
+`version-git.scm` reports the result, reloads the documents that changed,
+and refreshes the pages. Each of `git-fetch`, `git-pull` and `git-push` can
+take a continuation, which the tests use.
+
+The X11 version has no argv-based `unix_system` (it is compiled out), so
+`evaluate-system` would abort there. `git-base` detects this with
+`(x-gui?)` and falls back to `eval-system`: arguments are single-quoted,
+stdin and stderr go through temporary files, and the exit code is appended
+after a `\001` byte. Note that headless mode runs no event loop, so
+callbacks never fire there.
+
+## Merge conflicts
+
+For a conflicted TeXmacs file, `git-resolve-conflict` loads `OURS` into the
+buffer and calls `compare-with-newer` on `THEIRS`. In the resulting
+structured comparison, *old* is our version and *new* is theirs. The user
+steps through the differences and retains a side for each, with the usual
+Version menu actions and shortcuts. `git-mark-resolved` then warns if any
+`version-*` markup is left, saves the file, and stages it. The comparison is
+2-way; the base version is not used yet.
+
 ## Testing
 
 `doc/tests/run-git-tests.sh [dir]` builds a repository whose path contains
 spaces, adds a linked worktree, and runs `doc/tests/git-test.scm` with
 `texmacs.bin -headless` and a private `TEXMACS_HOME_PATH`. It covers
 detection, all file states, quoting, history and revisions, every page,
-branches, tags, stashes, renames and conflicts. The GUI parts (menus and
+branches, tags, stashes, renames and conflicts.
+
+`doc/tests/run-git-tests.sh --gui [dir]` runs `git-gui-test.scm` in the
+Qt GUI with `QT_QPA_PLATFORM=offscreen`, so that the event loop runs but
+no window appears. It creates a bare remote with two clones and a
+conflicting merge, and tests push (including upstream setup), fetch and
+pull, the reloading of an open document, the busy flag, and the structured
+resolution of the conflict. The GUI parts (menus and
 the dialog) were smoke-tested by driving the Qt app from `-x` scripts:
 expanding the menus with `menu-expand` and opening the dialog. Pages can be
 checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 
 ## Known gaps
 
-* `fetch`, `pull` and `push` are synchronous and freeze the UI while they
-  run. `async-eval-system` (on svn_sync) only returns stdout, so Phase 4
-  needs an argv-based asynchronous variant that also returns the exit code
-  and stderr.
-* Conflicted `.tm` files can only be marked resolved. There is no
-  structured 3-way view yet (Phase 5).
+* Conflict resolution is 2-way. A 3-way merge that uses `BASE` to accept
+  one-sided changes automatically is still to do, as are the optional git
+  merge and diff drivers.
+* A running asynchronous command cannot be cancelled.
+* Clone is not implemented. Init is available from the Version menu for
+  documents outside any repository.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
 * The side panel (`tm-tool*`) has not been written.

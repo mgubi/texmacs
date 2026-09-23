@@ -100,15 +100,19 @@
     (when (git-page? u root)
       (git-reload-buffer u))))
 
+(define (file-contents u)
+  (if (url-exists? u) (string-load u) ""))
+
 (tm-define (git-watch root)
-  (:synopsis "Modification times of the open documents in @root")
-  (map (lambda (u) (cons u (url-last-modified u))) (git-buffers root)))
+  (:synopsis "Contents on disk of the open documents in @root")
+  ;; NOTE: modification times have a too coarse resolution
+  (map (lambda (u) (cons u (file-contents u))) (git-buffers root)))
 
 (tm-define (git-reload root watch)
   (:synopsis "Reload the documents in @watch which changed on disk")
   (for (x watch)
     (let ((u (car x)) (old (cdr x)))
-      (when (!= (url-last-modified u) old)
+      (when (and (url-exists? u) (!= (file-contents u) old))
         (if (buffer-modified? u)
             (set-message `(concat "Modified on disk: "
                                   (verbatim ,(url->system u)))
@@ -174,8 +178,9 @@
 ;; A revision of a file in its history is encoded as <hash>:<file>, where
 ;; <file> is the tmfs string for the file at that commit (which may differ
 ;; from the current name, due to renames).  Otherwise, a revision is any
-;; revision understood by Git ("HEAD", a branch name, ...), or "INDEX"
-;; for the version in the index.
+;; revision understood by Git ("HEAD", a branch name, ...), "INDEX"
+;; for the version in the index, or "BASE", "OURS", "THEIRS" for the
+;; versions of a file with a merge conflict.
 
 (tm-define (version-history name)
   (:require (== (version-tool name) "git"))
@@ -193,14 +198,15 @@
                      (git-commit-subject c))))
            l))))
 
+(define git-stages
+  '(("INDEX" . "") ("BASE" . ":1") ("OURS" . ":2") ("THEIRS" . ":3")))
+
 (tm-define (version-revision name rev)
   (:require (== (version-tool name) "git"))
   (with root (git-root name)
     (if (not root) ""
         (with path (git-relative root name)
-          (if (== rev "INDEX")
-              (git-show-file root "" path)
-              (git-show-file root rev path))))))
+          (git-show-file root (or (assoc-ref git-stages rev) rev) path)))))
 
 (tm-define (version-beautify-revision name rev)
   (:require (== (version-tool name) "git"))
@@ -274,6 +280,43 @@
       (when answ
         (when (buffer-modified? name) (buffer-pretend-saved name))
         (git-discard-now name)))))
+
+(define (version-markup? t)
+  (tree-in? t '(version-old version-new version-both)))
+
+(tm-define (git-resolve-conflict name)
+  (:synopsis "Compare our and their versions of the conflicting file @name")
+  (:interactive #t)
+  (if (and (buffer-exists? name) (buffer-modified? name))
+      (set-message "Please save or revert the document first"
+                   "Resolve conflict")
+      (let* ((ours (string->url (version-revision-url name "OURS")))
+             (theirs (string->url (version-revision-url name "THEIRS")))
+             (t (tree-import ours "texmacs")))
+        (when (!= (url->url name) (url->url (current-buffer)))
+          (load-buffer name))
+        (buffer-set name t)
+        (compare-with-newer theirs)
+        (set-message (string-append "Old: our version, new: their version. "
+                                    "Retain the right changes, "
+                                    "then mark as resolved")
+                     "Resolve conflict"))))
+
+(tm-define (git-mark-resolved-now name)
+  (when (buffer-exists? name)
+    (buffer-save name)
+    (buffer-pretend-saved name))
+  (git-stage name))
+
+(tm-define (git-mark-resolved name)
+  (:synopsis "Save @name and mark its merge conflict as resolved")
+  (:interactive #t)
+  (if (and (buffer-exists? name)
+           (nnull? (tree-search (buffer-get name) version-markup?)))
+      (user-confirm "Some differences have not been resolved. Continue?" #f
+        (lambda (answ)
+          (when answ (git-mark-resolved-now name))))
+      (git-mark-resolved-now name)))
 
 (tm-define (git-compare-with name rev)
   (:synopsis "Compare the document @name with its revision @rev")
@@ -430,6 +473,14 @@
   (:secure #t)
   (git-discard (page-file root-s path)))
 
+(tm-define (git-page-resolve root-s path)
+  (:secure #t)
+  (git-resolve-conflict (page-file root-s path)))
+
+(tm-define (git-page-mark-resolved root-s path)
+  (:secure #t)
+  (git-mark-resolved (page-file root-s path)))
+
 (tm-define (git-page-compare root-s path rev)
   (:secure #t)
   (git-compare-with (page-file root-s path) rev))
@@ -558,7 +609,7 @@
                      ((== which 'conflict) "conflict")
                      (else (status-code code))))
          (cmp? (and (git-texmacs-file? u) (url-exists? u)
-                    (!= which 'untracked) (!= code #\A)))
+                    (nin? which '(untracked conflict)) (!= code #\A)))
          (acts (append
                 (if cmp? (list (git-action "compare" "git-page-compare"
                                            r path "HEAD"))
@@ -566,8 +617,13 @@
                 (cond ((== which 'staged)
                        (list (git-action "unstage" "git-page-unstage" r path)))
                       ((== which 'conflict)
-                       (list (git-action "mark resolved" "git-page-stage"
-                                         r path)))
+                       (append
+                        (if (git-texmacs-file? u)
+                            (list (git-action "resolve" "git-page-resolve"
+                                              r path))
+                            '())
+                        (list (git-action "mark resolved"
+                                          "git-page-mark-resolved" r path))))
                       ((== which 'untracked)
                        (list (git-action "add" "git-page-stage" r path)))
                       (else
