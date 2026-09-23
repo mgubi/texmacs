@@ -4,6 +4,7 @@
 ;; MODULE      : version-git.scm
 ;; DESCRIPTION : subroutines for the Git tools
 ;; COPYRIGHT   : (C) 2019  Darcy Shen, Joris van der Hoeven
+;;               (C) 2026  Massimiliano Gubinelli
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -12,14 +13,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (version version-git)
-  (:use (version version-tmfs)))
+  (:use (version version-tmfs)
+        (version version-compare)
+        (version git-base)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Supported features
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (version-supports-svn-style? name)
-  (:require (== (version-tool name) "git"))  
+  (:require (== (version-tool name) "git"))
   #f)
 
 (tm-define (version-supports-git-style? name)
@@ -27,413 +30,829 @@
   (versioned? name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Git base command
+;; Useful subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define NR_LOG_OPTION " -1000 ")
+(define (short-hash rev)
+  (if (>= (string-length rev) 40) (string-take rev 7) rev))
 
-(define (delete-tail-newline a-str)
-  (if (string-ends? a-str "\n")
-      (delete-tail-newline (string-drop-right a-str 1))
-      a-str))
+(tm-define (git-texmacs-file? u)
+  (in? (url-suffix u) '("tm" "ts" "tp" "stm" "tmml")))
 
-;; if git-versioned, return the root directory of the git repo
-;; otherwise, return the root directory ("/")
-(tm-define (git-root url)
-  (let* ((dir (if (url-directory? url) url (url-head url)))
-         (git-dir (url-append dir ".git"))
-         (pdir (url-expand (url-append dir ".."))))
-    (cond ((url-directory? git-dir)
-           (string-replace (url->system dir) "\\" "/"))
-          ((== pdir dir) "/")
-          (else (git-root pdir)))))
+(define (git-quote s)
+  ;; Scheme literal for the string s, for use inside 'action' scripts
+  (object->string s))
 
-(tm-define (git-command url)
-  (with work-dir (git-root url)
-    (string-append "git"
-                   " --work-tree=" work-dir
-                   " --git-dir=" work-dir "/.git")))
+(define (git-action text cmd . args)
+  `(action ,text ,(string-append "(" cmd " "
+                                 (string-recompose (map git-quote args) " ")
+                                 ")")))
 
-;; Warning: use it carefully since the current buffer changes during tmfs reverting
+(define (root-string root) (url->system root))
+(define (string-root s) (system->url s))
+
 (tm-define (current-git-root)
-  (git-root (current-buffer)))
+  (:synopsis "Root of the working tree for the current buffer or Git page")
+  (with u (current-buffer)
+    (cond ((not u) #f)
+          ((url-rooted-tmfs-protocol? u "git")
+           (with (class name) (tmfs-decompose-name u)
+             (tmfs-string->url (tmfs-cdr name))))
+          ((url-rooted-tmfs-protocol? u "commit")
+           (with (class name) (tmfs-decompose-name u)
+             (tmfs-string->url (tmfs-cdr name))))
+          ((version-revision? u) (git-root (version-head u)))
+          (else (git-root u)))))
 
-;; Warning: do not use it
-(tm-define (current-git-command)
-  (with work-dir (current-git-root)
-    (string-append "git"
-                   " --work-tree=" (current-git-root)
-                   " --git-dir=" (current-git-root) "/.git")))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Buffers of a working tree
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (git-page? u root)
+  (and (or (url-rooted-tmfs-protocol? u "git")
+           (url-rooted-tmfs-protocol? u "commit"))
+       (with (class name) (tmfs-decompose-name u)
+         (== (tmfs-string->url (tmfs-cdr name)) root))))
+
+(define (git-buffer? u root)
+  (and (not (url-rooted-tmfs? u))
+       (string-starts? (url->system u)
+                       (string-append (url->system root) "/"))))
+
+(tm-define (git-buffers root)
+  (:synopsis "Open buffers for files in the working tree @root")
+  (list-filter (buffer-list) (cut git-buffer? <> root)))
+
+(tm-define (git-modified-buffers root)
+  (list-filter (git-buffers root) buffer-modified?))
+
+(define (git-reload-buffer u)
+  (url-cache-invalidate u)
+  (with t (tree-import u (url-format u))
+    (when (!= t (tm->tree "error"))
+      (buffer-set u t)
+      (buffer-pretend-saved u))))
+
+(tm-define (git-refresh root)
+  (:synopsis "Refresh the Git pages about @root after a change")
+  (git-invalidate root)
+  (for (u (buffer-list))
+    (when (git-page? u root)
+      (git-reload-buffer u))))
+
+(tm-define (git-with-reload root thunk)
+  (:synopsis "Execute @thunk and reload the documents it changed on disk")
+  (let* ((l (git-buffers root))
+         (stamps (map url-last-modified l))
+         (ret (thunk)))
+    (for-each (lambda (u old)
+                (when (!= (url-last-modified u) old)
+                  (if (buffer-modified? u)
+                      (set-message `(concat "Modified on disk: "
+                                            (verbatim ,(url->system u)))
+                                   "Git")
+                      (git-reload-buffer u))))
+              l stamps)
+    (git-refresh root)
+    ret))
+
+(tm-define (git-when-saved root cont)
+  (:synopsis "Execute @cont after asking to save the modified documents")
+  (with l (git-modified-buffers root)
+    (if (null? l)
+        (cont)
+        (user-confirm "Save the modified documents in this repository first?"
+                      #t
+          (lambda (answ)
+            (when answ
+              (for-each (lambda (u) (buffer-save u) (buffer-pretend-saved u)) l)
+              (cont)))))))
+
+(tm-define (git-report ret what)
+  (:synopsis "Show the outcome @ret of a Git command in the footer")
+  (with msg (git-message ret)
+    (if (git-ok? ret)
+        (set-message (if (== msg "") what (utf8->cork msg)) "Git")
+        (set-message `(concat "Git error: " (verbatim ,(utf8->cork msg)))
+                     what))
+    (git-ok? ret)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File status
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (buffer-status name)
-  (let* ((path (url->system name))
-         (cmd (string-append (git-command name) " status --porcelain " path))
-         (ret (eval-system cmd)))
-    (cond ((> (string-length ret) 3) (string-take ret 2))
-          ((file-exists? path) "  ")
-          (else ""))))
-
 (tm-define (version-status name)
   (:require (== (version-tool name) "git"))
-  (with ret (buffer-status name)
-    (cond ((== ret "??") "unknown")
-          ((== ret "  ") "unmodified")
+  (with st (git-file-state name)
+    (cond ((not st) "unknown")
+          ((== st 'untracked) "unknown")
+          ((== st 'unmodified) "unmodified")
           (else "modified"))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Predicates of Git and Buffer
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (buffer-to-unadd? name)
-  (with ret (buffer-status name)
-        (or (== ret "A ")
-            (== ret "M ")
-            (== ret "MM")
-            (== ret "AM")))) 
-
-(tm-define (buffer-to-add? name)
-  (with ret (buffer-status name)
-        (or (== ret "??")
-            (== ret " M")
-            (== ret "MM")
-            (== ret "AM"))))
-
-(tm-define (buffer-histed? name)
-  (with ret (buffer-status name)
-        (or (== ret "M ")
-            (== ret "MM")
-            (== ret " M")
-            (== ret "  "))))
-
-(tm-define (buffer-has-diff? name)
-  (with ret (buffer-status name)
-        (or (== ret "M ")
-            (== ret "MM")
-            (== ret " M"))))
-
-(tm-define (buffer-tmfs? name)
-  (string-starts? (url->string name)
-                  "tmfs"))
+(tm-define (git-state-description st)
+  (cond ((== st 'untracked) "not tracked")
+        ((== st 'unmodified) "unmodified")
+        ((== st 'modified) "modified")
+        ((== st 'staged) "staged")
+        ((== st 'partial) "partially staged")
+        ((== st 'added) "added")
+        ((== st 'deleted) "deleted")
+        ((== st 'conflicted) "conflict")
+        (else "unknown")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; File history
-;; 1. Eval `git log --follow --pretty=%ai%n%an%n%s%n%H --name-only <name>`
-;; 2. Split the result by \n\n
-;; 3. Transform each string record to texmacs document
+;; File history and revisions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (git-history-item alist root)
-  (with (date by msg commit blank path) alist
-        (list
-         (string-append commit ":"
-          (url->tmfs-string (system->url (string-append root "/" path))))
-         by date msg)))
-
-(define (git-history-items alist root)
-  (if (< (length alist) 6)
-      (list)
-      (cons (git-history-item (list-take alist 6) root)
-            (git-history-items (list-drop alist 6) root))))
+;; A revision of a file in its history is encoded as <hash>:<file>, where
+;; <file> is the tmfs string for the file at that commit (which may differ
+;; from the current name, due to renames).  Otherwise, a revision is any
+;; revision understood by Git ("HEAD", a branch name, ...), or "INDEX"
+;; for the version in the index.
 
 (tm-define (version-history name)
   (:require (== (version-tool name) "git"))
-  (let* ((cmd (string-append
-               (git-command name) " log --follow --pretty=%ai%n%an%n%s%n%H --name-only"
-               NR_LOG_OPTION
-               (url->system name)))
-         (root (current-git-root))
-         (ret1 (eval-system cmd))
-         (ret2 (string-decompose ret1 "\n")))
-
-    (git-history-items ret2 root)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; File revisions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (and-with root (git-root name)
+    (and-with l (git-file-log name)
+      (map (lambda (c)
+             (with path (if (null? (git-commit-files c))
+                            (git-relative root name)
+                            (car (git-commit-files c)))
+               (list (string-append (git-commit-hash c) ":"
+                                    (url->tmfs-string
+                                     (git-absolute root path)))
+                     (git-commit-author c)
+                     (git-commit-date c)
+                     (git-commit-subject c))))
+           l))))
 
 (tm-define (version-revision name rev)
   (:require (== (version-tool name) "git"))
-  ;;(display* "Loading commit " rev " for " name "\n")
-  (let* ((git (git-command name))
-         (root (git-root name))
-         (rel (url-delta (url-append root "dummy") name))
-         (name-s (url->string name))
-         (cmd (string-append git " show " rev ":" (url->string rel)))
-         (ret (eval-system cmd)))
-    ;;(display* "Got " ret "\n")
-    ret))
-
-(define (beautify-git-revision rev)
-  (string-take rev 7))
+  (with root (git-root name)
+    (if (not root) ""
+        (with path (git-relative root name)
+          (if (== rev "INDEX")
+              (git-show-file root "" path)
+              (git-show-file root rev path))))))
 
 (tm-define (version-beautify-revision name rev)
   (:require (== (version-tool name) "git"))
-  (beautify-git-revision rev))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Masters
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (short-hash rev))
 
 (tm-define (git-master name)
-  (let* ((cmd (string-append (git-command name) " log -1 --pretty=%H"))
-         (ret (eval-system cmd)))
-    (delete-tail-newline ret)))
-
-;; Get the hashCode of the HEAD via `git log -1 --pretty=%H`
-(tm-define (git-commit-master)
-  (let* ((cmd (string-append (current-git-command) " log -1 --pretty=%H"))
-         (ret (eval-system cmd)))
-    (delete-tail-newline ret)))
+  (and-with root (git-root name)
+    (git-rev-parse root "HEAD")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Registration of files (add and reset)
+;; Operations on files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (version-register name)
   (:require (== (version-tool name) "git"))
-  (let* ((name-s (url->string name))
-         (cmd (string-append (git-command name) " add " name-s))
-         (ret (eval-system cmd)))
-    (set-message cmd (string-append "Registered file"))))
+  (with root (git-root name)
+    (with ret (git-run root "add" "--" (git-relative root name))
+      (git-refresh root)
+      (if (git-ok? ret) "Added file" (git-message ret)))))
 
 (tm-define (version-unregister name)
   (:require (== (version-tool name) "git"))
-  (let* ((name-s (url->string name))
-         (cmd (string-append (git-command name) " reset HEAD " name-s))
-         (ret (eval-system cmd)))
-    (set-message cmd "Unregistered file")))
+  (with root (git-root name)
+    (with ret (git-run root "rm" "--cached" "--quiet"
+                       "--" (git-relative root name))
+      (git-refresh root)
+      (if (git-ok? ret) "Stopped tracking file" (git-message ret)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Committing files
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(tm-define (version-commit name msg)
+  (:require (== (version-tool name) "git"))
+  (let* ((root (git-root name))
+         (path (git-relative root name)))
+    (when (== (git-file-state name) 'untracked)
+      (git-run root "add" "--" path))
+    (with ret (git-run-with-input root (cork->utf8 msg)
+                                  "commit" "--file=-" "--" path)
+      (git-refresh root)
+      (git-message ret))))
 
-(tm-define (git-commit-message root rev)
-  (let* ((cmd (string-append (git-command root) " log -1 " rev))
-         (ret (eval-system cmd)))
-    (string-split ret #\newline)))
+(tm-define (git-stage name)
+  (:synopsis "Stage the changes of the file @name")
+  (with root (git-root name)
+    (git-report (git-run root "add" "--" (git-relative root name))
+                "Staged file")
+    (git-refresh root)))
 
-(tm-define (git-commit-parents root rev)
-  (let* ((git (git-command root))
-         (cmd (string-append git " show --no-patch --format=%P " rev))
-         (ret1 (eval-system cmd))
-         (ret2 (delete-tail-newline ret1))
-         (ret3 (string-split ret2 #\newline))
-         (ret4 (cAr ret3))
-         (ret5 (string-split ret4 #\ )))
-    ret5))
+(tm-define (git-unstage name)
+  (:synopsis "Unstage the changes of the file @name")
+  (with root (git-root name)
+    (git-report (git-run root "reset" "--quiet" "--"
+                         (git-relative root name))
+                "Unstaged file")
+    (git-refresh root)))
 
-(tm-define (git-commit-parent root rev)
-  (cAr (git-commit-parents root rev)))
+(tm-define (git-discard-now name)
+  (let* ((root (git-root name))
+         (path (git-relative root name)))
+    (git-with-reload root
+      (lambda ()
+        (git-report (git-run root "checkout" "--" path)
+                    "Discarded changes")))))
 
-(tm-define (git-commit-file-parent file hash)
-  (let* ((cmd (string-append
-               (current-git-command) " log --pretty=%H "
-               (current-git-root) "/" file))
-         (ret (eval-system cmd))
-         (ret2 (string-decompose
-                ret (string-append hash "\n"))))
-    ;; (display ret2)
-    (if (== (length ret2) 1)
-        hash
-        (string-take (second ret2) 40))))
-
-(tm-define (git-commit-diff root parent hash)
-  (let* ((cmd (if (== parent hash)
-                  (string-append
-                   (git-command root) " show " hash
-                   " --numstat --pretty=oneline")
-                  (string-append
-                   (git-command root) " diff --numstat "
-                   parent " " hash)))
-         (ret (eval-system cmd))
-         (ret2 (if (== parent hash)
-                   (cdr (string-split ret #\newline))
-                   (string-split ret #\newline))))
-    (define (convert body)
-      (let* ((alist (string-split body #\tab)))
-        (with dest (url-append root (third alist))
-          (if (== (first alist) "-")
-              (list 0 0 (utf8->cork (third alist))
-                    (string-length (third alist)))
-              (list (string->number (first alist))
-                    (string->number (second alist))
-                    ($link (version-revision-url dest hash)
-                      (utf8->cork (third alist)))
-                    (string-length (third alist)))))))
-    (and (> (length ret2) 0)
-         (string-null? (cAr ret2))
-         (map convert (cDr ret2)))))
-
-(tm-define (git-commit message)
-  (let* ((cmd (string-append
-               (current-git-command) " commit -m " (raw-quote message)))
-         (ret (eval-system cmd)))
-    ;; (display ret)
-    (set-message (string-append (current-git-command) " commit") message))
-  (git-show-status))
-
-(tm-define (git-interactive-commit)
+(tm-define (git-discard name)
+  (:synopsis "Discard the changes to @name since it was last staged")
   (:interactive #t)
-  (git-show-status)
-  (interactive (lambda (message) (git-commit message))))
+  (user-confirm (if (buffer-modified? name)
+                    "Discard all changes, including the unsaved ones?"
+                    "Discard all changes since the file was last staged?")
+                #f
+    (lambda (answ)
+      (when answ
+        (when (buffer-modified? name) (buffer-pretend-saved name))
+        (git-discard-now name)))))
+
+(tm-define (git-compare-with name rev)
+  (:synopsis "Compare the document @name with its revision @rev")
+  (with u (string->url (version-revision-url name rev))
+    (when (!= (url->url name) (url->url (current-buffer)))
+      (load-buffer name))
+    (compare-with-older u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Comparing versions
+;; Operations on the whole working tree
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (git-compare-with-current name)
-  (let* ((name-s (url->string name))
-         (file-r (cAr (string-split name-s #\|)))
-         (file (string-append (current-git-root) "/" file-r)))
-    (switch-to-buffer (string->url file))
-    (compare-with-older name)))
+(tm-define (git-stage-all root)
+  (:synopsis "Stage all changes to tracked files in @root")
+  (git-report (git-run root "add" "--update") "Staged all changes")
+  (git-refresh root))
 
-(tm-define (git-compare-with-parent name)
-  (let* ((name-s (tmfs-cdr (tmfs-cdr (url->tmfs-string name))))
-         (hash (first (string-split name-s #\|)))
-         (file (second (string-split name-s #\|)))
-         (parent (git-commit-file-parent file hash))
-         (file-buffer-s (version-revision-url file parent))
-         (parent (string->url file-buffer-s)))
-    (if (== name parent)
-        ;; FIXME: should prompt a dialog
-        (set-message "No parent" "No parent")
-        (compare-with-older parent))))
+(tm-define (git-has-staged? root)
+  (list-or (map git-entry-staged? (git-status-entries root))))
 
-(tm-define (git-compare-with-master name)
-  (let* ((path (url->string name))
-         (buffer (version-revision-url name (git-master name)))
-         (master (string->url buffer)))
-    ;; (display* "\n" name "\n" buffer "\n" master "\n")
-    (compare-with-older master)))
+(tm-define (git-commit-staged root msg . opts)
+  (:synopsis "Commit the staged changes in @root with message @msg")
+  ;; The message @msg is in the utf8 encoding
+  ;; Options: :amend, :all (stage modified files first)
+  (let* ((args (append (if (in? :amend opts) (list "--amend") '())
+                       (if (in? :all opts) (list "--all") '())))
+         (ret (apply git-run-with-input
+                     (append (list root msg "commit" "--file=-")
+                             args))))
+    (git-refresh root)
+    (git-report ret "Committed changes")))
+
+(tm-define (git-last-commit-message root)
+  (if (git-rev-parse root "HEAD")
+      (utf8->cork (git-commit-message root "HEAD"))
+      ""))
+
+(tm-define (git-switch-branch root branch)
+  (:synopsis "Switch the working tree @root to @branch")
+  (git-when-saved root
+    (lambda ()
+      (git-with-reload root
+        (lambda ()
+          (git-report (git-run root "checkout" "--quiet" branch)
+                      (string-append "Switched to " branch)))))))
+
+(tm-define (git-create-branch root branch)
+  (:synopsis "Create a new branch @branch at HEAD and switch to it")
+  (git-report (git-run root "checkout" "--quiet" "-b" branch)
+              (string-append "Created branch " branch))
+  (git-refresh root))
+
+(tm-define (git-delete-branch root branch)
+  (user-confirm (string-append "Delete branch " branch "?") #f
+    (lambda (answ)
+      (when answ
+        (git-report (git-run root "branch" "--delete" branch)
+                    (string-append "Deleted branch " branch))
+        (git-refresh root)))))
+
+(tm-define (git-merge-branch root branch)
+  (:synopsis "Merge @branch into the current branch of @root")
+  (git-when-saved root
+    (lambda ()
+      (git-with-reload root
+        (lambda ()
+          (git-report (git-run root "merge" "--no-edit" branch)
+                      (string-append "Merged " branch)))))))
+
+(tm-define (git-create-tag root tag msg)
+  ;; The message @msg is in the utf8 encoding
+  (git-report (if (== msg "")
+                  (git-run root "tag" tag)
+                  (git-run-with-input root msg
+                                      "tag" "--annotate" "--file=-" tag))
+              (string-append "Created tag " tag))
+  (git-refresh root))
+
+(tm-define (git-stash root)
+  (git-when-saved root
+    (lambda ()
+      (git-with-reload root
+        (lambda () (git-report (git-run root "stash" "push") "Stashed"))))))
+
+(tm-define (git-stash-pop root . opt-name)
+  (git-with-reload root
+    (lambda ()
+      (git-report (apply git-run (append (list root "stash" "pop") opt-name))
+                  "Restored stash"))))
+
+(tm-define (git-stash-drop root name)
+  (user-confirm (string-append "Drop " name "?") #f
+    (lambda (answ)
+      (when answ
+        (git-report (git-run root "stash" "drop" name) "Dropped stash")
+        (git-refresh root)))))
+
+(tm-define (git-init dir)
+  (:synopsis "Create a new Git repository in the directory @dir")
+  (with ret (git-run dir "init" "--quiet")
+    (version-tool-reset)
+    (git-report ret "Created repository")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Status
+;; Remote operations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (git-fetch root)
+  (set-message "Fetching..." "Git")
+  (git-report (git-run root "fetch" "--all" "--prune") "Fetched")
+  (git-refresh root))
+
+(tm-define (git-pull root)
+  (git-when-saved root
+    (lambda ()
+      (set-message "Pulling..." "Git")
+      (git-with-reload root
+        (lambda ()
+          (git-report (git-run root "pull" "--ff-only") "Pulled"))))))
+
+(tm-define (git-push root)
+  (set-message "Pushing..." "Git")
+  (with branch (git-current-branch root)
+    (if (and branch (not (git-status-ref (git-status root) 'upstream))
+             (in? "origin" (git-remotes root)))
+        (git-report (git-run root "push" "--set-upstream" "origin" branch)
+                    "Pushed")
+        (git-report (git-run root "push") "Pushed")))
+  (git-refresh root))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Actions for the Git pages (callable from 'action' tags)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (page-file root-s path)
+  (git-absolute (string-root root-s) path))
+
+(tm-define (git-page-stage root-s path)
+  (:secure #t)
+  (git-stage (page-file root-s path)))
+
+(tm-define (git-page-unstage root-s path)
+  (:secure #t)
+  (git-unstage (page-file root-s path)))
+
+(tm-define (git-page-discard root-s path)
+  (:secure #t)
+  (git-discard (page-file root-s path)))
+
+(tm-define (git-page-compare root-s path rev)
+  (:secure #t)
+  (git-compare-with (page-file root-s path) rev))
+
+(tm-define (git-page-stage-all root-s)
+  (:secure #t)
+  (git-stage-all (string-root root-s)))
+
+(tm-define (git-page-commit root-s)
+  (:secure #t)
+  (git-interactive-commit (string-root root-s)))
+
+(tm-define (git-page-switch root-s branch)
+  (:secure #t)
+  (git-switch-branch (string-root root-s) branch))
+
+(tm-define (git-page-merge root-s branch)
+  (:secure #t)
+  (git-merge-branch (string-root root-s) branch))
+
+(tm-define (git-page-delete-branch root-s branch)
+  (:secure #t)
+  (git-delete-branch (string-root root-s) branch))
+
+(tm-define (git-page-stash-pop root-s name)
+  (:secure #t)
+  (git-stash-pop (string-root root-s) name))
+
+(tm-define (git-page-stash-drop root-s name)
+  (:secure #t)
+  (git-stash-drop (string-root root-s) name))
+
+(tm-define (git-page-refresh root-s)
+  (:secure #t)
+  (git-refresh (string-root root-s)))
+
+(tm-define (git-page-show root-s which)
+  (:secure #t)
+  (git-show-page (string-root root-s) which))
+
+(tm-define (git-page-remote root-s which)
+  (:secure #t)
+  (with root (string-root root-s)
+    (cond ((== which "fetch") (git-fetch root))
+          ((== which "pull") (git-pull root))
+          ((== which "push") (git-push root)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Git pages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
-(tm-define (git-status root)
-  (let* ((cmd (string-append (git-command root) " status --porcelain"))
-         (ret1 (eval-system cmd))
-         (ret2 (string-split ret1 #\newline)))
-    (define (convert name)
-      (let* ((status (string-take name 2))
-             (fname (string-drop name 3))
-             (full (url->string (url-append root fname)))
-             (file (if (or (string-starts? status "A")
-                           (string-starts? status "?"))
-                       fname
-                       ($link full (utf8->cork fname)))))
-        (list status file)))
-    (and (> (length ret2) 0)
-         (string-null? (cAr ret2))
-         (map convert (cDr ret2)))))
-
-(tm-define ($staged-file status file)
-  (cond ((string-starts? status "A")
-         (list 'concat "new file:   " file (list 'new-line)))
-        ((string-starts? status "M")
-         (list 'concat "modified:   " file (list 'new-line)))
-        ((string-starts? status "R")
-         (list 'concat "renamed:    " file (list 'new-line)))
-        (else "")))
-
-(tm-define ($unstaged-file status file)
-  (cond ((string-ends? status "M")
-         (list 'concat "modified:   " file (list 'new-line)))
-        (else "")))
-
-(tm-define ($untracked-file status file)
-  (cond ((== status "??")
-         (list 'concat file (list 'new-line)))
-        (else "")))
-
-(tm-define (git-status-content root)
-  (with s (git-status root)
-    ($generic
-     ($when (not s)
-       "Not git status available!")
-     ($when s
-       ($tmfs-title "Git Status")
-       ($description-long
-         ($describe-item "Changes to be committed"
-           ($for (x s)
-             ($with (status file) x
-               ($staged-file status file))))
-         ($describe-item "Changes not staged for commit"
-           ($for (x s)
-             ($with (status file) x
-               ($unstaged-file status file))))
-         ($describe-item "Untracked files"
-           ($for (x s)
-             ($with (status file) x
-               ($untracked-file status file)))))))))
-
-(tm-define (git-show-status)
+(tm-define (git-show-page root which)
+  (:synopsis "Show the Git page @which (status, log, ...) for @root")
   (cursor-history-add (cursor-path))
-  (revert-buffer-revert (tmfs-url-git (current-git-root) "status")))
+  (git-invalidate root)
+  (revert-buffer-revert (tmfs-url-git root which)))
+
+(tm-define (git-show-status . opt-root)
+  (and-with root (if (null? opt-root) (current-git-root) (car opt-root))
+    (git-show-page root "status")))
+
+(tm-define (git-show-log . opt-root)
+  (and-with root (if (null? opt-root) (current-git-root) (car opt-root))
+    (git-show-page root "log")))
+
+(tm-define (git-show-branches . opt-root)
+  (and-with root (if (null? opt-root) (current-git-root) (car opt-root))
+    (git-show-page root "branches")))
+
+(tm-define (git-show-output . opt-root)
+  (and-with root (if (null? opt-root) (current-git-root) (car opt-root))
+    (git-show-page root "output")))
+
+(define (git-page-menu root)
+  (with r (root-string root)
+    `(concat (with "font-size" "0.84"
+             (concat ,(git-action "Status" "git-page-show" r "status") " | "
+             ,(git-action "Log" "git-page-show" r "log") " | "
+             ,(git-action "Branches" "git-page-show" r "branches") " | "
+             ,(git-action "Output" "git-page-show" r "output") " | "
+             ,(git-action "Refresh" "git-page-refresh" r))))))
+
+(define (git-page root title . body)
+  ;; Items of body are paragraphs, or lists of paragraphs
+  `(document
+     (TeXmacs ,(texmacs-version))
+     (style (tuple "generic"))
+     (body (document (tmfs-title ,title)
+                     ,(git-page-menu root)
+                     ,@(append-map (lambda (x) (if (and (pair? x) (pair? (car x)))
+                                                   x (list x)))
+                                   body)))))
+
+(define (describe-item key body)
+  `(concat (item* ,key) ,body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Log
+;; Status page
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (string->commit-diff root str)
-  (if (string-null? str) '()
-      (with alist (string-split str #\newline)
-        (list (string-take (first alist) 19)
-              (second alist)
-              (third alist)
-              ($link (tmfs-url-commit root (fourth alist))
-                (beautify-git-revision (fourth alist)))))))
+(define (status-code c)
+  (cond ((== c #\M) "modified")
+        ((== c #\A) "new file")
+        ((== c #\D) "deleted")
+        ((== c #\R) "renamed")
+        ((== c #\C) "copied")
+        ((== c #\T) "type change")
+        (else "changed")))
 
-(tm-define (git-log root)
-  (let* ((cmd (string-append
-               (git-command root)
-               " log --pretty=%ai%n%an%n%s%n%H%n"
-               NR_LOG_OPTION))
-         (ret1 (eval-system cmd))
-         (ret2 (string-decompose ret1 "\n\n")))
-    (and (> (length ret2) 0)
-         (string-null? (cAr ret2))
-         (map (cut string->commit-diff root <>) (cDr ret2)))))
+(define (status-file root e)
+  (let* ((path (git-entry-path e))
+         (u (git-absolute root path)))
+    (if (url-exists? u)
+        ($link (url->unix u) ($verbatim (utf8->cork path)))
+        ($verbatim (utf8->cork path)))))
 
-(tm-define (git-log-content root)
-  (with h (git-log root)
-    ($generic
-     ($tmfs-title "Git Log")
-     ($when (not h)
-       "This directory is not under version control.")
-     ($when h
-       ($description-long
-         ($for (x h)
-           ($with (date by msg commit) x
-             ($describe-item
-                 ($inline "Commit " commit " by " (utf8->cork by) " on " date)
-               (utf8->cork msg)))))))))
+(define (status-line root e which)
+  (let* ((r (root-string root))
+         (path (git-entry-path e))
+         (u (git-absolute root path))
+         (code (if (== which 'staged) (git-entry-index e) (git-entry-worktree e)))
+         (desc (cond ((== which 'untracked) "untracked")
+                     ((== which 'conflict) "conflict")
+                     (else (status-code code))))
+         (cmp? (and (git-texmacs-file? u) (url-exists? u)
+                    (!= which 'untracked) (!= code #\A)))
+         (acts (append
+                (if cmp? (list (git-action "compare" "git-page-compare"
+                                           r path "HEAD"))
+                    '())
+                (cond ((== which 'staged)
+                       (list (git-action "unstage" "git-page-unstage" r path)))
+                      ((== which 'conflict)
+                       (list (git-action "mark resolved" "git-page-stage"
+                                         r path)))
+                      ((== which 'untracked)
+                       (list (git-action "add" "git-page-stage" r path)))
+                      (else
+                       (list (git-action "stage" "git-page-stage" r path)
+                             (git-action "discard" "git-page-discard"
+                                         r path)))))))
+    `(concat (with "color" "dark grey" ,desc) (hspace "1em")
+             ,(status-file root e)
+             ,(if (git-entry-orig e)
+                  `(concat " (from " ,($verbatim (utf8->cork (git-entry-orig e)))
+                           ")")
+                  "")
+             (hspace "1em")
+             (with "font-size" "0.84"
+               (concat "[" ,@(list-intersperse acts " | ") "]")))))
+
+(define (list-intersperse l sep)
+  (cond ((or (null? l) (null? (cdr l))) l)
+        (else (cons* (car l) sep (list-intersperse (cdr l) sep)))))
+
+(define (status-section root title l which)
+  (if (null? l) '()
+      (cons `(subsection* ,title)
+            (map (cut status-line root <> which) l))))
+
+(define (status-branch root st)
+  (let* ((head (git-status-ref st 'head))
+         (up (git-status-ref st 'upstream))
+         (ahead (or (git-status-ref st 'ahead) 0))
+         (behind (or (git-status-ref st 'behind) 0))
+         (oid (git-status-ref st 'oid)))
+    `(concat "On branch " (strong ,(utf8->cork (or head "?")))
+             ,(if (and oid (!= oid "(initial)"))
+                  `(concat " at " ,($link (tmfs-url-commit root oid)
+                                     (short-hash oid)))
+                  " (no commits yet)")
+             ,(if up
+                  `(concat ", tracking " ,(utf8->cork up)
+                           ,(if (and (== ahead 0) (== behind 0)) " (up to date)"
+                                `(concat " (" ,(number->string ahead)
+                                         " ahead, " ,(number->string behind)
+                                         " behind)")))
+                  ""))))
+
+(define (git-status-content root)
+  (let* ((st (git-status root))
+         (r (root-string root))
+         (l (or (git-status-ref st 'entries) '()))
+         (conflicts (list-filter l git-entry-conflicted?))
+         (staged (list-filter l git-entry-staged?))
+         (unstaged (list-filter l git-entry-unstaged?))
+         (untracked (list-filter l git-entry-untracked?)))
+    (if (not st)
+        (git-page root "Git status"
+                  "This directory is not a Git working tree.")
+        (apply git-page
+               (append
+                (list root "Git status"
+                      (status-branch root st)
+                      `(concat
+                        ,(git-action "Commit..." "git-page-commit" r) " | "
+                        ,(git-action "Stage all" "git-page-stage-all" r) " | "
+                        ,(git-action "Fetch" "git-page-remote" r "fetch") " | "
+                        ,(git-action "Pull" "git-page-remote" r "pull") " | "
+                        ,(git-action "Push" "git-page-remote" r "push")))
+                (if (null? l) (list "Nothing to commit, working tree clean.")
+                    '())
+                (status-section root "Conflicts" conflicts 'conflict)
+                (status-section root "Changes to be committed" staged 'staged)
+                (status-section root "Changes not staged for commit"
+                                unstaged 'unstaged)
+                (status-section root "Untracked files" untracked
+                                'untracked))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Log page
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (log-item root c)
+  (describe-item
+   `(concat "Commit " (hlink ,(short-hash (git-commit-hash c))
+                             ,(tmfs-url-commit root (git-commit-hash c)))
+            " by " ,(utf8->cork (git-commit-author c))
+            " on " ,(git-commit-date c))
+   (utf8->cork (git-commit-subject c))))
+
+(define (git-log-content root skip)
+  (let* ((n (git-log-length))
+         (h (git-log root skip n))
+         (r (root-string root)))
+    (git-page root "Git log"
+      (if (null? h)
+          "No commits."
+          `(description-long
+            (document ,@(map (cut log-item root <>) h))))
+      (if (< (length h) n) ""
+          (git-action "More..." "git-page-show" r
+                      (string-append "log." (number->string (+ skip n))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Branches page
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (branch-line root b local?)
+  (let* ((r (root-string root))
+         (name (git-branch-name b))
+         (cur? (git-branch-current? b))
+         (up (git-branch-upstream b))
+         (track (git-branch-track b))
+         (acts (cond (cur? '())
+                     (local?
+                      (list (git-action "switch" "git-page-switch" r name)
+                            (git-action "merge into current" "git-page-merge"
+                                        r name)
+                            (git-action "delete" "git-page-delete-branch"
+                                        r name)))
+                     (else
+                      (list (git-action "merge into current" "git-page-merge"
+                                        r name))))))
+    `(concat ,(if cur? `(strong ,(utf8->cork name)) (utf8->cork name))
+             ,(if (!= up "") `(concat " " (with "color" "dark grey"
+                                            ,(utf8->cork (string-append
+                                                          "-> " up " " track))))
+                  "")
+             (hspace "1em")
+             (with "color" "dark grey" ,(fifth b))
+             ,(if (null? acts) ""
+                  `(concat " " (with "font-size" "0.84"
+                                 (concat "[" ,@(list-intersperse acts " | ")
+                                         "]")))))))
+
+(define (stash-line root s)
+  (with r (root-string root)
+    `(concat ,(car s) ": " ,(utf8->cork (cadr s)) (hspace "1em")
+             (with "font-size" "0.84"
+               (concat "[" ,(git-action "pop" "git-page-stash-pop" r (car s))
+                       " | " ,(git-action "drop" "git-page-stash-drop"
+                                          r (car s)) "]")))))
+
+(define (git-branches-content root)
+  (let* ((local (git-branches root))
+         (remote (list-filter (git-remote-branches root)
+                              (lambda (b)
+                                (not (string-ends? (git-branch-name b)
+                                                   "/HEAD")))))
+         (tags (git-tags root))
+         (stashes (git-stashes root)))
+    (git-page root "Git branches"
+      '(subsection* "Local branches")
+      (map (cut branch-line root <> #t) local)
+      '(subsection* "Remote branches")
+      (if (null? remote) "None." (map (cut branch-line root <> #f) remote))
+      '(subsection* "Tags")
+      (if (null? tags) "None."
+          (map (lambda (t) (utf8->cork (git-branch-name t))) tags))
+      '(subsection* "Stashes")
+      (if (null? stashes) "None." (map (cut stash-line root <>) stashes)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Output page
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (verbatim-lines s)
+  (with l (git-split s "\n")
+    (if (null? l) ""
+        `(verbatim (document ,@(map utf8->cork l))))))
+
+(define (output-item x)
+  (with (time dir args ret) x
+    (list `(concat (strong (verbatim ,(utf8->cork (string-recompose
+                                                   (cons "git" args) " "))))
+                   " (exit code " ,(number->string (car ret)) ")")
+          (verbatim-lines (cadr ret))
+          (if (== (caddr ret) "") ""
+              `(with "color" "dark red" ,(verbatim-lines (caddr ret)))))))
+
+(define (git-output-content root)
+  (with l (list-filter (git-command-history)
+                       (lambda (x) (== (cadr x) (root-string root))))
+    (git-page root "Git output"
+      "Most recent Git commands first."
+      (append-map output-item l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Commit page
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (string-repeat str n)
+  (do ((i 1 (1+ i))
+       (ret "" (string-append ret str)))
+      ((> i n) ret)))
+
+(define (diff-bar added removed maxv)
+  (define (len nr)
+    (with ret (if (== maxv 0) 0 (quotient (* nr 40) (max maxv 40)))
+      (if (and (> nr 0) (== ret 0)) 1 ret)))
+  `(concat (with "color" "dark green" ,(string-repeat "+" (len added)))
+           (with "color" "dark red" ,(string-repeat "-" (len removed)))))
+
+(define (commit-file-row root rev parent x)
+  (let* ((added (first x))
+         (removed (second x))
+         (path (third x))
+         (u (git-absolute root path))
+         (r (root-string root))
+         (name ($verbatim (utf8->cork path)))
+         (link ($link (version-revision-url
+                       u (string-append rev ":" (url->tmfs-string u)))
+                 name)))
+    `(row (cell ,(if (and added removed) link name))
+          (cell ,(if (and added removed)
+                     (number->string (+ added removed))
+                     "bin"))
+          (cell ,(if (and added removed)
+                     (diff-bar added removed 40)
+                     ""))
+          (cell ,(if (and parent (git-texmacs-file? u) (url-exists? u))
+                     (git-action "compare with current" "git-page-compare"
+                                 r path rev)
+                     "")))))
+
+(define (git-commit-content root rev)
+  (let* ((c (git-commit-info root rev))
+         (parents (if c (git-commit-parents c) '()))
+         (parent (and (== (length parents) 1) (car parents)))
+         (d (cond ((null? parents) (git-numstat root rev))
+                  (parent (git-numstat root rev parent))
+                  (else '())))
+         (ins (list-fold + 0 (map (lambda (x) (or (first x) 0)) d)))
+         (del (list-fold + 0 (map (lambda (x) (or (second x) 0)) d))))
+    (if (not c)
+        (git-page root "Unknown commit" "")
+        (git-page root (string-append "Commit " (short-hash rev))
+          `(concat "Author: " ,(utf8->cork (git-commit-author c))
+                   ", " ,(git-commit-date c))
+          `(concat ,(if (<= (length parents) 1) "Parent: " "Parents: ")
+                   ,@(if (null? parents) (list "none")
+                         (list-intersperse
+                          (map (lambda (p) ($link (tmfs-url-commit root p)
+                                             (short-hash p)))
+                               parents)
+                          ", ")))
+          (verbatim-lines (git-commit-message root rev))
+          (if (not (or (null? parents) parent))
+              "This is a merge commit."
+              (list
+               `(tabular
+                 (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0pt")
+                          (cwith "1" "-1" "2" "2" "cell-halign" "r")
+                          (table ,@(map (cut commit-file-row root rev parent <>)
+                                        d))))
+               `(concat ,(number->string (length d)) " files changed, "
+                        ,(number->string ins) " insertions("
+                        (with "color" "dark green" "+") "), "
+                        ,(number->string del) " deletions("
+                        (with "color" "dark red" "-") ")")))))))
+
+(tm-define (tmfs-url-commit root rev)
+  (string-append "tmfs://commit/" rev "/" (url->tmfs-string root)))
+
+(tmfs-format-handler (commit name)
+  "texmacs")
+
+(tmfs-title-handler (commit name doc)
+  (let* ((root (tmfs-string->url (tmfs-cdr name)))
+         (rev (tmfs-car name)))
+    (string-append "Commit " (short-hash rev) " - "
+                   (url->system (url-tail root)))))
+
+(tmfs-load-handler (commit name)
+  (let* ((root (tmfs-string->url (tmfs-cdr name)))
+         (rev (tmfs-car name)))
+    (git-commit-content root rev)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The tmfs handlers for Git pages
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (page-skip which)
+  (with n (and (string-starts? which "log.")
+               (string->number (string-drop which 4)))
+    (or n 0)))
 
 (tmfs-title-handler (git name doc)
   (let* ((root (tmfs-string->url (tmfs-cdr name)))
-         (short (url->string (url-tail root)))
+         (short (url->system (url-tail root)))
          (which (tmfs-car name)))
     (cond ((== which "status") (string-append "Git Status - " short))
-          ((== which "log") (string-append "Git Log - " short))
-          (else (string-append "Git (unknown) - " short)))))
+          ((string-starts? which "log") (string-append "Git Log - " short))
+          ((== which "branches") (string-append "Git Branches - " short))
+          ((== which "output") (string-append "Git Output - " short))
+          (else (string-append "Git - " short)))))
 
 (tmfs-load-handler (git name)
   (let* ((root (tmfs-string->url (tmfs-cdr name)))
          (which (tmfs-car name)))
-    (cond ((== which "status")
-           (git-status-content root))
-          ((== which "log")
-           (git-log-content root))
-          (else '()))))
-
-(tm-define (git-show-log)
-  (cursor-history-add (cursor-path))
-  (revert-buffer-revert (tmfs-url-git (current-git-root) "log")))
+    (cond ((== which "status") (git-status-content root))
+          ((string-starts? which "log")
+           (git-log-content root (page-skip which)))
+          ((== which "branches") (git-branches-content root))
+          ((== which "output") (git-output-content root))
+          (else '(document "")))))
