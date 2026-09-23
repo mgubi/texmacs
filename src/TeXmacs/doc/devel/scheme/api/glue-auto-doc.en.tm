@@ -415,7 +415,15 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|async_evaluate_system> which returns
-    <scm|bool>.
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(async-evaluate-cancel <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_cancel> which returns
+    <scm|void>.
   </explain>
 
   <\explain>

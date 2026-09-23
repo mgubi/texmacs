@@ -120,6 +120,8 @@
   ("Tag this version..." (git-interactive-tag (current-git-root)))
   ---
   (with remotes? (nnull? (git-remotes (current-git-root)))
+    (assuming (git-busy? (current-git-root))
+      ("Cancel running command" (git-cancel (current-git-root))))
     (when (and remotes? (not (git-busy? (current-git-root))))
       ("Fetch" (git-fetch (current-git-root)))
       ("Pull" (git-pull (current-git-root)))

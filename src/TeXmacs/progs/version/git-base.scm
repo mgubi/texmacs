@@ -175,9 +175,15 @@
           ((not (spawn-supported?))
            (done (git-result (git-shell-run cmd input))))
           (else
-            (ahash-set! git-busy-table key #t)
-            (when (async-evaluate-system cmd (or input "") done)
-              (done (list -1 "" "Could not start Git")))))))
+            (with id (async-evaluate-system cmd (or input "") done)
+              (if (== id 0)
+                  (done (list -1 "" "Could not start Git"))
+                  (ahash-set! git-busy-table key id)))))))
+
+(tm-define (git-cancel root)
+  (:synopsis "Terminate the asynchronous Git command running for @root")
+  (and-with id (ahash-ref git-busy-table (url->system root))
+    (async-evaluate-cancel id)))
 
 (tm-define (git-ok? ret) (== (car ret) 0))
 (tm-define (git-out ret) (cadr ret))

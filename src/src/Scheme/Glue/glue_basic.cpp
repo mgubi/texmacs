@@ -541,10 +541,23 @@ tmg_async_evaluate_system (tmscm arg1, tmscm arg2, tmscm arg3) {
   object in3= tmscm_to_object (arg3);
 
   // TMSCM_DEFER_INTS;
-  bool out= async_evaluate_system (in1, in2, in3);
+  int out= async_evaluate_system (in1, in2, in3);
   // TMSCM_ALLOW_INTS;
 
-  return bool_to_tmscm (out);
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_async_evaluate_cancel (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "async-evaluate-cancel");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  async_evaluate_cancel (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
 }
 
 tmscm
@@ -11346,6 +11359,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("evaluate-system",  tmg_evaluate_system, 4, 0, 0);
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
+  tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);
   tmscm_install_procedure ("async-http-post",  tmg_async_http_post, 4, 0, 0);

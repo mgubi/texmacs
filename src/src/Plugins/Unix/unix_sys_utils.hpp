@@ -27,6 +27,7 @@ struct unix_process_rep;
 unix_process_rep* unix_system_start (array<string> arg, string input);
 bool unix_system_finished (unix_process_rep* rep,
 			   int& ret, string& out, string& err);
+void unix_system_kill (unix_process_rep* rep);
 
 #endif // defined UNIX_SYS_UTILS_H
 

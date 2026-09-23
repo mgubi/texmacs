@@ -77,6 +77,7 @@
 "evaluate-system"
 "async-eval-system"
 "async-evaluate-system"
+"async-evaluate-cancel"
 "http-post"
 "http-post-query"
 "async-http-post"
