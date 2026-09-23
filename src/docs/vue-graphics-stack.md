@@ -545,7 +545,11 @@ events. The buttons (`menu_button`) fade their hover and press highlight in
 of the main window have different greys and the focus bar, at 232, was so
 close to the highlight of the light theme, 240, that nothing showed on it;
 a bar less than half the theme's own step away from the highlight gets that
-step in the other direction instead. Clay interpolates the four channels of a colour independently, so
+step in the other direction instead. Every element which highlights under
+the pointer passes its own resting colour: the buttons and the pulldowns
+the colour of the bar or the menu they are on, a tab `tab_inactive`, an
+enum `shade[2]`, the items of the choice lists and of the tree view the
+white of a field, on which the highlight of the theme was invisible too. Clay interpolates the four channels of a colour independently, so
 what a flat button shows when it is *not* highlighted is the colour of the
 highlight with a zero alpha (`faded`) and not a transparent black: fading
 to the latter darkened the red, green and blue while the alpha fell, and

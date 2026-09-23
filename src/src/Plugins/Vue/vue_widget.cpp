@@ -187,7 +187,7 @@ theme_color (Clay_Color c) {
 
 // the colours the widgets use; they are the fields of the current theme
 Clay_Color palette[4];
-Clay_Color color_background, color_highlight, color_text, color_border;
+Clay_Color color_background, color_text, color_border;
 Clay_Color color_field, color_button, color_button_hover, color_button_down;
 // The colour behind the buttons being laid out. The bars of the main
 // window have different greys, and the highlight must show on each of them
@@ -204,7 +204,6 @@ static void
 vue_apply_theme () {
   for (int i= 0; i < 4; i++) palette[i]= the_theme.shade[i];
   color_background= the_theme.background;
-  color_highlight= the_theme.highlight;
   color_behind= the_theme.background;
   color_text= the_theme.text;
   color_border= the_theme.border;
@@ -1342,8 +1341,9 @@ layout_pull_button (vue_ui_rep *w) {
       .sizing= s,
       .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
     // flat: the bar or menu behind shows through unless hovered (the bars
-    // of the main window have different greys)
-    .backgroundColor= hot_id == button_id.id ? color_highlight : (Clay_Color) { 0, 0, 0, 0 } })
+    // of the main window have different greys, hence highlight_on)
+    .backgroundColor= hot_id == button_id.id ? highlight_on (color_behind)
+                                             : (Clay_Color) { 0, 0, 0, 0 } })
   {
     // items of vertical menus with check marks reserve their column
     if (!down && menu_has_marks)
@@ -1920,7 +1920,8 @@ vue_ui_rep::do_layout () {
           // the current tab is open at the bottom and merges with the page,
           // the other ones are framed and slightly lower
           Clay_Color bg= cur ? color_background
-                       : ((hot_id == tab_id.id) ? color_highlight : the_theme.tab_inactive);
+                       : ((hot_id == tab_id.id) ? highlight_on (the_theme.tab_inactive)
+                                                : the_theme.tab_inactive);
           Clay_ElementData td= Clay_GetElementData (tab_id);
           CLAY(tab_id, {
             .backgroundColor= bg,
@@ -2355,8 +2356,8 @@ vue_ui_rep::do_layout () {
     Clay_ElementData ed= Clay_GetElementData (enum_id);
     CLAY(enum_id, {
       .layout= { .sizing= sz, .padding= { 8, 8, 4, 4 }, .childGap= 4 },
-      .backgroundColor= (!inert && hot_id == enum_id.id) ? color_highlight
-                                                          : the_theme.shade[2],
+      .backgroundColor= (!inert && hot_id == enum_id.id)
+                          ? highlight_on (the_theme.shade[2]) : the_theme.shade[2],
       .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
     {
       layout_text (d.val, d.st, inert ? dark_grey : black);
@@ -2381,7 +2382,7 @@ vue_ui_rep::do_layout () {
             bool active= (d.vals[i] == d.val);
             CLAY(item_id, {
               .layout= { .padding= { 8, 8, 4, 4 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
-              .backgroundColor= (hot_id == item_id.id) ? color_highlight
+              .backgroundColor= (hot_id == item_id.id) ? highlight_on (color_background)
                                 : (active ? palette[2] : color_background) })
             {
               layout_text (d.vals[i], d.st, black);
@@ -2624,7 +2625,7 @@ vue_ui_rep::do_layout () {
         }
         Clay_Color bg= inert ? color_background : color_field;
         if (active) bg= inert ? the_theme.selection_soft : the_theme.selection;
-        else if (!inert && hot_id == item_id.id) bg= color_highlight;
+        else if (!inert && hot_id == item_id.id) bg= highlight_on (color_field);
         // the items of a mini list are tighter, as in the mini bars
         uint16_t pad_x= (d.style & WIDGET_STYLE_MINI) ? 4 : 8;
         uint16_t pad_y= (d.style & WIDGET_STYLE_MINI) ? 1 : 2;
@@ -2694,7 +2695,7 @@ vue_ui_rep::do_layout () {
           }
           Clay_Color bg= color_field;
           if (active) bg= the_theme.selection;
-          else if (hot_id == item_id.id) bg= color_highlight;
+          else if (hot_id == item_id.id) bg= highlight_on (color_field);
           CLAY(item_id, {
             .layout= { .padding= { 8, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
             .backgroundColor= bg })
@@ -5887,7 +5888,8 @@ vue_tree_view_widget_rep::layout_node (tree t, int depth) {
     }
     CLAY(label_id, {
       .layout= { .padding= { 4, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
-      .backgroundColor= (hot_id == label_id.id) ? color_highlight : color_field })
+      .backgroundColor= (hot_id == label_id.id) ? highlight_on (color_field)
+                                                 : color_field })
     {
       layout_text (node_label (t), 0, black);
     }
