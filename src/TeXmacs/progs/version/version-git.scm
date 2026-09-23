@@ -100,20 +100,27 @@
     (when (git-page? u root)
       (git-reload-buffer u))))
 
+(tm-define (git-watch root)
+  (:synopsis "Modification times of the open documents in @root")
+  (map (lambda (u) (cons u (url-last-modified u))) (git-buffers root)))
+
+(tm-define (git-reload root watch)
+  (:synopsis "Reload the documents in @watch which changed on disk")
+  (for (x watch)
+    (let ((u (car x)) (old (cdr x)))
+      (when (!= (url-last-modified u) old)
+        (if (buffer-modified? u)
+            (set-message `(concat "Modified on disk: "
+                                  (verbatim ,(url->system u)))
+                         "Git")
+            (git-reload-buffer u)))))
+  (git-refresh root))
+
 (tm-define (git-with-reload root thunk)
   (:synopsis "Execute @thunk and reload the documents it changed on disk")
-  (let* ((l (git-buffers root))
-         (stamps (map url-last-modified l))
+  (let* ((watch (git-watch root))
          (ret (thunk)))
-    (for-each (lambda (u old)
-                (when (!= (url-last-modified u) old)
-                  (if (buffer-modified? u)
-                      (set-message `(concat "Modified on disk: "
-                                            (verbatim ,(url->system u)))
-                                   "Git")
-                      (git-reload-buffer u))))
-              l stamps)
-    (git-refresh root)
+    (git-reload root watch)
     ret))
 
 (tm-define (git-when-saved root cont)
@@ -374,28 +381,35 @@
 ;; Remote operations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (git-fetch root)
-  (set-message "Fetching..." "Git")
-  (git-report (git-run root "fetch" "--all" "--prune") "Fetched")
-  (git-refresh root))
+(define (git-remote root what args done)
+  ;; Run a remote command asynchronously, since it may take a long time
+  (if (git-busy? root)
+      (set-message "Please wait for the running Git command" what)
+      (with watch (git-watch root)
+        (set-message (string-append what "...") "Git")
+        (git-run-async root args #f
+          (lambda (ret)
+            (git-report ret what)
+            (git-reload root watch)
+            (when done (done ret)))))))
 
-(tm-define (git-pull root)
+(tm-define (git-fetch root . opt-done)
+  (git-remote root "Fetch" (list "fetch" "--all" "--prune")
+              (and (nnull? opt-done) (car opt-done))))
+
+(tm-define (git-pull root . opt-done)
   (git-when-saved root
     (lambda ()
-      (set-message "Pulling..." "Git")
-      (git-with-reload root
-        (lambda ()
-          (git-report (git-run root "pull" "--ff-only") "Pulled"))))))
+      (git-remote root "Pull" (list "pull" "--ff-only")
+                  (and (nnull? opt-done) (car opt-done))))))
 
-(tm-define (git-push root)
-  (set-message "Pushing..." "Git")
-  (with branch (git-current-branch root)
-    (if (and branch (not (git-status-ref (git-status root) 'upstream))
-             (in? "origin" (git-remotes root)))
-        (git-report (git-run root "push" "--set-upstream" "origin" branch)
-                    "Pushed")
-        (git-report (git-run root "push") "Pushed")))
-  (git-refresh root))
+(tm-define (git-push root . opt-done)
+  (let* ((branch (git-current-branch root))
+         (new? (and branch (not (git-status-ref (git-status root) 'upstream))
+                    (in? "origin" (git-remotes root))))
+         (args (if new? (list "push" "--set-upstream" "origin" branch)
+                   (list "push"))))
+    (git-remote root "Push" args (and (nnull? opt-done) (car opt-done)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Actions for the Git pages (callable from 'action' tags)

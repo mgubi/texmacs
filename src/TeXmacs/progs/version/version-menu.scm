@@ -113,7 +113,7 @@
   ("Tag this version..." (git-interactive-tag (current-git-root)))
   ---
   (with remotes? (nnull? (git-remotes (current-git-root)))
-    (when remotes?
+    (when (and remotes? (not (git-busy? (current-git-root))))
       ("Fetch" (git-fetch (current-git-root)))
       ("Pull" (git-pull (current-git-root)))
       ("Push" (git-push (current-git-root)))))

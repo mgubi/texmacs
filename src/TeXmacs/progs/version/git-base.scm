@@ -29,6 +29,7 @@
 (define nul-char (list->string (list (integer->char 0))))
 (define unit-sep (list->string (list (integer->char 31))))
 (define record-sep (list->string (list (integer->char 30))))
+(define code-sep (list->string (list (integer->char 1))))
 
 (tm-define (git-split s sep)
   (:synopsis "Split @s at each occurrence of @sep, dropping a trailing @sep")
@@ -108,13 +109,40 @@
   (with code (string->number (car ret))
     (list (or code -1) (cadr ret) (caddr ret))))
 
+(define (spawn-supported?)
+  ;; NOTE: evaluate-system is not available for the X11 version
+  (not (x-gui?)))
+
+(define (shell-quote s)
+  (string-append "'" (string-replace s "'" "'\\''") "'"))
+
+(define (git-shell-run cmd input)
+  ;; Fallback via the shell, when evaluate-system is not available
+  (let* ((in (url-temp))
+         (err (url-temp))
+         (sh (string-append "(" (string-recompose (map shell-quote cmd) " ")
+                            " < " (shell-quote (url->system in))
+                            " 2> " (shell-quote (url->system err))
+                            "; printf '\\001%d' $?)")))
+    (string-save (or input "") in)
+    (let* ((out (eval-system sh))
+           (pos (string-search-backwards code-sep (string-length out) out))
+           (msg (if (url-exists? err) (string-load err) "")))
+      (system-remove in)
+      (system-remove err)
+      (if (< pos 0)
+          (list "-1" out msg)
+          (list (substring out (+ pos 1) (string-length out))
+                (substring out 0 pos)
+                msg)))))
+
 (tm-define (git-run-with-input root input . args)
   (:synopsis "Run Git with @args in @root, sending @input to its stdin")
   (git-set-environment)
   (let* ((cmd (git-arguments root args))
-         (ret (if input
-                  (evaluate-system cmd '(0) (list input) '(1 2))
-                  (evaluate-system cmd '() '() '(1 2))))
+         (ret (cond ((not (spawn-supported?)) (git-shell-run cmd input))
+                    (input (evaluate-system cmd '(0) (list input) '(1 2)))
+                    (else (evaluate-system cmd '() '() '(1 2)))))
          (r (git-result ret)))
     (git-remember root args r)
     r))
@@ -122,6 +150,33 @@
 (tm-define (git-run root . args)
   (:synopsis "Run Git with @args in @root and return (code stdout stderr)")
   (apply git-run-with-input (cons* root #f args)))
+
+;; Asynchronous commands, for those which may take a long time.
+;; At most one asynchronous command runs per working tree.
+
+(define git-busy-table (make-ahash-table))
+
+(tm-define (git-busy? root)
+  (:synopsis "Is an asynchronous Git command running for @root?")
+  (nnot (ahash-ref git-busy-table (url->system root))))
+
+(tm-define (git-run-async root args input cont)
+  (:synopsis "Run Git with @args in @root and call @cont with the result")
+  (git-set-environment)
+  (let* ((key (url->system root))
+         (cmd (git-arguments root args))
+         (done (lambda (r)
+                 (ahash-remove! git-busy-table key)
+                 (git-remember root args r)
+                 (cont r))))
+    (cond ((ahash-ref git-busy-table key)
+           (cont (list -1 "" "Another Git command is still running")))
+          ((not (spawn-supported?))
+           (done (git-result (git-shell-run cmd input))))
+          (else
+            (ahash-set! git-busy-table key #t)
+            (when (async-evaluate-system cmd (or input "") done)
+              (done (list -1 "" "Could not start Git")))))))
 
 (tm-define (git-ok? ret) (== (car ret) 0))
 (tm-define (git-out ret) (cadr ret))
