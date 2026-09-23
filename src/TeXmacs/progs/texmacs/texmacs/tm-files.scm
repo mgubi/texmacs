@@ -157,8 +157,13 @@
 (define (has-faithful-format? name)
   (in? (url-suffix name) '("tm" "ts" "tp" "stm" "tmml" "scm" "")))
 
+(tm-define (version-notify-saved name)
+  (:synopsis "Hook for versioning tools, called after saving @name")
+  (noop))
+
 (define (save-buffer-post name opts)
   ;;(display* "save-buffer-post " name "\n")
+  (version-notify-saved name)
   (cond ((in? :update opts)
          (update-buffer name))
         ((in? :commit opts)

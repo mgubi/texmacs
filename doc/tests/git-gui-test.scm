@@ -62,6 +62,17 @@
   (git-refresh (git-root C2))
   (test-clone))
 
+(define (test-save)
+  ;; Saving invalidates the cached status at once
+  (with u (system->url (string-append T "/remote/clone c/doc.tm"))
+    (load-buffer u)
+    (check "clean before save" (== (git-file-state u) 'unmodified))
+    (buffer-set-body u '(document "Edited."))
+    (buffer-pretend-modified u)
+    (save-buffer u)
+    (check "modified after save" (== (git-file-state u) 'modified))
+    (finish)))
+
 (define (test-clone)
   (with dest (string-append T "/remote/clone c")
     (git-clone (string-append T "/remote/origin.git") dest
@@ -72,7 +83,7 @@
         (check "clone is versioned"
                (== (version-tool (system->url (string-append dest "/doc.tm")))
                    "git"))
-        (finish)))))
+        (test-save)))))
 
 ;; Asynchronous remote commands and reloading of open documents
 (define (test-remote)
