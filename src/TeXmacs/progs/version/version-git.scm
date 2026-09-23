@@ -151,6 +151,10 @@
                      what))
     (git-ok? ret)))
 
+(tm-define (version-notify-saved name)
+  (:require (git-root name))
+  (git-refresh (git-root name)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File status
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

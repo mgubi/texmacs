@@ -230,6 +230,8 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
   is no dedicated dialog yet.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
-* The panel does not refresh by itself when you switch documents or save;
-  use its Refresh button. Its look has not been checked visually, since
+* The panel refreshes after git actions and saves (through the
+  `version-notify-saved` hook, called by `save-buffer-post` in
+  `tm-files.scm`), but not when you switch documents; use its Refresh
+  button. Its look has not been checked visually, since
   the tests run offscreen.
