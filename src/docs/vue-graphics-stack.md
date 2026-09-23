@@ -540,7 +540,12 @@ context has a transition in progress (`vue_clay_transitions_active` in
 `clay.c`, the only place where the context structure is visible)
 `transitions_running` keeps the loop drawing, paced at 8 ms and woken by
 events. The buttons (`menu_button`) fade their hover and press highlight in
-120 ms. Clay interpolates the four channels of a colour independently, so
+120 ms. The highlight is taken over the colour behind it (`highlight_on`,
+`color_behind`, set for the contents of a bar by `with_behind`): the bars
+of the main window have different greys and the focus bar, at 232, was so
+close to the highlight of the light theme, 240, that nothing showed on it;
+a bar less than half the theme's own step away from the highlight gets that
+step in the other direction instead. Clay interpolates the four channels of a colour independently, so
 what a flat button shows when it is *not* highlighted is the colour of the
 highlight with a zero alpha (`faded`) and not a transparent black: fading
 to the latter darkened the red, green and blue while the alpha fell, and

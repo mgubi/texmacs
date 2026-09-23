@@ -189,6 +189,15 @@ theme_color (Clay_Color c) {
 Clay_Color palette[4];
 Clay_Color color_background, color_highlight, color_text, color_border;
 Clay_Color color_field, color_button, color_button_hover, color_button_down;
+// The colour behind the buttons being laid out. The bars of the main
+// window have different greys, and the highlight must show on each of them
+// (see highlight_on); with_behind sets it for the contents of a bar.
+Clay_Color color_behind;
+struct with_behind {
+  Clay_Color saved;
+  with_behind (Clay_Color c) : saved (color_behind) { color_behind= c; }
+  ~with_behind () { color_behind= saved; }
+};
 Clay_Color color_pressed;
 
 static void
@@ -196,6 +205,7 @@ vue_apply_theme () {
   for (int i= 0; i < 4; i++) palette[i]= the_theme.shade[i];
   color_background= the_theme.background;
   color_highlight= the_theme.highlight;
+  color_behind= the_theme.background;
   color_text= the_theme.text;
   color_border= the_theme.border;
   color_field= the_theme.field;
@@ -203,6 +213,31 @@ vue_apply_theme () {
   color_button_hover= the_theme.button_hover;
   color_button_down= the_theme.button_down;
   color_pressed= the_theme.pressed;
+}
+
+static float
+clamp_channel (float v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+
+// The highlight of a flat button, over the colour behind it. The focus bar
+// is nearly as light as the highlight of the light theme, on which it did
+// not show at all. When the colour behind is that close to the highlight
+// -- less than half the step the theme itself takes on its own background
+// -- that step is taken in the other direction instead, so that the
+// highlight is as far from its bar as it is from the background of the
+// theme. The bars which are far enough keep the colour of the theme.
+static Clay_Color
+highlight_on (Clay_Color bg) {
+  Clay_Color h= the_theme.highlight, b= the_theme.background;
+  float dr= h.r - b.r, dg= h.g - b.g, db= h.b - b.b;
+  float step= fabsf (dr);
+  if (fabsf (dg) > step) step= fabsf (dg);
+  if (fabsf (db) > step) step= fabsf (db);
+  float dist= fabsf (h.r - bg.r);
+  if (fabsf (h.g - bg.g) > dist) dist= fabsf (h.g - bg.g);
+  if (fabsf (h.b - bg.b) > dist) dist= fabsf (h.b - bg.b);
+  if (2 * dist >= step) return h;
+  return (Clay_Color) { clamp_channel (bg.r - dr), clamp_channel (bg.g - dg),
+                        clamp_channel (bg.b - db), h.a };
 }
 
 // The background which a flat element shows when it is not highlighted.
@@ -2014,7 +2049,8 @@ vue_ui_rep::do_layout () {
     }
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
     if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
-    Clay_Color bg= faded (color_highlight); // flat buttons show their container
+    Clay_Color hl= highlight_on (color_behind); // shows on the bar behind
+    Clay_Color bg= faded (hl); // flat buttons show their container
     Clay_Padding padding= swatch ? CLAY_PADDING_ALL(2) : CLAY_PADDING_ALL(5);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(4);
     Clay_BorderElementConfig border= {};
@@ -2050,7 +2086,7 @@ vue_ui_rep::do_layout () {
       else if (hot) bg= { 220, 220, 220, 255 };
     }
     else if (down || pressed) bg= color_pressed;
-    else if (hot) bg= color_highlight;
+    else if (hot) bg= hl;
     Clay_ElementData bd= Clay_GetElementData (button_id);
     CLAY(button_id, {
       .layout= {
@@ -4219,6 +4255,7 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
                                 : (from == 2) ? slide_from_bottom : slide_from_right,
                 .trigger= CLAY_TRANSITION_ENTER_SKIP_ON_FIRST_PARENT_FRAME }}})
   {
+    with_behind b (palette[2]);
     tools->do_layout ();
   }
   Clay_ScrollContainerData sd= Clay_GetScrollContainerData (id);
@@ -4292,6 +4329,7 @@ void vue_texmacs_widget_rep::do_layout () {
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (mode_icons)) {
+        with_behind b (the_theme.bar_mode);
         mode_icons->do_layout ();
       }
     }
@@ -4306,6 +4344,7 @@ void vue_texmacs_widget_rep::do_layout () {
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
       if (!is_nil (focus_icons)) {
+        with_behind b (the_theme.bar_focus);
         focus_icons->do_layout ();
       }
     }
@@ -4322,6 +4361,7 @@ void vue_texmacs_widget_rep::do_layout () {
         .backgroundColor= the_theme.bar_focus,
         .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
       {
+        with_behind b (the_theme.bar_focus);
         user_icons->do_layout ();
       }
     // the middle row: left tools, the editor and the side tools
