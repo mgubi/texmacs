@@ -217,26 +217,38 @@ vue_apply_theme () {
 static float
 clamp_channel (float v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
 
-// The highlight of a flat button, over the colour behind it. The focus bar
-// is nearly as light as the highlight of the light theme, on which it did
-// not show at all. When the colour behind is that close to the highlight
-// -- less than half the step the theme itself takes on its own background
-// -- that step is taken in the other direction instead, so that the
-// highlight is as far from its bar as it is from the background of the
-// theme. The bars which are far enough keep the colour of the theme.
+// The highlight of a flat element, over the colour it rests on. The theme
+// gives one colour, a step away from its own background -- the light theme
+// lightens 192 to 240 -- and that colour is used wherever it shows, which
+// is anything half a step or more away from it. The focus bar, at 232, is
+// not: there the step is taken from the bar itself instead of from the
+// background of the theme, and only half of it, since a highlight which is
+// merely lighter than a light bar needs no more; that keeps the direction
+// of the theme, so hovering lightens everywhere it can. Only where there
+// is no room left for it, a field which is already almost white, does the
+// step go the other way.
+static float
+channel_gap (Clay_Color a, Clay_Color b) {
+  float g= fabsf (a.r - b.r);
+  if (fabsf (a.g - b.g) > g) g= fabsf (a.g - b.g);
+  if (fabsf (a.b - b.b) > g) g= fabsf (a.b - b.b);
+  return g;
+}
+
 static Clay_Color
 highlight_on (Clay_Color bg) {
   Clay_Color h= the_theme.highlight, b= the_theme.background;
   float dr= h.r - b.r, dg= h.g - b.g, db= h.b - b.b;
-  float step= fabsf (dr);
-  if (fabsf (dg) > step) step= fabsf (dg);
-  if (fabsf (db) > step) step= fabsf (db);
-  float dist= fabsf (h.r - bg.r);
-  if (fabsf (h.g - bg.g) > dist) dist= fabsf (h.g - bg.g);
-  if (fabsf (h.b - bg.b) > dist) dist= fabsf (h.b - bg.b);
-  if (2 * dist >= step) return h;
-  return (Clay_Color) { clamp_channel (bg.r - dr), clamp_channel (bg.g - dg),
-                        clamp_channel (bg.b - db), h.a };
+  float step= channel_gap (h, b);
+  if (step <= 0) return h;
+  float sep= step / 2;                   // enough of a difference to see
+  if (channel_gap (h, bg) >= sep) return h;
+  float k= sep / step;                   // half a step, in the same direction
+  Clay_Color up= { clamp_channel (bg.r + k * dr), clamp_channel (bg.g + k * dg),
+                   clamp_channel (bg.b + k * db), h.a };
+  if (channel_gap (up, bg) >= 0.75f * sep) return up;
+  return (Clay_Color) { clamp_channel (bg.r - k * dr), clamp_channel (bg.g - k * dg),
+                        clamp_channel (bg.b - k * db), h.a };
 }
 
 // The background which a flat element shows when it is not highlighted.

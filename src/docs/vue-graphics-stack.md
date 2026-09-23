@@ -543,9 +543,13 @@ events. The buttons (`menu_button`) fade their hover and press highlight in
 120 ms. The highlight is taken over the colour behind it (`highlight_on`,
 `color_behind`, set for the contents of a bar by `with_behind`): the bars
 of the main window have different greys and the focus bar, at 232, was so
-close to the highlight of the light theme, 240, that nothing showed on it;
-a bar less than half the theme's own step away from the highlight gets that
-step in the other direction instead. Every element which highlights under
+close to the highlight of the light theme, 240, that nothing showed on it.
+The theme's colour is used wherever it is half its own step or more away
+from the colour behind; where it is not, the step is taken from that colour
+instead and only half of it, in the direction the theme takes (232 gives
+white, 224 gives 248), since a highlight which is merely lighter than an
+already light bar needs no more. Only where there is no room left for it,
+a field which is almost white, does it go the other way (250 gives 226). Every element which highlights under
 the pointer passes its own resting colour: the buttons and the pulldowns
 the colour of the bar or the menu they are on, a tab `tab_inactive`, an
 enum `shade[2]`, the items of the choice lists and of the tree view the
