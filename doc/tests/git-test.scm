@@ -134,6 +134,23 @@
 (merge-check "delete versus edit" '(document "A." "B." "C.")
              '(document "A." "C.") '(document "A." "B!" "C.") #f 1)
 
+;; Merge driver: Git merges TeXmacs documents with TeXmacs
+(use-modules (version git-drivers))
+(define DR (system->url (string-append (getenv "GIT_TEST_DIR") "/drv")))
+(define DP (url-append DR "paper.tm"))
+(git-install-merge-driver DR)
+(check "driver installed" (git-merge-driver-installed? DR))
+(git-stage (url-append DR ".gitattributes"))
+(git-commit-staged DR "attributes")
+(git-merge-branch DR "theirs")
+(check "driver merge clean" (== (git-file-state DP) 'unmodified))
+(check "driver merged both" (string-contains? (string-load DP)
+                                              "The slow brown fox leaps."))
+(git-merge-branch DR "conflict")
+(check "driver conflict" (== (git-file-state DP) 'conflicted))
+(check "driver markup" (string-contains? (string-load DP) "<version-both|"))
+(git-run DR "merge" "--abort")
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

@@ -14,7 +14,8 @@
 (texmacs-module (version version-menu)
   (:use (version version-compare)
         (version version-tmfs)
-        (version git-widgets)))
+        (version git-widgets)
+        (version git-drivers)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compare with other revision
@@ -127,6 +128,9 @@
   (when (nnull? (git-stashes (current-git-root)))
     ("Restore last stash" (git-stash-pop (current-git-root))))
   ---
+  (when (not (git-merge-driver-installed? (current-git-root)))
+    ("Merge documents structurally"
+     (git-install-merge-driver (current-git-root))))
   ("Git output" (git-show-output))
   ("Refresh" (begin (version-tool-reset) (git-refresh (current-git-root)))))
 

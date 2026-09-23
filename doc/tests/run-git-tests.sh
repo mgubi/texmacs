@@ -30,6 +30,23 @@ if test $gui = no; then
     git add base.txt
     git commit -q -m base
     git worktree add -q "$dir/wt test" -b wt
+    # a repository for the merge driver
+    rm -rf "$dir/drv" && mkdir -p "$dir/drv" && cd "$dir/drv" || exit 1
+    git init -q -b main
+    git config user.email test@example.com
+    git config user.name "Test User"
+    tm "The quick brown fox jumps." > paper.tm
+    git add paper.tm
+    git commit -q -m base
+    git checkout -q -b theirs
+    tm "The quick brown fox leaps." > paper.tm
+    git commit -q -a -m theirs
+    git checkout -q -b conflict
+    tm "The fast brown fox leaps." > paper.tm
+    git commit -q -a -m conflict
+    git checkout -q main
+    tm "The slow brown fox jumps." > paper.tm
+    git commit -q -a -m ours
   )
   test=git-test.scm
   opts=-headless

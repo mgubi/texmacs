@@ -10,6 +10,7 @@ The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2
 | `version-tmfs.scm` | git-base | The generic VCS API. It uses `git-root` for detection (`git-active?`) and adds `version-tool-reset`. |
 | `version-git.scm` | version-tmfs, version-compare, git-base | The git backend (`version-*` overloads), the file and repository actions, the `tmfs://git/...` and `tmfs://commit/...` pages, and the `:secure` page actions. |
 | `version-merge.scm` | version-compare | Structured 3-way merge of documents (`merge-versions`). |
+| `git-drivers.scm` | version-merge, git-base | The git merge driver (`git-merge-driver`, loaded lazily) and its installation in a repository. |
 | `git-widgets.scm` | version-git | The commit dialog and the interactive prompts for branch, tag and init. |
 | `version-menu.scm` | git-widgets | `git-file-menu`, `git-repository-menu`, `git-compare-menu`, and the entry points in `version-menu`. |
 
@@ -167,6 +168,26 @@ a side for each, with the usual Version menu actions and shortcuts.
 `git-mark-resolved` warns if any `version-*` markup is left, saves the
 file, and stages it.
 
+## Merge driver
+
+"Git → Merge documents structurally" (`git-install-merge-driver`) does
+two things:
+
+* It sets `merge.texmacs.driver` in the repository's local config to
+  `TEXMACS_PATH=... <texmacs> -headless -x '(git-merge-driver "%O" "%A"
+  "%B")' > /dev/null 2>&1`. The executable is `$TEXMACS_PATH/bin/texmacs.bin`
+  or, in a macOS bundle, `Contents/MacOS/TeXmacs`.
+* It adds `*.tm merge=texmacs` to `.gitattributes`. Collaborators who
+  haven't configured the driver get git's usual text merge.
+
+`git-merge-driver` loads the three documents, runs `merge-versions` on
+their bodies, and writes the result into `%A` (ours, keeping our
+preamble). It exits with 0 if no conflict remains and 1 otherwise, so git
+reports the conflict. The conflicted file then holds `version-both` markup
+instead of `<<<<<<<` markers: TeXmacs can open it and resolve it directly,
+and "Resolve conflict" also still works. Starting TeXmacs headless costs
+about a second per merged document.
+
 ## Testing
 
 `doc/tests/run-git-tests.sh [dir]` builds a repository whose path contains
@@ -187,8 +208,8 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 
 ## Known gaps
 
-* The git merge and diff drivers, which would do the structured merge from
-  the command line as well, are still to do.
+* The textconv diff driver for readable `git diff` of `.tm` files is still
+  to do.
 * A running asynchronous command cannot be cancelled.
 * Clone is not implemented. Init is available from the Version menu for
   documents outside any repository.

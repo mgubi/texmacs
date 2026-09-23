@@ -179,3 +179,19 @@
   (cond ((npair? t) 0)
         ((tm-in? t '(version-both version-old version-new)) 1)
         (else (apply + (map merge-conflicts (cdr t))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Bodies of documents
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (document-body doc)
+  (:synopsis "The body of the complete document @doc (an stree), or #f")
+  (and (tm-is? doc 'document)
+       (and-with b (list-find (cdr doc) (cut tm-func? <> 'body 1))
+         (cadr b))))
+
+(tm-define (document-set-body doc body)
+  (:synopsis "The complete document @doc with its body replaced by @body")
+  (cons 'document
+        (map (lambda (x) (if (tm-func? x 'body 1) `(body ,body) x))
+             (cdr doc))))
