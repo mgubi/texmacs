@@ -329,6 +329,106 @@ unix_system (array<string> arg,
   return WEXITSTATUS(status);
 }
 
+/******************************************************************************
+* Asynchronous evaluation via standard input, output and error
+******************************************************************************/
+
+struct unix_process_rep {
+  pid_t     pid;
+  bool      has_in;
+  _channel  in, out, err;
+  pthread_t th_in, th_out, th_err;
+};
+
+static void
+_close_fds (int* fd, int n) {
+  for (int i= 0; i < n; i++) close (fd[i]);
+}
+
+unix_process_rep*
+unix_system_start (array<string> arg, string input) {
+  // Start the command arg[0] with arguments arg[i], i >= 1, send input
+  // to its standard input and collect its standard output and error.
+  // Returns NULL on failure; use unix_system_finished to wait for the end.
+  if (N(arg) == 0) return NULL;
+  int fd[6];
+  if (pipe (fd) != 0) return NULL;
+  if (pipe (fd + 2) != 0) { _close_fds (fd, 2); return NULL; }
+  if (pipe (fd + 4) != 0) { _close_fds (fd, 4); return NULL; }
+  // the ends of the parent should not leak into other child processes
+  fcntl (fd[1], F_SETFD, FD_CLOEXEC);
+  fcntl (fd[2], F_SETFD, FD_CLOEXEC);
+  fcntl (fd[4], F_SETFD, FD_CLOEXEC);
+  _file_actions_t file_actions;
+  bool ok= file_actions.status () == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[0], 0) == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[3], 1) == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[5], 2) == 0;
+  for (int i= 0; i < 6; i++)
+    ok= ok && posix_spawn_file_actions_addclose (&file_actions.rep, fd[i]) == 0;
+  if (!ok) { _close_fds (fd, 6); return NULL; }
+
+  array<char*> _arg;
+  for (int j= 0; j < N(arg); j++)
+    _arg << as_charp (arg[j]);
+  _arg << (char*) NULL;
+  pid_t pid;
+  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, NULL,
+			    A(_arg), environ);
+  for (int j= 0; j < N(arg); j++)
+    tm_delete_array (_arg[j]);
+  if (status != 0) {
+    if (DEBUG_IO) debug_io << "unix_system_start, failed " << arg << "\n";
+    _close_fds (fd, 6);
+    return NULL;
+  }
+  if (DEBUG_IO)
+    debug_io << "unix_system_start, pid " << pid << ": " << arg << "\n";
+  close (fd[0]); close (fd[3]); close (fd[5]);
+
+  // the threads close the remaining file descriptors when they are done
+  unix_process_rep* rep= tm_new<unix_process_rep> ();
+  rep->pid= pid;
+  rep->has_in= N(input) > 0;
+  rep->out._init_out (fd[2], 1 << 12);
+  rep->err._init_out (fd[4], 1 << 12);
+  if (rep->has_in) {
+    rep->in._init_in (fd[1], input, 1 << 12);
+    if (pthread_create (&rep->th_in, NULL, _background_write_task,
+			(void*) &(rep->in)))
+      { close (fd[1]); rep->has_in= false; }
+  }
+  else close (fd[1]);
+  pthread_create (&rep->th_out, NULL, _background_read_task,
+		  (void*) &(rep->out));
+  pthread_create (&rep->th_err, NULL, _background_read_task,
+		  (void*) &(rep->err));
+  return rep;
+}
+
+bool
+unix_system_finished (unix_process_rep* rep,
+		      int& ret, string& out, string& err) {
+  // Check whether the process has terminated; if so, then retrieve
+  // its exit code and output, and release rep.
+  int status;
+  pid_t wret= waitpid (rep->pid, &status, WNOHANG);
+  if (wret == 0) return false;
+  void* exit_status;
+  if (rep->has_in) pthread_join (rep->th_in, &exit_status);
+  pthread_join (rep->th_out, &exit_status);
+  pthread_join (rep->th_err, &exit_status);
+  out= string (rep->out.data.a, rep->out.data.n);
+  err= string (rep->err.data.a, rep->err.data.n);
+  if (wret < 0 || WIFEXITED (status) == 0) ret= -1;
+  else ret= WEXITSTATUS (status);
+  if (DEBUG_IO)
+    debug_io << "unix_system_finished, pid " << rep->pid
+	     << " exited with " << ret << "\n";
+  tm_delete<unix_process_rep> (rep);
+  return true;
+}
+
 #else
 
 int
@@ -337,6 +437,19 @@ unix_system (array<string> arg,
 	     array<int> fd_out, array<string*> str_out) {
   (void) arg; (void) fd_in; (void) str_in; (void) fd_out; (void) str_out;
   FAILED ("unsupported system call");
+}
+
+unix_process_rep*
+unix_system_start (array<string> arg, string input) {
+  (void) arg; (void) input;
+  return NULL;
+}
+
+bool
+unix_system_finished (unix_process_rep* rep,
+		      int& ret, string& out, string& err) {
+  (void) rep; ret= -1; out= ""; err= "";
+  return true;
 }
 
 #endif

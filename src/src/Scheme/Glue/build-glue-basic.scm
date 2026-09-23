@@ -67,6 +67,8 @@
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
   (async-eval-system async_eval_system (bool string object))
+  (async-evaluate-system async_evaluate_system
+    (bool array_string string object))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))
