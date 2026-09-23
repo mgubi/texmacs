@@ -86,14 +86,24 @@ struct vue_input_state {
   int    mouse_x, mouse_y;
   array<double> mouse_data;
   int    mouse_ticket; // for the "drop" action: the key of its payload
-  // kinetic scrolling (see wheel_inertia_step in vue_gui.cpp): the speed
-  // of the wheel estimated from its events, the velocity of the glide after
-  // they stop (wheel units per ms), the times of the last step and event
+  // kinetic scrolling (see wheel_step in vue_gui.cpp): the speed of the
+  // wheel estimated from its events, the velocity of the glide after they
+  // stop (device pixels per ms), the times of the last step and event
   double wheel_est_x, wheel_est_y;
   double wheel_vx, wheel_vy;
   time_t wheel_time;
   time_t wheel_event_time;
+  uint64_t wheel_stamp;    // SDL timestamp of the last wheel event (ns): the
+                           // events of a frame are handled together, so the
+                           // clock does not tell them apart (see wheel_event)
   bool   wheel_precise;    // the stream has fractional deltas (a trackpad)
+  bool   wheel_ambiguous;  // the stream opened with whole deltas: a notch?
+  // the distance a wheel notch has still to travel (device pixels), the
+  // time of the last step of that travel, and the excess which an opening
+  // notch would have scrolled if it turns out to come from a trackpad
+  double wheel_pend_x, wheel_pend_y;
+  double wheel_over_x, wheel_over_y;
+  time_t wheel_smooth_time;
   // popups and balloons
   bool current_popup;      // is there an active popup?
   bool cancel_popup;       // should we cancel popups?
@@ -111,7 +121,10 @@ struct vue_input_state {
     : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
       mouse_ticket (0),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
-      wheel_time (0), wheel_event_time (0), wheel_precise (false),
+      wheel_time (0), wheel_event_time (0), wheel_stamp (0),
+      wheel_precise (false),
+      wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
+      wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
       current_popup (false), cancel_popup (false), away_time (0),
       current_balloon (0), balloon_time (0),
       hot_id (0), active_id (0), active_button (0), last_id {},

@@ -1,4 +1,4 @@
-# needs wheel-inertia.scm (a long document): scrolling shifts the backing
+# needs wheel-travel.scm (a long document): scrolling shifts the backing
 # store and repaints only the exposed strips; the result must be identical
 # to a repaint from scratch (s1 = s2), also after scrolling back (s3 = s4)
 wait 7000

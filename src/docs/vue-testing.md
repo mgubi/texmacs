@@ -138,7 +138,7 @@ callback output.
 | `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
 | `pattern` | paper mode and glyphs filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns |
 | `wheel` | scrolling with the wheel, then a balloon from a hovered toolbar button |
-| `wheel-inertia` | a single wheel step scrolls in sync (snapshots i0, i1 and i2 identical) while three quick steps launch a glide. Needs `-debug-events`: the `handling wheel` lines after i3 are the synthetic decaying deltas |
+| `wheel-travel` | a wheel notch is travelled over some twenty frames rather than jumped (i0, 30 ms in, has moved much less than i1) and several notches add up (i2); a swipe which opens with a whole delta scrolls the ten points of a unit and not the eighty of a notch. Needs `-debug-events`: the checks are on the deltas of the `handling wheel` lines, see the script |
 | `scroll-shift` | scrolling shifts the backing store: the snapshots before and after a `repaint` must be identical in the editor area |
 | `balloon` | the help balloon of a menu item: near the pointer, above everything, not clipped by the menu and not covering the next item |
 | `styles` | the widget styles side by side, to compare with the Qt port: bold, mini, monospaced, grey, inert and centered |

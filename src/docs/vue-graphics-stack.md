@@ -333,10 +333,18 @@ must not claim that slot, since it belongs to the chain of the menu it is
 in and would close its own parent. Menus flip to the other side of their button or shift to stay in
 the window, are at most as tall as the window and scroll.
 
-* **Kinetic scrolling** (`vue_gui.cpp`, `wheel_event`,
-  `wheel_inertia_step`): wheel events scroll at once (a slowly turned wheel
-  moves the view in sync) while the speed of the wheel is estimated from
-  them (`vue_input_state::wheel_est_x/y`, device pixels per ms, smoothed).
+* **Scrolling with the wheel** (`vue_gui.cpp`, `wheel_event`,
+  `wheel_step`): a trackpad and a mouse wheel ask for different things and
+  are answered differently. A swipe *drags* the view: its events carry the
+  displacement of the fingers and are applied at once, so the page follows
+  them. A notch *asks for a distance*: that distance is not jumped but
+  travelled over the next few frames (`wheel_pend_x/y`, decaying with
+  `wheel_smooth_tau`, 45 ms), which is what the native applications do and
+  what makes a notch read as a movement rather than as a cut; several
+  notches add up, so a wheel which is spun scrolls continuously and comes to
+  rest shortly after the last notch. That travel replaced a glide launched
+  from the estimated speed of the wheel, which went on after the wheel had
+  stopped and read as the view running away.
   **Units**: SDL reports the deltas in "lines"; `wheel_event` converts them
   to device pixels — 10 points per unit for a precise (trackpad) stream,
   which is a tenth of the finger's displacement on macOS, so the page
@@ -348,29 +356,41 @@ the window, are at most as tall as the window and scroll.
   `/10`). The former mapping scaled a unit to a percentage of the viewport,
   so the page moved faster or slower than the finger depending on the
   window size.
-  When no event has come for `wheel_stream_dt` (30 ms) and the speed is
-  above `wheel_launch_speed` (1 px/ms), the view goes on with that velocity
-  (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
-  deltas every frame (`push_wheel`: `mouse_action= "wheel"` for the widgets
-  plus `Clay_UpdateScrollContainers` for the Clay container under the
-  pointer); a new event stops the glide. **Trackpads**: SDL reports their
-  gestures as wheel events with fractional ("precise") deltas and no phase,
-  so fingers which pause cannot be told from fingers which are lifted. On
-  macOS the system computes the momentum itself and, with the hint
+  **Telling the two apart**: SDL keeps no trace of which device sent an
+  event (`hasPreciseScrollingDeltas` is lost in the Cocoa backend, which
+  only rounds the deltas of a device without it), so the fractions are the
+  signal: a fractional delta is a trackpad (`wheel_precise`, sticky for the
+  stream). Whole deltas are ambiguous — a swipe can open on one, and eight
+  times too much would then be scrolled — so a second event which follows
+  the opening one within `wheel_burst_dt` (16 ms), too soon for a wheel to
+  have turned twice from rest, also means a trackpad. Until that is
+  settled, the opening notch travels no further than a swipe would have
+  (`wheel_over_x/y`, the excess), so the correction takes nothing back and
+  the view never springs. The intervals are measured on the timestamps SDL
+  gives the events (`wheel_stamp`, ns), not on the clock: the events queued
+  during a frame are all handled at the end of it and the clock would report
+  them as simultaneous.
+  **Trackpads**: SDL reports their gestures without a phase, so fingers
+  which pause cannot be told from fingers which are lifted. On macOS the
+  system computes the momentum itself and, with the hint
   `SDL_HINT_MAC_SCROLL_MOMENTUM` set before `SDL_Init` (SDL drops these
   events by default), sends it as a stream of wheel events after the fingers
   are lifted: the view follows the fingers exactly while they are down and
-  the system glide after; a precise stream (`wheel_precise`, sticky for the
-  stream) starts no glide of ours there (`wheel_system_momentum`), only the
-  integer ticks of a mouse wheel do. Elsewhere the wheel model applies to
-  trackpads too. **Pacing**: a frame costs more than the interval between
+  the system glide after. Where the system does not do it
+  (`wheel_system_momentum` is false), the speed of the fingers is estimated
+  from the events (`wheel_est_x/y`, device pixels per ms, smoothed) and,
+  when no event has come for `wheel_stream_dt` (30 ms) and that speed is
+  above `wheel_launch_speed` (1 px/ms), the view goes on with it
+  (`wheel_vx/vy`) decaying with `wheel_tau` (350 ms), as synthetic wheel
+  deltas every frame; a new event stops the glide.
+  **Pacing**: a frame costs more than the interval between
   the events of a trackpad, so the loop handles all the wheel and motion
   events already queued in the same frame (their deltas add up in
   `push_wheel`) instead of one event per frame, which lagged behind the
   fingers and made the motion jerky. The editor keeps the fractional SI
-  remainder of the small steps (`scroll_rest_x/y`). While a view glides the
-  loop paces itself at 5 ms (`SDL_WaitEventTimeout`), so any event wakes it
-  at once.
+  remainder of the small steps (`scroll_rest_x/y`). While a view moves by
+  itself the loop paces itself at 5 ms (`SDL_WaitEventTimeout`), so any
+  event wakes it at once.
 
 ## Icons
 
@@ -600,7 +620,7 @@ behaviour. Feature status against those two:
   (the window surface is BGR, pictures RGB) which took most of a frame
   while scrolling: the frame interval of a 1400×900 window went from
   22–35 ms to 13–20 ms (profiles with `sample` during
-  `wheel-inertia.scm` + a script of 300 wheel steps). Pattern fills,
+  `wheel-travel.scm` + a script of 300 wheel steps). Pattern fills,
   rounded corners, arcs and text still go through MuPDF; what remains of a
   frame is the editor repaint (`clear_device` tiles, glyphs), the blit and
   `SDL_UpdateWindowSurface`;

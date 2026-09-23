@@ -11,6 +11,9 @@ TODO
   and the background images of the Qt picker are not implemented. The
   colour menus do not reach it at all: they route on (qt-gui?) and fall
   back to the Scheme rgb picker, which is richer, so this is not urgent
+* the wheel always scrolls the view: wheel-capture? is not asked, so the
+  wheel does not pan a graphic (edit_graphics.cpp calls graphics-wheel for
+  it), and control-wheel does not zoom as it does in the Qt port
 * resize_widget ignores the initial scrolling position (hpos, vpos), and
   user_canvas_widget ignores its style
 * no image previsualizer in the file chooser (the native dialog has none)
@@ -107,11 +110,14 @@ DONE
 * tab/shift-tab move the focus between the inputs of a dialog
 * balloons follow the pointer, as the tooltips of the Qt port do: attached
   below their widget they covered the next item of a menu (test balloon)
-* kinetic scrolling: wheel events scroll in sync, a launched wheel makes the
-  view glide with a decaying velocity (editors and Clay containers); on
-  macOS the trackpad gestures drag while the fingers are down and glide
-  with the momentum of the system (SDL_HINT_MAC_SCROLL_MOMENTUM); the
-  queued wheel/motion events of a frame are handled together
+* scrolling with the wheel (test wheel-travel): a swipe drags the view in
+  sync while a notch asks for a distance, which is travelled over the next
+  frames instead of jumped (editors and Clay containers); the two are told
+  apart by the fractions of the deltas and, when a swipe opens on a whole
+  one, by the interval to the next event; on macOS the trackpad gestures
+  glide with the momentum of the system (SDL_HINT_MAC_SCROLL_MOMENTUM),
+  elsewhere with one of ours; the queued wheel/motion events of a frame
+  are handled together
 * editors are told when their window gains/loses the keyboard focus and when
   the focus moves to another widget (set_kbd_focus)
 * menus and popups stay on the screen (flip, shift, clamp)

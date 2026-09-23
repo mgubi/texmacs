@@ -1313,27 +1313,43 @@ void process_redraw ();
 bool gui_wait=  false;
 
 /******************************************************************************
-* Kinetic scrolling
+* Scrolling with the wheel
 *
-* Wheel events scroll at once, so that a wheel which is turned slowly moves
-* the view in sync. Meanwhile the speed of the wheel is estimated from the
-* events; when they stop while the wheel was "launched" (speed above
-* wheel_launch_speed), the view goes on with that velocity, decaying
-* exponentially with time constant wheel_tau, through synthetic wheel deltas.
+* A trackpad drags the view: its events carry the displacement of the
+* fingers and are applied at once, so the page follows them exactly. A
+* mouse wheel does not drag anything, it asks for a fixed distance: that
+* distance is not jumped but travelled over the next few frames (decaying
+* with the time constant wheel_smooth_tau), which is what the native
+* applications do and what makes a notch read as a movement rather than as
+* a cut. Several notches add up, so a wheel which is spun scrolls
+* continuously and comes to rest shortly after the last notch.
 *
-* Trackpads: SDL reports the gestures as wheel events with fractional
-* ("precise") deltas and no phase, so we cannot tell fingers which pause
+* Telling the two apart: SDL does not report which device sent an event
+* (hasPreciseScrollingDeltas is lost on the way), only the deltas, in
+* "lines". A trackpad gives a tenth of the displacement of the fingers in
+* points, hence wheel_precise_step, and its deltas are fractional; a notch
+* is one whole unit. Whole deltas are therefore ambiguous, and the first
+* event of a stream may be taken for a notch when it opens a fast swipe:
+* the next event settles it, by its fraction or by following within
+* wheel_burst_dt, and since a notch is travelled and not jumped the excess
+* can still be taken back (wheel_over_x/y) before it has all been applied.
+*
+* A trackpad has no phase either, so we cannot tell fingers which pause
 * from fingers which are lifted. On macOS the system computes the momentum
 * itself and, with SDL_HINT_MAC_SCROLL_MOMENTUM, sends it as a stream of
 * wheel events after the fingers are lifted: the view follows the fingers
-* exactly while they are down and the system glide after; precise streams
-* start no glide of ours there. Elsewhere the wheel model applies to them.
+* while they are down and the glide of the system after. Elsewhere the
+* speed of the fingers is estimated from the events and, when they stop
+* above wheel_launch_speed, the view goes on with that velocity, decaying
+* exponentially with the time constant wheel_tau.
 ******************************************************************************/
 
-static const double wheel_tau= 350.0;          // ms
+static const double wheel_tau= 350.0;          // ms: the glide of a trackpad
+static const double wheel_smooth_tau= 45.0;    // ms: the travel of a notch
 static const double wheel_launch_speed= 1.0;   // device pixels per ms
 static const time_t wheel_stream_dt= 30;       // ms: the events have stopped
 static const time_t wheel_slow_dt= 200;        // ms: the wheel is turned slowly
+static const time_t wheel_burst_dt= 16;        // ms: too soon for a second notch
 // SDL reports the deltas in "lines": a trackpad (precise deltas) gives a
 // tenth of the finger's displacement in points, so 10 points per unit make
 // the page follow the finger exactly, as a dragged scroll bar follows the
@@ -1365,28 +1381,57 @@ push_wheel (vue_window win, double dx, double dy) {
   Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) dx / 10, (float) dy / 10 }, 0.01f);
 }
 
-// a wheel event: scroll now and update the estimated speed of the wheel
-// (x, y are the deltas as reported by SDL, in wheel units)
+// a wheel event: scroll and update the estimated speed of the wheel
+// (x, y are the deltas as reported by SDL, in wheel units; stamp is the
+// timestamp SDL gave the event, in ns: the events queued during a frame
+// are all handled at the end of it, so the clock would report them as
+// simultaneous and the intervals below would all be zero)
 static void
-wheel_event (vue_window win, double x, double y, time_t now) {
+wheel_event (vue_window win, double x, double y, time_t now, uint64_t stamp) {
   vue_input_state& in= win->input;
   in.wheel_vx= in.wheel_vy= 0; // the user took over from a glide
-  time_t dt= (in.wheel_event_time == 0) ? wheel_slow_dt : now - in.wheel_event_time;
-  if (dt >= wheel_slow_dt) in.wheel_precise= false; // a new stream of events
-  if (x != floor (x) || y != floor (y)) in.wheel_precise= true;
+  time_t dt= (in.wheel_stamp == 0 || stamp <= in.wheel_stamp) ? wheel_slow_dt
+             : (time_t) ((stamp - in.wheel_stamp) / 1000000);
+  in.wheel_stamp= stamp;
+  bool fresh= (dt >= wheel_slow_dt); // a new stream of events
+  if (fresh) {
+    in.wheel_precise= false;
+    in.wheel_over_x= in.wheel_over_y= 0;
+  }
+  // fractional deltas are a trackpad; so is a second event which follows
+  // the opening one too soon for a wheel to have turned twice (see above)
+  bool precise= (x != floor (x) || y != floor (y)) ||
+                (in.wheel_ambiguous && !fresh && dt <= wheel_burst_dt);
+  in.wheel_ambiguous= fresh && !precise;
+  if (precise && !in.wheel_precise) {
+    in.wheel_precise= true;
+    // the stream opened with whole deltas and was taken for a notch: take
+    // back the excess, of which little has been applied so far
+    in.wheel_pend_x -= in.wheel_over_x;
+    in.wheel_pend_y -= in.wheel_over_y;
+    in.wheel_over_x= in.wheel_over_y= 0;
+  }
   double step= win->density * (in.wheel_precise ? wheel_precise_step : wheel_notch_step);
   double dx= x * step, dy= y * step; // device pixels
   dt= max ((time_t) 8, min (dt, wheel_slow_dt));
   in.wheel_est_x= 0.5 * (in.wheel_est_x + dx / dt);
   in.wheel_est_y= 0.5 * (in.wheel_est_y + dy / dt);
   in.wheel_event_time= now;
-  push_wheel (win, dx, dy);
+  if (in.wheel_precise) push_wheel (win, dx, dy); // follow the fingers
+  else {
+    // a notch is travelled over the next frames, not jumped (see above)
+    if (in.wheel_pend_x == 0 && in.wheel_pend_y == 0) in.wheel_smooth_time= now;
+    in.wheel_pend_x += dx; in.wheel_pend_y += dy;
+    double over= win->density * (wheel_notch_step - wheel_precise_step);
+    in.wheel_over_x= in.wheel_ambiguous ? x * over : 0.0;
+    in.wheel_over_y= in.wheel_ambiguous ? y * over : 0.0;
+  }
 }
 
-// advance the kinetic scrolling of all windows; returns true if the loop
-// must come back soon (a view glides or a glide may start)
+// advance the scrolling of all windows; returns true if the loop must come
+// back soon (a notch is travelling, a view glides, or a glide may start)
 static bool
-wheel_inertia_step () {
+wheel_step () {
   bool busy= false;
   time_t now= texmacs_time ();
   iterator<int> it= iterate (id_to_window);
@@ -1394,13 +1439,48 @@ wheel_inertia_step () {
     vue_window win= (vue_window) id_to_window[it->next ()];
     if (win == NULL) continue;
     vue_input_state& in= win->input;
+    // a stream which opened with whole deltas and got no second event in
+    // time comes from a wheel after all: the notch may travel in full
+    if (in.wheel_ambiguous && now - in.wheel_event_time > wheel_burst_dt) {
+      in.wheel_ambiguous= false;
+      in.wheel_over_x= in.wheel_over_y= 0;
+    }
+    // the distance asked by the wheel notches, travelled over a few frames
+    if (in.wheel_pend_x != 0 || in.wheel_pend_y != 0) {
+      busy= true;
+      time_t dt= now - in.wheel_smooth_time;
+      if (dt > 0) {
+        double part= 1.0 - exp (- (double) dt / wheel_smooth_tau);
+        double dx= in.wheel_pend_x * part, dy= in.wheel_pend_y * part;
+        // while the notch may still turn out to be a swipe, travel no
+        // further than a swipe would have: the excess (wheel_over_x/y) is
+        // then taken back before any of it has been applied, and the view
+        // does not have to spring back
+        if (in.wheel_ambiguous) {
+          if (fabs (in.wheel_pend_x - dx) < fabs (in.wheel_over_x))
+            dx= in.wheel_pend_x - in.wheel_over_x;
+          if (fabs (in.wheel_pend_y - dy) < fabs (in.wheel_over_y))
+            dy= in.wheel_pend_y - in.wheel_over_y;
+        }
+        in.wheel_pend_x -= dx; in.wheel_pend_y -= dy;
+        // the last half pixel is not worth another frame
+        if (!in.wheel_ambiguous) {
+          if (fabs (in.wheel_pend_x) < 0.5) { dx += in.wheel_pend_x; in.wheel_pend_x= 0; }
+          if (fabs (in.wheel_pend_y) < 0.5) { dy += in.wheel_pend_y; in.wheel_pend_y= 0; }
+        }
+        in.wheel_smooth_time= now;
+        if (dx != 0 || dy != 0) push_wheel (win, dx, dy);
+      }
+    }
     if (in.wheel_vx == 0 && in.wheel_vy == 0) {
-      // no glide: did the events just stop with a launched wheel?
+      // no glide: did the events just stop with a launched trackpad?
       if (in.wheel_est_x == 0 && in.wheel_est_y == 0) continue;
       busy= true;
       if (now - in.wheel_event_time < wheel_stream_dt) continue;
+      // a notch travels by itself and the system glides for a trackpad
+      // where it does the momentum: neither wants a glide of ours
       if (hypot (in.wheel_est_x, in.wheel_est_y) >= wheel_launch_speed &&
-          !(in.wheel_precise && wheel_system_momentum)) {
+          in.wheel_precise && !wheel_system_momentum) {
         in.wheel_vx= in.wheel_est_x;
         in.wheel_vy= in.wheel_est_y;
         in.wheel_time= now;
@@ -1581,11 +1661,11 @@ void gui_start_loop () {
       gui_needs_update= true;
       if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 8);
     }
-    if (wheel_inertia_step ()) {
-      // keep the frames coming while the view glides (or while a stream of
-      // wheel events is being watched for a launch), paced at 5 ms but
-      // woken up by any event: a plain sleep here added its length to the
-      // latency of every wheel event
+    if (wheel_step ()) {
+      // keep the frames coming while the view moves by itself (or while a
+      // stream of wheel events is being watched for a launch), paced at
+      // 5 ms but woken up by any event: a plain sleep here added its
+      // length to the latency of every wheel event
       gui_needs_update= true;
       if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 5);
     }
@@ -2240,7 +2320,8 @@ process_event (SDL_Event *event) {
         in.mouse_time= texmacs_time();
         in.mouse_x= (int) (event->wheel.mouse_x * win->density);
         in.mouse_y= (int) (event->wheel.mouse_y * win->density);
-        wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time); // kinetic scrolling, see above
+        wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time,
+                     event->wheel.timestamp); // see "Scrolling with the wheel"
       }
       break;
     } // case SDL_EVENT_MOUSE_WHEEL:
