@@ -104,10 +104,20 @@ theme.
 | `PRESSED` | darker flat button (toggled tool bar buttons) |
 | `BUTTON` | framed push button |
 | `CENTERED` | text centered in its container |
-| `BOLD` | bold font |
+| `BOLD` | bold font. The UI font used to be asked for through the name `apple-lucida`, whose translation rule (`fonts-truetype.scm`) maps every series to the regular face, so nothing was ever bold: the family is now named directly. The EC typewriter has no bold face, so bold together with monospaced still comes out in the regular weight, where Qt would ask the system for a synthetic bold |
 
 `context_style` adds flags from enclosing divisions (bold titles, grey
 discrete texts).
+
+The Qt port maps the same flags onto a `QFont` in `to_qfont`
+(`qt_utilities.cpp`), and its themes (`misc/themes/*.css`) bold the `title`
+and `subtitle` divisions and the title of a setting group, which is what the
+divisions here do through `context_style`. Two deliberate differences:
+`GREY` lightens the *weight* in `to_qfont`, which its own comment calls an
+approximation of grey, while the themes and this port grey the colour; and
+the Qt themes also draw a `discrete` division a little smaller, which this
+port does not. Nothing in the Qt port renders a label in italic. The test
+is `styles`.
 
 ## Tool areas of the main window
 

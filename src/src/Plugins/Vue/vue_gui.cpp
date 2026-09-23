@@ -2472,9 +2472,13 @@ font get_default_font (bool tt, bool mini, bool bold) {
     return find_font (tt_fn);
   }
   if (use_macos_fonts ()) {
-    tree lucida_fn= tuple ("apple-lucida", "ss", series, "right");
-    lucida_fn << as_string (sz) << as_string ((int) (0.95 * dpi));
-    return find_font (lucida_fn);
+    // The family is named directly rather than through the "apple-lucida"
+    // tuple: the rule which translates that name (fonts-truetype.scm) maps
+    // it to the regular face whatever the series is asked for, so every
+    // bold label came out in the regular weight. The Qt port does not go
+    // through this at all, it asks Qt for a bold QFont.
+    return find_font ("Lucida Grande", "ss", series, "right",
+                      sz, (int) (0.95 * dpi));
   }
   if (N(fam) >= 2) {
     string ff= fam (0, 2);

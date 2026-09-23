@@ -140,6 +140,7 @@ callback output.
 | `wheel` | scrolling with the wheel, then a balloon from a hovered toolbar button |
 | `wheel-inertia` | a single wheel step scrolls in sync (snapshots i0, i1 and i2 identical) while three quick steps launch a glide. Needs `-debug-events`: the `handling wheel` lines after i3 are the synthetic decaying deltas |
 | `scroll-shift` | scrolling shifts the backing store: the snapshots before and after a `repaint` must be identical in the editor area |
+| `styles` | the widget styles side by side, to compare with the Qt port: bold, mini, monospaced, grey, inert and centered |
 | `tmoutput` | the extent of the typeset boxes: on its own a `texmacs-output` is as wide as what it typesets, and inside a `resize` it fills the pane it was given |
 | `interactive` | the query line of the footer: the prompt and the field appear in place of the footer, the answer comes back (`answer: Bob`). It sets the "interactive questions" preference and puts it back in the same turn, since a test must not leave the settings changed |
 | `search-focus` | the search toolbar asks for the keyboard with `keyboard-focus-on`, so what is typed next lands in its field rather than in the document |
