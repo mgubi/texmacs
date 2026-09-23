@@ -44,7 +44,11 @@ shows a **Git** group with the entries that fit the file's state:
 | **Unstage changes** | staged, partially staged, or newly added | `git reset`; a rename also unstages the removal of the old name |
 | **Commit this file…** | there is something to commit | Prompts for a message, then commits only this file (adding it first if needed). Refused during a merge. |
 | **Discard changes…** | modified | Restores the staged version after a confirmation, which warns if unsaved edits would also be lost |
-| **Compare with → Last commit / Staged version / Branch …** | TeXmacs documents | Opens the **structured comparison** between the document and that revision |
+| **Compare with → Last commit / Staged version / Remote version / Before the last pull or merge / Other revision… / Tag … / Branch …** | TeXmacs documents | Opens the **structured comparison** between the document and that revision; you then accept or reject each difference |
+| **Who changed what** | TeXmacs documents | **Blame by paragraph**: the document, with each paragraph (or run of paragraphs) annotated with the commit, author and date that last changed it, or "Not committed yet". It follows paragraphs, not source lines, through the last 30 commits (preference `git blame depth`). |
+| **Restore version →** | tracked files | The last 15 versions of the document; restoring one makes it a new change, so the history is kept. Also available as **Restore this version** when viewing an old revision, and as "restore" on commit pages. |
+| **Add N missing project files** | the document uses untracked files | Adds the included documents, images, bibliography files and local style files the document (or its project's master document) depends on |
+| **Commit project…** | TeXmacs documents | Opens the commit dialog with all changed files of the project preselected |
 | **Resolve conflict…** / **Mark as resolved** | the file has a merge conflict | See section 5 |
 
 **History** (upstream) keeps working. It follows renames, and each
@@ -59,26 +63,34 @@ staged, added, deleted, conflicted.
 
 | Entry | Effect |
 |-------|--------|
+| **Git (branch, N changed, M ahead, K behind)** | The label of the submenu itself summarizes the state of the repository. |
 | **Status** | A page listing the branch, the upstream and ahead/behind counts, then conflicts, staged changes, unstaged changes and untracked files. Each file has a link to open it and actions `[compare \| stage \| unstage \| discard \| add \| resolve \| mark resolved]`. The page header links to Commit…, Stage all, Fetch, Pull, Push and the other pages. |
 | **Git panel** | The same information in a side panel: branch, Commit/Pull/Push/Cancel/Status/Refresh buttons, and one line per changed file with Stage/Unstage/Resolved buttons. It refreshes after every git action and after saving. |
+| **Graph** | The history of all branches as a graph, with branch and tag labels. Each commit links to its page. |
 | **Log** | The commit history, 250 commits per page with a "More…" link. Each commit opens a **commit page** showing author, date, parents, the full message and a per-file table of changes with +/− bars, links to the file at that revision, and "compare with current" for TeXmacs documents. |
-| **Branches and tags** | Local and remote branches with upstream tracking and last commit date; actions switch, merge into current and delete. Also the tags, and the stashes with pop and drop. |
+| **Branches and tags** | Local and remote branches with upstream tracking and last commit date; actions switch, merge into current and delete. Also the remotes with their URLs, the tags, and the stashes with pop and drop. |
 | **Commit…** | The **commit dialog** (below). |
 | **Stage all changes** | `git add --update` |
 | **New branch…** / **Switch to branch** / **Merge branch** | Create and switch; switch; merge into the current branch. Before switching or merging, it offers to save modified documents. |
 | **Tag this version…** | Annotated tag (lightweight if the message is empty). |
-| **Fetch** / **Pull** / **Push** | Run in the background (section 4). Pull is `--ff-only`. The first push of a branch sets its upstream to `origin`. |
+| **Fetch** / **Pull** / **Push** | Run in the background (section 4). When a pull cannot fast-forward because both sides changed, it offers to **merge the remote changes**. If that leads to conflicts, it opens the status page so you can resolve them (section 5). The first push of a branch sets its upstream. |
+| **Remotes → Add remote… / Push to / Remove** | Manage the remote repositories. Push goes to the upstream's remote, or `origin`, or the only remote. |
 | **Cancel running command** | Shown while a background command runs. |
 | **Stash changes** / **Restore last stash** | `git stash push` / `git stash pop`, after offering to save modified documents. |
 | **Merge documents structurally** | Installs the merge driver (section 6). |
+| **Preferences → Simple mode / Sign commits and tags / Pull** | See sections 3a and 7; the pull mode is fast-forward only (default), merge or rebase. |
 | **Git output** | The last 50 git commands with exit code, stdout and stderr. |
 | **Refresh** | Forgets cached state, including which files are versioned. |
 
 Outside any repository, the Version menu offers:
 
-* **Create Git repository…** — `git init` in the document's directory.
-* **Clone Git repository…** — asks for the repository and target
-  directory, clones in the background, then opens the status page.
+* **Create Git repository…** — `git init` in the document's directory,
+  with a default `.gitignore` for TeXmacs projects.
+* **Clone Git repository…** — a dialog for the repository and target
+  directory. Cloning into an existing directory creates a subdirectory
+  named after the repository. It runs in the background, then opens the
+  status page.
+* **Recent Git repositories** — the last ten repositories you worked with.
 
 ### Commit dialog
 
@@ -96,6 +108,29 @@ Outside any repository, the Version menu offers:
   deselected.
 * If the commit fails, the dialog stays open and the error appears in the
   footer.
+* **Suggest message** fills in a description of the selected changes, for
+  example `Update paper.tm: Introduction, Proofs`. Each TeXmacs document
+  lists the sections that contain changes, found by comparing it
+  structurally with the last commit.
+* Staging a file larger than 10 MB (preference `git large file size`)
+  asks for confirmation.
+* With signing enabled, commits and tags are signed with GnuPG. The commit
+  page shows whether a commit's signature is good.
+
+### 3a. Simple mode (snapshots)
+
+For coauthors who don't want to deal with staging, **Preferences → Simple
+mode** reduces the menus to:
+
+* **Save snapshot…** — records the state of all files, after a short
+  description.
+* **Restore snapshot →** — the last 15 snapshots. Restoring one puts back
+  all files as they were, as a new change, so the history is kept.
+* **Restore version →**, **Compare with**, **Who changed what** — for the
+  current document.
+* **Synchronize** — pulls the others' changes (merging them if needed),
+  then pushes yours.
+* **Status**, **Git panel**, **History**, **Git output**.
 
 ### Keeping documents in sync
 
@@ -197,11 +232,15 @@ driver get git's usual text merge.
 
 ## 8. New developer-level APIs
 
+(See also `git-blame`, `git-describe-changes`, `git-document-dependencies`
+and the snapshot functions in `git-blame.scm` and `git-project.scm`.)
+
 | API | Where | Purpose |
 |-----|-------|---------|
 | `(async-evaluate-system argv input callback)` → id | C++ glue | Runs a command without a shell in the background; `callback` receives `(code stdout stderr)`. |
 | `(async-evaluate-cancel id)` | C++ glue | Terminates such a command and its process group. |
 | `(merge-versions base ours theirs)`, `(merge-conflicts t)` | `version-merge.scm` | Structured 3-way merge of strees. |
+| `(version-match l1 l2)` | `version-merge.scm` | Longest common subsequence of two lists, as a vector of matching indices. |
 | `(version-normalize t)`, `(version-denormalize t)` | `version-compare.scm` | Public wrappers around the comparison helpers. |
 | `(version-notify-saved name)` | `tm-files.scm` | Hook called after a document is saved. |
 | `git-run`, `git-run-async`, `git-status`, `git-file-state`, `git-log`, … | `git-base.scm` | The git process layer and parsers (see git-implementation.md). |
@@ -215,8 +254,8 @@ any git revision (`HEAD`, a branch), `INDEX`, and `BASE`, `OURS` and
 ## 9. Tests
 
 ```sh
-doc/tests/run-git-tests.sh <scratch-dir>         # headless: 54 checks
-doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 26 checks
+doc/tests/run-git-tests.sh <scratch-dir>         # headless: 81 checks
+doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 39 checks
 ```
 
 The scripts create scratch repositories (with spaces in paths, a linked
@@ -245,10 +284,14 @@ private `TEXMACS_HOME_PATH` and open no windows. The checks cover:
   cancel it.
 * Plugin pipe links may collect a finished git process first, and the
   command is then reported with exit code −1.
+* Blame follows the file's linear history (`git log --follow`), not the
+  full commit graph, so a paragraph brought in by a merge is attributed to
+  the merge commit.
+* Snapshots use `git restore`, which needs git 2.23 or later.
+* The simple mode hides staging, but it doesn't hide merges: conflicts
+  still have to be resolved.
 * Opening a document inside a repository runs `git status`, which may run
   that repository's `core.fsmonitor` hook, as with any git GUI.
-* Clone asks for the repository and directory in the footer; there is no
-  dedicated dialog.
 * There is no textconv diff driver for `git diff` of `.tm` files on the
   command line.
 * Windows and Android run background commands synchronously; only the

@@ -11,7 +11,9 @@ The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2
 | `version-git.scm` | version-tmfs, version-compare, git-base | The git backend (`version-*` overloads), the file and repository actions, the `tmfs://git/...` and `tmfs://commit/...` pages, and the `:secure` page actions. |
 | `version-merge.scm` | version-compare | Structured 3-way merge of documents (`merge-versions`). |
 | `git-drivers.scm` | version-merge, git-base | The git merge driver (`git-merge-driver`, loaded lazily) and its installation in a repository. |
-| `git-widgets.scm` | version-git | The commit dialog and the interactive prompts for branch, tag and init. |
+| `git-blame.scm` | version-git, version-merge | Blame by paragraph: `git-blame`, and the `tmfs://blame/<file>` page (loaded lazily). |
+| `git-project.scm` | version-git, version-merge | Files used by documents, change descriptions for commit messages, snapshots and simple mode. |
+| `git-widgets.scm` | version-git, git-project | The commit dialog and the interactive prompts for branch, tag and init. |
 | `version-menu.scm` | git-widgets | `git-file-menu`, `git-repository-menu`, `git-compare-menu`, and the entry points in `version-menu`. |
 
 `init-texmacs.scm` registers the tmfs classes lazily:
@@ -250,6 +252,28 @@ instead of `<<<<<<<` markers: TeXmacs can open it and resolve it directly,
 and "Resolve conflict" also still works. Starting TeXmacs headless costs
 about a second per merged document.
 
+## Blame, change descriptions and projects
+
+* **Blame** (`git-blame name body`) walks the commits of `git-file-log`
+  from newest to oldest. It loads each revision's body, splits it into
+  paragraphs, and matches it against the next newer version with
+  `version-match`, an LCS over paragraph strees. Each current paragraph is
+  followed back until it no longer occurs, and the commit just before
+  that point gets the credit. A paragraph that doesn't occur in HEAD is
+  "not committed yet". If the depth limit cuts the history off, the
+  oldest commit examined is marked "or earlier".
+* **Change descriptions** (`git-describe-changes`) match the HEAD and
+  working-tree bodies both ways. For each unmatched paragraph they record
+  the title of the section it belongs to (`section`, `subsection`, … tags,
+  flattened to text with `cpp-texmacs->verbatim`).
+* **Dependencies** (`git-document-dependencies`) come from walking the
+  stree for `include` (followed recursively), `image`, `bibliography`
+  (with `.bib`) and `style` (local `.ts` files). The walk starts from
+  `project-get` when the buffer is attached to a project.
+* **Snapshots** are `add --all` followed by a commit. Restoring one is
+  `git restore --source=<rev> --staged --worktree -- .` inside
+  `git-with-reload`.
+
 ## Testing
 
 `doc/tests/run-git-tests.sh [dir]` builds a repository whose path contains
@@ -284,8 +308,11 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 * Opening a document in a repository runs `git status`, which may run that
   repository's `core.fsmonitor` hook, like any git GUI does. Don't open
   documents from untrusted repositories that you haven't inspected.
-* The commit dialog has not been exercised by hand in the GUI. Its
-  interaction was only smoke-tested.
+* The commit dialog, the panel and the menus are exercised by the offscreen
+  tests (built and opened, menus expanded), but have not been used by
+  hand.
+* A focus crash showed that two dialogs must never share an aux buffer:
+  each commit dialog gets its own `tmfs://aux/git-commit-<n>`.
 * The panel follows the current document (TeXmacs rebuilds side tools
   when the buffer changes), and is refreshed after git actions and saves,
   through the `version-notify-saved` hook called by `save-buffer-post` in
