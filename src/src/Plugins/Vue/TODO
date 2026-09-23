@@ -37,6 +37,9 @@ WIP
 
 DONE
 
+* the title of the window names the document and marks unsaved changes
+  (test title): SLOT_NAME was never forwarded to the window, and the
+  marker alone replaced a title which had never been set
 * contents which do not fit are clipped and marked, never given a scroll
   bar (test bars): the bars of the main window scroll sideways, the
   pulldown menus both ways; a marker is a fading strip of the colour behind

@@ -137,8 +137,9 @@ public:
   int id;
   string name;
   
-  string the_name;
-  string mod_name;
+  string the_name;         // the name TeXmacs gave the window
+  string mod_name;         // the title it shows (the name and the marker)
+  bool   modified;         // has the document unsaved changes?
   string orig_name;
 
   vue_widget content;
@@ -174,7 +175,7 @@ public:
   bool transitions_active; // Clay reported running transitions (keep drawing)
   
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
-  : id (serial++), name (_name), orig_name (_name), content (w),
+  : id (serial++), name (_name), modified (false), orig_name (_name), content (w),
     clay_debug (false), popup (_popup), layout_w (0), layout_h (0),
     density (1.0f), retina (1),
     visible_requested (false), shown (false), ready_to_show (false),

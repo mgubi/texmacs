@@ -86,6 +86,20 @@ padding; a footer 56 px high in the window colour, below the canvas and
 below the bottom tool rows when there are any. The flat buttons and the
 pull-down buttons are transparent, so the bar behind shows through.
 
+**The title.** TeXmacs sends the name of the document and the marker of
+unsaved changes (`SLOT_NAME`, `SLOT_MODIFIED`) to the widget of the editor,
+`tm_window_rep::wid`, which is this one, and the window below is what shows
+them. The widget only learns which window it is in when it is first laid
+out, and the name always arrives before that, so what comes early is kept
+(`win_title`) and given to the window then: forwarding it only when the
+window was known already lost it, and the title read `TeXmacs`, the name
+the window had been created with, for the whole session. The window keeps
+the name and the marker apart (`update_title`, `the_name` and `modified`)
+so that a change to one does not undo the other; the name a window is
+created with is its first `the_name`, or the first unsaved change turned
+the title into ` *`. SDL takes UTF-8, so the name goes through
+`cork_to_utf8` (test `title`).
+
 Those colours are fields of the theme (`the_theme.bar_mode`,
 `bar_focus`, `bar_line`, `color_background`; see *Themes* in
 [vue-graphics-stack.md](vue-graphics-stack.md)), not literals: in the light

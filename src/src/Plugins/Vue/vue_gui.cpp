@@ -101,6 +101,7 @@ public:
   void *platform_window () { return (void*)sdl_win; }
 
   void   destroy_event ();
+  void   update_title ();  // the name and the marker of unsaved changes
   void   set_name (string name);
   string get_name ();
   void   set_modified (bool flag);
@@ -188,8 +189,12 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
            SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN | SDL_WINDOW_NOT_FOCUSABLE;
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
-  c_string buf (name);
-  
+  // the name a window is created with is its title until TeXmacs gives it
+  // one (SLOT_NAME): the two must agree, or the first unsaved change would
+  // replace the title by its marker alone
+  the_name= name;
+  mod_name= name;
+  c_string buf (cork_to_utf8 (name));
   sdl_win= SDL_CreateWindow (buf, win_w, win_h, flags);
   if (!sdl_win) {
     // nothing sensible can be done without a window
@@ -343,14 +348,27 @@ vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h
   SDL_SetWindowMaximumSize (sdl_win, max (max_w/PIXEL, 0), max (max_h/PIXEL, 0));
 }
 
+// The title of a window is the name TeXmacs gives it plus, for a document
+// with unsaved changes, a marker (the Qt port draws the same through
+// setWindowModified and the [*] of its title). The two halves are kept
+// apart, so that a change to one does not undo the other: setting the name
+// dropped the marker until the document was saved and changed again, and
+// setting the marker on a window whose name had never arrived turned the
+// whole title into " *".
+void
+vue_sdl_base_window_rep::update_title () {
+  string name= modified ? the_name * " *" : the_name;
+  if (DEBUG_VUE_WIDGETS) debug_widgets << "window title: " << name << LF;
+  if (mod_name == name) return;
+  mod_name= name;
+  // SDL takes UTF-8, the names of TeXmacs are in its own encoding
+  c_string s (cork_to_utf8 (name));
+  SDL_SetWindowTitle (sdl_win, s);
+}
+
 void
 vue_sdl_base_window_rep::set_name (string name) {
-  if (the_name != name) {
-    c_string s (name);
-    SDL_SetWindowTitle (sdl_win, s);
-    the_name= name;
-    mod_name= name;
-  }
+  if (the_name != name) { the_name= name; update_title (); }
 }
 
 string
@@ -360,12 +378,7 @@ vue_sdl_base_window_rep::get_name () {
 
 void
 vue_sdl_base_window_rep::set_modified (bool flag) {
-  string name= (flag? (the_name * " *"): the_name);
-  if (mod_name != name) {
-    c_string s (name);
-    SDL_SetWindowTitle (sdl_win, s);
-    mod_name= name;
-  }
+  if (modified != flag) { modified= flag; update_title (); }
 }
 
 void

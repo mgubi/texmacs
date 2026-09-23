@@ -4101,6 +4101,15 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget interactive_input;
   bool interactive_mode;
 
+  // the title of the window and the marker of a document with unsaved
+  // changes. TeXmacs sends them to this widget, which only learns which
+  // window it is in when it is first laid out: what arrives before that
+  // (the name of the document always does) is kept here and given to the
+  // window then, or the title would stay the one given at creation
+  string win_title;
+  bool win_title_set;
+  bool win_modified, win_modified_set;
+
 public:
   vue_texmacs_widget_rep (int _mask, command _quit);
   
@@ -4139,7 +4148,8 @@ visibility_index (slot s) {
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit),
-    win (NULL), interactive_mode (false)
+    win (NULL), interactive_mode (false),
+    win_title_set (false), win_modified (false), win_modified_set (false)
 {
   // decode mask
   visibility[0]= (mask & 1)   == 1;   // header
@@ -4205,9 +4215,20 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
  //     the_gui->need_update ();
       break;
       
+    case SLOT_NAME:
+      // the title of the window: TeXmacs sends it to the widget of the
+      // editor (tm_window_rep::wid), which is this one, and the window
+      // below is what shows it. It was not forwarded at all, so the title
+      // never named the document
+      win_title= check_open<string> (val, s);
+      win_title_set= true;
+      if (win) { win->set_name (win_title); win_title_set= false; }
+      break;
+
     case SLOT_MODIFIED:
-      if (win) win->content->send (s, val);
-//      cout << "MODIFIED!" << LF;
+      win_modified= check_open<bool> (val, s);
+      win_modified_set= true;
+      if (win) { win->set_modified (win_modified); win_modified_set= false; }
       break;
 
     case SLOT_INTERACTIVE_MODE:
@@ -4472,6 +4493,13 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
 
 void vue_texmacs_widget_rep::do_layout () {
   win= current_window; // save the info
+  // what TeXmacs sent before we knew our window (see win_title)
+  if (win != NULL) {
+    if (win_title_set) { win->set_name (win_title); win_title_set= false; }
+    if (win_modified_set) {
+      win->set_modified (win_modified); win_modified_set= false;
+    }
+  }
   // grow to the size of the window
   SI w= 300, h= 300;
   if (win) win->get_size (w, h);
