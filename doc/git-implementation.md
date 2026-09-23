@@ -97,6 +97,21 @@ also has unsaved edits is not reloaded; a warning is shown instead.
 `git-when-saved` offers to save modified documents before switch, merge,
 pull and stash.
 
+## Side panel
+
+`git-tool` (in `git-widgets.scm`, registered with `lazy-tool`) is a
+`tm-tool*`, opened on the right with "Git → Git panel" (`git-open-tool`).
+It shows the branch with its ahead and behind counts, the buttons Commit,
+Pull, Push, Status and Refresh, and one line per changed file, with the
+file name (click to open) and Stage/Unstage buttons. Its contents are a
+`refreshable "git-tool"`, and `git-refresh` calls
+`(refresh-now "git-tool")`. The working tree is that of the window's
+buffer (`git-buffer-root`, which also understands git pages).
+
+The data are computed in one `let*` at the top of the widget. Widget
+branches such as `(if root ...)` did not keep expressions like
+`(git-status root)` from being evaluated when `root` was `#f`.
+
 ## Commit dialog
 
 `git-interactive-commit` opens `git-commit-widget`. The dialog has a
@@ -215,4 +230,6 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
   documents outside any repository.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
-* The side panel (`tm-tool*`) has not been written.
+* The panel does not refresh by itself when you switch documents or save;
+  use its Refresh button. Its look has not been checked visually, since
+  the tests run offscreen.

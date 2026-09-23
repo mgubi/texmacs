@@ -57,6 +57,9 @@
              '(document "The slow brown fox leaps." "Second.")))
   (git-mark-resolved C2)
   (check "merge resolved" (== (git-file-state C2) 'staged))
+  (git-open-tool)
+  (check "side tool" (in? '(git-tool) (window->tools (current-window) :right)))
+  (git-refresh (git-root C2))
   (finish))
 
 ;; Asynchronous remote commands and reloading of open documents

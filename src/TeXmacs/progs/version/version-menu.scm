@@ -98,6 +98,7 @@
 
 (menu-bind git-repository-menu
   ("Status" (git-show-status))
+  ("Git panel" (git-open-tool))
   ("Log" (git-show-log))
   ("Branches and tags" (git-show-branches))
   ---
