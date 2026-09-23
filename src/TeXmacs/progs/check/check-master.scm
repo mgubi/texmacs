@@ -13,8 +13,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (kernel texmacs tm-define-test)
+  (:use (kernel boot compat-s7-test)
+        (kernel boot boot-s7-test)
+        (kernel boot abbrevs-test)
+        (kernel logic logic-engine-test)
+        (kernel texmacs tm-define-test)
         (kernel texmacs tm-dialogue-test)
+        (kernel texmacs tm-convert-test)
+        (kernel texmacs tm-glue-test)
         (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
@@ -118,6 +124,9 @@
 ;; the first one) or integration (integration-test-group adds them to
 ;; integration-failure-total).
 (define regression-suites
+  (append
+   '(("compat-s7" regtest-compat-s7 error)
+     ("boot-s7" regtest-boot-s7 error))
   '(("htmltm" regtest-htmltm error)
     ("xmltm" regtest-xmltm error)
     ("tmlength" regtest-tmlength error)
@@ -169,8 +178,11 @@
     ("macro-drd" macro-drd-test-failures count)
     ("tm-define-regression" regtest-tm-define error)
     ("tm-dialogue" regtest-tm-dialogue error)
+    ("abbrevs" regtest-abbrevs error)
+    ("logic" regtest-logic error)
+    ("tm-glue" regtest-tm-glue error)
     ;; last, since it defines modes and functions in the running TeXmacs
-    ("tm-define" define-test-failures count)))
+    ("tm-define" define-test-failures count))))
 
 (define integration-suites
   '(("deletion-plan" regtest-deletion-plan integration)
