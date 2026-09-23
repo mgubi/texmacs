@@ -238,8 +238,6 @@ private `TEXMACS_HOME_PATH` and open no windows. The checks cover:
 
 ## 10. Known limitations
 
-* The side panel does not refresh when you switch documents; use its
-  Refresh button.
 * The commit dialog, panel and menus were exercised by scripts only. They
   have not yet been checked by hand in a normal session.
 * A background command finishes only when all its output is closed. A

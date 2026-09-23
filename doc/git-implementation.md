@@ -286,8 +286,8 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
   documents from untrusted repositories that you haven't inspected.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
-* The panel refreshes after git actions and saves (through the
-  `version-notify-saved` hook, called by `save-buffer-post` in
-  `tm-files.scm`), but not when you switch documents; use its Refresh
-  button. Its look has not been checked visually, since
+* The panel follows the current document (TeXmacs rebuilds side tools
+  when the buffer changes), and is refreshed after git actions and saves,
+  through the `version-notify-saved` hook called by `save-buffer-post` in
+  `tm-files.scm`. Its look has not been checked visually, since
   the tests run offscreen.

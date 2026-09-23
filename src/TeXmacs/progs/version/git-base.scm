@@ -20,7 +20,9 @@
 
 (define-preferences
   ("git executable" "git" noop)
-  ("git log length" "250" noop))
+  ("git log length" "250" noop)
+  ("git large file size" "10" noop)
+  ("git recent repositories" "" noop))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful subroutines
@@ -537,6 +539,46 @@
 (tm-define (git-remotes root)
   (with out (git-output root "remote")
     (if out (list-filter (git-split out "\n") (lambda (s) (!= s ""))) '())))
+
+(tm-define (git-remote-url root name)
+  (and (git-safe-name? name)
+       (and-with out (git-output root "remote" "get-url" name)
+         (git-chomp out))))
+
+(tm-define (git-push-remote root)
+  (:synopsis "The remote to which the current branch is pushed by default")
+  (let* ((up (git-status-ref (git-status root) 'upstream))
+         (l (git-remotes root)))
+    (cond ((and up (string-index up #\/))
+           (car (string-tokenize-by-char up #\/)))
+          ((in? "origin" l) "origin")
+          ((nnull? l) (car l))
+          (else #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Large files and recent repositories
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (git-large-file? u)
+  (:synopsis "Is @u too large for being conveniently versioned?")
+  (with mb (or (string->number (get-preference "git large file size")) 10)
+    (and (url-exists? u) (not (url-directory? u))
+         (> (url-size u) (* mb 1024 1024)))))
+
+(tm-define (git-recent-repositories)
+  (:synopsis "Recently used working trees (system paths)")
+  (list-filter (git-split (get-preference "git recent repositories") "\n")
+               (lambda (s) (and (!= s "")
+                                (url-exists? (url-append (system->url s)
+                                                         ".git"))))))
+
+(tm-define (git-remember-repository root)
+  (let* ((s (url->system root))
+         (l (cons s (list-filter (git-recent-repositories)
+                                 (lambda (x) (!= x s))))))
+    (set-preference "git recent repositories"
+                    (string-recompose (sublist l 0 (min 10 (length l)))
+                                      "\n"))))
 
 (tm-define (git-stashes root)
   (:synopsis "List of (name subject) for the stashes of @root")

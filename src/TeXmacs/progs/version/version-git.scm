@@ -264,12 +264,21 @@
                 (git-refresh root)
                 (git-message ret)))))))
 
-(tm-define (git-stage name)
-  (:synopsis "Stage the changes of the file @name")
+(tm-define (git-stage-now name)
   (and-with root (git-root name)
     (git-report (git-run root "add" "--" (git-relative root name))
                 "Staged file")
     (git-refresh root)))
+
+(tm-define (git-stage name)
+  (:synopsis "Stage the changes of the file @name")
+  (if (git-large-file? name)
+      (user-confirm (string-append (url->system (url-tail name))
+                                   " is large; versioning it makes the "
+                                   "repository big and slow. Stage anyway?")
+                    #f
+        (lambda (answ) (when answ (git-stage-now name))))
+      (git-stage-now name)))
 
 (tm-define (git-entry-paths e)
   (:synopsis "The paths affected by the status entry @e")
@@ -377,6 +386,35 @@
         (lambda (answ)
           (when answ (git-mark-resolved-now name))))
       (git-mark-resolved-now name)))
+
+(tm-define (git-restore-revision-now name rev)
+  (and-with root (git-root name)
+    (git-with-reload root
+      (lambda ()
+        (git-report (git-run root "checkout" rev "--" (git-relative root name))
+                    (string-append "Restored the version "
+                                   (short-hash rev)))))))
+
+(tm-define (git-restore-revision name rev)
+  (:synopsis "Replace @name by its version at the revision @rev")
+  (:interactive #t)
+  ;; NOTE: the history is kept: the restored version is a new change,
+  ;; which can be committed or discarded
+  (cond ((not (git-safe-name? rev)) (bad-name "revision"))
+        ((and (buffer-exists? name) (buffer-modified? name))
+         (set-message "Please save or revert the document first" "Restore"))
+        (else
+          (user-confirm (string-append "Replace the current version by the "
+                                       "version " (short-hash rev) "?") #f
+            (lambda (answ)
+              (when answ (git-restore-revision-now name rev)))))))
+
+(tm-define (git-revision-of u)
+  (:synopsis "The Git revision shown in the revision buffer @u, or #f")
+  (and (version-revision? u)
+       (with rev (version-get-revision u)
+         (and (git-safe-name? rev) (nin? rev '("INDEX" "BASE" "OURS" "THEIRS"))
+              rev))))
 
 (tm-define (git-compare-with name rev)
   (:synopsis "Compare the document @name with its revision @rev")
@@ -498,10 +536,22 @@
             (git-report (git-run root "stash" "drop" name) "Dropped stash")
             (git-refresh root))))))
 
+(define default-gitignore
+  (string-append
+   "# Files which are not worth versioning in TeXmacs projects\n"
+   "*~\n"
+   "*#\n"
+   ".DS_Store\n"
+   "# Uncomment if the documents are exported to PDF next to the sources\n"
+   "# *.pdf\n"))
+
 (tm-define (git-init dir)
   (:synopsis "Create a new Git repository in the directory @dir")
   (with ret (git-run dir "init" "--quiet")
     (version-tool-reset)
+    (when (and (git-ok? ret) (not (url-exists? (url-append dir ".gitignore"))))
+      (string-save default-gitignore (url-append dir ".gitignore")))
+    (when (git-ok? ret) (git-remember-repository dir))
     (git-report ret "Created repository")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -532,12 +582,41 @@
                   (and (nnull? opt-done) (car opt-done))))))
 
 (tm-define (git-push root . opt-done)
+  (with remote (git-push-remote root)
+    (if (not remote)
+        (set-message "This repository has no remote; add one first" "Push")
+        (apply git-push-to (cons* root remote opt-done)))))
+
+(tm-define (git-push-to root remote . opt-done)
+  (:synopsis "Push the current branch of @root to @remote")
+  ;; The first push of a branch sets its upstream
   (let* ((branch (git-current-branch root))
-         (new? (and branch (not (git-status-ref (git-status root) 'upstream))
-                    (in? "origin" (git-remotes root))))
-         (args (if new? (list "push" "--set-upstream" "origin" branch)
-                   (list "push"))))
+         (up (git-status-ref (git-status root) 'upstream))
+         (args (cond ((or (not branch) (not (git-safe-name? remote)))
+                      (list "push"))
+                     ((and up (string-starts? up (string-append remote "/")))
+                      (list "push" remote))
+                     (else (list "push" "--set-upstream" remote branch)))))
     (git-remote root "Push" args (and (nnull? opt-done) (car opt-done)))))
+
+(tm-define (git-add-remote root name url)
+  (:synopsis "Add the remote repository @url under the name @name")
+  (if (not (and (git-safe-name? name) (git-safe-name? url)))
+      (bad-name "remote")
+      (begin
+        (git-report (git-run root "remote" "add" name url)
+                    (string-append "Added remote " name))
+        (git-refresh root))))
+
+(tm-define (git-remove-remote root name)
+  (if (not (git-safe-name? name))
+      (bad-name "remote")
+      (user-confirm (string-append "Remove the remote " name "?") #f
+        (lambda (answ)
+          (when answ
+            (git-report (git-run root "remote" "remove" name)
+                        (string-append "Removed remote " name))
+            (git-refresh root))))))
 
 (tm-define (git-clone repository dir . opt-done)
   (:synopsis "Clone @repository into the new directory @dir")
@@ -607,6 +686,11 @@
   (when (page-context? root-s)
     (git-compare-with (page-file root-s path) rev)))
 
+(tm-define (git-page-restore root-s path rev)
+  (:secure #t)
+  (when (page-context? root-s)
+    (git-restore-revision (page-file root-s path) rev)))
+
 (tm-define (git-page-stage-all root-s)
   (:secure #t)
   (when (page-context? root-s)
@@ -667,10 +751,29 @@
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
+(tm-define (git-menu-label root)
+  (:synopsis "Label for the Git menu, which summarizes the state of @root")
+  (let* ((st (git-status root))
+         (head (git-status-ref st 'head))
+         (n (length (or (git-status-ref st 'entries) '())))
+         (ahead (or (git-status-ref st 'ahead) 0))
+         (behind (or (git-status-ref st 'behind) 0))
+         (l (append (if head (list (utf8->cork head)) '())
+                    (if (> n 0) (list (string-append (number->string n)
+                                                     " changed")) '())
+                    (if (> ahead 0) (list (string-append (number->string ahead)
+                                                         " ahead")) '())
+                    (if (> behind 0) (list (string-append
+                                            (number->string behind)
+                                            " behind")) '()))))
+    (if (null? l) "Git"
+        (string-append "Git (" (string-recompose l ", ") ")"))))
+
 (tm-define (git-show-page root which)
   (:synopsis "Show the Git page @which (status, log, ...) for @root")
   (cursor-history-add (cursor-path))
   (git-invalidate root)
+  (git-remember-repository root)
   (revert-buffer-revert (tmfs-url-git root which)))
 
 (tm-define (git-show-status . opt-root)
@@ -908,6 +1011,14 @@
       (map (cut branch-line root <> #t) local)
       '(subsection* "Remote branches")
       (if (null? remote) "None." (map (cut branch-line root <> #f) remote))
+      '(subsection* "Remotes")
+      (with l (git-remotes root)
+        (if (null? l) "None."
+            (map (lambda (name)
+                   `(concat (strong ,(utf8->cork name)) (hspace "1em")
+                            (verbatim ,(utf8->cork (or (git-remote-url root name)
+                                                       "")))))
+                 l)))
       '(subsection* "Tags")
       (if (null? tags) "None."
           (map (lambda (t) (utf8->cork (git-branch-name t))) tags))
@@ -973,8 +1084,11 @@
                      (diff-bar added removed 40)
                      ""))
           (cell ,(if (and parent (git-texmacs-file? u) (url-exists? u))
-                     (git-action "compare with current" "git-page-compare"
-                                 r path rev)
+                     `(concat
+                       ,(git-action "compare with current" "git-page-compare"
+                                    r path rev)
+                       " | "
+                       ,(git-action "restore" "git-page-restore" r path rev))
                      "")))))
 
 (define (git-commit-content root rev)
