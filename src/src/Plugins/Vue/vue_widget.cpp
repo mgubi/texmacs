@@ -2155,8 +2155,25 @@ vue_ui_rep::do_layout () {
       }
       time_t elapsed= texmacs_time () - balloon_time;
       if ((elapsed > 1000) && (elapsed < 5000)) {
-        // show the balloon
-        CLAY_AUTO_ID({
+        // The balloon sits near the pointer and floats over the whole
+        // window, as the tooltips of the Qt port do (QToolTip::showText at
+        // the cursor). Attached under its own widget it landed on top of
+        // the next item of a menu and was clipped to the menu's width, so
+        // walking down a menu replaced one item after another with an
+        // opaque box: it read as the menu flickering.
+        Clay_ElementId balloon_id= CLAY_IDI ("balloon_widget", id);
+        Clay_ElementData bd= Clay_GetElementData (balloon_id);
+        float bx= (float) mouse_x + 14, by= (float) mouse_y + 22;
+        if (bd.found && current_window != NULL) {
+          // keep it inside the window, and above the pointer when there is
+          // no room below (the size is the one it had in the last pass)
+          float bw= bd.boundingBox.width, bh= bd.boundingBox.height;
+          if (bx + bw > current_window->layout_w)
+            bx= max (0.0f, current_window->layout_w - bw);
+          if (by + bh > current_window->layout_h)
+            by= max (0.0f, (float) mouse_y - bh - 8);
+        }
+        CLAY(balloon_id, {
           .backgroundColor= the_theme.balloon,
           .layout= { .padding= { 10, 10, 10, 10 } },
           .cornerRadius= CLAY_CORNER_RADIUS(4),
@@ -2164,14 +2181,13 @@ vue_ui_rep::do_layout () {
             .width= { 1, 1, 1, 1 },
             .color= the_theme.balloon_border },
           .floating= {
-            .offset= { 0, 4 },
+            .offset= { bx, by },
             .zIndex= 10,
-            .parentId= target_id.id,
             .attachPoints= {
               .element= CLAY_ATTACH_POINT_LEFT_TOP,
-              .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM },
+              .parent= CLAY_ATTACH_POINT_LEFT_TOP },
             .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
-            .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID }})
+            .attachTo= CLAY_ATTACH_TO_ROOT }})
         {
           concrete(d.help)->do_layout ();
         }

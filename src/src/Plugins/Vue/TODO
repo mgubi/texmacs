@@ -105,7 +105,8 @@ DONE
 * menus stay in the window, scroll when taller than it and are drawn above
   the scroll bars of the editors; footer texts are clipped
 * tab/shift-tab move the focus between the inputs of a dialog
-* balloons are attached below their widget
+* balloons follow the pointer, as the tooltips of the Qt port do: attached
+  below their widget they covered the next item of a menu (test balloon)
 * kinetic scrolling: wheel events scroll in sync, a launched wheel makes the
   view glide with a decaying velocity (editors and Clay containers); on
   macOS the trackpad gestures drag while the fingers are down and glide
