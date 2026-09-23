@@ -187,7 +187,11 @@ _background_write_task (void* channel_as_void_ptr) {
   const char* d= c->data.a;
   int n= c->buffer_size;
   int t= (c->data).n, k= 0, o= 0;
-  if (t == 0) { c->finished= true; return (void*) NULL; }
+  if (t == 0) {
+    // NOTE: the process should see the end of its (empty) input
+    if (close (fd) != 0) c->status= -1;
+    c->finished= true;
+    return (void*) NULL; }
   if (n == 0) { c->status= -1; c->finished= true; return (void*) NULL; }
   do {
     int m= min (n, t - k);
@@ -342,7 +346,7 @@ struct unix_process_rep {
   pid_t     pid;
   bool      exited;
   int       status;
-  bool      has_in;
+  bool      has_in, has_out, has_err;
   _channel  in, out, err;
   pthread_t th_in, th_out, th_err;
 };
@@ -424,10 +428,12 @@ unix_system_start (array<string> arg, string input) {
   }
   else close (fd[1]);
   // NOTE: the output threads are always created
-  pthread_create (&rep->th_out, NULL, _background_read_task,
-		  (void*) &(rep->out));
-  pthread_create (&rep->th_err, NULL, _background_read_task,
-		  (void*) &(rep->err));
+  rep->has_out= pthread_create (&rep->th_out, NULL, _background_read_task,
+				(void*) &(rep->out)) == 0;
+  if (!rep->has_out) { close (fd[2]); rep->out.finished= true; }
+  rep->has_err= pthread_create (&rep->th_err, NULL, _background_read_task,
+				(void*) &(rep->err)) == 0;
+  if (!rep->has_err) { close (fd[4]); rep->err.finished= true; }
   return rep;
 }
 
@@ -451,8 +457,8 @@ unix_system_finished (unix_process_rep* rep,
     return false;
   void* exit_status;
   if (rep->has_in) pthread_join (rep->th_in, &exit_status);
-  pthread_join (rep->th_out, &exit_status);
-  pthread_join (rep->th_err, &exit_status);
+  if (rep->has_out) pthread_join (rep->th_out, &exit_status);
+  if (rep->has_err) pthread_join (rep->th_err, &exit_status);
   out= string (rep->out.data.a, rep->out.data.n);
   err= string (rep->err.data.a, rep->err.data.n);
   ret= rep->status;

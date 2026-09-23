@@ -151,6 +151,44 @@
 (check "driver markup" (string-contains? (string-load DP) "<version-both|"))
 (git-run DR "merge" "--abort")
 
+;; Findings of the review
+(check "empty message refused" (== (version-commit F "") "Empty commit message"))
+(check "empty stdin does not hang"
+       (not (git-ok? (git-run-with-input R "" "commit" "--file=-"))))
+(check "option as revision refused"
+       (== (git-log R 0 1 "--output=/tmp/git-test-owned") '()))
+(check "no file written" (not (url-exists? (system->url "/tmp/git-test-owned"))))
+(check "option in tmfs link refused"
+       (== (git-show-file R "--output=/tmp/git-test-owned" "base.txt") ""))
+(check "option as branch refused" (not (git-switch-branch R "-f")))
+(string-save "one\n" (file "n1.tm"))
+(string-save "bracket\n" (file "n[1].tm"))
+(git-stage (file "n1.tm"))
+(git-stage (file "n[1].tm"))
+(git-commit-staged R "brackets")
+(string-save "one changed\n" (file "n1.tm"))
+(string-save "bracket changed\n" (file "n[1].tm"))
+(git-discard-now (file "n[1].tm"))
+(check "literal pathspec" (== (string-load (file "n1.tm")) "one changed\n"))
+(git-run R "checkout" "--" "n1.tm")
+(git-run R "mv" "n1.tm" "n2.tm")
+(git-invalidate R)
+(git-unstage (file "n2.tm"))
+(check "unstaged rename leaves nothing staged" (not (git-has-staged? R)))
+(git-run R "add" "--all")
+(git-commit-staged R "rename n1")
+(string-save "two\n" (file "n2.tm"))
+(git-invalidate R)
+(git-page-stage (url->system R) "n2.tm")
+(check "page action refused outside Git pages"
+       (== (git-file-state (file "n2.tm")) 'modified))
+(git-run R "checkout" "--" "n2.tm")
+(string-save "x\n" (file "q\"uote.tm"))
+(git-stage (file "q\"uote.tm"))
+(git-commit-staged R "quote")
+(check "history of name with quote"
+       (== (length (version-history (file "q\"uote.tm"))) 1))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

@@ -227,54 +227,78 @@
 ;; Operations on files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (not-in-git) "the file is not in a Git working tree")
+
 (tm-define (version-register name)
   (:require (== (version-tool name) "git"))
   (with root (git-root name)
-    (with ret (git-run root "add" "--" (git-relative root name))
-      (git-refresh root)
-      (if (git-ok? ret) "Added file" (git-message ret)))))
+    (if (not root)
+        (not-in-git)
+        (with ret (git-run root "add" "--" (git-relative root name))
+          (git-refresh root)
+          (if (git-ok? ret) "Added file" (git-message ret))))))
 
 (tm-define (version-unregister name)
   (:require (== (version-tool name) "git"))
   (with root (git-root name)
-    (with ret (git-run root "rm" "--cached" "--quiet"
-                       "--" (git-relative root name))
-      (git-refresh root)
-      (if (git-ok? ret) "Stopped tracking file" (git-message ret)))))
+    (if (not root)
+        (not-in-git)
+        (with ret (git-run root "rm" "--cached" "--quiet"
+                           "--" (git-relative root name))
+          (git-refresh root)
+          (if (git-ok? ret) "Stopped tracking file" (git-message ret))))))
 
 (tm-define (version-commit name msg)
   (:require (== (version-tool name) "git"))
-  (let* ((root (git-root name))
-         (path (git-relative root name)))
-    (when (== (git-file-state name) 'untracked)
-      (git-run root "add" "--" path))
-    (with ret (git-run-with-input root (cork->utf8 msg)
-                                  "commit" "--file=-" "--" path)
-      (git-refresh root)
-      (git-message ret))))
+  (with root (git-root name)
+    (cond ((not root) (not-in-git))
+          ((== (tm-string-trim-both msg) "") "Empty commit message")
+          ((git-merging? root)
+           "A merge is in progress; commit the whole working tree")
+          (else
+            (with path (git-relative root name)
+              (when (== (git-file-state name) 'untracked)
+                (git-run root "add" "--" path))
+              (with ret (git-run-with-input root (cork->utf8 msg)
+                                            "commit" "--file=-" "--" path)
+                (git-refresh root)
+                (git-message ret)))))))
 
 (tm-define (git-stage name)
   (:synopsis "Stage the changes of the file @name")
-  (with root (git-root name)
+  (and-with root (git-root name)
     (git-report (git-run root "add" "--" (git-relative root name))
                 "Staged file")
     (git-refresh root)))
 
+(tm-define (git-entry-paths e)
+  (:synopsis "The paths affected by the status entry @e")
+  ;; NOTE: a rename also removes the original name
+  (if (git-entry-orig e)
+      (list (git-entry-path e) (git-entry-orig e))
+      (list (git-entry-path e))))
+
+(tm-define (git-unstage-paths root paths)
+  (git-run-list root (append (list "reset" "--quiet" "--") paths)))
+
+(tm-define (git-run-list root args)
+  (apply git-run (cons root args)))
+
 (tm-define (git-unstage name)
   (:synopsis "Unstage the changes of the file @name")
-  (with root (git-root name)
-    (git-report (git-run root "reset" "--quiet" "--"
-                         (git-relative root name))
-                "Unstaged file")
-    (git-refresh root)))
+  (and-with root (git-root name)
+    (let* ((e (git-file-entry root name))
+           (paths (if e (git-entry-paths e) (list (git-relative root name)))))
+      (git-report (git-unstage-paths root paths) "Unstaged file")
+      (git-refresh root))))
 
 (tm-define (git-discard-now name)
-  (let* ((root (git-root name))
-         (path (git-relative root name)))
-    (git-with-reload root
-      (lambda ()
-        (git-report (git-run root "checkout" "--" path)
-                    "Discarded changes")))))
+  (and-with root (git-root name)
+    (with path (git-relative root name)
+      (git-with-reload root
+        (lambda ()
+          (git-report (git-run root "checkout" "--" path)
+                      "Discarded changes"))))))
 
 (tm-define (git-discard name)
   (:synopsis "Discard the changes to @name since it was last staged")
@@ -298,36 +322,45 @@
         (tree->stree (tree-import (string->url (version-revision-url name rev))
                                   "texmacs")))))
 
+(define (resolve-message n)
+  (if (== n 0)
+      "Merged automatically; check the result, then mark as resolved"
+      (string-append (number->string n) " conflicting changes; old: ours, "
+                     "new: theirs. Retain the right versions, "
+                     "then mark as resolved")))
+
 (tm-define (git-resolve-conflict name)
   (:synopsis "Merge our and their versions of the conflicting file @name")
   (:interactive #t)
   ;; The changes made on only one side are merged automatically; the
   ;; others are shown as differences, with our version as the old one
-  (if (and (buffer-exists? name) (buffer-modified? name))
-      (set-message "Please save or revert the document first"
-                   "Resolve conflict")
-      (let* ((ours (string->url (version-revision-url name "OURS")))
-             (theirs (string->url (version-revision-url name "THEIRS")))
-             (base (revision-body name "BASE")))
-        (when (!= (url->url name) (url->url (current-buffer)))
-          (load-buffer name))
-        (buffer-set name (tree-import ours "texmacs"))
-        (if (not base)
-            (compare-with-newer theirs)
-            (with m (merge-versions base (tree->stree (buffer-tree))
-                                    (revision-body name "THEIRS"))
-              (tree-set (buffer-tree) (stree->tree m))
-              (version-first-difference)))
-        (with n (length (tree-search (buffer-tree) version-markup?))
-          (set-message (if (== n 0)
-                           (string-append "Merged automatically; "
-                                          "check the result, then mark "
-                                          "as resolved")
-                           (string-append (number->string n)
-                                          " conflicting changes; old: ours, "
-                                          "new: theirs. Retain the right "
-                                          "versions, then mark as resolved"))
-                       "Resolve conflict")))))
+  (let* ((base (revision-body name "BASE"))
+         (ours (revision-body name "OURS"))
+         (theirs (revision-body name "THEIRS")))
+    (cond ((and (buffer-exists? name) (buffer-modified? name))
+           (set-message "Please save or revert the document first"
+                        "Resolve conflict"))
+          ((not (and ours theirs))
+           (set-message (string-append "The document was removed on one "
+                                       "side; edit it, then mark as resolved")
+                        "Resolve conflict"))
+          (else
+            (when (!= (url->url name) (url->url (current-buffer)))
+              (load-buffer name))
+            (buffer-set name (tree-import (string->url
+                                           (version-revision-url name "OURS"))
+                                          "texmacs"))
+            (if base
+                (begin
+                  (tree-set (buffer-tree)
+                            (stree->tree (merge-versions base ours theirs)))
+                  (version-first-difference))
+                (compare-with-newer (string->url
+                                     (version-revision-url name "THEIRS"))))
+            (set-message (resolve-message
+                          (length (tree-search (buffer-tree)
+                                               version-markup?)))
+                         "Resolve conflict")))))
 
 (tm-define (git-mark-resolved-now name)
   (when (buffer-exists? name)
@@ -381,46 +414,62 @@
       (utf8->cork (git-commit-message root "HEAD"))
       ""))
 
+(define (bad-name what)
+  (set-message (string-append "Invalid " what) "Git")
+  #f)
+
 (tm-define (git-switch-branch root branch)
   (:synopsis "Switch the working tree @root to @branch")
-  (git-when-saved root
-    (lambda ()
-      (git-with-reload root
+  (if (not (git-safe-name? branch))
+      (bad-name "branch name")
+      (git-when-saved root
         (lambda ()
-          (git-report (git-run root "checkout" "--quiet" branch)
-                      (string-append "Switched to " branch)))))))
+          (git-with-reload root
+            (lambda ()
+              (git-report (git-run root "checkout" "--quiet" branch "--")
+                          (string-append "Switched to " branch))))))))
 
 (tm-define (git-create-branch root branch)
   (:synopsis "Create a new branch @branch at HEAD and switch to it")
-  (git-report (git-run root "checkout" "--quiet" "-b" branch)
-              (string-append "Created branch " branch))
-  (git-refresh root))
+  (if (not (git-safe-name? branch))
+      (bad-name "branch name")
+      (begin
+        (git-report (git-run root "checkout" "--quiet" "-b" branch)
+                    (string-append "Created branch " branch))
+        (git-refresh root))))
 
 (tm-define (git-delete-branch root branch)
-  (user-confirm (string-append "Delete branch " branch "?") #f
-    (lambda (answ)
-      (when answ
-        (git-report (git-run root "branch" "--delete" branch)
-                    (string-append "Deleted branch " branch))
-        (git-refresh root)))))
+  (if (not (git-safe-name? branch))
+      (bad-name "branch name")
+      (user-confirm (string-append "Delete branch " branch "?") #f
+        (lambda (answ)
+          (when answ
+            (git-report (git-run root "branch" "--delete" branch)
+                        (string-append "Deleted branch " branch))
+            (git-refresh root))))))
 
 (tm-define (git-merge-branch root branch)
   (:synopsis "Merge @branch into the current branch of @root")
-  (git-when-saved root
-    (lambda ()
-      (git-with-reload root
+  (if (not (git-safe-name? branch))
+      (bad-name "branch name")
+      (git-when-saved root
         (lambda ()
-          (git-report (git-run root "merge" "--no-edit" branch)
-                      (string-append "Merged " branch)))))))
+          (git-with-reload root
+            (lambda ()
+              (git-report (git-run root "merge" "--no-edit" branch)
+                          (string-append "Merged " branch))))))))
 
 (tm-define (git-create-tag root tag msg)
   ;; The message @msg is in the utf8 encoding
-  (git-report (if (== msg "")
-                  (git-run root "tag" tag)
-                  (git-run-with-input root msg
-                                      "tag" "--annotate" "--file=-" tag))
-              (string-append "Created tag " tag))
-  (git-refresh root))
+  (if (not (git-safe-name? tag))
+      (bad-name "tag name")
+      (begin
+        (git-report (if (== msg "")
+                        (git-run root "tag" tag)
+                        (git-run-with-input root msg "tag" "--annotate"
+                                            "--file=-" tag))
+                    (string-append "Created tag " tag))
+        (git-refresh root))))
 
 (tm-define (git-stash root)
   (git-when-saved root
@@ -429,17 +478,25 @@
         (lambda () (git-report (git-run root "stash" "push") "Stashed"))))))
 
 (tm-define (git-stash-pop root . opt-name)
-  (git-with-reload root
-    (lambda ()
-      (git-report (apply git-run (append (list root "stash" "pop") opt-name))
-                  "Restored stash"))))
+  ;; NOTE: unsaved documents would be overwritten by the stash
+  (if (not (git-safe-names? opt-name))
+      (bad-name "stash")
+      (git-when-saved root
+        (lambda ()
+          (git-with-reload root
+            (lambda ()
+              (git-report (apply git-run (append (list root "stash" "pop")
+                                                 opt-name))
+                          "Restored stash")))))))
 
 (tm-define (git-stash-drop root name)
-  (user-confirm (string-append "Drop " name "?") #f
-    (lambda (answ)
-      (when answ
-        (git-report (git-run root "stash" "drop" name) "Dropped stash")
-        (git-refresh root)))))
+  (if (not (git-safe-name? name))
+      (bad-name "stash")
+      (user-confirm (string-append "Drop " name "?") #f
+        (lambda (answ)
+          (when answ
+            (git-report (git-run root "stash" "drop" name) "Dropped stash")
+            (git-refresh root))))))
 
 (tm-define (git-init dir)
   (:synopsis "Create a new Git repository in the directory @dir")
@@ -495,7 +552,7 @@
           (else
             (set-message (string-append "Cloning " repository "...") "Git")
             (git-run-async parent
-                           (list "clone" repository
+                           (list "clone" "--" repository
                                  (url->system (url-tail dest)))
                            #f
               (lambda (ret)
@@ -511,72 +568,97 @@
 (define (page-file root-s path)
   (git-absolute (string-root root-s) path))
 
+(define (page-context? root-s)
+  ;; The actions below may be put in any document by anybody, so we only
+  ;; execute them from within the Git pages for the working tree root-s
+  (with ok? (and (string? root-s) (current-buffer)
+                 (git-page? (current-buffer) (string-root root-s)))
+    (when (not ok?)
+      (set-message "Git actions only work from the Git pages" "Git"))
+    ok?))
+
 (tm-define (git-page-stage root-s path)
   (:secure #t)
-  (git-stage (page-file root-s path)))
+  (when (page-context? root-s)
+    (git-stage (page-file root-s path))))
 
 (tm-define (git-page-unstage root-s path)
   (:secure #t)
-  (git-unstage (page-file root-s path)))
+  (when (page-context? root-s)
+    (git-unstage (page-file root-s path))))
 
 (tm-define (git-page-discard root-s path)
   (:secure #t)
-  (git-discard (page-file root-s path)))
+  (when (page-context? root-s)
+    (git-discard (page-file root-s path))))
 
 (tm-define (git-page-resolve root-s path)
   (:secure #t)
-  (git-resolve-conflict (page-file root-s path)))
+  (when (page-context? root-s)
+    (git-resolve-conflict (page-file root-s path))))
 
 (tm-define (git-page-mark-resolved root-s path)
   (:secure #t)
-  (git-mark-resolved (page-file root-s path)))
+  (when (page-context? root-s)
+    (git-mark-resolved (page-file root-s path))))
 
 (tm-define (git-page-compare root-s path rev)
   (:secure #t)
-  (git-compare-with (page-file root-s path) rev))
+  (when (page-context? root-s)
+    (git-compare-with (page-file root-s path) rev)))
 
 (tm-define (git-page-stage-all root-s)
   (:secure #t)
-  (git-stage-all (string-root root-s)))
+  (when (page-context? root-s)
+    (git-stage-all (string-root root-s))))
 
 (tm-define (git-page-commit root-s)
   (:secure #t)
-  (git-interactive-commit (string-root root-s)))
+  (when (page-context? root-s)
+    (git-interactive-commit (string-root root-s))))
 
 (tm-define (git-page-switch root-s branch)
   (:secure #t)
-  (git-switch-branch (string-root root-s) branch))
+  (when (page-context? root-s)
+    (git-switch-branch (string-root root-s) branch)))
 
 (tm-define (git-page-merge root-s branch)
   (:secure #t)
-  (git-merge-branch (string-root root-s) branch))
+  (when (page-context? root-s)
+    (git-merge-branch (string-root root-s) branch)))
 
 (tm-define (git-page-delete-branch root-s branch)
   (:secure #t)
-  (git-delete-branch (string-root root-s) branch))
+  (when (page-context? root-s)
+    (git-delete-branch (string-root root-s) branch)))
 
 (tm-define (git-page-stash-pop root-s name)
   (:secure #t)
-  (git-stash-pop (string-root root-s) name))
+  (when (page-context? root-s)
+    (git-stash-pop (string-root root-s) name)))
 
 (tm-define (git-page-stash-drop root-s name)
   (:secure #t)
-  (git-stash-drop (string-root root-s) name))
+  (when (page-context? root-s)
+    (git-stash-drop (string-root root-s) name)))
 
 (tm-define (git-page-refresh root-s)
   (:secure #t)
-  (git-refresh (string-root root-s)))
+  (when (page-context? root-s)
+    (git-refresh (string-root root-s))))
 
 (tm-define (git-page-show root-s which)
   (:secure #t)
-  (git-show-page (string-root root-s) which))
+  (when (page-context? root-s)
+    (git-show-page (string-root root-s) which)))
 
 (tm-define (git-page-remote root-s which)
   (:secure #t)
-  (with root (string-root root-s)
-    (cond ((== which "fetch") (git-fetch root))
-          ((== which "pull") (git-pull root))
-          ((== which "push") (git-push root)))))
+  (when (page-context? root-s)
+    (with root (string-root root-s)
+      (cond ((== which "fetch") (git-fetch root))
+            ((== which "pull") (git-pull root))
+            ((== which "push") (git-push root))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Git pages

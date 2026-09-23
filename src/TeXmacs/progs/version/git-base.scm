@@ -92,7 +92,9 @@
   (append (list (get-preference "git executable")
                 "-C" (url->system root)
                 "-c" "core.quotepath=off"
-                "-c" "color.ui=false")
+                "-c" "color.ui=false"
+                ;; file names are never patterns
+                "--literal-pathspecs")
           args))
 
 (define (git-remember root args ret)
@@ -214,6 +216,19 @@
                                                 "--version")
                     (if (git-ok? ret) 'yes 'no))))
     (== (ahash-ref git-available-cache exe) 'yes)))
+
+;; Revisions and names of branches, tags, stashes or remotes may come from
+;; untrusted sources (links in documents); they must never be taken for
+;; options by Git.
+
+(tm-define (git-safe-name? s)
+  (:synopsis "Can @s be passed to Git as a revision or a name?")
+  (and (string? s) (!= s "") (not (string-starts? s "-"))
+       (not (string-index s #\newline))
+       (not (string-index s (integer->char 0)))))
+
+(tm-define (git-safe-names? l)
+  (list-and (map git-safe-name? l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Status of the working tree
@@ -369,9 +384,13 @@
 (define git-date-format "--date=format:%Y-%m-%d %H:%M")
 
 (define (git-parse-commit r)
+  ;; NOTE: with -z, the file names are separated by null characters
   (let* ((lines (with l (git-split r "\n") (if (null? l) (list "") l)))
-         (fields (git-split (car lines) unit-sep))
-         (files (list-filter (cdr lines) (lambda (s) (!= s "")))))
+         (header (with l (git-split (car lines) nul-char)
+                   (if (null? l) "" (car l))))
+         (fields (git-split header unit-sep))
+         (names (append-map (cut git-split <> nul-char) (cdr lines)))
+         (files (list-filter names (lambda (s) (!= s "")))))
     (and (>= (length fields) 5)
          (list (first fields)
                (list-filter (string-tokenize-by-char (second fields) #\space)
@@ -393,12 +412,13 @@
 
 (tm-define (git-log root skip count . revs)
   (:synopsis "The @count commits of @root after the first @skip ones")
-  (with out (apply git-output
+  (with out (and (git-safe-names? revs)
+                 (apply git-output
                    (append (list root "log" git-log-format git-date-format
                                  (string-append "--skip=" (number->string skip))
                                  (string-append "--max-count="
                                                 (number->string count)))
-                           revs))
+                           revs)))
     (if out (git-parse-log out) '())))
 
 (tm-define (git-file-log u)
@@ -406,7 +426,7 @@
   ;; The last element of each commit is the list with the name of the file
   ;; at that commit
   (and-with root (git-root u)
-    (and-with out (git-output root "log" "--follow" "--name-only"
+    (and-with out (git-output root "log" "--follow" "--name-only" "-z"
                               git-log-format git-date-format
                               (string-append "--max-count="
                                              (number->string (git-log-length)))
@@ -420,14 +440,19 @@
 
 (tm-define (git-commit-message root rev)
   (:synopsis "Full message of the commit @rev")
-  (or (git-output root "show" "--no-patch" "--format=%B" rev) ""))
+  (or (and (git-safe-name? rev)
+           (git-output root "show" "--no-patch" "--format=%B" rev))
+      ""))
 
 (tm-define (git-numstat root rev . parent)
   (:synopsis "List of (added removed path) for the changes of @rev")
   ;; Binary files have #f for added and removed
-  (with out (if (null? parent)
-                (git-output root "show" "--numstat" "--format=" "-z" rev)
-                (git-output root "diff" "--numstat" "-z" (car parent) rev))
+  (with out (cond ((not (git-safe-names? (cons rev parent))) #f)
+                  ((null? parent)
+                   (git-output root "show" "--numstat" "--format=" "-z" rev))
+                  (else
+                   (git-output root "diff" "--numstat" "-z"
+                               (car parent) rev)))
     (if (not out) '()
         (let loop ((l (git-split out nul-char)) (acc '()))
           (cond ((null? l) (reverse acc))
@@ -450,11 +475,28 @@
 
 (tm-define (git-show-file root rev path)
   (:synopsis "Contents of the file with @path at the revision @rev")
-  (or (git-output root "show" (string-append rev ":" path)) ""))
+  ;; NOTE: rev may be empty or :1, :2, :3 for the stages in the index
+  (or (and (or (== rev "") (git-safe-name? rev))
+           (git-output root "show" (string-append rev ":" path)))
+      ""))
 
 (tm-define (git-rev-parse root rev)
-  (and-with out (git-output root "rev-parse" "--verify" "--quiet" rev)
-    (git-chomp out)))
+  (and (git-safe-name? rev)
+       (and-with out (git-output root "rev-parse" "--verify" "--quiet" rev)
+         (git-chomp out))))
+
+(tm-define (git-merging? root)
+  (:synopsis "Is a merge in progress in @root?")
+  (nnot (git-rev-parse root "MERGE_HEAD")))
+
+(tm-define (git-merge-message root)
+  (:synopsis "The prepared message for the merge in progress, or #f")
+  (and-with out (git-output root "rev-parse" "--git-path" "MERGE_MSG")
+    (with f (with u (unix->url (git-chomp out))
+              (if (url-rooted? u) u (url-append root u)))
+      (and (url-exists? f)
+           (list-filter (git-split (string-load f) "\n")
+                        (lambda (l) (not (string-starts? l "#"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Branches, tags and remotes
