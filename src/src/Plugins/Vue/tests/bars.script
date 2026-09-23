@@ -7,6 +7,9 @@
 #  b2: a wheel turned over the main bar scrolls it sideways (a mouse has no
 #      horizontal wheel), so its end shows and the marker moves to the left
 #  b3: a click on the marker of the mode bar brings the next screenful in
+#  b4: a window made wide enough for the whole of the bars puts them back at
+#      their first button (Clay clamps a scroll position only when it is
+#      handling a wheel event) and takes the markers away
 #  m1: a menu taller than the window is shifted up to fit inside it and
 #      carries a marker at the bottom; nothing is drawn outside the window
 #  m2: the wheel scrolls the menu; the marker moves to the top
@@ -24,6 +27,9 @@ snapshot b2
 click 505 90
 wait 600
 snapshot b3
+resize 1200 500
+wait 1200
+snapshot b4
 resize 560 300
 wait 900
 click 38 12

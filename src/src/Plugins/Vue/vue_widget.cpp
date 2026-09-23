@@ -1049,6 +1049,17 @@ render_marker_fn (renderer ren, void* data, rectangle r) {
 static void
 scroll_markers (Clay_ElementId id, Clay_ScrollContainerData& sd,
                 Clay_Color bg, bool horizontal, int16_t z= 1) {
+  // Clay clamps the position of a scroll container only while it handles a
+  // wheel event: a bar or a menu which fits again, because the window was
+  // made larger, would stay where it had been scrolled to, with its first
+  // items out of reach and no marker left to say where they went. Clamping
+  // it at every layout is what brings them back.
+  float over_x= max (0.0f, sd.contentDimensions.width -
+                           sd.scrollContainerDimensions.width);
+  float over_y= max (0.0f, sd.contentDimensions.height -
+                           sd.scrollContainerDimensions.height);
+  sd.scrollPosition->x= min (max (sd.scrollPosition->x, -over_x), 0.0f);
+  sd.scrollPosition->y= min (max (sd.scrollPosition->y, -over_y), 0.0f);
   float view=    horizontal ? sd.scrollContainerDimensions.width
                             : sd.scrollContainerDimensions.height;
   float content= horizontal ? sd.contentDimensions.width

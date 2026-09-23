@@ -356,7 +356,12 @@ when the window is resized under an open menu.
   screenful that way into view. The wheel scrolls them as it scrolls
   anything else, except that Clay gives each axis its own delta and a mouse
   has no horizontal wheel: `vue_wheel_axes` turns the vertical delta into a
-  horizontal one over a container which only scrolls sideways.
+  horizontal one over a container which only scrolls sideways. Clay clamps
+  the position of a container only while it is handling a wheel event, so
+  `scroll_markers` clamps it at every layout as well: a bar which fits
+  again, because the window was made larger, would otherwise stay where it
+  had been scrolled to, with its first buttons out of reach and no marker
+  left to say where they had gone.
 
 * **Scrolling with the wheel** (`vue_gui.cpp`, `wheel_event`,
   `wheel_step`): a trackpad and a mouse wheel ask for different things and
