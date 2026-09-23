@@ -101,7 +101,12 @@ Each iteration:
    (`gui_needs_relayout`), or the render commands would draw an interface
    which no longer exists;
 6. `vue_simple_widget_rep::repaint_all ()` repaints the editors' backing
-   stores (interruptible);
+   stores (interruptible). It is skipped while an SDL event is waiting, so
+   that a burst of input is handled before the pixels are computed — but
+   only until it is `vue_repaint_dt` (16 ms) old: a trackpad delivers its
+   events faster than a frame is drawn and its stream never runs dry, so
+   the repaint never got its turn for as long as a fast swipe lasted and
+   the page stood still;
 7. the same check again, up to four times: the repaint runs the typesetter,
    which executes Scheme and can replace widgets in its turn;
 8. `process_redraw ()` replays the render commands of every window.
@@ -388,7 +393,12 @@ the window, are at most as tall as the window and scroll.
   events already queued in the same frame (their deltas add up in
   `push_wheel`) instead of one event per frame, which lagged behind the
   fingers and made the motion jerky. The editor keeps the fractional SI
-  remainder of the small steps (`scroll_rest_x/y`). While a view moves by
+  remainder of the small steps (`scroll_rest_x/y`) and adds each delta to
+  the position it is already waiting to be given (`scroll_pending`) rather
+  than to `backing_pos`, which only moves with a repaint: computing it from
+  `backing_pos` lost every delta but the last whenever the repaint was
+  skipped, which is what a fast swipe does (see step 6 of the loop), so the
+  page barely moved while the fingers were flying. While a view moves by
   itself the loop paces itself at 5 ms (`SDL_WaitEventTimeout`), so any
   event wakes it at once.
 

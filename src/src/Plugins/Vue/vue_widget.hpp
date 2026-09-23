@@ -100,6 +100,10 @@ public:
   coord2 cursor_pos;
   bool mouse_grab;
   bool absolute_scroll;
+  // a scroll position which repaint_invalid_regions has not applied yet:
+  // the wheel then adds its delta to it instead of to backing_pos, which
+  // only moves with a repaint (see handle_events)
+  bool scroll_pending;
   
   string debug_text; // debug view
 

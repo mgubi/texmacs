@@ -1312,6 +1312,10 @@ void process_redraw ();
 
 bool gui_wait=  false;
 
+// ms: the editors are repainted at least this often while the events keep
+// coming (see the main loop)
+static const time_t vue_repaint_dt= 16;
+
 /******************************************************************************
 * Scrolling with the wheel
 *
@@ -1737,8 +1741,18 @@ void gui_start_loop () {
     // 6. repaint all the editors
     uint64_t t_rep= vue_now ();
     t2= texmacs_time ();
+    // The editors are repainted when no event is waiting, so that a burst
+    // of input is handled before the pixels are computed. A trackpad
+    // delivers its events faster than a frame is drawn, though, and its
+    // stream never runs dry: the repaint then never got its turn for as
+    // long as a swipe lasted and the page stood still. It is therefore
+    // done anyway once it is older than vue_repaint_dt.
+    static time_t last_repaint= 0;
+    time_t now_rep= texmacs_time ();
     int n_events= SDL_PollEvent (NULL);
-    if (n_events == 0 || request_partial_redraw) {
+    if (n_events == 0 || request_partial_redraw ||
+        now_rep - last_repaint >= vue_repaint_dt) {
+      last_repaint= now_rep;
       request_partial_redraw= false;
 
       interrupted= false;

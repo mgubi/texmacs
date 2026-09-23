@@ -4419,6 +4419,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   cursor_pos (coord2 (0, 0)),
   mouse_grab (false),
   absolute_scroll (false),
+  scroll_pending (false),
   ren (NULL),
   backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
   backing_valid (false),
@@ -4753,6 +4754,7 @@ vue_simple_widget_rep::do_layout () {
       scroll_pos.x1= -((SI) floor (scrollPosition.x + 0.5)) * ren->pixel;
       scroll_pos.x2=  ((SI) floor (scrollPosition.y + 0.5)) * ren->pixel;
       absolute_scroll= false;
+      scroll_pending= true;
     }
   }
   // note: our CLAY block is closed here, Clay_Hovered () would test the parent
@@ -4775,10 +4777,16 @@ vue_simple_widget_rep::do_layout () {
       debug_events << LF;
     }
     if (mouse_action == "wheel") {
-      // the deltas come in small steps (kinetic scrolling, see vue_gui.cpp):
-      // the fractions of SI are carried over to the next step
+      // the deltas come in small steps (see "Scrolling with the wheel" in
+      // vue_gui.cpp): the fractions of SI are carried over to the next step
+      // and the deltas add up on top of a position which is still pending.
+      // Starting from backing_pos each time lost every delta but the last
+      // whenever the repaint was skipped, which is exactly what a fast
+      // swipe does: its events never stop coming, so the repaint, which is
+      // what moves backing_pos, never got its turn and the page stood still
+      if (!scroll_pending || absolute_scroll) scroll_pos= backing_pos;
       absolute_scroll= false;
-      scroll_pos= backing_pos;
+      scroll_pending= true;
       scroll_rest_x += mouse_data[0];
       scroll_rest_y += mouse_data[1];
       // whole pixels only (the backing store is shifted, see
@@ -4942,6 +4950,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // store can be reused after a scroll (a shift by whole pixels)
     scroll_pos.x1= grid_floor (scroll_pos.x1, ren->pixel);
     scroll_pos.x2= grid_floor (scroll_pos.x2, ren->pixel);
+    scroll_pending= false; // the position below is the one asked for
   }
   
   // the scroll position changed: instead of repainting the whole backing
