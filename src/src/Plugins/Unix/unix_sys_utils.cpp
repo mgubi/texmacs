@@ -135,7 +135,11 @@ struct _pipe_t {
     fl= fcntl (rep[1], F_GETFL);
     fl= fl & (~(int) O_NONBLOCK);
     fcntl (rep[1], F_SETFL, fl); }
-  inline ~_pipe_t () { close (rep[0]); close (rep[1]); }
+  inline ~_pipe_t () {
+    if (rep[0] >= 0) close (rep[0]);
+    if (rep[1] >= 0) close (rep[1]); }
+  // the end i was closed elsewhere and should not be closed again
+  inline void release (int i) { rep[i]= -1; }
   inline int in () const { return rep[0]; }
   inline int out () const { return rep[1]; }
   inline int status () const { return st; }
@@ -149,7 +153,8 @@ struct _channel {
   array<char> buffer;
   int status;
   volatile bool finished;
-  _channel () : status (0), finished (false) {}
+  bool closed;
+  _channel () : status (0), finished (false), closed (false) {}
   void _init_in (int fd2, string data2, int chunk_size) {
     fd= fd2;
     data.copy (&data2[0], N(data2));
@@ -175,6 +180,7 @@ _background_read_task (void* channel_as_void_ptr) {
     if (m == 0) { if (close (fd) != 0) c->status= -1; }
   } while (m > 0);
   if (m < 0) close (fd);
+  c->closed= true;
   c->finished= true;
   return (void*) NULL;
 }
@@ -190,6 +196,7 @@ _background_write_task (void* channel_as_void_ptr) {
   if (t == 0) {
     // NOTE: the process should see the end of its (empty) input
     if (close (fd) != 0) c->status= -1;
+    c->closed= true;
     c->finished= true;
     return (void*) NULL; }
   if (n == 0) { c->status= -1; c->finished= true; return (void*) NULL; }
@@ -199,8 +206,8 @@ _background_write_task (void* channel_as_void_ptr) {
     o= write (fd, (void*) (d + k), m);
     // cout << "written " << o << " bytes to " << fd << "\n";
     if (o > 0) k += o;
-    if (o < 0) { close (fd); c->status= -1; }
-    if (k == t) { if (close (fd) != 0) c->status= -1; }
+    if (o < 0) { close (fd); c->status= -1; c->closed= true; }
+    if (k == t) { if (close (fd) != 0) c->status= -1; c->closed= true; }
   } while (o > 0 && k < t);
   c->finished= true;
   return (void*) NULL;
@@ -282,8 +289,8 @@ unix_system (array<string> arg,
 	     << pid << "\n";
 
   // close useless ports
-  for (int i= 0; i < n_in ; i++) close (pp_in[i].in ());
-  for (int i= 0; i < n_out; i++) close (pp_out[i].out ());
+  for (int i= 0; i < n_in ; i++) { close (pp_in[i].in ()); pp_in[i].release (0); }
+  for (int i= 0; i < n_out; i++) { close (pp_out[i].out ()); pp_out[i].release (1); }
 
   // write to spawn process
   array<_channel> channels_in (n_in);
@@ -324,10 +331,12 @@ unix_system (array<string> arg,
   int thread_status= 0;
   for (int i= 0; i < n_in; i++) {
     pthread_join (threads_write[i], &exit_status);
+    if (channels_in[i].closed) pp_in[i].release (1);
     if (channels_in[i].status < 0) thread_status= -1;
   }
   for (int i= 0; i < n_out; i++) {
     pthread_join (threads_read[i], &exit_status);
+    if (channels_out[i].closed) pp_out[i].release (0);
     *(str_out[i])= string (channels_out[i].data.a,
                            channels_out[i].data.n);
     if (channels_out[i].status < 0) thread_status= -1;
