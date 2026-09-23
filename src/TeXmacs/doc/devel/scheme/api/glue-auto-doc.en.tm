@@ -411,6 +411,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(async-evaluate-system <scm-arg|array_string> <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_system> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(http-post <scm-arg|string> <scm-arg|array_string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>

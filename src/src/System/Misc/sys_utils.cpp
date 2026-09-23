@@ -369,8 +369,80 @@ async_eval_system (string c, int& status, string& outbuf,
   return false;
 }
 
+/******************************************************************************
+* Asynchronous execution of commands without shell
+******************************************************************************/
+
+struct async_process {
+  object call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<string> result;
+#else
+  unix_process_rep* rep;
+#endif
+};
+
+static array<async_process*> async_processes;
+
+bool
+async_evaluate_system (array<string> arg, string in, object call_back) {
+  // Run arg[0] with arguments arg[i], i >= 1, without shell, sending in
+  // to its standard input.  When the command terminates, call_back is
+  // called with the list (exit-code stdout stderr).
+  // Returns true on failure, like async_eval_system.
+  async_process* p= tm_new<async_process> ();
+  p->call_back= call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<int> fd_in;
+  array<string> str_in;
+  if (N(in) > 0) { fd_in << 0; str_in << in; }
+  array<int> fd_out;
+  fd_out << 1 << 2;
+  p->result= evaluate_system (arg, fd_in, str_in, fd_out);
+#else
+  p->rep= unix_system_start (arg, in);
+  if (p->rep == NULL) {
+    tm_delete<async_process> (p);
+    return true;
+  }
+#endif
+  async_processes << p;
+  return false;
+}
+
+static void
+async_evaluate_pending () {
+  array<async_process*> done;
+  array<async_process*> busy;
+  array<object> results;
+  for (int i=0; i<N(async_processes); i++) {
+    async_process* p= async_processes[i];
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+    int ret= as_int (p->result[0]);
+    string out= p->result[1], err= p->result[2];
+    done << p;
+    results << list_object (object (ret), object (out), object (err));
+#else
+    int ret;
+    string out, err;
+    if (unix_system_finished (p->rep, ret, out, err)) {
+      done << p;
+      results << list_object (object (ret), object (out), object (err));
+    }
+    else busy << p;
+#endif
+  }
+  // NOTE: the call backs might start new processes
+  async_processes= busy;
+  for (int i=0; i<N(done); i++) {
+    call (done[i]->call_back, results[i]);
+    tm_delete<async_process> (done[i]);
+  }
+}
+
 void
 async_eval_pending () {
+  if (N(async_processes) > 0) async_evaluate_pending ();
   for (int i=0; i<N(async_busy); )
     if (async_busy[i]->done) {
       async_handle* handle= async_busy[i];
