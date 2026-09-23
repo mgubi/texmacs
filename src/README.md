@@ -1,3 +1,20 @@
+> ## Branch `wip_vue` — the Vue GUI
+>
+> Work in progress: a graphical back end for TeXmacs which owes nothing to a
+> widget toolkit. It draws the editor, the bars, the menus, the dialogs and
+> the tools itself, on three libraries — [Clay](https://github.com/nicbarker/clay)
+> for the layout, SDL3 for the windows, the input and the clipboard, and
+> MuPDF for the pixels.
+>
+> * Code: [`src/Plugins/Vue/`](src/Plugins/Vue/), with its `TODO` and its `tests/`
+> * Developer notes: [`docs/`](docs/README.md) — the graphics stack, the
+>   widgets, the test harness, how the TeXmacs core talks to a GUI plugin,
+>   and how to build and debug it
+> * Build: `./configure --with-gui=vue --with-sdl3 --with-mupdf=<prefix>`
+>
+> Everything outside `src/Plugins/Vue/` and `docs/` is stock TeXmacs, save
+> for the few places which had to learn that the GUI is neither Qt nor X11.
+
 # GNU TeXmacs
 [![Join the chat at https://gitter.im/texmacs/Lobby](https://badges.gitter.im/texmacs/Lobby.svg)](https://gitter.im/texmacs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
