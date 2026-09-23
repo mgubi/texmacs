@@ -76,6 +76,38 @@ therefore load even before anyone has opened the Version menu.
 `tmfs://revision/<rev>/<name>`, so the comparison is the structured
 TeXmacs one.
 
+## Safety rules
+
+These rules come out of a review of the branch (2026-09-24):
+
+* **Paths are never patterns.** Every command runs with
+  `--literal-pathspecs`. Otherwise "discard `n[1].tm`" would also revert
+  `n1.tm`.
+* **Names are never options.** Revisions and the names of branches, tags
+  and stashes can come from untrusted places, such as links
+  `tmfs://commit/<rev>/...` or `tmfs://revision/<rev>/...` in any
+  document. They are checked with `git-safe-name?` (non-empty, not
+  starting with `-`, no newline or NUL) before they reach git. Without
+  this, a link to `tmfs://commit/--output=<file>/<root>` could overwrite
+  a file.
+* **Page actions only run from git pages.** The `git-page-*` functions are
+  `:secure`, so any document could contain an `action` tag calling them.
+  They therefore check (`page-context?`) that the current buffer is a git
+  page of the same working tree.
+* **Stdin is always a pipe.** When there is input it is written to the pipe;
+  otherwise the pipe is closed at once, so a command that reads stdin (such
+  as `commit --file=-` with an empty message) sees end of file instead of
+  hanging the UI. Empty commit messages are refused up front.
+* **Renames have two paths.** Unstaging a renamed file also unstages the
+  removal of the old name (`git-entry-paths`).
+* **Unsaved work comes first.** Everything that rewrites files (switch,
+  merge, pull, stash, stash pop) first offers to save modified documents.
+  A document that changed on disk *and* has unsaved edits is never
+  reloaded.
+* **Merges are committed whole.** While `MERGE_HEAD` exists, "Commit this
+  file" is refused. The commit dialog refuses partial selections and
+  conflicts, and prefills `MERGE_MSG`.
+
 ## Pages and actions
 
 The pages are generated documents in style `generic`, built by `git-page`.
@@ -118,10 +150,15 @@ branches such as `(if root ...)` did not keep expressions like
 `texmacs-input` for the message (aux buffer `tmfs://aux/git-commit`,
 converted with `cpp-texmacs->verbatim ... "utf-8"`), a `choices` list with
 every changed file, and an "Amend" toggle. The files that start out
-selected are the ones with staged changes. When you commit, the index is
-changed to hold exactly the selected files (`add --all` for the selected
-ones, `reset` for the others), but only if you changed the selection. Then
-`commit --file=-` runs.
+selected are the ones with staged changes. When you commit:
+
+* a selected file without staged changes is staged entirely;
+* a selected file with staged changes is committed with exactly its staged
+  changes, so partial staging is kept;
+* a file that is not selected is unstaged.
+
+Then `commit --file=-` runs. If preparing the index or committing fails,
+the dialog stays open.
 
 ## Asynchronous commands
 
@@ -237,6 +274,16 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
   to do.
 * Clone asks for the repository and target directory in the footer. There
   is no dedicated dialog yet.
+* An asynchronous command only finishes once its output pipes are closed.
+  If a helper keeps them open (for example an `ssh` master started without
+  `ControlPersist` detaching), the command stays "running" until it is
+  cancelled.
+* Plugin pipe links reap children with `wait (NULL)` (`pipe_link.cpp`),
+  which can collect a git process. `waitpid` then fails and the command
+  is reported with exit code -1, even if it succeeded.
+* Opening a document in a repository runs `git status`, which may run that
+  repository's `core.fsmonitor` hook, like any git GUI does. Don't open
+  documents from untrusted repositories that you haven't inspected.
 * The commit dialog has not been exercised by hand in the GUI. Its
   interaction was only smoke-tested.
 * The panel refreshes after git actions and saves (through the

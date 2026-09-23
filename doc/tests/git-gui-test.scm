@@ -71,6 +71,11 @@
     (buffer-pretend-modified u)
     (save-buffer u)
     (check "modified after save" (== (git-file-state u) 'modified))
+    ;; page actions work from the Git pages of the same working tree
+    (with root (git-root u)
+      (git-show-status root)
+      (git-page-stage (url->system root) "doc.tm")
+      (check "page action from status page" (== (git-file-state u) 'staged)))
     (test-cancel)))
 
 (define (test-cancel)

@@ -20,7 +20,10 @@
 
 ;; The dialog lists all changed files; the selected ones are those which will
 ;; be committed.  Initially, these are the files with staged changes.
-;; On commit, the index is updated so as to contain exactly the selected files.
+;; A selected file without staged changes is staged entirely; for a selected
+;; file with staged changes, only the staged changes are committed; the
+;; changes of files which are not selected are unstaged.
+;; During a merge, all changes have to be committed together.
 
 (define (commit-candidates root)
   (list-filter (git-status-entries root)
@@ -39,62 +42,82 @@
   (with t (buffer-get-body u)
     (tm-string-trim-both (cpp-texmacs->verbatim t #f "utf-8"))))
 
+(define (initially-selected entries labels)
+  (list-filter labels
+               (lambda (lab)
+                 (with e (list-ref entries (list-find-index labels
+                                                            (cut == <> lab)))
+                   (git-entry-staged? e)))))
+
 (define (commit-update-index root entries labels selected)
-  ;; Stage the selected files and unstage the others
-  (for-each
-   (lambda (e lab)
-     (let* ((path (git-entry-path e))
-            (sel? (in? lab selected)))
-       (cond ((and sel? (or (git-entry-unstaged? e) (git-entry-untracked? e)))
-              (git-run root "add" "--all" "--" path))
-             ((and (not sel?) (git-entry-staged? e))
-              (git-run root "reset" "--quiet" "--" path)))))
-   entries labels))
+  ;; Stage the selected files without staged changes, unstage the others
+  (list-and
+   (map (lambda (e lab)
+          (let* ((paths (git-entry-paths e))
+                 (sel? (in? lab selected)))
+            (cond ((and sel? (not (git-entry-staged? e)))
+                   (git-ok? (git-run-list root (append (list "add" "--all" "--")
+                                                       paths))))
+                  ((and (not sel?) (git-entry-staged? e))
+                   (git-ok? (git-unstage-paths root paths)))
+                  (else #t))))
+        entries labels)))
 
 (define (commit-now root u entries labels selected amend?)
+  ;; Returns #t if the dialog can be closed
   (let* ((msg (commit-message u))
-         (changed? (!= selected
-                       (list-filter labels
-                                    (lambda (lab)
-                                      (with i (list-find-index labels
-                                                               (cut == <> lab))
-                                        (git-entry-staged?
-                                         (list-ref entries i))))))))
+         (merging? (git-merging? root))
+         (initial (initially-selected entries labels)))
     (cond ((and (== msg "") (not amend?))
            (set-message "Please enter a commit message" "Git commit")
            #f)
-          ((and (null? selected) (not amend?))
+          ((and merging? (list-find (git-status-entries root)
+                                    git-entry-conflicted?))
+           (set-message "Please resolve all conflicts first" "Git commit")
+           #f)
+          ((and merging? (not (== (length selected)
+                                  (length initial))))
+           (set-message "During a merge, all changes must be committed"
+                        "Git commit")
+           #f)
+          ((and (null? selected) (not amend?) (not merging?))
            (set-message "Nothing selected for commit" "Git commit")
            #f)
-          (else
-            (when changed?
-              (commit-update-index root entries labels selected))
-            (cond ((and amend? (== msg ""))
-                   (git-report (git-run root "commit" "--amend" "--no-edit")
-                               "Amended commit")
-                   (git-refresh root))
-                  (amend? (git-commit-staged root msg :amend))
-                  (else (git-commit-staged root msg)))
-            #t))))
+          ((not (or merging? (commit-update-index root entries labels
+                                                  selected)))
+           (git-refresh root)
+           (set-message "Could not prepare the files for commit" "Git commit")
+           #f)
+          ((and amend? (== msg ""))
+           (with ok? (git-report (git-run root "commit" "--amend" "--no-edit")
+                                 "Amended commit")
+             (git-refresh root)
+             ok?))
+          (amend? (git-commit-staged root msg :amend))
+          (else (git-commit-staged root msg)))))
+
+(define (commit-initial-message root)
+  (with l (and (git-merging? root) (git-merge-message root))
+    (if (and l (nnull? l))
+        `(document ,@(map utf8->cork l))
+        '(document ""))))
 
 (tm-widget ((git-commit-widget root u) quit)
   (let* ((entries (commit-candidates root))
          (labels (map commit-label entries))
-         (selected (list-filter labels
-                                (lambda (lab)
-                                  (with i (list-find-index labels
-                                                           (cut == <> lab))
-                                    (git-entry-staged? (list-ref entries i))))))
+         (selected (initially-selected entries labels))
          (amend? #f)
          (branch (or (git-current-branch root) "(detached)")))
     (padded
-      (text (string-append "Commit on branch " (utf8->cork branch) " in "
-                           (url->system root)))
+      (text (string-append (if (git-merging? root) "Merge commit on branch "
+                               "Commit on branch ")
+                           (utf8->cork branch) " in " (url->system root)))
       ===
       (bold (text "Commit message"))
       ===
       (resize "500px" "120px"
-        (texmacs-input `(document "") `(style (tuple "generic")) u))
+        (texmacs-input (commit-initial-message root)
+                       `(style (tuple "generic")) u))
       ===
       (bold (text "Files to commit"))
       ===
@@ -111,18 +134,6 @@
           ("Commit"
            (when (commit-now root u entries labels selected amend?)
              (quit))))))))
-
-(tm-define (git-interactive-commit . opt-root)
-  (:synopsis "Open a dialog for committing changes in the working tree")
-  (:interactive #t)
-  (and-with root (if (null? opt-root) (current-git-root) (car opt-root))
-    (let* ((u (string->url "tmfs://aux/git-commit"))
-           (b (current-buffer)))
-      (git-invalidate root)
-      (buffer-set-master u b)
-      (dialogue-window (git-commit-widget root u)
-                       (lambda x (noop))
-                       "Git commit" u))))
 
 (tm-define (git-interactive-commit-file name)
   (:synopsis "Commit the changes of the file @name")
@@ -164,9 +175,10 @@
       ((eval (utf8->cork (git-entry-path e)))
        (when (url-exists? u) (load-buffer u)))
       >>
-      (if (or (git-entry-unstaged? e) (git-entry-untracked? e)
-              (git-entry-conflicted? e))
+      (if (or (git-entry-unstaged? e) (git-entry-untracked? e))
           ("Stage" (git-stage u)))
+      (if (git-entry-conflicted? e)
+          ("Resolved" (git-mark-resolved u)))
       (if (git-entry-staged? e)
           ("Unstage" (git-unstage u))))))
 
@@ -213,24 +225,26 @@
 
 (tm-define (git-interactive-create-branch root)
   (:interactive #t)
-  (interactive (lambda (branch) (git-create-branch root branch))))
+  (interactive
+   (lambda (branch) (git-create-branch root (cork->utf8 branch)))))
 
 (tm-define (git-interactive-tag root)
   (:interactive #t)
   (interactive
-   (lambda (tag message) (git-create-tag root tag (cork->utf8 message)))))
+   (lambda (tag message)
+     (git-create-tag root (cork->utf8 tag) (cork->utf8 message)))))
 
 (tm-define (git-interactive-clone)
   (:synopsis "Clone a Git repository")
   (:interactive #t)
   (interactive
    (lambda (repository directory)
-     (let* ((u (system->url directory))
+     (let* ((u (system->url (cork->utf8 directory)))
             (b (current-buffer))
             (base (if (and b (not (url-rooted-tmfs? b)) (url-exists? b))
                       (url-head b)
                       (system->url (getenv "HOME")))))
-       (git-clone repository
+       (git-clone (cork->utf8 repository)
                   (url->system (if (url-rooted? u) u (url-append base u))))))))
 
 (tm-define (git-interactive-init name)
