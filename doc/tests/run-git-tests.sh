@@ -48,6 +48,14 @@ if test $gui = no; then
     tm "The slow brown fox jumps." > paper.tm
     git commit -q -a -m ours
   )
+  # a fake GnuPG, which signs anything
+  cat > "$dir/fake-gpg" <<'GPG'
+#!/bin/sh
+cat > /dev/null
+printf '\n[GNUPG:] SIG_CREATED D 1 8 00 1234567890 ABCDEF\n' >&2
+printf -- '-----BEGIN PGP SIGNATURE-----\n\nfake\n-----END PGP SIGNATURE-----\n'
+GPG
+  chmod +x "$dir/fake-gpg"
   test=git-test.scm
   opts=-headless
 else

@@ -62,10 +62,31 @@
        (not (versioned? u))
        (git-available?)))
 
+(tm-define (git-interactive-compare-with name)
+  (:interactive #t)
+  (interactive
+   (lambda (revision)
+     (git-compare-with-revision name (cork->utf8 revision)))))
+
+(define (current-root) (git-root (current-buffer)))
+
 (menu-bind git-compare-menu
   ("Last commit" (git-compare-with (current-buffer) "HEAD"))
   (when (git-state? 'staged 'partial)
     ("Staged version" (git-compare-with (current-buffer) "INDEX")))
+  (assuming (git-status-ref (git-status (current-root)) 'upstream)
+    ("Remote version"
+     (git-compare-with-revision (current-buffer) "@{upstream}")))
+  (assuming (git-rev-parse (current-root) "ORIG_HEAD")
+    ("Before the last pull or merge"
+     (git-compare-with-revision (current-buffer) "ORIG_HEAD")))
+  ("Other revision..." (git-interactive-compare-with (current-buffer)))
+  (with l (git-tags (current-root))
+    (assuming (nnull? l)
+      ---
+      (for (t (sublist l 0 (min 10 (length l))))
+        ((eval (string-append "Tag " (utf8->cork (git-branch-name t))))
+         (git-compare-with-revision (current-buffer) (git-branch-name t))))))
   (with l (list-filter (git-branches (git-root (current-buffer)))
                        (lambda (b) (not (git-branch-current? b))))
     (assuming (nnull? l)
@@ -100,6 +121,7 @@
   ("Status" (git-show-status))
   ("Git panel" (git-open-tool))
   ("Log" (git-show-log))
+  ("Graph" (git-show-page (current-git-root) "graph"))
   ("Branches and tags" (git-show-branches))
   ---
   ("Commit..." (git-interactive-commit))
@@ -144,6 +166,12 @@
   (when (nnull? (git-stashes (current-git-root)))
     ("Restore last stash" (git-stash-pop (current-git-root))))
   ---
+  (-> "Preferences"
+      ("Sign commits and tags" (git-toggle-signing))
+      (-> "Pull"
+          ("Fast-forward only" (git-set-pull-mode "fast-forward"))
+          ("Merge" (git-set-pull-mode "merge"))
+          ("Rebase" (git-set-pull-mode "rebase"))))
   (when (not (git-merge-driver-installed? (current-git-root)))
     ("Merge documents structurally"
      (git-install-merge-driver (current-git-root))))

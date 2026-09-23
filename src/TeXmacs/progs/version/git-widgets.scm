@@ -89,7 +89,10 @@
            (set-message "Could not prepare the files for commit" "Git commit")
            #f)
           ((and amend? (== msg ""))
-           (with ok? (git-report (git-run root "commit" "--amend" "--no-edit")
+           (with ok? (git-report (git-run-list root
+                                               (append (list "commit" "--amend"
+                                                             "--no-edit")
+                                                       (git-commit-options)))
                                  "Amended commit")
              (git-refresh root)
              ok?))
