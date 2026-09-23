@@ -13,7 +13,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert html htmltm-test)
+  (:use (kernel texmacs tm-define-test)
+        (kernel texmacs tm-dialogue-test)
+        (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
         (convert tools tmlength-test)
@@ -165,6 +167,8 @@
     ("kbd-menu" kbd-menu-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
+    ("tm-define-regression" regtest-tm-define error)
+    ("tm-dialogue" regtest-tm-dialogue error)
     ;; last, since it defines modes and functions in the running TeXmacs
     ("tm-define" define-test-failures count)))
 
