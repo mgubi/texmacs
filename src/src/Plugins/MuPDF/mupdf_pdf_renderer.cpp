@@ -35,6 +35,7 @@
 #include "scheme.hpp"
 #include "hashmap.hpp"
 #include "iterator.hpp"
+#include "frame.hpp"
 
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
@@ -129,6 +130,9 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
 
   array<pdf_outline_item> outlines;
   array<pdf_link_item>    links;
+  array<string>           dest_name;   // the anchors, in the order they came
+  array<pdf_link_item>    dest_pos;    // the page in x1, the point in y1, x2
+  hashmap<string,int>     dest_index;
   hashmap<string,string>  metadata;
 
   double to_x (SI x) { x += ox; return (x>=0 ? x : x-pixel+1) / (double) pixel; }
@@ -147,6 +151,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_fonts ();
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
+  void write_dests ();
   void write_links (pdf_obj* pobj);
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
@@ -161,6 +166,8 @@ public:
   bool is_started ();
   void next_page ();
 
+  void set_transformation (frame fr);
+  void reset_transformation ();
   void set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore= false);
   pencil get_pencil ();
   brush  get_background ();
@@ -180,6 +187,7 @@ public:
   void polygon (array<SI> x, array<SI> y, bool convex= true);
   void draw_picture (picture p, SI x, SI y, int alpha);
 
+  renderer shadow (picture& pic, SI x1, SI y1, SI x2, SI y2);
   void fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y);
   void new_shadow (renderer& ren);
   void delete_shadow (renderer& ren);
@@ -211,7 +219,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     cur_fill (0), cur_stroke (0), has_fill (false), has_stroke (false),
     cur_width (-1), cur_alpha (255),
     in_text (false), cur_font (-1), cur_size (0), text_x (0), text_y (0),
-    font_index (-1), font_by_file (-1), alpha_gs (-1),
+    font_index (-1), font_by_file (-1), dest_index (-1), alpha_gs (-1),
     n_alpha (0), n_xobj (0)
 {
   width = default_dpi * paper_w / 2.54;
@@ -240,6 +248,7 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   fz_try (ctx) {
     write_fonts ();
     write_outline ();
+    write_dests ();
     write_metadata ();
     // MuPDF subsets TrueType and CFF; the Type 1 fonts are left whole
     pdf_subset_fonts (ctx, doc, 0, NULL);
@@ -386,6 +395,41 @@ mupdf_pdf_renderer_rep::select_alpha (int a) {
     alpha_gs (a)= num;
   }
   fz_append_printf (ctx, contents, "/GS%d gs\n", num);
+}
+
+// A frame of the graphics: the stream gets the matrix and the clipping
+// rectangle follows it, as in pdf_hummus_renderer. Without this the
+// transformation was simply dropped and a rotated graphic came out
+// straight (renderer_rep::set_transformation is a no-op).
+void
+mupdf_pdf_renderer_rep::set_transformation (frame fr) {
+  ASSERT (fr->linear, "only linear transformations have been implemented");
+  if (contents == NULL) return;
+  end_text ();
+  SI cx1, cy1, cx2, cy2;
+  get_clipping (cx1, cy1, cx2, cy2);
+  rectangle oclip (cx1, cy1, cx2, cy2);
+  frame cv= scaling (point (pixel, pixel), point (-ox, -oy));
+  frame tr= invert (cv) * fr * cv;
+  point o = tr (point (0.0, 0.0));
+  point ux= tr (point (1.0, 0.0)) - o;
+  point uy= tr (point (0.0, 1.0)) - o;
+  put ("q\n");
+  fz_append_printf (ctx, contents, "%g %g %g %g %g %g cm\n",
+                    ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
+  // the state we were tracking does not survive the q
+  has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
+  rectangle nclip= fr [oclip];
+  renderer_rep::clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
+}
+
+void
+mupdf_pdf_renderer_rep::reset_transformation () {
+  if (contents == NULL) return;
+  end_text ();
+  renderer_rep::unclip ();
+  put ("Q\n");
+  has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
 }
 
 void
@@ -826,10 +870,18 @@ mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 * Links, the outline and the metadata
 ******************************************************************************/
 
+// A place a link can point at. They are collected here and written as a
+// name tree when the document is closed, since a link may well come
+// before the page it points at has been laid out.
 void
 mupdf_pdf_renderer_rep::anchor (string label, SI x1, SI y1, SI x2, SI y2) {
-  (void) label; (void) x1; (void) y1; (void) x2; (void) y2;
-  // the destination tree is not written yet, see the notes
+  (void) y1; (void) x2;
+  if (dest_index->contains (label)) return;
+  double f= (double) default_dpi / dpi;
+  dest_index (label)= N(dest_name);
+  dest_name << label;
+  dest_pos << pdf_link_item (label, (double) page_num,
+                             f * to_x (x1), f * to_y (y2 + 20*pixel), 0);
 }
 
 void
@@ -877,7 +929,13 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj) {
     pdf_array_push_int (ctx, border, 16);
     pdf_array_push_int (ctx, border, 16);
     pdf_array_push_int (ctx, border, 0);
-    if (!starts (links[i].label, "#")) {
+    if (starts (links[i].label, "#")) {
+      // a place in the document: the name is the one anchor () registered,
+      // resolved through the tree write_dests puts in the catalogue
+      c_string s (links[i].label);
+      pdf_dict_put_text_string (ctx, a, PDF_NAME(Dest), s);
+    }
+    else {
       pdf_obj* act= pdf_dict_put_dict (ctx, a, PDF_NAME(A), 2);
       pdf_dict_put (ctx, act, PDF_NAME(S), PDF_NAME(URI));
       c_string s (links[i].label);
@@ -887,17 +945,37 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj) {
   }
 }
 
+// The outline, as the tree its levels describe. An entry hangs under the
+// last one of a smaller level; the count of an entry is negative when its
+// children start folded, which is what a reader expects of a deep tree.
 void
 mupdf_pdf_renderer_rep::write_outline () {
   if (N(outlines) == 0) return;
   pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
   pdf_obj* out= pdf_dict_put_dict (ctx, root, PDF_NAME(Outlines), 4);
   pdf_dict_put (ctx, out, PDF_NAME(Type), PDF_NAME(Outlines));
-  pdf_obj* first= NULL; pdf_obj* prev= NULL;
-  int count= 0;
+  // the chain of parents: parent[l] is the open entry of level l
+  array<pdf_obj*> parent;  parent << out;
+  array<int>      level;   level  << 0;
+  array<pdf_obj*> first;   first  << (pdf_obj*) NULL;
+  array<pdf_obj*> last;    last   << (pdf_obj*) NULL;
+  array<int>      count;   count  << 0;
   for (int i=0; i<N(outlines); i++) {
     if (outlines[i].page >= N(pages)) continue;
-    pdf_obj* item= pdf_new_dict (ctx, doc, 5);
+    int l= outlines[i].level;
+    while (N(parent) > 1 && level[N(level)-1] >= l) {
+      // close the entries which this one is not under
+      int k= N(parent) - 1;
+      if (first[k] != NULL) {
+        pdf_dict_put (ctx, parent[k], PDF_NAME(First), first[k]);
+        pdf_dict_put (ctx, parent[k], PDF_NAME(Last), last[k]);
+        pdf_dict_put_int (ctx, parent[k], PDF_NAME(Count), -count[k]);
+      }
+      parent->resize (k); level->resize (k);
+      first->resize (k); last->resize (k); count->resize (k);
+    }
+    int k= N(parent) - 1;
+    pdf_obj* item= pdf_new_dict (ctx, doc, 6);
     c_string t (outlines[i].title);
     pdf_dict_put_text_string (ctx, item, PDF_NAME(Title), t);
     pdf_obj* dest= pdf_dict_put_array (ctx, item, PDF_NAME(Dest), 5);
@@ -907,18 +985,55 @@ mupdf_pdf_renderer_rep::write_outline () {
     pdf_array_push_real (ctx, dest, outlines[i].y);
     pdf_array_push_int (ctx, dest, 0);
     pdf_obj* ref= pdf_add_object_drop (ctx, doc, item);
-    if (first == NULL) first= ref;
-    if (prev != NULL) {
-      pdf_dict_put (ctx, prev, PDF_NAME(Next), ref);
-      pdf_dict_put (ctx, ref, PDF_NAME(Prev), prev);
+    pdf_dict_put (ctx, ref, PDF_NAME(Parent), parent[k]);
+    if (first[k] == NULL) first[k]= ref;
+    else {
+      pdf_dict_put (ctx, last[k], PDF_NAME(Next), ref);
+      pdf_dict_put (ctx, ref, PDF_NAME(Prev), last[k]);
     }
-    pdf_dict_put (ctx, ref, PDF_NAME(Parent), out);
-    prev= ref; count++;
+    last[k]= ref; count[k]++;
+    // this entry is now open for the deeper ones
+    parent << ref; level << l;
+    first << (pdf_obj*) NULL; last << (pdf_obj*) NULL; count << 0;
   }
-  if (first != NULL) {
-    pdf_dict_put (ctx, out, PDF_NAME(First), first);
-    pdf_dict_put (ctx, out, PDF_NAME(Last), prev);
-    pdf_dict_put_int (ctx, out, PDF_NAME(Count), count);
+  for (int k= N(parent) - 1; k >= 0; k--) {
+    if (first[k] == NULL) continue;
+    pdf_dict_put (ctx, parent[k], PDF_NAME(First), first[k]);
+    pdf_dict_put (ctx, parent[k], PDF_NAME(Last), last[k]);
+    pdf_dict_put_int (ctx, parent[k], PDF_NAME(Count),
+                      (k == 0) ? count[k] : -count[k]);
+  }
+}
+
+// The places the links point at, as the name tree of the catalogue. The
+// names must be sorted, which is what a reader relies on to find one.
+void
+mupdf_pdf_renderer_rep::write_dests () {
+  if (N(dest_name) == 0) return;
+  array<int> ord;
+  for (int i=0; i<N(dest_name); i++) ord << i;
+  for (int i=1; i<N(ord); i++)     // few and nearly sorted: insertion
+    for (int j=i; j>0 && dest_name[ord[j]] < dest_name[ord[j-1]]; j--) {
+      int t= ord[j]; ord[j]= ord[j-1]; ord[j-1]= t;
+    }
+  pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+  pdf_obj* names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 1);
+  pdf_obj* dests= pdf_dict_put_dict (ctx, names, PDF_NAME(Dests), 1);
+  pdf_obj* arr= pdf_dict_put_array (ctx, dests, PDF_NAME(Names),
+                                    2 * N(ord));
+  for (int i=0; i<N(ord); i++) {
+    int k= ord[i];
+    int page= (int) dest_pos[k].x1;
+    if (page < 0 || page >= N(pages)) continue;
+    c_string nm (dest_name[k]);
+    pdf_array_push_string (ctx, arr, nm, strlen (nm));
+    pdf_obj* d= pdf_new_array (ctx, doc, 5);
+    pdf_array_push (ctx, d, pages[page]);
+    pdf_array_push (ctx, d, PDF_NAME(XYZ));
+    pdf_array_push_real (ctx, d, dest_pos[k].y1);
+    pdf_array_push_real (ctx, d, dest_pos[k].x2);
+    pdf_array_push_int (ctx, d, 0);
+    pdf_array_push_drop (ctx, arr, pdf_add_object_drop (ctx, doc, d));
   }
 }
 
@@ -944,6 +1059,18 @@ mupdf_pdf_renderer_rep::write_metadata () {
 /******************************************************************************
 * No shadows on paper
 ******************************************************************************/
+
+// Whatever falls back to being rasterized -- a pattern, a scalable image
+// with an effect -- is drawn into a picture through this; on paper it must
+// be made at a print resolution and not at the resolution of a screen.
+renderer
+mupdf_pdf_renderer_rep::shadow (picture& pic, SI x1, SI y1, SI x2, SI y2) {
+  double old_zoomf= this->zoomf;
+  set_zoom_factor (5.0 * PICTURE_ZOOM);
+  renderer ren= renderer_rep::shadow (pic, x1, y1, x2, y2);
+  set_zoom_factor (old_zoomf);
+  return ren;
+}
 
 void mupdf_pdf_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y) {
   (void) x1; (void) y1; (void) x2; (void) y2; (void) ren; (void) x; (void) y; }
