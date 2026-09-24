@@ -269,23 +269,32 @@
   (:require (== (version-tool name) "git"))
   (git-commit-file name (cork->utf8 msg)))
 
-(tm-define (git-commit-file name msg)
+(tm-define (git-commit-file name msg . opt-sign)
   (:synopsis "Commit the file @name with the message @msg (in utf8)")
+  (cdr (apply git-commit-file* (cons* name msg opt-sign))))
+
+(tm-define (git-commit-file* name msg . opt-sign)
+  (:synopsis "Commit @name with message @msg; return (success . message)")
+  ;; NOTE: the document is saved first, since Git commits what is on disk
   (with root (git-root name)
-    (cond ((not root) (not-in-git))
-          ((== (tm-string-trim-both msg) "") "Empty commit message")
+    (cond ((not root) (cons #f (not-in-git)))
+          ((== (tm-string-trim-both msg) "") (cons #f "Empty commit message"))
           ((git-merging? root)
-           "A merge is in progress; commit the whole working tree")
+           (cons #f "A merge is in progress; commit the whole working tree"))
           (else
+            (when (and (buffer-exists? name) (buffer-modified? name))
+              (buffer-save name)
+              (buffer-pretend-saved name))
+            (git-invalidate root)
             (with path (git-relative root name)
               (when (== (git-file-state name) 'untracked)
                 (git-run root "add" "--" path))
               (with ret (apply git-run-with-input
                                (append (list root msg "commit" "--file=-")
-                                       (git-commit-options)
+                                       (apply git-commit-options opt-sign)
                                        (list "--" path)))
                 (git-refresh root)
-                (git-message ret)))))))
+                (cons (git-ok? ret) (git-message ret))))))))
 
 (tm-define (git-stage-now name)
   (and-with root (git-root name)
@@ -411,15 +420,25 @@
           (when answ (git-mark-resolved-now name))))
       (git-mark-resolved-now name)))
 
-(tm-define (git-restore-revision-now name rev)
+(tm-define (git-restore-revision-now name rev . opt-path)
+  ;; The contents of the file at the revision (with the relative path
+  ;; opt-path at that revision, in case of renames) replace the file
+  ;; @name on disk; the index is not touched, so that the restoration
+  ;; is a new change which can be discarded
   (and-with root (git-root name)
-    (git-with-reload root
-      (lambda ()
-        (git-report (git-run root "checkout" rev "--" (git-relative root name))
-                    (string-append "Restored the version "
-                                   (short-hash rev)))))))
+    (let* ((path (if (null? opt-path) (git-relative root name) (car opt-path)))
+           (spec (string-append rev ":" path)))
+      (if (not (git-ok? (git-run root "cat-file" "-e" spec)))
+          (set-message (string-append "The document does not exist at the "
+                                      "version " (short-hash rev)) "Restore")
+          (with s (git-show-file root rev path)
+            (git-with-reload root
+              (lambda ()
+                (string-save s name)
+                (set-message (string-append "Restored the version "
+                                            (short-hash rev)) "Restore"))))))))
 
-(tm-define (git-restore-revision name rev)
+(tm-define (git-restore-revision name rev . opt-path)
   (:synopsis "Replace @name by its version at the revision @rev")
   (:interactive #t)
   ;; NOTE: the history is kept: the restored version is a new change,
@@ -431,11 +450,22 @@
           (user-confirm (string-append "Replace the current version by the "
                                        "version " (short-hash rev) "?") #f
             (lambda (answ)
-              (when answ (git-restore-revision-now name rev)))))))
+              (when answ
+                (apply git-restore-revision-now (cons* name rev opt-path))))))))
+
+(tm-define (git-history-path name rev)
+  (:synopsis "Hash and relative path for a revision from the history of @name")
+  ;; Revisions of the history have the form <hash>:<tmfs file>
+  (with l (string-tokenize-by-char-n rev #\: 1)
+    (if (null? (cdr l)) (list rev #f)
+        (with root (git-root name)
+          (list (car l)
+                (and root (git-relative root (tmfs-string->url (cadr l)))))))))
 
 (tm-define (git-revision-of u)
   (:synopsis "The Git revision shown in the revision buffer @u, or #f")
   (and (version-revision? u)
+       (git-root (version-head u))
        (with rev (version-get-revision u)
          (and (git-safe-name? rev) (nin? rev '("INDEX" "BASE" "OURS" "THEIRS"))
               rev))))

@@ -667,9 +667,11 @@
   (:check-mark "*" git-test-pull-mode?)
   (set-preference "git pull mode" m))
 
-(tm-define (git-commit-options)
+(tm-define (git-commit-options . opt-sign)
   (:synopsis "Additional options for all commits")
-  (if (git-signing?) (list "--gpg-sign") '()))
+  ;; The optional argument overrides the preference for signing
+  (if (if (null? opt-sign) (git-signing?) (car opt-sign))
+      (list "--gpg-sign") '()))
 
 (tm-define (git-signature root rev)
   (:synopsis "Description of the signature of the commit @rev, or #f")

@@ -169,6 +169,9 @@
                        ""
                        (map (lambda (x) (string-append "- " x)) l))))))
 
+(define (git-short-rev rev)
+  (if (> (string-length rev) 7) (string-take rev 7) rev))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Snapshots
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -185,37 +188,53 @@
   (:check-mark "v" git-simple-mode?)
   (set-preference "git simple mode" (if (git-simple-mode?) "off" "on")))
 
-(tm-define (git-save-snapshot root msg)
+(tm-define (git-save-snapshot root msg . opt-done)
   (:synopsis "Save the state of all files of @root, described by @msg")
-  ;; The message @msg is in the utf8 encoding
-  (if (== (tm-string-trim-both msg) "")
-      (set-message "Please describe the snapshot" "Snapshot")
-      (git-when-saved root
-        (lambda ()
-          (with ret (git-run root "add" "--all")
-            (if (not (git-ok? ret))
-                (git-report ret "Snapshot")
-                (git-commit-staged root msg)))))))
+  ;; The message @msg is in the utf8 encoding; the optional argument
+  ;; is called with #t when the snapshot has been saved
+  (with done (if (null? opt-done) ignore (car opt-done))
+    (if (== (tm-string-trim-both msg) "")
+        (set-message "Please describe the snapshot" "Snapshot")
+        (git-when-saved root
+          (lambda ()
+            (with ret (git-run root "add" "--all")
+              (if (not (git-ok? ret))
+                  (git-report ret "Snapshot")
+                  (done (git-commit-staged root msg)))))))))
 
 (tm-define (git-snapshots root)
   (:synopsis "The most recent snapshots (commits) of @root")
   (git-log root 0 15))
 
 (tm-define (git-restore-snapshot-now root rev)
-  (git-with-reload root
-    (lambda ()
-      (git-report (git-run root "restore" (string-append "--source=" rev)
-                           "--staged" "--worktree" "--" ".")
-                  "Restored snapshot"))))
+  ;; NOTE: restoring discards the current state of the files, so this
+  ;; state is first saved in an automatic snapshot, if it has changes
+  (let* ((changes? (nnull? (git-status-entries root)))
+         (saved? (or (not changes?)
+                     (and (git-ok? (git-run root "add" "--all"))
+                          (git-ok? (git-run-with-input
+                                    root (string-append
+                                          "Automatic snapshot before "
+                                          "restoring " (git-short-rev rev))
+                                    "commit" "--file=-"))))))
+    (git-invalidate root)
+    (if (not saved?)
+        (set-message "Could not save the current state; nothing restored"
+                     "Snapshot")
+        (git-with-reload root
+          (lambda ()
+            (git-report (git-run root "restore" (string-append "--source=" rev)
+                                 "--staged" "--worktree" "--" ".")
+                        "Restored snapshot"))))))
 
 (tm-define (git-restore-snapshot root rev)
   (:synopsis "Put back all files of @root as they were at @rev")
   (if (not (git-safe-name? rev))
       (set-message "Invalid snapshot" "Snapshot")
       (user-confirm (string-append "Put back all files as they were in the "
-                                   "snapshot " (string-take rev 7)
-                                   "? The current state can be saved as a "
-                                   "snapshot first.") #f
+                                   "snapshot " (git-short-rev rev)
+                                   "? The current state is first saved in "
+                                   "an automatic snapshot.") #f
         (lambda (answ)
           (when answ
             (git-when-saved root

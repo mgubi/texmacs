@@ -154,6 +154,31 @@
                                      (tree->stree (footer-hook (tm->tree "x"))))
                                     "Git")))
       (switch-to-buffer u))
+    (test-commit-safety)))
+
+(define (test-commit-safety)
+  ;; Committing saves the document first; the panel keeps the message
+  (with u (system->url (string-append T "/remote/clone c/doc.tm"))
+    (switch-to-buffer u)
+    (buffer-set-body u '(document "Unsaved, then committed."))
+    (buffer-pretend-modified u)
+    (with r (git-commit-file* u "commit unsaved" #f)
+      (check "commit of unsaved document" (car r))
+      (check "unsaved edits committed"
+             (string-contains? (git-show-file (git-root u) "HEAD" "doc.tm")
+                               "Unsaved, then committed.")))
+    (git-open-tool)
+    (with p (list-find (buffer-list)
+                       (lambda (b) (string-starts? (url->unix b)
+                                                   "tmfs://aux/git-panel")))
+      (check "panel message buffer" p)
+      (when p
+        (buffer-set-body p '(document "a message being typed"))
+        (refresh-now "git-tool")
+        (git-refresh (git-root u))
+        (check "panel keeps the message"
+               (== (buffer-get-body p) (tm->tree '(document
+                                                   "a message being typed"))))))
     (test-diverged)))
 
 (define (test-diverged)
