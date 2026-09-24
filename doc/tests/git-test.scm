@@ -13,6 +13,21 @@
 (define R (system->url D))
 (define F (system->url (string-append D "/sub dir/a b.tm")))
 (define (file name) (system->url (string-append D "/" name)))
+(define T (getenv "GIT_TEST_DIR"))
+
+;; Untrusted repositories: Git is not run (their configuration could run
+;; programs, here through core.fsmonitor)
+(with E (system->url (string-append T "/evil"))
+  (check "untrusted: no status" (not (git-status E)))
+  (check "untrusted: no program run"
+         (not (url-exists? (system->url (string-append T "/evil-pwned")))))
+  (git-trust E)
+  (check "trusted: status" (nnot (git-status E)))
+  (check "trusted: fsmonitor still disabled"
+         (not (url-exists? (system->url (string-append T "/evil-pwned"))))))
+
+(for (r (list "/repo test" "/wt test" "/drv" "/proj"))
+  (git-trust (system->url (string-append T r))))
 
 ;; Detection
 (check "root with spaces" (== (url->system (git-root F)) D))

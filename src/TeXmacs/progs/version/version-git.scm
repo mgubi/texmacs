@@ -599,7 +599,9 @@
     (version-tool-reset)
     (when (and (git-ok? ret) (not (url-exists? (url-append dir ".gitignore"))))
       (string-save default-gitignore (url-append dir ".gitignore")))
-    (when (git-ok? ret) (git-remember-repository dir))
+    (when (git-ok? ret)
+      (git-trust dir)
+      (git-remember-repository dir))
     (git-report ret "Created repository")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -722,6 +724,7 @@
                            #f
               (lambda (ret)
                 (when (git-report ret "Cloned repository")
+                  (git-trust dest)
                   (version-tool-reset)
                   (when (not done) (git-show-status dest)))
                 (when done (done ret))))))))
@@ -1014,7 +1017,11 @@
          (untracked (list-filter l git-entry-untracked?)))
     (if (not st)
         (git-page root "Git status"
-                  "This directory is not a Git working tree.")
+                  (if (git-trusted? root)
+                      "This directory is not a Git working tree."
+                      (string-append "This repository is not trusted yet. "
+                                     "Open one of its documents and use "
+                                     "Version -> Use Git in this folder.")))
         (apply git-page
                (append
                 (list root "Git status"

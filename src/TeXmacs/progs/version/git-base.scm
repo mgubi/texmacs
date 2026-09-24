@@ -25,6 +25,7 @@
   ("git sign" "off" noop)
   ("git suggest messages" "on" noop)
   ("git mode chosen" "off" noop)
+  ("git trusted repositories" "" noop)
   ("git pull mode" "fast-forward" noop)
   ("git recent repositories" "" noop))
 
@@ -99,6 +100,8 @@
                 "-C" (url->system root)
                 "-c" "core.quotepath=off"
                 "-c" "color.ui=false"
+                ;; never run the file system monitor of a repository
+                "-c" "core.fsmonitor=false"
                 ;; file names are never patterns
                 "--literal-pathspecs")
           args))
@@ -152,7 +155,15 @@
       (list -1 "" "not in a Git working tree")
       (git-run-in root input args)))
 
+(define untrusted-result
+  (list -1 "" "This repository is not trusted: use Version -> Use Git in this folder"))
+
 (define (git-run-in root input args)
+  (if (not (git-trusted? root))
+      untrusted-result
+      (git-run-trusted root input args)))
+
+(define (git-run-trusted root input args)
   (git-set-environment)
   (let* ((cmd (git-arguments root args))
          (ret (cond ((not (spawn-supported?)) (git-shell-run cmd input))
@@ -184,7 +195,9 @@
                  (ahash-remove! git-busy-table key)
                  (git-remember root args r)
                  (cont r))))
-    (cond ((ahash-ref git-busy-table key)
+    (cond ((not (git-trusted? root))
+           (cont untrusted-result))
+          ((ahash-ref git-busy-table key)
            (cont (list -1 "" "Another Git command is still running")))
           ((not (spawn-supported?))
            (done (git-result (git-shell-run cmd input))))
@@ -221,13 +234,50 @@
 
 (tm-define (git-available?)
   (:synopsis "Can the Git executable be run?")
+  ;; NOTE: not run inside any repository
   (with exe (get-preference "git executable")
     (when (not (ahash-ref git-available-cache exe))
       (ahash-set! git-available-cache exe
-                  (with ret (git-run-with-input (system->url "$HOME") #f
-                                                "--version")
-                    (if (git-ok? ret) 'yes 'no))))
+                  (with ret (if (spawn-supported?)
+                                (evaluate-system (list exe "--version")
+                                                 '() '() '(1 2))
+                                (list (if (!= (eval-system
+                                               (string-append
+                                                (git-shell-quote exe)
+                                                " --version")) "")
+                                          "0" "1")))
+                    (if (== (car ret) "0") 'yes 'no))))
     (== (ahash-ref git-available-cache exe) 'yes)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Trusted repositories
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The configuration of a repository may make Git run arbitrary programs
+;; (for instance core.fsmonitor, or the filters of .gitattributes), even
+;; for "git status".  Since TeXmacs runs Git by itself (for the footer, the
+;; menus, the Git pages), it only does so in repositories which the user
+;; trusts: those created or cloned from TeXmacs, and those explicitly
+;; trusted with Version -> Use Git in this folder.
+
+(define (trusted-list)
+  (list-filter (git-split (get-preference "git trusted repositories") "\n")
+               (lambda (s) (!= s ""))))
+
+(tm-define (git-trusted? u)
+  (:synopsis "May Git be run for @u (a file or directory)?")
+  ;; True outside working trees (e.g. for git init)
+  (with r (git-root u)
+    (or (not r)
+        (in? (url->system r) (trusted-list)))))
+
+(tm-define (git-trust root)
+  (:synopsis "Trust the Git working tree @root")
+  (with s (url->system root)
+    (when (nin? s (trusted-list))
+      (set-preference "git trusted repositories"
+                      (string-recompose (cons s (trusted-list)) "\n"))
+      (git-invalidate root))))
 
 ;; Revisions and names of branches, tags, stashes or remotes may come from
 ;; untrusted sources (links in documents); they must never be taken for
@@ -314,6 +364,10 @@
 (tm-define (git-status root)
   (:synopsis "Status of the working tree @root (or #f)")
   (and root (git-status-in root)))
+
+(tm-define (git-status-known? root)
+  (:synopsis "Has the status of @root been asked for (even if it failed)?")
+  (and root (nnot (ahash-ref git-status-table (url->system root)))))
 
 (define (git-status-in root)
   (let* ((key (url->system root))
@@ -652,7 +706,8 @@
 
 (define (footer-schedule root)
   (with key (url->system root)
-    (when (not (ahash-ref git-footer-pending key))
+    (when (and (not (ahash-ref git-footer-pending key))
+               (not (git-status-known? root)))
       (ahash-set! git-footer-pending key #t)
       (delayed
         (:idle 500)
@@ -692,7 +747,8 @@
   (:synopsis "Add the state of the Git working tree to the footer @t")
   (let* ((u (current-buffer))
          (root (and u (git-root u)))
-         (s (and root (git-footer-text root))))
+         (s (and root (git-trusted? root) (git-available?)
+                 (git-footer-text root))))
     (if (not s) t
         (stree->tree `(concat ,(tree->stree t) (hspace "2em")
                               (with "color" "dark grey" ,s))))))
@@ -715,6 +771,10 @@
                                                          ".git"))))))
 
 (tm-define (git-remember-repository root)
+  (when (git-trusted? root)
+    (git-remember-trusted root)))
+
+(define (git-remember-trusted root)
   (let* ((s (url->system root))
          (l (cons s (list-filter (git-recent-repositories)
                                  (lambda (x) (!= x s))))))

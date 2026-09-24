@@ -845,6 +845,21 @@
   (:interactive #t)
   (dialogue-window (git-clone-widget) noop "Clone Git repository"))
 
+(tm-define (git-interactive-trust name)
+  (:synopsis "Allow TeXmacs to run Git for the working tree of @name")
+  (:interactive #t)
+  (and-with root (git-root name)
+    (user-confirm (string-append "Use Git in " (utf8->cork (url->system root))
+                                 "? Only do this for folders whose origin "
+                                 "you trust: the configuration of a "
+                                 "repository can make Git run programs.") #f
+      (lambda (answ)
+        (when answ
+          (git-trust root)
+          (git-remember-repository root)
+          (git-refresh root)
+          (set-message "Git is now used in this folder" "Git"))))))
+
 (tm-define (git-interactive-init name)
   (:synopsis "Create a Git repository for the document @name")
   (:interactive #t)

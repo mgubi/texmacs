@@ -11,6 +11,8 @@ if test "$1" = "--gui"; then gui=yes; shift; fi
 here=$(cd "$(dirname "$0")" && pwd)
 src=$(cd "$here/../../src" && pwd)
 dir=${1:-$(mktemp -d)}
+# every run starts from fresh preferences and repositories
+rm -rf "$dir/home" "$dir/new repo" "$dir/outside.tm"
 mkdir -p "$dir/home"
 
 tm () {
@@ -73,6 +75,11 @@ if test $gui = no; then
   echo png > fig.png
   echo "@article{a, title={A}}" > refs.bib
   git add main.tm && git commit -q -m main
+  # a repository whose configuration runs a program
+  rm -rf "$dir/evil" "$dir/evil-pwned" && mkdir -p "$dir/evil" && cd "$dir/evil" || exit 1
+  git init -q
+  echo x > a.tm
+  git config core.fsmonitor "touch '$dir/evil-pwned'; false"
   # a fake GnuPG, which signs anything
   cat > "$dir/fake-gpg" <<'GPG'
 #!/bin/sh
@@ -145,4 +152,12 @@ n=$(grep -c -E 'Guile error|bad format' "$log")
 if test "$n" != "0"; then
   echo "FAIL $n Scheme errors in $log:"
   grep -E -B2 'Guile error|bad format' "$log" | head -12
+fi
+# the exit status tells whether all tests ran and passed
+if grep -q '^FAILURES: 0$' "$log" && test "$n" = "0" &&
+   ! grep -q -E '^(FAIL |TEST-ERROR)' "$log"; then
+  exit 0
+else
+  grep -q '^FAILURES:' "$log" || echo "FAIL the tests did not complete (crash or time out), see $log"
+  exit 1
 fi
