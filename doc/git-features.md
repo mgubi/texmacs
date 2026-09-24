@@ -16,7 +16,8 @@ commits ahead as of 2026-09-24.
   `texmacs/texmacs/tm-server.scm`, the Tools and Preferences menus);
 * the footer hook and lazy handlers in `init-texmacs.scm`, and a save
   hook in `tm-files.scm`;
-* the user manual (`man-versioning.en.tm`).
+* the user manual: the chapter *Working with Git* (`man-git*.en.tm` in
+  `doc/main/editing`), linked from `man-versioning.en.tm`.
 
 Everything below is in the **Version** menu. By default (Tools →
 Versioning tool → Automatic) it appears for documents in a git or SVN

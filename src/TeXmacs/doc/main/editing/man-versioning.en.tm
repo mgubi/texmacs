@@ -148,84 +148,12 @@
   <paragraph*|Working with <name|Git>>
 
   For documents inside a <name|Git> working tree, the <menu|Version> menu
-  starts with the most frequent actions: <menu|Version|Commit> (or
-  <menu|Version|Save snapshot> in the simple mode, see below),
-  <menu|Version|Synchronize>, which gets the changes of your coauthors and
-  sends yours, and <menu|Version|Git panel>, a side panel with the state of
-  the repository. Then come the entries for the current document, and the
-  submenus <menu|Version|This file>, <menu|Version|Project> and a submenu
-  for the whole repository, whose name shows its state, like <menu|Git
-  (main, 3 changed)>, and which we will call <menu|Version|Git> below. The
-  footer of the window also shows the state of the repository.
-
-  Since the configuration of a repository could make <name|Git> run
-  programs, <TeXmacs> only uses <name|Git> in the repositories which you
-  created or cloned with <TeXmacs>, and in those for which you choose
-  <menu|Version|Use Git in this folder>. A document which does not belong
-  to any repository can be put under version control using
-  <menu|Version|Create Git repository>, and an existing repository can be
-  copied using <menu|Version|Clone Git repository>.
-
-  For the current document, <menu|Version|This file|Add to repository>,
-  <menu|Version|This file|Stage changes> and <menu|Version|This file|Unstage
-  changes> control which changes will be part of the next commit,
-  <menu|Version|This file|Commit this file> saves and commits the document
-  on its own, and <menu|Version|This file|Discard changes> restores the
-  version which was last staged. Using <menu|Version|Compare with>, the
-  document can be compared with the last commit, the staged version, the
-  version of your coauthors, the version before the last merge, a tag,
-  another branch or any other revision. The differences are shown in the
-  same way as when comparing two files, and a bar at the bottom of the
-  window helps you to go through them and to retain the right versions.
-
-  The page <menu|Version|Git|Status> lists the staged, modified, untracked
-  and conflicting files, with buttons for opening, comparing, staging,
-  unstaging or discarding each of them. The same information is shown in
-  the Git panel. <menu|Version|Commit> opens a dialog in which you enter a
-  message and select the files to be committed. <menu|Version|Git|Log>,
-  <menu|Version|Git|Graph> and <menu|Version|Git|Branches and tags> show
-  the history, the branches, the tags and the stashes of the repository.
-  The <menu|Version|Git> menu also allows you to create, switch to and
-  merge branches, to tag the current version, to stash your changes, and
-  to fetch, get and send changes from and to other repositories (<menu|Get
-  changes> and <menu|Send changes>); the latter operations run in the
-  background. Documents which are changed on disk by <name|Git> are
-  reloaded automatically.
-
-  When a merge leads to a conflict in a <TeXmacs> document, use
-  <menu|Version|Resolve conflict>. The changes which were made on only one
-  side are merged automatically, even inside a same paragraph; the
-  remaining conflicts are displayed as differences, where the old version
-  is yours and the new version is the other one. After retaining the right
-  version for each of them, use <menu|Version|Mark as resolved> and commit.
-  With <menu|Version|Git|Merge documents structurally>, you may also ask
-  <name|Git> to call <TeXmacs> for merging documents in this repository,
-  also when merging from the command line.
-
-  <menu|Version|Who changed what> shows the document with, before each
-  paragraph, the commit, the author and the date of its last change.
-  <menu|Version|Restore version> puts back an older version of the document
-  as a new change, so that nothing is lost. For a document which is split
-  into several files, <menu|Version|Project|Commit project> commits all
-  files used by the document (included documents, images, bibliographies
-  and style files), and <menu|Version|Project|Add missing files> adds those
-  which are not yet under version control. In the commit dialog,
-  <menu|Suggest message> proposes a message which lists the sections that
-  were changed.
-
-  If you prefer not to deal with the details of <name|Git>, then choose the
-  simple mode when <TeXmacs> asks for it, or in <menu|Version|Git
-  preferences>. The <menu|Version> menu then offers to save snapshots of
-  all your files, to restore one of the recent snapshots (the current
-  state is saved first), and to synchronize with the repositories of your
-  coauthors. The other preferences of the <name|Git> tools are also in
-  <menu|Version|Git preferences>.
-
-  The keyboard shortcuts <key|version g>, <key|version c>, <key|version y>,
-  <key|version s> and <key|version => respectively open the Git panel,
-  commit (or save a snapshot), synchronize, show the status page and
-  compare the document with its last commit. All commands which were
-  executed can be inspected using <menu|Version|Git|Git output>.
+  gives access to a complete interface to <name|Git>: committing changes
+  or saving snapshots, comparing the document with any earlier version,
+  restoring versions, seeing who changed what, synchronizing with
+  coauthors, branches and tags, and the structured resolution of
+  conflicts. These tools are described in the chapter <hlink|working with
+  <name|Git>|man-git.en.tm>.
 
   <tmdoc-copyright|2010\U2019|Joris van der Hoeven|Darcy Shen>
 
