@@ -123,12 +123,22 @@ get_bounding_rectangle (tree t) {
   return ret;
 }
 
+bool use_mupdf_pdf (); // edit_main.cpp
+
 bool
 supports_native_pdf () {
 #ifdef PDF_RENDERER
   return true;
 #else
+#ifdef MUPDF_RENDERER
+  // The writer on MuPDF is a native PDF renderer too, when it is the one
+  // chosen. Saying so keeps the Scheme side and the C++ side of the same
+  // mind: printer-file-suffix would otherwise ask for PostScript while
+  // use_pdf () was writing a PDF (see docs/pdf-output-with-mupdf.md).
+  return use_mupdf_pdf ();
+#else
   return false;
+#endif
 #endif
 }
 

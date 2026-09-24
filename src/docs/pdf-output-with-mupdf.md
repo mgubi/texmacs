@@ -299,15 +299,28 @@ readers then substitute.
 * **Real tiling patterns.** A patterned page costs five hundred `Do`
   operators and one image; a `/Pattern` would cost one fill. It is a
   saving in the content stream, not in the file, since the image is
-  already shared.
+  already shared and the stream compresses: the patterned test document
+  is 20 KB. Not worth the machinery as things stand.
 * **Encryption.** `pdf_write_options` has the fields and nothing in
   TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
   out), so it is written down rather than written.
 * **An image with an effect** on it has to be computed, so it is
   rasterized -- at a print resolution, but rasterized.
 * **A preference in the menus.** The renderer is chosen by the preference
-  `native pdf renderer` or by the environment, not by anything a user can
-  click.
+  `native pdf renderer` set to `mupdf`, or by `TEXMACS_PDF_MUPDF=1`, not by
+  anything a user can click. The menu it belongs in,
+  *TeXmacs -> Pdf/Postscript*, is itself shown only when
+  `supports-native-pdf?` is true, which -- now that the answer depends on
+  the preference -- would mean the entry which turns the renderer on is
+  hidden until it is on. Reaching it wants either a glue predicate of its
+  own or an entry in the shared menu which does nothing on the builds
+  without MuPDF; for a prototype the preference is interface enough.
+
+`supports-native-pdf?` does answer for the MuPDF renderer when it is the
+one chosen, which it has to: `printer-file-suffix` and
+`printer-file-format` are built on it, and they were asking for PostScript
+while `use_pdf ()` was writing a PDF. With the renderer off both say
+PostScript, as before; with it on both say PDF.
 
 ## Checking it
 
