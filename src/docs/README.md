@@ -11,6 +11,7 @@ to look in the code.
 | [vue-widgets.md](vue-widgets.md) | Catalogue of the widgets implemented in Vue, their layout rules and callback protocols |
 | [vue-testing.md](vue-testing.md) | Snapshot and scripted-event harness, how to run and write tests |
 | [texmacs-gui-architecture.md](texmacs-gui-architecture.md) | How the TeXmacs core talks to a GUI plugin: widget factories, slots, Scheme markup, tools, dialogs, the client/server sockets, the other entry points |
+| [pdf-output-with-mupdf.md](pdf-output-with-mupdf.md) | Writing the PDF with MuPDF instead of PDFHummus: what the Hummus renderer does, what MuPDF offers, the font subsetting which blocks it, and a working prototype |
 | [build-and-debug.md](build-and-debug.md) | Configuring, building, dependency tracking, crash reports, pitfalls met along the way |
 
 Source: `src/Plugins/Vue/` (`vue_gui.cpp`, `vue_widget.cpp`, headers, `TODO`,

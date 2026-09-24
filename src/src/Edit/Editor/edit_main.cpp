@@ -216,6 +216,11 @@ use_pdf () {
 #ifdef PDF_RENDERER
   return get_preference ("native pdf", "on") == "on";
 #else
+#ifdef MUPDF_RENDERER
+  // the prototype of a PDF writer on MuPDF writes the document itself,
+  // instead of having Ghostscript make it out of PostScript
+  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
+#endif
   return false;
 #endif
 }
