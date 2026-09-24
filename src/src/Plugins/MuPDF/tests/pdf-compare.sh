@@ -32,6 +32,7 @@ DOCS_DEFAULT="TeXmacs/doc/main/man-manual.en.tm
 TeXmacs/doc/main/automated/tag-help.en.tm
 TeXmacs/doc/main/start/man-conventions.en.tm
 src/Plugins/MuPDF/tests/figures.tm
+src/Plugins/MuPDF/tests/pdf-figures.tm
 src/Plugins/MuPDF/tests/pattern.tm
 src/Plugins/MuPDF/tests/pattern-photo.tm
 src/Plugins/MuPDF/tests/ligatures.tm
@@ -103,6 +104,32 @@ for doc in ${*:-$DOCS_DEFAULT}; do
     fail=1
   else
     echo "  ok    ligatures: $lig drawn, $span with their letters"
+  fi
+
+  # PDF figures the right way up. The two readers cannot see a figure
+  # upside down, since they draw the same file: the figures of
+  # pdf-figures.tm have text in them which says where it must be -- UP
+  # above the caption in the upright one, to its right in the one turned
+  # by /Rotate 90
+  if [ "$name" = pdf-figures ]; then
+    way=$(mutool draw -F stext -o - "$mu" 2>/dev/null | python3 -c '
+import sys, re
+up, cap= [], []
+for m in re.finditer (r"<line bbox=\"([^\"]*)\"[^>]*>(.*?)</line>", sys.stdin.read (), re.S):
+    s= "".join (re.findall (r"c=\"([^\"]*)\"", m.group (2)))
+    b= [float (v) for v in m.group (1).split ()]
+    if s == "UP": up.append (b)
+    elif s.startswith ("vector figure"): cap.append (b)
+up.sort (); cap.sort ()
+if len (up) != 2 or len (cap) != 2: print ("the figure text is not there")
+elif not up[0][1] < cap[0][1]: print ("the upright figure is upside down")
+elif not up[1][0] > cap[1][0]: print ("the rotated figure is turned the wrong way")
+else: print ("ok")')
+    if [ "$way" = ok ]; then
+      echo "  ok    the figures are the right way up"
+    else
+      echo "  FAIL  $way"; fail=1
+    fi
   fi
 
   # the two readers must agree on what the file says

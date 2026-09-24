@@ -195,6 +195,34 @@ class mupdf_pattern {
 CONCRETE_NULL_CODE (mupdf_pattern);
 
 /******************************************************************************
+* pdf figures, drawn as drawing
+******************************************************************************/
+
+// A PDF figure as a form XObject. Each lives in the document it was read
+// from -- read into memory, so that no file stays open -- and the form is
+// made there, around the contents and the resources of the first page;
+// dropping the form drops the document, and the memory with it (a form
+// grafted into the one auxiliary document would stay there for good).
+struct mupdf_form_rep: concrete_struct {
+  pdf_document *doc;
+  pdf_obj *xo;
+  mupdf_form_rep (pdf_document* doc2, pdf_obj* xo2): doc (doc2), xo (xo2) {}
+  ~mupdf_form_rep () {
+    pdf_drop_obj (mupdf_context (), xo);
+    pdf_drop_document (mupdf_context (), doc);
+  }
+  friend class mupdf_form;
+};
+
+class mupdf_form {
+  CONCRETE_NULL (mupdf_form);
+  mupdf_form (pdf_document* doc2, pdf_obj* xo2):
+    rep (tm_new<mupdf_form_rep> (doc2, xo2)) {}
+};
+
+CONCRETE_NULL_CODE (mupdf_form);
+
+/******************************************************************************
 * pdf fonts
 ******************************************************************************/
 
@@ -228,6 +256,7 @@ static hashmap<unsigned long long int, mupdf_image> picture_pool;
 static hashmap<tree, mupdf_image>  image_pool;
 static hashmap<tree, mupdf_pattern> pattern_pool;
 static hashmap<tree, mupdf_image> pattern_image_pool;
+static hashmap<tree, mupdf_form> form_pool; // nil: MuPDF cannot read it
 static hashmap<string, mupdf_font> native_fonts;
 
 // Garbage collect the cached images whose name matches (image_gc in
@@ -238,6 +267,7 @@ void mupdf_image_gc (string name) {
     image_pool= hashmap<tree, mupdf_image> ();
     pattern_pool= hashmap<tree, mupdf_pattern> ();
     pattern_image_pool= hashmap<tree, mupdf_image> ();
+    form_pool= hashmap<tree, mupdf_form> ();
     return;
   }
   array<tree> gone;
@@ -256,6 +286,14 @@ void mupdf_image_gc (string name) {
       gone << key;
   }
   for (int i= 0; i < N(gone); i++) pattern_image_pool->reset (gone[i]);
+  gone= array<tree> ();
+  it= iterate (form_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) form_pool->reset (gone[i]);
 }
 
 // flush caches
@@ -265,6 +303,7 @@ void del_obj_mupdf_renderer (void)  {
   picture_pool= hashmap<unsigned long long int, mupdf_image> ();
   pattern_pool= hashmap<tree, mupdf_pattern> ();
   pattern_image_pool= hashmap<tree, mupdf_image> ();
+  form_pool= hashmap<tree, mupdf_form> ();
   native_fonts= hashmap<string, mupdf_font> ();
 }
 
@@ -1239,6 +1278,103 @@ image (fz_context *ctx, pdf_processor *proc, mupdf_image im, int alpha,
   proc->op_Q (ctx, proc);
 }
 
+// the content streams of a page, which may be one stream or a list of them
+static fz_buffer*
+page_contents (fz_context* ctx, pdf_obj* contents) {
+  if (!pdf_is_array (ctx, contents)) return pdf_load_stream (ctx, contents);
+  fz_buffer* all= fz_new_buffer (ctx, 4096);
+  int n= pdf_array_len (ctx, contents);
+  for (int i=0; i<n; i++) {
+    fz_buffer* b= NULL;
+    fz_try (ctx) { b= pdf_load_stream (ctx, pdf_array_get (ctx, contents, i)); }
+    fz_catch (ctx) { b= NULL; }
+    if (b == NULL) continue;
+    unsigned char* d= NULL;
+    size_t len= fz_buffer_storage (ctx, b, &d);
+    fz_append_data (ctx, all, d, len);
+    fz_append_byte (ctx, all, '\n');
+    fz_drop_buffer (ctx, b);
+  }
+  return all;
+}
+
+// The first page of a PDF file as a form, nil if MuPDF cannot read it.
+static mupdf_form
+load_pdf_form (url u) {
+  fz_context* ctx= mupdf_context ();
+  fz_buffer* data= NULL;
+  fz_stream* in= NULL;
+  fz_buffer* buf= NULL;
+  pdf_document* doc= NULL;
+  pdf_obj* xo= NULL;
+  fz_var (data); fz_var (in); fz_var (buf); fz_var (doc); fz_var (xo);
+  fz_try (ctx) {
+    c_string path (concretize (u));
+    data= fz_read_file (ctx, path);
+    in= fz_open_buffer (ctx, data);
+    doc= pdf_open_document_with_stream (ctx, in);
+    pdf_obj* page= pdf_lookup_page_obj (ctx, doc, 0);
+    fz_rect box; fz_matrix m;
+    pdf_page_obj_transform (ctx, page, &box, &m);
+    // pdf_page_obj_transform gives fitz's transform of the page, which
+    // turns PDF space (y up) into fitz space (y down) as well as undoing
+    // /Rotate; a form's /Matrix lives in PDF space, so the turn upside
+    // down is taken back out, or every figure comes out upside down
+    m= fz_concat (m, fz_scale (1, -1));
+    buf= page_contents (ctx, pdf_dict_get (ctx, page, PDF_NAME(Contents)));
+    pdf_obj* res= pdf_dict_get_inheritable (ctx, page, PDF_NAME(Resources));
+    xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
+  }
+  fz_always (ctx) {
+    fz_drop_buffer (ctx, buf);
+    fz_drop_stream (ctx, in);
+    fz_drop_buffer (ctx, data);
+  }
+  fz_catch (ctx) {
+    cout << "TeXmacs] MuPDF cannot read " << u << ": "
+         << fz_caught_message (ctx) << LF;
+    pdf_drop_obj (ctx, xo);
+    pdf_drop_document (ctx, doc);
+    return mupdf_form ();
+  }
+  return mupdf_form (doc, xo);
+}
+
+// Draw a form into the box of size w by h (device pixels) whose lower left
+// corner is at (x, y). A form is drawn in its /BBox as its own /Matrix
+// places it -- a page turned by /Rotate comes with a matrix which turns it
+// back -- so it is that placed box which is mapped onto the one asked for,
+// as in the PDF renderer.
+static void
+draw_form (fz_context *ctx, pdf_processor *proc, mupdf_form fm, int alpha,
+           double w, double h, double x, double y) {
+  if (is_nil (fm) || fm->xo == NULL) return;
+  fz_rect b= pdf_dict_get_rect (ctx, fm->xo, PDF_NAME(BBox));
+  b= fz_transform_rect (b, pdf_dict_get_matrix (ctx, fm->xo, PDF_NAME(Matrix)));
+  double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+  if (bw <= 0 || bh <= 0) return;
+  double sx= w / bw, sy= h / bh;
+  // q and Q stay outside: a figure which throws halfway must not leave
+  // the graphics state one level deeper
+  proc->op_q (ctx, proc);
+  mupdf_protected ("draw_form", [&] () {
+    set_default_gstate (ctx, proc);
+    proc->op_cm (ctx, proc, sx, 0, 0, sy, x - b.x0 * sx, y - b.y0 * sy);
+    float da= ((float) alpha) / 255.0;
+    proc->op_gs_ca (ctx, proc, da);
+    proc->op_gs_CA (ctx, proc, da);
+    // a form is run against the resources of the stream it occurs in,
+    // and the operators here come from no stream: give it an empty stack
+    // (the form has resources of its own), the frame which
+    // pdf_process_contents would have pushed
+    pdf_processor_push_resources (ctx, proc, NULL);
+    fz_try (ctx) { proc->op_Do_form (ctx, proc, "Fm", fm->xo); }
+    fz_always (ctx) { pdf_drop_obj (ctx, pdf_processor_pop_resources (ctx, proc)); }
+    fz_catch (ctx) { fz_rethrow (ctx); }
+  });
+  proc->op_Q (ctx, proc);
+}
+
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
@@ -1271,6 +1407,22 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
   else {
     url u= im->get_name ();
     tree lookup= tuple (u->t);
+    if (locase_all (suffix (u)) == "pdf") {
+      // a PDF is drawn as what it is, a drawing, at any zoom
+      if (!form_pool->contains (lookup))
+        form_pool (lookup)= load_pdf_form (u);
+      mupdf_form fm= form_pool [lookup];
+      if (!is_nil (fm)) {
+        rectangle r= im->get_logical_extents ();
+        SI w= r->x2 - r->x1, h= r->y2 - r->y1;
+        end_text ();
+        draw_form (mupdf_context (), proc, fm, alpha,
+                   ((double) w)/pixel, ((double) h)/pixel,
+                   to_x (x - r->x1), to_y (y - r->y1));
+        return;
+      }
+      // MuPDF cannot read it: the converters may
+    }
     mupdf_image im2;
     if (image_pool->contains (lookup))
       im2= image_pool [lookup];

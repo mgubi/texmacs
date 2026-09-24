@@ -1240,6 +1240,11 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       pdf_obj* spage= pdf_lookup_page_obj (ctx, src, 0);
       fz_rect box; fz_matrix m;
       pdf_page_obj_transform (ctx, spage, &box, &m);
+      // pdf_page_obj_transform gives fitz's transform of the page, which
+      // turns PDF space (y up) into fitz space (y down) as well as undoing
+      // /Rotate; a form's /Matrix lives in PDF space, so the turn upside
+      // down is taken back out, or every figure comes out upside down
+      m= fz_concat (m, fz_scale (1, -1));
       buf= page_contents (ctx, pdf_dict_get (ctx, spage, PDF_NAME(Contents)));
       pdf_obj* sres= pdf_dict_get_inheritable (ctx, spage, PDF_NAME(Resources));
       map= pdf_new_graft_map (ctx, doc);

@@ -684,6 +684,17 @@ behaviour. Feature status against those two:
   (`set_transformation` as pdf_hummus), shadows (`new/get/put/apply_shadow`
   by pixmap copies), pictures and scalables (`draw_scalable` falls back to
   the generic conversion when MuPDF cannot load the file);
+* **PDF figures as drawing**: a PDF is not converted to a PNG (by
+  CoreGraphics, Ghostscript or ImageMagick, at one size) but read once into
+  memory and drawn through a form XObject made of its first page
+  (`load_pdf_form`, `draw_form`), sharp at any zoom. Each form keeps the
+  document it was read from, so that dropping it from `form_pool` (which
+  `image_gc` does) frees it. Two things were needed: the processor wants a
+  resource frame to run a form in (`pdf_processor_push_resources`, which
+  `pdf_process_contents` would otherwise push; without it `op_Do_form`
+  dereferences NULL), and the form's `/Matrix` must be taken out of fitz's
+  page transform (`pdf_page_obj_transform`), which also turns y upside
+  down, see *docs/pdf-output-with-mupdf.md*;
 * still open: the phase of tiling patterns relative to the page (matrix of
   `register_pattern`), `set_brush` also resets the pencil width/caps.
 
@@ -696,5 +707,5 @@ virtual `clear_device` (the neutral pattern behind the pages) and a `safe`
 flag of `set_zoom_factor` checking the consistency of `shrinkf`. The MuPDF
 renderers keep the older scheme instead: `pixel_ratio= 1`, the retina factor
 is multiplied into the zoom by their own `set_zoom_factor` (hence
-`safe= false`), `shrink` is called with ratio 1 and `clear_device` is a no-op
-(the editor clears the background itself).
+`safe= false`) and `shrink` is called with ratio 1; `clear_device` draws
+the white and the neutral pattern, as above.

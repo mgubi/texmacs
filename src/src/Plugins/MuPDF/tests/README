@@ -37,9 +37,14 @@ The checks were themselves checked: embedding the Type 1 fonts the wrong
 way again (pdf_add_cid_font instead of pdf_add_simple_font) makes the gs
 and text checks fail, as it should.
 
-Four of the documents are here rather than in the manual: figures.tm has
+Some of the documents are here rather than in the manual: figures.tm has
 a PostScript figure and a raster one, which must come out as a /Form and
-an /Image and not as pictures of themselves; pattern.tm has a patterned
+an /Image and not as pictures of themselves; pdf-figures.tm has two PDF
+figures, vector.pdf and the same turned by /Rotate 90, whose text says
+which way is up -- the one check which is not generic: the harness reads
+where UP lands against the caption, since the rendering check cannot see
+a figure upside down (both readers draw the same file); taking the fix out
+makes it fail, that was tried; pattern.tm has a patterned
 background of opaque tiles, which must be one /Pattern; pattern-photo.tm
 has a photograph with a soft mask as its tile, which must *not* be one,
 since Ghostscript draws such a pattern wrongly (and the check catches it

@@ -290,7 +290,14 @@ readers then substitute.
   with a ToUnicode CMap so the text is still searchable;
 * **figures**: a PDF as a `/Form` XObject with its drawing kept as
   drawing, a raster image as an `/Image`, anything else through the
-  converters first; each file embedded once however often it occurs;
+  converters first; each file embedded once however often it occurs.
+  The form's `/Matrix` is the page transform of `pdf_page_obj_transform`
+  with its turn upside down taken back out (`fz_scale (1, -1)`): that
+  transform goes from PDF space to fitz's, y down, and taken as it is it
+  drew every figure upside down -- which the rendering check cannot see,
+  both readers drawing the same file. `pdf-figures.tm` in the tests has
+  text in its figures which says which way is up, and the harness reads
+  where it lands;
 * pictures, **tiling patterns** (below), links, named destinations, the outline as a tree, `/Info` metadata, attachments.
 
 ### Ligatures
