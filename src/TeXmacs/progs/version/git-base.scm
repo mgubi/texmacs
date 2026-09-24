@@ -23,6 +23,8 @@
   ("git log length" "250" noop)
   ("git large file size" "10" noop)
   ("git sign" "off" noop)
+  ("git suggest messages" "on" noop)
+  ("git mode chosen" "off" noop)
   ("git pull mode" "fast-forward" noop)
   ("git recent repositories" "" noop))
 

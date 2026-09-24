@@ -92,16 +92,65 @@
 ;; The blame page
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (blame-note root c truncated?)
-  `(with "font-size" "0.71" "color" "dark grey"
+(define blame-colors
+  '("#1f4e9a" "#a0301f" "#20703a" "#7a3a9a" "#1f7a8a" "#8a6a10" "#5a5a5a"))
+
+(define (author-colors attr)
+  ;; Colors for the authors, in the order of their first appearance
+  (with t (make-ahash-table)
+    (for (c attr)
+      (when (and c (not (ahash-ref t (git-commit-author c))))
+        (ahash-set! t (git-commit-author c)
+                    (list-ref blame-colors
+                              (modulo (length (ahash-table->list t))
+                                      (length blame-colors))))))
+    t))
+
+(define (author-color colors c)
+  (if c (ahash-ref colors (git-commit-author c)) "#909090"))
+
+(define (blame-note root c earlier? color)
+  `(git-note ,color
      ,(if (not c)
           "Not committed yet"
           `(concat (hlink ,(string-take (git-commit-hash c) 7)
                           ,(tmfs-url-commit root (git-commit-hash c)))
-                   " " ,(utf8->cork (git-commit-author c))
+                   " " (strong ,(utf8->cork (git-commit-author c)))
                    ", " ,(git-commit-date c)
-                   ,(if truncated? " or earlier" "")
+                   ,(if earlier? " or earlier" "")
                    ": " ,(utf8->cork (git-commit-subject c))))))
+
+(define (blame-legend attr colors)
+  ;; The authors with the number of paragraphs which they last changed
+  (let* ((names (list-remove-duplicates
+                 (map (lambda (c) (if c (git-commit-author c) #f)) attr)))
+         (count (lambda (n)
+                  (length (list-filter attr
+                                       (lambda (c)
+                                         (== (and c (git-commit-author c))
+                                             n)))))))
+    `(concat
+      ,@(list-intersperse
+         (map (lambda (n)
+                `(git-note ,(if n (ahash-ref colors n) "#909090")
+                   (concat (strong ,(if n (utf8->cork n) "Not committed"))
+                           " " ,(number->string (count n)))))
+              names)
+         "   "))))
+
+(define (list-intersperse l sep)
+  (cond ((or (null? l) (null? (cdr l))) l)
+        (else (cons* (car l) sep (list-intersperse (cdr l) sep)))))
+
+(define (add-git-pages doc)
+  ;; Add the style package for the notes to the document @doc
+  (map (lambda (x)
+         (cond ((and (tm-func? x 'style 1) (tm-is? (cadr x) 'tuple))
+                `(style (tuple ,@(cdadr x) "git-pages")))
+               ((tm-func? x 'style 1)
+                `(style (tuple ,(cadr x) "git-pages")))
+               (else x)))
+       doc))
 
 (define (blame-document name)
   (let* ((root (git-root name))
@@ -110,17 +159,22 @@
                                (tree-import name "texmacs"))))
          (body (or (document-body doc) '(document ""))))
     (receive (attr oldest) (git-blame name body)
-      (let loop ((l (paragraphs body)) (a attr) (last 'none) (acc '()))
-        (if (null? l)
-            (document-set-body doc (cons 'document (reverse acc)))
-            (let* ((c (car a))
-                   (same? (and (!= last 'none)
-                               (== (and c (git-commit-hash c))
-                                   (and last (git-commit-hash last)))))
-                   (earlier? (and oldest c (== c oldest)))
-                   (acc* (if same? acc
-                             (cons (blame-note root c earlier?) acc))))
-              (loop (cdr l) (cdr a) c (cons (car l) acc*))))))))
+      (with colors (author-colors attr)
+        (let loop ((l (paragraphs body)) (a attr) (last 'none)
+                   (acc (list (blame-legend attr colors))))
+          (if (null? l)
+              (add-git-pages
+               (document-set-body doc (cons 'document (reverse acc))))
+              (let* ((c (car a))
+                     (same? (and (!= last 'none)
+                                 (== (and c (git-commit-hash c))
+                                     (and last (git-commit-hash last)))))
+                     (earlier? (and oldest c (== c oldest)))
+                     (acc* (if same? acc
+                               (cons (blame-note root c earlier?
+                                                 (author-color colors c))
+                                     acc))))
+                (loop (cdr l) (cdr a) c (cons (car l) acc*)))))))))
 
 (tm-define (git-show-blame name)
   (:synopsis "Show who last changed each paragraph of @name")

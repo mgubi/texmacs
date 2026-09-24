@@ -360,6 +360,26 @@ buffer is in a working tree. They are prefixed like the existing
   4.6 (explained failures, as a dialog with *Details* and a suggested
   action), 4.7 (review bar, for both comparisons and conflicts) and 4.13
   (wording: *Get changes*/*Send changes*, *Mine*/*Theirs*).
+* **Also implemented (P2):**
+  * 4.8: the style package `packages/miscellaneous/git-pages.ts` defines
+    `git-button`, `git-badge`, `git-muted` and `git-note`. The status page
+    uses tables with coloured badges and buttons; blame colours each
+    author and starts with a legend.
+  * 4.9: the commit dialog has All/None, a message suggested when it
+    opens (preference `git suggest messages`), a hint on the message
+    layout, a merge banner, and a tip when the summary line exceeds 72
+    characters.
+  * 4.10: preferences, as a separate *Git preferences* dialog.
+  * 4.11: first-run choice of mode.
+  * 4.12: shortcuts under the `version` prefix (`altcmd #`): `g` panel,
+    `c` commit or snapshot, `y` synchronize, `s` status, `=` compare with
+    the last commit. They are active for documents in a Git working tree
+    only (mode `in-git-document?`).
+* **Not done yet:** colouring the lines of the graph.
+* **Deviation from 4.10:** preferences-widgets.scm asks, in a TODO, not
+  to add tabs until the icon tabs are more compact. So the Git
+  preferences are a separate dialog, opened from *Version → Git
+  preferences…* and *Git → Preferences → All preferences…*.
 * **Lesson for widgets:** the bodies of `(if ...)` in widgets are evaluated
   even when the condition is false, and `for` is not accepted inside
   `aligned`. The git layer therefore accepts `#f` roots, and the test

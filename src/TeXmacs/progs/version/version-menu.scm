@@ -203,6 +203,8 @@
     ("Restore last stash" (git-stash-pop (current-git-root))))
   ---
   (-> "Preferences"
+      ("All preferences..." (open-git-preferences))
+      ---
       ("Simple mode" (git-toggle-simple-mode))
       ("Sign commits and tags" (git-toggle-signing))
       (-> "Pull"
@@ -338,4 +340,6 @@
             (for (r l)
               ((eval (utf8->cork r)) (git-show-status (system->url r))))))))
   ---
-  (-> "Differences" (link version-differences-menu)))
+  (-> "Differences" (link version-differences-menu))
+  (assuming (git-available?)
+    ("Git preferences..." (open-git-preferences))))

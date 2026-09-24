@@ -49,7 +49,8 @@
   (object->string s))
 
 (define (git-action text cmd . args)
-  `(action ,text ,(string-append "(" cmd " "
+  ;; A button (see the style package git-pages) executing a secure command
+  `(action (git-button ,text) ,(string-append "(" cmd " "
                                  (string-recompose (map git-quote args) " ")
                                  ")")))
 
@@ -776,6 +777,11 @@
   (when (page-context? root-s)
     (git-restore-revision (page-file root-s path) rev)))
 
+(tm-define (git-page-add-remote root-s)
+  (:secure #t)
+  (when (page-context? root-s)
+    (git-interactive-add-remote (string-root root-s))))
+
 (tm-define (git-page-stage-all root-s)
   (:secure #t)
   (when (page-context? root-s)
@@ -880,18 +886,18 @@
 (define (git-page-menu root)
   (with r (root-string root)
     `(concat (with "font-size" "0.84"
-             (concat ,(git-action "Status" "git-page-show" r "status") " | "
-             ,(git-action "Log" "git-page-show" r "log") " | "
-             ,(git-action "Graph" "git-page-show" r "graph") " | "
-             ,(git-action "Branches" "git-page-show" r "branches") " | "
-             ,(git-action "Output" "git-page-show" r "output") " | "
+             (concat ,(git-action "Status" "git-page-show" r "status") " "
+             ,(git-action "Log" "git-page-show" r "log") " "
+             ,(git-action "Graph" "git-page-show" r "graph") " "
+             ,(git-action "Branches" "git-page-show" r "branches") " "
+             ,(git-action "Output" "git-page-show" r "output") " "
              ,(git-action "Refresh" "git-page-refresh" r))))))
 
 (define (git-page root title . body)
   ;; Items of body are paragraphs, or lists of paragraphs
   `(document
      (TeXmacs ,(texmacs-version))
-     (style (tuple "generic"))
+     (style (tuple "generic" "git-pages"))
      (body (document (tmfs-title ,title)
                      ,(git-page-menu root)
                      ,@(append-map (lambda (x) (if (and (pair? x) (pair? (car x)))
@@ -921,12 +927,16 @@
         ($link (url->unix u) ($verbatim (utf8->cork path)))
         ($verbatim (utf8->cork path)))))
 
-(define (status-line root e which)
+(define (status-row root e which)
   (let* ((r (root-string root))
          (path (git-entry-path e))
          (u (git-absolute root path))
          (code (if (== which 'staged) (git-entry-index e) (git-entry-worktree e)))
-         (desc (cond ((== which 'untracked) "untracked")
+         (kind (cond ((== which 'untracked) "new")
+                     ((== which 'conflict) "conflict")
+                     ((== which 'staged) "staged")
+                     (else "changed")))
+         (desc (cond ((== which 'untracked) "new file")
                      ((== which 'conflict) "conflict")
                      (else (status-code code))))
          (cmp? (and (git-texmacs-file? u) (url-exists? u)
@@ -951,15 +961,15 @@
                        (list (git-action "stage" "git-page-stage" r path)
                              (git-action "discard" "git-page-discard"
                                          r path)))))))
-    `(concat (with "color" "dark grey" ,desc) (hspace "1em")
-             ,(status-file root e)
-             ,(if (git-entry-orig e)
-                  `(concat " (from " ,($verbatim (utf8->cork (git-entry-orig e)))
-                           ")")
-                  "")
-             (hspace "1em")
-             (with "font-size" "0.84"
-               (concat "[" ,@(list-intersperse acts " | ") "]")))))
+    `(row (cell (git-badge ,kind ,desc))
+          (cell (concat ,(status-file root e)
+                        ,(if (git-entry-orig e)
+                             `(git-muted (concat " (from "
+                                                 ,($verbatim (utf8->cork
+                                                              (git-entry-orig e)))
+                                                 ")"))
+                             "")))
+          (cell (concat ,@(list-intersperse acts " "))))))
 
 (define (list-intersperse l sep)
   (cond ((or (null? l) (null? (cdr l))) l)
@@ -967,8 +977,13 @@
 
 (define (status-section root title l which)
   (if (null? l) '()
-      (cons `(subsection* ,title)
-            (map (cut status-line root <> which) l))))
+      (list `(subsection* ,title)
+            `(tabular
+              (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0pt")
+                       (cwith "1" "-1" "1" "-1" "cell-rsep" "1.5em")
+                       (cwith "1" "-1" "1" "-1" "cell-bsep" "0.4ex")
+                       (cwith "1" "-1" "1" "-1" "cell-tsep" "0.4ex")
+                       (table ,@(map (cut status-row root <> which) l)))))))
 
 (define (status-branch root st)
   (let* ((head (git-status-ref st 'head))
@@ -1005,13 +1020,20 @@
                 (list root "Git status"
                       (status-branch root st)
                       `(concat
-                        ,(git-action "Commit..." "git-page-commit" r) " | "
-                        ,(git-action "Stage all" "git-page-stage-all" r) " | "
-                        ,(git-action "Fetch" "git-page-remote" r "fetch") " | "
+                        ,(git-action "Commit..." "git-page-commit" r) " "
+                        ,(git-action "Stage all" "git-page-stage-all" r) " "
+                        ,(git-action "Fetch" "git-page-remote" r "fetch") " "
                         ,(git-action "Get changes" "git-page-remote" r "pull")
-                        " | "
+                        " "
                         ,(git-action "Send changes" "git-page-remote" r "push")))
-                (if (null? l) (list "Nothing to commit, working tree clean.")
+                (if (null? l)
+                    (list '(git-muted "Nothing to commit: your work is saved."))
+                    '())
+                (if (null? (git-remotes root))
+                    (list `(git-muted
+                            (concat "No remote repository: "
+                                    ,(git-action "Add remote..."
+                                                 "git-page-add-remote" r))))
                     '())
                 (status-section root "Conflicts" conflicts 'conflict)
                 (status-section root "Changes to be committed" staged 'staged)
@@ -1103,16 +1125,15 @@
              (with "color" "dark grey" ,(fifth b))
              ,(if (null? acts) ""
                   `(concat " " (with "font-size" "0.84"
-                                 (concat "[" ,@(list-intersperse acts " | ")
-                                         "]")))))))
+                                 (concat ,@(list-intersperse acts " "))))))))
 
 (define (stash-line root s)
   (with r (root-string root)
     `(concat ,(car s) ": " ,(utf8->cork (cadr s)) (hspace "1em")
              (with "font-size" "0.84"
-               (concat "[" ,(git-action "pop" "git-page-stash-pop" r (car s))
-                       " | " ,(git-action "drop" "git-page-stash-drop"
-                                          r (car s)) "]")))))
+               (concat ,(git-action "pop" "git-page-stash-pop" r (car s))
+                       " " ,(git-action "drop" "git-page-stash-drop"
+                                        r (car s)))))))
 
 (define (git-branches-content root)
   (let* ((local (git-branches root))
@@ -1203,7 +1224,7 @@
                      `(concat
                        ,(git-action "compare with current" "git-page-compare"
                                     r path rev)
-                       " | "
+                       " "
                        ,(git-action "restore" "git-page-restore" r path rev))
                      "")))))
 
