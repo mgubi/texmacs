@@ -13,7 +13,21 @@
 
 (texmacs-module (version version-kbd)
   (:use (generic generic-kbd)
-	(version version-compare)))
+	(version version-compare)
+        (version git-widgets)))
+
+(texmacs-modes
+  (in-git-document% (git-directory? (current-buffer)) with-versioning-tool%))
+
+(kbd-map
+  (:mode in-git-document?)
+  ("version g" (git-open-tool))
+  ("version c" (if (git-simple-mode?)
+                   (git-interactive-save-snapshot (current-git-root))
+                   (git-interactive-commit)))
+  ("version y" (git-sync (current-git-root)))
+  ("version s" (git-show-status))
+  ("version =" (git-compare-with (current-buffer) "HEAD")))
 
 (kbd-map
   (:mode with-versioning-tool?)

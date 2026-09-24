@@ -6,6 +6,7 @@
 (use-modules (version version-menu))
 
 (define failures 0)
+(set-preference "git mode chosen" "on")
 (define (check name ok?)
   (display* (if ok? "ok   " "FAIL ") name "\n")
   (when (not ok?) (set! failures (+ failures 1))))
@@ -130,6 +131,16 @@
     (git-show-failure (list 1 "" " ! [rejected] main -> main (fetch first)")
                       "Push")
     (check "failure dialog" #t)
+    (open-git-preferences)
+    (check "preferences dialog" #t)
+    (set-preference "git mode chosen" "off")
+    (git-with-mode noop)
+    (check "mode dialog" (== (get-preference "git mode chosen") "on"))
+    (check "style package for pages"
+           (url-exists? (url-resolve "$TEXMACS_PATH/packages/miscellaneous/git-pages.ts" "r")))
+    (check "status page uses buttons"
+           (string-contains? (tmfs-load (tmfs-url-git (git-root u) "status"))
+                             "git-button"))
     (let* ((v (system->url (string-append T "/outside.tm"))))
       (string-save "<TeXmacs|2.1>\n\n<\\body>\n  x\n</body>\n" v)
       (load-buffer v)

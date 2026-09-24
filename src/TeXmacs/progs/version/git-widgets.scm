@@ -115,34 +115,56 @@
           (amend? (git-commit-staged root msg :amend))
           (else (git-commit-staged root msg)))))
 
-(define (commit-initial-message root)
+(define (commit-initial-message root entries labels selected)
+  ;; The prepared message of a merge, or a suggested message
   (with l (and (git-merging? root) (git-merge-message root))
-    (if (and l (nnull? l))
-        `(document ,@(map utf8->cork l))
-        '(document ""))))
+    (cond ((and l (nnull? l)) `(document ,@(map utf8->cork l)))
+          ((and (get-boolean-preference "git suggest messages")
+                (nnull? selected))
+           `(document ,@(map utf8->cork
+                             (git-describe-changes
+                              root (selected-entries entries labels
+                                                     selected)))))
+          (else '(document "")))))
+
+(define (long-summary? u)
+  (with l (git-split (commit-message u) "\n")
+    (and (nnull? l) (> (string-length (car l)) 72))))
 
 (tm-widget ((git-commit-widget root u paths) quit)
   (let* ((entries (commit-candidates root))
          (labels (map commit-label entries))
          (selected (initially-selected entries labels paths))
          (amend? #f)
+         (merging? (git-merging? root))
          (branch (or (git-current-branch root) "(detached)")))
     (padded
-      (text (string-append (if (git-merging? root) "Merge commit on branch "
+      (text (string-append (if merging? "Merge commit on branch "
                                "Commit on branch ")
                            (utf8->cork branch) " in " (url->system root)))
+      (if merging?
+          (text "A merge commit contains all changes: keep all files selected"))
       ===
       (bold (text "Commit message"))
+      (text "A short summary on the first line, then the details if needed")
       ===
       (resize "500px" "120px"
-        (texmacs-input (commit-initial-message root)
+        (texmacs-input (commit-initial-message root entries labels selected)
                        `(style (tuple "generic")) u))
       ===
-      (bold (text "Files to commit"))
+      (hlist
+        (bold (text "Files to commit"))
+        >>
+        ("All" (begin (set! selected labels)
+                      (refresh-now "git-commit-files")))
+        // //
+        ("None" (begin (set! selected '())
+                       (refresh-now "git-commit-files"))))
       ===
       (resize "500px" "180px"
-        (scrollable
-          (choices (set! selected answer) labels selected)))
+        (refreshable "git-commit-files"
+          (scrollable
+            (choices (set! selected answer) labels selected))))
       ===
       (hlist
         (toggle (set! amend? answer) amend?) // (text "Amend last commit")
@@ -154,8 +176,13 @@
           ("Cancel" (quit))
           // //
           ("Commit"
-           (when (commit-now root u entries labels selected amend?)
-             (quit))))))))
+           (let* ((long? (long-summary? u)))
+             (when (commit-now root u entries labels selected amend?)
+               (when long?
+                 (set-message (string-append "Tip: keep the first line of "
+                                             "the message under 72 "
+                                             "characters") "Git commit"))
+               (quit)))))))))
 
 (define commit-dialogs 0)
 
@@ -369,7 +396,7 @@
 (tm-define (git-open-tool)
   (:synopsis "Show the status of the working tree in a side tool")
   (:interactive #t)
-  (tool-select :right 'git-tool))
+  (git-with-mode (lambda () (tool-select :right 'git-tool))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Small dialogs
@@ -537,6 +564,107 @@
                                                              "^{commit}"))))
            "Unknown revision (try a hash, a tag, a branch or HEAD~2)"
            (begin (git-compare-with-revision name (car vals)) #f))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Preferences
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (pretty-value l val)
+  ;; l is a list of pairs (value . pretty-name)
+  (or (assoc-ref l val) val))
+
+(define (value-of-pretty l pretty)
+  (with x (list-find l (lambda (p) (== (cdr p) pretty)))
+    (if x (car x) pretty)))
+
+(define versioning-tool-names
+  '(("auto" . "Automatic") ("on" . "Always") ("off" . "Never")))
+
+(define mode-names
+  '(("on" . "Simple (snapshots)") ("off" . "Full (staging, branches)")))
+
+(define pull-names
+  '(("fast-forward" . "Ask before merging") ("merge" . "Merge")
+    ("rebase" . "Rebase")))
+
+(tm-widget (git-preferences-widget)
+  (padded
+    (aligned
+      (item (text "Versioning tool:")
+        (enum (set-preference "versioning tool"
+                              (value-of-pretty versioning-tool-names answer))
+              (map cdr versioning-tool-names)
+              (pretty-value versioning-tool-names
+                            (get-preference "versioning tool"))
+              "15em"))
+      (item (text "Mode:")
+        (enum (set-preference "git simple mode"
+                              (value-of-pretty mode-names answer))
+              (map cdr mode-names)
+              (pretty-value mode-names (get-preference "git simple mode"))
+              "15em"))
+      (item (text "When both sides changed:")
+        (enum (set-preference "git pull mode"
+                              (value-of-pretty pull-names answer))
+              (map cdr pull-names)
+              (pretty-value pull-names (get-preference "git pull mode"))
+              "15em"))
+      (item (text "Git executable:")
+        (enum (set-preference "git executable" answer)
+              (list (get-preference "git executable") "git" "")
+              (get-preference "git executable") "15em"))
+      (item (text "Warn for files larger than (MB):")
+        (enum (set-preference "git large file size" answer)
+              '("5" "10" "50" "100" "")
+              (get-preference "git large file size") "5em"))
+      (item (text "Commits examined by blame:")
+        (enum (set-preference "git blame depth" answer)
+              '("10" "30" "100" "")
+              (get-preference "git blame depth") "5em"))
+      (item (text "Commits per page of the log:")
+        (enum (set-preference "git log length" answer)
+              '("50" "250" "1000" "")
+              (get-preference "git log length") "5em")))
+    ======
+    (aligned
+      (meti (hlist // (text "Sign commits and tags with GnuPG"))
+        (toggle (set-boolean-preference "git sign" answer)
+                (get-boolean-preference "git sign")))
+      (meti (hlist // (text "Suggest commit messages"))
+        (toggle (set-boolean-preference "git suggest messages" answer)
+                (get-boolean-preference "git suggest messages"))))))
+
+(tm-define (open-git-preferences)
+  (:synopsis "Open the preferences for the Git tools")
+  (:interactive #t)
+  (top-window git-preferences-widget "Git preferences"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Choice of the mode, the first time
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-widget ((git-mode-widget cont) quit)
+  (padded
+    (bold (text "How do you want to work with Git?"))
+    ======
+    (explicit-buttons
+      ("Simple: save snapshots and synchronize with coauthors"
+       (begin (set-preference "git simple mode" "on") (quit) (cont))))
+    ===
+    (explicit-buttons
+      ("Full: staging, branches and remotes (for Git users)"
+       (begin (set-preference "git simple mode" "off") (quit) (cont))))
+    ======
+    (text "You may change this later in the Git preferences.")))
+
+(tm-define (git-with-mode cont)
+  (:synopsis "Execute @cont, after asking for the mode the first time")
+  (if (or (== (get-preference "git mode chosen") "on")
+          (headless?) (not (current-window)))
+      (cont)
+      (begin
+        (set-preference "git mode chosen" "on")
+        (dialogue-window (git-mode-widget cont) noop "Git"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Explaining failures

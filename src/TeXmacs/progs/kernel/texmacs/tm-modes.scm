@@ -154,6 +154,11 @@
                (ahash-set! versioning-directory-table key (or r 'none))
                r)))))
 
+(define-public (git-directory? u)
+  "Is @u inside a Git working tree?"
+  (and-with d (versioning-directory u)
+    (url-exists? (url-append d ".git"))))
+
 (define-public (versioning-directory-reset)
   (set! versioning-directory-table (make-ahash-table)))
 

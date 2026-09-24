@@ -65,6 +65,16 @@ Tools → Versioning tool.
   * a *History* tab with the last 20 versions of the current document,
     each with Compare and Restore;
   * a *Branches* tab with Switch and New branch….
+* **Git preferences** dialog (Version → Git preferences…): versioning
+  tool, mode, what to do when both sides changed, git executable,
+  large-file limit, blame depth, log length, signing, suggested messages.
+* **First-run choice** between simple mode (snapshots) and full mode.
+* **Shortcuts** (prefix `version`, i.e. `altcmd #`): `g` Git panel,
+  `c` commit or save snapshot, `y` synchronize, `s` status page,
+  `=` compare with the last commit.
+* **Styled pages:** the status and other pages use buttons and coloured
+  badges (style package `git-pages`). The blame page colours each author
+  and starts with a legend.
 * **Review bar.** After a comparison or a conflict resolution, a bar at
   the bottom of the window shows "Difference 2 of 7" (or "Conflict 2 of
   5"), with Previous/Next, Keep Old/New (Mine/Theirs), Show
