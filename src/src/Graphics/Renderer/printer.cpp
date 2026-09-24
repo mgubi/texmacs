@@ -1083,15 +1083,14 @@ printer_rep::generate_metadata () {
 
 bool use_pdf ();
 bool use_ps ();
+bool use_mupdf_pdf ();
 
 renderer
 printer (url ps_file_name, int dpi, int nr_pages,
 	 string page_type, bool landscape, double paper_w, double paper_h) {
 #ifdef MUPDF_RENDERER
-  // the prototype of a PDF writer on MuPDF, for comparing its output with
-  // the one of PDFHummus (see docs/pdf-output-with-mupdf.md)
-  if (get_env ("TEXMACS_PDF_MUPDF") == "1" &&
-      (suffix (ps_file_name) == "pdf" || !use_ps ()))
+  // the PDF writer on MuPDF (see docs/pdf-output-with-mupdf.md)
+  if (use_mupdf_pdf () && (suffix (ps_file_name) == "pdf" || !use_ps ()))
     return mupdf_pdf_renderer (ps_file_name, dpi, nr_pages,
                                page_type, landscape, paper_w, paper_h);
 #endif

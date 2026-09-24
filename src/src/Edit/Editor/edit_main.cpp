@@ -211,17 +211,27 @@ edit_main_rep::get_metadata (string kind) {
 string printing_dpi ("600");
 string printing_on ("a4");
 
+// Is the PDF written by the MuPDF renderer? It is a prototype, so it is
+// off unless it is asked for, by the preference or by the environment
+// (see docs/pdf-output-with-mupdf.md).
+bool
+use_mupdf_pdf () {
+#ifdef MUPDF_RENDERER
+  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
+  return get_preference ("native pdf renderer", "default") == "mupdf";
+#else
+  return false;
+#endif
+}
+
 bool
 use_pdf () {
 #ifdef PDF_RENDERER
   return get_preference ("native pdf", "on") == "on";
 #else
-#ifdef MUPDF_RENDERER
-  // the prototype of a PDF writer on MuPDF writes the document itself,
-  // instead of having Ghostscript make it out of PostScript
-  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
-#endif
-  return false;
+  // without a PDF renderer the document goes out as PostScript and
+  // Ghostscript makes the PDF; the MuPDF renderer writes it itself
+  return use_mupdf_pdf ();
 #endif
 }
 

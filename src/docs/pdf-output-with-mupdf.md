@@ -175,11 +175,11 @@ and `to_y` give. It does:
 * links, a flat outline, `/Info` metadata;
 * `pdf_subset_fonts` before saving.
 
-It is reached with `TEXMACS_PDF_MUPDF=1`, which `printer ()` looks at
-before choosing the Hummus renderer, and which also makes `use_pdf ()`
-true so that the document is not routed through PostScript and Ghostscript
-(this build has `PDF_RENDERER` undefined, so that is what normally
-happens).
+It is chosen by the preference **`native pdf renderer`** set to `mupdf`,
+or by `TEXMACS_PDF_MUPDF=1` in the environment. Either makes `use_pdf ()`
+true as well, so that the document is not routed through PostScript and
+Ghostscript, which is what this build does otherwise (`PDF_RENDERER` is
+undefined here, so the Hummus renderer is not compiled at all).
 
 Exporting the first page of the TeXmacs manual:
 
@@ -288,8 +288,14 @@ readers then substitute.
 * ~~The outline is flat.~~ Done: it is the tree the levels describe.
 * ~~Named destinations.~~ Done: the anchors are the name tree of the
   catalogue and a link refers to one by name.
-* **Encryption and attachments** (`pdf_hummus_make_attachment`, which the
-  "embed the .tm in the PDF" feature uses).
+* ~~Attachments.~~ Done: `mupdf_pdf_make_attachments` puts the files in the
+  `/EmbeddedFiles` name tree and in `/AF`, and
+  `pdf_hummus_make_attachment.hpp` calls it where it used to return false,
+  so the "embed the document in the exported PDF" of `tm-print.scm` works
+  in a build without the Hummus renderer.
+* **Encryption**: `pdf_write_options` has the fields, and nothing in
+  TeXmacs asks for them today (Hummus's own `EncryptionOptions` is
+  commented out), so it is written down rather than written.
 * **`draw_scalable`** falls back to rasterizing, where Hummus embeds the
   PDF or EPS figure itself. At least it now rasterizes at a print
   resolution (`shadow` raises the zoom).

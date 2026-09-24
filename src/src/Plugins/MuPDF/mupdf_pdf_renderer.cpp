@@ -1237,6 +1237,65 @@ void mupdf_pdf_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2) {
   (void) x1; (void) y1; (void) x2; (void) y2; }
 
 /******************************************************************************
+* Attachments
+******************************************************************************/
+
+// The files go into the /EmbeddedFiles name tree of the catalogue, and
+// into /AF, which is what a reader looks at to offer them.
+bool
+mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
+                            url out_path) {
+  fz_context* ctx= mupdf_context ();
+  pdf_document* doc= NULL;
+  bool ok= false;
+  fz_var (doc); fz_var (ok);
+  fz_try (ctx) {
+    c_string in (concretize (pdf_path));
+    doc= pdf_open_document (ctx, in);
+    pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+    pdf_obj* names= pdf_dict_get (ctx, root, PDF_NAME(Names));
+    if (names == NULL) names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 2);
+    pdf_obj* ef= pdf_dict_get (ctx, names, PDF_NAME(EmbeddedFiles));
+    if (ef == NULL) ef= pdf_dict_put_dict (ctx, names, PDF_NAME(EmbeddedFiles), 1);
+    pdf_obj* arr= pdf_dict_get (ctx, ef, PDF_NAME(Names));
+    if (arr == NULL)
+      arr= pdf_dict_put_array (ctx, ef, PDF_NAME(Names), 2 * N(attachments));
+    pdf_obj* af= pdf_dict_get (ctx, root, PDF_NAME(AF));
+    if (af == NULL) af= pdf_dict_put_array (ctx, root, PDF_NAME(AF),
+                                            N(attachments));
+    for (int i=0; i<N(attachments); i++) {
+      string body;
+      if (load_string (attachments[i], body, false)) continue;  // unreadable
+      string base= as_string (tail (attachments[i]));
+      c_string nm (base), data (body);
+      fz_buffer* buf=
+        fz_new_buffer_from_copied_data (ctx, (unsigned char*) (char*) data,
+                                        (size_t) N(body));
+      pdf_obj* fs= pdf_add_embedded_file (ctx, doc, nm,
+                                          "application/octet-stream",
+                                          buf, 0, 0, 0);
+      fz_drop_buffer (ctx, buf);
+      pdf_array_push_string (ctx, arr, nm, strlen (nm));
+      pdf_array_push (ctx, arr, fs);
+      pdf_array_push_drop (ctx, af, fs);
+    }
+    pdf_write_options opts= pdf_default_write_options;
+    opts.do_compress= 1;
+    opts.do_garbage= 3;
+    c_string out (concretize (out_path));
+    pdf_save_document (ctx, doc, out, &opts);
+    ok= true;
+  }
+  fz_always (ctx) { pdf_drop_document (ctx, doc); }
+  fz_catch (ctx) {
+    convert_error << "MuPDF cannot attach to " << pdf_path << ": "
+                  << fz_caught_message (ctx) << LF;
+    ok= false;
+  }
+  return ok;
+}
+
+/******************************************************************************
 * The entry point
 ******************************************************************************/
 

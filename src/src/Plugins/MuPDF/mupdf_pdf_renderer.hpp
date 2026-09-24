@@ -22,4 +22,10 @@ renderer mupdf_pdf_renderer (url pdf_file_name, int dpi, int nr_pages= 1,
                              string page_type= "a4", bool landscape= false,
                              double paper_w= 21.0, double paper_h= 29.7);
 
+// Copy the PDF and give it the files as attachments (what the Qt builds
+// do with pdf_hummus_make_attachments: the "embed the document in the
+// exported PDF" of tm-print.scm). True if it worked.
+bool mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
+                                 url out_path);
+
 #endif // MUPDF_PDF_RENDERER_H
