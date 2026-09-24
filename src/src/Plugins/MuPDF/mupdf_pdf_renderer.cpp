@@ -123,7 +123,11 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   color  cur_fill, cur_stroke;
   bool   has_fill, has_stroke;
   double cur_width;
-  int    cur_alpha;
+  int    cur_alpha;         // -1 when we no longer know what it is
+  void   forget_state () {  // after a Q: the state which comes back is
+    has_fill= has_stroke= false;   // not the one we were tracking
+    cur_width= -1; cur_alpha= -1;
+  }
   bool   in_text;
   int    cur_font;           // index in font_list, -1 if none
   double cur_size, text_x, text_y;
@@ -309,7 +313,8 @@ mupdf_pdf_renderer_rep::begin_page () {
   fz_catch (ctx) { contents= NULL; return; }
   pen= pencil (black); bgb= brush (white); fgb= brush (black);
   clip_level= 0;
-  has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
+  has_fill= has_stroke= false; cur_width= -1;
+  cur_alpha= 255;   // what a page starts with
   in_text= false; cur_font= -1; cur_size= 0;
   links= array<pdf_link_item> ();
   // the whole page is written in the pixels of the renderer
@@ -431,11 +436,10 @@ mupdf_pdf_renderer_rep::set_transformation (frame fr) {
   point o = tr (point (0.0, 0.0));
   point ux= tr (point (1.0, 0.0)) - o;
   point uy= tr (point (0.0, 1.0)) - o;
+  // a q saves the state and changes nothing, so what we track still holds
   put ("q\n");
   fz_append_printf (ctx, contents, "%g %g %g %g %g %g cm\n",
                     ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
-  // the state we were tracking does not survive the q
-  has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
   rectangle nclip= fr [oclip];
   renderer_rep::clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
 }
@@ -446,7 +450,7 @@ mupdf_pdf_renderer_rep::reset_transformation () {
   end_text ();
   renderer_rep::unclip ();
   put ("Q\n");
-  has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
+  forget_state ();
 }
 
 void
@@ -457,8 +461,7 @@ mupdf_pdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) 
   if (restore) {
     if (clip_level > 0) {
       put ("Q\n"); clip_level--;
-      // the state which comes back is not the one we were tracking
-      has_fill= has_stroke= false; cur_width= -1; cur_alpha= 255;
+      forget_state ();
     }
   }
   else {

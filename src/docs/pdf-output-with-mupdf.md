@@ -321,9 +321,10 @@ typeface; and the rendering check cannot see that fault, since both
 readers then substitute. The checks were themselves checked by putting the
 old CID embedding of the Type 1 fonts back, which makes two of them fail.
 
-Sixteen documents have been through it: twelve of the manual, among them
-Chinese and French for the fonts and the accents, and the four of the
-tests.
+Twenty-four documents have been through it: twenty of the manual -- among
+them Chinese, German, French and Polish for the fonts and the accents, and
+the mathematics, tables, graphics, links and presentation chapters -- and
+the two of the tests, each run both ways.
 
 ## If this is to replace PDFHummus
 
