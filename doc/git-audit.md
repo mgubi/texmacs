@@ -19,11 +19,11 @@ Every finding is **open** until a fix commit refers to it.
 | # | Finding | Where | Status |
 |---|---------|-------|--------|
 | A1 | **Git runs code from untrusted repositories without any user action.** With the new default versioning tool *Automatic*, the footer runs `git status` at idle for any document under a directory with a `.git`, e.g. an unpacked archive or a shared folder. Commands in that repository's `.git/config` then run, such as `core.fsmonitor` or `filter.*.clean` for racy files. Following a `tmfs://git/status/<dir>` link in a document does the same. **Verified:** a `core.fsmonitor` command runs with the exact arguments of `git-arguments`; `-c core.fsmonitor=false` prevents it. | `git-base.scm` (`git-arguments`, footer), `init-texmacs.scm`, `tm-server.scm` | fixed (cf39377e88) |
-| A2 | **Restore snapshot destroys uncommitted work.** `git restore --source=rev --staged --worktree -- .` discards uncommitted edits and deletes staged new files. The confirmation only *suggests* saving a snapshot first. **Verified.** | `git-project.scm` | fixed (next commit) |
-| A3 | **Restore version overwrites the staged version** (`git checkout rev -- path` writes the index), so "Discard" cannot undo it. After a rename, it restores the *old* path. **Verified.** | `version-git.scm` (`git-restore-revision-now`), `version-menu.scm` | fixed (next commit) |
-| A4 | **The panel's commit message is wiped** on every refresh of the panel: after each Stage/Unstage click, and after saving any file of the repository. The commit box is created with an empty document inside the refreshable, and `texmacs-input` resets the existing aux buffer to it. **Verified in code.** | `git-widgets.scm` (commit box) | fixed (next commit) |
-| A5 | **Commits ignore unsaved edits.** "Commit this file…" is offered because the buffer is modified, but `git-commit-file` and the commit dialog commit only what is on disk, typically with the result "nothing to commit". | `version-git.scm`, `git-widgets.scm` | fixed (next commit) |
-| A6 | **The merge driver fails without conflict markers.** On a failure (add/add with an empty base, a moved installation, a non-TeXmacs file matching the attribute), the driver exits 1 and leaves "ours" without any marker. A user who resolves outside TeXmacs may then drop "theirs". | `git-drivers.scm` | fixed (next commit) |
+| A2 | **Restore snapshot destroys uncommitted work.** `git restore --source=rev --staged --worktree -- .` discards uncommitted edits and deletes staged new files. The confirmation only *suggests* saving a snapshot first. **Verified.** | `git-project.scm` | fixed (578e566572) |
+| A3 | **Restore version overwrites the staged version** (`git checkout rev -- path` writes the index), so "Discard" cannot undo it. After a rename, it restores the *old* path. **Verified.** | `version-git.scm` (`git-restore-revision-now`), `version-menu.scm` | fixed (578e566572) |
+| A4 | **The panel's commit message is wiped** on every refresh of the panel: after each Stage/Unstage click, and after saving any file of the repository. The commit box is created with an empty document inside the refreshable, and `texmacs-input` resets the existing aux buffer to it. **Verified in code.** | `git-widgets.scm` (commit box) | fixed (578e566572) |
+| A5 | **Commits ignore unsaved edits.** "Commit this file…" is offered because the buffer is modified, but `git-commit-file` and the commit dialog commit only what is on disk, typically with the result "nothing to commit". | `version-git.scm`, `git-widgets.scm` | fixed (578e566572) |
+| A6 | **The merge driver fails without conflict markers.** On a failure (add/add with an empty base, a moved installation, a non-TeXmacs file matching the attribute), the driver exits 1 and leaves "ours" without any marker. A user who resolves outside TeXmacs may then drop "theirs". | `git-drivers.scm` | fixed (578e566572) |
 
 ## B. Robustness and correctness
 
@@ -85,3 +85,26 @@ Every finding is **open** until a fix commit refers to it.
    checked.
 3. **B1–B13, C1–C3**.
 4. **D1–D5**, then **E2–E7**.
+
+---
+
+## Resolution (2026-09-24)
+
+| Findings | Commit | Notes |
+|----------|--------|-------|
+| A1, B4, E1 | cf39377e88 | Trusted repositories (preference `git trusted repositories`, *Use Git in this folder…*), `core.fsmonitor=false` always, failed status queries are remembered, and the test runner has a real exit status. |
+| A2–A6, B7, D4 | 578e566572 | Automatic snapshot before restoring; restoring a version writes the file and keeps the index; save before committing; the commit box is outside the refreshable part (this also fixed a crash); textual fallback in the merge driver. |
+| B1–B3, B5, B6, B8–B13, C1–C3, D1–D3, D5 | 5287313500 | See the commit message. |
+| E2, E3, C3 (project cache) | 3a3117e4d2 | Tests: no checks that cannot fail, no dependence on the environment. |
+| E5–E7 | this commit | git-features.md, git-implementation.md, git-plan.md and the user manual updated. |
+
+**Still open:**
+* **E4:** no tests yet for the commit-dialog logic, for the confirmations
+  that need an answer (delete branch, drop stash, remove remote), for the
+  X11 fallback, Windows, submodules or non-ASCII paths.
+* **D3:** the "i of n" count of the review bar is only updated by its own
+  buttons, not by keyboard navigation.
+* **B8:** the labels of the upstream `version-compare-menu` (history of
+  revisions) are not converted from utf8 for git.
+* **A1 (residual):** once you trust a repository, its hooks and filters run
+  as with any git client.

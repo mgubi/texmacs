@@ -111,7 +111,7 @@ others. Until it exists, network commands run synchronously behind a
   `git` in `init-texmacs.scm`.
 * Write a test document and a scripted test (`texmacs -x '(load ...)'`) that
   builds a temporary repository in the scratch directory and runs the git
-  layer headlessly. Record the recipe in `doc/testing.md`.
+  layer headlessly. (Done: see `doc/tests/`.)
 
 ### Phase 1: a solid core (fix what exists)
 
@@ -242,3 +242,5 @@ Version menu, **Git** group, for the current buffer:
 | 2026-09-24 | Git side panel (`git-tool`). Asynchronous clone. User manual section. Save hook. Cancelling of asynchronous commands (process groups, non-blocking completion). |
 | 2026-09-24 | Fixes from an independent review: literal pathspecs, validation of revisions and names from links, git page actions restricted to git pages, empty stdin, renames when unstaging, merges committed whole, stash pop saves first, one-sided deletions in conflicts, `-z` for file histories, cork conversion of prompted names. |
 | 2026-09-24 | Second round of features: blame by paragraph; compare with tags, upstream, ORIG_HEAD or any revision; project-aware commits; state in the Git menu label; pull falling back to a merge; simple mode with snapshots; restore of versions; suggested commit messages; clone dialog and recent repositories; branch graph; signed commits and tags; large-file warning and default `.gitignore`; remote management. Fixed a focus crash (shared aux buffer) and a double close of pipe descriptors in `unix_system`. |
+| 2026-09-24 | UI work (see git-ui-design.md): footer status, automatic versioning tool, dialogs, failure explanations, review bar, restructured menu, new panel, preferences dialog, first-run mode, shortcuts, styled pages, coloured graph. |
+| 2026-09-24 | Audit (git-audit.md) and its fixes: trusted repositories and `core.fsmonitor=false`; safe restores; saving before commits; a commit box that survives refreshes; merge-driver fallback; robustness, performance and wording fixes; a test runner with a real exit status. The layout ended up flat in `version/` (not in `git/`), and `git-root` walks up the directories instead of running `rev-parse`. |

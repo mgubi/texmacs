@@ -642,7 +642,7 @@
   '(("on" . "Simple (snapshots)") ("off" . "Full (staging, branches)")))
 
 (define pull-names
-  '(("fast-forward" . "Ask before merging") ("merge" . "Merge")
+  '(("fast-forward" . "Fast-forward only") ("merge" . "Merge")
     ("rebase" . "Rebase")))
 
 (tm-widget (git-preferences-widget)

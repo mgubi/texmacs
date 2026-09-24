@@ -7,19 +7,21 @@
 
   When writing documents in collaboration with other authors, it frequently
   arises that one wants to go through changes made by the other authors, and
-  either accept, discard or further correct them. After enabling the
-  versioning tool through <menu|Tools|Versioning tool>, a special menu
-  <menu|Version> appears in the main menu bar, which makes this process
-  automatic. Below, we will describe in more detail how this tool works.
+  either accept, discard or further correct them. For this purpose, a
+  special menu <menu|Version> appears in the main menu bar, which makes
+  this process automatic. By default, this menu is shown for documents
+  under version control; using <menu|Tools|Versioning tool|Always>, it is
+  shown for all documents. Below, we will describe in more detail how this
+  tool works.
 
   In addition, there exist many stand-alone programs for maintaining several
   versions of a same file, such as <hlink|<name|Subversion>|https://en.wikipedia.org/wiki/Apache_Subversion>,
   <hlink|<name|Git>|http://git-scm.com/>,
   <hlink|<name|Darcs>|http://darcs.net/>, <hlink|<name|GNU
   Arch>|http://www.gnu.org/software/gnu-arch/>, just to mention a few of
-  them. <TeXmacs> currently provides a rudimentary support for
-  <name|Subversion> and <name|Git>, but interfaces for the other systems
-  could easily be added.
+  them. <TeXmacs> currently provides a basic support for <name|Subversion>
+  and an extensive support for <name|Git>, but interfaces for the other
+  systems could easily be added.
 
   <paragraph*|Comparing two versions>
 
@@ -34,7 +36,7 @@
   <menu|Version|Compare|With newer version>.
 
   It is possible to go through all the differences between the old and new
-  versions either from the items in the submenu <menu|Version|Move>, or using
+  versions either from the items in the submenu <menu|Version|Differences>, or using
   the keyboard shortcuts <shortcut|(version-previous-difference)> and
   <shortcut|(version-next-difference)>. One may also use the more general
   structured navigation shortcuts <shortcut|(kbd-select-if-active
@@ -50,7 +52,7 @@
   the new version in dark green.
 
   The visualization style can be specified individually for each individual
-  change, via <menu|Version|Show> or the keyboard shortcuts
+  change, via <menu|Version|Differences|Show> or the keyboard shortcuts
   <shortcut|(version-show 'version-old)> (old version),
   <shortcut|(version-show 'version-new)> (new version) and
   <shortcut|(version-show 'version-both)> (both versions). One may also cycle
@@ -66,7 +68,7 @@
   and progressively retain either one or the other version for each
   individual difference. Assuming that the cursor is inside a given
   difference, this can be done from entries in the submenu
-  <menu|Version|Retain>. Alternatively, one may use the shortcuts
+  <menu|Version|Differences|Retain>. Alternatively, one may use the shortcuts
   <shortcut|(version-retain 0)>, <shortcut|(version-retain 1)> and
   <shortcut|(kbd-control-return)> to retain the old, new and currently
   displayed version, respectively. If both versions are displayed, then
@@ -83,11 +85,11 @@
   <shortcut|(version-show 'version-old)> and <shortcut|(version-show
   'version-new)> to select the preferred version. As soon as all differences
   have been processed, you select the entire document and click on
-  <menu|Version|Retain|Current version>.
+  <menu|Version|Differences|Retain|Current version>.
 
   <paragraph*|Grain control and reactualizing the differences>
 
-  The entries in the submenu <menu|Version|Grain> allow you to control the
+  The entries in the submenu <menu|Version|Differences|Grain> allow you to control the
   grain with which differences between versions are computed. By default, we
   use the finest grain <menu|Detailed>. It is also possible to compute
   differences on a paragraph-based level, using <menu|Block>. In that case,
@@ -96,9 +98,9 @@
   occurs somewhere inside.
 
   The grain is used when comparing two documents using
-  <menu|Version|File|Compare>, but it is also possible to change the grain
+  <menu|Version|Compare>, but it is also possible to change the grain
   for a selected portion of text: simply select the text and choose the new
-  grain in the submenu <menu|Version|Grain>. This can in particular be
+  grain in the submenu <menu|Version|Differences|Grain>. This can in particular be
   applied on the entire buffer. Similarly, if you change the grain inside a
   difference, then the difference will be recomputed using the new grain.
 
@@ -122,11 +124,11 @@
   <menu|Version> menu will contain some clickable entries.
 
   First of all, if the current buffer is under version control, then you may
-  take a look at its history using <menu|Version|History>. The history
+  take a look at its history using <menu|Version|History of this document>. The history
   contains a list of hyperlinks to older revisions, together with short
   information about who changed what and when. Older revisions cannot be
   saved, but you may compare them to the current user version (on disk or
-  being edited) using <menu|Version|Compare|With current user version>.
+  being edited) using <menu|Version|Compare with|Current user version>.
 
   After making some changes to a file under version control, the version
   inside the editor or on disk no longer corresponds to the version in the
@@ -140,40 +142,55 @@
 
   If, while you were editing, changes to the file were made in the
   repository, then you may merge the result with your current version using
-  <menu|Version|Update>. At the moment, no conflict resolution has been
-  implemented yet, although this is planned for the future.
+  <menu|Version|Update>. For <name|Subversion>, no conflict resolution has
+  been implemented yet; for <name|Git>, see below.
 
   <paragraph*|Working with <name|Git>>
 
   For documents inside a <name|Git> working tree, the <menu|Version> menu
-  contains entries for the current document, followed by a
-  <menu|Version|Git> submenu with the operations on the whole repository.
-  A document which does not belong to any repository can be put under
-  version control using <menu|Version|Create Git repository>, and an
-  existing repository can be copied using <menu|Version|Clone Git
-  repository>.
+  starts with the most frequent actions: <menu|Version|Commit> (or
+  <menu|Version|Save snapshot> in the simple mode, see below),
+  <menu|Version|Synchronize>, which gets the changes of your coauthors and
+  sends yours, and <menu|Version|Git panel>, a side panel with the state of
+  the repository. Then come the entries for the current document, and the
+  submenus <menu|Version|This file>, <menu|Version|Project> and a submenu
+  for the whole repository, whose name shows its state, like <menu|Git
+  (main, 3 changed)>, and which we will call <menu|Version|Git> below. The
+  footer of the window also shows the state of the repository.
 
-  For the current document, <menu|Version|Add to repository>,
-  <menu|Version|Stage changes> and <menu|Version|Unstage changes> control
-  which changes will be part of the next commit, <menu|Version|Commit this
-  file> commits the document on its own, and <menu|Version|Discard
-  changes> restores the version which was last staged. Using
-  <menu|Version|Compare with>, the document can be compared with the last
-  commit, the staged version or the version on another branch; the
-  differences are shown in the same way as when comparing two files.
+  Since the configuration of a repository could make <name|Git> run
+  programs, <TeXmacs> only uses <name|Git> in the repositories which you
+  created or cloned with <TeXmacs>, and in those for which you choose
+  <menu|Version|Use Git in this folder>. A document which does not belong
+  to any repository can be put under version control using
+  <menu|Version|Create Git repository>, and an existing repository can be
+  copied using <menu|Version|Clone Git repository>.
+
+  For the current document, <menu|Version|This file|Add to repository>,
+  <menu|Version|This file|Stage changes> and <menu|Version|This file|Unstage
+  changes> control which changes will be part of the next commit,
+  <menu|Version|This file|Commit this file> saves and commits the document
+  on its own, and <menu|Version|This file|Discard changes> restores the
+  version which was last staged. Using <menu|Version|Compare with>, the
+  document can be compared with the last commit, the staged version, the
+  version of your coauthors, the version before the last merge, a tag,
+  another branch or any other revision. The differences are shown in the
+  same way as when comparing two files, and a bar at the bottom of the
+  window helps you to go through them and to retain the right versions.
 
   The page <menu|Version|Git|Status> lists the staged, modified, untracked
-  and conflicting files, with links for opening, comparing, staging,
-  unstaging or discarding each of them. The same information is shown in a
-  side panel by <menu|Version|Git|Git panel>. <menu|Version|Git|Commit>
-  opens a dialog in which you enter a message and select the files to be
-  committed. <menu|Version|Git|Log> and <menu|Version|Git|Branches and
-  tags> show the history, the branches, the tags and the stashes of the
-  repository. The <menu|Version|Git> menu also allows you to create,
-  switch to and merge branches, to tag the current version, to stash your
-  changes, and to fetch, pull and push changes from and to other
-  repositories; the latter operations run in the background. Documents
-  which are changed on disk by <name|Git> are reloaded automatically.
+  and conflicting files, with buttons for opening, comparing, staging,
+  unstaging or discarding each of them. The same information is shown in
+  the Git panel. <menu|Version|Commit> opens a dialog in which you enter a
+  message and select the files to be committed. <menu|Version|Git|Log>,
+  <menu|Version|Git|Graph> and <menu|Version|Git|Branches and tags> show
+  the history, the branches, the tags and the stashes of the repository.
+  The <menu|Version|Git> menu also allows you to create, switch to and
+  merge branches, to tag the current version, to stash your changes, and
+  to fetch, get and send changes from and to other repositories (<menu|Get
+  changes> and <menu|Send changes>); the latter operations run in the
+  background. Documents which are changed on disk by <name|Git> are
+  reloaded automatically.
 
   When a merge leads to a conflict in a <TeXmacs> document, use
   <menu|Version|Resolve conflict>. The changes which were made on only one
@@ -189,19 +206,26 @@
   paragraph, the commit, the author and the date of its last change.
   <menu|Version|Restore version> puts back an older version of the document
   as a new change, so that nothing is lost. For a document which is split
-  into several files, <menu|Version|Commit project> commits all files used
-  by the document (included documents, images, bibliographies and style
-  files), and a menu entry proposes to add those which are not yet under
-  version control. In the commit dialog, <menu|Suggest message> proposes a
-  message which lists the sections that were changed.
+  into several files, <menu|Version|Project|Commit project> commits all
+  files used by the document (included documents, images, bibliographies
+  and style files), and <menu|Version|Project|Add missing files> adds those
+  which are not yet under version control. In the commit dialog,
+  <menu|Suggest message> proposes a message which lists the sections that
+  were changed.
 
-  If you prefer not to deal with the details of <name|Git>, then turn on
-  <menu|Version|Git|Preferences|Simple mode>. The <menu|Version> menu then
-  offers to save snapshots of all your files, to restore any snapshot, and
-  to synchronize with the repositories of your coauthors.
+  If you prefer not to deal with the details of <name|Git>, then choose the
+  simple mode when <TeXmacs> asks for it, or in <menu|Version|Git
+  preferences>. The <menu|Version> menu then offers to save snapshots of
+  all your files, to restore one of the recent snapshots (the current
+  state is saved first), and to synchronize with the repositories of your
+  coauthors. The other preferences of the <name|Git> tools are also in
+  <menu|Version|Git preferences>.
 
-  All commands which were executed can be inspected using
-  <menu|Version|Git|Git output>.
+  The keyboard shortcuts <key|version g>, <key|version c>, <key|version y>,
+  <key|version s> and <key|version => respectively open the Git panel,
+  commit (or save a snapshot), synchronize, show the status page and
+  compare the document with its last commit. All commands which were
+  executed can be inspected using <menu|Version|Git|Git output>.
 
   <tmdoc-copyright|2010\U2019|Joris van der Hoeven|Darcy Shen>
 
