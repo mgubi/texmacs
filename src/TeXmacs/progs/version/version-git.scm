@@ -641,15 +641,17 @@
 ;; Remote operations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (git-remote root what args done)
-  ;; Run a remote command asynchronously, since it may take a long time
+(define (git-remote root what args done . opt-expected?)
+  ;; Run a remote command asynchronously, since it may take a long time;
+  ;; the failures satisfying the optional predicate are handled by done
   (if (git-busy? root)
       (set-message "Please wait for the running Git command" what)
       (with watch (git-watch root)
         (set-message (string-append what "...") "Git")
         (git-run-async root args #f
           (lambda (ret)
-            (git-report ret what)
+            (when (not (and (nnull? opt-expected?) ((car opt-expected?) ret)))
+              (git-report ret what))
             (git-reload root watch)
             (when done (done ret))))
         (refresh-now "git-tool"))))
@@ -687,9 +689,11 @@
   ;; If the branches diverged, then propose to merge them
   (let* ((done (and (nnull? opt-done) (car opt-done)))
          (mode (get-preference "git pull mode"))
+         (expected? (lambda (ret)
+                      (and (not (git-ok? ret)) (== mode "fast-forward")
+                           (diverged? ret))))
          (cont (lambda (ret)
-                 (if (and (not (git-ok? ret)) (== mode "fast-forward")
-                          (diverged? ret))
+                 (if (expected? ret)
                      (user-confirm (string-append "Your changes and the remote "
                                                   "changes diverged. Merge "
                                                   "them?") #t
@@ -700,7 +704,7 @@
                      ((pull-done root done) ret)))))
     (git-when-saved root
       (lambda ()
-        (git-remote root "Pull" (pull-arguments mode) cont)))))
+        (git-remote root "Pull" (pull-arguments mode) cont expected?)))))
 
 (tm-define (git-push root . opt-done)
   (with remote (git-push-remote root)

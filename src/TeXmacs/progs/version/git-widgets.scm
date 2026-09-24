@@ -44,14 +44,19 @@
     (tm-string-trim-both (cpp-texmacs->verbatim t #f "utf-8"))))
 
 (define (initially-selected entries labels . opt-paths)
-  ;; The files with staged changes and the files in opt-paths
-  (with paths (if (null? opt-paths) '() (car opt-paths))
+  ;; The files with staged changes and the files in opt-paths; if nothing
+  ;; is staged (as usual for users who do not stage), all changed files
+  ;; which are already tracked
+  (let* ((paths (if (null? opt-paths) '() (car opt-paths)))
+         (staged? (list-or (map git-entry-staged? entries)))
+         (sel? (lambda (e)
+                 (or (git-entry-staged? e)
+                     (in? (git-entry-path e) paths)
+                     (and (not staged?) (git-entry-unstaged? e))))))
     (list-filter labels
                  (lambda (lab)
-                   (with e (list-ref entries (list-find-index labels
-                                                              (cut == <> lab)))
-                     (or (git-entry-staged? e)
-                         (in? (git-entry-path e) paths)))))))
+                   (sel? (list-ref entries
+                                   (list-find-index labels (cut == <> lab))))))))
 
 (define (selected-entries entries labels selected)
   (list-filter entries
@@ -79,31 +84,33 @@
                   (else #t))))
         entries labels)))
 
+(define commit-error "")
+
+(define (refuse msg)
+  ;; Explain in the commit dialog why nothing was committed
+  (set! commit-error msg)
+  (refresh-now "git-commit-error")
+  #f)
+
 (define (commit-now root u entries labels selected amend?)
   ;; Returns #t if the dialog can be closed
   (let* ((msg (commit-message u))
          (merging? (git-merging? root))
          (initial (initially-selected entries labels)))
     (cond ((and (== msg "") (not amend?))
-           (set-message "Please enter a commit message" "Git commit")
-           #f)
+           (refuse "Please enter a commit message"))
           ((and merging? (list-find (git-status-entries root)
                                     git-entry-conflicted?))
-           (set-message "Please resolve all conflicts first" "Git commit")
-           #f)
+           (refuse "Please resolve all conflicts first"))
           ((and merging? (not (== (length selected)
                                   (length initial))))
-           (set-message "During a merge, all changes must be committed"
-                        "Git commit")
-           #f)
+           (refuse "During a merge, all changes must be committed"))
           ((and (null? selected) (not amend?) (not merging?))
-           (set-message "Nothing selected for commit" "Git commit")
-           #f)
+           (refuse "Nothing selected for commit"))
           ((not (or merging? (commit-update-index root entries labels
                                                   selected)))
            (git-refresh root)
-           (set-message "Could not prepare the files for commit" "Git commit")
-           #f)
+           (refuse "Could not prepare the files for commit"))
           ((and amend? (== msg ""))
            (with ok? (git-report (git-run-list root
                                                (append (list "commit" "--amend"
@@ -142,7 +149,7 @@
       (text (string-append (if merging? "Merge commit on branch "
                                "Commit on branch ")
                            (utf8->cork branch) " in "
-                           (utf8->cork (url->system root))))
+                           (utf8->cork (url->system (url-tail root)))))
       (if merging?
           (text "A merge commit contains all changes: keep all files selected"))
       ===
@@ -167,6 +174,9 @@
           (scrollable
             (choices (set! selected answer) labels selected))))
       ===
+      (refreshable "git-commit-error"
+        (if (!= commit-error "")
+            (hlist (bold (text commit-error)) >>)))
       (hlist
         (toggle (set! amend? answer) amend?) // (text "Amend last commit")
         >>
@@ -201,6 +211,7 @@
       ;; NOTE: Git commits what is on disk
       (git-when-saved root
         (lambda ()
+          (set! commit-error "")
           (git-invalidate root)
           (buffer-set-master u b)
           (dialogue-window (git-commit-widget root u paths)
@@ -282,9 +293,12 @@
         (for (e (cadr x))
           (dynamic (git-tool-entry root e (car x) simple?)))))))
 
-;; The message of the commit box, one buffer per window
+;; The message of the commit box, one buffer per window; the messages of
+;; the other repositories are kept aside
 
 (define panel-buffers (make-ahash-table))
+(define panel-roots (make-ahash-table))
+(define panel-messages (make-ahash-table))
 
 (define (panel-buffer win)
   (with key (url->string win)
@@ -296,6 +310,24 @@
           (ahash-set! panel-buffers key u)
           u))))
 
+(define (panel-follow-root win root)
+  ;; Show the message of @root in the commit box, when the panel of @win
+  ;; switches to another repository
+  ;; NOTE: the editor of the message is not rebuilt, since destroying it
+  ;; while it is being updated crashes
+  (let* ((key (url->string win))
+         (old (ahash-ref panel-roots key)))
+    (when (!= old root)
+      (ahash-set! panel-roots key root)
+      (delayed
+        (with u (panel-buffer win)
+          (when (buffer-exists? u)
+            (when old
+              (ahash-set! panel-messages (list key old)
+                          (tree->stree (buffer-get-body u))))
+            (buffer-set-body u (or (ahash-ref panel-messages (list key root))
+                                   '(document "")))))))))
+
 (define (panel-commit root u simple?)
   ;; NOTE: the message is only cleared once it has been used
   (with msg (commit-message u)
@@ -304,23 +336,26 @@
           (simple?
            (git-save-snapshot root msg
              (lambda (ok?) (when ok? (buffer-set-body u '(document ""))))))
-          ((not (git-has-staged? root))
-           (set-message "Stage some changes first, or use Commit..." "Git"))
           (else
+            ;; NOTE: without staged changes, all the changes of tracked
+            ;; files are committed
             (git-when-saved root
               (lambda ()
-                (when (git-commit-staged root msg)
+                (when (if (git-has-staged? root)
+                          (git-commit-staged root msg)
+                          (git-commit-staged root msg :all))
                   (buffer-set-body u '(document "")))))))))
 
 (define (panel-suggest win u)
+  ;; NOTE: without staged changes, the changes of tracked files are committed
   (and-with root (tool-root win)
-    (buffer-set-body
-     u `(document ,@(map utf8->cork
-                         (git-describe-changes
-                          root (if (git-simple-mode?)
-                                   (git-status-entries root)
-                                   (list-filter (git-status-entries root)
-                                                git-entry-staged?))))))))
+    (let* ((all (git-status-entries root))
+           (staged (list-filter all git-entry-staged?))
+           (l (cond ((git-simple-mode?) all)
+                    ((nnull? staged) staged)
+                    (else (list-filter all (non git-entry-untracked?))))))
+      (buffer-set-body
+       u `(document ,@(map utf8->cork (git-describe-changes root l)))))))
 
 (tm-widget (git-tool-commit-box win)
   ;; NOTE: this part of the panel is not refreshed, so that the editor of
@@ -392,7 +427,7 @@
         (git-simple-mode?)))
 
 (tm-widget (git-tool-sync-bar win)
-  (let* ((root (tool-root win))
+  (let* ((root (with r (tool-root win) (panel-follow-root win r) r))
          (simple? (git-simple-mode?))
          (busy? (and root (git-busy? root)))
          (remote? (and root (nnull? (git-remotes root)) (not busy?)))
@@ -711,7 +746,7 @@
        (begin (set-preference "git simple mode" "on")
               (set-preference "git mode chosen" "on")
               (quit) (cont))))
-    ===
+    ======
     (explicit-buttons
       ("Full: staging, branches and remotes (for Git users)"
        (begin (set-preference "git simple mode" "off")
@@ -856,7 +891,7 @@
       // //
       ("Close" (tool-close :transient-bottom 'version-review-tool #f win)))))
 
-(tm-tool* (version-review-tool win)
+(tm-tool (version-review-tool win)
   (:name "Review differences")
   (refreshable "version-review"
     (dynamic (version-review-contents win))))

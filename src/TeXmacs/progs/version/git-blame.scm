@@ -178,9 +178,12 @@
 
 (tm-define (git-show-blame name)
   (:synopsis "Show who last changed each paragraph of @name")
-  (cursor-history-add (cursor-path))
-  (revert-buffer-revert (string-append "tmfs://blame/"
-                                       (url->tmfs-string name))))
+  (if (== (git-file-state name) 'conflicted)
+      (set-message "Please resolve the conflict first" "Who changed what")
+      (begin
+        (cursor-history-add (cursor-path))
+        (revert-buffer-revert (string-append "tmfs://blame/"
+                                             (url->tmfs-string name))))))
 
 (tmfs-title-handler (blame name doc)
   (with u (tmfs-string->url name)
