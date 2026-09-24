@@ -8,13 +8,23 @@ The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2
 |--------|------------|------|
 | `git-base.scm` | nothing | The process layer and the parsers. It has no GUI code and doesn't touch buffers. |
 | `version-tmfs.scm` | git-base | The generic VCS API. It uses `git-root` for detection (`git-active?`) and adds `version-tool-reset`. |
-| `version-git.scm` | version-tmfs, version-compare, git-base | The git backend (`version-*` overloads), the file and repository actions, the `tmfs://git/...` and `tmfs://commit/...` pages, and the `:secure` page actions. |
+| `version-git.scm` | version-tmfs, version-compare, version-merge, git-base | The git backend (`version-*` overloads), the file and repository actions, the `tmfs://git/...` and `tmfs://commit/...` pages, and the `:secure` page actions. |
 | `version-merge.scm` | version-compare | Structured 3-way merge of documents (`merge-versions`). |
 | `git-drivers.scm` | version-merge, git-base | The git merge driver (`git-merge-driver`, loaded lazily) and its installation in a repository. |
 | `git-blame.scm` | version-git, version-merge | Blame by paragraph: `git-blame`, and the `tmfs://blame/<file>` page (loaded lazily). |
 | `git-project.scm` | version-git, version-merge | Files used by documents, change descriptions for commit messages, snapshots and simple mode. |
-| `git-widgets.scm` | version-git, git-project | The commit dialog and the interactive prompts for branch, tag and init. |
-| `version-menu.scm` | git-widgets | `git-file-menu`, `git-repository-menu`, `git-compare-menu`, and the entry points in `version-menu`. |
+| `git-widgets.scm` | version-git, git-project | Dialogs (commit, form and message dialogs, clone, failures, preferences, first-run mode), the side panel `git-tool`, and the review bar `version-review-tool`. |
+| `version-menu.scm` | git-widgets, git-project, git-blame, git-drivers | `version-menu` (with `version-trusted-menu`), `git-file-menu`, `git-project-menu`, `git-repository-menu`, `git-compare-menu`, `git-restore-menu` and `version-differences-menu`. |
+| `version-kbd.scm` | git-widgets | The shortcuts, in the mode `in-git-document?`. |
+
+Outside `version/`:
+* `kernel/texmacs/tm-modes.scm` has the cached predicates
+  `versioning-directory`, `git-directory?`, `git-context?` and
+  `versioning-tool-active?`;
+* `texmacs/texmacs/tm-server.scm` has `set-versioning-tool`;
+* `init-texmacs.scm` installs the footer hook;
+* `packages/miscellaneous/git-pages.ts` is the style of the generated
+  pages.
 
 `init-texmacs.scm` registers the tmfs classes lazily:
 `(lazy-tmfs-handler (version version-tmfs) history revision)` and
@@ -29,9 +39,15 @@ therefore load even before anyone has opened the Version menu.
   `git-output` returns stdout, or `#f` on failure. `git-message` picks the
   most informative line of the output, and `git-report` (in version-git)
   shows it in the footer.
-* Every command runs as `git -C <root> -c core.quotepath=off -c
-  color.ui=false ...` through `evaluate-system`: argv with no shell, so no
-  quoting is needed. The executable is the preference `"git executable"`.
+* Every command runs as `env LC_ALL=C git -C <root> -c
+  core.quotepath=off -c color.ui=false -c core.fsmonitor=false
+  --literal-pathspecs ...` through `evaluate-system`: argv with no shell,
+  so no quoting is needed. There is no `env` prefix on Windows. The
+  executable is the preference `"git executable"`.
+* **Trust:** `git-run` and `git-run-async` refuse to run in a working tree
+  that is not listed in the preference `"git trusted repositories"`. The
+  list is filled by `git-trust`, which is called by init, clone and
+  *Use Git in this folder…*.
 * The first call sets `GIT_TERMINAL_PROMPT=0` and `GIT_OPTIONAL_LOCKS=0` in
   TeXmacs's own environment (`system-setenv`), so git never waits for a
   password on a terminal that isn't there.
@@ -40,12 +56,12 @@ therefore load even before anyone has opened the Version menu.
 * `git-root u` walks up the directories looking for a `.git` **entry**,
   which can be a file (worktrees, submodules) or a directory. It never starts
   a process.
-* **Status**: `git-status root` runs `status --porcelain=v2 -z --branch
-  --untracked-files=all` and returns an alist with `head`, `oid`,
+* **Status**: `git-status root` runs `status --porcelain=v2 -z --branch`
+  (respecting the configuration of untracked files) and returns an alist with `head`, `oid`,
   `upstream`, `ahead`, `behind` and `entries`. An entry is
   `(kind xy path orig)`, where kind is one of
-  `ordinary renamed unmerged untracked`. The result is cached for 2 s per
-  root. `git-invalidate root` drops the cache, and every action calls it
+  `ordinary renamed unmerged untracked`. The result, even a failure, is
+  cached for 2 s per root (with the remotes). `git-invalidate root` drops the cache, and every action calls it
   through `git-refresh`.
 * `git-file-state u` returns one of `untracked unmodified modified staged
   partial added deleted conflicted`. A file that doesn't appear in the
@@ -112,7 +128,8 @@ These rules come out of a review of the branch (2026-09-24):
 
 ## Pages and actions
 
-The pages are generated documents in style `generic`, built by `git-page`.
+The pages are generated documents in style `(tuple "generic" "git-pages")`,
+built by `git-page`.
 Clickable operations are `(action text script)` tags whose script calls a
 `git-page-*` function. These are declared `(:secure #t)` and take only
 string arguments (the root as a system path, and a relative path), so
@@ -134,22 +151,26 @@ pull and stash.
 ## Side panel
 
 `git-tool` (in `git-widgets.scm`, registered with `lazy-tool`) is a
-`tm-tool*`, opened on the right with "Git → Git panel" (`git-open-tool`).
-It shows the branch with its ahead and behind counts, the buttons Commit,
-Pull, Push, Status and Refresh, and one line per changed file, with the
-file name (click to open) and Stage/Unstage buttons. Its contents are a
-`refreshable "git-tool"`, and `git-refresh` calls
-`(refresh-now "git-tool")`. The working tree is that of the window's
-buffer (`git-buffer-root`, which also understands git pages).
+`tm-tool*`, opened on the right with "Git panel" (`git-open-tool`). It
+has a sync bar and the tabs Changes (with a commit box), History and
+Branches (see git-features.md, section 1b).
 
-The data are computed in one `let*` at the top of the widget. Widget
-branches such as `(if root ...)` did not keep expressions like
-`(git-status root)` from being evaluated when `root` was `#f`.
+Only the parts that depend on the state of the working tree (the sync
+bar, the lists, the History and Branches tabs) are `refreshable
+"git-tool"`; `git-refresh` calls `(refresh-now "git-tool")`. The commit
+box is **not** refreshed. Rebuilding the `texmacs-input` of its message
+while the user types would destroy an editor with pending updates (a
+crash), and would lose the message. Its aux buffer
+`tmfs://aux/git-panel-<n>` is created per window.
+
+The working tree is that of the window's buffer (`git-buffer-root`, which
+also understands git pages). The bodies of `(if ...)` in widgets are
+evaluated eagerly, so the git layer accepts `#f` roots.
 
 ## Commit dialog
 
 `git-interactive-commit` opens `git-commit-widget`. The dialog has a
-`texmacs-input` for the message (aux buffer `tmfs://aux/git-commit`,
+`texmacs-input` for the message (aux buffer `tmfs://aux/git-commit-<n>`,
 converted with `cpp-texmacs->verbatim ... "utf-8"`), a `choices` list with
 every changed file, and an "Amend" toggle. The files that start out
 selected are the ones with staged changes. When you commit:
@@ -167,7 +188,8 @@ the dialog stays open.
 `fetch`, `pull` and `push` go through `git-run-async root args input cont`,
 which is built on the new C++ `async-evaluate-system argv input callback`.
 The callback receives `(code stdout stderr)` from the event loop
-(`async_eval_pending` in `tm_server.cpp`).
+(`async_evaluate_pending` in `sys_utils.cpp`, called by
+`async_eval_pending` from the event loop in `tm_server.cpp`).
 
 On Unix, `unix_system_start` in `Plugins/Unix/unix_sys_utils.cpp` spawns
 the process with `posix_spawnp` and starts background threads that
@@ -178,9 +200,12 @@ returns the result. On Windows and Android the command runs synchronously
 and only the callback is delayed.
 
 `async-evaluate-system` returns an identifier (0 on failure) which
-`async-evaluate-cancel` accepts. The child runs in its own process group
-(`POSIX_SPAWN_SETPGROUP`), so cancelling sends `SIGTERM` to the whole group,
-which includes helpers such as `ssh` or `git-remote-https`. A command only
+`async-evaluate-cancel` accepts. The child runs in a new session
+(`POSIX_SPAWN_SETSID`, or a new process group where that isn't
+available), so it has no controlling terminal and prompts can't stop it.
+Cancelling sends `SIGTERM` (then `SIGCONT`) to the whole group, which
+includes helpers such as `ssh` or `git-remote-https`; a second cancel
+sends `SIGKILL`. Nothing is sent once the process has been reaped. A command only
 counts as finished when it has exited *and* its reader threads have seen
 end of file. The event loop therefore never blocks in `pthread_join`,
 even if a grandchild keeps the pipes open.
@@ -188,7 +213,7 @@ even if a grandchild keeps the pipes open.
 At most one asynchronous command runs per root (`git-busy?`, which holds
 the identifier). "Git → Cancel running command" and the panel's Cancel
 button call `git-cancel`. While one is
-running, the menu hides Fetch, Pull and Push. `git-remote` in
+running, the menu hides Fetch, Get changes and Send changes. `git-remote` in
 `version-git.scm` reports the result, reloads the documents that changed,
 and refreshes the pages. Each of `git-fetch`, `git-pull` and `git-push` can
 take a continuation, which the tests use.
@@ -296,8 +321,6 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 
 * The textconv diff driver for readable `git diff` of `.tm` files is still
   to do.
-* Clone asks for the repository and target directory in the footer. There
-  is no dedicated dialog yet.
 * An asynchronous command only finishes once its output pipes are closed.
   If a helper keeps them open (for example an `ssh` master started without
   `ControlPersist` detaching), the command stays "running" until it is
@@ -305,9 +328,9 @@ checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
 * Plugin pipe links reap children with `wait (NULL)` (`pipe_link.cpp`),
   which can collect a git process. `waitpid` then fails and the command
   is reported with exit code -1, even if it succeeded.
-* Opening a document in a repository runs `git status`, which may run that
-  repository's `core.fsmonitor` hook, like any git GUI does. Don't open
-  documents from untrusted repositories that you haven't inspected.
+* The trust model protects against a repository's configuration only
+  until you trust it. After that, its hooks and filters run as with any
+  git client.
 * The commit dialog, the panel and the menus are exercised by the offscreen
   tests (built and opened, menus expanded), but have not been used by
   hand.

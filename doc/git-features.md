@@ -5,15 +5,31 @@ reviewers and testers. For how the code is organised, see
 [git-implementation.md](git-implementation.md); for the plan and its
 history, see [git-plan.md](git-plan.md).
 
-**Base:** `svn_sync`, the TeXmacs 2.1.5 upstream mirror, 14 commits ahead
-as of 2026-09-24.
-**Scope:** `src/TeXmacs/progs/version/` (Scheme), small C++ additions in
-`src/src/System/Misc/sys_utils.cpp` and
-`src/src/Plugins/Unix/unix_sys_utils.cpp`, the user manual
-(`man-versioning.en.tm`), and one hook in `tm-files.scm`.
+**Base:** `svn_sync`, the TeXmacs 2.1.5 upstream mirror, about 31
+commits ahead as of 2026-09-24.
+**Scope:**
+* `src/TeXmacs/progs/version/` (Scheme) and the style package
+  `packages/miscellaneous/git-pages.ts`;
+* small C++ additions in `src/src/System/Misc/sys_utils.cpp` and
+  `src/src/Plugins/Unix/unix_sys_utils.cpp`, with their glue;
+* the versioning tool's automatic mode (`kernel/texmacs/tm-modes.scm`,
+  `texmacs/texmacs/tm-server.scm`, the Tools and Preferences menus);
+* the footer hook and lazy handlers in `init-texmacs.scm`, and a save
+  hook in `tm-files.scm`;
+* the user manual (`man-versioning.en.tm`).
 
-Everything below is in the **Version** menu, which you enable with
-Tools → Versioning tool.
+Everything below is in the **Version** menu. By default (Tools →
+Versioning tool → Automatic) it appears for documents in a git or SVN
+working tree.
+
+**Trust.** The configuration of a repository can make git run programs,
+even for `git status`. TeXmacs therefore only runs git in repositories
+that you trust:
+* those created or cloned from TeXmacs;
+* those you allow with **Version → Use Git in this folder…**.
+
+For any other repository, the Version menu only offers that entry and the
+plain comparison tools.
 
 ---
 
@@ -29,6 +45,7 @@ Tools → Versioning tool.
 | Conflicts | Text conflict markers break `.tm` files | Structured 3-way merge; only real conflicts are left to resolve |
 | Command-line merges | Text merge | Optional git merge driver that runs the TeXmacs structured merge |
 | Side panel | None | Git panel with status and actions |
+| Untrusted repositories | — | Git is never run until you trust the folder; `core.fsmonitor` is always disabled |
 
 ---
 
@@ -56,7 +73,8 @@ Tools → Versioning tool.
   * for the document: Compare with, Restore version, History of this
     document, Who changed what;
   * submenus *This file*, *Project*, *Git (branch, state)*, *Differences*.
-* **Git panel,** in these parts:
+* **Git panel** (only its lists are rebuilt when the state changes, so a
+  message being typed and the selected tab are kept), in these parts:
   * a sync bar with the branch, "N to send / N to get", and Get/Send
     changes (or Synchronize in simple mode);
   * a *Changes* tab with sections Conflicts / Staged / Changed / New
@@ -82,21 +100,25 @@ Tools → Versioning tool.
 
 ## 2. Working with a single document
 
-When the current document is in a git working tree, the Version menu
-shows a **Git** group with the entries that fit the file's state:
+When the current document is in a trusted git working tree, the Version
+menu has, at the top, the entries for the document (Compare with, Restore
+version, History of this document, Who changed what). The operations on
+the file are in the **This file** submenu (hidden in simple mode); those on
+the project are in the **Project** submenu. Each entry is shown only in
+the states where it applies:
 
 | Entry | When shown | Effect |
 |-------|------------|--------|
-| **Add to repository** | the file is untracked | `git add` |
-| **Stage changes** | modified, or partially staged | `git add` |
-| **Unstage changes** | staged, partially staged, or newly added | `git reset`; a rename also unstages the removal of the old name |
-| **Commit this file…** | there is something to commit | Prompts for a message, then commits only this file (adding it first if needed). Refused during a merge. |
-| **Discard changes…** | modified | Restores the staged version after a confirmation, which warns if unsaved edits would also be lost |
+| **This file → Add to repository** | the file is untracked | `git add` |
+| **This file → Stage changes** | modified, or partially staged | `git add` |
+| **This file → Unstage changes** | staged, partially staged, or newly added | `git reset`; a rename also unstages the removal of the old name |
+| **This file → Commit this file…** | there is something to commit | Saves the document, asks for a message, then commits only this file (adding it first if needed). Refused during a merge. |
+| **This file → Discard changes…** | modified | Restores the staged version after a confirmation, which warns if unsaved edits would also be lost |
 | **Compare with → Last commit / Staged version / Remote version / Before the last pull or merge / Other revision… / Tag … / Branch …** | TeXmacs documents | Opens the **structured comparison** between the document and that revision; you then accept or reject each difference |
 | **Who changed what** | TeXmacs documents | **Blame by paragraph**: the document, with each paragraph (or run of paragraphs) annotated with the commit, author and date that last changed it, or "Not committed yet". It follows paragraphs, not source lines, through the last 30 commits (preference `git blame depth`). |
-| **Restore version →** | tracked files | The last 15 versions of the document; restoring one makes it a new change, so the history is kept. Also available as **Restore this version** when viewing an old revision, and as "restore" on commit pages. |
-| **Add N missing project files** | the document uses untracked files | Adds the included documents, images, bibliography files and local style files the document (or its project's master document) depends on |
-| **Commit project…** | TeXmacs documents | Opens the commit dialog with all changed files of the project preselected |
+| **Restore version →** | tracked files | The last 15 versions of the document. Restoring one writes that version into the current file, following renames. The staged version and the history are kept, so this is a new change that can be discarded. Also available as **Restore this version** when viewing an old revision, and as "restore" on commit pages. |
+| **Project → Add N missing files** | the document uses untracked files | Adds the included documents, images, bibliography files and local style files the document (or its project's master document) depends on |
+| **Project → Commit project…** | TeXmacs documents | Opens the commit dialog with all changed files of the project preselected |
 | **Resolve conflict…** / **Mark as resolved** | the file has a merge conflict | See section 5 |
 
 **History** (upstream) keeps working. It follows renames, and each
@@ -112,8 +134,8 @@ staged, added, deleted, conflicted.
 | Entry | Effect |
 |-------|--------|
 | **Git (branch, N changed, M ahead, K behind)** | The label of the submenu itself summarizes the state of the repository. |
-| **Status** | A page listing the branch, the upstream and ahead/behind counts, then conflicts, staged changes, unstaged changes and untracked files. Each file has a link to open it and actions `[compare \| stage \| unstage \| discard \| add \| resolve \| mark resolved]`. The page header links to Commit…, Stage all, Fetch, Pull, Push and the other pages. |
-| **Git panel** | The same information in a side panel: branch, Commit/Pull/Push/Cancel/Status/Refresh buttons, and one line per changed file with Stage/Unstage/Resolved buttons. It refreshes after every git action and after saving. |
+| **Status** | A page listing the branch, the upstream and ahead/behind counts, then conflicts, staged changes, unstaged changes and untracked files. Files are listed in tables with coloured badges and buttons (compare, stage, unstage, discard, add, resolve, mark resolved). The page header has buttons for Commit…, Stage all, Fetch, Get changes and Send changes, and for the other pages. |
+| **Git panel** | The side panel described in section 1b. |
 | **Graph** | The history of all branches as a graph, with branch and tag labels. Each commit links to its page. |
 | **Log** | The commit history, 250 commits per page with a "More…" link. Each commit opens a **commit page** showing author, date, parents, the full message and a per-file table of changes with +/− bars, links to the file at that revision, and "compare with current" for TeXmacs documents. |
 | **Branches and tags** | Local and remote branches with upstream tracking and last commit date; actions switch, merge into current and delete. Also the remotes with their URLs, the tags, and the stashes with pop and drop. |
@@ -121,12 +143,12 @@ staged, added, deleted, conflicted.
 | **Stage all changes** | `git add --update` |
 | **New branch…** / **Switch to branch** / **Merge branch** | Create and switch; switch; merge into the current branch. Before switching or merging, it offers to save modified documents. |
 | **Tag this version…** | Annotated tag (lightweight if the message is empty). |
-| **Fetch** / **Pull** / **Push** | Run in the background (section 4). When a pull cannot fast-forward because both sides changed, it offers to **merge the remote changes**. If that leads to conflicts, it opens the status page so you can resolve them (section 5). The first push of a branch sets its upstream. |
-| **Remotes → Add remote… / Push to / Remove** | Manage the remote repositories. Push goes to the upstream's remote, or `origin`, or the only remote. |
+| **Fetch** / **Get changes (pull)** / **Send changes (push)** | Run in the background (section 4). When a pull cannot fast-forward because both sides changed, it offers to **merge the remote changes**. If that leads to conflicts, it opens the status page so you can resolve them (section 5). The first push of a branch sets its upstream. |
+| **Remotes → Add remote… / Push to / Remove** | Manage the remote repositories. Send changes goes to the remote configured for the branch, or `origin`, or the only remote. |
 | **Cancel running command** | Shown while a background command runs. |
 | **Stash changes** / **Restore last stash** | `git stash push` / `git stash pop`, after offering to save modified documents. |
 | **Merge documents structurally** | Installs the merge driver (section 6). |
-| **Preferences → Simple mode / Sign commits and tags / Pull** | See sections 3a and 7; the pull mode is fast-forward only (default), merge or rebase. |
+| **Preferences → All preferences… / Simple mode / Sign commits and tags / Pull** | See sections 3a and 7. The pull mode is *Fast-forward only* (default: when both sides changed, it asks before merging), *Merge* or *Rebase*. |
 | **Git output** | The last 50 git commands with exit code, stdout and stderr. |
 | **Refresh** | Forgets cached state, including which files are versioned. |
 
@@ -172,8 +194,9 @@ mode** reduces the menus to:
 
 * **Save snapshot…** — records the state of all files, after a short
   description.
-* **Restore snapshot →** — the last 15 snapshots. Restoring one puts back
-  all files as they were, as a new change, so the history is kept.
+* **Restore snapshot →** — the last 15 snapshots. Restoring one first
+  saves the current state in an automatic snapshot, then puts back all
+  files as they were, as a new change, so nothing is lost.
 * **Restore version →**, **Compare with**, **Who changed what** — for the
   current document.
 * **Synchronize** — pulls the others' changes (merging them if needed),
@@ -198,7 +221,9 @@ mode** reduces the menus to:
 * At most one background command runs per repository. Its buttons are
   disabled meanwhile.
 * **Cancel** terminates the command and every process it started, such as
-  `ssh` or `git-remote-https`.
+  `ssh` or `git-remote-https`. A second Cancel kills them.
+* Commands run in a new session without a terminal, so an ssh prompt
+  can't stop them. The ssh command fails instead.
 * Git never waits for a password prompt it cannot show
   (`GIT_TERMINAL_PROMPT=0`). Use a credential helper or an ssh agent.
 
@@ -275,6 +300,15 @@ driver get git's usual text merge.
   correctly quoted shell command there.
 * **Encodings:** git output (UTF-8) and TeXmacs text (cork) are
   converted where they meet.
+* **Trust:** git is only run in trusted repositories, and
+  `core.fsmonitor` is always disabled (see the top of this page).
+* **Restoring never loses work:** restoring a snapshot first saves an
+  automatic snapshot; restoring a version doesn't touch the staged
+  version.
+* **Commits include unsaved edits:** documents are saved before they are
+  committed.
+* **Merge driver fallback:** when the structured merge fails, the driver
+  falls back on git's textual merge, with conflict markers.
 
 ---
 
@@ -302,13 +336,16 @@ any git revision (`HEAD`, a branch), `INDEX`, and `BASE`, `OURS` and
 ## 9. Tests
 
 ```sh
-doc/tests/run-git-tests.sh <scratch-dir>         # headless: 81 checks
-doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 39 checks
+doc/tests/run-git-tests.sh <scratch-dir>         # headless: 100 checks
+doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 51 checks
 ```
 
 The scripts create scratch repositories (with spaces in paths, a linked
 worktree, a bare remote with clones, and conflicting merges). They use a
-private `TEXMACS_HOME_PATH` and open no windows. The checks cover:
+private, freshly created `TEXMACS_HOME_PATH` and open no windows. The
+runner exits with a failure status if a check fails, if the tests do not
+complete (crash or time out), or if any Scheme error appears in the log.
+The checks cover:
 
 * detection and every file state;
 * quoting;
@@ -319,14 +356,31 @@ private `TEXMACS_HOME_PATH` and open no windows. The checks cover:
 * the merge engine and the merge driver;
 * push, fetch, pull, clone and cancel;
 * reloading of open documents;
-* the save hook, the side panel, and the review regressions.
+* the save hook, the side panel, and the review regressions;
+* trust (a repository whose `core.fsmonitor` would run a program), safe
+  restoring, committing unsaved edits, the merge-driver fallback, and the
+  other audit fixes.
+
+Not covered by the tests (see doc/git-audit.md, E4): the logic of the
+commit dialog, confirmations that need an answer (delete branch, drop
+stash, remove remote), the X11 shell fallback, Windows, submodules and
+non-ASCII paths.
 
 ---
 
 ## 10. Known limitations
 
-* The commit dialog, panel and menus were exercised by scripts only. They
-  have not yet been checked by hand in a normal session.
+* The commit dialog, panel and menus are covered by the offscreen tests
+  (built, opened, menus expanded), but haven't been used by hand in a
+  normal session.
+* During a rebase, git's "ours" is the upstream and "theirs" your commits,
+  so in *Resolve conflict* the Mine/Theirs labels are swapped.
+* On X11, the background commands run synchronously, through the shell.
+  On Windows and Android they run synchronously too, only the callback is
+  delayed, and they can't be cancelled.
+* The merge driver command assumes a POSIX shell (as git itself uses to
+  run it) and `texmacs.bin` or a macOS bundle.
+* The keyboard shortcuts only work while the versioning tool is active.
 * A background command finishes only when all its output is closed. A
   helper that keeps it open makes the command look running until you
   cancel it.
@@ -338,9 +392,6 @@ private `TEXMACS_HOME_PATH` and open no windows. The checks cover:
 * Snapshots use `git restore`, which needs git 2.23 or later.
 * The simple mode hides staging, but it doesn't hide merges: conflicts
   still have to be resolved.
-* Opening a document inside a repository runs `git status`, which may run
-  that repository's `core.fsmonitor` hook, as with any git GUI.
 * There is no textconv diff driver for `git diff` of `.tm` files on the
   command line.
-* Windows and Android run background commands synchronously; only the
-  callback is delayed.
+
