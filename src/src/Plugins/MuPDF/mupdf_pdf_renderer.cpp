@@ -82,9 +82,13 @@ struct pdf_font_item {
   pdf_obj* obj;        // the font dictionary
   int      num;        // /F<num> in the resources
   bool     simple;
+  bool     t3;         // a Type 3 font: the glyphs are drawn as bitmaps
+  font_glyphs fn;      // for a Type 3 font: where the bitmaps come from
+  int      chunk;      // ... and which 256 characters of it this is
   string   path;       // the file the program was read from (for subsetting)
   array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
-  pdf_font_item () : font (NULL), obj (NULL), num (0), simple (false) {}
+  pdf_font_item ()
+    : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0) {}
 };
 
 class mupdf_pdf_renderer_rep : public renderer_rep {
@@ -147,7 +151,8 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void select_stroke (color c);
   void select_width (SI w);
   void select_alpha (int a);
-  int  get_font (font_glyphs fn);
+  int  get_font (font_glyphs fn, int ch);
+  void write_type3 (pdf_font_item& it);
   void write_fonts ();
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
@@ -561,9 +566,16 @@ is_type1_file (url u) {
 }
 
 int
-mupdf_pdf_renderer_rep::get_font (font_glyphs fn) {
+mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
   string name= fn->res_name;
-  if (font_index->contains (name)) return font_index (name);
+  if (font_index->contains (name)) {
+    int k= font_index (name);
+    // a font drawn as bitmaps holds 256 characters at a time, so a
+    // character outside the chunk of the entry we found asks for another
+    if (!font_list[k].t3 || font_list[k].chunk == ch / 256) return k;
+    name= name * "-c" * as_string (ch / 256);
+    if (font_index->contains (name)) return font_index (name);
+  }
   int pos= search_forwards (":", name);
   string fname= (pos == -1 ? name : name (0, pos));
   url u= tt_font_find (fname);
@@ -612,9 +624,21 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn) {
       fz_drop_font (ctx, it.font); it.font= NULL; it.obj= NULL;
     }
   }
-  if (it.font == NULL)
-    convert_warning << "mupdf_pdf_renderer: " << fname
-                    << " is drawn as bitmaps" << LF;
+  if (it.font == NULL) {
+    // no font program MuPDF can embed: the glyphs go in as the bitmaps
+    // TeXmacs has, in a Type 3 font, which is what a PK font is anyway
+    it.t3= true;
+    it.fn= fn;
+    it.chunk= ch / 256;
+    for (int i=0; i<256; i++) it.gid << -1;
+    fz_try (ctx) {
+      it.obj= pdf_add_new_dict (ctx, doc, 8);
+      string nm= "F" * as_string (it.num);
+      c_string cnm (nm);
+      pdf_dict_puts (ctx, res_font, cnm, it.obj);
+    }
+    fz_catch (ctx) { it.obj= NULL; }
+  }
   font_list << it;
   font_index (name)= it.num;
   if (N(key) > 0) font_by_file (key)= it.num;
@@ -651,10 +675,15 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   if (contents == NULL) return;
   glyph gl= fn->get (ch);
   if (is_nil (gl)) return;
-  int k= get_font (fn);
-  if (font_list[k].font == NULL) { draw_bitmap_glyph (ch, fn, x, y); return; }
+  int k= get_font (fn, ch);
+  if (font_list[k].t3 && font_list[k].obj == NULL) {
+    draw_bitmap_glyph (ch, fn, x, y); return;
+  }
   select_fill (pen->get_color ());
-  double size= tm_font_size (fn->res_name);
+  // A Type 3 font is set at 100: its FontMatrix is a hundredth, so a unit
+  // of its glyph space is a pixel of the renderer, which is what the
+  // bitmaps of TeXmacs are drawn in. pdf_hummus_renderer does the same.
+  double size= font_list[k].t3 ? 100.0 : tm_font_size (fn->res_name);
   if (!in_text) {
     put ("BT\n"); in_text= true; cur_font= -1; text_x= text_y= 0;
   }
@@ -665,11 +694,12 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   double px= to_x (x), py= to_y (y);
   fz_append_printf (ctx, contents, "%g %g Td\n", px - text_x, py - text_y);
   text_x= px; text_y= py;
-  if (font_list[k].simple) {
+  if (font_list[k].simple || font_list[k].t3) {
     // one byte per glyph; the code is the one TeXmacs uses, and the
     // Differences array will say which glyph it selects
     int code= ch & 255;
-    if (font_list[k].gid[code] < 0) font_list[k].gid[code]= (int) gl->index;
+    if (font_list[k].gid[code] < 0)
+      font_list[k].gid[code]= font_list[k].t3 ? ch : (int) gl->index;
     fz_append_printf (ctx, contents, "<%02x> Tj\n", code);
   }
   else
@@ -682,6 +712,7 @@ void
 mupdf_pdf_renderer_rep::write_fonts () {
   for (int k=0; k<N(font_list); k++) {
     pdf_font_item& it= font_list[k];
+    if (it.t3) { write_type3 (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
     FT_Face face= (FT_Face) fz_font_ft_face (ctx, it.font);
     // The name of the glyph a code selects is asked of the font itself,
@@ -791,6 +822,128 @@ mupdf_pdf_renderer_rep::subset_type1 (pdf_font_item& it, array<string> keep) {
   }
   free (sub);
   if (psname != NULL) free (psname);
+}
+
+// A Type 3 font: the glyphs are little content streams which draw the
+// bitmap TeXmacs has, and the font is set at 100 because its FontMatrix is
+// a hundredth (see draw). This is what a PK font is, and what
+// pdf_hummus_renderer makes of one; the alternative, an image XObject per
+// glyph, is both larger and not text any more.
+void
+mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
+  if (it.obj == NULL || is_nil (it.fn)) return;
+  int first= 256, last= -1;
+  for (int c=0; c<256; c++)
+    if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
+  if (last < 0) return;
+  int b0= 0, b1= 0, b2= 0, b3= 0;   // the box of the whole font
+  fz_try (ctx) {
+    pdf_obj* procs= pdf_new_dict (ctx, doc, last - first + 1);
+    pdf_obj* enc= pdf_new_dict (ctx, doc, 2);
+    pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
+    pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
+    int prev= -2;
+    for (int c=first; c<=last; c++) {
+      if (it.gid[c] < 0) continue;
+      glyph gl= it.fn->get (it.gid[c]);
+      if (is_nil (gl)) continue;
+      int llx= -gl->xoff, lly= gl->yoff - gl->height + 1;
+      int urx= gl->width - gl->xoff + 1, ury= gl->yoff + 1;
+      int w= gl->width, h= gl->height;
+      if (b2 <= b0) { b0= llx; b1= lly; b2= urx; b3= ury; }
+      else {
+        if (llx < b0) b0= llx; if (lly < b1) b1= lly;
+        if (urx > b2) b2= urx; if (ury > b3) b3= ury;
+      }
+      fz_buffer* cs= fz_new_buffer (ctx, 256 + (size_t) w * h / 4);
+      // d1 says the glyph is a mask, so the colour is the one in force
+      fz_append_printf (ctx, cs, "%d 0 %d %d %d %d d1\n",
+                        (int) gl->lwidth, llx, lly, urx, ury);
+      if (w > 0 && h > 0) {
+        fz_append_printf (ctx, cs, "q\n%d 0 0 %d %d %d cm\n", w, h, llx, lly);
+        fz_append_printf (ctx, cs, "BI\n/W %d\n/H %d\n", w, h);
+        fz_append_string (ctx, cs, "/BPC 1 /F /AHx /D [0.0 1.0] /IM true\nID\n");
+        static const char* hex= "0123456789ABCDEF";
+        int cur= 0, count= 0;
+        for (int j=0; j<h; j++)
+          for (int i=0; i < ((w + 7) & (-8)); i++) {
+            cur= cur << 1;
+            if (i < w && gl->get_x (i, j) == 0) cur++;
+            count++;
+            if (count == 4) {
+              char d[2]; d[0]= hex[cur]; d[1]= 0;
+              fz_append_string (ctx, cs, d);
+              cur= 0; count= 0;
+            }
+          }
+        fz_append_string (ctx, cs, ">\nEI\nQ\n");
+      }
+      string nm= "ch" * as_string (c);
+      c_string cnm (nm);
+      pdf_obj* ref= pdf_add_stream (ctx, doc, cs, NULL, 0);
+      fz_drop_buffer (ctx, cs);
+      pdf_dict_puts_drop (ctx, procs, cnm, ref);
+      if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
+      pdf_array_push_name (ctx, diff, cnm);
+      prev= c;
+    }
+    pdf_dict_put (ctx, it.obj, PDF_NAME(Type), PDF_NAME(Font));
+    pdf_dict_put (ctx, it.obj, PDF_NAME(Subtype), PDF_NAME(Type3));
+    pdf_obj* box= pdf_dict_put_array (ctx, it.obj, PDF_NAME(FontBBox), 4);
+    pdf_array_push_int (ctx, box, b0); pdf_array_push_int (ctx, box, b1);
+    pdf_array_push_int (ctx, box, b2); pdf_array_push_int (ctx, box, b3);
+    pdf_obj* mat= pdf_dict_put_array (ctx, it.obj, PDF_NAME(FontMatrix), 6);
+    pdf_array_push_real (ctx, mat, 0.01); pdf_array_push_int (ctx, mat, 0);
+    pdf_array_push_int (ctx, mat, 0); pdf_array_push_real (ctx, mat, 0.01);
+    pdf_array_push_int (ctx, mat, 0); pdf_array_push_int (ctx, mat, 0);
+    pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
+    pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
+    pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths), last-first+1);
+    for (int c=first; c<=last; c++) {
+      double adv= 0;
+      if (it.gid[c] >= 0) {
+        glyph gl= it.fn->get (it.gid[c]);
+        if (!is_nil (gl)) adv= gl->lwidth;
+      }
+      pdf_array_push_real (ctx, w, adv);
+    }
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(CharProcs),
+                       pdf_add_object_drop (ctx, doc, procs));
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
+                       pdf_add_object_drop (ctx, doc, enc));
+    pdf_obj* res= pdf_dict_put_dict (ctx, it.obj, PDF_NAME(Resources), 1);
+    pdf_obj* ps= pdf_dict_put_array (ctx, res, PDF_NAME(ProcSet), 2);
+    pdf_array_push (ctx, ps, PDF_NAME(PDF));
+    pdf_array_push (ctx, ps, PDF_NAME(ImageB));
+    // the codes of a Type 3 font mean nothing to a reader: a CMap says
+    // which character each of them stands for, so the text can be found
+    string cmap;
+    cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+         << "/CIDSystemInfo << /Registry (TeXmacs) /Ordering (Type3) "
+         << "/Supplement 0 >> def\n"
+         << "/CMapName /TeXmacs-Type3 def /CMapType 2 def\n"
+         << "1 begincodespacerange <" << as_hexadecimal (first, 2)
+         << "> <" << as_hexadecimal (last, 2) << "> endcodespacerange\n";
+    int n= 0;
+    for (int c=first; c<=last; c++) if (it.gid[c] >= 0) n++;
+    cmap << as_string (n) << " beginbfchar\n";
+    for (int c=first; c<=last; c++)
+      if (it.gid[c] >= 0)
+        cmap << "<" << as_hexadecimal (c, 2) << "> <"
+             << as_hexadecimal (it.gid[c], 4) << ">\n";
+    cmap << "endbfchar\nendcmap CMapName currentdict /CMap defineresource "
+         << "pop end end\n";
+    c_string cm (cmap);
+    fz_buffer* cb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) (char*) cm,
+                                                   strlen (cm));
+    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(ToUnicode),
+                       pdf_add_stream (ctx, doc, cb, NULL, 0));
+    fz_drop_buffer (ctx, cb);
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not write a Type 3 font: "
+                    << fz_caught_message (ctx) << LF;
+  }
 }
 
 // A glyph of a font which cannot be embedded, drawn as an image. Hummus
