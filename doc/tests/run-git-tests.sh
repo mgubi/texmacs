@@ -24,7 +24,7 @@ if test $gui = no; then
   mkdir -p "$dir/repo test/sub dir"
   (
     cd "$dir/repo test" || exit 1
-    git init -q -b main
+    git init -q && git symbolic-ref HEAD refs/heads/main
     git config user.email test@example.com
     git config user.name "Test User"
     tm "Hello world." > "sub dir/a b.tm"
@@ -34,7 +34,7 @@ if test $gui = no; then
     git worktree add -q "$dir/wt test" -b wt
     # a repository for the merge driver
     rm -rf "$dir/drv" && mkdir -p "$dir/drv" && cd "$dir/drv" || exit 1
-    git init -q -b main
+    git init -q && git symbolic-ref HEAD refs/heads/main
     git config user.email test@example.com
     git config user.name "Test User"
     tm "The quick brown fox jumps." > paper.tm
@@ -52,7 +52,7 @@ if test $gui = no; then
   )
   # a repository for blame, change descriptions, projects and snapshots
   rm -rf "$dir/proj" && mkdir -p "$dir/proj" && cd "$dir/proj" || exit 1
-  git init -q -b main
+  git init -q && git symbolic-ref HEAD refs/heads/main
   git config user.email test@example.com
   git config user.name "Test User"
   doc () {
@@ -95,14 +95,14 @@ else
   mkdir -p "$dir/remote" "$dir/conflict"
   (
     cd "$dir/remote" || exit 1
-    git init -q --bare -b main origin.git
+    git init -q --bare origin.git && git -C origin.git symbolic-ref HEAD refs/heads/main
     for c in a b; do
       git clone -q origin.git "clone $c" 2> /dev/null
       git -C "clone $c" config user.email $c@example.com
       git -C "clone $c" config user.name "User $c"
     done
     cd "$dir/conflict" || exit 1
-    git init -q -b main
+    git init -q && git symbolic-ref HEAD refs/heads/main
     git config user.email test@example.com
     git config user.name "Test User"
     tm "First paragraph." > paper.tm
@@ -117,7 +117,7 @@ else
     git merge theirs > /dev/null 2>&1
     # a conflict for git, but not for a structured merge
     mkdir -p "$dir/conflict2" && cd "$dir/conflict2" || exit 1
-    git init -q -b main
+    git init -q && git symbolic-ref HEAD refs/heads/main
     git config user.email test@example.com
     git config user.name "Test User"
     tm2 () {
