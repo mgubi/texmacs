@@ -126,6 +126,51 @@
 ;; Mode related
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Versioning tool
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; With the preference "versioning tool" set to "auto", the versioning tool
+;; is active for documents inside a working tree of Git or Subversion.
+;; NOTE: this is tested very often (e.g. for the keyboard), hence the cache;
+;; no external command is run here.
+
+(define versioning-directory-table (make-ahash-table))
+
+(define (versioning-directory-sub dir)
+  (cond ((or (url-exists? (url-append dir ".git"))
+             (url-exists? (url-append dir ".svn"))) dir)
+        ((== (url-head dir) dir) #f)
+        (else (versioning-directory-sub (url-head dir)))))
+
+(define-public (versioning-directory u)
+  "Root of the Git or Subversion working tree containing @u, or @#f"
+  (and (url? u) (url-rooted? u) (not (url-rooted-tmfs? u))
+       (let* ((dir (url-head u))
+              (key (url->system dir))
+              (old (ahash-ref versioning-directory-table key)))
+         (if old (and (!= old 'none) old)
+             (with r (versioning-directory-sub dir)
+               (ahash-set! versioning-directory-table key (or r 'none))
+               r)))))
+
+(define-public (versioning-directory-reset)
+  (set! versioning-directory-table (make-ahash-table)))
+
+(define-public (versioning-tool-active?)
+  (with p (get-preference "versioning tool")
+    (or (== p "on")
+        (and (== p "auto")
+             (with u (current-buffer)
+               (or (nnot (versioning-directory u))
+                   (and (url? u) (url-rooted-tmfs? u)
+                        (list-or (map (cut string-starts? (url->unix u) <>)
+                                      versioning-pages)))))))))
+
+(define versioning-pages
+  '("tmfs://git/" "tmfs://commit/" "tmfs://history/" "tmfs://revision/"
+    "tmfs://blame/"))
+
 (texmacs-modes
   (always% #t)
   (prevail% #t)
@@ -294,7 +339,7 @@
   (with-presentation-tool% (== (get-preference "presentation tool") "on"))
   (with-remote-tool% (== (get-preference "remote tool") "on"))
   (with-source-tool% (== (get-preference "source tool") "on"))
-  (with-versioning-tool% (== (get-preference "versioning tool") "on"))
+  (with-versioning-tool% (versioning-tool-active?))
   (with-keyboard-tool% (== (get-preference "keyboard tool") "on"))
   (in-presentation% (or (style-has? "beamer-style")
                         (== (get-preference "presentation tool") "on")

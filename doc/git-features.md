@@ -32,6 +32,29 @@ Tools → Versioning tool.
 
 ---
 
+## 1b. User interface
+
+* **Footer status.** For documents in a git working tree, the footer ends
+  with the state of the repository, e.g. `Git main · 3 changes · ↑1 · working...`.
+  It is computed from the cached status only, so it never runs git while
+  you type.
+* **The Version menu appears by itself** for documents in a git or SVN
+  working tree. Tools → Versioning tool → Automatic is the new default;
+  Always and Never are the other choices.
+* **Dialogs** replace the footer prompts for "Commit this file", "Save
+  snapshot", "New branch" (with "switch to it"), "Tag this version" (with
+  "sign"), "Add remote" and "Compare with revision". Names are validated
+  in the dialog, which stays open with an explanation until the input is
+  valid.
+* **Failures are explained** in a dialog. It says in plain words what
+  happened (e.g. "Others sent changes first"), offers the likely next
+  step (Get changes, Save snapshot, Show status), and has a Details
+  button that opens the Git output page.
+* **Review bar.** After a comparison or a conflict resolution, a bar at
+  the bottom of the window shows "Difference 2 of 7" (or "Conflict 2 of
+  5"), with Previous/Next, Keep Old/New (Mine/Theirs), Show
+  Both/Old/New, Mark as resolved and Close.
+
 ## 2. Working with a single document
 
 When the current document is in a git working tree, the Version menu

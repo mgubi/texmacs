@@ -298,6 +298,11 @@
 ;; Top-level interface
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (version-review-open)
+  (:synopsis "Show the tool for reviewing the differences")
+  (when (and (not (headless?)) (current-window))
+    (tool-select :transient-bottom 'version-review-tool)))
+
 (tm-define (compare-with-older old)
   (let* ((t1 (tree-load-inclusion old))
 	 (t2 (buffer-tree))
@@ -308,7 +313,8 @@
 	 (rt (stree->tree mv)))
     ;;(display* "rt= " rt "\n")
     (tree-set (buffer-tree) rt)
-    (version-first-difference)))
+    (version-first-difference)
+    (version-review-open)))
 
 (tm-define (compare-with-newer new)
   (let* ((t1 (tree-load-inclusion new))
@@ -320,7 +326,8 @@
 	 (rt (stree->tree mv)))
     ;;(display* "rt= " rt "\n")
     (tree-set (buffer-tree) rt)
-    (version-first-difference)))
+    (version-first-difference)
+    (version-review-open)))
 
 (tm-define (compare-with-newer* new)
   (with t1 (buffer-tree)
@@ -333,7 +340,8 @@
            (rt (stree->tree mv)))
       ;;(display* "rt= " rt "\n")
       (tree-set (buffer-tree) rt)
-      (version-first-difference))))
+      (version-first-difference)
+      (version-review-open))))
 
 (define (version-get t which)
   (cond ((string? t) t)

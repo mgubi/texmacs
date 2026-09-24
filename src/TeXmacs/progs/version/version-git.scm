@@ -147,9 +147,21 @@
   (with msg (git-message ret)
     (if (git-ok? ret)
         (set-message (if (== msg "") what (utf8->cork msg)) "Git")
-        (set-message `(concat "Git error: " (verbatim ,(utf8->cork msg)))
-                     what))
+        (begin
+          (set-message `(concat "Git error: " (verbatim ,(utf8->cork msg)))
+                       what)
+          (git-show-failure ret what)))
     (git-ok? ret)))
+
+(tm-define (git-show-failure ret what)
+  (:synopsis "Explain the failure @ret of the Git command for @what")
+  ;; NOTE: redefined by the user interface (git-widgets.scm)
+  (noop))
+
+(tm-define (git-last-root)
+  (:synopsis "The working tree of the last Git command")
+  (with h (git-command-history)
+    (and (nnull? h) (system->url (cadr (car h))))))
 
 (tm-define (version-notify-saved name)
   (:require (git-root name))
@@ -250,6 +262,10 @@
 
 (tm-define (version-commit name msg)
   (:require (== (version-tool name) "git"))
+  (git-commit-file name (cork->utf8 msg)))
+
+(tm-define (git-commit-file name msg)
+  (:synopsis "Commit the file @name with the message @msg (in utf8)")
   (with root (git-root name)
     (cond ((not root) (not-in-git))
           ((== (tm-string-trim-both msg) "") "Empty commit message")
@@ -260,8 +276,7 @@
               (when (== (git-file-state name) 'untracked)
                 (git-run root "add" "--" path))
               (with ret (apply git-run-with-input
-                               (append (list root (cork->utf8 msg) "commit"
-                                             "--file=-")
+                               (append (list root msg "commit" "--file=-")
                                        (git-commit-options)
                                        (list "--" path)))
                 (git-refresh root)
@@ -366,7 +381,8 @@
                 (begin
                   (tree-set (buffer-tree)
                             (stree->tree (merge-versions base ours theirs)))
-                  (version-first-difference))
+                  (version-first-difference)
+                  (version-review-open))
                 (compare-with-newer (string->url
                                      (version-revision-url name "THEIRS"))))
             (set-message (resolve-message
@@ -479,14 +495,27 @@
               (git-report (git-run root "checkout" "--quiet" branch "--")
                           (string-append "Switched to " branch))))))))
 
-(tm-define (git-create-branch root branch)
+(tm-define (git-create-branch root branch . opt-switch)
   (:synopsis "Create a new branch @branch at HEAD and switch to it")
-  (if (not (git-safe-name? branch))
-      (bad-name "branch name")
-      (begin
-        (git-report (git-run root "checkout" "--quiet" "-b" branch)
-                    (string-append "Created branch " branch))
-        (git-refresh root))))
+  ;; With the optional argument #f, the new branch is not checked out
+  (cond ((not (git-safe-name? branch)) (bad-name "branch name"))
+        ((and (nnull? opt-switch) (not (car opt-switch)))
+         (git-report (git-run root "branch" branch)
+                     (string-append "Created branch " branch))
+         (git-refresh root))
+        (else
+          (git-report (git-run root "checkout" "--quiet" "-b" branch)
+                      (string-append "Created branch " branch))
+          (git-refresh root))))
+
+(tm-define (git-valid-branch-name? root name)
+  (and (git-safe-name? name)
+       (git-ok? (git-run root "check-ref-format" "--branch" name))))
+
+(tm-define (git-valid-tag-name? root name)
+  (and (git-safe-name? name)
+       (git-ok? (git-run root "check-ref-format"
+                         (string-append "refs/tags/" name)))))
 
 (tm-define (git-delete-branch root branch)
   (if (not (git-safe-name? branch))
@@ -509,12 +538,12 @@
               (git-report (git-run root "merge" "--no-edit" branch)
                           (string-append "Merged " branch))))))))
 
-(tm-define (git-create-tag root tag msg)
+(tm-define (git-create-tag root tag msg . opt-sign)
   ;; The message @msg is in the utf8 encoding
   (if (not (git-safe-name? tag))
       (bad-name "tag name")
       (begin
-        (git-report (cond ((git-signing?)
+        (git-report (cond ((if (null? opt-sign) (git-signing?) (car opt-sign))
                            (git-run-with-input root (if (== msg "") tag msg)
                                                "tag" "--sign" "--file=-" tag))
                           ((== msg "") (git-run root "tag" tag))

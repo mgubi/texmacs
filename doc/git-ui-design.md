@@ -353,6 +353,18 @@ buffer is in a working tree. They are prefixed like the existing
 
 ## 5. Priorities and effort
 
+**Status (2026-09-24):**
+* **Implemented:** 4.1 (footer indicator), 4.2 (automatic versioning tool,
+  now the default), 4.5 (dialogs), 4.6 (explained failures, as a dialog
+  with *Details* and a suggested action) and 4.7 (review bar, for both
+  comparisons and conflicts).
+* **Deviations:**
+  * The footer shows `Git main · 3 changes · ↑1 ↓2 · working...`, using
+    ASCII words and the arrow glyphs the TeXmacs fonts have.
+  * The review bar offers *Keep: Old/New* or *Mine/Theirs*, and *Show:
+    Both/Old/New*. "Keep both" is left out, since the comparison markup has
+    no such operation.
+
 | Priority | Item | Effort | Depends on |
 |----------|------|--------|------------|
 | P1 | 4.1 Footer indicator | S | — |

@@ -126,4 +126,15 @@
   ("Presentation tool" (toggle-preference "presentation tool"))
   ("Remote tool" (toggle-preference "remote tool"))
   ("Source macros tool" (toggle-preference "source tool"))
-  ("Versioning tool" (toggle-preference "versioning tool")))
+  (-> "Versioning tool"
+      ("Automatic" (set-versioning-tool "auto"))
+      ("Always" (set-versioning-tool "on"))
+      ("Never" (set-versioning-tool "off"))))
+
+(tm-define (versioning-tool-is? what)
+  (== (get-preference "versioning tool") what))
+
+(tm-define (set-versioning-tool what)
+  (:synopsis "When to show the versioning tool")
+  (:check-mark "*" versioning-tool-is?)
+  (set-preference "versioning tool" what))

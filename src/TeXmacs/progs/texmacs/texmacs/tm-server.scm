@@ -143,7 +143,7 @@
   ("presentation tool" "off" notify-tool)
   ("remote tool" "off" notify-tool)
   ("source tool" "off" notify-tool)
-  ("versioning tool" "off" notify-tool)
+  ("versioning tool" "auto" notify-tool)
   ("experimental alpha" "on" notify-tool)
   ("new style fonts" "on" notify-new-fonts)
   ("bitmap effects" "on" notify-tool)

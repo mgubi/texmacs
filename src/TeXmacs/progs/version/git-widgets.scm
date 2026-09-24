@@ -182,21 +182,6 @@
   (and-with root (git-root name)
     (git-interactive-commit root (or (git-project-files name) '()))))
 
-(tm-define (git-interactive-save-snapshot root)
-  (:synopsis "Save a snapshot of all files of @root")
-  (:interactive #t)
-  (interactive
-   (lambda (description)
-     (git-save-snapshot root (cork->utf8 description)))))
-
-(tm-define (git-interactive-commit-file name)
-  (:synopsis "Commit the changes of the file @name")
-  (:interactive #t)
-  (interactive
-   (lambda (message)
-     (set-message (utf8->cork (version-commit name message))
-                  "Commit file"))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Side tool with the status of the working tree
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -274,19 +259,302 @@
   (tool-select :right 'git-tool))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Simple prompts
+;; Small dialogs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A dialog with some fields (label default-value) and some check boxes
+;; (label initial-value).  The action receives the values of the fields
+;; (in utf8) and of the check boxes; it returns #f on success, or a
+;; message explaining why the values are not acceptable, in which case
+;; the dialog stays open.
+
+(define form-error "")
+
+(tm-widget ((git-form-widget fields toggles action) quit)
+  (let* ((flags (list->vector (map cadr toggles))))
+    (padded
+      (form "git-form"
+        (aligned
+          (for (f fields)
+            (item (text (car f))
+              (form-input (car f) "string" (list (cadr f)) "25em"))))
+        (for (i (.. 0 (length toggles)))
+          (hlist
+            (toggle (vector-set! flags i answer) (vector-ref flags i))
+            // (text (car (list-ref toggles i))) >>))
+        ===
+        (refreshable "git-form-error"
+          (if (!= form-error "")
+              (hlist (text form-error) >>)))
+        (bottom-buttons
+          >>
+          ("Cancel" (quit))
+          // //
+          ("Ok"
+           (let* ((vals (map (lambda (x) (if (string? x) (cork->utf8 x) ""))
+                             (form-values)))
+                  (err (action vals (vector->list flags))))
+             (if err
+                 (begin
+                   (set! form-error err)
+                   (refresh-now "git-form-error"))
+                 (quit)))))))))
+
+(tm-define (git-form-dialog title fields toggles action)
+  (:synopsis "Show a dialog with @fields and @toggles, validated by @action")
+  (set! form-error "")
+  (dialogue-window (git-form-widget fields toggles action) noop title))
+
+;; A dialog with a message (several lines) and some check boxes; the
+;; action receives the message (in utf8) and the values of the check boxes.
+
+(define message-dialogs 0)
+
+(tm-widget ((git-message-widget prompt u toggles action) quit)
+  (let* ((flags (list->vector (map cadr toggles))))
+    (padded
+      (bold (text prompt))
+      ===
+      (resize "450px" "100px"
+        (texmacs-input '(document "") '(style (tuple "generic")) u))
+      ===
+      (for (i (.. 0 (length toggles)))
+        (hlist
+          (toggle (vector-set! flags i answer) (vector-ref flags i))
+          // (text (car (list-ref toggles i))) >>))
+      (refreshable "git-form-error"
+        (if (!= form-error "")
+            (hlist (text form-error) >>)))
+      (bottom-buttons
+        >>
+        ("Cancel" (quit))
+        // //
+        ("Ok"
+         (let* ((msg (commit-message u))
+                (err (action msg (vector->list flags))))
+           (if err
+               (begin
+                 (set! form-error err)
+                 (refresh-now "git-form-error"))
+               (quit))))))))
+
+(tm-define (git-message-dialog title prompt toggles action)
+  (:synopsis "Show a dialog for entering a message, handled by @action")
+  (set! form-error "")
+  (set! message-dialogs (+ message-dialogs 1))
+  (let* ((u (string->url (string-append "tmfs://aux/git-message-"
+                                        (number->string message-dialogs))))
+         (b (current-buffer)))
+    (buffer-set-master u b)
+    (dialogue-window (git-message-widget prompt u toggles action)
+                     noop title u)))
+
+(define (empty? s) (== (tm-string-trim-both s) ""))
+
+(tm-define (git-interactive-commit-file name)
+  (:synopsis "Commit the changes of the file @name")
+  (:interactive #t)
+  (git-message-dialog
+   "Commit this file" (string-append "Describe the changes to "
+                                     (url->system (url-tail name)))
+   (list (list "Sign the commit" (git-signing?)))
+   (lambda (msg flags)
+     (if (empty? msg) "Please describe the changes"
+         (with old (get-preference "git sign")
+           (set-preference "git sign" (if (car flags) "on" "off"))
+           (set-message (utf8->cork (git-commit-file name msg)) "Commit file")
+           (set-preference "git sign" old)
+           #f)))))
+
+(tm-define (git-interactive-save-snapshot root)
+  (:synopsis "Save a snapshot of all files of @root")
+  (:interactive #t)
+  (git-message-dialog
+   "Save snapshot" "Describe this snapshot" '()
+   (lambda (msg flags)
+     (if (empty? msg) "Please describe the snapshot"
+         (begin (git-save-snapshot root msg) #f)))))
 
 (tm-define (git-interactive-create-branch root)
   (:interactive #t)
-  (interactive
-   (lambda (branch) (git-create-branch root (cork->utf8 branch)))))
+  (git-form-dialog
+   "New branch" (list (list "Name:" "")) (list (list "Switch to it" #t))
+   (lambda (vals flags)
+     (with name (car vals)
+       (if (not (git-valid-branch-name? root name))
+           "This is not a valid branch name"
+           (begin (git-create-branch root name (car flags)) #f))))))
 
 (tm-define (git-interactive-tag root)
   (:interactive #t)
-  (interactive
-   (lambda (tag message)
-     (git-create-tag root (cork->utf8 tag) (cork->utf8 message)))))
+  (git-form-dialog
+   "Tag this version" (list (list "Name:" "") (list "Message:" ""))
+   (list (list "Sign the tag" (git-signing?)))
+   (lambda (vals flags)
+     (with (name msg) vals
+       (cond ((not (git-valid-tag-name? root name))
+              "This is not a valid tag name")
+             ((in? name (map git-branch-name (git-tags root)))
+              "This tag already exists")
+             (else (git-create-tag root name msg (car flags)) #f))))))
+
+(tm-define (git-interactive-add-remote root)
+  (:interactive #t)
+  (git-form-dialog
+   "Add remote"
+   (list (list "Name:" (if (in? "origin" (git-remotes root)) "" "origin"))
+         (list "URL:" ""))
+   '()
+   (lambda (vals flags)
+     (with (name url) vals
+       (cond ((not (git-valid-branch-name? root name))
+              "This is not a valid name")
+             ((in? name (git-remotes root)) "This remote already exists")
+             ((not (git-safe-name? url)) "Please give the URL of the remote")
+             (else (git-add-remote root name url) #f))))))
+
+(tm-define (git-interactive-compare-with name)
+  (:interactive #t)
+  (git-form-dialog
+   "Compare with revision"
+   (list (list "Revision:" "HEAD~1")) '()
+   (lambda (vals flags)
+     (with root (git-root name)
+       (if (not (and root (git-rev-parse root (string-append (car vals)
+                                                             "^{commit}"))))
+           "Unknown revision (try a hash, a tag, a branch or HEAD~2)"
+           (begin (git-compare-with-revision name (car vals)) #f))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Explaining failures
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Each entry: (patterns explanation action-label action), where the action
+;; receives the working tree
+
+(define failure-explanations
+  (list
+   (list '("[rejected]" "non-fast-forward" "fetch first")
+         "Others sent changes first. Get their changes, then send yours again."
+         "Get changes" (lambda (root) (git-pull root)))
+   (list '("Authentication failed" "Permission denied" "could not read Username"
+           "terminal prompts disabled" "access denied")
+         (string-append "The server refused access. Check your credentials "
+                        "(credential helper or SSH key).")
+         #f #f)
+   (list '("Could not resolve host" "unable to access" "Connection refused"
+           "Network is unreachable" "timed out")
+         "The server could not be reached. Check your network connection."
+         #f #f)
+   (list '("would be overwritten")
+         (string-append "Some of your changes would be overwritten. Save "
+                        "them in a snapshot or a commit first.")
+         "Save snapshot..." (lambda (root) (git-interactive-save-snapshot root)))
+   (list '("CONFLICT" "Automatic merge failed" "unmerged files")
+         "Some parts were changed on both sides. Resolve the conflicts first."
+         "Show status" (lambda (root) (git-show-status root)))
+   (list '("nothing to commit" "nothing added to commit")
+         "There are no changes to save." #f #f)))
+
+(define (explain-failure ret)
+  (with msg (string-append (git-out ret) "\n" (git-err ret))
+    (or (list-find failure-explanations
+                   (lambda (x)
+                     (list-or (map (cut string-contains? msg <>) (car x)))))
+        (list '() "Git could not complete this operation." #f #f))))
+
+(tm-widget ((git-failure-widget what explanation msg label action) quit)
+  (padded
+    (bold (text (string-append what " failed")))
+    ===
+    (text explanation)
+    ===
+    (hlist (text msg) >>)
+    ======
+    (bottom-buttons
+      ("Details" (quit) (git-show-output))
+      >>
+      (if label
+          ((eval label) (quit) (action)))
+      // //
+      ("Close" (quit)))))
+
+(tm-define (git-show-failure ret what)
+  (:require (and (not (headless?)) (current-window)))
+  (let* ((root (git-last-root))
+         (x (explain-failure ret))
+         (label (third x))
+         (action (and (fourth x) root (lambda () ((fourth x) root)))))
+    (dialogue-window (git-failure-widget what (second x)
+                                         (utf8->cork (git-message ret))
+                                         (and action label) action)
+                     noop (string-append "Git: " what))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Reviewing differences and conflicts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (review-differences u)
+  (if (not (buffer-exists? u)) '()
+      (tree-search (buffer-get u)
+                   (lambda (t) (tree-in? t '(version-old version-new
+                                             version-both))))))
+
+(define (review-index l)
+  (and-with t (tree-innermost version-context?)
+    (with i (list-find-index l (cut == <> t))
+      (and i (+ i 1)))))
+
+(define (review-do cmd)
+  (cmd)
+  (refresh-now "version-review"))
+
+(define (review-conflict? u)
+  (and (url? u) (git-root u) (== (git-file-state u) 'conflicted)))
+
+(tm-widget (version-review-contents win)
+  (let* ((u (window->buffer win))
+         (conflict? (review-conflict? u))
+         (l (review-differences u))
+         (n (length l))
+         (i (review-index l))
+         (what (if conflict? "Conflict" "Difference")))
+    (hlist
+      (if (== n 0)
+          (text (if conflict? "All conflicts resolved"
+                    "No differences left")))
+      (if (> n 0)
+          (text (cond (i (string-append what " " (number->string i) " of "
+                                        (number->string n)))
+                      ((== n 1) (string-append "1 " (locase-first what)))
+                      (else (string-append (number->string n) " "
+                                           (locase-first what) "s"))))
+          // //
+          ("Previous" (review-do version-previous-difference))
+          ("Next" (review-do version-next-difference))
+          // // (text "Keep:")
+          ((eval (if conflict? "Mine" "Old"))
+           (review-do (lambda () (version-retain 0))))
+          ((eval (if conflict? "Theirs" "New"))
+           (review-do (lambda () (version-retain 1))))
+          // // (text "Show:")
+          ("Both" (review-do (lambda () (version-show 'version-both))))
+          ((eval (if conflict? "Mine" "Old"))
+           (review-do (lambda () (version-show 'version-old))))
+          ((eval (if conflict? "Theirs" "New"))
+           (review-do (lambda () (version-show 'version-new)))))
+      >>
+      (if conflict?
+          ("Mark as resolved"
+           (git-mark-resolved u)
+           (refresh-now "version-review")))
+      // //
+      ("Close" (tool-close :transient-bottom 'version-review-tool #f win)))))
+
+(tm-tool* (version-review-tool win)
+  (:name "Review differences")
+  (refreshable "version-review"
+    (dynamic (version-review-contents win))))
 
 (define (clone-default-directory)
   (with b (current-buffer)
@@ -335,12 +603,6 @@
   (:synopsis "Clone a Git repository")
   (:interactive #t)
   (dialogue-window (git-clone-widget) noop "Clone Git repository"))
-
-(tm-define (git-interactive-add-remote root)
-  (:interactive #t)
-  (interactive
-   (lambda (name url)
-     (git-add-remote root (cork->utf8 name) (cork->utf8 url)))))
 
 (tm-define (git-interactive-init name)
   (:synopsis "Create a Git repository for the document @name")

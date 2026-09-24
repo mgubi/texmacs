@@ -100,7 +100,46 @@
     (check "simple git menu" (pair? (menu-expand '(link git-repository-menu))))
     (set-preference "git simple mode" "off")
     (check "restore menu" (pair? (menu-expand '(link git-restore-menu))))
+    (check "review bar opened"
+           (in? '(version-review-tool)
+                (window->tools (current-window) :transient-bottom)))
+    (refresh-now "version-review")
     (revert-buffer-revert u)
+    (test-ui)))
+
+(define (test-ui)
+  ;; Footer, automatic versioning tool, dialogs, explanations of failures
+  (with u (system->url (string-append T "/remote/clone c/doc.tm"))
+    (set-preference "versioning tool" "auto")
+    (check "auto versioning tool in repository" (versioning-tool-active?))
+    (git-status (git-root u))
+    (check "footer indicator"
+           (string-contains? (object->string
+                              (tree->stree (footer-hook (tm->tree "x"))))
+                             "Git main"))
+    (git-interactive-create-branch (git-root u))
+    (git-interactive-tag (git-root u))
+    (git-interactive-add-remote (git-root u))
+    (git-interactive-commit-file u)
+    (git-interactive-save-snapshot (git-root u))
+    (git-interactive-compare-with u)
+    (check "dialogs" #t)
+    (check "valid branch name" (git-valid-branch-name? (git-root u) "topic"))
+    (check "invalid branch name"
+           (not (git-valid-branch-name? (git-root u) "a..b")))
+    (git-show-failure (list 1 "" " ! [rejected] main -> main (fetch first)")
+                      "Push")
+    (check "failure dialog" #t)
+    (let* ((v (system->url (string-append T "/outside.tm"))))
+      (string-save "<TeXmacs|2.1>\n\n<\\body>\n  x\n</body>\n" v)
+      (load-buffer v)
+      (check "no versioning tool outside repositories"
+             (not (versioning-tool-active?)))
+      (check "no footer indicator outside"
+             (not (string-contains? (object->string
+                                     (tree->stree (footer-hook (tm->tree "x"))))
+                                    "Git")))
+      (switch-to-buffer u))
     (test-diverged)))
 
 (define (test-diverged)
