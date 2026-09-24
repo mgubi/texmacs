@@ -50,6 +50,21 @@ Tools → Versioning tool.
   happened (e.g. "Others sent changes first"), offers the likely next
   step (Get changes, Save snapshot, Show status), and has a Details
   button that opens the Git output page.
+* **Version menu,** organized as follows:
+  * *Conflict* entries on top when relevant;
+  * Commit… (or Save snapshot…), Synchronize and Git panel;
+  * for the document: Compare with, Restore version, History of this
+    document, Who changed what;
+  * submenus *This file*, *Project*, *Git (branch, state)*, *Differences*.
+* **Git panel,** in these parts:
+  * a sync bar with the branch, "N to send / N to get", and Get/Send
+    changes (or Synchronize in simple mode);
+  * a *Changes* tab with sections Conflicts / Staged / Changed / New
+    files, Stage/Unstage icons, Compare and Resolve buttons, and a commit
+    box with Suggest and Commit (or Save snapshot);
+  * a *History* tab with the last 20 versions of the current document,
+    each with Compare and Restore;
+  * a *Branches* tab with Switch and New branch….
 * **Review bar.** After a comparison or a conflict resolution, a bar at
   the bottom of the window shows "Difference 2 of 7" (or "Conflict 2 of
   5"), with Previous/Next, Keep Old/New (Mine/Theirs), Show

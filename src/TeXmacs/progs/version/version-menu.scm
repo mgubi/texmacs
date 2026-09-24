@@ -91,10 +91,6 @@
         ((eval (string-append "Branch " (utf8->cork (git-branch-name b))))
          (git-compare-with (current-buffer) (git-branch-name b)))))))
 
-(tm-define (git-short-message msg)
-  (if (<= (string-length msg) 50) msg
-      (string-append (substring msg 0 47) "...")))
-
 (define (sublist* l i j)
   (sublist l i (min j (length l))))
 
@@ -107,30 +103,11 @@
          (git-restore-revision (current-buffer)
                                (car (string-tokenize-by-char rev #\:))))))))
 
-(menu-bind git-simple-file-menu
-  (group "Git")
-  ("Save snapshot..." (git-interactive-save-snapshot (current-git-root)))
-  (assuming (git-state? 'conflicted)
-    (assuming (git-texmacs-file? (current-buffer))
-      ("Resolve conflict..." (git-resolve-conflict (current-buffer))))
-    ("Mark as resolved" (git-mark-resolved (current-buffer))))
-  (assuming (not (git-state? 'untracked 'added))
-    (-> "Restore version" (link git-restore-menu)))
-  (assuming (and (git-texmacs-file? (current-buffer))
-                 (not (git-state? 'untracked 'added 'conflicted)))
-    (-> "Compare with" (link git-compare-menu))
-    ("Who changed what" (git-show-blame (current-buffer)))))
-
 (menu-bind git-file-menu
-  (group "Git")
   (assuming (git-state? 'untracked)
     ("Add to repository" (git-stage (current-buffer))))
   (assuming (git-state? 'modified 'partial)
     ("Stage changes" (git-stage (current-buffer))))
-  (assuming (git-state? 'conflicted)
-    (assuming (git-texmacs-file? (current-buffer))
-      ("Resolve conflict..." (git-resolve-conflict (current-buffer))))
-    ("Mark as resolved" (git-mark-resolved (current-buffer))))
   (assuming (git-state? 'staged 'partial 'added)
     ("Unstage changes" (git-unstage (current-buffer))))
   (assuming (not (git-state? 'conflicted))
@@ -138,20 +115,15 @@
               (buffer-modified? (current-buffer)))
       ("Commit this file..." (git-interactive-commit-file (current-buffer)))))
   (assuming (git-state? 'modified 'partial)
-    ("Discard changes..." (git-discard (current-buffer))))
-  (assuming (and (git-texmacs-file? (current-buffer))
-                 (not (git-state? 'untracked 'added 'conflicted)))
-    (-> "Compare with" (link git-compare-menu))
-    ("Who changed what" (git-show-blame (current-buffer))))
-  (assuming (not (git-state? 'untracked 'added))
-    (-> "Restore version" (link git-restore-menu)))
-  (assuming (git-texmacs-file? (current-buffer))
-    (with l (or (git-project-untracked (current-buffer)) '())
-      (assuming (nnull? l)
-        ((eval (string-append "Add " (number->string (length l))
-                              " missing project files"))
-         (git-add-project-files (current-buffer)))))
-    ("Commit project..." (git-interactive-commit-project (current-buffer)))))
+    ("Discard changes..." (git-discard (current-buffer)))))
+
+(menu-bind git-project-menu
+  ("Commit project..." (git-interactive-commit-project (current-buffer)))
+  (with l (or (git-project-untracked (current-buffer)) '())
+    (when (nnull? l)
+      ((eval (string-append "Add " (number->string (length l))
+                            " missing files"))
+       (git-add-project-files (current-buffer))))))
 
 (menu-bind git-simple-repository-menu
   ("Status" (git-show-status))
@@ -210,8 +182,8 @@
       ("Cancel running command" (git-cancel (current-git-root))))
     (when (and remotes? (not (git-busy? (current-git-root))))
       ("Fetch" (git-fetch (current-git-root)))
-      ("Pull" (git-pull (current-git-root)))
-      ("Push" (git-push (current-git-root)))))
+      ("Get changes (pull)" (git-pull (current-git-root)))
+      ("Send changes (push)" (git-push (current-git-root)))))
   (-> "Remotes"
       ("Add remote..." (git-interactive-add-remote (current-git-root)))
       (with l (git-remotes (current-git-root))
@@ -247,78 +219,20 @@
 ;; Main version menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(menu-bind version-menu
-  (assuming (versioned? (current-buffer))
-    (assuming (version-supports-history? (current-buffer))
-      (when (!= (version-status (current-buffer)) "unknown")
-        ("History" (version-show-history (current-buffer))))
-      ---))
-  (assuming (version-revision? (current-buffer))
-    (assuming (version-supports-history? (version-head (current-buffer)))
-      ("History" (version-show-history (version-head (current-buffer))))
-      ---))
-  (assuming (versioned? (current-buffer))
-    (assuming (version-supports-svn-style? (current-buffer))
-      (when (!= (version-status (current-buffer)) "unknown")
-        ("Update" (version-interactive-update (current-buffer))))
-      (when (== (version-status (current-buffer)) "unknown")
-        ("Register" (register-buffer (current-buffer))))
-      (when (and (!= (version-status (current-buffer)) "unknown")
-                 (or (== (version-status (current-buffer)) "modified")
-                     (buffer-modified? (current-buffer))))
-        ("Commit" (version-interactive-commit (current-buffer))))
-      ---))
-  (assuming (versioned? (current-buffer))
-    (assuming (version-supports-git-style? (current-buffer))
-      (assuming (git-simple-mode?) (link git-simple-file-menu))
-      (assuming (not (git-simple-mode?)) (link git-file-menu))
-      ---))
-  (assuming (git-revision-of (current-buffer))
-    ("Restore this version"
-     (git-restore-revision (version-head (current-buffer))
-                           (git-revision-of (current-buffer))))
-    ---)
-  (assuming (current-git-root)
-    (-> (eval (git-menu-label (current-git-root)))
-        (link git-repository-menu))
-    ---)
-  (assuming (git-can-init? (current-buffer))
-    ("Create Git repository..." (git-interactive-init (current-buffer))))
-  (assuming (git-available?)
-    ("Clone Git repository..." (git-interactive-clone))
-    (with l (git-recent-repositories)
-      (assuming (nnull? l)
-        (-> "Recent Git repositories"
-            (for (r l)
-              ((eval (utf8->cork r)) (git-show-status (system->url r)))))))
-    ---)
-  (assuming (or (versioned? (current-buffer))
-                (version-revision? (current-buffer)))
-    (-> "Compare with"
-        ;;(when (versioned? (current-buffer))
-        ;;  (when (buffer-tmfs? (current-buffer))
-        ;;    ("With current version"
-        ;;      (git-compare-with-current (current-buffer))))
-        ;;  (when (buffer-tmfs? (current-buffer))
-        ;;    ("With parent version"
-        ;;      (git-compare-with-parent (current-buffer))))
-        ;;  (when (and (not (buffer-tmfs? (current-buffer)))
-        ;;             (buffer-has-diff? (current-buffer)))
-        ;;    ("With the HEAD"
-        ;;      (git-compare-with-master (current-buffer)))))
-        (link version-compare-menu)))
-  (assuming (not (or (versioned? (current-buffer))
-                     (version-revision? (current-buffer))))
-    (-> "Compare"
-        ("With older version"
-         (choose-file compare-with-older "Compare with older version" ""))
-        ("With newer version"
-         (choose-file compare-with-newer "Compare with newer version" ""))))
-  (-> "Move::difference"
-      ("First difference" (version-first-difference))
-      ("Previous difference" (version-previous-difference))
-      ("Next difference" (version-next-difference))
-      ("Last difference" (version-last-difference)))
+(define (git-document?)
+  ;; Is the current buffer a document in a Git working tree?
+  (and (versioned? (current-buffer))
+       (version-supports-git-style? (current-buffer))))
+
+(define (git-history-document?)
+  (and (git-document?) (not (git-state? 'untracked 'added))))
+
+(menu-bind version-differences-menu
+  ("First difference" (version-first-difference))
+  ("Previous difference" (version-previous-difference))
+  ("Next difference" (version-next-difference))
+  ("Last difference" (version-last-difference))
+  ---
   (when (or (inside-version?) (selection-active-any?))
     (-> "Show"
 	("Both versions" (version-show 'version-both))
@@ -331,4 +245,97 @@
   (-> "Grain"
       ("Detailed" (version-set-grain "detailed"))
       ("Block" (version-set-grain "block"))
-      ("Rough" (version-set-grain "rough"))))
+      ("Rough" (version-set-grain "rough")))
+  ---
+  ("Review bar" (version-review-open)))
+
+(menu-bind version-menu
+  ;; Conflicts come first, since they have to be resolved
+  (assuming (and (git-document?) (git-state? 'conflicted))
+    (group "Conflict")
+    (assuming (git-texmacs-file? (current-buffer))
+      ("Resolve conflict..." (git-resolve-conflict (current-buffer))))
+    ("Mark as resolved" (git-mark-resolved (current-buffer)))
+    ---)
+  ;; The most frequent actions
+  (assuming (current-git-root)
+    (assuming (git-simple-mode?)
+      ("Save snapshot..." (git-interactive-save-snapshot (current-git-root))))
+    (assuming (not (git-simple-mode?))
+      ("Commit..." (git-interactive-commit)))
+    (with remotes? (nnull? (git-remotes (current-git-root)))
+      (assuming (git-busy? (current-git-root))
+        ("Cancel running command" (git-cancel (current-git-root))))
+      (assuming (and remotes? (not (git-busy? (current-git-root))))
+        ("Synchronize" (git-sync (current-git-root)))))
+    ("Git panel" (git-open-tool))
+    ---)
+  ;; The current document and its history
+  (assuming (git-revision-of (current-buffer))
+    ("Restore this version"
+     (git-restore-revision (version-head (current-buffer))
+                           (git-revision-of (current-buffer)))))
+  (assuming (and (git-history-document?) (git-texmacs-file? (current-buffer))
+                 (not (git-state? 'conflicted)))
+    (-> "Compare with"
+        (link git-compare-menu)
+        ---
+        (link version-compare-menu)))
+  (assuming (not (and (git-history-document?)
+                      (git-texmacs-file? (current-buffer))
+                      (not (git-state? 'conflicted))))
+    (assuming (or (versioned? (current-buffer))
+                  (version-revision? (current-buffer)))
+      (-> "Compare with" (link version-compare-menu)))
+    (assuming (not (or (versioned? (current-buffer))
+                       (version-revision? (current-buffer))))
+      (-> "Compare"
+          ("With older version"
+           (choose-file compare-with-older "Compare with older version" ""))
+          ("With newer version"
+           (choose-file compare-with-newer "Compare with newer version" "")))))
+  (assuming (git-history-document?)
+    (-> "Restore version" (link git-restore-menu)))
+  (assuming (versioned? (current-buffer))
+    (assuming (version-supports-history? (current-buffer))
+      (when (!= (version-status (current-buffer)) "unknown")
+        ("History of this document"
+         (version-show-history (current-buffer))))))
+  (assuming (version-revision? (current-buffer))
+    (assuming (version-supports-history? (version-head (current-buffer)))
+      ("History of this document"
+       (version-show-history (version-head (current-buffer))))))
+  (assuming (and (git-history-document?) (git-texmacs-file? (current-buffer)))
+    ("Who changed what" (git-show-blame (current-buffer))))
+  ---
+  ;; Subversion
+  (assuming (versioned? (current-buffer))
+    (assuming (version-supports-svn-style? (current-buffer))
+      (when (!= (version-status (current-buffer)) "unknown")
+        ("Update" (version-interactive-update (current-buffer))))
+      (when (== (version-status (current-buffer)) "unknown")
+        ("Register" (register-buffer (current-buffer))))
+      (when (and (!= (version-status (current-buffer)) "unknown")
+                 (or (== (version-status (current-buffer)) "modified")
+                     (buffer-modified? (current-buffer))))
+        ("Commit" (version-interactive-commit (current-buffer))))
+      ---))
+  ;; Submenus for Git
+  (assuming (and (git-document?) (not (git-simple-mode?)))
+    (-> "This file" (link git-file-menu)))
+  (assuming (and (git-document?) (git-texmacs-file? (current-buffer)))
+    (-> "Project" (link git-project-menu)))
+  (assuming (current-git-root)
+    (-> (eval (git-menu-label (current-git-root)))
+        (link git-repository-menu)))
+  (assuming (git-can-init? (current-buffer))
+    ("Create Git repository..." (git-interactive-init (current-buffer))))
+  (assuming (git-available?)
+    ("Clone Git repository..." (git-interactive-clone))
+    (with l (git-recent-repositories)
+      (assuming (nnull? l)
+        (-> "Recent Git repositories"
+            (for (r l)
+              ((eval (utf8->cork r)) (git-show-status (system->url r))))))))
+  ---
+  (-> "Differences" (link version-differences-menu)))

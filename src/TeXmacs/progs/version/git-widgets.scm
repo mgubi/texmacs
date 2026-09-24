@@ -189,64 +189,177 @@
 (define (tool-root win)
   (git-buffer-root (window->buffer win)))
 
-(define (tool-branch root)
+(define (tool-sync-text root)
   (let* ((st (git-status root))
-         (head (or (git-status-ref st 'head) "?"))
          (up (git-status-ref st 'upstream))
          (ahead (or (git-status-ref st 'ahead) 0))
          (behind (or (git-status-ref st 'behind) 0)))
-    (string-append "On " (utf8->cork head)
-                   (if (not up) ""
-                       (string-append " (" (number->string ahead) " ahead, "
-                                      (number->string behind) " behind)")))))
+    (cond ((not up) "")
+          ((and (== ahead 0) (== behind 0)) "up to date")
+          (else (string-append
+                 (if (> ahead 0) (string-append (number->string ahead)
+                                                " to send ") "")
+                 (if (> behind 0) (string-append (number->string behind)
+                                                 " to get") ""))))))
 
-(define (tool-code e)
-  (cond ((git-entry-conflicted? e) "C")
-        ((git-entry-untracked? e) "?")
-        ((and (git-entry-staged? e) (git-entry-unstaged? e)) "+~")
-        ((git-entry-staged? e) "+")
-        (else "~")))
+(define (tool-sections root simple?)
+  ;; List of (title entries) for the changes tab
+  (let* ((l (git-status-entries root))
+         (conflicts (list-filter l git-entry-conflicted?))
+         (staged (list-filter l git-entry-staged?))
+         (changed (list-filter l git-entry-unstaged?))
+         (untracked (list-filter l git-entry-untracked?)))
+    (list-filter
+     (if simple?
+         (list (list "Conflicts" conflicts)
+               (list "Changes" (list-filter l (lambda (e)
+                                                (not (git-entry-conflicted?
+                                                      e))))))
+         (list (list "Conflicts" conflicts) (list "Staged" staged)
+               (list "Changed" changed) (list "New files" untracked)))
+     (lambda (x) (nnull? (cadr x))))))
 
-(tm-widget (git-tool-entry root e)
-  (with u (git-absolute root (git-entry-path e))
+(tm-widget (git-tool-entry root e section simple?)
+  (let* ((u (git-absolute root (git-entry-path e)))
+         (tm? (git-texmacs-file? u)))
     (hlist
-      (text (tool-code e)) // //
       ((eval (utf8->cork (git-entry-path e)))
        (when (url-exists? u) (load-buffer u)))
       >>
-      (if (or (git-entry-unstaged? e) (git-entry-untracked? e))
-          ("Stage" (git-stage u)))
-      (if (git-entry-conflicted? e)
+      (if (== section "Conflicts")
+          (if tm?
+              ("Resolve" (begin (load-buffer u) (git-resolve-conflict u))))
           ("Resolved" (git-mark-resolved u)))
-      (if (git-entry-staged? e)
-          ("Unstage" (git-unstage u))))))
+      (if (and (in? section '("Changed" "Changes")) tm? (url-exists? u)
+               (not (git-entry-untracked? e)))
+          ("Compare" (git-compare-with u "HEAD")))
+      (if (and (not simple?) (in? section '("Changed" "New files")))
+          ((balloon (icon "tm_add.xpm") "Stage") (git-stage u)))
+      (if (and (not simple?) (== section "Staged"))
+          ((balloon (icon "tm_close_tool.xpm") "Unstage") (git-unstage u))))))
+
+(tm-widget (git-tool-changes root simple?)
+  (with l (tool-sections root simple?)
+    (if (null? l)
+        (text "Nothing to commit: your work is saved"))
+    (for (x l)
+      (division "discrete"
+        (bold (text (car x))))
+      (division "plain"
+        (for (e (cadr x))
+          (dynamic (git-tool-entry root e (car x) simple?)))))))
+
+;; The message of the commit box, one buffer per window
+
+(define panel-buffers (make-ahash-table))
+
+(define (panel-buffer win)
+  (with key (url->string win)
+    (or (ahash-ref panel-buffers key)
+        (with u (string->url (string-append "tmfs://aux/git-panel-"
+                                            (number->string
+                                             (+ 1 (length (ahash-table->list
+                                                           panel-buffers))))))
+          (ahash-set! panel-buffers key u)
+          u))))
+
+(define (panel-commit root u simple?)
+  (with msg (commit-message u)
+    (cond ((== msg "")
+           (set-message "Please describe the changes first" "Git"))
+          (simple? (git-save-snapshot root msg)
+                   (buffer-set-body u '(document "")))
+          ((not (git-has-staged? root))
+           (set-message "Stage some changes first, or use Commit..." "Git"))
+          ((git-commit-staged root msg)
+           (buffer-set-body u '(document ""))))))
+
+(tm-widget (git-tool-commit-box win root simple?)
+  (with u (panel-buffer win)
+    (resize "250px" "60px"
+      (texmacs-input '(document "") '(style (tuple "generic")) u))
+    (hlist
+      ("Suggest"
+       (buffer-set-body
+        u `(document ,@(map utf8->cork
+                            (git-describe-changes
+                             root (if simple? (git-status-entries root)
+                                      (list-filter (git-status-entries root)
+                                                   git-entry-staged?)))))))
+      >>
+      ((eval (if simple? "Save snapshot" "Commit"))
+       (panel-commit root u simple?)))))
+
+(tm-widget (git-tool-history root name)
+  (with l (if (and name (git-root name)) (or (git-file-log name) '()) '())
+    (if (null? l) (text "No history for this document"))
+    (division "plain"
+      (for (c (sublist l 0 (min 20 (length l))))
+        (hlist
+          ((eval (string-append (git-commit-date c) " "
+                                (utf8->cork (git-short-message
+                                             (git-commit-subject c)))))
+           (git-show-page root "log"))
+          >>
+          (if (git-texmacs-file? name)
+              ("Compare" (git-compare-with name (git-commit-hash c))))
+          ("Restore" (git-restore-revision name (git-commit-hash c))))))
+    ===
+    (hlist ("Full history" (git-show-log root)) >>)))
+
+(tm-widget (git-tool-branches root)
+  (with l (git-branches root)
+    (division "plain"
+      (for (b l)
+        (hlist
+          (if (git-branch-current? b)
+              (bold (text (utf8->cork (git-branch-name b)))))
+          (if (not (git-branch-current? b))
+              (text (utf8->cork (git-branch-name b))))
+          >>
+          (if (not (git-branch-current? b))
+              ("Switch" (git-switch-branch root (git-branch-name b)))))))
+    ===
+    (hlist ("New branch..." (git-interactive-create-branch root)) // //
+           ("All branches" (git-show-branches root)) >>)))
 
 (tm-widget (git-tool-contents win)
   (let* ((root (tool-root win))
-         (l (if root (git-status-entries root) '()))
+         (name (with b (window->buffer win)
+                 (and b (not (url-rooted-tmfs? b)) b)))
+         (simple? (git-simple-mode?))
          (busy? (and root (git-busy? root)))
          (remote? (and root (nnull? (git-remotes root)) (not busy?)))
-         (branch (if root (tool-branch root) "")))
+         (branch (if root (or (git-current-branch root) "(no branch)") ""))
+         (sync (cond ((not root) "")
+                     (busy? "working...")
+                     (else (tool-sync-text root)))))
     (if (not root)
         (text "The current document is not in a Git working tree"))
     (if root
-        (text branch)
-        ===
         (hlist
-          ("Commit..." (git-interactive-commit root)) // //
-          (if remote?
-              ("Pull" (git-pull root)) // //
-              ("Push" (git-push root)) // //)
-          (if busy?
-              ("Cancel" (git-cancel root)) // //)
-          ("Status" (git-show-status root)) // //
-          ("Refresh" (git-refresh root))
-          >>)
+          (bold (text (utf8->cork branch))) // //
+          (text sync)
+          >>
+          (if busy? ("Cancel" (git-cancel root)))
+          (if (and remote? simple?)
+              ("Synchronize" (git-sync root)))
+          (if (and remote? (not simple?))
+              ((balloon (icon "tm_cloud_download.xpm") "Get changes (pull)")
+               (git-pull root))
+              ((balloon (icon "tm_cloud_upload.xpm") "Send changes (push)")
+               (git-push root))))
         ===
-        (if (null? l) (text "Nothing to commit"))
-        (division "plain"
-          (for (e l)
-            (dynamic (git-tool-entry root e)))))))
+        (tabs
+          (tab (text "Changes")
+            (vlist
+              (dynamic (git-tool-changes root simple?))
+              ===
+              (dynamic (git-tool-commit-box win root simple?))))
+          (tab (text "History")
+            (dynamic (git-tool-history root name)))
+          (tab (text "Branches")
+            (dynamic (git-tool-branches root)))))))
 
 (tm-tool* (git-tool win)
   (:name "Git")
@@ -274,10 +387,10 @@
   (let* ((flags (list->vector (map cadr toggles))))
     (padded
       (form "git-form"
-        (aligned
-          (for (f fields)
-            (item (text (car f))
-              (form-input (car f) "string" (list (cadr f)) "25em"))))
+        (for (f fields)
+          (hlist
+            (text (car f)) >>
+            (form-input (car f) "string" (list (cadr f)) "25em")))
         (for (i (.. 0 (length toggles)))
           (hlist
             (toggle (vector-set! flags i answer) (vector-ref flags i))
@@ -472,10 +585,10 @@
     (hlist (text msg) >>)
     ======
     (bottom-buttons
-      ("Details" (quit) (git-show-output))
+      ("Details" (begin (quit) (git-show-output)))
       >>
       (if label
-          ((eval label) (quit) (action)))
+          ((eval label) (begin (quit) (action))))
       // //
       ("Close" (quit)))))
 
@@ -495,7 +608,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (review-differences u)
-  (if (not (buffer-exists? u)) '()
+  (if (not (and u (buffer-exists? u))) '()
       (tree-search (buffer-get u)
                    (lambda (t) (tree-in? t '(version-old version-new
                                              version-both))))))

@@ -355,9 +355,15 @@ buffer is in a working tree. They are prefixed like the existing
 
 **Status (2026-09-24):**
 * **Implemented:** 4.1 (footer indicator), 4.2 (automatic versioning tool,
-  now the default), 4.5 (dialogs), 4.6 (explained failures, as a dialog
-  with *Details* and a suggested action) and 4.7 (review bar, for both
-  comparisons and conflicts).
+  now the default), 4.3 (restructured Version menu), 4.4 (panel with sync
+  bar, *Changes/History/Branches* tabs and a commit box), 4.5 (dialogs),
+  4.6 (explained failures, as a dialog with *Details* and a suggested
+  action), 4.7 (review bar, for both comparisons and conflicts) and 4.13
+  (wording: *Get changes*/*Send changes*, *Mine*/*Theirs*).
+* **Lesson for widgets:** the bodies of `(if ...)` in widgets are evaluated
+  even when the condition is false, and `for` is not accepted inside
+  `aligned`. The git layer therefore accepts `#f` roots, and the test
+  runner fails on any "Guile error" or "bad format" message in the log.
 * **Deviations:**
   * The footer shows `Git main · 3 changes · ↑1 ↓2 · working...`, using
     ASCII words and the arrow glyphs the TeXmacs fonts have.
