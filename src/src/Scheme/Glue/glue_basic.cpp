@@ -188,6 +188,97 @@ tmg_gui_set_next_window_as_popup () {
 }
 
 tmscm
+tmg_gui_test_snapshot (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-snapshot");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  int out= gui_test_snapshot (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return int_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_buttons () {
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_buttons ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_click (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-click");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_click (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_menu (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-menu");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= gui_test_menu (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_menu_entries (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-menu-entries");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= gui_test_menu_entries (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_gui_test_type (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "gui-test-type");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_type (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_gui_test_click_later (tmscm arg1, tmscm arg2, tmscm arg3) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "gui-test-click-later");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "gui-test-click-later");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "gui-test-click-later");
+
+  int in1= tmscm_to_int (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+
+  // TMSCM_DEFER_INTS;
+  gui_test_click_later (in1, in2, in3);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_support_functionalityP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "support-functionality?");
 
@@ -11327,6 +11418,13 @@ initialize_glue_basic () {
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-snapshot",  tmg_gui_test_snapshot, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-buttons",  tmg_gui_test_buttons, 0, 0, 0);
+  tmscm_install_procedure ("gui-test-click",  tmg_gui_test_click, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-menu",  tmg_gui_test_menu, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-menu-entries",  tmg_gui_test_menu_entries, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-type",  tmg_gui_test_type, 1, 0, 0);
+  tmscm_install_procedure ("gui-test-click-later",  tmg_gui_test_click_later, 3, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
   tmscm_install_procedure ("default-look-and-feel",  tmg_default_look_and_feel, 0, 0, 0);

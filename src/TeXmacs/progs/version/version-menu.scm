@@ -76,7 +76,7 @@
   (assuming (git-rev-parse (current-root) "ORIG_HEAD")
     ("Before the last pull or merge"
      (git-compare-with-revision (current-buffer) "ORIG_HEAD")))
-  ("Other revision..." (git-interactive-compare-with (current-buffer)))
+  ("Other revision" (git-interactive-compare-with (current-buffer)))
   (with l (git-tags (current-root))
     (assuming (nnull? l)
       ---
@@ -115,16 +115,17 @@
   (assuming (not (git-state? 'conflicted))
     (when (or (not (git-state? 'unmodified))
               (buffer-modified? (current-buffer)))
-      ("Commit this file..." (git-interactive-commit-file (current-buffer)))))
+      ("Commit this file" (git-interactive-commit-file (current-buffer)))))
   (assuming (git-state? 'modified 'partial)
-    ("Discard changes..." (git-discard (current-buffer)))))
+    ("Discard changes" (git-discard (current-buffer)))))
 
 (menu-bind git-project-menu
-  ("Commit project..." (git-interactive-commit-project (current-buffer)))
+  ("Commit project" (git-interactive-commit-project (current-buffer)))
   (with l (or (git-project-untracked (current-buffer)) '())
     (when (nnull? l)
       ((eval (string-append "Add " (number->string (length l))
-                            " missing files"))
+                            (if (== (length l) 1) " missing file"
+                                " missing files")))
        (git-add-project-files (current-buffer))))))
 
 (menu-bind git-simple-repository-menu
@@ -132,7 +133,7 @@
   ("Git panel" (git-open-tool))
   ("History" (git-show-log))
   ---
-  ("Save snapshot..." (git-interactive-save-snapshot (current-git-root)))
+  ("Save snapshot" (git-interactive-save-snapshot (current-git-root)))
   (-> "Restore snapshot"
       (for (c (git-snapshots (current-git-root)))
         ((eval (string-append (git-commit-date c) " "
@@ -162,10 +163,10 @@
   ("Graph" (git-show-page (current-git-root) "graph"))
   ("Branches and tags" (git-show-branches))
   ---
-  ("Commit..." (git-interactive-commit))
+  ("Commit" (git-interactive-commit))
   ("Stage all changes" (git-stage-all (current-git-root)))
   ---
-  ("New branch..." (git-interactive-create-branch (current-git-root)))
+  ("New branch" (git-interactive-create-branch (current-git-root)))
   (with l (list-filter (git-branches (current-git-root))
                        (lambda (b) (not (git-branch-current? b))))
     (when (nnull? l)
@@ -177,7 +178,7 @@
           (for (b l)
             ((eval (utf8->cork (git-branch-name b)))
              (git-merge-branch (current-git-root) (git-branch-name b)))))))
-  ("Tag this version..." (git-interactive-tag (current-git-root)))
+  ("Tag this version" (git-interactive-tag (current-git-root)))
   ---
   (with remotes? (nnull? (git-remotes (current-git-root)))
     (assuming (git-busy? (current-git-root))
@@ -187,7 +188,7 @@
       ("Get changes (pull)" (git-pull (current-git-root)))
       ("Send changes (push)" (git-push (current-git-root)))))
   (-> "Remotes"
-      ("Add remote..." (git-interactive-add-remote (current-git-root)))
+      ("Add remote" (git-interactive-add-remote (current-git-root)))
       (with l (git-remotes (current-git-root))
         (assuming (nnull? l)
           ---
@@ -205,7 +206,7 @@
     ("Restore last stash" (git-stash-pop (current-git-root))))
   ---
   (-> "Preferences"
-      ("All preferences..." (open-git-preferences))
+      ("All preferences" (open-git-preferences))
       ---
       ("Simple mode" (git-toggle-simple-mode))
       ("Sign commits and tags" (git-toggle-signing))
@@ -259,7 +260,7 @@
 
 (menu-bind version-menu
   (assuming (untrusted-git-document?)
-    ("Use Git in this folder..." (git-interactive-trust (current-buffer)))
+    ("Use Git in this folder" (git-interactive-trust (current-buffer)))
     ---
     (-> "Compare"
         ("With older version"
@@ -284,15 +285,15 @@
   (assuming (and (git-document?) (git-state? 'conflicted))
     (group "Conflict")
     (assuming (git-texmacs-file? (current-buffer))
-      ("Resolve conflict..." (git-resolve-conflict (current-buffer))))
+      ("Resolve conflict" (git-resolve-conflict (current-buffer))))
     ("Mark as resolved" (git-mark-resolved (current-buffer)))
     ---)
   ;; The most frequent actions
   (assuming (current-git-root)
     (assuming (git-simple-mode?)
-      ("Save snapshot..." (git-interactive-save-snapshot (current-git-root))))
+      ("Save snapshot" (git-interactive-save-snapshot (current-git-root))))
     (assuming (not (git-simple-mode?))
-      ("Commit..." (git-interactive-commit)))
+      ("Commit" (git-interactive-commit)))
     (with remotes? (nnull? (git-remotes (current-git-root)))
       (assuming (git-busy? (current-git-root))
         ("Cancel running command" (git-cancel (current-git-root))))
@@ -363,9 +364,9 @@
     (-> (eval (git-menu-label (current-git-root)))
         (link git-repository-menu)))
   (assuming (git-can-init? (current-buffer))
-    ("Create Git repository..." (git-interactive-init (current-buffer))))
+    ("Create Git repository" (git-interactive-init (current-buffer))))
   (assuming (git-available?)
-    ("Clone Git repository..." (git-interactive-clone))
+    ("Clone Git repository" (git-interactive-clone))
     (with l (git-recent-repositories)
       (assuming (nnull? l)
         (-> "Recent Git repositories"
@@ -374,4 +375,4 @@
   ---
   (-> "Differences" (link version-differences-menu))
   (assuming (git-available?)
-    ("Git preferences..." (open-git-preferences))))
+    ("Git preferences" (open-git-preferences))))

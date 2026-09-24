@@ -161,7 +161,10 @@ bar, the lists, the History and Branches tabs) are `refreshable
 box is **not** refreshed. Rebuilding the `texmacs-input` of its message
 while the user types would destroy an editor with pending updates (a
 crash), and would lose the message. Its aux buffer
-`tmfs://aux/git-panel-<n>` is created per window.
+`tmfs://aux/git-panel-<n>` is created per window. When the window switches
+to a document of another repository, `panel-follow-root` (called by the
+sync bar) puts the message aside and shows the one of the new repository
+with `buffer-set-body`, without rebuilding the editor.
 
 The working tree is that of the window's buffer (`git-buffer-root`, which
 also understands git pages). The bodies of `(if ...)` in widgets are
@@ -316,6 +319,28 @@ resolution of the conflict. The GUI parts (menus and
 the dialog) were smoke-tested by driving the Qt app from `-x` scripts:
 expanding the menus with `menu-expand` and opening the dialog. Pages can be
 checked visually headlessly with `(load-buffer u) (print-to-file "x.pdf")`.
+
+### Driving the Qt interface
+
+`Plugins/Qt/qt_test.cpp` (and its Qt6 copy) exports a few commands to
+drive the real interface from `-x` scripts, with the normal (visible)
+platform. The offscreen platform does not render faithfully.
+
+| Command | Effect |
+|---------|--------|
+| `(gui-test-snapshot dir)` | saves the visible windows as `dir/window-<i>.png` |
+| `(gui-test-menu "Version\|Commit")` | triggers a menu entry (prefix match); lazy menus are populated first |
+| `(gui-test-menu-entries "Version")` | the labels of a menu |
+| `(gui-test-buttons)` | the labels of the visible buttons |
+| `(gui-test-click "Yes")` | clicks a button or tab, in the active window first |
+| `(gui-test-type "text")` | types into the focused widget |
+| `(gui-test-click-later ms dir label)` | answers a modal dialog: Qt timers still fire in its event loop, the delayed commands of TeXmacs don't |
+
+Labels are compared case-insensitively, with `...` for `<ldots>`. A
+walkthrough runs its steps with `(delayed (:pause 1500) ...)`, and uses a
+fresh `TEXMACS_HOME_PATH` initialised by a first headless run, so that no
+Welcome window steals the focus. On macOS, other processes cannot capture
+the TeXmacs windows, so snapshots must be taken from inside.
 
 ## Known gaps
 

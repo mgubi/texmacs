@@ -269,6 +269,20 @@
        (not (string-contains? (git-output R "cat-file" "commit" "HEAD")
                               "gpgsig")))
 
+;; The informative line of a failure
+(check "failure message skips progress and hints"
+       (== (git-message (list 1 "" (string-append "From /some/remote\n"
+                                                  "hint: Diverging branches\n"
+                                                  "fatal: Not possible to "
+                                                  "fast-forward, aborting.")))
+           "fatal: Not possible to fast-forward, aborting."))
+(check "failure message of a conflict"
+       (== (git-message (list 1 (string-append "Auto-merging paper.tm\n"
+                                               "CONFLICT (content): Merge "
+                                               "conflict in paper.tm\n")
+                              ""))
+           "CONFLICT (content): Merge conflict in paper.tm"))
+
 ;; Blame, descriptions of changes, projects, snapshots
 (use-modules (version git-blame) (version git-project))
 (define P (system->url (string-append (getenv "GIT_TEST_DIR") "/proj")))

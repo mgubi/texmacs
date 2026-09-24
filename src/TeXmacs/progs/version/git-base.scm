@@ -227,6 +227,10 @@
                        (lambda (s) (!= (tm-string-trim-both s) "")))
     (cond ((null? l) "")
           ((git-ok? ret) (cAr l))
+          ((list-find l (lambda (s) (or (string-starts? s "fatal:")
+                                        (string-starts? s "error:")
+                                        (string-starts? s "CONFLICT"))))
+           => identity)
           (else (car l)))))
 
 (tm-define (git-output root . args)
@@ -771,8 +775,8 @@
          (s (and root (git-trusted? root) (git-available?)
                  (git-footer-text root))))
     (if (not s) t
-        (stree->tree `(concat ,(tree->stree t) (hspace "2em")
-                              (with "color" "dark grey" ,s))))))
+        ;; NOTE: the footer is plain text, so spaces are used for spacing
+        (stree->tree `(concat ,(tree->stree t) "     " ,s)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Large files and recent repositories
