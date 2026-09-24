@@ -53,6 +53,7 @@
 
 (tm-define (version-tool-reset)
   (:synopsis "Forget which versioning tools manage which files")
+  (versioning-directory-reset)
   (set! version-tool-table (make-ahash-table)))
 
 (tm-define (version-tool* name)

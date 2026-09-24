@@ -505,7 +505,19 @@
 (lazy-tmfs-handler (version version-git) git commit)
 (lazy-tmfs-handler (version git-blame) blame)
 (lazy-define (version git-drivers) git-merge-driver)
-(lazy-tool (version git-widgets) git-tool)
+(lazy-tool (version git-widgets) git-tool version-review-tool)
+(lazy-define (version git-base) git-footer)
+(with previous footer-hook
+  ;; NOTE: the Git modules are only loaded for documents inside a working tree
+  (set! footer-hook
+        (lambda (t)
+          (with t* (previous t)
+            (if (and (versioning-tool-active?)
+                     (versioning-directory (current-buffer))
+                     (url-exists? (url-append (versioning-directory
+                                               (current-buffer)) ".git")))
+                (git-footer t*)
+                t*)))))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

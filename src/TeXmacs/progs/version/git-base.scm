@@ -316,6 +316,11 @@
             (ahash-remove! git-tracked-table key)
             st)))))
 
+(tm-define (git-status-cached root)
+  (:synopsis "The last known status of @root, without running Git")
+  (with old (ahash-ref git-status-table (url->system root))
+    (and old (cdr old))))
+
 (tm-define (git-status-ref st key)
   (and st (assoc-ref st key)))
 
@@ -624,6 +629,62 @@
                        (string-append " by " (cadr f)))
                    (if (== (caddr f) "") ""
                        (string-append " (key " (caddr f) ")")))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Indicator in the footer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The footer is updated very often, so the indicator only uses the cached
+;; status; if there is none yet, then the status is computed once idle.
+
+(define git-footer-pending (make-ahash-table))
+
+(define (footer-schedule root)
+  (with key (url->system root)
+    (when (not (ahash-ref git-footer-pending key))
+      (ahash-set! git-footer-pending key #t)
+      (delayed
+        (:idle 500)
+        (git-status root)
+        (ahash-remove! git-footer-pending key)))))
+
+(define (footer-count n singular plural)
+  (string-append (number->string n) " " (if (== n 1) singular plural)))
+
+(tm-define (git-footer-text root)
+  (:synopsis "Short description of the state of @root for the footer")
+  (with st (git-status-cached root)
+    (if (not st)
+        (begin (footer-schedule root) #f)
+        (let* ((head (or (git-status-ref st 'head) "?"))
+               (l (or (git-status-ref st 'entries) '()))
+               (n (length l))
+               (c (length (list-filter l git-entry-conflicted?)))
+               (ahead (or (git-status-ref st 'ahead) 0))
+               (behind (or (git-status-ref st 'behind) 0)))
+          (string-recompose
+           (append (list (string-append "Git " (utf8->cork head)))
+                   (cond ((> c 0) (list (footer-count c "conflict"
+                                                      "conflicts")))
+                         ((> n 0) (list (footer-count n "change" "changes")))
+                         (else (list "saved")))
+                   (if (> ahead 0) (list (string-append
+                                          "<#2191>" (number->string ahead)))
+                       '())
+                   (if (> behind 0) (list (string-append
+                                           "<#2193>" (number->string behind)))
+                       '())
+                   (if (git-busy? root) (list "working...") '()))
+           " <#B7> ")))))
+
+(tm-define (git-footer t)
+  (:synopsis "Add the state of the Git working tree to the footer @t")
+  (let* ((u (current-buffer))
+         (root (and u (git-root u)))
+         (s (and root (git-footer-text root))))
+    (if (not s) t
+        (stree->tree `(concat ,(tree->stree t) (hspace "2em")
+                              (with "color" "dark grey" ,s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Large files and recent repositories

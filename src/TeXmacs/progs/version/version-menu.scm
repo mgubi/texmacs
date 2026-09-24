@@ -64,12 +64,6 @@
        (not (versioned? u))
        (git-available?)))
 
-(tm-define (git-interactive-compare-with name)
-  (:interactive #t)
-  (interactive
-   (lambda (revision)
-     (git-compare-with-revision name (cork->utf8 revision)))))
-
 (define (current-root) (git-root (current-buffer)))
 
 (menu-bind git-compare-menu

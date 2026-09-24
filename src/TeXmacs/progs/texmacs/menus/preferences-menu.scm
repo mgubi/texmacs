@@ -242,7 +242,10 @@
         (toggle ("Linking tool" "linking tool"))
         (toggle ("Remote tool" "remote tool"))
         (toggle ("Source macros tool" "source tool"))
-        (toggle ("Versioning tool" "versioning tool")))
+        (-> "Versioning tool"
+            ("Automatic" (set-versioning-tool "auto"))
+            ("Always" (set-versioning-tool "on"))
+            ("Never" (set-versioning-tool "off"))))
     ---
     (enum ("Autosave" "autosave")
           ("5 s" "5")
