@@ -8,6 +8,7 @@ developers, not the user manual (the manual lives in
 |------|----------|
 | [git-features.md](git-features.md) | **What the branch adds**: the features by menu, examples of structured merges, safety properties, new APIs, tests and known limitations. Start here. |
 | [git-ui-design.md](git-ui-design.md) | **Proposed UI improvements**: audit of the current UI, design principles, mockups for the footer indicator, panel, menus, dialogs, guided conflict resolution, pages and preferences, with priorities. |
+| [git-audit.md](git-audit.md) | **Audit of the branch** (2026-09-24): security, data loss, robustness, performance, UI, docs and tests, with status per finding. |
 | [texmacs-internals.md](texmacs-internals.md) | The TeXmacs machinery that version control depends on: Scheme modules and `tm-define` dispatch, the `tmfs://` virtual file system, buffers and the save pipeline, menus, widgets and side tools, running external processes, the document comparison engine. |
 | [vcs-current-state.md](vcs-current-state.md) | How the current SVN and Git support works, file by file, plus a review of the WIP commit `0b8b565da6` and a list of known bugs. |
 | [git-plan.md](git-plan.md) | The plan for full git support, in phases. |
