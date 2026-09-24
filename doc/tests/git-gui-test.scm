@@ -19,6 +19,9 @@
 (define C (system->url (string-append T "/conflict/paper.tm")))
 (define C2 (system->url (string-append T "/conflict2/paper.tm")))
 
+(for (r (list "/remote/clone a" "/remote/clone b" "/conflict" "/conflict2"))
+  (git-trust (system->url (string-append T r))))
+
 (define (doc text)
   (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n  "
                  text "\n</body>\n"))

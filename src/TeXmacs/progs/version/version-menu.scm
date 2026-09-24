@@ -251,7 +251,24 @@
   ---
   ("Review bar" (version-review-open)))
 
+(define (untrusted-git-document?)
+  (with u (current-buffer)
+    (and u (git-directory? u) (not (git-trusted? u)))))
+
 (menu-bind version-menu
+  (assuming (untrusted-git-document?)
+    ("Use Git in this folder..." (git-interactive-trust (current-buffer)))
+    ---
+    (-> "Compare"
+        ("With older version"
+         (choose-file compare-with-older "Compare with older version" ""))
+        ("With newer version"
+         (choose-file compare-with-newer "Compare with newer version" "")))
+    (-> "Differences" (link version-differences-menu)))
+  (assuming (not (untrusted-git-document?))
+    (link version-trusted-menu)))
+
+(menu-bind version-trusted-menu
   ;; Conflicts come first, since they have to be resolved
   (assuming (and (git-document?) (git-state? 'conflicted))
     (group "Conflict")
