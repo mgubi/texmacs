@@ -208,8 +208,34 @@ Ghostscript reads all six pages with no complaint and no substitution, the
 text extracts correctly, and the two renderings agree to 92–99 % of pixels
 (the rest is Ghostscript's heavier stems, not different content).
 
-What is left of the gap is the OpenType half: MuPDF's own subsetter keeps
-118 KB where Ghostscript keeps far less.
+### The reference is not the better file
+
+The remaining difference in size is not a difference in subsetting, and it
+was read the wrong way round at first. The reference has **four Type 1
+fonts and thirty-seven Type 3 fonts**: the route through PostScript
+rasterizes most of its text, and what it embeds are bitmaps. Its text does
+not come out whole either -- the arrow of `t <- (focus-tree)` extracts as
+U+FFFD, and the words break. Ours embeds nine real fonts, all outlines,
+and extracts cleanly.
+
+MuPDF's OpenType subsetting, which the 118 KB was blamed on, is in fact
+doing its work:
+
+| font | whole | in the document |
+|---|---|---|
+| TeX Gyre Pagella Math | 601 KB | 38.5 KB |
+| Fira Sans Bold | 378 KB | 29.0 KB |
+| TeX Gyre Pagella Regular | 218 KB | 21.6 KB |
+| TeX Gyre Pagella Bold | 216 KB | 21.3 KB |
+
+So 519 KB of scalable, searchable text against 194 KB of bitmaps is the
+honest comparison, and the two are not the same document.
+
+There is nothing to take from TeX for this half: pdfTeX does not subset
+OpenType at all. `writeotf` in `writettf.c` stops with *"OTF fonts must be
+included entirely"* and copies the whole `CFF ` table. Its `writettf.c`
+does subset TrueType, in 1463 lines, but MuPDF already does that well
+(Lucida Grande Bold goes in at 7 KB), so there would be nothing to gain.
 
 Note that the reference is *not* PDFHummus: this build has `PDF_RENDERER`
 undefined, so the Hummus renderer is not compiled at all and the normal
@@ -257,10 +283,8 @@ choice, since it shares the coordinates and the sizes with Hummus.
 ## What it would take to finish
 
 1. ~~A Type 1 subsetter.~~ Done: pdfTeX's `writet1.c`, see above.
-1. The OpenType half: MuPDF's `pdf_subset_fonts` keeps 118 KB of the five
-   OpenType fonts of the six page document where Ghostscript keeps much
-   less. Worth measuring against `mutool clean -S` on its own before
-   deciding whether it is ours to fix or Artifex's.
+1. ~~The OpenType half.~~ There is no gap: the reference is bitmaps, and
+   MuPDF subsets the OpenType fonts by a factor of ten to fifteen.
 2. A Type 3 font writer for the bitmap fonts.
 3. Patterns, the outline tree, the destination tree, attachments.
 
