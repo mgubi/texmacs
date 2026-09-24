@@ -145,6 +145,12 @@
 
 (tm-define (git-run-with-input root input . args)
   (:synopsis "Run Git with @args in @root, sending @input to its stdin")
+  ;; NOTE: widgets evaluate their contents eagerly, so that root may be #f
+  (if (not root)
+      (list -1 "" "not in a Git working tree")
+      (git-run-in root input args)))
+
+(define (git-run-in root input args)
   (git-set-environment)
   (let* ((cmd (git-arguments root args))
          (ret (cond ((not (spawn-supported?)) (git-shell-run cmd input))
@@ -305,6 +311,9 @@
 
 (tm-define (git-status root)
   (:synopsis "Status of the working tree @root (or #f)")
+  (and root (git-status-in root)))
+
+(define (git-status-in root)
   (let* ((key (url->system root))
          (old (ahash-ref git-status-table key)))
     (if (and old (< (- (texmacs-time) (car old)) git-status-delay))
@@ -318,7 +327,7 @@
 
 (tm-define (git-status-cached root)
   (:synopsis "The last known status of @root, without running Git")
-  (with old (ahash-ref git-status-table (url->system root))
+  (with old (and root (ahash-ref git-status-table (url->system root)))
     (and old (cdr old))))
 
 (tm-define (git-status-ref st key)

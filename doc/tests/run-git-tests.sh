@@ -134,7 +134,15 @@ else
 fi
 
 cd "$src" || exit 1
+log="$dir/test.log"
 GIT_TEST_DIR="$dir" TEXMACS_HOME_PATH="$dir/home" TEXMACS_PATH="$src/TeXmacs" \
   perl -e 'alarm 300; exec @ARGV' TeXmacs/bin/texmacs.bin $opts \
-  -x "(begin (catch #t (lambda () (load \"$here/$test\")) (lambda args (display* \"TEST-ERROR \" args \"\\n\") (quit-TeXmacs))) (if (headless?) (quit-TeXmacs)))" 2>&1 \
-  | grep -E '^(ok|FAIL|FAILURES|TEST-ERROR)'
+  -x "(begin (catch #t (lambda () (load \"$here/$test\")) (lambda args (display* \"TEST-ERROR \" args \"\\n\") (quit-TeXmacs))) (if (headless?) (quit-TeXmacs)))" \
+  > "$log" 2>&1
+grep -E '^(ok|FAIL|FAILURES|TEST-ERROR)' "$log"
+# errors in call backs and widgets do not stop the tests: report them
+n=$(grep -c -E 'Guile error|bad format' "$log")
+if test "$n" != "0"; then
+  echo "FAIL $n Scheme errors in $log:"
+  grep -E -B2 'Guile error|bad format' "$log" | head -12
+fi

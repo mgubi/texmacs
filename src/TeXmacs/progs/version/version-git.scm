@@ -37,6 +37,10 @@
 (define (short-hash rev)
   (if (>= (string-length rev) 40) (string-take rev 7) rev))
 
+(tm-define (git-short-message msg)
+  (if (<= (string-length msg) 50) msg
+      (string-append (substring msg 0 47) "...")))
+
 (tm-define (git-texmacs-file? u)
   (in? (url-suffix u) '("tm" "ts" "tp" "stm" "tmml")))
 
@@ -1004,8 +1008,9 @@
                         ,(git-action "Commit..." "git-page-commit" r) " | "
                         ,(git-action "Stage all" "git-page-stage-all" r) " | "
                         ,(git-action "Fetch" "git-page-remote" r "fetch") " | "
-                        ,(git-action "Pull" "git-page-remote" r "pull") " | "
-                        ,(git-action "Push" "git-page-remote" r "push")))
+                        ,(git-action "Get changes" "git-page-remote" r "pull")
+                        " | "
+                        ,(git-action "Send changes" "git-page-remote" r "push")))
                 (if (null? l) (list "Nothing to commit, working tree clean.")
                     '())
                 (status-section root "Conflicts" conflicts 'conflict)
