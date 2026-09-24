@@ -133,6 +133,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   hashmap<string,int>  font_by_file; // by the file the program comes from
   hashmap<int,int>     alpha_gs;   // alpha -> the number of its ExtGState
   hashmap<string,int>  image_pool; // a file -> the number of its XObject
+  // MuPDF gives the same object back for the same image, so this is what
+  // keeps a picture which is drawn again -- every tile of a pattern, say
+  // -- from being named again in the resources
+  hashmap<pointer,int> xobj_num;
   int                  n_alpha, n_xobj;
 
   array<pdf_outline_item> outlines;
@@ -165,6 +169,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
   void place_image (int num, double w, double h, SI x, SI y, int alpha);
+  int  name_xobject (pdf_obj* ref);
 
 public:
   mupdf_pdf_renderer_rep (url pdf_file_name, int dpi, int nr_pages,
@@ -231,7 +236,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     cur_width (-1), cur_alpha (255),
     in_text (false), cur_font (-1), cur_size (0), text_x (0), text_y (0),
     font_index (-1), font_by_file (-1), dest_index (-1), alpha_gs (-1),
-    image_pool (-1),
+    image_pool (-1), xobj_num (-1),
     n_alpha (0), n_xobj (0)
 {
   width = default_dpi * paper_w / 2.54;
@@ -980,13 +985,14 @@ mupdf_pdf_renderer_rep::draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y) {
       }
     }
     img= fz_new_image_from_pixmap (ctx, pix, NULL);
-    pdf_obj* ref= pdf_add_image (ctx, doc, img);
-    string nm= "Im" * as_string (n_xobj++);
-    c_string cnm (nm);
-    pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
-    double x0= to_x (x) - gl->xoff, y0= to_y (y) - h + gl->yoff;
-    fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
-                      (double) w, (double) h, x0, y0, (const char*) cnm);
+    int num= name_xobject (pdf_add_image (ctx, doc, img));
+    if (num >= 0) {
+      string nm= "Im" * as_string (num);
+      c_string cnm (nm);
+      double x0= to_x (x) - gl->xoff, y0= to_y (y) - h + gl->yoff;
+      fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
+                        (double) w, (double) h, x0, y0, (const char*) cnm);
+    }
   }
   fz_always (ctx) { fz_drop_image (ctx, img); fz_drop_pixmap (ctx, pix); }
   fz_catch (ctx) {
@@ -999,6 +1005,23 @@ mupdf_pdf_renderer_rep::draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y) {
 * Pictures
 ******************************************************************************/
 
+// Give an XObject a name in the resources, or find the one it has. MuPDF
+// stores an image once however often it is added, so the same object
+// comes back and the same name serves: without this, a pattern of a
+// thousand tiles named a thousand resources for one image.
+int
+mupdf_pdf_renderer_rep::name_xobject (pdf_obj* ref) {
+  if (ref == NULL) return -1;
+  pointer key= (pointer) ref;
+  if (xobj_num->contains (key)) { pdf_drop_obj (ctx, ref); return xobj_num (key); }
+  int num= n_xobj++;
+  string nm= "Im" * as_string (num);
+  c_string cnm (nm);
+  pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
+  xobj_num (key)= num;
+  return num;
+}
+
 void
 mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   if (contents == NULL) return;
@@ -1010,14 +1033,15 @@ mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   fz_image* img= NULL;
   fz_try (ctx) {
     img= mupdf_image_from_pixmap (rep->pix);
-    pdf_obj* ref= pdf_add_image (ctx, doc, img);
-    string nm= "Im" * as_string (n_xobj++);
-    c_string cnm (nm);
-    pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
-    double x0= to_x (x) - rep->ox, y0= to_y (y) - rep->oy;
-    fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
-                      (double) rep->w, (double) rep->h, x0, y0,
-                      (const char*) cnm);
+    int num= name_xobject (pdf_add_image (ctx, doc, img));
+    if (num >= 0) {
+      string nm= "Im" * as_string (num);
+      c_string cnm (nm);
+      double x0= to_x (x) - rep->ox, y0= to_y (y) - rep->oy;
+      fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
+                        (double) rep->w, (double) rep->h, x0, y0,
+                        (const char*) cnm);
+    }
   }
   fz_always (ctx) { fz_drop_image (ctx, img); }
   fz_catch (ctx) {
@@ -1070,13 +1094,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     fz_image* img= NULL;
     fz_try (ctx) {
       img= mupdf_load_image (name);
-      if (img != NULL) {
-        pdf_obj* ref= pdf_add_image (ctx, doc, img);
-        num= n_xobj++;
-        string nm= "Im" * as_string (num);
-        c_string cnm (nm);
-        pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
-      }
+      if (img != NULL) num= name_xobject (pdf_add_image (ctx, doc, img));
     }
     fz_always (ctx) { fz_drop_image (ctx, img); }
     fz_catch (ctx) { num= -1; }

@@ -31,7 +31,8 @@ AGREE=${AGREE:-88}        # percent of pixels within 32 levels
 DOCS_DEFAULT="TeXmacs/doc/main/man-manual.en.tm
 TeXmacs/doc/main/automated/tag-help.en.tm
 TeXmacs/doc/main/start/man-conventions.en.tm
-src/Plugins/MuPDF/tests/figures.tm"
+src/Plugins/MuPDF/tests/figures.tm
+src/Plugins/MuPDF/tests/pattern.tm"
 
 [ -x "$BIN" ] || { echo "run me from the top of the source tree"; exit 2; }
 export TEXMACS_PATH="$PWD/TeXmacs"

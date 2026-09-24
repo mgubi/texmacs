@@ -27,5 +27,10 @@ The checks were themselves checked: embedding the Type 1 fonts the wrong
 way again (pdf_add_cid_font instead of pdf_add_simple_font) makes the gs
 and text checks fail, as it should.
 
+Two of the documents are here rather than in the manual: figures.tm has a
+PostScript figure and a raster one, which must come out as a /Form and an
+/Image and not as pictures of themselves, and pattern.tm has a patterned
+background, whose five hundred tiles must share one XObject.
+
 Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
 output directory, how long a conversion is given, and the threshold.

@@ -285,8 +285,10 @@ readers then substitute.
   stream, with a ToUnicode CMap so the text is still searchable. It also
   fixed glyphs which the image fallback drew as empty boxes.
 * **Patterns** are drawn, but as tiled images: `renderer_rep::clear_pattern`
-  does the tiling with `draw_picture`. Real PDF tiling patterns would be
-  smaller.
+  does the tiling with `draw_picture`. The tiles share one XObject
+  (`name_xobject`), so a patterned page costs five hundred `Do` operators
+  and one image rather than five hundred images; real PDF tiling patterns
+  would save the operators too.
 * ~~The outline is flat.~~ Done: it is the tree the levels describe.
 * ~~Named destinations.~~ Done: the anchors are the name tree of the
   catalogue and a link refers to one by name.
