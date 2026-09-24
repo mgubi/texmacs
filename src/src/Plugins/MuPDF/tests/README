@@ -1,0 +1,31 @@
+Checking the PDF the MuPDF renderer writes.
+
+    src/Plugins/MuPDF/tests/pdf-compare.sh [document.tm ...]
+
+from the top of the source tree; with no argument it takes three documents
+of the manual. It exports each one through the MuPDF renderer
+(TEXMACS_PDF_MUPDF=1) and through whatever the build does otherwise, and
+checks the first:
+
+  gs      Ghostscript reads the file without an error and without
+          substituting a font. This is the check which earns its keep: an
+          invalid font program is the mistake which is easiest to make and
+          hardest to see, since the page still looks like a page, only in
+          the wrong typeface.
+  text    the text extracts, and no character comes out as U+FFFD (a wrong
+          encoding, a missing glyph name, a stale ToUnicode).
+  render  the page Ghostscript draws and the page MuPDF draws agree to
+          within a threshold. They are two independent readers of the same
+          file, so a disagreement is a fault in the file -- but note that
+          it does *not* catch a substituted font, since both readers then
+          substitute; that is what the gs check is for.
+  size    reported, not judged. The two routes do not embed the same kind
+          of font -- the other one goes through PostScript and comes back
+          with bitmaps -- so the numbers are not comparable.
+
+The checks were themselves checked: embedding the Type 1 fonts the wrong
+way again (pdf_add_cid_font instead of pdf_add_simple_font) makes the gs
+and text checks fail, as it should.
+
+Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
+output directory, how long a conversion is given, and the threshold.

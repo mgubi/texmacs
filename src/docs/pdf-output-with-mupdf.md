@@ -264,21 +264,37 @@ choice, since it shares the coordinates and the sizes with Hummus.
   was cleared in PDF's default colour, black. The prototype carries
   `has_fill` / `has_stroke` flags instead.
 
+## Checking it
+
+`src/Plugins/MuPDF/tests/pdf-compare.sh` exports a few documents both ways
+and checks, of the MuPDF one, that Ghostscript reads it without an error
+and without substituting a font, that the text extracts with no U+FFFD in
+it, and that the pages Ghostscript and MuPDF draw agree. The first check is
+the one which earns its keep: an invalid font program still looks like a
+page, only in the wrong typeface. The checks were themselves checked by
+putting the old CID embedding of the Type 1 fonts back, which makes two of
+them fail; note that the rendering check does *not* catch that, since both
+readers then substitute.
+
 ## What is still missing
 
-* **Type 3 fonts** for the bitmap and unloadable fonts. The prototype
-  draws those glyphs as images, which is correct on the page but large and
-  not searchable. Hummus builds a Type 3 font per 256-glyph chunk; MuPDF
-  has no writer for them, so this is ours to write (`pdf_obj` is enough:
-  a Type 3 font is a dictionary of glyph content streams).
-* **Patterns** (`clear_pattern`, pattern brushes) — the prototype ignores
-  them.
-* **The outline is flat**: the levels are recorded but not nested.
-* **Named destinations**: internal links are written with a `/Dest` name
-  but the `/Dests` tree is not built yet, so `#anchor` links do not resolve.
+* ~~Type 3 fonts for the bitmap and unloadable fonts.~~ Done: one font per
+  256 characters, the glyph an inline image mask in a little content
+  stream, with a ToUnicode CMap so the text is still searchable. It also
+  fixed glyphs which the image fallback drew as empty boxes.
+* **Patterns** are drawn, but as tiled images: `renderer_rep::clear_pattern`
+  does the tiling with `draw_picture`. Real PDF tiling patterns would be
+  smaller.
+* ~~The outline is flat.~~ Done: it is the tree the levels describe.
+* ~~Named destinations.~~ Done: the anchors are the name tree of the
+  catalogue and a link refers to one by name.
 * **Encryption and attachments** (`pdf_hummus_make_attachment`, which the
   "embed the .tm in the PDF" feature uses).
-* **`draw_scalable`** falls back to rasterizing.
+* **`draw_scalable`** falls back to rasterizing, where Hummus embeds the
+  PDF or EPS figure itself. At least it now rasterizes at a print
+  resolution (`shadow` raises the zoom).
+* **Transformations** are honoured now (`set_transformation`), which they
+  were not: every frame of the graphics used to be dropped.
 
 ## What it would take to finish
 
