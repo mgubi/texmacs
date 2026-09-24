@@ -268,7 +268,7 @@ choice, since it shares the coordinates and the sizes with Hummus.
 
 ## Checking it
 
-`src/Plugins/MuPDF/tests/pdf-compare.sh` exports four documents both ways
+`src/Plugins/MuPDF/tests/pdf-compare.sh` exports a set of documents both ways
 and checks, of the MuPDF one, that Ghostscript reads it without an error
 and without substituting a font, that the text extracts with no U+FFFD in
 it, and that the pages Ghostscript and MuPDF draw agree. The first check is
@@ -291,8 +291,7 @@ readers then substitute.
 * **figures**: a PDF as a `/Form` XObject with its drawing kept as
   drawing, a raster image as an `/Image`, anything else through the
   converters first; each file embedded once however often it occurs;
-* pictures, patterns (tiled images sharing one XObject), links, named
-  destinations, the outline as a tree, `/Info` metadata, attachments.
+* pictures, **tiling patterns** (below), links, named destinations, the outline as a tree, `/Info` metadata, attachments.
 
 ### Ligatures
 
@@ -311,13 +310,36 @@ extraction is always "wrong". MuPDF does honour the spans -- rewriting one
 harness uses Ghostscript's blindness to count the ligature glyphs drawn,
 each of which must have its span.
 
+The name is asked through MuPDF (`glyph_name`): the charmap and the index
+under `fz_ft_lock`, the name with `fz_get_glyph_name`, which takes the lock
+itself. Asking FreeType directly worked on the Type 1 fonts and crashed on
+the first OpenType one: its table of glyph names is loaded the first time a
+name is asked, that load allocates, and FreeType's allocator is pointed at
+a MuPDF context only while the lock is held. Every FreeType call in the
+renderer goes through the lock for that reason.
+
+### Tiling patterns
+
+A patterned background is a `/Pattern` -- PatternType 1, colored, constant
+spacing -- whose one cell draws the tile image, and one fill with it; before,
+it was a `Do` per tile, five hundred on the test page. The geometry is that
+of `renderer_rep::clear_pattern`, taken over as it is, and the pattern's
+`/Matrix` is in the page's default space, so it carries the 72/dpi scale of
+the content stream as well as the position of the first tile. Measured on
+synthetic tiles, MuPDF, Ghostscript and the PostScript route put every
+tile on the same pixel.
+
+Not every tile goes into a pattern:
+
+* a tile drawn with an alpha below 1 is drawn tile by tile, as before;
+* so is a tile image **with a soft mask**. Ghostscript draws such an image
+  inside a tiling pattern wrongly -- the same page drawn tile by tile and
+  as a pattern agrees at 97.6% in MuPDF and at 46% in Ghostscript -- and a
+  file one of the two readers gets wrong is a file to avoid.
+  `opaque_tile` decides, and `pattern-photo.tm` in the tests is the case.
+
 ## What is left
 
-* **Real tiling patterns.** A patterned page costs five hundred `Do`
-  operators and one image; a `/Pattern` would cost one fill. It is a
-  saving in the content stream, not in the file, since the image is
-  already shared and the stream compresses: the patterned test document
-  is 20 KB. Not worth the machinery as things stand.
 * **Encryption.** `pdf_write_options` has the fields and nothing in
   TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
   out), so it is written down rather than written.
@@ -354,7 +376,11 @@ old CID embedding of the Type 1 fonts back, which makes two of them fail.
 Twenty-four documents have been through it: twenty of the manual -- among
 them Chinese, German, French and Polish for the fonts and the accents, and
 the mathematics, tables, graphics, links and presentation chapters -- and
-the two of the tests, each run both ways.
+the documents of the tests, each run both ways. The rendering check
+compares the pages after a blur of a pixel and a half, since the two
+readers anti-alias and resample differently: the documents agree at 97.5%
+and more, the photograph drawn tile by tile at 95%, and the pattern
+Ghostscript draws wrongly at 42%, so the threshold is 90%.
 
 ## If this is to replace PDFHummus
 

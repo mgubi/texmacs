@@ -26,13 +26,14 @@ set -u
 BIN=TeXmacs/bin/texmacs.bin
 OUT=${OUT:-/tmp/pdf-compare}
 WAIT=${WAIT:-60}          # seconds to let a conversion run
-AGREE=${AGREE:-88}        # percent of pixels within 32 levels
+AGREE=${AGREE:-90}        # percent of pixels within 32 levels, after a blur
 
 DOCS_DEFAULT="TeXmacs/doc/main/man-manual.en.tm
 TeXmacs/doc/main/automated/tag-help.en.tm
 TeXmacs/doc/main/start/man-conventions.en.tm
 src/Plugins/MuPDF/tests/figures.tm
 src/Plugins/MuPDF/tests/pattern.tm
+src/Plugins/MuPDF/tests/pattern-photo.tm
 src/Plugins/MuPDF/tests/ligatures.tm
 src/Plugins/MuPDF/tests/landscape.tm"
 
@@ -116,9 +117,14 @@ for doc in ${*:-$DOCS_DEFAULT}; do
     v=$(python3 - "$OUT/cmp-gs$p.png" "$OUT/cmp-mu$p.png" <<'PY'
 import sys
 try:
-    from PIL import Image, ImageChops
-    a= Image.open (sys.argv[1]).convert ("L")
-    b= Image.open (sys.argv[2]).convert ("L").resize (a.size)
+    from PIL import Image, ImageChops, ImageFilter
+    # blurred by a pixel and a half: two readers anti-alias and resample
+    # differently, which is not a fault in the file, and on a page of
+    # hard edges it moves the raw numbers more than a real fault does.
+    # Measured: documents 97.5% and up, a photo pattern 95%, a pattern
+    # Ghostscript draws wrongly 42%
+    a= Image.open (sys.argv[1]).convert ("L").filter (ImageFilter.GaussianBlur (1.5))
+    b= Image.open (sys.argv[2]).convert ("L").resize (a.size).filter (ImageFilter.GaussianBlur (1.5))
     h= ImageChops.difference (a, b).histogram ()
     print ("%.1f" % (100.0 * sum (h[:32]) / sum (h)))
 except Exception as e:

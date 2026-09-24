@@ -48,6 +48,8 @@ extern "C" {
 }
 
 extern url tt_font_find (string name); // font_select.cpp
+bool is_percentage (tree t, string s= "%"); // env_length.cpp, declared by
+double as_percentage (tree t);              // each user, as renderer.cpp does
 
 /******************************************************************************
 * The pieces which are written when the document is closed
@@ -144,6 +146,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   pdf_obj*      res_font;
   pdf_obj*      res_xobj;
   pdf_obj*      res_gs;
+  pdf_obj*      res_pat;
   array<pdf_obj*> pages;
 
   // the graphics state as it stands in the stream
@@ -173,6 +176,9 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   // keeps a picture which is drawn again -- every tile of a pattern, say
   // -- from being named again in the resources
   hashmap<pointer,int> xobj_num;
+  hashmap<string,int>  pattern_pool;  // a tile and its lattice -> /P<n>
+  int                  n_pat;
+  int                  transform_level; // how deep in set_transformation
   int                  n_alpha, n_xobj;
 
   array<pdf_outline_item> outlines;
@@ -194,8 +200,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void select_stroke (color c);
   void select_width (SI w);
   void select_alpha (int a);
+  int  alpha_state (int a);
   int  get_font (font_glyphs fn, int ch);
-  string ligature_of (pdf_font_item& it, int key);
+  string ligature_of (pdf_font_item& it, int key, int fallback);
+  string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
   void subset_type1 (pdf_font_item& it, array<string> keep);
@@ -207,6 +215,10 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   int  embed_image (url u);
   void place_image (int num, double w, double h, SI x, SI y, int alpha);
   int  name_xobject (pdf_obj* ref);
+  void xobject_fit (pdf_obj* xo, double w, double h, double x, double y,
+                    double m[6]);
+  int  tiling_pattern (int img, double w, double h, double ax, double ay);
+  bool opaque_tile (int img);
 
 public:
   mupdf_pdf_renderer_rep (url pdf_file_name, int dpi, int nr_pages,
@@ -233,6 +245,9 @@ public:
   void line (SI x1, SI y1, SI x2, SI y2);
   void lines (array<SI> x, array<SI> y);
   void clear (SI x1, SI y1, SI x2, SI y2);
+  using renderer_rep::clear_pattern;
+  void clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
+                      SI x1, SI y1, SI x2, SI y2);
   void fill (SI x1, SI y1, SI x2, SI y2);
   void arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
@@ -268,12 +283,14 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     started (false), page_num (0),
     ctx (mupdf_context ()), doc (NULL), contents (NULL),
     resources (NULL), res_font (NULL), res_xobj (NULL), res_gs (NULL),
+    res_pat (NULL),
     pen (black), bgb (white), fgb (black), clip_level (0),
     cur_fill (0), cur_stroke (0), has_fill (false), has_stroke (false),
     cur_width (-1), cur_alpha (255),
     in_text (false), cur_font (-1), cur_size (0), text_x (0), text_y (0),
     font_index (-1), font_by_file (-1), dest_index (-1), alpha_gs (-1),
-    image_pool (-1), xobj_num (-1),
+    image_pool (-1), xobj_num (-1), pattern_pool (-1), n_pat (0),
+    transform_level (0),
     n_alpha (0), n_xobj (0)
 {
   width = default_dpi * paper_w / 2.54;
@@ -286,6 +303,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     res_font= pdf_dict_put_dict (ctx, resources, PDF_NAME(Font), 8);
     res_xobj= pdf_dict_put_dict (ctx, resources, PDF_NAME(XObject), 8);
     res_gs=   pdf_dict_put_dict (ctx, resources, PDF_NAME(ExtGState), 4);
+    res_pat=  pdf_dict_put_dict (ctx, resources, PDF_NAME(Pattern), 2);
     started= true;
   }
   fz_catch (ctx) {
@@ -436,6 +454,12 @@ void
 mupdf_pdf_renderer_rep::select_alpha (int a) {
   if (a == cur_alpha) return;
   cur_alpha= a;
+  fz_append_printf (ctx, contents, "/GS%d gs\n", alpha_state (a));
+}
+
+// the ExtGState of an alpha, made the first time it is asked for
+int
+mupdf_pdf_renderer_rep::alpha_state (int a) {
   int num;
   if (alpha_gs->contains (a)) num= alpha_gs (a);
   else {
@@ -449,7 +473,7 @@ mupdf_pdf_renderer_rep::select_alpha (int a) {
     pdf_dict_puts_drop (ctx, res_gs, cnm, pdf_add_object_drop (ctx, doc, gs));
     alpha_gs (a)= num;
   }
-  fz_append_printf (ctx, contents, "/GS%d gs\n", num);
+  return num;
 }
 
 // A frame of the graphics: the stream gets the matrix and the clipping
@@ -471,6 +495,7 @@ mupdf_pdf_renderer_rep::set_transformation (frame fr) {
   point uy= tr (point (0.0, 1.0)) - o;
   // a q saves the state and changes nothing, so what we track still holds
   put ("q\n");
+  transform_level++;
   fz_append_printf (ctx, contents, "%g %g %g %g %g %g cm\n",
                     ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
   rectangle nclip= fr [oclip];
@@ -483,6 +508,7 @@ mupdf_pdf_renderer_rep::reset_transformation () {
   end_text ();
   renderer_rep::unclip ();
   put ("Q\n");
+  if (transform_level > 0) transform_level--;
   forget_state ();
 }
 
@@ -749,7 +775,7 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   string lig;
   if (!font_list[k].t3) {
     int key= font_list[k].simple ? (ch & 255) : (int) gl->index;
-    lig= ligature_of (font_list[k], key);
+    lig= ligature_of (font_list[k], key, (int) gl->index);
   }
   if (N(lig) > 0) {
     c_string cl (lig);
@@ -769,28 +795,58 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   if (N(lig) > 0) put ("EMC\n");
 }
 
-// The letters of the glyph a font draws for key -- the code in a simple
-// font, the glyph in a CID font -- when it is a ligature. The name is
-// asked of the font, as in write_fonts: through its built in encoding for
-// a Type 1, directly for the glyph otherwise.
+// The name of the glyph a font draws for key -- the code in a simple
+// font, looked up through its built in ("Adobe custom") encoding, the
+// glyph itself otherwise; fallback is the glyph to take when the encoding
+// has nothing for the code. The glyph goes in gid, and "" is returned when
+// there is no name.
+//
+// The index TeXmacs carries is its own and does not have to be FreeType's:
+// in the EC fonts it is the code, while FreeType numbers the glyphs from
+// the CharStrings, one less. Hence the encoding.
+//
+// FreeType is only ever reached with MuPDF's lock held (fz_ft_lock, and
+// fz_get_glyph_name, which takes it). The lock is also what points
+// FreeType's allocator at the calling context, and an OpenType face
+// allocates the first time a name is asked of it -- its table of names is
+// loaded lazily. Asked directly, that allocation crashed the renderer.
 string
-mupdf_pdf_renderer_rep::ligature_of (pdf_font_item& it, int key) {
-  if (it.lig->contains (key)) return it.lig [key];
-  string r;
-  FT_Face face= (it.font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, it.font);
-  if (face != NULL && FT_HAS_GLYPH_NAMES (face)) {
-    int g= key;
-    if (it.simple) {
-      if (FT_Select_Charmap (face, FT_ENCODING_ADOBE_CUSTOM) != 0)
-        FT_Select_Charmap (face, FT_ENCODING_ADOBE_STANDARD);
-      g= (int) FT_Get_Char_Index (face, key);
-    }
-    char nm[128];
-    nm[0]= 0;
-    if (g > 0 && g < (int) face->num_glyphs &&
-        FT_Get_Glyph_Name (face, g, nm, sizeof (nm)) == 0)
-      r= ligature_letters (string (nm));
+mupdf_pdf_renderer_rep::glyph_name (pdf_font_item& it, int key, int fallback,
+                                    int& gid) {
+  gid= -1;
+  if (it.font == NULL) return "";
+  FT_Face face= (FT_Face) fz_font_ft_face (ctx, it.font);
+  if (face == NULL) return "";
+  int g= key, n= 0;
+  bool names= false;
+  fz_ft_lock (ctx);
+  names= FT_HAS_GLYPH_NAMES (face);
+  n= (int) face->num_glyphs;
+  if (it.simple) {
+    if (FT_Select_Charmap (face, FT_ENCODING_ADOBE_CUSTOM) != 0)
+      FT_Select_Charmap (face, FT_ENCODING_ADOBE_STANDARD);
+    g= (int) FT_Get_Char_Index (face, key);
+    if (g == 0) g= fallback;
   }
+  fz_ft_unlock (ctx);
+  if (!names || g <= 0 || g >= n) return "";
+  char nm[128];
+  nm[0]= 0;
+  fz_try (ctx) { fz_get_glyph_name (ctx, it.font, g, nm, sizeof (nm)); }
+  fz_catch (ctx) { nm[0]= 0; }
+  if (nm[0] == 0) return "";
+  gid= g;
+  return string (nm);
+}
+
+// The letters of the glyph a font draws for key, when it is a ligature;
+// fallback as in glyph_name, the same glyph write_fonts will name.
+string
+mupdf_pdf_renderer_rep::ligature_of (pdf_font_item& it, int key,
+                                     int fallback) {
+  if (it.lig->contains (key)) return it.lig [key];
+  int g;
+  string r= ligature_letters (glyph_name (it, key, fallback, g));
   it.lig (key)= r;
   return r;
 }
@@ -803,16 +859,8 @@ mupdf_pdf_renderer_rep::write_fonts () {
     pdf_font_item& it= font_list[k];
     if (it.t3) { write_type3 (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
-    FT_Face face= (FT_Face) fz_font_ft_face (ctx, it.font);
-    // The name of the glyph a code selects is asked of the font itself,
-    // through its built in ("Adobe custom") encoding: the index TeXmacs
-    // carries is its own and does not have to be FreeType's -- in the EC
-    // fonts it is the code while FreeType numbers the glyphs from the
-    // CharStrings, one less -- and a name taken from it would be the wrong
-    // glyph, or none when it falls outside the font.
-    if (face != NULL)
-      if (FT_Select_Charmap (face, FT_ENCODING_ADOBE_CUSTOM) != 0)
-        FT_Select_Charmap (face, FT_ENCODING_ADOBE_STANDARD);
+    // the names of the glyphs the codes select are asked of the font
+    // itself, see glyph_name
     int first= 256, last= -1;
     for (int c=0; c<256; c++)
       if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
@@ -827,17 +875,14 @@ mupdf_pdf_renderer_rep::write_fonts () {
     for (int c=0; c<256; c++) { ftgid << -1; gname << string (); }
     for (int c=first; c<=last; c++) {
       if (it.gid[c] < 0) continue;
-      char nm[128];
-      nm[0]= 0;
-      int g= (face == NULL) ? 0 : (int) FT_Get_Char_Index (face, c);
-      if (g == 0) g= it.gid[c];   // no built in encoding: trust TeXmacs
-      if (face != NULL && FT_HAS_GLYPH_NAMES (face) && g > 0 &&
-          g < (int) face->num_glyphs)
-        if (FT_Get_Glyph_Name (face, g, nm, sizeof (nm)) != 0) nm[0]= 0;
-      if (nm[0] == 0) continue;   // no name: the built in encoding stands
-      ftgid[c]= g; gname[c]= string (nm);
+      // with no built in encoding for the code, trust the index of TeXmacs
+      int g;
+      string nm= glyph_name (it, c, it.gid[c], g);
+      if (N(nm) == 0) continue;   // no name: the built in encoding stands
+      ftgid[c]= g; gname[c]= nm;
       if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
-      pdf_array_push_name (ctx, diff, nm);
+      c_string cnm (nm);
+      pdf_array_push_name (ctx, diff, cnm);
       prev= c;
     }
     pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
@@ -1234,21 +1279,229 @@ mupdf_pdf_renderer_rep::place_image (int num, double w, double h,
   select_alpha (alpha);
   string nm= "Im" * as_string (num);
   c_string cnm (nm);
-  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
-  double sx= w, sy= h, tx= to_x (x), ty= to_y (y);
-  if (xo != NULL && pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
-                                 PDF_NAME(Form))) {
-    // a form carries its own box: map that box onto the size asked for
-    fz_rect b= pdf_dict_get_rect (ctx, xo, PDF_NAME(BBox));
-    double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
-    if (bw > 0 && bh > 0) {
-      sx= w / bw; sy= h / bh;
-      tx -= b.x0 * sx; ty -= b.y0 * sy;
-    }
-    else { sx= sy= 1; }
+  double m[6];
+  xobject_fit (pdf_dict_gets (ctx, res_xobj, cnm), w, h, to_x (x), to_y (y), m);
+  fz_append_printf (ctx, contents, "q %g %g %g %g %g %g cm /%s Do Q\n",
+                    m[0], m[1], m[2], m[3], m[4], m[5], (const char*) cnm);
+}
+
+// The matrix which draws an XObject into the box of size w by h whose
+// lower left corner is at (x, y). An image is drawn in the unit square. A
+// form is drawn in its /BBox as its own /Matrix places it -- a page turned
+// by /Rotate comes with a matrix which turns it back -- so it is that
+// placed box which must be mapped onto the one asked for.
+void
+mupdf_pdf_renderer_rep::xobject_fit (pdf_obj* xo, double w, double h,
+                                     double x, double y, double m[6]) {
+  m[0]= w; m[1]= 0; m[2]= 0; m[3]= h; m[4]= x; m[5]= y;
+  if (xo == NULL ||
+      !pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
+                    PDF_NAME(Form))) return;
+  fz_rect b= pdf_dict_get_rect (ctx, xo, PDF_NAME(BBox));
+  fz_matrix fm= pdf_dict_get_matrix (ctx, xo, PDF_NAME(Matrix));
+  b= fz_transform_rect (b, fm);
+  double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+  if (bw <= 0 || bh <= 0) { m[0]= m[3]= 1; return; }
+  m[0]= w / bw; m[3]= h / bh;
+  m[4]= x - b.x0 * m[0];
+  m[5]= y - b.y0 * m[3];
+}
+
+// A tiling pattern of the XObject img, the cell w by h in the pixels of
+// the renderer, the lattice anchored at (ax, ay). A pattern lives in the
+// default space of the page, not in the space of the stream where it is
+// used, so its matrix carries the scaling to points which begin_page
+// gives the stream.
+int
+mupdf_pdf_renderer_rep::tiling_pattern (int img, double w, double h,
+                                        double ax, double ay) {
+  string key= as_string (img) * ":" * as_string (w) * ":" * as_string (h)
+              * ":" * as_string (ax) * ":" * as_string (ay);
+  if (pattern_pool->contains (key)) return pattern_pool (key);
+  string inm= "Im" * as_string (img);
+  c_string cinm (inm);
+  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cinm);
+  if (xo == NULL) return -1;
+  int num= -1;
+  fz_buffer* buf= NULL;
+  pdf_obj* dict= NULL;
+  fz_var (buf); fz_var (dict); fz_var (num);
+  fz_try (ctx) {
+    double m[6];
+    xobject_fit (xo, w, h, 0, 0, m);
+    buf= fz_new_buffer (ctx, 128);
+    fz_append_printf (ctx, buf, "q %g %g %g %g %g %g cm /%s Do Q\n",
+                      m[0], m[1], m[2], m[3], m[4], m[5], (const char*) cinm);
+    dict= pdf_new_dict (ctx, doc, 9);
+    pdf_dict_put (ctx, dict, PDF_NAME(Type), PDF_NAME(Pattern));
+    pdf_dict_put_int (ctx, dict, PDF_NAME(PatternType), 1);
+    pdf_dict_put_int (ctx, dict, PDF_NAME(PaintType), 1);   // coloured
+    pdf_dict_put_int (ctx, dict, PDF_NAME(TilingType), 1);  // constant spacing
+    pdf_dict_put_rect (ctx, dict, PDF_NAME(BBox), fz_make_rect (0, 0, w, h));
+    pdf_dict_put_real (ctx, dict, PDF_NAME(XStep), w);
+    pdf_dict_put_real (ctx, dict, PDF_NAME(YStep), h);
+    double f= (double) default_dpi / dpi;
+    pdf_dict_put_matrix (ctx, dict, PDF_NAME(Matrix),
+                         fz_make_matrix (f, 0, 0, f, f * ax, f * ay));
+    pdf_obj* res= pdf_dict_put_dict (ctx, dict, PDF_NAME(Resources), 1);
+    pdf_obj* xres= pdf_dict_put_dict (ctx, res, PDF_NAME(XObject), 1);
+    pdf_dict_puts (ctx, xres, cinm, xo);
+    pdf_obj* ref= pdf_add_stream (ctx, doc, buf, dict, 0);
+    num= n_pat++;
+    string pnm= "P" * as_string (num);
+    c_string cpnm (pnm);
+    pdf_dict_puts_drop (ctx, res_pat, cpnm, ref);
   }
-  fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
-                    sx, sy, tx, ty, (const char*) cnm);
+  fz_always (ctx) {
+    fz_drop_buffer (ctx, buf);
+    pdf_drop_obj (ctx, dict);
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not make a pattern: "
+                    << fz_caught_message (ctx) << LF;
+    num= -1;
+  }
+  pattern_pool (key)= num;
+  return num;
+}
+
+// Can this tile go into a tiling pattern and be drawn by every reader as
+// it is drawn outside one? Not when it has transparency: Ghostscript 10
+// draws an image with a soft mask differently inside a tiling pattern
+// than as the same image placed tile by tile (46% of the pixels alike on
+// a photo tile, where MuPDF agrees with itself at 97.6%), and printing
+// often goes through Ghostscript. An opaque image, or a form with nothing
+// transparent in it, is safe; anything else is drawn tile by tile.
+static bool
+transparent_state (fz_context* ctx, pdf_obj* g) {
+  pdf_obj* sm= pdf_dict_get (ctx, g, PDF_NAME(SMask));
+  if (sm != NULL && !pdf_name_eq (ctx, sm, PDF_NAME(None))) return true;
+  if (pdf_dict_get (ctx, g, PDF_NAME(ca)) != NULL &&
+      pdf_dict_get_real (ctx, g, PDF_NAME(ca)) < 1) return true;
+  if (pdf_dict_get (ctx, g, PDF_NAME(CA)) != NULL &&
+      pdf_dict_get_real (ctx, g, PDF_NAME(CA)) < 1) return true;
+  pdf_obj* bm= pdf_dict_get (ctx, g, PDF_NAME(BM));
+  if (bm != NULL && pdf_is_name (ctx, bm)) {
+    const char* b= pdf_to_name (ctx, bm);
+    if (strcmp (b, "Normal") != 0 && strcmp (b, "Compatible") != 0) return true;
+  }
+  return false;
+}
+
+static bool
+transparent_xobject (fz_context* ctx, pdf_obj* xo, int depth) {
+  if (xo == NULL || depth > 8) return true;
+  if (pdf_dict_get (ctx, xo, PDF_NAME(SMask)) != NULL) return true;
+  if (!pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
+                    PDF_NAME(Form))) return false;
+  if (pdf_dict_get (ctx, xo, PDF_NAME(Group)) != NULL) return true;
+  pdf_obj* res= pdf_dict_get (ctx, xo, PDF_NAME(Resources));
+  pdf_obj* gs= pdf_dict_get (ctx, res, PDF_NAME(ExtGState));
+  for (int i=0; i<pdf_dict_len (ctx, gs); i++)
+    if (transparent_state (ctx, pdf_dict_get_val (ctx, gs, i))) return true;
+  pdf_obj* xs= pdf_dict_get (ctx, res, PDF_NAME(XObject));
+  for (int i=0; i<pdf_dict_len (ctx, xs); i++)
+    if (transparent_xobject (ctx, pdf_dict_get_val (ctx, xs, i), depth + 1))
+      return true;
+  return false;
+}
+
+bool
+mupdf_pdf_renderer_rep::opaque_tile (int img) {
+  string nm= "Im" * as_string (img);
+  c_string cnm (nm);
+  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
+  bool r= false;
+  fz_try (ctx) { r= (xo != NULL) && !transparent_xobject (ctx, xo, 0); }
+  fz_catch (ctx) { r= false; }
+  return r;
+}
+
+// A pattern background, as one fill with a tiling pattern instead of a
+// Do for every tile (renderer_rep::clear_pattern draws the tiles one by
+// one, which is right for a screen and five hundred operators on a page).
+// The size of the tile and the anchor of the lattice are computed exactly
+// as renderer_rep::clear_pattern computes them, so that the two draw the
+// same thing; under a transformation of the graphics the pattern would
+// have to follow it, and there the tiles are left to the generic code.
+void
+mupdf_pdf_renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
+                                       SI x1, SI y1, SI x2, SI y2) {
+  brush b= get_background ();
+  if (contents == NULL || transform_level > 0 ||
+      b->get_type () != brush_pattern || !is_func (b->get_pattern (), _PATTERN)) {
+    renderer_rep::clear_pattern (mx1, my1, mx2, my2, x1, y1, x2, y2);
+    return;
+  }
+  tree pattern= b->get_pattern ();
+  int pattern_alpha= b->get_alpha ();
+  outer_round (x1, y1, x2, y2);
+  // -- as in renderer_rep::clear_pattern ---------------------------------
+  url u= b->get_pattern_url ();
+  int imw_pt, imh_pt;
+  image_size (u, imw_pt, imh_pt);
+  double pt= ((double) 600*PIXEL) / 72.0;
+  SI imw= (SI) (((double) imw_pt) * pt);
+  SI imh= (SI) (((double) imh_pt) * pt);
+  double ratio= ((double) max (imw_pt, 1)) / ((double) max (imh_pt, 1));
+  bool flag= false;
+  SI w= mx2 - mx1, h= my2 - my1;
+  if (pattern[1] == "") w= imw;
+  else if (is_int (pattern[1])) w= as_int (pattern[1]);
+  else if (is_percentage (pattern[1]))
+    w= (SI) (as_percentage (pattern[1]) * ((double) w));
+  else flag= true;
+  if (pattern[1] == "") h= imh;
+  else if (is_int (pattern[2])) h= as_int (pattern[2]);
+  else if (is_percentage (pattern[2]))
+    h= (SI) (as_percentage (pattern[2]) * ((double) h));
+  else if (is_percentage (pattern[2], "@"))
+    h= (SI) (as_percentage (pattern[2]) * ((double) w) / ratio);
+  if (flag && is_percentage (pattern[1], "@"))
+    w= (SI) (as_percentage (pattern[1]) * ((double) h) * ratio);
+  w= ((w + pixel - 1) / pixel) * pixel;
+  h= ((h + pixel - 1) / pixel) * pixel;
+  tree eff= "";
+  if (N(pattern) == 4 && is_compound (pattern[3])) eff= pattern[3];
+  // -----------------------------------------------------------------------
+  if (w <= 0 || h <= 0) return;
+  // the tile: the file itself, or the picture its effect makes of it
+  int img= -1;
+  if (eff == tree ("")) img= embed_image (u);
+  else {
+    picture pic= cached_load_picture (u, w/pixel, h/pixel, eff, pixel, false);
+    picture p2= as_mupdf_picture (pic);
+    mupdf_picture_rep* rep= (mupdf_picture_rep*) p2->get_handle ();
+    if (rep != NULL && rep->pix != NULL) {
+      fz_image* fim= NULL;
+      fz_try (ctx) {
+        fim= mupdf_image_from_pixmap (rep->pix);
+        img= name_xobject (pdf_add_image (ctx, doc, fim));
+      }
+      fz_always (ctx) { fz_drop_image (ctx, fim); }
+      fz_catch (ctx) { img= -1; }
+    }
+  }
+  // a transparent tile, or a pattern drawn with an alpha of its own, is
+  // left to be drawn tile by tile (see opaque_tile)
+  if (img >= 0 && (pattern_alpha < 255 || !opaque_tile (img))) img= -1;
+  // the tiles meet at mx1 across and at my2 down (sx= -mx1, sy= -my2)
+  int pat= (img < 0) ? -1 :
+    tiling_pattern (img, ((double) w) / pixel, ((double) h) / pixel,
+                    to_x (mx1), to_y (my2));
+  if (pat < 0) {
+    renderer_rep::clear_pattern (mx1, my1, mx2, my2, x1, y1, x2, y2);
+    return;
+  }
+  end_text ();
+  // all of it inside q ... Q: the colour space, the pattern and the alpha
+  // are gone afterwards and what we track still holds
+  put ("q\n");
+  if (pattern_alpha < 255)
+    fz_append_printf (ctx, contents, "/GS%d gs\n", alpha_state (pattern_alpha));
+  fz_append_printf (ctx, contents, "/Pattern cs /P%d scn %g %g %g %g re f\nQ\n",
+                    pat, to_x (x1), to_y (y1),
+                    to_x (x2) - to_x (x1), to_y (y2) - to_y (y1));
 }
 
 void
