@@ -141,7 +141,8 @@
     (padded
       (text (string-append (if merging? "Merge commit on branch "
                                "Commit on branch ")
-                           (utf8->cork branch) " in " (url->system root)))
+                           (utf8->cork branch) " in "
+                           (utf8->cork (url->system root))))
       (if merging?
           (text "A merge commit contains all changes: keep all files selected"))
       ===
@@ -226,11 +227,13 @@
          (behind (or (git-status-ref st 'behind) 0)))
     (cond ((not up) "")
           ((and (== ahead 0) (== behind 0)) "up to date")
-          (else (string-append
-                 (if (> ahead 0) (string-append (number->string ahead)
-                                                " to send ") "")
-                 (if (> behind 0) (string-append (number->string behind)
-                                                 " to get") ""))))))
+          (else (string-recompose
+                 (append
+                  (if (> ahead 0) (list (string-append (number->string ahead)
+                                                       " to send")) '())
+                  (if (> behind 0) (list (string-append (number->string behind)
+                                                        " to get")) '()))
+                 ", ")))))
 
 (define (tool-sections root simple?)
   ;; List of (title entries) for the changes tab
@@ -259,7 +262,7 @@
       (if (== section "Conflicts")
           (if tm?
               ("Resolve" (begin (load-buffer u) (git-resolve-conflict u))))
-          ("Resolved" (git-mark-resolved u)))
+          ("Mark resolved" (git-mark-resolved u)))
       (if (and (in? section '("Changed" "Changes")) tm? (url-exists? u)
                (not (git-entry-untracked? e)))
           ("Compare" (git-compare-with u "HEAD")))
@@ -393,7 +396,7 @@
          (simple? (git-simple-mode?))
          (busy? (and root (git-busy? root)))
          (remote? (and root (nnull? (git-remotes root)) (not busy?)))
-         (branch (if root (or (git-current-branch root) "(no branch)") ""))
+         (branch (if root (or (git-current-branch root) "(detached)") ""))
          (sync (cond ((not root) "")
                      (busy? "working...")
                      (else (tool-sync-text root)))))
@@ -552,7 +555,8 @@
   (:interactive #t)
   (git-message-dialog
    "Commit this file" (string-append "Describe the changes to "
-                                     (url->system (url-tail name)))
+                                     (utf8->cork (url->system
+                                                  (url-tail name))))
    (list (list "Sign the commit" (git-signing?)))
    (lambda (msg flags)
      (if (empty? msg) "Please describe the changes"
@@ -652,8 +656,9 @@
                             (get-preference "versioning tool"))
               "15em"))
       (item (text "Mode:")
-        (enum (set-preference "git simple mode"
-                              (value-of-pretty mode-names answer))
+        (enum (begin (set-preference "git simple mode"
+                                     (value-of-pretty mode-names answer))
+                     (set-preference "git mode chosen" "on"))
               (map cdr mode-names)
               (pretty-value mode-names (get-preference "git simple mode"))
               "15em"))
@@ -703,11 +708,15 @@
     ======
     (explicit-buttons
       ("Simple: save snapshots and synchronize with coauthors"
-       (begin (set-preference "git simple mode" "on") (quit) (cont))))
+       (begin (set-preference "git simple mode" "on")
+              (set-preference "git mode chosen" "on")
+              (quit) (cont))))
     ===
     (explicit-buttons
       ("Full: staging, branches and remotes (for Git users)"
-       (begin (set-preference "git simple mode" "off") (quit) (cont))))
+       (begin (set-preference "git simple mode" "off")
+              (set-preference "git mode chosen" "on")
+              (quit) (cont))))
     ======
     (text "You may change this later in the Git preferences.")))
 
@@ -716,9 +725,7 @@
   (if (or (== (get-preference "git mode chosen") "on")
           (headless?) (not (current-window)))
       (cont)
-      (begin
-        (set-preference "git mode chosen" "on")
-        (dialogue-window (git-mode-widget cont) noop "Git"))))
+      (dialogue-window (git-mode-widget cont) noop "Git")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Explaining failures
@@ -744,7 +751,11 @@
    (list '("would be overwritten")
          (string-append "Some of your changes would be overwritten. Save "
                         "them in a snapshot or a commit first.")
-         "Save snapshot..." (lambda (root) (git-interactive-save-snapshot root)))
+         "Save them..."
+         (lambda (root)
+           (if (git-simple-mode?)
+               (git-interactive-save-snapshot root)
+               (git-interactive-commit root))))
    (list '("CONFLICT" "Automatic merge failed" "unmerged files")
          "Some parts were changed on both sides. Resolve the conflicts first."
          "Show status" (lambda (root) (git-show-status root)))
@@ -758,16 +769,16 @@
                      (list-or (map (cut string-contains? msg <>) (car x)))))
         (list '() "Git could not complete this operation." #f #f))))
 
-(tm-widget ((git-failure-widget what explanation msg label action) quit)
+(tm-widget ((git-failure-widget root explanation msg label action) quit)
   (padded
-    (bold (text (string-append what " failed")))
+    (bold (text "Git could not complete the operation"))
     ===
     (text explanation)
     ===
     (hlist (text msg) >>)
     ======
     (bottom-buttons
-      ("Details" (begin (quit) (git-show-output)))
+      ("Details" (begin (quit) (when root (git-show-output root))))
       >>
       (if label
           ((eval label) (begin (quit) (action))))
@@ -780,10 +791,10 @@
          (x (explain-failure ret))
          (label (third x))
          (action (and (fourth x) root (lambda () ((fourth x) root)))))
-    (dialogue-window (git-failure-widget what (second x)
+    (dialogue-window (git-failure-widget root (second x)
                                          (utf8->cork (git-message ret))
                                          (and action label) action)
-                     noop (string-append "Git: " what))))
+                     noop "Git")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reviewing differences and conflicts
@@ -828,10 +839,11 @@
           ("Previous" (review-do version-previous-difference))
           ("Next" (review-do version-next-difference))
           // // (text "Keep:")
-          ((eval (if conflict? "Mine" "Old"))
-           (review-do (lambda () (version-retain 0))))
-          ((eval (if conflict? "Theirs" "New"))
-           (review-do (lambda () (version-retain 1))))
+          (when i
+            ((eval (if conflict? "Mine" "Old"))
+             (review-do (lambda () (version-retain 0))))
+            ((eval (if conflict? "Theirs" "New"))
+             (review-do (lambda () (version-retain 1)))))
           // // (text "Show:")
           ("Both" (review-do (lambda () (version-show 'version-both))))
           ((eval (if conflict? "Mine" "Old"))
@@ -840,9 +852,7 @@
            (review-do (lambda () (version-show 'version-new)))))
       >>
       (if conflict?
-          ("Mark as resolved"
-           (git-mark-resolved u)
-           (refresh-now "version-review")))
+          ("Mark as resolved" (git-mark-resolved u)))
       // //
       ("Close" (tool-close :transient-bottom 'version-review-tool #f win)))))
 
@@ -879,7 +889,7 @@
           (form-input "repository" "string" (list "") "30em"))
         (item (text "Into directory:")
           (form-input "directory" "string"
-                      (list (clone-default-directory)) "30em")))
+                      (list (utf8->cork (clone-default-directory))) "30em")))
       ===
       (bottom-buttons
         >>

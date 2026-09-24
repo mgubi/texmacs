@@ -137,8 +137,12 @@
     (open-git-preferences)
     (check "preferences dialog" #t)
     (set-preference "git mode chosen" "off")
-    (git-with-mode noop)
-    (check "mode dialog" (== (get-preference "git mode chosen") "on"))
+    (with called? #f
+      (git-with-mode (lambda () (set! called? #t)))
+      (check "mode asked before continuing" (not called?))
+      (check "mode not chosen until answered"
+             (== (get-preference "git mode chosen") "off")))
+    (set-preference "git mode chosen" "on")
     (check "style package for pages"
            (url-exists? (url-resolve "$TEXMACS_PATH/packages/miscellaneous/git-pages.ts" "r")))
     (check "status page uses buttons"

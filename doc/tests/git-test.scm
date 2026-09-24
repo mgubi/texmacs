@@ -338,6 +338,38 @@
                                      (url->system b)) 1)
               (string-contains? (string-load a) "<<<<<<<"))))
 
+;; Robustness (audit B2, B5, B6, B9, C1)
+(git-run R "branch" "topic/with-slash")
+(check "revision of a branch with a slash"
+       (git-rev-parse R "topic/with-slash^{commit}"))
+(with big (file "big.txt")
+  (string-save (apply string-append (map (lambda (i) "line\n") (.. 0 500))) big)
+  (git-stage big)
+  (git-commit-staged R "big change")
+  (with page (tmfs-load (tmfs-url-commit R (git-rev-parse R "HEAD")))
+    (check "diff bars are scaled"
+           (not (string-contains? page (make-string 41 #\+))))))
+(git-add-remote R "up/stream" "/nowhere/a.git")
+(git-add-remote R "origin" "/nowhere/b.git")
+(git-run R "config" "branch.main.remote" "up/stream")
+(git-invalidate R)
+(check "push remote from the configuration"
+       (== (git-push-remote R) "up/stream"))
+(git-run R "remote" "remove" "up/stream")
+(git-run R "remote" "remove" "origin")
+(git-run R "config" "status.showUntrackedFiles" "no")
+(string-save "x\n" (file "not-listed.txt"))
+(git-invalidate R)
+(check "untracked files not listed when configured so"
+       (not (list-find (git-status-entries R)
+                       (lambda (e) (== (git-entry-path e) "not-listed.txt")))))
+(check "untracked file still known" (== (git-file-state (file "not-listed.txt"))
+                                        'untracked))
+(git-run R "config" "--unset" "status.showUntrackedFiles")
+(system-remove (file "not-listed.txt"))
+(check "no Git for web documents"
+       (not (git-root (string->url "https://www.texmacs.org/doc.tm"))))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

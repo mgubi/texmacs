@@ -17,7 +17,7 @@
         (version git-widgets)))
 
 (texmacs-modes
-  (in-git-document% (git-directory? (current-buffer)) with-versioning-tool%))
+  (in-git-document% (git-context? (current-buffer)) with-versioning-tool%))
 
 (kbd-map
   (:mode in-git-document?)

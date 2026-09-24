@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <signal.h>
+#include <errno.h>
 
 int
 unix_system (string s) {
@@ -176,6 +177,7 @@ _background_read_task (void* channel_as_void_ptr) {
   do {
     m= read (fd, b, n);
     // cout << "read " << m << " bytes from " << fd << "\n";
+    if (m < 0 && errno == EINTR) { m= 1; continue; }
     if (m > 0) c->data.append (b, m);
     if (m == 0) { if (close (fd) != 0) c->status= -1; }
   } while (m > 0);
@@ -353,6 +355,7 @@ unix_system (array<string> arg,
 
 struct unix_process_rep {
   pid_t     pid;
+  int       killed;
   bool      exited;
   int       status;
   bool      has_in, has_out, has_err;
@@ -395,12 +398,17 @@ unix_system_start (array<string> arg, string input) {
   ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[5], 2) == 0;
   for (int i= 0; i < 6; i++)
     ok= ok && posix_spawn_file_actions_addclose (&file_actions.rep, fd[i]) == 0;
-  // run the command in its own process group, so that it can be killed
-  // together with the processes that it starts
+  // run the command in a new session (or at least process group), so
+  // that it can be killed together with the processes that it starts;
+  // without controlling terminal, it cannot be stopped by prompts (SIGTTIN)
   _spawnattr_t attr;
   ok= ok && attr.status () == 0;
+#ifdef POSIX_SPAWN_SETSID
+  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETSID) == 0;
+#else
   ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETPGROUP) == 0;
   ok= ok && posix_spawnattr_setpgroup (&attr.rep, 0) == 0;
+#endif
   if (!ok) { _close_fds (fd, 6); return NULL; }
 
   array<char*> _arg;
@@ -424,6 +432,7 @@ unix_system_start (array<string> arg, string input) {
   // the threads close the remaining file descriptors when they are done
   unix_process_rep* rep= tm_new<unix_process_rep> ();
   rep->pid= pid;
+  rep->killed= 0;
   rep->exited= false;
   rep->status= 0;
   rep->has_in= N(input) > 0;
@@ -480,9 +489,13 @@ unix_system_finished (unix_process_rep* rep,
 
 void
 unix_system_kill (unix_process_rep* rep) {
-  // Terminate the process and the processes which it started
-  if (!rep->exited) kill (-rep->pid, SIGTERM);
-  else kill (-rep->pid, SIGKILL);
+  // Terminate the process and the processes which it started; they are
+  // woken up in case they were stopped, and killed at the second attempt.
+  // NOTE: once the process has been reaped, its pid may be reused
+  if (rep->exited) return;
+  rep->killed++;
+  kill (-rep->pid, rep->killed > 1 ? SIGKILL : SIGTERM);
+  kill (-rep->pid, SIGCONT);
 }
 
 #else
