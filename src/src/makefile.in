@@ -142,6 +142,7 @@ pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
 mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
+mupdf_c_src  := $(call findc_in,Plugins,@CONFIG_MUPDF@)
 sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
 vue_src    	 := $(call findsrc_in,Plugins,@CONFIG_VUE@)
 vue_c_src    := clay.c
@@ -339,6 +340,7 @@ pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
 gnutls_obj   := $(call makeobj,$(gnutls_src))
 mupdf_obj    := $(call makeobj,$(mupdf_src))
+mupdf_c_obj  := $(call makeobj_c,$(mupdf_c_src))
 sdl_obj      := $(call makeobj,$(sdl_src))
 vue_obj      := $(call makeobj,$(vue_src))
 vue_c_obj    := $(call makeobj_c,$(vue_c_src))
@@ -426,6 +428,8 @@ $(freetype_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
 $(mupdf_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(mupdf_incl) $(CXXFREETYPE) $(CXXMUPDF))
+$(mupdf_c_obj): Objects/%.o: %.c
+	$(call cc_flags,-I./Plugins/MuPDF $(CXXFREETYPE) $(CXXMUPDF))
 $(sdl_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(sdl_incl) $(CXXMUPDF) $(CXXSDL))
 $(vue_obj): Objects/%.o: %.cpp
@@ -497,7 +501,7 @@ uses_texmacs  := $(texmacs_obj)
 uses_pdf      := $(pdf_obj)
 uses_freetype := $(freetype_obj)
 uses_gnutls   := $(gnutls_obj)
-uses_mupdf    := $(mupdf_obj)
+uses_mupdf    := $(mupdf_obj) $(mupdf_c_obj)
 uses_sdl      := $(sdl_obj)
 uses_vue      := $(vue_obj) $(vue_c_obj)
 #"uses_windowsres" is defined above

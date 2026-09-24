@@ -6,8 +6,10 @@ for the screen, the question is whether MuPDF can write the document too,
 and whether the result would be *almost the same* — in particular whether
 the fonts would still be subsetted.
 
-The answer, measured rather than guessed, is: **the page contents yes, the
-subsetting of the Type 1 fonts no**. A working prototype is in
+The answer, measured rather than guessed, is **yes for the page contents
+and for the fonts, once the Type 1 subsetter of pdfTeX is brought in** --
+MuPDF has none, and every TeX font is a Type 1. A working prototype is
+in
 [`src/Plugins/MuPDF/mupdf_pdf_renderer.cpp`](../src/Plugins/MuPDF/mupdf_pdf_renderer.cpp);
 what follows is what it took and what is still missing.
 
@@ -91,8 +93,59 @@ Ghostscript now reads the output with no complaint and no substitution,
 and its rendering of the page agrees with MuPDF's own to 97.9 % of pixels
 within 32 levels — that is, the TeX font really is being used.
 
-The second defect stands: a simple Type 1 is not subsetted either (89,761
-bytes before `pdf_subset_fonts`, 89,143 after).
+MuPDF still does not subset it: a simple Type 1 comes out of
+`pdf_subset_fonts` as it went in (89,761 bytes before, 89,143 after). That
+is what `mupdf_writet1.c` is for.
+
+## The subsetter
+
+`mupdf_writet1.c` is **pdfTeX's `writet1.c`** (`texk/web2c/pdftexdir/`),
+vendored as it is there, with its copyright and under the GPL it already
+carried. It is the subsetter which has been cutting these very fonts down
+for twenty years: it decrypts the eexec section, reads the `Subrs` and the
+`CharStrings`, interprets the charstrings to find which subroutines and
+which accented components each glyph depends on (`callsubr`,
+`callothersubr`, `seac`), throws the rest away and encrypts what is left
+again.
+
+Around it, `mupdf_type1.c` supplies what pdfTeX supplied: memory, the file
+to read, the buffer to write, the ordered sets `writet1.c` calls AVL trees
+(a sorted array does for a few hundred glyphs), and a `pdftex_fail` which
+unwinds with `longjmp` instead of ending the process. The one entry point
+is
+
+    unsigned char* mupdf_t1_subset (path, names, n, &size,
+                                    &len1, &len2, &len3, &psname, &err);
+
+`mupdf_writet1.h` declares what the vendored file expects, and copies the
+buffer macros of `ptexmac.h` verbatim so that it keeps behaving as it does
+upstream. Keeping the file unchanged is deliberate: it stays comparable
+with its original, and a fix upstream can be taken over by hand.
+
+On `ecrm10.pfb`, 91,799 bytes for the whole font and **8,571** for a subset
+of six glyphs.
+
+The renderer calls it from `write_fonts`, once the codes in use are known,
+and replaces the `/FontFile` stream `pdf_add_simple_font` had written,
+together with the three lengths and the name -- which now carries the
+six-letter tag that says a font is a subset.
+
+### Two more bugs worth remembering
+
+* **The glyph name comes from the font, not from the index.** The index
+  TeXmacs carries in `gl->index` is its own: in the EC fonts FreeType
+  numbers the glyphs from the `CharStrings`, one less than the code, and
+  for some fonts the index falls outside the font altogether. The name of
+  the glyph a code selects is therefore asked of the font's own encoding
+  (`FT_ENCODING_ADOBE_CUSTOM`, `FT_Get_Char_Index`, `FT_Get_Glyph_Name`).
+  With the index, half the `/Differences` array was missing and the page
+  came out right only because the reader fell back to StandardEncoding.
+* **One file, one entry.** Several TeXmacs fonts share a program -- the
+  sizes of a TeX font, and the chunks of one font -- and
+  `pdf_add_simple_font` hands the same PDF object back for it. They must
+  share one entry in the renderer as well, keyed on the file: with one
+  entry each, the encoding written for one of them undid the encoding of
+  the next, and the letters only that one used disappeared from the text.
 
 For comparison, PDFHummus converts Type 1 to CFF and subsets it: in a real
 export the embedded font streams are **303 and 1182 bytes**
@@ -137,12 +190,26 @@ within 32 levels**, with the title, the rule, the bullets, the blue links,
 the image and the small-caps TeX logo all in place, and whose text
 extracts correctly (`THE GNU TEXMACS MANUAL`, `Getting started`).
 
-Ghostscript reads it without a complaint. What is left is the size: **253
-KB against the 54–60 KB** of the reference (two runs of the same export
-through PostScript and Ghostscript). The three OpenType fonts in the page
-are subsetted and carry the usual tags (`BWWMJR+Fira Sans Bold` and so
-on); the one Type 1 is embedded whole. That single number is what is left
-of the question.
+Ghostscript reads it without a complaint, and its rendering agrees with
+MuPDF's own to 97.9 % of pixels within 32 levels -- that is, the TeX font
+really is being used.
+
+On six pages of `tag-help.en.tm`, with four Type 1 fonts and five
+OpenType ones:
+
+| | whole fonts | with the subsetter | reference |
+|---|---|---|---|
+| the file | 784 KB | **519 KB** | 194 KB |
+| embedded font programs | 432 KB | **167 KB** | — |
+| └ the four Type 1 | 315 KB | **49 KB** | — |
+| └ the five OpenType | 118 KB | 118 KB | — |
+
+Ghostscript reads all six pages with no complaint and no substitution, the
+text extracts correctly, and the two renderings agree to 92–99 % of pixels
+(the rest is Ghostscript's heavier stems, not different content).
+
+What is left of the gap is the OpenType half: MuPDF's own subsetter keeps
+118 KB where Ghostscript keeps far less.
 
 Note that the reference is *not* PDFHummus: this build has `PDF_RENDERER`
 undefined, so the Hummus renderer is not compiled at all and the normal
@@ -189,10 +256,11 @@ choice, since it shares the coordinates and the sizes with Hummus.
 
 ## What it would take to finish
 
-1. A Type 1 → CFF converter and a CFF subsetter, or a Type 1 subsetter
-   (charstring level). Without one of those the output grows by several
-   hundred kilobytes per document. This is the bulk of the work, and it is
-   exactly the part of PDFHummus which is not replaced by MuPDF.
+1. ~~A Type 1 subsetter.~~ Done: pdfTeX's `writet1.c`, see above.
+1. The OpenType half: MuPDF's `pdf_subset_fonts` keeps 118 KB of the five
+   OpenType fonts of the six page document where Ghostscript keeps much
+   less. Worth measuring against `mutool clean -S` on its own before
+   deciding whether it is ours to fix or Artifex's.
 2. A Type 3 font writer for the bitmap fonts.
 3. Patterns, the outline tree, the destination tree, attachments.
 

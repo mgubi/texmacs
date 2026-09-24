@@ -40,6 +40,9 @@
 #include <mupdf/pdf.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+extern "C" {
+#include "mupdf_writet1.h"
+}
 
 extern url tt_font_find (string name); // font_select.cpp
 
@@ -78,7 +81,8 @@ struct pdf_font_item {
   pdf_obj* obj;        // the font dictionary
   int      num;        // /F<num> in the resources
   bool     simple;
-  array<int> gid;      // 256 entries: the glyph each code selects, -1 if free
+  string   path;       // the file the program was read from (for subsetting)
+  array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
   pdf_font_item () : font (NULL), obj (NULL), num (0), simple (false) {}
 };
 
@@ -118,7 +122,8 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   double cur_size, text_x, text_y;
 
   array<pdf_font_item> font_list;
-  hashmap<string,int>  font_index;
+  hashmap<string,int>  font_index;   // by the res_name of the TeXmacs font
+  hashmap<string,int>  font_by_file; // by the file the program comes from
   hashmap<int,int>     alpha_gs;   // alpha -> the number of its ExtGState
   int                  n_alpha, n_xobj;
 
@@ -140,6 +145,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void select_alpha (int a);
   int  get_font (font_glyphs fn);
   void write_fonts ();
+  void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_links (pdf_obj* pobj);
   void write_metadata ();
@@ -205,7 +211,8 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     cur_fill (0), cur_stroke (0), has_fill (false), has_stroke (false),
     cur_width (-1), cur_alpha (255),
     in_text (false), cur_font (-1), cur_size (0), text_x (0), text_y (0),
-    font_index (-1), alpha_gs (-1), n_alpha (0), n_xobj (0)
+    font_index (-1), font_by_file (-1), alpha_gs (-1),
+    n_alpha (0), n_xobj (0)
 {
   width = default_dpi * paper_w / 2.54;
   height= default_dpi * paper_h / 2.54;
@@ -516,6 +523,17 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn) {
   int pos= search_forwards (":", name);
   string fname= (pos == -1 ? name : name (0, pos));
   url u= tt_font_find (fname);
+  // Several TeXmacs fonts share a file -- the sizes of a TeX font are one
+  // program each, and its chunks are the same program again -- and MuPDF
+  // hands the same PDF object back for it. They must therefore share one
+  // entry here as well, or the encoding one of them writes would undo the
+  // encoding of the next.
+  string key= is_none (u) ? string ("") : string (concretize (u));
+  if (N(key) > 0 && font_by_file->contains (key)) {
+    int k= font_by_file (key);
+    font_index (name)= k;
+    return k;
+  }
   pdf_font_item it;
   it.num= N(font_list);
   if (!is_none (u)) {
@@ -528,6 +546,7 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn) {
   }
   if (it.font != NULL) {
     it.simple= is_type1_file (u);
+    it.path= concretize (u);
     fz_try (ctx) {
       if (it.simple) {
         // pdf_add_simple_font embeds the program and writes a descriptor;
@@ -554,6 +573,7 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn) {
                     << " is drawn as bitmaps" << LF;
   font_list << it;
   font_index (name)= it.num;
+  if (N(key) > 0) font_by_file (key)= it.num;
   return it.num;
 }
 
@@ -620,6 +640,15 @@ mupdf_pdf_renderer_rep::write_fonts () {
     pdf_font_item& it= font_list[k];
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
     FT_Face face= (FT_Face) fz_font_ft_face (ctx, it.font);
+    // The name of the glyph a code selects is asked of the font itself,
+    // through its built in ("Adobe custom") encoding: the index TeXmacs
+    // carries is its own and does not have to be FreeType's -- in the EC
+    // fonts it is the code while FreeType numbers the glyphs from the
+    // CharStrings, one less -- and a name taken from it would be the wrong
+    // glyph, or none when it falls outside the font.
+    if (face != NULL)
+      if (FT_Select_Charmap (face, FT_ENCODING_ADOBE_CUSTOM) != 0)
+        FT_Select_Charmap (face, FT_ENCODING_ADOBE_STANDARD);
     int first= 256, last= -1;
     for (int c=0; c<256; c++)
       if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
@@ -629,30 +658,95 @@ mupdf_pdf_renderer_rep::write_fonts () {
     pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
     pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
     int prev= -2;
+    array<int> ftgid;    // what FreeType calls the glyph of each code
+    array<string> gname;
+    for (int c=0; c<256; c++) { ftgid << -1; gname << string (); }
     for (int c=first; c<=last; c++) {
       if (it.gid[c] < 0) continue;
       char nm[128];
       nm[0]= 0;
-      if (face != NULL && FT_HAS_GLYPH_NAMES (face))
-        if (FT_Get_Glyph_Name (face, it.gid[c], nm, sizeof (nm)) != 0) nm[0]= 0;
+      int g= (face == NULL) ? 0 : (int) FT_Get_Char_Index (face, c);
+      if (g == 0) g= it.gid[c];   // no built in encoding: trust TeXmacs
+      if (face != NULL && FT_HAS_GLYPH_NAMES (face) && g > 0 &&
+          g < (int) face->num_glyphs)
+        if (FT_Get_Glyph_Name (face, g, nm, sizeof (nm)) != 0) nm[0]= 0;
       if (nm[0] == 0) continue;   // no name: the built in encoding stands
+      ftgid[c]= g; gname[c]= string (nm);
       if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
       pdf_array_push_name (ctx, diff, nm);
       prev= c;
     }
     pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
                        pdf_add_object_drop (ctx, doc, enc));
+    // The font program, cut down to the glyphs which are used. MuPDF
+    // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
+    // eighty kilobytes for a handful of letters; mupdf_t1_subset is
+    // pdfTeX's writet1.c, which knows how to do it.
+    array<string> keep;
+    for (int c=first; c<=last; c++)
+      if (N(gname[c]) > 0) keep << gname[c];
+    if (N(keep) > 0) subset_type1 (it, keep);
     // /Widths, in thousandths of the size
     pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
     pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
     pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths), last-first+1);
     for (int c=first; c<=last; c++) {
       double adv= 0;
-      if (it.gid[c] >= 0)
-        adv= fz_advance_glyph (ctx, it.font, it.gid[c], 0) * 1000.0;
+      if (ftgid[c] >= 0)
+        adv= fz_advance_glyph (ctx, it.font, ftgid[c], 0) * 1000.0;
       pdf_array_push_real (ctx, w, adv);
     }
   }
+}
+
+// Replace the font program of a simple font by a subset of itself which
+// has only the glyphs in `keep`, and rename the font as a subset is named.
+void
+mupdf_pdf_renderer_rep::subset_type1 (pdf_font_item& it, array<string> keep) {
+  pdf_obj* fdesc= pdf_dict_get (ctx, it.obj, PDF_NAME(FontDescriptor));
+  if (fdesc == NULL) return;
+  pdf_obj* ff= pdf_dict_get (ctx, fdesc, PDF_NAME(FontFile));
+  if (ff == NULL) return;   // not a Type 1 after all
+  c_string path (it.path);
+  const char** names= (const char**) fz_malloc (ctx, N(keep) * sizeof (char*));
+  c_string** cs= (c_string**) fz_malloc (ctx, N(keep) * sizeof (c_string*));
+  for (int i=0; i<N(keep); i++) {
+    cs[i]= new c_string (keep[i]);
+    names[i]= (const char*) *(cs[i]);
+  }
+  int size= 0, l1= 0, l2= 0, l3= 0;
+  char* psname= NULL;
+  const char* err= NULL;
+  unsigned char* sub= mupdf_t1_subset (path, names, N(keep), &size,
+                                       &l1, &l2, &l3, &psname, &err);
+  for (int i=0; i<N(keep); i++) delete cs[i];
+  fz_free (ctx, cs); fz_free (ctx, names);
+  if (sub == NULL) {
+    convert_warning << "the Type 1 font " << it.path
+                    << " could not be subsetted: "
+                    << string (err == NULL ? "?" : err) << LF;
+    return;
+  }
+  fz_try (ctx) {
+    fz_buffer* buf= fz_new_buffer_from_copied_data (ctx, sub, (size_t) size);
+    pdf_update_stream (ctx, doc, ff, buf, 0);
+    fz_drop_buffer (ctx, buf);
+    pdf_dict_put_int (ctx, ff, PDF_NAME(Length1), l1);
+    pdf_dict_put_int (ctx, ff, PDF_NAME(Length2), l2);
+    pdf_dict_put_int (ctx, ff, PDF_NAME(Length3), l3);
+    if (psname != NULL) {
+      // the tag says the font is a subset, and the two names must agree
+      // with the /FontName the program itself now carries
+      pdf_dict_put_name (ctx, it.obj, PDF_NAME(BaseFont), psname);
+      pdf_dict_put_name (ctx, fdesc, PDF_NAME(FontName), psname);
+    }
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not store the subsetted font: "
+                    << fz_caught_message (ctx) << LF;
+  }
+  free (sub);
+  if (psname != NULL) free (psname);
 }
 
 // A glyph of a font which cannot be embedded, drawn as an image. Hummus
