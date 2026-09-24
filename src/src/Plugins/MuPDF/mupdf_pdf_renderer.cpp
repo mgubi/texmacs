@@ -36,6 +36,8 @@
 #include "hashmap.hpp"
 #include "iterator.hpp"
 #include "frame.hpp"
+#include "image_files.hpp"
+#include "scalable.hpp"
 
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
@@ -130,6 +132,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   hashmap<string,int>  font_index;   // by the res_name of the TeXmacs font
   hashmap<string,int>  font_by_file; // by the file the program comes from
   hashmap<int,int>     alpha_gs;   // alpha -> the number of its ExtGState
+  hashmap<string,int>  image_pool; // a file -> the number of its XObject
   int                  n_alpha, n_xobj;
 
   array<pdf_outline_item> outlines;
@@ -160,6 +163,8 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_links (pdf_obj* pobj);
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
+  int  embed_image (url u);
+  void place_image (int num, double w, double h, SI x, SI y, int alpha);
 
 public:
   mupdf_pdf_renderer_rep (url pdf_file_name, int dpi, int nr_pages,
@@ -191,6 +196,7 @@ public:
   void fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void polygon (array<SI> x, array<SI> y, bool convex= true);
   void draw_picture (picture p, SI x, SI y, int alpha);
+  void draw_scalable (scalable im, SI x, SI y, int alpha);
 
   renderer shadow (picture& pic, SI x1, SI y1, SI x2, SI y2);
   void fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y);
@@ -225,6 +231,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     cur_width (-1), cur_alpha (255),
     in_text (false), cur_font (-1), cur_size (0), text_x (0), text_y (0),
     font_index (-1), font_by_file (-1), dest_index (-1), alpha_gs (-1),
+    image_pool (-1),
     n_alpha (0), n_xobj (0)
 {
   width = default_dpi * paper_w / 2.54;
@@ -1017,6 +1024,152 @@ mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
     convert_warning << "MuPDF picture failed: "
                     << fz_caught_message (ctx) << LF;
   }
+}
+
+/******************************************************************************
+* Images which are not pictures: a figure included in the document
+******************************************************************************/
+
+// the content streams of a page, which may be one stream or a list of them
+static fz_buffer*
+page_contents (fz_context* ctx, pdf_obj* contents) {
+  if (!pdf_is_array (ctx, contents)) return pdf_load_stream (ctx, contents);
+  fz_buffer* all= fz_new_buffer (ctx, 4096);
+  int n= pdf_array_len (ctx, contents);
+  for (int i=0; i<n; i++) {
+    fz_buffer* b= NULL;
+    fz_try (ctx) { b= pdf_load_stream (ctx, pdf_array_get (ctx, contents, i)); }
+    fz_catch (ctx) { b= NULL; }
+    if (b == NULL) continue;
+    unsigned char* d= NULL;
+    size_t len= fz_buffer_storage (ctx, b, &d);
+    fz_append_data (ctx, all, d, len);
+    fz_append_byte (ctx, all, '\n');
+    fz_drop_buffer (ctx, b);
+  }
+  return all;
+}
+
+// The XObject for a file, added once and used as often as it occurs.
+// A PDF goes in as a form -- its own drawing, kept as drawing -- and a
+// raster image as an image; anything else (EPS, PostScript, SVG) is
+// turned into a PDF first, which is what pdf_hummus_renderer does too.
+// Returns the number of the XObject, or -1.
+int
+mupdf_pdf_renderer_rep::embed_image (url u) {
+  url name= resolve (u);
+  if (is_none (name)) return -1;
+  string key= concretize (name);
+  if (image_pool->contains (key)) return image_pool (key);
+  string s= locase_all (suffix (name));
+  int num= -1;
+  bool raster= (s == "png" || s == "jpg" || s == "jpeg" || s == "gif" ||
+                s == "bmp" || s == "tif" || s == "tiff");
+  url tmp= url_none ();
+  if (raster) {
+    fz_image* img= NULL;
+    fz_try (ctx) {
+      img= mupdf_load_image (name);
+      if (img != NULL) {
+        pdf_obj* ref= pdf_add_image (ctx, doc, img);
+        num= n_xobj++;
+        string nm= "Im" * as_string (num);
+        c_string cnm (nm);
+        pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
+      }
+    }
+    fz_always (ctx) { fz_drop_image (ctx, img); }
+    fz_catch (ctx) { num= -1; }
+  }
+  else {
+    url pdf= name;
+    if (s != "pdf") {
+      // let the converters of TeXmacs make a PDF of it
+      tmp= url_temp (".pdf");
+      int w= 0, h= 0;
+      image_size (name, w, h);
+      image_to_pdf (name, tmp, w, h, 300);
+      pdf= tmp;
+    }
+    pdf_document* src= NULL;
+    fz_buffer* buf= NULL;
+    pdf_graft_map* map= NULL;
+    fz_try (ctx) {
+      c_string path (concretize (pdf));
+      src= pdf_open_document (ctx, path);
+      pdf_obj* spage= pdf_lookup_page_obj (ctx, src, 0);
+      fz_rect box; fz_matrix m;
+      pdf_page_obj_transform (ctx, spage, &box, &m);
+      buf= page_contents (ctx, pdf_dict_get (ctx, spage, PDF_NAME(Contents)));
+      pdf_obj* sres= pdf_dict_get_inheritable (ctx, spage, PDF_NAME(Resources));
+      map= pdf_new_graft_map (ctx, doc);
+      pdf_obj* res= (sres == NULL) ? NULL
+                                   : pdf_graft_mapped_object (ctx, map, sres);
+      pdf_obj* xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
+      num= n_xobj++;
+      string nm= "Im" * as_string (num);
+      c_string cnm (nm);
+      pdf_dict_puts_drop (ctx, res_xobj, cnm, xo);
+      pdf_drop_obj (ctx, res);
+    }
+    fz_always (ctx) {
+      pdf_drop_graft_map (ctx, map);
+      fz_drop_buffer (ctx, buf);
+      pdf_drop_document (ctx, src);
+    }
+    fz_catch (ctx) {
+      convert_warning << "MuPDF cannot include " << name << ": "
+                      << fz_caught_message (ctx) << LF;
+      num= -1;
+    }
+    if (!is_none (tmp)) remove (tmp);
+  }
+  image_pool (key)= num;
+  return num;
+}
+
+// w and h are the size the picture must have, in the pixels of the
+// renderer; an XObject is drawn in the unit square, or in its own BBox,
+// which the matrix maps onto that size
+void
+mupdf_pdf_renderer_rep::place_image (int num, double w, double h,
+                                     SI x, SI y, int alpha) {
+  if (num < 0 || contents == NULL) return;
+  end_text ();
+  select_alpha (alpha);
+  string nm= "Im" * as_string (num);
+  c_string cnm (nm);
+  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
+  double sx= w, sy= h, tx= to_x (x), ty= to_y (y);
+  if (xo != NULL && pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
+                                 PDF_NAME(Form))) {
+    // a form carries its own box: map that box onto the size asked for
+    fz_rect b= pdf_dict_get_rect (ctx, xo, PDF_NAME(BBox));
+    double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+    if (bw > 0 && bh > 0) {
+      sx= w / bw; sy= h / bh;
+      tx -= b.x0 * sx; ty -= b.y0 * sy;
+    }
+    else { sx= sy= 1; }
+  }
+  fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
+                    sx, sy, tx, ty, (const char*) cnm);
+}
+
+void
+mupdf_pdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
+  // an image with an effect on it has to be computed, so it is rasterized
+  // (at a print resolution, see shadow); a plain one is included as it is
+  if (im->get_type () != scalable_image || im->get_effect () != tree ("")) {
+    renderer_rep::draw_scalable (im, x, y, alpha);
+    return;
+  }
+  int num= embed_image (im->get_name ());
+  if (num < 0) { renderer_rep::draw_scalable (im, x, y, alpha); return; }
+  rectangle r= im->get_logical_extents ();
+  double w= ((double) (r->x2 - r->x1)) / pixel;
+  double h= ((double) (r->y2 - r->y1)) / pixel;
+  place_image (num, w, h, x - r->x1, y - r->y1, alpha);
 }
 
 /******************************************************************************

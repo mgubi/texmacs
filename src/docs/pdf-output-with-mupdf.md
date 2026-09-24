@@ -199,14 +199,16 @@ OpenType ones:
 
 | | whole fonts | with the subsetter | reference |
 |---|---|---|---|
-| the file | 784 KB | **519 KB** | 194 KB |
+| the file | 784 KB | **329 KB** | 194 KB |
 | embedded font programs | 432 KB | **167 KB** | — |
 | └ the four Type 1 | 315 KB | **49 KB** | — |
 | └ the five OpenType | 118 KB | 118 KB | — |
 
 Ghostscript reads all six pages with no complaint and no substitution, the
 text extracts correctly, and the two renderings agree to 92–99 % of pixels
-(the rest is Ghostscript's heavier stems, not different content).
+(the rest is Ghostscript's heavier stems, not different content). The 519
+KB of the first measurement became 329 once the figures stopped being
+rasterized.
 
 ### The reference is not the better file
 
@@ -266,7 +268,7 @@ choice, since it shares the coordinates and the sizes with Hummus.
 
 ## Checking it
 
-`src/Plugins/MuPDF/tests/pdf-compare.sh` exports a few documents both ways
+`src/Plugins/MuPDF/tests/pdf-compare.sh` exports four documents both ways
 and checks, of the MuPDF one, that Ghostscript reads it without an error
 and without substituting a font, that the text extracts with no U+FFFD in
 it, and that the pages Ghostscript and MuPDF draw agree. The first check is
@@ -296,9 +298,14 @@ readers then substitute.
 * **Encryption**: `pdf_write_options` has the fields, and nothing in
   TeXmacs asks for them today (Hummus's own `EncryptionOptions` is
   commented out), so it is written down rather than written.
-* **`draw_scalable`** falls back to rasterizing, where Hummus embeds the
-  PDF or EPS figure itself. At least it now rasterizes at a print
-  resolution (`shadow` raises the zoom).
+* ~~`draw_scalable` falls back to rasterizing.~~ Done: a figure is
+  included as a `/Form` XObject, its drawing kept as drawing (its page is
+  grafted, resources and all, and placed by its `/BBox`); a raster image
+  goes in as an `/Image`, and anything else -- EPS, PostScript, SVG -- is
+  turned into a PDF by the converters first, as Hummus does. An image with
+  an effect on it still has to be computed, so it is rasterized, but at a
+  print resolution. The figures of a document used to be pictures of
+  themselves, which is why this took a third off the size of the exports.
 * **Transformations** are honoured now (`set_transformation`), which they
   were not: every frame of the graphics used to be dropped.
 
