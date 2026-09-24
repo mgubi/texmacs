@@ -375,7 +375,7 @@ buffer is in a working tree. They are prefixed like the existing
     `c` commit or snapshot, `y` synchronize, `s` status, `=` compare with
     the last commit. They are active for documents in a Git working tree
     only (mode `in-git-document?`).
-* **Not done yet:** colouring the lines of the graph.
+* The lines of the graph are coloured by column.
 * **Deviation from 4.10:** preferences-widgets.scm asks, in a TODO, not
   to add tabs until the icon tabs are more compact. So the Git
   preferences are a separate dialog, opened from *Version → Git
