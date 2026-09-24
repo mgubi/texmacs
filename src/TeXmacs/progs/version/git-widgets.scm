@@ -197,11 +197,14 @@
                                           (number->string commit-dialogs))))
            (b (current-buffer))
            (paths (if (or (null? opt) (null? (cdr opt))) '() (cadr opt))))
-      (git-invalidate root)
-      (buffer-set-master u b)
-      (dialogue-window (git-commit-widget root u paths)
-                       (lambda x (noop))
-                       "Git commit" u))))
+      ;; NOTE: Git commits what is on disk
+      (git-when-saved root
+        (lambda ()
+          (git-invalidate root)
+          (buffer-set-master u b)
+          (dialogue-window (git-commit-widget root u paths)
+                           (lambda x (noop))
+                           "Git commit" u))))))
 
 (tm-define (git-interactive-commit-project name)
   (:synopsis "Commit the changes to the files used by the document @name")
@@ -291,31 +294,56 @@
           u))))
 
 (define (panel-commit root u simple?)
+  ;; NOTE: the message is only cleared once it has been used
   (with msg (commit-message u)
     (cond ((== msg "")
            (set-message "Please describe the changes first" "Git"))
-          (simple? (git-save-snapshot root msg)
-                   (buffer-set-body u '(document "")))
+          (simple?
+           (git-save-snapshot root msg
+             (lambda (ok?) (when ok? (buffer-set-body u '(document ""))))))
           ((not (git-has-staged? root))
            (set-message "Stage some changes first, or use Commit..." "Git"))
-          ((git-commit-staged root msg)
-           (buffer-set-body u '(document ""))))))
+          (else
+            (git-when-saved root
+              (lambda ()
+                (when (git-commit-staged root msg)
+                  (buffer-set-body u '(document "")))))))))
 
-(tm-widget (git-tool-commit-box win root simple?)
+(define (panel-suggest win u)
+  (and-with root (tool-root win)
+    (buffer-set-body
+     u `(document ,@(map utf8->cork
+                         (git-describe-changes
+                          root (if (git-simple-mode?)
+                                   (git-status-entries root)
+                                   (list-filter (git-status-entries root)
+                                                git-entry-staged?))))))))
+
+(tm-widget (git-tool-commit-box win)
+  ;; NOTE: this part of the panel is not refreshed, so that the editor of
+  ;; the message is not destroyed while typing
   (with u (panel-buffer win)
     (resize "250px" "60px"
-      (texmacs-input '(document "") '(style (tuple "generic")) u))
+      (texmacs-input (if (buffer-exists? u)
+                         (tree->stree (buffer-get-body u))
+                         '(document ""))
+                     '(style (tuple "generic")) u))
     (hlist
-      ("Suggest"
-       (buffer-set-body
-        u `(document ,@(map utf8->cork
-                            (git-describe-changes
-                             root (if simple? (git-status-entries root)
-                                      (list-filter (git-status-entries root)
-                                                   git-entry-staged?)))))))
+      ("Suggest" (panel-suggest win u))
       >>
-      ((eval (if simple? "Save snapshot" "Commit"))
-       (panel-commit root u simple?)))))
+      ((eval (if (git-simple-mode?) "Save snapshot" "Commit"))
+       (and-with root (tool-root win)
+         (panel-commit root u (git-simple-mode?)))))))
+
+(define (commit-path root c name)
+  ;; The path of the document @name at the commit @c (renames!)
+  (if (nnull? (git-commit-files c)) (car (git-commit-files c))
+      (git-relative root name)))
+
+(define (history-revision root c name)
+  (string-append (git-commit-hash c) ":"
+                 (url->tmfs-string (git-absolute root
+                                                 (commit-path root c name)))))
 
 (tm-widget (git-tool-history root name)
   (with l (if (and name (git-root name)) (or (git-file-log name) '()) '())
@@ -326,11 +354,14 @@
           ((eval (string-append (git-commit-date c) " "
                                 (utf8->cork (git-short-message
                                              (git-commit-subject c)))))
-           (git-show-page root "log"))
+           (revert-buffer-revert (tmfs-url-commit root (git-commit-hash c))))
           >>
           (if (git-texmacs-file? name)
-              ("Compare" (git-compare-with name (git-commit-hash c))))
-          ("Restore" (git-restore-revision name (git-commit-hash c))))))
+              ("Compare"
+               (git-compare-with name (history-revision root c name))))
+          ("Restore"
+           (git-restore-revision name (git-commit-hash c)
+                                 (commit-path root c name))))))
     ===
     (hlist ("Full history" (git-show-log root)) >>)))
 
@@ -350,10 +381,15 @@
     (hlist ("New branch..." (git-interactive-create-branch root)) // //
            ("All branches" (git-show-branches root)) >>)))
 
-(tm-widget (git-tool-contents win)
+(define (tool-context win)
+  ;; The working tree, the document and the mode for the panel of win
+  (list (tool-root win)
+        (with b (window->buffer win)
+          (and b (not (url-rooted-tmfs? b)) b))
+        (git-simple-mode?)))
+
+(tm-widget (git-tool-sync-bar win)
   (let* ((root (tool-root win))
-         (name (with b (window->buffer win)
-                 (and b (not (url-rooted-tmfs? b)) b)))
          (simple? (git-simple-mode?))
          (busy? (and root (git-busy? root)))
          (remote? (and root (nnull? (git-remotes root)) (not busy?)))
@@ -375,23 +411,43 @@
               ((balloon (icon "tm_cloud_download.xpm") "Get changes (pull)")
                (git-pull root))
               ((balloon (icon "tm_cloud_upload.xpm") "Send changes (push)")
-               (git-push root))))
+               (git-push root)))))))
+
+(tm-widget (git-tool-changes-of win)
+  (with (root name simple?) (tool-context win)
+    (if root (dynamic (git-tool-changes root simple?)))))
+
+(tm-widget (git-tool-history-of win)
+  (with (root name simple?) (tool-context win)
+    (if root (dynamic (git-tool-history root name)))))
+
+(tm-widget (git-tool-branches-of win)
+  (with (root name simple?) (tool-context win)
+    (if root (dynamic (git-tool-branches root)))))
+
+(tm-widget (git-tool-contents win)
+  ;; NOTE: only the parts which depend on the state of the working tree
+  ;; are refreshed (all refreshables with the same identifier are)
+  (refreshable "git-tool"
+    (dynamic (git-tool-sync-bar win)))
+  ===
+  (tabs
+    (tab (text "Changes")
+      (vlist
+        (refreshable "git-tool"
+          (dynamic (git-tool-changes-of win)))
         ===
-        (tabs
-          (tab (text "Changes")
-            (vlist
-              (dynamic (git-tool-changes root simple?))
-              ===
-              (dynamic (git-tool-commit-box win root simple?))))
-          (tab (text "History")
-            (dynamic (git-tool-history root name)))
-          (tab (text "Branches")
-            (dynamic (git-tool-branches root)))))))
+        (dynamic (git-tool-commit-box win))))
+    (tab (text "History")
+      (refreshable "git-tool"
+        (dynamic (git-tool-history-of win))))
+    (tab (text "Branches")
+      (refreshable "git-tool"
+        (dynamic (git-tool-branches-of win))))))
 
 (tm-tool* (git-tool win)
   (:name "Git")
-  (refreshable "git-tool"
-    (dynamic (git-tool-contents win))))
+  (dynamic (git-tool-contents win)))
 
 (tm-define (git-open-tool)
   (:synopsis "Show the status of the working tree in a side tool")
@@ -500,11 +556,9 @@
    (list (list "Sign the commit" (git-signing?)))
    (lambda (msg flags)
      (if (empty? msg) "Please describe the changes"
-         (with old (get-preference "git sign")
-           (set-preference "git sign" (if (car flags) "on" "off"))
-           (set-message (utf8->cork (git-commit-file name msg)) "Commit file")
-           (set-preference "git sign" old)
-           #f)))))
+         (with r (git-commit-file* name msg (car flags))
+           (set-message (utf8->cork (cdr r)) "Commit file")
+           (and (not (car r)) (utf8->cork (cdr r))))))))
 
 (tm-define (git-interactive-save-snapshot root)
   (:synopsis "Save a snapshot of all files of @root")

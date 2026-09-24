@@ -297,6 +297,47 @@
   (check "snapshot restored"
          (string-contains? (string-load PP) "One, not committed.")))
 
+;; Restoring never loses work (audit A2, A3, A6)
+(with rev (git-rev-parse P "HEAD")
+  (string-save "unsaved work\n" (url-append P "work.txt"))
+  (git-run P "add" "work.txt")
+  (string-save "<TeXmacs|2.1>\n\n<\\body>\n  Edited.\n</body>\n" PP)
+  (git-invalidate P)
+  (git-restore-snapshot-now P "HEAD~1")
+  (check "automatic snapshot before restoring"
+         (string-starts? (git-commit-subject (car (git-log P 0 1 "HEAD")))
+                         "Automatic snapshot"))
+  (check "staged new file kept in the snapshot"
+         (== (git-show-file P "HEAD" "work.txt") "unsaved work\n"))
+  (check "edits kept in the snapshot"
+         (string-contains? (git-show-file P "HEAD" "paper.tm") "Edited.")))
+(with f (file "k.txt")
+  (string-save "one\n" f)
+  (git-stage f)
+  (git-commit-staged R "k one")
+  (with first (git-rev-parse R "HEAD")
+    (string-save "two\n" f)
+    (git-stage f)
+    (git-restore-revision-now f first)
+    (check "restored contents" (== (string-load f) "one\n"))
+    (check "staged version untouched" (== (git-show-file R "" "k.txt") "two\n"))
+    (git-run R "reset" "--quiet" "--hard" "HEAD")
+    (git-run R "mv" "k.txt" "k2.txt")
+    (git-commit-staged R "rename k")
+    (git-restore-revision-now (file "k2.txt") first "k.txt")
+    (check "restore across a rename" (== (string-load (file "k2.txt")) "one\n"))
+    (check "old name not recreated" (not (url-exists? f)))
+    (git-run R "checkout" "--" "k2.txt")))
+(with (o a b) (map (lambda (x) (system->url (string-append T "/" x)))
+                   '("m-base.txt" "m-ours.txt" "m-theirs.txt"))
+  (string-save "line\n" o)
+  (string-save "ours\n" a)
+  (string-save "theirs\n" b)
+  (check "textual fallback of the merge driver"
+         (and (== (git-textual-merge (url->system o) (url->system a)
+                                     (url->system b)) 1)
+              (string-contains? (string-load a) "<<<<<<<"))))
+
 ;; Secure actions
 (check "secure page action" (secure? '(git-page-stage "a" "b")))
 

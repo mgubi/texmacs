@@ -100,8 +100,10 @@
       (with (rev by date msg) x
         ((eval (string-append date " " (utf8->cork by) ": "
                               (utf8->cork (git-short-message msg))))
-         (git-restore-revision (current-buffer)
-                               (car (string-tokenize-by-char rev #\:))))))))
+         (apply git-restore-revision
+                (cons (current-buffer)
+                      (with (hash path) (git-history-path (current-buffer) rev)
+                        (if path (list hash path) (list hash))))))))))
 
 (menu-bind git-file-menu
   (assuming (git-state? 'untracked)
@@ -292,8 +294,12 @@
   ;; The current document and its history
   (assuming (git-revision-of (current-buffer))
     ("Restore this version"
-     (git-restore-revision (version-head (current-buffer))
-                           (git-revision-of (current-buffer)))))
+     (if (url-exists? (version-head (current-buffer)))
+         (git-restore-revision (version-head (current-buffer))
+                               (git-revision-of (current-buffer)))
+         (set-message (string-append "The document was renamed since; open "
+                                     "it and use Restore version")
+                      "Restore"))))
   (assuming (and (git-history-document?) (git-texmacs-file? (current-buffer))
                  (not (git-state? 'conflicted)))
     (-> "Compare with"

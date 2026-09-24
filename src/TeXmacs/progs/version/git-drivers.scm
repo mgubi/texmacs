@@ -50,12 +50,26 @@
                                   "texmacs"))
                 (merge-conflicts m))))))
 
+(tm-define (git-textual-merge base ours theirs)
+  ;; When the structured merge fails (e.g. for a document which cannot be
+  ;; parsed), fall back on the textual merge of Git, with conflict markers
+  (with ret (evaluate-system (list (get-preference "git executable")
+                                   "merge-file" "-L" "ours" "-L" "base"
+                                   "-L" "theirs"
+                                   (url->system (driver-url ours))
+                                   (url->system (driver-url base))
+                                   (url->system (driver-url theirs)))
+                             '() '() '(1 2))
+    (if (== (car ret) "0") 0 1)))
+
 (tm-define (git-merge-driver base ours theirs)
   (:synopsis "Entry point for the merge driver of Git")
   (with n (catch #t
             (lambda () (git-merge-files base ours theirs))
             (lambda args #f))
-    (quit-TeXmacs-code (if (== n 0) 0 1))))
+    (quit-TeXmacs-code (cond ((== n 0) 0)
+                             ((number? n) 1)
+                             (else (git-textual-merge base ours theirs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Installing the driver in a repository
