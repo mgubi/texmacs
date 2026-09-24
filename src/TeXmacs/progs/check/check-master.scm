@@ -13,9 +13,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (kernel boot compat-s7-test)
-        (kernel boot boot-s7-test)
-        (kernel boot abbrevs-test)
+  (:use (kernel boot abbrevs-test)
         (kernel logic logic-engine-test)
         (kernel texmacs tm-define-test)
         (kernel texmacs tm-dialogue-test)
@@ -61,6 +59,10 @@
         (check macro-drd-test)
         (check crypto-test)
         (check plugins-test)))
+
+;; test suites which only make sense with S7
+(if (s7-scheme?)
+    (use-modules (kernel boot compat-s7-test) (kernel boot boot-s7-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -125,8 +127,10 @@
 ;; integration-failure-total).
 (define regression-suites
   (append
-   '(("compat-s7" regtest-compat-s7 error)
-     ("boot-s7" regtest-boot-s7 error))
+   (if (s7-scheme?)
+       '(("compat-s7" regtest-compat-s7 error)
+         ("boot-s7" regtest-boot-s7 error))
+       '())
   '(("htmltm" regtest-htmltm error)
     ("xmltm" regtest-xmltm error)
     ("tmlength" regtest-tmlength error)
