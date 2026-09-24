@@ -684,6 +684,12 @@ behaviour. Feature status against those two:
   (`set_transformation` as pdf_hummus), shadows (`new/get/put/apply_shadow`
   by pixmap copies), pictures and scalables (`draw_scalable` falls back to
   the generic conversion when MuPDF cannot load the file);
+* **FreeType under MuPDF's lock**: the charmap of a native font and the
+  glyph of each character are asked of the FreeType face of the MuPDF font
+  only through `mupdf_select_custom_charmap` and `mupdf_glyph_index`, which
+  hold `fz_ft_lock` (the Fitz renderer uses them too). Those two calls do
+  not allocate, so this is discipline rather than a fix; asked directly, a
+  glyph name on an OpenType face did crash the PDF renderer;
 * **PDF figures as drawing**: a PDF is not converted to a PNG (by
   CoreGraphics, Ghostscript or ImageMagick, at one size) but read once into
   memory and drawn through a form XObject made of its first page

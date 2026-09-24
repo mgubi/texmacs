@@ -10,6 +10,7 @@
 
 #include "fitz_renderer.hpp"
 #include "fitz_picture.hpp"
+#include "mupdf_renderer.hpp" // mupdf_glyph_index
 #include "analyze.hpp"
 #include "image_files.hpp"
 #include "file.hpp"
@@ -413,10 +414,7 @@ fitz_renderer_rep::load_fitz_font (string fontname) {
       if (font) {
         // Set up proper encoding for FreeType fonts
         // This matches the MuPDF renderer approach
-        FT_Face face = (FT_Face) font->ft_face;
-        if (face) {
-          ft_select_charmap (face, ft_encoding_adobe_custom);
-        }
+        mupdf_select_custom_charmap (font);
       }
     }
     fz_catch (ctx) {
@@ -467,16 +465,7 @@ fitz_renderer_rep::extract_font_size (string fontname) {
 unsigned int
 fitz_renderer_rep::decode_glyph_index (fz_font* font, int char_code) {
   // Same logic as MuPDF renderer for glyph index decoding
-  if (!font || !font->ft_face) return 0;
-
-  FT_Face face = (FT_Face) font->ft_face;
-
-  // Use the same decode_index logic as MuPDF renderer
-  if (char_code < 0xc000000) {
-    return ft_get_char_index (face, char_code);
-  } else {
-    return char_code - 0xc000000;
-  }
+  return mupdf_glyph_index (font, char_code);
 }
 
 void

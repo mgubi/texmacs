@@ -1582,8 +1582,7 @@ pdf_font_desc *load_pdf_font (string fontname) {
         // FIXME: do we need to care about all the other fields? (seems not)
         // fix the encoding for FreeType
         // see tt_face_rep::tt_face_rep
-        FT_Face face= (FT_Face)fontdesc->font->ft_face;
-        ft_select_charmap (face, ft_encoding_adobe_custom);
+        mupdf_select_custom_charmap (fontdesc->font);
       }
     }
     if (fontdesc != NULL) {
@@ -1613,11 +1612,33 @@ font_size (string name) {
   return mag;
 }
 
-// copied from tt_face.cpp
-inline FT_UInt
-decode_index (FT_Face face, int i) {
-  if (i < 0xc000000) return ft_get_char_index (face, i);
-  return i - 0xc000000;
+// FreeType is reached only with MuPDF's lock held. The lock is what
+// serializes FreeType between the threads MuPDF may run, and it points
+// FreeType's allocator at the calling context: a face which allocates
+// on first use -- an OpenType one asked for a glyph name loads its table
+// of names then -- crashed the PDF renderer when it was asked directly.
+// Selecting a charmap and looking up an index do not allocate, but the
+// discipline is kept everywhere so that it does not depend on that.
+void
+mupdf_select_custom_charmap (fz_font* font) {
+  fz_context* ctx= mupdf_context ();
+  FT_Face face= (font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, font);
+  if (face == NULL) return;
+  fz_ft_lock (ctx);
+  ft_select_charmap (face, ft_encoding_adobe_custom);
+  fz_ft_unlock (ctx);
+}
+
+unsigned int
+mupdf_glyph_index (fz_font* font, int i) {
+  if (i >= 0xc000000) return i - 0xc000000;
+  fz_context* ctx= mupdf_context ();
+  FT_Face face= (font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, font);
+  if (face == NULL) return 0;
+  fz_ft_lock (ctx);
+  FT_UInt g= ft_get_char_index (face, i);
+  fz_ft_unlock (ctx);
+  return g;
 }
 
 void
@@ -1674,8 +1695,7 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       //
       // MuPDF seems to like the glyph value returned by
       // ft_get_char_index on the FT_Face it will use.
-      FT_Face face= (FT_Face)fontdesc->font->ft_face;
-      gl_index= decode_index (face, c);
+      gl_index= mupdf_glyph_index (fontdesc->font, c);
     }
     char glyphs[2] = { (char)(gl_index >> 8), (char)(gl_index) };
     proc->op_Tj (mupdf_context (), proc, glyphs, 2);

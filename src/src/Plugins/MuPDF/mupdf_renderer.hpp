@@ -19,6 +19,13 @@
 
 fz_context* mupdf_context ();
 
+// FreeType on the face of a MuPDF font, with MuPDF's lock held: the
+// built in ("Adobe custom") encoding of a Type 1 font selected, and the
+// glyph of a TeXmacs character index (tt_face.cpp: an index from
+// 0xc000000 on is a glyph number already)
+void mupdf_select_custom_charmap (fz_font* font);
+unsigned int mupdf_glyph_index (fz_font* font, int i);
+
 /******************************************************************************
 * Graphic renderer
 ******************************************************************************/
