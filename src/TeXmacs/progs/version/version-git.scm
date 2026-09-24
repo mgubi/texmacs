@@ -1071,13 +1071,31 @@
 ;; Graph page
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define graph-colors
+  '("#1f4e9a" "#a0301f" "#20703a" "#7a3a9a" "#1f7a8a" "#8a6a10"))
+
+(define (graph-prefix prefix)
+  ;; The characters of the graph, colored by column
+  (with l (string->list prefix)
+    `(verbatim
+      (concat
+       ,@(map (lambda (ch i)
+                (with str (list->string (list ch))
+                  (if (== ch #\space) str
+                      `(with "color"
+                         ,(list-ref graph-colors
+                                    (modulo (quotient i 2)
+                                            (length graph-colors)))
+                         ,str))))
+              l (.. 0 (length l)))))))
+
 (define (graph-line root x)
   (with (prefix c) x
     (if (not c)
-        `(verbatim ,prefix)
+        (graph-prefix prefix)
         (let* ((hash (first c))
                (refs (if (>= (length c) 6) (sixth c) "")))
-          `(concat (verbatim ,prefix)
+          `(concat ,(graph-prefix prefix)
                    (hlink ,(short-hash hash) ,(tmfs-url-commit root hash))
                    " "
                    ,(if (== refs "") ""
