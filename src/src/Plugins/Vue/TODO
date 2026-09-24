@@ -37,6 +37,15 @@ WIP
 
 DONE
 
+* a PDF writer on MuPDF (src/Plugins/MuPDF/mupdf_pdf_renderer.cpp, notes in
+  docs/pdf-output-with-mupdf.md, harness in its tests/): it writes the page
+  contents itself, subsets the Type 1 fonts with pdfTeX's writet1.c which
+  is vendored beside it, makes Type 3 fonts of what cannot be embedded,
+  includes the figures instead of rasterizing them, and does the links,
+  the destinations, the outline and the attachments. Chosen by the
+  preference "native pdf renderer" set to "mupdf"; without it the export
+  still goes through PostScript and Ghostscript, since this build has no
+  PDFHummus
 * the title of the window names the document and marks unsaved changes
   (test title): SLOT_NAME was never forwarded to the window, and the
   marker alone replaced a title which had never been set

@@ -278,49 +278,58 @@ putting the old CID embedding of the Type 1 fonts back, which makes two of
 them fail; note that the rendering check does *not* catch that, since both
 readers then substitute.
 
-## What is still missing
+## What it does
 
-* ~~Type 3 fonts for the bitmap and unloadable fonts.~~ Done: one font per
-  256 characters, the glyph an inline image mask in a little content
-  stream, with a ToUnicode CMap so the text is still searchable. It also
-  fixed glyphs which the image fallback drew as empty boxes.
-* **Patterns** are drawn, but as tiled images: `renderer_rep::clear_pattern`
-  does the tiling with `draw_picture`. The tiles share one XObject
-  (`name_xobject`), so a patterned page costs five hundred `Do` operators
-  and one image rather than five hundred images; real PDF tiling patterns
-  would save the operators too.
-* ~~The outline is flat.~~ Done: it is the tree the levels describe.
-* ~~Named destinations.~~ Done: the anchors are the name tree of the
-  catalogue and a link refers to one by name.
-* ~~Attachments.~~ Done: `mupdf_pdf_make_attachments` puts the files in the
-  `/EmbeddedFiles` name tree and in `/AF`, and
-  `pdf_hummus_make_attachment.hpp` calls it where it used to return false,
-  so the "embed the document in the exported PDF" of `tm-print.scm` works
-  in a build without the Hummus renderer.
-* **Encryption**: `pdf_write_options` has the fields, and nothing in
-  TeXmacs asks for them today (Hummus's own `EncryptionOptions` is
-  commented out), so it is written down rather than written.
-* ~~`draw_scalable` falls back to rasterizing.~~ Done: a figure is
-  included as a `/Form` XObject, its drawing kept as drawing (its page is
-  grafted, resources and all, and placed by its `/BBox`); a raster image
-  goes in as an `/Image`, and anything else -- EPS, PostScript, SVG -- is
-  turned into a PDF by the converters first, as Hummus does. An image with
-  an effect on it still has to be computed, so it is rasterized, but at a
-  print resolution. The figures of a document used to be pictures of
-  themselves, which is why this took a third off the size of the exports.
-* **Transformations** are honoured now (`set_transformation`), which they
-  were not: every frame of the graphics used to be dropped.
+* pages, clipping, the graphics state, transparency through `ExtGState`;
+* paths, and the transformations of the graphics (`set_transformation`);
+* text in the fonts MuPDF can embed -- `/Type1` for the Type 1 programs,
+  subsetted by pdfTeX's `writet1.c`, and `/Type0` Identity-H for the rest,
+  subsetted by MuPDF;
+* **Type 3 fonts** for what cannot be embedded at all: one font per 256
+  characters, the glyph an inline image mask in a little content stream,
+  with a ToUnicode CMap so the text is still searchable;
+* **figures**: a PDF as a `/Form` XObject with its drawing kept as
+  drawing, a raster image as an `/Image`, anything else through the
+  converters first; each file embedded once however often it occurs;
+* pictures, patterns (tiled images sharing one XObject), links, named
+  destinations, the outline as a tree, `/Info` metadata, attachments.
 
-## What it would take to finish
+## What is left
 
-1. ~~A Type 1 subsetter.~~ Done: pdfTeX's `writet1.c`, see above.
-1. ~~The OpenType half.~~ There is no gap: the reference is bitmaps, and
-   MuPDF subsets the OpenType fonts by a factor of ten to fifteen.
-2. A Type 3 font writer for the bitmap fonts.
-3. Patterns, the outline tree, the destination tree, attachments.
+* **Real tiling patterns.** A patterned page costs five hundred `Do`
+  operators and one image; a `/Pattern` would cost one fill. It is a
+  saving in the content stream, not in the file, since the image is
+  already shared.
+* **Encryption.** `pdf_write_options` has the fields and nothing in
+  TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
+  out), so it is written down rather than written.
+* **An image with an effect** on it has to be computed, so it is
+  rasterized -- at a print resolution, but rasterized.
+* **A preference in the menus.** The renderer is chosen by the preference
+  `native pdf renderer` or by the environment, not by anything a user can
+  click.
 
-A reasonable middle road, if the aim is to drop PDFHummus: teach MuPDF
-itself to embed and subset Type 1 (upstream has the CFF subsetter already,
-and the conversion is the missing half), and keep the rest of this
-prototype. That way the subsetting stays in the library rather than
-becoming another vendored writer inside TeXmacs.
+## Checking it
+
+`src/Plugins/MuPDF/tests/pdf-compare.sh` and its `README`: it exports a
+set of documents both ways and checks, of the MuPDF one, that Ghostscript
+reads it without an error and without substituting a font, that the text
+extracts with no U+FFFD in it, and that the pages Ghostscript and MuPDF
+draw agree. The Ghostscript check is the one which earns its keep, because
+an invalid font program still looks like a page, only in the wrong
+typeface; and the rendering check cannot see that fault, since both
+readers then substitute. The checks were themselves checked by putting the
+old CID embedding of the Type 1 fonts back, which makes two of them fail.
+
+Sixteen documents have been through it: twelve of the manual, among them
+Chinese and French for the fonts and the accents, and the four of the
+tests.
+
+## If this is to replace PDFHummus
+
+The one piece which is neither ours nor MuPDF's is `writet1.c`, vendored
+from pdfTeX. The better home for it is upstream: MuPDF has the CFF
+subsetter already and only wants the Type 1 conversion in front of it, and
+a subsetter in the library serves everyone rather than sitting in a
+second copy inside TeXmacs. Until then it is here, unchanged, so that a
+fix there can be taken over by hand.
