@@ -89,9 +89,41 @@ struct pdf_font_item {
   int      chunk;      // ... and which 256 characters of it this is
   string   path;       // the file the program was read from (for subsetting)
   array<int> gid;      // 256 entries: the glyph TeXmacs asked for, -1 if free
+  // the letters a ligature glyph stands for, by the code (a simple font)
+  // or the glyph (a CID font) it is written with; "" for a glyph which is
+  // not a ligature, nothing when it has not been asked yet
+  hashmap<int,string> lig;
   pdf_font_item ()
-    : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0) {}
+    : font (NULL), obj (NULL), num (0), simple (false), t3 (false), chunk (0),
+      lig ("") {}
 };
+
+// The letters of a ligature, from the name of its glyph, or "" when the
+// glyph is not one. The names are those of the Adobe glyph list: the five
+// of the Latin ligatures as TeX fonts name them, their uniFB0x forms, and
+// the f_f_i of OpenType fonts, whose parts are joined by underscores.
+static string
+ligature_letters (string name) {
+  if (name == "ff" || name == "fi" || name == "fl" ||
+      name == "ffi" || name == "ffl") return name;
+  if (name == "uniFB00") return "ff";
+  if (name == "uniFB01") return "fi";
+  if (name == "uniFB02") return "fl";
+  if (name == "uniFB03") return "ffi";
+  if (name == "uniFB04") return "ffl";
+  if (search_forwards ("_", name) < 0) return "";
+  string r;
+  int start= 0;
+  for (int i=0; i<=N(name); i++)
+    if (i == N(name) || name[i] == '_') {
+      string part= name (start, i);
+      // only parts which are single letters: "f_f_i", not "a_acute"
+      if (N(part) != 1 || !is_alpha (part[0])) return "";
+      r << part;
+      start= i + 1;
+    }
+  return N(r) >= 2 ? r : string ("");
+}
 
 class mupdf_pdf_renderer_rep : public renderer_rep {
   static const int default_dpi= 72;
@@ -163,6 +195,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void select_width (SI w);
   void select_alpha (int a);
   int  get_font (font_glyphs fn, int ch);
+  string ligature_of (pdf_font_item& it, int key);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
   void subset_type1 (pdf_font_item& it, array<string> keep);
@@ -709,6 +742,20 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   double px= to_x (x), py= to_y (y);
   fz_append_printf (ctx, contents, "%g %g Td\n", px - text_x, py - text_y);
   text_x= px; text_y= py;
+  // A ligature says which letters it stands for. A reader which takes the
+  // text from the glyph names gets ﬁ (U+FB01) out of "fi", so a search for
+  // "first" misses it and a copy yields the ligature: Ghostscript does
+  // exactly that, while MuPDF happens to decompose it on its own.
+  string lig;
+  if (!font_list[k].t3) {
+    int key= font_list[k].simple ? (ch & 255) : (int) gl->index;
+    lig= ligature_of (font_list[k], key);
+  }
+  if (N(lig) > 0) {
+    c_string cl (lig);
+    fz_append_printf (ctx, contents, "/Span << /ActualText (%s) >> BDC\n",
+                      (const char*) cl);
+  }
   if (font_list[k].simple || font_list[k].t3) {
     // one byte per glyph; the code is the one TeXmacs uses, and the
     // Differences array will say which glyph it selects
@@ -719,6 +766,33 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else
     fz_append_printf (ctx, contents, "<%04x> Tj\n", ((int) gl->index) & 0xffff);
+  if (N(lig) > 0) put ("EMC\n");
+}
+
+// The letters of the glyph a font draws for key -- the code in a simple
+// font, the glyph in a CID font -- when it is a ligature. The name is
+// asked of the font, as in write_fonts: through its built in encoding for
+// a Type 1, directly for the glyph otherwise.
+string
+mupdf_pdf_renderer_rep::ligature_of (pdf_font_item& it, int key) {
+  if (it.lig->contains (key)) return it.lig [key];
+  string r;
+  FT_Face face= (it.font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, it.font);
+  if (face != NULL && FT_HAS_GLYPH_NAMES (face)) {
+    int g= key;
+    if (it.simple) {
+      if (FT_Select_Charmap (face, FT_ENCODING_ADOBE_CUSTOM) != 0)
+        FT_Select_Charmap (face, FT_ENCODING_ADOBE_STANDARD);
+      g= (int) FT_Get_Char_Index (face, key);
+    }
+    char nm[128];
+    nm[0]= 0;
+    if (g > 0 && g < (int) face->num_glyphs &&
+        FT_Get_Glyph_Name (face, g, nm, sizeof (nm)) == 0)
+      r= ligature_letters (string (nm));
+  }
+  it.lig (key)= r;
+  return r;
 }
 
 // The encoding and the widths of the simple fonts, once every page has

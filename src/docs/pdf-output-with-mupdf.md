@@ -294,6 +294,23 @@ readers then substitute.
 * pictures, patterns (tiled images sharing one XObject), links, named
   destinations, the outline as a tree, `/Info` metadata, attachments.
 
+### Ligatures
+
+A ligature glyph is wrapped in `/Span << /ActualText (fi) >> BDC ... EMC`,
+as PDFHummus does, so that it extracts as the letters it stands for. The
+letters come from the name of the glyph (`fi`, `uniFB01`, `f_f_i`), asked
+of the font the way `write_fonts` asks it. Without the span, a reader which
+takes the text from the glyph names -- Ghostscript is one -- gives `ﬁrst`
+for *first*, and a search finds nothing.
+
+Neither reader at hand can judge this alone, which is how it went unseen
+for a while: MuPDF decomposes ligatures whatever the file says, so its
+extraction was always right, and Ghostscript 10 ignores ActualText, so its
+extraction is always "wrong". MuPDF does honour the spans -- rewriting one
+`(fi)` as `(XY)` in a written file makes it extract *XYrst* -- and the
+harness uses Ghostscript's blindness to count the ligature glyphs drawn,
+each of which must have its span.
+
 ## What is left
 
 * **Real tiling patterns.** A patterned page costs five hundred `Do`

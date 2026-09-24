@@ -14,6 +14,14 @@ checks the first:
           the wrong typeface.
   text    the text extracts, and no character comes out as U+FFFD (a wrong
           encoding, a missing glyph name, a stale ToUnicode).
+  lig     every ligature glyph says which letters it stands for
+          (/ActualText), or a search for "first" finds nothing in a reader
+          which takes the text from the glyph names. Neither reader judges
+          this alone: MuPDF decomposes ligatures whatever the file says,
+          and Ghostscript 10 ignores ActualText. That second blindness is
+          what makes the check -- Ghostscript's extraction counts the
+          ligature glyphs drawn, and the content streams must hold a span
+          for each. Removing the spans makes it fail; that was tried.
   render  the page Ghostscript draws and the page MuPDF draws agree to
           within a threshold. They are two independent readers of the same
           file, so a disagreement is a fault in the file -- but note that
@@ -27,10 +35,11 @@ The checks were themselves checked: embedding the Type 1 fonts the wrong
 way again (pdf_add_cid_font instead of pdf_add_simple_font) makes the gs
 and text checks fail, as it should.
 
-Two of the documents are here rather than in the manual: figures.tm has a
-PostScript figure and a raster one, which must come out as a /Form and an
-/Image and not as pictures of themselves, and pattern.tm has a patterned
-background, whose five hundred tiles must share one XObject.
+Four of the documents are here rather than in the manual: figures.tm has
+a PostScript figure and a raster one, which must come out as a /Form and
+an /Image and not as pictures of themselves; pattern.tm has a patterned
+background; ligatures.tm is a line of fi, ffi, ffl and fl in the EC font;
+landscape.tm must come out wider than it is tall.
 
 Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
 output directory, how long a conversion is given, and the threshold.

@@ -32,7 +32,9 @@ DOCS_DEFAULT="TeXmacs/doc/main/man-manual.en.tm
 TeXmacs/doc/main/automated/tag-help.en.tm
 TeXmacs/doc/main/start/man-conventions.en.tm
 src/Plugins/MuPDF/tests/figures.tm
-src/Plugins/MuPDF/tests/pattern.tm"
+src/Plugins/MuPDF/tests/pattern.tm
+src/Plugins/MuPDF/tests/ligatures.tm
+src/Plugins/MuPDF/tests/landscape.tm"
 
 [ -x "$BIN" ] || { echo "run me from the top of the source tree"; exit 2; }
 export TEXMACS_PATH="$PWD/TeXmacs"
@@ -82,6 +84,24 @@ for doc in ${*:-$DOCS_DEFAULT}; do
     fail=1
   else
     echo "  ok    the text extracts ($(printf '%s' "$txt" | wc -w | tr -d ' ') words)"
+  fi
+
+  # Ligatures: each ligature glyph must say which letters it stands for
+  # (/ActualText), or a reader which takes the text from the glyph names
+  # gives a search for "first" nothing to find. Neither reader can judge
+  # this on its own -- MuPDF decomposes ligatures whatever the file says,
+  # and Ghostscript ignores ActualText -- but the second is what makes the
+  # check: what Ghostscript extracts counts the ligature glyphs drawn, and
+  # there must be a span for each of them in the content streams.
+  mutool clean -d "$mu" "$OUT/plain.pdf" >/dev/null 2>&1
+  lig=$(gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o - "$mu" 2>/dev/null |
+        python3 -c "import sys; t=sys.stdin.buffer.read().decode('utf-8','replace'); print(sum(1 for c in t if 0xfb00 <= ord(c) <= 0xfb06))")
+  span=$(python3 -c "import sys; print(open(sys.argv[1],'rb').read().count(b'/ActualText'))" "$OUT/plain.pdf" 2>/dev/null || echo 0)
+  if [ "${lig:-0}" -gt "${span:-0}" ]; then
+    echo "  FAIL  $lig ligature glyphs, only $span say which letters they are"
+    fail=1
+  else
+    echo "  ok    ligatures: $lig drawn, $span with their letters"
   fi
 
   # the two readers must agree on what the file says
