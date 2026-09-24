@@ -89,16 +89,13 @@
     (check "version menu" (pair? (menu-expand '(link version-menu))))
     (check "git menu" (pair? (menu-expand '(link git-repository-menu))))
     (git-interactive-clone)
-    (check "clone dialog" #t)
     (git-compare-with-revision u "HEAD~1")
     (check "compare with revision"
            (nnull? (tree-search (buffer-get u)
                                 (lambda (t) (tree-in? t '(version-both))))))
     (check "compare menu" (pair? (menu-expand '(link git-compare-menu))))
     (git-interactive-commit (git-root u))
-    (check "commit dialog" #t)
     (git-interactive-commit-project u)
-    (check "project commit dialog" #t)
     (set-preference "git simple mode" "on")
     (check "simple file menu" (pair? (menu-expand '(link version-menu))))
     (check "simple git menu" (pair? (menu-expand '(link git-repository-menu))))
@@ -127,15 +124,12 @@
     (git-interactive-commit-file u)
     (git-interactive-save-snapshot (git-root u))
     (git-interactive-compare-with u)
-    (check "dialogs" #t)
     (check "valid branch name" (git-valid-branch-name? (git-root u) "topic"))
     (check "invalid branch name"
            (not (git-valid-branch-name? (git-root u) "a..b")))
     (git-show-failure (list 1 "" " ! [rejected] main -> main (fetch first)")
                       "Push")
-    (check "failure dialog" #t)
     (open-git-preferences)
-    (check "preferences dialog" #t)
     (set-preference "git mode chosen" "off")
     (with called? #f
       (git-with-mode (lambda () (set! called? #t)))
@@ -230,6 +224,9 @@
     (git-clone (string-append T "/remote/origin.git") dest
       (lambda (r)
         (check "clone" (git-ok? r))
+        ;; NOTE: do not depend on the global identity of the user
+        (git-run (system->url dest) "config" "user.email" "c@example.com")
+        (git-run (system->url dest) "config" "user.name" "User c")
         (check "cloned document"
                (url-exists? (system->url (string-append dest "/doc.tm"))))
         (check "clone is versioned"

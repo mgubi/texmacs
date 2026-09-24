@@ -75,8 +75,20 @@
   (:synopsis "The main document of the project containing @u")
   (if (and (== u (current-buffer)) (project-attached?)) (project-get) u))
 
+(define project-cache (make-ahash-table))
+
 (tm-define (git-project-files u)
   (:synopsis "The files of the project of @u in its working tree, as paths")
+  ;; NOTE: cached for a few seconds, since this is asked for by the menus
+  (let* ((key (url->system u))
+         (old (ahash-ref project-cache key)))
+    (if (and old (< (- (texmacs-time) (car old)) 5000))
+        (cdr old)
+        (with r (project-files u)
+          (ahash-set! project-cache key (cons (texmacs-time) r))
+          r))))
+
+(define (project-files u)
   (and-with root (git-root u)
     (with l (git-document-dependencies (git-project-document u))
       (map (cut git-relative root <>)
@@ -99,6 +111,7 @@
         (git-report (git-run-list root (append (list "add" "--") l))
                     (string-append "Added " (number->string (length l))
                                    " files"))
+        (set! project-cache (make-ahash-table))
         (git-refresh root)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

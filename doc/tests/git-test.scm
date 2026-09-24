@@ -34,8 +34,9 @@
 (check "tool" (== (version-tool F) "git"))
 (check "no root outside" (not (git-root (system->url "/"))))
 (check "worktree root"
-       (git-root (system->url (string-append (getenv "GIT_TEST_DIR")
-                                             "/wt test/base.txt"))))
+       (== (url->system (git-root (system->url (string-append (getenv "GIT_TEST_DIR")
+                                                             "/wt test/base.txt"))))
+           (string-append (getenv "GIT_TEST_DIR") "/wt test")))
 
 ;; File states and staging
 (check "untracked" (== (git-file-state F) 'untracked))
@@ -85,7 +86,9 @@
 
 ;; Branches, tags, stashes
 (git-create-branch R "feature x")
-(check "invalid branch refused" (== (git-current-branch R) "main"))
+(check "invalid branch refused"
+       (and (== (git-current-branch R) "main")
+            (nin? "feature x" (map git-branch-name (git-branches R)))))
 (git-create-branch R "feature")
 (check "new branch" (== (git-current-branch R) "feature"))
 (git-switch-branch R "main")
@@ -170,11 +173,13 @@
 (check "empty message refused" (== (version-commit F "") "Empty commit message"))
 (check "empty stdin does not hang"
        (not (git-ok? (git-run-with-input R "" "commit" "--file=-"))))
+(define owned (string-append T "/git-test-owned"))
 (check "option as revision refused"
-       (== (git-log R 0 1 "--output=/tmp/git-test-owned") '()))
-(check "no file written" (not (url-exists? (system->url "/tmp/git-test-owned"))))
+       (== (git-log R 0 1 (string-append "--output=" owned)) '()))
+(check "no file written" (not (url-exists? (system->url owned))))
 (check "option in tmfs link refused"
-       (== (git-show-file R "--output=/tmp/git-test-owned" "base.txt") ""))
+       (== (git-show-file R (string-append "--output=" owned) "base.txt") ""))
+(check "still no file written" (not (url-exists? (system->url owned))))
 (check "option as branch refused" (not (git-switch-branch R "-f")))
 (string-save "one\n" (file "n1.tm"))
 (string-save "bracket\n" (file "n[1].tm"))
@@ -224,7 +229,7 @@
 (with dir (system->url (string-append (getenv "GIT_TEST_DIR") "/new repo"))
   (system-mkdir dir)
   (git-init dir)
-  (check "init" (git-root (url-append dir "x.tm")))
+  (check "init" (== (git-root (url-append dir "x.tm")) dir))
   (check "default gitignore" (url-exists? (url-append dir ".gitignore")))
   (check "recent repository"
          (in? (url->system dir) (git-recent-repositories))))
