@@ -7,7 +7,7 @@ and whether the result would be *almost the same* — in particular whether
 the fonts would still be subsetted.
 
 The answer, measured rather than guessed, is: **the page contents yes, the
-fonts no**. A working prototype is in
+subsetting of the Type 1 fonts no**. A working prototype is in
 [`src/Plugins/MuPDF/mupdf_pdf_renderer.cpp`](../src/Plugins/MuPDF/mupdf_pdf_renderer.cpp);
 what follows is what it took and what is still missing.
 
@@ -73,11 +73,26 @@ mathematical document uses:
    and CFF; on a Type 1 it fails (`format error: Reserved charstring byte`)
    and silently keeps the whole font.
 
-Going through `pdf_add_simple_font` instead of the device's automatic
-choice fixes the first defect — the font is then a plain `/Type1` with
-`/FontFile`, which Ghostscript accepts, and a 256-glyph TeX font fits a
-simple font exactly — but not the second: 89,761 bytes before, 89,143
-after.
+**The first defect is fixed in the prototype**, the second is not.
+
+MuPDF's pdf device is not the place to fix it: `pdf_dev_font` sends every
+embedded font to `pdf_add_cid_font`, with no hook and no option. The
+prototype therefore writes the content stream of each page itself and
+chooses the font: `pdf_add_simple_font` for a Type 1, which gives a plain
+`/Type1` with `/FontFile`, and `pdf_add_cid_font` for everything else,
+where MuPDF is right and its subsetter works. A TeX font has at most 256
+glyphs, so it fits a simple font exactly; the prototype assigns the
+TeXmacs character code to each glyph and writes an `/Encoding`
+`/Differences` array of glyph names (from FreeType) and a `/Widths` array
+when the document is closed and the codes in use are known. This is what
+PDFHummus does for its "ANSI" fonts.
+
+Ghostscript now reads the output with no complaint and no substitution,
+and its rendering of the page agrees with MuPDF's own to 97.9 % of pixels
+within 32 levels — that is, the TeX font really is being used.
+
+The second defect stands: a simple Type 1 is not subsetted either (89,761
+bytes before `pdf_subset_fonts`, 89,143 after).
 
 For comparison, PDFHummus converts Type 1 to CFF and subsets it: in a real
 export the embedded font streams are **303 and 1182 bytes**
@@ -88,16 +103,22 @@ MuPDF has no equivalent of.
 
 ## The prototype
 
-`mupdf_pdf_renderer.cpp` (about 700 lines against Hummus's 2550) does:
+`mupdf_pdf_renderer.cpp` (about 800 lines against Hummus's 2550) writes
+the content stream of each page itself, as Hummus does, rather than
+through the `fz` device — that is what makes the choice of font ours. It
+scales the stream by `72/dpi` once per page, so everything is written in
+the pixels of the renderer with y upwards, exactly the coordinates `to_x`
+and `to_y` give. It does:
 
-* pages, the coordinate conversion (TeXmacs SI → renderer pixels → points,
-  y downwards for the device), clipping, the graphics state;
+* pages, clipping (`q … re W n` … `Q`), the graphics state, transparency
+  through `ExtGState` objects;
 * paths: `line`, `lines`, `fill`, `clear`, `polygon`, `arc`, `fill_arc`;
-* text in fonts MuPDF can embed, glyphs accumulated into one `fz_text` per
-  colour, with the unicode carried through;
-* glyphs of fonts it cannot embed, drawn as bitmap images (a stopgap: see
-  below);
-* pictures through `fz_fill_image`;
+* text: `/Type1` simple fonts for the Type 1 programs and `/Type0`
+  Identity-H for the rest, one `BT`…`ET` run per stretch of text, the
+  positions as relative `Td`;
+* glyphs of fonts which cannot be embedded, drawn as images (a stopgap:
+  see below);
+* pictures as `/XObject` images;
 * links, a flat outline, `/Info` metadata;
 * `pdf_subset_fonts` before saving.
 
@@ -116,9 +137,12 @@ within 32 levels**, with the title, the rule, the bullets, the blue links,
 the image and the small-caps TeX logo all in place, and whose text
 extracts correctly (`THE GNU TEXMACS MANUAL`, `Getting started`).
 
-It is **254 KB against the 54–60 KB** of the reference (two runs of the
-same export through PostScript and Ghostscript), and Ghostscript
-substitutes the one Type 1 font in it. Those two facts are the whole story.
+Ghostscript reads it without a complaint. What is left is the size: **253
+KB against the 54–60 KB** of the reference (two runs of the same export
+through PostScript and Ghostscript). The three OpenType fonts in the page
+are subsetted and carry the usual tags (`BWWMJR+Fira Sans Bold` and so
+on); the one Type 1 is embedded whole. That single number is what is left
+of the question.
 
 Note that the reference is *not* PDFHummus: this build has `PDF_RENDERER`
 undefined, so the Hummus renderer is not compiled at all and the normal
@@ -127,16 +151,25 @@ above (303 and 1182 byte font streams) come from a file which went through
 that same route, where Ghostscript did the subsetting; a build configured
 with the PDF renderer is needed to compare the two writers directly.
 
-### Two bugs worth remembering
+### Three bugs worth remembering
 
-* **The glyph size.** Hummus scales its whole content stream by `72/dpi`
-  and passes `size * dpi_name / 72` to `Tf`; the fz device takes points, so
-  the same length is `size * dpi_name / dpi`. Using Hummus's formula made
-  every glyph 8.3× too large.
-* **The glyph orientation.** Glyph outlines are y upwards, the device is y
-  downwards: the text matrix needs a negative y scale. Without it the page
-  is laid out correctly but every glyph is mirrored — and, incidentally,
-  the text extractor then drops the doubled letters.
+The first two belong to the earlier version, which drew through the `fz`
+device; they are what makes writing the stream directly the simpler
+choice, since it shares the coordinates and the sizes with Hummus.
+
+* **The glyph size.** Hummus scales its content stream by `72/dpi` and
+  passes `size * dpi_name / 72` to `Tf`; an fz device takes points, so the
+  same length is `size * dpi_name / dpi`. Using Hummus's formula on the
+  device made every glyph 8.3× too large.
+* **The glyph orientation.** Glyph outlines are y upwards, an fz device is
+  y downwards: the text matrix needs a negative y scale there. Without it
+  the page is laid out correctly but every glyph is mirrored — and the
+  text extractor then drops the doubled letters.
+* **White is −1.** A `color` is an ARGB word, so white is `0xffffffff`,
+  which as an `int` is −1. Using −1 as the "no colour selected yet"
+  sentinel meant the first fill with white emitted nothing, and the page
+  was cleared in PDF's default colour, black. The prototype carries
+  `has_fill` / `has_stroke` flags instead.
 
 ## What is still missing
 
@@ -158,9 +191,8 @@ with the PDF renderer is needed to compare the two writers directly.
 
 1. A Type 1 → CFF converter and a CFF subsetter, or a Type 1 subsetter
    (charstring level). Without one of those the output grows by several
-   hundred kilobytes per document, and the files are not conformant unless
-   the simple-font route is taken as well. This is the bulk of the work,
-   and it is exactly the part of PDFHummus which is not replaced by MuPDF.
+   hundred kilobytes per document. This is the bulk of the work, and it is
+   exactly the part of PDFHummus which is not replaced by MuPDF.
 2. A Type 3 font writer for the bitmap fonts.
 3. Patterns, the outline tree, the destination tree, attachments.
 
