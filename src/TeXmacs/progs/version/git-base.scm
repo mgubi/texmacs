@@ -66,6 +66,7 @@
   ;; but a file for linked worktrees and submodules
   (and (url-rooted? u)
        (not (url-rooted-tmfs? u))
+       (not (url-rooted-web? u))
        (let loop ((dir (if (url-directory? u) u (url-head u))))
          (cond ((url-exists? (url-append dir ".git")) dir)
                ((== (url-head dir) dir) #f)
@@ -96,7 +97,10 @@
     (system-setenv "GIT_OPTIONAL_LOCKS" "0")))
 
 (tm-define (git-arguments root args)
-  (append (list (get-preference "git executable")
+  ;; NOTE: the messages of Git are in English (LC_ALL=C), since some are
+  ;; analyzed; this is not done on Windows, which has no env command
+  (append (if (or (os-mingw?) (os-win32?)) '() (list "env" "LC_ALL=C"))
+          (list (get-preference "git executable")
                 "-C" (url->system root)
                 "-c" "core.quotepath=off"
                 "-c" "color.ui=false"
@@ -355,11 +359,14 @@
                              entries)))
                 (else (loop (cdr l) st entries)))))))
 
+(define git-remotes-table (make-ahash-table))
+
 (tm-define (git-invalidate root)
   (:synopsis "Forget cached information about the working tree @root")
   (when root
     (ahash-remove! git-status-table (url->system root))
-    (ahash-remove! git-tracked-table (url->system root))))
+    (ahash-remove! git-tracked-table (url->system root))
+    (ahash-remove! git-remotes-table (url->system root))))
 
 (tm-define (git-status root)
   (:synopsis "Status of the working tree @root (or #f)")
@@ -374,8 +381,9 @@
          (old (ahash-ref git-status-table key)))
     (if (and old (< (- (texmacs-time) (car old)) git-status-delay))
         (cdr old)
-        (with ret (git-run root "status" "--porcelain=v2" "-z" "--branch"
-                           "--untracked-files=all")
+        ;; NOTE: the configuration of the untracked files is respected
+        ;; (git-file-state asks Git for files inside untracked directories)
+        (with ret (git-run root "status" "--porcelain=v2" "-z" "--branch")
           (with st (and (git-ok? ret) (git-parse-status (git-out ret)))
             (ahash-set! git-status-table key (cons (texmacs-time) st))
             (ahash-remove! git-tracked-table key)
@@ -580,8 +588,9 @@
          (git-chomp out))))
 
 (tm-define (git-merging? root)
-  (:synopsis "Is a merge in progress in @root?")
-  (nnot (git-rev-parse root "MERGE_HEAD")))
+  (:synopsis "Is a merge (or a rebase) in progress in @root?")
+  (or (nnot (git-rev-parse root "MERGE_HEAD"))
+      (nnot (git-rev-parse root "REBASE_HEAD"))))
 
 (tm-define (git-merge-message root)
   (:synopsis "The prepared message for the merge in progress, or #f")
@@ -629,8 +638,16 @@
     (and h (!= h "(detached)") h)))
 
 (tm-define (git-remotes root)
-  (with out (git-output root "remote")
-    (if out (list-filter (git-split out "\n") (lambda (s) (!= s ""))) '())))
+  ;; NOTE: cached, since it is asked for by the menus
+  (if (not root) '()
+      (with key (url->system root)
+        (or (ahash-ref git-remotes-table key)
+            (with l (with out (git-output root "remote")
+                      (if out (list-filter (git-split out "\n")
+                                           (lambda (s) (!= s "")))
+                          '()))
+              (ahash-set! git-remotes-table key l)
+              l)))))
 
 (tm-define (git-remote-url root name)
   (and (git-safe-name? name)
@@ -639,10 +656,12 @@
 
 (tm-define (git-push-remote root)
   (:synopsis "The remote to which the current branch is pushed by default")
-  (let* ((up (git-status-ref (git-status root) 'upstream))
+  (let* ((branch (git-current-branch root))
+         (conf (and branch (git-safe-name? branch)
+                    (git-output root "config" "--get"
+                                (string-append "branch." branch ".remote"))))
          (l (git-remotes root)))
-    (cond ((and up (string-index up #\/))
-           (car (string-tokenize-by-char up #\/)))
+    (cond ((and conf (in? (git-chomp conf) l)) (git-chomp conf))
           ((in? "origin" l) "origin")
           ((nnull? l) (car l))
           (else #f))))

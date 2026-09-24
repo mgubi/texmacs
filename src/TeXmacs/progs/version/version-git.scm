@@ -102,9 +102,11 @@
 
 (tm-define (git-refresh root)
   (:synopsis "Refresh the Git pages about @root after a change")
+  ;; NOTE: only the pages which are shown are regenerated (the others have
+  ;; a Refresh button), since this is done after each save
   (git-invalidate root)
   (for (u (buffer-list))
-    (when (git-page? u root)
+    (when (and (git-page? u root) (nnull? (buffer->windows u)))
       (git-reload-buffer u)))
   (refresh-now "git-tool"))
 
@@ -151,10 +153,10 @@
   (:synopsis "Show the outcome @ret of a Git command in the footer")
   (with msg (git-message ret)
     (if (git-ok? ret)
-        (set-message (if (== msg "") what (utf8->cork msg)) "Git")
+        (set-message (if (== msg "") (utf8->cork what) (utf8->cork msg)) "Git")
         (begin
           (set-message `(concat "Git error: " (verbatim ,(utf8->cork msg)))
-                       what)
+                       (utf8->cork what))
           (git-show-failure ret what)))
     (git-ok? ret)))
 
@@ -408,7 +410,8 @@
   (when (buffer-exists? name)
     (buffer-save name)
     (buffer-pretend-saved name))
-  (git-stage name))
+  (git-stage name)
+  (refresh-now "version-review"))
 
 (tm-define (git-mark-resolved name)
   (:synopsis "Save @name and mark its merge conflict as resolved")
@@ -1252,13 +1255,14 @@
       ((> i n) ret)))
 
 (define (diff-bar added removed maxv)
+  ;; At most 40 characters, for the largest change maxv
   (define (len nr)
     (with ret (if (== maxv 0) 0 (quotient (* nr 40) (max maxv 40)))
       (if (and (> nr 0) (== ret 0)) 1 ret)))
   `(concat (with "color" "dark green" ,(string-repeat "+" (len added)))
            (with "color" "dark red" ,(string-repeat "-" (len removed)))))
 
-(define (commit-file-row root rev parent x)
+(define (commit-file-row root rev parent maxv x)
   (let* ((added (first x))
          (removed (second x))
          (path (third x))
@@ -1273,7 +1277,7 @@
                      (number->string (+ added removed))
                      "bin"))
           (cell ,(if (and added removed)
-                     (diff-bar added removed 40)
+                     (diff-bar added removed maxv)
                      ""))
           (cell ,(if (and parent (git-texmacs-file? u) (url-exists? u))
                      `(concat
@@ -1314,7 +1318,13 @@
                `(tabular
                  (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0pt")
                           (cwith "1" "-1" "2" "2" "cell-halign" "r")
-                          (table ,@(map (cut commit-file-row root rev parent <>)
+                          (table ,@(map (cut commit-file-row root rev parent
+                                             (list-fold max 0
+                                                        (map (lambda (x)
+                                                               (+ (or (first x) 0)
+                                                                  (or (second x) 0)))
+                                                             d))
+                                             <>)
                                         d))))
                `(concat ,(number->string (length d)) " files changed, "
                         ,(number->string ins) " insertions("

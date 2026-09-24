@@ -242,6 +242,11 @@
 
 (tm-define (git-sync root)
   (:synopsis "Get the changes of the others, then send ours")
+  (if (null? (git-remotes root))
+      (set-message "This repository has no remote to synchronize with" "Git")
+      (git-sync-now root)))
+
+(define (git-sync-now root)
   (git-pull root
     (lambda (ret)
       (when (and (git-ok? ret) (not (git-merging? root))

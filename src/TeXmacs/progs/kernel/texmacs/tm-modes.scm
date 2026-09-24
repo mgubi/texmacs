@@ -146,6 +146,7 @@
 (define-public (versioning-directory u)
   "Root of the Git or Subversion working tree containing @u, or @#f"
   (and (url? u) (url-rooted? u) (not (url-rooted-tmfs? u))
+       (not (url-rooted-web? u))
        (let* ((dir (url-head u))
               (key (url->system dir))
               (old (ahash-ref versioning-directory-table key)))
@@ -158,6 +159,13 @@
   "Is @u inside a Git working tree?"
   (and-with d (versioning-directory u)
     (url-exists? (url-append d ".git"))))
+
+(define-public (git-context? u)
+  "Is @u a document inside a Git working tree, or a Git page?"
+  (or (git-directory? u)
+      (and (url? u) (url-rooted-tmfs? u)
+           (list-or (map (cut string-starts? (url->unix u) <>)
+                         '("tmfs://git/" "tmfs://commit/" "tmfs://blame/"))))))
 
 (define-public (versioning-directory-reset)
   (set! versioning-directory-table (make-ahash-table)))

@@ -300,3 +300,15 @@
 
 (tm-define (close-document*)
   (if (window-per-buffer?) (safely-kill-buffer) (safely-kill-window)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; When to show the versioning tool
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (versioning-tool-is? what)
+  (== (get-preference "versioning tool") what))
+
+(tm-define (set-versioning-tool what)
+  (:synopsis "When to show the versioning tool")
+  (:check-mark "*" versioning-tool-is?)
+  (set-preference "versioning tool" what))

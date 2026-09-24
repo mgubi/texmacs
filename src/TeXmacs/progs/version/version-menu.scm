@@ -89,7 +89,7 @@
       ---
       (for (b l)
         ((eval (string-append "Branch " (utf8->cork (git-branch-name b))))
-         (git-compare-with (current-buffer) (git-branch-name b)))))))
+         (git-compare-with-revision (current-buffer) (git-branch-name b)))))))
 
 (define (sublist* l i j)
   (sublist l i (min j (length l))))
@@ -271,6 +271,15 @@
     (link version-trusted-menu)))
 
 (menu-bind version-trusted-menu
+  ;; When reviewing differences, their navigation comes first
+  (assuming (inside-version?)
+    ("Previous difference" (version-previous-difference))
+    ("Next difference" (version-next-difference))
+    (-> "Retain"
+	("Current version" (version-retain 'current))
+	("Old version" (version-retain 0))
+	("New version" (version-retain 1)))
+    ---)
   ;; Conflicts come first, since they have to be resolved
   (assuming (and (git-document?) (git-state? 'conflicted))
     (group "Conflict")

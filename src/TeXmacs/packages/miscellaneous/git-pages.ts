@@ -34,7 +34,13 @@
 
   <assign|git-note|<macro|color|body|<small|<with|color|<arg|color>|<arg|body>>>>>
 
-  <drd-props|git-button|arity|1|git-badge|arity|2|git-muted|arity|1|git-note|arity|2>
+  <drd-props|git-button|arity|1>
+
+  <drd-props|git-badge|arity|2>
+
+  <drd-props|git-muted|arity|1>
+
+  <drd-props|git-note|arity|2>
 
   \;
 </body>
