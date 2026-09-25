@@ -329,13 +329,13 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
     convert_warning << "MuPDF could not finish the document: "
                     << fz_caught_message (ctx) << LF;
   }
+  c_string name (concretize (pdf_file_name)); // not in fz_try: a longjmp
   fz_try (ctx) {
     pdf_write_options opts= pdf_default_write_options;
     opts.do_compress= 1;
     opts.do_compress_images= 1;
     opts.do_compress_fonts= 1;
     opts.do_garbage= 4;
-    c_string name (concretize (pdf_file_name));
     pdf_save_document (ctx, doc, name, &opts);
   }
   fz_catch (ctx) {
@@ -468,8 +468,8 @@ mupdf_pdf_renderer_rep::alpha_state (int a) {
     pdf_dict_put (ctx, gs, PDF_NAME(Type), PDF_NAME(ExtGState));
     pdf_dict_put_real (ctx, gs, PDF_NAME(ca), a / 255.0);
     pdf_dict_put_real (ctx, gs, PDF_NAME(CA), a / 255.0);
-    string nm= "GS" * as_string (num);
-    c_string cnm (nm);
+    char cnm[32];
+    snprintf (cnm, sizeof (cnm), "GS%d", (int) (num));
     pdf_dict_puts_drop (ctx, res_gs, cnm, pdf_add_object_drop (ctx, doc, gs));
     alpha_gs (a)= num;
   }
@@ -688,8 +688,8 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
         for (int i=0; i<256; i++) it.gid << -1;
       }
       else it.obj= pdf_add_cid_font (ctx, doc, it.font);
-      string nm= "F" * as_string (it.num);
-      c_string cnm (nm);
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "F%d", (int) (it.num));
       pdf_dict_puts (ctx, res_font, cnm, it.obj);
     }
     fz_catch (ctx) {
@@ -707,8 +707,8 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
     for (int i=0; i<256; i++) it.gid << -1;
     fz_try (ctx) {
       it.obj= pdf_add_new_dict (ctx, doc, 8);
-      string nm= "F" * as_string (it.num);
-      c_string cnm (nm);
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "F%d", (int) (it.num));
       pdf_dict_puts (ctx, res_font, cnm, it.obj);
     }
     fz_catch (ctx) { it.obj= NULL; }
@@ -970,52 +970,83 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
   for (int c=0; c<256; c++)
     if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
   if (last < 0) return;
+  // Everything TeXmacs computes is computed first, and MuPDF is given the
+  // results in the fz_try below, which creates nothing with a destructor:
+  // a throw is a longjmp, which would skip it.
+  int n= last - first + 1;
+  array<string> proc (n);   // the content stream of each glyph, "" if none
+  array<double> adv (n);    // the widths
   int b0= 0, b1= 0, b2= 0, b3= 0;   // the box of the whole font
+  for (int c=first; c<=last; c++) {
+    adv[c-first]= 0;
+    if (it.gid[c] < 0) continue;
+    glyph gl= it.fn->get (it.gid[c]);
+    if (is_nil (gl)) continue;
+    adv[c-first]= gl->lwidth;
+    int llx= -gl->xoff, lly= gl->yoff - gl->height + 1;
+    int urx= gl->width - gl->xoff + 1, ury= gl->yoff + 1;
+    int w= gl->width, h= gl->height;
+    if (b2 <= b0) { b0= llx; b1= lly; b2= urx; b3= ury; }
+    else {
+      if (llx < b0) b0= llx; if (lly < b1) b1= lly;
+      if (urx > b2) b2= urx; if (ury > b3) b3= ury;
+    }
+    // d1 says the glyph is a mask, so the colour is the one in force
+    string& cs= proc[c-first];
+    cs << as_string ((int) gl->lwidth) << " 0 " << as_string (llx) << " "
+       << as_string (lly) << " " << as_string (urx) << " "
+       << as_string (ury) << " d1\n";
+    if (w > 0 && h > 0) {
+      cs << "q\n" << as_string (w) << " 0 0 " << as_string (h) << " "
+         << as_string (llx) << " " << as_string (lly) << " cm\n"
+         << "BI\n/W " << as_string (w) << "\n/H " << as_string (h) << "\n"
+         << "/BPC 1 /F /AHx /D [0.0 1.0] /IM true\nID\n";
+      static const char* hex= "0123456789ABCDEF";
+      int cur= 0, count= 0;
+      for (int j=0; j<h; j++)
+        for (int i=0; i < ((w + 7) & (-8)); i++) {
+          cur= cur << 1;
+          if (i < w && gl->get_x (i, j) == 0) cur++;
+          count++;
+          if (count == 4) { cs << hex[cur]; cur= 0; count= 0; }
+        }
+      cs << ">\nEI\nQ\n";
+    }
+  }
+  // the codes of a Type 3 font mean nothing to a reader: a CMap says
+  // which character each of them stands for, so the text can be found
+  string cmap;
+  cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+       << "/CIDSystemInfo << /Registry (TeXmacs) /Ordering (Type3) "
+       << "/Supplement 0 >> def\n"
+       << "/CMapName /TeXmacs-Type3 def /CMapType 2 def\n"
+       << "1 begincodespacerange <" << as_hexadecimal (first, 2)
+       << "> <" << as_hexadecimal (last, 2) << "> endcodespacerange\n";
+  int nused= 0;
+  for (int c=first; c<=last; c++) if (it.gid[c] >= 0) nused++;
+  cmap << as_string (nused) << " beginbfchar\n";
+  for (int c=first; c<=last; c++)
+    if (it.gid[c] >= 0)
+      cmap << "<" << as_hexadecimal (c, 2) << "> <"
+           << as_hexadecimal (it.gid[c], 4) << ">\n";
+  cmap << "endbfchar\nendcmap CMapName currentdict /CMap defineresource "
+       << "pop end end\n";
+
   fz_try (ctx) {
-    pdf_obj* procs= pdf_new_dict (ctx, doc, last - first + 1);
+    pdf_obj* procs= pdf_new_dict (ctx, doc, n);
     pdf_obj* enc= pdf_new_dict (ctx, doc, 2);
     pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
     pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
     int prev= -2;
     for (int c=first; c<=last; c++) {
-      if (it.gid[c] < 0) continue;
-      glyph gl= it.fn->get (it.gid[c]);
-      if (is_nil (gl)) continue;
-      int llx= -gl->xoff, lly= gl->yoff - gl->height + 1;
-      int urx= gl->width - gl->xoff + 1, ury= gl->yoff + 1;
-      int w= gl->width, h= gl->height;
-      if (b2 <= b0) { b0= llx; b1= lly; b2= urx; b3= ury; }
-      else {
-        if (llx < b0) b0= llx; if (lly < b1) b1= lly;
-        if (urx > b2) b2= urx; if (ury > b3) b3= ury;
-      }
-      fz_buffer* cs= fz_new_buffer (ctx, 256 + (size_t) w * h / 4);
-      // d1 says the glyph is a mask, so the colour is the one in force
-      fz_append_printf (ctx, cs, "%d 0 %d %d %d %d d1\n",
-                        (int) gl->lwidth, llx, lly, urx, ury);
-      if (w > 0 && h > 0) {
-        fz_append_printf (ctx, cs, "q\n%d 0 0 %d %d %d cm\n", w, h, llx, lly);
-        fz_append_printf (ctx, cs, "BI\n/W %d\n/H %d\n", w, h);
-        fz_append_string (ctx, cs, "/BPC 1 /F /AHx /D [0.0 1.0] /IM true\nID\n");
-        static const char* hex= "0123456789ABCDEF";
-        int cur= 0, count= 0;
-        for (int j=0; j<h; j++)
-          for (int i=0; i < ((w + 7) & (-8)); i++) {
-            cur= cur << 1;
-            if (i < w && gl->get_x (i, j) == 0) cur++;
-            count++;
-            if (count == 4) {
-              char d[2]; d[0]= hex[cur]; d[1]= 0;
-              fz_append_string (ctx, cs, d);
-              cur= 0; count= 0;
-            }
-          }
-        fz_append_string (ctx, cs, ">\nEI\nQ\n");
-      }
-      string nm= "ch" * as_string (c);
-      c_string cnm (nm);
-      pdf_obj* ref= pdf_add_stream (ctx, doc, cs, NULL, 0);
-      fz_drop_buffer (ctx, cs);
+      string& cs= proc[c-first];
+      if (N(cs) == 0) continue;
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "ch%d", c);
+      fz_buffer* buf= fz_new_buffer_from_copied_data (ctx,
+                        (unsigned char*) &cs[0], (size_t) N(cs));
+      pdf_obj* ref= pdf_add_stream (ctx, doc, buf, NULL, 0);
+      fz_drop_buffer (ctx, buf);
       pdf_dict_puts_drop (ctx, procs, cnm, ref);
       if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
       pdf_array_push_name (ctx, diff, cnm);
@@ -1032,15 +1063,8 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
     pdf_array_push_int (ctx, mat, 0); pdf_array_push_int (ctx, mat, 0);
     pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
     pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
-    pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths), last-first+1);
-    for (int c=first; c<=last; c++) {
-      double adv= 0;
-      if (it.gid[c] >= 0) {
-        glyph gl= it.fn->get (it.gid[c]);
-        if (!is_nil (gl)) adv= gl->lwidth;
-      }
-      pdf_array_push_real (ctx, w, adv);
-    }
+    pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths), n);
+    for (int k=0; k<n; k++) pdf_array_push_real (ctx, w, adv[k]);
     pdf_dict_put_drop (ctx, it.obj, PDF_NAME(CharProcs),
                        pdf_add_object_drop (ctx, doc, procs));
     pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
@@ -1049,27 +1073,8 @@ mupdf_pdf_renderer_rep::write_type3 (pdf_font_item& it) {
     pdf_obj* ps= pdf_dict_put_array (ctx, res, PDF_NAME(ProcSet), 2);
     pdf_array_push (ctx, ps, PDF_NAME(PDF));
     pdf_array_push (ctx, ps, PDF_NAME(ImageB));
-    // the codes of a Type 3 font mean nothing to a reader: a CMap says
-    // which character each of them stands for, so the text can be found
-    string cmap;
-    cmap << "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
-         << "/CIDSystemInfo << /Registry (TeXmacs) /Ordering (Type3) "
-         << "/Supplement 0 >> def\n"
-         << "/CMapName /TeXmacs-Type3 def /CMapType 2 def\n"
-         << "1 begincodespacerange <" << as_hexadecimal (first, 2)
-         << "> <" << as_hexadecimal (last, 2) << "> endcodespacerange\n";
-    int n= 0;
-    for (int c=first; c<=last; c++) if (it.gid[c] >= 0) n++;
-    cmap << as_string (n) << " beginbfchar\n";
-    for (int c=first; c<=last; c++)
-      if (it.gid[c] >= 0)
-        cmap << "<" << as_hexadecimal (c, 2) << "> <"
-             << as_hexadecimal (it.gid[c], 4) << ">\n";
-    cmap << "endbfchar\nendcmap CMapName currentdict /CMap defineresource "
-         << "pop end end\n";
-    c_string cm (cmap);
-    fz_buffer* cb= fz_new_buffer_from_copied_data (ctx, (unsigned char*) (char*) cm,
-                                                   strlen (cm));
+    fz_buffer* cb= fz_new_buffer_from_copied_data (ctx,
+                     (unsigned char*) &cmap[0], (size_t) N(cmap));
     pdf_dict_put_drop (ctx, it.obj, PDF_NAME(ToUnicode),
                        pdf_add_stream (ctx, doc, cb, NULL, 0));
     fz_drop_buffer (ctx, cb);
@@ -1109,8 +1114,8 @@ mupdf_pdf_renderer_rep::draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y) {
     img= fz_new_image_from_pixmap (ctx, pix, NULL);
     int num= name_xobject (pdf_add_image (ctx, doc, img));
     if (num >= 0) {
-      string nm= "Im" * as_string (num);
-      c_string cnm (nm);
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       double x0= to_x (x) - gl->xoff, y0= to_y (y) - h + gl->yoff;
       fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
                         (double) w, (double) h, x0, y0, (const char*) cnm);
@@ -1137,8 +1142,8 @@ mupdf_pdf_renderer_rep::name_xobject (pdf_obj* ref) {
   pointer key= (pointer) ref;
   if (xobj_num->contains (key)) { pdf_drop_obj (ctx, ref); return xobj_num (key); }
   int num= n_xobj++;
-  string nm= "Im" * as_string (num);
-  c_string cnm (nm);
+  char cnm[32];
+  snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
   pdf_dict_puts_drop (ctx, res_xobj, cnm, ref);
   xobj_num (key)= num;
   return num;
@@ -1157,8 +1162,8 @@ mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
     img= mupdf_image_from_pixmap (rep->pix);
     int num= name_xobject (pdf_add_image (ctx, doc, img));
     if (num >= 0) {
-      string nm= "Im" * as_string (num);
-      c_string cnm (nm);
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       double x0= to_x (x) - rep->ox, y0= to_y (y) - rep->oy;
       fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
                         (double) rep->w, (double) rep->h, x0, y0,
@@ -1234,8 +1239,9 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     pdf_document* src= NULL;
     fz_buffer* buf= NULL;
     pdf_graft_map* map= NULL;
+    // made before fz_try: a throw is a longjmp, which skips destructors
+    c_string path (concretize (pdf));
     fz_try (ctx) {
-      c_string path (concretize (pdf));
       src= pdf_open_document (ctx, path);
       pdf_obj* spage= pdf_lookup_page_obj (ctx, src, 0);
       fz_rect box; fz_matrix m;
@@ -1251,9 +1257,14 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       pdf_obj* res= (sres == NULL) ? NULL
                                    : pdf_graft_mapped_object (ctx, map, sres);
       pdf_obj* xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
+      // a group, so that an alpha applies to the figure as a whole and not
+      // to each of its paths and fills on its own (place_image); the form
+      // is shared by every use, so it is a group for all of them
+      pdf_obj* grp= pdf_dict_put_dict (ctx, xo, PDF_NAME(Group), 2);
+      pdf_dict_put (ctx, grp, PDF_NAME(S), PDF_NAME(Transparency));
       num= n_xobj++;
-      string nm= "Im" * as_string (num);
-      c_string cnm (nm);
+      char cnm[32];
+      snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       pdf_dict_puts_drop (ctx, res_xobj, cnm, xo);
       pdf_drop_obj (ctx, res);
     }
@@ -1282,8 +1293,8 @@ mupdf_pdf_renderer_rep::place_image (int num, double w, double h,
   if (num < 0 || contents == NULL) return;
   end_text ();
   select_alpha (alpha);
-  string nm= "Im" * as_string (num);
-  c_string cnm (nm);
+  char cnm[32];
+  snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
   double m[6];
   xobject_fit (pdf_dict_gets (ctx, res_xobj, cnm), w, h, to_x (x), to_y (y), m);
   fz_append_printf (ctx, contents, "q %g %g %g %g %g %g cm /%s Do Q\n",
@@ -1323,8 +1334,8 @@ mupdf_pdf_renderer_rep::tiling_pattern (int img, double w, double h,
   string key= as_string (img) * ":" * as_string (w) * ":" * as_string (h)
               * ":" * as_string (ax) * ":" * as_string (ay);
   if (pattern_pool->contains (key)) return pattern_pool (key);
-  string inm= "Im" * as_string (img);
-  c_string cinm (inm);
+  char cinm[32];
+  snprintf (cinm, sizeof (cinm), "Im%d", (int) (img));
   pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cinm);
   if (xo == NULL) return -1;
   int num= -1;
@@ -1353,8 +1364,8 @@ mupdf_pdf_renderer_rep::tiling_pattern (int img, double w, double h,
     pdf_dict_puts (ctx, xres, cinm, xo);
     pdf_obj* ref= pdf_add_stream (ctx, doc, buf, dict, 0);
     num= n_pat++;
-    string pnm= "P" * as_string (num);
-    c_string cpnm (pnm);
+    char cpnm[32];
+    snprintf (cpnm, sizeof (cpnm), "P%d", (int) (num));
     pdf_dict_puts_drop (ctx, res_pat, cpnm, ref);
   }
   fz_always (ctx) {
@@ -1413,8 +1424,8 @@ transparent_xobject (fz_context* ctx, pdf_obj* xo, int depth) {
 
 bool
 mupdf_pdf_renderer_rep::opaque_tile (int img) {
-  string nm= "Im" * as_string (img);
-  c_string cnm (nm);
+  char cnm[32];
+  snprintf (cnm, sizeof (cnm), "Im%d", (int) (img));
   pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
   bool r= false;
   fz_try (ctx) { r= (xo != NULL) && !transparent_xobject (ctx, xo, 0); }
@@ -1754,9 +1765,19 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
   fz_context* ctx= mupdf_context ();
   pdf_document* doc= NULL;
   bool ok= false;
+  // what TeXmacs has to compute is computed first: the fz_try below must
+  // create nothing with a destructor, since a throw is a longjmp
+  c_string in (concretize (pdf_path));
+  c_string out (concretize (out_path));
+  array<string> att_names, att_bodies;
+  for (int i=0; i<N(attachments); i++) {
+    string body;
+    if (load_string (attachments[i], body, false)) continue;  // unreadable
+    att_names << (as_string (tail (attachments[i])) * string ((char) 0));
+    att_bodies << body;
+  }
   fz_var (doc); fz_var (ok);
   fz_try (ctx) {
-    c_string in (concretize (pdf_path));
     doc= pdf_open_document (ctx, in);
     pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
     pdf_obj* names= pdf_dict_get (ctx, root, PDF_NAME(Names));
@@ -1769,14 +1790,13 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
     pdf_obj* af= pdf_dict_get (ctx, root, PDF_NAME(AF));
     if (af == NULL) af= pdf_dict_put_array (ctx, root, PDF_NAME(AF),
                                             N(attachments));
-    for (int i=0; i<N(attachments); i++) {
-      string body;
-      if (load_string (attachments[i], body, false)) continue;  // unreadable
-      string base= as_string (tail (attachments[i]));
-      c_string nm (base), data (body);
-      fz_buffer* buf=
-        fz_new_buffer_from_copied_data (ctx, (unsigned char*) (char*) data,
-                                        (size_t) N(body));
+    for (int i=0; i<N(att_names); i++) {
+      // the names end with a 0, so that they are C strings as they are
+      const char* nm= &att_names[i][0];
+      int len= N(att_bodies[i]);   // an empty string may have no storage
+      fz_buffer* buf= fz_new_buffer_from_copied_data (ctx,
+                        (unsigned char*) (len == 0? "": &att_bodies[i][0]),
+                        (size_t) len);
       pdf_obj* fs= pdf_add_embedded_file (ctx, doc, nm,
                                           "application/octet-stream",
                                           buf, 0, 0, 0);
@@ -1788,7 +1808,6 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
     pdf_write_options opts= pdf_default_write_options;
     opts.do_compress= 1;
     opts.do_garbage= 3;
-    c_string out (concretize (out_path));
     pdf_save_document (ctx, doc, out, &opts);
     ok= true;
   }

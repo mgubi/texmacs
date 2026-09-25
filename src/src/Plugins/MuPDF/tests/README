@@ -44,7 +44,11 @@ figures, vector.pdf and the same turned by /Rotate 90, whose text says
 which way is up -- the one check which is not generic: the harness reads
 where UP lands against the caption, since the rendering check cannot see
 a figure upside down (both readers draw the same file); taking the fix out
-makes it fail, that was tried; pattern.tm has a patterned
+makes it fail, that was tried. It also has overlap.pdf, two overlapping
+squares, at half opacity: as a transparency group the overlap is pale
+blue, without one purple (the blue square over a half transparent red
+one), and the harness counts purple pixels in what each reader draws --
+289 and 324 without the group, 0 with it; pattern.tm has a patterned
 background of opaque tiles, which must be one /Pattern; pattern-photo.tm
 has a photograph with a soft mask as its tile, which must *not* be one,
 since Ghostscript draws such a pattern wrongly (and the check catches it

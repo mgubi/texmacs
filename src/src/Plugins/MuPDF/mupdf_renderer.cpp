@@ -254,7 +254,7 @@ static hashmap<basic_character, mupdf_image> character_image;
 // caches
 static hashmap<unsigned long long int, mupdf_image> picture_pool;
 static hashmap<tree, mupdf_image>  image_pool;
-static hashmap<tree, mupdf_pattern> pattern_pool;
+static hashmap<tree, mupdf_pattern> pattern_pool; // by pattern_key
 static hashmap<tree, mupdf_image> pattern_image_pool;
 static hashmap<tree, mupdf_form> form_pool; // nil: MuPDF cannot read it
 static hashmap<string, mupdf_font> native_fonts;
@@ -606,6 +606,19 @@ placed_pattern (fz_context *ctx, pdf_pattern *t, double ox, double oy) {
                       fz_make_matrix (1, 0, 0, 1, (float) ox, (float) oy));
 }
 
+// The key of a pattern in pattern_pool: the pattern and the size of its
+// tile in device pixels, which depends on the zoom (get_pattern_data), so
+// that a pattern registered at one zoom is not used at another with tiles
+// of the wrong size
+static tree
+pattern_key (brush br, SI pixel) {
+  url u;
+  SI w, h;
+  tree eff;
+  get_pattern_data (u, w, h, eff, br, pixel);
+  return tuple (br->get_pattern (), as_string (w), as_string (h));
+}
+
 void
 mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
   // debug_convert << "register_pattern_image\n";
@@ -614,9 +627,8 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
                     << "brush with pattern expected\n";
     return;
   }
-  tree p= br->get_pattern ();
-  // debug_convert << p << "\n";
-  if (pattern_pool->contains(p)) return;
+  tree p= pattern_key (br, pixel);
+  if (pattern_pool->contains (p)) return;
 
   url u;
   SI w, h;
@@ -690,8 +702,9 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
 void
 mupdf_renderer_rep::select_stroke_pattern (brush br) {
   if (is_nil(br) || br->get_type () != brush_pattern) return;
-  tree p_tree= br->get_pattern ();
-  register_pattern (br, brushpx == -1 ? pixel : brushpx);
+  SI px= (brushpx == -1 ? pixel : brushpx);
+  tree p_tree= pattern_key (br, px);
+  register_pattern (br, px);
   if (!pattern_pool->contains (p_tree)) {
     convert_error << "mupdf_renderer_rep::select_stroke_pattern: "
                   << "cannot find registered pattern\n";
@@ -711,8 +724,9 @@ mupdf_renderer_rep::select_stroke_pattern (brush br) {
 void
 mupdf_renderer_rep::select_fill_pattern (brush br) {
   if (is_nil(br) || br->get_type () != brush_pattern) return;
-  tree p_tree= br->get_pattern ();
-  register_pattern (br, brushpx==-1? pixel: brushpx);
+  SI px= (brushpx == -1 ? pixel : brushpx);
+  tree p_tree= pattern_key (br, px);
+  register_pattern (br, px);
   if (!pattern_pool->contains (p_tree)) {
     convert_error << "mupdf_renderer_rep::select_fill_pattern: "
                   << "cannot find registered pattern\n";
@@ -781,13 +795,7 @@ mupdf_renderer_rep::set_brush (brush br) {
     select_stroke_color (pen->get_color ());
   }
   if (br->get_type () == brush_pattern) {
-    tree p_tree= br->get_pattern ();
-    register_pattern (br, brushpx == -1 ? pixel : brushpx);
-    if (!pattern_pool->contains (p_tree)) {
-      convert_error << "mupdf_renderer_rep::set_brush: "
-        << "cannot find registered pattern\n";
-      return;
-    }
+    // each registers the pattern and complains if it cannot
     select_fill_pattern (br);
     select_stroke_pattern (br);
   }
@@ -797,14 +805,23 @@ void
 mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
   // the neutral pattern around the pages, as in the Qt port: white, then
   // the pattern image tiled at its natural size
-  static brush neutral;
+  static url u= url_none ();
+  static int iw= 0, ih= 0;
   static bool resolved= false;
   if (!resolved) {
     resolved= true;
-    url u= resolve_pattern (url ("neutral-pattern.png"));
-    if (!is_none (u))
-      neutral= brush (compound ("pattern", as_string (u), "", ""), 255);
+    u= resolve_pattern (url ("neutral-pattern.png"));
+    if (!is_none (u)) image_size (u, iw, ih);
   }
+  // at its natural size whatever the zoom, as in the Qt port: the size is
+  // given in the units of the renderer, a pixel of the image being a point
+  // of the screen (retina_factor device pixels)
+  brush neutral;
+  if (!is_none (u) && iw > 0 && ih > 0)
+    neutral= brush (compound ("pattern", as_string (u),
+                              as_string ((int) (iw * retina_factor * pixel)),
+                              as_string ((int) (ih * retina_factor * pixel))),
+                    255);
   end_text ();
   float xx1= to_x (min (x1, x2));
   float yy1= to_y (min (y1, y2));
@@ -1335,8 +1352,9 @@ load_pdf_form (url u) {
   pdf_document* doc= NULL;
   pdf_obj* xo= NULL;
   fz_var (data); fz_var (in); fz_var (buf); fz_var (doc); fz_var (xo);
+  // made before fz_try: a throw is a longjmp, which skips destructors
+  c_string path (concretize (u));
   fz_try (ctx) {
-    c_string path (concretize (u));
     data= fz_read_file (ctx, path);
     in= fz_open_buffer (ctx, data);
     doc= pdf_open_document_with_stream (ctx, in);
@@ -1381,6 +1399,18 @@ draw_form (fz_context *ctx, pdf_processor *proc, mupdf_form fm, int alpha,
   double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
   if (bw <= 0 || bh <= 0) return;
   double sx= w / bw, sy= h / bh;
+  // A translucent figure is made translucent as a whole: as a group, or
+  // each of its paths and fills would take the alpha on its own and show
+  // through the ones above it. An opaque one is not made a group, which
+  // would cost a buffer the size of the figure at every repaint; the form
+  // is ours, so /Group is put or taken away for each use.
+  mupdf_protected ("draw_form group", [&] () {
+    if (alpha < 255) {
+      pdf_obj* g= pdf_dict_put_dict (ctx, fm->xo, PDF_NAME(Group), 2);
+      pdf_dict_put (ctx, g, PDF_NAME(S), PDF_NAME(Transparency));
+    }
+    else pdf_dict_del (ctx, fm->xo, PDF_NAME(Group));
+  });
   // q and Q stay outside: a figure which throws halfway must not leave
   // the graphics state one level deeper
   proc->op_q (ctx, proc);

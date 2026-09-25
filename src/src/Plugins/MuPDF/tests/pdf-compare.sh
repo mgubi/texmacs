@@ -130,6 +130,23 @@ else: print ("ok")')
     else
       echo "  FAIL  $way"; fail=1
     fi
+    # the half transparent figure is translucent as a whole (a group):
+    # where its squares overlap, pale blue (128 128 255); purple (128 64
+    # 191, measured), where the blue square went over a half transparent
+    # red one, means it is not, in either reader
+    for r in mu gs; do
+      if [ $r = mu ]; then mutool draw -r 72 -o "$OUT/grp-$r.png" "$mu" 1 >/dev/null 2>&1
+      else gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -o "$OUT/grp-$r.png" "$mu" >/dev/null 2>&1; fi
+      purple=$(python3 -c "
+from PIL import Image
+a= Image.open ('$OUT/grp-$r.png').convert ('RGB')
+print (sum (1 for p in a.getdata () if p[0] > 90 and p[2] > 150 and p[1] < 100))" 2>/dev/null || echo 1)
+      if [ "$purple" = 0 ]; then
+        echo "  ok    the translucent figure is a group ($r)"
+      else
+        echo "  FAIL  the translucent figure is not a group ($r: $purple purple pixels)"; fail=1
+      fi
+    done
   fi
 
   # the two readers must agree on what the file says

@@ -700,7 +700,12 @@ behaviour. Feature status against those two:
   `pdf_process_contents` would otherwise push; without it `op_Do_form`
   dereferences NULL), and the form's `/Matrix` must be taken out of fitz's
   page transform (`pdf_page_obj_transform`), which also turns y upside
-  down, see *docs/pdf-output-with-mupdf.md*;
+  down, see *docs/pdf-output-with-mupdf.md*. A figure drawn translucent
+  is made a transparency group for that use (`/Group` put on the form, and
+  taken away again for an opaque one, which would otherwise cost a buffer
+  the size of the figure at every repaint): the alpha then applies to the
+  figure as a whole, as it did to the bitmap, and not to each of its paths
+  and fills, which would show through one another;
 * **patterns anchored to the document**: the pool keeps each pattern
   unplaced, and every select makes a placed copy (`placed_pattern`) whose
   matrix puts a corner of the tiles at the origin of the document, where
@@ -712,11 +717,19 @@ behaviour. Feature status against those two:
   `pattern-scroll.scm` under `scroll-shift.script` differed from its
   repaint on 156 rows, now on none but the next point. Our `pdf_pattern`s
   are reference counted as MuPDF's own (`FZ_INIT_STORABLE`); they were
-  made with a count of 0 before, so that they were never freed;
+  made with a count of 0 before, so that they were never freed. The pool
+  is keyed by the pattern *and the size of its tile* in device pixels
+  (`pattern_key`), which depends on the zoom: keyed by the pattern alone,
+  a fill kept the tiles of the zoom it was first drawn at
+  (`pattern-zoom`: 26 pixel stripes at zoom 1 and at zoom 2, now 26 and
+  52), while the glyphs, whose pixmaps are keyed by size, did not.
+  `clear_device` gives the neutral pattern its size in the units of the
+  renderer, a pixel of the image to a point of the screen, so that it
+  stays at its natural size at every zoom as in the Qt port;
 * still open: after scrolling back up on a patterned page, one row of the
   grey surround at the edge of the repainted strip shows the page colour
-  (`pattern-scroll`, s3 against s4); it was there before the patterns were
-  anchored. `set_brush` also resets the pencil width/caps.
+  (`pattern-scroll`, s3 against s4, row 337); it was there before the
+  patterns were anchored. `set_brush` also resets the pencil width/caps.
 
 The renderers of the MuPDF plugin (`mupdf_renderer_rep`, used by the Vue
 windows and pictures, and `fitz_renderer_rep`) derive from

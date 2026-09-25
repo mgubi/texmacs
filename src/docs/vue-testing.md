@@ -136,7 +136,8 @@ callback output.
 | `debug-view` | the Clay debug view of F1 over a window with a tool; hover and click while it is shown |
 | `drop` | a dropped file name and a dropped piece of text reach `mouse-drop-event` and are inserted |
 | `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
-| `figures` | PDF figures drawn by MuPDF as drawing (a form XObject), upright and turned by `/Rotate 90`, and at a size where pixels would show; the figures are those of `Plugins/MuPDF/tests` |
+| `figures` | PDF figures drawn by MuPDF as drawing (a form XObject), upright and turned by `/Rotate 90`, one at half opacity (where its squares overlap: pale blue, never purple), and at a size where pixels would show; the figures are those of `Plugins/MuPDF/tests` |
+| `pattern-zoom` | a pattern fill and pattern glyphs at zoom 1 and zoom 2: the stripes of the fill must double with the glyphs'. The zoom is set with `set-window-zoom-factor`: `change-zoom-factor` saves it as the user's preference, which a test must never do |
 | `pattern-scroll` | `pattern-scroll.scm` under `scroll-shift.script`: a patterned page with patterned text, where scrolling must move the pattern with the page. s1 = s2; s3 and s4 still differ on one row of the surround (see the MuPDF renderer in vue-graphics-stack.md) |
 | `pattern` | paper mode and glyphs filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns |
 | `wheel` | scrolling with the wheel, then a balloon from a hovered toolbar button |

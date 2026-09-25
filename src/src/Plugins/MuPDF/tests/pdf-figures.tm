@@ -8,6 +8,12 @@
   top right of the second.
 
   <image|vector.pdf|6cm|||> <image|vector-rotated.pdf||4cm||>
+
+  A figure drawn at half opacity must be translucent as a whole: where its
+  red and blue squares overlap, blue over white, not blue over a
+  half-transparent red.
+
+  <with|opacity|50%|<image|overlap.pdf|3cm|||>>
 </body>
 
 <initial|<\collection>

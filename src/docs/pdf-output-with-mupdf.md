@@ -297,7 +297,11 @@ readers then substitute.
   drew every figure upside down -- which the rendering check cannot see,
   both readers drawing the same file. `pdf-figures.tm` in the tests has
   text in its figures which says which way is up, and the harness reads
-  where it lands;
+  where it lands. The form is also a transparency group (`/Group /S
+  /Transparency`), so that an alpha applies to the figure as a whole and
+  not to each path and fill on its own, which would show through one
+  another; the harness checks that too, with a half transparent figure
+  of two overlapping squares (`overlap.pdf`);
 * pictures, **tiling patterns** (below), links, named destinations, the outline as a tree, `/Info` metadata, attachments.
 
 ### Ligatures
@@ -347,6 +351,16 @@ Not every tile goes into a pattern:
 
 ## What is left
 
+* **C++ inside `fz_try`.** MuPDF throws with `longjmp`, which skips C++
+  destructors, so the code inside an `fz_try` must create nothing which
+  has one. The object names are made with `snprintf`, the paths before
+  the `fz_try`, `write_type3` computes the glyphs and the CMap first and
+  gives MuPDF the finished strings, and the attachments are read first.
+  What remains is the finishing of the document: `write_fonts`,
+  `write_outline`, `write_dests` and `write_metadata` run inside the one
+  `fz_try` of the destructor and use strings and arrays throughout. A
+  throw there -- which ends the export anyway -- leaks them; each would
+  want the same split as `write_type3`.
 * **Encryption.** `pdf_write_options` has the fields and nothing in
   TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
   out), so it is written down rather than written.
