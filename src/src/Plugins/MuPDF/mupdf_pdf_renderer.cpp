@@ -2027,8 +2027,20 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
                                           "application/octet-stream",
                                           buf, 0, 0, 0);
       fz_drop_buffer (ctx, buf);
+      // In the name tree, a file specification written out in full, not the
+      // reference MuPDF returns: the reader of pdf_hummus_extract_attachment
+      // takes /Names, /EmbeddedFiles, their array and each specification as
+      // direct objects, and finds nothing otherwise -- a PDF made here could
+      // not be opened by a build with PDFHummus. /AF keeps the reference.
+      // The direct one is made afresh, sharing no direct object with it.
+      pdf_obj* ef= pdf_dict_get (ctx, fs, PDF_NAME(EF));
       pdf_array_push_string (ctx, arr, nm, strlen (nm));
-      pdf_array_push (ctx, arr, fs);
+      pdf_obj* d= pdf_array_push_dict (ctx, arr, 4);
+      pdf_dict_put (ctx, d, PDF_NAME(Type), PDF_NAME(Filespec));
+      pdf_dict_put_string (ctx, d, PDF_NAME(F), nm, strlen (nm));
+      pdf_dict_put_text_string (ctx, d, PDF_NAME(UF), nm);
+      pdf_obj* def= pdf_dict_put_dict (ctx, d, PDF_NAME(EF), 2);
+      pdf_dict_put (ctx, def, PDF_NAME(F), pdf_dict_get (ctx, ef, PDF_NAME(F)));
       pdf_array_push_drop (ctx, af, fs);
     }
     pdf_write_options opts= pdf_default_write_options;

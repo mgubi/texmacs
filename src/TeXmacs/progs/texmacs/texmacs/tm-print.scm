@@ -127,15 +127,24 @@
           (notify-now "Fail to attach tm to pdf")))))
 
 (tm-define (attach-doc-to-exported-pdf fname)
+  ;; The document goes in with its linked files (images, included documents,
+  ;; styles of its own), and the copy which goes in names them by the paths
+  ;; pdf-replace-linked-path resolves against the document (taking them out,
+  ;; wrapped-import-pdf-embeded-with-tm reduces them to their file names).
+  ;; It is given a copy of the document, since it changes the tree it is
+  ;; given in place -- given the tree of the buffer, it rewrote the paths of
+  ;; the open document, behind the editor's back, and the next save kept
+  ;; them -- and it is that copy which goes in.
   (let* ((tem-url (buffer-new))
          (new-url (url-relative tem-url (string-append (url-basename fname) ".tm")))
          (cur-url (current-buffer-url))
-         (cur-tree (buffer-get cur-url))
+         (cur-tree (tree-copy (buffer-get cur-url)))
          (linked-file (pdf-get-linked-file-paths cur-tree cur-url))
          (linked-file-with-main (array-url-append new-url linked-file))
          (new-tree (pdf-replace-linked-path cur-tree cur-url)))
     (buffer-rename tem-url new-url)
     (buffer-copy cur-url new-url)
+    (buffer-set new-url new-tree)
     ;; copy also attachments and auxiliary data
     (with-buffer cur-url
       (let* ((attl (list-attachments)) 

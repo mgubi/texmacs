@@ -250,16 +250,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (wrapped-import-pdf-embeded-with-tm tem-pdf)
+  ;; the linked files (images, included documents...) come out of the PDF
+  ;; next to its document, which is therefore what their paths are made
+  ;; relative to: with PDFHummus that is next to the PDF, with MuPDF a
+  ;; directory of their own (see mupdf_attachments.cpp)
   (let* ((tem-dir (url-temp-dir))
          (tem-tm (url-append tem-dir "tem.tm"))
          (tem-tm2 (url-append tem-dir "extracted.tm")))
     (if (extract-attachments tem-pdf)
-        (begin
+        (let* ((main (url-relative tem-tm (pdf-get-attached-main-tm tem-pdf))))
           (string-save
             (serialize-texmacs
-              (pdf-replace-linked-path
-                (tree-import (url-relative tem-tm (pdf-get-attached-main-tm tem-pdf)) "texmacs")
-                tem-pdf))
+              (pdf-replace-linked-path (tree-import main "texmacs") main))
             tem-tm2)
           (load-buffer tem-tm2))
         (begin

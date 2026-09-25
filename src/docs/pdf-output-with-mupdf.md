@@ -406,6 +406,48 @@ the values of its labels, as a document saved by TeXmacs does (the
 after the reference which needs it. The same as LaTeX needing a second run,
 not a fault of the export.
 
+## The document in the PDF
+
+*File -> Export -> Pdf with embedded document* puts the TeXmacs document
+into the PDF, with the files it links to (images, included documents,
+styles of its own), and *File -> Import -> Pdf with embedded document*
+takes them back out. With PDFHummus that is
+`pdf_hummus_{make,extract}_attachment.cpp`; without it, as here, only the
+embedding had a MuPDF version (`mupdf_pdf_make_attachments`), and the rest
+were stubs: the linked files were not found, so only the document went in,
+and nothing came out -- the import always said "Can not extract
+attachments from PDF". `Plugins/MuPDF/mupdf_attachments.cpp` has the rest:
+the search for the linked files and the rewriting of their paths, taken
+over from the Hummus file as they are, and the extraction with MuPDF.
+
+It follows the format of Hummus, so that either reads what the other
+writes -- all four ways were tried, with a build with PDFHummus: the
+document first in `/Names/EmbeddedFiles` (the reader takes the first as
+the document), and in the name tree file specifications written out in
+full, since the reader of Hummus takes them as direct objects and found
+nothing in a PDF made here, where MuPDF had put references (`/AF` keeps
+those). Two things differ on purpose:
+
+* the files come out into a directory of their own, not next to the PDF:
+  the document of `paper.pdf` is `paper.tm`, and next to `paper.pdf` there
+  is often a `paper.tm` already -- the source, perhaps newer -- which the
+  Hummus extraction overwrites. The import therefore makes the linked paths
+  relative to the extracted document, not to the PDF (`file-menu.scm`),
+  which is where both put them;
+* the name a file has in the PDF is reduced to a file name before it is
+  written (a PDF naming one `../x` would write elsewhere), and decoded when
+  it is UTF-16.
+
+The export also changed the open document: `pdf-replace-linked-path`
+rewrites the tree it is given in place, and was given the tree of the
+buffer, so exporting turned the paths of the images of the open document
+into absolute ones, behind the editor's back (unmodified, until the next
+save kept them). It now works on a copy, and it is that copy which goes
+into the PDF, as was meant (`attach-doc-to-exported-pdf`, `tm-print.scm`).
+That was so with Hummus as well; here it only showed once the rewriting
+did something. The copy names the linked files by absolute paths, as
+before -- the import reduces them to file names.
+
 ## MuPDF's errors and C++
 
 MuPDF reports an error with `fz_throw`, a `longjmp`. Two things follow,
