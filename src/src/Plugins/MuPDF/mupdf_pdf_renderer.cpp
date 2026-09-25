@@ -1856,7 +1856,7 @@ mupdf_pdf_renderer_rep::write_outline () {
       pdf_array_push (ctx, dest, PDF_NAME(XYZ));
       pdf_array_push_real (ctx, dest, o.x);
       pdf_array_push_real (ctx, dest, o.y);
-      pdf_array_push_int (ctx, dest, 0);
+      pdf_array_push (ctx, dest, PDF_NULL);   // the zoom: the reader's, kept
       pdf_obj* e= entry; entry= NULL;  // pdf_add_object_drop drops it
       ref[j]= pdf_add_object_drop (ctx, doc, e);
     }
@@ -1915,7 +1915,9 @@ mupdf_pdf_renderer_rep::write_dests () {
       pdf_array_push (ctx, d, PDF_NAME(XYZ));
       pdf_array_push_real (ctx, d, pos.y1);
       pdf_array_push_real (ctx, d, pos.x2);
-      pdf_array_push_int (ctx, d, 0);
+      // the zoom: null, the reader's own, as pdf_hummus_renderer writes it;
+      // 0 means the same in the specification, but MuPDF takes it for 100%
+      pdf_array_push (ctx, d, PDF_NULL);
     }
   }
   fz_catch (ctx) {

@@ -400,6 +400,17 @@ as Hummus writes them. Three things differ, on purpose:
 `dest-bytes.py` in the tests checks the second and the third on the file
 itself; `structure.tm` has an accented heading, label, author and address.
 
+The outline was compared with the one a build with PDFHummus makes, on
+an article three levels deep, a book (a part, chapters, an unnumbered one,
+an appendix) and an article without a table of contents, with a level
+skipped and mathematics in a heading: the same entries, nested and folded
+the same way, on the same pages, at the same places to a tenth of a point.
+The titles differ where they have accents -- Hummus converts them from
+Cork, and they arrive in UTF-8, so it writes "GrÃ¶Ã§e" for "Größe". The
+zoom of a destination is `null`, the reader's own, as Hummus writes it;
+it was 0, which means the same in the specification but which MuPDF takes
+for 100%.
+
 A forward reference in a batch export is "?" unless the document carries
 the values of its labels, as a document saved by TeXmacs does (the
 `references` part at its end): the export typesets once, and a label comes

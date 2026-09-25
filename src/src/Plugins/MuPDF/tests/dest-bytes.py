@@ -26,7 +26,7 @@ i= d.find (b'/Dests')
 keys= set ()
 if i >= 0:
     j= d.find (b'/Names', i)
-    arr= d[j:d.find (b']\n', j) + 1] if j >= 0 else b''
+    arr= d[j:] if j >= 0 else b''   # the loop below stops at its end
     # the keys are the strings at the top level of the /Names array
     depth= 0; pos= arr.find (b'[') + 1
     while pos < len (arr):
