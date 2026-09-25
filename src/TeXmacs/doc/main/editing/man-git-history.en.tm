@@ -58,8 +58,12 @@
 
   <menu|Version|Restore version> lists the recent versions of the current
   document. Choosing one of them replaces the contents of the file by that
-  version. This is an ordinary change: the history is not modified, and
-  you may compare the result with the last commit, or discard it. Recent
+  version. The history is not modified: this is an ordinary change, which
+  you may compare with the last commit, commit or discard. However, the
+  changes of the file which were neither committed nor staged are lost,
+  and <TeXmacs> warns you about this before restoring; commit them first
+  if you want to keep them. A document with unsaved edits has to be saved
+  or reverted first. Recent
   versions can also be compared and restored from the <menu|History> tab
   of the <name|Git> panel.
 

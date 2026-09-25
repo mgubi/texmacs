@@ -33,14 +33,16 @@
   <paragraph*|Putting a document under version control>
 
   If the current document does not belong to a repository yet, then
-  <menu|Version|Create Git repository> creates a new repository in the
-  directory of the document. All files in this directory and its
+  <menu|Tools|Versioning tool|Create Git repository> creates a new
+  repository in the directory of the document (the same entry is in the
+  <menu|Version> menu, when it is shown). All files in this directory and its
   subdirectories may then be put under version control. A file
   <verbatim|.gitignore> is created as well, which tells <name|Git> to ignore
   the backup files of <TeXmacs>.
 
   If your coauthors already have a repository on a server, then use
-  <menu|Version|Clone Git repository>. In the dialog, enter the address of
+  <menu|Tools|Versioning tool|Clone Git repository> (or
+  <menu|Version|Clone Git repository>). In the dialog, enter the address of
   the repository, as given by the hosting service, and the directory in
   which the copy should be made. The copy is made in the background, after
   which the status of the new working tree is shown. The repositories you
@@ -54,14 +56,15 @@
   which you created or cloned with <TeXmacs>, and in those which you
   explicitly trust. When you open a document inside another repository,
   for instance one which you cloned in a terminal, the <menu|Version> menu
-  only contains <menu|Version|Use Git in this folder>. Choose it if you know
+  only contains <menu|Version|Use Git in this folder>, besides the tools for
+  comparing files. Choose it if you know
   where the repository comes from; the complete menu then becomes
   available. Only do this for folders whose origin you trust, such as your
   own projects: do not do it for an archive you received by e-mail.
 
   <paragraph*|Choosing a mode>
 
-  The first time you use the <name|Git> tools, <TeXmacs> asks you how you
+  The first time you open the <name|Git> panel, <TeXmacs> asks you how you
   want to work:
 
   <\description>
@@ -73,7 +76,8 @@
     <name|Git>.
   </description>
 
-  You may change your choice at any time in <menu|Version|Git preferences>.
+  Until you choose, the full mode is used. You may change your choice at
+  any time in <menu|Version|Git preferences>.
 
   <paragraph*|Overview of the interface>
 
@@ -86,14 +90,16 @@
     conflicts|man-git-conflicts.en.tm>).
 
     <item>The most frequent actions: <menu|Commit> (or <menu|Save
-    snapshot> in the simple mode), <menu|Synchronize> and <menu|Git panel>.
+    snapshot> in the simple mode), <menu|Synchronize> (when the repository
+    has a remote, see <hlink|working with coauthors|man-git-remote.en.tm>)
+    and <menu|Git panel>.
 
     <item>The actions on the history of the current document:
     <menu|Compare with>, <menu|Restore version>, <menu|History of this
     document> and <menu|Who changed what>.
 
     <item>The submenus <menu|This file> (full mode only) and
-    <menu|Project>, and a submenu for the whole repository, whose name
+    <menu|Project> (for <TeXmacs> documents), and a submenu for the whole repository, whose name
     summarizes its state, like <menu|Git (main, 3 changed, 1 ahead)>. In
     this manual, we will call it <menu|Version|Git>.
 
@@ -108,9 +114,13 @@
     Git main \<#B7\> 2 changes \<#B7\> \<#2191\>1
   </verbatim-code>
 
-  This means that you are on the branch <verbatim|main>, that two files were changed
-  since the last commit, and that one commit is waiting to be sent to the
-  server.
+  This means that you are on the branch <verbatim|main>, that two files
+  were changed or added since the last commit, and that one commit is
+  waiting to be sent to the server. Similarly, <verbatim|\<#2193\>2> means
+  that two commits of your coauthors are waiting to be received. The
+  footer shows <verbatim|saved> when there are no changes, the number of
+  conflicts during a merge, and <verbatim|working...> while <name|Git> is
+  running in the background.
 
   <paragraph*|The <name|Git> panel>
 
@@ -123,7 +133,8 @@
 
   <\description>
     <item*|Changes>The changed files, grouped into conflicts, staged
-    changes, other changes and new files, with buttons for staging,
+    changes, other changes and new files (in the simple mode, only
+    conflicts and changes), with buttons for staging,
     comparing and resolving them. Below, a box for a message, with
     <menu|Suggest>, which describes the changes, and <menu|Commit> (or
     <menu|Save snapshot>). Each repository keeps its own message.

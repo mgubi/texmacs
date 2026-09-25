@@ -506,6 +506,7 @@
 (lazy-tmfs-handler (version git-blame) blame)
 (lazy-define (version git-drivers) git-merge-driver)
 (lazy-tool (version git-widgets) git-tool version-review-tool)
+(lazy-define (version git-widgets) git-interactive-init git-interactive-clone)
 (lazy-define (version git-base) git-footer)
 (with previous footer-hook
   ;; NOTE: the Git modules are only loaded for documents inside a working tree

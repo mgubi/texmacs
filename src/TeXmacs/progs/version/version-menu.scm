@@ -374,5 +374,5 @@
               ((eval (utf8->cork r)) (git-show-status (system->url r))))))))
   ---
   (-> "Differences" (link version-differences-menu))
-  (assuming (git-available?)
-    ("Git preferences" (open-git-preferences))))
+  ;; NOTE: also shown when Git is not found, so that it can be located
+  ("Git preferences" (open-git-preferences)))

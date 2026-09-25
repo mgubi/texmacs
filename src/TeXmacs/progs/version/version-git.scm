@@ -445,13 +445,21 @@
   (:synopsis "Replace @name by its version at the revision @rev")
   (:interactive #t)
   ;; NOTE: the history is kept: the restored version is a new change,
-  ;; which can be committed or discarded
+  ;; which can be committed or discarded; but the changes which were not
+  ;; staged are replaced, so the confirmation warns about them
   (cond ((not (git-safe-name? rev)) (bad-name "revision"))
         ((and (buffer-exists? name) (buffer-modified? name))
          (set-message "Please save or revert the document first" "Restore"))
         (else
           (user-confirm (string-append "Replace the current version by the "
-                                       "version " (short-hash rev) "?") #f
+                                       "version " (short-hash rev) "?"
+                                       (if (in? (git-file-state name)
+                                                '(modified partial))
+                                           (string-append
+                                            " The changes which were not "
+                                            "committed or staged will be lost.")
+                                           ""))
+                        #f
             (lambda (answ)
               (when answ
                 (apply git-restore-revision-now (cons* name rev opt-path))))))))

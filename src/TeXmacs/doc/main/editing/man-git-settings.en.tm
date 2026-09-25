@@ -76,7 +76,7 @@
 
   <\description>
     <item*|The <menu|Version> menu only offers <menu|Use Git in this
-    folder>>The repository was not created by <TeXmacs>; see
+    folder>>The repository was not created or cloned by <TeXmacs>; see
     <hlink|getting started|man-git-start.en.tm>.
 
     <item*|The server refused the access>Configure an SSH key or a

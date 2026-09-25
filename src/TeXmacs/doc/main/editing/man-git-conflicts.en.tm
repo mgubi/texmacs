@@ -23,10 +23,20 @@
   fox leaps\Q. Only when the same words were changed in two different ways
   a real conflict remains.
 
+  By default, <name|Git> first merges the files line by line, as usual, and
+  marks the documents in which both sides changed the same paragraph as
+  having a conflict; the structured merge is then done when you resolve the
+  conflict, as explained below. With <menu|Version|Git|Merge documents
+  structurally>, <name|Git> directly uses the structured merge of
+  <TeXmacs>, so that only the documents with real conflicts remain to be
+  resolved (see the end of this page).
+
   <paragraph*|Resolving the conflicts of a document>
 
-  When a merge leaves conflicts, <TeXmacs> opens the status page, which
-  lists the files with conflicts; they are also shown at the top of the
+  When getting the changes of your coauthors leaves conflicts, <TeXmacs>
+  opens the status page, which lists the files with conflicts; after
+  <menu|Version|Git|Merge branch>, the dialog which reports the conflicts
+  offers to show this page. The conflicts are also shown at the top of the
   <name|Git> panel. For a <TeXmacs> document with a conflict, the
   <menu|Version> menu starts with the entries:
 
@@ -34,7 +44,10 @@
     <item*|<menu|Resolve conflict>>Merge the document structurally, and show
     the remaining conflicts in the document. For each of them, your version
     is displayed as the old version (in red) and the version of your
-    coauthor as the new version (in green). The bar at the bottom of the
+    coauthor as the new version (in green). The footer tells how many
+    conflicts remain; if there are none, then the document was merged
+    automatically, and you only have to check the result. The document must
+    not have unsaved edits: save or revert it first. The bar at the bottom of the
     window shows the number of conflicts; its buttons <menu|Previous> and
     <menu|Next> go from one conflict to the other, the buttons <menu|Mine>
     and <menu|Theirs> after <menu|Keep> retain one of the two versions, and

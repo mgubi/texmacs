@@ -177,9 +177,13 @@ top_menu_actions () {
 
 static void
 populate (QMenu* m) {
-  // NOTE: the menus of TeXmacs are built lazily, when shown
+  // NOTE: the menus of TeXmacs are built lazily, when shown; the menu is
+  // also "hidden" again, since TeXmacs postpones the updates of the main
+  // menu while one of its menus is shown (menu_count); the postponed
+  // update is only installed later, from a timer
   QMetaObject::invokeMethod (m, "force");
   QMetaObject::invokeMethod (m, "aboutToShow");
+  QMetaObject::invokeMethod (m, "aboutToHide");
 }
 
 bool

@@ -25,7 +25,7 @@
     document, and not as lines of source code;
 
     <item>when you and a coauthor changed different parts of the same
-    paragraph, the changes are merged automatically;
+    paragraph, <TeXmacs> merges both changes, word by word;
 
     <item>the few real conflicts are resolved in the document itself, one by
     one, by choosing your version or the other one;
@@ -46,6 +46,8 @@
 
   <\traverse>
     <branch|Getting started|man-git-start.en.tm>
+
+    <branch|Example: a paper with a coauthor|man-git-example.en.tm>
 
     <branch|The simple mode: snapshots|man-git-snapshots.en.tm>
 
