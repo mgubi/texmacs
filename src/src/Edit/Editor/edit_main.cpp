@@ -289,9 +289,17 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     env->write (PAGE_PRINTED, "true");
   }
 
-  // Typeset pages for printing
+  // Typeset pages for printing. The typesetter is kept until the pages
+  // are drawn, not dropped as typeset_as_document drops it: the links of
+  // the document (hlink and the like) are registered by the typesetter,
+  // and a box finds its own when it is drawn (box_rep::display_links).
+  // Dropped, they were found only when the editor had typeset the same
+  // document on the screen before -- never in a batch export (texmacs -c).
 
-  box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  env->style_init_env ();
+  env->update ();
+  typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+  box the_box= ::typeset (ttt);
 
   // Determine parameters for printer
 
@@ -336,6 +344,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     }
   }
   tm_delete (ren);
+  delete_typesetter (ttt);
 
 #ifdef USE_GS
   if (!use_pdf () && pdf) {

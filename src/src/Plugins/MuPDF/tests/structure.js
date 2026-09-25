@@ -12,6 +12,20 @@ function outline (list, depth) {
 }
 outline (doc.loadOutline (), 0);
 var pdf= doc.asPDF ();
+// every entry of the outline must point at its parent by reference: a
+// direct dictionary there is invalid, and breaks when the file is compacted
+function parents (item) {
+  for (; item && item.isIndirect (); item= item.get ("Next")) {
+    var p= item.get ("Parent");
+    if (!p || !p.isIndirect ()) print ("outline-parent: not a reference, under " + item.get ("Title"));
+    parents (item.get ("First"));
+  }
+}
+var outl= pdf.getTrailer ().get ("Root").get ("Outlines");
+if (outl && !outl.isNull ()) {
+  if (!outl.isIndirect ()) print ("outline-root: not an object of its own");
+  parents (outl.get ("First"));
+}
 var pagenum= {};
 for (var p=0; p<pdf.countPages (); p++) pagenum[pdf.findPage (p).asIndirect ()]= p;
 var names= pdf.getTrailer ().get ("Root").get ("Names");

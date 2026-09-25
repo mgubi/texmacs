@@ -32,6 +32,7 @@ void notify_insert_node (typesetter ttt, path p, tree t);
 void notify_remove_node (typesetter ttt, path p);
 void exec_until         (typesetter ttt, path p);
 box  typeset            (typesetter ttt, SI& x1, SI& y1, SI& x2, SI& y2);
+box  typeset            (typesetter ttt);  // the whole document, as a box
 
 box        typeset_as_concat (edit_env env, tree t, path ip);
 box        typeset_as_box (edit_env env, tree t, path ip);

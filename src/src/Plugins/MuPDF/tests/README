@@ -55,9 +55,13 @@ since Ghostscript draws such a pattern wrongly (and the check catches it
 when it is); ligatures.tm is a line of fi, ffi, ffl and fl in the EC font;
 landscape.tm must come out wider than it is tall; structure.tm has a table
 of contents three levels deep, labels and references, one on a second page,
-and a title, and structure.js (mutool run) with structure-check.py checks
-that the outline, the named destinations, the links and the title are
-there -- the parts the writer assembles when the document is closed.
+a link to a web page and a title, and was saved by TeXmacs, so that it
+carries the values of its labels (a forward reference is "?" otherwise).
+structure.js (mutool run) with structure-check.py checks that the outline,
+the named destinations, the links -- the web one included, which a batch
+export used to lose -- and the title are there, that every entry of the
+outline points at its parent by reference, and that MuPDF has nothing to
+repair: the parts the writer assembles when the document is closed.
 
 Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
 output directory, how long a conversion is given, and the threshold.

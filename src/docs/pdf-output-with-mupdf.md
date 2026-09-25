@@ -349,6 +349,40 @@ Not every tile goes into a pattern:
   file one of the two readers gets wrong is a file to avoid.
   `opaque_tile` decides, and `pattern-photo.tm` in the tests is the case.
 
+## Links
+
+A reference (`<reference|…>`) and a link to a web page (`<hlink|…|url>`)
+reach the renderer by two routes. A locus whose body is not text of the
+document -- the number a reference prints -- becomes a `locus_box` which
+calls `href` itself. A locus whose body is text of the document is left as
+that text, and each of its boxes finds the link when it is drawn
+(`box_rep::display_links`), in the link database the typesetter filled.
+
+`print_doc` typeset the document with `typeset_as_document`, which drops
+its typesetter before returning, and the typesetter owns the registrations:
+by the time the pages were drawn, the links it had registered were gone.
+An export from a session still found them, registered a second time by the
+typesetter of the window; a batch export (`texmacs -c`) found none, and
+every `hlink` came out as plain text. `print_doc` now keeps its typesetter
+until the pages are drawn -- which applies to every printer, the PostScript
+route too -- and `display_links` draws a link once however many
+typesetters registered it (without that, an export from a session had each
+URL four times).
+
+That uncovered a fault of the outline: `/Outlines` was a direct dictionary,
+and the `/Parent` of every entry of the first level was that same
+dictionary. It is meant to be a reference -- and a direct object shared
+that way is renumbered once for each place it occurs when the file is
+compacted, which in a file with more objects sent `/First` to a link
+annotation, and MuPDF had to repair the outline. It is now an object of its
+own. The code before had it too.
+
+A forward reference in a batch export is "?" unless the document carries
+the values of its labels, as a document saved by TeXmacs does (the
+`references` part at its end): the export typesets once, and a label comes
+after the reference which needs it. The same as LaTeX needing a second run,
+not a fault of the export.
+
 ## MuPDF's errors and C++
 
 MuPDF reports an error with `fz_throw`, a `longjmp`. Two things follow,

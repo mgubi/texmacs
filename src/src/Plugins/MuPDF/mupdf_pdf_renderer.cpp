@@ -1762,10 +1762,15 @@ mupdf_pdf_renderer_rep::write_outline () {
   pdf_obj* entry= NULL;
   fz_var (entry);
   fz_try (ctx) {
+    // /Outlines is an object of its own, an indirect one: every entry of
+    // the first level points at it as its /Parent. A direct dictionary put
+    // there would be shared by all of them -- invalid, and renumbered once
+    // for each when the file is compacted, which sent /First to whatever
+    // object ended up with the number (a link, in one file)
     pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
-    pdf_obj* out= pdf_dict_put_dict (ctx, root, PDF_NAME(Outlines), 4);
-    pdf_dict_put (ctx, out, PDF_NAME(Type), PDF_NAME(Outlines));
-    ref[0]= pdf_keep_obj (ctx, out);
+    ref[0]= pdf_add_new_dict (ctx, doc, 4);
+    pdf_dict_put (ctx, ref[0], PDF_NAME(Type), PDF_NAME(Outlines));
+    pdf_dict_put (ctx, root, PDF_NAME(Outlines), ref[0]);
     for (int j=1; j<=n; j++) {
       pdf_outline_item& o= outlines[item[j]];
       entry= pdf_new_dict (ctx, doc, 6);

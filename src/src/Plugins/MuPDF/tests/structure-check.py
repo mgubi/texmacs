@@ -14,7 +14,14 @@ for n in ['#sec-first', '#sec-deep', '#sec-second', '#on-page-two']:
         bad.append ('no destination ' + n)
 if not any (l.startswith ('dest: #on-page-two -> page 1 ') for l in dests):
     bad.append ('#on-page-two not on the second page')
-if len (links) < 4: bad.append ('%d links, not 4' % len (links))
+if len ([l for l in links if '#nameddest=' in l]) < 4:
+    bad.append ('fewer than 4 links into the document')
+# the hlink to a web page: registered by the typesetter which printed the
+# document, and lost when that one was dropped before the pages were drawn
+if not any ('https://www.texmacs.org' in l for l in links):
+    bad.append ('no link to https://www.texmacs.org')
 if 'title: Structure test' not in t: bad.append ('no title')
 if any ('rror' in l for l in t): bad.append ('structure.js failed')
+if any (l.startswith ('outline-') for l in t): bad.append ('an outline entry without a proper /Parent')
+if any (l.startswith ('warning') for l in t): bad.append ('MuPDF repairs the file: ' + [l for l in t if l.startswith ('warning')][0])
 print ('; '.join (bad) if bad else 'ok')
