@@ -33,6 +33,7 @@ TeXmacs/doc/main/automated/tag-help.en.tm
 TeXmacs/doc/main/start/man-conventions.en.tm
 src/Plugins/MuPDF/tests/figures.tm
 src/Plugins/MuPDF/tests/pdf-figures.tm
+src/Plugins/MuPDF/tests/structure.tm
 src/Plugins/MuPDF/tests/pattern.tm
 src/Plugins/MuPDF/tests/pattern-photo.tm
 src/Plugins/MuPDF/tests/ligatures.tm
@@ -147,6 +148,19 @@ print (sum (1 for p in a.getdata () if p[0] > 90 and p[2] > 150 and p[1] < 100))
         echo "  FAIL  the translucent figure is not a group ($r: $purple purple pixels)"; fail=1
       fi
     done
+  fi
+
+  # the structure of structure.tm: its outline (seven headings, three
+  # levels deep), the places its references point at, its links and its
+  # title -- what the writer puts together when the document is closed
+  if [ "$name" = structure ]; then
+    mutool run "$(dirname "$0")/structure.js" "$mu" > "$OUT/structure.txt" 2>&1
+    got=$(python3 "$(dirname "$0")/structure-check.py" "$OUT/structure.txt")
+    if [ "$got" = ok ]; then
+      echo "  ok    outline, destinations, links and title are there"
+    else
+      echo "  FAIL  $got"; fail=1
+    fi
   fi
 
   # the two readers must agree on what the file says

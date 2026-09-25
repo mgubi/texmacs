@@ -684,6 +684,16 @@ behaviour. Feature status against those two:
   (`set_transformation` as pdf_hummus), shadows (`new/get/put/apply_shadow`
   by pixmap copies), pictures and scalables (`draw_scalable` falls back to
   the generic conversion when MuPDF cannot load the file);
+* **MuPDF errors**: an error nothing catches ends the process, and a
+  `longjmp` skips C++ destructors (see *MuPDF's errors and C++* in
+  docs/pdf-output-with-mupdf.md). What can fail for another reason than
+  memory is protected: images are decoded when drawn (`image`, as
+  `draw_form`), the device complains of a clip left open (`end`), q and
+  clips have limits of nesting (`set_clipping` counts only the q which
+  happened, so that `end` balances them), a font descriptor
+  (`load_pdf_font`), a PNG which cannot be written (`save_picture`). The
+  path and text operators of each glyph and line fail only for want of
+  memory and stay unprotected;
 * **FreeType under MuPDF's lock**: the charmap of a native font and the
   glyph of each character are asked of the FreeType face of the MuPDF font
   only through `mupdf_select_custom_charmap` and `mupdf_glyph_index`, which

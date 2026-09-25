@@ -538,10 +538,21 @@ save_picture (url dest, picture p) {
   picture q= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) q->get_handle ();
   if (exists (dest)) remove (dest);
+  // a file which cannot be written is an error: caught, or it would end
+  // the process (made before fz_try: a throw is a longjmp)
   c_string path= concretize (dest);
-  fz_output *out= fz_new_output_with_path (mupdf_context (), path, 0);
-  fz_write_pixmap_as_png (mupdf_context (), out, pict->pix);
-  fz_close_output (mupdf_context (), out);
-  fz_drop_output (mupdf_context (), out);
+  fz_context* ctx= mupdf_context ();
+  fz_output* out= NULL;
+  fz_var (out);
+  fz_try (ctx) {
+    out= fz_new_output_with_path (ctx, path, 0);
+    fz_write_pixmap_as_png (ctx, out, pict->pix);
+    fz_close_output (ctx, out);
+  }
+  fz_always (ctx) { fz_drop_output (ctx, out); }
+  fz_catch (ctx) {
+    cout << "TeXmacs] cannot save " << concretize (dest) << ": "
+         << fz_caught_message (ctx) << LF;
+  }
 }
 #endif

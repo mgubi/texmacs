@@ -349,18 +349,52 @@ Not every tile goes into a pattern:
   file one of the two readers gets wrong is a file to avoid.
   `opaque_tile` decides, and `pattern-photo.tm` in the tests is the case.
 
+## MuPDF's errors and C++
+
+MuPDF reports an error with `fz_throw`, a `longjmp`. Two things follow,
+and the writer is built around both:
+
+* an error which no `fz_try` catches ends the process ("aborting process
+  from uncaught error"), so every MuPDF call is made inside one;
+* a `longjmp` skips C++ destructors, so nothing which has one may be alive
+  between an `fz_try` and a call which throws -- not in the body of the
+  `fz_try`, and not in a function it calls.
+
+Hence the shape of the code. What TeXmacs has to compute -- strings,
+arrays, the tree of the outline -- is computed first, and an `fz_try`
+then hands MuPDF the results: C strings are TeXmacs strings with a 0
+added (`&s[0]`), names are made with `snprintf`. `write_fonts`,
+`write_type3`, `subset_type1`, `write_outline`, `write_dests`,
+`write_metadata`, `write_links` (with labels prepared in `end_page`) and
+the attachments all have that split, and each catches its own errors: an
+error loses its part, as a warning, not the document. The page stream is
+written through `put` and `app`, which catch the error themselves, since
+they are called from everywhere with C++ objects around them; a page which
+failed halfway is not a page, so the file is then not written, and an
+error says so.
+
+This was checked two ways. A script lists, for every `fz_try` body and
+every `mupdf_protected` lambda of the plugin, what could create a C++
+object there and the functions it calls; each of those was read, down to
+`mupdf_load_image` and `mupdf_render_svg`, which catch their own errors.
+And faults were injected (a `fz_throw` behind an environment variable, in a
+build which was then thrown away): in the page stream the export reports
+the error and writes no file, in the outline and in an encoding it warns
+and writes the rest, and in each case TeXmacs goes on. The outline,
+destinations, links and metadata of `structure.tm` and `tag-help` came out
+the same as with the code before the change, and `structure.tm` is now in
+the harness with a check of them.
+
+The screen renderer follows the same rule where MuPDF can fail for another
+reason than memory: an image is decoded when drawn (`image`, like
+`draw_form`), `fz_close_device` complains of a clip left open (`end`), and
+q and clips have limits of nesting (`set_clipping`, `set_transformation`);
+`save_picture` catches a file which cannot be written. What it leaves
+unprotected are the path and text operators of every glyph and line, which
+fail only for want of memory -- a `setjmp` for each glyph is not worth it.
+
 ## What is left
 
-* **C++ inside `fz_try`.** MuPDF throws with `longjmp`, which skips C++
-  destructors, so the code inside an `fz_try` must create nothing which
-  has one. The object names are made with `snprintf`, the paths before
-  the `fz_try`, `write_type3` computes the glyphs and the CMap first and
-  gives MuPDF the finished strings, and the attachments are read first.
-  What remains is the finishing of the document: `write_fonts`,
-  `write_outline`, `write_dests` and `write_metadata` run inside the one
-  `fz_try` of the destructor and use strings and arrays throughout. A
-  throw there -- which ends the export anyway -- leaks them; each would
-  want the same split as `write_type3`.
 * **Encryption.** `pdf_write_options` has the fields and nothing in
   TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
   out), so it is written down rather than written.

@@ -192,9 +192,26 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   double to_y (SI y) { y += oy; return (y>=0 ? y : y-pixel+1) / (double) pixel; }
   double to_w (SI w) { return ((double) w) / pixel; }
 
+  // MuPDF reports an error with a longjmp (fz_throw), and one which no
+  // fz_try catches ends the process. Every MuPDF call is therefore made
+  // inside an fz_try, and the body of an fz_try creates nothing which has
+  // a destructor, in its own frame or in a frame it calls: the longjmp
+  // would skip it. Hence what TeXmacs has to compute -- strings, arrays --
+  // is computed first, and MuPDF is handed the results.
+  //
+  // The page stream is written through put and app, which catch the error
+  // themselves (they are called with C++ objects alive around them, from
+  // everywhere). A page stream which failed halfway is not a page: broken
+  // says so, and the file is then not written.
+  bool   broken;
+  void   fail (const char* what);
+  void   put (const char* s);
+  void   app (const char* fmt, ...) __attribute__ ((format (printf, 2, 3)));
+  void   arc_path (double cx, double cy, double rx, double ry,
+                   double a0, double a1, bool move);
+
   void begin_page ();
   void end_page ();
-  void put (const char* s) { fz_append_string (ctx, contents, s); }
   void end_text ();
   void select_fill (color c);
   void select_stroke (color c);
@@ -209,7 +226,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_dests ();
-  void write_links (pdf_obj* pobj);
+  void write_links (pdf_obj* pobj, array<string>& label, array<int>& local);
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
@@ -280,7 +297,7 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
     pdf_file_name (pdf_file_name2), dpi (dpi2), nr_pages (nr_pages2),
     page_type (page_type2), landscape (landscape2),
     paper_w (paper_w2), paper_h (paper_h2),
-    started (false), page_num (0),
+    started (false), page_num (0), broken (false),
     ctx (mupdf_context ()), doc (NULL), contents (NULL),
     resources (NULL), res_font (NULL), res_xobj (NULL), res_gs (NULL),
     res_pat (NULL),
@@ -317,20 +334,23 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
 mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   if (!started) return;
   end_page ();
-  fz_try (ctx) {
-    write_fonts ();
-    write_outline ();
-    write_dests ();
-    write_metadata ();
-    // MuPDF subsets TrueType and CFF; the Type 1 fonts are left whole
-    pdf_subset_fonts (ctx, doc, 0, NULL);
-  }
+  // each of these catches its own errors (see put): an error in one part
+  // loses that part, as a warning, and not the document
+  write_fonts ();
+  write_outline ();
+  write_dests ();
+  write_metadata ();
+  // MuPDF subsets TrueType and CFF; the Type 1 fonts are left whole
+  fz_try (ctx) { pdf_subset_fonts (ctx, doc, 0, NULL); }
   fz_catch (ctx) {
-    convert_warning << "MuPDF could not finish the document: "
+    convert_warning << "MuPDF could not subset the fonts: "
                     << fz_caught_message (ctx) << LF;
   }
   c_string name (concretize (pdf_file_name)); // not in fz_try: a longjmp
-  fz_try (ctx) {
+  if (broken)
+    convert_error << "The PDF " << pdf_file_name << " is not written: "
+                  << "a page of it could not be" << LF;
+  else fz_try (ctx) {
     pdf_write_options opts= pdf_default_write_options;
     opts.do_compress= 1;
     opts.do_compress_images= 1;
@@ -351,6 +371,31 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   pdf_drop_document (ctx, doc);
 }
 
+void
+mupdf_pdf_renderer_rep::fail (const char* what) {
+  if (!broken)
+    convert_error << "MuPDF could not write " << what << " of "
+                  << pdf_file_name << ": " << fz_caught_message (ctx) << LF;
+  broken= true;
+}
+
+void
+mupdf_pdf_renderer_rep::put (const char* s) {
+  if (contents == NULL) return;
+  fz_try (ctx) { fz_append_string (ctx, contents, s); }
+  fz_catch (ctx) { fail ("a page"); }
+}
+
+void
+mupdf_pdf_renderer_rep::app (const char* fmt, ...) {
+  if (contents == NULL) return;
+  va_list args;
+  va_start (args, fmt);
+  fz_try (ctx) { fz_append_vprintf (ctx, contents, fmt, args); }
+  fz_catch (ctx) { fail ("a page"); }
+  va_end (args);
+}
+
 bool mupdf_pdf_renderer_rep::is_printer () { return true; }
 bool mupdf_pdf_renderer_rep::is_started () { return started; }
 
@@ -369,7 +414,7 @@ mupdf_pdf_renderer_rep::begin_page () {
   in_text= false; cur_font= -1; cur_size= 0;
   links= array<pdf_link_item> ();
   // the whole page is written in the pixels of the renderer
-  fz_append_printf (ctx, contents, "q\n%g 0 0 %g 0 0 cm\n",
+  app ("q\n%g 0 0 %g 0 0 cm\n",
                     (double) default_dpi / dpi, (double) default_dpi / dpi);
   set_origin (0, (SI) (paper_h * dpi * pixel / 2.54));
   set_clipping (0, (SI) ((-dpi * pixel * paper_h) / 2.54),
@@ -383,17 +428,27 @@ mupdf_pdf_renderer_rep::end_page () {
   while (clip_level-- > 0) put ("Q\n");
   clip_level= 0;
   put ("Q\n");
+  // the labels of the links as C strings, and which are places in the
+  // document (see write_links)
+  array<string> label;
+  array<int> local;
+  for (int i=0; i<N(links); i++) {
+    label << (links[i].label * string ((char) 0));
+    local << (starts (links[i].label, "#") ? 1 : 0);
+  }
+  pdf_obj* page= NULL;
+  fz_var (page);
   fz_try (ctx) {
     fz_rect mediabox= fz_make_rect (0, 0, (float) width, (float) height);
-    pdf_obj* page= pdf_add_page (ctx, doc, mediabox, 0, resources, contents);
-    write_links (page);
+    page= pdf_add_page (ctx, doc, mediabox, 0, resources, contents);
+    write_links (page, label, local);
     pdf_insert_page (ctx, doc, -1, page);
-    pages << page;
   }
   fz_catch (ctx) {
-    convert_error << "MuPDF cannot close a page: "
-                  << fz_caught_message (ctx) << LF;
+    pdf_drop_obj (ctx, page); page= NULL;
+    fail ("a page");
   }
+  if (page != NULL) pages << page;
   fz_drop_buffer (ctx, contents); contents= NULL;
   page_num++;
 }
@@ -427,7 +482,7 @@ mupdf_pdf_renderer_rep::select_fill (color c) {
   cur_fill= c; has_fill= true;
   int r, g, b, a; get_rgb_color (c, r, g, b, a);
   select_alpha (a);
-  fz_append_printf (ctx, contents, "%g %g %g rg\n",
+  app ("%g %g %g rg\n",
                     r/255.0, g/255.0, b/255.0);
 }
 
@@ -437,7 +492,7 @@ mupdf_pdf_renderer_rep::select_stroke (color c) {
   cur_stroke= c; has_stroke= true;
   int r, g, b, a; get_rgb_color (c, r, g, b, a);
   select_alpha (a);
-  fz_append_printf (ctx, contents, "%g %g %g RG\n",
+  app ("%g %g %g RG\n",
                     r/255.0, g/255.0, b/255.0);
 }
 
@@ -446,7 +501,7 @@ mupdf_pdf_renderer_rep::select_width (SI w) {
   double lw= to_w (w);
   if (lw == cur_width) return;
   cur_width= lw;
-  fz_append_printf (ctx, contents, "%g w\n", lw);
+  app ("%g w\n", lw);
 }
 
 // the transparency of a colour is a graphics state of its own in a PDF
@@ -454,7 +509,7 @@ void
 mupdf_pdf_renderer_rep::select_alpha (int a) {
   if (a == cur_alpha) return;
   cur_alpha= a;
-  fz_append_printf (ctx, contents, "/GS%d gs\n", alpha_state (a));
+  app ("/GS%d gs\n", alpha_state (a));
 }
 
 // the ExtGState of an alpha, made the first time it is asked for
@@ -464,13 +519,22 @@ mupdf_pdf_renderer_rep::alpha_state (int a) {
   if (alpha_gs->contains (a)) num= alpha_gs (a);
   else {
     num= n_alpha++;
-    pdf_obj* gs= pdf_new_dict (ctx, doc, 3);
-    pdf_dict_put (ctx, gs, PDF_NAME(Type), PDF_NAME(ExtGState));
-    pdf_dict_put_real (ctx, gs, PDF_NAME(ca), a / 255.0);
-    pdf_dict_put_real (ctx, gs, PDF_NAME(CA), a / 255.0);
     char cnm[32];
     snprintf (cnm, sizeof (cnm), "GS%d", (int) (num));
-    pdf_dict_puts_drop (ctx, res_gs, cnm, pdf_add_object_drop (ctx, doc, gs));
+    pdf_obj* gs= NULL;
+    fz_var (gs);
+    fz_try (ctx) {
+      gs= pdf_new_dict (ctx, doc, 3);
+      pdf_dict_put (ctx, gs, PDF_NAME(Type), PDF_NAME(ExtGState));
+      pdf_dict_put_real (ctx, gs, PDF_NAME(ca), a / 255.0);
+      pdf_dict_put_real (ctx, gs, PDF_NAME(CA), a / 255.0);
+      pdf_obj* g= gs; gs= NULL;   // pdf_add_object_drop drops it, error or not
+      pdf_dict_puts_drop (ctx, res_gs, cnm, pdf_add_object_drop (ctx, doc, g));
+    }
+    fz_catch (ctx) {
+      pdf_drop_obj (ctx, gs);
+      fail ("a transparency");   // a /GS the page names and the file lacks
+    }
     alpha_gs (a)= num;
   }
   return num;
@@ -496,7 +560,7 @@ mupdf_pdf_renderer_rep::set_transformation (frame fr) {
   // a q saves the state and changes nothing, so what we track still holds
   put ("q\n");
   transform_level++;
-  fz_append_printf (ctx, contents, "%g %g %g %g %g %g cm\n",
+  app ("%g %g %g %g %g %g cm\n",
                     ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
   rectangle nclip= fr [oclip];
   renderer_rep::clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
@@ -524,7 +588,7 @@ mupdf_pdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) 
     }
   }
   else {
-    fz_append_printf (ctx, contents, "q\n%g %g %g %g re W n\n",
+    app ("q\n%g %g %g %g re W n\n",
                       to_x (x1), to_y (y1),
                       to_x (x2) - to_x (x1), to_y (y2) - to_y (y1));
     clip_level++;
@@ -541,7 +605,7 @@ mupdf_pdf_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
   end_text ();
   select_stroke (pen->get_color ());
   select_width (pen->get_width ());
-  fz_append_printf (ctx, contents, "%g %g m %g %g l S\n",
+  app ("%g %g m %g %g l S\n",
                     to_x (x1), to_y (y1), to_x (x2), to_y (y2));
 }
 
@@ -551,9 +615,9 @@ mupdf_pdf_renderer_rep::lines (array<SI> x, array<SI> y) {
   end_text ();
   select_stroke (pen->get_color ());
   select_width (pen->get_width ());
-  fz_append_printf (ctx, contents, "%g %g m\n", to_x (x[0]), to_y (y[0]));
+  app ("%g %g m\n", to_x (x[0]), to_y (y[0]));
   for (int i=1; i<N(x); i++)
-    fz_append_printf (ctx, contents, "%g %g l\n", to_x (x[i]), to_y (y[i]));
+    app ("%g %g l\n", to_x (x[i]), to_y (y[i]));
   put ("S\n");
 }
 
@@ -562,7 +626,7 @@ mupdf_pdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   if (contents == NULL || x1 >= x2 || y1 >= y2) return;
   end_text ();
   select_fill (pen->get_color ());
-  fz_append_printf (ctx, contents, "%g %g %g %g re f\n",
+  app ("%g %g %g %g re f\n",
                     to_x (x1), to_y (y1),
                     to_x (x2) - to_x (x1), to_y (y2) - to_y (y1));
 }
@@ -572,7 +636,7 @@ mupdf_pdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   if (contents == NULL || x1 >= x2 || y1 >= y2) return;
   end_text ();
   select_fill (bgb->get_color ());
-  fz_append_printf (ctx, contents, "%g %g %g %g re f\n",
+  app ("%g %g %g %g re f\n",
                     to_x (x1), to_y (y1),
                     to_x (x2) - to_x (x1), to_y (y2) - to_y (y1));
 }
@@ -583,22 +647,21 @@ mupdf_pdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   if (contents == NULL || N(x) < 2 || N(x) != N(y)) return;
   end_text ();
   select_fill (pen->get_color ());
-  fz_append_printf (ctx, contents, "%g %g m\n", to_x (x[0]), to_y (y[0]));
+  app ("%g %g m\n", to_x (x[0]), to_y (y[0]));
   for (int i=1; i<N(x); i++)
-    fz_append_printf (ctx, contents, "%g %g l\n", to_x (x[i]), to_y (y[i]));
+    app ("%g %g l\n", to_x (x[i]), to_y (y[i]));
   put ("h f\n");
 }
 
 // an arc of the ellipse inscribed in the box, in 1/64 degrees as in X11
-static void
-arc_path (fz_context* ctx, fz_buffer* buf, double cx, double cy,
-          double rx, double ry, double a0, double a1, bool move) {
+void
+mupdf_pdf_renderer_rep::arc_path (double cx, double cy, double rx, double ry,
+                                  double a0, double a1, bool move) {
   const int n= 24;
   for (int i=0; i<=n; i++) {
     double a= a0 + (a1 - a0) * i / n;
     double px= cx + rx * cos (a), py= cy + ry * sin (a);
-    fz_append_printf (ctx, buf, "%g %g %s\n", px, py,
-                      (i == 0 && move) ? "m" : "l");
+    app ("%g %g %s\n", px, py, (i == 0 && move) ? "m" : "l");
   }
 }
 
@@ -610,7 +673,7 @@ mupdf_pdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   select_width (pen->get_width ());
   double cx= (to_x (x1) + to_x (x2)) / 2, cy= (to_y (y1) + to_y (y2)) / 2;
   double rx= (to_x (x2) - to_x (x1)) / 2, ry= (to_y (y2) - to_y (y1)) / 2;
-  arc_path (ctx, contents, cx, cy, rx, ry,
+  arc_path (cx, cy, rx, ry,
             alpha * M_PI / (64*180), (alpha+delta) * M_PI / (64*180), true);
   put ("S\n");
 }
@@ -622,8 +685,8 @@ mupdf_pdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int del
   select_fill (pen->get_color ());
   double cx= (to_x (x1) + to_x (x2)) / 2, cy= (to_y (y1) + to_y (y2)) / 2;
   double rx= (to_x (x2) - to_x (x1)) / 2, ry= (to_y (y2) - to_y (y1)) / 2;
-  fz_append_printf (ctx, contents, "%g %g m\n", cx, cy);
-  arc_path (ctx, contents, cx, cy, rx, ry,
+  app ("%g %g m\n", cx, cy);
+  arc_path (cx, cy, rx, ry,
             alpha * M_PI / (64*180), (alpha+delta) * M_PI / (64*180), false);
   put ("h f\n");
 }
@@ -668,11 +731,14 @@ mupdf_pdf_renderer_rep::get_font (font_glyphs fn, int ch) {
   it.num= N(font_list);
   if (!is_none (u)) {
     c_string path (concretize (u));
-    fz_try (ctx) { it.font= fz_new_font_from_file (ctx, NULL, path, 0, 0); }
-    fz_catch (ctx) { it.font= NULL; }
-    if (it.font != NULL && !pdf_font_writing_supported (ctx, it.font)) {
-      fz_drop_font (ctx, it.font); it.font= NULL;
+    fz_font* f= NULL;
+    fz_var (f);
+    fz_try (ctx) {
+      f= fz_new_font_from_file (ctx, NULL, path, 0, 0);
+      if (!pdf_font_writing_supported (ctx, f)) { fz_drop_font (ctx, f); f= NULL; }
     }
+    fz_catch (ctx) { fz_drop_font (ctx, f); f= NULL; }
+    it.font= f;
   }
   if (it.font != NULL) {
     it.simple= is_type1_file (u);
@@ -762,11 +828,11 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     put ("BT\n"); in_text= true; cur_font= -1; text_x= text_y= 0;
   }
   if (cur_font != k || cur_size != size) {
-    fz_append_printf (ctx, contents, "/F%d %g Tf\n", font_list[k].num, size);
+    app ("/F%d %g Tf\n", font_list[k].num, size);
     cur_font= k; cur_size= size;
   }
   double px= to_x (x), py= to_y (y);
-  fz_append_printf (ctx, contents, "%g %g Td\n", px - text_x, py - text_y);
+  app ("%g %g Td\n", px - text_x, py - text_y);
   text_x= px; text_y= py;
   // A ligature says which letters it stands for. A reader which takes the
   // text from the glyph names gets ﬁ (U+FB01) out of "fi", so a search for
@@ -779,7 +845,7 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   if (N(lig) > 0) {
     c_string cl (lig);
-    fz_append_printf (ctx, contents, "/Span << /ActualText (%s) >> BDC\n",
+    app ("/Span << /ActualText (%s) >> BDC\n",
                       (const char*) cl);
   }
   if (font_list[k].simple || font_list[k].t3) {
@@ -788,10 +854,10 @@ mupdf_pdf_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
     int code= ch & 255;
     if (font_list[k].gid[code] < 0)
       font_list[k].gid[code]= font_list[k].t3 ? ch : (int) gl->index;
-    fz_append_printf (ctx, contents, "<%02x> Tj\n", code);
+    app ("<%02x> Tj\n", code);
   }
   else
-    fz_append_printf (ctx, contents, "<%04x> Tj\n", ((int) gl->index) & 0xffff);
+    app ("<%04x> Tj\n", ((int) gl->index) & 0xffff);
   if (N(lig) > 0) put ("EMC\n");
 }
 
@@ -859,19 +925,16 @@ mupdf_pdf_renderer_rep::write_fonts () {
     pdf_font_item& it= font_list[k];
     if (it.t3) { write_type3 (it); continue; }
     if (it.font == NULL || !it.simple || it.obj == NULL) continue;
-    // the names of the glyphs the codes select are asked of the font
-    // itself, see glyph_name
     int first= 256, last= -1;
     for (int c=0; c<256; c++)
       if (it.gid[c] >= 0) { if (c < first) first= c; last= c; }
     if (last < 0) continue;
-    // /Encoding: the glyph names of the codes which are used
-    pdf_obj* enc= pdf_new_dict (ctx, doc, 2);
-    pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
-    pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
-    int prev= -2;
+    // The names of the glyphs the codes select, asked of the font itself
+    // (see glyph_name), first: the fz_try below must create nothing with a
+    // destructor. They end with a 0, to be C strings as they are.
     array<int> ftgid;    // what FreeType calls the glyph of each code
-    array<string> gname;
+    array<string> gname; // its name, "" if it has none
+    array<string> keep;  // the names, for the subsetter
     for (int c=0; c<256; c++) { ftgid << -1; gname << string (); }
     for (int c=first; c<=last; c++) {
       if (it.gid[c] < 0) continue;
@@ -879,31 +942,54 @@ mupdf_pdf_renderer_rep::write_fonts () {
       int g;
       string nm= glyph_name (it, c, it.gid[c], g);
       if (N(nm) == 0) continue;   // no name: the built in encoding stands
-      ftgid[c]= g; gname[c]= nm;
-      if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
-      c_string cnm (nm);
-      pdf_array_push_name (ctx, diff, cnm);
-      prev= c;
+      ftgid[c]= g;
+      gname[c]= nm * string ((char) 0);
+      keep << nm;
     }
-    pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
-                       pdf_add_object_drop (ctx, doc, enc));
+    // /Encoding: the glyph names of the codes which are used
+    pdf_obj* enc= NULL;
+    fz_var (enc);
+    fz_try (ctx) {
+      enc= pdf_new_dict (ctx, doc, 2);
+      pdf_dict_put (ctx, enc, PDF_NAME(Type), PDF_NAME(Encoding));
+      pdf_obj* diff= pdf_dict_put_array (ctx, enc, PDF_NAME(Differences), 16);
+      int prev= -2;
+      for (int c=first; c<=last; c++) {
+        if (N(gname[c]) == 0) continue;
+        if (c != prev + 1) pdf_array_push_int (ctx, diff, c);
+        pdf_array_push_name (ctx, diff, &gname[c][0]);
+        prev= c;
+      }
+      pdf_obj* e= enc; enc= NULL;   // pdf_add_object_drop drops it, error or not
+      pdf_dict_put_drop (ctx, it.obj, PDF_NAME(Encoding),
+                         pdf_add_object_drop (ctx, doc, e));
+    }
+    fz_catch (ctx) {
+      pdf_drop_obj (ctx, enc);
+      convert_warning << "MuPDF could not write the encoding of "
+                      << it.path << ": " << fz_caught_message (ctx) << LF;
+    }
     // The font program, cut down to the glyphs which are used. MuPDF
     // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
     // eighty kilobytes for a handful of letters; mupdf_t1_subset is
     // pdfTeX's writet1.c, which knows how to do it.
-    array<string> keep;
-    for (int c=first; c<=last; c++)
-      if (N(gname[c]) > 0) keep << gname[c];
     if (N(keep) > 0) subset_type1 (it, keep);
     // /Widths, in thousandths of the size
-    pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
-    pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
-    pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths), last-first+1);
-    for (int c=first; c<=last; c++) {
-      double adv= 0;
-      if (ftgid[c] >= 0)
-        adv= fz_advance_glyph (ctx, it.font, ftgid[c], 0) * 1000.0;
-      pdf_array_push_real (ctx, w, adv);
+    fz_try (ctx) {
+      pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
+      pdf_dict_put_int (ctx, it.obj, PDF_NAME(LastChar), last);
+      pdf_obj* w= pdf_dict_put_array (ctx, it.obj, PDF_NAME(Widths),
+                                      last - first + 1);
+      for (int c=first; c<=last; c++) {
+        double adv= 0;
+        if (ftgid[c] >= 0)
+          adv= fz_advance_glyph (ctx, it.font, ftgid[c], 0) * 1000.0;
+        pdf_array_push_real (ctx, w, adv);
+      }
+    }
+    fz_catch (ctx) {
+      convert_warning << "MuPDF could not write the widths of "
+                      << it.path << ": " << fz_caught_message (ctx) << LF;
     }
   }
 }
@@ -912,34 +998,38 @@ mupdf_pdf_renderer_rep::write_fonts () {
 // has only the glyphs in `keep`, and rename the font as a subset is named.
 void
 mupdf_pdf_renderer_rep::subset_type1 (pdf_font_item& it, array<string> keep) {
-  pdf_obj* fdesc= pdf_dict_get (ctx, it.obj, PDF_NAME(FontDescriptor));
-  if (fdesc == NULL) return;
-  pdf_obj* ff= pdf_dict_get (ctx, fdesc, PDF_NAME(FontFile));
-  if (ff == NULL) return;   // not a Type 1 after all
-  c_string path (it.path);
-  const char** names= (const char**) fz_malloc (ctx, N(keep) * sizeof (char*));
-  c_string** cs= (c_string**) fz_malloc (ctx, N(keep) * sizeof (c_string*));
-  for (int i=0; i<N(keep); i++) {
-    cs[i]= new c_string (keep[i]);
-    names[i]= (const char*) *(cs[i]);
+  pdf_obj* fdesc= NULL;
+  pdf_obj* ff= NULL;
+  fz_try (ctx) {
+    fdesc= pdf_dict_get (ctx, it.obj, PDF_NAME(FontDescriptor));
+    if (fdesc != NULL) ff= pdf_dict_get (ctx, fdesc, PDF_NAME(FontFile));
   }
+  fz_catch (ctx) { ff= NULL; }
+  if (ff == NULL) return;   // not a Type 1 after all
+  // the subsetter is C, with an error handling of its own which unwinds
+  // only its own frames (mupdf_type1.c); it wants C strings
+  c_string path (it.path);
+  array<string> kz;
+  for (int i=0; i<N(keep); i++) kz << (keep[i] * string ((char) 0));
+  const char** names= tm_new_array<const char*> (N(kz));
+  for (int i=0; i<N(kz); i++) names[i]= &kz[i][0];
   int size= 0, l1= 0, l2= 0, l3= 0;
   char* psname= NULL;
   const char* err= NULL;
-  unsigned char* sub= mupdf_t1_subset (path, names, N(keep), &size,
+  unsigned char* sub= mupdf_t1_subset (path, names, N(kz), &size,
                                        &l1, &l2, &l3, &psname, &err);
-  for (int i=0; i<N(keep); i++) delete cs[i];
-  fz_free (ctx, cs); fz_free (ctx, names);
+  tm_delete_array (names);
   if (sub == NULL) {
     convert_warning << "the Type 1 font " << it.path
                     << " could not be subsetted: "
                     << string (err == NULL ? "?" : err) << LF;
     return;
   }
+  fz_buffer* buf= NULL;
+  fz_var (buf);
   fz_try (ctx) {
-    fz_buffer* buf= fz_new_buffer_from_copied_data (ctx, sub, (size_t) size);
+    buf= fz_new_buffer_from_copied_data (ctx, sub, (size_t) size);
     pdf_update_stream (ctx, doc, ff, buf, 0);
-    fz_drop_buffer (ctx, buf);
     pdf_dict_put_int (ctx, ff, PDF_NAME(Length1), l1);
     pdf_dict_put_int (ctx, ff, PDF_NAME(Length2), l2);
     pdf_dict_put_int (ctx, ff, PDF_NAME(Length3), l3);
@@ -950,6 +1040,7 @@ mupdf_pdf_renderer_rep::subset_type1 (pdf_font_item& it, array<string> keep) {
       pdf_dict_put_name (ctx, fdesc, PDF_NAME(FontName), psname);
     }
   }
+  fz_always (ctx) { fz_drop_buffer (ctx, buf); }
   fz_catch (ctx) {
     convert_warning << "MuPDF could not store the subsetted font: "
                     << fz_caught_message (ctx) << LF;
@@ -1117,7 +1208,7 @@ mupdf_pdf_renderer_rep::draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y) {
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       double x0= to_x (x) - gl->xoff, y0= to_y (y) - h + gl->yoff;
-      fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
+      app ("q %g 0 0 %g %g %g cm /%s Do Q\n",
                         (double) w, (double) h, x0, y0, (const char*) cnm);
     }
   }
@@ -1165,7 +1256,7 @@ mupdf_pdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
       char cnm[32];
       snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
       double x0= to_x (x) - rep->ox, y0= to_y (y) - rep->oy;
-      fz_append_printf (ctx, contents, "q %g 0 0 %g %g %g cm /%s Do Q\n",
+      app ("q %g 0 0 %g %g %g cm /%s Do Q\n",
                         (double) rep->w, (double) rep->h, x0, y0,
                         (const char*) cnm);
     }
@@ -1296,8 +1387,11 @@ mupdf_pdf_renderer_rep::place_image (int num, double w, double h,
   char cnm[32];
   snprintf (cnm, sizeof (cnm), "Im%d", (int) (num));
   double m[6];
-  xobject_fit (pdf_dict_gets (ctx, res_xobj, cnm), w, h, to_x (x), to_y (y), m);
-  fz_append_printf (ctx, contents, "q %g %g %g %g %g %g cm /%s Do Q\n",
+  pdf_obj* xo= NULL;
+  fz_try (ctx) { xo= pdf_dict_gets (ctx, res_xobj, cnm); }
+  fz_catch (ctx) { xo= NULL; }
+  xobject_fit (xo, w, h, to_x (x), to_y (y), m);
+  app ("q %g %g %g %g %g %g cm /%s Do Q\n",
                     m[0], m[1], m[2], m[3], m[4], m[5], (const char*) cnm);
 }
 
@@ -1310,12 +1404,18 @@ void
 mupdf_pdf_renderer_rep::xobject_fit (pdf_obj* xo, double w, double h,
                                      double x, double y, double m[6]) {
   m[0]= w; m[1]= 0; m[2]= 0; m[3]= h; m[4]= x; m[5]= y;
-  if (xo == NULL ||
-      !pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
-                    PDF_NAME(Form))) return;
-  fz_rect b= pdf_dict_get_rect (ctx, xo, PDF_NAME(BBox));
-  fz_matrix fm= pdf_dict_get_matrix (ctx, xo, PDF_NAME(Matrix));
-  b= fz_transform_rect (b, fm);
+  bool form= false;
+  fz_rect b= fz_empty_rect;
+  fz_try (ctx) {
+    form= xo != NULL &&
+          pdf_name_eq (ctx, pdf_dict_get (ctx, xo, PDF_NAME(Subtype)),
+                       PDF_NAME(Form));
+    if (form)
+      b= fz_transform_rect (pdf_dict_get_rect (ctx, xo, PDF_NAME(BBox)),
+                            pdf_dict_get_matrix (ctx, xo, PDF_NAME(Matrix)));
+  }
+  fz_catch (ctx) { form= false; }
+  if (!form) return;
   double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
   if (bw <= 0 || bh <= 0) { m[0]= m[3]= 1; return; }
   m[0]= w / bw; m[3]= h / bh;
@@ -1336,7 +1436,9 @@ mupdf_pdf_renderer_rep::tiling_pattern (int img, double w, double h,
   if (pattern_pool->contains (key)) return pattern_pool (key);
   char cinm[32];
   snprintf (cinm, sizeof (cinm), "Im%d", (int) (img));
-  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cinm);
+  pdf_obj* xo= NULL;
+  fz_try (ctx) { xo= pdf_dict_gets (ctx, res_xobj, cinm); }
+  fz_catch (ctx) { xo= NULL; }
   if (xo == NULL) return -1;
   int num= -1;
   fz_buffer* buf= NULL;
@@ -1426,9 +1528,11 @@ bool
 mupdf_pdf_renderer_rep::opaque_tile (int img) {
   char cnm[32];
   snprintf (cnm, sizeof (cnm), "Im%d", (int) (img));
-  pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
   bool r= false;
-  fz_try (ctx) { r= (xo != NULL) && !transparent_xobject (ctx, xo, 0); }
+  fz_try (ctx) {
+    pdf_obj* xo= pdf_dict_gets (ctx, res_xobj, cnm);
+    r= (xo != NULL) && !transparent_xobject (ctx, xo, 0);
+  }
   fz_catch (ctx) { r= false; }
   return r;
 }
@@ -1514,8 +1618,8 @@ mupdf_pdf_renderer_rep::clear_pattern (SI mx1, SI my1, SI mx2, SI my2,
   // are gone afterwards and what we track still holds
   put ("q\n");
   if (pattern_alpha < 255)
-    fz_append_printf (ctx, contents, "/GS%d gs\n", alpha_state (pattern_alpha));
-  fz_append_printf (ctx, contents, "/Pattern cs /P%d scn %g %g %g %g re f\nQ\n",
+    app ("/GS%d gs\n", alpha_state (pattern_alpha));
+  app ("/Pattern cs /P%d scn %g %g %g %g re f\nQ\n",
                     pat, to_x (x1), to_y (y1),
                     to_x (x2) - to_x (x1), to_y (y2) - to_y (y1));
 }
@@ -1582,8 +1686,11 @@ mupdf_pdf_renderer_rep::set_metadata (string kind, string val) {
   metadata (kind)= val;
 }
 
+// called inside the fz_try of end_page, with the labels prepared there:
+// nothing here may have a destructor
 void
-mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj) {
+mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj, array<string>& label,
+                                     array<int>& local) {
   if (N(links) == 0) return;
   pdf_obj* annots= pdf_dict_put_array (ctx, pobj, PDF_NAME(Annots), N(links));
   for (int i=0; i<N(links); i++) {
@@ -1599,16 +1706,15 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj) {
     pdf_array_push_int (ctx, border, 16);
     pdf_array_push_int (ctx, border, 16);
     pdf_array_push_int (ctx, border, 0);
-    if (starts (links[i].label, "#")) {
+    const char* s= &label[i][0];
+    if (local[i]) {
       // a place in the document: the name is the one anchor () registered,
       // resolved through the tree write_dests puts in the catalogue
-      c_string s (links[i].label);
       pdf_dict_put_text_string (ctx, a, PDF_NAME(Dest), s);
     }
     else {
       pdf_obj* act= pdf_dict_put_dict (ctx, a, PDF_NAME(A), 2);
       pdf_dict_put (ctx, act, PDF_NAME(S), PDF_NAME(URI));
-      c_string s (links[i].label);
       pdf_dict_put_text_string (ctx, act, PDF_NAME(URI), s);
     }
     pdf_array_push_drop (ctx, annots, pdf_add_object_drop (ctx, doc, a));
@@ -1618,60 +1724,80 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj) {
 // The outline, as the tree its levels describe. An entry hangs under the
 // last one of a smaller level; the count of an entry is negative when its
 // children start folded, which is what a reader expects of a deep tree.
+// The tree is worked out first, and the objects made from it after, in an
+// fz_try which creates nothing with a destructor (see put).
 void
 mupdf_pdf_renderer_rep::write_outline () {
-  if (N(outlines) == 0) return;
-  pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
-  pdf_obj* out= pdf_dict_put_dict (ctx, root, PDF_NAME(Outlines), 4);
-  pdf_dict_put (ctx, out, PDF_NAME(Type), PDF_NAME(Outlines));
-  // the chain of parents: parent[l] is the open entry of level l
-  array<pdf_obj*> parent;  parent << out;
-  array<int>      level;   level  << 0;
-  array<pdf_obj*> first;   first  << (pdf_obj*) NULL;
-  array<pdf_obj*> last;    last   << (pdf_obj*) NULL;
-  array<int>      count;   count  << 0;
-  for (int i=0; i<N(outlines); i++) {
-    if (outlines[i].page >= N(pages)) continue;
-    int l= outlines[i].level;
-    while (N(parent) > 1 && level[N(level)-1] >= l) {
-      // close the entries which this one is not under
-      int k= N(parent) - 1;
-      if (first[k] != NULL) {
-        pdf_dict_put (ctx, parent[k], PDF_NAME(First), first[k]);
-        pdf_dict_put (ctx, parent[k], PDF_NAME(Last), last[k]);
-        pdf_dict_put_int (ctx, parent[k], PDF_NAME(Count), -count[k]);
-      }
-      parent->resize (k); level->resize (k);
-      first->resize (k); last->resize (k); count->resize (k);
-    }
-    int k= N(parent) - 1;
-    pdf_obj* item= pdf_new_dict (ctx, doc, 6);
-    c_string t (outlines[i].title);
-    pdf_dict_put_text_string (ctx, item, PDF_NAME(Title), t);
-    pdf_obj* dest= pdf_dict_put_array (ctx, item, PDF_NAME(Dest), 5);
-    pdf_array_push (ctx, dest, pages[outlines[i].page]);
-    pdf_array_push (ctx, dest, PDF_NAME(XYZ));
-    pdf_array_push_real (ctx, dest, outlines[i].x);
-    pdf_array_push_real (ctx, dest, outlines[i].y);
-    pdf_array_push_int (ctx, dest, 0);
-    pdf_obj* ref= pdf_add_object_drop (ctx, doc, item);
-    pdf_dict_put (ctx, ref, PDF_NAME(Parent), parent[k]);
-    if (first[k] == NULL) first[k]= ref;
-    else {
-      pdf_dict_put (ctx, last[k], PDF_NAME(Next), ref);
-      pdf_dict_put (ctx, ref, PDF_NAME(Prev), last[k]);
-    }
-    last[k]= ref; count[k]++;
-    // this entry is now open for the deeper ones
-    parent << ref; level << l;
-    first << (pdf_obj*) NULL; last << (pdf_obj*) NULL; count << 0;
+  // entry 0 is the root, the /Outlines dictionary; entries 1..n are the
+  // outline items which point at a page there is; 0 as a link means none
+  array<int> item;      // item[j]: the index in outlines of entry j
+  item << -1;
+  for (int i=0; i<N(outlines); i++)
+    if (outlines[i].page >= 0 && outlines[i].page < N(pages)) item << i;
+  int n= N(item) - 1;
+  if (n == 0) return;
+  array<int> par, fst, lst, prv, nxt, cnt;
+  array<string> title;  // with a 0 at the end, to be a C string
+  for (int j=0; j<=n; j++) {
+    par << 0; fst << 0; lst << 0; prv << 0; nxt << 0; cnt << 0;
+    title << (j == 0 ? string () : outlines[item[j]].title * string ((char) 0));
   }
-  for (int k= N(parent) - 1; k >= 0; k--) {
-    if (first[k] == NULL) continue;
-    pdf_dict_put (ctx, parent[k], PDF_NAME(First), first[k]);
-    pdf_dict_put (ctx, parent[k], PDF_NAME(Last), last[k]);
-    pdf_dict_put_int (ctx, parent[k], PDF_NAME(Count),
-                      (k == 0) ? count[k] : -count[k]);
+  // the open entries, from the root down, and their levels
+  array<int> open;  open << 0;
+  array<int> lev;   lev  << 0;
+  for (int j=1; j<=n; j++) {
+    int l= outlines[item[j]].level;
+    while (N(open) > 1 && lev[N(lev)-1] >= l) {
+      open->resize (N(open) - 1); lev->resize (N(lev) - 1);
+    }
+    int p= open[N(open)-1];
+    par[j]= p;
+    if (fst[p] == 0) fst[p]= j;
+    else { nxt[lst[p]]= j; prv[j]= lst[p]; }
+    lst[p]= j; cnt[p]++;
+    open << j; lev << l;
+  }
+  array<pdf_obj*> ref;  // the objects of the entries (0: /Outlines)
+  for (int j=0; j<=n; j++) ref << ((pdf_obj*) NULL);
+  pdf_obj* entry= NULL;
+  fz_var (entry);
+  fz_try (ctx) {
+    pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+    pdf_obj* out= pdf_dict_put_dict (ctx, root, PDF_NAME(Outlines), 4);
+    pdf_dict_put (ctx, out, PDF_NAME(Type), PDF_NAME(Outlines));
+    ref[0]= pdf_keep_obj (ctx, out);
+    for (int j=1; j<=n; j++) {
+      pdf_outline_item& o= outlines[item[j]];
+      entry= pdf_new_dict (ctx, doc, 6);
+      pdf_dict_put_text_string (ctx, entry, PDF_NAME(Title), &title[j][0]);
+      pdf_obj* dest= pdf_dict_put_array (ctx, entry, PDF_NAME(Dest), 5);
+      pdf_array_push (ctx, dest, pages[o.page]);
+      pdf_array_push (ctx, dest, PDF_NAME(XYZ));
+      pdf_array_push_real (ctx, dest, o.x);
+      pdf_array_push_real (ctx, dest, o.y);
+      pdf_array_push_int (ctx, dest, 0);
+      pdf_obj* e= entry; entry= NULL;  // pdf_add_object_drop drops it
+      ref[j]= pdf_add_object_drop (ctx, doc, e);
+    }
+    for (int j=1; j<=n; j++) {
+      pdf_dict_put (ctx, ref[j], PDF_NAME(Parent), ref[par[j]]);
+      if (prv[j] != 0) pdf_dict_put (ctx, ref[j], PDF_NAME(Prev), ref[prv[j]]);
+      if (nxt[j] != 0) pdf_dict_put (ctx, ref[j], PDF_NAME(Next), ref[nxt[j]]);
+    }
+    for (int j=0; j<=n; j++) {
+      if (fst[j] == 0) continue;
+      pdf_dict_put (ctx, ref[j], PDF_NAME(First), ref[fst[j]]);
+      pdf_dict_put (ctx, ref[j], PDF_NAME(Last), ref[lst[j]]);
+      pdf_dict_put_int (ctx, ref[j], PDF_NAME(Count), j == 0 ? cnt[j] : -cnt[j]);
+    }
+  }
+  fz_always (ctx) {
+    pdf_drop_obj (ctx, entry);
+    for (int j=0; j<=n; j++) pdf_drop_obj (ctx, ref[j]);
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not write the outline: "
+                    << fz_caught_message (ctx) << LF;
   }
 }
 
@@ -1681,49 +1807,61 @@ void
 mupdf_pdf_renderer_rep::write_dests () {
   if (N(dest_name) == 0) return;
   array<int> ord;
-  for (int i=0; i<N(dest_name); i++) ord << i;
+  for (int i=0; i<N(dest_name); i++) {
+    int page= (int) dest_pos[i].x1;
+    if (page >= 0 && page < N(pages)) ord << i;
+  }
   for (int i=1; i<N(ord); i++)     // few and nearly sorted: insertion
     for (int j=i; j>0 && dest_name[ord[j]] < dest_name[ord[j-1]]; j--) {
       int t= ord[j]; ord[j]= ord[j-1]; ord[j-1]= t;
     }
-  pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
-  pdf_obj* names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 1);
-  pdf_obj* dests= pdf_dict_put_dict (ctx, names, PDF_NAME(Dests), 1);
-  pdf_obj* arr= pdf_dict_put_array (ctx, dests, PDF_NAME(Names),
-                                    2 * N(ord));
-  for (int i=0; i<N(ord); i++) {
-    int k= ord[i];
-    int page= (int) dest_pos[k].x1;
-    if (page < 0 || page >= N(pages)) continue;
-    c_string nm (dest_name[k]);
-    pdf_array_push_string (ctx, arr, nm, strlen (nm));
-    pdf_obj* d= pdf_new_array (ctx, doc, 5);
-    pdf_array_push (ctx, d, pages[page]);
-    pdf_array_push (ctx, d, PDF_NAME(XYZ));
-    pdf_array_push_real (ctx, d, dest_pos[k].y1);
-    pdf_array_push_real (ctx, d, dest_pos[k].x2);
-    pdf_array_push_int (ctx, d, 0);
-    pdf_array_push_drop (ctx, arr, pdf_add_object_drop (ctx, doc, d));
+  array<string> nm;     // with a 0 at the end, to be C strings
+  for (int i=0; i<N(ord); i++) nm << (dest_name[ord[i]] * string ((char) 0));
+  fz_try (ctx) {
+    pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+    pdf_obj* names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 1);
+    pdf_obj* dests= pdf_dict_put_dict (ctx, names, PDF_NAME(Dests), 1);
+    pdf_obj* arr= pdf_dict_put_array (ctx, dests, PDF_NAME(Names),
+                                      2 * N(ord));
+    for (int i=0; i<N(ord); i++) {
+      pdf_link_item& pos= dest_pos[ord[i]];
+      pdf_array_push_string (ctx, arr, &nm[i][0], N(nm[i]) - 1);
+      pdf_obj* d= pdf_array_push_array (ctx, arr, 5);
+      pdf_array_push (ctx, d, pages[(int) pos.x1]);
+      pdf_array_push (ctx, d, PDF_NAME(XYZ));
+      pdf_array_push_real (ctx, d, pos.y1);
+      pdf_array_push_real (ctx, d, pos.x2);
+      pdf_array_push_int (ctx, d, 0);
+    }
+  }
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not write the destinations: "
+                    << fz_caught_message (ctx) << LF;
   }
 }
 
 void
 mupdf_pdf_renderer_rep::write_metadata () {
-  pdf_obj* info= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Info));
-  if (info == NULL) {
-    info= pdf_add_new_dict (ctx, doc, 8);
-    pdf_dict_put (ctx, pdf_trailer (ctx, doc), PDF_NAME(Info), info);
+  // with a 0 at the end, to be C strings; "" when absent
+  string title, author, subject;
+  if (metadata->contains ("title")) title= metadata ("title") * string ((char) 0);
+  if (metadata->contains ("author")) author= metadata ("author") * string ((char) 0);
+  if (metadata->contains ("subject")) subject= metadata ("subject") * string ((char) 0);
+  fz_try (ctx) {
+    pdf_obj* info= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Info));
+    if (info == NULL) {
+      info= pdf_add_new_dict (ctx, doc, 8);
+      pdf_dict_put_drop (ctx, pdf_trailer (ctx, doc), PDF_NAME(Info), info);
+    }
+    if (N(title) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Title), &title[0]);
+    if (N(author) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Author), &author[0]);
+    if (N(subject) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Subject), &subject[0]);
+    pdf_dict_put_text_string (ctx, info, PDF_NAME(Producer), "GNU TeXmacs (MuPDF)");
   }
-  iterator<string> it= iterate (metadata);
-  while (it->busy ()) {
-    string key= it->next ();
-    c_string val (metadata (key));
-    if (key == "title") pdf_dict_put_text_string (ctx, info, PDF_NAME(Title), val);
-    else if (key == "author") pdf_dict_put_text_string (ctx, info, PDF_NAME(Author), val);
-    else if (key == "subject") pdf_dict_put_text_string (ctx, info, PDF_NAME(Subject), val);
+  fz_catch (ctx) {
+    convert_warning << "MuPDF could not write the metadata: "
+                    << fz_caught_message (ctx) << LF;
   }
-  c_string producer ("GNU TeXmacs (MuPDF)");
-  pdf_dict_put_text_string (ctx, info, PDF_NAME(Producer), producer);
 }
 
 /******************************************************************************

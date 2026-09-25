@@ -401,21 +401,28 @@ mupdf_renderer_rep::begin (void* handle) {
 void
 mupdf_renderer_rep::end () {
   end_text ();
-
+  fz_context* ctx= mupdf_context ();
+  // Protected: the device complains -- with an error, not a warning --
+  // when a clip is left open (fz_close_device), and an error which nothing
+  // catches ends the process. The processor and the device are dropped
+  // whatever happens.
   if (proc) {
-    // reset set_clipping calls in order to have well formed PDF.
-    while (clip_level--)
-      proc->op_Q (mupdf_context (), proc);
-    // outmost restore for the graphics state (see begin_page)
-    proc->op_Q (mupdf_context (), proc);
-
-    pdf_close_processor (mupdf_context (), proc);
-    pdf_drop_processor (mupdf_context (), proc);
+    mupdf_protected ("mupdf_renderer_rep::end", [&] () {
+      // reset set_clipping calls in order to have well formed PDF.
+      while (clip_level-- > 0) proc->op_Q (ctx, proc);
+      // outmost restore for the graphics state (see begin_page)
+      proc->op_Q (ctx, proc);
+      pdf_close_processor (ctx, proc);
+    });
+    clip_level= 0;
+    pdf_drop_processor (ctx, proc);
     proc= NULL;
   }
   if (dev) {
-    fz_close_device (mupdf_context (), dev);
-    fz_drop_device (mupdf_context (), dev);
+    mupdf_protected ("mupdf_renderer_rep::end, device", [&] () {
+      fz_close_device (ctx, dev);
+    });
+    fz_drop_device (ctx, dev);
     dev= NULL;
   }
   if (pixmap) {
@@ -464,8 +471,13 @@ mupdf_renderer_rep::set_transformation (frame fr) {
   point uy= tr (point (0.0, 1.0)) - o;
   //cout << "Set transformation " << o << ", " << ux << ", " << uy << "\n";
 
-  proc->op_q (mupdf_context (), proc);
-  proc->op_cm (mupdf_context (), proc, ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
+  // protected: a q past MuPDF's limit of nested states is an error
+  double m[6]= { ux[0], ux[1], uy[0], uy[1], o[0], o[1] };
+  fz_context* ctx= mupdf_context ();
+  mupdf_protected ("set_transformation", [&] () {
+    proc->op_q (ctx, proc);
+    proc->op_cm (ctx, proc, m[0], m[1], m[2], m[3], m[4], m[5]);
+  });
 
   rectangle nclip= fr [oclip];
   clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
@@ -474,7 +486,8 @@ mupdf_renderer_rep::set_transformation (frame fr) {
 void
 mupdf_renderer_rep::reset_transformation () {
   unclip ();
-  proc->op_Q (mupdf_context (), proc);
+  fz_context* ctx= mupdf_context ();
+  mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
 }
 
 /******************************************************************************
@@ -488,25 +501,32 @@ mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   end_text();
   
   outer_round (x1, y1, x2, y2);
+  // protected: q and a clip past MuPDF's limits of nesting are errors;
+  // clip_level counts the q which did happen, so that end balances them
+  fz_context* ctx= mupdf_context ();
   if (restore) {
     // debug_convert << "restore clipping\n";
     if (clip_level > 0) {
-      proc->op_Q (mupdf_context (), proc);
+      mupdf_protected ("set_clipping, restore", [&] () { proc->op_Q (ctx, proc); });
       clip_level--;
     }
     cfn= "";
   }
   else {
     // debug_convert << "set clipping\n";
-    proc->op_q (mupdf_context (), proc);
-    clip_level++;
     float xx1= to_x (min (x1, x2));
     float yy1= to_y (min (y1, y2));
     float xx2= to_x (max (x1, x2));
     float yy2= to_y (max (y1, y2));
-    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
-    proc->op_W (mupdf_context (), proc);
-    proc->op_n (mupdf_context (), proc);
+    bool saved= false;
+    mupdf_protected ("set_clipping", [&] () {
+      proc->op_q (ctx, proc);
+      saved= true;
+      proc->op_re (ctx, proc, xx1, yy1, xx2-xx1, yy2-yy1);
+      proc->op_W (ctx, proc);
+      proc->op_n (ctx, proc);
+    });
+    if (saved) clip_level++;
   }
 }
 
@@ -1310,15 +1330,19 @@ image (fz_context *ctx, pdf_processor *proc, mupdf_image im, int alpha,
   // debug_convert << "mupdf_renderer_rep::image " << u << ", " << w << " x " << h
   //    << " + (" << x << ", " << y << ")" << LF;
   if (is_nil (im) || im->img == NULL) return; // nothing to draw
+  fz_image* img= im->img;
+  // An image is decoded when it is drawn, and one which cannot be (a file
+  // cut short, a format MuPDF does not know) is an error: protected, as in
+  // draw_form, with q and Q outside so that the state stays balanced
   proc->op_q (ctx, proc);
-  set_default_gstate (ctx, proc);
-  proc->op_cm (ctx, proc, a, b, c, d, e, f);
-  float da = ((float) alpha)/255.0;
-  proc->op_gs_ca (ctx, proc, da);
-  proc->op_gs_CA (ctx, proc, da);
-  proc->op_Do_image (ctx, proc, "Image", im->img);
- // proc->op_re (ctx, proc, 0, 0, 1, 1);
- // proc->op_S (ctx, proc);
+  mupdf_protected ("image", [&] () {
+    set_default_gstate (ctx, proc);
+    proc->op_cm (ctx, proc, a, b, c, d, e, f);
+    float da = ((float) alpha)/255.0;
+    proc->op_gs_ca (ctx, proc, da);
+    proc->op_gs_CA (ctx, proc, da);
+    proc->op_Do_image (ctx, proc, "Image", img);
+  });
   proc->op_Q (ctx, proc);
 }
 
@@ -1635,14 +1659,22 @@ pdf_font_desc *load_pdf_font (string fontname) {
       c_string path (concretize (u));
       fz_font *font= mupdf_font_from_file (path);
       if (font) {
-        fontdesc= pdf_new_font_desc (mupdf_context ());
-        fontdesc->font= font;
-        fontdesc->encoding=
-            pdf_load_system_cmap (mupdf_context (), "Identity-H");
+        // protected: the descriptor takes the font over, and drops it
+        fz_context* ctx= mupdf_context ();
+        bool ok= mupdf_protected ("load_pdf_font", [&] () {
+          fontdesc= pdf_new_font_desc (ctx);
+          fontdesc->font= font;
+          fontdesc->encoding= pdf_load_system_cmap (ctx, "Identity-H");
+        });
+        if (!ok) {
+          if (fontdesc != NULL) pdf_drop_font (ctx, fontdesc);
+          else fz_drop_font (ctx, font);
+          fontdesc= NULL;
+        }
         // FIXME: do we need to care about all the other fields? (seems not)
         // fix the encoding for FreeType
         // see tt_face_rep::tt_face_rep
-        mupdf_select_custom_charmap (fontdesc->font);
+        else mupdf_select_custom_charmap (fontdesc->font);
       }
     }
     if (fontdesc != NULL) {
