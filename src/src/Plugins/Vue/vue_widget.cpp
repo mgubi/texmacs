@@ -4503,7 +4503,14 @@ void vue_texmacs_widget_rep::do_layout () {
   // grow to the size of the window
   SI w= 300, h= 300;
   if (win) win->get_size (w, h);
-  if (win->kbd_focus == NULL) set_kbd_focus (win, main_widget);
+  // the editor gets the focus of a new window, but not from here: a focus
+  // is a change of the editor (freeze, focus, decorations), which the
+  // interpose handler applies, and a window first laid out after it -- one
+  // opened by a command, the second file on the command line -- would be
+  // repainted with the change pending ("Invalid situation" in
+  // edit_interface_rep::handle_repaint). The loop gives it just before
+  // the interpose handler (apply_default_focus in vue_gui.cpp)
+  if (win->kbd_focus == NULL) win->default_focus= main_widget;
   // the bars follow the mask given at creation and the visibility slots;
   // an embedded editor (texmacs-input in a dialog or a tool, mask 0) is
   // only its canvas, as the Qt embedded widget
@@ -5178,7 +5185,15 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       origin.x1= (SI) d.boundingBox.x;
       origin.x2= (SI) d.boundingBox.y;
     } else {
+      // Not in the layout, so not on the screen: nothing to paint, and the
+      // regions stay invalid until it is laid out again. An editor whose
+      // view was taken out of its window is such a widget -- the "no name"
+      // one, replaced by a file named on the command line before it was
+      // ever painted -- and repainting it made its detached view current
+      // (SERVER in edit_interface_rep::update_visible), where TeXmacs
+      // stopped: "no window attached to view".
       if (DEBUG_VUE_WIDGETS) debug_widgets << "clay_id of a simple widget not found" << LF;
+      return;
     }
   }
 

@@ -139,6 +139,35 @@ windows still name their texts and widgets, so a drag accumulates one
 layout's worth of each per event until the main loop lays everything out
 again.
 
+The watch runs its frame only while the loop is waiting for events
+(`watch_may_run`, set around the loop's own `SDL_PollEvent` and
+`SDL_WaitEventTimeout` through `loop_poll`/`loop_wait`), which is where a
+drag delivers its resizes. SDL also calls watches from inside any call
+which pumps events -- `SDL_ShowWindow`, which `process_layout` calls in the
+middle of a frame, or `SDL_PushEvent` from a test script -- and a frame
+started there ran inside another one. The event is then left to the next
+frame, whose layout reads the size of the window anyway.
+
+**Starting with files** (`texmacs file.tm other.tm`). The command line
+loads the first file into the "no name" window before the loop has run a
+frame, and the next ones into windows of their own. Two faults showed:
+
+* the "no name" editor, replaced before it was ever painted, was still in
+  the paint list with invalid regions, and repainting it made its detached
+  view current (`SERVER` in `edit_interface_rep::update_visible`):
+  TeXmacs stopped at once with "no window attached to view". A simple
+  widget which is not in the layout of its window is not on the screen and
+  is no longer repainted (`repaint_invalid_regions`); its regions stay
+  invalid until it is laid out again;
+* the editor of a window opened by a command got the keyboard focus when
+  the window was first laid out, which is after the interpose handler: a
+  focus is a change of the editor (freeze, focus, decorations: 546), and
+  the repaint of the same frame found it pending, "Invalid situation (546)
+  in edit_interface_rep::handle_repaint", in the console window. The layout
+  now only records that focus (`default_focus`), and the loop gives it just
+  before the interpose handler (`apply_default_focus`). What is typed into
+  a new window, before any click, still lands in its document.
+
 ## Layout conventions
 
 * **Units**: Clay works in *pixels* of the window surface, `retina_factor`

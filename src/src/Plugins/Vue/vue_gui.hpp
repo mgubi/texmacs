@@ -144,6 +144,8 @@ public:
 
   vue_widget content;
   vue_widget kbd_focus;
+  vue_widget default_focus; // given the focus before the next interpose, see
+                            // apply_default_focus in vue_gui.cpp
   hashset<string> refresh_kinds; // refresh cycle
   hashset<string> next_refresh_kinds; // refresh cycle
 

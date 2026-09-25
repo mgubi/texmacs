@@ -1637,6 +1637,48 @@ vue_profile_frame () {
   vue_total_commands= 0;
 }
 
+// The resize watch (event_filter) runs a whole frame, and SDL calls it
+// from inside whatever SDL call pumps the events -- SDL_ShowWindow among
+// them, which process_layout calls in the middle of a frame. It may do so
+// only while the loop is waiting for events, which is also where a live
+// resize (the window dragged) delivers them; anywhere else the event is
+// left to the next frame, whose layout reads the size of the window anyway.
+// Running a frame from inside SDL_ShowWindow repainted an editor whose view
+// was not yet attached to its window: with a file on the command line,
+// TeXmacs stopped at once ("no window attached to view").
+static bool watch_may_run= false;
+
+// The focus a window was given when first laid out (default_focus), set
+// just before the interpose handler, so that it applies the change of the
+// editor before anything is repainted (see vue_texmacs_widget_rep). A window
+// which has closed in between is no longer in the table.
+static void
+apply_default_focus () {
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    vue_window win= (vue_window) Window_to_window [it->next ()];
+    if (win == NULL || is_nil (win->default_focus)) continue;
+    vue_widget w= win->default_focus;
+    win->default_focus= vue_widget ();
+    if (is_nil (win->kbd_focus)) set_kbd_focus (win, w);
+  }
+}
+
+static bool
+loop_poll (SDL_Event* event) {
+  watch_may_run= true;
+  bool r= SDL_PollEvent (event);
+  watch_may_run= false;
+  return r;
+}
+
+static void
+loop_wait (int ms) {
+  watch_may_run= true;
+  SDL_WaitEventTimeout (NULL, ms);
+  watch_may_run= false;
+}
+
 void gui_start_loop () {
   // start the main loop
   int  delay= 10;
@@ -1654,7 +1696,7 @@ void gui_start_loop () {
     // 1. process events
     script_step (); // may push synthetic events
     SDL_Event event;
-    if (SDL_PollEvent (&event)) {
+    if (loop_poll (&event)) {
       bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
                        event.type == SDL_EVENT_MOUSE_MOTION);
       process_event (&event);
@@ -1672,14 +1714,14 @@ void gui_start_loop () {
                              SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
              (event.type == SDL_EVENT_MOUSE_WHEEL ||
               event.type == SDL_EVENT_MOUSE_MOTION) &&
-             SDL_PollEvent (&event)) {
+             loop_poll (&event)) {
         process_event (&event);
       }
     }
     if (transitions_running ()) {
       // a transition animates: keep the frames coming (paced, woken by events)
       gui_needs_update= true;
-      if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 8);
+      if (!loop_poll (NULL)) loop_wait (8);
     }
     if (wheel_step ()) {
       // keep the frames coming while the view moves by itself (or while a
@@ -1687,7 +1729,7 @@ void gui_start_loop () {
       // 5 ms but woken up by any event: a plain sleep here added its
       // length to the latency of every wheel event
       gui_needs_update= true;
-      if (!SDL_PollEvent (NULL)) SDL_WaitEventTimeout (NULL, 5);
+      if (!loop_poll (NULL)) loop_wait (5);
     }
 
     if (gui_needs_update) {
@@ -1708,7 +1750,7 @@ void gui_start_loop () {
       // while any is open, they have no event of their own to wake us
       int pause= notifiers_active () ? min (delay, 40) : delay;
       uint64_t t_wait= vue_now ();
-      SDL_WaitEventTimeout (NULL, pause);
+      loop_wait (pause);
       vue_profile_add (VP_WAIT, vue_now () - t_wait);
       delay += (delay/5);
       if (delay > 1000) delay= 1000;
@@ -1740,6 +1782,7 @@ void gui_start_loop () {
     // 5. interpose
     uint64_t t_int= vue_now ();
     t2= texmacs_time ();
+    apply_default_focus ();
     vue_simple_widget_rep::notify_resizes ();
     if (the_interpose_handler != NULL) the_interpose_handler ();
     if (nr_windows == 0) continue;
@@ -2525,6 +2568,10 @@ bool event_filter (void *userdata, SDL_Event *event) {
     // the middle of another one.
     static bool busy= false;
     if (busy) return true;
+    // only while the main loop waits for events (see watch_may_run): the
+    // event stays in the queue, and the next frame lays the window out at
+    // its new size
+    if (!watch_may_run) return true;
     vue_window win= get_window_from_ID (event->window.windowID);
     if (win) {
       busy= true;
