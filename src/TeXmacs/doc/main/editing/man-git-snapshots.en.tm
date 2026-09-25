@@ -27,10 +27,10 @@
 
   <menu|Version|Git|Restore snapshot> lists your recent snapshots. When you
   choose one of them, all files are put back as they were at that time.
-  Nothing is lost when doing so: the current state of your files is first
-  saved in an automatic snapshot, and restoring is itself recorded as a new
-  snapshot. You can therefore always return to the state before the
-  restoration.
+  Nothing is lost when doing so: if there are changes since the last
+  snapshot, then the current state of your files is first saved in an
+  automatic snapshot, to which you can return. The restored state itself is
+  recorded when you save the next snapshot.
 
   If you only want to recover an earlier version of the current document,
   then use <menu|Version|Restore version> instead, or first compare it with
@@ -39,18 +39,29 @@
 
   <paragraph*|Synchronizing with your coauthors>
 
-  If your project was cloned from a server, or if a server was added to it,
-  then <menu|Version|Synchronize> (or <key|version y>) first gets the
-  snapshots of your coauthors, then sends yours. This happens in the
-  background, so that you can continue to work in the meantime; the
-  progress is shown in the footer.
+  If your project was cloned from a server, then <menu|Version|Synchronize>
+  (or <key|version y>) first gets the snapshots of your coauthors, then
+  sends yours. This happens in the background, so that you can continue to
+  work in the meantime; the progress is shown in the footer.
+
+  Only snapshots are exchanged: save a snapshot before synchronizing, both
+  to send your work and because getting the changes of others fails when
+  the same files have changes which are not in a snapshot yet. The simple
+  mode has no command for connecting an existing project to a server: this
+  is done once in the full mode, with <menu|Version|Git|Remotes|Add remote>
+  (see <hlink|working with coauthors|man-git-remote.en.tm>). Alternatively,
+  the coauthor who created the project on the server can give you its
+  address, so that you can clone it.
 
   If both you and a coauthor saved snapshots since the last
-  synchronization, then <TeXmacs> asks whether they should be merged. Parts
-  which were changed by only one of you are merged automatically, even
-  inside a same paragraph. If you both changed the same words, then a
-  conflict remains, which you have to resolve before synchronizing again:
-  see <hlink|resolving conflicts|man-git-conflicts.en.tm>.
+  synchronization, then <TeXmacs> asks whether they should be merged.
+  Documents in which you changed different paragraphs are merged
+  automatically. If you both changed the same paragraph, even in different
+  places, then the document is marked as having a conflict: use
+  <menu|Version|Resolve conflict>, which merges the changes word by word
+  and only asks you to choose where you both changed the same words. Then
+  use <menu|Version|Mark as resolved>, save a snapshot and synchronize
+  again. See <hlink|resolving conflicts|man-git-conflicts.en.tm>.
 
   It is a good habit to synchronize before starting to work, and after
   saving a snapshot.

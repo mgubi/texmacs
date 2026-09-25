@@ -26,8 +26,10 @@
     should first commit or stash your changes.
 
     <item*|<menu|Merge branch>>Merge another branch into the current one.
-    <TeXmacs> documents are merged structurally, as <hlink|when working with
-    coauthors|man-git-remote.en.tm>.
+    Conflicts in <TeXmacs> documents are handled as <hlink|when working with
+    coauthors|man-git-remote.en.tm>: if the merge stops, the dialog which
+    explains it offers to show the status, from which the conflicts can be
+    resolved.
   </description>
 
   <TeXmacs> offers to save your modified documents before switching or
@@ -54,7 +56,8 @@
 
   A <em|stash> puts your uncommitted changes aside, and brings the files
   back to the state of the last commit; for instance, when you have to
-  correct something urgently in a clean version. <menu|Version|Git|Stash
+  correct something urgently in a clean version. New files, which are not
+  yet under version control, are not put aside. <menu|Version|Git|Stash
   changes> creates a stash, and <menu|Version|Git|Restore last stash> puts
   the changes back. The stashes are listed on the page
   <menu|Version|Git|Branches and tags>, where they can also be restored or

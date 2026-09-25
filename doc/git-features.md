@@ -153,7 +153,12 @@ staged, added, deleted, conflicted.
 | **Git output** | The last 50 git commands with exit code, stdout and stderr. |
 | **Refresh** | Forgets cached state, including which files are versioned. |
 
-Outside any repository, the Version menu offers:
+Outside any repository, the Version menu (when shown, see Tools →
+Versioning tool) offers the entries below. *Create* and *Clone* are also in
+**Tools → Versioning tool**, since by default the Version menu is only
+shown for documents in a working tree. *Git preferences* is always in the
+Version menu, also when git is not found, so that its location can be
+set.
 
 * **Create Git repository…** — `git init` in the document's directory,
   with a default `.gitignore` for TeXmacs projects.

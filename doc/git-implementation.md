@@ -336,7 +336,11 @@ platform. The offscreen platform does not render faithfully.
 | `(gui-test-type "text")` | types into the focused widget |
 | `(gui-test-click-later ms dir label)` | answers a modal dialog: Qt timers still fire in its event loop, the delayed commands of TeXmacs don't |
 
-Labels are compared case-insensitively, with `...` for `<ldots>`. A
+Labels are compared case-insensitively, with `...` for `<ldots>`. To
+build a lazy menu, the harness emits its `aboutToShow` signal, then
+`aboutToHide`: Qt TeXmacs postpones the updates of the menu bar while a
+menu is shown (`menu_count` in `qt_tm_widget.cpp`), so a menu left "open"
+would freeze the menu bar. A
 walkthrough runs its steps with `(delayed (:pause 1500) ...)`, and uses a
 fresh `TEXMACS_HOME_PATH` initialised by a first headless run, so that no
 Welcome window steals the focus. On macOS, other processes cannot capture

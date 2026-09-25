@@ -130,9 +130,11 @@
   saved, but you may compare them to the current user version (on disk or
   being edited) using <menu|Version|Compare with|Current user version>.
 
-  After making some changes to a file under version control, the version
-  inside the editor or on disk no longer corresponds to the version in the
-  repository. Using<nbsp><menu|Version|Commit>, the current user's version
+  For <name|Subversion>, the <menu|Version> menu also contains the
+  following entries; the corresponding tools for <name|Git> are described
+  below. After making some changes to a file under version control, the
+  version inside the editor or on disk no longer corresponds to the version
+  in the repository. Using<nbsp><menu|Version|Commit>, the current user's version
   can be committed to the repository. When doing so, you will be prompted for
   a small explanatory message about the changes that you have made. A file
   that is not yet under version control can be added to the version control
@@ -142,8 +144,8 @@
 
   If, while you were editing, changes to the file were made in the
   repository, then you may merge the result with your current version using
-  <menu|Version|Update>. For <name|Subversion>, no conflict resolution has
-  been implemented yet; for <name|Git>, see below.
+  <menu|Version|Update>. No conflict resolution has been implemented yet
+  for <name|Subversion>.
 
   <paragraph*|Working with <name|Git>>
 

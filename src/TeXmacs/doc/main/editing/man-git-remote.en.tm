@@ -53,12 +53,17 @@
 
   If you and your coauthors made commits since the last exchange, then the
   two histories have to be combined. By default, <TeXmacs> asks you whether
-  they should be merged, which creates a <em|merge commit>. The documents
-  are then merged automatically, using the structure of <TeXmacs>
-  documents: two changes in different places are both kept, even inside the
-  same paragraph. Only when the same part of a document was changed in two
-  different ways, a <em|conflict> remains; see <hlink|resolving
-  conflicts|man-git-conflicts.en.tm>.
+  they should be merged, which creates a <em|merge commit>. <name|Git>
+  merges files line by line, and a paragraph of a <TeXmacs> document is
+  usually stored on a single line: as soon as you both changed the same
+  paragraph, even in different places, the document is marked as having a
+  <em|conflict>. <menu|Version|Resolve conflict> then merges it word by
+  word, using the structure of the document, and only asks you to choose
+  where the same words were changed in two different ways; see
+  <hlink|resolving conflicts|man-git-conflicts.en.tm>. With
+  <menu|Version|Git|Merge documents structurally>, this structured merge
+  is done directly during the merge, so that only real conflicts
+  remain.
 
   Users of <name|Git> may prefer another behavior, which can be chosen in
   <menu|Version|Git|Preferences|Pull>: <menu|Merge> always merges without
