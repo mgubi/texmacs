@@ -268,6 +268,14 @@ choice, since it shares the coordinates and the sizes with Hummus.
 
 ## Checking it
 
+Built against MuPDF 1.28.5 (Homebrew), since 26 September 2026; it was
+written against 1.26.9. The move needed no change of the code, and the
+checks came out the same on both: the ten documents of the harness, the
+round trip of a PDF with its document embedded, and on the screen the
+document area of the `pattern` and `figures` tests pixel for pixel (the
+vector icons of the toolbars differ in their anti-aliasing, and nothing
+else).
+
 `src/Plugins/MuPDF/tests/pdf-compare.sh` exports a set of documents both ways
 and checks, of the MuPDF one, that Ghostscript reads it without an error
 and without substituting a font, that the text extracts with no U+FFFD in
