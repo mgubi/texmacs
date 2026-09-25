@@ -137,6 +137,7 @@ callback output.
 | `drop` | a dropped file name and a dropped piece of text reach `mouse-drop-event` and are inserted |
 | `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
 | `figures` | PDF figures drawn by MuPDF as drawing (a form XObject), upright and turned by `/Rotate 90`, and at a size where pixels would show; the figures are those of `Plugins/MuPDF/tests` |
+| `pattern-scroll` | `pattern-scroll.scm` under `scroll-shift.script`: a patterned page with patterned text, where scrolling must move the pattern with the page. s1 = s2; s3 and s4 still differ on one row of the surround (see the MuPDF renderer in vue-graphics-stack.md) |
 | `pattern` | paper mode and glyphs filled with patterns: the MuPDF renderer's `draw_bis` and tiling patterns |
 | `wheel` | scrolling with the wheel, then a balloon from a hovered toolbar button |
 | `title` | the title of the window names the document (`No name [n]`) and takes a `*` at the first change. Needs `-debug-qt-widgets`: the checks are the `window title` lines |

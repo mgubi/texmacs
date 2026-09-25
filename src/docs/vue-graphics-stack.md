@@ -701,8 +701,22 @@ behaviour. Feature status against those two:
   dereferences NULL), and the form's `/Matrix` must be taken out of fitz's
   page transform (`pdf_page_obj_transform`), which also turns y upside
   down, see *docs/pdf-output-with-mupdf.md*;
-* still open: the phase of tiling patterns relative to the page (matrix of
-  `register_pattern`), `set_brush` also resets the pencil width/caps.
+* **patterns anchored to the document**: the pool keeps each pattern
+  unplaced, and every select makes a placed copy (`placed_pattern`) whose
+  matrix puts a corner of the tiles at the origin of the document, where
+  the Qt port puts it (`decode (0, 0)`); the glyphs filled with a pattern
+  (`draw_bis`) sample it from the same corner. Before, the matrix was
+  fixed when the pattern was first used, with the scroll position of that
+  moment, so a pattern stood still while the page moved and a strip
+  repainted after a scroll shift did not meet the part which was moved:
+  `pattern-scroll.scm` under `scroll-shift.script` differed from its
+  repaint on 156 rows, now on none but the next point. Our `pdf_pattern`s
+  are reference counted as MuPDF's own (`FZ_INIT_STORABLE`); they were
+  made with a count of 0 before, so that they were never freed;
+* still open: after scrolling back up on a patterned page, one row of the
+  grey surround at the edge of the repainted strip shows the page colour
+  (`pattern-scroll`, s3 against s4); it was there before the patterns were
+  anchored. `set_brush` also resets the pencil width/caps.
 
 The renderers of the MuPDF plugin (`mupdf_renderer_rep`, used by the Vue
 windows and pictures, and `fitz_renderer_rep`) derive from

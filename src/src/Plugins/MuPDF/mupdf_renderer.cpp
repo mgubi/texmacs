@@ -564,6 +564,48 @@ get_image (url u, int w, int h, tree eff, SI pixel) {
   return mpim;
 }
 
+// A pdf_pattern of ours is reference counted like one MuPDF loads, and
+// dropped the same way (pdf_drop_pattern_imp is not exported)
+static void
+drop_pattern_imp (fz_context *ctx, fz_storable *s) {
+  pdf_pattern *pat= (pdf_pattern *) s;
+  pdf_drop_obj (ctx, pat->resources);
+  pdf_drop_obj (ctx, pat->contents);
+  fz_free (ctx, pat);
+}
+
+static pdf_pattern*
+new_pattern (fz_context *ctx, pdf_document *doc, float w, float h,
+             pdf_obj *resources, pdf_obj *contents, fz_matrix m) {
+  pdf_pattern *pat= fz_malloc_struct (ctx, pdf_pattern);
+  FZ_INIT_STORABLE (pat, 1, drop_pattern_imp);
+  pat->document= doc;
+  pat->id= 0; // no id: no cached tiles, which would not know the phase
+  pat->ismask= 0;
+  pat->xstep= w;
+  pat->ystep= h;
+  pat->bbox= fz_make_rect (0, 0, w, h);
+  pat->matrix= m;
+  pat->resources= pdf_keep_obj (ctx, resources);
+  pat->contents= pdf_keep_obj (ctx, contents);
+  return pat;
+}
+
+// The pattern p placed for this renderer: its tiles have a corner at the
+// origin of the document, as the Qt port places them (decode (0, 0)), so
+// that the pattern moves with what it fills when the view scrolls -- and
+// a strip repainted after a scroll shift meets the part which was moved
+// without a seam. A pattern lives in the default space of the processor
+// (the matrix of begin), which is the space of to_x and to_y. The one in
+// the pool is the unplaced original; the placed one is made for each use
+// and belongs to the caller.
+static pdf_pattern*
+placed_pattern (fz_context *ctx, pdf_pattern *t, double ox, double oy) {
+  return new_pattern (ctx, t->document, t->xstep, t->ystep,
+                      t->resources, t->contents,
+                      fz_make_matrix (1, 0, 0, 1, (float) ox, (float) oy));
+}
+
 void
 mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
   // debug_convert << "register_pattern_image\n";
@@ -632,36 +674,13 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
     return; // the pattern stays unregistered: the callers fall back
   }
   {
-    // make a pdf_pattern
-    int width= fz_pixmap_width (ctx, pixmap);
-    int height= fz_pixmap_height (ctx, pixmap);
-    SI sx= width + to_x(0); // FIXME: ??
-    SI sy= height; // FIXME: ??
-    float scale_x= 1.0; //((float) default_dpi) / dpi;
-    float scale_y= 1.0; //((float) default_dpi) / dpi;
-
-   // const float matrix[]= { scale_x, 0, 0, scale_y, (float) sx, (float) sy };
-
-    pdf_pattern *pat= fz_malloc_struct (ctx, pdf_pattern);
-    pat->document= doc;
-    pat->id= 0; //pdf_to_num (ctx, dict);
-    pat->ismask= 0; //pdf_dict_get_int(ctx, dict, PDF_NAME(PaintType)) == 2;
-    pat->xstep= w; //pdf_dict_get_real(ctx, dict, PDF_NAME(XStep));
-    pat->ystep= h; //pdf_dict_get_real(ctx, dict, PDF_NAME(YStep));
-    pat->bbox= fz_make_rect (0, 0, w, h); //pdf_dict_get_rect(ctx, dict, PDF_NAME(BBox));
-    pat->matrix= fz_make_matrix (scale_x, 0, 0, scale_y, (float) sx, (float) sy);// pdf_dict_get_matrix(ctx, dict, PDF_NAME(Matrix));
-    pat->resources= subres; // we already own it
-    //pdf_keep_obj (ctx, pat->resources);
-    pat->contents= contents; // we already own it
-    //pdf_keep_obj (ctx, pat->contents);
-
-    // debug_convert << "  insert pattern\n";
-    // debug_convert << "pdf_pattern " << ox << ", " << oy
-    //         << ", " << pixel << ", " << shrinkf
-    //       << ", " << zoomf << LF;
-    // debug_convert << "            " << to_x(0) << ", " << to_y(0) << LF;
-    // debug_convert << "            " << w << ", " << h << LF;
-
+    pdf_pattern *pat= NULL;
+    mupdf_protected ("mupdf_renderer_rep::register_pattern", [&] () {
+      pat= new_pattern (ctx, doc, w, h, subres, contents, fz_identity);
+    });
+    pdf_drop_obj (ctx, subres);
+    pdf_drop_obj (ctx, contents);
+    if (pat == NULL) return;
     mupdf_pattern p_pdf (pat);
     pdf_drop_pattern (ctx, pat);
     pattern_pool (p) = p_pdf;
@@ -679,10 +698,14 @@ mupdf_renderer_rep::select_stroke_pattern (brush br) {
     return;
   }
   mupdf_pattern p= pattern_pool [p_tree];
-  proc->op_CS (mupdf_context (), proc, "Pattern",
-               fz_device_rgb (mupdf_context ()));
-  proc->op_SC_pattern (mupdf_context (), proc, "*stroke-pattern*",
-                       p->pat, 0, NULL);
+  fz_context *ctx= mupdf_context ();
+  pdf_pattern *pat= NULL;
+  mupdf_protected ("select_stroke_pattern", [&] () {
+    pat= placed_pattern (ctx, p->pat, to_x (0), to_y (0));
+    proc->op_CS (ctx, proc, "Pattern", fz_device_rgb (ctx));
+    proc->op_SC_pattern (ctx, proc, "*stroke-pattern*", pat, 0, NULL);
+  });
+  pdf_drop_pattern (ctx, pat); // the processor keeps its own
 }
 
 void
@@ -697,10 +720,14 @@ mupdf_renderer_rep::select_fill_pattern (brush br) {
   }
   mupdf_pattern p= pattern_pool [p_tree];
   fill_is_pattern= true;
-  proc->op_CS (mupdf_context (), proc, "Pattern",
-               fz_device_rgb (mupdf_context ()));
-  proc->op_sc_pattern (mupdf_context (), proc, "*fill-pattern*",
-                       p->pat, 0, NULL);
+  fz_context *ctx= mupdf_context ();
+  pdf_pattern *pat= NULL;
+  mupdf_protected ("select_fill_pattern", [&] () {
+    pat= placed_pattern (ctx, p->pat, to_x (0), to_y (0));
+    proc->op_CS (ctx, proc, "Pattern", fz_device_rgb (ctx));
+    proc->op_sc_pattern (ctx, proc, "*fill-pattern*", pat, 0, NULL);
+  });
+  pdf_drop_pattern (ctx, pat); // the processor keeps its own
   select_alpha ((1000*br->get_alpha ())/255);
 }
 
@@ -1515,10 +1542,13 @@ mupdf_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
   unsigned char *samples= (unsigned char *)
     Memento_label (fz_malloc (ctx, h*w*4), "pattern_glyph_data");
   unsigned char *d= samples;
+  // the pattern is anchored at the origin of the document, as the fills
+  // are (placed_pattern): its device position is (to_x (0), -to_y (0))
+  int ax= tx - (int) floor (to_x (0)), ay= ty + (int) floor (to_y (0));
   for (int j=0; j<h; j++) {
-    int py= ((ty + j) % ph + ph) % ph;
+    int py= ((ay + j) % ph + ph) % ph;
     for (int i=0; i<w; i++) {
-      int px= ((tx + i) % pw + pw) % pw;
+      int px= ((ax + i) % pw + pw) % pw;
       unsigned char* s= ps + py*stride + px*pn;
       int r= s[0], g= (pn >= 3? s[1]: s[0]), b= (pn >= 3? s[2]: s[0]);
       int a= (pn == 4 || pn == 2)? s[pn-1]: 255;
