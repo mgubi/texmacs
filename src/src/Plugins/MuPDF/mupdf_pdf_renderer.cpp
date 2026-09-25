@@ -38,6 +38,9 @@
 #include "frame.hpp"
 #include "image_files.hpp"
 #include "scalable.hpp"
+#include "converter.hpp"   // decode_from_utf8
+#include "link.hpp"        // get_locus_rendering
+#include "tm_configure.hpp"  // TEXMACS_VERSION
 
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
@@ -126,6 +129,10 @@ ligature_letters (string name) {
     }
   return N(r) >= 2 ? r : string ("");
 }
+
+// how names and addresses are written (see the links, below)
+static string pdf_text_bytes (string s);
+static string uri_bytes (string s);
 
 class mupdf_pdf_renderer_rep : public renderer_rep {
   static const int default_dpi= 72;
@@ -226,7 +233,8 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_dests ();
-  void write_links (pdf_obj* pobj, array<string>& label, array<int>& local);
+  void write_links (pdf_obj* pobj, array<string>& target, array<int>& local,
+                    int border);
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
@@ -428,20 +436,24 @@ mupdf_pdf_renderer_rep::end_page () {
   while (clip_level-- > 0) put ("Q\n");
   clip_level= 0;
   put ("Q\n");
-  // the labels of the links as C strings, and which are places in the
-  // document (see write_links)
-  array<string> label;
+  // the targets of the links as the bytes which go in the file: a place in
+  // the document by the name write_dests gives it, an address as a URI
+  array<string> target;
   array<int> local;
   for (int i=0; i<N(links); i++) {
-    label << (links[i].label * string ((char) 0));
-    local << (starts (links[i].label, "#") ? 1 : 0);
+    bool loc= starts (links[i].label, "#");
+    local << (loc ? 1 : 0);
+    target << (loc ? pdf_text_bytes (links[i].label) : uri_bytes (links[i].label));
   }
+  // as pdf_hummus_renderer: a dashed border, drawn only when the loci are
+  // to keep their look on paper
+  int border= (get_locus_rendering ("locus-on-paper") == "preserve") ? 1 : 0;
   pdf_obj* page= NULL;
   fz_var (page);
   fz_try (ctx) {
     fz_rect mediabox= fz_make_rect (0, 0, (float) width, (float) height);
     page= pdf_add_page (ctx, doc, mediabox, 0, resources, contents);
-    write_links (page, label, local);
+    write_links (page, target, local, border);
     pdf_insert_page (ctx, doc, -1, page);
   }
   fz_catch (ctx) {
@@ -1644,6 +1656,62 @@ mupdf_pdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
 * Links, the outline and the metadata
 ******************************************************************************/
 
+// The labels, titles and addresses reach the renderer in UTF-8 (checked:
+// the metadata, the entries of the outline, the anchors and the targets of
+// links all do), so they are not converted from Cork as pdf_hummus_renderer
+// converts them.
+
+// A text string of PDF, as bytes: ASCII as it is, anything else in UTF-16BE
+// after a byte order mark -- what pdf_new_text_string makes, spelled out so
+// that the same bytes can be written wherever the same name must be found.
+// A named destination is looked up by its bytes, and a link which names it
+// in other bytes than the name tree leads nowhere, in a reader which does
+// not decode both before comparing (MuPDF does).
+static string
+pdf_text_bytes (string s) {
+  bool ascii= true;
+  for (int i=0; i<N(s); i++) if (((unsigned char) s[i]) >= 128) ascii= false;
+  if (ascii) return s;
+  string r;
+  r << (char) 0xFE << (char) 0xFF;
+  int i= 0;
+  while (i < N(s)) {
+    unsigned int c= decode_from_utf8 (s, i);
+    if (c >= 0x10000) {   // a surrogate pair
+      c -= 0x10000;
+      unsigned int hi= 0xD800 + (c >> 10), lo= 0xDC00 + (c & 0x3FF);
+      r << (char) (hi >> 8) << (char) (hi & 0xFF)
+        << (char) (lo >> 8) << (char) (lo & 0xFF);
+    }
+    else r << (char) (c >> 8) << (char) (c & 0xFF);
+  }
+  return r;
+}
+
+// the order of the keys of a name tree: by their bytes
+static bool
+bytes_less (string a, string b) {
+  int n= min (N(a), N(b));
+  for (int i=0; i<n; i++)
+    if (a[i] != b[i]) return ((unsigned char) a[i]) < ((unsigned char) b[i]);
+  return N(a) < N(b);
+}
+
+// A URI is an ASCII string: what is not ASCII -- and a space, a control
+// character -- is percent encoded, from its UTF-8 bytes (RFC 3987). Hummus
+// writes the address as a text string, UTF-16 as soon as it has an accent.
+static string
+uri_bytes (string s) {
+  static const char* hex= "0123456789ABCDEF";
+  string r;
+  for (int i=0; i<N(s); i++) {
+    unsigned char c= (unsigned char) s[i];
+    if (c <= 32 || c >= 127) r << '%' << hex[c >> 4] << hex[c & 15];
+    else r << (char) c;
+  }
+  return r;
+}
+
 // A place a link can point at. They are collected here and written as a
 // name tree when the document is closed, since a link may well come
 // before the page it points at has been laid out.
@@ -1689,8 +1757,8 @@ mupdf_pdf_renderer_rep::set_metadata (string kind, string val) {
 // called inside the fz_try of end_page, with the labels prepared there:
 // nothing here may have a destructor
 void
-mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj, array<string>& label,
-                                     array<int>& local) {
+mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj, array<string>& target,
+                                     array<int>& local, int border) {
   if (N(links) == 0) return;
   pdf_obj* annots= pdf_dict_put_array (ctx, pobj, PDF_NAME(Annots), N(links));
   for (int i=0; i<N(links); i++) {
@@ -1702,20 +1770,28 @@ mupdf_pdf_renderer_rep::write_links (pdf_obj* pobj, array<string>& label,
     pdf_array_push_real (ctx, rect, links[i].y1);
     pdf_array_push_real (ctx, rect, links[i].x2);
     pdf_array_push_real (ctx, rect, links[i].y2);
-    pdf_obj* border= pdf_dict_put_array (ctx, a, PDF_NAME(Border), 3);
-    pdf_array_push_int (ctx, border, 16);
-    pdf_array_push_int (ctx, border, 16);
-    pdf_array_push_int (ctx, border, 0);
-    const char* s= &label[i][0];
+    // /Border [16 16 w [3 10]] /Color [0.75 0.5 1.0], as pdf_hummus_renderer
+    pdf_obj* b= pdf_dict_put_array (ctx, a, PDF_NAME(Border), 4);
+    pdf_array_push_int (ctx, b, 16);
+    pdf_array_push_int (ctx, b, 16);
+    pdf_array_push_int (ctx, b, border);
+    pdf_obj* dash= pdf_array_push_array (ctx, b, 2);
+    pdf_array_push_int (ctx, dash, 3);
+    pdf_array_push_int (ctx, dash, 10);
+    pdf_obj* col= pdf_dict_put_array (ctx, a, PDF_NAME(C), 3);
+    pdf_array_push_real (ctx, col, 0.75);
+    pdf_array_push_real (ctx, col, 0.5);
+    pdf_array_push_real (ctx, col, 1.0);
+    string& t= target[i];
     if (local[i]) {
-      // a place in the document: the name is the one anchor () registered,
-      // resolved through the tree write_dests puts in the catalogue
-      pdf_dict_put_text_string (ctx, a, PDF_NAME(Dest), s);
+      // a place in the document: the name anchor () registered, in the
+      // bytes write_dests gives the key of the name tree
+      pdf_dict_put_string (ctx, a, PDF_NAME(Dest), &t[0], N(t));
     }
     else {
       pdf_obj* act= pdf_dict_put_dict (ctx, a, PDF_NAME(A), 2);
       pdf_dict_put (ctx, act, PDF_NAME(S), PDF_NAME(URI));
-      pdf_dict_put_text_string (ctx, act, PDF_NAME(URI), s);
+      pdf_dict_put_string (ctx, act, PDF_NAME(URI), &t[0], N(t));
     }
     pdf_array_push_drop (ctx, annots, pdf_add_object_drop (ctx, doc, a));
   }
@@ -1816,12 +1892,14 @@ mupdf_pdf_renderer_rep::write_dests () {
     int page= (int) dest_pos[i].x1;
     if (page >= 0 && page < N(pages)) ord << i;
   }
+  // the keys, in the bytes the links name them by (see pdf_text_bytes),
+  // sorted by those bytes, which is the order a reader searches them in
+  array<string> key;
+  for (int i=0; i<N(dest_name); i++) key << pdf_text_bytes (dest_name[i]);
   for (int i=1; i<N(ord); i++)     // few and nearly sorted: insertion
-    for (int j=i; j>0 && dest_name[ord[j]] < dest_name[ord[j-1]]; j--) {
+    for (int j=i; j>0 && bytes_less (key[ord[j]], key[ord[j-1]]); j--) {
       int t= ord[j]; ord[j]= ord[j-1]; ord[j-1]= t;
     }
-  array<string> nm;     // with a 0 at the end, to be C strings
-  for (int i=0; i<N(ord); i++) nm << (dest_name[ord[i]] * string ((char) 0));
   fz_try (ctx) {
     pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
     pdf_obj* names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 1);
@@ -1830,7 +1908,8 @@ mupdf_pdf_renderer_rep::write_dests () {
                                       2 * N(ord));
     for (int i=0; i<N(ord); i++) {
       pdf_link_item& pos= dest_pos[ord[i]];
-      pdf_array_push_string (ctx, arr, &nm[i][0], N(nm[i]) - 1);
+      string& k= key[ord[i]];
+      pdf_array_push_string (ctx, arr, &k[0], N(k));
       pdf_obj* d= pdf_array_push_array (ctx, arr, 5);
       pdf_array_push (ctx, d, pages[(int) pos.x1]);
       pdf_array_push (ctx, d, PDF_NAME(XYZ));
@@ -1861,7 +1940,11 @@ mupdf_pdf_renderer_rep::write_metadata () {
     if (N(title) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Title), &title[0]);
     if (N(author) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Author), &author[0]);
     if (N(subject) > 0) pdf_dict_put_text_string (ctx, info, PDF_NAME(Subject), &subject[0]);
-    pdf_dict_put_text_string (ctx, info, PDF_NAME(Producer), "GNU TeXmacs (MuPDF)");
+    // as pdf_hummus_renderer: TeXmacs made it, with the library named
+    pdf_dict_put_text_string (ctx, info, PDF_NAME(Creator), "TeXmacs " TEXMACS_VERSION);
+    pdf_dict_put_text_string (ctx, info, PDF_NAME(Producer),
+                              "TeXmacs " TEXMACS_VERSION " + MuPDF " FZ_VERSION);
+    pdf_dict_put_date (ctx, info, PDF_NAME(CreationDate), (int64_t) time (NULL));
   }
   fz_catch (ctx) {
     convert_warning << "MuPDF could not write the metadata: "

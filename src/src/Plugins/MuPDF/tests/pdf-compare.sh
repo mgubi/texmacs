@@ -156,6 +156,11 @@ print (sum (1 for p in a.getdata () if p[0] > 90 and p[2] > 150 and p[1] < 100))
   if [ "$name" = structure ]; then
     mutool run "$(dirname "$0")/structure.js" "$mu" > "$OUT/structure.txt" 2>&1
     got=$(python3 "$(dirname "$0")/structure-check.py" "$OUT/structure.txt")
+    # and, in the file itself, every link names its destination in the
+    # bytes of the name tree, and every URI is ASCII (dest-bytes.py)
+    mutool clean -d "$mu" "$OUT/structure-plain.pdf" >/dev/null 2>&1
+    bytes=$(python3 "$(dirname "$0")/dest-bytes.py" "$OUT/structure-plain.pdf")
+    case "$bytes" in ok*) ;; *) got="$got; $bytes" ;; esac
     if [ "$got" = ok ]; then
       echo "  ok    outline, destinations, links and title are there"
     else

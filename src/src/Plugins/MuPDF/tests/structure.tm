@@ -3,8 +3,7 @@
 <style|article>
 
 <\body>
-  <doc-data|<doc-title|Structure test>|<doc-author|<author-data|<author-name|A.
-  Tester>>>>
+  <doc-data|<doc-title|Structure test>|<doc-author|<author-data|<author-name|André Tëster>>>>
 
   <table-of-contents|toc|>
 
@@ -27,6 +26,11 @@
   Back to <reference|sec-first>.
 
   <subsection|Last subsection>
+
+  <subsection|Größe à Paris><label|sec-été>
+
+  Accents everywhere: back to <reference|sec-été>, and to <hlink|a page on
+  summer|https://fr.wikipedia.org/wiki/Été>.
 
   <new-page>
 

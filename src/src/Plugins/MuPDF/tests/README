@@ -61,7 +61,10 @@ structure.js (mutool run) with structure-check.py checks that the outline,
 the named destinations, the links -- the web one included, which a batch
 export used to lose -- and the title are there, that every entry of the
 outline points at its parent by reference, and that MuPDF has nothing to
-repair: the parts the writer assembles when the document is closed.
+repair: the parts the writer assembles when the document is closed. It has
+accents in a heading, a label, the author and an address, and dest-bytes.py
+checks the file itself: every link names its destination in the bytes of a
+key of the name tree (a reader compares bytes), and every URI is ASCII.
 
 Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
 output directory, how long a conversion is given, and the threshold.

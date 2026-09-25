@@ -377,6 +377,29 @@ compacted, which in a file with more objects sent `/First` to a link
 annotation, and MuPDF had to repair the outline. It is now an object of its
 own. The code before had it too.
 
+What a link looks like and how it is named follows pdf_hummus_renderer:
+`/Border [16 16 w [3 10]] /Color [0.75 0.5 1.0]`, the width 1 only when
+the preference `locus-on-paper` is `preserve` (the loci keep their look
+on paper), and `/Creator`, `/Producer` and `/CreationDate` in the metadata
+as Hummus writes them. Three things differ, on purpose:
+
+* the strings reach the renderer in UTF-8 -- the metadata, the entries of
+  the outline, anchors and targets alike (checked, byte by byte) -- so they
+  are not converted from Cork, as Hummus converts them;
+* a place in the document keeps its own name (`#sec-first`, in a name
+  tree), where Hummus numbers them (`/label7`, in a `/Dests` dictionary),
+  so that `file.pdf#nameddest=...` finds it. The name is written in the
+  same bytes in the link and in the tree (`pdf_text_bytes`: ASCII, or
+  UTF-16BE after a byte order mark), and the tree is sorted by them: a
+  reader looks a name up by its bytes, and the link used to be UTF-16 where
+  the tree was UTF-8, which only MuPDF, decoding both, forgave;
+* a URI is an ASCII string, so what is not ASCII is percent encoded from
+  its UTF-8 (`https://fr.wikipedia.org/wiki/%C3%89t%C3%A9`); Hummus writes
+  a text string, UTF-16 as soon as there is an accent.
+
+`dest-bytes.py` in the tests checks the second and the third on the file
+itself; `structure.tm` has an accented heading, label, author and address.
+
 A forward reference in a batch export is "?" unless the document carries
 the values of its labels, as a document saved by TeXmacs does (the
 `references` part at its end): the export typesets once, and a label comes
