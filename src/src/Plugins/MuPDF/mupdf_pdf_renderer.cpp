@@ -1729,9 +1729,29 @@ mupdf_pdf_renderer_rep::anchor (string label, SI x1, SI y1, SI x2, SI y2) {
 void
 mupdf_pdf_renderer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
   double f= (double) default_dpi / dpi;
-  links << pdf_link_item (label,
-                          f * to_x (x1 - 5*pixel), f * to_y (y1 - 10*pixel),
-                          f * to_x (x2 + 5*pixel), f * to_y (y2 + 10*pixel));
+  pdf_link_item it (label,
+                    f * to_x (x1 - 5*pixel), f * to_y (y1 - 10*pixel),
+                    f * to_x (x2 + 5*pixel), f * to_y (y2 + 10*pixel));
+  // The words of a link come one at a time, a box each: one which follows
+  // the last on its line, to the same place, makes the last one longer,
+  // so that a link is one annotation on each line it runs over, and not
+  // one a word ("the", "TeXmacs", "site"). On the same line: the heights
+  // overlap for the most part; following it: no further than a space of
+  // large type (12 pt)
+  int n= N(links);
+  if (n > 0) {
+    pdf_link_item& last= links[n-1];
+    double lo= max (last.y1, it.y1), hi= min (last.y2, it.y2);
+    double h = min (last.y2 - last.y1, it.y2 - it.y1);
+    if (last.label == label && h > 0 && hi - lo > 0.5 * h &&
+        it.x1 >= last.x1 && it.x1 - last.x2 <= 12.0) {
+      last.x2= max (last.x2, it.x2);
+      last.y1= min (last.y1, it.y1);
+      last.y2= max (last.y2, it.y2);
+      return;
+    }
+  }
+  links << it;
 }
 
 void

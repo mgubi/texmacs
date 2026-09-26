@@ -405,6 +405,11 @@ as Hummus writes them. Three things differ, on purpose:
   its UTF-8 (`https://fr.wikipedia.org/wiki/%C3%89t%C3%A9`); Hummus writes
   a text string, UTF-16 as soon as there is an accent.
 
+A link is one annotation on each line it runs over: its words reach
+`href` a box at a time, and a box which follows the last one on its line,
+to the same place, lengthens it (Hummus, and the PostScript route, have
+one annotation a word).
+
 `dest-bytes.py` in the tests checks the second and the third on the file
 itself; `structure.tm` has an accented heading, label, author and address.
 
