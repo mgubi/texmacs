@@ -96,6 +96,35 @@ mupdf_screen_colorspace () {
   return fz_device_bgr (mupdf_context ());
 }
 
+bool
+mupdf_image_size (url u, int& w, int& h) {
+  fz_context* ctx= mupdf_context ();
+  string suf= locase_all (suffix (u));
+  c_string path (concretize (u));
+  if (suf == "pdf" || suf == "svg") {
+    float fw= 0, fh= 0;
+    fz_document* doc= NULL;
+    fz_page* page= NULL;
+    bool ok= mupdf_protected ("mupdf_image_size", [&] () {
+      doc= fz_open_document (ctx, path);
+      page= fz_load_page (ctx, doc, 0);
+      fz_rect r= fz_bound_page (ctx, page);
+      fw= r.x1 - r.x0; fh= r.y1 - r.y0;
+    });
+    // dropped outside: the protected body must not leak them on an error
+    if (page != NULL) fz_drop_page (ctx, page);
+    if (doc != NULL) fz_drop_document (ctx, doc);
+    if (!ok || fw <= 0 || fh <= 0) return false;
+    w= (int) (fw + 0.5); h= (int) (fh + 0.5);
+    return true;
+  }
+  fz_image* im= mupdf_image_from_file (path);
+  if (im == NULL) return false;
+  w= im->w; h= im->h; // a point per pixel, as the other loaders
+  fz_drop_image (ctx, im);
+  return w > 0 && h > 0;
+}
+
 fz_pixmap*
 mupdf_new_pixmap (int w, int h) {
   fz_context* ctx= mupdf_context ();

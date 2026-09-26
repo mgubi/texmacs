@@ -11,6 +11,10 @@
 
 #include "glue.hpp"
 
+// the glue type uint (see build-glue): the C library of macOS declares it,
+// that of the browser build does not (a typedef may be repeated in C++)
+typedef unsigned int uint;
+
 #include "promise.hpp"
 #include "tree.hpp"
 #include "drd_mode.hpp"
