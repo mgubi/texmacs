@@ -439,6 +439,23 @@ postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod) {
 // the name of a key for TeXmacs; produces_text is set when the keystroke
 // types text, which then comes as a text event (composed with the dead keys
 // and the input method) and is delivered instead of the key
+// The name of a key for TeXmacs, from the text it types (in the Cork
+// encoding of utf8_to_cork), as the Qt port names it (QTMKeyboardEvent.cpp):
+// a symbol without its brackets, which the editor puts back ("<alpha>"
+// gives "alpha"), and "<" and ">" as themselves. A key "<less>" was
+// inserted as "<<less>>": a broken string in the document, whose cursor
+// then went past its end ("bad path", a crash, after a Backspace).
+static string
+cork_key (string r) {
+  int n= N(r);
+  if (n >= 3 && r[0] == '<' && r[1] != '#' && r[n-1] == '>' &&
+      search_forwards ("<", 1, r) < 0)
+    r= r (1, n-1);
+  if (r == "less") return "<";
+  if (r == "gtr") return ">";
+  return r;
+}
+
 static string
 lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool& produces_text) {
   SDL_Keycode key= postprocess_key_event (scancode, &mod);
@@ -449,7 +466,7 @@ lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool& produces_text) {
 
   const char* str= SDL_GetKeyName (key);
   string r (str, (int) strlen (str));
-  r= utf8_to_cork (r);
+  r= cork_key (utf8_to_cork (r));
   if (contains_unicode_char (r)) return r;
   string s= r;
   if ((key >= 'A') && (key <= 'Z')) s= upper_key[key - 'A' + 'a'];
@@ -1060,10 +1077,8 @@ sdl_gui_rep::process_event (SDL_Event *event) {
         key_stamp= 0;
         break;
       }
-      string r= utf8_to_cork (event->text.text);
+      string r= cork_key (utf8_to_cork (event->text.text));
       if (r == " ") r= "space";
-      else if (r == "<") r= "<less>";
-      else if (r == ">") r= "<gtr>";
       if (DEBUG_EVENTS) debug_events << "text " << r << LF;
       win->key_event (r);
       break;

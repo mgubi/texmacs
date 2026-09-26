@@ -2046,6 +2046,7 @@ int number_of_servers (); // in texmacs_server.hpp
 
 void sdl_log_event (const SDL_Event *event);
 static string lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text= NULL);
+static string cork_key (string r);
 static string print_modifiers (SDL_Keymod mod);
 static string print_key_info ( SDL_KeyboardEvent *key );
 
@@ -3387,10 +3388,8 @@ process_event (SDL_Event *event) {
     {
       // the text typed by a keystroke (see SDL_EVENT_KEY_DOWN): the key
       // names of TeXmacs for the characters which have one
-      string r= utf8_to_cork (event->text.text);
+      string r= cork_key (utf8_to_cork (event->text.text));
       if (r == " ") r= "space";
-      else if (r == "<") r= "<less>";
-      else if (r == ">") r= "<gtr>";
       win= route_keys (get_window_from_ID (event->text.windowID));
       if (win) {
         // a text event right after a key delivered as a key (a command
@@ -4557,6 +4556,23 @@ initialize_keyboard () {
 ******************************************************************************/
 
 
+// The name of a key for TeXmacs, from the text it types (in the Cork
+// encoding of utf8_to_cork), as the Qt port names it (QTMKeyboardEvent.cpp):
+// a symbol without its brackets, which the editor puts back ("<alpha>"
+// gives "alpha"), and "<" and ">" as themselves. A key "<less>" was
+// inserted as "<<less>>": a broken string in the document, whose cursor
+// then went past its end ("bad path", a crash, after a Backspace).
+static string
+cork_key (string r) {
+  int n= N(r);
+  if (n >= 3 && r[0] == '<' && r[1] != '#' && r[n-1] == '>' &&
+      search_forwards ("<", 1, r) < 0)
+    r= r (1, n-1);
+  if (r == "less") return "<";
+  if (r == "gtr") return ">";
+  return r;
+}
+
 static string
 lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
   SDL_Keycode key= postprocess_key_event (scancode, &mod, false);
@@ -4573,7 +4589,7 @@ lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool* produces_text) {
 
   const char* str= SDL_GetKeyName (key);
   string r (str, (int)strlen (str));
-  r= utf8_to_cork (r);
+  r= cork_key (utf8_to_cork (r));
   if (contains_unicode_char (r)) return r;
   string s=r;
   if ((key >= 'A') && (key <= 'Z')) s= upper_key[key - 'A' + 'a'];
