@@ -80,8 +80,13 @@ vendored s7 11.9.
   - `map` or `for-each` over a table yields `(key . value)` pairs.
   - Tables and environments are applicable: `(ht key)`, `(env 'sym)`.
 - **`(string->symbol "")` is an error** ✓ (`wrong-type-arg`). Guile allows
-  it. Guards were added in `macro-widgets.scm`, and one `xmltm` test was
-  disabled.
+  it. The empty symbol itself exists: `s7_make_symbol` creates it from C, so
+  the XML parser returns it as the name of `<??>`. Scheme code just can't
+  write it. Guards were added in `macro-widgets.scm`, and the `xmltm` test
+  of `<??>` compares symbol names as strings.
+  - s7 prints the empty symbol as nothing, where Guile prints `#{}#`, so it
+    is lost when an s-expression is written and read back (see
+    [06](06-open-issues.md#62-fragile-or-surprising-behavior)).
 - **Procedure printing** ✓. `(object->string car)` → `"car"`, and a named
   closure prints as its name. `procedure-symbol-name` relies on this.
 - **Print length** ✓. `*s7* 'print-length` (default 12) truncates vectors,
