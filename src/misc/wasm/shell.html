@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GNU TeXmacs</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #a0a0a0; }
+  canvas { display: block; outline: none; }
+  #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center;
+            font: 16px -apple-system, "Helvetica Neue", sans-serif; color: #222; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="status">Loading TeXmacs…</div>
+<script>
+  var statusElement = document.getElementById('status');
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: function (text) { console.log(text); },
+    printErr: function (text) { console.error(text); },
+    setStatus: function (text) {
+      statusElement.textContent = text || '';
+      statusElement.style.display = text ? 'block' : 'none';
+    },
+    monitorRunDependencies: function (left) {
+      if (left) Module.setStatus('Loading TeXmacs… (' + left + ')');
+    }
+  };
+  window.onerror = function (msg) { Module.setStatus('Error: ' + msg); };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

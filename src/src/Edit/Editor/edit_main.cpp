@@ -216,7 +216,9 @@ string printing_on ("a4");
 // (see docs/pdf-output-with-mupdf.md).
 bool
 use_mupdf_pdf () {
-#ifdef MUPDF_RENDERER
+#ifdef __EMSCRIPTEN__
+  return true; // the only way to a PDF in the browser (no Ghostscript)
+#elif defined(MUPDF_RENDERER)
   if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
   return get_preference ("native pdf renderer", "default") == "mupdf";
 #else

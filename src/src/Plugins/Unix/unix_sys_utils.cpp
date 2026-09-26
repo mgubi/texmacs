@@ -261,8 +261,13 @@ unix_system (array<string> arg,
     _arg << as_charp (arg_[j]);
   _arg << (char*) NULL;
   pid_t pid;
+#ifdef __EMSCRIPTEN__
+  // no processes in the browser: the command fails as if not found
+  int status= -1; pid= 0;
+#else
   int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, NULL,
 			    A(_arg), environ);
+#endif
   for (int j= 0; j < N(arg_); j++)
     tm_delete_array (_arg[j]);
   if (status != 0) {

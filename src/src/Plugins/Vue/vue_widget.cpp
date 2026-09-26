@@ -1042,6 +1042,20 @@ render_marker_fn (renderer ren, void* data, rectangle r) {
   }
 }
 
+// An arrow of the widgets (dir as for render_marker_fn): the character of
+// the interface font when it has one, the drawn chevron otherwise (Fira, the
+// font of the browser, has no U+25B8 and no U+25BE)
+static void
+layout_arrow (string glyph, int dir, color c) {
+  font fn= get_default_styled_font (0);
+  if (fn->supports (glyph)) { layout_text (glyph, 0, c); return; }
+  float s= (float) retina_factor * ((fn->y2 - fn->y1) / 3) / PIXEL;
+  CLAY_AUTO_ID({
+    .layout= { .sizing= { CLAY_SIZING_FIXED(s), CLAY_SIZING_FIXED(s) }},
+    .custom= { .customData= (void*) &render_marker_fn },
+    .userData= (void*) (intptr_t) dir }) {}
+}
+
 static void
 scroll_markers (Clay_ElementId id, Clay_ScrollContainerData& sd,
                 Clay_Color bg, bool horizontal, int16_t z= 1) {
@@ -1504,7 +1518,7 @@ layout_pull_button (vue_ui_rep *w) {
     concrete(d.w)->do_layout ();
     if (!down) {
       CLAY_AUTO_ID({ .layout= { .sizing= layoutExpand }}){};
-      layout_text("<#25B8>", 0, black); // right arrow
+      layout_arrow ("<#25B8>", 1, black); // right arrow
     }
     if (sig.clicked == 1) {
       if (is_nil (d.cw)) {
@@ -2535,7 +2549,7 @@ vue_ui_rep::do_layout () {
     {
       layout_text (d.val, d.st, inert ? dark_grey : black);
       CLAY_AUTO_ID({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
-      layout_text ("<#25BE>", 0, inert ? dark_grey : black); // down arrow
+      layout_arrow ("<#25BE>", 3, inert ? dark_grey : black); // down arrow
       if (d.open) {
         CLAY(list_id, {
           .floating= {
@@ -6110,7 +6124,7 @@ vue_tree_view_widget_rep::layout_node (tree t, int depth) {
         .sizing= { CLAY_SIZING_FIXED(24), CLAY_SIZING_FIT(0) },
         .padding= { 4, 4, 2, 2 }}})
     {
-      if (kids) layout_text (open ? "<#25BE>" : "<#25B8>", 0, dark_grey);
+      if (kids) layout_arrow (open ? "<#25BE>" : "<#25B8>", open ? 3 : 1, dark_grey);
     }
     CLAY(label_id, {
       .layout= { .padding= { 4, 8, 2, 2 }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
