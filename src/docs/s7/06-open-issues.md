@@ -75,6 +75,10 @@
   `tmscm_install_procedure` ignores the optional and rest argument counts.
 - **`developer-mode?` is `#f` on s7.** The Guile version reads the
   preference.
+- **The empty symbol doesn't survive printing.** The XML parser names the
+  PI `<??>` with the empty symbol, which C code can create. s7 prints it as
+  nothing (Guile prints `#{}#`), so writing such an s-expression with
+  `object->string` and reading it back loses the symbol.
 - **s7 needs more memory than Guile** on large workloads: about 90 MB more
   for repeated LaTeX export, and 80 MB more for regenerating the manual
   (see [07](07-performance.md#memory)).

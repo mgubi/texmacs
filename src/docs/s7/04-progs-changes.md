@@ -75,7 +75,8 @@ syntax such as `#_define` can't appear in them.
 | `convert/tools/environment.scm` | `environment-ref*` is a bare `ahash-ref`. |
 | `source/macro-widgets.scm` | Guards against `(string->symbol "")`. |
 | `utils/automate/auto-build.scm` | `auto-safe-mode?` is a `tm-define`, so it is visible from the rootlet. |
-| `convert/{html,tools}/*-test.scm` | Tests that relied on Guile behavior (empty PI symbol, unbound-variable errors) are disabled. |
+| `convert/tools/xmltm-test.scm` | The test of the nameless PI `<??>` compares the names as strings, since s7 can't evaluate `(string->symbol "")`. |
+| `convert/tools/environment-test.scm` | The two tests that relied on Guile's unbound-variable errors are disabled. |
 
 ## 4.3 Fixes to shared code made on this branch
 
@@ -140,6 +141,10 @@ TEXMACS_HOME_PATH=<scratch dir> QT_QPA_PLATFORM=offscreen \
 - **Each expression is evaluated twice.** `regression-test-group` evaluates
   every test expression once for the "Result in" display and once for the
   comparison. Tests with side effects must be idempotent.
+- **Expected values can't contain the empty symbol.** s7 refuses
+  `(string->symbol "")`, and the error would stop the whole run. Compare
+  `symbol->string` of the result instead, as the `null PI` test of
+  `xmltm-test.scm` does.
 - **Test modules run in module environments.** `define` there is
   `curried-define`, and `tm-define` definitions are global, so give them
   distinctive names.
