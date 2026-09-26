@@ -18,7 +18,7 @@ AC_DEFUN([TM_GUI],[
   CONFIG_GUI="X11"
   CONFIG_QTPIPES="no"
 
-  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl, vue],
+  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, cocoa (or aqua), sdl, vue],
             gui_selector="$withval", gui_selector="qt")
 
   case "$gui_selector" in
@@ -53,7 +53,7 @@ AC_DEFUN([TM_GUI],[
          AC_PATH_X
          AC_PATH_XTRA
          ;;
-      cocoa)
+      cocoa | aqua)
          AC_MSG_RESULT([enabling experimental Cocoa port])
          COCOA_CFLAGS=""
          COCOA_LDFLAGS="-framework Cocoa"

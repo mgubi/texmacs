@@ -1665,7 +1665,7 @@ Optional Packages:
   --with-resvg[=DIR]      with resvg support [ARG=auto]
   --with-sdk[=none]       Apple SDK level (i.e 10.6)
   --with-osx[=none]       targeted configuration (i.e 10.6)
-  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, aqua, sdl, vue
+  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, cocoa (or aqua), sdl, vue
   --with-qt-find-method=METHOD
                           Method to find Qt (autotroll, autotrollstatic,
                           pkgconfig)
@@ -36298,7 +36298,7 @@ fi
 fi
 
          ;;
-      cocoa)
+      cocoa | aqua)
          { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling experimental Cocoa port" >&5
 printf '%s\n' "enabling experimental Cocoa port" >&6; }
          COCOA_CFLAGS=""
