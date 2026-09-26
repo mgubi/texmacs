@@ -25,7 +25,9 @@ var tmFrame = (function () {
     #tm-frame .tm-app { display:flex; align-items:center; padding:0 12px; font-weight:bold;
       cursor:pointer; border-right:1px solid #b8b8b8 }
     #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#c8c8c8 }
-    #tm-frame .tm-tabs { display:flex; flex:1; overflow-x:auto; overflow-y:hidden }
+    #tm-frame .tm-tabs { display:flex; flex:1; overflow:hidden; scrollbar-width:none }
+    #tm-frame .tm-tabs::-webkit-scrollbar { display:none }
+    #tm-frame .tm-tabs.dragging { cursor:grabbing }
     #tm-frame .tm-tab { display:flex; align-items:center; max-width:240px; min-width:90px;
       padding:0 6px 0 12px; border-right:1px solid #b8b8b8; cursor:default; background:#d0d0d0 }
     #tm-frame .tm-tab.active { background:#f0f0f0 }
@@ -55,6 +57,7 @@ var tmFrame = (function () {
     appButton.title = 'About this TeXmacs';
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
+    ribbon (strip);
     var plus = el ('div', 'tm-new', '+');
     plus.title = 'New window';
     plus.onclick = function () { _vue_web_new_tab (); };
@@ -63,6 +66,37 @@ var tmFrame = (function () {
     bar.appendChild (plus);
     document.addEventListener ('mousedown', function (e) {
       if (menu && !menu.contains (e.target)) closeMenu ();
+    });
+  }
+
+  // the ribbon of the tabs has no scroll bar: the wheel (either way) and a
+  // drag of the ribbon move it, and the active tab is brought into view
+  var dragged = false;
+  function ribbon (r) {
+    r.addEventListener ('wheel', function (e) {
+      var d = Math.abs (e.deltaX) > Math.abs (e.deltaY) ? e.deltaX : e.deltaY;
+      if (e.deltaMode === 1) d *= 16;
+      r.scrollLeft += d;
+      e.preventDefault ();
+    }, { passive: false });
+    var startX = 0, startScroll = 0, down = false;
+    r.addEventListener ('pointerdown', function (e) {
+      if (e.button !== 0 || e.target.classList.contains ('tm-close')) return;
+      down = true; dragged = false;
+      startX = e.clientX; startScroll = r.scrollLeft;
+    });
+    window.addEventListener ('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - startX;
+      if (!dragged && Math.abs (dx) > 4) { dragged = true; r.classList.add ('dragging'); }
+      if (dragged) r.scrollLeft = startScroll - dx;
+    });
+    window.addEventListener ('pointerup', function () {
+      if (!down) return;
+      down = false;
+      r.classList.remove ('dragging');
+      // the click which follows the release sees whether it was a drag
+      setTimeout (function () { dragged = false; }, 0);
     });
   }
 
@@ -76,8 +110,9 @@ var tmFrame = (function () {
       tab.title = t.title;
       var title = el ('span', 'tm-title', (t.modified ? '• ' : '') + t.title);
       tab.appendChild (title);
+      // a click shows the tab, unless the ribbon was dragged (see ribbon)
+      tab.onclick = function (e) { if (!dragged) _vue_web_activate_tab (t.id); };
       tab.onmousedown = function (e) {
-        if (e.button === 0) _vue_web_activate_tab (t.id);
         if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) _vue_web_close_tab (t.id); }
       };
       if (tabs.length > 1) {
@@ -90,6 +125,12 @@ var tmFrame = (function () {
       strip.appendChild (tab);
     });
     var active = tabs.filter (function (t) { return t.active; })[0];
+    var at = strip.querySelector ('.tm-tab.active');
+    if (at) {
+      var l = at.offsetLeft - strip.offsetLeft, r = l + at.offsetWidth;
+      if (l < strip.scrollLeft) strip.scrollLeft = l;
+      else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth;
+    }
     document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs'
                             : 'GNU TeXmacs';
   }

@@ -16,6 +16,7 @@
 //   --script <file>    actions after the load, one per line (# comments):
 //                        wait <ms> | shot <name> | click <x> <y> |
 //                        move <x> <y> | type <text> | key <name> |
+//                        wheel <x> <y> <dx> <dy> | drag <x1> <y1> <x2> <y2> |
 //                        upload <x> <y> <file> (the click opens the file
 //                        input of the page, which is given the file) |
 //                        uploadto <selector> <file> (to a file input) |
@@ -96,6 +97,18 @@ if (script) {
     }
     else if (cmd === 'click') await page.mouse.click (Number (a[0]), Number (a[1]));
     else if (cmd === 'move') await page.mouse.move (Number (a[0]), Number (a[1]));
+    else if (cmd === 'wheel') {
+      await page.mouse.move (Number (a[0]), Number (a[1]));
+      await page.mouse.wheel ({ deltaX: Number (a[2]), deltaY: Number (a[3]) });
+    }
+    else if (cmd === 'drag') {
+      await page.mouse.move (Number (a[0]), Number (a[1]));
+      await page.mouse.down ();
+      for (let k = 1; k <= 10; k++)
+        await page.mouse.move (Number (a[0]) + (Number (a[2]) - Number (a[0])) * k / 10,
+                               Number (a[1]) + (Number (a[3]) - Number (a[1])) * k / 10);
+      await page.mouse.up ();
+    }
     else if (cmd === 'uploadto') {
       // give the file a[1] to the file input a[0] (a CSS selector)
       const el = await page.waitForSelector (a[0], { timeout: 15000 });
