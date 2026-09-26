@@ -66,16 +66,27 @@ tests after a change to the sizing of the widgets.
 ## Running the tests
 
 `src/Plugins/Vue/tests/` holds Scheme files building test widgets (loaded with
-`-x`) and the scripts driving them (`README` there). Typical run:
+`-x`) and the scripts driving them (`README` there). Run one with
+`run.sh`, from the top of the source tree:
 
 ```sh
-export TEXMACS_PATH=$PWD/TeXmacs
-export TEXMACS_VUE_SNAPSHOT=/tmp/snap TEXMACS_VUE_SCRIPT=src/Plugins/Vue/tests/widgets.script
-TeXmacs/bin/texmacs.bin -x '(load "src/Plugins/Vue/tests/widgets.scm")' > /tmp/run.log 2>&1 &
-TEST=$!
-sleep 25; kill -9 $TEST
-grep -n 'choice:\|Error message\|vue script: done' /tmp/run.log
+sh src/Plugins/Vue/tests/run.sh widgets 25        # widgets.scm + widgets.script
+SCM=wheel-travel.scm SCRIPT=scroll-shift.script \
+  sh src/Plugins/Vue/tests/run.sh scroll-shift 28  # a script with another .scm
 ```
+
+It prints what the test prints (`choice:`, `got:`...), the errors and the
+end of the script, and leaves the snapshots in `/tmp/vue-tests/<test>`.
+**TeXmacs runs with a home of its own**, a copy of `~/.TeXmacs` made for
+the run (`cp -Rc`, copy on write, instant on APFS) and removed afterwards:
+a test must never change the user's settings, and it did when it ran in
+the real home -- `change-zoom-factor` saves the zoom as a preference,
+`load-buffer` adds to the recent files. That is also what makes the boot
+lock below harmless: a run killed while it boots can only wipe its own
+copy. Run TeXmacs by hand for a test only with `TEXMACS_HOME_PATH` set to
+such a copy (and in zsh, with the assignments written out: a variable
+holding `A=1 B=2` is one word, and `env $vars ...` sets one garbled
+variable and runs in the real home).
 
 Boot takes 5 to 15 s, more under load: scripts start with `wait 5000` or
 more, and a missing `vue script: done` usually means the run was killed too

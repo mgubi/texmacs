@@ -2,10 +2,25 @@ Checking the PDF the MuPDF renderer writes.
 
     src/Plugins/MuPDF/tests/pdf-compare.sh [document.tm ...]
 
-from the top of the source tree; with no argument it takes three documents
-of the manual. It exports each one through the MuPDF renderer
-(TEXMACS_PDF_MUPDF=1) and through whatever the build does otherwise, and
-checks the first:
+Every TeXmacs it starts has a home of its own (a copy of ~/.TeXmacs, copy
+on write), so that nothing of the user's is changed and the runs side by
+side share nothing; JOBS (4) of them run at a time, first the exports and
+then the checks, which takes some 40 s for the whole set. REF=1 exports
+every document through the other route of the build as well, for its
+size; EMBED=0 leaves out the round trip of an embedded document
+(embed-roundtrip.sh: exported with its source, found by mutool extract,
+imported with the source folder gone, and a file next to the PDF left
+alone). pdf-check.js adds MuPDF's own check of the structure
+(PDFDocument.check, MuPDF 1.27 and later) to every document; it looks at
+the cross reference table and the syntax of the objects, not at what the
+objects mean -- the outline which pointed at a link annotation passed it,
+which is what structure-check.py and dest-bytes.py are for.
+
+
+
+from the top of the source tree; with no argument it takes the documents
+listed in the script, some of the manual and the ones here. It exports each
+one through the MuPDF renderer (TEXMACS_PDF_MUPDF=1) and checks it:
 
   gs      Ghostscript reads the file without an error and without
           substituting a font. This is the check which earns its keep: an
