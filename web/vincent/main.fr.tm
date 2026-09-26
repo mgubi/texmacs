@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|2.1.5>
 
-<style|<tuple|tmweb2|maxima|giac>>
+<style|<tuple|tmweb2|maxima|giac|french|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Contribute|Contributing><tmweb-title|Cahier de brouillon de
@@ -25,8 +25,7 @@
   À créer ensemble :
 
   <\itemize>
-    <item>Le <hlink|cookbook|vinz_documents/cookbook.fr.tm> dans sa version
-    actuelle
+    <item>Le <hlink|cookbook|cookbook.fr.tm> dans sa version actuelle
 
     <item>Idées (anglais) pour des <hlink|videos|videos.en.tm> sur <TeXmacs>
   </itemize>
@@ -95,6 +94,5 @@
 <\initial>
   <\collection>
     <associate|info-flag|detailed>
-    <associate|language|french>
   </collection>
 </initial>

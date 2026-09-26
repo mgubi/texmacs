@@ -452,7 +452,7 @@ sdl_window_rep::repaint_invalid_regions () {
 }
 
 #ifdef MUPDF_RENDERER
-void snapshot_pixmap (fz_pixmap *pix);
+void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
 
 SDL_Surface*
 sdl_window_rep::get_backing_store () {

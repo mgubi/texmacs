@@ -1,0 +1,16 @@
+# needs dialogs.scm: color picker, printer dialog and a popup window
+wait 5000
+window Colors
+snapshot c0
+click 16 30
+wait 500
+# the Print button; its row depends on the options of the default printer
+# (three rows here: color, two-sided, paper size)
+window Print
+snapshot p0
+click 95 172
+wait 500
+window Popup
+snapshot c1
+click 40 12
+wait 500

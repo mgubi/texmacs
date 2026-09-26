@@ -4,6 +4,7 @@
 ;; MODULE      : client-chat.scm
 ;; DESCRIPTION : Sending messages and chatting, client side
 ;; COPYRIGHT   : (C) 2020  Joris van der Hoeven
+;;                   2025  Robin Wils
 ;;
 ;; This software falls under the GNU general public license version 3 or later.
 ;; It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
@@ -49,7 +50,7 @@
         `(concat "The resource " ,h " has been shared with you."))))
 
 (define (message->document msg)
-  (with (action pseudo full-name date doc) msg
+  (with (action pseudo full-name date doc to) msg
     (let* ((date* (pretty-time (string->number date)))
            (full-name* (utf8->cork full-name)))
       (cond ((== action "share")
@@ -196,8 +197,29 @@
               (lambda (h)
                 `(hlink ,(tm-ref h 0) ,(fix-link sname (tm-ref h 1))))))
 
-(tmfs-permission-handler (chat-rooms name type)
-  (in? type (list "read")))
+(tmfs-permission-handler (chat-rooms sname type)
+  (and (client-find-server sname) (in? type (list "read"))))
+
+(define (chat-room-table-entry sname server entry)
+  (let* ((name (if (pair? entry) (car entry) entry))
+         (date-raw (if (pair? entry) (cadr entry) ""))
+         (date (if (and date-raw (not (equal? date-raw "")))
+                   (pretty-date (string->number date-raw) "short")
+                   ""))
+         (link (string-append "tmfs://chat/" sname "/" name)))
+    `(dir-entry "tm_cloud_chat.svg" ,name ,link ,date
+                ,(build-table-share-action server link))))
+
+(tm-define (chat-rooms-table title sname server entries)
+  (let ((sorted (sort-name-entries entries "")))
+    (build-dir-table title "Created"
+                     (map (cut chat-room-table-entry sname server <>) sorted)
+                     (build-table-share-action server ""))))
+
+(tm-define (chat-rooms-document sname server entries)
+  (remote-file-browser-document
+    `(document
+       (dir-list ,(chat-rooms-table "My Chat Rooms" sname server entries)))))
 
 (tmfs-load-handler (chat-rooms sname)
   (let* ((u (string-append "tmfs://chat-rooms/" sname))
@@ -205,11 +227,10 @@
          (server (client-find-server sname)))
     (client-remote-eval server `(remote-list-chat-rooms)
       (lambda (l)
-        (with hyp (lambda (c) `(hlink ,c ,(string-append base "/" c)))
-          (with doc `(document (section* "My chat rooms") ,@(map hyp l))
-            (buffer-set-body u (fix-links sname doc))
-            (buffer-pretend-saved u)
-            (set-message "retrieved contents" "list of chat rooms"))))
+        (cache-dir-entries u sname server l)
+        (with doc (chat-rooms-document sname server l)
+          (buffer-set-stm u doc)
+          (set-message "retrieved contents" "list of chat rooms")))
       (lambda (err)
         (set-message err "list of chat rooms")))
     (set-message "loading..." "list of chat rooms")
@@ -224,45 +245,60 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tmfs-permission-handler (shared sname type)
-  (in? type (list "read")))
-
-(define (list-shared? t msg)
-  (with (action pseudo full-name date doc) msg
-    (and (== action "share")
-         (and (not (ahash-ref t doc)) (ahash-set! t doc #t)))))
+  (and (client-find-server sname) (in? type (list "read"))))
 
 (define (list-shared-name msg)
-  (with (action pseudo full-name date doc) msg
+  (with (action pseudo full-name date doc to) msg
     (utf8->cork full-name)))
 
 (define (list-shared-links l name)
   (with f (list-filter l (lambda (m) (== (list-shared-name m) name)))
     `((subsection* ,name)
       ,@(map (lambda (m)
-               (with (action pseudo full-name date u) m
-                 `(hlink ,(url->string (url-tail u))
-                         ,(url->string u))))
+               (with (action pseudo full-name date u to) m
+                 (resource-link (tmfs-type u)
+                                (url->string (url-tail u))
+                                (url->string u))))
              f))))
 
-(define (list-shared-document l)
-  (let* ((doc-table (make-ahash-table))
-         (f (list-filter l (cut list-shared? doc-table <>)))
-         (names (list-remove-duplicates (map list-shared-name f))))
-    `(document
-       (section* "Shared resources")
-       ,@(append-map (cut list-shared-links f <>) names))))
+(define (shared-table-entry item)
+  (with (action pseudo full-name date u to) item
+    (let* ((icon-name (tmfs-icon (tmfs-type u)))
+           (name (url->string (url-tail u)))
+           (link (url->string u))
+           (date* (if (and date (not (equal? date "")))
+                      (pretty-date (string->number date) "short")
+                      "")))
+      `(dir-entry ,icon-name ,name ,link ,date* ""))))
+
+;; Sort shared entries - format: (action pseudo full-name date u to)
+(define (sort-shared-entries entries sort-field)
+  (sort-entries entries
+    (lambda (e) (url->string (url-tail (list-ref e 4))))
+    (lambda (e) (tmfs-type (list-ref e 4)))
+    (lambda (e) (list-ref e 3))
+    sort-field))
+
+(tm-define (shared-table title entries)
+  (let ((sorted (sort-shared-entries entries "")))
+    (build-dir-table title "Shared" (map shared-table-entry sorted) "")))
+
+(tm-define (shared-documents entries)
+  (remote-file-browser-document
+     `(document
+        (dir-list ,(shared-table "Shared with me" entries)))))
 
 (tmfs-load-handler (shared sname)
   (let* ((u (string-append "tmfs://shared/" sname))
          (server (client-find-server sname)))
-    (client-remote-eval server `(remote-mail-open)
+    (client-remote-eval server `(remote-shared)
       (lambda (l)
-        (with doc (list-shared-document l)
-          (buffer-set-body u (fix-links sname doc))
-          (buffer-pretend-saved u)
-          (set-message "retrieved contents" "list of shared resources")))
+        (cache-dir-entries u sname server l)
+        (with doc (shared-documents l)
+              (buffer-set-stm u doc)
+              (set-message "retrieved contents" "list of shared resources")))
       (lambda (err)
-        (set-message err "list of chat rooms")))
+        (set-message err "list of shared resources")))
     (set-message "loading..." "list of shared resources")
     (empty-document)))
 
@@ -288,13 +324,13 @@
          (server (chat-room-server fname))
          (room (chat-room-name fname)))
     (cond ((not server)
-           ;; FIXME: better error handling
-           (texmacs-error "chat" "invalid server"))
+           (client-open-error "invalid server"))
           ((not (string-starts? room "mail-"))
            (client-remote-eval server `(remote-chat-room-open ,room)
              (lambda (ret)
                (chat-room-set fname (cadr ret))
                (chat-room-set-writable fname (car ret))
+               (fetch-missing-cache-refs server fname)
                (if (car ret)
                    (set-message "retrieved contents" "join chat room")
                    (set-message "joined in read only mode" "join chat room")))
@@ -307,6 +343,7 @@
              (lambda (msgs)
                (chat-room-set fname msgs)
                (chat-room-set-writable fname #t)
+               (fetch-missing-cache-refs server fname)
                (set-message "retrieved contents" "open mail box"))
              (lambda (err)
                (set-message err "join chat room")))

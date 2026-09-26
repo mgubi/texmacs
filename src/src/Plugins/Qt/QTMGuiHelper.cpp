@@ -37,7 +37,12 @@ QTMGuiHelper::eventFilter (QObject *obj, QEvent *event) {
   if (event->type() == QEvent::FileOpen) {
     static bool new_window_flag= false;
     QFileOpenEvent* openEvent = static_cast<QFileOpenEvent *>(event);
-    QByteArray tmp= openEvent->file().toUtf8();
+    const QUrl url = openEvent->url();
+    QByteArray tmp;
+    if (url.isLocalFile())
+      tmp= openEvent->file().toUtf8();
+    else
+      tmp= url.toDisplayString().toUtf8();
     const string s (tmp.constData(), tmp.size());
     const char *win= new_window_flag? ":new-window": ":current-window";
     if (DEBUG_EVENTS)
@@ -68,6 +73,10 @@ BEGIN_SLOT
   if (menu_count <= 0) {
     menu_count = 0;
     QTimer::singleShot (0, the_gui->gui_helper, SLOT (doPopWaitingWidgets ()));
+#if QT_VERSION >= 0x050000
+    // get the active widget and process_keyboard_focus
+    QTMWidget::setFocusToLast();
+#endif
   }
 END_SLOT
 }

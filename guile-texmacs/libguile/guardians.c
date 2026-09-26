@@ -346,7 +346,8 @@ scm_init_guardians ()
   scm_set_smob_apply (tc16_guardian, guardian_apply, 0, 1, 0);
 #endif
 
-#include "libguile/guardians.x"
+ scm_c_define_gsubr (s_scm_make_guardian, 0, 0, 0, (SCM (*)()) scm_make_guardian); ;
+
 }
 
 /*

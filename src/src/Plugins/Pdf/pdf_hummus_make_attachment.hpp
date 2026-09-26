@@ -35,10 +35,21 @@ bool pdf_hummus_make_attachments (url pdf_path, array<url> attachment_path,
  * when the pdf plugin is not enabled, you can still include the pdf headers files.
  * in that case the pdf functions will alaways return an error.
  */
+#ifdef MUPDF_RENDERER
+// MuPDF can do it too, and does when the Hummus renderer is not built in
+bool mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
+                                 url out_path);
 inline bool pdf_hummus_make_attachments (url pdf_path, array<url> attachment_path,
                                          url out_path) {
+  return mupdf_pdf_make_attachments (pdf_path, attachment_path, out_path);
+}
+#else
+inline bool pdf_hummus_make_attachments (url pdf_path, array<url> attachment_path,
+                                         url out_path) {
+  (void) pdf_path; (void) attachment_path; (void) out_path;
   return false;
 }
+#endif
 #endif
 
 #endif // ifdef PDF_HUMMUS_MAKE_ATTACHMENT_H

@@ -25,6 +25,10 @@
 #  include <locale>
 #endif
 
+#ifdef OS_MINGW
+#include <winnls.h>
+#endif
+
 /******************************************************************************
 * Constructors and destructors
 ******************************************************************************/
@@ -140,6 +144,7 @@ edit_process_rep::generate_bibliography (
             std_error << "Could not load BibTeX file " << fname << LF;
             set_message ("Could not find bibliography file",
                          "compile bibliography");
+	    system_wait ("");
             return;
           }
         t= as_tree (call (string ("bib-compile"),
@@ -222,6 +227,7 @@ edit_process_rep::generate_bibliography (
   if (is_atomic (t) && starts (t->label, "Error:"))
     set_message (t->label, "compile bibliography");
   else if (is_compound (t) && N(t) > 0) insert_tree (t);
+  system_wait ("");
 }
 
 /******************************************************************************
@@ -243,6 +249,7 @@ edit_process_rep::generate_table_of_contents (string toc) {
 
 static hashmap<string,tree> followup (TUPLE);
 
+#ifndef OS_MINGW
 struct locale_less_eq_operator {
   static std::locale le;
   static inline bool leq (string& a, string& b) {
@@ -253,6 +260,30 @@ struct locale_less_eq_operator {
   }
 };
 std::locale locale_less_eq_operator::le;
+#else
+// use CompareStringEx function on Windows
+struct locale_less_eq_operator {
+  static string locale_name;
+  static inline bool leq (string& a, string& b) {
+    if (a == b) return true;
+    string A= cork_to_utf8 (a), B= cork_to_utf8 (b);
+    std::wstring wa= texmacs_utf8_to_wide (A);
+    std::wstring wb= texmacs_utf8_to_wide (B);
+    int result = CompareStringEx(
+      texmacs_utf8_to_wide(locale_name).c_str(),
+      SORT_STRINGSORT,
+      wa.c_str(),
+      static_cast<int>(wa.size()),
+      wb.c_str(),
+      static_cast<int>(wb.size()),
+      NULL,
+      NULL,
+      0);
+    return result == CSTR_LESS_THAN;
+  }
+};
+string locale_less_eq_operator::locale_name = "en-US";
+#endif
 
 static string
 index_name_sub (tree t, bool all) {
@@ -446,10 +477,12 @@ edit_process_rep::generate_index (string idx) {
     for (i=0; i<n; i++)
       entry[i]= index_name (I[i]);
 #if __cplusplus >= 201103L
-    string loc= language_to_locale
-      (get_init_string ("language")) * ".UTF-8";
-    c_string _loc (loc);
-    locale_less_eq_operator::le= std::locale (_loc);
+#ifndef OS_MINGW
+    locale_less_eq_operator::le= get_std_locale (get_init_string ("language"));
+#else
+    locale_less_eq_operator::locale_name = language_to_locale (get_init_string ("language"));
+    locale_less_eq_operator::locale_name[2] = '-';
+#endif
     merge_sort_leq<string,locale_less_eq_operator> (entry);
 #else
     merge_sort (entry);
@@ -478,6 +511,7 @@ edit_process_rep::generate_index (string idx) {
       make_entry (D, h (entry[i]), R, rec);
     insert_tree (remove_labels (D));
   }
+  system_wait ("");
 }
 
 /******************************************************************************
@@ -524,6 +558,7 @@ edit_process_rep::generate_glossary (string gly) {
       }
     insert_tree (remove_labels (D));
   }
+  system_wait ("");
 }
 
 /******************************************************************************

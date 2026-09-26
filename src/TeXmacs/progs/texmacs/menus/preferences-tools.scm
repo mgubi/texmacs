@@ -23,6 +23,12 @@
     (meti (hlist // (text "Encryption"))
       (toggle (set-boolean-preference "experimental encryption" answer)
               (get-boolean-preference "experimental encryption")))
+    (meti (hlist // (text "Continuous spell checking"))
+      (toggle (set-boolean-preference "continuous spell checking" answer)
+              (get-boolean-preference "continuous spell checking")))
+    (meti (hlist // (text "grammar checking"))
+      (toggle (set-boolean-preference "grammar checking" answer)
+              (get-boolean-preference "grammar checking")))
     (meti (hlist // (text "Fast environments"))
       (toggle (set-boolean-preference "fast environments" answer)
               (get-boolean-preference "fast environments")))
@@ -58,17 +64,11 @@
     (meti (hlist // (text "Case-insensitive search"))
       (toggle (set-boolean-preference "case-insensitive-match" answer)
               (get-boolean-preference "case-insensitive-match")))
-    (assuming (qt-gui?)  ; TODO: recode the dialogue in scheme
+    (assuming (or (qt-gui?) (vue-gui?))  ; TODO: recode the dialogue in scheme
       (meti (hlist // (text "Use print dialogue"))
         (toggle (set-boolean-preference "gui:print dialogue" answer)
                 (get-boolean-preference "gui:print dialogue"))))
-    (assuming (os-macos?)
-      (meti (hlist // (text "Use unified toolbars"))
-        (toggle (set-boolean-preference "use unified toolbar" answer)
-                (get-boolean-preference "use unified toolbar"))))
-    (meti (hlist // (text "Use multi-tabs"))
-      (toggle (set-boolean-preference "enable tab" answer)
-              (get-boolean-preference "enable tab")))))
+    ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Preferences tool

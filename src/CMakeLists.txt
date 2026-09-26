@@ -53,7 +53,7 @@ set (CMAKE_MODULE_PATH ${TEXMACS_SOURCE_DIR}/cmake)
 
 set (VERSION_MAJOR "2")
 set (VERSION_MINOR "1")
-set (VERSION_BUILD "4")
+set (VERSION_BUILD "5")
 set (TEXMACS_VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_BUILD})
 
 set (DEVEL_VERSION ${TEXMACS_VERSION})
@@ -108,6 +108,12 @@ option (USE_GMP "use GMP" ON)
 if (USE_GMP)
   find_package (GMP)
 endif (USE_GMP)
+
+option (USE_GNUTLS "use GnuTLS" ON)
+if (USE_GNUTLS)
+  find_package (GnuTLS)
+  option (LINKED_GNUTLS "Use Linked GnuTLS" ON)
+endif (USE_GNUTLS)
 
 if (WIN32)
   option (OS_MINGW "Using OS MINGW" ON)
@@ -420,6 +426,7 @@ set (TeXmacs_Include_Dirs
   ${TEXMACS_SOURCE_DIR}/src/Kernel/Types
   ${TEXMACS_SOURCE_DIR}/src/Plugins
   ${TEXMACS_SOURCE_DIR}/src/Plugins/Pdf/LibAesgm
+  ${TEXMACS_SOURCE_DIR}/src/Plugins/Gnutls
   ${TEXMACS_SOURCE_DIR}/src/Scheme
   ${TEXMACS_SOURCE_DIR}/src/Scheme/Guile
   ${TEXMACS_SOURCE_DIR}/src/Scheme/Scheme
@@ -453,7 +460,7 @@ endif (WIN32)
 
 set (TeXmacs_Include_Dirs ${TeXmacs_Include_Dirs}
   ${Guile_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} ${Cairo_INCLUDE_DIRS}
-  ${IMLIB2_INCLUDE_DIR} ${GMP_INCLUDES}
+  ${IMLIB2_INCLUDE_DIR} ${GMP_INCLUDES} ${GNUTLS_INCLUDE_DIRS}
 )
 
 ### --------------------------------------------------------------------
@@ -479,6 +486,7 @@ file (GLOB_RECURSE TeXmacs_Std_Plugins_SRCS
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Cairo/*.cpp"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Database/*.cpp"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Freetype/*.cpp"
+  "${TEXMACS_SOURCE_DIR}/src/Plugins/Gnutls/*.cpp"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Pdf/*.cpp"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Pdf/*.c"
   "${TEXMACS_SOURCE_DIR}/src/Plugins/Ghostscript/*.cpp"
@@ -571,6 +579,9 @@ if (LINKED_FREETYPE)
   set (TeXmacs_Libraries ${TeXmacs_Libraries} ${FREETYPE_LIBRARIES})
 endif (LINKED_FREETYPE)
 
+if (LINKED_GNUTLS)
+  set (TeXmacs_Libraries ${TeXmacs_Libraries} ${GNUTLS_LIBRARIES})
+endif (LINKED_GNUTLS)
 
 ### --------------------------------------------------------------------
 ### GUI selection

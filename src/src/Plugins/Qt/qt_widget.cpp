@@ -74,6 +74,16 @@ qt_widget_rep::add_child (widget w) {
 }
 
 void
+qt_widget_rep::remove_child (widget w) {
+  if (is_nil (w) || N(children) == 0) return;
+  array<widget> kept;
+  for (int i = 0; i < N(children); ++i)
+    if (is_nil(children[i]) || children[i] != w)
+      kept << children[i];
+  children = kept;
+}
+
+void
 qt_widget_rep::add_children (array<widget> a) {
   children << a;
 }
@@ -143,10 +153,13 @@ qt_widget_rep::send (slot s, blackbox val) {
 
  */
 inline QWidget*
-qt_widget_rep::as_qwidget () {
+qt_widget_rep::as_qwidget (QWidget* parent_widget) {
+  (void) parent_widget;
   if (DEBUG_QT_WIDGETS)
     debug_widgets << "qt_widget_rep::as_qwidget() for "
                   << type_as_string() << LF;
+  // throw an error?
+  throw "qt_widget_rep::as_qwidget() called on base class";
   return qwid;
 }
 
@@ -168,8 +181,8 @@ qt_widget_rep::as_qaction() {
  The policy is to give ownership of the object to the caller.
 */
 inline QLayoutItem*
-qt_widget_rep::as_qlayoutitem () {
-  return new QWidgetItem (as_qwidget ()); 
+qt_widget_rep::as_qlayoutitem (QWidget* parent_widget) {
+  return new QWidgetItem (as_qwidget (parent_widget)); 
 }
 
 
@@ -177,14 +190,6 @@ QList<QAction*>*
 qt_widget_rep::get_qactionlist() {
   return NULL;
 }
-
-#if QT_VERSION >= 0x060000
-double
-qt_widget_rep::get_dpr () {
-  if (!qwid.isNull ()) return qwid->devicePixelRatio ();
-  return qt_max_available_dpr ();;
-}
-#endif
 
 /*! Returns the widget as a window.
  
@@ -209,8 +214,8 @@ qt_widget_rep::plain_window_widget (string name, command quit, int border) {
     debug_widgets << "qt_widget_rep::plain_window_widget() around a "
                   << type_as_string() << LF;
 
-  QTMPlainWindow* win = new QTMPlainWindow (0);
-  QLayoutItem*     li = as_qlayoutitem();
+  QTMPlainWindow* win = new QTMPlainWindow (nullptr);
+  QLayoutItem*     li = as_qlayoutitem(win);
   if (li) {
     QLayout* l = li->layout();
     if (! l) {
@@ -219,7 +224,7 @@ qt_widget_rep::plain_window_widget (string name, command quit, int border) {
     }
     win->setLayout (l);// Transfers ownership of QWidgets in QLayoutItems to win
   } else {
-    QWidget* qw = as_qwidget();
+    QWidget* qw = as_qwidget(win);
     if (qw) {
       QLayout* l = new QVBoxLayout (win);
       win->setLayout (l); // And the QLayout to the QTMPlainWindow.
@@ -414,6 +419,22 @@ widget icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs) {
   wid->add_children (bs);
   return abstract (wid);
 }
+widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
+  if (headless_mode) return headless_widget ();
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::responsive_tabs_widget,
+                                             tabs, bodies);
+  wid->add_children (tabs);
+  wid->add_children (bodies);
+  return abstract (wid);
+}
+widget responsive_icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs) {
+  if (headless_mode) return headless_widget ();
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::responsive_icon_tabs_widget,
+                                    us, ts, bs);
+  wid->add_children (ts);
+  wid->add_children (bs);
+  return abstract (wid);
+}
 widget wrapped_widget (widget w, command cmd) {
   if (headless_mode) return headless_widget ();
   return tm_new<qt_wrapped_widget_rep> (w, cmd);
@@ -497,18 +518,40 @@ widget enum_widget (command cmd, array<string> vals, string val, int style,
                                              cmd, vals, val, style, width);
   return abstract (wid);
 }
-widget choice_widget (command cmd, array<string> vals, array<string> chosen) {
+widget setting_toggle_widget (command cmd, string setting, bool on, int style) {
   if (headless_mode) return headless_widget ();
-  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::choice_widget,
-                                             cmd, vals, chosen, true);
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::setting_toggle_widget,
+                                             cmd, setting, on, style);
   return abstract (wid);
 }
-widget choice_widget (command cmd, array<string> vals, string cur) {
+widget setting_enum_widget (command cmd, string setting, array<string> vals,
+                          string val, int style, string width) {
+  if (headless_mode) return headless_widget ();
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::setting_enum_widget,
+                                             cmd, setting, vals, val, style, width);
+  return abstract (wid);
+}
+widget setting_group_widget (string text, array<widget> vals, int style) {
+  if (headless_mode) return headless_widget ();
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::setting_group_widget,
+                                             text, vals, style);
+  wid->add_children (vals);
+  return abstract (wid);
+}
+widget choice_widget (command cmd, array<string> vals, array<string> chosen,
+		      int style) {
+  if (headless_mode) return headless_widget ();
+  qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::choice_widget,
+                                             cmd, vals, chosen, true, style);
+  return abstract (wid);
+}
+widget choice_widget (command cmd, array<string> vals, string cur,
+		      int style) {
   if (headless_mode) return headless_widget ();
   array<string> chosen (1);
   chosen[0]= cur;
   qt_widget wid = qt_ui_element_rep::create (qt_widget_rep::choice_widget,
-                                             cmd, vals, chosen, false);
+                                             cmd, vals, chosen, false, style);
   return abstract (wid);
 }
 widget choice_widget (command cmd, array<string> vals, string cur, string filter) {

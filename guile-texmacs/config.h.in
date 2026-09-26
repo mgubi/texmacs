@@ -1,37 +1,33 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+
+/*GUILE_CONFIGURE_COPYRIGHT*/
+
 /*
-
-Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
-
-This file is part of GUILE
-
-GUILE is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your
-option) any later version.
-
-GUILE is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with GUILE; see the file COPYING.  If not, write to the
-Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.
-
+  TeXmacs may include another generated config header before this one,
+  which can predefine autoconf PACKAGE_* names. Undefine them here so
+  the defines emitted by this config header do not trigger redefinition
+  warnings.
 */
+#ifdef PACKAGE_BUGREPORT
+# undef PACKAGE_BUGREPORT
+#endif
+#ifdef PACKAGE_NAME
+# undef PACKAGE_NAME
+#endif
+#ifdef PACKAGE_STRING
+# undef PACKAGE_STRING
+#endif
+#ifdef PACKAGE_TARNAME
+# undef PACKAGE_TARNAME
+#endif
+
 
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
 /* Define to 1 if using 'alloca.c'. */
 #undef C_ALLOCA
-
-/* Define to 1 if translation of program messages to the user's native
-   language is requested. */
-#undef ENABLE_NLS
 
 /* Define to the type of elements in the array argument to 'getgroups'.
    Usually this is either 'int' or 'gid_t'. */
@@ -74,18 +70,6 @@ Boston, MA 02110-1301, USA.
 /* Define to 1 if you have the 'cexp' function. */
 #undef HAVE_CEXP
 
-/* Define to 1 if you have the Mac OS X function CFLocaleCopyCurrent in the
-   CoreFoundation framework. */
-#undef HAVE_CFLOCALECOPYCURRENT
-
-/* Define to 1 if you have the Mac OS X function
-   CFLocaleCopyPreferredLanguages in the CoreFoundation framework. */
-#undef HAVE_CFLOCALECOPYPREFERREDLANGUAGES
-
-/* Define to 1 if you have the Mac OS X function CFPreferencesCopyAppValue in
-   the CoreFoundation framework. */
-#undef HAVE_CFPREFERENCESCOPYAPPVALUE
-
 /* Define to 1 if you have the 'chown' function. */
 #undef HAVE_CHOWN
 
@@ -127,10 +111,6 @@ Boston, MA 02110-1301, USA.
 
 /* Define to 1 if you have the 'cuserid' function. */
 #undef HAVE_CUSERID
-
-/* Define if the GNU dcgettext() function is already present or preinstalled.
-   */
-#undef HAVE_DCGETTEXT
 
 /* Define to 1 if you have the declaration of 'cuserid', and to 0 if you
    don't. */
@@ -283,9 +263,6 @@ Boston, MA 02110-1301, USA.
 /* Define to 1 if you have the 'getservent' function. */
 #undef HAVE_GETSERVENT
 
-/* Define if the GNU gettext() function is already present or preinstalled. */
-#undef HAVE_GETTEXT
-
 /* Define to 1 if you have the 'gettimeofday' function. */
 #undef HAVE_GETTIMEOFDAY
 
@@ -300,9 +277,6 @@ Boston, MA 02110-1301, USA.
 
 /* Define if h_errno is declared in netdb.h. */
 #undef HAVE_H_ERRNO
-
-/* Define if you have the iconv() function and it works. */
-#undef HAVE_ICONV
 
 /* Define to 1 if you have the <ieeefp.h> header file. */
 #undef HAVE_IEEEFP_H

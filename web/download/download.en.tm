@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.12>
+<TeXmacs|2.1.5>
 
-<style|tmweb2>
+<style|<tuple|tmweb2|english|old-spacing|old-dots|old-lengths>>
 
 <\body>
   <tmweb-current|Download|General><tmweb-title|Downloading and installing
@@ -11,7 +11,7 @@
   <TeXmacs>, follow the link which corresponds to your system.
 
   <\description>
-    <item*|<hlink|GNU/Linux|unix.en.tm>>For users of <name|Linux> on Intel
+    <item*|<hlink|GNU/Linux|linux.en.tm>>For users of <name|Linux> on Intel
     compatible architectures.
 
     <item*|<hlink|BSD|bsd.en.tm>>For users of BSD <name|Unix>.
@@ -29,13 +29,10 @@
   On more exotic systems, you should <hlink|compile <TeXmacs> yourself from
   the source code|sources.en.tm>.
 
-  <tmdoc-copyright|1999--2011|Joris van der Hoeven>
+  <tmdoc-copyright|1999\U2011|Joris van der Hoeven>
 
   <tmweb-license>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

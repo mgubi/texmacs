@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "QTMStyle.hpp"
+#include "QTMApplication.hpp"
 #include "qt_utilities.hpp"
 #include <time.h>
 
@@ -34,6 +35,11 @@
 #include <QNetworkReply>
 #include <QFile>
 #include <QGuiApplication>
+#endif
+
+
+#ifdef USE_QTSVG
+#include <QSvgRenderer>
 #endif
 
 #include "colors.hpp"
@@ -131,11 +137,6 @@ QSize
 qt_decode_length (string width, string height,
                   const QSize& ref, const QFontMetrics& fm) {
   (void) fm;
-#if QT_VERSION >= 0x060000
-  int retina_scale = 1;
-  int retina_zoom = 1;
-#endif
-
   QSize size= ref;
 
   string w_unit, h_unit;
@@ -185,7 +186,7 @@ qt_decode_length (string width, string height,
 static string
 conv_sub (const string& ks) {
   string r(ks);
-#if QT_VERSION >= 0x060000
+#if QT_VERSION >= 0x060000 && QT_VERSION < QT_VERSION_CHECK(6, 10, 0)
   r = replace (r, "hat", "^");
   r = replace (r, "&", u8"﹠");
 #endif
@@ -411,43 +412,89 @@ bool
 qt_supports (url u) {
   static QList<QByteArray> formats= QImageReader::supportedImageFormats();
 /*  if (DEBUG_CONVERT) {
-	  debug_convert <<"QT valid formats:";
-	  foreach (QString _format, formats) debug_convert <<", "<< from_qstring(_format);
-	  debug_convert <<LF;
-  }	*/  
+    debug_convert <<"QT valid formats:";
+    foreach (QString _format, formats)
+      debug_convert <<", "<< from_qstring(_format);
+      debug_convert <<LF;
+      }	*/  
   string suf=suffix (u);
-// as of 2023, even if qt claims it can handle pdf, do not use it as it produces blurry pngs
-// see http://forum.texmacs.cn/t/how-are-graphics-supposed-to-look-like/963/12
+  // as of 2023, even if qt claims it can handle pdf,
+  // do not use it as it produces blurry pngs, see
+  // http://forum.texmacs.cn/t/how-are-graphics-supposed-to-look-like/963/12
   if (suf == "pdf" || suf == "ps" || suf == "eps")
     return false; 
+#ifdef USE_QTSVG
+  if (suf == "svg")
+    return true;
+#endif
   bool ans= (bool) formats.contains((QByteArray) as_charp(suf));
-  //if (DEBUG_CONVERT) {debug_convert <<"QT valid format:"<<((ans)?"yes":"no")<<LF;}
+  if (DEBUG_CONVERT) {
+    if (ans)
+      debug_convert << "qt_supports, " << u << " is supported" << LF;
+    else
+      debug_convert << "qt_supports, " << u << " is not supported" << LF;
+  }
   return ans;
 }
 
 bool
 qt_image_size (url image, int& w, int& h) {// w, h in points
-  if (DEBUG_CONVERT) debug_convert << "qt_image_size :" <<LF;
-  QImage im= QImage (utf8_to_qstring (concretize (image)));
+  if (DEBUG_CONVERT)
+    debug_convert << "qt_image_size, handling " << image << LF;
+#ifdef USE_QTSVG
+  if (suffix (image) == "svg") {
+    QSvgRenderer r (utf8_to_qstring (materialize (image)));
+    if (r.isValid ()) {
+      QSize sz = r.defaultSize ();
+      w = (int) rint (sz.width () * 72.0 / 96.0);
+      h = (int) rint (sz.height () * 72.0 / 96.0);
+      if (DEBUG_CONVERT)
+        debug_convert << "qtsvg image_size: " << w << " x " << h << LF;
+      return true;
+    }
+  }
+#endif
+  if (suffix (image) == "svg") {
+    convert_error << "Cannot read SVG image file '" << image << "'"
+                  << " in qt_image_size" << LF;
+    w = 35; h = 35;
+    return false;
+  }
+  QImage im= QImage (utf8_to_qstring (materialize (image)));
   if (im.isNull ()) {
-      convert_error << "Cannot read image file '" << image << "'"
-      << " in qt_image_size" << LF;
-      w= 35; h= 35;
-      return false;
+    convert_error << "qt_image_size, failed reading " << image << LF;
+    w= 35; h= 35;
+    return false;
   }
   else {
     w= (int) rint ((((double) im.width ())*2834)/im.dotsPerMeterX());
     h= (int) rint ((((double) im.height())*2834)/im.dotsPerMeterY());
-    if (DEBUG_CONVERT) debug_convert <<"QT dotsPerMeter: "
-        <<w<<" x "<<h<<LF;
+    if (DEBUG_CONVERT)
+      debug_convert << "qt_image_size, found size (in dotsPerMeter): "
+		    << w << " x " << h << LF;
     return true;      
   }
 }
 
 bool
 qt_native_image_size (url image, int& w, int& h) {
-  if (DEBUG_CONVERT) debug_convert << "qt_image_size :" <<LF;
-  QImage im= QImage (utf8_to_qstring (concretize (image)));
+  if (DEBUG_CONVERT)
+    debug_convert << "qt_native_image_size, handling " << image << LF;
+#ifdef USE_QTSVG
+  if (suffix (image) == "svg") {
+    QSvgRenderer r (utf8_to_qstring (materialize (image)));
+    if (r.isValid ()) {
+      QSize sz = r.defaultSize ();
+      w = (int) ceil (sz.width ());
+      h = (int) ceil (sz.height ());
+      return true;
+    }
+  }
+#endif
+  if (suffix (image) == "svg") {
+    return false;
+  }
+  QImage im= QImage (utf8_to_qstring (materialize (image)));
   if (im.isNull ()) return false;
   else {
     w= im.width ();
@@ -487,15 +534,33 @@ qt_pretty_image_size (url image, string& w, string& h) {
 
 void
 qt_convert_image (url image, url dest, int w, int h) {// w, h in pixels
-  if (DEBUG_CONVERT) debug_convert << "qt_convert_image " << image << " -> "<<dest<<LF;
-  QImage im (utf8_to_qstring (concretize (image)));
+  if (DEBUG_CONVERT)
+    debug_convert << "qt_convert_image, converting " << image
+		  << " into " << dest << LF;
+#ifdef USE_QTSVG
+  if (suffix (image) == "svg") {
+    QSvgRenderer renderer (utf8_to_qstring (materialize (image)));
+    if (renderer.isValid ()) {
+      if (w <= 0) w = (int) ceil (renderer.defaultSize ().width ());
+      if (h <= 0) h = (int) ceil (renderer.defaultSize ().height ());
+      if (w > 0 && h > 0) {
+        QImage tmp (w, h, QImage::Format_ARGB32);
+        tmp.fill (Qt::transparent);
+        QPainter painter (&tmp);
+        renderer.render (&painter, QRectF (0, 0, w, h));
+        tmp.save (utf8_to_qstring (materialize (dest, "")));
+      }
+      return;
+    }
+  }
+#endif
+  QImage im (utf8_to_qstring (materialize (image)));
   if (im.isNull ())
-    convert_error << "Cannot read image file '" << image << "'"
-    << " in qt_convert_image" << LF;
+    convert_error << "qt_convert_image, failed reading " << image << LF;
   else {
     if (w > 0 && h > 0)
       im= im.scaled (w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    im.scaled (w, h).save (utf8_to_qstring (concretize (dest)));
+    im.scaled (w, h).save (utf8_to_qstring (materialize (dest, "")));
   }
 }
 
@@ -504,17 +569,22 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
 // use a QPrinter to output raster images to eps or pdf
 // dpi is the maximum dpi : the image will either be dowsampled to that dpi
 // or the actual dpi will be lower
-  if (DEBUG_CONVERT) debug_convert << "qt_image_to_eps_or_pdf " << image << " -> "<<outfile<<LF;
+  if (DEBUG_CONVERT)
+    debug_convert << "qt_image_to_pdf, converting " << image
+		  << " into " << outfile << LF;
   QPrinter printer;
 #if QT_VERSION < 0x060000
   printer.setOrientation(QPrinter::Portrait);
 #else
   printer.setPageOrientation(QPageLayout::Portrait);
 #endif
-  if (suffix(outfile)=="eps") {
+  if (suffix (outfile) == "eps") {
 #if (QT_VERSION >= 0x050000)
-    //note that PostScriptFormat is gone in Qt5. a substitute?: http://soft.proindependent.com/eps/
-    cout << "TeXmacs] warning: PostScript format no longer supported in Qt5\n";
+    // note that PostScriptFormat is gone in Qt5.
+    // a substitute?: http://soft.proindependent.com/eps/
+    convert_warning
+      << "qt_image_to_pdf, PostScript format "
+      << "is no longer supported from Qt5" << LF;
     printer.setOutputFormat(QPrinter::PdfFormat);
 #else    
     printer.setOutputFormat(QPrinter::PostScriptFormat);
@@ -524,22 +594,15 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
   printer.setFullPage(true);
   if (!dpi) dpi=96; 
   printer.setResolution(dpi);
-  printer.setOutputFileName(utf8_to_qstring (concretize (outfile)));
-  QImage im (utf8_to_qstring (concretize (image)));
-  if (im.isNull ()) {
-    convert_error << "Cannot read image file '" << image << "'"
-    << " in qt_image_to_pdf" << LF;
-  // load the "?" image?
-  }
+  printer.setOutputFileName(utf8_to_qstring (materialize (outfile, "")));
+  QImage im (utf8_to_qstring (materialize (image)));
+  if (im.isNull ())
+    convert_error << "qt_image_to_pdf, failed reading " << image << LF;
   else {
-/*  if (DEBUG_CONVERT) debug_convert << "size asked " << w_pt << "x"<<h_pt
-  << " at " << maximum dpi <<" dpi"<<LF
-  << "dpi set: " << printer.resolution() <<LF;
-*/
     if (dpi > 0 && w_pt > 0 && h_pt > 0) {
 
-#if QT_VERSION < 0x060000
-	    printer.setPaperSize(QSizeF(w_pt, h_pt), QPrinter::Point); // in points
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+      printer.setPaperSize(QSizeF(w_pt, h_pt), QPrinter::Point); // in points
 #else
       printer.setPageSize(QPageSize(QSizeF(w_pt, h_pt), QPageSize::Point));
 #endif
@@ -548,13 +611,15 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
       int ww = w_pt * dpi / 72;
       int hh = h_pt * dpi / 72;
       if ((ww < im.width ()) ||( hh < im.height ())) //downsample if possible to reduce file size
-	      im= im.scaled (ww, hh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-  	  else // image was too small, reduce dpi accordingly to fill page
+	im= im.scaled (ww, hh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+      else // image was too small, reduce dpi accordingly to fill page
         printer.setResolution((int) (dpi*im.width())/(double)ww);
-      if (DEBUG_CONVERT) debug_convert << "dpi asked: "<< dpi <<" ; actual dpi set: " << printer.resolution() <<LF;
-	  }
-#if QT_VERSION < 0x060000
-	  else printer.setPaperSize(QSizeF(im.width (), im.height ()), QPrinter::DevicePixel);
+      if (DEBUG_CONVERT)
+	debug_convert << "qt_image_to_pdf, " << dpi << " required, but "
+		      << "actual dpi is set to " << printer.resolution() << LF;
+    }
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    else printer.setPaperSize(QSizeF(im.width (), im.height ()), QPrinter::DevicePixel);
 #else
     else printer.setPageSize(QPageSize(QSizeF(im.width (), im.height ()), QPageSize::Point));
 #endif
@@ -562,122 +627,11 @@ qt_image_to_pdf (url image, url outfile, int w_pt, int h_pt, int dpi) {
     p.begin(&printer);
     p.drawImage(0, 0, im);
     p.end();
-    }
+  }
 }
 
 void qt_image_to_eps(url image, url outfile, int w_pt, int h_pt, int dpi) {
-  qt_image_to_pdf(image, outfile, w_pt, h_pt, dpi);};
-
-/* not in use anymore : now use a Qt printer that outputs ps.
-
-void
-qt_image_to_eps (url image, url eps, int w_pt, int h_pt, int dpi) {
-  if (DEBUG_CONVERT) debug_convert << "qt_image_to_eps " << image << " -> "<<eps<<LF;
-  string r= qt_image_to_eps (image, w_pt, h_pt, dpi);
-  save_string (eps, r);
-}
-
-string
-qt_image_to_eps (url image, int w_pt, int h_pt, int dpi) {
-  if (DEBUG_CONVERT) debug_convert << "in qt_image_to_eps"<<LF; 
-
-  static const char* d= "0123456789ABCDEF";
-  QImage im (utf8_to_qstring (concretize (image)));
-  string r;
-  if (im.isNull ())
-    convert_error << "Cannot read image file '" << image << "'"
-    << " in qt_image_to_eps" << LF;
-  else {
-    bool alpha= im.hasAlphaChannel ();
-    if (dpi > 0 && w_pt > 0 && h_pt > 0) {
-      int ww= w_pt * dpi / 72;
-      int hh= h_pt * dpi / 72;
-      if (ww < im.width () || hh < im.height ()) {
-        im= im.scaled (ww, hh, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-      }
-    }
-    string sw= as_string (im.width ());
-    string sh= as_string (im.height ());
-    r << "%!PS-Adobe-3.0 EPSF-3.0\n%%Creator: TeXmacs\n%%BoundingBox: 0 0 "
-    << sw << " " << sh
-    << "\n\n% Created by qt_image_to_eps ()\n\n%%BeginProlog\nsave\n"
-    << "countdictstack\nmark\nnewpath\n/showpage {} def\n/setpagedevice "
-    << "{pop} def\n%%EndProlog\n%%Page 1 1\n"
-    << "/max { 2 copy lt { exch } if pop } bind def\n"
-    << "/ImageWidth " << sw
-    << " def\n/ImageHeight " << sh << " def\nImageWidth ImageHeight max "
-    << "ImageWidth ImageHeight max scale\n\n/ImageDatas\n\tcurrentfile\n\t"
-    << "<< /Filter /ASCIIHexDecode >>\n\t/ReusableStreamDecode\n\tfilter\n";
-    
-    int v, i= 0, j= 0, k= 0, l= 0;
-    string mask;
-    for (j= 0; j < im.height (); j++) {
-      for (i=0; i < im.width (); i++) {
-        l++;
-        QRgb p= im.pixel (i, j);
-        v= qRed (p);
-        r << d [(v >> 4)] << d [v % 16];
-        v= qGreen (p);
-        r << d [(v >> 4)] << d [v % 16];
-        v= qBlue (p);
-        r << d [(v >> 4)] << d [v % 16];
-        if (l > 12) {
-          r << "\n";
-          l= 0;
-        }
-      }
-     if (alpha) {
-        v= 0;
-        for (i=0; i < im.width (); i++) {
-          v+= (qAlpha (im.pixel (i, j)) == 0) << (3 - i % 4);
-          if (i % 4 == 3 || i + 1 == im.width ()) {
-            mask << d[v];
-            v= 0;
-            k++;
-              // Padding of the image data mask
-            if (i + 1 == im.width () && k % 2 == 1) {
-              mask << d[0];
-              k++;
-            }
-              // Code layout
-            if (k >= 78) {
-              mask << "\n";
-              k= 0;
-            }
-          }
-        }
-      }
-    }
-    r << ">\ndef\n\n";
-    
-    if (alpha) {
-      r << "/MaskDatas\n\tcurrentfile\n\t<< /Filter /ASCIIHexDecode >>\n"
-      << "\t/ReusableStreamDecode\n\tfilter\n"
-      << mask
-      << ">\ndef\n\n"
-      << "/TheMask\n<<\n\t/ImageType\t1\n\t/Width\t\tImageWidth\n\t/Height\t"
-      << "\tImageHeight\n\t/BitsPerComponent 1\n\t/Decode [ 0 1 ]\n\t"
-      << "/ImageMatrix [ ImageWidth 0 0 ImageWidth neg 0 ImageHeight ]\n\t"
-      << "/DataSource MaskDatas\n>> def\n\n";
-    }
-    r << "/TheImage\n<<\n\t/ImageType\t1\n\t/Width\t\tImageWidth\n\t/Height\t"
-    << "\tImageHeight\n\t/BitsPerComponent 8\n\t/Decode [ 0 1 0 1 0 1 ]\n\t"
-    << "/ImageMatrix [ ImageWidth 0 0 ImageWidth neg 0 ImageHeight ]\n\t"
-    << "/DataSource ImageDatas\n>> def\n\n"
-    << "/DeviceRGB setcolorspace\n";
-    if (alpha) {
-      r << "<<\n\t/ImageType 3\n\t/InterleaveType 3\n\t/DataDict TheImage\n"
-      << "\t/MaskDict TheMask\n>>";
-    }
-    else {
-      r << "\tTheImage";
-    }
-    r << "\nimage\nshowpage\n%%Trailer\ncleartomark\ncountdictstack\n"
-    << "exch sub { end } repeat\nrestore\n%%EOF\n";
-  }
-  return r;
-}
-*/
+  qt_image_to_pdf(image, outfile, w_pt, h_pt, dpi); }
 
 QPixmap
 as_pixmap (const QImage& im) {
@@ -688,16 +642,6 @@ as_pixmap (const QImage& im) {
   pm.fromImage (im);
 #endif
   return pm;
-}
-
-double
-qt_max_available_dpr () {
-  double dpr= 1;
-  QList<QScreen*> screens= QGuiApplication::screens ();
-  QList<QScreen*>::ConstIterator it= screens.constBegin ();
-  for (; it != screens.constEnd (); ++it)
-    dpr= max (dpr, (*it)->devicePixelRatio ());
-  return dpr;
 }
 
 /******************************************************************************
@@ -742,6 +686,16 @@ qt_apply_tm_style (QWidget* qwid, int style) {
   QString sheet = "* {" + parse_tm_style (style) + "}";
   qwid->setStyleSheet (sheet);
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
+
+  if (!qwid->property("tm_theme_connected").toBool()) {
+    QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
+    if (app) {
+      QObject::connect(app, &QTMApplication::themeChanged, qwid, [qwid,style](){
+        qt_apply_tm_style(qwid, style);
+      });
+      qwid->setProperty("tm_theme_connected", true);
+    }
+  }
 }
 
 void
@@ -763,6 +717,16 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
 #endif
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
   qwid->setStyleSheet (sheet);
+
+  if (!qwid->property("tm_theme_connected").toBool()) {
+    QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
+    if (app) {
+      QObject::connect(app, &QTMApplication::themeChanged, qwid, [qwid,style,c](){
+        qt_apply_tm_style(qwid, style, c);
+      });
+      qwid->setProperty("tm_theme_connected", true);
+    }
+  }
 }
 
 
@@ -826,6 +790,30 @@ qt_pretty_time (int t) {
   QDateTime dt= QDateTime::fromTime_t (t);
 #endif
   QString s= dt.toString ();
+  return from_qstring (s);
+}
+
+string
+qt_pretty_date (int t, string fm) {
+#if QT_VERSION >= 0x060000
+  QDateTime dt= QDateTime::fromSecsSinceEpoch (t);
+#else
+  QDateTime dt= QDateTime::fromTime_t (t);
+#endif
+
+  QLocale loc = QLocale (to_qstring (get_locale_language ()));
+#if (QT_VERSION >= 0x040400)
+  QString s ("");
+  if (fm == "short") {
+    s = loc.toString (dt.date (), QLocale::FormatType::ShortFormat);
+  } else if (fm == "") {
+    s = loc.toString (dt.date (), QLocale::FormatType::LongFormat);
+  } else {
+    s = loc.toString (dt.date (), to_qstring (fm));
+  }
+#else
+  QString s = dt.date ().toString ("MMM dd yyyy");
+#endif
   return from_qstring (s);
 }
 
@@ -1034,9 +1022,6 @@ init_palette (QApplication* app) {
 
 string
 scale_px (string s) {
-#if QT_VERSION >= 0x060000
-  double retina_scale = 1.0;
-#endif
   string r;
   for (int i=0; i<N(s); )
     if (s[i] == ':') {
@@ -1063,8 +1048,8 @@ init_style_sheet (QApplication* app) {
   if (!exists (css)) {
     if (suffix (css) == "") css= glue (css, ".css");
     url dir ("$TEXMACS_THEME_PATH");
-    css= resolve (dir * css);
-    if (is_none (css)) return;
+    css= dir * css;
+    if (is_none (resolve (css))) return;
   }
   if (tm_style_sheet != "" && !load_string (css, ss, false)) {
     string p= as_string (url ("$TEXMACS_PATH"));
@@ -1083,18 +1068,16 @@ init_style_sheet (QApplication* app) {
     ss= replace (ss, "Nomac", "");
 #endif
 #ifdef OS_MINGW
-    ss= replace (ss, "Mingw", "");
+  ss= replace (ss, "-mingw", "");    
+  ss= replace (ss, "Mingw", "");
+#else
+    ss= replace (ss, "-nomingw", "");
+    ss= replace (ss, "Nomingw", "");
 #endif
 #ifdef OS_GNU_LINUX
     ss= replace (ss, "Linux", "");
 #endif
-    if (use_unified_toolbar)
-      ss= replace (ss, "Uni", "");
-    else
-      ss= replace (ss, "Nonuni", "");
-    if (!use_unified_toolbar ||
-        get_preference ("main icon bar", "off") != "off")
-      ss= replace (ss, "Nounim", "");
+    ss= replace (ss, "Nonuni", "");
     ss= scale_px (ss);
     current_style_sheet= ss;
     app->setStyleSheet (to_qstring (current_style_sheet));

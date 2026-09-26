@@ -189,9 +189,15 @@ edit_main_rep::get_metadata (string kind) {
   if (kind == "title") return utf8_to_cork (as_string (tail (get_name ())));
 #ifndef OS_MINGW
   if (kind == "author" &&
+      !is_none (resolve_in_path ("whoami")) &&
       !is_none (resolve_in_path ("finger")) &&
       !is_none (resolve_in_path ("sed"))) {
     string val= var_eval_system ("finger `whoami` | sed -e '/Name/!d' -e 's/.*Name: //'");
+    if (N(val) > 1) return utf8_to_cork (val);
+  }
+  if (kind == "pseudo" &&
+      !is_none (resolve_in_path ("whoami"))) {
+    string val= var_eval_system ("whoami");
     if (N(val) > 1) return utf8_to_cork (val);
   }
 #endif
@@ -205,12 +211,27 @@ edit_main_rep::get_metadata (string kind) {
 string printing_dpi ("600");
 string printing_on ("a4");
 
+// Is the PDF written by the MuPDF renderer? It is a prototype, so it is
+// off unless it is asked for, by the preference or by the environment
+// (see docs/pdf-output-with-mupdf.md).
+bool
+use_mupdf_pdf () {
+#ifdef MUPDF_RENDERER
+  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
+  return get_preference ("native pdf renderer", "default") == "mupdf";
+#else
+  return false;
+#endif
+}
+
 bool
 use_pdf () {
 #ifdef PDF_RENDERER
   return get_preference ("native pdf", "on") == "on";
 #else
-  return false;
+  // without a PDF renderer the document goes out as PostScript and
+  // Ghostscript makes the PDF; the MuPDF renderer writes it itself
+  return use_mupdf_pdf ();
 #endif
 }
 
@@ -268,9 +289,17 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     env->write (PAGE_PRINTED, "true");
   }
 
-  // Typeset pages for printing
+  // Typeset pages for printing. The typesetter is kept until the pages
+  // are drawn, not dropped as typeset_as_document drops it: the links of
+  // the document (hlink and the like) are registered by the typesetter,
+  // and a box finds its own when it is drawn (box_rep::display_links).
+  // Dropped, they were found only when the editor had typeset the same
+  // document on the screen before -- never in a batch export (texmacs -c).
 
-  box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  env->style_init_env ();
+  env->update ();
+  typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+  box the_box= ::typeset (ttt);
 
   // Determine parameters for printer
 
@@ -315,6 +344,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     }
   }
   tm_delete (ren);
+  delete_typesetter (ttt);
 
 #ifdef USE_GS
   if (!use_pdf () && pdf) {
@@ -328,10 +358,13 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
   if (ps || pdf)
     if (get_preference ("texmacs->pdf:check", "off") == "on") {
 # if QT_VERSION >= 0x060000
-      system_wait ("Checking exported file for correctness", "please wait");
-      // FIXME: the wait message often causes a crash, otherwise
+      system_wait ("Checking exported file '" *
+		   as_string (tail (orig)) * "' for correctness");
 # endif
       gs_check (orig);
+# if QT_VERSION >= 0x060000
+      system_wait ("");
+# endif
     }
 #endif
 }
@@ -389,7 +422,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   string s= suffix (name);
   bool bitmap=
     (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS)
   bitmap= false;
 #endif
   bool ps= (s == "ps" || s == "eps");
@@ -493,6 +526,11 @@ edit_main_rep::the_path () {
 path
 edit_main_rep::the_shifted_path () {
   return shift (et, tp, 1);
+}
+
+path
+the_editor_path () {
+  return get_current_editor()->the_path ();
 }
 
 /******************************************************************************

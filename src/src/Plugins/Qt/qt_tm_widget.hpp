@@ -21,13 +21,20 @@
 #include "QTMInteractiveInputHelper.hpp"
 #include "QTMWidget.hpp"
 #include "QTMScrollView.hpp"
+#include "QTMToolbar.hpp"
 
 #include <QMainWindow>
 #include <QStackedWidget>
 #include <QLayout>
+#include <QPointer>
+
+#if QT_VERSION >= 0x050000
+#define DISABLE_QTMTOOLBAR 0
+#else
+#define DISABLE_QTMTOOLBAR 1
+#endif
 
 class QLabel; 
-class QTMToolbar;
 class QTMInteractivePrompt;
 
 /*! Models one main window with toolbars, an associated view, etc.
@@ -52,29 +59,34 @@ class qt_tm_widget_rep: public qt_window_widget_rep {
    extra_tools_visibility   = 512
    } visibility_t;
    */
-  QLabel*       rightLabel;
-  QLabel*        leftLabel;
-#ifdef OS_ANDROID
-  QTMToolbar*    menuToolBar;
+  QPointer<QLabel>          rightLabel;
+  QPointer<QLabel>           leftLabel;
+#if !DISABLE_QTMTOOLBAR
+  QPointer<QTMToolbar>     menuToolBar;
+  QPointer<QTMToolbar>     mainToolBar;
+  QPointer<QTMToolbar>     modeToolBar;
+  QPointer<QTMToolbar>    focusToolBar;
+  QPointer<QTMToolbar>     userToolBar;
+#else
+  QPointer<QToolBar>       mainToolBar;
+  QPointer<QToolBar>       modeToolBar;
+  QPointer<QToolBar>      focusToolBar;
+  QPointer<QToolBar>       userToolBar;
 #endif
-  QTMToolbar*    mainToolBar;
-  QTMToolbar*    modeToolBar;
-  QTMToolbar*   focusToolBar;
-  QTMToolbar*    userToolBar;
-  QDockWidget*   sideTools;
-  QDockWidget*   leftTools;
-  QDockWidget* bottomTools;
-  QDockWidget*  extraTools;
+  QPointer<QDockWidget>      sideTools;
+  QPointer<QDockWidget>      leftTools;
+  QPointer<QDockWidget>    bottomTools;
+  QPointer<QDockWidget>     extraTools;
 
 #ifdef Q_OS_MAC
-  QToolBar*      dumbToolBar;
-  QAction* modeToolBarAction;
-  QAction* mainToolBarAction;
-  QWidget*       rulerWidget;
+  QPointer<QToolBar>       dumbToolBar;
+  QPointer<QAction>  modeToolBarAction;
+  QPointer<QAction>  mainToolBarAction;
+  QPointer<QWidget>        rulerWidget;
 #endif
 
   QTMInteractiveInputHelper helper;
-  QTMInteractivePrompt*     prompt;
+  QPointer<QTMInteractivePrompt> prompt;
   qt_widget int_prompt;
   qt_widget int_input;
   
@@ -159,8 +171,8 @@ public:
   virtual widget    read (slot s, blackbox index);
   virtual void     write (slot s, blackbox index, widget w);
   
-  virtual QWidget*         as_qwidget ();
-  virtual QLayoutItem* as_qlayoutitem ();
+  virtual QWidget*         as_qwidget (QWidget* parent_widget);
+  virtual QLayoutItem* as_qlayoutitem (QWidget* parent_widget);
 };
 
 #endif // QT_TM_WIDGET_HPP

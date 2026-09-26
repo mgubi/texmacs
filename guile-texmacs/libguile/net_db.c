@@ -453,7 +453,24 @@ void
 scm_init_net_db ()
 {
   scm_add_feature ("net-db");
-#include "libguile/net_db.x"
+ scm_host_not_found_key = scm_permanent_object (scm_from_locale_symbol ("host-not-found")) ;
+ scm_try_again_key = scm_permanent_object (scm_from_locale_symbol ("try-again")) ;
+ scm_no_recovery_key = scm_permanent_object (scm_from_locale_symbol ("no-recovery")) ;
+ scm_no_data_key = scm_permanent_object (scm_from_locale_symbol ("no-data")) ;
+ scm_c_define_gsubr (s_scm_gethost, 0, 1, 0, (SCM (*)()) scm_gethost); ;
+#if defined (HAVE_GETPROTOENT) || defined (__MINGW32__)
+ scm_c_define_gsubr (s_scm_getproto, 0, 1, 0, (SCM (*)()) scm_getproto); ;
+#endif
+#if defined (HAVE_GETSERVENT) || defined (__MINGW32__)
+ scm_c_define_gsubr (s_scm_getserv, 0, 2, 0, (SCM (*)()) scm_getserv); ;
+#endif
+#if defined (HAVE_SETPROTOENT) && defined (HAVE_ENDPROTOENT) || defined (__MINGW32__)
+ scm_c_define_gsubr (s_scm_setproto, 0, 1, 0, (SCM (*)()) scm_setproto); ;
+#endif
+#if defined (HAVE_SETSERVENT) && defined (HAVE_ENDSERVENT) || defined (__MINGW32__)
+ scm_c_define_gsubr (s_scm_setserv, 0, 1, 0, (SCM (*)()) scm_setserv); ;
+#endif
+
 }
 
 /*

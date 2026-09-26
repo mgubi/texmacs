@@ -33,6 +33,31 @@ typedef struct texmacs_dirent {
 } texmacs_dirent;
 
 /*
+ * @brief Reset the last error code
+ */
+void texmacs_reset_last_error();
+
+/*
+ * @brief Get the last error code (from posix errno)
+ */
+int64_t texmacs_get_last_error();
+
+/*
+ * @brief Get the last error string (from posix strerror)
+ */
+string texmacs_get_last_error_str();
+
+/*
+ * @brief Acquire advisory lock on file
+ */
+void texmacs_lock_file(FILE *&file, bool nonblock=false);
+
+/*
+ * @brief Release advisory lock on file
+ */
+void texmacs_unlock_file(FILE *&file);
+
+/*
  * @brief Proxy function to call the fopen function.
  * @param lock: if true, the file will be locked.
  */
@@ -136,24 +161,5 @@ string get_default_theme();
  * runs from
  */
 url texmacs_get_application_directory();
-
-/*
- * @brief Tell TeXmacs system that a long task is starting. This will
- * allow TeXmacs to process the essential user events, and make TeXmacs
- * responsive while the task is running.
- */
- void texmacs_system_start_long_task();
-
- /*
-  * @brief Tell TeXmacs system that a long task is ending.
-  * @see texmacs_system_start_long_task
-  */
- void texmacs_system_end_long_task();
- 
-/*
- * @brief Process the essential user events. This function should be called
- * in long tasks to keep TeXmacs responsive.
- */
-void texmacs_process_event();
 
 #endif // TEXMACS_UNIX_SYSTEM_HPP

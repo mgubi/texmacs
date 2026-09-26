@@ -19,12 +19,23 @@ def download_url(url):
         return
     # check if the file already exists
     filename = url.split('/')[-1]
-    filename = url.split('?')[0].split('#')[0]  # Remove query and fragment parts
+    filename = filename.split('?')[0].split('#')[0]  # Remove query and fragment parts
     filename_without_extension = filename.split('.')[0]
     if os.path.isfile(filename) or os.path.isdir(filename_without_extension):
         print(f"File {filename} already exists")
         return filename
 
+    tmserver_url = "https://ftp.texmacs.org/TeXmacs/misc/" + filename
+    print("Trying TeXmacs server: " + tmserver_url)
+    response = urllib.request.urlopen(tmserver_url)
+    if response.status == 200:
+        content = response.read()
+        with open(filename, 'wb') as f:
+            f.write(content)
+        print(f"Downloaded {filename} from TeXmacs server")
+        return filename
+
+    print("Downloading from original URL: " + url)
     response = urllib.request.urlopen(url)
     if response.status == 200:
         content = response.read()
@@ -34,7 +45,7 @@ def download_url(url):
         print(f"Downloaded {filename}")
         return filename
     else:
-        print(f"Failed to download {url}")
+        raise Exception(f"Failed to download {url}, status code: {response.status}")
 
 def clone_git_repo(url):
     # check if the directory already exists
@@ -122,6 +133,7 @@ def main():
                 downloaded_files.append(downloaded_file)
         except Exception as e:
             print(f"Error downloading {url}: {e}")
+            exit(1)
 
     for downloaded_file in downloaded_files:
         print(f"Extracting {downloaded_file}")
@@ -134,3 +146,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

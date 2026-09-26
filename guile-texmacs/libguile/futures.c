@@ -367,7 +367,8 @@ scm_init_futures ()
   scm_set_smob_print (scm_tc16_future, future_print);
 
   scm_c_hook_add (&scm_before_sweep_c_hook, scan_futures, 0, 0);
-#include "libguile/futures.x"
+
+
 }
 
 #endif

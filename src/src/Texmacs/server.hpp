@@ -108,17 +108,25 @@ public:
   virtual bool   is_yes (string s) = 0;
   virtual void   quit () = 0;
   virtual void   shell (string s) = 0;
+  virtual int    cpu_idle_time () = 0;
 };
 
 class server {
-  ABSTRACT(server);
+  server_rep *rep;
+public:
+  server (const server&);
+  ~server ();
+  server_rep* operator -> ();
+  server& operator = (server x);
+  server (server_rep*);
   server ();
 };
-ABSTRACT_CODE(server);
 
+int cpu_idle_time ();
 extern bool rescue_mode;
 scheme_tree menu_merge (scheme_tree m1, scheme_tree m2);
 server get_server ();
+void quit_TeXmacs_code (int code);
 void gui_set_output_language (string lan);
 inline bool in_rescue_mode () { return rescue_mode; }
 

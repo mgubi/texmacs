@@ -35,7 +35,9 @@
      (ai-translate lan (get-preference "ai")))))
 
 (tm-menu (tools-equation-editor-menu)
-  ("Enable" (toggle-preference "equation-editor")))
+  ("Enable" (begin 
+              (toggle-preference "equation-editor")
+              (reinit-plugin-cache))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The Tools menu
@@ -78,14 +80,14 @@
   (-> "AI engine"
       ("Off" (reset-preference "ai"))
       ---
+      (when (has-albert?)
+        ("Albert" (set-preference "ai" "albert")))
       (when (has-chatgpt?)
         ("Chat GPT" (set-preference "ai" "chatgpt")))
       (when (has-gemini?)
         ("Gemini" (set-preference "ai" "gemini")))
-      (when (has-llama3?)
-        ("Llama 3" (set-preference "ai" "llama3")))
-      (when (has-llama4?)
-        ("Llama 4" (set-preference "ai" "llama4")))
+      (when (has-ollama?)
+        ("Ollama" (set-preference "ai" "ollama")))
       (when (has-open-mistral-7b?)
         ("Mistral 7B" (set-preference "ai" "open-mistral-7b"))))
   (when (and (cpp-has-preference? "ai")

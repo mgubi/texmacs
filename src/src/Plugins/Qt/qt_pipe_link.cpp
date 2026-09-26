@@ -28,7 +28,9 @@
 #include <errno.h>
 
 void close_all_cmdlines ();
+void close_all_requests ();
 void process_all_cmdlines ();
+void process_all_requests ();
 
 hashset<pointer> pipe_link_set;
 
@@ -151,7 +153,7 @@ qt_pipe_link_rep::interrupt () {
   // Not implemented
   qt_error << "SIGINT not implemented on Windows\n";
 #else
-#if QT_VERSION < 0x060000
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
   Q_PID pid = PipeLink.pid ();
   
   // REMARK: previously there were here below a call to ::killpg which does not seems to work on MacOS
@@ -199,6 +201,7 @@ close_all_pipes () {
     if (con->alive) con->stop ();
   }
   close_all_cmdlines ();
+  close_all_requests ();
 }
 
 void
@@ -209,6 +212,7 @@ process_all_pipes () {
     if (con->alive) con->apply_command ();
   }
   process_all_cmdlines ();
+  process_all_requests ();
 }
 
 #endif // defined (QTTEXMACS) && defined (OS_MINGW)

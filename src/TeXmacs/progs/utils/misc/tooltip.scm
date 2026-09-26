@@ -13,67 +13,98 @@
 
 (texmacs-module (utils misc tooltip))
 
-(define tooltip-id #f)
-(define tooltip-win #f)
-(define tooltip-unmap? #f)
-(define tooltip-settings #f)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tooltip management by identifiers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define tooltips (list))
+
+(define (tooltip-ids)
+  (map car tooltips))
+
+(define (tooltip-set id win settings unmap?)
+  (set! tooltips (assoc-set! tooltips id (list win settings unmap?))))
+
+(define (tooltip-reset id)
+  (set! tooltips (assoc-remove! tooltips id)))
+
+(define (tooltip-win id)
+  (and-with l (assoc-ref tooltips id)
+    (car l)))
+
+(define (tooltip-settings id)
+  (and-with l (assoc-ref tooltips id)
+    (cadr l)))
+
+(define (tooltip-unmap? id)
+  (and-with l (assoc-ref tooltips id)
+    (caddr l)))
+
+(define (tooltip-set-settings id settings)
+  (and-with l (assoc-ref tooltips id)
+    (with (win settings* unmap?) l
+      (tooltip-set id win settings unmap?))))
+
+(define (tooltip-set-unmap? id unmap?)
+  (and-with l (assoc-ref tooltips id)
+    (with (win settings unmap?*) l
+      (tooltip-set id win settings unmap?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Map and unmap
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tooltip-confirm settings)
-  ;;(display* "Confirm " tooltip-win "\n")
-  (set! tooltip-unmap? #f)
-  (set! tooltip-settings settings))
+(define (tooltip-confirm id settings)
+  ;;(display* "Confirm " id " -> " (tooltip-win id) "\n")
+  (and-with win (tooltip-win id)
+    (tooltip-set id win settings #f)))
 
-(define (tooltip-unmap)
-  ;;(display* "Unmap " tooltip-win "\n")
-  (alt-window-hide tooltip-win)
-  (alt-window-delete tooltip-win)
-  (set! tooltip-id #f)
-  (set! tooltip-win #f)
-  (set! tooltip-unmap? #f)
-  (set! tooltip-settings #f))
+(define (tooltip-unmap id)
+  ;;(display* "Unmap " id " -> " (tooltip-win id) "\n")
+  (and-with win (tooltip-win id)
+    (alt-window-hide win)
+    (alt-window-delete win)
+    (tooltip-reset id)))
 
 (define (tooltip-map wid x y id settings)
   (set! x (quotient x 256))
   (set! y (quotient y 256))
-  (if tooltip-win (tooltip-unmap))
+  (if (tooltip-win id) (tooltip-unmap id))
   (with win (alt-window-handle)
     (alt-window-create-tooltip win wid (translate "Tooltip"))
     (alt-window-set-position win x y)
     (alt-window-show win)
-    (set! tooltip-id id)
-    (set! tooltip-win win)
-    (set! tooltip-unmap? #f)
-    (set! tooltip-settings settings)
-    ;;(display* "Map " tooltip-win "\n")
+    (tooltip-set id win settings #f)
+    ;;(display* "Map " id " -> " win "\n")
     ))
 
-(define (tooltip-delayed-unmap)
-  (set! tooltip-unmap? tooltip-win)
-  ;;(display* "Schedule unmap " tooltip-win "\n")
-  (delayed
-    (:pause 250)
-    (when (and tooltip-unmap? (== tooltip-unmap? tooltip-win))
-      (tooltip-unmap))))
+(define (tooltip-delayed-unmap id)
+  (and-with win (tooltip-win id)
+    (tooltip-set-unmap? id #t)
+    ;;(display* "Schedule unmap " id " -> " (tooltip-win id) "\n")
+    (delayed
+      (:pause 250)
+      (when (tooltip-unmap? id)
+        (tooltip-unmap id)))))
 
 (tm-define (keyboard-press key time)
-  (:require (and tooltip-win (not tooltip-unmap?)))
-  (when (== (cAr tooltip-settings) "keyboard")
-    (tooltip-delayed-unmap))
+  (:require (nnull? tooltips))
+  ;;(display* "Key event " key ", " time "\n")
+  (for (id (tooltip-ids))
+    (when (== (cAr (tooltip-settings id)) "keyboard")
+      (tooltip-delayed-unmap id)))
   (former key time))
 
 (tm-define (mouse-event key x y mods time data)
-  (:require (and tooltip-win (not tooltip-unmap?)))
+  (:require (nnull? tooltips))
   ;;(display* "Mouse event " key ", " x ", " y "; " time "\n")
-  (with (x1 y1 x2 y2 mx my sx sy zf type) tooltip-settings
-    (let* ((xx (inexact->exact (round (/ (- x sx) (/ 5.0 zf)))))
-           (yy (inexact->exact (round (/ (- y sy) (/ 5.0 zf)))))
-           (dx (quotient (abs (- xx mx)) 256))
-           (dy (quotient (abs (- yy my)) 256))
-           (d  (* 5 256)))
+  (for (id (tooltip-ids))
+    (with (x1 y1 x2 y2 mx my sx sy zf type) (tooltip-settings id)
+      (let* ((xx (inexact->exact (round (/ (- x sx) (/ 5.0 zf)))))
+             (yy (inexact->exact (round (/ (- y sy) (/ 5.0 zf)))))
+             (dx (quotient (abs (- xx mx)) 256))
+             (dy (quotient (abs (- yy my)) 256))
+             (d  (* 5 256)))
       ;;(display* "  Type        " type "\n")
       ;;(display* "  Shift       "
       ;;          (quotient (inexact->exact (round (/ sx (/ 5.0 zf)))) 256) ", "
@@ -83,12 +114,12 @@
       ;;(display* "  Bottom left " (quotient x1 256) ", " (quotient y1 256) "\n")
       ;;(display* "  Top right   " (quotient x2 256) ", " (quotient y2 256) "\n")
       ;;(display* "  Delta       " dx ", " dy "\n")
-      (when (or (!= key "move")
-                (< xx (- x1 d)) (> xx (+ x2 d))
-                (< yy (- y1 d)) (> yy (+ y2 d))
-                (and (== type "mouse") (or (> dx 10) (> dy 10))))
-        (when (!= type "keyboard")
-          (tooltip-delayed-unmap)))))
+        (when (or (!= key "move")
+                  (< xx (- x1 d)) (> xx (+ x2 d))
+                  (< yy (- y1 d)) (> yy (+ y2 d))
+                  (and (== type "mouse") (or (> dx 10) (> dy 10))))
+          (when (!= type "keyboard")
+            (tooltip-delayed-unmap id))))))
   (former key x y mods time data))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -119,6 +150,8 @@
            (let* ((va* (string-drop va 7))
                   (vai (cond ((== va* "Bottom") "Top")
                              ((== va* "Top") "Bottom")
+                             ((== va* "BOTTOM") "TOP")
+                             ((== va* "TOP") "BOTTOM")
                              ((== va* "mouse-Bottom") "mouse-Top")
                              ((== va* "mouse-Top") "mouse-Bottom")
                              (else va*)))
@@ -131,10 +164,12 @@
            (with y (tooltip-y y1 y2 wy bh sh my (string-append "raw-" va))
              (max (- bh sh) (min 0 y))))
           ((== va "raw-Bottom") (+ wy y1 (- d)))
+          ((== va "raw-BOTTOM") (+ wy y1 (- d) (- d)))
           ((== va "raw-bottom") (+ wy y1 bh))
           ((== va "raw-center") (+ wy (quotient (+ (+ y1 y2) bh) 2)))
           ((== va "raw-top") (+ wy y2))
           ((== va "raw-Top") (+ wy y2 bh d))
+          ((== va "raw-TOP") (+ wy y2 bh d d))
           ((== va "raw-mouse-Bottom") (+ wy my (- ph)))
           ((== va "raw-mouse-bottom") (+ wy my))
           ((== va "raw-mouse-center") (+ wy my (quotient (- bh ph) 2)))
@@ -191,8 +226,8 @@
       (when (or (== type "keyboard")
                 (and (>= mx (- x1 d)) (<= mx (+ x2 d))
                      (>= my (- y1 d)) (<= my (+ y2 d))))
-        (if (and tooltip-win id (== id tooltip-id))
-            (tooltip-confirm settings)
+        (if (and id (assoc-ref tooltips id))
+            (tooltip-confirm id settings)
             (and-let* ((wx (get-window-x))
                        (wy (get-window-y))
                        (packs (get-style-list))
@@ -218,6 +253,15 @@
                            id
                            settings)))))))
 
-(tm-define (close-tooltip)
-  (when tooltip-win
-    (tooltip-unmap)))
+(tm-define (close-tooltip id)
+  (when (tooltip-win id)
+    (tooltip-unmap id)))
+
+(tm-define (close-tooltips)
+  (for (id (tooltip-ids))
+    (close-tooltip id)))
+
+(tm-define (refresh-tooltips)
+  (delayed
+    (:idle 100)
+    (notify-change 1024)))

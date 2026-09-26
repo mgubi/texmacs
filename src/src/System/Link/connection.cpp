@@ -41,6 +41,7 @@ struct connection_rep: rep<connection> {
   int     prev_status;   // last notified status
   bool    forced_eval;   // forced input evaluation without call backs
   bool    cmdline_eval;  // command line style evaluation
+  bool    request_eval;  // request style evaluation
   texmacs_input tm_out;  // texmacs input handler for output from child
   texmacs_input tm_err;  // texmacs input handler for errors from child
 
@@ -70,12 +71,11 @@ connection_callback (void *obj, void* info) {
   con->listen ();
 }
 
-
 connection_rep::connection_rep (string name2, string session2, tm_link ln2):
   rep<connection> (name2 * "-" * session2),
   name (name2), session (session2), ln (ln2),
   status (CONNECTION_DEAD), prev_status (CONNECTION_DEAD),
-  forced_eval (false), cmdline_eval (false),
+  forced_eval (false), cmdline_eval (false), request_eval (false),
   tm_out ("output"), tm_err ("error") {}
 
 string
@@ -104,6 +104,12 @@ connection_rep::start (bool again) {
   }
   if (message == "cmdline") {
     tm_out->format= "cmdline-" * name;
+    tm_out->mode  = tm_out->get_mode (tm_out->format);
+    status= WAITING_FOR_INPUT;
+    connection_notify_status (this);
+  }
+  if (message == "request") {
+    tm_out->format= "request-" * name;
     tm_out->mode  = tm_out->get_mode (tm_out->format);
     status= WAITING_FOR_INPUT;
     connection_notify_status (this);
@@ -194,7 +200,7 @@ connection_rep::listen () {
   if (forced_eval) return;
   connection_notify_status (this);
   if (status != CONNECTION_DEAD) {
-    if (cmdline_eval) ln->listen (1);
+    if (cmdline_eval || request_eval) ln->listen (1);
     read (LINK_ERR);
     connection_notify (this, "error", tm_err->get ("error"));
     read (LINK_OUT);
@@ -255,16 +261,15 @@ connection_start (string name, string session, bool again) {
       con= tm_new<connection_rep> (name, session, ln);
       con->cmdline_eval= true;
     }
+    if (is_tuple (t, "request")) {
+      tm_link ln= make_request_link (name);
+      con= tm_new<connection_rep> (name, session, ln);
+      con->request_eval= true;
+    }
     if (is_tuple (t, "pipe", 1)) {
       tm_link ln= make_pipe_link (t[1]->label);
       con= tm_new<connection_rep> (name, session, ln);
     }
-#if !(defined(QTTEXMACS) || defined(SDLTEXMACS))
-    else if (is_tuple (t, "socket", 2)) {
-      tm_link ln= make_socket_link (t[1]->label, as_int (t[2]->label));
-      con= tm_new<connection_rep> (name, session, ln);
-    }
-#endif
     else if (is_tuple (t, "dynlink", 3)) {
       tm_link ln=
         make_dynamic_link (t[1]->label, t[2]->label, t[3]->label, session);

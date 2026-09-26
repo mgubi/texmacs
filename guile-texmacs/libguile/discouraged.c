@@ -324,7 +324,9 @@ scm_c_make_keyword (const char *s)
 void
 scm_i_init_discouraged (void)
 {
-#include "libguile/discouraged.x"
+ scm_c_define_gsubr (s_scm_make_keyword_from_dash_symbol, 1, 0, 0, (SCM (*)()) scm_make_keyword_from_dash_symbol); ;
+ scm_c_define_gsubr (s_scm_keyword_dash_symbol, 1, 0, 0, (SCM (*)()) scm_keyword_dash_symbol); ;
+
 }
 
 #endif

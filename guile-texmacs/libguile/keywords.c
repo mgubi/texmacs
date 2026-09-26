@@ -118,7 +118,10 @@ scm_init_keywords ()
   scm_set_smob_print (scm_tc16_keyword, keyword_print);
 
   scm_keyword_obarray = scm_c_make_hash_table (0);
-#include "libguile/keywords.x"
+ scm_c_define_gsubr (s_scm_keyword_p, 1, 0, 0, (SCM (*)()) scm_keyword_p); ;
+ scm_c_define_gsubr (s_scm_symbol_to_keyword, 1, 0, 0, (SCM (*)()) scm_symbol_to_keyword); ;
+ scm_c_define_gsubr (s_scm_keyword_to_symbol, 1, 0, 0, (SCM (*)()) scm_keyword_to_symbol); ;
+
 }
 
 

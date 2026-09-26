@@ -20,6 +20,7 @@
 #include <winnls.h>
 #endif
 
+#include <iostream>
 
 #define outline Core_outline
 #define extend Core_extends
@@ -227,6 +228,36 @@ get_locale_charset () {
 #endif
 }
 
+std::locale
+get_std_locale (string language) {
+  {
+    string loc= language_to_locale(language) * ".UTF-8";
+    c_string _loc (loc);
+    try {
+      return std::locale (_loc);
+    } catch (std::runtime_error&) {
+      std_warning << "locale " << loc << " not found\n";
+    }
+  }
+
+  {
+    string loc= language_to_locale(language);
+    loc[2] = '-';
+    c_string _loc (loc);
+    try {
+      return std::locale (_loc);
+    } catch (std::runtime_error&) {
+      std_warning << "locale " << loc << " not found\n";
+    }
+  }
+
+  std::locale loc= std::locale::classic(); 
+  std::wcout.imbue(loc);
+  string loc_name(loc.name().c_str());
+  std_warning << "falling back to locale " << loc_name << "\n";
+  return loc;
+}
+
 /******************************************************************************
 * Getting a formatted date
 ******************************************************************************/
@@ -240,6 +271,11 @@ get_date (string lan, string fm) {
 string
 pretty_time (int t) {
   return qt_pretty_time (t);
+}
+
+string
+pretty_date (int t, string fm) {
+  return qt_pretty_date (t, fm);
 }
 #else
 
@@ -300,6 +336,12 @@ get_date (string lan, string fm) {
 
 string
 pretty_time (int t) {
+  return var_eval_system ("date -r " * as_string (t));
+}
+
+string
+pretty_date (int t, string fm) {
+  (void) fm;
   return var_eval_system ("date -r " * as_string (t));
 }
 #endif

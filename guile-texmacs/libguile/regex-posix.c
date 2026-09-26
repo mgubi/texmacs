@@ -305,7 +305,11 @@ scm_init_regex_posix ()
   scm_c_define ("regexp/notbol", scm_from_int (REG_NOTBOL));
   scm_c_define ("regexp/noteol", scm_from_int (REG_NOTEOL));
 
-#include "libguile/regex-posix.x"
+ scm_regexp_error_key = scm_permanent_object (scm_from_locale_symbol ("regular-expression-syntax")) ;
+ scm_c_define_gsubr (s_scm_regexp_p, 1, 0, 0, (SCM (*)()) scm_regexp_p); ;
+ scm_c_define_gsubr (s_scm_make_regexp, 1, 0, 1, (SCM (*)()) scm_make_regexp); ;
+ scm_c_define_gsubr (s_scm_regexp_exec, 2, 2, 0, (SCM (*)()) scm_regexp_exec); ;
+
 
   scm_add_feature ("regex");
 }

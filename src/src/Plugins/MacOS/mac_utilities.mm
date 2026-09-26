@@ -40,6 +40,7 @@
 #include <QApplication>
 #include <QKeyEvent>
 #include <QString>
+#include <QMainWindow>
 #include "Qt/QTMWidget.hpp"
 #include "Qt/qt_gui.hpp"
 #include "Qt/qt_utilities.hpp"
@@ -112,6 +113,9 @@ mac_fix_paths () {
 
 NSEvent *
 mac_handler_body (NSEvent *event) {
+  if (get_user_preference("use experimental keyboard patches") == "on") {
+    return event;
+  }
   if (([event type] == NSKeyDown) || ([event type] == NSKeyUp)) {
     NSString *nss = [event charactersIgnoringModifiers];
     if ([nss length] > 0) {
@@ -173,6 +177,9 @@ mac_handler_body (NSEvent *event) {
   
 void 
 mac_install_filter () {
+  if (get_user_preference("use experimental keyboard patches") == "on") {
+    return;
+  }
 #if NS_BLOCKS_AVAILABLE
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   
@@ -556,4 +563,25 @@ mac_end_server () {
   }
 #endif
 #endif
+}
+
+
+
+#ifdef QTTEXMACS
+void applyMacOSUnifiedBar(QWidget* widget) {
+  if (widget == nullptr) return;
+
+  NSView* nativeView = reinterpret_cast<NSView*>(widget->winId());
+  NSWindow* nativeWindow = [nativeView window];
+
+  [nativeWindow setStyleMask:[nativeWindow styleMask] | NSFullSizeContentViewWindowMask | NSWindowTitleHidden];
+  [nativeWindow setTitlebarAppearsTransparent:YES];
+
+  //[nativeWindow setMovableByWindowBackground:YES];
+}
+#endif
+
+void
+mac_beep () {
+  NSBeep ();
 }

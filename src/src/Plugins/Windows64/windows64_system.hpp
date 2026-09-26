@@ -37,6 +37,36 @@ typedef struct texmacs_dirent {
 
 
 /*
+ * @brief Reset the last error code
+ */
+void texmacs_reset_last_error();
+
+/*
+ * @brief Get the last error code (from posix errno or windows GetLastError)
+ */
+int64_t texmacs_get_last_error();
+
+/*
+ * @brief Get the last error string (from posix strerror or windows FormatMessage)
+ */
+string texmacs_get_last_error_str();
+
+/*
+ * @brief Check if the program is running in a MSIX package
+ */
+bool is_running_in_msix();
+
+/*
+ * @brief Acquire advisory lock on file
+ */
+void texmacs_lock_file(FILE *&file, bool nonblock=false);
+
+/*
+ * @brief Release advisory lock on file
+ */
+void texmacs_unlock_file(FILE *&file);
+
+/*
  * @brief Proxy function to call the fopen function with UTF-8 encoded strings
  * The lock parameter is used to lock the file when it is opened.
  */
@@ -84,6 +114,11 @@ texmacs_dirent texmacs_readdir(TEXMACS_DIR dirp);
  * @brief Proxy function to the stat function with UTF-8 encoded strings
  */
 int texmacs_stat(string filename, struct_stat* buf);
+
+/*
+ * @brief Return the AppData path (internal to the app for msix)
+ */
+string get_local_appdata_path();
 
 /*
  * @brief Proxy function to the getenv function with UTF-8 encoded strings
@@ -211,24 +246,5 @@ inline url texmacs_get_application_directory() {
     return url_system(texmacs_get_application_directory_str());
 }
 #endif
-
-/*
- * @brief Tell TeXmacs system that a long task is starting. This will
- * allow TeXmacs to process the essential user events, and make TeXmacs
- * responsive while the task is running.
- */
-void texmacs_system_start_long_task();
-
-/*
- * @brief Tell TeXmacs system that a long task is ending.
- * @see texmacs_system_start_long_task
- */
-void texmacs_system_end_long_task();
-
-/*
- * @brief Process the essential user events. This function should be called
- * in long tasks to keep TeXmacs responsive.
- */
-void texmacs_process_event();
 
 #endif

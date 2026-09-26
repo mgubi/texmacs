@@ -114,19 +114,22 @@ AC_DEFUN([LC_WITH_GUILE],[
         *mingw*)
           GUILE_PREFIX=$(pwd -W)/embedded_guile/build
           GUILE_STATIC='$(shell '${GUILE_PREFIX}'/bin/guile.exe -e main -s "'${GUILE_PREFIX}'/bin/guile-config" link)'
+          GUILE_BIN=${GUILE_PREFIX}/bin/guile.exe
         ;;
         *)
           GUILE_PREFIX=$(pwd)/embedded_guile/build
           GUILE_STATIC='$(shell '${GUILE_PREFIX}'/bin/guile-config link)'
+          GUILE_BIN=${GUILE_PREFIX}/bin/guile
         ;;
       esac
       AX_SUBDIRS_CONFIGURE(
         [embedded_guile],
-        [[--without-guile-readline],[CPPFLAGS=${CPPFLAGS}],[LDFLAGS=${LDFLAGS}]],
+        [[--without-guile-readline],[CPPFLAGS=${CPPFLAGS}],[LDFLAGS=${LDFLAGS}],[CFLAGS=-O2 -std=gnu99 -Wno-error]],
         [[--disable-shared]],
 	      [[--prefix=${GUILE_PREFIX}]],
         [--with-tmrepo=])
       AC_SUBST([GUILE_STATIC])
+      AC_SUBST([GUILE_BIN])
       LC_APPEND_FLAG([-I${GUILE_PREFIX}/include],[GUILE_CPPFLAGS])
       LC_APPEND_FLAG([-I${GUILE_PREFIX}/include/guile],[GUILE_CPPFLAGS])
       GUILE_VERSION=$GUILE_EMBEDDED_VERSION

@@ -8,15 +8,26 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
+#include <initguid.h>
 #include <windows.h>
+#ifdef PACKAGE_VERSION
+#undef PACKAGE_VERSION
+#endif
+#include <appmodel.h>
+#include <shlobj.h>
+#include <knownfolders.h>
 #include <io.h>
 #include <fcntl.h>
-#include <io.h>
 #include <process.h>
+#include <dwmapi.h> 
+#include <windowsx.h>
 #include <string>
 #include <vector>
 #include <iostream>
 #include <chrono>
+#include <vector>
+
+#undef FAILED
 
 #include "config.h"
 #include "windows64_system.hpp"
@@ -32,6 +43,7 @@
 #include <QGuiApplication>
 #include <QCoreApplication>
 #include <QStyleHints>
+#include <QWidget>
 #endif
 
 #include "analyze.hpp"
@@ -43,11 +55,78 @@ typedef struct texmacs_dir_t {
   bool is_find_data_valid;
 } texmacs_dir_t;
 
+void texmacs_reset_last_error() {
+  SetLastError(0);
+  errno = 0;
+}
+
+int64_t texmacs_get_last_error() {
+  DWORD errorMessageID = GetLastError();
+  if (errorMessageID != 0 && errno != 0) {
+    return errno;
+  }
+  if (errorMessageID != 0) {
+    return errorMessageID;
+  }
+  return errno;
+}
+
+string texmacs_get_last_error_str() {
+  string result = "";
+  DWORD errorMessageID = GetLastError();
+  if (errorMessageID != 0) {
+    LPWSTR messageBuffer = nullptr;
+    size_t size = FormatMessageW(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPWSTR)&messageBuffer, 0, NULL);
+
+    result = texmacs_wide_to_utf8(std::wstring(messageBuffer, size));
+    LocalFree(messageBuffer);
+  }
+  if (errno != 0) {
+    if (N(result) > 0) {
+      result = result * " ; ";
+    }
+    result = result * strerror(errno);
+  }
+  return result;
+}
+
+void texmacs_lock_file(FILE *&file, bool nonblock) {
+  int fd = _fileno(file);
+  HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+  DWORD flags = LOCKFILE_EXCLUSIVE_LOCK;
+  if (nonblock) flags |= LOCKFILE_FAIL_IMMEDIATELY;
+  OVERLAPPED overlapped = { 0 };
+  if (!LockFileEx(hFile, flags, 0, MAXDWORD, MAXDWORD, &overlapped)) {
+    fclose(file);
+    file = nullptr;
+  }
+}
+
+void texmacs_unlock_file(FILE *&file) {
+    int fd = _fileno(file);
+    HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+    OVERLAPPED overlapped = { 0 };
+    UnlockFileEx(hFile, 0, MAXDWORD, MAXDWORD, &overlapped);
+}
+
+bool is_running_in_msix() {
+    UINT32 length = 0;
+    LONG result = GetCurrentPackageFullName(&length, NULL);
+    return result != APPMODEL_ERROR_NO_PACKAGE;
+}
+
 FILE* texmacs_fopen(string filename, string mode, bool lock) {
   std::wstring wide_filename = texmacs_utf8_to_wide(filename);
   std::wstring wide_mode = texmacs_utf8_to_wide(mode);
   wide_mode += L"b";
   FILE* result = _wfopen(wide_filename.c_str(), wide_mode.c_str());
+  // lock the file with LockFileEx if requested
+  if (result && lock) {
+    texmacs_lock_file(result);
+  }
   return result;
 }
 
@@ -75,8 +154,13 @@ ssize_t texmacs_fwrite(const char *str, size_t size, FILE *stream) {
 }
 
 void texmacs_fclose(FILE *&file, bool unlock) {
-  fclose(file);
-  file = nullptr;
+  if (unlock && file) {
+    texmacs_unlock_file(file);
+  }
+  if (file) {
+    fclose(file);
+    file = nullptr;
+  }
 }
 
 TEXMACS_DIR texmacs_opendir(string dirname) {
@@ -108,6 +192,18 @@ texmacs_dirent texmacs_readdir(TEXMACS_DIR dirp) {
 
 int texmacs_stat(string filename, struct_stat* buf) {
   return _wstat64(texmacs_utf8_to_wide(filename).c_str(), buf);
+}
+
+string get_local_appdata_path() {
+  PWSTR path = NULL;  
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &path);  
+  if (SUCCEEDED(hr)) {
+    string result = texmacs_wide_to_utf8(std::wstring(path));
+    CoTaskMemFree(path);
+    return result;
+  }
+  FAILED("Could not get AppData path");
+  return "";
 }
 
 bool texmacs_getenv(string var_name, string &var_value) {
@@ -149,10 +245,11 @@ bool texmacs_rmdir(string dirname) {
 }
 
 bool texmacs_rename(string oldname, string newname) {
-  texmacs_remove(newname);
-  return MoveFileW(
-    texmacs_utf8_to_wide(oldname).c_str(), 
-    texmacs_utf8_to_wide(newname).c_str()
+  // Mimic Linux rename: atomic + overwrite existing destination.
+  return MoveFileExW(
+    texmacs_utf8_to_wide(oldname).c_str(),
+    texmacs_utf8_to_wide(newname).c_str(),
+    MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH
   ) != 0;
 }
 
@@ -288,32 +385,6 @@ int texmacs_guile_fprintf(FILE *stream, const char *format, ...) {
 
 #endif
 
-bool is_doing_long_task = false;
-using time_point = std::chrono::time_point<std::chrono::system_clock>;
-using duration = std::chrono::duration<double>;
-
-void texmacs_system_start_long_task() {
-  is_doing_long_task = true;
-}
-void texmacs_system_end_long_task() {
-  is_doing_long_task = false;
-}
-
-#ifdef SCM_HAVE_HOOKS
-
-void texmacs_process_event() {
-  if (!is_doing_long_task) return;
-  static time_point last_time = std::chrono::system_clock::now();
-  time_point current_time = std::chrono::system_clock::now();
-  duration elapsed_seconds = current_time - last_time;
-  if (elapsed_seconds.count() < 0.1) return;
-  last_time = current_time;
-#ifdef QTTEXMACS
-  QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-#endif
-}
-#endif
-
 void texmacs_init_guile_hooks() {
 #ifdef SCM_HAVE_HOOKS
   guile_stat = texmacs_guile_stat;
@@ -325,7 +396,6 @@ void texmacs_init_guile_hooks() {
   guile_getenv = texmacs_guile_getenv;
   guile_fprintf = texmacs_guile_fprintf;
   guile_printf = texmacs_guile_printf;
-  guile_process_event = texmacs_process_event;
 #else
   cout << "warning: guile hooks are not available" << LF;
 #endif
@@ -341,6 +411,8 @@ intptr_t texmacs_spawnvp(int mode, string name, array<string> args) {
     c_wide_arg[wide_arg.size()] = 0;
     wide_args.push_back(c_wide_arg);
   }
+
+  wide_args.push_back(nullptr);
 
   // convert the name to a wide string
   std::wstring wide_name = texmacs_utf8_to_wide(name);
@@ -438,6 +510,14 @@ public:
   HANDLE h = 0;
 };
 
+std::wstring ConsoleOutputToWide(const std::string& str) {
+    if (str.empty()) return std::wstring();
+    int size_needed = MultiByteToWideChar(CP_OEMCP, 0, &str[0], (int)str.size(), NULL, 0);
+    std::wstring wstrTo(size_needed, 0);
+    MultiByteToWideChar(CP_OEMCP, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+    return wstrTo;
+}
+
 int windows_system(string cmd, string *cmdout, string *cmderr) {
 
   SECURITY_ATTRIBUTES sa;
@@ -483,9 +563,12 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
 
   std::wstring wide_cmd = texmacs_utf8_to_wide(cmd);
 
+  std::vector<wchar_t> cmdBuffer(wide_cmd.begin(), wide_cmd.end());
+  cmdBuffer.push_back(0);
+
   // CreateProcessW will work only on executable files.
   // It will not work to open PDF, links, etc.
-  res = CreateProcessW(NULL, (LPWSTR)wide_cmd.c_str(), NULL, NULL, 
+  res = CreateProcessW(NULL, cmdBuffer.data(), NULL, NULL,
                        TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
   if (!res) {
     // If we are here, it means that windows_system is trying to
@@ -506,6 +589,8 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
   if (cmdout == nullptr && cmderr == nullptr) {
     // If we are here, we launched a command, and we don't want to read
     // the output, so we immediately return.
+    CloseHandle(hOutWrite.h);
+    CloseHandle(hErrWrite.h);
     return 0;
   }
 
@@ -513,35 +598,40 @@ int windows_system(string cmd, string *cmdout, string *cmderr) {
   // todo : this should be done asynchronously, 
   // because it can freeze the application
   WaitForSingleObject(pi.hProcess, 30000);
-  
+
   // Close the write pipe handle so the child process stops reading
   // and we can read the output
   CloseHandle(hOutWrite.h);
   CloseHandle(hErrWrite.h);
 
   DWORD bytesRead;
-  std::wstring wide_cmdout, wide_cmderr;
-  WCHAR buffer[4096];
+  CHAR buffer[4096];
+  std::string raw_stdout, raw_stderr;
 
   while (ReadFile(hOutRead.h, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
-    wide_cmdout += std::wstring(buffer, bytesRead);
+    raw_stdout.append(buffer, bytesRead);
   }
-
+    
   while (ReadFile(hErrRead.h, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
-    wide_cmderr += std::wstring(buffer, bytesRead);
+    raw_stderr.append(buffer, bytesRead);
   }
 
-  if (cmdout != nullptr) {
-    *cmdout = texmacs_wide_to_utf8(wide_cmdout);
-  }
-  if (cmderr != nullptr) {
-    *cmderr = texmacs_wide_to_utf8(wide_cmderr);
-  }
+  WaitForSingleObject(pi.hProcess, 30000);
 
   DWORD exitCode;
   GetExitCodeProcess(pi.hProcess, &exitCode);
   CloseHandle(pi.hProcess);
   CloseHandle(pi.hThread);
+
+  if (cmdout != nullptr) {
+      std::wstring wout = ConsoleOutputToWide(raw_stdout);
+      *cmdout = texmacs_wide_to_utf8(wout); 
+  }
+
+  if (cmderr != nullptr) {
+      std::wstring werr = ConsoleOutputToWide(raw_stderr);
+      *cmderr = texmacs_wide_to_utf8(werr); 
+  }
 
   return exitCode;
 }
@@ -635,6 +725,10 @@ mingw_system (::array< ::string> arg,
         if (o >= 0) { 
           pos_in[i] += o;
           if (N(str_in[i]) == pos_in[i]) ch[i].close (); else busy= true;
+        } else {
+          debug_io << "unix_system, pid " << process.getpid ()
+               << ", warning: write error on fd " 
+               << ch[i].getPipe () << "\n";
         } 
       }
     }
@@ -644,7 +738,47 @@ mingw_system (::array< ::string> arg,
   int wret= process.wait();
   debug_io << "unix_system, pid " << process.getpid ()
            << " terminated with code" << wret << "\n"; 
-  for (int i= 0; i < n_out; ++i)
+  for (int i= 0; i < n_out; ++i) {
     (*(str_out[i])) << ::string(str[i].data (), str[i].length ()); 
+  }
   return (wret);
 }
+
+#ifdef QTTEXMACS
+void applyWindowsAcrylicAndUnifiedToolbar(QWidget* widget) {
+  if (widget == nullptr) return;
+
+  widget->setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
+
+  
+  widget->setWindowFlag(Qt::Window, true);
+  widget->setAttribute(Qt::WA_TranslucentBackground);
+  widget->setAttribute(Qt::WA_NoSystemBackground);
+
+  QPalette pal = widget->palette();
+  pal.setColor(QPalette::Window, Qt::transparent);
+  widget->setPalette(pal);
+
+  widget->show(); // Important to ensure the window is created before applying DWM attributes
+
+  HWND hwnd = reinterpret_cast<HWND>(widget->winId());
+  if (hwnd == nullptr) return;
+
+  const int DWMWA_WINDOW_CORNER_PREFERENCE_VAL = 33;
+  const int DWMWA_SYSTEMBACKDROP_TYPE_VAL = 38;
+
+  // 1. Rounded corner
+  const int cornerPreference = 2; // DWMWCP_ROUND 
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE_VAL, &cornerPreference, sizeof(cornerPreference));
+
+  // 2. Acrylic backdrop
+  const int backdropType = 3; 
+  DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE_VAL, &backdropType, sizeof(backdropType));
+
+  // 3. Extend the frame so that the Acrylic covers the client area
+  MARGINS margins = {-1, -1, -1, -1};
+  DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+
+}
+#endif

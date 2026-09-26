@@ -850,7 +850,11 @@ scm_init_throw ()
   tc16_pre_unwind_data = scm_make_smob_type ("pre-unwind-data", 0);
   scm_set_smob_print (tc16_pre_unwind_data, pre_unwind_data_print);
 
-#include "libguile/throw.x"
+ scm_c_define_gsubr (s_scm_catch_with_pre_unwind_handler, 3, 1, 0, (SCM (*)()) scm_catch_with_pre_unwind_handler); ;
+ scm_c_define_gsubr (s_scm_with_throw_handler, 3, 0, 0, (SCM (*)()) scm_with_throw_handler); ;
+ scm_c_define_gsubr (s_scm_lazy_catch, 3, 0, 0, (SCM (*)()) scm_lazy_catch); ;
+ scm_c_define_gsubr (s_scm_throw, 1, 0, 1, (SCM (*)()) scm_throw); ;
+
 }
 
 /*

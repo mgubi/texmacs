@@ -359,7 +359,28 @@ int scm_n_charnames = sizeof (scm_charnames) / sizeof (char *);
 void
 scm_init_chars ()
 {
-#include "libguile/chars.x"
+ scm_c_define_gsubr (s_scm_char_p, 1, 0, 0, (SCM (*)()) scm_char_p); ;
+ scm_c_define_subr (s_scm_char_eq_p, 69, scm_char_eq_p); ;
+ scm_c_define_subr (s_scm_char_less_p, 69, scm_char_less_p); ;
+ scm_c_define_subr (s_scm_char_leq_p, 69, scm_char_leq_p); ;
+ scm_c_define_subr (s_scm_char_gr_p, 69, scm_char_gr_p); ;
+ scm_c_define_subr (s_scm_char_geq_p, 69, scm_char_geq_p); ;
+ scm_c_define_subr (s_scm_char_ci_eq_p, 69, scm_char_ci_eq_p); ;
+ scm_c_define_subr (s_scm_char_ci_less_p, 69, scm_char_ci_less_p); ;
+ scm_c_define_subr (s_scm_char_ci_leq_p, 69, scm_char_ci_leq_p); ;
+ scm_c_define_subr (s_scm_char_ci_gr_p, 69, scm_char_ci_gr_p); ;
+ scm_c_define_subr (s_scm_char_ci_geq_p, 69, scm_char_ci_geq_p); ;
+ scm_c_define_gsubr (s_scm_char_alphabetic_p, 1, 0, 0, (SCM (*)()) scm_char_alphabetic_p); ;
+ scm_c_define_gsubr (s_scm_char_numeric_p, 1, 0, 0, (SCM (*)()) scm_char_numeric_p); ;
+ scm_c_define_gsubr (s_scm_char_whitespace_p, 1, 0, 0, (SCM (*)()) scm_char_whitespace_p); ;
+ scm_c_define_gsubr (s_scm_char_upper_case_p, 1, 0, 0, (SCM (*)()) scm_char_upper_case_p); ;
+ scm_c_define_gsubr (s_scm_char_lower_case_p, 1, 0, 0, (SCM (*)()) scm_char_lower_case_p); ;
+ scm_c_define_gsubr (s_scm_char_is_both_p, 1, 0, 0, (SCM (*)()) scm_char_is_both_p); ;
+ scm_c_define_gsubr (s_scm_char_to_integer, 1, 0, 0, (SCM (*)()) scm_char_to_integer); ;
+ scm_c_define_gsubr (s_scm_integer_to_char, 1, 0, 0, (SCM (*)()) scm_integer_to_char); ;
+ scm_c_define_gsubr (s_scm_char_upcase, 1, 0, 0, (SCM (*)()) scm_char_upcase); ;
+ scm_c_define_gsubr (s_scm_char_downcase, 1, 0, 0, (SCM (*)()) scm_char_downcase); ;
+
 }
 
 

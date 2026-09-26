@@ -233,6 +233,7 @@ cached_load_picture (url file_name, int w, int h, tree eff,
 
 picture qt_load_xpm (url file_name);
 picture mupdf_load_xpm (url file_name);
+string  mupdf_get_icon_theme ();
 
 picture 
 raw_load_xpm (url file_name) {
@@ -304,7 +305,13 @@ raw_load_xpm (url file_name) {
 picture
 load_xpm (url file_name) {
   static hashmap<string,picture> cache;
-  string name= as_string (file_name);
+  // the variant which is loaded depends on the resolution we draw at and,
+  // for the vector icons, on the theme (see mupdf_load_xpm): the key
+  // mentions both, so that a change of either is picked up
+  string name= as_string (file_name) * "#" * as_string (retina_factor);
+#ifdef MUPDF_RENDERER
+  name= name * "#" * mupdf_get_icon_theme ();
+#endif
   if (cache->contains (name)) return cache[name];
 
 #ifdef QTTEXMACS

@@ -1,0 +1,7 @@
+# needs macros-tool.scm
+wait 9000
+window #2
+snapshot ms0
+click 1240 258
+wait 1500
+snapshot ms1

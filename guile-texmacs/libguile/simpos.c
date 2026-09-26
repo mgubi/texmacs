@@ -79,7 +79,7 @@ SCM_DEFINE (scm_system, "system", 0, 1, 0,
   eno = errno; free (c_cmd); errno = eno;
   if (rv == -1 || (rv == 127 && errno != 0))
     SCM_SYSERROR;
-#ifndef __MINGW64__
+#if !defined(__MINGW64__) && !defined(_WIN32)
   rv = WEXITSTATUS (rv);
 #endif
   return scm_from_int (rv);
@@ -236,7 +236,11 @@ SCM_DEFINE (scm_primitive__exit, "primitive-_exit", 0, 1, 0,
 void
 scm_init_simpos ()
 {
-#include "libguile/simpos.x"
+ scm_c_define_gsubr (s_scm_system, 0, 1, 0, (SCM (*)()) scm_system); ;
+ scm_c_define_gsubr (s_scm_getenv, 1, 0, 0, (SCM (*)()) scm_getenv); ;
+ scm_c_define_gsubr (s_scm_primitive_exit, 0, 1, 0, (SCM (*)()) scm_primitive_exit); ;
+ scm_c_define_gsubr (s_scm_primitive__exit, 0, 1, 0, (SCM (*)()) scm_primitive__exit); ;
+
 }
 
 

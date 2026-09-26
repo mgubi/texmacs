@@ -9,8 +9,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Concurrent)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Concurrent)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Concurrent Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Concurrent Network)
 find_package(GnuTLS REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Nettle REQUIRED nettle IMPORTED_TARGET)
@@ -52,7 +52,8 @@ target_link_libraries(
         Qt${QT_VERSION_MAJOR}::Svg
         Qt${QT_VERSION_MAJOR}::PrintSupport
         Qt${QT_VERSION_MAJOR}::Concurrent
-        Qt${QT_VERSION_MAJOR}::CorePrivate
+        Qt${QT_VERSION_MAJOR}::Network
+        # Qt${QT_VERSION_MAJOR}::CorePrivate
         GnuTLS::GnuTLS
         PkgConfig::Nettle
         PkgConfig::hogweed
@@ -76,9 +77,9 @@ set_target_properties(TeXmacsLauncher PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
-    QT_ANDROID_TARGET_SDK_VERSION 34
+    QT_ANDROID_TARGET_SDK_VERSION 35
     QT_ANDROID_MIN_SDK_VERSION 31
-    QT_ANDROID_COMPILE_SDK_VERSION 34
+    QT_ANDROID_COMPILE_SDK_VERSION 35
 )
 
 include(GNUInstallDirs)

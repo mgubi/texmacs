@@ -35,16 +35,24 @@ pkgs=(
   tools-git
   winpthreads-git
   winstorecompat-git
+  rust
 )
 
 # Install packages if not installed
-for pkg in autoconf-wrapper git rsync subversion texinfo unzip; do
-  echo "Installing $pkg..."
-  pacman -Qi "$pkg" &>/dev/null || pacman -S --noconfirm "$pkg"
+pacman_pkgs=""
+for pkg in autoconf-wrapper git rsync subversion texinfo unzip make; do
+  pacman -Qi "$pkg" &>/dev/null || pacman_pkgs+="$pkg "
 done
+
 
 for suffix in "${pkgs[@]}"; do
   full_pkg="${prefix}-${suffix}"
-    echo "Installing $full_pkg..."
-  pacman -Qi "$full_pkg" &>/dev/null || pacman -S --noconfirm "$full_pkg"
+  pacman -Qi "$full_pkg" &>/dev/null || pacman_pkgs+="$full_pkg "
 done
+
+if [ -n "$pacman_pkgs" ]; then
+  echo "Installing packages: $pacman_pkgs"
+  pacman -S --noconfirm $pacman_pkgs
+else
+  echo "All packages are already installed."
+fi

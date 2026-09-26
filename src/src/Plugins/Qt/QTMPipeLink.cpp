@@ -15,6 +15,12 @@
 #include "QTMPipeLink.hpp"
 #include <QByteArray>
 
+#ifdef OS_MINGW
+#include <windows.h>
+#elif !defined(OS_ANDROID)
+#include <wordexp.h>
+#endif
+
 static string
 debug_io_string (QByteArray s) {
   int i, n= s.size ();
@@ -48,26 +54,70 @@ QTMPipeLink::~QTMPipeLink () {
 bool
 QTMPipeLink::launchCmd () {
   if (state () != QProcess::NotRunning) killProcess (1000);
-  //FIXME: is UTF8 the right encoding here?
-#if QT_VERSION >= 0x060000
-  QProcess::startCommand(utf8_to_qstring(cmd));
-#else
-  QProcess::start(utf8_to_qstring(cmd));
-#endif
-  bool r= waitForStarted ();
-  if (r) {
-    connect (this, SIGNAL(readyReadStandardOutput ()), SLOT(readErrOut ()));
-    connect (this, SIGNAL(readyReadStandardError ()), SLOT(readErrOut ()));
+
+  QString raw = utf8_to_qstring(cmd);
+  QString program;
+  QStringList args;
+
+#if defined(Q_OS_WIN)
+  int argc = 0;
+  LPWSTR *argv = CommandLineToArgvW((LPCWSTR)raw.utf16(), &argc);
+
+  if (!argv) {
+    return false;
   }
-  return r;
+
+  if (argc > 0) {
+    program = QString::fromWCharArray(argv[0]);
+    for (int i = 1; i < argc; ++i)
+        args << QString::fromWCharArray(argv[i]);
+  }
+
+  LocalFree(argv);
+
+#elif !defined(OS_ANDROID)
+  wordexp_t exp;
+  memset(&exp, 0, sizeof(exp));
+
+  int status = wordexp(raw.toUtf8().constData(), &exp, 0);
+
+  if (status != 0) {
+    wordfree(&exp);
+    return false;
+  }
+
+  if (exp.we_wordc > 0) {
+    program = QString::fromUtf8(exp.we_wordv[0]);
+    for (size_t i = 1; i < exp.we_wordc; ++i)
+    args << QString::fromUtf8(exp.we_wordv[i]);
+  }
+
+  wordfree(&exp);
+#else
+  QStringList list = QProcess::splitCommand(raw);
+  if (!list.isEmpty()) {
+    program = list.takeFirst();
+  }
+  args = list;
+#endif
+
+  this->start(program, args);
+
+  bool ok = waitForStarted();
+  if (ok) {
+    connect(this, SIGNAL(readyReadStandardOutput()), SLOT(readErrOut()));
+    connect(this, SIGNAL(readyReadStandardError()), SLOT(readErrOut()));
+  }
+  return ok;
 }
 
 int
 QTMPipeLink::writeStdin (string s) {
   c_string _s (s);
   if (DEBUG_IO) debug_io << "[INPUT]" << debug_io_string ((char*)_s);
-  int err= QIODevice::write (_s, N(s));
-  return err;
+  int written= QIODevice::write (_s, N(s));
+  if (written == -1 || !waitForBytesWritten (-1)) return -1;
+  return written;
 }
 
 void

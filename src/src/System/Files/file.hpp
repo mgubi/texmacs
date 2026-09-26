@@ -19,9 +19,11 @@
  * Load the url to a string, and return a boolean indicator
  * @param u the url to load
  * @param s the loaded string
+ * @param fatal abort with an error if the file cannot be loaded
+ * @param lock take an flock on the file while reading (default true)
  * @return If there are errors, return true, else, return false
  */
-bool load_string (url file_name, string& s, bool fatal);
+bool load_string (url file_name, string& s, bool fatal, bool lock= true);
 bool save_string (url file_name, string s, bool fatal=false);
 bool append_string (url u, string s, bool fatal= false);
 
@@ -37,6 +39,8 @@ url  url_temp (string suffix= "");
 url  url_numbered (url dir, string prefix, string postfix, int i=1);
 url  url_scratch (string prefix="no_name_", string postfix=".tm", int i=1);
 bool is_scratch (url u);
+url  url_backup (url u);
+bool is_backup (url u);
 string file_format (url u);
 
 array<string> read_directory (url name, bool& error_flag);
@@ -64,6 +68,7 @@ void remove (url what);
 void append_to (url what, url to);
 void mkdir (url dir);
 void rmdir (url what);
+void rmdir_recursive (url what);
 void change_mode (url u, int mode);
 void ps2pdf (url u1, url u2);
 

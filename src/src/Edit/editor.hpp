@@ -19,7 +19,11 @@
 #  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 #    include "Qt/qt_simple_widget.hpp"
 #  else
-#    include "Widkit/simple_wk_widget.hpp"
+#    if defined(VUETEXMACS)
+#      include "Vue/vue_widget.hpp"
+#    else
+#      include "Widkit/simple_wk_widget.hpp"
+#    endif
 #  endif
 #endif
 #include "server.hpp"
@@ -29,7 +33,7 @@
 #  include "../Style/Memorizer/memorizer.hpp"
 #endif
 #include "new_data.hpp"
-#define TEXMACS_COPYRIGHT (string("(c) 1999-2024 by Joris van der Hoeven and others"))
+#define TEXMACS_COPYRIGHT (string("(c) 1999-2025 by Joris van der Hoeven and others"))
 
 #define THE_CURSOR ((int) 1)
 #define THE_FOCUS ((int) 2)
@@ -41,6 +45,8 @@
 #define THE_LOCUS ((int) 128)
 #define THE_MENUS ((int) 256)
 #define THE_FREEZE ((int) 512)
+#define THE_TOOLTIP ((int) 1024)
+#define THE_SPELL_ERRORS ((int) 2048)
 
 class tm_buffer_rep;
 class tm_view_rep;
@@ -649,6 +655,7 @@ public:
 EXTEND_NULL_CODE(widget,editor);
 
 editor new_editor (server_rep* sv, tm_buffer buf);
+path the_editor_path ();
 
 #define SERVER(cmd) {                 \
   url temp= get_current_view_safe (); \

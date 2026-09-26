@@ -1,0 +1,15 @@
+# the context menu of the editor: opens on right click, an item runs its
+# command and closes it; near the screen border it is moved back on screen
+wait 5000
+window #2
+click 300 400 right
+wait 800
+window Popup
+snapshot p1
+move 40 340
+wait 300
+click 40 340
+wait 800
+window #2
+click 1400 900 right
+wait 800

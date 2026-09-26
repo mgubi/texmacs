@@ -1,0 +1,159 @@
+TODO
+
+* the animation subsystem is Clay's transitions (see "Animation" in
+  docs/vue-graphics-stack.md): the button highlights and the tool panels
+  use it; popup windows (menus) cannot, they are separate SDL windows
+* the printer dialog offers the options lpoptions reports (paper size,
+  two-sided, color); orientation would need a rotation of the PDF
+* the debug view (F1) shows the element tree; its own scroll bars and
+  toggles are Clay's and are not styled like ours
+* the colour picker offers named colours only; the bg flag, the patterns
+  and the background images of the Qt picker are not implemented. The
+  colour menus do not reach it at all: they route on (qt-gui?) and fall
+  back to the Scheme rgb picker, which is richer, so this is not urgent
+* the wheel always scrolls the view: wheel-capture? is not asked, so the
+  wheel does not pan a graphic (edit_graphics.cpp calls graphics-wheel for
+  it), and control-wheel does not zoom as it does in the Qt port
+* resize_widget ignores the initial scrolling position (hpos, vpos), and
+  user_canvas_widget ignores its style
+* no image previsualizer in the file chooser (the native dialog has none)
+* copying a selection as an image to the clipboard is Qt-only
+  (graphics_file_to_clipboard); the menu entry is hidden
+* the tree view does not observe its tree, so a database browser will not
+  refresh by itself (Qt has QTMTreeModel)
+* responsive tabs are plain tabs: the "gui:responsive tab mode" preference
+  does nothing
+* Windows: perform_select and the pipe layer are stubs, so no plugins and
+  no client/server there; printing shells out to CUPS
+* Linux: no X11 PRIMARY selection (SDL has only the system clipboard), and
+  the interface is drawn in the TeX fonts rather than a desktop UI font
+
+WIP
+
+* text input: the pre-edit of the input methods is shown in the editor
+  (test pre-edit) and in the fields of the dialogs (test pre-edit-input);
+  the input widget has a selection, the clipboard and word moves (test
+  input-edit); double-click selection and a context menu are missing
+
+DONE
+
+* a PDF writer on MuPDF (src/Plugins/MuPDF/mupdf_pdf_renderer.cpp, notes in
+  docs/pdf-output-with-mupdf.md, harness in its tests/): it writes the page
+  contents itself, subsets the Type 1 fonts with pdfTeX's writet1.c which
+  is vendored beside it, makes Type 3 fonts of what cannot be embedded,
+  includes the figures instead of rasterizing them, and does the links,
+  the destinations, the outline and the attachments. Chosen by the
+  preference "native pdf renderer" set to "mupdf"; without it the export
+  still goes through PostScript and Ghostscript, since this build has no
+  PDFHummus
+* the title of the window names the document and marks unsaved changes
+  (test title): SLOT_NAME was never forwarded to the window, and the
+  marker alone replaced a title which had never been set
+* contents which do not fit are clipped and marked, never given a scroll
+  bar (test bars): the bars of the main window scroll sideways, the
+  pulldown menus both ways; a marker is a fading strip of the colour behind
+  with a chevron in it, and a click on one brings the next screenful in.
+  Menus are at most as large as the window in both directions and are
+  placed before they are first drawn
+* Vue is no longer taken for X11 by the Scheme layer (gui_is_x is false and
+  vue-gui? exists), the query line of the footer works (test interactive),
+  keyboard-focus-on reaches the search and spell fields (test search-focus),
+  full screen works, the user icon bar is drawn, copying to another
+  application pastes readable text, and the image effects are computed
+  without Qt
+* themes: every colour is a field of vue_theme, light and dark ship, the
+  "gui theme" preference chooses and "default" follows the system
+  (test theme, TEXMACS_VUE_THEME); the help balloons are a sheet of note
+  paper instead of pure yellow
+* themed vector icons: MuPDF draws the SVG sets of misc/pixmaps/light and
+  misc/pixmaps/dark itself (no --with-resvg), sharp at every resolution and
+  recoloured for the dark theme (test icons)
+* the choice widgets honour their style (inert, grey, mini, monospaced,
+  bold), test choice-style; the icons are loaded in the variant which
+  matches the resolution instead of always the 2x one
+* retina: each window follows the density of its display (with_window makes
+  its factor current), the sizes are converted with retina_factor instead
+  of a hardcoded 2, TEXMACS_VUE_DENSITY overrides it for testing
+* drag and drop of files and text (test drop)
+* the GUI entry points which were stubs: beep, image_gc,
+  show_help_balloon, show_wait_indicator, external_event (test entrypoints)
+* audit of the plugin (2026-09-21): lost clicks after the event batching,
+  the renderer leak of every destroyed editor, dangling window pointers,
+  the scroll requests dropped by a second layout pass, the file dialog
+  callback running Scheme off the main thread, the hardcoded pixel
+  density, unsigned pointer coordinates, a frame started re-entrantly
+  from the event pump, two menus open at once; the traces are behind the
+  debug flags and the plugin compiles without warnings
+* the TeXmacs client/server works without Qt (System/Link/tm_sockets.cpp on
+  the socket notifiers; both protocols tested: tests sockets, sockets-tls;
+  the build has --with-gnutls)
+* scroll bar thumbs, buttons and every element share button_logic
+  (hot/active/capture: pressed, held, clicked); nothing stays hovered when
+  the pointer leaves the window
+* the Clay id strings are interned (the debug view read freed memory):
+  the debug view works over any window (test debug-view)
+* Clay transitions are driven by the frame time; button highlights fade
+* typing goes through the text events (dead keys, input methods): a key
+  which produces a character waits for its text
+* printer dialog: printer, copies, pages and the printer's options
+* tool panels slide in; the pre-edit of the input methods reaches the editor
+* tests: color picker and printer (dialogs), splitters (aligned), keyboard
+  focus between windows (focus-windows), debug view
+* win->relayout removed (every window is laid out each iteration)
+* no extra caching of the rendering structures (decision recorded in the docs)
+* resize_widget min/max sizes are the limits of the window (set_size_limits)
+* scrolling shifts the backing store of the editor and repaints only the
+  exposed strips (scroll positions on the pixel grid)
+* MuPDF renderer: plain fills and 1:1 picture blits write the pixels
+  directly (the frame while scrolling was dominated by path rasterization
+  and colorspace conversion)
+* Clay's element hash map is pruned every frame (upstream Clay main since 2026-09-21):
+  rebuilt widget trees no longer exhaust it (misdrawn tools after a refresh)
+* the filtered choice list stays inside its box (input and long values clipped)
+* embedded editors (texmacs-input): no bars for mask 0, they fill their
+  resize box (the macro editors work)
+* MuPDF renderer: pattern-filled glyphs, tiling patterns (resources fixed,
+  images scaled to the requested size), neutral pattern behind the pages,
+  missing images do not crash
+* the editor is told when its viewport changes (notify_resizes) and centers
+  the paper in a wider canvas; the paper follows the side tools
+* section bars of the tools ("sections", "section-tabs") drawn as segmented
+  bars and tabs; flat buttons are transparent
+* widgets measured from the previous pass ask for another pass when new
+  (layout_again), no misaligned first frame
+* tabs/icon-tabs fill their container, the page area is as large as the largest
+  page (hidden pages are measured off-screen), so switching tabs is stable
+* menus stay in the window, scroll when taller than it and are drawn above
+  the scroll bars of the editors; footer texts are clipped
+* tab/shift-tab move the focus between the inputs of a dialog
+* balloons follow the pointer, as the tooltips of the Qt port do: attached
+  below their widget they covered the next item of a menu (test balloon)
+* scrolling with the wheel (test wheel-travel): a swipe drags the view in
+  sync while a notch asks for a distance, which is travelled over the next
+  frames instead of jumped (editors and Clay containers); the two are told
+  apart by the fractions of the deltas and, when a swipe opens on a whole
+  one, by the interval to the next event; on macOS the trackpad gestures
+  glide with the momentum of the system (SDL_HINT_MAC_SCROLL_MOMENTUM),
+  elsewhere with one of ours; the queued wheel/motion events of a frame
+  are handled together
+* editors are told when their window gains/loses the keyboard focus and when
+  the focus moves to another widget (set_kbd_focus)
+* menus and popups stay on the screen (flip, shift, clamp)
+* resize_widget: default size for auto-sized windows, min/max as window limits
+* implement commands in inputs_list_widget
+* events go to the window they belong to (vue_input_state)
+* auto-size dialog windows to their contents
+* header dependencies in the makefile (-MMD)
+* implement the missing widgets: popup/tooltip windows, popup_widget, tree view,
+  ink, enum dropdown, (filtered) choice lists, extend, wait, empty, minibar,
+  division, printer and color picker dialogs
+* TEXMACS_VUE_SNAPSHOT=<dir> saves the rendering of each window as PNG (debugging)
+* TEXMACS_VUE_SCRIPT=<file> drives the GUI with synthetic events (see tests/)
+* popup windows grab the pointer (edit_mouse relies on the X11 grab semantics)
+* implement copy & paste
+* fix keyboard handling (Alt+3 should give #)
+* remove balloons after a while
+* fix closing windows (why is not working??)
+* scrollbars for editors 
+
+

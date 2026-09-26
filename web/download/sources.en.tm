@@ -1,4 +1,4 @@
-<TeXmacs|2.1.4>
+<TeXmacs|2.1.5>
 
 <style|<tuple|tmweb2|old-dots|old-lengths>>
 
@@ -7,10 +7,9 @@
   source code|<tmweb-download-links>>
 
   On this page, we explain how to compile <TeXmacs> from the source code on
-  <name|Unix>-like systems, including <name|MacOS> and <name|Windows> with
-  <name|Mingw> or <name|Cygwin>. In the case of <name|Windows>, you may first
-  want to install the appropriate build environment and follow our
-  <hlink|instructions for compilation under <name|Windows>|winqt.en.tm>.
+  <name|Unix>-like systems (including <name|MacOS>). For Windows users,
+  please refer to <hlink|our dedicated Windows compilation
+  instructions|winqt.en.tm>.
 
   <section|Verify the <TeXmacs> dependencies>
 
@@ -19,15 +18,20 @@
 
   <\description>
     <item*|<hlink|<name|Qt>|http://qt.nokia.com/products/>>A cross-platform
-    library for the development of user interfaces.
-
-    <item*|<hlink|<name|Guile>|http://www.gnu.org/s/guile/>>The GNU
-    implementation of <name|Scheme>, which is used as an extension language.
-    Please note that as of Oct. 2013, <name|Guile> 2.x is
-    <with|font-series|bold|not supported>; you will need <name|Guile> 1.8.
+    library for the development of user interfaces. <TeXmacs> is compatible
+    with Qt version 6, 5 and 4.
 
     <item*|<hlink|<name|Freetype2>|http://www.freetype.org/freetype2/index.html>>A
     library for font rendering.
+
+    <item*|<name|<hlink|Texinfo|https://www.gnu.org/software/texinfo/>>>A
+    typesetting syntax used for generating documentation.
+
+    <item*|<name|<hlink|Flex|https://github.com/westes/flex>>>A computer
+    program that generates lexical analyzers.
+
+    <item*|<name|<hlink|GMP|https://gmplib.org/>>>A library for arbitrary
+    precision arithmetic
   </description>
 
   Some more software that you might wish to install for more functionality
@@ -65,6 +69,9 @@
 
   <\shell-code>
     svn co svn://svn.savannah.gnu.org/texmacs/trunk/src
+
+    svn co svn://svn.savannah.gnu.org/texmacs/trunk/guile-texmacs
+    texmacs/src/tm-guile188
   </shell-code>
 
   Notice that you may also <hlink|browse|http://svn.savannah.gnu.org/viewvc/trunk/?root=texmacs>
@@ -82,7 +89,7 @@
   to <TeXmacs>. A <hlink|Git|http://git-scm.com/> mirror of the main
   Subversion repository is maintained at <hlink|Github|https://github.com/texmacs/texmacs>.
 
-  <section|Compile, install and run>
+  <section|Compile and run>
 
   <TeXmacs> supports the standard <name|GNU> compilation and installation
   procedure. Assuming that you logged yourself in as root (needed only for
@@ -93,26 +100,40 @@
     ./configure
 
     make
+  </shell-code>
 
+  The first command examines your particular system configuration. The second
+  command launches the compilation.
+
+  <\warning*>
+    If you have multiple versions of the <name|Qt> libraries installed in
+    your system, compilation will fail unless you select the former. This can
+    be done by preceding the above commands with <shell|export QT_SELECT=6>
+    or <shell|setenv QT_SELECT 6> depending on your shell (you may need to
+    <shell|make clean> before).
+  </warning*>
+
+  Launch the compiled <TeXmacs> by typing :\ 
+
+  <\shell-code>
+    ./TeXmacs/bin/texmacs.bin
+  </shell-code>
+
+  <section|Insall <TeXmacs>>
+
+  The following command installs <TeXmacs> in
+  <with|font-family|tt|/usr/local>.
+
+  <\shell-code>
     make install
   </shell-code>
 
-  <\warning*>
-    If you have both version 4 and version 5 of the <name|Qt> libraries
-    installed in your system, compilation will fail unless you select the
-    former. This can be done by preceding the above commands with
-    <shell|export QT_SELECT=4> or <shell|setenv QT_SELECT 4> depending on
-    your shell (you may need to <shell|make clean> before).
-  </warning*>
-
-  The first command examines your particular system configuration. The second
-  command launches the compilation. The last command installs <TeXmacs> in
-  <with|font-family|tt|/usr/local>. Under <name|MacOS> the recommended way is
-  to run <shell|make MACOS_BUNDLE> instead of <shell|make> and <shell|make
-  install>. This will create a <tt|<merge|<TeXmacs-version-release|devel>|.app>>
-  application bundle in <tt|../distr> which you can move and open as any
-  other application. For other systems, if everything works fine with the
-  commands above you should be able to run <TeXmacs> by typing
+  Under <name|MacOS> the recommended way is to run <shell|make MACOS_BUNDLE>
+  instead of <shell|make> and <shell|make install>. This will create a
+  <tt|<merge|<TeXmacs-version-release|devel>|.app>> application bundle in
+  <tt|../distr> which you can move and open as any other application. For
+  other systems, if everything works fine with the commands above you should
+  be able to run <TeXmacs> by typing
 
   <\shell-code>
     texmacs &
@@ -154,8 +175,10 @@
 
   allows you to build the historical X11 version of <TeXmacs> instead of the
   <name|Qt>-based version. For more configuration options, type
-  <shell|./configure --help>. For systems where both <name|Guile> 1.8 and 2.0
-  are installed you may use the following command for configuration:
+  <shell|./configure --help>.
+
+  For systems where both <name|Guile> 1.8 and 2.0 are installed you may use
+  the following command for configuration:
 
   <\shell-code>
     ./configure \\

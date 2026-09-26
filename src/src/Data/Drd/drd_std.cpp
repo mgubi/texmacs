@@ -587,6 +587,12 @@ init_std_drd () {
         fixed (1, 1, BIFORM) ->
         string_type (0) -> name (0, "kind") ->
         string_type (1) -> name (1, "title"));
+  init (CACHE_REF, "cache-ref",
+        fixed (2, 2, DETAILED) ->
+        string_type (0) -> name (0, "hash") ->
+        string_type (1) -> name (1, "kind") ->
+        length (2) -> name (2, "width") ->
+        length (3) -> name (3, "height"));
 
   init (TUPLE, "tuple",
         repeat (0, 1) -> accessible (0));
@@ -1020,6 +1026,7 @@ init_std_drd () {
   init_var (SELECTION_COLOR, TYPE_COLOR);
   init_var (TABLE_SELECTION_COLOR, TYPE_COLOR);
   init_var (MATCH_COLOR, TYPE_COLOR);
+  init_var (SPELL_ERROR_COLOR, TYPE_COLOR);
   init_var (CLICKABLE_COLOR, TYPE_COLOR);
   init_var (CORRECT_COLOR, TYPE_COLOR);
   init_var (INCORRECT_COLOR, TYPE_COLOR);

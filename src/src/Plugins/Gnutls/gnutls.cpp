@@ -13,6 +13,7 @@
 #include "Gnutls/gnutls.hpp"
 #include "analyze.hpp"
 #include "list.hpp"
+#include "locale.hpp"
 #include "string.hpp"
 
 #ifdef USE_GNUTLS
@@ -22,14 +23,12 @@
 #if defined(_WIN32) && defined (TEXMACS_FIX_1_GNUTLS)
 #define GNUTLS_INTERNAL_BUILD
 #endif
-#include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
+#include <gnutls/abstract.h>
 #include <gnutls/crypto.h>
 #include "client_server.hpp"
+#include "boot.hpp"
 
-#ifdef QTTEXMACS
-#include <QMessageBox>
-#endif
 
 /******************************************************************************
  * Functionality provided by the plug-in
@@ -44,11 +43,11 @@ gnutls_present () {
  * TLS log facilities
  ******************************************************************************/
 
-static const int tm_gnutls_log_level= 0;
+static int tm_gnutls_log_level= 0;
 
 void tm_gnutls_log_callback (int level, const char* msg) {
   (void) level;
-  server_log_write (log_info, msg);
+  GNUTLS_LOGI (msg);
 }
 
 /******************************************************************************
@@ -62,11 +61,14 @@ static gnutls_certificate_credentials_t tm_x509_client_credentials;
 static gnutls_certificate_credentials_t tm_x509_server_credentials;
 static const int tm_dh_bitsize= 2048;
 static gnutls_dh_params_t tm_dh_parameters;
-static const string tm_x509_cert_path= "$TEXMACS_HOME_PATH/server/cert.pem";
-static const string tm_x509_key_path= "$TEXMACS_HOME_PATH/server/key.pem";
+
+static const string tm_x509_cert_path= "$TEXMACS_SERVER_CERT_DIR/cert.pem";
+static const string tm_x509_key_path= "$TEXMACS_SERVER_CERT_DIR/key.pem";
 static const string tm_x509_trusted_cas_path=
   "$TEXMACS_HOME_PATH/system/certificates/trusted-certificates.crt";
-static gnutls_x509_crt_t server_certificate = NULL;
+
+static unsigned int cert_verify_flags = 0;
+static gnutls_rnd_level_t rnd_level= GNUTLS_RND_NONCE;
 
 static void
 tm_initialize_tls () {
@@ -78,54 +80,54 @@ tm_initialize_tls () {
   int ret = 0;
 
   /* for backwards compatibility with gnutls < 3.3.0 */
-  CHECK_GNUTLS_INIT(ret, gnutls_global_init ());
+  CHECK_GNUTLS_INIT (ret, gnutls_global_init ());
+  if (DEBUG_GNUTLS) tm_gnutls_log_level= 4;
   gnutls_global_set_log_level (tm_gnutls_log_level);
   gnutls_global_set_log_function (tm_gnutls_log_callback);
 
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret,
     gnutls_anon_allocate_server_credentials (&tm_anon_server_credentials));
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret,
     gnutls_anon_allocate_client_credentials (&tm_anon_client_credentials));
 
   // X509 server
   url cert_path (tm_x509_cert_path);
   url key_path (tm_x509_key_path);
 
-  GNUTLS_LOG("x509 Certificate Path: " * as_string (cert_path));
-  GNUTLS_LOG("x509 Key Path: " * as_string (key_path));
+  GNUTLS_LOG ("x509 Certificate Path: " * as_string (cert_path));
+  GNUTLS_LOG ("x509 Key Path: " * as_string (key_path));
 
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret,
     gnutls_certificate_allocate_credentials (&tm_x509_server_credentials));
   if (exists (cert_path) && exists (key_path)) {
     c_string _cert_path (as_string (cert_path));
-    c_string _key_path (as_string (cert_path));
-    CHECK_GNUTLS_INIT(ret,
-        gnutls_certificate_set_x509_key_file (tm_x509_server_credentials,
-          _cert_path,
-          _key_path,
-          GNUTLS_X509_FMT_PEM));
+    c_string _key_path (as_string (key_path));
+    CHECK_GNUTLS_INIT (ret,
+        gnutls_certificate_set_x509_key_file
+	  (tm_x509_server_credentials, _cert_path,
+	   _key_path,GNUTLS_X509_FMT_PEM));
   } else if (!exists (cert_path)) {
-    GNUTLS_LOG("Certificate file not found: " * as_string (cert_path));
+    GNUTLS_LOG ("Certificate file not found: " * as_string (cert_path));
   } else {
-    GNUTLS_LOG("Key file not found: " * as_string (key_path));
+    GNUTLS_LOG ("Key file not found: " * as_string (key_path));
   }
 
   // X509 client
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret,
     gnutls_certificate_allocate_credentials (&tm_x509_client_credentials));
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret,
     gnutls_certificate_set_x509_system_trust (tm_x509_client_credentials));
 
   url trusted_path (tm_x509_trusted_cas_path);
   if (exists (trusted_path)) {
     c_string _trusted_path (as_string (trusted_path));
-    CHECK_GNUTLS_INIT(ret,
+    CHECK_GNUTLS_INIT (ret,
       gnutls_certificate_set_x509_trust_file (tm_x509_client_credentials,
         _trusted_path, GNUTLS_X509_FMT_PEM));
   }
 
-  CHECK_GNUTLS_INIT(ret, gnutls_dh_params_init (&tm_dh_parameters));
-  CHECK_GNUTLS_INIT(ret,
+  CHECK_GNUTLS_INIT (ret, gnutls_dh_params_init (&tm_dh_parameters));
+  CHECK_GNUTLS_INIT (ret,
     gnutls_dh_params_generate2 (tm_dh_parameters, tm_dh_bitsize));
 
 #if GNUTLS_VERSION_NUMBER >= 0x030506
@@ -139,7 +141,7 @@ tm_initialize_tls () {
     tm_dh_parameters);
 
   tm_gnutls_initialized= true;
-  GNUTLS_LOG("GnuTLS initialization succeeded");
+  GNUTLS_LOG ("GnuTLS initialization succeeded");
 }
 
 static void
@@ -147,11 +149,11 @@ tm_deinitialize_tls () {
   if (!tm_gnutls_initialized) return;
   gnutls_anon_free_server_credentials (tm_anon_server_credentials);
   gnutls_anon_free_client_credentials (tm_anon_client_credentials);
-  gnutls_certificate_free_credentials(tm_x509_client_credentials);
-  gnutls_certificate_free_credentials(tm_x509_server_credentials);
+  gnutls_certificate_free_credentials (tm_x509_client_credentials);
+  gnutls_certificate_free_credentials (tm_x509_server_credentials);
   gnutls_global_deinit ();
   tm_gnutls_initialized= false;
-  GNUTLS_LOG("GnuTLS deinitialization succeeded");
+  GNUTLS_LOG ("GnuTLS deinitialization succeeded");
 }
 
 // Lazy initialization
@@ -169,12 +171,67 @@ tls_ensure_initialization () {
 }
 
 /******************************************************************************
+ * GnuTLS utilities
+ ******************************************************************************/
+
+int
+gnutls_random_int (uint32_t limit)
+{
+  ASSERT (limit <= UINT_MAX, "random number limit too big");
+
+  if (limit == 0) return 0;
+
+  uint32_t rnd;
+
+  // See https://www.pcg-random.org/posts/bounded-rands.html
+  // Debiased Modulo (Twice) — OpenBSD's Method
+  const uint32_t ceil = UINT_MAX - (UINT_MAX % limit) - 1;
+
+  do {
+    if (gnutls_rnd (rnd_level, &rnd, 4) < 0) {
+      GNUTLS_LOGE ("cannot generate random number");
+      return 0;
+    }
+  } while (rnd > ceil);
+
+  return (rnd % limit);
+}
+
+/******************************************************************************
  * X.509 authentication
  ******************************************************************************/
 
+static gnutls_x509_crt_t
+crt_cpy (gnutls_x509_crt_t src)
+{
+  gnutls_datum_t tmp= {NULL,0};
+  gnutls_x509_crt_t dst;
+  int ret;
+
+  ret = gnutls_x509_crt_export2 (src, GNUTLS_X509_FMT_DER, &tmp);
+  if (ret < 0) {
+    GNUTLS_ERR_LOGW (ret, "gnutls cert copy (export der)");
+    return NULL;
+  }
+
+  ret = gnutls_x509_crt_init (&dst);
+  if (ret < 0) {
+    GNUTLS_ERR_LOGW (ret, "gnutls cert copy (init)");
+    return NULL;
+  }
+
+  ret = gnutls_x509_crt_import (dst, &tmp ,GNUTLS_X509_FMT_DER);
+  if (ret < 0) {
+    GNUTLS_ERR_LOGW (ret, "gnutls cert copy (import der)");
+    return NULL;
+  }
+
+  return dst;
+}
+
 static string
 as_string_gnutls_datum (gnutls_datum_t data, bool full = false) {
-  string str(reinterpret_cast<char*>(data.data));
+  string str (reinterpret_cast<char*> (data.data));
   if (!full) {
     return str;
   }
@@ -182,69 +239,105 @@ as_string_gnutls_datum (gnutls_datum_t data, bool full = false) {
 }
 
 static string
-as_string_gnutls_crt (const gnutls_x509_crt_t crt) {
-  gnutls_datum_t info;
-  int ret = 0;
+as_string_cert_serial (const gnutls_x509_crt_t crt)
+{
+  uint8_t serial[128] = {0};
+  size_t serial_size = sizeof(serial);
+  string serial_str;
 
-  ret = gnutls_x509_crt_print (crt,
-      GNUTLS_CRT_PRINT_FULL,
-      &info);
-  if (ret < 0) {
+  int err =
+    gnutls_x509_crt_get_serial(crt, serial, &serial_size);
+  if (err < 0)
     return "";
+  else {
+    for (size_t i = 0; i < serial_size; i++) {
+      serial_str << as_hexadecimal (serial[i]);
+    }
+    return serial_str;
   }
+}
 
-  string crt_info = as_string_gnutls_datum(info);
+static string
+as_string_gnutls_crt (const gnutls_x509_crt_t crt) {
+  string info;
 
-  string line;
-  int i = 0;
-  string CN, OU, O, ST, C;
-  string start_date, end_date;
-  while (read_line (crt_info, i, line)) {
-    int start;
-    for (start=0;
-        start<N (line) && (is_space (line[start]) || line[start] == '\t');
-        start++) ;
-    line = line (start, N (line));
+  {
+    uint8_t serial[128] = {0};
+    size_t serial_size = sizeof(serial);
+    int err;
 
-    if (starts (line, "Issuer")) {
-      int pos = tm_search_forwards (" ", 0, line) + 1;
-      for (int next_field = 0;
-          next_field >= 0 ;
-          pos = next_field + 1) {
-        next_field = tm_search_forwards(",", pos, line);
-        int value_delim = tm_search_forwards ("=", pos, line);
-        string field = line (pos, value_delim);
-        GNUTLS_LOG(as_string (value_delim) * ", " * next_field * " field '" * field * "'");
-        string value;
-        if (next_field == -1) {
-          value = line (value_delim+1, N (line));
-        } else {
-          value = line (value_delim+1, next_field);
-          pos = next_field + 1;
-        }
-        GNUTLS_LOG("value '" * value * "'");
-        if (field == "CN") CN = value;
-        else if (field == "OU") OU = value;
-        else if (field == "O") O = value;
-        else if (field == "ST") ST = value;
-        else if (field == "C") C = value;
+    err =
+      gnutls_x509_crt_get_serial(crt, serial, &serial_size);
+    if (err < 0)
+      info << "Serial error: " << gnutls_strerror (err) << "\n";
+    else {
+      info << "Serial: ";
+      for (size_t i = 0; i < serial_size; i++) {
+        info << as_hexadecimal (serial[i]);
       }
-    } else if (starts (line, "Not Before")) {
-      start_date = line (tm_search_forwards (":", 0, line) + 1, N (line));
-    } else if (starts (line, "Not After")) {
-      end_date = line (tm_search_forwards (":", 0, line) + 1, N (line));
+      info << "\n";
     }
   }
 
-  gnutls_free(info.data);
+  {
+    size_t len;
+    int err;
 
-  return "Common Name: " * CN * "\n"
-    * "Organization Unit: " * OU * "\n"
-    * "Organization: " * O * "\n"
-    * "State: " * ST * "\n"
-    * "Country Name: " * C * "\n"
-    * "Start Date: " * start_date * "\n"
-    * "End Date: " * end_date * "\n";
+#define _GET_DN_OID(name, print) \
+    do { \
+      char name[GNUTLS_X509_ ## name ## _SIZE + 1] = {0}; \
+      len = sizeof (name); \
+      err = gnutls_x509_crt_get_dn_by_oid (crt, \
+          GNUTLS_OID_X520_ ## name, 0, 0, name, &len); \
+      if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) { \
+        info << print ":\n"; \
+      } else if (err < 0) { \
+        info << print " error: " << gnutls_strerror (err) << "\n"; \
+      } else { \
+        info << print ": " << name << "\n"; \
+      } \
+    } while (0)
+
+    _GET_DN_OID (COMMON_NAME, "Common Name");
+    _GET_DN_OID (ORGANIZATION_NAME, "Organization");
+    _GET_DN_OID (ORGANIZATIONAL_UNIT_NAME, "Unit");
+    _GET_DN_OID (COUNTRY_NAME, "Country");
+    _GET_DN_OID (STATE_OR_PROVINCE_NAME, "State");
+    _GET_DN_OID (LOCALITY_NAME, "City");
+  }
+
+  {
+    time_t tim;
+
+    tim = gnutls_x509_crt_get_activation_time(crt);
+    if (tim != -1) {
+      string s= pretty_time(tim);
+      info << "Not Before: " << s << "\n";
+    }
+
+    tim = gnutls_x509_crt_get_expiration_time(crt);
+    if (tim != -1) {
+      string s= pretty_time(tim);
+      info << "Not After: " << s << "\n";
+    }
+  }
+
+  {
+    gnutls_datum_t dn;
+    int err;
+
+    err = gnutls_x509_crt_get_issuer_dn3(crt, &dn, 0);
+    if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+      info << "Issuer:\n";
+    } else if (err < 0) {
+      info << "Issuer error: " << gnutls_strerror (err) << "\n";
+    } else {
+      info << "Issuer: " << as_string (dn.data) << "\n";
+      gnutls_free(dn.data);
+    }
+  }
+
+  return info;
 }
 
 
@@ -256,139 +349,299 @@ as_string_gnutls_crt (const gnutls_x509_crt_t crt) {
  * deinit by the user
  */
 static gnutls_x509_crt_t
-tm_get_cert (const gnutls_datum_t* cert_data) {
-	string cert_info;
+tm_get_cert (const gnutls_datum_t* cert_data, gnutls_x509_crt_fmt_t fmt) {
   gnutls_x509_crt_t cert = NULL;
 
-  if (gnutls_x509_crt_init(&cert) == 0 &&
-      gnutls_x509_crt_import(cert, cert_data,
-        GNUTLS_X509_FMT_DER) ==
-      0) {
+  if (gnutls_x509_crt_init (&cert) == 0 &&
+      gnutls_x509_crt_import (cert, cert_data, fmt) == 0) {
     return cert;
   }
   return NULL;
 }
 
+static gnutls_x509_crt_t
+tm_get_cert (const string cert_str, gnutls_x509_crt_fmt_t fmt) {
+	c_string _cert_str (cert_str);
+
+  gnutls_datum_t cert_data {
+    .data= reinterpret_cast<unsigned char*> ((char *) _cert_str),
+    .size= (unsigned int) N (cert_str),
+  };
+
+  return tm_get_cert (&cert_data, fmt);
+}
+
+static string
+tm_cert_as_pem_string (gnutls_x509_crt_t cert) {
+  gnutls_datum_t out= {NULL, 0};
+  string pem;
+  int ret;
+
+  ret = gnutls_x509_crt_export2 (cert, GNUTLS_X509_FMT_PEM, &out);
+  if (ret < 0) {
+    return "";
+  }
+
+  pem = as_string_gnutls_datum (out);
+  gnutls_free (out.data);
+
+  return pem;
+}
+
 static int
-tm_trust_cert () {
-  if (!server_certificate) {
+trust_certificate (gnutls_x509_crt_t crt, string crt_pem) {
+  bool deinit_cert= false;
+
+  if (!crt) {
+    if (N (crt_pem) == 0) {
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+    crt = tm_get_cert (crt_pem, GNUTLS_X509_FMT_PEM);
+    deinit_cert = true;
+  }
+
+  if (!crt) {
     return GNUTLS_E_CERTIFICATE_ERROR;
   }
 
   int ret = gnutls_certificate_set_x509_trust (tm_x509_client_credentials,
-      &server_certificate, 1);
+      &crt, 1);
   if (ret < 0) {
     return ret;
   }
 
-  // write to our custome trust store
-  gnutls_datum_t out;
-  ret = gnutls_x509_crt_export2(server_certificate, GNUTLS_X509_FMT_PEM, &out);
-  if (ret < 0) {
+  // write to our custom trust store
+  if (N (crt_pem) == 0) {
+    gnutls_datum_t out;
+    ret = gnutls_x509_crt_export2 (crt, GNUTLS_X509_FMT_PEM, &out);
+    if (ret < 0) {
+      return ret;
+    }
+
+    crt_pem = as_string_gnutls_datum (out);
+    gnutls_free (out.data);
+  }
+
+  if (!append_string (tm_x509_trusted_cas_path, crt_pem)) {
     return ret;
   }
 
-  if (!append_string(tm_x509_trusted_cas_path, as_string_gnutls_datum (out))) {
-    return ret;
-  }
+  if (deinit_cert) gnutls_x509_crt_deinit (crt);
 
-  gnutls_free(out.data);
-
-  // cert is trusted, we can safely remove local reference
-  gnutls_x509_crt_deinit(server_certificate);
-  server_certificate = NULL;
+  return 0;
 }
 
-static bool
-tm_trust_cert (const string& cert_serial) {
-  char serial[128] = {0};
-  size_t serial_size = sizeof (serial);
+bool
+trust_certificate (const string& crt_pem) {
+  return trust_certificate (NULL, crt_pem) == 0;
+}
 
-  int ret = gnutls_x509_crt_get_serial (server_certificate, serial, &serial_size);
+void
+disable_certificate_time_checks () {
+  cert_verify_flags |= GNUTLS_VERIFY_DISABLE_TRUSTED_TIME_CHECKS |
+      GNUTLS_VERIFY_DISABLE_TIME_CHECKS;
+}
+
+static gnutls_x509_crt_t crt_cpy (gnutls_x509_crt_t src);
+
+struct x509_certificate {
+  gnutls_x509_crt_t cert;
+  unsigned int status;
+
+  x509_certificate(gnutls_x509_crt_t crt, unsigned int status)
+    : cert (crt_cpy(crt)), status (status) {}
+
+  inline bool valid () { return cert != NULL; }
+};
+
+static hashmap<string,pointer> certificates_verified (NULL);
+
+static string server_certificate_serial = "";
+
+static int cert_out_callback (gnutls_x509_crt_t cert,
+    gnutls_x509_crt_t issuer,
+    gnutls_x509_crl_t crl,
+    unsigned int verification_output)
+{
+  (void) crl;
+  gnutls_datum_t txt= {NULL,0};
+  int ret;
+  string serial = as_string_cert_serial (cert);
+  string issuer_serial = issuer ? as_string_cert_serial (issuer) : "";
+
+  GNUTLS_LOG ("\tCertificate:\n" * as_string_gnutls_crt (cert));
+
+  if (issuer != NULL) {
+    GNUTLS_LOG ("\tIssuer Certificate:\n" * as_string_gnutls_crt (issuer));
+  }
+
+  if (verification_output) {
+    GNUTLS_LOG ("\tNot Verified");
+  } else {
+    GNUTLS_LOG ("\tVerified");
+  }
+
+  if (serial == "" || certificates_verified->contains (serial))
+    return 0;
+
+  ret = gnutls_certificate_verification_status_print (verification_output,
+      GNUTLS_CRT_X509, &txt, 0);
   if (ret < 0) {
-    io_warning << "cannot get server cert " << gnutls_strerror (ret);
+    GNUTLS_ERR_LOGE (ret, "gnutls_certificate_verification_status_print");
+    return 1;
+  }
+
+  GNUTLS_LOG ("verification status (" * as_string (verification_output) * "): "
+      * as_string_gnutls_datum (txt));
+  gnutls_free (txt.data);
+
+  certificates_verified (serial)=
+    new x509_certificate(cert, verification_output);
+  server_certificate_serial = serial;
+
+  return 0;
+}
+
+static inline bool
+handle_cert_error_interactive (unsigned int status) {
+  return status & GNUTLS_CERT_SIGNER_NOT_FOUND ||
+    status & GNUTLS_CERT_SIGNER_NOT_CA ||
+    status & GNUTLS_CERT_NOT_ACTIVATED ||
+    status & GNUTLS_CERT_EXPIRED;
+}
+
+static inline string
+as_unquoted_string (tree t) { return scm_unquote (as_string (t)); }
+
+static crt_cfg
+crt_cfg_from_tree (tree cfg) {
+  std::string s;
+  crt_cfg h ("");
+
+  for (int i=0; i<N (cfg); i++) {
+    if (is_tuple (cfg[i])) {
+      h (as_unquoted_string (cfg[i][0])) = as_unquoted_string (cfg[i][1]);
+    }
+  }
+
+  return h;
+}
+
+string certificate_path ()    { return concretize (tm_x509_cert_path); }
+bool   certificate_present () { return exists (tm_x509_cert_path); }
+
+bool
+generate_self_signed (tree cfg_tree, url cert_path, url key_path)
+{
+  gnutls_privkey_t pkey;
+  gnutls_x509_privkey_t x509_pkey;
+  gnutls_pubkey_t pubkey;
+  gnutls_digest_algorithm_t dig;
+  gnutls_x509_crt_t crt;
+  gnutls_datum_t crt_out;
+  char key_out[PRIVKEY_OUTPUT_BUFSIZE];
+  size_t key_out_size = PRIVKEY_OUTPUT_BUFSIZE;
+  int ret;
+  unsigned char serial[CRT_SERIAL_SIZE];
+  time_t secs;
+
+  if (!is_tuple (cfg_tree)) {
+    GNUTLS_LOGE ("wrong certificate config given");
     return false;
   }
 
-  string server_cert_serial (serial);
-  GNUTLS_LOG("trusting cert " * cert_serial * " and last server cert is"
-      * server_cert_serial);
+  crt_cfg cfg = crt_cfg_from_tree (cfg_tree);
 
-  if (server_cert_serial != cert_serial) {
-    io_warning << "cannot trust cert " << cert_serial <<
-      ", server cert remembered was " << server_cert_serial;
-    return false;
+  CHECK_GNUTLS_BRETURN (ret, gnutls_privkey_init (&pkey));
+  CHECK_GNUTLS_BRETURN (ret, gnutls_privkey_generate (pkey, PRIVKEY_ALGO,
+        gnutls_sec_param_to_pk_bits (PRIVKEY_ALGO, PRIVKEY_SEC_PARAM),
+        0));
+  CHECK_GNUTLS_BRETURN (ret, gnutls_privkey_verify_params (pkey));
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_pubkey_init (&pubkey));
+  CHECK_GNUTLS_BRETURN (ret, gnutls_pubkey_import_privkey (pubkey, pkey, 0, 0));
+  CHECK_GNUTLS_BRETURN (ret,
+      gnutls_pubkey_get_preferred_hash_algorithm (pubkey, &dig, NULL));
+
+  GNUTLS_LOG ("Generating a self signed certificate...");
+
+  CHECK_GNUTLS_BRETURN (ret,
+      gnutls_rnd (GNUTLS_RND_NONCE, serial, CRT_SERIAL_SIZE));
+
+  // serial must be positive and max 20 octets
+  // so we must zero the most significant bit (with MSB set, the DER encoding
+  // would be 21 octets long). See RFC 5280, section 4.1.2.2.
+  serial[0] &= 0x7F;
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_init (&crt));
+
+#define _SET_DN_OID(name, key) \
+    do { \
+      if (cfg->contains (key)) { \
+        c_string _tmp (cfg[key]); \
+        CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_dn_by_oid (crt, \
+              GNUTLS_OID_X520_ ## name, 0, _tmp, \
+              N (cfg[key]))); \
+      } \
+    } while (0)
+
+  _SET_DN_OID (COMMON_NAME, "cn");
+  _SET_DN_OID (ORGANIZATION_NAME, "organization");
+  _SET_DN_OID (ORGANIZATIONAL_UNIT_NAME, "unit");
+  _SET_DN_OID (COUNTRY_NAME, "country");
+  _SET_DN_OID (STATE_OR_PROVINCE_NAME, "state");
+  _SET_DN_OID (LOCALITY_NAME, "locality");
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_pubkey (crt, pubkey));
+  gnutls_pubkey_deinit (pubkey);
+
+  CHECK_GNUTLS_BRETURN (ret,
+      gnutls_x509_crt_set_serial (crt, serial, CRT_SERIAL_SIZE));
+
+  secs = time (NULL);
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_activation_time (crt, secs));
+
+  secs += 730 * 24 * 60 * 60;
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_expiration_time (crt, secs));
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_basic_constraints (crt, 0, -1));
+
+  if (cfg->contains ("uri")) {
+    c_string _uri (cfg["uri"]);
+    CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_subject_alt_name (crt,
+          GNUTLS_SAN_RFC822NAME, _uri, N (cfg["uri"]), GNUTLS_FSAN_APPEND));
   }
 
-  ret = tm_trust_cert();
-  if (ret < 0) {
-    io_warning << "cannot trust cert " << cert_serial <<
-      gnutls_strerror (ret);
-    return false;
-  }
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_key_purpose_oid (crt,
+        GNUTLS_KP_TLS_WWW_SERVER, 0));
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_key_usage (crt,
+        GNUTLS_KEY_DIGITAL_SIGNATURE));
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_crt_set_version (crt, 3));
+
+  CHECK_GNUTLS_BRETURN (ret,
+      gnutls_x509_crt_privkey_sign (crt, crt, pkey, dig, 0));
+
+  CHECK_GNUTLS_BRETURN (ret, gnutls_privkey_export_x509 (pkey, &x509_pkey));
+  CHECK_GNUTLS_BRETURN (ret, gnutls_x509_privkey_export_pkcs8 (x509_pkey,
+        GNUTLS_X509_FMT_PEM, NULL, GNUTLS_PKCS_NULL_PASSWORD,
+        key_out, &key_out_size));
+
+  string _key_out (key_out, key_out_size);
+  save_string (key_path, _key_out);
+
+  CHECK_GNUTLS_BRETURN (ret,
+      gnutls_x509_crt_export2 (crt, GNUTLS_X509_FMT_PEM, &crt_out));
+
+  save_string (cert_path, as_string_gnutls_datum (crt_out));
+  gnutls_free (crt_out.data);
+
+  gnutls_x509_crt_deinit (crt);
+  gnutls_x509_privkey_deinit (x509_pkey);
+  gnutls_privkey_deinit (pkey);
 
   return true;
-}
-
-static int
-certificate_client_verification_callback (gnutls_session_t session) {
-  unsigned int status;
-  int ret;
-  unsigned int cert_list_size = 0;
-
-  if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
-    return GNUTLS_E_CERTIFICATE_ERROR;
-  }
-
-  /* This verification function uses the trusted CAs in the credentials
-   * structure. So you must have installed one or more CA certificates.
-   * 
-   * TODO: use gnutls_certificate_verify_peers3 to check hostname, but
-   * we need access to it here, through user pointer for example:
-   * gnutls_session_get_ptr(session), set with gnutls_transport_set_ptr
-   * ret = gnutls_certificate_verify_peers3 (session, s->hostname, &status);
-   */
-  ret = gnutls_certificate_verify_peers2 (session, &status);
-  if (ret < 0) {
-      GNUTLS_LOG("Could not verify peer certificate due to an error");
-    return GNUTLS_E_CERTIFICATE_ERROR;
-  }
-
-  const gnutls_datum_t* cert_list =
-    gnutls_certificate_get_peers (session, &cert_list_size);
-  if (cert_list_size < 1) {
-    GNUTLS_LOG("Could not get peer certificate info");
-    return GNUTLS_E_CERTIFICATE_ERROR;
-  }
-
-  gnutls_x509_crt_t crt = tm_get_cert (&cert_list[0]);
-  gnutls_datum_t info;
-
-  ret = gnutls_x509_crt_print (crt,
-      GNUTLS_CRT_PRINT_ONELINE,
-      &info);
-  GNUTLS_LOG("Server certificate: " * as_string_gnutls_datum (info));
-  gnutls_free(info.data);
-
-  if (status) {
-    gnutls_datum_t txt;
-    ret = gnutls_certificate_verification_status_print (status,
-        GNUTLS_CRT_X509, &txt, 0);
-    if (ret >= 0) {
-      GNUTLS_LOG("verification error (" * as_string (status) * "): " 
-        * as_string_gnutls_datum (txt, true));
-
-      server_certificate = crt;
-
-      gnutls_free (txt.data);
-    }
-    return GNUTLS_E_CERTIFICATE_ERROR;
-  }
-
-  GNUTLS_LOG("Peer passed certificate verification");
-
-  /* notify gnutls to continue handshake normally */
-  return 0;
 }
 
 /******************************************************************************
@@ -396,11 +649,24 @@ certificate_client_verification_callback (gnutls_session_t session) {
  ******************************************************************************/
 
 static string
-as_string_gnutls_error (int e) {
+as_string_gnutls_error (int e, int cert_verification) {
   if (e == GNUTLS_E_SUCCESS)
     return string ("");
-  if (e == -1024)
-    return string ("unexpected inactive GnuTLS session");
+  if (e == TM_NET_SESSION_INACTIVE)
+    return string ("unexpected dead GnuTLS session");
+  if (e == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR &&
+      handle_cert_error_interactive (cert_verification))
+    return string ("certificate verify interactive");
+  if (e == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR) {
+    gnutls_datum_t txt= {NULL,0};
+    int ret = gnutls_certificate_verification_status_print (cert_verification,
+        GNUTLS_CRT_X509, &txt, 0);
+    if (ret < 0) {
+      GNUTLS_ERR_LOGE (ret, "gnutls_certificate_verification_status_print");
+      return string("cannot get certificate verification status text");
+    }
+    return as_string_gnutls_datum (txt);
+  }
   const char* msg= gnutls_strerror (e);
   if (msg == NULL)
     return string ("unknown GnuTLS error");
@@ -413,111 +679,111 @@ as_string_gnutls_error (int e) {
 
 static string
 tm_session_info (gnutls_session_t session) {
-  string info("- Session:");
+  string info ("- Session:");
   gnutls_credentials_type_t cred;
-	gnutls_kx_algorithm_t kx;
-	int dhe, ecdh;
+  gnutls_kx_algorithm_t kx;
+  int dhe, ecdh;
   gnutls_group_t group;
-	char *desc;
+  char *desc;
 
-	/* get a description of the session connection, protocol,
-	 * cipher/key exchange */
-	desc = gnutls_session_get_desc (session);
-	if (desc != NULL) {
-		info << desc << "\n";
-	} else {
-		info << "(Unknown)\n";
+  /* get a description of the session connection, protocol,
+   * cipher/key exchange */
+  desc = gnutls_session_get_desc (session);
+  if (desc != NULL) {
+    info << desc << "\n";
+  } else {
+    info << "(Unknown)\n";
   }
 
-	dhe = ecdh = 0;
+  dhe = ecdh = 0;
 
-	kx = gnutls_kx_get (session);
+  kx = gnutls_kx_get (session);
 
-	/* Check the authentication type used and switch
-	 * to the appropriate.
-	 */
-	cred = gnutls_auth_get_type (session);
-	switch (cred) {
-	case GNUTLS_CRD_SRP: {
-    const char* srp_username = gnutls_srp_server_get_username (session);
-		info << "- SRP session";
-    if (srp_username) {
-      info << " with user name " << srp_username;
-    } 
-		break;
-  }
+  /* Check the authentication type used and switch
+   * to the appropriate.
+   */
+  cred = gnutls_auth_get_type (session);
+  switch (cred) {
+    case GNUTLS_CRD_SRP:
+      {
+        const char* srp_username = gnutls_srp_server_get_username (session);
+        info << "- SRP session";
+        if (srp_username) {
+          info << " with user name " << srp_username;
+        }
+        break;
+      }
 
-	case GNUTLS_CRD_PSK:
-		/* This returns NULL in server side.
-		 */
-		if (gnutls_psk_client_get_hint (session) != NULL)
-			info << "- PSK authentication. PSK hint '"
-        << gnutls_psk_client_get_hint (session) << "'\n";
-		/* This returns NULL in client side.
-		 */
-		if (gnutls_psk_server_get_username (session) != NULL)
-      info << "- PSK authentication. Connected as '"
-        << gnutls_psk_server_get_username (session) << "'\n";
+    case GNUTLS_CRD_PSK:
+      if (gnutls_psk_client_get_hint (session) != NULL)
+        info << "- PSK authentication. PSK hint '"
+          << gnutls_psk_client_get_hint (session) << "'\n";
 
-		if (kx == GNUTLS_KX_ECDHE_PSK)
-			ecdh = 1;
-		else if (kx == GNUTLS_KX_DHE_PSK)
-			dhe = 1;
-		break;
+      if (gnutls_psk_server_get_username (session) != NULL)
+        info << "- PSK authentication. Connected as '"
+          << gnutls_psk_server_get_username (session) << "'\n";
 
-	case GNUTLS_CRD_ANON: /* anonymous authentication */
+      if (kx == GNUTLS_KX_ECDHE_PSK)
+        ecdh = 1;
+      else if (kx == GNUTLS_KX_DHE_PSK)
+        dhe = 1;
+      break;
 
-		info << "- Anonymous authentication.\n";
-		if (kx == GNUTLS_KX_ANON_ECDH)
-			ecdh = 1;
-		else if (kx == GNUTLS_KX_ANON_DH)
-			dhe = 1;
-		break;
+    case GNUTLS_CRD_ANON: /* anonymous authentication */
 
-	case GNUTLS_CRD_CERTIFICATE: /* certificate authentication */
+      info << "- Anonymous authentication.\n";
+      if (kx == GNUTLS_KX_ANON_ECDH)
+        ecdh = 1;
+      else if (kx == GNUTLS_KX_ANON_DH)
+        dhe = 1;
+      break;
 
-		/* Check if we have been using ephemeral Diffie-Hellman.
-		 */
-		if (kx == GNUTLS_KX_DHE_RSA || kx == GNUTLS_KX_DHE_DSS)
-			dhe = 1;
-		else if (kx == GNUTLS_KX_ECDHE_RSA ||
-			 kx == GNUTLS_KX_ECDHE_ECDSA)
-			ecdh = 1;
-    info << "- X.509 Auth\n";
+    case GNUTLS_CRD_CERTIFICATE: /* certificate authentication */
 
-		/* if the certificate list is available, then
-		 * print some information about it.
-		 * print_ 509_certificate_info(session);
-		 */
-		break;
-  case GNUTLS_CRD_IA:
-    info << "- IA credential\n";
-	default:
-    info << "- Wrong credential type" << as_string (cred) << "\n";
-		break;
-	} /* switch */
+      /* Check if we have been using ephemeral Diffie-Hellman.
+      */
+      if (kx == GNUTLS_KX_DHE_RSA || kx == GNUTLS_KX_DHE_DSS)
+        dhe = 1;
+      else if (kx == GNUTLS_KX_ECDHE_RSA ||
+          kx == GNUTLS_KX_ECDHE_ECDSA)
+        ecdh = 1;
+      info << "- X.509 Auth\n";
 
-	/* read the negotiated group - if any */
-	group = gnutls_group_get (session);
-	if (group != 0) {
-		info << "- Negotiated group " << gnutls_group_get_name (group);
-	} else {
-		if (ecdh != 0)
+      /* if the certificate list is available, then
+       * print some information about it.
+       * print_ 509_certificate_info(session);
+       */
+      break;
+    case GNUTLS_CRD_IA:
+      info << "- IA credential\n";
+      break;
+    default:
+      info << "- Wrong credential type " << as_string (cred) << "\n";
+      break;
+  } /* switch */
+
+  /* read the negotiated group - if any */
+  group = gnutls_group_get (session);
+  if (group != 0) {
+    info << "- Negotiated group " << gnutls_group_get_name (group);
+  } else {
+    if (ecdh != 0)
       info << "- Ephemeral ECDH using curve "
         << gnutls_ecc_curve_get_name (gnutls_ecc_curve_get (session));
-		else if (dhe != 0)
+    else if (dhe != 0)
       info << "- Ephemeral DH using prime of " <<
         gnutls_dh_get_prime_bits (session) << " bitsn";
-	}
+  }
 
-	return info;
+  return info;
 }
 
 struct tls_server_contact_rep: tm_contact_rep {
   int io;
   pointer ptr;
   int error_number;
-  public:
+  bool handshake_in_progress;
+
   tls_server_contact_rep (array<array<string> > auths=
       array<array<string> > ());
   ~tls_server_contact_rep ();
@@ -525,13 +791,17 @@ struct tls_server_contact_rep: tm_contact_rep {
   void stop ();
   int send (const void* buffer, size_t length);
   int receive (void* buffer, size_t length);
+  bool alive ();
   bool active ();
   string last_error ();
+
+private:
+  void reset () { io=-1; ptr=(pointer) NULL; handshake_in_progress= false; }
 };
 
 tls_server_contact_rep::tls_server_contact_rep (array<array<string> > auths):
   tm_contact_rep (auths), io (-1), ptr (NULL),
-  error_number (GNUTLS_E_SUCCESS)
+  error_number (GNUTLS_E_SUCCESS), handshake_in_progress (false)
 {
   tls_ensure_initialization ();
   type= SOCKET_SERVER;
@@ -544,113 +814,103 @@ tls_server_contact_rep::~tls_server_contact_rep () {
 void
 tls_server_contact_rep::start (int io2) {
   ASSERT (!active (), "contact already active");
-  error_number= GNUTLS_E_SUCCESS;
-  if (N(args) == 0) {
-    server_log_write (log_warning,
-        string ("Missing credentials for starting TLS session ")
-        * string ("for client ") * as_string (io2));
-    io= -1;
-    return;
-  }
-  io= io2;
-  server_log_write (log_info,
-      string ("GnuTLS session starting for client ")
-      * as_string (io));
-
+  int e;
   gnutls_session_t s;
-  int e= gnutls_init (&s, GNUTLS_SERVER);
-  if (e != GNUTLS_E_SUCCESS && e < 0) {
-    server_log_write (log_error, "cannot initialize GnuTLS server: "
-        * as_string (gnutls_strerror (e)));
-    io= -1;
-    return;
-  }
-
-  ptr= (pointer) s;
-
-  string priority= "NORMAL";
-  for (int i= 0; i < N(args); i++) {
-    if (N(args[i]) == 0) continue;
-    else if (args[i][0] == string ("anonymous")) {
-      gnutls_credentials_set (s, GNUTLS_CRD_ANON,
-          tm_anon_server_credentials);
-      priority = priority * ":+ANON-DH";
+  if (!handshake_in_progress) {
+    error_number= GNUTLS_E_SUCCESS;
+    if (N (args) == 0) {
+      GNUTLS_LOGW ("Missing credentials for starting TLS session for client "
+          * as_string (io2));
+      io= -1;
+      return;
     }
-    else
-      server_log_write (log_warning,
-          "Unknown GnuTLS credential type " *
-          as_string (args[i]));
-  }
-  // do not request any certificate from the client.
-  gnutls_certificate_server_set_request (s, GNUTLS_CERT_IGNORE);
-  gnutls_credentials_set (s, GNUTLS_CRD_CERTIFICATE,
+    io= io2;
+    GNUTLS_LOGI ("GnuTLS session starting for client " * as_string (io));
+
+    e= gnutls_init (&s, GNUTLS_SERVER|GNUTLS_NONBLOCK);
+    if (e != GNUTLS_E_SUCCESS && e < 0) {
+      GNUTLS_ERR_LOGE (e, "server init");
+      reset ();
+      return;
+    }
+
+    ptr= (pointer) s;
+
+    string priority= "NORMAL";
+    for (int i= 0; i < N (args); i++) {
+      if (N (args[i]) == 0) continue;
+      else if (args[i][0] == string ("anonymous")) {
+        gnutls_credentials_set (s, GNUTLS_CRD_ANON,
+            tm_anon_server_credentials);
+        priority = priority * ":+ANON-DH";
+      }
+      else
+        GNUTLS_LOGW ("Unknown GnuTLS credential type " * as_string (args[i]));
+    }
+    // do not request any certificate from the client.
+    gnutls_certificate_server_set_request (s, GNUTLS_CERT_IGNORE);
+    gnutls_credentials_set (s, GNUTLS_CRD_CERTIFICATE,
         tm_x509_server_credentials);
-  c_string _priority (priority);
-  e= gnutls_priority_set_direct (s, _priority, NULL);
-  if (e != GNUTLS_E_SUCCESS && e < 0) {
-    server_log_write (log_error, "cannot set priority '" * priority * "': "
-        * as_string (gnutls_strerror (e)));
-    gnutls_deinit (s);
-    io= -1;
-    ptr= (pointer) NULL;
-    return;
+    c_string _priority (priority);
+    e= gnutls_priority_set_direct (s, _priority, NULL);
+    if (e != GNUTLS_E_SUCCESS && e < 0) {
+      GNUTLS_ERR_LOGE (e, priority * " priority set ");
+      gnutls_deinit (s);
+      reset ();
+      return;
+    }
+    gnutls_dh_set_prime_bits (s, tm_dh_bitsize);
+    gnutls_transport_set_int2 (s, io, io);
+    string _timeout= get_preference ("server contact timeout");
+    int timeout= is_int (_timeout) ? as_int (_timeout) : 0;
+    if (timeout == 0)
+      GNUTLS_LOGW ("server connection timeout is disabled");
+    gnutls_handshake_set_timeout (s, timeout);
+  } else {
+    s= (gnutls_session_t) ptr;
   }
-  gnutls_dh_set_prime_bits (s, tm_dh_bitsize);
-  gnutls_transport_set_int2 (s, io, io);
-  string _timeout= get_preference ("server contact timeout");
-  int timeout= is_int (_timeout) ? as_int (_timeout) : 0;
-  if (timeout == 0)
-    io_warning << "server connection timeout is disabled" << LF; 
-  gnutls_handshake_set_timeout (s, timeout);
 
   e= gnutls_handshake (s);
-  server_log_write (log_info, "GnuTLS handshake with client " *
-      as_string (io) * string (" returned (")
-      * as_string (e) * string (") '") *
-      gnutls_strerror (e) * "'");
-  if (e != GNUTLS_E_SUCCESS && e < 0) {
-    server_log_write (log_info, "GnuTLS session failed for client " *
-        as_string (io));
-    server_log_write (log_error, "\n" * tm_session_info (s));
+  if (e == GNUTLS_E_SUCCESS) {
+    GNUTLS_LOGI ("GnuTLS session started for client " * as_string (io));
+    GNUTLS_LOGI (tm_session_info (s));
+    handshake_in_progress= false;
+  } else if (e == GNUTLS_E_AGAIN || e == GNUTLS_E_INTERRUPTED) {
+    //GNUTLS_LOG ("GnuTLS handshake in progress for client " * as_string (io));
+    handshake_in_progress= true;
+  } else if (e < 0) {
+    GNUTLS_ERR_LOGE (e, "session handshake for client " * as_string (io));
+    GNUTLS_LOGE (tm_session_info (s));
     gnutls_deinit (s);
-    io= -1;
-    ptr= (pointer) NULL;
+    reset ();
     return;
   }
-  server_log_write (log_info, "GnuTLS session started for client " *
-      as_string (io));
-  server_log_write (log_info, "\n" * tm_session_info (s));
 
   gnutls_credentials_type_t cred_type= gnutls_auth_server_get_type (s);
   if (cred_type == GNUTLS_CRD_ANON)
-    server_log_write (log_info, "client " * as_string (io) *
-        " authenticated anonymously");
+    GNUTLS_LOGI ("client " * as_string (io) * " authenticated anonymously");
 }
 
 void
 tls_server_contact_rep::stop () {
-  if (!active ()) return;
+  if (!alive ()) return;
   gnutls_credentials_type_t cred_type=
     gnutls_auth_server_get_type ((gnutls_session_t) ptr);
-  if (cred_type != GNUTLS_CRD_ANON)
-    server_log_write (log_warning, "unknown credential type for client "
-        * as_string (io));
+  if (cred_type != GNUTLS_CRD_ANON && cred_type != GNUTLS_CRD_CERTIFICATE)
+    GNUTLS_LOGW ("unknown credential type for client " * as_string (io));
 
   gnutls_bye ((gnutls_session_t) ptr, GNUTLS_SHUT_WR);
   gnutls_deinit ((gnutls_session_t) ptr);
-  io= -1;
-  ptr= (pointer) NULL;
-  server_log_write (log_info, "GnuTLS closed session for client " *
-      as_string (io));
+  GNUTLS_LOGI ("GnuTLS closed session for client " * as_string (io));
+  reset ();
 }
 
 int
 tls_server_contact_rep::send (const void* buffer, size_t length) {
   if (!active ()) {
-    server_log_write (log_error,
-        "unexpected inactive GnuTLS session while sending"
-        * string (" to client ") * as_string (io));
-    return -1024;
+    GNUTLS_LOGE ("unexpected inactive GnuTLS session while sending to client "
+        * as_string (io));
+    return TM_NET_SESSION_INACTIVE;
   }
   int r= gnutls_record_send ((gnutls_session_t) ptr, buffer, length);
   error_number= r < 0 ? r : GNUTLS_E_SUCCESS;
@@ -664,10 +924,9 @@ tls_server_contact_rep::send (const void* buffer, size_t length) {
 int
 tls_server_contact_rep::receive (void* buffer, size_t length) {
   if (!active ()) {
-    server_log_write (log_error,
-        "unexpected inactive GnuTLS session while receiving"
-        * string (" from client ") * as_string (io));
-    return -1024;
+    GNUTLS_LOGE ("unexpected inactive GnuTLS session while receiving "
+        "from client " * as_string (io));
+    return TM_NET_SESSION_INACTIVE;
   }
   int r= gnutls_record_recv ((gnutls_session_t) ptr, buffer, length);
   error_number= r < 0 ? r : GNUTLS_E_SUCCESS;
@@ -680,13 +939,19 @@ tls_server_contact_rep::receive (void* buffer, size_t length) {
 
 string
 tls_server_contact_rep::last_error () {
-  return as_string_gnutls_error (error_number);
+  return as_string_gnutls_error (error_number, 0);
+}
+
+bool
+tls_server_contact_rep::alive () {
+  // Cannot be alive if GnuTLS is not present
+  return ptr != (pointer) NULL;
 }
 
 bool
 tls_server_contact_rep::active () {
   // Cannot be active if GnuTLS is not present
-  return ptr != (pointer) NULL;
+  return alive () && !handshake_in_progress;
 }
 
 tm_contact 
@@ -702,13 +967,18 @@ struct tls_client_contact_rep: tm_contact_rep {
   int io;
   pointer ptr;
   int error_number;
-  tls_client_contact_rep (array<array<string> > args=
-      array<array<string> > ());
+  unsigned int cert_verif_status;
+  bool handshake_in_progress;
+  bool skip_cert_verify;
+  char* host;
+  tls_client_contact_rep (string host, array<array<string> > args=
+      array<array<string> > (), bool skip_verify= false);
   ~tls_client_contact_rep ();
   void start (int io);
   void stop ();
   int send (const void* buffer, size_t length);
   int receive (void* buffer, size_t length);
+  bool alive ();
   bool active ();
   string last_error ();
 
@@ -720,12 +990,14 @@ private:
    * @return 0 on success, 1 on error, 2 on retry
    */
   int handshake (gnutls_session_t s);
-  int verify ();
+  void reset () { io=-1; ptr=(pointer) NULL; handshake_in_progress= false; }
 };
 
-tls_client_contact_rep::tls_client_contact_rep (array<array<string> > creds):
-  tm_contact_rep (creds), io (-1), ptr (NULL),
-  error_number (GNUTLS_E_SUCCESS)
+tls_client_contact_rep::tls_client_contact_rep (string host,
+    array<array<string> > args, bool skip_verify):
+  tm_contact_rep (args), io (-1), ptr (NULL),
+  error_number (GNUTLS_E_SUCCESS), handshake_in_progress (false),
+  skip_cert_verify (skip_verify), host (as_charp (host))
 {
   tls_ensure_initialization ();
   type= SOCKET_CLIENT;
@@ -738,247 +1010,298 @@ tls_client_contact_rep::~tls_client_contact_rep () {
 int
 tls_client_contact_rep::handshake (gnutls_session_t s) {
   int ret= gnutls_handshake (s);
-  GNUTLS_LOG("GnuTLS handshake for client " * as_string (io)
-      * " returned '" * gnutls_strerror (ret));
   if (ret == GNUTLS_E_SUCCESS) {
-    GNUTLS_LOG("GnuTLS session started for client " * as_string  (io));
-    GNUTLS_LOG(tm_session_info (s));
-    return 0;
+    GNUTLS_LOGI ("GnuTLS session started for client " * as_string (io));
+    GNUTLS_LOG (tm_session_info (s));
+    handshake_in_progress= false;
+    return ret;
+  } else if (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED) {
+    //GNUTLS_LOG ("GnuTLS handshake in progress for " * as_string (io));
+    handshake_in_progress = true;
+    error_number= ret;
+    return ret;
+  } else if (ret < 0) {
+    error_number= ret;
+    GNUTLS_ERR_LOGE (ret, "handshake for client " * as_string (io));
+    reset ();
   }
-  else if (ret == GNUTLS_E_CERTIFICATE_ERROR && server_certificate != NULL) {
+
+  if (ret == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR &&
+      gnutls_session_get_verify_cert_status (s) != 0) {
+    cert_verif_status= gnutls_session_get_verify_cert_status (s);
+    GNUTLS_LOGW (string("got verify cert status for session: ") * as_string (cert_verif_status));
+
+    gnutls_datum_t txt;
+    ret = gnutls_certificate_verification_status_print (cert_verif_status,
+        GNUTLS_CRT_X509, &txt, 0);
+    if (ret >= 0) {
+      GNUTLS_LOGW (as_string_gnutls_datum (txt));
+    }
+
     // ask user for server cert confirmation if it isn't a trusted cert
-    gnutls_datum_t info_short;
+    // or expired/not active
+    if (!handle_cert_error_interactive (cert_verif_status) ||
+        !certificates_verified->contains (server_certificate_serial))
+      return ret;
+
     string msg;
 
-    string crt_str = as_string_gnutls_crt (server_certificate);
-    if (crt_str == "") {
-      char serial[128] = {0};
-      size_t serial_size = sizeof (serial);
+    x509_certificate* server_certificate= (x509_certificate*)
+      certificates_verified (server_certificate_serial);
 
-      int ret = gnutls_x509_crt_get_serial (server_certificate, serial, &serial_size);
-      if (ret < 0) {
-        io_warning << "cannot get server cert " << gnutls_strerror (ret);
-        gnutls_deinit (s);
-        io= -1;
-        ptr= (pointer) NULL;
-        return 1;
-      }
-      msg = string (serial);
+    if (!server_certificate->valid ()) {
+      GNUTLS_LOGW (string ("certificate ") * server_certificate_serial
+         * " is invalid");
+      return ret;
+    }
+
+    string crt_str = as_string_gnutls_crt (server_certificate->cert);
+    if (crt_str == "") {
+      msg = as_string_cert_serial (server_certificate->cert);
     } else {
       msg = crt_str;
     }
-    GNUTLS_LOG("Untrusted certificate:" * as_string (io));
-    GNUTLS_LOG(msg);
 
-#ifdef QTTEXMACS
-    QMessageBox msgBox;
-    c_string _msg("The server certificate issuer is unknown\n\n" * msg);
-    QString q_msg(_msg);
-    gnutls_datum_t info_full;
-    int ret_full = gnutls_x509_crt_print(server_certificate,
-        GNUTLS_CRT_PRINT_FULL,
-        &info_full);
+    GNUTLS_LOGW (msg);
 
-    msgBox.setText(q_msg);
-    if (ret_full == 0) {
-      c_string detailed(as_string_gnutls_datum (info_full));
-      msgBox.setDetailedText((char *)detailed);
+    if (is_headless ()) {
+      GNUTLS_LOGE ("certificate verification failed in headless mode, "
+          "use --tls-no-verify to skip");
+    } else if (cert_verif_status & GNUTLS_CERT_SIGNER_NOT_FOUND ||
+        cert_verif_status & GNUTLS_CERT_SIGNER_NOT_CA) {
+      call ("trust-certificate-interactive",
+          object (msg),
+          object (tm_cert_as_pem_string (server_certificate->cert)));
+    } else {
+      call ("disable-certificate-time-checks-interactive", object (msg));
     }
-    msgBox.setInformativeText("Do you still want to trust it ?");
-    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No
-        | QMessageBox::Cancel);
-    msgBox.setDefaultButton(QMessageBox::Save);
-    int ret = msgBox.exec();
-    switch (ret) {
-      case QMessageBox::Yes:
-        ret = tm_trust_cert();
-        if (ret < 0) {
-          io_warning << "cannot get server cert " << gnutls_strerror (ret);
-          break;
-        }
-        // retry handshake
-        return 2;
-      default:
-        break;
-    }
-#else
-    eval ("(trust-certificate-interactive \"" *
-        scm_quote (as_string_gnutls_datum (info)) * "\")");
-#endif
-    if (ret_full) {
-      gnutls_free(info_full.data);
-    }
-    gnutls_free(info_short.data);
   }
-  return 1;
+
+  return ret;
 }
 
 void
 tls_client_contact_rep::start (int io2) {
   ASSERT (!active (), "contact already active");
-  GNUTLS_LOG("tls_client_contact_rep::start");
-  error_number= GNUTLS_E_SUCCESS;
-  if (!tm_gnutls_initialized) return;
-  if (N(args) == 0) {
-    GNUTLS_LOG("Missing credentials for starting TLS session for client "
-        * as_string (io));
-    io= -1;
-    return;
-  }
-  io= io2;
-  GNUTLS_LOG("GnuTLS session starting for client " * as_string (io) * "...");
+
+  int ret;
   gnutls_session_t s;
-  gnutls_init (&s, GNUTLS_CLIENT);
-  ptr= (pointer) s;
-  string priority = "NORMAL";
-  for (int i= 0; i < N(args); i++) {
-    array<string> cred= args[i];
-    if (N(cred) == 0) continue;
-    if (N(cred) == 1 && cred[0] == "anonymous") {
-      gnutls_credentials_set (s, GNUTLS_CRD_ANON,
-          tm_anon_client_credentials);
-      priority << ":+ANON-DH";
+
+  ret= error_number= GNUTLS_E_SUCCESS;
+  if (!handshake_in_progress) {
+    if (!tm_gnutls_initialized) return;
+    if (N (args) == 0) {
+      GNUTLS_LOGE ("Missing credentials for starting TLS session for client "
+          * as_string (io));
+      reset ();
+      return;
     }
-    else
-      io_warning << "Unknown credentials " << cred
-        << " for GnuTLS session of client " << io << "\n";
-  }
 
-  gnutls_session_set_verify_function(s,
-      certificate_client_verification_callback);
-  gnutls_credentials_set (s, GNUTLS_CRD_CERTIFICATE,
-      tm_x509_client_credentials);
+    io= io2;
+    GNUTLS_LOG ("GnuTLS session starting for client " * as_string (io) * "...");
 
-  c_string _priority (priority);
-  if (gnutls_priority_set_direct (s, _priority, NULL) != GNUTLS_E_SUCCESS) {
-    io_warning << "GnuTLS failed setting priorities " << priority
-      << " for client " << io << "\n";
-    gnutls_deinit (s);
-    io= -1;
-    ptr= (pointer) NULL;
-    return;
-  }
-  gnutls_transport_set_int2 (s, io, io);
-  string _timeout= get_preference ("client contact timeout");
-  int timeout= is_int (_timeout) ? as_int (_timeout) : 0;
-  if (timeout == 0)
-    io_warning << "client connection timeout is disabled" << LF;
-  gnutls_handshake_set_timeout (s, timeout);
-
-  int ret = 0;
-  do {
-    if (ret == 2) {
-      GNUTLS_LOG("Retrying GnuTLS handshake...");
+    ret = gnutls_init (&s, GNUTLS_CLIENT|GNUTLS_NONBLOCK);
+    ptr= (pointer) s;
+    string priority = "NORMAL";
+    for (int i= 0; i < N (args); i++) {
+      array<string> cred= args[i];
+      if (N (cred) == 0) continue;
+      if (N (cred) == 1 && cred[0] == "anonymous") {
+        gnutls_credentials_set (s, GNUTLS_CRD_ANON,
+            tm_anon_client_credentials);
+        priority << ":+ANON-DH";
+      }
+      else {
+        GNUTLS_LOGW ("Unknown credentials " * print_to_string (cred)
+            * " for GnuTLS session of client " * as_string (io));
+      }
     }
-    ret = handshake(s);
-  } while (ret == 2);
 
-  if (ret == 1) {
-    GNUTLS_LOG("GnuTLS session aborted for client " * as_string (io));
+    /* we could set the hostname to ask gnutls to verify that the cert's CN
+     * corresponds to the host we are connecting to but it is too much
+     * bureaucracy for now, we would need to implement an override button.
+     *
+     * gnutls_session_set_verify_cert (s, host, cert_verify_flags);
+     */
+
+    if (!skip_cert_verify)
+      gnutls_session_set_verify_cert (s, NULL, cert_verify_flags);
+    gnutls_session_set_verify_output_function (s, cert_out_callback);
+
+    ret = gnutls_credentials_set (s, GNUTLS_CRD_CERTIFICATE,
+        tm_x509_client_credentials);
+    if (ret != GNUTLS_E_SUCCESS) {
+      GNUTLS_ERR_LOGE (ret, "x509 credentials set");
+      gnutls_deinit (s);
+      reset ();
+      return;
+    }
+
+    c_string _priority (priority);
+    ret = gnutls_priority_set_direct (s, _priority, NULL);
+    if (ret != GNUTLS_E_SUCCESS) {
+      GNUTLS_ERR_LOGE (ret, "setting priorities " * priority
+          * " for client " * as_string (io));
+      gnutls_deinit (s);
+      reset ();
+      return;
+    }
+    gnutls_transport_set_int2 (s, io, io);
+    string _timeout= get_preference ("client contact timeout");
+    int timeout= is_int (_timeout) ? as_int (_timeout) : 0;
+    if (timeout == 0)
+      GNUTLS_LOGW ("client connection timeout is disabled");
+    gnutls_handshake_set_timeout (s, timeout);
+    certificates_verified->clear ();
+  } else {
+    s= (gnutls_session_t) ptr;
+  }
+  ret = handshake (s);
+  if (ret < 0 && ret != GNUTLS_E_AGAIN && ret != GNUTLS_E_INTERRUPTED) {
+    GNUTLS_LOGE ("GnuTLS session aborted for client " * as_string (io));
     gnutls_deinit (s);
-    io= -1;
-    ptr= (pointer) NULL;
+    reset ();
   }
 }
 
 void
 tls_client_contact_rep::stop () {
-  if (active ()) {
+  if (alive ()) {
     gnutls_bye ((gnutls_session_t) ptr, GNUTLS_SHUT_RDWR);
     gnutls_deinit ((gnutls_session_t) ptr);
     ptr= (pointer) NULL;
+    handshake_in_progress= false;
   }
   if (io >= 0) {
-    GNUTLS_LOG("GnuTLS closed session for client " * as_string (io));
-    io= -1;
+    GNUTLS_LOG ("GnuTLS closed session for client " * as_string (io));
+    reset ();
+  }
+  if (host) {
+    tm_delete_array (host);
+    host = NULL;
   }
 }
 
 int
 tls_client_contact_rep::send (const void* buffer, size_t length) {
   if (!active ()) {
-    io_error << "Unexpected inactive GnuTLS session while sending"
-      << " to client " << io << "\n";
-    return -1024;
+    GNUTLS_LOGE ("Unexpected inactive GnuTLS session while sending to client "
+      * as_string (io));
+    return TM_NET_SESSION_INACTIVE;
   }
   int r= gnutls_record_send ((gnutls_session_t) ptr, buffer, length);
   error_number= r < 0 ? r : GNUTLS_E_SUCCESS;
   if (r < 0 &&
       r != GNUTLS_E_SUCCESS &&
       r != GNUTLS_E_AGAIN &&
-      r != GNUTLS_E_INTERRUPTED ) stop ();
+      r != GNUTLS_E_INTERRUPTED) stop ();
   return r;
 }
 
 int
 tls_client_contact_rep::receive (void* buffer, size_t length) {
   if (!active ()) {
-    io_error << "Unexpected inactive GnuTLS session while receiving"
-      << " from client " << io << "\n";
-    return -1024;
+    GNUTLS_LOGE ("Unexpected dead GnuTLS session while receiving "
+        "from client " * as_string (io));
+    return TM_NET_SESSION_INACTIVE;
   }
   int r= gnutls_record_recv ((gnutls_session_t) ptr, buffer, length);
   error_number= r < 0 ? r : GNUTLS_E_SUCCESS;
   if (r < 0 &&
       r != GNUTLS_E_SUCCESS &&
       r != GNUTLS_E_AGAIN &&
-      r != GNUTLS_E_INTERRUPTED ) stop ();
+      r != GNUTLS_E_INTERRUPTED) stop ();
   return r;
 }
 
 string
 tls_client_contact_rep::last_error () {
-  return as_string_gnutls_error (error_number);
+  string errstr= as_string_gnutls_error (error_number, cert_verif_status);
+
+  return error_number == GNUTLS_E_PREMATURE_TERMINATION ?
+    errstr * " Is TeXmacs server up ?" : errstr;
+}
+
+bool
+tls_client_contact_rep::alive () {
+  // Cannot be alive if GnuTLS is not present
+  return ptr != (pointer) NULL;
 }
 
 bool
 tls_client_contact_rep::active () {
   // Cannot be active if GnuTLS is not present
-  return ptr != (pointer) NULL;
+  return alive () && !handshake_in_progress;
 }
 
-tm_contact 
-make_tls_client_contact (array<array<string> > args) {
-  return (tm_contact_rep*) tm_new<tls_client_contact_rep> (args);
+tm_contact
+make_tls_client_contact (string host, array<array<string> > args,
+    bool skip_verify) {
+  return (tm_contact_rep*) tm_new<tls_client_contact_rep> (host, args,
+      skip_verify);
 }
 
 /******************************************************************************
 * PBKDF2 password hash
 ******************************************************************************/
 
+string gnutls_generate_salt () {
+  unsigned char salt[SALT_SIZE] = {0};
+  gnutls_datum_t salt_data= {salt,SALT_SIZE};
+  gnutls_datum_t salt_b64=  {NULL,0};
+
+  if (gnutls_rnd (rnd_level, &salt, SALT_SIZE) < 0) {
+    return "";
+  }
+
+  if (gnutls_base64_encode2 (&salt_data, &salt_b64) < 0) {
+    return "";
+  }
+
+  return as_string_gnutls_datum (salt_b64);
+}
+
 string hash_password_pbkdf2 (string passwd, string salt) {
-	c_string _passwd(passwd), _salt(salt);
-	gnutls_datum_t key_data = {
-      .data = (unsigned char*)((char *)_passwd),
-      .size = static_cast<unsigned int>(N (passwd)),
-    };
-    gnutls_datum_t salt_data = {
-      .data = (unsigned char *)((char *)_salt),
-      .size = static_cast<unsigned int>(N (salt)),
-    };
-    uint8_t output_raw[4096] = {0};
-    gnutls_datum_t out_data, out_b64, salt_b64;
+  c_string _pwd(passwd);
+  c_string _salt(salt);
 
-    int ret = gnutls_pbkdf2(GNUTLS_MAC_SHA256 , &key_data, &salt_data,
-        MAC_SHA256_ITER_COUNT, output_raw, MAC_SHA256_BYTE_SIZE);
-    if (ret < 0) {
-      return "";
-    }
+  gnutls_datum_t key_data = {
+    .data = (unsigned char *)(char *)_pwd,
+    .size = static_cast<unsigned int> (N (passwd)),
+  };
+  gnutls_datum_t salt_data = {
+    .data = (unsigned char *)(char *)_salt,
+    .size = static_cast<unsigned int> (N (salt)),
+  };
+  uint8_t output_raw[4096] = {0};
+  gnutls_datum_t out_data={NULL,0}, out_b64={NULL,0}, salt_raw={NULL,0};
 
-    out_data.data = output_raw;
-    out_data.size = MAC_SHA256_BYTE_SIZE;
+  if (GNUTLS_E_SUCCESS != gnutls_base64_decode2 (&salt_data, &salt_raw)) {
+    return "";
+  }
 
-    if (GNUTLS_E_SUCCESS != gnutls_base64_encode2(&out_data, &out_b64)) {
-      return "";
-    }
+  if (SALT_SIZE > salt_raw.size) {
+    return "";
+  }
 
-    if (GNUTLS_E_SUCCESS != gnutls_base64_encode2(&salt_data, &salt_b64)) {
-      return "";
-    }
+  if (GNUTLS_E_SUCCESS !=
+      gnutls_pbkdf2 (GNUTLS_MAC_SHA256, &key_data, &salt_raw,
+        MAC_SHA256_ITER_COUNT, output_raw, MAC_SHA256_BYTE_SIZE)) {
+    return "";
+  }
 
-    return string("$7$") * as_string (MAC_SHA256_ITER_COUNT)
-      * "$" * as_string (reinterpret_cast<const char *>(salt_b64.data))
-      * "$" * as_string (reinterpret_cast<const char *>(out_b64.data));
+  gnutls_free (salt_raw.data);
+
+  out_data.data = output_raw;
+  out_data.size = MAC_SHA256_BYTE_SIZE;
+
+  if (GNUTLS_E_SUCCESS != gnutls_base64_encode2 (&out_data, &out_b64)) {
+    return "";
+  }
+
+  return string ("$7$") * as_string (MAC_SHA256_ITER_COUNT)
+    * "$" * as_string (salt_data.data)
+    * "$" * as_string (out_b64.data);
 }
 
 #else // USE_GNUTLS
@@ -993,21 +1316,65 @@ bool gnutls_present () {
 
 tm_contact
 make_tls_server_contact (array<array<string> > args) {
+  (void) args;
   return tm_contact ();
 }
 
 tm_contact
-make_tls_client_contact (array<array<string> > args) {
+make_tls_client_contact (string host, array<array<string> > args,
+    bool skip_verify) {
+  (void) host;
+  (void) args;
+  (void) skip_verify;
   return tm_contact ();
 }
 
 list<string>
 srp_verifier_and_salt (string pseudo, string passwd) {
+  (void) pseudo; (void) passwd;
   return list<string> ();
 }
 
 string hash_password_pbkdf2 (string passwd, string salt) {
-    return string("");
+  (void) passwd; (void) salt;
+  return string("");
+}
+
+string
+certificate_path () {
+  return "";
+}
+
+bool
+certificate_present () {
+  return true;
+}
+
+bool
+trust_certificate (const string& crt_pem) {
+  (void) crt_pem;
+  return true;
+}
+
+bool
+generate_self_signed (tree cfg_tree, url cert_path, url key_path) {
+  (void) cfg_tree; (void) cert_path; (void) key_path;
+  return true;
+}
+
+void
+disable_certificate_time_checks () {
+}
+
+int
+gnutls_random_int (uint32_t limit)
+{
+  (void) limit;
+  return 0;
+}
+
+string gnutls_generate_salt () {
+  return "";
 }
 
 #endif // USE_GNUTLS

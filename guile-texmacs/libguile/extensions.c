@@ -157,7 +157,8 @@ void
 scm_init_extensions ()
 {
   registered_extensions = NULL;
-#include "libguile/extensions.x"
+ scm_c_define_gsubr (s_scm_load_extension, 2, 0, 0, (SCM (*)()) scm_load_extension); ;
+
 }
 
 /*

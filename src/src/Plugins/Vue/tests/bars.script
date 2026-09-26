@@ -1,0 +1,40 @@
+# Contents which do not fit: the bars of the main window and the pulldown
+# menus are clipped and show markers, never a scroll bar.
+#
+#  b1: in a narrow window the menu bar, the main bar and the mode bar are
+#      cut off and each carries a marker at its right end, a chevron over a
+#      strip of the bar fading over the buttons; the focus bar still fits
+#  b2: a wheel turned over the main bar scrolls it sideways (a mouse has no
+#      horizontal wheel), so its end shows and the marker moves to the left
+#  b3: a click on the marker of the mode bar brings the next screenful in
+#  b4: a window made wide enough for the whole of the bars puts them back at
+#      their first button (Clay clamps a scroll position only when it is
+#      handling a wheel event) and takes the markers away
+#  m1: a menu taller than the window is shifted up to fit inside it and
+#      carries a marker at the bottom; nothing is drawn outside the window
+#  m2: the wheel scrolls the menu; the marker moves to the top
+wait 6000
+window #2
+wait 500
+resize 520 380
+wait 900
+snapshot b1
+move 250 52
+wait 200
+wheel 250 52 0 -4
+wait 600
+snapshot b2
+click 505 90
+wait 600
+snapshot b3
+resize 1200 500
+wait 1200
+snapshot b4
+resize 560 300
+wait 900
+click 38 12
+wait 900
+snapshot m1
+wheel 60 150 0 -5
+wait 600
+snapshot m2

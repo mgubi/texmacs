@@ -16,42 +16,51 @@
 #include "frame.hpp"
 
 int    std_shrinkf  = 5;
-#if QT_VERSION >= 0x060000
-int    get_retina_factor () { return -1; }
-int    get_retina_zoom () { return -1; }
-int    get_retina_icons () { return -1; }
-double get_retina_scale () { return -1.0; }
-void   set_retina_factor (int f) { (void) f; }
-void   set_retina_zoom (int z) { (void) z; }
-void   set_retina_icons (int i) { (void) i; }
-void   set_retina_scale (double s) { (void) s; }
-#else
+
+#if QT_VERSION < 0x060000
 bool   retina_manual= false;
 bool   retina_iman  = false;
 int    retina_factor= 1;
 int    retina_zoom  = 1;
 int    retina_icons = 1;
 double retina_scale = 1.0;
-
-int    get_retina_factor () { return retina_factor; }
-int    get_retina_zoom () { return retina_zoom; }
-int    get_retina_icons () { return retina_icons; }
-double get_retina_scale () { return retina_scale; }
 void   set_retina_factor (int f) { retina_factor= f; }
 void   set_retina_zoom (int z) { retina_zoom= z; }
 void   set_retina_icons (int i) { retina_icons= i; }
 void   set_retina_scale (double s) { retina_scale= s; }
+#else
+void   set_retina_factor (int f) {
+  (void) f;
+  cerr << "Unexpected call to set_retina_factor" << LF;
+}
+void   set_retina_zoom (int z) {
+  (void) z;
+  cerr << "Unexpected call to set_retina_zoom" << LF;
+}
+void   set_retina_icons (int i) {
+  (void) i;
+  cerr << "Unexpected call to set_retina_icons" << LF;
+}
+void   set_retina_scale (double s) {
+  (void) s;
+  cerr << "Unexpected call to set_retina_scale" << LF;
+}
 #endif
+int    get_retina_factor () { return retina_factor; }
+int    get_retina_zoom () { return retina_zoom; }
+int    get_retina_icons () { return retina_icons; }
+double get_retina_scale () { return retina_scale; }
 
 /******************************************************************************
 * Constructors and handles
 ******************************************************************************/
 
-renderer_rep::renderer_rep (bool screen_flag):
+renderer_rep::renderer_rep (bool screen_flag, double pixel_ratio2):
   ox (0), oy (0), cx1 (0), cy1 (0), cx2 (0), cy2 (0),
   is_screen (screen_flag),
-  zoomf (std_shrinkf), shrinkf (1),
-  pixel (PIXEL), retina_pixel (PIXEL),
+  pixel_ratio (pixel_ratio2),
+  zoomf (pixel_ratio2 * std_shrinkf), shrinkf (1),
+  pixel (PIXEL), retina_pixel (pixel_ratio2 * PIXEL),
   brushpx (-1), thicken (0),
   master (NULL), cur_page (0) {}
 
@@ -143,9 +152,13 @@ normal_zoom (double zoom) {
 }
 
 void
-renderer_rep::set_zoom_factor (double zoom) {
-  if (shrinkf != ((int) tm_round (std_shrinkf / zoomf)))
-    cout << "Invalid zoom " << zoomf << ", " << shrinkf << LF;
+renderer_rep::set_zoom_factor (double zoom, bool safe) {
+  if (safe &&
+      shrinkf != ((int) tm_round (pixel_ratio * std_shrinkf / zoomf)))
+    cerr << "Invalid zoom: zoomf= " << zoomf
+	 << ", shrinkf= " << shrinkf
+      	 << ", std_shrinkf= " << std_shrinkf
+	 << ", pixel_ratio= " << pixel_ratio << LF;
   ox = (SI) tm_round (ox  * zoomf);
   oy = (SI) tm_round (oy  * zoomf);
   //cx1= (SI) ::floor (cx1 * zoomf);
@@ -156,11 +169,11 @@ renderer_rep::set_zoom_factor (double zoom) {
   cx2= (SI) tm_round (cx2 * zoomf);
   cy1= (SI) tm_round (cy1 * zoomf);
   cy2= (SI) tm_round (cy2 * zoomf);
-  zoomf  = zoom;
-  shrinkf= (int) tm_round (std_shrinkf / zoomf);
+  zoomf  = pixel_ratio * zoom;
+  shrinkf= (int) tm_round (pixel_ratio * std_shrinkf / zoomf);
   thicken= (shrinkf >> 1) * PIXEL;
   pixel       = (SI) tm_round ((std_shrinkf * PIXEL) / zoomf);
-  retina_pixel= pixel;
+  retina_pixel= pixel_ratio * pixel;
   ox = (SI) tm_round (ox  / zoomf);
   oy = (SI) tm_round (oy  / zoomf);
   //cx1= (SI) ::floor (cx1 / zoomf);
@@ -330,12 +343,35 @@ abs_outer_round (SI& x1, SI& y1, SI& x2, SI& y2) {
 ******************************************************************************/
 
 void
+renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {}
+
+void
 renderer_rep::draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3) {
   array<SI> x (3), y (3);
   x[0]= x1; y[0]= y1;
   x[1]= x2; y[1]= y2;
   x[2]= x3; y[2]= y3;
   polygon (x, y);
+}
+
+void
+renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                 SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                 bool filled) {
+  // Fallback implementation: draw a plain rectangle without rounded corners
+  (void) r_tl; (void) r_tr; (void) r_br; (void) r_bl;
+  if (filled)
+    fill (x1, y1, x2, y2);
+  else {
+    // Draw the outline using lines
+    array<SI> x (5), y (5);
+    x[0]= x1; y[0]= y1;
+    x[1]= x2; y[1]= y1;
+    x[2]= x2; y[2]= y2;
+    x[3]= x1; y[3]= y2;
+    x[4]= x1; y[4]= y1;
+    lines (x, y);
+  }
 }
 
 void
@@ -486,6 +522,7 @@ renderer_rep::shadow (picture& pic, SI x1, SI y1, SI x2, SI y2) {
   ren->cx2= cx2;
   ren->cy2= cy2;
   ren->is_screen= is_screen;
+  ren->pixel_ratio= pixel_ratio;
   ren->zoomf= zoomf;
   ren->shrinkf= shrinkf;
   ren->pixel= pixel;
@@ -529,7 +566,7 @@ delete_renderer (renderer ren) {
   tm_delete (ren);
 }
 
-#if !(defined(QTTEXMACS) || defined(X11TEXMACS) || defined(SDLTEXMACS))
+#if !(defined(QTTEXMACS) || defined(X11TEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS))
 
 picture
 native_picture (int w, int h, int ox, int oy) {

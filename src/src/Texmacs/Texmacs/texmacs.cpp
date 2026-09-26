@@ -29,6 +29,8 @@
 #include "tm_timer.hpp"
 #include "data_cache.hpp"
 #include "tm_window.hpp"
+#include "client_server.hpp"
+
 #ifdef AQUATEXMACS
 void mac_fix_paths ();
 #endif
@@ -69,14 +71,31 @@ extern bool texmacs_started;
 bool disable_error_recovery= false;
 bool start_server_flag= false;
 bool headless_mode= false;
+bool open_mode= false;
+string open_mode_url;
+bool tls_no_verify= false;
 string extra_init_cmd;
+bool exec_exit= true;
 void server_start ();
 
 #ifdef QTTEXMACS
 // Qt application infrastructure
 static QTMApplication* qtmapp= NULL;
 static QTMCoreApplication* qtmcoreapp= NULL;
+#if !defined(Q_OS_MAC)
+bool send_to_single_instance (string);
 #endif
+#endif
+
+bool
+is_headless () {
+  return headless_mode;
+}
+
+bool
+is_tls_no_verify () {
+  return tls_no_verify;
+}
 
 /******************************************************************************
 * For testing
@@ -99,6 +118,16 @@ void
 clean_exit_on_segfault (int sig_num) {
   (void) sig_num;
   FAILED ("segmentation fault");
+}
+
+void
+clean_exit_on_sigterm (int sig_num) {
+  (void) sig_num;
+#ifdef ADVANCED_DEVELOPER_MODE
+  exit (0);
+#else
+  _exit (0);
+#endif
 }
 
 /******************************************************************************
@@ -165,8 +194,9 @@ TeXmacs_init_paths (int& argc, char** argv) {
     set_env ("TEXMACS_PATH", as_string(exedir * "../Resources/share/TeXmacs"));
   //cout << get_env("PATH") * ":" * as_string(url("$PWD") * argv[0]
   // * "../../Resources/share/TeXmacs/bin") << LF;
-  if (exists("/bin/bash")) {
-    string shell_env = var_eval_system ("PATH='' /bin/bash -l -c 'echo $PATH'");
+  string shell= get_env ("SHELL");
+  if (shell != "" && exists(shell)) {
+    string shell_env = var_eval_system ("PATH='' $SHELL -l -c 'echo $PATH'");
     set_env ("PATH", get_env("PATH") * ":" * shell_env * ":" *
              as_string (exedir * "../Resources/share/TeXmacs/bin"));
   } else {
@@ -247,6 +277,8 @@ set_global_options  (int argc, char** argv)  {
       else if ((s == "-d") || (s == "-debug")) debug (DEBUG_FLAG_STD, true);
       else if (s == "-debug-events") debug (DEBUG_FLAG_EVENTS, true);
       else if (s == "-debug-io") debug (DEBUG_FLAG_IO, true);
+      else if (s == "-debug-sockets") debug (DEBUG_FLAG_SOCKETS, true);
+      else if (s == "-debug-gnutls") debug (DEBUG_FLAG_GNUTLS, true);
       else if (s == "-debug-bench") debug (DEBUG_FLAG_BENCH, true);
       else if (s == "-debug-history") debug (DEBUG_FLAG_HISTORY, true);
       else if (s == "-debug-qt") debug (DEBUG_FLAG_QT, true);
@@ -341,15 +373,15 @@ set_global_options  (int argc, char** argv)  {
       }
       else if ((s == "-R") || (s == "-retina")) {
         retina_manual= true;
-#ifdef MACOSX_EXTENSIONS
+#  ifdef MACOSX_EXTENSIONS
         retina_factor= 2;
         retina_zoom  = 1;
         retina_scale = 1.4;
-#else
+#  else
         retina_factor= 1;
         retina_zoom  = 2;
         retina_scale = (tm_style_sheet == ""? 1.0: 1.6666);
-#endif
+#  endif
         retina_icons = 2;
       }
       else if (s == "-no-retina-icons") {
@@ -375,6 +407,23 @@ set_global_options  (int argc, char** argv)  {
         i++;
         if (i<argc) my_init_cmds= (my_init_cmds * " ") * argv[i];
       }
+      else if ((s == "-X")) {
+        exec_exit= false;
+      }
+      else if (s == "-server") set_server ();
+      else if (s == "-port") {
+        i++;
+        if (i<argc) {
+          string port_str = argv[i];
+          set_server_port (as_int (port_str));
+        }
+      }
+      else if (s == "-reset-server-preferences") {
+        set_reset_preferences (true);
+      }
+      else if (s == "-reset-admin-password") {
+        set_reset_admin_password (true);
+      }
       else if (s == "-W" || s == "-build-website" ||
 	       s == "-U" || s == "-update-website") {
         i+=2;
@@ -388,7 +437,6 @@ set_global_options  (int argc, char** argv)  {
             " " * scm_quote (as_string (out)) * ")";
         }
       }
-      else if (s == "-server") start_server_flag= true;
       else if (s == "-log-file") i++;
       else if ((s == "-Oc") || (s == "-no-char-clipping")) char_clip= false;
       else if ((s == "+Oc") || (s == "-char-clipping")) char_clip= true;
@@ -397,7 +445,8 @@ set_global_options  (int argc, char** argv)  {
                (s == "-delete-style-cache") || (s == "-delete-file-cache") ||
                (s == "-delete-doc-cache") || (s == "-delete-plugin-cache") ||
                (s == "-delete-server-data") || (s == "-delete-databases") ||
-	       (s == "-headless") || (s == "-H"));
+	       (s == "-headless") || (s == "-H") || s == "-open");
+      else if (s == "-tls-no-verify") tls_no_verify= true;
       else if (s == "-build-manual") {
         if ((++i)<argc)
           extra_init_cmd << "(build-manual "
@@ -434,6 +483,7 @@ set_global_options  (int argc, char** argv)  {
         cout << "  -V         Show some informative messages\n";
         cout << "  -W [i] [o] Recursively convert directory into website\n";
         cout << "  -x [cmd]   Execute scheme command\n";
+        cout << "  --tls-no-verify  Skip TLS certificate verification\n";
         cout << "  -Oc        TeX characters bitmap clipping off\n";
         cout << "  +Oc        TeX characters bitmap clipping on (default)\n";
         cout << "\nPlease report bugs to <bugs@texmacs.org>\n";
@@ -455,7 +505,7 @@ set_global_options  (int argc, char** argv)  {
   // End parse command line options
 
   // in headless mode quit after processing of the command line
-  if (headless_mode) my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
+  if (headless_mode && exec_exit && !is_server ()) my_init_cmds= my_init_cmds * " (quit-TeXmacs)";
 
   // Further options via environment variables
 #if QT_VERSION < 0x060000
@@ -495,14 +545,12 @@ set_global_options  (int argc, char** argv)  {
   string unify = (gui_version () == "qt4"? string ("on"): string ("off"));
   string mini  = (os_macos ()? string ("off"): string ("on"));
   if (tm_style_sheet != "") mini= "off";
-  #if (defined(OS_MACOS) && QT_VERSION <= QT_VERSION_CHECK(5, 15, 9)) || defined(qt_no_fontconfig)
+#if (defined(OS_MACOS) && QT_VERSION < 0x060000) || defined(qt_no_fontconfig)
   use_native_menubar = get_preference ("use native menubar", native) == "force";
-  #else
+#else
   use_native_menubar = get_preference ("use native menubar", native) == "on" || get_preference ("use native menubar", native) == "force";
-  #endif
-  use_unified_toolbar= get_preference ("use unified toolbar", unify) == "on";
+#endif
   use_mini_bars      = get_preference ("use minibars",         mini) == "on";
-  if (!use_native_menubar) use_unified_toolbar= false;
   // End user preferences
 #endif
 }
@@ -551,7 +599,7 @@ TeXmacs_main (int argc, char** argv) {
       if (DEBUG_STD) debug_boot << "Creating 'no name' buffer...\n";
       open_window ();
     }
-  
+    extra_init_cmd << "(delayed (:idle 500) (keyboard-focus-on \"canvas\"))"; 
     bench_print ();
     bench_reset ("initialize texmacs");
     bench_reset ("initialize plugins");
@@ -560,7 +608,20 @@ TeXmacs_main (int argc, char** argv) {
     if (DEBUG_STD) debug_boot << "Starting event loop...\n";
     texmacs_started= true;
     if (!disable_error_recovery) signal (SIGSEGV, clean_exit_on_segfault);
-    if (start_server_flag) server_start ();
+
+    // allow docker stop to work
+    signal (SIGTERM, clean_exit_on_sigterm);
+
+    // Ignore SIGPIPE: writing to a socket or pipe whose peer has
+    // disconnected must not terminate the process (this was killing the
+    // server with exit code 141 when a client aborted its TLS connection).
+#ifdef SIGPIPE
+    signal (SIGPIPE, SIG_IGN);
+#endif
+
+    if (is_server () && server_can_start ()) {
+      server_start ();
+    }
     release_boot_lock ();
     
     // inject scheme commands 
@@ -576,7 +637,7 @@ TeXmacs_main (int argc, char** argv) {
   if (DEBUG_STD) debug_boot << "Good bye...\n";
 }  
   
-/*  *****************************************************************************
+/******************************************************************************
 * Main program
 ******************************************************************************/
 
@@ -634,6 +695,9 @@ immediate_options (int argc, char** argv) {
     set_env ("TEXMACS_HOME_PATH", get_env ("HOME") * "/.TeXmacs");
 #endif
   if (get_env ("TEXMACS_HOME_PATH") == "") return;
+  if (get_env ("TEXMACS_SERVER_CERT_DIR") == "")
+    set_env ("TEXMACS_SERVER_CERT_DIR",
+             get_env ("TEXMACS_HOME_PATH") * "/server");
   for (int i=1; i<argc; i++) {
     string s= argv[i];
     if ((N(s)>=2) && (s(0,2)=="--")) s= s (1, N(s));
@@ -676,7 +740,17 @@ immediate_options (int argc, char** argv) {
       system ("rm -rf", url ("$TEXMACS_HOME_PATH/system/database"));
       system ("rm -rf", url ("$TEXMACS_HOME_PATH/users"));
     }
-#ifdef QTTEXMACS
+
+    else if (s == "-open" && i + 1 < argc) {
+      i++;
+#if !defined(OS_MACOS)
+      headless_mode= true;
+      open_mode= true;
+      open_mode_url= string (argv[i]);
+#endif
+    }
+
+#if defined (QTTEXMACS) || defined (VUETEXMACS)
     else if (s == "-headless" || s == "-H" || s == "-C" ||
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
@@ -699,12 +773,6 @@ immediate_options (int argc, char** argv) {
 int
 texmacs_entrypoint (int argc, char** argv) {
   immediate_options (argc, argv);
-#ifdef QTTEXMACS
-  if (!headless_mode) qtmapp= new QTMApplication (argc, argv);
-#endif
-#ifdef OS_ANDROID
-  init_android();
-#endif
 
 #ifdef STACK_SIZE
   struct rlimit limit;
@@ -723,6 +791,27 @@ texmacs_entrypoint (int argc, char** argv) {
   windows_delayed_refresh (1000000000);
   TeXmacs_init_paths (argc, argv);
   load_user_preferences ();
+
+
+#ifdef QTTEXMACS
+  if (!headless_mode) {
+    string scaling = get_user_preference ("gui scaling");
+    if (scaling != "default" && scaling != "")
+      set_env ("QT_SCALE_FACTOR", scaling);
+#if QT_VERSION >= 0x060000
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy
+      (Qt::HighDpiScaleFactorRoundingPolicy::Round);
+#if defined(OS_GNULINUX) || defined(OS_FREEBSD)
+    QApplication::setStyle("fusion");
+#endif
+#endif
+    qtmapp= new QTMApplication (argc, argv);
+  }
+#endif
+#ifdef OS_ANDROID
+  init_android();
+#endif
+
 #ifndef OS_MINGW
   set_env ("LC_NUMERIC", "POSIX");
 #endif
@@ -745,14 +834,40 @@ texmacs_entrypoint (int argc, char** argv) {
     ((QTMApplication*)qtmapp)->load();
 #endif
 
+  // Open urls via a single TeXmacs instance
+#if !defined(OS_MACOS)  
+  if (open_mode) {
+    ASSERT (headless_mode, "headless_mode is necessary");
+#  ifdef OS_MINGW
+    url exe= "$TEXMACS_PATH/bin/texmacs.exe";
+#  else
+    url exe= "$TEXMACS_PATH/bin/texmacs";
+#  endif
+    c_string _exe (concretize (exe));
+#  if defined(QTTEXMACS)
+    string cmd= string ("(load-buffer \"") * open_mode_url
+                * string ("\")");
+    if (!send_to_single_instance (cmd))
+#  endif
+    {
+      c_string tmp (open_mode_url);
+      execl (_exe, _exe, (const char*) tmp, NULL);
+    }
+    exit (0);
+  }
+#endif
+
   TeXmacs_init_font  ();
 #ifdef QTTEXMACS
-  if (!headless_mode)
+  if (!headless_mode) {
 #  if QT_VERSION >= 0x060000
+#    ifndef OS_MACOS
     tmapp()->set_window_icon("/misc/images/texmacs.svg");
+#    endif
 #  else
     tmapp()->set_window_icon("/misc/images/texmacs-512.png");
 #  endif
+  }
 #endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();

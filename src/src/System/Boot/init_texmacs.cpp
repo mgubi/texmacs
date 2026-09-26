@@ -124,7 +124,7 @@ make_dir (url which) {
 
 static url
 url_temp_dir_sub () {
-#ifdef OS_MINGW
+#if defined(OS_MINGW) && !defined(OS_MINGW64)
   static url tmp_dir=
     url_system (main_tmp_dir) * url_system (as_string (time (NULL)));
 #else
@@ -203,6 +203,7 @@ init_user_dirs () {
   make_dir ("$TEXMACS_HOME_PATH/langs/natural");
   make_dir ("$TEXMACS_HOME_PATH/langs/natural/dic");
   make_dir ("$TEXMACS_HOME_PATH/langs/natural/hyphen");
+  make_dir ("$TEXMACS_HOME_PATH/langs/natural/spell");
   make_dir ("$TEXMACS_HOME_PATH/langs/programming");
   make_dir ("$TEXMACS_HOME_PATH/misc");
   make_dir ("$TEXMACS_HOME_PATH/misc/patterns");
@@ -216,11 +217,15 @@ init_user_dirs () {
   make_dir ("$TEXMACS_HOME_PATH/system");
   make_dir ("$TEXMACS_HOME_PATH/system/bib");
   make_dir ("$TEXMACS_HOME_PATH/system/cache");
+  make_dir ("$TEXMACS_HOME_PATH/system/certificates");
   make_dir ("$TEXMACS_HOME_PATH/system/database");
   make_dir ("$TEXMACS_HOME_PATH/system/database/bib");
   make_dir ("$TEXMACS_HOME_PATH/system/make");
   make_dir ("$TEXMACS_HOME_PATH/system/tmp");
+  make_dir ("$TEXMACS_HOME_PATH/system/tmp/tree_cache");
   make_dir ("$TEXMACS_HOME_PATH/texts");
+  make_dir ("$TEXMACS_HOME_PATH/texts/backup");
+  make_dir ("$TEXMACS_HOME_PATH/texts/scratch");
   make_dir ("$TEXMACS_HOME_PATH/users");
   change_mode ("$TEXMACS_HOME_PATH/server", 7 << 6);
   change_mode ("$TEXMACS_HOME_PATH/system", 7 << 6);
@@ -549,6 +554,18 @@ test_texmacs_path (url path, bool set_environment) {
   if (!exists (path * "fonts")) return false;
   if (!exists (path * "progs")) return false;
   if (!exists (path * "styles")) return false;
+  // read path/SVNREV and check that the content is equal to ALTERNATIVE_VERSION
+  url rev_file= path * "SVNREV";
+  if (!exists (rev_file)) return false;
+  string rev;
+  if (load_string (rev_file, rev, false)) return false;
+  // remove \n at the end of rev
+  if (N(rev) > 0 && rev[N(rev)-1] == '\n') rev= rev (0, N(rev)-1);
+  if (rev != ALTERNATIVE_VERSION) {
+    cout << "The directory " << path << " contains an incompatible version of TeXmacs.\n";
+    cout << "Expected version: " << ALTERNATIVE_VERSION << ", found version: " << rev << ".\n";
+    return false;
+  }
   if (set_environment) set_env_path ("TEXMACS_PATH", path);
   return true;
 }

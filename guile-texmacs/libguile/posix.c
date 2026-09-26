@@ -88,6 +88,18 @@ extern char *ttyname();
 # define pipe(fd) _pipe (fd, 256, O_BINARY)
 #endif /* __MINGW32__ */
 
+#ifdef HAVE_SYS_UTIME_H
+# include <sys/utime.h>
+#endif
+#ifdef HAVE_UTIME_H
+# include <utime.h>
+#endif
+#ifdef _MSC_VER
+# include <sys/utime.h>
+# define utimbuf _utimbuf
+# define utime _utime
+#endif
+
 #if HAVE_SYS_WAIT_H
 # include <sys/wait.h>
 #endif
@@ -100,7 +112,7 @@ extern char *ttyname();
 
 #include <signal.h>
 
-#if defined(__MINGW64__) && defined (HAVE_MINGW64_UCRT64)
+#ifdef __MINGW32__
 __declspec (dllimport)
 #endif
 extern char ** environ;
@@ -568,7 +580,7 @@ SCM_DEFINE (scm_waitpid, "waitpid", 1, 1, 0,
 #undef FUNC_NAME
 #endif /* HAVE_WAITPID */
 
-#if !defined(__MINGW32__) || defined(__MINGW64__)
+#if !defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
 SCM_DEFINE (scm_status_exit_val, "status:exit-val", 1, 0, 0, 
             (SCM status),
 	    "Return the exit status value, as would be set if a process\n"
@@ -2122,7 +2134,31 @@ scm_init_posix ()
 #endif
 
 #include "libguile/cpp_sig_symbols.c"
-#include "libguile/posix.x"
+ sym_read_pipe = scm_permanent_object (scm_from_locale_symbol ("read pipe")) ;
+ sym_write_pipe = scm_permanent_object (scm_from_locale_symbol ("write pipe")) ;
+ scm_c_define_gsubr (s_scm_pipe, 0, 0, 0, (SCM (*)()) scm_pipe); ;
+ scm_c_define_gsubr (s_scm_kill, 2, 0, 0, (SCM (*)()) scm_kill); ;
+#if !defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
+  scm_c_define_gsubr (s_scm_status_exit_val, 1, 0, 0, (SCM (*)()) scm_status_exit_val); ;
+#endif
+ scm_c_define_gsubr (s_scm_execl, 1, 0, 1, (SCM (*)()) scm_execl); ;
+ scm_c_define_gsubr (s_scm_execlp, 1, 0, 1, (SCM (*)()) scm_execlp); ;
+ scm_c_define_gsubr (s_scm_execle, 2, 0, 1, (SCM (*)()) scm_execle); ;
+ scm_c_define_gsubr (s_scm_uname, 0, 0, 0, (SCM (*)()) scm_uname); ;
+ scm_c_define_gsubr (s_scm_environ, 0, 1, 0, (SCM (*)()) scm_environ); ;
+ scm_c_define_gsubr (s_scm_tmpnam, 0, 0, 0, (SCM (*)()) scm_tmpnam); ;
+ scm_c_define_gsubr (s_scm_mkstemp, 1, 0, 0, (SCM (*)()) scm_mkstemp); ;
+ scm_c_define_gsubr (s_scm_utime, 1, 2, 0, (SCM (*)()) scm_utime); ;
+ scm_c_define_gsubr (s_scm_access, 2, 0, 0, (SCM (*)()) scm_access); ;
+ scm_c_define_gsubr (s_scm_getpid, 0, 0, 0, (SCM (*)()) scm_getpid); ;
+ scm_c_define_gsubr (s_scm_putenv, 1, 0, 0, (SCM (*)()) scm_putenv); ;
+ scm_c_define_gsubr (s_scm_setlocale, 1, 1, 0, (SCM (*)()) scm_setlocale); ;
+ scm_c_define_gsubr (s_scm_getlogin, 0, 0, 0, (SCM (*)()) scm_getlogin); ;
+ scm_c_define_gsubr (s_scm_flock, 2, 0, 0, (SCM (*)()) scm_flock); ;
+#if HAVE_GETHOSTNAME
+ scm_c_define_gsubr (s_scm_gethostname, 0, 0, 0, (SCM (*)()) scm_gethostname); ;
+#endif
+
 }
 
 /*

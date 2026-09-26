@@ -193,6 +193,22 @@
   (:synopsis "One icon tab of an icon tab bar")
   `(cons* 'icon-tab ($list ,@l)))
 
+(tm-define-macro ($responsive-tabs . l)
+  (:synopsis "A responsive tab bar")
+  `(cons* 'responsive-tabs ($list ,@l)))
+
+(tm-define-macro ($responsive-tab . l)
+  (:synopsis "One responsive tab of a responsive tab bar")
+  `(cons* 'responsive-tab ($list ,@l)))
+
+(tm-define-macro ($responsive-icon-tabs . l)
+  (:synopsis "A responsive icon tab bar")
+  `(cons* 'responsive-icon-tabs ($list ,@l)))
+
+(tm-define-macro ($responsive-icon-tab . l)
+  (:synopsis "One responsive icon tab of a responsive icon tab bar")
+  `(cons* 'responsive-icon-tab ($list ,@l)))
+
 (tm-define-macro ($horizontal . l)
   (:synopsis "Horizontal layout of widgets")
   `(cons* 'horizontal ($list ,@l)))
@@ -339,10 +355,23 @@
   (:synopsis "Make input toggle")
   `(list 'toggle (lambda (answer) ,cmd) (lambda () ,on)))
 
+(tm-define-macro ($setting-toggle cmd setting on)
+  (:synopsis "Make input toggle for a setting")
+  `(list 'setting-toggle (lambda (answer) ,cmd) ,setting (lambda () ,on)))
+
 (tm-define-macro ($enum cmd vals val width)
   (:synopsis "Make input enumeration field")
   `(list 'enum (lambda (answer) ,cmd) (lambda () ,vals) (lambda () ,val)
          ,width))
+
+(tm-define-macro ($setting-enum cmd name vals val width)
+  (:synopsis "Make input enumeration field for a setting")
+  `(list 'setting-enum (lambda (answer) ,cmd) ,name (lambda () ,vals)
+         (lambda () ,val) ,width))
+
+(tm-define-macro ($setting-group name . l)
+  (:synopsis "Make a grouped settings widget")
+  `(cons* 'setting-group (lambda () ,name) ($list ,@l)))
 
 (tm-define-macro ($choice cmd vals val)
   (:synopsis "Make a choice list")

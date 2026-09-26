@@ -26,7 +26,12 @@
 #include <QPainter>
 #include <QPaintDevice>
 #include <QPixmap>
+#ifdef USE_RESVG
+#include "Resvg/resvg.hpp"
+#endif
+#ifdef USE_QTSVG
 #include <QSvgRenderer>
+#endif
 
 /******************************************************************************
 * Abstract Qt pictures
@@ -108,7 +113,7 @@ qt_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 ******************************************************************************/
 
 qt_image_renderer_rep::qt_image_renderer_rep (picture p, double zoom):
-  qt_renderer_rep (new QPainter ()), pict (p)
+  qt_renderer_rep (new QPainter (), 1), pict (p)
 {
   zoomf  = zoom;
   shrinkf= (int) tm_round (std_shrinkf / zoomf);
@@ -150,8 +155,8 @@ qt_image_renderer_rep::~qt_image_renderer_rep () {
 }
 
 void
-qt_image_renderer_rep::set_zoom_factor (double zoom) {
-  renderer_rep::set_zoom_factor (zoom);
+qt_image_renderer_rep::set_zoom_factor (double zoom, bool safe) {
+  renderer_rep::set_zoom_factor (zoom, safe);
 }
 
 void*
@@ -241,27 +246,40 @@ may_transform (url file_name, const QImage& pm) {
 QImage*
 get_image_for_real (url u, int w, int h, tree eff, SI pixel) {
   QImage *pm = NULL;
-
+#ifdef USE_RESVG
   if (suffix (u) == "svg") {
-    QSvgRenderer renderer (utf8_to_qstring (concretize (u)));
-    pm= new QImage (w, h, QImage::Format_ARGB32);
-    pm->fill (Qt::transparent);
-    QPainter painter (pm);
-    renderer.render (&painter);
-  } else if (qt_supports (u)) {
-    pm= new QImage (utf8_to_qstring (concretize (u)));
-  } else {
-    url temp= url_temp (".png");
-    image_to_png (u, temp, w, h);
-    pm= new QImage (utf8_to_qstring (as_string (temp)));
-    remove (temp);
+    if (w <= 0 || h <= 0) {
+      int nw = w, nh = h;
+      if (resvg_native_image_size (u, nw, nh)) {
+        if (w <= 0) w = nw;
+        if (h <= 0) h = nh;
+      }
+    }
+    if (w > 0 && h > 0) {
+      QImage tmp (w, h, QImage::Format_RGBA8888_Premultiplied);
+      tmp.fill (Qt::transparent);
+      if (resvg_render_image (u, w, h, (char*) tmp.bits ())) {
+        pm = new QImage (tmp.convertToFormat (QImage::Format_ARGB32));
+      }
+    }
+  }
+#endif
+  if (pm == NULL) {
+    if (qt_supports (u)) {
+      pm= new QImage (utf8_to_qstring (materialize (u)));
+    } else {
+      url temp= url_temp (".png");
+      image_to_png (u, temp, w, h);
+      pm= new QImage (utf8_to_qstring (materialize (temp, "")));
+      remove (temp);
+    }
   }
 
   // Error Handling
   if (pm == NULL || pm->isNull ()) {
-      if (pm != NULL) delete pm;
-      cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
-      return NULL;
+    if (pm != NULL) delete pm;
+    std_warning << "cannot render " << u << "\n";
+    return NULL;
   }
 
   // Scaling
@@ -321,11 +339,7 @@ picture
 new_qt_load_xpm (url file_name) {
   string sss;
   double f= 1.0;
-#if QT_VERSION >= 0x060000
-  double scale= 1.0;
-#else
   double scale= max (retina_scale, (double) retina_icons);
-#endif
   if (suffix (file_name) == "xpm" || suffix (file_name) == "png") {
     string suf= ".png";
     if (scale == 1.0) {}
@@ -352,19 +366,9 @@ new_qt_load_xpm (url file_name) {
   }
 #if (QT_VERSION < 0x050000) && defined (Q_OS_MAC)
   if (retina_icons == 2) {
-    if (use_unified_toolbar) {
-      static bool main_icons=
-        get_preference ("main icon bar", "off") != "off";
-      if (pm.height () > 40) f *= 0.75;
-      else if (pm.height () > 32 && main_icons) f *= 0.85;
-      else if (pm.height () > 32) f *= 0.6;
-      else f *= 0.5;
-    }
-    else {
-      if (pm.height () > 40) f *= 1.0;
-      else if (pm.height () > 32) f *= 0.9;
-      else f *= 0.8;
-    }
+    if (pm.height () > 40) f *= 1.0;
+    else if (pm.height () > 32) f *= 0.9;
+    else f *= 0.8;
   }
 #endif
   pm= pm.scaled ((int) floor (f * pm.width () + 0.5),
@@ -377,12 +381,10 @@ picture
 qt_load_xpm (url file_name) {
   if (tm_style_sheet != "") return new_qt_load_xpm (file_name);
   string sss;
-#if QT_VERSION < 0x060000
   if (retina_icons > 1 && suffix (file_name) == "xpm") {
     url png_equiv= glue (unglue (file_name, 4), "_x2.png");
     load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
   }
-#endif
   if (sss == "" && suffix (file_name) == "xpm") {
     url png_equiv= glue (unglue (file_name, 3), "png");
     load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
@@ -410,7 +412,7 @@ qt_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
   picture t= e->apply (a, PIXEL);
   picture q= as_qt_picture (t);
   qt_picture_rep* pict= (qt_picture_rep*) q->get_handle ();
-  pict->pict.save (utf8_to_qstring (concretize (dest)));
+  pict->pict.save (utf8_to_qstring (materialize (dest, "")));
 }
 
 #ifndef MUPDF_RENDERER
@@ -419,6 +421,6 @@ save_picture (url dest, picture p) {
   picture q= as_qt_picture (p);
   qt_picture_rep* pict= (qt_picture_rep*) q->get_handle ();
   if (exists (dest)) remove (dest);
-  pict->pict.save (utf8_to_qstring (concretize (dest)));
+  pict->pict.save (utf8_to_qstring (materialize (dest, "")));
 }
 #endif

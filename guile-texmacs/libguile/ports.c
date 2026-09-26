@@ -1750,7 +1750,43 @@ scm_init_ports ()
   cur_errport_fluid = scm_permanent_object (scm_make_fluid ());
   cur_loadport_fluid = scm_permanent_object (scm_make_fluid ());
 
-#include "libguile/ports.x"
+ scm_c_define_gsubr (s_scm_char_ready_p, 0, 1, 0, (SCM (*)()) scm_char_ready_p); ;
+ scm_c_define_gsubr (s_scm_drain_input, 1, 0, 0, (SCM (*)()) scm_drain_input); ;
+ scm_c_define_gsubr (s_scm_current_input_port, 0, 0, 0, (SCM (*)()) scm_current_input_port); ;
+ scm_c_define_gsubr (s_scm_current_output_port, 0, 0, 0, (SCM (*)()) scm_current_output_port); ;
+ scm_c_define_gsubr (s_scm_current_error_port, 0, 0, 0, (SCM (*)()) scm_current_error_port); ;
+ scm_c_define_gsubr (s_scm_current_load_port, 0, 0, 0, (SCM (*)()) scm_current_load_port); ;
+ scm_c_define_gsubr (s_scm_set_current_input_port, 1, 0, 0, (SCM (*)()) scm_set_current_input_port); ;
+ scm_c_define_gsubr (s_scm_set_current_output_port, 1, 0, 0, (SCM (*)()) scm_set_current_output_port); ;
+ scm_c_define_gsubr (s_scm_set_current_error_port, 1, 0, 0, (SCM (*)()) scm_set_current_error_port); ;
+ scm_c_define_gsubr (s_scm_port_revealed, 1, 0, 0, (SCM (*)()) scm_port_revealed); ;
+ scm_c_define_gsubr (s_scm_set_port_revealed_x, 2, 0, 0, (SCM (*)()) scm_set_port_revealed_x); ;
+ scm_c_define_gsubr (s_scm_port_mode, 1, 0, 0, (SCM (*)()) scm_port_mode); ;
+ scm_c_define_gsubr (s_scm_close_port, 1, 0, 0, (SCM (*)()) scm_close_port); ;
+ scm_c_define_gsubr (s_scm_close_input_port, 1, 0, 0, (SCM (*)()) scm_close_input_port); ;
+ scm_c_define_gsubr (s_scm_close_output_port, 1, 0, 0, (SCM (*)()) scm_close_output_port); ;
+ scm_c_define_gsubr (s_scm_port_for_each, 1, 0, 0, (SCM (*)()) scm_port_for_each); ;
+ scm_c_define_gsubr (s_scm_input_port_p, 1, 0, 0, (SCM (*)()) scm_input_port_p); ;
+ scm_c_define_gsubr (s_scm_output_port_p, 1, 0, 0, (SCM (*)()) scm_output_port_p); ;
+ scm_c_define_gsubr (s_scm_port_p, 1, 0, 0, (SCM (*)()) scm_port_p); ;
+ scm_c_define_gsubr (s_scm_port_closed_p, 1, 0, 0, (SCM (*)()) scm_port_closed_p); ;
+ scm_c_define_gsubr (s_scm_eof_object_p, 1, 0, 0, (SCM (*)()) scm_eof_object_p); ;
+ scm_c_define_gsubr (s_scm_force_output, 0, 1, 0, (SCM (*)()) scm_force_output); ;
+ scm_c_define_gsubr (s_scm_flush_all_ports, 0, 0, 0, (SCM (*)()) scm_flush_all_ports); ;
+ scm_c_define_gsubr (s_scm_read_char, 0, 1, 0, (SCM (*)()) scm_read_char); ;
+ scm_c_define_gsubr (s_scm_peek_char, 0, 1, 0, (SCM (*)()) scm_peek_char); ;
+ scm_c_define_gsubr (s_scm_unread_char, 1, 1, 0, (SCM (*)()) scm_unread_char); ;
+ scm_c_define_gsubr (s_scm_unread_string, 2, 0, 0, (SCM (*)()) scm_unread_string); ;
+ scm_c_define_gsubr (s_scm_seek, 3, 0, 0, (SCM (*)()) scm_seek); ;
+ scm_c_define_gsubr (s_scm_truncate_file, 1, 1, 0, (SCM (*)()) scm_truncate_file); ;
+ scm_c_define_gsubr (s_scm_port_line, 1, 0, 0, (SCM (*)()) scm_port_line); ;
+ scm_c_define_gsubr (s_scm_set_port_line_x, 2, 0, 0, (SCM (*)()) scm_set_port_line_x); ;
+ scm_c_define_gsubr (s_scm_port_column, 1, 0, 0, (SCM (*)()) scm_port_column); ;
+ scm_c_define_gsubr (s_scm_set_port_column_x, 2, 0, 0, (SCM (*)()) scm_set_port_column_x); ;
+ scm_c_define_gsubr (s_scm_port_filename, 1, 0, 0, (SCM (*)()) scm_port_filename); ;
+ scm_c_define_gsubr (s_scm_set_port_filename_x, 2, 0, 0, (SCM (*)()) scm_set_port_filename_x); ;
+ scm_c_define_gsubr (s_scm_sys_make_void_port, 1, 0, 0, (SCM (*)()) scm_sys_make_void_port); ;
+
 }
 
 /*

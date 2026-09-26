@@ -80,13 +80,3 @@ ETAGS_ARGS = $(info_TEXINFOS) $(guile_TEXINFOS)
 
 EXTRA_DIST = ChangeLog-2008
 
-include $(top_srcdir)/am/pre-inst-guile
-
-# Automated snarfing
-
-autoconf.texi: autoconf-macros.texi
-autoconf-macros.texi: $(top_srcdir)/guile-config/guile.m4
-	GUILE="$(GUILE_FOR_BUILD)" $(top_srcdir)/scripts/snarf-guile-m4-docs $(top_srcdir)/guile-config/guile.m4 \
-	  > $(srcdir)/$@
-
-MAINTAINERCLEANFILES = autoconf-macros.texi

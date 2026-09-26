@@ -28,6 +28,31 @@ typedef struct texmacs_dirent {
 } texmacs_dirent;
 
 /*
+ * @brief Reset the last error code
+ */
+void texmacs_reset_last_error();
+
+/*
+ * @brief Get the last error code (from posix errno)
+ */
+int64_t texmacs_get_last_error();
+
+/*
+ * @brief Get the last error string (from posix strerror)
+ */
+string texmacs_get_last_error_str();
+
+/*
+ * @brief Acquire advisory lock on file
+ */
+void texmacs_lock_file(FILE *&file, bool nonblock=false);
+
+/*
+ * @brief Release advisory lock on file
+ */
+void texmacs_unlock_file(FILE *&file);
+
+/*
  * @brief Proxy function to call the fopen function 
  * with UTF-8 encoded strings
  * @param lock: not used on Windows
@@ -145,19 +170,5 @@ inline url texmacs_get_application_directory() {
     return url_system(texmacs_get_application_directory_str());
 }
 #endif
-
-inline void texmacs_system_start_long_task() {
-  // do nothing
-}
-
-inline void texmacs_system_end_long_task() {
-  // do nothing
-}
-
-/*
- * @brief Process the essential user events. This function should be called
- * in long tasks to keep TeXmacs responsive.
- */
-void texmacs_process_event();
 
 #endif

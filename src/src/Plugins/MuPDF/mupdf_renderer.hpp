@@ -19,6 +19,13 @@
 
 fz_context* mupdf_context ();
 
+// FreeType on the face of a MuPDF font, with MuPDF's lock held: the
+// built in ("Adobe custom") encoding of a Type 1 font selected, and the
+// glyph of a TeXmacs character index (tt_face.cpp: an index from
+// 0xc000000 on is a glyph number already)
+void mupdf_select_custom_charmap (fz_font* font);
+unsigned int mupdf_glyph_index (fz_font* font, int i);
+
 /******************************************************************************
 * Graphic renderer
 ******************************************************************************/
@@ -35,6 +42,8 @@ protected:
   SI        lw;
   double    current_width;
   int       clip_level;
+  int       transform_level; // how deep in set_transformation
+  bool      fill_is_pattern; // the PDF fill color is a pattern (no direct fill)
   
 //  pencil    pen;
 //  brush     bgb, fgb;
@@ -70,18 +79,27 @@ protected:
   void select_fill_pattern (brush br);
   void register_pattern (brush br, SI pixel);
 
+  // direct access to the pixels of the target pixmap (see the notes there)
+  bool device_box (SI x1, SI y1, SI x2, SI y2,
+                   int& px1, int& py1, int& px2, int& py2);
+  bool fill_direct (SI x1, SI y1, SI x2, SI y2, color c);
+  bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
+                           bool opaque= false);
+
 public:
   mupdf_renderer_rep (int w = 0, int h = 0);
   ~mupdf_renderer_rep ();
   void* get_handle ();
 
-  void set_zoom_factor (double zoom);
+  void set_zoom_factor (double zoom, bool safe= true);
+  // the device background is the pattern/color cleared by the editor itself
+  void clear_device (SI x1, SI y1, SI x2, SI y2);
 
   void begin (void* handle);
   void end ();
 
   //void set_extent (int _w, int _h) { w = _w; h = _h; }
-  void get_extents (int& w, int& h);
+  void get_extents (SI& w, SI& h);
 
   void set_transformation (frame fr);
   void reset_transformation ();
@@ -102,6 +120,9 @@ public:
   void arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void polygon (array<SI> x, array<SI> y, bool convex=true);
+  void rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                          SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                          bool filled);
 //  void  draw_triangle (SI x1, SI y1, SI x2, SI y2, SI x3, SI y3);
 
   void bezier_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta, bool filled);
@@ -122,3 +143,4 @@ public:
 mupdf_renderer_rep* the_mupdf_renderer ();
 
 #endif // defined MUPDF_RENDERER_HPP
+void mupdf_image_gc (string name); // see image_gc in gui.hpp

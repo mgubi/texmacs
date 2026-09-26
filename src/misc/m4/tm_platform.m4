@@ -62,6 +62,7 @@ AC_DEFUN([TM_PLATFORM],[
       CONFIG_OS="GNU_LINUX"
       CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
       CONFIG_QTPIPES="yes"
+      LC_APPEND_FLAG([-rdynamic],[LDFLAGS])
       AC_DEFINE([STACK_SIZE], 0x1000000, [If not set during link])
       AC_CHECK_LIB(expat,XML_ParserCreate,[CONFIG_BSTATIC="-lexpat $CONFIG_BSTATIC";CONFIG_STYPE=A])
       AC_CHECK_LIB(xcb,xcb_disconnect,[CONFIG_BSTATIC="-lxcb $CONFIG_BSTATIC";CONFIG_STYPE=B])
@@ -125,12 +126,12 @@ AC_DEFUN([TM_PLATFORM],[
       AC_SUBST([CONFIG_BUNDLE],[WINDOWS_BUNDLE])
       AC_SUBST([CONFIG_PACKAGE],[WINDOWS_PACKAGE])
       CONFIG_OS=MINGW
-      CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
+      CONFIG_CXXOPTIMIZE="-O3"
       CONFIG_QTPIPES="yes"
       CONFIG_OS_COMPAT="Windows64"
       CPPFLAGS="$CPPFLAGS -IPlugins/Windows64 -I."
       LC_APPEND_FLAG([-Wl,--stack=16777216],[LDFLAGS])
-      LC_APPEND_FLAG([-ldbghelp -lSecur32 -lshell32 -lole32 -ladvapi32 -lsecur32],[LDFLAGS])
+      LC_APPEND_FLAG([-ldbghelp -lSecur32 -lshell32 -lole32 -ladvapi32 -lsecur32 -ldwmapi],[LDFLAGS])
       CONFIG_CP="cp -f -R -p" #rsync do not work properly on mingw
     ;;
     *mingw*)
@@ -139,7 +140,7 @@ AC_DEFUN([TM_PLATFORM],[
       AC_SUBST([CONFIG_BUNDLE],[WINDOWS_BUNDLE])
       AC_SUBST([CONFIG_PACKAGE],[WINDOWS_PACKAGE])
       CONFIG_OS=MINGW
-      CONFIG_CXXOPTIMIZE="-O3 -fexpensive-optimizations"
+      CONFIG_CXXOPTIMIZE="-O3"
       CONFIG_QTPIPES="yes"
       CONFIG_OS_COMPAT="Windows"
       CPPFLAGS="$CPPFLAGS -I/usr/local/include -IPlugins/Windows -I."
@@ -320,6 +321,7 @@ AC_DEFUN([TM_PLATFORM],[
   AC_SUBST(CONFIG_CXXTEMPLATE)
   AC_SUBST(CONFIG_CXXOPTIMIZE)
   AC_SUBST(CONFIG_CXXDEBUG)
+  AC_SUBST(CONFIG_CXXSANITIZERS)
   AC_SUBST(CONFIG_CXXPROFILE)
   AC_SUBST(CONFIG_BFLAGS)
   AC_SUBST(CONFIG_BSTATIC)

@@ -196,7 +196,7 @@ edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
     SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
     widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
-#if defined (QTTEXMACS) || defined(AQUATEXMACS)
+#if defined (QTTEXMACS) || defined(AQUATEXMACS) || defined(VUETEXMACS)
     SI ox, oy, sx, sy;
     get_position (this, ox, oy);
     get_scroll_position(this, sx, sy);
@@ -553,21 +553,20 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t,
   if (type == "scale") eval ("(pinch-scale " * as_string (data[0]) * ")");
   if (type == "rotate") eval ("(pinch-rotate " * as_string (-data[0]) * ")");
 
-  if (inside_graphics ()) {
+  if (inside_graphics (type != "release-left")) {
     path gp= search_upwards (GRAPHICS);
-    bool b= inside_graphics (type != "release-left");
     if (!is_nil (gp) && gp != previous_gp) {
-      if (!is_nil (previous_gp) && type == "move")
-	mouse_click (x, y);
+      eval ("(graphics-exit-right)");
+      mouse_any (type, x, y, mods, t, data);
       previous_gp= gp;
-    }
-    if (b) {
-      if (mouse_graphics (type, x, y, mods, t, data)) return;
-      if (!over_graphics (x, y))
-	eval ("(graphics-reset-context 'text-cursor)");
+      return;
     }
   }
-  
+  if (inside_graphics (type != "release-left")) {
+    if (mouse_graphics (type, x, y, mods, t, data)) return;
+    if (!over_graphics (x, y))
+      eval ("(graphics-reset-context 'text-cursor)");
+  }
   if (type == "press-left" || type == "start-drag-left") {
     if (mods > 1) {
       mouse_adjusting = mods;
@@ -633,7 +632,7 @@ relativize (tree t, url base) {
 
 static void
 call_drop_event (string kind, SI x, SI y, SI ticket, time_t t, url base) {
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (VUETEXMACS)
   (void) kind; (void) x; (void) y; (void) t;
   extern hashmap<int, tree> payloads;
   tree doc = payloads [ticket];

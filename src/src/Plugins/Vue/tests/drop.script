@@ -1,0 +1,10 @@
+# needs drop.scm: a dropped file name is inserted, so is dropped text
+wait 6000
+window #2
+click 400 500
+wait 300
+drop 400 500 /tmp/dropped-example.tm
+wait 800
+drop 400 500 text:some dropped text
+wait 800
+snapshot d1

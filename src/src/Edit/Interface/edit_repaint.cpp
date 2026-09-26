@@ -26,13 +26,16 @@ edit_interface_rep::draw_background (renderer ren,
                                      SI x1, SI y1, SI x2, SI y2) {
   tree bg= get_init_value (BG_COLOR);
   ren->set_background (bg);
-  if (get_init_value (PAGE_MEDIUM) == "paper")
+  if (get_init_value (PAGE_MEDIUM) == "paper") {
+    ren->clear_device (x1, y1, x2, y2);
     eb->clear (ren, x1, y1, x2, y2);
+  }
   else {
     rectangle m (eb->x1, eb->y1, eb->x2, eb->y2);
     rectangle r (x1, y1, x2, y2);
     rectangle tm= translate (m, ren->ox, ren->oy);
     rectangle tr= translate (r, ren->ox, ren->oy);
+    ren->clear_device (x1, y1, x2, y2);
     clear_pattern_rectangles (ren, tm, tr);
   }
 }
@@ -150,17 +153,26 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
   for (int i=0; i<N(alt_selection_rects); i++) {
     color col= get_env_color (MATCH_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#if defined(QTTEXMACS) || defined (SDLTEXMACS)
+#if defined(QTTEXMACS) || defined (SDLTEXMACS) || defined(VUETEXMACS)
     ren->draw_selection (alt_selection_rects[i] & visible);
 #else
     ren->draw_rectangles (alt_selection_rects[i] & visible);
+#endif
+  }
+  for (int i=0; i<N(spell_error_rects); i++) {
+    color col= get_env_color (SPELL_ERROR_COLOR);
+    ren->set_pencil (pencil (col, ren->pixel));
+#ifdef QTTEXMACS
+    ren->draw_selection (spell_error_rects[i] & visible);
+#else
+    ren->draw_rectangles (spell_error_rects[i] & visible);
 #endif
   }
   if (!is_nil (selection_rects)) {
     color col= get_env_color (SELECTION_COLOR);
     if (table_selection) col= get_env_color (TABLE_SELECTION_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#if defined(QTTEXMACS) || defined (SDLTEXMACS)
+#if defined(QTTEXMACS) || defined (SDLTEXMACS) || defined(VUETEXMACS)
     ren->draw_selection (selection_rects & visible);
 #else
     ren->draw_rectangles (selection_rects & visible);

@@ -33,6 +33,11 @@
 #if QT_VERSION < 0x060000
 #include <QDesktopWidget>
 #endif
+
+#if QT_VERSION >= 0x060000
+#include <QDialog>
+#endif
+
 #include <QClipboard>
 #include <QBuffer>
 #include <QFileOpenEvent>
@@ -48,7 +53,6 @@
 #include <QLibraryInfo>
 #include <QImage>
 #include <QUrl>
-//#include <QDesktopWidget>
 #include <QApplication>
 
 #include "QTMGuiHelper.hpp"
@@ -121,19 +125,16 @@ tm_sleep () {
 ******************************************************************************/
 
 qt_gui_rep::qt_gui_rep (int &argc, char **argv):
-interrupted (false), popup_wid_time (0), q_translator (0),
+interrupted (false), waitWindow (NULL), popup_wid_time (0), q_translator (0),
 time_credit (100), do_check_events (false), updating (false), 
 needing_update (false)
 {
+#if QT_VERSION >= 0x060000
+  waitLabel= NULL;
+#endif
+
   (void) argc; (void) argv;
-    // argc = argc2;
-    // argv = argv2;
-  
-  interrupted  = false;
-  time_credit  = 100;
   timeout_time = texmacs_time () + time_credit;
-  
-    //waitDialog = NULL;
   
   gui_helper = new QTMGuiHelper (this);
   qApp->installEventFilter (gui_helper);
@@ -162,14 +163,14 @@ needing_update (false)
 #if QT_VERSION < 0x060000
   if (!retina_manual) {
     retina_manual= true;
-#ifdef MACOSX_EXTENSIONS
+#  ifdef MACOSX_EXTENSIONS
     double mac_hidpi = mac_screen_scale_factor();
     if (DEBUG_STD)
       debug_boot << "Mac Screen scaleFfactor: " << mac_hidpi <<  "\n";
           
     if (mac_hidpi == 2) {
       if (DEBUG_STD) debug_boot << "Setting up HiDPI mode\n";
-#if (QT_VERSION < 0x050000)
+#   if (QT_VERSION < 0x050000)
       retina_factor= 2;
       if (tm_style_sheet == "") retina_scale = 1.4;
       else retina_scale = 1.0;
@@ -179,11 +180,11 @@ needing_update (false)
         // retina_icons = 1;
         // retina_icons = 2;  // FIXME: why is this not better?
       }
-#else
+#   else
       retina_factor= 2;      
-#endif
+#   endif
     }
-#else
+#  else
     SI w, h;
     get_extents (w, h);
     if (DEBUG_STD)
@@ -196,7 +197,7 @@ needing_update (false)
         retina_icons = 2;
       }
     }
-#endif
+#  endif
   }
   if (has_user_preference ("retina-factor"))
     retina_factor= get_user_preference ("retina-factor") == "on"? 2: 1;
@@ -230,6 +231,17 @@ qt_gui_rep::get_max_size (SI& width, SI& height) {
 
 qt_gui_rep::~qt_gui_rep()  {
   delete gui_helper;
+#if QT_VERSION >= 0x060000
+  if (waitWindow) waitWindow->deleteLater();  
+#else
+  while (waitDialogs.count()) {
+    waitDialogs.last()->deleteLater();
+    waitDialogs.removeLast();
+  }
+  if (waitWindow) delete waitWindow;  
+    // delete updatetimer; we do not need this given that gui_helper is the
+    // parent of updatetimer
+#endif
 }
 
 
@@ -447,6 +459,146 @@ void qt_gui_rep::set_mouse_pointer (string curs_name, string mask_name)
  * Main loop
  ******************************************************************************/
 
+#if QT_VERSION >= 0x060000
+static void
+center_waitWindow (widget w, QDialog* waitWindow) {
+  qt_window_widget_rep* wid = static_cast<qt_window_widget_rep*> (w.rep);
+  QSize sz = waitWindow->geometry ().size ();
+  QRect rect = QRect (QPoint (0,0), sz);
+  qApp->processEvents (QEventLoop::ExcludeUserInputEvents);
+  QPoint pt = wid->qwid->window ()->geometry ().center ();
+  rect.moveCenter (pt);
+  waitWindow->move (rect.topLeft ());
+}
+
+void
+qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
+  if (headless_mode) return;
+  if (DEBUG_QT)
+    debug_qt << "show_wait_indicator \"" << message << "\"\"" << arg << "\"\n";
+  if (!waitWindow) {
+    waitWindow = new QDialog ();
+    waitWindow->setModal(true);
+    waitWindow->setWindowFlags (Qt::Window | Qt::FramelessWindowHint
+    				| Qt::WindowStaysOnTopHint);
+    QHBoxLayout *layout = new QHBoxLayout (waitWindow);
+    waitWindow->setLayout (layout);
+    QLabel* iconLabel = new QLabel (waitWindow);
+    layout->addWidget (iconLabel);
+    QIcon icon = tmapp ()->icon_manager ().getIcon ("TeXmacs");
+    QPixmap pm = icon.pixmap (256, 256);
+    iconLabel->setPixmap (pm);
+    iconLabel->setAlignment (Qt::AlignCenter);
+    iconLabel->setFixedSize (32, 32);
+    iconLabel->setScaledContents (true);
+    waitLabel = new QLabel (waitWindow);
+    layout->addWidget (waitLabel);
+  }
+  if (N(message)) {
+    // push a new wait message in the list
+    string tmp= message;
+    if (arg != "") tmp = tmp * " " * arg * "...";
+    waitDialogs << to_qstring (tmp);
+  } else {
+    // pop the next wait message from the list
+    if (waitDialogs.count())
+      waitDialogs.removeLast();
+  }
+  if (waitDialogs.count()) {
+    QString msg= waitDialogs.first();
+    if (waitDialogs.count() >= 2)
+      msg= msg + QString ("\n") + waitDialogs.last ();
+    waitLabel->setText (msg);
+    center_waitWindow (w, waitWindow);
+    waitWindow->updateGeometry ();
+    waitWindow->show ();
+    qApp->processEvents (QEventLoop::ExcludeUserInputEvents);
+  } else {
+    waitLabel->setText ("");
+    waitWindow->close ();
+    QTMWidget::setFocusToLast();
+  }
+  qt_window_widget_rep* wid= static_cast<qt_window_widget_rep*> (w.rep);
+  wid->qwid->activateWindow ();
+  send_keyboard_focus (wid);
+  need_update ();
+}
+#else
+void
+qt_gui_rep::show_wait_indicator (widget w, string message, string arg)  {
+  if (headless_mode) return;
+  if (DEBUG_QT)
+    debug_qt << "show_wait_indicator \"" << message << "\"\"" << arg << "\"\n";
+  
+  qt_window_widget_rep* wid = static_cast<qt_window_widget_rep*> (w.rep);
+  
+    // we move the texmacs window during an operation.
+    // We need to disable updates of the window to avoid erasure of the canvas
+    // area
+    //  wid->wid->setUpdatesEnabled (false);
+  
+    //FIXME: we must center the wait widget wrt the current active window
+  
+  if (!waitWindow) {
+    waitWindow = new QWidget (wid->qwid->window());
+    waitWindow->setWindowFlags (Qt::Window | Qt::FramelessWindowHint
+				| Qt::WindowStaysOnTopHint);
+    QStackedLayout *layout = new QStackedLayout();
+    layout->setSizeConstraint (QLayout::SetFixedSize);
+    waitWindow->setLayout (layout);
+  }
+  
+  if (waitDialogs.count()) {
+    waitWindow->layout()->removeWidget (waitDialogs.last());
+  }
+  
+  if (N(message)) {
+      // push a new wait message in the list
+    
+    if (arg != "") message = message * " " * arg * "...";
+    
+    QLabel* lab = new  QLabel();
+    lab->setFocusPolicy (Qt::NoFocus);
+    lab->setMargin (15);
+    lab->setText (to_qstring (message));
+    waitDialogs << lab;
+  } else {
+      // pop the next wait message from the list
+    if (waitDialogs.count()) {
+      waitDialogs.last()->deleteLater();
+      waitDialogs.removeLast();
+    }
+  }
+  
+  if (waitDialogs.count()) {
+    waitWindow->layout()->addWidget (waitDialogs.last());
+    waitWindow->updateGeometry();
+    {
+      QSize sz = waitWindow->geometry().size();
+      QRect rect = QRect (QPoint (0,0),sz);
+        //HACK:
+        // processEvents is needed to let Qt update windows coordinates in the case
+      qApp->processEvents (QEventLoop::ExcludeUserInputEvents);
+        //ENDHACK
+      QPoint pt = wid->qwid->window()->geometry().center();
+      rect.moveCenter (pt);
+      waitWindow->move (rect.topLeft());
+      
+    }
+    waitWindow->show();
+    qApp->processEvents (QEventLoop::ExcludeUserInputEvents);
+    waitWindow->repaint();
+  } else {
+    waitWindow->close();
+  }
+
+  wid->qwid->activateWindow ();
+  send_keyboard_focus (wid);
+    // next time we do update the dialog will disappear
+  need_update();
+}
+#endif
+
 void (*the_interpose_handler) (void) = NULL;
 
 void gui_interpose (void (*r) (void)) { the_interpose_handler = r; }
@@ -483,26 +635,11 @@ gui_open (int& argc, char** argv) {
   // (see as_double() in string.cpp)
 
   setlocale (LC_NUMERIC, "C");
-
-  // From Qt docs:
-  // On Unix/Linux Qt is configured to use the system locale settings by
-  // default. This can cause a conflict when using POSIX functions, for
-  // instance, when converting between data types such as floats and strings,
-  // since the notation may differ between locales. To get around this problem,
-  // call the POSIX function setlocale(LC_NUMERIC,"C") right after initializing
-  // QApplication, QGuiApplication or QCoreApplication to reset the locale
-  // that is used for number formatting to "C"-locale.
-  // See https://doc.qt.io/qt-5/qcoreapplication.html#locale-settings
-
-  if (!headless_mode)
-    init_style_sheet (tmapp());
 }
 
 void
 gui_start_loop () {
   // start the main loop
-  if (!headless_mode)
-    tmapp()->installWaitHandler();
   the_gui->event_loop ();
 }
 
@@ -546,6 +683,12 @@ gui_version () {
   return "qt4";
 #endif
 #endif
+}
+
+bool
+qt_support_functionality (string s) {
+  (void) s;
+  return false;
 }
 
 /******************************************************************************
@@ -768,13 +911,6 @@ qt_gui_rep::update () {
     return;
   }
 
-  if (!headless_mode
-      && tmapp()->waitDialog().isActive()
-      && !tmapp()->waitDialog().isVisible()) {
-    cout << "Waiting for splash screen to be visible" << LF;
-    return;
-  }
-  
     // cout << "<" << texmacs_time() << " " << N(delayed_queue) << " ";
   
   updatetimer->stop();
@@ -783,14 +919,24 @@ qt_gui_rep::update () {
   static int count_events    = 0;
   static int max_proc_events = 40;
 
-  if (!headless_mode && tmapp()->waitDialog().isActive()) {
-    max_proc_events = 1000;
-    texmacs_system_start_long_task();
-  }
-  
   time_t     now = texmacs_time();
   needing_update = false;
   time_credit    = 9 / (waiting_events.size() + 1);
+
+  if (waitDialogs.count()) {
+#if QT_VERSION >= 0x060000
+    waitWindow->close();
+    waitLabel->setText ("");
+    waitDialogs.clear ();
+#else
+    waitWindow->layout()->removeWidget (waitDialogs.last());
+    waitWindow->close();
+    while (waitDialogs.count()) {
+      waitDialogs.last()->deleteLater();
+      waitDialogs.removeLast();
+    }
+#endif
+  }
     
   if (popup_wid_time > 0 && now > popup_wid_time) {
     popup_wid_time = 0;
@@ -811,16 +957,17 @@ qt_gui_rep::update () {
   if (waiting_events.size() == 0) {
       // If there are no waiting events call the interpose handler at least once
     //if (the_interpose_handler) the_interpose_handler();
-    if (!headless_mode && tmapp()->waitDialog().isActive()) {
-      tmapp()->waitDialog().setActive(false);
-      texmacs_system_end_long_task();
-    }
   }
   else while (waiting_events.size() > 0 && count_events < max_proc_events) {
     process_queued_events (1);
     count_events++;
     //if (the_interpose_handler) the_interpose_handler();
   }
+
+  if (waiting_events.size() > 0) {
+    cout << "warning: too many pending events in qt_gui_rep::update()" << LF;
+  }
+
   // Repaint invalid regions and redraw
   bool postpone_treatment= (keyboard_events > 0 && keyboard_special == 0);
   keyboard_events = 0;
@@ -909,6 +1056,7 @@ qt_gui_rep::refresh_language() {
  */
 void
 qt_gui_rep::show_help_balloon (widget wid, SI x, SI y) {
+  if (!has_current_window ()) return;
   if (popup_wid_time > 0) return;
   
   _popup_wid = popup_window_widget (wid, "Balloon");
@@ -1042,6 +1190,15 @@ show_help_balloon (widget balloon, SI x, SI y) {
     // Display a help balloon at position (x, y); the help balloon should
     // disappear as soon as the user presses a key or moves the mouse
   the_gui->show_help_balloon (balloon, x, y);
+}
+
+void
+show_wait_indicator (widget base, string message, string argument) {
+  // Display a wait indicator with a message and an optional argument
+  // The indicator might for instance be displayed at the center of
+  // the base widget which triggered the lengthy operation;
+  // the indicator should be removed if the message is empty
+  the_gui->show_wait_indicator (base, message, argument);
 }
 
 void

@@ -42,21 +42,51 @@ typedef unsigned int color;
 #define MAX_INT ((int) 0x7fffffff)
 #define MIN_INT ((int) 0x80000000)
 
-#define SI_32
-#ifdef SI_32
-typedef int SI;
-typedef long long int DI;
-#define MAX_SI ((SI) 0x7fffffff)
-#define MIN_SI ((SI) 0x80000000)
-#define PLUS_INFINITY  ((SI) 0x3fffffff)
-#define MINUS_INFINITY ((SI) 0xc0000000)
+#if SIZEOF_VOID_P == 8
+  #define SI_64 1
+#elif SIZEOF_VOID_P == 4
+  #define SI_32 1
 #else
-typedef long int SI;
-typedef long long int DI;
-#define MAX_SI ((SI) 0x7fffffffffffffff)
-#define MIN_SI ((SI) 0x8000000000000000)
-#define PLUS_INFINITY  ((SI) 0x3fffffffffffffff)
-#define MINUS_INFINITY ((SI) 0xc000000000000000)
+  #error "Cannot determine 32 bit or 64 bit. void* size is: " SIZEOF_VOID_P
+#endif
+
+#if SIZEOF_INT == 4
+  typedef int tm_int32_t;
+#elif SIZEOF_LONG == 4
+  typedef long tm_int32_t;
+#elif SIZEOF_SHORT == 4
+  typedef short tm_int32_t;
+#else
+  #error "Cannot determine 32 bit integer type."
+#endif
+
+#if SIZEOF_LONG == 8
+  typedef long tm_int64_t;
+#elif SIZEOF_LONG_LONG == 8
+  typedef long long tm_int64_t;
+#elif SIZEOF_INT == 8
+  typedef int tm_int64_t;
+#else
+  #error "Cannot determine 64 bit integer type."
+#endif
+
+// don't use : typedef long int SI;
+// while long int is 64 bits on Linux and macOS (which use the LP64 data model), 
+// long int is strictly 32 bits on 64-bit Windows (which uses the LLP64 data model).
+#ifdef SI_32
+  typedef tm_int32_t SI;
+  typedef tm_int64_t DI;
+  #define MAX_SI ((SI) 0x7fffffff)
+  #define MIN_SI ((SI) 0x80000000)
+  #define PLUS_INFINITY  ((SI) 0x3fffffff)
+  #define MINUS_INFINITY ((SI) 0xc0000000)
+#else
+  typedef tm_int64_t SI;
+  typedef tm_int64_t DI;
+  #define MAX_SI ((SI) 0x7fffffffffffffff)
+  #define MIN_SI ((SI) 0x8000000000000000)
+  #define PLUS_INFINITY  ((SI) 0x3fffffffffffffff)
+  #define MINUS_INFINITY ((SI) 0xc000000000000000)
 #endif
 
 /******************************************************************************
@@ -72,11 +102,11 @@ typedef long long int DI;
 #endif
 
 enum { DEBUG_FLAG_AUTO, DEBUG_FLAG_VERBOSE, DEBUG_FLAG_EVENTS,
-       DEBUG_FLAG_STD, DEBUG_FLAG_IO, DEBUG_FLAG_BENCH,
-       DEBUG_FLAG_HISTORY, DEBUG_FLAG_QT, DEBUG_FLAG_QT_WIDGETS,
-       DEBUG_FLAG_KEYBOARD, DEBUG_FLAG_PACKRAT, DEBUG_FLAG_FLATTEN,
-       DEBUG_FLAG_PARSER, DEBUG_FLAG_CORRECT, DEBUG_FLAG_CONVERT,
-       DEBUG_FLAG_REMOTE, DEBUG_FLAG_LIVE };
+       DEBUG_FLAG_STD, DEBUG_FLAG_IO, DEBUG_FLAG_SOCKETS, DEBUG_FLAG_GNUTLS,
+       DEBUG_FLAG_BENCH, DEBUG_FLAG_HISTORY, DEBUG_FLAG_QT,
+       DEBUG_FLAG_QT_WIDGETS, DEBUG_FLAG_KEYBOARD, DEBUG_FLAG_PACKRAT,
+       DEBUG_FLAG_FLATTEN, DEBUG_FLAG_PARSER, DEBUG_FLAG_CORRECT,
+       DEBUG_FLAG_CONVERT, DEBUG_FLAG_REMOTE, DEBUG_FLAG_LIVE };
 bool debug (int which, bool write_flag= false);
 int  debug_off ();
 void debug_on (int status);
@@ -88,6 +118,8 @@ bool debug_get (string s);
 #define DEBUG_EVENTS (debug (DEBUG_FLAG_EVENTS))
 #define DEBUG_STD (debug (DEBUG_FLAG_STD))
 #define DEBUG_IO (debug (DEBUG_FLAG_IO))
+#define DEBUG_SOCKETS (debug (DEBUG_FLAG_SOCKETS))
+#define DEBUG_GNUTLS (debug (DEBUG_FLAG_GNUTLS))
 #define DEBUG_BENCH (debug (DEBUG_FLAG_BENCH))
 #define DEBUG_HISTORY (debug (DEBUG_FLAG_HISTORY))
 #define DEBUG_QT (debug (DEBUG_FLAG_QT))
@@ -133,20 +165,24 @@ void clear_debug_messages (string channel);
 * miscellaneous routines
 ******************************************************************************/
 
-inline int min (int i, int j) { if (i<j) return i; else return j; }
-inline int max (int i, int j) { if (i>j) return i; else return j; }
-inline long int min (long int i, long int j) {
+inline tm_int32_t min (tm_int32_t i, tm_int32_t j) { if (i<j) return i; else return j; }
+inline tm_int32_t max (tm_int32_t i, tm_int32_t j) { if (i>j) return i; else return j; }
+inline tm_int64_t min (tm_int64_t i, tm_int64_t j) {
   if (i<j) return i; else return j; }
-inline long int max (long int i, long int j) {
+inline tm_int64_t max (tm_int64_t i, tm_int64_t j) {
   if (i>j) return i; else return j; }
-inline long int min (long int i, int j) {
+inline tm_int64_t min (tm_int64_t i, tm_int32_t j) {
   if (i<j) return i; else return j; }
-inline long int max (long int i, int j) {
+inline tm_int64_t max (tm_int64_t i, tm_int32_t j) {
   if (i>j) return i; else return j; }
-inline long long int min (long long int i, long long int j) {
+inline tm_int64_t min (tm_int32_t i, tm_int64_t j) {
   if (i<j) return i; else return j; }
-inline long long int max (long long int i, long long int j) {
+inline tm_int64_t max (tm_int32_t i, tm_int64_t j) {
   if (i>j) return i; else return j; }
+//inline long long int min (long long int i, long long int j) {
+//  if (i<j) return i; else return j; }
+//inline long long int max (long long int i, long long int j) {
+//  if (i>j) return i; else return j; }
 inline double min (double i, double j) { if (i<j) return i; else return j; }
 inline double max (double i, double j) { if (i>j) return i; else return j; }
 inline int hash (int i) { return i; }
@@ -172,6 +208,7 @@ tm_ostream& operator << (tm_ostream& out, display_control ctrl);
 
 bool gui_is_x ();
 bool gui_is_qt ();
+bool gui_is_vue ();
 bool os_win32 ();
 bool os_mingw ();
 bool os_mingw64 ();
@@ -179,6 +216,8 @@ bool os_macos ();
 bool os_android ();
 bool use_macos_fonts ();
 const char* default_look_and_feel ();
+void gui_set_next_window_as_popup ();
+bool support_functionality (string);
 
 template<typename T>
 struct type_helper {

@@ -29,6 +29,18 @@ extern "C" {
 #include "libguile/fports.h"
 }
 
+void texmacs_reset_last_error() {
+  errno = 0;
+}
+
+int64_t texmacs_get_last_error() {
+  return errno;
+}
+
+string texmacs_get_last_error_str() {
+  return strerror(errno);
+}
+
 inline QString texmacs_string_to_qstring(string utf8_string) {
   return QString::fromUtf8(&utf8_string[0], N(utf8_string));
 }
@@ -36,7 +48,7 @@ inline QString texmacs_string_to_qstring(string utf8_string) {
 inline string texmacs_qstring_to_string(const QString &local_string) {
   return string(
     local_string.toUtf8().data(),
-    (int)local_string.size()
+    (int)local_string.toUtf8().size()
   );
 }
 
@@ -47,7 +59,7 @@ inline string texmacs_qbytearray_to_string(const QByteArray &local_string) {
   );
 }
 
-void texmacs_lock_file(FILE *&file) {
+void texmacs_lock_file(FILE *&file, bool nonblock) {
   // do nothing
 }
 
@@ -305,42 +317,8 @@ url texmacs_get_application_directory() {
   return url_system(texmacs_qstring_to_string(home));
 }
 
-bool is_doing_long_task = false;
-using time_point = std::chrono::time_point<std::chrono::system_clock>;
-using duration = std::chrono::duration<double>;
-
-void texmacs_system_start_long_task() {
-  if (is_doing_long_task) return;
-  is_doing_long_task = true;
-#ifdef QTTEXMACS
-  QGuiApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-#endif
-}
-void texmacs_system_end_long_task() {
-  if (!is_doing_long_task) return;
-  is_doing_long_task = false;
-#ifdef QTTEXMACS
-  
-  QGuiApplication::restoreOverrideCursor();  
-  QApplication::alert(QApplication::topLevelWidgets().first());
-#endif
-}
-
-void texmacs_process_event() {
-  if (!is_doing_long_task) return;
-  static time_point last_time = std::chrono::system_clock::now();
-  time_point current_time = std::chrono::system_clock::now();
-  duration elapsed_seconds = current_time - last_time;
-  if (elapsed_seconds.count() < 0.1) return;
-  last_time = current_time;
-#ifdef QTTEXMACS
-  QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-#endif
-}
-
 void texmacs_init_guile_hooks() {
   guile_fprintf = texmacs_guile_fprintf;
   guile_printf = texmacs_guile_printf;
-  guile_process_event = texmacs_process_event;
   scm_set_log_function(texmacs_guile_log);
 }

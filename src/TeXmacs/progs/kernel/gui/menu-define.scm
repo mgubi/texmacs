@@ -121,6 +121,14 @@
   (require-format x '(enum :%4))
   `($enum ,@(cdr x)))
 
+(define (gui-make-setting-enum x)
+  (require-format x '(setting-enum :%5))
+  `($setting-enum ,@(cdr x)))
+
+(define (gui-make-setting-group x)
+  (require-format x '(setting-group :%1 :*))
+  `($setting-group ,(cadr x) ,@(map gui-make (cddr x))))
+
 (define (gui-make-choice x)
   (require-format x '(choice :%3))
   `($choice ,@(cdr x)))
@@ -144,6 +152,10 @@
 (define (gui-make-toggle x)
   (require-format x '(toggle :%2))
   `($toggle ,@(cdr x)))
+
+(define (gui-make-setting-toggle x)
+  (require-format x '(setting-toggle :%3))
+  `($setting-toggle ,@(cdr x)))
 
 (define (gui-make-icon x)
   (require-format x '(icon :%1))
@@ -225,6 +237,14 @@
   (require-format x '(tab :%1 :*))
   `($tab ,@(map gui-make (cdr x))))
 
+(define (gui-make-responsive-tabs x)
+  (require-format x '(responsive-tabs :*))
+  `($responsive-tabs ,@(map gui-make (cdr x))))
+
+(define (gui-make-responsive-tab x)
+  (require-format x '(responsive-tab :%1 :*))
+  `($responsive-tab ,@(map gui-make (cdr x))))
+
 (define (gui-make-icon-tabs x)
   (require-format x '(icon-tabs :*))
   `($icon-tabs ,@(map gui-make (cdr x))))
@@ -232,6 +252,14 @@
 (define (gui-make-icon-tab x)
   (require-format x '(icon-tab :%2 :*))
   `($icon-tab ,@(map gui-make (cdr x))))
+
+(define (gui-make-responsive-icon-tabs x)
+  (require-format x '(responsive-icon-tabs :*))
+  `($responsive-icon-tabs ,@(map gui-make (cdr x))))
+
+(define (gui-make-responsive-icon-tab x)
+  (require-format x '(responsive-icon-tab :%2 :*))
+  `($responsive-icon-tab ,@(map gui-make (cdr x))))
 
 (define (gui-make-plain-style x)
   (require-format x '(plain-style :*))
@@ -409,12 +437,15 @@
   (texmacs-input ,gui-make-texmacs-input)
   (input ,gui-make-input)
   (enum ,gui-make-enum)
+  (setting-enum ,gui-make-setting-enum)
+  (setting-group ,gui-make-setting-group)
   (choice ,gui-make-choice)
   (choices ,gui-make-choices)
   (tree-view ,gui-make-tree-view)
   (filtered-choice ,gui-make-filtered-choice)
   (color-input ,gui-make-color-input)
   (toggle ,gui-make-toggle)
+  (setting-toggle ,gui-make-setting-toggle)
   (icon ,gui-make-icon)
   (replace ,gui-make-replace)
   (concat ,gui-make-concat)
@@ -437,6 +468,10 @@
   (tab ,gui-make-tab)
   (icon-tabs ,gui-make-icon-tabs)
   (icon-tab ,gui-make-icon-tab)
+  (responsive-tabs ,gui-make-responsive-tabs)
+  (responsive-tab ,gui-make-responsive-tab)
+  (responsive-icon-tabs ,gui-make-responsive-icon-tabs)
+  (responsive-icon-tab ,gui-make-responsive-icon-tab)
   (plain-style ,gui-make-plain-style)
   (inert ,gui-make-inert)
   (explicit-buttons ,gui-make-explicit-buttons)

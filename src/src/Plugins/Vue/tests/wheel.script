@@ -1,0 +1,13 @@
+# scroll the editor with the wheel, then hover a toolbar button for a balloon
+wait 5000
+window #2
+text Lorem ipsum dolor sit amet
+wait 500
+wheel 300 400 0 -3
+wait 300
+wheel 300 400 0 -3
+wait 500
+snapshot w1
+move 60 35
+wait 1500
+snapshot w2

@@ -1,0 +1,90 @@
+Checking the PDF the MuPDF renderer writes.
+
+    src/Plugins/MuPDF/tests/pdf-compare.sh [document.tm ...]
+
+Every TeXmacs it starts has a home of its own (a copy of ~/.TeXmacs, copy
+on write), so that nothing of the user's is changed and the runs side by
+side share nothing; JOBS (4) of them run at a time, first the exports and
+then the checks, which takes some 40 s for the whole set. REF=1 exports
+every document through the other route of the build as well, for its
+size; EMBED=0 leaves out the round trip of an embedded document
+(embed-roundtrip.sh: exported with its source, found by mutool extract,
+imported with the source folder gone, and a file next to the PDF left
+alone); encrypt-check.sh exports with passwords and restricted
+permissions and checks that no reader opens the PDF without a password,
+that both passwords do, that it is AES-256 and that only what was asked
+is allowed. pdf-check.js adds MuPDF's own check of the structure
+(PDFDocument.check, MuPDF 1.27 and later) to every document; it looks at
+the cross reference table and the syntax of the objects, not at what the
+objects mean -- the outline which pointed at a link annotation passed it,
+which is what structure-check.py and dest-bytes.py are for.
+
+
+
+from the top of the source tree; with no argument it takes the documents
+listed in the script, some of the manual and the ones here. It exports each
+one through the MuPDF renderer (TEXMACS_PDF_MUPDF=1) and checks it:
+
+  gs      Ghostscript reads the file without an error and without
+          substituting a font. This is the check which earns its keep: an
+          invalid font program is the mistake which is easiest to make and
+          hardest to see, since the page still looks like a page, only in
+          the wrong typeface.
+  text    the text extracts, and no character comes out as U+FFFD (a wrong
+          encoding, a missing glyph name, a stale ToUnicode).
+  lig     every ligature glyph says which letters it stands for
+          (/ActualText), or a search for "first" finds nothing in a reader
+          which takes the text from the glyph names. Neither reader judges
+          this alone: MuPDF decomposes ligatures whatever the file says,
+          and Ghostscript 10 ignores ActualText. That second blindness is
+          what makes the check -- Ghostscript's extraction counts the
+          ligature glyphs drawn, and the content streams must hold a span
+          for each. Removing the spans makes it fail; that was tried.
+  render  the page Ghostscript draws and the page MuPDF draws agree to
+          within a threshold, once both are blurred by a pixel and a half
+          (the readers anti-alias and resample differently; measured, the
+          documents agree at 97.5% and more, a real fault at 42%). They are two independent readers of the same
+          file, so a disagreement is a fault in the file -- but note that
+          it does *not* catch a substituted font, since both readers then
+          substitute; that is what the gs check is for.
+  size    reported, not judged. The two routes do not embed the same kind
+          of font -- the other one goes through PostScript and comes back
+          with bitmaps -- so the numbers are not comparable.
+
+The checks were themselves checked: embedding the Type 1 fonts the wrong
+way again (pdf_add_cid_font instead of pdf_add_simple_font) makes the gs
+and text checks fail, as it should.
+
+Some of the documents are here rather than in the manual: figures.tm has
+a PostScript figure and a raster one, which must come out as a /Form and
+an /Image and not as pictures of themselves; pdf-figures.tm has two PDF
+figures, vector.pdf and the same turned by /Rotate 90, whose text says
+which way is up -- the one check which is not generic: the harness reads
+where UP lands against the caption, since the rendering check cannot see
+a figure upside down (both readers draw the same file); taking the fix out
+makes it fail, that was tried. It also has overlap.pdf, two overlapping
+squares, at half opacity: as a transparency group the overlap is pale
+blue, without one purple (the blue square over a half transparent red
+one), and the harness counts purple pixels in what each reader draws --
+289 and 324 without the group, 0 with it; pattern.tm has a patterned
+background of opaque tiles, which must be one /Pattern; pattern-photo.tm
+has a photograph with a soft mask as its tile, which must *not* be one,
+since Ghostscript draws such a pattern wrongly (and the check catches it
+when it is); ligatures.tm is a line of fi, ffi, ffl and fl in the EC font;
+landscape.tm must come out wider than it is tall; layer.tm includes
+layer.pdf (made by mklayer.js), a figure with a layer which is off by
+default, which must stay hidden in the PDF; structure.tm has a table
+of contents three levels deep, labels and references, one on a second page,
+a link to a web page and a title, and was saved by TeXmacs, so that it
+carries the values of its labels (a forward reference is "?" otherwise).
+structure.js (mutool run) with structure-check.py checks that the outline,
+the named destinations, the links -- the web one included, which a batch
+export used to lose -- and the title are there, that every entry of the
+outline points at its parent by reference, and that MuPDF has nothing to
+repair: the parts the writer assembles when the document is closed. It has
+accents in a heading, a label, the author and an address, and dest-bytes.py
+checks the file itself: every link names its destination in the bytes of a
+key of the name tree (a reader compares bytes), and every URI is ASCII.
+
+Needs gs, mutool, and python3 with PIL. OUT, WAIT and AGREE override the
+output directory, how long a conversion is given, and the threshold.

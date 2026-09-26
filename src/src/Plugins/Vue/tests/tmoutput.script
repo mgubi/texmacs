@@ -1,0 +1,5 @@
+# needs tmoutput.scm: the extent of the typeset boxes
+wait 8000
+window TmOutput
+snapshot tmoutput
+wait 800

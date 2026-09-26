@@ -17,7 +17,39 @@
 
 #include "windows32_system.hpp"
 #include "nowide/iostream.hpp"
+#include "nowide/convert.hpp"
 #include "win-utf8-compat.hpp"
+
+void texmacs_reset_last_error() {
+  errno = 0;
+}
+
+int64_t texmacs_get_last_error() {
+  return errno;
+}
+
+string texmacs_get_last_error_str() {
+  return strerror(errno);
+}
+
+void texmacs_lock_file(FILE *&file, bool nonblock) {
+  int fd = _fileno(file);
+  HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+  DWORD flags = LOCKFILE_EXCLUSIVE_LOCK;
+  if (nonblock) flags |= LOCKFILE_FAIL_IMMEDIATELY;
+  OVERLAPPED overlapped = { 0 };
+  if (!LockFileEx(hFile, flags, 0, MAXDWORD, MAXDWORD, &overlapped)) {
+    fclose(file);
+    file = nullptr;
+  }
+}
+
+void texmacs_unlock_file(FILE *&file) {
+    int fd = _fileno(file);
+    HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+    OVERLAPPED overlapped = { 0 };
+    UnlockFileEx(hFile, 0, MAXDWORD, MAXDWORD, &overlapped);
+}
 
 FILE* texmacs_fopen(string filename, string mode, bool lock) {
   cout << "texmacs_fopen " << filename << " " << mode << "\r\n";
@@ -117,8 +149,12 @@ bool texmacs_rmdir(string dirname) {
 bool texmacs_rename(string oldname, string newname) {
   c_string c_oldname = oldname;
   c_string c_newname = newname;
-  texmacs_remove(newname);
-  return rename(c_oldname, c_newname) == 0;
+  // Mimic Linux rename: atomic + overwrite existing destination.
+  return MoveFileExW(
+    nowide::widen((char*) c_oldname).c_str(),
+    nowide::widen((char*) c_newname).c_str(),
+    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+  ) != 0;
 }
 
 bool texmacs_chmod(string filename, int mode) {
@@ -186,8 +222,4 @@ string qt_application_directory ();
 
 string texmacs_get_application_directory_str() {
   return qt_application_directory ();
-}
-
-void texmacs_process_event() {
-  
 }

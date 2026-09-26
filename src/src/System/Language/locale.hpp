@@ -12,6 +12,7 @@
 #ifndef LOCALE_HPP
 #define LOCALE_HPP
 
+#include <locale>
 #include "string.hpp"
 
 string locale_to_language (string s);
@@ -19,6 +20,7 @@ string language_to_locale (string s);
 string language_to_local_ISO_charset (string s);
 string get_locale_language ();
 string get_locale_charset ();
+std::locale get_std_locale (string language);
 #ifdef OS_MINGW
 namespace win32 {
   string get_date (string lan, string fm);
@@ -26,6 +28,7 @@ namespace win32 {
 #endif
 string get_date (string lan, string fm);
 string pretty_time (int t);
+string pretty_date (int t, string fm);
 
 #endif // LOCALE_HPP
 

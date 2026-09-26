@@ -12,13 +12,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (server server-chat)
-  (:use (server server-tmfs)))
+  (:use (server server-tmfs)
+        (server server-notifications)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Chat rooms
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (chat-room-create uid name)
+(tm-define (server-chat-room-create uid name)
   (with-time-stamp #t
     (db-create-entry `(("type" "chat-room")
                        ("name" ,name)
@@ -26,14 +27,19 @@
                        ("readable" "all")
                        ("writable" "all")))))
 
+(tm-define (server-chat-room-remove uid)
+  (with msgs (db-search `(("type" "chat-message") ("to" ,uid)))
+    (for-each db-remove-entry msgs))
+  (db-remove-entry uid))
+
 (tm-service (remote-chat-room-create name)
   ;; Create chat room and return its identifier
   ;;(display* "remote-chat-room-create " name "\n")
   (with uid (server-get-user envelope)
-    (with crid (chat-room-create uid name)
+    (with crid (server-chat-room-create uid name)
       (server-return envelope crid))))
 
-(define (chat-room-id name)
+(tm-define (chat-room-id name)
   (with l (db-search `(("type" "chat-room")
                        ("name" ,name)))
     (and (nnull? l) (car l))))
@@ -43,31 +49,46 @@
   (chat-room-id (url->string (url-tail u))))
 
 (tm-service (remote-list-chat-rooms)
-  ;; Return list of chat rooms owned by the user
+  ;; Return list of chat rooms owned by the user as (name date) pairs
   ;;(display* "remote-list-chat-rooms\n")
   (with (client msg-id) envelope
     (let* ((uid (server-get-user envelope))
            (l (db-search `(("type" "chat-room")
                            ("owner" ,uid))))
-           (get-name (lambda (id) (db-get-field-first id "name" #f)))
-           (r (list-filter (map get-name l)
-                           (lambda (s) (not (string-starts? s "mail-"))))))
+           (get-entry (lambda (id)
+                        (let* ((name (db-get-field-first id "name" #f))
+                               (date (db-get-field-first id "date" "")))
+                          (list name date))))
+           (entries (map get-entry l))
+           (r (list-filter entries
+                           (lambda (e) (not (string-starts? (car e) "mail-"))))))
       (server-return envelope r))))
+
+;; Find first active participant (excluding uid being deleted)
+;; Priority: writable users > readable users > message senders
+(define (find-active-participant crid exclude-uid)
+  (let* ((writable (db-get-field crid "writable"))
+         (readable (db-get-field crid "readable"))
+         (msg-ids (db-search `(("type" "chat-message") ("to" ,crid))))
+         (senders (map (lambda (mid)
+                         (db-get-field-first mid "from" "")) msg-ids))
+         (exclude (list exclude-uid "all" ""))
+         (candidates (list-difference
+                       (append writable readable senders)
+                       exclude)))
+    (list-find candidates
+      (lambda (uid) (server-get-user-info uid)))))
+
+;; Remove all chat messages sent by a user
+(tm-define (server-remove-user-chat-messages uid)
+  (let* ((msgs (db-search `(("type" "chat-message") ("from" ,uid)))))
+    (for-each db-remove-entry msgs)))
 
 (define chat-room-messages (make-ahash-table))
 (define chat-room-present  (make-ahash-table))
 
-(define (chat-message-retrieve mid)
-  (let* ((action (db-get-field-first mid "action" "unknown"))
-         (msg (db-get-field-first mid "message" "unknown"))
-         (from (db-get-field-first mid "from" "unknown"))
-         (pseudo (db-get-field-first from "pseudo" "unknown"))
-         (full (db-get-field-first from "name" "unknown"))
-         (date (db-get-field-first mid "date" "unknown")))
-    (when (== action "send")
-      (with doc (string-load (repository-get msg))
-        (set! msg (convert doc "texmacs-snippet" "texmacs-stree"))))
-    (list action pseudo full date msg)))
+(define (msg-is-shared? msg)
+  (== (msg-action msg) "share"))
 
 (define (chat-room-retrieve crid)
   (with l (db-search `(("type" "chat-message")
@@ -75,10 +96,35 @@
                        (:order "date" #t)))
     (map chat-message-retrieve l)))
 
+;; return #t if the chat room was actually initialized,
+;; #f if it was already there.
 (define (chat-room-initialize crid)
-  (when (not (ahash-ref chat-room-messages crid))
-    (ahash-set! chat-room-messages crid (chat-room-retrieve crid))
-    (ahash-set! chat-room-present  crid (list))))
+  (and (not (ahash-ref chat-room-messages crid))
+       (begin
+         (ahash-set! chat-room-messages crid (chat-room-retrieve crid))
+         (ahash-set! chat-room-present  crid (list))
+         #t)))
+
+(define (ensure-chat-room client crid)
+  (chat-room-initialize crid)
+  (with l (ahash-ref chat-room-present crid)
+    (when (nin? client l)
+      (ahash-set! chat-room-present crid (cons client l)))))
+
+(tm-define (chat-room-messages-reset)
+  (set! chat-room-messages (make-ahash-table)))
+
+(tm-service (remote-chat-room-messages-reset)
+  (chat-room-messages-reset)
+  (server-return envelope "ok"))
+
+(define (chat-messages-cached uid ms)
+  (map (lambda (t)
+         (tree->stree
+           (if (server-can-handle-cache? uid)
+             (tree-cache-update server-tree-cache-host (stree->tree t))
+             (stree->tree t))))
+       ms))
 
 (tm-service (remote-chat-room-open name)
   ;; Connect client to a chat room and return list of past messages
@@ -93,13 +139,11 @@
             ((not (db-allow? crid uid "readable"))
              (server-error envelope "Error: access to chat room denied"))
             (else
-             (chat-room-initialize crid)
-             (with l (ahash-ref chat-room-present crid)
-               (when (nin? client l)
-                 (ahash-set! chat-room-present crid (cons client l))))
+             (ensure-chat-room client crid)
              (let* ((ms (ahash-ref chat-room-messages crid))
+                    (cached (chat-messages-cached uid ms))
                     (w? (db-allow? crid uid "writable")))
-               (server-return envelope (list w? ms))))))))
+               (server-return envelope (list w? cached))))))))
 
 (tm-service (remote-mail-open)
   ;; Open mail while creating mail box (a chat room) if necessary
@@ -108,22 +152,45 @@
     (let* ((uid (server-get-user envelope))
            (pseudo (or (user->pseudo uid) uid))
            (name (string-append "mail-" pseudo))
-           (crid (or (chat-room-id name) (chat-room-create uid name))))
-      (chat-room-initialize crid)
-      (with l (ahash-ref chat-room-present crid)
-        (when (nin? client l)
-          (ahash-set! chat-room-present crid (cons client l))))
-      (server-return envelope (ahash-ref chat-room-messages crid)))))
+           (crid (or (chat-room-id name) (server-chat-room-create uid name))))
+      (ensure-chat-room client crid)
+      (server-return envelope
+        (chat-messages-cached uid (ahash-ref chat-room-messages crid))))))
 
-(define (chat-room-notify mid)
+(tm-service (remote-shared)
+  (with (client msg-id) envelope
+    (let* ((uid (server-get-user envelope))
+           (pseudo (or (user->pseudo uid) uid))
+           (name (string-append "mail-" pseudo))
+           (crid (or (chat-room-id name) (server-chat-room-create uid name))))
+      (ensure-chat-room client crid)
+      (server-return
+        envelope
+        (list-filter (ahash-ref chat-room-messages crid) msg-is-shared?)))))
+
+(define (pseudo-present? pseudo crid)
+  (and-let* ((uid (server-find-user pseudo))
+             (client (uid-logged? uid))
+             (present (ahash-ref chat-room-present crid)))
+    (in? client present)))
+
+(tm-define (chat-room-notify mid)
   ;; Notify the arrival of a new message to all participants
   (let* ((crid (db-get-field-first mid "to" "unknown"))
          (name (db-get-field-first crid "name" "unknown"))
-         (dummy (chat-room-initialize crid))
+         (owner (db-get-field-first crid "owner" "unknown"))
+         (init? (chat-room-initialize crid))
          (old-l (ahash-ref chat-room-messages crid))
          (new-m (chat-message-retrieve mid))
-         (new-l (rcons old-l new-m)))
+         (new-l (if init? old-l (rcons old-l new-m)))
+         (users (make-ahash-table))
+         (shared-with (resource-shared-with name owner)))
     (ahash-set! chat-room-messages crid new-l)
+    (if (string-starts? name "mail-")
+      (server-push-message (rcons new-m mid))
+      (for (msg shared-with)
+        (when (not (pseudo-present? (msg-to msg) crid))
+          (server-push-chat-notification (msg-to msg) name new-m mid))))
     (for (client (ahash-ref chat-room-present crid))
       (server-remote-eval client `(chat-room-receive ,name ,new-m)
         (lambda (ok?) (noop))))))
@@ -132,7 +199,7 @@
 ;; Sending messages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (remote-create-message uid msg)
+(tm-define (remote-create-message uid msg)
   (let* ((rid (with-time-stamp #t
                 (db-create-entry `(("type" "message")
                                    ("owner" ,uid)))))
@@ -142,7 +209,7 @@
     (string-save doc fname)
     rid))
 
-(define (remote-send uid dest action msg)
+(tm-define (remote-send uid dest action msg)
   (cond ((== action "send-document")
          (and-with msg* (remote-create-message uid msg)
            (remote-send uid dest "send" msg*)))
@@ -151,12 +218,18 @@
            (remote-send uid did action msg)))
         ((== (db-get-field-first dest "type" #f) "chat-room")
          (with-time-stamp #t
-           (with mid (db-create-entry `(("type" "chat-message")
-                                        ("action" ,action)
-                                        ("from" ,uid)
-                                        ("to" ,dest)
-                                        ("message" ,msg)))
-             (chat-room-notify mid))))
+           ;; Look up resource ID from URL for "share" action
+           (with rid (if (== action "share") (search-remote-identifier msg) #f)
+             (with mid (db-create-entry `(("type" "chat-message")
+                                          ("action" ,action)
+                                          ("from" ,uid)
+                                          ("to" ,dest)
+                                          ("message" ,msg)
+                                          ,@(if rid
+                                              `(("resource-id" ,rid))
+                                              '())))
+               (chat-room-notify mid)
+               mid))))
         ((chat-room-id dest)
          (with crid (chat-room-id dest)
            (when (db-allow? crid uid "writable")
@@ -164,7 +237,7 @@
         ((string-starts? dest "mail-")
          (let* ((pseudo (string-drop dest 5))
                 (user (or (pseudo->user pseudo) pseudo))
-                (crid (chat-room-create user dest)))
+                (crid (server-chat-room-create user dest)))
            (remote-send uid crid action msg)))))
 
 (tm-service (remote-send-message dest action msg)

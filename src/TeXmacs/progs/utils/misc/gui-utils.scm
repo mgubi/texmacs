@@ -53,21 +53,33 @@
                (when (string? cmd)
                  ;;(display* "gui-on-select " cmd "\n")
                  (secure-eval (string->object cmd)))
-               (close-tooltip))
+               (close-tooltips))
              (update-menus)
              "done"))))
 
 (tm-define (gui-on-toggle type x y cmd)
   (:secure #t)
-  ;;(display* "gui-on-toggle " type ", " x ", " y ", " cmd "\n")  
-  (let* ((val (tm-ref cmd :up 0))
-         (new (object->string (and val (tm-equal? val "false")))))
+  (let* ((parent (tree-up cmd))
+         (val (if (== (tree-arity parent) 3)
+                (tree-ref parent 1)
+                (tree-ref parent 0)))
+         (new (object->string (and val (tm-equal? val "false"))))
+         (name (if (== (tree-arity parent) 3)
+                 (object->string (tree->stree (tree-ref parent 0)))
+                 "")))
+    ;(display* "gui-on-toggle " type ", " x ", " y ", " cmd " " val "\n")
     (when (and (== (tm->stree type) "select") val)
       (cond ((tm-equal? val "true") (tree-assign! val "false"))
             ((tm-equal? val "false") (tree-assign! val "true"))))
     (and-let* ((cmd* (tm->stree cmd))
-               (ncmd (string-append "(with answer " new " " cmd* ")")))
+               (ncmd (string-append "(with answer '" new
+                                    "(with name '" name " " cmd* "))")))
       (gui-on-select type x y ncmd))))
+
+(tm-define (gui-on-toggle-go-to type x y cmd loc)
+  (:secure #t)
+  (go-to (rcons (cDr (tree->path loc)) 0))
+  (gui-on-toggle type x y cmd))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keyboard emulation
@@ -283,7 +295,7 @@
                (cmd (string-append "(with answer '" (object->string sel)
                                    " " c ")")))
           (focus-on-canvas)
-          (close-tooltip)
+          (close-tooltips)
           (tree-set (tree-ref u 1) new)
           (when (tree-in? u :up '(input-popup input-list))
             (tree-set (tree-ref u :up 3) new))
@@ -332,6 +344,16 @@
   (when (== key "return")
     (fun)))
 
+(define (gui-delayed-eval cmd*)
+  (delayed
+    (:idle 1)
+    ;;(display* "keyboard-press: " cmd* "\n")
+    (secure-eval (string->object cmd*))
+    (delayed
+      (:pause 25)
+      (close-tooltips)
+      (update-menus))))
+
 (tm-define (keyboard-press key time)
   (:require (tree-innermost gui-input-context?))
   (with t (tree-innermost gui-input-context?)
@@ -343,15 +365,7 @@
                (cmd  (as-string (tree->stree (tree-ref t 1)) "(noop)"))
                (val  (object->string (tree->stree (tree-ref t 3))))
                (cmd* (string-append "(with answer '" val " " cmd ")"))
-               (fun  (lambda ()
-                       (delayed
-                         (:idle 1)
-                         ;;(display* "keyboard-press: " cmd* "\n")
-                         (secure-eval (string->object cmd*))
-                         (delayed
-                           (:pause 25)
-                           (close-tooltip)
-                           (update-menus))))))
+               (fun  (lambda () (gui-delayed-eval cmd*))))
           (gui-input-relay type fun key time))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -376,3 +390,29 @@
                 (for (t (tm-children bodies))
                   (tree-assign-node t 'hidden))
                 (tree-assign-node (tm-ref bodies nr) 'shown)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Forms
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (form-input-text-context? t)
+  (tree-in? t '(form-input-text form-text-area)))
+
+(tm-define (keyboard-press key time)
+  (:require (tree-innermost form-input-text-context?))
+  (with t (tree-innermost form-input-text-context?)
+    ;; (display* (tree-cursor-path t) "\n")
+    (former key time)
+    ; check if we are in the right argument (the element's body)
+    (when (and (list>1? (tree-cursor-path t))
+               (== (car (tree-cursor-path t)) 4))
+      (and-with t* (tree-innermost form-input-text-context?)
+        (when (and (tree? t) (== (tree->path t) (tree->path t*)))
+          (let* ((type (tree->stree (tree-ref t 0)))
+                 (cmd  (as-string (tree->stree (tree-ref t 2)) "(noop)"))
+                 (val  (object->string (tree->stree (tree-ref t 4))))
+                 (name  (object->string (tree->stree (tree-ref t 0))))
+                 (cmd* (string-append "(with answer '" val " (with name '" name " " cmd "))"))
+                 ; (cmd* (string-append "(let ((answer '" val ") (name '" name ")) " cmd ")"))
+                 (fun  (lambda () (gui-delayed-eval cmd*))))
+            (fun)))))))

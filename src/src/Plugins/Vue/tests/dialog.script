@@ -1,0 +1,20 @@
+# needs dialog.scm: fill the two fields of an interactive prompt
+wait 5000
+window Enter data
+key Backspace
+key Backspace
+key Backspace
+text Bob
+wait 300
+key Tab
+wait 300
+text 42
+wait 500
+snapshot d1
+key Return
+wait 800
+# keyboard events go to the window they are sent to: type in the editor
+window #2
+text xyz
+wait 800
+snapshot main

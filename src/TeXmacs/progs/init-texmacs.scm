@@ -93,7 +93,7 @@
 ;; (set! primitive-load new-primitive-load)
 
 ;(display "Booting TeXmacs kernel functionality\n")
-(if (os-mingw?)
+(if (and (os-mingw?) (string= (gui-version) "qt4"))
     (load "kernel/boot/boot.scm")
     (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
 (inherit-modules (kernel boot compat) (kernel boot abbrevs)
@@ -137,7 +137,7 @@
 (use-modules (utils plugins plugin-convert))
 (use-modules (utils misc markup-funcs))
 (use-modules (utils misc artwork))
-(use-modules (utils misc ai))
+(use-modules (utils misc tooltip))
 (use-modules (utils handwriting handwriting))
 (lazy-tmfs-handler (utils automate auto-tmfs) automate)
 (lazy-define (utils automate auto-tmfs) auto-load-help)
@@ -177,7 +177,6 @@
 (lazy-define (texmacs menus file-menu) recent-file-list recent-directory-list)
 (lazy-define (texmacs menus view-menu) set-bottom-bar test-bottom-bar?)
 (lazy-tool (texmacs menus preferences-tools) preferences-tool)
-(lazy-tool (texmacs menus view-tools) retina-settings-tool)
 (tm-define (notify-set-attachment name key val) (noop))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
@@ -253,6 +252,7 @@
            text-icons text-block-icons text-inline-icons)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
+(lazy-define (text text-drd) tm-register-new-list-tag)
 
 ;(display "Booting math mode\n")
 (lazy-keyboard (math math-kbd) in-math?)
@@ -437,6 +437,11 @@
 (lazy-define (database bib-manage)
              bib-import-bibtex bib-compile bib-attach open-bib-chooser)
 (lazy-define (database bib-local) open-biblio)
+(lazy-define (database ai-agents-db) ai-agents-get-corrector
+	     ai-agents-get-interlocutor ai-agents-get-translator
+	     ai-agents-correctors ai-agents-interlocutors
+	     ai-agents-translators)
+(lazy-define (database ai-agents-menu) open-ai-agents in-ai-agents?)
 (lazy-menu (database db-menu) db-menu db-toolbar)
 (lazy-tmfs-handler (database db-tmfs) db)
 (lazy-keyboard (database bib-kbd) in-bib?)
@@ -462,13 +467,20 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting remote facilities\n")
+(lazy-define (client client-base) client-login-then)
+(lazy-define (client client-remote-config) client-public-preferences-then)
 (lazy-define (client client-tmfs) remote-home-directory)
-(lazy-menu (server server-menu) start-server-menu server-menu)
-(lazy-menu (client client-menu) start-client-menu client-menu
+(lazy-menu (server server-menu) server-start-menu server-menu)
+(lazy-menu (client client-menu) client-start-menu client-menu
            remote-menu remote-icons)
 (lazy-tmfs-handler (client client-tmfs) remote-file)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
+(lazy-define (client client-notifications)
+             notifiable-icon notifiable-entry notif-count-label
+             client-sync-remote-notifications)
+(lazy-define (notification notification-base)
+             has-notifications? add-notification notification-count)
 
 ;(display "Booting linking facilities\n")
 (lazy-menu (link link-menu) link-menu)
@@ -487,6 +499,7 @@
 ;(display "Booting versioning facilities\n")
 (lazy-menu (version version-menu) version-menu)
 (lazy-keyboard (version version-kbd) with-versioning-tool?)
+(lazy-keyboard (tools spell spell-kbd) always?)
 (lazy-define (version version-tmfs) update-buffer commit-buffer)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
@@ -501,10 +514,14 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting editing modes for various special styles\n")
-(lazy-menu (various poster-menu) poster-block-menu)
-(lazy-menu (various theme-menu) basic-theme-menu)
-(lazy-define (various theme-edit) current-basic-theme)
-(lazy-define (various theme-menu) basic-theme-name)
+(lazy-menu (tools poster poster-menu) poster-block-menu)
+(lazy-menu (tools theme theme-menu) basic-theme-menu)
+(lazy-define (tools theme theme-edit) current-basic-theme)
+(lazy-define (tools theme theme-menu) basic-theme-name)
+(lazy-define (tools spell spell-edit) spell-user-words continuous-spell-check)
+(lazy-define (tools spell spell-lantool) lantool-server supports-lantool? lantool-check)
+(use-modules (tools ai ai-batch))
+(lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -528,7 +545,8 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting regression testing\n")
-(lazy-define (check check-master) check-all run-checks run-all-tests)
+(lazy-define (check check-master) check-all run-checks run-all-tests
+             run-integration-tests)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

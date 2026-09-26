@@ -1,4 +1,4 @@
-<TeXmacs|2.1.2>
+<TeXmacs|2.1.5>
 
 <style|<tuple|source|std>>
 
@@ -613,7 +613,9 @@
 
   <assign|preview-bg-color|#edc>
 
-  <assign|preview-balloon|<macro|body|<tabular|<tformat|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|<value|preview-bg-color>>|<twith|table-width|40em>|<twith|table-hmode|min>|<cwith|1|1|1|1|cell-lsep|1spc>|<cwith|1|1|1|1|cell-rsep|1spc>|<cwith|1|1|1|1|cell-bsep|1spc>|<cwith|1|1|1|1|cell-tsep|1spc>|<table|<row|<\cell>
+  <assign|preview-padding|1spc>
+
+  <assign|preview-balloon|<macro|body|<tabular|<tformat|<cwith|1|1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|<value|preview-bg-color>>|<twith|table-width|40em>|<twith|table-hmode|min>|<cwith|1|1|1|1|cell-lsep|<value|preview-padding>>|<cwith|1|1|1|1|cell-rsep|<value|preview-padding>>|<cwith|1|1|1|1|cell-bsep|<value|preview-padding>>|<cwith|1|1|1|1|cell-tsep|<value|preview-padding>>|<table|<row|<\cell>
     <arg|body>
   </cell>>>>>>>
 
@@ -671,7 +673,11 @@
 
   <assign|version-old|<macro|old|new|<render-old|<arg|old>>>>
 
+  <assign|version-old|<macro|old|new|<on-event|focus|<render-old|<arg|old>>|display-balloon|<quote-arg|old>|<with|preview-bg-color|<blend|#fffd|<value|new-version-color>>|preview-padding|0.5spc|<small|<preview-balloon|<render-new|<arg|new>>>>>|left|BOTTOM|keyboard>>>
+
   <assign|version-new|<macro|old|new|<render-new|<arg|new>>>>
+
+  <assign|version-new|<macro|old|new|<on-event|focus|<render-new|<arg|new>>|display-balloon|<quote-arg|new>|<with|preview-bg-color|<blend|#fffd|<value|old-version-color>>|preview-padding|0.5spc|<small|<preview-balloon|<render-old|<arg|old>>>>>|left|BOTTOM|keyboard>>>
 
   <assign|version-both-small|<macro|old|new|<render-old|<arg|old>><render-new|<arg|new>>>>
 
@@ -684,6 +690,41 @@
   <assign|version-both|<macro|old|new|<compound|<if|<equal|<get-label|<arg|old>>|document>|version-both-big|version-both-small>|<arg|old>|<arg|new>>>>
 
   <assign|version-suppressed|<macro|<math|<op|\<times\>>>>>
+
+  <assign|version-comment|<macro|body|comment|<on-event|focus|<arg|body>|display-balloon|<quote-arg|body>|<small|<preview-balloon|<arg|comment>>>|left|TOP|keyboard>>>
+
+  <\active*>
+    <\src-comment>
+      Spell checking
+    </src-comment>
+  </active*>
+
+  <assign|spell-title-color|#edc>
+
+  <assign|spell-body-color|<blend|#fffd|<value|new-version-color>>>
+
+  <assign|spell-padding|1spc>
+
+  <assign|spell-balloon|<macro|title|body|<tabular|<tformat|<cwith|1|-1|1|1|cell-hyphen|t>|<cwith|1|1|1|1|cell-background|<value|spell-title-color>>|<cwith|2|2|1|1|cell-background|<value|spell-body-color>>|<twith|table-width|30em>|<twith|table-hmode|min>|<cwith|1|1|1|1|cell-lsep|<value|spell-padding>>|<cwith|1|1|1|1|cell-rsep|<value|spell-padding>>|<cwith|1|1|1|1|cell-bsep|<value|spell-padding>>|<cwith|1|1|1|1|cell-tsep|<value|spell-padding>>|<cwith|1|1|1|1|cell-bborder|0.3333ln>|<table|<row|<\cell>
+    <arg|title>
+  </cell>>|<row|<\cell>
+    <arg|body>
+  </cell>>>>>>>
+
+  <assign|spell-error*|<macro|body|msg|proposals|<on-event|focus|<render-old|<arg|body>>|display-balloon|<quote-arg|body>|<very-small|<spell-balloon|<arg|msg>|<arg|proposals>>>|left|BOTTOM|keyboard>>>
+
+  <assign|show-key|<macro|key|<active*|<move|<with|font-family|tt|<with|ornament-color|#e8e0d8|ornament-sunny-color|#f4f0ec|ornament-shadow-color|#d0c0b0|ornament-vpadding|2ln|ornament-border|2ln|ornament-hpadding|4ln|ornament-shape|rounded|ornament-corner|50%|<ornament|<compound|inflate|<with|color|dark
+  brown|<arg|key>>>>>>||0.075ex>>>>
+
+  <assign|spell-propositions|<xmacro|items|<extern|ext-spell-propositions|<quote-arg|items>>>>
+
+  <assign|spell-error|<xmacro|items|<extern|ext-spell-error|<quote-arg|items>>>>
+
+  <drd-props|spell-propositions|arity|<tuple|repeat|1|1>|accessible|all>
+
+  <drd-props|spell-error|arity|<tuple|repeat|1|1>|accessible|all>
+
+  \;
 </body>
 
 <\initial>

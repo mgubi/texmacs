@@ -23,7 +23,11 @@ openssl (string args) {
   if (openssl_cmd == "") openssl_cmd= get_env ("TM_OPENSSL");
   if (openssl_cmd == "") openssl_cmd= "openssl";
   //cout << "TeXmacs] " << (openssl_cmd * " " * args) << LF;
-  return eval_system (openssl_cmd * " " * args);
+  string r= eval_system (openssl_cmd * " " * args);
+  if (DEBUG_IO)
+    debug_io << "openssl " << args << " -> " << N(r) << " bytes"
+             << (N(r) > 0 && N(r) < 400 && r[0] != 0 && (r[0] < 32 || r[0] > 126) ? "" : (": " * r (0, min (N(r), 80)))) << LF;
+  return r;
 }
 
 string
@@ -81,9 +85,11 @@ rsa_encode (string msg, string key) {
   save_string (_msg, msg);
   url _key= url_temp ();
   save_string (_key, key);
-  string r= openssl_rsa ("-in " * as_string (_msg) *
-			 " -pubin -inkey " * as_string (_key) *
-			 " -encrypt");
+  // the operation comes first: LibreSSL (the openssl of macOS) loads the
+  // key when it meets -inkey, for the operation selected so far (signing,
+  // which needs a private key, unless -encrypt was given before)
+  string r= openssl_rsa ("-encrypt -in " * as_string (_msg) *
+			 " -pubin -inkey " * as_string (_key));
   remove (_msg);
   remove (_key);
   return r;
@@ -95,9 +101,8 @@ rsa_decode (string msg, string key) {
   save_string (_msg, msg);
   url _key= url_temp ();
   save_string (_key, key);
-  string r= openssl_rsa ("-in " * as_string (_msg) *
-                         " -inkey " * as_string (_key) *
-                         " -decrypt");
+  string r= openssl_rsa ("-decrypt -in " * as_string (_msg) *
+                         " -inkey " * as_string (_key));
   remove (_msg);
   remove (_key);
   return r;

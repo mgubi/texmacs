@@ -12,19 +12,28 @@
 
 #include "client_server.hpp"
 #include "scheme.hpp"
+#include "boot.hpp"
 #include "iterator.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
-#include <Gnutls/gnutls.hpp>
+
+// version of the client/server protocol (also reported without sockets)
+constexpr int TM_PROTOCOL_VERSION = 1;
 
 #ifdef QTTEXMACS
 #include "Qt/QTMSockets.hpp"
+#else
+#include "tm_sockets.hpp"
+#endif
+#if 1 // the sockets exist in every build now
 
 #define CLT_KO(c) (c == NULL || !c->alive)
 
 static hashset<pointer> the_clients;
 static hashmap<int,pointer> client_from_fd; 
 static bool clients_started= false;
+
+// v1: tree_cache
 
 /******************************************************************************
 * Utilities
@@ -72,7 +81,7 @@ static int
 _client_start (string host, int port, tm_contact contact) {
   if (port < 0 || port > 65535) {
     io_error << "invalid port number " << port << "\n";
-    return -11;
+    return TM_NET_INVALID_PORT;
   }
   if (!clients_started) {
     (void) eval ("(use-modules (client client-base))");
@@ -81,7 +90,7 @@ _client_start (string host, int port, tm_contact contact) {
   socket_link_rep* client=
     tm_new<socket_link_rep> (host, port, contact);
   if (client == NULL)
-    return -20;
+    return TM_NET_INTERNAL_ERROR;
   string status= client->start ();
    if (DEBUG_IO)
      debug_io << "client started, its status is now '" << status << "'\n";
@@ -93,9 +102,9 @@ _client_start (string host, int port, tm_contact contact) {
   }
   client->stop ();
   if (status == "contact has not started")
-    return -60;
+    return TM_NET_CONTACT_DEAD;
   tm_delete (client);
-  return -120;
+  return TM_NET_CONNECTION_FAILED;
 }
 
 int
@@ -106,15 +115,16 @@ legacy_client_start (string host, int port) {
 int
 tls_client_start (string host, int port, scheme_tree args) {
   if (!gnutls_present ())
-    return -100;
+    return TM_NET_NO_GNUTLS;
   if (!is_tuple_tuple_string (args)) {
     if (DEBUG_IO)
       debug_io << "wrong arguments in 'tls_client_start': " << args << "\n";
-    return -1;
+    return TM_NET_WRONG_ARGUMENTS;
   }
   //cout << "tls_client_start, " << args << LF;
   return _client_start (host, port,
-    make_tls_client_contact (as_array_array_string (args)));
+    make_tls_client_contact (host, as_array_array_string (args),
+        is_tls_no_verify ()));
 }
 
 static socket_link_rep*
@@ -162,7 +172,7 @@ client_write (int fd, string s) {
   DEBUG_SOCKET_DATA ("client output: ", s);
   client->write_packet (s, LINK_IN);
   if (client->alive)
-    return 0;
+    return TM_NET_SUCCESS;
   return -1;
 }
 
@@ -184,49 +194,8 @@ client_listen_connections (int msecs) {
   }
 }
 
-#else // Non QT part
-
-int
-client_start (string host) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-int
-legacy_client_start (string host, int port) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-
-int
-tls_client_start (string host, scheme_tree args) {
-  io_error << "sockets are not implemented";
-  return -1;
-}
-void
-client_stop (int fd) {
-  io_error << "sockets are not implemented";
-}
-
-string
-client_read (int fd) {
-  io_error << "sockets are not implemented";
-  return "";
-}
-
-int
-client_write (int fd, string s) {
-  io_error << "sockets are not implemented";
-  return 0;
-}
-
-void
-enter_secure_mode (int fd) {
-  io_error << "sockets are not implemented";
-}
-
-void
-client_listen_connections (int msecs) {
-  io_error << "sockets are not implemented";
+int client_protocol_version () {
+  return TM_PROTOCOL_VERSION;
 }
 #endif
+

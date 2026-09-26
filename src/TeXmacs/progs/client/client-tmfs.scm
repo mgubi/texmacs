@@ -17,21 +17,206 @@
         (version version-tmfs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Directory entries cache (to avoid refetching on sort change)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define dir-entries-cache (make-ahash-table))
+
+(tm-define (cache-dir-entries url sname server entries)
+  (ahash-set! dir-entries-cache url (list sname server entries)))
+
+(tm-define (get-cached-dir-entries url)
+  (ahash-ref dir-entries-cache url))
+
+(tm-define (clear-cached-dir-entries url)
+  (ahash-remove! dir-entries-cache url))
+
+(define (rebuild-from-cache url)
+  (and-with cached (get-cached-dir-entries url)
+    (let ((sname   (car cached))
+          (server  (cadr cached))
+          (entries (caddr cached)))
+      (cond
+        ((string-starts? url "tmfs://remote-dir/")
+         (with name (substring url 18 (string-length url))
+           (remote-dir-set name (dir-page sname server entries))
+           #t))
+        ((string-starts? url "tmfs://shared/")
+         (buffer-set-stm url (shared-documents entries))
+         #t)
+        ((string-starts? url "tmfs://chat-rooms/")
+         (buffer-set-stm url (chat-rooms-document sname server entries))
+         #t)
+        ((string-starts? url "tmfs://live-list/")
+         (buffer-set-stm url (live-documents sname server entries))
+         #t)
+        (else #f)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Directory sorting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (notify-sort-change pref val)
+  (when (buffer-exists? (current-buffer))
+    (with u (url->string (current-buffer))
+      (when (or (string-starts? u "tmfs://remote-dir/")
+                (string-starts? u "tmfs://shared/")
+                (string-starts? u "tmfs://chat-rooms/")
+                (string-starts? u "tmfs://live-list/"))
+        (rebuild-from-cache u)))))
+
+(define-preferences
+  ("remote-file-browser:sort-field" "type" notify-sort-change)
+  ("remote-file-browser:sort-direction" "asc" notify-sort-change))
+
+(tm-define (entry-type-priority type-str)
+  (cond ((== type-str "dir") 0)
+        ((== type-str "file") 1)
+        ((or (== type-str "chat-room") (== type-str "chat")) 2)
+        ((== type-str "live") 3)
+        (else 4)))
+
+;; Generic comparator that respects sort direction
+(define (make-comparator cmp ascending?)
+  (if ascending? cmp (lambda (a b) (cmp b a))))
+
+;; Sort by name (case-insensitive)
+(define (compare-by-name name-a name-b)
+  (string<? (string-downcase name-a) (string-downcase name-b)))
+
+;; Sort by type, then by name within same type
+(define (compare-by-type type-a name-a type-b name-b)
+  (let ((prio-a (entry-type-priority type-a))
+        (prio-b (entry-type-priority type-b)))
+    (if (== prio-a prio-b)
+        (compare-by-name name-a name-b)
+        (< prio-a prio-b))))
+
+;; Sort by date (timestamps as strings or numbers)
+(define (compare-by-date date-a date-b)
+  (let ((num-a (cond ((number? date-a) date-a)
+                     ((string? date-a) (or (string->number date-a) 0))
+                     (else 0)))
+        (num-b (cond ((number? date-b) date-b)
+                     ((string? date-b) (or (string->number date-b) 0))
+                     (else 0))))
+    (< num-a num-b)))
+
+(tm-define (get-sort-field)
+  (get-preference "remote-file-browser:sort-field"))
+
+(tm-define (get-sort-direction)
+  (get-preference "remote-file-browser:sort-direction"))
+
+(tm-define (sort-ascending?)
+  (== (get-sort-direction) "asc"))
+
+(tm-define (toggle-sort-direction)
+  (:secure #t)
+  (set-preference "remote-file-browser:sort-direction"
+                  (if (sort-ascending?) "desc" "asc")))
+
+(tm-define (set-sort-field field)
+  (:secure #t)
+  (set-preference "remote-file-browser:sort-field" field))
+
+;; Generic sort function with accessor functions
+;; get-name: extracts name from entry
+;; get-type: extracts type from entry (or #f if not applicable)
+;; get-date: extracts date from entry
+(tm-define (sort-entries entries get-name get-type get-date sort-field)
+  (let* ((field (if (== sort-field "") (get-sort-field) sort-field))
+         (asc? (sort-ascending?))
+         (cmp (cond
+               ((== field "name")
+                (lambda (a b)
+                  (compare-by-name (get-name a) (get-name b))))
+               ((and (== field "type") get-type)
+                (lambda (a b)
+                  (compare-by-type (get-type a) (get-name a)
+                                   (get-type b) (get-name b))))
+               ((== field "date")
+                (lambda (a b)
+                  (compare-by-date (get-date a) (get-date b))))
+               (else
+                (lambda (a b)
+                  (compare-by-name (get-name a) (get-name b))))))
+         (final-cmp (make-comparator cmp asc?)))
+    (list-sort entries final-cmp)))
+
+;; Sort directory entries
+;; Entry format: (short-name full-name dir? props)
+(define (sort-directory-entries entries sort-field)
+  (sort-entries entries
+    (lambda (e) (car e))
+    (lambda (e) (if (caddr e) "dir" "file"))
+    (lambda (e)
+      (and-let* ((props (cadddr e))
+                 (date-raw (assoc-ref props "date")))
+        (if (pair? date-raw) (car date-raw) date-raw)))
+    sort-field))
+
+;; Sort entries by name/date (for chat rooms, live docs)
+;; Entry format: (name date) or just name
+(tm-define (sort-name-entries entries sort-field)
+  (sort-entries entries
+    (lambda (e) (if (pair? e) (car e) e))
+    #f
+    (lambda (e) (if (pair? e) (cadr e) #f))
+    sort-field))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Server lookup from tmfs path
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Find the server handle for a tmfs name like "localhost/~pseudo/..."
+;; by extracting the pseudo from the ~pseudo path component.
+(tm-define (find-server-for-name name)
+  (let* ((parts (tmfs->list name))
+         (sname (car parts))
+         (pseudo-part (and (>= (length parts) 2) (cadr parts)))
+         (pseudo (and pseudo-part (string-starts? pseudo-part "~")
+                      (substring pseudo-part 1
+                                 (string-length pseudo-part)))))
+    (if pseudo
+        (client-find-server-by-pseudo sname pseudo)
+        (client-find-server sname))))
+
+(tm-define (remote-file-get-server-name name)
+  (let* ((parts (tmfs->list name))
+         (name-and-port (if (null? parts) "" (car parts)))
+         (name-and-port-list (string-split name-and-port #\:)))
+      (car name-and-port-list)))
+
+(tm-define (remote-file-get-port name)
+  (let* ((parts (tmfs->list name))
+         (name-and-port (if (null? parts) "" (car parts)))
+         (port-list (cdr (string-split name-and-port #\:))))
+      (if (or (null? port-list) (not (string->number (car port-list))))
+          "6561" (car port-list))))
+
+(tm-define (remote-file-get-pseudo name)
+  (let* ((parts (tmfs->list name))
+         (pseudo-part (and (>= (length parts) 2) (cadr parts))))
+     (and pseudo-part (string-starts? pseudo-part "~")
+                      (substring pseudo-part 1
+                                 (string-length pseudo-part)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (generic-document doc)
+(tm-define (remote-file-browser-document doc)
   `(document
      (TeXmacs ,(texmacs-version))
-     (style (tuple "generic"))
+     (style (tuple "generic" "remote-file-browser"))
      (body ,doc)))
 
 (define (empty-document)
-  (generic-document '(document "")))
+  (remote-file-browser-document '(document "")))
 
-(define (buffer-set-stm u doc)
-  (let* ((s (object->tmstring doc))
-         (t (tree-import-loaded s u "stm")))
+(tm-define (buffer-set-stm u doc)
+  (with t (tree-import-loaded-from-object doc u)
     (buffer-set u t)
     (buffer-pretend-saved u)))
 
@@ -150,7 +335,7 @@
       (lambda (name)
         (and-with fname (prepend-dir server name "remote-file")
           (remote-create-file server fname (empty-document))))
-    (list "Name" "string" '())))
+    (list "Name" "string")))
 
 (tmfs-permission-handler (remote-file name type)
   ;; FIXME: asynchroneous retrieval of file permissions
@@ -167,9 +352,43 @@
       title
       (string-append title " - " (pretty-time t))))
 
+(define (expand-cache-refs sname fname refs)
+  (for (ref refs)
+    (when (and (tree->path ref) (tree-is? ref 'cache-ref))
+      (and-with tm (tree-cache-get sname (tm->string (tm-ref ref 0)))
+        (when (not (tm-func? tm 'uninit))
+          (with modified? (and fname (buffer-modified? fname))
+            (tree-set ref tm)
+            (when (and fname (not modified?))
+              (buffer-pretend-saved fname))))))))
+
+(tm-define (fetch-missing-cache-refs server arg)
+  (let* ((fname (if (tree? arg) #f arg))
+         (t (if (tree? arg) arg (buffer->tree fname)))
+         (refs (select t '(:* cache-ref)))
+         (hashes (map (lambda (r) (tm->string (tm-ref r 0))) refs))
+         (sname (client-find-server-name server))
+         (missing
+           (list-remove-duplicates
+             (list-filter
+               hashes (lambda (h) (not (tree-cache-contains? sname h)))))))
+    (expand-cache-refs sname fname refs)
+    (for-each
+      (lambda (h)
+        (client-remote-eval server
+          `(remote-get-cache-ref ,h)
+          (lambda (tm)
+            (tree-cache-put sname h (stree->tree tm))
+            (expand-cache-refs sname fname refs)
+            (set-message (string-append "retrieved " h)
+                         "load remote cache ref"))
+          (lambda (err)
+            (set-message err "load remote cache ref"))))
+      missing)))
+
 (tmfs-title-handler (remote-file name doc)
   (let* ((sname (tmfs-car name))
-         (server (client-find-server sname))
+         (server (find-server-for-name name))
          (fname (string-append "tmfs://remote-file/" name))
          (def-title (url->string (url-tail fname)))
          (t (remote-get-time fname)))
@@ -189,17 +408,37 @@
 
 (tmfs-load-handler (remote-file name)
   (let* ((sname (tmfs-car name))
-         (server (client-find-server sname))
-         (fname (string-append "tmfs://remote-file/" name)))
+         (server (find-server-for-name name))
+	 (server-name (remote-file-get-server-name name))
+         (fname (string-append "tmfs://remote-file/" name))
+	 (cb (lambda () (load-buffer fname))))
     (if (not server)
-        ;; FIXME: better error handling
-        (texmacs-error "remote-file" "invalid server")
+	(with accounts
+	    (list-filter (client-accounts)
+			 (lambda (x) (== (car x) server-name)))
+	  (if (null? accounts)
+	      (dialogue-window
+	       (remote-login-widget server-name "6561" "" `tls-password cb)
+				    noop "Remote login")
+	      (with (server-name port pseudo authentications) (car accounts)
+		(with-wallet
+		  (with credential
+		      (wallet-get (list "remote" server-name port
+					pseudo (car authentications)))
+		    (if credential
+			(client-login-home server-name port
+					   pseudo credential cb)
+			(dialogue-window
+			 (remote-login-widget server-name port pseudo
+					      (car authentications) cb)
+					 noop "Remote login")))))))
         (begin
           (client-remote-eval server `(remote-file-load ,name)
             (lambda (tm)
               (with doc (convert tm "texmacs-document" "texmacs-stree")
                 ;;(display* "LOAD ") (write doc) (display* "\n")
-                (remote-file-set name doc))
+                (remote-file-set name doc)
+                (fetch-missing-cache-refs server fname))
               (set-message "retrieved contents" "load remote file"))
             (lambda (err)
               (set-message err "load remote file")))
@@ -209,7 +448,7 @@
 (tmfs-save-handler (remote-file name doc)
   ;;(display* "SAVE ") (write doc) (display* "\n")
   (let* ((sname (tmfs-car name))
-         (server (client-find-server sname))
+         (server (find-server-for-name name))
          (fname (string-append "tmfs://remote-file/" name))
          (msg remote-commit-message))
     (if (not server)
@@ -220,6 +459,10 @@
               (set-message "file saved" "save remote file"))
             (lambda (err)
               (set-message err "save remote file")))))))
+
+(tmfs-autosave-handler (remote-file name suf)
+  ;;(display* "AUTOSAVE ") (write name) (display* "\n")
+  (url-backup (url-glue name suf)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Remote directories
@@ -241,30 +484,139 @@
       (lambda (name)
         (and-with fname (prepend-dir server name "remote-dir")
           (remote-create-dir server fname)))
-    (list "Name" "string" '())))
+    (list "Name" "string")))
 
-(define (dir-line sname entry)
+(tm-define (tmfs-type u)
+  (with head (tmfs-car (url->string (url-unroot u)))
+    (if (string-starts? head "remote-") (string-drop head 7) head)))
+
+(tm-define (tmfs-icon type)
+  (with icon-type (if (== type "chat-room") "chat" type)
+    (string-append "tm_cloud_" icon-type ".svg")))
+
+(define (directory-entry sname server entry)
   (with (short-name full-name dir? props) entry
-    (let* ((type (if dir? "remote-dir" "remote-file"))
-           (name (string-append "tmfs://" type "/" sname "/" full-name))
-           (hlink `(hlink ,short-name ,name)))
-      hlink)))
+    (let* ((type (if dir? "dir" "file"))
+           (icon-name (tmfs-icon type))
+           (link (prepend-dir server short-name (string-append "remote-" type)))
+           (actions (build-actions-bar server link))
+           (date-raw (assoc-ref props "date"))
+           (date (if (and date-raw (pair? date-raw))
+                     (pretty-date (string->number (car date-raw)) "short")
+                     "")))
+      `(dir-entry ,icon-name ,short-name ,link ,date ,actions))))
 
-(define (dir-page sname entries)
-  (generic-document `(document (section* "File list")
-                               ,@(map (cut dir-line sname <>) entries))))
+(tm-define (build-table-share-action server u)
+  (with action-cmd
+    (string-append "(open-permissions-editor "
+                   (number->string server) " \""
+                   u "\")")
+    `(action (dir-entry-icon "tm_cloud_share.svg") ,action-cmd)))
+
+(tm-define (build-table-rename-action server u)
+  (with action-cmd
+    (string-append "(remote-rename-interactive "
+                   (number->string server) " \""
+                   u "\")")
+    `(action (dir-entry-icon "tm_replace.svg") ,action-cmd)))
+
+(tm-define (build-table-remove-action server u)
+  (with action-cmd
+    (string-append "(remote-remove-interactive "
+                   (number->string server) " \""
+                   u "\")")
+    `(action (dir-entry-icon "tm_focus_delete.svg") ,action-cmd)))
+
+(tm-define (build-actions-bar server link)
+  (let* ((share-action (build-table-share-action server link))
+         (rename-action (build-table-rename-action server link))
+         (remove-action (build-table-remove-action server link)))
+    `(concat ,share-action (hspace "0.5em") ,rename-action (hspace "0.5em")
+             ,remove-action)))
+
+(tm-define (sort-header-label field label)
+  (let* ((current-field (get-sort-field))
+         (asc? (sort-ascending?))
+         (is-current? (== field current-field))
+         (indicator
+           (if is-current?
+             (if asc? '<blacktriangleup> '<blacktriangledown>)
+             '<vartriangleright>)))
+    `(concat ,label " " ,indicator)))
+
+;; A clickable header cell, ready to be dropped into a column of `dir-header'
+(tm-define (sort-header-cell field label)
+  `(dir-header-cell ,(sort-header-label field label)
+                    ,(sort-header-action field)))
+
+;; Build clickable sort action
+(tm-define (sort-header-action field)
+  (let ((current-field (get-sort-field)))
+    (if (== field current-field)
+        "(toggle-sort-direction)"
+        (string-append "(set-sort-field \"" field "\")"))))
+
+(define (path-breadcrumbs p)
+  (let loop ((cur p) (acc '()))
+    (let* ((tail (url->string (url-tail cur)))
+           (is-home? (string-prefix? "~" tail))
+           (name (if is-home? "Home" tail))
+           (entry (if (== cur p)
+                    `(strong ,name)
+                    `(hlink ,name ,(url->string cur))))
+           (new-acc (cons entry acc)))
+      (if is-home?
+        new-acc
+        (loop (url-head cur) new-acc)))))
+
+(define (build-dir-breadcrumbs p)
+  (if (== (tmfs-type p) "dir")
+    (with sep `(with color white (concat " " <blacktriangleright> " "))
+      (list-intersperse (path-breadcrumbs p) sep))
+    '()))
+
+;; actions is the same actions bar the entries carry. The header renders it
+;; as a phantom so that the columns line up with the entries below
+(tm-define (build-dir-table title date-label content actions)
+  (let* ((breadcrumbs (build-dir-breadcrumbs (buffer-get-title (current-buffer))))
+         ;; breadcrumbs already emphasize their last element
+         ;; put title as strong otherwise
+         (table-name (if (null? breadcrumbs)
+                         `(strong ,title)
+                         `(concat ,@breadcrumbs)))
+         (hdr `(dir-header ,table-name
+                           ,(sort-header-cell "type" "")
+                           ,(sort-header-cell "name" "Name")
+                           ,(sort-header-cell "date" date-label)
+                           ,actions)))
+    `(compact (document ,hdr
+                        ,@(if (null? content)
+                              '((dir-entry-empty))
+                              `((dir-content (document ,@content))))))))
+
+(define (directory-table sname server entries)
+  (let ((sorted (sort-directory-entries entries "")))
+    (build-dir-table "My Files" "Date"
+                     (map (cut directory-entry sname server <>) sorted)
+                     (build-actions-bar server ""))))
+
+(define (dir-page sname server entries)
+  (remote-file-browser-document
+    `(document
+       (dir-list ,(directory-table sname server entries)))))
 
 (tmfs-load-handler (remote-dir name)
   ;;(display* "Loading remote dir " name "\n")
   (let* ((sname (car (tmfs->list name)))
-         (server (client-find-server sname))
+         (server (find-server-for-name name))
          (fname (string-append "tmfs://remote-dir/" name)))
     (if (not server)
         (texmacs-error "remote-file" "invalid server")
         (begin
           (client-remote-eval server `(remote-dir-load ,name)
             (lambda (entries)
-              (remote-dir-set name (dir-page sname entries))
+              (cache-dir-entries fname sname server entries)
+              (remote-dir-set name (dir-page sname server entries))
               (set-message "retrieved contents" "remote directory"))
             (lambda (err)
               (set-message err "remote directory")))
@@ -285,7 +637,7 @@
          (dest* (remote-file-name dest))
          (src-sv (car (tmfs->list src*)))
          (dest-sv (car (tmfs->list dest*)))
-         (server (client-find-server src-sv))
+         (server (find-server-for-name src*))
          (action (if (remote-file? src) "rename file" "rename directory"))
          (dir (remote-parent dest))
          (name (url->string (url-tail dest))))
@@ -309,22 +661,37 @@
                 (else
                   (remote-set-field server rid "dir" (list did))
                   (remote-set-field server rid "name" (list name))
+                  ;; Clear server message cache so renamed resources are resolved correctly
+                  (client-remote-eval server '(remote-chat-room-messages-reset)
+                    ignore
+                    ignore)
                   (buffer-rename src dest)
                   (set-message (string-append "renamed as " (url->string dest))
-                               action))))))))
+                               action)
+                  (when (remote-directory? (current-buffer))
+                    (revert-buffer-revert)))))))))
 
 (tm-define (remote-remove what)
   (let* ((dir? (remote-directory? what))
          (name (remote-file-name what))
          (server-name (car (tmfs->list name)))
-         (server (client-find-server server-name))
+         (server (find-server-for-name name))
          (action (if dir? "remove directory" "remove file"))
          (done (if dir? "directory removed" "file removed"))
+         (rname-url (string->url
+                      (string-append
+                        (if dir? "tmfs://remote-dir/" "tmfs://remote-file/")
+                        name)))
          (cmd `(,(if dir? 'remote-dir-remove 'remote-file-remove) ,name)))
     (if (remote-home-directory? what)
         (set-message "not allowed to remove home directory" action)
         (client-remote-eval server cmd
           (lambda (removed)
+            (with-database* (user-database "sync")
+              (with ids (db-search
+                          `(("remote-name" ,(url->system rname-url))
+                            ("type" "sync")))
+                (for (id ids) (db-remove-entry id))))
             (when (buffer-exists? what)
               (buffer-close what))
             (set-message done action))
@@ -365,7 +732,7 @@
 (define (compute-remote-versions rname)
   (let* ((name (remote-file-name rname))
          (sname (tmfs-car name))
-         (server (client-find-server sname))
+         (server (find-server-for-name name))
          (fname (string-append "tmfs://remote-file/" name))
          (prefix (string-append "tmfs://remote-file/" sname "/")))
     (and server

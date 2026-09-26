@@ -653,6 +653,7 @@ a:active, a:focus, a:hover {
 tt, .verbatim {
     font-family: 'Liberation Mono', monospace;
     font-size: 90%;
+    overflow: auto;
 }
 
 /******************************************************************************

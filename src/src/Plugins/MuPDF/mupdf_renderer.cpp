@@ -11,6 +11,7 @@
 
 #include "mupdf_renderer.hpp"
 #include "analyze.hpp"
+#include "iterator.hpp" // mupdf_image_gc
 #include "image_files.hpp"
 #include "file.hpp"
 #include "image_files.hpp"
@@ -25,14 +26,48 @@
 
 #include "mupdf_picture.hpp"
 
+// MuPDF errors and warnings go to the log (an error thrown outside a fz_try
+// block still terminates the process, see mupdf_picture.cpp)
+static void
+mupdf_error_callback (void* user, const char* message) {
+  (void) user;
+  cout << "TeXmacs] MuPDF error: " << message << LF;
+}
+
+static void
+mupdf_warning_callback (void* user, const char* message) {
+  (void) user;
+  cout << "TeXmacs] MuPDF warning: " << message << LF;
+}
+
 // manage a single global context for fitz
 fz_context*
 mupdf_context () {
   static fz_context *ctx= NULL;
   if (!ctx) {
     ctx= fz_new_context (NULL, NULL, FZ_STORE_UNLIMITED);
+    fz_set_error_callback (ctx, mupdf_error_callback, NULL);
+    fz_set_warning_callback (ctx, mupdf_warning_callback, NULL);
   }
   return ctx;
+}
+
+// load a font file, NULL if MuPDF cannot (fz_throw outside fz_try would
+// terminate the process)
+static fz_font*
+mupdf_font_from_file (const char* path) {
+  fz_context* ctx= mupdf_context ();
+  fz_font* font= NULL;
+  fz_var (font);
+  fz_try (ctx) {
+    font= fz_new_font_from_file (ctx, NULL, path, 0, 0);
+  }
+  fz_catch (ctx) {
+    font= NULL;
+    cout << "TeXmacs] MuPDF cannot load font " << path << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return font;
 }
 
 // global auxiliary document needed to invoke some functions
@@ -40,23 +75,47 @@ pdf_document*
 mupdf_document () {
   static pdf_document *doc= NULL;
   if (!doc) {
-    doc= pdf_create_document (mupdf_context ());
+    fz_context *ctx= mupdf_context ();
+    fz_var (doc);
+    fz_try (ctx) {
+      doc= pdf_create_document (ctx);
+    }
+    fz_catch (ctx) {
+      doc= NULL;
+      cout << "TeXmacs] MuPDF cannot create the auxiliary document: "
+           << fz_caught_message (ctx) << LF;
+    }
   }
   return doc;
 }
 
 
 void
-snapshot_pixmap (fz_pixmap *pix) {
+snapshot_pixmap (fz_context *ctx, fz_pixmap *pix) {
   static int i=0;
   string str = "/Users/mgubi/snapshot-";
   str << as_string (i) << ".png";
   i = (i+1) % 1000;
   c_string cstr (str);
-  fz_output *out= fz_new_output_with_path (mupdf_context(), cstr, 0);
-  fz_write_pixmap_as_png (mupdf_context (), out, pix);
-  fz_close_output (mupdf_context(), out);
-  fz_drop_output (mupdf_context(), out);
+  fz_output *out;
+  fz_pixmap *rgb_pix;
+  fz_var (out);
+  fz_var (rgb_pix);
+  fz_try (ctx) {
+    rgb_pix = fz_convert_pixmap(ctx, pix, fz_device_rgb (ctx),
+                                                NULL, NULL, fz_default_color_params, 1);
+    out= fz_new_output_with_path (ctx, cstr, 0);
+    fz_write_pixmap_as_png (ctx, out, rgb_pix);
+  }
+  fz_always (ctx) {
+    fz_drop_pixmap (ctx, rgb_pix);
+    fz_close_output (ctx, out);
+    fz_drop_output (ctx, out);
+  }
+  fz_catch (ctx) {
+    const char* error_msg = fz_caught_message(ctx);
+    cout << "Fitz error in snapshot_pixmap: " << error_msg << LF;
+  }
 }
 
 /******************************************************************************
@@ -90,13 +149,16 @@ struct mupdf_image_rep: concrete_struct {
   int w, h, xo, yo;
   fz_image *img;
   mupdf_image_rep (fz_image* img2)
-    : img (img2) {
+    : w (0), h (0), xo (0), yo (0), img (img2) {
+    if (img == NULL) return; // an image which could not be loaded
     fz_keep_image (mupdf_context (), img);
     // get pixmap size
-    fz_pixmap *pix= fz_get_pixmap_from_image (mupdf_context (), img,
-                                              NULL, NULL, &w, &h);
-    fz_drop_pixmap (mupdf_context (), pix);
-    xo = yo = 0;
+    fz_pixmap *pix= mupdf_pixmap_from_image (img);
+    if (pix != NULL) {
+      w= fz_pixmap_width (mupdf_context (), pix);
+      h= fz_pixmap_height (mupdf_context (), pix);
+      fz_drop_pixmap (mupdf_context (), pix);
+    }
   }
   ~mupdf_image_rep() { fz_drop_image (mupdf_context (), img); }
   friend class mupdf_image;
@@ -133,6 +195,34 @@ class mupdf_pattern {
 CONCRETE_NULL_CODE (mupdf_pattern);
 
 /******************************************************************************
+* pdf figures, drawn as drawing
+******************************************************************************/
+
+// A PDF figure as a form XObject. Each lives in the document it was read
+// from -- read into memory, so that no file stays open -- and the form is
+// made there, around the contents and the resources of the first page;
+// dropping the form drops the document, and the memory with it (a form
+// grafted into the one auxiliary document would stay there for good).
+struct mupdf_form_rep: concrete_struct {
+  pdf_document *doc;
+  pdf_obj *xo;
+  mupdf_form_rep (pdf_document* doc2, pdf_obj* xo2): doc (doc2), xo (xo2) {}
+  ~mupdf_form_rep () {
+    pdf_drop_obj (mupdf_context (), xo);
+    pdf_drop_document (mupdf_context (), doc);
+  }
+  friend class mupdf_form;
+};
+
+class mupdf_form {
+  CONCRETE_NULL (mupdf_form);
+  mupdf_form (pdf_document* doc2, pdf_obj* xo2):
+    rep (tm_new<mupdf_form_rep> (doc2, xo2)) {}
+};
+
+CONCRETE_NULL_CODE (mupdf_form);
+
+/******************************************************************************
 * pdf fonts
 ******************************************************************************/
 
@@ -164,9 +254,50 @@ static hashmap<basic_character, mupdf_image> character_image;
 // caches
 static hashmap<unsigned long long int, mupdf_image> picture_pool;
 static hashmap<tree, mupdf_image>  image_pool;
-static hashmap<tree, mupdf_pattern> pattern_pool;
+static hashmap<tree, mupdf_pattern> pattern_pool; // by pattern_key
 static hashmap<tree, mupdf_image> pattern_image_pool;
+static hashmap<tree, mupdf_form> form_pool; // nil: MuPDF cannot read it
+static void form_cache_forget (string name);  // the figures kept drawn
 static hashmap<string, mupdf_font> native_fonts;
+
+// Garbage collect the cached images whose name matches (image_gc in
+// gui.hpp; the keys of the pools are tuples whose first element is the
+// name of the file). "*" flushes everything.
+void mupdf_image_gc (string name) {
+  if (name == "*" || name == "") {
+    image_pool= hashmap<tree, mupdf_image> ();
+    pattern_pool= hashmap<tree, mupdf_pattern> ();
+    pattern_image_pool= hashmap<tree, mupdf_image> ();
+    form_pool= hashmap<tree, mupdf_form> ();
+    form_cache_forget ("*");
+    return;
+  }
+  array<tree> gone;
+  iterator<tree> it= iterate (image_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) image_pool->reset (gone[i]);
+  gone= array<tree> ();
+  it= iterate (pattern_image_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) pattern_image_pool->reset (gone[i]);
+  gone= array<tree> ();
+  it= iterate (form_pool);
+  while (it->busy ()) {
+    tree key= it->next ();
+    if (N(key) > 0 && is_atomic (key[0]) && occurs (name, key[0]->label))
+      gone << key;
+  }
+  for (int i= 0; i < N(gone); i++) form_pool->reset (gone[i]);
+  form_cache_forget (name);
+}
 
 // flush caches
 void del_obj_mupdf_renderer (void)  {
@@ -175,6 +306,8 @@ void del_obj_mupdf_renderer (void)  {
   picture_pool= hashmap<unsigned long long int, mupdf_image> ();
   pattern_pool= hashmap<tree, mupdf_pattern> ();
   pattern_image_pool= hashmap<tree, mupdf_image> ();
+  form_pool= hashmap<tree, mupdf_form> ();
+  form_cache_forget ("*");
   native_fonts= hashmap<string, mupdf_font> ();
 }
 
@@ -183,10 +316,10 @@ void del_obj_mupdf_renderer (void)  {
 ******************************************************************************/
 
 mupdf_renderer_rep::mupdf_renderer_rep (int w2, int h2)
-  : basic_renderer_rep (true, w2, h2),
+  : basic_renderer_rep (true, 1.0, w2, h2),
     pixmap (NULL), dev (NULL), proc (NULL),
     fg (-1), bg (-1),
-    lw (-1),
+    lw (-1), clip_level (0), transform_level (0), fill_is_pattern (false),
     in_text (false), cfn ("")
 {
   reset_zoom_factor();
@@ -202,7 +335,7 @@ mupdf_renderer_rep::get_handle () {
 }
 
 void
-mupdf_renderer_rep::get_extents (int& w2, int& h2) {
+mupdf_renderer_rep::get_extents (SI& w2, SI& h2) {
   if (pixmap) {
     w2= fz_pixmap_width (mupdf_context (), pixmap);
     h2= fz_pixmap_height (mupdf_context (), pixmap);
@@ -212,8 +345,11 @@ mupdf_renderer_rep::get_extents (int& w2, int& h2) {
 }
 
 void
-mupdf_renderer_rep::set_zoom_factor (double zoom) {
-  renderer_rep::set_zoom_factor (retina_factor * zoom);
+mupdf_renderer_rep::set_zoom_factor (double zoom, bool safe) {
+  // the retina factor is applied here, not through pixel_ratio: the
+  // consistency check of the base class does not apply
+  (void) safe;
+  renderer_rep::set_zoom_factor (retina_factor * zoom, false);
   retina_pixel= pixel * retina_factor;
 }
 
@@ -227,9 +363,22 @@ mupdf_renderer_rep::begin (void* handle) {
     fz_keep_pixmap (ctx, pixmap);
     w= fz_pixmap_width (ctx, pixmap);
     h= fz_pixmap_height (ctx, pixmap);
-    dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+    dev= NULL; proc= NULL;
     fz_matrix ctm= fz_make_matrix(1, 0, 0, -1, 0, 0);
-    proc=pdf_new_run_processor (ctx, mupdf_document (),  dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    bool ok= mupdf_protected ("mupdf_renderer_rep::begin", [&] () {
+      dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+      proc= pdf_new_run_processor (ctx, mupdf_document (), dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    });
+    if (!ok) {
+      // the drawing operators need a processor: draw into a 1x1 dummy
+      // pixmap instead (if even this fails we are out of memory)
+      if (dev != NULL) { fz_drop_device (ctx, dev); dev= NULL; }
+      fz_drop_pixmap (ctx, pixmap);
+      pixmap= mupdf_new_pixmap (1, 1);
+      w= h= 1;
+      dev= fz_new_draw_device (ctx, fz_identity, pixmap);
+      proc= pdf_new_run_processor (ctx, mupdf_document (), dev, ctm, -1, "View", NULL, NULL, NULL, NULL, NULL);
+    }
     
     fg  = -1;
     bg  = -1;
@@ -238,6 +387,8 @@ mupdf_renderer_rep::begin (void* handle) {
     cfn= "";
     in_text = false;
     clip_level = 0;
+    transform_level = 0;
+    fill_is_pattern = false;
     
     // outmost save of the graphics state
     proc->op_q (mupdf_context (), proc);
@@ -255,21 +406,28 @@ mupdf_renderer_rep::begin (void* handle) {
 void
 mupdf_renderer_rep::end () {
   end_text ();
-
+  fz_context* ctx= mupdf_context ();
+  // Protected: the device complains -- with an error, not a warning --
+  // when a clip is left open (fz_close_device), and an error which nothing
+  // catches ends the process. The processor and the device are dropped
+  // whatever happens.
   if (proc) {
-    // reset set_clipping calls in order to have well formed PDF.
-    while (clip_level--)
-      proc->op_Q (mupdf_context (), proc);
-    // outmost restore for the graphics state (see begin_page)
-    proc->op_Q (mupdf_context (), proc);
-
-    pdf_close_processor (mupdf_context (), proc);
-    pdf_drop_processor (mupdf_context (), proc);
+    mupdf_protected ("mupdf_renderer_rep::end", [&] () {
+      // reset set_clipping calls in order to have well formed PDF.
+      while (clip_level-- > 0) proc->op_Q (ctx, proc);
+      // outmost restore for the graphics state (see begin_page)
+      proc->op_Q (ctx, proc);
+      pdf_close_processor (ctx, proc);
+    });
+    clip_level= 0;
+    pdf_drop_processor (ctx, proc);
     proc= NULL;
   }
   if (dev) {
-    fz_close_device (mupdf_context (), dev);
-    fz_drop_device (mupdf_context (), dev);
+    mupdf_protected ("mupdf_renderer_rep::end, device", [&] () {
+      fz_close_device (ctx, dev);
+    });
+    fz_drop_device (ctx, dev);
     dev= NULL;
   }
   if (pixmap) {
@@ -318,8 +476,14 @@ mupdf_renderer_rep::set_transformation (frame fr) {
   point uy= tr (point (0.0, 1.0)) - o;
   //cout << "Set transformation " << o << ", " << ux << ", " << uy << "\n";
 
-  proc->op_q (mupdf_context (), proc);
-  proc->op_cm (mupdf_context (), proc, ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
+  // protected: a q past MuPDF's limit of nested states is an error
+  double m[6]= { ux[0], ux[1], uy[0], uy[1], o[0], o[1] };
+  fz_context* ctx= mupdf_context ();
+  mupdf_protected ("set_transformation", [&] () {
+    proc->op_q (ctx, proc);
+    proc->op_cm (ctx, proc, m[0], m[1], m[2], m[3], m[4], m[5]);
+  });
+  transform_level++;
 
   rectangle nclip= fr [oclip];
   clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
@@ -328,7 +492,9 @@ mupdf_renderer_rep::set_transformation (frame fr) {
 void
 mupdf_renderer_rep::reset_transformation () {
   unclip ();
-  proc->op_Q (mupdf_context (), proc);
+  fz_context* ctx= mupdf_context ();
+  mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
+  if (transform_level > 0) transform_level--;
 }
 
 /******************************************************************************
@@ -342,25 +508,32 @@ mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   end_text();
   
   outer_round (x1, y1, x2, y2);
+  // protected: q and a clip past MuPDF's limits of nesting are errors;
+  // clip_level counts the q which did happen, so that end balances them
+  fz_context* ctx= mupdf_context ();
   if (restore) {
     // debug_convert << "restore clipping\n";
     if (clip_level > 0) {
-      proc->op_Q (mupdf_context (), proc);
+      mupdf_protected ("set_clipping, restore", [&] () { proc->op_Q (ctx, proc); });
       clip_level--;
     }
     cfn= "";
   }
   else {
     // debug_convert << "set clipping\n";
-    proc->op_q (mupdf_context (), proc);
-    clip_level++;
     float xx1= to_x (min (x1, x2));
     float yy1= to_y (min (y1, y2));
     float xx2= to_x (max (x1, x2));
     float yy2= to_y (max (y1, y2));
-    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
-    proc->op_W (mupdf_context (), proc);
-    proc->op_n (mupdf_context (), proc);
+    bool saved= false;
+    mupdf_protected ("set_clipping", [&] () {
+      proc->op_q (ctx, proc);
+      saved= true;
+      proc->op_re (ctx, proc, xx1, yy1, xx2-xx1, yy2-yy1);
+      proc->op_W (ctx, proc);
+      proc->op_n (ctx, proc);
+    });
+    if (saved) clip_level++;
   }
 }
 
@@ -403,6 +576,7 @@ mupdf_renderer_rep::select_fill_color (color c) {;
   float db= ((float) b) / 1000.0;
   proc->op_rg (mupdf_context (), proc, dr, dg, db); // non-stroking color
   select_alpha (a);
+  fill_is_pattern= false;
 }
 
 static mupdf_image
@@ -410,11 +584,66 @@ get_image (url u, int w, int h, tree eff, SI pixel) {
   mupdf_image mpim= mupdf_image ();
   fz_pixmap *pix= mupdf_load_pixmap (u, w, h, eff, pixel);
   if (pix) {
-    fz_image *im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    fz_image *im= mupdf_image_from_pixmap (pix);
     fz_drop_pixmap (mupdf_context (), pix);
-    mpim= mupdf_image (im);
+    if (im != NULL) mpim= mupdf_image (im);
   }
   return mpim;
+}
+
+// A pdf_pattern of ours is reference counted like one MuPDF loads, and
+// dropped the same way (pdf_drop_pattern_imp is not exported)
+static void
+drop_pattern_imp (fz_context *ctx, fz_storable *s) {
+  pdf_pattern *pat= (pdf_pattern *) s;
+  pdf_drop_obj (ctx, pat->resources);
+  pdf_drop_obj (ctx, pat->contents);
+  fz_free (ctx, pat);
+}
+
+static pdf_pattern*
+new_pattern (fz_context *ctx, pdf_document *doc, float w, float h,
+             pdf_obj *resources, pdf_obj *contents, fz_matrix m) {
+  pdf_pattern *pat= fz_malloc_struct (ctx, pdf_pattern);
+  FZ_INIT_STORABLE (pat, 1, drop_pattern_imp);
+  pat->document= doc;
+  pat->id= 0; // no id: no cached tiles, which would not know the phase
+  pat->ismask= 0;
+  pat->xstep= w;
+  pat->ystep= h;
+  pat->bbox= fz_make_rect (0, 0, w, h);
+  pat->matrix= m;
+  pat->resources= pdf_keep_obj (ctx, resources);
+  pat->contents= pdf_keep_obj (ctx, contents);
+  return pat;
+}
+
+// The pattern p placed for this renderer: its tiles have a corner at the
+// origin of the document, as the Qt port places them (decode (0, 0)), so
+// that the pattern moves with what it fills when the view scrolls -- and
+// a strip repainted after a scroll shift meets the part which was moved
+// without a seam. A pattern lives in the default space of the processor
+// (the matrix of begin), which is the space of to_x and to_y. The one in
+// the pool is the unplaced original; the placed one is made for each use
+// and belongs to the caller.
+static pdf_pattern*
+placed_pattern (fz_context *ctx, pdf_pattern *t, double ox, double oy) {
+  return new_pattern (ctx, t->document, t->xstep, t->ystep,
+                      t->resources, t->contents,
+                      fz_make_matrix (1, 0, 0, 1, (float) ox, (float) oy));
+}
+
+// The key of a pattern in pattern_pool: the pattern and the size of its
+// tile in device pixels, which depends on the zoom (get_pattern_data), so
+// that a pattern registered at one zoom is not used at another with tiles
+// of the wrong size
+static tree
+pattern_key (brush br, SI pixel) {
+  url u;
+  SI w, h;
+  tree eff;
+  get_pattern_data (u, w, h, eff, br, pixel);
+  return tuple (br->get_pattern (), as_string (w), as_string (h));
 }
 
 void
@@ -425,9 +654,8 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
                     << "brush with pattern expected\n";
     return;
   }
-  tree p= br->get_pattern ();
-  // debug_convert << p << "\n";
-  if (pattern_pool->contains(p)) return;
+  tree p= pattern_key (br, pixel);
+  if (pattern_pool->contains (p)) return;
 
   url u;
   SI w, h;
@@ -456,54 +684,42 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
 
   fz_context *ctx= mupdf_context ();
   pdf_document *doc= mupdf_document ();
-  pdf_obj *subres= pdf_new_dict (ctx, doc, 2);
-  pdf_obj *ref= pdf_add_image (ctx, doc, image_pdf->img);
-  pdf_dict_puts (ctx, subres, "pattern-image", ref);
-  pdf_drop_obj (ctx, ref);
-  
-  fz_buffer *buf= fz_new_buffer(ctx, 0);
-//  fz_output *out= fz_new_output_with_buffer(ctx, buf);
-  {
+  pdf_obj *subres= NULL;
+  pdf_obj *contents= NULL;
+  fz_buffer *buf= NULL;
+  bool ok= mupdf_protected ("mupdf_renderer_rep::register_pattern", [&] () {
+    // the resources of the pattern: /Resources << /XObject << /pattern-image ref >> >>
+    subres= pdf_new_dict (ctx, doc, 1);
+    pdf_obj *xobjs= pdf_new_dict (ctx, doc, 1);
+    pdf_obj *ref= pdf_add_image (ctx, doc, image_pdf->img);
+    pdf_dict_puts (ctx, xobjs, "pattern-image", ref);
+    pdf_dict_puts (ctx, subres, "XObject", xobjs);
+    pdf_drop_obj (ctx, ref);
+    pdf_drop_obj (ctx, xobjs);
+    buf= fz_new_buffer (ctx, 0);
     pdf_processor *pout= pdf_new_buffer_processor (ctx, buf, 0, 0);
     pout->op_q (ctx, pout);
     pout->op_cm (ctx, pout, w, 0, 0, h, 0, 0);
     pout->op_Do_image (ctx, pout, "pattern-image", NULL);
     pout->op_Q (ctx, pout);
     pdf_close_processor (ctx, pout);
+    pdf_drop_processor (ctx, pout);
+    contents= pdf_add_stream (ctx, doc, buf, NULL /* dict */, 0 /* compress */);
+  });
+  if (buf != NULL) fz_drop_buffer (ctx, buf);
+  if (!ok) {
+    if (subres != NULL) pdf_drop_obj (ctx, subres);
+    if (contents != NULL) pdf_drop_obj (ctx, contents);
+    return; // the pattern stays unregistered: the callers fall back
   }
-  pdf_obj *contents= pdf_add_stream (ctx, doc, buf, NULL /* dict */, 0 /* compress */);
-  fz_drop_buffer (ctx, buf);
   {
-    // make a pdf_pattern
-    int width= fz_pixmap_width (ctx, pixmap);
-    int height= fz_pixmap_height (ctx, pixmap);
-    SI sx= width + to_x(0); // FIXME: ??
-    SI sy= height; // FIXME: ??
-    float scale_x= 1.0; //((float) default_dpi) / dpi;
-    float scale_y= 1.0; //((float) default_dpi) / dpi;
-
-   // const float matrix[]= { scale_x, 0, 0, scale_y, (float) sx, (float) sy };
-
-    pdf_pattern *pat= fz_malloc_struct (ctx, pdf_pattern);
-    pat->document= doc;
-    pat->id= 0; //pdf_to_num (ctx, dict);
-    pat->ismask= 0; //pdf_dict_get_int(ctx, dict, PDF_NAME(PaintType)) == 2;
-    pat->xstep= w; //pdf_dict_get_real(ctx, dict, PDF_NAME(XStep));
-    pat->ystep= h; //pdf_dict_get_real(ctx, dict, PDF_NAME(YStep));
-    pat->bbox= fz_make_rect (0, 0, w, h); //pdf_dict_get_rect(ctx, dict, PDF_NAME(BBox));
-    pat->matrix= fz_make_matrix (scale_x, 0, 0, scale_y, (float) sx, (float) sy);// pdf_dict_get_matrix(ctx, dict, PDF_NAME(Matrix));
-    pat->resources= subres; // we already own it
-    //pdf_keep_obj (ctx, pat->resources);
-    pat->contents= contents; // we already own it
-    //pdf_keep_obj (ctx, pat->contents);
-
-    // debug_convert << "  insert pattern\n";
-    // debug_convert << "pdf_pattern " << ox << ", " << oy
-    //         << ", " << pixel << ", " << shrinkf
-    //       << ", " << zoomf << LF;
-    // debug_convert << "            " << to_x(0) << ", " << to_y(0) << LF;
-    // debug_convert << "            " << w << ", " << h << LF;
-
+    pdf_pattern *pat= NULL;
+    mupdf_protected ("mupdf_renderer_rep::register_pattern", [&] () {
+      pat= new_pattern (ctx, doc, w, h, subres, contents, fz_identity);
+    });
+    pdf_drop_obj (ctx, subres);
+    pdf_drop_obj (ctx, contents);
+    if (pat == NULL) return;
     mupdf_pattern p_pdf (pat);
     pdf_drop_pattern (ctx, pat);
     pattern_pool (p) = p_pdf;
@@ -513,35 +729,46 @@ mupdf_renderer_rep::register_pattern (brush br, SI pixel) {
 void
 mupdf_renderer_rep::select_stroke_pattern (brush br) {
   if (is_nil(br) || br->get_type () != brush_pattern) return;
-  tree p_tree= br->get_pattern ();
-  register_pattern (br, brushpx == -1 ? pixel : brushpx);
+  SI px= (brushpx == -1 ? pixel : brushpx);
+  tree p_tree= pattern_key (br, px);
+  register_pattern (br, px);
   if (!pattern_pool->contains (p_tree)) {
     convert_error << "mupdf_renderer_rep::select_stroke_pattern: "
                   << "cannot find registered pattern\n";
     return;
   }
   mupdf_pattern p= pattern_pool [p_tree];
-  proc->op_CS (mupdf_context (), proc, "Pattern",
-               fz_device_rgb (mupdf_context ()));
-  proc->op_SC_pattern (mupdf_context (), proc, "*stroke-pattern*",
-                       p->pat, 0, NULL);
+  fz_context *ctx= mupdf_context ();
+  pdf_pattern *pat= NULL;
+  mupdf_protected ("select_stroke_pattern", [&] () {
+    pat= placed_pattern (ctx, p->pat, to_x (0), to_y (0));
+    proc->op_CS (ctx, proc, "Pattern", fz_device_rgb (ctx));
+    proc->op_SC_pattern (ctx, proc, "*stroke-pattern*", pat, 0, NULL);
+  });
+  pdf_drop_pattern (ctx, pat); // the processor keeps its own
 }
 
 void
 mupdf_renderer_rep::select_fill_pattern (brush br) {
   if (is_nil(br) || br->get_type () != brush_pattern) return;
-  tree p_tree= br->get_pattern ();
-  register_pattern (br, brushpx==-1? pixel: brushpx);
+  SI px= (brushpx == -1 ? pixel : brushpx);
+  tree p_tree= pattern_key (br, px);
+  register_pattern (br, px);
   if (!pattern_pool->contains (p_tree)) {
     convert_error << "mupdf_renderer_rep::select_fill_pattern: "
                   << "cannot find registered pattern\n";
     return;
   }
   mupdf_pattern p= pattern_pool [p_tree];
-  proc->op_CS (mupdf_context (), proc, "Pattern",
-               fz_device_rgb (mupdf_context ()));
-  proc->op_sc_pattern (mupdf_context (), proc, "*fill-pattern*",
-                       p->pat, 0, NULL);
+  fill_is_pattern= true;
+  fz_context *ctx= mupdf_context ();
+  pdf_pattern *pat= NULL;
+  mupdf_protected ("select_fill_pattern", [&] () {
+    pat= placed_pattern (ctx, p->pat, to_x (0), to_y (0));
+    proc->op_CS (ctx, proc, "Pattern", fz_device_rgb (ctx));
+    proc->op_sc_pattern (ctx, proc, "*fill-pattern*", pat, 0, NULL);
+  });
+  pdf_drop_pattern (ctx, pat); // the processor keeps its own
   select_alpha ((1000*br->get_alpha ())/255);
 }
 
@@ -595,18 +822,55 @@ mupdf_renderer_rep::set_brush (brush br) {
     select_stroke_color (pen->get_color ());
   }
   if (br->get_type () == brush_pattern) {
-    tree p_tree= br->get_pattern ();
-    register_pattern (br, brushpx == -1 ? pixel : brushpx);
-    if (!pattern_pool->contains (p_tree)) {
-      convert_error << "mupdf_renderer_rep::set_brush: "
-        << "cannot find registered pattern\n";
-      return;
-    }
+    // each registers the pattern and complains if it cannot
     select_fill_pattern (br);
     select_stroke_pattern (br);
   }
   //select_alpha (br->get_alpha ());
 }
+void
+mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
+  // the neutral pattern around the pages, as in the Qt port: white, then
+  // the pattern image tiled at its natural size
+  static url u= url_none ();
+  static int iw= 0, ih= 0;
+  static bool resolved= false;
+  if (!resolved) {
+    resolved= true;
+    u= resolve_pattern (url ("neutral-pattern.png"));
+    if (!is_none (u)) image_size (u, iw, ih);
+  }
+  // at its natural size whatever the zoom, as in the Qt port: the size is
+  // given in the units of the renderer, a pixel of the image being a point
+  // of the screen (retina_factor device pixels)
+  brush neutral;
+  if (!is_none (u) && iw > 0 && ih > 0)
+    neutral= brush (compound ("pattern", as_string (u),
+                              as_string ((int) (iw * retina_factor * pixel)),
+                              as_string ((int) (ih * retina_factor * pixel))),
+                    255);
+  end_text ();
+  float xx1= to_x (min (x1, x2));
+  float yy1= to_y (min (y1, y2));
+  float xx2= to_x (max (x1, x2));
+  float yy2= to_y (max (y1, y2));
+  bool cleared= fill_direct (x1, y1, x2, y2, white);
+  proc->op_q (mupdf_context (), proc);
+  if (!cleared) {
+    select_fill_color (white);
+    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
+    proc->op_f (mupdf_context (), proc);
+  }
+  if (!is_nil (neutral)) {
+    select_fill_pattern (neutral);
+    proc->op_re (mupdf_context (), proc, xx1, yy1, xx2-xx1, yy2-yy1);
+    proc->op_f (mupdf_context (), proc);
+  }
+  select_fill_color (fg);
+  select_fill_pattern (fg_brush);
+  proc->op_Q (mupdf_context (), proc);
+}
+
 void
 mupdf_renderer_rep::set_background (brush b) {
   // debug_convert << "set_background\n";
@@ -651,6 +915,8 @@ mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  if ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern) &&
+      fill_direct (x1, y1, x2, y2, bg)) return; // a plain background color
   end_text ();
   float xx1= to_x (min (x1, x2));
   float yy1= to_y (min (y1, y2));
@@ -667,10 +933,160 @@ mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
   proc->op_Q (mupdf_context (), proc);
 }
 
+/******************************************************************************
+ * Direct pixel access
+ *
+ * The filled rectangles of the GUI and the blits of the backing stores of
+ * the editors make up most of a frame of the Vue GUI. Drawn through the PDF
+ * processor they are rasterized as paths and painted as images (with a
+ * colorspace conversion, the window surface being BGR), which took most of
+ * the frame time while scrolling. Axis-aligned boxes land on integer device
+ * pixels (to_x/to_y divide SI by the pixel size), so they are written into
+ * the pixmap directly, with the same result: solid or translucent colors
+ * (source-over, premultiplied alpha as in MuPDF's pixmaps) within the
+ * current clip, as long as the fill is not a pattern. Everything else
+ * (rounded corners, arcs, text, patterns) still goes through MuPDF.
+ ******************************************************************************/
+
+// the device pixels [px1, px2) x [py1, py2) (y down) covered by the SI box,
+// intersected with the current clip and with the pixmap; false if empty
+bool
+mupdf_renderer_rep::device_box (SI x1, SI y1, SI x2, SI y2,
+                                int& px1, int& py1, int& px2, int& py2) {
+  if (pixmap == NULL || pixmap->samples == NULL) return false;
+  if (x1 > x2) { SI t= x1; x1= x2; x2= t; }
+  if (y1 > y2) { SI t= y1; y1= y2; y2= t; }
+  // to_x/to_y map SI (y up) to PDF points at integer positions, the device
+  // is upside down (see the ctm in begin)
+  px1= (int) to_x (x1); px2= (int) to_x (x2);
+  py1= (int) -to_y (y2); py2= (int) -to_y (y1);
+  if (clip_level > 0) {
+    // the clip of the PDF state was set from the same SI coordinates
+    SI ax1, ay1, ax2, ay2;
+    get_clipping (ax1, ay1, ax2, ay2);
+    px1= max (px1, (int) to_x (ax1)); px2= min (px2, (int) to_x (ax2));
+    py1= max (py1, (int) -to_y (ay2)); py2= min (py2, (int) -to_y (ay1));
+  }
+  px1= max (px1, 0); py1= max (py1, 0);
+  px2= min (px2, pixmap->w); py2= min (py2, pixmap->h);
+  return px1 < px2 && py1 < py2;
+}
+
+// fill the box with a plain color; false if MuPDF must do it
+bool
+mupdf_renderer_rep::fill_direct (SI x1, SI y1, SI x2, SI y2, color c) {
+  if (pixmap == NULL) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  fz_context* ctx= mupdf_context ();
+  bool bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  if (!bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  int px1, py1, px2, py2;
+  end_text ();
+  if (!device_box (x1, y1, x2, y2, px1, py1, px2, py2)) return true; // clipped away
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  if (bgr) { int t= r; r= b; b= t; }
+  if (a <= 0) return true;
+  unsigned char* row= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
+  int n= px2 - px1;
+  if (a >= 255) {
+    unsigned char c[4]= { (unsigned char) r, (unsigned char) g, (unsigned char) b, 255 };
+    for (int py= py1; py < py2; py++, row += pixmap->stride) {
+      unsigned char* d= row;
+      for (int i= 0; i < n; i++, d += 4) { d[0]= c[0]; d[1]= c[1]; d[2]= c[2]; d[3]= c[3]; }
+    }
+  }
+  else {
+    // source-over with a premultiplied source color
+    int sr= r*a/255, sg= g*a/255, sb= b*a/255, ia= 255 - a;
+    for (int py= py1; py < py2; py++, row += pixmap->stride) {
+      unsigned char* d= row;
+      for (int i= 0; i < n; i++, d += 4) {
+        d[0]= (unsigned char) (sr + (d[0]*ia)/255);
+        d[1]= (unsigned char) (sg + (d[1]*ia)/255);
+        d[2]= (unsigned char) (sb + (d[2]*ia)/255);
+        d[3]= (unsigned char) (a  + (d[3]*ia)/255);
+      }
+    }
+  }
+  return true;
+}
+
+// blit the pixmap with its bottom left corner at (x, y) (SI), 1 device
+// pixel per pixel of the source, composed with the given alpha; false if
+// MuPDF must do it (other formats). opaque says that every pixel of the
+// source has an alpha of 255, which the caller knows and we cannot afford
+// to check: reading the source to find out costs as much as the blit.
+bool
+mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
+                                       bool opaque) {
+  if (src == NULL || src->samples == NULL || pixmap == NULL) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  if (src->s != 0 || (!(src->n == 4 && src->alpha) && !(src->n == 3 && !src->alpha)))
+    return false;
+  fz_context* ctx= mupdf_context ();
+  bool dst_bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  bool src_bgr= (src->colorspace == fz_device_bgr (ctx));
+  if (!dst_bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  if (!src_bgr && src->colorspace != fz_device_rgb (ctx)) return false;
+  if (alpha <= 0) return true;
+  end_text ();
+  // the box of the image in device pixels, then the visible part of it
+  int ix1= (int) to_x (x), iy2= (int) -to_y (y);
+  int ix2= ix1 + src->w, iy1= iy2 - src->h;
+  int px1, py1, px2, py2;
+  if (!device_box (x, y, x + src->w * pixel, y + src->h * pixel, px1, py1, px2, py2)) return true;
+  px1= max (px1, ix1); px2= min (px2, ix2);
+  py1= max (py1, iy1); py2= min (py2, iy2);
+  if (px1 >= px2 || py1 >= py2) return true;
+  bool swap_rb= (dst_bgr != src_bgr);
+  int sn= src->n, n= px2 - px1;
+  const unsigned char* srow= src->samples + (ptrdiff_t) (py1 - iy1) * src->stride + sn * (px1 - ix1);
+  unsigned char* drow= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
+  // Nothing to compose and nothing to decide per pixel: the rows are copied
+  // as they are, or reordered with a loop the compiler can vectorise. This
+  // is the blit of an editor's backing store, which is opaque throughout
+  // (see native_opaque_picture); it is an order of magnitude faster than
+  // the general loop below, whose cost is the test on the alpha rather than
+  // the reordering.
+  if (opaque && alpha >= 255 && sn == 4) {
+    for (int py= py1; py < py2; py++, srow += src->stride, drow += pixmap->stride) {
+      if (!swap_rb) memcpy (drow, srow, (size_t) n * 4);
+      else {
+        const unsigned char* sp= srow;
+        unsigned char* d= drow;
+        for (int i= 0; i < n; i++, sp += 4, d += 4) {
+          d[0]= sp[2]; d[1]= sp[1]; d[2]= sp[0]; d[3]= 255;
+        }
+      }
+    }
+    return true;
+  }
+  for (int py= py1; py < py2; py++, srow += src->stride, drow += pixmap->stride) {
+    const unsigned char* sp= srow;
+    unsigned char* d= drow;
+    for (int i= 0; i < n; i++, sp += sn, d += 4) {
+      int sr= sp[0], sg= sp[1], sb= sp[2], sa= (sn == 4) ? sp[3] : 255;
+      if (swap_rb) { int t= sr; sr= sb; sb= t; }
+      if (alpha < 255) { sr= sr*alpha/255; sg= sg*alpha/255; sb= sb*alpha/255; sa= sa*alpha/255; }
+      if (sa >= 255) { d[0]= sr; d[1]= sg; d[2]= sb; d[3]= 255; }
+      else if (sa > 0) {
+        int ia= 255 - sa;
+        d[0]= (unsigned char) (sr + (d[0]*ia)/255);
+        d[1]= (unsigned char) (sg + (d[1]*ia)/255);
+        d[2]= (unsigned char) (sb + (d[2]*ia)/255);
+        d[3]= (unsigned char) (sa + (d[3]*ia)/255);
+      }
+    }
+  }
+  return true;
+}
+
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   if ((x1<x2) && (y1<y2))
   {
+    if (!fill_is_pattern && fill_direct (x1, y1, x2, y2, fg)) return;
     end_text ();
     float xx1= to_x (min (x1, x2));
     float yy1= to_y (min (y1, y2));
@@ -771,10 +1187,108 @@ mupdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   for (i=1; i<n; i++)
     proc->op_l (mupdf_context (), proc, to_x (x[i]), to_y (y[i]));
   proc->op_h (mupdf_context (), proc);
+  // as the PDF renderer (and X11): nonzero winding for convex polygons,
+  // even-odd for the others (the Qt port uses the winding rule there)
   if (convex)
-    proc->op_f (mupdf_context (), proc); // odd-even
+    proc->op_f (mupdf_context (), proc); // nonzero winding
   else
-    proc->op_fstar (mupdf_context (), proc); // nonzero winding
+    proc->op_fstar (mupdf_context (), proc); // even-odd
+}
+
+void
+mupdf_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
+                                       SI r_tl, SI r_tr, SI r_br, SI r_bl,
+                                       bool filled) {
+  // Draw a rectangle with rounded corners using cubic Bézier curves
+  // r_tl, r_tr, r_br, r_bl are the radii for top-left, top-right,
+  // bottom-right, and bottom-left corners respectively
+  end_text ();
+
+  // Ensure coordinates are ordered correctly
+  float xx1 = to_x (min (x1, x2));
+  float yy1 = to_y (min (y1, y2));
+  float xx2 = to_x (max (x1, x2));
+  float yy2 = to_y (max (y1, y2));
+
+  // Convert radii to PDF coordinates
+  float rtl = (float) r_tl / pixel;
+  float rtr = (float) r_tr / pixel;
+  float rbr = (float) r_br / pixel;
+  float rbl = (float) r_bl / pixel;
+
+  // Clamp radii to half the rectangle dimensions
+  float max_rx = (xx2 - xx1) / 2.0;
+  float max_ry = (yy2 - yy1) / 2.0;
+  float max_r = (max_rx < max_ry) ? max_rx : max_ry;
+  if (rtl > max_r) rtl = max_r;
+  if (rtr > max_r) rtr = max_r;
+  if (rbr > max_r) rbr = max_r;
+  if (rbl > max_r) rbl = max_r;
+
+  // Bézier control point distance for circular arc approximation
+  // For a 90° arc, the magic number is 4/3 * tan(π/8) ≈ 0.5522847498
+  float kappa = 0.5522847498;
+
+  // Note: In PDF coordinates y increases downward, so yy1 is visually bottom, yy2 is top
+  // Therefore: r_bl -> yy1 left, r_br -> yy1 right, r_tl -> yy2 left, r_tr -> yy2 right
+
+  // Start at bottom-left corner (moving right from the rounded corner)
+  proc->op_m (mupdf_context (), proc, xx1 + rbl, yy1);
+
+  // Bottom edge
+  proc->op_l (mupdf_context (), proc, xx2 - rbr, yy1);
+
+  // Bottom-right corner
+  if (rbr > 0) {
+    float cx = rbr * kappa;
+    proc->op_c (mupdf_context (), proc,
+                xx2 - rbr + cx, yy1,
+                xx2, yy1 + rbr - cx,
+                xx2, yy1 + rbr);
+  }
+
+  // Right edge
+  proc->op_l (mupdf_context (), proc, xx2, yy2 - rtr);
+
+  // Top-right corner
+  if (rtr > 0) {
+    float cx = rtr * kappa;
+    proc->op_c (mupdf_context (), proc,
+                xx2, yy2 - rtr + cx,
+                xx2 - rtr + cx, yy2,
+                xx2 - rtr, yy2);
+  }
+
+  // Top edge
+  proc->op_l (mupdf_context (), proc, xx1 + rtl, yy2);
+
+  // Top-left corner
+  if (rtl > 0) {
+    float cx = rtl * kappa;
+    proc->op_c (mupdf_context (), proc,
+                xx1 + rtl - cx, yy2,
+                xx1, yy2 - rtl + cx,
+                xx1, yy2 - rtl);
+  }
+
+  // Left edge
+  proc->op_l (mupdf_context (), proc, xx1, yy1 + rbl);
+
+  // Bottom-left corner (closing the path)
+  if (rbl > 0) {
+    float cx = rbl * kappa;
+    proc->op_c (mupdf_context (), proc,
+                xx1, yy1 + rbl - cx,
+                xx1 + rbl - cx, yy1,
+                xx1 + rbl, yy1);
+  }
+
+  // Close and paint the path
+  proc->op_h (mupdf_context (), proc);
+  if (filled)
+    proc->op_f (mupdf_context (), proc);
+  else
+    proc->op_S (mupdf_context (), proc);
 }
 
 /******************************************************************************
@@ -822,26 +1336,258 @@ image (fz_context *ctx, pdf_processor *proc, mupdf_image im, int alpha,
        float a, float b, float c, float d, float e, float f) {
   // debug_convert << "mupdf_renderer_rep::image " << u << ", " << w << " x " << h
   //    << " + (" << x << ", " << y << ")" << LF;
+  if (is_nil (im) || im->img == NULL) return; // nothing to draw
+  fz_image* img= im->img;
+  // An image is decoded when it is drawn, and one which cannot be (a file
+  // cut short, a format MuPDF does not know) is an error: protected, as in
+  // draw_form, with q and Q outside so that the state stays balanced
   proc->op_q (ctx, proc);
-  set_default_gstate (ctx, proc);
-  proc->op_cm (ctx, proc, a, b, c, d, e, f);
-  float da = ((float) alpha)/255.0;
-  proc->op_gs_ca (ctx, proc, da);
-  proc->op_gs_CA (ctx, proc, da);
-  proc->op_Do_image (ctx, proc, "Image", im->img);
- // proc->op_re (ctx, proc, 0, 0, 1, 1);
- // proc->op_S (ctx, proc);
+  mupdf_protected ("image", [&] () {
+    set_default_gstate (ctx, proc);
+    proc->op_cm (ctx, proc, a, b, c, d, e, f);
+    float da = ((float) alpha)/255.0;
+    proc->op_gs_ca (ctx, proc, da);
+    proc->op_gs_CA (ctx, proc, da);
+    proc->op_Do_image (ctx, proc, "Image", img);
+  });
   proc->op_Q (ctx, proc);
+}
+
+// the content streams of a page, which may be one stream or a list of them
+static fz_buffer*
+page_contents (fz_context* ctx, pdf_obj* contents) {
+  if (!pdf_is_array (ctx, contents)) return pdf_load_stream (ctx, contents);
+  fz_buffer* all= fz_new_buffer (ctx, 4096);
+  int n= pdf_array_len (ctx, contents);
+  for (int i=0; i<n; i++) {
+    fz_buffer* b= NULL;
+    fz_try (ctx) { b= pdf_load_stream (ctx, pdf_array_get (ctx, contents, i)); }
+    fz_catch (ctx) { b= NULL; }
+    if (b == NULL) continue;
+    unsigned char* d= NULL;
+    size_t len= fz_buffer_storage (ctx, b, &d);
+    fz_append_data (ctx, all, d, len);
+    fz_append_byte (ctx, all, '\n');
+    fz_drop_buffer (ctx, b);
+  }
+  return all;
+}
+
+// The first page of a PDF file as a form, nil if MuPDF cannot read it.
+static mupdf_form
+load_pdf_form (url u) {
+  fz_context* ctx= mupdf_context ();
+  fz_buffer* data= NULL;
+  fz_stream* in= NULL;
+  fz_buffer* buf= NULL;
+  pdf_document* doc= NULL;
+  pdf_obj* xo= NULL;
+  fz_var (data); fz_var (in); fz_var (buf); fz_var (doc); fz_var (xo);
+  // made before fz_try: a throw is a longjmp, which skips destructors
+  c_string path (concretize (u));
+  fz_try (ctx) {
+    data= fz_read_file (ctx, path);
+    in= fz_open_buffer (ctx, data);
+    doc= pdf_open_document_with_stream (ctx, in);
+    pdf_obj* page= pdf_lookup_page_obj (ctx, doc, 0);
+    fz_rect box; fz_matrix m;
+    pdf_page_obj_transform (ctx, page, &box, &m);
+    // pdf_page_obj_transform gives fitz's transform of the page, which
+    // turns PDF space (y up) into fitz space (y down) as well as undoing
+    // /Rotate; a form's /Matrix lives in PDF space, so the turn upside
+    // down is taken back out, or every figure comes out upside down
+    m= fz_concat (m, fz_scale (1, -1));
+    buf= page_contents (ctx, pdf_dict_get (ctx, page, PDF_NAME(Contents)));
+    pdf_obj* res= pdf_dict_get_inheritable (ctx, page, PDF_NAME(Resources));
+    xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
+  }
+  fz_always (ctx) {
+    fz_drop_buffer (ctx, buf);
+    fz_drop_stream (ctx, in);
+    fz_drop_buffer (ctx, data);
+  }
+  fz_catch (ctx) {
+    cout << "TeXmacs] MuPDF cannot read " << u << ": "
+         << fz_caught_message (ctx) << LF;
+    pdf_drop_obj (ctx, xo);
+    pdf_drop_document (ctx, doc);
+    return mupdf_form ();
+  }
+  return mupdf_form (doc, xo);
+}
+
+// A PostScript figure as a form: made a PDF by the converters, once --
+// the form keeps what it read, so the file goes at once -- nil if that
+// gives nothing MuPDF can read
+static mupdf_form
+load_ps_form (url u) {
+  url pdf= url_temp (".pdf");
+  int w= 0, h= 0;
+  image_size (u, w, h);
+  image_to_pdf (u, pdf, w, h, 300);
+  mupdf_form fm;
+  if (exists (pdf)) fm= load_pdf_form (pdf);
+  remove (pdf);
+  return fm;
+}
+
+// Draw a form into the box of size w by h (device pixels) whose lower left
+// corner is at (x, y). A form is drawn in its /BBox as its own /Matrix
+// places it -- a page turned by /Rotate comes with a matrix which turns it
+// back -- so it is that placed box which is mapped onto the one asked for,
+// as in the PDF renderer.
+static void
+draw_form (fz_context *ctx, pdf_processor *proc, mupdf_form fm, int alpha,
+           double w, double h, double x, double y) {
+  if (is_nil (fm) || fm->xo == NULL) return;
+  fz_rect b= pdf_dict_get_rect (ctx, fm->xo, PDF_NAME(BBox));
+  b= fz_transform_rect (b, pdf_dict_get_matrix (ctx, fm->xo, PDF_NAME(Matrix)));
+  double bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+  if (bw <= 0 || bh <= 0) return;
+  double sx= w / bw, sy= h / bh;
+  // A translucent figure is made translucent as a whole: as a group, or
+  // each of its paths and fills would take the alpha on its own and show
+  // through the ones above it. An opaque one is not made a group, which
+  // would cost a buffer the size of the figure at every repaint; the form
+  // is ours, so /Group is put or taken away for each use.
+  mupdf_protected ("draw_form group", [&] () {
+    if (alpha < 255) {
+      pdf_obj* g= pdf_dict_put_dict (ctx, fm->xo, PDF_NAME(Group), 2);
+      pdf_dict_put (ctx, g, PDF_NAME(S), PDF_NAME(Transparency));
+    }
+    else pdf_dict_del (ctx, fm->xo, PDF_NAME(Group));
+  });
+  // q and Q stay outside: a figure which throws halfway must not leave
+  // the graphics state one level deeper
+  proc->op_q (ctx, proc);
+  mupdf_protected ("draw_form", [&] () {
+    set_default_gstate (ctx, proc);
+    proc->op_cm (ctx, proc, sx, 0, 0, sy, x - b.x0 * sx, y - b.y0 * sy);
+    float da= ((float) alpha) / 255.0;
+    proc->op_gs_ca (ctx, proc, da);
+    proc->op_gs_CA (ctx, proc, da);
+    // a form is run against the resources of the stream it occurs in,
+    // and the operators here come from no stream: give it an empty stack
+    // (the form has resources of its own), the frame which
+    // pdf_process_contents would have pushed
+    pdf_processor_push_resources (ctx, proc, NULL);
+    fz_try (ctx) { proc->op_Do_form (ctx, proc, "Fm", fm->xo); }
+    fz_always (ctx) { pdf_drop_obj (ctx, pdf_processor_pop_resources (ctx, proc)); }
+    fz_catch (ctx) { fz_rethrow (ctx); }
+  });
+  proc->op_Q (ctx, proc);
+}
+
+// A figure drawn as a drawing costs the interpretation of all of it every
+// time a part of it is repainted, and a scroll repaints a strip at a time:
+// measured with a plot of 50000 points and 5000 markers, the repaint of a
+// frame took 5.8 ms on average and 44 ms at worst while scrolling through
+// it, against 3.5 and 22 for the same figure as a PNG. So a figure is also
+// kept drawn, at the size it has on the screen, in a pixmap with a
+// transparent background, and that is blitted while the size stays the
+// same -- until the zoom changes. Not under a transformation of the
+// graphics (a figure turned in a drawing): that is drawn as a drawing.
+// At most form_cache_max figures, and form_cache_bytes bytes, the oldest
+// going first; image_gc empties it for the file it names.
+struct form_pixmap_entry {
+  tree key;          // (the file, width, height)
+  fz_pixmap* pix;
+};
+static array<form_pixmap_entry> form_cache;
+static const int form_cache_max= 8;
+static const size_t form_cache_bytes= 64 << 20;
+
+static void
+form_cache_drop (int i) {
+  fz_drop_pixmap (mupdf_context (), form_cache[i].pix);
+  array<form_pixmap_entry> rest;
+  for (int j=0; j<N(form_cache); j++) if (j != i) rest << form_cache[j];
+  form_cache= rest;
+}
+
+static void
+form_cache_forget (string name) {  // "" or "*": everything
+  for (int i= N(form_cache) - 1; i >= 0; i--) {
+    tree k= form_cache[i].key;
+    if (name == "" || name == "*" ||
+        (N(k) > 0 && is_atomic (k[0]) && occurs (name, k[0]->label)))
+      form_cache_drop (i);
+  }
+}
+
+// the first page of the figure, drawn into a transparent w x h pixmap
+static fz_pixmap*
+render_form_pixmap (mupdf_form fm, int w, int h) {
+  fz_context* ctx= mupdf_context ();
+  pdf_document* doc= fm->doc;
+  fz_pixmap* pix= NULL;
+  fz_page* page= NULL;
+  fz_device* dev= NULL;
+  fz_var (pix); fz_var (page); fz_var (dev);
+  fz_try (ctx) {
+    page= (fz_page*) pdf_load_page (ctx, doc, 0);
+    fz_rect b= fz_bound_page (ctx, page);  // the crop box, turned by /Rotate
+    float bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+    if (bw <= 0 || bh <= 0) fz_throw (ctx, FZ_ERROR_GENERIC, "empty page");
+    fz_matrix ctm= fz_concat (fz_translate (-b.x0, -b.y0),
+                              fz_scale (w / bw, h / bh));
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w, h, NULL, 1);
+    fz_clear_pixmap (ctx, pix);
+    dev= fz_new_draw_device (ctx, fz_identity, pix);
+    fz_run_page (ctx, page, dev, ctm, NULL);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_page (ctx, page);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+  }
+  return pix;
+}
+
+// the pixmap of a figure at a size, drawn now or kept from before
+static fz_pixmap*
+form_pixmap (tree name, mupdf_form fm, int w, int h) {
+  tree key= tuple (name, as_string (w), as_string (h));
+  for (int i=0; i<N(form_cache); i++)
+    if (form_cache[i].key == key) {
+      form_pixmap_entry e= form_cache[i];   // the newest goes last
+      array<form_pixmap_entry> rest;
+      for (int j=0; j<N(form_cache); j++) if (j != i) rest << form_cache[j];
+      rest << e;
+      form_cache= rest;
+      return e.pix;
+    }
+  fz_pixmap* pix= render_form_pixmap (fm, w, h);
+  if (pix == NULL) return NULL;
+  form_pixmap_entry e= { key, pix };
+  form_cache << e;
+  size_t total= 0;
+  for (int i=0; i<N(form_cache); i++)
+    total += (size_t) form_cache[i].pix->stride * form_cache[i].pix->h;
+  while (N(form_cache) > 1 &&
+         (N(form_cache) > form_cache_max || total > form_cache_bytes)) {
+    total -= (size_t) form_cache[0].pix->stride * form_cache[0].pix->h;
+    form_cache_drop (0);
+  }
+  return pix;
 }
 
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  if (draw_pixmap_direct (pict->pix, x - p->get_origin_x () * pixel,
+                          y - p->get_origin_y () * pixel, alpha, pict->opaque))
+    return;
   if (!pict->im) {
     // let's cache the image representation of the pixmap
     // it will be dropped by the object
-    pict->im= fz_new_image_from_pixmap (mupdf_context (), pict->pix, NULL);
+    pict->im= mupdf_image_from_pixmap (pict->pix);
+    if (pict->im == NULL) return;
   }
   int w= p->get_width (), h= p->get_height ();
   int ox= p->get_origin_x (), oy= p->get_origin_y ();
@@ -862,17 +1608,51 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
   else {
     url u= im->get_name ();
     tree lookup= tuple (u->t);
+    string suf= locase_all (suffix (u));
+    if (suf == "pdf" || suf == "eps" || suf == "ps") {
+      // a PDF is drawn as what it is, a drawing, at any zoom; so is a
+      // PostScript figure, made a PDF once by the converters (Ghostscript,
+      // which keeps it a drawing), as the PDF renderer does
+      if (!form_pool->contains (lookup))
+        form_pool (lookup)= (suf == "pdf") ? load_pdf_form (u)
+                                           : load_ps_form (u);
+      mupdf_form fm= form_pool [lookup];
+      if (!is_nil (fm)) {
+        rectangle r= im->get_logical_extents ();
+        SI w= r->x2 - r->x1, h= r->y2 - r->y1;
+        end_text ();
+        // kept drawn at its size on the screen, when it can be blitted
+        // (see form_pixmap); drawn as a drawing otherwise
+        int pw= (int) (((double) w)/pixel + 0.5);
+        int ph= (int) (((double) h)/pixel + 0.5);
+        if (transform_level == 0 && pw > 0 && ph > 0 &&
+            pw <= 8000 && ph <= 8000) {
+          fz_pixmap* pix= form_pixmap (u->t, fm, pw, ph);
+          if (pix != NULL && draw_pixmap_direct (pix, x - r->x1, y - r->y1, alpha))
+            return;
+        }
+        draw_form (mupdf_context (), proc, fm, alpha,
+                   ((double) w)/pixel, ((double) h)/pixel,
+                   to_x (x - r->x1), to_y (y - r->y1));
+        return;
+      }
+      // MuPDF cannot read it: the converters may
+    }
     mupdf_image im2;
     if (image_pool->contains (lookup))
       im2= image_pool [lookup];
     else {
-      // FIXME: handle the possibility that the image is not found
       fz_image* fzim= mupdf_load_image (u);
+      if (fzim == NULL) {
+        // not loadable by MuPDF: the generic path converts the file
+        renderer_rep::draw_scalable (im, x, y, alpha);
+        return;
+      }
       im2= mupdf_image (fzim);
       fz_drop_image (mupdf_context (), fzim);
       image_pool (lookup)= im2;
     }
-    if (is_nil (im2)) return;
+    if (is_nil (im2) || im2->img == NULL) return;
     rectangle r= im->get_logical_extents ();
     SI w= r->x2 - r->x1, h= r->y2 - r->y1;
     int ox= r->x1, oy= r->y1;
@@ -889,78 +1669,115 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
 * Glyph rendering
 ******************************************************************************/
 
-#if 0
-void
-mupdf_renderer_rep::draw_clipped (QImage *im, int w, int h, SI x, SI y) {
-  (void) w; (void) h;
-  int x1= cx1-ox, y1= cy2-oy, x2= cx2-ox, y2= cy1-oy;
-  decode (x , y );
-  decode (x1, y1);
-  decode (x2, y2);
-  y--; // top-left origin to bottom-left origin conversion
-       // clear(x1,y1,x2,y2);
-  painter->setRenderHints (0);
-  painter->drawImage (x, y, *im);
-}
+// Glyphs filled with the pattern of a brush pencil: the glyph mask
+// modulates the pattern image, sampled where the glyph lands on the device
+// (as in the Qt port), and the result is drawn as an image.
 
-void
-mupdf_renderer_rep::draw_clipped (QPixmap *im, int w, int h, SI x, SI y) {
-  decode (x , y );
-  y--; // top-left origin to bottom-left origin conversion
-  // clear(x1,y1,x2,y2);
-  painter->setRenderHints (0);
-  painter->drawPixmap (x, y, w, h, *im);
+// the pattern images decoded as RGB pixmaps, by pattern data
+static hashmap<tree,pointer> pattern_pixmap_pool (NULL);
+
+static fz_pixmap*
+get_pattern_pixmap (brush br, SI pixel) {
+  url u;
+  SI w, h;
+  tree eff;
+  get_pattern_data (u, w, h, eff, br, pixel);
+  tree key= tuple (u->t, as_string (w), as_string (h), eff);
+  if (pattern_pixmap_pool->contains (key))
+    return (fz_pixmap*) pattern_pixmap_pool [key];
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= mupdf_load_pixmap (u, w, h, eff, pixel);
+  fz_pixmap* rgb= NULL;
+  if (pix != NULL) {
+    // RGB with alpha, whatever the file provides
+    mupdf_protected ("pattern pixmap", [&] () {
+      rgb= fz_convert_pixmap (ctx, pix, fz_device_rgb (ctx), NULL, NULL,
+                              fz_default_color_params, 1);
+    });
+    fz_drop_pixmap (ctx, pix);
+  }
+  pattern_pixmap_pool (key)= (pointer) rgb; // NULL too: do not retry
+  return rgb;
 }
 
 void
 mupdf_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
-  // draw with background pattern
+  fz_context* ctx= mupdf_context ();
   SI xo, yo;
   glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
   int w= gl->width, h= gl->height;
-  QImage *im= new QImage (w, h, QImage::Format_ARGB32);
-  im->fill (Qt::transparent);
-
-  {
-    brush br= pen->get_brush ();
-    QImage* pm= get_pattern_image (br, brushpx==-1? pixel: brushpx);
-    int pattern_alpha= br->get_alpha ();
-    QPainter glim (im);
-    glim.setOpacity (qreal (pattern_alpha) / qreal (255));
-    if (pm != NULL) {
-      SI tx= x- xo*std_shrinkf, ty= y+ yo*std_shrinkf;
-      decode (tx, ty); ty--;
-      QBrush qbr (*pm);
-      QTransform qtf= painter->transform ();
-      qbr.setTransform (qtf.translate (-tx, -ty));
-      glim.setBrush (qbr);
-    }
-    glim.setPen (Qt::NoPen);
-    glim.drawRect (0, 0, w, h);
-
-    int nr_cols= std_shrinkf*std_shrinkf;
-    if (nr_cols >= 64) nr_cols= 64;
-    for (int j=0; j<h; j++)
-      for (int i=0; i<w; i++) {
-        color patcol= im->pixel (i, j);
-        int r, g, b, a;
-        get_rgb (patcol, r, g, b, a);
-        if (get_reverse_colors ()) reverse (r, g, b);
-        int col = gl->get_x (i, j);
-        im->setPixel (i, j, qRgba (r, g, b, (a*col)/nr_cols));
-      }
+  if (w <= 0 || h <= 0) return;
+  brush br= pen->get_brush ();
+  fz_pixmap* pat= get_pattern_pixmap (br, brushpx == -1? pixel: brushpx);
+  if (pat == NULL) { // no pattern: plain glyph in the color of the pencil
+    pencil saved= pen;
+    pen= pencil (pen->get_color (), pen->get_width ());
+    draw (c, fng, x, y);
+    pen= saved;
+    return;
   }
-
-  draw_clipped (im, w, h, x- xo*std_shrinkf, y+ yo*std_shrinkf);
-  delete im;
+  int pattern_alpha= br->get_alpha ();
+  int pw= fz_pixmap_width (ctx, pat), ph= fz_pixmap_height (ctx, pat);
+  int pn= fz_pixmap_components (ctx, pat), stride= fz_pixmap_stride (ctx, pat);
+  unsigned char* ps= fz_pixmap_samples (ctx, pat);
+  // device position of the top left pixel of the glyph (the device y axis
+  // points downwards, see the matrix of begin)
+  int tx= (int) floor (to_x (x - xo*std_shrinkf));
+  int ty= (int) floor (- to_y (y + yo*std_shrinkf));
+  int nr_cols= std_shrinkf*std_shrinkf;
+  if (nr_cols >= 64) nr_cols= 64;
+  unsigned char *samples= (unsigned char *)
+    Memento_label (fz_malloc (ctx, h*w*4), "pattern_glyph_data");
+  unsigned char *d= samples;
+  // the pattern is anchored at the origin of the document, as the fills
+  // are (placed_pattern): its device position is (to_x (0), -to_y (0))
+  int ax= tx - (int) floor (to_x (0)), ay= ty + (int) floor (to_y (0));
+  for (int j=0; j<h; j++) {
+    int py= ((ay + j) % ph + ph) % ph;
+    for (int i=0; i<w; i++) {
+      int px= ((ax + i) % pw + pw) % pw;
+      unsigned char* s= ps + py*stride + px*pn;
+      int r= s[0], g= (pn >= 3? s[1]: s[0]), b= (pn >= 3? s[2]: s[0]);
+      int a= (pn == 4 || pn == 2)? s[pn-1]: 255;
+      if (get_reverse_colors ()) reverse (r, g, b);
+      int cov= (gl->get_x (i, j) * pattern_alpha) / nr_cols; // 0..255
+      // fz pixmaps with alpha are premultiplied, and so is the result
+      d[0]= (r*cov)/255;
+      d[1]= (g*cov)/255;
+      d[2]= (b*cov)/255;
+      d[3]= (a*cov)/255;
+      d+= 4;
+    }
+  }
+  fz_pixmap* pix= NULL;
+  fz_image* im= NULL;
+  mupdf_protected ("pattern glyph image", [&] () {
+    pix= fz_new_pixmap_with_data (ctx, fz_device_rgb (ctx),
+                                  w, h, NULL, 1, w*4, samples);
+    im= fz_new_image_from_pixmap (ctx, pix, NULL);
+  });
+  if (im == NULL) {
+    if (pix != NULL) fz_drop_pixmap (ctx, pix);
+    else fz_free (ctx, samples);
+    return;
+  }
+  mupdf_image mi (im);
+  fz_drop_pixmap (ctx, pix);
+  fz_drop_image (ctx, im);
+  end_text ();
+  image (ctx, proc, mi, 255, w, 0.0, 0.0, h,
+         to_x (x - xo*std_shrinkf), to_y (y + yo*std_shrinkf - h*pixel));
 }
-#endif
 
 static
 pdf_font_desc *load_pdf_font (string fontname) {
   int pos= search_forwards (":", fontname);
   string fname= (pos==-1? fontname: fontname (0, pos));
+  // compound and other virtual fonts ("compound-(math ...)") have no file:
+  // do not ask kpsewhich about them (the shell chokes on the name)
+  if (occurs (" ", fname) || occurs ("(", fname) || occurs ("[", fname))
+    return NULL;
   url u = url_none ();
   {
     //debug_convert << " try freetype " << LF;
@@ -974,17 +1791,24 @@ pdf_font_desc *load_pdf_font (string fontname) {
     {
       //debug_convert << "fz_new_font_from_file "  << u  << LF;
       c_string path (concretize (u));
-      fz_font *font= fz_new_font_from_file (mupdf_context (), NULL, path, 0, 0);
+      fz_font *font= mupdf_font_from_file (path);
       if (font) {
-        fontdesc= pdf_new_font_desc (mupdf_context ());
-        fontdesc->font= font;
-        fontdesc->encoding=
-            pdf_load_system_cmap (mupdf_context (), "Identity-H");
+        // protected: the descriptor takes the font over, and drops it
+        fz_context* ctx= mupdf_context ();
+        bool ok= mupdf_protected ("load_pdf_font", [&] () {
+          fontdesc= pdf_new_font_desc (ctx);
+          fontdesc->font= font;
+          fontdesc->encoding= pdf_load_system_cmap (ctx, "Identity-H");
+        });
+        if (!ok) {
+          if (fontdesc != NULL) pdf_drop_font (ctx, fontdesc);
+          else fz_drop_font (ctx, font);
+          fontdesc= NULL;
+        }
         // FIXME: do we need to care about all the other fields? (seems not)
         // fix the encoding for FreeType
         // see tt_face_rep::tt_face_rep
-        FT_Face face= (FT_Face)fontdesc->font->ft_face;
-        ft_select_charmap (face, ft_encoding_adobe_custom);
+        else mupdf_select_custom_charmap (fontdesc->font);
       }
     }
     if (fontdesc != NULL) {
@@ -1014,15 +1838,43 @@ font_size (string name) {
   return mag;
 }
 
-// copied from tt_face.cpp
-inline FT_UInt
-decode_index (FT_Face face, int i) {
-  if (i < 0xc000000) return ft_get_char_index (face, i);
-  return i - 0xc000000;
+// FreeType is reached only with MuPDF's lock held. The lock is what
+// serializes FreeType between the threads MuPDF may run, and it points
+// FreeType's allocator at the calling context: a face which allocates
+// on first use -- an OpenType one asked for a glyph name loads its table
+// of names then -- crashed the PDF renderer when it was asked directly.
+// Selecting a charmap and looking up an index do not allocate, but the
+// discipline is kept everywhere so that it does not depend on that.
+void
+mupdf_select_custom_charmap (fz_font* font) {
+  fz_context* ctx= mupdf_context ();
+  FT_Face face= (font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, font);
+  if (face == NULL) return;
+  fz_ft_lock (ctx);
+  ft_select_charmap (face, ft_encoding_adobe_custom);
+  fz_ft_unlock (ctx);
+}
+
+unsigned int
+mupdf_glyph_index (fz_font* font, int i) {
+  if (i >= 0xc000000) return i - 0xc000000;
+  fz_context* ctx= mupdf_context ();
+  FT_Face face= (font == NULL) ? NULL : (FT_Face) fz_font_ft_face (ctx, font);
+  if (face == NULL) return 0;
+  fz_ft_lock (ctx);
+  FT_UInt g= ft_get_char_index (face, i);
+  fz_ft_unlock (ctx);
+  return g;
 }
 
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
+  if (pen->get_type () == pencil_brush &&
+      !is_nil (pen->get_brush ()) &&
+      pen->get_brush ()->get_type () == brush_pattern) {
+    draw_bis (c, fng, x, y); // glyphs filled with a pattern
+    return;
+  }
   string fontname = fng->res_name;
   pdf_font_desc* fontdesc= NULL;
 
@@ -1069,8 +1921,7 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       //
       // MuPDF seems to like the glyph value returned by
       // ft_get_char_index on the FT_Face it will use.
-      FT_Face face= (FT_Face)fontdesc->font->ft_face;
-      gl_index= decode_index (face, c);
+      gl_index= mupdf_glyph_index (fontdesc->font, c);
     }
     char glyphs[2] = { (char)(gl_index >> 8), (char)(gl_index) };
     proc->op_Tj (mupdf_context (), proc, glyphs, 2);
@@ -1080,13 +1931,6 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // we use an "immediate" approach, without trying to build a Type3 font
   // this is appropriate for raster rendering, but we need to change it
   // if we want to render to a PDF file
-#if 0
-  // FIXME: implement brushes!
-  if (pen->get_type () == pencil_brush) {
-    draw_bis (c, fng, x, y);
-    return;
-  }
-#endif
   // get the pixmap
   color fgc= pen->get_color ();
   basic_character xc (c, fng, std_shrinkf, fgc, 0);
@@ -1097,7 +1941,7 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     if (get_reverse_colors ()) reverse (r, g, b);
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int w= gl->width, h= gl->height;
 
     unsigned char *samples = (unsigned char *)
@@ -1118,10 +1962,19 @@ mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
         d+= 4;
       }
     }
-    fz_pixmap* pix= fz_new_pixmap_with_data (mupdf_context (),
-                                   fz_device_rgb (mupdf_context ()),
-                                   w, h, NULL, 1, w*4, samples);
-    fz_image* im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    fz_pixmap* pix= NULL;
+    fz_image* im= NULL;
+    mupdf_protected ("glyph image", [&] () {
+      pix= fz_new_pixmap_with_data (mupdf_context (),
+                                    fz_device_rgb (mupdf_context ()),
+                                    w, h, NULL, 1, w*4, samples);
+      im= fz_new_image_from_pixmap (mupdf_context (), pix, NULL);
+    });
+    if (im == NULL) { // the glyph is not drawn
+      if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix);
+      else fz_free (mupdf_context (), samples);
+      return;
+    }
     mi= mupdf_image (im);
     mi->xo= xo; mi->yo= yo;
     character_image (xc)= mi;
@@ -1243,9 +2096,7 @@ mupdf_renderer_rep::new_shadow (renderer& ren) {
   }
   if (ren == NULL)  {
     ren= (renderer) tm_new<mupdf_renderer_rep> (mw, mh);
-    fz_pixmap *pix= fz_new_pixmap (mupdf_context (),
-                                   fz_device_rgb (mupdf_context ()), mw, mh,
-                                   NULL, 1);
+    fz_pixmap *pix= mupdf_new_pixmap (mw, mh);
     static_cast<mupdf_renderer_rep*>(ren)->begin(pix);
     fz_drop_pixmap (mupdf_context (), pix);
   }

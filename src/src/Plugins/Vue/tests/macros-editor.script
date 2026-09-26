@@ -1,0 +1,7 @@
+# needs macros-editor.scm: the macros editor dialog, select a macro in the list
+wait 9000
+window #4
+snapshot me0
+click 60 150
+wait 1500
+snapshot me1
