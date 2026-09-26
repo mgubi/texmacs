@@ -65,3 +65,5 @@ packages/macos/TeXmacs.xcodeproj/project.xcworkspace
 packages/macos/TeXmacs.xcodeproj/xcuserdata
 config.status
 /build-wasm/
+# the makefile of the browser build is a source, not a generated file
+!/misc/wasm/Makefile
