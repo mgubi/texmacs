@@ -1,11 +1,12 @@
 # Builds TeXmacs (with s7) on Linux, macOS and Windows, runs the regression
 # suites headless, and keeps a runnable bundle of each build as an artifact.
+# The TeXmacs source tree is the src directory of this repository.
 
 name: CI
 
 on:
   push:
-    branches: [wip_s7, wip_s7-ci]
+    branches: [wip_s7]
   pull_request:
     branches: [wip_s7]
   workflow_dispatch:
@@ -19,6 +20,9 @@ jobs:
     name: Linux (Ubuntu 24.04, Qt 6)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +42,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Run the regression suites
-        run: .github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
 
       - name: Package
         run: tar -czf texmacs-linux-x86_64.tar.gz TeXmacs
@@ -46,13 +50,16 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: texmacs-linux-x86_64
-          path: texmacs-linux-x86_64.tar.gz
+          path: src/texmacs-linux-x86_64.tar.gz
           retention-days: 14
 
   macos:
     name: macOS (Apple silicon, Qt 6)
     runs-on: macos-14
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -71,7 +78,7 @@ jobs:
         run: make -j"$(sysctl -n hw.ncpu)"
 
       - name: Run the regression suites
-        run: .github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
 
       - name: Bundle
         run: |
@@ -84,7 +91,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: texmacs-macos-arm64
-          path: texmacs-macos-arm64.zip
+          path: src/texmacs-macos-arm64.zip
           retention-days: 14
 
   windows:
@@ -94,6 +101,7 @@ jobs:
     defaults:
       run:
         shell: msys2 {0}
+        working-directory: src
     env:
       # qmake6 is in /mingw64/bin, but moc, uic and rcc of Qt 6 only in here
       QT6_BIN: /mingw64/share/qt6/bin
@@ -136,7 +144,7 @@ jobs:
         run: |
           BIN=TeXmacs/bin/texmacs.bin
           test -f "$BIN" || BIN=TeXmacs/bin/texmacs.bin.exe
-          .github/scripts/run-tests.sh "$BIN"
+          ../.github/scripts/run-tests.sh "$BIN"
 
       - name: Bundle
         run: |
