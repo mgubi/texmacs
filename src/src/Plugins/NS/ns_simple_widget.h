@@ -37,6 +37,7 @@ class ns_simple_widget_rep: public ns_widget_rep {
     t_slot_entry(const t_slot_entry& other)
     : seq (other.seq), id (other.id), val (other.val) { };
     bool operator< (const t_slot_entry& b) const { return this->seq < b.seq; }
+    bool operator<= (const t_slot_entry& b) const { return this->seq <= b.seq; }
   } t_slot_entry;
   
   t_slot_entry sent_slots[slot_id__LAST];

@@ -859,8 +859,8 @@ texmacs_entrypoint (int argc, char** argv) {
 #  else
     tmapp()->set_window_icon("/misc/images/texmacs-512.png");
 #  endif
-#endif
   }
+#endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
   the_et->obs= ip_observer (path ());

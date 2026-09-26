@@ -13,13 +13,18 @@
 #define NS_WIDGET_H
 
 #include "widget.hpp"
+#include "message.hpp"
 
 #ifndef MAC_COCOA_H
+// hack to allow inclusion in pure C++ sources
+#include <CoreGraphics/CGGeometry.h>
 typedef struct TeXmacs_NSView {
   void * isa;
-}  NSView ; // hack to allow inclusion in pure C++ sources
-//#else
-//typedef NSView * NSViewPtr ; 
+}  NSView ;
+typedef struct TeXmacs_NSBitmapImageRep {
+  void * isa;
+}  NSBitmapImageRep ;
+typedef CGPoint NSPoint;
 typedef void *TMMenuItem;
 #else
 @class TMMenuItem;
