@@ -809,10 +809,12 @@ Vue GUI says at compile time that it needs MuPDF.
 
 It was last present in commit `0a1e203505` (2026-09-26, on `wip_vue`),
 the parent of `e9426a21e7`, which removed it; its last change of its own
-was `412b4ef7b4` (FreeType asked under MuPDF's lock). To look at it again:
+was `412b4ef7b4` (FreeType asked under MuPDF's lock). To look at it again,
+from the top of the source tree (the `./` makes the path of `git show`
+relative to it, not to the top of the repository):
 
 ```sh
-git show 0a1e203505:src/Plugins/MuPDF/fitz_renderer.cpp
+git show 0a1e203505:./src/Plugins/MuPDF/fitz_renderer.cpp
 git checkout 0a1e203505 -- src/Plugins/MuPDF/fitz_renderer.cpp \
   src/Plugins/MuPDF/fitz_renderer.hpp src/Plugins/MuPDF/fitz_picture.cpp \
   src/Plugins/MuPDF/fitz_picture.hpp src/Plugins/MuPDF/README_fitz.md
