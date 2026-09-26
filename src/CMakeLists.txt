@@ -218,13 +218,23 @@ set (STDC_HEADERS 1)
 set (DEBUG_ASSERT 1)
 
 ### --------------------------------------------------------------------
-### Guile integration (embedded tm-guile188)
+### Scheme interpreter: S7 (vendored in src/Scheme/S7), the embedded Guile
+### (tm-guile188), or a system Guile found with pkg-config
 ### --------------------------------------------------------------------
 
-set (SCHEME_IMPL "embedded18" CACHE STRING "Implementation of Scheme to compile for.")
+set (SCHEME_IMPL "s7" CACHE STRING
+  "Implementation of Scheme to compile for: s7, embedded18 (tm-guile188) or guile")
+set_property (CACHE SCHEME_IMPL PROPERTY STRINGS s7 embedded18 guile)
 
-if (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
+if (SCHEME_IMPL STREQUAL "s7")
+  message (STATUS "Using the S7 Scheme interpreter")
+  set (SCHEME_DIR "S7")
+  set (USE_S7 1)
+  set (guile_str_size_t "size_t")
+elseif (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
   message (STATUS "Using embedded Guile from tm-guile188")
+  set (SCHEME_DIR "Guile")
+  set (USE_GUILE 1)
   add_subdirectory (tm-guile188)
   set (GUILE_C 1)
   set (GUILE_NUM 1)
@@ -241,6 +251,9 @@ if (SCHEME_IMPL STREQUAL "embedded18" OR SCHEME_IMPL STREQUAL "tm-guile188")
     ${GUILE_BUILD_DIR}/include/libguile
   )
 else ()
+  message (STATUS "Using a system Guile")
+  set (SCHEME_DIR "Guile")
+  set (USE_GUILE 1)
   pkg_search_module (Guile REQUIRED guile-1.8 guile-3.0 guile-2.2 guile-2.0)
   if (Guile_VERSION VERSION_LESS 2.0)
     set (GUILE_C 1)
@@ -461,7 +474,8 @@ file (GLOB_RECURSE TeXmacs_Graphics_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Graphi
 file (GLOB_RECURSE TeXmacs_Kernel_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Kernel/*.cpp")
 file (GLOB_RECURSE TeXmacs_Scheme_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Scheme/*.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Guile/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.c"
 )
 option (ENABLE_EXPERIMENTAL "Enable experimental style rewriting code" OFF)
 if (ENABLE_EXPERIMENTAL)
@@ -581,7 +595,7 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Resvg
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Guile
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Scheme
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Glue
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Style
