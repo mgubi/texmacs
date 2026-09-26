@@ -107,7 +107,7 @@ AC_DEFUN([TM_GUI],[
           AC_DEFINE(X11TEXMACS, 1, [Use standard X11 port])
          ;;
       COCOA)
-         CONFIG_COCOA="Cocoa"
+         CONFIG_COCOA="NS"
          CONFIG_GUI_DEFINE="AQUATEXMACS"
           AC_DEFINE(AQUATEXMACS, 1, [Enable experimental Cocoa port])
          ;;

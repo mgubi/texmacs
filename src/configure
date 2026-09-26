@@ -36420,7 +36420,7 @@ printf "%s\n" "#define X11TEXMACS 1" >>confdefs.h
 
          ;;
       COCOA)
-         CONFIG_COCOA="Cocoa"
+         CONFIG_COCOA="NS"
          CONFIG_GUI_DEFINE="AQUATEXMACS"
 
 printf "%s\n" "#define AQUATEXMACS 1" >>confdefs.h
