@@ -9,7 +9,7 @@ is regenerated with s7 too.
 | Build system | s7 (default) | Guile |
 |---|---|---|
 | autotools | `./configure` or `./configure --with-scheme=s7` | `./configure --with-scheme=guile` |
-| CMake | `-DSCHEME_IMPL=s7` | `-DSCHEME_IMPL=guile` (any version), or `guile-1.8`, `guile-2.0`, `guile-2.2`, `guile-3.0` |
+| CMake | `-DSCHEME_IMPL=s7` | `-DSCHEME_IMPL=embedded18` (the embedded Guile of `tm-guile188`) or `guile` (a system Guile, found with pkg-config) |
 
 The option drives everything else:
 
@@ -32,17 +32,17 @@ The option drives everything else:
 - **Guile:** checked with autotools on macOS, with Guile 1.8.7. Guile runs
   all the regression suites except the two that test s7 specifically.
 
-**CMake.** Upstream's CMake build had gaps that stayed hidden while an
-autotools `config.h` was left in the source tree. Three were fixed:
-- the generated `config.h` now comes first in the include path;
-- `config.h.cmake` defines `SIZEOF_{SHORT,INT,LONG,LONG_LONG}` and
-  `ALTERNATIVE_VERSION`;
-- the Guile checks pass `Guile_CFLAGS` as a space-separated string.
+**CMake.** The interpreter option was redone on upstream's CMake files of
+September 2026, which set `SCHEME_DIR` and `USE_S7`/`USE_GUILE` from
+`SCHEME_IMPL`. With `SCHEME_IMPL=s7`, CMake configures and the whole tree
+compiles, including `s7.c`. On macOS the link still fails, for two upstream
+reasons that don't depend on the Scheme choice:
+- no platform sources are compiled on macOS: the `APPLE` branch of the OS
+  sources is empty, so the functions of `src/Plugins/Unix` are missing;
+- `gnutls` is linked by name without its library directory.
 
-Out of tree, the CMake build still stops at `System/Files/web_files.cpp`,
-which includes the Qt header `qt_utilities.hpp` from outside the core
-library's include path. That upstream problem doesn't depend on the Scheme
-choice.
+The man page target also expects `misc/man/texmacs.1`, which only
+`configure` generates. CI uses autotools.
 
 **Xcode.** `packages/macos/TeXmacs.xcodeproj` compiles `s7_tm.cpp` and
 `s7.c` in three targets.
@@ -119,30 +119,46 @@ first patch broke.
 
 ## 5.3 The branch
 
-`wip_s7` is the upstream snapshot `svn_sync_20260921` (`fa8da19dd0`,
-2026-09-17) plus a linear series:
+Development happens on the branch **`wip_s7` of
+[mgubi/texmacs](https://github.com/mgubi/texmacs)**. In that repository the
+TeXmacs source tree is the `src` directory, so paths in these notes are
+relative to `src/`. The CI configuration (`.github/`) is at the root of the
+repository.
 
-1. **`b23f01c12c` "S7 Scheme support (squashed from wip_s7)":** the whole
-   original port as one commit, with its conflicts resolved against the
-   newer upstream.
+The branch is `svn_sync` of that repository, as of 2026-09-24 (`8629ced4f7`),
+plus a linear series:
+
+1. **`ae6b005002` "S7 Scheme support (squashed from wip_s7)":** the whole
+   original port as one commit.
 2. **Fixes and new work,** each in its own commit:
    - bug fixes, the update to s7 11.9 and the tests;
    - the build option and the kernel shared with Guile;
    - the module-system and lookup work;
-   - the init files, the `latex-needs?` cache and the HTML export fixes.
+   - the init files, the `latex-needs?` cache and the HTML export fixes;
+   - CI.
 3. **Commits whose subject starts with `docs/s7:`,** which only touch
    these notes.
 
-The original history, with all commits and authors, is kept on the branch
-**`wip_s7_pre_rebase_20260924`** (`dd11d3310a`). In short:
+**Where the series comes from.** It was developed on `wip_s7` of
+`texmacs/texmacs`, whose tree is this `src/` directory, on top of
+`svn_sync_20260921`. It was moved here on 2026-09-27 by replaying every
+commit under `src/` (`git format-patch`, then `git am --directory=src`).
+- The only conflicts were in the CMake files, which upstream had rewritten
+  in the meantime. The interpreter option was redone on the new files in a
+  separate commit.
+- The original history, with all commits and authors, is on the branch
+  `wip_s7_pre_rebase_20260924` of `texmacs/texmacs` (`dd11d3310a`).
+
+In short, that history is:
 - the port was written in 2020–2022 by Massimiliano Gubinelli;
 - it was imported into the TeXmacs repository by Darcy Shen (沈达) in
   November 2021, with CMake support and fixes;
 - s7 was updated in January 2022;
-- the branch was rebased onto upstream in July 2025.
+- the branch was rebased onto upstream in July 2025, and again in
+  September 2026.
 
 **To rebase onto a later snapshot**, run
-`git rebase --onto <new-snapshot> <old-snapshot>`. Then:
+`git rebase --onto <new-svn_sync> <old-svn_sync>`. Then:
 
 1. **Merge upstream's changes to the init files.** Upstream edits
    `init-texmacs.scm`, which is split here into four files:
@@ -158,14 +174,15 @@ The original history, with all commits and authors, is kept on the branch
 <a id="ci"></a>
 ## 5.4 Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `wip_s7` (and to
-`wip_s7-ci`), on pull requests to `wip_s7`, and by hand from the Actions tab.
+`.github/workflows/ci.yml`, at the root of the repository, runs on every
+push to `wip_s7`, on pull requests to `wip_s7`, and by hand from the Actions
+tab. Its jobs run in `src/`.
 It has one job per platform, each limited to 60 minutes. Each job:
 1. installs the dependencies;
 2. configures with `--with-scheme=s7`;
 3. builds;
 4. runs the regression suites headless, with
-   `.github/scripts/run-tests.sh`;
+   `../.github/scripts/run-tests.sh`;
 5. uploads a runnable bundle, kept for 14 days.
 
 | Platform | Runner and dependencies | Artifact |
