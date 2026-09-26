@@ -11,11 +11,13 @@
 // of the user, which is when TeXmacs copies.
 //
 // Paste: SDL cancels the keys with Ctrl, which cancels the paste event of
-// the browser with them, and the canvas is not editable, so that Firefox has
-// no paste event for it anyway. The key of a paste (Ctrl+V, Cmd+V,
-// Shift+Insert) is kept from SDL, and the focus goes for a moment to a
-// hidden text area, which gets the paste event; its contents become those
-// of tmClipboard, the focus comes back, and SDL gets the key, again:
+// the browser with them, and the canvas is not editable, so that the browser
+// has no paste for it anyway. The focus goes to a hidden text area as soon
+// as Ctrl or Cmd is down (Safari enables its Paste, the command of Cmd+V,
+// only when an editable element had the focus before the V), until it is
+// up again. The key of a paste (Ctrl+V, Cmd+V, Shift+Insert) is kept from
+// SDL, and the text area gets the paste event; its contents become those
+// of tmClipboard, and SDL gets the key, again:
 // TeXmacs pastes as it always does. A browser whose paste event has no
 // data (Safari, at times) pastes into the text area, which is read a moment
 // later, as editors in the browser do. When the browser has no paste for
@@ -33,9 +35,12 @@ var tmClipboard = (function () {
   var known = { plain: '', html: '' };
   var pending = null; // the key of a paste, until its paste event
   var sink = null, back = null; // the hidden text area, the focus before it
+  var held = false; // Ctrl or Cmd is down, the focus is in the text area
+  var trace = typeof location !== 'undefined' && location.search.indexOf ('trace-clipboard') >= 0;
+  function log (s) { if (trace) console.log ('clipboard: ' + s); }
 
   function editable (t) {
-    return t && t.nodeType === 1 &&
+    return t && t.nodeType === 1 && t !== sink &&
            (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test (t.tagName));
   }
   function isPaste (e) {
@@ -54,8 +59,9 @@ var tmClipboard = (function () {
     if (!p.pasted && sink && sink.value)
       known = { plain: sink.value.replace (/\r\n?/g, '\n'), html: '' };
     if (sink) sink.value = '';
-    if (back && document.activeElement === sink) back.focus ({ preventScroll: true });
-    back = null;
+    log ('the key to TeXmacs, ' + (p.pasted ? 'with a paste event' : 'the text area: ' +
+         JSON.stringify (known.plain.slice (0, 40))));
+    if (!held) giveBack ();
     window.dispatchEvent (new KeyboardEvent ('keydown', p.init));
     // the keys released meanwhile (Cmd, V), after the key
     p.ups.forEach (function (u) { window.dispatchEvent (new KeyboardEvent ('keyup', u)); });
@@ -65,6 +71,20 @@ var tmClipboard = (function () {
     return { key: e.key, code: e.code, location: e.location, repeat: e.repeat,
              ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
              metaKey: e.metaKey, bubbles: true, cancelable: true };
+  }
+
+  // the focus to the text area, and back
+  function borrow () {
+    if (!makeSink ()) return;
+    if (document.activeElement !== sink) {
+      back = document.activeElement;
+      sink.value = '';
+      sink.focus ({ preventScroll: true });
+    }
+  }
+  function giveBack () {
+    if (back && document.activeElement === sink) back.focus ({ preventScroll: true });
+    back = null;
   }
 
   function makeSink () {
@@ -81,27 +101,40 @@ var tmClipboard = (function () {
     // before SDL (its listeners are on window, in the bubbling phase)
     window.addEventListener ('keydown', function (e) {
       if (!e.isTrusted || editable (e.target)) return;
+      if (e.key === 'Meta' || e.key === 'Control') {
+        held = true;
+        borrow ();
+        return;
+      }
       if (!isPaste (e)) {
         if (e.metaKey) e.preventDefault ();
         return;
       }
       e.stopImmediatePropagation ();
-      if (makeSink ()) {
-        back = document.activeElement;
-        sink.value = '';
-        sink.focus ({ preventScroll: true });
-      }
+      log ('paste key ' + e.key + ', focus in ' + (document.activeElement && document.activeElement.nodeName));
+      borrow ();
+      if (pending) release ();
       pending = { init: init (e), ups: [], pasted: false,
                   timer: setTimeout (release, WAIT) };
     }, true);
     window.addEventListener ('keyup', function (e) {
-      if (!e.isTrusted || !pending) return;
+      if (!e.isTrusted) return;
+      if (e.key === 'Meta' || e.key === 'Control') {
+        held = false;
+        if (!pending) giveBack ();
+      }
+      if (!pending) return;
       e.stopImmediatePropagation ();
       pending.ups.push (init (e));
     }, true);
+    // Cmd+Tab: its key up goes to another application
+    window.addEventListener ('blur', function (e) {
+      if (e.target === window) { held = false; if (!pending) giveBack (); }
+    });
     document.addEventListener ('paste', function (e) {
-      if (editable (e.target) && e.target !== sink) return;
+      if (editable (e.target)) return;
       var d = e.clipboardData;
+      log ('paste event on ' + e.target.nodeName + ', types ' + (d ? Array.from (d.types) : 'none'));
       var plain = d ? d.getData ('text/plain') || '' : '', html = d ? d.getData ('text/html') || '' : '';
       if (!plain && !html) return; // into the text area, read by release
       known = { plain: plain, html: html };
