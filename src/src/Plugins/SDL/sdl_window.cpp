@@ -14,9 +14,12 @@
 #include "message.hpp"
 #include "boot.hpp"
 
-#ifdef MUPDF_RENDERER
-#include "../MuPDF/mupdf_picture.hpp"
+// the SDL port draws with MuPDF: the backing store of a window is a MuPDF
+// pixmap, drawn by mupdf_renderer
+#if !MUPDF_RENDERER
+#error "the SDL GUI needs MuPDF (MUPDF_RENDERER)"
 #endif
+#include "../MuPDF/mupdf_picture.hpp"
 
 int nr_windows;
 
@@ -31,86 +34,82 @@ static int serial= 1; // serial identifier for windows
 
 void
 sdl_window_rep::initialize () {
-
   SI min_w= Min_w / PIXEL, min_h= Min_h / PIXEL;
-  SI def_w= Def_w / PIXEL, def_h= Def_h / PIXEL;
   SI max_w= Max_w / PIXEL, max_h= Max_h / PIXEL;
 
   full_screen_flag= false;
 
-  if (win_w == 0) win_w= def_w;
-  if (win_h == 0) win_h= def_h;
-  if ((win_x+ win_w) > gui->screen_width) win_x= gui->screen_width- win_w;
+  if (win_x + win_w > gui->screen_width) win_x= gui->screen_width - win_w;
   if (win_x < 0) win_x= 0;
-  if ((win_y+ win_h) > gui->screen_height) win_y= gui->screen_height- win_h;
-  if (win_y < 0) win_y=0;
-  
-  SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY;
-  if (name == NULL) {
-    name= const_cast<char*> ("popup");
-    flags |= SDL_WINDOW_BORDERLESS;
-  } else {
-    flags |= SDL_WINDOW_RESIZABLE;
-  }
-  
-  if (!SDL_CreateWindowAndRenderer (name, win_w, win_h, flags, &sdl_win, &sdl_ren)) {
-    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
-  }
-  
-//  sdl_ren= SDL_CreateRenderer (win, NULL);
-  
-  if (the_name == "") {
-    the_name= name;
-    mod_name= name;
-  }
+  if (win_y + win_h > gui->screen_height) win_y= gui->screen_height - win_h;
+  if (win_y < 0) win_y= 0;
 
-  SDL_SetWindowPosition (sdl_win, win_x, win_y),
-  SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
+  // windows start hidden: TeXmacs shows them once they are set up
+  // (set_visibility). Popups (menus, balloons) are undecorated, stay on top
+  // and never take the keyboard focus from the window which opened them.
+  SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
+  if (popup)
+    flags |= SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP |
+             SDL_WINDOW_NOT_FOCUSABLE;
+  else flags |= SDL_WINDOW_RESIZABLE;
+
+  c_string title (cork_to_utf8 (orig_name));
+  sdl_win= SDL_CreateWindow (title, max (win_w, 1), max (win_h, 1), flags);
+  if (sdl_win == NULL) {
+    SDL_LogError (SDL_LOG_CATEGORY_APPLICATION,
+                  "Couldn't create window: %s", SDL_GetError ());
+    FAILED ("SDL: cannot create a window");
+  }
+  the_name= orig_name;
+  mod_name= orig_name;
+
+  SDL_SetWindowPosition (sdl_win, win_x, win_y);
+  if (max_w > 0 && max_h > 0) SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
   SDL_SetWindowMinimumSize (sdl_win, min_w, min_h);
+  if (!popup) SDL_StartTextInput (sdl_win); // text and input method events
 
-  backing_store= native_picture (win_w * retina_factor, win_h  * retina_factor, 0, 0);
+  int pw= 1, ph= 1;
+  SDL_GetWindowSizeInPixels (sdl_win, &pw, &ph);
+  density= (win_w > 0) ? ((float) pw) / win_w : 1.0f;
+  backing_store= native_opaque_picture (max (pw, 1), max (ph, 1), 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
-  
+
   nr_windows++;
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
   id_to_window (id)= this;
-  
+
   // update widget state
   set_identifier (w, id);
   notify_position (w, 0, 0);
-  notify_size (w, Def_w,  Def_h);
+  notify_size (w, to_si (pw), to_si (ph));
 
   gui->created_window (sdl_win);
-  cout << "create window " << id << LF;
+  if (DEBUG_EVENTS) debug_events << "create window " << id << LF;
 }
 
-sdl_window_rep::sdl_window_rep (widget w2, sdl_gui gui2, char* n2,
-			    SI min_w, SI min_h, SI def_w, SI def_h,
-			    SI max_w, SI max_h):
-  window_rep (), w (w2), gui (gui2),
-  orig_name (n2 == ((char*) NULL)? string ("popup"): n2), name (n2),
+sdl_window_rep::sdl_window_rep (widget w2, sdl_gui gui2, string n2, bool popup2,
+                                SI min_w, SI min_h, SI def_w, SI def_h,
+                                SI max_w, SI max_h):
+  window_rep (), w (w2), gui (gui2), orig_name (n2), popup (popup2),
+  sdl_win (NULL), ren (NULL), density (1.0f),
   Min_w (min_w), Min_h (min_h), Def_w (def_w), Def_h (def_h),
   Max_w (max_w), Max_h (max_h),
-  win_x (0), win_y (0), win_w (Def_w/PIXEL), win_h (Def_h/PIXEL),
-  kbd_focus (w.rep), has_focus (false)
+  win_x (0), win_y (0), win_w (def_w/PIXEL), win_h (def_h/PIXEL),
+  kbd_focus (w.rep), has_focus (false), full_screen_flag (false)
 {
-  //cout << "Min " << (min_w >> 8) << ", " << (min_h >> 8) << "\n";
-  //cout << "Def " << (def_w >> 8) << ", " << (def_h >> 8) << "\n";
-  //cout << "Max " << (max_w >> 8) << ", " << (max_h >> 8) << "\n";
-
   initialize ();
 }
 
 sdl_window_rep::~sdl_window_rep () {
-  cout << "destroy window " << id << LF;
+  if (DEBUG_EVENTS) debug_events << "destroy window " << id << LF;
   id_to_window->reset (id);
   id= 0;
   set_identifier (w, 0); // FIXME: is this ok?
   Window_to_window->reset (sdl_win);
   nr_windows--;
   gui->deleted_window (sdl_win);
-  SDL_DestroyRenderer (sdl_ren);
+  if (!popup) SDL_StopTextInput (sdl_win);
   SDL_DestroyWindow (sdl_win);
   delete_renderer (ren);
 }
@@ -138,6 +137,13 @@ get_sdl_window (widget w) {
   return (sdl_window)id_to_window[id];
 }
 
+sdl_window
+get_window_from_ID (Uint32 ID) {
+  SDL_Window *w= SDL_GetWindowFromID (ID);
+  if (w == NULL) return NULL;
+  return (sdl_window) Window_to_window [w];
+}
+
 int
 get_identifier (window w) {
   if (w == NULL) return 0;
@@ -148,6 +154,13 @@ window
 get_window (int id) {
   if (id == 0) return NULL;
   else return id_to_window [id];
+}
+
+// a length in device pixels in TeXmacs units: the widgets see the window
+// at the scale of its renderer, whatever the density of its display
+SI
+sdl_window_rep::to_si (int pixels) {
+  return ((SI) pixels) * ren->pixel;
 }
 
 /******************************************************************************
@@ -164,8 +177,8 @@ sdl_window_rep::get_position (SI& x, SI& y) {
 
 void
 sdl_window_rep::get_size (SI& ww, SI& hh) {
-  ww= win_w*PIXEL;
-  hh= win_h*PIXEL;
+  ww= to_si (backing_store->get_width ());
+  hh= to_si (backing_store->get_height ());
 }
 
 void
@@ -189,7 +202,6 @@ sdl_window_rep::set_position (SI x, SI y) {
 void
 sdl_window_rep::set_size (SI w, SI h) {
   w= w/PIXEL; h= h/PIXEL;
-  //h=-h; ren->decode (w, h);
   SDL_SetWindowSize (sdl_win, w, h);
 }
 
@@ -200,14 +212,14 @@ sdl_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
   min_w= min_w/PIXEL; min_h= min_h/PIXEL;
   max_w= max_w/PIXEL; max_h= max_h/PIXEL;
-  SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
+  if (max_w > 0 && max_h > 0) SDL_SetWindowMaximumSize (sdl_win, max_w, max_h);
   SDL_SetWindowMinimumSize (sdl_win, min_w, min_h);
 }
 
 void
 sdl_window_rep::set_name (string name) {
   if (the_name != name) {
-    c_string s (name);
+    c_string s (cork_to_utf8 (name));
     SDL_SetWindowTitle (sdl_win, s);
     the_name= name;
     mod_name= name;
@@ -223,7 +235,7 @@ void
 sdl_window_rep::set_modified (bool flag) {
   string name= (flag? (the_name * " *"): the_name);
   if (mod_name != name) {
-    c_string s (name);
+    c_string s (cork_to_utf8 (name));
     SDL_SetWindowTitle (sdl_win, s);
     mod_name= name;
   }
@@ -231,42 +243,23 @@ sdl_window_rep::set_modified (bool flag) {
 
 void
 sdl_window_rep::set_visibility (bool flag) {
-  if (flag) SDL_ShowWindow (sdl_win);
+  if (flag) {
+    SDL_ShowWindow (sdl_win);
+    // a popup is shown where the pointer is: bring it above the window
+    // which opened it, without taking the focus
+    if (popup) SDL_RaiseWindow (sdl_win);
+    // as after an Expose event of X11: the widgets paint the whole window
+    invalidate_all ();
+  }
   else SDL_HideWindow (sdl_win);
 }
 
 void
 sdl_window_rep::set_full_screen (bool flag) {
   if (full_screen_flag == flag) return;
-  string old_name= get_name ();
-  if (old_name == "")
-    old_name= as_string (name);
-  if (flag) {
-    save_win= sdl_win;
-    name= NULL;
-    save_x= win_x; save_y= win_y;
-    save_w= win_w; save_h= win_h;
-//    initialize ();
-    SDL_SetWindowFullscreen (sdl_win,  SDL_WINDOW_FULLSCREEN);
-    move_event   (0, 0);
-    resize_event (gui->screen_width, gui->screen_height);
-    set_visibility (true);
-//    XSetInputFocus (dpy, win, PointerRoot, CurrentTime);
-  }
-  else {
-    SDL_SetWindowFullscreen (sdl_win,  0);
-    sdl_win= save_win;
-    //FIXME: is this 'as_charp' a possible memory leak?
-    name= as_charp (old_name);
-    win_x= save_x; win_y= save_y;
-    win_w= save_w; win_h= save_h;
-    set_visibility (true);
-    SDL_SetWindowPosition (sdl_win, save_x, save_y);
-    SDL_SetWindowSize (sdl_win, save_w, save_h);
-    resize_event (save_w, save_h);
-    move_event   (save_x, save_y);
-  }
-  set_name (old_name);
+  // the system resizes the window, which is followed by the usual resize
+  // events (resize_event)
+  SDL_SetWindowFullscreen (sdl_win, flag);
   full_screen_flag= flag;
 }
 
@@ -275,15 +268,8 @@ sdl_window_rep::move_event (int x, int y) {
   bool flag= (win_x!=x) || (win_y!=y);
   win_x= x; win_y= y;
   if (flag) {
- //   XWindowAttributes attrs;
- //   XGetWindowAttributes (dpy, win, &attrs);
- //   int border_x= attrs.x, border_y= attrs.y;
-    int border_x=0, border_y=0;
-    notify_position (w, win_x*PIXEL, win_y*PIXEL); //FIXME: not used???
-    if (border_x >= 0 && border_x <= 5 && border_y >= 0 && border_y <= 30) {
-      //cout << "Move to " << x-border_x << ", " << y-border_y << "\n";
-      notify_window_move (orig_name, (x-border_x)*PIXEL, (border_y-y)*PIXEL);
-    }
+    notify_position (w, win_x*PIXEL, win_y*PIXEL);
+    notify_window_move (orig_name, x*PIXEL, -y*PIXEL);
   }
 }
 
@@ -291,9 +277,15 @@ void
 sdl_window_rep::resize_event (int ww, int hh) {
   bool flag= (win_w!=ww) || (win_h!=hh);
   win_w= ww; win_h= hh;
-  cout << win_w << "," << win_h << LF;
   if (flag) {
-    notify_size (w, win_w*PIXEL, win_h*PIXEL);
+    // the backing store follows the window at once, so that the widgets
+    // are laid out for the size which is on the screen
+    sync_backing_store ();
+    notify_size (w, to_si (backing_store->get_width ()),
+                    to_si (backing_store->get_height ()));
+    // the widgets were laid out again: they paint the whole window (X11
+    // sends an Expose event after a resize, on which Widkit relies)
+    invalidate_all ();
     notify_window_resize (orig_name, ww*PIXEL, hh*PIXEL);
   }
 }
@@ -310,7 +302,6 @@ sdl_window_rep::destroy_event () {
 
 void
 sdl_window_rep::invalidate_event (int x1, int y1, int x2, int y2) {
-//  cout << "invalidate " << x1 << ", " << y1 << ", "  << x2 << ", " << y2 << LF;
   invalid_regions= invalid_regions | rectangles (rectangle (x1, y1, x2, y2));
 }
 
@@ -321,7 +312,6 @@ sdl_window_rep::key_event (string key) {
 
 void
 sdl_window_rep::focus_in_event () {
-//  SDL_SetWindowKeyboardGrab (win, SDL_TRUE);
   has_focus= true;
   notify_keyboard_focus (kbd_focus, true);
   gui->focussed_window (sdl_win);
@@ -329,174 +319,184 @@ sdl_window_rep::focus_in_event () {
 
 void
 sdl_window_rep::focus_out_event () {
- // SDL_SetWindowKeyboardGrab (win, false);
   has_focus= false;
   notify_keyboard_focus (kbd_focus, false);
 }
 
+// a position of the pointer (points, relative to the window) in the
+// coordinates of the renderer
 void
-sdl_window_rep::mouse_event (string ev, int x, int y, time_t t) {
-  //cout << "mouse_event " << ev << " " << x << "," << y << LF;
-  x *= retina_factor;
-  y *= retina_factor;
-  if (is_nil (gui->grab_ptr) ||
-      get_sdl_window (gui->grab_ptr->item) == NULL) {
-    ren->set_origin (0, 0);
-    ren->encode (x, y);
-    send_mouse (w, ev, x, y, gui->mouse_state, t);
-  }
-  else {
-    sdl_window grab_win= get_sdl_window (gui->grab_ptr->item);
-    int gw_x, gw_y;
-    SDL_GetWindowPosition (grab_win->sdl_win, &gw_x, &gw_y);
-    int w_x, w_y;
-    SDL_GetWindowPosition (sdl_win, &w_x, &w_y);
-    if (this != grab_win) {
-//      x += win_x - grab_win->win_x;
-//      y += win_y - grab_win->win_y;
-      x += (w_x - gw_x)*retina_factor;
-      y += (w_y - gw_y)*retina_factor;
-      // return;
+sdl_window_rep::pointer_position (float x, float y, SI& px, SI& py) {
+  px= (SI) (x * density);
+  py= (SI) (y * density);
+  ren->set_origin (0, 0);
+  ren->encode (px, py);
+}
+
+void
+sdl_window_rep::mouse_event (string ev, float x, float y, time_t t) {
+  sdl_window target= this;
+  widget     wid   = w;
+  if (!is_nil (gui->grab_ptr) && get_sdl_window (gui->grab_ptr->item) != NULL) {
+    // the events go to the widget which grabbed the pointer, in its
+    // coordinates (a menu gets the events of the window it was opened from)
+    target= get_sdl_window (gui->grab_ptr->item);
+    wid   = gui->grab_ptr->item;
+    if (target != this) {
+      int gw_x, gw_y, w_x, w_y;
+      SDL_GetWindowPosition (target->sdl_win, &gw_x, &gw_y);
+      SDL_GetWindowPosition (sdl_win, &w_x, &w_y);
+      x += (float) (w_x - gw_x);
+      y += (float) (w_y - gw_y);
     }
-    ren->set_origin (0, 0);
-    ren->encode (x, y);
-    send_mouse (gui->grab_ptr->item, ev, x, y, gui->mouse_state, t);
+  }
+  SI px, py;
+  target->pointer_position (x, y, px, py);
+  send_mouse (wid, ev, px, py, gui->mouse_state, t);
+}
+
+/******************************************************************************
+* The backing store
+******************************************************************************/
+
+// the size of the window in device pixels changed (a resize, or a move to a
+// display of another density): a new backing store, which keeps what can be
+// kept of the old one
+bool
+sdl_window_rep::sync_backing_store () {
+  int pw= 1, ph= 1;
+  SDL_GetWindowSizeInPixels (sdl_win, &pw, &ph);
+  int ww= 1, wh= 1;
+  SDL_GetWindowSize (sdl_win, &ww, &wh);
+  if (ww > 0) density= ((float) pw) / ww;
+  pw= max (pw, 1); ph= max (ph, 1);
+  int bs_w= backing_store->get_width ();
+  int bs_h= backing_store->get_height ();
+  if (pw == bs_w && ph == bs_h) return false;
+
+  picture new_store= native_opaque_picture (pw, ph, 0, 0);
+  fz_pixmap* src= ((mupdf_picture_rep*) backing_store->get_handle ())->pix;
+  fz_pixmap* dst= ((mupdf_picture_rep*) new_store->get_handle ())->pix;
+  int cw= min (bs_w, pw), ch= min (bs_h, ph);
+  if (src != NULL && dst != NULL && src->n == dst->n)
+    for (int y= 0; y < ch; y++)
+      memcpy (dst->samples + y * dst->stride, src->samples + y * src->stride,
+              (size_t) cw * src->n);
+  if (pw > bs_w) invalidate_event (bs_w, 0, pw, ph);
+  if (ph > bs_h) invalidate_event (0, bs_h, pw, ph);
+  invalid_regions= invalid_regions & rectangles (rectangle (0, 0, pw, ph));
+
+  renderer ren2= picture_renderer (new_store, std_shrinkf * retina_factor);
+  delete_renderer (ren);
+  ren= ren2;
+  backing_store= new_store;
+  expose (); // the surface of the window was replaced as well
+  return true;
+}
+
+void
+sdl_window_rep::expose () {
+  dirty= rectangles (rectangle (0, 0, backing_store->get_width (),
+                                backing_store->get_height ()));
+}
+
+// copy what was repainted to the surface of the window, and show it
+void
+sdl_window_rep::present () {
+  if (is_nil (dirty)) return;
+  SDL_Surface* surf= SDL_GetWindowSurface (sdl_win);
+  fz_pixmap* pix= ((mupdf_picture_rep*) backing_store->get_handle ())->pix;
+  if (surf == NULL || pix == NULL || pix->n != 4) {
+    // e.g. a window which is being destroyed or minimized
+    dirty= rectangles ();
+    return;
+  }
+  int W= min (pix->w, surf->w), H= min (pix->h, surf->h);
+  rectangle lub= least_upper_bound (dirty);
+  if (area (lub) < 1.2 * area (dirty)) dirty= rectangles (lub);
+  bool locked= SDL_MUSTLOCK (surf) && SDL_LockSurface (surf);
+  int bpp= SDL_BYTESPERPIXEL (surf->format);
+  array<SDL_Rect> rects;
+  for (rectangles l= dirty; !is_nil (l); l= l->next) {
+    int x1= max ((int) l->item->x1, 0), y1= max ((int) l->item->y1, 0);
+    int x2= min ((int) l->item->x2, W), y2= min ((int) l->item->y2, H);
+    if (x1 >= x2 || y1 >= y2) continue;
+    // the pixmap is RGBA in memory; SDL converts to the format of the
+    // window (BGRA on most systems)
+    SDL_ConvertPixels (x2 - x1, y2 - y1, SDL_PIXELFORMAT_RGBA32,
+                       pix->samples + (ptrdiff_t) y1 * pix->stride + 4 * x1,
+                       (int) pix->stride, surf->format,
+                       ((unsigned char*) surf->pixels) +
+                         (ptrdiff_t) y1 * surf->pitch + bpp * x1,
+                       surf->pitch);
+    SDL_Rect r= { x1, y1, x2 - x1, y2 - y1 };
+    rects << r;
+  }
+  if (locked) SDL_UnlockSurface (surf);
+  dirty= rectangles ();
+  if (N(rects) > 0 && !SDL_UpdateWindowSurfaceRects (sdl_win, A(rects), N(rects))) {
+    static int reported= 0;
+    if (reported++ < 3)
+      SDL_Log ("SDL_UpdateWindowSurfaceRects failed: %s", SDL_GetError ());
   }
 }
 
 void
 sdl_window_rep::repaint_invalid_regions () {
+  sync_backing_store ();
 
-  int bs_w= backing_store->get_width();
-  int bs_h= backing_store->get_height();
-
-  int new_bs_w, new_bs_h;
-  SDL_GetWindowSize (sdl_win, &new_bs_w, &new_bs_h);
-  new_bs_w *= retina_factor;
-  new_bs_h *= retina_factor;
-  
-  if ((new_bs_w != bs_w)   || (new_bs_h != bs_h)) {
-    // the viewport size changed, reset the backing store
-    
-    // create a new backing store with updated viewport and the renderer
-    picture new_backing_store= native_picture (new_bs_w, new_bs_h, 0, 0);
-    renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
-    
-    // copy the old backingstore
-    SI x1=0, y1=0, x2=bs_w, y2=bs_h;
-    ren->encode (x1, y1);
-    ren->encode (x2, y2);
-    ren2->fetch (x1, y2, x2, y1, ren, x1, y2);
-    
-    // compute new invalid regions
-    // add new exposed regions due to resize
-    if (new_bs_w > bs_w) {
-      rectangle r = rectangle (bs_w, 0, new_bs_w, new_bs_h);
-      invalid_regions = invalid_regions | rectangles (r);
-    }
-    if (new_bs_h > bs_h) {
-      rectangle r = rectangle (0, bs_h, new_bs_w, new_bs_h);
-      invalid_regions = invalid_regions | rectangles (r);
-    }
-    
-    // update the state
-    bs_w = new_bs_w;
-    bs_h = new_bs_h;
-    backing_store= new_backing_store;
-    delete_renderer (ren);
-    ren= ren2;
-  }
-  
-  //invalid_regions= rectangles (rectangle (0,0, bs_w, bs_h));
-  
   // repaint invalid rectangles if needed
   if (!is_nil (invalid_regions)) {
     rectangles new_regions;
-    
+
     // simplify
     rectangle lub= least_upper_bound (invalid_regions);
     if (area (lub) < 1.2 * area (invalid_regions))
       invalid_regions= rectangles (lub);
-    
+
     while (!is_nil (invalid_regions)) {
       ren->set_origin (0, 0);
-      rectangle r= copy (invalid_regions->item);
-//      cout << "repaint " << r->x1 << ", " << r->y1 << ", "
-//           << r->x2 << ", " << r->y2 << LF;
-      r= thicken (r, 1, 1);
-      ren->encode (r->x1, r->y1);
-      ren->encode (r->x2, r->y2);
-      ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-      send_repaint (w, ren, r->x1, r->y2, r->x2, r->y1);
-      ren->set_clipping (r->x1, r->y2, r->x2, r->y1, true);
+      rectangle r= thicken (invalid_regions->item, 1, 1);
+      dirty= dirty | rectangles (r);
+      SI x1= r->x1, y1= r->y1, x2= r->x2, y2= r->y2;
+      ren->encode (x1, y1);
+      ren->encode (x2, y2);
+      ren->set_clipping (x1, y2, x2, y1);
+      send_repaint (w, ren, x1, y2, x2, y1);
+      ren->set_clipping (x1, y2, x2, y1, true);
       if (gui_interrupted ())
         new_regions= rectangles (invalid_regions->item, new_regions);
       invalid_regions= invalid_regions->next;
     }
     invalid_regions= new_regions;
-  
-    // propagate immediately the changes to the screen
-    {
-      SDL_Surface *surf= get_backing_store ();
-      SDL_Texture *tex= SDL_CreateTextureFromSurface (sdl_ren, surf);
-      SDL_SetTextureBlendMode (tex, SDL_BLENDMODE_NONE);
-      SDL_RenderClear (sdl_ren);
-      SDL_RenderTexture (sdl_ren, tex, NULL, NULL);
-      SDL_DestroyTexture (tex);
-      unsigned char *p= (unsigned char*)surf->pixels;
-      SDL_DestroySurface (surf);
-      tm_delete_array (p);
-      SDL_RenderPresent (sdl_ren);
-    }
-  } // if (!is_nil (invalid_regions))
-}
-
-#ifdef MUPDF_RENDERER
-void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
-
-SDL_Surface*
-sdl_window_rep::get_backing_store () {
-  fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
-  //snapshot_pixmap (pix);
-  unsigned char *samples= fz_pixmap_samples (mupdf_context (), pix);
-  int w= fz_pixmap_width (mupdf_context (), pix);
-  int h= fz_pixmap_height (mupdf_context (), pix);
-  //  fz_keep_pixmap (mupdf_context (), pix);
-  SDL_Surface *surf= NULL;
-  unsigned char *pixels= tm_new_array<unsigned char>(w*h*4);
-#if 0
-  unsigned char *p= pixels;
-  for (int y=h; y; y--) {
-    for (int x=w; x; x--) {
-      if (samples[3]) {
-        p[0] = ((unsigned int)samples[0] * 255)/samples[3];
-        p[1] = ((unsigned int)samples[1] * 255)/samples[3];
-        p[2] = ((unsigned int)samples[2] * 255)/samples[3];
-        p[3] = samples[3];
-      } else {
-        p[0] = p[1] = p[2] = p[3] =0;
-      }
-      p += 4; samples += 4;
-    }
   }
-#else
-  memcpy (pixels, samples, w*h*4);
-#endif
-  // the SDL pixel data is not copied so we need to ensure that the pixmap stays alive.
-  surf= SDL_CreateSurfaceFrom (w, h, SDL_PIXELFORMAT_RGBA32, pixels, 4*w);
-  // FIXME: premultiplied?
-  return surf;
+  present ();
 }
-#else
-SDL_Surface*
-sdl_window_rep::get_backing_store () {
-  return NULL;
-}
-#endif
 
-extern "C" {
-// Additional Fitz API
-void fz_copy_pixmap_rect(fz_context *ctx, fz_pixmap *dest, fz_pixmap *src, fz_irect b, const fz_default_colorspaces *default_cs);
+// move the pixels of the rectangle (x1, y1)-(x2, y2) by (dx, dy), inside
+// that rectangle (what moves out of it is lost)
+void
+sdl_window_rep::shift_pixels (int x1, int y1, int x2, int y2, int dx, int dy) {
+  fz_pixmap* pix= ((mupdf_picture_rep*) backing_store->get_handle ())->pix;
+  if (pix == NULL || pix->samples == NULL) return;
+  x1= max (x1, 0); y1= max (y1, 0);
+  x2= min (x2, pix->w); y2= min (y2, pix->h);
+  // the destination: the rectangle moved, within the rectangle
+  int X1= max (x1, x1 + dx), X2= min (x2, x2 + dx);
+  int Y1= max (y1, y1 + dy), Y2= min (y2, y2 + dy);
+  if (X1 >= X2 || Y1 >= Y2) return;
+  int n= pix->n;
+  ptrdiff_t stride= pix->stride;
+  size_t len= (size_t) (X2 - X1) * n;
+  if (dy > 0) // down: from the last row up, so as not to overwrite the sources
+    for (int y= Y2 - 1; y >= Y1; y--)
+      memmove (pix->samples + y * stride + X1 * n,
+               pix->samples + (y - dy) * stride + (X1 - dx) * n, len);
+  else
+    for (int y= Y1; y < Y2; y++)
+      memmove (pix->samples + y * stride + X1 * n,
+               pix->samples + (y - dy) * stride + (X1 - dx) * n, len);
+  dirty= dirty | rectangles (rectangle (X1, Y1, X2, Y2));
 }
 
 void
@@ -519,22 +519,8 @@ sdl_window_rep::translate (SI x1, SI y1, SI x2, SI y2, SI dx, SI dy) {
   rectangles extra= thicken (region - ::translate (region, dx, dy), 1, 1);
   invalid_regions= invalid_regions | extra;
 
-  if (x1<x2 && y2<y1) {
-//    cout << "translate " << x1 << ", " << y1 << ", " << x2 << ", " << y2 << ", " << X1 << ", " << Y2  << LF;
-    fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
-    int w= fz_pixmap_width (mupdf_context (), pix);
-    int h= fz_pixmap_height (mupdf_context (), pix);
-    fz_pixmap *area= fz_new_pixmap (mupdf_context (),
-                                   fz_device_rgb (mupdf_context ()),
-                                   w, h, NULL, 1);
-    fz_irect r= fz_make_irect (x1, y2, x2, y1);
-    fz_copy_pixmap_rect (mupdf_context(), area, pix, r, NULL);
-    area->x= dx;
-    area->y= dy;
-    fz_copy_pixmap_rect (mupdf_context(), pix, area, r, NULL);
-    fz_drop_pixmap (mupdf_context(), area);
-    //    XCopyArea (dpy, win, win, gc, x1, y2, x2-x1, y1-y2, X1, Y2);
-  }
+  if (x1<x2 && y2<y1)
+    shift_pixels ((int) x1, (int) y2, (int) x2, (int) y1, (int) dx, (int) dy);
 }
 
 void
@@ -629,8 +615,8 @@ window
 popup_window (widget w, string name, SI min_w, SI min_h,
 	      SI def_w, SI def_h, SI max_w, SI max_h)
 {
-  window win= tm_new<sdl_window_rep> (w, the_gui, (char*) NULL,
-				    min_w, min_h, def_w, def_h, max_w, max_h);
+  window win= tm_new<sdl_window_rep> (w, the_gui, name, true,
+				      min_w, min_h, def_w, def_h, max_w, max_h);
   return win;
 }
 
@@ -638,8 +624,7 @@ window
 plain_window (widget w, string name, SI min_w, SI min_h,
 	      SI def_w, SI def_h, SI max_w, SI max_h)
 {
-  c_string _name (name);
-  window win= tm_new<sdl_window_rep> (w, the_gui, _name,
-				    min_w, min_h, def_w, def_h, max_w, max_h);
+  window win= tm_new<sdl_window_rep> (w, the_gui, name, false,
+				      min_w, min_h, def_w, def_h, max_w, max_h);
   return win;
 }

@@ -17,16 +17,29 @@
 #include "message.hpp"
 #include "iterator.hpp"
 #include "font.hpp"
-#include "tm_link.hpp" // number_of_servers
+#include "analyze.hpp"
+#include "converter.hpp"
+#include "convert.hpp"
+#include "locale.hpp"
+#include "scheme.hpp"
+#include "tm_link.hpp"       // number_of_servers
+#include "sys_utils.hpp"     // get_env
+#include "file.hpp"          // load_string (scripted events)
+#include "socket_notifier.hpp" // notifiers_active (pause of the loop)
+#ifdef OS_MACOS
+#include "MacOS/mac_utilities.h" // mac_beep
+#endif
 
 #include "sdl_window.hpp"
+#include "../MuPDF/mupdf_picture.hpp"
+#include "../MuPDF/mupdf_renderer.hpp" // mupdf_image_gc
 
 extern hashmap<SDL_Window*,pointer> Window_to_window;
+extern int nr_windows;
 
 sdl_gui_rep* the_gui= NULL;
 
 bool char_clip= true;
-
 
 void initialize_keyboard ();
 
@@ -34,33 +47,49 @@ void initialize_keyboard ();
 * General stuff
 ******************************************************************************/
 
-sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2)
-  : mouse_state (0), selection_t ("none"), selection_s (""),
-    selection_w ((SDL_Window*) 0)
-    
+sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2):
+  mouse_state (0), buttons (0), balloon_win (NULL), interrupted (false),
+  interrupt_time (0), update_requested (false),
+  wheel_acc (0.0), wheel_precise (false), wheel_stamp (0), key_stamp (0)
 {
+  (void) argc2; (void) argv2;
   the_gui= this;
-  
-  if (!SDL_Init (SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
+
+  // trackpads: macOS generates the momentum of a gesture itself (SDL drops
+  // these events by default)
+  SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
+  if (!SDL_Init (SDL_INIT_VIDEO)) { // no audio backend is needed
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
   }
-  
   SDL_SetHint (SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
-  
-  screen_width= 600;
-  screen_height= 600;
-  set_retina_factor (2);
 
+  screen_width = 1440;
+  screen_height= 900;
   SDL_Rect r;
-  if (SDL_GetDisplayBounds (1, &r)) {
-    screen_width= r.w;
+  if (SDL_GetDisplayBounds (SDL_GetPrimaryDisplay (), &r)) {
+    screen_width = r.w;
     screen_height= r.h;
-    //cout << "SCREEN:" << screen_width << "," << screen_height << LF;
-  } else {
-    SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
   }
-  
+  else SDL_Log ("SDL_GetDisplayBounds failed: %s", SDL_GetError ());
+
+  // The renderers draw at retina_factor device pixels per point. It was
+  // hardcoded to 2, which made everything twice too large on a display
+  // without HiDPI. TeXmacs keeps one global factor, which follows the
+  // primary display: the pixel density of its desktop mode (its content
+  // scale is 1 on macOS while it draws at 2 pixels per point).
+  float density= 0.0f;
+  const SDL_DisplayMode* mode= SDL_GetDesktopDisplayMode (SDL_GetPrimaryDisplay ());
+  if (mode != NULL) density= mode->pixel_density;
+  string forced= get_env ("TEXMACS_SDL_DENSITY");
+  if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
+  int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
+  if (density <= 0.0f) factor= 2; // unknown: the previous default
+  set_retina_factor (factor);
+  if (DEBUG_EVENTS)
+    debug_events << "display pixel density " << density
+                 << ": drawing at " << factor << "x" << LF;
+
   initialize_colors ();
   initialize_keyboard ();
 }
@@ -81,53 +110,50 @@ sdl_gui_rep::get_max_size (SI& width, SI& height) {
   height= 6000 * PIXEL;
 }
 
-void sdl_gui_rep::update_mouse_state () {
+// The state of the buttons and of the modifiers as TeXmacs expects it
+// (as in the Qt port). On macOS, control and option emulate the right and
+// middle buttons; the modifiers are passed as well.
+void
+sdl_gui_rep::update_mouse_state () {
   unsigned int state= 0;
-
-  float x, y;
-
-  Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
-  SDL_Keymod mods= SDL_GetModState();
-
-  // compute state
-  if ((buttons & SDL_BUTTON_LMASK) != 0)  state += 1;
-  if ((buttons & SDL_BUTTON_MMASK) != 0)  state += 2;
-  if ((buttons & SDL_BUTTON_RMASK) != 0)  state += 4;
+  SDL_Keymod mods= SDL_GetModState ();
+  if ((buttons & SDL_BUTTON_LMASK)  != 0) state += 1;
+  if ((buttons & SDL_BUTTON_MMASK)  != 0) state += 2;
+  if ((buttons & SDL_BUTTON_RMASK)  != 0) state += 4;
   if ((buttons & SDL_BUTTON_X1MASK) != 0) state += 8;
   if ((buttons & SDL_BUTTON_X2MASK) != 0) state += 16;
+#ifdef OS_MACOS
+  if ((mods & SDL_KMOD_CTRL)  != 0) state= 1024 + 4; // control key
+  if ((mods & SDL_KMOD_ALT)   != 0) state= 2048 + 2; // option key
   if ((mods & SDL_KMOD_SHIFT) != 0) state += 256;
-  if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024 + 4;
-  if ((mods & SDL_KMOD_ALT)  != 0)  state += 2048 + 2;
-  if ((mods & SDL_KMOD_GUI)  != 0)  state += 4096;
-//  if ((mods & SDL_KMOD_CAPS)  != 0) state += 1024;
+  if ((mods & SDL_KMOD_GUI)   != 0) state += 4096;   // command key
+#else
+  if ((mods & SDL_KMOD_SHIFT) != 0) state += 256;
+  if ((mods & SDL_KMOD_CTRL)  != 0) state += 1024;
+  if ((mods & SDL_KMOD_ALT)   != 0) state += 2048;
+  if ((mods & SDL_KMOD_GUI)   != 0) state += 4096;
+#endif
   mouse_state= state;
 }
 
 void
 sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   float x, y;
-  int ox, oy, x1, y1;
-  
-  //update_mouse_state ();
-  // cout << "emulate_leave_enter mouse_state " << mouse_state << LF;
-  //SDL_PumpEvents();  // make sure we have the latest mouse state.
-  Uint32 buttons= SDL_GetGlobalMouseState (&x, &y);
-  (void) buttons;
-  // cout << "emulate_leave_enter buttons " << buttons << LF;
-  //update_mouse_state ();
-
-  SDL_GetWindowPosition (get_Window (old_widget), &ox, &oy);
-  x1= (int)x - ox; y1= (int)y - oy;
-  x1= (x1 * PIXEL); y1= ((-y1) * PIXEL);
-  // cout << "Emulate leave " << old_widget << "\n";
-  send_mouse (old_widget, "leave", x1, y1, mouse_state, 0);
-  // cout << "Leave OK\n";
-  SDL_GetWindowPosition (get_Window (new_widget), &ox, &oy);
-  x1= x - ox; y1= y - oy;
-  x1= (x1 * PIXEL); y1= ((-y1) * PIXEL);
-  // cout << "Emulate enter " << new_widget << "\n";
-  send_mouse (new_widget, "enter", x1, y1, mouse_state, 0);
-  // cout << "Enter OK\n\n";
+  SDL_GetGlobalMouseState (&x, &y);
+  sdl_window old_win= get_sdl_window (old_widget);
+  sdl_window new_win= get_sdl_window (new_widget);
+  int ox, oy;
+  SI px, py;
+  if (old_win != NULL) {
+    SDL_GetWindowPosition (old_win->sdl_win, &ox, &oy);
+    old_win->pointer_position (x - ox, y - oy, px, py);
+    send_mouse (old_widget, "leave", px, py, mouse_state, 0);
+  }
+  if (new_win != NULL) {
+    SDL_GetWindowPosition (new_win->sdl_win, &ox, &oy);
+    new_win->pointer_position (x - ox, y - oy, px, py);
+    send_mouse (new_widget, "enter", px, py, mouse_state, 0);
+  }
 }
 
 /******************************************************************************
@@ -136,18 +162,14 @@ sdl_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
 
 void
 sdl_gui_rep::obtain_mouse_grab (widget wid) {
-  //SDL_Window *win= get_Window (wid);
   widget old_widget;
   if (!is_nil (grab_ptr)) old_widget= grab_ptr->item;
   if (wid == old_widget) return;
   grab_ptr= list<widget> (wid, grab_ptr);
   widget new_widget= grab_ptr->item;
   notify_mouse_grab (new_widget, true);
-  SDL_CaptureMouse (false);
-//  SDL_RaiseWindow (win);
+  // the pointer is tracked outside of the windows while grabbed
   SDL_CaptureMouse (true);
-  // SDL_SetWindowGrab (win, true);
-  // cout << "---> obtain_mouse_grab: in grab " << wid << "\n";
   if (!is_nil (old_widget)) {
     notify_mouse_grab (old_widget, false);
     emulate_leave_enter (old_widget, new_widget);
@@ -159,20 +181,11 @@ sdl_gui_rep::release_mouse_grab () {
   if (is_nil (grab_ptr)) return;
   widget old_widget= grab_ptr->item;
   grab_ptr= grab_ptr->next;
-  if (is_nil (grab_ptr)) {
-    // SDL_Window *win= SDL_GetGrabbedWindow ();
-    // if (win) SDL_SetWindowGrab (win, false);
-    SDL_CaptureMouse (false);
-    // cout << "---> release_mouse_grab: no grab\n";
-  }
+  if (is_nil (grab_ptr)) SDL_CaptureMouse (false);
   else {
     widget new_widget= grab_ptr->item;
-    sdl_window grab_win= get_sdl_window (new_widget);
     notify_mouse_grab (new_widget, true);
-    SDL_RaiseWindow (grab_win->sdl_win);
     SDL_CaptureMouse (true);
-    // SDL_SetWindowGrab (grab_win->win, true);
-    // cout << "---> release_mouse_grab: next grab " <<  new_widget  << "\n";
     notify_mouse_grab (old_widget, false);
     emulate_leave_enter (old_widget, new_widget);
   }
@@ -211,31 +224,26 @@ remote_time (Uint32 t) {
   return ((time_t) t) + time_difference;
 }
 
-
 /******************************************************************************
 * Set up keyboard
 ******************************************************************************/
 
-#ifndef SDLK_ISO_Left_Tab
-#define SDLK_ISO_Left_Tab 0xFE20
-#endif
+hashmap<int,string> lower_key;
+hashmap<int,string> upper_key;
 
-hashmap<int,string>          lower_key;
-hashmap<int,string>          upper_key;
-
-void
+static void
 map (int key, string s) {
   lower_key (key)= s;
   upper_key (key)= "S-" * s;
 }
 
-void
+static void
 Map (int key, string s) {
   lower_key (key)= s;
   upper_key (key)= s;
 }
 
-void
+static void
 MMap (int key, string s1, string s2) {
   lower_key (key)= s1;
   upper_key (key)= s2;
@@ -246,155 +254,17 @@ initialize_keyboard () {
   static bool initialized= false;
   if (initialized) return;
   initialized= true;
-  
+
   // Latin characters
-  MMap (SDLK_A, "a", "A");
-  MMap (SDLK_B, "b", "B");
-  MMap (SDLK_C, "c", "C");
-  MMap (SDLK_D, "d", "D");
-  MMap (SDLK_E, "e", "E");
-  MMap (SDLK_F, "f", "F");
-  MMap (SDLK_G, "g", "G");
-  MMap (SDLK_H, "h", "H");
-  MMap (SDLK_I, "i", "I");
-  MMap (SDLK_J, "j", "J");
-  MMap (SDLK_K, "k", "K");
-  MMap (SDLK_L, "l", "L");
-  MMap (SDLK_M, "m", "M");
-  MMap (SDLK_N, "n", "N");
-  MMap (SDLK_O, "o", "O");
-  MMap (SDLK_P, "p", "P");
-  MMap (SDLK_Q, "q", "Q");
-  MMap (SDLK_R, "r", "R");
-  MMap (SDLK_S, "s", "S");
-  MMap (SDLK_T, "t", "T");
-  MMap (SDLK_U, "u", "U");
-  MMap (SDLK_V, "v", "V");
-  MMap (SDLK_W, "w", "W");
-  MMap (SDLK_X, "x", "X");
-  MMap (SDLK_Y, "y", "Y");
-  MMap (SDLK_Z, "z", "Z");
-#if 0
-  Map (SDLK_A, "A");
-  Map (SDLK_B, "B");
-  Map (SDLK_C, "C");
-  Map (SDLK_D, "D");
-  Map (SDLK_E, "E");
-  Map (SDLK_F, "F");
-  Map (SDLK_G, "G");
-  Map (SDLK_H, "H");
-  Map (SDLK_I, "I");
-  Map (SDLK_J, "J");
-  Map (SDLK_K, "K");
-  Map (SDLK_L, "L");
-  Map (SDLK_M, "M");
-  Map (SDLK_N, "N");
-  Map (SDLK_O, "O");
-  Map (SDLK_P, "P");
-  Map (SDLK_Q, "Q");
-  Map (SDLK_R, "R");
-  Map (SDLK_S, "S");
-  Map (SDLK_T, "T");
-  Map (SDLK_U, "U");
-  Map (SDLK_V, "V");
-  Map (SDLK_W, "W");
-  Map (SDLK_X, "X");
-  Map (SDLK_Y, "Y");
-  Map (SDLK_Z, "Z");
-#endif
-  Map (SDLK_0, "0");
-  Map (SDLK_1, "1");
-  Map (SDLK_2, "2");
-  Map (SDLK_3, "3");
-  Map (SDLK_4, "4");
-  Map (SDLK_5, "5");
-  Map (SDLK_6, "6");
-  Map (SDLK_7, "7");
-  Map (SDLK_8, "8");
-  Map (SDLK_9, "9");
+  for (int c= 'a'; c <= 'z'; c++) {
+    char lo[2]= { (char) c, 0 }, up[2]= { (char) (c - 'a' + 'A'), 0 };
+    MMap (c, string (lo), string (up));
+  }
+  for (int c= '0'; c <= '9'; c++) {
+    char s[2]= { (char) c, 0 };
+    Map (c, string (s));
+  }
 
-#if 0
-  // Cyrillic letters
-  Map (SDLK_Cyrillic_a,   "\xe0");
-  Map (SDLK_Cyrillic_be,  "\xe1");
-  Map (SDLK_Cyrillic_ve,  "\xe2");
-  Map (SDLK_Cyrillic_ghe, "\xe3");
-  Map (SDLK_Cyrillic_de,  "\xe4");
-  Map (SDLK_Cyrillic_ie,  "\xe5");
-  Map (SDLK_Cyrillic_io,  "\xbc");
-  Map (SDLK_Cyrillic_zhe, "\xe6");
-  Map (SDLK_Cyrillic_ze,  "\xe7");
-  Map (SDLK_Cyrillic_i,   "\xe8");
-  Map (SDLK_Cyrillic_shorti,   "\xe9");
-  Map (SDLK_Cyrillic_ka,  "\xea");
-  Map (SDLK_Cyrillic_el,  "\xeb");
-  Map (SDLK_Cyrillic_em,  "\xec");
-  Map (SDLK_Cyrillic_en,  "\xed");
-  Map (SDLK_Cyrillic_o,   "\xee");
-  Map (SDLK_Cyrillic_pe,  "\xef");
-  Map (SDLK_Cyrillic_er,  "\xf0");
-  Map (SDLK_Cyrillic_es,  "\xf1");
-  Map (SDLK_Cyrillic_te,  "\xf2");
-  Map (SDLK_Cyrillic_u,   "\xf3");
-  Map (SDLK_Cyrillic_ef,  "\xf4");
-  Map (SDLK_Cyrillic_ha,  "\xf5");
-  Map (SDLK_Cyrillic_tse, "\xf6");
-  Map (SDLK_Cyrillic_che, "\xf7");
-  Map (SDLK_Cyrillic_sha, "\xf8");
-  Map (SDLK_Cyrillic_shcha,    "\xf9");
-  Map (SDLK_Cyrillic_hardsign, "\xfa");
-  Map (SDLK_Cyrillic_yeru,     "\xfb");
-  Map (SDLK_Cyrillic_softsign, "\xfc");
-  Map (SDLK_Cyrillic_e,   "\xfd");
-  Map (SDLK_Cyrillic_yu,  "\xfe");
-  Map (SDLK_Cyrillic_ya,  "\xff");
-  Map (SDLK_Cyrillic_A,   "\xc0");
-  Map (SDLK_Cyrillic_BE,  "\xc1");
-  Map (SDLK_Cyrillic_VE,  "\xc2");
-  Map (SDLK_Cyrillic_GHE, "\xc3");
-  Map (SDLK_Cyrillic_DE,  "\xc4");
-  Map (SDLK_Cyrillic_IE,  "\xc5");
-  Map (SDLK_Cyrillic_IO,  "\x9c");
-  Map (SDLK_Cyrillic_ZHE, "\xc6");
-  Map (SDLK_Cyrillic_ZE,  "\xc7");
-  Map (SDLK_Cyrillic_I,   "\xc8");
-  Map (SDLK_Cyrillic_SHORTI,   "\xc9");
-  Map (SDLK_Cyrillic_KA,  "\xca");
-  Map (SDLK_Cyrillic_EL,  "\xcb");
-  Map (SDLK_Cyrillic_EM,  "\xcc");
-  Map (SDLK_Cyrillic_EN,  "\xcd");
-  Map (SDLK_Cyrillic_O,   "\xce");
-  Map (SDLK_Cyrillic_PE,  "\xcf");
-  Map (SDLK_Cyrillic_ER,  "\xd0");
-  Map (SDLK_Cyrillic_ES,  "\xd1");
-  Map (SDLK_Cyrillic_TE,  "\xd2");
-  Map (SDLK_Cyrillic_U,   "\xd3");
-  Map (SDLK_Cyrillic_EF,  "\xd4");
-  Map (SDLK_Cyrillic_HA,  "\xd5");
-  Map (SDLK_Cyrillic_TSE, "\xd6");
-  Map (SDLK_Cyrillic_CHE, "\xd7");
-  Map (SDLK_Cyrillic_SHA, "\xd8");
-  Map (SDLK_Cyrillic_SHCHA,    "\xd9");
-  Map (SDLK_Cyrillic_HARDSIGN, "\xda");
-  Map (SDLK_Cyrillic_YERU,     "\xdb");
-  Map (SDLK_Cyrillic_SOFTSIGN, "\xdc");
-  Map (SDLK_Cyrillic_E,   "\xdd");
-  Map (SDLK_Cyrillic_YU,  "\xde");
-  Map (SDLK_Cyrillic_YA,  "\xdf");
-
-  //Ukrainian letters in T2A encoding
-  Map (SDLK_Ukrainian_i,   "i"); // Fall back!
-  Map (SDLK_Ukrainian_I,   "I"); // Fall back!
-  Map (SDLK_Ukrainian_yi,   "\xa8");
-  Map (SDLK_Ukrainian_YI,   "\x88");
-  Map (SDLK_Ukrainian_ie,   "\xb9");
-  Map (SDLK_Ukrainian_IE,   "\x99");
-  // Map (SDLK_Ukrainian_ghe_with_upturn,   "\xa0");
-  // Map (SDLK_Ukrainian_GHE_WITH_UPTURN,   "\x80");
-  Map (0x6ad,   "\xa0");
-  Map (0x6bd,   "\x80");
-#endif
-  
   // Standard ASCII Symbols
   Map (SDLK_EXCLAIM, "!");
   Map (SDLK_DBLAPOSTROPHE, "\x22");
@@ -424,10 +294,8 @@ initialize_keyboard () {
   Map (SDLK_CARET, "^");
   Map (SDLK_UNDERSCORE, "_");
   Map (SDLK_GRAVE, "`");
-  Map (SDLK_LEFTBRACKET, "{");
-  Map (SDLK_KP_VERTICALBAR, "|");
-  Map (SDLK_RIGHTBRACKET, "}");
-  //Map (SDLK_TILDA, "~");
+  // "{", "|" and "}" are typed with a modifier and come as text events;
+  // mapping them here overwrote the "[", "]" entries of the same keys
 
   // dead keys
   Map (0xFE50, "grave");
@@ -448,175 +316,8 @@ initialize_keyboard () {
   Map (0xFE5F, "semivoicedsound");
   Map (0xFE60, "belowdot");
 
-#if 0
-  // Extended symbols and accented characters
-  Map (SDLK_nobreakspace, "varspace");
-  Map (SDLK_exclamdown, "exclamdown");
-  Map (SDLK_cent, "cent");
-  Map (SDLK_sterling, "sterling");
-  Map (SDLK_currency, "currency");
-  Map (SDLK_yen, "yen");
-  Map (SDLK_brokenbar, "brokenbar");
-  Map (SDLK_section, "section");
-  Map (SDLK_diaeresis, "umlaut");
-  Map (SDLK_copyright, "copyright");
-  Map (SDLK_ordfeminine, "ordfeminine");
-  Map (SDLK_guillemotleft, "guillemotleft");
-  Map (SDLK_notsign, "notsign");
-  Map (SDLK_hyphen, "hyphen");
-  Map (SDLK_registered, "registered");
-  Map (SDLK_macron, "macron");
-  Map (SDLK_degree, "degree");
-  Map (SDLK_plusminus, "plusminus");
-  Map (SDLK_twosuperior, "twosuperior");
-  Map (SDLK_threesuperior, "threesuperior");
-  Map (SDLK_acute, "acute");
-  Map (SDLK_mu, "mu");
-  Map (SDLK_paragraph, "paragraph");
-  Map (SDLK_periodcentered, "periodcentered");
-  Map (SDLK_cedilla, "cedilla");
-  Map (SDLK_onesuperior, "onesuperior");
-  Map (SDLK_masculine, "masculine");
-  Map (SDLK_guillemotright, "guillemotright");
-  Map (SDLK_onequarter, "onequarter");
-  Map (SDLK_onehalf, "onehalf");
-  Map (SDLK_threequarters, "threequarters");
-  Map (SDLK_questiondown, "questiondown");
-  Map (SDLK_multiply, "times");
-  Map (SDLK_division, "div");
-
-  Map (SDLK_Agrave, "\xc0");
-  Map (SDLK_Aacute, "\xc1");
-  Map (SDLK_Acircumflex, "\xc2");
-  Map (SDLK_Atilde, "\xc3");
-  Map (SDLK_Adiaeresis, "\xc4");
-  Map (SDLK_Aring, "\xc5");
-  Map (SDLK_AE, "\xc6");
-  Map (SDLK_Ccedilla, "\xc7");
-  Map (SDLK_Egrave, "\xc8");
-  Map (SDLK_Eacute, "\xc9");
-  Map (SDLK_Ecircumflex, "\xca");
-  Map (SDLK_Ediaeresis, "\xcb");
-  Map (SDLK_Igrave, "\xcc");
-  Map (SDLK_Iacute, "\xcd");
-  Map (SDLK_Icircumflex, "\xce");
-  Map (SDLK_Idiaeresis, "\xcf");
-  Map (SDLK_ETH, "\xd0");
-  Map (SDLK_Eth, "\xd0");
-  Map (SDLK_Ntilde, "\xd1");
-  Map (SDLK_Ograve, "\xd2");
-  Map (SDLK_Oacute, "\xd3");
-  Map (SDLK_Ocircumflex, "\xd4");
-  Map (SDLK_Otilde, "\xd5");
-  Map (SDLK_Odiaeresis, "\xd6");
-  Map (SDLK_OE, "\xd7");
-  Map (SDLK_Ooblique, "\xd8");
-  Map (SDLK_Ugrave, "\xd9");
-  Map (SDLK_Uacute, "\xda");
-  Map (SDLK_Ucircumflex, "\xdb");
-  Map (SDLK_Udiaeresis, "\xdc");
-  Map (SDLK_Yacute, "\xdd");
-  Map (SDLK_THORN, "\xde");
-  Map (SDLK_Thorn, "\xde");
-  Map (SDLK_ssharp, "sz");
-  Map (SDLK_agrave, "\xe0");
-  Map (SDLK_aacute, "\xe1");
-  Map (SDLK_acircumflex, "\xe2");
-  Map (SDLK_atilde, "\xe3");
-  Map (SDLK_adiaeresis, "\xe4");
-  Map (SDLK_aring, "\xe5");
-  Map (SDLK_ae, "\xe6");
-  Map (SDLK_ccedilla, "\xe7");
-  Map (SDLK_egrave, "\xe8");
-  Map (SDLK_eacute, "\xe9");
-  Map (SDLK_ecircumflex, "\xea");
-  Map (SDLK_ediaeresis, "\xeb");
-  Map (SDLK_igrave, "\xec");
-  Map (SDLK_iacute, "\xed");
-  Map (SDLK_icircumflex, "\xee");
-  Map (SDLK_idiaeresis, "\xef");
-  Map (SDLK_eth, "\xf0");
-  Map (SDLK_ntilde, "\xf1");
-  Map (SDLK_ograve, "\xf2");
-  Map (SDLK_oacute, "\xf3");
-  Map (SDLK_ocircumflex, "\xf4");
-  Map (SDLK_otilde, "\xf5");
-  Map (SDLK_odiaeresis, "\xf6");
-  Map (SDLK_oe, "\xf7");
-  Map (SDLK_oslash, "\xf8");
-  Map (SDLK_ugrave, "\xf9");
-  Map (SDLK_uacute, "\xfa");
-  Map (SDLK_ucircumflex, "\xfb");
-  Map (SDLK_udiaeresis, "\xfc");
-  Map (SDLK_yacute, "\xfd");
-  Map (SDLK_thorn, "\xfe");
-  Map (SDLK_ydiaeresis, "\xff");
-
-  // Symbols from iso-latin-2
-  Map (SDLK_Aogonek, "\x81");
-  Map (SDLK_breve, "breve");
-  Map (SDLK_Lstroke, "\x8a");
-  Map (SDLK_Lcaron, "\x89");
-  Map (SDLK_Sacute, "\x91");
-  Map (SDLK_Scaron, "\x92");
-  Map (SDLK_Scedilla, "\x93");
-  Map (SDLK_Tcaron, "\x94");
-  Map (SDLK_Zacute, "\x99");
-  Map (SDLK_Zcaron, "\x9a");
-  Map (SDLK_Zabovedot, "\x9b");
-  Map (SDLK_aogonek, "\xa1");
-  Map (SDLK_ogonek, "ogonek");
-  Map (SDLK_lstroke, "\xaa");
-  Map (SDLK_lcaron, "\xa9");
-  Map (SDLK_sacute, "\xb1");
-  Map (SDLK_caron, "caron");
-  Map (SDLK_scaron, "\xb2");
-  Map (SDLK_scedilla, "\xb3");
-  Map (SDLK_tcaron, "\xb4");
-  Map (SDLK_zacute, "\xb9");
-  Map (SDLK_doubleacute, "doubleacute");
-  Map (SDLK_zcaron, "\xba");
-  Map (SDLK_zabovedot, "\xbb");
-  Map (SDLK_Racute, "\x8f");
-  Map (SDLK_Abreve, "\x80");
-  Map (SDLK_Lacute, "\x88");
-  Map (SDLK_Cacute, "\x82");
-  Map (SDLK_Ccaron, "\x83");
-  Map (SDLK_Eogonek, "\x86");
-  Map (SDLK_Ecaron, "\x85");
-  Map (SDLK_Dcaron, "\x84");
-  Map (SDLK_Dstroke, "\xd0");
-  Map (SDLK_Nacute, "\x8b");
-  Map (SDLK_Ncaron, "\x8c");
-  Map (SDLK_Odoubleacute, "\x8e");
-  Map (SDLK_Rcaron, "\x90");
-  Map (SDLK_Uring, "\x97");
-  Map (SDLK_Udoubleacute, "\x96");
-  Map (SDLK_Tcedilla, "\x95");
-  Map (SDLK_racute, "\xaf");
-  Map (SDLK_abreve, "\xa0");
-  Map (SDLK_lacute, "\xa8");
-  Map (SDLK_cacute, "\xa2");
-  Map (SDLK_ccaron, "\xa3");
-  Map (SDLK_eogonek, "\xa6");
-  Map (SDLK_ecaron, "\xa5");
-  Map (SDLK_dcaron, "\xa4");
-  Map (SDLK_dstroke, "\x9e");
-  Map (SDLK_nacute, "\xab");
-  Map (SDLK_ncaron, "\xac");
-  Map (SDLK_odoubleacute, "\xae");
-  Map (SDLK_udoubleacute, "\xb6");
-  Map (SDLK_rcaron, "\xb0");
-  Map (SDLK_uring, "\xb7");
-  Map (SDLK_tcedilla, "\xb5");
-  Map (SDLK_abovedot, "abovedot");
-#endif
-  
   // Special control keys
-  Map (SDLK_PAGEUP, "pageup");
-  Map (SDLK_PAGEDOWN, "pagedown");
   Map (SDLK_UNDO, "undo");
-//  Map (SDLK_REDO, "redo");
   Map (SDLK_CANCEL, "cancel");
 
   // Control keys
@@ -626,7 +327,7 @@ initialize_keyboard () {
   map (SDLK_DELETE, "delete");
   map (SDLK_INSERT, "insert");
   map (SDLK_TAB, "tab");
-  map (SDLK_ISO_Left_Tab, "tab");
+  map (SDLK_LEFT_TAB, "tab");
   map (SDLK_ESCAPE, "escape");
   map (SDLK_LEFT, "left");
   map (SDLK_RIGHT, "right");
@@ -656,27 +357,11 @@ initialize_keyboard () {
   map (SDLK_F18, "F18");
   map (SDLK_F19, "F19");
   map (SDLK_F20, "F20");
-  // map (SDLK_Mode_switch, "modeswitch");
 
   // Keypad keys
   Map (SDLK_KP_SPACE, "K-space");
   Map (SDLK_KP_ENTER, "K-return");
-//  Map (SDLK_KP_DELETE, "K-delete");
-//  Map (SDLK_KP_INSERT, "K-insert");
   Map (SDLK_KP_TAB, "K-tab");
-//  Map (SDLK_KP_LEFT, "K-left");
-//  Map (SDLK_KP_Right, "K-right");
-//  Map (SDLK_KP_Up, "K-up");
-//  Map (SDLK_KP_Down, "K-down");
-//  Map (SDLK_KP_Page_Up, "K-pageup");
-//  Map (SDLK_KP_Page_Down, "K-pagedown");
-//  Map (SDLK_KP_Home, "K-home");
-//  Map (SDLK_KP_Begin, "K-begin");
-//  Map (SDLK_KP_End, "K-end");
-//  Map (SDLK_KP_F1, "K-F1");
-//  Map (SDLK_KP_F2, "K-F2");
-//  Map (SDLK_KP_F3, "K-F3");
-//  Map (SDLK_KP_F4, "K-F4");
   Map (SDLK_KP_EQUALS, "K-=");
   Map (SDLK_KP_MULTIPLY, "K-*");
   Map (SDLK_KP_PLUS, "K-+");
@@ -699,186 +384,74 @@ initialize_keyboard () {
   Map (0x20ac, "euro");
 }
 
-
-/******************************************************************************
-* Event loop
-******************************************************************************/
-
-#define MIN_DELAY   10
-#define MAX_DELAY   1000
-#define SLEEP_AFTER 120000
-
-extern int nr_windows;
-static void (*the_interpose_handler) (void) = NULL;
-
-static int  kbd_count= 0;
-static bool request_partial_redraw= false;
-
-
-void
-sdl_gui_rep::event_loop () {
-  bool wait = true;
-  int  count= 0;
-  int  delay= MIN_DELAY;
-
-  while (nr_windows>0 || number_of_servers () != 0) {
-    request_partial_redraw= false;
-
-    // Get events
-    SDL_Event event;
-    if (SDL_PollEvent (&event)) {
-      process_event (&event);
-      count= 0;
-      delay= MIN_DELAY;
-      wait = false;
-    }
-    if (nr_windows == 0) continue;
-
-    // FIXME: Don't typeset when resizing window
-
-    // Wait for events on all channels and interpose
-    //time_t t1= texmacs_time ();
-    if (wait) {
-//      struct timeval tv;
-//      tv.tv_sec  = delay/1000;
-//      tv.tv_usec = 1000 * (delay%1000);
-//      select (0, NULL, NULL, NULL, &tv);
-      SDL_Delay (delay);
-      count += delay;
-      if (count >= SLEEP_AFTER) delay= MAX_DELAY;
-    }
-    else wait= true;
-    if (the_interpose_handler != NULL) the_interpose_handler ();
-    if (nr_windows == 0) continue;
-    //time_t t2= texmacs_time ();
-    //if (t2 - t1 >= 10) cout << "interpose took " << t2-t1 << "ms\n";
-
-    // Popup help balloons
-    if (!is_nil (balloon_wid))
-      if (texmacs_time () - balloon_time >= 666)
-        if (balloon_win == NULL)
-          map_balloon ();
-
-    // Redraw invalid windows
-    //time_t t3= texmacs_time ();
-    if (SDL_PollEvent (NULL) == 0 || request_partial_redraw) {
-      interrupted= false;
-      interrupt_time= texmacs_time () + (100 / (1 + 1));
-//      interrupt_time= texmacs_time () + (100 / (XPending (dpy) + 1));
-      iterator<SDL_Window*> it= iterate (Window_to_window);
-      while (it->busy()) { // first the window which has the focus
-        sdl_window win= (sdl_window) Window_to_window[it->next()];
-        if (win->has_focus) win->repaint_invalid_regions();
-      }
-      it= iterate (Window_to_window);
-      while (it->busy()) { // and then the other windows
-        sdl_window win= (sdl_window) Window_to_window[it->next()];
-        if (!win->has_focus) win->repaint_invalid_regions();
-      }
-    }
-    //time_t t4= texmacs_time ();
-    //if (t4 - t3 >= 10) cout << "redraw took " << t4-t3 << "ms\n";
-
-    // Handle alarm messages
-    if (!is_nil (messages)) {
-      list<message> not_ready;
-      while (!is_nil (messages)) {
-        time_t ct= texmacs_time ();
-        message m= messages->item;
-        if ((m->t - ct) <= 0) send_delayed_message (m->wid, m->s, m->t);
-        else not_ready= list<message> (m, not_ready);
-        messages= messages->next;
-      }
-      messages= not_ready;
-    }
-  }
-}
-
-static sdl_window
-get_window_from_ID (Uint32 ID) {
-  SDL_Window *w= SDL_GetWindowFromID (ID);
-  if (w == NULL) return NULL;
-  sdl_window win= (sdl_window) Window_to_window [w];
-  return win;
-}
-
 static string
-lookup_mouse (Uint8 button) {
-  if (button == SDL_BUTTON_LEFT)   return "left";
-  if (button == SDL_BUTTON_MIDDLE) return "middle";
-  if (button == SDL_BUTTON_RIGHT)  return "right";
-  if (button == SDL_BUTTON_X1)     return "extra1";
-  if (button == SDL_BUTTON_X2)     return "extra2";
-  return "button-error";
-}
-
-static string
-mouse_decode (unsigned int mstate) {
-  // we check (mstate & 1) at last since it is usually set
-  if (mstate & 2)       return "middle";
-  else if (mstate & 4)  return "right";
-  else if (mstate & 8)  return "up";
-  else if (mstate & 16) return "down";
-  else if (mstate & 1)  return "left";
-  return "unknown";
+print_modifiers (SDL_Keymod mod) {
+  string s;
+  s << "[";
+  if (mod & SDL_KMOD_NUM)   s << " NUMLOCK";
+  if (mod & SDL_KMOD_CAPS)  s << " CAPSLOCK";
+  if (mod & SDL_KMOD_CTRL)  s << " CTRL";
+  if (mod & SDL_KMOD_SHIFT) s << " SHIFT";
+  if (mod & SDL_KMOD_ALT)   s << " ALT";
+  if (mod & SDL_KMOD_GUI)   s << " GUI";
+  s << " ]";
+  return s;
 }
 
 static SDL_Keycode
-postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod, bool is_key_event) {
-  SDL_Keycode out_key;
-
-  // Test all combinations of shift and alt
+postprocess_key_event (SDL_Scancode scancode, SDL_Keymod *current_mod) {
+  // the key with each combination of shift and alt
   static SDL_Keymod combinations[4]= {
     SDL_KMOD_NONE,
     SDL_KMOD_SHIFT,
     SDL_KMOD_ALT,
     SDL_KMOD_SHIFT | SDL_KMOD_ALT
   };
-
   SDL_Keycode results[4];
-  for (int i = 0; i < 4; i++) {
-    results[i]= SDL_GetKeyFromScancode (scancode, combinations[i], is_key_event);
-  }
+  for (int i = 0; i < 4; i++)
+    results[i]= SDL_GetKeyFromScancode (scancode, combinations[i], false);
 
-  // Check if the base key (results[0]) is a modifier
-  bool is_modifier = (results[0] == SDLK_LSHIFT   || results[0] == SDLK_RSHIFT ||
-                      results[0] == SDLK_LCTRL    || results[0] == SDLK_RCTRL ||
-                      results[0] == SDLK_LALT     || results[0] == SDLK_RALT ||
-                      results[0] == SDLK_LGUI     || results[0] == SDLK_RGUI ||
-                      results[0] == SDLK_LMETA    || results[0] == SDLK_RMETA ||
-                      results[0] == SDLK_CAPSLOCK || results[0] == SDLK_NUMLOCKCLEAR ||
-                      results[0] == SDLK_SCROLLLOCK);
-
-  if (is_modifier) {
+  // a modifier alone is not a key
+  SDL_Keycode k= results[0];
+  if (k == SDLK_LSHIFT || k == SDLK_RSHIFT || k == SDLK_LCTRL || k == SDLK_RCTRL ||
+      k == SDLK_LALT   || k == SDLK_RALT   || k == SDLK_LGUI  || k == SDLK_RGUI  ||
+      k == SDLK_LMETA  || k == SDLK_RMETA  || k == SDLK_CAPSLOCK ||
+      k == SDLK_NUMLOCKCLEAR || k == SDLK_SCROLLLOCK)
     return SDLK_UNKNOWN;
-  }
 
-  // Remove modifiers in current event are already used to compose key
-  if ( (*current_mod & SDL_KMOD_SHIFT) && (*current_mod & SDL_KMOD_ALT) && (results[3] != results[0])) {
-    *current_mod&= ~(SDL_KMOD_SHIFT | SDL_KMOD_ALT);
-    out_key= results[3];
-  } else if ( (*current_mod & SDL_KMOD_ALT) && (results[2] != results[0])) {
-    *current_mod&= ~SDL_KMOD_ALT;
-    out_key= results[2];
-  } else if ( (*current_mod & SDL_KMOD_SHIFT) && (results[1] != results[0])) {
-    *current_mod&= ~SDL_KMOD_SHIFT;
-    out_key= results[1];
-  } else {
-    out_key= results[0];
+  // the modifiers which were used to compose the key are removed
+  if ((*current_mod & SDL_KMOD_SHIFT) && (*current_mod & SDL_KMOD_ALT) &&
+      results[3] != results[0]) {
+    *current_mod &= ~(SDL_KMOD_SHIFT | SDL_KMOD_ALT);
+    return results[3];
   }
-  return out_key;
+  if ((*current_mod & SDL_KMOD_ALT) && results[2] != results[0]) {
+    *current_mod &= ~SDL_KMOD_ALT;
+    return results[2];
+  }
+  if ((*current_mod & SDL_KMOD_SHIFT) && results[1] != results[0]) {
+    *current_mod &= ~SDL_KMOD_SHIFT;
+    return results[1];
+  }
+  return results[0];
 }
 
+// the name of a key for TeXmacs; produces_text is set when the keystroke
+// types text, which then comes as a text event (composed with the dead keys
+// and the input method) and is delivered instead of the key
 static string
-lookup_key (SDL_Scancode scancode, SDL_Keymod mod) {
-  SDL_Keycode key= postprocess_key_event (scancode, &mod, false);
+lookup_key (SDL_Scancode scancode, SDL_Keymod mod, bool& produces_text) {
+  SDL_Keycode key= postprocess_key_event (scancode, &mod);
+  produces_text= false;
   if (key == SDLK_UNKNOWN) return ""; // it is only a modifier, we ignore it
+  produces_text= (key >= 0x20 && key != 0x7f && (key & SDLK_SCANCODE_MASK) == 0 &&
+                  (mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) == 0);
 
   const char* str= SDL_GetKeyName (key);
-  string r (str, (int)strlen (str));
+  string r (str, (int) strlen (str));
   r= utf8_to_cork (r);
   if (contains_unicode_char (r)) return r;
-  string s=r;
+  string s= r;
   if ((key >= 'A') && (key <= 'Z')) s= upper_key[key - 'A' + 'a'];
   else if ((key >= 'a') && (key <= 'z')) s= lower_key[key];
   else if (lower_key->contains (key)) s= lower_key [key];
@@ -888,54 +461,478 @@ lookup_key (SDL_Scancode scancode, SDL_Keymod mod) {
   if (mod & SDL_KMOD_CTRL)  s= "C-" * s;
   if (mod & SDL_KMOD_ALT)   s= "A-" * s;
   if (mod & SDL_KMOD_GUI)   s= "M-" * s;
-  cout << "key press: " << s << LF;
+  if (DEBUG_EVENTS)
+    debug_events << "key " << s << " " << print_modifiers (mod)
+                 << (produces_text ? " (text follows)" : "") << LF;
   return s;
 }
 
-// Print modifier info
-static string
-print_modifiers (SDL_Keymod mod) {
+/******************************************************************************
+* Scripted events (development aid)
+*
+* When TEXMACS_SDL_SCRIPT names a file, its lines are executed one by one
+* (a line is executed only when no event is pending). Coordinates are in
+* points, relative to the target window:
+*
+*   # comment
+*   wait <ms>                       pause
+*   window <substring of title>     select the target window (default: the
+*   window #<id>                      last one created)
+*   move x y                        pointer motion
+*   press x y [left|right|middle]   button down
+*   release x y [left|right|middle] button up
+*   click x y [left|right|middle]   press followed by release
+*   wheel x y dx dy                 wheel event at (x, y)
+*   key [S-][C-][A-][M-]<name>      key press (SDL name: Return, Escape, Down...)
+*   text <string>                   text input, one event per character
+*   focus                           pretend the window got the keyboard focus
+*   snapshot <name>                 save the backing store of the target
+*                                   window as <TEXMACS_SDL_SNAPSHOT>/<name>.png
+*   resize w h                      resize the target window (points)
+*   close                           ask to close the target window
+******************************************************************************/
+
+static bool script_active= false;
+static array<string> script_lines;
+static int script_pos= 0;
+static time_t script_next= 0;
+static int script_win_id= 0;       // the target, 0: the last window created
+static bool script_no_target= false;
+
+static void
+script_init () {
+  string file= get_env ("TEXMACS_SDL_SCRIPT");
+  if (N(file) == 0) return;
   string s;
-  s << " Modifers: [" << as_string (mod) << " ";
-  
-  // If there are none then say so and return.
-  if( mod == SDL_KMOD_NONE ){
-    s << "None ]\n";
-    return s;
+  if (load_string (url_system (file), s, false)) {
+    cout << "sdl script: cannot read " << file << LF;
+    return;
   }
-  
-  // Check for the presence of each SDLMod value
-  if( mod & SDL_KMOD_NUM )    s << "NUMLOCK ";
-  if( mod & SDL_KMOD_CAPS )   s << "CAPSLOCK ";
-  if( mod & SDL_KMOD_LCTRL )  s << "LCTRL ";
-  if( mod & SDL_KMOD_RCTRL )  s << "RCTRL ";
-  if( mod & SDL_KMOD_RSHIFT ) s << "RSHIFT ";
-  if( mod & SDL_KMOD_LSHIFT ) s << "LSHIFT ";
-  if( mod & SDL_KMOD_RALT )   s << "RALT ";
-  if( mod & SDL_KMOD_LALT )   s << "LALT ";
-  if( mod & SDL_KMOD_RGUI )   s << "RGUI ";
-  if( mod & SDL_KMOD_LGUI )   s << "LGUI ";
-  if( mod & SDL_KMOD_CTRL )   s << "CTRL ";
-  if( mod & SDL_KMOD_SHIFT )  s << "SHIFT ";
-  if( mod & SDL_KMOD_ALT )    s << "ALT ";
-  if( mod & SDL_KMOD_GUI )    s << "GUI ";
-  s << "]";
-  return s;
+  script_lines= tokenize (s, "\n");
+  script_active= true;
+  cout << "sdl script: " << N(script_lines) << " lines" << LF;
 }
 
-// Print all information about a key event
+static sdl_window
+script_target () {
+  if (script_no_target) return NULL;
+  if (script_win_id != 0) {
+    window w= get_window (script_win_id);
+    if (w != NULL) return (sdl_window) w;
+  }
+  sdl_window last= NULL;
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    sdl_window w= (sdl_window) Window_to_window [it->next ()];
+    if (!w->popup && (last == NULL || w->id > last->id)) last= w;
+  }
+  return last;
+}
+
+static Uint8
+script_button (array<string> a, int i) {
+  if (N(a) > i && a[i] == "right") return SDL_BUTTON_RIGHT;
+  if (N(a) > i && a[i] == "middle") return SDL_BUTTON_MIDDLE;
+  return SDL_BUTTON_LEFT;
+}
+
+static SDL_MouseButtonFlags script_buttons= 0;
+
+static void
+script_push_button (sdl_window win, float x, float y, Uint8 button, bool down) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+  ev.button.timestamp= SDL_GetTicksNS ();
+  ev.button.windowID= SDL_GetWindowID (win->sdl_win);
+  ev.button.button= button;
+  ev.button.down= down;
+  ev.button.clicks= 1;
+  ev.button.x= x;
+  ev.button.y= y;
+  if (down) script_buttons |= SDL_BUTTON_MASK (button);
+  else script_buttons &= ~SDL_BUTTON_MASK (button);
+  SDL_PushEvent (&ev);
+}
+
+static void
+script_push_motion (sdl_window win, float x, float y) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= SDL_EVENT_MOUSE_MOTION;
+  ev.motion.timestamp= SDL_GetTicksNS ();
+  ev.motion.windowID= SDL_GetWindowID (win->sdl_win);
+  ev.motion.state= script_buttons;
+  ev.motion.x= x;
+  ev.motion.y= y;
+  SDL_PushEvent (&ev);
+}
+
+static void
+save_pixmap_as_png (fz_pixmap* pix, string path) {
+  fz_context* ctx= mupdf_context ();
+  c_string cpath (path);
+  mupdf_protected ("save_pixmap_as_png", [&] () {
+    fz_save_pixmap_as_png (ctx, pix, cpath);
+  });
+}
+
+static void
+script_window_event (sdl_window win, Uint32 type) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= type;
+  ev.window.timestamp= SDL_GetTicksNS ();
+  ev.window.windowID= SDL_GetWindowID (win->sdl_win);
+  SDL_PushEvent (&ev);
+}
+
+static void
+script_step () {
+  if (!script_active) return;
+  if (SDL_PollEvent (NULL)) return; // let pending events be processed first
+  time_t now= texmacs_time ();
+  if (now < script_next) return;
+  while (script_pos < N(script_lines)) {
+    string line= trim_spaces (script_lines[script_pos++]);
+    if (N(line) == 0 || line[0] == '#') continue;
+    array<string> a= tokenize (line, " ");
+    string cmd= a[0];
+    cout << "sdl script: " << line << LF;
+    if (cmd == "wait" && N(a) > 1) {
+      script_next= now + as_int (a[1]);
+      return;
+    }
+    if (cmd == "window" && N(a) > 1) {
+      string title= line (N(cmd)+1, N(line));
+      // no match: the following commands are skipped rather than sent to
+      // another window (e.g. closing the main window by mistake)
+      script_win_id= 0;
+      iterator<SDL_Window*> it= iterate (Window_to_window);
+      while (it->busy ()) {
+        sdl_window w= (sdl_window) Window_to_window [it->next ()];
+        if (title == "#" * as_string (w->id) || occurs (title, w->get_name ()))
+          script_win_id= w->id;
+      }
+      script_no_target= (script_win_id == 0);
+      if (script_no_target) {
+        cout << "sdl script: no window matches " << title << "; windows:";
+        it= iterate (Window_to_window);
+        while (it->busy ()) {
+          sdl_window w= (sdl_window) Window_to_window [it->next ()];
+          cout << " #" << w->id << (w->popup ? " (popup) " : " ") << w->get_name ();
+        }
+        cout << LF;
+      }
+      continue;
+    }
+    sdl_window win= script_target ();
+    if (win == NULL) continue;
+    if (cmd == "move" && N(a) > 2)
+      script_push_motion (win, as_double (a[1]), as_double (a[2]));
+    else if (cmd == "press" && N(a) > 2)
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+    else if (cmd == "release" && N(a) > 2)
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+    else if (cmd == "click" && N(a) > 2) {
+      script_push_motion (win, as_double (a[1]), as_double (a[2]));
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+    }
+    else if (cmd == "wheel" && N(a) > 4) {
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_MOUSE_WHEEL;
+      ev.wheel.timestamp= SDL_GetTicksNS ();
+      ev.wheel.windowID= SDL_GetWindowID (win->sdl_win);
+      ev.wheel.mouse_x= as_double (a[1]);
+      ev.wheel.mouse_y= as_double (a[2]);
+      ev.wheel.x= as_double (a[3]);
+      ev.wheel.y= as_double (a[4]);
+      SDL_PushEvent (&ev);
+    }
+    else if (cmd == "key" && N(a) > 1) {
+      SDL_Event ev;
+      SDL_zero (ev);
+      string kn= a[1];
+      SDL_Keymod mod= SDL_KMOD_NONE;
+      while (N(kn) > 2 && kn[1] == '-') {
+        if (kn[0] == 'S') mod |= SDL_KMOD_LSHIFT;
+        else if (kn[0] == 'C') mod |= SDL_KMOD_LCTRL;
+        else if (kn[0] == 'A') mod |= SDL_KMOD_LALT;
+        else if (kn[0] == 'M') mod |= SDL_KMOD_LGUI;
+        else break;
+        kn= kn (2, N(kn));
+      }
+      c_string name (kn);
+      ev.type= SDL_EVENT_KEY_DOWN;
+      ev.key.timestamp= SDL_GetTicksNS ();
+      ev.key.windowID= SDL_GetWindowID (win->sdl_win);
+      ev.key.scancode= SDL_GetScancodeFromName (name);
+      ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
+      ev.key.mod= mod;
+      ev.key.down= true;
+      SDL_PushEvent (&ev);
+    }
+    else if (cmd == "text" && N(a) > 1) {
+      // one text event per (utf8) character, as SDL does
+      static char buffers[64][8]; // the events keep pointers to the text
+      static int next= 0;
+      string txt= line (N(cmd)+1, N(line));
+      int i= 0;
+      while (i < N(txt)) {
+        int start= i;
+        unsigned char c= (unsigned char) txt[i];
+        int len= (c < 0x80) ? 1 : (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+        i= min (N(txt), start + len);
+        char* buf= buffers[next++ % 64];
+        int n= min (i - start, 7);
+        for (int j=0; j<n; j++) buf[j]= txt[start+j];
+        buf[n]= 0;
+        SDL_Event ev;
+        SDL_zero (ev);
+        ev.type= SDL_EVENT_TEXT_INPUT;
+        ev.text.timestamp= SDL_GetTicksNS ();
+        ev.text.windowID= SDL_GetWindowID (win->sdl_win);
+        ev.text.text= buf;
+        SDL_PushEvent (&ev);
+      }
+    }
+    else if (cmd == "focus")
+      script_window_event (win, SDL_EVENT_WINDOW_FOCUS_GAINED);
+    else if (cmd == "snapshot" && N(a) > 1) {
+      string dir= get_env ("TEXMACS_SDL_SNAPSHOT");
+      if (N(dir) == 0) dir= ".";
+      fz_pixmap* pix= ((mupdf_picture_rep*) win->backing_store->get_handle ())->pix;
+      save_pixmap_as_png (pix, dir * "/" * a[1] * ".png");
+    }
+    else if (cmd == "resize" && N(a) > 2)
+      win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
+    else if (cmd == "close")
+      script_window_event (win, SDL_EVENT_WINDOW_CLOSE_REQUESTED);
+    else cout << "sdl script: unknown command " << line << LF;
+    return; // one command per loop iteration
+  }
+  cout << "sdl script: done" << LF;
+  script_active= false;
+}
+
+/******************************************************************************
+* Event loop
+******************************************************************************/
+
+#define MIN_DELAY   10
+#define MAX_DELAY   1000
+#define REPAINT_DT  50   // ms: repaint even while events keep coming
+
+static void (*the_interpose_handler) (void) = NULL;
+
+static int  kbd_count= 0;
+static bool request_partial_redraw= false;
+
+// The resize watch (event_watch) repaints a window from inside SDL's event
+// pump, which runs from every SDL call that pumps the events -- showing a
+// window among them. It may do so only while the loop is waiting for
+// events, which is also where a live resize (the window dragged) delivers
+// them; anywhere else the event is left in the queue for the loop.
+static bool watch_may_run= false;
+
+static bool
+loop_poll (SDL_Event* event) {
+  watch_may_run= true;
+  bool r= SDL_PollEvent (event);
+  watch_may_run= false;
+  return r;
+}
+
+static void
+loop_wait (int ms) {
+  watch_may_run= true;
+  SDL_WaitEventTimeout (NULL, ms);
+  watch_may_run= false;
+}
+
+// While the window is dragged by its border, the system does not return to
+// our loop (macOS runs a loop of its own): the window is laid out and
+// repainted here, so that it never shows stale content.
+static bool SDLCALL
+event_watch (void* data, SDL_Event* event) {
+  (void) data;
+  static bool busy= false;
+  if (busy || !watch_may_run) return true;
+  if (event->type != SDL_EVENT_WINDOW_RESIZED &&
+      event->type != SDL_EVENT_WINDOW_EXPOSED) return true;
+  sdl_window win= get_window_from_ID (event->window.windowID);
+  if (win == NULL) return true;
+  busy= true;
+  if (event->type == SDL_EVENT_WINDOW_RESIZED)
+    win->resize_event (event->window.data1, event->window.data2);
+  else win->expose ();
+  if (the_interpose_handler != NULL) the_interpose_handler ();
+  if (nr_windows > 0 && get_window_from_ID (event->window.windowID) == win)
+    win->repaint_invalid_regions ();
+  busy= false;
+  return true;
+}
+
+void
+sdl_gui_rep::process_messages () {
+  if (is_nil (messages)) return;
+  list<message> not_ready;
+  while (!is_nil (messages)) {
+    time_t ct= texmacs_time ();
+    message m= messages->item;
+    if ((m->t - ct) <= 0) send_delayed_message (m->wid, m->s, m->t);
+    else not_ready= list<message> (m, not_ready);
+    messages= messages->next;
+  }
+  messages= not_ready;
+}
+
+// the pause of the loop, shortened for the next delayed message
+int
+sdl_gui_rep::next_message_delay (int delay) {
+  time_t now= texmacs_time ();
+  for (list<message> l= messages; !is_nil (l); l= l->next)
+    delay= min (delay, max (0, (int) (l->item->t - now)));
+  if (!is_nil (balloon_wid) && balloon_win == NULL)
+    delay= min (delay, max (0, (int) (balloon_time + 666 - now)));
+  return delay;
+}
+
+void
+sdl_gui_rep::repaint_windows () {
+  interrupted= false;
+  interrupt_time= texmacs_time () + 50;
+  // first the window which has the focus, and then the other windows
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    sdl_window win= (sdl_window) Window_to_window[it->next ()];
+    if (win->has_focus) win->repaint_invalid_regions ();
+  }
+  it= iterate (Window_to_window);
+  while (it->busy ()) {
+    sdl_window win= (sdl_window) Window_to_window[it->next ()];
+    if (!win->has_focus) win->repaint_invalid_regions ();
+  }
+}
+
+void
+sdl_gui_rep::event_loop () {
+  int    delay= MIN_DELAY;
+  time_t last_repaint= 0;
+
+  SDL_AddEventWatch (&event_watch, NULL);
+  script_init ();
+
+  while (nr_windows > 0 || number_of_servers () != 0) {
+    request_partial_redraw= false;
+    script_step (); // may push synthetic events
+
+    // 1. the events which are waiting. A burst is handled in one go (a
+    // motion followed by another one is superseded by it), except that a
+    // keystroke is shown before the next one is handled
+    bool   busy= false;
+    int    count= 0;
+    SDL_Event event;
+    while (count < 100 && loop_poll (&event)) {
+      if (event.type == SDL_EVENT_MOUSE_MOTION) {
+        SDL_Event next;
+        if (SDL_PeepEvents (&next, 1, SDL_PEEKEVENT,
+                            SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
+            next.type == SDL_EVENT_MOUSE_MOTION &&
+            next.motion.windowID == event.motion.windowID &&
+            next.motion.state == event.motion.state)
+          continue;
+      }
+      process_event (&event);
+      busy= true;
+      count++;
+      if (request_partial_redraw || nr_windows == 0) break;
+    }
+    if (nr_windows == 0) continue;
+
+    // 2. nothing to do: sleep until an event arrives, or until the interpose
+    // handler or a delayed message needs a turn. The pause grows while
+    // nothing happens; sockets and pipes (plugins, the server) have no
+    // event of their own and are polled by the interpose handler
+    if (busy || update_requested) {
+      delay= MIN_DELAY;
+      update_requested= false;
+    }
+    else {
+      int pause= notifiers_active () ? min (delay, 40) : delay;
+      pause= next_message_delay (pause);
+      if (pause > 0) loop_wait (pause);
+      delay= min (delay + delay/5 + 1, MAX_DELAY);
+    }
+
+    // 3. the editors apply the changes
+    if (the_interpose_handler != NULL) the_interpose_handler ();
+    if (nr_windows == 0) continue;
+
+    // 4. popup help balloons
+    if (!is_nil (balloon_wid))
+      if (texmacs_time () - balloon_time >= 666)
+        if (balloon_win == NULL)
+          map_balloon ();
+
+    // 5. repaint, once the events have been handled. A trackpad delivers
+    // its events faster than a frame is drawn and its stream never runs
+    // dry: the repaint is therefore done anyway once it is old enough
+    time_t now= texmacs_time ();
+    if (!SDL_PollEvent (NULL) || request_partial_redraw ||
+        now - last_repaint >= REPAINT_DT) {
+      repaint_windows ();
+      last_repaint= now;
+    }
+
+    // 6. delayed messages
+    process_messages ();
+  }
+  SDL_RemoveEventWatch (&event_watch, NULL);
+}
+
 static string
-print_key_info ( SDL_KeyboardEvent *key ) {
-  string s;
-  // Is it a release or a press?
-  s <<  (key->type == SDL_EVENT_KEY_UP ? "Release:- " : "Press:- ");
-  // Print the hardware scancode first
-  s << "Scancode: " << as_hexadecimal (key->scancode);
-  // Print the name of the key
-  s << ", Name: " << SDL_GetKeyName (key->key);
-  // Print modifier info
-  s << print_modifiers (key->mod);
-  return s;
+mouse_decode (unsigned int mstate) {
+  // left last: on macOS, control and option emulate the other buttons
+  if (mstate & 2)       return "middle";
+  else if (mstate & 4)  return "right";
+  else if (mstate & 1)  return "left";
+  else if (mstate & 8)  return "up";
+  else if (mstate & 16) return "down";
+  return "unknown";
+}
+
+// The editor scrolls by a fixed step for each "press-up" or "press-down"
+// (edit_mouse.cpp): the wheel deltas accumulate into such steps. A notch of
+// a mouse wheel is one step. A trackpad gives fractional deltas, a tenth of
+// the displacement of the fingers in points, and the editor steps by about
+// 100 points: ten units make a step, so that the page follows the fingers.
+void
+sdl_gui_rep::wheel_event (sdl_window win, SDL_MouseWheelEvent* ev) {
+  Uint64 stamp= ev->timestamp;
+  if (wheel_stamp == 0 || stamp - wheel_stamp > 200000000ull) {
+    // a new stream of events
+    wheel_acc= 0.0;
+    wheel_precise= false;
+  }
+  wheel_stamp= stamp;
+  double y= ev->y;
+  if (y != floor (y)) wheel_precise= true;
+  wheel_acc += wheel_precise ? y / 10.0 : y;
+  update_mouse_state ();
+  time_t t= texmacs_time ();
+  while (wheel_acc >= 1.0) {
+    win->mouse_event ("press-up", ev->mouse_x, ev->mouse_y, t);
+    win->mouse_event ("release-up", ev->mouse_x, ev->mouse_y, t);
+    wheel_acc -= 1.0;
+  }
+  while (wheel_acc <= -1.0) {
+    win->mouse_event ("press-down", ev->mouse_x, ev->mouse_y, t);
+    win->mouse_event ("release-down", ev->mouse_x, ev->mouse_y, t);
+    wheel_acc += 1.0;
+  }
 }
 
 void
@@ -943,192 +940,153 @@ sdl_gui_rep::process_event (SDL_Event *event) {
   sdl_window win;
   switch (event->type) {
     case SDL_EVENT_WINDOW_SHOWN:
-      SDL_Log("Window %d shown", event->window.windowID);
-      win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        win->invalidate_all ();
-        win->repaint_invalid_regions();
-      }
-      break;
-    case SDL_EVENT_WINDOW_HIDDEN:
-      SDL_Log("Window %d hidden", event->window.windowID);
-      break;
     case SDL_EVENT_WINDOW_EXPOSED:
-      SDL_Log("Window %d exposed", event->window.windowID);
+      win= get_window_from_ID (event->window.windowID);
+      if (win) win->expose ();
       break;
     case SDL_EVENT_WINDOW_MOVED:
-      SDL_Log("Window %d moved to %d,%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
       win= get_window_from_ID (event->window.windowID);
       if (win) win->move_event (event->window.data1, event->window.data2);
       break;
     case SDL_EVENT_WINDOW_RESIZED:
-      SDL_Log("Window %d resized to %dx%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
       win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        win->resize_event (event->window.data1, event->window.data2);
-        win->invalidate_all ();
-      }
+      if (win) win->resize_event (event->window.data1, event->window.data2);
       break;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-      SDL_Log("Window %d pixel size changed to %dx%d",
-              event->window.windowID, event->window.data1,
-              event->window.data2);
-      break;
-    case SDL_EVENT_WINDOW_MINIMIZED:
-      SDL_Log("Window %d minimized", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_MAXIMIZED:
-      SDL_Log("Window %d maximized", event->window.windowID);
-      break;
-    case SDL_EVENT_WINDOW_RESTORED:
-      SDL_Log("Window %d restored", event->window.windowID);
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+      // e.g. the window moved to a display of another density: the backing
+      // store follows (sync_backing_store) and is repainted
+      win= get_window_from_ID (event->window.windowID);
+      if (win && win->sync_backing_store ()) win->invalidate_all ();
       break;
     case SDL_EVENT_WINDOW_MOUSE_ENTER:
-      SDL_Log("Mouse entered window %d",
-              event->window.windowID);
-        //unmap_balloon ();
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
       win= get_window_from_ID (event->window.windowID);
       if (win) {
-        // FIXME: not quite right
-        float x,y;
-        int ox,oy;
-        update_mouse_state ();
+        float x, y;
+        int ox, oy;
         SDL_GetGlobalMouseState (&x, &y);
         SDL_GetWindowPosition (win->sdl_win, &ox, &oy);
-        x -= ox; y -= oy;
-        win->mouse_event ("enter", x, y, texmacs_time ());
-      }
-        break;
-    case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-      SDL_Log("Mouse left window %d", event->window.windowID);
-      //unmap_balloon ();
-      win= get_window_from_ID (event->window.windowID);
-      if (win) {
-        // FIXME: not quite right
-        float x,y;
-        int ox,oy;
         update_mouse_state ();
-        SDL_GetGlobalMouseState (&x, &y);
-        SDL_GetWindowPosition(win->sdl_win, &ox, &oy);
-        x -= ox; y -= oy;
-        win->mouse_event ("leave", x, y, texmacs_time ());
+        bool enter= (event->type == SDL_EVENT_WINDOW_MOUSE_ENTER);
+        win->mouse_event (enter ? "enter" : "leave", x - ox, y - oy,
+                          texmacs_time ());
       }
       break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
-      SDL_Log("Window %d gained keyboard focus",
-              event->window.windowID);
       win= get_window_from_ID (event->window.windowID);
       if (win) win->focus_in_event ();
       break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
-      SDL_Log("Window %d lost keyboard focus",
-                event->window.windowID);
       win= get_window_from_ID (event->window.windowID);
       if (win) win->focus_out_event ();
       break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-      SDL_Log("Window %d close requested", event->window.windowID);
       win= get_window_from_ID (event->window.windowID);
       if (win) win->destroy_event();
-      break;
-    case SDL_EVENT_WINDOW_HIT_TEST:
-      SDL_Log("Window %d has a special hit test", event->window.windowID);
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
     {
       unmap_balloon ();
+      // the state is that of the event: with the button for a press,
+      // without it for a release (the global state of SDL may be ahead of
+      // or behind the queue)
+      SDL_MouseButtonFlags mask= SDL_BUTTON_MASK (event->button.button);
+      bool down= (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+      buttons= down ? (buttons | mask) : (buttons & ~mask);
+      SDL_MouseButtonFlags now= buttons;
+      buttons |= mask;
       update_mouse_state ();
-      // we need to take into account explicitly the current button
-      cout << "new mouse state " << mouse_state << LF;
+      string action= (down ? "press-" : "release-") * mouse_decode (mouse_state);
+      buttons= now;
+      update_mouse_state ();
+      if (DEBUG_EVENTS) debug_events << action << " state " << mouse_state << LF;
       win= get_window_from_ID (event->button.windowID);
-      if (win) {
-        string action;
-        if (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-          action= "press-" * mouse_decode (mouse_state);
-        } else {
-          action= "release-" * mouse_decode (mouse_state | SDL_BUTTON_MASK (event->button.button));
-        }
-        //FIXME: this is not yet correct, as we need to take into account modifiers
-        //        action = action * lookup_mouse (event->button.button);
-        cout << ">>>>>" << action << LF;
-        //        set_button_state (event->button.state ^ get_button_mask (&ev->xbutton));
-        win->mouse_event (action,
-                          event->button.x, event->button.y, texmacs_time ());
-      }
+      if (win) win->mouse_event (action, event->button.x, event->button.y,
+                                 texmacs_time ());
       break;
-    } // case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    }
     case SDL_EVENT_MOUSE_WHEEL:
     {
       unmap_balloon ();
-      update_mouse_state ();
-      SDL_Log("Window %d got wheel event event %f %f",
-              event->wheel.windowID, event->wheel.x, event->wheel.y);
       win= get_window_from_ID (event->wheel.windowID);
-      if (win) {
-        int x, y;
-        x= event->wheel.mouse_x;
-        y= event->wheel.mouse_y;
-        //float deltaX= event->wheel.x;
-        float deltaY= event->wheel.y;
-        if (deltaY >= 0.5) {
-          win->mouse_event ("press-up", x, y, texmacs_time ());
-        } else if (deltaY <= -0.5) {
-          win->mouse_event ("press-down", x, y, texmacs_time ());
-        }
-      }
+      if (win) wheel_event (win, &event->wheel);
       break;
-    } // case SDL_EVENT_MOUSE_WHEEL:
+    }
     case SDL_EVENT_MOUSE_MOTION:
     {
       unmap_balloon ();
+      buttons= event->motion.state;
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
-      if (win) {
-        win->mouse_event ("move",
-                          event->motion.x, event->motion.y, texmacs_time ());
-      }
+      if (win) win->mouse_event ("move", event->motion.x, event->motion.y,
+                                 texmacs_time ());
       break;
-    } // case SDL_EVENT_MOUSE_MOTION:
+    }
     case SDL_EVENT_KEY_DOWN:
     {
-      SDL_Keycode keycode = SDL_GetKeyFromScancode(event->key.scancode, event->key.mod, false);
-      {
-        c_string buf (print_key_info (&(event->key)));
-        SDL_Log("Keydown: %s ", (char*)buf);
-      }
       unmap_balloon ();
       win= get_window_from_ID (event->key.windowID);
-      if (win) {
-        string key= lookup_key(event->key.scancode, event->key.mod);
-        
-        if (N(key)>0) {
-          //cout << "Press " << key << " at " << (time_t) ev->xkey.time
-          //<< " (" << texmacs_time() << ")\n";
-          kbd_count++;
-          //FIXME: conversion below loses precision from UInt64 to UInt32
-          synchronize_time (event->key.timestamp);
-          if (texmacs_time () - remote_time (event->key.timestamp) < 100 ||
-              (kbd_count & 15) == 0)
-            request_partial_redraw= true;
-          //cout << "key   : " << key << "\n";
-          //cout << "redraw: " << request_partial_redraw << "\n";
-          win->key_event (key);
-        }
-      }
+      if (win == NULL) break;
+      bool produces_text= false;
+      string key= lookup_key (event->key.scancode, event->key.mod, produces_text);
+      if (N(key) == 0) break;
+      // SDL3 timestamps are nanoseconds (they were compared with
+      // milliseconds, which set request_partial_redraw at random)
+      Uint32 stamp= (Uint32) (event->key.timestamp / 1000000ull);
+      kbd_count++;
+      synchronize_time (stamp);
+      if (texmacs_time () - remote_time (stamp) < 100 || (kbd_count & 15) == 0)
+        request_partial_redraw= true;
+      if (produces_text) break; // the text event of this keystroke follows
+      // with a modifier, the system may still send a text event for the
+      // keystroke (see SDL_EVENT_TEXT_INPUT); without one there is none, and
+      // the text of the next keystroke must not be taken for it
+      bool with_mods= (event->key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) != 0;
+      key_stamp= with_mods ? event->key.timestamp : 0;
+      win->key_event (key);
       break;
-    } // case SDL_EVENT_KEY_DOWN:
-  } // switch (event->type)
+    }
+    case SDL_EVENT_TEXT_INPUT:
+    {
+      // the text typed by a keystroke (see SDL_EVENT_KEY_DOWN): the key
+      // names of TeXmacs for the characters which have one
+      win= get_window_from_ID (event->text.windowID);
+      if (win == NULL || event->text.text == NULL) break;
+      // a text event right after a key delivered as a key (a command
+      // modifier, an unconsumed alt) belongs to that keystroke
+      if (key_stamp != 0 && event->text.timestamp - key_stamp < 30000000ull) {
+        key_stamp= 0;
+        break;
+      }
+      string r= utf8_to_cork (event->text.text);
+      if (r == " ") r= "space";
+      else if (r == "<") r= "<less>";
+      else if (r == ">") r= "<gtr>";
+      if (DEBUG_EVENTS) debug_events << "text " << r << LF;
+      win->key_event (r);
+      break;
+    }
+    case SDL_EVENT_TEXT_EDITING:
+    {
+      // the composition of an input method (dead keys, CJK...): shown by
+      // the editor as a pre-edit ("pre-edit:<cursor>:<text>", an empty text
+      // ends it), as in the Qt port; the committed text comes as text input
+      win= get_window_from_ID (event->edit.windowID);
+      if (win == NULL) break;
+      string t= (event->edit.text != NULL) ?
+        utf8_to_cork (string (event->edit.text)) : string ("");
+      string k= "pre-edit:";
+      if (N(t) > 0) k << as_string (max (0, (int) event->edit.start)) << ":" << t;
+      win->key_event (k);
+      break;
+    }
+  }
 }
 
-
-
 /******************************************************************************
-* Selections
+* Windows
 ******************************************************************************/
 
 void
@@ -1146,43 +1104,181 @@ sdl_gui_rep::focussed_window (SDL_Window* win) {
   windows_l= list<SDL_Window*> (win, remove (windows_l, win));
 }
 
+/******************************************************************************
+* Selections and the clipboard
+*
+* SDL has the system clipboard only: it holds the "primary" selection; the
+* other ones (the internal buffers of TeXmacs) are kept here.
+******************************************************************************/
+
+static hashmap<string,tree>   selection_t ("none");
+static hashmap<string,string> selection_s ("");
+
+// what is offered to the other applications; owned by SDL until it asks
+// for its cleanup
+struct sdl_clipboard_data {
+  c_string texmacs_data;
+  c_string plain_text;
+  c_string html_text;
+  int      n_texmacs, n_plain, n_html;
+  sdl_clipboard_data (string t, string p, string h):
+    texmacs_data (t), plain_text (p), html_text (h),
+    n_texmacs (N(t)), n_plain (N(p)), n_html (N(h)) {}
+};
+
+static const void* SDLCALL
+clipboard_data_callback (void *userdata, const char *mime_type, size_t *size) {
+  sdl_clipboard_data* data= static_cast<sdl_clipboard_data*> (userdata);
+  *size= 0;
+  if (data == NULL || mime_type == NULL) return NULL;
+  string mime (mime_type);
+  if (mime == "text/html" && data->n_html > 0) {
+    *size= data->n_html;
+    return (const void*) (char*) data->html_text;
+  }
+  if (starts (mime, "text/plain") && data->n_plain > 0) {
+    *size= data->n_plain;
+    return (const void*) (char*) data->plain_text;
+  }
+  *size= data->n_texmacs;
+  return (const void*) (char*) data->texmacs_data;
+}
+
+static void SDLCALL
+clipboard_cleanup_callback (void *userdata) {
+  delete static_cast<sdl_clipboard_data*> (userdata);
+}
+
 bool
-sdl_gui_rep::get_selection (string key, tree& t, string& s) {
-  t= "none";
+set_selection (string key, tree t, string s, string sv, string sh, string format) {
+  selection_t (key)= copy (t);
+  selection_s (key)= copy (s);
+  if (key != "primary") return true;
+
+  string plain= s;
+  if ((format == "verbatim" || format == "default") && N(sv) > 0) plain= sv;
+  string html= (format == "html") ? s : sh;
+  sdl_clipboard_data* data= new sdl_clipboard_data (s, plain, html);
+  const char* mime_types[4];
+  size_t n= 0;
+  mime_types[n++]= "application/x-texmacs-clipboard";
+  if (N(html) > 0) mime_types[n++]= "text/html";
+  mime_types[n++]= "text/plain;charset=utf-8";
+  mime_types[n++]= "text/plain";
+  if (!SDL_SetClipboardData (clipboard_data_callback, clipboard_cleanup_callback,
+                             data, mime_types, n)) {
+    SDL_Log ("Failed to set clipboard data: %s", SDL_GetError ());
+    delete data;
+    return false;
+  }
+  return true;
+}
+
+static bool
+clipboard_fetch (const char* mime, string& s) {
+  if (!SDL_HasClipboardData (mime)) return false;
+  size_t size= 0;
+  void* p= SDL_GetClipboardData (mime, &size);
+  if (p == NULL) return false;
+  s= string ((char*) p, (int) size);
+  SDL_free (p);
+  return true;
+}
+
+bool
+get_selection (string key, tree& t, string& s, string format) {
+  bool direct= (key == "extern");
+  if (direct) key= "primary";
   s= "";
-  if (selection_t->contains (key)) {
+  t= "none";
+  if (key != "primary") {
+    if (!selection_t->contains (key)) return false;
     t= copy (selection_t [key]);
     s= copy (selection_s [key]);
     return true;
   }
-  return false;
-}
 
-bool
-sdl_gui_rep::set_selection (string key, tree t, string s) {
-  selection_t (key)= copy (t);
-  selection_s (key)= copy (s);
+  string input_format;
+  if (format == "default") {
+    if (clipboard_fetch ("application/x-texmacs-clipboard", s))
+      input_format= "texmacs-snippet";
+    else if (clipboard_fetch ("text/html", s))
+      input_format= "html-snippet";
+    else if (clipboard_fetch ("text/plain;charset=utf-8", s) ||
+             clipboard_fetch ("text/plain", s))
+      input_format= "verbatim-snippet";
+  }
+  if (N(s) == 0 && input_format == "") {
+    char* text= SDL_GetClipboardText ();
+    if (text != NULL) {
+      s= string (text);
+      SDL_free (text);
+      if (format == "default") input_format= "verbatim-snippet";
+    }
+  }
+  if (N(s) == 0) return false;
+
+  if (input_format == "html-snippet" && seems_buggy_html_paste (s))
+    s= correct_buggy_html_paste (s);
+  if (seems_buggy_paste (s))
+    s= correct_buggy_paste (s);
+  if (input_format != "" && !direct)
+    s= as_string (call ("convert", s, input_format, "texmacs-snippet"));
+  if (input_format == "html-snippet") {
+    tree tt= as_tree (call ("convert", s, "texmacs-snippet", "texmacs-tree"));
+    tt= default_with_simplify (tt);
+    s= as_string (call ("convert", tt, "texmacs-tree", "texmacs-snippet"));
+  }
+  t= tuple ("extern", s);
   return true;
 }
 
 void
-sdl_gui_rep::clear_selection (string key) {
+clear_selection (string key) {
   selection_t->reset (key);
   selection_s->reset (key);
+  if (key == "primary") SDL_ClearClipboardData ();
 }
 
 /******************************************************************************
 * Mouse pointers
 ******************************************************************************/
 
-void
-sdl_gui_rep::set_mouse_pointer (widget w, string name) {
-  // FIXME: implement
+static SDL_Cursor*
+system_cursor (SDL_SystemCursor id) {
+  static hashmap<int,pointer> cursors (NULL);
+  if (!cursors->contains ((int) id))
+    cursors ((int) id)= (pointer) SDL_CreateSystemCursor (id);
+  return (SDL_Cursor*) cursors [(int) id];
 }
 
+// the X11 cursor names (XC_...) which TeXmacs asks for
+void
+sdl_gui_rep::set_mouse_pointer (widget w, string name) {
+  (void) w;
+  if (starts (name, "XC_")) name= name (3, N(name));
+  SDL_SystemCursor id= SDL_SYSTEM_CURSOR_DEFAULT;
+  if (name == "xterm") id= SDL_SYSTEM_CURSOR_TEXT;
+  else if (name == "watch" || name == "clock") id= SDL_SYSTEM_CURSOR_WAIT;
+  else if (name == "crosshair" || name == "cross" || name == "tcross")
+    id= SDL_SYSTEM_CURSOR_CROSSHAIR;
+  else if (name == "hand1" || name == "hand2") id= SDL_SYSTEM_CURSOR_POINTER;
+  else if (name == "fleur") id= SDL_SYSTEM_CURSOR_MOVE;
+  else if (name == "sb_h_double_arrow") id= SDL_SYSTEM_CURSOR_EW_RESIZE;
+  else if (name == "sb_v_double_arrow") id= SDL_SYSTEM_CURSOR_NS_RESIZE;
+  else if (name == "X_cursor" || name == "pirate") id= SDL_SYSTEM_CURSOR_NOT_ALLOWED;
+  SDL_Cursor* c= system_cursor (id);
+  if (c != NULL) SDL_SetCursor (c);
+  SDL_ShowCursor ();
+}
+
+// a cursor drawn by TeXmacs: only the invisible one (graphics mode draws
+// its own pointer) is supported
 void
 sdl_gui_rep::set_mouse_pointer (widget w, string name, string mask_name) {
-  // FIXME: implement
+  (void) mask_name;
+  if (occurs ("none", name)) SDL_HideCursor ();
+  else set_mouse_pointer (w, "XC_top_left_arrow");
 }
 
 /******************************************************************************
@@ -1231,7 +1327,9 @@ sdl_gui_rep::show_wait_indicator (widget w, string message, string arg) {
   if (arg != "") message= message * " " * arg * "...";
   SI width= 400*PIXEL, height= 160*PIXEL;
   widget wait_wid= wait_widget (width, height, message);
-  SI mid_x= (ww->win_w>>1)*PIXEL, mid_y= -(ww->win_h>>1)*PIXEL + height;
+  SI win_w, win_h;
+  ww->get_size (win_w, win_h);
+  SI mid_x= win_w/2, mid_y= -win_h/2 + height;
   SI x= mid_x- width/2, y= mid_y- height/2;
   widget old_wid= ww->w;
   ww->w= wait_wid;
@@ -1260,47 +1358,49 @@ sdl_gui_rep::check_event (int type) {
   case INTERRUPT_EVENT:
     if (interrupted) return true;
     else {
-      int n=1; // n=XPending (dpy);
       time_t now= texmacs_time ();
       if (now - interrupt_time < 0) return false;
-      else interrupt_time= now + (100 / (n + 1));
-      interrupted= (SDL_HasEvent (SDL_EVENT_KEY_DOWN) == true) ||
-                   (SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_DOWN) == true);
+      else interrupt_time= now + 50;
+      interrupted= SDL_HasEvent (SDL_EVENT_KEY_DOWN) ||
+                   SDL_HasEvent (SDL_EVENT_TEXT_INPUT) ||
+                   SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_DOWN);
       return interrupted;
     }
   case INTERRUPTED_EVENT:
     return interrupted;
   case ANY_EVENT:
-    return (SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST) == true);
+    // SDL leaves a poll sentinel in the queue after each pump: it is not an
+    // event of ours, and counting it made the editor never idle (no delayed
+    // :idle commands, no pre-edit of the input methods)
+    return SDL_HasEvents (SDL_EVENT_FIRST, SDL_EVENT_POLL_SENTINEL - 1) ||
+           SDL_HasEvents (SDL_EVENT_POLL_SENTINEL + 1, SDL_EVENT_USER - 1);
   case MOTION_EVENT:
-    status= (SDL_HasEvent (SDL_EVENT_MOUSE_MOTION) == true);
-    return status;
+    return SDL_HasEvent (SDL_EVENT_MOUSE_MOTION);
   case DRAG_EVENT:
     {
       status= false;
       SDL_Event event;
       if (SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION)) {
-        if (event.motion.state) {
-          status= true;
-        }
-      }
+                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION) == 1)
+        status= (event.motion.state != 0);
     }
     return status;
   case MENU_EVENT:
-    status= (SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_UP) == true);
+    status= SDL_HasEvent (SDL_EVENT_MOUSE_BUTTON_UP);
     if (!status) {
       SDL_Event event;
       if (SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION)) {
-        status=  (event.motion.state != 0);
-      }
+                          SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION) == 1)
+        status= (event.motion.state != 0);
     }
     return status;
   }
   return interrupted;
 }
 
+/******************************************************************************
+* Fonts
+******************************************************************************/
 
 static string the_default_font ("");
 font the_default_wait_font;
@@ -1327,16 +1427,17 @@ sdl_gui_rep::default_font_sub (bool tt, bool mini, bool bold) {
   int dpi= (j<n? as_int (s (j, n)): 300);
   if (mini) { sz= (int) (0.6 * sz); dpi= (int) (1.3333333 * dpi); }
   if (use_macos_fonts ()) {
-    tree lucida_fn= tuple ("apple-lucida", "ss", series, "right");
-    lucida_fn << as_string (sz) << as_string ((int) (0.95 * dpi));
-    return find_font (lucida_fn);
+    // the family is named directly: the "apple-lucida" rule maps to the
+    // regular face whatever the series (see get_default_font in the Vue port)
+    return find_font ("Lucida Grande", "ss", series, "right",
+                      sz, (int) (0.95 * dpi));
   }
   if (N(fam) >= 2) {
     string ff= fam (0, 2);
     string out_lan= get_output_language ();
     if (((out_lan == "bulgarian") || (out_lan == "russian") ||
-   (out_lan == "ukrainian")) &&
-  ((ff == "cm") || (ff == "ec"))) {
+         (out_lan == "ukrainian")) &&
+        ((ff == "cm") || (ff == "ec"))) {
       fam= "la" * fam (2, N(fam)); ff= "la"; if (sz<100) sz *= 100; }
     if (out_lan == "japanese" || out_lan == "korean") {
       tree modern_fn= tuple ("modern", "ss", series, "right");
@@ -1347,10 +1448,6 @@ sdl_gui_rep::default_font_sub (bool tt, bool mini, bool bold) {
       return unicode_font ("fireflysung", sz, dpi);
     if (out_lan == "greek")
       return unicode_font ("Stix", sz, dpi);
-    //if (out_lan == "japanese")
-    //return unicode_font ("ipagui", sz, dpi);
-    //if (out_lan == "korean")
-    //return unicode_font ("UnDotum", sz, dpi);
     if (ff == "ec")
       return tex_ec_font (tt? ff * "tt": fam, sz, dpi);
     if (ff == "la")
@@ -1360,10 +1457,6 @@ sdl_gui_rep::default_font_sub (bool tt, bool mini, bool bold) {
       return tex_cm_font (tt? ff * "tt": fam, sz, dpi);
   }
   return tex_font (fam, sz, dpi);
-  // if (out_lan == "german") return tex_font ("ygoth", 14, 300, 0);
-  // return tex_font ("rpagk", 10, 300, 0);
-  // return tex_font ("rphvr", 10, 300, 0);
-  // return ps_font ("b&h-lucidabright-medium-r-normal", 11, 300);
 }
 
 font
@@ -1420,10 +1513,19 @@ gui_version () {
   return "sdl";
 }
 
-
 void
 beep () {
-  // FIXME: implement
+#ifdef OS_MACOS
+  mac_beep ();
+#else
+  cerr << "\a" << flush;
+#endif
+}
+
+void
+image_gc (string name) {
+  // the renderer caches the decoded images, the patterns and their images
+  mupdf_image_gc (name);
 }
 
 void
@@ -1443,6 +1545,8 @@ external_event (string type, time_t t) {
 
 void
 needs_update () {
+  // the editor asks for a repaint: do not sleep in the loop
+  if (the_gui != NULL) the_gui->update_requested= true;
 }
 
 bool
@@ -1450,25 +1554,8 @@ check_event (int type) {
   return the_gui->check_event (type);
 }
 
-bool
-set_selection (string key, tree t,
-               string s, string sv, string sh, string format) {
-  (void) format;
-  return the_gui->set_selection (key, t, s);
-}
-
-bool
-get_selection (string key, tree& t, string& s, string format) {
-  (void) format;
-  return the_gui->get_selection (key, t, s);
-}
-
 void
-clear_selection (string key) {
-  the_gui->clear_selection (key);
-}
-
-void gui_interpose (void (*r) (void)) {
+gui_interpose (void (*r) (void)) {
   the_interpose_handler= r;
 }
 
@@ -1481,5 +1568,3 @@ font
 get_default_font (bool tt, bool mini, bool bold) {
   return the_gui->default_font (tt, mini, bold);
 }
-
-

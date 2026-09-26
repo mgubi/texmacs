@@ -22,6 +22,11 @@
 
 /******************************************************************************
 * The sdl_window class
+*
+* The widgets draw with a MuPDF renderer into the backing store, an opaque
+* pixmap of the size of the window in device pixels; what changed is copied
+* to the surface of the window when the repaint is done (present). The
+* rectangles below are in device pixels, with y going down.
 ******************************************************************************/
 
 class sdl_window_rep: public window_rep {
@@ -30,43 +35,38 @@ public:
   widget           w;
   sdl_gui          gui;
   string           orig_name;
-  char*            name;
+  bool             popup;
   string           the_name;
   string           mod_name;
 
   SDL_Window*   sdl_win;
 
+  picture       backing_store;
   renderer      ren;
-  
-  rectangles    invalid_regions;
+  float         density;         // device pixels per point
+
+  rectangles    invalid_regions; // to be repainted by the widgets
+  rectangles    dirty;           // repainted, not yet on the screen
   SI            Min_w, Min_h;
   SI            Def_w, Def_h;
   SI            Max_w, Max_h;
-  int           win_x, win_y;
-  int           win_w, win_h;
+  int           win_x, win_y;    // points
+  int           win_w, win_h;    // points
 
   widget_rep*   kbd_focus;
   bool          has_focus;
 
   bool          full_screen_flag;
-  SDL_Window*   save_win;
-  int           save_x, save_y;
-  int           save_w, save_h;
 
-  SDL_Renderer* sdl_ren;
-  
-  picture       backing_store;
-  
 public:
 
   /******************** specific routines for sdl_window *********************/
 
-  sdl_window_rep (widget w, sdl_gui gui, char* name,
-		SI min_w, SI min_h, SI def_w, SI def_h, SI max_w, SI max_h);
+  sdl_window_rep (widget w, sdl_gui gui, string name, bool popup,
+                  SI min_w, SI min_h, SI def_w, SI def_h, SI max_w, SI max_h);
   ~sdl_window_rep ();
   widget get_widget ();
 
-  void set_hints (int min_w, int min_h, int max_w, int max_h);
   void initialize ();
 
   void move_event (int x, int y);
@@ -74,13 +74,18 @@ public:
   void destroy_event ();
   void invalidate_event (int x1, int y1, int x2, int y2);
   void key_event (string key);
-  void mouse_event (string ev, int x, int y, time_t t);
+  void mouse_event (string ev, float x, float y, time_t t);
   void focus_in_event ();
   void focus_out_event ();
   void repaint_invalid_regions ();
 
   void invalidate_all ();
-  SDL_Surface* get_backing_store ();
+  void expose ();                // the whole backing store to the screen
+  void present ();               // the dirty rectangles to the screen
+  bool sync_backing_store ();    // follow the size of the window
+  void shift_pixels (int x1, int y1, int x2, int y2, int dx, int dy);
+  void pointer_position (float x, float y, SI& px, SI& py);
+  SI   to_si (int pixels);
 
   /********************* routines from window.hpp ****************************/
 
@@ -114,5 +119,6 @@ public:
 typedef sdl_window_rep* sdl_window;
 SDL_Window* get_Window (widget w);
 sdl_window get_sdl_window (widget w);
+sdl_window get_window_from_ID (Uint32 ID);
 
 #endif // defined SDL_WINDOW_H
