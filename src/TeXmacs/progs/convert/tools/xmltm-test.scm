@@ -84,7 +84,6 @@
    (test "processing instruction"
          "<?xml version='1.0'?>" '((*PI* xml "version='1.0'")))
    (test "empty PI" "<?empty?>" '((*PI* empty "")))
-  ;(test "null PI" "<??>" `((*PI* ,(string->symbol "") "")))
    (test "doctype" "<!DOCTYPE mytype>" '((*DOCTYPE* "mytype")))
    (test "implicit /p" "<p>hello<p>b" '((p "hello") (p "b")))
    (test "implicit /li" "<ul><li>a<li>b</ul>" '((ul (li "a")  (li "b"))))
@@ -107,6 +106,20 @@
    ;;               ,(string-append (nl) (latin1-chart))))
    (test "HTML, UTF-8" (latin1-chart) `(,(latin1-chart)))))
    ;;(test "HTML, latin1" (highbit-chart) `(*TOP* ,(latin1-chart)))))
+
+;; A PI without a name has the empty symbol as its name. s7 refuses
+;; (string->symbol ""), so the expected value can't be written as a symbol:
+;; compare the names of the first node as strings instead.
+
+(define (parse-html-first-names s)
+  (map (lambda (x) (if (symbol? x) (symbol->string x) x))
+       (cadr (parse-html s))))
+
+(define (regtest-htmltm-parse-null-pi)
+  (regression-test-group
+   "internal html/xml parser" "null PI"
+   parse-html-first-names :none
+   (test "null PI" "<??>" '("*PI*" "" ""))))
 
 ;; Namespace-aware parser wrapper
 
@@ -193,6 +206,7 @@
 
 (tm-define (regtest-xmltm)
   (let ((n (+ (regtest-htmltm-parse)
+              (regtest-htmltm-parse-null-pi)
               (regtest-parse-xmlns)
               (regtest-parse-htmlns)
               (regtest-htmltm-serial))))
