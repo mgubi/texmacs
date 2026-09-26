@@ -93,7 +93,13 @@ mupdf_pixmap_from_image (fz_image* im) {
 // pixel (see mupdf_renderer_rep::draw_pixmap_direct).
 fz_colorspace*
 mupdf_screen_colorspace () {
+#ifdef __EMSCRIPTEN__
+  // the canvas of the browser takes its pixels as R, G, B, A (SDL's window
+  // surface is SDL_PIXELFORMAT_RGBA32 there)
+  return fz_device_rgb (mupdf_context ());
+#else
   return fz_device_bgr (mupdf_context ());
+#endif
 }
 
 bool

@@ -18,6 +18,7 @@
 //                        move <x> <y> | type <text> | key <name> |
 //                        upload <x> <y> <file> (the click opens the file
 //                        input of the page, which is given the file) |
+//                        uploadto <selector> <file> (to a file input) |
 //                        answer <text> (the next prompt of the page) |
 //                        eval <js> (printed)
 //                      (names of keys as in puppeteer: Enter, Backspace,
@@ -102,6 +103,11 @@ if (script) {
     }
     else if (cmd === 'click') await page.mouse.click (Number (a[0]), Number (a[1]));
     else if (cmd === 'move') await page.mouse.move (Number (a[0]), Number (a[1]));
+    else if (cmd === 'uploadto') {
+      // give the file a[1] to the file input a[0] (a CSS selector)
+      const el = await page.waitForSelector (a[0], { timeout: 15000 });
+      await el.uploadFile (path.resolve (a[1]));
+    }
     else if (cmd === 'answer') answer = line.slice (7);
     else if (cmd === 'eval') {
       try { console.log ('eval:', JSON.stringify (await page.evaluate (line.slice (5)))); }

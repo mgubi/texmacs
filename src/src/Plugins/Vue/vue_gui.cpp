@@ -726,9 +726,20 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
   // SDL only promises the format which suits the window best: check that
   // it is four bytes per pixel and use its own pitch (the rows may be
   // padded, which sheared the image when 4*w was assumed)
+  // and the order of its bytes: B, G, R, A for the formats of macOS
+  // (ARGB8888), R, G, B, A for that of the browser (RGBA32, i.e. ABGR8888
+  // on a little endian machine); taking one for the other exchanged the
+  // red and the blue of everything
+  fz_colorspace* cs= mupdf_screen_colorspace ();
+  if (surf != NULL) {
+    if (surf->format == SDL_PIXELFORMAT_ABGR8888 ||
+        surf->format == SDL_PIXELFORMAT_XBGR8888) cs= fz_device_rgb (ctx);
+    else if (surf->format == SDL_PIXELFORMAT_ARGB8888 ||
+             surf->format == SDL_PIXELFORMAT_XRGB8888) cs= fz_device_bgr (ctx);
+  }
   bool ok= (surf != NULL) && SDL_BYTESPERPIXEL (surf->format) == 4 &&
            mupdf_protected ("window surface", [&] () {
-    pix= fz_new_pixmap_with_data (ctx, mupdf_screen_colorspace (),
+    pix= fz_new_pixmap_with_data (ctx, cs,
                                   surf->w, surf->h, NULL, 1, surf->pitch,
                                   (unsigned char*) surf->pixels);
   });
@@ -3783,30 +3794,70 @@ EM_JS (void, vue_web_open_dialog, (void* res, const char* accept), {
   function safe_name (n) {
     return n.split ('/').join ('_').split (String.fromCharCode (92)).join ('_');
   }
+  // A panel of the page with the file input on it: the browsers open the
+  // chooser of a file input only for a click of the user being handled
+  // (Firefox and Safari strictly), and TeXmacs asks for it later, in a frame
+  // of its loop; a file may also be dropped on the panel
+  var old = document.getElementById ('tm-open-panel');
+  if (old) old.remove ();
+  var panel = document.createElement ('div');
+  panel.id = 'tm-open-panel';
+  panel.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);' +
+    'background:#f4f4f4;border:1px solid #888;border-radius:6px;padding:18px 22px;' +
+    'box-shadow:0 6px 24px rgba(0,0,0,.3);font:14px -apple-system,Helvetica,sans-serif;' +
+    'color:#222;z-index:10;min-width:320px';
+  var title = document.createElement ('div');
+  title.textContent = 'Open a file';
+  title.style.cssText = 'font-weight:bold;margin-bottom:12px';
   var input = document.createElement ('input');
   input.type = 'file';
+  input.id = 'tm-open-input';
   var acc = UTF8ToString (accept);
   if (acc) input.accept = acc;
+  var hint = document.createElement ('div');
+  hint.textContent = 'or drop it here';
+  hint.style.cssText = 'color:#666;margin:10px 0 14px';
+  var cancel = document.createElement ('button');
+  cancel.textContent = 'Cancel';
+  var row = document.createElement ('div');
+  row.style.cssText = 'text-align:right';
+  row.appendChild (cancel);
+  panel.appendChild (title);
+  panel.appendChild (input);
+  panel.appendChild (hint);
+  panel.appendChild (row);
   var done = false;
   function finish (path) {
     if (done) return;
     done = true;
+    panel.remove ();
+    document.removeEventListener ('keydown', onkey, true);
     withStackSave (function () {
       _vue_web_dialog_done (res, path ? stringToUTF8OnStack (path) : 0);
     });
   }
-  input.addEventListener ('cancel', function () { finish (null); });
-  input.onchange = function () {
-    var f = input.files && input.files[0];
-    if (!f) { finish (null); return; }
+  function load (f) {
+    if (!f) return;
     f.arrayBuffer ().then (function (buf) {
       try { FS.mkdirTree ('/home/web/Uploads'); } catch (e) {}
       var path = '/home/web/Uploads/' + safe_name (f.name);
       FS.writeFile (path, new Uint8Array (buf));
       finish (path);
     });
-  };
-  input.click ();
+  }
+  function onkey (e) {
+    if (e.key === 'Escape') { e.stopPropagation (); e.preventDefault (); finish (null); }
+  }
+  input.onchange = function () { load (input.files && input.files[0]); };
+  cancel.onclick = function () { finish (null); };
+  panel.addEventListener ('dragover', function (e) { e.preventDefault (); });
+  panel.addEventListener ('drop', function (e) {
+    e.preventDefault ();
+    load (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+  document.addEventListener ('keydown', onkey, true);
+  document.body.appendChild (panel);
+  input.focus ();
 });
 
 EM_JS (void, vue_web_save_dialog, (void* res, const char* name), {
