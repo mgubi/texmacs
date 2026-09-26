@@ -705,9 +705,12 @@
 (tm-define (print-buffer)
   (:synopsis "Print the current buffer")
   (:interactive (use-print-dialog?))
-  (if (use-print-dialog?)
-      (interactive-print-buffer)
-      (direct-print-buffer)))
+  (cond ((defined? 'web-open-pdf)
+         ;; in the browser: the PDF in a tab, whose viewer prints it
+         (preview-buffer))
+        ((use-print-dialog?)
+         (interactive-print-buffer))
+        (else (direct-print-buffer))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Important files to which the buffer is linked (e.g. bibliographies)

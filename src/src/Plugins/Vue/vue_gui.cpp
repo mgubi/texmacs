@@ -1870,6 +1870,22 @@ web_files_s7 (s7_scheme* sc, s7_pointer args) {
   emscripten_run_script ("tmFiles.browse ()");
   return s7_unspecified (sc);
 }
+
+EM_JS (void, vue_web_open_pdf, (const char* path, const char* name), {
+  if (typeof tmPrint !== 'undefined')
+    tmPrint.open (UTF8ToString (path), UTF8ToString (name));
+});
+
+// (web-open-pdf path name): the PDF at path (in the file system of the
+// page) in a tab of the browser, for printing (misc/wasm/print.js); name
+// is that of its download
+static s7_pointer
+web_open_pdf_s7 (s7_scheme* sc, s7_pointer args) {
+  const char* path= s7_string (s7_car (args));
+  const char* name= s7_string (s7_cadr (args));
+  vue_web_open_pdf (path, name);
+  return s7_unspecified (sc);
+}
 #endif
 
 void gui_open (int& argc, char** argv) {
@@ -1878,6 +1894,9 @@ void gui_open (int& argc, char** argv) {
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-files", web_files_s7, 0, 0, false,
                         "(web-files): the files of the page");
+  if (tm_s7 != NULL)
+    s7_define_function (tm_s7, "web-open-pdf", web_open_pdf_s7, 2, 0, false,
+                        "(web-open-pdf path name): a PDF in a tab of the browser");
 #endif
 #ifdef __EMSCRIPTEN__
   {

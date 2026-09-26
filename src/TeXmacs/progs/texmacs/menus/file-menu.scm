@@ -213,6 +213,10 @@
 
 (menu-bind print-menu
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"
@@ -227,6 +231,10 @@
 
 (menu-bind print-menu-inline
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"

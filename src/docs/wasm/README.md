@@ -138,6 +138,26 @@ clipboard: the last copy of TeXmacs, or what the last paste event brought.
 - Paste from a menu has no paste event: it pastes what the page knows, the
   last copy or paste.
 
+## Printing
+
+Print and Preview (File menu, Cmd+P or Ctrl+P) write the PDF of the
+document with MuPDF into `/tmp` of the page (not the home directory, which
+is kept in IndexedDB) and call `(web-open-pdf path name)` (`vue_gui.cpp`),
+which hands it to `misc/wasm/print.js`: the PDF opens in a tab of its own,
+in the viewer of the browser, from which it is printed or saved. The
+Scheme side is in `tm-print.scm` (`preview-buffer`, `preview-file`),
+`tm-files.scm` (`print-buffer`) and `file-menu.scm` (the Print item).
+
+A browser opens a tab only shortly after a click or a key: when the PDF
+took longer (a long document) the tab is refused, and a notice in the page
+offers to open it (a click of its own) or to download it. The last four
+PDFs are kept for their tabs (`URL.revokeObjectURL` for the older ones).
+
+Known: the Fira fonts of some documents (the Welcome document) are
+embedded whole, not subset (`MuPDF error: format error: Reserved
+charstring byte`): the PDF is right but larger (740 KB for the Welcome
+document, 130 KB on the desktop, which uses other fonts for it).
+
 ## The files of TeXmacs in the page
 
 `misc/wasm/package.py` writes the files of `TeXmacs/` (without `bin/` and
