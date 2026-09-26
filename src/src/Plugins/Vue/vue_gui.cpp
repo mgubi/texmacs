@@ -1777,9 +1777,11 @@ vue_web_close_tab (int id) {
   gui_needs_relayout= true;
 }
 
+// the + of the tabs: a new window, whatever the buffer management (with
+// "separate", new-document* makes a new buffer in the current window)
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_new_tab () {
-  exec_delayed (scheme_cmd ("(new-document*)"));
+  exec_delayed (scheme_cmd ("(open-window)"));
 }
 #else
 static void frame_sync () {}
