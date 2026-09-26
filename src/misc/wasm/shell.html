@@ -6,13 +6,19 @@
 <title>GNU TeXmacs</title>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #a0a0a0; }
-  canvas { display: block; outline: none; }
+  body { display: flex; flex-direction: column; }
+  /* the frame (misc/wasm/frame.js) above, the canvas of TeXmacs below it:
+     SDL takes the size the page gives the canvas, and follows it */
+  #tm-canvas-box { flex: 1; position: relative; min-height: 0; }
+  canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+           display: block; outline: none; }
   #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center;
             font: 16px -apple-system, "Helvetica Neue", sans-serif; color: #222; }
 </style>
 </head>
 <body>
-<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="tm-frame"></div>
+<div id="tm-canvas-box"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
 <div id="status">Loading TeXmacs…</div>
 <script>
   var statusElement = document.getElementById('status');

@@ -43,13 +43,36 @@ MuPDF writer) in about 4 s, boot included.
 
 | | done | not yet |
 |---|---|---|
-| windows | single-window mode (virtual windows, title bars, routing) | resize handles of the virtual windows |
+| windows | single-window mode: tabs for the windows of the editors, floating dialogs; the frame of the page | resize handles of the dialogs |
 | build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
 | loop | one iteration per frame (`emscripten_set_main_loop`) | all the events of a frame in one iteration |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
 | processes | `posix_spawnp` fails cleanly | plugin menus hidden, no external converters offered |
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
+
+## Windows and the frame of the page
+
+In single-window mode the only SDL window, the host, is a container with
+nothing of its own; every window of TeXmacs is virtual. The windows of the
+editors are tabs: each fills the host and only the active one is drawn and
+gets the events (dialogs, tools, balloons and popups float above it). In
+the browser the page has a frame above the canvas (`misc/wasm/frame.js`):
+the tabs, labelled with the names of the windows (the title of a window on
+the desktop, and the title of the page for the active one), with a marker
+for unsaved changes, a close box (not on the last tab: TeXmacs asks as for
+a window whether to save), a `+` for a new window, and a TeXmacs menu: what
+this TeXmacs is (version, S7, MuPDF, build date), where its files are, how
+many of its packages have come, the storage used, the Files panel, notes
+on the keyboard (the browser keeps some shortcuts), texmacs.org, reload,
+and a reset (the files kept by the browser deleted). The plugin tells the
+frame of the tabs once per frame when they changed (`frame_sync`); the
+frame asks it to show, close or open one. Quitting TeXmacs reloads the
+page (after the home directory is written to the storage of the browser).
+
+On the desktop, `TEXMACS_VUE_SINGLE_WINDOW=1` gives the same, without the
+frame: a tab asks the host to change its size and position, so that it
+looks as before; the scripted tests have `tab <id>` to show a tab.
 
 ## Building and running
 

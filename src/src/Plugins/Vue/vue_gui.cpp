@@ -36,6 +36,7 @@
 #include "MacOS/mac_utilities.h" // mac_beep
 #endif
 #include "sys_utils.hpp"     // get_env
+#include "tm_configure.hpp"  // TEXMACS_VERSION (the frame of the page)
 #include "file.hpp"          // load_string (scripted events)
 #include "socket_notifier.hpp" // notifiers_active (pause of the loop)
 
@@ -227,11 +228,8 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   // windows start hidden and are shown once laid out, see set_visibility
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
                          SDL_WINDOW_HIDDEN;
-#ifdef __EMSCRIPTEN__
-  // the one window of the browser (the others are virtual) takes the page,
-  // and follows its size
-  flags |= SDL_WINDOW_FILL_DOCUMENT;
-#endif
+  // (in the browser the canvas has the size the page gives it, below the
+  // frame of the page: SDL_WINDOW_FILL_DOCUMENT would hide the frame)
   if (popup)
     // popups and tooltips are undecorated, start hidden and stay on top;
     // they are shown via SLOT_VISIBILITY once positioned
@@ -1148,15 +1146,18 @@ void layout_text (string s, int style, color c) {
 //******************************************************************************
 // Single-window mode: virtual windows
 //
-// In a browser there is one canvas and no other window. The first window
-// becomes the host, and the windows created after it (dialogs, tools,
-// balloons, popups) are virtual: each has its layout context and its input
-// state as an SDL window has, but no SDL window. The host draws them over
-// its own contents (composite_virtual_windows), dialogs with a title bar to
-// move and close them, and hands them the pointer events which fall on them
-// and the keys when one of them has the focus (route_pointer, route_keys).
-// Their positions are screen points like those of SDL windows, so that the
-// code which places a window relative to another does not change.
+// In a browser there is one canvas and no other window. The only SDL window
+// is the host, a container with nothing of its own, and all the windows of
+// TeXmacs are virtual: each has its layout context and its input state as an
+// SDL window has, but no SDL window. The windows of the editors are tabs:
+// each fills the host, and only the active one is shown (the page shows the
+// tabs, see misc/wasm/frame.js). The other windows (dialogs, tools,
+// balloons, popups) float above the active tab, the dialogs with a title
+// bar to move and close them. The host draws them (composite_virtual_windows)
+// and hands them the pointer events which fall on them and the keys when
+// one of them has the focus (route_pointer, route_keys). Their positions are
+// screen points like those of SDL windows, so that the code which places a
+// window relative to another does not change.
 //
 // Always on in the browser; on the desktop with TEXMACS_VUE_SINGLE_WINDOW.
 //******************************************************************************
@@ -1179,6 +1180,9 @@ class vue_virtual_window_rep;
 static vue_sdl_mupdf_window_rep* the_host= NULL;       // holds the others
 static array<vue_virtual_window_rep*> virtual_windows; // back to front
 static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
+static vue_virtual_window_rep* active_tab= NULL;       // the tab shown
+static array<vue_virtual_window_rep*> tabs;            // in the order of creation
+static bool frame_dirty= false;                        // the page must hear of the tabs
 static const float title_bar_h= 24.0f;                 // points
 
 // the content area of the host, in screen points
@@ -1197,18 +1201,19 @@ public:
   float x, y;  // top left corner of the contents, screen points
   float w, h;  // size of the contents, points
   bool  placed; // positioned by TeXmacs (else centered on the host)
+  bool  tab;    // the window of an editor: fills the host, shown when active
   SI Min_w, Min_h, Max_w, Max_h;
 
-  vue_virtual_window_rep (vue_widget w, string name, bool popup);
+  vue_virtual_window_rep (vue_widget w, string name, bool popup, bool tab);
   ~vue_virtual_window_rep ();
 
   void*  platform_window () { return NULL; }
-  bool   decorated () { return !popup; }
+  bool   decorated () { return !popup && !tab; }
   float  top () { return decorated () ? y - title_bar_h : y; }
   void   destroy_event ();
-  void   set_name (string n) { the_name= n; mod_name= n; }
+  void   set_name (string n);
   string get_name () { return the_name; }
-  void   set_modified (bool flag) { modified= flag; }
+  void   set_modified (bool flag);
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag) { (void) flag; }
   void   set_size (SI w, SI h);
@@ -1227,6 +1232,7 @@ public:
   void   show ();
   void   raise ();
   void   clamp ();
+  void   fit_tab ();
   bool   contains (float sx, float sy) {
     return sx >= x && sx < x + w && sy >= y && sy < y + h; }
   bool   in_title_bar (float sx, float sy) {
@@ -1234,14 +1240,16 @@ public:
 };
 
 static void focus_virtual (vue_virtual_window_rep* v);
+static void activate_tab (vue_virtual_window_rep* v);
 static vue_window pointer_hover= NULL;             // the window under the pointer
 static vue_virtual_window_rep* pointer_capture= NULL; // a button is held in it
 static vue_virtual_window_rep* drag_win= NULL;     // moved by its title bar
 static float drag_dx= 0, drag_dy= 0;
 
-vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name, bool _popup)
+vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name,
+                                                bool _popup, bool _tab)
   : vue_window_rep (_content, _name, _popup), x (0), y (0), w (200), h (200),
-    placed (false), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
+    placed (false), tab (_tab), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
   if (DEBUG_VUE) debug_widgets << "create vue_virtual_window_rep " << id << (popup ? " (popup)" : "") << LF;
   the_name= name;
@@ -1260,6 +1268,7 @@ vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _nam
     Clay_SetMeasureTextFunction (ren_measure_text, this);
   }
   virtual_windows << this;
+  if (tab) { tabs << this; fit_tab (); frame_dirty= true; }
 }
 
 vue_virtual_window_rep::~vue_virtual_window_rep () {
@@ -1271,11 +1280,30 @@ vue_virtual_window_rep::~vue_virtual_window_rep () {
   if (pointer_hover == this) pointer_hover= NULL;
   if (pointer_capture == this) pointer_capture= NULL;
   if (drag_win == this) drag_win= NULL;
-  if (focused_virtual == this) focus_virtual (NULL);
   array<vue_virtual_window_rep*> rest;
   for (int i= 0; i < N(virtual_windows); i++)
     if (virtual_windows[i] != this) rest << virtual_windows[i];
   virtual_windows= rest;
+  if (tab) {
+    // the tab goes: its neighbour (the one after it, else before) is shown
+    int at= -1;
+    array<vue_virtual_window_rep*> others;
+    for (int i= 0; i < N(tabs); i++)
+      if (tabs[i] == this) at= i; else others << tabs[i];
+    tabs= others;
+    frame_dirty= true;
+    if (active_tab == this) {
+      active_tab= NULL;
+      vue_virtual_window_rep* next= NULL;
+      for (int i= max (at, 0); i < N(tabs) && next == NULL; i++)
+        if (tabs[i]->shown) next= tabs[i];
+      for (int i= min (at, N(tabs)) - 1; i >= 0 && next == NULL; i--)
+        if (tabs[i]->shown) next= tabs[i];
+      if (focused_virtual == this) focused_virtual= NULL;
+      activate_tab (next);
+    }
+  }
+  if (focused_virtual == this) focus_virtual (NULL);
   id_to_window->reset (id);
   id= 0;
   set_identifier (abstract (content), 0);
@@ -1302,9 +1330,34 @@ vue_virtual_window_rep::layout_size (int& lw, int& lh) {
   lh= max (1, (int) (h * density + 0.5f));
 }
 
+// a tab takes the place of the host
+void
+vue_virtual_window_rep::fit_tab () {
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  x= hx; y= hy; w= hw; h= hh;
+  placed= true;
+}
+
+void
+vue_virtual_window_rep::set_name (string n) {
+  the_name= n;
+  mod_name= n;
+  if (tab) frame_dirty= true;
+  if (tab && active_tab == this && the_host != NULL) the_host->set_name (n);
+}
+
+void
+vue_virtual_window_rep::set_modified (bool flag) {
+  modified= flag;
+  if (tab) frame_dirty= true;
+  if (tab && active_tab == this && the_host != NULL) the_host->set_modified (flag);
+}
+
 void
 vue_virtual_window_rep::process_layout () {
   update_density ();
+  if (tab) fit_tab ();
   layout_window_passes (this);
   layout_passes++;
   if (visible_requested && !shown && (ready_to_show || layout_passes > 10))
@@ -1326,6 +1379,12 @@ vue_virtual_window_rep::clamp () {
 void
 vue_virtual_window_rep::show () {
   shown= true;
+  if (tab) {
+    // a new window of an editor becomes the active tab
+    fit_tab ();
+    activate_tab (this);
+    return;
+  }
   if (!placed) {
     // centered on the host (a dialog nobody positioned)
     float hx, hy, hw, hh;
@@ -1352,6 +1411,12 @@ vue_virtual_window_rep::set_visibility (bool flag) {
   visible_requested= flag;
   if (!flag) {
     shown= false;
+    if (tab && active_tab == this) {
+      active_tab= NULL;
+      for (int i= 0; i < N(tabs); i++)
+        if (tabs[i] != this && tabs[i]->shown) { activate_tab (tabs[i]); break; }
+      frame_dirty= true;
+    }
     if (focused_virtual == this) focus_virtual (NULL);
     if (pointer_capture == this) pointer_capture= NULL;
     if (drag_win == this) drag_win= NULL;
@@ -1362,6 +1427,14 @@ vue_virtual_window_rep::set_visibility (bool flag) {
 
 void
 vue_virtual_window_rep::set_size (SI sw, SI sh) {
+  if (tab) {
+    // a tab has the size of the host: the desktop resizes the host, in the
+    // browser the size is that of the page
+#ifndef __EMSCRIPTEN__
+    if (the_host != NULL) the_host->set_size (sw, sh);
+#endif
+    return;
+  }
   w= max (1.0f, (float) sw / PIXEL);
   h= max (1.0f, (float) sh / PIXEL);
   if (Min_w > 0) w= max (w, (float) Min_w / PIXEL);
@@ -1378,6 +1451,7 @@ vue_virtual_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h)
 
 void
 vue_virtual_window_rep::get_size (SI& sw, SI& sh) {
+  if (tab) fit_tab ();
   sw= (SI) (w * PIXEL);
   sh= (SI) (h * PIXEL);
 }
@@ -1389,6 +1463,12 @@ vue_virtual_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& ma
 
 void
 vue_virtual_window_rep::set_position (SI sx, SI sy) {
+  if (tab) {
+#ifndef __EMSCRIPTEN__
+    if (the_host != NULL) the_host->set_position (sx, sy);
+#endif
+    return;
+  }
   x= (float) sx / PIXEL;
   y= (float) -sy / PIXEL;
   placed= true;
@@ -1397,6 +1477,7 @@ vue_virtual_window_rep::set_position (SI sx, SI sy) {
 
 void
 vue_virtual_window_rep::get_position (SI& sx, SI& sy) {
+  if (tab) fit_tab ();
   sx= (SI) (x * PIXEL);
   sy= (SI) (-y * PIXEL);
 }
@@ -1431,6 +1512,7 @@ forget_host (vue_window w) {
 // which has the focus in each is told whether its window has it
 static void
 focus_virtual (vue_virtual_window_rep* v) {
+  if (v == NULL) v= active_tab; // the base of the keys is the tab shown
   if (focused_virtual == v) return;
   vue_window old= (focused_virtual != NULL) ? (vue_window) focused_virtual
                                             : (vue_window) the_host;
@@ -1438,6 +1520,21 @@ focus_virtual (vue_virtual_window_rep* v) {
   vue_window cur= (v != NULL) ? (vue_window) v : (vue_window) the_host;
   if (old != NULL) notify_window_focus (old, false);
   if (cur != NULL) notify_window_focus (cur, true);
+}
+
+// the tab v is shown, gets the keys, and gives its name to the host
+static void
+activate_tab (vue_virtual_window_rep* v) {
+  active_tab= v;
+  frame_dirty= true;
+  gui_needs_relayout= true;
+  if (v != NULL) {
+    focus_virtual (v);
+    if (the_host != NULL) {
+      the_host->set_name (v->the_name);
+      the_host->set_modified (v->modified);
+    }
+  }
 }
 
 // a text drawn with the fonts of the widgets, vertically centered in the
@@ -1461,9 +1558,15 @@ composite_virtual_windows (vue_window host, renderer ren) {
   host_geometry (hx, hy, hw, hh);
   float d= host->density;
   SI px= ren->pixel;
-  for (int i= 0; i < N(virtual_windows); i++) {
-    vue_virtual_window_rep* v= virtual_windows[i];
+  // the active tab first, then the other windows in their order
+  array<vue_virtual_window_rep*> order;
+  if (active_tab != NULL && active_tab->shown) order << active_tab;
+  for (int i= 0; i < N(virtual_windows); i++)
+    if (!virtual_windows[i]->tab) order << virtual_windows[i];
+  for (int i= 0; i < N(order); i++) {
+    vue_virtual_window_rep* v= order[i];
     if (!v->shown) continue;
+    if (v->tab) v->fit_tab ();
     int X= (int) ((v->x - hx) * d), Y= (int) ((v->y - hy) * d);
     int W, H;
     v->layout_size (W, H);
@@ -1534,13 +1637,17 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   vue_virtual_window_rep* target= NULL;
   bool title= false;
   if (pointer_capture != NULL && kind != 3) target= pointer_capture;
-  else
+  else {
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
-      if (!v->shown) continue;
+      if (!v->shown || v->tab) continue;
       if (v->contains (sx, sy)) { target= v; break; }
       if (v->in_title_bar (sx, sy)) { target= v; title= true; break; }
     }
+    // under the floating windows: the active tab
+    if (target == NULL && active_tab != NULL && active_tab->shown &&
+        active_tab->contains (sx, sy)) target= active_tab;
+  }
   if (kind == 1) {
     // a press outside the popups dismisses them, and reaches its target
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
@@ -1548,8 +1655,8 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (v->shown && v->popup && v != target) v->set_visibility (false);
     }
     if (target != NULL) {
-      target->raise ();
-      if (target->decorated ()) focus_virtual (target);
+      if (!target->tab) target->raise ();
+      if (target->decorated () || target->tab) focus_virtual (target);
     }
     else focus_virtual (NULL);
     if (title) {
@@ -1588,17 +1695,118 @@ route_keys (vue_window win) {
   return win;
 }
 
+// the tab with the id id, if any
+static vue_virtual_window_rep*
+find_tab (int id) {
+  for (int i= 0; i < N(tabs); i++)
+    if (tabs[i]->id == id) return tabs[i];
+  return NULL;
+}
+
+#ifdef __EMSCRIPTEN__
+// The frame of the page (misc/wasm/frame.js) shows the tabs: it is told of
+// them once per frame when they changed (frame_sync), and asks to show,
+// close or open one (vue_web_activate_tab, vue_web_close_tab,
+// vue_web_new_tab)
+
+EM_JS (void, vue_web_frame_update, (const char* json), {
+  if (typeof tmFrame !== 'undefined') tmFrame.update (JSON.parse (UTF8ToString (json)));
+});
+
+EM_JS (void, vue_web_frame_info, (const char* json), {
+  if (typeof tmFrame !== 'undefined') tmFrame.info (JSON.parse (UTF8ToString (json)));
+});
+
+// a string of TeXmacs in JSON
+static string
+frame_json_string (string s) {
+  string u= cork_to_utf8 (s), r= "\"";
+  for (int i= 0; i < N(u); i++) {
+    char c= u[i];
+    if (c == '"' || c == '\\') { r << '\\'; r << c; }
+    else if ((unsigned char) c < 0x20) r << ' ';
+    else r << c;
+  }
+  return r * "\"";
+}
+
+static void
+frame_sync () {
+  if (!frame_dirty) return;
+  frame_dirty= false;
+  string j= "{\"tabs\":[";
+  bool first= true;
+  for (int i= 0; i < N(tabs); i++) {
+    vue_virtual_window_rep* t= tabs[i];
+    if (!t->shown) continue;
+    if (!first) j << ",";
+    first= false;
+    j << "{\"id\":" << as_string (t->id)
+      << ",\"title\":" << frame_json_string (t->the_name)
+      << ",\"modified\":" << (t->modified ? "true" : "false")
+      << ",\"active\":" << (t == active_tab ? "true" : "false") << "}";
+  }
+  j << "]}";
+  c_string cj (j);
+  vue_web_frame_update (cj);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_activate_tab (int id) {
+  vue_virtual_window_rep* t= find_tab (id);
+  if (t != NULL && t->shown) activate_tab (t);
+  gui_needs_relayout= true;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_close_tab (int id) {
+  vue_virtual_window_rep* t= find_tab (id);
+  if (t == NULL) return;
+  // as the close box of a window: TeXmacs asks to save what is not saved
+  if (t != active_tab) activate_tab (t);
+  t->destroy_event ();
+  gui_needs_relayout= true;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_new_tab () {
+  exec_delayed (scheme_cmd ("(new-document*)"));
+}
+#else
+static void frame_sync () {}
+#endif
+
 //******************************************************************************
 // entrypoints for top-level windows
 
+// the host of single-window mode: an SDL window with nothing of its own
+// (a glue, over which the tabs are drawn), outside the ids of the windows
+// of TeXmacs (the scripted tests address those by id)
+static void
+make_host () {
+  int saved= vue_window_rep::serial;
+  vue_widget empty= concrete (glue_widget (true, true, 0, 0));
+  the_host= tm_new<vue_sdl_mupdf_window_rep> (empty, "TeXmacs", false);
+  vue_window_rep::serial= saved;
+  id_to_window->reset (the_host->id);
+  the_host->id= 1000000;
+  id_to_window (the_host->id)= the_host;
+  set_identifier (abstract (empty), the_host->id);
+  if (last_created_window == (vue_window) the_host) last_created_window= NULL;
+  the_host->ready_to_show= true;
+  the_host->set_visibility (true);
+}
+
 vue_window
-plain_window (vue_widget wwid, string name, bool popup) {
+plain_window (vue_widget wwid, string name, bool popup, bool document) {
   // headless: the windows are virtual as well, with no host to be drawn in
-  if (is_headless () || (single_window_mode () && the_host != NULL))
-    return tm_new<vue_virtual_window_rep> (wwid, name, popup);
-  vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
-  if (single_window_mode () && the_host == NULL && !popup) the_host= w;
-  return w;
+  if (is_headless ())
+    return tm_new<vue_virtual_window_rep> (wwid, name, popup, false);
+  if (single_window_mode ()) {
+    if (the_host == NULL) make_host ();
+    return tm_new<vue_virtual_window_rep> (wwid, name, popup, document && !popup);
+  }
+  return tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
 }
 
 //******************************************************************************
@@ -1632,6 +1840,15 @@ void gui_open (int& argc, char** argv) {
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-files", web_files_s7, 0, 0, false,
                         "(web-files): the files of the page");
+#endif
+#ifdef __EMSCRIPTEN__
+  {
+    // what the frame of the page says about the application
+    string info= "{\"version\":\"" TEXMACS_VERSION "\",\"built\":\"" __DATE__
+                 "\",\"mupdf\":\"" FZ_VERSION "\",\"scheme\":\"S7\"}";
+    c_string ci (info);
+    vue_web_frame_info (ci);
+  }
 #endif
   
   // headless (-headless): no display is opened at all, which is what makes
@@ -2367,6 +2584,7 @@ loop_iteration () {
   if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
   vue_profile_add (VP_FRAME, vue_now () - t_frame);
   vue_profile_frame ();
+  frame_sync (); // the tabs, to the page
   gui_wait= true;
 }
 
@@ -2406,8 +2624,11 @@ void process_layout () {
   // the virtual windows (single-window mode); the array may change while
   // they are laid out
   array<vue_virtual_window_rep*> vl= virtual_windows;
-  for (int i= 0; i < N(vl); i++)
-    if (id_to_window->contains (vl[i]->id)) vl[i]->process_layout ();
+  for (int i= 0; i < N(vl); i++) {
+    if (!id_to_window->contains (vl[i]->id)) continue;
+    if (vl[i]->tab && vl[i]->shown && vl[i] != active_tab) continue; // hidden tab
+    vl[i]->process_layout ();
+  }
 }
 
 void process_redraw () {
@@ -2452,6 +2673,7 @@ get_window_from_ID (Uint32 ID) {
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
+*   tab <id>                        show the tab #id (single-window mode)
 ******************************************************************************/
 
 static array<string> script_lines;
@@ -2727,6 +2949,12 @@ script_step () {
       ev.drop.x= dx;
       ev.drop.y= dy;
       SDL_PushEvent (&ev);
+    }
+    else if (cmd == "tab" && N(a) > 1) {
+      // show the tab (a window of an editor in single-window mode) #id
+      vue_virtual_window_rep* t= find_tab (as_int (a[1]));
+      if (t != NULL && t->shown) activate_tab (t);
+      else cout << "vue script: no tab " << a[1] << LF;
     }
     else if (cmd == "close" && win->platform_window () == NULL)
       win->destroy_event (); // a virtual window: as its close box does

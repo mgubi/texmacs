@@ -10,6 +10,9 @@
 ******************************************************************************/
 
 #include "config.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #include "boot.hpp"
 #include "tm_server.hpp"
 #include "drd_std.hpp"
@@ -325,6 +328,19 @@ quit_texmacs_internal (int code) {
   del_obj_qt_renderer ();
 #endif
 
+#ifdef __EMSCRIPTEN__
+  // in a page there is nothing to go back to: TeXmacs starts again, once
+  // the home directory (the preferences just saved) is written to the
+  // storage of the browser (see misc/wasm/web-pre.js); headless (node), it
+  // ends as elsewhere
+  if (!is_headless ()) {
+    emscripten_cancel_main_loop ();
+    EM_ASM ({
+      FS.syncfs (false, function () { location.reload (); });
+    });
+    return;
+  }
+#endif
 #ifdef ADVANCED_DEVELOPER_MODE
   // Crashes sometimes occur when destructing Qt objects at exit.
   // Developers are invited to investigate this issue.

@@ -6190,7 +6190,7 @@ widget plain_window_widget (widget wid, string s, command quit) {
     // contents, the main window and the popups have their own rules
     // (see vue_plain_window_widget_rep::post_layout)
     vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
-    plain_window (wwid, s);
+    plain_window (wwid, s, false, concrete (wid)->type == "vue_texmacs_widget_rep");
     return abstract (wwid);
   }
 }
