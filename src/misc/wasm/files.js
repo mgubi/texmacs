@@ -316,7 +316,7 @@ var tmFiles = (function () {
       nameInput.id = 'tm-files-name';
       nameInput.value = opts.name || 'untitled.tm';
       var dl = el ('label', 'white-space:nowrap');
-      dlBox = el ('input'); dlBox.type = 'checkbox'; dlBox.checked = true;
+      dlBox = el ('input'); dlBox.type = 'checkbox'; dlBox.checked = false;
       dl.appendChild (dlBox); dl.appendChild (document.createTextNode (' download a copy'));
       foot.appendChild (el ('span', '', 'Name:'));
       foot.appendChild (nameInput);

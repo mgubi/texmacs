@@ -22,7 +22,10 @@
   (if (or (like-gnome?) (like-macos?) (like-windows?)) "popup" "footer"))
 
 (define (get-default-buffer-management)
-  (if (or (like-macos?) (like-windows?)) "separate" "shared"))
+  ;; in the browser (where the Vue plugin defines web-files) the windows are
+  ;; the tabs of the page: a document per tab
+  (if (or (like-macos?) (like-windows?) (defined? 'web-files))
+      "separate" "shared"))
 
 (define (notify-buffer-management var val)
   (when (== val (get-default-buffer-management))

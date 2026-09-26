@@ -32,6 +32,7 @@
 #include "image_files.hpp"
 #include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
+#include "new_window.hpp"   // buffer_to_windows (the tabs of the page)
 #ifdef OS_MACOS
 #include "MacOS/mac_utilities.h" // mac_beep
 #endif
@@ -1695,6 +1696,14 @@ route_keys (vue_window win) {
   return win;
 }
 
+// the tab of the window widget w of TeXmacs, if any
+static vue_virtual_window_rep*
+find_tab_of (widget w) {
+  for (int i= 0; i < N(tabs); i++)
+    if (abstract (tabs[i]->content) == w) return tabs[i];
+  return NULL;
+}
+
 // the tab with the id id, if any
 static vue_virtual_window_rep*
 find_tab (int id) {
@@ -3136,10 +3145,22 @@ vue_web_drop_files (float x, float y, const char* paths) {
   if (the_host != NULL) drop_deliver (the_host, x, y);
 }
 
+static vue_virtual_window_rep* find_tab_of (widget w);
+static void activate_tab (vue_virtual_window_rep* v);
+
+// a document of the page is shown in its tab if it has one, else opened in
+// a new one (a new window of TeXmacs)
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_open_document (const char* path) {
   url u= url_system (utf8_to_cork (string (path)));
-  exec_delayed (scheme_cmd ("(load-buffer " * scm_quote (as_string (u)) * ")"));
+  array<url> ws= buffer_to_windows (u);
+  for (int i= 0; i < N(ws); i++) {
+    tm_window tw= concrete_window (ws[i]);
+    vue_virtual_window_rep* t= (tw != NULL) ? find_tab_of (tw->win) : NULL;
+    if (t != NULL) { activate_tab (t); gui_needs_update= true; return; }
+  }
+  exec_delayed (scheme_cmd ("(load-buffer-in-new-window " *
+                            scm_quote (as_string (u)) * ")"));
   gui_needs_update= true;
 }
 #endif
