@@ -42,12 +42,14 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#if MUPDF_RENDERER
+// The Vue GUI draws with MuPDF: its windows and pictures are MuPDF pixmaps,
+// drawn by mupdf_renderer (the experimental fitz_renderer, the other one,
+// has gone; see the log of Plugins/MuPDF)
+#if !MUPDF_RENDERER
+#error "the Vue GUI needs MuPDF (MUPDF_RENDERER)"
+#endif
 #include "../MuPDF/mupdf_picture.hpp"
 #include "../MuPDF/mupdf_renderer.hpp" // mupdf_image_gc
-#else
-#include "../MuPDF/fitz_picture.hpp"
-#endif
 
 #include "clay.h"
 extern "C" bool vue_clay_transitions_active (void); // clay.c
@@ -515,13 +517,8 @@ save_pixmap_as_png (fz_context *ctx, fz_pixmap *pix, string path) {
 void
 sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
-#if MUPDF_RENDERER
   fz_pixmap *pix=  ((mupdf_picture_rep*)pic->get_handle())->pix;
   fz_context *ctx= mupdf_context ();
-#else
-  fz_pixmap *pix=  ((fitz_picture_rep*)pic->get_handle())->pix;
-  fz_context *ctx= get_fitz_context ();
-#endif
 
   snapshot_pixmap (ctx, pix);
   unsigned char *pixels= fz_pixmap_samples (ctx, pix);
@@ -662,13 +659,8 @@ vue_sdl_mupdf_window_rep::process_layout () {
 void
 sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
   // propagate immediately the changes to the screen
-#if MUPDF_RENDERER
   fz_pixmap *pix= ((mupdf_picture_rep*)pic->get_handle())->pix;
   fz_context *ctx= mupdf_context ();
-#else
-  fz_pixmap *pix= ((fitz_picture_rep*)pic->get_handle())->pix;
-  fz_context *ctx= get_fitz_context ();
-#endif
   snapshot_pixmap (ctx, pix);
   unsigned char *pixels= fz_pixmap_samples (ctx, pix);
   int w= fz_pixmap_width (ctx, pix);
@@ -687,13 +679,8 @@ sdl_draw_picture (SDL_Surface *dest_surf, picture pic, SDL_FRect *dest) {
 
 picture
 native_picture_from_SDL_Surface (SDL_Surface *surf) {
-#if MUPDF_RENDERER
   fz_context *ctx= mupdf_context ();
-#else
-  fz_context *ctx= get_fitz_context ();
-#endif
   fz_pixmap *pix= NULL;
-#if MUPDF_RENDERER
   // the window surface is wrapped, not copied; a 1x1 pixmap replaces it if
   // MuPDF refuses (nothing is then drawn in this frame)
   // SDL only promises the format which suits the window best: check that
@@ -714,17 +701,7 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
     }
   }
   if (!ok) pix= mupdf_new_pixmap (1, 1);
-#else
-  pix= fz_new_pixmap_with_data (ctx,
-                      fz_device_bgr (ctx),
-                      surf->w, surf->h, NULL, 1, 4*surf->w,
-                      (unsigned char*)surf->pixels);
-#endif
-#if MUPDF_RENDERER
   picture p= mupdf_picture (pix, 0, 0);
-#else
-  picture p= fitz_picture (pix, 0, 0);
-#endif
   fz_drop_pixmap (ctx, pix);
   return p;
 }
@@ -757,22 +734,13 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     return;
   }
   backing_store= native_picture_from_SDL_Surface (surf);
-#if MUPDF_RENDERER
   fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
   fz_context *ctx= mupdf_context ();
-#else
-  fz_pixmap *pix= ((fitz_picture_rep*)backing_store->get_handle())->pix;
-  fz_context *ctx= get_fitz_context ();
-#endif
 
   if (!ren) {
     ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
   } else {
-#if MUPDF_RENDERER
     static_cast<mupdf_renderer_rep*>(ren)->begin (pix);
-#else
-    static_cast<fitz_renderer_rep*>(ren)->begin (pix);
-#endif
   }
   
   win_w = surf->w;
@@ -791,11 +759,7 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   }
   render_clay_commands (ren, &render_commands);
 
-#if MUPDF_RENDERER
     static_cast<mupdf_renderer_rep*>(ren)->end ();
-#else
-    static_cast<fitz_renderer_rep*>(ren)->end ();
-#endif
 
   if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
   t1= t2; t2= texmacs_time ();
@@ -3066,11 +3030,7 @@ bool check_event (int type) {
 void image_gc (string name) {
   // Garbage collect images of a given name (may use wildcards): the
   // renderer caches the decoded images, the patterns and their images
-#if MUPDF_RENDERER
   mupdf_image_gc (name);
-#else
-  (void) name;
-#endif
 }
 
 // the balloon shown by show_help_balloon, and the wait indicator: both are

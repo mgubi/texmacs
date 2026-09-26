@@ -30,11 +30,7 @@
 #include "analyze.hpp"   // for occurs (filtered choice)
 #include "poly_line.hpp" // for ink widget
 
-#if MUPDF_RENDERER
 #include "../MuPDF/mupdf_picture.hpp"
-#else
-#include "../MuPDF/fitz_picture.hpp"
-#endif
 
 widget make_menu_widget (object wid);
 extern bool menu_caching;
@@ -5130,11 +5126,7 @@ vue_simple_widget_rep::is_invalid () {
 // invalidated by the caller
 void
 vue_simple_widget_rep::translate_backing_store (int dpx, int dpy) {
-#if MUPDF_RENDERER
   fz_pixmap *pix=  ((mupdf_picture_rep*)backing_store->get_handle())->pix;
-#else
-  fz_pixmap *pix=  ((fitz_picture_rep*)backing_store->get_handle())->pix;
-#endif
   if (pix == NULL || pix->samples == NULL) return;
   int w= pix->w, h= pix->h, n= pix->n;
   ptrdiff_t stride= pix->stride;

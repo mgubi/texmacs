@@ -726,7 +726,7 @@ behaviour. Feature status against those two:
 * **FreeType under MuPDF's lock**: the charmap of a native font and the
   glyph of each character are asked of the FreeType face of the MuPDF font
   only through `mupdf_select_custom_charmap` and `mupdf_glyph_index`, which
-  hold `fz_ft_lock` (the Fitz renderer uses them too). Those two calls do
+  hold `fz_ft_lock`. Those two calls do
   not allocate, so this is discipline rather than a fix; asked directly, a
   glyph name on an OpenType face did crash the PDF renderer;
 * **Figures kept drawn**: a figure drawn as a drawing is interpreted in full
@@ -785,14 +785,24 @@ behaviour. Feature status against those two:
   (`pattern-scroll`, s3 against s4, row 337); it was there before the
   patterns were anchored. `set_brush` also resets the pencil width/caps.
 
-The renderers of the MuPDF plugin (`mupdf_renderer_rep`, used by the Vue
-windows and pictures, and `fitz_renderer_rep`) derive from
+The screen renderer of the MuPDF plugin (`mupdf_renderer_rep`, used by
+the Vue windows and pictures) derives from
 `basic_renderer_rep`. Since TeXmacs 2.1.5 `renderer_rep` carries a
 `pixel_ratio` (device pixels per point, used by the Qt6 port) which enters
 `zoomf`, `retina_pixel` and `shrink (glyph, ..., pixel_ratio)`, plus a pure
 virtual `clear_device` (the neutral pattern behind the pages) and a `safe`
 flag of `set_zoom_factor` checking the consistency of `shrinkf`. The MuPDF
-renderers keep the older scheme instead: `pixel_ratio= 1`, the retina factor
+renderer keeps the older scheme instead: `pixel_ratio= 1`, the retina factor
 is multiplied into the zoom by their own `set_zoom_factor` (hence
 `safe= false`) and `shrink` is called with ratio 1; `clear_device` draws
 the white and the neutral pattern, as above.
+
+The plugin had a second screen renderer, `fitz_renderer_rep`, which drew
+through MuPDF's device interface directly instead of through its PDF
+interpreter. It was experimental ("not working, and probably not useful",
+as its first commit says), used only when `MUPDF_RENDERER` was 0, which
+no configuration sets, and it had none of the work on `mupdf_renderer`
+(direct pixels, patterns anchored to the document, figures as drawings
+and kept drawn, the protection against MuPDF's errors). It was compiled
+and linked all the same; it has been removed (September 2026), and the
+Vue GUI says at compile time that it needs MuPDF.
