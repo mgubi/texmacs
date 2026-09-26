@@ -145,7 +145,7 @@ mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
 mupdf_c_src  := $(call findc_in,Plugins,@CONFIG_MUPDF@)
 sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
 vue_src    	 := $(call findsrc_in,Plugins,@CONFIG_VUE@)
-vue_c_src    := clay.c
+vue_c_src    := $(if $(strip @CONFIG_VUE@),clay.c,)
 
 # Each makefile will have its own Deps directory. Okay that is a bit
 # inefficient, but that is much simpler to maintain.
