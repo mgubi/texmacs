@@ -729,7 +729,10 @@ behaviour. Feature status against those two:
   hold `fz_ft_lock` (the Fitz renderer uses them too). Those two calls do
   not allocate, so this is discipline rather than a fix; asked directly, a
   glyph name on an OpenType face did crash the PDF renderer;
-* **PDF figures as drawing**: a PDF is not converted to a PNG (by
+* **PDF and PostScript figures as drawing**: an EPS or PS figure is made a
+  PDF once (`image_to_pdf`, Ghostscript, which keeps it a drawing;
+  `load_ps_form`) and then drawn as a PDF is, where it went to a PNG at
+  every size it was shown at. A PDF is not converted to a PNG (by
   CoreGraphics, Ghostscript or ImageMagick, at one size) but read once into
   memory and drawn through a form XObject made of its first page
   (`load_pdf_form`, `draw_form`), sharp at any zoom. Each form keeps the

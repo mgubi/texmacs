@@ -1409,6 +1409,21 @@ load_pdf_form (url u) {
   return mupdf_form (doc, xo);
 }
 
+// A PostScript figure as a form: made a PDF by the converters, once --
+// the form keeps what it read, so the file goes at once -- nil if that
+// gives nothing MuPDF can read
+static mupdf_form
+load_ps_form (url u) {
+  url pdf= url_temp (".pdf");
+  int w= 0, h= 0;
+  image_size (u, w, h);
+  image_to_pdf (u, pdf, w, h, 300);
+  mupdf_form fm;
+  if (exists (pdf)) fm= load_pdf_form (pdf);
+  remove (pdf);
+  return fm;
+}
+
 // Draw a form into the box of size w by h (device pixels) whose lower left
 // corner is at (x, y). A form is drawn in its /BBox as its own /Matrix
 // places it -- a page turned by /Rotate comes with a matrix which turns it
@@ -1488,10 +1503,14 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
   else {
     url u= im->get_name ();
     tree lookup= tuple (u->t);
-    if (locase_all (suffix (u)) == "pdf") {
-      // a PDF is drawn as what it is, a drawing, at any zoom
+    string suf= locase_all (suffix (u));
+    if (suf == "pdf" || suf == "eps" || suf == "ps") {
+      // a PDF is drawn as what it is, a drawing, at any zoom; so is a
+      // PostScript figure, made a PDF once by the converters (Ghostscript,
+      // which keeps it a drawing), as the PDF renderer does
       if (!form_pool->contains (lookup))
-        form_pool (lookup)= load_pdf_form (u);
+        form_pool (lookup)= (suf == "pdf") ? load_pdf_form (u)
+                                           : load_ps_form (u);
       mupdf_form fm= form_pool [lookup];
       if (!is_nil (fm)) {
         rectangle r= im->get_logical_extents ();

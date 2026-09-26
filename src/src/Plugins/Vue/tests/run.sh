@@ -8,7 +8,8 @@
 # <test>.script, and prints what the test prints (choice:, got:, ...), the
 # errors and the end of the script; the snapshots go to OUT (default
 # /tmp/vue-tests/<test>). SCM= and SCRIPT= name another pair, for the tests
-# which share one (SCM=wheel-travel.scm SCRIPT=scroll-shift.script).
+# which share one (SCM=wheel-travel.scm SCRIPT=scroll-shift.script), in the
+# directory of the tests or by an absolute path.
 #
 # TeXmacs runs with a home of its own, a copy of ~/.TeXmacs made for the
 # run (copy on write where the file system can): a test must not change
@@ -34,10 +35,13 @@ if [ -d "$HOME/.TeXmacs" ]; then
     echo "cannot make a home for TeXmacs in $HOMEDIR"; exit 2; }
 else mkdir -p "$HOMEDIR"; fi
 
+# SCM and SCRIPT are in the directory of the tests, or absolute paths
+case "$SCM" in /*) ;; *) SCM="$PWD/$T/$SCM" ;; esac
+case "$SCRIPT" in /*) ;; *) SCRIPT="$PWD/$T/$SCRIPT" ;; esac
 load=""
-[ -f "$T/$SCM" ] && load="(load \"$T/$SCM\")"
+[ -f "$SCM" ] && load="(load \"$SCM\")"
 script=""
-[ -f "$T/$SCRIPT" ] && script="$PWD/$T/$SCRIPT"
+[ -f "$SCRIPT" ] && script="$SCRIPT"
 
 TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
 TEXMACS_VUE_SNAPSHOT="$OUT" TEXMACS_VUE_SCRIPT="$script" \
