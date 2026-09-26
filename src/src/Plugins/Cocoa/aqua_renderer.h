@@ -27,6 +27,8 @@ public:
   void  line (SI x1, SI y1, SI x2, SI y2);
   void  lines (array<SI> x, array<SI> y);
   void  clear (SI x1, SI y1, SI x2, SI y2);
+  // the background of the device (outside the paper): the plain background
+  void  clear_device (SI x1, SI y1, SI x2, SI y2) { clear (x1, y1, x2, y2); }
   void  fill (SI x1, SI y1, SI x2, SI y2);
   void  arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);
   void  fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta);

@@ -16,6 +16,7 @@
 #include "analyze.hpp"
 #include <locale.h>
 #include "language.hpp"
+#include "locale.hpp" // get_locale_language
 #include "message.hpp"
 #include "aqua_renderer.h" // for the_aqua_renderer
 
@@ -411,6 +412,12 @@ void gui_refresh ()
 {
   // update and redraw all windows (e.g. on change of output language)
   // FIXME: add suitable code
+}
+
+string gui_version ()
+{
+  // the type of GUI in use
+  return "cocoa";
 }
 
 

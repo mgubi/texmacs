@@ -1116,6 +1116,12 @@ widget popup_window_widget (widget w, string s)
   return concrete(w)->popup_window_widget(s);
 }
 
+widget tooltip_window_widget (widget w, string s)
+// a tooltip: an undecorated window as well
+{
+  return popup_window_widget (w, s);
+}
+
 void   destroy_window_widget (widget w) {  
 // destroys a window as created by the above routines
   (void) w;
@@ -1206,6 +1212,8 @@ wait_widget (SI width, SI height, string message) {
 widget aligned_widget (array<widget> lhs, array<widget> rhs, SI hsep, SI vsep, SI lpad, SI rpad)  { return widget(); }
 widget tabs_widget (array<widget> tabs, array<widget> bodies)  { return widget(); }
 widget icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs)  { return widget(); }
+widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) { return tabs_widget (tabs, bodies); }
+widget responsive_icon_tabs_widget (array<url> us, array<widget> ts, array<widget> bs) { return icon_tabs_widget (us, ts, bs); }
 widget wrapped_widget (widget w, command cmd) { return widget(); }
 //widget tile_menu (array<widget> a, int cols)  { return widget(); }
 //widget minibar_menu (array<widget> arr)  { return widget(); }
@@ -1219,6 +1227,9 @@ widget wrapped_widget (widget w, command cmd) { return widget(); }
 //widget xpm_widget (url file_name)  { return widget(); }
 widget toggle_widget (command cmd, bool on, int style)  { return widget(); }
 widget enum_widget (command cmd, array<string> vals, string val, int style, string width)  { return widget(); }
+widget setting_toggle_widget (command cmd, string text, bool on, int style)  { return widget(); }
+widget setting_enum_widget (command cmd, string text, array<string> vals, string val, int style, string width)  { return widget(); }
+widget setting_group_widget (string text, array<widget> vals, int style)  { return widget(); }
 widget choice_widget (command cmd, array<string> vals, array<string> chosen, int style) { return widget(); }
 widget choice_widget (command cmd, array<string> vals, string cur, int style) { return widget(); }
 widget choice_widget (command cmd, array<string> vals, string cur, string filter)  { return widget(); }

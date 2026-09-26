@@ -348,7 +348,7 @@ aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
 	if (is_nil(mi)) {
 		SI xo, yo;
 		glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-		glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+		glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
 		int i, j, w= gl->width, h= gl->height;
 		CGImageRef im = NULL;
 		{
@@ -380,8 +380,8 @@ aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     CGContextRef cgc = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
 
 		(void) w; (void) h;
-		int x1= x- mi->xo*std_shrinkf;
-		int y1=  y+ mi->yo*std_shrinkf;
+		SI x1= x- mi->xo*std_shrinkf;
+		SI y1=  y+ mi->yo*std_shrinkf;
 		decode (x1, y1);
 		y1--; // top-left origin to bottom-left origin conversion
 		CGRect r = CGRectMake(x1,y1,mi->w,mi->h);
@@ -402,7 +402,7 @@ void aqua_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     // debug_events << "CACHING:" << c << "\n" ;
     SI xo, yo;
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
     int i, j, w= gl->width, h= gl->height;
     NSImage *im = [[NSImage alloc] initWithSize:NSMakeSize(w,h)];
     int nr_cols= std_shrinkf*std_shrinkf;

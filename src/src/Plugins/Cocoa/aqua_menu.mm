@@ -139,10 +139,10 @@ public:
     [img lockFocus];
     
     basic_renderer r = the_aqua_renderer();
-    int x1 = 0;
-    int y1 = s.height;
-    int x2 = s.width;
-    int y2 = 0;
+    SI x1 = 0;
+    SI y1 = s.height;
+    SI x2 = s.width;
+    SI y2 = 0;
     
     r -> begin([NSGraphicsContext currentContext]);
     

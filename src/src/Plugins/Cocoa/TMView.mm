@@ -280,10 +280,10 @@ void initkeymap()
 	
   {
     aqua_renderer_rep* r = the_aqua_renderer();
-    int x1 = rect.origin.x;
-    int y1 = rect.origin.y+rect.size.height;
-    int x2 = rect.origin.x+rect.size.width;
-    int y2 = rect.origin.y;
+    SI x1 = rect.origin.x;
+    SI y1 = rect.origin.y+rect.size.height;
+    SI x2 = rect.origin.x+rect.size.width;
+    SI y2 = rect.origin.y;
     
     r -> begin ([NSGraphicsContext currentContext]);
     r -> view = self;
