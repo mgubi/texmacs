@@ -48,10 +48,23 @@
 (define-public scheme-completions-built? #f)
 
 (tm-define (all-used-modules)
-  (cons (current-module) (module-uses (current-module))))
+  (if (s7-scheme?)
+      *modules*
+      (cons (current-module) (module-uses (current-module)))))
 
 (tm-define (all-used-symbols)
-  (list-fold obarray-fold-sub '() (all-used-modules)))
+  (if (s7-scheme?)
+      (map symbol->string
+           (append
+            ;; tm-defined symbols
+            (map car tm-defined-table)
+            ;; all other exported symbols
+            (apply append
+                   (map (lambda (m)
+                          (let ((e ((cdr m) '*exports*)))
+                            (if (undefined? e) (values) e)))
+                        *modules*))))
+      (list-fold obarray-fold-sub '() (all-used-modules))))
 
 (tm-define (scheme-completions-add str)
   (set! completions (pt-add completions str)))

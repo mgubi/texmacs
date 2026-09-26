@@ -17,8 +17,18 @@
 ;; Adaptive hash tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (vector? (make-hash-table 1))
-    (begin ;; old style
+(cond ((s7-scheme?)
+       (begin ;; S7 hash tables
+         (define-public make-ahash-table make-hash-table)
+         (define-public ahash-ref hash-table-ref)
+         (define-public (ahash-get-handle h s)
+           (let ((v  (hash-table-ref h s))) (if v (cons s v) #f)))
+         (define-public ahash-set! hash-table-set!)
+         (define-public (ahash-remove! h s) (hash-table-set! h s #f))
+         (define-public (ahash-table->list h) (map values h))
+         (define-public ahash-size hash-table-entries)))
+      ((vector? (make-hash-table 1))
+       (begin ;; old style (Guile)
       (define-public (make-ahash-table)
 	(cons (make-hash-table 1) 0))
 
@@ -59,9 +69,9 @@
 	(hash-fold folder init (car h)))
 
       (define-public (ahash-table->list h)
-	(hash-fold acons '() (car h))))
-
-    (begin ;; new style
+	(hash-fold acons '() (car h)))))
+      (else
+       (begin ;; new style (Guile)
       (define-public make-ahash-table make-hash-table)
       (define-public ahash-ref hash-ref)
       (define-public ahash-get-handle hash-get-handle)
@@ -71,7 +81,7 @@
       (define-public ahash-remove! hash-remove!)
       (define-public ahash-fold hash-fold)
       (define-public (ahash-table->list h)
-	(hash-fold acons '() h))))
+	(hash-fold acons '() h)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra routines on adaptive hash tables

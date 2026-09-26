@@ -1,3 +1,10 @@
+> ## Branch `wip_wasm_vue` — TeXmacs in the browser
+>
+> Work in progress: a WebAssembly build of TeXmacs running in a web page,
+> on the Vue GUI (below) and SDL3, with the [S7](https://ccrma.stanford.edu/software/snd/snd/s7.html)
+> Scheme interpreter in place of Guile (merged from `wip_s7` of
+> texmacs/texmacs; notes in [`docs/s7/`](docs/s7/README.md)).
+>
 > ## Branch `wip_vue` — the Vue GUI
 >
 > Work in progress: a graphical back end for TeXmacs which owes nothing to a

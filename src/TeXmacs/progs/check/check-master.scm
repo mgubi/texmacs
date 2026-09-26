@@ -13,7 +13,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert html htmltm-test)
+  (:use (kernel boot abbrevs-test)
+        (kernel logic logic-engine-test)
+        (kernel texmacs tm-define-test)
+        (kernel texmacs tm-dialogue-test)
+        (kernel texmacs tm-convert-test)
+        (kernel texmacs tm-glue-test)
+        (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
         (convert tools tmlength-test)
@@ -26,6 +32,10 @@
         (server server-notifications-test)
         (server server-tmfs-test)
         (utils cite cite-sort-test)))
+
+;; test suites which only make sense with S7
+(if (s7-scheme?)
+    (use-modules (kernel boot compat-s7-test) (kernel boot boot-s7-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -85,6 +95,13 @@
   (check-latex-export "$TEXMACS_CHECKS/latex-export"))
 
 (tm-define (run-all-tests)
+  (when (s7-scheme?)
+    (regtest-compat-s7)
+    (regtest-boot-s7))
+  (regtest-abbrevs)
+  (regtest-logic)
+  (regtest-tm-glue)
+  (regtest-tm-convert)
   (regtest-htmltm)
   (regtest-xmltm)
   (regtest-tmlength)
@@ -93,6 +110,8 @@
   (regtest-tmhtml)
   (regtest-tmmltm)
   (regtest-prog-format)
+  (regtest-tm-define)
+  (regtest-tm-dialogue)
   (regtest-cite-sort)
 )
 
