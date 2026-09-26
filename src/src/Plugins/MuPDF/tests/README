@@ -10,7 +10,10 @@ every document through the other route of the build as well, for its
 size; EMBED=0 leaves out the round trip of an embedded document
 (embed-roundtrip.sh: exported with its source, found by mutool extract,
 imported with the source folder gone, and a file next to the PDF left
-alone). pdf-check.js adds MuPDF's own check of the structure
+alone); encrypt-check.sh exports with passwords and restricted
+permissions and checks that no reader opens the PDF without a password,
+that both passwords do, that it is AES-256 and that only what was asked
+is allowed. pdf-check.js adds MuPDF's own check of the structure
 (PDFDocument.check, MuPDF 1.27 and later) to every document; it looks at
 the cross reference table and the syntax of the objects, not at what the
 objects mean -- the outline which pointed at a link annotation passed it,

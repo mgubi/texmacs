@@ -497,6 +497,31 @@ told everyone who got the PDF where the author's files were kept. A build
 with PDFHummus reads the bare names as well (tried). The harness checks it
 (`embed-roundtrip.sh`).
 
+## A PDF with a password
+
+*File -> Export -> Pdf with password* (shown only when the MuPDF renderer
+writes the PDF, `pdf-encryption?`: anything else would ignore the passwords
+and write a PDF which is not protected) asks for a password to open the
+PDF, an owner password, which lifts the restrictions (empty: the same),
+and what is allowed without it (all, none, or a list: print, print-hq,
+copy, modify, annotate, form, assemble, accessibility). The PDF is
+encrypted with AES, a key of 256 bits (`pdf_encryption`, which fills
+`pdf_write_options`); a password longer than the 127 bytes MuPDF keeps
+fails the export rather than protect the PDF with part of it.
+
+The passwords reach the renderer through the environment
+(`TEXMACS_PDF_USER_PASSWORD`, `TEXMACS_PDF_OWNER_PASSWORD`,
+`TEXMACS_PDF_PERMISSIONS`), put there by the command for the one export
+and taken away after it, even when it fails: a preference or the document
+would keep them on the disk in clear. For the same reason the answers to
+an argument of type `password` are no longer learned: `learn-interactive`
+kept every answer given to an interactive command and saved them in
+`interactive.scm`, in clear -- which it did with the passphrases of the
+wallet too. The attachment of the document (Pdf with embedded document)
+opens the PDF with the password and keeps its encryption. With the
+variables set, a batch export (`texmacs -c`) is encrypted as well, which
+is how `encrypt-check.sh` in the tests tries it.
+
 ## MuPDF's errors and C++
 
 MuPDF reports an error with `fz_throw`, a `longjmp`. Two things follow,
@@ -543,9 +568,6 @@ fail only for want of memory -- a `setjmp` for each glyph is not worth it.
 
 ## What is left
 
-* **Encryption.** `pdf_write_options` has the fields and nothing in
-  TeXmacs asks for them (PDFHummus's own `EncryptionOptions` is commented
-  out), so it is written down rather than written.
 * **An image with an effect** on it has to be computed, so it is
   rasterized -- at a print resolution, but rasterized.
 * **A preference in the menus.** The renderer is chosen by the preference

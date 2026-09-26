@@ -340,6 +340,60 @@ mupdf_pdf_renderer_rep::mupdf_pdf_renderer_rep (
   if (started) begin_page ();
 }
 
+// Encryption. The passwords come from the environment, where the command
+// which asks for them (File -> Export -> Pdf with password, tm-print.scm)
+// puts them for one export and takes them away again: a preference or the
+// document would keep them on the disk in clear. With no password nothing
+// is encrypted. The permissions are a list separated by commas (print,
+// print-hq, copy, modify, annotate, form, assemble, accessibility), or all,
+// the default, or none: what a reader lets someone who has only the password to
+// open it do; the owner password (the password to open it when none is
+// given) lifts them. AES with a key of 256 bits.
+static int
+pdf_permissions (string s) {
+  if (N(s) == 0 || s == "all") return ~0;
+  if (s == "none") return 0;   // to be read, and nothing else
+  int r= 0;
+  array<string> l= tokenize (s, ",");
+  for (int i=0; i<N(l); i++) {
+    string w= trim_spaces (l[i]);
+    if (w == "print") r |= PDF_PERM_PRINT;
+    else if (w == "print-hq") r |= PDF_PERM_PRINT | PDF_PERM_PRINT_HQ;
+    else if (w == "copy") r |= PDF_PERM_COPY;
+    else if (w == "modify") r |= PDF_PERM_MODIFY;
+    else if (w == "annotate") r |= PDF_PERM_ANNOTATE;
+    else if (w == "form") r |= PDF_PERM_FORM;
+    else if (w == "assemble") r |= PDF_PERM_ASSEMBLE;
+    else if (w == "accessibility") r |= PDF_PERM_ACCESSIBILITY;
+    else if (w == "all") r= ~0;
+    else convert_warning << "unknown PDF permission " << w << LF;
+  }
+  return r;
+}
+
+// the options for encryption, false when a password does not fit (it is
+// then not written at all: a password cut short would not be the one given)
+static bool
+pdf_encryption (pdf_write_options& opts) {
+  string upw= get_env ("TEXMACS_PDF_USER_PASSWORD");
+  string opw= get_env ("TEXMACS_PDF_OWNER_PASSWORD");
+  if (N(upw) == 0 && N(opw) == 0) return true;
+  if (N(opw) == 0) opw= upw;
+  if (N(upw) >= (int) sizeof (opts.upwd_utf8) ||
+      N(opw) >= (int) sizeof (opts.opwd_utf8)) {
+    convert_error << "a PDF password may have at most "
+                  << (int) sizeof (opts.upwd_utf8) - 1 << " bytes" << LF;
+    return false;
+  }
+  memset (opts.upwd_utf8, 0, sizeof (opts.upwd_utf8));
+  memset (opts.opwd_utf8, 0, sizeof (opts.opwd_utf8));
+  if (N(upw) > 0) memcpy (opts.upwd_utf8, &upw[0], N(upw));
+  memcpy (opts.opwd_utf8, &opw[0], N(opw));
+  opts.do_encrypt= PDF_ENCRYPT_AES_256;
+  opts.permissions= pdf_permissions (get_env ("TEXMACS_PDF_PERMISSIONS"));
+  return true;
+}
+
 mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
   if (!started) return;
   end_page ();
@@ -356,15 +410,18 @@ mupdf_pdf_renderer_rep::~mupdf_pdf_renderer_rep () {
                     << fz_caught_message (ctx) << LF;
   }
   c_string name (concretize (pdf_file_name)); // not in fz_try: a longjmp
+  pdf_write_options opts= pdf_default_write_options;
+  opts.do_compress= 1;
+  opts.do_compress_images= 1;
+  opts.do_compress_fonts= 1;
+  opts.do_garbage= 4;
+  bool encrypt_ok= pdf_encryption (opts);
   if (broken)
     convert_error << "The PDF " << pdf_file_name << " is not written: "
                   << "a page of it could not be" << LF;
+  else if (!encrypt_ok)
+    convert_error << "The PDF " << pdf_file_name << " is not written" << LF;
   else fz_try (ctx) {
-    pdf_write_options opts= pdf_default_write_options;
-    opts.do_compress= 1;
-    opts.do_compress_images= 1;
-    opts.do_compress_fonts= 1;
-    opts.do_garbage= 4;
     pdf_save_document (ctx, doc, name, &opts);
   }
   fz_catch (ctx) {
@@ -2078,8 +2135,17 @@ mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
     att_bodies << body;
   }
   fz_var (doc); fz_var (ok);
+  // a PDF written with a password is opened with it (see pdf_encryption),
+  // and written again as it was encrypted (the default: keep)
+  string upw= get_env ("TEXMACS_PDF_USER_PASSWORD");
+  string opw= get_env ("TEXMACS_PDF_OWNER_PASSWORD");
+  if (N(opw) == 0) opw= upw;
+  c_string cpw (opw);
   fz_try (ctx) {
     doc= pdf_open_document (ctx, in);
+    if (pdf_needs_password (ctx, doc) &&
+        !pdf_authenticate_password (ctx, doc, cpw))
+      fz_throw (ctx, FZ_ERROR_GENERIC, "the PDF is encrypted, and the password does not open it");
     pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
     pdf_obj* names= pdf_dict_get (ctx, root, PDF_NAME(Names));
     if (names == NULL) names= pdf_dict_put_dict (ctx, root, PDF_NAME(Names), 2);

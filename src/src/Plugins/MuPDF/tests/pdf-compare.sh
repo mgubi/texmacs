@@ -21,8 +21,8 @@
 #   size      reported, not judged
 #
 # and some documents have checks of their own (see below), and the round
-# trip of a PDF with its document embedded is run as well
-# (embed-roundtrip.sh).
+# trip of a PDF with its document embedded (embed-roundtrip.sh) and a PDF
+# with a password (encrypt-check.sh) are run as well.
 #
 # Every TeXmacs it starts has a home of its own, a copy of ~/.TeXmacs made
 # for it (copy on write where the file system can): a test must not change
@@ -308,6 +308,8 @@ start=$(date +%s)
     new_home "$OUT/homes/embed"
     echo "sh '$HERE/embed-roundtrip.sh' '$OUT' '$OUT/homes/embed' > '$OUT/embed.result' 2>&1"
   fi
+  new_home "$OUT/homes/encrypt"
+  echo "sh '$HERE/encrypt-check.sh' '$OUT' '$OUT/homes/encrypt' > '$OUT/encrypt.result' 2>&1"
 } > "$OUT/jobs.txt"
 batch < "$OUT/jobs.txt"
 
@@ -329,6 +331,9 @@ if [ "$EMBED" = 1 ]; then
   cat "$OUT/embed.result"
   grep -q "FAIL" "$OUT/embed.result" && fail=1
 fi
+echo "=== encrypted PDF"
+cat "$OUT/encrypt.result"
+grep -q "FAIL" "$OUT/encrypt.result" && fail=1
 rm -rf "${OUT:?}/homes"
 
 echo

@@ -105,6 +105,49 @@
         (buffer-close buf))
       (print-to-file fname)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A PDF with a password (the MuPDF renderer only, see pdf-encryption?)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (pdf-encryption?)
+  ;; whether the PDF will be written by the MuPDF renderer, which encrypts
+  ;; (as use_mupdf_pdf in edit_main.cpp): anything else would ignore the
+  ;; passwords and write a PDF which is not protected
+  (and (supports-native-pdf?)
+       (or (== (getenv "TEXMACS_PDF_MUPDF") "1")
+           (== (get-preference "native pdf renderer") "mupdf"))))
+
+(define pdf-password-target #f)
+
+(tm-define (print-to-pdf-with-password upw opw perm)
+  (:synopsis "Export to a PDF which asks for a password")
+  (:argument upw "password" "Password to open the PDF")
+  (:argument opw "password" "Owner password, which lifts the restrictions (empty: the same)")
+  (:argument perm "string" "Allowed without it (all, or print, copy, modify, annotate...)")
+  (:proposals perm '("all" "print,copy" "print" "none"))
+  ;; The passwords go to the renderer through the environment, for this one
+  ;; export only (mupdf_pdf_renderer.cpp, pdf_encryption): neither the
+  ;; preferences nor the document keep them, which would put them on the
+  ;; disk in clear.
+  (when pdf-password-target
+    (let ((fname pdf-password-target)
+          (clear (lambda ()
+                   (system-setenv "TEXMACS_PDF_USER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_PERMISSIONS" ""))))
+      (set! pdf-password-target #f)
+      (dynamic-wind
+        (lambda ()
+          (system-setenv "TEXMACS_PDF_USER_PASSWORD" upw)
+          (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" opw)
+          (system-setenv "TEXMACS_PDF_PERMISSIONS" perm))
+        (lambda () (wrapped-print-to-file fname))
+        clear))))
+
+(tm-define (choose-pdf-with-password fname)
+  (set! pdf-password-target fname)
+  (interactive print-to-pdf-with-password))
+
 (tm-define (wrapped-print-to-pdf-embeded-with-tm fname)
     (unless (string=? (url-suffix fname) "pdf")
       (texmacs-error "Wrapped-print-to-pdf-embeded-with-tm" "fname is not a pdf"))
