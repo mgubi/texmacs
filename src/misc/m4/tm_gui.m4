@@ -52,6 +52,10 @@ AC_DEFUN([TM_GUI],[
          LC_X_HEADERS
          AC_PATH_X
          AC_PATH_XTRA
+         if test x"$no_x" = xyes; then
+            AC_MSG_ERROR([cannot find X11 (use --x-includes and --x-libraries)])
+         fi
+         X11_CXX="$X_CFLAGS"
          ;;
       cocoa | aqua)
          AC_MSG_RESULT([enabling experimental Cocoa port])
@@ -152,6 +156,7 @@ AC_DEFUN([TM_GUI],[
   esac
 
   AC_SUBST(CONFIG_X11)
+  AC_SUBST(X11_CXX)
   AC_SUBST(CONFIG_COCOA)
   AC_SUBST(CONFIG_QT)
   AC_SUBST(CONFIG_SDL)

@@ -650,6 +650,7 @@ PDF_CFLAGS
 PDF_CPP
 PDF_CXX
 CONFIG_PDF
+CONFIG_MUPDF
 VUE_LDFLAGS
 VUE_CFLAGS
 SDL_LDFLAGS
@@ -712,7 +713,6 @@ MUPDF_LDFLAGS
 MUPDF_CFLAGS
 MUPDF_CPP
 MUPDF_CXX
-CONFIG_MUPDF
 APPCAST
 SPARKLE_LIBS
 SPARKLE_LDFLAGS
@@ -24864,27 +24864,18 @@ then :
 
     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf '%s\n' "yes" >&6; }
-
-printf '%s\n' "#define USE_MUPDF 1" >>confdefs.h
-
+    mupdf_usable=yes
     MUPDF_CPPFLAGS="$CPPFLAGS"
     MUPDF_LDFLAGS="$LDFLAGS"
     if test "$with_mupdf" = "linked" ; then
       MUPDF_LIBS="$LIBS"
-
-printf '%s\n' "#define LINKED_MUPDF 1" >>confdefs.h
-
     fi
-
-printf '%s\n' "#define MUPDF_RENDERER 1" >>confdefs.h
-
-    CONFIG_MUPDF="MuPdf"
-
 
 else case e in #(
   e)
     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf '%s\n' "no" >&6; } ;;
+printf '%s\n' "no" >&6; }
+    mupdf_usable=no ;;
 esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
@@ -36297,6 +36288,10 @@ fi
 
 fi
 
+         if test x"$no_x" = xyes; then
+            as_fn_error $? "cannot find X11 (use --x-includes and --x-libraries)" "$LINENO" 5
+         fi
+         X11_CXX="$X_CFLAGS"
          ;;
       cocoa | aqua)
          { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling experimental Cocoa port" >&5
@@ -36632,6 +36627,47 @@ printf '%s\n' "#define VUETEXMACS 1" >>confdefs.h
 
 
 
+
+
+
+
+  CONFIG_MUPDF=""
+  case "$CONFIG_GUI" in
+    X11 | COCOA)
+      if test "$mupdf_usable" = yes; then
+        if test "x$with_mupdf" != x -a "x$with_mupdf" != xno; then
+          as_fn_error $? "--with-gui=$gui_selector cannot draw with MuPDF: configure it without --with-mupdf" "$LINENO" 5
+        fi
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: not using MuPDF with --with-gui=$gui_selector" >&5
+printf '%s\n' "not using MuPDF with --with-gui=$gui_selector" >&6; }
+      fi
+      MUPDF_CFLAGS=""
+      MUPDF_LIBS=""
+      MUPDF_CPPFLAGS=""
+      MUPDF_LDFLAGS=""
+      ;;
+    *)
+      if test "$mupdf_usable" = yes; then
+
+printf '%s\n' "#define USE_MUPDF 1" >>confdefs.h
+
+        if test "$with_mupdf" = "linked" ; then
+
+printf '%s\n' "#define LINKED_MUPDF 1" >>confdefs.h
+
+        fi
+
+printf '%s\n' "#define MUPDF_RENDERER 1" >>confdefs.h
+
+        CONFIG_MUPDF="MuPdf"
+      else
+        case "$CONFIG_GUI" in
+          SDL | VUE)
+            as_fn_error $? "--with-gui=$gui_selector needs MuPDF: use --with-mupdf=DIR" "$LINENO" 5 ;;
+        esac
+      fi
+      ;;
+  esac
 
 
 

@@ -31,6 +31,34 @@ or in `mupdf_renderer_rep::new_shadow`). When in doubt rebuild everything:
 Vue-specific objects: `vue_gui.cpp`, `vue_widget.cpp` (C++20), `clay.c`
 (the Clay implementation, compiled once).
 
+## Choosing the GUI
+
+`--with-gui=` selects the port (`misc/m4/tm_gui.m4`); whether MuPDF is used
+is decided after it (`TM_MUPDF_FOR_GUI` in `misc/m4/mupdf.m4`), since the
+ports do not all draw their pictures the same way:
+
+| `--with-gui=` | define | MuPDF | plugin directories |
+|---|---|---|---|
+| `qt` (default) | `QTTEXMACS` | optional | `Qt` (or `Qt6`), `MacOS` |
+| `qtwk` | `QTWKTEXMACS`, `QTTEXMACS` | optional | `Qtwk`, `Widkit`, a few files of `Qt` |
+| `x11` | `X11TEXMACS` | not usable | `X11`, `Widkit` |
+| `cocoa` or `aqua` | `AQUATEXMACS` | not usable | `Cocoa`, `MacOS` |
+| `sdl` | `SDLTEXMACS` | required | `SDL`, `Widkit` |
+| `vue` | `VUETEXMACS` | required | `Vue` |
+
+With MuPDF, `MUPDF_RENDERER` makes MuPDF the screen renderer and picture
+type; X11 and Cocoa have pictures of their own, which clash with MuPDF's at
+link time, so for them an explicit `--with-mupdf` is an error and a MuPDF
+found by itself is left out. SDL and Vue stop at configure time without
+MuPDF. The X11 port needs the X11 headers: with Homebrew's `libx11`, pass
+`--x-includes=/opt/homebrew/include --x-libraries=/opt/homebrew/lib`
+(configure stops if it finds none).
+
+Checked on 2026-09-26 (macOS, clean builds): qt with and without MuPDF,
+qtwk, x11, cocoa, sdl and vue all build; x11 and cocoa with `--with-mupdf`,
+sdl and vue without it, x11 without X11 headers and an unknown GUI all stop
+in configure with a message. Only the Vue and SDL ports were run.
+
 ## Syncing with upstream
 
 Upstream TeXmacs (the SVN trunk) is mirrored in the `svn_sync` branch of the
