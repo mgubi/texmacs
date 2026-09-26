@@ -257,6 +257,7 @@ static hashmap<tree, mupdf_image>  image_pool;
 static hashmap<tree, mupdf_pattern> pattern_pool; // by pattern_key
 static hashmap<tree, mupdf_image> pattern_image_pool;
 static hashmap<tree, mupdf_form> form_pool; // nil: MuPDF cannot read it
+static void form_cache_forget (string name);  // the figures kept drawn
 static hashmap<string, mupdf_font> native_fonts;
 
 // Garbage collect the cached images whose name matches (image_gc in
@@ -268,6 +269,7 @@ void mupdf_image_gc (string name) {
     pattern_pool= hashmap<tree, mupdf_pattern> ();
     pattern_image_pool= hashmap<tree, mupdf_image> ();
     form_pool= hashmap<tree, mupdf_form> ();
+    form_cache_forget ("*");
     return;
   }
   array<tree> gone;
@@ -294,6 +296,7 @@ void mupdf_image_gc (string name) {
       gone << key;
   }
   for (int i= 0; i < N(gone); i++) form_pool->reset (gone[i]);
+  form_cache_forget (name);
 }
 
 // flush caches
@@ -304,6 +307,7 @@ void del_obj_mupdf_renderer (void)  {
   pattern_pool= hashmap<tree, mupdf_pattern> ();
   pattern_image_pool= hashmap<tree, mupdf_image> ();
   form_pool= hashmap<tree, mupdf_form> ();
+  form_cache_forget ("*");
   native_fonts= hashmap<string, mupdf_font> ();
 }
 
@@ -315,7 +319,7 @@ mupdf_renderer_rep::mupdf_renderer_rep (int w2, int h2)
   : basic_renderer_rep (true, 1.0, w2, h2),
     pixmap (NULL), dev (NULL), proc (NULL),
     fg (-1), bg (-1),
-    lw (-1), clip_level (0), fill_is_pattern (false),
+    lw (-1), clip_level (0), transform_level (0), fill_is_pattern (false),
     in_text (false), cfn ("")
 {
   reset_zoom_factor();
@@ -383,6 +387,7 @@ mupdf_renderer_rep::begin (void* handle) {
     cfn= "";
     in_text = false;
     clip_level = 0;
+    transform_level = 0;
     fill_is_pattern = false;
     
     // outmost save of the graphics state
@@ -478,6 +483,7 @@ mupdf_renderer_rep::set_transformation (frame fr) {
     proc->op_q (ctx, proc);
     proc->op_cm (ctx, proc, m[0], m[1], m[2], m[3], m[4], m[5]);
   });
+  transform_level++;
 
   rectangle nclip= fr [oclip];
   clip (nclip->x1, nclip->y1, nclip->x2, nclip->y2);
@@ -488,6 +494,7 @@ mupdf_renderer_rep::reset_transformation () {
   unclip ();
   fz_context* ctx= mupdf_context ();
   mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
+  if (transform_level > 0) transform_level--;
 }
 
 /******************************************************************************
@@ -1471,6 +1478,104 @@ draw_form (fz_context *ctx, pdf_processor *proc, mupdf_form fm, int alpha,
   proc->op_Q (ctx, proc);
 }
 
+// A figure drawn as a drawing costs the interpretation of all of it every
+// time a part of it is repainted, and a scroll repaints a strip at a time:
+// measured with a plot of 50000 points and 5000 markers, the repaint of a
+// frame took 5.8 ms on average and 44 ms at worst while scrolling through
+// it, against 3.5 and 22 for the same figure as a PNG. So a figure is also
+// kept drawn, at the size it has on the screen, in a pixmap with a
+// transparent background, and that is blitted while the size stays the
+// same -- until the zoom changes. Not under a transformation of the
+// graphics (a figure turned in a drawing): that is drawn as a drawing.
+// At most form_cache_max figures, and form_cache_bytes bytes, the oldest
+// going first; image_gc empties it for the file it names.
+struct form_pixmap_entry {
+  tree key;          // (the file, width, height)
+  fz_pixmap* pix;
+};
+static array<form_pixmap_entry> form_cache;
+static const int form_cache_max= 8;
+static const size_t form_cache_bytes= 64 << 20;
+
+static void
+form_cache_drop (int i) {
+  fz_drop_pixmap (mupdf_context (), form_cache[i].pix);
+  array<form_pixmap_entry> rest;
+  for (int j=0; j<N(form_cache); j++) if (j != i) rest << form_cache[j];
+  form_cache= rest;
+}
+
+static void
+form_cache_forget (string name) {  // "" or "*": everything
+  for (int i= N(form_cache) - 1; i >= 0; i--) {
+    tree k= form_cache[i].key;
+    if (name == "" || name == "*" ||
+        (N(k) > 0 && is_atomic (k[0]) && occurs (name, k[0]->label)))
+      form_cache_drop (i);
+  }
+}
+
+// the first page of the figure, drawn into a transparent w x h pixmap
+static fz_pixmap*
+render_form_pixmap (mupdf_form fm, int w, int h) {
+  fz_context* ctx= mupdf_context ();
+  pdf_document* doc= fm->doc;
+  fz_pixmap* pix= NULL;
+  fz_page* page= NULL;
+  fz_device* dev= NULL;
+  fz_var (pix); fz_var (page); fz_var (dev);
+  fz_try (ctx) {
+    page= (fz_page*) pdf_load_page (ctx, doc, 0);
+    fz_rect b= fz_bound_page (ctx, page);  // the crop box, turned by /Rotate
+    float bw= b.x1 - b.x0, bh= b.y1 - b.y0;
+    if (bw <= 0 || bh <= 0) fz_throw (ctx, FZ_ERROR_GENERIC, "empty page");
+    fz_matrix ctm= fz_concat (fz_translate (-b.x0, -b.y0),
+                              fz_scale (w / bw, h / bh));
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w, h, NULL, 1);
+    fz_clear_pixmap (ctx, pix);
+    dev= fz_new_draw_device (ctx, fz_identity, pix);
+    fz_run_page (ctx, page, dev, ctm, NULL);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_page (ctx, page);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+  }
+  return pix;
+}
+
+// the pixmap of a figure at a size, drawn now or kept from before
+static fz_pixmap*
+form_pixmap (tree name, mupdf_form fm, int w, int h) {
+  tree key= tuple (name, as_string (w), as_string (h));
+  for (int i=0; i<N(form_cache); i++)
+    if (form_cache[i].key == key) {
+      form_pixmap_entry e= form_cache[i];   // the newest goes last
+      array<form_pixmap_entry> rest;
+      for (int j=0; j<N(form_cache); j++) if (j != i) rest << form_cache[j];
+      rest << e;
+      form_cache= rest;
+      return e.pix;
+    }
+  fz_pixmap* pix= render_form_pixmap (fm, w, h);
+  if (pix == NULL) return NULL;
+  form_pixmap_entry e= { key, pix };
+  form_cache << e;
+  size_t total= 0;
+  for (int i=0; i<N(form_cache); i++)
+    total += (size_t) form_cache[i].pix->stride * form_cache[i].pix->h;
+  while (N(form_cache) > 1 &&
+         (N(form_cache) > form_cache_max || total > form_cache_bytes)) {
+    total -= (size_t) form_cache[0].pix->stride * form_cache[0].pix->h;
+    form_cache_drop (0);
+  }
+  return pix;
+}
+
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
@@ -1516,6 +1621,16 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
         rectangle r= im->get_logical_extents ();
         SI w= r->x2 - r->x1, h= r->y2 - r->y1;
         end_text ();
+        // kept drawn at its size on the screen, when it can be blitted
+        // (see form_pixmap); drawn as a drawing otherwise
+        int pw= (int) (((double) w)/pixel + 0.5);
+        int ph= (int) (((double) h)/pixel + 0.5);
+        if (transform_level == 0 && pw > 0 && ph > 0 &&
+            pw <= 8000 && ph <= 8000) {
+          fz_pixmap* pix= form_pixmap (u->t, fm, pw, ph);
+          if (pix != NULL && draw_pixmap_direct (pix, x - r->x1, y - r->y1, alpha))
+            return;
+        }
         draw_form (mupdf_context (), proc, fm, alpha,
                    ((double) w)/pixel, ((double) h)/pixel,
                    to_x (x - r->x1), to_y (y - r->y1));

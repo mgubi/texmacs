@@ -729,6 +729,18 @@ behaviour. Feature status against those two:
   hold `fz_ft_lock` (the Fitz renderer uses them too). Those two calls do
   not allocate, so this is discipline rather than a fix; asked directly, a
   glyph name on an OpenType face did crash the PDF renderer;
+* **Figures kept drawn**: a figure drawn as a drawing is interpreted in full
+  whenever a part of it is repainted, and a scroll repaints a strip at a
+  time. Measured with a plot of 50000 points and 5000 markers, scrolled
+  through (`TEXMACS_VUE_PROFILE`): repaint 5.8 ms a frame on average and
+  44 ms at worst, against 3.5 and 22 for the same figure as a PNG. So it
+  is also kept drawn, at its size on the screen, in a pixmap with a
+  transparent background (`form_pixmap`), blitted until the size changes:
+  0.8 ms and 5.2 ms. Not under a transformation of the graphics
+  (`transform_level`), where it is drawn as a drawing; at most eight
+  figures and 64 MB, the oldest going first, and `image_gc` forgets them.
+  The screen is the same as drawn as a drawing, to the anti-aliasing of the
+  edges (the pixmap is put on whole pixels);
 * **PDF and PostScript figures as drawing**: an EPS or PS figure is made a
   PDF once (`image_to_pdf`, Ghostscript, which keeps it a drawing;
   `load_ps_form`) and then drawn as a PDF is, where it went to a PNG at

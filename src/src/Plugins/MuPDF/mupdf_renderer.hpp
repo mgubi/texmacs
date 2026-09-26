@@ -42,6 +42,7 @@ protected:
   SI        lw;
   double    current_width;
   int       clip_level;
+  int       transform_level; // how deep in set_transformation
   bool      fill_is_pattern; // the PDF fill color is a pattern (no direct fill)
   
 //  pencil    pen;
