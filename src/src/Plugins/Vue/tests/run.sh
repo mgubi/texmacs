@@ -25,7 +25,7 @@ secs=${2:-25}
 OUT=${OUT:-/tmp/vue-tests/$test}
 SCM=${SCM:-$test.scm}
 SCRIPT=${SCRIPT:-$test.script}
-BIN=TeXmacs/bin/texmacs.bin
+BIN=${BIN:-TeXmacs/bin/texmacs.bin} # BIN=<path>: another build (CMake)
 [ -x "$BIN" ] || { echo "run me from the top of the source tree"; exit 2; }
 
 rm -rf "${OUT:?}"; mkdir -p "$OUT"
