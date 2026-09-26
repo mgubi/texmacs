@@ -1,0 +1,13 @@
+# no .scm needed: a text event right after a plain key (Return) belongs to
+# the next keystroke and must not be dropped (it was taken for the text of
+# the Return: "second" came out as "econd")
+wait 7000
+window #2
+focus
+click 300 400
+wait 300
+text first
+key Return
+text second
+wait 800
+snapshot kt
