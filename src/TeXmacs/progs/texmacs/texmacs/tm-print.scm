@@ -126,11 +126,41 @@
       (unless (attach-doc-to-exported-pdf fname)
           (notify-now "Fail to attach tm to pdf")))))
 
+(define (pdf-embedded-name s)
+  ;; a linked file by its name alone, when it is given by a path
+  (if (or (string-index s #\/) (string-index s #\\))
+      (url->string (url-tail (system->url s)))
+      s))
+
+(define (pdf-embedded-bare-names s)
+  ;; The copy of the document which goes into the PDF names the files it
+  ;; links to by their names alone: they go in next to it, and come out
+  ;; next to it (wrapped-import-pdf-embeded-with-tm), in either build. The
+  ;; paths pdf-replace-linked-path leaves are the author's, absolute ones --
+  ;; they worked, but every PDF told where the author's files are kept.
+  ;; On the stree, and a new one made: a subtree of a tree which is in no
+  ;; buffer cannot be assigned (tree-assign only rebinds it).
+  (cond ((not (pair? s)) s)
+        ((and (in? (car s) '(image include)) (pair? (cdr s)) (string? (cadr s)))
+         (cons* (car s) (pdf-embedded-name (cadr s))
+                (map pdf-embedded-bare-names (cddr s))))
+        ((and (== (car s) 'style) (pair? (cdr s)))
+         (with a (cadr s)
+           (cons* 'style
+                  (cond ((string? a) (pdf-embedded-name a))
+                        ((and (pair? a) (== (car a) 'tuple))
+                         (cons 'tuple
+                               (map (lambda (x)
+                                      (if (string? x) (pdf-embedded-name x) x))
+                                    (cdr a))))
+                        (else a))
+                  (cddr s))))
+        (else (cons (car s) (map pdf-embedded-bare-names (cdr s))))))
+
 (tm-define (attach-doc-to-exported-pdf fname)
   ;; The document goes in with its linked files (images, included documents,
-  ;; styles of its own), and the copy which goes in names them by the paths
-  ;; pdf-replace-linked-path resolves against the document (taking them out,
-  ;; wrapped-import-pdf-embeded-with-tm reduces them to their file names).
+  ;; styles of its own), and the copy which goes in names them by their file
+  ;; names alone (pdf-embedded-bare-names), which is where they come out.
   ;; It is given a copy of the document, since it changes the tree it is
   ;; given in place -- given the tree of the buffer, it rewrote the paths of
   ;; the open document, behind the editor's back, and the next save kept
@@ -144,7 +174,8 @@
          (new-tree (pdf-replace-linked-path cur-tree cur-url)))
     (buffer-rename tem-url new-url)
     (buffer-copy cur-url new-url)
-    (buffer-set new-url new-tree)
+    (buffer-set new-url
+                (stree->tree (pdf-embedded-bare-names (tree->stree new-tree))))
     ;; copy also attachments and auxiliary data
     (with-buffer cur-url
       (let* ((attl (list-attachments)) 

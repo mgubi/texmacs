@@ -480,8 +480,12 @@ into absolute ones, behind the editor's back (unmodified, until the next
 save kept them). It now works on a copy, and it is that copy which goes
 into the PDF, as was meant (`attach-doc-to-exported-pdf`, `tm-print.scm`).
 That was so with Hummus as well; here it only showed once the rewriting
-did something. The copy names the linked files by absolute paths, as
-before -- the import reduces them to file names.
+did something. The copy names the linked files by their file names alone
+(`pdf-embedded-bare-names`): it used to name them by the author's absolute
+paths, which worked, since the import reduces them to file names, but
+told everyone who got the PDF where the author's files were kept. A build
+with PDFHummus reads the bare names as well (tried). The harness checks it
+(`embed-roundtrip.sh`).
 
 ## MuPDF's errors and C++
 

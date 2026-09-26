@@ -80,6 +80,14 @@ case "$first" in
                else echo "  FAIL  embed: mutool extract does not give the image back"; fi ;;
   *) echo "  FAIL  embed: the first embedded file is not the document ($first)" ;;
 esac
+# the embedded document names its image by its name alone, not by the
+# author's path to it
+tm=$(ls "$D/extract"/file-*.tm 2>/dev/null | head -1)
+if [ -n "$tm" ] && grep -q "<image|pic.png|" "$tm"; then
+  echo "  ok    embed: the embedded document names its image pic.png, not by a path"
+else
+  echo "  FAIL  embed: the embedded document names its image by a path ($(grep -o '<image|[^|]*' "$tm" 2>/dev/null))"
+fi
 # the import, with the source folder gone
 mv "$D/src" "$D/src-gone"
 run "$D/import.scm" "$D/import.log" imported
