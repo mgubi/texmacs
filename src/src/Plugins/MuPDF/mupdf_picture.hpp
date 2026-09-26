@@ -105,6 +105,9 @@ fz_image*  mupdf_image_from_file (const char* path);
 fz_image*  mupdf_image_from_pixmap (fz_pixmap* pix);
 fz_pixmap* mupdf_pixmap_from_image (fz_image* im);
 fz_pixmap* mupdf_new_pixmap (int w, int h); // cleared; 1x1 on failure
+// the size of an image in points (see image_size in image_files.cpp): the
+// first page of a pdf or an svg, a point per pixel for a bitmap
+bool mupdf_image_size (url u, int& w, int& h);
 
 // The channel order of the window surfaces (the pixmaps which wrap them).
 fz_colorspace* mupdf_screen_colorspace ();
