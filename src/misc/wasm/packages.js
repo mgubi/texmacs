@@ -27,7 +27,8 @@ var tmPackages = (function () {
   }
 
   // the bytes of a package, from the cache of the browser or from the network
-  async function fetchPackage (pkg) {
+  // (onBytes (n): the bytes which came, for the progress of the page)
+  async function fetchPackage (pkg, onBytes) {
     var cache = null;
     try { if (typeof caches !== 'undefined') cache = await caches.open (CACHE); } catch (e) {}
     var u = url (pkg.url), resp = cache ? await cache.match (u) : null;
@@ -36,7 +37,16 @@ var tmPackages = (function () {
       if (!resp.ok) throw new Error ('cannot load ' + pkg.url + ': ' + resp.status);
       if (cache) try { await cache.put (u, resp.clone ()); } catch (e) {}
     }
-    return new Uint8Array (await resp.arrayBuffer ());
+    if (!onBytes || !resp.body) return new Uint8Array (await resp.arrayBuffer ());
+    var bytes = new Uint8Array (pkg.size), at = 0, reader = resp.body.getReader ();
+    for (;;) {
+      var r = await reader.read ();
+      if (r.done) break;
+      bytes.set (r.value, at);
+      at += r.value.length;
+      onBytes (at);
+    }
+    return bytes;
   }
   // the packages of an older build go (their names carry a digest)
   async function prune () {
@@ -159,7 +169,16 @@ var tmPackages = (function () {
         manifest = m;
         createTree ();
         var boot = manifest.packages.filter (function (p) { return p.boot; });
-        for (var i = 0; i < boot.length; i++) await install (boot[i], await fetchPackage (boot[i]), false);
+        var total = 0, done = 0;
+        boot.forEach (function (p) { total += p.size; });
+        var progress = typeof tmProgress !== 'undefined' ? tmProgress.files : function () {};
+        progress (0, total);
+        for (var i = 0; i < boot.length; i++) {
+          var bytes = await fetchPackage (boot[i], function (n) { progress (done + n, total); });
+          done += boot[i].size;
+          progress (done, total);
+          await install (boot[i], bytes, false);
+        }
         console.log ('TeXmacs: boot files in ' + Math.round (performance.now () - stats.start) + ' ms');
         removeRunDependency ('texmacs-files');
         // the rest once TeXmacs runs (and has had its first frames);
@@ -170,7 +189,8 @@ var tmPackages = (function () {
       })
       .catch (function (e) {
         console.error ('TeXmacs: cannot load its files', e);
-        if (Module.setStatus) Module.setStatus ('Cannot load the files of TeXmacs: ' + e.message);
+        if (typeof tmProgress !== 'undefined') tmProgress.error ('Cannot load the files of TeXmacs: ' + e.message);
+        else if (Module.setStatus) Module.setStatus ('Cannot load the files of TeXmacs: ' + e.message);
       });
   });
 

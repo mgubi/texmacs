@@ -13,6 +13,8 @@
 //                      belongs to its origin: keep it with --profile)
 //   --profile <dir>    the profile of the browser, kept between runs (the
 //                      IndexedDB of the page: the home directory of TeXmacs)
+//   --slow <KB/s>      the server sends that many KB per second (the
+//                      progress of the loading)
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
 //   --script <file>    actions after the load, one per line (# comments):
@@ -62,7 +64,8 @@ const puppeteer = require ('puppeteer-core');
 import { serve } from './serve.mjs';
 const served = [];
 const server = await serve (dir, Number (opt ('--port', '0')), '127.0.0.1',
-                            (p, n, how) => served.push ({ p, n, how, t: Date.now () }));
+                            (p, n, how) => served.push ({ p, n, how, t: Date.now () }),
+                            1000 * Number (opt ('--slow', '0')));
 const url = `http://127.0.0.1:${server.address ().port}/texmacs.html${query}`;
 
 const profile = opt ('--profile', null);

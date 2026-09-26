@@ -1,5 +1,5 @@
-// Serve the browser build: node misc/wasm/serve.mjs [dir] [port]
-// (default build-wasm/out/web on port 8080), then open
+// Serve the browser build: node misc/wasm/serve.mjs [dir] [port] [KB/s]
+// (default build-wasm/out/web on port 8080, at full speed), then open
 // http://localhost:<port>/texmacs.html
 //
 // A file with a brotli copy (<file>.br, written by the build) is sent
@@ -10,7 +10,22 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function serve (dir, port, host = '127.0.0.1', onServed = null) {
+// rate: bytes per second sent (0: as fast as possible), to see the page
+// load as over a slow network
+function send (file, res, opts, rate) {
+  const stream = fs.createReadStream (file, opts);
+  if (!rate) { stream.pipe (res); return; }
+  let start = Date.now (), sent = 0;
+  stream.on ('data', chunk => {
+    sent += chunk.length;
+    const wait = start + 1000 * sent / rate - Date.now ();
+    res.write (chunk);
+    if (wait > 0) { stream.pause (); setTimeout (() => stream.resume (), wait); }
+  });
+  stream.on ('end', () => res.end ());
+}
+
+export function serve (dir, port, host = '127.0.0.1', onServed = null, rate = 0) {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
                   '.wasm': 'application/wasm', '.data': 'application/octet-stream',
                   '.pack': 'application/octet-stream' };
@@ -27,7 +42,7 @@ export function serve (dir, port, host = '127.0.0.1', onServed = null) {
       res.writeHead (206, { 'Content-Type': type, 'Content-Length': end - start + 1,
                             'Content-Range': `bytes ${start}-${end}/${size}`,
                             'Accept-Ranges': 'bytes' });
-      fs.createReadStream (file, { start, end }).pipe (res);
+      send (file, res, { start, end }, rate);
       if (onServed) onServed (p, end - start + 1, 'range');
       return;
     }
@@ -46,7 +61,7 @@ export function serve (dir, port, host = '127.0.0.1', onServed = null) {
                           'Accept-Ranges': 'bytes', 'Vary': 'Accept-Encoding',
                           'Last-Modified': mtime.toUTCString (), 'Cache-Control': 'no-cache',
                           ...(br ? { 'Content-Encoding': 'br' } : {}) });
-    fs.createReadStream (src).pipe (res);
+    send (src, res, {}, rate);
     if (onServed) onServed (p, fs.statSync (src).size, br ? 'br' : 'identity');
   });
   return new Promise (ok => server.listen (port, host, () => ok (server)));
@@ -55,6 +70,7 @@ export function serve (dir, port, host = '127.0.0.1', onServed = null) {
 if (process.argv[1] && process.argv[1].endsWith ('serve.mjs')) {
   const dir = path.resolve (process.argv[2] || 'build-wasm/out/web');
   const port = Number (process.argv[3] || 8080);
-  await serve (dir, port);
+  const rate = 1000 * Number (process.argv[4] || 0); // [KB/s]
+  await serve (dir, port, '127.0.0.1', null, rate);
   console.log (`TeXmacs: http://localhost:${port}/texmacs.html`);
 }

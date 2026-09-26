@@ -97,6 +97,16 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
   from 59 MB to 22.5 MB (5.2 MB with brotli). Its fonts were 37 MB of it.
 - SDL3_ttf serves only the unused rendering through SDL's renderer
   (`VUE_SDL_RENDERER`): not linked.
+- The progress of the loading (`misc/wasm/progress.js`, the first pre-js):
+  a panel with the phase and a bar, for the program (fetched by
+  `Module.instantiateWasm` to count its bytes, compiled by the browser as
+  they come), the boot package (`packages.js` reports its bytes), what is
+  left to compile, and the boot of TeXmacs, before which the page is
+  painted (a run dependency of its own, removed after two frames). The
+  sizes are those of the files uncompressed: the build writes that of
+  `texmacs.wasm` into the page (`@TM_WASM_SIZE@` in `shell.html`), since a
+  compressed response does not give it. `serve.mjs [dir] [port] [KB/s]` and
+  `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
 ## The clipboard
 

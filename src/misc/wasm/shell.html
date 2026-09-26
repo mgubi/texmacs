@@ -12,6 +12,7 @@
   #tm-canvas-box { flex: 1; position: relative; min-height: 0; }
   canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
            display: block; outline: none; }
+  /* until the panel of misc/wasm/progress.js replaces it */
   #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center;
             font: 16px -apple-system, "Helvetica Neue", sans-serif; color: #222; }
 </style>
@@ -24,6 +25,9 @@
   var statusElement = document.getElementById('status');
   var Module = {
     canvas: document.getElementById('canvas'),
+    // the size of texmacs.wasm, written by the build (misc/wasm/Makefile)
+    // for the progress of its download (misc/wasm/progress.js)
+    tmWasmSize: Number('@TM_WASM_SIZE@') || 0,
     print: function (text) { console.log(text); },
     printErr: function (text) { console.error(text); },
     setStatus: function (text) {
