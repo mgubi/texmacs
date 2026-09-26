@@ -268,6 +268,18 @@ edit_env_rep::patch_env (hashmap<string,tree> patch) {
 }
 
 void
+edit_env_rep::active_vars (hashmap<string,tree> patch, array<string>& vars) {
+  // the variables of patch, in the order used by patch_env, for which
+  // write_update does more than storing the value
+  int i=0, n=patch->n;
+  for (; i<n; i++) {
+    list<hashentry<string,tree> > l=patch->a[i];
+    for (; !is_nil(l); l=l->next)
+      if (var_type[l->item.key] != Env_User) vars << l->item.key;
+  }
+}
+
+void
 edit_env_rep::read_env (hashmap<string,tree>& ret) {
   ret= copy ((hashmap<string,tree>) env); // (all of it: see env_table)
 }
