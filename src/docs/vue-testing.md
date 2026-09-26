@@ -123,6 +123,7 @@ callback output.
 | `palette` | the colour palette of the document "Color" menu, in a popup sized to its contents: flat cells, framed only by the highlight of the one hovered, sitting next to each other |
 | `choice-style` | the four styles of a choice list side by side; a click on the inert one neither selects nor calls back |
 | `input-edit` | editing in a text input: select all and replace, word selection, cut and paste (`got: Bob Smith / 42`) |
+| `math-backspace` | typed symbols are keys named without their brackets, as in the Qt port: `x<y` and `$a<=` then two Backspaces; F12 prints the tree, `(math "a<leqslant>")`, `(math "a")`, `(math "")`. `<` was the key `<less>`, inserted as `<<less>>`, and a Backspace then crashed (`bad path`) |
 | `pre-edit` | the composition of an input method in the editor: a dead key then a letter, shown in a pre-edit box and replaced by the committed text |
 | `pre-edit-input` | the same inside a dialog field |
 | `focus-windows` | the keyboard focus moves from a prompt to the editor and back (`got: BobBy / 42`) |
