@@ -663,6 +663,13 @@ gui_refresh () {
   the_gui->refresh_language();
 }
 
+// The core calls these hooks of the Qt port whenever QTTEXMACS is defined,
+// which it is for this port too (see tm_gui.m4); the Widkit windows have
+// nothing to do with them.
+bool qt_support_functionality (string s) { (void) s; return false; }
+void qt_notify_preference (string var) { (void) var; }
+void gui_set_next_window_as_popup () {}
+
 string
 gui_version () {
 #if (QT_VERSION >= 0x060000)

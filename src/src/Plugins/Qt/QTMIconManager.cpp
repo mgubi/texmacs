@@ -19,9 +19,8 @@
 #ifdef MUPDF_RENDERER
   #include "MuPDF/mupdf_picture.hpp"
   #include "MuPDF/mupdf_renderer.hpp"
-#else
-  #include "qt_picture.hpp"
 #endif
+#include "qt_picture.hpp" // xpm_image, invert_colors, saturate (all renderers)
 #include "qt_utilities.hpp"
 
 #ifdef USE_RESVG

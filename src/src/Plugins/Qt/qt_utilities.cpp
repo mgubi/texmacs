@@ -10,7 +10,9 @@
 ******************************************************************************/
 
 #include "QTMStyle.hpp"
+#ifndef QTWKTEXMACS
 #include "QTMApplication.hpp"
+#endif
 #include "qt_utilities.hpp"
 #include <time.h>
 
@@ -687,6 +689,7 @@ qt_apply_tm_style (QWidget* qwid, int style) {
   qwid->setStyleSheet (sheet);
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
 
+#ifndef QTWKTEXMACS // the application of the Qt port follows the theme
   if (!qwid->property("tm_theme_connected").toBool()) {
     QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
     if (app) {
@@ -696,6 +699,7 @@ qt_apply_tm_style (QWidget* qwid, int style) {
       qwid->setProperty("tm_theme_connected", true);
     }
   }
+#endif
 }
 
 void
@@ -718,6 +722,7 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
   qwid->setStyleSheet (sheet);
 
+#ifndef QTWKTEXMACS // the application of the Qt port follows the theme
   if (!qwid->property("tm_theme_connected").toBool()) {
     QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
     if (app) {
@@ -727,6 +732,7 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
       qwid->setProperty("tm_theme_connected", true);
     }
   }
+#endif
 }
 
 
