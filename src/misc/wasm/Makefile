@@ -22,7 +22,9 @@ TM       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 S        := $(TM)/src
 W        := $(TM)/misc/wasm
 MUPDF    ?= $(CURDIR)/mupdf-1.28.5-source
-MUPDF_LIB = $(MUPDF)/build/wasm/release
+# the slim build of MuPDF (misc/wasm/build-mupdf.sh): no fonts of its own
+# but the standard 14, no document formats but PDF, SVG and the images
+MUPDF_LIB ?= $(MUPDF)/build/wasm/slim
 OBJ      := obj
 OUT      := out
 
@@ -57,22 +59,28 @@ LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
 
 all: $(OUT)/texmacs.js
 
-# the page: TeXmacs/ is packaged at /texmacs, without what the browser
-# cannot use: the programs (bin/ and those of the plugins, which need
-# processes; their Scheme code is kept, the formats refer to it) and the
-# documentation of the plugins
-PACKAGE  := --preload-file $(TM)/TeXmacs@/texmacs \
-  --exclude-file '*/TeXmacs/bin' --exclude-file '*/TeXmacs/plugins/*/bin' \
-  --exclude-file '*/TeXmacs/plugins/*/doc' \
-  --exclude-file '*/misc/images/windows' --exclude-file '*.DS_Store'
+# the page: the files of TeXmacs/ go in packages (misc/wasm/package.py),
+# loaded by the page (packages.js): the boot package before TeXmacs starts,
+# the others in the background; brotli copies are written for the servers
+# which serve them (misc/wasm/serve.mjs does)
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json
 
-web: $(OUT)/web/texmacs.html
-
-$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/web-pre.js $(W)/files.js $(W)/shell.html
+$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
-	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/web-pre.js --pre-js $(W)/files.js \
-	  --shell-file $(W)/shell.html \
-	  $(PACKAGE) $(OBJECTS) $(LIBS) -o $@
+	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/packages.js --pre-js $(W)/web-pre.js \
+	  --pre-js $(W)/files.js --shell-file $(W)/shell.html \
+	  $(OBJECTS) $(LIBS) -o $@
+	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
+
+# made at every build (package.py only writes the packages which changed)
+$(OUT)/web/texmacs-files.json: FORCE
+	@mkdir -p $(OUT)/web
+	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
+	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack; do \
+	  [ -f $$f.br ] || brotli -q 9 -k $$f; done; \
+	  brotli -f -q 9 -k $(OUT)/web/texmacs-files.json
+
+FORCE:
 
 # a variant for node, which sees the host file system as it is (NODERAWFS)
 # and takes its environment: to test the build headless, see

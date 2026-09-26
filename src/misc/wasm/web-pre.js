@@ -7,6 +7,17 @@
 // preferences and the documents of the user survive a reload.
 Module['preRun'] = Module['preRun'] || [];
 Module['preRun'].push(function () {
+  // ?trace-files: the files of /texmacs which TeXmacs opens, in the order
+  // it opens them (window.tmTrace), to choose the files needed at boot
+  if (typeof location !== 'undefined' && location.search.indexOf ('trace-files') >= 0) {
+    var seen = {}, open = FS.open;
+    window.tmTrace = [];
+    FS.open = function (path, flags, mode) {
+      var p = typeof path === 'string' ? path : '';
+      if (p.startsWith ('/texmacs/') && !seen[p]) { seen[p] = true; window.tmTrace.push (p); }
+      return open.apply (FS, arguments);
+    };
+  }
   ENV['TEXMACS_PATH'] = '/texmacs';
   ENV['HOME'] = '/home/web';
   ENV['TEXMACS_HOME_PATH'] = '/home/web/.TeXmacs';

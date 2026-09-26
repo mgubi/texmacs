@@ -44,23 +44,20 @@ MuPDF writer) in about 4 s, boot included.
 | | done | not yet |
 |---|---|---|
 | windows | single-window mode (virtual windows, title bars, routing) | resize handles of the virtual windows |
-| build | `misc/wasm/Makefile`, MuPDF 1.28.5 for wasm, S7, SDL3 3.4 | a size diet (`texmacs.wasm` 59 MB, mostly MuPDF's fonts; `texmacs.data` 63 MB) |
+| build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
 | loop | one iteration per frame (`emscripten_set_main_loop`) | all the events of a frame in one iteration |
-| files | `TeXmacs/` preloaded at `/texmacs`, home at `/home/web` | persistence (IDBFS), upload/download, lazy loading |
+| files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
 | processes | `posix_spawnp` fails cleanly | plugin menus hidden, no external converters offered |
-| file dialogs | cancelled | the file input of the page |
+| file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
 
 ## Building and running
 
     . misc/wasm/emenv.sh build-wasm       # Emscripten (Python >= 3.10, config)
-    cd build-wasm
-    curl -LO https://mupdf.com/downloads/archive/mupdf-1.28.5-source.tar.gz
-    tar xzf mupdf-1.28.5-source.tar.gz
-    (cd mupdf-1.28.5-source && emmake make -j8 OS=wasm build=release libs)
-    cd ..
+    sh misc/wasm/build-mupdf.sh           # MuPDF 1.28.5, the slim build
     make -C build-wasm -f ../misc/wasm/Makefile -j8 web    # the page
     make -C build-wasm -f ../misc/wasm/Makefile -j8 node   # node, headless
+    node misc/wasm/serve.mjs              # http://localhost:8080/texmacs.html
 
 - `misc/wasm/config.h`, `tm_configure.hpp`: the configuration (wasm32:
   pointers and `long` are 4 bytes), in place of what configure writes.
@@ -71,8 +68,46 @@ MuPDF writer) in about 4 s, boot included.
   same, which rules out ASYNCIFY; the main loop gives control back to the
   browser instead (`loop_iteration` in `vue_gui.cpp`). Leaving it unwinds the
   stack, so the server of `TeXmacs_main` is allocated on the heap there.
+- The slim MuPDF (`build-mupdf.sh`) has no fonts of its own but the standard
+  14 and reads no documents but PDF, SVG and images: `texmacs.wasm` went
+  from 59 MB to 22.5 MB (5.2 MB with brotli). Its fonts were 37 MB of it.
 - SDL3_ttf serves only the unused rendering through SDL's renderer
   (`VUE_SDL_RENDERER`): not linked.
+
+## The files of TeXmacs in the page
+
+`misc/wasm/package.py` writes the files of `TeXmacs/` (without `bin/` and
+the programs and documentation of the plugins: 62.6 MB) as packages with a
+manifest, `texmacs-files.json` (each file: its package, offset, size).
+`misc/wasm/packages.js` makes the whole tree at `/texmacs` before TeXmacs
+starts, every file a placeholder of its size, and loads the boot package;
+the others (fonts, icons, languages, documentation, the rest, in pieces of
+4 MB) come one after the other once TeXmacs runs. A file read before its
+package fetches its bytes alone, a range of the package (synchronously, as
+text in the user defined charset: TeXmacs reads its files synchronously),
+so that TeXmacs never finds a file of its tree missing, nor records it as
+such. The packages are kept in the Cache Storage of the browser.
+
+The boot package is the files TeXmacs opens when it starts
+(`misc/wasm/boot-files.txt`, the list of `?trace-files`: boot, the welcome
+document, a new document with text and a formula) and some whole groups
+read at unforeseeable times (the Scheme code, styles, packages, the metrics
+of the fonts, the icons of the light theme): 15.9 MB, 4.0 MB with brotli.
+To make the list again: load the page with `?trace-files`, use it, and
+save `window.tmTrace` (see `build-wasm/trace.txt` of the notes below).
+
+Measured in a headless Firefox with `misc/wasm/serve.mjs` (brotli, ranges,
+304 for what did not change):
+
+| | transferred |
+|---|---|
+| before TeXmacs starts (program + boot package) | 9.3 MB |
+| everything, the first time (16 packages, 2.6 s locally) | 33.3 MB |
+| the next visit | 0 (the Cache Storage, and 304 for the program) |
+| a document of the help opened before its packages (`?no-background`) | 5 files on demand, 353 KB |
+
+The same page before: one package of 62.6 MB and a program of 59 MB, 122 MB
+(56 MB with brotli), all of it before TeXmacs could start.
 
 Headless, under node, which sees the host files (NODERAWFS):
 

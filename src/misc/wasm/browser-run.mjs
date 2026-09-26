@@ -56,17 +56,10 @@ fs.mkdirSync (out, { recursive: true });
 const require = createRequire (path.resolve ('build-wasm/tools/package.json'));
 const puppeteer = require ('puppeteer-core');
 
-const types = { '.html': 'text/html', '.js': 'text/javascript',
-                '.wasm': 'application/wasm', '.data': 'application/octet-stream' };
-const server = http.createServer ((req, res) => {
-  const file = path.join (dir, decodeURIComponent (req.url.split ('?')[0]));
-  fs.readFile (file, (err, data) => {
-    if (err) { res.writeHead (404); res.end (); return; }
-    res.writeHead (200, { 'Content-Type': types[path.extname (file)] || 'application/octet-stream' });
-    res.end (data);
-  });
-});
-await new Promise (ok => server.listen (Number (opt ('--port', '0')), '127.0.0.1', ok));
+import { serve } from './serve.mjs';
+const served = [];
+const server = await serve (dir, Number (opt ('--port', '0')), '127.0.0.1',
+                            (p, n, how) => served.push ({ p, n, how, t: Date.now () }));
 const url = `http://127.0.0.1:${server.address ().port}/texmacs.html${query}`;
 
 const profile = opt ('--profile', null);
@@ -139,3 +132,9 @@ else for (const s of shots.sort ((a, b) => a.ms - b.ms)) {
 }
 await browser.close ();
 server.close ();
+// what went over the network
+const total = served.reduce ((a, x) => a + x.n, 0);
+const ranges = served.filter (x => x.how === 'range');
+console.log (`served: ${(total / 1e6).toFixed (2)} MB in ${served.length} requests` +
+             ` (${ranges.length} ranges, ${served.filter (x => x.how === 'br').length} compressed)`);
+for (const x of served) if (x.n > 100000) console.log (`  ${x.p} ${(x.n / 1e6).toFixed (2)} MB ${x.how}`);
