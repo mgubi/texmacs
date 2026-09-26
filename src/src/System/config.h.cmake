@@ -36,6 +36,10 @@
 /* gs lib */
 #cmakedefine GS_LIB "@GS_LIB@"
 
+/* Scheme interpreter */
+#cmakedefine USE_S7 1
+#cmakedefine USE_GUILE 1
+
 /* Guile version */
 #cmakedefine GUILE_A 1
 #cmakedefine GUILE_B 1
