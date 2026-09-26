@@ -1,6 +1,7 @@
 #!/bin/sh
 # Runs the TeXmacs regression suites headless and fails unless they pass.
-# Usage: run-tests.sh <texmacs binary>   (from the top of the source tree)
+# Usage: run-tests.sh <texmacs binary>   (from the top of the TeXmacs source
+# tree, which contains TeXmacs/)
 
 BIN=${1:-TeXmacs/bin/texmacs.bin}
 TOP=$(pwd)
@@ -11,7 +12,7 @@ mkdir -p "$TEXMACS_HOME_PATH"
 
 # On Windows (MSYS2), TeXmacs needs a native path in the Scheme string;
 # MSYS2 converts the environment variables above, but not this string
-SCRIPT="$TOP/.github/scripts/run-tests.scm"
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/run-tests.scm"
 if command -v cygpath > /dev/null 2>&1; then SCRIPT=$(cygpath -m "$SCRIPT"); fi
 
 # A script that fails to load must not leave TeXmacs waiting
