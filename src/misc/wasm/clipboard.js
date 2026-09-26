@@ -16,7 +16,8 @@
 // as Ctrl or Cmd is down (Safari enables its Paste, the command of Cmd+V,
 // only when an editable element had the focus before the V), until it is
 // up again. The key of a paste (Ctrl+V, Cmd+V, Shift+Insert) is kept from
-// SDL, and the text area gets the paste event; its contents become those
+// SDL, with its keypress (SDL cancels it, and Safari then cancels the
+// paste), and the text area gets the paste event; its contents become those
 // of tmClipboard, and SDL gets the key, again:
 // TeXmacs pastes as it always does. A browser whose paste event has no
 // data (Safari, at times) pastes into the text area, which is read a moment
@@ -116,6 +117,10 @@ var tmClipboard = (function () {
       if (pending) release ();
       pending = { init: init (e), ups: [], pasted: false,
                   timer: setTimeout (release, WAIT) };
+    }, true);
+    // Safari has a keypress for Cmd+V: SDL would cancel it, and the paste
+    window.addEventListener ('keypress', function (e) {
+      if (e.isTrusted && pending && isPaste (e)) e.stopImmediatePropagation ();
     }, true);
     window.addEventListener ('keyup', function (e) {
       if (!e.isTrusted) return;

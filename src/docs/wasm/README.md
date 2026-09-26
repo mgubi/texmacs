@@ -111,11 +111,15 @@ clipboard: the last copy of TeXmacs, or what the last paste event brought.
   is what is pasted as long as the text of the clipboard is the one copied
   with it (copy and paste between tabs lose nothing).
 - **Paste**: SDL cancels the keys with Ctrl, and the canvas is not editable,
-  so the browser would have no paste event. The page takes the key of a
-  paste (Ctrl+V, Cmd+V, Shift+Insert) before SDL, focuses a hidden text area
-  for the paste event of the browser, keeps its contents, gives the focus
-  back and then the key to SDL: TeXmacs pastes as usual, from
+  so the browser would have no paste event. A hidden text area has the
+  focus while Ctrl or Cmd is down; the page takes the key of a paste
+  (Ctrl+V, Cmd+V, Shift+Insert) before SDL, with its keypress (Safari has
+  one, which SDL cancels, and Safari then cancels the paste), the text area
+  gets the paste event of the browser (or the text, when the event has no
+  data), and SDL then gets the key: TeXmacs pastes as usual, from
   `get_selection`, which reads the page's clipboard in place of SDL's.
+  Tested in Firefox and in Safari (through `safaridriver`, with "Allow
+  remote automation"); `?trace-clipboard` logs each paste.
 - **Shortcuts**: the look and feel defaults to that of the platform of the
   browser (`TEXMACS_WEB_PLATFORM`, set by `web-pre.js`; `basic.cpp`), so
   that on a Mac copy and paste are Cmd+C and Cmd+V for TeXmacs as for the
