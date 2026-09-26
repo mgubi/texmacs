@@ -1613,8 +1613,26 @@ bool char_clip= true;
 void initialize_keyboard ();
 extern Uint32 vue_dialog_event; // the results of the file dialogs (below)
 
+#if defined(__EMSCRIPTEN__) && defined(USE_S7)
+#include "S7/s7.h"
+extern s7_scheme* tm_s7;
+
+// (web-files): the panel of the files of the page (misc/wasm/files.js)
+static s7_pointer
+web_files_s7 (s7_scheme* sc, s7_pointer args) {
+  (void) args;
+  emscripten_run_script ("tmFiles.browse ()");
+  return s7_unspecified (sc);
+}
+#endif
+
 void gui_open (int& argc, char** argv) {
   // start the gui
+#if defined(__EMSCRIPTEN__) && defined(USE_S7)
+  if (tm_s7 != NULL)
+    s7_define_function (tm_s7, "web-files", web_files_s7, 0, 0, false,
+                        "(web-files): the files of the page");
+#endif
   
   // headless (-headless): no display is opened at all, which is what makes
   // the browser build testable under node (see docs/wasm/README.md)
@@ -2843,6 +2861,61 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
   return true;
 }
 
+// a file of a drop: images are inserted as such, everything else by name
+static void
+drop_add_file (string item) {
+  url u= url_system (item);
+  string ext= locase_all (suffix (u));
+  if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" ||
+      ext == "tif" || ext == "tiff" || ext == "bmp" || ext == "svg" ||
+      ext == "pdf" || ext == "ps" || ext == "eps") {
+    string iw, ih;
+    vue_pretty_image_size (u, iw, ih);
+    drop_doc << tree (IMAGE, as_string (u), iw, ih, "", "");
+  }
+  else drop_doc << as_string (u);
+}
+
+// the items of the drop, at (x, y) of win (points), to the editor there
+static void
+drop_deliver (vue_window win, float x, float y) {
+  win= route_pointer (win, x, y, 3);
+  if (win == NULL || N(drop_doc) == 0) { drop_doc= tree (CONCAT); return; }
+  vue_input_state& in= win->input;
+  in.mouse_action= "drop";
+  in.mouse_time= texmacs_time ();
+  in.mouse_x= (int) (x * win->density);
+  in.mouse_y= (int) (y * win->density);
+  in.mouse_ticket= ++drop_serial;
+  payloads (in.mouse_ticket)= drop_doc;
+  if (DEBUG_VUE_EVENTS)
+    debug_events << "drop of " << N(drop_doc) << " item(s) at "
+                 << in.mouse_x << "," << in.mouse_y << LF;
+  drop_doc= tree (CONCAT);
+  gui_needs_update= true;
+}
+
+#ifdef __EMSCRIPTEN__
+// The page (misc/wasm/files.js) asks: images dropped at (x, y) of the canvas
+// (paths separated by newlines, in the file system of the page), and a
+// document to open
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_drop_files (float x, float y, const char* paths) {
+  drop_doc= tree (CONCAT);
+  array<string> l= tokenize (utf8_to_cork (string (paths)), "\n");
+  for (int i= 0; i < N(l); i++)
+    if (N(l[i]) > 0) drop_add_file (l[i]);
+  if (the_host != NULL) drop_deliver (the_host, x, y);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_open_document (const char* path) {
+  url u= url_system (utf8_to_cork (string (path)));
+  exec_delayed (scheme_cmd ("(load-buffer " * scm_quote (as_string (u)) * ")"));
+  gui_needs_update= true;
+}
+#endif
+
 void
 process_event (SDL_Event *event) {
   // note: events are stored in the input state of their window and cleared
@@ -3072,40 +3145,13 @@ process_event (SDL_Event *event) {
       string item= utf8_to_cork (string (event->drop.data,
                                          (int) strlen (event->drop.data)));
       if (event->type == SDL_EVENT_DROP_TEXT) drop_doc << item;
-      else {
-        // a file: images are inserted as such, everything else by name
-        url u= url_system (item);
-        string ext= locase_all (suffix (u));
-        if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" ||
-            ext == "tif" || ext == "tiff" || ext == "bmp" || ext == "svg" ||
-            ext == "pdf" || ext == "ps" || ext == "eps") {
-          string iw, ih;
-          vue_pretty_image_size (u, iw, ih);
-          drop_doc << tree (IMAGE, as_string (u), iw, ih, "", "");
-        }
-        else drop_doc << as_string (u);
-      }
+      else drop_add_file (item);
       break;
     }
     case SDL_EVENT_DROP_COMPLETE:
-    {
-      win= get_window_from_ID (event->drop.windowID);
-      float dx= event->drop.x, dy= event->drop.y;
-      win= route_pointer (win, dx, dy, 3);
-      if (win == NULL || N(drop_doc) == 0) { drop_doc= tree (CONCAT); break; }
-      vue_input_state& in= win->input;
-      in.mouse_action= "drop";
-      in.mouse_time= texmacs_time ();
-      in.mouse_x= (int) (dx * win->density);
-      in.mouse_y= (int) (dy * win->density);
-      in.mouse_ticket= ++drop_serial;
-      payloads (in.mouse_ticket)= drop_doc;
-      if (DEBUG_VUE_EVENTS)
-        debug_events << "drop of " << N(drop_doc) << " item(s) at "
-                     << in.mouse_x << "," << in.mouse_y << LF;
-      drop_doc= tree (CONCAT);
+      drop_deliver (get_window_from_ID (event->drop.windowID),
+                    event->drop.x, event->drop.y);
       break;
-    }
     case SDL_EVENT_TEXT_EDITING:
     {
       // the composition of an input method (dead keys, CJK...): the editor
@@ -3778,120 +3824,29 @@ vue_dialog_finish (vue_dialog_result* res) {
 /******************************************************************************
 * The file dialogs of the browser
 *
-* SDL has none there. Open: the file input of the page; the file chosen is
-* copied to /home/web/Uploads and its path handed over as SDL's callback
-* would. Save: the name is asked for (a page cannot choose a place on the
-* disk of the user); the file goes to /home/web/Documents, which is kept
-* (see misc/wasm/web-pre.js), and is offered as a download once written:
-* the command of the dialog writes it in a later frame, so the page waits
-* until its size is stable. The input needs a recent gesture of the user,
-* which the click on the menu item is.
+* SDL has none there: the dialogs are the panel of the files of the page
+* (tmFiles in misc/wasm/files.js), which shows the home directory kept in
+* the browser and brings files in (upload of files, folders, zips) and out
+* (a copy of a saved file is downloaded); its answer is handed over as
+* SDL's callback would.
 ******************************************************************************/
 
 EM_JS_DEPS (vue_web_dialogs, "$withStackSave,$stringToUTF8OnStack,$UTF8ToString");
 
 EM_JS (void, vue_web_open_dialog, (void* res, const char* accept), {
-  function safe_name (n) {
-    return n.split ('/').join ('_').split (String.fromCharCode (92)).join ('_');
-  }
-  // A panel of the page with the file input on it: the browsers open the
-  // chooser of a file input only for a click of the user being handled
-  // (Firefox and Safari strictly), and TeXmacs asks for it later, in a frame
-  // of its loop; a file may also be dropped on the panel
-  var old = document.getElementById ('tm-open-panel');
-  if (old) old.remove ();
-  var panel = document.createElement ('div');
-  panel.id = 'tm-open-panel';
-  panel.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);' +
-    'background:#f4f4f4;border:1px solid #888;border-radius:6px;padding:18px 22px;' +
-    'box-shadow:0 6px 24px rgba(0,0,0,.3);font:14px -apple-system,Helvetica,sans-serif;' +
-    'color:#222;z-index:10;min-width:320px';
-  var title = document.createElement ('div');
-  title.textContent = 'Open a file';
-  title.style.cssText = 'font-weight:bold;margin-bottom:12px';
-  var input = document.createElement ('input');
-  input.type = 'file';
-  input.id = 'tm-open-input';
-  var acc = UTF8ToString (accept);
-  if (acc) input.accept = acc;
-  var hint = document.createElement ('div');
-  hint.textContent = 'or drop it here';
-  hint.style.cssText = 'color:#666;margin:10px 0 14px';
-  var cancel = document.createElement ('button');
-  cancel.textContent = 'Cancel';
-  var row = document.createElement ('div');
-  row.style.cssText = 'text-align:right';
-  row.appendChild (cancel);
-  panel.appendChild (title);
-  panel.appendChild (input);
-  panel.appendChild (hint);
-  panel.appendChild (row);
-  var done = false;
-  function finish (path) {
-    if (done) return;
-    done = true;
-    panel.remove ();
-    document.removeEventListener ('keydown', onkey, true);
+  tmFiles.open (UTF8ToString (accept), function (path) {
     withStackSave (function () {
       _vue_web_dialog_done (res, path ? stringToUTF8OnStack (path) : 0);
     });
-  }
-  function load (f) {
-    if (!f) return;
-    f.arrayBuffer ().then (function (buf) {
-      try { FS.mkdirTree ('/home/web/Uploads'); } catch (e) {}
-      var path = '/home/web/Uploads/' + safe_name (f.name);
-      FS.writeFile (path, new Uint8Array (buf));
-      finish (path);
-    });
-  }
-  function onkey (e) {
-    if (e.key === 'Escape') { e.stopPropagation (); e.preventDefault (); finish (null); }
-  }
-  input.onchange = function () { load (input.files && input.files[0]); };
-  cancel.onclick = function () { finish (null); };
-  panel.addEventListener ('dragover', function (e) { e.preventDefault (); });
-  panel.addEventListener ('drop', function (e) {
-    e.preventDefault ();
-    load (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
   });
-  document.addEventListener ('keydown', onkey, true);
-  document.body.appendChild (panel);
-  input.focus ();
 });
 
 EM_JS (void, vue_web_save_dialog, (void* res, const char* name), {
-  function safe_name (n) {
-    return n.split ('/').join ('_').split (String.fromCharCode (92)).join ('_');
-  }
-  var n = window.prompt ('Save as', UTF8ToString (name) || 'untitled.tm');
-  if (!n) {
-    withStackSave (function () { _vue_web_dialog_done (res, 0); });
-    return;
-  }
-  n = safe_name (n);
-  try { FS.mkdirTree ('/home/web/Documents'); } catch (e) {}
-  var path = '/home/web/Documents/' + n;
-  withStackSave (function () {
-    _vue_web_dialog_done (res, stringToUTF8OnStack (path));
+  tmFiles.save (UTF8ToString (name), function (path) {
+    withStackSave (function () {
+      _vue_web_dialog_done (res, path ? stringToUTF8OnStack (path) : 0);
+    });
   });
-  var last = -1, stable = 0, tries = 0;
-  var timer = setInterval (function () {
-    var size = -1;
-    try { size = FS.stat (path).size; } catch (e) {}
-    stable = (size >= 0 && size === last) ? stable + 1 : 0;
-    last = size;
-    if (stable < 2 && ++tries < 120) return;
-    clearInterval (timer);
-    if (size < 0) return;
-    var a = document.createElement ('a');
-    a.href = URL.createObjectURL (new Blob ([FS.readFile (path)]));
-    a.download = n;
-    document.body.appendChild (a);
-    a.click ();
-    a.remove ();
-    setTimeout (function () { URL.revokeObjectURL (a.href); }, 10000);
-  }, 500);
 });
 
 // the answer of a dialog of the page (path NULL: cancelled)

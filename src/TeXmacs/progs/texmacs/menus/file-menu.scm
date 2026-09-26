@@ -169,6 +169,10 @@
 (menu-bind load-menu
   ("Load" (open-document))
   ("Revert" (revert-buffer))
+  ;; the browser build: the files kept in the page (web-files is defined
+  ;; by the Vue plugin there)
+  (if (defined? 'web-files)
+      ("Files of the page..." (web-files)))
   (if (not (window-per-buffer?))
       ("Load in new window" (open-document*)))
   ---

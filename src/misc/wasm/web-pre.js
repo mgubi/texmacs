@@ -21,6 +21,8 @@ Module['preRun'].push(function () {
   });
 });
 
+// the home directory to IndexedDB now (files.js calls it after a change)
+var tmSaveHome;
 (function () {
   var busy = false;
   function save () {
@@ -31,6 +33,7 @@ Module['preRun'].push(function () {
       if (err) console.error ('TeXmacs: cannot save the home directory', err);
     });
   }
+  tmSaveHome = save;
   setInterval (save, 5000);
   if (typeof window !== 'undefined') {
     window.addEventListener ('pagehide', save);

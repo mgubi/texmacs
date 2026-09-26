@@ -68,9 +68,10 @@ PACKAGE  := --preload-file $(TM)/TeXmacs@/texmacs \
 
 web: $(OUT)/web/texmacs.html
 
-$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/web-pre.js $(W)/shell.html
+$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/web-pre.js $(W)/files.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
-	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/web-pre.js --shell-file $(W)/shell.html \
+	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/web-pre.js --pre-js $(W)/files.js \
+	  --shell-file $(W)/shell.html \
 	  $(PACKAGE) $(OBJECTS) $(LIBS) -o $@
 
 # a variant for node, which sees the host file system as it is (NODERAWFS)
