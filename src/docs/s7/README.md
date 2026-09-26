@@ -13,7 +13,7 @@ performs, and what is left before it can be merged.
 | [04-progs-changes.md](04-progs-changes.md) | The Scheme code shared by both interpreters, the s7-motivated edits and fixes, the tests |
 | [05-build-and-vendored-s7.md](05-build-and-vendored-s7.md) | Choosing the interpreter at build time, glue regeneration, the vendored s7, the branch and how to rebase it, CI |
 | [06-open-issues.md](06-open-issues.md) | Open bugs, fragile spots, Guile leftovers, what to do before merging |
-| [07-performance.md](07-performance.md) | s7 versus Guile 1.8.7 on boot, tests, conversions, LaTeX export and the manual; where the time goes |
+| [07-performance.md](07-performance.md) | s7 versus Guile 1.8.7 on boot, tests, conversions, LaTeX export and the manual; where the time goes; other Schemes on the R7RS benchmarks (2021) |
 | [bench/](bench) | The benchmark scripts |
 
 ## Summary
