@@ -52,6 +52,7 @@ TeXmacs/doc/main/start/man-conventions.en.tm
 src/Plugins/MuPDF/tests/figures.tm
 src/Plugins/MuPDF/tests/pdf-figures.tm
 src/Plugins/MuPDF/tests/structure.tm
+src/Plugins/MuPDF/tests/layer.tm
 src/Plugins/MuPDF/tests/pattern.tm
 src/Plugins/MuPDF/tests/pattern-photo.tm
 src/Plugins/MuPDF/tests/ligatures.tm
@@ -203,6 +204,28 @@ print (sum (1 for p in a.getdata () if p[0] > 90 and p[2] > 150 and p[1] < 100))
     else
       echo "  FAIL  $got"
     fi
+  fi
+
+  # layer.tm: a PDF figure with a layer which is off by default, a red
+  # square (layer.pdf, made by mklayer.js); the frame around it shows, the
+  # square must not, in either reader -- which it did before the layers of a
+  # figure went into the catalogue (merge_layers)
+  if [ "$name" = layer ]; then
+    for r in mu gs; do
+      if [ $r = mu ]; then mutool draw -r 72 -o "$OUT/$name-lay-$r.png" "$mu" 1 >/dev/null 2>&1
+      else gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -o "$OUT/$name-lay-$r.png" "$mu" >/dev/null 2>&1; fi
+      counts=$(python3 -c "
+from PIL import Image
+a= Image.open ('$OUT/$name-lay-$r.png').convert ('RGB')
+print (sum (1 for p in a.getdata () if p[0] > 200 and p[1] < 80 and p[2] < 80),
+       sum (1 for p in a.getdata () if p[0] < 60 and p[1] < 60 and p[2] < 60))" 2>/dev/null || echo "1 0")
+      red=${counts% *}; dark=${counts#* }
+      if [ "$red" = 0 ] && [ "$dark" -gt 500 ]; then
+        echo "  ok    the hidden layer of the figure stays hidden ($r)"
+      else
+        echo "  FAIL  the hidden layer of the figure shows ($r: $red red pixels, $dark dark)"
+      fi
+    done
   fi
 
   # the two readers must agree on what the file says

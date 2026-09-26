@@ -238,6 +238,7 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   void write_metadata ();
   void draw_bitmap_glyph (int ch, font_glyphs fn, SI x, SI y);
   int  embed_image (url u);
+  void merge_layers (pdf_document* src, pdf_graft_map* map);
   void place_image (int num, double w, double h, SI x, SI y, int alpha);
   int  name_xobject (pdf_obj* ref);
   void xobject_fit (pdf_obj* xo, double w, double h, double x, double y,
@@ -1304,6 +1305,57 @@ page_contents (fz_context* ctx, pdf_obj* contents) {
   return all;
 }
 
+// The layers of a figure (optional content, /OC in its content) go with
+// it: the objects which name them come over with its resources, but whether
+// a layer is seen is said in the catalogue of the figure (/OCProperties),
+// and without it a layer which the figure hides by default was drawn -- in
+// every reader. Its layers are added to the list of the document, with the
+// same graft map as the resources, so that they are the same objects; the
+// ones it hides go into the /OFF of the document, and its order, which is
+// what a reader lists, into /Order. Called inside the fz_try of
+// embed_image: nothing here has a destructor.
+void
+mupdf_pdf_renderer_rep::merge_layers (pdf_document* src, pdf_graft_map* map) {
+  pdf_obj* sroot= pdf_dict_get (ctx, pdf_trailer (ctx, src), PDF_NAME(Root));
+  pdf_obj* socp= pdf_dict_get (ctx, sroot, PDF_NAME(OCProperties));
+  pdf_obj* socgs= pdf_dict_get (ctx, socp, PDF_NAME(OCGs));
+  int n= pdf_array_len (ctx, socgs);
+  if (n == 0) return;
+  pdf_obj* sd= pdf_dict_get (ctx, socp, PDF_NAME(D));
+  pdf_obj* root= pdf_dict_get (ctx, pdf_trailer (ctx, doc), PDF_NAME(Root));
+  pdf_obj* ocp= pdf_dict_get (ctx, root, PDF_NAME(OCProperties));
+  if (ocp == NULL) ocp= pdf_dict_put_dict (ctx, root, PDF_NAME(OCProperties), 2);
+  pdf_obj* ocgs= pdf_dict_get (ctx, ocp, PDF_NAME(OCGs));
+  if (ocgs == NULL) ocgs= pdf_dict_put_array (ctx, ocp, PDF_NAME(OCGs), n);
+  pdf_obj* d= pdf_dict_get (ctx, ocp, PDF_NAME(D));
+  if (d == NULL) d= pdf_dict_put_dict (ctx, ocp, PDF_NAME(D), 2);
+  pdf_obj* off= pdf_dict_get (ctx, d, PDF_NAME(OFF));
+  pdf_obj* order= pdf_dict_get (ctx, d, PDF_NAME(Order));
+  // off by default: the ones in /OFF, or, when the figure starts with all
+  // of them off (/BaseState /OFF), all but the ones in /ON
+  bool base_off= pdf_name_eq (ctx, pdf_dict_get (ctx, sd, PDF_NAME(BaseState)),
+                              PDF_NAME(OFF));
+  pdf_obj* son= pdf_dict_get (ctx, sd, PDF_NAME(ON));
+  pdf_obj* soff= pdf_dict_get (ctx, sd, PDF_NAME(OFF));
+  for (int i=0; i<n; i++) {
+    pdf_obj* g= pdf_array_get (ctx, socgs, i);
+    pdf_array_push_drop (ctx, ocgs, pdf_graft_mapped_object (ctx, map, g));
+    bool hidden= base_off ? !pdf_array_contains (ctx, son, g)
+                          : pdf_array_contains (ctx, soff, g);
+    if (hidden) {
+      if (off == NULL) off= pdf_dict_put_array (ctx, d, PDF_NAME(OFF), 4);
+      pdf_array_push_drop (ctx, off, pdf_graft_mapped_object (ctx, map, g));
+    }
+  }
+  pdf_obj* sorder= pdf_dict_get (ctx, sd, PDF_NAME(Order));
+  for (int i=0; i < pdf_array_len (ctx, sorder); i++) {
+    if (order == NULL) order= pdf_dict_put_array (ctx, d, PDF_NAME(Order), 4);
+    pdf_array_push_drop (ctx, order,
+                         pdf_graft_mapped_object (ctx, map,
+                                                  pdf_array_get (ctx, sorder, i)));
+  }
+}
+
 // The XObject for a file, added once and used as often as it occurs.
 // A PDF goes in as a form -- its own drawing, kept as drawing -- and a
 // raster image as an image; anything else (EPS, PostScript, SVG) is
@@ -1359,6 +1411,7 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
       map= pdf_new_graft_map (ctx, doc);
       pdf_obj* res= (sres == NULL) ? NULL
                                    : pdf_graft_mapped_object (ctx, map, sres);
+      merge_layers (src, map);
       pdf_obj* xo= pdf_new_xobject (ctx, doc, box, m, res, buf);
       // a group, so that an alpha applies to the figure as a whole and not
       // to each of its paths and fills on its own (place_image); the form

@@ -405,6 +405,16 @@ as Hummus writes them. Three things differ, on purpose:
   its UTF-8 (`https://fr.wikipedia.org/wiki/%C3%89t%C3%A9`); Hummus writes
   a text string, UTF-16 as soon as there is an accent.
 
+A PDF figure keeps its layers: the objects which name them came over with
+its resources, but whether a layer is seen is said in the catalogue of the
+figure, and without it a layer the figure hides by default was drawn, in
+every reader. `merge_layers` adds the layers of a figure to the
+`/OCProperties` of the document, with the same graft map as its resources,
+the hidden ones to `/OFF` (also under `/BaseState /OFF`) and its `/Order`
+to the document's. On the screen nothing was needed: a figure is drawn
+from its own document, which keeps its catalogue. (`/AS`, `/RBGroups` and
+`/Locked` are not taken over.)
+
 A link is one annotation on each line it runs over: its words reach
 `href` a box at a time, and a box which follows the last one on its line,
 to the same place, lengthens it (Hummus, and the PostScript route, have

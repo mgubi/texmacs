@@ -68,7 +68,9 @@ background of opaque tiles, which must be one /Pattern; pattern-photo.tm
 has a photograph with a soft mask as its tile, which must *not* be one,
 since Ghostscript draws such a pattern wrongly (and the check catches it
 when it is); ligatures.tm is a line of fi, ffi, ffl and fl in the EC font;
-landscape.tm must come out wider than it is tall; structure.tm has a table
+landscape.tm must come out wider than it is tall; layer.tm includes
+layer.pdf (made by mklayer.js), a figure with a layer which is off by
+default, which must stay hidden in the PDF; structure.tm has a table
 of contents three levels deep, labels and references, one on a second page,
 a link to a web page and a title, and was saved by TeXmacs, so that it
 carries the values of its labels (a forward reference is "?" otherwise).
