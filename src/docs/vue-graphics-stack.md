@@ -822,3 +822,15 @@ git checkout 0a1e203505 -- src/Plugins/MuPDF/fitz_renderer.cpp \
 
 (and the `#else` branches of `vue_gui.cpp` and `vue_widget.cpp`, in the
 same commit).
+
+A NanoVG renderer (`src/Plugins/NanoVG`: `nanovg_renderer_rep`, a demo and
+a CMake file) was started on `wip_other_guis` in commit `94277cec8a`
+(2025-09-25). It was a skeleton: no pictures, no shadows or `fetch`, bitmap
+glyphs only, no GUI created it, it did not compile against the current
+`renderer` interface, and NanoVG itself was not in the tree. It has been
+removed (September 2026). To look at it again:
+
+```sh
+git show 94277cec8a:./src/Plugins/NanoVG/nanovg_renderer.cpp
+git checkout 94277cec8a -- src/Plugins/NanoVG
+```
