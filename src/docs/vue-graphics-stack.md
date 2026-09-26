@@ -806,3 +806,17 @@ no configuration sets, and it had none of the work on `mupdf_renderer`
 and kept drawn, the protection against MuPDF's errors). It was compiled
 and linked all the same; it has been removed (September 2026), and the
 Vue GUI says at compile time that it needs MuPDF.
+
+It was last present in commit `0a1e203505` (2026-09-26, on `wip_vue`),
+the parent of `e9426a21e7`, which removed it; its last change of its own
+was `412b4ef7b4` (FreeType asked under MuPDF's lock). To look at it again:
+
+```sh
+git show 0a1e203505:src/Plugins/MuPDF/fitz_renderer.cpp
+git checkout 0a1e203505 -- src/Plugins/MuPDF/fitz_renderer.cpp \
+  src/Plugins/MuPDF/fitz_renderer.hpp src/Plugins/MuPDF/fitz_picture.cpp \
+  src/Plugins/MuPDF/fitz_picture.hpp src/Plugins/MuPDF/README_fitz.md
+```
+
+(and the `#else` branches of `vue_gui.cpp` and `vue_widget.cpp`, in the
+same commit).
