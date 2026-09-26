@@ -2423,7 +2423,10 @@ process_event (SDL_Event *event) {
           win->input.key_event= key;
           win->input.key_time= texmacs_time();
           win->input.last_key= key;
-          win->input.key_stamp= event->key.timestamp;
+          // only a keystroke with a modifier may still get a text event of
+          // its own; without one, the text which follows is the next key's
+          bool with_mods= (event->key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) != 0;
+          win->input.key_stamp= with_mods ? event->key.timestamp : 0;
         }
       }
       break;
