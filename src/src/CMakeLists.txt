@@ -10,15 +10,29 @@ target_include_directories (texmacs_body PUBLIC
 )
 
 target_compile_options (texmacs_body PRIVATE
-  $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-  $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+  $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+  $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
 )
 
 target_link_libraries (texmacs_body PUBLIC
   ${TeXmacs_Libraries}
 )
 
-set_target_properties (texmacs_body PROPERTIES AUTOMOC ON)
+if (QTTEXMACS)
+  set_target_properties (texmacs_body PROPERTIES AUTOMOC ON)
+endif ()
+
+# the objects of the executables: those of the sources in C++20 (the Vue
+# GUI) are compiled apart
+set (TEXMACS_OBJECTS $<TARGET_OBJECTS:texmacs_body>)
+if (TeXmacs_CXX20_SRCS)
+  add_library (texmacs_cxx20 OBJECT ${TeXmacs_CXX20_SRCS})
+  target_include_directories (texmacs_cxx20 PUBLIC ${TeXmacs_Include_Dirs})
+  target_compile_options (texmacs_cxx20 PRIVATE
+    -include ${CMAKE_BINARY_DIR}/src/System/config.h)
+  set_target_properties (texmacs_cxx20 PROPERTIES CXX_STANDARD 20)
+  list (APPEND TEXMACS_OBJECTS $<TARGET_OBJECTS:texmacs_cxx20>)
+endif ()
 
 if (WIN32)
   set_source_files_properties (
@@ -36,15 +50,15 @@ if (WIN32)
 
   # texmacs.exe
   add_executable (texmacs WIN32
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     ${TEXMACS_ENTRYPOINT_SRC}
     ${TEXMACS_RC_SRC}
   )
 
   target_include_directories (texmacs PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (texmacs PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
     -UQT_NEEDS_QMAIN
   )
   target_link_libraries (texmacs PRIVATE ${TeXmacs_Libraries})
@@ -52,15 +66,15 @@ if (WIN32)
 
   # texmacs-open.exe
   add_executable (texmacs-open WIN32
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     "${TEXMACS_SOURCE_DIR}/src/Launcher/texmacs_open_main.cpp"
     ${TEXMACS_RC_SRC}
   )
 
   target_include_directories (texmacs-open PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (texmacs-open PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
     -UQT_NEEDS_QMAIN
   )
   target_link_libraries (texmacs-open PRIVATE ${TeXmacs_Libraries})
@@ -121,15 +135,16 @@ if (WIN32)
 
   install (TARGETS texmacs texmacs-open DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
-elseif (APPLE)
+elseif (APPLE AND QTTEXMACS)
   set (TeXmacs_binary_name "TeXmacs")
   add_executable (${TeXmacs_binary_name} MACOSX_BUNDLE
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
+    "${TEXMACS_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp"
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (${TeXmacs_binary_name} PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
   )
   target_link_libraries (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Libraries})
   set_target_properties (${TeXmacs_binary_name} PROPERTIES
@@ -140,15 +155,17 @@ elseif (APPLE)
     RUNTIME_OUTPUT_DIRECTORY ${TEXMACS_BINARY_DIR}
   )
 else ()
+  # also the other GUIs on macOS: TeXmacs/bin/texmacs.bin, run by the
+  # script TeXmacs/bin/texmacs, as on the other Unix systems
   set (TeXmacs_binary_name "texmacs.bin")
   add_executable (${TeXmacs_binary_name}
-    $<TARGET_OBJECTS:texmacs_body>
+    ${TEXMACS_OBJECTS}
     "${TEXMACS_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp"
   )
   target_include_directories (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Include_Dirs})
   target_compile_options (${TeXmacs_binary_name} PRIVATE
-    $<$<COMPILE_LANGUAGE:C,CXX>:-include>
-    $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-include>
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${CMAKE_BINARY_DIR}/src/System/config.h>
   )
   target_link_libraries (${TeXmacs_binary_name} PRIVATE ${TeXmacs_Libraries})
   set_target_properties (${TeXmacs_binary_name} PROPERTIES

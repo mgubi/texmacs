@@ -59,6 +59,51 @@ qtwk, x11, cocoa, sdl and vue all build; x11 and cocoa with `--with-mupdf`,
 sdl and vue without it, x11 without X11 headers and an unknown GUI all stop
 in configure with a message. Only the Vue and SDL ports were run.
 
+## CMake
+
+The CMake build is upstream's (r15744, merged from `wip_opentype`), made to
+build what this branch builds, out of the source tree:
+
+    cmake -S . -B build -DTEXMACS_GUI=Vue -DMUPDF_DIR=/opt/homebrew
+    cmake --build build -j8
+    TEXMACS_PATH=$PWD/build/TeXmacs build/TeXmacs/bin/texmacs.bin
+
+(without `TEXMACS_PATH`, the script `build/TeXmacs/bin/texmacs` looks for
+an installed TeXmacs, under `CMAKE_INSTALL_PREFIX`).
+
+| option | values |
+|---|---|
+| `TEXMACS_GUI` | `Qt` (default: Qt6, else Qt5), `Qt6`, `Qt5`, `Qt4`, `Vue`, `SDL`, `X11` |
+| `SCHEME_IMPL` | `s7` (default), `embedded18` (upstream's `tm-guile188`, not in this tree), `guile`, `guile-X.Y` |
+| `USE_MUPDF`, `MUPDF_DIR` | on for Vue and SDL (required), off for Qt (on: MuPDF in place of Hummus for the PDF), never for X11 |
+
+What was added to upstream's file, and why:
+
+- **macOS**: the Unix sources and the Objective-C of `Plugins/MacOS` (not
+  its `cg_renderer.cpp`, as with configure), the Cocoa and IOKit
+  frameworks, and the entry point `unix_entrypoint.cpp`. Qt makes
+  `build/TeXmacs.app`; the other GUIs make `build/TeXmacs/bin/texmacs.bin`,
+  as on Linux.
+- **GUIs**: the plugin directories of the table above. The Vue sources are
+  C++20, as in `makefile.in`: CMake puts its own `-std=gnu++17` after a flag
+  given to a source, so they are a library of their own (`texmacs_cxx20` in
+  `src/CMakeLists.txt`). Hummus (`Plugins/Pdf`) comes with Qt only, as in
+  configure, and not with MuPDF, which defines the same attachment functions.
+  `Cairo` and `Imlib2`, guarded inside, are compiled as with configure (X11
+  calls Imlib2).
+- **The source tree of a build with configure** has its own `config.h`,
+  `tm_configure.hpp` and Qt `moc_*.cpp`: the generated headers of the build
+  directory come first in the include path, and the moc files of the source
+  tree are left out (AUTOMOC makes its own).
+- **Libraries**: GnuTLS by the full paths of pkg-config (Homebrew), iconv
+  through `cmake/FindIconv.cmake` (which names its results `ICONV_...`),
+  `CMAKE_DL_LIBS`, SDL3 and SDL3_ttf by pkg-config.
+
+`src/Plugins/Vue/tests/run.sh` runs another build with
+`BIN=build/TeXmacs/bin/texmacs.bin`. Checked on 2026-09-27 (macOS, clean
+builds, S7): Qt (Qt 6.9, run), Vue (the `font` test), SDL (run) and X11
+(built, not run: no X server) build.
+
 ## Syncing with upstream
 
 Upstream TeXmacs (the SVN trunk) is mirrored in the `svn_sync` branch of the
