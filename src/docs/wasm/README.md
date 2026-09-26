@@ -50,6 +50,7 @@ MuPDF writer) in about 4 s, boot included.
 | processes | `posix_spawnp` fails cleanly | plugin menus hidden, no external converters offered |
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
+| clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac) | paste from the menus sees the last paste or copy only |
 
 ## Windows and the frame of the page
 
@@ -96,6 +97,32 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
   from 59 MB to 22.5 MB (5.2 MB with brotli). Its fonts were 37 MB of it.
 - SDL3_ttf serves only the unused rendering through SDL's renderer
   (`VUE_SDL_RENDERER`): not linked.
+
+## The clipboard
+
+TeXmacs reads the clipboard synchronously when it pastes; the browser gives
+its contents to a paste event only (or asynchronously, with the consent of
+the user). `misc/wasm/clipboard.js` keeps what the page knows of the
+clipboard: the last copy of TeXmacs, or what the last paste event brought.
+
+- **Copy, cut**: `set_selection` (`vue_gui.cpp`) hands the text, and the
+  HTML when there is one, to `navigator.clipboard`, which the browser allows
+  just after a key or a click. The TeXmacs format stays in the program, and
+  is what is pasted as long as the text of the clipboard is the one copied
+  with it (copy and paste between tabs lose nothing).
+- **Paste**: SDL cancels the keys with Ctrl, and the canvas is not editable,
+  so the browser would have no paste event. The page takes the key of a
+  paste (Ctrl+V, Cmd+V, Shift+Insert) before SDL, focuses a hidden text area
+  for the paste event of the browser, keeps its contents, gives the focus
+  back and then the key to SDL: TeXmacs pastes as usual, from
+  `get_selection`, which reads the page's clipboard in place of SDL's.
+- **Shortcuts**: the look and feel defaults to that of the platform of the
+  browser (`TEXMACS_WEB_PLATFORM`, set by `web-pre.js`; `basic.cpp`), so
+  that on a Mac copy and paste are Cmd+C and Cmd+V for TeXmacs as for the
+  browser. The browser does not act on the other keys with Cmd (Cmd+S would
+  save the page), save those it reserves (Cmd+W, Cmd+T, Cmd+N, Cmd+Q).
+- Paste from a menu has no paste event: it pastes what the page knows, the
+  last copy or paste.
 
 ## The files of TeXmacs in the page
 

@@ -350,6 +350,14 @@ use_macos_fonts () {
 
 static const char*
 default_look_and_feel_impl () {
+#ifdef __EMSCRIPTEN__
+  // in the browser, that of the platform of the browser (web-pre.js), so
+  // that the shortcuts of TeXmacs and of the browser agree (Cmd+V on a Mac)
+  string web= get_env ("TEXMACS_WEB_PLATFORM");
+  if (web == "macos") return "macos";
+  if (web == "windows") return "windows";
+  return "gnome";
+#endif
   if (os_mingw () || os_win32 ()) return "windows";
   if (os_macos ()) return "macos";
   string session= get_env ("DESKTOP_SESSION");

@@ -38,8 +38,13 @@
 >   fetched alone (a byte range). Everything is kept in the cache of the
 >   browser: a second visit loads nothing.
 >
+> * **The clipboard of the system**: copy, cut and paste with the other
+>   programs (text, and HTML when TeXmacs has it); TeXmacs' own format is
+>   kept when a copy is pasted back. On a Mac the shortcuts are Cmd+..., as
+>   the browser's.
+>
 > Not there yet: plugins and external converters (no processes in a page),
-> the system clipboard (untested in the page), resizing the dialogs.
+> resizing the dialogs.
 >
 > Build and try it (Emscripten, tested with 6.0; Python ≥ 3.10; Node):
 >

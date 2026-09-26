@@ -3590,6 +3590,72 @@ void load_system_font (string family, int size, int dpi,
 static hashmap<string,tree> selection_t ("none");
 static hashmap<string,string> selection_s ("");
 
+#ifdef __EMSCRIPTEN__
+// In the browser, SDL has no clipboard of the system: the page keeps what
+// it knows of it (tmClipboard in misc/wasm/clipboard.js: what TeXmacs
+// copied last, or what the last paste event of the browser brought), and
+// gives TeXmacs' copies to the system. Its text has no room for the TeXmacs
+// format: that stays here, and is pasted as long as the text of the
+// clipboard is the one which was copied with it.
+EM_JS_DEPS (vue_web_clipboard, "$stringToNewUTF8,$UTF8ToString");
+
+EM_JS (void, vue_web_clipboard_write, (const char* plain, const char* html), {
+  if (typeof tmClipboard !== 'undefined')
+    tmClipboard.write (UTF8ToString (plain), UTF8ToString (html));
+});
+
+EM_JS (char*, vue_web_clipboard_read, (const char* mime), {
+  var s = (typeof tmClipboard !== 'undefined') ? tmClipboard.read (UTF8ToString (mime)) : null;
+  return s === null ? 0 : stringToNewUTF8 (s);
+});
+
+static string web_clip_plain, web_clip_texmacs;
+
+static void*
+web_clipboard_get (const char* mime, size_t* size) {
+  string m (mime);
+  if (m == "application/x-texmacs-clipboard") {
+    if (N(web_clip_texmacs) == 0) return NULL;
+    char* p= vue_web_clipboard_read ("text/plain");
+    bool same= (p != NULL) && string (p) == web_clip_plain;
+    free (p);
+    if (!same) return NULL;
+    c_string c (web_clip_texmacs);
+    void* r= SDL_malloc (N(web_clip_texmacs) + 1);
+    memcpy (r, (char*) c, N(web_clip_texmacs) + 1);
+    *size= N(web_clip_texmacs);
+    return r;
+  }
+  char* p= vue_web_clipboard_read (mime);
+  if (p == NULL) return NULL;
+  size_t n= strlen (p);
+  void* r= SDL_malloc (n + 1);
+  memcpy (r, p, n + 1);
+  free (p);
+  *size= n;
+  return r;
+}
+
+static bool
+web_clipboard_has (const char* mime) {
+  size_t n= 0;
+  void* p= web_clipboard_get (mime, &n);
+  SDL_free (p);
+  return p != NULL;
+}
+
+static char*
+web_clipboard_text () {
+  size_t n= 0;
+  return (char*) web_clipboard_get ("text/plain", &n);
+}
+
+// get_selection reads the clipboard of the page as SDL's
+#define SDL_HasClipboardData web_clipboard_has
+#define SDL_GetClipboardData web_clipboard_get
+#define SDL_GetClipboardText web_clipboard_text
+#endif
+
 // Structure to hold clipboard data for the callback
 struct clipboard_data {
   string texmacs_data;    // TeXmacs native format
@@ -3733,6 +3799,17 @@ bool set_selection (string key, tree t,
   // Always offer plain text (UTF-8)
   mime_types[num_mime_types++] = "text/plain;charset=utf-8";
   mime_types[num_mime_types++] = "text/plain";
+
+#ifdef __EMSCRIPTEN__
+  string plain= N(clip_data->plain_text) > 0 ? clip_data->plain_text
+                                             : clip_data->texmacs_data;
+  web_clip_plain  = plain;
+  web_clip_texmacs= clip_data->texmacs_data;
+  c_string c_plain (plain), c_html (clip_data->html_text);
+  vue_web_clipboard_write (c_plain, c_html);
+  delete clip_data;
+  return true;
+#endif
 
   // Set clipboard data with callbacks
   if (!SDL_SetClipboardData (clipboard_data_callback,
@@ -3886,8 +3963,12 @@ void clear_selection (string key) {
   // SDL3 only supports system clipboard, not primary/mouse selections
   if (key != "primary") return;
 
+#ifdef __EMSCRIPTEN__
+  web_clip_texmacs= ""; // the clipboard of the system stays as it is
+#else
   // Clear the SDL clipboard
   SDL_ClearClipboardData ();
+#endif
 }
 
 /******************************************************************************

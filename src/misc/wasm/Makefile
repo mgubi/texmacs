@@ -65,10 +65,10 @@ all: $(OUT)/texmacs.js
 # which serve them (misc/wasm/serve.mjs does)
 web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json
 
-$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/shell.html
+$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
 	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/packages.js --pre-js $(W)/web-pre.js \
-	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --shell-file $(W)/shell.html \
+	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --pre-js $(W)/clipboard.js --shell-file $(W)/shell.html \
 	  $(OBJECTS) $(LIBS) -o $@
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
 

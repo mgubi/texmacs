@@ -22,6 +22,12 @@ Module['preRun'].push(function () {
   ENV['HOME'] = '/home/web';
   ENV['TEXMACS_HOME_PATH'] = '/home/web/.TeXmacs';
   ENV['LANG'] = 'en_US.UTF-8';
+  // the look and feel of TeXmacs follows the platform of the browser, whose
+  // shortcuts are Cmd+... on a Mac (src/Kernel/Abstractions/basic.cpp)
+  var platform = (typeof navigator === 'undefined') ? '' :
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  ENV['TEXMACS_WEB_PLATFORM'] = /mac|iphone|ipad/i.test (platform) ? 'macos' :
+                                /win/i.test (platform) ? 'windows' : 'other';
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');
