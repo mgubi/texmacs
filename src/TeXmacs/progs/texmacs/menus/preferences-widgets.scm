@@ -736,33 +736,7 @@
       (toggle (set-boolean-preference
 	       "ai-correct explain" answer)
 	      (get-boolean-preference
-	       "ai-correct explain"))))
-  (if (get-boolean-preference "grammar checking")
-      ======
-      (bold (text "Languagetool settings"))
-      ===
-      (aligned
-	(item (hlist // (text "Server URL:"))
-	  (enum (set-preference "languagetool server" answer)
-		'("http://localhost:8081" "https://api.languagetool.org" "")
-		(get-preference "languagetool server") "14em"))
-	(meti (hlist // (text "Use Premium access"))
-	  (toggle (begin (set-boolean-preference
-			  "languagetool premium" answer)
-			 (refresh-now "languagetool premium"))
-		  (get-boolean-preference
-		   "languagetool premium"))))
-      (refreshable "languagetool premium"
-	(when (get-boolean-preference "languagetool premium")
-	(aligned
-	  (item (hlist // (text "Username:"))
-	    (enum (set-preference "languagetool username" answer)
-		  '((get-preference "languagetool username") "")
-		  (get-preference "languagetool username") "14em"))
-	  (item (hlist // (text "API key:"))
-	    (enum (set-preference "languagetool API key" answer)
-		  '((get-preference "languagetool API key") "")
-		  (get-preference "languagetool API key") "14em")))))))
+	       "ai-correct explain")))))
 
 ;; All converters ----------
 
@@ -965,6 +939,9 @@
       (meti (hlist // (text "New style fonts"))
         (toggle (set-boolean-preference "new style fonts" answer)
                 (get-boolean-preference "new style fonts")))
+      (meti (hlist // (text "Hand tuned math fonts"))
+        (toggle (set-boolean-preference "hand tuned math fonts" answer)
+                (get-boolean-preference "hand tuned math fonts")))
       (meti (hlist // (text "Advanced font customization"))
         (toggle (set-boolean-preference "advanced font customization" answer)
                 (get-boolean-preference "advanced font customization")))

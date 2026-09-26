@@ -139,6 +139,14 @@
   (glyph-recognize recognize_glyph (string array_array_array_double))
   (set-new-fonts set_new_fonts (void bool))
   (new-fonts? get_new_fonts (bool))
+  (set-hand-tuned-math-fonts set_hand_tuned_math_fonts (void bool))
+  (math-font-profile-set math_font_profile_set (void string scheme_tree))
+  (math-font-profile math_font_profile (scheme_tree string))
+  (math-font-profile-families math_font_profile_families (array_string))
+  (math-font-profile-attr math_font_profile_attr (string string string))
+  (math-family-for-text math_family_for_text (string string))
+  (text-family-for-math text_family_for_math (string string))
+  (hand-tuned-math-fonts? get_hand_tuned_math_fonts (bool))
   (tmtm-eqnumber->nonumber eqnumber_to_nonumber (tree tree))
   (busy-versioning? is_busy_versioning (bool))
   (players-set-elapsed players_set_elapsed (void tree double))
@@ -166,6 +174,8 @@
   (font-database-delta-families font_database_delta_families (array_string))
   (font-database-styles font_database_styles (array_string string))
   (font-database-search font_database_search (array_string string string))
+  (font-available-features ot_font_features (array_string string))
+  (font-logical-search font_database_search (array_string string string string string))
   (font-database-characteristics
    font_database_characteristics (array_string string string))
   (font-database-substitutions

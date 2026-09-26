@@ -506,6 +506,23 @@
                             (make-menu-command (insert sym))
                             "" "" style))))
 
+(define (quote-angles s)
+  ;; "<pm>" becomes "<less>pm<gtr>", which is shown as <pm> and not drawn
+  ;; as the symbol itself
+  (apply string-append
+         (map (lambda (c)
+                (cond ((== c #\<) "<less>")
+                      ((== c #\>) "<gtr>")
+                      (else (string c))))
+              (string->list s))))
+
+(define (symbol-balloon-text symstring sh)
+  ;; what the balloon of a symbol button says: the markup of the symbol,
+  ;; and the keyboard equivalent after it when there is one
+  (with txt (quote-angles symstring)
+    (if (== sh "") txt
+        (string-append txt ",  keyboard equivalent: " sh))))
+
 (define (make-menu-symbol p style)
   "Make @(symbol :string? :*) menu item."
   ;; Possibilities for p:
@@ -516,12 +533,9 @@
           (make-menu-error "invalid symbol command in " p)
           (let* ((source (and opt-cmd (promise-source opt-cmd)))
                  (sh (kbd-find-shortcut (if source source symstring) #f)))
-            (if (== sh "")
-                (make-menu-symbol-button style symstring opt-cmd)
-                (widget-balloon
-                 (make-menu-symbol-button style symstring opt-cmd)
-                 (make-menu-label (string-append "Keyboard equivalent: " sh)
-                                  style))))))))
+            (widget-balloon
+             (make-menu-symbol-button style symstring opt-cmd)
+             (make-menu-label (symbol-balloon-text symstring sh) style)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Composite menus and submenus

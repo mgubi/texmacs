@@ -69,7 +69,8 @@ struct lim_box_rep: public composite_box_rep {
   font fn;
   bool glued;
   int  type;
-  lim_box_rep (path ip, box ref, box lo, box hi, font fn, bool glued);
+  lim_box_rep (path ip, box ref, box lo, box hi, font fn, bool glued,
+               bool stretched= false);
   operator tree () { return tree (TUPLE, "lim", bs[0]); }
   void finalize ();
   box adjust_kerning (int mode, double factor);
@@ -79,7 +80,8 @@ struct lim_box_rep: public composite_box_rep {
   path find_tree_path (path bp);
 };
 
-lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl):
+lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl,
+                          bool stretched):
   composite_box_rep (ip), ref (r2), fn (fn2), glued (gl)
 {
   SI sep_lo= fn->sep + fn->yshift;
@@ -87,12 +89,30 @@ lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl):
   SI X, Y;
   insert (ref, 0, 0);
   type= 0;
+  bool use_opentype= fn->ot_math &&
+                     (fn->lower_limit_gap_min > 0) &&
+                     (fn->lower_limit_baseline_drop_min > 0);
+
   if (!is_nil (lo)) type += 1;
   if (!is_nil (hi)) type += 2;
   if (!is_nil (lo)) {
     SI top= max (lo->y2, fn->y2 * script (fn->size, 1) / fn->size) + sep_lo;
     Y= ref->y1;
     X= ((SI) (ref->right_slope ()* (Y+top-lo->y1))) + ((ref->x1+ref->x2)>>1);
+    if (use_opentype) {
+      // a stretched base (a long arrow, a wide brace) has its own
+      // constants: the label sits closer to it than a limit to an operator
+      if (stretched && fn->stretch_stack_gap_below_min > 0) {
+        top= lo->y2 + fn->stretch_stack_gap_below_min;
+        // the shift is measured from the baseline of the base, the limit
+        // drop from its bottom edge
+        top= max (top, fn->stretch_stack_bottom_shift_down + ref->y1);
+      }
+      else {
+        top= lo->y2 + fn->lower_limit_gap_min;
+        top= max (top, fn->lower_limit_baseline_drop_min);
+      }
+    }
     insert (lo, X- (lo->x2 >> 1), Y-top);
     italic_correct (lo);
   }
@@ -100,6 +120,16 @@ lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl):
     SI bot= min (hi->y1, fn->y1 * script (fn->size, 1) / fn->size) - sep_hi;
     Y= ref->y2;
     X= ((SI) (ref->right_slope ()*(Y+hi->y2-bot))) + ((ref->x1+ref->x2)>>1);
+    if (use_opentype) {
+      if (stretched && fn->stretch_stack_gap_above_min > 0) {
+        bot= hi->y1 - fn->stretch_stack_gap_above_min;
+        bot= min (bot, ref->y2 - fn->stretch_stack_top_shift_up);
+      }
+      else {
+        bot= hi->y1 - fn->upper_limit_gap_min;
+        bot= min (bot, -fn->upper_limit_baseline_rise_min);
+      }
+    }
     insert (hi, X- (hi->x2 >> 1), Y-bot);
     italic_correct (hi);
   }
@@ -346,6 +376,39 @@ struct side_box_rep: public composite_box_rep {
   */
 };
 
+// Script shifts according to the OpenType MATH specification: the standard
+// shifts for ordinary glyphs; for boxes and extended shapes the scripts
+// follow the height of the base within the baseline drop limits; minimum
+// gap between a subscript and a superscript, resolved as in TeX.
+static void
+ot_script_shifts (font fn, box ref, int level, box sub, box sup,
+                  SI& ysub, SI& ysup) {
+  bool ext= ref->extended_shape ();
+  if (!is_nil (sup)) {
+    ysup= ref->sup_lo_base (level);
+    if (ext) ysup= max (ysup, ref->y2 - fn->sup_drop_max);
+    if (ysup + sup->y1 < fn->ysup_lo_lim) ysup= fn->ysup_lo_lim - sup->y1;
+  }
+  if (!is_nil (sub)) {
+    ysub= ref->sub_lo_base (level);
+    if (ext) ysub= min (ysub, ref->y1 - fn->sub_drop_min);
+    if (ysub + sub->y2 > fn->ysub_hi_lim) ysub= fn->ysub_hi_lim - sub->y2;
+  }
+  if (!is_nil (sub) && !is_nil (sup)) {
+    SI gap= (ysup + sup->y1) - (ysub + sub->y2);
+    if (gap < fn->sub_sup_gap_min) {
+      SI delta= fn->sub_sup_gap_min - gap;
+      ysub -= delta;
+      SI over= (ysup + sup->y1) - fn->sup_bottom_max_with_sub;
+      if (over > 0) {
+        SI d2= min (over, delta);
+        ysup -= d2;
+        ysub += d2;
+      }
+    }
+  }
+}
+
 side_box_rep::side_box_rep (
   path ip, box ref, box l1, box l2, box r1, box r2, font fn2, int level2):
   composite_box_rep (ip), fn (fn2), level (level2)
@@ -421,25 +484,40 @@ side_box_rep::side_box_rep (
     }
   }
 
+  // fonts with an OpenType MATH table place scripts by its constants
+  bool ot= fn->ot_math && (fn->sub_sup_gap_min > 0);
+  if (ot) {
+    ot_script_shifts (fn, ref, level, l1, l2, lsub, lsup);
+    ot_script_shifts (fn, ref, level, r1, r2, rsub, rsup);
+  }
+
+  // The corrections are evaluated at the height of the edge of the script
+  // which faces the base (for the base) and of the edge of the base which
+  // faces the script (for the script), as needed for OpenType math kerning.
   if (!is_nil (l1)) {
-    SI dx= l1->rsup_correction () - ref->lsub_correction ();
+    SI dx= l1->rsup_correction_at (ref->y1 - lsub) -
+           ref->lsub_correction_at (lsub + l1->y2);
     insert (l1, -l1->x2- dx, lsub);
   }
   if (!is_nil (l2)) {
-    SI dx= l2->rsub_correction () - ref->lsup_correction ();
+    SI dx= l2->rsub_correction_at (ref->y2 - lsup) -
+           ref->lsup_correction_at (lsup + l2->y1);
     insert (l2, -l2->x2- dx, lsup);
   }
   if (!is_nil (r1)) {
-    SI dx= -r1->lsup_correction () + ref->rsub_correction ();
+    SI dx= -r1->lsup_correction_at (ref->y1 - rsub) +
+           ref->rsub_correction_at (rsub + r1->y2);
     insert (r1, ref->x2+ dx, rsub);
   }
   if (!is_nil (r2)) {
-    SI dx= -r2->lsub_correction () + ref->rsup_correction ();
+    SI dx= -r2->lsub_correction_at (ref->y2 - rsup) +
+           ref->rsup_correction_at (rsup + r2->y1);
     insert (r2, ref->x2+ dx, rsup);
   }
 
   position ();
   left_justify ();
+  if (ot && nr_right > 0) x2 += fn->space_after_script;
 
   int i;
   id_left= id_right= 0;
@@ -675,8 +753,9 @@ side_box_rep::get_bracket_extents (SI& lo, SI& hi) {
 ******************************************************************************/
 
 box
-limit_box (path ip, box ref, box lo, box hi, font fn, bool glued) {
-  return tm_new<lim_box_rep> (ip, ref, lo, hi, fn, glued);
+limit_box (path ip, box ref, box lo, box hi, font fn, bool glued,
+           bool stretched) {
+  return tm_new<lim_box_rep> (ip, ref, lo, hi, fn, glued, stretched);
 }
 
 box

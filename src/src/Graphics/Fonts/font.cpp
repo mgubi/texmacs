@@ -125,6 +125,48 @@ font_rep::copy_math_pars (font fn) {
   wquad        = fn->wquad;
 
   double_bracket_correct= fn->double_bracket_correct;
+
+  // opentype math parameters
+  upper_limit_gap_min          = fn->upper_limit_gap_min;
+  upper_limit_baseline_rise_min= fn->upper_limit_baseline_rise_min;
+  lower_limit_gap_min          = fn->lower_limit_gap_min;
+  lower_limit_baseline_drop_min= fn->lower_limit_baseline_drop_min;
+  stretch_stack_top_shift_up     = fn->stretch_stack_top_shift_up;
+  stretch_stack_bottom_shift_down= fn->stretch_stack_bottom_shift_down;
+  stretch_stack_gap_above_min    = fn->stretch_stack_gap_above_min;
+  stretch_stack_gap_below_min    = fn->stretch_stack_gap_below_min;
+  frac_rule_thickness          = fn->frac_rule_thickness;
+  frac_num_shift_up            = fn->frac_num_shift_up;
+  frac_num_disp_shift_up       = fn->frac_num_disp_shift_up;
+  frac_num_gap_min             = fn->frac_num_gap_min;
+  frac_num_disp_gap_min        = fn->frac_num_disp_gap_min;
+  frac_denom_shift_down        = fn->frac_denom_shift_down;
+  frac_denom_disp_shift_down   = fn->frac_denom_disp_shift_down;
+  frac_denom_gap_min           = fn->frac_denom_gap_min;
+  frac_denom_disp_gap_min      = fn->frac_denom_disp_gap_min;
+  sqrt_ver_gap                 = fn->sqrt_ver_gap;
+  sqrt_ver_disp_gap            = fn->sqrt_ver_disp_gap;
+  sqrt_rule_thickness          = fn->sqrt_rule_thickness;
+  sqrt_extra_ascender          = fn->sqrt_extra_ascender;
+  sqrt_degree_rise_percent     = fn->sqrt_degree_rise_percent;
+  sqrt_kern_before_degree      = fn->sqrt_kern_before_degree;
+  sqrt_kern_after_degree       = fn->sqrt_kern_after_degree;
+  sub_sup_gap_min              = fn->sub_sup_gap_min;
+  sup_drop_max                 = fn->sup_drop_max;
+  sub_drop_min                 = fn->sub_drop_min;
+  sup_bottom_max_with_sub      = fn->sup_bottom_max_with_sub;
+  space_after_script           = fn->space_after_script;
+  script_percent               = fn->script_percent;
+  script_script_percent        = fn->script_script_percent;
+  accent_base_height           = fn->accent_base_height;
+  flattened_accent_base_height = fn->flattened_accent_base_height;
+  overbar_vertical_gap         = fn->overbar_vertical_gap;
+  overbar_rule_thickness       = fn->overbar_rule_thickness;
+  overbar_extra_ascender       = fn->overbar_extra_ascender;
+  underbar_vertical_gap        = fn->underbar_vertical_gap;
+  underbar_rule_thickness      = fn->underbar_rule_thickness;
+  underbar_extra_descender     = fn->underbar_extra_descender;
+  ot_math                      = fn->ot_math;
 }
 
 void
@@ -274,6 +316,19 @@ font_rep::get_rsup_correction (string s) {
     r += (SI) (rsup_correct[s (N(s)-1, N(s))] * wfn);
   return r;
 }
+
+SI
+font_rep::get_lsub_correction_at (string s, SI h) {
+  (void) h; return get_lsub_correction (s); }
+SI
+font_rep::get_lsup_correction_at (string s, SI h) {
+  (void) h; return get_lsup_correction (s); }
+SI
+font_rep::get_rsub_correction_at (string s, SI h) {
+  (void) h; return get_rsub_correction (s); }
+SI
+font_rep::get_rsup_correction_at (string s, SI h) {
+  (void) h; return get_rsup_correction (s); }
 
 SI
 font_rep::get_wide_correction (string s, int mode) {
@@ -531,21 +586,26 @@ qt_font (string family, int size, int dpi) {
 
 static hashmap<string,font> larger_font_table;
 bool has_poor_rubber= true;
+bool hand_tuned_math_fonts= true;
+
+void set_hand_tuned_math_fonts (bool val) { hand_tuned_math_fonts= val; }
+bool get_hand_tuned_math_fonts () { return hand_tuned_math_fonts; }
 
 bool
 use_poor_rubber (font fn) {
   return has_poor_rubber && fn->type == FONT_TYPE_UNICODE &&
-    !starts (fn->res_name, "stix-");
+    !starts (locase_all (fn->res_name), "stix-");
 }
 
-static font
-make_rubber_font (font fn) {
+font
+font_rep::make_rubber_font (font fn) {
   string name= locase_all (fn->res_name);
-  if (starts (name, "stix-") ||
-      starts (name, "stix,") ||
-      occurs (",stix,", name) ||
-      occurs ("math=stix", name) ||
-      occurs ("mathrubber=stix", name))
+  if (hand_tuned_math_fonts &&
+      (starts (name, "stix-") ||
+       starts (name, "stix,") ||
+       occurs (",stix,", name) ||
+       occurs ("math=stix", name) ||
+       occurs ("mathrubber=stix", name)))
     return rubber_stix_font (fn);
   else if (occurs ("mathlarge=", name) ||
            occurs ("mathrubber=", name))
@@ -558,11 +618,41 @@ make_rubber_font (font fn) {
     return fn;
 }
 
+bool
+font_rep::get_rubber_variant (string s, SI height, string& r) {
+  (void) s; (void) height; (void) r;
+  return false;
+}
+
+bool
+font_rep::is_extended_shape (string s) {
+  (void) s;
+  return false;
+}
+
+bool
+font_rep::get_wide_variant (string s, SI width, string& r) {
+  (void) s; (void) width; (void) r;
+  return false;
+}
+
+bool
+font_rep::get_top_accent (string s, SI& x) {
+  (void) s; (void) x;
+  return false;
+}
+
+bool
+font_rep::get_feature_variant (string s, string feature, int alt, string& r) {
+  (void) s; (void) feature; (void) alt; (void) r;
+  return false;
+}
+
 font
 rubber_font (font base) {
   if (larger_font_table->contains (base->res_name))
     return larger_font_table (base->res_name);
-  font larger= make_rubber_font (base);
+  font larger= base->make_rubber_font (base);
   larger_font_table (base->res_name)= larger;
   return larger;
 }

@@ -156,13 +156,14 @@ box highlight_box (path ip, box b, box xb, ornament_parameters ps);
 box highlight_box (path ip, box b, SI w, brush col, brush sunc, brush shad);
 box art_box (path ip, box b, art_box_parameters ps);
 
-box frac_box (path ip, box b1, box b2, font fn, font sfn, pencil pen);
+box frac_box (path ip, box b1, box b2, font fn, font sfn, pencil pen, bool disp= false);
 box sqrt_box (path ip, box b1, box b2, box sqrtb, font fn, pencil pen);
 box neg_box (path ip, box b, font fn, pencil pen);
 box tree_box (path ip, array<box> bs, font fn, pencil pen);
 box wide_box (path ip, box ref, string s, font fn, pencil p, bool wf, bool af);
 box repeat_box (path ip, box ref, box repeat, SI xoff=0, bool under= false);
-box limit_box (path ip, box ref, box lo, box hi, font fn, bool glued);
+box limit_box (path ip, box ref, box lo, box hi, font fn, bool glued,
+               bool stretched= false);
 box script_box (path ip, box b1, box b2, font fn);
 box left_script_box (path ip, box ref, box b1, box b2, font fn, int level);
 box right_script_box (path ip, box ref, box b1, box b2, font fn, int level);

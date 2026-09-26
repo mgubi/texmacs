@@ -1,3 +1,9 @@
+
+# temp , to be removed
+plugins/scilab/*
+packages/android/AndroidManifest.xml
+packages/android/res/values/
+
 # binary files
 *.so
 *.[oa]

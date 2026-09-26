@@ -30,6 +30,7 @@ struct font_glyphs;
 #define MATH_TYPE_NORMAL      0
 #define MATH_TYPE_STIX        1
 #define MATH_TYPE_TEX_GYRE    2
+#define MATH_TYPE_OPENTYPE    3
 
 #define START_OF_LINE         1
 #define END_OF_LINE           2
@@ -95,9 +96,76 @@ struct font_rep: rep<font> {
   array<array<space> >   wide_spacing;     // wide spacing table
   SI double_bracket_correct; // extra space between double brackets
 
+  // math measurements for opentype fonts (zero when unknown); ot_math tells
+  // whether they were loaded from a MATH table. Fonts with hand-tuned
+  // customizations keep their own math_type (TeX Gyre, STIX): the tuned
+  // tables take precedence, the MATH data fills what they do not cover.
+  bool ot_math= false;
+  SI  upper_limit_gap_min= 0;
+  SI  upper_limit_baseline_rise_min= 0;
+  SI  lower_limit_gap_min= 0;
+  SI  lower_limit_baseline_drop_min= 0;
+  SI  stretch_stack_top_shift_up= 0;
+  SI  stretch_stack_bottom_shift_down= 0;
+  SI  stretch_stack_gap_above_min= 0;
+  SI  stretch_stack_gap_below_min= 0;
+  SI  frac_rule_thickness= 0;
+  SI  frac_num_shift_up= 0;
+  SI  frac_num_disp_shift_up= 0;
+  SI  frac_num_gap_min= 0;
+  SI  frac_num_disp_gap_min= 0;
+  SI  frac_denom_shift_down= 0;
+  SI  frac_denom_disp_shift_down= 0;
+  SI  frac_denom_gap_min= 0;
+  SI  frac_denom_disp_gap_min= 0;
+  SI  sqrt_ver_gap= 0;
+  SI  sqrt_ver_disp_gap= 0;
+  SI  sqrt_rule_thickness= 0;
+  SI  sqrt_extra_ascender= 0;
+  int sqrt_degree_rise_percent= 0;
+  SI  sqrt_kern_before_degree= 0;
+  SI  sqrt_kern_after_degree= 0;
+  SI  sub_sup_gap_min= 0;         // subSuperscriptGapMin
+  SI  sup_drop_max= 0;            // superscriptBaselineDropMax
+  SI  sub_drop_min= 0;            // subscriptBaselineDropMin
+  SI  sup_bottom_max_with_sub= 0; // superscriptBottomMaxWithSubscript
+  SI  space_after_script= 0;      // spaceAfterScript
+  int script_percent= 0;          // scriptPercentScaleDown
+  int script_script_percent= 0;   // scriptScriptPercentScaleDown
+  SI  accent_base_height= 0;      // accentBaseHeight
+  SI  flattened_accent_base_height= 0; // flattenedAccentBaseHeight
+  SI  overbar_vertical_gap= 0;    // overbarVerticalGap
+  SI  overbar_rule_thickness= 0;  // overbarRuleThickness
+  SI  overbar_extra_ascender= 0;  // overbarExtraAscender
+  SI  underbar_vertical_gap= 0;   // underbarVerticalGap
+  SI  underbar_rule_thickness= 0; // underbarRuleThickness
+  SI  underbar_extra_descender= 0;// underbarExtraDescender
+
   font_rep (string name);
   font_rep (string name, font fn);
   void copy_math_pars (font fn);
+
+  virtual font make_rubber_font (font base);
+  // For a rubber character s (<left-(>, <large-sqrt>, ...), return in r
+  // the name of the smallest size variant reaching the given height, or of
+  // an assembly made to measure; false when the font cannot tell
+  virtual bool get_rubber_variant (string s, SI height, string& r);
+  // whether the glyph s is an "extended shape" (tall operator or
+  // delimiter) whose scripts follow its height, as opposed to an ordinary
+  // glyph whose scripts sit at the standard shifts
+  virtual bool is_extended_shape (string s);
+  // For a wide character s (<wide-hat>, <rubber-rightarrow>, ...), return
+  // in r the name of the narrowest variant reaching the width, or of an
+  // assembly made to measure; false when the font cannot tell
+  virtual bool get_wide_variant (string s, SI width, string& r);
+  // horizontal position of the attachment point of accents over the glyph
+  // s, relative to its origin; false when unknown (use the center)
+  virtual bool get_top_accent (string s, SI& x);
+  // the alt-th substitute of the glyph s under the OpenType feature
+  // (e.g. "dtls" for dotless letters, "flac" for flattened accents, "ssty"
+  // for script size alternates), as a native glyph name; false when none
+  virtual bool get_feature_variant (string s, string feature, int alt,
+                                    string& r);
 
   virtual bool   supports (string c) = 0;
   virtual void   get_extents (string s, metric& ex) = 0;
@@ -124,6 +192,13 @@ struct font_rep: rep<font> {
   virtual SI     get_lsup_correction  (string s);
   virtual SI     get_rsub_correction  (string s);
   virtual SI     get_rsup_correction  (string s);
+  // script corrections when the vertical position of the script is known:
+  // h is the height, relative to the baseline of s, of the edge of the
+  // script facing s (bottom of a superscript, top of a subscript)
+  virtual SI     get_lsub_correction_at (string s, SI h);
+  virtual SI     get_lsup_correction_at (string s, SI h);
+  virtual SI     get_rsub_correction_at (string s, SI h);
+  virtual SI     get_rsup_correction_at (string s, SI h);
   virtual SI     get_left_protrusion  (string s, int mode);
   virtual SI     get_right_protrusion (string s, int mode);
   virtual SI     get_wide_correction (string s, int mode);
@@ -180,6 +255,9 @@ font poor_bbb_font (font base);
 font poor_distorted_font (font base, tree kind);
 font poor_effected_font (font base, tree kind);
 font recolored_font (font base, tree kind);
+font feature_font (font base, string feature, int alt);
+font apply_features (font fn, string features);
+array<string> ot_font_features (string name);
 font superposed_font (array<font> fns, int ref);
 font x_font (string family, int size, int dpi);
 font qt_font (string family, int size, int dpi);
@@ -231,10 +309,24 @@ void above_adjust_bbb (hashmap<string,double>& t, double force);
 int  get_spacing_id (tree spacing_desc);
 tree get_spacing_desc (int spacing_id);
 
+// Profiles of named OpenType math fonts (math_font_profiles.cpp)
+void          math_font_profile_set (string family, tree profile);
+tree          math_font_profile (string family);
+array<string> math_font_profile_families ();
+string        math_font_profile_attr (string family, string key);
+string        math_family_for_text (string text_family);
+string        text_family_for_math (string math_family);
+
 // Font database
 extern bool new_fonts;
 void set_new_fonts (bool new_val);
 bool get_new_fonts ();
+// Whether the hand-tuned customizations for fonts which also carry an
+// OpenType MATH table (TeX Gyre Math, STIX, ...) are applied; when off,
+// such fonts are typeset from their MATH table only
+extern bool hand_tuned_math_fonts;
+void set_hand_tuned_math_fonts (bool val);
+bool get_hand_tuned_math_fonts ();
 void font_database_build (url u);
 void font_database_build_local ();
 void font_database_extend_local (url u);
@@ -249,6 +341,7 @@ void font_database_save_local_delta ();
 array<string> font_database_families ();
 array<string> font_database_delta_families ();
 array<string> font_database_styles (string family);
+string        font_database_master (string family);
 array<string> font_database_global_styles (string family);
 array<string> font_database_search (string family, string style);
 array<string> font_database_search (string fam, string var,

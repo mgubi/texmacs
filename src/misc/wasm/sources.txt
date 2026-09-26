@@ -119,6 +119,7 @@ Graphics/Colors/colors.cpp
 Graphics/Colors/true_color.cpp
 Graphics/Fonts/charmap.cpp
 Graphics/Fonts/compound_font.cpp
+Graphics/Fonts/feature_font.cpp
 Graphics/Fonts/find_font.cpp
 Graphics/Fonts/font_database.cpp
 Graphics/Fonts/font_guess.cpp
@@ -129,6 +130,7 @@ Graphics/Fonts/font_spacing.cpp
 Graphics/Fonts/font_translate.cpp
 Graphics/Fonts/font_wide.cpp
 Graphics/Fonts/font.cpp
+Graphics/Fonts/math_font_profiles.cpp
 Graphics/Fonts/math_font.cpp
 Graphics/Fonts/poor_bbb.cpp
 Graphics/Fonts/poor_bold.cpp

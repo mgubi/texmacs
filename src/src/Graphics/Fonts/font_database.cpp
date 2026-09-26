@@ -11,8 +11,10 @@
 
 #include "font.hpp"
 #include "iterator.hpp"
+#include "hashset.hpp"
 #include "file.hpp"
 #include "convert.hpp"
+#include "analyze.hpp"
 #include "merge_sort.hpp"
 #include "Freetype/tt_file.hpp"
 #include "Freetype/tt_tools.hpp"
@@ -32,6 +34,7 @@ static array<string> font_database_families (hashmap<tree,tree> ftab);
 #define LOCAL_FEATURES "$TEXMACS_HOME_PATH/fonts/font-features.scm"
 #define LOCAL_CHARACTERISTICS \
   "$TEXMACS_HOME_PATH/fonts/font-characteristics.scm"
+#define SHIPPED_STAMP "$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm"
 #define DELTA_DATABASE "$TEXMACS_HOME_PATH/fonts/delta-database.scm"
 #define DELTA_FEATURES "$TEXMACS_HOME_PATH/fonts/delta-features.scm"
 #define DELTA_CHARACTERISTICS \
@@ -219,28 +222,95 @@ font_database_load_substitutions (url u) {
   }
 }
 
+// The database TeXmacs ships grows with every version, with the fonts that
+// version registers. The local database is derived from it once and saved
+// again whenever fonts are scanned, so its date says nothing about which
+// shipped database it comes from: a stamp records that, and the entries of
+// a newer one are merged in. Without this, a font a new version registers
+// stays invisible to an old home directory, and a character which only that
+// font draws is not found at all and comes out as its name in red.
+//
+// Merging keeps only the fonts which are installed on this machine, and the
+// fonts TeXmacs ships are installed in the directory of the installation
+// which merges. A home directory shared by several installations, as a
+// developer has, would otherwise keep the fonts of whichever ran last and
+// hide the rest for good, the stamp saying that the merge had been done:
+// the installation is therefore part of the stamp.
+
+static string
+shipped_fonts_stamp () {
+  return
+    as_string (last_modified (GLOBAL_DATABASE, false)) * " " *
+    as_string (file_size (GLOBAL_DATABASE)) * " " *
+    as_string (last_modified (GLOBAL_FEATURES, false)) * " " *
+    as_string (file_size (GLOBAL_FEATURES)) * " " *
+    as_string (last_modified (GLOBAL_CHARACTERISTICS, false)) * " " *
+    as_string (file_size (GLOBAL_CHARACTERISTICS)) * " " *
+    get_env ("TEXMACS_PATH");
+}
+
+// The two lines of the stamp: what was merged, and how large the database
+// was when this installation left it
+static array<string>
+shipped_fonts_mark () {
+  string s;
+  array<string> r;
+  if (!exists (url (SHIPPED_STAMP))) return r;
+  if (load_string (SHIPPED_STAMP, s, false)) return r;
+  return tokenize (trim_spaces (s), "\n");
+}
+
+static bool
+shipped_fonts_changed () {
+  if (!exists (url (GLOBAL_DATABASE))) return false;
+  array<string> mark= shipped_fonts_mark ();
+  if (N (mark) < 2) return true;
+  return trim_spaces (mark[0]) != shipped_fonts_stamp ();
+}
+
+// Another installation which rebuilds the database of this home directory
+// keeps the fonts it ships and drops the ones we ship, and would leave our
+// stamp behind: merge again when the database has lost entries.
+static bool
+shipped_fonts_shrunk (int nr) {
+  array<string> mark= shipped_fonts_mark ();
+  if (N (mark) < 2) return false;
+  string n= trim_spaces (mark[1]);
+  return is_int (n) && nr < as_int (n);
+}
+
 void
 font_database_load () {
   if (fonts_loaded) return;
+  bool renew= shipped_fonts_changed ();
   font_database_load_database (LOCAL_DATABASE);
-  if (N (font_table) == 0) {
+  if (renew && N (font_table) != 0)
+    cout << "TeXmacs] the shipped font database changed, merging it\n";
+  else if (!renew && shipped_fonts_shrunk (N (font_table))) {
+    cout << "TeXmacs] the local font database lost entries, merging again\n";
+    renew= true;
+  }
+  if (N (font_table) == 0 || renew) {
     font_database_load_database (GLOBAL_DATABASE);
     font_database_filter ();
     font_database_save_database (LOCAL_DATABASE);
   }
   font_database_load_features (LOCAL_FEATURES);
-  if (N (font_features) == 0) {
+  if (N (font_features) == 0 || renew) {
     font_database_load_features (GLOBAL_FEATURES);
     font_database_filter_features ();
     font_database_save_features (LOCAL_FEATURES);
   }
   font_database_load_characteristics (LOCAL_CHARACTERISTICS);
-  if (N (font_characteristics) == 0) {
+  if (N (font_characteristics) == 0 || renew) {
     font_database_load_characteristics (GLOBAL_CHARACTERISTICS);
     font_database_filter_characteristics ();
     font_database_save_characteristics (LOCAL_CHARACTERISTICS);
   }
   font_database_load_substitutions (GLOBAL_SUBSTITUTIONS);
+  if (renew)
+    save_string (SHIPPED_STAMP,
+                 shipped_fonts_stamp () * "\n" * as_string (N (font_table)));
   fonts_loaded= true;
 }
 
@@ -278,8 +348,33 @@ on_blacklist (string name) {
     starts (name, "FonetikaDania");
 }
 
+// Scanning a font file means reading it whole and parsing its name table,
+// which is slow when there are thousands of them (a TeX Live installation
+// on the font path). Files whose name and size are already recorded in the
+// database are therefore skipped: this index maps "name size" to true and
+// is built once from the database.
+static hashset<string> scanned_files;
+static bool scanned_files_ready= false;
+static int  scan_new= 0, scan_skipped= 0;
+
+static void
+font_database_init_scanned () {
+  scanned_files= hashset<string> ();
+  iterator<tree> it= iterate (font_table);
+  while (it->busy ()) {
+    tree im= font_table[it->next ()];
+    for (int i=0; i<N(im); i++)
+      if (is_func (im[i], TUPLE, 3))
+        scanned_files->insert (as_string (im[i][0]) * " " *
+                               as_string (im[i][2]));
+  }
+  scanned_files_ready= true;
+  scan_new= scan_skipped= 0;
+}
+
 void
 font_database_build (url u) {
+  if (!scanned_files_ready) font_database_init_scanned ();
   if (is_none (u));
   else if (is_or (u)) {
     font_database_build (u[1]);
@@ -296,23 +391,30 @@ font_database_build (url u) {
           font_database_build (u * url (a[i]));
   }
   else if (is_regular (u)) {
-    if (on_blacklist (as_string (tail (u)))) return;
-    cout << "Process " << u << "\n";
+    string name= as_string (tail (u));
+    if (on_blacklist (name)) return;
+    int sz= file_size (u);
+    if (scanned_files->contains (name * " " * as_string (sz))) {
+      scan_skipped++;
+      return;
+    }
+    scan_new++;
+    if (DEBUG_VERBOSE) debug_fonts << "Process " << u << "\n";
     scheme_tree t= tt_font_name (u);
     for (int i=0; i<N(t); i++)
       if (is_func (t[i], TUPLE, 2) &&
           is_atomic (t[i][0]) &&
           is_atomic (t[i][1]))
         {
-          int  sz = file_size (u);
           tree key= t[i];
-          tree im = tuple (as_string (tail (u)), as_string (i), as_string (sz));
+          tree im = tuple (name, as_string (i), as_string (sz));
           tree all= tree (TUPLE);
           if (font_table->contains (key))
             all= font_table [key];
           tuple_insert (all, im);
           font_table (key)= all;
         }
+    scanned_files->insert (name * " " * as_string (sz));
   }
 }
 
@@ -331,7 +433,10 @@ font_database_guess_features () {
 void
 font_database_build_local () {
   font_database_load ();
+  font_database_init_scanned ();
   font_database_build (tt_font_path ());
+  cout << "TeXmacs] scanned " << scan_new << " new font file(s), skipped "
+       << scan_skipped << " already known\n";
   font_database_build_characteristics (false);
   font_database_guess_features ();
   font_database_save ();
@@ -341,6 +446,7 @@ void
 font_database_extend_local (url u) {
   tt_extend_font_path (u);
   font_database_load ();
+  font_database_init_scanned ();
   font_database_build (u);
   font_database_build_characteristics (false);
   font_database_guess_features ();
@@ -355,6 +461,7 @@ font_database_build_global (url u) {
   font_database_load_features (GLOBAL_FEATURES);
   font_database_load_characteristics (GLOBAL_CHARACTERISTICS);
   fonts_loaded= fonts_global_loaded= true;
+  font_database_init_scanned ();
   font_database_build (u);
   font_database_build_characteristics (false);
   font_database_guess_features ();
@@ -574,17 +681,22 @@ font_database_filter_characteristics () {
 void
 font_database_build_characteristics (bool force) {
   iterator<tree> it= iterate (font_table);
+  int done= 0;
   while (it->busy ()) {
     tree key= it->next ();
     tree im = font_table[key];
     if (!(is_func (key, TUPLE) && N(key) >= 2)) continue;
-    cout << "Analyzing " << key[0] << " " << key[1] << "\n";
+    if (!force && font_characteristics->contains (key)) continue;
+    if (DEBUG_VERBOSE)
+      debug_fonts << "Analyzing " << key[0] << " " << key[1] << "\n";
+    done++;
     for (int i=0; i<N(im); i++)
       if (force || !font_characteristics->contains (key))
         if (is_func (im[i], TUPLE, 3)) {
           string name= as_string (im[i][0]);
           string nr  = as_string (im[i][1]);
-          cout << "| Processing " << name << ", " << nr << "\n";
+          if (DEBUG_VERBOSE)
+            debug_fonts << "| Processing " << name << ", " << nr << "\n";
           if (ends (name, ".ttc"))
             name= (name (0, N(name)-4) * "." * nr * ".ttf");
           if (ends (name, ".ttf") ||
@@ -595,7 +707,7 @@ font_database_build_characteristics (bool force) {
               name= name (0, N(name)-2);
             if (tt_font_exists (name)) {
               array<string> a= tt_analyze (name);
-              cout << name << " ~> " << a << "\n";
+              if (DEBUG_VERBOSE) debug_fonts << name << " ~> " << a << "\n";
               tree t (TUPLE, N(a));
               for (int j=0; j<N(a); j++) t[j]= a[j];
               font_characteristics (key)= t;
@@ -603,6 +715,8 @@ font_database_build_characteristics (bool force) {
           }
         }
   }
+  if (done > 0)
+    cout << "TeXmacs] analyzed " << done << " font style(s)\n";
 }
 
 /******************************************************************************
@@ -690,6 +804,23 @@ font_database_search (string fam, string var, string series, string shape) {
   array<string> pfn= search_font (lfn);
   //cout << "Physical font: " << pfn << "\n";
   return font_database_search (pfn[0], pfn[1]);
+}
+
+// The master a family belongs to ("Fira" for "Fira Sans", "Kepler Math" for
+// "KpMath"), or "" when the features database does not know the family. The
+// font selection is driven by masters, so a name that comes from elsewhere
+// has to be translated before it is used as a font. Unlike family_to_master,
+// this says so instead of guessing, and it prints nothing.
+string
+font_database_master (string family) {
+  font_database_load ();
+  if (!font_features->contains (tree (family))) {
+    font_database_global_load ();
+    if (!font_features->contains (tree (family))) return "";
+  }
+  tree t= font_features [tree (family)];
+  if (is_func (t, TUPLE) && N(t) >= 1 && is_atomic (t[0])) return t[0]->label;
+  return "";
 }
 
 array<string>

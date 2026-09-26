@@ -14,6 +14,7 @@
 #include "Freetype/free_type.hpp"
 #include "Freetype/tt_file.hpp"
 #include "Freetype/tt_face.hpp"
+#include "Freetype/tt_tools.hpp"
 #include "analyze.hpp"
 #include "converter.hpp"
 
@@ -34,6 +35,7 @@
 #define LIGATURE_ST  64
 
 font unicode_font (string family, int size, int hdpi, int vdpi);
+font rubber_unicode_font (font base, tt_face face);
 
 hashmap<string,double> lsup_guessed_table ();
 hashmap<string,double> rsub_guessed_table ();
@@ -134,9 +136,35 @@ struct unicode_font_rep: font_rep {
 
   hashmap<string,int> native; // additional native (non unicode) characters
   
+  // only for OpenType fonts /////////
+
+  tt_face      ot_face;  // the parsed face: MATH, GSUB and GPOS
+  ot_mathtable math_table;
+
+  font make_rubber_font (font base);
+  bool get_ot_kerning (string s, SI height, bool top, bool left, SI& kerning);
+  bool get_ot_italic_correction (string s, SI& r);
+  bool is_ot_integral (string s);
+  bool is_extended_shape (string s);
+  bool get_top_accent (string s, SI& x);
+  bool get_feature_variant (string s, string feature, int alt, string& r);
+  void init_ot_math (tt_face face);
+  hashset<unsigned int> ot_integral;
+
+  double design_unit_to_metric_factor;   // vertical
+  double design_unit_to_metric_x_factor; // horizontal
+  double metric_to_design_unit_factor;   // vertical
+  void   init_design_unit_factor ();
+  SI     design_unit_to_metric (int du);   // vertical lengths
+  SI     design_unit_to_metric_x (int du); // horizontal lengths
+  int    metric_to_design_unit (SI m);     // vertical lengths
+
+  ////////////////////////////
+
   unicode_font_rep (string name, string family, int size, int hdpi, int vdpi);
   void tex_gyre_operators ();
 
+  unsigned int get_glyphID (string s);
   unsigned int read_unicode_char (string s, int& i);
   unsigned int ligature_replace (unsigned int c, string s, int& i);
   bool   supports (string c);
@@ -157,6 +185,10 @@ struct unicode_font_rep: font_rep {
   SI     get_lsup_correction  (string s);
   SI     get_rsub_correction  (string s);
   SI     get_rsup_correction  (string s);
+  SI     get_lsub_correction_at (string s, SI h);
+  SI     get_lsup_correction_at (string s, SI h);
+  SI     get_rsub_correction_at (string s, SI h);
+  SI     get_rsup_correction_at (string s, SI h);
   SI     get_wide_correction  (string s, int mode);
 };
 
@@ -275,7 +307,16 @@ unicode_font_rep::unicode_font_rep (string name,
   if (starts (family, "texgyre") && ends (family, "-math"))
     tex_gyre_operators ();
 
-  if (starts (family, "STIX-")) {
+  // Fonts with an OpenType MATH table are typeset from the table; the
+  // hand-tuned customizations below take precedence over the table when
+  // both exist, unless the user switched them off (preference
+  // "hand tuned math fonts") to compare with the table-only result.
+  this->ot_face= tt_face (family);
+  bool    has_ot  = !is_nil (ot_face) && !is_nil (ot_face->math_table);
+  bool    tuned   = hand_tuned_math_fonts || !has_ot;
+  if (has_ot) init_ot_math (ot_face);
+
+  if (tuned && starts (family, "STIX-")) {
     if (!ends (family, "italic")) {
       global_rsub_correct= (SI) (0.04 * wfn);
       global_rsup_correct= (SI) (0.04 * wfn);
@@ -296,7 +337,7 @@ unicode_font_rep::unicode_font_rep (string name,
     }
   }
 
-  else if (starts (family, "texgyre")) {
+  else if (tuned && starts (family, "texgyre")) {
     if (!ends (family, "italic")) {
       if (starts (family, "texgyretermes-")) {
         global_rsup_correct= (SI) (0.04 * wfn);
@@ -369,7 +410,7 @@ unicode_font_rep::unicode_font_rep (string name,
     }
   }
 
-  else if (starts (family, "Papyrus")) {
+  else if (tuned && starts (family, "Papyrus")) {
     lsup_correct= copy (lsup_guessed_table ());
     rsub_correct= copy (rsub_guessed_table ());
     adjust_integral (lsup_correct, "1", -0.15);
@@ -378,7 +419,7 @@ unicode_font_rep::unicode_font_rep (string name,
     adjust_integral (rsub_correct, "2", 0.15);
   }
 
-  else if (starts (family, "LinLibertine")) {
+  else if (tuned && starts (family, "LinLibertine")) {
     if (!ends (family, "I")) {
       lsub_correct= lsub_libertine_table ();
       lsup_correct= lsup_libertine_table ();
@@ -395,7 +436,7 @@ unicode_font_rep::unicode_font_rep (string name,
     }
     if (starts (family, "LinLibertine_a")) ligs= 0;
   }
-  else if (starts (family, "LinBiolinum")) {
+  else if (tuned && starts (family, "LinBiolinum")) {
     if (!ends (family, "I")) {
       lsub_correct= lsub_biolinum_table ();
       lsup_correct= lsup_biolinum_table ();
@@ -412,7 +453,7 @@ unicode_font_rep::unicode_font_rep (string name,
     }
     if (starts (family, "LinBiolinum_a")) ligs= 0;
   }
-  else if (starts (family, "FiraSans")) {
+  else if (tuned && starts (family, "FiraSans")) {
     if (!ends (family, "Italic")) {
       lsub_correct= lsub_fira_table ();
       lsup_correct= lsup_fira_table ();
@@ -428,6 +469,106 @@ unicode_font_rep::unicode_font_rep (string name,
       above_correct= above_fira_italic_table ();
     }
   }
+  else if (has_ot) math_type= MATH_TYPE_OPENTYPE;
+}
+
+// Load the layout parameters of an OpenType MATH table. This runs before
+// the hand-tuned per-family customizations of the constructor, which may
+// override any of these values.
+void
+unicode_font_rep::init_ot_math (tt_face face) {
+  this->ot_face   = face;
+  this->math_table= face->math_table;
+  ot_math= true;
+  init_design_unit_factor ();
+  MathConstantsTable& mc= math_table->constants_table;
+  // general parameters: math axis, rule thickness, script placement
+  if (mc[axisHeight] > 0)
+    yfrac= design_unit_to_metric (mc[axisHeight]);
+  if (mc[fractionRuleThickness] > 0)
+    wline= design_unit_to_metric (mc[fractionRuleThickness]);
+  if (mc[superscriptShiftUp] > 0 && mc[subscriptShiftDown] > 0) {
+    ysub_lo_base= -design_unit_to_metric (mc[subscriptShiftDown]);
+    ysub_hi_lim = design_unit_to_metric (mc[subscriptTopMax]);
+    ysup_lo_lim = design_unit_to_metric (mc[superscriptBottomMin]);
+    ysup_lo_base= design_unit_to_metric (mc[superscriptShiftUp]);
+    ysup_hi_lim = max (ysup_lo_base, yx);
+    yshift      = design_unit_to_metric (mc[superscriptShiftUp] -
+                                         mc[superscriptShiftUpCramped]);
+  }
+  // limit boxes
+  upper_limit_gap_min=
+      design_unit_to_metric (math_table->constants_table[upperLimitGapMin]);
+  upper_limit_baseline_rise_min= design_unit_to_metric (
+      math_table->constants_table[upperLimitBaselineRiseMin]);
+  lower_limit_gap_min=
+      design_unit_to_metric (math_table->constants_table[lowerLimitGapMin]);
+  lower_limit_baseline_drop_min= design_unit_to_metric (
+      math_table->constants_table[lowerLimitBaselineDropMin]);
+  // labels above and below a stretched glyph (long arrows, wide braces)
+  stretch_stack_top_shift_up= design_unit_to_metric (
+      math_table->constants_table[stretchStackTopShiftUp]);
+  stretch_stack_bottom_shift_down= design_unit_to_metric (
+      math_table->constants_table[stretchStackBottomShiftDown]);
+  stretch_stack_gap_above_min= design_unit_to_metric (
+      math_table->constants_table[stretchStackGapAboveMin]);
+  stretch_stack_gap_below_min= design_unit_to_metric (
+      math_table->constants_table[stretchStackGapBelowMin]);
+  // frac boxes
+  frac_rule_thickness= design_unit_to_metric (
+      math_table->constants_table[fractionRuleThickness]);
+  frac_num_shift_up= design_unit_to_metric (
+      math_table->constants_table[fractionNumeratorShiftUp]);
+  frac_num_disp_shift_up= design_unit_to_metric (
+      math_table->constants_table[fractionNumeratorDisplayStyleShiftUp]);
+  frac_num_gap_min= design_unit_to_metric (
+      math_table->constants_table[fractionNumeratorGapMin]);
+  frac_num_disp_gap_min= design_unit_to_metric (
+      math_table->constants_table[fractionNumDisplayStyleGapMin]);
+  frac_denom_shift_down= design_unit_to_metric (
+      math_table->constants_table[fractionDenominatorShiftDown]);
+  frac_denom_disp_shift_down= design_unit_to_metric (
+      math_table
+          ->constants_table[fractionDenominatorDisplayStyleShiftDown]);
+  frac_denom_gap_min= design_unit_to_metric (
+      math_table->constants_table[fractionDenominatorGapMin]);
+  frac_denom_disp_gap_min= design_unit_to_metric (
+      math_table->constants_table[fractionDenomDisplayStyleGapMin]);
+  // sqrt boxes
+  sqrt_ver_gap= design_unit_to_metric (
+      math_table->constants_table[radicalVerticalGap]);
+  sqrt_ver_disp_gap= design_unit_to_metric (
+      math_table->constants_table[radicalDisplayStyleVerticalGap]);
+  sqrt_rule_thickness= design_unit_to_metric (
+      math_table->constants_table[radicalRuleThickness]);
+  sqrt_extra_ascender= design_unit_to_metric (
+      math_table->constants_table[radicalExtraAscender]);
+  sqrt_degree_rise_percent=
+      math_table->constants_table[radicalDegreeBottomRaisePercent];
+  sqrt_kern_before_degree= design_unit_to_metric (
+      math_table->constants_table[radicalKernBeforeDegree]);
+  sqrt_kern_after_degree= design_unit_to_metric (
+      math_table->constants_table[radicalKernAfterDegree]);
+  // scripts
+  sub_sup_gap_min= design_unit_to_metric (mc[subSuperscriptGapMin]);
+  sup_drop_max   = design_unit_to_metric (mc[superscriptBaselineDropMax]);
+  sub_drop_min   = design_unit_to_metric (mc[subscriptBaselineDropMin]);
+  sup_bottom_max_with_sub=
+      design_unit_to_metric (mc[superscriptBottomMaxWithSubscript]);
+  space_after_script= design_unit_to_metric_x (mc[spaceAfterScript]);
+  script_percent       = mc[scriptPercentScaleDown];
+  script_script_percent= mc[scriptScriptPercentScaleDown];
+  // accents
+  accent_base_height= design_unit_to_metric (mc[accentBaseHeight]);
+  flattened_accent_base_height=
+      design_unit_to_metric (mc[flattenedAccentBaseHeight]);
+  // over- and underlines
+  overbar_vertical_gap    = design_unit_to_metric (mc[overbarVerticalGap]);
+  overbar_rule_thickness  = design_unit_to_metric (mc[overbarRuleThickness]);
+  overbar_extra_ascender  = design_unit_to_metric (mc[overbarExtraAscender]);
+  underbar_vertical_gap   = design_unit_to_metric (mc[underbarVerticalGap]);
+  underbar_rule_thickness = design_unit_to_metric (mc[underbarRuleThickness]);
+  underbar_extra_descender= design_unit_to_metric (mc[underbarExtraDescender]);
 }
 
 /******************************************************************************
@@ -577,6 +718,11 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
       start++;
       return (unsigned int) from_hexadecimal (s (start, i++));
     }
+    else if (s[start] == '@') {
+      // <@XXXX> are native glyph ids generated by rubber_unicode_font
+      start++;
+      return 0xc000000 + (unsigned int) from_hexadecimal (s (start, i++));
+    }
     else {
       string ss= s (start-1, ++i);
       string uu= strict_cork_to_utf8 (ss);
@@ -635,6 +781,8 @@ unicode_font_rep::supports (string c) {
   if (uc >= 0x42 && uc <= 0x5a && !fnm->exists (0x41)) return false;
   if (uc >= 0x62 && uc <= 0x7a && !fnm->exists (0x61)) return false;
   metric_struct* m= fnm->get (uc);
+  // native glyphs (<@XXXX>) may be combining marks without advance
+  if (uc >= 0xc000000) return m->x3 < m->x4 && m->y3 < m->y4;
   return m->x1 < m->x2 && m->y1 < m->y2;
 }
 
@@ -877,6 +1025,10 @@ unicode_font_rep::get_left_correction  (string s) {
 
 SI
 unicode_font_rep::get_right_correction (string s) {
+  if (math_type == MATH_TYPE_OPENTYPE) {
+    SI r= 0;
+    if (get_ot_italic_correction (s, r)) return r;
+  }
   metric ex;
   get_extents (s, ex);
   if (math_type == MATH_TYPE_TEX_GYRE && is_integral (s))
@@ -888,6 +1040,30 @@ unicode_font_rep::get_right_correction (string s) {
 
 SI
 unicode_font_rep::get_lsub_correction (string s) {
+  return get_lsub_correction_at (s, y1);
+}
+
+SI
+unicode_font_rep::get_lsup_correction (string s) {
+  return get_lsup_correction_at (s, y2);
+}
+
+SI
+unicode_font_rep::get_rsub_correction (string s) {
+  return get_rsub_correction_at (s, y1);
+}
+
+SI
+unicode_font_rep::get_rsup_correction (string s) {
+  return get_rsup_correction_at (s, y2);
+}
+
+SI
+unicode_font_rep::get_lsub_correction_at (string s, SI h) {
+  if (math_type == MATH_TYPE_OPENTYPE) {
+    SI r= 0;
+    if (get_ot_kerning (s, h, false, true, r)) return r;
+  }
   SI r= -get_left_correction (s) + global_lsub_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)));
@@ -899,7 +1075,11 @@ unicode_font_rep::get_lsub_correction (string s) {
 }
 
 SI
-unicode_font_rep::get_lsup_correction (string s) {
+unicode_font_rep::get_lsup_correction_at (string s, SI h) {
+  if (math_type == MATH_TYPE_OPENTYPE) {
+    SI r= 0;
+    if (get_ot_kerning (s, h, true, true, r)) return r;
+  }
   SI r= global_lsup_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)))
@@ -912,7 +1092,18 @@ unicode_font_rep::get_lsup_correction (string s) {
 }
 
 SI
-unicode_font_rep::get_rsub_correction (string s) {
+unicode_font_rep::get_rsub_correction_at (string s, SI h) {
+  if (math_type == MATH_TYPE_OPENTYPE) {
+    SI   ic= 0, kern= 0;
+    bool has_ic  = get_ot_italic_correction (s, ic);
+    bool has_kern= get_ot_kerning (s, h, false, false, kern);
+
+    if (has_ic || has_kern) {
+      // for integral, we use 3/5 of italic correction for rsub, otherwise 0
+      ic  = is_ot_integral (s) ? (SI) (0.6 * ic) : 0;
+      return -ic + kern;
+    }
+  }
   SI r= global_rsub_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)));
@@ -924,8 +1115,18 @@ unicode_font_rep::get_rsub_correction (string s) {
 }
 
 SI
-unicode_font_rep::get_rsup_correction (string s) {
-  //cout << "Check " << s << ", " << rsup_correct[s] << ", " << this->res_name << LF;
+unicode_font_rep::get_rsup_correction_at (string s, SI h) {
+  if (math_type == MATH_TYPE_OPENTYPE) {
+    SI   ic= 0, kern= 0;
+    bool has_ic  = get_ot_italic_correction (s, ic);
+    bool has_kern= get_ot_kerning (s, h, true, false, kern);
+
+    if (has_ic || has_kern) {
+      // for integral signs, we use 2/5 of italic correction for rsup
+      if (is_ot_integral (s)) ic= (SI) (0.4 * ic);
+      return ic + kern;
+    }
+  }
   SI r= get_right_correction (s) + global_rsup_correct;
   if (math_type == MATH_TYPE_STIX &&
       (is_integral (s) || is_alt_integral (s)));
@@ -945,6 +1146,188 @@ unicode_font_rep::get_wide_correction (string s, int mode) {
   else if (mode < 0 && below_correct->contains (s))
     return (SI) (below_correct[s] * wfn);
   else return 0;
+}
+
+/******************************************************************************
+ * OpenType
+ ******************************************************************************/
+
+inline void
+unicode_font_rep::init_design_unit_factor () {
+  // The face is scaled to 'size' points at hdpi x vdpi, so one design unit
+  // measures size/units_per_EM points, i.e. size*hpt/units_per_EM vertically
+  // and size*wpt/units_per_EM horizontally (in SI units).
+  double upem= (double) ot_face->ft_face->units_per_EM;
+  if (upem <= 0.0) upem= 1000.0;
+  design_unit_to_metric_factor  = ((double) size * (double) hpt) / upem;
+  design_unit_to_metric_x_factor= ((double) size * (double) wpt) / upem;
+  metric_to_design_unit_factor  = 1.0 / design_unit_to_metric_factor;
+}
+
+inline SI
+unicode_font_rep::design_unit_to_metric (int du) {
+  return (SI) tm_round (design_unit_to_metric_factor * du);
+}
+
+inline SI
+unicode_font_rep::design_unit_to_metric_x (int du) {
+  return (SI) tm_round (design_unit_to_metric_x_factor * du);
+}
+
+inline int
+unicode_font_rep::metric_to_design_unit (SI m) {
+  return (int) tm_round (metric_to_design_unit_factor * m);
+}
+
+font
+unicode_font_rep::make_rubber_font (font base) {
+  if (!is_nil (this->math_table)) {
+    return rubber_unicode_font (this, this->ot_face);
+  }
+  return font_rep::make_rubber_font (base);
+}
+
+inline int
+decode_index (FT_Face face, int i) {
+  if (i < 0xc000000) return ft_get_char_index (face, i);
+  return i - 0xc000000;
+}
+
+inline unsigned int
+unicode_font_rep::get_glyphID (string s) {
+  // <@XXXX>
+  if (starts (s, "<@")) {
+    return from_hexadecimal (s (2, 6));
+  }
+  font_metric fm;
+  font_glyphs fg;
+  if (is_nil (ot_face)) return 0;
+  int         index= index_glyph (s, fm, fg);
+  return decode_index (ot_face->ft_face, index);
+}
+
+inline string
+get_left (string s) {
+  if (N (s) == 0) return s;
+  int i= 0;
+  tm_char_forwards (s, i);
+  return s (0, i);
+}
+
+inline string
+get_right (string s) {
+  if (N (s) == 0) return s;
+  int i= N (s);
+  tm_char_backwards (s, i);
+  return s (i, N (s));
+}
+
+bool
+unicode_font_rep::get_ot_italic_correction (string s, SI& r) {
+  if (math_type != MATH_TYPE_OPENTYPE || N (s) == 0) return false;
+
+  auto italics_correction= math_table->italics_correction;
+  // italic correction is only available for right side of the glyph
+  string ss     = get_right (s);
+  unsigned int glyphID= get_glyphID (ss);
+
+  if (italics_correction->contains (glyphID)) {
+    int correction= italics_correction[glyphID].value;
+    r= design_unit_to_metric_x (correction);
+    return true;
+  }
+  return false;
+}
+
+bool
+unicode_font_rep::get_ot_kerning (string s, SI height, bool top, bool left,
+                                  SI& kerning) {
+  if (math_type != MATH_TYPE_OPENTYPE || N (s) == 0) return false;
+
+  string       ss     = left ? get_left (s) : get_right (s);
+  unsigned int glyphID= get_glyphID (ss);
+
+  if (!math_table->has_kerning (glyphID, top, left)) return false;
+
+  int kerning_unit= math_table->get_kerning (
+      glyphID, metric_to_design_unit (height), top, left);
+
+  kerning= design_unit_to_metric_x (kerning_unit);
+  // cout << "Kerning for " << ss << " with height: " << kerning_unit << " -> "
+  //      << kerning << LF;
+  return true;
+}
+
+bool
+unicode_font_rep::is_extended_shape (string s) {
+  if (!ot_math || N(s) == 0) return false;
+  unsigned int glyphID= get_glyphID (s);
+  glyphID= math_table->get_init_glyphID (glyphID);
+  return math_table->extended_shape_coverage->contains (glyphID);
+}
+
+bool
+unicode_font_rep::get_top_accent (string s, SI& x) {
+  if (!ot_math || N(s) == 0) return false;
+  unsigned int glyphID= get_glyphID (s);
+  if (!math_table->top_accent->contains (glyphID)) return false;
+  x= design_unit_to_metric_x (math_table->top_accent[glyphID].value);
+  return true;
+}
+
+bool
+unicode_font_rep::get_feature_variant (string s, string feature, int alt,
+                                       string& r) {
+  if (N(s) == 0 || is_nil (ot_face)) return false;
+  unsigned int glyphID= get_glyphID (s);
+  if (glyphID == 0) return false;
+  ot_gsub_map& m= ot_face->gsub_feature (feature);
+  if (!m->contains (glyphID)) return false;
+  array<unsigned int> alts= m[glyphID];
+  if (alt < 0 || alt >= N(alts)) return false;
+  r= "<@" * as_hexadecimal (alts[alt], 4) * ">";
+  return true;
+}
+
+// The OpenType features a font file offers, for a menu or a dialog to
+// propose only what the font is able to do. The name is the one a font
+// rule gives to the file, as in "lmroman10-regular".
+array<string>
+ot_font_features (string name) {
+  array<string> r;
+  // the database gives a file name, a font rule gives the name without
+  // its extension; accept both
+  if (ends (name, ".otf") || ends (name, ".ttf") || ends (name, ".ttc") ||
+      ends (name, ".pfb"))
+    name= name (0, N(name) - 4);
+  if (!tt_font_exists (name)) return r;
+  tt_face face= load_tt_face (name);
+  if (is_nil (face) || face->bad_face) return r;
+  return face->gsub_tags ();
+}
+
+bool
+unicode_font_rep::is_ot_integral (string s) {
+  if (!ot_math) return false;
+  if (N (ot_integral) == 0) {
+    array<string> integrals;
+    integrals << string ("<int>") << string ("<iiint>") << string ("<iiiint>")
+              << string ("<oint>") << string ("<oiint>") << string ("<oiiint>")
+              << string ("<upint>") << string ("<upiint>")
+              << string ("<upiiint>") << string ("<upiiiint>")
+              << string ("<upoint>") << string ("<upoiint>")
+              << string ("<upoiiint>") << string ("<intlim>")
+              << string ("<iintlim>") << string ("<iiintlim>")
+              << string ("<iiiintlim>") << string ("<ointlim>")
+              << string ("<oiintlim>") << string ("<oiiintlim>");
+    for (int i=0; i < N(integrals); i++) {
+      ot_integral << get_glyphID (integrals[i]);
+    }
+  }
+  unsigned int glyphID= get_glyphID (s);
+  // if variant, we turn to the base glyphID
+  glyphID= math_table->get_init_glyphID (glyphID);
+  return ot_integral->contains (glyphID);
 }
 
 /******************************************************************************
