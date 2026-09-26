@@ -1509,6 +1509,33 @@ forget_host (vue_window w) {
   if (pointer_hover == w) pointer_hover= NULL;
 }
 
+// The editors are told of a change of focus when the loop may change them,
+// before the interpose handler applies their changes (deliver_focus). A
+// focus given in between, e.g. to a tab made by a command of the interpose
+// handler, left an editor with changes not applied when it was repainted
+// ("Invalid situation (514) in edit_interface_rep::handle_repaint"): the
+// windows of SDL get their focus as events, at the start of the loop.
+static array<int>  focus_ids;
+static array<bool> focus_flags;
+
+static void
+queue_focus (vue_window w, bool flag) {
+  if (w == NULL) return;
+  focus_ids << w->id;
+  focus_flags << flag;
+}
+
+static void
+deliver_focus () {
+  array<int> ids= focus_ids;
+  array<bool> flags= focus_flags;
+  focus_ids= array<int> ();
+  focus_flags= array<bool> ();
+  for (int i= 0; i < N(ids); i++)
+    if (id_to_window->contains (ids[i]))
+      notify_window_focus ((vue_window) id_to_window[ids[i]], flags[i]);
+}
+
 // the keys go to the focused virtual window, or to the host; the widget
 // which has the focus in each is told whether its window has it
 static void
@@ -1519,8 +1546,8 @@ focus_virtual (vue_virtual_window_rep* v) {
                                             : (vue_window) the_host;
   focused_virtual= v;
   vue_window cur= (v != NULL) ? (vue_window) v : (vue_window) the_host;
-  if (old != NULL) notify_window_focus (old, false);
-  if (cur != NULL) notify_window_focus (cur, true);
+  queue_focus (old, false);
+  queue_focus (cur, true);
 }
 
 // the tab v is shown, gets the keys, and gives its name to the host
@@ -2530,6 +2557,7 @@ loop_iteration () {
   // 5. interpose
   uint64_t t_int= vue_now ();
   t2= texmacs_time ();
+  deliver_focus (); // the changes of focus of the virtual windows
   apply_default_focus ();
   vue_simple_widget_rep::notify_resizes ();
   if (the_interpose_handler != NULL) the_interpose_handler ();
