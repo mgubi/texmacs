@@ -419,6 +419,17 @@ zoom of a destination is `null`, the reader's own, as Hummus writes it;
 it was 0, which means the same in the specification but which MuPDF takes
 for 100%.
 
+The other route of the build -- PostScript through Ghostscript, when the
+MuPDF renderer is not chosen -- put its outline off the pages: the entries
+are written after the last page as pdfmarks, where the coordinates are
+PDF's, points from the bottom left corner, but they were given as dvips
+has them inside a page, pixels at the printing resolution from a margin
+of an inch, y downwards -- y 2542 on a page 842 high. `printer_rep::
+toc_entry` now gives points, and on a landscape page, which dvips draws a
+quarter turned on portrait paper for the PDF to turn back (`/Rotate 90`),
+the coordinates of the paper. Both routes now send an entry to the same
+place, to a fifth of a point, portrait and landscape.
+
 A forward reference in a batch export is "?" unless the document carries
 the values of its labels, as a document saved by TeXmacs does (the
 `references` part at its end): the export typesets once, and a label comes

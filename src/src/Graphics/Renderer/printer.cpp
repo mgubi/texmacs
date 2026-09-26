@@ -991,7 +991,16 @@ printer_rep::href (string label, SI x1, SI y1, SI x2, SI y2) {
 
 void
 printer_rep::toc_entry (string kind, string title, SI x, SI y) {
-  decode (x, y);
+  // The outline is written after the last page (generate_toc), where the
+  // coordinates are those of PDF, points from the bottom left corner of the
+  // page, and not those of dvips inside a page, pixels from a margin of an
+  // inch, y downwards (print (SI, SI)): written in the second, an entry
+  // pointed far below its page -- y 2542 on a page 842 high. The place is
+  // a little above the heading, as the PDF renderers put it.
+  y += 20*pixel;
+  decode (x, y);     // pixels from the top left corner of the page
+  double f = 72.0 / dpi;
+  double ph= 72.0 * paper_h / 2.54;
   string ls= "1";
   if (kind == "toc-strong-1") ls= "1";
   if (kind == "toc-strong-2") ls= "2";
@@ -1001,8 +1010,12 @@ printer_rep::toc_entry (string kind, string title, SI x, SI y) {
   if (kind == "toc-4") ls= "6";
   if (kind == "toc-5") ls= "7";
   string ps= as_string (cur_page);
-  string xs= as_string (x-dpi);
-  string ys= as_string (y-dpi);
+  // A landscape page is drawn by dvips a quarter turned on portrait paper
+  // (@landscape, tex.pro), and the PDF says /Rotate 90 to turn it back:
+  // the place is in the coordinates of the paper, where the distance from
+  // the top of the page as it is read runs along the first axis
+  string xs= as_string (landscape? y * f: x * f);
+  string ys= as_string (landscape? x * f: ph - y * f);
   toc << tuple (title, ls, ps, xs, ys);
 }
 
