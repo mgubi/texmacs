@@ -13,6 +13,8 @@
 //                      belongs to its origin: keep it with --profile)
 //   --profile <dir>    the profile of the browser, kept between runs (the
 //                      IndexedDB of the page: the home directory of TeXmacs)
+//   --headed           a window on the screen: the clipboard of the system
+//                      (a headless browser has one of its own)
 //   --script <file>    actions after the load, one per line (# comments):
 //                        wait <ms> | shot <name> | click <x> <y> |
 //                        move <x> <y> | type <text> | key <name> |
@@ -66,7 +68,7 @@ const url = `http://127.0.0.1:${server.address ().port}/texmacs.html${query}`;
 const profile = opt ('--profile', null);
 if (profile) fs.mkdirSync (profile, { recursive: true });
 const browser = await puppeteer.launch ({
-  browser: 'firefox', executablePath: browserPath, headless: true,
+  browser: 'firefox', executablePath: browserPath, headless: !process.argv.includes ('--headed'),
   ...(profile ? { userDataDir: path.resolve (profile) } : {}),
   args: [`--width=${W}`, `--height=${H}`]
 });

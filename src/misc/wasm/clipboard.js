@@ -16,8 +16,10 @@
 // Shift+Insert) is kept from SDL, and the focus goes for a moment to a
 // hidden text area, which gets the paste event; its contents become those
 // of tmClipboard, the focus comes back, and SDL gets the key, again:
-// TeXmacs pastes as it always does. When the browser has no paste event for
-// the key (nothing to paste), SDL gets the key anyway.
+// TeXmacs pastes as it always does. A browser whose paste event has no
+// data (Safari, at times) pastes into the text area, which is read a moment
+// later, as editors in the browser do. When the browser has no paste for
+// the key (nothing to paste), SDL gets the key all the same.
 //
 // On a Mac the shortcuts of TeXmacs are those of the Mac, Cmd+... (its look
 // and feel follows the platform of the browser, see web-pre.js), and SDL
@@ -42,13 +44,27 @@ var tmClipboard = (function () {
            (e.key === 'Insert' && e.shiftKey && !e.ctrlKey && !e.metaKey);
   }
 
+  var WAIT = 60; // ms for the paste of a key into the text area
+
   function release () {
     if (!pending) return;
     var p = pending;
     pending = null;
+    clearTimeout (p.timer);
+    if (!p.pasted && sink && sink.value)
+      known = { plain: sink.value.replace (/\r\n?/g, '\n'), html: '' };
+    if (sink) sink.value = '';
     if (back && document.activeElement === sink) back.focus ({ preventScroll: true });
     back = null;
-    window.dispatchEvent (new KeyboardEvent ('keydown', p));
+    window.dispatchEvent (new KeyboardEvent ('keydown', p.init));
+    // the keys released meanwhile (Cmd, V), after the key
+    p.ups.forEach (function (u) { window.dispatchEvent (new KeyboardEvent ('keyup', u)); });
+  }
+
+  function init (e) {
+    return { key: e.key, code: e.code, location: e.location, repeat: e.repeat,
+             ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
+             metaKey: e.metaKey, bubbles: true, cancelable: true };
   }
 
   function makeSink () {
@@ -75,16 +91,22 @@ var tmClipboard = (function () {
         sink.value = '';
         sink.focus ({ preventScroll: true });
       }
-      pending = { key: e.key, code: e.code, location: e.location, repeat: e.repeat,
-                  ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
-                  metaKey: e.metaKey, bubbles: true, cancelable: true };
-      setTimeout (release, 0);
+      pending = { init: init (e), ups: [], pasted: false,
+                  timer: setTimeout (release, WAIT) };
+    }, true);
+    window.addEventListener ('keyup', function (e) {
+      if (!e.isTrusted || !pending) return;
+      e.stopImmediatePropagation ();
+      pending.ups.push (init (e));
     }, true);
     document.addEventListener ('paste', function (e) {
       if (editable (e.target) && e.target !== sink) return;
       var d = e.clipboardData;
-      if (d) known = { plain: d.getData ('text/plain') || '', html: d.getData ('text/html') || '' };
+      var plain = d ? d.getData ('text/plain') || '' : '', html = d ? d.getData ('text/html') || '' : '';
+      if (!plain && !html) return; // into the text area, read by release
+      known = { plain: plain, html: html };
       e.preventDefault ();
+      if (pending) pending.pasted = true;
       release ();
     });
   }
