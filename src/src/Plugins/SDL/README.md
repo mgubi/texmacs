@@ -35,6 +35,11 @@ the drawing.
   editor: a notch is one step, ten units of a trackpad make one.
 - The system clipboard holds the primary selection (TeXmacs, HTML and plain
   text flavours); the other selections are kept internally.
+- Side tools (Widkit, `texmacs_widget.cpp`): the middle of a window is
+  `[left panel | canvas | right panel]`, the panels hidden until tools are
+  shown on that side, 300 points wide (not resizable yet). As in the Qt port,
+  the Scheme side offers them when the "side tools" (or "left tools") and
+  "developer tool" preferences are on; e.g. `(tool-select :right 'context-tool)`.
 - After a window is shown or resized, the whole window is invalidated, as the
   Expose events of X11 do: Widkit relies on them.
 

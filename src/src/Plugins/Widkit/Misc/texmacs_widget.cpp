@@ -172,14 +172,34 @@ make_footer (int mask) {
   return switch_widget (S, S_name, (mask & 32) == 32? 0: 2);
 }
 
+// the side tools: a panel of a fixed width on either side of the canvas,
+// hidden until the tools are shown (as the bottom tools)
+static wk_widget
+side_tools_widget (wk_widget tools) {
+  return resize_widget (tools, 0, "300px", "", "300px", "", "300px", "",
+                        "left", "top");
+}
+
+static wk_widget
+side_panel () {
+  array<wk_widget> T (1);
+  array<string> T_name (1);
+  T[0]= side_tools_widget (glue_wk_widget (false, true, 0, 0));
+  T_name[0]= "tools";
+  return optional_widget (vertical_list (T, T_name), false);
+}
+
 static wk_widget
 middle_widget () {
-  wk_widget w1= canvas_widget (glue_wk_widget (), center, true);
-  wk_widget w2= glue_wk_widget (true, true, 200*PIXEL, 0);
-  wk_widget w3= resize_widget (w2, 0, "200px", "", "200px", "", "200px", "",
-                               "left", "top");
-  if (!use_side_tools) return w1;
-  else return hsplit_widget (w1, w3);
+  array<wk_widget> M (3);
+  array<string> M_name (3);
+  M[0]= side_panel ();
+  M[1]= canvas_widget (glue_wk_widget (), center, true);
+  M[2]= side_panel ();
+  M_name[0]= "left";
+  M_name[1]= "canvas";
+  M_name[2]= "right";
+  return horizontal_list (M, M_name);
 }
 
 static wk_widget
@@ -324,10 +344,7 @@ texmacs_widget_rep::handle_get_size (get_size_event ev) {
 
 void
 texmacs_widget_rep::handle_get_widget (get_widget_event ev) {
-  if (ev->which == "canvas") {
-    if (use_side_tools) a[0] ["middle"] << get_widget ("left", ev->w);
-    else a[0] << get_widget ("middle", ev->w);
-  }
+  if (ev->which == "canvas") a[0] ["middle"] << get_widget ("canvas", ev->w);
   else a[0] << ev;
 }
 
@@ -343,30 +360,14 @@ texmacs_widget_rep::handle_set_widget (set_widget_event ev) {
     set_subwidget (THIS ["header"] ["focus"] ["bar"], "icons", ev->w);
   else if (ev->which == "user icons bar")
     set_subwidget (THIS ["header"] ["user"] ["bar"], "icons", ev->w);
-  else if (ev->which == "side tools") {
-    if (use_side_tools) {
-      wk_widget side=
-        resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
-                       "left", "top");
-      THIS ["middle"] << set_widget ("right", side);
-      if (attached ()) {
-        side << emit_attach_window (win);
-        THIS ["middle"] << emit_reposition ();
-        THIS ["middle"] ["right"] << emit_invalidate_all ();
-     }
-    }
-  }
-  else if (ev->which == "left tools") {
-    if (use_side_tools) {
-      wk_widget side=
-        resize_widget (ev->w, 0, "200px", "", "200px", "", "200px", "",
-                       "left", "top");
-      THIS ["middle"] << set_widget ("left", side);
-      if (attached ()) {
-        side << emit_attach_window (win);
-        THIS ["middle"] << emit_reposition ();
-        THIS ["middle"] ["left"] << emit_invalidate_all ();
-      }
+  else if (ev->which == "side tools" || ev->which == "left tools") {
+    wk_widget panel= THIS ["middle"] [ev->which == "side tools"? "right": "left"];
+    wk_widget side= side_tools_widget (ev->w);
+    panel << set_widget ("tools", side);
+    if (attached ()) {
+      side << emit_attach_window (win);
+      THIS << emit_reposition ();
+      panel << emit_invalidate_all ();
     }
   }
   else if (ev->which == "extra tools") {
@@ -435,8 +436,11 @@ texmacs_widget_rep::handle_set_string (set_string_event ev) {
     set_subwidget_flag (THIS ["header"] ["focus"], ev->s == "on");
   else if (ev->which == "user icons")
     set_subwidget_flag (THIS ["header"] ["user"], ev->s == "on");
-  else if (ev->which == "side tools")
-    /*set_side_tools_flag (ev->s == "on")*/;
+  else if (ev->which == "side tools" || ev->which == "left tools") {
+    if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
+    set_subwidget_flag (THIS ["middle"] [ev->which == "side tools"? "right": "left"],
+                        ev->s == "on");
+  }
   else if (ev->which == "bottom tools") {
     if (ev->s != "on") send_keyboard_focus (abstract (THIS ["canvas"]));
     set_subwidget_flag (THIS ["bottom"], ev->s == "on");
@@ -466,9 +470,9 @@ texmacs_widget_rep::handle_get_string (get_string_event ev) {
   else if (ev->which == "user icons")
     ev->s= get_subwidget_flag (THIS ["header"] ["user"])?
              string ("on"): string ("off");
-  else if (ev->which == "side tools")
-    //ev->s= get_side_tools_flag ()? string ("on"): string ("off");
-    ev->s= string (use_side_tools? "on": "off");
+  else if (ev->which == "side tools" || ev->which == "left tools")
+    ev->s= get_subwidget_flag (THIS ["middle"] [ev->which == "side tools"? "right": "left"])?
+             string ("on"): string ("off");
   else if (ev->which == "bottom tools")
     ev->s= get_subwidget_flag (THIS ["bottom"])?
              string ("on"): string ("off");
