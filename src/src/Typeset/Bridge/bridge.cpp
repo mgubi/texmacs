@@ -41,8 +41,8 @@ bridge nil_bridge;
 
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
-  status (CORRUPTED), changes (UNINIT), reads (),
-  in_known (false), in_items (""), in_fp (0) {}
+  status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
+  removed (UNINIT), bound (UNINIT), stack_cache_ok (false), version (0) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -624,6 +624,8 @@ bridge_rep::typeset (int desired_status) {
     ttt->local_end (l, sb);
     env->link_env= old_link_env;
     status= desired_status;
+    stack_cache_ok= false;
+    version++;
     // cout << "old_patch     = " << ttt->old_patch << LF;
     // cout << "changes       = " << changes << LF;
     // cout << UNINDENT << "Typesetted " << st << ", " << desired_status << LF;
@@ -633,6 +635,8 @@ bridge_rep::typeset (int desired_status) {
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
   if (ttt->paper || (N(l) <= 1)) ttt->insert_stack (l, sb);
+  else if (stack_cache_ok && strong_equal (ip, stack_cache_ip))
+    ttt->insert_stack (stack_cache, sb);
   else {
     bool flag= false;
     int i, n= N(l);
@@ -662,6 +666,9 @@ bridge_rep::typeset (int desired_status) {
       new_l[0]= page_item (lb);
       new_l[0]->spc= l[last]->spc;
       new_l << special_l;
+      stack_cache= new_l;
+      stack_cache_ip= ip;
+      stack_cache_ok= true;
       ttt->insert_stack (new_l, sb);
     }
   }
