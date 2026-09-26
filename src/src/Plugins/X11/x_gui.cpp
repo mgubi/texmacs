@@ -100,23 +100,24 @@ x_gui_rep::set_button_state (unsigned int state) {
 void
 x_gui_rep::emulate_leave_enter (widget old_widget, widget new_widget) {
   Window root, child;
-  SI root_x, root_y, x, y;
+  int root_x, root_y, px, py;
   unsigned int mask;
+  SI x, y;
 
   XQueryPointer (dpy, get_Window (old_widget),
-		 &root, &child, &root_x, &root_y, &x, &y, &mask);
+		 &root, &child, &root_x, &root_y, &px, &py, &mask);
   set_button_state (mask);
-  x= (x * PIXEL);
-  y= ((-y) * PIXEL);
+  x= (px * PIXEL);
+  y= ((-py) * PIXEL);
   // cout << "\nLeave " << old_widget << "\n";
   send_mouse (old_widget, "leave", x, y, state, 0);
   // cout << "Leave OK\n";
 
   XQueryPointer (dpy, get_Window (new_widget),
-		 &root, &child, &root_x, &root_y, &x, &y, &mask);
+		 &root, &child, &root_x, &root_y, &px, &py, &mask);
   set_button_state (mask);
-  x= (x * PIXEL);
-  y= ((-y) * PIXEL);
+  x= (px * PIXEL);
+  y= ((-py) * PIXEL);
   // cout << "Enter " << new_widget << "\n";
   send_mouse (new_widget, "enter", x, y, state, 0);
   // cout << "Enter OK\n\n";
