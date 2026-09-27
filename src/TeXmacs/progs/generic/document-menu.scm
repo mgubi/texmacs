@@ -370,7 +370,6 @@
   (if (font-exists-in-tt? "STIX-Regular")
       ("Stix" (init-font "stix" "math-stix")))
   (if (nnull? (opentype-math-font-list))
-      (group "Text and OpenType mathematics")
       (link opentype-font-menu))
   ---
   (group "Text only")

@@ -116,6 +116,13 @@
         ((== val "Linux Libertine") "libertine-font")
         (else (string-append val "-font"))))
 
+;; A TeX Gyre text font goes with the package of its own mathematics, unless
+;; another math font is asked for: Euler Math and Asana Math are set with
+;; Pagella text, and the package would replace them by Pagella Math
+(define (tex-gyre-font? val opts name)
+  (and (string-starts? val name)
+       (or (null? opts) (string-starts? (car opts) name))))
+
 (tm-define (init-font val . opts)
   (:check-mark "*" test-init-font?)
   (cond ((== val "TeXmacs Computer Modern")
@@ -126,13 +133,13 @@
         ;; profile of its own and its own math font
         ((== val "Stix")
          (init-font "stix" "math-stix"))
-        ((string-starts? val "TeX Gyre Bonum")
+        ((tex-gyre-font? val opts "TeX Gyre Bonum")
          (init-font "bonum" "math-bonum"))
-        ((string-starts? val "TeX Gyre Pagella")
+        ((tex-gyre-font? val opts "TeX Gyre Pagella")
          (init-font "pagella" "math-pagella"))
-        ((string-starts? val "TeX Gyre Schola")
+        ((tex-gyre-font? val opts "TeX Gyre Schola")
          (init-font "schola" "math-schola"))
-        ((string-starts? val "TeX Gyre Termes")
+        ((tex-gyre-font? val opts "TeX Gyre Termes")
          (init-font "termes" "math-termes"))
         (else
           (init-env "font" val)
@@ -140,9 +147,15 @@
             (init-env "math-font" (car opts)))
           (init-env "font-family" "rm")
           (remove-font-packages)
+          ;; the packages of fira-font and libertine-font take the large
+          ;; operators from TeX Gyre Pagella, and are older than the
+          ;; OpenType math fonts of the same design, which cover them
           (with pack (font-package-name val)
             (with dir "$TEXMACS_PATH/packages/customize/fonts"
-              (when (url-exists? (url-append dir (string-append pack ".ts")))
+              (when (and (url-exists? (url-append dir (string-append pack ".ts")))
+                         (or (null? opts)
+                             (== (math-font-profile-attr (car opts) "file")
+                                 "")))
                 (init-default "font")
                 (init-default "font-family")
                 (add-style-package pack)))))))
