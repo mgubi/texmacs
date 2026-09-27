@@ -200,9 +200,12 @@ there.
 The page keeps two things in the browser: the home directory (IndexedDB,
 `web-pre.js`) and the packages of TeXmacs (the Cache Storage,
 `packages.js`), some 2 and 44 MB. The TeXmacs Vue menu counts them
-itself (`storageUse` in `frame.js`), next to what the browser counts for
-the site (`navigator.storage.estimate`), which is often more: its
-database files do not shrink when data is replaced. The temporary
+itself (`storageUse` in `frame.js`), and not with
+`navigator.storage.estimate`: Safari's count grows by the size of each
+download and does not go down when the data is deleted (measured: 46 MB
+after a first load, still 46 MB once the caches and the databases were
+deleted, 92 MB after the reload which fetched the 46 MB again), so that
+it reached hundreds of MB for some 46 kept. The temporary
 directory of TeXmacs (`.TeXmacs/system/tmp`) is emptied at each start: a
 page never quits, where TeXmacs empties it, and its process always has
 the same number, so that the pictures of every session piled up there.

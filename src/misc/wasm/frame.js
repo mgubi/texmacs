@@ -159,9 +159,9 @@ var tmFrame = (function () {
   }
 
   // what the page keeps: the home directory (in IndexedDB) and the packages
-  // of TeXmacs (in the Cache Storage), counted here, and what the browser
-  // counts for the site (navigator.storage.estimate: its database files
-  // do not shrink when data is replaced, so it is often more)
+  // of TeXmacs (in the Cache Storage), counted here (not with
+  // navigator.storage.estimate: Safari's count grows with each download
+  // and does not go down when the data is deleted)
   function storageUse () {
     var home = 0;
     (function walk (p) {
@@ -183,12 +183,7 @@ var tmFrame = (function () {
         });
       }).then (function (l) { return l.reduce (function (a, b) { return a + b; }, 0); },
                function () { return 0; });
-    var browser = (navigator.storage && navigator.storage.estimate) ?
-      navigator.storage.estimate ().then (function (e) { return e.usage || 0; },
-                                          function () { return 0; }) : Promise.resolve (0);
-    return Promise.all ([cache, browser]).then (function (r) {
-      return { home: home, cache: r[0], browser: r[1] };
-    });
+    return cache.then (function (c) { return { home: home, cache: c }; });
   }
 
   // everything the page keeps in the browser goes, and TeXmacs stops: its
@@ -311,9 +306,7 @@ var tmFrame = (function () {
     var storage = text ('Your files and preferences are kept in the storage of this browser.');
     storageUse ().then (function (u) {
       storage.textContent = 'Kept in this browser: your files and preferences, ' +
-        human (u.home) + ', and the files of TeXmacs, ' + human (u.cache) + '.' +
-        (u.browser ? ' (The browser counts ' + human (u.browser) + ' for this site, with ' +
-                     'the space it has not given back yet.)' : '');
+        human (u.home) + ', and the files of TeXmacs, ' + human (u.cache) + '.';
     });
     sep ();
     item ('Files of the page…', function () { tmFiles.browse (); });
