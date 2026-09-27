@@ -520,18 +520,26 @@
 
 (define-public (alt-launcher name) #f)
 
+;; the result of a :require or :versions: an empty string is no command
+;; ((python-command) is "" where no Python is found: in a browser, the
+;; plugins which run Python were declared, and froze it)
+(define (plugin-detected r)
+  (and r (not (and (string? r) (== r ""))) r))
+
 (define (plugin-configure-cmd name cmd)
   (cond ((func? cmd :require 1)
          (when reconfigure-flag?
            ;;(display* "try to detect " name "\n")
            (if (alt-launcher name)
                (ahash-set! plugin-data-table name #t)
-               (ahash-set! plugin-data-table name ((second cmd))))))
+               (ahash-set! plugin-data-table name
+                           (plugin-detected ((second cmd)))))))
         ((func? cmd :versions 1)
          (when reconfigure-flag?
            (if (alt-launcher name)
                (ahash-set! plugin-data-table name #t)
-               (ahash-set! plugin-data-table name ((second cmd))))))
+               (ahash-set! plugin-data-table name
+                           (plugin-detected ((second cmd)))))))
         ((func? cmd :preferences 1)
          (ahash-set! plugin-prefs-table name ((second cmd))))
         ((func? cmd :setup 1)

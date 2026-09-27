@@ -24,6 +24,7 @@
 #include "resource.hpp"
 #include "Generic/input.hpp"
 #include "gui.hpp"
+#include "analyze.hpp"
 
 static tree connection_retrieve (string name, string session);
 
@@ -89,7 +90,9 @@ connection_rep::start (bool again) {
     message= ln->start ();
     tm_out = texmacs_input ("output");
     tm_err = texmacs_input ("error");
-    status = WAITING_FOR_OUTPUT;
+    // a program which could not be started (a page has no processes) is
+    // dead, not awaited: plugin-start reports its error
+    status = starts (message, "Error:") ? CONNECTION_DEAD : WAITING_FOR_OUTPUT;
     if (again && (message == "ok")) {
       beep ();
       (void) connection_retrieve (name, session);

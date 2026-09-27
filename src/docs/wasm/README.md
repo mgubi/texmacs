@@ -48,7 +48,7 @@ MuPDF writer) in about 4 s, boot included.
 | build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
 | loop | one iteration per frame (`emscripten_set_main_loop`) | all the events of a frame in one iteration |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
-| processes | `posix_spawnp` fails cleanly | plugin menus hidden, no external converters offered |
+| processes | `posix_spawnp` fails cleanly; the plugins which run a program are not offered (their `:require` sees no command), and one started anyway fails at once, its session dead with an error (it froze the page: `fork` fails, and the pipes were read again and again); Scheme sessions work | no external converters offered |
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
 | clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac) | paste from the menus sees the last paste or copy only |

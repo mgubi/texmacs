@@ -151,11 +151,23 @@ pipe_link_rep::start () {
 #ifndef OS_MINGW
   if (alive) return "busy";
   if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
+#ifdef __EMSCRIPTEN__
+  // a page has no processes: fork fails, and the pipes, taken for those of
+  // a live program, were read again and again (the page froze)
+  return "Error: the programs of the plugins do not run in the browser";
+#endif
 
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
   int e3= pipe (pp_err); (void) e3;
   pid= fork ();
+  if (pid < 0) { // no process: not a live program
+    int* fds[3]= { pp_in, pp_out, pp_err };
+    for (int i= 0; i < 3; i++)
+      for (int j= 0; j < 2; j++)
+        if (fds[i][j] >= 0) { close (fds[i][j]); fds[i][j]= -1; }
+    return "Error: cannot start '" * cmd * "'";
+  }
   if (pid==0) { // the child
     setsid();
     close (pp_in  [OUT]);
