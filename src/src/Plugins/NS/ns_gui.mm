@@ -1004,6 +1004,15 @@ ns_press (NSView* v, NSString* label) {
         return true;
       }
   }
+  if ([v isKindOfClass: [NSSegmentedControl class]]) {
+    NSSegmentedControl* sc= (NSSegmentedControl*) v;
+    for (NSInteger i=0; i<[sc segmentCount]; i++)
+      if ([[sc labelForSegment: i] isEqualToString: label]) {
+        [sc setSelectedSegment: i];
+        [sc sendAction: [sc action] to: [sc target]];
+        return true;
+      }
+  }
   if ([v isKindOfClass: [NSButton class]] &&
       [[(NSButton*) v title] isEqualToString: label]) {
     [(NSButton*) v performClick: nil];
@@ -1020,11 +1029,22 @@ ns_dump_view (NSView* v, int depth) {
   NSString* extra= @"";
   if ([v isKindOfClass: [NSTextField class]])
     extra= [(NSTextField*) v stringValue];
+  if ([v isKindOfClass: [NSStackView class]])
+    extra= [NSString stringWithFormat: @"%s dist %ld hug %.0f/%.0f",
+             [(NSStackView*) v orientation] == NSUserInterfaceLayoutOrientationVertical? "V": "H",
+             (long) [(NSStackView*) v distribution],
+             [v contentHuggingPriorityForOrientation: NSLayoutConstraintOrientationHorizontal],
+             [(NSStackView*) v huggingPriorityForOrientation: NSLayoutConstraintOrientationHorizontal]];
   fprintf (stderr, "VIEW %*s%s %.0f,%.0f %.0fx%.0f %s%s\n", 2*depth, "",
            [NSStringFromClass ([v class]) UTF8String],
            f.origin.x, f.origin.y, f.size.width, f.size.height,
            [v isHidden]? "hidden ": "", [extra UTF8String]);
-  if (depth > 14) return;
+  if (getenv ("TEXMACS_NS_DUMP_CONSTRAINTS") &&
+      [v isKindOfClass: [NSStackView class]] && fabs (f.size.width - 528) < 1)
+    for (NSLayoutConstraint* c in [v constraintsAffectingLayoutForOrientation:
+                                     NSLayoutConstraintOrientationHorizontal])
+      fprintf (stderr, "CONSTRAINT %s\n", [[c description] UTF8String]);
+  if (depth > 40) return;
   for (NSView* w in [v subviews]) ns_dump_view (w, depth + 1);
 }
 
@@ -1035,8 +1055,13 @@ ns_dump_view (NSView* v, int depth) {
 @implementation TMPressHelper
 - (void) press: (NSTimer*) timer
 {
-  (void) timer;
-  NSString* label= to_nsstring (get_env ("TEXMACS_NS_PRESS"));
+  // NOTE: several steps are separated by ";", one per second
+  static int step= 0;
+  NSArray* steps= [to_nsstring (get_env ("TEXMACS_NS_PRESS"))
+                    componentsSeparatedByString: @";"];
+  if (step >= (int) [steps count]) { [timer invalidate]; return; }
+  NSString* label= [steps objectAtIndex: step++];
+  if (step >= (int) [steps count]) [timer invalidate];
   bool done= false;
   if ([label isEqualToString: @"dump-views"]) {
     // the views of the windows, with their frames and constraints on size
@@ -1116,9 +1141,10 @@ ns_gui_rep::event_loop () {
   if (get_env ("TEXMACS_NS_PRESS") != "") {
     // NOTE: also in modal dialogs
     TMPressHelper* h= [[TMPressHelper alloc] init];
-    NSTimer* t= [NSTimer timerWithTimeInterval: 4.0 target: h
+    NSTimer* t= [NSTimer timerWithTimeInterval: 1.0 target: h
                                       selector: @selector(press:)
-                                      userInfo: nil repeats: NO];
+                                      userInfo: nil repeats: YES];
+    [t setFireDate: [NSDate dateWithTimeIntervalSinceNow: 4.0]];
     [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
   if (get_env ("TEXMACS_NS_MENUS") != "") {

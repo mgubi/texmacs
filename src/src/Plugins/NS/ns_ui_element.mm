@@ -126,19 +126,40 @@ stack_of (array<widget> a, bool vertical) {
     NSView* v= concrete (a[i])->as_nsview ();
     if (!v) continue;
     [sv addArrangedSubview: v];
-    NSSize is= [v intrinsicContentSize];
-    bool stretch= [v isKindOfClass: [NSScrollView class]] ||
-      (vertical? is.width == NSViewNoIntrinsicMetric
-               : is.height == NSViewNoIntrinsicMetric);
-    if (!stretch || [v isKindOfClass: [NSStackView class]]) continue;
+    // as in the box layouts of Qt, the containers stretch across the list
+    // (the controls keep their size)
+    // (the controls and the grids keep their size, as in Qt)
+    if ([v isKindOfClass: [NSGridView class]]) continue;
+    bool stretch= ![v isKindOfClass: [NSControl class]];
+    if (!stretch) continue;
     NSLayoutConstraint* c= vertical
       ? [v.widthAnchor constraintEqualToAnchor: sv.widthAnchor]
       : [v.heightAnchor constraintEqualToAnchor: sv.heightAnchor];
     [c setPriority: NSLayoutPriorityDefaultHigh - 10];
     [c setActive: YES];
+    // across the list, the containers stretch; along it, only the lists
+    // and scroll views take the extra space (the grids keep their rows)
     [v setContentHuggingPriority: NSLayoutPriorityDefaultLow - 1
-                  forOrientation: vertical? NSLayoutConstraintOrientationVertical
-                                          : NSLayoutConstraintOrientationHorizontal];
+                  forOrientation: vertical? NSLayoutConstraintOrientationHorizontal
+                                          : NSLayoutConstraintOrientationVertical];
+    if (![v isKindOfClass: [NSGridView class]])
+      [v setContentHuggingPriority: NSLayoutPriorityDefaultLow - 1
+                    forOrientation: vertical? NSLayoutConstraintOrientationVertical
+                                            : NSLayoutConstraintOrientationHorizontal];
+  }
+  // the extensible glues along the list share the extra space equally
+  NSString* along= vertical? @"V": @"H";
+  NSView* first= nil;
+  for (NSView* v in [sv arrangedSubviews]) {
+    NSString* id= [v identifier];
+    if (!id || ![id hasPrefix: @"TMGlue"] ||
+        [id rangeOfString: along].location == NSNotFound) continue;
+    if (!first) { first= v; continue; }
+    NSLayoutConstraint* c= vertical
+      ? [v.heightAnchor constraintEqualToAnchor: first.heightAnchor]
+      : [v.widthAnchor constraintEqualToAnchor: first.widthAnchor];
+    [c setPriority: NSLayoutPriorityDefaultHigh];
+    [c setActive: YES];
   }
   return sv;
 }
@@ -803,15 +824,39 @@ ns_ui_element_rep::as_nsview () {
     {
       typedef triple<array<widget>, array<widget>, coord4> T;
       T x= open_box<T> (load);
+      // As in the Qt interface: the left column is aligned to the right,
+      // the right one to the left, with spacings of 6 points plus the
+      // separations of TeXmacs
       NSGridView* g= [[[NSGridView alloc] init] autorelease];
       for (int i=0; i < min (N(x.x1), N(x.x2)); i++) {
         NSView* l= is_nil (x.x1[i])? nil: concrete (x.x1[i])->as_nsview ();
         NSView* r= is_nil (x.x2[i])? nil: concrete (x.x2[i])->as_nsview ();
-        if (!l) l= [[[NSView alloc] init] autorelease];
-        if (!r) r= [[[NSView alloc] init] autorelease];
+        if (!l) l= [NSGridCell emptyContentView];
+        if (!r) r= [NSGridCell emptyContentView];
         [g addRowWithViews: [NSArray arrayWithObjects: l, r, nil]];
       }
-      return g;
+      [g setColumnSpacing: 6 + x.x3.x1 / PIXEL];
+      [g setRowSpacing: 6 + x.x3.x2 / PIXEL];
+      [g setRowAlignment: NSGridRowAlignmentNone];
+      [g setYPlacement: NSGridCellPlacementCenter];
+      if ([g numberOfColumns] >= 2) {
+        [[g columnAtIndex: 0] setXPlacement: NSGridCellPlacementTrailing];
+        [[g columnAtIndex: 1] setXPlacement: NSGridCellPlacementLeading];
+      }
+      // NOTE: the grid keeps its natural height in a container which takes
+      // the extra space (NSGridView would give it to its first row)
+      NSView* box= [[[NSView alloc] init] autorelease];
+      [box setTranslatesAutoresizingMaskIntoConstraints: NO];
+      [g setTranslatesAutoresizingMaskIntoConstraints: NO];
+      [box addSubview: g];
+      NSLayoutConstraint* hh= [g.heightAnchor constraintEqualToConstant: 0];
+      [hh setPriority: NSLayoutPriorityDefaultLow - 20];
+      [NSLayoutConstraint activateConstraints: @[
+        [g.leadingAnchor constraintEqualToAnchor: box.leadingAnchor],
+        [g.trailingAnchor constraintEqualToAnchor: box.trailingAnchor],
+        [g.topAnchor constraintEqualToAnchor: box.topAnchor],
+        [g.bottomAnchor constraintLessThanOrEqualToAnchor: box.bottomAnchor], hh]];
+      return box;
     }
 
     case tile_menu:
@@ -916,6 +961,21 @@ ns_ui_element_rep::as_nsview () {
       [p selectItemWithTitle: to_label (x.x3)];
       [p setCommand: x.x1.rep];
       [p setEnabled: (x.x4 & WIDGET_STYLE_INERT) == 0];
+      if (x.x4 & WIDGET_STYLE_MINI) {
+        [p setControlSize: NSControlSizeSmall];
+        [p setFont: [NSFont systemFontOfSize:
+                      [NSFont systemFontSizeForControlSize: NSControlSizeSmall]]];
+      }
+      // the width given by TeXmacs (see QTMComboBox::addItemsAndResize)
+      [p sizeToFit];
+      if (x.x5 != "") {
+        NSSize sz= ns_decode_length (x.x5, "", [p fittingSize]);
+        [p setTranslatesAutoresizingMaskIntoConstraints: NO];
+        NSLayoutConstraint* c= [p.widthAnchor constraintEqualToConstant:
+                                  max (sz.width, [p fittingSize].width)];
+        [c setPriority: NSLayoutPriorityDefaultHigh - 5];
+        [c setActive: YES];
+      }
       return p;
     }
 
@@ -1005,10 +1065,24 @@ ns_ui_element_rep::as_nsview () {
     {
       typedef quartet<bool, bool, SI, SI> T;
       T x= open_box<T> (load);
+      // NOTE: an extensible glue takes the extra space (as the spacers of
+      // Qt), shared with the other glues of its list (see stack_of)
       NSView* v= [[[NSView alloc] init] autorelease];
       [v setTranslatesAutoresizingMaskIntoConstraints: NO];
       if (!x.x1) [[v.widthAnchor constraintEqualToConstant: x.x3] setActive: YES];
+      else {
+        [[v.widthAnchor constraintGreaterThanOrEqualToConstant: x.x3] setActive: YES];
+        [v setContentHuggingPriority: 1
+                      forOrientation: NSLayoutConstraintOrientationHorizontal];
+      }
       if (!x.x2) [[v.heightAnchor constraintEqualToConstant: x.x4] setActive: YES];
+      else {
+        [[v.heightAnchor constraintGreaterThanOrEqualToConstant: x.x4] setActive: YES];
+        [v setContentHuggingPriority: 1
+                      forOrientation: NSLayoutConstraintOrientationVertical];
+      }
+      [v setIdentifier: [NSString stringWithFormat: @"TMGlue%s%s",
+                          x.x1? "H": "", x.x2? "V": ""]];
       return v;
     }
 
@@ -1074,6 +1148,27 @@ ns_ui_element_rep::as_nsview () {
           [it setView: holder];
         }
         [tv addTabViewItem: it];
+      }
+      // As QTabWidget: the size of the largest page (the hidden pages are
+      // not taken into account by the layout of AppKit)
+      {
+        CGFloat mw= 0, mh= 0;
+        for (NSTabViewItem* it in [tv tabViewItems]) {
+          NSSize fs= [[it view] fittingSize];
+          mw= max (mw, fs.width); mh= max (mh, fs.height);
+        }
+        if (mw > 0 && mh > 0) {
+          NSSize extra= NSMakeSize (0, 0);
+          if (type == tabs_widget) {
+            NSRect cr= [tv contentRect], fr= [tv frame];
+            extra= NSMakeSize (fr.size.width - cr.size.width,
+                               fr.size.height - cr.size.height);
+            if (extra.width <= 0 || extra.height <= 0) extra= NSMakeSize (20, 40);
+          }
+          [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
+          [[tv.widthAnchor constraintGreaterThanOrEqualToConstant: mw + extra.width] setActive: YES];
+          [[tv.heightAnchor constraintGreaterThanOrEqualToConstant: mh + extra.height] setActive: YES];
+        }
       }
       if (type == tabs_widget) return tv;
       // the icon tabs: a segmented control with the icons above the tabs

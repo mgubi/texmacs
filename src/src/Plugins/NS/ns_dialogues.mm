@@ -621,7 +621,8 @@ ns_input_text_widget_rep::as_nsview () {
   // NOTE: as in the Qt interface, the fields shrink when there is no room
   [f setTranslatesAutoresizingMaskIntoConstraints: NO];
   NSLayoutConstraint* c= [f.widthAnchor constraintEqualToConstant: sz.width];
-  [c setPriority: NSLayoutPriorityDefaultLow];
+  // NOTE: above the stretching of the lists and glues (see stack_of)
+  [c setPriority: NSLayoutPriorityDefaultHigh - 5];
   [c setActive: YES];
   [[f.widthAnchor constraintGreaterThanOrEqualToConstant: min (sz.width, 30.0)]
     setActive: YES];

@@ -714,7 +714,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
         [doc addSubview: v];
         NSLayoutConstraint* tr= [v.trailingAnchor constraintEqualToAnchor:
                                    doc.trailingAnchor constant: -4];
-        [tr setPriority: NSLayoutPriorityDefaultHigh];
+        [tr setPriority: NSLayoutPriorityRequired - 1];
         [NSLayoutConstraint activateConstraints: @[
           [v.leadingAnchor constraintEqualToAnchor: doc.leadingAnchor constant: 4],
           tr,
@@ -732,7 +732,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
         // NOTE: the trailing edge gives way while the tools are hidden
         NSLayoutConstraint* tr= [v.trailingAnchor constraintEqualToAnchor:
                                    tool_views[i].trailingAnchor constant: -4];
-        [tr setPriority: NSLayoutPriorityDefaultHigh];
+        [tr setPriority: NSLayoutPriorityRequired - 1];
         [NSLayoutConstraint activateConstraints: @[
           [v.leadingAnchor constraintEqualToAnchor: tool_views[i].leadingAnchor constant: 4],
           tr,
