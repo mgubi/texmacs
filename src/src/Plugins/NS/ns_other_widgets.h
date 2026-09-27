@@ -75,6 +75,7 @@ public:
   
   ns_widget int_prompt;
   ns_widget int_input;
+  NSView* prompt_view;  //!< the interactive prompt, in the footer
 
   bool visibility[10];  //!< the bars and tools, as in qt_tm_widget_rep
 
@@ -100,6 +101,7 @@ public:
 	void layout();
   void updateVisibility();
   void do_interactive_prompt();
+  void end_interactive_prompt();
 };
 
 
@@ -158,6 +160,7 @@ public:
   bool continuous ();
   bool can_autocommit ();
   string get_input () { return input; }
+  bool is_ok () { return ok; }
   };
 
 class ns_field_widget_rep;

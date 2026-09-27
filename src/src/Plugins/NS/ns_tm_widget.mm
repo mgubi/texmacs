@@ -122,6 +122,7 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   ns_view_widget_rep ([[[NSView alloc] initWithFrame:NSMakeRect(0,0,100,100)] autorelease],
                       texmacs_widget),
   sv(nil), leftField(nil), rightField(nil), bc(nil), toolbar(nil),
+  prompt_view(nil),
   quit (_quit)
 {
   // decode mask
@@ -237,6 +238,8 @@ void ns_tm_widget_rep::layout()
   [bc layout];
   CGFloat bar_h = visibility[0]? [[bc bar] frame].size.height: 0;
   CGFloat foot_h= visibility[5]? fs.height: 0;
+  if (prompt_view)
+    foot_h= max (fs.height, [prompt_view fittingSize].height);
   bool show[4];
   NSSize sz[4];
   for (int i=0; i<4; i++) {
@@ -261,8 +264,9 @@ void ns_tm_widget_rep::layout()
   [leftField setFrame: NSMakeRect (0, 0, r.size.width - fs.width, foot_h)];
   [rightField setFrame: NSMakeRect (r.size.width - fs.width, 0,
                                     fs.width, foot_h)];
-  [leftField setHidden: foot_h == 0];
-  [rightField setHidden: foot_h == 0];
+  [leftField setHidden: foot_h == 0 || prompt_view];
+  [rightField setHidden: foot_h == 0 || prompt_view];
+  if (prompt_view) [prompt_view setFrame: NSMakeRect (0, 0, r.size.width, foot_h)];
 }
 
 
@@ -429,10 +433,8 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
   case SLOT_INTERACTIVE_MODE:
     {
       check_type<bool> (val, s);
-      if (open_box<bool>(val) == true) {
-        //FIXME: to postpone once we return to the runloop
-	    do_interactive_prompt();
-      }
+      if (open_box<bool>(val) == true) do_interactive_prompt ();
+      else end_interactive_prompt ();
     }
     break;
     
@@ -492,13 +494,15 @@ ns_tm_widget_rep::query (slot s, int type_id) {
   case SLOT_INTERACTIVE_INPUT:
     {
       check_type_id<string> (type_id, s);
-      return close_box<string> ( ((ns_input_text_widget_rep*) int_input.rep)->get_input () );
-      
+      // as in the Qt interface
+      ns_input_text_widget_rep* w= (ns_input_text_widget_rep*) int_input.rep;
+      if (w && w->is_ok ()) return close_box<string> (scm_quote (w->get_input ()));
+      return close_box<string> ("#f");
     }
   case SLOT_INTERACTIVE_MODE:
     {
       check_type_id<bool> (type_id, s);
-      return close_box<bool> (false);  // FIXME: who needs this info?
+      return close_box<bool> (prompt_view != nil);
     }
     
   default:
@@ -663,24 +667,42 @@ ns_tm_widget_rep::plain_window_widget (string s, command q) {
 
 void
 ns_tm_widget_rep::do_interactive_prompt () {
-  // FIXME: the Qt interface shows the prompt in the footer
+  // As QTMInteractivePrompt: the prompt and the input replace the messages
+  // of the footer, and the input gets the focus
   if (is_nil (int_prompt) || is_nil (int_input)) return;
-  NSStackView* sv= [[[NSStackView alloc] init] autorelease];
-  [sv setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+  end_interactive_prompt ();
+  NSStackView* st= [[[NSStackView alloc] init] autorelease];
+  [st setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+  [st setEdgeInsets: NSEdgeInsetsMake (1, 6, 1, 6)];
+  [st setSpacing: 6];
   NSView* p= int_prompt->as_nsview ();
   NSView* i= int_input->as_nsview ();
-  if (p) [sv addArrangedSubview: p];
+  if (p) [st addArrangedSubview: p];
   if (i) {
-    [sv addArrangedSubview: i];
-    [[i.widthAnchor constraintGreaterThanOrEqualToConstant: 250] setActive: YES];
+    [st addArrangedSubview: i];
+    // the input takes the rest of the footer
+    NSLayoutConstraint* c= [i.trailingAnchor constraintEqualToAnchor:
+                              st.trailingAnchor constant: -6];
+    [c setPriority: NSLayoutPriorityDefaultLow + 10];
+    [c setActive: YES];
   }
-  [sv setFrameSize: [sv fittingSize]];
-  NSAlert* alert= [[[NSAlert alloc] init] autorelease];
-  [alert setMessageText: @""];
-  [alert setAccessoryView: sv];
-  [alert addButtonWithTitle: @"OK"];
-  [alert addButtonWithTitle: @"Cancel"];
-  if (i) [[alert window] setInitialFirstResponder: i];
-  bool ok= [alert runModal] == NSAlertFirstButtonReturn;
-  ((ns_input_text_widget_rep*) int_input.rep)->commit (ok);
+  prompt_view= [st retain];
+  [view addSubview: prompt_view];
+  layout ();
+  if (i && [i window]) [[i window] makeFirstResponder: i];
+}
+
+void
+ns_tm_widget_rep::end_interactive_prompt () {
+  if (!prompt_view) return;
+  NSWindow* win= [prompt_view window];
+  [prompt_view removeFromSuperview];
+  [prompt_view release];
+  prompt_view= nil;
+  layout ();
+  // the editor gets the focus back (as in Qt 6)
+  if (!is_nil (main_widget) && win) {
+    NSView* v= canvas_of (concrete (main_widget)->as_nsview ());
+    if (v) [win makeFirstResponder: v];
+  }
 }
