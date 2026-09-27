@@ -272,9 +272,9 @@ hand-tuned tables for corrections, wide accents and integrals, while the
 MATH table gives them the delimiter variants, the assemblies and the
 constants they never had; the menu calls them Palatino, Times, Bookman and
 Schoolbook. TeX Gyre DejaVu Math is not shipped; it has no tuned tables and
-takes the MATH path like the fonts above. On that path the display
-integrals of the TeX Gyre fonts stay at their text size, a known defect
-(`doc/opentype-math-design.md` section 6).
+takes the MATH path like the fonts above. Its display integral is about one
+and a half em, as the font designs it and as LuaLaTeX draws it, rather than
+the tall integral of New Computer Modern or STIX Two.
 
 ![TeX Gyre Pagella Math](opentype-math/tex-gyre-pagella-math.png)
 
