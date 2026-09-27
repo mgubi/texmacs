@@ -2147,10 +2147,26 @@ static const time_t wheel_burst_dt= 16;        // ms: too soon for a second notc
 // SDL reports the deltas in "lines": a trackpad (precise deltas) gives a
 // tenth of the finger's displacement in points, so 10 points per unit make
 // the page follow the finger exactly, as a dragged scroll bar follows the
-// pointer; a notch of a mouse wheel is one unit and scrolls about six lines
+// pointer; a notch of a mouse wheel is one unit and scrolls about six lines.
+// In the browser SDL gives the displacement in pixels of the page (points)
+// divided by 100: with 10 points per unit the page moved a tenth of the
+// fingers, and felt viscous
+#ifdef __EMSCRIPTEN__
+static const double wheel_precise_step= 100.0; // points per unit
+#else
 static const double wheel_precise_step= 10.0;  // points per unit
+#endif
 static const double wheel_notch_step= 80.0;    // points per notch
-#ifdef OS_MACOS
+// does the system glide after the fingers are lifted (see above)? macOS
+// does, also in a browser, which passes its momentum on as wheel events
+#if defined(__EMSCRIPTEN__)
+static bool
+wheel_system_momentum_of () {
+  static bool mac= (get_env ("TEXMACS_WEB_PLATFORM") == "macos");
+  return mac;
+}
+#define wheel_system_momentum (wheel_system_momentum_of ())
+#elif defined(OS_MACOS)
 static const bool wheel_system_momentum= true; // the system glides for us
 #else
 static const bool wheel_system_momentum= false;
