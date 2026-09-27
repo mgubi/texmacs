@@ -432,10 +432,16 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
  
 // The layout of a window (SDL or virtual) at the size it has in device
 // pixels, with the passes its contents ask for
+static void clay_wheel_flush (vue_window_rep* win);
+
 static void
 layout_window_passes (vue_window_rep* w) {
   bool relayout= false;
   int passes= 0;
+  {
+    with_window frame (w);
+    clay_wheel_flush (w);
+  }
   do {
     with_window frame (w);
     layout_again= false;
@@ -1912,8 +1918,25 @@ push_wheel (vue_window win, double dx, double dy) {
   // a bar which only scrolls sideways takes the wheel sideways
   double cx= dx, cy= dy;
   vue_wheel_axes (cx, cy);
-  // Clay scrolls its containers by ten pixels per unit of delta
-  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) cx / 10, (float) cy / 10 }, 0.01f);
+  // Clay scrolls its containers by ten pixels per unit of delta. The deltas
+  // are applied once, before the next layout (clay_wheel_flush): each call
+  // of Clay_UpdateScrollContainers forgets the containers not laid out
+  // since the previous one, so that a second call in a frame (a trackpad
+  // sends several events per frame) reset their scrolling to the start
+  in.clay_wheel_x += cx / 10;
+  in.clay_wheel_y += cy / 10;
+}
+
+// the wheel of the frame to the Clay scroll containers of the window, as
+// Clay wants it, once before its layout (win is the current window)
+static void
+clay_wheel_flush (vue_window_rep* win) {
+  vue_input_state& in= win->input;
+  if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0) return;
+  Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
+  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) in.clay_wheel_x,
+                                                      (float) in.clay_wheel_y }, 0.01f);
+  in.clay_wheel_x= in.clay_wheel_y= 0;
 }
 
 // a wheel event: scroll and update the estimated speed of the wheel
