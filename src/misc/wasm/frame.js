@@ -49,6 +49,11 @@ var tmFrame = (function () {
     #tm-menu .tm-item { padding:5px 14px; cursor:pointer }
     #tm-menu .tm-item:hover { background:#dde6f0 }
     #tm-menu a { color:#036 }
+    #tm-menu .tm-soft { display:grid; grid-template-columns:auto 1fr; column-gap:10px;
+      row-gap:2px; padding:2px 14px 4px; color:#444 }
+    #tm-menu .tm-soft a { text-decoration:none }
+    #tm-menu .tm-soft a:hover { text-decoration:underline }
+    #tm-menu .tm-soft .tm-ver { color:#666; font-variant-numeric:tabular-nums }
   `;
 
   function build () {
@@ -179,7 +184,27 @@ var tmFrame = (function () {
     text ('Vue is a new interface for TeXmacs (Clay, SDL3 and MuPDF), here on WebAssembly, ' +
           'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
           'mathematics included. Expect rough edges.');
-    text ('MuPDF ' + (app.mupdf || '') + ', built ' + (app.built || '') + '.');
+    // the software this page is made of, with their versions as the program
+    // reports them (gui_open in vue_gui.cpp), and their pages
+    var soft = [
+      ['MuPDF', 'https://mupdf.com', app.mupdf, 'the pixels, the pictures, the PDF'],
+      ['SDL', 'https://www.libsdl.org', app.sdl, 'the window, the input'],
+      ['S7 Scheme', 'https://ccrma.stanford.edu/software/snd/snd/s7.html',
+       app.s7 ? app.s7 + (app.s7date ? ' (' + app.s7date + ')' : '') : '',
+       'the extension language'],
+      ['Emscripten', 'https://emscripten.org', app.emscripten, 'the compiler to WebAssembly']
+    ];
+    var grid = el ('div', 'tm-soft');
+    soft.forEach (function (e) {
+      if (!e[2]) return;
+      var a = el ('a', null, e[0]);
+      a.href = e[1]; a.target = '_blank'; a.rel = 'noopener';
+      a.title = e[3];
+      grid.appendChild (a);
+      grid.appendChild (el ('span', 'tm-ver', e[2]));
+    });
+    menu.appendChild (grid);
+    text ('Built ' + (app.built || '') + '.');
     sep ();
     var files = text ('Files of TeXmacs: …');
     if (typeof tmPackages !== 'undefined' && tmPackages.manifest ()) {

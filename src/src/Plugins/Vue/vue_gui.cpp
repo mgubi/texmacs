@@ -45,6 +45,7 @@
 #include <unistd.h> // usleep (the headless loop)
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h> // emscripten_set_main_loop
+#include <emscripten/version.h> // __EMSCRIPTEN_major__ ... (the info of the page)
 #endif
 // SDL3_ttf serves only the rendering through SDL's own renderer (see
 // vue_sdl_window_rep), which the browser build leaves out
@@ -1900,9 +1901,23 @@ void gui_open (int& argc, char** argv) {
 #endif
 #ifdef __EMSCRIPTEN__
   {
-    // what the frame of the page says about the application
+    // what the frame of the page says about the application: the versions
+    // of the program and of the software it is made of, as they are (SDL
+    // tells the one linked, the others are those of their headers)
+    int sv= SDL_GetVersion ();
+    string sdl= as_string (SDL_VERSIONNUM_MAJOR (sv)) * "." *
+                as_string (SDL_VERSIONNUM_MINOR (sv)) * "." *
+                as_string (SDL_VERSIONNUM_MICRO (sv));
+    string ems= as_string (__EMSCRIPTEN_major__) * "." *
+                as_string (__EMSCRIPTEN_minor__) * "." *
+                as_string (__EMSCRIPTEN_tiny__);
     string info= "{\"version\":\"" TEXMACS_VERSION "\",\"built\":\"" __DATE__
-                 "\",\"mupdf\":\"" FZ_VERSION "\",\"scheme\":\"S7\"}";
+                 "\",\"mupdf\":\"" FZ_VERSION "\",\"sdl\":\"" * sdl *
+                 "\",\"emscripten\":\"" * ems * "\"";
+#ifdef USE_S7
+    info << ",\"scheme\":\"S7\",\"s7\":\"" S7_VERSION "\",\"s7date\":\"" S7_DATE "\"";
+#endif
+    info << "}";
     c_string ci (info);
     vue_web_frame_info (ci);
   }
