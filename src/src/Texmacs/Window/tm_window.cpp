@@ -713,6 +713,17 @@ window_hide (int win) {
   set_visibility (pww, false);
 }
 
+void
+window_set_on_top (int win, bool flag) {
+  ASSERT (window_table->contains (win), "window does not exist");
+#ifdef QTTEXMACS
+  // the other interfaces do not know this slot, and Widkit fails on it
+  set_on_top (window_table [win], flag);
+#else
+  (void) flag;
+#endif
+}
+
 scheme_tree
 window_get_size (int win) {
   ASSERT (window_table->contains (win), "window does not exist");
