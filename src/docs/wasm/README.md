@@ -88,8 +88,15 @@ unzip it and serve it with `node misc/wasm/serve.mjs <dir>`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
 
 The job `pages` publishes the page at https://mgubi.github.io/texmacs/
-(GitHub Pages, source "GitHub Actions"; the environment `github-pages`
-allows the branch `wip_wasm_vue`). Pages sends files as they are, without
+(GitHub Pages, source "GitHub Actions"), from the branch `gh-pages` only:
+the pushes to `wip_wasm_vue` are built and tested, and a state is
+published by moving `gh-pages` to it,
+
+    git push origin wip_wasm_vue:gh-pages
+
+(the environment `github-pages` allows that branch). `gh-pages` holds the
+sources, as `wip_wasm_vue`, not the built site: the site is the artifact of
+the run. Pages sends files as they are, without
 the brotli copies of `serve.mjs`: the build also writes gzip copies of
 `texmacs.wasm` and of the packages, which the page decompresses itself
 (`DecompressionStream`, in `progress.js` and `packages.js`), 6.2 MB for the
