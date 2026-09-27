@@ -6467,6 +6467,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(alt-window-set-on-top <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_set_on_top> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(alt-window-get-size <scm-arg|int>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9488,6 +9496,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|show_box> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-info <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_info> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-report)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_report> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>
