@@ -260,12 +260,26 @@ var tmFrame = (function () {
     var h = el ('div', 'tm-head', 'TeXmacs Vue');
     h.appendChild (el ('span', 'tm-badge', 'experimental'));
     menu.appendChild (h);
-    text ('An experimental port of GNU TeXmacs ' + (app.version || '') + ', the structured ' +
-          'editor for scientists, running in this page: nothing is installed, and nothing ' +
-          'leaves the browser unless you download it.');
-    text ('Vue is a new interface for TeXmacs (Clay, SDL3 and MuPDF), here on WebAssembly, ' +
-          'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
-          'mathematics included. Expect rough edges.');
+    // a paragraph of texts and links ([text, url])
+    function para (parts) {
+      var d = el ('div', 'tm-text');
+      parts.forEach (function (x) {
+        if (typeof x === 'string') { d.appendChild (document.createTextNode (x)); return; }
+        var a = el ('a', null, x[0]);
+        a.href = x[1]; a.target = '_blank'; a.rel = 'noopener';
+        d.appendChild (a);
+      });
+      menu.appendChild (d);
+      return d;
+    }
+    para (['An experimental port of ', ['GNU TeXmacs', 'https://www.texmacs.org'], ' ' +
+           (app.version || '') + ', the structured editor for scientists, running in this ' +
+           'page: nothing is installed, and nothing leaves the browser unless you download it.']);
+    para (['Vue is a new interface for TeXmacs (Clay, SDL3 and MuPDF), here on WebAssembly, ' +
+           'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
+           'mathematics included. Expect rough edges. ',
+           ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/wip_wasm_vue'],
+           '.']);
     // the software this page is made of, with their versions as the program
     // reports them (gui_open in vue_gui.cpp), and their pages
     var soft = [
@@ -312,10 +326,6 @@ var tmFrame = (function () {
         'upload or by dropping them on the page, and go out as downloads.');
     });
     sep ();
-    item ('texmacs.org', function () { window.open ('https://www.texmacs.org', '_blank'); });
-    item ('This port (sources, notes)', function () {
-      window.open ('https://github.com/mgubi/texmacs/tree/wip_wasm_vue', '_blank');
-    });
     item ('Reload', function () { location.reload (); });
     item ('Reset…', function () {
       if (!window.confirm ('Delete your files and preferences kept in this browser, ' +
