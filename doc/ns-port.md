@@ -60,6 +60,10 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   after each step (`scroll-<i>.png`);
 * `TEXMACS_NS_DROP=<file>`: after 3 seconds, the file is dropped on the
   canvas.
+* `TEXMACS_NS_SCROLL_STEP=<points>`: the steps of `TEXMACS_NS_SCROLL`
+  (trackpads give fractional ones); with `TEXMACS_NS_SNAPSHOT`, the backing
+  store of the canvas is saved as `backing.png` at the end (upside down),
+  and `TEXMACS_NS_DEBUG_RED=1` fills the parts to repaint in red first;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
   printed (the snapshots redraw everything, and do not show what is on
   screen; other programs cannot capture the windows of TeXmacs).

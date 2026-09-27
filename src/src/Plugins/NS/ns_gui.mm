@@ -859,7 +859,7 @@ find_document_scroll_view (NSView* v) {
 
 @interface TMScrollHelper : NSObject
 {
-  int remaining;
+  double remaining;
 }
 - (void) step: (NSTimer*) timer;
 @end
@@ -886,7 +886,11 @@ find_document_scroll_view (NSView* v) {
     fprintf (stderr, "TEXMACS_NS_SCROLL window %.0f,%.0f,%.0f,%.0f\n",
              f.origin.x, H - NSMaxY (f), f.size.width, f.size.height);
   }
-  int d= remaining > 0? min (remaining, 40): max (remaining, -40);
+  // NOTE: TEXMACS_NS_SCROLL_STEP gives other steps (trackpads give
+  // fractional ones)
+  double st= get_env ("TEXMACS_NS_SCROLL_STEP") == ""? 40.0:
+             as_double (get_env ("TEXMACS_NS_SCROLL_STEP"));
+  double d= remaining > 0? min ((double) remaining, st): max ((double) remaining, -st);
   NSClipView* clip= [sv contentView];
   NSPoint p= [clip bounds].origin;
   p.y += d;
@@ -895,6 +899,7 @@ find_document_scroll_view (NSView* v) {
                                      [clip bounds].size.height)].origin];
   [sv reflectScrolledClipView: clip];
   remaining -= d;
+  if (fabs (remaining) < 0.01) remaining= 0;
   static int step= 0;
   string dir= get_env ("TEXMACS_NS_SNAPSHOT");
   if (dir != "") {
@@ -906,6 +911,19 @@ find_document_scroll_view (NSView* v) {
                                     properties: [NSDictionary dictionary]];
     string name= dir * "/scroll-" * as_string (step++) * ".png";
     [data writeToFile: to_nsstring (name) atomically: NO];
+  }
+  if (remaining == 0 && dir != "") {
+    // the backing store of the canvas itself (what is shown on the screen)
+    NSView* canvas= nil;
+    for (NSView* w in [[sv documentView] subviews])
+      if ([NSStringFromClass ([w class]) isEqualToString: @"TMView"]) canvas= w;
+    widget_rep* wr= canvas? (widget_rep*) [(id) canvas widget]: NULL;
+    NSBitmapImageRep* bp= wr? ((ns_simple_widget_rep*) wr)->backingPixmap: nil;
+    if (bp) {
+      NSData* data= [bp representationUsingType: NSBitmapImageFileTypePNG
+                                     properties: [NSDictionary dictionary]];
+      [data writeToFile: to_nsstring (dir * "/backing.png") atomically: NO];
+    }
   }
   if (remaining == 0) {
     fprintf (stderr, "TEXMACS_NS_SCROLL done at %g\n", [clip bounds].origin.y);

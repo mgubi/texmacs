@@ -585,6 +585,8 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     moved= true;
     int dx =  retina_factor * (origin.x - backing_pos.x);
     int dy =  retina_factor * (origin.y - backing_pos.y);
+    if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
+      fprintf (stderr, "SHIFT %g -> %g dy %d size %g\n", backing_pos.y, origin.y, dy, [backingPixmap size].height);
     backing_pos.x = origin.x;
     backing_pos.y = origin.y;
     NSBitmapImageRep *newBackingPixmap = [[NSBitmapImageRep alloc]
@@ -602,6 +604,10 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     NSGraphicsContext* gc = [NSGraphicsContext graphicsContextWithBitmapImageRep: newBackingPixmap];
     [NSGraphicsContext saveGraphicsState];
     [NSGraphicsContext setCurrentContext: gc];
+    if (getenv ("TEXMACS_NS_DEBUG_RED")) {
+      [[NSColor redColor] setFill];
+      NSRectFill (NSMakeRect (0, 0, sz.width, sz.height));
+    }
     [backingPixmap drawAtPoint: NSMakePoint (-dx, -dy)];
     [NSGraphicsContext restoreGraphicsState];
     [backingPixmap release];
@@ -710,9 +716,14 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       rectangles rects = invalid_regions;
       invalid_regions = rectangles();
       
+      NSSize bs= NSMakeSize ([backingPixmap pixelsWide], [backingPixmap pixelsHigh]);
       while (!is_nil (rects)) {
-        rectangle r = copy (rects->item);
+        // NOTE: with a margin of one pixel, since the conversion to the
+        // coordinates of TeXmacs loses the first row (seams while scrolling)
         rectangle r0 = rects->item;
+        rectangle r = rectangle (max (r0->x1 - 1, (SI) 0), max (r0->y1 - 1, (SI) 0),
+                                 min (r0->x2 + 1, (SI) bs.width),
+                                 min (r0->y2 + 1, (SI) bs.height));
         NSRect qr = NSMakeRect (r0->x1 / retina_factor, r0->y1 / retina_factor,
                           (r0->x2 - r0->x1) / retina_factor,
                           (r0->y2 - r0->y1) / retina_factor);
