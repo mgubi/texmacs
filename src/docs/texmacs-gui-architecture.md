@@ -53,6 +53,10 @@ Mouse kinds are strings: `press-left`, `release-right`, `move`,
 menu on *any* editor mouse event but `leave` (it assumes the popup grabbed the
 pointer). The editor draws its cursor only when `got_focus`.
 
+That the editor *is* a widget of the GUI, chosen at compile time, is what
+[editor-frontend-separation.md](editor-frontend-separation.md) proposes to
+change.
+
 Embedded documents (`texmacs-output`, `texmacs-input` markup) are
 `box_widget_rep` / editor widgets created in `Texmacs/Window/tm_button.cpp`,
 which replaces a white document background by a color meant to blend into the
