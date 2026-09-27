@@ -35,7 +35,7 @@
 
 @implementation TMDocView
 - (BOOL) isFlipped { return YES; }
-- (BOOL) isOpaque { return YES; }
+- (BOOL) isOpaque { return NO; }
 // NOTE: TeXmacs draws synchronously, like the Qt interface
 + (BOOL) isCompatibleWithResponsiveScrolling { return NO; }
 
@@ -648,19 +648,19 @@ ns_simple_widget_rep::repaint_invalid_regions () {
                                          bitmapFormat:NSBitmapFormatAlphaFirst
                                          bytesPerRow:0
                                          bitsPerPixel:0];
+      // NOTE: the new parts are transparent, so that the background of the
+      // window is shown where TeXmacs does not paint (as for the tooltips
+      // of the Qt interface)
+      memset ([newBackingPixmap bitmapData], 0,
+              [newBackingPixmap bytesPerRow] * [newBackingPixmap pixelsHigh]);
       NSGraphicsContext* gc = [NSGraphicsContext graphicsContextWithBitmapImageRep: newBackingPixmap];
       [NSGraphicsContext saveGraphicsState];
       [NSGraphicsContext setCurrentContext: gc];
       [backingPixmap drawAtPoint: NSMakePoint (0, 0)];
-      if (_newSize.width > _oldSize.width) {
+      if (_newSize.width > _oldSize.width)
         invalidate_rect (_oldSize.width, 0, _newSize.width, _newSize.height);
-        [[NSColor colorWithWhite:0.5 alpha:1.0] drawSwatchInRect:
-          NSMakeRect (_oldSize.width, 0, _newSize.width-_oldSize.width, _newSize.height)];
-      }
-      if (_newSize.height > _oldSize.height) {
+      if (_newSize.height > _oldSize.height)
         invalidate_rect (0,_oldSize.height, _newSize.width, _newSize.height);
-        [[NSColor colorWithWhite:0.5 alpha:1.0] drawSwatchInRect: NSMakeRect (0,_oldSize.height, _newSize.width, _newSize.height-_oldSize.height)];
-      }
       [NSGraphicsContext restoreGraphicsState];
       [backingPixmap release];
       backingPixmap = newBackingPixmap;

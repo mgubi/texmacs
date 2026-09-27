@@ -21,6 +21,8 @@
 #include "boot.hpp"
 #include "sys_utils.hpp"
 
+#include "tm_window.hpp"
+#include "new_window.hpp"
 #include "ns_gui.h"
 #include "ns_utilities.h"
 #include "ns_renderer.h" // for the_ns_renderer
@@ -244,9 +246,62 @@ static bool check_mask(int mask)
 
 
 
+/*! A window with the icon of TeXmacs and the message, at the center of the
+ window of w (see qt_gui_rep::show_wait_indicator); the messages are stacked,
+ and an empty message removes the last one. */
 void
 ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
-  // FIXME: implement show_wait_indicator
+  static NSPanel* wait_window= nil;
+  static NSTextField* wait_label= nil;
+  static NSMutableArray* wait_messages= nil;
+  if (!wait_window) {
+    wait_window= [[NSPanel alloc] initWithContentRect: NSMakeRect (0, 0, 300, 60)
+                   styleMask: NSWindowStyleMaskBorderless |
+                              NSWindowStyleMaskNonactivatingPanel
+                     backing: NSBackingStoreBuffered defer: YES];
+    [wait_window setReleasedWhenClosed: NO];
+    [wait_window setLevel: NSFloatingWindowLevel];
+    [wait_window setHasShadow: YES];
+    NSStackView* sv= [[[NSStackView alloc] init] autorelease];
+    [sv setEdgeInsets: NSEdgeInsetsMake (12, 12, 12, 16)];
+    [sv setSpacing: 12];
+    NSImageView* icon= [NSImageView imageViewWithImage:
+                          [NSApp applicationIconImage]];
+    [[icon.widthAnchor constraintEqualToConstant: 32] setActive: YES];
+    [[icon.heightAnchor constraintEqualToConstant: 32] setActive: YES];
+    wait_label= [[NSTextField wrappingLabelWithString: @""] retain];
+    [sv addArrangedSubview: icon];
+    [sv addArrangedSubview: wait_label];
+    [wait_window setContentView: sv];
+    wait_messages= [[NSMutableArray alloc] init];
+  }
+  if (N(message) > 0) {
+    string tmp= message;
+    if (arg != "") tmp= tmp * " " * arg * "...";
+    [wait_messages addObject: to_label (tmp)];
+  }
+  else if ([wait_messages count] > 0) [wait_messages removeLastObject];
+  if ([wait_messages count] > 0) {
+    NSString* msg= [wait_messages firstObject];
+    if ([wait_messages count] >= 2)
+      msg= [NSString stringWithFormat: @"%@\n%@", msg, [wait_messages lastObject]];
+    [wait_label setStringValue: msg];
+    [wait_window setContentSize: [[wait_window contentView] fittingSize]];
+    NSWindow* win= nil;
+    if (!is_nil (w)) {
+      NSView* v= concrete (w)->as_nsview ();
+      win= [v window];
+    }
+    if (!win) win= [NSApp mainWindow];
+    NSRect f= [wait_window frame];
+    NSRect r= win? [win frame]: [[NSScreen mainScreen] visibleFrame];
+    [wait_window setFrameOrigin:
+       NSMakePoint (NSMidX (r) - f.size.width / 2,
+                    NSMidY (r) - f.size.height / 2)];
+    [wait_window orderFront: nil];
+    [wait_window displayIfNeeded];
+  }
+  else [wait_window orderOut: nil];
 }
 
 
@@ -605,9 +660,20 @@ ns_snapshot (string dir) {
     // x,y or x,y,right
     array<string> xy= tokenize (click, ",");
     bool right= N(xy) > 2 && xy[2] == "right";
+    bool move = N(xy) > 2 && xy[2] == "move";
     NSPoint p= NSMakePoint (as_double (xy[0]), as_double (xy[1]));
     p= [v convertPoint: p toView: nil];
-    for (int up=0; up<2; up++) {
+    if (move) {
+      // x,y,move: the mouse moves there
+      NSEvent* e= [NSEvent mouseEventWithType: NSEventTypeMouseMoved
+                                     location: p modifierFlags: 0
+                                    timestamp: [[NSProcessInfo processInfo] systemUptime]
+                                 windowNumber: [win windowNumber]
+                                      context: nil eventNumber: 0
+                                   clickCount: 0 pressure: 0.0];
+      [(NSView*) v mouseMoved: e];
+    }
+    else for (int up=0; up<2; up++) {
       NSEvent* e= [NSEvent mouseEventWithType:
                              right? (up? NSEventTypeRightMouseUp: NSEventTypeRightMouseDown)
                                   : (up? NSEventTypeLeftMouseUp: NSEventTypeLeftMouseDown)
@@ -738,6 +804,37 @@ find_document_scroll_view (NSView* v) {
 }
 @end
 
+// NOTE: when the environment variable TEXMACS_NS_DROP is a file, it is dropped
+// on the canvas of the key window after three seconds
+
+void ns_test_drop (NSView* v, NSString* path);
+
+static NSView*
+find_canvas (NSView* v) {
+  if ([NSStringFromClass ([v class]) isEqualToString: @"TMView"]) return v;
+  for (NSView* w in [v subviews]) {
+    NSView* r= find_canvas (w);
+    if (r) return r;
+  }
+  return nil;
+}
+
+@interface TMDropHelper : NSObject
+- (void) drop: (NSTimer*) timer;
+@end
+
+@implementation TMDropHelper
+- (void) drop: (NSTimer*) timer
+{
+  (void) timer;
+  NSWindow* win= [NSApp keyWindow];
+  if (!win) win= [[NSApp orderedWindows] firstObject];
+  NSView* v= find_canvas ([win contentView]);
+  ns_test_drop (v, to_nsstring (get_env ("TEXMACS_NS_DROP")));
+  fprintf (stderr, "TEXMACS_NS_DROP %s\n", v? "done": "no canvas");
+}
+@end
+
 // NOTE: when the environment variable TEXMACS_NS_PRESS is set, the button
 // or the tab with this label is pressed after four seconds
 
@@ -826,6 +923,13 @@ ns_gui_rep::event_loop () {
     [t setFireDate: [NSDate dateWithTimeIntervalSinceNow: 3.0]];
     [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
+  if (get_env ("TEXMACS_NS_DROP") != "") {
+    TMDropHelper* h= [[TMDropHelper alloc] init];
+    NSTimer* t= [NSTimer timerWithTimeInterval: 3.0 target: h
+                                      selector: @selector(drop:)
+                                      userInfo: nil repeats: NO];
+    [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
+  }
   if (get_env ("TEXMACS_NS_PRESS") != "") {
     // NOTE: also in modal dialogs
     TMPressHelper* h= [[TMPressHelper alloc] init];
@@ -840,7 +944,7 @@ ns_gui_rep::event_loop () {
                                    selector: @selector(print:)
                                    userInfo: nil repeats: NO];
   }
-  if (get_env ("TEXMACS_NS_TYPE") != "") {
+  if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_CLICK") != "") {
     TMTypeHelper* h= [[TMTypeHelper alloc] init];
     [NSTimer scheduledTimerWithTimeInterval: 2.0 target: h
                                    selector: @selector(type:)
@@ -1068,10 +1172,22 @@ void image_gc (string name) {
 
 void
 show_help_balloon (widget balloon, SI x, SI y) {
-  // FIXME: implement
   // Display a help balloon at position (x, y); the help balloon should
   // disappear as soon as the user presses a key or moves the mouse
-  (void) balloon; (void) x; (void) y;
+  the_gui->show_help_balloon (balloon, x, y);
+}
+
+/*! Display a popup help balloon at window coordinates x, y (as in the Qt
+ interface, it is shown a little later by update ()). */
+void
+ns_gui_rep::show_help_balloon (widget wid, SI x, SI y) {
+  if (!has_current_window ()) return;
+  if (popup_wid_time > 0) return;
+  _popup_wid = popup_window_widget (wid, "Balloon");
+  SI winx, winy;
+  get_position (get_window (concrete_window()->win), winx, winy);
+  set_position (_popup_wid, x+winx, y+winy);
+  popup_wid_time = texmacs_time() + 66;
 }
 
 void

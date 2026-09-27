@@ -51,6 +51,8 @@ public:
 class ns_popup_widget_rep: public ns_widget_rep {
 public:
   command quit;
+  void* panel;  //!< the window (TMPopupPanel)
+  bool tooltip; //!< a tooltip, which does not disappear with the mouse moves
   
   ns_popup_widget_rep (widget wid, command q);
   ~ns_popup_widget_rep ();

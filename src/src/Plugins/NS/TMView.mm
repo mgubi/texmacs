@@ -18,6 +18,8 @@
 #include "ns_renderer.h"
 #include "ns_gui.h"
 #include "scheme.hpp"
+#include "MacOS/mac_images.h"
+#include "editor.hpp"
 
 //extern bool ns_update_flag;
 //extern int time_credit;
@@ -29,6 +31,97 @@ hashmap<int,string> nskeymap("");
 - (void) focusIn;
 - (void) focusOut;
 @end
+
+/******************************************************************************
+* Dropped documents (see QTMWidget::dropEvent)
+******************************************************************************/
+
+int drop_payload_serial= 0;
+hashmap<int,tree> payloads;
+
+static int
+ns_drop_payload (tree doc) {
+  int ticket= drop_payload_serial++;
+  payloads (ticket)= doc;
+  return ticket;
+}
+
+static void
+ns_pretty_image_size (int ww, int hh, string& w, string& h) {
+  // As qt_pretty_image_size: in points, or the width of a paragraph
+  SI pt = get_current_editor()->as_length ("1pt");
+  SI par= get_current_editor()->as_length ("1par");
+  if (ww <= 0 || hh <= 0 || ww * pt > par) { w= "1par"; h= ""; }
+  else { w= as_string (ww) * "pt"; h= as_string (hh) * "pt"; }
+}
+
+static tree
+ns_raw_image (NSData* data, string format, int ww, int hh) {
+  string w= "", h= "";
+  if (ww > 0) ns_pretty_image_size (ww, hh, w, h);
+  return tree (IMAGE, tree (RAW_DATA, string ((char*) [data bytes],
+                                              (int) [data length]), format),
+               w, h, "", "");
+}
+
+static tree
+ns_dropped_document (NSPasteboard* pb) {
+  tree doc (CONCAT);
+  NSArray* urls= [pb readObjectsForClasses: [NSArray arrayWithObject: [NSURL class]]
+                                   options: nil];
+  if ([urls count] > 0) {
+    for (NSURL* u in urls) {
+      if ([u isFileURL]) {
+        string name= from_nsstring ([u path]);
+        string ext= locase_all (suffix (url_system (name)));
+        if (ext == "eps" || ext == "ps" || ext == "svg" || ext == "pdf" ||
+            ext == "png" || ext == "jpg" || ext == "jpeg") {
+          string w= "", h= "";
+          int ww, hh;
+          if (ext != "pdf" && ext != "ps" && ext != "eps" &&
+              mac_image_size (url_system (name), ww, hh))
+            ns_pretty_image_size (ww, hh, w, h);
+          doc << tree (IMAGE, name, w, h, "", "");
+        }
+        else doc << name;
+      }
+      else {
+        // not a local file: a link to it
+        string link= from_nsstring ([u absoluteString]);
+        string label= link;
+        NSString* txt= [pb stringForType: NSPasteboardTypeString];
+        if (txt) {
+          NSString* first= [[txt componentsSeparatedByString: @"\n"] firstObject];
+          if ([first length] > 0) label= from_nsstring (first);
+        }
+        doc << tree (HLINK, label, link);
+      }
+    }
+  }
+  else if ([pb dataForType: NSPasteboardTypePNG] ||
+           [pb dataForType: NSPasteboardTypeTIFF]) {
+    NSData* d= [pb dataForType: NSPasteboardTypePNG];
+    if (!d) {
+      NSBitmapImageRep* rep= [NSBitmapImageRep imageRepWithData:
+                                [pb dataForType: NSPasteboardTypeTIFF]];
+      d= [rep representationUsingType: NSBitmapImageFileTypePNG
+                            properties: [NSDictionary dictionary]];
+    }
+    NSBitmapImageRep* rep= [NSBitmapImageRep imageRepWithData: d];
+    doc << ns_raw_image (d, "png", (int) [rep size].width, (int) [rep size].height);
+  }
+  else if ([pb dataForType: NSPasteboardTypePDF])
+    doc << ns_raw_image ([pb dataForType: NSPasteboardTypePDF], "pdf", 0, 0);
+  else if ([pb stringForType: NSPasteboardTypeString])
+    doc << from_nsstring ([pb stringForType: NSPasteboardTypeString]);
+  if (N(doc) == 1) return doc[0];
+  if (N(doc) > 1) {
+    tree sec (CONCAT, doc[0]);
+    for (int i=1; i<N(doc); i++) sec << " " << doc[i];
+    return sec;
+  }
+  return doc;
+}
 
 @implementation TMView
 
@@ -130,6 +223,18 @@ initkeymap () {
     wid = NULL;
     processingCompose = NO;
     workingText = nil;
+    // NOTE: as the QTMWidget, the canvas follows the mouse and accepts drops
+    NSTrackingArea* ta=
+      [[[NSTrackingArea alloc] initWithRect: NSZeroRect
+         options: NSTrackingMouseMoved | NSTrackingActiveInKeyWindow |
+                  NSTrackingInVisibleRect
+           owner: self userInfo: nil] autorelease];
+    [self addTrackingArea: ta];
+    [self registerForDraggedTypes:
+       [NSArray arrayWithObjects: NSPasteboardTypeFileURL, NSPasteboardTypeURL,
+                                  NSPasteboardTypePNG, NSPasteboardTypeTIFF,
+                                  NSPasteboardTypePDF, NSPasteboardTypeString,
+                                  nil]];
   }
   return self;
 }
@@ -213,7 +318,7 @@ initkeymap () {
                           rect.size.width * retina_factor,
                           rect.size.height * retina_factor);
   [wid->backingPixmap drawInRect: rect fromRect: src
-                       operation: NSCompositingOperationCopy
+                       operation: NSCompositingOperationSourceOver
                         fraction: 1.0 respectFlipped: NO hints: nil];
 }
 
@@ -349,25 +454,34 @@ initkeymap () {
 
 static unsigned int
 mouse_state (NSEvent* event, bool flag) {
-  // As in the Qt interface on the Mac: control and option emulate the right
-  // and middle buttons, but the modifiers are passed anyway
-  (void) flag;
-  unsigned int i= 0;
-  NSInteger b= [event buttonNumber];
+  // As in the Qt interface on the Mac: the buttons which are pressed (and
+  // the button of the event when flag is set, for the releases); control
+  // and option emulate the right and middle buttons, but the modifiers are
+  // passed anyway
+  NSUInteger bstate= [NSEvent pressedMouseButtons];
+  NSInteger b= -1;
   switch ([event type]) {
-    case NSEventTypeLeftMouseDown: case NSEventTypeLeftMouseUp:
-    case NSEventTypeLeftMouseDragged:
+    case NSEventTypeLeftMouseDown: case NSEventTypeLeftMouseDragged:
+      b= 0; flag= true; break;
+    case NSEventTypeLeftMouseUp:
       b= 0; break;
-    case NSEventTypeRightMouseDown: case NSEventTypeRightMouseUp:
-    case NSEventTypeRightMouseDragged:
+    case NSEventTypeRightMouseDown: case NSEventTypeRightMouseDragged:
+      b= 1; flag= true; break;
+    case NSEventTypeRightMouseUp:
       b= 1; break;
+    case NSEventTypeOtherMouseDown: case NSEventTypeOtherMouseDragged:
+      b= [event buttonNumber]; flag= true; break;
+    case NSEventTypeOtherMouseUp:
+      b= [event buttonNumber]; break;
     default: break;
   }
-  if (b == 0) i += 1;
-  else if (b == 1) i += 4;
-  else if (b == 2) i += 2;
-  else if (b == 3) i += 8;
-  else if (b == 4) i += 16;
+  if (flag && b >= 0) bstate |= (1 << b);
+  unsigned int i= 0;
+  if (bstate & 1 ) i += 1;   // left
+  if (bstate & 4 ) i += 2;   // middle
+  if (bstate & 2 ) i += 4;   // right
+  if (bstate & 8 ) i += 8;
+  if (bstate & 16) i += 16;
   NSEventModifierFlags mods = [event modifierFlags];
   if (mods & NSEventModifierFlagControl) i = 1024 + 4;
   if (mods & NSEventModifierFlagOption)  i = 2048 + 2;
@@ -402,7 +516,7 @@ mouse_decode (unsigned int mstate) {
   if (wid) {
     NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
-    unsigned int mstate = mouse_state (event, false);
+    unsigned int mstate = mouse_state (event, true);
     string s = "release-" * mouse_decode (mstate);
     the_gui -> process_mouse (wid, s, pt.x1, pt.x2, mstate, texmacs_time ());
   }
@@ -439,6 +553,87 @@ mouse_decode (unsigned int mstate) {
 
 + (BOOL) isCompatibleWithResponsiveScrolling { return NO; }
 
+/******************************************************************************
+* Gestures (see QTMWidget::gestureEvent)
+******************************************************************************/
+
+- (void) gesture: (string) s event: (NSEvent*) event data: (array<double>) data
+{
+  if (!wid) return;
+  NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
+  coord2 pt = from_nspoint (point);
+  the_gui->process_mouse (wid, s, pt.x1, pt.x2, 0, texmacs_time (), data);
+}
+
+- (void) magnifyWithEvent: (NSEvent*) event
+{
+  static double scale= 1.0;
+  array<double> data;
+  switch ([event phase]) {
+  case NSEventPhaseBegan:
+    scale= 1.0;
+    [self gesture: "pinch-start" event: event data: data];
+    break;
+  case NSEventPhaseEnded:
+  case NSEventPhaseCancelled:
+    [self gesture: "pinch-end" event: event data: data];
+    break;
+  default:
+    scale *= 1.0 + [event magnification];
+    data << scale;
+    [self gesture: "scale" event: event data: data];
+  }
+}
+
+- (void) rotateWithEvent: (NSEvent*) event
+{
+  static double angle= 0.0;
+  array<double> data;
+  if ([event phase] == NSEventPhaseBegan) angle= 0.0;
+  // NOTE: counterclockwise in Cocoa, clockwise in Qt
+  angle -= [event rotation];
+  data << angle;
+  [self gesture: "rotate" event: event data: data];
+}
+
+- (void) swipeWithEvent: (NSEvent*) event
+{
+  array<double> data;
+  if ([event deltaX] > 0) [self gesture: "swipe-left" event: event data: data];
+  else if ([event deltaX] < 0) [self gesture: "swipe-right" event: event data: data];
+  else if ([event deltaY] > 0) [self gesture: "swipe-up" event: event data: data];
+  else if ([event deltaY] < 0) [self gesture: "swipe-down" event: event data: data];
+}
+
+/******************************************************************************
+* Drag and drop (see QTMWidget::dropEvent)
+******************************************************************************/
+
+- (NSDragOperation) draggingEntered: (id<NSDraggingInfo>) sender
+{
+  (void) sender;
+  return NSDragOperationCopy;
+}
+
+- (NSDragOperation) draggingUpdated: (id<NSDraggingInfo>) sender
+{
+  (void) sender;
+  return NSDragOperationCopy;
+}
+
+- (BOOL) performDragOperation: (id<NSDraggingInfo>) sender
+{
+  if (!wid) return NO;
+  NSPoint point = [[self superview] convertPoint: [sender draggingLocation]
+                                        fromView: nil];
+  coord2 pt = from_nspoint (point);
+  tree doc= ns_dropped_document ([sender draggingPasteboard]);
+  if (N(doc) == 0) return NO;
+  int ticket= ns_drop_payload (doc);
+  the_gui->process_mouse (wid, "drop", pt.x1, pt.x2, ticket, texmacs_time ());
+  return YES;
+}
+
 - (void) scrollWheel: (NSEvent *) event
 {
   // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
@@ -471,7 +666,7 @@ mouse_decode (unsigned int mstate) {
 
 - (BOOL) isOpaque
 {
-  return YES;
+  return NO;  // the parts which TeXmacs does not paint are transparent
 }
 
 - (void) resizeWithOldSuperviewSize: (NSSize)oldBoundsSize
@@ -615,3 +810,26 @@ plain_string (id s) {
 }
 
 @end
+
+/******************************************************************************
+* Test aid (see TEXMACS_NS_DROP in ns_gui.mm)
+******************************************************************************/
+
+void
+ns_test_drop (NSView* v, NSString* path) {
+  // Drop the file on the middle of the visible part of the canvas v
+  if (![v isKindOfClass: [TMView class]]) return;
+  TMView* tv= (TMView*) v;
+  if (![tv widget]) return;
+  NSPasteboard* pb= [NSPasteboard pasteboardWithUniqueName];
+  [pb clearContents];
+  [pb writeObjects: [NSArray arrayWithObject: [NSURL fileURLWithPath: path]]];
+  NSRect r= [tv frame];
+  NSPoint point= NSMakePoint (NSMidX (r), NSMidY (r));
+  coord2 pt = from_nspoint (point);
+  tree doc= ns_dropped_document (pb);
+  int ticket= ns_drop_payload (doc);
+  the_gui->process_mouse ((ns_simple_widget_rep*) [tv widget], "drop",
+                          pt.x1, pt.x2, ticket, texmacs_time ());
+  [pb releaseGlobally];
+}

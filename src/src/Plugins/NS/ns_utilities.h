@@ -81,6 +81,8 @@ tm_ostream& operator << (tm_ostream& out, coord2 c);
 //#define TYPE_CHECK(b) ASSERT (b, "type mismatch")
 
 NSSize ns_decode_length (string width, string height, NSSize ref);
+NSString* to_label (string s);
+string from_label (NSString* s);
 
 #define NOT_IMPLEMENTED(x) \
 { if (DEBUG_QT) debug_qt << x << " not implemented yet.\n"; }

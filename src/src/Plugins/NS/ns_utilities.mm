@@ -14,6 +14,7 @@
 #include "dictionary.hpp"
 #include "converter.hpp"
 #include "analyze.hpp"
+#include "wencoding.hpp"
 
 #define SCREEN_PIXEL (PIXEL)
 const float invpix =  1.0/SCREEN_PIXEL;
@@ -142,4 +143,22 @@ ns_decode_length (string width, string height, NSSize ref) {
   else if (h_unit == "em") size.height= 14.0 * h_len;
   else if (h_unit == "px") size.height= h_len;
   return size;
+}
+
+/******************************************************************************
+ * Labels of the widgets
+ ******************************************************************************/
+
+NSString*
+to_label (string s) {
+  // Menu and widget labels are in the cork or in the utf8 encoding
+  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
+    return to_nsstring (s);
+  return to_nsstring_utf8 (s);
+}
+
+string
+from_label (NSString* s) {
+  // Inputs are returned in the cork encoding, like in the Qt interface
+  return utf8_to_cork (from_nsstring (s));
 }

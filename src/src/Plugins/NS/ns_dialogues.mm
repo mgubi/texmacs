@@ -25,18 +25,6 @@
 #include "scheme.hpp"
 #include "url.hpp"
 
-static NSString*
-to_label (string s) {
-  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
-    return to_nsstring (s);
-  return to_nsstring_utf8 (s);
-}
-
-static string
-from_label (NSString* s) {
-  // Inputs are returned in the cork encoding, like in the Qt interface
-  return utf8_to_cork (from_nsstring (s));
-}
 
 /******************************************************************************
 * ns_chooser_widget_rep

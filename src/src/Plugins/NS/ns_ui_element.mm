@@ -28,13 +28,6 @@ NSColor* to_nscolor (color col);
  * Helpers
  ******************************************************************************/
 
-static NSString*
-to_label (string s) {
-  // Menu and widget labels are in the cork or in the utf8 encoding
-  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
-    return to_nsstring (s);
-  return to_nsstring_utf8 (s);
-}
 
 static NSImage*
 to_nsimage (url u) {

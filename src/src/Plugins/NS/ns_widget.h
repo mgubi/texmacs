@@ -21,7 +21,11 @@ typedef pair<SI,SI> coord2;
 tm_ostream& operator << (tm_ostream& out, coord4 c);
 tm_ostream& operator << (tm_ostream& out, coord2 c);
 
-#ifndef MAC_COCOA_H
+#ifdef __OBJC__
+#import <Cocoa/Cocoa.h>
+#endif
+
+#if !defined (MAC_COCOA_H) && !defined (__OBJC__)
 // hack to allow inclusion in pure C++ sources
 #include <CoreGraphics/CGGeometry.h>
 typedef struct TeXmacs_NSView {

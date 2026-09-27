@@ -389,53 +389,152 @@ ns_window_widget_rep::write (slot s, blackbox index, widget w) {
 
 #pragma mark ns_popup_widget
 
+/*! The window of a popup widget (see QTMPopupWidget): it disappears as soon
+ as the mouse leaves it or a key is pressed, and then applies its command. */
+@interface TMPopupPanel : NSPanel
+{
+@public
+  ns_popup_widget_rep* wid;
+  id monitor;
+}
+- (void) dismiss;
+@end
+
+@implementation TMPopupPanel
+- (BOOL) canBecomeKeyWindow { return NO; }
+
+- (void) startMonitoring
+{
+  if (monitor || (wid && wid->tooltip)) return;
+  monitor= [NSEvent addLocalMonitorForEventsMatchingMask:
+             NSEventMaskMouseMoved | NSEventMaskKeyDown |
+             NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown |
+             NSEventMaskScrollWheel
+             handler: ^NSEvent* (NSEvent* e) {
+      if ([e type] == NSEventTypeMouseMoved &&
+          NSPointInRect ([NSEvent mouseLocation], [self frame]))
+        return e;
+      [self dismiss];
+      return e;
+    }];
+  [monitor retain];
+}
+
+- (void) stopMonitoring
+{
+  if (!monitor) return;
+  [NSEvent removeMonitor: monitor];
+  [monitor release];
+  monitor= nil;
+}
+
+- (void) dismiss
+{
+  if (![self isVisible]) return;
+  [self stopMonitoring];
+  [self orderOut: nil];
+  if (wid && !is_nil (wid->quit)) wid->quit ();
+}
+
+- (void) dealloc
+{
+  [self stopMonitoring];
+  [super dealloc];
+}
+@end
+
 ns_popup_widget_rep::ns_popup_widget_rep (widget wid, command _quit)
-: ns_widget_rep (ns_widget_rep::popup_widget), quit(_quit) {
-  
+: ns_widget_rep (ns_widget_rep::popup_widget), quit(_quit), panel (nil),
+  tooltip (false) {
+  NSView* v= concrete (wid)->as_nsview ();
+  NSSize sz= v? [v fittingSize]: NSMakeSize (10, 10);
+  if (v && (sz.width < 1 || sz.height < 1)) sz= [v frame].size;
+  TMPopupPanel* p=
+    [[TMPopupPanel alloc] initWithContentRect: NSMakeRect (0, 0, sz.width, sz.height)
+                                    styleMask: NSWindowStyleMaskBorderless |
+                                               NSWindowStyleMaskNonactivatingPanel
+                                      backing: NSBackingStoreBuffered
+                                        defer: YES];
+  p->wid= this;
+  [p setReleasedWhenClosed: NO];
+  [p setLevel: NSPopUpMenuWindowLevel];
+  [p setHasShadow: YES];
+  [p setAcceptsMouseMovedEvents: YES];
+  if (v) {
+    // the contents fill the window
+    NSView* cv= [p contentView];
+    [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+    [cv addSubview: v];
+    [NSLayoutConstraint activateConstraints: @[
+      [v.leadingAnchor constraintEqualToAnchor: cv.leadingAnchor],
+      [v.trailingAnchor constraintEqualToAnchor: cv.trailingAnchor],
+      [v.topAnchor constraintEqualToAnchor: cv.topAnchor],
+      [v.bottomAnchor constraintEqualToAnchor: cv.bottomAnchor]]];
+  }
+  panel= p;
 }
 
 ns_popup_widget_rep::~ns_popup_widget_rep () {
+  TMPopupPanel* p= (TMPopupPanel*) panel;
+  if (p) {
+    p->wid= NULL;
+    [p stopMonitoring];
+    [p orderOut: nil];
+    [p release];
+  }
 }
 
 widget
 ns_popup_widget_rep::popup_window_widget(string s) {
-  //qwid->setWindowTitle (to_qstring (s)); // useless for Qt::Popup
+  [(NSPanel*) panel setTitle: to_nsstring (s)];
   return this;
 }
 
 void
 ns_popup_widget_rep::send (slot s, blackbox val) {
+  TMPopupPanel* p= (TMPopupPanel*) panel;
   switch (s) {
     case SLOT_SIZE:
     {
       check_type<coord2>(val, s);
-//      qwid->resize (to_qsize (open_box<coord2> (val)));
+      NSSize sz= to_nssize (open_box<coord2> (val));
+      NSRect f= [p frame];
+      [p setFrame: NSMakeRect (f.origin.x, NSMaxY (f) - sz.height,
+                               sz.width, sz.height) display: NO];
     }
       break;
     case SLOT_POSITION:
     {
+      // NOTE: the screen coordinates of TeXmacs start at the top left
       check_type<coord2>(val, s);
-//      qwid->move (to_qpoint (open_box<coord2> (val)));
+      NSPoint pt= to_nspoint (open_box<coord2> (val));
+      pt.y= main_screen_height () - pt.y;
+      [p setFrameTopLeftPoint: pt];
+      // keep it on the screen
+      NSScreen* scr= [p screen]? [p screen]: [NSScreen mainScreen];
+      NSRect f= [p frame], v= [scr visibleFrame];
+      if (NSMaxX (f) > NSMaxX (v)) f.origin.x= NSMaxX (v) - f.size.width;
+      if (f.origin.y < v.origin.y) f.origin.y= v.origin.y;
+      [p setFrameOrigin: f.origin];
     }
       break;
     case SLOT_VISIBILITY:
     {
       check_type<bool> (val, s);
-//      qwid->setVisible(open_box<bool> (val));
+      if (open_box<bool> (val)) {
+        [p orderFront: nil];
+        [p startMonitoring];
+      }
+      else {
+        [p stopMonitoring];
+        [p orderOut: nil];
+      }
     }
       break;
-      //FIXME: what's this?
     case SLOT_MOUSE_GRAB:
     {
       check_type<bool> (val, s);
-      bool flag = open_box<bool> (val);  // true= get grab, false= release grab
-
-#if 0
-      qwid->hide();
-      if (flag) qwid->setWindowModality(Qt::WindowModal); //ok?
-      else      qwid->setWindowModality(Qt::NonModal);    //ok?
-      qwid->show();
-#endif
+      if (open_box<bool> (val)) { [p orderFront: nil]; [p startMonitoring]; }
     }
       break;
     default:
@@ -451,16 +550,19 @@ blackbox
 ns_popup_widget_rep::query (slot s, int type_id) {
   if (DEBUG_QT_WIDGETS)
     debug_widgets << "ns_popup_widget_rep::query " << slot_name(s) << LF;
+  NSPanel* p= (NSPanel*) panel;
   switch (s) {
     case SLOT_POSITION:
     {
       check_type_id<coord2> (type_id, s);
-     // return close_box<coord2> (from_qpoint (qwid->pos()));
+      NSRect f= [p frame];
+      NSPoint pt= NSMakePoint (f.origin.x, main_screen_height () - NSMaxY (f));
+      return close_box<coord2> (from_nspoint (pt));
     }
     case SLOT_SIZE:
     {
       check_type_id<coord2> (type_id, s);
-    //  return close_box<coord2> (from_qsize (qwid->size()));
+      return close_box<coord2> (from_nssize ([p frame].size));
     }
     default:
       return ns_widget_rep::query (s, type_id);
@@ -792,8 +894,12 @@ widget tree_view_widget (command cmd, tree data, tree actions) {
 //// Widgets which are not strictly required by TeXmacs have void implementations
 
 widget tooltip_window_widget (widget w, string s) {
-  // FIXME: a proper tooltip window
-  return popup_window_widget (w, s);
+  // As the popup windows, but the tooltips stay while the mouse moves (they
+  // are removed by TeXmacs, see tooltip.scm)
+  widget p= popup_window_widget (w, s);
+  if (concrete (p)->type == ns_widget_rep::popup_widget)
+    ((ns_popup_widget_rep*) p.rep)->tooltip= true;
+  return p;
 }
 
 widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
