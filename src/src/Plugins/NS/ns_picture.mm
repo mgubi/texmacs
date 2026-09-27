@@ -187,7 +187,9 @@ get_image (url u, int w, int h) {
 }
 
 picture
-load_picture (url u, int w, int h) {
+load_picture (url u, int w, int h, tree eff, int pixel) {
+  // FIXME: the effect eff is not applied
+  (void) eff; (void) pixel;
   NSImage* im = get_image (u, w, h);
   if (im == nil) return error_picture (w, h);
   picture p = native_picture (w, h, 0, 0);
@@ -243,13 +245,14 @@ void
 ns_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
   array<picture> a;
   for (int i=0; i<N(src); i++)
-    a << load_picture (src[i], w, h);
+    a << load_picture (src[i], w, h, tree (""), PIXEL);
   effect  e= build_effect (eff);
   picture t= e->apply (a, PIXEL);
   picture q= as_ns_picture (t);
   ns_picture_rep* pict= (ns_picture_rep*) q->get_handle ();
   
-  NSBitmapImageFileType format = 0;
+  NSBitmapImageFileType format = NSBitmapImageFileTypeTIFF;
+  bool known= true;
   {
     string suf = suffix (dest);
     if (suf == "png") format = NSBitmapImageFileTypePNG;
@@ -257,11 +260,28 @@ ns_apply_effect (tree eff, array<url> src, url dest, int w, int h) {
     else if (suf == "bmp") format = NSBitmapImageFileTypeBMP;
     else if (suf == "jpg") format = NSBitmapImageFileTypeJPEG;
     else if ((suf == "tif") || (suf == "tiff")) format = NSBitmapImageFileTypeTIFF;
+    else known= false;
   }
-  if (format) {
+  if (known) {
     NSData *png_data = [pict->pict representationUsingType: format properties: [NSDictionary dictionary]];
     [png_data writeToFile: to_nsstring_utf8 ( concretize (dest))
               atomically: NO];
   } else
     cout << "TeXmacs] warning: cannot save " << concretize (dest) << "\n";
+}
+
+void
+save_picture (url dest, picture p) {
+  picture q= as_ns_picture (p);
+  ns_picture_rep* pict= (ns_picture_rep*) q->get_handle ();
+  if (exists (dest)) remove (dest);
+  string suf= suffix (dest);
+  NSBitmapImageFileType format= NSBitmapImageFileTypePNG;
+  if (suf == "jpg" || suf == "jpeg") format= NSBitmapImageFileTypeJPEG;
+  else if (suf == "tif" || suf == "tiff") format= NSBitmapImageFileTypeTIFF;
+  else if (suf == "bmp") format= NSBitmapImageFileTypeBMP;
+  else if (suf == "gif") format= NSBitmapImageFileTypeGIF;
+  NSData* data= [pict->pict representationUsingType: format
+                                         properties: [NSDictionary dictionary]];
+  [data writeToFile: to_nsstring_utf8 (concretize (dest)) atomically: NO];
 }

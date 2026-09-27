@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "ns_utilities.h"
+#include "ns_widget.h"
 #include "dictionary.hpp"
 #include "converter.hpp"
 #include "analyze.hpp"
@@ -105,3 +106,15 @@ operator << (tm_ostream& out, NSSize size) {
 }
 
 
+
+tm_ostream&
+operator << (tm_ostream& out, coord4 c) {
+  out << "[" << c.x1 << "," << c.x2 << "," << c.x3 << "," << c.x4 << "]";
+  return out;
+}
+
+tm_ostream&
+operator << (tm_ostream& out, coord2 c) {
+  out << "[" << c.x1 << "," << c.x2 << "]";
+  return out;
+}

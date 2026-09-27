@@ -35,12 +35,11 @@ public:
   virtual widget make_popup_widget ();
   
   
-  //virtual QAction*         as_qaction ();
-  //virtual QWidget*         as_qwidget ();
-  //virtual QLayoutItem*     as_qlayoutitem ();
-  //virtual QList<QAction*>* get_qactionlist();
+  virtual TMMenuItem* as_menuitem ();
+  virtual NSView*     as_nsview ();
   
   operator tree ();
+  operator blackbox ();
   
   template<class X1> static ns_widget create (types _type, X1 x1) {
     return tm_new <ns_ui_element_rep> (_type, close_box<X1>(x1));
@@ -89,8 +88,8 @@ public:
   
   NSBitmapImageRep* render ();
   
-  //virtual QAction* as_qaction ();
-  //virtual QWidget* as_qwidget ();
+  virtual TMMenuItem* as_menuitem ();
+  virtual NSView*     as_nsview ();
 };
 
 /*! A wrapper widget executing a quit command upon SLOT_DESTROY. */
@@ -104,7 +103,7 @@ public:
     add_child (tmwid);
   }
   
-  //QWidget* as_qwidget () { return concrete(tmwid)->as_qwidget(); }
+  NSView* as_nsview () { return concrete(tmwid)->as_nsview(); }
   
   void send (slot s, blackbox val) {
     switch (s) {

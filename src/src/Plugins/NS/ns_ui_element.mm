@@ -8,132 +8,527 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
+#include "mac_cocoa.h"
+#include "ns_ui_element.h"
+#include "ns_menu.h"
+#include "ns_picture.h"
+#include "ns_renderer.h"
+#include "ns_utilities.h"
+#include "ns_simple_widget.h"
 
+#include "analyze.hpp"
+#include "converter.hpp"
+#include "wencoding.hpp"
+#include "gui.hpp"
+#include "message.hpp"
 
-
+NSColor* to_nscolor (color col);
 
 /******************************************************************************
- * glue widget
+ * Helpers
  ******************************************************************************/
 
+static NSString*
+to_label (string s) {
+  // Menu and widget labels are in the cork or in the utf8 encoding
+  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
+    return to_nsstring (s);
+  return to_nsstring_utf8 (s);
+}
+
+static NSImage*
+to_nsimage (url u) {
+  NSBitmapImageRep* rep= xpm_image (u);
+  if (!rep) return nil;
+  NSImage* img= [[[NSImage alloc] initWithSize: [rep size]] autorelease];
+  [img addRepresentation: rep];
+  return img;
+}
+
+static string
+text_of (widget w) {
+  // The text of a text widget, used for the tooltips of balloons
+  if (is_nil (w)) return "";
+  ns_widget nsw= concrete (w);
+  if (nsw->type != ns_widget_rep::text_widget) return "";
+  typedef quartet<string, int, color, bool> T;
+  return open_box<T> (((ns_ui_element_rep*) nsw.rep)->operator blackbox ()).x1;
+}
+
+/*! A button, a check box or a popup button executing a TeXmacs command.
+ The kind of the button tells how the command is called: without arguments,
+ with the state of the check box, or with the selected item.
+ */
+@interface TMCommandButton : NSButton
 {
-  SI width, height;
-  handle_get_size_hint (width, height);
-  NSSize s = to_nssize (width, height);
-  NSSize phys_s = s;
-  phys_s.width *= retina_factor;
-  phys_s.height *= retina_factor;
-  NSBitmapImageRep* im =
-  [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
-                                          pixelsWide: phys_s.width
-                                          pixelsHigh: phys_s.height
-                                       bitsPerSample: 8
-                                     samplesPerPixel: 4
-                                            hasAlpha: YES
-                                            isPlanar: NO
-                                      colorSpaceName: NSDeviceRGBColorSpace
-                                         bytesPerRow: 4 * phys_s.width
-                                        bitsPerPixel: 32];
-  if (DEBUG_QT)
-    debug_qt << "impress (" << s.width << "," << s.height << ")\n";
-    NSGraphicsContext* cg = [NSGraphicsContext graphicsContextWithBitmapImageRep: im];
-  {
-    ns_renderer_rep *ren = the_ns_renderer();
-    ren->begin (cg);
-    // transparent fill
-    [[NSColor colorWithDeviceWhite:1.0 alpha:0.0] drawSwatchInRect: NSMakeRect(0, 0, phys_s.width, phys_s.height)];
-    
-    rectangle r = rectangle (0, 0,  phys_s.width, phys_s.height);
-    ren->set_origin (0, 0);
-    ren->encode (r->x1, r->y1);
-    ren->encode (r->x2, r->y2);
-    ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-    {
-      // we do not want to be interrupted here...
-      the_gui->set_check_events (false);
-      handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
-      the_gui->set_check_events (true);
-    }
-    ren->end();
+  command_rep *cmd;
+  int kind;  // 0: plain, 1: check box, 2: popup
+}
+- (void)setCommand:(command_rep *)_c kind:(int)_k;
+- (void)doit:(id)sender;
+@end
+
+@implementation TMCommandButton
+- (void)setCommand:(command_rep *)_c kind:(int)_k
+{
+  if (cmd) { DEC_COUNT_NULL(cmd); } cmd = _c; kind= _k;
+  if (cmd) {
+    INC_COUNT_NULL(cmd);
+    [self setTarget:self];
+    [self setAction:@selector(doit:)];
   }
-    return im;
+}
+- (void)dealloc { [self setCommand:NULL kind:0]; [super dealloc]; }
+- (void)doit:(id)sender
+{
+  (void) sender;
+  if (!cmd) return;
+  command c (cmd);
+  if (kind == 1) c (list_object (object ([self state] == NSControlStateValueOn)));
+  else c ();
+}
+@end
+
+@interface TMCommandPopUp : NSPopUpButton
+{
+  command_rep *cmd;
+}
+- (void)setCommand:(command_rep *)_c;
+- (void)doit:(id)sender;
+@end
+
+@implementation TMCommandPopUp
+- (void)setCommand:(command_rep *)_c
+{
+  if (cmd) { DEC_COUNT_NULL(cmd); } cmd = _c;
+  if (cmd) {
+    INC_COUNT_NULL(cmd);
+    [self setTarget:self];
+    [self setAction:@selector(doit:)];
+  }
+}
+- (void)dealloc { [self setCommand:NULL]; [super dealloc]; }
+- (void)doit:(id)sender
+{
+  (void) sender;
+  if (!cmd) return;
+  command c (cmd);
+  c (list_object (object (from_nsstring ([self titleOfSelectedItem]))));
+}
+@end
+
+static NSView*
+stack_of (array<widget> a, bool vertical) {
+  NSStackView* sv= [[[NSStackView alloc] init] autorelease];
+  [sv setOrientation: vertical? NSUserInterfaceLayoutOrientationVertical
+                              : NSUserInterfaceLayoutOrientationHorizontal];
+  [sv setAlignment: vertical? NSLayoutAttributeLeading
+                            : NSLayoutAttributeCenterY];
+  for (int i=0; i<N(a); i++) {
+    if (is_nil (a[i])) continue;
+    NSView* v= concrete (a[i])->as_nsview ();
+    if (v) [sv addArrangedSubview: v];
+  }
+  return sv;
+}
+
+static NSView*
+placeholder (string what) {
+  // FIXME: widgets which are not implemented yet
+  if (DEBUG_QT_WIDGETS)
+    debug_widgets << "ns_ui_element: no view for " << what << LF;
+  NSTextField* t= [NSTextField labelWithString: to_nsstring ("[" * what * "]")];
+  [t setTextColor: [NSColor disabledControlTextColor]];
+  return t;
+}
+
+/******************************************************************************
+ * ns_ui_element_rep
+ ******************************************************************************/
+
+ns_ui_element_rep::ns_ui_element_rep (types _type, blackbox _load)
+  : ns_widget_rep (_type), load (_load) {}
+
+ns_ui_element_rep::~ns_ui_element_rep () {}
+
+blackbox
+ns_ui_element_rep::get_payload (ns_widget nsw, types check_type) {
+  ASSERT (check_type == none || nsw->type == check_type,
+          c_string ("get_payload: widget " * nsw->type_as_string() *
+                    " was not of the expected type."));
+  switch (nsw->type) {
+    case horizontal_menu:   case vertical_menu:    case horizontal_list:
+    case vertical_list:     case tile_menu:        case aligned_widget:
+    case minibar_menu:      case menu_separator:   case menu_group:
+    case pulldown_button:   case pullright_button: case menu_button:
+    case text_widget:       case xpm_widget:       case toggle_widget:
+    case enum_widget:       case choice_widget:    case filtered_choice_widget:
+    case scrollable_widget: case hsplit_widget:    case vsplit_widget:
+    case tabs_widget:       case icon_tabs_widget: case resize_widget:
+    case refresh_widget:    case refreshable_widget: case balloon_widget:
+    case glue_widget:       case tree_view_widget:
+      return static_cast<ns_ui_element_rep*> (nsw.rep)->load;
+    default:
+      return blackbox ();
+  }
+}
+
+ns_ui_element_rep::operator blackbox () {
+  return load;
+}
+
+ns_ui_element_rep::operator tree () {
+  return tree (TUPLE, "ns_ui_element", type_as_string ());
+}
+
+/*! A vertical menu is shown as a native popup menu (see ns_menu_rep). */
+widget
+ns_ui_element_rep::make_popup_widget () {
+  if (type == vertical_menu)
+    return tm_new<ns_menu_rep> (as_menuitem ());
+  return ns_widget_rep::make_popup_widget ();
+}
+
+/******************************************************************************
+ * Menu items (menus and toolbars)
+ ******************************************************************************/
+
+static TMMenuItem*
+new_item (NSString* title) {
+  return [[[TMMenuItem alloc] initWithTitle: title action: NULL
+                              keyEquivalent: @""] autorelease];
+}
+
+static TMMenuItem*
+submenu_item (array<widget> a) {
+  TMMenuItem* mi= new_item (@"Menu");
+  NSMenu *menu= [[[NSMenu alloc] init] autorelease];
+  [menu setAutoenablesItems: NO];
+  for (int i=0; i<N(a); i++) {
+    if (is_nil (a[i])) break;
+    NSMenuItem* item= concrete (a[i])->as_menuitem ();
+    if (item) [menu addItem: item];
+  }
+  [mi setSubmenu: menu];
+  return mi;
+}
+
+TMMenuItem*
+ns_ui_element_rep::as_menuitem () {
+  switch (type) {
+    case horizontal_menu: case vertical_menu: case horizontal_list:
+    case vertical_list:   case minibar_menu:
+      return submenu_item (open_box<array<widget> > (load));
+
+    case tile_menu:
+    {
+      typedef pair<array<widget>, int> T;
+      T x= open_box<T> (load);
+      NSMutableArray *tiles= [NSMutableArray arrayWithCapacity: N(x.x1)];
+      for (int i=0; i<N(x.x1); i++) {
+        if (is_nil (x.x1[i])) break;
+        NSMenuItem* item= concrete (x.x1[i])->as_menuitem ();
+        if (item) [tiles addObject: item];
+      }
+      TMTileView* tv= [[[TMTileView alloc] initWithObjects: tiles
+                                                      cols: x.x2] autorelease];
+      TMMenuItem* mi= new_item (@"Tile");
+      [mi setView: tv];
+      return mi;
     }
 
+    case menu_separator:
+      return (TMMenuItem*) [NSMenuItem separatorItem];
+
+    case menu_group:
+    {
+      typedef pair<string, int> T;
+      T x= open_box<T> (load);
+      TMMenuItem* mi= new_item (to_label (x.x1));
+      NSMutableParagraphStyle *pstyle=
+        [[[NSParagraphStyle defaultParagraphStyle] mutableCopy] autorelease];
+      [pstyle setAlignment: NSTextAlignmentCenter];
+      NSDictionary* attrs= [NSDictionary dictionaryWithObjectsAndKeys:
+                            pstyle, NSParagraphStyleAttributeName, nil];
+      [mi setAttributedTitle: [[[NSAttributedString alloc]
+                                 initWithString: [mi title]
+                                     attributes: attrs] autorelease]];
+      [mi setEnabled: NO];
+      return mi;
+    }
+
+    case pulldown_button: case pullright_button:
+    {
+      typedef pair<widget, promise<widget> > T;
+      T x= open_box<T> (load);
+      TMMenuItem* mi= concrete (x.x1)->as_menuitem ();
+      if (!mi) mi= new_item (@"");
+      TMLazyMenu *lm= [[[TMLazyMenu alloc] init] autorelease];
+      [lm setAutoenablesItems: NO];
+      [lm setPromise: x.x2.rep];
+      [mi setSubmenu: lm];
+      return mi;
+    }
+
+    case menu_button:
+    {
+      typedef quintuple<widget, command, string, string, int> T;
+      T x= open_box<T> (load);
+      bool ok= (x.x5 & WIDGET_STYLE_INERT) == 0;
+      TMMenuItem* mi= concrete (x.x1)->as_menuitem ();
+      if (!mi) mi= new_item (@"");
+      [mi setCommand: x.x2.rep];
+      [mi setEnabled: (ok? YES: NO)];
+      // FIXME: keyboard shortcuts (x.x4) and the prefixes "*" and "o"
+      [mi setState: (x.x3 != ""? NSControlStateValueOn: NSControlStateValueOff)];
+      return mi;
+    }
+
+    case balloon_widget:
+    {
+      typedef pair<widget, widget> T;
+      T x= open_box<T> (load);
+      TMMenuItem* mi= concrete (x.x1)->as_menuitem ();
+      if (mi) [mi setToolTip: to_label (text_of (x.x2))];
+      return mi;
+    }
+
+    case text_widget:
+    {
+      typedef quartet<string, int, color, bool> T;
+      T x= open_box<T> (load);
+      return new_item (to_label (x.x1));
+    }
+
+    case xpm_widget:
+    {
+      url u= open_box<url> (load);
+      NSImage* img= to_nsimage (u);
+      TMMenuItem* mi= new_item (@"");
+      [mi setRepresentedObject: img];
+      [mi setImage: img];
+      return mi;
+    }
+
+    default:
+      // FIXME: widgets inside menus (toggles, enums, ...)
+      if (DEBUG_QT_WIDGETS)
+        debug_widgets << "ns_ui_element: no menu item for "
+                      << type_as_string () << LF;
+      return nil;
+  }
+}
+
+/******************************************************************************
+ * Views (dialogs and other windows)
+ ******************************************************************************/
+
+NSView*
+ns_ui_element_rep::as_nsview () {
+  switch (type) {
+    case horizontal_menu: case horizontal_list: case minibar_menu:
+      return stack_of (open_box<array<widget> > (load), false);
+
+    case vertical_menu: case vertical_list:
+      return stack_of (open_box<array<widget> > (load), true);
+
+    case aligned_widget:
+    {
+      typedef triple<array<widget>, array<widget>, coord4> T;
+      T x= open_box<T> (load);
+      NSGridView* g= [[[NSGridView alloc] init] autorelease];
+      for (int i=0; i < min (N(x.x1), N(x.x2)); i++) {
+        NSView* l= is_nil (x.x1[i])? nil: concrete (x.x1[i])->as_nsview ();
+        NSView* r= is_nil (x.x2[i])? nil: concrete (x.x2[i])->as_nsview ();
+        if (!l) l= [[[NSView alloc] init] autorelease];
+        if (!r) r= [[[NSView alloc] init] autorelease];
+        [g addRowWithViews: [NSArray arrayWithObjects: l, r, nil]];
+      }
+      return g;
+    }
+
+    case menu_separator:
+    {
+      NSBox* b= [[[NSBox alloc] init] autorelease];
+      [b setBoxType: NSBoxSeparator];
+      return b;
+    }
+
+    case menu_group:
+    {
+      typedef pair<string, int> T;
+      T x= open_box<T> (load);
+      NSTextField* t= [NSTextField labelWithString: to_label (x.x1)];
+      [t setTextColor: [NSColor secondaryLabelColor]];
+      return t;
+    }
+
+    case text_widget:
+    {
+      typedef quartet<string, int, color, bool> T;
+      T x= open_box<T> (load);
+      NSTextField* t= [NSTextField labelWithString: to_label (x.x1)];
+      if ((x.x2 & WIDGET_STYLE_INERT) != 0)
+        [t setTextColor: [NSColor disabledControlTextColor]];
+      return t;
+    }
+
+    case xpm_widget:
+      return [NSImageView imageViewWithImage: to_nsimage (open_box<url> (load))];
+
+    case menu_button:
+    {
+      typedef quintuple<widget, command, string, string, int> T;
+      T x= open_box<T> (load);
+      TMCommandButton* b= [[[TMCommandButton alloc] init] autorelease];
+      [b setBezelStyle: NSBezelStyleRounded];
+      ns_widget w= concrete (x.x1);
+      if (w->type == text_widget) {
+        typedef quartet<string, int, color, bool> T2;
+        [b setTitle: to_label (open_box<T2> (get_payload (w)).x1)];
+      }
+      else if (w->type == xpm_widget) {
+        [b setTitle: @""];
+        [b setImage: to_nsimage (open_box<url> (get_payload (w)))];
+      }
+      else [b setTitle: @""];
+      [b setCommand: x.x2.rep kind: 0];
+      [b setEnabled: (x.x5 & WIDGET_STYLE_INERT) == 0];
+      return b;
+    }
+
+    case toggle_widget:
+    {
+      typedef triple<command, bool, int> T;
+      T x= open_box<T> (load);
+      TMCommandButton* b= [[[TMCommandButton alloc] init] autorelease];
+      [b setButtonType: NSButtonTypeSwitch];
+      [b setTitle: @""];
+      [b setState: x.x2? NSControlStateValueOn: NSControlStateValueOff];
+      [b setCommand: x.x1.rep kind: 1];
+      [b setEnabled: (x.x3 & WIDGET_STYLE_INERT) == 0];
+      return b;
+    }
+
+    case enum_widget:
+    {
+      typedef quintuple<command, array<string>, string, int, string> T;
+      T x= open_box<T> (load);
+      TMCommandPopUp* p= [[[TMCommandPopUp alloc] init] autorelease];
+      for (int i=0; i<N(x.x2); i++)
+        if (x.x2[i] != "") [p addItemWithTitle: to_label (x.x2[i])];
+      [p selectItemWithTitle: to_label (x.x3)];
+      [p setCommand: x.x1.rep];
+      [p setEnabled: (x.x4 & WIDGET_STYLE_INERT) == 0];
+      return p;
+    }
+
+    case balloon_widget:
+    {
+      typedef pair<widget, widget> T;
+      T x= open_box<T> (load);
+      NSView* v= concrete (x.x1)->as_nsview ();
+      if (v) [v setToolTip: to_label (text_of (x.x2))];
+      return v;
+    }
+
+    case scrollable_widget:
+    {
+      typedef pair<widget, int> T;
+      T x= open_box<T> (load);
+      NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+      [sv setHasVerticalScroller: YES];
+      [sv setDocumentView: concrete (x.x1)->as_nsview ()];
+      return sv;
+    }
+
+    case resize_widget:
+    {
+      typedef triple<string, string, string> T1;
+      typedef quartet<widget, int, T1, T1> T;
+      T x= open_box<T> (load);
+      // FIXME: the sizes are not applied
+      return concrete (x.x1)->as_nsview ();
+    }
+
+    case glue_widget:
+    {
+      typedef quartet<bool, bool, SI, SI> T;
+      T x= open_box<T> (load);
+      NSView* v= [[[NSView alloc] init] autorelease];
+      [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+      if (!x.x1) [[v.widthAnchor constraintEqualToConstant: x.x3] setActive: YES];
+      if (!x.x2) [[v.heightAnchor constraintEqualToConstant: x.x4] setActive: YES];
+      return v;
+    }
+
+    case hsplit_widget: case vsplit_widget:
+    {
+      typedef pair<widget, widget> T;
+      T x= open_box<T> (load);
+      NSSplitView* sv= [[[NSSplitView alloc] init] autorelease];
+      [sv setVertical: type == hsplit_widget];
+      NSView* v1= concrete (x.x1)->as_nsview ();
+      NSView* v2= concrete (x.x2)->as_nsview ();
+      if (v1) [sv addArrangedSubview: v1];
+      if (v2) [sv addArrangedSubview: v2];
+      return sv;
+    }
+
+    default:
+      // FIXME: tabs, choices, refreshable widgets, tree views, ...
+      return placeholder (type_as_string ());
+  }
+}
+
+/******************************************************************************
+ * Glue widgets with a colored background (color menus)
+ ******************************************************************************/
 
 NSBitmapImageRep*
 ns_glue_widget_rep::render () {
-  NSSize s = to_nssize (w, h);
-  NSBitmapImageRep *im = [[NSBitmapImageRep alloc]
-                          initWithBitmapDataPlanes: NULL
-                          pixelsWide: s.width
-                          pixelsHigh: s.height
-                          bitsPerSample: 8
-                          samplesPerPixel: 4
-                          hasAlpha: YES
-                          isPlanar: NO
-                          colorSpaceName: NSDeviceRGBColorSpace
-                          bitmapFormat: NSBitmapFormatAlphaFirst
-                          bytesPerRow: 0
-                          bitsPerPixel: 0];
-  NSGraphicsContext* gc = [NSGraphicsContext graphicsContextWithBitmapImageRep: im];
-  if (gc) {
-    ns_renderer_rep* ren = the_ns_renderer();
-    ren->begin (gc);
-    rectangle r = rectangle (0, 0, s.width(), s.height());
-    ren->set_origin (0,0);
-    ren->encode (r->x1, r->y1);
-    ren->encode (r->x2, r->y2);
-    ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-    
-    if (col == "") {
-      // do nothing
-    } else {
-      if (is_atomic (col)) {
-        color c = named_color (col->label);
-        ren->set_background (c);
-        ren->set_pencil (c);
-        ren->fill (r->x1, r->y2, r->x2, r->y1);
-      } else {
-        ren->set_shrinking_factor (std_shrinkf);
-        brush old_b = ren->get_background ();
-        ren->set_background (col);
-        ren->clear_pattern (5*r->x1, 5*r->y2, 5*r->x2, 5*r->y1);
-        ren->set_background (old_b);
-        ren->set_shrinking_factor (1);
-      }
-    }
-    ren->end();
+  NSSize s= NSMakeSize (max (w / PIXEL, 1), max (h / PIXEL, 1));
+  NSBitmapImageRep *im=
+    [[[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
+                                             pixelsWide: s.width
+                                             pixelsHigh: s.height
+                                          bitsPerSample: 8
+                                        samplesPerPixel: 4
+                                               hasAlpha: YES
+                                               isPlanar: NO
+                                         colorSpaceName: NSDeviceRGBColorSpace
+                                            bytesPerRow: 0
+                                           bitsPerPixel: 0] autorelease];
+  NSGraphicsContext* gc=
+    [NSGraphicsContext graphicsContextWithBitmapImageRep: im];
+  if (gc && is_atomic (col) && col != "") {
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext setCurrentContext: gc];
+    [to_nscolor (named_color (col->label)) setFill];
+    NSRectFill (NSMakeRect (0, 0, s.width, s.height));
+    [NSGraphicsContext restoreGraphicsState];
   }
+  // FIXME: patterns (non atomic colors)
   return im;
 }
 
-QAction *
-ns_glue_widget_rep::as_qaction() {
-  QAction* a = new QTMAction();
-  a->setText (to_qstring (as_string (col)));
-  QIcon icon;
-#if 0
-  tree old_col = col;
-  icon.addPixmap (render(), QIcon::Active, QIcon::On);
-  col = "";
-  icon.addPixmap (render(), QIcon::Normal, QIcon::On);
-  col = old_col;
-#else
-  icon.addPixmap (render ());
-#endif
-  a->setIcon (icon);
-  a->setEnabled (false);
-  return a;
+TMMenuItem*
+ns_glue_widget_rep::as_menuitem () {
+  TMMenuItem* mi= [[[TMMenuItem alloc] initWithTitle: to_nsstring (as_string (col))
+                                              action: NULL
+                                       keyEquivalent: @""] autorelease];
+  NSBitmapImageRep* rep= render ();
+  NSImage* img= [[[NSImage alloc] initWithSize: [rep size]] autorelease];
+  [img addRepresentation: rep];
+  [mi setImage: img];
+  [mi setEnabled: NO];
+  return mi;
 }
 
 NSView*
 ns_glue_widget_rep::as_nsview () {
-  QLabel* qw = new QLabel();
-  qw->setText (to_qstring (as_string (col)));
-  qw->setPixmap (render ());
-  qw->setMinimumSize (to_qsize (w, h));
-  //  w->setEnabled(false);
-  qwid = qw;
-  return qwid;
+  NSBitmapImageRep* rep= render ();
+  NSImage* img= [[[NSImage alloc] initWithSize: [rep size]] autorelease];
+  [img addRepresentation: rep];
+  return [NSImageView imageViewWithImage: img];
 }
-

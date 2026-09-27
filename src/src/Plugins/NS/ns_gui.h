@@ -100,7 +100,7 @@ public:
   void clear_pending ();
   bool must_wait (time_t now) const;
   
-  friend class qt_gui_rep;
+  friend class ns_gui_rep;
 };
 
 
@@ -112,9 +112,11 @@ typedef class ns_gui_rep* ns_gui;
 extern ns_gui the_gui;
 
 class ns_gui_rep {
+public:
+  NSTimer*       updatetimer;    //!< runs update () (see start_update_timer)
+private:
   bool           interrupted;
   time_t      interrupt_time;
-  NSTimer*       updatetimer;
 //  QList<QLabel*> waitDialogs;
 //  QWidget*        waitWindow;
   widget          _popup_wid;

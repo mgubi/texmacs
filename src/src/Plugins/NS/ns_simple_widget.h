@@ -71,6 +71,7 @@ public:
   ////////////////////// NS semantics of abstract texmacs widgets
 
   virtual TMMenuItem *as_menuitem();
+  virtual NSView* as_nsview ();
 
   NSBitmapImageRep *impress ();
   

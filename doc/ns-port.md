@@ -16,53 +16,53 @@ make -k -j8
 `--enable-cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS` (it used to
 compile the old `Plugins/Cocoa`), together with `Plugins/MacOS`.
 
-## State (2026-09-27)
+## State (2026-09-27, evening)
 
-| | |
-|---|---|
-| Rest of TeXmacs | compiles (403 objects) |
-| `Plugins/NS/AutoLayout`, `TMView`, `TMButtonsController`, `ns_simple_widget`, `ns_utilities` | compile |
-| `ns_widget`, `ns_dialogues`, `ns_ui_element`, `ns_renderer`, `ns_gui`, `ns_menu`, `ns_picture` | 57 errors |
-| Linking, running | not reached |
+**TeXmacs compiles, links and starts with the NS interface:** the main window
+opens with its title, canvas and footer, the Cocoa event loop runs the
+TeXmacs update cycle, and no error occurs during startup. The document is not
+drawn yet (the canvas stays grey) and the toolbars are not visible.
 
-Commits so far:
-1. import of `Plugins/NS`, unchanged;
-2. `--enable-cocoa` builds `Plugins/NS`, the editor uses its simple widget;
-3. headers usable from C++, AutoLayout includes, and two generic fixes for
-   non-Qt builds (`unix_entrypoint.cpp` used Qt unconditionally; a brace of
-   `TeXmacs_main` was inside `#ifdef QTTEXMACS`).
+Snapshots for testing: with `TEXMACS_NS_SNAPSHOT=<dir>`, the windows are saved
+as `<dir>/window-<i>.png` every 3 seconds (other programs are not allowed to
+capture the windows).
 
-## Remaining compile errors, by cause
+### What was done
 
-**Interfaces changed since 2018** (mechanical; follow `Plugins/Qt`):
-* `check_type<T> (val, slot)` and `check_type_void (val, slot)` take the
-  slot, not a string: about 20 places in `ns_widget.mm` and `ns_dialogues.mm`.
-* `plain_window_widget (name, quit)` has a quit command; the preferred
-  position and size are now handled by the generic `plain_window_widget`
-  (`ns_widget.mm`).
-* Renderer: new pure virtual `clear_device`; `get_pattern_data`,
-  `decode` and `shrink` have new signatures; `image_gc` is gone
-  (`ns_renderer.mm`, `ns_gui.mm`).
-* `get_locale_language` was renamed or moved (`ns_gui.mm`).
-* `NSBitmapImageFileType` is an enum in the current SDK (`ns_picture.mm`).
+* **Widget layer** (the 2018 refactoring, completed on the model of Qt):
+  `ns_widget.mm` holds the factories and the base, window, popup and view
+  widgets; the main window moved to `ns_tm_widget.mm`; `ns_ui_element.mm`
+  builds menu items (menus and toolbars) and views (dialogs: labels, icons,
+  buttons, check boxes, popups, stacks, grids, glue, scroll and split views);
+  `ns_menu.mm` has the Objective-C menu classes and `ns_menu_rep` (popup
+  menus); `ns_dialogues.mm` implements the file chooser (NSOpenPanel,
+  NSSavePanel), questions and input dialogs (NSAlert), the text input and the
+  embedded editor.
+* **Event loop** (`ns_gui.mm`): queued keyboard, mouse, resize and command
+  events and the update cycle of `qt_gui.cpp`, with an NSTimer and
+  `[NSApp run]`.
+* **Renderer**: `clear_device`, shadows drawing in the context of their
+  master (as the Qt proxy renderers), the current `get_pattern_data`,
+  `decode`, `shrink`, pixel ratio; `load_picture`, `save_picture`.
+* **Simple widget**: its `TMView` is created on demand (`as_nsview`).
+* **Builds without Qt** (also useful for X11): stubs for the client/server
+  functions, `execute_shell` defined only once, and `AQUATEXMACS` treated as
+  Qt for delayed commands and native pictures.
 
-**Unfinished refactoring of 2018** (needs decisions):
-* `ns_other_widgets.h` now declares the widget classes, but
-  `ns_dialogues.mm` still defines `ns_chooser_widget_rep` and
-  `ns_field_widget_rep` itself, with other members.
-* `ns_ui_element.mm` (uncommitted work) was started from the Qt code: it
-  still uses `QAction` and a `ns_glue_widget_rep` which is not declared
-  where it is used.
-* `ns_widget.mm` defines `make_popup_widget` and `popup_window_widget`
-  twice, and `ns_view_widget_rep` does not match its declaration.
-* `ns_menu.mm` includes `ns_basic_widgets.h`, deleted in 715c2ffbdc.
-* `NOT_IMPLEMENTED` is used in `ns_dialogues.mm` before being defined.
+### Known gaps (FIXME in the code)
+
+* the canvas is not painted; toolbars not visible;
+* menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
+* views: tabs, choice lists, refreshable widgets, tree views, resize sizes;
+* color picker and printing; picture effects and patterns;
+* the interactive prompt is a dialog instead of the footer;
+* the side tools (left, right, bottom, extra) are ignored.
 
 ## After compiling
 
 In order:
-1. **Link and start:** a window with the canvas, rendering (with Retina
-   scaling), keyboard with input methods (`NSTextInputClient`), mouse.
+1. **Paint the canvas:** rendering (with Retina scaling), then keyboard
+   with input methods (`NSTextInputClient`) and mouse.
    At this point documents can be edited: this is the main milestone.
 2. The `FIXME`/`NOT_IMPLEMENTED` of 2018 (about 60): arcs, alpha, images,
    mouse grab, pointer and cursor, the wait indicator, the empty and ink

@@ -19,13 +19,37 @@
 #include "ns_utilities.h"
 #include "ns_renderer.h"
 #include "ns_gui.h"
+#import "TMView.h"
 
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
-: ns_widget_rep (simple_widget),  sequencer (0) { }
+: ns_widget_rep (simple_widget),  sequencer (0), view (nil),
+  backingPixmap (nil) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
   all_widgets->remove ((pointer) this);
+  if (view) {
+    [(TMView*) view setWidget: NULL];
+    [view release];
+  }
+}
+
+/*! The view of the canvas, created when it is needed for the first time
+ (see qt_simple_widget_rep::as_qwidget).
+ */
+NSView*
+ns_simple_widget_rep::as_nsview () {
+  if (view) return view;
+  SI width, height;
+  handle_get_size_hint (width, height);
+  NSSize sz = to_nssize (coord2 (width, height));
+  TMView* v= [[TMView alloc] initWithFrame: NSMakeRect (0, 0, sz.width, sz.height)];
+  [v setWidget: this];
+  view= v;
+  reapply_sent_slots ();
+  all_widgets->insert ((pointer) this);
+  backing_pos= [view frame].origin;
+  return view;
 }
 
 #if 0

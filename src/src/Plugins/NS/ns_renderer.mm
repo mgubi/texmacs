@@ -80,7 +80,7 @@ static hashmap<string,ns_image> images;
  ******************************************************************************/
 
 ns_renderer_rep::ns_renderer_rep (int w2, int h2) :
-  basic_renderer_rep (true, w2, h2), context (NULL)
+  basic_renderer_rep (true, 1.0, w2, h2), context (NULL)
 {
   reset_zoom_factor();
 }
@@ -179,9 +179,11 @@ double as_percentage (tree t);
 
 static NSImage*
 get_pattern_image (brush br, SI pixel) {
+  // FIXME: the effect eff of the pattern is not applied
   url u;
   SI w, h;
-  get_pattern_data (u, w, h, br, pixel);
+  tree eff;
+  get_pattern_data (u, w, h, eff, br, pixel);
   NSImage* pm= get_image (u, w, h);
   return pm;
 }
@@ -340,6 +342,22 @@ ns_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
 	NSRect rect = NSMakeRect (x1,y2,x2-x1,y1-y2);
   [context saveGraphicsState];
   [to_nscolor (bg_brush->get_color ()) setFill];
+  [NSBezierPath fillRect:rect];
+  [context restoreGraphicsState];
+}
+
+void
+ns_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
+  // The background of the device, outside the pages
+  // FIXME: the Qt interface uses the pattern neutral-pattern.png
+  x1= max (x1, cx1-ox); y1= max (y1, cy1-oy);
+  x2= min (x2, cx2-ox); y2= min (y2, cy2-oy);
+  decode (x1, y1);
+  decode (x2, y2);
+  if ((x1>=x2) || (y1<=y2)) return;
+  NSRect rect = NSMakeRect (x1,y2,x2-x1,y1-y2);
+  [context saveGraphicsState];
+  [[NSColor lightGrayColor] setFill];
   [NSBezierPath fillRect:rect];
   [context restoreGraphicsState];
 }
@@ -505,7 +523,7 @@ ns_renderer_rep::image (url u, SI w, SI h, SI x, SI y,
 void
 ns_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
   (void) w; (void) h;
-  int x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
+  SI x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
   decode (x , y );
   decode (x1, y1);
   decode (x2, y2);
@@ -517,7 +535,7 @@ ns_renderer_rep::draw_clipped (NSImage *im, int w, int h, SI x, SI y) {
 void
 ns_renderer_rep::draw_clipped (CGImageRef im, int w, int h, SI x, SI y) {
   (void) w; (void) h;
-  int x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
+  SI x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
   decode (x , y );
   decode (x1, y1);
   decode (x2, y2);
@@ -571,7 +589,7 @@ ns_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     if (get_reverse_colors ()) reverse (r, g, b);
 		SI xo, yo;
 		glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-		glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo);
+		glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
 		int i, j, w= gl->width, h= gl->height;
 		CGImageRef im = NULL;
 		{
@@ -812,3 +830,73 @@ the_ns_renderer () {
 }
 
 
+
+/******************************************************************************
+* Shadows
+******************************************************************************/
+
+// NOTE: as the proxy renderers of the Qt interface, the shadows draw directly
+// in the graphics context of their master, which is buffered by the simple
+// widget; the shadow borrows the context without retaining it
+
+void
+ns_renderer_rep::new_shadow (renderer& ren) {
+  SI mw, mh, sw, sh;
+  get_extents (mw, mh);
+  if (ren != NULL) {
+    ren->get_extents (sw, sh);
+    if (sw != mw || sh != mh) {
+      delete_shadow (ren);
+      ren= NULL;
+    }
+  }
+  if (ren == NULL) ren= (renderer) tm_new<ns_renderer_rep> (w, h);
+}
+
+void
+ns_renderer_rep::delete_shadow (renderer& ren) {
+  if (ren != NULL) {
+    static_cast<ns_renderer_rep*> (ren)->context= NULL;
+    tm_delete (ren);
+    ren= NULL;
+  }
+}
+
+void
+ns_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+  ASSERT (ren != NULL, "invalid renderer");
+  if (ren->is_printer ()) return;
+  ns_renderer_rep* shadow= static_cast<ns_renderer_rep*> (ren);
+  shadow->master = this;
+  shadow->context= context;
+  outer_round (x1, y1, x2, y2);
+  x1= max (x1, cx1- ox);
+  y1= max (y1, cy1- oy);
+  x2= min (x2, cx2- ox);
+  y2= min (y2, cy2- oy);
+  shadow->ox= ox;
+  shadow->oy= oy;
+  if (x1<x2 && y1<y2) shadow->set_clipping (x1, y1, x2, y2);
+}
+
+void
+ns_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
+  ASSERT (ren != NULL, "invalid renderer");
+  if (ren->is_printer ()) return;
+  // NOTE: nothing to copy, since the shadow draws in our own context
+  if (context == static_cast<ns_renderer_rep*> (ren)->context) return;
+  // FIXME: copy the region from shadows with their own context
+  (void) x1; (void) y1; (void) x2; (void) y2;
+}
+
+void
+ns_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2) {
+  if (master == NULL) return;
+  if (context == static_cast<ns_renderer_rep*> (master)->context) return;
+  outer_round (x1, y1, x2, y2);
+  decode (x1, y1);
+  decode (x2, y2);
+  static_cast<ns_renderer_rep*> (master)->encode (x1, y1);
+  static_cast<ns_renderer_rep*> (master)->encode (x2, y2);
+  master->put_shadow (this, x1, y1, x2, y2);
+}

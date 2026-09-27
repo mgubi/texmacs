@@ -1,729 +1,524 @@
-
 /******************************************************************************
 * MODULE     : ns_dialogues.mm
-* DESCRIPTION: Aqua dialogues widgets classes
-* COPYRIGHT  : (C) 2007  Massimiliano Gubinelli
+* DESCRIPTION: Dialogs (file chooser, questions, inputs) for the NS port
+* COPYRIGHT  : (C) 2009  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
 * It comes WITHOUT ANY WARRANTY WHATSOEVER. For details, see the file LICENSE
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "mac_cocoa.h" 
-
-#include "ns_dialogues.h"
-
-#include "gui.hpp" 
-#include "widget.hpp" 
-#include "message.hpp"
-#include "ns_utilities.h"
+#include "mac_cocoa.h"
 #include "ns_other_widgets.h"
+#include "ns_utilities.h"
+#include "ns_simple_widget.h"
+#include "ns_gui.h"
 
-#include "url.hpp"
 #include "analyze.hpp"
+#include "converter.hpp"
+#include "wencoding.hpp"
+#include "gui.hpp"
+#include "dictionary.hpp"
+#include "message.hpp"
+#include "scheme.hpp"
+#include "url.hpp"
 
-#define TYPE_CHECK(b) ASSERT (b, "type mismatch")
-
-#pragma mark ns_chooser_widget_rep
-
-class ns_chooser_widget_rep: public ns_widget_rep {
-protected:	
-  command cmd;
-  string type;
-  bool   save;
-  string win_title;
-  string directory;
-  coord2 position;
-  coord2 size;
-  string file;
-	
-public:
-  ns_chooser_widget_rep (command, string, bool);
-  ~ns_chooser_widget_rep ();
-	
-  virtual void send (slot s, blackbox val);
-  virtual blackbox query (slot s, int type_id);
-  virtual widget read (slot s, blackbox index);
-  virtual void write (slot s, blackbox index, widget w);
-  virtual void notify (slot s, blackbox new_val);
-  //  virtual void connect (slot s, widget w2, slot s2);
-  //  virtual void deconnect (slot s, widget w2, slot s2);
-  virtual widget plain_window_widget (string s);
-
-  void perform_dialog();
-};
-
-ns_chooser_widget_rep::ns_chooser_widget_rep (command _cmd, string _type, bool _save) 
-: ns_widget_rep(), cmd(_cmd), type(_type), 
-  save(_save), position (coord2 (0, 0)), 
-  size (coord2 (100, 100)), file ("")
-{
+static NSString*
+to_label (string s) {
+  if (looks_utf8 (s) && !(looks_ascii (s) || looks_universal (s)))
+    return to_nsstring (s);
+  return to_nsstring_utf8 (s);
 }
 
-ns_chooser_widget_rep::~ns_chooser_widget_rep()  {  }
+static string
+from_label (NSString* s) {
+  // Inputs are returned in the cork encoding, like in the Qt interface
+  return utf8_to_cork (from_nsstring (s));
+}
 
+/******************************************************************************
+* ns_chooser_widget_rep
+******************************************************************************/
 
+ns_chooser_widget_rep::ns_chooser_widget_rep (command _cmd, string _type,
+                                              string _prompt):
+  ns_widget_rep (file_chooser), cmd (_cmd), type (_type), prompt (_prompt),
+  position (coord2 (0, 0)), size (coord2 (100, 100)), file ("") {}
+
+bool
+ns_chooser_widget_rep::set_type (const string& _type) {
+  // FIXME: filters for the file types, as in qt_chooser_widget_rep
+  type= _type;
+  return true;
+}
 
 void
 ns_chooser_widget_rep::send (slot s, blackbox val) {
   switch (s) {
-  case SLOT_VISIBILITY:
-    {	
-      check_type<bool> (val, "SLOT_VISIBILITY");
-      bool flag = open_box<bool> (val);
-      (void) flag;
-      NOT_IMPLEMENTED
-	}	
-    break;
-  case SLOT_SIZE:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
-      size = open_box<coord2> (val);
-    }
-    break;
-  case SLOT_POSITION:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
-      position = open_box<coord2> (val);
-    }
-    break;
-  case SLOT_KEYBOARD_FOCUS:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<bool>::id);
-      perform_dialog();
-    }
-    break;
-    
-  case SLOT_STRING_INPUT:
-    //		send_string (THIS, "input", val);
-    NOT_IMPLEMENTED 
+    case SLOT_VISIBILITY:
+      check_type<bool> (val, s);
       break;
-  case SLOT_INPUT_TYPE:
-    TYPE_CHECK (type_box (val) == type_helper<string>::id);
-    type = open_box<string> (val);        
-    //	send_string (THIS, "type", val);
-    break;
-#if 0
-  case SLOT_INPUT_PROPOSAL:
-    //send_string (THIS, "default", val);
-    break;
-#endif
-  case SLOT_FILE:
-    //send_string (THIS, "file", val);
-    NOT_IMPLEMENTED
+    case SLOT_SIZE:
+      check_type<coord2> (val, s);
+      size= open_box<coord2> (val);
       break;
-  case SLOT_DIRECTORY:
-    TYPE_CHECK (type_box (val) == type_helper<string>::id);
-    directory = open_box<string> (val);
-    directory = as_string (url_pwd () * url_system (directory));
-    break;
-    
-  default:
-    ns_widget_rep::send(s,val);
+    case SLOT_POSITION:
+      check_type<coord2> (val, s);
+      position= open_box<coord2> (val);
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      check_type<bool> (val, s);
+      perform_dialog ();
+      break;
+    case SLOT_STRING_INPUT:
+      check_type<string> (val, s);
+      break;
+    case SLOT_INPUT_TYPE:
+      check_type<string> (val, s);
+      set_type (open_box<string> (val));
+      break;
+    case SLOT_FILE:
+      check_type<string> (val, s);
+      file= open_box<string> (val);
+      break;
+    case SLOT_DIRECTORY:
+      check_type<string> (val, s);
+      directory= open_box<string> (val);
+      directory= as_string (url_pwd () * url_system (directory));
+      break;
+    default:
+      ns_widget_rep::send (s, val);
   }
 }
-
 
 blackbox
 ns_chooser_widget_rep::query (slot s, int type_id) {
   switch (s) {
-  case SLOT_POSITION:  
-    {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
+    case SLOT_POSITION:
+      check_type_id<coord2> (type_id, s);
       return close_box<coord2> (position);
-    }
-  case SLOT_SIZE:
-    {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
+    case SLOT_SIZE:
+      check_type_id<coord2> (type_id, s);
       return close_box<coord2> (size);
-    }
-			
-  case SLOT_STRING_INPUT:
-    {
-      TYPE_CHECK (type_id == type_helper<string>::id);
+    case SLOT_STRING_INPUT:
+      check_type_id<string> (type_id, s);
       return close_box<string> (file);
-    }
-    
-  default:
-    return ns_widget_rep::query(s,type_id);
+    default:
+      return ns_widget_rep::query (s, type_id);
   }
-}
-
-
-void
-ns_chooser_widget_rep::notify (slot s, blackbox new_val) {
-  switch (s) {
-  default: ;
-  }
-  widget_rep::notify (s, new_val);
 }
 
 widget
 ns_chooser_widget_rep::read (slot s, blackbox index) {
   switch (s) {
-  case SLOT_WINDOW:
-    check_type_void (index, "SLOT_WINDOW");
-    return this;
-  case SLOT_FORM_FIELD:
-    check_type<int> (index, "SLOT_FORM_FIELD");
-    return this;
-  case SLOT_FILE:
-    check_type_void (index, "SLOT_FILE");
-    return this;
-  case SLOT_DIRECTORY:
-    check_type_void (index, "SLOT_DIRECTORY");
-    return this;
-  default:
-    return ns_widget_rep::read(s,index);
+    case SLOT_WINDOW:
+      check_type_void (index, s);
+      return this;
+    case SLOT_FORM_FIELD:
+      check_type<int> (index, s);
+      return this;
+    case SLOT_FILE: case SLOT_DIRECTORY:
+      check_type_void (index, s);
+      return this;
+    default:
+      return ns_widget_rep::read (s, index);
   }
 }
 
-void
-ns_chooser_widget_rep::write (slot s, blackbox index, widget w) {
-  switch (s) {
-  default:
-    ns_widget_rep::write(s,index,w);
-  }
-}
-
-
-widget ns_chooser_widget_rep::plain_window_widget (string s)
-{
-  win_title = s;
+widget
+ns_chooser_widget_rep::plain_window_widget (string s, command q) {
+  win_title= s;
+  quit= q;
   return this;
 }
 
-
-
-widget file_chooser_widget (command cmd, string type, bool save) 
-// file chooser widget for files of a given type; for files of type "image",
-// the widget includes a previsualizer and a default magnification
-// for importation can be specified
-{
-  return tm_new <ns_chooser_widget_rep> (cmd, type, save);
-}
-
-
-@interface TMSavePanel : NSSavePanel
-{
-}
-- (BOOL)_overwriteExistingFileCheck:(NSString *)filename;
-@end
-
-@implementation TMSavePanel
-- (BOOL)_overwriteExistingFileCheck:(NSString *)filename
-{
-  return YES;
-}
-@end
-
-#if 0
-void ns_chooser_widget_rep::perform_dialog()
-{
-  int result;
-  NSArray *fileTypes = [NSArray arrayWithObject:@"tm"];
-  NSOpenPanel *oPanel = [NSOpenPanel openPanel];
-  [oPanel setTitle:to_nsstring(win_title)];
-  [oPanel setAllowsMultipleSelection:YES];
-  result = [oPanel runModalForDirectory:NSHomeDirectory()
-		   file:nil types:fileTypes];
-  if (result == NSOKButton) {
-    NSArray *filesToOpen = [oPanel filenames];
-    int i, count = [filesToOpen count];
-    for (i=0; i<count; i++) {
-      NSString *aFile = [filesToOpen objectAtIndex:i];
-      //			id currentDoc = [[ToDoDoc alloc] initWithFile:aFile];
-    }
-    if (count > 0) {
-      file = from_nsstring([filesToOpen objectAtIndex:0]);
-      url u= url_system (scm_unquote (file));
-      file = "(system->url " * scm_quote (as_string (u)) * ")";
-      
-    }
+void
+ns_chooser_widget_rep::perform_dialog () {
+  // The result is queried by TeXmacs with SLOT_STRING_INPUT
+  bool save= (prompt != "");
+  NSSavePanel* panel;
+  if (save) panel= [NSSavePanel savePanel];
+  else {
+    NSOpenPanel* op= [NSOpenPanel openPanel];
+    [op setCanChooseDirectories: type == "directory"];
+    [op setCanChooseFiles: type != "directory"];
+    [op setAllowsMultipleSelection: NO];
+    panel= op;
   }
-  cmd();	
-}
-#else
-void ns_chooser_widget_rep::perform_dialog()
-{
-  int result;
-  NSArray *fileTypes = [NSArray arrayWithObject:@"tm"];
-  NSSavePanel *oPanel = [TMSavePanel savePanel];
-  [oPanel setTitle:to_nsstring(win_title)];
-  //  [oPanel setMessage:@"Choose a file."];
-  [oPanel setNameFieldLabel:@"File:"];
-  [oPanel setPrompt:@"Choose"];
-  [oPanel setAllowedFileTypes:fileTypes];
-  // [oPanel setAllowsMultipleSelection:YES];
-  NSPoint pos = to_nspoint(position);
-  NSRect r = NSMakeRect(0,0,0,0);
-  r.size = [oPanel frame].size;
-  NSOffsetRect(r, pos.x - r.size.width/2, pos.y - r.size.height/2);
-  [oPanel setFrameOrigin:r.origin];
-  
-  result = [oPanel runModalForDirectory:to_nsstring(directory)
-		   file:nil ];
-  if (result == NSOKButton) {
-    file = from_nsstring([oPanel filename]);
-    url u= url_system (scm_unquote (file));
-    if (type == "image")
-      file = "(list (system->url " * scm_quote (as_string (u)) *
-             ") \"\" \"\" \"\" \"\")";
-    //FIXME: fake image dimensions
-    else
-      file = "(system->url " * scm_quote (as_string (u)) * ")";
-  } else {
-    file = "#f";
+  if (win_title != "") [panel setMessage: to_label (win_title)];
+  if (save) {
+    string text= prompt;
+    if (ends (text, ":")) text= text (0, N(text) - 1);
+    if (ends (text, " as")) text= text (0, N(text) - 3);
+    [panel setPrompt: to_label (translate (text))];
   }
-  cmd ();	
+  if (directory != "")
+    [panel setDirectoryURL: [NSURL fileURLWithPath: to_nsstring (directory)]];
+  if (file != "" && save)
+    [panel setNameFieldStringValue: to_nsstring (as_string (tail (url_system (file))))];
+
+  file= "#f";
+  if ([panel runModal] == NSModalResponseOK) {
+    string name= from_nsstring ([[panel URL] path]);
+    file= "(system->url " * scm_quote (name) * ")";
+  }
+  cmd ();
+  if (!is_nil (quit)) quit ();
 }
 
-#endif
-#pragma mark ns_input_widget_rep
+/******************************************************************************
+* ns_field_widget_rep and ns_inputs_list_widget_rep
+******************************************************************************/
 
-class ns_field_widget;
-
-class ns_input_widget_rep: public ns_widget_rep {
-protected:	
-  command cmd;
-  array<ns_field_widget> fields;
-  coord2 size, position;
-  string win_title; 	
-public:
-  ns_input_widget_rep (command, array<string>);
-  ~ns_input_widget_rep ();
-	
-  virtual void send (slot s, blackbox val);
-  virtual blackbox query (slot s, int type_id);
-  virtual widget read (slot s, blackbox index);
-  virtual void write (slot s, blackbox index, widget w);
-  virtual void notify (slot s, blackbox new_val);
-  //  virtual void connect (slot s, widget w2, slot s2);
-  //  virtual void deconnect (slot s, widget w2, slot s2);
-  virtual widget plain_window_widget (string s);
-  
-  void perform_dialog();
-};
-
-class ns_field_widget_rep : public widget_rep {
-  string prompt;
-  string input;
-  string type;
-  array<string> proposals;
-  ns_input_widget_rep *parent;
- public:
- ns_field_widget_rep(ns_input_widget_rep *_parent) : widget_rep(), prompt(""), input(""),  proposals(), parent(_parent) {};
-  virtual void send (slot s, blackbox val);
-  virtual blackbox query (slot s, int type_id);
-  
-  friend class ns_input_widget_rep;
-};
-
+ns_field_widget_rep::ns_field_widget_rep (ns_inputs_list_widget_rep* _parent,
+                                          string _prompt):
+  ns_widget_rep (field_widget), prompt (_prompt), input (""), parent (_parent) {}
 
 void
 ns_field_widget_rep::send (slot s, blackbox val) {
   switch (s) {
-  case SLOT_STRING_INPUT:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
-      input =  open_box<string> (val);
-    }
-    //		send_string (THIS, "input", val);
-    break;
-  case SLOT_INPUT_TYPE:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
-      type =  open_box<string> (val);
-    }
-    break;
-  case SLOT_INPUT_PROPOSAL:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<string>::id);
-      proposals <<  open_box<string> (val);
-    }
-    //send_string (THIS, "default", val);
-    break;
-  case SLOT_KEYBOARD_FOCUS:
-    {
-      parent->send(s,val);
-    }
-    break;
-  default:
-    widget_rep::send(s,val);
+    case SLOT_STRING_INPUT:
+      check_type<string> (val, s);
+      input= scm_quote (open_box<string> (val));
+      break;
+    case SLOT_INPUT_TYPE:
+      check_type<string> (val, s);
+      type= open_box<string> (val);
+      break;
+    case SLOT_INPUT_PROPOSAL:
+      check_type<string> (val, s);
+      proposals << open_box<string> (val);
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      parent->send (s, val);
+      break;
+    default:
+      ns_widget_rep::send (s, val);
   }
 }
 
 blackbox
 ns_field_widget_rep::query (slot s, int type_id) {
   switch (s) {
-  case SLOT_STRING_INPUT:
-    {
-      TYPE_CHECK (type_id == type_helper<string>::id);
+    case SLOT_STRING_INPUT:
+      check_type_id<string> (type_id, s);
       return close_box<string> (input);
-    }
-    
-  default:
-    return widget_rep::query(s,type_id);
+    default:
+      return ns_widget_rep::query (s, type_id);
   }
 }
 
-
-class ns_field_widget {
-public:
-ABSTRACT_NULL(ns_field_widget);
-};
-ABSTRACT_NULL_CODE(ns_field_widget);
-
-
-
-ns_input_widget_rep::ns_input_widget_rep (command _cmd, array<string> _prompts) 
-: ns_widget_rep(), cmd(_cmd), fields(N(_prompts)), size(coord2(100,100)), position(coord2(0,0)), win_title("") 
+ns_inputs_list_widget_rep::ns_inputs_list_widget_rep (command _cmd,
+                                                      array<string> _prompts):
+  ns_widget_rep (input_widget), cmd (_cmd), size (coord2 (100, 100)),
+  position (coord2 (0, 0)), win_title (""), style (0)
 {
-  for(int i=0; i < N(_prompts); i++) {
-    fields[i] = tm_new <ns_field_widget_rep> (this);
-    fields[i]->prompt = _prompts[i];
-  }
-}
-
-ns_input_widget_rep::~ns_input_widget_rep()  {  }
-
-
-
-void
-ns_input_widget_rep::send (slot s, blackbox val) {
-  switch (s) {
-  case SLOT_VISIBILITY:
-    {	
-      check_type<bool> (val, "SLOT_VISIBILITY");
-      bool flag = open_box<bool> (val);
-      (void) flag;
-      NOT_IMPLEMENTED 
-	}	
-    break;
-  case SLOT_SIZE:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
-      size = open_box<coord2> (val);
-    }
-    break;
-  case SLOT_POSITION:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<coord2>::id);
-      position = open_box<coord2> (val);
-    }
-    break;
-  case SLOT_KEYBOARD_FOCUS:
-    {
-      TYPE_CHECK (type_box (val) == type_helper<bool>::id);
-      perform_dialog();
-    }
-    break;
-    
-    
-  default:
-    ns_widget_rep::send(s,val);
-  }
-}
-
-
-blackbox
-ns_input_widget_rep::query (slot s, int type_id) {
-  switch (s) {
-  case SLOT_POSITION:  
-    {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      return close_box<coord2> (position);
-    }
-  case SLOT_SIZE:
-    {
-      typedef pair<SI,SI> coord2;
-      TYPE_CHECK (type_id == type_helper<coord2>::id);
-      return close_box<coord2> (size);
-    }
-  case SLOT_STRING_INPUT:
-    return fields[0]->query(s,type_id);
-    
-    
-  default:
-    return ns_widget_rep::query(s,type_id);
-  }
-}
-
-
-void
-ns_input_widget_rep::notify (slot s, blackbox new_val) {
-  switch (s) {
-  default: ;
-  }
-  widget_rep::notify (s, new_val);
+  for (int i = 0; i < N(_prompts); i++)
+    add_child (tm_new<ns_field_widget_rep> (this, _prompts[i]));
 }
 
 widget
-ns_input_widget_rep::read (slot s, blackbox index) {
-  switch (s) {
-  case SLOT_WINDOW:
-    check_type_void (index, "SLOT_WINDOW");
-    return this;
-  case SLOT_FORM_FIELD:
-    check_type<int> (index, "SLOT_FORM_FIELD");
-    return (widget_rep*)(fields[open_box<int>(index)].rep);
-  default:
-    return ns_widget_rep::read(s,index);
-  }
-}
-
-void
-ns_input_widget_rep::write (slot s, blackbox index, widget w) {
-  switch (s) {
-  default:
-    ns_widget_rep::write(s,index,w);
-  }
-}
-
-
-widget ns_input_widget_rep::plain_window_widget (string s)
-{
-  win_title = s;
+ns_inputs_list_widget_rep::plain_window_widget (string s, command q) {
+  (void) q; // The widget already has a command (dialogue_command)
+  win_title= s;
   return this;
 }
 
-
-@interface TMInputHelper : NSObject
-{
-@public
-  IBOutlet NSMatrix *form;
-  IBOutlet NSWindow *dialog;
-  ns_tm_widget_rep *wid;
-}
-- (IBAction) doForm:(id)sender;
-@end
-
-@implementation TMInputHelper
-- (id) init
-{
-  self = [super init];
-  if (self != nil) {
-    NSRect panelRect = NSMakeRect(0, 0, 480, 360);
-    dialog = [[NSWindow alloc] initWithContentRect:panelRect
-                                        styleMask:NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask
-                                          backing:NSBackingStoreBuffered defer:YES];
-    form = [[[NSMatrix alloc] initWithFrame: NSMakeRect(20, 60, 440, 280) ] autorelease];
-    NSButton* cancelButton = [[[NSButton alloc] initWithFrame: NSMakeRect(274, 12, 96, 32) ] autorelease];
-    NSButton* okButton = [[[NSButton alloc] initWithFrame: NSMakeRect(370, 12, 96, 32) ] autorelease];
-    [cancelButton setTitle:@"Cancel"];
-    [okButton setTitle:@"Ok"];
-
-    [okButton setButtonType:   NSMomentaryPushInButton];
-    [cancelButton setButtonType:   NSMomentaryPushInButton];
-
-    [okButton setBezelStyle: NSRoundedBezelStyle];
-    [cancelButton setBezelStyle: NSRoundedBezelStyle];
-    
-    [cancelButton setTag: 1];
-    [okButton setTag: 0];
-    [okButton setTarget: self];
-    [okButton setAction: @selector(doForm:)];
-    [cancelButton setTarget: self];
-    [cancelButton setAction: @selector(doForm:)];
-
-    [okButton setKeyEquivalent:@"\r"];
-    [cancelButton setKeyEquivalent:@"\E"];
- 
-    [form   setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable];
-    [okButton setAutoresizingMask: NSViewMinXMargin | NSViewMaxYMargin];
-    [cancelButton setAutoresizingMask: NSViewMinXMargin | NSViewMaxYMargin];
-    
-    [[dialog contentView] addSubview: form];
-    [[dialog contentView] addSubview: cancelButton];
-    [[dialog contentView] addSubview: okButton];
-    
-    [dialog makeFirstResponder: form];
-    [form setNextKeyView: cancelButton];
-    [cancelButton setNextKeyView: okButton];
-    [okButton setNextKeyView: form];
-    
-    [form retain];   
-
-    [dialog setReleasedWhenClosed:NO];
-    wid = NULL;
-  }
-  return self;
-}
-- (void) dealloc
-{
-  [dialog release];
-  [form release];
-  [super dealloc];
-}
-
-- (IBAction) doForm:(id)sender
-{
-  if ([sender tag] == 0)
-  {
-    [NSApp stopModalWithCode:0]; // OK button
-  }
-  else
-  {
-    [NSApp stopModalWithCode:1]; // Cancel button
-  }
-}
-
-- (void) delayedRun
-{
-  int code = [NSApp runModalForWindow: dialog];
-  // Dialog is up here.
-  [NSApp endSheet: dialog];
-  [dialog orderOut: self];
-  
-  
-  if (code == 0) { // Ok button
-    NSString *ans = [(NSComboBoxCell*)[form cellAtRow:0 column:1] stringValue];
-    ((ns_input_text_widget_rep*)wid->int_input.rep)->text = scm_quote(from_nsstring(ans));
-    ((ns_input_text_widget_rep*)wid->int_input.rep)->cmd();
-  }
-  else  { // Cancel button
-  }
-  
-  
-  [self release]; // autodestroy
-}
-@end
-
-
-void ns_input_widget_rep::perform_dialog()
-{
-  TMInputHelper *ih = [[TMInputHelper alloc] init];
-  NSMatrix *form = ih->form;
-  [form renewRows:N(fields) columns:2];
-  for(int i=0; i<N(fields); i++) {
-    NSCell *cell = [[[NSCell alloc] initTextCell:to_nsstring(fields[i]->prompt)] autorelease];
-    [form putCell:cell atRow:i column:0];
-    NSComboBoxCell *cell2 = [[[NSComboBoxCell alloc] initTextCell:to_nsstring(fields[i]->input)] autorelease];
-    [cell2 setEditable:YES];
-    [cell2 setCompletes:YES];
-    [form putCell:cell2 atRow:i column:1];
-  //  [cell2 addItemWithObjectValue:to_nsstring(fields[i]->input)];
-    for(int j=0; j < N(fields[i]->proposals); j++)
-    {
-      [cell2 addItemWithObjectValue:to_nsstring(fields[i]->proposals[j])];
-    }
-  }
-  
-  NSRect rect0 = [form frame];
-  [form sizeToFit];
-  NSRect rect1 = [form frame];
-  [form setFrame:rect0];
-  NSRect frame = [ih->dialog frame];
-  frame.size.width += rect1.size.width - rect0.size.width;
-  frame.size.height += rect1.size.height - rect0.size.height;
-  [ih->dialog setFrame:frame display:NO];
-  
-  NSModalSession session = [NSApp beginModalSessionForWindow:ih->dialog];
-  NSInteger code;
-  for (;;) {
-    code = [NSApp runModalSession:session];
-    if (code != NSRunContinuesResponse)
+void
+ns_inputs_list_widget_rep::send (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_VISIBILITY:
+      check_type<bool> (val, s);
       break;
-    //   [self doSomeWork];
+    case SLOT_SIZE:
+      check_type<coord2> (val, s);
+      size= open_box<coord2> (val);
+      break;
+    case SLOT_POSITION:
+      check_type<coord2> (val, s);
+      position= open_box<coord2> (val);
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      check_type<bool> (val, s);
+      perform_dialog ();
+      break;
+    default:
+      ns_widget_rep::send (s, val);
   }
-  [NSApp endModalSession:session];
-  [ih->dialog close];
+}
 
-  if (code == 0) { // Ok button
-    
-    for(int i=0; i<N(fields); i++) {
-      NSString *ans = [(NSComboBoxCell*)[form cellAtRow:i column:1] stringValue];
-      fields[i]->input = scm_quote(from_nsstring(ans));
-    }
+blackbox
+ns_inputs_list_widget_rep::query (slot s, int type_id) {
+  switch (s) {
+    case SLOT_POSITION:
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (position);
+    case SLOT_SIZE:
+      check_type_id<coord2> (type_id, s);
+      return close_box<coord2> (size);
+    case SLOT_STRING_INPUT:
+      if (N(children) > 0) return field(0)->query (s, type_id);
+      return ns_widget_rep::query (s, type_id);
+    default:
+      return ns_widget_rep::query (s, type_id);
   }
-  else  { // Cancel button
-    for(int i=0; i<N(fields); i++) {
-      fields[i]->input = "#f";
-    }
-  }
- 
-  
-  [ih release];
-  cmd();
 }
-
-
-
-
-widget inputs_list_widget (command call_back, array<string> prompts)
-// a dialogue widget with Ok and Cancel buttons and a series of textual
-// input widgets with specified prompts
-{
-	return tm_new <ns_input_widget_rep> (call_back,prompts);
-
-}
-
-
-
-widget input_text_widget (command call_back, string type, array<string> def,
-                          int style, string width)
-// a textual input widget for input of a given type and a list of suggested
-// default inputs (the first one should be displayed, if there is one)
-{
-  (void) style; (void) width;
-  return tm_new <ns_input_text_widget_rep> (call_back, type, def);
-}
-
-
-void ns_tm_widget_rep::do_interactive_prompt()
-{
-  TMInputHelper *ih = [[TMInputHelper alloc] init];
-  ih->wid = this;
-  NSMatrix *form = ih->form;
-  [form renewRows:1 columns:2];
-  NSCell *cell = [[[NSCell alloc] initTextCell:to_nsstring(((ns_text_widget_rep*)int_prompt.rep)->str)] autorelease];
-  [form putCell:cell atRow:0 column:0];
-  NSComboBoxCell *cell2 = [[[NSComboBoxCell alloc] initTextCell:@""] autorelease];
-  [cell2 setEditable:YES];
-  [cell2 setCompletes:YES];
-  [form putCell:cell2 atRow:0 column:1];
-  [form setKeyCell:cell2];
-  ns_input_text_widget_rep *it = (ns_input_text_widget_rep*)int_input.rep;
-  for(int j=0; j < N(it->def); j++)
-  {
-    if (j==0) [cell2 setStringValue:to_nsstring(it->def[j])];
-    [cell2 addItemWithObjectValue:to_nsstring(it->def[j])];
-  }
-  
-  NSRect rect0 = [form frame];
-  [form sizeToFit];
-  NSRect rect1 = [form frame];
-  [form setFrame:rect0];
-  NSRect frame = [ih->dialog frame];
-  frame.size.width += rect1.size.width - rect0.size.width;
-  frame.size.height += rect1.size.height - rect0.size.height;
-  [ih->dialog setFrame:frame display:NO];
-  
-  [NSApp beginSheet: ih->dialog
-     modalForWindow: [view window]
-      modalDelegate: nil
-     didEndSelector: nil
-        contextInfo: nil];
-  [ih performSelector:@selector(delayedRun) withObject:nil afterDelay:0.0];
-}
-
-widget 
-printer_widget (command cmd, url u) {
-  (void) u;
-  return menu_button (text_widget ("Cancel", 0, black), cmd, "", "", 0);
-}
-
 
 widget
-color_picker_widget (command call_back, bool bg, array<tree> proposals) {
-  // widgets for selecting a color, a pattern or a background image,
-  // encoded by a tree. On input, we give a list of recently used proposals
-  // on termination the command is called with the selected color as argument
-  // the bg flag specifies whether we are picking a background color or fill
-  NOT_IMPLEMENTED;
-  (void) call_back; (void) bg; (void) proposals;
-  return glue_widget (false, false, 100*PIXEL, 100*PIXEL);
+ns_inputs_list_widget_rep::read (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_WINDOW:
+      check_type_void (val, s);
+      return this;
+    case SLOT_FORM_FIELD:
+    {
+      check_type<int> (val, s);
+      int index= open_box<int> (val);
+      if (N(children) > index)
+        return static_cast<widget_rep*> (children[index].rep);
+      return widget ();
+    }
+    default:
+      return ns_widget_rep::read (s, val);
+  }
+}
+
+ns_field_widget_rep*
+ns_inputs_list_widget_rep::field (int i) {
+  return static_cast<ns_field_widget_rep*> (children[i].rep);
+}
+
+void
+ns_inputs_list_widget_rep::perform_dialog () {
+  NSAlert* alert= [[[NSAlert alloc] init] autorelease];
+  if ((N(children) == 1) && (field(0)->type == "question")) {
+    // A question: one button per proposal, the first one being the default
+    ns_field_widget_rep* f= field(0);
+    [alert setMessageText: to_label (f->prompt)];
+    [alert setAlertStyle: NSAlertStyleInformational];
+    for (int i=0; i<N(f->proposals); i++)
+      [alert addButtonWithTitle: to_label (upcase_first (f->proposals[i]))];
+    [alert addButtonWithTitle: to_label (translate ("Cancel"))];
+    NSModalResponse r= [alert runModal];
+    int i= (int) (r - NSAlertFirstButtonReturn);
+    if (i >= 0 && i < N(f->proposals)) f->input= scm_quote (f->proposals[i]);
+    else f->input= "#f";
+  }
+  else {
+    // A list of fields, each with a prompt and a combo box
+    [alert setMessageText: to_label (win_title)];
+    NSGridView* grid= [[[NSGridView alloc] init] autorelease];
+    NSMutableArray* boxes= [NSMutableArray array];
+    for (int i=0; i<N(children); i++) {
+      ns_field_widget_rep* f= field(i);
+      NSTextField* label= [NSTextField labelWithString: to_label (f->prompt)];
+      NSComboBox* box= [[[NSComboBox alloc]
+                          initWithFrame: NSMakeRect (0, 0, 300, 24)] autorelease];
+      for (int j=0; j<N(f->proposals); j++)
+        [box addItemWithObjectValue: to_label (f->proposals[j])];
+      if (N(f->proposals) > 0) [box setStringValue: to_label (f->proposals[0])];
+      [grid addRowWithViews: [NSArray arrayWithObjects: label, box, nil]];
+      [boxes addObject: box];
+    }
+    [grid setFrameSize: [grid fittingSize]];
+    [alert setAccessoryView: grid];
+    [alert addButtonWithTitle: to_label (translate ("Ok"))];
+    [alert addButtonWithTitle: to_label (translate ("Cancel"))];
+    if (N(children) > 0)
+      [[alert window] setInitialFirstResponder: [boxes objectAtIndex: 0]];
+    bool ok= [alert runModal] == NSAlertFirstButtonReturn;
+    for (int i=0; i<N(children); i++)
+      field(i)->input= ok? scm_quote (from_label ([[boxes objectAtIndex: i]
+                                                    stringValue]))
+                         : string ("#f");
+  }
+  if (!is_nil (cmd)) cmd ();
+}
+
+/******************************************************************************
+* ns_input_text_widget_rep
+******************************************************************************/
+
+@interface TMInputTextHelper : NSObject <NSTextFieldDelegate>
+{
+  ns_input_text_widget_rep* wid;
+}
+- (id) initWithWidget: (ns_input_text_widget_rep*) w;
+- (void) commit: (id) sender;
+@end
+
+@implementation TMInputTextHelper
+- (id) initWithWidget: (ns_input_text_widget_rep*) w
+{
+  self= [super init];
+  if (self) wid= w;
+  return self;
+}
+- (void) commit: (id) sender
+{
+  (void) sender;
+  if (wid) wid->commit (true);
+}
+@end
+
+ns_input_text_widget_rep::ns_input_text_widget_rep (command _cmd, string _type,
+                                                    array<string> _proposals,
+                                                    int _style, string _width):
+  ns_widget_rep (input_widget), cmd (_cmd), type (_type),
+  proposals (_proposals), input (""), style (_style), width (_width),
+  ok (false), done (false), view (nil)
+{
+  if (type == "password") proposals= array<string> (0);
+  if (N(proposals) > 0) input= proposals[0];
+}
+
+NSView*
+ns_input_text_widget_rep::as_nsview () {
+  // FIXME: completion with the proposals and file names
+  NSTextField* f= (type == "password")
+    ? [[[NSSecureTextField alloc] init] autorelease]
+    : [[[NSTextField alloc] init] autorelease];
+  [f setStringValue: to_label (input)];
+  // NOTE: the helper lives as long as the text field
+  TMInputTextHelper* h= [[TMInputTextHelper alloc] initWithWidget: this];
+  [f setTarget: h];
+  [f setAction: @selector(commit:)];
+  view= f;
+  return f;
+}
+
+void
+ns_input_text_widget_rep::commit (bool flag) {
+  NSTextField* f= (NSTextField*) view;
+  if (flag) {
+    done = false;
+    ok   = true;
+    if (f) input= from_label ([f stringValue]);
+  }
+  else if (f) [f setStringValue: to_label (input)];
+  if (done) return;
+  done= true;
+  the_gui->process_command (cmd, ok? list_object (object (input))
+                                   : list_object (object (false)));
+}
+
+/******************************************************************************
+* ns_tm_embedded_widget_rep
+******************************************************************************/
+
+ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
+  ns_widget_rep (embedded_tm_widget), quit (_quit) {}
+
+void
+ns_tm_embedded_widget_rep::send (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_DESTROY:
+      if (!is_nil (quit)) quit ();
+      quit= command ();
+      break;
+    default:
+      if (!is_nil (main_widget)) main_widget->send (s, val);
+  }
+}
+
+blackbox
+ns_tm_embedded_widget_rep::query (slot s, int type_id) {
+  if (!is_nil (main_widget)) return main_widget->query (s, type_id);
+  return ns_widget_rep::query (s, type_id);
+}
+
+widget
+ns_tm_embedded_widget_rep::read (slot s, blackbox index) {
+  switch (s) {
+    case SLOT_WINDOW:
+      check_type_void (index, s);
+      return this;
+    case SLOT_SCROLLABLE:
+      check_type_void (index, s);
+      return main_widget;
+    default:
+      return ns_widget_rep::read (s, index);
+  }
+}
+
+void
+ns_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
+  switch (s) {
+    case SLOT_SCROLLABLE:
+      check_type_void (index, s);
+      main_widget= w;
+      break;
+    default:
+      ns_widget_rep::write (s, index, w);
+  }
+}
+
+NSView*
+ns_tm_embedded_widget_rep::as_nsview () {
+  if (is_nil (main_widget)) return nil;
+  return concrete (main_widget)->as_nsview ();
+}
+
+/******************************************************************************
+* Color picker and printer (not implemented yet)
+******************************************************************************/
+
+ns_color_picker_widget_rep::ns_color_picker_widget_rep (command cmd, bool bg,
+                                                        array<tree> proposals):
+  ns_widget_rep (none), _commandAfterExecution (cmd), _pickPattern (false)
+{ (void) bg; (void) proposals; }
+
+ns_color_picker_widget_rep::~ns_color_picker_widget_rep () {}
+
+widget
+ns_color_picker_widget_rep::plain_window_widget (string s, command q) {
+  (void) q;
+  _windowTitle= s;
+  return this;
+}
+
+void
+ns_color_picker_widget_rep::send (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_VISIBILITY:
+      check_type<bool> (val, s);
+      if (open_box<bool> (val)) showDialog ();
+      break;
+    default:
+      ns_widget_rep::send (s, val);
+  }
+}
+
+void
+ns_color_picker_widget_rep::showDialog () {
+  // FIXME: use NSColorPanel
+  NOT_IMPLEMENTED ("ns_color_picker_widget_rep::showDialog");
+}
+
+ns_printer_widget_rep::ns_printer_widget_rep (command cmd, url ps_pdf_file):
+  ns_widget_rep (none), commandAfterExecution (cmd)
+{ (void) ps_pdf_file; }
+
+widget
+ns_printer_widget_rep::plain_window_widget (string s, command q) {
+  (void) s; (void) q;
+  return this;
+}
+
+void
+ns_printer_widget_rep::send (slot s, blackbox val) {
+  switch (s) {
+    case SLOT_VISIBILITY:
+      check_type<bool> (val, s);
+      if (open_box<bool> (val)) showDialog ();
+      break;
+    default:
+      ns_widget_rep::send (s, val);
+  }
+}
+
+void
+ns_printer_widget_rep::showDialog () {
+  // FIXME: use NSPrintOperation on the PDF file
+  NOT_IMPLEMENTED ("ns_printer_widget_rep::showDialog");
 }

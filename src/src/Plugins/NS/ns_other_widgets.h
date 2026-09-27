@@ -33,7 +33,8 @@ public:
   TMWindowController *wc;
   
 public:
-  ns_window_widget_rep (ns_widget wid, string _name, command _quit, bool _fake);
+  ns_window_widget_rep (ns_widget wid, string _name, command _quit,
+                        bool _fake= false);
   ~ns_window_widget_rep ();
   
   virtual void send (slot s, blackbox val);
@@ -76,7 +77,10 @@ public:
   bool visibility[5]; 
 
 public:
-  ns_tm_widget_rep (int mask = 0);
+  command quit;
+  widget main_widget;  //!< the canvas (the editor)
+
+  ns_tm_widget_rep (int mask, command _quit);
   ~ns_tm_widget_rep ();
 	
 	virtual void send (slot s, blackbox val);
@@ -87,7 +91,7 @@ public:
 	
 	//  virtual void connect (slot s, widget w2, slot s2);
 	//  virtual void deconnect (slot s, widget w2, slot s2);
-	virtual widget plain_window_widget (string s);
+  virtual widget plain_window_widget (string s, command q);
 	
 	void layout();
   void updateVisibility();
@@ -116,8 +120,7 @@ public:
   virtual widget    read (slot s, blackbox index);
   virtual void     write (slot s, blackbox index, widget w);
   
-  //virtual QWidget*         as_qwidget ();
-  //virtual QLayoutItem* as_qlayoutitem ();
+  virtual NSView* as_nsview ();
 };
 
 
@@ -140,44 +143,15 @@ public:
   ns_input_text_widget_rep (command _cmd, string _type, array<string> _proposals,
                             int _style, string _width);
   
-  //virtual QAction*  as_qaction ();
-  //virtual QWidget*  as_qwidget ();
-  
-  void commit(bool ok);
+  NSView* view;
+
+  virtual NSView* as_nsview ();
+  void commit (bool ok);
+  string get_input () { return input; }
   };
 
 class ns_field_widget_rep;
 
-
-
-class ns_text_widget_rep : public ns_widget_rep {
-public:
-  string str;
-  color col;
-  bool tsp;
-  
-  ns_text_widget_rep(string _s, color _col, bool _tsp)
-  : str(_s), col(_col), tsp(_tsp) {};
-  
-  virtual TMMenuItem *as_menuitem();
-  
-};
-
-class ns_image_widget_rep : public ns_widget_rep {
-public:
-  url image;
-  
-  ns_image_widget_rep(url _image) : image(_image) {};
-  virtual TMMenuItem *as_menuitem();
-};
-
-class ns_balloon_widget_rep : public ns_widget_rep {
-public:
-  widget text, hint;
-  
-  ns_balloon_widget_rep(widget _text, widget _hint) : text(_text), hint(_hint) {};
-  virtual TMMenuItem *as_menuitem();
-};
 
 
 /*! A dialog with a list of inputs and ok and cancel buttons.

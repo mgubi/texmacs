@@ -14,6 +14,12 @@
 
 #include "widget.hpp"
 #include "message.hpp"
+#include "ntuple.hpp"
+
+typedef quartet<SI,SI,SI,SI> coord4;
+typedef pair<SI,SI> coord2;
+tm_ostream& operator << (tm_ostream& out, coord4 c);
+tm_ostream& operator << (tm_ostream& out, coord2 c);
 
 #ifndef MAC_COCOA_H
 // hack to allow inclusion in pure C++ sources
@@ -24,6 +30,12 @@ typedef struct TeXmacs_NSView {
 typedef struct TeXmacs_NSBitmapImageRep {
   void * isa;
 }  NSBitmapImageRep ;
+typedef struct TeXmacs_NSMenu {
+  void * isa;
+}  NSMenu ;
+typedef struct TeXmacs_NSMenuItem {
+  void * isa;
+}  NSMenuItem ;
 typedef CGPoint NSPoint;
 typedef void *TMMenuItem;
 #else
@@ -76,6 +88,7 @@ public:
   ////////////////////// NS semantics of abstract texmacs widgets
   
   virtual NSView*  as_nsview ();
+  virtual TMMenuItem* as_menuitem ();
   
   //virtual QAction*         as_qaction ();
   //virtual QWidget*         as_qwidget ();
@@ -179,7 +192,7 @@ public:
 	NSView *view;
 
 public:
-  ns_view_widget_rep (NSView *v);
+  ns_view_widget_rep (NSView *v, types _type= view_widget);
   ~ns_view_widget_rep ();
 
   virtual void send (slot s, blackbox val);
@@ -197,7 +210,9 @@ public:
 //  virtual void deconnect (slot s, widget w2, slot s2);
     // deconnect a state slot s from another slot s2 of another widget w2
 
-	virtual widget plain_window_widget (string s); 
+  virtual NSView* as_nsview () { return view; }
 };
+
+extern widget the_keyboard_focus;
 
 #endif // defined NS_WIDGET_H

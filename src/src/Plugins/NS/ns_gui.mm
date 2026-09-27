@@ -15,9 +15,11 @@
 #include "dictionary.hpp"
 #include "analyze.hpp"
 #include "language.hpp"
+#include "locale.hpp"
 #include "message.hpp"
 #include "scheme.hpp"
 #include "boot.hpp"
+#include "sys_utils.hpp"
 
 #include "ns_gui.h"
 #include "ns_utilities.h"
@@ -43,7 +45,8 @@ int timeout_time;
 
 
 ns_gui_rep::ns_gui_rep (int& argc, char** argv)
- : interrupted (false), popup_wid_time (0), time_credit (100),
+ : updatetimer (nil), interrupted (false), popup_wid_time (0),
+   time_credit (100),
    do_check_events (false), updating (false), needing_update (false),
    selection (NULL)
 {
@@ -56,10 +59,6 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
   set_output_language (get_locale_language ());
   refresh_language();
   
-  //updatetimer = new QTimer (gui_helper);
-  //updatetimer->setSingleShot (true);
-  //QObject::connect (updatetimer, SIGNAL (timeout()),
-  //                  gui_helper, SLOT (doUpdate()));
   
   if (!retina_manual) {
     retina_manual= true;
@@ -215,47 +214,7 @@ static bool check_mask(int mask)
   
 }
 
-#if 0
-bool
-ns_gui_rep::check_event (int type) {
-  switch (type) {
-    case INTERRUPT_EVENT:
-      if (interrupted) return true;
-      else  {
-        time_t now= texmacs_time ();
-        if (now - interrupt_time < 0) return false;
-        //        else interrupt_time= now + (100 / (XPending (dpy) + 1));
-        else interrupt_time= now + 100;
-        interrupted= check_mask (NSKeyDownMask |
-                                 // NSKeyUpMask |
-                                 NSLeftMouseDownMask |
-                                 NSLeftMouseUpMask |
-                                 NSRightMouseDownMask |
-                                 NSRightMouseUpMask );
-        return interrupted;
-      }
-    case INTERRUPTED_EVENT:
-      return interrupted;
-    case ANY_EVENT:
-      return check_mask (NSAnyEventMask);
-    case MOTION_EVENT:
-      return check_mask (NSMouseMovedMask);
-    case DRAG_EVENT:
-      return check_mask (NSLeftMouseDraggedMask|NSRightMouseDraggedMask);
-    case MENU_EVENT:
-      return check_mask (NSLeftMouseDownMask |
-                         NSLeftMouseUpMask |
-                         NSRightMouseDownMask |
-                         NSRightMouseUpMask );
-  }
-  return interrupted;
-}
-#else
-bool
-ns_gui_rep::check_event (int type) {
-  return false;
-}
-#endif
+
 
 void
 ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
@@ -267,139 +226,342 @@ void (*the_interpose_handler) (void) = NULL;
 
 void gui_interpose (void (*r) (void)) { the_interpose_handler= r; }
 
-void update()
-{
-	//NSBeep();
-	if (the_interpose_handler) the_interpose_handler();
-}
+/******************************************************************************
+* Queued processing (see qt_gui.cpp)
+******************************************************************************/
 
-void ns_gui_rep::update ()
-{
-//  NSLog(@"UPDATE----------------------------");
-  ::update();
-}
-
-
-@interface TMHelper : NSObject
-{
-}
+@interface TMUpdateHelper : NSObject
+- (void) doUpdate: (NSTimer*) timer;
 @end
-@implementation TMHelper
-- init
-{
-  if (self = [super init])
-  {
-		[NSApp setDelegate: self];
-  }
-  return self;
-}
 
-- (void)applicationWillUpdate:(NSNotification *)aNotification
+@implementation TMUpdateHelper
+- (void) doUpdate: (NSTimer*) timer
 {
-//	NSBeep();
-	update();
-}
-- (void)dealloc
-{
-	[NSApp setDelegate:nil];
-  [super dealloc];
+  (void) timer;
+  the_gui->update ();
 }
 @end
 
+static TMUpdateHelper* update_helper= nil;
 
-@interface TMInterposer : NSObject
-{  
-	NSNotification *n;
-}
-- (void)interposeNow;
--(void)waitIdle;
-@end
-
-@implementation TMInterposer
-- init
-{
-  if (self = [super init])
-  {
-	//	n = [[NSNotification notificationWithName:@"TMInterposeNotification" object:self] retain];
-   // [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interposeNow) name:@"TMInterposeNotification" object:nil];
-		 [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(interposeNow) name:NSApplicationWillUpdateNotification object:nil];
-	//	[self waitIdle];
-  }
-  return self;
-}
-- (void)dealloc
-{
-	//[n release];
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
-  [super dealloc];
+static void
+start_update_timer (time_t delay) {
+  // Run update () after delay milliseconds, when the other events are done
+  if (!update_helper) update_helper= [[TMUpdateHelper alloc] init];
+  NSTimer* t= [NSTimer timerWithTimeInterval: ((double) delay) / 1000.0
+                                      target: update_helper
+                                    selector: @selector(doUpdate:)
+                                    userInfo: nil
+                                     repeats: NO];
+  [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
+  [[NSRunLoop currentRunLoop] addTimer: t forMode: NSModalPanelRunLoopMode];
+  if (the_gui->updatetimer) [the_gui->updatetimer invalidate];
+  the_gui->updatetimer= t;
 }
 
-- (void)interposeNow
-{
-//	NSBeep();
-	update();
-	//[self performSelector:@selector(waitIdle) withObject:nil afterDelay:0.25 inModes:[NSArray arrayWithObjects:NSDefaultRunLoopMode, nil]];
-}
--(void)waitIdle
-{
-	[[NSNotificationQueue defaultQueue] enqueueNotification:n 
-																						 postingStyle:NSPostWhenIdle
-																						 coalesceMask:NSNotificationCoalescingOnName 
-																								 forModes:nil];
-}
-
-@end
-
-
-
-//@class FScriptMenuItem;
+static int keyboard_events = 0;
+static int keyboard_special= 0;
 
 void
-ns_gui_rep::event_loop ()
-#if 0
-{
-  //	TMInterposer* i = [[TMInterposer alloc ] init];
-  //[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
-  //	update();
-  [[[TMHelper alloc] init] autorelease];
-  [NSApp run];
-  //	[i release];
-}
-#else
-{
-  //	[[NSApp mainMenu] addItem:[[[FScriptMenuItem alloc] init] autorelease]];
-  [NSApp finishLaunching];
-  {
-    NSEvent *event = nil;
-    time_credit= 1000000;
-    
-    while (1) {
-      timeout_time= texmacs_time () + time_credit;
-      
-      NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-      NSDate *dateSlow = [NSDate dateWithTimeIntervalSinceNow:0.5];
-      event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate: dateSlow //[NSDate distantFuture]
-                                   inMode:NSDefaultRunLoopMode dequeue:YES];
-      while (event)
+ns_gui_rep::process_queued_events (int max) {
+  int count = 0;
+  while (max < 0 || count < max)  {
+    const queued_event& ev = waiting_events.next();
+    if (ev.x1 == qp_type::QP_NULL) break;
+    switch (ev.x1) {
+      case qp_type::QP_NULL :
+        break;
+      case qp_type::QP_KEYPRESS :
       {
-        [NSApp sendEvent:event];
-        //	update();
-        //NSDate *dateFast = [NSDate dateWithTimeIntervalSinceNow:0.001];
-        event= [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:[NSDate distantPast] // dateFast
-                                     inMode:NSDefaultRunLoopMode dequeue:YES];
+        typedef triple<widget, string, time_t > T;
+        T x = open_box <T> (ev.x2);
+        if (!is_nil (x.x1)) {
+          ((ns_simple_widget_rep*) x.x1.rep)->handle_keypress (x.x2, x.x3);
+          keyboard_events++;
+          if (N(x.x2) > 1) keyboard_special++;
+        }
       }
-      interrupted = false;
-      if (!event)  {
-        update();
-        time_credit= min (1000000, 2 * time_credit);
-        ns_update_flag= false;
+        break;
+      case qp_type::QP_KEYBOARD_FOCUS :
+      {
+        typedef triple<widget, bool, time_t > T;
+        T x = open_box <T> (ev.x2);
+        if (!is_nil (x.x1))
+          ((ns_simple_widget_rep*) x.x1.rep)->handle_keyboard_focus (x.x2, x.x3);
       }
-      [pool release];
+        break;
+      case qp_type::QP_MOUSE :
+      {
+        typedef quintuple<string, SI, SI, int, time_t > T1;
+        typedef pair<widget, T1> T;
+        T x = open_box <T> (ev.x2);
+        if (!is_nil (x.x1))
+          ((ns_simple_widget_rep*) x.x1.rep)->handle_mouse (x.x2.x1, x.x2.x2,
+                                                            x.x2.x3, x.x2.x4,
+                                                            x.x2.x5);
+      }
+        break;
+      case qp_type::QP_RESIZE :
+      {
+        typedef triple<widget, SI, SI > T;
+        T x = open_box <T> (ev.x2);
+        if (!is_nil (x.x1))
+          ((ns_simple_widget_rep*) x.x1.rep)->handle_notify_resize (x.x2, x.x3);
+      }
+        break;
+      case qp_type::QP_COMMAND :
+      {
+        command cmd = open_box <command> (ev.x2) ;
+        cmd->apply();
+      }
+        break;
+      case qp_type::QP_COMMAND_ARGS :
+      {
+        typedef pair<command, object> T;
+        T x = open_box <T> (ev.x2);
+        x.x1->apply (x.x2);
+      }
+        break;
+      case qp_type::QP_DELAYED_COMMANDS :
+        delayed_commands.exec_pending();
+        break;
+      default:
+        FAILED ("Unexpected queued event");
+    }
+    switch (ev.x1) {
+      case qp_type::QP_COMMAND:
+      case qp_type::QP_COMMAND_ARGS:
+      case qp_type::QP_RESIZE:
+      case qp_type::QP_DELAYED_COMMANDS:
+        break;
+      default:
+        count++;
+        break;
     }
   }
 }
-#endif
 
+void
+ns_gui_rep::process_keypress (ns_simple_widget_rep *wid, string key, time_t t) {
+  typedef triple<widget, string, time_t > T;
+  add_event (queued_event (qp_type::QP_KEYPRESS,
+                           close_box<T> (T (wid, key, t))));
+}
+
+void
+ns_gui_rep::process_keyboard_focus (ns_simple_widget_rep *wid, bool has_focus,
+                                    time_t t) {
+  typedef triple<widget, bool, time_t > T;
+  add_event (queued_event (qp_type::QP_KEYBOARD_FOCUS,
+                           close_box<T> (T (wid, has_focus, t))));
+}
+
+void
+ns_gui_rep::process_mouse (ns_simple_widget_rep *wid, string kind, SI x, SI y,
+                           int mods, time_t t) {
+  typedef quintuple<string, SI, SI, int, time_t > T1;
+  typedef pair<widget, T1> T;
+  add_event (queued_event (qp_type::QP_MOUSE,
+                           close_box<T> (T (wid, T1 (kind, x, y, mods, t)))));
+}
+
+void
+ns_gui_rep::process_resize (ns_simple_widget_rep *wid, SI x, SI y) {
+  typedef triple<widget, SI, SI > T;
+  add_event (queued_event (qp_type::QP_RESIZE, close_box<T> (T (wid, x, y))));
+}
+
+void
+ns_gui_rep::process_command (command _cmd) {
+  add_event (queued_event (qp_type::QP_COMMAND, close_box<command> (_cmd)));
+}
+
+void
+ns_gui_rep::process_command (command _cmd, object _args) {
+  typedef pair<command, object > T;
+  add_event (queued_event (qp_type::QP_COMMAND_ARGS,
+                           close_box<T> (T (_cmd,_args))));
+}
+
+void
+ns_gui_rep::process_delayed_commands () {
+  add_event (queued_event (qp_type::QP_DELAYED_COMMANDS, blackbox()));
+}
+
+bool
+ns_gui_rep::check_event (int type) {
+  // do not interrupt if not updating (e.g. while painting the icons in menus)
+  if (!updating || !do_check_events) return false;
+  switch (type) {
+    case INTERRUPT_EVENT:
+      if (interrupted) return true;
+      else {
+        time_t now = texmacs_time ();
+        if (now - timeout_time < 0) return false;
+        timeout_time = now + time_credit;
+        interrupted  = !waiting_events.is_empty();
+        return interrupted;
+      }
+    case INTERRUPTED_EVENT:
+      return interrupted;
+    default:
+      return false;
+  }
+}
+
+void
+ns_gui_rep::set_check_events (bool enable_check) {
+  do_check_events = enable_check;
+}
+
+void
+ns_gui_rep::add_event (const queued_event& ev) {
+  waiting_events.append (ev);
+  if (updating) needing_update = true;
+  else need_update();
+}
+
+void
+ns_gui_rep::update () {
+  time_t std_delay= 90 / 6;
+  if (updating) {
+    cout << "NESTED UPDATING: This should not happen" << LF;
+    need_update();
+    return;
+  }
+  if (updatetimer) { [updatetimer invalidate]; updatetimer= nil; }
+  updating = true;
+
+  static int count_events    = 0;
+  static int max_proc_events = 40;
+
+  time_t     now = texmacs_time();
+  needing_update = false;
+  time_credit    = 9 / (waiting_events.size() + 1);
+
+  if (popup_wid_time > 0 && now > popup_wid_time) {
+    popup_wid_time = 0;
+    _popup_wid->send (SLOT_VISIBILITY, close_box<bool> (true));
+  }
+
+  // Delayed commands
+  if (delayed_commands.must_wait (now))
+    process_delayed_commands();
+
+  // Pending events, until the limit is reached
+  while (waiting_events.size() > 0 && count_events < max_proc_events) {
+    process_queued_events (1);
+    count_events++;
+  }
+
+  // Repaint invalid regions and redraw
+  bool postpone_treatment= (keyboard_events > 0 && keyboard_special == 0);
+  keyboard_events = 0;
+  keyboard_special= 0;
+  count_events    = 0;
+
+  interrupted  = false;
+  timeout_time = texmacs_time() + time_credit;
+
+  if (!postpone_treatment) {
+    if (the_interpose_handler) the_interpose_handler();
+    ns_simple_widget_rep::repaint_all ();
+  }
+
+  if (waiting_events.size() > 0) needing_update = true;
+  if (interrupted)               needing_update = true;
+  if (nr_windows == 0) {
+    [NSApp stop: nil];
+    // NOTE: stop only takes effect after an event
+    [NSApp postEvent: [NSEvent otherEventWithType: NSEventTypeApplicationDefined
+                                         location: NSZeroPoint
+                                    modifierFlags: 0
+                                        timestamp: 0
+                                     windowNumber: 0
+                                          context: nil
+                                          subtype: 0
+                                            data1: 0
+                                            data2: 0]
+             atStart: YES];
+  }
+
+  time_t delay = delayed_commands.lapse - texmacs_time();
+  if (needing_update) delay = 0;
+  else                delay = max ((time_t) 0, min (std_delay, delay));
+  if (postpone_treatment) delay= 9; // NOTE: force occasional display
+
+  start_update_timer (delay);
+  updating = false;
+}
+
+void
+ns_gui_rep::force_update () {
+  if (updating) needing_update = true;
+  else          update();
+}
+
+void
+ns_gui_rep::need_update () {
+  if (updating) needing_update = true;
+  else          start_update_timer (0);
+}
+
+void
+ns_gui_rep::refresh_language () {
+  // FIXME: update the texts of the menus
+}
+
+/******************************************************************************
+* Snapshots of the windows (for testing)
+******************************************************************************/
+
+// NOTE: when the environment variable TEXMACS_NS_SNAPSHOT is a directory,
+// the windows are saved as dir/window-<i>.png every few seconds, since other
+// programs are not allowed to capture the windows of TeXmacs
+
+static void
+ns_snapshot (string dir) {
+  int n= 0;
+  for (NSWindow* win in [NSApp windows]) {
+    if (![win isVisible]) continue;
+    NSView* v= [[win contentView] superview];
+    if (!v) v= [win contentView];
+    NSRect r= [v bounds];
+    NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: r];
+    if (!rep) continue;
+    [v cacheDisplayInRect: r toBitmapImageRep: rep];
+    NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
+                                    properties: [NSDictionary dictionary]];
+    string name= dir * "/window-" * as_string (n++) * ".png";
+    [data writeToFile: to_nsstring (name) atomically: NO];
+  }
+}
+
+@interface TMSnapshotHelper : NSObject
+- (void) snapshot: (NSTimer*) timer;
+@end
+
+@implementation TMSnapshotHelper
+- (void) snapshot: (NSTimer*) timer
+{
+  (void) timer;
+  string dir= get_env ("TEXMACS_NS_SNAPSHOT");
+  if (dir != "") ns_snapshot (dir);
+}
+@end
+
+void
+ns_gui_rep::event_loop () {
+  [NSApp finishLaunching];
+  need_update ();
+  if (get_env ("TEXMACS_NS_SNAPSHOT") != "") {
+    TMSnapshotHelper* h= [[TMSnapshotHelper alloc] init];
+    [NSTimer scheduledTimerWithTimeInterval: 3.0 target: h
+                                   selector: @selector(snapshot:)
+                                   userInfo: nil repeats: YES];
+  }
+  [NSApp run];
+}
 
 /* interface ******************************************************************/
 #pragma mark GUI interface
@@ -538,7 +700,7 @@ beep () {
 
 void 
 needs_update () {
-  ns_update_flag= true;
+  the_gui->need_update ();
 }
 
 bool check_event (int type)
@@ -548,8 +710,8 @@ bool check_event (int type)
 
 void image_gc (string name) {
   // Garbage collect images of a given name (may use wildcards)
-  // This routine only needs to be implemented if you use your own image cache
-  the_ns_renderer()->image_gc(name); 
+  // NOTE: not used by TeXmacs any more (nor implemented by Qt)
+  (void) name;
 }
 
 void
@@ -704,3 +866,8 @@ event_queue::size() const {
 
 
 
+
+string
+gui_version () {
+  return "ns";
+}
