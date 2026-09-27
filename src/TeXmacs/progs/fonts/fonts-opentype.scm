@@ -211,6 +211,9 @@
          (string-starts? math text)
          (string-append (locase-all (string-drop text 9)) "-font"))))
 
+;; The menus below are built in loops, so their entries say which one is
+;; checked with (check ...): the check mark a command declares is applied
+;; to the arguments as written in the menu, (cadr p), not to their values
 (define (test-opentype-font? math)
   (with pack (tex-gyre-package math)
     (if pack
@@ -221,26 +224,39 @@
 
 (tm-define (init-opentype-font math)
   (:synopsis "Set the text and mathematics of the document in @math")
-  (:check-mark "*" test-opentype-font?)
   (init-font (opentype-font-value math) math)
   (with fam (opentype-font-family math)
     (when (!= fam "rm") (init-env "font-family" fam))))
 
 (tm-menu (opentype-math-font-menu)
   (for (p (opentype-math-font-list))
-    ((eval (car p)) (init-env "math-font" (cadr p)))))
+    ((check (eval (car p)) "*" (== (get-init "math-font") (cadr p)))
+     (init-env "math-font" (cadr p)))))
 
-(tm-menu (opentype-font-group-menu group)
-  (for (p (opentype-math-font-group-list group))
-    ((eval (car p)) (init-opentype-font (cadr p)))))
+;; A submenu is expanded when it is opened, after the menu which holds it,
+;; and a menu with arguments has lost them by then ("widget expected"):
+;; hence one menu without arguments for each section
+(tm-menu (opentype-serif-font-menu)
+  (for (p (opentype-math-font-group-list "Serif"))
+    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
+     (init-opentype-font (cadr p)))))
+
+(tm-menu (opentype-sans-font-menu)
+  (for (p (opentype-math-font-group-list "Sans serif"))
+    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
+     (init-opentype-font (cadr p)))))
+
+(tm-menu (opentype-other-font-menu)
+  (for (p (opentype-math-font-group-list "Other"))
+    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
+     (init-opentype-font (cadr p)))))
 
 (tm-menu (opentype-font-menu)
   (assuming (nnull? (opentype-math-font-group-list "Serif"))
     (group "Serif text and mathematics")
-    (dynamic (opentype-font-group-menu "Serif")))
+    (link opentype-serif-font-menu))
   (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
     (group "Sans serif text and mathematics")
-    (dynamic (opentype-font-group-menu "Sans serif")))
+    (link opentype-sans-font-menu))
   (assuming (nnull? (opentype-math-font-group-list "Other"))
-    (-> "Other OpenType math fonts"
-        (dynamic (opentype-font-group-menu "Other")))))
+    (-> "Other OpenType math fonts" (link opentype-other-font-menu))))
