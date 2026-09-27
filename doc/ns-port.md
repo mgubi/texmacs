@@ -32,10 +32,13 @@ screens), and the footer shows the messages of TeXmacs. Dialogs made with
 menus, buttons, refreshable parts, and embedded TeXmacs editors), and so do
 the side and bottom tools (for instance the document metadata and the search
 bar). The clipboard works with the other applications (text and HTML) and
-between TeXmacs processes (in the format of TeXmacs).
+between TeXmacs processes (in the format of TeXmacs). As in the Qt
+interface, the canvas and its backing store have the size of the visible
+part of the document, so that long documents can be edited.
 
 Testing aids (other programs are not allowed to capture or control the
-windows):
+windows). NOTE: with them, TeXmacs becomes the active application, so that
+keys typed meanwhile go to TeXmacs.
 * with `TEXMACS_NS_SNAPSHOT` or `TEXMACS_NS_TYPE`, TeXmacs activates itself
   and its window becomes the key window (otherwise, started in the
   background, the editor does not keep the focus);
@@ -83,9 +86,7 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 
 * the rows of icons are shown or hidden together; the side tools have the
   width wanted by their contents (no splitter to resize them);
-* the backing store has the size of the whole document (the Qt interface
-  uses a canvas of the size of the visible part, which scales to long
-  documents);
+
 * menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
 * views: icons of the icon tabs, filter of the filtered choices, tree
   views, maximal and default sizes of the resize widgets;

@@ -388,7 +388,7 @@ mouse_decode (unsigned int mstate) {
 - (void) mouseDown: (NSEvent *)event
 {
   if (wid) {
-    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+    NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
     unsigned int mstate = mouse_state (event, false);
     string s = "press-" * mouse_decode (mstate);
@@ -399,7 +399,7 @@ mouse_decode (unsigned int mstate) {
 - (void) mouseUp: (NSEvent *)event
 {
   if (wid) {
-    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+    NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
     unsigned int mstate = mouse_state (event, false);
     string s = "release-" * mouse_decode (mstate);
@@ -410,7 +410,7 @@ mouse_decode (unsigned int mstate) {
 - (void) mouseDragged: (NSEvent *)event
 {
   if (wid) {
-    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+    NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
     unsigned int mstate = mouse_state (event, false);
     string s = "move";
@@ -428,7 +428,7 @@ mouse_decode (unsigned int mstate) {
 - (void) mouseMoved: (NSEvent *)event
 {
   if (wid) {
-    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+    NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
     coord2 pt = from_nspoint (point);
     unsigned int mstate = mouse_state (event, false);
     string s = "move";
@@ -576,7 +576,7 @@ plain_string (id s) {
   // The cursor on the screen, for the windows of the input methods
   (void) range; (void) actualRange;
   NSPoint p= wid? wid->cursor_pos: NSZeroPoint;
-  NSRect r= [self convertRect: NSMakeRect (p.x, p.y, 1, 16) toView: nil];
+  NSRect r= [[self superview] convertRect: NSMakeRect (p.x, p.y, 1, 16) toView: nil];
   return [self window]? [[self window] convertRectToScreen: r]: r;
 }
 

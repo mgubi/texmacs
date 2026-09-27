@@ -235,6 +235,15 @@ void ns_tm_widget_rep::layout()
 }
 
 
+static NSView*
+canvas_of (NSView* v) {
+  // The canvas (TMView) in the document view of a simple widget
+  if ([v isKindOfClass: [TMView class]]) return v;
+  for (NSView* sub in [v subviews])
+    if ([sub isKindOfClass: [TMView class]]) return sub;
+  return v;
+}
+
 static int
 visibility_index (slot s) {
   // The index in ns_tm_widget_rep::visibility (see the constructor)
@@ -274,7 +283,7 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       // menus and tools are updated
       check_type<string> (val, s);
       if (open_box<string> (val) == "canvas" && !is_nil (main_widget)) {
-        NSView* v= concrete (main_widget)->as_nsview ();
+        NSView* v= canvas_of (concrete (main_widget)->as_nsview ());
         if (v && [v window]) [[v window] makeFirstResponder: v];
         the_gui->process_keyboard_focus
           ((ns_simple_widget_rep*) main_widget.rep, true, texmacs_time ());
@@ -544,7 +553,7 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
       main_widget = w;
       NSView *v = concrete (w)->as_nsview ();
       [sv setDocumentView: v];
-      [[sv window] makeFirstResponder:v];
+      [[sv window] makeFirstResponder: canvas_of (v)];
     }
     break;
   case SLOT_MAIN_MENU:

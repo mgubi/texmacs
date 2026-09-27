@@ -22,8 +22,19 @@
 #import "TMView.h"
 
 
+/*! A view of the size of the document, in which the canvas (TMView) covers
+ the visible part only, as the canvas of the Qt interface: its backing store
+ has the size of the visible part, which scales to long documents. */
+@interface TMDocView : NSView
+@end
+
+@implementation TMDocView
+- (BOOL) isFlipped { return YES; }
+- (BOOL) isOpaque { return YES; }
+@end
+
 ns_simple_widget_rep::ns_simple_widget_rep ()
-: ns_widget_rep (simple_widget),  sequencer (0), view (nil),
+: ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
   backingPixmap (nil) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
@@ -32,6 +43,16 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [(TMView*) view setWidget: NULL];
     [view release];
   }
+  if (doc) [doc release];
+}
+
+void
+ns_simple_widget_rep::follow_visible_part () {
+  // The canvas covers the visible part of the document view
+  if (!view || !doc) return;
+  NSRect r= [doc visibleRect];
+  if (NSIsEmptyRect (r)) r= [doc bounds];
+  if (!NSEqualRects (r, [view frame])) [view setFrame: r];
 }
 
 /*! The view of the canvas, created when it is needed for the first time
@@ -39,17 +60,19 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
  */
 NSView*
 ns_simple_widget_rep::as_nsview () {
-  if (view) return view;
+  if (doc) return doc;
   SI width, height;
   handle_get_size_hint (width, height);
   NSSize sz = to_nssize (coord2 (width, height));
+  doc= [[TMDocView alloc] initWithFrame: NSMakeRect (0, 0, sz.width, sz.height)];
   TMView* v= [[TMView alloc] initWithFrame: NSMakeRect (0, 0, sz.width, sz.height)];
   [v setWidget: this];
+  [doc addSubview: v];
   view= v;
   reapply_sent_slots ();
   all_widgets->insert ((pointer) this);
   backing_pos= [view frame].origin;
-  return view;
+  return doc;
 }
 
 #if 0
@@ -205,13 +228,14 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       coord4 p = open_box<coord4> (val);
       NSRect rect = to_nsrect (p);
       // NOTE: the canvas fills at least the visible part of the scroll view
-      NSScrollView* sv= [view enclosingScrollView];
+      NSScrollView* sv= [doc enclosingScrollView];
       if (sv) {
         NSSize ws= [sv contentSize];
         rect.size.width = max (rect.size.width , ws.width );
         rect.size.height= max (rect.size.height, ws.height);
       }
-      [view setFrameSize: rect.size];
+      [doc setFrameSize: rect.size];
+      follow_visible_part ();
     }
       break;
       
@@ -219,7 +243,8 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2 sz = open_box<coord2> (val);
-      [view setFrameSize: to_nssize (sz)]; // FIXME?
+      [doc setFrameSize: to_nssize (sz)]; // FIXME?
+      follow_visible_part ();
     }
       break;
       
@@ -229,10 +254,11 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       coord2  p = open_box<coord2> (val);
       // NOTE: p is the center of the visible part (see qt_simple_widget_rep)
       NSPoint pt = to_nspoint(p);
-      NSSize sz = [view visibleRect].size;
+      NSSize sz = [doc visibleRect].size;
       pt.y -= sz.height/2;
       pt.x -= sz.width/2;
-      [view scrollPoint: pt];
+      [doc scrollPoint: pt];
+      follow_visible_part ();
     }
       break;
       
@@ -313,9 +339,9 @@ ns_simple_widget_rep::query (slot s, int type_id) {
       check_type_id<coord2> (type_id, s);
       // The position of the canvas in its window, from the top left corner
       // of the window (see qt_simple_widget_rep)
-      if (!view || ![view window]) return close_box<coord2> (coord2 (0, 0));
-      NSRect r= [view convertRect: [view visibleRect] toView: nil];
-      NSRect f= [[view window] frame];
+      if (!doc || ![doc window]) return close_box<coord2> (coord2 (0, 0));
+      NSRect r= [doc convertRect: [doc visibleRect] toView: nil];
+      NSRect f= [[doc window] frame];
       NSPoint pt= NSMakePoint (r.origin.x, f.size.height - NSMaxY (r));
       return close_box<coord2> (from_nspoint (pt));
     }
@@ -323,7 +349,7 @@ ns_simple_widget_rep::query (slot s, int type_id) {
     case SLOT_SIZE:
     {
       check_type_id<coord2> (type_id, s);
-      NSRect rect = [view frame];
+      NSRect rect = [doc frame];
       return close_box<coord2> (from_nssize (rect.size));
     }
       
@@ -331,22 +357,22 @@ ns_simple_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<coord2> (type_id, s);
       // The origin of the visible part (see qt_simple_widget_rep)
-      NSRect rect = [view visibleRect];
+      NSRect rect = [doc visibleRect];
       return close_box<coord2> (from_nspoint (rect.origin));
     }
       
     case SLOT_EXTENTS:
     {
       check_type_id<coord4> (type_id, s);
-      NSRect rect = [view frame];
+      NSRect rect = [doc frame];
       return close_box<coord4> (from_nsrect (rect));
     }
       
     case SLOT_VISIBLE_PART:
     {
       check_type_id<coord4> (type_id, s);
-      if (view) {
-        NSRect rect= [view visibleRect];
+      if (doc) {
+        NSRect rect= [doc visibleRect];
         coord4 c= from_nsrect (rect);
         return close_box<coord4> (c);
        // QSize sz = canvas()->surface()->size();
@@ -444,10 +470,11 @@ ns_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
 
 void
 ns_simple_widget_rep::invalidate_all () {
-  SI w, h;
-  get_size (this, w, h);
+  // NOTE: the backing store has the size of the visible part
+  NSSize sz= view? [view frame].size: NSZeroSize;
   invalid_regions = rectangles();
-  invalidate_rect (0, 0, w, h);
+  invalidate_rect (0, 0, (int) ceil (sz.width * retina_factor),
+                   (int) ceil (sz.height * retina_factor));
   //QSize sz = canvas()->surface()->size();
   //cout << "invalidate all " << LF;
   //invalidate_rect (0, 0, retina_factor * sz.width(),
@@ -486,6 +513,7 @@ inline float mmax (float a, float b) { return (a>b? a: b); }
 void
 ns_simple_widget_rep::repaint_invalid_regions () {
   
+  follow_visible_part ();
   NSPoint origin = [view frame].origin;
   NSSize sz = [backingPixmap size];
   
