@@ -134,7 +134,8 @@ process_all_pipes () {
 ******************************************************************************/
 
 #ifndef OS_MINGW
-void
+// NOTE: the same as in cmdline_link.cpp, which is compiled with it without Qt
+static void
 execute_shell (string s) {
   c_string _s (s);
   char *argv[4];

@@ -228,6 +228,18 @@ unset_server () {}
 int
 server_port_in_use () { return 0; }
 
+bool
+server_can_start () { return false; }
+
+void
+server_define_error_codes () {}
+
+string
+server_client_address (int fd) {
+  (void) fd;
+  return "";
+}
+
 /******************************************************************************
 * Server side
 ******************************************************************************/
