@@ -154,16 +154,34 @@
                (lambda (a b) (string<=? (locase-all (car a))
                                         (locase-all (car b)))))))
 
-(tm-menu (text-font-kind-menu kind)
-  (for (p (text-font-list kind))
-    ((eval (car p)) (init-font (cadr p)))))
+;; A submenu is expanded when it is opened, and a menu with arguments has
+;; lost them by then ("widget expected"): one menu per kind
+(tm-menu (text-font-serif-menu)
+  (for (p (text-font-list 'serif))
+    ((check (eval (car p)) "*" (test-init-font? (cadr p)))
+     (init-font (cadr p)))))
+
+(tm-menu (text-font-sans-menu)
+  (for (p (text-font-list 'sans))
+    ((check (eval (car p)) "*" (test-init-font? (cadr p)))
+     (init-font (cadr p)))))
+
+(tm-menu (text-font-mono-menu)
+  (for (p (text-font-list 'mono))
+    ((check (eval (car p)) "*" (test-init-font? (cadr p)))
+     (init-font (cadr p)))))
+
+(tm-menu (text-font-other-menu)
+  (for (p (text-font-list 'other))
+    ((check (eval (car p)) "*" (test-init-font? (cadr p)))
+     (init-font (cadr p)))))
 
 (tm-menu (document-short-text-font-menu)
   (assuming (nnull? (text-font-list 'serif))
-    (-> "Serif" (dynamic (text-font-kind-menu 'serif))))
+    (-> "Serif" (link text-font-serif-menu)))
   (assuming (nnull? (text-font-list 'sans))
-    (-> "Sans serif" (dynamic (text-font-kind-menu 'sans))))
+    (-> "Sans serif" (link text-font-sans-menu)))
   (assuming (nnull? (text-font-list 'mono))
-    (-> "Typewriter" (dynamic (text-font-kind-menu 'mono))))
+    (-> "Typewriter" (link text-font-mono-menu)))
   (assuming (nnull? (text-font-list 'other))
-    (-> "Decorative" (dynamic (text-font-kind-menu 'other)))))
+    (-> "Decorative" (link text-font-other-menu))))
