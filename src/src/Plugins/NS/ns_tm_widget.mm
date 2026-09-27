@@ -35,6 +35,13 @@ NSString *TMButtonsIdentifier = @"TMButtonsIdentifier";
 @end
 NSColor* to_nscolor (color col);
 
+@interface TMFlippedToolView : NSView
+@end
+
+@implementation TMFlippedToolView
+- (BOOL) isFlipped { return YES; }
+@end
+
 /*! The handle between the canvas and the side tools, which resizes them as
  the splitters of the docks of the Qt interface. */
 @interface TMSplitHandle : NSView
@@ -245,9 +252,19 @@ ns_tm_widget_rep::~ns_tm_widget_rep()
 
 static NSSize
 tool_size (NSView* v) {
-  // The size wanted by the contents of a tool container
+  // The size wanted by the contents of a tool container (the side tools are
+  // in a scroll view, as in the Qt interface)
   if ([[v subviews] count] == 0) return NSZeroSize;
-  NSSize fs= [[[v subviews] firstObject] fittingSize];
+  NSView* c= [[v subviews] firstObject];
+  if ([c isKindOfClass: [NSScrollView class]]) {
+    NSView* doc= [(NSScrollView*) c documentView];
+    if ([[doc subviews] count] == 0) return NSZeroSize;
+    NSSize fs= [[[doc subviews] firstObject] fittingSize];
+    return NSMakeSize (fs.width + 8 + [NSScroller scrollerWidthForControlSize:
+                         NSControlSizeRegular scrollerStyle: [NSScroller preferredScrollerStyle]],
+                       fs.height + 8);
+  }
+  NSSize fs= [c fittingSize];
   return NSMakeSize (fs.width + 8, fs.height + 8);
 }
 
@@ -668,12 +685,43 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
       for (NSView* old in [[[tool_views[i] subviews] copy] autorelease])
         [old removeFromSuperview];
       NSView* v= is_nil (w)? nil: concrete (w)->as_nsview ();
-      if (v) {
+      if (v && i < 2) {
+        // the side tools can be scrolled (as the QScrollArea of Qt)
+        NSScrollView* sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
+        [sc setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
+        [sc setHasVerticalScroller: YES];
+        [sc setAutohidesScrollers: YES];
+        [sc setDrawsBackground: NO];
+        NSView* doc= [[[TMFlippedToolView alloc] init] autorelease];
+        [doc setTranslatesAutoresizingMaskIntoConstraints: NO];
+        [sc setDocumentView: doc];
+        NSClipView* clip= [sc contentView];
+        [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+        [doc addSubview: v];
+        NSLayoutConstraint* tr= [v.trailingAnchor constraintEqualToAnchor:
+                                   doc.trailingAnchor constant: -4];
+        [tr setPriority: NSLayoutPriorityDefaultHigh];
+        [NSLayoutConstraint activateConstraints: @[
+          [v.leadingAnchor constraintEqualToAnchor: doc.leadingAnchor constant: 4],
+          tr,
+          [v.topAnchor constraintEqualToAnchor: doc.topAnchor constant: 4],
+          [v.bottomAnchor constraintLessThanOrEqualToAnchor: doc.bottomAnchor constant: -4],
+          [doc.leadingAnchor constraintEqualToAnchor: clip.leadingAnchor],
+          [doc.widthAnchor constraintEqualToAnchor: clip.widthAnchor],
+          [doc.topAnchor constraintEqualToAnchor: clip.topAnchor],
+          [doc.heightAnchor constraintGreaterThanOrEqualToAnchor: clip.heightAnchor]]];
+        [tool_views[i] addSubview: sc];
+      }
+      else if (v) {
         [v setTranslatesAutoresizingMaskIntoConstraints: NO];
         [tool_views[i] addSubview: v];
+        // NOTE: the trailing edge gives way while the tools are hidden
+        NSLayoutConstraint* tr= [v.trailingAnchor constraintEqualToAnchor:
+                                   tool_views[i].trailingAnchor constant: -4];
+        [tr setPriority: NSLayoutPriorityDefaultHigh];
         [NSLayoutConstraint activateConstraints: @[
           [v.leadingAnchor constraintEqualToAnchor: tool_views[i].leadingAnchor constant: 4],
-          [v.trailingAnchor constraintEqualToAnchor: tool_views[i].trailingAnchor constant: -4],
+          tr,
           [v.topAnchor constraintEqualToAnchor: tool_views[i].topAnchor constant: 4]]];
       }
       layout ();

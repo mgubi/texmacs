@@ -736,7 +736,25 @@ ns_snapshot (string dir) {
     bool move = N(xy) > 2 && xy[2] == "move";
     NSPoint p= NSMakePoint (as_double (xy[0]), as_double (xy[1]));
     p= [v convertPoint: p toView: nil];
-    if (move) {
+    if (N(xy) > 4 && xy[2] == "drag") {
+      // x,y,drag,x2,y2: press at x,y, drag to x2,y2 and release
+      NSPoint q= NSMakePoint (as_double (xy[3]), as_double (xy[4]));
+      q= [v convertPoint: q toView: nil];
+      for (int k=0; k<=11; k++) {
+        NSEventType tp= (k == 0? NSEventTypeLeftMouseDown:
+                         k == 11? NSEventTypeLeftMouseUp: NSEventTypeLeftMouseDragged);
+        double f= k <= 1? 0.0: (k - 1) / 9.0;
+        if (f > 1.0) f= 1.0;
+        NSPoint r= NSMakePoint (p.x + f * (q.x - p.x), p.y + f * (q.y - p.y));
+        NSEvent* e= [NSEvent mouseEventWithType: tp location: r modifierFlags: 0
+                                      timestamp: [[NSProcessInfo processInfo] systemUptime]
+                                   windowNumber: [win windowNumber]
+                                        context: nil eventNumber: 0
+                                     clickCount: 1 pressure: tp == NSEventTypeLeftMouseUp? 0.0: 1.0];
+        [NSApp postEvent: e atStart: NO];
+      }
+    }
+    else if (move) {
       // x,y,move: the mouse moves there
       NSEvent* e= [NSEvent mouseEventWithType: NSEventTypeMouseMoved
                                      location: p modifierFlags: 0
@@ -968,6 +986,20 @@ ns_press (NSView* v, NSString* label) {
   return false;
 }
 
+static void
+ns_dump_view (NSView* v, int depth) {
+  NSRect f= [v frame];
+  NSString* extra= @"";
+  if ([v isKindOfClass: [NSTextField class]])
+    extra= [(NSTextField*) v stringValue];
+  fprintf (stderr, "VIEW %*s%s %.0f,%.0f %.0fx%.0f %s%s\n", 2*depth, "",
+           [NSStringFromClass ([v class]) UTF8String],
+           f.origin.x, f.origin.y, f.size.width, f.size.height,
+           [v isHidden]? "hidden ": "", [extra UTF8String]);
+  if (depth > 14) return;
+  for (NSView* w in [v subviews]) ns_dump_view (w, depth + 1);
+}
+
 @interface TMPressHelper : NSObject
 - (void) press: (NSTimer*) timer;
 @end
@@ -978,6 +1010,14 @@ ns_press (NSView* v, NSString* label) {
   (void) timer;
   NSString* label= to_nsstring (get_env ("TEXMACS_NS_PRESS"));
   bool done= false;
+  if ([label isEqualToString: @"dump-views"]) {
+    // the views of the windows, with their frames and constraints on size
+    for (NSWindow* win in [NSApp orderedWindows]) {
+      fprintf (stderr, "WINDOW %s\n", [[win title] UTF8String]);
+      ns_dump_view ([win contentView], 1);
+    }
+    return;
+  }
   if ([label isEqualToString: @"abort-modal"]) {
     // the modal window (for instance a file panel) is closed
     NSWindow* w= [NSApp modalWindow];

@@ -87,6 +87,8 @@ public:
   NSBitmapImageRep*       backingPixmap;
   NSPoint                 cursor_pos;  //!< for the input methods
   void follow_visible_part ();  //!< the canvas follows the scrolling
+  NSRect viewport ();           //!< the visible part, as in Qt
+  coord4 extents;               //!< the extents of the document
 
 protected:
   

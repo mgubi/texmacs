@@ -118,13 +118,37 @@ stack_of (array<widget> a, bool vertical) {
                               : NSUserInterfaceLayoutOrientationHorizontal];
   [sv setAlignment: vertical? NSLayoutAttributeLeading
                             : NSLayoutAttributeCenterY];
+  // NOTE: as in the layouts of Qt, the views without a natural size (lists,
+  // scroll views, containers) take the extra space
+  [sv setDistribution: NSStackViewDistributionFill];
   for (int i=0; i<N(a); i++) {
     if (is_nil (a[i])) continue;
     NSView* v= concrete (a[i])->as_nsview ();
-    if (v) [sv addArrangedSubview: v];
+    if (!v) continue;
+    [sv addArrangedSubview: v];
+    NSSize is= [v intrinsicContentSize];
+    bool stretch= [v isKindOfClass: [NSScrollView class]] ||
+      (vertical? is.width == NSViewNoIntrinsicMetric
+               : is.height == NSViewNoIntrinsicMetric);
+    if (!stretch || [v isKindOfClass: [NSStackView class]]) continue;
+    NSLayoutConstraint* c= vertical
+      ? [v.widthAnchor constraintEqualToAnchor: sv.widthAnchor]
+      : [v.heightAnchor constraintEqualToAnchor: sv.heightAnchor];
+    [c setPriority: NSLayoutPriorityDefaultHigh - 10];
+    [c setActive: YES];
+    [v setContentHuggingPriority: NSLayoutPriorityDefaultLow - 1
+                  forOrientation: vertical? NSLayoutConstraintOrientationVertical
+                                          : NSLayoutConstraintOrientationHorizontal];
   }
   return sv;
 }
+
+@interface TMFlippedDocView : NSView
+@end
+
+@implementation TMFlippedDocView
+- (BOOL) isFlipped { return YES; }
+@end
 
 static NSView*
 placeholder (string what) {
@@ -908,9 +932,36 @@ ns_ui_element_rep::as_nsview () {
     {
       typedef pair<widget, int> T;
       T x= open_box<T> (load);
+      // NOTE: the lists are already scrollable; the other contents follow
+      // the width of the scroll view (as QScrollArea::setWidgetResizable)
+      NSView* v= concrete (x.x1)->as_nsview ();
+      NSView* inner= v;
+      while ([inner isKindOfClass: [NSStackView class]] &&
+             [[(NSStackView*) inner arrangedSubviews] count] == 1)
+        inner= [[(NSStackView*) inner arrangedSubviews] firstObject];
+      if (!v || [inner isKindOfClass: [NSScrollView class]]) return v;
       NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
       [sv setHasVerticalScroller: YES];
-      [sv setDocumentView: concrete (x.x1)->as_nsview ()];
+      [sv setDrawsBackground: NO];
+      NSView* doc= [[[TMFlippedDocView alloc] init] autorelease];
+      [doc setTranslatesAutoresizingMaskIntoConstraints: NO];
+      [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+      [doc addSubview: v];
+      [sv setDocumentView: doc];
+      NSClipView* clip= [sv contentView];
+      [NSLayoutConstraint activateConstraints: @[
+        [v.leadingAnchor constraintEqualToAnchor: doc.leadingAnchor],
+        [v.trailingAnchor constraintEqualToAnchor: doc.trailingAnchor],
+        [v.topAnchor constraintEqualToAnchor: doc.topAnchor],
+        [v.bottomAnchor constraintEqualToAnchor: doc.bottomAnchor],
+        [doc.leadingAnchor constraintEqualToAnchor: clip.leadingAnchor],
+        [doc.trailingAnchor constraintEqualToAnchor: clip.trailingAnchor],
+        [doc.topAnchor constraintEqualToAnchor: clip.topAnchor]]];
+      // the contents fill at least the height of the scroll view
+      NSLayoutConstraint* fill= [doc.heightAnchor constraintEqualToAnchor: clip.heightAnchor];
+      [fill setPriority: NSLayoutPriorityDefaultLow];
+      [fill setActive: YES];
+      [[doc.heightAnchor constraintGreaterThanOrEqualToAnchor: clip.heightAnchor] setActive: YES];
       return sv;
     }
 

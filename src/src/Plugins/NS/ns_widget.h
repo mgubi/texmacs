@@ -41,6 +41,7 @@ typedef struct TeXmacs_NSMenuItem {
   void * isa;
 }  NSMenuItem ;
 typedef CGPoint NSPoint;
+typedef CGRect NSRect;
 typedef void *TMMenuItem;
 #else
 @class TMMenuItem;

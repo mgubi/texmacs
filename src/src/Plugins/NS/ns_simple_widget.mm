@@ -78,7 +78,7 @@
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
-  backingPixmap (nil) { }
+  backingPixmap (nil), extents (coord4 (0, 0, 0, 0)) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
   all_widgets->remove ((pointer) this);
@@ -90,6 +90,22 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     ((TMDocView*) doc)->wid= NULL;
     [doc release];
   }
+}
+
+NSRect
+ns_simple_widget_rep::viewport () {
+  // The part of the document seen in the scroll view, with its full size
+  // (the document is centered when it is smaller, see TMClipView), or the
+  // whole document for the canvases without a scroll view
+  if (!doc) return NSZeroRect;
+  NSView* clip= [doc superview];
+  if ([clip isKindOfClass: [NSClipView class]]) {
+    NSRect r= [clip bounds];
+    r.origin.x= max (r.origin.x, (CGFloat) 0);
+    r.origin.y= max (r.origin.y, (CGFloat) 0);
+    return r;
+  }
+  return [doc bounds];
 }
 
 void
@@ -276,6 +292,7 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord4>(val, s);
       coord4 p = open_box<coord4> (val);
+      extents= p;
       NSRect rect = to_nsrect (p);
       // NOTE: the scroll view centers the document when it is smaller; the
       // sizes remain within the limits of AppKit (some embedded widgets have
@@ -393,41 +410,33 @@ ns_simple_widget_rep::query (slot s, int type_id) {
       return close_box<coord2> (from_nspoint (pt));
     }
       
+    // NOTE: as in the Qt interface, the size and the visible part are those
+    // of the viewport (the window on the document), which does not depend
+    // on the extents of the document; otherwise the documents whose width
+    // follows the one of the window are typeset again and again
     case SLOT_SIZE:
     {
       check_type_id<coord2> (type_id, s);
-      NSRect rect = [doc frame];
-      return close_box<coord2> (from_nssize (rect.size));
+      return close_box<coord2> (from_nssize (viewport ().size));
     }
       
     case SLOT_SCROLL_POSITION:
     {
       check_type_id<coord2> (type_id, s);
-      // The origin of the visible part (see qt_simple_widget_rep)
-      NSRect rect = [doc visibleRect];
-      return close_box<coord2> (from_nspoint (rect.origin));
+      return close_box<coord2> (from_nspoint (viewport ().origin));
     }
       
     case SLOT_EXTENTS:
     {
       check_type_id<coord4> (type_id, s);
-      NSRect rect = [doc frame];
-      return close_box<coord4> (from_nsrect (rect));
+      return close_box<coord4> (extents);
     }
       
     case SLOT_VISIBLE_PART:
     {
       check_type_id<coord4> (type_id, s);
-      if (doc) {
-        NSRect rect= [doc visibleRect];
-        coord4 c= from_nsrect (rect);
-        return close_box<coord4> (c);
-       // QSize sz = canvas()->surface()->size();
-        //QPoint pos = backing_pos;
-        //return close_box<coord4> (from_qrect(QRect(pos, sz)));
-      } else {
-        return close_box<coord4>(coord4(0,0,0,0));
-      }
+      if (!doc) return close_box<coord4> (coord4 (0, 0, 0, 0));
+      return close_box<coord4> (from_nsrect (viewport ()));
     }
       
     default:
