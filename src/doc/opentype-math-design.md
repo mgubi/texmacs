@@ -929,6 +929,33 @@ prints, the `get_unicode_range` experiment) were dropped.
   Serif Thin and Sans Thin carried no Thin feature and tied with the
   regular faces under the master IBM Plex; they are tagged now.
 
+- **Tools to see the choices of the font system (27 September 2026).**
+  TeXmacs emulates what a font lacks, by design, and the question became
+  how to see where it does. `Tools > Fonts > Font inspector` opens a window
+  kept above the editor windows (`alt-window-set-on-top`, a new slot
+  `SLOT_ON_TOP` that the Qt window turns into a tool window and that only
+  Qt builds send), from which the other two tools are reached:
+
+  the debug switch `fonts` (new in `basic.hpp`) colours each glyph by its
+  route, from the specification `sm->fn_spec[nr]` the resolver records for
+  each subfont (the requested font, a family of a rule, a fallback at a
+  later attempt, an emulation, the error font); `virtual_font_constructs`
+  tells, in a font extended by a virtual one, which characters are
+  constructions. The switch is tested once per string in
+  `smart_font_rep::draw_fixed`, and metrics, routing and caches are
+  untouched, so it needs a repaint, not a typesetting; an export of
+  `math-showcase.tm` takes the same time with it on and off. The font
+  inspector (`font-debug-info`, `edit_main_rep::font_debug_info`) finds the
+  text box under the cursor or the mouse and reads the smart font's tables
+  for one character without resolving anything; its window refreshes from
+  `notify-cursor-moved` and `mouse-event` overrides that exist only once
+  the lazy module `fonts/font-debug.scm` is loaded and apply only while the
+  window is open. The font report (`font-debug-report`) walks the typeset
+  boxes of the document and counts the characters by route; it is the
+  document `tmfs://fontdbg/<master>`, attached to its master, and for
+  emulated characters `virtual_font_draws_vectors` says whether the PDF
+  writer draws them as vectors or embeds a bitmap.
+
 ## 5. Tests
 
 ### Unit tests

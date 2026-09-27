@@ -116,6 +116,45 @@
   the fonts are embedded as subsets, except for the glyphs which <TeXmacs>
   draws itself, which become small bitmap fonts.
 
+  <paragraph*|Seeing the choices>
+
+  The ladder is a strength: a document can use any font, and whatever the
+  font lacks is found elsewhere or emulated. <menu|Tools|Fonts|Font
+  inspector> opens a window which shows what it decided, and gives access
+  to the other tools; none of them slows the typesetter down when it is not
+  in use. The window stays above the editor windows.
+
+  <\description>
+    <item*|The inspector>Reports, as the cursor (or, with <menu|Follow the
+    mouse>, the mouse) moves, what the font system did with the glyph before
+    the cursor: its route, the font file which draws it, the rewriting into
+    another character (a letter into its mathematical italic, for instance),
+    and whether the <name|OpenType> math path applies. It reads the routing
+    tables and resolves nothing, so inspecting a glyph changes nothing.
+    <menu|Freeze> keeps the report of one glyph while the cursor moves on.
+
+    <item*|<menu|Colour glyphs by origin>>Draws every glyph in the colour of
+    its route: as usual for the requested font, blue for a family which a
+    font rule names, orange for another family found by feature distance,
+    green for an emulation (a virtual or a derived font); the error font is
+    red anyway. Only the drawing changes, so the switch takes effect at the
+    next repaint, and it is turned off with the inspector. The same switch
+    is <verbatim|fonts> in the <menu|Debug> menu.
+
+    <item*|<menu|Font report>>A document attached to the document being
+    edited, like
+    the bibliography viewer, which lists every character of the typeset
+    document by route: a summary per family, then the emulated characters,
+    those taken from other families or from families of a font rule, and
+    those no font has, each shown and counted. For an emulated character it
+    also says whether a <name|PDF> export will draw it as vectors or as a
+    bitmap. Opening it again regenerates it.
+  </description>
+
+  Glyphs which <TeX> fonts assemble themselves, inside the compound fonts of
+  the traditional mathematics, are not marked: the tools see the routes of
+  the smart font, not the insides of those fonts.
+
   <paragraph*|When something looks wrong>
 
   <\description>
