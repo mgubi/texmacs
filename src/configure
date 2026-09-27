@@ -24817,9 +24817,18 @@ fi
 
 
 
+  # MuPDF's own build and Homebrew have the third-party libraries in
+  # libmupdf-third; the distributions (Arch, MSYS2, ...) link libmupdf
+  # against their own and give its flags with pkg-config instead
   if test "x$MUPDF_DIR" != "x"; then
     MUPDF_CFLAGS="-I$MUPDF_DIR/include"
-    MUPDF_LIBS="-L$MUPDF_DIR/lib -lmupdf -lmupdf-third"
+    MUPDF_LIBS="-L$MUPDF_DIR/lib -lmupdf"
+    if ls "$MUPDF_DIR"/lib/libmupdf-third.* > /dev/null 2>&1; then
+      MUPDF_LIBS="$MUPDF_LIBS -lmupdf-third"
+    fi
+  elif pkg-config --exists mupdf 2> /dev/null; then
+    MUPDF_CFLAGS=`pkg-config --cflags mupdf`
+    MUPDF_LIBS=`pkg-config --libs mupdf`
   else
     MUPDF_CFLAGS=""
     MUPDF_LIBS="-lmupdf -lmupdf-third"
