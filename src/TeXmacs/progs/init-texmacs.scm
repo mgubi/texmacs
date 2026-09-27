@@ -550,6 +550,9 @@
 (lazy-define (fonts font-new-widgets)
              open-font-selector open-document-font-selector
              open-document-other-font-selector)
+(lazy-define (fonts font-debug)
+             open-font-inspector toggle-font-colours-by-origin
+             open-font-report)
 (tm-property (open-font-selector) (:interactive #t))
 (tm-property (open-document-font-selector) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
