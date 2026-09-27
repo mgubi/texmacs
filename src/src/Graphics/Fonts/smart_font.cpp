@@ -1092,8 +1092,8 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         else if (wanted == substitute_math_letter (c, 2)) ok= true;
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
-        else if (N(wanted) > 0 && wanted[0] == '!' &&
-                 !in_collection (c, wanted)) ok= true;
+        else if (N(wanted) > 1 && wanted[0] == '!' &&
+                 !in_collection (c, wanted (1, N(wanted)))) ok= true;
         else {
           array<string> w= tokenize (v[j], ":");
           if (N(w) == 1) w << w[0];

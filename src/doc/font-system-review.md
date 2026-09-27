@@ -325,10 +325,10 @@ pseudo ranges `mathlarge`, `mathbigop` and `mathrubber`, the character
 collections (`digit`, `latin`, `greek`, `basic-letters` and their case and
 bold variants), the alphabet names that `substitute_math_letter` gives a
 letter (`bold-math`, `cal`, `frak`, `bbb`, ...), a literal character and a
-code point range `A:Z`. A negated collection, `!latin`, is meant to be one
-too, but the resolver looks up a collection named with the `!` itself,
-finds none, and so accepts every character (`smart_font.cpp`, `resolve`,
-unchanged since 2013): the negation is currently always satisfied.
+code point range `A:Z`. A negated collection, `!latin`, accepts the characters
+outside the collection (until 27 September 2026 the resolver looked up a
+collection named with the `!` itself, found none, and accepted every
+character).
 
 ### 5.2 Per-character resolution
 
