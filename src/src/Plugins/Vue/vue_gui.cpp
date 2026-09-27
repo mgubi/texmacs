@@ -1155,7 +1155,8 @@ void layout_text (string s, int style, color c) {
 // each fills the host, and only the active one is shown (the page shows the
 // tabs, see misc/wasm/frame.js). The other windows (dialogs, tools,
 // balloons, popups) float above the active tab, the dialogs with a title
-// bar to move and close them. The host draws them (composite_virtual_windows)
+// bar to move and close them and a frame to resize them by its edges and
+// corners. The host draws them (composite_virtual_windows)
 // and hands them the pointer events which fall on them and the keys when
 // one of them has the focus (route_pointer, route_keys). Their positions are
 // screen points like those of SDL windows, so that the code which places a
@@ -1186,6 +1187,9 @@ static vue_virtual_window_rep* active_tab= NULL;       // the tab shown
 static array<vue_virtual_window_rep*> tabs;            // in the order of creation
 static bool frame_dirty= false;                        // the page must hear of the tabs
 static const float title_bar_h= 24.0f;                 // points
+static const float frame_w= 4.0f;     // the frame around a dialog, points
+static const float frame_grab= 3.0f;  // and outside it, which also grabs it
+static const float dialog_min_w= 120.0f, dialog_min_h= 48.0f; // resized
 
 // the content area of the host, in screen points
 static void
@@ -1234,6 +1238,9 @@ public:
   void   show ();
   void   raise ();
   void   clamp ();
+  int    frame_edges (float sx, float sy);
+  void   resize_from (int e, float x0, float y0, float w0, float h0,
+                      float dx, float dy);
   void   fit_tab ();
   bool   contains (float sx, float sy) {
     return sx >= x && sx < x + w && sy >= y && sy < y + h; }
@@ -1247,6 +1254,10 @@ static vue_window pointer_hover= NULL;             // the window under the point
 static vue_virtual_window_rep* pointer_capture= NULL; // a button is held in it
 static vue_virtual_window_rep* drag_win= NULL;     // moved by its title bar
 static float drag_dx= 0, drag_dy= 0;
+static vue_virtual_window_rep* resize_win= NULL;   // resized by its frame
+static int   resize_edges= 0;                      // see frame_edges
+static float resize_px, resize_py;                 // where the drag started
+static float resize_x0, resize_y0, resize_w0, resize_h0; // and the window then
 
 vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name,
                                                 bool _popup, bool _tab)
@@ -1282,6 +1293,7 @@ vue_virtual_window_rep::~vue_virtual_window_rep () {
   if (pointer_hover == this) pointer_hover= NULL;
   if (pointer_capture == this) pointer_capture= NULL;
   if (drag_win == this) drag_win= NULL;
+  if (resize_win == this) resize_win= NULL;
   array<vue_virtual_window_rep*> rest;
   for (int i= 0; i < N(virtual_windows); i++)
     if (virtual_windows[i] != this) rest << virtual_windows[i];
@@ -1366,16 +1378,86 @@ vue_virtual_window_rep::process_layout () {
     show ();
 }
 
-// keep the window, title bar included, on the host
+// keep the window, title bar and frame included, on the host; a dialog
+// larger than the host is made smaller (its contents scroll, see
+// vue_plain_window_widget_rep::do_layout)
 void
 vue_virtual_window_rep::clamp () {
   float hx, hy, hw, hh;
   host_geometry (hx, hy, hw, hh);
   float tb= decorated () ? title_bar_h : 0;
-  if (x + w > hx + hw) x= hx + hw - w;
-  if (x < hx) x= hx;
-  if (y + h > hy + hh) y= hy + hh - h;
-  if (y - tb < hy) y= hy + tb;
+  float f= decorated () ? frame_w : 0;
+  if (decorated ()) {
+    w= min (w, max (hw - 2*f, 1.0f));
+    h= min (h, max (hh - tb - 2*f, 1.0f));
+  }
+  if (x + w + f > hx + hw) x= hx + hw - w - f;
+  if (x - f < hx) x= hx + f;
+  if (y + h + f > hy + hh) y= hy + hh - h - f;
+  if (y - tb - f < hy) y= hy + tb + f;
+}
+
+// the edges of the frame of a dialog under the point (sx, sy): 1 left,
+// 2 right, 4 top, 8 bottom, two of them at a corner (which takes some
+// length of the sides, to be easy to grab); 0 elsewhere
+int
+vue_virtual_window_rep::frame_edges (float sx, float sy) {
+  if (!decorated () || !shown) return 0;
+  float x1= x - frame_w, x2= x + w + frame_w;
+  float y1= top () - frame_w, y2= y + h + frame_w;
+  if (sx < x1 - frame_grab || sx >= x2 + frame_grab ||
+      sy < y1 - frame_grab || sy >= y2 + frame_grab) return 0;
+  int e= 0;
+  if (sx < x) e |= 1; else if (sx >= x + w) e |= 2;
+  if (sy < top ()) e |= 4; else if (sy >= y + h) e |= 8;
+  const float corner= 14.0f;
+  if (e & 3) { if (sy < y1 + corner) e |= 4; else if (sy >= y2 - corner) e |= 8; }
+  if (e & 12) { if (sx < x1 + corner) e |= 1; else if (sx >= x2 - corner) e |= 2; }
+  return e;
+}
+
+// the frame of a dialog was dragged by (dx, dy) from where the window was
+// (x0, y0, w0, h0): its edges e follow, within the host and the limits
+void
+vue_virtual_window_rep::resize_from (int e, float x0, float y0, float w0,
+                                     float h0, float dx, float dy) {
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  // at most up to the edges of the host, and to the limits of the contents
+  float max_w= (e & 1) ? x0 + w0 - (hx + frame_w) : hx + hw - frame_w - x0;
+  float max_h= (e & 4) ? y0 + h0 - (hy + title_bar_h + frame_w)
+                       : hy + hh - frame_w - y0;
+  if (Max_w > 0) max_w= min (max_w, (float) Max_w / PIXEL);
+  if (Max_h > 0) max_h= min (max_h, (float) Max_h / PIXEL);
+  float nw= w0, nh= h0;
+  if (e & 1) nw= w0 - dx; else if (e & 2) nw= w0 + dx;
+  if (e & 4) nh= h0 - dy; else if (e & 8) nh= h0 + dy;
+  nw= max (min (nw, max_w), min (dialog_min_w, w0));
+  nh= max (min (nh, max_h), min (dialog_min_h, h0));
+  x= (e & 1) ? x0 + w0 - nw : x0;
+  y= (e & 4) ? y0 + h0 - nh : y0;
+  w= nw; h= nh;
+  placed= true;
+  gui_needs_relayout= true;
+}
+
+// the pointer of the host: a double arrow over the frame of a dialog
+static void
+set_frame_cursor (int e) {
+  static int current= 0;
+  static SDL_Cursor* cursors[16]= { NULL };
+  if (e == current) return;
+  current= e;
+  SDL_SystemCursor c= SDL_SYSTEM_CURSOR_DEFAULT;
+  switch (e) {
+    case 1: case 2: c= SDL_SYSTEM_CURSOR_EW_RESIZE; break;
+    case 4: case 8: c= SDL_SYSTEM_CURSOR_NS_RESIZE; break;
+    case 5: case 10: c= SDL_SYSTEM_CURSOR_NWSE_RESIZE; break;
+    case 6: case 9: c= SDL_SYSTEM_CURSOR_NESW_RESIZE; break;
+    default: e= 0;
+  }
+  if (cursors[e] == NULL) cursors[e]= SDL_CreateSystemCursor (c);
+  if (cursors[e] != NULL) SDL_SetCursor (cursors[e]);
 }
 
 void
@@ -1422,6 +1504,7 @@ vue_virtual_window_rep::set_visibility (bool flag) {
     if (focused_virtual == this) focus_virtual (NULL);
     if (pointer_capture == this) pointer_capture= NULL;
     if (drag_win == this) drag_win= NULL;
+    if (resize_win == this) resize_win= NULL;
   }
   else if (ready_to_show && !shown) show ();
   // otherwise it is shown by process_layout once it fits its contents
@@ -1602,11 +1685,20 @@ composite_virtual_windows (vue_window host, renderer ren) {
     ren->set_origin (0, 0);
     if (v->decorated ()) {
       int T= (int) (title_bar_h * d), B= max (1, (int) d);
-      // a frame around the title bar and the contents
+      int F= (int) (frame_w * d + 0.5f);
+      // a shadow, then a frame around the title bar and the contents, with
+      // a line on both of its sides
+      for (int k= 3; k >= 1; k--) {
+        int s= k * B;
+        ren->set_pencil (rgb_color (0, 0, 0, 22));
+        ren->fill ((X-F-B-s)*px, -(Y+H+F+B+s+B)*px, (X+W+F+B+s)*px, -(Y-T-F-B-s+B)*px);
+      }
       ren->set_pencil (theme_color (the_theme.border));
-      ren->fill ((X-B)*px, -(Y+H+B)*px, (X+W+B)*px, -(Y-T-B)*px);
+      ren->fill ((X-F-B)*px, -(Y+H+F+B)*px, (X+W+F+B)*px, -(Y-T-F-B)*px);
       ren->set_pencil (theme_color (the_theme.shade[2]));
-      ren->fill (X*px, -Y*px, (X+W)*px, -(Y-T)*px);
+      ren->fill ((X-F)*px, -(Y+H+F)*px, (X+W+F)*px, -(Y-T-F)*px);
+      ren->set_pencil (theme_color (the_theme.border));
+      ren->fill ((X-B)*px, -(Y+H+B)*px, (X+W+B)*px, -Y*px);
       color tc= theme_color (the_theme.text);
       draw_band_text (ren, v->the_name, WIDGET_STYLE_BOLD, tc,
                       (X + (int) (8*d))*px, -Y*px, -(Y-T)*px);
@@ -1653,6 +1745,14 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   float hx, hy, hw, hh;
   host_geometry (hx, hy, hw, hh);
   float sx= hx + x, sy= hy + y;
+  if (resize_win != NULL && kind != 3) {
+    if (kind == 0)
+      resize_win->resize_from (resize_edges, resize_x0, resize_y0,
+                               resize_w0, resize_h0,
+                               sx - resize_px, sy - resize_py);
+    else if (kind == 2) { resize_win= NULL; set_frame_cursor (0); }
+    return NULL;
+  }
   if (drag_win != NULL && kind != 3) {
     if (kind == 0) {
       drag_win->x= sx - drag_dx;
@@ -1665,6 +1765,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   }
   vue_virtual_window_rep* target= NULL;
   bool title= false;
+  int  edges= 0; // on the frame of target (then title is true too)
   if (pointer_capture != NULL && kind != 3) target= pointer_capture;
   else {
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
@@ -1672,6 +1773,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (!v->shown || v->tab) continue;
       if (v->contains (sx, sy)) { target= v; break; }
       if (v->in_title_bar (sx, sy)) { target= v; title= true; break; }
+      if ((edges= v->frame_edges (sx, sy)) != 0) { target= v; title= true; break; }
     }
     // under the floating windows: the active tab
     if (target == NULL && active_tab != NULL && active_tab->shown &&
@@ -1688,6 +1790,14 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (target->decorated () || target->tab) focus_virtual (target);
     }
     else focus_virtual (NULL);
+    if (edges != 0) {
+      resize_win= target;
+      resize_edges= edges;
+      resize_px= sx; resize_py= sy;
+      resize_x0= target->x; resize_y0= target->y;
+      resize_w0= target->w; resize_h0= target->h;
+      return NULL;
+    }
     if (title) {
       if (sx >= target->x + target->w - title_bar_h) target->destroy_event ();
       else {
@@ -1708,6 +1818,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (old != NULL) pointer_left (old);
     }
   }
+  if (kind == 0) set_frame_cursor (edges);
   if (title) return NULL;
   if (target == NULL) return win;
   x= sx - target->x;

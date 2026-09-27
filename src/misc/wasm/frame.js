@@ -275,7 +275,6 @@ var tmFrame = (function () {
       'Only the fonts which come with TeXmacs: the page cannot see the fonts of the system.',
       'The remote tools (the Remote menu) connect over WebSocket to a TeXmacs server of ' +
       'this branch, on this machine only for now (no encrypted wss yet).',
-      'The dialogs cannot be resized.',
       'Two tabs of the browser with this page share the same storage, and their saves ' +
       'may overwrite each other: keep TeXmacs Vue open in one tab.',
       'It is slower than the desktop program, and its first visit downloads some 40 to 50 MB.']]

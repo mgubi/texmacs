@@ -44,7 +44,7 @@ MuPDF writer) in about 4 s, boot included.
 
 | | done | not yet |
 |---|---|---|
-| windows | single-window mode: tabs for the windows of the editors, floating dialogs; the frame of the page | resize handles of the dialogs |
+| windows | single-window mode: tabs for the windows of the editors, floating dialogs, resized by their frame, their contents scrolled when they do not fit; the frame of the page | |
 | build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
 | loop | one iteration per frame (`emscripten_set_main_loop`) | all the events of a frame in one iteration |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
@@ -59,16 +59,25 @@ MuPDF writer) in about 4 s, boot included.
 In single-window mode the only SDL window, the host, is a container with
 nothing of its own; every window of TeXmacs is virtual. The windows of the
 editors are tabs: each fills the host and only the active one is drawn and
-gets the events (dialogs, tools, balloons and popups float above it). In
+gets the events (dialogs, tools, balloons and popups float above it). A
+dialog has a title bar, to move and close it, and a frame of 4 points: its
+edges and corners resize it (with the double arrows of the system as the
+pointer), within the host and the size limits of its contents. Once a
+dialog has its size, its contents are laid out in a container which clips
+and scrolls (`vue_plain_window_widget_rep::do_layout`): at their own size
+at least, larger when the dialog is, with scroll bars and the wheel when
+it is smaller (after a resize, or on a page smaller than the dialog, which
+is then made to fit). In
 the browser the page has a frame above the canvas (`misc/wasm/frame.js`):
 the tabs, labelled with the names of the windows (the title of a window on
 the desktop, and the title of the page for the active one), with a marker
 for unsaved changes, a close box (not on the last tab: TeXmacs asks as for
 a window whether to save), a `+` for a new window, and a TeXmacs menu: what
 this TeXmacs is (version, S7, MuPDF, build date), where its files are, how
-many of its packages have come, the storage used, the Files panel, notes
-on the keyboard (the browser keeps some shortcuts), texmacs.org, reload,
-and a reset (the files kept by the browser deleted). The plugin tells the
+many of its packages have come, the storage used, a popup with more info
+and the limitations of the port (the keyboard, the files, what is
+missing), the Files panel, reload, a reset (the files kept by the browser
+deleted) and a removal from the browser. The plugin tells the
 frame of the tabs once per frame when they changed (`frame_sync`); the
 frame asks it to show, close or open one. Quitting TeXmacs reloads the
 page (after the home directory is written to the storage of the browser).

@@ -27,7 +27,8 @@
 >   windows of TeXmacs become virtual ones: each document is a tab of the
 >   frame above the canvas (its name, a dot when modified, × to close, + for
 >   a new one, a ribbon which scrolls with the wheel or a drag), and the
->   dialogs float over it with a title bar. The same mode runs on the desktop
+>   dialogs float over it with a title bar and a frame which resizes them
+  (their contents scroll when they do not fit). The same mode runs on the desktop
 >   with `TEXMACS_VUE_SINGLE_WINDOW=1`, which is how it is tested.
 > * **The TeXmacs menu** of the page: the version, the state of the files,
 >   the storage used, the Files panel, reload and reset.
@@ -53,8 +54,7 @@
 >   usual port), for remote files and shared documents.
 >
 > Not there yet: plugins and external converters (no processes in a page),
-> `wss` for servers elsewhere than on the same machine, resizing the
-> dialogs.
+> `wss` for servers elsewhere than on the same machine.
 >
 > Build and try it (Emscripten, tested with 6.0; Python ≥ 3.10; Node):
 >
