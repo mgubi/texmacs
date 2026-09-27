@@ -61,7 +61,10 @@
 - (NSSize) intrinsicContentSize
 {
   NSSize s= [super intrinsicContentSize];
-  s.width += ([[self title] length] > 0? 12: 6) + ([self hasMenu]? 10: 0);
+  // the text buttons with a menu have a chevron after the text; the icon
+  // buttons a small triangle in their corner
+  BOOL text= [[self title] length] > 0;
+  s.width += (text? 12: 8) + ((text && [self hasMenu])? 9: 0);
   s.height= MAX (s.height, 24);
   return s;
 }
@@ -83,26 +86,42 @@
     [[NSColor colorWithWhite: 0.0 alpha: 0.07] setFill];
     [p fill];
   }
-  if ([self hasMenu]) {
-    // the content leaves room for the chevron
+  BOOL text= [[self title] length] > 0;
+  if ([self hasMenu] && text) {
+    // a chevron after the text
     NSImage *ch= [NSImage imageWithSystemSymbolName: @"chevron.down"
                             accessibilityDescription: nil];
     NSImageSymbolConfiguration *cf=
-      [NSImageSymbolConfiguration configurationWithPointSize: 8
-                                                      weight: NSFontWeightSemibold];
+      [NSImageSymbolConfiguration configurationWithPointSize: 7
+                                                      weight: NSFontWeightBold];
     ch= [ch imageWithSymbolConfiguration: cf];
     NSSize cs= [ch size];
-    NSRect cr= NSMakeRect (NSMaxX ([self bounds]) - cs.width - 5,
-                           NSMidY ([self bounds]) - cs.height / 2,
+    NSRect inner= [self bounds];
+    inner.size.width -= 9;
+    NSRect cr= NSMakeRect (NSMaxX (inner) - 3,
+                           floor (NSMidY ([self bounds]) - cs.height / 2) + 1,
                            cs.width, cs.height);
     [ch drawInRect: cr fromRect: NSZeroRect
          operation: NSCompositingOperationSourceOver
-          fraction: [self isEnabled]? 0.55: 0.25 respectFlipped: YES hints: nil];
-    NSRect inner= [self bounds];
-    inner.size.width -= 10;
+          fraction: [self isEnabled]? 0.6: 0.25 respectFlipped: YES hints: nil];
     [[self cell] drawInteriorWithFrame: inner inView: self];
   }
-  else [[self cell] drawInteriorWithFrame: [self bounds] inView: self];
+  else {
+    [[self cell] drawInteriorWithFrame: [self bounds] inView: self];
+    if ([self hasMenu]) {
+      // a small triangle in the bottom right corner (as in Xcode)
+      NSRect b= [self bounds];
+      CGFloat x= NSMaxX (b) - 3, y= NSMaxY (b) - 4, d= 4;
+      NSBezierPath *t= [NSBezierPath bezierPath];
+      [t moveToPoint: NSMakePoint (x, y - d)];
+      [t lineToPoint: NSMakePoint (x, y)];
+      [t lineToPoint: NSMakePoint (x - d, y)];
+      [t closePath];
+      [[[NSColor labelColor] colorWithAlphaComponent:
+          [self isEnabled]? 0.55: 0.2] setFill];
+      [t fill];
+    }
+  }
   (void) r;
 }
 @end
