@@ -59,8 +59,9 @@ jobs:
       - name: Smoke test (node, the Welcome document to PDF)
         run: |
           home=$(mktemp -d)
+          # a hang must not take the whole run (it takes seconds)
           TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$home/.TeXmacs" HOME="$home" \
-            node build-wasm/out/node/texmacs.js -headless \
+            timeout 300 node build-wasm/out/node/texmacs.js -headless \
               -c TeXmacs/doc/about/welcome/new-welcome.en.tm "$home/welcome.pdf" -q
           test -s "$home/welcome.pdf"
           head -c 5 "$home/welcome.pdf" | grep -q '%PDF'
