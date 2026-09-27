@@ -344,14 +344,6 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
   return sv;
 }
 
-static double
-length_in_points (string l) {
-  // Approximate sizes of the resize widgets (FIXME: as qt_decode_length)
-  if (ends (l, "px")) return as_double (l (0, N(l) - 2));
-  if (ends (l, "em")) return 12.0 * as_double (l (0, N(l) - 2));
-  if (ends (l, "ex")) return 6.0 * as_double (l (0, N(l) - 2));
-  return 0.0;
-}
 
 /******************************************************************************
  * ns_ui_element_rep
@@ -762,16 +754,37 @@ ns_ui_element_rep::as_nsview () {
 
     case resize_widget:
     {
+      // As in the Qt interface: the minimal, default and maximal sizes
       typedef triple<string, string, string> T1;
       typedef quartet<widget, int, T1, T1> T;
       T x= open_box<T> (load);
       NSView* v= concrete (x.x1)->as_nsview ();
       if (!v) return v;
-      // FIXME: only the minimal sizes (in px, em and ex) are applied
-      double w= length_in_points (x.x3.x1), h= length_in_points (x.x4.x1);
-      if (w > 0 || h > 0) [v setTranslatesAutoresizingMaskIntoConstraints: NO];
-      if (w > 0) [[v.widthAnchor constraintGreaterThanOrEqualToConstant: w] setActive: YES];
-      if (h > 0) [[v.heightAnchor constraintGreaterThanOrEqualToConstant: h] setActive: YES];
+      NSSize ref= [v fittingSize];
+      if (ref.width < 1) ref.width= 100;
+      if (ref.height < 1) ref.height= 22;
+      NSSize mins= ns_decode_length (x.x3.x1, x.x4.x1, ref);
+      NSSize defs= ns_decode_length (x.x3.x2, x.x4.x2, ref);
+      NSSize maxs= ns_decode_length (x.x3.x3, x.x4.x3, ref);
+      [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+      NSMutableArray* cs= [NSMutableArray array];
+      if (NSEqualSizes (mins, defs) && NSEqualSizes (defs, maxs)) {
+        [cs addObject: [v.widthAnchor constraintEqualToConstant: defs.width]];
+        [cs addObject: [v.heightAnchor constraintEqualToConstant: defs.height]];
+      }
+      else {
+        [cs addObject: [v.widthAnchor constraintGreaterThanOrEqualToConstant: mins.width]];
+        [cs addObject: [v.heightAnchor constraintGreaterThanOrEqualToConstant: mins.height]];
+        [cs addObject: [v.widthAnchor constraintLessThanOrEqualToConstant: max (maxs.width, mins.width)]];
+        [cs addObject: [v.heightAnchor constraintLessThanOrEqualToConstant: max (maxs.height, mins.height)]];
+        NSLayoutConstraint* dw= [v.widthAnchor constraintEqualToConstant: defs.width];
+        NSLayoutConstraint* dh= [v.heightAnchor constraintEqualToConstant: defs.height];
+        [dw setPriority: NSLayoutPriorityDefaultLow];
+        [dh setPriority: NSLayoutPriorityDefaultLow];
+        [cs addObject: dw];
+        [cs addObject: dh];
+      }
+      [NSLayoutConstraint activateConstraints: cs];
       return v;
     }
 

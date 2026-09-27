@@ -123,6 +123,8 @@
       [row addArrangedSubview: t];
     }
   }
+  // NOTE: the row has its natural size until it is laid out
+  [row setFrameSize: [row fittingSize]];
   return row;
 }
 

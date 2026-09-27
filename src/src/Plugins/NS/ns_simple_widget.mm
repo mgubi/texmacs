@@ -96,8 +96,11 @@ void
 ns_simple_widget_rep::follow_visible_part () {
   // The canvas covers the visible part of the document view
   if (!view || !doc) return;
-  NSRect r= [doc visibleRect];
-  if (NSIsEmptyRect (r)) r= [doc bounds];
+  // NOTE: nothing is visible before the document view is shown (its bounds
+  // can be huge, for the embedded widgets with infinite extents)
+  if (![doc window]) return;
+  NSRect r= NSIntersectionRect ([doc visibleRect], [doc bounds]);
+  if (NSIsEmptyRect (r)) return;
   if (!NSEqualRects (r, [view frame])) [view setFrame: r];
 }
 
@@ -274,7 +277,11 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       check_type<coord4>(val, s);
       coord4 p = open_box<coord4> (val);
       NSRect rect = to_nsrect (p);
-      // NOTE: the scroll view centers the document when it is smaller
+      // NOTE: the scroll view centers the document when it is smaller; the
+      // sizes remain within the limits of AppKit (some embedded widgets have
+      // infinite extents)
+      rect.size.width = min (rect.size.width , 5000000.0);
+      rect.size.height= min (rect.size.height, 5000000.0);
       [doc setFrameSize: rect.size];
       follow_visible_part ();
     }
