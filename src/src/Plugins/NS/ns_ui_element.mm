@@ -121,6 +121,8 @@ stack_of (array<widget> a, bool vertical) {
   // NOTE: as in the layouts of Qt, the views without a natural size (lists,
   // scroll views, containers) take the extra space
   [sv setDistribution: NSStackViewDistributionFill];
+  // NOTE: as in the Qt interface, no spacing (TeXmacs puts glues)
+  [sv setSpacing: 0];
   for (int i=0; i<N(a); i++) {
     if (is_nil (a[i])) continue;
     NSView* v= concrete (a[i])->as_nsview ();
@@ -978,7 +980,10 @@ ns_ui_element_rep::as_nsview () {
         NSView* cv= w->as_nsview ();
         if ([cv isKindOfClass: [NSImageView class]])
           [b setImage: [(NSImageView*) cv image]];
-        [b setBezelStyle: NSBezelStyleSmallSquare];
+        // flat, with a border under the mouse (as the tool buttons of Qt)
+        [b setBezelStyle: NSBezelStyleAccessoryBarAction];
+        [b setShowsBorderOnlyWhileMouseInside: YES];
+        [b setImagePosition: NSImageOnly];
       }
       [b setCommand: x.x2.rep kind: 0];
       [b setEnabled: (x.x5 & WIDGET_STYLE_INERT) == 0];

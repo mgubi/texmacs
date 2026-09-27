@@ -79,7 +79,8 @@ ns_gui_rep::ns_gui_rep (int& argc, char** argv)
         // retina_icons = 1;
         // retina_icons = 2;  // FIXME: why is this not better?
       }
-      retina_scale = 1.4;
+      // NOTE: as with Qt 6 on the Mac (the points already follow the screen)
+      retina_scale = 1.0;
     }
   }
   if (has_user_preference ("retina-factor"))
