@@ -14,6 +14,7 @@
 #include "ns_renderer.h"
 #include "ns_utilities.h"
 #include "ns_menu.h"
+#include "ns_gui.h"
 
 #include "gui.hpp"
 #include "widget.hpp"
@@ -155,12 +156,21 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   //	[mt setPostsFrameChangedNotifications:YES];
   wh = [[TMWidgetHelper alloc] init];
   wh->wid = this;
-#if 0
-  [(NSNotificationCenter*)[NSNotificationCenter defaultCenter] addObserver:wh
-			  selector:@selector(notify:)
-			  name:NSViewFrameDidChangeNotification 
-			  object:mt];
-#endif
+  // the side tools and the canvas are laid out again when the window is
+  // resized and when the contents of the tools change (see TMRefreshView)
+  [view setIdentifier: @"TMMainView"];
+  [view setPostsFrameChangedNotifications: YES];
+  [[NSNotificationCenter defaultCenter] addObserver: wh
+      selector: @selector(notify:)
+          name: NSViewFrameDidChangeNotification object: view];
+  [[NSNotificationCenter defaultCenter] addObserver: wh
+      selector: @selector(notify:)
+          name: @"TMToolsChanged" object: view];
+  for (int i=0; i<4; i++) {
+    tool_views[i]= [[NSView alloc] initWithFrame: NSZeroRect];
+    [tool_views[i] setHidden: YES];
+    [view addSubview: tool_views[i]];
+  }
 	
   toolbar = [[NSToolbar alloc] initWithIdentifier:TMToolbarIdentifier ];
   [toolbar setDelegate:wh];
@@ -171,25 +181,52 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
 
 ns_tm_widget_rep::~ns_tm_widget_rep() 
 { 
-  //	[(NSNotificationCenter*)[NSNotificationCenter defaultCenter] removeObserver:wh];
+  [[NSNotificationCenter defaultCenter] removeObserver: wh];
+  for (int i=0; i<4; i++) [tool_views[i] release];
   [wh release];	
   [bc release]; 
 }
 
 
+
+static NSSize
+tool_size (NSView* v) {
+  // The size wanted by the contents of a tool container
+  if ([[v subviews] count] == 0) return NSZeroSize;
+  NSSize fs= [[[v subviews] firstObject] fittingSize];
+  return NSMakeSize (fs.width + 8, fs.height + 8);
+}
+
 void ns_tm_widget_rep::layout()
 {
-  // From top to bottom: the icon bars, the canvas and the footer
+  // From top to bottom: the icon bars, the left tools, the canvas and the
+  // side tools, the bottom and extra tools, and the footer
   NSSize fs = NSMakeSize (100, 20); // size of the right footer
   NSRect r = [view bounds];
   CGFloat bar_h = (visibility[1] || visibility[2] || visibility[3] ||
                    visibility[4])? [[bc bar] frame].size.height: 0;
   CGFloat foot_h= visibility[5]? fs.height: 0;
+  bool show[4];
+  NSSize sz[4];
+  for (int i=0; i<4; i++) {
+    sz[i]= tool_size (tool_views[i]);
+    show[i]= visibility[6+i] && sz[i].width > 0 && sz[i].height > 0;
+    [tool_views[i] setHidden: !show[i]];
+  }
+  CGFloat side_w = show[0]? min (sz[0].width, r.size.width / 2): 0;
+  CGFloat left_w = show[1]? min (sz[1].width, r.size.width / 2): 0;
+  CGFloat extra_h= show[3]? sz[3].height: 0;
+  CGFloat bot_h  = show[2]? sz[2].height: 0;
+  CGFloat y0= foot_h + extra_h + bot_h;
+  CGFloat mid_h= max (0.0, r.size.height - bar_h - y0);
   [[bc bar] setFrame: NSMakeRect (0, r.size.height - bar_h,
                                   r.size.width, bar_h)];
   [[bc bar] setHidden: bar_h == 0];
-  [sv setFrame: NSMakeRect (0, foot_h, r.size.width,
-                            r.size.height - bar_h - foot_h)];
+  [tool_views[1] setFrame: NSMakeRect (0, y0, left_w, mid_h)];
+  [tool_views[0] setFrame: NSMakeRect (r.size.width - side_w, y0, side_w, mid_h)];
+  [sv setFrame: NSMakeRect (left_w, y0, r.size.width - left_w - side_w, mid_h)];
+  [tool_views[2] setFrame: NSMakeRect (0, foot_h + extra_h, r.size.width, bot_h)];
+  [tool_views[3] setFrame: NSMakeRect (0, foot_h, r.size.width, extra_h)];
   [leftField setFrame: NSMakeRect (0, 0, r.size.width - fs.width, foot_h)];
   [rightField setFrame: NSMakeRect (r.size.width - fs.width, 0,
                                     fs.width, foot_h)];
@@ -230,6 +267,20 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
   case SLOT_MOUSE_GRAB:
     if (!is_nil (main_widget)) main_widget->send (s, val);
     return;
+  case SLOT_KEYBOARD_FOCUS_ON:
+    {
+      // As in the Qt interface (focus to the widget of this name): the
+      // editor gets the focus, which is noticed as a change, so that the
+      // menus and tools are updated
+      check_type<string> (val, s);
+      if (open_box<string> (val) == "canvas" && !is_nil (main_widget)) {
+        NSView* v= concrete (main_widget)->as_nsview ();
+        if (v && [v window]) [[v window] makeFirstResponder: v];
+        the_gui->process_keyboard_focus
+          ((ns_simple_widget_rep*) main_widget.rep, true, texmacs_time ());
+      }
+    }
+    break;
   case SLOT_MODIFIED:
     {
       // the "edited" dot in the close button of the window
@@ -464,6 +515,29 @@ TMMenuHelper *the_menu_helper = nil;
 void
 ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
   switch (s) {
+  case SLOT_SIDE_TOOLS:
+  case SLOT_LEFT_TOOLS:
+  case SLOT_BOTTOM_TOOLS:
+  case SLOT_EXTRA_TOOLS:
+    {
+      check_type_void (index, s);
+      int i= (s == SLOT_SIDE_TOOLS? 0: s == SLOT_LEFT_TOOLS? 1:
+              s == SLOT_BOTTOM_TOOLS? 2: 3);
+      tool_widgets[i]= w;
+      for (NSView* old in [[[tool_views[i] subviews] copy] autorelease])
+        [old removeFromSuperview];
+      NSView* v= is_nil (w)? nil: concrete (w)->as_nsview ();
+      if (v) {
+        [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+        [tool_views[i] addSubview: v];
+        [NSLayoutConstraint activateConstraints: @[
+          [v.leadingAnchor constraintEqualToAnchor: tool_views[i].leadingAnchor constant: 4],
+          [v.trailingAnchor constraintEqualToAnchor: tool_views[i].trailingAnchor constant: -4],
+          [v.topAnchor constraintEqualToAnchor: tool_views[i].topAnchor constant: 4]]];
+      }
+      layout ();
+    }
+    break;
   case SLOT_SCROLLABLE: 
     {
       check_type_void (index, s);

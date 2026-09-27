@@ -79,6 +79,8 @@ public:
 public:
   command quit;
   widget main_widget;  //!< the canvas (the editor)
+  widget tool_widgets[4]; //!< right, left, bottom and extra tools
+  NSView* tool_views[4];  //!< their containers
 
   ns_tm_widget_rep (int mask, command _quit);
   ~ns_tm_widget_rep ();
@@ -109,6 +111,8 @@ public:
  */
 class ns_tm_embedded_widget_rep: public ns_widget_rep {
   widget main_widget;
+  NSView* container;  //!< holds the canvas, which may come later
+  void show_canvas ();
   
 public:
   command quit;

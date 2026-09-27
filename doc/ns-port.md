@@ -29,7 +29,9 @@ all of them, with their submenus, can be built. The icon bars are shown
 above the canvas (with the PNG icons, at double resolution on Retina
 screens), and the footer shows the messages of TeXmacs. Dialogs made with
 `tm-widget` work, such as the preferences and the page format (tabs, pop-up
-menus, buttons, refreshable parts, and embedded TeXmacs editors).
+menus, buttons, refreshable parts, and embedded TeXmacs editors), and so do
+the side and bottom tools (for instance the document metadata and the search
+bar).
 
 Testing aids (other programs are not allowed to capture or control the
 windows):
@@ -78,8 +80,8 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 
 ### Known gaps (FIXME in the code)
 
-* the rows of icons are shown or hidden together; the side tools (left,
-  right, bottom, extra) are not shown;
+* the rows of icons are shown or hidden together; the side tools have the
+  width wanted by their contents (no splitter to resize them);
 * the backing store has the size of the whole document (the Qt interface
   uses a canvas of the size of the visible part, which scales to long
   documents);

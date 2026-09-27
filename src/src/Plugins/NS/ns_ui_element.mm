@@ -249,9 +249,13 @@ ns_refresh_state::recompute (string what) {
   [self show: kind];
   if (content != old) {
     // the window takes the size of its new contents (as in the Qt interface)
+    // in the main windows, the tools are laid out again
     NSWindow* win= [self window];
     NSView* root= [win contentView];
-    if (win && root && ![root isKindOfClass: [NSClassFromString(@"TMView") class]]) {
+    if (root && [[root identifier] isEqualToString: @"TMMainView"])
+      [[NSNotificationCenter defaultCenter]
+        postNotificationName: @"TMToolsChanged" object: root];
+    else if (win && root) {
       NSSize fs= [root fittingSize];
       if (fs.width > 0 && fs.height > 0) [win setContentSize: fs];
     }

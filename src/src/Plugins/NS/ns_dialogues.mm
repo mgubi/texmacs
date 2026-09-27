@@ -407,7 +407,24 @@ ns_input_text_widget_rep::commit (bool flag) {
 ******************************************************************************/
 
 ns_tm_embedded_widget_rep::ns_tm_embedded_widget_rep (command _quit):
-  ns_widget_rep (embedded_tm_widget), quit (_quit) {}
+  ns_widget_rep (embedded_tm_widget), container (nil), quit (_quit) {}
+
+void
+ns_tm_embedded_widget_rep::show_canvas () {
+  // The canvas fills the container
+  if (!container || is_nil (main_widget)) return;
+  for (NSView* old in [[[container subviews] copy] autorelease])
+    [old removeFromSuperview];
+  NSView* v= concrete (main_widget)->as_nsview ();
+  if (!v) return;
+  [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [container addSubview: v];
+  [NSLayoutConstraint activateConstraints: @[
+    [v.leadingAnchor constraintEqualToAnchor: container.leadingAnchor],
+    [v.trailingAnchor constraintEqualToAnchor: container.trailingAnchor],
+    [v.topAnchor constraintEqualToAnchor: container.topAnchor],
+    [v.bottomAnchor constraintEqualToAnchor: container.bottomAnchor]]];
+}
 
 void
 ns_tm_embedded_widget_rep::send (slot s, blackbox val) {
@@ -448,6 +465,7 @@ ns_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
     case SLOT_SCROLLABLE:
       check_type_void (index, s);
       main_widget= w;
+      show_canvas ();
       break;
     default:
       ns_widget_rep::write (s, index, w);
@@ -456,8 +474,14 @@ ns_tm_embedded_widget_rep::write (slot s, blackbox index, widget w) {
 
 NSView*
 ns_tm_embedded_widget_rep::as_nsview () {
-  if (is_nil (main_widget)) return nil;
-  return concrete (main_widget)->as_nsview ();
+  // NOTE: as in the Qt interface, a container, since the canvas is usually
+  // given after the view was requested
+  if (!container) {
+    container= [[NSView alloc] initWithFrame: NSMakeRect (0, 0, 100, 30)];
+    [container setTranslatesAutoresizingMaskIntoConstraints: NO];
+    show_canvas ();
+  }
+  return container;
 }
 
 /******************************************************************************
