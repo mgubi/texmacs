@@ -20,6 +20,7 @@
   NSMutableArray *menuArray;    // the menu of each row (keeps the items)
   NSMutableArray *shownArray;   // whether each row is visible
   NSView *view;
+  NSBox *line;           // the hairline below the rows
 }
 - (void) setMenu:(NSMenu *)menu forRow:(unsigned) idx;
 - (void) setVisible:(BOOL) flag forRow:(unsigned) idx;

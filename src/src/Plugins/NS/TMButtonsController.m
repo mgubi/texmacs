@@ -22,6 +22,91 @@
 - (BOOL) isFlipped { return YES; }
 @end
 
+/******************************************************************************
+* Buttons of the icon bars, in the style of the toolbars of macOS: no border,
+* a rounded highlight when the mouse is over them or presses them, an accent
+* background when they are on, and a chevron for those with a menu
+******************************************************************************/
+
+@interface TMBarButton : NSButton
+{
+@public
+  NSMenuItem *item;
+  BOOL hover;
+}
+@end
+
+@implementation TMBarButton
+- (void) dealloc
+{
+  [item release];
+  [super dealloc];
+}
+
+- (void) updateTrackingAreas
+{
+  for (NSTrackingArea *ta in [self trackingAreas]) [self removeTrackingArea: ta];
+  [self addTrackingArea:
+     [[[NSTrackingArea alloc] initWithRect: NSZeroRect
+         options: NSTrackingMouseEnteredAndExited | NSTrackingActiveInActiveApp |
+                  NSTrackingInVisibleRect
+           owner: self userInfo: nil] autorelease]];
+  [super updateTrackingAreas];
+}
+- (void) mouseEntered: (NSEvent*) e { (void) e; hover= YES; [self setNeedsDisplay: YES]; }
+- (void) mouseExited: (NSEvent*) e { (void) e; hover= NO; [self setNeedsDisplay: YES]; }
+
+- (BOOL) hasMenu { return [item submenu] != nil; }
+
+- (NSSize) intrinsicContentSize
+{
+  NSSize s= [super intrinsicContentSize];
+  s.width += ([[self title] length] > 0? 12: 6) + ([self hasMenu]? 10: 0);
+  s.height= MAX (s.height, 24);
+  return s;
+}
+
+- (void) drawRect: (NSRect) r
+{
+  NSRect b= NSInsetRect ([self bounds], 0.5, 1.5);
+  NSBezierPath *p= [NSBezierPath bezierPathWithRoundedRect: b xRadius: 5 yRadius: 5];
+  BOOL on= [item state] == NSControlStateValueOn;
+  if ([[self cell] isHighlighted]) {
+    [[NSColor colorWithWhite: 0.0 alpha: 0.16] setFill];
+    [p fill];
+  }
+  else if (on) {
+    [[[NSColor controlAccentColor] colorWithAlphaComponent: 0.22] setFill];
+    [p fill];
+  }
+  else if (hover && [self isEnabled]) {
+    [[NSColor colorWithWhite: 0.0 alpha: 0.07] setFill];
+    [p fill];
+  }
+  if ([self hasMenu]) {
+    // the content leaves room for the chevron
+    NSImage *ch= [NSImage imageWithSystemSymbolName: @"chevron.down"
+                            accessibilityDescription: nil];
+    NSImageSymbolConfiguration *cf=
+      [NSImageSymbolConfiguration configurationWithPointSize: 8
+                                                      weight: NSFontWeightSemibold];
+    ch= [ch imageWithSymbolConfiguration: cf];
+    NSSize cs= [ch size];
+    NSRect cr= NSMakeRect (NSMaxX ([self bounds]) - cs.width - 5,
+                           NSMidY ([self bounds]) - cs.height / 2,
+                           cs.width, cs.height);
+    [ch drawInRect: cr fromRect: NSZeroRect
+         operation: NSCompositingOperationSourceOver
+          fraction: [self isEnabled]? 0.55: 0.25 respectFlipped: YES hints: nil];
+    NSRect inner= [self bounds];
+    inner.size.width -= 10;
+    [[self cell] drawInteriorWithFrame: inner inView: self];
+  }
+  else [[self cell] drawInteriorWithFrame: [self bounds] inView: self];
+  (void) r;
+}
+@end
+
 @implementation TMButtonsController
 
 - (id) init
@@ -32,6 +117,10 @@
     menuArray = [[NSMutableArray alloc] initWithCapacity:4];
     shownArray = [[NSMutableArray alloc] initWithCapacity:4];
     view = [[TMFlippedView alloc] init];
+    // a hairline below the icon bars, as below the toolbars of macOS
+    line = [[NSBox alloc] init];
+    [line setBoxType: NSBoxSeparator];
+    [view addSubview: line];
   }
   return self;
 }
@@ -41,58 +130,69 @@
   [rowArray release];
   [menuArray release];
   [shownArray release];
+  [line release];
   [view release];
   [super dealloc];
 }
 
-- (void) buttonsAction:(id) sc
+- (void) buttonAction:(TMBarButton*) b
 {
-  NSInteger idx = [sc selectedSegment];
-  NSArray *arr = [[sc cell] representedObject];
-  if (idx < 0 || idx >= (NSInteger) [arr count]) return;
-  NSMenuItem *mi = [arr objectAtIndex:idx];
+  NSMenuItem *mi = b->item;
   NSMenu *sm = [mi submenu];
   if (sm) {
-    // the menu below the segment, as the menus of the Qt tool bars
-    NSRect r = [sc bounds];
-    CGFloat x = 0;
-    for (NSInteger j = 0; j < idx; j++) x += [sc widthForSegment:j];
+    // the menu below the button
     [sm popUpMenuPositioningItem:nil
-                      atLocation:NSMakePoint (x, [sc isFlipped]?
-                                              NSMaxY (r) + 2: -2)
-                          inView:sc];
+                      atLocation:NSMakePoint (0, NSMaxY ([b bounds]) + 3)
+                          inView:b];
+    [b setNeedsDisplay: YES];
   }
   else if ([mi respondsToSelector:@selector(doit)]) [(id)mi doit];
 }
 
-- (NSSegmentedControl*) segmentFor:(NSArray*) items
+- (NSView*) buttonFor:(NSMenuItem*) mi
 {
-  NSSegmentedControl *sc = [[[NSSegmentedControl alloc] init] autorelease];
-  [sc setSegmentStyle: NSSegmentStyleTexturedSquare];
-  [sc setSegmentCount:[items count]];
-  for (NSUInteger j = 0; j < [items count]; j++) {
-    NSMenuItem *mi = [items objectAtIndex:j];
-    [sc setEnabled:[mi isEnabled] forSegment:j];
-    if ([mi representedObject]) {
-      [sc setImage:[mi representedObject] forSegment:j];
-      [sc setImageScaling: NSImageScaleProportionallyDown forSegment:j];
-      [sc setLabel:@"" forSegment:j];
-      [sc setWidth:25.0 forSegment:j];
-    }
-    else {
-      // buttons with a text instead of an icon (focus bar)
-      [sc setImage:nil forSegment:j];
-      [sc setLabel:[mi title] forSegment:j];
-      [sc setWidth:0.0 forSegment:j];
-    }
-    [(NSSegmentedCell*)[sc cell] setToolTip:[mi toolTip] forSegment:j];
+  TMBarButton *b = [[[TMBarButton alloc] init] autorelease];
+  b->item = [mi retain];
+  [b setBordered: NO];
+  [b setButtonType: NSButtonTypeMomentaryChange];
+  [b setFocusRingType: NSFocusRingTypeNone];
+  NSImage *img = [mi representedObject];
+  if (img) {
+    NSImage *small = [[img copy] autorelease];
+    NSSize s = [small size];
+    CGFloat k = MIN (1.0, 20.0 / MAX (s.width, s.height));
+    [small setSize: NSMakeSize (s.width * k, s.height * k)];
+    [b setImage: small];
+    [b setImagePosition: NSImageOnly];
+    [b setTitle: @""];
   }
-  [(NSCell*)[sc cell] setRepresentedObject:items];
-  [[sc cell] setTrackingMode: NSSegmentSwitchTrackingMomentary];
-  [sc setTarget: self];
-  [sc setAction:@selector(buttonsAction:)];
-  [sc sizeToFit];
-  return sc;
+  else {
+    NSDictionary *attrs =
+      [NSDictionary dictionaryWithObjectsAndKeys:
+        [NSFont systemFontOfSize: [NSFont smallSystemFontSize] + 1],
+        NSFontAttributeName,
+        [mi isEnabled]? [NSColor labelColor]: [NSColor tertiaryLabelColor],
+        NSForegroundColorAttributeName, nil];
+    [b setAttributedTitle: [[[NSAttributedString alloc]
+                              initWithString: [mi title] attributes: attrs]
+                             autorelease]];
+    [b setImagePosition: NSNoImage];
+  }
+  [b setEnabled: [mi isEnabled]];
+  [b setToolTip: [mi toolTip]];
+  [b setTarget: self];
+  [b setAction: @selector(buttonAction:)];
+  return b;
+}
+
+- (NSView*) separator
+{
+  NSBox *sep = [[[NSBox alloc] init] autorelease];
+  [sep setBoxType: NSBoxSeparator];
+  [sep setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [[sep.widthAnchor constraintEqualToConstant: 1] setActive: YES];
+  [[sep.heightAnchor constraintEqualToConstant: 18] setActive: YES];
+  return sep;
 }
 
 - (NSView*) rowFor:(NSMenu*) menu
@@ -100,29 +200,38 @@
   NSStackView *row = [[[NSStackView alloc] init] autorelease];
   [row setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
   [row setAlignment: NSLayoutAttributeCenterY];
-  [row setSpacing: 5.0];
-  [row setEdgeInsets: NSEdgeInsetsMake (2, 6, 2, 6)];
-  NSMutableArray *segs = [NSMutableArray array];
+  [row setSpacing: 1.0];
+  [row setEdgeInsets: NSEdgeInsetsMake (1, 8, 1, 8)];
+  BOOL first = YES, pending_sep = NO;
   NSInteger c = [menu numberOfItems];
-  for (NSInteger i = 0; i <= c; i++) {
-    NSMenuItem *mi = (i < c)? [menu itemAtIndex:i]: nil;
-    BOOL button = mi && ![mi isSeparatorItem] && ![mi view] &&
-      ([mi representedObject] || [mi submenu] || [mi action]);
-    if (button) { [segs addObject:mi]; continue; }
-    if ([segs count] > 0) {
-      [row addArrangedSubview: [self segmentFor: segs]];
-      segs = [NSMutableArray array];
-    }
-    if (!mi || [mi isSeparatorItem]) continue;
+  for (NSInteger i = 0; i < c; i++) {
+    NSMenuItem *mi = [menu itemAtIndex:i];
+    if ([mi isSeparatorItem]) { pending_sep = !first; continue; }
+    NSView *v = nil;
     if ([mi view]) {
-      NSView *v = [[[mi view] retain] autorelease];
+      v = [[[mi view] retain] autorelease];
       [mi setView:nil];
-      [row addArrangedSubview: v];
     }
+    else if ([mi representedObject] || [mi submenu] || [mi action])
+      v = [self buttonFor: mi];
     else if ([[mi title] length] > 0) {
       NSTextField *t = [NSTextField labelWithString:[mi title]];
-      [row addArrangedSubview: t];
+      [t setTextColor: [NSColor secondaryLabelColor]];
+      [t setFont: [NSFont systemFontOfSize: [NSFont smallSystemFontSize] + 1]];
+      v = t;
     }
+    if (!v) continue;
+    if (pending_sep) {
+      // the groups are separated by a thin line, with some space
+      NSView *sep = [self separator];
+      [row addArrangedSubview: sep];
+      [row setCustomSpacing: 7 afterView: [[row arrangedSubviews] objectAtIndex:
+                                             [[row arrangedSubviews] count] - 2]];
+      [row setCustomSpacing: 7 afterView: sep];
+      pending_sep = NO;
+    }
+    [row addArrangedSubview: v];
+    first = NO;
   }
   // NOTE: the row has its natural size until it is laid out
   [row setFrameSize: [row fittingSize]];
@@ -158,9 +267,10 @@
 
 - (void) layout
 {
-  // The rows from the top to the bottom, with their natural height
-  // NOTE: a little space below the title bar and above the canvas
-  CGFloat y = 6.0, w = [view frame].size.width;
+  // The rows from the top to the bottom, with their natural height, a
+  // little space below the title bar, and a hairline below the rows
+  CGFloat y = 4.0, w = [view frame].size.width;
+  BOOL any = NO;
   for (NSUInteger i = 0; i < [rowArray count]; i++) {
     NSView *row = [rowArray objectAtIndex:i];
     BOOL shown = [[shownArray objectAtIndex:i] boolValue] &&
@@ -170,11 +280,14 @@
     NSSize sz = [row fittingSize];
     // NOTE: the input fields shrink when the row is too long
     [row setFrame: NSMakeRect (0, y, w > 0? w: sz.width, sz.height)];
-    y += sz.height;
+    y += sz.height + 2.0;
+    any = YES;
   }
   NSRect r = [view frame];
-  r.size.height = y > 6.0? y + 4.0: 0.0;
+  r.size.height = any? y + 3.0: 0.0;
   [view setFrame:r];
+  [line setFrame: NSMakeRect (0, r.size.height - 1, w, 1)];
+  [line setHidden: !any];
   [view setNeedsDisplay:YES];
 }
 

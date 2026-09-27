@@ -795,6 +795,10 @@ ns_tm_widget_rep::plain_window_widget (string s, command q) {
   widget w = ns_widget_rep::plain_window_widget (s, q);
   // to manage correctly retain counts
   ns_window_widget_rep * wid = (ns_window_widget_rep *)(w.rep);
+  // the icon bars continue the title bar, as the toolbars of macOS
+  NSWindow* win= [[wid->get_windowcontroller () window] retain];
+  [win setTitlebarAppearsTransparent: YES];
+  [win release];
   return wid;
 }
 
