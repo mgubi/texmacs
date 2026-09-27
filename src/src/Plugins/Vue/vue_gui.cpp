@@ -1039,11 +1039,19 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
 #endif
       } break;
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+        // within the clipping in force (renderer_rep::clip replaces it): an
+        // element which clips may be larger than what shows it, as the
+        // contents of a dialog made smaller, and was drawn outside of it
         clip_depth++;
-        ren->clip (rcmd->boundingBox.x * ren->pixel,
-                   -(rcmd->boundingBox.y + rcmd->boundingBox.height) * ren->pixel,
-                   (rcmd->boundingBox.x + rcmd->boundingBox.width) * ren->pixel,
-                   -rcmd->boundingBox.y * ren->pixel);
+        SI x1= rcmd->boundingBox.x * ren->pixel;
+        SI y1= -(rcmd->boundingBox.y + rcmd->boundingBox.height) * ren->pixel;
+        SI x2= (rcmd->boundingBox.x + rcmd->boundingBox.width) * ren->pixel;
+        SI y2= -rcmd->boundingBox.y * ren->pixel;
+        SI ox1, oy1, ox2, oy2;
+        ren->get_clipping (ox1, oy1, ox2, oy2);
+        x1= max (x1, ox1); y1= max (y1, oy1);
+        x2= max (x1, min (x2, ox2)); y2= max (y1, min (y2, oy2));
+        ren->clip (x1, y1, x2, y2);
           break;
       }
       case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
