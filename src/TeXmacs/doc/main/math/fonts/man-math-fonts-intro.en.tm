@@ -101,7 +101,7 @@
   Bold mathematics (for instance in a bold title, or with
   <src-var|math-font-series> set to <verbatim|bold>) uses a real bold
   mathematical font when the family has one, as New Computer Modern, Kp
-  Fonts, Charter and Concrete do, and is otherwise emulated by thickening
+  Fonts, Utopia, Charter and Concrete do, and is otherwise emulated by thickening
   the strokes of the regular font. Sans serif and typewriter letters in a
   formula come from the companions of the font.
 
