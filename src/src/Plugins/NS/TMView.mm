@@ -311,9 +311,9 @@ initkeymap () {
         if (nskeymap->contains(key)) {
           r = nskeymap[key];
           r = ((mods & NSShiftKeyMask)? "S-" * modstr: modstr) * r;          
-          cout << "function key press: " << r << LF;
+          if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << r << LF;
           [self deleteWorkingText];
-          wid -> handle_keypress (r, texmacs_time());    
+          the_gui->process_keypress (wid, r, texmacs_time());
           return;
         } else if (mods & (NSControlKeyMask  | NSCommandKeyMask | NSHelpKeyMask))
         {
@@ -323,7 +323,6 @@ initkeymap () {
           r= utf8_to_cork (rr);          
           
           string s ( modstr * r);
-          cout << "modified  key press: " << s << LF;
           [self deleteWorkingText];
           
           if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << s << LF;
@@ -433,6 +432,14 @@ mouse_decode (unsigned int mstate) {
   }
 }
 
+- (BOOL) acceptsFirstMouse: (NSEvent*) event
+{
+  // NOTE: a click in an inactive window also positions the cursor, as in
+  // the Qt interface
+  (void) event;
+  return YES;
+}
+
 - (BOOL) acceptsFirstResponder
 {
 	return YES;
@@ -454,7 +461,6 @@ mouse_decode (unsigned int mstate) {
 // instead of keyDown: aString can be NSString or NSAttributedString
 {
   processingCompose = NO;
-  NSLog(@"insertText: <%@>",aString);
   
   NSString *str = [aString respondsToSelector: @selector(string)] ?
   [aString string] : aString;
@@ -486,7 +492,6 @@ mouse_decode (unsigned int mstate) {
     return;
   workingText = [str copy];
   processingCompose = YES;
-  NSLog(@"setMarkedText: <%@>",workingText);
 }
 
 - (void) unmarkText

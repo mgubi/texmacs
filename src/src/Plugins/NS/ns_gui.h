@@ -177,7 +177,8 @@ public:
   void process_keyboard_focus (ns_simple_widget_rep *wid, bool has_focus,
                                time_t t);
   void process_mouse (ns_simple_widget_rep *wid, string kind, SI x, SI y,
-                      int mods, time_t t);
+                      int mods, time_t t,
+                      array<double> data= array<double> ());
   void process_resize (ns_simple_widget_rep *wid, SI x, SI y);
   void process_command (command _cmd);
   void process_command (command _cmd, object _args);

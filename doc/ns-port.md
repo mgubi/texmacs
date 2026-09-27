@@ -20,13 +20,26 @@ compile the old `Plugins/Cocoa`), together with `Plugins/MacOS`.
 
 **TeXmacs compiles, links and starts with the NS interface:** the main window
 opens with its title, canvas and footer, the Cocoa event loop runs the
-TeXmacs update cycle, and documents are drawn correctly (text, mathematics,
-at the right scale on Retina screens). Keyboard and mouse are not tested yet,
-and the toolbars are not visible.
+TeXmacs update cycle, documents are drawn correctly (text, mathematics,
+at the right scale on Retina screens), and **documents can be edited**:
+typing (including return and backspace) and clicking to move the cursor
+work. The toolbars are not visible yet.
 
-Snapshots for testing: with `TEXMACS_NS_SNAPSHOT=<dir>`, the windows are saved
-as `<dir>/window-<i>.png` every 3 seconds (other programs are not allowed to
-capture the windows).
+Testing aids (other programs are not allowed to capture or control the
+windows):
+* `TEXMACS_NS_SNAPSHOT=<dir>`: the windows are saved as
+  `<dir>/window-<i>.png` every 3 seconds;
+* `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
+  to the canvas (`\r` is return, `\b` backspace);
+* `TEXMACS_NS_CLICK=<x>,<y>`: a click at this point of the canvas (in
+  points), before typing.
+
+For example, to check the result:
+
+```sh
+TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
+  '(delayed (:pause 5000) (display* (buffer-get-body (current-buffer))) (quit-TeXmacs))'
+```
 
 ### What was done
 
@@ -66,7 +79,9 @@ capture the windows).
 ## After compiling
 
 In order:
-1. **Keyboard** with input methods (`NSTextInputClient`) and **mouse**.
+1. **Keyboard:** input methods with `NSTextInputClient` (the view still uses
+   the deprecated `NSTextInput`), modifiers; **mouse:** right button,
+   wheel, drag selection; menus and toolbars.
    At this point documents can be edited: this is the main milestone.
 2. The `FIXME`/`NOT_IMPLEMENTED` of 2018 (about 60): arcs, alpha, images,
    mouse grab, pointer and cursor, the wait indicator, the empty and ink

@@ -103,8 +103,9 @@ ns_simple_widget_rep::handle_keyboard_focus (bool has_focus, time_t t) {
 }
 
 void
-ns_simple_widget_rep::handle_mouse (string kind, SI x, SI y, int mods, time_t t) {
-  (void) kind; (void) x; (void) y; (void) mods; (void) t;
+ns_simple_widget_rep::handle_mouse (string kind, SI x, SI y, int mods, time_t t,
+                                    array<double> data) {
+  (void) kind; (void) x; (void) y; (void) mods; (void) t; (void) data;
 }
 
 void

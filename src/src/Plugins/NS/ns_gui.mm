@@ -292,13 +292,13 @@ ns_gui_rep::process_queued_events (int max) {
         break;
       case qp_type::QP_MOUSE :
       {
-        typedef quintuple<string, SI, SI, int, time_t > T1;
+        typedef sextuple<string, SI, SI, int, time_t, array<double> > T1;
         typedef pair<widget, T1> T;
         T x = open_box <T> (ev.x2);
         if (!is_nil (x.x1))
           ((ns_simple_widget_rep*) x.x1.rep)->handle_mouse (x.x2.x1, x.x2.x2,
                                                             x.x2.x3, x.x2.x4,
-                                                            x.x2.x5);
+                                                            x.x2.x5, x.x2.x6);
       }
         break;
       case qp_type::QP_RESIZE :
@@ -358,11 +358,11 @@ ns_gui_rep::process_keyboard_focus (ns_simple_widget_rep *wid, bool has_focus,
 
 void
 ns_gui_rep::process_mouse (ns_simple_widget_rep *wid, string kind, SI x, SI y,
-                           int mods, time_t t) {
-  typedef quintuple<string, SI, SI, int, time_t > T1;
+                           int mods, time_t t, array<double> data) {
+  typedef sextuple<string, SI, SI, int, time_t, array<double> > T1;
   typedef pair<widget, T1> T;
   add_event (queued_event (qp_type::QP_MOUSE,
-                           close_box<T> (T (wid, T1 (kind, x, y, mods, t)))));
+                           close_box<T> (T (wid, T1 (kind, x, y, mods, t, data)))));
 }
 
 void
@@ -550,10 +550,78 @@ ns_snapshot (string dir) {
 }
 @end
 
+// NOTE: when the environment variable TEXMACS_NS_TYPE is set, its characters
+// are sent as key events to the key window after two seconds (\r stands for
+// return and \b for backspace), for testing the keyboard handling
+
+@interface TMTypeHelper : NSObject
+- (void) type: (NSTimer*) timer;
+@end
+
+@implementation TMTypeHelper
+- (void) type: (NSTimer*) timer
+{
+  (void) timer;
+  string click= get_env ("TEXMACS_NS_CLICK");
+  string text= get_env ("TEXMACS_NS_TYPE");
+  text= replace (replace (text, "\\r", "\r"), "\\b", "\x7f");
+  NSWindow* win= [NSApp keyWindow];
+  if (!win) win= [[NSApp windows] firstObject];
+  NSView* v= [win firstResponder];
+  // NOTE: the window does not become the key window when TeXmacs is not the
+  // active application, so that the canvas does not get the focus
+  if ([v respondsToSelector: @selector(focusIn)])
+    [v performSelector: @selector(focusIn)];
+  if (click != "" && [v isKindOfClass: [NSView class]]) {
+    // a click at the point x,y of the view which has the focus
+    int k= search_forwards (",", click);
+    NSPoint p= NSMakePoint (as_double (click (0, k)),
+                            as_double (click (k+1, N(click))));
+    p= [v convertPoint: p toView: nil];
+    for (int up=0; up<2; up++) {
+      NSEvent* e= [NSEvent mouseEventWithType: up? NSEventTypeLeftMouseUp
+                                                 : NSEventTypeLeftMouseDown
+                                     location: p
+                                modifierFlags: 0
+                                    timestamp: [[NSProcessInfo processInfo] systemUptime]
+                                 windowNumber: [win windowNumber]
+                                      context: nil
+                                  eventNumber: 0
+                                   clickCount: 1
+                                     pressure: 1.0];
+      [NSApp postEvent: e atStart: NO];
+    }
+  }
+  NSString* all= to_nsstring (text);
+  for (NSUInteger i=0; i<[all length]; i++) {
+    NSString* c= [all substringWithRange: NSMakeRange (i, 1)];
+    for (int up=0; up<2; up++) {
+      NSEvent* e= [NSEvent keyEventWithType: up? NSEventTypeKeyUp: NSEventTypeKeyDown
+                                   location: NSZeroPoint
+                              modifierFlags: 0
+                                  timestamp: [[NSProcessInfo processInfo] systemUptime]
+                               windowNumber: [win windowNumber]
+                                    context: nil
+                                 characters: c
+                charactersIgnoringModifiers: c
+                                  isARepeat: NO
+                                    keyCode: 0];
+      [NSApp postEvent: e atStart: NO];
+    }
+  }
+}
+@end
+
 void
 ns_gui_rep::event_loop () {
   [NSApp finishLaunching];
   need_update ();
+  if (get_env ("TEXMACS_NS_TYPE") != "") {
+    TMTypeHelper* h= [[TMTypeHelper alloc] init];
+    [NSTimer scheduledTimerWithTimeInterval: 2.0 target: h
+                                   selector: @selector(type:)
+                                   userInfo: nil repeats: NO];
+  }
   if (get_env ("TEXMACS_NS_SNAPSHOT") != "") {
     TMSnapshotHelper* h= [[TMSnapshotHelper alloc] init];
     [NSTimer scheduledTimerWithTimeInterval: 3.0 target: h
