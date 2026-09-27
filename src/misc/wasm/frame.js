@@ -64,8 +64,11 @@ var tmFrame = (function () {
     bar.appendChild (appButton);
     bar.appendChild (strip);
     bar.appendChild (plus);
+    // a press outside the menu closes it; not one on the TeXmacs button,
+    // whose click toggles it (else the press closed it and the click
+    // opened it again)
     document.addEventListener ('mousedown', function (e) {
-      if (menu && !menu.contains (e.target)) closeMenu ();
+      if (menu && !menu.contains (e.target) && !appButton.contains (e.target)) closeMenu ();
     });
   }
 
