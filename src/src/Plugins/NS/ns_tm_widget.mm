@@ -210,18 +210,15 @@ void ns_tm_widget_rep::updateVisibility()
 void
 ns_tm_widget_rep::send (slot s, blackbox val) {
   switch (s) {
+  // NOTE: as in the Qt interface, the canvas handles these messages
+  case SLOT_INVALIDATE:
+  case SLOT_INVALIDATE_ALL:
   case SLOT_EXTENTS:
-    {
-      check_type<coord4> (val, s);
-      coord4 p= open_box<coord4> (val);
-      NSRect rect = to_nsrect(p);
-      NSSize ws = [sv contentSize];
-      NSSize sz = rect.size;
-      sz.height = max (sz.height, ws.height );
-      //			[[view window] setContentSize:rect.size];
-      [[sv documentView] setFrameSize: sz];
-    }
-    break;
+  case SLOT_SCROLL_POSITION:
+  case SLOT_ZOOM_FACTOR:
+  case SLOT_MOUSE_GRAB:
+    if (!is_nil (main_widget)) main_widget->send (s, val);
+    return;
   case SLOT_HEADER_VISIBILITY:
     {
       check_type<bool> (val, s);
@@ -280,17 +277,6 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     }
     break;
     
-  case SLOT_SCROLL_POSITION:
-    {
-      check_type<coord2> (val, s);
-      coord2 p= open_box<coord2> (val);
-      NSPoint pt = to_nspoint(p);
-      NSSize sz = [[sv contentView] bounds].size;
-      if (DEBUG_EVENTS) cout << "Scroll position :" << pt.x << "," << pt.y << LF;
-      [[sv documentView] scrollPoint:pt];
- //     [[sv documentView] scrollRectToVisible:NSMakeRect(pt.x,pt.y,1.0,1.0)];
-    }
-    break;
     
   case SLOT_SCROLLBARS_VISIBILITY:
     // ignore this: cocoa handles scrollbars independently
@@ -307,18 +293,6 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     }
     break;
     
-  case SLOT_ZOOM_FACTOR:
-    {
-      check_type<int> (val, s);
-      simple_widget_rep *w = (simple_widget_rep *)[(TMView*)[sv documentView] widget];
-      if (w) {
-        double new_zoom = open_box<double> (val);
-        if (DEBUG_EVENTS) cout << "New zoom factor :" << new_zoom << LF;
-        w->handle_set_zoom_factor (new_zoom);
-      }
-      break;
-    }
-
   case SLOT_FILE:
     {
       check_type<string> (val, s);
@@ -338,40 +312,11 @@ blackbox
 ns_tm_widget_rep::query (slot s, int type_id) {
   switch (s) {
   case SLOT_SCROLL_POSITION:
-    {
-      check_type_id<coord2> (type_id, s);
-      NSPoint pt = [[sv documentView] frame].origin;
-      if (DEBUG_EVENTS)
-        cout << "Position (" << pt.x << "," << pt.y << ")\n"; 
-      return close_box<coord2> (from_nspoint(pt));
-    }
-        
   case SLOT_EXTENTS:
-    {
-      check_type_id<coord4> (type_id, s);
-      NSRect rect= [[sv documentView] frame];
-      coord4 c= from_nsrect (rect);
-      if (DEBUG_EVENTS) cout << "Canvas geometry (" << rect.origin.x 
-        << "," << rect.origin.y
-        << "," << rect.size.width
-        << "," << rect.size.height
-        << ")" << LF;
-      return close_box<coord4> (c);
-    }
-        
-        
   case SLOT_VISIBLE_PART:
-    {
-      check_type_id<coord4> (type_id, s);
-      NSRect rect= [sv documentVisibleRect];
-      coord4 c= from_nsrect (rect);
-      if (DEBUG_EVENTS) cout << "Visible region (" << rect.origin.x 
-        << "," << rect.origin.y
-        << "," << rect.size.width
-        << "," << rect.size.height
-        << ")" << LF;
-      return close_box<coord4> (c);
-    }
+  case SLOT_ZOOM_FACTOR:
+    if (!is_nil (main_widget)) return main_widget->query (s, type_id);
+    return ns_view_widget_rep::query (s, type_id);
 
         
   case SLOT_USER_ICONS_VISIBILITY:

@@ -108,8 +108,8 @@ ns_renderer_rep::end () {
 }
 
 void
-ns_renderer_rep::set_zoom_factor (double zoom) {
-    renderer_rep::set_zoom_factor (retina_factor * zoom);
+ns_renderer_rep::set_zoom_factor (double zoom, bool safe) {
+    renderer_rep::set_zoom_factor (retina_factor * zoom, safe);
     retina_pixel= pixel * retina_factor;
 }
 

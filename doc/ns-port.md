@@ -20,8 +20,9 @@ compile the old `Plugins/Cocoa`), together with `Plugins/MacOS`.
 
 **TeXmacs compiles, links and starts with the NS interface:** the main window
 opens with its title, canvas and footer, the Cocoa event loop runs the
-TeXmacs update cycle, and no error occurs during startup. The document is not
-drawn yet (the canvas stays grey) and the toolbars are not visible.
+TeXmacs update cycle, and documents are drawn correctly (text, mathematics,
+at the right scale on Retina screens). Keyboard and mouse are not tested yet,
+and the toolbars are not visible.
 
 Snapshots for testing: with `TEXMACS_NS_SNAPSHOT=<dir>`, the windows are saved
 as `<dir>/window-<i>.png` every 3 seconds (other programs are not allowed to
@@ -51,7 +52,11 @@ capture the windows).
 
 ### Known gaps (FIXME in the code)
 
-* the canvas is not painted; toolbars not visible;
+* toolbars not visible; the view is redrawn at each update even without
+  changes;
+* the backing store has the size of the whole document (the Qt interface
+  uses a canvas of the size of the visible part, which scales to long
+  documents);
 * menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
 * views: tabs, choice lists, refreshable widgets, tree views, resize sizes;
 * color picker and printing; picture effects and patterns;
@@ -61,8 +66,7 @@ capture the windows).
 ## After compiling
 
 In order:
-1. **Paint the canvas:** rendering (with Retina scaling), then keyboard
-   with input methods (`NSTextInputClient`) and mouse.
+1. **Keyboard** with input methods (`NSTextInputClient`) and **mouse**.
    At this point documents can be edited: this is the main milestone.
 2. The `FIXME`/`NOT_IMPLEMENTED` of 2018 (about 60): arcs, alpha, images,
    mouse grab, pointer and cursor, the wait indicator, the empty and ink

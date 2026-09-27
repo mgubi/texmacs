@@ -203,7 +203,14 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       check_type<coord4>(val, s);
       coord4 p = open_box<coord4> (val);
       NSRect rect = to_nsrect (p);
-      [view setFrame: rect];
+      // NOTE: the canvas fills at least the visible part of the scroll view
+      NSScrollView* sv= [view enclosingScrollView];
+      if (sv) {
+        NSSize ws= [sv contentSize];
+        rect.size.width = max (rect.size.width , ws.width );
+        rect.size.height= max (rect.size.height, ws.height);
+      }
+      [view setFrameSize: rect.size];
     }
       break;
       
@@ -219,13 +226,12 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2  p = open_box<coord2> (val);
+      // NOTE: p is the center of the visible part (see qt_simple_widget_rep)
       NSPoint pt = to_nspoint(p);
-      NSSize sz = [view bounds].size;
+      NSSize sz = [view visibleRect].size;
       pt.y -= sz.height/2;
       pt.x -= sz.width/2;
-      // NOTE: adjust because child is centered
-      //[view scrollPoint:pt];
-      [view scrollRectToVisible: NSMakeRect (pt.x,pt.y,1.0,1.0)];
+      [view scrollPoint: pt];
     }
       break;
       
@@ -327,7 +333,8 @@ ns_simple_widget_rep::query (slot s, int type_id) {
     case SLOT_SCROLL_POSITION:
     {
       check_type_id<coord2> (type_id, s);
-      NSRect rect = [view frame];
+      // The origin of the visible part (see qt_simple_widget_rep)
+      NSRect rect = [view visibleRect];
       return close_box<coord2> (from_nspoint (rect.origin));
     }
       

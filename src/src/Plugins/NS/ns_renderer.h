@@ -21,7 +21,7 @@ public:
   ns_renderer_rep (int w = 0, int h = 0);
   ~ns_renderer_rep ();
     
-  void set_zoom_factor (double zoom);
+  void set_zoom_factor (double zoom, bool safe= true);
     
   void begin (void* handle);
   void end ();

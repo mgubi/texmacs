@@ -203,7 +203,17 @@ initkeymap () {
 
 - (void) drawRect: (NSRect)rect
 {
-  [wid->backingPixmap drawInRect: rect];
+  // Copy the corresponding part of the backing store, which has
+  // retina_factor pixels per point; the view is flipped, and so is the
+  // backing store, so that the coordinates correspond directly
+  if (!wid || !wid->backingPixmap) return;
+  NSRect src= NSMakeRect (rect.origin.x * retina_factor,
+                          rect.origin.y * retina_factor,
+                          rect.size.width * retina_factor,
+                          rect.size.height * retina_factor);
+  [wid->backingPixmap drawInRect: rect fromRect: src
+                       operation: NSCompositingOperationCopy
+                        fraction: 1.0 respectFlipped: NO hints: nil];
 }
 
 #if 0
