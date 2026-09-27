@@ -31,7 +31,7 @@ var tmProgress = (function () {
     #tm-loading .tm-title { font-weight:bold; font-size:17px; margin-bottom:4px }
     #tm-loading .tm-about { font-size:12px; color:#555; margin-bottom:12px }
     #tm-loading .tm-badge { display:inline-block; margin-left:8px; padding:1px 6px;
-      font-size:11px; font-weight:normal; color:#8a4b00; background:#ffe9c7; border:1px solid #e8b56b;
+      font-size:11px; font-weight:normal; color:#1f4e8c; background:#e3eefc; border:1px solid #9cbce8;
       border-radius:8px; vertical-align:middle }
     #tm-loading .tm-phase { margin-bottom:8px }
     #tm-loading .tm-bar { height:8px; background:#d4d4d4; border-radius:4px; overflow:hidden;

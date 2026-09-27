@@ -42,7 +42,7 @@ var tmFrame = (function () {
       font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222; z-index:30; padding:6px 0 }
     #tm-menu .tm-head { padding:8px 14px 4px; font-weight:bold; font-size:14px }
     #tm-menu .tm-badge, #tm-loading .tm-badge { display:inline-block; margin-left:8px; padding:1px 6px;
-      font-size:11px; font-weight:normal; color:#8a4b00; background:#ffe9c7; border:1px solid #e8b56b;
+      font-size:11px; font-weight:normal; color:#1f4e8c; background:#e3eefc; border:1px solid #9cbce8;
       border-radius:8px; vertical-align:middle }
     #tm-menu .tm-text { padding:2px 14px; color:#444 }
     #tm-menu .tm-sep { height:1px; background:#ccc; margin:6px 0 }
