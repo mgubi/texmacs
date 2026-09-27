@@ -16,6 +16,9 @@ tree. Re-run it when fonts are updated:
 tests/opentype/survey-math-fonts.py -t /path/to/unicode-math-table.scm *.otf
 ```
 
+Give it math fonts only: on a font without vertical variants, such as
+Concrete-Math-Bold, the script stops with an error.
+
 ## 1. What matters for TeXmacs
 
 For a math font to work well in TeXmacs we need, in decreasing order of
@@ -48,7 +51,8 @@ Symbols is the coverage of the `unicode-math` list, alnum the coverage of
 the Mathematical Alphanumeric Symbols block (996 assigned code points), ops
 the Mathematical Operators block. Kern info is the number of glyphs with
 MathKernInfo; vert (asm) the number of glyphs with vertical variants and how
-many of them have an assembly. Most fonts have `ssty` (script-style
+many of them have an assembly; the GPOS column names the `kern` and `mark`
+features only. Most fonts have `ssty` (script-style
 alternates) and `dtls` (dotless i and j); XITS Math Bold and Libertinus Math
 have `ssty` but no `dtls`, and STIX Math v1 has neither.
 
@@ -95,9 +99,11 @@ MathGlyphVariantRecord of a glyph is the glyph itself, parentheses,
 brackets, braces, bars, radicals and integrals have both size variants and
 an assembly, and summation has two sizes without an assembly. But the first
 record is not the base glyph for the parentheses, brackets and braces of
-XCharter Math and Concrete Math, nor for the bar of STIX Math v1 and XITS
-Math Bold; the integrals have no assembly in Latin Modern Math, STIX Math v1,
-both XITS weights, Libertinus Math, Fira Math, Garamond Math and Neo Euler;
+XCharter Math and Concrete Math, for the parenthesis and the radical of
+KpMath Sans, nor for the bar of STIX Math v1 and XITS Math Bold; the
+integrals have no assembly in Latin Modern Math, STIX Math v1, both XITS
+weights, Libertinus Math, Fira Math, Garamond Math, Neo Euler and the bold
+weights of KpMath;
 the bar has no vertical variants in STIX Math v1 and XITS Math Bold, which
 also has none for the radical and no assembly for the parentheses; and Asana
 Math gives summation four sizes. STIX Math v1 is the outlier overall: no
@@ -124,7 +130,7 @@ through Metafont, so this is the natural OpenType default and the reference
 against which to compare TeXmacs's own TeX-based layout. Quirk seen in the
 samples: the radical sign is drawn so that its top edge is the rule, and its
 `radicalExtraAscender` of 40 design units is the smallest of the fonts
-measured, so a gap between the sign and the rule shows immediately. This is
+measured (New Computer Modern Math and Euler Math have 40 too), so a gap between the sign and the rule shows immediately. This is
 what the radical junction of 22 September 2026 fixed. *Now: shipped
 (`lm`), with LM Roman, Sans and Mono; menu entry "Latin Modern".*
 
@@ -263,16 +269,17 @@ now carry what the OpenType math fonts need, and the menus of
 `fonts-opentype.scm` list them:
 
 - `unicode_font.cpp`: the constructor ladder that installs hand-tuned
-  script corrections for STIX, TeX Gyre, Papyrus, Libertine, Biolinum and
-  Fira from the `adjust_*.cpp` files, and the `tex_gyre_operators` table
+  script corrections for STIX, TeX Gyre, Libertine, Biolinum and Fira from
+  the `adjust_*.cpp` files and for Papyrus inline, and the `tex_gyre_operators` table
   of glyphs without Unicode names.
 - `font.cpp`: `get_math_type` from the file name prefix, and
   `make_rubber_font`, which selects `rubber_stix_font` by name.
 - `rubber_stix_font.cpp`: knows the STIX size fonts (`STIXSizeOneSym`,
   `STIXIntegralsD`, ...) by file name.
-- `smart_font.cpp`: `is_math_family` (fixed list), and `tex_gyre_fix`,
-  `kepler_fix` and `math_fix`, which append " Math" to the family for math
-  shapes (`stix_fix` exists but every call is commented out);
+- `smart_font.cpp`: `is_math_family` (fixed list), and `tex_gyre_fix` and
+  `kepler_fix`, which append " Math" to the family for math shapes, with
+  `math_fix` applying them inside `math=` rules (`stix_fix` exists but every
+  call is commented out);
   `supports_big_operators` in `poor_rubber.cpp`.
 - `font_translate.cpp`: the map from legacy names (`math-stix`,
   `math-pagella`, `math-asana`, ...) to database family names.
@@ -361,7 +368,9 @@ What each field replaces:
   `MATH_TYPE_TEX_GYRE`. Each quirk has a name so that it is greppable.
 
 Activation stays generic: any font with a MATH table gets
-`MATH_TYPE_OPENTYPE` and the table-driven layout. The profile only adds
+`MATH_TYPE_OPENTYPE` and the table-driven layout, unless a hand-tuned branch
+of the constructor ladder claims it while the hand tuning is on (STIX, the
+TeX Gyre fonts, TeX Gyre DejaVu Math among them, Libertine, Fira). The profile only adds
 knowledge that is not in the font. A font without a profile (Cambria Math,
 a new release) still works with defaults: `letters text`, alphabets
 detected from the cmap, no cap.
@@ -470,7 +479,7 @@ Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
 `TeXmacs/progs/fonts/fonts-opentype.scm` activate when the files are
 found, and the font menus list exactly the profiled fonts that are
 installed. New Computer Modern Sans Math is profiled for that reason and
-not shipped (2.6 MB with its text faces). TeX Gyre DejaVu Math (serif
+not shipped (2.4 MB with its text faces). TeX Gyre DejaVu Math (serif
 section) and Lete Sans Math (sans serif section) are profiled and offered
 when installed, and XITS, Asana, IBM Plex, Garamond, Old Standard and GFS
 Neohellenic in the submenu of other fonts.
