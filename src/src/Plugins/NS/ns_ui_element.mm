@@ -9,6 +9,7 @@
  ******************************************************************************/
 
 #include "mac_cocoa.h"
+#import <objc/runtime.h>
 #include "ns_ui_element.h"
 #include "ns_menu.h"
 #include "ns_picture.h"
@@ -260,15 +261,19 @@ ns_refresh_state::recompute (string what) {
  * Choice lists (see QTMListView)
  ******************************************************************************/
 
-@interface TMChoiceList : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+@interface TMChoiceList : NSObject <NSTableViewDataSource, NSTableViewDelegate,
+                                    NSSearchFieldDelegate>
 {
   command_rep* cmd;
-  NSArray* items;
+  NSArray* all;      // all the items
+  NSArray* items;    // the items which pass the filter
   BOOL multiple;
+  BOOL filtering;
   NSTableView* table;
 }
 - (id) initWithItems: (NSArray*) its command: (command_rep*) c
             multiple: (BOOL) m table: (NSTableView*) t;
+- (void) setFilter: (NSString*) f;
 @end
 
 @implementation TMChoiceList
@@ -277,15 +282,54 @@ ns_refresh_state::recompute (string what) {
 {
   self= [super init];
   if (self) {
-    items= [its retain]; cmd= c; INC_COUNT_NULL (cmd);
+    all= [its retain]; items= [its retain]; cmd= c; INC_COUNT_NULL (cmd);
     multiple= m; table= t;
   }
   return self;
 }
 - (void) dealloc
 {
-  [items release]; DEC_COUNT_NULL (cmd);
+  [all release]; [items release]; DEC_COUNT_NULL (cmd);
   [super dealloc];
+}
+- (void) setFilter: (NSString*) f
+{
+  // As QTMListView::setFilterRegularExpression (case insensitive)
+  NSMutableArray* a= [NSMutableArray array];
+  NSRegularExpression* re= nil;
+  if ([f length] > 0)
+    re= [NSRegularExpression regularExpressionWithPattern: f
+          options: NSRegularExpressionCaseInsensitive error: nil];
+  for (NSString* it in all) {
+    if ([f length] == 0) [a addObject: it];
+    else if (re) {
+      if ([re firstMatchInString: it options: 0
+                           range: NSMakeRange (0, [it length])])
+        [a addObject: it];
+    }
+    else if ([it rangeOfString: f options: NSCaseInsensitiveSearch].location
+             != NSNotFound)
+      [a addObject: it];
+  }
+  // the selected values remain selected (without calling the command)
+  NSMutableSet* chosen= [NSMutableSet set];
+  NSIndexSet* sel= [table selectedRowIndexes];
+  for (NSUInteger i= [sel firstIndex]; i != NSNotFound;
+       i= [sel indexGreaterThanIndex: i])
+    if (i < [items count]) [chosen addObject: [items objectAtIndex: i]];
+  [items release];
+  items= [a retain];
+  filtering= YES;
+  [table reloadData];
+  NSMutableIndexSet* nsel= [NSMutableIndexSet indexSet];
+  for (NSUInteger i=0; i<[items count]; i++)
+    if ([chosen containsObject: [items objectAtIndex: i]]) [nsel addIndex: i];
+  [table selectRowIndexes: nsel byExtendingSelection: NO];
+  filtering= NO;
+}
+- (void) controlTextDidChange: (NSNotification*) n
+{
+  [self setFilter: [[n object] stringValue]];
 }
 - (NSInteger) numberOfRowsInTableView: (NSTableView*) tv
 {
@@ -299,7 +343,7 @@ ns_refresh_state::recompute (string what) {
 - (void) tableViewSelectionDidChange: (NSNotification*) n
 {
   (void) n;
-  if (!cmd) return;
+  if (!cmd || filtering) return;
   NSIndexSet* sel= [table selectedRowIndexes];
   object l= null_object ();
   if (multiple) {
@@ -316,7 +360,8 @@ ns_refresh_state::recompute (string what) {
 @end
 
 static NSView*
-choice_list (command cmd, array<string> vals, array<string> chosen, bool multiple) {
+choice_list (command cmd, array<string> vals, array<string> chosen, bool multiple,
+             string filter= "", bool filtered= false) {
   NSMutableArray* its= [NSMutableArray array];
   for (int i=0; i<N(vals); i++) [its addObject: to_label (vals[i])];
   NSTableView* t= [[[NSTableView alloc] init] autorelease];
@@ -341,6 +386,123 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
   [sv setTranslatesAutoresizingMaskIntoConstraints: NO];
   [[sv.heightAnchor constraintGreaterThanOrEqualToConstant: 120] setActive: YES];
   [[sv.widthAnchor constraintGreaterThanOrEqualToConstant: 200] setActive: YES];
+  if (!filtered) return sv;
+  // a filter above the list (see the Qt interface)
+  NSSearchField* f= [[[NSSearchField alloc] init] autorelease];
+  [f setStringValue: to_label (filter)];
+  [f setDelegate: ds];
+  [ds setFilter: [f stringValue]];
+  NSStackView* st= [NSStackView stackViewWithViews:
+                     [NSArray arrayWithObjects: f, sv, nil]];
+  [st setOrientation: NSUserInterfaceLayoutOrientationVertical];
+  [st setAlignment: NSLayoutAttributeLeading];
+  [st setSpacing: 2];
+  [[f.widthAnchor constraintEqualToAnchor: sv.widthAnchor] setActive: YES];
+  return st;
+}
+
+/******************************************************************************
+ * Tree views (see QTMTreeView)
+ ******************************************************************************/
+
+@interface TMTreeNode : NSObject
+{
+@public
+  tree t;
+  NSMutableArray* kids;
+}
+@end
+
+@implementation TMTreeNode
+- (void) dealloc { [kids release]; [super dealloc]; }
+- (NSString*) label
+{
+  if (is_atomic (t)) return to_label (t->label);
+  return to_label (as_string (L(t)));
+}
+- (NSArray*) children
+{
+  if (!kids) {
+    kids= [[NSMutableArray alloc] init];
+    if (is_compound (t))
+      for (int i=0; i<N(t); i++) {
+        TMTreeNode* n= [[[TMTreeNode alloc] init] autorelease];
+        n->t= t[i];
+        [kids addObject: n];
+      }
+  }
+  return kids;
+}
+@end
+
+@interface TMTreeList : NSObject <NSOutlineViewDataSource, NSOutlineViewDelegate>
+{
+@public
+  command_rep* cmd;
+  TMTreeNode* root;
+  NSOutlineView* view;
+}
+@end
+
+@implementation TMTreeList
+- (void) dealloc { DEC_COUNT_NULL (cmd); [root release]; [super dealloc]; }
+- (NSInteger) outlineView: (NSOutlineView*) ov numberOfChildrenOfItem: (id) item
+{
+  (void) ov;
+  return [[(item? item: root) children] count];
+}
+- (id) outlineView: (NSOutlineView*) ov child: (NSInteger) i ofItem: (id) item
+{
+  (void) ov;
+  return [[(item? item: root) children] objectAtIndex: i];
+}
+- (BOOL) outlineView: (NSOutlineView*) ov isItemExpandable: (id) item
+{
+  (void) ov;
+  return [[item children] count] > 0;
+}
+- (id) outlineView: (NSOutlineView*) ov objectValueForTableColumn: (NSTableColumn*) c
+            byItem: (id) item
+{
+  (void) ov; (void) c;
+  return [item label];
+}
+- (void) outlineViewSelectionDidChange: (NSNotification*) n
+{
+  // the command gets the subtree (there are no roles yet) and -1, as in Qt
+  (void) n;
+  id item= [view itemAtRow: [view selectedRow]];
+  if (!cmd || !item) return;
+  command c (cmd);
+  c (list_object (object (((TMTreeNode*) item)->t), object (-1)));
+}
+@end
+
+static NSView*
+tree_view (command cmd, tree data) {
+  NSOutlineView* ov= [[[NSOutlineView alloc] init] autorelease];
+  NSTableColumn* col= [[[NSTableColumn alloc] initWithIdentifier: @"t"] autorelease];
+  [col setWidth: 250];
+  [ov addTableColumn: col];
+  [ov setOutlineTableColumn: col];
+  [ov setHeaderView: nil];
+  TMTreeList* ds= [[TMTreeList alloc] init];
+  ds->cmd= cmd.rep; INC_COUNT_NULL (ds->cmd);
+  ds->root= [[TMTreeNode alloc] init];
+  ds->root->t= data;
+  ds->view= ov;
+  // NOTE: the data source lives as long as the view
+  objc_setAssociatedObject (ov, "TMTreeList", ds, OBJC_ASSOCIATION_RETAIN);
+  [ds release];
+  [ov setDataSource: ds];
+  [ov setDelegate: ds];
+  [ov reloadData];
+  NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+  [sv setDocumentView: ov];
+  [sv setHasVerticalScroller: YES];
+  [sv setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [[sv.heightAnchor constraintGreaterThanOrEqualToConstant: 150] setActive: YES];
+  [[sv.widthAnchor constraintGreaterThanOrEqualToConstant: 250] setActive: YES];
   return sv;
 }
 
@@ -832,8 +994,8 @@ ns_ui_element_rep::as_nsview () {
 
     case tabs_widget: case icon_tabs_widget:
     {
-      // FIXME: the icons of icon_tabs_widget
       array<widget> tabs, bodies;
+      array<url> icons;
       if (type == tabs_widget) {
         typedef pair<array<widget>, array<widget> > T;
         T x= open_box<T> (load);
@@ -842,7 +1004,7 @@ ns_ui_element_rep::as_nsview () {
       else {
         typedef triple<array<url>, array<widget>, array<widget> > T;
         T x= open_box<T> (load);
-        tabs= x.x2; bodies= x.x3;
+        icons= x.x1; tabs= x.x2; bodies= x.x3;
       }
       NSTabView* tv= [[[NSTabView alloc] init] autorelease];
       for (int i=0; i < min (N(tabs), N(bodies)); i++) {
@@ -862,7 +1024,26 @@ ns_ui_element_rep::as_nsview () {
         }
         [tv addTabViewItem: it];
       }
-      return tv;
+      if (type == tabs_widget) return tv;
+      // the icon tabs: a segmented control with the icons above the tabs
+      [tv setTabViewType: NSNoTabsBezelBorder];
+      NSSegmentedControl* sc= [[[NSSegmentedControl alloc] init] autorelease];
+      NSInteger n= [tv numberOfTabViewItems];
+      [sc setSegmentCount: n];
+      for (NSInteger i=0; i<n; i++) {
+        [sc setLabel: [[tv tabViewItemAtIndex: i] label] forSegment: i];
+        if (i < N(icons)) [sc setImage: to_nsimage (icons[i]) forSegment: i];
+        [sc setImageScaling: NSImageScaleProportionallyDown forSegment: i];
+      }
+      [sc setSelectedSegment: 0];
+      [sc setTarget: tv];
+      [sc setAction: @selector(takeSelectedTabViewItemFromSender:)];
+      NSStackView* st= [NSStackView stackViewWithViews:
+                         [NSArray arrayWithObjects: sc, tv, nil]];
+      [st setOrientation: NSUserInterfaceLayoutOrientationVertical];
+      [st setAlignment: NSLayoutAttributeCenterX];
+      [[tv.widthAnchor constraintEqualToAnchor: st.widthAnchor] setActive: YES];
+      return st;
     }
 
     case choice_widget:
@@ -874,16 +1055,21 @@ ns_ui_element_rep::as_nsview () {
 
     case filtered_choice_widget:
     {
-      // FIXME: the filter field
       typedef quartet<command, array<string>, string, string> T;
       T x= open_box<T> (load);
       array<string> chosen;
       chosen << x.x3;
-      return choice_list (x.x1, x.x2, chosen, false);
+      return choice_list (x.x1, x.x2, chosen, false, x.x4, true);
+    }
+
+    case tree_view_widget:
+    {
+      typedef triple<command, tree, tree> T;
+      T x= open_box<T> (load);
+      return tree_view (x.x1, x.x2);
     }
 
     default:
-      // FIXME: tree views
       return placeholder (type_as_string ());
   }
 }
