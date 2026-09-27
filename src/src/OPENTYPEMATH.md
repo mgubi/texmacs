@@ -148,6 +148,20 @@ environment variable `font-features`, from `Document > Font > Features`,
 `Format > Font features` and a column of the font browser, which lists the
 features of the font it will really use.
 
+**Seeing what the font system decides** (`Graphics/Fonts/smart_font.cpp`,
+`TeXmacs/progs/fonts/font-debug.scm`). Emulation is how TeXmacs lets any
+font be used for mathematics, so the question is less whether a glyph is
+emulated than being able to see it. `Tools > Fonts > Font inspector` opens a window that stays above the
+editor windows, follows the cursor or the mouse and reports the route, the
+file and the MATH path of one glyph, read from the routing tables without
+resolving anything. From it, the glyphs can be coloured by the route they
+took (the debug switch `fonts`, which acts on drawing only) and the font
+report opened, a document attached to the document being edited
+(`tmfs://fontdbg/...`), which lists every
+character of the typeset document by route and says which emulated glyphs a
+PDF export draws as bitmaps. With the tools off, layout is untouched and
+drawing tests one flag per string.
+
 **Documentation in TeXmacs.** `Help > Manual > Fonts` gathers the page on
 choosing fonts, the user section *Mathematical fonts*
 (`TeXmacs/doc/main/math/fonts/`: how the math fonts work, every shipped font
